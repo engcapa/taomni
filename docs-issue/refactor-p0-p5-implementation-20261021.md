@@ -598,3 +598,18 @@ Presto、SDK detect、ACP wire protocol、SSH server、scroll capture、structur
 Q 三端运行补齐到 14 份原始报告，签名/hash/stable identity 通过，统一指纹 e38f477021ef029d0a305761c0922fa8c5b133c66233490742ebf118253b0cff：browser 三平台各18 passed，Linux native28 passed，macOS native22 passed/1 failed；Windows native 尚在构建。macOS PERF-03 的 fps_ratio=0.698785 未达到0.85，带宽比1.079894符合1.15门槛；两轮动画源帧率也不匹配，继续诊断并保留原失败，未放宽15%门槛。
 
 S browser 首轮 `browser-s/run-20261022-030828-201851151`：**8 passed / 2 failed / 0 skipped**。C8-01 在打开 appearance settings 后页面重新导航，LAYOUT-01 在 welcome 可见性处失败且 console 有重复 createRoot 记录，不能确定其具体触发源；不将其直接归因于宿主负载。源码和断言不变，单 worker `browser-s-recheck` 的上述两项 **2 passed / 0 failed / 0 skipped**，保留首轮失败。两轮 receipt 签名、summary hash、stable identity 通过，源码指纹 fe59d5f080736171eff4104ac337cbcb6822c5a568fdddf1322b1e5ca21ee9e2。SocksCap preview 的实际 assertions 已复用，browser 不证明系统捕获。尚余 142 个 >800 行文件（含生成/locale/测试），整体继续推进。
+
+## 2026-10-22 实施批次 T：会话、传输、HBase、分组与查找生命周期
+
+11 个 Rust 入口拆出 93 个实现/测试模块：LSP session、terminal、database、VNC RFB、SocksCap redirector runtime、DAP、LanChat transport、HBase native client、截图 capture、SFTP 和 RDP WebSocket。最大生产模块 LSP startup 442 行；保留既有子模块路径、public API 和命令 helpers。实例方法按职责拆分，仍使用同一个 session/client/self、pending map、writer、cancel token、frame/flow queue 和 listener；未复制共享状态。协议协商、认证、请求、读取/写入、重连、事务、下载/上传和清理分别归属。
+
+HBaseShellTab 1399→323 行、EditorGroup 1251→654 行、FindInFilesPanel 1344→526 行，16 个新前端模块最大 509 行。HBase workspace 拥有 panels/editor handles/flush/autosave，execution 保留串行执行及 finally timer cleanup；分组 tabs 保留顺序、固定、滚动、ResizeObserver 和 active reveal cleanup；查找 lifetime 持有 search ID/listener/cache，替换动作使用原 preview/prepare token/abort refs，拒绝过时结果和取消语义不变。
+
+- `t-rust-final-2.log`：lib **1868 passed / 0 failed / 25 ignored**，integration **80 passed / 0 failed**。对所有 cfg alternatives，402 个生产函数经同样 rustfmt 规范化后 token 对照一致。静态一致性不代替三平台运行。
+- `t-ui-tests.log`：HBaseShellTab、EditorGroup、FindInFilesPanel 和 CodeWorkspaceTab 原组合 **4 files / 317 passed**。`t-build-final.log` 完整类型检查及 production build 通过；761 commands / 328 façade exports / 39 literal events 契约、693 implementation modules 边界检查通过。清单更新为 3180 项。
+- `browser-t/run-20261022-033430-521245373`：Linux Chromium、单 worker，**10 passed / 0 failed / 0 skipped**。覆盖 HBase 离线查询库、tab policy、分栏布局、replace preview/exclude/cancel、输入焦点、replace undo、正式 tab 导航和 Find/Replace。receipt 签名、summary hash、stable identity 核验通过；summary SHA256 `7112b012d5b3b66b3a703542fb92a0a6af44e61320dff6a8c07db7b76c1abe01`，source identity `114ea2ab8be1e81930eff7185993c03524b73f6eefdcb722e8257ccaf3b9e4d1`。
+- 初期 Rust inherited import/trait/doc scope 错误和 TS 嵌套 import-type 的 unused 诊断均已修；最终成功日志明确如上，原失败与主动停止记录保留。未新增仅验证文件搬迁的重复测试，原生网络、协议和系统行为继续由最终完整 SHA 的三端场景验证。
+
+Q 三端最终结果：[39652904042](https://github.com/engcapa/taomni/actions/runs/39652904042)，完整 head `53d56b407df41966e8ed8a2dcd4f887ae1e5c0e7`。18 份原始 reports 签名/hash/stable identity 通过，统一身份 `e38f477021ef029d0a305761c0922fa8c5b133c66233490742ebf118253b0cff`。Linux browser18/native28、Windows browser18/native25、macOS browser18/native22 passed + 1 failed，合计 **129 passed / 1 failed / 0 skipped**。workflow 为 failure，不能以 native 执行 job 成功称整体通过。失败保留为 macOS `TC-RDPS-PERF-03-photo-content`：fps_ratio=0.698785121 未达到0.85；kbps_per_frame_ratio=1.079893889 符合1.15门槛；source animation 两轮帧率也不匹配。保留原采样和截图，未以归一化指标替换失败或放宽15%容差。
+
+S selected 三端运行 [39659861812](https://github.com/engcapa/taomni/actions/runs/39659861812) 绑定完整提交 `209f134f58b2be8efbdd272fcb1053ee7a1ed535`，包含63个 IDs，当前尚未收齐原始报告。整体 P0→P5 仍须处理其余大文件，并完成最终完整提交的全量回归与三端 scope=all。

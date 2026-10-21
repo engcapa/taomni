@@ -6,6 +6,9 @@ import ts from "typescript";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // These are implementation modules, not alternate application entry points.
 const boundaries = [
+  ["src/components/database/hbase", "src/components/database/HBaseShellTab.tsx"],
+  ["src/components/editor/workspace/group", "src/components/editor/workspace/EditorGroup.tsx"],
+  ["src/components/editor/workspace/panels/findInFiles", "src/components/editor/workspace/panels/FindInFilesPanel.tsx"],
   ["src/components/chat/drawer", "src/components/chat/ChatDrawer.tsx"],
   ["src/components/git/diff", "src/components/git/DiffViewer.tsx"],
   ["src/components/agent/bridge", "src/components/agent/CcAgentBridge.tsx"],
