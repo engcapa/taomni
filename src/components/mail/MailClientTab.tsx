@@ -1,125 +1,10 @@
 import { MailMutationError, MailMutationSession } from "../../lib/mailMutations";
 import { MailArchivePanel } from "./MailArchivePanel";
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type SetStateAction, type UIEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent, type SetStateAction, type UIEvent } from "react";
 import { isRecoveryStartup } from "../../lib/runtimeRecovery";
-import {
-  Group as PanelGroup,
-  Panel,
-  Separator as PanelResizeHandle,
-  type PanelImperativeHandle,
-  type PanelSize,
-} from "react-resizable-panels";
-import {
-  AlertTriangle,
-  Archive,
-  Ban,
-  BookUser,
-  Bot,
-  CalendarDays,
-  CheckCircle2,
-  ChevronDown,
-  Code,
-  Copy,
-  Download,
-  ExternalLink,
-  FileText,
-  Filter as FilterIcon,
-  Folder,
-  FolderInput,
-  FolderPlus,
-  FolderSymlink,
-  FolderX,
-  Forward,
-  Image as ImageIcon,
-  ImageOff,
-  Inbox,
-  Link as LinkIcon,
-  ListChecks,
-  Loader2,
-  Mail as MailIcon,
-  MailOpen,
-  MessageSquareReply,
-  Paperclip,
-  PenLine,
-  Printer,
-  RefreshCw,
-  Save,
-  Search,
-  Send,
-  ShieldCheck,
-  Sparkles,
-  Star,
-  Tag,
-  Trash2,
-  X,
-  ZoomIn,
-  ZoomOut,
-} from "lucide-react";
-import type { MailIdentity, MailTabInfo } from "../../types";
-import {
-  mailClearCache,
-  mailCopyMessages,
-  mailCreateFolder,
-  mailDeleteFolder,
-  mailDeleteMessages,
-  mailDownloadAttachment,
-  mailExportMbox,
-  isMailCertificateError,
-  mailProbeCertificate,
-  mailImportMessages,
-  mailFetchRaw,
-  mailSendReceipt,
-  MAIL_MDN_SENT,
-  mailGetInvite,
-  mailRespondInvite,
-  mailGetMessageBody,
-  mailPrefetchMessageBody,
-  mailIdleStart,
-  mailIdleStop,
-  mailIndexCachedContacts,
-  mailDeleteDraft,
-  mailDiscardRemoteDraft,
-  mailStoreRemoteDraft,
-  mailListDrafts,
-  mailListFolders,
-  mailListCachedFolders,
-  mailListCachedMessages,
-  mailSaveDraft,
-  mailMarkRead,
-  mailMoveMessages,
-  mailRenameFolder,
-  mailSaveRaw,
-  mailSendMessage,
-  mailSetFlags,
-  mailSetFolderSubscription,
-  mailSearchContacts,
-  mailSearchMessages,
-  mailSearchServer,
-  mailSyncAllFolders,
-  mailSyncFolder,
-  mailSyncHeaders,
-  mailTestConnection,
-  mailUnsubscribeOneClick,
-  MAIL_IDLE_EVENT,
-  type MailAddress,
-  type MailAttachmentInfo,
-  type MailContactSuggestion,
-  type MailDraft,
-  type MailDraftAttachment,
-  type MailDraftContext,
-  type MailFolder,
-  type MailCertificateInfo,
-  type MailFolderSyncResult,
-  type MailIdleEvent,
-  type MailInvite,
-  type MailInviteReply,
-  type MailMessageBody,
-  type MailMessageHeader,
-  type MailSearchField,
-  type MailSendRequest,
-  type MailSendResult,
-  type MailSyncRequestMode,
-} from "../../lib/mail";
+import { Group as PanelGroup, Panel, Separator as PanelResizeHandle, type PanelImperativeHandle, type PanelSize } from "react-resizable-panels";
+import { AlertTriangle, Archive, Ban, BookUser, Bot, CalendarDays, CheckCircle2, ChevronDown, Code, Copy, Download, ExternalLink, FileText, Filter as FilterIcon, Folder, FolderInput, FolderPlus, FolderSymlink, FolderX, Forward, Image as ImageIcon, ImageOff, Inbox, Link as LinkIcon, ListChecks, Loader2, Mail as MailIcon, MailOpen, MessageSquareReply, Paperclip, PenLine, Printer, RefreshCw, Save, Search, Send, ShieldCheck, Sparkles, Star, Tag, Trash2, X, ZoomIn, ZoomOut } from "lucide-react";
+import { mailClearCache, mailCopyMessages, mailCreateFolder, mailDeleteFolder, mailDeleteMessages, mailDownloadAttachment, mailExportMbox, isMailCertificateError, mailProbeCertificate, mailImportMessages, mailFetchRaw, mailSendReceipt, MAIL_MDN_SENT, mailGetInvite, mailRespondInvite, mailIdleStart, mailIdleStop, mailIndexCachedContacts, mailDeleteDraft, mailDiscardRemoteDraft, mailStoreRemoteDraft, mailListDrafts, mailListFolders, mailSaveDraft, mailMarkRead, mailMoveMessages, mailRenameFolder, mailSaveRaw, mailSendMessage, mailSetFlags, mailSetFolderSubscription, mailSearchContacts, mailSearchMessages, mailSearchServer, mailTestConnection, mailUnsubscribeOneClick, MAIL_IDLE_EVENT, type MailAttachmentInfo, type MailDraft, type MailFolder, type MailCertificateInfo, type MailIdleEvent, type MailInvite, type MailInviteReply, type MailMessageBody, type MailMessageHeader, type MailSearchField, type MailSendRequest, type MailSendResult, type MailSyncRequestMode } from "../../lib/mail";
 import { listen } from "@tauri-apps/api/event";
 import { notifyDesktop } from "../../lib/lanNotify";
 import { formatInviteRange, hasCalendarPart, myPartstat } from "../../lib/mailInvite";
@@ -127,1149 +12,52 @@ import { filterFromMessage, mailApplyFilters, type MailFilter } from "../../lib/
 import { MailFiltersPanel } from "./MailFiltersPanel";
 import { MailAddressBookPanel } from "./MailAddressBookPanel";
 import { MailAgendaPanel } from "./MailAgendaPanel";
-import {
-  agendaKey,
-  agendaTimeLabel,
-  dueReminders,
-  mailAddInviteToCalendar,
-  mailCalDavSync,
-  mailListAgenda,
-  type MailAgendaEvent,
-} from "../../lib/mailCalendar";
+import { agendaKey, agendaTimeLabel, dueReminders, mailAddInviteToCalendar, mailCalDavSync, mailListAgenda, type MailAgendaEvent } from "../../lib/mailCalendar";
 import { emptyAddressBookEntry, type MailAddressBookEntry } from "../../lib/mailContacts";
-import {
-  folderLabel,
-  isSelectable,
-  isSubscribed,
-  loadSubscribedOnly,
-  saveSubscribedOnly,
-  visibleFolders,
-} from "../../lib/mailFolders";
-import {
-  fromDateTimeLocal,
-  isOutbox,
-  isTransientSendError,
-  outboxNextAttemptAt,
-  outboxState,
-  toDateTimeLocal,
-  type MailOutboxState,
-} from "../../lib/mailOutbox";
+import { folderLabel, isSelectable, isSubscribed, loadSubscribedOnly, saveSubscribedOnly, visibleFolders } from "../../lib/mailFolders";
+import { fromDateTimeLocal, isOutbox, isTransientSendError, outboxNextAttemptAt, outboxState, toDateTimeLocal, type MailOutboxState } from "../../lib/mailOutbox";
 import { parseMailto } from "../../lib/mailto";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { mentionsAttachment } from "../../lib/mailAttachReminder";
 import { isEditableTarget, mailShortcutAction, type MailShortcutAction } from "../../lib/mailShortcuts";
 import { buildMailThreads, flattenMailThreads, type MailThreadRow } from "../../lib/mailThreads";
-import {
-  DEFAULT_IDENTITY_ID,
-  identityFromHeader,
-  identityLabel,
-  mailIdentities,
-  ownIdentityAddresses,
-  pickReplyIdentity,
-  swapSignature,
-} from "../../lib/mailIdentities";
-import {
-  JUNK_KEYWORD,
-  MAIL_TAGS,
-  NOT_JUNK_KEYWORD,
-  isJunk,
-  messageTags,
-  toggleKeywordPlan,
-} from "../../lib/mailTags";
-import {
-  countNewMail,
-  folderHasMoreToLoad,
-  mergeFolderMeta,
-  mergeSyncedMessages,
-  runFolderSyncLoop,
-} from "../../lib/mailSync";
+import { identityLabel, mailIdentities, ownIdentityAddresses, pickReplyIdentity, swapSignature } from "../../lib/mailIdentities";
+import { JUNK_KEYWORD, MAIL_TAGS, NOT_JUNK_KEYWORD, messageTags, toggleKeywordPlan } from "../../lib/mailTags";
+import { mergeFolderMeta } from "../../lib/mailSync";
 import { RecipientField } from "./RecipientField";
 import { RichMailEditor } from "./RichMailEditor";
 import { MailMessageBodyView } from "./MailMessageBodyView";
-import {
-  extractDefaultMailDomain,
-  formatRecipientForSend,
-  isValidEmailAddress,
-  mergeRecipientSuggestions,
-  parseRecipientsText,
-  recipientLabel,
-  searchCachedMessageContacts,
-  type ComposeRecipient,
-  type RecipientSuggestion,
-} from "../../lib/mailRecipients";
-import {
-  buildForwardHtml,
-  buildInlineImageHtml,
-  buildMailReaderSrcDoc,
-  buildReplyHtml,
-  hasRichMailFormatting,
-  mailHtmlHasRemoteImages,
-  mailHtmlToPlainText,
-  plainTextToMailHtml,
-  prepareMailHtmlForSend,
-  quotePlainText,
-  sanitizeMailComposeHtml,
-  signatureToMailHtml,
-} from "../../lib/mailHtml";
+import { extractDefaultMailDomain, formatRecipientForSend, isValidEmailAddress, mergeRecipientSuggestions, parseRecipientsText, recipientLabel, searchCachedMessageContacts, type RecipientSuggestion } from "../../lib/mailRecipients";
+import { buildForwardHtml, buildMailReaderSrcDoc, buildReplyHtml, hasRichMailFormatting, mailHtmlHasRemoteImages, mailHtmlToPlainText, plainTextToMailHtml, prepareMailHtmlForSend, quotePlainText, sanitizeMailComposeHtml, signatureToMailHtml } from "../../lib/mailHtml";
 import { formatMailPlainTextHtml } from "../../lib/mailPlainText";
-import {
-  openLocalPath,
-  readFileBytes,
-  selectUploadFile,
-  temporaryFilePath,
-  writeStreamAbort,
-  writeStreamAppend,
-  writeStreamClose,
-  writeStreamOpen,
-} from "../../lib/ipc";
-import {
-  readClipboardImageFiles,
-  readNativeClipboardImagePath,
-} from "../../lib/clipboard";
-import {
-  droppedFilePaths,
-  droppedFiles,
-  isOsFileDrag,
-  NATIVE_FILE_DROP_EVENT,
-  preventDefaultForOsFileDrag,
-  type NativeFileDropDetail,
-} from "../../lib/osFileDrop";
+import { openLocalPath, selectUploadFile, temporaryFilePath } from "../../lib/ipc";
+import { droppedFilePaths, droppedFiles, isOsFileDrag, NATIVE_FILE_DROP_EVENT, preventDefaultForOsFileDrag, type NativeFileDropDetail } from "../../lib/osFileDrop";
 import { useChatStore } from "../../stores/chatStore";
 import { useTaoAlertStore } from "../../stores/taoAlertStore";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { useConfirmDialog, useTextInputDialog } from "../sidebar/ConfirmDialog";
-import { DEFAULT_MAIL_TERMINAL_PROFILE, type TerminalProfile } from "../../lib/terminalProfile";
-import { useModalDraggableAndResizable } from "../../hooks/useModalDraggableAndResizable";
+import { DEFAULT_MAIL_TERMINAL_PROFILE } from "../../lib/terminalProfile";
 import { useAppTheme } from "../../lib/appTheme";
-import { resolveMailTheme } from "../../lib/mailTheme";
+import { type MailClientTabProps, type OpenMailMessageTab, type BodyWarmState, type ComposeDraft, type ComposePromptState, type RecipientSearchState, type RecipientFieldKey, type AiAction } from "./client/types";
+import { type MailRowActions } from "./client/MailRowActions";
+import { MAIL_THREAD_VIEW_STORAGE_KEY, isOAuthReauthRequired, messagePageSize, refreshBatchSize, catchupStepSize, dedupeMessages, messageKey, sortMessages, mailClientErrorMessage, addressLabel, isFlagged, bodyMatchesMessage, messageBatchesByFolder, formatFullDate, withFlagsMutation, escapeHtml, formatBytes, formatShortDate } from "./client/messages";
+import { EMPTY_DRAFT, isTemplate, draftWithSignature, emptyComposeDraft, serializeDraftContent, draftHasContent, draftContextWithIdentity, TEMPLATE_KIND, draftFromSaved, withoutOutbox, replyContextFor, normalizedMailAddress, appendUniqueAddress, threadHeadersFor, identitySendFields, forwardSubject } from "./client/compose";
+import { MAILBOX_EXPANDED_SIZE, clampMailFontSize, mailAppearanceStyle, MAILBOX_RIBBON_THRESHOLD } from "./client/appearance";
+import { DEFAULT_FOLDER, isUnread, NEW_MAIL_EXCLUDED_KINDS, folderMatchesSpecial, type SpecialFolderKind, folderIcon, MAIL_DRAG_TYPE, folderDepth } from "./client/folders";
+import { basename, escapeRegExp, suggestedAttachmentName, ALL_ATTACHMENTS_INDEX, uniqueAttachmentName, joinLocalPath } from "./client/attachments";
+import { aiPrompt } from "./client/ai";
+import { RemoteImagesBanner } from "./client/RemoteImagesBanner";
+import { MailListRow } from "./client/MailListRow";
+import { MailComposePrompt } from "./client/MailComposePrompt";
+import { MailDraggableDialog } from "./client/MailDraggableDialog";
+import { createLoadCachedFolders, createLoadCachedMessages, createRememberBody, createFetchBodyForMessage, createWarmRecentBodies, createLoadBody, createLoadMoreMessages } from "./client/messageLoading";
+import { createRunFolderSync, createQueueFolderCatchups, createStartBackfill, createSyncFolderNow, createSyncSelectedFolder, createQuietPollSelectedAndInbox, createSyncAllFolders } from "./client/synchronization";
+import { createMarkMessagesReadLocally, createHandleMarkSelectedRead, createHandleMarkFolderRead, createHandleMarkSingleRead } from "./client/readActions";
+import { createAddDraftAttachmentPaths, createInsertInlineImageFromPath, createInsertInlineImageFromFile, createHandlePasteImages, createHandleDropComposeFiles } from "./client/composerAttachments";
 
-interface MailClientTabProps {
-  tabId: string;
-  info: MailTabInfo;
-  visible: boolean;
-  onEditSession?: (sessionId: string) => void;
-}
 
-interface ComposeDraft {
-  id?: string | null;
-  to: ComposeRecipient[];
-  cc: ComposeRecipient[];
-  bcc: ComposeRecipient[];
-  subject: string;
-  htmlBody: string;
-  textBody: string;
-  attachments: MailDraftAttachment[];
-  replyContext?: MailDraftContext | null;
-  richFormatUsed: boolean;
-  /** Sending identity (DEFAULT_IDENTITY_ID = account address). */
-  identityId?: string | null;
-  /** Ask for a read receipt (RFC 8098). */
-  readReceipt?: boolean;
-}
-
-type RecipientFieldKey = "to" | "cc" | "bcc";
-
-interface RecipientSearchState {
-  field: RecipientFieldKey | null;
-  query: string;
-  suggestions: MailContactSuggestion[];
-  loading: boolean;
-}
-
-interface OpenMailMessageTab {
-  key: string;
-  message: MailMessageHeader;
-}
-
-interface BodyWarmState {
-  active: boolean;
-  done: number;
-  total: number;
-  folder?: string | null;
-}
-
-interface MailDraggableDialogProps {
-  title: string;
-  icon: ReactNode;
-  ariaLabel: string;
-  minWidth: number;
-  minHeight: number;
-  className: string;
-  children: ReactNode;
-  headerActions?: ReactNode;
-  closeTestId?: string;
-  onClose: () => void;
-}
-
-type ComposePromptState = {
-  kind: "error" | "attachment";
-  title: string;
-  message: string;
-};
-
-type AiAction = "summarize" | "reply" | "tasks";
-type SyncIndicator = "sync" | "more" | "none";
-
-function isOAuthReauthRequired(message: string | null | undefined): boolean {
-  if (!message) return false;
-  const normalized = message.toLowerCase();
-  return normalized.includes("oauth authorization expired or was revoked")
-    || normalized.includes("oauth2 authorization expired or was revoked")
-    || normalized.includes("oauth2 refresh token is missing")
-    || normalized.includes("invalid_grant")
-    || normalized.includes("aadsts70008")
-    || normalized.includes("aadsts700082");
-}
-
-function mailClientErrorMessage(error: unknown): string {
-  const message = String(error);
-  if (isOAuthReauthRequired(message)) {
-    return "OAuth authorization expired or was revoked. Reauthorize this mail account.";
-  }
-  return message;
-}
-
-interface SyncFolderOptions {
-  limit?: number;
-  offset?: number;
-  includeBodies?: boolean;
-  append?: boolean;
-  indicator?: SyncIndicator;
-  /** Default true for open/manual sync; quiet polls pass false to skip LIST. */
-  refreshFolders?: boolean;
-}
-
-const DEFAULT_FOLDER: MailFolder = {
-  accountId: "",
-  name: "INBOX",
-  delimiter: "/",
-  flags: [],
-  uidValidity: null,
-  uidNext: null,
-  total: null,
-  unread: null,
-  updatedAt: 0,
-};
-
-function emptyComposeDraft(): ComposeDraft {
-  return {
-    id: null,
-    to: [],
-    cc: [],
-    bcc: [],
-    subject: "",
-    htmlBody: "<p><br></p>",
-    textBody: "",
-    attachments: [],
-    replyContext: null,
-    richFormatUsed: false,
-  };
-}
-
-const EMPTY_DRAFT: ComposeDraft = {
-  id: null,
-  to: [],
-  cc: [],
-  bcc: [],
-  subject: "",
-  htmlBody: "<p><br></p>",
-  textBody: "",
-  attachments: [],
-  replyContext: null,
-  richFormatUsed: false,
-};
-
-const MAIL_MESSAGE_PAGE_SIZE = 200;
-const MAIL_REFRESH_BATCH_SIZE = 50;
-const MAILBOX_RIBBON_THRESHOLD = 7;
-const MAILBOX_EXPANDED_SIZE = 14;
-const MAIL_BASE_FONT_SIZE = DEFAULT_MAIL_TERMINAL_PROFILE.fontSize;
-const MAIL_MIN_FONT_SIZE = 8;
-const MAIL_MAX_FONT_SIZE = 32;
-const ALL_ATTACHMENTS_INDEX = -1;
-function messageKey(message: MailMessageHeader): string {
-  return `${message.folder}:${message.uid}`;
-}
-
-function bodyMatchesMessage(
-  body: MailMessageBody | null,
-  message: MailMessageHeader | null | undefined,
-): body is MailMessageBody {
-  return !!body
-    && !!message
-    && body.accountId === message.accountId
-    && body.folder === message.folder
-    && body.uid === message.uid;
-}
-
-function clampMailFontSize(value: number): number {
-  if (!Number.isFinite(value)) return MAIL_BASE_FONT_SIZE;
-  return Math.min(MAIL_MAX_FONT_SIZE, Math.max(MAIL_MIN_FONT_SIZE, Math.round(value)));
-}
-
-function color(value: string | undefined, fallback: string): string {
-  return typeof value === "string" && value.trim() ? value : fallback;
-}
-
-function parseHexColor(value: string): [number, number, number] | null {
-  const match = /^#([0-9a-fA-F]{6})$/.exec(value.trim());
-  if (!match) return null;
-  const raw = match[1];
-  return [
-    parseInt(raw.slice(0, 2), 16),
-    parseInt(raw.slice(2, 4), 16),
-    parseInt(raw.slice(4, 6), 16),
-  ];
-}
-
-function hex(value: number): string {
-  return Math.max(0, Math.min(255, Math.round(value))).toString(16).padStart(2, "0");
-}
-
-function mixColor(foreground: string, background: string, amount: number): string {
-  const fg = parseHexColor(foreground);
-  const bg = parseHexColor(background);
-  if (!fg || !bg) return amount >= 50 ? foreground : background;
-  const ratio = Math.max(0, Math.min(100, amount)) / 100;
-  const mixed = fg.map((channel, index) => channel * ratio + bg[index] * (1 - ratio));
-  return `#${hex(mixed[0])}${hex(mixed[1])}${hex(mixed[2])}`;
-}
-
-function colorLuminance(value: string): number | null {
-  const rgb = parseHexColor(value);
-  if (!rgb) return null;
-  const [r, g, b] = rgb.map((channel) => {
-    const normalized = channel / 255;
-    return normalized <= 0.03928
-      ? normalized / 12.92
-      : ((normalized + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-function mailAppearanceStyle(profile: TerminalProfile | undefined, fontSize: number, appPrefersDark: boolean): CSSProperties {
-  const terminalProfile = profile ?? DEFAULT_MAIL_TERMINAL_PROFILE;
-  const theme = resolveMailTheme(terminalProfile.theme, appPrefersDark);
-  const background = color(theme.background, "#1d1f21");
-  const foreground = color(theme.foreground, "#eaeaea");
-  const accent = color(theme.blue ?? theme.cyan ?? theme.cursor, "#83a7d8");
-  const darkBackground = (colorLuminance(background) ?? 0) < 0.5;
-  const accentSoft = darkBackground
-    ? mixColor(foreground, accent, 24)
-    : mixColor(background, accent, 24);
-  const divider = mixColor(foreground, background, 18);
-  const buttonFrom = darkBackground
-    ? mixColor(foreground, background, 12)
-    : mixColor(foreground, background, 2);
-  const buttonTo = darkBackground
-    ? mixColor(foreground, background, 8)
-    : mixColor(foreground, background, 7);
-  const buttonHoverFrom = darkBackground
-    ? mixColor(foreground, background, 18)
-    : mixColor(foreground, background, 4);
-  const buttonHoverTo = darkBackground
-    ? mixColor(foreground, background, 13)
-    : mixColor(foreground, background, 11);
-  const buttonDisabled = darkBackground
-    ? mixColor(foreground, background, 5)
-    : mixColor(foreground, background, 6);
-  return {
-    "--taomni-color-scheme": darkBackground ? "dark" : "light",
-    "--taomni-bg": background,
-    "--taomni-panel-bg": mixColor(foreground, background, 5),
-    "--taomni-sidebar-bg": mixColor(foreground, background, 8),
-    "--taomni-chrome-bg": mixColor(foreground, background, 11),
-    "--taomni-quick-bg": mixColor(foreground, background, 9),
-    "--taomni-input-bg": mixColor(foreground, background, 6),
-    "--taomni-input-border": divider,
-    "--taomni-chrome-border": divider,
-    "--taomni-divider": divider,
-    "--taomni-hover": mixColor(accent, background, 16),
-    "--taomni-selected": mixColor(accent, background, 26),
-    "--taomni-accent": accent,
-    "--taomni-accent-soft": accentSoft,
-    "--taomni-button-from": buttonFrom,
-    "--taomni-button-to": buttonTo,
-    "--taomni-button-hover-from": buttonHoverFrom,
-    "--taomni-button-hover-to": buttonHoverTo,
-    "--taomni-button-disabled": buttonDisabled,
-    "--taomni-text": foreground,
-    "--taomni-text-muted": mixColor(foreground, background, 62),
-    colorScheme: darkBackground ? "dark" : "light",
-    fontFamily: terminalProfile.fontFamily || DEFAULT_MAIL_TERMINAL_PROFILE.fontFamily,
-    zoom: clampMailFontSize(fontSize) / MAIL_BASE_FONT_SIZE,
-  } as CSSProperties;
-}
-
-function MailDraggableDialog({
-  title,
-  icon,
-  ariaLabel,
-  minWidth,
-  minHeight,
-  className,
-  children,
-  headerActions,
-  closeTestId,
-  onClose,
-}: MailDraggableDialogProps) {
-  const { containerRef, handleRef } = useModalDraggableAndResizable({ minWidth, minHeight });
-
-  return (
-    <div
-      ref={containerRef}
-      className={`relative flex flex-col rounded-md border shadow-2xl overflow-hidden ${className}`}
-      style={{
-        background: "var(--taomni-bg)",
-        borderColor: "var(--taomni-divider)",
-        color: "var(--taomni-text)",
-      }}
-      role="dialog"
-      aria-modal="true"
-      aria-label={ariaLabel}
-    >
-      <div
-        ref={handleRef}
-        className="h-9 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] bg-[var(--taomni-chrome-bg)] select-none"
-      >
-        {icon}
-        <span className="text-[12px] font-semibold min-w-0 flex-1 truncate">
-          {title}
-        </span>
-        {headerActions}
-        <button
-          type="button"
-          className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
-          onClick={onClose}
-          aria-label="Close dialog"
-          title="Close"
-          data-testid={closeTestId}
-        >
-          <X className="w-3.5 h-3.5" />
-        </button>
-      </div>
-      {children}
-    </div>
-  );
-}
-
-function MailComposePrompt({
-  prompt,
-  onClose,
-  onAttach,
-  onSendAnyway,
-}: {
-  prompt: ComposePromptState;
-  onClose: () => void;
-  onAttach: () => void;
-  onSendAnyway: () => void;
-}) {
-  const attachmentPrompt = prompt.kind === "attachment";
-  return (
-    <div
-      className="fixed inset-0 z-[960] flex items-center justify-center bg-black/40 px-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={prompt.title}
-      data-testid={attachmentPrompt ? "mail-attach-reminder" : "mail-compose-error-dialog"}
-      onClick={onClose}
-    >
-      <div
-        className="w-[min(460px,calc(100vw-32px))] rounded-md border p-4 shadow-2xl"
-        style={{ background: "var(--taomni-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-start gap-2">
-          <AlertTriangle className={`mt-0.5 h-4 w-4 shrink-0 ${attachmentPrompt ? "text-amber-500" : "text-red-500"}`} />
-          <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold">{prompt.title}</div>
-            <div className="mt-2 whitespace-pre-line text-[12px]" data-testid="mail-compose-prompt-message">
-              {prompt.message}
-            </div>
-          </div>
-        </div>
-        <div className="mt-4 flex justify-end gap-2">
-          {attachmentPrompt ? (
-            <>
-              <button
-                type="button"
-                className="taomni-btn h-7 px-2.5 text-[12px]"
-                data-testid="mail-attach-reminder-cancel"
-                onClick={onClose}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="taomni-btn h-7 px-2.5 text-[12px]"
-                data-testid="mail-attach-reminder-attach"
-                onClick={onAttach}
-              >
-                Attach…
-              </button>
-              <button
-                type="button"
-                className="taomni-btn h-7 px-2.5 text-[12px]"
-                data-primary="true"
-                data-testid="mail-attach-reminder-send"
-                onClick={onSendAnyway}
-              >
-                Send anyway
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="taomni-btn h-7 px-3 text-[12px]"
-              data-primary="true"
-              data-testid="mail-compose-error-ok"
-              onClick={onClose}
-            >
-              OK
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function addressLabel(address: MailAddress | null | undefined): string {
-  if (!address) return "";
-  const name = address.name?.trim();
-  const mail = address.address?.trim();
-  if (name && mail) return `${name} <${mail}>`;
-  return name || mail || "";
-}
-
-function folderDepth(folder: MailFolder): number {
-  const delimiter = folder.delimiter?.trim();
-  if (!delimiter) return 0;
-  return Math.max(0, folder.name.split(delimiter).filter(Boolean).length - 1);
-}
-
-function folderIcon(folder: MailFolder) {
-  const name = `${folder.name} ${folderLabel(folder)}`.toLowerCase();
-  if (name.includes("inbox") || name.includes("收件")) return <Inbox className="w-4 h-4" />;
-  if (name.includes("sent") || name.includes("已发送") || name.includes("已傳送")) return <Send className="w-4 h-4" />;
-  if (name.includes("trash") || name.includes("deleted") || name.includes("垃圾") || name.includes("已删除")) return <Trash2 className="w-4 h-4" />;
-  if (name.includes("archive") || name.includes("归档") || name.includes("封存")) return <Archive className="w-4 h-4" />;
-  return <Folder className="w-4 h-4" />;
-}
-
-function isUnread(message: MailMessageHeader): boolean {
-  return !message.flags.some((flag) => flag.toLowerCase().includes("seen"));
-}
-
-function withSeenFlag(message: MailMessageHeader): MailMessageHeader {
-  if (!isUnread(message)) return message;
-  return { ...message, flags: [...message.flags, "\\Seen"] };
-}
-
-type SpecialFolderKind = "trash" | "junk" | "archive" | "sent";
-
-/** Drag payload marker for messages dragged onto the folder tree. */
-const MAIL_DRAG_TYPE = "application/x-taomni-mail";
-
-/** Folders whose new arrivals never raise a new-mail alert. */
-const NEW_MAIL_EXCLUDED_KINDS: SpecialFolderKind[] = ["sent", "trash", "junk"];
-
-const SPECIAL_FOLDER_MATCHERS: Record<SpecialFolderKind, { flag: string; names: string[] }> = {
-  trash: { flag: "trash", names: ["trash", "deleted", "已删除", "已刪除", "垃圾桶", "废件箱", "廢件匣"] },
-  junk: { flag: "junk", names: ["junk", "spam", "bulk", "垃圾邮件", "垃圾郵件"] },
-  archive: { flag: "archive", names: ["archive", "归档", "封存", "歸檔"] },
-  sent: { flag: "sent", names: ["sent", "已发送", "已傳送", "寄件"] },
-};
-
-function folderMatchesSpecial(
-  folder: MailFolder,
-  kind: SpecialFolderKind,
-  overrides?: MailTabInfo["specialFolders"],
-): boolean {
-  // A manual choice in the account settings beats attributes and names.
-  const manual = overrides?.[kind];
-  if (manual) return folder.name === manual || folderLabel(folder) === manual;
-  const matcher = SPECIAL_FOLDER_MATCHERS[kind];
-  if (folder.flags.some((flag) => flag.toLowerCase().includes(matcher.flag))) return true;
-  const haystack = `${folder.name} ${folderLabel(folder)}`.toLowerCase();
-  return matcher.names.some((name) => haystack.includes(name));
-}
-
-function isFlagged(message: MailMessageHeader): boolean {
-  return message.flags.some((flag) => flag.toLowerCase().includes("flagged"));
-}
-
-function withFlagsMutation(
-  message: MailMessageHeader,
-  add: string[],
-  remove: string[],
-): MailMessageHeader {
-  let flags = message.flags.filter(
-    (flag) => !remove.some((candidate) => flag.toLowerCase() === candidate.toLowerCase()),
-  );
-  for (const candidate of add) {
-    if (!flags.some((flag) => flag.toLowerCase() === candidate.toLowerCase())) {
-      flags = [...flags, candidate];
-    }
-  }
-  return { ...message, flags };
-}
-
-// Reuse ICU formatters across rows and progress updates. Constructing one per
-// row repeatedly allocates locale data while large accounts are synchronizing.
-const shortDateFormatter = new Intl.DateTimeFormat(undefined, {
-  month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
-});
-const fullDateFormatter = new Intl.DateTimeFormat(undefined, {
-  dateStyle: "medium", timeStyle: "short",
-});
-
-function formatShortDate(ts: number | null | undefined): string {
-  if (!ts) return "";
-  const date = new Date(ts * 1000);
-  if (Number.isNaN(date.getTime())) return "";
-  return shortDateFormatter.format(date);
-}
-
-function formatFullDate(ts: number | null | undefined): string {
-  if (!ts) return "";
-  const date = new Date(ts * 1000);
-  if (Number.isNaN(date.getTime())) return "";
-  return fullDateFormatter.format(date);
-}
-
-function formatBytes(value: number | null | undefined): string {
-  if (!value || value <= 0) return "";
-  if (value < 1024) return `${value} B`;
-  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
-  return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function messagePageSize(info: MailTabInfo): number {
-  return Math.max(50, Math.min(500, info.sync.maxFetchPerSync || MAIL_MESSAGE_PAGE_SIZE));
-}
-
-function refreshBatchSize(info: MailTabInfo): number {
-  return Math.max(1, Math.min(MAIL_REFRESH_BATCH_SIZE, info.sync.maxFetchPerSync || MAIL_REFRESH_BATCH_SIZE));
-}
-
-function sortMessages(messages: MailMessageHeader[]): MailMessageHeader[] {
-  return messages.slice().sort((a, b) => {
-    const date = (b.dateTs ?? 0) - (a.dateTs ?? 0);
-    if (date !== 0) return date;
-    return b.uid - a.uid;
-  });
-}
-
-function mergeMessagePages(current: MailMessageHeader[], next: MailMessageHeader[]): MailMessageHeader[] {
-  const byKey = new Map<string, MailMessageHeader>();
-  for (const message of current) byKey.set(messageKey(message), message);
-  for (const message of next) byKey.set(messageKey(message), message);
-  return sortMessages(Array.from(byKey.values()));
-}
-
-const MAIL_THREAD_VIEW_STORAGE_KEY = "taomni.mail.threadView";
-
-/** Headers per gap-free catch-up step (the loop repeats until caught up). */
-function catchupStepSize(info: MailTabInfo): number {
-  return Math.max(20, Math.min(500, info.sync.maxFetchPerSync || 200));
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-function replyContextFor(
-  kind: "reply" | "replyAll" | "forward",
-  target: MailMessageHeader,
-): MailDraftContext {
-  const references = [...(target.references ?? [])];
-  if (target.inReplyTo && !references.includes(target.inReplyTo)) references.push(target.inReplyTo);
-  return {
-    kind,
-    folder: target.folder,
-    uid: target.uid,
-    messageId: target.messageId,
-    subject: target.subject,
-    references,
-  };
-}
-
-/** In-Reply-To / References for a reply; forwards start a new thread. */
-function threadHeadersFor(context: MailDraftContext | null | undefined): { inReplyTo: string | null; references: string[] } {
-  if (!context || context.kind === "forward" || !context.messageId) return { inReplyTo: null, references: [] };
-  return { inReplyTo: context.messageId, references: context.references ?? [] };
-}
-
-function decodeFolderLabel(name: string, folders: readonly MailFolder[]): string {
-  const folder = folders.find((entry) => entry.name === name);
-  return folder ? folderLabel(folder) : name;
-}
-
-const TEMPLATE_KIND = "template";
-
-function isTemplate(saved: MailDraft): boolean {
-  return saved.replyContext?.kind === TEMPLATE_KIND;
-}
-
-function draftContextWithIdentity(draft: ComposeDraft): MailDraftContext | null {
-  const identityId = draft.identityId && draft.identityId !== DEFAULT_IDENTITY_ID ? draft.identityId : null;
-  if (!draft.replyContext && !identityId) return null;
-  return { ...(draft.replyContext ?? {}), identityId };
-}
-
-function identitySendFields(identity: MailIdentity): { from: string | null; replyTo: string | null } {
-  if (identity.id === DEFAULT_IDENTITY_ID) return { from: null, replyTo: null };
-  return { from: identityFromHeader(identity), replyTo: identity.replyTo ?? null };
-}
-
-function draftWithSignature(draft: Partial<ComposeDraft>, signature: string | null | undefined): ComposeDraft {
-  const base = { ...emptyComposeDraft(), ...draft };
-  if (!signature?.trim()) return base;
-  const signatureHtml = signatureToMailHtml(signature);
-  const signatureText = `\n\n-- \n${signature.trimEnd()}`;
-  const htmlBody = base.htmlBody?.trim() && base.htmlBody !== "<p><br></p>"
-    ? base.htmlBody
-    : `<p><br></p>${signatureHtml}`;
-  const textBody = base.textBody?.trim() ? base.textBody : signatureText.trimStart();
-  return { ...base, htmlBody, textBody };
-}
-
-function draftHasContent(draft: ComposeDraft): boolean {
-  return !!(
-    draft.to.length ||
-    draft.cc.length ||
-    draft.bcc.length ||
-    draft.subject.trim() ||
-    draft.textBody.trim() ||
-    mailHtmlToPlainText(draft.htmlBody).trim() ||
-    draft.attachments.length
-  );
-}
-
-function serializeDraftContent(draft: ComposeDraft): string {
-  return JSON.stringify({
-    to: draft.to.map(formatRecipientForSend),
-    cc: draft.cc.map(formatRecipientForSend),
-    bcc: draft.bcc.map(formatRecipientForSend),
-    subject: draft.subject,
-    textBody: draft.textBody,
-    htmlBody: draft.htmlBody,
-    attachments: draft.attachments,
-    replyContext: draft.replyContext ?? null,
-  });
-}
-
-/** Reply context without the Outbox queue state (editing leaves the Outbox). */
-function withoutOutbox(context: MailDraftContext | null | undefined): MailDraftContext | null {
-  if (!context) return null;
-  const { outbox: _outbox, ...rest } = context;
-  return rest;
-}
-
-function draftFromSaved(saved: MailDraft): ComposeDraft {
-  return {
-    readReceipt: outboxState(saved)?.readReceipt ?? false,
-    id: saved.id,
-    to: parseRecipientsText(saved.to.join(", ")),
-    cc: parseRecipientsText(saved.cc.join(", ")),
-    bcc: parseRecipientsText(saved.bcc.join(", ")),
-    subject: saved.subject,
-    htmlBody: saved.htmlBody || plainTextToMailHtml(saved.textBody),
-    textBody: saved.textBody,
-    attachments: saved.attachments ?? [],
-    replyContext: withoutOutbox(saved.replyContext),
-    richFormatUsed: hasRichMailFormatting(saved.htmlBody),
-    identityId: saved.replyContext?.identityId ?? null,
-  };
-}
-
-function suggestedAttachmentName(attachment: MailAttachmentInfo, index: number, subject?: string): string {
-  const raw = attachment.name?.trim() || `${subject?.trim() || "attachment"}-${index + 1}`;
-  const cleaned = raw
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, "_")
-    .replace(/\s+/g, " ")
-    .trim();
-  return (cleaned || `attachment-${index + 1}`).slice(0, 160);
-}
-
-function splitAttachmentName(name: string): { stem: string; ext: string } {
-  const dot = name.lastIndexOf(".");
-  if (dot <= 0 || dot === name.length - 1) return { stem: name, ext: "" };
-  return { stem: name.slice(0, dot), ext: name.slice(dot) };
-}
-
-function uniqueAttachmentName(name: string, usedNames: Set<string>): string {
-  const { stem, ext } = splitAttachmentName(name);
-  let candidate = name;
-  let suffix = 2;
-  while (usedNames.has(candidate.toLowerCase())) {
-    candidate = `${stem} (${suffix})${ext}`;
-    suffix += 1;
-  }
-  usedNames.add(candidate.toLowerCase());
-  return candidate;
-}
-
-function joinLocalPath(dir: string, name: string): string {
-  const base = dir.trim();
-  if (!base) return name;
-  if (base.endsWith("/") || base.endsWith("\\")) return `${base}${name}`;
-  if (/^[A-Za-z]:$/.test(base)) return `${base}\\${name}`;
-  const sep = base.includes("\\") && !base.includes("/") ? "\\" : "/";
-  return `${base}${sep}${name}`;
-}
-
-function basename(path: string): string {
-  return path.split(/[\\/]/).filter(Boolean).pop() || path || "attachment";
-}
-
-function makeInlineImageContentId(name: string): string {
-  const stem = name
-    .replace(/\.[^.]+$/, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 32) || "image";
-  const random = Math.random().toString(36).slice(2, 10);
-  return `taomni-${stem}-${Date.now()}-${random}@inline.local`;
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function guessContentType(name: string): string {
-  const ext = name.split(".").pop()?.toLowerCase() ?? "";
-  if (["jpg", "jpeg"].includes(ext)) return "image/jpeg";
-  if (ext === "png") return "image/png";
-  if (ext === "gif") return "image/gif";
-  if (ext === "pdf") return "application/pdf";
-  if (ext === "html" || ext === "htm") return "text/html";
-  if (ext === "csv") return "text/csv";
-  if (ext === "json") return "application/json";
-  if (ext === "txt" || ext === "log" || ext === "md") return "text/plain";
-  return "application/octet-stream";
-}
-
-function dedupeMessages(messages: readonly MailMessageHeader[]): MailMessageHeader[] {
-  const seen = new Set<string>();
-  const unique: MailMessageHeader[] = [];
-  for (const message of messages) {
-    const key = messageKey(message);
-    if (seen.has(key)) continue;
-    seen.add(key);
-    unique.push(message);
-  }
-  return unique;
-}
-
-function* messageBatchesByFolder(messages: readonly MailMessageHeader[], batchSize = 250): Generator<[string, MailMessageHeader[]]> {
-  const map = new Map<string, MailMessageHeader[]>();
-  for (const message of messages) {
-    const list = map.get(message.folder) ?? [];
-    list.push(message);
-    map.set(message.folder, list);
-  }
-  // Bound UID command length and update the UI after each successful batch.
-  // An error leaves already completed batches removed and the rest selected.
-  for (const [folder, group] of map) {
-    for (let offset = 0; offset < group.length; offset += batchSize) {
-      yield [folder, group.slice(offset, offset + batchSize)];
-    }
-  }
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function forwardSubject(subject: string): string {
-  const trimmed = subject.trim();
-  return /^fwd?:/i.test(trimmed) ? trimmed : `Fwd: ${trimmed || "(no subject)"}`;
-}
-
-function normalizedMailAddress(value: string | null | undefined): string {
-  return (value ?? "").trim().toLowerCase();
-}
-
-function appendUniqueAddress(target: string[], seen: Set<string>, address: MailAddress | null | undefined, ownAddresses: Set<string>) {
-  const label = addressLabel(address);
-  const mail = normalizedMailAddress(address?.address ?? label);
-  if (!label || !mail || ownAddresses.has(mail) || seen.has(mail)) return;
-  seen.add(mail);
-  target.push(label);
-}
-
-async function writeBytesToPath(path: string, bytes: Uint8Array): Promise<void> {
-  let handleId: string | null = null;
-  try {
-    handleId = await writeStreamOpen(path);
-    const chunkSize = 256 * 1024;
-    for (let offset = 0; offset < bytes.byteLength; offset += chunkSize) {
-      const end = Math.min(offset + chunkSize, bytes.byteLength);
-      await writeStreamAppend(handleId, bytes.subarray(offset, end));
-    }
-    await writeStreamClose(handleId);
-  } catch (err) {
-    if (handleId) await writeStreamAbort(handleId).catch(() => undefined);
-    throw err;
-  }
-}
-
-function uint8ToBase64(bytes: Uint8Array): string {
-  let binary = "";
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
-  }
-  return btoa(binary);
-}
-
-function extensionForMime(mime: string): string {
-  const lower = mime.toLowerCase();
-  if (lower.includes("jpeg") || lower.includes("jpg")) return "jpg";
-  if (lower.includes("png")) return "png";
-  if (lower.includes("gif")) return "gif";
-  if (lower.includes("webp")) return "webp";
-  if (lower.includes("bmp")) return "bmp";
-  if (lower.includes("svg")) return "svg";
-  return "bin";
-}
-
-function RemoteImagesBanner({
-  visible,
-  allowRemoteImages,
-  onAllowThisMessage,
-  onAllowAllInTab,
-  onBlock,
-}: {
-  visible: boolean;
-  allowRemoteImages: boolean;
-  onAllowThisMessage: () => void;
-  onAllowAllInTab: () => void;
-  onBlock: () => void;
-}) {
-  if (!visible) return null;
-  return (
-    <div
-      className="mx-4 mt-3 mb-0 flex flex-wrap items-center gap-2 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)] px-3 py-2 text-[12px]"
-      data-testid="mail-remote-images-banner"
-    >
-      <ImageOff className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-text-muted)]" />
-      <span className="flex-1 text-[var(--taomni-text-muted)]">
-        {allowRemoteImages
-          ? "Remote images are shown for this message."
-          : "To protect your privacy, remote images in this message have been blocked."}
-      </span>
-      {allowRemoteImages ? (
-        <button
-          type="button"
-          className="taomni-btn h-6 px-2 text-[11px]"
-          data-testid="mail-remote-images-toggle"
-          onClick={onBlock}
-        >
-          Block remote content
-        </button>
-      ) : (
-        <>
-          <button
-            type="button"
-            className="taomni-btn h-6 px-2 text-[11px]"
-            data-testid="mail-remote-images-toggle"
-            onClick={onAllowThisMessage}
-          >
-            Show for this message
-          </button>
-          <button
-            type="button"
-            className="taomni-btn h-6 px-2 text-[11px]"
-            data-testid="mail-remote-images-allow-all"
-            onClick={onAllowAllInTab}
-            title="Allow remote images for all messages in this tab until closed"
-          >
-            Allow all in tab
-          </button>
-        </>
-      )}
-    </div>
-  );
-}
-
-function htmlToText(html: string): string {
-  return mailHtmlToPlainText(html);
-}
-
-function bodyTextForAi(body: MailMessageBody): string {
-  const text = body.text?.trim() || (body.html ? htmlToText(body.html) : "") || body.snippet || "";
-  return text.length > 12000 ? `${text.slice(0, 12000)}\n\n[truncated]` : text;
-}
-
-function aiPrompt(action: AiAction, message: MailMessageHeader, body: MailMessageBody): string {
-  const from = addressLabel(message.from) || "(unknown sender)";
-  const to = message.to.map(addressLabel).filter(Boolean).join(", ");
-  const bodyText = bodyTextForAi(body);
-  const header = [
-    `Subject: ${message.subject || "(no subject)"}`,
-    `From: ${from}`,
-    to ? `To: ${to}` : "",
-    message.dateTs ? `Date: ${formatFullDate(message.dateTs)}` : "",
-  ].filter(Boolean).join("\n");
-
-  if (action === "reply") {
-    return `Draft a concise, professional reply for this email. Keep the reply actionable and do not invent facts.\n\n${header}\n\nEmail body:\n${bodyText}`;
-  }
-  if (action === "tasks") {
-    return `Extract action items, deadlines, owners, and unresolved questions from this email. Return a compact checklist.\n\n${header}\n\nEmail body:\n${bodyText}`;
-  }
-  return `Summarize this email for a busy operator. Include the purpose, key facts, urgency, and suggested next step.\n\n${header}\n\nEmail body:\n${bodyText}`;
-}
-
-type MailRowActions = {
-  selectListMessage: (message: MailMessageHeader) => void;
-  openMessageTab: (message: MailMessageHeader) => void;
-  toggleMessageChecked: (message: MailMessageHeader, checked: boolean, range?: boolean) => void;
-  toggleThreadExpanded: (key: string) => void;
-  contextMenu: (event: ReactMouseEvent, message: MailMessageHeader) => void;
-  dragStart: (event: ReactDragEvent, message: MailMessageHeader) => void;
-  dragEnd: () => void;
-};
-
-// Body/progress changes should not rebuild every message row. Event handlers
-// consult the current actions so menus and multi-selection never use stale state.
-const MailListRow = memo(function MailListRow({ message, threadKey, depth, isRoot, threadSize, threadUnread, expanded, active, checked, threadView, selectedFolder, displayFolders, actions }: MailThreadRow & {
-  active: boolean;
-  checked: boolean;
-  threadView: boolean;
-  selectedFolder: string;
-  displayFolders: MailFolder[];
-  actions: { current: MailRowActions | null };
-}) {
-  const unread = isUnread(message);
-  return (
-    <div
-      data-thread-key={threadView ? threadKey : undefined}
-      data-thread-depth={threadView ? depth : undefined}
-      style={{
-        // Offscreen rows skip layout/paint (TASK-22) while
-        // staying in the DOM for find, a11y and selection.
-        contentVisibility: "auto",
-        containIntrinsicSize: "auto 82px",
-        ...(threadView && depth > 0 ? { paddingLeft: `${12 + depth * 16}px` } : {}),
-      }}
-      draggable
-      onDragStart={(event) => {
-        actions.current!.dragStart(event, message);
-      }}
-      onDragEnd={() => {
-        actions.current!.dragEnd();
-      }}
-      role="button"
-      tabIndex={0}
-      aria-pressed={active}
-      data-testid="mail-message-row"
-      data-uid={message.uid}
-      data-checked={checked ? "true" : "false"}
-      data-unread={unread ? "true" : "false"}
-      data-flagged={isFlagged(message) ? "true" : "false"}
-      className={`w-full min-h-[82px] px-3 py-2.5 text-left border-b border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] cursor-pointer ${active || checked ? "bg-[var(--taomni-selected)]" : ""}`}
-      onClick={(event) => {
-        if (event.shiftKey || event.ctrlKey || event.metaKey) {
-          actions.current!.toggleMessageChecked(message, event.shiftKey || !checked, event.shiftKey);
-        } else {
-          actions.current!.selectListMessage(message);
-        }
-      }}
-      onDoubleClick={() => actions.current!.openMessageTab(message)}
-      onContextMenu={(event) => actions.current!.contextMenu(event, message)}
-      onKeyDown={(event) => {
-        if (event.key !== "Enter" && event.key !== " ") return;
-        event.preventDefault();
-        actions.current!.selectListMessage(message);
-      }}
-    >
-      <div className="flex items-start gap-2">
-        <input
-          type="checkbox"
-          className="taomni-checkbox mt-1 shrink-0"
-          aria-label={`Select ${message.subject || "message"}`}
-          checked={checked}
-          onClick={(event) => event.stopPropagation()}
-          onKeyDown={(event) => {
-            if (event.key === " " || event.key === "Enter") event.stopPropagation();
-          }}
-          onChange={(event) => actions.current!.toggleMessageChecked(message, event.target.checked, (event.nativeEvent as MouseEvent).shiftKey)}
-        />
-        {threadView && isRoot && threadSize > 1 && (
-          <button
-            type="button"
-            className="mt-0.5 shrink-0 inline-flex items-center gap-0.5 rounded px-1 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)]"
-            data-testid="mail-thread-expand"
-            aria-expanded={expanded}
-            aria-label={`${expanded ? "Collapse" : "Expand"} conversation of ${threadSize} messages`}
-            onClick={(event) => {
-              event.stopPropagation();
-              actions.current!.toggleThreadExpanded(threadKey);
-            }}
-          >
-            <ChevronDown className={`w-3 h-3 transition-transform ${expanded ? "" : "-rotate-90"}`} />
-            <span data-testid="mail-thread-size">{threadSize}</span>
-            {threadUnread > 0 && !expanded && (
-              <span className="text-[var(--taomni-accent)]">({threadUnread})</span>
-            )}
-          </button>
-        )}
-        <div className="min-w-0 flex-1">
-          <div className="min-w-0 flex items-center gap-1.5">
-            {isJunk(message) && (
-              <span title="Junk" data-testid="mail-message-junk" className="shrink-0 text-[var(--taomni-text-muted)]">
-                <Ban className="w-3 h-3" />
-              </span>
-            )}
-            <div className={`min-w-0 text-[14px] leading-5 truncate ${unread ? "font-semibold text-[var(--taomni-text)]" : "font-medium text-[var(--taomni-text-muted)]"}`}>
-              {message.subject || "(no subject)"}
-            </div>
-            {messageTags(message).map((tag) => (
-              <span
-                key={tag.keyword}
-                className="shrink-0 inline-block w-2 h-2 rounded-full"
-                style={{ background: tag.color }}
-                title={tag.label}
-                data-testid="mail-message-tag"
-                data-tag={tag.keyword}
-              />
-            ))}
-          </div>
-          <div className="mt-1 flex items-center gap-1.5 text-[12px] leading-4">
-            <span className={`min-w-0 truncate ${unread ? "font-semibold text-[var(--taomni-text)]" : "text-[var(--taomni-text-muted)]"}`}>
-              {addressLabel(message.from) || "(unknown)"}
-            </span>
-            {message.folder !== selectedFolder && (
-              <span
-                className="shrink-0 rounded border border-[var(--taomni-divider)] px-1 text-[10px] text-[var(--taomni-text-muted)]"
-                data-testid="mail-message-folder"
-              >
-                {decodeFolderLabel(message.folder, displayFolders)}
-              </span>
-            )}
-            {message.hasAttachments && <Paperclip className="w-3 h-3 text-[var(--taomni-text-muted)] shrink-0" />}
-            {message.bodyCached && <FileText className="w-3 h-3 text-[var(--taomni-accent)] shrink-0" />}
-          </div>
-          <div className="text-[11px] text-[var(--taomni-text-muted)] line-clamp-2 mt-1.5">
-            {message.snippet || "No preview"}
-          </div>
-        </div>
-        <span className="text-[11px] text-[var(--taomni-text-muted)] shrink-0 leading-5">{formatShortDate(message.dateTs)}</span>
-      </div>
-    </div>
-  );
-});
 
 export function MailClientTab({ tabId, info, visible, onEditSession }: MailClientTabProps) {
   const rowActionsRef = useRef<MailRowActions | null>(null);
@@ -1983,233 +771,60 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }
   }, [mailboxPaneSize]);
 
-  const loadCachedFolders = useCallback(async () => {
-    if (!visibleRef.current) {
-      pendingCacheRefreshRef.current = true;
-      return;
-    }
-    setLoadingFolders(true);
-    setError(null);
-    try {
-      const cached = await mailListCachedFolders(info.sessionId);
-      if (!visibleRef.current) {
-        pendingCacheRefreshRef.current = true;
-        return;
-      }
-      foldersRef.current = cached;
-      setFolders(cached);
-      updateSelectedFolder((current) =>
-        cached.length > 0 && !cached.some((folder) => folder.name === current)
-          ? cached[0].name
-          : current,
-      );
-    } catch (e) {
-      setError(mailClientErrorMessage(e));
-    } finally {
-      setLoadingFolders(false);
-    }
-  }, [info.sessionId, updateSelectedFolder]);
+  const loadCachedFolders = useCallback(createLoadCachedFolders({
+    visibleRef,
+    pendingCacheRefreshRef,
+    setLoadingFolders,
+    setError,
+    info,
+    foldersRef,
+    setFolders,
+    updateSelectedFolder,
+  }), [info.sessionId, updateSelectedFolder]);
 
-  const loadCachedMessages = useCallback(async (
-    folder: string,
-    offset = 0,
-    append = false,
-    quiet = false,
-    limitOverride?: number,
-  ) => {
-    if (!visibleRef.current) {
-      pendingCacheRefreshRef.current = true;
-      return { page: [] as MailMessageHeader[], hasMore: false };
-    }
-    if (append) {
-      setLoadingMoreMessages(true);
-    } else {
-      if (!quiet) setLoadingMessages(true);
-      setHasMoreMessages(false);
-    }
-    setError(null);
-    try {
-      const limit = Math.max(pageSize, limitOverride ?? pageSize);
-      const removalVersion = cacheRemovalVersionsRef.current.get(folder) ?? 0;
-      const cached = await mailListCachedMessages(info.sessionId, folder, limit + 1, offset);
-      if (!visibleRef.current) {
-        pendingCacheRefreshRef.current = true;
-        return { page: [] as MailMessageHeader[], hasMore: false };
-      }
-      if (selectedFolderRef.current !== folder
-        || (cacheRemovalVersionsRef.current.get(folder) ?? 0) !== removalVersion) {
-        // A snapshot started before a successful move/delete can still contain
-        // removed rows. Keep the current list until the next fresh query.
-        return { page: [] as MailMessageHeader[], hasMore: false };
-      }
-      const page = cached.slice(0, limit);
-      const loadedCount = offset + page.length;
-      const hasMore = folderHasMoreToLoad(
-        foldersRef.current.find((entry) => entry.name === folder),
-        loadedCount,
-        cached.length > limit,
-      );
-      setHasMoreMessages(hasMore);
-      // Update the ref synchronously: concurrent sync steps merge against it.
-      const next = append ? mergeMessagePages(messagesRef.current, page) : sortMessages(page);
-      setMessages(next);
-      if (!quiet) {
-        setStatus(
-          append
-            ? page.length > 0 ? `Loaded ${page.length} older cached messages` : "No more cached messages"
-            : page.length > 0 ? `Loaded ${page.length} cached messages` : "No cached messages",
-        );
-      }
-      return { page, hasMore };
-    } catch (e) {
-      setError(mailClientErrorMessage(e));
-      return { page: [] as MailMessageHeader[], hasMore: false };
-    } finally {
-      if (append) {
-        setLoadingMoreMessages(false);
-      } else {
-        if (!quiet) setLoadingMessages(false);
-      }
-    }
-  }, [info.sessionId, pageSize]);
+  const loadCachedMessages = useCallback(createLoadCachedMessages({
+    visibleRef,
+    pendingCacheRefreshRef,
+    setLoadingMoreMessages,
+    setLoadingMessages,
+    setHasMoreMessages,
+    setError,
+    pageSize,
+    cacheRemovalVersionsRef,
+    info,
+    selectedFolderRef,
+    foldersRef,
+    messagesRef,
+    setMessages,
+    setStatus,
+  }), [info.sessionId, pageSize]);
 
-  const rememberBody = useCallback((nextBody: MailMessageBody) => {
-    const key = `${nextBody.folder}:${nextBody.uid}`;
-    const nextCache = new Map(bodyCacheRef.current);
-    nextCache.set(key, nextBody);
-    bodyCacheRef.current = nextCache;
-    if (!visibleRef.current) {
-      pendingCacheRefreshRef.current = true;
-      return;
-    }
-    setBodyCache(nextCache);
-    setBody(nextBody);
+  const rememberBody = useCallback(createRememberBody({
+    bodyCacheRef,
+    visibleRef,
+    pendingCacheRefreshRef,
+    setBodyCache,
+    setBody,
+    setMessages,
+    setSearchResults,
+    setMessageTabs,
+  }), []);
 
-    const enrichHeader = (message: MailMessageHeader): MailMessageHeader => {
-      if (messageKey(message) !== key) return message;
-      const attachmentCount = nextBody.attachments.length;
-      return {
-        ...message,
-        messageId: nextBody.messageId ?? message.messageId,
-        subject: nextBody.subject || message.subject,
-        snippet: nextBody.snippet ?? message.snippet,
-        rawSize: nextBody.rawSize ?? message.rawSize,
-        bodyCached: true,
-        hasAttachments: message.hasAttachments || attachmentCount > 0,
-        attachmentCount: Math.max(message.attachmentCount, attachmentCount),
-        attachments: attachmentCount > 0 ? nextBody.attachments : message.attachments,
-      };
-    };
+  const fetchBodyForMessage = useCallback(createFetchBodyForMessage({
+    bodyCacheRef,
+    rememberBody,
+    bodyRequestsRef,
+    info,
+  }), [info, rememberBody]);
 
-    setMessages((current) => current.map(enrichHeader));
-    setSearchResults((current) => current?.map(enrichHeader) ?? null);
-    setMessageTabs((current) => current.map((tab) => ({
-      ...tab,
-      message: enrichHeader(tab.message),
-    })));
-  }, []);
-
-  const fetchBodyForMessage = useCallback((message: MailMessageHeader): Promise<MailMessageBody> => {
-    const key = messageKey(message);
-    const cached = bodyCacheRef.current.get(key);
-    if (cached && bodyMatchesMessage(cached, message)) {
-      rememberBody(cached);
-      return Promise.resolve(cached);
-    }
-    const inflight = bodyRequestsRef.current.get(key);
-    if (inflight) return inflight;
-
-    const request = mailGetMessageBody(info, message.folder, message.uid)
-      .then((nextBody) => {
-        rememberBody(nextBody);
-        return nextBody;
-      })
-      .finally(() => {
-        bodyRequestsRef.current.delete(key);
-      });
-    bodyRequestsRef.current.set(key, request);
-    return request;
-  }, [info, rememberBody]);
-
-  const warmRecentBodies = useCallback(async (foldersToWarm: MailFolder[], preferredFolder: string) => {
-    if (!info.cache.enabled || info.cache.bodyRecentLimit <= 0) {
-      setBodyWarming({ active: false, done: 0, total: 0 });
-      return;
-    }
-    if (!visibleRef.current) {
-      pendingCacheRefreshRef.current = true;
-      return;
-    }
-    const seq = bodyWarmSeqRef.current + 1;
-    bodyWarmSeqRef.current = seq;
-    const limit = Math.max(1, Math.min(1000, info.cache.bodyRecentLimit));
-    const orderedFolders = foldersToWarm.slice().sort((a, b) => {
-      if (a.name === preferredFolder) return -1;
-      if (b.name === preferredFolder) return 1;
-      return 0;
-    });
-    const seen = new Set<string>();
-    const candidates: MailMessageHeader[] = [];
-    setBodyWarming({ active: true, done: 0, total: 0 });
-
-    try {
-      for (const folder of orderedFolders) {
-        if (bodyWarmSeqRef.current !== seq || !visibleRef.current) return;
-        const page = await mailListCachedMessages(info.sessionId, folder.name, limit, 0);
-        if (bodyWarmSeqRef.current !== seq || !visibleRef.current) return;
-        for (const message of page) {
-          const key = messageKey(message);
-          if (seen.has(key) || message.bodyCached || bodyCacheRef.current.has(key)) continue;
-          seen.add(key);
-          candidates.push(message);
-        }
-      }
-
-      if (bodyWarmSeqRef.current !== seq || !visibleRef.current) return;
-      if (candidates.length === 0) {
-        setBodyWarming({ active: false, done: 0, total: 0 });
-        return;
-      }
-
-      setBodyWarming({ active: true, done: 0, total: candidates.length, folder: candidates[0]?.folder ?? null });
-      let done = 0;
-      let lastProgressAt = Date.now();
-      for (const message of candidates) {
-        if (bodyWarmSeqRef.current !== seq || !visibleRef.current) return;
-        try {
-          // Warm only the native disk cache. Manual opens use the interactive
-          // connection and must not join a request queued behind history sync.
-          await mailPrefetchMessageBody(info, message.folder, message.uid);
-        } catch {
-          // Body warming is opportunistic; direct message open still reports errors.
-        }
-        done += 1;
-        if (bodyWarmSeqRef.current !== seq || !visibleRef.current) return;
-        const now = Date.now();
-        if (done === candidates.length || now - lastProgressAt >= 250) {
-          lastProgressAt = now;
-          setBodyWarming({
-            active: done < candidates.length,
-            done,
-            total: candidates.length,
-            folder: message.folder,
-          });
-        }
-        // Cached IPC can settle synchronously. Give input/paint a task turn
-        // without rebuilding every visible row once per warmed body.
-        if (done % 8 === 0) await delay(0);
-      }
-    } finally {
-      if (bodyWarmSeqRef.current === seq) {
-        setBodyWarming((current) => ({
-          active: false,
-          done: current.total > 0 ? current.done : 0,
-          total: current.total,
-          folder: current.folder,
-        }));
-      }
-    }
-  }, [info]);
+  const warmRecentBodies = useCallback(createWarmRecentBodies({
+    info,
+    setBodyWarming,
+    visibleRef,
+    pendingCacheRefreshRef,
+    bodyWarmSeqRef,
+    bodyCacheRef,
+  }), [info]);
 
   const isNewMailExcludedFolder = useCallback((folder: MailFolder) =>
     NEW_MAIL_EXCLUDED_KINDS.some((kind) => folderMatchesSpecial(folder, kind, info.specialFolders))
@@ -2295,346 +910,125 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
    * visible list is then reloaded from the cache so deletions and flag
    * changes from other clients show up too.
    */
-  const runFolderSync = useCallback(async (folder: string, options: {
-    mode?: MailSyncRequestMode;
-    indicator?: SyncIndicator;
-    maxSteps?: number;
-  } = {}) => {
-    const generation = syncGenerationRef.current;
-    const indicator = options.indicator ?? "none";
-    let changed = false;
-    try {
-      const loop = await runFolderSyncLoop({
-        mode: options.mode ?? "auto",
-        maxSteps: options.maxSteps ?? 40,
-        isCancelled: () => syncGenerationRef.current !== generation,
-        step: (mode) => mailSyncFolder(info, folder, { mode, limit: catchupBatchSize, includeBodies: false }),
-        onStep: (result, progress) => {
-          if (result.fetched > 0 || result.vanished > 0 || result.flagsUpdated > 0) changed = true;
-          applySyncedFolder(result.folder);
-          if (!visibleRef.current) {
-            pendingCacheRefreshRef.current = true;
-            return;
-          }
-          const merged = mergeSyncedMessages(
-            selectedFolderRef.current,
-            folder,
-            messagesRef.current,
-            result.messages,
-            sortMessages,
-            // Sync indexes all messages, but must not expand the rendered page.
-            // Preserve explicitly loaded depth; older rows remain available via
-            // Load older messages after the final cache refresh.
-            Math.max(pageSize, messagesRef.current.length),
-          );
-          if (merged) {
-            setMessages(merged);
-          }
-          if (result.uidValidityReset) {
-            setStatus(`${folderLabel(result.folder)} was rebuilt on the server; resynced`);
-          }
-          if (indicator !== "none" && result.more) {
-            setSyncProgress({ folder, fetched: progress.fetched, remaining: progress.remaining });
-          }
-        },
-      });
-      if (changed && info.cache.enabled) await reloadVisibleFromCache(folder);
-      if (loop.fetched > 0 && folder.trim().toUpperCase() === "INBOX") {
-        await incomingFiltersRef.current?.();
-      }
-      return loop;
-    } finally {
-      if (indicator !== "none" && visibleRef.current) setSyncProgress(null);
-    }
-  }, [applySyncedFolder, catchupBatchSize, info, pageSize, reloadVisibleFromCache]);
+  const runFolderSync = useCallback(createRunFolderSync({
+    syncGenerationRef,
+    info,
+    catchupBatchSize,
+    applySyncedFolder,
+    visibleRef,
+    pendingCacheRefreshRef,
+    selectedFolderRef,
+    messagesRef,
+    pageSize,
+    setMessages,
+    setStatus,
+    setSyncProgress,
+    reloadVisibleFromCache,
+    incomingFiltersRef,
+  }), [applySyncedFolder, catchupBatchSize, info, pageSize, reloadVisibleFromCache]);
 
   // A manual scan must not wait for up to 120 additional history batches.
   // Drain every pending folder fairly in the background, releasing the guard
   // between steps so another Sync/folder switch can get its turn.
-  const queueFolderCatchups = useCallback((names: string[], reconcile: MailSyncRequestMode) => {
-    const queue = pendingCatchupsRef.current;
-    for (const name of names) queue.folders.set(name, { mode: "auto", reconcile });
-    if (queue.running || queue.disposed || queue.folders.size === 0) return;
-    queue.running = true;
-    void (async () => {
-      try {
-        while (!queue.disposed && queue.folders.size > 0) {
-          if (syncInFlightRef.current || manualSyncPendingRef.current) {
-            await delay(50);
-            continue;
-          }
-          const [name, task] = queue.folders.entries().next().value!;
-          queue.folders.delete(name);
-          syncInFlightRef.current = true;
-          try {
-            const result = await runFolderSync(name, { mode: task.mode, maxSteps: 1 });
-            if (queue.disposed) return;
-            if (result.last?.more) queue.folders.set(name, task);
-            else if (task.mode === "auto") {
-              // A scan with a pending catch-up cannot reconcile the older range
-              // yet. Do it after the final header batch, including remote deletes.
-              queue.folders.set(name, { ...task, mode: task.reconcile });
-            }
-            if (!isNewMailExcludedName(name)) notifyNewMail(result.newUnseen);
-          } catch (e) {
-            // Do not spin indefinitely on an unavailable folder. Its durable
-            // watermark survives, and the next scan/Retry resumes it.
-            if (!queue.disposed && visibleRef.current) {
-              setError(`${name}: ${mailClientErrorMessage(e)}`);
-              void loadCachedFolders();
-            }
-          } finally {
-            syncInFlightRef.current = false;
-          }
-          await delay(50);
-        }
-      } finally {
-        queue.running = false;
-      }
-    })();
-  }, [isNewMailExcludedName, loadCachedFolders, notifyNewMail, runFolderSync]);
+  const queueFolderCatchups = useCallback(createQueueFolderCatchups({
+    pendingCatchupsRef,
+    syncInFlightRef,
+    manualSyncPendingRef,
+    runFolderSync,
+    isNewMailExcludedName,
+    notifyNewMail,
+    visibleRef,
+    setError,
+    loadCachedFolders,
+  }), [isNewMailExcludedName, loadCachedFolders, notifyNewMail, runFolderSync]);
 
   /**
    * Fetch older history for the selected folder in the background (full
    * header index). Yields to user-triggered syncs and stops on folder switch,
    * tab hide or unmount; the next open resumes from the stored watermark.
    */
-  const startBackfill = useCallback((folder: string) => {
-    const meta = foldersRef.current.find((entry) => entry.name === folder);
-    if (!info.cache.enabled || !meta || meta.syncComplete || meta.syncHighUid == null) return;
-    const seq = backfillSeqRef.current + 1;
-    backfillSeqRef.current = seq;
-    const active = () =>
-      backfillSeqRef.current === seq && visibleRef.current && selectedFolderRef.current === folder;
-    void (async () => {
-      try {
-        for (let round = 0; round < 1000; round += 1) {
-          if (!active()) return;
-          if (syncInFlightRef.current || manualSyncPendingRef.current) {
-            await delay(800);
-            continue;
-          }
-          syncInFlightRef.current = true;
-          let result: MailFolderSyncResult;
-          try {
-            result = await mailSyncFolder(info, folder, { mode: "backfill", limit: catchupBatchSize });
-          } finally {
-            syncInFlightRef.current = false;
-          }
-          applySyncedFolder(result.folder);
-          if (!active()) return;
-          const cached = result.folder.cachedCount ?? 0;
-          const total = result.folder.total ?? cached;
-          if (!result.more) {
-            setBackfillProgress(null);
-            setHasMoreMessages(folderHasMoreToLoad(
-              result.folder,
-              messagesRef.current.filter((message) => message.folder === folder).length,
-              false,
-            ));
-            return;
-          }
-          setBackfillProgress({ folder, cached, total });
-          setHasMoreMessages(true);
-          await delay(200);
-        }
-      } catch (e) {
-        console.debug("mail history backfill paused", e);
-      } finally {
-        if (backfillSeqRef.current === seq && visibleRef.current) setBackfillProgress(null);
-      }
-    })();
-  }, [applySyncedFolder, catchupBatchSize, info]);
+  const startBackfill = useCallback(createStartBackfill({
+    foldersRef,
+    info,
+    backfillSeqRef,
+    visibleRef,
+    selectedFolderRef,
+    syncInFlightRef,
+    manualSyncPendingRef,
+    catchupBatchSize,
+    applySyncedFolder,
+    setBackfillProgress,
+    setHasMoreMessages,
+    messagesRef,
+  }), [applySyncedFolder, catchupBatchSize, info]);
 
   /**
    * Open / folder-select sync: catch the folder (and INBOX) up completely,
    * however long the tab was closed.
    */
-  const syncFolderNow = useCallback(async (
-    folder: string,
-    indicator: SyncIndicator = "sync",
-    notify = false,
-  ) => {
-    if (syncInFlightRef.current) {
-      if (indicator !== "none" && visibleRef.current) setStatus("Mail sync already running");
-      return null;
-    }
-    syncInFlightRef.current = true;
-    syncGenerationRef.current += 1;
-    if (indicator === "sync") setSyncing(true);
-    if (indicator !== "none") setError(null);
-    try {
-      const primary = await runFolderSync(folder, { indicator });
-      let fetched = primary.fetched;
-      let newUnseen = isNewMailExcludedName(folder) ? 0 : primary.newUnseen;
-      if (!manualSyncPendingRef.current && folder.trim().toUpperCase() !== "INBOX") {
-        try {
-          const inbox = await runFolderSync("INBOX");
-          fetched += inbox.fetched;
-          newUnseen += inbox.newUnseen;
-        } catch (e) {
-          console.debug("mail INBOX catch-up failed", e);
-        }
-      }
-      if (notify) notifyNewMail(newUnseen);
-      if (indicator !== "none" && visibleRef.current) {
-        setStatus(fetched > 0 ? `Synced ${fetched} headers` : "Mailbox up to date");
-      }
-      return primary;
-    } catch (e) {
-      if (visibleRef.current) {
-        if (indicator !== "none") setError(mailClientErrorMessage(e));
-        // Surface the folder failure recorded by the backend.
-        void loadCachedFolders();
-      }
-      return null;
-    } finally {
-      syncInFlightRef.current = false;
-      if (indicator === "sync" && visibleRef.current) setSyncing(false);
-    }
-  }, [isNewMailExcludedName, loadCachedFolders, notifyNewMail, runFolderSync]);
+  const syncFolderNow = useCallback(createSyncFolderNow({
+    syncInFlightRef,
+    visibleRef,
+    setStatus,
+    syncGenerationRef,
+    setSyncing,
+    setError,
+    runFolderSync,
+    isNewMailExcludedName,
+    manualSyncPendingRef,
+    notifyNewMail,
+    loadCachedFolders,
+  }), [isNewMailExcludedName, loadCachedFolders, notifyNewMail, runFolderSync]);
 
-  const syncSelectedFolder = useCallback(async (folder: string) => {
-    // A user folder switch must survive an existing poll/catch-up. Keep only
-    // the latest selection eligible so rapid switches do not queue old work.
-    const sequence = ++folderSelectSeqRef.current;
-    const current = () => folderSelectSeqRef.current === sequence
-      && visibleRef.current && selectedFolderRef.current === folder;
-    while (syncInFlightRef.current || manualSyncPendingRef.current) {
-      if (!current()) return;
-      await delay(50);
-    }
-    if (!current()) return;
-    await syncFolderNow(folder, "none");
-    if (current()) startBackfill(folder);
-  }, [startBackfill, syncFolderNow]);
+  const syncSelectedFolder = useCallback(createSyncSelectedFolder({
+    folderSelectSeqRef,
+    visibleRef,
+    selectedFolderRef,
+    syncInFlightRef,
+    manualSyncPendingRef,
+    syncFolderNow,
+    startBackfill,
+  }), [startBackfill, syncFolderNow]);
 
   useEffect(() => () => { folderSelectSeqRef.current += 1; }, [info.sessionId]);
 
   /** Quiet background poll: catch up the selected folder and INBOX, reconcile flags. */
-  const quietPollSelectedAndInbox = useCallback(async () => {
-    if (syncInFlightRef.current || manualSyncPendingRef.current) return;
-    syncInFlightRef.current = true;
-    const activeFolder = selectedFolderRef.current;
-    try {
-      const selected = await runFolderSync(activeFolder, { maxSteps: 10 });
-      let newUnseen = isNewMailExcludedName(activeFolder) ? 0 : selected.newUnseen;
-      if (!manualSyncPendingRef.current && activeFolder.trim().toUpperCase() !== "INBOX") {
-        try {
-          newUnseen += (await runFolderSync("INBOX", { maxSteps: 10 })).newUnseen;
-        } catch (e) {
-          // Selected-folder refresh already succeeded; inbox is best-effort.
-          console.debug("quiet INBOX poll failed", e);
-        }
-      }
-      if (info.cache.enabled && !manualSyncPendingRef.current) {
-        try {
-          await runFolderSync(activeFolder, { mode: "reconcile", maxSteps: 3 });
-        } catch (e) {
-          console.debug("quiet mail reconcile failed", e);
-        }
-      }
-      notifyNewMail(newUnseen);
-    } catch (e) {
-      console.debug("quiet mail poll failed", e);
-    } finally {
-      syncInFlightRef.current = false;
-    }
-  }, [info.cache.enabled, isNewMailExcludedName, notifyNewMail, runFolderSync]);
+  const quietPollSelectedAndInbox = useCallback(createQuietPollSelectedAndInbox({
+    syncInFlightRef,
+    manualSyncPendingRef,
+    selectedFolderRef,
+    runFolderSync,
+    isNewMailExcludedName,
+    info,
+    notifyNewMail,
+  }), [info.cache.enabled, isNewMailExcludedName, notifyNewMail, runFolderSync]);
 
-  const syncAllFolders = useCallback(async (
-    quiet = false,
-    options: Pick<SyncFolderOptions, "limit" | "includeBodies" | "indicator"> = {},
-  ) => {
-    const indicator = options.indicator ?? "sync";
-    const limit = Math.max(1, options.limit ?? batchSize);
-    const includeBodies = options.includeBodies ?? false;
-    const activeBeforeSync = selectedFolderRef.current;
-    const manual = !quiet && indicator !== "none";
-    if (manual) {
-      manualSyncPendingRef.current = true;
-      // Existing catch-up loops yield after their current bounded step.
-      syncGenerationRef.current += 1;
-    }
-
-    if (syncInFlightRef.current) {
-      // Background work (open catch-up, backfill, quiet poll) holds the lock.
-      // Periodic scans just skip; a manual sync waits its turn instead of
-      // being dropped, so a click always ends with fresh server state.
-      if (quiet || indicator === "none") return null;
-      if (indicator === "sync") setSyncing(true);
-      if (visibleRef.current) setStatus("Waiting for current mail sync…");
-      const deadline = Date.now() + 120_000;
-      while (syncInFlightRef.current && Date.now() < deadline) {
-        await delay(150);
-      }
-      if (syncInFlightRef.current) {
-        manualSyncPendingRef.current = false;
-        if (indicator === "sync" && visibleRef.current) setSyncing(false);
-        if (visibleRef.current) setStatus("Mail sync already running");
-        return null;
-      }
-    }
-    syncInFlightRef.current = true;
-    manualSyncPendingRef.current = false;
-
-    if (indicator === "sync") {
-      setSyncing(true);
-    }
-    if (!quiet && indicator !== "none") setStatus(null);
-    if (indicator !== "none") setError(null);
-
-    try {
-      // Manual sync reconciles every cached message; periodic scans only the newest window.
-      const result = await mailSyncAllFolders(
-        { ...info, sync: { ...info.sync, subscribedOnly: subscribedOnlyRef.current } },
-        { limit, includeBodies, fullReconcile: !quiet },
-      );
-      foldersRef.current = result.folders;
-      const newMessages = countNewMail(result.newUnseenByFolder, result.folders, isNewMailExcludedFolder);
-      const pending = (result.pendingFolders ?? [])
-        .slice()
-        .sort((a, b) => Number(b === activeBeforeSync) - Number(a === activeBeforeSync));
-      queueFolderCatchups(pending, quiet ? "reconcile" : "reconcileFull");
-      if (indicator === "none") notifyNewMail(newMessages);
-      // New INBOX mail from the full scan goes through the incoming filters
-      // (a cheap cache query when nothing is new or no filter is enabled).
-      if (result.fetchedMessages > 0) await incomingFiltersRef.current?.();
-      if (!visibleRef.current) {
-        pendingCacheRefreshRef.current = true;
-        return result;
-      }
-      setFolders(foldersRef.current);
-      const currentFolder = selectedFolderRef.current;
-      const nextFolder = foldersRef.current.some((folder) => folder.name === currentFolder)
-        ? currentFolder
-        : foldersRef.current[0]?.name ?? currentFolder;
-      if (nextFolder !== currentFolder) {
-        updateSelectedFolder(nextFolder);
-      }
-      const loaded = messagesRef.current.filter((message) => message.folder === nextFolder).length;
-      await loadCachedMessages(nextFolder, 0, false, quiet || indicator === "none", Math.max(pageSize, loaded));
-      const failed = result.failedFolders ?? [];
-      if (indicator !== "none") {
-        setStatus(
-          `Synced ${result.fetchedMessages} new headers across ${result.folders.length} folders`
-          + (failed.length > 0 ? `; ${failed.length} folder${failed.length === 1 ? "" : "s"} failed` : "")
-          + (pending.length > 0 ? "; remaining headers syncing in background" : ""),
-        );
-      }
-      void warmRecentBodies(foldersRef.current, nextFolder);
-      startBackfill(nextFolder);
-      return result;
-    } catch (e) {
-      if (indicator !== "none") setError(mailClientErrorMessage(e));
-      return null;
-    } finally {
-      syncInFlightRef.current = false;
-      if (indicator === "sync") {
-        if (visibleRef.current) setSyncing(false);
-      }
-    }
-  }, [
+  const syncAllFolders = useCallback(createSyncAllFolders({
+    batchSize,
+    selectedFolderRef,
+    manualSyncPendingRef,
+    syncGenerationRef,
+    syncInFlightRef,
+    setSyncing,
+    visibleRef,
+    setStatus,
+    setError,
+    info,
+    subscribedOnlyRef,
+    foldersRef,
+    isNewMailExcludedFolder,
+    queueFolderCatchups,
+    notifyNewMail,
+    incomingFiltersRef,
+    pendingCacheRefreshRef,
+    setFolders,
+    updateSelectedFolder,
+    messagesRef,
+    loadCachedMessages,
+    pageSize,
+    warmRecentBodies,
+    startBackfill,
+  }), [
     batchSize,
     info,
     isNewMailExcludedFolder,
@@ -2647,103 +1041,45 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     warmRecentBodies,
   ]);
 
-  const loadBody = useCallback(async (message: MailMessageHeader) => {
-    const key = messageKey(message);
-    const cached = bodyCacheRef.current.get(key);
-    if (cached && bodyMatchesMessage(cached, message)) {
-      rememberBody(cached);
-      return cached;
-    }
-    const seq = bodyLoadSeqRef.current + 1;
-    bodyLoadSeqRef.current = seq;
-    setBodyLoadingKey(key);
-    setError(null);
-    try {
-      const nextBody = await fetchBodyForMessage(message);
-      if (bodyLoadSeqRef.current === seq) {
-        setStatus(nextBody.source === "cache" ? "Loaded body from cache" : "Loaded body from server");
-      }
-      return nextBody;
-    } catch (e) {
-      setError(mailClientErrorMessage(e));
-      return null;
-    } finally {
-      setBodyLoadingKey((current) => (current === key ? null : current));
-    }
-  }, [fetchBodyForMessage, rememberBody]);
+  const loadBody = useCallback(createLoadBody({
+    bodyCacheRef,
+    rememberBody,
+    bodyLoadSeqRef,
+    setBodyLoadingKey,
+    setError,
+    fetchBodyForMessage,
+    setStatus,
+  }), [fetchBodyForMessage, rememberBody]);
 
-  const markMessagesReadLocally = useCallback((folder: string, uids: number[] | null, markedCount: number) => {
-    if (markedCount <= 0) return;
-    const uidSet = uids ? new Set(uids) : null;
-    const shouldMark = (message: MailMessageHeader) =>
-      message.folder === folder && (!uidSet || uidSet.has(message.uid));
-    setMessages((current) => current.map((message) => {
-      return shouldMark(message) ? withSeenFlag(message) : message;
-    }));
-    setSearchResults((current) => current?.map((message) => shouldMark(message) ? withSeenFlag(message) : message) ?? null);
-    setMessageTabs((current) => current.map((tab) => {
-      return shouldMark(tab.message) ? { ...tab, message: withSeenFlag(tab.message) } : tab;
-    }));
-    setFolders((current) => current.map((entry) => {
-      if (entry.name !== folder || entry.unread === null || entry.unread === undefined) return entry;
-      return { ...entry, unread: Math.max(0, entry.unread - markedCount), updatedAt: Math.floor(Date.now() / 1000) };
-    }));
-  }, []);
+  const markMessagesReadLocally = useCallback(createMarkMessagesReadLocally({
+    setMessages,
+    setSearchResults,
+    setMessageTabs,
+    setFolders,
+  }), []);
 
-  const handleMarkSelectedRead = useCallback(async () => {
-    const unread = checkedMessages.filter(isUnread);
-    if (unread.length === 0) {
-      setStatus("Selected messages are already read");
-      return;
-    }
+  const handleMarkSelectedRead = useCallback(createHandleMarkSelectedRead({
+    checkedMessages,
+    setStatus,
+    setMarkingRead,
+    setError,
+    info,
+    markMessagesReadLocally,
+    setCheckedMessageKeys,
+  }), [checkedMessages, info, markMessagesReadLocally]);
 
-    setMarkingRead(true);
-    setError(null);
-    try {
-      let marked = 0;
-      for (const [folder, group] of messageBatchesByFolder(unread)) {
-        const uids = group.map((message) => message.uid);
-        const result = await mailMarkRead(info, folder, uids, false);
-        marked += result.marked;
-        markMessagesReadLocally(folder, uids, result.marked);
-        setCheckedMessageKeys((current) => {
-          const next = new Set(current);
-          for (const message of group) next.delete(messageKey(message));
-          return next;
-        });
-      }
-      setStatus(marked > 0 ? `Marked ${marked} selected messages as read` : "No selected unread messages");
-    } catch (e) {
-      setError(mailClientErrorMessage(e));
-    } finally {
-      setMarkingRead(false);
-    }
-  }, [checkedMessages, info, markMessagesReadLocally]);
-
-  const handleMarkFolderRead = useCallback(async (folderName = selectedFolder) => {
-    setMarkingRead(true);
-    setError(null);
-    try {
-      const result = await mailMarkRead(info, folderName, [], true);
-      markMessagesReadLocally(folderName, null, result.marked);
-      await loadCachedFolders();
-      if (selectedFolderRef.current === folderName) {
-        await loadCachedMessages(folderName, 0, false, true, messagesRef.current.length);
-      }
-      // Read flags do not change the user’s selection, including selections made
-      // while this potentially long folder operation was running.
-      setStatus(result.marked > 0 ? `Marked ${result.marked} messages as read` : "Folder is already read");
-    } catch (e) {
-      // Completed batches are committed even if a later STORE fails.
-      await loadCachedFolders();
-      if (selectedFolderRef.current === folderName) {
-        await loadCachedMessages(folderName, 0, false, true, messagesRef.current.length);
-      }
-      setError(mailClientErrorMessage(e));
-    } finally {
-      setMarkingRead(false);
-    }
-  }, [info, loadCachedFolders, loadCachedMessages, markMessagesReadLocally, selectedFolder]);
+  const handleMarkFolderRead = useCallback(createHandleMarkFolderRead({
+    selectedFolder,
+    setMarkingRead,
+    setError,
+    info,
+    markMessagesReadLocally,
+    loadCachedFolders,
+    selectedFolderRef,
+    loadCachedMessages,
+    messagesRef,
+    setStatus,
+  }), [info, loadCachedFolders, loadCachedMessages, markMessagesReadLocally, selectedFolder]);
 
   const toggleMessageChecked = useCallback((message: MailMessageHeader, checked: boolean, range = false) => {
     const key = messageKey(message);
@@ -2823,23 +1159,13 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     setPopupMessageKey(messageKey(message));
   }, [mailViewKey, selectMessage]);
 
-  const handleMarkSingleRead = useCallback(async (message: MailMessageHeader) => {
-    if (!isUnread(message)) {
-      setStatus("Message is already read");
-      return;
-    }
-    setMarkingRead(true);
-    setError(null);
-    try {
-      const result = await mailMarkRead(info, message.folder, [message.uid], false);
-      markMessagesReadLocally(message.folder, [message.uid], result.marked);
-      setStatus(result.marked > 0 ? "Marked message as read" : "Message was already read");
-    } catch (e) {
-      setError(mailClientErrorMessage(e));
-    } finally {
-      setMarkingRead(false);
-    }
-  }, [info, markMessagesReadLocally]);
+  const handleMarkSingleRead = useCallback(createHandleMarkSingleRead({
+    setStatus,
+    setMarkingRead,
+    setError,
+    info,
+    markMessagesReadLocally,
+  }), [info, markMessagesReadLocally]);
 
   const loadInitialMessages = useCallback(async (folder: string) => {
     await loadCachedMessages(folder);
@@ -3099,49 +1425,27 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }
   };
 
-  const loadMoreMessages = useCallback(async () => {
-    if (query.trim() || loadingMessages || loadingMoreMessages || !hasMoreMessages) return;
-    const folder = selectedFolder;
-    const loaded = messages.length;
-    if (!info.cache.enabled) {
-      // No cache to page: fall back to server offset paging.
-      setLoadingMoreMessages(true);
-      try {
-        const result = await mailSyncHeaders(info, folder, { limit: pageSize, offset: loaded, refreshFolders: false });
-        const merged = mergeSyncedMessages(selectedFolderRef.current, folder, messagesRef.current, result.messages, sortMessages);
-        if (merged) {
-          setMessages(merged);
-        }
-        setHasMoreMessages(result.hasMore);
-      } catch (e) {
-        setError(mailClientErrorMessage(e));
-      } finally {
-        setLoadingMoreMessages(false);
-      }
-      return;
-    }
-    // Cache first; only when the cache is exhausted backfill older history.
-    const { page } = await loadCachedMessages(folder, loaded, true);
-    if (page.length > 0) return;
-    const meta = foldersRef.current.find((entry) => entry.name === folder);
-    if (!meta || meta.syncComplete || syncInFlightRef.current) {
-      if (meta?.syncComplete) setHasMoreMessages(false);
-      return;
-    }
-    syncInFlightRef.current = true;
-    setLoadingMoreMessages(true);
-    try {
-      const result = await mailSyncFolder(info, folder, { mode: "backfill", limit: pageSize });
-      applySyncedFolder(result.folder);
-      await loadCachedMessages(folder, loaded, true);
-      if (!result.more && result.fetched === 0) setStatus("No more messages");
-    } catch (e) {
-      setError(mailClientErrorMessage(e));
-    } finally {
-      syncInFlightRef.current = false;
-      setLoadingMoreMessages(false);
-    }
-  }, [
+  const loadMoreMessages = useCallback(createLoadMoreMessages({
+    query,
+    loadingMessages,
+    loadingMoreMessages,
+    hasMoreMessages,
+    selectedFolder,
+    messages,
+    info,
+    setLoadingMoreMessages,
+    pageSize,
+    selectedFolderRef,
+    messagesRef,
+    setMessages,
+    setHasMoreMessages,
+    setError,
+    loadCachedMessages,
+    foldersRef,
+    syncInFlightRef,
+    applySyncedFolder,
+    setStatus,
+  }), [
     applySyncedFolder,
     hasMoreMessages,
     info,
@@ -3709,39 +2013,12 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     setStatus("Sending cancelled");
   };
 
-  const addDraftAttachmentPaths = useCallback(async (paths: string[]) => {
-    const unique = paths.map((path) => path.trim()).filter(Boolean);
-    if (unique.length === 0) return;
-    setAttachProgress({ done: 0, total: unique.length, label: "Attaching files…" });
-    try {
-      setDraft((current) => {
-        const existing = new Set(current.attachments.map((attachment) => attachment.path));
-        const nextAttachments = unique
-          .filter((path) => !existing.has(path))
-          .map((path) => {
-            const name = basename(path);
-            return {
-              path,
-              name,
-              contentType: guessContentType(name),
-              size: null,
-              modifiedAt: null,
-            } satisfies MailDraftAttachment;
-          });
-        return { ...current, attachments: [...current.attachments, ...nextAttachments] };
-      });
-      setAttachProgress({ done: unique.length, total: unique.length, label: "Attachments ready" });
-      setStatus(
-        unique.length === 1
-          ? `Attached ${basename(unique[0])}`
-          : `Attached ${unique.length} files`,
-      );
-      window.setTimeout(() => setAttachProgress(null), 1200);
-    } catch (e) {
-      setAttachProgress(null);
-      setError(mailClientErrorMessage(e));
-    }
-  }, []);
+  const addDraftAttachmentPaths = useCallback(createAddDraftAttachmentPaths({
+    setAttachProgress,
+    setDraft,
+    setStatus,
+    setError,
+  }), []);
 
   const handleAddDraftAttachments = async () => {
     try {
@@ -3753,62 +2030,15 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }
   };
 
-  const insertInlineImageFromPath = useCallback(async (path: string): Promise<string | null> => {
-    const name = basename(path);
-    const contentType = guessContentType(name);
-    if (!contentType.toLowerCase().startsWith("image/")) {
-      setError("Inline image must be a local image file.");
-      return null;
-    }
-    const bytes = await readFileBytes(path);
-    const dataUrl = `data:${contentType};base64,${uint8ToBase64(bytes)}`;
-    const contentId = makeInlineImageContentId(name);
-    const attachment: MailDraftAttachment = {
-      path,
-      name,
-      contentType,
-      inline: true,
-      contentId,
-      size: bytes.byteLength,
-      modifiedAt: null,
-    };
-    setDraft((current) => ({
-      ...current,
-      richFormatUsed: true,
-      attachments: [...current.attachments, attachment],
-    }));
-    return buildInlineImageHtml({ contentId, dataUrl, alt: name });
-  }, []);
+  const insertInlineImageFromPath = useCallback(createInsertInlineImageFromPath({
+    setError,
+    setDraft,
+  }), []);
 
-  const insertInlineImageFromFile = useCallback(async (file: File): Promise<string | null> => {
-    const mime = file.type || "image/png";
-    if (!mime.toLowerCase().startsWith("image/")) {
-      setError("Inline image must be an image file.");
-      return null;
-    }
-    const ext = extensionForMime(mime);
-    const name = (file.name?.trim() || `pasted-image.${ext}`).replace(/[\\/]/g, "_");
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    const path = await temporaryFilePath(name);
-    await writeBytesToPath(path, bytes);
-    const dataUrl = `data:${mime};base64,${uint8ToBase64(bytes)}`;
-    const contentId = makeInlineImageContentId(name);
-    const attachment: MailDraftAttachment = {
-      path,
-      name,
-      contentType: mime,
-      inline: true,
-      contentId,
-      size: bytes.byteLength,
-      modifiedAt: null,
-    };
-    setDraft((current) => ({
-      ...current,
-      richFormatUsed: true,
-      attachments: [...current.attachments, attachment],
-    }));
-    return buildInlineImageHtml({ contentId, dataUrl, alt: name });
-  }, []);
+  const insertInlineImageFromFile = useCallback(createInsertInlineImageFromFile({
+    setError,
+    setDraft,
+  }), []);
 
   const handleInsertInlineImage = async (): Promise<string | null> => {
     try {
@@ -3822,74 +2052,19 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     }
   };
 
-  const handlePasteImages = useCallback(async (files: File[]): Promise<string[]> => {
-    const snippets: string[] = [];
-    // Prefer files from the paste event when present (multi-image). When the
-    // webview omits image/* (common on Linux WebKitGTK for screenshots), fall
-    // back to native arboard, then the async Clipboard API.
-    let imageFiles = files.filter((file) => (file.type || "").startsWith("image/"));
-    if (imageFiles.length === 0) {
-      const nativePath = await readNativeClipboardImagePath();
-      if (nativePath) {
-        setAttachProgress({ done: 0, total: 1, label: "Inserting images…" });
-        try {
-          const html = await insertInlineImageFromPath(nativePath);
-          if (html) {
-            setAttachProgress({ done: 1, total: 1, label: "Images inserted" });
-            setStatus("Image pasted");
-            window.setTimeout(() => setAttachProgress(null), 1200);
-            return [html];
-          }
-        } catch (e) {
-          setAttachProgress(null);
-          setError(mailClientErrorMessage(e));
-          return [];
-        }
-      }
-      imageFiles = await readClipboardImageFiles();
-    }
-    if (imageFiles.length === 0) return [];
+  const handlePasteImages = useCallback(createHandlePasteImages({
+    setAttachProgress,
+    insertInlineImageFromPath,
+    setStatus,
+    setError,
+    insertInlineImageFromFile,
+  }), [insertInlineImageFromFile, insertInlineImageFromPath]);
 
-    setAttachProgress({ done: 0, total: imageFiles.length, label: "Inserting images…" });
-    try {
-      for (let i = 0; i < imageFiles.length; i += 1) {
-        const html = await insertInlineImageFromFile(imageFiles[i]);
-        if (html) snippets.push(html);
-        setAttachProgress({ done: i + 1, total: imageFiles.length, label: "Inserting images…" });
-      }
-      setAttachProgress({ done: imageFiles.length, total: imageFiles.length, label: "Images inserted" });
-      if (snippets.length > 0) {
-        setStatus(snippets.length === 1 ? "Image pasted" : `${snippets.length} images pasted`);
-      }
-      window.setTimeout(() => setAttachProgress(null), 1200);
-      return snippets;
-    } catch (e) {
-      setAttachProgress(null);
-      setError(mailClientErrorMessage(e));
-      return snippets;
-    }
-  }, [insertInlineImageFromFile, insertInlineImageFromPath]);
-
-  const handleDropComposeFiles = useCallback(async (files: File[]) => {
-    if (files.length === 0) return;
-    setAttachProgress({ done: 0, total: files.length, label: "Attaching files…" });
-    try {
-      const paths: string[] = [];
-      for (let i = 0; i < files.length; i += 1) {
-        const file = files[i];
-        const name = (file.name?.trim() || `attachment-${i + 1}`).replace(/[\\/]/g, "_");
-        const path = await temporaryFilePath(name);
-        const bytes = new Uint8Array(await file.arrayBuffer());
-        await writeBytesToPath(path, bytes);
-        paths.push(path);
-        setAttachProgress({ done: i + 1, total: files.length, label: "Attaching files…" });
-      }
-      await addDraftAttachmentPaths(paths);
-    } catch (e) {
-      setAttachProgress(null);
-      setError(mailClientErrorMessage(e));
-    }
-  }, [addDraftAttachmentPaths]);
+  const handleDropComposeFiles = useCallback(createHandleDropComposeFiles({
+    setAttachProgress,
+    addDraftAttachmentPaths,
+    setError,
+  }), [addDraftAttachmentPaths]);
 
   const removeDraftAttachment = (index: number) => {
     setDraft((current) => {
