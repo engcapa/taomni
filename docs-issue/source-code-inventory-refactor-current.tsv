@@ -11,7 +11,7 @@ scripts/configure-release-signing.mjs	tooling	mjs	tool-script	209	7	6	0		开发�
 scripts/configure-release-signing.test.mjs	tooling	mjs	test	187	8	0	0		自动化测试/QA 集成测试
 scripts/editor_performance_browser.py	frontend	py	frontend-lib	162	6	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 scripts/macos-runtime-paths.test.mjs	tooling	mjs	test	99	7	0	0		自动化测试/QA 集成测试
-scripts/refactor-boundaries.mjs	frontend	mjs	frontend-lib	99	4	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+scripts/refactor-boundaries.mjs	frontend	mjs	frontend-lib	100	4	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 scripts/refactor-contracts.mjs	frontend	mjs	frontend-lib	91	4	5	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 scripts/release-workflow.test.mjs	tooling	mjs	test	161	8	0	0		自动化测试/QA 集成测试
 scripts/resolve-release-build.mjs	tooling	mjs	tool-script	55	3	2	0		开发、QA、构建或性能工具脚本
@@ -834,8 +834,8 @@ src/components/database/HBaseShellTab.test.tsx	frontend	tsx	test	197	5	0	0		自�
 src/components/database/HBaseShellTab.tsx	frontend	tsx	frontend-component	1399	26	1	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/database/QueryLibraryPanel.test.tsx	frontend	tsx	test	169	4	0	0		自动化测试/QA 集成测试
 src/components/database/QueryLibraryPanel.tsx	frontend	tsx	frontend-component	584	5	2	0		React UI/交互组件，具体职责由目录和文件名定义
-src/components/database/QueryResultGrid.test.tsx	frontend	tsx	test	440	6	0	0		自动化测试/QA 集成测试
-src/components/database/QueryResultGrid.tsx	frontend	tsx	frontend-component	1813	19	2	0		查询结果虚拟表格、排序/过滤/编辑/复制/导出及 SQL 重写交互
+src/components/database/QueryResultGrid.test.tsx	frontend	tsx	test	476	6	0	0		自动化测试/QA 集成测试
+src/components/database/QueryResultGrid.tsx	frontend	tsx	frontend-component	952	17	2	0		查询结果虚拟表格、排序/过滤/编辑/复制/导出及 SQL 重写交互
 src/components/database/RedisCli.test.tsx	frontend	tsx	test	202	5	0	0		自动化测试/QA 集成测试
 src/components/database/RedisCli.tsx	frontend	tsx	frontend-component	381	7	2	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/database/RedisClientTab.test.tsx	frontend	tsx	test	150	6	0	0		自动化测试/QA 集成测试
@@ -873,12 +873,18 @@ src/components/database/formatSql.test.ts	frontend	ts	test	22	2	0	0		自动化�
 src/components/database/formatSql.ts	frontend	ts	frontend-feature-lib	76	1	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/database/grid/CellValueDialog.tsx	frontend	tsx	frontend-component	98	3	1	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/database/grid/ExportDialog.tsx	frontend	tsx	frontend-component	342	9	1	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/database/grid/GridColumnFilterPopover.tsx	frontend	tsx	frontend-component	126	3	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/database/grid/chrome.tsx	frontend	tsx	frontend-component	79	2	4	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/database/grid/export.tsx	frontend	tsx	frontend-component	453	3	27	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/database/grid/generatedSql.tsx	frontend	tsx	frontend-component	375	4	17	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/database/grid/model.tsx	frontend	tsx	frontend-component	81	4	10	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/database/grid/preferences.tsx	frontend	tsx	frontend-component	116	2	10	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/database/grid/types.tsx	frontend	tsx	frontend-component	247	2	36	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/database/grid/useGridEditing.ts	frontend	ts	frontend-component	223	7	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/database/grid/useGridExport.ts	frontend	ts	frontend-component	148	10	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/database/grid/useGridFilters.ts	frontend	ts	frontend-component	216	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/database/grid/useGridGeneratedSql.ts	frontend	ts	frontend-component	220	7	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/database/grid/useGridSelection.ts	frontend	ts	frontend-component	139	3	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/database/useDbSessionFontSize.test.tsx	frontend	tsx	test	48	4	0	0		自动化测试/QA 集成测试
 src/components/database/useDbSessionFontSize.ts	frontend	ts	frontend-feature-lib	106	1	2	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/detached/DetachedSessionWindow.test.tsx	frontend	tsx	test	182	7	0	0		自动化测试/QA 集成测试

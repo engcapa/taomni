@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { QueryResultGrid } from "./QueryResultGrid";
 import { dbRewriteResultSql } from "../../lib/ipc";
@@ -135,6 +135,42 @@ function longTextResult(): DbQueryResult {
 }
 
 describe("QueryResultGrid", () => {
+  it("clears an old selection and filter draft when a different result replaces the sheet", () => {
+    const { rerender } = render(<QueryResultGrid result={filterResult()} />);
+    fireEvent.mouseDown(screen.getByTitle("Ann"), { button: 0, altKey: true });
+    fireEvent.mouseEnter(screen.getByTitle("inactive"), { buttons: 1, altKey: true });
+    fireEvent.mouseUp(document);
+    fireEvent.click(screen.getByLabelText("Filter column name"));
+    fireEvent.change(screen.getByLabelText("Filter name"), { target: { value: "Ann" } });
+
+    rerender(<QueryResultGrid result={longTextResult()} />);
+
+    expect(screen.queryByLabelText("Filter name")).not.toBeInTheDocument();
+    expect(screen.getByTestId("query-result-row-count")).toHaveTextContent("1/2");
+    fireEvent.keyDown(screen.getByTestId("query-result-grid-scroll"), { key: "c", ctrlKey: true });
+    expect(writeText).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText("Filter column payload"));
+    expect(screen.getByLabelText("Filter payload")).toHaveValue("");
+  });
+
+  it("ignores a late SQL rewrite after another sort request has become current", async () => {
+    let resolveOld!: (value: Awaited<ReturnType<typeof dbRewriteResultSql>>) => void;
+    vi.mocked(dbRewriteResultSql).mockImplementationOnce(() => new Promise((resolve) => {
+      resolveOld = resolve;
+    }));
+    render(<QueryResultGrid result={filterResult()} sourceSql="select * from users" sqlEngine="MySQL" />);
+    fireEvent.click(screen.getByRole("button", { name: "status" }));
+    await waitFor(() => expect(dbRewriteResultSql).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole("button", { name: "status" }));
+    await waitFor(() => expect(screen.getByTestId("query-result-generated-sql")).toHaveTextContent("ORDER BY `status` DESC"));
+
+    await act(async () => resolveOld({ sql: "stale ascending query", mode: "inline", reason: null, warnings: [] }));
+
+    expect(screen.getByTestId("query-result-generated-sql")).toHaveTextContent("ORDER BY `status` DESC");
+    fireEvent.click(screen.getByTestId("query-result-generated-sql-copy"));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("select * from users\nORDER BY `status` DESC;"));
+  });
+
   it("keeps the table header horizontally synchronized with the body scroll", () => {
     render(<QueryResultGrid result={wideResult()} />);
 

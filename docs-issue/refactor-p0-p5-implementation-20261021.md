@@ -389,3 +389,18 @@ H 迭代证据：`h-editor-fixed.log` 5 files / 289 passed，`h-routing-tests.lo
 
 
 H browser：`browser-h/run-20261021-215313-961905131` **9 passed / 0 skipped**，TC-IDE-C4-01、C5-01、CW-UI-01、PARITY-004-01/02/03、010-01/03、024-01；包括设置应用/重开、键位 draft/apply/conflict/cancel/reset/delete/输入保护、工具窗口移动和保留 dirty editor。receipt signature、summary hash、stable identity 已核验，summary sha256 `65f979546f6256d529a188169eaa10a150b5df379f7ed891ec2b44af80929404`，运行期间产品源码未改。`h-build.log` 通过 761 commands / 328 façade exports / 39 literal events 与 373 implementation boundaries；当前文件清单 2512 项。
+
+
+H 最终组合全量 `h-unit-full.log`：**541 files / 5458 passed / 1 conditional skip**。`audit-h.log` 全部 gates 通过。提交 `cecf5782` 已 push；后续 I 与 H 组合使用新完整 SHA 验证三端。
+
+## 2026-10-21 实施批次 I：数据库结果表格
+
+QueryResultGrid 从 1813 行降至 952 行（以最终清单为准），保留虚拟行显示和 toolbar 编排；`useGridFilters` 拥有排序/列过滤草稿与 popover listener、`useGridSelection` 拥有行/矩形选择和拖动终止、`useGridEditing` 拥有编辑框/提交状态与原 preview→confirm→commit 流程、`useGridExport` 拥有导出选项/列/目标/窗口与原真实导出调用、`useGridGeneratedSql` 拥有异步 rewrite identity 和迟到响应取消。结果或 columns 变化时，原 reset 分别归到所属 owner；shell 仍拥有共享 rows，避免 selection/filter 与 editing 互相调用造成循环依赖。ColumnFilterPopover 直接消费 typed filter owner，不复制几十个 prop 类型。
+
+- 原 15 项 grid mounted tests 在第一轮提取后通过；补充跨边界 regression：替换结果后旧选区/过滤草稿清理；第二次排序生效后丢弃第一次迟到 SQL rewrite。
+- `i-grid-fixed.log`：QueryResultGrid / DbClientTab / dbGridChanges **63 passed**，覆盖真实组件的确认取消、预览失败回退、排序/过滤、复制矩形选择、生成 SQL 和父级 database 集成。
+- 失败记录保留：`i-grid-types.log` 发现未使用的 shell setters；`i-build.log` / `i-grid-final.log` 发现 `editing` owner 与行内 editing 布尔值遮蔽、popover nullable narrowing 及遗漏的 status 解构。已修正为 editSession、局部 non-null column 与显式 status 依赖，后续定向通过。
+- browser 的 DB stub 明确不提供真实连接/执行，现有 browser transaction case 只测 offline；不把它计为 grid 行为验证。本批复用 TC-DB-GRID-001-sort-filter-count-native、TC-DB-EDIT-001-grid-sql-preview-native 及既有 DB execution/transaction cases，通过新三端 native job 验证真实 MySQL IPC 与写回。没有为重构伪造网络/SQL stub 的通过证据。
+- 扩展 `refactor-boundaries.mjs` 覆盖 database/grid，禁止反向依赖 QueryResultGrid façade 和内部 runtime cycle。
+
+I 最终构建 `i-build-final.log` 通过，原 contracts 与 386 implementation boundaries 通过。`i-build-fixed.log` 补抓到 selection.activeCell 在 closure 中需局部 narrowing，已修正为捕获当前 activeCell；不更改选择语义。
