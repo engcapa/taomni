@@ -1,35 +1,10 @@
-import {
-  Fragment,
-  lazy,
-  Suspense,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useCallback,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-} from "react";
+import { Fragment, Suspense, useEffect, useMemo, useRef, useState, useCallback, type PointerEvent as ReactPointerEvent } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import {
-  Group as PanelGroup,
-  Panel,
-  Separator as PanelResizeHandle,
-  type PanelImperativeHandle,
-  type PanelSize,
-} from "react-resizable-panels";
+import { Group as PanelGroup, Panel, Separator as PanelResizeHandle, type PanelImperativeHandle, type PanelSize } from "react-resizable-panels";
 import { useSessionImportExport } from "../components/menubar/useSessionImportExport";
 import type { AppCommand } from "../components/menubar/commands";
 import { buildAppMenuSpec, installAppMenu, type MenuActionId } from "../lib/nativeAppMenu";
-import {
-  LEGACY_MAIL_HEADER_LIMIT_PER_FOLDER,
-  LEGACY_MAIL_HEADER_RETENTION_DAYS,
-  mailHeaderLimitOption,
-} from "../lib/mailSync";
-import { parseMailIdentities } from "../lib/mailIdentities";
-import { parseSpecialFolders } from "../lib/mailFolders";
 import { QuickConnect } from "../components/quickconnect/QuickConnect";
 import { Sidebar } from "../components/sidebar/Sidebar";
 import { useConfirmDialog } from "../components/sidebar/ConfirmDialog";
@@ -61,48 +36,28 @@ import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowse
 import { ObjectStorageBrowser } from "../components/objectstorage/ObjectStorageBrowser";
 import { MailClientTab } from "../components/mail/MailClientTab";
 import { MailUnifiedTab } from "../components/mail/MailUnifiedTab";
-import { sessionToObjectStorageConfig, objectStorageHasVaultSecret } from "../lib/objectStorage";
+import { sessionToObjectStorageConfig } from "../lib/objectStorage";
 import { SftpSidebar } from "../components/filebrowser/SftpSidebar";
 import { useSftpStore } from "../stores/sftpStore";
 import { getAppPlatform, isTauriRuntime } from "../lib/runtime";
-import { effectiveFileType, openExternalUrl, openSftpWindow, sftpOpenPath, sftpStat } from "../lib/sftp";
-import { openDetachedWindow } from "../lib/detachWindowing";
+import { effectiveFileType, openExternalUrl, sftpOpenPath, sftpStat } from "../lib/sftp";
 import { writeTerminal } from "../lib/ipc";
 import { encodeBase64 } from "../lib/ipc";
-import {
-  clearDetachedHandoff,
-  detachedWindowUrl,
-  writeDetachedHandoff,
-} from "../components/filebrowser/SftpDetachedWindow";
-import {
-  writeDetachedHandoff as writeGenericHandoff,
-  clearDetachedHandoff as clearGenericHandoff,
-  detachedWindowUrl as detachedGenericUrl,
-  subscribeReattach,
-  drainPendingReattach,
-  clearReattachHandoff,
-  type DetachedKind,
-  type ReattachMessage,
-} from "../lib/detachedSession";
+import { subscribeReattach, drainPendingReattach, clearReattachHandoff, type ReattachMessage } from "../lib/detachedSession";
 import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams, DetachedDbParams } from "../components/detached/DetachedSessionWindow";
-import { redactVncHandoff, vncConsumeDetachClaim, vncCreateDetachClaim } from "../lib/vnc";
-import {
-  deserializeVncViewerOptions,
-  parseVncViewerOptions,
-  serializeVncViewerOptions,
-  writeVncViewerOptions,
-} from "../lib/vncOptions";
+import { vncConsumeDetachClaim } from "../lib/vnc";
+import { deserializeVncViewerOptions, parseVncViewerOptions, writeVncViewerOptions } from "../lib/vncOptions";
 import type { VncSessionProperties } from "../components/vnc/VncPropertiesDialog";
-import { Bot, Columns2, FolderOpen, Grid2X2, Lock, Rows3, Unlock, X } from "lucide-react";
+import { Bot, FolderOpen, Lock, Unlock } from "lucide-react";
 import { createPortal } from "react-dom";
 import { ToolWindowRail, type ToolWindowRailItem } from "../components/editor/workspace/panels/ToolWindowRail";
 import { effectiveStripeWidth } from "../components/editor/workspace/toolWindowLayout";
 import { useToolWindowStripeStore } from "../components/editor/workspace/toolWindowStripeStore";
 import { useMainRailHostStore } from "../stores/mainRailHostStore";
 import { sidebarRailGroup } from "../stores/sidebarRailPolicy";
-import type { SftpTabInfo, Tab, DbConnectInfo, HBaseConnectInfo, MailConnectionSecurity, MailTabInfo, MailAuthMode, MailProvider, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, GitWorkspaceRootInfo, RecentWorkspace } from "../types";
-import { computeNewTerminalTitle, newWorkspaceInstanceId, recentWorkspaceIdFromParts, useAppStore, type TerminalSplitLayout } from "../stores/appStore";
-import { normalizeLocalStartCwd, terminalCwdTitlePrefix } from "../lib/terminalCwd";
+import type { Tab, DbConnectInfo, MailTabInfo, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, RecentWorkspace } from "../types";
+import { computeNewTerminalTitle, newWorkspaceInstanceId, recentWorkspaceIdFromParts, useAppStore } from "../stores/appStore";
+import { terminalCwdTitlePrefix } from "../lib/terminalCwd";
 import { buildTabDetailSummary } from "../lib/tabDetails";
 import { useSessionStore } from "../stores/sessionStore";
 import { WelcomePanel } from "../components/WelcomePanel";
@@ -110,41 +65,20 @@ import { AboutDialog } from "../components/AboutDialog";
 import { UpdateDialog } from "../components/UpdateDialog";
 import { useUpdateStore } from "../stores/updateStore";
 import { useServersStore } from "../stores/serversStore";
-import { parseQuickConnectInput } from "../lib/quickConnect";
 import { exitApp, selectFolderPath, getSession, type SessionConfig } from "../lib/ipc";
-import {
-  vaultPut,
-  VAULT_LOCKED_EVENT,
-} from "../lib/ipc";
+import { vaultPut, VAULT_LOCKED_EVENT } from "../lib/ipc";
 import { useVaultStore } from "../stores/vaultStore";
 import { ensureVaultReady } from "../lib/vaultGate";
 import { VaultUnlockDialog } from "../components/vault/VaultUnlockDialog";
 import { parseSessionOptions } from "../lib/terminalProfile";
-import {
-  DEFAULT_MAIL_TERMINAL_PROFILE,
-  getSessionTerminalProfile,
-  loadTerminalDefaultProfile,
-  type TerminalProfile,
-} from "../lib/terminalProfile";
+import { getSessionTerminalProfile, loadTerminalDefaultProfile, type TerminalProfile } from "../lib/terminalProfile";
 import { getSessionNetworkSettings, toNetworkSettingsPayload } from "../lib/networkSettings";
 import { loadResizableLayout, saveResizableLayout } from "../lib/resizableLayout";
 import { parsePathMappings } from "../components/filebrowser/PathMappingsEditor";
 import { parseRdpOptions } from "../types/rdp";
-import type {
-  LocalLaunchOutcome,
-  LocalShellSelection,
-  ResumeIssue,
-  SnapshotEntry,
-} from "../types";
-import {
-  isResumeEligibleSavedSession,
-  localTerminalEntry,
-  primaryViewTypeForEntry,
-  savedSessionEntry,
-  snapshotEntriesFingerprint,
-  commitWelcomeRunSnapshot,
-} from "../lib/welcomeSessionResume";
-import { useWelcomeSessionResume, type OpenEntryResult } from "../hooks/useWelcomeSessionResume";
+import type { LocalLaunchOutcome, LocalShellSelection, SnapshotEntry } from "../types";
+import { primaryViewTypeForEntry } from "../lib/welcomeSessionResume";
+import { useWelcomeSessionResume } from "../hooks/useWelcomeSessionResume";
 import { ChatDrawer } from "../components/chat/ChatDrawer";
 import { TaoRibbon } from "../components/tao/TaoRibbon";
 import { FloatingNotesPanel } from "../components/notes/FloatingNotesPanel";
@@ -152,585 +86,29 @@ import { TaoAlertPoller } from "../components/tao/TaoAlertPoller";
 import { resolveChatDock } from "../lib/chat/chatDock";
 import { useViewportSize } from "../hooks/useViewportSize";
 import { CcAgentBridge } from "../components/agent/CcAgentBridge";
-import { useChatStore, isChatCapableTabType } from "../stores/chatStore";
+import { useChatStore } from "../stores/chatStore";
 import { useAiStore } from "../stores/aiStore";
 import { useLanChatStore, totalUnread } from "../stores/lanChatStore";
-import { setActiveTerminalTab, getTerminal, markTerminalDetachPending, clearTerminalDetachPending } from "../lib/terminal/terminalRegistry";
+import { setActiveTerminalTab } from "../lib/terminal/terminalRegistry";
 import { listQueryTabs, setActiveQueryTab } from "../lib/queryRegistry";
 import { t as tr, useT } from "../lib/i18n";
 import { gitInitRepo, gitProbePath, gitRepoName } from "../lib/git";
 import { alertAppDialog, confirmAppDialog } from "../lib/appDialogs";
+import { type ControlToolExecutor, type PendingAuth, type ConnectQueueEntry, type ResumeWaiter, type ControlToolDispatch } from "./main/types";
+import { readQuickConnectVisible, localShellSupportsCwdProbe, chatBindingIdForTab, normalizeGitWorkspaceRoots, gitWorkspaceRootsKey, browserUrlFromSession, commandTerminalFromSession, writeQuickConnectVisible, macCommandDigitIndex } from "./main/sessionPolicy";
+import { SAVED_PASSWORD_VAULT_REASON_KEY, passwordRefFromOptions } from "./main/authentication";
+import { sessionToDbConnectInfo, sessionToHBaseConnectInfo } from "./main/databaseSession";
+import { sessionToMailTabInfo, mailSmtpPasswordRefFromOptions } from "./main/mailSession";
+import { positiveWeight, axisWeights, weightsToGridTemplate, sumWeights, resizeAdjacentWeights, cumulativeWeightPercent } from "./main/splitLayout";
+import { TerminalSplitToolbar } from "./main/TerminalSplitToolbar";
+import { VncLoadingPanel, VncPanel, RdpLoadingPanel, RdpPanel, DbLoadingPanel, DbClientTab, RedisClientTab, HBaseShellTab, ProxyTestTab, UnavailablePanel } from "./main/panels";
+import { createOpenDetachedSftp, createOpenDetachedGenericWindow, createOpenDetachedRdp, createOpenDetachedVnc, createOpenDetachedTerminal, createOpenDetachedDatabase, createHandleDetachActiveTab } from "./main/detachedWindows";
+import { createQueueVaultUnlock, createOpenAfterJumpPassword, createOpenQueuedSession, createContinueConnectQueue, createHandleAuthSubmit } from "./main/connectionQueue";
+import { createResolveResumeWaiter, createCancelResumeWaiter, createCancelAllResumeWaiters, createResolveResumeWaiterForTab, createOpenSavedSessionForRestore, createOpenLocalTerminalForRestore, createCancelPendingAuthForRestore, createBuildRunSnapshotEntries, createCommitRunSnapshotNow } from "./main/restore";
+import { createHandleQuickConnect, createHandleCommand } from "./main/commandActions";
+import { createExecuteControlTool } from "./main/controlTools";
 
-const VncPanel = lazy(() => import("../components/vnc/VncPanel"));
-const RdpPanel = lazy(() => import("../components/rdp/RdpPanel"));
-const DbClientTab = lazy(() => import("../components/database/DbClientTab"));
-const RedisClientTab = lazy(() => import("../components/database/RedisClientTab"));
-const HBaseShellTab = lazy(() => import("../components/database/HBaseShellTab"));
-const ProxyTestTab = lazy(() => import("../components/proxy/ProxyTestTab"));
 
-interface PendingSessionAuth {
-  kind: "session";
-  session: SessionConfig;
-  /** Present when the auth wait belongs to a Welcome restore operation. */
-  resumeRequestId?: string;
-  restoreOperationId?: string;
-}
-
-interface PendingJumpAuth {
-  kind: "jump";
-  session: SessionConfig;
-  jumpSession?: SessionConfig;
-  host: string;
-  port: number;
-  username: string;
-  manual: boolean;
-  onResolved: (session: SessionConfig) => void;
-}
-
-type PendingAuth = PendingSessionAuth | PendingJumpAuth;
-
-interface ControlToolDispatch {
-  callId: string;
-  threadId: string;
-  tool: string;
-  args: Record<string, unknown>;
-}
-
-type ControlToolExecutor = (dispatch: ControlToolDispatch) => Promise<void>;
-
-type ConnectQueueOutcome = "opened" | "awaiting-auth" | "awaiting-vault";
-
-/** Connect-queue entry carrying optional Welcome restore context. */
-interface ConnectQueueEntry {
-  session: SessionConfig;
-  resume?: ResumeQueueContext;
-}
-
-interface ResumeQueueContext {
-  requestId: string;
-  operationId: string;
-  entryIdentity: string;
-}
-
-/** A pending Welcome restore entry open, resolved by tab readiness/cancel. */
-interface ResumeWaiter {
-  requestId: string;
-  operationId: string;
-  entryIdentity: string;
-  sessionId: string;
-  tabId: string | null;
-  resolve: (result: OpenEntryResult) => void;
-  settled: boolean;
-  /** Tabs that already existed when the waiter registered (never bind). */
-  excludeTabIds: Set<string>;
-  guardTimer: number | null;
-}
-
-const MIN_SPLIT_WEIGHT = 0.35;
-const SAVED_PASSWORD_VAULT_REASON_KEY = "vault.unlockReasonDefault";
-const QUICK_CONNECT_VISIBLE_KEY = "taomni.quickConnectVisible";
-
-function chatBindingIdForTab(tab: Tab | null | undefined): string | null {
-  if (!tab || !isChatCapableTabType(tab.type)) return null;
-  return tab.chatTabId ?? tab.id;
-}
-
-function macCommandDigitIndex(event: KeyboardEvent): number | null {
-  if (
-    getAppPlatform() !== "macos" ||
-    !event.metaKey ||
-    event.ctrlKey ||
-    event.shiftKey ||
-    event.altKey
-  ) {
-    return null;
-  }
-
-  const digit =
-    /^[1-9]$/.test(event.key)
-      ? event.key
-      : event.code.match(/^(?:Digit|Numpad)([1-9])$/)?.[1];
-  if (!digit) return null;
-
-  const number = Number.parseInt(digit, 10);
-  return number === 9 ? -1 : number - 1;
-}
-
-// Whether a local terminal's shell can answer an OSC 7 cwd probe when its tab
-// is duplicated. PowerShell and POSIX shells (bash/zsh/git-bash/WSL) can; cmd
-// can't emit OSC 7 cleanly, so it's skipped (the duplicate opens in the default
-// directory). SSH terminals always run a POSIX remote shell and are handled
-// separately. A LocalShellSelection identifies the shell by its executable
-// path (see TabBar's shellSelectionFor), so we match on the path/name text.
-function localShellSupportsCwdProbe(localShell?: LocalShellSelection): boolean {
-  const hint = `${localShell?.id ?? ""} ${localShell?.name ?? ""}`.toLowerCase();
-  if (
-    hint.includes("cmd.exe") ||
-    hint.includes("command prompt") ||
-    hint.includes("command-prompt")
-  ) {
-    return false;
-  }
-  return true;
-}
-
-function readQuickConnectVisible(): boolean {
-  try {
-    return typeof window !== "undefined" && window.localStorage.getItem(QUICK_CONNECT_VISIBLE_KEY) === "true";
-  } catch {
-    return false;
-  }
-}
-
-function writeQuickConnectVisible(visible: boolean) {
-  try {
-    window.localStorage.setItem(QUICK_CONNECT_VISIBLE_KEY, visible ? "true" : "false");
-  } catch {
-    // Ignore storage failures; the in-memory visibility state still applies.
-  }
-}
-
-function localShellSelectionFromSession(session: SessionConfig): LocalShellSelection | undefined {
-  const options = parseSessionOptions(session.options_json);
-  const path = typeof options.localShellPath === "string" ? options.localShellPath.trim() : "";
-  if (!path) return undefined;
-  const args = Array.isArray(options.localShellArgs)
-    ? options.localShellArgs.filter((value): value is string => typeof value === "string")
-    : undefined;
-  return {
-    id: path,
-    name: session.name || path,
-    ...(args && args.length > 0 ? { args } : {}),
-  };
-}
-
-function browserUrlFromSession(session: SessionConfig): string | null {
-  const target = session.host.trim();
-  if (!target) return null;
-  if (/^https?:\/\//i.test(target)) return target;
-  const withoutSlashes = target.replace(/^\/+/, "");
-  const port = session.port > 0 ? `:${session.port}` : "";
-  return `https://${withoutSlashes}${port}`;
-}
-
-const COMMAND_TERMINAL_SESSION_TYPES = new Set(["FTP", "Telnet", "Rlogin", "Serial", "Mosh"]);
-
-function commandTerminalFromSession(session: SessionConfig): NonNullable<Tab["commandTerminal"]> | null {
-  if (!COMMAND_TERMINAL_SESSION_TYPES.has(session.session_type)) return null;
-  const host = session.host.trim();
-  if (!host) return null;
-  return {
-    sessionId: session.id,
-    kind: session.session_type as NonNullable<Tab["commandTerminal"]>["kind"],
-    host,
-    port: session.port,
-    username: session.username,
-    optionsJson: session.options_json,
-  };
-}
-
-function controlArgRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : null;
-}
-
-function controlString(value: unknown): string | undefined {
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
-function controlStringArray(value: unknown): string[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  const items = value.filter((item): item is string => typeof item === "string");
-  return items.length > 0 ? items : undefined;
-}
-
-function normalizeControlShellType(value: string): string {
-  return value.trim().toLowerCase().replace(/[_\s]+/g, "-");
-}
-
-function controlLocalShellSelection(args: Record<string, unknown>): {
-  localShell?: LocalShellSelection;
-  error?: string;
-} {
-  const nested = controlArgRecord(args.local_shell) ?? controlArgRecord(args.localShell);
-  const shellType = controlString(nested?.type)
-    ?? controlString(nested?.shell)
-    ?? controlString(args.shell)
-    ?? controlString(args.shell_type);
-  const shellPath = controlString(nested?.path) ?? controlString(args.shell_path);
-  const shellArgs = controlStringArray(nested?.args) ?? controlStringArray(args.shell_args);
-  const shellName = controlString(nested?.name) ?? controlString(args.shell_name);
-
-  if (!shellType && !shellPath && !shellArgs && !shellName) return {};
-  const type = normalizeControlShellType(shellType ?? (shellPath ? "custom" : "default"));
-  const withArgs = (id: string, name: string): LocalShellSelection => ({
-    id,
-    name: shellName ?? name,
-    ...(shellArgs ? { args: shellArgs } : {}),
-  });
-
-  switch (type) {
-    case "default":
-      if (shellArgs) return { error: "local_shell.args requires local_shell.type or local_shell.path" };
-      return {};
-    case "cmd":
-    case "cmd.exe":
-    case "command-prompt":
-      return { localShell: withArgs("command-prompt", "Command Prompt") };
-    case "powershell":
-    case "powershell7":
-    case "pwsh":
-    case "ps7":
-      return { localShell: withArgs("powershell", "PowerShell") };
-    case "windows-powershell":
-    case "windows-powershell5":
-    case "powershell5":
-      return { localShell: withArgs("windows-powershell", "Windows PowerShell") };
-    case "git-bash":
-    case "gitbash":
-      return { localShell: withArgs("git-bash", "Git Bash") };
-    case "wsl":
-    case "wsl.exe":
-      return { localShell: withArgs("wsl.exe", "WSL") };
-    case "bash":
-    case "zsh":
-    case "sh":
-      return { localShell: withArgs(type, type) };
-    case "custom":
-      if (!shellPath) return { error: "local_shell.type=custom requires local_shell.path" };
-      return { localShell: withArgs(shellPath, shellPath) };
-    default:
-      return {
-        error: `unsupported local_shell.type: ${shellType ?? shellPath ?? ""}`,
-      };
-  }
-}
-
-function resolveSessionAuth(session: SessionConfig): { method: string; data: string | null } {
-  const method = typeof session.auth_method === "string"
-    ? session.auth_method
-    : "PrivateKey";
-  const data = typeof session.auth_method === "object" && "PrivateKey" in session.auth_method
-    ? session.auth_method.PrivateKey.key_path
-    : null;
-  return { method, data };
-}
-
-function passwordRefFromOptions(session: SessionConfig): string | null {
-  const opts = parseSessionOptions(session.options_json);
-  const ref = typeof opts.passwordRef === "string" ? opts.passwordRef : "";
-  return ref && ref.startsWith("vault:") ? ref : null;
-}
-
-interface MissingJumpPassword {
-  session: SessionConfig;
-  jumpSession?: SessionConfig;
-  host: string;
-  port: number;
-  username: string;
-  manual: boolean;
-}
-
-function missingJumpPasswordForSession(
-  session: SessionConfig,
-  allSessions: SessionConfig[],
-): MissingJumpPassword | null {
-  const ns = getSessionNetworkSettings(session.options_json);
-  if (ns.proxyKind !== "ssh-tunnel") return null;
-  if (ns.jumpPassword.trim()) return null;
-
-  const jumpSessionId = ns.jumpSessionId.trim();
-  if (jumpSessionId) {
-    const jumpSession = allSessions.find((s) => s.id === jumpSessionId);
-    if (!jumpSession) return null;
-    const { method } = resolveSessionAuth(jumpSession);
-    if (method !== "Password") return null;
-    if (passwordRefFromOptions(jumpSession)) return null;
-    return {
-      session,
-      jumpSession,
-      host: jumpSession.host,
-      port: jumpSession.port,
-      username: jumpSession.username ?? "root",
-      manual: false,
-    };
-  }
-
-  if (ns.jumpAuthKind !== "Password") return null;
-  if (!ns.jumpHost.trim()) return null;
-  return {
-    session,
-    host: ns.jumpHost.trim(),
-    port: parseInt(ns.jumpPort, 10) || 22,
-    username: ns.jumpUser.trim() || "root",
-    manual: true,
-  };
-}
-
-function sessionWithJumpPassword(
-  session: SessionConfig,
-  password: string,
-  saveAuth = false,
-): SessionConfig {
-  const opts = parseSessionOptions(session.options_json);
-  const ns = getSessionNetworkSettings(session.options_json);
-  const updated = {
-    ...opts,
-    networkSettings: {
-      ...ns,
-      jumpPassword: password,
-      jumpSaveAuth: saveAuth || ns.jumpSaveAuth,
-    },
-  };
-  return { ...session, options_json: JSON.stringify(updated) };
-}
-
-function mailSmtpPasswordRefFromOptions(session: SessionConfig): string | null {
-  const opts = parseSessionOptions(session.options_json);
-  const useImapAuth = opts.mailSmtpUseImapAuth !== false;
-  if (useImapAuth) return null;
-  const ref = typeof opts.mailSmtpPasswordRef === "string" ? opts.mailSmtpPasswordRef : "";
-  return ref && ref.startsWith("vault:") ? ref : null;
-}
-
-function mailSecurityFromOptions(value: unknown, fallback: MailConnectionSecurity): MailConnectionSecurity {
-  if (value === "STARTTLS" || value === "starttls") return "starttls";
-  if (value === "None" || value === "none") return "none";
-  if (value === "TLS" || value === "tls") return "tls";
-  return fallback;
-}
-
-function mailProviderFromOptions(value: unknown, imapHost: string): MailProvider {
-  if (value === "gmail" || value === "outlook" || value === "custom") return value;
-  const host = imapHost.trim().toLowerCase();
-  if (host === "imap.gmail.com") return "gmail";
-  if (host === "outlook.office365.com") return "outlook";
-  return "custom";
-}
-
-function mailAuthModeFromOptions(value: unknown): MailAuthMode {
-  return value === "oauth2" ? "oauth2" : "password";
-}
-
-function mailNumberOption(
-  options: Record<string, unknown>,
-  key: string,
-  fallback: number,
-  min = 0,
-): number {
-  const raw = options[key];
-  const n = typeof raw === "number" ? raw : parseInt(String(raw ?? ""), 10);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(min, Math.round(n));
-}
-
-function sessionToMailTabInfo(
-  session: SessionConfig,
-  password?: string,
-  smtpPassword?: string,
-): MailTabInfo {
-  const opts = parseSessionOptions(session.options_json);
-  const str = (key: string, fallback = ""): string =>
-    typeof opts[key] === "string" ? (opts[key] as string) : fallback;
-  const smtpUseImapAuth = opts.mailSmtpUseImapAuth !== false;
-  const emailAddress = session.username || str("mailEmailAddress");
-  const provider = mailProviderFromOptions(opts.mailProvider, session.host);
-  const authMode = mailAuthModeFromOptions(opts.mailAuthMode);
-  const ns = getSessionNetworkSettings(session.options_json);
-  const networkSettings = ns.proxyKind !== "none" ? toNetworkSettingsPayload(ns) : null;
-  return {
-    sessionId: session.id,
-    emailAddress,
-    provider,
-    authMode,
-    displayName: str("mailDisplayName") || null,
-    replyTo: str("mailReplyTo") || null,
-    signature: str("mailSignature") || null,
-    terminalProfile: getSessionTerminalProfile(session.options_json) ?? DEFAULT_MAIL_TERMINAL_PROFILE,
-    imap: {
-      host: session.host,
-      port: session.port,
-      username: session.username || emailAddress || null,
-      password,
-      security: mailSecurityFromOptions(opts.mailImapSecurity, "tls"),
-      trustedCert: str("mailImapTrustedCert") || null,
-    },
-    smtp: {
-      host: str("mailSmtpHost"),
-      port: mailNumberOption(opts, "mailSmtpPort", 465, 1),
-      username: smtpUseImapAuth ? (session.username || emailAddress || null) : (str("mailSmtpUsername") || emailAddress || null),
-      password: smtpUseImapAuth ? password : smtpPassword,
-      security: mailSecurityFromOptions(opts.mailSmtpSecurity, "tls"),
-      useImapAuth: smtpUseImapAuth,
-      trustedCert: str("mailSmtpTrustedCert") || null,
-    },
-    oauth: {
-      clientId: str("mailOauthClientId") || null,
-      clientSecret: str("mailOauthClientSecretRef") || undefined,
-      tokenRef: str("mailOauthTokenRef") || null,
-      refreshTokenRef: str("mailOauthRefreshTokenRef") || null,
-      expiresAt: mailNumberOption(opts, "mailOauthExpiresAt", 0, 0) || null,
-      scope: str("mailOauthScope") || null,
-    },
-    networkSettings,
-    sync: {
-      onOpen: opts.mailSyncOnOpen !== false,
-      intervalMinutes: mailNumberOption(opts, "mailSyncIntervalMinutes", 5, 1),
-      maxFetchPerSync: mailNumberOption(opts, "mailMaxFetchPerSync", 200, 1),
-      idle: opts.mailIdlePush !== false,
-      desktopNotify: opts.mailDesktopNotify === true,
-      subscribedOnly: opts.mailSubscribedOnly === true,
-    },
-    specialFolders: parseSpecialFolders(opts.mailSpecialFolders),
-    undoSendSeconds: mailNumberOption(opts, "mailUndoSendSeconds", 0, 0),
-    carddav: typeof opts.mailCardDavUrl === "string" && opts.mailCardDavUrl.trim()
-      ? {
-        url: opts.mailCardDavUrl.trim(),
-        username: typeof opts.mailCardDavUsername === "string" && opts.mailCardDavUsername.trim()
-          ? opts.mailCardDavUsername.trim()
-          : null,
-      }
-      : null,
-    caldav: typeof opts.mailCalDavUrl === "string" && opts.mailCalDavUrl.trim()
-      ? {
-        url: opts.mailCalDavUrl.trim(),
-        username: typeof opts.mailCalDavUsername === "string" && opts.mailCalDavUsername.trim()
-          ? opts.mailCalDavUsername.trim()
-          : null,
-      }
-      : null,
-    receiptPolicy: opts.mailReceiptPolicy === "always" || opts.mailReceiptPolicy === "never" ? opts.mailReceiptPolicy : "ask",
-    incoming: opts.mailIncoming === "pop3" ? "pop3" : "imap",
-    pop3LeaveDays: opts.mailPop3LeaveDays === undefined || opts.mailPop3LeaveDays === null || String(opts.mailPop3LeaveDays).trim() === ""
-      ? null
-      : mailNumberOption(opts, "mailPop3LeaveDays", 0, 0),
-    cache: {
-      // POP3 mail lives only in the local store, so its cache is always on.
-      enabled: opts.mailCacheEnabled !== false || opts.mailIncoming === "pop3",
-      headerRetentionDays: mailHeaderLimitOption(opts, "mailHeaderRetentionDays", LEGACY_MAIL_HEADER_RETENTION_DAYS),
-      headerLimitPerFolder: mailHeaderLimitOption(opts, "mailHeaderLimitPerFolder", LEGACY_MAIL_HEADER_LIMIT_PER_FOLDER),
-      bodyRecentLimit: mailNumberOption(opts, "mailBodyRecentLimit", 200, 0),
-      bodyMaxBytes: mailNumberOption(opts, "mailBodyMaxBytes", 262144, 1024),
-      attachmentCache: opts.mailAttachmentCache === true,
-      saveDirectory: str("mailSaveDirectory") || null,
-      storageDirectory: str("mailStorageDirectory") || null,
-      fullMessageMode: opts.mailFullMessageMode === "include" || opts.mailFullMessageMode === "exclude" ? opts.mailFullMessageMode : "all",
-      fullMessageFolders: Array.isArray(opts.mailFullMessageFolders) ? opts.mailFullMessageFolders.filter((v): v is string => typeof v === "string") : [],
-    },
-    ai: {
-      enabled: opts.mailAiEnabled !== false,
-      skipBodyConfirm: opts.mailAiSkipBodyConfirm === true,
-    },
-    saveSentCopy: opts.mailSaveSentCopy === "on" ? true : opts.mailSaveSentCopy === "off" ? false : null,
-    identities: parseMailIdentities(opts.mailIdentities),
-  };
-}
-
-/**
- * Build a {@link DbConnectInfo} from a saved DB session. Engine-specific
- * options (ClickHouse HTTP port / protocol, Presto catalog / dialect, Redis
- * DB index, SSL, timeout, default database) live in `options_json` under the
- * `db*` keys the session editor writes. `password` is the resolved credential
- * (plaintext or a `vault:` reference) the connect path already worked out.
- */
-function sessionToDbConnectInfo(session: SessionConfig, password?: string): DbConnectInfo {
-  const opts = parseSessionOptions(session.options_json);
-  const str = (key: string, fallback = ""): string =>
-    typeof opts[key] === "string" ? (opts[key] as string) : fallback;
-  const num = (key: string): number | null => {
-    const raw = opts[key];
-    const n = typeof raw === "number" ? raw : parseInt(String(raw ?? ""), 10);
-    return Number.isFinite(n) ? n : null;
-  };
-  const engine = session.session_type as DbConnectInfo["engine"];
-  // Only attach network settings when a proxy / SSH jump host is actually
-  // selected; a direct connection sends none so the backend skips the
-  // loopback forwarder entirely.
-  const ns = getSessionNetworkSettings(session.options_json);
-  const networkSettings = ns.proxyKind !== "none" ? toNetworkSettingsPayload(ns) : null;
-  const prestoDialectRaw = str("dbPrestoDialect", "presto").toLowerCase();
-  return {
-    sessionId: session.id,
-    workspaceSessionId: session.id,
-    engine,
-    host: session.host,
-    port: session.port,
-    username: session.username,
-    password,
-    catalog: engine === "Presto" ? str("dbCatalog") || null : null,
-    database: str("dbDatabase") || null,
-    ssl: opts.dbSsl === true,
-    timeoutSecs: num("dbTimeout"),
-    httpPort: engine === "ClickHouse" ? (num("dbHttpPort") ?? 8123) : null,
-    protocol: engine === "ClickHouse" ? str("dbChProtocol", "HTTP").toLowerCase() : null,
-    prestoDialect:
-      engine === "Presto"
-        ? (prestoDialectRaw === "trino" ? "trino" : "presto")
-        : null,
-    dbIndex: engine === "Redis" ? (num("dbRedisIndex") ?? 0) : null,
-    networkSettings,
-  };
-}
-
-function sessionToHBaseConnectInfo(session: SessionConfig, password?: string): HBaseConnectInfo {
-  const opts = parseSessionOptions(session.options_json);
-  const str = (key: string, fallback = ""): string =>
-    typeof opts[key] === "string" ? (opts[key] as string) : fallback;
-  const num = (key: string): number | null => {
-    const raw = opts[key];
-    const n = typeof raw === "number" ? raw : parseInt(String(raw ?? ""), 10);
-    return Number.isFinite(n) ? n : null;
-  };
-  return {
-    sessionId: session.id,
-    workspaceSessionId: session.id,
-    host: session.host,
-    port: session.port,
-    username: session.username,
-    password,
-    ssl: opts.dbSsl === true,
-    timeoutSecs: num("dbTimeout"),
-    restPath: str("hbaseRestPath") || null,
-    namespace: str("hbaseNamespace") || null,
-    connectionMode:
-      str("hbaseConnectionMode") === "rest"
-        ? "rest"
-        : str("hbaseConnectionMode") === "thrift"
-          ? "thrift"
-          : "native",
-    zkQuorum: str("hbaseZkQuorum") || null,
-    zkRoot: str("hbaseZkRoot") || null,
-    effectiveUser: str("hbaseEffectiveUser") || null,
-    authMethod: (str("hbaseAuthMethod") as any) || null,
-    servicePrincipal: str("hbaseServicePrincipal") || null,
-    principal: str("hbasePrincipal") || null,
-    keytabPath: str("hbaseKeytabPath") || null,
-    krb5ConfPath: str("hbaseKrb5ConfPath") || null,
-    hbaseSitePath: str("hbaseSitePath") || null,
-  };
-}
-
-function normalizeGitWorkspaceRoots(roots: readonly GitWorkspaceRootInfo[]): GitWorkspaceRootInfo[] {
-  const seen = new Set<string>();
-  const next: GitWorkspaceRootInfo[] = [];
-  for (const root of roots) {
-    const repoRoot = root.repoRoot.trim();
-    if (!repoRoot || seen.has(repoRoot)) continue;
-    seen.add(repoRoot);
-    next.push({
-      ...root,
-      repoRoot,
-      name: root.name || gitRepoName(repoRoot),
-      rootIds: root.rootIds ?? [],
-    });
-  }
-  return next.sort((a, b) => a.name.toLowerCase().localeCompare(b.name.toLowerCase()));
-}
-
-function gitWorkspaceRootsKey(roots: readonly GitWorkspaceRootInfo[]): string {
-  return roots.map((root) => root.repoRoot).sort((a, b) => a.localeCompare(b)).join("\n");
-}
 
 export function MainLayout() {
   const t = useT();
@@ -1197,45 +575,9 @@ export function MainLayout() {
     setTabHasNewOutput(tabId, true);
   }, [setTabHasNewOutput]);
 
-  const openDetachedSftp = useCallback((params: SftpTabInfo, title: string) => {
-    // Use a DIFFERENT session id for the detached window so its backend
-    // SFTP channel is independent from the sidebar's. Without this, the
-    // popup and the sidebar share one `Arc<Mutex<SftpSession>>` and any
-    // long transfer in one window stalls clicks/listings in the other.
-    // The suffix is stable per parent so re-clicking "Detach" focuses the
-    // existing popup instead of opening a second one.
-    const detachedSessionId = `${params.sessionId}__detached`;
-    writeDetachedHandoff({
-      ...params,
-      sessionId: detachedSessionId,
-      parentSessionId: params.sessionId,
-      title,
-    });
-    if (isTauriRuntime()) {
-      // Native: open a real OS window via the Rust command. The handoff
-      // payload was just written to localStorage above so the new window
-      // can read it on mount. If launching the OS window fails we must
-      // wipe the handoff immediately — otherwise the credentials sit on
-      // disk for the rest of the run with no one waiting to consume them.
-      void openSftpWindow(detachedSessionId, title).catch((err) => {
-        clearDetachedHandoff(detachedSessionId);
-        setStatusMessage(tr("status.sftpWindowError", {
-          error: err instanceof Error ? err.message : String(err),
-        }));
-      });
-      return;
-    }
-    const url = detachedWindowUrl(detachedSessionId);
-    const features = "width=1200,height=760,resizable=yes,scrollbars=yes";
-    const handle = window.open(url, `taomni_sftp_${detachedSessionId}`, features);
-    if (!handle) {
-      // Pop-up blocked — clean up the credential blob right away so it
-      // doesn't linger in localStorage waiting for a window that never
-      // arrives.
-      clearDetachedHandoff(detachedSessionId);
-      setStatusMessage(tr("status.sftpPopupBlocked"));
-    }
-  }, [setStatusMessage]);
+  const openDetachedSftp = useCallback(createOpenDetachedSftp({
+    setStatusMessage,
+  }), [setStatusMessage]);
 
   /**
    * Hand off the credentials of a non-SFTP tab to a new OS window and
@@ -1244,186 +586,52 @@ export function MainLayout() {
    * `BroadcastChannel('taomni.detach.sync')` subscriber wired below.
    */
   const openDetachedGenericWindow = useCallback(
-    <T,>(
-      kind: DetachedKind,
-      sourceTabId: string,
-      detachedId: string,
-      payload: T,
-      title: string,
-    ) => {
-      writeGenericHandoff(kind, detachedId, payload);
-      if (isTauriRuntime()) {
-        void openDetachedWindow({
-          kind,
-          sessionId: detachedId,
-          title,
-        })
-          .then(() => {
-            // Once the OS window is up the source tab is no longer the
-            // owner of this connection. Drop it; the detached window owns
-            // a fresh connection of its own.
-            removeTab(sourceTabId);
-          })
-          .catch((err) => {
-            clearGenericHandoff(kind, detachedId);
-            if (kind === "terminal") clearTerminalDetachPending(sourceTabId);
-            setStatusMessage(
-              tr("status.detachWindowError", {
-                error: err instanceof Error ? err.message : String(err),
-              }),
-            );
-          });
-        return;
-      }
-      const url = detachedGenericUrl(kind, detachedId);
-      const features = "width=1280,height=800,resizable=yes,scrollbars=yes";
-      const handle = window.open(url, `taomni_${kind}_${detachedId}`, features);
-      if (!handle) {
-        clearGenericHandoff(kind, detachedId);
-        if (kind === "terminal") clearTerminalDetachPending(sourceTabId);
-        setStatusMessage(tr("status.detachPopupBlocked"));
-        return;
-      }
-      removeTab(sourceTabId);
-    },
+    createOpenDetachedGenericWindow({
+    removeTab,
+    setStatusMessage,
+  }),
     [removeTab, setStatusMessage],
   );
 
   const openDetachedRdp = useCallback(
-    (tabId: string, info: NonNullable<Tab["rdp"]>, title: string) => {
-      const detachedId = `${tabId}__detached`;
-      const payload: DetachedRdpParams = {
-        tabId,
-        sessionId: info.sessionId,
-        host: info.host,
-        port: info.port,
-        username: info.username ?? null,
-        password: info.password,
-        options: info.options,
-        networkSettingsJson: info.networkSettingsJson ?? null,
-        title,
-      };
-      openDetachedGenericWindow("rdp", tabId, detachedId, payload, title);
-    },
+    createOpenDetachedRdp({
+    openDetachedGenericWindow,
+  }),
     [openDetachedGenericWindow],
   );
 
   const openDetachedVnc = useCallback(
-    (tabId: string, info: NonNullable<Tab["vnc"]>, title: string) => {
-      const detachedId = `${tabId}__detached`;
-      void vncCreateDetachClaim({
-        host: info.host,
-        port: info.port,
-        username: info.username ?? null,
-        password: info.password,
-        network_settings_json: info.networkSettingsJson ?? null,
-        security_policy: info.securityPolicy ?? "prefer-encryption",
-        view_only: info.viewOnly ?? false,
-        clipboard_policy: info.clipboardPolicy ?? "bidirectional",
-        viewer_options_json: info.viewerOptions ? serializeVncViewerOptions(info.viewerOptions) : null,
-      }).then((claimId) => {
-        // The browser-persisted handoff contains only an opaque one-time id;
-        // password/proxy secrets stay in backend memory.
-        const payload = redactVncHandoff<DetachedVncParams>({
-          tabId,
-          sessionId: info.sessionId,
-          host: info.host,
-          port: info.port,
-          username: info.username,
-          networkSettingsJson: info.networkSettingsJson,
-          title,
-        }, claimId);
-        openDetachedGenericWindow("vnc", tabId, detachedId, payload, title);
-      }).catch((error) => {
-        setStatusMessage(error instanceof Error ? error.message : String(error));
-      });
-    },
+    createOpenDetachedVnc({
+    openDetachedGenericWindow,
+    setStatusMessage,
+  }),
     [openDetachedGenericWindow, setStatusMessage],
   );
 
   const openDetachedTerminal = useCallback(
-    (
-      tabId: string,
-      tab: Tab,
-      title: string,
-    ) => {
-      // Capture the live backend session id + scrollback snapshot so the
-      // detached window can adopt the existing PTY/SSH session instead of
-      // spawning a fresh one. The TerminalPanel cleanup on the source tab
-      // honours the detach-pending flag and skips its `closeTerminal`
-      // call so the backend session survives the React unmount.
-      const detachedId = `${tabId}__detached`;
-      const liveSessionId = terminalSessionIds.current[tabId];
-      const liveEntry = getTerminal(tabId);
-      const snapshotText = liveEntry ? liveEntry.getBufferText() : undefined;
-      const reattach = liveSessionId
-        ? { terminalSessionId: liveSessionId, snapshotText }
-        : undefined;
-      const terminalProfile = terminalProfileOverrides[tabId]
-        ?? (tab.sessionId ? terminalProfilesBySessionId.get(tab.sessionId) : undefined)
-        ?? tab.terminalProfile
-        ?? null;
-      const payload: DetachedTerminalParams = {
-        tabId,
-        title,
-        terminalTitleMode: tab.terminalTitleMode,
-        terminalTitleOperation: tab.terminalTitleOperation,
-        terminalTitleSessionName: tab.terminalTitleSessionName,
-        ssh: tab.ssh ?? null,
-        commandTerminal: tab.commandTerminal ?? null,
-        localShell: tab.localShell ?? null,
-        terminalProfile,
-        reattach,
-      };
-      if (liveSessionId) {
-        markTerminalDetachPending(tabId);
-      }
-      try {
-        openDetachedGenericWindow("terminal", tabId, detachedId, payload, title);
-      } catch (err) {
-        clearTerminalDetachPending(tabId);
-        throw err;
-      }
-    },
+    createOpenDetachedTerminal({
+    terminalSessionIds,
+    terminalProfileOverrides,
+    terminalProfilesBySessionId,
+    openDetachedGenericWindow,
+  }),
     [openDetachedGenericWindow, terminalProfileOverrides, terminalProfilesBySessionId],
   );
 
   const openDetachedDatabase = useCallback(
-    (tabId: string, info: NonNullable<Tab["db"]>, title: string) => {
-      const detachedId = `${tabId}__detached`;
-      const payload: DetachedDbParams = {
-        tabId,
-        title,
-        // Give the detached window its own connection handle so the source
-        // tab's unmount disconnect cannot race and close the detached query
-        // workspace connection.
-        info: {
-          ...info,
-          sessionId: detachedId,
-          workspaceSessionId: info.workspaceSessionId ?? info.sessionId,
-        },
-      };
-      openDetachedGenericWindow("database", tabId, detachedId, payload, title);
-    },
+    createOpenDetachedDatabase({
+    openDetachedGenericWindow,
+  }),
     [openDetachedGenericWindow],
   );
 
-  const handleDetachActiveTab = useCallback(() => {
-    const state = useAppStore.getState();
-    const tab = state.tabs.find((item) => item.id === state.activeTabId);
-    if (!tab) return;
-    if (tab.type === "terminal" && !state.terminalSplitActive) {
-      openDetachedTerminal(tab.id, tab, tab.title);
-    } else if (tab.type === "rdp" && tab.rdp) {
-      openDetachedRdp(tab.id, tab.rdp, tab.title);
-    } else if (tab.type === "vnc" && tab.vnc) {
-      openDetachedVnc(tab.id, tab.vnc, tab.title);
-    } else if (tab.type === "database" && tab.db) {
-      openDetachedDatabase(tab.id, tab.db, tab.title);
-    } else if (tab.type === "sftp" && tab.sftp) {
-      openDetachedSftp(tab.sftp, tab.title);
-    }
-  }, [openDetachedDatabase, openDetachedRdp, openDetachedSftp, openDetachedTerminal, openDetachedVnc]);
+  const handleDetachActiveTab = useCallback(createHandleDetachActiveTab({
+    openDetachedTerminal,
+    openDetachedRdp,
+    openDetachedVnc,
+    openDetachedDatabase,
+    openDetachedSftp,
+  }), [openDetachedDatabase, openDetachedRdp, openDetachedSftp, openDetachedTerminal, openDetachedVnc]);
 
   /**
    * Subscribe to reattach messages broadcast by detached windows. Each
@@ -2480,197 +1688,43 @@ export function MainLayout() {
     });
   }, [addTab]);
 
-  const queueVaultUnlock = useCallback((
-    session: SessionConfig,
-    resume?: ResumeQueueContext,
-  ): ConnectQueueOutcome => {
-    connectQueueRef.current.unshift({ session, resume });
-    awaitingVaultUnlockRef.current = true;
-    pendingVaultActionRef.current = () => {
-      awaitingVaultUnlockRef.current = false;
-      continueConnectQueueRef.current();
-    };
-    setVaultUnlockReason((current) => current ?? tr(SAVED_PASSWORD_VAULT_REASON_KEY));
-    return "awaiting-vault";
-  }, []);
+  const queueVaultUnlock = useCallback(createQueueVaultUnlock({
+    connectQueueRef,
+    awaitingVaultUnlockRef,
+    pendingVaultActionRef,
+    continueConnectQueueRef,
+    setVaultUnlockReason,
+  }), []);
 
-  const openAfterJumpPassword = useCallback((
-    session: SessionConfig,
-    open: (session: SessionConfig) => void,
-  ): ConnectQueueOutcome => {
-    const missing = missingJumpPasswordForSession(session, sessions);
-    if (missing) {
-      awaitingManualAuthRef.current = true;
-      setPendingAuth({
-        kind: "jump",
-        ...missing,
-        onResolved: open,
-      });
-      return "awaiting-auth";
-    }
-    open(session);
-    return "opened";
-  }, [sessions]);
+  const openAfterJumpPassword = useCallback(createOpenAfterJumpPassword({
+    sessions,
+    awaitingManualAuthRef,
+    setPendingAuth,
+  }), [sessions]);
 
-  const openQueuedSession = useCallback((
-    session: SessionConfig,
-    localShellOverride?: LocalShellSelection,
-    resume?: ResumeQueueContext,
-  ): ConnectQueueOutcome => {
-    if (session.session_type === "SSH") {
-      const { method, data } = resolveSessionAuth(session);
-      if (method === "Password") {
-        const ref = passwordRefFromOptions(session);
-        if (ref) {
-          const vaultState = useVaultStore.getState().state;
-          if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session, resume);
-          return openAfterJumpPassword(session, (effectiveSession) => openSshTab(effectiveSession, "Password", ref));
-        } else {
-          awaitingManualAuthRef.current = true;
-          setPendingAuth({
-            kind: "session",
-            session,
-            resumeRequestId: resume?.requestId,
-            restoreOperationId: resume?.operationId,
-          });
-          return "awaiting-auth";
-        }
-      } else {
-        return openAfterJumpPassword(session, (effectiveSession) => openSshTab(effectiveSession, method, data));
-      }
-    } else if (session.session_type === "SFTP") {
-      const { method, data } = resolveSessionAuth(session);
-      if (method === "Password") {
-        const ref = passwordRefFromOptions(session);
-        if (ref) {
-          const vaultState = useVaultStore.getState().state;
-          if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session, resume);
-          return openAfterJumpPassword(session, (effectiveSession) => openSftpTab(effectiveSession, "Password", ref));
-        } else {
-          awaitingManualAuthRef.current = true;
-          setPendingAuth({
-            kind: "session",
-            session,
-            resumeRequestId: resume?.requestId,
-            restoreOperationId: resume?.operationId,
-          });
-          return "awaiting-auth";
-        }
-      } else {
-        return openAfterJumpPassword(session, (effectiveSession) => openSftpTab(effectiveSession, method, data));
-      }
-    } else if (session.session_type === "LocalShell") {
-      openLocalTab(
-        session.name || tr("tabs.localTerminal"),
-        session.id,
-        getSessionTerminalProfile(session.options_json),
-        localShellOverride ?? localShellSelectionFromSession(session),
-      );
-    } else if (session.session_type === "VNC") {
-      const { method, data } = resolveSessionAuth(session);
-      if (method === "Password") {
-        const ref = passwordRefFromOptions(session);
-        if (ref) {
-          const vaultState = useVaultStore.getState().state;
-          if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session, resume);
-          openVncTab(session, ref);
-        } else {
-          // DEC-VNC-21: connect first; the session's own authentication form
-          // asks only when the server requires a password (RealVNC), so a
-          // None-only server needs no input at all.
-          openVncTab(session);
-        }
-      } else {
-        openVncTab(session, data ?? undefined);
-      }
-    } else if (session.session_type === "RDP") {
-      const { method, data } = resolveSessionAuth(session);
-      if (method === "Password") {
-        const ref = passwordRefFromOptions(session);
-        if (ref) {
-          const vaultState = useVaultStore.getState().state;
-          if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session, resume);
-          return openAfterJumpPassword(session, (effectiveSession) => openRdpTab(effectiveSession, ref));
-        } else {
-          awaitingManualAuthRef.current = true;
-          setPendingAuth({
-            kind: "session",
-            session,
-            resumeRequestId: resume?.requestId,
-            restoreOperationId: resume?.operationId,
-          });
-          return "awaiting-auth";
-        }
-      } else {
-        return openAfterJumpPassword(session, (effectiveSession) => openRdpTab(effectiveSession, data ?? undefined));
-      }
-    } else if (session.session_type === "File") {
-      openFileSession(session);
-    } else if (session.session_type === "Browser") {
-      openBrowserSession(session);
-    } else if (COMMAND_TERMINAL_SESSION_TYPES.has(session.session_type)) {
-      openCommandTerminalTab(session);
-    } else if (
-      session.session_type === "MySQL" ||
-      session.session_type === "PostgreSQL" ||
-      session.session_type === "PanWeiDB" ||
-      session.session_type === "Oracle" ||
-      session.session_type === "SQLServer" ||
-      session.session_type === "StarRocks" ||
-      session.session_type === "ClickHouse" ||
-      session.session_type === "Presto" ||
-      session.session_type === "Redis"
-    ) {
-      // DB sessions store the password as a vault: ref in options_json. Many
-      // databases (notably Redis / trust-auth Postgres) connect without one,
-      // so a missing ref just means "no password" — we don't force a prompt.
-      const ref = passwordRefFromOptions(session);
-      if (ref) {
-        const vaultState = useVaultStore.getState().state;
-        if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session, resume);
-        return openAfterJumpPassword(session, (effectiveSession) => openDbTab(effectiveSession, ref));
-      } else {
-        return openAfterJumpPassword(session, (effectiveSession) => openDbTab(effectiveSession, undefined));
-      }
-    } else if (session.session_type === "HBaseShell") {
-      const ref = passwordRefFromOptions(session);
-      if (ref) {
-        const vaultState = useVaultStore.getState().state;
-        if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session, resume);
-        openHBaseShellTab(session, ref);
-      } else {
-        openHBaseShellTab(session, undefined);
-      }
-    } else if (session.session_type === "Proxy") {
-      openProxyTestTab(session);
-    } else if (session.session_type === "S3" || session.session_type === "AzureBlob") {
-      // Secrets are vault: refs in options_json; resolve happens server-side on
-      // attach. If any secret is vault-backed and the vault is locked, unlock
-      // first so the attach doesn't fail with a cryptic error.
-      if (objectStorageHasVaultSecret(session)) {
-        const vaultState = useVaultStore.getState().state;
-        if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session, resume);
-      }
-      return openAfterJumpPassword(session, openObjectStorageTab);
-    } else if (session.session_type === "Mail") {
-      const existing = tabsRef.current.find((tab) => tab.type === "mail" && tab.sessionId === session.id);
-      if (existing) {
-        setActiveTab(existing.id);
-        return "opened";
-      }
-      const ref = passwordRefFromOptions(session);
-      const smtpRef = mailSmtpPasswordRefFromOptions(session);
-      if (ref || smtpRef) {
-        const vaultState = useVaultStore.getState().state;
-        if (vaultState !== "unlocked" && vaultState !== "empty") return queueVaultUnlock(session, resume);
-      }
-      openMailTab(session, ref ?? undefined, smtpRef ?? undefined);
-    } else {
-      openUnsupportedTab(session);
-      void markConnected(session.id);
-    }
-    return "opened";
-  }, [
+  const openQueuedSession = useCallback(createOpenQueuedSession({
+    queueVaultUnlock,
+    openAfterJumpPassword,
+    openSshTab,
+    awaitingManualAuthRef,
+    setPendingAuth,
+    openSftpTab,
+    openLocalTab,
+    openVncTab,
+    openRdpTab,
+    openFileSession,
+    openBrowserSession,
+    openCommandTerminalTab,
+    openDbTab,
+    openHBaseShellTab,
+    openProxyTestTab,
+    openObjectStorageTab,
+    tabsRef,
+    setActiveTab,
+    openMailTab,
+    openUnsupportedTab,
+    markConnected,
+  }), [
     markConnected,
     openBrowserSession,
     openCommandTerminalTab,
@@ -2691,20 +1745,13 @@ export function MainLayout() {
     setActiveTab,
   ]);
 
-  const continueConnectQueue = useCallback(() => {
-    if (connectQueueRunningRef.current || awaitingManualAuthRef.current || awaitingVaultUnlockRef.current) return;
-    connectQueueRunningRef.current = true;
-    try {
-      while (connectQueueRef.current.length > 0) {
-        const entry = connectQueueRef.current.shift();
-        if (!entry) continue;
-        const outcome = openQueuedSession(entry.session, undefined, entry.resume);
-        if (outcome !== "opened") return;
-      }
-    } finally {
-      connectQueueRunningRef.current = false;
-    }
-  }, [openQueuedSession]);
+  const continueConnectQueue = useCallback(createContinueConnectQueue({
+    connectQueueRunningRef,
+    awaitingManualAuthRef,
+    awaitingVaultUnlockRef,
+    connectQueueRef,
+    openQueuedSession,
+  }), [openQueuedSession]);
 
   useEffect(() => {
     continueConnectQueueRef.current = continueConnectQueue;
@@ -2714,73 +1761,36 @@ export function MainLayout() {
   // Welcome restore orchestration (design §4.2.3-4.2.5)
   // -------------------------------------------------------------------------
 
-  const resolveResumeWaiter = useCallback((requestId: string, result: OpenEntryResult) => {
-    const waiter = resumeWaitersRef.current.get(requestId);
-    if (!waiter || waiter.settled) return;
-    waiter.settled = true;
-    resumeWaitersRef.current.delete(requestId);
-    if (waiter.guardTimer != null) {
-      window.clearTimeout(waiter.guardTimer);
-      waiter.guardTimer = null;
-    }
-    if (waiter.tabId) resumeWaiterByTabRef.current.delete(waiter.tabId);
-    if (resumeWaiterBySessionRef.current.get(waiter.sessionId) === requestId) {
-      resumeWaiterBySessionRef.current.delete(waiter.sessionId);
-    }
-    const settleTimer = resumeSettleTimersRef.current.get(requestId);
-    if (settleTimer != null) {
-      window.clearTimeout(settleTimer);
-      resumeSettleTimersRef.current.delete(requestId);
-    }
-    waiter.resolve(result);
-  }, []);
+  const resolveResumeWaiter = useCallback(createResolveResumeWaiter({
+    resumeWaitersRef,
+    resumeWaiterByTabRef,
+    resumeWaiterBySessionRef,
+    resumeSettleTimersRef,
+  }), []);
 
   const cancelResumeWaiter = useCallback(
-    (requestId: string, code: ResumeIssue["code"], message: string) => {
-      resolveResumeWaiter(requestId, {
-        tabId: null,
-        status: "cancelled",
-        readiness: null,
-        issue: { code, message },
-      });
-    },
+    createCancelResumeWaiter({
+    resolveResumeWaiter,
+  }),
     [resolveResumeWaiter],
   );
 
   const cancelAllResumeWaiters = useCallback(
-    (code: ResumeIssue["code"], message: string) => {
-      for (const requestId of Array.from(resumeWaitersRef.current.keys())) {
-        cancelResumeWaiter(requestId, code, message);
-      }
-    },
+    createCancelAllResumeWaiters({
+    resumeWaitersRef,
+    cancelResumeWaiter,
+  }),
     [cancelResumeWaiter],
   );
 
   /** Resolve the waiter bound to a restored tab by its readiness outcome. */
   const resolveResumeWaiterForTab = useCallback(
-    (tabId: string, status: "connected" | "failed", error?: unknown) => {
-      const requestId = resumeWaiterByTabRef.current.get(tabId);
-      if (!requestId) return;
-      if (status === "connected") {
-        resolveResumeWaiter(requestId, {
-          tabId,
-          status: "ready",
-          readiness: "connected",
-          issue: null,
-        });
-      } else {
-        const waiter = resumeWaitersRef.current.get(requestId);
-        if (waiter) {
-          restoreFailedLocalTabsRef.current.set(waiter.entryIdentity, tabId);
-        }
-        resolveResumeWaiter(requestId, {
-          tabId,
-          status: "failed",
-          readiness: null,
-          issue: { code: "connect", message: String(error ?? "Connection failed") },
-        });
-      }
-    },
+    createResolveResumeWaiterForTab({
+    resumeWaiterByTabRef,
+    resolveResumeWaiter,
+    resumeWaitersRef,
+    restoreFailedLocalTabsRef,
+  }),
     [resolveResumeWaiter],
   );
 
@@ -2828,100 +1838,23 @@ export function MainLayout() {
   }, [tabs, resolveResumeWaiter, cancelResumeWaiter]);
 
   const openSavedSessionForRestore = useCallback(
-    (
-      session: SessionConfig,
-      context: { operationId: string; entryIdentity: string },
-    ): Promise<OpenEntryResult> => {
-      return new Promise<OpenEntryResult>((resolve) => {
-        const requestId = `resume-${globalThis.crypto?.randomUUID?.() ?? Date.now()}`;
-        const excludeTabIds = new Set(
-          useAppStore
-            .getState()
-            .tabs.filter((tab) => tab.sessionId === session.id)
-            .map((tab) => tab.id),
-        );
-        const waiter: ResumeWaiter = {
-          requestId,
-          operationId: context.operationId,
-          entryIdentity: context.entryIdentity,
-          sessionId: session.id,
-          tabId: null,
-          resolve,
-          settled: false,
-          excludeTabIds,
-          guardTimer: null,
-        };
-        resumeWaitersRef.current.set(requestId, waiter);
-        resumeWaiterBySessionRef.current.set(session.id, requestId);
-        waiter.guardTimer = window.setTimeout(() => {
-          cancelResumeWaiter(requestId, "connect", "Restore entry timed out waiting for dispatch");
-        }, 60000);
-        // A retry replaces the operation-owned failed tab (design §4.2.5).
-        const previousFailed = restoreFailedLocalTabsRef.current.get(context.entryIdentity);
-        if (previousFailed) {
-          restoreFailedLocalTabsRef.current.delete(context.entryIdentity);
-          if (useAppStore.getState().tabs.some((tab) => tab.id === previousFailed)) {
-            removeTab(previousFailed);
-          }
-        }
-        openQueuedSession(session, undefined, {
-          requestId,
-          operationId: context.operationId,
-          entryIdentity: context.entryIdentity,
-        });
-      });
-    },
+    createOpenSavedSessionForRestore({
+    resumeWaitersRef,
+    resumeWaiterBySessionRef,
+    cancelResumeWaiter,
+    restoreFailedLocalTabsRef,
+    removeTab,
+    openQueuedSession,
+  }),
     [openQueuedSession, cancelResumeWaiter, removeTab],
   );
 
   const openLocalTerminalForRestore = useCallback(
-    async (
-      entry: Extract<SnapshotEntry, { kind: "local-terminal" }>,
-      _context: { operationId: string },
-    ): Promise<OpenEntryResult> => {
-      // Retry of an operation-owned failed tab replaces it (never stacks).
-      const previousFailed = restoreFailedLocalTabsRef.current.get(entry.identity);
-      if (previousFailed) {
-        restoreFailedLocalTabsRef.current.delete(entry.identity);
-        if (useAppStore.getState().tabs.some((tab) => tab.id === previousFailed)) {
-          removeTab(previousFailed);
-        }
-      }
-      const shellSelection: LocalShellSelection = {
-        id: entry.shellId,
-        name: entry.displayName,
-        ...(entry.shellArgs.length > 0 ? { args: [...entry.shellArgs] } : {}),
-      };
-      const outcome = await openLocalTab(
-        entry.displayName,
-        undefined,
-        undefined,
-        shellSelection,
-        entry.confirmedCwd,
-        entry.identity.startsWith("local:") ? entry.identity.slice("local:".length) : undefined,
-      );
-      switch (outcome.status) {
-        case "started":
-          return { tabId: outcome.tabId, status: "ready", readiness: "connected", issue: null };
-        case "failed":
-          if (outcome.tabId) {
-            restoreFailedLocalTabsRef.current.set(entry.identity, outcome.tabId);
-          }
-          return {
-            tabId: outcome.tabId,
-            status: "failed",
-            readiness: null,
-            issue: { code: "connect", message: outcome.error ?? "Local terminal failed to start" },
-          };
-        default:
-          return {
-            tabId: outcome.tabId,
-            status: "cancelled",
-            readiness: null,
-            issue: { code: "cancelled", message: "Local terminal launch cancelled" },
-          };
-      }
-    },
+    createOpenLocalTerminalForRestore({
+    restoreFailedLocalTabsRef,
+    removeTab,
+    openLocalTab,
+  }),
     [openLocalTab, removeTab],
   );
 
@@ -2952,24 +1885,13 @@ export function MainLayout() {
   }, []);
 
   const cancelPendingAuthForRestore = useCallback(
-    (operationId: string) => {
-      setPendingAuth((current) => {
-        if (current && current.kind === "session" && current.restoreOperationId === operationId) {
-          if (current.resumeRequestId) {
-            cancelResumeWaiter(current.resumeRequestId, "cancelled", "Restore cancelled");
-          }
-          awaitingManualAuthRef.current = false;
-          continueConnectQueueRef.current();
-          return null;
-        }
-        return current;
-      });
-      for (const [requestId, waiter] of Array.from(resumeWaitersRef.current.entries())) {
-        if (waiter.operationId === operationId) {
-          cancelResumeWaiter(requestId, "cancelled", "Restore cancelled");
-        }
-      }
-    },
+    createCancelPendingAuthForRestore({
+    setPendingAuth,
+    cancelResumeWaiter,
+    awaitingManualAuthRef,
+    continueConnectQueueRef,
+    resumeWaitersRef,
+  }),
     [cancelResumeWaiter],
   );
 
@@ -3004,76 +1926,21 @@ export function MainLayout() {
   // deep-compare, debounced commit. Empty snapshots are never written.
   // -------------------------------------------------------------------------
 
-  const buildRunSnapshotEntries = useCallback(() => {
-    const sessionsById = new Map(
-      useSessionStore.getState().sessions.map((session) => [session.id, session]),
-    );
-    const entries: SnapshotEntry[] = [];
-    const identityByTab = new Map<string, string>();
-    for (const tab of tabs) {
-      let entry: SnapshotEntry | null = null;
-      if (tab.type === "terminal") {
-        if (tab.sessionId) {
-          const session = sessionsById.get(tab.sessionId);
-          if (session && isResumeEligibleSavedSession(session)) {
-            entry = savedSessionEntry(session);
-          }
-        } else if (
-          tab.localShell &&
-          tab.localShell.id !== "wsl.exe" &&
-          !tab.localShell.id.startsWith("wsl:")
-        ) {
-          const rawCwd = terminalCwds[tab.id] ?? null;
-          const confirmedCwd = rawCwd ? normalizeLocalStartCwd(rawCwd, getAppPlatform()) : null;
-          if (confirmedCwd) {
-            entry = localTerminalEntry({
-              tabId: tab.chatTabId ?? tab.id,
-              displayName: tab.localShell.name,
-              shellId: tab.localShell.id,
-              shellArgs: tab.localShell.args,
-              confirmedCwd,
-            });
-          }
-        }
-      } else if (
-        tab.sessionId &&
-        ["sftp", "vnc", "rdp", "database", "redis", "hbase-shell", "proxy-test", "object-storage", "mail", "file-browser"].includes(tab.type)
-      ) {
-        const session = sessionsById.get(tab.sessionId);
-        if (session && isResumeEligibleSavedSession(session)) {
-          entry = savedSessionEntry(session);
-        }
-      }
-      if (entry && !welcomeRestoreInstanceRef.current.isIdentitySuppressed(entry.identity)) {
-        entries.push(entry);
-        identityByTab.set(tab.id, entry.identity);
-      }
-    }
-    const activeIdentity = identityByTab.get(activeTabId ?? "") ?? null;
-    return { entries, activeIdentity };
-  }, [tabs, activeTabId, terminalCwds]);
+  const buildRunSnapshotEntries = useCallback(createBuildRunSnapshotEntries({
+    tabs,
+    terminalCwds,
+    welcomeRestoreInstanceRef,
+    activeTabId,
+  }), [tabs, activeTabId, terminalCwds]);
 
-  const commitRunSnapshotNow = useCallback(async () => {
-    const state = welcomeRestoreViewRef.current.state;
-    if (state === "restoring" || state === "awaiting-auth") return; // suppression
-    const { entries, activeIdentity } = buildRunSnapshotEntries();
-    if (entries.length === 0) return; // never write empty snapshots
-    const fingerprint = snapshotEntriesFingerprint(entries, activeIdentity);
-    if (fingerprint === snapshotFingerprintRef.current) return;
-    try {
-      const response = await commitWelcomeRunSnapshot({
-        batchId: runBatchIdRef.current,
-        entries,
-        activeIdentity,
-        expectedRevision: snapshotRevisionRef.current || undefined,
-        restored: false,
-      });
-      if (response.record) snapshotRevisionRef.current = response.record.revision;
-      if (response.applied) snapshotFingerprintRef.current = fingerprint;
-    } catch (error) {
-      setStatusMessage(tr("welcome.snapshotSaveFailed", { error: String(error) }));
-    }
-  }, [buildRunSnapshotEntries, setStatusMessage, tr]);
+  const commitRunSnapshotNow = useCallback(createCommitRunSnapshotNow({
+    welcomeRestoreViewRef,
+    buildRunSnapshotEntries,
+    snapshotFingerprintRef,
+    runBatchIdRef,
+    snapshotRevisionRef,
+    setStatusMessage,
+  }), [buildRunSnapshotEntries, setStatusMessage, tr]);
 
   // Always execute the latest collector closure when the pending timer
   // fires, so a change committed during the debounce window is not lost.
@@ -3116,138 +1983,33 @@ export function MainLayout() {
     setStatusMessage(tr("status.revealedSession", { name: session.name || session.host || session.session_type }));
   }, [setActiveSideTab, setSearchQuery, setSelectedSession, setSidebarCollapsed, setStatusMessage, tr]);
 
-  const handleAuthSubmit = useCallback(async (password: string, saveToVault: boolean) => {
-    if (!pendingAuth) return;
-    const session = pendingAuth.session;
-    let credential: string = password;
+  const handleAuthSubmit = useCallback(createHandleAuthSubmit({
+    pendingAuth,
+    updateSession,
+    setPendingAuth,
+    awaitingManualAuthRef,
+    continueConnectQueueRef,
+    openAfterJumpPassword,
+    openSftpTab,
+    openVncTab,
+    openRdpTab,
+    openSshTab,
+  }), [pendingAuth, openAfterJumpPassword, openSftpTab, openSshTab, openVncTab, openRdpTab, updateSession]);
 
-    if (pendingAuth.kind === "jump") {
-      let persistJumpPasswordOnTarget = false;
-      if (saveToVault) {
-        const ready = await ensureVaultReady(tr(SAVED_PASSWORD_VAULT_REASON_KEY));
-        if (ready) {
-          try {
-            const label = `${pendingAuth.username}@${pendingAuth.host}:${pendingAuth.port}`;
-            const result = await vaultPut("ssh-password", label, password);
-            credential = result.reference;
-
-            if (pendingAuth.jumpSession) {
-              const opts = parseSessionOptions(pendingAuth.jumpSession.options_json);
-              await updateSession({
-                ...pendingAuth.jumpSession,
-                options_json: JSON.stringify({ ...opts, passwordRef: result.reference }),
-              });
-            } else if (pendingAuth.manual) {
-              persistJumpPasswordOnTarget = true;
-              await updateSession(sessionWithJumpPassword(session, result.reference, true));
-            }
-          } catch (err) {
-            console.error("Failed to save jump host password to vault:", err);
-            credential = password;
-            persistJumpPasswordOnTarget = false;
-          }
-        }
-      }
-
-      pendingAuth.onResolved(sessionWithJumpPassword(session, credential, persistJumpPasswordOnTarget));
-      setPendingAuth(null);
-      awaitingManualAuthRef.current = false;
-      continueConnectQueueRef.current();
-      return;
-    }
-
-    if (saveToVault) {
-      // Make sure the vault is ready (set master password if empty, unlock if
-      // locked) via the on-demand gate before encrypting. If the user cancels
-      // the gate, fall back to a one-shot connect with the typed plaintext.
-      const ready = await ensureVaultReady(tr(SAVED_PASSWORD_VAULT_REASON_KEY));
-      if (ready) {
-        try {
-          const kind =
-            session.session_type === "VNC"
-              ? "vnc-password"
-              : session.session_type === "RDP"
-                ? "rdp-password"
-                : "ssh-password";
-          const label = `${session.username || "user"}@${session.host || "?"}:${session.port}`;
-          const result = await vaultPut(kind, label, password);
-          credential = result.reference;
-
-          // Persist the vault reference back into options_json so future
-          // connects find it without re-prompting.
-          const opts = parseSessionOptions(session.options_json);
-          const updated = JSON.stringify({ ...opts, passwordRef: result.reference });
-          await updateSession({ ...session, options_json: updated });
-        } catch (err) {
-          // On any vault error, fall back to one-shot connect with the typed
-          // plaintext — don't block the user.
-          console.error("Failed to save password to vault:", err);
-          credential = password;
-        }
-      }
-    }
-
-    let outcome: ConnectQueueOutcome = "opened";
-    if (session.session_type === "SFTP") {
-      outcome = openAfterJumpPassword(session, (effectiveSession) => openSftpTab(effectiveSession, "Password", credential));
-    } else if (session.session_type === "VNC") {
-      openVncTab(session, credential);
-    } else if (session.session_type === "RDP") {
-      outcome = openAfterJumpPassword(session, (effectiveSession) => openRdpTab(effectiveSession, credential));
-    } else {
-      outcome = openAfterJumpPassword(session, (effectiveSession) => openSshTab(effectiveSession, "Password", credential));
-    }
-    if (outcome === "opened") {
-      setPendingAuth(null);
-      awaitingManualAuthRef.current = false;
-      continueConnectQueueRef.current();
-    }
-  }, [pendingAuth, openAfterJumpPassword, openSftpTab, openSshTab, openVncTab, openRdpTab, updateSession]);
-
-  const handleQuickConnect = useCallback((value: string) => {
-    try {
-      const parsed = parseQuickConnectInput(value);
-      const session = parsed.config;
-      if (session.session_type === "LocalShell") {
-        openLocalTab(session.name);
-      } else if (session.session_type === "Browser") {
-        openBrowserSession(session);
-      } else if (session.session_type === "Mail") {
-        openMailTab(session, parsed.authData ?? undefined);
-      } else if (COMMAND_TERMINAL_SESSION_TYPES.has(session.session_type)) {
-        openCommandTerminalTab(session);
-      } else if (
-        session.session_type === "SSH"
-        || session.session_type === "SFTP"
-        || session.session_type === "RDP"
-        || session.session_type === "VNC"
-      ) {
-        if (session.session_type === "VNC" && session.auth_method === "Password") {
-          // DEC-VNC-21: like saved sessions, ask in the session only when the
-          // server requires a password.
-          openVncTab(session);
-        } else if (session.auth_method === "Password") {
-          awaitingManualAuthRef.current = true;
-          setPendingAuth({ kind: "session", session });
-        } else {
-          const authMethod = typeof session.auth_method === "string" ? session.auth_method : "PrivateKey";
-          if (session.session_type === "SFTP") {
-            openSftpTab(session, authMethod, parsed.authData);
-          } else if (session.session_type === "RDP") {
-            openRdpTab(session, parsed.authData ?? undefined);
-          } else if (session.session_type === "VNC") {
-            openVncTab(session, parsed.authData ?? undefined);
-          } else {
-            openSshTab(session, authMethod, parsed.authData);
-          }
-        }
-      } else {
-        openUnsupportedTab(session);
-      }
-    } catch (err) {
-      setStatusMessage(err instanceof Error ? err.message : String(err));
-    }
-  }, [openBrowserSession, openCommandTerminalTab, openLocalTab, openMailTab, openRdpTab, openSftpTab, openSshTab, openVncTab, openUnsupportedTab, setStatusMessage]);
+  const handleQuickConnect = useCallback(createHandleQuickConnect({
+    openLocalTab,
+    openBrowserSession,
+    openMailTab,
+    openCommandTerminalTab,
+    openVncTab,
+    awaitingManualAuthRef,
+    setPendingAuth,
+    openSftpTab,
+    openRdpTab,
+    openSshTab,
+    openUnsupportedTab,
+    setStatusMessage,
+  }), [openBrowserSession, openCommandTerminalTab, openLocalTab, openMailTab, openRdpTab, openSftpTab, openSshTab, openVncTab, openUnsupportedTab, setStatusMessage]);
 
   const openPlaceholderTab = useCallback((title: string, message: string) => {
     addTab({
@@ -3282,223 +2044,24 @@ export function MainLayout() {
     return () => window.removeEventListener("taomni:open-settings-section", onOpenSettingsSection);
   }, [openSettingsTab]);
 
-  const executeControlTool = useCallback(async (dispatch: ControlToolDispatch) => {
-    let ok = false;
-    let output = "";
-    const args = dispatch.args ?? {};
-    const resolveTab = (raw: unknown): Tab | undefined => {
-      const id = String(raw ?? "").trim();
-      if (!id) return undefined;
-      return tabsRef.current.find((tab) => tab.id === id);
-    };
-    const resolveSession = async (): Promise<SessionConfig | null> => {
-      const sessionId = String(args.session_id ?? "").trim();
-      if (sessionId) {
-        let found = useSessionStore.getState().sessions.find((s) => s.id === sessionId) ?? null;
-        if (!found) {
-          await loadSessions();
-          found = useSessionStore.getState().sessions.find((s) => s.id === sessionId) ?? null;
-        }
-        return found;
-      }
-      const query = String(args.query ?? "").trim().toLowerCase();
-      if (!query) return null;
-      let all = useSessionStore.getState().sessions;
-      if (all.length === 0) {
-        await loadSessions();
-        all = useSessionStore.getState().sessions;
-      }
-      const matches = all.filter((s) =>
-        s.id.toLowerCase() === query ||
-        s.name.toLowerCase().includes(query) ||
-        s.host.toLowerCase().includes(query)
-      );
-      return matches.length === 1 ? matches[0] : null;
-    };
-
-    try {
-      switch (dispatch.tool) {
-        case "session_open": {
-          const session = await resolveSession();
-          if (!session) {
-            output = "session_open could not resolve a unique session";
-            break;
-          }
-          const localShell = controlLocalShellSelection(args);
-          if (localShell.error) {
-            output = localShell.error;
-            break;
-          }
-          if (localShell.localShell && session.session_type !== "LocalShell") {
-            output = "local_shell only applies to saved LocalShell sessions";
-            break;
-          }
-          const outcome = openQueuedSession(session, localShell.localShell);
-          if (outcome === "opened") {
-            ok = true;
-            output = `opened session ${session.id}`;
-          } else {
-            ok = true;
-            output = `session ${session.id} queued: ${outcome}`;
-          }
-          break;
-        }
-        case "session_open_editor": {
-          const sessionId = String(args.session_id ?? "").trim();
-          if (sessionId) {
-            const session = await resolveSession();
-            if (!session) {
-              output = `session not found: ${sessionId}`;
-              break;
-            }
-            setEditingSession(session);
-            setNewSessionGroupPath(null);
-            setNewSessionInitialProto(undefined);
-          } else {
-            setEditingSession(undefined);
-            setNewSessionGroupPath(typeof args.group_path === "string" ? args.group_path : null);
-            setNewSessionInitialProto(typeof args.session_type === "string" ? args.session_type : undefined);
-          }
-          setShowSessionEditor(true);
-          ok = true;
-          output = "session editor opened";
-          break;
-        }
-        case "quick_connect": {
-          const input = String(args.input ?? "").trim();
-          if (!input) {
-            output = "quick_connect requires input";
-            break;
-          }
-          handleQuickConnect(input);
-          ok = true;
-          output = "quick connect submitted";
-          break;
-        }
-        case "tab_list": {
-          const tabs = useAppStore.getState().tabs.map((tab, index) => ({
-            id: tab.id,
-            title: tab.title,
-            type: tab.type,
-            sessionId: tab.sessionId ?? null,
-            active: tab.id === useAppStore.getState().activeTabId,
-            index,
-          }));
-          ok = true;
-          output = JSON.stringify(tabs, null, 2);
-          break;
-        }
-        case "tab_switch": {
-          const tab = resolveTab(args.tab_id);
-          if (!tab) {
-            output = `tab not found: ${String(args.tab_id ?? "")}`;
-            break;
-          }
-          setActiveTab(tab.id);
-          ok = true;
-          output = `switched to tab ${tab.id}`;
-          break;
-        }
-        case "tab_duplicate": {
-          const tab = resolveTab(args.tab_id);
-          if (!tab) {
-            output = `tab not found: ${String(args.tab_id ?? "")}`;
-            break;
-          }
-          await handleDuplicateTab(tab.id);
-          ok = true;
-          output = `duplicated tab ${tab.id}`;
-          break;
-        }
-        case "tab_rename": {
-          const tab = resolveTab(args.tab_id);
-          const title = String(args.title ?? "").trim();
-          if (!tab || !title) {
-            output = "tab_rename requires a valid tab_id and title";
-            break;
-          }
-          updateTabTitle(tab.id, title);
-          ok = true;
-          output = `renamed tab ${tab.id}`;
-          break;
-        }
-        case "tab_close": {
-          const tab = resolveTab(args.tab_id);
-          if (!tab) {
-            output = `tab not found: ${String(args.tab_id ?? "")}`;
-            break;
-          }
-          if (!tab.closable) {
-            output = `tab is not closable: ${tab.id}`;
-            break;
-          }
-          removeTab(tab.id);
-          ok = true;
-          output = `closed tab ${tab.id}`;
-          break;
-        }
-        case "tab_move": {
-          const tab = resolveTab(args.tab_id);
-          const toIndex = Number(args.to_index);
-          if (!tab || !Number.isInteger(toIndex)) {
-            output = "tab_move requires a valid tab_id and integer to_index";
-            break;
-          }
-          moveTabToIndex(tab.id, toIndex);
-          ok = true;
-          output = `moved tab ${tab.id} to index ${toIndex}`;
-          break;
-        }
-        case "tab_open_settings": {
-          openSettingsTab();
-          ok = true;
-          output = "settings tab opened";
-          break;
-        }
-        case "tab_open_local_terminal": {
-          const localShell = controlLocalShellSelection(args);
-          if (localShell.error) {
-            output = localShell.error;
-            break;
-          }
-          openLocalTab(
-            typeof args.title === "string" ? args.title : localShell.localShell?.name,
-            undefined,
-            undefined,
-            localShell.localShell,
-          );
-          ok = true;
-          output = "local terminal opened";
-          break;
-        }
-        case "tab_open_file_browser": {
-          const path = String(args.path ?? "").trim();
-          if (!path) {
-            output = "tab_open_file_browser requires path";
-            break;
-          }
-          openFileBrowserTab(typeof args.title === "string" ? args.title : path, path);
-          ok = true;
-          output = `file browser opened: ${path}`;
-          break;
-        }
-        default:
-          output = `unsupported control tool: ${dispatch.tool}`;
-      }
-    } catch (err) {
-      output = err instanceof Error ? err.message : String(err);
-    }
-
-    try {
-      await invoke("cc_resolve_tool_call", {
-        callId: dispatch.callId,
-        ok,
-        output,
-      });
-    } catch (err) {
-      console.error("cc_resolve_tool_call failed:", err);
-    }
-  }, [
+  const executeControlTool = useCallback(createExecuteControlTool({
+    tabsRef,
+    loadSessions,
+    openQueuedSession,
+    setEditingSession,
+    setNewSessionGroupPath,
+    setNewSessionInitialProto,
+    setShowSessionEditor,
+    handleQuickConnect,
+    setActiveTab,
+    handleDuplicateTab,
+    updateTabTitle,
+    removeTab,
+    moveTabToIndex,
+    openSettingsTab,
+    openLocalTab,
+    openFileBrowserTab,
+  }), [
     handleDuplicateTab,
     handleQuickConnect,
     loadSessions,
@@ -3656,104 +2219,34 @@ export function MainLayout() {
     setStatusMessage(tr(next ? "status.quickConnectShown" : "status.quickConnectHidden"));
   }, [quickConnectVisible, setStatusMessage]);
 
-  const handleCommand = useCallback((command: AppCommand) => {
-    switch (command) {
-      case "new-session":
-        handleNewSession();
-        break;
-      case "new-sftp":
-        handleNewSftpSession();
-        break;
-      case "new-terminal":
-        openLocalTab();
-        break;
-      case "close-active":
-        if (activeTab?.closable) removeTab(activeTab.id);
-        break;
-      case "reload-sessions":
-        void loadSessions();
-        setStatusMessage(tr("status.sessionsReloaded"));
-        break;
-      case "toggle-xserver":
-        toggleXServer();
-        break;
-      case "view":
-        toggleSidebar();
-        break;
-      case "toggle-quick-connect":
-        toggleQuickConnectVisible();
-        break;
-      case "servers":
-        useServersStore.getState().openDialog(tr("servers.dialogTitle"));
-        break;
-      case "sessions":
-        setSidebarCollapsed(false);
-        break;
-      case "split":
-        toggleTerminalSplit();
-        break;
-      case "multiexec":
-        toggleMultiExec();
-        break;
-      case "exit":
-        requestAppExit();
-        break;
-      case "tunneling": {
-        const existing = tabsRef.current.find((tab) => tab.type === "nettools");
-        if (existing) {
-          setActiveTab(existing.id);
-        } else {
-          addTab({
-            id: "nettools-tunnels",
-            type: "nettools",
-            title: t("tunnels.title"),
-            closable: true,
-          });
-        }
-        break;
-      }
-      case "sockscap": {
-        const existing = tabsRef.current.find((tab) => tab.type === "sockscap");
-        if (existing) {
-          setActiveTab(existing.id);
-        } else {
-          addTab({
-            id: "sockscap-main",
-            type: "sockscap",
-            title: t("sockscap.title"),
-            closable: true,
-          });
-        }
-        break;
-      }
-      case "tools":
-        openPlaceholderTab(t("tabs.networkTools"), t("status.commandUnavailable"));
-        break;
-      case "git":
-        void openGitRepository();
-        break;
-      case "code-workspace":
-        openEmptyCodeWorkspaceTab();
-        break;
-      case "settings":
-        openSettingsTab();
-        break;
-      case "lan-chat":
-        openLanChatTab();
-        break;
-      case "mail-unified":
-        openUnifiedMailTab();
-        break;
-      case "mfa":
-        openMfaTab();
-        break;
-      case "help":
-        setShowAbout(true);
-        break;
-      default:
-        setStatusMessage(tr("status.commandUnavailable"));
-    }
-  }, [
+  const handleCommand = useCallback(createHandleCommand({
+    handleNewSession,
+    handleNewSftpSession,
+    openLocalTab,
+    activeTab,
+    removeTab,
+    loadSessions,
+    setStatusMessage,
+    toggleXServer,
+    toggleSidebar,
+    toggleQuickConnectVisible,
+    setSidebarCollapsed,
+    toggleTerminalSplit,
+    toggleMultiExec,
+    requestAppExit,
+    tabsRef,
+    setActiveTab,
+    addTab,
+    t,
+    openPlaceholderTab,
+    openGitRepository,
+    openEmptyCodeWorkspaceTab,
+    openSettingsTab,
+    openLanChatTab,
+    openUnifiedMailTab,
+    openMfaTab,
+    setShowAbout,
+  }), [
     activeTab,
     handleNewSession,
     handleNewSftpSession,
@@ -5038,167 +3531,5 @@ export function MainLayout() {
       <EdgeDrawer />
     </div>
     </TabActionSlotProvider>
-  );
-}
-
-function positiveWeight(value: number | undefined): number {
-  return typeof value === "number" && Number.isFinite(value) && value > 0
-    ? value
-    : 1;
-}
-
-function axisWeights(weights: number[], count: number): number[] {
-  return Array.from({ length: count }, (_, index) => positiveWeight(weights[index]));
-}
-
-function sumWeights(weights: number[]): number {
-  return weights.reduce((sum, weight) => sum + positiveWeight(weight), 0) || 1;
-}
-
-function resizeAdjacentWeights(weights: number[], index: number, deltaWeight: number): number[] {
-  const next = weights.map(positiveWeight);
-  if (index < 0 || index >= next.length - 1) return next;
-
-  const left = next[index];
-  const right = next[index + 1];
-  const minDelta = MIN_SPLIT_WEIGHT - left;
-  const maxDelta = right - MIN_SPLIT_WEIGHT;
-  const clampedDelta = Math.max(minDelta, Math.min(maxDelta, deltaWeight));
-  next[index] = left + clampedDelta;
-  next[index + 1] = right - clampedDelta;
-  return next;
-}
-
-function weightsToGridTemplate(weights: number[]): string {
-  return weights.map((weight) => `minmax(0, ${positiveWeight(weight)}fr)`).join(" ");
-}
-
-function cumulativeWeightPercent(weights: number[], index: number): number {
-  const total = sumWeights(weights);
-  const before = weights
-    .slice(0, index + 1)
-    .reduce((sum, weight) => sum + positiveWeight(weight), 0);
-  return total > 0 ? (before / total) * 100 : 0;
-}
-
-function TerminalSplitToolbar({
-  layout,
-  lockedCount,
-  onLayoutChange,
-  onClearLocks,
-  onClose,
-}: {
-  layout: TerminalSplitLayout;
-  lockedCount: number;
-  onLayoutChange: (layout: TerminalSplitLayout) => void;
-  onClearLocks: () => void;
-  onClose: () => void;
-}) {
-  const t = useT();
-  const options: Array<{ id: TerminalSplitLayout; label: string; icon: ReactNode }> = [
-    { id: "horizontal", label: t("terminalSplit.horizontal"), icon: <Columns2 className="w-3.5 h-3.5" /> },
-    { id: "vertical", label: t("terminalSplit.vertical"), icon: <Rows3 className="w-3.5 h-3.5" /> },
-    { id: "grid", label: t("terminalSplit.grid"), icon: <Grid2X2 className="w-3.5 h-3.5" /> },
-  ];
-
-  return (
-    <div
-      data-testid="terminal-split-toolbar"
-      className="h-8 shrink-0 flex items-center gap-1 px-2"
-      style={{
-        background: "var(--taomni-chrome-bg)",
-        borderBottom: "1px solid var(--taomni-divider)",
-      }}
-    >
-      {options.map((option) => (
-        <button
-          key={option.id}
-          type="button"
-          data-testid={`terminal-split-layout-${option.id}`}
-          aria-label={option.label}
-          title={option.label}
-          data-active={layout === option.id || undefined}
-          className="h-6 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
-          style={layout === option.id ? { background: "var(--taomni-selected)", color: "var(--taomni-accent)" } : undefined}
-          onClick={() => onLayoutChange(option.id)}
-        >
-          {option.icon}
-        </button>
-      ))}
-      <span className="taomni-pill ml-1" style={{ fontSize: 11 }}>
-        {t("terminalSplit.locked", { count: lockedCount })}
-      </span>
-      <button
-        type="button"
-        className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[var(--taomni-hover)] disabled:opacity-40"
-        style={{ color: "var(--taomni-text-muted)" }}
-        disabled={lockedCount === 0}
-        onClick={onClearLocks}
-      >
-        {t("terminalSplit.clearLocks")}
-      </button>
-      <div className="flex-1" />
-      <button
-        type="button"
-        aria-label={t("terminalSplit.closeView")}
-        title={t("terminalSplit.closeView")}
-        className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
-        onClick={onClose}
-      >
-        <X className="w-3.5 h-3.5" />
-      </button>
-    </div>
-  );
-}
-
-function VncLoadingPanel() {
-  const t = useT();
-  return (
-    <div
-      className="w-full h-full flex items-center justify-center text-sm"
-      style={{ background: "var(--taomni-term-bg)", color: "var(--taomni-term-text)" }}
-    >
-      {t("vnc.loading")}
-    </div>
-  );
-}
-
-function RdpLoadingPanel() {
-  const t = useT();
-  return (
-    <div
-      className="w-full h-full flex items-center justify-center text-sm"
-      style={{ background: "var(--taomni-term-bg)", color: "var(--taomni-term-text)" }}
-    >
-      {t("rdp.loading")}
-    </div>
-  );
-}
-
-function DbLoadingPanel() {
-  return (
-    <div
-      className="w-full h-full flex items-center justify-center text-sm"
-      style={{ background: "var(--taomni-bg)", color: "var(--taomni-text-muted)" }}
-    >
-      Loading database client…
-    </div>
-  );
-}
-
-function UnavailablePanel({ title, message }: { title: string; message?: string }) {
-  const t = useT();
-  return (
-    <div
-      className="w-full h-full flex items-center justify-center text-sm p-6"
-      style={{ background: "var(--taomni-term-bg)", color: "var(--taomni-term-text)" }}
-    >
-      <div className="max-w-md text-center">
-        <div className="text-lg font-semibold mb-2">{title}</div>
-        <div className="text-[12px] text-slate-300">
-          {message ?? t("status.commandUnavailable")}
-        </div>
-      </div>
-    </div>
   );
 }
