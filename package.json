@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && pnpm check:refactor && vite build",
+    "check:refactor": "node scripts/refactor-contracts.mjs && node scripts/refactor-boundaries.mjs",
     "test": "vitest run",
     "test:tools": "node --test scripts/*.test.mjs",
     "preview": "vite preview",

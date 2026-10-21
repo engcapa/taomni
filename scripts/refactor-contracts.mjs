@@ -51,7 +51,7 @@ export function currentContracts() {
     baselineCommit: "f3e375eb",
     note: "Native registered commands and public facade exports; event names cover literal frontend calls only. Dynamic names and payload compatibility require runtime tests.",
     commands: nativeCommands(),
-    facades: Object.fromEntries(["src/lib/ipc.ts", "src/stores/appStore.ts"].map((file) => [file, facadeExports(file)])),
+    facades: Object.fromEntries(["src/lib/ipc.ts", "src/stores/appStore.ts", "src/lib/sessionImportExport.ts"].map((file) => [file, facadeExports(file)])),
     frontendLiteralEvents: frontendEvents(),
   };
 }
