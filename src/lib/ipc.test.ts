@@ -196,3 +196,55 @@ describe("ipc dbConnect payload", () => {
     });
   });
 });
+
+describe("IPC retained async boundaries", () => {
+  beforeEach(() => { mocks.invoke.mockReset(); mocks.listen.mockReset(); });
+
+  it("normalizes legacy directory arrays and keeps the envelope revision", async () => {
+    const { listCommonLocalDirectories } = await import("./ipc");
+    mocks.invoke.mockResolvedValueOnce([{ path: "/tmp/project" }, { path: "" }, null]);
+    const legacy = await listCommonLocalDirectories();
+    expect(legacy.revision).toBe(0);
+    expect(legacy.directories).toEqual([expect.objectContaining({ path: "/tmp/project", availability: "unknown" })]);
+    mocks.invoke.mockResolvedValueOnce({ revision: 7, directories: [{ path: "/tmp/project", lastUsedAtMs: 123 }] });
+    expect(await listCommonLocalDirectories()).toMatchObject({ revision: 7, directories: [{ lastUsedAtMs: 123 }] });
+  });
+
+  it("keeps terminal output binary and subscribes to the requested session only", async () => {
+    const { createLocalTerminal, listenTerminalExit } = await import("./ipc");
+    const onOutput = vi.fn();
+    mocks.invoke.mockResolvedValueOnce({ sessionId: "a", shellId: "bash", taskEnvironment: {} });
+    await createLocalTerminal("a", 80, 24, "bash", [], "/tmp", onOutput);
+    const channel = mocks.invoke.mock.calls[0][1].onOutput;
+    channel.onmessage(Uint8Array.from([0, 127, 255]).buffer);
+    expect(onOutput).toHaveBeenCalledWith(Uint8Array.from([0, 127, 255]));
+    const unlisten = vi.fn();
+    mocks.listen.mockResolvedValueOnce(unlisten);
+    const onExit = vi.fn();
+    expect(await listenTerminalExit("a", onExit)).toBe(unlisten);
+    expect(mocks.listen.mock.calls[0][0]).toBe("terminal-exit-a");
+    mocks.listen.mock.calls[0][1]({ payload: null });
+    expect(onExit).toHaveBeenCalledTimes(1);
+  });
+
+  it("emits the vault notification and rethrows the original connection error", async () => {
+    const { dbConnect, VAULT_LOCKED_EVENT } = await import("./ipc");
+    const error = new Error("VAULT_LOCKED");
+    const notice = vi.fn();
+    window.addEventListener(VAULT_LOCKED_EVENT, notice);
+    mocks.invoke.mockRejectedValueOnce(error);
+    try {
+      await expect(dbConnect({ sessionId: "a", engine: "MySQL", host: "localhost", port: 3306 })).rejects.toBe(error);
+      expect(notice).toHaveBeenCalledTimes(1);
+    } finally { window.removeEventListener(VAULT_LOCKED_EVENT, notice); }
+  });
+
+  it("disconnects a failed probe even if cleanup itself fails", async () => {
+    const failure = new Error("ping failed");
+    mocks.invoke.mockResolvedValueOnce({ ok: true }).mockRejectedValueOnce(failure).mockRejectedValueOnce(new Error("close failed"));
+    await expect(dbTestConnection({ sessionId: "live", engine: "MySQL", host: "localhost", port: 3306 })).rejects.toBe(failure);
+    const probeId = mocks.invoke.mock.calls[0][1].sessionId;
+    expect(probeId).not.toBe("live");
+    expect(mocks.invoke.mock.calls.at(-1)).toEqual(["db_disconnect", { sessionId: probeId }]);
+  });
+});
