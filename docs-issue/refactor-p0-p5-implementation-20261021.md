@@ -448,3 +448,15 @@ K 定向验证：`k-editor-tests.log` **8 files / 298 passed**；`k-build.log` *
 `browser-k/run-20261021-223550-231825961` **8 passed / 0 skipped**：C3-01 跨分栏 clipboard/undo/lease、CW-SHELL-01 编码与无 provider 操作、PARITY-006-02 输入/全局撤销焦点、012-01 弹层返回原 caret、013-01 Find Action、015-01 provider unavailable、022-01 gutter/stripe、025-01 断点弹层/键盘输入归属。报告 signature/hash/identity_stable 全部通过，summary SHA256 `566263d35a61281595dce8eac3429ba3b9d3b44d166cc99b194c5488bccd09d1`，source identity `5f82db08b94bd23daacaf725d8894740b7307701b9b1f8b260951e5f1c1270aa`。没有把这些 browser stub 场景计为真实 Java provider、remote attach 或 OS 剪贴板证据。
 
 K 全量首轮 `k-unit-full.log`：543 files，5465 passed / 1 failed / 1 conditional skip。失败为 tree-menu 卸载后焦点 reset 的测试：其 `await waitFor(menu gone)` 期间下一帧可能已执行，随后才模拟 blur，就把“卸载后、下一帧前失焦”变成了更晚的失焦。产品的 `claimTreeFocus` 原实现没有改动；原定向组合该项通过不能覆盖本次全量失败。测试现显式截取并执行下一帧，先确认菜单卸载及 body 失焦，再执行 RAF 并断言恢复到原 tree row，未放宽断言或增加超时。`k-focus-tests.log` DEC-TOF-04 的 3 项通过；249 项因名称过滤未执行，不计通过。最终全量重跑待完成。
+
+### G 最终三端结果（历史提交，未验收通过）
+
+[39609696680](https://github.com/engcapa/taomni/actions/runs/39609696680) 完整结束，tested head `513cea1f1a1426f66e77f1121042aa71f7f3ff24`。25 reports 均 signature/hash/stable identity 通过；source identity `94aec519ca3bc413fe7a4b1465874bf10ff299c302bc45c6c0d6d1dac2cc1a8f`。实际 **1785 passed / 2 failed / 0 skipped**，aggregate `report_ok=true`、`passed=false`、无 infrastructure errors。Linux browser 396 / native 214 passed + 1 failed（含 dual-display 1）；Windows browser 396 / native 199 全通过；macOS browser 394 / native 186 passed + 1 failed。失败为旧标准 PERF-03 与上述 MAIL-BULK-01。3 个 declared capability gaps 与 99 个 unreviewed cases 保留，不因执行通过声称完整验收。
+
+G RDP contracts 日志已下载到 `github-g-contracts/contracts.log`；K 的 native 源码、vendor/lock/toolchain 均未更改，定向复用 G unit contracts，仍重新执行真实平台场景。
+
+K 定向 [39619541727](https://github.com/engcapa/taomni/actions/runs/39619541727) tested head `26e9bb580e481e6455ab0d18c1f4a2cae517ee37`，三端 browser/native：8 个 K browser IDs，加 tree-open focus、Problems provider、gutter facts、真实 debugger/Java breakpoint、MAIL-BULK-01 和 PERF-03（尊重原平台支持范围）。H/I/J 全量 [39616923665](https://github.com/engcapa/taomni/actions/runs/39616923665) 仍运行；不能用 K 定向替代该全量。K browser 本地报告绑定测试时间的源码身份，后续仅更改焦点测试文件也会使保守 source fingerprint 变化，最新提交证据以本次 GitHub run 为准。
+
+K 最终全量 `k-unit-final.log`：**543 files / 5466 passed / 1 conditional skip**，exit 0。该结果包含确定帧顺序的焦点测试修正；首轮 1 failed 的日志保留。生产源码迁移复核 28 个原 initializer，除依赖访问路径和 2 处 type literal 尾部分号格式外保持原表达式。
+
+H/I/J 全量的当前下载仅含 8 reports（Linux browser 396、Linux dual-display native 1、macOS browser 230），均签名/hash/stable identity 通过，尚非完整结果。GitHub 39616923665 与 39619541727 仍在执行；最终三端结论待下载全部 artifacts 后核验。
