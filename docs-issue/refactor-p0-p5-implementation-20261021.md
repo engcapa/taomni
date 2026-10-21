@@ -69,3 +69,56 @@
 | Backup | TC-BACKUP-001、TC-BACKUP-CLOUD-001、TC-BACKUP-CLOUD-003 | 后台任务、独立代理配置、服务恢复 |
 
 上述 IDs 来自当前仓库用例。平台能力不支持、skip、缺少 receipt 的结果不计通过；最终报告需记录 selection、原始 receipt 和 ci-summary。
+
+## 2026-10-21 实施批次 B
+
+继续接入生产入口，保持原有闭包时点、effect 依赖、订阅清理和异步失败传播：
+
+- P2：编辑器 toolbar/editor group 视图、buffer mutation/统一字节写入/save commit、比较、树动作、语义查询、菜单、恢复日志、布局持久化和启动操作继续迁出。项目诊断、语义装饰及工作区偏好开始拥有独立 hook 生命周期；原有 generation/epoch/取消保护保留。CodeWorkspaceTab 仍有 12,949 行的状态与编排，不能把它描述为已经完成的轻量 shell。
+- 编辑器原测试按行为迁入 15 个 case 模块，共享原 mocks/setup/fixture，不通过复制实现验证自身。原基线的 236 个字面量测试名完整保留，参数化展开后仍为 252 项。修复共享 clipboard mock 未恢复导致的测试顺序依赖：每个用例前清空内存剪贴板并恢复 read/write mock 实现。保存路径静态保护改为扫描主组件和全部 controller，仍只允许统一 writer 内的两个 encoded 写入调用。
+- P3：Terminal session 生命周期和 viewport effect、MainLayout TabContentRouter/分离窗口事件、SessionEditor 通用连接字段迁出。终端连接类型直接依赖领域 types，旧组件导出兼容；全局 registry 和后台会话 owner 不随视图拆分重建。
+- 会话导入按 portable/CSV/MobaXterm/Xshell/Tabby/数据库客户端/终端配置/ZeroOmega/归档/公共校验拆分，旧入口仅显式 re-export。公共校验不反向依赖格式解析器。原基线公开导出也纳入契约快照。
+- P4：Mail toolbar/folders/messages/reader/composer 视图、draft actions、outbox hook 接入原流程；发送成功与异步 Sent-copy 状态仍分开。SQL 连接、查询/流式结果、值解码、语句分类、MySQL/PostgreSQL/SQL Server 元数据服务分离；所有新 SQL 模块使用显式导入，无 `super::*`。
+- P5：SocksCap preflight/start/stop/recover/redirector 生命周期操作迁出，原权限提示、独立代理选择、诊断与恢复行为保留。
+- P0：新增 `scripts/refactor-boundaries.mjs` 检查迁移目录不回引各自 facade/UI shell、无目录内运行时循环；包含 inline import type 和动态 import 检查。`pnpm build` 同时执行契约和边界检查。此静态约束不替代行为测试，也不声称检查了全仓所有动态依赖。
+
+### 原有测试假设的修复
+
+1. 原 `three_source_probe` 期望旧 models manifest 含 ASR；`0bc9d88b` 已将 ASR 迁至独立 pinned catalog。集成测试继续校验 LLM，新增 ASR catalog 单元测试校验真实 MODELS 非空、预期大小、有效 SHA-256 和下载 URL。没有为测试重新添加旧 manifest 条目或暴露内部 API。
+2. 原保存静态测试依赖 `const writeTextSnapshot = useCallback(async ...` 源码位置；迁出后改为 AST 检查全部 controller 的写入边界，断言两个 encoded writer 恰好各一处，未允许绕过统一保存入口。
+3. GitHub macOS browser `TC-IDE-PARITY-017-02` 在第二次 Undo 失败：trace 中第二次 Meta+z 始于 725192.624ms，而首次 `Undid Rename symbol` 完成状态直到 727589.460ms 的快照才出现。buffer 文本早于 journal bookkeeping 完成可见，busy journal 原本就拒绝重入。用例 step 35 从固定等待 0.8s 改为断言首次撤销完成提示；原 82 步的编号及完整文件内容断言保留，补充该完成状态检查的 requirement 映射。
+
+### 批次 B 验证记录
+
+- `unit-d.log`：540 文件中 539 通过，5454 项通过、1 条件跳过、1 失败（上述旧保存路径静态假设）。`write-boundary.log` 修正后保存边界 + 全部会话格式测试 66 项通过；保留失败日志。
+- `terminal-qa-b.log`：QA 编译模式终端 86 项通过、1 条件跳过，与默认模式互补。
+- `db-contract2.log`：SQL 拆分后 database 单元测试 62 通过、1 ignored；ignored 不是通过。
+- `build-e.log`：生产构建与 761 命令/新增后的 façade 导出/39 事件及边界检查通过。后续只调整类型依赖与静态测试；最终构建记录在 `build-final-b.log`。
+- `browser-extract`：当前 Linux Chromium 完整执行原 TC-IDE-PARITY-017-02，82 步通过；更新完成状态等待后的报告在 `browser-extract-completion`。这不是 macOS/native 证据。
+- 最终组合上的全量 Vitest、Rust lib/integration、构建分别记录在 `unit-final-b.log`、`rust-final-b.log`、`build-final-b.log`；完成结果待追加。
+
+### GitHub 批次 A 证据（不代表 B 的最终源码）
+
+源码 `d10b8917f16a381f5c964a22fdf719f69c94f2a6`，workflow run：
+<https://github.com/engcapa/taomni/actions/runs/39552025913>。
+
+三端 native 构建通过。已下载 12 个 browser 原始报告并校验 summary 哈希与 runner receipt 签名：Linux 396 passed；Windows 396 passed；macOS 393 passed / 1 failed，失败为上述 Undo 时序用例。执行 job 的 success 不能替代用例结果，聚合报告仍需检查。native 分片仍在执行，最终以 aggregate 的结果为准。
+
+selection 有 3 个外部项目能力缺口：三平台 `TC-IDE-C6-06-java-definition-realproject-native` 需要 `QA_JAVA_PROJECT_ROOT` 指向仓库不分发的 clickhousecrud 项目；这些项目不能计为通过。其余 unreviewed/not_applicable 是登记或平台/模式配对信息，不能混入 passed。
+
+为区分旧时序假设与本次回归，安排基线 `f3e375eb` 在 macOS browser 执行原用例：
+<https://github.com/engcapa/taomni/actions/runs/39556543432>。该 run 的 workflow ref 是重构分支，实际测试源码由完整 head 输入指定为原始基线。
+
+### 剩余退出条件
+
+P0–P5 仍未全部完成：编辑器主壳的大量状态/事件/工具窗口编排、Session/Terminal 剩余表单与输入责任、Git/File 现有分层的完整验收、部分 Rust glob 依赖和最终提交上的三端 native 证据仍需收敛。所有本地或 GitHub 既有失败、能力缺口均保留，不用旧提交的成功覆盖新提交。
+
+### 批次 B 最终本地结果
+
+- `unit-final-b.log`：540 文件全部通过，**5455 passed / 1 conditional skip**；终端 QA 模式另有 86 passed / 1 conditional skip，覆盖另一编译分支。
+- `rust-final-b.log`：**1868 passed / 25 ignored**（lib）、**62 passed**（integration）。ignored 保持基线条件，未作为通过。
+- `build-final-b.log`：通过；契约检查为 **761 native commands / 328 façade exports / 39 literal events**，包含 29 个旧会话导入导出 API；155 个实现模块边界检查通过。
+- `audit-b.log`：全部静态 gate 通过，无目录/requirement 漂移。
+- `browser-extract-isolated`：更新后的 TC-IDE-PARITY-017-02 **82 步全部通过**，有完整 summary/receipt。前一次 `browser-extract-completion` 在并行工具运行期间页面重新导航到 welcome，导致 step49 超时；保留失败报告和 trace，不改断言，在构建/单测结束后隔离重跑。仅证明本地 Linux Chromium。
+- 基线 macOS browser 对照 run `39556543432` 完成；需与重构提交的原始报告比较，单次基线成功不代表负载下不会出现上述 busy 时序。
+- 批次 A native 已发现待定位失败：Linux/macOS `TC-RDPS-PERF-03-photo-content` 的 FPS 比率约 0.90，低于原 0.95 阈值；macOS `TC-MAIL-STORAGE-09` 的 server 18 条与 UI 0 条不一致；macOS `TC-152` VNC 会话菜单未出现。保留原阈值/断言，后续使用最终提交与必要的基线对照定位。
