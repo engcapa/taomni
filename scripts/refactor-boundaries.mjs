@@ -6,11 +6,13 @@ import ts from "typescript";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // These are implementation modules, not alternate application entry points.
 const boundaries = [
+  ["src/components/editor/workspace/host", "src/components/editor/workspace/CodeMirrorHost.tsx"],
   ["src/lib/ipc", "src/lib/ipc.ts"],
   ["src/lib/sessionImportExport", "src/lib/sessionImportExport.ts"],
   ["src/stores/app", "src/stores/appStore.ts"],
   ["src/stubs/commands", "src/stubs/tauri-core.ts"],
   ["src/components/editor/workspace/controller", "src/components/editor/CodeWorkspaceTab.tsx"],
+  ["src/components/editor/workspace/completion", "src/components/editor/workspace/lspCompletion.ts"],
   ["src/components/editor/workspace/commands", "src/components/editor/workspace/controller/commandCatalog.tsx"],
   ["src/components/editor/workspace/debug", "src/components/editor/workspace/useCodeDebugSession.ts"],
   ["src/components/editor/workspace/hooks", "src/components/editor/CodeWorkspaceTab.tsx"],

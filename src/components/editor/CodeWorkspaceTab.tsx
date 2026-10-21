@@ -1,227 +1,232 @@
-import { Fragment, startTransition, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
-import { createPortal, flushSync } from "react-dom";
-import { Group as PanelGroup, Panel, Separator as PanelResizeHandle, type PanelImperativeHandle } from "react-resizable-panels";
-import { AlertTriangle, Activity, Braces, GitBranch, GitCommitHorizontal, ListTree, GitFork, Network, ListTodo, BookOpen, TerminalSquare, Play, Hammer, FlaskConical, Bug, Search, ShieldCheck, FolderTree } from "lucide-react";
-import { workspaceReadFile, workspaceReadLooseFile, type WorkspaceToolConfig } from "../../lib/editor/workspace";
-import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
-import { lspCodeActionResolve, lspDocumentSymbols, lspJavaModules, lspResolveWorkspaceEdit, lspStartWorkspaceWatcher, lspStopWorkspaceWatcher, lspSelectionRanges, lspWorkspaceSymbolResolve, type LspCodeAction, type LspDiagnostic, type LspDocumentDescriptor, type LspDocumentSymbol, type LspDocumentHighlight, type LspInlayHint, type LspSemanticToken, type LspLocation, type LspPosition, type LspRange, type LspWorkspaceEdit, type LspWorkspaceApplyEditRequest, type LspWorkspaceEditOperation } from "../../lib/editor/lsp";
 import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { listen,type UnlistenFn } from "@tauri-apps/api/event";
+import { Activity,AlertTriangle,BookOpen,Braces,Bug,FlaskConical,FolderTree,GitBranch,GitCommitHorizontal,GitFork,Hammer,ListTodo,ListTree,Network,Play,Search,ShieldCheck,TerminalSquare } from "lucide-react";
+import { Fragment,startTransition,useCallback,useDeferredValue,useEffect,useLayoutEffect,useMemo,useRef,useState,type CSSProperties,type ReactNode } from "react";
+import { createPortal,flushSync } from "react-dom";
+import { Panel,Group as PanelGroup,Separator as PanelResizeHandle,type PanelImperativeHandle } from "react-resizable-panels";
+import { useMountedRef } from "../../hooks/useMountedRef";
+import { useProjectDescriptorDiscovery } from "../../hooks/useProjectDescriptorDiscovery";
+import { useProjectFacts } from "../../hooks/useProjectFacts";
+import { promptAppDialog } from "../../lib/appDialogs";
+import { loadAutoImportPreferences } from "../../lib/autoImportPreferences";
+import { readText,writeText } from "../../lib/clipboard";
 import { loadCodeViewProfile } from "../../lib/codeViewProfile";
+import { lspCodeActionResolve,lspDocumentSymbols,lspJavaModules,lspResolveWorkspaceEdit,lspSelectionRanges,lspStartWorkspaceWatcher,lspStopWorkspaceWatcher,lspWorkspaceSymbolResolve,type LspCodeAction,type LspDiagnostic,type LspDocumentDescriptor,type LspDocumentHighlight,type LspDocumentSymbol,type LspInlayHint,type LspLocation,type LspPosition,type LspRange,type LspSemanticToken,type LspWorkspaceApplyEditRequest,type LspWorkspaceEdit,type LspWorkspaceEditOperation } from "../../lib/editor/lsp";
+import type { StructuralMatch } from "../../lib/editor/structuralSearch";
+import { workspaceReadFile,workspaceReadLooseFile,type WorkspaceToolConfig } from "../../lib/editor/workspace";
+import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
+import { useT } from "../../lib/i18n";
+import { isTauriRuntime } from "../../lib/runtime";
+import { openSettingsSection } from "../../lib/settingsNavigation";
 import { registerShellKeyClaim } from "../../lib/shellKeyClaims";
 import { useAppStore } from "../../stores/appStore";
-import { useMainRailHostStore } from "../../stores/mainRailHostStore";
-import { createEditorGroup, selectCodeWorkspaceUi, useCodeWorkspaceStore, type BottomDockTabId, type EditorGroupId, type RightPaneTabId } from "../../stores/codeWorkspaceStore";
-import { useCodeWorkspaceStatusStore } from "../../stores/codeWorkspaceStatusStore";
-import { type EffectiveCodeStyle, type ExplicitIndentationOverride, resolveEffectiveCodeStyle } from "./workspace/codeStyleModel";
-import type { ResolvedCodeStyle } from "./workspace/editorConfigResolver";
-import { createWorkspaceStyleController, type WorkspaceStyleController } from "./workspace/workspaceStyleController";
-import { SaveTransactionRegistry } from "./workspace/saveCommit";
-import { type SaveObservationRecord, type SaveObservationState } from "./workspace/saveObservationContract";
-import { listDiskEffectLedgerEntries, resolveDiskEffectLedgerEntry, type WorkspaceDiskEffectLedgerEntryV4 } from "./workspace/workspaceRecovery";
-import { DEFAULT_WORKSPACE_TAB_POLICY_V3, type ClosedTabEntry, type WorkspaceTabPolicyV3 } from "./workspace/workspaceTabPolicy";
-import { attachWorkspaceMouseDispatcher } from "./workspace/workspaceMouseDispatcher";
-import { createWorkspaceLocationController, isPathContainedInRoot, type WorkspaceLocationController } from "./workspace/navigationHistoryModel";
-import { WorkspaceSemanticQueryHost } from "./workspace/workspaceSemanticQueryHost";
-import { createSingleLeafLayout, getAllLeafNodes, panelLayoutToRatios, type LayoutNode } from "./workspace/recursiveLayoutTree";
-import { defaultWorkspaceLayoutSnapshot, layoutSnapshotHasOpenFiles, readWorkspaceLayoutSnapshot, uniqueOrderedKeys, writeWorkspaceLayoutSnapshot, type PersistedEditorViewState, type WorkspaceViewStates } from "./workspace/workspaceLayoutPersistence";
-import { LocalHistoryDialog } from "./workspace/LocalHistoryDialog";
-import { CodeStyleSettingsDialog } from "./workspace/CodeStyleSettingsDialog";
-import { WorkspaceTabPolicySettingsDialog } from "./workspace/WorkspaceTabPolicySettingsDialog";
-import { NewJavaClassDialog } from "./workspace/NewJavaClassDialog";
-import { FileTemplateSettingsDialog } from "./workspace/FileTemplateSettingsDialog";
-import { AutoImportSettingsDialog } from "./workspace/AutoImportSettingsDialog";
-import { AutoImportCandidateDialog } from "./workspace/AutoImportCandidateDialog";
-import { loadAutoImportPreferences } from "../../lib/autoImportPreferences";
-import { type AutoImportCandidate } from "./workspace/autoImportModel";
-import { BUILT_IN_SCHEME_ID, activeSchemeForLanguage, readCodeStyleSchemeStore, schemeStyleFields, writeCodeStyleSchemeStore, type CodeStyleSchemeStoreState } from "./workspace/workspaceCodeStyleSchemes";
-import { EditorSelectionAiToolbar } from "./workspace/EditorSelectionAiToolbar";
-import { EditorAiRewriteDialog } from "./workspace/EditorAiRewriteDialog";
-import { promptAppDialog } from "../../lib/appDialogs";
-import { readText, writeText } from "../../lib/clipboard";
-import { useContextMenu, type ContextMenuCloseReason } from "../ContextMenu";
 import { useChatStore } from "../../stores/chatStore";
-import { type EditorCommandId, type EditorCommandOptions, type EditorCommandPort, type EditorCommandPortRegistration, type EditorCommandState, type EditorCommandTarget, type EditorSelectionRange } from "./workspace/CodeMirrorHost";
-import { WorkspaceDocumentTransactionOwner } from "./workspace/workspaceDocumentTransactionOwner";
-import { SurroundWithDialog } from "./workspace/SurroundWithDialog";
-import { GenerateCodeDialog } from "./workspace/GenerateCodeDialog";
-import { ClipboardHistoryPopup } from "./workspace/ClipboardHistoryPopup";
-import { acquireClipboardStore, createDefaultClipboardPermissionAdapter, WorkspaceClipboardSessionContext } from "./workspace/workspaceClipboardSession";
-import { WorkspaceObservationBridge } from "./workspace/workspaceObservationBridge";
-import { WorkspaceObservationBoundary } from "./workspace/WorkspaceObservationBoundary";
-import { openSettingsSection } from "../../lib/settingsNavigation";
-import { isTauriRuntime } from "../../lib/runtime";
-import { useMountedRef } from "../../hooks/useMountedRef";
-import { inlayHintsEnabledForLanguage, readWorkspaceIntelligencePreferences, writeWorkspaceIntelligencePreferences, type WorkspaceIntelligencePreferences } from "./workspace/intelligencePreferences";
-import { WorkspaceLspSessionManager } from "./workspace/workspaceLspSessionManager";
-import { isLargeFileContent } from "./workspace/largeFile";
-import { workspaceEditApplyResponse } from "./workspace/workspaceEditApply";
-import { formatWorkspaceEditPreview, type WorkspaceEditPreview } from "./workspace/workspaceEditPreview";
-import { RefactoringPreviewDialog } from "./workspace/RefactoringPreviewDialog";
-import { InlineRenamePopup } from "./workspace/InlineRenamePopup";
-import { inlineRenameNameError } from "./workspace/inlineRename";
-import { writeRefactorOptionsMode } from "./workspace/refactorOptions";
-import { javaMainRunLines, type RunGutterTarget } from "./workspace/runGutter";
-import { RefactorRecoveryReviewDialog } from "./workspace/RefactorRecoveryReviewDialog";
-import { type RefactorPlanV3 } from "./workspace/refactorPlan";
-import { createRestoreEchoSuppressor } from "./workspace/refactorRecoveryController";
-import { KeymapCheatSheetDialog } from "./workspace/KeymapCheatSheetDialog";
-import { KeymapSettingsDialog } from "./workspace/KeymapSettingsDialog";
-import { KeymapMigrationNotice } from "./workspace/KeymapMigrationNotice";
-import { GoToLineDialog } from "./workspace/GoToLineDialog";
-import { languageServiceReadiness } from "./workspace/languageServiceReadiness";
-import { WorkspaceGitManager } from "../git/WorkspaceGitManager";
-import { CodeInsightNotice, caretAnchor, type CodeInsightNoticeState } from "./workspace/CodeInsightNotice";
-import type { GoToLineRequest } from "./workspace/CodeMirrorHost";
-import { BUILTIN_KEYMAP_PRESETS, consumeKeymapDefaultsMigrationNotice, dismissKeymapDefaultsMigrationNotice, isBuiltinKeymapScheme, readKeymapSchemes, writeKeymapSchemes, type KeymapSchemeV3 } from "./workspace/workspaceKeymapScheme";
-import { TabSwitcher } from "./workspace/TabSwitcher";
-import { DapAdapterGuideDialog } from "./workspace/DapAdapterGuideDialog";
-import { buildWorkspacePathSnapshotEdit, WorkspaceEditHistory, type WorkspaceEditPathSnapshot } from "./workspace/workspaceEditHistory";
-import { evidencePresentationLine } from "./workspace/capabilityEvidence";
-import { toProviderDiagnosticsV3 } from "./workspace/inspectionProviderAdapter";
-import { IntentionSession } from "./workspace/intentionSession";
-import { CanonicalCodeActionService } from "./workspace/codeActionProviderAdapter";
-import { WorkspaceResourceRecoveryCoordinator, type ResourceCleanupHandlers, type ResourceCleanupOutcome } from "./workspace/workspaceResourceRecoveryCoordinator";
-import { BottomDock, type BottomDockTab } from "./workspace/panels/BottomDock";
-import { ToolWindowRail, type ToolWindowRailItem } from "./workspace/panels/ToolWindowRail";
-import { useLatestHandlers } from "./workspace/useLatestHandlers";
-import { useToolWindowLayout } from "./workspace/useToolWindowLayout";
-import { ToolWindowPortal, useToolWindowNodes } from "./workspace/panels/ToolWindowHost";
-import { workspaceNavigationSegments } from "./workspace/workspaceNavigationBar";
-import { ReferencesPanel, type ReferencesResultState } from "./workspace/panels/ReferencesPanel";
-import { ProblemsPanel, type ProblemFileGroup } from "./workspace/panels/ProblemsPanel";
-import { FindInFilesPanel } from "./workspace/panels/FindInFilesPanel";
-import { StructuralSearchPanel } from "./workspace/panels/StructuralSearchPanel";
-import { StructuralSearchDialog } from "./workspace/StructuralSearchDialog";
-import { useStructuralSearchSession } from "./workspace/useStructuralSearchSession";
-import type { StructuralMatch } from "../../lib/editor/structuralSearch";
-import { DocumentationPane } from "./workspace/panels/DocumentationPane";
-import { HierarchyPanel } from "./workspace/panels/HierarchyPanel";
-import { type HierarchyRootState } from "./workspace/hierarchyQueryModel";
-import { TodosBookmarksPanel } from "./workspace/panels/TodosBookmarksPanel";
-import { CoveragePanel } from "./workspace/panels/CoveragePanel";
-import { parseCoverageReport, type WorkspaceCoverageReport } from "./workspace/coverageModel";
-import { findBookmarkByMnemonic, readWorkspaceBookmarks } from "./workspace/todoBookmarks";
-import { formatOccurrenceStatus, stepOccurrence, type OccurrenceHighlightSession } from "./workspace/occurrenceHighlightModel";
-import { readHighlightingLevel, writeHighlightingLevel, type HighlightingLevel } from "./workspace/highlightingLevelModel";
-import { type EditorCompareSession } from "./workspace/editorCompareModel";
-import { EditorCompareDialog } from "./workspace/EditorCompareDialog";
-import { isDiagnosticScopeCurrent, type DiagnosticScope } from "./workspace/diagnosticScopeModel";
-import { isDocCommentRenderingSupported, readReaderModePreference, writeReaderModePreference } from "./workspace/renderedDocCommentsModel";
-import { useDeferredOpenFileTodos } from "./workspace/useDeferredOpenFileTodos";
-import { type QuickDocContent } from "./workspace/referenceDocumentation";
-import { type ParameterInvalidateReason, type ReferenceSessionContext } from "./workspace/referenceInfoSession";
-import { useWorkspaceProjectAnalysis } from "./workspace/useWorkspaceProjectAnalysis";
-import { useProjectFacts } from "../../hooks/useProjectFacts";
-import { useProjectDescriptorDiscovery } from "../../hooks/useProjectDescriptorDiscovery";
+import { useCodeWorkspaceStatusStore } from "../../stores/codeWorkspaceStatusStore";
+import { selectCodeWorkspaceUi,useCodeWorkspaceStore,type BottomDockTabId,type EditorGroupId,type RightPaneTabId } from "../../stores/codeWorkspaceStore";
+import { useMainRailHostStore } from "../../stores/mainRailHostStore";
 import { useProjectFactsStore } from "../../stores/projectFactsStore";
-import { DEFAULT_SCOPE_SELECTION, UsageQuerySession, type UsagesScopeSelection } from "./workspace/usageQuerySession";
-import { UsagesScopeDialog } from "./workspace/UsagesScopeDialog";
-import { type GoToSymbolItem } from "./workspace/SearchEverywhere";
-import { WorkspacePopupsHost } from "./workspace/WorkspacePopupsHost";
-import { UndoWorkspaceEditConfirmDialog } from "./workspace/UndoWorkspaceEditConfirmDialog";
-import { WorkspaceBuildRunToolsDialog } from "./workspace/WorkspaceBuildRunToolsDialog";
-import { WorkspaceIntelligenceSettingsDialog } from "./workspace/WorkspaceIntelligenceSettingsDialog";
-import { WorkspaceEditorAppearanceSettingsDialog } from "./workspace/WorkspaceEditorAppearanceSettingsDialog";
-import { DEFAULT_EDITOR_APPEARANCE_PROFILE, matchesSoftWrapPath, normalizeEditorAppearanceProfile, readEditorAppearanceProfileWithDiagnostics, writeEditorAppearanceProfile, type EditorAppearanceProfile } from "./workspace/editorAppearanceProfile";
-import { applyRunOverrideToDebugConfiguration, applyRunOverrideToJavaLaunch, readRunConfigurationOverrides, writeActiveRunConfigurationSelection } from "./workspace/runConfigurationPersistence";
-import { FileTreePane } from "./workspace/FileTreePane";
-import { ProjectTree } from "./workspace/ProjectTree";
-import { navigateProjectTree } from "./workspace/projectTreeNavigation";
-import { OutlinePane } from "./workspace/OutlinePane";
-import { useWorkspaceActionsController } from "./workspace/useWorkspaceActionsController";
-import { type WorkspaceCommand, type WorkspaceCommandContext } from "./workspace/workspaceCommands";
-import type { ShellShortcutClaim } from "./workspace/shellShortcutRouter";
-import type { WorkspaceFocus } from "./workspace/workspaceActionRegistry";
-import { codePointOffsetToUtf16Offset, collectReplacePreimages, replaceMatchAbsolutePath, type ReplaceFilePreimage, type ReplacePrepareOptions } from "./workspace/replaceInFilesModel";
-import type { CodeWorkspaceFileRef, CodeWorkspaceLooseFileInfo, CodeWorkspaceRootInfo } from "../../types";
-import { type LibraryBufferInfo, type LspFileState, type OpenFileState, type TreeSelection, type TreeViewMode, type WorkspaceBuildRunTools, readWorkspaceBuildRunTools, writeWorkspaceBuildRunTools, workspaceToolConfig, CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE, CODE_WORKSPACE_MAX_TREE_FONT_SIZE, CODE_WORKSPACE_MIN_TREE_FONT_SIZE, absoluteWorkspacePath, basename, clampCodeWorkspaceFontSize, clampCodeWorkspaceTreeFontSize, errorMessage, fileKey, gitRootForWorkspacePath, initialLooseFiles, initialRoots, shouldLiveSyncLsp, shouldProbeLsp, fsPathComparisonKey, fsPathEquals, normalizeEditorText, normalizeFsPath, parentPath, readCodeWorkspaceTreeFontSize, relativePathWithinRoot, rootDirKey, workspaceTitle, writeCodeWorkspaceTreeFontSize, writeCodeWorkspaceTreeViewMode } from "./workspace/codeWorkspaceModel";
-import { useWorkspaceTreeData } from "./workspace/useWorkspaceTreeData";
-import { useWorkspaceLspSession } from "./workspace/useWorkspaceLspSession";
-import { useWorkspaceGitSnapshots } from "./workspace/useWorkspaceGitSnapshots";
-import { useWorkspaceNavigation } from "./workspace/useWorkspaceNavigation";
-import { useWorkspaceFileActions } from "./workspace/useWorkspaceFileActions";
-import { symbolChainAtPosition, type BreadcrumbPathChild, type BreadcrumbPathSegment } from "./workspace/Breadcrumbs";
-import { useT } from "../../lib/i18n";
-import { TerminalDockPanel, type TerminalDockHandle } from "./workspace/panels/TerminalDockPanel";
-import { RunPanel, type RunPanelHandle, type WorkspaceTaskItem } from "./workspace/panels/RunPanel";
-import { BuildPanel } from "./workspace/panels/BuildPanel";
-import { AnalysisPanel } from "./workspace/panels/AnalysisPanel";
-import { TestsPanel } from "./workspace/panels/TestsPanel";
-import { DebugPanel } from "./workspace/panels/DebugPanel";
-import { JavaMainClassPicker } from "./workspace/JavaMainClassPicker";
-import { useCodeDebugSession } from "./workspace/useCodeDebugSession";
-import { type JavaMainClassOption } from "../../lib/editor/dap";
-import { type DebugBreakpoint, type DebugStackFrame } from "./workspace/dapDebugModel";
-import { BreakpointPopup, GutterBreakpointMenu } from "./workspace/panels/debug/BreakpointPopup";
-import { BreakpointsDialog } from "./workspace/panels/debug/BreakpointsDialog";
-import { EvaluateExpressionDialog } from "./workspace/panels/debug/EvaluateExpressionDialog";
-import type { EditorRevealTarget } from "./workspace/EditorGroup";
-import { LspMessageRequestDialog } from "./workspace/LspMessageRequestDialog";
-import { useWorkspaceLspClientEvents } from "./workspace/useWorkspaceLspClientEvents";
-import { addDiagnosticToInspectionBaseline, addInspectionSuppression, applyInspectionProfile, clearInspectionBaseline, importInspectionBaseline, readInspectionProfile, removeInspectionBaselineEntry, removeInspectionSuppression, diagnosticInspectionId, replaceInspectionBaseline, serializeInspectionBaseline, updateInspectionRule, writeInspectionProfile, type InspectionProfile, type InspectionRule, type InspectionSuppressionScope } from "./workspace/inspectionProfile";
-import { ExternalFileConflictDialog } from "./workspace/ExternalFileConflictDialog";
-import { WorkspaceRecoveryDialog } from "./workspace/WorkspaceRecoveryDialog";
-import { FileEncodingDialog } from "./workspace/FileEncodingDialog";
-import { readWorkspaceRecoveryEntries, reconcileWorkspaceRecoveryEntries, removeWorkspaceRecoveryEntry, writeWorkspaceRecoveryEntries, type WorkspaceRecoveryEntry } from "./workspace/workspaceRecovery";
-import { useWorkspaceSemanticIndex } from "./workspace/useWorkspaceSemanticIndex";
+import type { CodeWorkspaceFileRef,CodeWorkspaceLooseFileInfo,CodeWorkspaceRootInfo } from "../../types";
+import { useContextMenu,type ContextMenuCloseReason } from "../ContextMenu";
+import { WorkspaceGitManager } from "../git/WorkspaceGitManager";
 import { TextInputDialog } from "../sidebar/ConfirmDialog";
-import { createOpenFile } from "./workspace/controller/fileActions";
-import { createOpenHierarchy, createNavigateDiagnostic } from "./workspace/controller/navigationActions";
-import { createApplyLspResourceOperationUnlocked } from "./workspace/controller/resourceActions";
-import { createApplyLspWorkspaceEditNow } from "./workspace/controller/workspaceEditActions";
-import { createRequestCodeActions, createRunCodeAction } from "./workspace/controller/codeActionActions";
-import { createExecuteAutoImportOnTheFly, createExecutePasteWithAutoImport, createRunRearrangeExecute, createRunCleanupExecute } from "./workspace/controller/styleActions";
+import { AutoImportCandidateDialog } from "./workspace/AutoImportCandidateDialog";
+import { AutoImportSettingsDialog } from "./workspace/AutoImportSettingsDialog";
+import { symbolChainAtPosition,type BreadcrumbPathChild,type BreadcrumbPathSegment } from "./workspace/Breadcrumbs";
+import { ClipboardHistoryPopup } from "./workspace/ClipboardHistoryPopup";
+import { CodeInsightNotice,caretAnchor,type CodeInsightNoticeState } from "./workspace/CodeInsightNotice";
+import type { GoToLineRequest } from "./workspace/CodeMirrorHost";
+import { type EditorCommandId,type EditorCommandOptions,type EditorCommandPort,type EditorCommandPortRegistration,type EditorCommandState,type EditorCommandTarget,type EditorSelectionRange } from "./workspace/CodeMirrorHost";
+import { CodeStyleSettingsDialog } from "./workspace/CodeStyleSettingsDialog";
+import { DapAdapterGuideDialog } from "./workspace/DapAdapterGuideDialog";
+import { EditorAiRewriteDialog } from "./workspace/EditorAiRewriteDialog";
+import { EditorCompareDialog } from "./workspace/EditorCompareDialog";
+import type { EditorRevealTarget } from "./workspace/EditorGroup";
+import { EditorSelectionAiToolbar } from "./workspace/EditorSelectionAiToolbar";
+import { ExternalFileConflictDialog } from "./workspace/ExternalFileConflictDialog";
+import { FileEncodingDialog } from "./workspace/FileEncodingDialog";
+import { FileTemplateSettingsDialog } from "./workspace/FileTemplateSettingsDialog";
+import { FileTreePane } from "./workspace/FileTreePane";
+import { GenerateCodeDialog } from "./workspace/GenerateCodeDialog";
+import { GoToLineDialog } from "./workspace/GoToLineDialog";
+import { InlineRenamePopup } from "./workspace/InlineRenamePopup";
+import { JavaMainClassPicker } from "./workspace/JavaMainClassPicker";
+import { KeymapCheatSheetDialog } from "./workspace/KeymapCheatSheetDialog";
+import { KeymapMigrationNotice } from "./workspace/KeymapMigrationNotice";
+import { KeymapSettingsDialog } from "./workspace/KeymapSettingsDialog";
+import { LocalHistoryDialog } from "./workspace/LocalHistoryDialog";
+import { LspMessageRequestDialog } from "./workspace/LspMessageRequestDialog";
+import { NewJavaClassDialog } from "./workspace/NewJavaClassDialog";
+import { OutlinePane } from "./workspace/OutlinePane";
+import { ProjectTree } from "./workspace/ProjectTree";
+import { RefactorRecoveryReviewDialog } from "./workspace/RefactorRecoveryReviewDialog";
+import { RefactoringPreviewDialog } from "./workspace/RefactoringPreviewDialog";
+import { type GoToSymbolItem } from "./workspace/SearchEverywhere";
+import { StructuralSearchDialog } from "./workspace/StructuralSearchDialog";
+import { SurroundWithDialog } from "./workspace/SurroundWithDialog";
+import { TabSwitcher } from "./workspace/TabSwitcher";
+import { UndoWorkspaceEditConfirmDialog } from "./workspace/UndoWorkspaceEditConfirmDialog";
+import { UsagesScopeDialog } from "./workspace/UsagesScopeDialog";
+import { WorkspaceBuildRunToolsDialog } from "./workspace/WorkspaceBuildRunToolsDialog";
+import { WorkspaceEditorAppearanceSettingsDialog } from "./workspace/WorkspaceEditorAppearanceSettingsDialog";
+import { WorkspaceIntelligenceSettingsDialog } from "./workspace/WorkspaceIntelligenceSettingsDialog";
+import { WorkspaceObservationBoundary } from "./workspace/WorkspaceObservationBoundary";
+import { WorkspacePopupsHost } from "./workspace/WorkspacePopupsHost";
+import { WorkspaceRecoveryDialog } from "./workspace/WorkspaceRecoveryDialog";
+import { WorkspaceTabPolicySettingsDialog } from "./workspace/WorkspaceTabPolicySettingsDialog";
+import { type AutoImportCandidate } from "./workspace/autoImportModel";
+import { evidencePresentationLine } from "./workspace/capabilityEvidence";
+import { CanonicalCodeActionService } from "./workspace/codeActionProviderAdapter";
+import { resolveEffectiveCodeStyle,type EffectiveCodeStyle,type ExplicitIndentationOverride } from "./workspace/codeStyleModel";
+import { CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE,CODE_WORKSPACE_MAX_TREE_FONT_SIZE,CODE_WORKSPACE_MIN_TREE_FONT_SIZE,absoluteWorkspacePath,basename,clampCodeWorkspaceFontSize,clampCodeWorkspaceTreeFontSize,errorMessage,fileKey,fsPathComparisonKey,fsPathEquals,gitRootForWorkspacePath,initialLooseFiles,initialRoots,normalizeEditorText,normalizeFsPath,parentPath,readCodeWorkspaceTreeFontSize,readWorkspaceBuildRunTools,relativePathWithinRoot,rootDirKey,shouldLiveSyncLsp,shouldProbeLsp,workspaceTitle,workspaceToolConfig,writeCodeWorkspaceTreeFontSize,writeCodeWorkspaceTreeViewMode,writeWorkspaceBuildRunTools,type LibraryBufferInfo,type LspFileState,type OpenFileState,type TreeSelection,type TreeViewMode,type WorkspaceBuildRunTools } from "./workspace/codeWorkspaceModel";
+import { createApplyTabPolicy } from "./workspace/controller/applyTabPolicy";
+import { createMutateOpenBuffer,createQueueEditorTextUpdate } from "./workspace/controller/bufferMutations";
+import { createRequestCodeActions,createRunCodeAction } from "./workspace/controller/codeActionActions";
 import { createWorkspaceCommands } from "./workspace/controller/commandCatalog";
-import { createStartDebugActiveFile, createStartDebugActiveTarget } from "./workspace/controller/runActions";
-import { type CodeWorkspaceTabProps, type PendingExternalFileConflict, type PendingExternalFileEvent, WORKSPACE_TOOL_WINDOW_LAYOUT_ENTRIES, type TabPolicyLifecycleReceiptView, type ResourceCleanupRecoveryView, TREE_DETAILS_STORAGE_KEY, type PendingClosedFile, extractContextSnippet, EMPTY_DISPLAY_DIAGNOSTICS, breadcrumbSegmentsForFile, LSP_DOCUMENT_SYMBOLS_IDLE_DELAY_MS, type CodeWorkspaceGitManagerPayload, RECENT_FILES_TOOL_WINDOWS } from "./workspace/controller/model";
-import { type TreeOpenIntent, type WorkspaceEditApplyOptions } from "./workspace/controller/mutationTypes";
-import { WorkspaceToolbar } from "./workspace/views/WorkspaceToolbar";
-import { createRenderEditorGroup } from "./workspace/views/editorGroupView";
-import { createBeginSemanticQuery, createFetchWorkspaceSymbols, createCopyReferenceAtCursor, createHighlightUsagesInFile, createParameterInfoProvider, createGetLspHover } from "./workspace/controller/semanticQueries";
-import { createLoadBreadcrumbPathChildren, createBreadcrumbPathActions, createShowTreeContextMenu, createCreateJavaClassFromPlan } from "./workspace/controller/treeActions";
-import { createMutateOpenBuffer, createQueueEditorTextUpdate } from "./workspace/controller/bufferMutations";
-import { createReadWorkspaceEditPathSnapshot } from "./workspace/controller/recoveryJournal";
 import { createShowEditorContextMenu } from "./workspace/controller/editorMenus";
+import { createOpenFile } from "./workspace/controller/fileActions";
+import { EMPTY_DISPLAY_DIAGNOSTICS,LSP_DOCUMENT_SYMBOLS_IDLE_DELAY_MS,RECENT_FILES_TOOL_WINDOWS,TREE_DETAILS_STORAGE_KEY,WORKSPACE_TOOL_WINDOW_LAYOUT_ENTRIES,breadcrumbSegmentsForFile,extractContextSnippet,type CodeWorkspaceGitManagerPayload,type CodeWorkspaceTabProps,type PendingClosedFile,type PendingExternalFileConflict,type PendingExternalFileEvent,type ResourceCleanupRecoveryView,type TabPolicyLifecycleReceiptView } from "./workspace/controller/model";
+import { type TreeOpenIntent,type WorkspaceEditApplyOptions } from "./workspace/controller/mutationTypes";
+import { createNavigateDiagnostic,createOpenHierarchy } from "./workspace/controller/navigationActions";
 import { createPrepareJavaLaunch } from "./workspace/controller/projectLaunch";
+import { createReadWorkspaceEditPathSnapshot } from "./workspace/controller/recoveryJournal";
+import { createReplaceMatches } from "./workspace/controller/replaceMatches";
+import { createApplyLspResourceOperationUnlocked } from "./workspace/controller/resourceActions";
+import { createBeginSemanticQuery,createCopyReferenceAtCursor,createFetchWorkspaceSymbols,createGetLspHover,createHighlightUsagesInFile,createParameterInfoProvider } from "./workspace/controller/semanticQueries";
+import { createExecuteAutoImportOnTheFly,createExecutePasteWithAutoImport,createRunCleanupExecute,createRunRearrangeExecute } from "./workspace/controller/styleActions";
+import { createBreadcrumbPathActions,createCreateJavaClassFromPlan,createLoadBreadcrumbPathChildren,createShowTreeContextMenu } from "./workspace/controller/treeActions";
+import { useEditorSemanticDecorations } from "./workspace/controller/useEditorSemanticDecorations";
 import { useProjectDiagnostics } from "./workspace/controller/useProjectDiagnostics";
 import { useWorkspacePreferences } from "./workspace/controller/useWorkspacePreferences";
-import { useEditorSemanticDecorations } from "./workspace/controller/useEditorSemanticDecorations";
-import { useWorkspaceTests } from "./workspace/hooks/useWorkspaceTests";
-import { useExecutionTargets } from "./workspace/hooks/useExecutionTargets";
-import { createReplaceMatches } from "./workspace/controller/replaceMatches";
+import { createApplyLspWorkspaceEditNow } from "./workspace/controller/workspaceEditActions";
+import { parseCoverageReport,type WorkspaceCoverageReport } from "./workspace/coverageModel";
+import { type DebugBreakpoint } from "./workspace/dapDebugModel";
+import { isDiagnosticScopeCurrent,type DiagnosticScope } from "./workspace/diagnosticScopeModel";
+import { DEFAULT_EDITOR_APPEARANCE_PROFILE,matchesSoftWrapPath,normalizeEditorAppearanceProfile,readEditorAppearanceProfileWithDiagnostics,writeEditorAppearanceProfile,type EditorAppearanceProfile } from "./workspace/editorAppearanceProfile";
+import { type EditorCompareSession } from "./workspace/editorCompareModel";
+import type { ResolvedCodeStyle } from "./workspace/editorConfigResolver";
+import { type HierarchyRootState } from "./workspace/hierarchyQueryModel";
+import { readHighlightingLevel,writeHighlightingLevel,type HighlightingLevel } from "./workspace/highlightingLevelModel";
 import { useBreakpointControls } from "./workspace/hooks/useBreakpointControls";
-import { useWorkspaceSave } from "./workspace/hooks/useWorkspaceSave";
-import { useSymbolRefactoring } from "./workspace/hooks/useSymbolRefactoring";
-import { useWorkspaceKeyboard } from "./workspace/hooks/useWorkspaceKeyboard";
-import { useWorkspaceFileLifecycle } from "./workspace/hooks/useWorkspaceFileLifecycle";
-import { useWorkspaceGitDecorations } from "./workspace/hooks/useWorkspaceGitDecorations";
-import { useWorkspaceToolWindows } from "./workspace/hooks/useWorkspaceToolWindows";
-import { createApplyTabPolicy } from "./workspace/controller/applyTabPolicy";
-import { createToolWindowChrome } from "./workspace/views/toolWindowChrome";
+import { useCodeGeneration } from "./workspace/hooks/useCodeGeneration";
+import { useDebugSourceNavigation } from "./workspace/hooks/useDebugSourceNavigation";
 import { useEditorAiActions } from "./workspace/hooks/useEditorAiActions";
-import { useWorkspaceCompletion } from "./workspace/hooks/useWorkspaceCompletion";
-import { useSemanticNavigation } from "./workspace/hooks/useSemanticNavigation";
-import { useWorkspaceLocalHistory } from "./workspace/hooks/useWorkspaceLocalHistory";
-import { useWorkspaceLayoutPersistence } from "./workspace/hooks/useWorkspaceLayoutPersistence";
-import { useWorkspaceSplits } from "./workspace/hooks/useWorkspaceSplits";
-import { useWorkspaceRunActions } from "./workspace/hooks/useWorkspaceRunActions";
+import { useExecutionTargets } from "./workspace/hooks/useExecutionTargets";
+import { useIntentionActions } from "./workspace/hooks/useIntentionActions";
 import { useRefactorRecovery } from "./workspace/hooks/useRefactorRecovery";
 import { useReferenceDocumentation } from "./workspace/hooks/useReferenceDocumentation";
-import { useWorkspaceEncoding } from "./workspace/hooks/useWorkspaceEncoding";
-import { useWorkspaceStructure } from "./workspace/hooks/useWorkspaceStructure";
-import { useWorkspaceLocationOpening } from "./workspace/hooks/useWorkspaceLocationOpening";
+import { useSemanticNavigation } from "./workspace/hooks/useSemanticNavigation";
+import { useSymbolRefactoring } from "./workspace/hooks/useSymbolRefactoring";
 import { useWorkspaceBookmarkActions } from "./workspace/hooks/useWorkspaceBookmarkActions";
-import { useWorkspaceComparisons } from "./workspace/hooks/useWorkspaceComparisons";
-import { useWorkspaceUiActions } from "./workspace/hooks/useWorkspaceUiActions";
 import { useWorkspaceBufferStore } from "./workspace/hooks/useWorkspaceBufferStore";
+import { useWorkspaceClipboard } from "./workspace/hooks/useWorkspaceClipboard";
+import { useWorkspaceComparisons } from "./workspace/hooks/useWorkspaceComparisons";
+import { useWorkspaceCompletion } from "./workspace/hooks/useWorkspaceCompletion";
+import { useWorkspaceDebugLaunch } from "./workspace/hooks/useWorkspaceDebugLaunch";
 import { useWorkspaceDocumentSync } from "./workspace/hooks/useWorkspaceDocumentSync";
 import { useWorkspaceEditSnapshots } from "./workspace/hooks/useWorkspaceEditSnapshots";
-import { useCodeGeneration } from "./workspace/hooks/useCodeGeneration";
-import { useIntentionActions } from "./workspace/hooks/useIntentionActions";
-import { useWorkspaceReferenceSessions } from "./workspace/hooks/useWorkspaceReferenceSessions";
+import { useWorkspaceEncoding } from "./workspace/hooks/useWorkspaceEncoding";
+import { useWorkspaceFileLifecycle } from "./workspace/hooks/useWorkspaceFileLifecycle";
+import { useWorkspaceGitDecorations } from "./workspace/hooks/useWorkspaceGitDecorations";
+import { useWorkspaceKeyboard } from "./workspace/hooks/useWorkspaceKeyboard";
+import { useWorkspaceLayoutHydration } from "./workspace/hooks/useWorkspaceLayoutHydration";
+import { useWorkspaceLayoutPersistence } from "./workspace/hooks/useWorkspaceLayoutPersistence";
 import { useWorkspaceLibrarySources } from "./workspace/hooks/useWorkspaceLibrarySources";
+import { useWorkspaceLocalHistory } from "./workspace/hooks/useWorkspaceLocalHistory";
+import { useWorkspaceLocationOpening } from "./workspace/hooks/useWorkspaceLocationOpening";
+import { useWorkspaceReferenceSessions } from "./workspace/hooks/useWorkspaceReferenceSessions";
+import { useWorkspaceRunActions } from "./workspace/hooks/useWorkspaceRunActions";
+import { useWorkspaceSave } from "./workspace/hooks/useWorkspaceSave";
+import { useWorkspaceSplits } from "./workspace/hooks/useWorkspaceSplits";
+import { useWorkspaceStructure } from "./workspace/hooks/useWorkspaceStructure";
+import { useWorkspaceTests } from "./workspace/hooks/useWorkspaceTests";
+import { useWorkspaceToolWindows } from "./workspace/hooks/useWorkspaceToolWindows";
+import { useWorkspaceUiActions } from "./workspace/hooks/useWorkspaceUiActions";
 import { useWorkspaceUsages } from "./workspace/hooks/useWorkspaceUsages";
+import { inlineRenameNameError } from "./workspace/inlineRename";
+import { addDiagnosticToInspectionBaseline,addInspectionSuppression,applyInspectionProfile,clearInspectionBaseline,diagnosticInspectionId,importInspectionBaseline,readInspectionProfile,removeInspectionBaselineEntry,removeInspectionSuppression,replaceInspectionBaseline,serializeInspectionBaseline,updateInspectionRule,writeInspectionProfile,type InspectionProfile,type InspectionRule,type InspectionSuppressionScope } from "./workspace/inspectionProfile";
+import { toProviderDiagnosticsV3 } from "./workspace/inspectionProviderAdapter";
+import { inlayHintsEnabledForLanguage,readWorkspaceIntelligencePreferences,writeWorkspaceIntelligencePreferences,type WorkspaceIntelligencePreferences } from "./workspace/intelligencePreferences";
+import { IntentionSession } from "./workspace/intentionSession";
+import { languageServiceReadiness } from "./workspace/languageServiceReadiness";
+import { isLargeFileContent } from "./workspace/largeFile";
+import { createWorkspaceLocationController,isPathContainedInRoot,type WorkspaceLocationController } from "./workspace/navigationHistoryModel";
+import { formatOccurrenceStatus,stepOccurrence,type OccurrenceHighlightSession } from "./workspace/occurrenceHighlightModel";
+import { AnalysisPanel } from "./workspace/panels/AnalysisPanel";
+import { BottomDock,type BottomDockTab } from "./workspace/panels/BottomDock";
+import { BuildPanel } from "./workspace/panels/BuildPanel";
+import { CoveragePanel } from "./workspace/panels/CoveragePanel";
+import { DebugPanel } from "./workspace/panels/DebugPanel";
+import { DocumentationPane } from "./workspace/panels/DocumentationPane";
+import { FindInFilesPanel } from "./workspace/panels/FindInFilesPanel";
+import { HierarchyPanel } from "./workspace/panels/HierarchyPanel";
+import { ProblemsPanel,type ProblemFileGroup } from "./workspace/panels/ProblemsPanel";
+import { ReferencesPanel,type ReferencesResultState } from "./workspace/panels/ReferencesPanel";
+import { RunPanel,type RunPanelHandle,type WorkspaceTaskItem } from "./workspace/panels/RunPanel";
+import { StructuralSearchPanel } from "./workspace/panels/StructuralSearchPanel";
+import { TerminalDockPanel,type TerminalDockHandle } from "./workspace/panels/TerminalDockPanel";
+import { TestsPanel } from "./workspace/panels/TestsPanel";
+import { TodosBookmarksPanel } from "./workspace/panels/TodosBookmarksPanel";
+import { ToolWindowPortal,useToolWindowNodes } from "./workspace/panels/ToolWindowHost";
+import { ToolWindowRail,type ToolWindowRailItem } from "./workspace/panels/ToolWindowRail";
+import { BreakpointPopup,GutterBreakpointMenu } from "./workspace/panels/debug/BreakpointPopup";
+import { BreakpointsDialog } from "./workspace/panels/debug/BreakpointsDialog";
+import { EvaluateExpressionDialog } from "./workspace/panels/debug/EvaluateExpressionDialog";
+import { navigateProjectTree } from "./workspace/projectTreeNavigation";
+import { getAllLeafNodes,panelLayoutToRatios,type LayoutNode } from "./workspace/recursiveLayoutTree";
+import { writeRefactorOptionsMode } from "./workspace/refactorOptions";
+import { type RefactorPlanV3 } from "./workspace/refactorPlan";
+import { createRestoreEchoSuppressor } from "./workspace/refactorRecoveryController";
+import { type QuickDocContent } from "./workspace/referenceDocumentation";
+import { type ParameterInvalidateReason,type ReferenceSessionContext } from "./workspace/referenceInfoSession";
+import { isDocCommentRenderingSupported,readReaderModePreference,writeReaderModePreference } from "./workspace/renderedDocCommentsModel";
+import { codePointOffsetToUtf16Offset,collectReplacePreimages,replaceMatchAbsolutePath,type ReplaceFilePreimage,type ReplacePrepareOptions } from "./workspace/replaceInFilesModel";
+import { applyRunOverrideToDebugConfiguration,readRunConfigurationOverrides,writeActiveRunConfigurationSelection } from "./workspace/runConfigurationPersistence";
+import { javaMainRunLines,type RunGutterTarget } from "./workspace/runGutter";
+import { SaveTransactionRegistry } from "./workspace/saveCommit";
+import { type SaveObservationRecord,type SaveObservationState } from "./workspace/saveObservationContract";
+import type { ShellShortcutClaim } from "./workspace/shellShortcutRouter";
+import { findBookmarkByMnemonic,readWorkspaceBookmarks } from "./workspace/todoBookmarks";
+import { DEFAULT_SCOPE_SELECTION,UsageQuerySession,type UsagesScopeSelection } from "./workspace/usageQuerySession";
+import { useCodeDebugSession } from "./workspace/useCodeDebugSession";
+import { useDeferredOpenFileTodos } from "./workspace/useDeferredOpenFileTodos";
+import { useLatestHandlers } from "./workspace/useLatestHandlers";
+import { useStructuralSearchSession } from "./workspace/useStructuralSearchSession";
+import { useToolWindowLayout } from "./workspace/useToolWindowLayout";
+import { useWorkspaceActionsController } from "./workspace/useWorkspaceActionsController";
+import { useWorkspaceFileActions } from "./workspace/useWorkspaceFileActions";
+import { useWorkspaceGitSnapshots } from "./workspace/useWorkspaceGitSnapshots";
+import { useWorkspaceLspClientEvents } from "./workspace/useWorkspaceLspClientEvents";
+import { useWorkspaceLspSession } from "./workspace/useWorkspaceLspSession";
+import { useWorkspaceNavigation } from "./workspace/useWorkspaceNavigation";
+import { useWorkspaceProjectAnalysis } from "./workspace/useWorkspaceProjectAnalysis";
+import { useWorkspaceSemanticIndex } from "./workspace/useWorkspaceSemanticIndex";
+import { useWorkspaceTreeData } from "./workspace/useWorkspaceTreeData";
+import { WorkspaceToolbar } from "./workspace/views/WorkspaceToolbar";
+import { createRenderEditorGroup } from "./workspace/views/editorGroupView";
+import { createToolWindowChrome } from "./workspace/views/toolWindowChrome";
+import type { WorkspaceFocus } from "./workspace/workspaceActionRegistry";
+import { WorkspaceClipboardSessionContext } from "./workspace/workspaceClipboardSession";
+import { BUILT_IN_SCHEME_ID,activeSchemeForLanguage,readCodeStyleSchemeStore,schemeStyleFields,writeCodeStyleSchemeStore,type CodeStyleSchemeStoreState } from "./workspace/workspaceCodeStyleSchemes";
+import { type WorkspaceCommand,type WorkspaceCommandContext } from "./workspace/workspaceCommands";
+import { WorkspaceDocumentTransactionOwner } from "./workspace/workspaceDocumentTransactionOwner";
+import { workspaceEditApplyResponse } from "./workspace/workspaceEditApply";
+import { WorkspaceEditHistory,buildWorkspacePathSnapshotEdit,type WorkspaceEditPathSnapshot } from "./workspace/workspaceEditHistory";
+import { formatWorkspaceEditPreview,type WorkspaceEditPreview } from "./workspace/workspaceEditPreview";
+import { BUILTIN_KEYMAP_PRESETS,consumeKeymapDefaultsMigrationNotice,dismissKeymapDefaultsMigrationNotice,isBuiltinKeymapScheme,readKeymapSchemes,writeKeymapSchemes,type KeymapSchemeV3 } from "./workspace/workspaceKeymapScheme";
+import { readWorkspaceLayoutSnapshot,type PersistedEditorViewState } from "./workspace/workspaceLayoutPersistence";
+import { WorkspaceLspSessionManager } from "./workspace/workspaceLspSessionManager";
+import { attachWorkspaceMouseDispatcher } from "./workspace/workspaceMouseDispatcher";
+import { workspaceNavigationSegments } from "./workspace/workspaceNavigationBar";
+import { WorkspaceObservationBridge } from "./workspace/workspaceObservationBridge";
+import { listDiskEffectLedgerEntries,readWorkspaceRecoveryEntries,reconcileWorkspaceRecoveryEntries,removeWorkspaceRecoveryEntry,resolveDiskEffectLedgerEntry,writeWorkspaceRecoveryEntries,type WorkspaceDiskEffectLedgerEntryV4,type WorkspaceRecoveryEntry } from "./workspace/workspaceRecovery";
+import { WorkspaceResourceRecoveryCoordinator,type ResourceCleanupHandlers,type ResourceCleanupOutcome } from "./workspace/workspaceResourceRecoveryCoordinator";
+import { WorkspaceSemanticQueryHost } from "./workspace/workspaceSemanticQueryHost";
+import { createWorkspaceStyleController,type WorkspaceStyleController } from "./workspace/workspaceStyleController";
+import { DEFAULT_WORKSPACE_TAB_POLICY_V3,type ClosedTabEntry,type WorkspaceTabPolicyV3 } from "./workspace/workspaceTabPolicy";
+
+
+
+
 
 
 
@@ -355,31 +360,10 @@ export function CodeWorkspaceTab({
     setTabPolicySettingsOpen(false);
     requestAnimationFrame(() => tabPolicyTriggerRef.current?.focus());
   }, []);
-
-  // §8.26.2 AA1: Root workspace clipboard session handle with permission adapter (§8.27.2 BB1 / ED-CLIP-002)
-  const clipboardHandle = useMemo(() => acquireClipboardStore(workspaceInstanceId), [workspaceInstanceId]);
-  const clipboardSnapshot = useSyncExternalStore(
-    clipboardHandle.subscribe,
-    clipboardHandle.getSnapshot,
-    clipboardHandle.getSnapshot,
-  );
-  useEffect(() => {
-    const observeClipboard = (snapshot: typeof clipboardSnapshot) => {
-      publishWorkspaceObservation((bridge) => {
-        bridge.observeClipboardSession(snapshot.payloadRevision, snapshot.consumerCount);
-      });
-    };
-    const unsubscribe = clipboardHandle.subscribe(observeClipboard);
-    observeClipboard(clipboardHandle.getSnapshot());
-    return unsubscribe;
-  }, [clipboardHandle, publishWorkspaceObservation]);
-  useEffect(() => {
-    const detachAdapter = clipboardHandle.attachPermissionAdapter(createDefaultClipboardPermissionAdapter());
-    return () => {
-      detachAdapter();
-      clipboardHandle.release();
-    };
-  }, [clipboardHandle]);
+  const { clipboardHandle, clipboardSnapshot } = useWorkspaceClipboard({
+    workspaceInstanceId,
+    publishWorkspaceObservation,
+  });
   // §8.19.9 R8-D1: code style schemes — production store with persistence;
   // the active scheme layers into effective-style resolution BELOW EditorConfig.
   const [codeStyleSchemes, setCodeStyleSchemes] = useState<CodeStyleSchemeStoreState>(
@@ -452,94 +436,15 @@ export function CodeWorkspaceTab({
     ensureWorkspaceUi(workspaceInstanceId);
     replaceBookmarks(readWorkspaceBookmarks(workspaceInstanceId));
   }, [ensureWorkspaceUi, replaceBookmarks, workspaceInstanceId]);
-
-  // Restore chrome/layout once per instance, then seed expand keys only when empty.
-  const layoutHydratedRef = useRef<string | null>(null);
-  const layoutRestoredOpenFilesRef = useRef(false);
-  // ED-IMPROVE-007: in-memory per-leaf/file view snapshots; hydrated from the
-  // layout snapshot before the first editor mounts so a reopen/restart applies
-  // the right leaf's caret, selection, scroll and folds.
-  const [hydratedViewStates] = useState<WorkspaceViewStates>(() => (
-    readWorkspaceLayoutSnapshot(workspaceInstanceId)?.viewStates ?? {}
-  ));
-  const viewStatesRef = useRef<WorkspaceViewStates>(hydratedViewStates);
-  const [viewStateRevision, setViewStateRevision] = useState(0);
-  useEffect(() => {
-    if (layoutHydratedRef.current === workspaceInstanceId) return;
-    layoutHydratedRef.current = workspaceInstanceId;
-    layoutRestoredOpenFilesRef.current = false;
-    viewStatesRef.current = {};
-    const snapshot = readWorkspaceLayoutSnapshot(workspaceInstanceId);
-    if (snapshot) {
-      viewStatesRef.current = snapshot.viewStates ?? {};
-      if (snapshot.layoutRecovered) {
-        setStatusMessage("Recovered invalid workspace layout into a single editor leaf");
-      }
-      if (snapshot.shellChromeState?.projectWidthPx) {
-        lastProjectPanelSizeRef.current = snapshot.shellChromeState.projectWidthPx;
-      }
-      setTabPolicy(snapshot.tabPolicy ?? { ...DEFAULT_WORKSPACE_TAB_POLICY_V3 });
-      patchWorkspaceUi(workspaceInstanceId, {
-        bottomDockOpen: snapshot.bottomDockOpen,
-        bottomDockTab: snapshot.bottomDockTab,
-        rightPaneOpen: snapshot.rightPaneOpen,
-        rightPaneTab: snapshot.rightPaneTab,
-        languagePanelOpen: snapshot.languagePanelOpen,
-        splitOrientation: snapshot.splitOrientation,
-        activeEditorGroupId: snapshot.activeEditorGroupId,
-        expandedRootIds: snapshot.expandedRootIds,
-        expandedDirKeys: snapshot.expandedDirKeys,
-        layoutTreeV2: snapshot.layoutTreeV2,
-        shellChromeState: snapshot.shellChromeState,
-        editorGroups: Object.fromEntries(
-          Object.entries(snapshot.editorGroups).map(([id, g]) => [
-            id,
-            {
-              id,
-              openOrder: g.openOrder,
-              activeKey: g.activeKey,
-              previewKey: g.previewKey,
-              pinnedKeys: g.pinnedKeys,
-            },
-          ]),
-        ),
-        openOrder: uniqueOrderedKeys(snapshot.editorGroups),
-        activeKey: snapshot.editorGroups[snapshot.activeEditorGroupId]?.activeKey
-          ?? snapshot.editorGroups.primary?.activeKey
-          ?? snapshot.editorGroups.secondary?.activeKey
-          ?? null,
-      });
-      writeWorkspaceLayoutSnapshot(workspaceInstanceId, snapshot);
-      layoutRestoredOpenFilesRef.current = layoutSnapshotHasOpenFiles(snapshot);
-      return;
-    }
-    const seedRoots = initialRoots(workspace);
-    // §8.16.4 N6.6: fresh mounts materialize a single-leaf v2 tree
-    // immediately so the recursive renderer is the only production layout
-    // path from first paint; the primary/secondary fallback never renders.
-    // The dormant "secondary" group stays present-but-empty: empty legacy
-    // slots carry no layout truth (see validateTreeGroupConsistency).
-    const uiNow = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
-    patchWorkspaceUi(workspaceInstanceId, {
-      layoutTreeV2: createSingleLeafLayout(
-        "primary",
-        uiNow.editorGroups.primary?.openOrder ?? [],
-        uiNow.editorGroups.primary?.activeKey ?? null,
-      ),
-      editorGroups: {
-        primary: uiNow.editorGroups.primary ?? createEditorGroup("primary"),
-        secondary: createEditorGroup("secondary"),
-      },
-      activeEditorGroupId: "primary",
-    });
-      writeWorkspaceLayoutSnapshot(workspaceInstanceId, defaultWorkspaceLayoutSnapshot());
-      if (seedRoots.length === 0) return;
-    seedTreeExpandIfEmpty(
-      workspaceInstanceId,
-      seedRoots.map((root) => root.id),
-      seedRoots.map((root) => rootDirKey(root.id, "")),
-    );
-  }, [patchWorkspaceUi, seedTreeExpandIfEmpty, workspace, workspaceInstanceId]);
+  const { viewStatesRef, setViewStateRevision, layoutRestoredOpenFilesRef, viewStateRevision } = useWorkspaceLayoutHydration({
+    workspaceInstanceId,
+    setStatusMessage,
+    lastProjectPanelSizeRef,
+    setTabPolicy,
+    patchWorkspaceUi,
+    workspace,
+    seedTreeExpandIfEmpty,
+  });
 
   const {
     languagePanelOpen,
@@ -5845,15 +5750,6 @@ export function CodeWorkspaceTab({
   ]);
   prepareJavaLaunchRef.current = prepareJavaLaunch;
 
-  /** Pending main-class choice when the active file resolves to several mains. */
-  const [javaMainCandidates, setJavaMainCandidates] = useState<{
-    candidates: JavaMainClassOption[];
-    launch: Record<string, unknown>;
-    override?: ReturnType<typeof readRunConfigurationOverrides>[string];
-    environment: Record<string, string>;
-    runtimeOptions: string[];
-  } | null>(null);
-
   /** Interactive refactoring usages preview modal state. */
   const [refactoringPreviewModal, setRefactoringPreviewModal] = useState<{
     title: string;
@@ -5863,41 +5759,12 @@ export function CodeWorkspaceTab({
     sourceTexts?: Record<string, string | null>;
     resolve: (filtered: LspWorkspaceEdit | boolean) => void;
   } | null>(null);
-
-  /** Start a Java debug session, optionally pinned to an explicit main class. */
-  const launchJavaDebug = useCallback(
-    (
-      launch: Record<string, unknown>,
-      main?: JavaMainClassOption,
-      override = activeRunConfigurationOverride,
-      environment: Record<string, string> = {},
-      runtimeOptions: readonly string[] = activeRunConfiguration?.runtimeOptions ?? [],
-    ) => {
-      const config = main
-        ? { ...launch, mainClass: main.mainClass, projectName: main.projectName }
-        : launch;
-      const configured = applyRunOverrideToJavaLaunch(config, override, environment, runtimeOptions);
-      if (buildRunTools.stepFilters?.enabled) {
-        configured.stepFilters = {
-          classNameFilters: buildRunTools.stepFilters.patterns,
-          skipSynthetics: buildRunTools.stepFilters.skipSynthetics,
-          skipStaticInitializers: buildRunTools.stepFilters.skipStaticInitializers,
-          skipConstructors: buildRunTools.stepFilters.skipConstructors,
-        };
-      }
-      if (main) {
-        // Resolving the classpath + asking java-debug for a port is another
-        // multi-second server round trip: name the target so the panel is not
-        // blank while it runs.
-        debug.reportStartupProgress(`Launching ${main.mainClass}…`);
-      }
-      void debug.startDebug(configured).catch((err) => setStatusMessage(errorMessage(err)));
-    },
-    [activeRunConfiguration, activeRunConfigurationOverride, buildRunTools.stepFilters, debug, setStatusMessage],
-  );
-
-  /** Build a Java launch config for the active file and start debugging. */
-  const startDebugActiveFile = useCallback(createStartDebugActiveFile({
+  const { startDebugActiveTarget, launchJavaDebug, javaMainCandidates, setJavaMainCandidates } = useWorkspaceDebugLaunch({
+    activeRunConfigurationOverride,
+    activeRunConfiguration,
+    buildRunTools,
+    debug,
+    setStatusMessage,
     openFilesRef,
     activeKey,
     findRoot,
@@ -5906,74 +5773,17 @@ export function CodeWorkspaceTab({
     workspaceInstanceId,
     setBottomDockTab,
     setBottomDockOpen,
-    debug,
     saveOpenBufferText,
     executeBeforeLaunch,
-    activeRunConfiguration,
     activeExecutionModel,
-    setStatusMessage,
     prepareJavaLaunch,
     mountedRef,
     readEnvironmentFile,
-    setJavaMainCandidates,
-    activeRunConfigurationOverride,
-    launchJavaDebug,
-  }), [
-    activeExecutionModel,
-    activeKey,
-    activeRunConfiguration,
-    activeRunConfigurationOverride,
-    debug,
-    executeBeforeLaunch,
-    findRoot,
-    lspDescriptorForFile,
-    absolutePathForOpenFile,
-    launchJavaDebug,
-    prepareJavaLaunch,
-    readEnvironmentFile,
-    saveOpenBufferText,
-    setBottomDockOpen,
-    setBottomDockTab,
-    setStatusMessage,
-    workspaceInstanceId,
-  ]);
-
-
-  const startDebugActiveTarget = useCallback(createStartDebugActiveTarget({
     activeFileIsJava,
-    activeRunConfiguration,
-    activeDebugConfiguration,
-    startDebugActiveFile,
-    setStatusMessage,
-    openFilesRef,
-    activeKey,
-    setBottomDockTab,
-    setBottomDockOpen,
-    debug,
-    saveOpenBufferText,
-    findRoot,
-    activeDebugConfigurationCatalog,
-    activeExecutionModel,
-    roots,
-    readEnvironmentFile,
-    executeBeforeLaunch,
-  }), [
     activeDebugConfiguration,
     activeDebugConfigurationCatalog,
-    activeExecutionModel,
-    activeFileIsJava,
-    activeKey,
-    debug,
-    executeBeforeLaunch,
-    findRoot,
-    readEnvironmentFile,
     roots,
-    saveOpenBufferText,
-    setBottomDockOpen,
-    setBottomDockTab,
-    setStatusMessage,
-    startDebugActiveFile,
-  ]);
+  });
 
   // ED-PARITY-022 DEC-022-03: run gutter ▶ only where a detected run
   // configuration of this very file exists (no facts → no icon).
@@ -6059,73 +5869,19 @@ export function CodeWorkspaceTab({
     activeKey, debug, findRoot, lspDescriptorForFile, absolutePathForOpenFile,
     setBottomDockOpen, setBottomDockTab, setStatusMessage, workspaceInstanceId,
   ]);
-
-  const openDebugFrame = useCallback((
-    frame: Pick<DebugStackFrame, "path" | "line"> & Partial<Pick<DebugStackFrame, "sourceReference" | "sourceName" | "name">> & { column?: number },
-  ) => {
-    // D11.1: line/column arrive 1-based; convert to 0-based exactly once here
-    const line0 = frame.line - 1;
-    const char0 = (frame.column ?? 1) - 1;
-    const range = { start: { line: line0, character: char0 }, end: { line: line0, character: char0 } };
-    const ref = frame.path ? problemPathToRef(frame.path) : null;
-    if (ref) {
-      void openFile(ref).then(() => revealEditorLocation(fileKey(ref), range));
-      return;
-    }
-    // Outside the workspace (JDK / a dependency JAR): ask the adapter for the
-    // attached or decompiled source and show it read-only, like IDEA does.
-    const sourceReference = frame.sourceReference ?? 0;
-    if (sourceReference <= 0) return;
-    const origin = openFilesRef.current[activeKey ?? ""]
-      ?? Object.values(openFilesRef.current).find((item) => !item.loading)
-      ?? null;
-    const descriptor = origin ? lspDescriptorForFile(origin) : null;
-    if (!descriptor) return;
-    void (async () => {
-      const text = await debugRef.current?.fetchSource(sourceReference);
-      if (!text) {
-        setStatusMessage("No source available for this frame");
-        return;
-      }
-      const title = frame.sourceName ?? `${frame.name ?? "frame"}.java`;
-      await openLibraryBuffer(
-        {
-          uri: `dap-source:${sourceReference}/${title}`,
-          title,
-          container: frame.name ?? null,
-          languageId: "java",
-          originRootPath: descriptor.rootPath ?? null,
-          originFilePath: descriptor.filePath,
-          decompiled: true,
-        },
-        text,
-        range,
-      );
-    })();
-  }, [
-    activeKey, lspDescriptorForFile, openFile, openLibraryBuffer, problemPathToRef,
-    revealEditorLocation, setStatusMessage,
-  ]);
-
-  // IDEA-style: jump to the stopped location (breakpoint hit / step landing)
-  // automatically, once per distinct location.
-  const debugRevealRef = useRef<string | null>(null);
-  useEffect(() => {
-    const loc = debug.currentLocation;
-    if (!loc || debug.state?.status !== "stopped") {
-      debugRevealRef.current = null;
-      return;
-    }
-    const key = `${loc.path}:${loc.line}`;
-    if (debugRevealRef.current === key) return;
-    debugRevealRef.current = key;
-    openDebugFrame({ path: loc.path, line: loc.line });
-  }, [debug.currentLocation, debug.state?.status, openDebugFrame]);
-  showDebugExecutionPointRef.current = () => {
-    const state = debug.state;
-    const frame = state?.frames.find((candidate) => candidate.id === state.selectedFrameId) ?? state?.frames[0];
-    if (frame && (frame.path || frame.sourceReference > 0)) openDebugFrame(frame);
-  };
+  const { openDebugFrame } = useDebugSourceNavigation({
+    problemPathToRef,
+    openFile,
+    revealEditorLocation,
+    openFilesRef,
+    activeKey,
+    lspDescriptorForFile,
+    debugRef,
+    setStatusMessage,
+    openLibraryBuffer,
+    debug,
+    showDebugExecutionPointRef,
+  });
 
   // Real Java debugging drives the DAP kernel over Tauri IPC, which the browser
   // dev-preview stubs cannot provide (there is no JVM / java-debug adapter). Gate
@@ -7952,4 +7708,8 @@ export function CodeWorkspaceTab({
 
 
 
-export { type CodeWorkspaceGitManagerPayload, isDeclarationDefinitionEquivalentLanguage, extractContextSnippet, debugCurrentLineForFile } from "./workspace/controller/model";
+
+
+
+
+export { debugCurrentLineForFile,extractContextSnippet,isDeclarationDefinitionEquivalentLanguage,type CodeWorkspaceGitManagerPayload } from "./workspace/controller/model";

@@ -1,55 +1,84 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { importFoldRange } from "./importFold";
-import { TriangleAlert, X } from "lucide-react";
-import { Compartment, EditorState, Prec, Transaction, type Extension } from "@codemirror/state";
-import { remoteTransactionAnnotation, type DocumentChangeDelta } from "./workspaceDocumentTransactionOwner";
-import { EditorView, crosshairCursor, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, rectangularSelection, showTooltip } from "@codemirror/view";
-import { type WindowResizeSession } from "./windowResizeSession";
+import { acceptCompletion,closeBrackets,closeCompletion,completionStatus,setSelectedCompletion,startCompletion } from "@codemirror/autocomplete";
 import { history } from "@codemirror/commands";
+import { bracketMatching,foldEffect,foldGutter,indentOnInput,indentUnit } from "@codemirror/language";
+import { search,searchPanelOpen } from "@codemirror/search";
+import { Compartment,EditorState,Transaction } from "@codemirror/state";
 import type { KeyBinding } from "@codemirror/view";
-import { acceptCompletion, setSelectedCompletion, autocompletion, closeBrackets, closeCompletion, completionStatus, startCompletion, type Completion, type CompletionContext, type CompletionResult, type CompletionSource } from "@codemirror/autocomplete";
-import { createLiveTemplateCompletionSource, expandLiveTemplateAt, isProviderTemplateSnippet, liveTemplateLanguageForPath, matchLiveTemplateAbbreviation, plainTemplateAbbreviations, type LiveTemplateLanguage, type LiveTemplateSourceOptions } from "./liveTemplates";
-import { bracketMatching, foldEffect, foldGutter, indentOnInput, indentUnit, unfoldEffect } from "@codemirror/language";
-import { gotoLine, search, searchPanelOpen } from "@codemirror/search";
-import { writeText } from "../../../lib/clipboard";
+import { crosshairCursor,drawSelection,EditorView,highlightActiveLine,highlightActiveLineGutter,keymap,lineNumbers,rectangularSelection } from "@codemirror/view";
+import { TriangleAlert,X } from "lucide-react";
+import { memo,useCallback,useEffect,useRef,useState } from "react";
 import { codeViewExtensions } from "../../../lib/codeViewTheme";
-import { languageForPath } from "../../git/diffLanguage";
-import { useWorkspaceClipboardSession } from "./workspaceClipboardSession";
 import { type ClipboardObservationRecord } from "./clipboardObservationContract";
-import { createWorkspaceSearchPanel, openWorkspaceReplacePanel, WORKSPACE_SEARCH_STYLE } from "./editorSearchPanel";
-import { activeLspSnippetChoices, advanceLspSnippetTabstop, cancelLspSnippetSession, cycleLspSnippetChoice, retreatLspSnippetTabstop, createLspCompletionSource, lspSnippetSessionInvalidator, resetBasicCompletionSession, withCompletionAcceptIntent, type CompletionRequestIdentity, type CompletionResolveGateRequest } from "./lspCompletion";
-import { createDiagnosticChrome } from "./lspDiagnosticChrome";
-import { createErrorStripe, setErrorStripeSources } from "./errorStripe";
-import { createRunGutter, setRunGutter, type RunGutterTarget } from "./runGutter";
-import { createLspOverlayChrome, createLspSemanticTokenChrome, LSP_INTELLIGENCE_THEME, updateLspOverlayChrome, updateLspSemanticTokenChrome } from "./lspIntelligenceChrome";
-import { createGitEditorChrome, updateGitEditorChrome } from "./gitEditorChrome";
-import { createDebugEditorChrome, type DebugBreakpointMarker } from "./debugEditorChrome";
 import { createCoverageEditorChrome } from "./coverageEditorChrome";
+import { createDebugEditorChrome,type DebugBreakpointMarker } from "./debugEditorChrome";
 import { editorAppearanceExtension } from "./editorAppearanceExtension";
-import { lspPositionFromOffset, offsetFromLspPosition } from "./lspPositions";
-import { cutEditorSelections, editorClipboardPayload, escapeEditorSelections, expandSelectionFromLspRanges, expandSyntaxSelection, occurrenceSessionField, pasteEditorClipboardPayload, createRegionFoldService, detectLineFoldProvenance, selectionHistoryField } from "./workspaceEditorCommands";
-import { buildEditorHostActions, buildEditorPrimitiveKeybindings } from "./workspaceCodeMirrorKeymap";
-import { EditorActionBridge } from "./workspaceActionHost";
-import { RENDERED_DOC_THEME, renderedDocDecorationConfig, renderedDocDecorationField } from "./renderedDocCommentsExtension";
-import { treeRevisionField } from "./workspaceSyntaxFacts";
-import { desiredVisualColumnField, isEditorGeometryReady, virtualOverflowRestoreField, virtualSpaceClickHandler, virtualSpaceOverflowField, virtualSpaceTypingHandler } from "./workspaceVirtualSpace";
+import { createWorkspaceSearchPanel,openWorkspaceReplacePanel,WORKSPACE_SEARCH_STYLE } from "./editorSearchPanel";
+import { createErrorStripe } from "./errorStripe";
+import { createGitEditorChrome } from "./gitEditorChrome";
+import { LSP_EDITOR_STYLE,readOnlyExtension,WORKSPACE_EDITOR_STYLE } from "./host/appearance";
+import { bumpClipboardOwnerGeneration,clipboardContextByView,clipboardOwnerGeneration } from "./host/clipboard";
+import { editorCommandPort,editorLanguageByView } from "./host/commands";
+import { createCompositionLifecycle } from "./host/createCompositionLifecycle";
+import { createDocumentUpdateListener } from "./host/createDocumentUpdateListener";
+import { createEditorDomHandlers } from "./host/createEditorDomHandlers";
+import { createMountedEditorActions } from "./host/createMountedEditorActions";
+import { createTemplateKeybindings } from "./host/createTemplateKeybindings";
+import { cancelActiveHoverResize,foldHoverProvenanceTooltip,lspHoverExtension,lspNavigationExtensions } from "./host/intelligence";
+import { areCodeMirrorHostPropsEqual,EMPTY_DEBUG_BREAKPOINTS,EMPTY_DEBUG_INLINE_VALUES,EMPTY_DIAGNOSTICS,EMPTY_GIT_CHANGES,EMPTY_HIGHLIGHTS,EMPTY_INLAY_HINTS,EMPTY_RUN_GUTTER_TARGETS,EMPTY_SEMANTIC_TOKENS } from "./host/reconciliation";
+import { type CodeMirrorHostProps,type CompositionSession,type EditorSelectionRange } from "./host/types";
+import { useDocumentReconciliation } from "./host/useDocumentReconciliation";
+import { useEditorDecorations } from "./host/useEditorDecorations";
+import { useEditorIntelligence } from "./host/useEditorIntelligence";
+import { useEditorPresentation } from "./host/useEditorPresentation";
+import { useProviderCompletion } from "./host/useProviderCompletion";
+import { applyPersistedEditorViewState,captureEditorViewState,importFoldPathByView } from "./host/viewState";
+import { importFoldRange } from "./importFold";
+import { liveTemplateLanguageForPath } from "./liveTemplates";
+import { cancelLspSnippetSession,lspSnippetSessionInvalidator,resetBasicCompletionSession,type CompletionResolveGateRequest } from "./lspCompletion";
+import { createDiagnosticChrome } from "./lspDiagnosticChrome";
+import { createLspOverlayChrome,createLspSemanticTokenChrome,LSP_INTELLIGENCE_THEME } from "./lspIntelligenceChrome";
+import { lspPositionFromOffset,offsetFromLspPosition } from "./lspPositions";
+import { RENDERED_DOC_THEME,renderedDocDecorationConfig,renderedDocDecorationField } from "./renderedDocCommentsExtension";
+import { createRunGutter } from "./runGutter";
 import type { WorkspaceActionHost } from "./workspaceActionHost";
-import { EMPTY_DIAGNOSTICS, EMPTY_HIGHLIGHTS, EMPTY_INLAY_HINTS, EMPTY_SEMANTIC_TOKENS, EMPTY_GIT_CHANGES, EMPTY_RUN_GUTTER_TARGETS, EMPTY_DEBUG_BREAKPOINTS, EMPTY_DEBUG_INLINE_VALUES, trimPendingLocalDocumentEchoes, sameEditorAppearance, sameArrayOrBothEmpty, sameInlineValues, areCodeMirrorHostPropsEqual } from "./host/reconciliation";
-import { type CodeMirrorHostProps, type CompositionSession, type EditorSelectionRange } from "./host/types";
-import { positionCompletionInfo, readOnlyExtension, WORKSPACE_EDITOR_STYLE, LSP_EDITOR_STYLE } from "./host/appearance";
-import { captureEditorViewState, importFoldPathByView, applyPersistedEditorViewState } from "./host/viewState";
-import { foldHoverProvenanceTooltip, lspHoverExtension, lspNavigationExtensions, cancelActiveHoverResize, signatureTooltipDom } from "./host/intelligence";
-import { clipboardOwnerGeneration, rememberEditorClipboardPayload, cutSystemClipboard, payloadForSystemClipboardText, writeEditorSelectionToClipboard, pasteSystemClipboard, bumpClipboardOwnerGeneration, clipboardContextByView } from "./host/clipboard";
-import { applyDocumentSnapshotToView, applySharedTransactionToView } from "./host/documentSync";
-import { editorLanguageByView, isCompositionNavigationKey, editorCommandPort } from "./host/commands";
+import { EditorActionBridge } from "./workspaceActionHost";
+import { useWorkspaceClipboardSession } from "./workspaceClipboardSession";
+import { buildEditorPrimitiveKeybindings } from "./workspaceCodeMirrorKeymap";
+import { createRegionFoldService,detectLineFoldProvenance,escapeEditorSelections,expandSelectionFromLspRanges,expandSyntaxSelection,occurrenceSessionField,selectionHistoryField } from "./workspaceEditorCommands";
+import { treeRevisionField } from "./workspaceSyntaxFacts";
+import { desiredVisualColumnField,virtualOverflowRestoreField,virtualSpaceClickHandler,virtualSpaceOverflowField,virtualSpaceTypingHandler } from "./workspaceVirtualSpace";
+
+
+
+
+
+
+
+
+
+
 
 
 // CodeMirror uses this only to ignore the key event that opened a popup. It is
 // unrelated to how long completion documentation waits before being shown.
-const COMPLETION_INTERACTION_DELAY_MS = 75;
+
+
+
+
+
 
 
 let nextEditorHostViewId = 0;
+
+
+
+
+
+
+
+
+
+
 
 
 export const CodeMirrorHost = memo(function CodeMirrorHost({
@@ -152,8 +181,6 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   workspaceHistoryClaimRef.current = onWorkspaceHistoryClaim;
   const historyReplayRef = useRef(historyReplay);
   historyReplayRef.current = historyReplay;
-  const documentRevisionRef = useRef(documentRevision);
-  documentRevisionRef.current = documentRevision;
   // §8.18.2: the mount-once editor effect reads the live host through a ref so
   // editor.* actions register against the workspace controller's instance.
   const workspaceActionHostRef = useRef<WorkspaceActionHost | null>(workspaceActionHost);
@@ -170,373 +197,14 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   onClipboardObservationRef.current = (record: ClipboardObservationRecord) => {
     onClipboardObservation?.(record);
   };
-  const languageCompartment = useRef(new Compartment());
-  const codeStyleCompartment = useRef(new Compartment());
-  const diagnosticsCompartment = useRef(new Compartment());
   const overlayCompartment = useRef(new Compartment());
   const semanticTokensCompartment = useRef(new Compartment());
   const gitCompartment = useRef(new Compartment());
-  const coverageCompartment = useRef(new Compartment());
-  const debugCompartment = useRef(new Compartment());
-  const signatureCompartment = useRef(new Compartment());
-  const hoverCompartment = useRef(new Compartment());
-  const readOnlyCompartment = useRef(new Compartment());
-  const wrappingCompartment = useRef(new Compartment());
-  const appearanceCompartment = useRef(new Compartment());
   const completionCompartment = useRef(new Compartment());
-  const renderedDocCompartment = useRef(new Compartment());
   const presentResolveGateRef = useRef<((request: CompletionResolveGateRequest) => void) | null>(null);
   const pendingCompletionAcceptanceRef = useRef<(() => void) | null>(null);
   const resolveGateSequenceRef = useRef(0);
 
-  interface ActiveProviderTemplateState {
-    workspaceId: string;
-    fileKey: string;
-    documentRevision: number;
-    lspSessionGeneration: number;
-    from: number;
-    to: number;
-    items: Map<string, Completion>;
-  }
-
-  /**
-   * Plain abbreviations the language provider currently offers: jdtls ships the Eclipse
-   * Java editor templates as snippet proposals, and those exact IDs win over
-   * the app's live templates when valid for the current revision and caret range.
-   * Merged per active result, not permanently suppressed across the whole session.
-   */
-  const currentProviderTemplatesRef = useRef<ActiveProviderTemplateState | null>(null);
-  const pendingTriggerOriginRef = useRef<{ pos: number; char: string; docLength: number } | null>(null);
-
-  const completionPolicyGenerationRef = useRef(0);
-  const localRefreshTimerRef = useRef<number | null>(null);
-  const lastCollisionFingerprintRef = useRef<string>("");
-  const activeQueryCounterRef = useRef(0);
-  const lastAppliedQueryIdRef = useRef(0);
-  const trackedLspSourceRef = useRef<CompletionSource | null>(null);
-
-  const providerOwnedAbbreviations = useCallback(
-    (language: LiveTemplateLanguage): ReadonlySet<string> | undefined => {
-      if (language !== "java") return undefined;
-      const current = currentProviderTemplatesRef.current;
-      if (!current) return undefined;
-      const identity = getCompletionIdentityRef.current?.();
-      if (!identity) return undefined;
-      if (
-        current.workspaceId !== identity.workspaceId
-        || current.fileKey !== identity.fileKey
-        || current.documentRevision !== identity.documentRevision
-        || current.lspSessionGeneration !== identity.lspSessionGeneration
-      ) {
-        return undefined;
-      }
-      const view = viewRef.current;
-      if (view) {
-        const pos = view.state.selection.main.head;
-        if (pos < current.from || pos > current.to) {
-          return undefined;
-        }
-      }
-      return new Set(current.items.keys());
-    },
-    [],
-  );
-
-  const liveTemplateSourceOptions = useMemo<LiveTemplateSourceOptions>(
-    () => ({ providerOwnedAbbreviations }),
-    [providerOwnedAbbreviations],
-  );
-
-  const getValidActiveProviderCandidate = useCallback(
-    (
-      view: EditorView,
-      language: LiveTemplateLanguage,
-    ): { completion: Completion; from: number; to: number } | null => {
-      if (language !== "java") return null;
-      const current = currentProviderTemplatesRef.current;
-      if (!current) return null;
-      const identity = getCompletionIdentityRef.current?.();
-      if (!identity) return null;
-      if (
-        current.workspaceId !== identity.workspaceId
-        || current.fileKey !== identity.fileKey
-        || current.documentRevision !== identity.documentRevision
-        || current.lspSessionGeneration !== identity.lspSessionGeneration
-      ) {
-        return null;
-      }
-      const pos = view.state.selection.main.head;
-      if (!view.state.selection.main.empty) return null;
-      const plain = matchLiveTemplateAbbreviation(view.state.doc, pos, language);
-      if (!plain?.exact) return null;
-      if (plain.from !== current.from || plain.to !== current.to) return null;
-      const candidate = current.items.get(plain.template.abbreviation);
-      if (!candidate) return null;
-      return { completion: candidate, from: plain.from, to: plain.to };
-    },
-    [],
-  );
-
-  const buildAutocompletionConfig = useCallback(
-    (localSource: CompletionSource, lspSource: CompletionSource) => {
-      const policy = completionController?.getPolicy();
-      const autoPopup = policy?.autoPopup ?? true;
-      const delayMs = policy?.delayMs ?? 100;
-      const maxVisibleItems = policy?.maxVisibleItems ?? 100;
-
-      return autocompletion({
-        activateOnTyping: autoPopup,
-        activateOnTypingDelay: delayMs,
-        defaultKeymap: true,
-        icons: true,
-        maxRenderedOptions: maxVisibleItems,
-        interactionDelay: COMPLETION_INTERACTION_DELAY_MS,
-        positionInfo: positionCompletionInfo,
-        optionClass: (completion) => [
-          completion.type ? `cm-completion-type-${completion.type}` : "",
-          (completion as Completion & { isLspProvider?: boolean }).isLspProvider ? "cm-lsp-provider-option" : "",
-        ].filter(Boolean).join(" "),
-        override: [localSource, lspSource],
-      });
-    },
-    [completionController, hoverDocumentationDelayMs],
-  );
-
-  const scheduleLocalRefresh = useCallback(
-    (scope: CompletionRequestIdentity, policyGen: number) => {
-      if (localRefreshTimerRef.current !== null) {
-        window.clearTimeout(localRefreshTimerRef.current);
-        localRefreshTimerRef.current = null;
-      }
-      localRefreshTimerRef.current = window.setTimeout(() => {
-        localRefreshTimerRef.current = null;
-        const view = viewRef.current;
-        if (!view) return;
-        if (completionStatus(view.state) === null) return;
-        if (completionPolicyGenerationRef.current !== policyGen) return;
-        const identity = getCompletionIdentityRef.current?.();
-        if (
-          !identity
-          || identity.workspaceId !== scope.workspaceId
-          || identity.fileKey !== scope.fileKey
-          || identity.documentRevision !== scope.documentRevision
-          || identity.lspSessionGeneration !== scope.lspSessionGeneration
-        ) {
-          return;
-        }
-        const trackedSource = trackedLspSourceRef.current;
-        if (!trackedSource) return;
-
-        const newLocalSource = createLiveTemplateCompletionSource(
-          () => pathRef.current,
-          liveTemplateSourceOptions,
-        );
-        view.dispatch({
-          effects: completionCompartment.current.reconfigure(
-            buildAutocompletionConfig(newLocalSource, trackedSource),
-          ),
-        });
-      }, 0);
-    },
-    [buildAutocompletionConfig, liveTemplateSourceOptions],
-  );
-
-  const handleProviderTemplateClaim = useCallback(
-    (
-      result: CompletionResult | null,
-      contextPos: number,
-      capturedIdentity: CompletionRequestIdentity,
-      capturedPolicyGen: number,
-    ): void => {
-      const language = liveTemplateLanguageForPath(pathRef.current);
-      if (language !== "java") {
-        currentProviderTemplatesRef.current = null;
-        return;
-      }
-
-      if (!result || result.options.length === 0) {
-        currentProviderTemplatesRef.current = null;
-        const from = result?.from ?? 0;
-        const emptyFingerprint = `${capturedIdentity.workspaceId}:${capturedIdentity.fileKey}:${capturedIdentity.documentRevision}:${capturedIdentity.lspSessionGeneration}:${from}:${contextPos}:`;
-        if (lastCollisionFingerprintRef.current !== "" && lastCollisionFingerprintRef.current !== emptyFingerprint) {
-          lastCollisionFingerprintRef.current = emptyFingerprint;
-          scheduleLocalRefresh(capturedIdentity, capturedPolicyGen);
-        }
-        return;
-      }
-
-      const snippets = new Map<string, Completion>();
-      for (const option of result.options) {
-        if (isProviderTemplateSnippet(option) && option.label) {
-          snippets.set(option.label, option);
-        }
-      }
-
-      if (snippets.size === 0) {
-        currentProviderTemplatesRef.current = null;
-        const emptyFingerprint = `${capturedIdentity.workspaceId}:${capturedIdentity.fileKey}:${capturedIdentity.documentRevision}:${capturedIdentity.lspSessionGeneration}:${result.from}:${contextPos}:`;
-        if (lastCollisionFingerprintRef.current !== "" && lastCollisionFingerprintRef.current !== emptyFingerprint) {
-          lastCollisionFingerprintRef.current = emptyFingerprint;
-          scheduleLocalRefresh(capturedIdentity, capturedPolicyGen);
-        }
-        return;
-      }
-
-      currentProviderTemplatesRef.current = {
-        workspaceId: capturedIdentity.workspaceId,
-        fileKey: capturedIdentity.fileKey,
-        documentRevision: capturedIdentity.documentRevision,
-        lspSessionGeneration: capturedIdentity.lspSessionGeneration,
-        from: result.from,
-        to: contextPos,
-        items: snippets,
-      };
-
-      const appAbbreviations = plainTemplateAbbreviations("java");
-      const collidingLabels = [...snippets.keys()]
-        .filter((label) => appAbbreviations.has(label))
-        .sort();
-
-      const fingerprint = `${capturedIdentity.workspaceId}:${capturedIdentity.fileKey}:${capturedIdentity.documentRevision}:${capturedIdentity.lspSessionGeneration}:${result.from}:${contextPos}:${collidingLabels.join(",")}`;
-
-      if (fingerprint === lastCollisionFingerprintRef.current) {
-        return;
-      }
-
-      const hadPreviousCollisions = lastCollisionFingerprintRef.current !== "" && !lastCollisionFingerprintRef.current.endsWith(":");
-      lastCollisionFingerprintRef.current = fingerprint;
-
-      if (collidingLabels.length === 0 && !hadPreviousCollisions) {
-        return;
-      }
-
-      scheduleLocalRefresh(capturedIdentity, capturedPolicyGen);
-    },
-    [scheduleLocalRefresh],
-  );
-
-  const getOrCreateTrackedLspSource = useCallback(() => {
-    if (trackedLspSourceRef.current) {
-      return trackedLspSourceRef.current;
-    }
-    const lspSource = createLspCompletionSource({
-      identity: () => getCompletionIdentityRef.current(),
-      fetch: (position, trigger, token, invocation) =>
-        onCompleteRef.current?.(position, trigger, token, invocation) ?? Promise.resolve(null),
-      resolve: (raw, token) =>
-        onCompleteResolveRef.current?.(raw, token) ?? Promise.resolve(null),
-      triggerCharacters: () => completionTriggersRef.current,
-      getDocumentRevision: () => getCompletionIdentityRef.current()?.documentRevision ?? -1,
-      reportDiagnostic: (kind, detail) => onCompletionDiagnosticRef.current(kind, detail),
-      onScopeFallback: (state) => onScopeFallbackRef.current?.(state),
-      onProviderUnavailable: (info) => onCompletionUnavailableRef.current?.(info),
-      onResolveGate: (request) => presentResolveGateRef.current?.(request),
-      onAcceptancePending: (cancel) => {
-        pendingCompletionAcceptanceRef.current?.();
-        pendingCompletionAcceptanceRef.current = cancel;
-        resolveGateSequenceRef.current += 1;
-        setResolveGateUi(null);
-      },
-      onAcceptanceSettled: (cancel) => {
-        if (pendingCompletionAcceptanceRef.current === cancel) {
-          pendingCompletionAcceptanceRef.current = null;
-        }
-      },
-      controller: completionControllerRef.current,
-      getView: () => viewRef.current,
-      consumeTriggerOrigin: (pos, docLength) => {
-        const pending = pendingTriggerOriginRef.current;
-        if (!pending) return null;
-        pendingTriggerOriginRef.current = null;
-        if (pending.pos === pos && pending.docLength === docLength) {
-          return pending.char;
-        }
-        return null;
-      },
-    });
-
-    const trackedLspSource: CompletionSource = async (context: CompletionContext) => {
-      const queryId = ++activeQueryCounterRef.current;
-      const queryPos = context.pos;
-      const capturedIdentity = getCompletionIdentityRef.current?.();
-      const capturedPolicyGen = completionPolicyGenerationRef.current;
-
-      const result = await lspSource(context);
-
-      if (context.aborted) {
-        return result;
-      }
-      const view = viewRef.current;
-      if (!view) {
-        return result;
-      }
-      if (completionPolicyGenerationRef.current !== capturedPolicyGen) {
-        return result;
-      }
-      if (queryId < lastAppliedQueryIdRef.current) {
-        return result;
-      }
-      lastAppliedQueryIdRef.current = queryId;
-
-      const currentIdentity = getCompletionIdentityRef.current?.();
-      if (
-        !capturedIdentity
-        || !currentIdentity
-        || capturedIdentity.workspaceId !== currentIdentity.workspaceId
-        || capturedIdentity.fileKey !== currentIdentity.fileKey
-        || capturedIdentity.documentRevision !== currentIdentity.documentRevision
-        || capturedIdentity.lspSessionGeneration !== currentIdentity.lspSessionGeneration
-      ) {
-        return result;
-      }
-
-      handleProviderTemplateClaim(result, queryPos, capturedIdentity, capturedPolicyGen);
-      return result;
-    };
-
-    trackedLspSourceRef.current = trackedLspSource;
-    return trackedLspSource;
-  }, [handleProviderTemplateClaim]);
-
-  const buildAutocompletionExtension = useCallback(() => {
-    const trackedSource = getOrCreateTrackedLspSource();
-    const localSource = createLiveTemplateCompletionSource(
-      () => pathRef.current,
-      liveTemplateSourceOptions,
-    );
-    return buildAutocompletionConfig(localSource, trackedSource);
-  }, [buildAutocompletionConfig, getOrCreateTrackedLspSource, liveTemplateSourceOptions]);
-  const lastParameterInfoNonceRef = useRef(parameterInfoRequestNonce);
-  const requestParameterInfoRef = useRef<(() => boolean) | null>(null);
-  const activeHoverResizeSessionRef = useRef<WindowResizeSession | null>(null);
-  /** True while applying a prop-driven doc replace so it is not treated as a user edit. */
-  const applyingExternalDocRef = useRef(false);
-  /** Mirrors the last full text sent through onChange or applied from props. */
-  const lastDocumentTextRef = useRef(doc);
-  /** Last controlled prop snapshot; distinguishes stale lag from a real reload. */
-  const lastPropDocumentTextRef = useRef(doc);
-  /** Local snapshots awaiting a controlled-prop echo, oldest first. */
-  const pendingLocalDocumentEchoesRef = useRef<Array<{
-    text: string;
-    expectedDocumentRevision: number;
-  }>>([]);
-  const lastLocalDocumentRevisionRef = useRef(documentRevision);
-  const rememberLocalDocumentEcho = (text: string): void => {
-    const expectedDocumentRevision = Math.max(
-      documentRevisionRef.current,
-      lastLocalDocumentRevisionRef.current,
-    ) + 1;
-    lastLocalDocumentRevisionRef.current = expectedDocumentRevision;
-    const pendingEchoes = pendingLocalDocumentEchoesRef.current;
-    const lastPendingEcho = pendingEchoes[pendingEchoes.length - 1];
-    if (
-      lastPendingEcho?.text !== text
-      || lastPendingEcho.expectedDocumentRevision !== expectedDocumentRevision
-    ) {
-      pendingEchoes.push({ text, expectedDocumentRevision });
-      trimPendingLocalDocumentEchoes(pendingEchoes);
-    }
-  };
   const lastSelectionRef = useRef<{ from: number; to: number; searchOpen: boolean } | null>(null);
   /** Origin of the latest selection change (DEC-011-07). */
   const selectionOriginRef = useRef<"pointer" | "keyboard" | "other">("other");
@@ -545,34 +213,6 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   const selectionKeyTrackerCleanupRef = useRef<(() => void) | null>(null);
   const selectionEmitTimerRef = useRef<number | null>(null);
   const viewportEmitTimerRef = useRef<number | null>(null);
-  const renderedDiagnosticsRef = useRef(diagnostics);
-  const renderedReadOnlyRef = useRef(readOnly);
-  const renderedSoftWrapRef = useRef(softWrap);
-  const renderedAppearanceRef = useRef(appearance);
-  const renderedHoverRef = useRef({
-    enabled: showHoverDocumentation,
-    delayMs: hoverDocumentationDelayMs,
-  });
-  const renderedCodeStyleRef = useRef({
-    tabSize: codeStyle?.tabSize ?? 2,
-    insertSpaces: codeStyle?.insertSpaces ?? true,
-    indentSize: codeStyle?.indentSize || (codeStyle?.tabSize ?? 2),
-  });
-  const renderedCoverageRef = useRef({ fileCoverage, coverageEnabled });
-  const renderedOverlayRef = useRef({ highlights, inlayHints });
-  const renderedSemanticTokensRef = useRef(semanticTokens);
-  const renderedGitRef = useRef({ changes: gitChanges, blame: gitBlame });
-  const pendingGitUpdateFrameRef = useRef<number | null>(null);
-  const renderedDebugRef = useRef({
-    breakpoints: debugBreakpoints,
-    currentLine: debugCurrentLine,
-    inlineValues: debugInlineValues,
-    evaluating: !!debugEvaluate,
-  });
-  const renderedDocConfigRef = useRef({
-    enabled: !!renderedDocEnabled,
-    languageId: renderedDocLanguageId ?? liveTemplateLanguageForPath(path),
-  });
   const renderedCompletionPolicyRef = useRef<{
     autoPopup: boolean;
     delayMs: number;
@@ -695,6 +335,25 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
    * is a flag rather than the callback so a new function identity per render
    * does not churn the editor.
    */
+  const { buildAutocompletionExtension, pendingTriggerOriginRef, localRefreshTimerRef, getValidActiveProviderCandidate, liveTemplateSourceOptions, completionPolicyGenerationRef, lastCollisionFingerprintRef } = useProviderCompletion({
+    getCompletionIdentityRef,
+    viewRef,
+    completionController,
+    hoverDocumentationDelayMs,
+    pathRef,
+    completionCompartment,
+    onCompleteRef,
+    onCompleteResolveRef,
+    completionTriggersRef,
+    onCompletionDiagnosticRef,
+    onScopeFallbackRef,
+    onCompletionUnavailableRef,
+    presentResolveGateRef,
+    pendingCompletionAcceptanceRef,
+    resolveGateSequenceRef,
+    setResolveGateUi,
+    completionControllerRef,
+  });
   const buildDebugChrome = useCallback((
     markers: DebugBreakpointMarker[] | undefined,
     currentLine: number | null | undefined,
@@ -795,7 +454,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     });
   };
 
-  useEffect(() => {
+  useEffect(function mountEditorHost() {
     if (!hostRef.current) return;
     const owner = transactionOwnerRef.current;
     const sharedFileKey = fileKeyRef.current;
@@ -1133,49 +792,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
         // 4) Else fall through to indentWithTab. The final tabstop exits
         //    with a caret-only move (never an undoable indent), and
         //    Shift-Tab walks back through the stops while the session lives.
-        Prec.high(keymap.of([
-          {
-            key: "Tab",
-            run: (view) => {
-              // ED-AUDIT-011: Tab during IME composition selects the candidate.
-              if (view.composing || view.state.readOnly) return false;
-              if (withCompletionAcceptIntent(view, "replace", () => acceptCompletion(view))) return true;
-              const language = liveTemplateLanguageForPath(pathRef.current);
-              const providerCandidate = getValidActiveProviderCandidate(view, language);
-              if (providerCandidate) {
-                const { completion, from, to } = providerCandidate;
-                if (typeof completion.apply === "function") {
-                  const apply = completion.apply;
-                  withCompletionAcceptIntent(view, "replace", () => apply(view, completion, from, to));
-                } else if (typeof completion.apply === "string") {
-                  view.dispatch({
-                    changes: { from, to, insert: completion.apply },
-                    selection: { anchor: from + completion.apply.length },
-                    userEvent: "input.complete",
-                  });
-                } else {
-                  view.dispatch({
-                    changes: { from, to, insert: completion.label },
-                    selection: { anchor: from + completion.label.length },
-                    userEvent: "input.complete",
-                  });
-                }
-                return true;
-              }
-              if (expandLiveTemplateAt(view, language, liveTemplateSourceOptions)) return true;
-              if (activeLspSnippetChoices(view)) return cycleLspSnippetChoice(view);
-              return advanceLspSnippetTabstop(view);
-            },
-          },
-          {
-            key: "Shift-Tab",
-            run: (view) => {
-              // ED-AUDIT-011: Shift-Tab during composition belongs to the IME.
-              if (view.composing || view.state.readOnly) return false;
-              return retreatLspSnippetTabstop(view);
-            },
-          },
-        ])),
+        createTemplateKeybindings({ pathRef, getValidActiveProviderCandidate, liveTemplateSourceOptions }),
         keymap.of([
           // §8.19.2 retained primitives: with a host, ONLY the allowlisted
           // set remains here (Escape panel-close stack, closeBrackets typing,
@@ -1214,273 +831,8 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
                 { key: "Mod-w", run: expandSemanticSelection },
               ]),
         ]),
-        EditorView.domEventHandlers({
-          // WebKitGTK's WebDriver pointer path can deliver the editor mouse
-          // event without transferring DOM focus from the body. Keep the
-          // production pointer entry equivalent to a user click before
-          // CodeMirror resolves its selection position.
-          mousedown(_event, view) {
-            pointerClickCountRef.current = _event.detail || 1;
-            shiftExtendKeyRef.current = false;
-            if (!view.hasFocus) view.focus();
-            return false;
-          },
-          copy(event, view) {
-            const payload = editorClipboardPayload(view.state);
-            if (!payload) return false;
-            event.preventDefault();
-            if (event.clipboardData) {
-              event.clipboardData.setData("text/plain", payload.plainText);
-              rememberEditorClipboardPayload(view, payload);
-            } else {
-              void writeText(payload.plainText).then(() => {
-                if (view.dom.isConnected) rememberEditorClipboardPayload(view, payload);
-              }).catch(() => {});
-            }
-            return true;
-          },
-          cut(event, view) {
-            if (view.composing || view.state.readOnly) return false;
-            const payload = editorClipboardPayload(view.state);
-            if (!payload) return false;
-            event.preventDefault();
-            if (!event.clipboardData) {
-              cutSystemClipboard(view);
-              return true;
-            }
-            event.clipboardData.setData("text/plain", payload.plainText);
-            rememberEditorClipboardPayload(view, payload);
-            return cutEditorSelections(view);
-          },
-          paste(event, view) {
-            if (view.composing || view.state.readOnly) return false;
-            const text = event.clipboardData?.getData("text/plain");
-            if (text === undefined) return false;
-            event.preventDefault();
-            return pasteEditorClipboardPayload(view, payloadForSystemClipboardText(view, text));
-          },
-          contextmenu(event, view) {
-            const handler = onContextMenuRef.current;
-            if (!handler) return false;
-            const coords = { x: event.clientX, y: event.clientY };
-            // posAtCoords can be null in headless/jsdom; fall back to caret.
-            const pos = view.posAtCoords(coords) ?? view.state.selection.main.head;
-            event.preventDefault();
-            const clickedSelection = view.state.selection.ranges.find((range) => (
-              pos >= range.from && pos <= range.to
-            ));
-            // Click outside every selection: place the caret there (IDEA-like).
-            if (!clickedSelection) {
-              view.dispatch({ selection: { anchor: pos }, scrollIntoView: true });
-            }
-            const selection = view.state.selection.main;
-            const selectedRanges = view.state.selection.ranges.filter((range) => !range.empty);
-            const selectedText = selectedRanges
-              .map((range) => view.state.sliceDoc(range.from, range.to))
-              .join(view.state.lineBreak);
-            const selectionStart = lspPositionFromOffset(
-              view.state.doc,
-              Math.min(selection.from, selection.to),
-            );
-            const selectionEnd = lspPositionFromOffset(
-              view.state.doc,
-              Math.max(selection.from, selection.to),
-            );
-            handler({
-              position: lspPositionFromOffset(view.state.doc, selection.head),
-              selectionStart,
-              selectionEnd,
-              clientX: event.clientX,
-              clientY: event.clientY,
-              hasSelection: selectedRanges.length > 0,
-              selectedText,
-              cut: () => cutSystemClipboard(view),
-              copy: () => {
-                writeEditorSelectionToClipboard(view);
-                view.focus();
-              },
-              paste: () => pasteSystemClipboard(view),
-            });
-            return true;
-          },
-        }),
-        EditorView.updateListener.of((update) => {
-          if (update.docChanged) {
-            const isRemote = update.transactions.some((tr) => tr.annotation(remoteTransactionAnnotation));
-            if (!applyingExternalDocRef.current && !isRemote) {
-              // onChange currently carries a full string, so one conversion is
-              // unavoidable. Remember it to avoid a second full conversion in
-              // the controlled-doc effect after React reflects the change.
-              const nextDoc = update.state.doc.toString();
-              lastDocumentTextRef.current = nextDoc;
-              if (transactionOwnerRef.current && fileKeyRef.current && viewIdRef.current) {
-                const deltas: DocumentChangeDelta[] = [];
-                update.changes.iterChanges((fromA, toA, _fromB, _toB, insertedText) => {
-                  const deleted = update.startState.doc.sliceString(fromA, toA);
-                  deltas.push({
-                    from: fromA,
-                    to: toA,
-                    insert: insertedText.toString(),
-                    ...(deleted ? { deleted } : {}),
-                  });
-                });
-                if (deltas.length > 0) {
-                  let currentSession = currentCompositionSessionRef.current;
-                  const compositionTransaction = update.transactions.some((tr) => tr.isUserEvent("input.type.compose"));
-                  if (currentSession?.status === "end_pending" && !compositionTransaction
-                    && !compositionActiveRef.current && !update.view.composing) {
-                    // Ordinary typing can arrive before the finalize timer.
-                    // Only CodeMirror's final compose flush extends the old session.
-                    currentSession.owner.finalizeComposition(currentSession.fileKey, currentSession.id);
-                    currentSession.status = "finalized";
-                    currentCompositionSessionRef.current = null;
-                    currentSession = null;
-                  }
-                  const isSessionComposing = currentSession !== null && (
-                    currentSession.status === "active" || currentSession.status === "end_pending"
-                  );
-                  const composingInput = isSessionComposing
-                    || compositionActiveRef.current
-                    || update.view.composing
-                    || compositionTransaction;
-                  const sessionId = isSessionComposing ? currentSession?.id : undefined;
-                  const isCompletionEdit = update.transactions.some((tr) => tr.isUserEvent("input.complete"));
-                  const sharedTransaction = transactionOwnerRef.current.dispatchTransaction(
-                    fileKeyRef.current,
-                    viewIdRef.current,
-                    deltas,
-                    composingInput ? "composition" : isCompletionEdit ? "completion" : "user-input",
-                    sessionId,
-                    isCompletionEdit && !composingInput
-                      ? {
-                          before: {
-                            anchor: update.startState.selection.main.anchor,
-                            head: update.startState.selection.main.head,
-                          },
-                          after: {
-                            anchor: update.state.selection.main.anchor,
-                            head: update.state.selection.main.head,
-                          },
-                        }
-                      : undefined,
-                  );
-                  if (!sharedTransaction) {
-                    const rejectedView = update.view;
-                    const rejectedText = nextDoc;
-                    queueMicrotask(() => {
-                      const currentView = viewRef.current;
-                      const currentOwner = transactionOwnerRef.current;
-                      const currentFileKey = fileKeyRef.current;
-                      if (
-                        currentView !== rejectedView
-                        || !currentOwner
-                        || !currentFileKey
-                        || currentView.state.doc.toString() !== rejectedText
-                      ) return;
-                      const canonical = currentOwner.getDocument(currentFileKey);
-                      if (canonical === null || canonical === rejectedText) return;
-                      applyingExternalDocRef.current = true;
-                      try {
-                        applyDocumentSnapshotToView(currentView, canonical);
-                        lastDocumentTextRef.current = currentView.state.doc.toString();
-                      } finally {
-                        applyingExternalDocRef.current = false;
-                      }
-                    });
-                    return;
-                  }
-                }
-              }
-              rememberLocalDocumentEcho(nextDoc);
-              onChangeRef.current(
-                nextDoc,
-                lspPositionFromOffset(update.state.doc, update.state.selection.main.head),
-                update.state.selection.main.head,
-              );
-            }
-            let inserted = "";
-            update.changes.iterChanges((_fromA, _toA, _fromB, _toB, text) => {
-              inserted = text.toString();
-            });
-            const lastChar = inserted.slice(-1);
-            if (
-              !applyingExternalDocRef.current
-              && !isRemote
-              && lastChar
-              && signatureTriggersRef.current.includes(lastChar)
-            ) {
-              emitParameterTrigger(update.view, lastChar, "typing");
-            } else if (lastChar === ")" || inserted.includes("\n")) {
-              onParameterInvalidateRef.current?.("closing-char");
-            } else {
-              // §8.20.2: a document change closes the OLD tooltip; the next
-              // trigger character opens a fresh request through the session.
-              onParameterInvalidateRef.current?.("doc-changed");
-            }
-          } else if (update.selectionSet) {
-            // A cursor move without an edit (mouse click, jump) dismisses it.
-            onParameterInvalidateRef.current?.("caret-moved");
-          }
-          if (update.selectionSet || update.docChanged || searchPanelOpen(update.startState) !== searchPanelOpen(update.state)) {
-            // Cursor state fans out into workspace UI and LSP effects. During
-            // a text burst, publish the final cursor after a short idle rather
-            // than causing a React render for every keypress.
-            scheduleSelectionEmit(update.view, update.docChanged ? 125 : 0);
-          }
-          // Viewport offsets move with the document even when no scrolling
-          // occurs. Publishing them synchronously on each key bypasses the
-          // text/caret batching and rerenders the entire workspace. Keep the
-          // final live range (including a subsequent CodeMirror measure) for
-          // inlay hints, while ordinary scrolling still publishes immediately.
-          if (update.docChanged || update.viewportChanged) {
-            scheduleViewportEmit(update.view, update.docChanged || viewportEmitTimerRef.current !== null);
-          }
-          if (!restoringInitialViewStateRef.current && (
-            update.selectionSet
-            || update.docChanged
-            || update.transactions.some((tr) => tr.isUserEvent("select") || tr.isUserEvent("input"))
-          )) {
-            userInteractedSinceMountRef.current = true;
-            pendingDeferredScrollRef.current = null;
-          }
-          if (
-            pendingDeferredScrollRef.current
-            && !userInteractedSinceMountRef.current
-            && update.view.scrollDOM
-          ) {
-            const dom = update.view.scrollDOM;
-            const target = pendingDeferredScrollRef.current;
-            const canScrollVertically = target.scrollTop > 0 && dom.scrollHeight > dom.clientHeight;
-            const canScrollHorizontally = target.scrollLeft > 0 && dom.scrollWidth > dom.clientWidth;
-            if (canScrollVertically || canScrollHorizontally) {
-              if (target.scrollTop > 0 && canScrollVertically) {
-                const maxScrollTop = Math.max(0, dom.scrollHeight - dom.clientHeight);
-                dom.scrollTop = Math.min(target.scrollTop, maxScrollTop);
-                target.scrollTop = 0;
-              }
-              if (target.scrollLeft > 0 && canScrollHorizontally) {
-                const maxScrollLeft = Math.max(0, dom.scrollWidth - dom.clientWidth);
-                dom.scrollLeft = Math.min(target.scrollLeft, maxScrollLeft);
-                target.scrollLeft = 0;
-              }
-              if (target.scrollTop === 0 && target.scrollLeft === 0) {
-                pendingDeferredScrollRef.current = null;
-              }
-            }
-          }
-          // ED-IMPROVE-007: capture caret/selection/scroll/fold changes for
-          // this leaf/file; persisted later with the layout snapshot.
-          if (
-            update.selectionSet
-            || update.docChanged
-            || update.viewportChanged
-            || update.transactions.some((tr) => tr.effects.some(
-              (effect) => effect.is(foldEffect) || effect.is(unfoldEffect),
-            ))
-          ) {
-            scheduleViewStateEmit(update.view, update.docChanged ? 250 : 150);
-          }
-        }),
+        createEditorDomHandlers({ pointerClickCountRef, shiftExtendKeyRef, onContextMenuRef }),
+        createDocumentUpdateListener({ applyingExternalDocRef, lastDocumentTextRef, transactionOwnerRef, fileKeyRef, viewIdRef, currentCompositionSessionRef, compositionActiveRef, viewRef, rememberLocalDocumentEcho, onChangeRef, signatureTriggersRef, emitParameterTrigger, onParameterInvalidateRef, scheduleSelectionEmit, scheduleViewportEmit, viewportEmitTimerRef, restoringInitialViewStateRef, userInteractedSinceMountRef, pendingDeferredScrollRef, scheduleViewStateEmit }),
       ],
     });
     const view = new EditorView({ state, parent: hostRef.current });
@@ -1553,82 +905,17 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     };
     view.scrollDOM?.addEventListener("wheel", cancelDeferredScroll, { passive: true });
     view.scrollDOM?.addEventListener("pointerdown", cancelDeferredScroll, { passive: true });
-    const compositionNavigationGuard = (event: KeyboardEvent) => {
-      if (
-        (!view.composing && event.isComposing !== true && !compositionActiveRef.current)
-        || !isCompositionNavigationKey(event.key)
-      ) return;
-      // CodeMirror intentionally ignores key handlers during composition, so
-      // this capture listener also has to stop the contenteditable default
-      // action from moving the caret before the composition is committed.
-      event.preventDefault();
-    };
-    view.contentDOM.addEventListener("keydown", compositionNavigationGuard, true);
-    const clearPendingCompositionFinalize = () => {
-      if (compositionEndFinalizeRef.current === null) return;
-      window.clearTimeout(compositionEndFinalizeRef.current);
-      compositionEndFinalizeRef.current = null;
-    };
-    const finalizeSession = (session: CompositionSession) => {
-      if (session.status === "finalized") return;
-      session.status = "finalized";
-      try {
-        session.owner.finalizeComposition(session.fileKey, session.id);
-      } catch {
-        // ignore
-      }
-      if (currentCompositionSessionRef.current === session) {
-        currentCompositionSessionRef.current = null;
-        compositionActiveRef.current = false;
-      }
-    };
-    const compositionStartGuard = () => {
-      clearPendingCompositionFinalize();
-      const previousSession = currentCompositionSessionRef.current;
-      if (previousSession && previousSession.status !== "finalized") {
-        finalizeSession(previousSession);
-      }
-      compositionActiveRef.current = true;
-      const currentOwner = transactionOwnerRef.current;
-      const currentFileKey = fileKeyRef.current;
-      if (currentOwner && currentFileKey) {
-        const nextId = `comp_${++compositionSessionSeqRef.current}_${Date.now()}`;
-        const newSession: CompositionSession = {
-          id: nextId,
-          status: "active",
-          owner: currentOwner,
-          fileKey: currentFileKey,
-          viewId: viewIdRef.current,
-          workspaceId: clipboardWorkspaceId ?? null,
-        };
-        currentCompositionSessionRef.current = newSession;
-      }
-    };
-    const compositionEndGuard = () => {
-      compositionActiveRef.current = false;
-      const session = currentCompositionSessionRef.current;
-      if (!session || session.status === "finalized") {
-        clearPendingCompositionFinalize();
-        return;
-      }
-      session.status = "end_pending";
-      clearPendingCompositionFinalize();
-      // ED-MAIN-006 & ED-REPAIR-007:
-      // CodeMirror dispatches the final composition change from
-      // `Promise.resolve().then(flush)` after compositionend. Defer finalization
-      // to the next macrotask so the flush extends this session's entry first.
-      compositionEndFinalizeRef.current = window.setTimeout(() => {
-        compositionEndFinalizeRef.current = null;
-        if (session.status === "end_pending") {
-          finalizeSession(session);
-        }
-      }, 0);
-    };
-    const compositionBlurGuard = () => {
-      // Blur may precede CodeMirror's final microtask flush just like end.
-      // Preserve this session until that flush has joined its undo entry.
-      compositionEndGuard();
-    };
+  const disposeComposition = createCompositionLifecycle({
+    view,
+    compositionActiveRef,
+    compositionEndFinalizeRef,
+    currentCompositionSessionRef,
+    transactionOwnerRef,
+    fileKeyRef,
+    compositionSessionSeqRef,
+    viewIdRef,
+    clipboardWorkspaceId,
+  });
     // ED-MAIN-007: any focus loss that leaves this view bumps the clipboard
     // owner generation, so an in-flight result can detect that another surface
     // (search box, sibling leaf, other window) claimed focus.
@@ -1642,9 +929,6 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       ) return;
       bumpClipboardOwnerGeneration(view);
     };
-    view.contentDOM.addEventListener("compositionstart", compositionStartGuard, true);
-    view.contentDOM.addEventListener("compositionend", compositionEndGuard, true);
-    view.contentDOM.addEventListener("blur", compositionBlurGuard, true);
     view.contentDOM.addEventListener("focusout", clipboardFocusOutGuard, true);
     emitSelection(view);
     emitViewport(view);
@@ -1660,94 +944,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     if (actionHost && !actionHost.isDisposed()) {
       // Handlers close over this mount's view instance; the registration is
       // removed in cleanup so a remount re-binds against the fresh view.
-      unregisterEditorActions = actionHost.registerActions(buildEditorHostActions({
-        openReplacePanel: () => openReplacePanel(view),
-        // ED-PARITY-012 DEC-012-06: IDEA "Go to Line:Column" dialog.
-        openGoToLine: () => {
-          const request = onGoToLineRequestRef.current;
-          if (!request) return gotoLine(view);
-          const head = view.state.selection.main.head;
-          const line = view.state.doc.lineAt(head);
-          request({
-            current: { line: line.number, column: head - line.from + 1 },
-            lineCount: view.state.doc.lines,
-            apply: (target) => {
-              const targetLine = view.state.doc.line(Math.min(target.line, view.state.doc.lines));
-              const pos = Math.min(targetLine.from + target.column - 1, targetLine.to);
-              view.dispatch({ selection: { anchor: pos }, scrollIntoView: true, userEvent: "select" });
-              view.focus();
-            },
-            cancel: () => view.focus(),
-          });
-          return true;
-        },
-        expandSemanticSelection: () => expandSemanticSelection(view),
-        // §8.19.4 explicit Basic Completion. With a popup already open at
-        // this caret, close + restart so the second explicit call re-runs the
-        // source (ordinal ≥ 2 → requestedScope expanded); the reopen flag
-        // stops the popup-close listener from resetting the ordinal between
-        // the two halves of the toggle.
-        startBasicCompletion: () => {
-          if (!viewRef.current) return false;
-          pendingCompletionAcceptanceRef.current?.();
-          setResolveGateUi(null);
-          if (completionStatus(view.state) === null) {
-            startCompletion(view);
-            return true;
-          }
-          basicCompletionReopenRef.current = true;
-          try {
-            closeCompletion(view);
-            startCompletion(view);
-          } finally {
-            basicCompletionReopenRef.current = false;
-          }
-          return true;
-        },
-        escapeStack: () =>
-          cancelLspSnippetSession(view)
-          || escapeEditorSelections(view)
-          || (onParameterEscapeRef.current?.() ?? false),
-        isEditorGeometryReady: () => isEditorGeometryReady(view),
-        runEditorCommand: (command) => command(view),
-        undo: () => {
-          // ED-AUDIT-008: the workspace-edit journal is the newest
-          // user-visible history owner; when it can serve this stroke the
-          // document ledger must not act on it.
-          const claimed = workspaceHistoryClaimRef.current?.("undo");
-          if (claimed !== undefined) return claimed;
-          const currentOwner = transactionOwnerRef.current;
-          if (!currentOwner) return undefined;
-          if (view.state.readOnly || view.composing) return false;
-          if (currentOwner.getDocument(fileKeyRef.current) !== view.state.doc.toString()) return false;
-          const transaction = currentOwner.undo(fileKeyRef.current, viewIdRef.current);
-          if (!transaction || !applySharedTransactionToView(view, transaction)) return false;
-          rememberLocalDocumentEcho(view.state.doc.toString());
-          onChangeRef.current(
-            view.state.doc.toString(),
-            lspPositionFromOffset(view.state.doc, view.state.selection.main.head),
-            view.state.selection.main.head,
-          );
-          return true;
-        },
-        redo: () => {
-          const claimed = workspaceHistoryClaimRef.current?.("redo");
-          if (claimed !== undefined) return claimed;
-          const currentOwner = transactionOwnerRef.current;
-          if (!currentOwner) return undefined;
-          if (view.state.readOnly || view.composing) return false;
-          if (currentOwner.getDocument(fileKeyRef.current) !== view.state.doc.toString()) return false;
-          const transaction = currentOwner.redo(fileKeyRef.current, viewIdRef.current);
-          if (!transaction || !applySharedTransactionToView(view, transaction)) return false;
-          rememberLocalDocumentEcho(view.state.doc.toString());
-          onChangeRef.current(
-            view.state.doc.toString(),
-            lspPositionFromOffset(view.state.doc, view.state.selection.main.head),
-            view.state.selection.main.head,
-          );
-          return true;
-        },
-      }), { ownerViewId: viewId ?? fileKey });
+      unregisterEditorActions = actionHost.registerActions(createMountedEditorActions({ openReplacePanel, view, onGoToLineRequestRef, expandSemanticSelection, viewRef, pendingCompletionAcceptanceRef, setResolveGateUi, basicCompletionReopenRef, onParameterEscapeRef, workspaceHistoryClaimRef, transactionOwnerRef, fileKeyRef, viewIdRef, rememberLocalDocumentEcho, onChangeRef }), { ownerViewId: viewId ?? fileKey });
       // §8.19.2 EditorActionBridge: register this mounted view so keyboard
       // dispatch knows the live view set; unmount releases it.
       bridgeRegistration = new EditorActionBridge(actionHost).registerView(sharedViewId);
@@ -1789,21 +986,11 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       requestParameterInfoRef.current = null;
       cancelActiveHoverResize(activeHoverResizeSessionRef);
       clipboardContextByView.delete(view);
-      compositionActiveRef.current = false;
-      clearPendingCompositionFinalize();
       if (localRefreshTimerRef.current !== null) {
         window.clearTimeout(localRefreshTimerRef.current);
         localRefreshTimerRef.current = null;
       }
-      if (currentCompositionSessionRef.current) {
-        finalizeSession(currentCompositionSessionRef.current);
-      } else if (transactionOwnerRef.current && fileKeyRef.current) {
-        transactionOwnerRef.current.finalizeComposition(fileKeyRef.current);
-      }
-      view.contentDOM.removeEventListener("keydown", compositionNavigationGuard, true);
-      view.contentDOM.removeEventListener("compositionstart", compositionStartGuard, true);
-      view.contentDOM.removeEventListener("compositionend", compositionEndGuard, true);
-      view.contentDOM.removeEventListener("blur", compositionBlurGuard, true);
+      disposeComposition();
       view.contentDOM.removeEventListener("focusout", clipboardFocusOutGuard, true);
       pendingCompletionAcceptanceRef.current?.();
       pendingCompletionAcceptanceRef.current = null;
@@ -1901,295 +1088,54 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       compositionActiveRef.current = false;
     }
   }, [fileKey]);
-
   // §8.19.4: a resolve gate belongs to one buffer identity; switching files
   // drops the banner (the request closures would refuse to act anyway).
   useEffect(() => {
     setResolveGateUi(null);
   }, [fileKey]);
 
-  useEffect(() => {
-    let cancelled = false;
-    void languageForPath(path)
-      .then((language: Extension | null) => {
-        if (cancelled || !viewRef.current) return;
-        viewRef.current.dispatch({
-          effects: languageCompartment.current.reconfigure(language ?? []),
-        });
-      })
-      .catch(() => {
-        if (cancelled || !viewRef.current) return;
-        viewRef.current.dispatch({
-          effects: languageCompartment.current.reconfigure([]),
-        });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [path]);
-
-  useLayoutEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    const previous = renderedHoverRef.current;
-    if (
-      previous.enabled === showHoverDocumentation
-      && previous.delayMs === hoverDocumentationDelayMs
-    ) {
-      return;
-    }
-    renderedHoverRef.current = {
-      enabled: showHoverDocumentation,
-      delayMs: hoverDocumentationDelayMs,
-    };
-    cancelActiveHoverResize(activeHoverResizeSessionRef);
-    view.dispatch({
-      effects: hoverCompartment.current.reconfigure(lspHoverExtension(
-        onHoverRef,
-        onPinHoverDocRef,
-        activeHoverResizeSessionRef,
-        showHoverDocumentation,
-        hoverDocumentationDelayMs,
-      )),
-    });
-  }, [hoverDocumentationDelayMs, showHoverDocumentation]);
-
-  useEffect(() => {
-    if (parameterInfoRequestNonce === lastParameterInfoNonceRef.current) return;
-    lastParameterInfoNonceRef.current = parameterInfoRequestNonce;
-    requestParameterInfoRef.current?.();
-  }, [parameterInfoRequestNonce]);
-
-  // §8.20.2 W1: the Parameter Info tooltip is pure display — it renders the
-  // session-published view and nothing else. No request sequence lives here.
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    if (!parameterPopup || parameterPopup.signatures.length === 0) {
-      window.queueMicrotask(() => {
-        const current = viewRef.current;
-        if (!current || current !== view) return;
-        current.dispatch({ effects: signatureCompartment.current.reconfigure([]) });
-      });
-      return;
-    }
-    const pos = Math.min(Math.max(0, parameterPopup.anchorOffset), view.state.doc.length);
-    view.dispatch({
-      effects: signatureCompartment.current.reconfigure(
-        showTooltip.of({
-          pos,
-          above: true,
-          create: () => ({
-            dom: signatureTooltipDom(parameterPopup, parameterInfoShowFullSignaturesRef.current),
-          }),
-        }),
-      ),
-    });
-  }, [parameterPopup]);
-
-  useLayoutEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    if (renderedReadOnlyRef.current === readOnly) return;
-    renderedReadOnlyRef.current = readOnly;
-    view.dispatch({ effects: readOnlyCompartment.current.reconfigure(readOnlyExtension(readOnly)) });
-  }, [readOnly]);
-
-  useLayoutEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    if (sameEditorAppearance(renderedAppearanceRef.current, appearance)) return;
-    renderedAppearanceRef.current = appearance;
-    view.dispatch({
-      effects: appearanceCompartment.current.reconfigure(
-        appearance ? editorAppearanceExtension(appearance) : [],
-      ),
-    });
-  }, [appearance]);
-
-  useLayoutEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    if (renderedSoftWrapRef.current === softWrap) return;
-    renderedSoftWrapRef.current = softWrap;
-    view.dispatch({
-      effects: wrappingCompartment.current.reconfigure(softWrap ? EditorView.lineWrapping : []),
-    });
-  }, [softWrap]);
-
-  useLayoutEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    const languageId = renderedDocLanguageId ?? liveTemplateLanguageForPath(path);
-    const enabled = !!renderedDocEnabled;
-    const previous = renderedDocConfigRef.current;
-    if (previous.enabled === enabled && previous.languageId === languageId) return;
-    renderedDocConfigRef.current = { enabled, languageId };
-    view.dispatch({
-      effects: renderedDocCompartment.current.reconfigure(
-        renderedDocDecorationConfig.of({
-          languageId,
-          enabled,
-          onToggleRaw: () => {
-            onToggleRenderedDocRawRef.current?.();
-            viewRef.current?.focus();
-          },
-        }),
-      ),
-    });
-  }, [path, renderedDocEnabled, renderedDocLanguageId]);
-
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    if (sameArrayOrBothEmpty(renderedDiagnosticsRef.current, diagnostics)) return;
-    renderedDiagnosticsRef.current = diagnostics;
-    view.dispatch({
-      effects: diagnosticsCompartment.current.reconfigure(createDiagnosticChrome(
-        diagnostics,
-        (line) => onLightbulbRef.current?.(line),
-      )),
-    });
-  }, [diagnostics]);
-
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    const previous = renderedOverlayRef.current;
-    if (
-      sameArrayOrBothEmpty(previous.highlights, highlights)
-      && sameArrayOrBothEmpty(previous.inlayHints, inlayHints)
-    ) {
-      return;
-    }
-    renderedOverlayRef.current = { highlights, inlayHints };
-    view.dispatch({
-      effects: updateLspOverlayChrome(highlights, inlayHints),
-    });
-  }, [highlights, inlayHints]);
-
-  // The stripe is secondary chrome: update it after the frame so document and
-  // decoration transactions keep their single synchronous dispatch.
-  useEffect(() => {
-    const frame = window.requestAnimationFrame(() => {
-      const view = viewRef.current;
-      if (!view || !view.dom.isConnected) return;
-      view.dispatch({
-        effects: setErrorStripeSources.of({ diagnostics, gitChanges, usages: highlights }),
-      });
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [diagnostics, gitChanges, highlights]);
-
-  const runGutterClick = useCallback(
-    (target: RunGutterTarget, anchor: { x: number; y: number }) => onRunGutterClickRef.current?.(target, anchor),
-    [],
-  );
-  const renderedRunGutterRef = useRef(runGutterTargets);
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view || renderedRunGutterRef.current === runGutterTargets) return;
-    renderedRunGutterRef.current = runGutterTargets;
-    view.dispatch({ effects: setRunGutter.of({ targets: runGutterTargets, onClick: runGutterClick }) });
-  }, [runGutterClick, runGutterTargets]);
-
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    const tabSize = codeStyle?.tabSize ?? 2;
-    const insertSpaces = codeStyle?.insertSpaces ?? true;
-    const indentSize = codeStyle?.indentSize || tabSize;
-    const prev = renderedCodeStyleRef.current;
-    if (prev.tabSize === tabSize && prev.insertSpaces === insertSpaces && prev.indentSize === indentSize) {
-      return;
-    }
-    renderedCodeStyleRef.current = { tabSize, insertSpaces, indentSize };
-    view.dispatch({
-      effects: codeStyleCompartment.current.reconfigure([
-        EditorState.tabSize.of(tabSize),
-        indentUnit.of(insertSpaces ? " ".repeat(indentSize) : "\t"),
-      ]),
-    });
-  }, [codeStyle?.tabSize, codeStyle?.indentSize, codeStyle?.insertSpaces]);
-
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    if (sameArrayOrBothEmpty(renderedSemanticTokensRef.current, semanticTokens)) return;
-    renderedSemanticTokensRef.current = semanticTokens;
-    view.dispatch({
-      effects: updateLspSemanticTokenChrome(semanticTokens),
-    });
-  }, [semanticTokens]);
-
-  useEffect(() => {
-    const previous = renderedGitRef.current;
-    if (sameArrayOrBothEmpty(previous.changes, gitChanges) && previous.blame === gitBlame) return;
-    const frame = window.requestAnimationFrame(() => {
-      if (pendingGitUpdateFrameRef.current !== frame) return;
-      pendingGitUpdateFrameRef.current = null;
-      const view = viewRef.current;
-      if (!view || !view.dom.isConnected) return;
-      renderedGitRef.current = { changes: gitChanges, blame: gitBlame };
-      view.dispatch({
-        effects: updateGitEditorChrome(
-          gitChanges,
-          gitBlame,
-          (change) => onGitChangeClickRef.current?.(change),
-        ),
-      });
-    });
-    pendingGitUpdateFrameRef.current = frame;
-    return () => {
-      if (pendingGitUpdateFrameRef.current !== frame) return;
-      window.cancelAnimationFrame(frame);
-      pendingGitUpdateFrameRef.current = null;
-    };
-  }, [gitBlame, gitChanges]);
-
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    const prev = renderedCoverageRef.current;
-    if (prev.fileCoverage === fileCoverage && prev.coverageEnabled === coverageEnabled) {
-      return;
-    }
-    renderedCoverageRef.current = { fileCoverage, coverageEnabled };
-    view.dispatch({
-      effects: coverageCompartment.current.reconfigure(
-        createCoverageEditorChrome(fileCoverage ?? null, coverageEnabled),
-      ),
-    });
-  }, [fileCoverage, coverageEnabled]);
-
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    const previous = renderedDebugRef.current;
-    const evaluating = !!debugEvaluate;
-    if (
-      sameArrayOrBothEmpty(previous.breakpoints ?? [], debugBreakpoints ?? [])
-      && previous.currentLine === debugCurrentLine
-      && sameInlineValues(previous.inlineValues, debugInlineValues)
-      && previous.evaluating === evaluating
-    ) {
-      return;
-    }
-    renderedDebugRef.current = {
-      breakpoints: debugBreakpoints,
-      currentLine: debugCurrentLine,
-      inlineValues: debugInlineValues,
-      evaluating,
-    };
-    view.dispatch({
-      effects: debugCompartment.current.reconfigure(buildDebugChrome(
-        debugBreakpoints,
-        debugCurrentLine,
-        debugInlineValues,
-        evaluating,
-      )),
-    });
-  }, [buildDebugChrome, debugBreakpoints, debugCurrentLine, debugEvaluate, debugInlineValues]);
+  const { languageCompartment, signatureCompartment, hoverCompartment, requestParameterInfoRef, activeHoverResizeSessionRef } = useEditorIntelligence({
+    path,
+    viewRef,
+    showHoverDocumentation,
+    hoverDocumentationDelayMs,
+    onHoverRef,
+    onPinHoverDocRef,
+    parameterInfoRequestNonce,
+    parameterPopup,
+    parameterInfoShowFullSignaturesRef,
+  });
+  const { readOnlyCompartment, wrappingCompartment, appearanceCompartment, renderedDocCompartment } = useEditorPresentation({
+    viewRef,
+    readOnly,
+    appearance,
+    softWrap,
+    renderedDocLanguageId,
+    path,
+    renderedDocEnabled,
+    onToggleRenderedDocRawRef,
+  });
+  const { codeStyleCompartment, diagnosticsCompartment, coverageCompartment, debugCompartment } = useEditorDecorations({
+    viewRef,
+    diagnostics,
+    onLightbulbRef,
+    highlights,
+    inlayHints,
+    gitChanges,
+    onRunGutterClickRef,
+    runGutterTargets,
+    codeStyle,
+    semanticTokens,
+    gitBlame,
+    onGitChangeClickRef,
+    fileCoverage,
+    coverageEnabled,
+    debugEvaluate,
+    debugBreakpoints,
+    debugCurrentLine,
+    debugInlineValues,
+    buildDebugChrome,
+  });
 
   const reconfigureAutocompletion = useCallback(() => {
     const view = viewRef.current;
@@ -2232,122 +1178,18 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
       reconfigureAutocompletion();
     });
   }, [completionController, reconfigureAutocompletion]);
-
-  useEffect(() => {
-    const owner = transactionOwner;
-    if (!owner || !fileKey) return;
-
-    return owner.subscribe(fileKey, (transaction) => {
-      if (transaction.sourceViewId === editorViewId) return;
-      const currentView = viewRef.current;
-      if (!currentView || !currentView.dom.isConnected) return;
-      if (applySharedTransactionToView(currentView, transaction)) {
-        lastDocumentTextRef.current = currentView.state.doc.toString();
-      }
-    });
-  }, [transactionOwner, fileKey, editorViewId]);
-
-  useEffect(() => {
-    const view = viewRef.current;
-    if (!view) return;
-    const previousPropDocument = lastPropDocumentTextRef.current;
-    lastPropDocumentTextRef.current = doc;
-    const pendingEchoes = pendingLocalDocumentEchoesRef.current;
-    lastLocalDocumentRevisionRef.current = Math.max(
-      lastLocalDocumentRevisionRef.current,
-      documentRevision,
-    );
-    let localEchoIndex = -1;
-    for (let index = pendingEchoes.length - 1; index >= 0; index -= 1) {
-      const entry = pendingEchoes[index]!;
-      if (
-        entry.text === doc
-        && entry.expectedDocumentRevision === documentRevision
-      ) {
-        localEchoIndex = index;
-        break;
-      }
-    }
-    if (localEchoIndex >= 0) {
-      pendingEchoes.splice(0, localEchoIndex + 1);
-      // A recognized echo acknowledges an earlier local transaction. During
-      // native character-level input, both the view and shared owner may have
-      // advanced again before React delivers this prop. Replacing the live
-      // document here can corrupt an in-flight CodeMirror change set; a later
-      // non-echo snapshot remains responsible for canonical reconciliation.
-      lastDocumentTextRef.current = view.state.doc.toString();
-      return;
-    }
-    while (
-      pendingEchoes.length > 0
-      && pendingEchoes[0]!.expectedDocumentRevision <= documentRevision
-    ) {
-      pendingEchoes.shift();
-    }
-
-    const owner = transactionOwnerRef.current;
-    if (owner && fileKeyRef.current) {
-      const canonical = owner.getDocument(fileKeyRef.current);
-      if (canonical !== null) {
-        const currentText = view.state.doc.toString();
-        if (doc === canonical) {
-          // The controlled snapshot caught up with the shared owner. If a
-          // remote transaction raced this effect, repair only the changed
-          // range and preserve the view's selection.
-          if (currentText !== canonical) {
-            applyingExternalDocRef.current = true;
-            try {
-              applyDocumentSnapshotToView(view, canonical);
-            } finally {
-              applyingExternalDocRef.current = false;
-            }
-          }
-          lastDocumentTextRef.current = view.state.doc.toString();
-          return;
-        }
-        if (previousPropDocument !== doc) {
-          // A changed prop is an external/store snapshot. Make it one shared
-          // transaction so every split sees the same replacement and history
-          // remains owned by the canonical document. ED-AUDIT-008: a
-          // workspace-history restore is journaled at transaction level, so
-          // its reconciliation records no second document-ledger entry —
-          // otherwise a follow-up Ctrl+Z would re-apply the undone change.
-          const transaction = owner.replaceDocument(
-            fileKeyRef.current,
-            viewIdRef.current,
-            doc,
-            historyReplayRef.current ? "undo" : "external-disk",
-          );
-          if (transaction) {
-            applySharedTransactionToView(view, transaction);
-            lastDocumentTextRef.current = view.state.doc.toString();
-            return;
-          }
-          // replaceDocument declined (no canonical record, or the record
-          // already holds this text). Fall through to the direct snapshot
-          // apply below so a programmatic store change still reaches this
-          // view instead of being swallowed with a stale document.
-        }
-        if (currentText === canonical || lastDocumentTextRef.current === canonical) {
-          // React may still expose the previous store value while a live
-          // editor edit is buffered. The shared owner is authoritative.
-          lastDocumentTextRef.current = currentText;
-          return;
-        }
-      }
-    }
-
-    if (lastDocumentTextRef.current === doc) {
-      return;
-    }
-    applyingExternalDocRef.current = true;
-    try {
-      applyDocumentSnapshotToView(view, doc);
-      lastDocumentTextRef.current = view.state.doc.toString();
-    } finally {
-      applyingExternalDocRef.current = false;
-    }
-  }, [doc, documentRevision]);
+  const { applyingExternalDocRef, lastDocumentTextRef, rememberLocalDocumentEcho } = useDocumentReconciliation({
+    transactionOwner,
+    fileKey,
+    editorViewId,
+    viewRef,
+    doc,
+    documentRevision,
+    transactionOwnerRef,
+    fileKeyRef,
+    viewIdRef,
+    historyReplayRef,
+  });
 
   useEffect(() => {
     if (!visible) return;
@@ -2457,10 +1299,50 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   );
 }, areCodeMirrorHostPropsEqual);
 
-export { type BreakpointGutterActions, type EditorRevealTarget, type GoToLineRequest, type EditorSelectionRange, type EditorContextMenuRequest, type EditorCommandTarget, type EditorCommandId, type EditorCommandOptions, type EditorCommandState, type EditorCommandPort, type EditorCommandPortRegistration } from "./host/types";
 
-export { documentTextIdentity, captureEditorViewState, type ApplyPersistedEditorViewStateResult, applyPersistedEditorViewState } from "./host/viewState";
 
-export { bumpClipboardOwnerGeneration, watchClipboardRequestFocus } from "./host/clipboard";
 
-export { MAX_PENDING_ECHO_CHARS, MAX_PENDING_ECHO_ENTRIES, trimPendingLocalDocumentEchoes } from "./host/reconciliation";
+
+
+
+
+
+
+
+export { type BreakpointGutterActions,type EditorCommandId,type EditorCommandOptions,type EditorCommandPort,type EditorCommandPortRegistration,type EditorCommandState,type EditorCommandTarget,type EditorContextMenuRequest,type EditorRevealTarget,type EditorSelectionRange,type GoToLineRequest } from "./host/types";
+
+
+
+
+
+
+
+
+
+
+
+export { applyPersistedEditorViewState,captureEditorViewState,documentTextIdentity,type ApplyPersistedEditorViewStateResult } from "./host/viewState";
+
+
+
+
+
+
+
+
+
+
+
+export { bumpClipboardOwnerGeneration,watchClipboardRequestFocus } from "./host/clipboard";
+
+
+
+
+
+
+
+
+
+
+
+export { MAX_PENDING_ECHO_CHARS,MAX_PENDING_ECHO_ENTRIES,trimPendingLocalDocumentEchoes } from "./host/reconciliation";

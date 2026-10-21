@@ -1,65 +1,68 @@
-import { MailMutationSession } from "../../lib/mailMutations";
-import { MailArchivePanel } from "./MailArchivePanel";
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type SetStateAction, type UIEvent } from "react";
-import { Group as PanelGroup, Separator as PanelResizeHandle, type PanelImperativeHandle, type PanelSize } from "react-resizable-panels";
-import { AlertTriangle, Archive, Ban, BookUser, CalendarDays, CheckCircle2, ChevronDown, Code, Copy, Download, ExternalLink, FileText, Filter as FilterIcon, Folder, FolderInput, FolderPlus, FolderSymlink, FolderX, Forward, ImageOff, Inbox, Link as LinkIcon, ListChecks, Loader2, Mail as MailIcon, MailOpen, MessageSquareReply, PenLine, Printer, RefreshCw, Save, Search, Send, ShieldCheck, Star, Tag, Trash2, X } from "lucide-react";
-import { mailClearCache, mailExportMbox, isMailCertificateError, mailImportMessages, mailSendReceipt, MAIL_MDN_SENT, mailGetInvite, mailIndexCachedContacts, mailDeleteDraft, mailListFolders, mailMarkRead, mailSetFlags, mailSetFolderSubscription, mailSearchContacts, mailSearchMessages, mailSearchServer, mailTestConnection, mailUnsubscribeOneClick, type MailDraft, type MailFolder, type MailCertificateInfo, type MailInvite, type MailInviteReply, type MailMessageBody, type MailMessageHeader, type MailSearchField, type MailSyncRequestMode } from "../../lib/mail";
-import { notifyDesktop } from "../../lib/lanNotify";
-import { hasCalendarPart } from "../../lib/mailInvite";
-import { type MailFilter } from "../../lib/mailFilters";
-import { MailFiltersPanel } from "./MailFiltersPanel";
-import { MailAddressBookPanel } from "./MailAddressBookPanel";
-import { MailAgendaPanel } from "./MailAgendaPanel";
-import { agendaKey, agendaTimeLabel, dueReminders, mailCalDavSync, mailListAgenda, type MailAgendaEvent } from "../../lib/mailCalendar";
-import { type MailAddressBookEntry } from "../../lib/mailContacts";
-import { folderLabel, isSelectable, isSubscribed, loadSubscribedOnly, saveSubscribedOnly, visibleFolders } from "../../lib/mailFolders";
-import { isOutbox, outboxNextAttemptAt, outboxState } from "../../lib/mailOutbox";
-import { parseMailto } from "../../lib/mailto";
-import { isEditableTarget, mailShortcutAction, type MailShortcutAction } from "../../lib/mailShortcuts";
-import { buildMailThreads, flattenMailThreads, type MailThreadRow } from "../../lib/mailThreads";
-import { mailIdentities, ownIdentityAddresses, pickReplyIdentity } from "../../lib/mailIdentities";
-import { MAIL_TAGS, messageTags } from "../../lib/mailTags";
-import { mergeFolderMeta } from "../../lib/mailSync";
-import { MailMessageBodyView } from "./MailMessageBodyView";
-import { extractDefaultMailDomain, mergeRecipientSuggestions, parseRecipientsText, searchCachedMessageContacts, type RecipientSuggestion } from "../../lib/mailRecipients";
-import { buildForwardHtml, buildReplyHtml, mailHtmlHasRemoteImages, plainTextToMailHtml, quotePlainText } from "../../lib/mailHtml";
+import { AlertTriangle,Archive,Ban,BookUser,CalendarDays,CheckCircle2,ChevronDown,Code,Copy,Download,ExternalLink,FileText,Filter as FilterIcon,Folder,FolderInput,FolderPlus,FolderSymlink,FolderX,Forward,ImageOff,Inbox,Link as LinkIcon,ListChecks,Loader2,Mail as MailIcon,MailOpen,MessageSquareReply,PenLine,Printer,RefreshCw,Save,Search,Send,ShieldCheck,Star,Tag,Trash2,X } from "lucide-react";
+import { useCallback,useEffect,useMemo,useRef,useState,type MouseEvent as ReactMouseEvent,type SetStateAction,type UIEvent } from "react";
+import { Group as PanelGroup,Separator as PanelResizeHandle,type PanelImperativeHandle,type PanelSize } from "react-resizable-panels";
+import { useAppTheme } from "../../lib/appTheme";
 import { selectUploadFile } from "../../lib/ipc";
+import { notifyDesktop } from "../../lib/lanNotify";
+import { MAIL_MDN_SENT,isMailCertificateError,mailClearCache,mailDeleteDraft,mailExportMbox,mailGetInvite,mailImportMessages,mailIndexCachedContacts,mailListFolders,mailMarkRead,mailSearchContacts,mailSendReceipt,mailSetFlags,mailSetFolderSubscription,mailTestConnection,mailUnsubscribeOneClick,type MailCertificateInfo,type MailDraft,type MailFolder,type MailInvite,type MailInviteReply,type MailMessageBody,type MailMessageHeader,type MailSyncRequestMode } from "../../lib/mail";
+import { agendaKey,agendaTimeLabel,dueReminders,mailCalDavSync,mailListAgenda,type MailAgendaEvent } from "../../lib/mailCalendar";
+import { type MailAddressBookEntry } from "../../lib/mailContacts";
+import { type MailFilter } from "../../lib/mailFilters";
+import { folderLabel,isSelectable,isSubscribed,loadSubscribedOnly,saveSubscribedOnly,visibleFolders } from "../../lib/mailFolders";
+import { buildForwardHtml,buildReplyHtml,mailHtmlHasRemoteImages,plainTextToMailHtml,quotePlainText } from "../../lib/mailHtml";
+import { mailIdentities,ownIdentityAddresses,pickReplyIdentity } from "../../lib/mailIdentities";
+import { hasCalendarPart } from "../../lib/mailInvite";
+import { MailMutationSession } from "../../lib/mailMutations";
+import { isOutbox,outboxNextAttemptAt,outboxState } from "../../lib/mailOutbox";
+import { extractDefaultMailDomain,mergeRecipientSuggestions,parseRecipientsText,searchCachedMessageContacts,type RecipientSuggestion } from "../../lib/mailRecipients";
+import { isEditableTarget,mailShortcutAction,type MailShortcutAction } from "../../lib/mailShortcuts";
+import { mergeFolderMeta } from "../../lib/mailSync";
+import { MAIL_TAGS,messageTags } from "../../lib/mailTags";
+import { buildMailThreads,flattenMailThreads,type MailThreadRow } from "../../lib/mailThreads";
+import { parseMailto } from "../../lib/mailto";
+import { loadResizableLayout,saveResizableLayout } from "../../lib/resizableLayout";
+import { DEFAULT_MAIL_TERMINAL_PROFILE } from "../../lib/terminalProfile";
 import { useChatStore } from "../../stores/chatStore";
 import { useTaoAlertStore } from "../../stores/taoAlertStore";
-import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
-import { useContextMenu, type MenuItem } from "../ContextMenu";
-import { useConfirmDialog, useTextInputDialog } from "../sidebar/ConfirmDialog";
-import { DEFAULT_MAIL_TERMINAL_PROFILE } from "../../lib/terminalProfile";
-import { useAppTheme } from "../../lib/appTheme";
-import { type MailClientTabProps, type OpenMailMessageTab, type BodyWarmState, type ComposeDraft, type ComposePromptState, type RecipientSearchState, type RecipientFieldKey, type AiAction } from "./client/types";
-import { type MailRowActions } from "./client/MailRowActions";
-import { MAIL_THREAD_VIEW_STORAGE_KEY, isOAuthReauthRequired, messagePageSize, refreshBatchSize, catchupStepSize, dedupeMessages, messageKey, sortMessages, mailClientErrorMessage, addressLabel, isFlagged, bodyMatchesMessage, formatFullDate, formatBytes, formatShortDate } from "./client/messages";
-import { EMPTY_DRAFT, isTemplate, emptyComposeDraft, serializeDraftContent, draftHasContent, replyContextFor, normalizedMailAddress, appendUniqueAddress, forwardSubject } from "./client/compose";
-import { MAILBOX_EXPANDED_SIZE, clampMailFontSize, mailAppearanceStyle, MAILBOX_RIBBON_THRESHOLD } from "./client/appearance";
-import { DEFAULT_FOLDER, isUnread, NEW_MAIL_EXCLUDED_KINDS, folderMatchesSpecial, folderIcon, MAIL_DRAG_TYPE, folderDepth } from "./client/folders";
-import { ALL_ATTACHMENTS_INDEX } from "./client/attachments";
+import { useContextMenu,type MenuItem } from "../ContextMenu";
+import { useConfirmDialog,useTextInputDialog } from "../sidebar/ConfirmDialog";
 import { aiPrompt } from "./client/ai";
-import { RemoteImagesBanner } from "./client/RemoteImagesBanner";
+import { MAILBOX_EXPANDED_SIZE,MAILBOX_RIBBON_THRESHOLD,clampMailFontSize,mailAppearanceStyle } from "./client/appearance";
+import { EMPTY_DRAFT,appendUniqueAddress,draftHasContent,emptyComposeDraft,forwardSubject,isTemplate,normalizedMailAddress,replyContextFor,serializeDraftContent } from "./client/compose";
+import { createAttachmentActions } from "./client/createAttachmentActions";
+import { createCertificateActions } from "./client/createCertificateActions";
+import { createFolderActions } from "./client/createFolderActions";
+import { createInvitationControls } from "./client/createInvitationControls";
+import { createMailReaderRenderer } from "./client/createMailReaderRenderer";
+import { createMessageExportActions } from "./client/createMessageExportActions";
+import { createDraftActions } from "./client/draftActions";
+import { DEFAULT_FOLDER,MAIL_DRAG_TYPE,NEW_MAIL_EXCLUDED_KINDS,folderDepth,folderIcon,folderMatchesSpecial,isUnread } from "./client/folders";
 import { MailComposePrompt } from "./client/MailComposePrompt";
+import { MailComposer } from "./client/MailComposer";
 import { MailDraggableDialog } from "./client/MailDraggableDialog";
-import { createLoadCachedFolders, createLoadCachedMessages, createRememberBody, createFetchBodyForMessage, createWarmRecentBodies, createLoadBody, createLoadMoreMessages } from "./client/messageLoading";
-import { createRunFolderSync, createQueueFolderCatchups, createStartBackfill, createSyncFolderNow, createSyncSelectedFolder, createQuietPollSelectedAndInbox, createSyncAllFolders } from "./client/synchronization";
-import { createMarkMessagesReadLocally, createHandleMarkSelectedRead, createHandleMarkFolderRead, createHandleMarkSingleRead } from "./client/readActions";
-import { MailToolbar } from "./client/MailToolbar";
 import { MailFoldersPane } from "./client/MailFoldersPane";
 import { MailMessagesPane } from "./client/MailMessagesPane";
 import { MailReaderPane } from "./client/MailReaderPane";
-import { MailComposer } from "./client/MailComposer";
-import { createDraftActions } from "./client/draftActions";
-import { useMailOutbox } from "./client/useMailOutbox";
+import { type MailRowActions } from "./client/MailRowActions";
+import { MailToolbar } from "./client/MailToolbar";
+import { createFetchBodyForMessage,createLoadBody,createLoadCachedFolders,createLoadCachedMessages,createLoadMoreMessages,createRememberBody,createWarmRecentBodies } from "./client/messageLoading";
+import { MAIL_THREAD_VIEW_STORAGE_KEY,addressLabel,bodyMatchesMessage,catchupStepSize,dedupeMessages,formatFullDate,formatShortDate,isFlagged,isOAuthReauthRequired,mailClientErrorMessage,messageKey,messagePageSize,refreshBatchSize } from "./client/messages";
 import { createMailMutations } from "./client/mutations";
-import { useMailboxLifecycle } from "./client/useMailboxLifecycle";
+import { createHandleMarkFolderRead,createHandleMarkSelectedRead,createHandleMarkSingleRead,createMarkMessagesReadLocally } from "./client/readActions";
+import { createQueueFolderCatchups,createQuietPollSelectedAndInbox,createRunFolderSync,createStartBackfill,createSyncAllFolders,createSyncFolderNow,createSyncSelectedFolder } from "./client/synchronization";
+import { type AiAction,type BodyWarmState,type ComposeDraft,type ComposePromptState,type MailClientTabProps,type OpenMailMessageTab,type RecipientFieldKey,type RecipientSearchState } from "./client/types";
 import { useComposerAttachments } from "./client/useComposerAttachments";
-import { createAttachmentActions } from "./client/createAttachmentActions";
-import { createMessageExportActions } from "./client/createMessageExportActions";
-import { createFolderActions } from "./client/createFolderActions";
-import { createInvitationControls } from "./client/createInvitationControls";
-import { createCertificateActions } from "./client/createCertificateActions";
+import { useMailboxLifecycle } from "./client/useMailboxLifecycle";
+import { useMailOutbox } from "./client/useMailOutbox";
+import { useMailSearch } from "./client/useMailSearch";
+import { useRemoteContentPermissions } from "./client/useRemoteContentPermissions";
+import { MailAddressBookPanel } from "./MailAddressBookPanel";
+import { MailAgendaPanel } from "./MailAgendaPanel";
+import { MailArchivePanel } from "./MailArchivePanel";
+import { MailFiltersPanel } from "./MailFiltersPanel";
+
+
+
 
 
 
@@ -87,18 +90,6 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const [checkedMessageKeys, setCheckedMessageKeys] = useState<Set<string>>(() => new Set());
   const selectionAnchorRef = useRef<string | null>(null);
   const [body, setBody] = useState<MailMessageBody | null>(null);
-  const [query, setQuery] = useState("");
-  const [searchScope, setSearchScope] = useState<"folder" | "all">("folder");
-  const [searchField, setSearchField] = useState<MailSearchField>("all");
-  const [quickFilters, setQuickFilters] = useState<{ unread: boolean; flagged: boolean; attachments: boolean }>({
-    unread: false,
-    flagged: false,
-    attachments: false,
-  });
-  const [tagFilter, setTagFilter] = useState<string>("");
-  const [searchResults, setSearchResults] = useState<MailMessageHeader[] | null>(null);
-  const [serverSearching, setServerSearching] = useState(false);
-  const searchSeqRef = useRef(0);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadingFolders, setLoadingFolders] = useState(false);
@@ -154,9 +145,6 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   });
   const [sending, setSending] = useState(false);
   const [downloadingAttachmentIndex, setDownloadingAttachmentIndex] = useState<number | null>(null);
-  /** Thunderbird-style: allow remote content for specific messages, or the whole tab session. */
-  const [allowRemoteAllInTab, setAllowRemoteAllInTab] = useState(false);
-  const [remoteAllowedMessageKeys, setRemoteAllowedMessageKeys] = useState<Set<string>>(() => new Set());
   const [composeDragActive, setComposeDragActive] = useState(false);
   const [attachProgress, setAttachProgress] = useState<{ done: number; total: number; label: string } | null>(null);
   const composeRootRef = useRef<HTMLDivElement>(null);
@@ -295,38 +283,17 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     const scheme = String((mailAppearance as Record<string, string | number | undefined>)["--taomni-color-scheme"] ?? "");
     return scheme === "dark";
   }, [mailAppearance]);
-
-  const messageAllowsRemote = useCallback((key: string | null | undefined) => {
-    if (allowRemoteAllInTab) return true;
-    if (!key) return false;
-    return remoteAllowedMessageKeys.has(key);
-  }, [allowRemoteAllInTab, remoteAllowedMessageKeys]);
-
-  const allowRemoteForMessage = useCallback((key: string) => {
-    setRemoteAllowedMessageKeys((prev) => {
-      if (prev.has(key)) return prev;
-      const next = new Set(prev);
-      next.add(key);
-      return next;
-    });
-  }, []);
-
-  const blockRemoteForMessage = useCallback((key: string) => {
-    setAllowRemoteAllInTab(false);
-    setRemoteAllowedMessageKeys((prev) => {
-      if (!prev.has(key)) return prev;
-      const next = new Set(prev);
-      next.delete(key);
-      return next;
-    });
-  }, []);
-
-  const toggleRemoteForMessage = useCallback((key: string) => {
-    if (messageAllowsRemote(key)) blockRemoteForMessage(key);
-    else allowRemoteForMessage(key);
-  }, [allowRemoteForMessage, blockRemoteForMessage, messageAllowsRemote]);
+  const { messageAllowsRemote, toggleRemoteForMessage, allowRemoteForMessage, blockRemoteForMessage, setAllowRemoteAllInTab, setRemoteAllowedMessageKeys } = useRemoteContentPermissions();
   // Search can return headers outside the loaded folder/page. They still need
   // to participate in selection, reading and bulk actions.
+  const { filteredMessages, runServerSearch, searchActive, quickFilterActive, query, setQuery, searchScope, setSearchScope, searchField, setSearchField, quickFilters, setQuickFilters, tagFilter, setTagFilter, searchResults, setSearchResults, serverSearching } = useMailSearch({
+    info,
+    selectedFolder,
+    selectedFolderRef,
+    setError,
+    setStatus,
+    messages,
+  });
   const availableMessages = useMemo(
     () => query.trim() && searchResults ? dedupeMessages([...searchResults, ...messages]) : messages,
     [messages, query, searchResults],
@@ -392,98 +359,6 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     ));
   }, [visible]);
 
-  const quickFilterActive = quickFilters.unread || quickFilters.flagged || quickFilters.attachments || Boolean(tagFilter);
-  const searchActive = query.trim().length > 0;
-
-  // Local full-text search over the whole cached index (not just loaded rows).
-  useEffect(() => {
-    const text = query.trim();
-    const seq = searchSeqRef.current + 1;
-    searchSeqRef.current = seq;
-    if (!text || !info.cache.enabled) {
-      setSearchResults(null);
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      void mailSearchMessages(info.sessionId, {
-        text,
-        folder: searchScope === "folder" ? selectedFolder : null,
-        field: searchField,
-        unreadOnly: quickFilters.unread,
-        flaggedOnly: quickFilters.flagged,
-        withAttachments: quickFilters.attachments,
-        keyword: tagFilter || null,
-        limit: 1000,
-      })
-        .then((results) => {
-          if (searchSeqRef.current === seq) setSearchResults(results);
-        })
-        .catch((e) => {
-          if (searchSeqRef.current === seq) {
-            setSearchResults(null);
-            console.debug("mail local search failed", e);
-          }
-        });
-    }, 200);
-    return () => window.clearTimeout(timer);
-  }, [info.cache.enabled, info.sessionId, query, quickFilters, searchField, searchScope, selectedFolder, tagFilter]);
-
-  const runServerSearch = useCallback(async () => {
-    const text = query.trim();
-    if (!text) return;
-    const folder = selectedFolderRef.current;
-    const seq = searchSeqRef.current;
-    setServerSearching(true);
-    setError(null);
-    try {
-      const results = await mailSearchServer(info, folder, {
-        text,
-        field: searchField,
-        unreadOnly: quickFilters.unread,
-        flaggedOnly: quickFilters.flagged,
-        limit: 200,
-      });
-      if (searchSeqRef.current !== seq) return;
-      setSearchResults((current) => {
-        const byKey = new Map<string, MailMessageHeader>();
-        for (const message of current ?? []) byKey.set(messageKey(message), message);
-        for (const message of results) byKey.set(messageKey(message), message);
-        return sortMessages(Array.from(byKey.values()));
-      });
-      setStatus(`Server search found ${results.length} message${results.length === 1 ? "" : "s"} in ${folder}`);
-    } catch (e) {
-      setError(mailClientErrorMessage(e));
-    } finally {
-      setServerSearching(false);
-    }
-  }, [info, query, quickFilters.flagged, quickFilters.unread, searchField]);
-
-  const filteredMessages = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    let base: MailMessageHeader[];
-    if (q && searchResults) {
-      base = searchResults;
-    } else if (q) {
-      // Cache disabled (or index not ready): filter the loaded rows.
-      base = messages.filter((message) => {
-        const haystack = [
-          message.subject,
-          addressLabel(message.from),
-          message.snippet ?? "",
-          ...message.to.map(addressLabel),
-        ].join(" ").toLowerCase();
-        return haystack.includes(q);
-      });
-    } else {
-      base = messages;
-    }
-    if (!quickFilterActive) return base;
-    return base.filter((message) =>
-      (!quickFilters.unread || isUnread(message))
-      && (!quickFilters.flagged || isFlagged(message))
-      && (!quickFilters.attachments || message.hasAttachments)
-      && (!tagFilter || message.flags.some((flag) => flag.toLowerCase() === tagFilter.toLowerCase())));
-  }, [messages, query, quickFilterActive, quickFilters, searchResults, tagFilter]);
   const listRows = useMemo<MailThreadRow[]>(() => {
     if (threadView) return flattenMailThreads(buildMailThreads(filteredMessages), expandedThreads);
     return filteredMessages.map((message) => ({
@@ -2105,174 +1980,28 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const cacheLine = info.cache.enabled
     ? `${info.cache.headerRetentionDays > 0 ? `${info.cache.headerRetentionDays}d` : "all"} headers, ${info.cache.bodyRecentLimit} recent bodies`
     : "cache off";
-  const renderReaderSurface = (message: MailMessageHeader | null, popup = false) => {
-    const currentBody = message
-      ? bodyCache.get(messageKey(message)) ?? (bodyMatchesMessage(body, message) ? body : null)
-      : null;
-    const currentKey = message ? messageKey(message) : null;
-    const currentHasRemoteImages = mailHtmlHasRemoteImages(currentBody?.html);
-    const currentAllowsRemote = messageAllowsRemote(currentKey);
-    const currentAttachments = currentBody?.attachments.length ? currentBody.attachments : message?.attachments ?? [];
-    const loadingThisBody = !!message && bodyLoadingKey === messageKey(message);
-
-    return (
-      <main
-        className="h-full min-w-0 flex flex-col"
-        onContextMenu={(event) => showReaderMenu(event, message)}
-      >
-        <div className="h-8 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)]">
-          <span className="text-[12px] font-semibold min-w-0 truncate">
-            {message?.subject || "Message"}
-          </span>
-          {loadingThisBody && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-text-muted)]" />}
-          <div className="ml-auto flex items-center gap-1">
-            <button
-              type="button"
-              className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
-              onClick={() => openReply(message)}
-              disabled={!message}
-              title="Reply"
-            >
-              <MessageSquareReply className="w-3.5 h-3.5" />
-              Reply
-            </button>
-            <button
-              type="button"
-              className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
-              onClick={() => openReplyAll(message)}
-              disabled={!message}
-              title="Reply all"
-            >
-              <MessageSquareReply className="w-3.5 h-3.5" />
-              Reply all
-            </button>
-            {!popup && (
-              <button
-                type="button"
-                className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
-                onClick={() => message && openMessagePopup(message)}
-                disabled={!message}
-                title="Open message in popup window"
-              >
-                <ExternalLink className="w-3.5 h-3.5" />
-                Popup
-              </button>
-            )}
-          </div>
-        </div>
-
-        {!message ? (
-          <div className="flex-1 min-h-0 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">
-            Select a message
-          </div>
-        ) : (
-          <div className="flex-1 min-h-0 overflow-auto">
-            <div className="px-4 py-3 border-b border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)]">
-              <h2 className="text-[17px] font-semibold leading-6 mb-1 break-words">
-                {message.subject || "(no subject)"}
-              </h2>
-              <div className="grid grid-cols-[56px_1fr] gap-x-2 gap-y-1 text-[12px]">
-                <span className="text-[var(--taomni-text-muted)]">From</span>
-                <span className="truncate" title={addressLabel(message.from)}>{addressLabel(message.from) || "(unknown)"}</span>
-                <span className="text-[var(--taomni-text-muted)]">To</span>
-                <span className="truncate" title={message.to.map(addressLabel).join(", ")}>
-                  {message.to.map(addressLabel).filter(Boolean).join(", ") || "(none)"}
-                </span>
-                {message.cc.length > 0 && (
-                  <>
-                    <span className="text-[var(--taomni-text-muted)]">Cc</span>
-                    <span className="truncate" title={message.cc.map(addressLabel).join(", ")}>
-                      {message.cc.map(addressLabel).filter(Boolean).join(", ")}
-                    </span>
-                  </>
-                )}
-                <span className="text-[var(--taomni-text-muted)]">Date</span>
-                <span>{formatFullDate(message.dateTs) || "(unknown)"}</span>
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-[var(--taomni-text-muted)]">
-                <span>{currentBody?.source === "cache" ? "cached body" : currentBody?.source === "remote" ? "remote body" : "header cached"}</span>
-                {message.rawSize ? <span>{formatBytes(message.rawSize)}</span> : null}
-                {currentHasRemoteImages && currentKey && (
-                  <button
-                    type="button"
-                    className="taomni-btn h-5 px-2 text-[10px]"
-                    data-testid="mail-remote-images-header-toggle"
-                    onClick={() => toggleRemoteForMessage(currentKey)}
-                  >
-                    {currentAllowsRemote ? "Block remote images" : "Load remote images"}
-                  </button>
-                )}
-                {renderUnsubscribe(message)}
-              </div>
-              {currentAttachments.length > 0 ? (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {currentAttachments.length > 1 && (
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-1.5 py-0.5 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] disabled:opacity-60"
-                      title="Save all attachments"
-                      onClick={() => void handleSaveAllAttachments(message, currentAttachments)}
-                      disabled={downloadingAttachmentIndex !== null}
-                    >
-                      {downloadingAttachmentIndex === ALL_ATTACHMENTS_INDEX ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                      <span>Save all</span>
-                    </button>
-                  )}
-                  {currentAttachments.map((attachment, index) => {
-                    const downloading = downloadingAttachmentIndex === index;
-                    const savingAll = downloadingAttachmentIndex === ALL_ATTACHMENTS_INDEX;
-                    const name = attachment.name || `attachment-${index + 1}`;
-                    return (
-                      <button
-                        key={`${name}-${index}`}
-                        type="button"
-                        className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-1.5 py-0.5 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] disabled:opacity-60"
-                        title={`Double-click to open ${name}; right-click to save`}
-                        onDoubleClick={() => void handleOpenAttachment(message, attachment, index)}
-                        onContextMenu={(event) => handleAttachmentContextMenu(event, message, currentAttachments, attachment, index)}
-                        onKeyDown={(event) => {
-                          if (event.key !== "Enter" && event.key !== " ") return;
-                          event.preventDefault();
-                          void handleOpenAttachment(message, attachment, index);
-                        }}
-                        disabled={downloading || savingAll}
-                      >
-                        {downloading ? <Loader2 className="w-3 h-3 animate-spin" /> : <ExternalLink className="w-3 h-3" />}
-                        <span className="max-w-[360px] truncate">{name}</span>
-                        {attachment.size ? <span>{formatBytes(attachment.size)}</span> : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : null}
-            </div>
-
-            <RemoteImagesBanner
-              visible={currentHasRemoteImages}
-              allowRemoteImages={currentAllowsRemote}
-              onAllowThisMessage={() => currentKey && allowRemoteForMessage(currentKey)}
-              onAllowAllInTab={() => setAllowRemoteAllInTab(true)}
-              onBlock={() => currentKey && blockRemoteForMessage(currentKey)}
-            />
-
-            <div className="p-3 sm:p-4">
-              <MailMessageBodyView
-                html={currentBody?.html}
-                text={currentBody?.text}
-                snippet={message.snippet}
-                allowRemoteImages={currentAllowsRemote}
-                preferDark={preferDarkReader}
-                fontSize={mailFontSize}
-                title={message.subject || "Message body"}
-                loading={loadingThisBody && !currentBody}
-                onMailtoLink={openComposeFromMailto}
-              />
-            </div>
-          </div>
-        )}
-      </main>
-    );
-  };
+  const { renderReaderSurface } = createMailReaderRenderer({
+    bodyCache,
+    body,
+    messageAllowsRemote,
+    bodyLoadingKey,
+    showReaderMenu,
+    openReply,
+    openReplyAll,
+    openMessagePopup,
+    toggleRemoteForMessage,
+    renderUnsubscribe,
+    handleSaveAllAttachments,
+    downloadingAttachmentIndex,
+    handleOpenAttachment,
+    handleAttachmentContextMenu,
+    allowRemoteForMessage,
+    setAllowRemoteAllInTab,
+    blockRemoteForMessage,
+    preferDarkReader,
+    mailFontSize,
+    openComposeFromMailto,
+  });
 
   const rowActions: MailRowActions = {
     selectListMessage, openMessageTab, toggleMessageChecked, toggleThreadExpanded,
