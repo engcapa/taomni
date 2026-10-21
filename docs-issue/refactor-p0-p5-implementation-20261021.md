@@ -581,3 +581,20 @@ Presto、SDK detect、ACP wire protocol、SSH server、scroll capture、structur
 - `browser-r/run-20261022-024340-911919226`：Linux Chromium **11 passed / 0 failed / 0 skipped**，覆盖 AI drawer/附件 chip/隐藏重开、Notes 建立完成/筛选/主题/边缘停靠/通知，以及归档列表分页/搜索和通讯录重开自动补全。已核验 receipt 签名、summary hash 和 stable identity，源码指纹 `09f0efef61b1adb8867c5f68a0f100b38ee89901f07a283d59a120877b20b6fd`。browser 邮件 fixture 不作为原生磁盘/IMAP/CardDAV 网络证据；后端保留原相关 Rust 测试，最终仍需三端 native 全量。
 
 本批为保留原行为的实现重构，复用现有可执行场景及断言。O/P/Q 的三端 selected workflow [39652904042](https://github.com/engcapa/taomni/actions/runs/39652904042) 绑定完整提交 `53d56b407df41966e8ed8a2dcd4f887ae1e5c0e7`，当前仍在执行，未将 job 状态当作全部验收结果。剩余大文件与最终完整 SHA 的全量验收继续推进。
+
+
+## 2026-10-22 实施批次 S：协议实例、录屏与编辑器/数据库/代理生命周期
+
+8 个 Rust 入口按责任拆出 72 个实现/测试模块：RDP gfx/input、S3、录屏、LSP manager、MCP control、LanChat swarm 和 Linux tracer。最大生产模块 MCP routes 712 行，其余生产模块不超过 424 行。CodeMirrorHost 1244→586 行、DbClientTab 1154→628 行、SocksCapPanel 1148→574 行；10 个新前端模块最大 706 行。当前清单 3071 项。
+
+- RDP 保留同一 GfxTransport 的编码/ack/decoded 状态和 VideoToolbox callback lifetime，同一 RdpInput 和 actor queue；按平台输入、映射、权限、注入与队列划分。S3 的上传分块/重试/恢复/校验仍使用同一个 client；录屏唯一 lease/session、capture/encode 线程和 bounded frame queue 不变。
+- LSP 保留同一 manager 的 session、watchers、cache 与取消归属；MCP 的 session policy、参数、local targets、groups 与 routes 分开，tool_router 生成函数可见性明确为原父模块域 pub(super)。LanChat 保留同一 swarm/piece map/cancel/watchers；tracer 保留各架构 cfg alternatives、supervisor/flow queue 与 syscall 状态。
+- CodeMirror 的 refs owner、View mount/destroy lifetime 与 surface 分开，memo 和 public exports 保留。mount effect 的后声明依赖经带类型 getter 延迟读取，未改变空依赖 effect、composition/timer cleanup。数据库 workspace 持有 panels、autosave/hydration/rename，connection 持有订阅/连接取消/晚到 disconnect；关闭时 rollback 后 disconnect 的次序保留。SocksCap runtime 持有 config/status/caps/stats/poll，同一 interval cleanup，view 与 dialogs 分离。
+- `s-rust-final.log`：lib **1868 passed / 0 failed / 25 ignored**，integration **80 passed / 0 failed**。对所有 cfg alternative 使用 Counter 对照，**350 个生产函数**解析模块路径、忽略 visibility/rustfmt 后 tokens 一致。`s-editor-db-sockscap-tests-2.log`：**10 files / 448 passed**；`s-build-final.log` 完整类型检查/production build 成功。761/328/39 契约和 677 implementation modules 边界检查通过。
+- 初期 tool_router helper private、MP4 Seek、tracer fd/CommandExt imports，以及 TS 闭包 null narrowing 已修；原检查/主动停止的测试日志保留。未使用 non-null assertion 掩盖 render capture，保留原 render 绑定的值。Linux 本地结果不代替 macOS gfx 和 Windows input 的编译/执行证据。
+
+此批保留已有行为与用例断言，复用数据库执行/事务、编辑器分屏/虚拟空格/查找/生命周期和 SocksCap preview 场景。原生网络、系统注入与磁盘语义由 Rust 和后续三端 native 验证，browser fixture 不当作 native 证据。
+
+Q 三端运行补齐到 14 份原始报告，签名/hash/stable identity 通过，统一指纹 e38f477021ef029d0a305761c0922fa8c5b133c66233490742ebf118253b0cff：browser 三平台各18 passed，Linux native28 passed，macOS native22 passed/1 failed；Windows native 尚在构建。macOS PERF-03 的 fps_ratio=0.698785 未达到0.85，带宽比1.079894符合1.15门槛；两轮动画源帧率也不匹配，继续诊断并保留原失败，未放宽15%门槛。
+
+S browser 首轮 `browser-s/run-20261022-030828-201851151`：**8 passed / 2 failed / 0 skipped**。C8-01 在打开 appearance settings 后页面重新导航，LAYOUT-01 在 welcome 可见性处失败且 console 有重复 createRoot 记录，不能确定其具体触发源；不将其直接归因于宿主负载。源码和断言不变，单 worker `browser-s-recheck` 的上述两项 **2 passed / 0 failed / 0 skipped**，保留首轮失败。两轮 receipt 签名、summary hash、stable identity 通过，源码指纹 fe59d5f080736171eff4104ac337cbcb6822c5a568fdddf1322b1e5ca21ee9e2。SocksCap preview 的实际 assertions 已复用，browser 不证明系统捕获。尚余 142 个 >800 行文件（含生成/locale/测试），整体继续推进。
