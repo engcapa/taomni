@@ -521,6 +521,10 @@ M 三端 run 39636904994 当前已收齐 11 reports：Linux browser5/native8、m
 
 M 最终三端结果：完整提交 `3f1143ab8364bf9f69acd7dc87b913d5673fbce5`、[run 39636904994](https://github.com/engcapa/taomni/actions/runs/39636904994)，15 reports 全部下载至 `github-m/` 并核验签名、summary hash 和 stable source identity。Linux browser5/native8、Windows browser5/native8、macOS browser5/native7，总计 **38 passed / 0 failed / 0 skipped**。聚合 `ci-summary.json` 的 head 正确、`report_ok=true`、`passed=true`，failures/gaps/infrastructure_errors/unreviewed 均为空；统一 source identity 与上述部分结果相同。该次 selected planner 未运行 tool/native contracts，不能将 skipped job 算作合约通过。H/I/J 历史失败及其原始证据继续保留。
 
+N 最终三端结果：完整提交 `275eb19168b776d032c870b2ce3afa5855b449d8`、[run 39643166877](https://github.com/engcapa/taomni/actions/runs/39643166877)。18 reports 全部下载到 `github-n/`；签名、summary hash、stable source identity 核验通过，身份与 N 本地 browser 相同。Linux browser72/native28、Windows browser72/native28、macOS browser72/native26，合计 **298 passed / 0 failed / 0 skipped**。聚合 head 正确、`report_ok=true`、`passed=true`，failures/gaps/infrastructure_errors 为空。`TC-TERM-IME-001` 已在 Linux native 通过，但不能外推到 Windows/macOS IME；本次 tool/native contracts job 未执行。
+
+N 聚合仍有 13 项旧用例审阅缺口：TC-005/014/019/020/021/022/023/024/025/035/059/061、TC-auto-F-Detach-1-terminal-detach。它们的执行结果通过，但不视为 reviewed coverage；最终验收须分别说明审阅和执行状态，原失败与该缺口继续保留。
+
 ## 2026-10-22 实施批次 O：工作区模型、事务、Action 与模板
 
 7 个旧门面继续提供兼容 API：dapDebugModel 1735→130、rearrangeCleanupWorkflow 1718→65、refactorPlan 1522→60、codeWorkspaceModel 1577→162、workspaceActionRegistry 1644→23、workspaceActionHost 1482→22、liveTemplates 1475→17。新增 68 个实现模块，最大 591 行；清单 2720 项。公开导出列表保持可读格式，未压缩实现来减少行数。
@@ -534,3 +538,18 @@ M 最终三端结果：完整提交 `3f1143ab8364bf9f69acd7dc87b913d5673fbce5`�
 - `browser-o/run-20261022-013518-613396492`：**12 passed / 0 failed / 0 skipped**，receipt 签名、summary hash、identity_stable 核验通过，源码身份 `46fa032947f79a27ba2c4a34e8851f93f81535df4516a0f1ba9200c5619633b0`。覆盖 keymap scheme 编辑/Apply、冲突重分配/取消、输入保护/Reset/Delete、tree recorder、Classic scheme、模板 popup/postfix/comment、breakpoint gutter/dialog、不可用 Rearrange/Cleanup、shell Actions 以及 Extract Method/Undo。随后只展开原门面的长 export 列表；最终组合仍需完整 SHA 的全量回归。
 
 本批为保留行为的实现重构，复用上述已执行的原场景，不新增只验证搬文件的用例。真实 JDT LS 整理/清理、refactor journal 磁盘恢复、DAP hit 和 WebView 重启持久化仍由最终组合上的原生场景验证。整体 P0→P5 尚未全部完成。
+
+## 2026-10-22 实施批次 P：Rust 协议、同步、探测与平台职责
+
+Presto、SDK detect、ACP wire protocol、SSH server、scroll capture、structural search、mail sync 和 config 共 8 个旧大模块按责任分离；83 个相关 Rust 文件中最大为 Presto 测试 762 行，生产模块最大为 SSH requests 494 行。每个实现模块使用显式 imports，旧 API 和两套 Tauri generated command helpers 经门面保留。清单更新至 2795 项。
+
+- Presto 按协议、共享流状态、transport、statement/value、query/catalog 分离；SDK 按证据模型、scope、manifest、Maven/Gradle/Python/version files 分离；ACP 按 request/response、permission、updates/display 分离。
+- SSH authentication/connection、listener、request、forwarding、PTY 与 SFTP path/attributes/handler 分开，共享原连接状态与取消/Drop；截图 scroll 的 control/capture/sampling/input/frame/matching/stitching/chrome 分开。macOS debug QA permission guard 的可见范围保留至 screenshot 域。
+- Structural search 的请求 owner/Drop、pattern、matching/results/files、service/commands 分开；mail sync 的 schema、水位、cache、planning、IMAP 与 folder step 分开，原 UIDVALIDITY/补洞/flags/atomic commit 保留。
+- Config 按文件流、dialogs、clipboard、paths 和四类平台实现分开，平台逻辑 module path 保持兼容。文件流 owner、abort/close、clipboard formats 与原生对话框行为保持。
+- `p-rust-baseline.log` 初次有 4 项本地 HTTP fixture 被外网代理返回 502；加回环 `NO_PROXY` 后同一改前组合 `p-rust-baseline-local.log` 为 **1868 passed / 0 failed / 25 ignored**。没有改产品网络策略或放宽断言。
+- 前 4 模块拆后 `p-rust-check-2.log` 为 **1868 passed / 0 failed / 25 ignored**。8 模块组合 `p-rust-final.log`：lib **1868 passed / 0 failed / 25 ignored**，integration **80 passed / 0 failed**。初期遗漏 trait import、Tauri helper 与重复 test import 的失败日志保留。
+- 301 个生产函数 token 对照一致；Config 公共 29 个函数和 Windows 12/macOS 13/Unix 26/unsupported 8 个平台函数对照一致，仅可见域、真实 helper 路径和 rustfmt 调整。此静态对照不替代行为执行。
+- `rustfmt` 仅作用于本批文件，`git diff --check` 和 **761 commands / 328 façade exports / 39 literal events** 契约通过。格式整理及删除一个 unused import 不改变执行语义；最终仍需完整提交上的三端 native 和全量组合验证。
+
+本批为实现位置与依赖重构，复用原有真实数据库/SSH、截图、clipboard、structural search、ASR 与相关单元测试，不添加只验证文件搬迁的重复场景。后续继续处理其余大文件；当前批次通过不代表 P0→P5 整体完成。
