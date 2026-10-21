@@ -7,7 +7,6 @@ import { Panel,Group as PanelGroup,Separator as PanelResizeHandle,type PanelImpe
 import { useMountedRef } from "../../hooks/useMountedRef";
 import { useProjectDescriptorDiscovery } from "../../hooks/useProjectDescriptorDiscovery";
 import { useProjectFacts } from "../../hooks/useProjectFacts";
-import { promptAppDialog } from "../../lib/appDialogs";
 import { loadAutoImportPreferences } from "../../lib/autoImportPreferences";
 import { writeText } from "../../lib/clipboard";
 import { lspCodeActionResolve,lspDocumentSymbols,lspJavaModules,lspResolveWorkspaceEdit,lspSelectionRanges,lspStartWorkspaceWatcher,lspStopWorkspaceWatcher,lspWorkspaceSymbolResolve,type LspCodeAction,type LspDiagnostic,type LspDocumentDescriptor,type LspDocumentHighlight,type LspDocumentSymbol,type LspInlayHint,type LspLocation,type LspPosition,type LspRange,type LspSemanticToken,type LspWorkspaceApplyEditRequest,type LspWorkspaceEdit,type LspWorkspaceEditOperation } from "../../lib/editor/lsp";
@@ -33,7 +32,7 @@ import { symbolChainAtPosition,type BreadcrumbPathChild,type BreadcrumbPathSegme
 import { ClipboardHistoryPopup } from "./workspace/ClipboardHistoryPopup";
 import { CodeInsightNotice,caretAnchor,type CodeInsightNoticeState } from "./workspace/CodeInsightNotice";
 import type { GoToLineRequest } from "./workspace/CodeMirrorHost";
-import { type EditorCommandId,type EditorCommandOptions,type EditorCommandPort,type EditorCommandPortRegistration,type EditorCommandState,type EditorCommandTarget,type EditorSelectionRange } from "./workspace/CodeMirrorHost";
+import { type EditorSelectionRange } from "./workspace/CodeMirrorHost";
 import { CodeStyleSettingsDialog } from "./workspace/CodeStyleSettingsDialog";
 import { DapAdapterGuideDialog } from "./workspace/DapAdapterGuideDialog";
 import { EditorAiRewriteDialog } from "./workspace/EditorAiRewriteDialog";
@@ -72,7 +71,6 @@ import { WorkspacePopupsHost } from "./workspace/WorkspacePopupsHost";
 import { WorkspaceRecoveryDialog } from "./workspace/WorkspaceRecoveryDialog";
 import { WorkspaceTabPolicySettingsDialog } from "./workspace/WorkspaceTabPolicySettingsDialog";
 import { type AutoImportCandidate } from "./workspace/autoImportModel";
-import { evidencePresentationLine } from "./workspace/capabilityEvidence";
 import { CanonicalCodeActionService } from "./workspace/codeActionProviderAdapter";
 import { resolveEffectiveCodeStyle,type EffectiveCodeStyle,type ExplicitIndentationOverride } from "./workspace/codeStyleModel";
 import { CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE,CODE_WORKSPACE_MAX_TREE_FONT_SIZE,CODE_WORKSPACE_MIN_TREE_FONT_SIZE,absoluteWorkspacePath,basename,errorMessage,fileKey,fsPathComparisonKey,fsPathEquals,gitRootForWorkspacePath,initialLooseFiles,initialRoots,normalizeEditorText,normalizeFsPath,parentPath,readWorkspaceBuildRunTools,relativePathWithinRoot,rootDirKey,shouldLiveSyncLsp,shouldProbeLsp,workspaceTitle,workspaceToolConfig,writeCodeWorkspaceTreeViewMode,writeWorkspaceBuildRunTools,type LibraryBufferInfo,type LspFileState,type OpenFileState,type TreeSelection,type TreeViewMode,type WorkspaceBuildRunTools } from "./workspace/codeWorkspaceModel";
@@ -96,7 +94,6 @@ import { useEditorSemanticDecorations } from "./workspace/controller/useEditorSe
 import { useProjectDiagnostics } from "./workspace/controller/useProjectDiagnostics";
 import { useWorkspacePreferences } from "./workspace/controller/useWorkspacePreferences";
 import { createApplyLspWorkspaceEditNow } from "./workspace/controller/workspaceEditActions";
-import { parseCoverageReport,type WorkspaceCoverageReport } from "./workspace/coverageModel";
 import { type DebugBreakpoint } from "./workspace/dapDebugModel";
 import { isDiagnosticScopeCurrent,type DiagnosticScope } from "./workspace/diagnosticScopeModel";
 import { DEFAULT_EDITOR_APPEARANCE_PROFILE } from "./workspace/editorAppearanceProfile";
@@ -117,11 +114,15 @@ import { useWorkspaceAppearance } from "./workspace/hooks/useWorkspaceAppearance
 import { useWorkspaceBookmarkActions } from "./workspace/hooks/useWorkspaceBookmarkActions";
 import { useWorkspaceBufferStore } from "./workspace/hooks/useWorkspaceBufferStore";
 import { useWorkspaceClipboard } from "./workspace/hooks/useWorkspaceClipboard";
+import { useWorkspaceCommandFocus } from "./workspace/hooks/useWorkspaceCommandFocus";
 import { useWorkspaceComparisons } from "./workspace/hooks/useWorkspaceComparisons";
 import { useWorkspaceCompletion } from "./workspace/hooks/useWorkspaceCompletion";
+import { useWorkspaceCoverage } from "./workspace/hooks/useWorkspaceCoverage";
+import { useWorkspaceDebugEntryPoints } from "./workspace/hooks/useWorkspaceDebugEntryPoints";
 import { useWorkspaceDebugLaunch } from "./workspace/hooks/useWorkspaceDebugLaunch";
 import { useWorkspaceDocumentSync } from "./workspace/hooks/useWorkspaceDocumentSync";
 import { useWorkspaceEditSnapshots } from "./workspace/hooks/useWorkspaceEditSnapshots";
+import { useWorkspaceEditorCommands } from "./workspace/hooks/useWorkspaceEditorCommands";
 import { useWorkspaceEncoding } from "./workspace/hooks/useWorkspaceEncoding";
 import { useWorkspaceFileLifecycle } from "./workspace/hooks/useWorkspaceFileLifecycle";
 import { useWorkspaceGitDecorations } from "./workspace/hooks/useWorkspaceGitDecorations";
@@ -136,6 +137,7 @@ import { useWorkspaceLibrarySources } from "./workspace/hooks/useWorkspaceLibrar
 import { useWorkspaceLocalHistory } from "./workspace/hooks/useWorkspaceLocalHistory";
 import { useWorkspaceLocationOpening } from "./workspace/hooks/useWorkspaceLocationOpening";
 import { useWorkspaceParameterInfo } from "./workspace/hooks/useWorkspaceParameterInfo";
+import { useWorkspaceProblemPresentation } from "./workspace/hooks/useWorkspaceProblemPresentation";
 import { useWorkspaceReferenceSessions } from "./workspace/hooks/useWorkspaceReferenceSessions";
 import { useWorkspaceRunActions } from "./workspace/hooks/useWorkspaceRunActions";
 import { useWorkspaceSave } from "./workspace/hooks/useWorkspaceSave";
@@ -149,8 +151,7 @@ import { useWorkspaceUiActions } from "./workspace/hooks/useWorkspaceUiActions";
 import { useWorkspaceUsages } from "./workspace/hooks/useWorkspaceUsages";
 import { useWorkspaceUsagesState } from "./workspace/hooks/useWorkspaceUsagesState";
 import { inlineRenameNameError } from "./workspace/inlineRename";
-import { diagnosticInspectionId,replaceInspectionBaseline } from "./workspace/inspectionProfile";
-import { toProviderDiagnosticsV3 } from "./workspace/inspectionProviderAdapter";
+import { diagnosticInspectionId } from "./workspace/inspectionProfile";
 import { inlayHintsEnabledForLanguage } from "./workspace/intelligencePreferences";
 import { IntentionSession } from "./workspace/intentionSession";
 import { languageServiceReadiness } from "./workspace/languageServiceReadiness";
@@ -186,7 +187,6 @@ import { type QuickDocContent } from "./workspace/referenceDocumentation";
 import { isDocCommentRenderingSupported,readReaderModePreference,writeReaderModePreference } from "./workspace/renderedDocCommentsModel";
 import { codePointOffsetToUtf16Offset,collectReplacePreimages,replaceMatchAbsolutePath,type ReplaceFilePreimage,type ReplacePrepareOptions } from "./workspace/replaceInFilesModel";
 import { applyRunOverrideToDebugConfiguration,readRunConfigurationOverrides,writeActiveRunConfigurationSelection } from "./workspace/runConfigurationPersistence";
-import { javaMainRunLines,type RunGutterTarget } from "./workspace/runGutter";
 import { SaveTransactionRegistry } from "./workspace/saveCommit";
 import { type SaveObservationRecord,type SaveObservationState } from "./workspace/saveObservationContract";
 import type { ShellShortcutClaim } from "./workspace/shellShortcutRouter";
@@ -207,7 +207,6 @@ import { useWorkspaceTreeData } from "./workspace/useWorkspaceTreeData";
 import { WorkspaceToolbar } from "./workspace/views/WorkspaceToolbar";
 import { createRenderEditorGroup } from "./workspace/views/editorGroupView";
 import { createToolWindowChrome } from "./workspace/views/toolWindowChrome";
-import type { WorkspaceFocus } from "./workspace/workspaceActionRegistry";
 import { WorkspaceClipboardSessionContext } from "./workspace/workspaceClipboardSession";
 import { BUILT_IN_SCHEME_ID,activeSchemeForLanguage,readCodeStyleSchemeStore,schemeStyleFields,writeCodeStyleSchemeStore,type CodeStyleSchemeStoreState } from "./workspace/workspaceCodeStyleSchemes";
 import { type WorkspaceCommand,type WorkspaceCommandContext } from "./workspace/workspaceCommands";
@@ -224,6 +223,11 @@ import { WorkspaceResourceRecoveryCoordinator,type ResourceCleanupHandlers,type 
 import { WorkspaceSemanticQueryHost } from "./workspace/workspaceSemanticQueryHost";
 import { createWorkspaceStyleController,type WorkspaceStyleController } from "./workspace/workspaceStyleController";
 import { type ClosedTabEntry,type WorkspaceTabPolicyV3 } from "./workspace/workspaceTabPolicy";
+
+
+
+
+
 
 
 
@@ -474,145 +478,24 @@ export function CodeWorkspaceTab({
   const openFilesRef = useRef(openFiles);
   const openOrderRef = useRef(openOrder);
   const lspFilesRef = useRef(lspFiles);
-  const editorCommandPortsRef = useRef(new Map<EditorGroupId, {
-    fileKey: string;
-    token: object;
-    port: EditorCommandPort;
-  }>());
   const treeInteractionEpochRef = useRef(0);
   const treeOpenRequestIdRef = useRef(0);
   const pendingTreeOpenIntentRef = useRef<TreeOpenIntent | null>(null);
   const tryGrantTreeFocusRef = useRef<(intent: TreeOpenIntent, canonicalKey: string) => boolean>(() => false);
-
-  const [editorCommandContextRevision, setEditorCommandContextRevision] = useState(0);
-  /** Selection-derived action-context flags last published (see onSelectionChange). */
-  const editorCommandSignatureRef = useRef<string | null>(null);
-  const registerEditorCommandPort = useCallback((
-    groupId: EditorGroupId,
-    registration: EditorCommandPortRegistration,
-  ) => {
-    const current = editorCommandPortsRef.current.get(groupId);
-    if (registration.port) {
-      editorCommandPortsRef.current.set(groupId, {
-        fileKey: registration.fileKey,
-        token: registration.token,
-        port: registration.port,
-      });
-      setEditorCommandContextRevision((revision) => revision + 1);
-      if (pendingTreeOpenIntentRef.current) {
-        const intent = pendingTreeOpenIntentRef.current;
-        if (intent.groupId === groupId) {
-          const expectedKey = intent.canonicalFileKey ?? intent.requestedFileKey;
-          if (expectedKey === registration.fileKey) {
-            tryGrantTreeFocusRef.current(intent, registration.fileKey);
-          }
-        }
-      }
-      return;
-    }
-    if (
-      current?.fileKey !== registration.fileKey
-      || current.token !== registration.token
-    ) {
-      return;
-    }
-    editorCommandPortsRef.current.delete(groupId);
-    setEditorCommandContextRevision((revision) => revision + 1);
-  }, []);
-  const activeEditorCommandOwner = useCallback(() => {
-    const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
-    const groupId = ui.activeEditorGroupId;
-    const fileKey = ui.editorGroups[groupId]?.activeKey ?? null;
-    const owner = editorCommandPortsRef.current.get(groupId) ?? null;
-    return owner && fileKey === owner.fileKey ? owner : null;
-  }, [workspaceInstanceId]);
-  /**
-   * Owner lookup pinned to an explicit recursive leaf. Context menus freeze
-   * `{groupId, fileKey}` at open time; this guard keeps a later active-group
-   * change from redirecting their execution to a different editor.
-   */
-  const editorCommandOwnerFor = useCallback((groupId: string, fileKey: string) => {
-    const owner = editorCommandPortsRef.current.get(groupId as EditorGroupId) ?? null;
-    return owner && owner.fileKey === fileKey ? owner : null;
-  }, []);
-  const activeEditorCommandState = useCallback((): EditorCommandState | null => {
-    return activeEditorCommandOwner()?.port.state() ?? null;
-  }, [activeEditorCommandOwner]);
-  const executeActiveEditorCommand = useCallback((commandId: EditorCommandId, options?: EditorCommandOptions) => {
-    return activeEditorCommandOwner()?.port.execute(commandId, options) ?? false;
-  }, [activeEditorCommandOwner]);
-  const executeEditorCommandFor = useCallback((
-    target: EditorCommandTarget | undefined,
-    commandId: EditorCommandId,
-    options?: EditorCommandOptions,
-  ) => {
-    if (target) {
-      return editorCommandOwnerFor(target.groupId, target.fileKey)
-        ?.port.execute(commandId, options) ?? false;
-    }
-    return executeActiveEditorCommand(commandId, options);
-  }, [editorCommandOwnerFor, executeActiveEditorCommand]);
-  const executeEditorCommand = useCallback((commandId: EditorCommandId, context?: WorkspaceCommandContext) => {
-    const target = context?.payload as EditorCommandTarget | undefined;
-    if (
-      target
-      && typeof target === "object"
-      && typeof target.groupId === "string"
-      && typeof target.fileKey === "string"
-    ) {
-      return executeEditorCommandFor(target, commandId);
-    }
-    return executeActiveEditorCommand(commandId);
-  }, [executeActiveEditorCommand, executeEditorCommandFor]);
-  /**
-   * Availability state for a command invocation. A context-menu payload pins
-   * the owning leaf; without one (keyboard, palette) the active leaf answers.
-   */
-  const editorCommandStateFor = useCallback((context?: WorkspaceCommandContext): EditorCommandState | null => {
-    const target = context?.payload as EditorCommandTarget | undefined;
-    if (
-      target
-      && typeof target === "object"
-      && typeof target.groupId === "string"
-      && typeof target.fileKey === "string"
-    ) {
-      return editorCommandOwnerFor(target.groupId, target.fileKey)?.port.state() ?? null;
-    }
-    return activeEditorCommandState();
-  }, [activeEditorCommandState, editorCommandOwnerFor]);
-  const handleReturnToEditor = useCallback(() => {
-    const owner = activeEditorCommandOwner();
-    if (owner?.port?.focus) {
-      owner.port.focus({ preventScroll: true });
-      return;
-    }
-    const cmContent = document.querySelector<HTMLElement>(".cm-editor .cm-content");
-    cmContent?.focus({ preventScroll: true });
-  }, [activeEditorCommandOwner]);
-  /**
-   * Resolve a provider-action invocation target. Context-menu payloads carry
-   * the clicked file and position; keyboard/palette invocations fall back to
-   * the active file at the current selection.
-   */
-  const resolveEditorTarget = useCallback((context?: WorkspaceCommandContext): {
-    file: OpenFileState | null;
-    position: LspPosition | undefined;
-  } => {
-    const payload = context?.payload as {
-      groupId?: unknown;
-      fileKey?: unknown;
-      position?: LspPosition;
-    } | undefined;
-    if (typeof payload === "object" && payload !== null && typeof payload.fileKey === "string") {
-      const file = openFilesRef.current[payload.fileKey] ?? null;
-      return { file, position: payload.position };
-    }
-    // activeKeyRef is declared later in the component (keyboard switcher owns
-    // it), so read through the store for the fallback active file.
-    const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
-    const file = openFilesRef.current[ui.activeKey ?? ""] ?? null;
-    return { file, position: editorSelectionRef.current.end };
-  }, [workspaceInstanceId]);
+  const editorSelectionRef = useRef<EditorSelectionRange>({
+    start: { line: 0, character: 0 },
+    end: { line: 0, character: 0 },
+    empty: true,
+    text: "",
+    rect: null,
+  });
+  const { editorCommandOwnerFor, handleReturnToEditor, resolveEditorTarget, executeActiveEditorCommand, executeEditorCommand, editorCommandStateFor, activeEditorCommandState, editorCommandContextRevision, activeEditorCommandOwner, executeEditorCommandFor, editorCommandSignatureRef, setEditorCommandContextRevision, registerEditorCommandPort } = useWorkspaceEditorCommands({
+    pendingTreeOpenIntentRef,
+    tryGrantTreeFocusRef,
+    workspaceInstanceId,
+    openFilesRef,
+    editorSelectionRef,
+  });
   /**
    * False after unmount so async callbacks skip setState. MUST come from
    * `useMountedRef`: the inline `useEffect(() => () => { ref.current = false })`
@@ -865,13 +748,6 @@ export function CodeWorkspaceTab({
   // this value so an older response can never repaint a newer buffer.
   const lspDocumentEpochRef = useRef<Record<string, number>>({});
   const revealNonceRef = useRef(0);
-  const editorSelectionRef = useRef<EditorSelectionRange>({
-    start: { line: 0, character: 0 },
-    end: { line: 0, character: 0 },
-    empty: true,
-    text: "",
-    rect: null,
-  });
   const workspaceCommandRunnerRef = useRef<(commandId: string, context?: WorkspaceCommandContext) => boolean>(() => false);
   // CodeMirror owns character-level history. This separate stack groups a
   // multi-file WorkspaceEdit into one IDEA-style transaction.
@@ -1569,7 +1445,7 @@ export function CodeWorkspaceTab({
         return false;
       }
     }
-    const owner = editorCommandPortsRef.current.get(intent.groupId);
+    const owner = editorCommandOwnerFor(intent.groupId, canonicalKey);
     if (owner && owner.fileKey === canonicalKey && owner.port.focus) {
       const focused = owner.port.focus({ preventScroll: true });
       if (focused) {
@@ -4102,38 +3978,12 @@ export function CodeWorkspaceTab({
     }, 250);
     return () => clearTimeout(timer);
   }, [activeFile, executeAutoImportOnTheFly, lspFiles]);
-
-  const [coverageReport, setCoverageReport] = useState<WorkspaceCoverageReport | null>(null);
-  const [coverageOverlayEnabled, setCoverageOverlayEnabled] = useState(true);
+  const { coverageReport, scanWorkspaceCoverage, coverageOverlayEnabled, setCoverageOverlayEnabled } = useWorkspaceCoverage({
+    rootsRef,
+    setStatusMessage,
+  });
   const [dapGuideOpen, setDapGuideOpen] = useState(false);
   const [keymapCheatSheetOpen, setKeymapCheatSheetOpen] = useState(false);
-
-  const scanWorkspaceCoverage = useCallback(async () => {
-    for (const root of rootsRef.current) {
-      const candidates = [
-        "coverage/lcov.info",
-        "lcov.info",
-        "target/site/jacoco/jacoco.xml",
-        "target/site/jacoco-aggregate/jacoco.xml",
-        "build/reports/jacoco/test/jacocoTestReport.xml",
-        "coverage.xml",
-      ];
-      for (const rel of candidates) {
-        try {
-          const file = await workspaceReadFile(root.path, rel);
-          if (file && file.text) {
-            const report = parseCoverageReport(file.text);
-            setCoverageReport(report);
-            setStatusMessage(`Loaded test coverage (${rel}): ${report.totalPercentage}% covered`);
-            return;
-          }
-        } catch {
-          // Continue searching candidates
-        }
-      }
-    }
-    setStatusMessage("No coverage reports found (run tests with coverage enabled)");
-  }, [setStatusMessage]);
 
   // §8.18.5 closed-tab reopen stack (session-only, max 50, never persisted).
   const [closedTabsStack, setClosedTabsStack] = useState<readonly ClosedTabEntry[]>([]);
@@ -4478,54 +4328,10 @@ export function CodeWorkspaceTab({
     coverageReport,
     occurrenceSession,
   ]);
-
-  const commandFocusForTarget = useCallback((target: EventTarget | null): WorkspaceFocus => {
-    const node = target instanceof Node ? target : null;
-    if (!node) return "workspace";
-    // Terminal dock marks itself with data-workspace-focus="terminal".
-    const el = node instanceof Element ? node : node.parentElement;
-    if (el?.closest?.('[data-workspace-focus="terminal"]')) return "terminal";
-    if (el?.closest?.('[data-workspace-focus="modal"]') || el?.closest?.('[role="dialog"]') || el?.closest?.('[data-testid$="-popup"]')) return "modal";
-    if ((el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) && !el.closest(".cm-editor")) return "modal";
-    if (treePaneRef.current?.contains(node)) return "tree";
-    if (editorPaneRef.current?.contains(node)) return "editor";
-    return "workspace";
-  }, []);
-
-  const isSurfaceOwnedKeyEvent = useCallback((target: EventTarget | null): boolean => {
-    const node = target instanceof Node ? target : null;
-    const element = node instanceof Element ? node : node?.parentElement;
-    return Boolean(element?.closest?.(
-      '[data-testid="code-workspace-editor-search"], [data-testid="code-workspace-breadcrumbs"], [data-testid="code-workspace-highlighting-widget"], [data-testid="code-workspace-todos-panel"], [data-taomni-context-menu], [data-testid="code-workspace-search-everywhere"]'
-      // ED-PARITY-004 S7/A3.5: the Keymap settings + Cheat Sheet surfaces own
-      // their own keyboard state. Their filter/search inputs must receive
-      // Ctrl+F as text instead of the workspace dispatcher opening the editor
-      // find panel behind the dialog. The Keymap recorder keeps working
-      // because it listens on window capture independently of this guard.
-      + ', [data-testid="workspace-keymap-settings-dialog"], [data-testid="keymap-cheatsheet-dialog"], [data-testid="code-workspace-undo-confirm"]'
-      // ED-PARITY-009: the Structural Search dialog owns Esc/Ctrl+Enter and text input.
-      + ', [data-testid="structural-search-dialog"]'
-      // ED-PARITY-017: the in-place naming session owns Esc/Enter/Shift+F6/Alt+Shift+O.
-      + ', [data-testid="code-workspace-inline-rename"]'
-      // Debugger popups/dialogs own their fields, Esc and Delete.
-      + ', [data-testid="debug-breakpoint-popup"], [data-testid="debug-breakpoints-dialog"], [data-testid="debug-evaluate-dialog"]',
-    ));
-  }, []);
-
-  const isNativeTextInputTarget = useCallback((target: EventTarget | null): boolean => {
-    const node = target instanceof Node ? target : null;
-    const element = node instanceof Element ? node : node?.parentElement;
-    return Boolean(
-      (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement)
-      && !element.closest(".cm-editor"),
-    );
-  }, []);
-
-  const isEditorSurfaceKeyEvent = useCallback((target: EventTarget | null): boolean => {
-    const node = target instanceof Node ? target : null;
-    const element = node instanceof Element ? node : node?.parentElement;
-    return Boolean(element?.closest?.(".cm-editor"));
-  }, []);
+  const { commandFocusForTarget, isSurfaceOwnedKeyEvent, isNativeTextInputTarget, isEditorSurfaceKeyEvent } = useWorkspaceCommandFocus({
+    treePaneRef,
+    editorPaneRef,
+  });
 
   // Stable identity unless the active file actually changes, so the action
   // snapshot stays fresh on file switch without re-render feedback loops.
@@ -4984,79 +4790,22 @@ export function CodeWorkspaceTab({
 
   const problemsScopeFiles = problemsScope === "project" ? projectProblemFiles : problemFiles;
   const analysisFiles = problemsScopeFiles;
-  // §8.20.4 DoD: every diagnostic row shows provider/scope/revision/completeness.
-  const problemEvidenceLinesByKey = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const file of problemsScopeFiles) {
-      const state = lspFilesRef.current[file.key];
-      if (!state) continue;
-      for (const wrapped of toProviderDiagnosticsV3(state.diagnostics ?? [], {
-        languageId: state.status?.languageId ?? "plaintext",
-        provider: { id: "jdtls", version: state.status?.displayName ?? null, generation: lspSessionGeneration() },
-        projectFingerprint: projectAnalysisSnapshot?.projectFingerprint ?? "",
-        uri: state.status?.uri ?? file.key,
-        revision: openFilesRef.current[file.key]?.documentRevision ?? 0,
-      })) {
-        map.set(
-          `${file.key}:${wrapped.diagnostic.message}:${wrapped.diagnostic.range.start.line}`,
-          evidencePresentationLine(wrapped.evidence),
-        );
-      }
-    }
-    return map;
-  }, [lspSessionGeneration, problemsScopeFiles, projectAnalysisSnapshot?.projectFingerprint]);
-  const evidenceLineForProblem = useCallback((fileKey: string, diagnostic: LspDiagnostic) => (
-    problemEvidenceLinesByKey.get(`${fileKey}:${diagnostic.message}:${diagnostic.range.start.line}`) ?? null
-  ), [problemEvidenceLinesByKey]);
-  const suppressedInSourceForProblem = useCallback((fileKey: string, diagnostic: LspDiagnostic) => (
-    suppressedInSourceKeys.has(
-      `${inspectionPathForFileKey(fileKey)}:${diagnosticInspectionId(diagnostic)}:${diagnostic.range.start.line}`,
-    )
-  ), [inspectionPathForFileKey, suppressedInSourceKeys]);
-  const createInspectionBaselineFromScope = useCallback(() => {
-    const sources = problemsScopeFiles.flatMap((file) => file.diagnostics.map((diagnostic) => ({
-      diagnostic,
-      path: inspectionPathForFileKey(file.key),
-    })));
-    persistInspectionProfile((current) => replaceInspectionBaseline(current, sources));
-    setStatusMessage(`Inspection baseline replaced with ${sources.length} provider diagnostic${sources.length === 1 ? "" : "s"}`);
-  }, [inspectionPathForFileKey, persistInspectionProfile, problemsScopeFiles, setStatusMessage]);
-  const activeProblemCounts = useMemo(
-    () => problemsScopeFiles.reduce(
-      (counts, file) => {
-        for (const diagnostic of file.diagnostics) {
-          const display = inspectionTransform(diagnostic, file.path ?? file.subtitle);
-          if (display?.severity === 1) counts.errors += 1;
-          else if (display?.severity === 2) counts.warnings += 1;
-        }
-        return counts;
-      },
-      { errors: 0, warnings: 0 },
-    ),
-    [inspectionTransform, problemsScopeFiles],
-  );
-
-  const openProblem = useCallback(
-    (fileKeyValue: string, diagnostic: LspDiagnostic) => {
-      // Open-file key (open scope) → reveal in place.
-      const openState = openFilesRef.current[fileKeyValue];
-      if (openState) {
-        revealEditorLocation(openState.key, diagnostic.range);
-        void openFile(openState.ref);
-        return;
-      }
-      // Project scope: the key is an absolute path to a (possibly unopened) file.
-      const ref = problemPathToRef(fileKeyValue);
-      if (!ref) return;
-      void openFile(ref).then(() => revealEditorLocation(fileKey(ref), diagnostic.range));
-    },
-    [openFile, problemPathToRef, revealEditorLocation],
-  );
-
-  const openRelatedDiagnostic = useCallback((diagnostic: LspDiagnostic) => {
-    const location = diagnostic.relatedInformation?.[0]?.location;
-    if (location) void openLspLocation(location);
-  }, [openLspLocation]);
+  const { activeProblemCounts, openProblem, openRelatedDiagnostic, evidenceLineForProblem, suppressedInSourceForProblem, createInspectionBaselineFromScope } = useWorkspaceProblemPresentation({
+    problemsScopeFiles,
+    lspFilesRef,
+    lspSessionGeneration,
+    projectAnalysisSnapshot,
+    openFilesRef,
+    suppressedInSourceKeys,
+    inspectionPathForFileKey,
+    persistInspectionProfile,
+    setStatusMessage,
+    inspectionTransform,
+    revealEditorLocation,
+    openFile,
+    problemPathToRef,
+    openLspLocation,
+  });
 
   // M8 E: Java test discovery + terminal run. Discovery targets the active .java
   // file; running builds a Maven/Gradle command and reuses the terminal runner.
@@ -5215,91 +4964,24 @@ export function CodeWorkspaceTab({
     activeDebugConfigurationCatalog,
     roots,
   });
-
-  // ED-PARITY-022 DEC-022-03: run gutter ▶ only where a detected run
-  // configuration of this very file exists (no facts → no icon).
-  const runGutterKey = useMemo(() => {
-    if (!activeFile || !activeFileIsJava || !activeRunConfiguration?.sourceFile) return "";
-    const absolute = absolutePathForOpenFile(activeFile);
-    if (!absolute || !fsPathEquals(normalizeFsPath(activeRunConfiguration.sourceFile), normalizeFsPath(absolute))) return "";
-    const { classLine, mainLine } = javaMainRunLines(activeFile.text);
-    if (mainLine === null) return "";
-    return JSON.stringify({
-      label: activeRunConfiguration.label,
-      lines: classLine !== null && classLine !== mainLine ? [classLine, mainLine] : [mainLine],
-    });
-  }, [absolutePathForOpenFile, activeFile, activeFileIsJava, activeRunConfiguration]);
-  const activeRunGutterTargets = useMemo<RunGutterTarget[]>(() => {
-    if (!runGutterKey) return [];
-    const parsed = JSON.parse(runGutterKey) as { label: string; lines: number[] };
-    return parsed.lines.map((line) => ({ line, label: parsed.label }));
-  }, [runGutterKey]);
-  const handleRunGutterClick = useCallback((target: RunGutterTarget, anchor: { x: number; y: number }) => {
-    openEditorContextMenuAt(anchor.x, anchor.y, [
-      {
-        label: `Run '${target.label}'`,
-        testId: "code-workspace-run-gutter-run",
-        shortcut: "Ctrl+Shift+F10",
-        onClick: () => { void runActiveJavaFileRef.current(); },
-      },
-      {
-        label: `Debug '${target.label}'`,
-        testId: "code-workspace-run-gutter-debug",
-        onClick: () => startDebugActiveTarget(),
-      },
-    ]);
-  }, [openEditorContextMenuAt, startDebugActiveTarget]);
-
-  /**
-   * Attach to a JVM already running with `-agentlib:jdwp=...,server=y,address=…`
-   * (IDEA's "Remote JVM Debug"). The active file still selects the jdtls session
-   * so breakpoints resolve against this project's sources.
-   */
-  const attachRemoteDebug = useCallback(() => {
-    const file = openFilesRef.current[activeKey ?? ""];
-    if (!file || file.ref.kind !== "root") return;
-    const root = findRoot(file.ref.rootId);
-    const absolute = absolutePathForOpenFile(file);
-    if (!root || !absolute) return;
-    const descriptor = lspDescriptorForFile(file);
-    void (async () => {
-      const target = await promptAppDialog({
-        title: "Attach to remote JVM",
-        label: "Debug address — host:port, or just the port for localhost",
-        initialValue: "localhost:5005",
-      });
-      if (target === null) return;
-      const trimmed = target.trim();
-      if (!trimmed) return;
-      const [hostPart, portPart] = trimmed.includes(":")
-        ? [trimmed.slice(0, trimmed.lastIndexOf(":")), trimmed.slice(trimmed.lastIndexOf(":") + 1)]
-        : ["localhost", trimmed];
-      const port = Number.parseInt(portPart, 10);
-      if (!Number.isInteger(port) || port <= 0 || port > 65535) {
-        setStatusMessage(`Not a valid debug address: ${trimmed}`);
-        return;
-      }
-      try {
-        await debug.startDebug({
-          workspaceId: descriptor?.workspaceId ?? workspaceInstanceId,
-          rootPath: root.path,
-          filePath: absolute,
-          request: "attach",
-          hostName: hostPart || "localhost",
-          port,
-          serverCommandId: descriptor?.serverCommandId ?? null,
-          customServerCommand: descriptor?.customServerCommand ?? null,
-        });
-        setBottomDockTab("debug");
-        setBottomDockOpen(true);
-      } catch (err) {
-        setStatusMessage(errorMessage(err));
-      }
-    })();
-  }, [
-    activeKey, debug, findRoot, lspDescriptorForFile, absolutePathForOpenFile,
-    setBottomDockOpen, setBottomDockTab, setStatusMessage, workspaceInstanceId,
-  ]);
+  const { activeRunGutterTargets, handleRunGutterClick, attachRemoteDebug } = useWorkspaceDebugEntryPoints({
+    activeFile,
+    activeFileIsJava,
+    activeRunConfiguration,
+    absolutePathForOpenFile,
+    openEditorContextMenuAt,
+    runActiveJavaFileRef,
+    startDebugActiveTarget,
+    openFilesRef,
+    activeKey,
+    findRoot,
+    lspDescriptorForFile,
+    setStatusMessage,
+    debug,
+    workspaceInstanceId,
+    setBottomDockTab,
+    setBottomDockOpen,
+  });
   const { openDebugFrame } = useDebugSourceNavigation({
     problemPathToRef,
     openFile,
@@ -7044,6 +6726,11 @@ export function CodeWorkspaceTab({
     </WorkspaceClipboardSessionContext.Provider>
   );
 }
+
+
+
+
+
 
 
 
