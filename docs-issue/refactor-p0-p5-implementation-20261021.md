@@ -477,3 +477,25 @@ H/I/J 全量的当前下载仅含 8 reports（Linux browser 396、Linux dual-dis
 全文件清单现为 2558 项。P0→P5 其余结构退出条件及最终三端验证继续推进，不以此单批次宣布整体完成。
 
 L 修正后的 `l-build-final.log` 成功：TypeScript、761 commands / 328 façade exports / 39 literal events、424 implementation modules 的边界检查及 Vite 构建全部通过。`l-recipient-final.log` 3 passed，IPC mock 类型与真实边界一致。
+
+### H/I/J 全量及 K 定向三端原始结果收齐
+
+- H/I/J run [39616923665](https://github.com/engcapa/taomni/actions/runs/39616923665)，实际源码 `4741b43c09dbcc759da24f3ae79f86ec8302f44f`。25 份原始 runner receipt 的签名、summary 哈希及 `identity_stable` 全部核验通过，源码指纹统一为 `a3284b1fd12a3cc48d7bdad8cc1013e6de0177df77bef82deea3c9419ad27e96`。Linux browser 396/native 215（含独立双屏 1），Windows browser 396/native 197 passed + 2 failed，macOS browser 394/native 186 passed + 1 failed；合计 **1784 passed / 3 failed / 0 skipped**。聚合 `passed=false`、`report_ok=true`，三端 native build 和 Rust contracts job 成功；原 3 个外部 Java 项目缺口及 99 个 unreviewed 条目保留。
+- H/I/J 失败保留：macOS `TC-123` step56 在保存后重开会话设置时找不到网络页按钮；Windows `TC-IDE-TREEOPEN-01-project-tree-open-focus-native` step40 的树菜单缺少 Open/Rename/Delete；Windows `TC-RDPS-NAT-08-mstsc-interop` step26 在停止已连接、完成图像断言的 mstsc 时抛出 WinError5。须依据原始日志/截图和实际生命周期定位，不得用 workflow 绿色或重跑成功抹除。
+- K run [39619541727](https://github.com/engcapa/taomni/actions/runs/39619541727)，实际源码 `26e9bb580e481e6455ab0d18c1f4a2cae517ee37`。15 份原始报告核验通过，统一指纹 `49f866c47d7275dadcd6ec99978edc397cfbd4920d3ff497869b1970812ba460`。Linux browser9/native7，Windows browser9/native5，macOS browser9/native5；合计 **44 passed / 0 failed / 0 skipped**，聚合 `passed=true`、`report_ok=true`、无 gaps。Linux 的两项 Java 调试场景没有在另两平台选择，不能作为另两平台的通过项。三平台 PERF-03 与 MAIL-BULK-01 在各自已选择范围通过，仍须最终提交全量验收。
+
+原始报告分别保留于 `qa-ui-auto-report/refactor-p0-p5/github-hij/` 和 `github-k/`。以上是对应历史提交的证据，未用作尚在修改的 M 批次完成证明。
+
+## 2026-10-22 实施批次 M：编辑器入口职责收敛
+
+- `CodeWorkspaceTab.tsx` 从 6,791 行收敛至 152 行，只按依赖顺序连接 session、project、files、editing、semantics、commands、insight、execution 和 surfaces。保留对外 props/exports。新建 53 个生产模块，格式化后最大 546 行，ShellView 330 行；没有另建巨型 controller。
+- 按实际所有权迁移 buffer/edit/recovery、code style、semantic query、tree intent/focus/menu、LSP document/cancellation、Java creation、code actions、transaction/planning、自动导入 timer、status/context publication、缩放监听和视图弹窗。异步 token、ref mirror、StrictMode restore、卸载 cleanup 和原 effect 依赖保持原语义。后声明动作继续通过带类型的接口惰性读取，避免 render 初始化顺序改变；界面状态与执行/语义动作各有独立 owner。
+- 本批是实现重构，保留原有可执行用例和断言。`m-editor-tests-2.log`：原 CodeWorkspaceTab + CodeMirrorHost **327 passed / 0 failed**。首次 `m-editor-tests-1.log` 的 3 个失败为 refactoring popup 提取时引用遗漏，已修复，失败日志保留。
+- `m-types-9.log`、`m-build.log` 通过；后续只整理 import、展开长 return 对象和修复反向 type import，`m-build-final.log` 为提交前最终构建。契约 761 commands / 328 façade exports / 39 literal events，477 implementation modules 无反向 facade 引用和内部运行时循环。
+- `browser-m/run-20261022-003444-968965816`：Linux Chromium **19 passed / 0 failed / 0 skipped**，覆盖 settings、tab policy、clipboard、keymap、tool windows、replace undo、VCS popup、focus、Actions、occurrences、Problems、Undo transaction、SSH network save/reopen。已校验 summary 哈希、receipt 签名及 identity_stable；最终格式整理不改变这些执行语义。native 留待本批提交上的三端 workflow。
+- H/I/J macOS TC-123 的保存后重开竞态：两次保存均增加等待旧 editor 关闭的断言；不能以已有 tree row 判断保存完成。所有旧持久化断言保留，requirements step/actions/results 映射同步，`m-audit.log` gate 通过，当前 browser 原场景通过。
+- Windows mstsc stop 的进程退出竞态：TerminateProcess 返回 ACCESS_DENIED 时只在 GetExitCodeProcess 已确认退出后接受；仍运行或其他错误继续失败。5 个 focused Python 回归中先验证两个旧实现失败，再全部通过（`m-mstsc-red.log` / `m-mstsc-green.log`），workflow tool-contracts 加入该测试。仍需 Windows 实际 native 退出验证。TREEOPEN 的历史输入落在树空白区域的问题仍保留为待验证，未盲改产品或放宽断言。
+
+AGENTS.md 的小文件规则已在 `bd8ddb29` 提交：目标 200–500 行、新建/提取 ≤800 行、按状态与生命周期划分，禁止压缩排版或搬成另一个巨型 controller，生成/schema/locale/不可分 fixture 例外需按规则处理。
+
+P0→P5 整体仍在推进，后续继续处理其余大文件，并在最终完整 SHA 上执行全量 Vitest、适用 Rust 回归和三端 scope=all；历史通过不代替最终证据。

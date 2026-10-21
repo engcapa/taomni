@@ -892,7 +892,7 @@ src/components/detached/DetachedSessionWindow.tsx	frontend	tsx	frontend-componen
 src/components/detached/LanChatDetachedWindow.tsx	frontend	tsx	frontend-component	571	14	1	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/editor/CodeWorkspaceTab.fileTemplate.test.tsx	frontend	tsx	test	647	7	0	0		自动化测试/QA 集成测试
 src/components/editor/CodeWorkspaceTab.test.tsx	frontend	tsx	test	1096	22	2	0		工作区总控集成测试；覆盖保存、恢复、LSP、布局、导航和编辑行为
-src/components/editor/CodeWorkspaceTab.tsx	frontend	tsx	frontend-component	6791	225	2	1	>=5000	工作区总控组件：文件树、编辑器组、LSP、保存/恢复、WorkspaceEdit、工具窗口、命令绑定与渲染
+src/components/editor/CodeWorkspaceTab.tsx	frontend	tsx	frontend-component	152	15	2	1		工作区总控组件：文件树、编辑器组、LSP、保存/恢复、WorkspaceEdit、工具窗口、命令绑定与渲染
 src/components/editor/workspace/AutoImportCandidateDialog.test.tsx	frontend	tsx	test	119	4	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/AutoImportCandidateDialog.tsx	frontend	tsx	frontend-component	144	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/editor/workspace/AutoImportSettingsDialog.test.tsx	frontend	tsx	test	73	4	0	0		自动化测试/QA 集成测试
@@ -1193,48 +1193,88 @@ src/components/editor/workspace/hooks/useRefactorRecovery.ts	frontend	ts	fronten
 src/components/editor/workspace/hooks/useReferenceDocumentation.ts	frontend	ts	frontend-component	288	11	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/hooks/useSemanticNavigation.ts	frontend	ts	frontend-component	308	8	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/hooks/useSymbolRefactoring.ts	frontend	ts	frontend-component	595	18	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/editor/workspace/hooks/useWorkspaceActionPorts.ts	frontend	ts	frontend-component	69	9	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceAnnouncements.ts	frontend	ts	frontend-component	91	3	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceAppearance.ts	frontend	ts	frontend-component	183	5	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceBookmarkActions.ts	frontend	ts	frontend-component	162	5	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/editor/workspace/hooks/useWorkspaceBufferState.ts	frontend	ts	frontend-component	68	3	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceBufferStore.ts	frontend	ts	frontend-component	157	5	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/editor/workspace/hooks/useWorkspaceBuildTools.ts	frontend	ts	frontend-component	60	6	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceClipboard.ts	frontend	ts	frontend-feature-lib	39	3	2	0		按职责拆分的领域模块；生产入口调用，保留原有 API 与生命周期
+src/components/editor/workspace/hooks/useWorkspaceCodeActions.ts	frontend	ts	frontend-component	169	20	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceCodeStyle.ts	frontend	ts	frontend-component	112	8	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceCommandCatalog.ts	frontend	ts	frontend-component	504	56	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceCommandFocus.ts	frontend	ts	frontend-component	61	2	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceCommandRouting.tsx	frontend	tsx	frontend-component	401	23	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceComparisons.ts	frontend	ts	frontend-component	160	9	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/hooks/useWorkspaceCompletion.ts	frontend	ts	frontend-component	182	5	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/editor/workspace/hooks/useWorkspaceContextPublication.ts	frontend	ts	frontend-component	140	6	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceCoverage.ts	frontend	ts	frontend-component	45	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceDebugEntryPoints.ts	frontend	ts	frontend-component	134	7	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceDebugLaunch.ts	frontend	ts	frontend-feature-lib	186	8	2	0		按职责拆分的领域模块；生产入口调用，保留原有 API 与生命周期
+src/components/editor/workspace/hooks/useWorkspaceDocumentEditing.ts	frontend	ts	frontend-component	262	21	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceDocumentLanguage.ts	frontend	ts	frontend-component	268	16	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceDocumentSync.ts	frontend	ts	frontend-component	128	3	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/editor/workspace/hooks/useWorkspaceEditPlanning.ts	frontend	ts	frontend-component	123	9	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceEditSnapshots.ts	frontend	ts	frontend-component	205	11	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/editor/workspace/hooks/useWorkspaceEditState.ts	frontend	ts	frontend-component	195	7	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceEditTransactions.ts	frontend	ts	frontend-component	305	29	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceEditingFeatures.ts	frontend	ts	frontend-component	254	21	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceEditorCommands.test.ts	frontend	ts	test	89	5	0	0		行为回归测试
 src/components/editor/workspace/hooks/useWorkspaceEditorCommands.ts	frontend	ts	frontend-component	164	7	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceEditorTelemetry.ts	frontend	ts	frontend-component	121	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceEncoding.ts	frontend	ts	frontend-component	130	6	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/editor/workspace/hooks/useWorkspaceExecutionRuntime.ts	frontend	ts	frontend-component	270	22	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceFileLifecycle.ts	frontend	ts	frontend-component	316	14	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/editor/workspace/hooks/useWorkspaceFileOpening.ts	frontend	ts	frontend-component	324	20	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceGitDecorations.ts	frontend	ts	frontend-component	266	10	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/hooks/useWorkspaceHierarchy.ts	frontend	ts	frontend-component	126	9	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceInspections.ts	frontend	ts	frontend-component	139	7	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceIntelligencePreferences.ts	frontend	ts	frontend-component	43	3	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceIntelligenceRuntime.ts	frontend	ts	frontend-component	246	21	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceJavaCreation.ts	frontend	ts	frontend-component	115	12	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceKeyboard.ts	frontend	ts	frontend-component	396	9	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/hooks/useWorkspaceKeymap.ts	frontend	ts	frontend-component	89	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceLanguagePreferences.ts	frontend	ts	frontend-component	97	9	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceLayoutHydration.ts	frontend	ts	frontend-feature-lib	117	6	2	0		按职责拆分的领域模块；生产入口调用，保留原有 API 与生命周期
 src/components/editor/workspace/hooks/useWorkspaceLayoutPersistence.ts	frontend	ts	frontend-component	305	9	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/hooks/useWorkspaceLibrarySources.ts	frontend	ts	frontend-component	223	8	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/hooks/useWorkspaceLocalHistory.ts	frontend	ts	frontend-component	105	6	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/hooks/useWorkspaceLocationOpening.ts	frontend	ts	frontend-component	108	6	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/editor/workspace/hooks/useWorkspaceOccurrences.ts	frontend	ts	frontend-component	103	6	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceParameterInfo.ts	frontend	ts	frontend-component	109	5	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceProblemPresentation.ts	frontend	ts	frontend-component	120	9	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceProjectRuntime.ts	frontend	ts	frontend-component	270	25	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceReaderMode.ts	frontend	ts	frontend-component	65	3	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceRecoveryActions.ts	frontend	ts	frontend-component	147	6	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceRecoveryState.ts	frontend	ts	frontend-component	147	6	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceReferenceSessions.ts	frontend	ts	frontend-component	39	3	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/hooks/useWorkspaceRunActions.ts	frontend	ts	frontend-component	304	9	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/hooks/useWorkspaceSave.ts	frontend	ts	frontend-component	374	19	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/editor/workspace/hooks/useWorkspaceSearchNavigation.ts	frontend	ts	frontend-component	214	22	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceSemanticFeatures.ts	frontend	ts	frontend-component	295	22	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceSemanticQueries.ts	frontend	ts	frontend-component	53	7	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceSession.ts	frontend	ts	frontend-component	183	23	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceSplits.ts	frontend	ts	frontend-component	134	3	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/editor/workspace/hooks/useWorkspaceStatusBridge.ts	frontend	ts	frontend-component	226	15	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceStoreActions.ts	frontend	ts	frontend-component	64	1	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceStructure.ts	frontend	ts	frontend-component	93	4	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/editor/workspace/hooks/useWorkspaceStyleActions.ts	frontend	ts	frontend-component	230	16	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceSurfaceComposition.tsx	frontend	tsx	frontend-component	372	22	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceSurfaceState.ts	frontend	ts	frontend-component	120	9	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceTabPolicy.ts	frontend	ts	frontend-component	45	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceTests.ts	frontend	ts	frontend-component	263	9	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/hooks/useWorkspaceToolWindowRouting.test.tsx	frontend	tsx	test	71	4	0	0		行为回归测试
 src/components/editor/workspace/hooks/useWorkspaceToolWindowRouting.ts	frontend	ts	frontend-component	119	6	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceToolWindows.ts	frontend	ts	frontend-component	338	4	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/editor/workspace/hooks/useWorkspaceTreeFocusState.ts	frontend	ts	frontend-component	23	2	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceTreeInteractions.ts	frontend	ts	frontend-component	354	19	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceTreeModel.ts	frontend	ts	frontend-component	96	8	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceTreeOpening.ts	frontend	ts	frontend-component	113	8	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/hooks/useWorkspaceUiActions.ts	frontend	ts	frontend-component	179	12	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/hooks/useWorkspaceUsages.ts	frontend	ts	frontend-component	131	10	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/hooks/useWorkspaceUsagesState.ts	frontend	ts	frontend-component	56	5	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/hooks/useWorkspaceZoom.ts	frontend	ts	frontend-component	107	7	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/host/appearance.ts	frontend	ts	frontend-component	117	3	4	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/host/clipboard.ts	frontend	ts	frontend-component	749	6	23	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/host/commands.ts	frontend	ts	frontend-component	194	9	6	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
@@ -1481,7 +1521,20 @@ src/components/editor/workspace/useWorkspaceSemanticIndex.test.tsx	frontend	tsx	
 src/components/editor/workspace/useWorkspaceSemanticIndex.ts	frontend	ts	frontend-feature-lib	164	2	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/useWorkspaceTreeData.test.tsx	frontend	tsx	test	183	5	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/useWorkspaceTreeData.ts	frontend	ts	frontend-feature-lib	273	4	2	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/views/WorkspaceConfigurationPopups.tsx	frontend	tsx	frontend-component	105	12	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/views/WorkspaceDebugPopups.tsx	frontend	tsx	frontend-component	84	6	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/views/WorkspaceDocumentPopups.tsx	frontend	tsx	frontend-component	141	15	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/views/WorkspaceEditingPopups.tsx	frontend	tsx	frontend-component	205	21	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/views/WorkspaceGenerationPopups.tsx	frontend	tsx	frontend-component	100	9	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/views/WorkspaceNavigationPopups.tsx	frontend	tsx	frontend-component	258	27	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/views/WorkspaceOperationObservations.tsx	frontend	tsx	frontend-component	87	3	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/views/WorkspaceRefactoringPopups.tsx	frontend	tsx	frontend-component	130	16	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/views/WorkspaceShellView.tsx	frontend	tsx	frontend-component	330	30	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/views/WorkspaceToolbar.tsx	frontend	tsx	frontend-component	385	15	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/editor/workspace/views/createWorkspaceDockContents.tsx	frontend	tsx	frontend-component	546	52	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/views/createWorkspaceLayoutRenderer.tsx	frontend	tsx	frontend-component	54	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/views/createWorkspaceShellProps.ts	frontend	ts	frontend-component	295	13	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/views/createWorkspaceSideContents.tsx	frontend	tsx	frontend-component	203	21	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/views/editorGroupView.tsx	frontend	tsx	frontend-component	643	36	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/views/toolWindowChrome.tsx	frontend	tsx	frontend-component	240	8	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/windowResizeSession.test.ts	frontend	ts	test	52	2	0	0		自动化测试/QA 集成测试
