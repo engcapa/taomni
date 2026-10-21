@@ -32,7 +32,11 @@ steps:
 - assert_pattern:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     regex: '(?m)^唯一屏幕🙂\r?\nALT-FAKE\$ ?$'
-    timeout_sec: 3
+    # The command stays on the alternate screen for five seconds once it runs;
+    # three seconds was shorter than the shell needed to echo and execute the
+    # long printf on a loaded Windows shard, so the poll could end before the
+    # alternate screen existed.
+    timeout_sec: 10
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"]:not([data-terminal-ready])'
     timeout_sec: 2
