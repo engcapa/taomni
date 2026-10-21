@@ -63,7 +63,7 @@ export interface TabContentRouterProps {
   clearTerminalSplitInputLocks: () => void;
   toggleTerminalSplit: () => void;
   splitPanesRef: import("react").RefObject<HTMLDivElement | null>;
-  terminalPanesClass: "flex-1 min-h-0 flex flex-row relative" | "flex-1 min-h-0 flex flex-col relative" | "flex-1 min-h-0 grid relative" | "contents";
+  terminalPanesClass: string;
   splitGridColumnTemplate: string;
   splitGridRowTemplate: string;
   terminalTabs: Tab[];

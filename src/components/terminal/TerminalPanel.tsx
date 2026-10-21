@@ -1,15 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent as ReactDragEvent, type MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebglAddon } from "@xterm/addon-webgl";
 import { SearchAddon } from "@xterm/addon-search";
-import { isCustomTerminalTheme, loadTerminalDefaultProfile, resolveTerminalTheme, resolveTerminalThemeWithSystem, saveTerminalDefaultProfile, type TerminalProfile, type TerminalSyntaxMode, type UserCommonCommand } from "../../lib/terminalProfile";
-import { resolveThemeId } from "../../lib/themes";
-import { buildTerminalThemeOptions } from "../theme/themePreviews";
-import { TerminalAppearanceMenuPanel } from "./TerminalAppearanceMenuPanel";
+import { loadTerminalDefaultProfile, resolveTerminalThemeWithSystem, saveTerminalDefaultProfile, type TerminalProfile, type TerminalSyntaxMode, type UserCommonCommand } from "../../lib/terminalProfile";
 import { TerminalImeInputGuard } from "../../lib/terminalImeGuard";
 import { isEditableTarget, isTerminalFocused } from "../../lib/terminal/keyboardGuards";
-import { readFiles as clipboardReadFiles, parseFilePaths as clipboardParseFilePaths, readText as clipboardReadText, writeText as clipboardWriteText, writeMultiFormat as clipboardWriteMultiFormat } from "../../lib/clipboard";
+import { readFiles as clipboardReadFiles } from "../../lib/clipboard";
 import { useAppTheme } from "../../lib/appTheme";
 import { ScreenshotMenuButton } from "../screenshot/ScreenshotMenuButton";
 import { TabActions } from "../tabbar/TabActionSlot";
@@ -32,22 +29,34 @@ import { SelectionToolbar } from "./SelectionToolbar";
 import { useChatStore } from "../../stores/chatStore";
 import { WINDOWS_PRESET_COMMANDS } from "../../lib/commonCommandsPresets";
 import { useAppStore } from "../../stores/appStore";
-import { useContextMenu, type MenuItem } from "../ContextMenu";
+import { useContextMenu } from "../ContextMenu";
 import { promptAppDialog } from "../../lib/appDialogs";
-import { NATIVE_FILE_DROP_EVENT, type NativeFileDropDetail, droppedFilePaths, formatDroppedPathsForShell, isOsFileDrag, shellQuoteStyleForTerminalDrop } from "../../lib/osFileDrop";
 import { useT } from "../../lib/i18n";
 import { gitProbePath, gitSnapshot } from "../../lib/git";
 import "@xterm/xterm/css/xterm.css";
-import { type TerminalPanelProps, type TerminalConnectionState, type TerminalBlockSelection, type SearchMatch, type TerminalEventLogEntry, type TerminalReattachState, type TerminalGitState, type TerminalBlockSelectionCell } from "./panel/types";
-import { terminalProfileSignature, formatPasteForTerminal, uniqueNonEmpty, terminalCanPromptForLocalPathUpload, downloadTextFile, safeFilePart, timestampFilePart } from "./panel/transfer";
-import { currentTerminalSize, shouldUseTerminalWebgl, escapeHtml, DEFAULT_FONT_SIZE, terminalCursorCell, isMacPrintableOptionInput, terminalCellFromMouseEvent, isTerminalBlockSelectionMouseEvent } from "./panel/policy";
-import { getBufferText, collectTerminalBlockSelectionText, findAndSelectBufferText, getLastBufferLines, terminalAtIdlePrompt, getVisibleSearchHighlights, getVisibleKeywordHighlights, getVisibleTerminalBlockSelectionHighlights, computeInlineGhost } from "./panel/buffer";
+import { type TerminalPanelProps, type TerminalConnectionState, type TerminalBlockSelection, type TerminalEventLogEntry, type TerminalReattachState, type TerminalGitState, type TerminalBlockSelectionCell } from "./panel/types";
+import { terminalProfileSignature } from "./panel/transfer";
+import { currentTerminalSize, shouldUseTerminalWebgl, DEFAULT_FONT_SIZE, terminalCursorCell } from "./panel/policy";
+import { getBufferText, collectTerminalBlockSelectionText, getLastBufferLines, terminalAtIdlePrompt, getVisibleSearchHighlights, getVisibleKeywordHighlights, getVisibleTerminalBlockSelectionHighlights, computeInlineGhost } from "./panel/buffer";
 import { CWD_QUERY_COMMAND, PS_CWD_QUERY_COMMAND, formatZmodemBytes } from "./panel/protocol";
 import { CurrentTerminalSettingsDialog } from "./panel/CurrentTerminalSettingsDialog";
 import { createTerminalSessionLifecycle } from "./panel/sessionLifecycle";
 import { useTerminalViewport } from "./panel/useTerminalViewport";
 import { useTerminalSuggestions } from "./panel/useTerminalSuggestions";
 import { useTerminalInput } from "./panel/useTerminalInput";
+import { useTerminalClipboard } from "./panel/useTerminalClipboard";
+import { useTerminalRecording } from "./panel/useTerminalRecording";
+import { useTerminalSearchActions } from "./panel/useTerminalSearchActions";
+import { useTerminalShortcuts } from "./panel/useTerminalShortcuts";
+import { useTerminalContextMenu } from "./panel/useTerminalContextMenu";
+import { useTerminalPointer } from "./panel/useTerminalPointer";
+
+
+
+
+
+
+
 
 
 
@@ -146,7 +155,6 @@ export function TerminalPanel({
   const initializedRef = useRef(false);
   const readOnlyRef = useRef(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const fallbackSearchRef = useRef<{ query: string; index: number }>({ query: "", index: -1 });
   const contextMenu = useContextMenu();
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const updateTabTitle = useAppStore((s) => s.updateTabTitle);
@@ -293,14 +301,7 @@ export function TerminalPanel({
     themeName,
     webglRenderer,
   ]);
-
-  const [searchOpen, setSearchOpen] = useState(false);
   const [eventLogOpen, setEventLogOpen] = useState(false);
-  const [searchValue, setSearchValue] = useState("");
-  const searchTimerRef = useRef<number | null>(null);
-  const [searchStatus, setSearchStatus] = useState("");
-  const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([]);
-  const [activeSearchIndex, setActiveSearchIndex] = useState(-1);
   const [viewportVersion, setViewportVersion] = useState(0);
   const [eventLog, setEventLog] = useState<TerminalEventLogEntry[]>([]);
   const [macroRecording, setMacroRecording] = useState(false);
@@ -602,391 +603,47 @@ export function TerminalPanel({
     terminalProfile,
     cwdProbeCommandRef,
   });
-
-  const writeClipboardText = useCallback(async (text: string, successMessage: string) => {
-    if (!text) {
-      setStatusMessage("Nothing to copy");
-      return;
-    }
-    try {
-      await clipboardWriteText(text);
-      setStatusMessage(successMessage);
-    } catch (err) {
-      setStatusMessage(err instanceof Error ? err.message : "Clipboard copy failed");
-    }
-  }, [setStatusMessage]);
-
-  const showTerminalSelectionToolbar = useCallback((text: string) => {
-    if (!text || text.trim().length < 2) {
-      setSelectionToolbar(null);
-      return;
-    }
-    const container = containerRef.current;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    setSelectionToolbar({
-      text,
-      rect: {
-        top: rect.top + 24,
-        left: rect.left + rect.width / 3,
-        right: rect.right,
-        bottom: rect.bottom,
-      },
-    });
-  }, []);
-
-  const updateTerminalBlockSelection = useCallback((next: TerminalBlockSelection | null) => {
-    blockSelectionRef.current = next;
-    const term = termRef.current;
-    blockSelectionTextRef.current = next && term ? collectTerminalBlockSelectionText(term, next) : "";
-    setBlockSelection(next);
-    if (!next) {
-      setSelectionToolbar(null);
-    }
-  }, []);
-
-  const getActiveTerminalSelectionText = useCallback(() => {
-    const term = termRef.current;
-    if (!term) return "";
-    const block = blockSelectionRef.current;
-    if (block) {
-      const text = blockSelectionTextRef.current || collectTerminalBlockSelectionText(term, block);
-      if (text) return text;
-    }
-    return term.getSelection();
-  }, []);
-
-  const clearTerminalBlockSelection = useCallback(() => {
-    updateTerminalBlockSelection(null);
-  }, [updateTerminalBlockSelection]);
-
-  const copySelection = useCallback(async () => {
-    const term = termRef.current;
-    if (!term) return;
-    await writeClipboardText(getActiveTerminalSelectionText(), "Copied selection");
-    focusTerminal();
-  }, [focusTerminal, getActiveTerminalSelectionText, writeClipboardText]);
-
-  const copyAll = useCallback(() => {
-    const term = termRef.current;
-    if (!term) return;
-    void writeClipboardText(getBufferText(term), "Copied terminal buffer");
-    focusTerminal();
-  }, [focusTerminal, writeClipboardText]);
-
-  const copyFormattedSelection = useCallback(async () => {
-    const term = termRef.current;
-    if (!term) return;
-    const text = getActiveTerminalSelectionText();
-    if (!text) {
-      setStatusMessage("Nothing to copy");
-      return;
-    }
-
-    const resolvedTheme = resolvePanelTheme(themeName);
-    const html = `<pre style="margin:0;font-family:${escapeHtml(fontFamily)};font-size:${fontSize}px;background:${resolvedTheme.background ?? "#1d1f21"};color:${resolvedTheme.foreground ?? "#eaeaea"};white-space:pre-wrap;">${escapeHtml(text)}</pre>`;
-
-    try {
-      await clipboardWriteMultiFormat({ text, html });
-      setStatusMessage("Copied formatted selection");
-    } catch (err) {
-      setStatusMessage(err instanceof Error ? err.message : "Formatted copy failed");
-    } finally {
-      focusTerminal();
-    }
-  }, [focusTerminal, fontFamily, fontSize, getActiveTerminalSelectionText, resolvePanelTheme, setStatusMessage, themeName, writeClipboardText]);
-
-  const pasteTextIntoTerminal = useCallback(async (text: string): Promise<boolean> => {
-    if (readOnlyRef.current) {
-      setStatusMessage("Terminal is read-only");
-      return false;
-    }
-
-    if (!text) return false;
-    if (multilinePasteConfirm && /\r?\n/.test(text)) {
-      const lineCount = text.split(/\r?\n/).length;
-      const ok = await confirmPaste({
-        title: t("terminal.multilinePasteTitle"),
-        message: t("terminal.multilinePasteMessage", { count: lineCount }),
-        confirmLabel: t("terminal.paste"),
-      });
-      if (!ok) return false;
-    }
-    writeBroadcastInput(formatPasteForTerminal(termRef.current, text));
-    focusTerminal();
-    return true;
-  }, [confirmPaste, focusTerminal, multilinePasteConfirm, setStatusMessage, t, writeBroadcastInput]);
-
-  const handleTerminalDragOver = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
-    if (!isOsFileDrag(event.dataTransfer)) return;
-    event.preventDefault();
-    if (readOnlyRef.current) {
-      event.dataTransfer.dropEffect = "none";
-      return;
-    }
-    event.dataTransfer.dropEffect = "copy";
-  }, []);
-
-  const insertFilePaths = useCallback((paths: string[]) => {
-    if (readOnlyRef.current) {
-      setStatusMessage("Terminal is read-only");
-      focusTerminal();
-      return;
-    }
-
-    const quoteStyle = shellQuoteStyleForTerminalDrop({
-      isSsh: !isLocal,
-      localShellId: resolvedLocalShellId ?? localShell?.id ?? null,
-    });
-    const text = formatDroppedPathsForShell(paths, quoteStyle);
-    if (!text) return;
-
-    writeBroadcastInput(formatPasteForTerminal(termRef.current, text));
-    appendEvent("input", `Inserted ${paths.length} dropped file path${paths.length === 1 ? "" : "s"}`);
-    setStatusMessage(`Inserted ${paths.length} file path${paths.length === 1 ? "" : "s"}`);
-    focusTerminal();
-  }, [appendEvent, focusTerminal, isLocal, localShell?.id, resolvedLocalShellId, setStatusMessage, writeBroadcastInput]);
-
-  const handleLocalFilePaths = useCallback(async (paths: string[]) => {
-    const cleanPaths = uniqueNonEmpty(paths);
-    if (cleanPaths.length === 0) return;
-    if (readOnlyRef.current) {
-      setStatusMessage("Terminal is read-only");
-      focusTerminal();
-      return;
-    }
-
-    const term = termRef.current;
-    const upload = onUploadLocalPathsRef.current;
-    const canOfferUpload =
-      !isLocal &&
-      !!upload &&
-      terminalCanPromptForLocalPathUpload(term);
-    if (!canOfferUpload) {
-      insertFilePaths(cleanPaths);
-      return;
-    }
-
-    const cwd = latestCwdRef.current;
-    const confirmed = await confirmPaste({
-      title: t("terminal.filePasteTitle"),
-      message: t("terminal.filePasteMessage", {
-        count: cleanPaths.length,
-        cwd: cwd ?? t("terminal.filePasteUnknownCwd"),
-      }),
-      confirmLabel: t("terminal.filePasteUpload"),
-      cancelLabel: t("terminal.filePastePaths"),
-    });
-
-    if (!confirmed) {
-      insertFilePaths(cleanPaths);
-      return;
-    }
-
-    try {
-      await upload({ paths: cleanPaths, cwd });
-      setStatusMessage(t("terminal.filePasteUploadQueued", { count: cleanPaths.length }));
-      focusTerminal();
-    } catch (err) {
-      setStatusMessage(err instanceof Error ? err.message : "Upload failed");
-      focusTerminal();
-    }
-  }, [confirmPaste, focusTerminal, insertFilePaths, isLocal, setStatusMessage, t]);
-
-  const pasteFromClipboard = useCallback(async () => {
-    if (readOnlyRef.current) {
-      setStatusMessage("Terminal is read-only");
-      return;
-    }
-
-    try {
-      if (!isLocal && onUploadLocalPathsRef.current) {
-        const paths = await clipboardReadFiles();
-        if (paths.length > 0) {
-          await handleLocalFilePaths(paths);
-          return;
-        }
-      }
-      const text =
-        (await clipboardReadText()) ||
-        (await promptAppDialog({
-          title: "Paste text",
-          initialValue: "",
-          allowEmpty: true,
-        })) ||
-        "";
-      if (!text) return;
-
-      if (!isLocal && onUploadLocalPathsRef.current) {
-        const textPaths = await clipboardParseFilePaths(text);
-        if (textPaths.length > 0) {
-          await handleLocalFilePaths(textPaths);
-          return;
-        }
-      }
-
-      await pasteTextIntoTerminal(text);
-    } catch (err) {
-      setStatusMessage(err instanceof Error ? err.message : "Clipboard paste failed");
-    }
-  }, [handleLocalFilePaths, isLocal, pasteTextIntoTerminal, setStatusMessage]);
-
-  const handleTerminalDrop = useCallback((event: ReactDragEvent<HTMLDivElement>) => {
-    if (!isOsFileDrag(event.dataTransfer)) return;
-    event.preventDefault();
-    event.stopPropagation();
-
-    const paths = droppedFilePaths(event.dataTransfer);
-    if (paths.length === 0) {
-      setStatusMessage("Dropped file paths are not available in this environment");
-      focusTerminal();
-      return;
-    }
-
-    void handleLocalFilePaths(paths);
-  }, [focusTerminal, handleLocalFilePaths, setStatusMessage]);
-
-  useEffect(() => {
-    const handleNativeFileDrop = (event: Event) => {
-      const detail = (event as CustomEvent<NativeFileDropDetail>).detail;
-      if (!detail?.paths?.length) return;
-
-      const panel = panelRef.current;
-      const target = document.elementFromPoint(detail.clientX, detail.clientY);
-      if (!panel || !target || !panel.contains(target)) return;
-
-      void handleLocalFilePaths(detail.paths);
-    };
-
-    window.addEventListener(NATIVE_FILE_DROP_EVENT, handleNativeFileDrop);
-    return () => window.removeEventListener(NATIVE_FILE_DROP_EVENT, handleNativeFileDrop);
-  }, [handleLocalFilePaths]);
-
-  const saveBufferToFile = useCallback(() => {
-    const term = termRef.current;
-    if (!term) return;
-    downloadTextFile(
-      `${safeFilePart(tabTitle)}-${timestampFilePart()}.txt`,
-      getBufferText(term),
-      "text/plain",
-    );
-    appendEvent("export", "Saved terminal buffer to file");
-    setStatusMessage("Saved terminal buffer");
-    focusTerminal();
-  }, [appendEvent, focusTerminal, setStatusMessage, tabTitle]);
-
-  const flushRecordedOutput = useCallback((reason: string) => {
-    if (!outputLogRef.current) {
-      setStatusMessage("No recorded output to save");
-      return;
-    }
-    downloadTextFile(
-      `${safeFilePart(tabTitle)}-recording-${timestampFilePart()}.txt`,
-      outputLogRef.current,
-      "text/plain",
-    );
-    appendEvent("log", reason);
-    outputLogRef.current = "";
-    setStatusMessage("Saved terminal recording");
-  }, [appendEvent, setStatusMessage, tabTitle]);
-
-  const toggleOutputRecording = useCallback(() => {
-    setLoggingActive((active) => {
-      if (active) {
-        flushRecordedOutput("Stopped output recording and saved file");
-        return false;
-      }
-      outputLogRef.current = "";
-      appendEvent("log", "Started output recording");
-      setStatusMessage("Recording terminal output");
-      return true;
-    });
-    focusTerminal();
-  }, [appendEvent, flushRecordedOutput, focusTerminal, setStatusMessage]);
-
-  const toggleMacroRecording = useCallback(() => {
-    setMacroRecording((active) => {
-      if (active) {
-        lastMacroRef.current = macroBufferRef.current;
-        appendEvent("macro", `Recorded ${lastMacroRef.current.length} input character${lastMacroRef.current.length === 1 ? "" : "s"}`);
-        setStatusMessage(lastMacroRef.current ? "Macro recorded" : "Macro recording was empty");
-        return false;
-      }
-      macroBufferRef.current = "";
-      appendEvent("macro", "Started macro recording");
-      setStatusMessage("Recording terminal macro");
-      return true;
-    });
-    focusTerminal();
-  }, [appendEvent, focusTerminal, setStatusMessage]);
-
-  const executeMacro = useCallback(() => {
-    const macro = lastMacroRef.current;
-    if (!macro) {
-      setStatusMessage("No macro recorded");
-      return;
-    }
-    macroPlaybackRef.current = true;
-    writeInput(macro);
-    macroPlaybackRef.current = false;
-    appendEvent("macro", `Executed macro (${macro.length} input character${macro.length === 1 ? "" : "s"})`);
-    focusTerminal();
-  }, [appendEvent, focusTerminal, setStatusMessage, writeInput]);
-
-  const openSearch = useCallback(() => {
-    setSearchOpen(true);
-    setSearchStatus("");
-  }, []);
-
-  const cancelPendingSearch = useCallback(() => {
-    if (searchTimerRef.current !== null) {
-      window.clearTimeout(searchTimerRef.current);
-      searchTimerRef.current = null;
-    }
-  }, []);
-
-  const closeSearch = useCallback(() => {
-    cancelPendingSearch();
-    setSearchOpen(false);
-    setSearchStatus("");
-    setSearchMatches([]);
-    setActiveSearchIndex(-1);
-    searchAddonRef.current?.clearDecorations();
-    termRef.current?.clearSelection();
-    clearTerminalBlockSelection();
-    focusTerminal();
-  }, [cancelPendingSearch, clearTerminalBlockSelection, focusTerminal]);
-
-  const runSearch = useCallback((direction: "next" | "previous" = "next") => {
-    cancelPendingSearch();
-    const terminal = termRef.current;
-    const term = (searchInputRef.current?.value ?? searchValue).trim();
-    if (!terminal || !term) {
-      searchAddonRef.current?.clearDecorations();
-      setSearchMatches([]);
-      setActiveSearchIndex(-1);
-      setSearchStatus("");
-      return;
-    }
-
-    searchAddonRef.current?.clearDecorations();
-    clearTerminalBlockSelection();
-    const result = findAndSelectBufferText(
-      terminal,
-      term,
-      direction,
-      fallbackSearchRef,
-    );
-    if (result) {
-      setSearchMatches(result.matches);
-      setActiveSearchIndex(result.index);
-      setSearchStatus(`Match ${result.index + 1}/${result.total}`);
-    } else {
-      setSearchMatches([]);
-      setActiveSearchIndex(-1);
-      setSearchStatus("No matches");
-    }
-  }, [cancelPendingSearch, clearTerminalBlockSelection, searchValue]);
+  const { clearTerminalBlockSelection, updateTerminalBlockSelection, showTerminalSelectionToolbar, getActiveTerminalSelectionText, copySelection, pasteFromClipboard, copyAll, copyFormattedSelection, writeClipboardText, handleLocalFilePaths, pasteTextIntoTerminal, handleTerminalDragOver, handleTerminalDrop } = useTerminalClipboard({
+    setStatusMessage,
+    setSelectionToolbar,
+    containerRef,
+    blockSelectionRef,
+    termRef,
+    blockSelectionTextRef,
+    setBlockSelection,
+    focusTerminal,
+    resolvePanelTheme,
+    themeName,
+    fontFamily,
+    fontSize,
+    readOnlyRef,
+    multilinePasteConfirm,
+    confirmPaste,
+    t,
+    writeBroadcastInput,
+    isLocal,
+    resolvedLocalShellId,
+    localShell,
+    appendEvent,
+    onUploadLocalPathsRef,
+    latestCwdRef,
+    panelRef,
+  });
+  const { saveBufferToFile, executeMacro, toggleMacroRecording, toggleOutputRecording, flushRecordedOutput } = useTerminalRecording({
+    termRef,
+    tabTitle,
+    appendEvent,
+    setStatusMessage,
+    focusTerminal,
+    outputLogRef,
+    setLoggingActive,
+    setMacroRecording,
+    lastMacroRef,
+    macroBufferRef,
+    macroPlaybackRef,
+    writeInput,
+  });
+  const { openSearch, closeSearch, cancelPendingSearch, runSearch, setSearchStatus, setSearchMatches, setActiveSearchIndex, searchValue, fallbackSearchRef, searchOpen, searchMatches, activeSearchIndex, setSearchValue, searchStatus } = useTerminalSearchActions({ searchAddonRef, termRef, clearTerminalBlockSelection, focusTerminal, searchInputRef });
 
   const renameTerminal = useCallback(async () => {
     if (!tabId) return;
@@ -1179,527 +836,107 @@ export function TerminalPanel({
 
   const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
   const effectiveReadOnly = readOnly || inputLocked;
-
-  const handleShortcutKey = useCallback((event: KeyboardEvent): boolean => {
-    if (isEditableTarget(event.target, document.activeElement)) {
-      return true;
-    }
-    if (event.key === "F11") {
-      event.preventDefault();
-      setFullscreen((v) => !v);
-      return false;
-    }
-    if (
-      event.altKey && event.shiftKey && !event.ctrlKey && !event.metaKey &&
-      (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "ArrowLeft" || event.key === "ArrowRight")
-    ) {
-      if (extendTerminalBlockSelectionByKeyboard(event.key)) {
-        event.preventDefault();
-        return false;
-      }
-    }
-    if (isMac && isMacPrintableOptionInput(event)) {
-      event.preventDefault();
-      writeBroadcastInput(event.key);
-      return false;
-    }
-    if (event.key === "Escape" && blockSelectionRef.current) {
-      event.preventDefault();
-      clearTerminalBlockSelection();
-      return false;
-    }
-    if (
-      isLocal && supportsShellTools &&
-      event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey &&
-      event.key.toLowerCase() === "p"
-    ) {
-      if (readOnlyRef.current) return false;
-      if (termRef.current?.buffer.active.type === "alternate") return false;
-      event.preventDefault();
-      setPaletteOpen(true);
-      return false;
-    }
-    // Ctrl+K: AI command rewrite overlay (v2.2)
-    if (
-      supportsShellTools && aiCommandRewriteEnabled && !isLocalPowerShell &&
-      event.ctrlKey && !event.shiftKey && !event.altKey && !event.metaKey &&
-      event.key.toLowerCase() === "k"
-    ) {
-      if (readOnlyRef.current) return false;
-      if (termRef.current?.buffer.active.type === "alternate") return false;
-      event.preventDefault();
-      setAiRewriteOpen(true);
-      return false;
-    }
-    // Cross-platform copy/paste shortcuts
-    if (isMac) {
-      if (event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "c") {
-        if (getActiveTerminalSelectionText()) {
-          event.preventDefault();
-          void copySelection();
-          return false;
-        }
-        return true; // no selection: pass through (sends ETX)
-      }
-      if (event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "v") {
-        event.preventDefault();
-        if (!readOnlyRef.current) {
-          // The desktop clipboard helper uses native IPC on macOS, so Cmd+V
-          // does not depend on WKWebView synthesizing a paste event or prompt
-          // for navigator.clipboard permission. Ignore a late native event to
-          // keep the shortcut from inserting the same text twice.
-          suppressNativePasteUntilRef.current = Date.now() + 500;
-          void pasteFromClipboard();
-        }
-        return false;
-      }
-    } else {
-      // Windows / Linux
-      if (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === "c") {
-        if (getActiveTerminalSelectionText()) {
-          event.preventDefault();
-          void copySelection();
-          return false;
-        }
-        return true; // no selection: pass through
-      }
-      if (event.ctrlKey && event.shiftKey && !event.altKey && !event.metaKey && event.key.toLowerCase() === "v") {
-        if (!readOnlyRef.current) {
-          event.preventDefault();
-          void pasteFromClipboard();
-          return false;
-        }
-        return true;
-      }
-    }
-    if (event.shiftKey && event.key === "Insert") {
-      event.preventDefault();
-      void pasteFromClipboard();
-      return false;
-    }
-    if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "f") {
-      event.preventDefault();
-      openSearch();
-      return false;
-    }
-    if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "s") {
-      event.preventDefault();
-      saveBufferToFile();
-      return false;
-    }
-    if (
-      gitToggle &&
-      event.shiftKey &&
-      event.key.toLowerCase() === "g" &&
-      (isMac ? event.metaKey : event.ctrlKey) &&
-      !event.altKey
-    ) {
-      event.preventDefault();
-      gitToggle.onOpen();
-      return false;
-    }
-    if (event.ctrlKey && (event.key === "+" || event.key === "=")) {
-      event.preventDefault();
-      increaseFontSize();
-      return false;
-    }
-    if (event.ctrlKey && (event.key === "-" || event.key === "_")) {
-      event.preventDefault();
-      decreaseFontSize();
-      return false;
-    }
-    if (event.ctrlKey && event.key === "0") {
-      event.preventDefault();
-      resetFontSize();
-      return false;
-    }
-    if (event.ctrlKey && event.code === "Space") {
-      event.preventDefault();
-      executeMacro();
-      return false;
-    }
-    if (searchOpen && event.key === "Escape") {
-      event.preventDefault();
-      closeSearch();
-      return false;
-    }
-    if (
-      (event.key === "ArrowRight" || event.key === "End") &&
-      !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey
-    ) {
-      if (acceptInlineSuggestion()) {
-        event.preventDefault();
-        return false;
-      }
-    }
-    return true;
-  }, [
-    acceptInlineSuggestion,
-    closeSearch,
-    clearTerminalBlockSelection,
-    decreaseFontSize,
-    executeMacro,
-    gitToggle,
+  const { handleShortcutKey } = useTerminalShortcuts({
+    setFullscreen,
     extendTerminalBlockSelectionByKeyboard,
-    getActiveTerminalSelectionText,
-    increaseFontSize,
-    isLocal,
     isMac,
-    openSearch,
-    pasteFromClipboard,
-    resetFontSize,
-    saveBufferToFile,
-    searchOpen,
-    supportsShellTools,
     writeBroadcastInput,
-  ]);
-
-  const buildContextMenu = useCallback((): MenuItem[] => {
-    const hasSelection = !!getActiveTerminalSelectionText();
-    const copyShortcut = isMac ? "Cmd+C" : "Ctrl+Shift+C";
-    const pasteShortcut = isMac ? "Cmd+V" : "Ctrl+Shift+V / Shift+Insert";
-    const customTheme = isCustomTerminalTheme(themeName) ? resolveTerminalTheme(themeName) : null;
-    const themeMenuValue = customTheme ? themeName : resolveThemeId(themeName);
-    const themeOptions = buildTerminalThemeOptions({
-      includeSystem: true,
-      systemLabel: t("terminalAppearance.themeSystemName"),
-      customValue: customTheme ? themeName : undefined,
-      customTheme,
-      customLabel: "Custom colors",
-      darkGroup: "Dark",
-      lightGroup: "Light",
-    }).map((option) => ({
-      ...option,
-      testId: `terminal-context-theme-option-${option.value.replace(/[^a-zA-Z0-9_-]+/g, "-")}`,
-    }));
-
-    return [
-      { label: "Copy", shortcut: copyShortcut, onClick: () => void copySelection(), disabled: !hasSelection },
-      { label: "Copy All", onClick: copyAll },
-      { label: "Copy formatted text (HTML/RTF)", onClick: () => void copyFormattedSelection(), disabled: !hasSelection },
-      { label: "Paste", shortcut: pasteShortcut, onClick: () => void pasteFromClipboard(), disabled: effectiveReadOnly },
-      { label: "Find", shortcut: "Ctrl+Shift+F", onClick: openSearch },
-      ...(gitToggle
-        ? [
-            { label: "", separator: true },
-            {
-              label: gitState.kind === "none" ? "Initialize Git Repository..." : "Open Git Panel",
-              shortcut: isMac ? "Cmd+Shift+G" : "Ctrl+Shift+G",
-              onClick: gitToggle.onOpen,
-              disabled: !gitToggle.cwd,
-            },
-          ]
-        : []),
-      { label: "", separator: true },
-      { label: "Zoom in", shortcut: "Ctrl++ / Ctrl+WheelUp", onClick: increaseFontSize },
-      { label: "Zoom out", shortcut: "Ctrl+- / Ctrl+WheelDown", onClick: decreaseFontSize },
-      { label: "Reset zoom", shortcut: "Ctrl+0", onClick: resetFontSize },
-      {
-        label: "Appearance",
-        testId: "context-menu-item-appearance",
-        customPanel: (
-          <TerminalAppearanceMenuPanel
-            themeValue={themeMenuValue}
-            themeOptions={themeOptions}
-            fontFamily={fontFamily}
-            fontSize={fontSize}
-            fontSelectTestId="terminal-context-font-select"
-            fontSizeTestId="terminal-context-font-size"
-            onChangeTheme={(nextTheme) => commitTerminalProfilePatch({ theme: nextTheme })}
-            onChangeFontFamily={(nextFontFamily) => commitTerminalProfilePatch({ fontFamily: nextFontFamily })}
-            onChangeFontSize={(nextFontSize) => commitTerminalProfilePatch({ fontSize: nextFontSize })}
-          />
-        ),
-      },
-      {
-        label: t("terminal.contextSetAppearanceDefault"),
-        testId: "terminal-context-set-local-default-theme",
-        onClick: saveCurrentAppearanceAsTerminalDefault,
-      },
-      {
-        label: t("terminal.contextSetProfileDefault"),
-        testId: "terminal-context-set-local-default-profile",
-        onClick: () => {
-          void saveCurrentProfileAsTerminalDefault();
-        },
-      },
-      {
-        label: "Terminal display",
-        testId: "context-menu-item-terminal-display",
-        children: [
-          { label: "Reset terminal output", onClick: resetOutput },
-          { label: "Clear terminal scrollback", onClick: clearScrollback },
-          { label: "Set terminal title", onClick: renameTerminal, disabled: !tabId },
-          {
-            label: "Toggle terminal scrollbar",
-            testId: "context-menu-item-toggle-terminal-scrollbar",
-            checked: showScrollbar,
-            onClick: () => commitTerminalProfilePatch({ showScrollbar: !showScrollbar }),
-          },
-          {
-            label: "Fullscreen terminal",
-            testId: "context-menu-item-fullscreen-terminal",
-            shortcut: "F11",
-            checked: fullscreen,
-            onClick: () => setFullscreen((v) => !v),
-          },
-          {
-            label: "Read-only terminal",
-            testId: "context-menu-item-read-only-terminal",
-            checked: readOnly,
-            onClick: () => commitTerminalProfilePatch({ readOnly: !readOnly }),
-          },
-        ],
-      },
-      {
-        label: "Syntax highlighting",
-        children: [
-          { label: "Default", checked: syntaxMode === "default", onClick: () => setSyntaxModeAndFocus("default") },
-          { label: "Error/Warning/Success keywords", checked: syntaxMode === "keywords", onClick: () => setSyntaxModeAndFocus("keywords") },
-          { label: "Unix shell script", disabled: true },
-          { label: "Cisco (network configuration)", disabled: true },
-          { label: "Perl syntax", disabled: true },
-          { label: "SQL syntax", disabled: true },
-        ],
-      },
-      { label: "", separator: true },
-      { label: "Execute macro", shortcut: "Ctrl+Space", onClick: executeMacro, disabled: !lastMacroRef.current },
-      { label: macroRecording ? "Stop macro recording" : "Record new macro", checked: macroRecording, onClick: toggleMacroRecording },
-      { label: loggingActive ? "Stop recording terminal output" : "Record terminal output to file", checked: loggingActive, onClick: toggleOutputRecording },
-      { label: "Save to file", shortcut: "Ctrl+Shift+S", onClick: saveBufferToFile },
-      { label: "Print", shortcut: "Ctrl+Shift+P", disabled: true },
-      { label: "", separator: true },
-      { label: "Send file using Z-modem", onClick: () => void startZmodemSend(), disabled: zmodemState !== "idle" },
-      { label: "", separator: true },
-      {
-        label: t("terminal.contextChangeSettings"),
-        testId: "terminal-context-change-settings",
-        onClick: () => setSettingsDialogOpen(true),
-      },
-      {
-        label: "Special Command",
-        children: [
-          { label: "Break", disabled: true },
-          { label: "SIGINT (Interrupt)", onClick: () => sendSpecialSignal("SIGINT", "\x03") },
-          { label: "SIGTERM (Terminate)", onClick: () => sendSpecialSignal("SIGTERM") },
-          { label: "SIGKILL (Kill)", onClick: () => sendSpecialSignal("SIGKILL") },
-          { label: "SIGQUIT (Quit)", onClick: () => sendSpecialSignal("SIGQUIT", "\x1c") },
-          { label: "SIGHUP (Hangup)", onClick: () => sendSpecialSignal("SIGHUP") },
-          { label: "More signals", disabled: true },
-          { label: "", separator: true },
-          { label: "IGNORE message", disabled: true },
-        ],
-      },
-      { label: "Event Log", testId: "context-menu-item-event-log", onClick: () => setEventLogOpen(true) },
-      { label: "", separator: true },
-      {
-        label: "AI: 解释最近的终端输出",
-        onClick: () => {
-          const term = termRef.current;
-          if (!term) return;
-          // Pull the last 50 lines from the buffer; if there's a selection,
-          // prefer that. Both paths route to a fresh AI thread via
-          // explainSelection (already redacts via chat::redact server-side).
-          const selected = getActiveTerminalSelectionText();
-          const text = selected && selected.trim()
-            ? selected
-            : getLastBufferLines(term, 50);
-          if (text.trim().length === 0) {
-            setStatusMessage("Terminal buffer is empty");
-            return;
-          }
-          void useChatStore.getState().explainSelection(text);
-        },
-      },
-    ];
-  }, [
-    clearScrollback,
+    blockSelectionRef,
+    clearTerminalBlockSelection,
+    isLocal,
+    supportsShellTools,
+    readOnlyRef,
+    termRef,
+    setPaletteOpen,
+    aiCommandRewriteEnabled,
+    isLocalPowerShell,
+    setAiRewriteOpen,
+    getActiveTerminalSelectionText,
+    copySelection,
+    suppressNativePasteUntilRef,
+    pasteFromClipboard,
+    openSearch,
+    saveBufferToFile,
+    gitToggle,
+    increaseFontSize,
+    decreaseFontSize,
+    resetFontSize,
+    executeMacro,
+    searchOpen,
+    closeSearch,
+    acceptInlineSuggestion,
+  });
+  const { handleTerminalContextMenu } = useTerminalContextMenu({
+    getActiveTerminalSelectionText,
+    isMac,
+    themeName,
+    t,
+    copySelection,
     copyAll,
     copyFormattedSelection,
-    copySelection,
-    commitTerminalProfilePatch,
-    decreaseFontSize,
-    executeMacro,
-    fontFamily,
-    fontLigatures,
-    fontSize,
-    fullscreen,
-    getActiveTerminalSelectionText,
-    gitState.kind,
-    gitToggle,
-    increaseFontSize,
-    isMac,
-    openSearch,
     pasteFromClipboard,
     effectiveReadOnly,
-    readOnly,
-    renameTerminal,
+    openSearch,
+    gitToggle,
+    gitState,
+    increaseFontSize,
+    decreaseFontSize,
     resetFontSize,
-    resetOutput,
-    saveBufferToFile,
+    fontFamily,
+    fontSize,
+    commitTerminalProfilePatch,
     saveCurrentAppearanceAsTerminalDefault,
     saveCurrentProfileAsTerminalDefault,
+    resetOutput,
+    clearScrollback,
+    renameTerminal,
+    tabId,
     showScrollbar,
-    setStatusMessage,
+    fullscreen,
+    setFullscreen,
+    readOnly,
     syntaxMode,
     setSyntaxModeAndFocus,
-    t,
-    themeName,
-    sendSpecialSignal,
-    tabId,
-    toggleMacroRecording,
-    toggleOutputRecording,
-    loggingActive,
+    executeMacro,
+    lastMacroRef,
     macroRecording,
+    toggleMacroRecording,
+    loggingActive,
+    toggleOutputRecording,
+    saveBufferToFile,
     startZmodemSend,
     zmodemState,
-  ]);
-
-  useEffect(() => {
-    if (!contextMenu.isOpen) return;
-    contextMenu.refreshItems(buildContextMenu());
-  }, [buildContextMenu, contextMenu.isOpen, contextMenu.refreshItems]);
-
-  const handleTerminalContextMenu = useCallback((event: ReactMouseEvent) => {
-    if (rightClickBehavior === "paste") {
-      event.preventDefault();
-      event.stopPropagation();
-      void pasteFromClipboard();
-      return;
-    }
-
-    if (rightClickBehavior === "copy-or-paste") {
-      event.preventDefault();
-      event.stopPropagation();
-      if (getActiveTerminalSelectionText()) {
-          void copySelection();
-      } else {
-        void pasteFromClipboard();
-      }
-      return;
-    }
-
-    contextMenu.show(event, buildContextMenu());
-  }, [
-    buildContextMenu,
+    setSettingsDialogOpen,
+    sendSpecialSignal,
+    setEventLogOpen,
+    termRef,
+    setStatusMessage,
+    fontLigatures,
     contextMenu,
-    copySelection,
-    getActiveTerminalSelectionText,
-    pasteFromClipboard,
     rightClickBehavior,
-  ]);
-
-  const pasteMiddleClickSelectionOrClipboard = useCallback(() => {
-    if (readOnlyRef.current) {
-      middleClickSelectionRef.current = "";
-      setStatusMessage("Terminal is read-only");
-      return;
-    }
-
-    const selection = getActiveTerminalSelectionText() || middleClickSelectionRef.current;
-    middleClickSelectionRef.current = "";
-    if (selection) {
-      writeBroadcastInput(formatPasteForTerminal(termRef.current, selection));
-      focusTerminal();
-      return;
-    }
-    void pasteFromClipboard();
-  }, [focusTerminal, getActiveTerminalSelectionText, pasteFromClipboard, setStatusMessage, writeBroadcastInput]);
-
-  const shouldHandleMacMiddlePaste = useCallback(() => {
-    const now = Date.now();
-    if (now - lastMacMiddlePasteAtRef.current < 250) return false;
-    lastMacMiddlePasteAtRef.current = now;
-    return true;
-  }, []);
-
-  const finishTerminalBlockSelection = useCallback((selection: TerminalBlockSelection | null) => {
-    if (!selection) return;
-    const term = termRef.current;
-    if (!term) return;
-    const text = blockSelectionTextRef.current || collectTerminalBlockSelectionText(term, selection);
-    if (copyOnSelectRef.current && text) {
-      void writeClipboardText(text, "");
-    }
-    showTerminalSelectionToolbar(text);
-  }, [showTerminalSelectionToolbar, writeClipboardText]);
-
-  const startTerminalBlockSelection = useCallback((event: ReactMouseEvent) => {
-    const term = termRef.current;
-    const container = containerRef.current;
-    if (!term || !container) return false;
-
-    const anchor = terminalCellFromMouseEvent(term, container, event);
-    if (!anchor) return false;
-
-    event.preventDefault();
-    event.stopPropagation();
-    term.clearSelection();
-
-    const initial = { anchor, focus: anchor };
-    updateTerminalBlockSelection(initial);
-    setSelectionToolbar(null);
-
-    let latest = initial;
-    const onMove = (moveEvent: globalThis.MouseEvent) => {
-      const focus = terminalCellFromMouseEvent(term, container, moveEvent);
-      if (!focus) return;
-      latest = { anchor, focus };
-      updateTerminalBlockSelection(latest);
-    };
-    const onUp = (upEvent: globalThis.MouseEvent) => {
-      const focus = terminalCellFromMouseEvent(term, container, upEvent);
-      if (focus) {
-        latest = { anchor, focus };
-        updateTerminalBlockSelection(latest);
-      }
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-      finishTerminalBlockSelection(latest);
-      focusTerminal();
-    };
-
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-    return true;
-  }, [finishTerminalBlockSelection, focusTerminal, updateTerminalBlockSelection]);
-
-  // Middle-click paste: if the terminal has a current selection, paste it at
-  // the cursor; otherwise fall back to the system clipboard. Linux/Windows use
-  // auxclick; macOS gets a mouseup capture fallback because WKWebView does not
-  // consistently dispatch auxclick for the middle button.
-  const handleMiddleClick = useCallback((event: ReactMouseEvent) => {
-    if (event.button !== 1) return;
-    event.preventDefault();
-    if (isMac && !shouldHandleMacMiddlePaste()) return;
-    pasteMiddleClickSelectionOrClipboard();
-  }, [isMac, pasteMiddleClickSelectionOrClipboard, shouldHandleMacMiddlePaste]);
-
-  const handleTerminalMouseDownCapture = useCallback((event: ReactMouseEvent) => {
-    if (event.button === 0) {
-      const target = event.target;
-      if (!(target instanceof Node) || !containerRef.current?.contains(target)) {
-        return;
-      }
-      cancelPendingSearch();
-      if (isTerminalBlockSelectionMouseEvent(event)) {
-        startTerminalBlockSelection(event);
-        return;
-      }
-      clearTerminalBlockSelection();
-    }
-    if (event.button === 1) {
-      suppressNativePasteUntilRef.current = Date.now() + 500;
-      middleClickSelectionRef.current = getActiveTerminalSelectionText();
-    }
-  }, [cancelPendingSearch, clearTerminalBlockSelection, getActiveTerminalSelectionText, startTerminalBlockSelection]);
-
-  const handleTerminalMouseUpCapture = useCallback((event: ReactMouseEvent) => {
-    if (!isMac || event.button !== 1) return;
-    event.preventDefault();
-    if (!shouldHandleMacMiddlePaste()) return;
-    pasteMiddleClickSelectionOrClipboard();
-  }, [isMac, pasteMiddleClickSelectionOrClipboard, shouldHandleMacMiddlePaste]);
+  });
+  const { handleTerminalMouseDownCapture, handleTerminalMouseUpCapture, handleMiddleClick } = useTerminalPointer({
+    readOnlyRef,
+    middleClickSelectionRef,
+    setStatusMessage,
+    getActiveTerminalSelectionText,
+    writeBroadcastInput,
+    termRef,
+    focusTerminal,
+    pasteFromClipboard,
+    lastMacMiddlePasteAtRef,
+    blockSelectionTextRef,
+    copyOnSelectRef,
+    writeClipboardText,
+    showTerminalSelectionToolbar,
+    containerRef,
+    updateTerminalBlockSelection,
+    setSelectionToolbar,
+    isMac,
+    cancelPendingSearch,
+    clearTerminalBlockSelection,
+    suppressNativePasteUntilRef,
+  });
 
   useEffect(() => {
     readOnlyRef.current = effectiveReadOnly;
@@ -1966,32 +1203,6 @@ export function TerminalPanel({
     el.addEventListener("paste", onPaste, { capture: true });
     return () => el.removeEventListener("paste", onPaste, { capture: true });
   }, [handleLocalFilePaths, isLocal, isMac, pasteTextIntoTerminal, setStatusMessage]);
-
-  useEffect(() => {
-    if (!searchOpen) return;
-
-    const frame = requestAnimationFrame(() => {
-      searchInputRef.current?.focus();
-      searchInputRef.current?.select();
-    });
-
-    return () => cancelAnimationFrame(frame);
-  }, [searchOpen]);
-
-  useEffect(() => {
-    if (!searchOpen) return;
-    if (!searchValue.trim()) {
-      searchAddonRef.current?.clearDecorations();
-      setSearchMatches([]);
-      setActiveSearchIndex(-1);
-      termRef.current?.clearSelection();
-      setSearchStatus("");
-      return;
-    }
-
-    searchTimerRef.current = window.setTimeout(() => runSearch("next"), 120);
-    return cancelPendingSearch;
-  }, [cancelPendingSearch, runSearch, searchOpen, searchValue]);
 
   const searchHighlights = useMemo(
     () => getVisibleSearchHighlights(
@@ -2566,7 +1777,21 @@ export function TerminalPanel({
 
 
 
+
+
+
+
+
+
+
 export { type SshConnectInfo, type CommandTerminalConnectInfo, type TerminalReattachState, type AdoptedTerminalSession, type DetachedTerminalWindowControls, type TerminalLocalPathUploadRequest, type TerminalBlockSelectionCell, type TerminalBlockSelection } from "./panel/types";
+
+
+
+
+
+
+
 
 
 

@@ -1,94 +1,87 @@
-import { useEffect, useMemo, useRef, useState, useCallback, type PointerEvent as ReactPointerEvent } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { Group as PanelGroup, Panel, Separator as PanelResizeHandle, type PanelImperativeHandle, type PanelSize } from "react-resizable-panels";
-import { useSessionImportExport } from "../components/menubar/useSessionImportExport";
-import type { AppCommand } from "../components/menubar/commands";
-import { type MenuActionId } from "../lib/nativeAppMenu";
-import { QuickConnect } from "../components/quickconnect/QuickConnect";
-import { Sidebar } from "../components/sidebar/Sidebar";
-import { useConfirmDialog } from "../components/sidebar/ConfirmDialog";
-import { ControlBar } from "../components/tabbar/ControlBar";
-import { TabActionSlotProvider } from "../components/tabbar/TabActionSlot";
-import { StatusBar } from "../components/statusbar/StatusBar";
-import { WindowResizeHandles } from "../components/window/WindowResizeHandles";
-import { type TerminalLocalPathUploadRequest } from "../components/terminal/TerminalPanel";
-import { type CodeWorkspaceGitManagerPayload } from "../components/editor/CodeWorkspaceTab";
-import type { WorkspaceCommandRegistration } from "../components/editor/workspace/workspaceCommands";
-import { decideWorkspaceGitSync } from "../lib/workspaceGitManagerSync";
-import { MultiExecBar } from "../components/terminal/MultiExecBar";
-import { SessionEditor } from "../components/session/SessionEditor";
-import { AuthPrompt } from "../components/session/AuthPrompt";
-import { EdgeDrawer } from "../components/lanchat/EdgeDrawer";
-import { CallOverlay } from "../components/lanchat/CallOverlay";
-import { WhiteboardOverlay } from "../components/lanchat/whiteboard/WhiteboardOverlay";
-import { type SftpPendingUploadRequest } from "../components/filebrowser/FileBrowser";
-import { sessionToObjectStorageConfig } from "../lib/objectStorage";
-import { useSftpStore } from "../stores/sftpStore";
-import { getAppPlatform, isTauriRuntime } from "../lib/runtime";
-import { effectiveFileType, openExternalUrl, sftpOpenPath, sftpStat } from "../lib/sftp";
-import { writeTerminal } from "../lib/ipc";
-import { encodeBase64 } from "../lib/ipc";
-import { parseVncViewerOptions, writeVncViewerOptions } from "../lib/vncOptions";
-import type { VncSessionProperties } from "../components/vnc/VncPropertiesDialog";
-import { Bot, FolderOpen } from "lucide-react";
+import { Bot,FolderOpen } from "lucide-react";
+import { useCallback,useEffect,useMemo,useRef,useState } from "react";
 import { createPortal } from "react-dom";
-import { ToolWindowRail, type ToolWindowRailItem } from "../components/editor/workspace/panels/ToolWindowRail";
+import { Panel,Group as PanelGroup,Separator as PanelResizeHandle,type PanelImperativeHandle,type PanelSize } from "react-resizable-panels";
+import { AboutDialog } from "../components/AboutDialog";
+import { CcAgentBridge } from "../components/agent/CcAgentBridge";
+import { ChatDrawer } from "../components/chat/ChatDrawer";
+import { ToolWindowRail,type ToolWindowRailItem } from "../components/editor/workspace/panels/ToolWindowRail";
 import { effectiveStripeWidth } from "../components/editor/workspace/toolWindowLayout";
 import { useToolWindowStripeStore } from "../components/editor/workspace/toolWindowStripeStore";
-import { useMainRailHostStore } from "../stores/mainRailHostStore";
-import { sidebarRailGroup } from "../stores/sidebarRailPolicy";
-import type { Tab, DbConnectInfo, MailTabInfo, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, RecentWorkspace } from "../types";
-import { computeNewTerminalTitle, newWorkspaceInstanceId, recentWorkspaceIdFromParts, useAppStore } from "../stores/appStore";
-import { terminalCwdTitlePrefix } from "../lib/terminalCwd";
-import { useSessionStore } from "../stores/sessionStore";
-import { AboutDialog } from "../components/AboutDialog";
-import { UpdateDialog } from "../components/UpdateDialog";
-import { useUpdateStore } from "../stores/updateStore";
-import { useServersStore } from "../stores/serversStore";
-import { exitApp, selectFolderPath, getSession, type SessionConfig } from "../lib/ipc";
-import { vaultPut, VAULT_LOCKED_EVENT } from "../lib/ipc";
-import { useVaultStore } from "../stores/vaultStore";
-import { ensureVaultReady } from "../lib/vaultGate";
-import { VaultUnlockDialog } from "../components/vault/VaultUnlockDialog";
-import { parseSessionOptions } from "../lib/terminalProfile";
-import { getSessionTerminalProfile, loadTerminalDefaultProfile, type TerminalProfile } from "../lib/terminalProfile";
-import { getSessionNetworkSettings, toNetworkSettingsPayload } from "../lib/networkSettings";
-import { loadResizableLayout, saveResizableLayout } from "../lib/resizableLayout";
-import { parsePathMappings } from "../components/filebrowser/PathMappingsEditor";
-import { parseRdpOptions } from "../types/rdp";
-import type { LocalLaunchOutcome, LocalShellSelection, SnapshotEntry } from "../types";
-import { primaryViewTypeForEntry } from "../lib/welcomeSessionResume";
-import { useWelcomeSessionResume } from "../hooks/useWelcomeSessionResume";
-import { ChatDrawer } from "../components/chat/ChatDrawer";
-import { TaoRibbon } from "../components/tao/TaoRibbon";
+import type { WorkspaceCommandRegistration } from "../components/editor/workspace/workspaceCommands";
+import { type SftpPendingUploadRequest } from "../components/filebrowser/FileBrowser";
+import { CallOverlay } from "../components/lanchat/CallOverlay";
+import { EdgeDrawer } from "../components/lanchat/EdgeDrawer";
+import { WhiteboardOverlay } from "../components/lanchat/whiteboard/WhiteboardOverlay";
+import type { AppCommand } from "../components/menubar/commands";
+import { useSessionImportExport } from "../components/menubar/useSessionImportExport";
 import { FloatingNotesPanel } from "../components/notes/FloatingNotesPanel";
+import { QuickConnect } from "../components/quickconnect/QuickConnect";
+import { AuthPrompt } from "../components/session/AuthPrompt";
+import { SessionEditor } from "../components/session/SessionEditor";
+import { useConfirmDialog } from "../components/sidebar/ConfirmDialog";
+import { Sidebar } from "../components/sidebar/Sidebar";
+import { StatusBar } from "../components/statusbar/StatusBar";
+import { ControlBar } from "../components/tabbar/ControlBar";
+import { TabActionSlotProvider } from "../components/tabbar/TabActionSlot";
 import { TaoAlertPoller } from "../components/tao/TaoAlertPoller";
-import { resolveChatDock } from "../lib/chat/chatDock";
+import { TaoRibbon } from "../components/tao/TaoRibbon";
+import { MultiExecBar } from "../components/terminal/MultiExecBar";
+import { type TerminalLocalPathUploadRequest } from "../components/terminal/TerminalPanel";
+import { UpdateDialog } from "../components/UpdateDialog";
+import { VaultUnlockDialog } from "../components/vault/VaultUnlockDialog";
+import { WindowResizeHandles } from "../components/window/WindowResizeHandles";
 import { useViewportSize } from "../hooks/useViewportSize";
-import { CcAgentBridge } from "../components/agent/CcAgentBridge";
-import { useChatStore } from "../stores/chatStore";
-import { useAiStore } from "../stores/aiStore";
-import { useLanChatStore, totalUnread } from "../stores/lanChatStore";
+import { resolveChatDock } from "../lib/chat/chatDock";
+import { t as tr,useT } from "../lib/i18n";
+import { VAULT_LOCKED_EVENT,encodeBase64,writeTerminal,type SessionConfig } from "../lib/ipc";
+import { type MenuActionId } from "../lib/nativeAppMenu";
+import { getSessionNetworkSettings,toNetworkSettingsPayload } from "../lib/networkSettings";
+import { setActiveQueryTab } from "../lib/queryRegistry";
+import { loadResizableLayout,saveResizableLayout } from "../lib/resizableLayout";
+import { getAppPlatform,isTauriRuntime } from "../lib/runtime";
+import { effectiveFileType,openExternalUrl,sftpOpenPath,sftpStat } from "../lib/sftp";
 import { setActiveTerminalTab } from "../lib/terminal/terminalRegistry";
-import { listQueryTabs, setActiveQueryTab } from "../lib/queryRegistry";
-import { t as tr, useT } from "../lib/i18n";
-import { gitInitRepo, gitProbePath, gitRepoName } from "../lib/git";
-import { alertAppDialog, confirmAppDialog } from "../lib/appDialogs";
-import { type ControlToolExecutor, type PendingAuth, type ConnectQueueEntry, type ResumeWaiter, type ControlToolDispatch } from "./main/types";
-import { readQuickConnectVisible, localShellSupportsCwdProbe, chatBindingIdForTab, normalizeGitWorkspaceRoots, gitWorkspaceRootsKey, browserUrlFromSession, commandTerminalFromSession, writeQuickConnectVisible } from "./main/sessionPolicy";
-import { SAVED_PASSWORD_VAULT_REASON_KEY, passwordRefFromOptions } from "./main/authentication";
-import { sessionToDbConnectInfo, sessionToHBaseConnectInfo } from "./main/databaseSession";
-import { sessionToMailTabInfo, mailSmtpPasswordRefFromOptions } from "./main/mailSession";
-import { positiveWeight, axisWeights, weightsToGridTemplate, sumWeights, resizeAdjacentWeights } from "./main/splitLayout";
-import { createOpenDetachedSftp, createOpenDetachedGenericWindow, createOpenDetachedRdp, createOpenDetachedVnc, createOpenDetachedTerminal, createOpenDetachedDatabase, createHandleDetachActiveTab } from "./main/detachedWindows";
-import { createQueueVaultUnlock, createOpenAfterJumpPassword, createOpenQueuedSession, createContinueConnectQueue, createHandleAuthSubmit } from "./main/connectionQueue";
-import { createResolveResumeWaiter, createCancelResumeWaiter, createCancelAllResumeWaiters, createResolveResumeWaiterForTab, createOpenSavedSessionForRestore, createOpenLocalTerminalForRestore, createCancelPendingAuthForRestore, createBuildRunSnapshotEntries, createCommitRunSnapshotNow } from "./main/restore";
-import { createHandleQuickConnect, createHandleCommand } from "./main/commandActions";
-import { createExecuteControlTool } from "./main/controlTools";
+import { terminalCwdTitlePrefix } from "../lib/terminalCwd";
+import { loadTerminalDefaultProfile,type TerminalProfile } from "../lib/terminalProfile";
+import { useAiStore } from "../stores/aiStore";
+import { computeNewTerminalTitle,useAppStore } from "../stores/appStore";
+import { useChatStore } from "../stores/chatStore";
+import { totalUnread,useLanChatStore } from "../stores/lanChatStore";
+import { useMainRailHostStore } from "../stores/mainRailHostStore";
+import { useServersStore } from "../stores/serversStore";
+import { useSessionStore } from "../stores/sessionStore";
+import { useSftpStore } from "../stores/sftpStore";
+import { sidebarRailGroup } from "../stores/sidebarRailPolicy";
+import { useUpdateStore } from "../stores/updateStore";
+import { useVaultStore } from "../stores/vaultStore";
+import type { LocalLaunchOutcome,LocalShellSelection,MailTabInfo,RecentWorkspace,Tab } from "../types";
+import { SAVED_PASSWORD_VAULT_REASON_KEY,passwordRefFromOptions } from "./main/authentication";
+import { createHandleCommand,createHandleQuickConnect } from "./main/commandActions";
+import { createContinueConnectQueue,createHandleAuthSubmit,createOpenAfterJumpPassword,createOpenQueuedSession,createQueueVaultUnlock } from "./main/connectionQueue";
+import { createHandleDetachActiveTab,createOpenDetachedDatabase,createOpenDetachedGenericWindow,createOpenDetachedRdp,createOpenDetachedSftp,createOpenDetachedTerminal,createOpenDetachedVnc } from "./main/detachedWindows";
+import { mailSmtpPasswordRefFromOptions,sessionToMailTabInfo } from "./main/mailSession";
+import { chatBindingIdForTab,localShellSupportsCwdProbe,readQuickConnectVisible,writeQuickConnectVisible } from "./main/sessionPolicy";
 import { TabContentRouter } from "./main/TabContentRouter";
+import { type ConnectQueueEntry,type ControlToolExecutor,type PendingAuth } from "./main/types";
+import { useApplicationExit } from "./main/useApplicationExit";
+import { useControlTools } from "./main/useControlTools";
 import { useDetachedWindowEvents } from "./main/useDetachedWindowEvents";
 import { useMainMenuBridge } from "./main/useMainMenuBridge";
+import { useProtocolTabs } from "./main/useProtocolTabs";
+import { useSessionResume } from "./main/useSessionResume";
+import { useShellSessionTabs } from "./main/useShellSessionTabs";
+import { useTerminalProfiles } from "./main/useTerminalProfiles";
+import { useTerminalSplitLayout } from "./main/useTerminalSplitLayout";
+import { useWorkspaceTabs } from "./main/useWorkspaceTabs";
+
+
+
+
+
+
+
+
 
 
 
@@ -145,67 +138,10 @@ export function MainLayout() {
   useEffect(() => {
     useAppStore.getState().applySidebarForActiveTab();
   }, [activeRailGroup, mergeToolWindowRail]);
-  const terminalProfilesBySessionId = useMemo(() => {
-    const profiles = new Map<string, TerminalProfile | undefined>();
-    for (const session of sessions) {
-      profiles.set(session.id, getSessionTerminalProfile(session.options_json));
-    }
-    return profiles;
-  }, [sessions]);
-  const terminalProfileSignaturesBySessionId = useMemo(() => {
-    const signatures = new Map<string, string | null>();
-    for (const session of sessions) {
-      const profile = getSessionTerminalProfile(session.options_json);
-      signatures.set(session.id, profile ? JSON.stringify(profile) : null);
-    }
-    return signatures;
-  }, [sessions]);
-  const [terminalProfileOverrides, setTerminalProfileOverrides] = useState<Record<string, TerminalProfile>>({});
-  const previousTerminalProfileSignaturesRef = useRef<Map<string, string | null> | null>(null);
-
-  useEffect(() => {
-    setTerminalProfileOverrides((current) => {
-      const liveTabIds = new Set(tabs.map((tab) => tab.id));
-      let changed = false;
-      const next = { ...current };
-      for (const tabId of Object.keys(next)) {
-        if (!liveTabIds.has(tabId)) {
-          delete next[tabId];
-          changed = true;
-        }
-      }
-      return changed ? next : current;
-    });
-  }, [tabs]);
-
-  useEffect(() => {
-    const previous = previousTerminalProfileSignaturesRef.current;
-    previousTerminalProfileSignaturesRef.current = terminalProfileSignaturesBySessionId;
-    if (!previous) return;
-
-    setTerminalProfileOverrides((current) => {
-      let changed = false;
-      const next = { ...current };
-      for (const tab of tabs) {
-        if (tab.type !== "terminal" || !tab.sessionId || !(tab.id in next)) continue;
-        const before = previous.get(tab.sessionId);
-        const after = terminalProfileSignaturesBySessionId.get(tab.sessionId) ?? null;
-        if (before !== undefined && before !== after) {
-          delete next[tab.id];
-          changed = true;
-        }
-      }
-      return changed ? next : current;
-    });
-  }, [tabs, terminalProfileSignaturesBySessionId]);
-
-  const handleTerminalProfileChange = useCallback((tabId: string, profile: TerminalProfile) => {
-    setTerminalProfileOverrides((current) => {
-      const currentProfile = current[tabId];
-      if (currentProfile && JSON.stringify(currentProfile) === JSON.stringify(profile)) return current;
-      return { ...current, [tabId]: profile };
-    });
-  }, []);
+  const { terminalProfileOverrides, terminalProfilesBySessionId, handleTerminalProfileChange } = useTerminalProfiles({
+    sessions,
+    tabs,
+  });
   const welcomeRecentSessions = useMemo(
     () =>
       sessions
@@ -275,36 +211,15 @@ export function MainLayout() {
   const [terminalCwds, setTerminalCwds] = useState<Record<string, string>>({});
   const [terminalCwdVersions, setTerminalCwdVersions] = useState<Record<string, number>>({});
   const [terminalCwdRequestTokens, setTerminalCwdRequestTokens] = useState<Record<string, number>>({});
-  const [splitPaneWeights, setSplitPaneWeights] = useState<Record<string, number>>({});
-  const [splitGridColumnWeights, setSplitGridColumnWeights] = useState<number[]>([]);
-  const [splitGridRowWeights, setSplitGridRowWeights] = useState<number[]>([]);
   const [vaultUnlockReason, setVaultUnlockReason] = useState<string | null>(null);
   const pendingVaultActionRef = useRef<(() => void) | null>(null);
   const connectQueueRef = useRef<ConnectQueueEntry[]>([]);
   const connectQueueRunningRef = useRef(false);
   /// Pending Welcome local-terminal launches keyed by tab id (design §4.1.5).
   const pendingLocalLaunchesRef = useRef<Map<string, (outcome: LocalLaunchOutcome) => void>>(new Map());
-  /// Welcome restore orchestration (design §4.2.3): per-entry waiters keyed by
-  /// request id, plus tabId bindings and readiness timers.
-  const resumeWaitersRef = useRef<Map<string, ResumeWaiter>>(new Map());
-  const resumeWaiterBySessionRef = useRef<Map<string, string>>(new Map());
-  const resumeWaiterByTabRef = useRef<Map<string, string>>(new Map());
-  /// Non-terminal restored tabs: settle timer -> view-opened while alive.
-  const resumeSettleTimersRef = useRef<Map<string, number>>(new Map());
-  /// Failed tabs owned by a restore operation, keyed by entry identity;
-  /// retry replaces them instead of stacking (design §4.2.5).
-  const restoreFailedLocalTabsRef = useRef<Map<string, string>>(new Map());
-  /// Run-snapshot collector state (design §4.2.1).
-  const runBatchIdRef = useRef<string>(
-    globalThis.crypto?.randomUUID?.() ?? `run-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-  );
-  const snapshotFingerprintRef = useRef<string>("");
-  const snapshotRevisionRef = useRef<number>(0);
-  const snapshotCommitTimerRef = useRef<number | null>(null);
   const awaitingManualAuthRef = useRef(false);
   const awaitingVaultUnlockRef = useRef(false);
   const continueConnectQueueRef = useRef<() => void>(() => undefined);
-  const splitPanesRef = useRef<HTMLDivElement>(null);
   const refreshVault = useVaultStore((s) => s.refresh);
   const unlockVault = useVaultStore((s) => s.unlock);
   const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
@@ -701,76 +616,11 @@ export function MainLayout() {
   useEffect(() => {
     void useServersStore.getState().loadAll();
   }, []);
-
-  const confirmExitWithOpenTabs = useCallback(async () => {
-    const currentTabs = tabsRef.current;
-    const terminalCount = currentTabs.filter((tab) => tab.type === "terminal" && tab.closable).length;
-    const tabCount = currentTabs.filter((tab) => tab.closable).length;
-    if (tabCount === 0) return true;
-
-    const isOne = tabCount === 1;
-    let message: string;
-    if (terminalCount > 0) {
-      message = tr(isOne ? "exit.promptOneTerminal" : "exit.promptManyTerminals", {
-        count: tabCount,
-        terminals: terminalCount,
-      });
-    } else {
-      message = tr(isOne ? "exit.promptOne" : "exit.promptMany", { count: tabCount });
-    }
-    return confirmAppExit({
-      title: tr("ribbon.exit"),
-      message,
-      confirmLabel: tr("ribbon.exit"),
-      danger: true,
-    });
-  }, [confirmAppExit]);
-
-  const requestAppExit = useCallback(() => {
-    if (exitRequestInFlightRef.current) return;
-    exitRequestInFlightRef.current = true;
-    void (async () => {
-      try {
-        if (!(await confirmExitWithOpenTabs())) return;
-        await Promise.allSettled(
-          listQueryTabs().map((entry) => entry.flushWorkspace?.()),
-        );
-        for (;;) {
-          try {
-            await exitApp();
-            return;
-          } catch (error) {
-            const retry = await confirmAppExit({
-              title: tr("exit.cleanupFailedTitle"),
-              message: tr("exit.cleanupFailedMessage", { error: String(error) }),
-              confirmLabel: tr("exit.retryCleanup"),
-              cancelLabel: tr("exit.cancelExit"),
-              danger: true,
-            });
-            if (!retry) return;
-          }
-        }
-      } finally {
-        exitRequestInFlightRef.current = false;
-      }
-    })();
-  }, [confirmAppExit, confirmExitWithOpenTabs]);
-
-  useEffect(() => {
-    const appWindow = getCurrentWindow();
-    let unlisten: (() => void) | undefined;
-
-    void appWindow.onCloseRequested((event) => {
-      event.preventDefault();
-      requestAppExit();
-    }).then((fn) => {
-      unlisten = fn;
-    });
-
-    return () => {
-      unlisten?.();
-    };
-  }, [requestAppExit]);
+  const { requestAppExit } = useApplicationExit({
+    tabsRef,
+    confirmAppExit,
+    exitRequestInFlightRef,
+  });
 
   const handleNewSession = useCallback((groupPath: string | null = null) => {
     setEditingSession(undefined);
@@ -860,241 +710,14 @@ export function MainLayout() {
     const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
     if (session) handleEditSession(session);
   }, [handleEditSession]);
-
-  const openSftpTab = useCallback((session: SessionConfig, authMethod: string, authData: string | null) => {
-    const tabId = `sftp-${session.id}-${Date.now()}`;
-    const ns = toNetworkSettingsPayload(getSessionNetworkSettings(session.options_json));
-    const pathMappings = parsePathMappings(session.options_json);
-    addTab({
-      id: tabId,
-      type: "sftp",
-      title: `${session.name || `${session.username ?? "user"}@${session.host}`} (SFTP)`,
-      sessionId: session.id,
-      closable: true,
-      sftp: {
-        sessionId: tabId,
-        host: session.host,
-        port: session.port,
-        username: session.username ?? "root",
-        authMethod,
-        authData,
-        networkSettingsJson: JSON.stringify(ns),
-        attachedToTerminal: false,
-        pathMappings: pathMappings.length > 0 ? pathMappings : undefined,
-      },
-    });
-    void markConnected(session.id);
-  }, [addTab, markConnected]);
-
-  const openVncTab = useCallback((session: SessionConfig, password?: string) => {
-    const id = `vnc-${session.id}-${Date.now()}`;
-    const options = parseSessionOptions(session.options_json);
-    const rawPolicy = typeof options.vncSecurityPolicy === "string" ? options.vncSecurityPolicy : "prefer-encryption";
-    const securityPolicy = rawPolicy === "require-encryption" || rawPolicy === "legacy-compatible" || rawPolicy === "allow-none"
-      || rawPolicy === "prefer-off"
-      ? rawPolicy
-      : "prefer-encryption";
-    const ns = toNetworkSettingsPayload(getSessionNetworkSettings(session.options_json));
-    addTab({
-      id,
-      type: "vnc",
-      title: session.name || `${session.host}:${session.port}`,
-      sessionId: session.id,
-      closable: true,
-      vnc: {
-        sessionId: session.id,
-        host: session.host,
-        port: session.port,
-        username: session.username,
-        password,
-        networkSettingsJson: JSON.stringify(ns),
-        securityPolicy,
-        viewOnly: options.vncViewOnly === true,
-        clipboardPolicy:
-          options.vncClipboardPolicy === "disabled" || options.vncClipboardPolicy === "client-to-server" || options.vncClipboardPolicy === "server-to-client"
-            ? options.vncClipboardPolicy
-            : "bidirectional",
-        viewerOptions: parseVncViewerOptions(options),
-      },
-    });
-  }, [addTab]);
-
-  // VNC-CONN-001: Properties changed in a VNC session persist to the saved
-  // session (like RealVNC's address-book entry) and to the tab.
-  const persistVncProperties = useCallback(async (tabId: string, sessionId: string, properties: VncSessionProperties) => {
-    useAppStore.getState().updateTabVnc(tabId, {
-      viewOnly: properties.viewOnly,
-      clipboardPolicy: properties.clipboardPolicy,
-      viewerOptions: properties.viewer,
-    });
-    const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
-    if (!session) return;
-    const options = writeVncViewerOptions(parseSessionOptions(session.options_json), properties.viewer);
-    options.vncViewOnly = properties.viewOnly;
-    options.vncClipboardPolicy = properties.clipboardPolicy;
-    try {
-      await updateSession({ ...session, options_json: JSON.stringify(options) });
-    } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : String(error));
-    }
-  }, [setStatusMessage, updateSession]);
-
-  // "Remember password" in the in-session authentication form stores the
-  // password in the vault and references it from the session.
-  const rememberVncCredentials = useCallback(async (tabId: string, sessionId: string, password: string) => {
-    const session = useSessionStore.getState().sessions.find((item) => item.id === sessionId);
-    if (!session) return;
-    const ready = await ensureVaultReady(tr(SAVED_PASSWORD_VAULT_REASON_KEY));
-    if (!ready) return;
-    try {
-      const label = `${session.username || "user"}@${session.host || "?"}:${session.port}`;
-      const result = await vaultPut("vnc-password", label, password);
-      const opts = parseSessionOptions(session.options_json);
-      await updateSession({ ...session, options_json: JSON.stringify({ ...opts, passwordRef: result.reference }) });
-      useAppStore.getState().updateTabVnc(tabId, { password: result.reference });
-    } catch (error) {
-      setStatusMessage(error instanceof Error ? error.message : String(error));
-    }
-  }, [setStatusMessage, updateSession]);
-
-  const openRdpTab = useCallback((session: SessionConfig, password?: string) => {
-    const id = `rdp-${session.id}-${Date.now()}`;
-    const opts = parseRdpOptions(session.options_json);
-    const ns = toNetworkSettingsPayload(getSessionNetworkSettings(session.options_json));
-    addTab({
-      id,
-      type: "rdp",
-      title: session.name || `${session.host}:${session.port}`,
-      sessionId: session.id,
-      closable: true,
-      rdp: {
-        sessionId: session.id,
-        host: session.host,
-        port: session.port,
-        username: session.username,
-        password,
-        options: opts,
-        networkSettingsJson: JSON.stringify(ns),
-      },
-    });
-    void markConnected(session.id);
-  }, [addTab, markConnected]);
-
-  const openFileBrowserTab = useCallback((title: string, initialPath: string, sessionId?: string) => {
-    const id = `file-${sessionId ?? "ad-hoc"}-${Date.now()}`;
-    addTab({
-      id,
-      type: "file-browser",
-      title,
-      sessionId,
-      closable: true,
-      fileBrowser: { initialPath },
-    });
-  }, [addTab]);
-
-  const openDbTab = useCallback((session: SessionConfig, password?: string) => {
-    const engine = session.session_type as DbConnectInfo["engine"];
-    const isRedis = engine === "Redis";
-    const id = `${isRedis ? "redis" : "database"}-${session.id}-${Date.now()}`;
-    const info = sessionToDbConnectInfo(session, password);
-    const prestoPath = info.engine === "Presto"
-      ? [info.catalog, info.database].filter(Boolean).join(".")
-      : info.database;
-    const title = `${engine} ${session.host}:${session.port}${prestoPath ? `/${prestoPath}` : ""}`;
-    addTab({
-      id,
-      type: isRedis ? "redis" : "database",
-      title,
-      sessionId: session.id,
-      closable: true,
-      db: info,
-    });
-    void markConnected(session.id);
-  }, [addTab, markConnected]);
-
-  const openHBaseShellTab = useCallback((session: SessionConfig, password?: string) => {
-    const id = `hbase-shell-${session.id}-${Date.now()}`;
-    const info = sessionToHBaseConnectInfo(session, password);
-    // Native mode may have no host/port (it bootstraps via ZK quorum or
-    // hbase-site.xml), so build a sensible endpoint label per mode.
-    const endpointLabel =
-      info.connectionMode === "native"
-        ? info.zkQuorum?.split(",")[0]?.trim() ||
-          (session.host ? `${session.host}:${session.port}` : "") ||
-          (info.hbaseSitePath ? "hbase-site.xml" : "ZooKeeper")
-        : `${session.host}:${session.port}`;
-    const title = `HBase ${endpointLabel}${info.namespace ? `/${info.namespace}` : ""}`;
-    addTab({
-      id,
-      type: "hbase-shell",
-      title,
-      sessionId: session.id,
-      closable: true,
-      hbase: info,
-    });
-    void markConnected(session.id);
-  }, [addTab, markConnected]);
-
-  const openProxyTestTab = useCallback((session: SessionConfig) => {
-    const id = `proxy-test-${session.id}-${Date.now()}`;
-    const options = parseSessionOptions(session.options_json);
-    const proxyKind = (options.proxyKind === "socks5" ? "socks5" : "http") as "http" | "socks5";
-    const title = `${proxyKind === "http" ? "HTTP" : "SOCKS5"} ${session.host}:${session.port}`;
-    addTab({
-      id,
-      type: "proxy-test",
-      title,
-      sessionId: session.id,
-      closable: true,
-      proxyTest: {
-        sessionId: session.id,
-        proxyKind,
-        host: session.host,
-        port: session.port,
-        username: session.username,
-        password: passwordRefFromOptions(session) || undefined,
-        testUrl: typeof options.testUrl === "string" ? options.testUrl : "www.google.com:443",
-      },
-    });
-    void markConnected(session.id);
-  }, [addTab, markConnected]);
-
-  const openObjectStorageTab = useCallback((session: SessionConfig) => {
-    const id = `object-storage-${session.id}-${Date.now()}`;
-    const config = sessionToObjectStorageConfig(session);
-    const title = session.name || session.host || "Object Storage";
-    addTab({
-      id,
-      type: "object-storage",
-      title,
-      sessionId: session.id,
-      closable: true,
-      // The browser keys its live store by the tab session id (not the saved
-      // session id) so two tabs for the same saved session stay independent.
-      objectStorage: { sessionId: id, config },
-    });
-    void markConnected(session.id);
-  }, [addTab, markConnected]);
-
-  const openMailTab = useCallback((session: SessionConfig, password?: string, smtpPassword?: string) => {
-    const existing = tabsRef.current.find((tab) => tab.type === "mail" && tab.sessionId === session.id);
-    if (existing) {
-      setActiveTab(existing.id);
-      return;
-    }
-    const id = `mail-${session.id}-${Date.now()}`;
-    const info = sessionToMailTabInfo(session, password, smtpPassword);
-    const title = session.name || info.emailAddress || `Mail ${session.host}`;
-    addTab({
-      id,
-      type: "mail",
-      title,
-      sessionId: session.id,
-      closable: true,
-      mail: info,
-    });
-    void markConnected(session.id);
-  }, [addTab, markConnected, setActiveTab]);
+  const { openFileBrowserTab, openSftpTab, openVncTab, openRdpTab, openDbTab, openHBaseShellTab, openProxyTestTab, openObjectStorageTab, openMailTab, persistVncProperties, rememberVncCredentials } = useProtocolTabs({
+    addTab,
+    markConnected,
+    updateSession,
+    setStatusMessage,
+    tabsRef,
+    setActiveTab,
+  });
 
   // Open a local path or URL: http(s) URLs and files always go to the system handler;
   // folders open in an embedded Taomni tab when `embedFolder` is true, otherwise
@@ -1165,337 +788,20 @@ export function MainLayout() {
     if (!target) return;
     void handleOpenLocalPath(target, { embedFolder: false });
   }, [handleOpenLocalPath]);
-
-  const openGitTab = useCallback((repoRoot: string) => {
-    const normalized = repoRoot.trim();
-    if (!normalized) return;
-    const existing = tabsRef.current.find(
-      (tab) => tab.type === "git" && tab.git?.repoRoot === normalized && !tab.git?.workspaceRoots?.length,
-    );
-    if (existing) {
-      setActiveTab(existing.id);
-      return;
-    }
-    addTab({
-      id: `git-${Date.now()}`,
-      type: "git",
-      title: `Git · ${gitRepoName(normalized)}`,
-      closable: true,
-      git: { repoRoot: normalized },
-    });
-  }, [addTab, setActiveTab]);
-
-  const openWorkspaceGitManager = useCallback((payload: CodeWorkspaceGitManagerPayload) => {
-    const workspaceRoots = normalizeGitWorkspaceRoots(payload.roots);
-    if (workspaceRoots.length === 0) return;
-    const activeRepoRoot = payload.activeRepoRoot && workspaceRoots.some((root) => root.repoRoot === payload.activeRepoRoot)
-      ? payload.activeRepoRoot
-      : workspaceRoots[0].repoRoot;
-    const name = payload.workspaceName.trim() || "Code Workspace";
-    const existing = tabsRef.current.find((tab) => {
-      if (tab.type !== "git" || !tab.git?.workspaceRoots?.length) return false;
-      if (payload.workspaceInstanceId) {
-        return tab.git.sourceWorkspaceInstanceId === payload.workspaceInstanceId;
-      }
-      return gitWorkspaceRootsKey(tab.git.workspaceRoots) === gitWorkspaceRootsKey(workspaceRoots);
-    });
-    if (existing) {
-      updateGitTabInfo(existing.id, {
-        ...existing.git!,
-        repoRoot: activeRepoRoot,
-        workspaceName: name,
-        workspaceRoots,
-        activeRepoRoot,
-        sourceWorkspaceInstanceId: payload.workspaceInstanceId ?? existing.git?.sourceWorkspaceInstanceId,
-        sourceWorkspaceId: payload.workspaceId ?? existing.git?.sourceWorkspaceId,
-        sourceWorkspaceName: name,
-      }, `Git · ${name}`);
-      setActiveTab(existing.id);
-      return;
-    }
-    addTab({
-      id: `git-workspace-${Date.now()}`,
-      type: "git",
-      title: `Git · ${name}`,
-      closable: true,
-      git: {
-        repoRoot: activeRepoRoot,
-        workspaceName: name,
-        workspaceRoots,
-        activeRepoRoot,
-        sourceWorkspaceInstanceId: payload.workspaceInstanceId,
-        sourceWorkspaceId: payload.workspaceId,
-        sourceWorkspaceName: name,
-      },
-    });
-  }, [addTab, setActiveTab, updateGitTabInfo]);
-
-  const syncWorkspaceGitManager = useCallback((payload: CodeWorkspaceGitManagerPayload) => {
-    const sourceWorkspaceInstanceId = payload.workspaceInstanceId;
-    if (!sourceWorkspaceInstanceId) return;
-    const workspaceRoots = normalizeGitWorkspaceRoots(payload.roots);
-    const existing = tabsRef.current.find((tab) => (
-      tab.type === "git"
-      && tab.git?.sourceWorkspaceInstanceId === sourceWorkspaceInstanceId
-    ));
-    const decision = decideWorkspaceGitSync({
-      hasLinkedTab: !!existing?.git,
-      workspaceRoots,
-      existingActiveRepoRoot: existing?.git?.activeRepoRoot ?? existing?.git?.repoRoot,
-      payloadActiveRepoRoot: payload.activeRepoRoot,
-    });
-    if (decision.kind === "noop" || !existing?.git) return;
-    // Empty / removed roots: close the linked Git tab so we never keep
-    // snapshotting deleted paths after the workspace drops them (issue #324 B1).
-    if (decision.kind === "close") {
-      removeTab(existing.id);
-      return;
-    }
-    const name = payload.workspaceName.trim() || "Code Workspace";
-    updateGitTabInfo(existing.id, {
-      ...existing.git,
-      repoRoot: decision.activeRepoRoot,
-      workspaceName: name,
-      workspaceRoots: decision.workspaceRoots,
-      activeRepoRoot: decision.activeRepoRoot,
-      sourceWorkspaceInstanceId,
-      sourceWorkspaceId: payload.workspaceId ?? existing.git.sourceWorkspaceId,
-      sourceWorkspaceName: name,
-    }, `Git · ${name}`);
-  }, [removeTab, updateGitTabInfo]);
-
-  // Close workspace Git manager tabs whose source Code Workspace tab is gone so
-  // they cannot keep snapshotting stale repo paths after the workspace is closed.
-  useEffect(() => {
-    const openWorkspaceInstanceIds = new Set(
-      tabs
-        .filter((tab) => tab.type === "code-workspace" && tab.codeWorkspace)
-        .map((tab) => {
-          const ws = tab.codeWorkspace!;
-          return ws.workspaceInstanceId ?? ws.workspaceId ?? ws.repoRoot?.trim() ?? tab.id;
-        }),
-    );
-    for (const tab of tabs) {
-      if (tab.type !== "git" || !tab.git?.sourceWorkspaceInstanceId) continue;
-      if (!tab.git.workspaceRoots?.length) continue;
-      if (openWorkspaceInstanceIds.has(tab.git.sourceWorkspaceInstanceId)) continue;
-      removeTab(tab.id);
-    }
-  }, [removeTab, tabs]);
-
-  const openCodeWorkspaceInfo = useCallback((workspace: CodeWorkspaceTabInfo) => {
-    const roots = workspace.roots ?? [];
-    const looseFiles = workspace.looseFiles ?? [];
-    const identity = recentWorkspaceIdFromParts(roots, looseFiles);
-    const existing = tabsRef.current.find(
-      (tab) => {
-        if (tab.type !== "code-workspace" || !tab.codeWorkspace) return false;
-        if (workspace.workspaceId && tab.codeWorkspace.workspaceId === workspace.workspaceId) return true;
-        if (tab.codeWorkspace.workspaceId === identity) return true;
-        const tabRoots = tab.codeWorkspace.roots ?? [];
-        const tabLooseFiles = tab.codeWorkspace.looseFiles ?? [];
-        if (tabRoots.length === 0 && tabLooseFiles.length === 0) return false;
-        return recentWorkspaceIdFromParts(tabRoots, tabLooseFiles) === identity;
-      },
-    );
-    if (existing) {
-      setActiveTab(existing.id);
-      return;
-    }
-    const title = workspace.name?.trim()
-      || (roots.length === 1 && looseFiles.length === 0 ? roots[0].name : "")
-      || (roots.length === 0 && looseFiles.length > 0 ? "Editor Workspace" : "Code Workspace");
-    addTab({
-      id: `code-workspace-${Date.now()}`,
-      type: "code-workspace",
-      title: `Code · ${title}`,
-      closable: true,
-      codeWorkspace: {
-        ...workspace,
-        workspaceId: workspace.workspaceId ?? identity,
-        // Derive the instance id from the workspace identity (the same
-        // deterministic recents id the tab already carries) instead of minting
-        // a fresh uuid per entry: the layout v2 snapshot and the bounded
-        // recovery copies are keyed by this id, so a fresh uuid per re-entry
-        // orphaned every snapshot/recovery entry across a reload or app
-        // restart. An explicit workspaceInstanceId (duplicate tab, detached
-        // window) still wins.
-        workspaceInstanceId: workspace.workspaceInstanceId ?? (identity || newWorkspaceInstanceId()),
-        name: title,
-      },
-    });
-  }, [addTab, setActiveTab]);
-
-  const openCodeWorkspaceTab = useCallback((repoRoot: string, initialPath?: string | null) => {
-    const normalized = repoRoot.trim();
-    if (!normalized) return;
-    const root: CodeWorkspaceRootInfo = {
-      id: `root-${Date.now()}`,
-      name: gitRepoName(normalized),
-      path: normalized,
-      kind: "git",
-    };
-    openCodeWorkspaceInfo({
-      repoRoot: normalized,
-      initialPath: initialPath ?? null,
-      workspaceId: recentWorkspaceIdFromParts([root], []),
-      name: root.name,
-      roots: [root],
-      looseFiles: [],
-      initialFile: initialPath ? { kind: "root", rootId: root.id, path: initialPath } : null,
-    });
-  }, [openCodeWorkspaceInfo]);
-
-  const openRecentCodeWorkspace = useCallback((workspace: RecentWorkspace) => {
-    openCodeWorkspaceInfo({
-      repoRoot: workspace.roots[0]?.path ?? "",
-      workspaceId: workspace.id,
-      name: workspace.name,
-      roots: workspace.roots,
-      looseFiles: workspace.looseFiles,
-      initialFile: workspace.lastActiveFile ?? null,
-    });
-  }, [openCodeWorkspaceInfo]);
-
-  const openEmptyCodeWorkspaceTab = useCallback(() => {
-    const id = `code-workspace-${Date.now()}`;
-    addTab({
-      id,
-      type: "code-workspace",
-      title: "Code · Editor Workspace",
-      closable: true,
-      codeWorkspace: {
-        repoRoot: "",
-        workspaceId: id,
-        workspaceInstanceId: newWorkspaceInstanceId(),
-        name: "Editor Workspace",
-        roots: [],
-        looseFiles: [],
-        initialFile: null,
-      },
-    });
-  }, [addTab]);
-
-  const openNewCodeWorkspaceFromWelcome = useCallback(async () => {
-    const path = await selectFolderPath();
-    if (path) openCodeWorkspaceTab(path);
-  }, [openCodeWorkspaceTab]);
-
-  const openGitRepository = useCallback(async (path?: string | null) => {
-    const target = path ?? await selectFolderPath();
-    if (!target) return;
-    try {
-      const probe = await gitProbePath(target);
-      if (!probe.gitAvailable) {
-        await alertAppDialog({
-          title: "Git Repository",
-          message: probe.error ?? "Git executable was not found.",
-        });
-        return;
-      }
-      if (probe.isRepo && probe.repoRoot) {
-        openGitTab(probe.repoRoot);
-        return;
-      }
-      const shouldInit = await confirmAppDialog({
-        title: "Initialize Git repository",
-        message: `"${target}" is not inside a Git repository. Initialize a new repository here?`,
-        confirmLabel: "Initialize",
-      });
-      if (!shouldInit) return;
-      const initialized = await gitInitRepo(target);
-      openGitTab(initialized.repoRoot ?? target);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setStatusMessage(message);
-      await alertAppDialog({ title: "Git Repository", message });
-    }
-  }, [openGitTab, setStatusMessage]);
-
-  const openBrowserSession = useCallback((session: SessionConfig) => {
-    const url = browserUrlFromSession(session);
-    if (!url) {
-      setStatusMessage(tr("status.browserSessionMissing"));
-      return;
-    }
-    void openExternalUrl(url).catch((err) => {
-      setStatusMessage(tr("status.openFailed", {
-        error: err instanceof Error ? err.message : String(err),
-      }));
-    });
-    void markConnected(session.id);
-  }, [markConnected, setStatusMessage]);
-
-  const openSshTab = useCallback((session: SessionConfig, authMethod: string, authData: string | null) => {
-    const id = `ssh-${session.id}-${Date.now()}`;
-    addTab({
-      id,
-      type: "terminal",
-      title: session.name || `${session.username}@${session.host}`,
-      sessionId: session.id,
-      terminalTitleMode: "pending-auto",
-      terminalTitleOperation: "new",
-      terminalTitleSessionName: session.name || `${session.username ?? "root"}@${session.host}`,
-      closable: true,
-      ssh: {
-        sessionId: session.id,
-        host: session.host,
-        port: session.port,
-        username: session.username ?? "root",
-        authMethod,
-        authData,
-        optionsJson: session.options_json,
-      },
-      terminalProfile: getSessionTerminalProfile(session.options_json) ?? loadTerminalDefaultProfile(),
-    });
-    void markConnected(session.id);
-  }, [addTab, markConnected]);
-
-  const openCommandTerminalTab = useCallback((session: SessionConfig) => {
-    const commandTerminal = commandTerminalFromSession(session);
-    if (!commandTerminal) {
-      setStatusMessage(
-        session.session_type === "Serial"
-          ? tr("status.serialSessionMissing")
-          : tr("status.remoteSessionMissing"),
-      );
-      return;
-    }
-    const id = `${session.session_type.toLowerCase()}-${session.id}-${Date.now()}`;
-    const title = session.name || (
-      session.session_type === "Serial"
-        ? commandTerminal.host
-        : `${session.session_type} ${commandTerminal.username ? `${commandTerminal.username}@` : ""}${commandTerminal.host}`
-    );
-    addTab({
-      id,
-      type: "terminal",
-      title,
-      sessionId: session.id,
-      terminalTitleMode: "pending-auto",
-      terminalTitleOperation: "new",
-      terminalTitleSessionName: session.name || title,
-      closable: true,
-      commandTerminal,
-      terminalProfile: getSessionTerminalProfile(session.options_json) ?? loadTerminalDefaultProfile(),
-    });
-    void markConnected(session.id);
-  }, [addTab, markConnected, setStatusMessage]);
-
-  const openUnsupportedTab = useCallback((session: SessionConfig) => {
-    const id = `${session.session_type.toLowerCase()}-${session.id}-${Date.now()}`;
-    const kind = ["SFTP", "VNC"].includes(session.session_type)
-      ? session.session_type.toLowerCase()
-      : "placeholder";
-    addTab({
-      id,
-      type: kind as "sftp" | "vnc" | "placeholder",
-      title: session.name || session.host || session.session_type,
-      sessionId: session.id,
-      closable: true,
-      message: `${session.session_type} connection UI is present, but its backend is outside Phase 1-2. Session data is saved and can be edited from the sidebar.`,
-    });
-  }, [addTab]);
+  const { openGitRepository, openEmptyCodeWorkspaceTab, openRecentCodeWorkspace, openNewCodeWorkspaceFromWelcome, openCodeWorkspaceTab, openWorkspaceGitManager, syncWorkspaceGitManager } = useWorkspaceTabs({
+    tabsRef,
+    setActiveTab,
+    addTab,
+    updateGitTabInfo,
+    removeTab,
+    tabs,
+    setStatusMessage,
+  });
+  const { openSshTab, openBrowserSession, openCommandTerminalTab, openUnsupportedTab } = useShellSessionTabs({
+    setStatusMessage,
+    markConnected,
+    addTab,
+  });
 
   const queueVaultUnlock = useCallback(createQueueVaultUnlock({
     connectQueueRef,
@@ -1565,207 +871,20 @@ export function MainLayout() {
   useEffect(() => {
     continueConnectQueueRef.current = continueConnectQueue;
   }, [continueConnectQueue]);
-
-  // -------------------------------------------------------------------------
-  // Welcome restore orchestration (design §4.2.3-4.2.5)
-  // -------------------------------------------------------------------------
-
-  const resolveResumeWaiter = useCallback(createResolveResumeWaiter({
-    resumeWaitersRef,
-    resumeWaiterByTabRef,
-    resumeWaiterBySessionRef,
-    resumeSettleTimersRef,
-  }), []);
-
-  const cancelResumeWaiter = useCallback(
-    createCancelResumeWaiter({
-    resolveResumeWaiter,
-  }),
-    [resolveResumeWaiter],
-  );
-
-  const cancelAllResumeWaiters = useCallback(
-    createCancelAllResumeWaiters({
-    resumeWaitersRef,
-    cancelResumeWaiter,
-  }),
-    [cancelResumeWaiter],
-  );
-
-  /** Resolve the waiter bound to a restored tab by its readiness outcome. */
-  const resolveResumeWaiterForTab = useCallback(
-    createResolveResumeWaiterForTab({
-    resumeWaiterByTabRef,
-    resolveResumeWaiter,
-    resumeWaitersRef,
-    restoreFailedLocalTabsRef,
-  }),
-    [resolveResumeWaiter],
-  );
-
-  // Bind newly created tabs (sessionId match, tab absent at registration) to
-  // their waiting restore entry, then start a settle fallback. A bound tab
-  // that closes before readiness completes its entry as cancelled.
-  useEffect(() => {
-    const liveIds = new Set(tabs.map((tab) => tab.id));
-    for (const [tabId, requestId] of Array.from(resumeWaiterByTabRef.current.entries())) {
-      if (!liveIds.has(tabId)) {
-        resumeWaiterByTabRef.current.delete(tabId);
-        cancelResumeWaiter(requestId, "cancelled", "Restored tab was closed");
-      }
-    }
-    if (resumeWaiterBySessionRef.current.size === 0) return;
-    for (const tab of tabs) {
-      if (!tab.sessionId) continue;
-      const requestId = resumeWaiterBySessionRef.current.get(tab.sessionId);
-      if (!requestId) continue;
-      const waiter = resumeWaitersRef.current.get(requestId);
-      if (!waiter || waiter.tabId || waiter.excludeTabIds.has(tab.id)) continue;
-      waiter.tabId = tab.id;
-      resumeWaiterBySessionRef.current.delete(waiter.sessionId);
-      resumeWaiterByTabRef.current.set(tab.id, requestId);
-      const isTerminalTab = tab.type === "terminal";
-      const settleMs = isTerminalTab ? 15000 : 6000;
-      const timer = window.setTimeout(() => {
-        resumeSettleTimersRef.current.delete(requestId);
-        const tabAlive = useAppStore
-          .getState()
-          .tabs.some((candidate) => candidate.id === waiter.tabId);
-        if (tabAlive) {
-          resolveResumeWaiter(requestId, {
-            tabId: waiter.tabId,
-            status: "ready",
-            readiness: isTerminalTab ? "client-started" : "view-opened",
-            issue: null,
-          });
-        } else {
-          cancelResumeWaiter(requestId, "cancelled", "Restored tab closed before it became ready");
-        }
-      }, settleMs);
-      resumeSettleTimersRef.current.set(requestId, timer);
-    }
-  }, [tabs, resolveResumeWaiter, cancelResumeWaiter]);
-
-  const openSavedSessionForRestore = useCallback(
-    createOpenSavedSessionForRestore({
-    resumeWaitersRef,
-    resumeWaiterBySessionRef,
-    cancelResumeWaiter,
-    restoreFailedLocalTabsRef,
+  const { welcomeRestore, resolveResumeWaiterForTab, cancelResumeWaiter, cancelAllResumeWaiters } = useSessionResume({
+    tabs,
     removeTab,
     openQueuedSession,
-  }),
-    [openQueuedSession, cancelResumeWaiter, removeTab],
-  );
-
-  const openLocalTerminalForRestore = useCallback(
-    createOpenLocalTerminalForRestore({
-    restoreFailedLocalTabsRef,
-    removeTab,
     openLocalTab,
-  }),
-    [openLocalTab, removeTab],
-  );
-
-  const loadSessionConfigForRestore = useCallback(async (savedSessionId: string): Promise<SessionConfig> => {
-    try {
-      return await getSession(savedSessionId);
-    } catch {
-      throw Object.assign(
-        new Error(`Saved session ${savedSessionId} no longer exists`),
-        { code: "missing-session" },
-      );
-    }
-  }, []);
-
-  const findExistingTabForEntry = useCallback((entry: SnapshotEntry): string | null => {
-    if (entry.kind !== "saved-session") return null;
-    const expectedType = primaryViewTypeForEntry(entry);
-    const runtimeByTab = useAppStore.getState().terminalRuntimeByTab;
-    const match = useAppStore.getState().tabs.find(
-      (tab) =>
-        tab.sessionId === entry.savedSessionId &&
-        tab.type === expectedType &&
-        // A disconnected (failed) terminal is not a restorable target; retry
-        // must rebuild it, not "locate" it (design §4.2.5).
-        runtimeByTab[tab.id]?.state !== "disconnected",
-    );
-    return match?.id ?? null;
-  }, []);
-
-  const cancelPendingAuthForRestore = useCallback(
-    createCancelPendingAuthForRestore({
     setPendingAuth,
-    cancelResumeWaiter,
     awaitingManualAuthRef,
     continueConnectQueueRef,
-    resumeWaitersRef,
-  }),
-    [cancelResumeWaiter],
-  );
-
-  const restoreCallbacksRef = useRef({
-    loadSessionConfig: loadSessionConfigForRestore,
-    findExistingTab: findExistingTabForEntry,
-    activateTab: setActiveTab,
-    openSavedSession: openSavedSessionForRestore,
-    openLocalTerminal: openLocalTerminalForRestore,
-    cancelPendingAuth: cancelPendingAuthForRestore,
-  });
-  restoreCallbacksRef.current = {
-    loadSessionConfig: loadSessionConfigForRestore,
-    findExistingTab: findExistingTabForEntry,
-    activateTab: setActiveTab,
-    openSavedSession: openSavedSessionForRestore,
-    openLocalTerminal: openLocalTerminalForRestore,
-    cancelPendingAuth: cancelPendingAuthForRestore,
-  };
-
-  const welcomeRestore = useWelcomeSessionResume(
-    activeTab?.type === "welcome" || !activeTab,
-    restoreCallbacksRef.current,
-  );
-  const welcomeRestoreViewRef = useRef(welcomeRestore.view);
-  welcomeRestoreViewRef.current = welcomeRestore.view;
-  const welcomeRestoreInstanceRef = useRef(welcomeRestore);
-  welcomeRestoreInstanceRef.current = welcomeRestore;
-
-  // -------------------------------------------------------------------------
-  // Run-snapshot collector (design §4.2.1): eligible tabs + active identity,
-  // deep-compare, debounced commit. Empty snapshots are never written.
-  // -------------------------------------------------------------------------
-
-  const buildRunSnapshotEntries = useCallback(createBuildRunSnapshotEntries({
-    tabs,
+    setActiveTab,
+    activeTab,
     terminalCwds,
-    welcomeRestoreInstanceRef,
     activeTabId,
-  }), [tabs, activeTabId, terminalCwds]);
-
-  const commitRunSnapshotNow = useCallback(createCommitRunSnapshotNow({
-    welcomeRestoreViewRef,
-    buildRunSnapshotEntries,
-    snapshotFingerprintRef,
-    runBatchIdRef,
-    snapshotRevisionRef,
     setStatusMessage,
-  }), [buildRunSnapshotEntries, setStatusMessage, tr]);
-
-  // Always execute the latest collector closure when the pending timer
-  // fires, so a change committed during the debounce window is not lost.
-  const commitRunSnapshotNowRef = useRef(commitRunSnapshotNow);
-  commitRunSnapshotNowRef.current = commitRunSnapshotNow;
-  const commitRunSnapshotSoon = useCallback(() => {
-    if (snapshotCommitTimerRef.current != null) return;
-    snapshotCommitTimerRef.current = window.setTimeout(() => {
-      snapshotCommitTimerRef.current = null;
-      void commitRunSnapshotNowRef.current();
-    }, 400);
-  }, []);
-
-  useEffect(() => {
-    commitRunSnapshotSoon();
-  }, [tabs, activeTabId, terminalCwds, commitRunSnapshotSoon]);
+  });
 
   const handleConnectSession = useCallback((session: SessionConfig) => {
     connectQueueRef.current.push({ session });
@@ -1852,8 +971,7 @@ export function MainLayout() {
     window.addEventListener("taomni:open-settings-section", onOpenSettingsSection);
     return () => window.removeEventListener("taomni:open-settings-section", onOpenSettingsSection);
   }, [openSettingsTab]);
-
-  const executeControlTool = useCallback(createExecuteControlTool({
+  useControlTools({
     tabsRef,
     loadSessions,
     openQueuedSession,
@@ -1870,45 +988,9 @@ export function MainLayout() {
     openSettingsTab,
     openLocalTab,
     openFileBrowserTab,
-  }), [
-    handleDuplicateTab,
-    handleQuickConnect,
-    loadSessions,
-    moveTabToIndex,
-    openFileBrowserTab,
-    openLocalTab,
-    openQueuedSession,
-    openSettingsTab,
-    removeTab,
-    setActiveTab,
-    updateTabTitle,
-  ]);
-
-  useEffect(() => {
-    executeControlToolRef.current = executeControlTool;
-  }, [executeControlTool]);
-
-  useEffect(() => {
-    let unlisten: UnlistenFn | null = null;
-    let disposed = false;
-    void listen<ControlToolDispatch>("agent-cc-control-tool", (event) => {
-      const executor = executeControlToolRef.current;
-      if (!executor) return;
-      const callId = event.payload.callId;
-      const seen = seenControlToolCallsRef.current;
-      if (seen.has(callId)) return;
-      if (seen.size > 5000) seen.clear();
-      seen.add(callId);
-      void executor(event.payload);
-    }).then((fn) => {
-      if (disposed) void fn();
-      else unlisten = fn;
-    }).catch(() => {});
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }, []);
+    executeControlToolRef,
+    seenControlToolCallsRef,
+  });
 
   const openLanChatTab = useCallback(() => {
     // If LanChat is currently docked as an edge drawer, undock it; the
@@ -2180,121 +1262,11 @@ export function MainLayout() {
   const effectiveMultiExecSelectedCount = terminalSplitActive
     ? [...multiExecSelectedTabIds].filter((id) => !terminalSplitInputLockedTabIds.has(id)).length
     : multiExecSelectedTabIds.size;
-  const splitGridColumns = Math.max(1, Math.ceil(Math.sqrt(terminalTabs.length)));
-  const splitGridRows = Math.max(1, Math.ceil(terminalTabs.length / splitGridColumns));
-  const splitPaneWeightsForTabs = useMemo(
-    () => terminalTabs.map((tab) => positiveWeight(splitPaneWeights[tab.id])),
-    [splitPaneWeights, terminalTabs],
-  );
-  const splitGridColumnWeightsForLayout = useMemo(
-    () => axisWeights(splitGridColumnWeights, splitGridColumns),
-    [splitGridColumnWeights, splitGridColumns],
-  );
-  const splitGridRowWeightsForLayout = useMemo(
-    () => axisWeights(splitGridRowWeights, splitGridRows),
-    [splitGridRowWeights, splitGridRows],
-  );
-  const splitGridColumnTemplate = weightsToGridTemplate(splitGridColumnWeightsForLayout);
-  const splitGridRowTemplate = weightsToGridTemplate(splitGridRowWeightsForLayout);
-  const terminalPanesClass = terminalSplitVisible
-    ? terminalSplitLayout === "horizontal"
-      ? "flex-1 min-h-0 flex flex-row relative"
-      : terminalSplitLayout === "vertical"
-        ? "flex-1 min-h-0 flex flex-col relative"
-        : "flex-1 min-h-0 grid relative"
-    : "contents";
-
-  const startLinearSplitResize = useCallback((
-    index: number,
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) => {
-    if (!terminalSplitVisible || terminalSplitLayout === "grid") return;
-    const container = splitPanesRef.current;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    const horizontal = terminalSplitLayout === "horizontal";
-    const dimension = horizontal ? rect.width : rect.height;
-    if (dimension <= 0) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    const ids = terminalTabs.map((tab) => tab.id);
-    const initialWeights = ids.map((id) => positiveWeight(splitPaneWeights[id]));
-    const totalWeight = sumWeights(initialWeights);
-    const startCoord = horizontal ? event.clientX : event.clientY;
-
-    const handleMove = (moveEvent: PointerEvent) => {
-      const currentCoord = horizontal ? moveEvent.clientX : moveEvent.clientY;
-      const deltaWeight = ((currentCoord - startCoord) / dimension) * totalWeight;
-      const nextWeights = resizeAdjacentWeights(initialWeights, index, deltaWeight);
-      setSplitPaneWeights((prev) => {
-        const next = { ...prev };
-        ids.forEach((id, weightIndex) => {
-          next[id] = nextWeights[weightIndex];
-        });
-        return next;
-      });
-    };
-
-    const stop = () => {
-      window.removeEventListener("pointermove", handleMove);
-      window.removeEventListener("pointerup", stop);
-      window.removeEventListener("pointercancel", stop);
-    };
-
-    window.addEventListener("pointermove", handleMove);
-    window.addEventListener("pointerup", stop);
-    window.addEventListener("pointercancel", stop);
-  }, [splitPaneWeights, terminalSplitLayout, terminalSplitVisible, terminalTabs]);
-
-  const startGridSplitResize = useCallback((
-    axis: "column" | "row",
-    index: number,
-    event: ReactPointerEvent<HTMLDivElement>,
-  ) => {
-    if (!terminalSplitVisible || terminalSplitLayout !== "grid") return;
-    const container = splitPanesRef.current;
-    if (!container) return;
-    const rect = container.getBoundingClientRect();
-    const dimension = axis === "column" ? rect.width : rect.height;
-    if (dimension <= 0) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    const initialWeights = axis === "column"
-      ? splitGridColumnWeightsForLayout
-      : splitGridRowWeightsForLayout;
-    const totalWeight = sumWeights(initialWeights);
-    const startCoord = axis === "column" ? event.clientX : event.clientY;
-
-    const handleMove = (moveEvent: PointerEvent) => {
-      const currentCoord = axis === "column" ? moveEvent.clientX : moveEvent.clientY;
-      const deltaWeight = ((currentCoord - startCoord) / dimension) * totalWeight;
-      const nextWeights = resizeAdjacentWeights(initialWeights, index, deltaWeight);
-      if (axis === "column") {
-        setSplitGridColumnWeights(nextWeights);
-      } else {
-        setSplitGridRowWeights(nextWeights);
-      }
-    };
-
-    const stop = () => {
-      window.removeEventListener("pointermove", handleMove);
-      window.removeEventListener("pointerup", stop);
-      window.removeEventListener("pointercancel", stop);
-    };
-
-    window.addEventListener("pointermove", handleMove);
-    window.addEventListener("pointerup", stop);
-    window.addEventListener("pointercancel", stop);
-  }, [
-    splitGridColumnWeightsForLayout,
-    splitGridRowWeightsForLayout,
-    terminalSplitLayout,
+  const { terminalPanesClass, splitGridColumnTemplate, splitGridRowTemplate, splitGridColumns, splitPaneWeightsForTabs, startLinearSplitResize, splitGridColumnWeightsForLayout, startGridSplitResize, splitGridRowWeightsForLayout, splitPanesRef } = useTerminalSplitLayout({
+    terminalTabs,
     terminalSplitVisible,
-  ]);
+    terminalSplitLayout,
+  });
 
   // macOS uses the native overlay title bar (traffic lights + native resize),
   // so the custom resize handles are Windows/Linux only.

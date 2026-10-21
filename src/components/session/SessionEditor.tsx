@@ -1,39 +1,30 @@
-import { mailStorageOptions } from "../mail/MailStorageSettings";
 import { useEffect, useMemo, useState, type ClipboardEvent } from "react";
 import { useModalDraggableAndResizable } from "../../hooks/useModalDraggableAndResizable";
 import { useModalShortcuts, getShortcutSuffixes } from "../../hooks/useModalShortcuts";
 import { X, Terminal as TerminalIcon, Monitor, Folder, Wifi, Bookmark, Shield, FlaskConical, FileText, Cloud, Save, RotateCcw, Network, HelpCircle, Database, Mail, Palette } from "lucide-react";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useVaultStore } from "../../stores/vaultStore";
-import { MAIL_HEADER_LIMITS_EXPLICIT_KEY, mailHeaderLimitOption } from "../../lib/mailSync";
-import { parseSpecialFolders } from "../../lib/mailFolders";
-import { parseMailIdentities } from "../../lib/mailIdentities";
-import { selectFilePath, selectFolderPath, selectPrivateKeyFile, listWslDistros, listLocalShells, type WslDistro, type LocalShellOption } from "../../lib/ipc";
-import type { MailIdentity } from "../../types";
-import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
+import { selectFilePath, selectFolderPath, selectPrivateKeyFile } from "../../lib/ipc";
 import { DEFAULT_NETWORK_SETTINGS, getSessionNetworkSettings, type NetworkSettings as NetworkSettingsValue } from "../../lib/networkSettings";
 import { parseSshConnectionCommand, parseUserHostPort } from "../../lib/quickConnect";
 import { SESSION_ROOT_LABEL, collectFolderPaths, folderOptionLabel, toStoredGroupPath } from "../../lib/sessionPaths";
 import { alertAppDialog } from "../../lib/appDialogs";
-import type { SessionConfig, AuthMethod } from "../../lib/ipc";
+import type { SessionConfig } from "../../lib/ipc";
 import { SYSTEM_TERMINAL_THEME, parseSessionOptions, type TerminalProfile } from "../../lib/terminalProfile";
 import { supportsTerminalAppearanceSessionType } from "../../lib/sessionTerminalTheme";
-import { buildWslLaunchArgs, parseWslOptions, serializeWslOptions, type WslOptions } from "../../types/wsl";
-import { parseRdpOptions, serializeRdpOptions, type RdpOptions } from "../../types/rdp";
-import { parseLocalShellOptions, serializeLocalShellOptions, type LocalShellOptions } from "../../types/localShell";
+import { parseRdpOptions, type RdpOptions } from "../../types/rdp";
 import { RdpOptionsForm } from "./forms/RdpOptionsForm";
-import { ObjectStorageSettings, ossFormFromOptions, ossFormToConfig, type OssFormState } from "./ObjectStorageSettings";
-import { engineForProvider } from "../../types/objectStorage";
+import { ObjectStorageSettings, ossFormFromOptions, type OssFormState } from "./ObjectStorageSettings";
 import { WslOptionsForm } from "./forms/WslOptionsForm";
 import { LocalShellOptionsForm } from "./forms/LocalShellOptionsForm";
 import { MailAppearanceSettings } from "../mail/MailAppearanceSettings";
 import { useT } from "../../lib/i18n";
 import { normalizeVncScaling, VNC_SCALE_PERCENTAGES } from "../../lib/vnc";
-import { parseVncViewerOptions, writeVncViewerOptions, type VncViewerOptions } from "../../lib/vncOptions";
+import { parseVncViewerOptions, type VncViewerOptions } from "../../lib/vncOptions";
 import { PathMappingsEditor, parsePathMappings as parsePathMappingsFromOptions } from "../filebrowser/PathMappingsEditor";
 import type { SftpPathMapping } from "../../types";
-import { sessionTypeToProto, type Proto, type SectionTab, DEFAULT_PORTS, optionString, extractAuthType, extractKeyPath, optionBoolean, optionStringOrNumber, initialTerminalProfileForProto, DB_PROTOS, PLANNED_CLIENT_PROTOS, protoToSessionType, defaultTerminalProfileForProto, stripSerialOptions, stripLocalShellLaunchOptions, stripDeprecatedCwdOptions, stripTerminalProfileOption, cloneNetworkSettings, PROTOS } from "./editor/sessionPolicy";
-import { type MailProvider, initialMailProvider, type MailAuthMode, normalizeMailAuthMode, type MailSecurityMode, type MailOAuthFlow, initialMailOAuthFlow, type MailOAuthDeviceInfo, defaultMailOAuthFlow, MAIL_PROVIDER_PRESETS, stripMailIdentityOptions, effectiveMailOAuthFlow, mailOAuthClientSecretVisible, mailOAuthClientSecretRequired } from "./editor/mailPolicy";
+import { sessionTypeToProto, type Proto, type SectionTab, DEFAULT_PORTS, optionString, extractAuthType, extractKeyPath, optionBoolean, initialTerminalProfileForProto, DB_PROTOS, PLANNED_CLIENT_PROTOS, protoToSessionType, defaultTerminalProfileForProto, cloneNetworkSettings, PROTOS } from "./editor/sessionPolicy";
+import { type MailProvider, defaultMailOAuthFlow, MAIL_PROVIDER_PRESETS } from "./editor/mailPolicy";
 import { Field, Select } from "./editor/Fields";
 import { AdvancedSshSettings } from "./editor/SshSettings";
 import { TerminalSettings } from "./editor/TerminalSettings";
@@ -46,6 +37,16 @@ import { SessionConnectionFields } from "./editor/SessionConnectionFields";
 import { createHandleSave, createHandleSaveTemplate, createHandleNewFolder, createHandleDelete, createHandleSaveAsProxySession } from "./editor/persistenceActions";
 import { createHandleMailOAuthConnect } from "./editor/mailAuthentication";
 import { createHandleTestConnection, createBuildDbConnectInfo, createBuildHBaseConnectInfo, createHandleTestDbConnection, createHandleTestHBaseConnection, createHandleTestProxyConnection } from "./editor/connectionProbes";
+import { useMailSessionForm } from "./editor/useMailSessionForm";
+import { useLocalShellForm } from "./editor/useLocalShellForm";
+import { useDatabaseSessionForm } from "./editor/useDatabaseSessionForm";
+import { createSessionSerialization } from "./editor/serialization";
+import { createSessionReset } from "./editor/reset";
+
+
+
+
+
 
 
 
@@ -64,6 +65,11 @@ interface SessionEditorProps {
   initialProto?: string;
   onClose: () => void;
 }
+
+
+
+
+
 
 
 
@@ -145,35 +151,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   /* --- file session options --- */
   const [fileEmbedInTab, setFileEmbedInTab] = useState(() => optionBoolean(initialOptions, "fileEmbedInTab", true));
   const [fileExtraArgs, setFileExtraArgs] = useState(() => optionString(initialOptions, "fileExtraArgs", ""));
-
-  /* --- database session options (MySQL/PostgreSQL/PanWeiDB/Oracle/SQLServer/StarRocks/ClickHouse/Presto/Redis) --- */
-  const [dbCatalog, setDbCatalog] = useState(() => optionString(initialOptions, "dbCatalog", ""));
-  const [dbDatabase, setDbDatabase] = useState(() => optionString(initialOptions, "dbDatabase", ""));
-  const [dbSsl, setDbSsl] = useState(() => optionBoolean(initialOptions, "dbSsl", false));
-  const [dbTimeout, setDbTimeout] = useState(() => optionString(initialOptions, "dbTimeout", "15"));
-  const [dbHttpPort, setDbHttpPort] = useState(() => optionString(initialOptions, "dbHttpPort", "8123"));
-  const [dbChProtocol, setDbChProtocol] = useState(() => optionString(initialOptions, "dbChProtocol", "HTTP"));
-  // New sessions default to Trino (modern default); saved sessions without the
-  // key hydrate as "Presto" so legacy options_json keeps X-Presto-* behavior.
-  const [dbPrestoDialect, setDbPrestoDialect] = useState(() => {
-    const stored = optionString(initialOptions, "dbPrestoDialect", "");
-    if (stored.toLowerCase() === "trino") return "Trino";
-    if (stored.toLowerCase() === "presto") return "Presto";
-    return session ? "Presto" : "Trino";
+  const databaseForm = useDatabaseSessionForm({
+    initialOptions,
+    session,
   });
-  const [dbRedisIndex, setDbRedisIndex] = useState(() => optionString(initialOptions, "dbRedisIndex", "0"));
-  const [hbaseNamespace, setHBaseNamespace] = useState(() => optionString(initialOptions, "hbaseNamespace", ""));
-  const [hbaseRestPath, setHBaseRestPath] = useState(() => optionString(initialOptions, "hbaseRestPath", ""));
-  const [hbaseConnectionMode, setHBaseConnectionMode] = useState(() => optionString(initialOptions, "hbaseConnectionMode", "native"));
-  const [hbaseZkQuorum, setHBaseZkQuorum] = useState(() => optionString(initialOptions, "hbaseZkQuorum", ""));
-  const [hbaseZkRoot, setHBaseZkRoot] = useState(() => optionString(initialOptions, "hbaseZkRoot", ""));
-  const [hbaseEffectiveUser, setHBaseEffectiveUser] = useState(() => optionString(initialOptions, "hbaseEffectiveUser", ""));
-  const [hbaseAuthMethod, setHBaseAuthMethod] = useState(() => optionString(initialOptions, "hbaseAuthMethod", "simple"));
-  const [hbaseServicePrincipal, setHBaseServicePrincipal] = useState(() => optionString(initialOptions, "hbaseServicePrincipal", ""));
-  const [hbasePrincipal, setHBasePrincipal] = useState(() => optionString(initialOptions, "hbasePrincipal", ""));
-  const [hbaseKeytabPath, setHBaseKeytabPath] = useState(() => optionString(initialOptions, "hbaseKeytabPath", ""));
-  const [hbaseKrb5ConfPath, setHBaseKrb5ConfPath] = useState(() => optionString(initialOptions, "hbaseKrb5ConfPath", ""));
-  const [hbaseSitePath, setHBaseSitePath] = useState(() => optionString(initialOptions, "hbaseSitePath", ""));
 
   /* --- proxy session options --- */
   const [proxyKind, setProxyKind] = useState<"http" | "socks5">(() => {
@@ -181,72 +162,11 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     return v === "socks5" ? "socks5" : "http";
   });
   const [proxyTestUrl, setProxyTestUrl] = useState(() => optionString(initialOptions, "testUrl", "www.google.com:443"));
-
-  /* --- mail session options (generic IMAP + SMTP) --- */
-  const [mailProvider, setMailProvider] = useState<MailProvider>(() => initialMailProvider(initialOptions, session?.host));
-  const [mailAuthMode, setMailAuthMode] = useState<MailAuthMode>(() => normalizeMailAuthMode(initialOptions.mailAuthMode));
-  const [mailDisplayName, setMailDisplayName] = useState(() => optionString(initialOptions, "mailDisplayName", ""));
-  const [mailReplyTo, setMailReplyTo] = useState(() => optionString(initialOptions, "mailReplyTo", ""));
-  const [mailSignature, setMailSignature] = useState(() => optionString(initialOptions, "mailSignature", ""));
-  const [mailImapSecurity, setMailImapSecurity] = useState<MailSecurityMode>(() => {
-    const value = optionString(initialOptions, "mailImapSecurity", "TLS");
-    return value === "STARTTLS" || value === "None" ? value : "TLS";
+  const mailForm = useMailSessionForm({
+    initialOptions,
+    session,
+    initialProtoValue,
   });
-  const [mailSmtpHost, setMailSmtpHost] = useState(() => optionString(initialOptions, "mailSmtpHost", ""));
-  const [mailSmtpPort, setMailSmtpPort] = useState(() => optionString(initialOptions, "mailSmtpPort", "465"));
-  const [mailSmtpSecurity, setMailSmtpSecurity] = useState<MailSecurityMode>(() => {
-    const value = optionString(initialOptions, "mailSmtpSecurity", "TLS");
-    return value === "STARTTLS" || value === "None" ? value : "TLS";
-  });
-  const [mailSmtpUsername, setMailSmtpUsername] = useState(() => optionString(initialOptions, "mailSmtpUsername", ""));
-  const [mailSmtpUseImapAuth, setMailSmtpUseImapAuth] = useState(() => optionBoolean(initialOptions, "mailSmtpUseImapAuth", true));
-  const [mailSmtpPassword, setMailSmtpPassword] = useState("");
-  const [mailSmtpPasswordRef, setMailSmtpPasswordRef] = useState(() => optionString(initialOptions, "mailSmtpPasswordRef", ""));
-  const [mailSmtpSaveInVault, setMailSmtpSaveInVault] = useState(() =>
-    !!optionString(initialOptions, "mailSmtpPasswordRef", "") || initialProtoValue === "Mail",
-  );
-  const [mailOauthClientId, setMailOauthClientId] = useState(() => optionString(initialOptions, "mailOauthClientId", ""));
-  const [mailOauthClientSecret, setMailOauthClientSecret] = useState("");
-  const [mailOauthClientSecretRef, setMailOauthClientSecretRef] = useState(() => optionString(initialOptions, "mailOauthClientSecretRef", ""));
-  const [mailOauthClientSecretSaveInVault, setMailOauthClientSecretSaveInVault] = useState(() =>
-    !!optionString(initialOptions, "mailOauthClientSecretRef", "") || initialProtoValue === "Mail",
-  );
-  const [mailOauthFlow, setMailOauthFlow] = useState<MailOAuthFlow>(() =>
-    initialMailOAuthFlow(initialOptions, initialMailProvider(initialOptions, session?.host)),
-  );
-  const [mailOauthDeviceInfo, setMailOauthDeviceInfo] = useState<MailOAuthDeviceInfo | null>(null);
-  const [mailOauthTokenRef, setMailOauthTokenRef] = useState(() => optionString(initialOptions, "mailOauthTokenRef", ""));
-  const [mailOauthExpiresAt, setMailOauthExpiresAt] = useState(() => optionStringOrNumber(initialOptions, "mailOauthExpiresAt", ""));
-  const [mailOauthScope, setMailOauthScope] = useState(() => optionString(initialOptions, "mailOauthScope", ""));
-  const [mailOauthConnecting, setMailOauthConnecting] = useState(false);
-  const [mailOauthStatus, setMailOauthStatus] = useState<{ ok: boolean; msg: string } | null>(null);
-  const [mailCacheEnabled, setMailCacheEnabled] = useState(() => optionBoolean(initialOptions, "mailCacheEnabled", true));
-  const [mailStorage, setMailStorage] = useState(() => mailStorageOptions(initialOptions));
-  const [mailSaveDirectory, setMailSaveDirectory] = useState(() => optionString(initialOptions, "mailSaveDirectory", ""));
-  const [mailHeaderRetentionDays, setMailHeaderRetentionDays] = useState(() => String(mailHeaderLimitOption(initialOptions, "mailHeaderRetentionDays", 30)));
-  const [mailHeaderLimitPerFolder, setMailHeaderLimitPerFolder] = useState(() => String(mailHeaderLimitOption(initialOptions, "mailHeaderLimitPerFolder", 2000)));
-  const [mailBodyRecentLimit, setMailBodyRecentLimit] = useState(() => optionString(initialOptions, "mailBodyRecentLimit", "200"));
-  const [mailBodyMaxBytes, setMailBodyMaxBytes] = useState(() => optionString(initialOptions, "mailBodyMaxBytes", "262144"));
-  const [mailAttachmentCache, setMailAttachmentCache] = useState(() => optionBoolean(initialOptions, "mailAttachmentCache", false));
-  const [mailSyncOnOpen, setMailSyncOnOpen] = useState(() => optionBoolean(initialOptions, "mailSyncOnOpen", true));
-  const [mailIdlePush, setMailIdlePush] = useState(() => optionBoolean(initialOptions, "mailIdlePush", true));
-  const [mailSubscribedOnly, setMailSubscribedOnly] = useState(() => optionBoolean(initialOptions, "mailSubscribedOnly", false));
-  const [mailIncoming, setMailIncoming] = useState<"imap" | "pop3">(() => (optionString(initialOptions, "mailIncoming", "imap") === "pop3" ? "pop3" : "imap"));
-  const [mailPop3LeaveDays, setMailPop3LeaveDays] = useState(() => optionString(initialOptions, "mailPop3LeaveDays", ""));
-  const [mailUndoSendSeconds, setMailUndoSendSeconds] = useState(() => optionString(initialOptions, "mailUndoSendSeconds", "0"));
-  const [mailCardDavUrl, setMailCardDavUrl] = useState(() => optionString(initialOptions, "mailCardDavUrl", ""));
-  const [mailCardDavUsername, setMailCardDavUsername] = useState(() => optionString(initialOptions, "mailCardDavUsername", ""));
-  const [mailCalDavUrl, setMailCalDavUrl] = useState(() => optionString(initialOptions, "mailCalDavUrl", ""));
-  const [mailCalDavUsername, setMailCalDavUsername] = useState(() => optionString(initialOptions, "mailCalDavUsername", ""));
-  const [mailReceiptPolicy, setMailReceiptPolicy] = useState(() => optionString(initialOptions, "mailReceiptPolicy", "ask"));
-  const [mailSpecialFolders, setMailSpecialFolders] = useState(() => parseSpecialFolders(initialOptions.mailSpecialFolders));
-  const [mailDesktopNotify, setMailDesktopNotify] = useState(() => optionBoolean(initialOptions, "mailDesktopNotify", false));
-  const [mailSyncIntervalMinutes, setMailSyncIntervalMinutes] = useState(() => optionString(initialOptions, "mailSyncIntervalMinutes", "5"));
-  const [mailMaxFetchPerSync, setMailMaxFetchPerSync] = useState(() => optionString(initialOptions, "mailMaxFetchPerSync", "200"));
-  const [mailSaveSentCopy, setMailSaveSentCopy] = useState(() => optionString(initialOptions, "mailSaveSentCopy", "auto"));
-  const [mailIdentityList, setMailIdentityList] = useState<MailIdentity[]>(() => parseMailIdentities(initialOptions.mailIdentities));
-  const [mailAiEnabled, setMailAiEnabled] = useState(() => optionBoolean(initialOptions, "mailAiEnabled", true));
-  const [mailAiSkipBodyConfirm, setMailAiSkipBodyConfirm] = useState(() => optionBoolean(initialOptions, "mailAiSkipBodyConfirm", false));
 
   /* --- terminal profile --- */
   const [terminalProfile, setTerminalProfile] = useState<TerminalProfile>(() =>
@@ -260,73 +180,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const [serialBaud, setSerialBaud] = useState(() =>
     optionString(initialOptions, "serialBaud", "115200"),
   );
-
-  /* --- local shell options --- */
-  const [localShellOptions, setLocalShellOptions] = useState<LocalShellOptions>(() =>
-    parseLocalShellOptions(session?.options_json),
-  );
-  const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
-  const [localShellStatus, setLocalShellStatus] = useState<"loading" | "ready" | "error">("loading");
-
-  useEffect(() => {
-    if (proto !== "Shell") return;
-    let cancelled = false;
-    setLocalShellStatus("loading");
-    listLocalShells()
-      .then((shells) => {
-        if (cancelled) return;
-        setLocalShells(shells);
-        setLocalShellStatus("ready");
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setLocalShellStatus("error");
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [proto]);
-
-  /* --- WSL options --- */
-  const [wslOptions, setWslOptions] = useState<WslOptions>(() =>
-    parseWslOptions(session?.options_json),
-  );
-  const [wslDistros, setWslDistros] = useState<WslDistro[]>([]);
-  const [wslStatus, setWslStatus] = useState<"loading" | "ready" | "error" | "unsupported">(
-    // WSL sessions need the desktop backend; the browser preview (even on a
-    // Windows host) cannot launch them, so report unsupported there.
-    () => (getAppPlatform() === "windows" && isTauriRuntime() ? "loading" : "unsupported"),
-  );
-
-  useEffect(() => {
-    if (proto !== "WSL") return;
-    if (getAppPlatform() !== "windows" || !isTauriRuntime()) {
-      setWslStatus("unsupported");
-      return;
-    }
-    let cancelled = false;
-    setWslStatus("loading");
-    listWslDistros()
-      .then((distros) => {
-        if (cancelled) return;
-        const list = distros ?? [];
-        setWslDistros(list);
-        setWslStatus("ready");
-        // If editing a brand-new session, default to the system's default distro.
-        if (!wslOptions.distro && list.length > 0) {
-          const def = list.find((d) => d.isDefault) ?? list[0];
-          setWslOptions((prev) => ({ ...prev, distro: def.name }));
-        }
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setWslStatus("error");
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [proto]);
+  const shellForm = useLocalShellForm({
+    session,
+    proto,
+  });
 
   /* --- RDP options --- */
   const [rdpOptions, setRdpOptions] = useState<RdpOptions>(() =>
@@ -442,7 +299,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       setSection("mail");
       setSpecifyUser(true);
       setSaveInVault(true);
-      setMailSmtpSaveInVault(true);
+      mailForm.setMailSmtpSaveInVault(true);
       setTerminalProfile((current) => ({ ...current, theme: SYSTEM_TERMINAL_THEME }));
     } else {
       setTerminalProfile((current) => current.theme === SYSTEM_TERMINAL_THEME
@@ -454,21 +311,21 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   };
 
   const handleMailProviderChange = (provider: MailProvider) => {
-    setMailProvider(provider);
-    setMailAuthMode(provider === "custom" ? "password" : "oauth2");
-    setMailOauthFlow(defaultMailOAuthFlow(provider));
-    setMailOauthDeviceInfo(null);
-    setMailOauthStatus(null);
+    mailForm.setMailProvider(provider);
+    mailForm.setMailAuthMode(provider === "custom" ? "password" : "oauth2");
+    mailForm.setMailOauthFlow(defaultMailOAuthFlow(provider));
+    mailForm.setMailOauthDeviceInfo(null);
+    mailForm.setMailOauthStatus(null);
     const preset = MAIL_PROVIDER_PRESETS[provider];
     if (!preset) return;
 
     setHost(preset.imapHost);
     setPort(preset.imapPort);
-    setMailImapSecurity(preset.imapSecurity);
-    setMailSmtpHost(preset.smtpHost);
-    setMailSmtpPort(preset.smtpPort);
-    setMailSmtpSecurity(preset.smtpSecurity);
-    setMailSmtpUseImapAuth(preset.smtpUseImapAuth);
+    mailForm.setMailImapSecurity(preset.imapSecurity);
+    mailForm.setMailSmtpHost(preset.smtpHost);
+    mailForm.setMailSmtpPort(preset.smtpPort);
+    mailForm.setMailSmtpSecurity(preset.smtpSecurity);
+    mailForm.setMailSmtpUseImapAuth(preset.smtpUseImapAuth);
   };
 
   /* Keep authMethod in sync with the radio group */
@@ -488,301 +345,58 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
       setUsePrivKey(false);
     }
   };
-
-  const buildOptionsJson = ({
-    passwordRefValue = passwordRef,
-    networkSettingsValue = networkSettings,
-    proxyPassValue = networkSettings.proxyPass,
-    jumpPasswordValue = networkSettings.jumpPassword,
-    mailSmtpPasswordRefValue = mailSmtpPasswordRef,
-    mailOauthClientSecretRefValue = mailOauthClientSecretRef,
-    mailOauthTokenRefValue = mailOauthTokenRef,
-    mailOauthExpiresAtValue = mailOauthExpiresAt,
-    mailOauthScopeValue = mailOauthScope,
-    ossConfigValue,
-  }: {
-    passwordRefValue?: string;
-    networkSettingsValue?: NetworkSettingsValue;
-    proxyPassValue?: string;
-    jumpPasswordValue?: string;
-    mailSmtpPasswordRefValue?: string;
-    mailOauthClientSecretRefValue?: string;
-    mailOauthTokenRefValue?: string;
-    mailOauthExpiresAtValue?: string;
-    mailOauthScopeValue?: string;
-    /** Resolved object-storage option map (secrets already swapped for vault
-     *  refs by handleSave). Falls back to current form state when omitted. */
-    ossConfigValue?: Record<string, unknown>;
-  } = {}): string => {
-    const rawPreviousOptions = stripSerialOptions(
-      stripLocalShellLaunchOptions(
-        stripDeprecatedCwdOptions(parseSessionOptions(session?.options_json)),
-      ),
-    );
-    const previousOptionsBase = supportsTerminalAppearance || isMail
-      ? rawPreviousOptions
-      : stripTerminalProfileOption(rawPreviousOptions);
-    const previousOptions = proto === "Mail"
-      ? stripMailIdentityOptions(previousOptionsBase)
-      : previousOptionsBase;
-    const localShellOverrides: Record<string, unknown> =
-      proto === "Shell" ? serializeLocalShellOptions(localShellOptions) : {};
-    const serialOverrides: Record<string, unknown> =
-      proto === "Serial"
-        ? {
-            serialDevice: serialDevice.trim(),
-            serialBaud: serialBaud.trim() || "115200",
-          }
-        : {};
-    const wslOverrides: Record<string, unknown> =
-      proto === "WSL"
-        ? {
-            ...serializeWslOptions(wslOptions),
-            localShellPath: "wsl.exe",
-            localShellArgs: buildWslLaunchArgs(wslOptions),
-          }
-        : {};
-    const rdpOverrides: Record<string, unknown> =
-      proto === "RDP"
-        ? (JSON.parse(serializeRdpOptions(rdpOptions)) as Record<string, unknown>)
-        : {};
-    const vncOverrides: Record<string, unknown> =
-      proto === "VNC"
-        ? writeVncViewerOptions({ vncSecurityPolicy, vncViewOnly, vncClipboardPolicy }, vncViewer)
-        : {};
-    const dbOverrides: Record<string, unknown> = isDb
-      ? {
-          dbDatabase,
-          dbCatalog,
-          dbSsl,
-          dbTimeout,
-          dbHttpPort,
-          dbChProtocol,
-          dbPrestoDialect: dbPrestoDialect.toLowerCase(),
-          dbRedisIndex,
-        }
-      : {};
-    const proxyOverrides: Record<string, unknown> = isProxy
-      ? { proxyKind, testUrl: proxyTestUrl }
-      : {};
-    const mailOauthExpiresAtNumber = Number.parseInt(mailOauthExpiresAtValue, 10);
-    const effectiveMailOauthFlow = effectiveMailOAuthFlow(mailProvider, mailOauthFlow);
-    const persistMailOauthClientSecret = mailOAuthClientSecretVisible(mailProvider, effectiveMailOauthFlow);
-    const mailOverrides: Record<string, unknown> = isMail
-      ? {
-          mailProvider,
-          mailAuthMode,
-          mailOauthFlow: mailAuthMode === "oauth2" ? effectiveMailOauthFlow : "browser",
-          mailOauthClientId: mailAuthMode === "oauth2" ? mailOauthClientId : "",
-          mailOauthClientSecretRef:
-            mailAuthMode === "oauth2" && persistMailOauthClientSecret
-              ? mailOauthClientSecretRefValue
-              : "",
-          mailOauthTokenRef: mailAuthMode === "oauth2" ? mailOauthTokenRefValue : "",
-          mailOauthExpiresAt: mailAuthMode === "oauth2" && Number.isFinite(mailOauthExpiresAtNumber) ? mailOauthExpiresAtNumber : 0,
-          mailOauthScope: mailAuthMode === "oauth2" ? mailOauthScopeValue : "",
-          mailDisplayName,
-          mailReplyTo,
-          mailSignature,
-          mailImapSecurity,
-          mailSmtpHost,
-          mailSmtpPort,
-          mailSmtpSecurity,
-          mailSmtpUsername,
-          mailSmtpUseImapAuth,
-          mailSmtpPasswordRef: mailSmtpUseImapAuth ? "" : mailSmtpPasswordRefValue,
-          mailCacheEnabled,
-          mailSaveDirectory,
-          mailStorageDirectory: mailStorage.directory.trim(),
-          mailFullMessageMode: mailStorage.mode,
-          mailFullMessageFolders: Array.from(new Set(mailStorage.folders.map((v) => v.trim()).filter(Boolean))),
-          mailHeaderRetentionDays,
-          mailHeaderLimitPerFolder,
-          [MAIL_HEADER_LIMITS_EXPLICIT_KEY]: true,
-          mailBodyRecentLimit,
-          mailBodyMaxBytes,
-          mailAttachmentCache,
-          mailSyncOnOpen,
-          mailIdlePush,
-          mailSubscribedOnly,
-          mailIncoming,
-          mailPop3LeaveDays,
-          mailUndoSendSeconds,
-          mailCardDavUrl: mailCardDavUrl.trim(),
-          mailCardDavUsername: mailCardDavUsername.trim(),
-          mailCalDavUrl: mailCalDavUrl.trim(),
-          mailCalDavUsername: mailCalDavUsername.trim(),
-          mailReceiptPolicy,
-          mailSpecialFolders: JSON.stringify(parseSpecialFolders(mailSpecialFolders)),
-          mailDesktopNotify,
-          mailSyncIntervalMinutes,
-          mailMaxFetchPerSync,
-          mailSaveSentCopy,
-          mailIdentities: JSON.stringify(parseMailIdentities(mailIdentityList)),
-          mailAiEnabled,
-          mailAiSkipBodyConfirm,
-        }
-      : {};
-    const ossOverrides: Record<string, unknown> =
-      proto === "S3"
-        ? (ossConfigValue ?? { ...ossFormToConfig(oss) })
-        : {};
-    const hbaseOverrides: Record<string, unknown> = isHBase
-      ? {
-          hbaseNamespace,
-          hbaseRestPath,
-          hbaseConnectionMode,
-          hbaseZkQuorum,
-          hbaseZkRoot,
-          hbaseEffectiveUser,
-          hbaseAuthMethod,
-          hbaseServicePrincipal,
-          hbasePrincipal,
-          hbaseKeytabPath,
-          hbaseKrb5ConfPath,
-          hbaseSitePath,
-          dbSsl,
-          dbTimeout,
-        }
-      : {};
-
-    const terminalProfileOverrides = supportsTerminalAppearance || isMail ? { terminalProfile } : {};
-
-    return JSON.stringify({
-      ...previousOptions,
-      x11, x11Trusted, compression, startupCmd,
-      description, tags, doNotExit, disableAiWrite,
-      remoteEnv, sshBrowser, usePrivKey,
-      fileEmbedInTab, fileExtraArgs,
-      ...terminalProfileOverrides,
-      // SSH password vault reference (vault:<id>). Empty string means no
-      // saved password; the user types it on connect.
-      passwordRef: isMail && mailAuthMode === "oauth2" ? "" : passwordRefValue || "",
-      // Strip the proxy password unless the user explicitly opted into
-      // "Save in vault". `options_json` lands in the SQLite session row
-      // in plaintext, so this is the gate keeping secrets out at rest.
-      // When proxySaveAuth is on AND the value is already a vault: ref,
-      // we keep it (the resolution happens server-side). The jump-host
-      // password is gated the same way via jumpSaveAuth.
-      networkSettings: {
-        ...networkSettingsValue,
-        proxyPass: networkSettingsValue.proxySaveAuth ? proxyPassValue : "",
-        jumpPassword: networkSettingsValue.jumpSaveAuth ? jumpPasswordValue : "",
-      },
-      // SFTP deployment path mappings (only stored for SFTP sessions).
-      ...(proto === "SFTP" ? { pathMappings } : {}),
-      ...wslOverrides,
-      ...rdpOverrides,
-      ...vncOverrides,
-      ...dbOverrides,
-      ...proxyOverrides,
-      ...mailOverrides,
-      ...hbaseOverrides,
-      ...ossOverrides,
-      ...localShellOverrides,
-      ...serialOverrides,
-    });
-  };
-
-  const buildConfig = (overrides: Partial<SessionConfig> = {}): SessionConfig => {
-    const now = Math.floor(Date.now() / 1000);
-    let auth: AuthMethod =
-      proto === "Shell" ||
-      proto === "WSL" ||
-      proto === "File" ||
-      proto === "Browser" ||
-      proto === "FTP" ||
-      proto === "Telnet" ||
-      proto === "Rlogin" ||
-      proto === "Serial" ||
-      proto === "Mosh"
-        ? "None"
-        : "Password";
-    if (authMethod === "PrivateKey")
-      auth = { PrivateKey: { key_path: keyPath || "~/.ssh/id_ed25519" } };
-    else if (authMethod === "Agent") auth = "Agent";
-    else if (authMethod === "None") auth = "None";
-
-    const displayName = name
-      || (proto === "WSL"
-        ? t("sessionEditor2.wslDefaultName", { distro: wslOptions.distro || "Linux" })
-        : proto === "S3"
-          ? (oss.defaultBucket || oss.defaultContainer || oss.accountName || oss.endpoint || "Object Storage")
-          : proto === "Mail"
-            ? (username || host || "Mail account")
-          : proto === "Serial"
-            ? (serialDevice ? `Serial ${serialDevice}` : "Serial terminal")
-          : (proto === "File" && host
-            ? (host.split(/[\\/]/).filter(Boolean).pop() || host)
-            : (host ? `${username ? username + "@" : ""}${host}` : "Local terminal")));
-    const storedHost = proto === "Serial" ? serialDevice.trim() : host;
-    const storedPort = proto === "Serial" ? 0 : (parseInt(port) || DEFAULT_PORTS[proto] || 0);
-    return {
-      id: session?.id ?? crypto.randomUUID(),
-      name: displayName,
-      session_type:
-        proto === "S3"
-          ? (engineForProvider(oss.provider) === "azure" ? "AzureBlob" : "S3")
-          : protoToSessionType(proto),
-      group_path: toStoredGroupPath(groupPath),
-      host: storedHost,
-      port: storedPort,
-      username: username || null,
-      auth_method: auth,
-      options_json: buildOptionsJson(),
-      created_at: session?.created_at ?? now,
-      updated_at: now,
-      last_connected_at: session?.last_connected_at ?? null,
-      sort_order: session?.sort_order ?? 0,
-      ...overrides,
-    };
-  };
-
-  const validate = () => {
-    if (needsHost && !host.trim()) return t("sessionEditor2.errHostRequired");
-    if (proto === "Serial" && !serialDevice.trim()) return t("sessionEditor2.errSerialDeviceRequired");
-    if (proto === "File" && !host.trim()) return t("sessionEditor2.errFilePathRequired");
-    if (proto === "WSL" && !wslOptions.distro.trim()) return t("sessionEditor2.errWslDistroRequired");
-    if (proto === "Presto" && !dbCatalog.trim()) return "Presto catalog is required.";
-    if (proto === "Mail") {
-      if (!username.trim()) return "Mail email or username is required.";
-      if (!host.trim()) return "IMAP host is required.";
-      if (!mailSmtpHost.trim()) return "SMTP host is required.";
-      if (mailAuthMode === "oauth2") {
-        if (mailProvider === "custom") return "OAuth2 mail auth requires Gmail or Outlook provider.";
-        if (!mailOauthClientId.trim()) return "OAuth2 client ID is required.";
-        if (mailOAuthClientSecretRequired(mailProvider, mailOauthFlow)) {
-          if (!mailOauthClientSecretRef.trim() && !mailOauthClientSecret.trim()) {
-            return "Gmail device code requires an OAuth2 client secret.";
-          }
-          if (!mailOauthClientSecretRef.trim() && mailOauthClientSecret.trim() && !mailOauthClientSecretSaveInVault) {
-            return "Gmail device code client secret must be saved in the vault.";
-          }
-        }
-        if (!mailOauthTokenRef.trim()) return "OAuth2 token is required. Use Connect OAuth2 first.";
-      } else {
-        if (!saveInVault) return "Mail credentials must be saved in the vault.";
-        if (!passwordRef && !password) return "Mail password or app password token is required.";
-        if (!mailSmtpUseImapAuth && !mailSmtpSaveInVault) return "SMTP credentials must be saved in the vault.";
-        if (!mailSmtpUseImapAuth && !mailSmtpPasswordRef && !mailSmtpPassword) {
-          return "SMTP password or app password token is required.";
-        }
-      }
-    }
-    if (isSSH && specifyUser && !username.trim()) return t("sessionEditor2.errUsernameEmpty");
-    if (authMethod === "PrivateKey" && !keyPath.trim()) return t("sessionEditor2.errKeyPathRequired");
-    if (proto === "HBaseShell") {
-      if ((hbaseConnectionMode === "rest" || hbaseConnectionMode === "thrift") && !host.trim()) {
-        return hbaseConnectionMode === "thrift"
-          ? "HBase Thrift host is required."
-          : "HBase REST host is required.";
-      }
-      if (hbaseConnectionMode === "native" && !hbaseSitePath.trim() && !hbaseZkQuorum.trim() && !host.trim()) {
-        return "HBase ZooKeeper quorum, HBase-site.xml, or Remote host is required.";
-      }
-    }
-    return null;
-  };
+  const { validate, buildConfig, buildOptionsJson } = createSessionSerialization({
+    passwordRef,
+    networkSettings,
+    mailForm,
+    session,
+    supportsTerminalAppearance,
+    isMail,
+    proto,
+    shellForm,
+    serialDevice,
+    serialBaud,
+    rdpOptions,
+    vncSecurityPolicy,
+    vncViewOnly,
+    vncClipboardPolicy,
+    vncViewer,
+    isDb,
+    databaseForm,
+    isProxy,
+    proxyKind,
+    proxyTestUrl,
+    oss,
+    isHBase,
+    terminalProfile,
+    x11,
+    x11Trusted,
+    compression,
+    startupCmd,
+    description,
+    tags,
+    doNotExit,
+    disableAiWrite,
+    remoteEnv,
+    sshBrowser,
+    usePrivKey,
+    fileEmbedInTab,
+    fileExtraArgs,
+    pathMappings,
+    authMethod,
+    keyPath,
+    name,
+    t,
+    username,
+    host,
+    port,
+    groupPath,
+    needsHost,
+    saveInVault,
+    password,
+    isSSH,
+    specifyUser,
+  });
 
   const handleSave = createHandleSave({
     validate,
@@ -795,7 +409,7 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     isProxy,
     isMail,
     authMethod,
-    mailAuthMode,
+    mailAuthMode: mailForm.mailAuthMode,
     saveInVault,
     password,
     t,
@@ -806,29 +420,29 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     setPassword,
     networkSettings,
     setNetworkSettings,
-    mailSmtpPasswordRef,
-    mailSmtpUseImapAuth,
-    mailSmtpSaveInVault,
-    mailSmtpPassword,
-    mailSmtpUsername,
-    mailSmtpHost,
-    mailSmtpPort,
-    setMailSmtpPasswordRef,
-    setMailSmtpPassword,
-    mailOauthClientSecretRef,
-    mailProvider,
-    mailOauthFlow,
-    setMailOauthClientSecretRef,
-    setMailOauthClientSecret,
-    mailOauthClientSecretSaveInVault,
-    mailOauthClientSecret,
+    mailSmtpPasswordRef: mailForm.mailSmtpPasswordRef,
+    mailSmtpUseImapAuth: mailForm.mailSmtpUseImapAuth,
+    mailSmtpSaveInVault: mailForm.mailSmtpSaveInVault,
+    mailSmtpPassword: mailForm.mailSmtpPassword,
+    mailSmtpUsername: mailForm.mailSmtpUsername,
+    mailSmtpHost: mailForm.mailSmtpHost,
+    mailSmtpPort: mailForm.mailSmtpPort,
+    setMailSmtpPasswordRef: mailForm.setMailSmtpPasswordRef,
+    setMailSmtpPassword: mailForm.setMailSmtpPassword,
+    mailOauthClientSecretRef: mailForm.mailOauthClientSecretRef,
+    mailProvider: mailForm.mailProvider,
+    mailOauthFlow: mailForm.mailOauthFlow,
+    setMailOauthClientSecretRef: mailForm.setMailOauthClientSecretRef,
+    setMailOauthClientSecret: mailForm.setMailOauthClientSecret,
+    mailOauthClientSecretSaveInVault: mailForm.mailOauthClientSecretSaveInVault,
+    mailOauthClientSecret: mailForm.mailOauthClientSecret,
     oss,
     setOss,
     buildConfig,
     buildOptionsJson,
-    mailOauthTokenRef,
-    mailOauthExpiresAt,
-    mailOauthScope,
+    mailOauthTokenRef: mailForm.mailOauthTokenRef,
+    mailOauthExpiresAt: mailForm.mailOauthExpiresAt,
+    mailOauthScope: mailForm.mailOauthScope,
     isEdit,
     updateSession,
     addSession,
@@ -846,156 +460,53 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     addSession,
     setTestResult,
   });
-
-  const handleReset = () => {
-    const nextOptions = parseSessionOptions(session?.options_json);
-    const nextProto = sessionTypeToProto(session?.session_type, session?.options_json);
-    setProto(nextProto);
-    setSection("advanced");
-    setName(session?.name ?? "");
-    setHost(session?.host ?? "");
-    setPort(String(session?.port ?? DEFAULT_PORTS[nextProto] ?? 22));
-    const nextUsername = nextProto === "Mail"
-      ? session?.username ?? optionString(nextOptions, "mailEmailAddress", "")
-      : session?.username ?? "";
-    setUsername(nextUsername);
-    setSpecifyUser(!!nextUsername || nextProto === "Mail");
-    setGroupPath(toStoredGroupPath(session?.group_path ?? defaultGroupPath) ?? "");
-    const nextAuth = extractAuthType(session?.auth_method);
-    setAuthMethod(nextAuth);
-    setAuthRadio(nextAuth === "PrivateKey" ? "privatekey" : nextAuth === "Agent" ? "agent" : nextAuth === "None" ? "gssapi" : "password");
-    setKeyPath(extractKeyPath(session?.auth_method));
-    setPassword("");
-    const restoredRef = optionString(nextOptions, "passwordRef", "");
-    setPasswordRef(restoredRef);
-    setSaveInVault(!!restoredRef || nextProto === "Mail");
-    setX11(optionBoolean(nextOptions, "x11", true));
-    setX11Trusted(optionBoolean(nextOptions, "x11Trusted", true));
-    setCompression(optionBoolean(nextOptions, "compression", false));
-    setStartupCmd(optionString(nextOptions, "startupCmd", ""));
-    setDoNotExit(optionBoolean(nextOptions, "doNotExit", true));
-    setDisableAiWrite(optionBoolean(nextOptions, "disableAiWrite", false));
-    setRemoteEnv(optionString(nextOptions, "remoteEnv", "Interactive shell"));
-    setSshBrowser(optionString(nextOptions, "sshBrowser", "SFTP protocol (recommended)"));
-    setUsePrivKey(nextAuth === "PrivateKey");
-    setDescription(optionString(nextOptions, "description", ""));
-    setTags(optionString(nextOptions, "tags", ""));
-    setFileEmbedInTab(optionBoolean(nextOptions, "fileEmbedInTab", true));
-    setFileExtraArgs(optionString(nextOptions, "fileExtraArgs", ""));
-    setDbCatalog(optionString(nextOptions, "dbCatalog", ""));
-    setDbDatabase(optionString(nextOptions, "dbDatabase", ""));
-    setDbSsl(optionBoolean(nextOptions, "dbSsl", false));
-    setDbTimeout(optionString(nextOptions, "dbTimeout", "15"));
-    setDbHttpPort(optionString(nextOptions, "dbHttpPort", "8123"));
-    setDbChProtocol(optionString(nextOptions, "dbChProtocol", "HTTP"));
-    {
-      const dialect = optionString(nextOptions, "dbPrestoDialect", "presto").toLowerCase();
-      setDbPrestoDialect(dialect === "trino" ? "Trino" : "Presto");
-    }
-    setDbRedisIndex(optionString(nextOptions, "dbRedisIndex", "0"));
-    setHBaseNamespace(optionString(nextOptions, "hbaseNamespace", ""));
-    setHBaseRestPath(optionString(nextOptions, "hbaseRestPath", ""));
-    setHBaseConnectionMode(optionString(nextOptions, "hbaseConnectionMode", "native"));
-    setHBaseZkQuorum(optionString(nextOptions, "hbaseZkQuorum", ""));
-    setHBaseZkRoot(optionString(nextOptions, "hbaseZkRoot", ""));
-    setHBaseEffectiveUser(optionString(nextOptions, "hbaseEffectiveUser", ""));
-    setHBaseAuthMethod(optionString(nextOptions, "hbaseAuthMethod", "simple"));
-    setHBaseServicePrincipal(optionString(nextOptions, "hbaseServicePrincipal", ""));
-    setHBasePrincipal(optionString(nextOptions, "hbasePrincipal", ""));
-    setHBaseKeytabPath(optionString(nextOptions, "hbaseKeytabPath", ""));
-    setHBaseKrb5ConfPath(optionString(nextOptions, "hbaseKrb5ConfPath", ""));
-    setHBaseSitePath(optionString(nextOptions, "hbaseSitePath", ""));
-    setTerminalProfile(initialTerminalProfileForProto(session?.options_json, nextProto));
-    setNetworkSettings(getSessionNetworkSettings(session?.options_json));
-    setSerialDevice(session?.session_type === "Serial" ? session.host : optionString(nextOptions, "serialDevice", ""));
-    setSerialBaud(optionString(nextOptions, "serialBaud", "115200"));
-    setLocalShellOptions(parseLocalShellOptions(session?.options_json));
-    setWslOptions(parseWslOptions(session?.options_json));
-    setRdpOptions(parseRdpOptions(session?.options_json));
-    {
-      const policy = optionString(nextOptions, "vncSecurityPolicy", "prefer-encryption");
-      setVncSecurityPolicy(
-        policy === "require-encryption" || policy === "legacy-compatible" || policy === "allow-none"
-          || policy === "prefer-off"
-          ? policy
-          : "prefer-encryption",
-      );
-    }
-    setVncViewOnly(optionBoolean(nextOptions, "vncViewOnly", false));
-    setVncViewer(parseVncViewerOptions(nextOptions));
-    {
-      const policy = optionString(nextOptions, "vncClipboardPolicy", "bidirectional");
-      setVncClipboardPolicy(
-        policy === "disabled" || policy === "client-to-server" || policy === "server-to-client"
-          ? policy
-          : "bidirectional",
-      );
-    }
-    setPathMappings(parsePathMappingsFromOptions(session?.options_json));
-    const restoredMailProvider = initialMailProvider(nextOptions, session?.host);
-    setMailProvider(restoredMailProvider);
-    setMailAuthMode(normalizeMailAuthMode(nextOptions.mailAuthMode));
-    setMailDisplayName(optionString(nextOptions, "mailDisplayName", ""));
-    setMailReplyTo(optionString(nextOptions, "mailReplyTo", ""));
-    setMailSignature(optionString(nextOptions, "mailSignature", ""));
-    setMailImapSecurity((() => {
-      const value = optionString(nextOptions, "mailImapSecurity", "TLS");
-      return value === "STARTTLS" || value === "None" ? value : "TLS";
-    })());
-    setMailSmtpHost(optionString(nextOptions, "mailSmtpHost", ""));
-    setMailSmtpPort(optionString(nextOptions, "mailSmtpPort", "465"));
-    setMailSmtpSecurity((() => {
-      const value = optionString(nextOptions, "mailSmtpSecurity", "TLS");
-      return value === "STARTTLS" || value === "None" ? value : "TLS";
-    })());
-    setMailSmtpUsername(optionString(nextOptions, "mailSmtpUsername", ""));
-    setMailSmtpUseImapAuth(optionBoolean(nextOptions, "mailSmtpUseImapAuth", true));
-    setMailSmtpPassword("");
-    const restoredSmtpRef = optionString(nextOptions, "mailSmtpPasswordRef", "");
-    setMailSmtpPasswordRef(restoredSmtpRef);
-    setMailSmtpSaveInVault(!!restoredSmtpRef || nextProto === "Mail");
-    setMailOauthClientId(optionString(nextOptions, "mailOauthClientId", ""));
-    setMailOauthClientSecret("");
-    const restoredOauthSecretRef = optionString(nextOptions, "mailOauthClientSecretRef", "");
-    setMailOauthClientSecretRef(restoredOauthSecretRef);
-    setMailOauthClientSecretSaveInVault(!!restoredOauthSecretRef || nextProto === "Mail");
-    setMailOauthFlow(initialMailOAuthFlow(nextOptions, restoredMailProvider));
-    setMailOauthDeviceInfo(null);
-    setMailOauthTokenRef(optionString(nextOptions, "mailOauthTokenRef", ""));
-    setMailOauthExpiresAt(optionStringOrNumber(nextOptions, "mailOauthExpiresAt", ""));
-    setMailOauthScope(optionString(nextOptions, "mailOauthScope", ""));
-    setMailOauthStatus(null);
-    setMailCacheEnabled(optionBoolean(nextOptions, "mailCacheEnabled", true));
-    setMailSaveDirectory(optionString(nextOptions, "mailSaveDirectory", ""));
-    setMailStorage(mailStorageOptions(nextOptions));
-    setMailHeaderRetentionDays(String(mailHeaderLimitOption(nextOptions, "mailHeaderRetentionDays", 30)));
-    setMailHeaderLimitPerFolder(String(mailHeaderLimitOption(nextOptions, "mailHeaderLimitPerFolder", 2000)));
-    setMailBodyRecentLimit(optionString(nextOptions, "mailBodyRecentLimit", "200"));
-    setMailBodyMaxBytes(optionString(nextOptions, "mailBodyMaxBytes", "262144"));
-    setMailAttachmentCache(optionBoolean(nextOptions, "mailAttachmentCache", false));
-    setMailSyncOnOpen(optionBoolean(nextOptions, "mailSyncOnOpen", true));
-    setMailIdlePush(optionBoolean(nextOptions, "mailIdlePush", true));
-    setMailSubscribedOnly(optionBoolean(nextOptions, "mailSubscribedOnly", false));
-    setMailIncoming(optionString(nextOptions, "mailIncoming", "imap") === "pop3" ? "pop3" : "imap");
-    setMailPop3LeaveDays(optionString(nextOptions, "mailPop3LeaveDays", ""));
-    setMailUndoSendSeconds(optionString(nextOptions, "mailUndoSendSeconds", "0"));
-    setMailCardDavUrl(optionString(nextOptions, "mailCardDavUrl", ""));
-    setMailCardDavUsername(optionString(nextOptions, "mailCardDavUsername", ""));
-    setMailCalDavUrl(optionString(nextOptions, "mailCalDavUrl", ""));
-    setMailCalDavUsername(optionString(nextOptions, "mailCalDavUsername", ""));
-    setMailReceiptPolicy(optionString(nextOptions, "mailReceiptPolicy", "ask"));
-    setMailSpecialFolders(parseSpecialFolders(nextOptions.mailSpecialFolders));
-    setMailDesktopNotify(optionBoolean(nextOptions, "mailDesktopNotify", false));
-    setMailSyncIntervalMinutes(optionString(nextOptions, "mailSyncIntervalMinutes", "5"));
-    setMailMaxFetchPerSync(optionString(nextOptions, "mailMaxFetchPerSync", "200"));
-    setMailSaveSentCopy(optionString(nextOptions, "mailSaveSentCopy", "auto"));
-    setMailIdentityList(parseMailIdentities(nextOptions.mailIdentities));
-    setMailAiEnabled(optionBoolean(nextOptions, "mailAiEnabled", true));
-    setMailAiSkipBodyConfirm(optionBoolean(nextOptions, "mailAiSkipBodyConfirm", false));
-    setOss(ossFormFromOptions(session?.options_json));
-    setSaveError(null);
-    setTestResult(null);
-  };
+  const { handleReset } = createSessionReset({
+    session,
+    setProto,
+    setSection,
+    setName,
+    setHost,
+    setPort,
+    setUsername,
+    setSpecifyUser,
+    setGroupPath,
+    defaultGroupPath,
+    setAuthMethod,
+    setAuthRadio,
+    setKeyPath,
+    setPassword,
+    setPasswordRef,
+    setSaveInVault,
+    setX11,
+    setX11Trusted,
+    setCompression,
+    setStartupCmd,
+    setDoNotExit,
+    setDisableAiWrite,
+    setRemoteEnv,
+    setSshBrowser,
+    setUsePrivKey,
+    setDescription,
+    setTags,
+    setFileEmbedInTab,
+    setFileExtraArgs,
+    databaseForm,
+    setTerminalProfile,
+    setNetworkSettings,
+    setSerialDevice,
+    setSerialBaud,
+    shellForm,
+    setRdpOptions,
+    setVncSecurityPolicy,
+    setVncViewOnly,
+    setVncViewer,
+    setVncClipboardPolicy,
+    setPathMappings,
+    mailForm,
+    setOss,
+    setSaveError,
+    setTestResult,
+  });
 
   const applySshCommandText = (value: string): boolean => {
     const parsed = parseSshConnectionCommand(value);
@@ -1094,30 +605,30 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
   const handleBrowseMailSaveDirectory = async () => {
     setSaveError(null);
     try {
-      const selected = await selectFolderPath(mailSaveDirectory || undefined);
-      if (selected) setMailSaveDirectory(selected.trim());
+      const selected = await selectFolderPath(mailForm.mailSaveDirectory || undefined);
+      if (selected) mailForm.setMailSaveDirectory(selected.trim());
     } catch (err) {
       setSaveError(`Failed to choose mail save directory: ${String(err)}`);
     }
   };
 
   const handleMailOAuthConnect = createHandleMailOAuthConnect({
-    setMailOauthStatus,
-    mailProvider,
-    mailOauthFlow,
+    setMailOauthStatus: mailForm.setMailOauthStatus,
+    mailProvider: mailForm.mailProvider,
+    mailOauthFlow: mailForm.mailOauthFlow,
     username,
-    mailOauthClientId,
-    mailOauthClientSecret,
-    mailOauthClientSecretRef,
+    mailOauthClientId: mailForm.mailOauthClientId,
+    mailOauthClientSecret: mailForm.mailOauthClientSecret,
+    mailOauthClientSecretRef: mailForm.mailOauthClientSecretRef,
     t,
-    setMailOauthConnecting,
-    setMailOauthDeviceInfo,
+    setMailOauthConnecting: mailForm.setMailOauthConnecting,
+    setMailOauthDeviceInfo: mailForm.setMailOauthDeviceInfo,
     session,
     networkSettings,
-    setMailAuthMode,
-    setMailOauthTokenRef,
-    setMailOauthExpiresAt,
-    setMailOauthScope,
+    setMailAuthMode: mailForm.setMailAuthMode,
+    setMailOauthTokenRef: mailForm.setMailOauthTokenRef,
+    setMailOauthExpiresAt: mailForm.setMailOauthExpiresAt,
+    setMailOauthScope: mailForm.setMailOauthScope,
   });
 
   const handleNewFolder = createHandleNewFolder({
@@ -1160,14 +671,14 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     username,
     password,
     passwordRef,
-    dbCatalog,
-    dbDatabase,
-    dbSsl,
-    dbTimeout,
-    dbHttpPort,
-    dbChProtocol,
-    dbPrestoDialect,
-    dbRedisIndex,
+    dbCatalog: databaseForm.dbCatalog,
+    dbDatabase: databaseForm.dbDatabase,
+    dbSsl: databaseForm.dbSsl,
+    dbTimeout: databaseForm.dbTimeout,
+    dbHttpPort: databaseForm.dbHttpPort,
+    dbChProtocol: databaseForm.dbChProtocol,
+    dbPrestoDialect: databaseForm.dbPrestoDialect,
+    dbRedisIndex: databaseForm.dbRedisIndex,
     networkSettings,
   });
 
@@ -1178,20 +689,20 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     username,
     password,
     passwordRef,
-    dbSsl,
-    dbTimeout,
-    hbaseRestPath,
-    hbaseNamespace,
-    hbaseConnectionMode,
-    hbaseZkQuorum,
-    hbaseZkRoot,
-    hbaseEffectiveUser,
-    hbaseAuthMethod,
-    hbaseServicePrincipal,
-    hbasePrincipal,
-    hbaseKeytabPath,
-    hbaseKrb5ConfPath,
-    hbaseSitePath,
+    dbSsl: databaseForm.dbSsl,
+    dbTimeout: databaseForm.dbTimeout,
+    hbaseRestPath: databaseForm.hbaseRestPath,
+    hbaseNamespace: databaseForm.hbaseNamespace,
+    hbaseConnectionMode: databaseForm.hbaseConnectionMode,
+    hbaseZkQuorum: databaseForm.hbaseZkQuorum,
+    hbaseZkRoot: databaseForm.hbaseZkRoot,
+    hbaseEffectiveUser: databaseForm.hbaseEffectiveUser,
+    hbaseAuthMethod: databaseForm.hbaseAuthMethod,
+    hbaseServicePrincipal: databaseForm.hbaseServicePrincipal,
+    hbasePrincipal: databaseForm.hbasePrincipal,
+    hbaseKeytabPath: databaseForm.hbaseKeytabPath,
+    hbaseKrb5ConfPath: databaseForm.hbaseKrb5ConfPath,
+    hbaseSitePath: databaseForm.hbaseSitePath,
   });
 
   const handleTestDbConnection = createHandleTestDbConnection({
@@ -1199,18 +710,18 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     presentTestOutcome,
     t,
     proto,
-    dbCatalog,
+    dbCatalog: databaseForm.dbCatalog,
     setTesting,
     setTestResult,
     buildDbConnectInfo,
   });
 
   const handleTestHBaseConnection = createHandleTestHBaseConnection({
-    hbaseConnectionMode,
+    hbaseConnectionMode: databaseForm.hbaseConnectionMode,
     host,
     presentTestOutcome,
-    hbaseSitePath,
-    hbaseZkQuorum,
+    hbaseSitePath: databaseForm.hbaseSitePath,
+    hbaseZkQuorum: databaseForm.hbaseZkQuorum,
     setTesting,
     setTestResult,
     buildHBaseConnectInfo,
@@ -1585,10 +1096,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               {t("sessionEditor2.localShellTitle")}
             </div>
             <LocalShellOptionsForm
-              options={localShellOptions}
-              shells={localShells}
-              status={localShellStatus}
-              onChange={setLocalShellOptions}
+              options={shellForm.localShellOptions}
+              shells={shellForm.localShells}
+              status={shellForm.localShellStatus}
+              onChange={shellForm.setLocalShellOptions}
             />
           </div>
         )}
@@ -1608,10 +1119,10 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
               {t("wsl.options.title")}
             </div>
             <WslOptionsForm
-              options={wslOptions}
-              distros={wslDistros}
-              status={wslStatus}
-              onChange={setWslOptions}
+              options={shellForm.wslOptions}
+              distros={shellForm.wslDistros}
+              status={shellForm.wslStatus}
+              onChange={shellForm.setWslOptions}
             />
           </div>
         )}
@@ -1806,70 +1317,70 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
           {activeSection === "mail" && isMail && (
             <div data-testid="session-mail-section">
               <MailSettings
-                provider={mailProvider} setProvider={handleMailProviderChange}
-                authMode={mailAuthMode} setAuthMode={setMailAuthMode}
+                provider={mailForm.mailProvider} setProvider={handleMailProviderChange}
+                authMode={mailForm.mailAuthMode} setAuthMode={mailForm.setMailAuthMode}
                 imapHost={host} setImapHost={setHost}
                 imapPort={port} setImapPort={setPort}
                 username={username} setUsername={(value) => { setUsername(value); setSpecifyUser(true); }}
                 password={password} setPassword={setPassword}
                 passwordRef={passwordRef} clearPasswordRef={() => setPasswordRef("")}
                 saveInVault={saveInVault} setSaveInVault={setSaveInVault}
-                displayName={mailDisplayName} setDisplayName={setMailDisplayName}
-                replyTo={mailReplyTo} setReplyTo={setMailReplyTo}
-                signature={mailSignature} setSignature={setMailSignature}
-                imapSecurity={mailImapSecurity} setImapSecurity={setMailImapSecurity}
-                smtpHost={mailSmtpHost} setSmtpHost={setMailSmtpHost}
-                smtpPort={mailSmtpPort} setSmtpPort={setMailSmtpPort}
-                smtpSecurity={mailSmtpSecurity} setSmtpSecurity={setMailSmtpSecurity}
-                smtpUsername={mailSmtpUsername} setSmtpUsername={setMailSmtpUsername}
-                smtpUseImapAuth={mailSmtpUseImapAuth} setSmtpUseImapAuth={setMailSmtpUseImapAuth}
-                smtpPassword={mailSmtpPassword} setSmtpPassword={setMailSmtpPassword}
-                smtpPasswordRef={mailSmtpPasswordRef} clearSmtpPasswordRef={() => setMailSmtpPasswordRef("")}
-                smtpSaveInVault={mailSmtpSaveInVault} setSmtpSaveInVault={setMailSmtpSaveInVault}
-                oauthClientId={mailOauthClientId} setOauthClientId={setMailOauthClientId}
-                oauthClientSecret={mailOauthClientSecret} setOauthClientSecret={setMailOauthClientSecret}
-                oauthClientSecretRef={mailOauthClientSecretRef} clearOauthClientSecretRef={() => setMailOauthClientSecretRef("")}
-                oauthClientSecretSaveInVault={mailOauthClientSecretSaveInVault} setOauthClientSecretSaveInVault={setMailOauthClientSecretSaveInVault}
-                oauthFlow={mailOauthFlow} setOauthFlow={(value) => {
-                  setMailOauthFlow(value);
-                  setMailOauthDeviceInfo(null);
-                  setMailOauthStatus(null);
+                displayName={mailForm.mailDisplayName} setDisplayName={mailForm.setMailDisplayName}
+                replyTo={mailForm.mailReplyTo} setReplyTo={mailForm.setMailReplyTo}
+                signature={mailForm.mailSignature} setSignature={mailForm.setMailSignature}
+                imapSecurity={mailForm.mailImapSecurity} setImapSecurity={mailForm.setMailImapSecurity}
+                smtpHost={mailForm.mailSmtpHost} setSmtpHost={mailForm.setMailSmtpHost}
+                smtpPort={mailForm.mailSmtpPort} setSmtpPort={mailForm.setMailSmtpPort}
+                smtpSecurity={mailForm.mailSmtpSecurity} setSmtpSecurity={mailForm.setMailSmtpSecurity}
+                smtpUsername={mailForm.mailSmtpUsername} setSmtpUsername={mailForm.setMailSmtpUsername}
+                smtpUseImapAuth={mailForm.mailSmtpUseImapAuth} setSmtpUseImapAuth={mailForm.setMailSmtpUseImapAuth}
+                smtpPassword={mailForm.mailSmtpPassword} setSmtpPassword={mailForm.setMailSmtpPassword}
+                smtpPasswordRef={mailForm.mailSmtpPasswordRef} clearSmtpPasswordRef={() => mailForm.setMailSmtpPasswordRef("")}
+                smtpSaveInVault={mailForm.mailSmtpSaveInVault} setSmtpSaveInVault={mailForm.setMailSmtpSaveInVault}
+                oauthClientId={mailForm.mailOauthClientId} setOauthClientId={mailForm.setMailOauthClientId}
+                oauthClientSecret={mailForm.mailOauthClientSecret} setOauthClientSecret={mailForm.setMailOauthClientSecret}
+                oauthClientSecretRef={mailForm.mailOauthClientSecretRef} clearOauthClientSecretRef={() => mailForm.setMailOauthClientSecretRef("")}
+                oauthClientSecretSaveInVault={mailForm.mailOauthClientSecretSaveInVault} setOauthClientSecretSaveInVault={mailForm.setMailOauthClientSecretSaveInVault}
+                oauthFlow={mailForm.mailOauthFlow} setOauthFlow={(value) => {
+                  mailForm.setMailOauthFlow(value);
+                  mailForm.setMailOauthDeviceInfo(null);
+                  mailForm.setMailOauthStatus(null);
                 }}
-                oauthDeviceInfo={mailOauthDeviceInfo}
-                oauthTokenRef={mailOauthTokenRef}
-                oauthExpiresAt={mailOauthExpiresAt}
-                oauthScope={mailOauthScope}
-                oauthConnecting={mailOauthConnecting}
-                oauthStatus={mailOauthStatus}
+                oauthDeviceInfo={mailForm.mailOauthDeviceInfo}
+                oauthTokenRef={mailForm.mailOauthTokenRef}
+                oauthExpiresAt={mailForm.mailOauthExpiresAt}
+                oauthScope={mailForm.mailOauthScope}
+                oauthConnecting={mailForm.mailOauthConnecting}
+                oauthStatus={mailForm.mailOauthStatus}
                 onOAuthConnect={() => void handleMailOAuthConnect()}
-                cacheEnabled={mailCacheEnabled} setCacheEnabled={setMailCacheEnabled}
-                storage={mailStorage} setStorage={setMailStorage} accountId={session?.id}
-                saveDirectory={mailSaveDirectory} setSaveDirectory={setMailSaveDirectory}
+                cacheEnabled={mailForm.mailCacheEnabled} setCacheEnabled={mailForm.setMailCacheEnabled}
+                storage={mailForm.mailStorage} setStorage={mailForm.setMailStorage} accountId={session?.id}
+                saveDirectory={mailForm.mailSaveDirectory} setSaveDirectory={mailForm.setMailSaveDirectory}
                 onBrowseSaveDirectory={() => void handleBrowseMailSaveDirectory()}
-                headerRetentionDays={mailHeaderRetentionDays} setHeaderRetentionDays={setMailHeaderRetentionDays}
-                headerLimitPerFolder={mailHeaderLimitPerFolder} setHeaderLimitPerFolder={setMailHeaderLimitPerFolder}
-                bodyRecentLimit={mailBodyRecentLimit} setBodyRecentLimit={setMailBodyRecentLimit}
-                bodyMaxBytes={mailBodyMaxBytes} setBodyMaxBytes={setMailBodyMaxBytes}
-                attachmentCache={mailAttachmentCache} setAttachmentCache={setMailAttachmentCache}
-                syncOnOpen={mailSyncOnOpen} setSyncOnOpen={setMailSyncOnOpen}
-                idlePush={mailIdlePush} setIdlePush={setMailIdlePush}
-                subscribedOnly={mailSubscribedOnly} setSubscribedOnly={setMailSubscribedOnly}
-                incoming={mailIncoming} setIncoming={setMailIncoming}
-                pop3LeaveDays={mailPop3LeaveDays} setPop3LeaveDays={setMailPop3LeaveDays}
-                undoSendSeconds={mailUndoSendSeconds} setUndoSendSeconds={setMailUndoSendSeconds}
-                cardDavUrl={mailCardDavUrl} setCardDavUrl={setMailCardDavUrl}
-                cardDavUsername={mailCardDavUsername} setCardDavUsername={setMailCardDavUsername}
-                calDavUrl={mailCalDavUrl} setCalDavUrl={setMailCalDavUrl}
-                calDavUsername={mailCalDavUsername} setCalDavUsername={setMailCalDavUsername}
-                receiptPolicy={mailReceiptPolicy} setReceiptPolicy={setMailReceiptPolicy}
-                specialFolders={mailSpecialFolders} setSpecialFolders={setMailSpecialFolders}
-                desktopNotify={mailDesktopNotify} setDesktopNotify={setMailDesktopNotify}
-                syncIntervalMinutes={mailSyncIntervalMinutes} setSyncIntervalMinutes={setMailSyncIntervalMinutes}
-                maxFetchPerSync={mailMaxFetchPerSync} setMaxFetchPerSync={setMailMaxFetchPerSync}
-                saveSentCopy={mailSaveSentCopy} setSaveSentCopy={setMailSaveSentCopy}
-                identities={mailIdentityList} setIdentities={setMailIdentityList}
-                aiEnabled={mailAiEnabled} setAiEnabled={setMailAiEnabled}
-                aiSkipBodyConfirm={mailAiSkipBodyConfirm} setAiSkipBodyConfirm={setMailAiSkipBodyConfirm}
+                headerRetentionDays={mailForm.mailHeaderRetentionDays} setHeaderRetentionDays={mailForm.setMailHeaderRetentionDays}
+                headerLimitPerFolder={mailForm.mailHeaderLimitPerFolder} setHeaderLimitPerFolder={mailForm.setMailHeaderLimitPerFolder}
+                bodyRecentLimit={mailForm.mailBodyRecentLimit} setBodyRecentLimit={mailForm.setMailBodyRecentLimit}
+                bodyMaxBytes={mailForm.mailBodyMaxBytes} setBodyMaxBytes={mailForm.setMailBodyMaxBytes}
+                attachmentCache={mailForm.mailAttachmentCache} setAttachmentCache={mailForm.setMailAttachmentCache}
+                syncOnOpen={mailForm.mailSyncOnOpen} setSyncOnOpen={mailForm.setMailSyncOnOpen}
+                idlePush={mailForm.mailIdlePush} setIdlePush={mailForm.setMailIdlePush}
+                subscribedOnly={mailForm.mailSubscribedOnly} setSubscribedOnly={mailForm.setMailSubscribedOnly}
+                incoming={mailForm.mailIncoming} setIncoming={mailForm.setMailIncoming}
+                pop3LeaveDays={mailForm.mailPop3LeaveDays} setPop3LeaveDays={mailForm.setMailPop3LeaveDays}
+                undoSendSeconds={mailForm.mailUndoSendSeconds} setUndoSendSeconds={mailForm.setMailUndoSendSeconds}
+                cardDavUrl={mailForm.mailCardDavUrl} setCardDavUrl={mailForm.setMailCardDavUrl}
+                cardDavUsername={mailForm.mailCardDavUsername} setCardDavUsername={mailForm.setMailCardDavUsername}
+                calDavUrl={mailForm.mailCalDavUrl} setCalDavUrl={mailForm.setMailCalDavUrl}
+                calDavUsername={mailForm.mailCalDavUsername} setCalDavUsername={mailForm.setMailCalDavUsername}
+                receiptPolicy={mailForm.mailReceiptPolicy} setReceiptPolicy={mailForm.setMailReceiptPolicy}
+                specialFolders={mailForm.mailSpecialFolders} setSpecialFolders={mailForm.setMailSpecialFolders}
+                desktopNotify={mailForm.mailDesktopNotify} setDesktopNotify={mailForm.setMailDesktopNotify}
+                syncIntervalMinutes={mailForm.mailSyncIntervalMinutes} setSyncIntervalMinutes={mailForm.setMailSyncIntervalMinutes}
+                maxFetchPerSync={mailForm.mailMaxFetchPerSync} setMaxFetchPerSync={mailForm.setMailMaxFetchPerSync}
+                saveSentCopy={mailForm.mailSaveSentCopy} setSaveSentCopy={mailForm.setMailSaveSentCopy}
+                identities={mailForm.mailIdentityList} setIdentities={mailForm.setMailIdentityList}
+                aiEnabled={mailForm.mailAiEnabled} setAiEnabled={mailForm.setMailAiEnabled}
+                aiSkipBodyConfirm={mailForm.mailAiSkipBodyConfirm} setAiSkipBodyConfirm={mailForm.setMailAiSkipBodyConfirm}
                 vaultState={vaultState}
               />
             </div>
@@ -1883,14 +1394,14 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 passwordRef={passwordRef} clearPasswordRef={() => setPasswordRef("")}
                 saveInVault={saveInVault} setSaveInVault={setSaveInVault}
                 vaultState={vaultState}
-                catalog={dbCatalog} setCatalog={setDbCatalog}
-                database={dbDatabase} setDatabase={setDbDatabase}
-                ssl={dbSsl} setSsl={setDbSsl}
-                timeoutSecs={dbTimeout} setTimeoutSecs={setDbTimeout}
-                httpPort={dbHttpPort} setHttpPort={setDbHttpPort}
-                chProtocol={dbChProtocol} setChProtocol={setDbChProtocol}
-                prestoDialect={dbPrestoDialect} setPrestoDialect={setDbPrestoDialect}
-                redisDbIndex={dbRedisIndex} setRedisDbIndex={setDbRedisIndex}
+                catalog={databaseForm.dbCatalog} setCatalog={databaseForm.setDbCatalog}
+                database={databaseForm.dbDatabase} setDatabase={databaseForm.setDbDatabase}
+                ssl={databaseForm.dbSsl} setSsl={databaseForm.setDbSsl}
+                timeoutSecs={databaseForm.dbTimeout} setTimeoutSecs={databaseForm.setDbTimeout}
+                httpPort={databaseForm.dbHttpPort} setHttpPort={databaseForm.setDbHttpPort}
+                chProtocol={databaseForm.dbChProtocol} setChProtocol={databaseForm.setDbChProtocol}
+                prestoDialect={databaseForm.dbPrestoDialect} setPrestoDialect={databaseForm.setDbPrestoDialect}
+                redisDbIndex={databaseForm.dbRedisIndex} setRedisDbIndex={databaseForm.setDbRedisIndex}
               />
             </div>
           )}
@@ -1904,20 +1415,20 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
                 passwordRef={passwordRef} clearPasswordRef={() => setPasswordRef("")}
                 saveInVault={saveInVault} setSaveInVault={setSaveInVault}
                 vaultState={vaultState}
-                namespace={hbaseNamespace} setNamespace={setHBaseNamespace}
-                restPath={hbaseRestPath} setRestPath={setHBaseRestPath}
-                connectionMode={hbaseConnectionMode} setConnectionMode={setHBaseConnectionMode}
-                zkQuorum={hbaseZkQuorum} setZkQuorum={setHBaseZkQuorum}
-                zkRoot={hbaseZkRoot} setZkRoot={setHBaseZkRoot}
-                effectiveUser={hbaseEffectiveUser} setEffectiveUser={setHBaseEffectiveUser}
-                ssl={dbSsl} setSsl={setDbSsl}
-                timeoutSecs={dbTimeout} setTimeoutSecs={setDbTimeout}
-                authMethod={hbaseAuthMethod} setAuthMethod={setHBaseAuthMethod}
-                servicePrincipal={hbaseServicePrincipal} setServicePrincipal={setHBaseServicePrincipal}
-                principal={hbasePrincipal} setPrincipal={setHBasePrincipal}
-                keytabPath={hbaseKeytabPath} setKeytabPath={setHBaseKeytabPath}
-                krb5ConfPath={hbaseKrb5ConfPath} setKrb5ConfPath={setHBaseKrb5ConfPath}
-                hbaseSitePath={hbaseSitePath} setHBaseSitePath={setHBaseSitePath}
+                namespace={databaseForm.hbaseNamespace} setNamespace={databaseForm.setHBaseNamespace}
+                restPath={databaseForm.hbaseRestPath} setRestPath={databaseForm.setHBaseRestPath}
+                connectionMode={databaseForm.hbaseConnectionMode} setConnectionMode={databaseForm.setHBaseConnectionMode}
+                zkQuorum={databaseForm.hbaseZkQuorum} setZkQuorum={databaseForm.setHBaseZkQuorum}
+                zkRoot={databaseForm.hbaseZkRoot} setZkRoot={databaseForm.setHBaseZkRoot}
+                effectiveUser={databaseForm.hbaseEffectiveUser} setEffectiveUser={databaseForm.setHBaseEffectiveUser}
+                ssl={databaseForm.dbSsl} setSsl={databaseForm.setDbSsl}
+                timeoutSecs={databaseForm.dbTimeout} setTimeoutSecs={databaseForm.setDbTimeout}
+                authMethod={databaseForm.hbaseAuthMethod} setAuthMethod={databaseForm.setHBaseAuthMethod}
+                servicePrincipal={databaseForm.hbaseServicePrincipal} setServicePrincipal={databaseForm.setHBaseServicePrincipal}
+                principal={databaseForm.hbasePrincipal} setPrincipal={databaseForm.setHBasePrincipal}
+                keytabPath={databaseForm.hbaseKeytabPath} setKeytabPath={databaseForm.setHBaseKeytabPath}
+                krb5ConfPath={databaseForm.hbaseKrb5ConfPath} setKrb5ConfPath={databaseForm.setHBaseKrb5ConfPath}
+                hbaseSitePath={databaseForm.hbaseSitePath} setHBaseSitePath={databaseForm.setHBaseSitePath}
               />
             </div>
           )}
