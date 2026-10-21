@@ -705,7 +705,7 @@ Y补记：`y-build-final-3.log`完整build通过，契约761/328/39与868 implem
 `y-build-complete.log`最终完整build（含新增规模gate）通过。`y-jdtls-fixtures.log`在隔离fixture副本中用原入口执行，真实Java21/JDT LS1.61与Gradle9.5.1下 **5/5 fixtures green**：Maven单模块、多模块、broken classpath和Gradle单模块、多模块；原场景断言完整保留，原始trace位于`jdtls-y/traces/`，未覆盖仓库基线trace。
 
 
-## 2026-10-22 最终组合全量三端验收（运行中）
+## 2026-10-22 Y 组合全量三端回归（功能通过，诊断工件缺失）
 
 产品完整提交 `7d9fbb208dbfa26b588a3b4413232ad5ebe5382c`，前置修复 `dd6b4736` 与格式规范 `750bed0f` 均已包含并推送。指定workflow [39678994785](https://github.com/engcapa/taomni/actions/runs/39678994785) 使用 **scope=all /linux,windows,macos /browser,native /native_release=true /run_rdp_unit_contracts=true /publish_issues=false**，未用selected替代全量。
 
@@ -722,3 +722,23 @@ Y补记：`y-build-final-3.log`完整build通过，契约761/328/39与868 implem
 在`.github/workflows/qa-ui-auto-entry.yml`的主报告和compact diagnostics两个上传步骤启用`include-hidden-files: true`；保留全部原有应用数据、缓存、工作目录与一次性更新包的明确排除规则。该修复仅影响CI工件留存，不改变产品和用例断言。原运行继续保留，在修复后的完整提交重新执行scope=all三端browser/native，并逐一核对receipt中的路径、大小及SHA256；新运行结果单独记录，不覆盖原失败或缺失证据。
 
 修复后`python -m unittest test_ci_build_pipeline test_ci_report test_ci_native_artifact` **16 passed**；`pnpm check:refactor`的761/328/39契约、868模块依赖边界和3866文件规模检查通过。工件是否完整由新运行下载后的逐文件校验确认。
+
+### 工件修复后的完整提交全量运行（待收齐）
+
+修复提交`13dec76385f6774fa02eea1d1265cf6e573f8f30`已推送同一分支，新运行[39684081033](https://github.com/engcapa/taomni/actions/runs/39684081033)继续使用指定workflow、scope=all、三端browser/native、release和RDP unit contracts。selection绑定该完整head，产品source identity为`f58137508f7066bb47db1ee47081332a2a42f41dc77faad61fed28c1c345100c`，runner identity为`4f20afd22ae6b244f69f77782e571f0d963c95b88a23524174591c3acc0e1450`；与前次产品源码一致，workflow变化体现在新head中。
+
+共25个执行分片、7组、1788个平台/模式结果：Linux browser396/native216（含双屏1），Windows browser396/native199，macOS browser394/native187。原始selection、各分片报告和工件保存在`qa-ui-auto-report/refactor-p0-p5/github-z/`。逐项验证包括receipt签名、上传策略要求保留的登记文件SHA256和大小、case摘要与精确选例、原生QA标识/二进制/构建源码/release profile、桌面配置、分片head/run/attempt和最终aggregate；原策略明确排除的fixture文件另列，不能计为已经逐字校验。不能以scope=all的job绿色代替case全部通过。
+
+Y运行已结束，25份报告全部收齐：**1788 passed /0 failed /0 skipped**，三端release及Windows capture helper contracts均成功。早先S的Windows rename用例本轮通过，历史失败仍保留，不能据此断言其根因已确定。逐文件检查最终发现2508个意外漏传的隐藏文件，另有62个登记文件被原有上传策略明确排除（一次性macOS更新包、签名副本和Disposable.app）；这些62项的期望摘要与具体排除规则单独保留于`github-y/delivery-verification.json`。两类遗漏不能混淆，Y不作为诊断工件完整的交付运行。
+
+Z运行的Linux native shard4已验证：此前漏传的同类340个隐藏工件已保留并通过大小/SHA256核验。额外下载其compact diagnostics，722个文件与主报告逐字一致，含287个隐藏文件、286份JDT LS metadata日志；清单见`diagnostics-z/verified-compact.json`。其余分片继续执行。
+
+### Linux Secret Service 准备阶段失败与修复
+
+Z的`TC-BACKUP-CLOUD-001`在准备阶段`secret-tool store`返回1（约0.1秒），50个产品操作步骤均未执行。原报告保留，原fixture捕获的stderr没有写入报告，现有证据不足以唯一确定该CI失败的原因。
+
+在私有D-Bus和临时XDG目录中实测旧实现：30轮新会话及30轮预先激活服务后替换均通过，未复现原CI失败。受控锁定/替换实验显示，调用进程更换XDG环境不会同步D-Bus激活环境；自动激活的服务可能沿用bus启动时的目录，且daemon退出成功不足以证明collection可写。早期受控延迟解锁实验未能解除collection锁定，其失败材料继续保留，未当作修复成功证据。
+
+修复限定为已验证的GitHub native/Linux私有bus和run-owned storage：先同步三个XDG激活变量，再启动daemon，以5秒预算等待真实store/lookup/clear完成；错误的往返值、成功往返后的清理失败、持续不可用和超时仍失败。每次尝试保留stderr及失败阶段，诊断不记录probe值或lookup stdout；清理/诊断写入错误保留原始失败。产品源码和YAML业务断言不变，继续复用`TC-BACKUP-CLOUD-001`，无搬迁专用新case。
+
+`credential-fixture-unit-final.log` **41 tests passed**，覆盖激活环境拒绝、短暂不可用后完整往返、持续失败截止、错误值、清理失败和诊断写入失败；本地真实Secret Service **30轮新会话+30轮预先激活/替换均通过**，材料为`secret-service-candidate-fresh.json`与`secret-service-candidate-replace.json`。持续锁定的真实服务在约5.047秒按预期失败并保留stderr（`secret-service-persistent-lock.json`），没有将锁定异常转换成pass。新完整提交须再次执行三端scope=all，整体验收仍未结束。

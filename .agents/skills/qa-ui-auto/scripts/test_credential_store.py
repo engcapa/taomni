@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import tempfile
@@ -34,9 +35,11 @@ class CredentialStoreTest(unittest.TestCase):
             with patch.dict(os.environ, env, clear=True):
                 run.return_value = SimpleNamespace(stdout='probe\n')
                 credential_store.setup(ctx)
-                self.assertIn('--replace', run.call_args_list[0].args[0])
-                self.assertIn('--daemonize', run.call_args_list[0].args[0])
-                self.assertEqual([c.args[0][1] for c in run.call_args_list[1:]], ['store','lookup','clear'])
+                self.assertEqual(run.call_args_list[0].args[0],
+                                 ['dbus-update-activation-environment', 'XDG_DATA_HOME', 'XDG_CONFIG_HOME', 'XDG_CACHE_HOME'])
+                self.assertIn('--replace', run.call_args_list[1].args[0])
+                self.assertIn('--daemonize', run.call_args_list[1].args[0])
+                self.assertEqual([c.args[0][1] for c in run.call_args_list[2:]], ['store','lookup','clear'])
                 run.reset_mock();run.return_value = SimpleNamespace(stdout='wrong')
                 with self.assertRaisesRegex(RuntimeError, 'roundtrip'):
                     credential_store.setup(ctx)
@@ -50,13 +53,17 @@ class CredentialStoreTest(unittest.TestCase):
             env = {**native_isolation_env(ctx.report_root), 'GITHUB_ACTIONS': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'private'}
             store_error = subprocess.CalledProcessError(1, ['secret-tool', 'store'], stderr='collection locked')
             cleanup_error = subprocess.CalledProcessError(1, ['secret-tool', 'clear'])
-            run.side_effect = [SimpleNamespace(stdout=''), store_error, cleanup_error]
-            with patch.dict(os.environ, env, clear=True):
+            run.side_effect = [SimpleNamespace(stdout=''), SimpleNamespace(stdout=''), store_error, cleanup_error]
+            with patch.dict(os.environ, env, clear=True), patch.object(credential_store, 'READINESS_TIMEOUT_SEC', 0):
                 with self.assertRaises(subprocess.CalledProcessError) as caught:
                     credential_store.setup(ctx)
             self.assertIs(caught.exception, store_error)
             self.assertIn('cleanup also failed', caught.exception.__notes__[0])
             self.assertEqual(run.call_args.args[0][1], 'clear')
+            trace = json.loads(next(ctx.report_root.glob('credential-store-readiness/*.json')).read_text())
+            self.assertEqual(trace['status'], 'failed')
+            self.assertEqual(trace['attempts'][0]['failed_operation'], 'store')
+            self.assertEqual(trace['failure']['stderr'], 'collection locked')
 
     def test_failed_cleanup_after_successful_roundtrip_still_fails(self):
         with tempfile.TemporaryDirectory() as directory, \
@@ -66,8 +73,90 @@ class CredentialStoreTest(unittest.TestCase):
             ctx = SimpleNamespace(cfg={'app': {'mode': 'native'}}, report_root=Path(directory))
             env = {**native_isolation_env(ctx.report_root), 'GITHUB_ACTIONS': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'private'}
             cleanup_error = subprocess.CalledProcessError(1, ['secret-tool', 'clear'])
-            run.side_effect = [SimpleNamespace(stdout=''), SimpleNamespace(stdout=''), SimpleNamespace(stdout='probe\n'), cleanup_error]
+            run.side_effect = [SimpleNamespace(stdout=''), SimpleNamespace(stdout=''), SimpleNamespace(stdout=''), SimpleNamespace(stdout='probe\n'), cleanup_error]
             with patch.dict(os.environ, env, clear=True):
                 with self.assertRaises(subprocess.CalledProcessError) as caught:
                     credential_store.setup(ctx)
             self.assertIs(caught.exception, cleanup_error)
+
+    def test_initial_unready_service_requires_a_later_real_roundtrip(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(credential_store.platform, 'system', return_value='Linux'), \
+             patch.object(credential_store.secrets, 'token_hex', return_value='probe-secret'), \
+             patch.object(credential_store.time, 'sleep'), \
+             patch.object(credential_store.subprocess, 'run') as run:
+            ctx = SimpleNamespace(cfg={'app': {'mode': 'native'}}, report_root=Path(directory))
+            env = {**native_isolation_env(ctx.report_root), 'GITHUB_ACTIONS': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'private'}
+            unavailable = subprocess.CalledProcessError(1, ['secret-tool', 'store'], stderr='service unavailable')
+            run.side_effect = [SimpleNamespace(stdout=''), SimpleNamespace(stdout=''), unavailable,
+                               SimpleNamespace(stdout=''), SimpleNamespace(stdout=''),
+                               SimpleNamespace(stdout='probe-secret\n'), SimpleNamespace(stdout='')]
+            with patch.dict(os.environ, env, clear=True):
+                credential_store.setup(ctx)
+            self.assertEqual([call.args[0][1] for call in run.call_args_list[2:]],
+                             ['store', 'clear', 'store', 'lookup', 'clear'])
+            report = next(ctx.report_root.glob('credential-store-readiness/*.json')).read_text()
+            self.assertNotIn('probe-secret', report)
+            trace = json.loads(report)
+            self.assertEqual(trace['status'], 'ready')
+            self.assertEqual([attempt['status'] for attempt in trace['attempts']], ['failed', 'ready'])
+            self.assertEqual(trace['attempts'][0]['failure']['stderr'], 'service unavailable')
+
+    def test_permanently_unavailable_service_fails_at_deadline(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(credential_store.platform, 'system', return_value='Linux'), \
+             patch.object(credential_store.time, 'sleep'), \
+             patch.object(credential_store.time, 'monotonic') as monotonic, \
+             patch.object(credential_store, 'READINESS_TIMEOUT_SEC', 1), \
+             patch.object(credential_store.subprocess, 'run') as run:
+            ctx = SimpleNamespace(cfg={'app': {'mode': 'native'}}, report_root=Path(directory))
+            env = {**native_isolation_env(ctx.report_root), 'GITHUB_ACTIONS': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'private'}
+            now = [0.0]
+            monotonic.side_effect = lambda: now[0]
+            unavailable = subprocess.CalledProcessError(1, ['secret-tool', 'store'], stderr='collection locked')
+
+            def execute(command, **kwargs):
+                if command[0] == 'secret-tool' and command[1] == 'store':
+                    now[0] += 0.75
+                    raise unavailable
+                return SimpleNamespace(stdout='')
+
+            run.side_effect = execute
+            with patch.dict(os.environ, env, clear=True):
+                with self.assertRaises(subprocess.CalledProcessError) as caught:
+                    credential_store.setup(ctx)
+            self.assertIs(caught.exception, unavailable)
+            trace = json.loads(next(ctx.report_root.glob('credential-store-readiness/*.json')).read_text())
+            self.assertEqual(trace['status'], 'failed')
+            self.assertEqual(len(trace['attempts']), 2)
+
+    def test_activation_environment_failure_cannot_start_a_daemon_with_stale_roots(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(credential_store.platform, 'system', return_value='Linux'), \
+             patch.object(credential_store.subprocess, 'run') as run:
+            ctx = SimpleNamespace(cfg={'app': {'mode': 'native'}}, report_root=Path(directory))
+            env = {**native_isolation_env(ctx.report_root), 'GITHUB_ACTIONS': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'private'}
+            failure = subprocess.CalledProcessError(1, ['dbus-update-activation-environment'], stderr='private bus rejected update')
+            run.side_effect = failure
+            with patch.dict(os.environ, env, clear=True):
+                with self.assertRaises(subprocess.CalledProcessError) as caught:
+                    credential_store.setup(ctx)
+            self.assertIs(caught.exception, failure)
+            self.assertEqual(run.call_count, 1)
+            trace = json.loads(next(ctx.report_root.glob('credential-store-readiness/*.json')).read_text())
+            self.assertEqual(trace['failure']['stderr'], 'private bus rejected update')
+
+    def test_diagnostic_write_failure_preserves_the_service_error(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.object(credential_store.platform, 'system', return_value='Linux'), \
+             patch.object(credential_store.subprocess, 'run') as run, \
+             patch.object(Path, 'write_text', side_effect=OSError('disk full')):
+            ctx = SimpleNamespace(cfg={'app': {'mode': 'native'}}, report_root=Path(directory))
+            env = {**native_isolation_env(ctx.report_root), 'GITHUB_ACTIONS': 'true', 'DBUS_SESSION_BUS_ADDRESS': 'private'}
+            failure = subprocess.CalledProcessError(1, ['dbus-update-activation-environment'], stderr='bus unavailable')
+            run.side_effect = failure
+            with patch.dict(os.environ, env, clear=True):
+                with self.assertRaises(subprocess.CalledProcessError) as caught:
+                    credential_store.setup(ctx)
+            self.assertIs(caught.exception, failure)
+            self.assertIn('diagnostics also failed', caught.exception.__notes__[0])
