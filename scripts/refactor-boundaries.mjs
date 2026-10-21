@@ -6,6 +6,8 @@ import ts from "typescript";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // These are implementation modules, not alternate application entry points.
 const boundaries = [
+  ["src/components/rdp/panel", "src/components/rdp/RdpPanel.tsx"],
+  ["src/components/filebrowser/filePanel", "src/components/filebrowser/FilePanel.tsx"],
   ["src/components/filebrowser/browser", "src/components/filebrowser/FileBrowser.tsx"],
   ["src/components/database/schema", "src/components/database/SchemaTree.tsx"],
   ["src/components/screenshot/annotation", "src/components/screenshot/AnnotationCanvas.tsx"],

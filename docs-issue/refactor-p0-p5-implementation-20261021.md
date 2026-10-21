@@ -627,3 +627,16 @@ FileBrowser 1248→373 行、SchemaTree 1247→386 行、AnnotationCanvas 1193�
 - 初期 Rust trait/cfg 遗漏、FileBrowser view 的 props 命名冲突、MFA 闭包 narrowing、basename re-export 和 painting 缓存误留门面均已修复，原失败/主动停止日志保留。修改后重新执行上述最终回归；没有删除断言、提高性能容差或新增搬文件专用测试。
 
 Q 聚合 artifact 已收齐，head 正确、`report_ok=true`、`passed=false`、无 infrastructure errors/gaps；原 macOS 性能失败保留。S 已收齐14份签名/hash/stable identity正确的报告：Linux browser31/native35、macOS browser31/native30、Windows browser31，共158 passed，无失败/跳过；macOS PERF-03 此次 fps_ratio=1.023579244，在原0.85门槛内。Windows native 构建尚在执行，S仍无最终结论，也不以重跑通过替代Q失败记录。剩余结构与最终全量三端验收继续推进。
+
+## 2026-10-22 实施批次 V：配置/会话模型、聊天分支与文件/Git/RDP owner
+
+11 个 Rust 入口拆出 88 个模块：Linux launched capture、relay、LSP 模型、SDK registry、session import、mail 模型、tunnel、QA driver、Agent context、RDP server 与 chat stream。Chat 的共同 preparation 交付同一 owned StreamTurn 给 Claude Code/Codex/普通 provider 分支；原 select、cancel、工具循环、registry 和 guard 的 lifetime 保持。其余模块按模型、持久化、认证、传输、修复和命令职责划分，不复制 session、锁或共享缓存。QA driver include_str 解析到原 pointer/keyboard 资产。
+
+FilePanel 1036→298 行、WorkspaceGitManager 1118→416 行、RdpPanel 1127→208 行；17 个新前端模块最大 RDP connection 512 行。FilePanel interactions 在原非空 pane guard 后创建，未引入条件 hook。Git repositories owner 保留原 live roots/refresh sequence 和晚到结果拒绝；changes/batch/view 分开。RDP connection/input/audio 使用原同一 socket、init ref、heartbeat、frame queue、pressed scancodes 和 composition refs，事件订阅与清理次序保持。
+
+- `v-rust-final-2.log`：lib **1868 passed / 0 failed / 25 ignored**，integration **80 passed / 0 failed**。256 个生产函数（含全部 cfg alternatives）tokens 一致；Chat 的 Claude 28 个、Codex 27 个原 statements、普通 provider 全部原 statements/select/cancel loops 与共同 preparation 对照一致，仅新增 owned dispatch 组合。
+- `v-ui-tests.log`：5 files / **81 passed**；`v-build-final.log` 完整类型检查和 production build 成功。761/328/39 契约、727 implementation modules 边界检查通过；3 个前端公共 API、24 个原声明和 top-level effects 一致（除 UI owner 提取与无渲染意义 JSX 缩进）。清单 3375 项，全部新增/修改实现≤800行。
+- `browser-v/run-20261022-040649-326138930`：单 worker、带一次性 Docker SSH fixture，**13 passed / 0 failed / 0 skipped**。覆盖 SFTP 打开/导航/过滤/排序/布局/传输控制/跨窗格拖放/创建目录/隐藏重开、RDP 面板与多仓库 Git diff 切换/过时结果和工具窗口。receipt 签名、summary hash、stable identity 已核验；summary SHA256 `9181ae596b9229b179df6f692d08ea60f0bcfb1fd1d5245d4f946f1b27e1abb4`，source identity `8d6cf479c19e42afc212e17c6e9512b428bc98ce1a82735d3eacb420aafd3d65`。
+- include_str 相对路径、Rust trait imports、FilePanel re-export 与 RdpStore 私有类型依赖遗漏已修，原失败日志保留。复用原有行为测试，没有删除断言或放宽性能门槛；native 系统副作用仍须最终三端验证。
+
+S selected 三端运行的 Windows release 构建已完成，四个 Windows native shard 正在执行；尚无完整 aggregate 结论。整体继续处理余下大文件及最终完整 SHA 的全量回归。

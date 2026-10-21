@@ -1,97 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import {
-  Bot,
-  Fullscreen,
-  Minimize2,
-  PictureInPicture,
-  PictureInPicture2,
-  RefreshCw,
-} from "lucide-react";
-
-import {
-  applyExtended,
-  encodeAck,
-  encodeKey,
-  encodePing,
-  encodePointer,
-  encodeRefresh,
-  encodeResize,
-  encodeWheel,
-  extractRdpCertificateChallenge,
-  formatRdpCertificateFingerprint,
-  isRetryableRdpConnectError,
-  keyEventToScancode,
-  mouseButtonMask,
-  normalizeRdpResizeSize,
-  OUT_AUDIO,
-  OUT_CURSOR,
-  OUT_FRAME,
-  OUT_FRAME_END,
-  parseAudioFrame,
-  parseFrameTile,
-  parseRdpCursorFrame,
-  parseRdpWsText,
-  rdpConnect,
-  rdpDisconnect,
-  RdpFrameBatchBuffer,
-  type RdpFrameTile,
-  rdpCursorToCss,
-  rdpTrustCertificate,
-  wheelDeltaToRotationUnits,
-  ctrlAltDelSequence,
-  type RdpNetworkInfo,
-} from "../../lib/rdp";
-import { RdpConnectionBar } from "./RdpConnectionBar";
-import { useRdpStore } from "../../stores/rdpStore";
-import type { RdpOptions } from "../../types/rdp";
-import { useT, t as tr } from "../../lib/i18n";
+import { Fullscreen, Minimize2 } from "lucide-react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useT } from "../../lib/i18n";
+import { type RdpNetworkInfo } from "../../lib/rdp";
 import { isTauriRuntime } from "../../lib/runtime";
-import {
-  readFiles as readClipboardFiles,
-  readText as readClipboardText,
-  writeFiles as writeClipboardFiles,
-  writeText as writeClipboardText,
-} from "../../lib/clipboard";
-import { ScreenshotMenuButton } from "../screenshot/ScreenshotMenuButton";
-import { TabActions } from "../tabbar/TabActionSlot";
-import {
-  FT_BUTTON_STYLE,
-  FT_BUTTON_ACTIVE_OVERRIDE,
-  FT_ICON_BUTTON_STYLE,
-  FT_SEPARATOR_STYLE,
-} from "../floating-toolbar/floatingToolbarStyles";
-import { confirmAppDialog } from "../../lib/appDialogs";
-
-export interface RdpPanelProps {
-  tabId: string;
-  host: string;
-  port: number;
-  username?: string | null;
-  password?: string;
-  options: RdpOptions;
-  networkSettingsJson?: string | null;
-  visible: boolean;
-  /** Callback for the toolbar Detach button. When undefined, the button
-   *  is hidden — used by the detached window itself, which should show
-   *  Reattach instead. */
-  onDetach?: () => void;
-  /** When set, the toolbar shows an AI-chat toggle bound to this tab.
-   *  Hidden in detached windows (no ChatDrawer lives there). */
-  chatToggle?: {
-    open: boolean;
-    onToggle: () => void;
-  };
-  detachedWindowControls?: {
-    onReattach: () => void;
-    onToggleOsFullscreen: () => void;
-    osFullscreen: boolean;
-  };
-}
-
-type ScaleMode = "fit" | "one";
-// View state for the single "enlarge" button: normal <-> OS fullscreen.
-type ViewMode = "normal" | "fullscreen";
+import { useRdpStore } from "../../stores/rdpStore";
+import { RdpPanelView } from "./panel/RdpPanelView";
+import { type RdpPanelProps, type ScaleMode, type ViewMode } from "./panel/types";
+import { useRdpAudio } from "./panel/useRdpAudio";
+import { useRdpConnection } from "./panel/useRdpConnection";
+import { useRdpInput } from "./panel/useRdpInput";
 
 export default function RdpPanel({
   tabId,
@@ -111,23 +29,6 @@ export default function RdpPanel({
   const containerRef = useRef<HTMLDivElement>(null);
   const imeInputRef = useRef<HTMLTextAreaElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const sessionIdRef = useRef<string | null>(null);
-  const heartbeatRef = useRef<number | null>(null);
-  const reconnectTimerRef = useRef<number | null>(null);
-  const reconnectAttemptsRef = useRef(0);
-  const connectedAtRef = useRef(0);
-  const retryAllowedRef = useRef(true);
-  const audioRef = useRef<{ ctx: AudioContext; nextTime: number } | null>(null);
-  const lastResizeRequestRef = useRef<string | null>(null);
-  const destroyedRef = useRef(false);
-  const certificatePromptRef = useRef(false);
-  const reconnectRef = useRef<() => void>(() => {});
-  const visibleRef = useRef(visible);
-  const suppressNextPasteKeyUpRef = useRef(false);
-  const pressedScancodesRef = useRef(new Set<number>());
-  const frameBatchRef = useRef(new RdpFrameBatchBuffer());
-  const composingRef = useRef(false);
   const initRef = useRef({ host, port, username, password, options, networkSettingsJson });
   const [scaleMode, setScaleMode] = useState<ScaleMode>("fit");
   const [remoteCursorCss, setRemoteCursorCss] = useState("default");
@@ -142,443 +43,28 @@ export default function RdpPanel({
 
   const store = useRdpStore();
   const conn = store.connections[tabId];
-
-  const clearReconnectTimer = useCallback(() => {
-    if (reconnectTimerRef.current !== null) {
-      window.clearTimeout(reconnectTimerRef.current);
-      reconnectTimerRef.current = null;
-    }
-  }, []);
-
-  const handleAutomaticReconnect = useCallback(
-    (reason: string): boolean => {
-      if (destroyedRef.current || certificatePromptRef.current || !retryAllowedRef.current) {
-        return false;
-      }
-      if (reconnectTimerRef.current !== null) return true;
-      if (reconnectAttemptsRef.current >= 3) {
-        store.setDisconnected(tabId, reason);
-        return true;
-      }
-
-      reconnectAttemptsRef.current += 1;
-      const attempt = reconnectAttemptsRef.current;
-      const delay = 500 * 2 ** (attempt - 1);
-      store.initConnection(tabId);
-      store.setStage(tabId, t("rdp.autoReconnect", { attempt }));
-      reconnectTimerRef.current = window.setTimeout(() => {
-        reconnectTimerRef.current = null;
-        if (!destroyedRef.current) reconnectRef.current();
-      }, delay);
-      return true;
-    },
-    [store, t, tabId],
-  );
-
-  /* ── Send helpers ────────────────────────────────────────────────── */
-
-  const sendBinary = useCallback((data: ArrayBuffer) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(data);
-    }
-  }, []);
-
-  const sendText = useCallback((data: unknown) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.send(JSON.stringify(data));
-    }
-  }, []);
-
-  const releaseRemoteInput = useCallback(() => {
-    pressedScancodesRef.current.clear();
-    suppressNextPasteKeyUpRef.current = false;
-    sendText({ type: "release_input" });
-  }, [sendText]);
-
-  const sendRemoteResize = useCallback(
-    (width: number, height: number, force = false) => {
-      const size = normalizeRdpResizeSize(width, height);
-      if (!size) return;
-      const key = `${size.width}x${size.height}`;
-      if (!force && lastResizeRequestRef.current === key) return;
-      lastResizeRequestRef.current = key;
-      sendBinary(encodeResize(size.width, size.height));
-    },
-    [sendBinary],
-  );
-
-  const requestViewportResize = useCallback(
-    (force = false) => {
-      const viewport = viewportRef.current;
-      if (!viewport) return;
-      const rect = viewport.getBoundingClientRect();
-      sendRemoteResize(rect.width, rect.height, force);
-    },
-    [sendRemoteResize],
-  );
-
-  const closeAudio = useCallback(() => {
-    const audio = audioRef.current;
-    audioRef.current = null;
-    if (audio) {
-      void audio.ctx.close().catch(() => {});
-    }
-  }, []);
-
-  const playAudioFrame = useCallback((frame: ReturnType<typeof parseAudioFrame>) => {
-    if (!frame || initRef.current.options.redirectAudio !== "play") return;
-    if (frame.channels < 1 || frame.channels > 2 || frame.bitsPerSample !== 16) return;
-
-    const AudioContextCtor =
-      typeof AudioContext !== "undefined"
-        ? AudioContext
-        : (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AudioContextCtor) return;
-
-    let audio = audioRef.current;
-    if (!audio || audio.ctx.state === "closed") {
-      audio = { ctx: new AudioContextCtor({ sampleRate: frame.sampleRate }), nextTime: 0 };
-      audioRef.current = audio;
-    }
-    if (audio.ctx.state === "suspended") {
-      void audio.ctx.resume().catch(() => {});
-    }
-
-    const bytesPerSample = frame.bitsPerSample / 8;
-    const frameSize = bytesPerSample * frame.channels;
-    const sampleCount = Math.floor(frame.pcm.byteLength / frameSize);
-    if (sampleCount <= 0) return;
-
-    const buffer = audio.ctx.createBuffer(frame.channels, sampleCount, frame.sampleRate);
-    const view = new DataView(frame.pcm.buffer, frame.pcm.byteOffset, frame.pcm.byteLength);
-    for (let i = 0; i < sampleCount; i += 1) {
-      for (let ch = 0; ch < frame.channels; ch += 1) {
-        const offset = i * frameSize + ch * bytesPerSample;
-        buffer.getChannelData(ch)[i] = view.getInt16(offset, true) / 32768;
-      }
-    }
-
-    const source = audio.ctx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(audio.ctx.destination);
-    const startAt = Math.max(audio.nextTime, audio.ctx.currentTime + 0.02);
-    source.start(startAt);
-    audio.nextTime = startAt + buffer.duration;
-  }, []);
-
-  /* ── Connect lifecycle ───────────────────────────────────────────── */
-
-  const doConnect = useCallback(() => {
-    const args = initRef.current;
-    destroyedRef.current = false;
-    lastResizeRequestRef.current = null;
-    retryAllowedRef.current = true;
-    frameBatchRef.current.reset();
-    setRemoteCursorCss("default");
-    store.initConnection(tabId);
-
-    let cancelled = false;
-    (async () => {
-      try {
-        const result = await rdpConnect(
-          args.host,
-          args.port,
-          args.username,
-          args.password,
-          args.options,
-          args.networkSettingsJson ?? null,
-        );
-        if (cancelled || destroyedRef.current) {
-          rdpDisconnect(result.session_id).catch(() => {});
-          return;
-        }
-        sessionIdRef.current = result.session_id;
-        store.setConnecting(tabId, result.session_id, result.ws_port);
-
-        const ws = new WebSocket(`ws://127.0.0.1:${result.ws_port}`, [
-          `taomni-rdp.${result.ws_token}`,
-        ]);
-        ws.binaryType = "arraybuffer";
-        wsRef.current = ws;
-
-        ws.onopen = () => {
-          if (heartbeatRef.current !== null) {
-            window.clearInterval(heartbeatRef.current);
-          }
-          heartbeatRef.current = window.setInterval(() => {
-            sendBinary(encodePing());
-          }, 15000);
-        };
-
-        ws.onmessage = (event) => {
-          if (destroyedRef.current || wsRef.current !== ws) return;
-          if (event.data instanceof ArrayBuffer) {
-            const dv = new DataView(event.data);
-            if (event.data.byteLength === 0) return;
-            const tag = dv.getUint8(0);
-            if (tag === OUT_FRAME) {
-              const tile = parseFrameTile(event.data);
-              const canvas = canvasRef.current;
-              frameBatchRef.current.push(tile, canvas?.width ?? 0, canvas?.height ?? 0);
-            } else if (tag === OUT_FRAME_END) {
-              const batch = frameBatchRef.current.finish();
-              if (batch.refreshRequired) {
-                sendBinary(encodeRefresh());
-                return;
-              }
-              drawTileBatch(canvasRef.current, batch.tiles);
-              if (visibleRef.current) sendBinary(encodeAck());
-            } else if (tag === OUT_AUDIO) {
-              playAudioFrame(parseAudioFrame(event.data));
-            } else if (tag === OUT_CURSOR) {
-              const cursor = parseRdpCursorFrame(event.data);
-              if (cursor) setRemoteCursorCss(rdpCursorToCss(cursor));
-            }
-          } else {
-            const msg = parseRdpWsText(event.data as string);
-            if (!msg) return;
-            switch (msg.type) {
-              case "connected":
-                connectedAtRef.current = Date.now();
-                retryAllowedRef.current = true;
-                setNetwork(null);
-                store.setConnected(tabId, msg.width, msg.height, msg.protocol, msg.server_name);
-                frameBatchRef.current.reset();
-                resizeCanvas(canvasRef.current, msg.width, msg.height);
-                window.setTimeout(() => requestViewportResize(false), 0);
-                // Nudge the server to repaint the whole desktop shortly after
-                // we (re)connect. Windows often hands us a stale framebuffer
-                // across the logon→desktop transition; a Refresh Rect request
-                // forces a fresh paint so the canvas is never stuck on the
-                // pre-login image.
-                window.setTimeout(() => sendBinary(encodeRefresh()), 400);
-                break;
-              case "disconnected":
-                store.setDisconnected(tabId, msg.reason);
-                break;
-              case "status":
-                store.setStage(tabId, msg.stage);
-                break;
-              case "network":
-                setNetwork({
-                  baseRttMs: msg.baseRttMs ?? null,
-                  averageRttMs: msg.averageRttMs,
-                  bandwidthKbps: msg.bandwidthKbps ?? null,
-                });
-                break;
-              case "error":
-                {
-                  const challenge = extractRdpCertificateChallenge(msg.message);
-                  if (certificatePromptRef.current) break;
-                  if (!challenge) {
-                    retryAllowedRef.current = msg.retryable === true;
-                    store.setDisconnected(tabId, msg.message);
-                    // The native worker has ended, but its relay can stay
-                    // open awaiting controls. Release it explicitly so the
-                    // close handler cleans up and applies the bounded retry
-                    // policy instead of leaving a transient error stranded.
-                    ws.close();
-                    break;
-                  }
-                  retryAllowedRef.current = false;
-                  clearReconnectTimer();
-                  certificatePromptRef.current = true;
-                  store.setStage(tabId, "certificate-review");
-                  void (async () => {
-                    const fingerprint = formatRdpCertificateFingerprint(challenge.observed);
-                    const confirmed = await confirmAppDialog({
-                      title: t(
-                        challenge.changed
-                          ? "rdp.certificateChangedTitle"
-                          : "rdp.certificateTrustTitle",
-                      ),
-                      message: t(
-                        challenge.changed
-                          ? "rdp.certificateChangedMessage"
-                          : "rdp.certificateTrustMessage",
-                        {
-                          host: challenge.host,
-                          port: challenge.port,
-                          fingerprint,
-                        },
-                      ),
-                      confirmLabel: t("rdp.certificateTrustConfirm"),
-                      danger: challenge.changed,
-                    });
-                    if (!confirmed || destroyedRef.current) {
-                      certificatePromptRef.current = false;
-                      store.setDisconnected(tabId, t("rdp.certificateTrustDeclined"));
-                      return;
-                    }
-                    try {
-                      await rdpTrustCertificate(
-                        challenge.host,
-                        challenge.port,
-                        challenge.observed,
-                      );
-                      const oldSession = sessionIdRef.current;
-                      sessionIdRef.current = null;
-                      if (oldSession) await rdpDisconnect(oldSession).catch(() => {});
-                      const currentWs = wsRef.current;
-                      wsRef.current = null;
-                      currentWs?.close();
-                      reconnectAttemptsRef.current = 0;
-                      certificatePromptRef.current = false;
-                      window.setTimeout(() => reconnectRef.current(), 0);
-                    } catch (err) {
-                      certificatePromptRef.current = false;
-                      store.setDisconnected(tabId, String(err));
-                    }
-                  })();
-                }
-                break;
-              case "clipboard":
-                void writeClipboardText(msg.text).catch((err) => {
-                  console.warn("[rdp.clip] write local clipboard failed:", err);
-                });
-                break;
-              case "clipboard_files":
-                void writeClipboardFiles(msg.paths).catch((err) => {
-                  console.warn("[rdp.clip] write local file clipboard failed:", err);
-                  if ("text" in msg && typeof msg.text === "string") {
-                    void writeClipboardText(msg.text).catch(() => {});
-                  }
-                });
-                break;
-            }
-          }
-        };
-
-        ws.onclose = () => {
-          if (wsRef.current !== ws) return;
-          closeAudio();
-          pressedScancodesRef.current.clear();
-          wsRef.current = null;
-          if (heartbeatRef.current !== null) {
-            window.clearInterval(heartbeatRef.current);
-            heartbeatRef.current = null;
-          }
-          const sid = sessionIdRef.current;
-          sessionIdRef.current = null;
-          if (sid) void rdpDisconnect(sid).catch(() => {});
-          if (connectedAtRef.current > 0 && Date.now() - connectedAtRef.current >= 30_000) {
-            reconnectAttemptsRef.current = 0;
-          }
-          connectedAtRef.current = 0;
-          if (destroyedRef.current || certificatePromptRef.current) return;
-          const reason = tr("rdp.closedConnection");
-          if (!retryAllowedRef.current) return;
-          if (!handleAutomaticReconnect(reason)) store.setDisconnected(tabId, reason);
-        };
-        ws.onerror = () => {
-          if (!destroyedRef.current && wsRef.current === ws) {
-            store.setStage(tabId, "websocket-error");
-          }
-        };
-      } catch (err) {
-        if (!cancelled && !destroyedRef.current) {
-          const reason = String(err);
-          retryAllowedRef.current = isRetryableRdpConnectError(err);
-          if (!handleAutomaticReconnect(reason)) store.setDisconnected(tabId, reason);
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    clearReconnectTimer,
-    closeAudio,
-    handleAutomaticReconnect,
-    playAudioFrame,
-    requestViewportResize,
-    sendBinary,
+  const audio = useRdpAudio({
+    initRef,
+  });
+  const connection = useRdpConnection({
+    visible,
     store,
     tabId,
-  ]);
-
-  reconnectRef.current = doConnect;
-
-  useEffect(() => {
-    initRef.current = { host, port, username, password, options, networkSettingsJson };
-    let cancel: (() => void) | undefined;
-    const t = window.setTimeout(() => {
-      cancel = doConnect();
-    }, 0);
-    return () => {
-      window.clearTimeout(t);
-      cancel?.();
-      destroyedRef.current = true;
-      clearReconnectTimer();
-      if (heartbeatRef.current !== null) {
-        window.clearInterval(heartbeatRef.current);
-        heartbeatRef.current = null;
-      }
-      closeAudio();
-      releaseRemoteInput();
-      frameBatchRef.current.reset();
-      const sid = sessionIdRef.current;
-      sessionIdRef.current = null;
-      if (sid) rdpDisconnect(sid).catch(() => {});
-      const currentWs = wsRef.current;
-      wsRef.current = null;
-      currentWs?.close();
-      store.removeConnection(tabId);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    visibleRef.current = visible;
-    if (!visible) releaseRemoteInput();
-  }, [releaseRemoteInput, visible]);
-
-  useEffect(() => {
-    const release = () => releaseRemoteInput();
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "hidden") release();
-    };
-    window.addEventListener("blur", release);
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => {
-      window.removeEventListener("blur", release);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [releaseRemoteInput]);
-
-  /* ── Input handlers ──────────────────────────────────────────────── */
-
-  const syncClipboardForRemotePaste = useCallback(async () => {
-    const files = await readClipboardFiles().catch((err) => {
-      console.warn("[rdp.clip] read local file clipboard failed:", err);
-      return [];
-    });
-    if (files.length > 0) {
-      sendText({ type: "clipboard_files", paths: files });
-      window.setTimeout(() => {
-        sendBinary(encodeKey(true, 0x1d)); // Ctrl
-        sendBinary(encodeKey(true, 0x2f)); // V
-        sendBinary(encodeKey(false, 0x2f));
-        sendBinary(encodeKey(false, 0x1d));
-      }, 40);
-      return;
-    }
-
-    const text = await readClipboardText().catch((err) => {
-      console.warn("[rdp.clip] read local clipboard failed:", err);
-      return "";
-    });
-    if (!text) return;
-
-    sendText({ type: "clipboard", text });
-    window.setTimeout(() => {
-      sendBinary(encodeKey(true, 0x1d)); // Ctrl
-      sendBinary(encodeKey(true, 0x2f)); // V
-      sendBinary(encodeKey(false, 0x2f));
-      sendBinary(encodeKey(false, 0x1d));
-    }, 40);
-  }, [sendBinary, sendText]);
+    t,
+    viewportRef,
+    initRef,
+    setRemoteCursorCss,
+    canvasRef,
+    audio,
+    setNetwork,
+    host,
+    port,
+    username,
+    password,
+    options,
+    networkSettingsJson,
+    conn,
+  });
 
   /* ── View controls (local, never forwarded to the remote) ────────── */
 
@@ -613,7 +99,7 @@ export default function RdpPanel({
           // resolves; re-sync the remote desktop to the new viewport so the
           // RDP session repaints at the full screen size instead of the stale
           // work-area size.
-          window.setTimeout(() => requestViewportResize(true), 120);
+          window.setTimeout(() => connection.requestViewportResize(true), 120);
         } catch {
           /* window API unavailable — ignore */
         }
@@ -627,184 +113,29 @@ export default function RdpPanel({
           await document.documentElement.requestFullscreen();
           setOsFullscreen(true);
         }
-        window.setTimeout(() => requestViewportResize(true), 120);
+        window.setTimeout(() => connection.requestViewportResize(true), 120);
       } catch {
         /* fullscreen request rejected — ignore */
       }
     })();
-  }, [detachedWindowControls, requestViewportResize]);
-
-  const onKey = useCallback(
-    (down: boolean) => (e: React.KeyboardEvent<HTMLDivElement>) => {
-      if (!visible || conn?.status !== "connected") return;
-      const code = e.nativeEvent.code;
-
-      if (composingRef.current || e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) {
-        e.preventDefault();
-        return;
-      }
-
-      // Local view shortcuts intercepted before reaching the remote desktop:
-      //   F11 → toggle host-window OS fullscreen
-      //   Ctrl+Alt+Home → show the full-screen connection bar (mstsc)
-      if (code === "F11") {
-        e.preventDefault();
-        if (down && !e.nativeEvent.repeat) toggleOsFullscreen();
-        return;
-      }
-      const fullscreen = detachedWindowControls?.osFullscreen ?? osFullscreen;
-      if (fullscreen && code === "Home" && e.ctrlKey && e.altKey) {
-        e.preventDefault();
-        if (down) setBarReveal((n) => n + 1);
-        return;
-      }
-
-      if (!down && suppressNextPasteKeyUpRef.current && code === "KeyV") {
-        suppressNextPasteKeyUpRef.current = false;
-        e.preventDefault();
-        return;
-      }
-      if (down && (e.ctrlKey || e.metaKey) && code === "KeyV") {
-        e.preventDefault();
-        suppressNextPasteKeyUpRef.current = true;
-        void syncClipboardForRemotePaste();
-        return;
-      }
-      const sc = keyEventToScancode(e.nativeEvent);
-      if (!sc) return;
-      e.preventDefault();
-      const wireScancode = applyExtended(sc.scancode, sc.extended);
-      if (down) pressedScancodesRef.current.add(wireScancode);
-      else pressedScancodesRef.current.delete(wireScancode);
-      sendBinary(encodeKey(down, wireScancode));
-    },
-    [
-      conn?.status,
-      detachedWindowControls?.osFullscreen,
-      osFullscreen,
-      sendBinary,
-      syncClipboardForRemotePaste,
-      toggleOsFullscreen,
-      visible,
-    ],
-  );
-
-  const sendCtrlAltDel = useCallback(() => {
-    for (const [down, scancode] of ctrlAltDelSequence()) {
-      sendBinary(encodeKey(down, scancode));
-    }
-  }, [sendBinary]);
+  }, [detachedWindowControls, connection.requestViewportResize]);
 
   const minimizeWindow = useCallback(() => {
     if (!isTauriRuntime()) return;
     void getCurrentWindow()
       .minimize()
-      .catch(() => {});
+      .catch(() => { });
   }, []);
-
-  const onCompositionEnd = useCallback(
-    (e: React.CompositionEvent<HTMLTextAreaElement>) => {
-      composingRef.current = false;
-      const text = e.data;
-      e.currentTarget.value = "";
-      if (!text || !visible || conn?.status !== "connected") return;
-      const characters = Array.from(text);
-      for (let offset = 0; offset < characters.length; offset += 1024) {
-        sendText({ type: "unicode", text: characters.slice(offset, offset + 1024).join("") });
-      }
-    },
-    [conn?.status, sendText, visible],
-  );
-
-  const onPointer = useCallback(
-    (e: React.PointerEvent<HTMLCanvasElement>) => {
-      if (!visible || conn?.status !== "connected") return;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      const { x, y } = canvasPointFromClient(canvas, e.clientX, e.clientY);
-      sendBinary(encodePointer(x, y, mouseButtonMask(e.nativeEvent)));
-    },
-    [conn?.status, sendBinary, visible],
-  );
-
-  const onWheel = useCallback(
-    (e: React.WheelEvent<HTMLCanvasElement>) => {
-      if (!visible || conn?.status !== "connected") return;
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-      e.preventDefault();
-      const { x, y } = canvasPointFromClient(canvas, e.clientX, e.clientY);
-
-      const verticalUnits = wheelDeltaToRotationUnits(e.deltaY, e.deltaMode);
-      if (verticalUnits !== 0) {
-        sendBinary(encodeWheel(x, y, -verticalUnits, true));
-      }
-
-      const horizontalUnits = wheelDeltaToRotationUnits(e.deltaX, e.deltaMode);
-      if (horizontalUnits !== 0) {
-        sendBinary(encodeWheel(x, y, horizontalUnits, false));
-      }
-    },
-    [conn?.status, sendBinary, visible],
-  );
-
-  useEffect(() => {
-    if (!visible || conn?.status !== "connected") return;
-    const viewport = viewportRef.current;
-    if (!viewport || typeof ResizeObserver === "undefined") return;
-
-    let timer: number | null = null;
-    const observer = new ResizeObserver(() => {
-      if (timer !== null) {
-        window.clearTimeout(timer);
-      }
-      timer = window.setTimeout(() => requestViewportResize(false), 300);
-    });
-    observer.observe(viewport);
-    requestViewportResize(false);
-
-    return () => {
-      observer.disconnect();
-      if (timer !== null) {
-        window.clearTimeout(timer);
-      }
-    };
-  }, [conn?.status, requestViewportResize, visible]);
-
-  const reconnect = useCallback(() => {
-    clearReconnectTimer();
-    reconnectAttemptsRef.current = 0;
-    connectedAtRef.current = 0;
-    const sid = sessionIdRef.current;
-    sessionIdRef.current = null;
-    if (sid) rdpDisconnect(sid).catch(() => {});
-    const currentWs = wsRef.current;
-    wsRef.current = null;
-    currentWs?.close();
-    closeAudio();
-    store.setDisconnected(tabId);
-    doConnect();
-  }, [clearReconnectTimer, closeAudio, doConnect, store, tabId]);
-
-  // Connection bar "disconnect": end the session without an automatic
-  // reconnect; the tab stays open and Reconnect starts a new session. A
-  // user-chosen disconnect is not an error, so no reason is recorded.
-  const disconnectSession = useCallback(() => {
-    clearReconnectTimer();
-    retryAllowedRef.current = false;
-    const sid = sessionIdRef.current;
-    sessionIdRef.current = null;
-    if (sid) rdpDisconnect(sid).catch(() => {});
-    const currentWs = wsRef.current;
-    wsRef.current = null;
-    currentWs?.close();
-    if (heartbeatRef.current !== null) {
-      window.clearInterval(heartbeatRef.current);
-      heartbeatRef.current = null;
-    }
-    closeAudio();
-    store.setDisconnected(tabId);
-  }, [clearReconnectTimer, closeAudio, store, tabId]);
+  const input = useRdpInput({
+    connection,
+    visible,
+    conn,
+    toggleOsFullscreen,
+    detachedWindowControls,
+    osFullscreen,
+    setBarReveal,
+    canvasRef,
+  });
 
   /* ── Render ──────────────────────────────────────────────────────── */
 
@@ -841,287 +172,37 @@ export default function RdpPanel({
       ? { icon: <Minimize2 size={14} />, label: t("rdp.restore"), hint: " (F11)" }
       : { icon: <Fullscreen size={14} />, label: t("rdp.osFullscreen"), hint: " (F11)" };
 
-  return (
-    <div
-      ref={containerRef}
-      className="rdp-panel"
-      data-testid="rdp-panel"
-      tabIndex={0}
-      onKeyDown={onKey(true)}
-      onKeyUp={onKey(false)}
-      onBlur={(e) => {
-        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) releaseRemoteInput();
-      }}
-      style={{
-        outline: "none",
-        position: "relative",
-        width: "100%",
-        height: "100%",
-        background: "#000",
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
-      <TabActions active={visible}>
-        <span
-          data-testid="rdp-status"
-          style={{
-            fontSize: 11,
-            color: "#ddd",
-            padding: "0 6px",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
-            whiteSpace: "nowrap",
-          }}
-        >
-          {t(`rdp.status.${status}`)}
-          {protocol && <span style={{ opacity: 0.65 }}>· {protocol}</span>}
-          {dims && <span style={{ opacity: 0.65 }}>· {dims}</span>}
-          {showStage && <span style={{ opacity: 0.45 }}>· {stage}</span>}
-        </span>
-        <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
-        {/* Action group — operations on the live session. */}
-        <button
-          type="button"
-          data-testid="rdp-reconnect"
-          onClick={reconnect}
-          title={t("rdp.reconnect")}
-          aria-label={t("rdp.reconnect")}
-          style={FT_ICON_BUTTON_STYLE}
-        >
-          <RefreshCw size={14} />
-        </button>
-        <button
-          type="button"
-          data-testid="rdp-ctrl-alt-del"
-          onClick={sendCtrlAltDel}
-          disabled={status !== "connected"}
-          title={t("rdp.ctrlAltDel")}
-          aria-label={t("rdp.ctrlAltDel")}
-          style={FT_BUTTON_STYLE}
-        >
-          Ctrl+Alt+Del
-        </button>
-        {chatToggle && (
-          <button
-            type="button"
-            data-testid="rdp-chat-toggle"
-            onClick={chatToggle.onToggle}
-            title={chatToggle.open ? t("terminal.chatFloatingTitleClose") : t("terminal.chatFloatingTitleOpen")}
-            aria-label={chatToggle.open ? t("terminal.chatFloatingLabelClose") : t("terminal.chatFloatingLabelOpen")}
-            style={{
-              ...FT_ICON_BUTTON_STYLE,
-              ...(chatToggle.open ? FT_BUTTON_ACTIVE_OVERRIDE : {}),
-            }}
-          >
-            <Bot size={14} />
-          </button>
-        )}
-        {onDetach && (
-          <button
-            type="button"
-            data-testid="rdp-detach"
-            onClick={onDetach}
-            title={t("rdp.detach")}
-            aria-label={t("rdp.detach")}
-            style={FT_ICON_BUTTON_STYLE}
-          >
-            <PictureInPicture2 size={14} />
-          </button>
-        )}
-        <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
-        {/* View group — how the desktop is scaled and sized. The remote
-            desktop auto-resizes to the viewport on its own (ResizeObserver
-            below), so there is no manual resize button: scale toggle picks
-            fit-vs-1:1, the view button toggles OS fullscreen. */}
-        <button
-          type="button"
-          data-testid="rdp-scale-toggle"
-          onClick={() => setScaleMode((m) => (m === "fit" ? "one" : "fit"))}
-          title={scaleMode === "fit" ? t("rdp.scaleOne") : t("rdp.scaleFit")}
-          style={FT_BUTTON_STYLE}
-        >
-          {scaleMode === "fit" ? t("rdp.scaleOne") : t("rdp.scaleFit")}
-        </button>
-        <button
-          type="button"
-          data-testid="rdp-view-cycle"
-          onClick={cycleView}
-          title={`${cycle.label}${cycle.hint}`}
-          aria-label={cycle.label}
-          style={FT_ICON_BUTTON_STYLE}
-        >
-          {cycle.icon}
-        </button>
-        {detachedWindowControls && (
-          <>
-            <ScreenshotMenuButton />
-            <span style={FT_SEPARATOR_STYLE} aria-hidden="true" />
-            <button
-              type="button"
-              data-testid="detached-reattach"
-              onClick={detachedWindowControls.onReattach}
-              title={t("rdp.reattach")}
-              aria-label={t("rdp.reattach")}
-              style={FT_BUTTON_STYLE}
-            >
-              <PictureInPicture size={14} />
-              <span>{t("rdp.reattach")}</span>
-            </button>
-          </>
-        )}
-      </TabActions>
-
-      {currentFullscreen && visible && status === "connected" && (
-        <RdpConnectionBar
-          title={conn?.serverName || host}
-          network={network}
-          revealSignal={barReveal}
-          onCtrlAltDel={sendCtrlAltDel}
-          onMinimize={minimizeWindow}
-          onRestore={toggleOsFullscreen}
-          onDisconnect={() => {
-            disconnectSession();
-            toggleOsFullscreen();
-          }}
-        />
-      )}
-
-      <div
-        ref={viewportRef}
-        style={{
-          flex: 1,
-          background: "#000",
-          width: "100%",
-          minHeight: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          overflow: scaleMode === "one" ? "auto" : "hidden",
-        }}
-      >
-        <canvas
-          ref={canvasRef}
-          className={canvasClass}
-          data-testid="rdp-canvas"
-          // The connected handler owns framebuffer dimensions. React must not
-          // assign them again after the first resized frame has been drawn:
-          // even an identical canvas dimension assignment clears its pixels.
-          width={1920}
-          height={1080}
-          onPointerMove={onPointer}
-          onPointerDown={(e) => {
-            imeInputRef.current?.focus({ preventScroll: true });
-            onPointer(e);
-          }}
-          onPointerUp={onPointer}
-          onPointerCancel={() => releaseRemoteInput()}
-          onWheel={onWheel}
-          onContextMenu={(e) => e.preventDefault()}
-          style={{
-            maxWidth: scaleMode === "fit" ? "100%" : undefined,
-            maxHeight: scaleMode === "fit" ? "100%" : undefined,
-            imageRendering: "pixelated",
-            background: "#000",
-            // IronRDP forwards the server-provided shape, while the WebView
-            // moves this local cursor immediately without waiting for a remote
-            // framebuffer update.
-            cursor: status === "connected" ? remoteCursorCss : "default",
-          }}
-        />
-        <textarea
-          ref={imeInputRef}
-          tabIndex={-1}
-          aria-label={t("rdp.imeInput")}
-          autoCapitalize="off"
-          autoCorrect="off"
-          spellCheck={false}
-          onCompositionStart={() => {
-            composingRef.current = true;
-          }}
-          onCompositionEnd={onCompositionEnd}
-          onInput={(e) => {
-            if (!composingRef.current) e.currentTarget.value = "";
-          }}
-          onPaste={(e) => e.preventDefault()}
-          style={{
-            position: "absolute",
-            width: 1,
-            height: 1,
-            opacity: 0,
-            pointerEvents: "none",
-            insetInlineStart: 0,
-            bottom: 0,
-            padding: 0,
-            border: 0,
-          }}
-        />
-      </div>
-
-      {status !== "connected" && (
-        <div
-          className="rdp-overlay"
-          style={{
-            position: "absolute",
-            inset: 0,
-            background: "rgba(0,0,0,0.4)",
-            color: "#fff",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            pointerEvents: "none",
-            fontSize: 14,
-          }}
-        >
-          {status === "connecting" && t("rdp.connecting")}
-          {status === "disconnected" && t("rdp.disconnected")}
-          {status === "error" && (conn?.error ?? t("rdp.errorGeneric"))}
-        </div>
-      )}
-    </div>
-  );
+  return <RdpPanelView
+    containerRef={containerRef}
+    input={input}
+    connection={connection}
+    visible={visible}
+    t={t}
+    status={status}
+    protocol={protocol}
+    dims={dims}
+    showStage={showStage}
+    stage={stage}
+    chatToggle={chatToggle}
+    onDetach={onDetach}
+    setScaleMode={setScaleMode}
+    scaleMode={scaleMode}
+    cycleView={cycleView}
+    cycle={cycle}
+    detachedWindowControls={detachedWindowControls}
+    currentFullscreen={currentFullscreen}
+    conn={conn}
+    host={host}
+    network={network}
+    barReveal={barReveal}
+    minimizeWindow={minimizeWindow}
+    toggleOsFullscreen={toggleOsFullscreen}
+    viewportRef={viewportRef}
+    canvasRef={canvasRef}
+    canvasClass={canvasClass}
+    imeInputRef={imeInputRef}
+    remoteCursorCss={remoteCursorCss}
+  />;
 }
 
-/* ── Canvas helpers ─────────────────────────────────────────────────── */
-
-function resizeCanvas(canvas: HTMLCanvasElement | null, w: number, h: number) {
-  if (!canvas) return;
-  if (canvas.width !== w) canvas.width = w;
-  if (canvas.height !== h) canvas.height = h;
-}
-
-function canvasPointFromClient(canvas: HTMLCanvasElement, clientX: number, clientY: number) {
-  const rect = canvas.getBoundingClientRect();
-  const cssX = clientX - rect.left;
-  const cssY = clientY - rect.top;
-  const x = Math.max(0, Math.min(canvas.width - 1, Math.floor(cssX * (canvas.width / rect.width))));
-  const y = Math.max(0, Math.min(canvas.height - 1, Math.floor(cssY * (canvas.height / rect.height))));
-  return { x, y };
-}
-
-function drawTile(
-  canvas: HTMLCanvasElement | null,
-  tile: { x: number; y: number; w: number; h: number; rgba: Uint8ClampedArray<ArrayBuffer> },
-) {
-  if (!canvas) return;
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-  // ImageData expects rgba length == 4*w*h. If the relay over-pads (which
-  // shouldn't happen given the wire format), trim.
-  const expected = 4 * tile.w * tile.h;
-  if (tile.rgba.length < expected) return;
-  const slice =
-    tile.rgba.length === expected
-      ? tile.rgba
-      : (new Uint8ClampedArray(tile.rgba.buffer, tile.rgba.byteOffset, expected) as Uint8ClampedArray<ArrayBuffer>);
-  const img = new ImageData(slice, tile.w, tile.h);
-  ctx.putImageData(img, tile.x, tile.y);
-}
-
-function drawTileBatch(
-  canvas: HTMLCanvasElement | null,
-  tiles: RdpFrameTile[],
-) {
-  for (const tile of tiles) drawTile(canvas, tile);
-}
+export { type RdpPanelProps } from "./panel/types";
