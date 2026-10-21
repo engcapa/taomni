@@ -556,7 +556,7 @@ Presto、SDK detect、ACP wire protocol、SSH server、scroll capture、structur
 
 ## 2026-10-22 实施批次 Q：协议 owner 与前端领域 API
 
-继续处理 13 个旧入口。RDP server clipboard/display、RDPDR、本地 ASR 安装、邮件过滤和 LanChat SQLite store 拆为 57 个实现/测试模块；Rust 最大 537 行左右。前端 LSP、布局树、Code Action、编辑命令、邮件 API、邮件 HTML 和 SQL metadata completion 拆为 60 个实现模块，最大 689 行。旧门面保留原导出，清单为 2912 项。
+继续处理 13 个旧入口。RDP server clipboard/display、RDPDR、本地 ASR 安装、邮件过滤和 LanChat SQLite store 拆为 57 个实现/测试模块；Rust 最大 536 行。前端 LSP、布局树、Code Action、编辑命令、邮件 API、邮件 HTML 和 SQL metadata completion 拆为 60 个实现模块，最大 689 行。旧门面保留原导出，清单为 2912 项。
 
 - CLIPRDR 的 host worker、change token、共享 snapshot/request gate、文件 staging/download 与 per-client backend 分离；原 echo suppression、锁定快照、超时/取消及 Drop 归属不变。RDP display 的 mailbox、更新消费、三平台 warm-up 和 capture loop 分离；保留同一个 capture/mailbox lifetime。
 - RDPDR 在同一 backend 上分离 opening、file IO、query、mutation、path confinement、metadata 和 wire response；未重建 handle map 或写入预算。ASR 的 installation tracker、取消令牌、reporter、proxy、inventory、下载校验与两类安装流程独立，仍串行化到同一个 INSTALL owner。
@@ -567,3 +567,17 @@ Presto、SDK detect、ACP wire protocol、SSH server、scroll capture、structur
 - `q-rust-final.log`：lib **1868 passed / 0 failed / 25 ignored**；integration **80 passed / 0 failed**。`q-model-tests.log`：**16 files / 627 passed**，包含原编辑器、数据库与邮件入口回归。`q-types-2.log` 和 `q-build.log` 通过；契约 761/328/39、**646 implementation modules** 边界通过。初期 test import、format capture constant、trait import 和 unused facade import 的失败日志保留。
 
 本批保持原流程和测试断言，因此复用原 executable cases。O/P/Q 组合的原生 clipboard、capture、JDT LS、真实 SSH、结构搜索、邮件过滤与 RDP 性能将使用完整提交在三平台验证；ASR 的原生网络与文件语义还由 Rust loopback HTTP/cancellation/integrity tests 验证，浏览器 fixture 不作为其网络证据。整体剩余大文件与最终 scope=all 继续推进。
+
+
+## 2026-10-22 实施批次 R：归档、目录身份、SQL、VNC 与聊天/Git/Agent
+
+7 个 Rust 旧入口按责任拆为 56 个实现/测试模块：mail archive、storage、contacts、terminal local directories、notes DB、SQL rewrite 和 VNC encodings。生产模块最大为 ZRLE 537 行，测试模块最大为 archive 501 行；原命令/API 及两套 generated command helpers 保留。前端新增 21 个模块：ChatDrawer 1619→603 行，DiffViewer 1576→498 行，CcAgentBridge 1296→349 行，新模块最大为 ChatDrawer View 757 行。清单更新至 2989 项。
+
+- 邮件归档的唯一 job/暂停 flag/socket/status owner、部分 FETCH 校验、分块下载、原子 publication、账号级锁和重开后的进度恢复保持原流程；存储按 index/publication/reading/relocation/cleanup 分开，失败不覆盖完成文件的约束保持。通讯录分离本地 SQLite、建议、CardDAV protocol/sync 与 command adapters。
+- 目录身份探测、记录/迁移、列表排序/可用性 probe 分开；Notes 的行映射、查询、变更、tags/steps/preferences/alerts 分开。SQL rewrite 的 projection、condition、inline patch 与 syntax 独立；VNC raw/hextile/ZRLE/pixels/cursor 分开，原 inflate scratch 仍归同一个 decoder。
+- ChatDrawer 的停靠/resize/outside-click 状态和 effect cleanup、提醒订阅/跳转/历史、ribbon 和视图分别归属；线程与 composer 的绑定/排队/格式契约保持。Diff 的一次性 style 安装、split layout、drag/scroll interactions 与 cleanup 分开；Agent 的权限定位/卡片、唯一 tool-card target map、SFTP session/transfer/upload plan 和 tools 分开。提取后发现 formatting↔uploadPlanning 循环，已用底层 arguments 模块解除。
+- `r-rust-final.log`：lib **1868 passed / 0 failed / 25 ignored**，integration **80 passed / 0 failed**；7 个域 **180 个生产函数**在解析相对模块路径、忽略 visibility/rustfmt 后 tokens 一致。`r-ui-tests-2.log`：4 files / **63 passed**；`r-build-final.log` 完整类型检查和 production build 成功。契约 761/328/39、667 implementation modules 边界检查通过。
+- 首次 Rust check 遗漏邮件归档显式依赖/trait；首次 UI/type 检查遗漏样式模板的 CONNECTOR_WIDTH import；均已修复，原失败日志保留。`r-types.log` 的 pnpm PATH 错误及首次 browser 的 Python PATH/jsonschema 错误为执行环境问题，不算产品执行通过。
+- `browser-r/run-20261022-024340-911919226`：Linux Chromium **11 passed / 0 failed / 0 skipped**，覆盖 AI drawer/附件 chip/隐藏重开、Notes 建立完成/筛选/主题/边缘停靠/通知，以及归档列表分页/搜索和通讯录重开自动补全。已核验 receipt 签名、summary hash 和 stable identity，源码指纹 `09f0efef61b1adb8867c5f68a0f100b38ee89901f07a283d59a120877b20b6fd`。browser 邮件 fixture 不作为原生磁盘/IMAP/CardDAV 网络证据；后端保留原相关 Rust 测试，最终仍需三端 native 全量。
+
+本批为保留原行为的实现重构，复用现有可执行场景及断言。O/P/Q 的三端 selected workflow [39652904042](https://github.com/engcapa/taomni/actions/runs/39652904042) 绑定完整提交 `53d56b407df41966e8ed8a2dcd4f887ae1e5c0e7`，当前仍在执行，未将 job 状态当作全部验收结果。剩余大文件与最终完整 SHA 的全量验收继续推进。

@@ -6,6 +6,9 @@ import ts from "typescript";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // These are implementation modules, not alternate application entry points.
 const boundaries = [
+  ["src/components/chat/drawer", "src/components/chat/ChatDrawer.tsx"],
+  ["src/components/git/diff", "src/components/git/DiffViewer.tsx"],
+  ["src/components/agent/bridge", "src/components/agent/CcAgentBridge.tsx"],
   ["src/lib/editor/lsp", "src/lib/editor/lsp.ts"],
   ["src/lib/mail", "src/lib/mail.ts"],
   ["src/lib/mailHtml", "src/lib/mailHtml.ts"],
