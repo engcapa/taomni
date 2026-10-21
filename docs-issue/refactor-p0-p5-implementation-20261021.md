@@ -553,3 +553,17 @@ Presto、SDK detect、ACP wire protocol、SSH server、scroll capture、structur
 - `rustfmt` 仅作用于本批文件，`git diff --check` 和 **761 commands / 328 façade exports / 39 literal events** 契约通过。格式整理及删除一个 unused import 不改变执行语义；最终仍需完整提交上的三端 native 和全量组合验证。
 
 本批为实现位置与依赖重构，复用原有真实数据库/SSH、截图、clipboard、structural search、ASR 与相关单元测试，不添加只验证文件搬迁的重复场景。后续继续处理其余大文件；当前批次通过不代表 P0→P5 整体完成。
+
+## 2026-10-22 实施批次 Q：协议 owner 与前端领域 API
+
+继续处理 13 个旧入口。RDP server clipboard/display、RDPDR、本地 ASR 安装、邮件过滤和 LanChat SQLite store 拆为 57 个实现/测试模块；Rust 最大 537 行左右。前端 LSP、布局树、Code Action、编辑命令、邮件 API、邮件 HTML 和 SQL metadata completion 拆为 60 个实现模块，最大 689 行。旧门面保留原导出，清单为 2912 项。
+
+- CLIPRDR 的 host worker、change token、共享 snapshot/request gate、文件 staging/download 与 per-client backend 分离；原 echo suppression、锁定快照、超时/取消及 Drop 归属不变。RDP display 的 mailbox、更新消费、三平台 warm-up 和 capture loop 分离；保留同一个 capture/mailbox lifetime。
+- RDPDR 在同一 backend 上分离 opening、file IO、query、mutation、path confinement、metadata 和 wire response；未重建 handle map 或写入预算。ASR 的 installation tracker、取消令牌、reporter、proxy、inventory、下载校验与两类安装流程独立，仍串行化到同一个 INSTALL owner。
+- Mail filter model/matching/planning、cache mark、IMAP SEARCH、actions 与 command adapter 分离。LanChat 在同一 Connection mutex 和 message key 上分离 identity、pins/peers、conversations、encryption/messages、retention/groups 与 schema；未复制数据库连接或 key。
+- LSP 保留 renderer 全局请求序号、detect cache epoch 和 QA completion observation 的单次初始化；Code Action class 保留原 request/resolve/apply pipeline。布局事务、持久化、节点操作、编辑命令的 clipboard/caret/folding/selection/statement/line 行为各自独立。
+- SQL completion 的语法、parsing、metadata、SELECT/JOIN/INSERT、namespace 与 source 分开；邮件 HTML 的 purifier hook owner、style sanitizer、document preparation 与 compose 分开。边界 gate 发现并消除了 document↔sanitize 循环，旧 sanitizer 与 iframe 行为由原测试保留。
+- 静态对照：6 个 Rust 域共 **265 个生产函数**保持 tokens 一致（仅 visibility、module path 和 rustfmt）；7 个前端公共 API、**525 个原声明及全部 top-level side effects**保持一致。静态对照不代替执行结果。
+- `q-rust-final.log`：lib **1868 passed / 0 failed / 25 ignored**；integration **80 passed / 0 failed**。`q-model-tests.log`：**16 files / 627 passed**，包含原编辑器、数据库与邮件入口回归。`q-types-2.log` 和 `q-build.log` 通过；契约 761/328/39、**646 implementation modules** 边界通过。初期 test import、format capture constant、trait import 和 unused facade import 的失败日志保留。
+
+本批保持原流程和测试断言，因此复用原 executable cases。O/P/Q 组合的原生 clipboard、capture、JDT LS、真实 SSH、结构搜索、邮件过滤与 RDP 性能将使用完整提交在三平台验证；ASR 的原生网络与文件语义还由 Rust loopback HTTP/cancellation/integrity tests 验证，浏览器 fixture 不作为其网络证据。整体剩余大文件与最终 scope=all 继续推进。

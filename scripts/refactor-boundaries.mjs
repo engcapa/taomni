@@ -6,6 +6,13 @@ import ts from "typescript";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // These are implementation modules, not alternate application entry points.
 const boundaries = [
+  ["src/lib/editor/lsp", "src/lib/editor/lsp.ts"],
+  ["src/lib/mail", "src/lib/mail.ts"],
+  ["src/lib/mailHtml", "src/lib/mailHtml.ts"],
+  ["src/lib/sqlMetadataCompletions", "src/lib/sqlMetadataCompletions.ts"],
+  ["src/components/editor/workspace/layoutTree", "src/components/editor/workspace/recursiveLayoutTree.ts"],
+  ["src/components/editor/workspace/codeActions", "src/components/editor/workspace/codeActionProviderAdapter.ts"],
+  ["src/components/editor/workspace/editorCommands", "src/components/editor/workspace/workspaceEditorCommands.ts"],
   ["src/components/editor/workspace/actions", "src/components/editor/workspace/workspaceActionRegistry.ts"],
   ["src/components/editor/workspace/actions", "src/components/editor/workspace/workspaceActionHost.ts"],
   ["src/components/editor/workspace/templates", "src/components/editor/workspace/liveTemplates.ts"],
