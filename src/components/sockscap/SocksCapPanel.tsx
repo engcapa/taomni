@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, AlertTriangle, ArrowDown, ArrowDownLeft, ArrowUp, ArrowUpRight, CheckCircle2, ChevronDown, ChevronRight, Copy, FolderOpen, HelpCircle, Info, Layers, Loader2, Lock, PanelLeftClose, PanelLeftOpen, Pencil, Play, Plus, RefreshCw, Search, Shield, Square, Trash2, X } from "lucide-react";
-import { sockscapCapabilities, sockscapGetConfig, sockscapValidateMacosApp, sockscapGfwlistStatus, sockscapImportRules, sockscapListProcesses, sockscapRefreshGfwlist, sockscapSetConfig, sockscapLaunchApp, sockscapLaunchedApps, sockscapStopLaunchedApp, sockscapStatsSnapshot, sockscapStatus, sockscapStop, sockscapGetDomainRecords, sockscapClearDomainRecords, sockscapHelperStatus, sockscapTestTarget, sockscapTestUpstream, sockscapTestCoreUpstream, sockscapParseShareLink, sockscapDetectLocalProxies, sockscapDetectTunConflicts, sockscapImportSubscription, sockscapRedirectorInstallStatus, upstreamRequiresCore, type AppSelector, type LocalProxyCandidate, type Decision, type DomainRecord, type GfwListStatus, type HelperStatus, type LaunchedAppInfo, type LaunchPreparation, type ProcessInfo, type RedirectorInstallStatus, type RuleMode, type ScopeMode, type SocksCapCapabilities, type SocksCapConfig, type SocksCapProfile, type SocksCapStatus, type StatsSnapshot, type TargetTestResult, type UpstreamKind, type UpstreamParams, type UserRule } from "../../lib/sockscap";
+import { sockscapCapabilities, sockscapGetConfig, sockscapValidateMacosApp, sockscapGfwlistStatus, sockscapImportRules, sockscapListProcesses, sockscapRefreshGfwlist, sockscapSetConfig, sockscapLaunchedApps, sockscapStatsSnapshot, sockscapStatus, sockscapGetDomainRecords, sockscapClearDomainRecords, sockscapHelperStatus, sockscapTestTarget, sockscapTestUpstream, sockscapTestCoreUpstream, sockscapParseShareLink, sockscapDetectLocalProxies, sockscapDetectTunConflicts, sockscapImportSubscription, sockscapRedirectorInstallStatus, upstreamRequiresCore, type AppSelector, type LocalProxyCandidate, type Decision, type DomainRecord, type GfwListStatus, type HelperStatus, type LaunchedAppInfo, type ProcessInfo, type RedirectorInstallStatus, type RuleMode, type ScopeMode, type SocksCapCapabilities, type SocksCapConfig, type SocksCapProfile, type SocksCapStatus, type StatsSnapshot, type TargetTestResult, type UpstreamKind, type UpstreamParams, type UserRule } from "../../lib/sockscap";
 import { type UpstreamConfigIssue } from "../../lib/sockscapPreflight";
 import { SocksCapRootPrompt } from "./SocksCapRootPrompt";
 import { SocksCapMacosSetupGuide } from "./SocksCapMacosSetupGuide";
@@ -10,14 +10,15 @@ import { useT } from "../../lib/i18n";
 import { isTauriRuntime } from "../../lib/runtime";
 import { writeText } from "../../lib/clipboard";
 import { open } from "@tauri-apps/plugin-dialog";
-import { useAppStore } from "../../stores/appStore";
 import { type Props, type MacosSetupGuideMode, hasCompletedMacosSetup, type SessionOpt, type EnvironmentDraft, normalizeFrontendConfig, DEFAULT_CFG, DEFAULT_PROFILE, profilesByPriority, MIN_PROFILE_PRIORITY, MAX_PROFILE_PRIORITY, phaseTone } from "./panel/configuration";
 import { Field } from "./panel/Field";
-import { normalizeLaunchPreparation, formatRootlessArguments, launchPreparationIsEmpty, rootlessAppKey, parseShellArguments, formatRootlessCommand } from "./panel/launchPolicy";
+import { normalizeLaunchPreparation, formatRootlessArguments, launchPreparationIsEmpty, rootlessAppKey, formatRootlessCommand } from "./panel/launchPolicy";
 import { formatSpeed, formatBytes, formatTime } from "./panel/formatting";
 import { Section } from "./panel/Section";
 import { ManualAppAdd } from "./panel/ManualAppAdd";
 import { createSocksCapLifecycleActions } from "./panel/lifecycleActions";
+import { createApplicationLaunch } from "./panel/applicationLaunch";
+
 
 
 
@@ -1296,194 +1297,34 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
       rootlessAppKey(app.path, app.args, app.launchMode, app.launchPreparation),
     );
   };
-
-  const addRootlessApplication = async () => {
-    if (!cfg || locked) return;
-    const command = rootlessCommand.trim();
-    if (!command) return;
-    let args: string[];
-    try {
-      args = parseShellArguments(rootlessArguments);
-    } catch {
-      report(t("sockscap.rootlessArgsInvalid"), false);
-      return;
-    }
-    const environment: Record<string, string> = {};
-    for (const entry of rootlessEnvironment) {
-      const name = entry.name.trim();
-      if (!name || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
-        report(t("sockscap.rootlessEnvironmentInvalid"), false);
-        return;
-      }
-      if (Object.prototype.hasOwnProperty.call(environment, name)) {
-        report(t("sockscap.rootlessEnvironmentDuplicate", { name }), false);
-        return;
-      }
-      environment[name] = entry.value;
-    }
-    const workingDirectory = rootlessWorkingDirectory.trim();
-    if (workingDirectory && !workingDirectory.startsWith("/")) {
-      report(t("sockscap.rootlessWorkingDirectoryAbsolute"), false);
-      return;
-    }
-    const launchPreparation = normalizeLaunchPreparation({
-      workingDirectory,
-      environment,
-      preCommand: rootlessPreCommand.trim(),
-      shell: rootlessLaunchShell,
-    });
-    const candidate: AppSelector = {
-      path: command,
-      args,
-      launchMode: rootlessLaunchMode,
-      ...(launchPreparationIsEmpty(launchPreparation) ? {} : { launchPreparation }),
-      name: command.split(/[/\\]/).pop() || command,
-    };
-    const key = rootlessAppKey(
-      candidate.path,
-      candidate.args,
-      candidate.launchMode,
-      candidate.launchPreparation,
-    );
-    if (
-      selectedProf.apps.some(
-        (app) =>
-          rootlessAppKey(
-            app.path,
-            app.args,
-            app.launchMode,
-            app.launchPreparation,
-          ) === key &&
-          rootlessAppKey(
-            app.path,
-            app.args,
-            app.launchMode,
-            app.launchPreparation,
-          ) !== editingRootlessAppKey,
-      )
-    ) {
-      report(t("sockscap.rootlessAppAlreadyAdded"), false);
-      return;
-    }
-    const apps = editingRootlessAppKey
-      ? selectedProf.apps.map((app) =>
-          rootlessAppKey(
-            app.path,
-            app.args,
-            app.launchMode,
-            app.launchPreparation,
-          ) === editingRootlessAppKey
-            ? candidate
-            : app,
-        )
-      : [...selectedProf.apps, candidate];
-    const nextConfig = await patchSelectedProfile({ apps });
-    if (nextConfig) {
-      resetRootlessApplicationDraft();
-    }
-  };
-
-  const onRootlessLaunchApp = async (
-    profileId: string,
-    path: string,
-    args: string[] = [],
-    launchMode: "desktop" | "terminal" = "desktop",
-    launchPreparation: LaunchPreparation = {},
-    name?: string,
-    configOverride?: SocksCapConfig,
-  ) => {
-    if (launchingPath || stoppingPid !== null) return;
-    const launchKey = rootlessAppKey(path, args, launchMode, launchPreparation);
-    setLaunchingPath(launchKey);
-    let startedHere = false;
-    try {
-      let launchConfig = configOverride ?? cfg;
-      if (!running) {
-        const targetProfile = launchConfig?.profiles.find(
-          (profile) => profile.id === profileId,
-        );
-        if (launchConfig && targetProfile) {
-          const profileActive =
-            targetProfile.enabled &&
-            launchConfig.activeProfileIds.length === 1 &&
-            launchConfig.activeProfileIds[0] === profileId;
-          if (!profileActive) {
-            launchConfig = {
-              ...launchConfig,
-              profiles: launchConfig.profiles.map((profile) =>
-                profile.id === profileId ? { ...profile, enabled: true } : profile,
-              ),
-              activeProfileIds: [profileId],
-            };
-            if (!(await persistConfig(launchConfig))) return;
-          }
-        }
-        const started = await preflightAndStart(launchConfig ?? undefined);
-        if (!started) return;
-        startedHere = true;
-      }
-      if (launchMode === "terminal") {
-        const id = `sockscap-terminal-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-        useAppStore.getState().addTab({
-          id,
-          type: "terminal",
-          title: name || path.split(/[/\\]/).pop() || path,
-          closable: true,
-          sockscapTerminal: {
-            profileId,
-            path,
-            args,
-            launchPreparation,
-            terminalSessionId: id,
-          },
-          terminalTitleMode: "manual",
-        });
-        report(t("sockscap.terminalApplicationOpened"));
-        return;
-      }
-      const launched = await sockscapLaunchApp(
-        profileId,
-        path,
-        args,
-        launchPreparation,
-      );
-      setLaunchedApps((current) => [
-        ...current.filter((app) => app.pid !== launched.pid),
-        launched,
-      ]);
-      report(t("sockscap.applicationLaunched", { pid: launched.pid }));
-    } catch (e) {
-      report(String(e), false);
-      if (startedHere) {
-        const stopped = await sockscapStop().catch(() => null);
-        if (stopped) setStatus(stopped);
-      }
-    } finally {
-      setLaunchingPath(null);
-    }
-  };
-
-  const onStopLaunchedApp = async (pid: number) => {
-    if (launchingPath || stoppingPid !== null) return;
-    setStoppingPid(pid);
-    try {
-      await sockscapStopLaunchedApp(pid);
-      const remaining = launchedApps.filter((app) => app.running && app.pid !== pid);
-      setLaunchedApps((current) =>
-        current.map((app) => (app.pid === pid ? { ...app, running: false } : app)),
-      );
-      if (linuxLaunchOnly && remaining.length === 0) {
-        const stopped = await sockscapStop();
-        setStatus(stopped);
-        setLaunchedApps([]);
-      }
-      report(t("sockscap.applicationStopped", { pid }));
-    } catch (e) {
-      report(String(e), false);
-    } finally {
-      setStoppingPid(null);
-    }
-  };
+  const { addRootlessApplication, onStopLaunchedApp, onRootlessLaunchApp } = createApplicationLaunch({
+    cfg,
+    locked,
+    rootlessCommand,
+    rootlessArguments,
+    report,
+    t,
+    rootlessEnvironment,
+    rootlessWorkingDirectory,
+    rootlessPreCommand,
+    rootlessLaunchShell,
+    rootlessLaunchMode,
+    selectedProf,
+    editingRootlessAppKey,
+    patchSelectedProfile,
+    resetRootlessApplicationDraft,
+    launchingPath,
+    stoppingPid,
+    setLaunchingPath,
+    running,
+    persistConfig,
+    preflightAndStart,
+    setLaunchedApps,
+    setStatus,
+    setStoppingPid,
+    launchedApps,
+    linuxLaunchOnly,
+  });
 
   const addUserRule = async () => {
     if (!cfg || locked || !newRule.pattern.trim()) return;
@@ -3544,6 +3385,7 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     </div>
   );
 }
+
 
 
 export { SOCKSCAP_MACOS_SETUP_STORAGE_KEY } from "./panel/configuration";

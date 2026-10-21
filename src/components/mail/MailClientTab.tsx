@@ -1,18 +1,18 @@
-import { MailMutationError, MailMutationSession } from "../../lib/mailMutations";
+import { MailMutationSession } from "../../lib/mailMutations";
 import { MailArchivePanel } from "./MailArchivePanel";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type SetStateAction, type UIEvent } from "react";
 import { Group as PanelGroup, Separator as PanelResizeHandle, type PanelImperativeHandle, type PanelSize } from "react-resizable-panels";
 import { AlertTriangle, Archive, Ban, BookUser, CalendarDays, CheckCircle2, ChevronDown, Code, Copy, Download, ExternalLink, FileText, Filter as FilterIcon, Folder, FolderInput, FolderPlus, FolderSymlink, FolderX, Forward, ImageOff, Inbox, Link as LinkIcon, ListChecks, Loader2, Mail as MailIcon, MailOpen, MessageSquareReply, PenLine, Printer, RefreshCw, Save, Search, Send, ShieldCheck, Star, Tag, Trash2, X } from "lucide-react";
-import { mailClearCache, mailCopyMessages, mailCreateFolder, mailDeleteFolder, mailDeleteMessages, mailDownloadAttachment, mailExportMbox, isMailCertificateError, mailProbeCertificate, mailImportMessages, mailFetchRaw, mailSendReceipt, MAIL_MDN_SENT, mailGetInvite, mailRespondInvite, mailIdleStart, mailIdleStop, mailIndexCachedContacts, mailDeleteDraft, mailListFolders, mailMarkRead, mailMoveMessages, mailRenameFolder, mailSaveRaw, mailSetFlags, mailSetFolderSubscription, mailSearchContacts, mailSearchMessages, mailSearchServer, mailTestConnection, mailUnsubscribeOneClick, MAIL_IDLE_EVENT, type MailAttachmentInfo, type MailDraft, type MailFolder, type MailCertificateInfo, type MailIdleEvent, type MailInvite, type MailInviteReply, type MailMessageBody, type MailMessageHeader, type MailSearchField, type MailSyncRequestMode } from "../../lib/mail";
+import { mailClearCache, mailCreateFolder, mailDeleteFolder, mailDeleteMessages, mailDownloadAttachment, mailExportMbox, isMailCertificateError, mailProbeCertificate, mailImportMessages, mailFetchRaw, mailSendReceipt, MAIL_MDN_SENT, mailGetInvite, mailRespondInvite, mailIdleStart, mailIdleStop, mailIndexCachedContacts, mailDeleteDraft, mailListFolders, mailMarkRead, mailRenameFolder, mailSaveRaw, mailSetFlags, mailSetFolderSubscription, mailSearchContacts, mailSearchMessages, mailSearchServer, mailTestConnection, mailUnsubscribeOneClick, MAIL_IDLE_EVENT, type MailAttachmentInfo, type MailDraft, type MailFolder, type MailCertificateInfo, type MailIdleEvent, type MailInvite, type MailInviteReply, type MailMessageBody, type MailMessageHeader, type MailSearchField, type MailSyncRequestMode } from "../../lib/mail";
 import { listen } from "@tauri-apps/api/event";
 import { notifyDesktop } from "../../lib/lanNotify";
 import { formatInviteRange, hasCalendarPart, myPartstat } from "../../lib/mailInvite";
-import { filterFromMessage, mailApplyFilters, type MailFilter } from "../../lib/mailFilters";
+import { type MailFilter } from "../../lib/mailFilters";
 import { MailFiltersPanel } from "./MailFiltersPanel";
 import { MailAddressBookPanel } from "./MailAddressBookPanel";
 import { MailAgendaPanel } from "./MailAgendaPanel";
 import { agendaKey, agendaTimeLabel, dueReminders, mailAddInviteToCalendar, mailCalDavSync, mailListAgenda, type MailAgendaEvent } from "../../lib/mailCalendar";
-import { emptyAddressBookEntry, type MailAddressBookEntry } from "../../lib/mailContacts";
+import { type MailAddressBookEntry } from "../../lib/mailContacts";
 import { folderLabel, isSelectable, isSubscribed, loadSubscribedOnly, saveSubscribedOnly, visibleFolders } from "../../lib/mailFolders";
 import { isOutbox, outboxNextAttemptAt, outboxState } from "../../lib/mailOutbox";
 import { parseMailto } from "../../lib/mailto";
@@ -21,7 +21,7 @@ import { useSessionStore } from "../../stores/sessionStore";
 import { isEditableTarget, mailShortcutAction, type MailShortcutAction } from "../../lib/mailShortcuts";
 import { buildMailThreads, flattenMailThreads, type MailThreadRow } from "../../lib/mailThreads";
 import { mailIdentities, ownIdentityAddresses, pickReplyIdentity } from "../../lib/mailIdentities";
-import { JUNK_KEYWORD, MAIL_TAGS, NOT_JUNK_KEYWORD, messageTags, toggleKeywordPlan } from "../../lib/mailTags";
+import { MAIL_TAGS, messageTags } from "../../lib/mailTags";
 import { mergeFolderMeta } from "../../lib/mailSync";
 import { MailMessageBodyView } from "./MailMessageBodyView";
 import { extractDefaultMailDomain, mergeRecipientSuggestions, parseRecipientsText, searchCachedMessageContacts, type RecipientSuggestion } from "../../lib/mailRecipients";
@@ -38,10 +38,10 @@ import { DEFAULT_MAIL_TERMINAL_PROFILE } from "../../lib/terminalProfile";
 import { useAppTheme } from "../../lib/appTheme";
 import { type MailClientTabProps, type OpenMailMessageTab, type BodyWarmState, type ComposeDraft, type ComposePromptState, type RecipientSearchState, type RecipientFieldKey, type AiAction } from "./client/types";
 import { type MailRowActions } from "./client/MailRowActions";
-import { MAIL_THREAD_VIEW_STORAGE_KEY, isOAuthReauthRequired, messagePageSize, refreshBatchSize, catchupStepSize, dedupeMessages, messageKey, sortMessages, mailClientErrorMessage, addressLabel, isFlagged, bodyMatchesMessage, messageBatchesByFolder, formatFullDate, withFlagsMutation, escapeHtml, formatBytes, formatShortDate } from "./client/messages";
+import { MAIL_THREAD_VIEW_STORAGE_KEY, isOAuthReauthRequired, messagePageSize, refreshBatchSize, catchupStepSize, dedupeMessages, messageKey, sortMessages, mailClientErrorMessage, addressLabel, isFlagged, bodyMatchesMessage, formatFullDate, escapeHtml, formatBytes, formatShortDate } from "./client/messages";
 import { EMPTY_DRAFT, isTemplate, emptyComposeDraft, serializeDraftContent, draftHasContent, replyContextFor, normalizedMailAddress, appendUniqueAddress, forwardSubject } from "./client/compose";
 import { MAILBOX_EXPANDED_SIZE, clampMailFontSize, mailAppearanceStyle, MAILBOX_RIBBON_THRESHOLD } from "./client/appearance";
-import { DEFAULT_FOLDER, isUnread, NEW_MAIL_EXCLUDED_KINDS, folderMatchesSpecial, type SpecialFolderKind, folderIcon, MAIL_DRAG_TYPE, folderDepth } from "./client/folders";
+import { DEFAULT_FOLDER, isUnread, NEW_MAIL_EXCLUDED_KINDS, folderMatchesSpecial, folderIcon, MAIL_DRAG_TYPE, folderDepth } from "./client/folders";
 import { escapeRegExp, suggestedAttachmentName, ALL_ATTACHMENTS_INDEX, uniqueAttachmentName, joinLocalPath } from "./client/attachments";
 import { aiPrompt } from "./client/ai";
 import { RemoteImagesBanner } from "./client/RemoteImagesBanner";
@@ -58,6 +58,8 @@ import { MailReaderPane } from "./client/MailReaderPane";
 import { MailComposer } from "./client/MailComposer";
 import { createDraftActions } from "./client/draftActions";
 import { useMailOutbox } from "./client/useMailOutbox";
+import { createMailMutations } from "./client/mutations";
+
 
 
 
@@ -1867,281 +1869,35 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       .then(() => setStatus(`Copied ${label}`))
       .catch((e) => setError(mailClientErrorMessage(e)));
   };
-
-  const applyFlagsLocally = (folder: string, uids: number[], add: string[], remove: string[], unreadDelta: number) => {
-    const uidSet = new Set(uids);
-    const applies = (message: MailMessageHeader) => message.folder === folder && uidSet.has(message.uid);
-    setMessages((current) => current.map((message) => (applies(message) ? withFlagsMutation(message, add, remove) : message)));
-    setSearchResults((current) => current?.map((message) => applies(message) ? withFlagsMutation(message, add, remove) : message) ?? null);
-    setMessageTabs((current) => current.map((tab) => (applies(tab.message) ? { ...tab, message: withFlagsMutation(tab.message, add, remove) } : tab)));
-    if (unreadDelta !== 0) {
-      setFolders((current) => current.map((entry) => {
-        if (entry.name !== folder || entry.unread === null || entry.unread === undefined) return entry;
-        return { ...entry, unread: Math.max(0, entry.unread + unreadDelta), updatedAt: Math.floor(Date.now() / 1000) };
-      }));
-    }
-  };
-
-  const removeMessagesLocally = (folder: string, uids: number[], unreadRemoved: number) => {
-    cacheRemovalVersionsRef.current.set(folder, (cacheRemovalVersionsRef.current.get(folder) ?? 0) + 1);
-    const removedKeys = new Set(uids.map((uid) => `${folder}:${uid}`));
-    setMessages((current) => current.filter((message) => !removedKeys.has(messageKey(message))));
-    setSearchResults((current) => current?.filter((message) => !removedKeys.has(messageKey(message))) ?? null);
-    setMessageTabs((current) => current.filter((tab) => !removedKeys.has(tab.key)));
-    setCheckedMessageKeys((current) => {
-      if (current.size === 0) return current;
-      const next = new Set(current);
-      for (const key of removedKeys) next.delete(key);
-      return next.size === current.size ? current : next;
-    });
-    setMailViewKey((current) => (removedKeys.has(current) ? "mailbox" : current));
-    setSelectedMessageKey((current) => (current && removedKeys.has(current) ? null : current));
-    setPopupMessageKey((current) => (current && removedKeys.has(current) ? null : current));
-    setFolders((current) => current.map((entry) => {
-      if (entry.name !== folder) return entry;
-      const nextTotal = entry.total !== null && entry.total !== undefined ? Math.max(0, entry.total - uids.length) : entry.total;
-      const nextUnread = entry.unread !== null && entry.unread !== undefined ? Math.max(0, entry.unread - unreadRemoved) : entry.unread;
-      return { ...entry, total: nextTotal, unread: nextUnread, updatedAt: Math.floor(Date.now() / 1000) };
-    }));
-  };
-
-  const runMailAction = async (action: () => Promise<void>, retry = false) => {
-    if (!retry) {
-      mutationSessionRef.current = new MailMutationSession();
-      setMutationProgress(null);
-    }
-    retryMailActionRef.current = action;
-    setMutationFailure(null);
-    setBusyAction(true);
-    setError(null);
-    try {
-      await action();
-    } catch (e) {
-      setError(mailClientErrorMessage(e));
-      if (mutationSessionRef.current.used) {
-        setMutationFailure({ message: mailClientErrorMessage(e), retryable: !(e instanceof MailMutationError) || e.retryable,
-          detail: e instanceof MailMutationError ? e.detail : null });
-      }
-    } finally {
-      setBusyAction(false);
-    }
-  };
-
-  const reportMutationProgress = (completed: number, total: number) => {
-    setMutationProgress(`Processed ${completed}/${total} messages`);
-  };
-
-  const resolveSpecialFolder = (kind: SpecialFolderKind): string | null =>
-    displayFolders.find((folder) => folderMatchesSpecial(folder, kind, info.specialFolders))?.name ?? null;
-
-  const resolveInboxFolder = (): string =>
-    displayFolders.find((folder) => folder.name.toUpperCase() === "INBOX")?.name
-    ?? displayFolders.find((folder) => `${folder.name} ${folderLabel(folder)}`.toLowerCase().includes("inbox"))?.name
-    ?? "INBOX";
-
-  /** AC-40: run the incoming filters on new INBOX mail (tab open only, DEC-01). */
-  incomingFiltersRef.current = async () => {
-    try {
-      const result = await mailApplyFilters(info, resolveInboxFolder(), "incoming", {
-        trashFolder: resolveSpecialFolder("trash"),
-      });
-      if (result.errors.length > 0) {
-        setFilterErrors(result.errors);
-        setError(`Mail filter actions failed: ${result.errors.join("; ")}`);
-      }
-      if (result.matched > 0) {
-        setStatus(`Filters handled ${result.matched} new message${result.matched === 1 ? "" : "s"}`);
-        await reloadVisibleFromCache(selectedFolderRef.current);
-        void loadCachedFolders();
-      }
-    } catch (e) {
-      console.debug("incoming mail filters failed", e);
-    }
-  };
-
-  /** AC-41: run filters by hand on the selected folder. */
-  const runFiltersOnFolder = async (filterIds: string[] | undefined) => {
-    const folder = selectedFolderRef.current;
-    const result = await mailApplyFilters(info, folder, "manual", {
-      filterIds,
-      trashFolder: resolveSpecialFolder("trash"),
-    });
-    await reloadVisibleFromCache(folder);
-    void loadCachedFolders();
-    return result;
-  };
-
-  const openContactFromMessage = (message: MailMessageHeader) => {
-    const address = message.from?.address?.trim() ?? "";
-    setContactDraft(emptyAddressBookEntry({
-      displayName: message.from?.name?.trim() || "",
-      emails: [address],
-    }));
-    setAddressBookOpen(true);
-  };
-
-  const openFilterFromMessage = (message: MailMessageHeader) => {
-    setFilterDraft(filterFromMessage(message));
-    setFiltersOpen(true);
-  };
-
-  const handleToggleFlagged = (targets: MailMessageHeader[]) => runMailAction(async () => {
-    const unique = dedupeMessages(targets);
-    if (unique.length === 0) return;
-    const allFlagged = unique.every(isFlagged);
-    const add = allFlagged ? [] : ["\\Flagged"];
-    const remove = allFlagged ? ["\\Flagged"] : [];
-    for (const [folder, group] of messageBatchesByFolder(unique)) {
-      const uids = group.map((message) => message.uid);
-      await mailSetFlags(info, folder, uids, add, remove);
-      applyFlagsLocally(folder, uids, add, remove, 0);
-    }
-    setStatus(allFlagged ? "Removed star" : `Starred ${unique.length} message${unique.length === 1 ? "" : "s"}`);
-  });
-
-  const handleToggleKeyword = (targets: MailMessageHeader[], keyword: string, label: string) => runMailAction(async () => {
-    const unique = dedupeMessages(targets);
-    if (unique.length === 0) return;
-    const plan = toggleKeywordPlan(unique, keyword);
-    for (const [folder, group] of messageBatchesByFolder(unique)) {
-      const uids = group.map((message) => message.uid);
-      await mailSetFlags(info, folder, uids, plan.add, plan.remove);
-      applyFlagsLocally(folder, uids, plan.add, plan.remove, 0);
-    }
-    setStatus(plan.enable ? `Tagged ${unique.length} as ${label}` : `Removed tag ${label}`);
-  });
-
-  const handleClearTags = (targets: MailMessageHeader[]) => runMailAction(async () => {
-    const unique = dedupeMessages(targets).filter((message) => messageTags(message).length > 0);
-    const remove = MAIL_TAGS.map((tag) => tag.keyword);
-    for (const [folder, group] of messageBatchesByFolder(unique)) {
-      const uids = group.map((message) => message.uid);
-      await mailSetFlags(info, folder, uids, [], remove);
-      applyFlagsLocally(folder, uids, [], remove, 0);
-    }
-    setStatus("Removed tags");
-  });
-
-  /** Train the server's junk filter via $Junk/$NotJunk; unsupported keywords are not fatal. */
-  const setJunkKeywords = async (targets: MailMessageHeader[], junk: boolean) => {
-    const add = [junk ? JUNK_KEYWORD : NOT_JUNK_KEYWORD];
-    const remove = [junk ? NOT_JUNK_KEYWORD : JUNK_KEYWORD];
-    for (const [folder, group] of messageBatchesByFolder(dedupeMessages(targets))) {
-      const uids = group.map((message) => message.uid);
-      try {
-        await mailSetFlags(info, folder, uids, add, remove);
-        applyFlagsLocally(folder, uids, add, remove, 0);
-      } catch (e) {
-        console.debug("mail: junk keyword not accepted by the server", e);
-      }
-    }
-  };
-
-  const handleMarkUnread = (targets: MailMessageHeader[]) => runMailAction(async () => {
-    const unique = dedupeMessages(targets).filter((message) => !isUnread(message));
-    if (unique.length === 0) {
-      setStatus("Selected messages are already unread");
-      return;
-    }
-    for (const [folder, group] of messageBatchesByFolder(unique)) {
-      const uids = group.map((message) => message.uid);
-      await mailSetFlags(info, folder, uids, [], ["\\Seen"]);
-      applyFlagsLocally(folder, uids, [], ["\\Seen"], group.length);
-    }
-    setStatus(`Marked ${unique.length} message${unique.length === 1 ? "" : "s"} as unread`);
-  });
-
-  const moveTargetsTo = async (targets: MailMessageHeader[], target: string): Promise<number> => {
-    const unique = dedupeMessages(targets).filter((message) => message.folder !== target);
-    const operation = mutationSessionRef.current;
-    operation.total = unique.length;
-    reportMutationProgress(operation.completed, operation.total);
-    let moved = 0;
-    for (const [folder, group] of messageBatchesByFolder(unique, 50)) {
-      const uids = group.map((message) => message.uid);
-      moved += await operation.execute(JSON.stringify(["move", folder, target, uids]), uids,
-        (id) => mailMoveMessages(info, folder, uids, target, id),
-        (done) => removeMessagesLocally(folder, done, group.filter((m) => done.includes(m.uid) && isUnread(m)).length),
-        reportMutationProgress);
-    }
-    return moved;
-  };
-
-  const handleMoveMessages = (targets: MailMessageHeader[], target: string) => runMailAction(async () => {
-    const moved = await moveTargetsTo(targets, target);
-    setStatus(moved > 0 ? `Moved ${moved} message${moved === 1 ? "" : "s"} to ${target}` : "Nothing to move");
-  });
-
-  const handleCopyMessages = (targets: MailMessageHeader[], target: string) => runMailAction(async () => {
-    const unique = dedupeMessages(targets);
-    const operation = mutationSessionRef.current;
-    operation.total = unique.length;
-    reportMutationProgress(operation.completed, operation.total);
-    let copied = 0;
-    for (const [folder, group] of messageBatchesByFolder(unique, 50)) {
-      const uids = group.map((message) => message.uid);
-      copied += await operation.execute(JSON.stringify(["copy", folder, target, uids]), uids,
-        (id) => mailCopyMessages(info, folder, uids, target, id), () => {}, reportMutationProgress);
-    }
-    setStatus(copied > 0 ? `Copied ${copied} message${copied === 1 ? "" : "s"} to ${target}` : "Nothing to copy");
-  });
-
-  const handleArchiveMessages = (targets: MailMessageHeader[]) => runMailAction(async () => {
-    const target = resolveSpecialFolder("archive");
-    if (!target) {
-      setError("No Archive folder found for this account.");
-      return;
-    }
-    const moved = await moveTargetsTo(targets, target);
-    setStatus(moved > 0 ? `Archived ${moved} message${moved === 1 ? "" : "s"}` : "Already archived");
-  });
-
-  const handleJunkMessages = (targets: MailMessageHeader[]) => runMailAction(async () => {
-    const target = resolveSpecialFolder("junk");
-    if (!target) {
-      setError("No Junk folder found for this account.");
-      return;
-    }
-    await setJunkKeywords(targets, true);
-    const moved = await moveTargetsTo(targets, target);
-    setStatus(moved > 0 ? `Moved ${moved} message${moved === 1 ? "" : "s"} to Junk` : "Already in Junk");
-  });
-
-  const handleNotJunkMessages = (targets: MailMessageHeader[]) => runMailAction(async () => {
-    const target = resolveInboxFolder();
-    await setJunkKeywords(targets, false);
-    const moved = await moveTargetsTo(targets, target);
-    setStatus(moved > 0 ? `Moved ${moved} message${moved === 1 ? "" : "s"} to Inbox` : "Already in Inbox");
-  });
-
-  const handleDeleteMessages = (targets: MailMessageHeader[]) => runMailAction(async () => {
-    const unique = dedupeMessages(targets);
-    if (unique.length === 0) return;
-    const trash = resolveSpecialFolder("trash");
-    const allInTrash = trash !== null && unique.every((message) => message.folder === trash);
-    if (!trash || allInTrash) {
-      const confirmed = await confirmDialog.confirm({
-        title: "Delete permanently",
-        message: `Permanently delete ${unique.length} message${unique.length === 1 ? "" : "s"}? This cannot be undone.`,
-        confirmLabel: "Delete",
-        danger: true,
-      });
-      if (!confirmed) return;
-      const operation = mutationSessionRef.current;
-      operation.total = unique.length;
-      reportMutationProgress(operation.completed, operation.total);
-      for (const [folder, group] of messageBatchesByFolder(unique, 50)) {
-        const uids = group.map((message) => message.uid);
-        await operation.execute(JSON.stringify(["delete", folder, uids]), uids,
-          (id) => mailDeleteMessages(info, folder, uids, false, id),
-          (done) => removeMessagesLocally(folder, done, group.filter((m) => done.includes(m.uid) && isUnread(m)).length),
-          reportMutationProgress);
-      }
-      setStatus(`Deleted ${unique.length} message${unique.length === 1 ? "" : "s"}`);
-      return;
-    }
-    const moved = await moveTargetsTo(unique, trash);
-    setStatus(`Moved ${moved} message${moved === 1 ? "" : "s"} to Trash`);
+  const { runMailAction, removeMessagesLocally, reportMutationProgress, resolveSpecialFolder, applyFlagsLocally, handleMarkUnread, handleToggleFlagged, handleToggleKeyword, handleClearTags, handleArchiveMessages, handleMoveMessages, handleCopyMessages, handleJunkMessages, handleNotJunkMessages, handleDeleteMessages, openFilterFromMessage, openContactFromMessage, runFiltersOnFolder } = createMailMutations({
+    setMessages,
+    setSearchResults,
+    setMessageTabs,
+    setFolders,
+    cacheRemovalVersionsRef,
+    setCheckedMessageKeys,
+    setMailViewKey,
+    setSelectedMessageKey,
+    setPopupMessageKey,
+    mutationSessionRef,
+    setMutationProgress,
+    retryMailActionRef,
+    setMutationFailure,
+    setBusyAction,
+    setError,
+    displayFolders,
+    info,
+    incomingFiltersRef,
+    setFilterErrors,
+    setStatus,
+    reloadVisibleFromCache,
+    selectedFolderRef,
+    loadCachedFolders,
+    setContactDraft,
+    setAddressBookOpen,
+    setFilterDraft,
+    setFiltersOpen,
+    confirmDialog,
   });
 
   const buildForwardBody = (
