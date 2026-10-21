@@ -6,6 +6,8 @@ import ts from "typescript";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // These are implementation modules, not alternate application entry points.
 const boundaries = [
+  ["src/components/welcome", "src/components/WelcomePanel.tsx"],
+  ["src/components/vnc/panel", "src/components/vnc/VncPanel.tsx"],
   ["src/components/editor/workspace/host", "src/components/editor/workspace/CodeMirrorHost.tsx"],
   ["src/lib/ipc", "src/lib/ipc.ts"],
   ["src/lib/sessionImportExport", "src/lib/sessionImportExport.ts"],
