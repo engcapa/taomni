@@ -142,3 +142,45 @@ Run [39557611607](https://github.com/engcapa/taomni/actions/runs/39557611607)，
 - 原批次 A 的 Undo、邮件列表、VNC、photo-content 失败在本轮对应平台原始报告均通过；本轮不能抹去之前失败记录，也不能证明以后没有性能抖动。
 
 原始文件保留在 `qa-ui-auto-report/refactor-p0-p5/github-final/`，汇总 `qa-summary-749f8f80c503487f96d591c6dbde1caa/ci-summary.json`。P0–P5 剩余架构退出条件仍未完成。
+
+## 2026-10-21 实施批次 C（进行中）
+
+用户确认 CodeWorkspaceTab 仍过大，并要求其他大文件采用相同职责拆分标准。本批次进一步迁移真实 hook 状态与 lifecycle，仍不能将入口文件描述为轻量 shell：
+
+- CodeWorkspace：保存编排、外部文件变更订阅/合并/关闭、运行配置发现、JUnit 测试发现/执行/结果、符号重构/Extract 命名、断点弹窗、Git HEAD/blame 缓存与异步效果、键盘/MRU 切换、工具窗口尺寸/显隐生命周期成为独立 hooks。Git 缓存与 Extract session 的 state/ref 归属 hook；保留前序控制器读取 later bindings 的惰性访问，避免 render 时 TDZ。
+- 批量替换的整体 preflight 与磁盘快照核对，以及 tab policy 的资源清理/原子布局提交/恢复结果，迁出 JSX 到 controller。工具窗口菜单、条带和 pane 的视图组织单独实现。
+- MainLayout：原生菜单安装与主窗口键盘监听归属 `useMainMenuBridge`，原注销/取消和最新 handler ref 保留。
+- SessionEditor：保存/另存代理/模板/删除、邮件 OAuth、SSH/DB/HBase/代理连接探测各有独立 actions；原 JSON/校验表单状态尚未完整归并，不能算 Session shell 已完成。
+- TerminalPanel：命令历史/建议状态归属 `useTerminalSuggestions`；IME 过滤、输入暂存/释放、广播、二进制输入与 CWD 请求归属 `useTerminalInput`，复用原 session refs 和 cleanup。
+- MailClientTab：flags、移动/复制、垃圾箱/永久删除、批处理幂等 session、失败重试、incoming filters 与缓存列表对账迁入 mutations 模块。
+- SocksCapPanel：rootless 应用配置、启动前检查、已启动进程清单和停止操作迁入 applicationLaunch。
+- 新 workspace hooks 纳入反向 facade 依赖和 runtime cycle 检查。保存静态保护同时扫描 controllers/hooks，仍限定统一 writer 中两处 encoded 写入，并要求只存在一个 writer 接线。
+
+均为行为保持重构，复用原测试与 testcase；不添加仅检查重构后文件/函数存在的用例。保留的关键流程包括 TC-IDE-PARITY-017-02、TC-IDE-C4-01、TC-IDE-C4-02、TC-IDE-CW-LAYOUT-01、TC-019、TC-MAIL-BULK-03 和原 Session/Terminal/MainLayout mounted tests。
+
+### B 后续定向 native 与性能基线
+
+- 修复 runner 的提交 `db2befbf9f8888c8b0c3625687bf47ce5c798632`：run [39567883553](https://github.com/engcapa/taomni/actions/runs/39567883553)，Windows/macOS 各执行 TC-BACKUP-001、TC-RDPS-PERF-01-performance-budget、TC-RDPS-PERF-03-photo-content。6 份原始报告签名/summary 哈希/identity_stable 验证通过，**6 passed**，aggregate passed=true。macOS p95=44.35825 ms、Windows p95=35.9545 ms。没有修改 RDP 实现或阈值，因此不称为性能修复；此前全量超标仍保留。
+- 原始基线 `f3e375ebdeb63e8dad0af807dddf8c475142edf8`：run [39567671565](https://github.com/engcapa/taomni/actions/runs/39567671565)，macOS 原生性能 2 项，**1 passed / 1 failed**。receipt/hash 均验证。PERF-01 p95=50.130166 ms，通过；PERF-03 photo-content FPS ratio=0.8014557576021836 < 0.95，失败。说明 photo-content 超标在重构前也存在；不同 hosted runner 的单次结果不能证明性能等价或提速。RDP server 实现目录 `src-tauri/src/servers/` 在基线至本分支没有变更。
+- 本地 raw artifacts：`github-followup/`、`github-perf-baseline/`。这两次结果绑定 B 后的源码，不能代表 C。
+
+### C 本地验证（暂记）
+
+- `editor-c-stable.log`：CodeWorkspaceTab 原 252 项 + 保存字节/写入边界 20 项，**272 passed**。
+- `types-c5.log`、`types-c6.log`：对应当时迁移组合类型检查通过。
+- `unit-c.log`：**539 files passed / 1 suite failed，5407 passed / 1 conditional skip**。失败套件 MainLayout 因新 hook 末尾整理空返回值时生成多余逗号，transform 失败；其余所有套件（含 editor/mail/session/terminal/sockscap）通过。已修正空返回值，后续 focused MainLayout 与 build 记录待追加。
+- `editor-c.log`：误用 `pnpm test -- ...`，Vitest 将分隔符后参数视为脚本参数，实际启动全量；包含 StructuralSearch 单次失败，主动停止并保留日志。后续正确用 `pnpm exec vitest run <paths>`。最终 unit-c 中 StructuralSearch 已通过。
+- `editor-c-focused.log` 在状态迁移过程中启动，保存静态路径假设未同步，后主动停止；修复并稳定后由 editor-c-stable 完整覆盖。
+- `types-c3.log`：Git hook state 移入后留了一个旧 setter 参数及未使用 import，已修复，后续类型检查通过。
+
+- `main-c-fixed.log`：修正后 MainLayout 原 **48 tests passed**，与 unit-c 已通过的 5407 项合计覆盖原全量 **5455 passed / 1 conditional skip**。无需把相同 539 套件无差别再跑一轮。
+- `build-c-fixed.log`：类型检查通过后，边界 gate 抓到新 terminal hook 的两个类型仍回引 TerminalPanel façade；修为直接依赖原 `panel/types.tsx` 领域类型，未改变运行逻辑。最终构建 `build-c-final.log`。
+
+本批次后六个主要入口（未计新模块）行数：CodeWorkspaceTab 10477，MainLayout 2643，SessionEditor 2122，TerminalPanel 2575，MailClientTab 3638，SocksCapPanel 3391。入口仍有剩余状态/视图编排，需要后续批次；不能据此宣布 P0–P5 完成。
+
+### C 本地验收补充
+
+- `build-c-final.log`：生产构建、761 commands / 328 exports / 39 events 契约及 **175 modules** 边界检查通过。
+- `terminal-c-qa.log`：终端 QA 编译模式 **86 passed / 1 conditional skip**，与默认模式互补。
+- `audit-c.log`：全部静态 gates 通过。
+- `browser-c/run-20261021-165707-464696343`：Linux Chromium 原用例 **4 passed / 0 skipped**，TC-IDE-C4-01（80 步）、TC-IDE-C4-02（46 步）、TC-IDE-CW-LAYOUT-01-resize-and-split-browser（54 步）、TC-IDE-PARITY-017-02（82 步）。签名、summary 哈希及 identity_stable=true 核验通过。三端 native 仍需 GitHub 上本批次源码证据。
