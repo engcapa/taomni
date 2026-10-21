@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, AlertTriangle, ArrowDown, ArrowDownLeft, ArrowUp, ArrowUpRight, CheckCircle2, ChevronDown, ChevronRight, Copy, FolderOpen, HelpCircle, Info, Layers, Loader2, Lock, PanelLeftClose, PanelLeftOpen, Pencil, Play, Plus, RefreshCw, Search, Shield, Square, Trash2, X } from "lucide-react";
-import { sockscapCapabilities, sockscapGetConfig, sockscapValidateMacosApp, sockscapGfwlistStatus, sockscapImportRules, sockscapListProcesses, sockscapRefreshGfwlist, sockscapRecover, sockscapSetConfig, sockscapStart, sockscapLaunchApp, sockscapLaunchedApps, sockscapStopLaunchedApp, sockscapStatsSnapshot, sockscapStatus, sockscapStop, sockscapGetDomainRecords, sockscapClearDomainRecords, sockscapHelperStatus, sockscapTestTarget, sockscapTestUpstream, sockscapTestCoreUpstream, sockscapParseShareLink, sockscapDetectLocalProxies, sockscapDetectTunConflicts, sockscapDiagnostics, sockscapImportSubscription, sockscapInstallRedirector, sockscapRedirectorInstallStatus, upstreamRequiresCore, type AppSelector, type LocalProxyCandidate, type Decision, type DomainRecord, type GfwListStatus, type HelperStatus, type LaunchedAppInfo, type LaunchPreparation, type ProcessInfo, type RedirectorInstallStatus, type RuleMode, type ScopeMode, type SocksCapCapabilities, type SocksCapConfig, type SocksCapProfile, type SocksCapStatus, type StatsSnapshot, type TargetTestResult, type UpstreamKind, type UpstreamParams, type UserRule } from "../../lib/sockscap";
-import { collectProbeTargets, collectUpstreamConfigIssues, type ProbeTarget, type UpstreamConfigIssue } from "../../lib/sockscapPreflight";
+import { sockscapCapabilities, sockscapGetConfig, sockscapValidateMacosApp, sockscapGfwlistStatus, sockscapImportRules, sockscapListProcesses, sockscapRefreshGfwlist, sockscapSetConfig, sockscapLaunchApp, sockscapLaunchedApps, sockscapStopLaunchedApp, sockscapStatsSnapshot, sockscapStatus, sockscapStop, sockscapGetDomainRecords, sockscapClearDomainRecords, sockscapHelperStatus, sockscapTestTarget, sockscapTestUpstream, sockscapTestCoreUpstream, sockscapParseShareLink, sockscapDetectLocalProxies, sockscapDetectTunConflicts, sockscapImportSubscription, sockscapRedirectorInstallStatus, upstreamRequiresCore, type AppSelector, type LocalProxyCandidate, type Decision, type DomainRecord, type GfwListStatus, type HelperStatus, type LaunchedAppInfo, type LaunchPreparation, type ProcessInfo, type RedirectorInstallStatus, type RuleMode, type ScopeMode, type SocksCapCapabilities, type SocksCapConfig, type SocksCapProfile, type SocksCapStatus, type StatsSnapshot, type TargetTestResult, type UpstreamKind, type UpstreamParams, type UserRule } from "../../lib/sockscap";
+import { type UpstreamConfigIssue } from "../../lib/sockscapPreflight";
 import { SocksCapRootPrompt } from "./SocksCapRootPrompt";
 import { SocksCapMacosSetupGuide } from "./SocksCapMacosSetupGuide";
 import { UpstreamSourcePicker, type UpstreamChoice } from "./UpstreamSourcePicker";
@@ -11,12 +11,14 @@ import { isTauriRuntime } from "../../lib/runtime";
 import { writeText } from "../../lib/clipboard";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useAppStore } from "../../stores/appStore";
-import { type Props, type MacosSetupGuideMode, hasCompletedMacosSetup, type SessionOpt, type EnvironmentDraft, normalizeFrontendConfig, DEFAULT_CFG, DEFAULT_PROFILE, profilesByPriority, MIN_PROFILE_PRIORITY, MAX_PROFILE_PRIORITY, needsStartElevation, SOCKSCAP_MACOS_SETUP_STORAGE_KEY, isRootRequiredError, isSudoAuthenticationError, needsRecoveryElevation, phaseTone } from "./panel/configuration";
+import { type Props, type MacosSetupGuideMode, hasCompletedMacosSetup, type SessionOpt, type EnvironmentDraft, normalizeFrontendConfig, DEFAULT_CFG, DEFAULT_PROFILE, profilesByPriority, MIN_PROFILE_PRIORITY, MAX_PROFILE_PRIORITY, phaseTone } from "./panel/configuration";
 import { Field } from "./panel/Field";
 import { normalizeLaunchPreparation, formatRootlessArguments, launchPreparationIsEmpty, rootlessAppKey, parseShellArguments, formatRootlessCommand } from "./panel/launchPolicy";
 import { formatSpeed, formatBytes, formatTime } from "./panel/formatting";
 import { Section } from "./panel/Section";
 import { ManualAppAdd } from "./panel/ManualAppAdd";
+import { createSocksCapLifecycleActions } from "./panel/lifecycleActions";
+
 
 
 export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
@@ -620,295 +622,35 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     await persistConfig(nextCfg);
     report("方案已删除");
   };
-
-  const onRefreshStatus = async () => {
-    setBusy(true);
-    try {
-      const [st, sn, hp, gf, drs, ri, launched] = await Promise.all([
-        sockscapStatus().catch(() => null),
-        sockscapStatsSnapshot().catch(() => null),
-        sockscapHelperStatus().catch(() => null),
-        sockscapGfwlistStatus().catch(() => null),
-        sockscapGetDomainRecords().catch(() => null),
-        sockscapRedirectorInstallStatus().catch(() => null),
-        sockscapLaunchedApps().catch(() => []),
-      ]);
-      if (st) setStatus(st);
-      if (sn) setStats(sn);
-      if (hp) setHelper(hp);
-      if (gf) setGfw(gf);
-      if (drs) setDomainRecords(drs);
-      if (ri) setRedirectorInstall(ri);
-      setLaunchedApps(launched);
-      report(t("sockscap.statusRefreshed"));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // Probe a single upstream the same way the "Test upstream" button does —
-  // core kinds spin up a throwaway xray sidecar; native kinds dial directly.
-  // Uses the stored passwordRef (what a real start dials with), not the typed
-  // password. Throws on failure so the caller can collect it.
-  const probeUpstream = async (target: ProbeTarget): Promise<void> => {
-    const u = target.upstream;
-    if (upstreamRequiresCore(u.kind)) {
-      await sockscapTestCoreUpstream({
-        upstream: u,
-        testHost: "www.google.com",
-        testPort: 443,
-      });
-    } else {
-      await sockscapTestUpstream({
-        kind: u.kind,
-        host: u.host || "127.0.0.1",
-        port: u.port || 1080,
-        username: u.username,
-        password: u.passwordRef || undefined,
-        sessionId: u.sessionId || undefined,
-        testHost: "www.google.com",
-        testPort: 443,
-      });
-    }
-  };
-
-  // Start button entry point: reject unconfigured upstreams, probe configured
-  // ones, and only then start. A probe failure surfaces a force/cancel prompt.
-  const preflightAndStart = async (
-    configOverride?: SocksCapConfig,
-  ): Promise<boolean> => {
-    const startConfig = configOverride ?? cfg;
-    if (!startConfig || busy || probing) return false;
-
-    // 1) Empty upstream(s) → block start, tell the user which profile.
-    const issues = collectUpstreamConfigIssues(startConfig);
-    if (issues.length > 0) {
-      setConfigIssues(issues);
-      return false;
-    }
-
-    // 2) Probe every configured active upstream in parallel.
-    const targets = collectProbeTargets(startConfig);
-    if (targets.length === 0) {
-      return onStart(undefined, startConfig);
-    }
-    setProbing(true);
-    try {
-      const results = await Promise.all(
-        targets.map((tg) =>
-          probeUpstream(tg).then(
-            () => null,
-            (e) => ({
-              profileName: tg.profileName,
-              kind: tg.kind as string,
-              error: String(e),
-            }),
-          ),
-        ),
-      );
-      const failures = results.filter(
-        (r): r is { profileName: string; kind: string; error: string } => r !== null,
-      );
-      if (failures.length > 0) {
-        if (linuxLaunchOnly) {
-          const detail = failures
-            .map((failure) => `${failure.profileName} (${failure.kind}): ${failure.error}`)
-            .join("\n\n");
-          openTestDetail(t("sockscap.rootlessProbeFailedTitle"), detail);
-          report(t("sockscap.rootlessProbeFailed"), false);
-        } else {
-          setProbeFailures(failures);
-        }
-        return false;
-      }
-    } finally {
-      setProbing(false);
-    }
-
-    // 3) All probes passed → start.
-    if (needsStartElevation(caps)) {
-      setRootPromptIntent("start");
-      setRootPromptError(null);
-      return false;
-    }
-    return onStart(undefined, startConfig);
-  };
-
-  const onStart = async (
-    sudoPassword?: string,
-    configOverride?: SocksCapConfig,
-  ): Promise<boolean> => {
-    const startConfig = configOverride ?? cfg;
-    if (!startConfig) return false;
-    setMacosSetupError(null);
-    if (sudoPassword) {
-      setRootPromptBusy(true);
-      setRootPromptError(null);
-    } else {
-      setBusy(true);
-    }
-    try {
-      await sockscapSetConfig(startConfig);
-      const st = await sockscapStart(sudoPassword);
-      setStatus(st);
-      setRootPromptIntent(null);
-      setRootPromptError(null);
-      if (
-        caps?.platform === "macos" &&
-        (st.phase === "active" || st.phase === "degraded")
-      ) {
-        setMacosSetupCompleted(true);
-        setMacosSetupGuideMode(null);
-        try {
-          window.localStorage.setItem(SOCKSCAP_MACOS_SETUP_STORAGE_KEY, "complete");
-        } catch {
-          // Setup completion is still retained for this session when storage is unavailable.
-        }
-      }
-      report(st.message || t("sockscap.started"), st.phase !== "idle");
-      const [gf, sn, hp, launched] = await Promise.all([
-        sockscapGfwlistStatus().catch(() => null),
-        sockscapStatsSnapshot().catch(() => null),
-        sockscapHelperStatus().catch(() => null),
-        sockscapLaunchedApps().catch(() => []),
-      ]);
-      setGfw(gf);
-      if (sn) setStats(sn);
-      if (hp) setHelper(hp);
-      setLaunchedApps(launched);
-      return true;
-    } catch (e) {
-      const errStr = String(e);
-      const needsPassword = needsStartElevation(caps);
-      if (needsPassword && !sudoPassword && isRootRequiredError(errStr)) {
-        setRootPromptIntent("start");
-        setRootPromptError(null);
-      } else if (needsPassword && sudoPassword && isSudoAuthenticationError(errStr)) {
-        setRootPromptIntent("start");
-        setRootPromptError(t("sockscap.rootPromptIncorrectPassword"));
-      } else {
-        if (sudoPassword) setRootPromptIntent(null);
-        if (caps?.platform === "macos") {
-          const latestInstall = await sockscapRedirectorInstallStatus().catch(() => null);
-          if (latestInstall) setRedirectorInstall(latestInstall);
-          const lower = errStr.toLowerCase();
-          if (
-            latestInstall?.state === "pendingSystemApproval" ||
-            lower.includes("redirector") ||
-            lower.includes("system extension") ||
-            lower.includes("network configuration")
-          ) {
-            setMacosSetupGuideMode("onboarding");
-          }
-        }
-        report(errStr, false);
-      }
-      return false;
-    } finally {
-      setBusy(false);
-      setRootPromptBusy(false);
-    }
-  };
-
-  const onStop = async () => {
-    setBusy(true);
-    try {
-      const st = await sockscapStop();
-      setStatus(st);
-      const [sn, hp] = await Promise.all([
-        sockscapStatsSnapshot().catch(() => null),
-        sockscapHelperStatus().catch(() => null),
-      ]);
-      if (sn) setStats(sn);
-      if (hp) setHelper(hp);
-      setLaunchedApps([]);
-      report(t("sockscap.stopped"));
-    } catch (e) {
-      report(String(e), false);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onRecover = async (sudoPassword?: string) => {
-    if (sudoPassword) {
-      setRootPromptBusy(true);
-      setRootPromptError(null);
-    } else {
-      setBusy(true);
-    }
-    try {
-      await sockscapRecover(sudoPassword);
-      setRootPromptIntent(null);
-      setRootPromptError(null);
-      await refresh();
-      report(t("sockscap.recovered"));
-    } catch (e) {
-      const errStr = String(e);
-      const needsPassword = needsRecoveryElevation(caps?.platform);
-      if (needsPassword && !sudoPassword && isRootRequiredError(errStr)) {
-        setRootPromptIntent("recover");
-        setRootPromptError(null);
-      } else if (needsPassword && sudoPassword && isSudoAuthenticationError(errStr)) {
-        setRootPromptIntent("recover");
-        setRootPromptError(t("sockscap.rootPromptIncorrectPassword"));
-      } else {
-        if (sudoPassword) setRootPromptIntent(null);
-        report(errStr, false);
-      }
-    } finally {
-      setBusy(false);
-      setRootPromptBusy(false);
-    }
-  };
-
-  const copyDiagnostics = async () => {
-    try {
-      const diagnostics = await sockscapDiagnostics();
-      await writeText(JSON.stringify(diagnostics, null, 2));
-      report(t("sockscap.diagnosticsCopied"));
-    } catch (e) {
-      report(String(e), false);
-    }
-  };
-
-  const installRedirector = async () => {
-    setBusy(true);
-    setMacosSetupError(null);
-    try {
-      const install = await sockscapInstallRedirector();
-      setRedirectorInstall(install);
-      await refresh();
-      report(install.message);
-    } catch (e) {
-      const error = String(e);
-      setMacosSetupError(error);
-      report(error, false);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const refreshRedirectorApproval = async () => {
-    setBusy(true);
-    setMacosSetupError(null);
-    try {
-      const install = await sockscapRedirectorInstallStatus();
-      setRedirectorInstall(install);
-      report(t("sockscap.statusRefreshed"));
-    } catch (e) {
-      const error = String(e);
-      setMacosSetupError(error);
-      report(error, false);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const continueMacosSetupToStart = () => {
-    setMacosSetupGuideMode(null);
-    window.requestAnimationFrame(() => startButtonRef.current?.focus());
-  };
+  const { preflightAndStart, onStop, onRefreshStatus, onRecover, copyDiagnostics, refreshRedirectorApproval, installRedirector, continueMacosSetupToStart, onStart } = createSocksCapLifecycleActions({
+    setBusy,
+    setStatus,
+    setStats,
+    setHelper,
+    setGfw,
+    setDomainRecords,
+    setRedirectorInstall,
+    setLaunchedApps,
+    report,
+    t,
+    cfg,
+    busy,
+    probing,
+    setConfigIssues,
+    setProbing,
+    linuxLaunchOnly,
+    openTestDetail,
+    setProbeFailures,
+    caps,
+    setRootPromptIntent,
+    setRootPromptError,
+    setMacosSetupError,
+    setRootPromptBusy,
+    setMacosSetupCompleted,
+    setMacosSetupGuideMode,
+    refresh,
+    startButtonRef,
+  });
 
   const onRefreshGfw = async () => {
     if (!cfg || locked) return;
@@ -3802,5 +3544,6 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     </div>
   );
 }
+
 
 export { SOCKSCAP_MACOS_SETUP_STORAGE_KEY } from "./panel/configuration";
