@@ -460,3 +460,20 @@ K 定向 [39619541727](https://github.com/engcapa/taomni/actions/runs/3961954172
 K 最终全量 `k-unit-final.log`：**543 files / 5466 passed / 1 conditional skip**，exit 0。该结果包含确定帧顺序的焦点测试修正；首轮 1 failed 的日志保留。生产源码迁移复核 28 个原 initializer，除依赖访问路径和 2 处 type literal 尾部分号格式外保持原表达式。
 
 H/I/J 全量的当前下载仅含 8 reports（Linux browser 396、Linux dual-display native 1、macOS browser 230），均签名/hash/stable identity 通过，尚非完整结果。GitHub 39616923665 与 39619541727 仍在执行；最终三端结论待下载全部 artifacts 后核验。
+
+## 2026-10-21 实施批次 L：邮件 owner 与小文件约束
+
+根目录 `AGENTS.md` 已在 `bd8ddb29` 加入持续规则：手写源码以 200–500 行为目标，超过 500 行复核职责，新文件和提取模块不超过 800 行；既有大文件禁止继续增加职责。按状态、生命周期、协议和平台拆分，保留取消/清理与异步归属，禁止通过压缩排版、删除测试或另建巨型 controller 降低表面行数。生成绑定、schema、locale 和不可分 fixture 采用明确例外。此次也纠正定向 Vitest 命令，使用 `pnpm exec vitest run <files>`，避免 `--` 把过滤器变成透传参数。
+
+`MailClientTab.tsx` 从 2761 行降至 799 行，`MailClientView` 614 行，其余新模块 53–293 行左右。消息缓存持有同步更新的 live list、正文请求表、请求代次和缓存删除版本；加载、同步/补历史、线程与范围选择、邮件标签页、阅读/自动标记、写信/草稿/Outbox、联系人、日历/提醒、回执、字体与面板和快捷键各有独立 owner。菜单与各弹窗采用显式类型输入，视图消费 typed owner，未将整份组件搬入另一个大 controller。原有接口、隐藏标签页后台同步、批处理重试、SMTP 接受与 Sent-copy 状态、草稿自动保存和证书确认保留。
+
+联系人查询的额外回归用例先复现关闭写信窗口后的迟到响应重新填入建议列表（`l-recipient-red.log`：2 passed / 1 failed），随后在 effect cleanup 作废对应请求序号。测试还覆盖旧查询后到、账户切换隔离；未删除/放宽断言。`TC-MAIL-CONTACTS-01` 增加关闭→重新打开→再查询的 browser/native 入口验证，原用例 ID、目录映射与断言保留。竞态由 unit test 控制响应顺序，入口 case 不声称控制了 native 后端响应时序。
+
+- 定向组合 `l-mail-final.log`：5 files / 78 passed。随后只将 mock 的响应类型从 UI 建议类型收窄为真实 IPC 的 `MailContactSuggestion`；此前构建因该测试类型不匹配失败（`l-build.log`），不是产品运行失败，修正后的构建与该单测复核另记。
+- `browser-l/run-20261021-232358-964768938`：13 passed / 0 failed / 0 skipped；批量操作、联系人重开、邀请、快捷键、退订、Outbox、回执、搜索、发送、标签、线程和收件人校验。签名、summary hash、identity_stable 核验通过。Summary SHA-256 `af77f998fbc22655a0a87521b12e41b35b14b9e3b30359614c48ad1bf9884bec`；源码身份 `aecdf40018290d09723f61f4d565ef5bab81ea1746173d2c28cad51ee5f46569`。此报告在上述测试类型修正之前；生产实现与 case 相同，不作为整个任务最终提交的当前 native 证据。
+- `audit-l.log`：全部静态 gate 通过。没有把 catalog/schema 检查计作执行通过。
+- `l-mail-tests.log` 是误将文件过滤放在 `--` 后启动的全量运行，已终止，不计完成验证；正确的 `l-mail-focused.log` 为 4 files / 75 passed。最终任务仍需稳定提交的全量测试与三端 workflow。
+
+全文件清单现为 2558 项。P0→P5 其余结构退出条件及最终三端验证继续推进，不以此单批次宣布整体完成。
+
+L 修正后的 `l-build-final.log` 成功：TypeScript、761 commands / 328 façade exports / 39 literal events、424 implementation modules 的边界检查及 Vite 构建全部通过。`l-recipient-final.log` 3 passed，IPC mock 类型与真实边界一致。

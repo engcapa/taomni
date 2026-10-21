@@ -69,6 +69,19 @@ steps:
     selector: '[data-testid="mail-recipient-suggestions"]'
     contains: Zed Contact
 - screenshot: mail-contacts-01-autocomplete.png
+- click: '[role="dialog"][aria-label="New message"] button[aria-label="Close dialog"]'
+- assert_not_visible: '[role="dialog"][aria-label="New message"]'
+- click: '[data-testid="mail-compose-open"]'
+- fill:
+    selector: '[data-testid="mail-recipient-to"] input'
+    value: zed.con
+- wait_for:
+    selector: '[data-testid="mail-recipient-suggestion"]'
+    timeout_sec: 20
+- assert_text:
+    selector: '[data-testid="mail-recipient-suggestions"]'
+    contains: Zed Contact
+- screenshot: mail-contacts-01-reopened.png
 verification:
   review: reviewed
   requirements:
@@ -106,6 +119,23 @@ verification:
     results:
     - 18
     - 19
+  - id: R3
+    requirement: 关闭写信窗口后重新打开，重新输入联系人片段仍能得到当前查询的建议；关闭期间的迟到查询不得恢复旧建议（该竞态另由 owner 单测控制响应顺序验证）。
+    actions:
+    - 21
+    - 23
+    - 24
+    checkpoints:
+    - step: 22
+      expectation: 写信窗口关闭。
+    - step: 25
+      expectation: 重新打开后出现当前查询的联系人建议。
+    - step: 26
+      expectation: 建议中仍包含 Zed Contact。
+    results:
+    - 22
+    - 25
+    - 26
   visual:
   - check: 截图中收件人下拉列出 “Zed Contact <zed.contact@example.org>”。
     method: manual

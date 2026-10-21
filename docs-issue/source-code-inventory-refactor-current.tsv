@@ -1647,7 +1647,7 @@ src/components/mail/MailArchiveDialog.tsx	frontend	tsx	frontend-component	192	5	
 src/components/mail/MailArchivePanel.test.tsx	frontend	tsx	test	125	4	0	0		自动化测试/QA 集成测试
 src/components/mail/MailArchivePanel.tsx	frontend	tsx	frontend-component	62	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/mail/MailClientTab.test.tsx	frontend	tsx	test	1887	10	0	0		自动化测试/QA 集成测试
-src/components/mail/MailClientTab.tsx	frontend	tsx	frontend-component	2761	62	1	0	>=2000	邮件主界面：文件夹/消息列表、阅读器、线程、搜索、草稿、附件、变更操作和轮询
+src/components/mail/MailClientTab.tsx	frontend	tsx	frontend-component	799	41	1	0		邮件主界面：文件夹/消息列表、阅读器、线程、搜索、草稿、附件、变更操作和轮询
 src/components/mail/MailFiltersPanel.test.tsx	frontend	tsx	test	131	4	0	0		自动化测试/QA 集成测试
 src/components/mail/MailFiltersPanel.tsx	frontend	tsx	frontend-component	488	4	2	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/mail/MailHtmlReader.test.tsx	frontend	tsx	test	35	3	0	0		自动化测试/QA 集成测试
@@ -1663,14 +1663,23 @@ src/components/mail/RecipientField.test.tsx	frontend	tsx	test	103	5	0	0		自动�
 src/components/mail/RecipientField.tsx	frontend	tsx	frontend-component	228	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/mail/RichMailEditor.test.tsx	frontend	tsx	test	412	3	0	0		自动化测试/QA 集成测试
 src/components/mail/RichMailEditor.tsx	frontend	tsx	frontend-component	731	8	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mail/client/MailAddressBookDialog.tsx	frontend	tsx	frontend-component	44	7	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/mail/client/MailAgendaDialog.tsx	frontend	tsx	frontend-component	38	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/mail/client/MailCertificateDialog.tsx	frontend	tsx	frontend-component	78	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/mail/client/MailClientView.tsx	frontend	tsx	frontend-component	614	34	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/mail/client/MailComposePrompt.tsx	frontend	tsx	frontend-component	84	2	1	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/mail/client/MailComposer.tsx	frontend	tsx	frontend-component	344	14	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/mail/client/MailDraftsDialog.tsx	frontend	tsx	frontend-component	153	7	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/mail/client/MailDraggableDialog.tsx	frontend	tsx	frontend-component	56	3	1	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/mail/client/MailFiltersDialog.tsx	frontend	tsx	frontend-component	65	7	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/mail/client/MailFoldersPane.tsx	frontend	tsx	frontend-component	185	10	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/mail/client/MailListRow.tsx	frontend	tsx	frontend-component	140	9	1	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/mail/client/MailMessagePopup.tsx	frontend	tsx	frontend-component	41	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/mail/client/MailMessagesPane.tsx	frontend	tsx	frontend-component	165	10	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/mail/client/MailReaderPane.tsx	frontend	tsx	frontend-component	236	9	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/mail/client/MailRowActions.tsx	frontend	tsx	frontend-component	13	2	1	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/mail/client/MailSourceDialog.tsx	frontend	tsx	frontend-component	41	3	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/mail/client/MailSubscriptionsDialog.tsx	frontend	tsx	frontend-component	73	6	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/mail/client/MailToolbar.tsx	frontend	tsx	frontend-component	269	5	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/mail/client/RemoteImagesBanner.tsx	frontend	tsx	frontend-component	61	1	1	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/mail/client/ai.tsx	frontend	tsx	frontend-component	36	4	3	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
@@ -1682,6 +1691,7 @@ src/components/mail/client/createAttachmentActions.tsx	frontend	tsx	frontend-com
 src/components/mail/client/createCertificateActions.tsx	frontend	tsx	frontend-component	72	5	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/mail/client/createFolderActions.tsx	frontend	tsx	frontend-component	125	5	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/mail/client/createInvitationControls.tsx	frontend	tsx	frontend-component	180	6	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/mail/client/createMailMenus.tsx	frontend	tsx	frontend-component	300	14	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/mail/client/createMailReaderRenderer.tsx	frontend	tsx	frontend-component	226	8	2	0		按职责拆分的领域模块；生产入口调用，保留原有 API 与生命周期
 src/components/mail/client/createMessageExportActions.tsx	frontend	tsx	frontend-component	99	6	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/mail/client/draftActions.ts	frontend	ts	frontend-component	183	8	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
@@ -1693,9 +1703,23 @@ src/components/mail/client/readActions.ts	frontend	ts	frontend-component	154	5	8
 src/components/mail/client/synchronization.ts	frontend	ts	frontend-component	472	6	14	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/mail/client/types.tsx	frontend	tsx	frontend-component	92	4	11	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/mail/client/useComposerAttachments.tsx	frontend	tsx	frontend-component	123	8	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/mail/client/useMailAppearance.ts	frontend	ts	frontend-component	119	5	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/mail/client/useMailCacheActions.ts	frontend	ts	frontend-component	63	5	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/mail/client/useMailCacheLoading.ts	frontend	ts	frontend-component	96	5	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/mail/client/useMailCacheState.ts	frontend	ts	frontend-component	53	3	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/mail/client/useMailCalendar.ts	frontend	ts	frontend-component	110	6	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/mail/client/useMailComposer.ts	frontend	ts	frontend-component	293	14	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/mail/client/useMailMessageTabs.ts	frontend	ts	frontend-component	79	3	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/mail/client/useMailOutbox.ts	frontend	ts	frontend-component	372	11	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/mail/client/useMailReading.ts	frontend	ts	frontend-component	119	9	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/mail/client/useMailSearch.ts	frontend	ts	frontend-feature-lib	126	4	2	0		按职责拆分的领域模块；生产入口调用，保留原有 API 与生命周期
+src/components/mail/client/useMailSelection.ts	frontend	ts	frontend-component	133	6	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/mail/client/useMailShortcuts.ts	frontend	ts	frontend-component	139	6	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/mail/client/useMailSynchronization.ts	frontend	ts	frontend-component	271	9	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/mail/client/useMailboxLifecycle.tsx	frontend	tsx	frontend-component	239	5	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/mail/client/useReadReceipts.tsx	frontend	tsx	frontend-component	79	3	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/mail/client/useRecipientSuggestions.test.ts	frontend	ts	test	85	6	0	0		行为回归测试
+src/components/mail/client/useRecipientSuggestions.ts	frontend	ts	frontend-component	94	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/mail/client/useRemoteContentPermissions.ts	frontend	ts	frontend-feature-lib	41	1	1	0		按职责拆分的领域模块；生产入口调用，保留原有 API 与生命周期
 src/components/menubar/commands.ts	frontend	ts	frontend-feature-lib	31	0	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/menubar/useSessionImportExport.tsx	frontend	tsx	frontend-component	223	12	3	0		React UI/交互组件，具体职责由目录和文件名定义

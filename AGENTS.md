@@ -50,7 +50,7 @@ Apply these requirements when adding or changing features that access external n
 
 ## Testing Guidelines
 
-Frontend tests use Vitest, jsdom, and Testing Library. Colocate `*.test.ts` or `*.test.tsx` with source; run focused tests with `pnpm test -- src/path/example.test.ts`. Rust unit tests live in `#[cfg(test)]` modules.
+Frontend tests use Vitest, jsdom, and Testing Library. Colocate `*.test.ts` or `*.test.tsx` with source; run focused tests with `pnpm exec vitest run src/path/example.test.ts`. Do not put `--` before file filters: Vitest treats subsequent arguments as passthrough and can run the full suite. Rust unit tests live in `#[cfg(test)]` modules.
 
 Cover changed behavior and regressions; Vitest has no configured numeric coverage threshold. UI cases use `TC-XXX-<slug>.testcase.yaml`; follow `qa-ui-auto-tests/README.md` for browser/native runs. Verify native behavior in the desktop app because browser tests use stubs. Live SSH tests require environment credentials and explicit opt-in; see `src-tauri/tests/README.md`.
 
