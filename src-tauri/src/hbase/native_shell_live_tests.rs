@@ -1,4 +1,3 @@
-
 //! End-to-end test of the shell-command path (parse + native_execute)
 //! against a live standalone HBase. Gated by HBASE_LIVE_TEST=1.
 use super::model::HBaseShellResult;

@@ -519,7 +519,8 @@ pub async fn java_debug_resolve_main_classes(
 ) -> Result<JavaMainClassResolution, String> {
     let scope = session_scope(&launch_config)?;
     let resolved = state
-        .workspace.lsp
+        .workspace
+        .lsp
         .execute_java_command(
             scope.workspace_id.clone(),
             scope.root_path.clone(),

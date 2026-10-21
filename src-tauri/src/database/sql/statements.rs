@@ -1,4 +1,3 @@
-
 /// Heuristic: does the statement return rows? (SELECT/SHOW/DESCRIBE/WITH/...)
 pub(super) fn sql_head_keyword(sql: &str) -> String {
     executable_sql_head(sql)

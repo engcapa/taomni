@@ -128,7 +128,8 @@ pub async fn java_test_discover(
     let uri = crate::java_test::file_uri(root_path.as_deref(), &file_path)?;
     let identity = crate::lsp::JavaSessionIdentity::new(server_command_id, custom_server_command);
     let result = state
-        .workspace.lsp
+        .workspace
+        .lsp
         .execute_java_command(
             workspace_id,
             root_path,
@@ -224,7 +225,8 @@ pub async fn java_test_resolve_launch(
 ) -> Result<JavaTestLaunch, String> {
     let identity = crate::lsp::JavaSessionIdentity::new(server_command_id, custom_server_command);
     let result = state
-        .workspace.lsp
+        .workspace
+        .lsp
         .execute_java_command(
             workspace_id,
             root_path,

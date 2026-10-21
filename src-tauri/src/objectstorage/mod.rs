@@ -238,7 +238,8 @@ async fn get_session(
     session_id: &str,
 ) -> Result<Arc<ObjectStorageSession>, String> {
     state
-        .files.oss_sessions
+        .files
+        .oss_sessions
         .read()
         .await
         .get(session_id)
@@ -256,7 +257,8 @@ pub async fn storage_attach(
 ) -> Result<(), String> {
     let session = build_session(&state, session_id.clone(), config).await?;
     if let Some(old) = state
-        .files.oss_sessions
+        .files
+        .oss_sessions
         .write()
         .await
         .insert(session_id, Arc::new(session))

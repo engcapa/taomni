@@ -22,39 +22,69 @@ pub const MAX_NOTE_CHARS: usize = 500;
 /// Smallest pin arranged by tiling (logical px), so content stays legible.
 const MIN_ARRANGED: f64 = 96.0;
 
-pub(super) fn tools_label(pin: &str) -> String { format!("screenshot-tools-{pin}") }
+pub(super) fn tools_label(pin: &str) -> String {
+    format!("screenshot-tools-{pin}")
+}
 
 pub(super) fn close_pin_tools(app: &AppHandle, pin: &str) {
-    if let Some(window) = app.get_webview_window(&tools_label(pin)) { let _ = window.close(); }
+    if let Some(window) = app.get_webview_window(&tools_label(pin)) {
+        let _ = window.close();
+    }
 }
 
 #[tauri::command]
-pub async fn screenshot_open_pin_tools(app: AppHandle, window: WebviewWindow, view: serde_json::Value) -> Result<String, String> {
+pub async fn screenshot_open_pin_tools(
+    app: AppHandle,
+    window: WebviewWindow,
+    view: serde_json::Value,
+) -> Result<String, String> {
     let pin = window.label().to_string();
-    if !tool_state().pins.contains_key(&pin) { return Err("not a pin window".into()); }
+    if !tool_state().pins.contains_key(&pin) {
+        return Err("not a pin window".into());
+    }
     let label = tools_label(&pin);
-    tool_state().pin_tools.insert(label.clone(), serde_json::json!({"label":pin,"view":view}));
+    tool_state()
+        .pin_tools
+        .insert(label.clone(), serde_json::json!({"label":pin,"view":view}));
     if let Some(tools) = app.get_webview_window(&label) {
         tools.show().map_err(|e| e.to_string())?;
         tools.set_focus().map_err(|e| e.to_string())?;
         return Ok(label);
     }
-    let tools = super::window_builder(&app, &label, tauri::WebviewUrl::App("index.html#screenshot-pin-tools".into()))
-        .title("Pin options").inner_size(420.0, 620.0).min_inner_size(360.0, 400.0)
-        .resizable(true).always_on_top(true).visible(false).build().map_err(|e| e.to_string())?;
+    let tools = super::window_builder(
+        &app,
+        &label,
+        tauri::WebviewUrl::App("index.html#screenshot-pin-tools".into()),
+    )
+    .title("Pin options")
+    .inner_size(420.0, 620.0)
+    .min_inner_size(360.0, 400.0)
+    .resizable(true)
+    .always_on_top(true)
+    .visible(false)
+    .build()
+    .map_err(|e| e.to_string())?;
     let monitor = pin_monitor(&app, window).await?;
     let area = monitor.work_area();
     let scale = monitor.scale_factor().max(1.0);
-    tools.set_position(tauri::LogicalPosition::new(
-        area.position.x as f64 / scale + (area.size.width as f64 / scale - 420.0).max(0.0) / 2.0,
-        area.position.y as f64 / scale + (area.size.height as f64 / scale - 620.0).max(0.0) / 2.0,
-    )).map_err(|e| e.to_string())?;
+    tools
+        .set_position(tauri::LogicalPosition::new(
+            area.position.x as f64 / scale
+                + (area.size.width as f64 / scale - 420.0).max(0.0) / 2.0,
+            area.position.y as f64 / scale
+                + (area.size.height as f64 / scale - 620.0).max(0.0) / 2.0,
+        ))
+        .map_err(|e| e.to_string())?;
     let closed_app = app.clone();
     let closed_label = label.clone();
     tools.on_window_event(move |event| {
         if matches!(event, tauri::WindowEvent::Destroyed) {
             tool_state().pin_tools.remove(&closed_label);
-            let _ = closed_app.emit_to(&pin, "screenshot://pin-tool", serde_json::json!({"action":"toolsClosed"}));
+            let _ = closed_app.emit_to(
+                &pin,
+                "screenshot://pin-tool",
+                serde_json::json!({"action":"toolsClosed"}),
+            );
         }
     });
     tools.show().map_err(|e| e.to_string())?;
@@ -64,11 +94,18 @@ pub async fn screenshot_open_pin_tools(app: AppHandle, window: WebviewWindow, vi
 
 #[tauri::command]
 pub async fn screenshot_pin_tools_init(window: WebviewWindow) -> Result<serde_json::Value, String> {
-    tool_state().pin_tools.get(window.label()).cloned().ok_or("pin options are closed".into())
+    tool_state()
+        .pin_tools
+        .get(window.label())
+        .cloned()
+        .ok_or("pin options are closed".into())
 }
 
 #[tauri::command]
-pub async fn screenshot_close_pin_tools(app: AppHandle, window: WebviewWindow) -> Result<(), String> {
+pub async fn screenshot_close_pin_tools(
+    app: AppHandle,
+    window: WebviewWindow,
+) -> Result<(), String> {
     close_pin_tools(&app, window.label());
     Ok(())
 }
@@ -191,7 +228,10 @@ pub fn arrange(sizes: &[(f64, f64)], area: Rect, mode: PinArrangement, scale: f6
             let step = 32.0 * s;
             // Restart the diagonal every ten pins so all stay on screen.
             let depth = (n - 1).min(10) as f64;
-            let (max_w, max_h) = (area.w - gap * 2.0 - step * depth, area.h - gap * 2.0 - step * depth);
+            let (max_w, max_h) = (
+                area.w - gap * 2.0 - step * depth,
+                area.h - gap * 2.0 - step * depth,
+            );
             sizes
                 .iter()
                 .enumerate()
@@ -371,18 +411,28 @@ pub async fn screenshot_arrange_pins(
             .map(|s| s.width as f64 <= 70.0 * monitor.scale_factor())
             .unwrap_or(false);
         if !collapsed {
-            window.set_size(PhysicalSize::new(rect.w as u32, rect.h as u32)).map_err(|e| e.to_string())?;
+            window
+                .set_size(PhysicalSize::new(rect.w as u32, rect.h as u32))
+                .map_err(|e| e.to_string())?;
         }
-        window.set_position(PhysicalPosition::new(rect.x as i32, rect.y as i32)).map_err(|e| e.to_string())?;
+        window
+            .set_position(PhysicalPosition::new(rect.x as i32, rect.y as i32))
+            .map_err(|e| e.to_string())?;
     }
-    let _ = app.emit(PIN_ACTION_EVENT, serde_json::json!({ "action": "arranged" }));
+    let _ = app.emit(
+        PIN_ACTION_EVENT,
+        serde_json::json!({ "action": "arranged" }),
+    );
     Ok(targets.len())
 }
 
 /// Apply one action to every open pin. Closing happens here; view-state
 /// actions are applied by each pin window through [`PIN_ACTION_EVENT`].
 #[tauri::command]
-pub async fn screenshot_pins_batch(app: AppHandle, action: PinBatchAction) -> Result<usize, String> {
+pub async fn screenshot_pins_batch(
+    app: AppHandle,
+    action: PinBatchAction,
+) -> Result<usize, String> {
     let pins = pin_windows(&app);
     let count = pins.len();
     if action == PinBatchAction::CloseAll {
@@ -423,27 +473,52 @@ pub struct BoardPin {
 
 #[tauri::command]
 pub fn screenshot_board_pins() -> Vec<BoardPin> {
-    let mut pins: Vec<_> = super::tool_state().pins.iter().map(|(label, pin)| BoardPin { label: label.clone(), pin: pin.clone() }).collect();
+    let mut pins: Vec<_> = super::tool_state()
+        .pins
+        .iter()
+        .map(|(label, pin)| BoardPin {
+            label: label.clone(),
+            pin: pin.clone(),
+        })
+        .collect();
     pins.sort_by_key(|pin| pin_order(&pin.label));
     pins
 }
 
 fn open_board(app: &AppHandle, mode: PinArrangement) -> Result<(), String> {
-    let board = if let Some(board) = app.get_webview_window(BOARD_LABEL) { board } else {
-        let board = super::window_builder(app, BOARD_LABEL, tauri::WebviewUrl::App("index.html#screenshot-pin-board".into()))
-            .title("Pinned screenshots").inner_size(1000.0, 700.0).always_on_top(true).build().map_err(|e| e.to_string())?;
+    let board = if let Some(board) = app.get_webview_window(BOARD_LABEL) {
+        board
+    } else {
+        let board = super::window_builder(
+            app,
+            BOARD_LABEL,
+            tauri::WebviewUrl::App("index.html#screenshot-pin-board".into()),
+        )
+        .title("Pinned screenshots")
+        .inner_size(1000.0, 700.0)
+        .always_on_top(true)
+        .build()
+        .map_err(|e| e.to_string())?;
         let handle = app.clone();
         board.on_window_event(move |event| {
             if matches!(event, tauri::WindowEvent::Destroyed) {
-                for (_, pin) in pin_windows(&handle) { let _ = pin.show(); }
+                for (_, pin) in pin_windows(&handle) {
+                    let _ = pin.show();
+                }
             }
         });
         board
     };
     board.show().map_err(|e| e.to_string())?;
     board.set_focus().map_err(|e| e.to_string())?;
-    for (_, pin) in pin_windows(app) { pin.hide().map_err(|e| e.to_string())?; }
-    app.emit(PIN_ACTION_EVENT, serde_json::json!({"action":"arranged", "mode":mode})).map_err(|e| e.to_string())?;
+    for (_, pin) in pin_windows(app) {
+        pin.hide().map_err(|e| e.to_string())?;
+    }
+    app.emit(
+        PIN_ACTION_EVENT,
+        serde_json::json!({"action":"arranged", "mode":mode}),
+    )
+    .map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -451,10 +526,18 @@ fn open_board(app: &AppHandle, mode: PinArrangement) -> Result<(), String> {
 mod tests {
     use super::*;
 
-    const AREA: Rect = Rect { x: 0.0, y: 0.0, w: 1920.0, h: 1040.0 };
+    const AREA: Rect = Rect {
+        x: 0.0,
+        y: 0.0,
+        w: 1920.0,
+        h: 1040.0,
+    };
 
     fn inside(r: &Rect, area: Rect) -> bool {
-        r.x >= area.x && r.y >= area.y && r.x + r.w <= area.x + area.w + 0.5 && r.y + r.h <= area.y + area.h + 0.5
+        r.x >= area.x
+            && r.y >= area.y
+            && r.x + r.w <= area.x + area.w + 0.5
+            && r.y + r.h <= area.y + area.h + 0.5
     }
 
     fn overlaps(a: &Rect, b: &Rect) -> bool {
@@ -480,7 +563,12 @@ mod tests {
     fn tile_keeps_aspect_and_never_upscales() {
         let rects = arrange(&[(200.0, 100.0)], AREA, PinArrangement::Tile, 1.0);
         assert_eq!((rects[0].w, rects[0].h), (200.0, 100.0));
-        let big = arrange(&[(4000.0, 2000.0), (4000.0, 2000.0)], AREA, PinArrangement::Tile, 1.0);
+        let big = arrange(
+            &[(4000.0, 2000.0), (4000.0, 2000.0)],
+            AREA,
+            PinArrangement::Tile,
+            1.0,
+        );
         for r in &big {
             assert!((r.w / r.h - 2.0).abs() < 0.02, "{r:?}");
             assert!(r.w < 4000.0);
@@ -489,8 +577,18 @@ mod tests {
 
     #[test]
     fn work_area_offset_is_respected_on_secondary_or_panel_monitors() {
-        let area = Rect { x: -1280.0, y: 40.0, w: 1280.0, h: 984.0 };
-        for mode in [PinArrangement::Tile, PinArrangement::Cascade, PinArrangement::StackRight, PinArrangement::StackBottom] {
+        let area = Rect {
+            x: -1280.0,
+            y: 40.0,
+            w: 1280.0,
+            h: 984.0,
+        };
+        for mode in [
+            PinArrangement::Tile,
+            PinArrangement::Cascade,
+            PinArrangement::StackRight,
+            PinArrangement::StackBottom,
+        ] {
             for r in arrange(&[(500.0, 400.0); 7], area, mode, 1.0) {
                 assert!(inside(&r, area), "{mode:?}: {r:?}");
             }
@@ -525,14 +623,33 @@ mod tests {
     #[test]
     fn empty_input_and_degenerate_area_are_noops() {
         assert!(arrange(&[], AREA, PinArrangement::Tile, 1.0).is_empty());
-        assert!(arrange(&[(10.0, 10.0)], Rect { x: 0.0, y: 0.0, w: 0.0, h: 10.0 }, PinArrangement::Tile, 1.0).is_empty());
+        assert!(
+            arrange(
+                &[(10.0, 10.0)],
+                Rect {
+                    x: 0.0,
+                    y: 0.0,
+                    w: 0.0,
+                    h: 10.0
+                },
+                PinArrangement::Tile,
+                1.0
+            )
+            .is_empty()
+        );
     }
 
     #[test]
     fn notes_are_trimmed_bounded_and_stripped_of_control_characters() {
         assert_eq!(normalize_note("  login page\u{7}  "), "login page");
         assert_eq!(normalize_note("line 1\nline 2"), "line 1\nline 2");
-        assert_eq!(normalize_note(&"x".repeat(900)).chars().count(), MAX_NOTE_CHARS);
-        assert_eq!(normalize_note(&"字".repeat(600)).chars().count(), MAX_NOTE_CHARS);
+        assert_eq!(
+            normalize_note(&"x".repeat(900)).chars().count(),
+            MAX_NOTE_CHARS
+        );
+        assert_eq!(
+            normalize_note(&"字".repeat(600)).chars().count(),
+            MAX_NOTE_CHARS
+        );
     }
 }

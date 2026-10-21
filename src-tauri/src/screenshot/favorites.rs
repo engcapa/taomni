@@ -189,7 +189,14 @@ pub async fn screenshot_pin_favorite(app: AppHandle, id: String) -> Result<Strin
         Ok((path, favorite))
     })
     .await?;
-    super::open_pin_with_note(&app, path, favorite.width, favorite.height, Some(favorite.id), favorite.note)
+    super::open_pin_with_note(
+        &app,
+        path,
+        favorite.width,
+        favorite.height,
+        Some(favorite.id),
+        favorite.note,
+    )
 }
 
 #[cfg(test)]

@@ -136,7 +136,15 @@ pub async fn cc_send_message(
     // Get or create CC process for this thread. Only a *new* process writes
     // temp config files; a reused one keeps the obscure settings file it was
     // launched with (scrubbed when the session stops).
-    let existing = { state.agent.cc_processes.lock().await.get(&req.thread_id).cloned() };
+    let existing = {
+        state
+            .agent
+            .cc_processes
+            .lock()
+            .await
+            .get(&req.thread_id)
+            .cloned()
+    };
     let process = match existing {
         Some(p) => p,
         None => {
@@ -289,7 +297,8 @@ pub(crate) async fn recycle_thread_process(state: &AppState, thread_id: &str) {
             // `session_id` is the tab id stored at capture time; `terminals` is
             // keyed by the backend session id, so translate via the live map.
             let backend_sid = state
-                .agent.cc_tab_sessions
+                .agent
+                .cc_tab_sessions
                 .lock()
                 .ok()
                 .and_then(|m| m.get(&session_id).cloned())
@@ -315,7 +324,8 @@ pub async fn cc_cancel_capture(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let notify = state
-        .agent.cc_capture_cancels
+        .agent
+        .cc_capture_cancels
         .lock()
         .map_err(|e| e.to_string())?
         .get(&capture_id)
@@ -339,7 +349,8 @@ pub async fn cc_track_terminal(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state
-        .agent.cc_tab_sessions
+        .agent
+        .cc_tab_sessions
         .lock()
         .map_err(|e| e.to_string())?
         .insert(tab_id, session_id);
@@ -356,7 +367,11 @@ pub async fn cc_untrack_terminal(
     session_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let mut map = state.agent.cc_tab_sessions.lock().map_err(|e| e.to_string())?;
+    let mut map = state
+        .agent
+        .cc_tab_sessions
+        .lock()
+        .map_err(|e| e.to_string())?;
     if map.get(&tab_id).is_some_and(|s| *s == session_id) {
         map.remove(&tab_id);
     }
@@ -374,7 +389,8 @@ pub async fn cc_resolve_tool_call(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let sender = state
-        .agent.cc_pending_tool_calls
+        .agent
+        .cc_pending_tool_calls
         .lock()
         .map_err(|e| e.to_string())?
         .remove(&call_id);
@@ -396,7 +412,8 @@ pub async fn cc_resolve_permission(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let sender = state
-        .agent.cc_pending_permissions
+        .agent
+        .cc_pending_permissions
         .lock()
         .map_err(|e| e.to_string())?
         .remove(&call_id);
@@ -446,7 +463,15 @@ pub async fn cc_stream_message(
         }
     };
 
-    let existing = { state.agent.cc_processes.lock().await.get(&req.thread_id).cloned() };
+    let existing = {
+        state
+            .agent
+            .cc_processes
+            .lock()
+            .await
+            .get(&req.thread_id)
+            .cloned()
+    };
     let process = match existing {
         Some(p) => p,
         None => {

@@ -54,15 +54,15 @@ pub use rpc::{
 };
 pub use stream::GatewayStream;
 pub use tunnel::open_tunnel;
-mod rpc;
+mod authentication;
+mod bootstrap;
 mod http;
 mod payload;
-mod bootstrap;
-mod authentication;
-mod stream;
-mod tunnel;
-mod transport;
+mod rpc;
 mod rpc_transport;
+mod stream;
+mod transport;
+mod tunnel;
 
 #[cfg(test)]
 mod tests;

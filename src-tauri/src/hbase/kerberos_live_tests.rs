@@ -1,4 +1,3 @@
-
 //! End-to-end test against a live *Kerberos-secured* HBase, exercising the
 //! exact program path the UI uses: `build_session` (which parses
 //! hbase-site.xml, runs the keytab env setup, and builds the native client)

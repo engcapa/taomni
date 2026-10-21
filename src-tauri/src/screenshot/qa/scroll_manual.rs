@@ -3,12 +3,17 @@ use super::*;
 /// GTK client-side shadows belong to the Wayland buffer, not the configured
 /// document size. Observe Mutter's visible frame and retain the buffer facts
 /// separately; a fixed shadow allowance would hide actual size regressions.
-async fn document_size(window: &WebviewWindow) -> anyhow::Result<(tauri::PhysicalSize<u32>, Value)> {
+async fn document_size(
+    window: &WebviewWindow,
+) -> anyhow::Result<(tauri::PhysicalSize<u32>, Value)> {
     #[cfg(target_os = "linux")]
     if wayland::active() {
         let native = wayland::window(window).await?;
         let size = wayland::rect(&native["frame"], window.scale_factor()?.max(0.5))?.1;
-        return Ok((size, json!({"transport":"Mutter frame excluding GTK shadows","native":native})));
+        return Ok((
+            size,
+            json!({"transport":"Mutter frame excluding GTK shadows","native":native}),
+        ));
     }
     let size = window.inner_size()?;
     Ok((size, json!({"transport":"native inner size","size":size})))
@@ -197,7 +202,9 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
         let maximized = overlay.is_maximized().map_err(|e| e.to_string())?;
         editor_state = json!({"resizable":resizable,"fullscreen":fullscreen,"decorated":decorated,"maximized":maximized});
         editor_resizable = resizable && !fullscreen && !maximized && decorated;
-        if editor_resizable { break; }
+        if editor_resizable {
+            break;
+        }
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
     let expected_width = (display.width as f64 / display.scale_factor.max(1.0) * 0.8).min(1100.0);
@@ -207,22 +214,31 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
     let mut initial_editor_sized = false;
     let initial_deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < initial_deadline {
-        (initial_editor_size, initial_editor_geometry) = document_size(&overlay).await.map_err(|e| e.to_string())?;
-        initial_editor_sized = (initial_editor_size.width as f64 / source.scale - expected_width).abs() < 3.0
-            && (initial_editor_size.height as f64 / source.scale - expected_height).abs() < 3.0;
-        if initial_editor_sized { break; }
+        (initial_editor_size, initial_editor_geometry) =
+            document_size(&overlay).await.map_err(|e| e.to_string())?;
+        initial_editor_sized =
+            (initial_editor_size.width as f64 / source.scale - expected_width).abs() < 3.0
+                && (initial_editor_size.height as f64 / source.scale - expected_height).abs() < 3.0;
+        if initial_editor_sized {
+            break;
+        }
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
-    overlay.set_size(tauri::LogicalSize::new(760.0, 620.0)).map_err(|e| e.to_string())?;
+    overlay
+        .set_size(tauri::LogicalSize::new(760.0, 620.0))
+        .map_err(|e| e.to_string())?;
     let mut editor_size = tauri::PhysicalSize::new(0, 0);
     let mut editor_geometry = json!({});
     let mut editor_resized = false;
     let resize_deadline = Instant::now() + Duration::from_secs(5);
     while Instant::now() < resize_deadline {
-        (editor_size, editor_geometry) = document_size(&overlay).await.map_err(|e| e.to_string())?;
+        (editor_size, editor_geometry) =
+            document_size(&overlay).await.map_err(|e| e.to_string())?;
         editor_resized = (editor_size.width as f64 / source.scale - 760.0).abs() < 3.0
             && (editor_size.height as f64 / source.scale - 620.0).abs() < 3.0;
-        if editor_resized { break; }
+        if editor_resized {
+            break;
+        }
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
     let output = super::super::tool_state()
@@ -285,8 +301,7 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
                 w: size.width as i32,
                 h: size.height as i32,
             };
-            if cancel_bar.is_visible().map_err(|e| e.to_string())?
-                && !captured.intersects(controls)
+            if cancel_bar.is_visible().map_err(|e| e.to_string())? && !captured.intersects(controls)
             {
                 break controls;
             }
@@ -310,7 +325,9 @@ pub async fn screenshot_qa_scroll_manual(app: AppHandle) -> Result<String, Strin
     trace.mark("cancelled", cancelled.clone());
     Ok(report(
         bottom_still_active
-            && editor_resizable && initial_editor_sized && editor_resized
+            && editor_resizable
+            && initial_editor_sized
+            && editor_resized
             && preview["preview"] == true
             && comparison["passed"] == true
             && cancelled == true

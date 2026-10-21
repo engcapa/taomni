@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use crate::support::mock_provider::{MockEvent, MockLlm};
-use taomni_lib::llm::router::{provider_group_route_id, FallbackConfig, LlmRouter};
+use taomni_lib::llm::router::{FallbackConfig, LlmRouter, provider_group_route_id};
 use taomni_lib::llm::{ChatRequest, TaskKind};
 
 fn req() -> ChatRequest {

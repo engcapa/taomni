@@ -205,7 +205,8 @@ pub async fn codex_test_config(
 
     {
         state
-            .agent.codex_processes
+            .agent
+            .codex_processes
             .lock()
             .await
             .insert(thread_id.clone(), process.clone());

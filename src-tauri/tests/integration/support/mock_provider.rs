@@ -52,7 +52,7 @@ impl Llm for MockLlm {
                     return Err(LlmError::Provider {
                         status: 500,
                         message: m.clone(),
-                    })
+                    });
                 }
             }
         }

@@ -44,11 +44,17 @@ fn recognize_inner(png: &[u8], width: u32, height: u32) -> Result<MacOcr, String
         .into_iter()
         .filter(|l| supported.iter().any(|s| s == l))
         .collect();
-    let langs = if wanted.is_empty() { vec!["en-US"] } else { wanted };
+    let langs = if wanted.is_empty() {
+        vec!["en-US"]
+    } else {
+        wanted
+    };
     let ns_langs: Vec<Retained<NSString>> = langs.iter().map(|l| NSString::from_str(l)).collect();
     request.setRecognitionLanguages(&NSArray::from_retained_slice(&ns_langs));
     let requests: Retained<NSArray<VNRequest>> =
-        NSArray::from_retained_slice(&[Retained::into_super(Retained::into_super(request.clone()))]);
+        NSArray::from_retained_slice(&[Retained::into_super(Retained::into_super(
+            request.clone(),
+        ))]);
     handler
         .performRequests_error(&requests)
         .map_err(|e| format!("macOS Vision OCR failed: {}", e.localizedDescription()))?;
@@ -56,7 +62,9 @@ fn recognize_inner(png: &[u8], width: u32, height: u32) -> Result<MacOcr, String
     if let Some(observations) = request.results() {
         for (line_index, observation) in observations.iter().enumerate() {
             let candidates = observation.topCandidates(1);
-            let Some(best) = candidates.firstObject() else { continue };
+            let Some(best) = candidates.firstObject() else {
+                continue;
+            };
             let text = best.string().to_string();
             if text.trim().is_empty() {
                 continue;
@@ -68,8 +76,16 @@ fn recognize_inner(png: &[u8], width: u32, height: u32) -> Result<MacOcr, String
             let h = (b.size.height * height as f64).max(1.0);
             let y = ((1.0 - b.origin.y - b.size.height) * height as f64).max(0.0);
             let conf = best.confidence() * 100.0;
-            words.extend(split_line_words(&text, (x, y, w, h), conf, &format!("0:0:{line_index}")));
+            words.extend(split_line_words(
+                &text,
+                (x, y, w, h),
+                conf,
+                &format!("0:0:{line_index}"),
+            ));
         }
     }
-    Ok(MacOcr { words, langs: langs.join("+") })
+    Ok(MacOcr {
+        words,
+        langs: langs.join("+"),
+    })
 }

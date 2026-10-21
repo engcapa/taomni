@@ -366,8 +366,7 @@ mod tests {
         append_history(&conn, &second).unwrap();
         append_history(&conn, &other_session).unwrap();
 
-        let changed =
-            update_history_tab_name(&conn, "s1", "panel-1", Some("订单巡检")).unwrap();
+        let changed = update_history_tab_name(&conn, "s1", "panel-1", Some("订单巡检")).unwrap();
         assert_eq!(changed, 1);
 
         let rows = list_history(&conn, None, None, 10).unwrap();
