@@ -104,11 +104,18 @@ class SelectionTests(unittest.TestCase):
                 self.assertEqual(entry['desktop']['display_server'], 'Xorg dummy')
 
     def test_full_wayland_native_selection_matches_x11_case_ids(self):
+        from qa_ui_auto.ci import discover
         plan = make_plan(args(scope='all', platforms='linux', modes='native',
                               linux_profiles='ubuntu-24.04-xvfb,ubuntu-26.04-wayland'))
         x11 = [e for e in plan['entries'] if e['linux_profile'] == 'ubuntu-24.04-xvfb']
         wayland = [e for e in plan['entries'] if e['linux_profile'] == 'ubuntu-26.04-wayland']
-        self.assertEqual({cid for entry in x11 for cid in entry['selected_ids']}, {
+        # linux_x11_required cases are a declared capability gap on Wayland, not
+        # a silently dropped id: the Wayland selection must equal the X11 one
+        # minus exactly the cases that declare that requirement.
+        x11_only = {case.id for case in discover(Path('qa-ui-auto-tests/cases'))
+                    if 'linux_x11_required' in case.fixtures}
+        self.assertIn('TC-SHOT-N25', x11_only)
+        self.assertEqual({cid for entry in x11 for cid in entry['selected_ids']} - x11_only, {
             cid for entry in wayland for cid in entry['selected_ids']
         })
         self.assertEqual(len(x11), 2)
@@ -117,7 +124,8 @@ class SelectionTests(unittest.TestCase):
         # The user's external project remains unavailable on both desktops.
         self.assertEqual([(g['case'], g['linux_profile']) for g in plan['gaps']], [
             ('TC-IDE-C6-06-java-definition-realproject-native', 'ubuntu-24.04-xvfb'),
-            ('TC-IDE-C6-06-java-definition-realproject-native', 'ubuntu-26.04-wayland')])
+            ('TC-IDE-C6-06-java-definition-realproject-native', 'ubuntu-26.04-wayland'),
+            *[(cid, 'ubuntu-26.04-wayland') for cid in sorted(x11_only)]])
 
     def test_restore_pulls_predecessor_before_it(self):
         cid = 'TC-auto-F-DB-1-query-tab-rename-native-restore'

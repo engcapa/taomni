@@ -42,6 +42,12 @@ steps:
     value: ${fixture.mail_quick_connect}
 - click: '[data-testid="qc-submit"]'
 - wait_for: '[data-testid="mail-client-tab"]'
+# The tab can open with the folder counts already cached while its header list
+# is still empty ("No cached messages. Run Sync to refresh all folders."), and
+# that state can outlive a 60s wait on a loaded runner. Request the folder sync
+# explicitly, like the other mail cases do; IDLE push below is what this case
+# proves.
+- click: '[data-testid="mail-sync-button"]'
 - mail_server_assert_list_matches:
     timeout_sec: 60
 - wait_for:
@@ -78,29 +84,30 @@ verification:
     - 3
     - 5
     - 6
-    - 12
+    - 8
+    - 13
     checkpoints:
-    - step: 8
-      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
     - step: 9
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-idle-status\"][data-active=\"true\"]", "timeout_sec": 30}}'
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
     - step: 10
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-idle-status\"][data-active=\"true\"]", "timeout_sec": 30}}'
+    - step: 11
       expectation: '{"mail_server_assert_idle_clients": {"equals": 1, "timeout_sec": 20}}'
-    - step: 12
-      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 15}}'
     - step: 13
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 15}}'
+    - step: 14
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "Pushed 0003", "timeout_sec": 10}}'
     results:
-    - 12
     - 13
+    - 14
   - id: R2
     requirement: 关闭标签后 IDLE 连接在 10 秒内释放（AC-37，DEC-01 不做后台收信）。
     actions:
-    - 15
+    - 16
     checkpoints:
-    - step: 16
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-client-tab\"]", "state": "detached"}}'
     - step: 17
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-client-tab\"]", "state": "detached"}}'
+    - step: 18
       expectation: '{"mail_server_assert_idle_clients": {"equals": 0, "timeout_sec": 10}}'
     results:
     - 17

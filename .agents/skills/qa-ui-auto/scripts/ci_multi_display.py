@@ -80,7 +80,7 @@ def patterns(report):
     display = Gdk.Display.get_default()
     if display.get_n_monitors() != 2:
         raise RuntimeError(f"GTK sees {display.get_n_monitors()} monitors, dual fixture is not ready")
-    windows, facts = [], []
+    windows, facts, areas = [], [], []
     for index in range(2):
         monitor = display.get_monitor(index)
         rect = monitor.get_geometry()
@@ -92,6 +92,12 @@ def patterns(report):
         area = Gtk.DrawingArea()
         area.connect("draw", lambda widget, context, i=index: paint(
             context, widget.get_allocated_width(), widget.get_allocated_height(), i))
+        # The 200% output resizes the window after its first draw, and a
+        # Wayland compositor can keep that half-allocated buffer on screen for
+        # the rest of the run (the capture then matched only the painted half).
+        # Repaint on every allocation change and once per readiness tick.
+        area.connect("size-allocate", lambda *_: area.queue_draw())
+        areas.append(area)
         window.add(area)
         window.show_all()
         # Send the explicit output request after creating the native surface.
@@ -108,6 +114,8 @@ def patterns(report):
             "scale": scale, "expected": str(expected.resolve()), "primary": monitor == display.get_primary_monitor()})
     started, last = time.monotonic(), [None]
     def ready():
+        for area in areas:
+            area.queue_draw()
         observations = []
         for window, fact in zip(windows, facts):
             size = window.get_size()
