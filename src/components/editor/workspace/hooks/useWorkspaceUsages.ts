@@ -1,21 +1,19 @@
 import { useCallback } from "react";
-import { type LspDocumentDescriptor, type LspPosition } from "../../../../lib/editor/lsp";
-import { type BottomDockTabId } from "../../../../stores/codeWorkspaceStore";
-import { WorkspaceSemanticQueryHost } from "../workspaceSemanticQueryHost";
 import { confirmAppDialog } from "../../../../lib/appDialogs";
-import { type ReferencesResultState } from "../panels/ReferencesPanel";
-import { UsageQuerySession, type UsagesScopeSelection } from "../usageQuerySession";
+import { type LspDocumentDescriptor,type LspPosition } from "../../../../lib/editor/lsp";
+import { type BottomDockTabId } from "../../../../stores/codeWorkspaceStore";
 import type { CodeWorkspaceRootInfo } from "../../../../types";
 import { type OpenFileState } from "../codeWorkspaceModel";
 import { createRunFindReferences } from "../controller/navigationActions";
+import { type UsagesScopeSelection } from "../usageQuerySession";
+import { WorkspaceSemanticQueryHost } from "../workspaceSemanticQueryHost";
+import type { WorkspaceUsagesState } from "./useWorkspaceUsagesState";
 
 
 export interface UseWorkspaceUsagesContext {
-  referencesRequestSequenceRef: import("react").RefObject<number>;
+  usages: WorkspaceUsagesState;
   setBottomDockOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
   setBottomDockTab: (tab: BottomDockTabId | ((prev: BottomDockTabId) => BottomDockTabId)) => void;
-  setReferencesResult: import("react").Dispatch<import("react").SetStateAction<ReferencesResultState>>;
-  usageSessionRef: import("react").RefObject<UsageQuerySession | null>;
   semanticIndex: import("../useWorkspaceSemanticIndex").WorkspaceSemanticIndexController;
   ensureWorkspaceSemanticDocumentsSynced: (requiredFileKey: string, expectedRevision: number) => Promise<OpenFileState | null>;
   lspDescriptorForFile: (file: OpenFileState) => LspDocumentDescriptor | null;
@@ -25,26 +23,15 @@ export interface UseWorkspaceUsagesContext {
   rootsRef: import("react").RefObject<CodeWorkspaceRootInfo[]>;
   semanticQueryHostRef: import("react").RefObject<WorkspaceSemanticQueryHost>;
   updateLspStatusForFile: (file: OpenFileState, status: import("../../../../lib/editor/lsp").LspDocumentStatus) => void;
-  referencesRerunRef: import("react").RefObject<{ fileKey: string; uri: string; position: LspPosition; symbolName: string; } | null>;
   projectAnalysisSnapshot: import("../projectAnalysisModel").JavaProjectAnalysisSnapshotV1 | null;
-  setUsagesRecentsRevision: import("react").Dispatch<import("react").SetStateAction<number>>;
   setStatusMessage: (message: string) => void;
-  referencesPinnedRef: import("react").RefObject<boolean>;
-  setUsagesScopeDialog: import("react").Dispatch<import("react").SetStateAction<{ open: boolean; file: OpenFileState; position: LspPosition; } | null>>;
-  findReferencesRef: import("react").RefObject<(file: OpenFileState, position: LspPosition) => Promise<void>>;
-  setUsagesScopeSelection: import("react").Dispatch<import("react").SetStateAction<UsagesScopeSelection>>;
-  usagesScopeDialog: { open: boolean; file: OpenFileState; position: LspPosition; } | null;
   openFilesRef: import("react").RefObject<Record<string, import("../editorGroupTypes").OpenFileViewModel>>;
-  usagesScopeSelection: UsagesScopeSelection;
 }
 
 export function useWorkspaceUsages(context: UseWorkspaceUsagesContext) {
   const {
-    referencesRequestSequenceRef,
     setBottomDockOpen,
     setBottomDockTab,
-    setReferencesResult,
-    usageSessionRef,
     semanticIndex,
     ensureWorkspaceSemanticDocumentsSynced,
     lspDescriptorForFile,
@@ -54,18 +41,11 @@ export function useWorkspaceUsages(context: UseWorkspaceUsagesContext) {
     rootsRef,
     semanticQueryHostRef,
     updateLspStatusForFile,
-    referencesRerunRef,
     projectAnalysisSnapshot,
-    setUsagesRecentsRevision,
     setStatusMessage,
-    referencesPinnedRef,
-    setUsagesScopeDialog,
-    findReferencesRef,
-    setUsagesScopeSelection,
-    usagesScopeDialog,
     openFilesRef,
-    usagesScopeSelection,
   } = context;
+  const { referencesRequestSequenceRef, setReferencesResult, usageSessionRef, referencesRerunRef, setUsagesRecentsRevision, referencesPinnedRef, setUsagesScopeDialog, findReferencesRef, setUsagesScopeSelection, usagesScopeDialog, usagesScopeSelection } = context.usages;
 
   const runFindReferences = useCallback(
     createRunFindReferences({

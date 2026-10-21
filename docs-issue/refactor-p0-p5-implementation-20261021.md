@@ -360,3 +360,32 @@ Linux 凭据诊断：临时目录解包 libsecret-tools（没有修改系统安�
 - 本批不改用户行为，沿用已有 SocksCap browser/native 场景。真实 WinDivert/UAC 流量接管仍需要匹配具备驱动与权限的原生场景，不把纯算法测试计为真实网络接管验证。
 
 G 补充：`g-windows-typecheck-final.log` 使用临时最小 Cargo manifest 直接引用实际 helper `main.rs`，`cargo check --target x86_64-pc-windows-gnu --tests --offline` 通过，覆盖全部生产 helper 与 tests 的 Windows cfg/type/import 边界。它不是 Windows 可执行测试，后续 hosted Windows 会真正运行 binary unit tests。首次临时 manifest 漏列 tracing 导致检查失败，补齐后通过，未为此修改产品依赖。当前全文件清单 2502 项。
+
+
+### D/E 定向对照结果
+
+两个 run 均核验 2 份原始 receipt 的 signature/hash/identity_stable；aggregate 均为 `report_ok=true`、`passed=false`，无 infrastructure_errors。每个版本实际 Linux native 3 passed / 1 failed、Windows native 5 passed，0 skipped。原 E 的凭据 fixture 和 3 项 Windows Java 场景在同提交定向对照中通过，D 也通过；这是定向通过证据，不能覆盖原全量失败或据此确认某一种 race 原因。
+
+Linux TC-RDPS-PERF-03-photo-content 在两个版本均未达标：D `fps_ratio=0.8550504600956308`、E `0.9421719934680614`，要求仍为 ≥0.95。该指标取 decoded marker 的 observed FPS；D baseline/adaptive 为 34.60/29.58，E 为 32.99/31.09。两组 bulk decompression_errors 均为 0，adaptive 选择 RemoteFX photo tiles，不能把正确解码等同于性能通过。D 在 E 之前的完整 run 曾通过，现在定向基线也失败，说明并非 E 独有；确切性能原因仍需调查，未更改阈值。
+
+F/G 组合全量 [39609696680](https://github.com/engcapa/taomni/actions/runs/39609696680) 测试完整 SHA `513cea1f1a1426f66e77f1121042aa71f7f3ff24`，三平台 browser/native，等待最终 raw reports。
+
+## 2026-10-21 实施批次 H：编辑器状态与生命周期
+
+CodeWorkspaceTab 从 7715 行降至 7104 行。新边界按职责拥有原 state/ref/effect，而非把全部状态送入另一个巨型 controller：
+
+- `useWorkspaceAppearance`：外观 hydration/migration/persistence、workspace rebinding、每个 editor 的 zoom、soft wrap、列选模式、树字体与 clipboard history 配置。
+- `useWorkspaceToolWindowRouting`：legacy dock/right-pane 路由、同一 microtask 的 open/tab 顺序处理、tool layout 和稳定内容 host nodes。原 `useWorkspaceToolWindows` 的尺寸/焦点/恢复控制保留。
+- `useWorkspaceInspections`：profile 与 rule/baseline/suppression 操作、clipboard import/export、源诊断数组的 WeakMap 显示缓存，保持 provider 原始 diagnostics 不变。
+- `useWorkspaceIntelligencePreferences` 与 `useWorkspaceParameterInfo`：分别拥有偏好和 completion session manager、参数提示 provider 请求及文件切换/invalidation/Escape 接线；原 ReferenceInfoSession owner 保留订阅和 dispose。
+- `useWorkspaceUsagesState`：唯一 UsageQuerySession、dispose、pin/scope/recents/result/rerun marker；actions hook 接收一个 typed owner，面板的 pin/restore 操作归还 owner。
+- `useWorkspaceHierarchy`：call/type roots、request sequence、provider/project provenance 和 stale panel props，不向 shell 暴露内部 setters。
+- `useWorkspaceKeymap`：scheme hydration/persistence、action host 同步、shell key claims、mouse listener 的注册与清理。
+- `useWorkspaceTabPolicy`：policy/revision/receipt、设置窗口焦点返回与事务 base revision；已有 layout restore 和 apply transaction 继续用原契约。
+
+新增 routing mounted tests 验证 open→tab / tab→open 均定位到已移动工具窗口、同 microtask suppression 在下一轮失效、内容 node 不重建，及 documentation 隐藏/重开。纯重构继续使用既有用户入口 cases；不新增只检查文件存在的 case。原有 browser usages case 仅打开 Analysis，不能用它证明真实 provider 的 pin/rerun/hierarchy；这些由现有 session/panel/semantic 单测和最终 native 证据区分。
+
+H 迭代证据：`h-editor-fixed.log` 5 files / 289 passed，`h-routing-tests.log` 3 passed；最终组合 `h-build.log` 通过。初次 `h-types.log` 捕获提取时误用了已有 hook 名称以及 Usages 参数残留，已恢复原 hook 并将新 owner 命名为 ToolWindowRouting，`h-types-fixed.log` 通过。旧 `h-editor-tests.log` 在缺陷修正后终止，未作为通过证据。最终全量 unit 和 browser 结果后续追加。
+
+
+H browser：`browser-h/run-20261021-215313-961905131` **9 passed / 0 skipped**，TC-IDE-C4-01、C5-01、CW-UI-01、PARITY-004-01/02/03、010-01/03、024-01；包括设置应用/重开、键位 draft/apply/conflict/cancel/reset/delete/输入保护、工具窗口移动和保留 dirty editor。receipt signature、summary hash、stable identity 已核验，summary sha256 `65f979546f6256d529a188169eaa10a150b5df379f7ed891ec2b44af80929404`，运行期间产品源码未改。`h-build.log` 通过 761 commands / 328 façade exports / 39 literal events 与 373 implementation boundaries；当前文件清单 2512 项。

@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen,type UnlistenFn } from "@tauri-apps/api/event";
 import { Activity,AlertTriangle,BookOpen,Braces,Bug,FlaskConical,FolderTree,GitBranch,GitCommitHorizontal,GitFork,Hammer,ListTodo,ListTree,Network,Play,Search,ShieldCheck,TerminalSquare } from "lucide-react";
-import { Fragment,startTransition,useCallback,useDeferredValue,useEffect,useLayoutEffect,useMemo,useRef,useState,type CSSProperties,type ReactNode } from "react";
+import { Fragment,startTransition,useCallback,useDeferredValue,useEffect,useLayoutEffect,useMemo,useRef,useState,type ReactNode } from "react";
 import { createPortal,flushSync } from "react-dom";
 import { Panel,Group as PanelGroup,Separator as PanelResizeHandle,type PanelImperativeHandle } from "react-resizable-panels";
 import { useMountedRef } from "../../hooks/useMountedRef";
@@ -9,8 +9,7 @@ import { useProjectDescriptorDiscovery } from "../../hooks/useProjectDescriptorD
 import { useProjectFacts } from "../../hooks/useProjectFacts";
 import { promptAppDialog } from "../../lib/appDialogs";
 import { loadAutoImportPreferences } from "../../lib/autoImportPreferences";
-import { readText,writeText } from "../../lib/clipboard";
-import { loadCodeViewProfile } from "../../lib/codeViewProfile";
+import { writeText } from "../../lib/clipboard";
 import { lspCodeActionResolve,lspDocumentSymbols,lspJavaModules,lspResolveWorkspaceEdit,lspSelectionRanges,lspStartWorkspaceWatcher,lspStopWorkspaceWatcher,lspWorkspaceSymbolResolve,type LspCodeAction,type LspDiagnostic,type LspDocumentDescriptor,type LspDocumentHighlight,type LspDocumentSymbol,type LspInlayHint,type LspLocation,type LspPosition,type LspRange,type LspSemanticToken,type LspWorkspaceApplyEditRequest,type LspWorkspaceEdit,type LspWorkspaceEditOperation } from "../../lib/editor/lsp";
 import type { StructuralMatch } from "../../lib/editor/structuralSearch";
 import { workspaceReadFile,workspaceReadLooseFile,type WorkspaceToolConfig } from "../../lib/editor/workspace";
@@ -18,11 +17,10 @@ import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
 import { useT } from "../../lib/i18n";
 import { isTauriRuntime } from "../../lib/runtime";
 import { openSettingsSection } from "../../lib/settingsNavigation";
-import { registerShellKeyClaim } from "../../lib/shellKeyClaims";
 import { useAppStore } from "../../stores/appStore";
 import { useChatStore } from "../../stores/chatStore";
 import { useCodeWorkspaceStatusStore } from "../../stores/codeWorkspaceStatusStore";
-import { selectCodeWorkspaceUi,useCodeWorkspaceStore,type BottomDockTabId,type EditorGroupId,type RightPaneTabId } from "../../stores/codeWorkspaceStore";
+import { selectCodeWorkspaceUi,useCodeWorkspaceStore,type BottomDockTabId,type EditorGroupId } from "../../stores/codeWorkspaceStore";
 import { useMainRailHostStore } from "../../stores/mainRailHostStore";
 import { useProjectFactsStore } from "../../stores/projectFactsStore";
 import type { CodeWorkspaceFileRef,CodeWorkspaceLooseFileInfo,CodeWorkspaceRootInfo } from "../../types";
@@ -77,21 +75,21 @@ import { type AutoImportCandidate } from "./workspace/autoImportModel";
 import { evidencePresentationLine } from "./workspace/capabilityEvidence";
 import { CanonicalCodeActionService } from "./workspace/codeActionProviderAdapter";
 import { resolveEffectiveCodeStyle,type EffectiveCodeStyle,type ExplicitIndentationOverride } from "./workspace/codeStyleModel";
-import { CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE,CODE_WORKSPACE_MAX_TREE_FONT_SIZE,CODE_WORKSPACE_MIN_TREE_FONT_SIZE,absoluteWorkspacePath,basename,clampCodeWorkspaceFontSize,clampCodeWorkspaceTreeFontSize,errorMessage,fileKey,fsPathComparisonKey,fsPathEquals,gitRootForWorkspacePath,initialLooseFiles,initialRoots,normalizeEditorText,normalizeFsPath,parentPath,readCodeWorkspaceTreeFontSize,readWorkspaceBuildRunTools,relativePathWithinRoot,rootDirKey,shouldLiveSyncLsp,shouldProbeLsp,workspaceTitle,workspaceToolConfig,writeCodeWorkspaceTreeFontSize,writeCodeWorkspaceTreeViewMode,writeWorkspaceBuildRunTools,type LibraryBufferInfo,type LspFileState,type OpenFileState,type TreeSelection,type TreeViewMode,type WorkspaceBuildRunTools } from "./workspace/codeWorkspaceModel";
+import { CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE,CODE_WORKSPACE_MAX_TREE_FONT_SIZE,CODE_WORKSPACE_MIN_TREE_FONT_SIZE,absoluteWorkspacePath,basename,errorMessage,fileKey,fsPathComparisonKey,fsPathEquals,gitRootForWorkspacePath,initialLooseFiles,initialRoots,normalizeEditorText,normalizeFsPath,parentPath,readWorkspaceBuildRunTools,relativePathWithinRoot,rootDirKey,shouldLiveSyncLsp,shouldProbeLsp,workspaceTitle,workspaceToolConfig,writeCodeWorkspaceTreeViewMode,writeWorkspaceBuildRunTools,type LibraryBufferInfo,type LspFileState,type OpenFileState,type TreeSelection,type TreeViewMode,type WorkspaceBuildRunTools } from "./workspace/codeWorkspaceModel";
 import { createApplyTabPolicy } from "./workspace/controller/applyTabPolicy";
 import { createMutateOpenBuffer,createQueueEditorTextUpdate } from "./workspace/controller/bufferMutations";
 import { createRequestCodeActions,createRunCodeAction } from "./workspace/controller/codeActionActions";
 import { createWorkspaceCommands } from "./workspace/controller/commandCatalog";
 import { createShowEditorContextMenu } from "./workspace/controller/editorMenus";
 import { createOpenFile } from "./workspace/controller/fileActions";
-import { EMPTY_DISPLAY_DIAGNOSTICS,LSP_DOCUMENT_SYMBOLS_IDLE_DELAY_MS,RECENT_FILES_TOOL_WINDOWS,TREE_DETAILS_STORAGE_KEY,WORKSPACE_TOOL_WINDOW_LAYOUT_ENTRIES,breadcrumbSegmentsForFile,extractContextSnippet,type CodeWorkspaceGitManagerPayload,type CodeWorkspaceTabProps,type PendingClosedFile,type PendingExternalFileConflict,type PendingExternalFileEvent,type ResourceCleanupRecoveryView,type TabPolicyLifecycleReceiptView } from "./workspace/controller/model";
+import { LSP_DOCUMENT_SYMBOLS_IDLE_DELAY_MS,RECENT_FILES_TOOL_WINDOWS,TREE_DETAILS_STORAGE_KEY,breadcrumbSegmentsForFile,extractContextSnippet,type CodeWorkspaceGitManagerPayload,type CodeWorkspaceTabProps,type PendingClosedFile,type PendingExternalFileConflict,type PendingExternalFileEvent,type ResourceCleanupRecoveryView } from "./workspace/controller/model";
 import { type TreeOpenIntent,type WorkspaceEditApplyOptions } from "./workspace/controller/mutationTypes";
-import { createNavigateDiagnostic,createOpenHierarchy } from "./workspace/controller/navigationActions";
+import { createNavigateDiagnostic } from "./workspace/controller/navigationActions";
 import { createPrepareJavaLaunch } from "./workspace/controller/projectLaunch";
 import { createReadWorkspaceEditPathSnapshot } from "./workspace/controller/recoveryJournal";
 import { createReplaceMatches } from "./workspace/controller/replaceMatches";
 import { createApplyLspResourceOperationUnlocked } from "./workspace/controller/resourceActions";
-import { createBeginSemanticQuery,createCopyReferenceAtCursor,createFetchWorkspaceSymbols,createGetLspHover,createHighlightUsagesInFile,createParameterInfoProvider } from "./workspace/controller/semanticQueries";
+import { createBeginSemanticQuery,createCopyReferenceAtCursor,createFetchWorkspaceSymbols,createGetLspHover,createHighlightUsagesInFile } from "./workspace/controller/semanticQueries";
 import { createExecuteAutoImportOnTheFly,createExecutePasteWithAutoImport,createRunCleanupExecute,createRunRearrangeExecute } from "./workspace/controller/styleActions";
 import { createBreadcrumbPathActions,createCreateJavaClassFromPlan,createLoadBreadcrumbPathChildren,createShowTreeContextMenu } from "./workspace/controller/treeActions";
 import { useEditorSemanticDecorations } from "./workspace/controller/useEditorSemanticDecorations";
@@ -101,10 +99,9 @@ import { createApplyLspWorkspaceEditNow } from "./workspace/controller/workspace
 import { parseCoverageReport,type WorkspaceCoverageReport } from "./workspace/coverageModel";
 import { type DebugBreakpoint } from "./workspace/dapDebugModel";
 import { isDiagnosticScopeCurrent,type DiagnosticScope } from "./workspace/diagnosticScopeModel";
-import { DEFAULT_EDITOR_APPEARANCE_PROFILE,matchesSoftWrapPath,normalizeEditorAppearanceProfile,readEditorAppearanceProfileWithDiagnostics,writeEditorAppearanceProfile,type EditorAppearanceProfile } from "./workspace/editorAppearanceProfile";
+import { DEFAULT_EDITOR_APPEARANCE_PROFILE } from "./workspace/editorAppearanceProfile";
 import { type EditorCompareSession } from "./workspace/editorCompareModel";
 import type { ResolvedCodeStyle } from "./workspace/editorConfigResolver";
-import { type HierarchyRootState } from "./workspace/hierarchyQueryModel";
 import { readHighlightingLevel,writeHighlightingLevel,type HighlightingLevel } from "./workspace/highlightingLevelModel";
 import { useBreakpointControls } from "./workspace/hooks/useBreakpointControls";
 import { useCodeGeneration } from "./workspace/hooks/useCodeGeneration";
@@ -116,6 +113,7 @@ import { useRefactorRecovery } from "./workspace/hooks/useRefactorRecovery";
 import { useReferenceDocumentation } from "./workspace/hooks/useReferenceDocumentation";
 import { useSemanticNavigation } from "./workspace/hooks/useSemanticNavigation";
 import { useSymbolRefactoring } from "./workspace/hooks/useSymbolRefactoring";
+import { useWorkspaceAppearance } from "./workspace/hooks/useWorkspaceAppearance";
 import { useWorkspaceBookmarkActions } from "./workspace/hooks/useWorkspaceBookmarkActions";
 import { useWorkspaceBufferStore } from "./workspace/hooks/useWorkspaceBufferStore";
 import { useWorkspaceClipboard } from "./workspace/hooks/useWorkspaceClipboard";
@@ -127,25 +125,33 @@ import { useWorkspaceEditSnapshots } from "./workspace/hooks/useWorkspaceEditSna
 import { useWorkspaceEncoding } from "./workspace/hooks/useWorkspaceEncoding";
 import { useWorkspaceFileLifecycle } from "./workspace/hooks/useWorkspaceFileLifecycle";
 import { useWorkspaceGitDecorations } from "./workspace/hooks/useWorkspaceGitDecorations";
+import { useWorkspaceHierarchy } from "./workspace/hooks/useWorkspaceHierarchy";
+import { useWorkspaceInspections } from "./workspace/hooks/useWorkspaceInspections";
+import { useWorkspaceIntelligencePreferences } from "./workspace/hooks/useWorkspaceIntelligencePreferences";
 import { useWorkspaceKeyboard } from "./workspace/hooks/useWorkspaceKeyboard";
+import { useWorkspaceKeymap } from "./workspace/hooks/useWorkspaceKeymap";
 import { useWorkspaceLayoutHydration } from "./workspace/hooks/useWorkspaceLayoutHydration";
 import { useWorkspaceLayoutPersistence } from "./workspace/hooks/useWorkspaceLayoutPersistence";
 import { useWorkspaceLibrarySources } from "./workspace/hooks/useWorkspaceLibrarySources";
 import { useWorkspaceLocalHistory } from "./workspace/hooks/useWorkspaceLocalHistory";
 import { useWorkspaceLocationOpening } from "./workspace/hooks/useWorkspaceLocationOpening";
+import { useWorkspaceParameterInfo } from "./workspace/hooks/useWorkspaceParameterInfo";
 import { useWorkspaceReferenceSessions } from "./workspace/hooks/useWorkspaceReferenceSessions";
 import { useWorkspaceRunActions } from "./workspace/hooks/useWorkspaceRunActions";
 import { useWorkspaceSave } from "./workspace/hooks/useWorkspaceSave";
 import { useWorkspaceSplits } from "./workspace/hooks/useWorkspaceSplits";
 import { useWorkspaceStructure } from "./workspace/hooks/useWorkspaceStructure";
+import { useWorkspaceTabPolicy } from "./workspace/hooks/useWorkspaceTabPolicy";
 import { useWorkspaceTests } from "./workspace/hooks/useWorkspaceTests";
+import { useWorkspaceToolWindowRouting } from "./workspace/hooks/useWorkspaceToolWindowRouting";
 import { useWorkspaceToolWindows } from "./workspace/hooks/useWorkspaceToolWindows";
 import { useWorkspaceUiActions } from "./workspace/hooks/useWorkspaceUiActions";
 import { useWorkspaceUsages } from "./workspace/hooks/useWorkspaceUsages";
+import { useWorkspaceUsagesState } from "./workspace/hooks/useWorkspaceUsagesState";
 import { inlineRenameNameError } from "./workspace/inlineRename";
-import { addDiagnosticToInspectionBaseline,addInspectionSuppression,applyInspectionProfile,clearInspectionBaseline,diagnosticInspectionId,importInspectionBaseline,readInspectionProfile,removeInspectionBaselineEntry,removeInspectionSuppression,replaceInspectionBaseline,serializeInspectionBaseline,updateInspectionRule,writeInspectionProfile,type InspectionProfile,type InspectionRule,type InspectionSuppressionScope } from "./workspace/inspectionProfile";
+import { diagnosticInspectionId,replaceInspectionBaseline } from "./workspace/inspectionProfile";
 import { toProviderDiagnosticsV3 } from "./workspace/inspectionProviderAdapter";
-import { inlayHintsEnabledForLanguage,readWorkspaceIntelligencePreferences,writeWorkspaceIntelligencePreferences,type WorkspaceIntelligencePreferences } from "./workspace/intelligencePreferences";
+import { inlayHintsEnabledForLanguage } from "./workspace/intelligencePreferences";
 import { IntentionSession } from "./workspace/intentionSession";
 import { languageServiceReadiness } from "./workspace/languageServiceReadiness";
 import { isLargeFileContent } from "./workspace/largeFile";
@@ -160,13 +166,13 @@ import { DocumentationPane } from "./workspace/panels/DocumentationPane";
 import { FindInFilesPanel } from "./workspace/panels/FindInFilesPanel";
 import { HierarchyPanel } from "./workspace/panels/HierarchyPanel";
 import { ProblemsPanel,type ProblemFileGroup } from "./workspace/panels/ProblemsPanel";
-import { ReferencesPanel,type ReferencesResultState } from "./workspace/panels/ReferencesPanel";
+import { ReferencesPanel } from "./workspace/panels/ReferencesPanel";
 import { RunPanel,type RunPanelHandle,type WorkspaceTaskItem } from "./workspace/panels/RunPanel";
 import { StructuralSearchPanel } from "./workspace/panels/StructuralSearchPanel";
 import { TerminalDockPanel,type TerminalDockHandle } from "./workspace/panels/TerminalDockPanel";
 import { TestsPanel } from "./workspace/panels/TestsPanel";
 import { TodosBookmarksPanel } from "./workspace/panels/TodosBookmarksPanel";
-import { ToolWindowPortal,useToolWindowNodes } from "./workspace/panels/ToolWindowHost";
+import { ToolWindowPortal } from "./workspace/panels/ToolWindowHost";
 import { ToolWindowRail,type ToolWindowRailItem } from "./workspace/panels/ToolWindowRail";
 import { BreakpointPopup,GutterBreakpointMenu } from "./workspace/panels/debug/BreakpointPopup";
 import { BreakpointsDialog } from "./workspace/panels/debug/BreakpointsDialog";
@@ -177,7 +183,6 @@ import { writeRefactorOptionsMode } from "./workspace/refactorOptions";
 import { type RefactorPlanV3 } from "./workspace/refactorPlan";
 import { createRestoreEchoSuppressor } from "./workspace/refactorRecoveryController";
 import { type QuickDocContent } from "./workspace/referenceDocumentation";
-import { type ParameterInvalidateReason,type ReferenceSessionContext } from "./workspace/referenceInfoSession";
 import { isDocCommentRenderingSupported,readReaderModePreference,writeReaderModePreference } from "./workspace/renderedDocCommentsModel";
 import { codePointOffsetToUtf16Offset,collectReplacePreimages,replaceMatchAbsolutePath,type ReplaceFilePreimage,type ReplacePrepareOptions } from "./workspace/replaceInFilesModel";
 import { applyRunOverrideToDebugConfiguration,readRunConfigurationOverrides,writeActiveRunConfigurationSelection } from "./workspace/runConfigurationPersistence";
@@ -186,12 +191,10 @@ import { SaveTransactionRegistry } from "./workspace/saveCommit";
 import { type SaveObservationRecord,type SaveObservationState } from "./workspace/saveObservationContract";
 import type { ShellShortcutClaim } from "./workspace/shellShortcutRouter";
 import { findBookmarkByMnemonic,readWorkspaceBookmarks } from "./workspace/todoBookmarks";
-import { DEFAULT_SCOPE_SELECTION,UsageQuerySession,type UsagesScopeSelection } from "./workspace/usageQuerySession";
 import { useCodeDebugSession } from "./workspace/useCodeDebugSession";
 import { useDeferredOpenFileTodos } from "./workspace/useDeferredOpenFileTodos";
 import { useLatestHandlers } from "./workspace/useLatestHandlers";
 import { useStructuralSearchSession } from "./workspace/useStructuralSearchSession";
-import { useToolWindowLayout } from "./workspace/useToolWindowLayout";
 import { useWorkspaceActionsController } from "./workspace/useWorkspaceActionsController";
 import { useWorkspaceFileActions } from "./workspace/useWorkspaceFileActions";
 import { useWorkspaceGitSnapshots } from "./workspace/useWorkspaceGitSnapshots";
@@ -212,17 +215,24 @@ import { WorkspaceDocumentTransactionOwner } from "./workspace/workspaceDocument
 import { workspaceEditApplyResponse } from "./workspace/workspaceEditApply";
 import { WorkspaceEditHistory,buildWorkspacePathSnapshotEdit,type WorkspaceEditPathSnapshot } from "./workspace/workspaceEditHistory";
 import { formatWorkspaceEditPreview,type WorkspaceEditPreview } from "./workspace/workspaceEditPreview";
-import { BUILTIN_KEYMAP_PRESETS,consumeKeymapDefaultsMigrationNotice,dismissKeymapDefaultsMigrationNotice,isBuiltinKeymapScheme,readKeymapSchemes,writeKeymapSchemes,type KeymapSchemeV3 } from "./workspace/workspaceKeymapScheme";
+import { BUILTIN_KEYMAP_PRESETS,dismissKeymapDefaultsMigrationNotice } from "./workspace/workspaceKeymapScheme";
 import { readWorkspaceLayoutSnapshot,type PersistedEditorViewState } from "./workspace/workspaceLayoutPersistence";
-import { WorkspaceLspSessionManager } from "./workspace/workspaceLspSessionManager";
-import { attachWorkspaceMouseDispatcher } from "./workspace/workspaceMouseDispatcher";
 import { workspaceNavigationSegments } from "./workspace/workspaceNavigationBar";
 import { WorkspaceObservationBridge } from "./workspace/workspaceObservationBridge";
 import { listDiskEffectLedgerEntries,readWorkspaceRecoveryEntries,reconcileWorkspaceRecoveryEntries,removeWorkspaceRecoveryEntry,resolveDiskEffectLedgerEntry,writeWorkspaceRecoveryEntries,type WorkspaceDiskEffectLedgerEntryV4,type WorkspaceRecoveryEntry } from "./workspace/workspaceRecovery";
 import { WorkspaceResourceRecoveryCoordinator,type ResourceCleanupHandlers,type ResourceCleanupOutcome } from "./workspace/workspaceResourceRecoveryCoordinator";
 import { WorkspaceSemanticQueryHost } from "./workspace/workspaceSemanticQueryHost";
 import { createWorkspaceStyleController,type WorkspaceStyleController } from "./workspace/workspaceStyleController";
-import { DEFAULT_WORKSPACE_TAB_POLICY_V3,type ClosedTabEntry,type WorkspaceTabPolicyV3 } from "./workspace/workspaceTabPolicy";
+import { type ClosedTabEntry,type WorkspaceTabPolicyV3 } from "./workspace/workspaceTabPolicy";
+
+
+
+
+
+
+
+
+
 
 
 
@@ -331,35 +341,9 @@ export function CodeWorkspaceTab({
   const { replaceBookmarks, bookmarksRef, restoreBookmarksForFileKey, editorAiPreferences, bookmarks, cycleAiAnswerLanguage, setAiAnswerLanguage, editorAiPreferencesRef } = useWorkspacePreferences({
     workspaceInstanceId,
   });
-  // §8.19.6 per-workspace tab policy: restored from the layout snapshot
-  // (migrated/repaired on read) and consumed by open-time limit enforcement.
-  // Editing UI is deferred — restored values already govern eviction.
-  const [tabPolicy, setTabPolicy] = useState<WorkspaceTabPolicyV3>(() => ({ ...DEFAULT_WORKSPACE_TAB_POLICY_V3 }));
-  const tabPolicyRef = useRef(tabPolicy);
-  tabPolicyRef.current = tabPolicy;
-  const tabPolicyTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const [tabPolicyRevision, setTabPolicyRevision] = useState(0);
-  // §8.26.3 AA2: Monotonic layout revision and base revision for tab policy transactions (§ED-TABS-001)
-  const layoutRevision = useCodeWorkspaceStore(
-    (state) => state.byInstanceId[workspaceInstanceId]?.layoutRevision ?? 0,
-  );
-  const [baseLayoutRevision, setBaseLayoutRevision] = useState(0);
-
-  const openTabPolicySettings = useCallback(() => {
-    const trigger = document.activeElement instanceof HTMLButtonElement ? document.activeElement : null;
-    // ED-PARITY-010: an opener inside the transient ⋮ menu disappears with it;
-    // return focus to the ⋮ anchor instead.
-    tabPolicyTriggerRef.current = trigger?.closest('[data-testid="code-workspace-toolbar-more-menu"]')
-      ? document.querySelector<HTMLButtonElement>('[data-testid="code-workspace-toolbar-more"]')
-      : trigger;
-    setBaseLayoutRevision(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).layoutRevision);
-    setTabPolicySettingsOpen(true);
-  }, [workspaceInstanceId]);
-
-  const closeTabPolicySettings = useCallback(() => {
-    setTabPolicySettingsOpen(false);
-    requestAnimationFrame(() => tabPolicyTriggerRef.current?.focus());
-  }, []);
+  const { setTabPolicy, setTabPolicyReceipt, tabPolicyRef, tabPolicyRevision, openTabPolicySettings, tabPolicy, baseLayoutRevision, setTabPolicyRevision, layoutRevision, tabPolicyReceipt, tabPolicySettingsOpen, closeTabPolicySettings } = useWorkspaceTabPolicy({
+    workspaceInstanceId,
+  });
   const { clipboardHandle, clipboardSnapshot } = useWorkspaceClipboard({
     workspaceInstanceId,
     publishWorkspaceObservation,
@@ -691,103 +675,15 @@ export function CodeWorkspaceTab({
   const invalidateSemanticAfterLspRestart = useCallback(() => {
     semanticIndex.invalidate("language-server-restarted");
   }, [semanticIndex.invalidate]);
-
-  const setBottomDockOpenRaw = useCallback((open: boolean) => {
-    patchWorkspaceUi(workspaceInstanceId, { bottomDockOpen: open });
-  }, [patchWorkspaceUi, workspaceInstanceId]);
-  const setBottomDockTabRaw = useCallback((tab: string) => {
-    patchWorkspaceUi(workspaceInstanceId, { bottomDockTab: tab as BottomDockTabId });
-  }, [patchWorkspaceUi, workspaceInstanceId]);
-  const setLanguagePanelOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
-    const prev = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).languagePanelOpen;
-    patchWorkspaceUi(workspaceInstanceId, {
-      languagePanelOpen: typeof open === "function" ? open(prev) : open,
-    });
-  }, [patchWorkspaceUi, workspaceInstanceId]);
-
-  // ED-PARITY-024: IDEA tool window placement. Project and the bottom-left
-  // dock keep their persisted flags; moved windows (and Structure/Docs) live
-  // in the layout controller. Legacy "open the dock on tab X" call sites are
-  // routed to X's current anchor below.
-  const toolWindowLayout = useToolWindowLayout(
+  const { setBottomDockTab, setBottomDockOpen, rightPaneOpen, setLanguagePanelOpen, setRightPaneTab, setRightPaneOpen, leftToolAreaOpen, toolWindowLayoutRef, rightPaneTabRef, rightPanelRef, rightToolAreaOpen, lastRightPanelSizeRef, toolWindowLayout, toolWindowNodes } = useWorkspaceToolWindowRouting({
+    patchWorkspaceUi,
     workspaceInstanceId,
-    WORKSPACE_TOOL_WINDOW_LAYOUT_ENTRIES,
-    {
-      projectOpen: languagePanelOpen,
-      setProjectOpen: (open) => setLanguagePanelOpen(open),
-      bottomDockOpen,
-      bottomDockTab,
-      setBottomDockOpen: setBottomDockOpenRaw,
-      setBottomDockTab: setBottomDockTabRaw,
-    },
-    rightPaneOpenStored ? [rightPaneTab === "documentation" ? "documentation" : "structure"] : [],
-  );
-  const toolWindowLayoutRef = useRef(toolWindowLayout);
-  toolWindowLayoutRef.current = toolWindowLayout;
-  const toolWindowNodes = useToolWindowNodes();
-  const leftToolAreaOpen = toolWindowLayout.sideOpen("left");
-  const rightToolAreaOpen = toolWindowLayout.sideOpen("right");
-  /** A routed tab request suppresses the dock open that accompanies it. */
-  const routedDockRequestRef = useRef<{ tab: string; dockWasOpen: boolean } | null>(null);
-  const pendingDockOpenRef = useRef<{ tab: string; dockWasOpen: boolean } | null>(null);
-  const setBottomDockOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
-    const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
-    const next = typeof open === "function" ? open(ui.bottomDockOpen) : open;
-    if (next && routedDockRequestRef.current) return;
-    if (next && !ui.bottomDockOpen) {
-      // The tab request of the same call site may follow; remember that the
-      // dock was closed so a routed tab can undo this open.
-      const request = { tab: "", dockWasOpen: false };
-      pendingDockOpenRef.current = request;
-      queueMicrotask(() => {
-        if (pendingDockOpenRef.current === request) pendingDockOpenRef.current = null;
-      });
-    }
-    setBottomDockOpenRaw(next);
-  }, [setBottomDockOpenRaw, workspaceInstanceId]);
-  const setBottomDockTab = useCallback((tab: BottomDockTabId | ((prev: BottomDockTabId) => BottomDockTabId)) => {
-    const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
-    const next = typeof tab === "function" ? tab(ui.bottomDockTab) : tab;
-    const layout = toolWindowLayoutRef.current;
-    if (layout.anchorOf(next) !== "bottom-left") {
-      // A dock open issued just before this request (same call site) is undone.
-      if (pendingDockOpenRef.current) {
-        pendingDockOpenRef.current = null;
-        setBottomDockOpenRaw(false);
-      }
-      const request = { tab: next, dockWasOpen: ui.bottomDockOpen };
-      routedDockRequestRef.current = request;
-      queueMicrotask(() => {
-        if (routedDockRequestRef.current === request) routedDockRequestRef.current = null;
-      });
-      layout.show(next);
-      return;
-    }
-    setBottomDockTabRaw(next);
-  }, [setBottomDockOpenRaw, setBottomDockTabRaw, workspaceInstanceId]);
-  const rightPanelRef = useRef<PanelImperativeHandle>(null);
-  const lastRightPanelSizeRef = useRef(20);
-  /** Legacy right-pane API (Outline / Documentation) mapped onto tool windows. */
-  const rightPaneTabRef = useRef<RightPaneTabId>(rightPaneTab);
-  const setRightPaneOpen = useCallback((open: boolean | ((prev: boolean) => boolean)) => {
-    const layout = toolWindowLayoutRef.current;
-    const tool = rightPaneTabRef.current === "documentation" ? "documentation" : "structure";
-    const next = typeof open === "function" ? open(layout.isVisible(tool)) : open;
-    if (next) layout.show(tool);
-    else layout.hide(tool);
-    patchWorkspaceUi(workspaceInstanceId, { rightPaneOpen: next });
-  }, [patchWorkspaceUi, workspaceInstanceId]);
-  const setRightPaneTab = useCallback((tab: RightPaneTabId) => {
-    const layout = toolWindowLayoutRef.current;
-    const previous = rightPaneTabRef.current === "documentation" ? "documentation" : "structure";
-    const nextTool = tab === "documentation" ? "documentation" : "structure";
-    rightPaneTabRef.current = tab;
-    if (previous !== nextTool && layout.isVisible(previous)) layout.show(nextTool);
-    patchWorkspaceUi(workspaceInstanceId, { rightPaneTab: tab });
-  }, [patchWorkspaceUi, workspaceInstanceId]);
-  // Readers of the legacy flag see whether the right-pane tool is visible.
-  const rightPaneOpen = toolWindowLayout.isVisible(rightPaneTab === "documentation" ? "documentation" : "structure");
-  void rightPaneOpenStored;
+    languagePanelOpen,
+    bottomDockOpen,
+    bottomDockTab,
+    rightPaneOpenStored,
+    rightPaneTab,
+  });
   const { updateEditorGroup, activateEditorGroup, setSearchEverywhereMode, setSearchEverywhereOpen, setRecentEntries, setRecentFilesOpen, setSearchFocusNonce, setSearchIncludePreset, setSelected, setExpandedRoots, setExpandedDirs, setOpenOrder, setActiveKey, setMarkdownModes, latestClipboardObservation, setPinnedDoc, setPinnedDocLocked, setQuickDocOpen, setQuickDocContent, setGenerateCode, generateCodeContextRef, setStructureSymbols, setStructureUnavailable, setStructureLoading, setStructureOpen, setSurroundWithDialogOpen, setRecentLocationsChangedOnly, setRecentLocationsOpen, setClipboardHistoryEntries, setClipboardHistoryOpen, setLocationPeek, setLatestClipboardObservation, setTreeFilter, setSearchQueryPreset, recentLocationsOpen, recentLocationsChangedOnly, clipboardHistoryOpen, clipboardHistoryEntries, generateCode, surroundWithDialogOpen } = useWorkspaceUiActions({
     workspaceInstanceId,
     searchEverywhereTriggerRef,
@@ -814,25 +710,16 @@ export function CodeWorkspaceTab({
     updateStoreLspFiles,
     replaceStoreFileState,
   });
-
-  const initialEditorAppearance = readEditorAppearanceProfileWithDiagnostics(
+  const activeEditorGroupIdRef = useRef<EditorGroupId>("primary");
+  const { stepTreeFontSize, setTreeFontSize, stepCodeViewFontSize, setCodeViewFontSize, currentEditorFontSize, setEditorAppearanceSettingsOpen, activeFileSoftWrap, toggleSoftWrap, columnSelectionMode, toggleColumnSelectionMode, editorAppearanceProfile, activeEditorFontSizes, editorPaneStyle, treePaneStyle, treeFontSize, editorAppearanceSettingsOpen, updateEditorAppearanceProfile } = useWorkspaceAppearance({
     workspaceInstanceId,
-    loadCodeViewProfile(),
-  );
-  const [editorAppearanceProfile, setEditorAppearanceProfileState] = useState<EditorAppearanceProfile>(
-    () => {
-      if (initialEditorAppearance.source === "migrated") {
-        return writeEditorAppearanceProfile(workspaceInstanceId, initialEditorAppearance.profile);
-      }
-      return initialEditorAppearance.profile;
-    },
-  );
-  const [activeEditorFontSizes, setActiveEditorFontSizes] = useState<Record<EditorGroupId, number>>({});
-  const [editorAppearanceSettingsOpen, setEditorAppearanceSettingsOpen] = useState(false);
-  const [tabPolicySettingsOpen, setTabPolicySettingsOpen] = useState(false);
-  const [tabPolicyReceipt, setTabPolicyReceipt] = useState<TabPolicyLifecycleReceiptView | null>(null);
-  const [columnSelectionMode, setColumnSelectionMode] = useState(false);
-  const [treeFontSize, setTreeFontSizeState] = useState(() => readCodeWorkspaceTreeFontSize());
+    clipboardHandle,
+    setStatusMessage,
+    activeEditorGroupIdRef,
+    activeEditorGroupId,
+    activeKey,
+    openFilesRef,
+  });
   const [roots, setRoots] = useState<CodeWorkspaceRootInfo[]>(() => initialRoots(workspace));
   const projectFactsRoot = roots[0]?.path ?? "";
   const projectFacts = useProjectFacts(projectFactsRoot, {
@@ -904,42 +791,17 @@ export function CodeWorkspaceTab({
     primary: [],
     secondary: [],
   });
-  const [inspectionProfile, setInspectionProfile] = useState<InspectionProfile>(
-    () => readInspectionProfile(workspaceInstanceId),
-  );
-  useEffect(() => {
-    setInspectionProfile(readInspectionProfile(workspaceInstanceId));
-  }, [workspaceInstanceId]);
-  const persistInspectionProfile = useCallback((
-    update: (current: InspectionProfile) => InspectionProfile,
-  ) => {
-    setInspectionProfile((current) => {
-      return writeInspectionProfile(workspaceInstanceId, update(current));
-    });
-  }, [workspaceInstanceId]);
-  const updateInspectionProfileRule = useCallback((id: string, patch: Partial<InspectionRule>) => {
-    persistInspectionProfile((current) => updateInspectionRule(current, id, patch));
-  }, [persistInspectionProfile]);
-  const [intelligencePreferences, setIntelligencePreferencesState] = useState<WorkspaceIntelligencePreferences>(
-    () => readWorkspaceIntelligencePreferences(workspaceInstanceId),
-  );
-  useEffect(() => {
-    setIntelligencePreferencesState(readWorkspaceIntelligencePreferences(workspaceInstanceId));
-  }, [workspaceInstanceId]);
-  const [parameterInfoRequestNonce, setParameterInfoRequestNonce] = useState(0);
-  // 迁移时保留用户现值: persisted auto-popup/delay values flow straight into
-  // the session; defaults never overwrite them.
-  useEffect(() => {
-    parameterInfoSession.setPreferences(intelligencePreferences.parameterInfo);
-  }, [intelligencePreferences.parameterInfo, parameterInfoSession]);
-  const workspaceLspSessionManagerRef = useRef<WorkspaceLspSessionManager | null>(null);
-  if (!workspaceLspSessionManagerRef.current) {
-    workspaceLspSessionManagerRef.current = new WorkspaceLspSessionManager(intelligencePreferences.completion);
-  }
-  useEffect(() => {
-    workspaceLspSessionManagerRef.current?.setCompletionPreferences(intelligencePreferences.completion);
-  }, [intelligencePreferences.completion]);
-  const [intelligenceSettingsOpen, setIntelligenceSettingsOpen] = useState(false);
+  const rootsRef = useRef(roots);
+  const { inspectionPathForFileKey, displayDiagnosticsFor, persistInspectionProfile, inspectionTransform, suppressInspection, addInspectionBaseline, inspectionProfile, updateInspectionProfileRule, clearInspectionBaselineEntries, removeInspectionBaseline, removeInspectionSuppressionEntry, exportInspectionBaseline, importInspectionBaselineFromClipboard } = useWorkspaceInspections({
+    workspaceInstanceId,
+    openFilesRef,
+    rootsRef,
+    setStatusMessage,
+  });
+  const { intelligencePreferences, setIntelligencePreferences, setParameterInfoRequestNonce, setIntelligenceSettingsOpen, parameterInfoRequestNonce, workspaceLspSessionManagerRef, intelligenceSettingsOpen } = useWorkspaceIntelligencePreferences({
+    workspaceInstanceId,
+    parameterInfoSession,
+  });
   const [breadcrumbSymbolsByGroup, setBreadcrumbSymbolsByGroupNow] = useState<Record<EditorGroupId, LspDocumentSymbol[]>>({
     primary: [],
     secondary: [],
@@ -994,64 +856,11 @@ export function CodeWorkspaceTab({
   }, [workspaceInstanceId]);
   const [activeCompareSession, setActiveCompareSession] = useState<EditorCompareSession | null>(null);
   const [readerModeByFile, setReaderModeByFile] = useState<Record<string, boolean>>({});
-  const [referencesResult, setReferencesResult] = useState<ReferencesResultState>({
-    loading: false,
-    origin: null,
-    locations: [],
-    error: null,
-  });
-  const referencesRequestSequenceRef = useRef(0);
-  // §8.20.5 W4: ONE immutable usages session backs the tool window, the
-  // lightweight Show Usages popup and the recent-query stack.
-  const usageSessionRef = useRef<UsageQuerySession | null>(null);
-  if (!usageSessionRef.current) usageSessionRef.current = new UsageQuerySession();
-  useEffect(() => () => usageSessionRef.current?.dispose(), []);
-  const [usagesScopeSelection, setUsagesScopeSelection] = useState<UsagesScopeSelection>({ ...DEFAULT_SCOPE_SELECTION });
-  const [usagesScopeDialog, setUsagesScopeDialog] = useState<{
-    open: boolean;
-    file: OpenFileState;
-    position: LspPosition;
-  } | null>(null);
-  const [usagesRecentsRevision, setUsagesRecentsRevision] = useState(0);
-  // §8.19.7: pin ownership + rerun origin marker live above the panel so a
-  // new Find Usages asks before replacing a pinned session and rerun targets
-  // the recorded symbol identity instead of the current caret.
-  const referencesPinnedRef = useRef(false);
-  const [referencesPinned, setReferencesPinned] = useState(false);
-  referencesPinnedRef.current = referencesPinned;
-  const referencesRerunRef = useRef<{
-    fileKey: string;
-    uri: string;
-    position: LspPosition;
-    symbolName: string;
-  } | null>(null);
-  const findReferencesRef = useRef<(file: OpenFileState, position: LspPosition) => Promise<void>>(async () => {});
-  const [callHierarchyRoot, setCallHierarchyRoot] = useState<HierarchyRootState | null>(null);
-  const hierarchyRequestSequenceRef = useRef(0);
-  // §8.20.5 W4: per-mode provenance for stale detection (provider restart /
-  // project fingerprint move) surfaced as a Rerun banner in HierarchyPanel.
-  const hierarchyProvenanceRef = useRef<Partial<Record<"call" | "type", {
-    generation: number;
-    projectFingerprint: string;
-  }>>>({});
-  const [hierarchyProvenanceRevision, setHierarchyProvenanceRevision] = useState(0);
-  const [typeHierarchyRoot, setTypeHierarchyRoot] = useState<HierarchyRootState | null>(null);
-  const setIntelligencePreferences = useCallback((
-    update: WorkspaceIntelligencePreferences
-      | ((current: WorkspaceIntelligencePreferences) => WorkspaceIntelligencePreferences),
-  ) => {
-    setIntelligencePreferencesState((current) => {
-      const next = typeof update === "function" ? update(current) : update;
-      return writeWorkspaceIntelligencePreferences(workspaceInstanceId, next);
-    });
-  }, [workspaceInstanceId]);
-  const rootsRef = useRef(roots);
+  const usages = useWorkspaceUsagesState();
   const looseFilesRef = useRef(looseFiles);
   // Library sources opened from the language server (JDK / dependency classes),
   // keyed by editor key so a closed tab can be re-fetched from history.
   const libraryBuffersRef = useRef<Record<string, LibraryBufferInfo>>({});
-  const editorAppearanceProfileRef = useRef(editorAppearanceProfile);
-  const treeFontSizeRef = useRef(treeFontSize);
   // Incremented for each active-buffer revision.  Async LSP responses capture
   // this value so an older response can never repaint a newer buffer.
   const lspDocumentEpochRef = useRef<Record<string, number>>({});
@@ -1108,7 +917,6 @@ export function CodeWorkspaceTab({
     primary: [],
     secondary: [],
   });
-  const activeEditorGroupIdRef = useRef<EditorGroupId>("primary");
   const documentTransactionOwnerRef = useRef(new WorkspaceDocumentTransactionOwner({
     onTransaction: ({ fileKey, revision }) => {
       publishWorkspaceObservation((bridge) => bridge.observeDocumentRevision(fileKey, revision));
@@ -1426,16 +1234,6 @@ export function CodeWorkspaceTab({
     sessionGeneration: projectAnalysisGeneration,
     descriptorForRoot: projectAnalysisDescriptorForRoot,
   });
-  const treePaneStyle = useMemo(() => ({
-    "--taomni-code-tree-font-size": `${treeFontSize}px`,
-    "--taomni-code-tree-small-font-size": `${Math.max(10, treeFontSize - 1)}px`,
-    "--taomni-code-tree-row-height": `${Math.max(24, treeFontSize + 15)}px`,
-  }) as CSSProperties, [treeFontSize]);
-  const editorPaneStyle = useMemo(() => ({
-    "--taomni-code-editor-ui-font-size": `${editorAppearanceProfile.fontSizePx}px`,
-    "--taomni-code-editor-ui-small-font-size": `${Math.max(10, editorAppearanceProfile.fontSizePx - 2)}px`,
-    "--taomni-code-editor-tab-height": `${Math.max(28, editorAppearanceProfile.fontSizePx + 15)}px`,
-  }) as CSSProperties, [editorAppearanceProfile.fontSizePx]);
 
   useEffect(() => {
     rootsRef.current = roots;
@@ -1600,133 +1398,6 @@ export function CodeWorkspaceTab({
   useEffect(() => {
     activeEditorGroupIdRef.current = activeEditorGroupId;
   }, [activeEditorGroupId]);
-
-  useEffect(() => {
-    editorAppearanceProfileRef.current = editorAppearanceProfile;
-    clipboardHandle.setHistoryEnabled(editorAppearanceProfile.clipboard.historyEnabled);
-    clipboardHandle.setHistoryLimits(
-      editorAppearanceProfile.clipboard.historyMaxItems,
-      editorAppearanceProfile.clipboard.historyMaxTotalBytes,
-    );
-  }, [editorAppearanceProfile, clipboardHandle]);
-
-  useEffect(() => {
-    const result = readEditorAppearanceProfileWithDiagnostics(
-      workspaceInstanceId,
-      loadCodeViewProfile(),
-    );
-    const next = result.source === "migrated"
-      ? writeEditorAppearanceProfile(workspaceInstanceId, result.profile)
-      : result.profile;
-    editorAppearanceProfileRef.current = next;
-    setEditorAppearanceProfileState(next);
-    setActiveEditorFontSizes({});
-    if (result.diagnostic?.kind === "corrupt") {
-      setStatusMessage(result.diagnostic.message);
-    }
-  }, [setStatusMessage, workspaceInstanceId]);
-
-  useEffect(() => {
-    treeFontSizeRef.current = treeFontSize;
-  }, [treeFontSize]);
-
-  const updateEditorAppearanceProfile = useCallback((
-    updater: EditorAppearanceProfile
-      | ((current: EditorAppearanceProfile) => EditorAppearanceProfile),
-    statusMessage?: (profile: EditorAppearanceProfile) => string,
-  ) => {
-    const current = editorAppearanceProfileRef.current;
-    const next = normalizeEditorAppearanceProfile(
-      typeof updater === "function" ? updater(current) : updater,
-    );
-    editorAppearanceProfileRef.current = next;
-    setEditorAppearanceProfileState(next);
-    writeEditorAppearanceProfile(workspaceInstanceId, next);
-    if (next.zoomScope === "all-editors") setActiveEditorFontSizes({});
-    if (statusMessage) setStatusMessage(statusMessage(next));
-  }, [setStatusMessage, workspaceInstanceId]);
-
-  const effectiveEditorFontSize = useCallback((groupId: EditorGroupId) => (
-    editorAppearanceProfileRef.current.zoomScope === "active-editor"
-      ? activeEditorFontSizes[groupId] ?? editorAppearanceProfileRef.current.fontSizePx
-      : editorAppearanceProfileRef.current.fontSizePx
-  ), [activeEditorFontSizes]);
-
-  const setCodeViewFontSize = useCallback((size: number) => {
-    const nextSize = clampCodeWorkspaceFontSize(size);
-    if (editorAppearanceProfileRef.current.zoomScope === "active-editor") {
-      setActiveEditorFontSizes((current) => ({
-        ...current,
-        [activeEditorGroupIdRef.current]: nextSize,
-      }));
-      setStatusMessage(`Active editor zoom ${nextSize}px`);
-      return;
-    }
-    updateEditorAppearanceProfile(
-      (current) => ({ ...current, fontSizePx: nextSize }),
-      (next) => `Code workspace zoom ${next.fontSizePx}px`,
-    );
-  }, [setStatusMessage, updateEditorAppearanceProfile]);
-
-  const currentEditorFontSize = effectiveEditorFontSize(activeEditorGroupId);
-  const activeAppearancePath = activeKey
-    ? openFilesRef.current[activeKey]?.languagePath
-    : undefined;
-  const activeFileSoftWrap = !!activeAppearancePath && matchesSoftWrapPath(
-    activeAppearancePath,
-    editorAppearanceProfile.softWrap.patterns,
-  );
-
-  const toggleSoftWrap = useCallback(() => {
-    const path = activeKey ? openFilesRef.current[activeKey]?.languagePath : undefined;
-    if (!path) return;
-    updateEditorAppearanceProfile((current) => {
-      const enabled = matchesSoftWrapPath(path, current.softWrap.patterns);
-      return {
-        ...current,
-        softWrap: {
-          ...current.softWrap,
-          patterns: enabled
-            ? current.softWrap.patterns.filter((pattern) => !matchesSoftWrapPath(path, [pattern]))
-            : [...current.softWrap.patterns, path],
-        },
-      };
-    }, (next) => (
-      matchesSoftWrapPath(path, next.softWrap.patterns)
-        ? `Soft wrap enabled for ${path}`
-        : `Soft wrap disabled for ${path}`
-    ));
-  }, [activeKey, updateEditorAppearanceProfile]);
-
-  const toggleColumnSelectionMode = useCallback(() => {
-    setColumnSelectionMode((current) => {
-      const next = !current;
-      setStatusMessage(`Column selection mode ${next ? "enabled" : "disabled"}`);
-      return next;
-    });
-  }, [setStatusMessage]);
-
-  const stepCodeViewFontSize = useCallback((delta: number) => {
-    setCodeViewFontSize(effectiveEditorFontSize(activeEditorGroupIdRef.current) + delta);
-  }, [effectiveEditorFontSize, setCodeViewFontSize]);
-
-  const setTreeFontSize = useCallback(
-    (size: number) => {
-      const next = clampCodeWorkspaceTreeFontSize(size);
-      treeFontSizeRef.current = next;
-      setTreeFontSizeState(next);
-      writeCodeWorkspaceTreeFontSize(next);
-      setStatusMessage(`File tree zoom ${next}px`);
-    },
-    [setStatusMessage],
-  );
-
-  const stepTreeFontSize = useCallback(
-    (delta: number) => {
-      setTreeFontSize(treeFontSizeRef.current + delta);
-    },
-    [setTreeFontSize],
-  );
 
   const setTreeViewMode = useCallback((mode: TreeViewMode) => {
     patchWorkspaceUi(workspaceInstanceId, { treeViewMode: mode });
@@ -2658,63 +2329,6 @@ export function CodeWorkspaceTab({
     }
     return view;
   }, [absolutePathForOpenFile, isLspDocumentSynced, lspDocumentVersion]);
-  const inspectionPathForFileKey = useCallback((fileKeyValue: string): string => {
-    const open = openFilesRef.current[fileKeyValue];
-    const ref = open?.ref;
-    if (ref?.kind === "root") {
-      return `root:${ref.rootId}:${normalizeFsPath(ref.path).replace(/^\/+/, "")}`;
-    }
-    if (ref) return `loose:${normalizeFsPath(ref.path)}`;
-    for (const root of rootsRef.current) {
-      const relative = relativePathWithinRoot(root.path, fileKeyValue);
-      if (relative !== null) return `root:${root.id}:${normalizeFsPath(relative).replace(/^\/+/, "")}`;
-    }
-    return normalizeFsPath(fileKeyValue);
-  }, []);
-  const suppressInspection = useCallback((
-    fileKeyValue: string,
-    diagnostic: LspDiagnostic,
-    scope: InspectionSuppressionScope,
-  ) => {
-    const path = inspectionPathForFileKey(fileKeyValue);
-    persistInspectionProfile((current) => addInspectionSuppression(current, diagnostic, path, scope));
-    setStatusMessage(`Hidden locally (${scope}): ${diagnostic.source ?? "inspection"}:${diagnostic.code ?? "*"}`);
-  }, [inspectionPathForFileKey, persistInspectionProfile, setStatusMessage]);
-  const addInspectionBaseline = useCallback((fileKeyValue: string, diagnostic: LspDiagnostic) => {
-    const path = inspectionPathForFileKey(fileKeyValue);
-    persistInspectionProfile((current) => addDiagnosticToInspectionBaseline(current, diagnostic, path));
-    setStatusMessage("Added diagnostic to inspection baseline");
-  }, [inspectionPathForFileKey, persistInspectionProfile, setStatusMessage]);
-  const clearInspectionBaselineEntries = useCallback(() => {
-    persistInspectionProfile(clearInspectionBaseline);
-    setStatusMessage("Inspection baseline cleared");
-  }, [persistInspectionProfile, setStatusMessage]);
-  const removeInspectionBaseline = useCallback((key: string) => {
-    persistInspectionProfile((current) => removeInspectionBaselineEntry(current, key));
-  }, [persistInspectionProfile]);
-  const removeInspectionSuppressionEntry = useCallback((key: string) => {
-    persistInspectionProfile((current) => removeInspectionSuppression(current, key));
-  }, [persistInspectionProfile]);
-  const exportInspectionBaseline = useCallback(async () => {
-    const text = serializeInspectionBaseline(inspectionProfile);
-    await writeText(text);
-    setStatusMessage("Inspection baseline copied to clipboard");
-  }, [inspectionProfile, setStatusMessage]);
-  const importInspectionBaselineFromClipboard = useCallback(async () => {
-    try {
-      const text = await readText();
-      // Validate before entering the state updater. An invalid clipboard
-      // payload must report an import error without throwing during render.
-      const imported = importInspectionBaseline(inspectionProfile, text);
-      persistInspectionProfile((current) => ({
-        ...current,
-        baseline: imported.baseline,
-      }));
-      setStatusMessage("Inspection baseline imported");
-    } catch (error) {
-      setStatusMessage(errorMessage(error));
-    }
-  }, [inspectionProfile, persistInspectionProfile, setStatusMessage]);
 
   const readWorkspaceEditPathSnapshot = useCallback(createReadWorkspaceEditPathSnapshot({
     openFilesRef,
@@ -2938,37 +2552,6 @@ export function CodeWorkspaceTab({
   const deferredOpenFiles = useDeferredValue(openFiles);
   const activeLspState = activeKey ? lspFiles[activeKey] ?? null : null;
   const activeCapabilities = activeLspState?.status?.capabilities ?? null;
-  const inspectionTransform = useCallback(
-    (diagnostic: LspDiagnostic, path?: string): LspDiagnostic | null => (
-      applyInspectionProfile(diagnostic, inspectionProfile, { path })
-    ),
-    [inspectionProfile],
-  );
-  // The session layer already content-dedupes `lspFiles[key].diagnostics`, so the
-  // source array identity is stable between real diagnostic changes. Mapping it
-  // through the inspection profile on every render would throw that stability
-  // away and defeat CodeMirrorHost's identity-based memo, forcing a full
-  // diagnostics-compartment reconfigure per render. Cache per source array so
-  // the mapped result keeps the same identity too.
-  const displayDiagnosticsCache = useMemo(
-    () => new WeakMap<readonly LspDiagnostic[], { path: string | undefined; result: LspDiagnostic[] }>(),
-    [inspectionProfile],
-  );
-  const displayDiagnosticsFor = useCallback(
-    (source: LspDiagnostic[] | null | undefined, path: string | undefined): LspDiagnostic[] => {
-      if (!source || source.length === 0) return EMPTY_DISPLAY_DIAGNOSTICS;
-      const cached = displayDiagnosticsCache.get(source);
-      if (cached && cached.path === path) return cached.result;
-      const mapped = source.flatMap((diagnostic) => {
-        const display = inspectionTransform(diagnostic, path);
-        return display ? [display] : [];
-      });
-      const result = mapped.length === 0 ? EMPTY_DISPLAY_DIAGNOSTICS : mapped;
-      displayDiagnosticsCache.set(source, { path, result });
-      return result;
-    },
-    [displayDiagnosticsCache, inspectionTransform],
-  );
   const diagnosticScopeForFile = useCallback((
     file: OpenFileState,
     state: LspFileState | null | undefined,
@@ -3017,8 +2600,7 @@ export function CodeWorkspaceTab({
       && lspDocumentEpochRef.current[file.key] === epoch
       && isLspDocumentSynced(file.key, file.text);
   }, [isLspDocumentSynced]);
-
-  const openHierarchy = useCallback(createOpenHierarchy({
+  const { openHierarchy, hierarchyPanelProps } = useWorkspaceHierarchy({
     activeFile,
     lspDescriptorForFile,
     setStatusMessage,
@@ -3028,30 +2610,14 @@ export function CodeWorkspaceTab({
     editorSelectionRef,
     openFilesRef,
     lspSessionGeneration,
-    hierarchyRequestSequenceRef,
     workspaceInstanceId,
     workspaceInstanceIdRef,
     semanticQueryHostRef,
     projectAnalysisSnapshot,
     updateLspStatusForFile,
-    hierarchyProvenanceRef,
-    setHierarchyProvenanceRevision,
-    setCallHierarchyRoot,
     setBottomDockTab,
-    setTypeHierarchyRoot,
     setBottomDockOpen,
-  }), [
-    activeEditorGroupId,
-    activeFile,
-    lspSessionGeneration,
-    projectAnalysisSnapshot?.projectFingerprint,
-    lspDescriptorForFile,
-    setBottomDockOpen,
-    setBottomDockTab,
-    setStatusMessage,
-    updateLspStatusForFile,
-    workspaceInstanceId,
-  ]);
+  });
   const activeLanguageId = activeLspState?.status?.languageId ?? null;
   const activeRenderedDocLanguageId = activeLanguageId
     ?? activeFile?.languagePath.split(".").pop()?.toLowerCase()
@@ -4720,8 +4286,8 @@ export function CodeWorkspaceTab({
     goToDeclarationRef,
     get goToDefinition() { return goToDefinition; },
     activeKey,
-    findReferencesRef,
-    usageSessionRef,
+    findReferencesRef: usages.findReferencesRef,
+    usageSessionRef: usages.usageSessionRef,
     setLocationPeek,
     toggleTodosPane,
     toggleBookmarkAtCursor,
@@ -5027,12 +4593,11 @@ export function CodeWorkspaceTab({
   }, [actionsController]);
   workspaceCommandRunnerRef.current = executeWorkspaceCommand;
 
-  // §8.18.2 editable Keymap: per-app-profile scheme store; the active scheme
-  // is applied to the live action host so every dispatcher/surface shares it.
-  const keymapStore = useMemo(() => readKeymapSchemes(), []);
-  const [keymapSchemes, setKeymapSchemes] = useState<KeymapSchemeV3[]>(keymapStore.schemes);
-  const [activeKeymapSchemeId, setActiveKeymapSchemeId] = useState<string | null>(keymapStore.activeId);
-  const [keymapSettingsOpen, setKeymapSettingsOpen] = useState(false);
+  const { setKeymapSettingsOpen, setKeymapAssignActionId, keymapMigrationNoticeOpen, keymapSettingsOpen, setKeymapMigrationNoticeOpen, keymapSchemes, activeKeymapSchemeId, keymapCorruptDiagnostic, setActiveKeymapSchemeId, setKeymapSchemes, applyKeymapScheme, keymapAssignActionId } = useWorkspaceKeymap({
+    actionsController,
+    rootRef,
+    visible,
+  });
   const [toolbarMoreOpen, setToolbarMoreOpen] = useState(false);
   /** ED-PARITY-012 DEC-012-06: pending Go to Line:Column dialog. */
   const [goToLineRequest, setGoToLineRequest] = useState<GoToLineRequest | null>(null);
@@ -5060,20 +4625,6 @@ export function CodeWorkspaceTab({
   }, [toolbarMoreOpen]);
   const workspaceWidgetHost = useCodeWorkspaceStatusStore((s) => s.widgetHost);
   const statusNavigationHost = useCodeWorkspaceStatusStore((s) => s.navigationHost);
-  /** Action to record a shortcut for when the dialog opens (Assign Shortcut). */
-  const [keymapAssignActionId, setKeymapAssignActionId] = useState<string | null>(null);
-  const keymapCorruptDiagnostic = keymapStore.recoveredFromCorrupt
-    ? "Stored keymap was corrupted; a backup was kept and defaults are active."
-    : null;
-  const activeKeymapScheme = useMemo(
-    () => [...keymapSchemes, ...BUILTIN_KEYMAP_PRESETS].find((scheme) => scheme.id === activeKeymapSchemeId) ?? null,
-    [keymapSchemes, activeKeymapSchemeId],
-  );
-  // ED-PARITY-013 DEC-013-06: one-time notice for profiles that used the
-  // pre-IDEA defaults (F12 / Ctrl+Alt+S). Decided once at mount.
-  const [keymapMigrationNoticeOpen, setKeymapMigrationNoticeOpen] = useState(
-    () => consumeKeymapDefaultsMigrationNotice(),
-  );
 
   // Stable handler identities let the memoized project tree skip the
   // per-caret-move workspace re-render.
@@ -5148,51 +4699,6 @@ export function CodeWorkspaceTab({
       },
     },
   ];
-
-  useEffect(() => {
-    writeKeymapSchemes(keymapSchemes, activeKeymapSchemeId);
-  }, [keymapSchemes, activeKeymapSchemeId]);
-
-  useEffect(() => {
-    actionsController.host.setKeymapScheme(activeKeymapScheme);
-  }, [actionsController.host, activeKeymapScheme]);
-
-  // IDEA's macOS keymap binds Cmd+1..0 to tool windows; the app shell's Cmd+N
-  // tab switch yields those strokes while focus is inside this workspace.
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return undefined;
-    const host = actionsController.host;
-    return registerShellKeyClaim(root, (event) => host.claimsSingleStroke(event));
-  }, [actionsController.host, visible]);
-
-  // §8.19.2: one workspace-root mouse dispatcher; unbound gestures (text
-  // selection, editing) pass through untouched. Re-attach only when the
-  // element or host instance changes.
-  const mouseHostRef = useRef(actionsController.host);
-  mouseHostRef.current = actionsController.host;
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return undefined;
-    const attached = attachWorkspaceMouseDispatcher(mouseHostRef.current, root);
-    return () => attached.dispose();
-  }, [visible]);
-
-  // ED-PARITY-004 DEC-03: the Keymap dialog's Apply is the only edge that
-  // reaches this. `null` means the user deleted the active scheme and the app
-  // is back on the built-in defaults.
-  const applyKeymapScheme = useCallback((scheme: KeymapSchemeV3 | null) => {
-    // Built-in presets ship with the app: only their id becomes active.
-    if (scheme && !isBuiltinKeymapScheme(scheme.id)) {
-      setKeymapSchemes((schemes) => {
-        const exists = schemes.some((entry) => entry.id === scheme.id);
-        return exists
-          ? schemes.map((entry) => (entry.id === scheme.id ? scheme : entry))
-          : [...schemes, scheme];
-      });
-    }
-    setActiveKeymapSchemeId(scheme?.id ?? null);
-  }, []);
   const { mruFileKeysRef, activeKeyRef, tabSwitcherOpen, switcherSnapshot, tabSwitcherIndex, setTabSwitcherIndex, commitTabSwitcher, setTabSwitcherOpen, setSwitcherSnapshot } = useWorkspaceKeyboard({
     activeKey,
     workspaceInstanceId,
@@ -5316,12 +4822,7 @@ export function CodeWorkspaceTab({
     ensureLspDocumentSynced,
     updateLspStatusForFile,
   });
-
-  // §8.20.2 W1 Parameter single channel: the provider adapter behind the
-  // session. The controller owns identity/cancel; this closure only talks to
-  // the language server through the §8.18.6 cancel bridge.
-  const parameterInfoProvider = useCallback(
-    createParameterInfoProvider({
+  const { handleParameterTrigger, handleParameterInvalidate, handleParameterEscape } = useWorkspaceParameterInfo({
     openFilesRef,
     lspFilesRef,
     ensureLspDocumentSynced,
@@ -5329,69 +4830,9 @@ export function CodeWorkspaceTab({
     workspaceInstanceId,
     lspSessionGeneration,
     updateLspStatusForFile,
-  }),
-    [
-      ensureLspDocumentSynced,
-      lspDescriptorForFile,
-      lspSessionGeneration,
-      updateLspStatusForFile,
-      workspaceInstanceId,
-    ],
-  );
-
-  /** Live file identity snapshot feeding the session's stale/closure checks.
-   * Reads through openFilesRef: a typed edit bumps the revision synchronously
-   * there, while the rendered OpenFileState can lag one flush behind. */
-  const sessionContextForFile = useCallback((file: OpenFileState): ReferenceSessionContext | null => {
-    const latest = openFilesRef.current[file.key] ?? file;
-    if (latest.loading) return null;
-    const descriptor = lspDescriptorForFile(latest);
-    return {
-      fileKey: latest.key,
-      uri: descriptor?.documentUri
-        ?? lspFilesRef.current[latest.key]?.status?.uri
-        ?? descriptor?.filePath
-        ?? latest.languagePath,
-      languageId: descriptor?.languageId ?? "plaintext",
-      documentRevision: latest.documentRevision,
-      providerGeneration: lspSessionGeneration(),
-    };
-  }, [lspDescriptorForFile, lspSessionGeneration]);
-
-  // File switches (and workspace remounts) close the old tooltip; per-edit
-  // closure comes from the host's doc-changed/caret invalidation events.
-  const activeParameterFileKey = activeFile?.key ?? null;
-  useEffect(() => {
-    if (!activeParameterFileKey) {
-      parameterInfoSession.setContext(null);
-      return;
-    }
-    const latest = openFilesRef.current[activeParameterFileKey];
-    if (!latest) return;
-    const context = sessionContextForFile(latest);
-    if (context) parameterInfoSession.setContext(context);
-  }, [activeParameterFileKey, parameterInfoSession, sessionContextForFile]);
-
-  const handleParameterTrigger = useCallback((file: OpenFileState, event: {
-    position: LspPosition;
-    anchorOffset: number;
-    triggerCharacter: string | null;
-    origin: "explicit" | "typing";
-  }) => {
-    const context = sessionContextForFile(file);
-    if (!context) return;
-    // The edit that carried the trigger also bumped the identity; publishing
-    // it here closes any pre-edit tooltip before the fresh query starts.
-    parameterInfoSession.setContext(context);
-    parameterInfoSession.request(event, (request, ticket) =>
-      parameterInfoProvider(request, event.triggerCharacter, ticket));
-  }, [parameterInfoProvider, parameterInfoSession, sessionContextForFile]);
-
-  const handleParameterInvalidate = useCallback((reason: ParameterInvalidateReason) => {
-    parameterInfoSession.invalidate(reason);
-  }, [parameterInfoSession]);
-
-  const handleParameterEscape = useCallback(() => parameterInfoSession.escape(), [parameterInfoSession]);
+    activeFile,
+    parameterInfoSession,
+  });
 
   const getLspHover = useCallback(
     createGetLspHover({
@@ -5462,19 +4903,17 @@ export function CodeWorkspaceTab({
     intentionSessionRef,
     runCodeAction,
     runExtractMethodRef,
-    referencesRequestSequenceRef,
+    referencesRequestSequenceRef: usages.referencesRequestSequenceRef,
     setBottomDockOpen,
     setBottomDockTab,
-    setReferencesResult,
+    setReferencesResult: usages.setReferencesResult,
     absolutePathForOpenFile,
     safeDeleteSymbolRef,
   });
   const { findReferences, rerunFindReferences, confirmUsagesScope } = useWorkspaceUsages({
-    referencesRequestSequenceRef,
+    usages,
     setBottomDockOpen,
     setBottomDockTab,
-    setReferencesResult,
-    usageSessionRef,
     semanticIndex,
     ensureWorkspaceSemanticDocumentsSynced,
     lspDescriptorForFile,
@@ -5484,17 +4923,9 @@ export function CodeWorkspaceTab({
     rootsRef,
     semanticQueryHostRef,
     updateLspStatusForFile,
-    referencesRerunRef,
     projectAnalysisSnapshot,
-    setUsagesRecentsRevision,
     setStatusMessage,
-    referencesPinnedRef,
-    setUsagesScopeDialog,
-    findReferencesRef,
-    setUsagesScopeSelection,
-    usagesScopeDialog,
     openFilesRef,
-    usagesScopeSelection,
   });
 
   const showEditorContextMenu = useCallback(createShowEditorContextMenu({
@@ -6284,29 +5715,20 @@ export function CodeWorkspaceTab({
       id: "references",
       label: "References",
       icon: <ListTree className="h-3.5 w-3.5" />,
-      badge: referencesResult.locations.length,
+      badge: usages.referencesResult.locations.length,
       content: (
         <ReferencesPanel
-          result={referencesResult}
+          result={usages.referencesResult}
           roots={roots}
           semanticIndex={semanticIndex.snapshot}
           onOpenLocation={(location) => void openLspLocation(location)}
-          pinned={referencesPinned}
-          onPinChange={(pinned) => {
-            setReferencesPinned(pinned);
-            usageSessionRef.current?.setPinned(pinned);
-          }}
+          pinned={usages.referencesPinned}
+          onPinChange={usages.setPinned}
           onRerun={rerunFindReferences}
-          scopeSelection={usagesScopeSelection}
-          recentSessions={usageSessionRef.current?.getRecent().map((snapshot) => ({
-            id: snapshot.id,
-            label: `${snapshot.symbol.displayName || "symbol"} · ${snapshot.envelope.results.length} · ${new Date(snapshot.createdAt).toLocaleTimeString()}`,
-          })) ?? []}
-          onRestoreRecent={(id) => {
-            usageSessionRef.current?.restore(id);
-            setUsagesRecentsRevision((revision) => revision + 1);
-          }}
-          recentsRevision={usagesRecentsRevision}
+          scopeSelection={usages.usagesScopeSelection}
+          recentSessions={usages.recentSessions}
+          onRestoreRecent={usages.restoreRecent}
+          recentsRevision={usages.usagesRecentsRevision}
         />
       ),
     },
@@ -6316,30 +5738,9 @@ export function CodeWorkspaceTab({
       icon: <GitFork className="h-3.5 w-3.5" />,
       content: (
         <HierarchyPanel
-          mode="call"
-          root={callHierarchyRoot}
+          {...hierarchyPanelProps("call")}
           active={bottomDockOpen && bottomDockTab === "call-hierarchy"}
-          staleReason={(() => {
-            const provenance = hierarchyProvenanceRef.current.call;
-            if (!provenance || !callHierarchyRoot) return null;
-            void hierarchyProvenanceRevision;
-            if (provenance.generation !== lspSessionGeneration()) {
-              return "Provider restarted since this hierarchy was prepared";
-            }
-            const current = projectAnalysisSnapshot?.projectFingerprint ?? "";
-            if (current && provenance.projectFingerprint !== current) {
-              return "Project model changed since this hierarchy was prepared";
-            }
-            return null;
-          })()}
-          onRerunStale={() => void openHierarchy("call")}
           onOpenLocation={(location) => void openLspLocation(location)}
-          queryHost={semanticQueryHostRef.current}
-          liveLspGeneration={lspSessionGeneration}
-          liveDocumentRevision={() => openFilesRef.current[callHierarchyRoot?.fileKey ?? ""]?.documentRevision ?? -1}
-          onStatus={(status) => {
-            if (activeFile) updateLspStatusForFile(activeFile, status);
-          }}
         />
       ),
     },
@@ -6349,30 +5750,9 @@ export function CodeWorkspaceTab({
       icon: <Network className="h-3.5 w-3.5" />,
       content: (
         <HierarchyPanel
-          mode="type"
-          root={typeHierarchyRoot}
+          {...hierarchyPanelProps("type")}
           active={bottomDockOpen && bottomDockTab === "type-hierarchy"}
-          staleReason={(() => {
-            const provenance = hierarchyProvenanceRef.current.type;
-            if (!provenance || !typeHierarchyRoot) return null;
-            void hierarchyProvenanceRevision;
-            if (provenance.generation !== lspSessionGeneration()) {
-              return "Provider restarted since this hierarchy was prepared";
-            }
-            const current = projectAnalysisSnapshot?.projectFingerprint ?? "";
-            if (current && provenance.projectFingerprint !== current) {
-              return "Project model changed since this hierarchy was prepared";
-            }
-            return null;
-          })()}
-          onRerunStale={() => void openHierarchy("type")}
           onOpenLocation={(location) => void openLspLocation(location)}
-          queryHost={semanticQueryHostRef.current}
-          liveLspGeneration={lspSessionGeneration}
-          liveDocumentRevision={() => openFilesRef.current[typeHierarchyRoot?.fileKey ?? ""]?.documentRevision ?? -1}
-          onStatus={(status) => {
-            if (activeFile) updateLspStatusForFile(activeFile, status);
-          }}
         />
       ),
     },
@@ -7178,11 +6558,11 @@ export function CodeWorkspaceTab({
       {editorContextMenu}
       {visible ? <StructuralSearchDialog session={structuralSearch} /> : null}
       <UsagesScopeDialog
-        open={!!usagesScopeDialog?.open}
-        symbolHint={usagesScopeDialog?.file.subtitle ?? null}
+        open={!!usages.usagesScopeDialog?.open}
+        symbolHint={usages.usagesScopeDialog?.file.subtitle ?? null}
         onConfirm={confirmUsagesScope}
         onCancel={() => {
-          setUsagesScopeDialog(null);
+          usages.setUsagesScopeDialog(null);
           setStatusMessage("Find Usages cancelled");
         }}
       />
@@ -7664,6 +7044,15 @@ export function CodeWorkspaceTab({
     </WorkspaceClipboardSessionContext.Provider>
   );
 }
+
+
+
+
+
+
+
+
+
 
 
 
