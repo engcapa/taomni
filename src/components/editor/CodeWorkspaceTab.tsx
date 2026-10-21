@@ -1,155 +1,11 @@
-import {
-  Fragment,
-  startTransition,
-  useCallback,
-  useDeferredValue,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type CSSProperties,
-  type ReactNode,
-} from "react";
+import { Fragment, startTransition, useCallback, useDeferredValue, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { createPortal, flushSync } from "react-dom";
-import {
-  Group as PanelGroup,
-  Panel,
-  Separator as PanelResizeHandle,
-  type PanelImperativeHandle,
-  type PanelSize,
-} from "react-resizable-panels";
-import {
-  AlertTriangle,
-  Activity,
-  ArrowLeft,
-  ArrowRight,
-  Braces,
-  GitBranch,
-  GitCommitHorizontal,
-  ListTree,
-  GitFork,
-  Network,
-  ListTodo,
-  Loader2,
-  RefreshCw,
-  RotateCcw,
-  Save,
-  BookOpen,
-  PanelRight,
-  Columns2,
-  Rows2,
-  TerminalSquare,
-  Play,
-  Hammer,
-  FlaskConical,
-  Bug,
-  Search,
-  X,
-  ZoomIn,
-  ZoomOut,
-  WrapText,
-  Columns3,
-  ShieldCheck,
-  Link2,
-  AlignHorizontalJustifyCenter,
-  Maximize2,
-  Square,
-  SlidersHorizontal,
-  FolderTree,
-  MoreVertical,
-  Settings as SettingsIcon,
-} from "lucide-react";
-import {
-  workspaceListDir,
-  workspaceReadFile,
-  workspaceReadLooseFile,
-  workspaceReadFileWithEncoding,
-  workspaceReadLooseFileWithEncoding,
-  workspaceJavaRunTarget,
-  workspaceExecutionModel,
-  workspaceTaskTree,
-  workspaceTestResults,
-  workspaceApplyResourceOperation,
-  workspaceWriteFileEncoded,
-  workspaceWriteLooseFileEncoded,
-  type WorkspaceFile,
-  type WorkspaceGitRoot,
-  type WorkspaceExecutionModel,
-  type ExecutionRunConfiguration,
-  type ExecutionDebugConfiguration,
-  type ExecutionBuildTarget,
-  type WorkspaceToolConfig,
-  type StructuredTestResult,
-  type StructuredTestResults,
-  type WorkspaceWriteAck,
-} from "../../lib/editor/workspace";
+import { Group as PanelGroup, Panel, Separator as PanelResizeHandle, type PanelImperativeHandle, type PanelSize } from "react-resizable-panels";
+import { AlertTriangle, Activity, ArrowLeft, ArrowRight, Braces, GitBranch, GitCommitHorizontal, ListTree, GitFork, Network, ListTodo, Loader2, RefreshCw, RotateCcw, Save, BookOpen, PanelRight, Columns2, Rows2, TerminalSquare, Play, Hammer, FlaskConical, Bug, Search, X, ZoomIn, ZoomOut, WrapText, Columns3, ShieldCheck, Link2, AlignHorizontalJustifyCenter, Maximize2, Square, SlidersHorizontal, FolderTree, MoreVertical, Settings as SettingsIcon } from "lucide-react";
+import { workspaceListDir, workspaceReadFile, workspaceReadLooseFile, workspaceReadFileWithEncoding, workspaceReadLooseFileWithEncoding, workspaceJavaRunTarget, workspaceExecutionModel, workspaceTaskTree, workspaceTestResults, workspaceWriteFileEncoded, workspaceWriteLooseFileEncoded, type WorkspaceFile, type WorkspaceExecutionModel, type ExecutionRunConfiguration, type ExecutionDebugConfiguration, type ExecutionBuildTarget, type WorkspaceToolConfig, type StructuredTestResult, type StructuredTestResults, type WorkspaceWriteAck } from "../../lib/editor/workspace";
 import type { WorkspaceSearchMatch } from "../../lib/editor/workspaceSearch";
-import {
-  gitBlameLines,
-  gitBlobPair,
-  type GitBlameLine,
-  type GitChange,
-} from "../../lib/git";
-import {
-  lspCodeActions,
-  lspCodeActionResolve,
-  lspCompletion,
-  lspCompletionResolve,
-  lspDocumentSymbols,
-  lspDocumentHighlights,
-  lspFormatting,
-  lspDeclaration,
-  lspDefinition,
-  lspCancelReferenceRequest,
-  lspHover,
-  lspImplementation,
-  lspInlayHints,
-  lspJavaModules,
-  javaTestDiscover,
-  javaTestResolveLaunch,
-  lspPrepareRename,
-  lspRangeFormatting,
-  lspExecuteCommand,
-  lspResolveWorkspaceEdit,
-  lspDownloadSources,
-  lspWorkspaceDidChangeWatchedFiles,
-  lspStartWorkspaceWatcher,
-  lspStopWorkspaceWatcher,
-  lspReloadProject,
-  lspBuildWorkspace,
-  lspWorkspaceDiagnostics,
-  lspReadUriContents,
-  lspReferences,
-  lspRename,
-  lspSelectionRanges,
-  lspSemanticTokens,
-  lspSignatureHelp,
-  lspTypeDefinition,
-  lspWorkspaceSymbolResolve,
-  lspWorkspaceSymbols,
-  nextLspRequestSequence,
-  type LspCodeAction,
-  type JavaTestItem,
-  type LspCompletionResolveResult,
-  type LspCompletionResult,
-  type LspDiagnostic,
-  type LspDocumentDescriptor,
-  type LspDocumentStatus,
-  type LspDocumentSymbol,
-  type LspDocumentHighlight,
-  type LspInlayHint,
-  type LspSemanticToken,
-  type LspLocation,
-  type LspPosition,
-  type LspRange,
-  type LspRenameResult,
-  type LspWorkspaceEdit,
-  type LspWorkspaceApplyEditRequest,
-  type LspWorkspaceEditOperation,
-  type LspExternalFileChange,
-} from "../../lib/editor/lsp";
+import { gitBlameLines, gitBlobPair, type GitBlameLine, type GitChange } from "../../lib/git";
+import { lspCodeActionResolve, lspCompletion, lspCompletionResolve, lspDocumentSymbols, lspDocumentHighlights, lspFormatting, lspDeclaration, lspDefinition, lspCancelReferenceRequest, lspHover, lspImplementation, lspInlayHints, lspJavaModules, javaTestDiscover, javaTestResolveLaunch, lspPrepareRename, lspRangeFormatting, lspResolveWorkspaceEdit, lspDownloadSources, lspWorkspaceDidChangeWatchedFiles, lspStartWorkspaceWatcher, lspStopWorkspaceWatcher, lspReloadProject, lspBuildWorkspace, lspWorkspaceDiagnostics, lspSelectionRanges, lspSemanticTokens, lspSignatureHelp, lspTypeDefinition, lspWorkspaceSymbolResolve, lspWorkspaceSymbols, nextLspRequestSequence, type LspCodeAction, type JavaTestItem, type LspCompletionResolveResult, type LspCompletionResult, type LspDiagnostic, type LspDocumentDescriptor, type LspDocumentSymbol, type LspDocumentHighlight, type LspInlayHint, type LspSemanticToken, type LspLocation, type LspPosition, type LspRange, type LspWorkspaceEdit, type LspWorkspaceApplyEditRequest, type LspWorkspaceEditOperation, type LspExternalFileChange } from "../../lib/editor/lsp";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { selectFilePath } from "../../lib/ipc";
@@ -157,136 +13,26 @@ import { loadCodeViewProfile } from "../../lib/codeViewProfile";
 import { registerShellKeyClaim } from "../../lib/shellKeyClaims";
 import { useAppStore } from "../../stores/appStore";
 import { useMainRailHostStore } from "../../stores/mainRailHostStore";
-import {
-  createEditorGroup,
-  selectCodeWorkspaceUi,
-  useCodeWorkspaceStore,
-  type BottomDockTabId,
-  type CodeWorkspaceEditorGroupState,
-  type EditorGroupId,
-  type EditorSplitOrientation,
-  type RightPaneTabId,
-} from "../../stores/codeWorkspaceStore";
+import { createEditorGroup, selectCodeWorkspaceUi, useCodeWorkspaceStore, type BottomDockTabId, type CodeWorkspaceEditorGroupState, type EditorGroupId, type EditorSplitOrientation, type RightPaneTabId } from "../../stores/codeWorkspaceStore";
 import type { OpenFileEol } from "./workspace/editorGroupTypes";
-import {
-  useCodeWorkspaceStatusStore,
-  type WorkspaceEol,
-} from "../../stores/codeWorkspaceStatusStore";
-import {
-  type EffectiveCodeStyle,
-  type ExplicitIndentationOverride,
-  resolveEffectiveCodeStyle,
-} from "./workspace/codeStyleModel";
+import { useCodeWorkspaceStatusStore, type WorkspaceEol } from "../../stores/codeWorkspaceStatusStore";
+import { type EffectiveCodeStyle, type ExplicitIndentationOverride, resolveEffectiveCodeStyle } from "./workspace/codeStyleModel";
 import type { ResolvedCodeStyle } from "./workspace/editorConfigResolver";
-import {
-  createWorkspaceStyleController,
-  type PreparedSaveCommitter,
-  type SaveTransactionV2,
-  type WorkspaceStyleController,
-} from "./workspace/workspaceStyleController";
-import type {
-  CompletionAcceptanceDiagnostic,
-  CompletionInvocationRequest,
-  CompletionRequestIdentity,
-  CompletionRequestToken,
-} from "./workspace/lspCompletion";
-import {
-  resolveCompletionScopeFacts,
-  sameCompletionScopeFacts,
-  type CompletionScopeFactsState,
-} from "./workspace/completionScopeAdapter";
-import {
-  buildFinalBytesReceipt,
-  buildPreparedSave,
-  classifySaveWriteback,
-  classifyUnknownDiskEffect,
-  nextSaveTransactionId,
-  prepareSaveTextForWriter,
-  resolveUnknownDiskResolution,
-  resolveWritePolicy,
-  saveCommitResultFromError,
-  SaveTransactionRegistry,
-  validatePreparedSaveBoundary,
-  type DiskResolution,
-  type PreparedSave,
-  type SaveCommitResult,
-} from "./workspace/saveCommit";
-import {
-  createSaveObservationRecord,
-  type SaveObservationRecord,
-  type SaveObservationState,
-} from "./workspace/saveObservationContract";
-import {
-  applySaveRaceWriteFault,
-  holdSaveRaceStage,
-  recordSaveRaceEvent,
-} from "./workspace/saveRaceProbe";
-import {
-  hasBlockingDiskEffectResolution,
-  listDiskEffectLedgerEntries,
-  recordDiskEffectLedgerEntry,
-  resolveDiskEffectLedgerEntry,
-  workspaceFileIdentity,
-  type WorkspaceDiskEffectLedgerEntryV4,
-} from "./workspace/workspaceRecovery";
-import {
-  applyTabPolicyGroupImagesToLayout,
-  applyWorkspaceTabPolicyTransaction,
-  enforceTabPolicy,
-  pushClosedTab,
-  buildReopenTreeRoute,
-  resolveReopenLocation,
-  DEFAULT_WORKSPACE_TAB_POLICY_V3,
-  type ClosedTabEntry,
-  type WorkspaceTabPolicyV3,
-} from "./workspace/workspaceTabPolicy";
-import {
-  WORKSPACE_BOTTOM_DOCK_WINDOWS,
-  listToolWindowsForCycle,
-  syncBottomDockToolWindows,
-  unregisterAllToolWindows,
-} from "./workspace/toolWindowRegistry";
+import { createWorkspaceStyleController, type PreparedSaveCommitter, type WorkspaceStyleController } from "./workspace/workspaceStyleController";
+import type { CompletionAcceptanceDiagnostic, CompletionInvocationRequest, CompletionRequestIdentity, CompletionRequestToken } from "./workspace/lspCompletion";
+import { resolveCompletionScopeFacts, sameCompletionScopeFacts, type CompletionScopeFactsState } from "./workspace/completionScopeAdapter";
+import { buildFinalBytesReceipt, buildPreparedSave, classifySaveWriteback, classifyUnknownDiskEffect, nextSaveTransactionId, prepareSaveTextForWriter, resolveUnknownDiskResolution, resolveWritePolicy, saveCommitResultFromError, SaveTransactionRegistry, validatePreparedSaveBoundary, type DiskResolution, type PreparedSave, type SaveCommitResult } from "./workspace/saveCommit";
+import { type SaveObservationRecord, type SaveObservationState } from "./workspace/saveObservationContract";
+import { applySaveRaceWriteFault, holdSaveRaceStage, recordSaveRaceEvent } from "./workspace/saveRaceProbe";
+import { hasBlockingDiskEffectResolution, listDiskEffectLedgerEntries, recordDiskEffectLedgerEntry, resolveDiskEffectLedgerEntry, workspaceFileIdentity, type WorkspaceDiskEffectLedgerEntryV4 } from "./workspace/workspaceRecovery";
+import { applyTabPolicyGroupImagesToLayout, applyWorkspaceTabPolicyTransaction, pushClosedTab, buildReopenTreeRoute, DEFAULT_WORKSPACE_TAB_POLICY_V3, type ClosedTabEntry, type WorkspaceTabPolicyV3 } from "./workspace/workspaceTabPolicy";
+import { listToolWindowsForCycle, syncBottomDockToolWindows, unregisterAllToolWindows } from "./workspace/toolWindowRegistry";
 import { attachWorkspaceMouseDispatcher } from "./workspace/workspaceMouseDispatcher";
-import {
-  createWorkspaceLocationController,
-  isPathContainedInRoot,
-  NavigationHistoryFacade,
-  workspacePathComparisonKey,
-  type BackForwardHistoryBridge,
-  type WorkspaceLocationController,
-} from "./workspace/navigationHistoryModel";
-import {
-  WorkspaceSemanticQueryHost,
-  type SemanticQueryIdentity,
-  type SemanticQueryKind,
-  type SemanticQueryLiveGuards,
-} from "./workspace/workspaceSemanticQueryHost";
-import {
-  createSingleLeafLayout,
-  findLeafNode,
-  getAllLeafNodes,
-  navigateLeafOrder,
-  panelLayoutToRatios,
-  cloneLayoutTree,
-  type LayoutNode,
-} from "./workspace/recursiveLayoutTree";
-import {
-  historyList,
-  historyRead,
-  historySnapshot,
-  type LocalHistoryEntry,
-} from "../../lib/localHistory";
-import {
-  defaultWorkspaceLayoutSnapshot,
-  enrichViewStatesWithIdentity,
-  layoutSnapshotHasOpenFiles,
-  readWorkspaceLayoutSnapshot,
-  snapshotFromWorkspaceUi,
-  uniqueOrderedKeys,
-  writeWorkspaceLayoutSnapshot,
-  type PersistedEditorViewState,
-  type WorkspaceViewStates,
-} from "./workspace/workspaceLayoutPersistence";
+import { createWorkspaceLocationController, isPathContainedInRoot, NavigationHistoryFacade, workspacePathComparisonKey, type BackForwardHistoryBridge, type WorkspaceLocationController } from "./workspace/navigationHistoryModel";
+import { WorkspaceSemanticQueryHost, type SemanticQueryIdentity, type SemanticQueryKind, type SemanticQueryLiveGuards } from "./workspace/workspaceSemanticQueryHost";
+import { createSingleLeafLayout, findLeafNode, getAllLeafNodes, navigateLeafOrder, panelLayoutToRatios, cloneLayoutTree, type LayoutNode } from "./workspace/recursiveLayoutTree";
+import { historyList, historyRead, historySnapshot, type LocalHistoryEntry } from "../../lib/localHistory";
+import { defaultWorkspaceLayoutSnapshot, enrichViewStatesWithIdentity, layoutSnapshotHasOpenFiles, readWorkspaceLayoutSnapshot, snapshotFromWorkspaceUi, uniqueOrderedKeys, writeWorkspaceLayoutSnapshot, type PersistedEditorViewState, type WorkspaceViewStates } from "./workspace/workspaceLayoutPersistence";
 import { LocalHistoryDialog } from "./workspace/LocalHistoryDialog";
 import { CodeStyleSettingsDialog } from "./workspace/CodeStyleSettingsDialog";
 import { WorkspaceTabPolicySettingsDialog } from "./workspace/WorkspaceTabPolicySettingsDialog";
@@ -294,94 +40,31 @@ import { NewJavaClassDialog } from "./workspace/NewJavaClassDialog";
 import { FileTemplateSettingsDialog } from "./workspace/FileTemplateSettingsDialog";
 import { AutoImportSettingsDialog } from "./workspace/AutoImportSettingsDialog";
 import { AutoImportCandidateDialog } from "./workspace/AutoImportCandidateDialog";
-import {
-  loadAutoImportPreferences,
-} from "../../lib/autoImportPreferences";
-import {
-  planAutoImport,
-  planPasteAutoImports,
-  parseProviderImportCandidates,
-  scanPastedTypeTokens,
-  buildPasteWithImportsChanges,
-  computeImportInsertionOffset,
-  type AutoImportCandidate,
-  type AutoImportPlanOutcome,
-} from "./workspace/autoImportModel";
+import { loadAutoImportPreferences } from "../../lib/autoImportPreferences";
+import { type AutoImportCandidate } from "./workspace/autoImportModel";
 import type { PlanTemplateCreationResult } from "./workspace/fileTemplateModel";
-import {
-  filterFormattingRanges,
-  resolveEffectiveSavePolicy,
-} from "./workspace/workspaceCodeStyleScheme";
-import { planReformat } from "./workspace/reformatWorkflow";
-import {
-  BUILT_IN_SCHEME_ID,
-  activeSchemeForLanguage,
-  readCodeStyleSchemeStore,
-  schemeStyleFields,
-  writeCodeStyleSchemeStore,
-  type CodeStyleSchemeStoreState,
-} from "./workspace/workspaceCodeStyleSchemes";
+import { filterFormattingRanges } from "./workspace/workspaceCodeStyleScheme";
+import { BUILT_IN_SCHEME_ID, activeSchemeForLanguage, readCodeStyleSchemeStore, schemeStyleFields, writeCodeStyleSchemeStore, type CodeStyleSchemeStoreState } from "./workspace/workspaceCodeStyleSchemes";
 import { EditorSelectionAiToolbar } from "./workspace/EditorSelectionAiToolbar";
-import {
-  CONTEXT_LINE_RADIUS,
-  MAX_DIAGNOSTICS,
-  buildEditorAiPrompt,
-  describeScopeChain,
-  extractImports,
-  fenceLanguageFor,
-  languageLabelFor,
-  surroundingLines,
-  truncateSelection,
-  type EditorAiAction,
-  type EditorAiContext,
-} from "./workspace/editorAiPrompts";
-import {
-  nextAnswerLanguage,
-  readEditorAiPreferences,
-  writeEditorAiPreferences,
-} from "./workspace/editorAiPreferences";
-import {
-  AI_ANSWER_LANGUAGES,
-  answerLanguageLabelKey,
-  type AiAnswerLanguage,
-} from "../../lib/ai/answerLanguage";
+import { CONTEXT_LINE_RADIUS, MAX_DIAGNOSTICS, buildEditorAiPrompt, describeScopeChain, extractImports, fenceLanguageFor, languageLabelFor, surroundingLines, truncateSelection, type EditorAiAction, type EditorAiContext } from "./workspace/editorAiPrompts";
+import { nextAnswerLanguage, readEditorAiPreferences, writeEditorAiPreferences } from "./workspace/editorAiPreferences";
+import { AI_ANSWER_LANGUAGES, answerLanguageLabelKey, type AiAnswerLanguage } from "../../lib/ai/answerLanguage";
 import { EditorAiRewriteDialog } from "./workspace/EditorAiRewriteDialog";
 import { confirmAppDialog, promptAppDialog } from "../../lib/appDialogs";
 import { readText, readTextResult, writeText } from "../../lib/clipboard";
 import { useContextMenu, type ContextMenuCloseReason } from "../ContextMenu";
 import { useChatStore } from "../../stores/chatStore";
-import {
-  type EditorCommandId,
-  type EditorCommandOptions,
-  type EditorCommandPort,
-  type EditorCommandPortRegistration,
-  type EditorCommandState,
-  type EditorCommandTarget,
-  type EditorContextMenuRequest,
-  type EditorSelectionRange,
-} from "./workspace/CodeMirrorHost";
+import { type EditorCommandId, type EditorCommandOptions, type EditorCommandPort, type EditorCommandPortRegistration, type EditorCommandState, type EditorCommandTarget, type EditorContextMenuRequest, type EditorSelectionRange } from "./workspace/CodeMirrorHost";
 import { WorkspaceDocumentTransactionOwner } from "./workspace/workspaceDocumentTransactionOwner";
 import { SurroundWithDialog } from "./workspace/SurroundWithDialog";
 import { GenerateCodeDialog } from "./workspace/GenerateCodeDialog";
-import {
-  applyGenerateSelection,
-  type GenerateCandidate,
-} from "./workspace/generateCodeWorkflow";
+import { applyGenerateSelection, type GenerateCandidate } from "./workspace/generateCodeWorkflow";
 import { filterGenerateCodeActions } from "./workspace/workspaceSemanticEditing";
 import { copyReferenceCandidates } from "./workspace/workspaceCopyReference";
 import { ClipboardHistoryPopup } from "./workspace/ClipboardHistoryPopup";
-import { validateAndApplyOrganizeImportsPlan } from "./workspace/saveOrganizeImportsAdapter";
-import {
-  acquireClipboardStore,
-  createDefaultClipboardPermissionAdapter,
-  type EditorClipboardSession,
-  WorkspaceClipboardSessionContext,
-} from "./workspace/workspaceClipboardSession";
+import { acquireClipboardStore, createDefaultClipboardPermissionAdapter, type EditorClipboardSession, WorkspaceClipboardSessionContext } from "./workspace/workspaceClipboardSession";
 import type { ClipboardObservationRecord } from "./workspace/clipboardObservationContract";
-import {
-  WorkspaceObservationBridge,
-  type WorkspaceSaveObservationResult,
-} from "./workspace/workspaceObservationBridge";
+import { WorkspaceObservationBridge } from "./workspace/workspaceObservationBridge";
 import { WorkspaceObservationBoundary } from "./workspace/WorkspaceObservationBoundary";
 import { buildEditorContextMenuItems } from "./workspace/editorContextMenu";
 import { fieldDeclarationAt } from "./workspace/dataBreakpointTarget";
@@ -389,77 +72,21 @@ import { openSettingsSection } from "../../lib/settingsNavigation";
 import { isTauriRuntime } from "../../lib/runtime";
 import { useMountedRef } from "../../hooks/useMountedRef";
 import { fallbackWordHighlights, wordAt } from "./workspace/lspIntelligenceChrome";
-import {
-  inlayHintsEnabledForLanguage,
-  readWorkspaceIntelligencePreferences,
-  writeWorkspaceIntelligencePreferences,
-  type WorkspaceIntelligencePreferences,
-} from "./workspace/intelligencePreferences";
+import { inlayHintsEnabledForLanguage, readWorkspaceIntelligencePreferences, writeWorkspaceIntelligencePreferences, type WorkspaceIntelligencePreferences } from "./workspace/intelligencePreferences";
 import { WorkspaceLspSessionManager } from "./workspace/workspaceLspSessionManager";
 import { applyLspTextEditsToString } from "./workspace/lspTextEdits";
 import { isLargeFileContent } from "./workspace/largeFile";
-import {
-  applyWorkspaceEdit,
-  buildWorkspaceEditApplyResultV2,
-  classifyWorkspaceEditOperationRetry,
-  retryOpenBufferSave,
-  sliceWorkspaceEditForResume,
-  summarizeWorkspaceEditOutcomes,
-  workspaceEditApplyResponse,
-  WorkspaceEditOpenBufferSaveFailure,
-  type WorkspaceEditApplyHooks,
-  type WorkspaceEditApplyOutcome,
-  type WorkspaceEditApplyTransactionSummary,
-} from "./workspace/workspaceEditApply";
-import { validateSemanticWorkspaceEditPaths } from "./workspace/semanticWorkspaceEdit";
-import {
-  formatWorkspaceEditPreview,
-  workspaceEditOperations,
-  type WorkspaceEditPreview,
-} from "./workspace/workspaceEditPreview";
+import { workspaceEditApplyResponse, type WorkspaceEditApplyTransactionSummary } from "./workspace/workspaceEditApply";
+import { formatWorkspaceEditPreview, workspaceEditOperations, type WorkspaceEditPreview } from "./workspace/workspaceEditPreview";
 import { RefactoringPreviewDialog } from "./workspace/RefactoringPreviewDialog";
 import { EditorView } from "@codemirror/view";
 import { InlineRenamePopup, type InlineRenameAnchor } from "./workspace/InlineRenamePopup";
-import {
-  inlineRenameNameError,
-  showInlineRenameMarks,
-  suggestInlineRenameNames,
-  type InlineRenameRange,
-} from "./workspace/inlineRename";
+import { inlineRenameNameError, showInlineRenameMarks, suggestInlineRenameNames, type InlineRenameRange } from "./workspace/inlineRename";
 import { readRefactorOptionsMode, writeRefactorOptionsMode } from "./workspace/refactorOptions";
 import { javaMainRunLines, type RunGutterTarget } from "./workspace/runGutter";
 import { RefactorRecoveryReviewDialog } from "./workspace/RefactorRecoveryReviewDialog";
-import {
-  buildRefactorPlan,
-  refactorApplyGate,
-  evaluateDestructiveRefactorAvailability,
-  verifyRefactorPostHashes,
-  buildRefactorPostTextIndex,
-  resolveRefactorPostTextForDocument,
-  verifyRefactorMovePostEndpoints,
-  refactorJournalPostImageMatches,
-  refactorJournalPreImageMatches,
-  prepareRefactorRecoveryJournalV2,
-  recordRefactorRecoveryJournalV2,
-  getRefactorRecoveryJournalV2,
-  updateRefactorRecoveryJournalV2,
-  listRefactorRecoveryJournalsV2,
-  isPendingRefactorRecoveryEntry,
-  dismissRefactorRecoveryEntry,
-  buildTextWorkspaceEditRecoveryPlan,
-  type RefactorKind,
-  type RefactorPlanV3,
-  type RefactorRecoveryJournalEntryV2,
-  type RefactorRecoveryPreImageV2,
-  type WorkspaceEditRecoveryPlan,
-} from "./workspace/refactorPlan";
-import {
-  classifyRefactorRecoveryPreconditions,
-  createRestoreEchoSuppressor,
-  executeRefactorRecovery,
-  type RefactorRecoveryPreconditionSummary,
-} from "./workspace/refactorRecoveryController";
-import { sha256Hex } from "./workspace/projectAnalysisModel";
+import { getRefactorRecoveryJournalV2, updateRefactorRecoveryJournalV2, listRefactorRecoveryJournalsV2, isPendingRefactorRecoveryEntry, dismissRefactorRecoveryEntry, type RefactorPlanV3, type RefactorRecoveryJournalEntryV2 } from "./workspace/refactorPlan";
+import { classifyRefactorRecoveryPreconditions, createRestoreEchoSuppressor, type RefactorRecoveryPreconditionSummary } from "./workspace/refactorRecoveryController";
 import { KeymapCheatSheetDialog } from "./workspace/KeymapCheatSheetDialog";
 import { KeymapSettingsDialog } from "./workspace/KeymapSettingsDialog";
 import { KeymapMigrationNotice } from "./workspace/KeymapMigrationNotice";
@@ -469,75 +96,26 @@ import { javaSyntaxOutline } from "./workspace/javaSyntaxOutline";
 import { WorkspaceGitManager } from "../git/WorkspaceGitManager";
 import { CodeInsightNotice, caretAnchor, type CodeInsightNoticeState } from "./workspace/CodeInsightNotice";
 import type { GoToLineRequest } from "./workspace/CodeMirrorHost";
-import {
-  BUILTIN_KEYMAP_PRESETS,
-  consumeKeymapDefaultsMigrationNotice,
-  dismissKeymapDefaultsMigrationNotice,
-  isBuiltinKeymapScheme,
-  readKeymapSchemes,
-  writeKeymapSchemes,
-  type KeymapSchemeV3,
-} from "./workspace/workspaceKeymapScheme";
+import { BUILTIN_KEYMAP_PRESETS, consumeKeymapDefaultsMigrationNotice, dismissKeymapDefaultsMigrationNotice, isBuiltinKeymapScheme, readKeymapSchemes, writeKeymapSchemes, type KeymapSchemeV3 } from "./workspace/workspaceKeymapScheme";
 import { TabSwitcher, switcherArrowIndex, type TabSwitcherEntry, type TabSwitcherToolWindow } from "./workspace/TabSwitcher";
 import { DapAdapterGuideDialog } from "./workspace/DapAdapterGuideDialog";
 import { disabledReasonLabel } from "./workspace/workspaceCodeMirrorKeymap";
-import {
-  buildWorkspacePathSnapshotEdit,
-  workspaceEditUndoPrecondition,
-  WorkspaceEditHistory,
-  type WorkspaceEditHistoryEntry,
-  type WorkspaceEditPathSnapshot,
-} from "./workspace/workspaceEditHistory";
-import { makeSemanticRequestIdentity } from "./workspace/javaSemanticEvidence";
-import {
-  buildSafeDeleteWorkspaceEdit,
-  safeDeleteFileCount,
-} from "./workspace/safeDelete";
-import { buildCapabilityEvidence, evidencePresentationLine } from "./workspace/capabilityEvidence";
+import { buildWorkspacePathSnapshotEdit, WorkspaceEditHistory, type WorkspaceEditPathSnapshot } from "./workspace/workspaceEditHistory";
+import { evidencePresentationLine } from "./workspace/capabilityEvidence";
 import { toProviderDiagnosticsV3 } from "./workspace/inspectionProviderAdapter";
-import {
-  INTENTION_RESOLVE_TIMEOUT_MS,
-  candidateFromProviderAction,
-  IntentionSession,
-} from "./workspace/intentionSession";
-import {
-  CanonicalCodeActionService,
-  extractAffectedResourcesFromWorkspaceEdit,
-  snapshotCodeActionContext,
-  type CodeActionContextIdentity,
-  type CodeActionProviderClient,
-  type CodeActionTransactionSnapshot,
-  type ProviderActionV4,
-} from "./workspace/codeActionProviderAdapter";
+import { IntentionSession } from "./workspace/intentionSession";
+import { CanonicalCodeActionService, extractAffectedResourcesFromWorkspaceEdit, type CodeActionTransactionSnapshot } from "./workspace/codeActionProviderAdapter";
 import type { MenuItem } from "../ContextMenu";
-import {
-  transformWorkspaceResourceExpandedDirKeys,
-  transformWorkspaceResourceFileKey,
-  transformWorkspaceResourceFileRef,
-  transformWorkspaceResourceTreeSelection,
-  type WorkspaceResourceUiChange,
-} from "./workspace/workspaceResourceState";
-import {
-  WorkspaceResourceRecoveryCoordinator,
-  type ResourceCleanupHandlers,
-  type ResourceCleanupOutcome,
-} from "./workspace/workspaceResourceRecoveryCoordinator";
+import { WorkspaceResourceRecoveryCoordinator, type ResourceCleanupHandlers, type ResourceCleanupOutcome } from "./workspace/workspaceResourceRecoveryCoordinator";
 import { BottomDock, BOTTOM_DOCK_MIN_HEIGHT, BOTTOM_DOCK_MAX_HEIGHT, type BottomDockTab } from "./workspace/panels/BottomDock";
 import { MoreToolWindowsButton, ToolWindowRail, type ToolWindowRailItem } from "./workspace/panels/ToolWindowRail";
 import { useLatestHandlers } from "./workspace/useLatestHandlers";
-import { useToolWindowLayout, type ToolWindowLayoutEntry } from "./workspace/useToolWindowLayout";
+import { useToolWindowLayout } from "./workspace/useToolWindowLayout";
 import { ToolWindowPane, ToolWindowPortal, ToolWindowSlot, ToolWindowSplitArea, useToolWindowNodes } from "./workspace/panels/ToolWindowHost";
 import { TOOL_WINDOW_ANCHORS, TOOL_WINDOW_ANCHOR_LABELS, anchorSide, type ToolWindowAnchor } from "./workspace/toolWindowLayout";
 import { workspaceNavigationSegments } from "./workspace/workspaceNavigationBar";
-import {
-  ReferencesPanel,
-  type ReferencesResultState,
-} from "./workspace/panels/ReferencesPanel";
-import {
-  ProblemsPanel,
-  type ProblemFileGroup,
-  type ProblemsScope,
-} from "./workspace/panels/ProblemsPanel";
+import { ReferencesPanel, type ReferencesResultState } from "./workspace/panels/ReferencesPanel";
+import { ProblemsPanel, type ProblemFileGroup, type ProblemsScope } from "./workspace/panels/ProblemsPanel";
 import { FindInFilesPanel } from "./workspace/panels/FindInFilesPanel";
 import { StructuralSearchPanel } from "./workspace/panels/StructuralSearchPanel";
 import { StructuralSearchDialog } from "./workspace/StructuralSearchDialog";
@@ -545,109 +123,33 @@ import { useStructuralSearchSession } from "./workspace/useStructuralSearchSessi
 import type { StructuralMatch } from "../../lib/editor/structuralSearch";
 import { DocumentationPane } from "./workspace/panels/DocumentationPane";
 import { HierarchyPanel } from "./workspace/panels/HierarchyPanel";
-import {
-  executeHierarchyPrepare,
-  type HierarchyRootState,
-} from "./workspace/hierarchyQueryModel";
+import { type HierarchyRootState } from "./workspace/hierarchyQueryModel";
 import { TodosBookmarksPanel } from "./workspace/panels/TodosBookmarksPanel";
 import { CoveragePanel } from "./workspace/panels/CoveragePanel";
-import {
-  findFileCoverage,
-  parseCoverageReport,
-  type WorkspaceCoverageReport,
-} from "./workspace/coverageModel";
-import {
-  findBookmarkByMnemonic,
-  isValidMnemonic,
-  mergeWorkspaceBookmarkSnapshot,
-  normalizeMnemonic,
-  readWorkspaceBookmarks,
-  renameWorkspaceBookmarkGroup,
-  restoreWorkspaceBookmarksForFile,
-  setMnemonicBookmark,
-  toggleWorkspaceBookmark,
-  writeWorkspaceBookmarks,
-  type WorkspaceBookmark,
-} from "./workspace/todoBookmarks";
-import {
-  createOccurrenceSession,
-  formatOccurrenceStatus,
-  isOccurrenceSessionValid,
-  stepOccurrence,
-  type OccurrenceHighlightSession,
-} from "./workspace/occurrenceHighlightModel";
-import {
-  selectActiveBanners,
-  type EditorBannerItem,
-} from "./workspace/editorBannerModel";
-import {
-  readHighlightingLevel,
-  writeHighlightingLevel,
-  type HighlightingLevel,
-} from "./workspace/highlightingLevelModel";
-import {
-  classifyCompareReadError,
-  compareDocumentDescriptor,
-  compareTextByteLength,
-  createClipboardCompareSession,
-  createFileCompareSession,
-  createUnavailableCompareSession,
-  MAX_COMPARE_SIZE_BYTES,
-  normalizeCompareText,
-  type CompareDocumentDescriptor,
-  type CompareSelection,
-  type CompareSource,
-  type CompareTarget,
-  type EditorCompareSession,
-} from "./workspace/editorCompareModel";
+import { findFileCoverage, parseCoverageReport, type WorkspaceCoverageReport } from "./workspace/coverageModel";
+import { findBookmarkByMnemonic, isValidMnemonic, mergeWorkspaceBookmarkSnapshot, normalizeMnemonic, readWorkspaceBookmarks, renameWorkspaceBookmarkGroup, restoreWorkspaceBookmarksForFile, setMnemonicBookmark, toggleWorkspaceBookmark, writeWorkspaceBookmarks, type WorkspaceBookmark } from "./workspace/todoBookmarks";
+import { createOccurrenceSession, formatOccurrenceStatus, isOccurrenceSessionValid, stepOccurrence, type OccurrenceHighlightSession } from "./workspace/occurrenceHighlightModel";
+import { selectActiveBanners, type EditorBannerItem } from "./workspace/editorBannerModel";
+import { readHighlightingLevel, writeHighlightingLevel, type HighlightingLevel } from "./workspace/highlightingLevelModel";
+import { classifyCompareReadError, createClipboardCompareSession, createFileCompareSession, createUnavailableCompareSession, MAX_COMPARE_SIZE_BYTES, normalizeCompareText, type CompareSelection, type CompareTarget, type EditorCompareSession } from "./workspace/editorCompareModel";
 import { EditorCompareDialog } from "./workspace/EditorCompareDialog";
 import { HighlightingWidget } from "./workspace/HighlightingWidget";
-import {
-  isDiagnosticScopeCurrent,
-  type DiagnosticScope,
-} from "./workspace/diagnosticScopeModel";
-import {
-  isDocCommentRenderingSupported,
-  readReaderModePreference,
-  writeReaderModePreference,
-} from "./workspace/renderedDocCommentsModel";
+import { isDiagnosticScopeCurrent, type DiagnosticScope } from "./workspace/diagnosticScopeModel";
+import { isDocCommentRenderingSupported, readReaderModePreference, writeReaderModePreference } from "./workspace/renderedDocCommentsModel";
 import { useDeferredOpenFileTodos } from "./workspace/useDeferredOpenFileTodos";
 import { type QuickDocContent } from "./workspace/referenceDocumentation";
-import {
-  extractProviderDocLinks,
-  openExternalDocumentation,
-  validateExternalDocUrl,
-} from "./workspace/referenceDocumentation";
-import {
-  LEGACY_CONTEXT_INFO_REASON,
-  ReferenceInfoController,
-  type ReferenceHistorySnapshot,
-} from "./workspace/referenceInfoController";
-import {
-  ParameterInfoSession,
-  type ParameterDisplayState,
-  type ParameterInvalidateReason,
-  type ReferenceSessionContext,
-} from "./workspace/referenceInfoSession";
+import { extractProviderDocLinks, openExternalDocumentation, validateExternalDocUrl } from "./workspace/referenceDocumentation";
+import { LEGACY_CONTEXT_INFO_REASON, ReferenceInfoController, type ReferenceHistorySnapshot } from "./workspace/referenceInfoController";
+import { ParameterInfoSession, type ParameterDisplayState, type ParameterInvalidateReason, type ReferenceSessionContext } from "./workspace/referenceInfoSession";
 import { useWorkspaceProjectAnalysis } from "./workspace/useWorkspaceProjectAnalysis";
 import { useProjectFacts } from "../../hooks/useProjectFacts";
 import { useProjectDescriptorDiscovery } from "../../hooks/useProjectDescriptorDiscovery";
 import { useProjectFactsStore } from "../../stores/projectFactsStore";
 import { selectQueryProjectGeneration } from "./workspace/projectFactsConsumers";
-import {
-  DEFAULT_SCOPE_SELECTION,
-  libraryUriClassifierForRoots,
-  UsageQuerySession,
-  type UsagesScopeSelection,
-} from "./workspace/usageQuerySession";
-import { formatUsageEvidenceSuffix } from "./workspace/providerUsageEvidence";
+import { DEFAULT_SCOPE_SELECTION, UsageQuerySession, type UsagesScopeSelection } from "./workspace/usageQuerySession";
 import { UsagesScopeDialog } from "./workspace/UsagesScopeDialog";
 import { type LocationPeekState } from "./workspace/LocationPeek";
-import {
-  type GoToSymbolQueryResult,
-  type GoToSymbolItem,
-  type SearchEverywhereMode,
-} from "./workspace/SearchEverywhere";
+import { type GoToSymbolQueryResult, type GoToSymbolItem, type SearchEverywhereMode } from "./workspace/SearchEverywhere";
 import { type RecentFileEntry } from "./workspace/RecentFilesPopup";
 import { EditorGroup } from "./workspace/EditorGroup";
 import { WorkspacePopupsHost } from "./workspace/WorkspacePopupsHost";
@@ -657,34 +159,9 @@ import { ProjectFactsStatusBadge } from "./workspace/ProjectFactsStatusBadge";
 import { WorkspaceBuildRunToolsDialog } from "./workspace/WorkspaceBuildRunToolsDialog";
 import { WorkspaceIntelligenceSettingsDialog } from "./workspace/WorkspaceIntelligenceSettingsDialog";
 import { WorkspaceEditorAppearanceSettingsDialog } from "./workspace/WorkspaceEditorAppearanceSettingsDialog";
-import {
-  DEFAULT_EDITOR_APPEARANCE_PROFILE,
-  matchesBreadcrumbLanguage,
-  matchesSoftWrapPath,
-  normalizeEditorAppearanceProfile,
-  readEditorAppearanceProfileWithDiagnostics,
-  writeEditorAppearanceProfile,
-  type EditorAppearanceProfile,
-} from "./workspace/editorAppearanceProfile";
-import {
-  applyRunConfigurationOverride,
-  applyRunOverrideToDebugConfiguration,
-  applyRunOverrideToJavaLaunch,
-  javaRunTargetToExecutionRunConfiguration,
-  materializeRunConfigurations,
-  mergeDebugEnvironment,
-  parseDotEnv,
-  readActiveRunConfigurationSelection,
-  readRunConfigurationOverrides,
-  resolveEnvironmentFilePath,
-  RUN_CONFIGURATION_CHANGED_EVENT,
-  writeActiveRunConfigurationSelection,
-} from "./workspace/runConfigurationPersistence";
-import {
-  executeTaskPlan,
-  resolveBuildTargetPlan,
-  validateCompoundExecutionGraph,
-} from "./workspace/executionPlan";
+import { DEFAULT_EDITOR_APPEARANCE_PROFILE, matchesBreadcrumbLanguage, matchesSoftWrapPath, normalizeEditorAppearanceProfile, readEditorAppearanceProfileWithDiagnostics, writeEditorAppearanceProfile, type EditorAppearanceProfile } from "./workspace/editorAppearanceProfile";
+import { applyRunConfigurationOverride, applyRunOverrideToDebugConfiguration, applyRunOverrideToJavaLaunch, javaRunTargetToExecutionRunConfiguration, materializeRunConfigurations, parseDotEnv, readActiveRunConfigurationSelection, readRunConfigurationOverrides, resolveEnvironmentFilePath, RUN_CONFIGURATION_CHANGED_EVENT, writeActiveRunConfigurationSelection } from "./workspace/runConfigurationPersistence";
+import { executeTaskPlan, resolveBuildTargetPlan } from "./workspace/executionPlan";
 import { FileTreePane } from "./workspace/FileTreePane";
 import { ProjectTree } from "./workspace/ProjectTree";
 import { navigateProjectTree } from "./workspace/projectTreeNavigation";
@@ -693,530 +170,21 @@ import { IconButton, LspStatusPill } from "./workspace/workspaceChrome";
 import { OutlinePane } from "./workspace/OutlinePane";
 import { useDeferredGitLineChanges } from "./workspace/useDeferredGitLineChanges";
 import { useWorkspaceActionsController } from "./workspace/useWorkspaceActionsController";
-import {
-  eventLogicalKey,
-  type WorkspaceCommand,
-  type WorkspaceCommandContext,
-  type WorkspaceCommandRegistration,
-} from "./workspace/workspaceCommands";
+import { eventLogicalKey, type WorkspaceCommand, type WorkspaceCommandContext } from "./workspace/workspaceCommands";
 import type { ShellShortcutClaim } from "./workspace/shellShortcutRouter";
 import type { WorkspaceFocus } from "./workspace/workspaceActionRegistry";
 import { buildReplaceWorkspaceEdit, workspaceSearchMatchKey } from "./workspace/buildReplaceEdits";
-import {
-  codePointOffsetToUtf16Offset,
-  collectReplacePreimages,
-  replaceMatchAbsolutePath,
-  replacePreimageExpectedHashes,
-  replacePreimagePathKey,
-  searchMatchesToReplaceInputs,
-  summarizeReplaceCommitReport,
-  validateReplacePreflight,
-  validateReplacePreviewSelection,
-  verifyReplaceMatchFreshness,
-  type ReplaceFilePreimage,
-  type ReplacePreflightFileInput,
-  type ReplacePrepareOptions,
-} from "./workspace/replaceInFilesModel";
-import type {
-  CodeWorkspaceFileRef,
-  CodeWorkspaceLooseFileInfo,
-  CodeWorkspaceRootInfo,
-  CodeWorkspaceTabInfo,
-} from "../../types";
-
-interface CodeWorkspaceTabProps {
-  tabId: string;
-  workspace: CodeWorkspaceTabInfo;
-  visible?: boolean;
-  onOpenGitManager?: (payload: CodeWorkspaceGitManagerPayload) => void;
-  onSyncGitManager?: (payload: CodeWorkspaceGitManagerPayload) => void;
-  onCommandsChange?: (tabId: string, registration: WorkspaceCommandRegistration | null) => void;
-}
-
-export interface CodeWorkspaceGitManagerPayload {
-    workspaceName: string;
-    workspaceInstanceId?: string;
-    workspaceId?: string;
-    roots: WorkspaceGitRoot[];
-    activeRepoRoot: string | null;
-}
-
-type LspLocationOpenOptions = {
-  groupId?: EditorGroupId;
-  preview?: boolean;
-  isCurrent?: () => boolean;
-  /** Provider document that owns a virtual/library URI result. */
-  originFile?: OpenFileState;
-  /** Keep a semantic jump's history transaction until reveal succeeds. */
-  recordHistory?: boolean;
-  onRevealed?: (ref: CodeWorkspaceFileRef, position: LspPosition) => void;
-};
-
-const TREE_DETAILS_STORAGE_KEY = "taomni.codeWorkspace.tree.details";
-
-function semanticLocationsFromResult(result: {
-  status: LspDocumentStatus;
-  locations: LspLocation[];
-}): LspLocation[] | null {
-  if (result.status.error) throw new Error(result.status.error);
-  if (!result.status.available || !result.status.active) return null;
-  return result.locations;
-}
-
-function breadcrumbSegmentsForFile(
-  file: OpenFileState,
-  roots: CodeWorkspaceRootInfo[],
-): BreadcrumbPathSegment[] {
-  // Library sources have no directory trail — show where the class came from.
-  if (file.library) {
-    const trail: BreadcrumbPathSegment[] = [];
-    if (file.library.container) {
-      trail.push({ label: file.library.container, path: "", kind: "root" });
-    }
-    trail.push({ label: file.title, path: file.path, kind: "file" });
-    return trail;
-  }
-  if (file.ref.kind === "root") {
-    const rootId = file.ref.rootId;
-    const root = roots.find((candidate) => candidate.id === rootId);
-    if (!root) return [{ label: file.title, path: file.ref.path, kind: "file" }];
-    const parts = file.ref.path.split("/").filter(Boolean);
-    let path = "";
-    return [
-      { label: root.name, path: "", kind: "root" },
-      ...parts.map((part, index): BreadcrumbPathSegment => {
-        path = path ? `${path}/${part}` : part;
-        return { label: part, path, kind: index === parts.length - 1 ? "file" : "directory" };
-      }),
-    ];
-  }
-  const normalized = normalizeFsPath(file.ref.path);
-  const parts = normalized.split("/").filter(Boolean);
-  let path = normalized.startsWith("/") ? "/" : "";
-  return parts.map((part, index): BreadcrumbPathSegment => {
-    path = path === "/" ? `/${part}` : path ? `${path}/${part}` : part;
-    return { label: part, path, kind: index === parts.length - 1 ? "file" : "directory" };
-  });
-}
-
-function initialInlayHintRange(text: string): LspRange {
-  const lines = text.split("\n");
-  const endLine = Math.min(Math.max(lines.length - 1, 0), 199);
-  return {
-    start: { line: 0, character: 0 },
-    end: { line: endLine, character: lines[endLine]?.length ?? 0 },
-  };
-}
-
-/** Maven / Gradle build descriptors that warrant a jdtls project reload on save. */
-function isJavaBuildFile(languagePath: string): boolean {
-  const name = languagePath.split(/[\\/]/).pop()?.toLowerCase() ?? "";
-  return name === "pom.xml"
-    || name === "build.gradle"
-    || name === "build.gradle.kts"
-    || name === "settings.gradle"
-    || name === "settings.gradle.kts";
-}
-
-function encodingSupportsBom(encoding: string): boolean {
-  const normalized = encoding.trim().toLowerCase().replace(/_/g, "-");
-  return normalized === "utf-8" || normalized === "utf-16le" || normalized === "utf-16be";
-}
-
-function compareSelectionFromEditorSelection(
-  selection: EditorSelectionRange,
-): CompareSelection | undefined {
-  if (selection.empty || (
-    selection.start.line === selection.end.line
-    && selection.start.character === selection.end.character
-  )) return undefined;
-  return {
-    start: { ...selection.start },
-    end: { ...selection.end },
-    text: normalizeCompareText(selection.text),
-  };
-}
-
-function compareDescriptorForOpenFile(
-  file: OpenFileState,
-  source: CompareSource,
-  path: string,
-  text = file.text,
-  title = file.title,
-): CompareDocumentDescriptor {
-  return compareDocumentDescriptor({
-    title,
-    path,
-    text,
-    encoding: file.encoding ?? "UTF-8",
-    eol: file.eol,
-    bom: file.bom ?? false,
-    sizeBytes: text === file.text && !file.dirty ? file.size : compareTextByteLength(text),
-    source,
-    readOnly: false,
-  });
-}
-
-function compareTargetForOpenFile(
-  file: OpenFileState,
-  selection?: CompareSelection,
-): CompareTarget {
-  return {
-    fileKey: file.key,
-    documentRevision: file.documentRevision ?? 0,
-    expectedText: file.text,
-    selection,
-  };
-}
-
-function comparePositionOffset(text: string, position: { line: number; character: number }): number {
-  const lines = text.split("\n");
-  const line = Math.min(Math.max(0, position.line), Math.max(0, lines.length - 1));
-  let offset = 0;
-  for (let index = 0; index < line; index += 1) {
-    offset += (lines[index]?.length ?? 0) + 1;
-  }
-  return offset + Math.min(Math.max(0, position.character), lines[line]?.length ?? 0);
-}
-
-function replaceCompareSelection(
-  text: string,
-  selection: CompareSelection,
-  replacement: string,
-): string | null {
-  const from = comparePositionOffset(text, selection.start);
-  const to = comparePositionOffset(text, selection.end);
-  const start = Math.min(from, to);
-  const end = Math.max(from, to);
-  if (text.slice(start, end) !== selection.text) return null;
-  return `${text.slice(0, start)}${replacement}${text.slice(end)}`;
-}
-
-function compareTargetMatches(file: OpenFileState | null, target: CompareTarget): boolean {
-  return !!file
-    && file.key === target.fileKey
-    && (file.documentRevision ?? 0) === target.documentRevision
-    && file.text === target.expectedText;
-}
-
-interface ExternalDiskSnapshot {
-  text: string;
-  eol: OpenFileState["eol"];
-  encoding: string;
-  bom: boolean;
-  hash: string;
-  mtime: number;
-  size: number;
-}
-
-interface PendingExternalFileConflict {
-  key: string;
-  path: string;
-  baseText: string;
-  localText: string;
-  disk: ExternalDiskSnapshot | null;
-}
-
-interface PendingExternalFileEvent {
-  change: LspExternalFileChange;
-  timer: number;
-}
-
-interface WorkspaceEditTabSnapshot {
-  activeGroupId: EditorGroupId;
-  splitOrientation: EditorSplitOrientation | null;
-  layoutTreeV2: LayoutNode;
-  files: Array<{
-    path: string;
-    ref: CodeWorkspaceFileRef;
-    groups: Array<{
-      id: EditorGroupId;
-      active: boolean;
-      preview: boolean;
-      pinned: boolean;
-    }>;
-  }>;
-}
-
-const EXTERNAL_FILE_EVENT_SETTLE_MS = 140;
-const WORKSPACE_BOOKMARK_MNEMONICS = [..."0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"];
-
-function coalesceExternalFileChange(
-  previous: LspExternalFileChange,
-  next: LspExternalFileChange,
-): LspExternalFileChange {
-  // Atomic replacement commonly arrives as Remove followed by Create for the
-  // same path. The editor should treat that sequence as one content change.
-  if (previous.type === 3 && next.type === 1) {
-    return { ...next, type: 2 };
-  }
-  return next;
-}
-
-function externalDiskSnapshot(file: WorkspaceFile): ExternalDiskSnapshot {
-  const normalized = normalizeEditorText(file.text);
-  return {
-    text: normalized.text,
-    eol: normalized.eol,
-    encoding: file.encoding ?? "UTF-8",
-    bom: file.bom ?? file.text.startsWith("\uFEFF"),
-    hash: file.hash,
-    mtime: file.mtime,
-    size: file.size,
-  };
-}
-
-
-// Keep document synchronization ahead of the comparatively expensive derived
-// LSP features.  In particular, rust-analyzer semantic tokens can be large
-// enough that applying them while somebody is still typing is noticeable.
-// Background typing coalesces didChange at this interval; completion/signature
-// force-flush immediately so the server is not one keystroke behind.
-// Slightly longer than a single keystroke so jdtls is not flooded while still
-// feeling immediate once ensureLspDocumentSynced force-flushes for completion.
-/**
- * ED-PARITY-024 tool windows and their IDEA new-UI default anchors: Project
- * (left top) with Structure split below it (left bottom), Documentation on
- * the right, and the bottom tool windows bottom-left.
- */
-/** IDEA registers these on demand: the stripe button appears once opened. */
-const ON_DEMAND_TOOL_WINDOWS = new Set(["references", "call-hierarchy", "type-hierarchy", "coverage"]);
-const WORKSPACE_TOOL_WINDOW_LAYOUT_ENTRIES: readonly ToolWindowLayoutEntry[] = [
-  { id: "project", defaultAnchor: "left-top" },
-  { id: "structure", defaultAnchor: "left-bottom" },
-  { id: "documentation", defaultAnchor: "right-top" },
-  ...[...WORKSPACE_BOTTOM_DOCK_WINDOWS.map((window) => window.id), "git"].map((id) => ({
-    id,
-    defaultAnchor: "bottom-left" as const,
-    bottomDock: true,
-    hiddenUntilUsed: ON_DEMAND_TOOL_WINDOWS.has(id),
-  })),
-];
-
-const LSP_CHANGE_SYNC_DELAY_MS = 140;
-const LSP_FEATURE_SYNC_WAIT_MS = 400;
-const LSP_HIGHLIGHT_IDLE_DELAY_MS = 500;
-const LSP_INLAY_HINT_IDLE_DELAY_MS = 650;
-const LSP_SEMANTIC_TOKENS_IDLE_DELAY_MS = 900;
-const LSP_DOCUMENT_SYMBOLS_IDLE_DELAY_MS = 650;
-// CodeMirror owns the live text while the user is typing. Publishing every
-// keypress into the workspace-wide Zustand object redraws the file tree,
-// panels, and command chrome, so commit an editing burst as one update.
-const EDITOR_TEXT_COMMIT_IDLE_DELAY_MS = 220;
-// Shared empty result so "no diagnostics" is always the same array identity.
-const EMPTY_DISPLAY_DIAGNOSTICS: LspDiagnostic[] = [];
-
-const DECLARATION_DEFINITION_EQUIVALENT_LANGUAGES = new Set([
-  "java",
-  "kotlin",
-  "scala",
-  "groovy",
-  "python",
-  "rust",
-  "go",
-  "typescript",
-  "javascript",
-  "typescriptreact",
-  "javascriptreact",
-  "php",
-  "ruby",
-  "swift",
-  "dart",
-  "lua",
-]);
-
-const DECLARATION_DEFINITION_EQUIVALENT_EXTENSIONS = new Set([
-  "java",
-  "kt",
-  "kts",
-  "scala",
-  "sc",
-  "groovy",
-  "gvy",
-  "gy",
-  "gsh",
-  "py",
-  "pyw",
-  "rs",
-  "go",
-  "ts",
-  "tsx",
-  "js",
-  "jsx",
-  "mjs",
-  "cjs",
-  "php",
-  "rb",
-  "swift",
-  "dart",
-  "lua",
-]);
-
-/**
- * Languages where declarations and definitions are physically identical
- * (no separate C-style header/implementation files). For these languages,
- * IDEA's Ctrl+B ("Go to Declaration or Usages") maps directly to definition
- * navigation so symbols resolve through standard definition providers.
- */
-export function isDeclarationDefinitionEquivalentLanguage(
-  languageId?: string | null,
-  filePath?: string | null,
-): boolean {
-  if (languageId && DECLARATION_DEFINITION_EQUIVALENT_LANGUAGES.has(languageId.toLowerCase())) {
-    return true;
-  }
-  if (filePath) {
-    const ext = filePath.split(".").pop()?.toLowerCase();
-    if (ext && DECLARATION_DEFINITION_EQUIVALENT_EXTENSIONS.has(ext)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-export function extractContextSnippet(
-  text: string,
-  targetLine: number,
-  targetOffset?: number,
-): { lineText: string; contextSnippet: string } {
-  if (targetOffset !== undefined) {
-    const offset = Math.max(0, Math.min(targetOffset, text.length));
-    const targetLineStart = offset === 0 ? 0 : text.lastIndexOf("\n", offset - 1) + 1;
-    const targetLineBreak = text.indexOf("\n", offset);
-    const targetLineEnd = targetLineBreak === -1 ? text.length : targetLineBreak;
-    const contextStart = targetLine <= 0
-      ? targetLineStart
-      : targetLineStart > 1
-        ? text.lastIndexOf("\n", targetLineStart - 2) + 1
-        : 0;
-    const nextLineBreak = targetLineBreak === -1
-      ? -1
-      : text.indexOf("\n", targetLineBreak + 1);
-    const contextEnd = nextLineBreak === -1 ? text.length : nextLineBreak;
-    return {
-      lineText: text.slice(targetLineStart, targetLineEnd),
-      contextSnippet: text.slice(contextStart, contextEnd),
-    };
-  }
-
-  const desiredStart = Math.max(0, targetLine - 1);
-  const desiredEnd = targetLine + 1;
-  let currentLine = 0;
-  let lineStart = 0;
-  let targetLineStart = 0;
-  let targetLineEnd = text.length;
-  let startLineOffset = 0;
-  let endLineOffset = text.length;
-
-  let pos = 0;
-  while (pos <= text.length) {
-    const nextNewline = text.indexOf("\n", pos);
-    const lineEnd = nextNewline === -1 ? text.length : nextNewline;
-    if (currentLine === desiredStart) startLineOffset = lineStart;
-    if (currentLine === targetLine) {
-      targetLineStart = lineStart;
-      targetLineEnd = lineEnd;
-    }
-    if (currentLine === desiredEnd) {
-      endLineOffset = lineEnd;
-      break;
-    }
-    if (nextNewline === -1) {
-      if (currentLine < desiredEnd) endLineOffset = text.length;
-      break;
-    }
-    currentLine++;
-    lineStart = nextNewline + 1;
-    pos = lineStart;
-  }
-
-  return {
-    lineText: text.slice(targetLineStart, targetLineEnd),
-    contextSnippet: text.slice(startLineOffset, endLineOffset),
-  };
-}
-
-import {
-  type LibraryBufferInfo,
-  type LspFileState,
-  type MarkdownViewMode,
-  type OpenFileState,
-  type TreeSelection,
-  type TreeViewMode,
-  type WorkspaceBuildRunTools,
-  type WorkspaceTreeCommandPayload,
-  readWorkspaceBuildRunTools,
-  writeWorkspaceBuildRunTools,
-  workspaceToolConfig,
-  CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE,
-  CODE_WORKSPACE_MAX_FONT_SIZE,
-  CODE_WORKSPACE_MAX_TREE_FONT_SIZE,
-  CODE_WORKSPACE_MIN_FONT_SIZE,
-  CODE_WORKSPACE_MIN_TREE_FONT_SIZE,
-  absoluteWorkspacePath,
-  basename,
-  clampCodeWorkspaceFontSize,
-  clampCodeWorkspaceTreeFontSize,
-  emptyLspFileState,
-  errorMessage,
-  fileKey,
-  fileRefUnder,
-  fileMeta,
-  formatBytes,
-  formatMtime,
-  gitRootForWorkspacePath,
-  gitPathForWorkspacePath,
-  gitRootsForWorkspaceRoot,
-  initialFileRef,
-  initialLooseFiles,
-  initialRoots,
-  isExternalHref,
-  isLspFeatureReady,
-  isMarkdownPath,
-  applyEditorEol,
-  looksLikeDocumentUri,
-  lspPresetIdForPath,
-  shouldLiveSyncLsp,
-  shouldProbeLsp,
-  makeLibraryFile,
-  makeLoadingFile,
-  makeLooseFile,
-  fsPathComparisonKey,
-  fsPathEquals,
-  normalizeEditorText,
-  normalizeFsPath,
-  parentPath,
-  readCodeWorkspaceTreeFontSize,
-  relativePathWithinRoot,
-  resolveLooseMarkdownLink,
-  resolveRootMarkdownLink,
-  rootDirKey,
-  shouldHideEntry,
-  workspacePathForGitPath,
-  workspaceTitle,
-  writeCodeWorkspaceTreeFontSize,
-  writeCodeWorkspaceTreeViewMode,
-} from "./workspace/codeWorkspaceModel";
+import { codePointOffsetToUtf16Offset, collectReplacePreimages, replaceMatchAbsolutePath, replacePreimageExpectedHashes, replacePreimagePathKey, searchMatchesToReplaceInputs, summarizeReplaceCommitReport, validateReplacePreflight, validateReplacePreviewSelection, verifyReplaceMatchFreshness, type ReplaceFilePreimage, type ReplacePreflightFileInput, type ReplacePrepareOptions } from "./workspace/replaceInFilesModel";
+import type { CodeWorkspaceFileRef, CodeWorkspaceLooseFileInfo, CodeWorkspaceRootInfo } from "../../types";
+import { type LibraryBufferInfo, type LspFileState, type MarkdownViewMode, type OpenFileState, type TreeSelection, type TreeViewMode, type WorkspaceBuildRunTools, type WorkspaceTreeCommandPayload, readWorkspaceBuildRunTools, writeWorkspaceBuildRunTools, workspaceToolConfig, CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE, CODE_WORKSPACE_MAX_FONT_SIZE, CODE_WORKSPACE_MAX_TREE_FONT_SIZE, CODE_WORKSPACE_MIN_FONT_SIZE, CODE_WORKSPACE_MIN_TREE_FONT_SIZE, absoluteWorkspacePath, basename, clampCodeWorkspaceFontSize, clampCodeWorkspaceTreeFontSize, emptyLspFileState, errorMessage, fileKey, formatBytes, formatMtime, gitRootForWorkspacePath, gitPathForWorkspacePath, gitRootsForWorkspaceRoot, initialFileRef, initialLooseFiles, initialRoots, isExternalHref, isLspFeatureReady, isMarkdownPath, applyEditorEol, lspPresetIdForPath, shouldLiveSyncLsp, shouldProbeLsp, makeLibraryFile, fsPathComparisonKey, fsPathEquals, normalizeEditorText, normalizeFsPath, parentPath, readCodeWorkspaceTreeFontSize, relativePathWithinRoot, resolveLooseMarkdownLink, resolveRootMarkdownLink, rootDirKey, shouldHideEntry, workspacePathForGitPath, workspaceTitle, writeCodeWorkspaceTreeFontSize, writeCodeWorkspaceTreeViewMode } from "./workspace/codeWorkspaceModel";
 import { useWorkspaceTreeData } from "./workspace/useWorkspaceTreeData";
-import {
-  LSP_DIAGNOSTICS_REFRESH_EVENT,
-  useWorkspaceLspSession,
-} from "./workspace/useWorkspaceLspSession";
+import { LSP_DIAGNOSTICS_REFRESH_EVENT, useWorkspaceLspSession } from "./workspace/useWorkspaceLspSession";
 import { useWorkspaceGitSnapshots } from "./workspace/useWorkspaceGitSnapshots";
 import { useWorkspaceNavigation } from "./workspace/useWorkspaceNavigation";
 import { useWorkspaceFileActions } from "./workspace/useWorkspaceFileActions";
-import {
-  Breadcrumbs,
-  symbolChainAtPosition,
-  type BreadcrumbPathAction,
-  type BreadcrumbPathChild,
-  type BreadcrumbPathSegment,
-} from "./workspace/Breadcrumbs";
+import { Breadcrumbs, symbolChainAtPosition, type BreadcrumbPathAction, type BreadcrumbPathChild, type BreadcrumbPathSegment } from "./workspace/Breadcrumbs";
 import { useT } from "../../lib/i18n";
-import {
-  TerminalDockPanel,
-  type TerminalDockHandle,
-} from "./workspace/panels/TerminalDockPanel";
+import { TerminalDockPanel, type TerminalDockHandle } from "./workspace/panels/TerminalDockPanel";
 import { RunPanel, type RunPanelHandle, type WorkspaceTaskItem } from "./workspace/panels/RunPanel";
 import { BuildPanel } from "./workspace/panels/BuildPanel";
 import { AnalysisPanel } from "./workspace/panels/AnalysisPanel";
@@ -1224,214 +192,42 @@ import { TestsPanel } from "./workspace/panels/TestsPanel";
 import { javaTestRunCommand, type JavaTestBuildTool } from "./workspace/panels/javaTestRun";
 import { DebugPanel } from "./workspace/panels/DebugPanel";
 import { JavaMainClassPicker } from "./workspace/JavaMainClassPicker";
-import {
-  useCodeDebugSession,
-  type DebugLaunchGroup,
-  type DebugLaunchNode,
-} from "./workspace/useCodeDebugSession";
-import {
-  dapResolveJavaMainClasses,
-  type JavaMainClassOption,
-  type JavaMainClassResolution,
-} from "../../lib/editor/dap";
+import { useCodeDebugSession } from "./workspace/useCodeDebugSession";
+import { type JavaMainClassOption } from "../../lib/editor/dap";
 import { effectiveSuspend, type DebugBreakpoint, type DebugStackFrame } from "./workspace/dapDebugModel";
-import {
-  breakpointMasterKeys,
-  breakpointRefKey,
-  breakpointTooltipLines,
-  masterOf,
-} from "./workspace/debugBreakpointProperties";
+import { breakpointMasterKeys, breakpointRefKey, breakpointTooltipLines, masterOf } from "./workspace/debugBreakpointProperties";
 import { BreakpointPopup, GutterBreakpointMenu } from "./workspace/panels/debug/BreakpointPopup";
 import { BreakpointsDialog } from "./workspace/panels/debug/BreakpointsDialog";
 import { EvaluateExpressionDialog } from "./workspace/panels/debug/EvaluateExpressionDialog";
 import type { EditorRevealTarget } from "./workspace/EditorGroup";
 import { LspMessageRequestDialog } from "./workspace/LspMessageRequestDialog";
 import { useWorkspaceLspClientEvents } from "./workspace/useWorkspaceLspClientEvents";
-import {
-  addDiagnosticToInspectionBaseline,
-  addInspectionSuppression,
-  applyInspectionProfile,
-  clearInspectionBaseline,
-  importInspectionBaseline,
-  readInspectionProfile,
-  removeInspectionBaselineEntry,
-  removeInspectionSuppression,
-  diagnosticInspectionId,
-  replaceInspectionBaseline,
-  serializeInspectionBaseline,
-  updateInspectionRule,
-  writeInspectionProfile,
-  type InspectionProfile,
-  type InspectionRule,
-  type InspectionSuppressionScope,
-} from "./workspace/inspectionProfile";
+import { addDiagnosticToInspectionBaseline, addInspectionSuppression, applyInspectionProfile, clearInspectionBaseline, importInspectionBaseline, readInspectionProfile, removeInspectionBaselineEntry, removeInspectionSuppression, diagnosticInspectionId, replaceInspectionBaseline, serializeInspectionBaseline, updateInspectionRule, writeInspectionProfile, type InspectionProfile, type InspectionRule, type InspectionSuppressionScope } from "./workspace/inspectionProfile";
 import { ExternalFileConflictDialog } from "./workspace/ExternalFileConflictDialog";
 import { WorkspaceRecoveryDialog } from "./workspace/WorkspaceRecoveryDialog";
 import { FileEncodingDialog } from "./workspace/FileEncodingDialog";
-import {
-  readWorkspaceRecoveryEntries,
-  reconcileWorkspaceRecoveryEntries,
-  removeWorkspaceRecoveryEntry,
-  writeWorkspaceRecoveryEntries,
-  type WorkspaceRecoveryEntry,
-} from "./workspace/workspaceRecovery";
-import {
-  changedWorkspaceSemanticBufferPaths,
-  workspaceSemanticIndexBuildIsCurrent,
-  workspaceSemanticIndexTokenRevisionCurrent,
-  type WorkspaceSemanticIndexBuildToken,
-} from "./workspace/workspaceSemanticIndex";
+import { readWorkspaceRecoveryEntries, reconcileWorkspaceRecoveryEntries, removeWorkspaceRecoveryEntry, writeWorkspaceRecoveryEntries, type WorkspaceRecoveryEntry } from "./workspace/workspaceRecovery";
+import { changedWorkspaceSemanticBufferPaths, workspaceSemanticIndexTokenRevisionCurrent, type WorkspaceSemanticIndexBuildToken } from "./workspace/workspaceSemanticIndex";
 import { useWorkspaceSemanticIndex } from "./workspace/useWorkspaceSemanticIndex";
-import {
-  createRestoreTimingRecorder,
-  executeBoundedAsyncQueue,
-  planWorkspaceRestore,
-} from "./workspace/workspaceRestoreModel";
-import {
-  resolveCleanupCapabilities,
-  resolveRearrangeCapabilities,
-  executeCleanupTransaction,
-  executeRearrangeTransaction,
-  validateWorkflowProviderAction,
-  CLEANUP_ACTION_KINDS,
-  REARRANGE_ACTION_KINDS,
-  isCleanupActionKind,
-  isRearrangeActionKind,
-} from "./workspace/rearrangeCleanupWorkflow";
-import {
-  EXTRACT_NAMING_UNAVAILABLE_MESSAGE,
-  extractBufferMatches,
-  extractDirtyBufferMessage,
-  extractMethodBoundaryMessage,
-  extractOwnerMatches,
-  extractReceiptMatches,
-  findExtractedMethodSymbol,
-  isExtractMethodKind,
-  type ExtractOwnerSnapshot,
-  type ExtractReceipt,
-  type ExtractSession,
-} from "./workspace/extractMethodFlow";
+import { createRestoreTimingRecorder, executeBoundedAsyncQueue, planWorkspaceRestore } from "./workspace/workspaceRestoreModel";
+import { extractBufferMatches, extractReceiptMatches, type ExtractOwnerSnapshot, type ExtractReceipt, type ExtractSession } from "./workspace/extractMethodFlow";
 import { TextInputDialog } from "../sidebar/ConfirmDialog";
+import { createOpenFile, createHandleExternalFileChange, createCloseFile } from "./workspace/controller/fileActions";
+import { createCommitClosedFilePreparedSave, createSaveFile } from "./workspace/controller/saveActions";
+import { createOpenHierarchy, createOpenLspLocation, createOpenQuickDocumentation, createNavigateDiagnostic, createRunFindReferences } from "./workspace/controller/navigationActions";
+import { createApplyLspResourceOperationUnlocked } from "./workspace/controller/resourceActions";
+import { createApplyLspWorkspaceEditNow } from "./workspace/controller/workspaceEditActions";
+import { createRunRecoveryRestore } from "./workspace/controller/recoveryActions";
+import { createRequestCodeActions, createRunCodeAction, createShowCodeActionsMenu } from "./workspace/controller/codeActionActions";
+import { createExecuteAutoImportOnTheFly, createExecutePasteWithAutoImport, createRunRearrangeExecute, createRunCleanupExecute } from "./workspace/controller/styleActions";
+import { createWorkspaceCommands } from "./workspace/controller/commandCatalog";
+import { createRenameSymbolAt, createContinueExtractNaming, createRunExtractMethod, createSafeDeleteSymbolAtCursor } from "./workspace/controller/refactorActions";
+import { createBuildActiveProject, createStartDebugActiveFile, createStartDebugActiveTarget } from "./workspace/controller/runActions";
+import { type CodeWorkspaceTabProps, type PendingExternalFileConflict, type PendingExternalFileEvent, WORKSPACE_TOOL_WINDOW_LAYOUT_ENTRIES, type TabPolicyLifecycleReceiptView, type ExtractSessionState, type ExtractNamingPromptState, type ResourceCleanupRecoveryView, TREE_DETAILS_STORAGE_KEY, type PendingClosedFile, extractContextSnippet, LSP_CHANGE_SYNC_DELAY_MS, LSP_FEATURE_SYNC_WAIT_MS, EDITOR_TEXT_COMMIT_IDLE_DELAY_MS, type WorkspaceEditTabSnapshot, compareSelectionFromEditorSelection, compareTargetForOpenFile, compareDescriptorForOpenFile, type FormatFileOutcome, type ExternalDiskSnapshot, externalDiskSnapshot, coalesceExternalFileChange, EXTERNAL_FILE_EVENT_SETTLE_MS, EMPTY_DISPLAY_DIAGNOSTICS, LSP_HIGHLIGHT_IDLE_DELAY_MS, initialInlayHintRange, LSP_INLAY_HINT_IDLE_DELAY_MS, LSP_SEMANTIC_TOKENS_IDLE_DELAY_MS, breadcrumbSegmentsForFile, LSP_DOCUMENT_SYMBOLS_IDLE_DELAY_MS, type CodeWorkspaceGitManagerPayload, encodingSupportsBom, type LspLocationOpenOptions, compareTargetMatches, replaceCompareSelection, semanticLocationsFromResult, isDeclarationDefinitionEquivalentLanguage, type InlineRenameRequest, type InlineNameResult, isJavaBuildFile, debugCurrentLineForFile, EMPTY_RUN_GUTTER, RECENT_FILES_TOOL_WINDOWS } from "./workspace/controller/model";
+import { type TreeOpenIntent, type BufferMutationPatch, type MutationReason, type WorkspaceEditApplyOptions } from "./workspace/controller/mutationTypes";
 
-interface ResourceCleanupRecoveryView {
-  readonly recoveryId: string;
-  readonly fileKey: string;
-  readonly nextStage: string;
-  readonly error: string;
-  readonly completedStageCount: number;
-  readonly attemptCount: number;
-}
 
-interface TabPolicyLifecycleReceiptView {
-  readonly status: "applied" | "no-op" | "aborted" | "stale";
-  readonly layoutRevision: number;
-  readonly activeKey: string | null;
-  readonly evictedCount: number;
-  readonly cleanupCount: number;
-  readonly cleanupCommittedCount: number;
-  readonly cleanupRecoveryCount: number;
-  readonly openResourceCount: number;
-}
 
-/** Resolve the execution line for one visible editor group. */
-export function debugCurrentLineForFile(
-  location: { path: string; line: number } | null,
-  frames: readonly Pick<DebugStackFrame, "id" | "path" | "line" | "sourceName">[],
-  selectedFrameId: number | null | undefined,
-  activeFilePath: string | null,
-  stopped: boolean,
-): number | null {
-  if (!activeFilePath) return null;
-  if (location && fsPathEquals(location.path, activeFilePath)) return location.line;
-  if (!stopped) return null;
-  const frame = frames.find((candidate) => candidate.id === selectedFrameId) ?? frames[0];
-  if (!frame || frame.line < 1) return null;
-  const sourceName = frame.sourceName ?? frame.path?.split(/[\\/]/).pop() ?? null;
-  const fileName = activeFilePath.split(/[\\/]/).pop() ?? null;
-  return sourceName && fileName && sourceName === fileName ? frame.line : null;
-}
-
-interface PendingClosedFile {
-  cleanup: Promise<ResourceCleanupOutcome> | null;
-  didCloseCompleted: boolean;
-}
-
-/**
- * Typed Reformat Document outcome. Provider unavailability is a value, never
- * a silent null: the action layer turns each reason into a status message and
- * keeps the buffer untouched (AC-FMT-03/04).
- */
-type FormatFileOutcome =
-  | { state: "formatted"; text: string }
-  | { state: "unchanged"; text: string }
-  | { state: "unavailable"; reason: string };
-
-/**
- * ED-PARITY-007 DEC-07: typed Rename outcome. Extract Method uses it to keep
- * the committed extraction when the naming step fails, instead of pretending
- * the whole transaction was cancelled.
- */
-type RenameSymbolAtResult = {
-  status: "applied" | "unchanged" | "empty-edit" | "cancelled" | "stale" | "failed";
-  message?: string;
-  recoveryId?: string;
-  /** The provider refused the name before any write; the caller may retry. */
-  retryable?: boolean;
-};
-
-const EMPTY_RUN_GUTTER: RunGutterTarget[] = [];
-
-/** ED-PARITY-017: outcome of one in-place naming session. */
-type InlineNameResult =
-  | { kind: "commit"; name: string }
-  | { kind: "cancel" }
-  | { kind: "dialog"; value: string };
-
-interface InlineRenameRequest {
-  id: number;
-  kind: "rename" | "extract";
-  fileKey: string;
-  view: EditorView;
-  anchor: InlineRenameAnchor;
-  initialValue: string;
-  suggestions: string[];
-  initialError: string | null;
-  languageId: string | null;
-  resolve: (result: InlineNameResult) => void;
-}
-
-/**
- * ED-PARITY-007 DEC-07: shell-side extension of the pure Extract session. The
- * before-symbols sample belongs to the frozen pre-commit context, the receipt
- * is attached at the canonical commit boundary, and the abort controller only
- * records that this owner stopped listening.
- */
-type ExtractSessionState = ExtractSession & {
-  beforeSymbols: LspDocumentSymbol[] | null;
-  receipt?: ExtractReceipt;
-  abortController: AbortController;
-};
-
-interface ExtractNamingPromptState {
-  sessionId: string;
-  title: string;
-  label: string;
-  confirmLabel: string;
-  initialValue: string;
-  resolve: (value: string | null) => void;
-}
-
-/** ED-PARITY-014 DEC-014-03: tool windows listed beside Recent Files (IDEA switcher). */
-const RECENT_FILES_TOOL_WINDOWS = [
-  { id: "project", label: "Project", shortcut: "Alt+1" },
-  { id: "problems", label: "Problems", shortcut: "Alt+6" },
-  { id: "structure", label: "Structure", shortcut: "Alt+7" },
-  { id: "terminal", label: "Terminal", shortcut: "Alt+F12" },
-  { id: "search", label: "Find" },
-  { id: "run", label: "Run" },
-  { id: "debug", label: "Debug" },
-  { id: "todos", label: "TODO" },
-] as const;
 
 export function CodeWorkspaceTab({
   tabId,
@@ -1813,14 +609,6 @@ export function CodeWorkspaceTab({
     token: object;
     port: EditorCommandPort;
   }>());
-  interface TreeOpenIntent {
-    workspaceInstanceId: string;
-    groupId: EditorGroupId;
-    requestedFileKey: string;
-    canonicalFileKey?: string;
-    interactionEpoch: number;
-    requestId: number;
-  }
   const treeInteractionEpochRef = useRef(0);
   const treeOpenRequestIdRef = useRef(0);
   const pendingTreeOpenIntentRef = useRef<TreeOpenIntent | null>(null);
@@ -3486,217 +2274,26 @@ export function CodeWorkspaceTab({
   const pendingClosedFilesRef = useRef(new Map<string, PendingClosedFile>());
 
   const openFile = useCallback(
-    async (
-      ref: CodeWorkspaceFileRef,
-      options: {
-        preview?: boolean;
-        groupId?: EditorGroupId;
-        activate?: boolean;
-        restoring?: boolean;
-        isCurrent?: () => boolean;
-      } = {},
-    ) => {
-      const isCurrent = options.isCurrent ?? (() => true);
-      if (!isCurrent()) {
-        return null;
-      }
-      // Switching tabs before the input idle timer fires must never show an
-      // older buffer snapshot in the newly activated editor.
-      flushPendingEditorText();
-      if (!isCurrent()) {
-        return null;
-      }
-      const key = fileKey(ref);
-      const pendingClosedFile = pendingClosedFilesRef.current.get(key);
-      const currentUi = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
-      const groupId = options.groupId ?? currentUi.activeEditorGroupId;
-      const shouldActivate = options.activate !== false;
-      updateEditorGroup(groupId, (group) => {
-        const alreadyOpen = group.openOrder.includes(key);
-        let nextOrder = group.openOrder;
-        let previewKey = group.previewKey;
-        const effectivePreview = options.preview && tabPolicyRef.current.previewMode;
-        if (!alreadyOpen) {
-          if (effectivePreview && tabPolicyRef.current.reusePreview && previewKey && previewKey !== key && !group.pinnedKeys.includes(previewKey)) {
-            nextOrder = nextOrder.filter((entry) => entry !== previewKey);
-          }
-          if (tabPolicyRef.current.openPosition === "after-active") {
-            const activeIdx = nextOrder.indexOf(group.activeKey ?? "");
-            if (activeIdx >= 0) {
-              nextOrder = [
-                ...nextOrder.slice(0, activeIdx + 1),
-                key,
-                ...nextOrder.slice(activeIdx + 1),
-              ];
-            } else {
-              nextOrder = [...nextOrder, key];
-            }
-          } else {
-            nextOrder = [...nextOrder, key];
-          }
-        }
-        if (effectivePreview) {
-          previewKey = group.pinnedKeys.includes(key) ? null : key;
-        } else if (previewKey === key) {
-          previewKey = null;
-        }
-        return { ...group, openOrder: nextOrder, activeKey: shouldActivate ? key : group.activeKey, previewKey };
-      });
-      if (shouldActivate && groupId !== currentUi.activeEditorGroupId) activateEditorGroup(groupId);
-      // §8.18.5 tab limit enforcement: opening beyond the leaf's limit evicts
-      // clean preview/least-recent candidates; dirty/pinned tabs are never
-      // silently closed (over-limit surfaces a reason instead).
-      if (!options.restoring) {
-        const groupAfter = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).editorGroups[groupId];
-        if (groupAfter) {
-          const meta = new Map(groupAfter.openOrder.map((entryKey) => [
-            entryKey,
-            {
-              key: entryKey,
-              dirty: !!openFilesRef.current[entryKey]?.dirty,
-              pinned: groupAfter.pinnedKeys.includes(entryKey),
-              preview: groupAfter.previewKey === entryKey,
-              lastUsedAt: 1_000_000 - mruFileKeysRef.current.indexOf(entryKey),
-            },
-          ]));
-          const eviction = enforceTabPolicy(groupAfter.openOrder, meta, tabPolicyRef.current);
-          if (eviction.kind === "evicted") {
-            for (const evictedKey of eviction.evictedKeys) {
-              if (evictedKey !== key) void closeFileRef.current?.(evictedKey, groupId, { discard: true });
-            }
-          } else if (eviction.kind === "over-limit-protected") {
-            setStatusMessage(eviction.reason);
-          }
-        }
-      }
-      if (!isCurrent()) {
-        return null;
-      }
-      // A close can have committed the layout before its LSP/buffer cleanup
-      // finishes. Reopening the entry must wait for that cleanup so a late
-      // buffer teardown cannot erase the newly visible editor.
-      if (pendingClosedFile?.cleanup) {
-        await pendingClosedFile.cleanup;
-        if (!isCurrent()) return null;
-        const latest = openFilesRef.current[key];
-        if (pendingClosedFile.didCloseCompleted && latest && !latest.loading) {
-          await syncLspDocument(latest, "open");
-          if (!isCurrent()) return null;
-        }
-      }
-      if (openFilesRef.current[key] && !openFilesRef.current[key].loading) {
-        const existing = openFilesRef.current[key];
-        return { canonicalFileKey: existing?.key ?? key, groupId, error: existing?.error ?? null };
-      }
-      // Library sources (JDK / dependency classes) have no file to read: ask the
-      // language server again so history and Recent Files can reopen them.
-      const library = libraryBuffersRef.current[key];
-      if (library) {
-        setOpenFiles((current) => ({
-          ...current,
-          [key]: current[key] ?? { ...makeLibraryFile(library, ""), loading: true },
-        }));
-        try {
-          const contents = await lspReadUriContents(
-            lspDescriptorForPath(library.originRootPath, library.originFilePath),
-            library.uri,
-          );
-          if (!isCurrent()) return null;
-          const info: LibraryBufferInfo = {
-            ...library,
-            title: contents.title || library.title,
-            container: contents.container ?? library.container,
-            languageId: contents.languageId || library.languageId,
-            decompiled: contents.decompiled,
-          };
-          libraryBuffersRef.current[key] = info;
-          setOpenFiles((current) => ({ ...current, [key]: makeLibraryFile(info, contents.text) }));
-          if (!options.restoring) setStatusMessage(`Opened ${info.title}`);
-          return { canonicalFileKey: key, groupId, error: null };
-        } catch (err) {
-          const message = errorMessage(err);
-          setOpenFiles((current) => ({
-            ...current,
-            [key]: {
-              ...(current[key] ?? makeLibraryFile(library, "")),
-              loading: false,
-              error: message,
-            },
-          }));
-          setStatusMessage(message);
-          return { canonicalFileKey: key, groupId, error: message };
-        }
-      }
-      setOpenFiles((current) => ({
-        ...current,
-        [key]: current[key] ?? makeLoadingFile(ref, rootsRef.current, looseFilesRef.current),
-      }));
-      try {
-        const file = ref.kind === "root"
-          ? await workspaceReadFile(findRoot(ref.rootId)?.path ?? "", ref.path)
-          : await workspaceReadLooseFile(ref.path);
-        if (!isCurrent()) {
-          return null;
-        }
-        const nextRef = ref.kind === "root" ? { ...ref, path: file.path } : { ...ref, path: file.path };
-        const meta = fileMeta(nextRef, rootsRef.current, looseFilesRef.current);
-        // CodeMirror normalizes to LF; keep buffer + dirty compare on LF and
-        // remember original EOL so save restores CRLF/CR on Windows files.
-        const normalized = normalizeEditorText(file.text);
-        setOpenFiles((current) => {
-          const next = { ...current };
-          if (fileKey(nextRef) !== key) delete next[key];
-          next[fileKey(nextRef)] = {
-            ref: nextRef,
-            key: fileKey(nextRef),
-            path: meta.path,
-            title: meta.title,
-            subtitle: meta.subtitle,
-            languagePath: meta.languagePath,
-            text: normalized.text,
-            savedText: normalized.text,
-            eol: normalized.eol,
-            encoding: file.encoding ?? "UTF-8",
-            bom: file.bom ?? file.text.startsWith("\uFEFF"),
-            hash: file.hash,
-            mtime: file.mtime,
-            size: file.size,
-            loading: false,
-            saving: false,
-            dirty: false,
-            documentRevision: 0,
-            error: null,
-          };
-          return next;
-        });
-        restoreBookmarksForFileKey(fileKey(nextRef), meta.subtitle);
-        updateEditorGroup(groupId, (group) => ({
-          ...group,
-          openOrder: group.openOrder.map((item) => (item === key ? fileKey(nextRef) : item)),
-          activeKey: group.activeKey === key ? fileKey(nextRef) : group.activeKey,
-          previewKey: group.previewKey === key ? fileKey(nextRef) : group.previewKey,
-          pinnedKeys: group.pinnedKeys.map((item) => (item === key ? fileKey(nextRef) : item)),
-        }));
-        if (!options.restoring) setStatusMessage(`Opened ${meta.subtitle}`);
-        return { canonicalFileKey: fileKey(nextRef), groupId, error: null };
-      } catch (err) {
-        if (!isCurrent()) {
-          return null;
-        }
-        const message = errorMessage(err);
-        setOpenFiles((current) => ({
-          ...current,
-          [key]: {
-            ...(current[key] ?? makeLoadingFile(ref, rootsRef.current, looseFilesRef.current)),
-            loading: false,
-            saving: false,
-            error: message,
-          },
-        }));
-        setStatusMessage(message);
-        return { canonicalFileKey: key, groupId, error: message };
-      }
-    },
+    createOpenFile({
+    flushPendingEditorText,
+    pendingClosedFilesRef,
+    workspaceInstanceId,
+    updateEditorGroup,
+    tabPolicyRef,
+    activateEditorGroup,
+    openFilesRef,
+    get mruFileKeysRef() { return mruFileKeysRef; },
+    closeFileRef,
+    setStatusMessage,
+    syncLspDocument,
+    libraryBuffersRef,
+    setOpenFiles,
+    lspDescriptorForPath,
+    rootsRef,
+    looseFilesRef,
+    findRoot,
+    restoreBookmarksForFileKey,
+  }),
     [
       activateEditorGroup,
       findRoot,
@@ -4821,31 +3418,6 @@ export function CodeWorkspaceTab({
     ],
   );
 
-  type MutationReason =
-    | "user-edit"
-    | "programmatic"
-    | "reload"
-    | "workspace-edit"
-    | "save-writeback"
-    | "save-metadata"
-    | "history-replay";
-
-  interface BufferMutationPatch {
-    text?: string;
-    savedText?: string;
-    eol?: OpenFileEol;
-    encoding?: string;
-    bom?: boolean;
-    hash?: string;
-    mtime?: number;
-    size?: number;
-    loading?: boolean;
-    saving?: boolean;
-    dirty?: boolean;
-    error?: string | null;
-    documentRevision?: number;
-  }
-
   const mutateOpenBuffer = useCallback((
     key: string,
     patch: BufferMutationPatch,
@@ -5898,197 +4470,15 @@ export function CodeWorkspaceTab({
    * open-buffer saves, and return the full typed result — callers must never
    * treat an uncertain write as success.
    */
-  const commitClosedFilePreparedSave = useCallback(async (
-    prepared: PreparedSave,
-    assertBeforeWrite?: () => void,
-  ): Promise<SaveCommitResult> => {
-    const registry = saveTransactionRegistryRef.current;
-    const owner = registry.begin(prepared.workspaceId, prepared.fileKey, prepared.transactionId);
-    try {
-      let historyId: string | undefined;
-      // Snapshot current disk contents before bulk WorkspaceEdit writes.
-      try {
-        let oldText: string | null = null;
-        for (const root of rootsRef.current) {
-          const rel = relativePathWithinRoot(root.path, prepared.filePath);
-          if (rel === null) continue;
-          try {
-            oldText = (await workspaceReadFile(root.path, rel)).text;
-          } catch {
-            oldText = null;
-          }
-          break;
-        }
-        if (oldText == null) {
-          try {
-            oldText = (await workspaceReadLooseFile(prepared.filePath)).text;
-          } catch {
-            oldText = null;
-          }
-        }
-        if (oldText != null && oldText.length <= 2 * 1024 * 1024) {
-          const historyEntry = await historySnapshot(prepared.filePath, oldText, "replace").catch(() => null);
-          if (historyEntry) historyId = `local-history-${historyEntry.id}`;
-        }
-      } catch {
-        // Best-effort history; never block the edit write.
-      }
-
-      let ack: WorkspaceWriteAck;
-      const ownerBeforeWrite = registry.check(owner);
-      if (!ownerBeforeWrite.active) {
-        return cancelledSaveCommit(prepared, "pre-write", ownerBeforeWrite.reason);
-      }
-      try {
-        assertBeforeWrite?.();
-      } catch (error) {
-        return cancelledSaveCommit(prepared, "pre-write", errorMessage(error));
-      }
-      try {
-        ack = await writeTextSnapshot({
-          filePath: prepared.filePath,
-          logicalText: prepared.text,
-          expectedDiskHash: prepared.expectedDiskHash,
-          policy: prepared.policy,
-        });
-      } catch (writeError) {
-        // Same typed classification as open-buffer commits (§8.19.1).
-        const mapped = saveCommitResultFromError(prepared.transactionId, writeError);
-        if (mapped.diskEffect !== "unknown") {
-          return mapped.kind === "conflict"
-            ? {
-              kind: "conflict",
-              transactionId: prepared.transactionId,
-              diskEffect: "none",
-              memoryEffect: "unchanged",
-              providerEffect: "not-sent",
-              error: mapped.error,
-            }
-            : {
-              kind: "failed",
-              transactionId: prepared.transactionId,
-              diskEffect: "none",
-              memoryEffect: "unchanged",
-              providerEffect: "not-sent",
-              error: mapped.error,
-            };
-        }
-        // The bridge could not prove whether bytes landed: verify against the
-        // real on-disk hash before reporting anything.
-        const observed = await readBackDiskSnapshot(prepared);
-        const verification = classifyUnknownDiskEffect({
-          writtenHash: mapped.error.intentHash ?? mapped.error.writtenHash,
-          expectedOldHash: prepared.expectedDiskHash,
-          observedHash: observed?.hash ?? null,
-        });
-        const intendedHash = mapped.error.intentHash ?? mapped.error.writtenHash ?? null;
-        if (verification.outcome === "committed" && observed) {
-          // Intended bytes are provably on disk; continue as committed.
-          ack = {
-            file: {
-              path: prepared.filePath,
-              text: observed.text,
-              encoding: observed.encoding ?? prepared.policy.encoding,
-              bom: observed.bom ?? prepared.policy.bom,
-              size: observed.size ?? 0,
-              mtime: observed.mtime ?? 0,
-              hash: observed.hash,
-            },
-            writtenHash: mapped.error.writtenHash ?? observed.hash,
-            writtenByteLength: mapped.error.writtenByteLength ?? observed.size ?? 0,
-            intentHash: mapped.error.intentHash ?? mapped.error.writtenHash ?? observed.hash,
-            oldHash: mapped.error.oldHash ?? prepared.expectedDiskHash,
-            atomicReplaceUsed: true,
-          };
-        } else if (verification.outcome === "none") {
-          // Verified zero disk effect — clear any stale ledger row for this
-          // exact transaction/path only.
-          resolveDiskEffectLedgerEntry(prepared.workspaceId, prepared.transactionId, prepared.filePath);
-          return {
-            kind: mapped.kind,
-            transactionId: prepared.transactionId,
-            diskEffect: "none",
-            memoryEffect: "unchanged",
-            providerEffect: "not-sent",
-            error: mapped.error,
-          } as SaveCommitResult;
-        } else {
-          recordUnknownDiskEffect(
-            prepared,
-            verification.outcome === "foreign" ? verification.observedHash : observed?.hash ?? null,
-            intendedHash,
-          );
-          return {
-            kind: "failed",
-            transactionId: prepared.transactionId,
-            diskEffect: "unknown",
-            memoryEffect: "unchanged",
-            providerEffect: "unknown",
-            error: mapped.error,
-            recoveryId: prepared.transactionId,
-          };
-        }
-      }
-
-      const receipt = buildFinalBytesReceipt(prepared, ack, { historyId });
-
-      // Disk acknowledged. Watcher notify is generation-gated like every
-      // other writeback side effect.
-      if (!registry.check(owner).active) {
-        recordCommittedDiscardLedgerEntry(prepared, ack.writtenHash);
-        const recoveryId = prepared.transactionId;
-        return {
-          kind: "committed-writeback-discarded",
-          transactionId: prepared.transactionId,
-          diskEffect: "committed",
-          memoryEffect: "writeback-discarded",
-          providerEffect: "discarded",
-          file: ack.file,
-          reason: "Closed-file write owner was discarded during the write",
-          receipt: { ...receipt, recoveryId },
-          historyId: receipt.historyId,
-          recoveryId,
-        };
-      }
-      await lspWorkspaceDidChangeWatchedFiles(prepared.workspaceId, [{
-        path: prepared.filePath,
-        type: 2,
-      }]).catch(() => 0);
-      if (!registry.check(owner).active) {
-        recordCommittedDiscardLedgerEntry(prepared, ack.writtenHash);
-        const recoveryId = prepared.transactionId;
-        return {
-          kind: "committed-writeback-discarded",
-          transactionId: prepared.transactionId,
-          diskEffect: "committed",
-          memoryEffect: "writeback-discarded",
-          providerEffect: "discarded",
-          file: ack.file,
-          reason: "Owner lost after watcher notify",
-          receipt: { ...receipt, recoveryId },
-          historyId: receipt.historyId,
-          recoveryId,
-        };
-      }
-      // A settled closed-file write clears its own ledger row for this path
-      // only (§8.19.1).
-      resolveDiskEffectLedgerEntry(prepared.workspaceId, prepared.transactionId, prepared.filePath);
-      // No open buffer owns this write: no didSave is sent and nothing merges
-      // back into memory ("saved-current" reports only the disk fact).
-      return {
-        kind: "saved-current",
-        transactionId: prepared.transactionId,
-        diskEffect: "committed",
-        memoryEffect: "saved-current",
-        providerEffect: "not-sent",
-        file: ack.file,
-        receipt,
-        historyId: receipt.historyId,
-      };
-    } finally {
-      registry.settle(owner);
-    }
-  }, [
+  const commitClosedFilePreparedSave = useCallback(createCommitClosedFilePreparedSave({
+    saveTransactionRegistryRef,
+    rootsRef,
+    get cancelledSaveCommit() { return cancelledSaveCommit; },
+    writeTextSnapshot,
+    readBackDiskSnapshot,
+    recordUnknownDiskEffect,
+    recordCommittedDiscardLedgerEntry,
+  }), [
     readBackDiskSnapshot,
     recordCommittedDiscardLedgerEntry,
     recordUnknownDiskEffect,
@@ -6762,258 +5152,28 @@ export function CodeWorkspaceTab({
   );
 
   const saveFile = useCallback(
-    async (key: string | null = activeKey) => {
-      if (!key) return;
-      const file = openFilesRef.current[key];
-      if (!file || file.loading || file.saving || !file.dirty) return;
-
-      const absPath = absolutePathForOpenFile(file) ?? file.languagePath;
-      if (hasBlockingDiskEffectResolution(workspaceInstanceId, absPath)) {
-        setStatusMessage(
-          `Save blocked for ${file.subtitle}; verify the previous unknown disk result in the recovery center`,
-        );
-        return;
-      }
-      let saveActionError: string | null = null;
-
-      const snapshotRevision = file.documentRevision ?? 0;
-      const styleGeneration = workspaceStyleControllerRef.current.getGeneration();
-      const descriptor = lspDescriptorForFile(file);
-      const lspStatus = lspFilesRef.current[file.key]?.status ?? null;
-      const projectRoot = file.ref.kind === "root" ? findRoot(file.ref.rootId) : null;
-      const saveDocumentUri = descriptor?.documentUri
-        ?? lspStatus?.uri
-        ?? descriptor?.filePath
-        ?? `file://${absPath}`;
-
-      const tx: SaveTransactionV2 = {
-        id: `tx-save-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-        workspaceId: workspaceInstanceId,
-        fileKey: file.key,
-        filePath: absPath,
-        bufferVersion: snapshotRevision,
-        styleGeneration,
-        expectedDiskHash: file.hash ?? null,
-        documentIdentity: {
-          uri: saveDocumentUri,
-          path: absPath,
-          revision: snapshotRevision,
-          languageId: lspStatus?.languageId
-            ?? descriptor?.languageId
-            ?? "plaintext",
-        },
-        diskIdentity: {
-          mtimeMs: file.mtime,
-          sizeBytes: file.size,
-          exists: true,
-          sha256: file.hash ?? null,
-        },
-        providerIdentity: {
-          id: lspStatus?.presetId ?? null,
-          generation: lspStatus?.presetId ? lspSessionGeneration() : null,
-        },
-        projectIdentity: {
-          fingerprint: projectAnalysisSnapshot?.projectFingerprint ?? null,
-          rootUri: projectRoot ? `file://${normalizeFsPath(projectRoot.path)}` : null,
-        },
-        explicitOverride: indentationOverridesRef.current[file.key] ?? null,
-        policy: {
-          eol: (file.eol?.toLowerCase() as "lf" | "crlf" | "cr") ?? "lf",
-          encoding: file.encoding ?? "UTF-8",
-          bom: file.bom ?? false,
-        },
-        text: file.text,
-      };
-
-      const schemeLanguageKey = file.languagePath.split(".").pop()?.toLowerCase() ?? "";
-      const activeScheme = activeSchemeForLanguage(
-        codeStyleSchemesRef.current,
-        schemeLanguageKey || null,
-      );
-      const effectiveSavePolicy = resolveEffectiveSavePolicy(
-        activeScheme,
-        intelligencePreferences.formatOnSave,
-        absPath,
-      );
-
-      // The controller prepares (style/normalization/policy freeze into one
-      // PreparedSave); the commit core is the single byte writer + writeback
-      // owner shared with every other save path (§8.17.1).
-      const outcome: SaveCommitResult = await workspaceStyleControllerRef.current.executeSaveTransaction(
-        tx,
-        (prepared) => commitOpenBufferPreparedSave(prepared),
-        {
-          savePolicy: effectiveSavePolicy,
-          formatOnSave: effectiveSavePolicy.format.enabled,
-          formatFn: async (currentText) => {
-            try {
-              const outcome = await formatFileText({ ...file, text: currentText });
-              if (outcome.state === "unavailable") {
-                saveActionError = `Format: ${outcome.reason}`;
-                return null;
-              }
-              return outcome.text;
-            } catch (err) {
-              saveActionError = `Format: ${errorMessage(err)}`;
-              return null;
-            }
-          },
-          organizeImportsOnSave: effectiveSavePolicy.organizeImports.enabled,
-          organizeImportsFn: async (shadowText) => {
-            try {
-              const textToProcess = shadowText ?? file.text ?? "";
-              const wholeFileRange: LspRange = {
-                start: { line: 0, character: 0 },
-                end: { line: textToProcess.split("\n").length, character: 0 },
-              };
-              const descriptor = lspDescriptorForFile(file);
-              if (!descriptor) return null;
-
-              const context: CodeActionContextIdentity = {
-                document: {
-                  uri: descriptor.documentUri ?? lspFilesRef.current[file.key]?.status?.uri ?? descriptor.filePath ?? file.key,
-                  revision: file.documentRevision,
-                  languageId: lspFilesRef.current[file.key]?.status?.languageId ?? descriptor.languageId ?? "plaintext",
-                },
-                provider: {
-                  id: descriptor.languageId === "java" || !descriptor.languageId ? "jdtls" : descriptor.languageId,
-                  version: null,
-                  generation: lspSessionGeneration(),
-                  projectFingerprint: projectAnalysisSnapshot?.projectFingerprint ?? "",
-                  trusted: true,
-                },
-                range: wholeFileRange,
-                diagnostics: [],
-                only: ["source.organizeImports"],
-              };
-
-              const client: CodeActionProviderClient = {
-                requestCodeActions: async (params) => {
-                  const result = await lspCodeActions(
-                    descriptor,
-                    params.range,
-                    [],
-                    params.context.only ? [...params.context.only] : undefined,
-                  );
-                  return result.actions;
-                },
-                resolveCodeAction: async (act) => {
-                  if (!act.raw) return null;
-                  const res = await lspCodeActionResolve(descriptor, act.raw);
-                  return res.action;
-                },
-              };
-
-              const planResult = await canonicalCodeActionServiceRef.current!.planAction(context, client, {
-                only: ["source.organizeImports"],
-              });
-              if (!planResult.plan) {
-                const noAction = planResult.requestState === "ready"
-                  && planResult.outcome.state === "unresolved"
-                  && planResult.outcome.reason === "No actions returned";
-                if (planResult.requestState !== "unsupported" && !noAction) {
-                  const reason = "reason" in planResult.outcome
-                    ? planResult.outcome.reason
-                    : planResult.outcome.state;
-                  saveActionError = `Organize imports: ${reason}`;
-                }
-                return null;
-              }
-
-              const validation = validateAndApplyOrganizeImportsPlan(
-                textToProcess,
-                context.document.uri,
-                planResult.plan,
-                context.document.revision,
-              );
-
-              if (validation.valid && validation.transformedText !== null) {
-                return validation.transformedText;
-              }
-              if (!validation.valid) {
-                saveActionError = `Organize imports: ${validation.reason ?? "plan validation failed"}`;
-              }
-            } catch (err) {
-              saveActionError = `Organize imports: ${errorMessage(err)}`;
-              return null;
-            }
-            return null;
-          },
-          getLatestBufferVersion: () => openFilesRef.current[key]?.documentRevision ?? file.documentRevision ?? 0,
-        },
-      );
-      recordSaveRaceEvent("commit-settled", {
-        workspaceId: workspaceInstanceId,
-        fileKey: key,
-        transactionId: outcome.transactionId,
-        filePath: absPath ?? file.path,
-      }, {
-        kind: outcome.kind,
-        diskEffect: outcome.diskEffect,
-        memoryEffect: outcome.memoryEffect,
-        providerEffect: outcome.providerEffect,
-      });
-
-      const latestAfterSave = openFilesRef.current[key] ?? null;
-      const observation = createSaveObservationRecord({
-        result: outcome,
-        fileKey: key,
-        filePath: absPath,
-        uri: saveDocumentUri,
-        bufferRevision: latestAfterSave?.documentRevision ?? snapshotRevision,
-        isDirty: latestAfterSave?.dirty ?? outcome.memoryEffect !== "saved-current",
-      });
-      setSaveObservations((current) => ({ ...current, [key]: observation }));
-      const observationResult: WorkspaceSaveObservationResult = outcome.diskEffect === "committed"
-        ? {
-          transactionId: outcome.transactionId,
-          diskEffect: outcome.diskEffect,
-          receipt: {
-            transactionId: outcome.receipt.transactionId,
-            encodedBytesSha256: outcome.receipt.encodedBytesSha256,
-            ...(outcome.receipt.historyId ? { historyId: outcome.receipt.historyId } : {}),
-          },
-        }
-        : {
-          transactionId: outcome.transactionId,
-          diskEffect: outcome.diskEffect,
-        };
-      publishWorkspaceObservation((bridge) => bridge.observeSaveResult({
-        result: observationResult,
-        fileKey: key,
-        bufferRevision: observation.bufferRevision,
-      }));
-
-      if (outcome.kind === "saved-current" || outcome.kind === "saved-stale-snapshot") {
-        const latestNow = openFilesRef.current[key];
-        const wasStale = outcome.kind === "saved-stale-snapshot"
-          || (latestNow?.documentRevision ?? 0) > snapshotRevision;
-        if (wasStale) {
-          setStatusMessage(`Saved previous snapshot of ${file.subtitle}; current changes remain unsaved`);
-        } else {
-          setStatusMessage(saveActionError
-            ? `Saved ${file.subtitle}; save action issue: ${saveActionError}`
-            : `Saved ${file.subtitle}`);
-        }
-        if (isJavaBuildFile(file.languagePath) && lspFilesRef.current[key]?.status?.active) {
-          void promptReloadProject(key, file.subtitle);
-        }
-      } else if (outcome.kind === "committed-writeback-discarded") {
-        // Bytes are on disk but no buffer state was resurrected: never show a
-        // success toast; the recovery center holds the disk path/hash.
-        setStatusMessage(`${file.subtitle} written to disk after it closed; see recovery center for details`);
-      } else if (outcome.kind === "cancelled") {
-        setStatusMessage(`Save cancelled (${outcome.phase}): ${outcome.reason}`);
-      } else if (outcome.kind === "conflict") {
-        setStatusMessage(`Save conflict: ${outcome.error.message}`);
-      } else if (outcome.diskEffect === "unknown") {
-        // Unknown disk effect blocks automatic retries for this path until a
-        // re-read confirms the real bytes (§8.18.1).
-        setStatusMessage(`Save result unknown for ${file.subtitle}; verify the file in the recovery center before saving again`);
-      } else {
-        setStatusMessage(`Save failed: ${outcome.error.message}`);
-      }
-    },
+    createSaveFile({
+    activeKey,
+    openFilesRef,
+    absolutePathForOpenFile,
+    workspaceInstanceId,
+    setStatusMessage,
+    workspaceStyleControllerRef,
+    lspDescriptorForFile,
+    lspFilesRef,
+    findRoot,
+    lspSessionGeneration,
+    projectAnalysisSnapshot,
+    indentationOverridesRef,
+    codeStyleSchemesRef,
+    intelligencePreferences,
+    commitOpenBufferPreparedSave,
+    formatFileText,
+    get canonicalCodeActionServiceRef() { return canonicalCodeActionServiceRef; },
+    setSaveObservations,
+    publishWorkspaceObservation,
+    promptReloadProject,
+  }),
     [
       activeKey,
       commitOpenBufferPreparedSave,
@@ -7155,127 +5315,19 @@ export function CodeWorkspaceTab({
     ));
   }, [absolutePathForOpenFile]);
 
-  const handleExternalFileChange = useCallback(async (change: LspExternalFileChange) => {
-    const normalizedPath = normalizeFsPath(change.path);
-    if (normalizedPath.endsWith(".editorconfig")) {
-      workspaceStyleControllerRef.current.invalidate(normalizedPath);
-    }
-    // The semantic revision only moves for a real content change: the watcher
-    // echo of our own save (or of a restore) re-delivers what the open buffer
-    // already holds, and must not cancel a rename whose dialog is open
-    // (Extract Method's naming prompt, ED-AUDIT-008 freshness contract).
-    const invalidateSemantics = () => semanticIndex.invalidate("external-file-change", [normalizedPath]);
-    const file = Object.values(openFilesRef.current).find((candidate) => {
-      const absolute = absolutePathForOpenFile(candidate);
-      return absolute !== null && fsPathEquals(absolute, normalizedPath);
-    });
-    refreshTree();
-    // Restore can remap a renamed file back into the open-file registry before
-    // Windows delivers the old delete notification. Consume that owned echo
-    // before either the open- or closed-file status path handles it.
-    if (restoreEchoSuppressorRef.current.shouldSuppress(fsPathComparisonKey(normalizedPath))) return;
-    if (!file) {
-      invalidateSemantics();
-      setStatusMessage(`File changed on disk: ${change.path}`);
-      return;
-    }
-    if (file.library) {
-      invalidateSemantics();
-      return;
-    }
-    if (file.saving) {
-      return;
-    }
-    if (change.type === 3) {
-      invalidateSemantics();
-      if (file.dirty) {
-        enqueueExternalFileConflict(file, null);
-        setStatusMessage(`${file.subtitle} was deleted on disk; choose how to recover the local buffer`);
-      } else {
-        setOpenFiles((current) => ({
-          ...current,
-          [file.key]: {
-            ...(current[file.key] ?? file),
-            error: "File deleted on disk; the open buffer is preserved",
-          },
-        }));
-        setStatusMessage(`${file.subtitle} was deleted on disk`);
-      }
-      return;
-    }
-
-    let disk: ExternalDiskSnapshot;
-    try {
-      disk = await readDiskSnapshot(file);
-    } catch (error) {
-      invalidateSemantics();
-      setStatusMessage(`Cannot read external change for ${file.subtitle}: ${errorMessage(error)}`);
-      return;
-    }
-    const latest = openFilesRef.current[file.key];
-    if (!latest || latest.saving) return;
-    if (disk.hash === latest.hash) {
-      // The bytes are still our accepted disk snapshot. A delayed save echo
-      // or chmod notification must not replace the selected encoding with
-      // the decoder's canonical alias (ISO-8859-1 reads as windows-1252),
-      // nor clear a newer edit or a failed-save state.
-      setOpenFiles((current) => ({
-        ...current,
-        [file.key]: { ...(current[file.key] ?? latest), mtime: disk.mtime, size: disk.size },
-      }));
-      return;
-    }
-    // A delayed watcher echo of our last save can arrive after the user
-    // chooses a new encoding/EOL without editing the logical text. Keep that
-    // unsaved policy while refreshing the disk guard.
-    const preservePolicy = latest.dirty && (
-      latest.eol !== disk.eol
-      || latest.encoding !== disk.encoding
-      || latest.bom !== disk.bom
-    );
-    if (disk.text !== latest.text && disk.text !== latest.savedText) invalidateSemantics();
-    if (disk.text === latest.text) {
-      // Another process wrote exactly the buffer we already have. Accept the
-      // new hash and clear dirty without repainting the editor document.
-      setOpenFiles((current) => ({
-        ...current,
-        [file.key]: {
-          ...(current[file.key] ?? latest),
-          savedText: disk.text,
-          ...(preservePolicy ? {} : { eol: disk.eol, encoding: disk.encoding, bom: disk.bom }),
-          hash: disk.hash,
-          mtime: disk.mtime,
-          size: disk.size,
-          dirty: preservePolicy,
-          error: null,
-        },
-      }));
-      return;
-    }
-    if (disk.text === latest.savedText) {
-      // Metadata-only/atomic-replace notification: the logical content did not
-      // change, so preserve a dirty buffer and just refresh its write guard.
-      setOpenFiles((current) => ({
-        ...current,
-        [file.key]: {
-          ...(current[file.key] ?? latest),
-          ...(preservePolicy ? {} : { eol: disk.eol, encoding: disk.encoding, bom: disk.bom }),
-          hash: disk.hash,
-          mtime: disk.mtime,
-          size: disk.size,
-          error: null,
-        },
-      }));
-      return;
-    }
-    if (!latest.dirty) {
-      applyDiskSnapshot(latest, disk);
-      setStatusMessage(`Reloaded ${latest.subtitle} from disk`);
-      return;
-    }
-    enqueueExternalFileConflict(latest, disk);
-    setStatusMessage(`${latest.subtitle} changed on disk; choose Keep Local, Load Disk, or Merge`);
-  }, [
+  const handleExternalFileChange = useCallback(createHandleExternalFileChange({
+    workspaceStyleControllerRef,
+    semanticIndex,
+    openFilesRef,
+    absolutePathForOpenFile,
+    refreshTree,
+    restoreEchoSuppressorRef,
+    setStatusMessage,
+    enqueueExternalFileConflict,
+    setOpenFiles,
+    readDiskSnapshot,
+    applyDiskSnapshot,
+  }), [
     absolutePathForOpenFile,
     applyDiskSnapshot,
     enqueueExternalFileConflict,
@@ -7319,127 +5371,25 @@ export function CodeWorkspaceTab({
   }, [handleExternalFileChange, workspaceInstanceId]);
 
   const closeFile = useCallback(
-    async (
-      key: string,
-      groupId: EditorGroupId = activeEditorGroupId,
-      options: { discard?: boolean } = {},
-    ) => {
-      const currentUi = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
-      const group = currentUi.editorGroups[groupId];
-      if (!group.openOrder.includes(key)) return;
-      const file = openFilesRef.current[key];
-      const usedByOtherGroup = Object.values(currentUi.editorGroups).some(
-        (candidate) => candidate.id !== groupId && candidate.openOrder.includes(key),
-      );
-      if (file?.dirty && !usedByOtherGroup && !options.discard) {
-        const confirmed = await confirmAppDialog({
-          title: "Close file",
-          message: `Discard unsaved changes in ${file.subtitle}?`,
-          confirmLabel: "Close",
-          danger: true,
-        });
-        if (!confirmed) return;
-      }
-      const lastUsedMap = new Map(mruFileKeysRef.current.map((k, idx) => [k, 1_000_000 - idx]));
-      closeLayoutTabInLeaf(workspaceInstanceId, groupId, key, tabPolicyRef.current, lastUsedMap);
-      if (usedByOtherGroup) return;
-
-      const coordinator = resourceRecoveryCoordinatorRef.current;
-      const closedTree = currentUi.layoutTreeV2;
-      const closedLeaf = findLeafNode(closedTree, groupId);
-      const pendingClosedFile: PendingClosedFile | null = file
-        ? { cleanup: null, didCloseCompleted: false }
-        : null;
-      const closedTabEntry: ClosedTabEntry | null = file
-        ? {
-            fileIdentity: workspaceFileIdentity(file.ref),
-            ref: file.ref,
-            title: file.title,
-            subtitle: file.subtitle,
-            leafPath: [groupId],
-            closedAt: Date.now(),
-            location: {
-              leafId: groupId,
-              treeRoute: buildReopenTreeRoute(closedTree, groupId),
-              siblingFileKeys: (closedLeaf?.openFileKeys ?? []).filter((entryKey) => entryKey !== key),
-            },
-          }
-        : null;
-      if (pendingClosedFile) {
-        pendingClosedFilesRef.current.set(key, pendingClosedFile);
-      }
-      // The editor tab is already committed closed at this point. Publish its
-      // reopen claim before awaiting provider cleanup so shell routing can
-      // honor an immediate Ctrl+Shift+T.
-      if (closedTabEntry) {
-        setClosedTabsStack((stack) => pushClosedTab(stack, closedTabEntry));
-      }
-      const isResourceReopened = () => {
-        const liveUi = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
-        return Object.values(liveUi.editorGroups).some((candidate) => candidate.openOrder.includes(key));
-      };
-
-      const cleanupHandlers: ResourceCleanupHandlers = {
-        didClose: async () => {
-          if (!file || isResourceReopened()) return;
-          await closeLspDocumentAndWait(file);
-          if (pendingClosedFile) pendingClosedFile.didCloseCompleted = true;
-        },
-        watcher: () => {
-          if (isResourceReopened()) return;
-          const pending = pendingExternalFileEventsRef.current.get(key);
-          if (pending) {
-            window.clearTimeout(pending.timer);
-            pendingExternalFileEventsRef.current.delete(key);
-          }
-        },
-        buffer: () => {
-          if (isResourceReopened()) return;
-          saveTransactionRegistryRef.current.discardFile(
-            workspaceInstanceId,
-            key,
-            `Buffer ${file?.subtitle ?? key} was closed`,
-          );
-          setOpenFiles((current) => {
-            if (!(key in current)) return current;
-            const next = { ...current };
-            delete next[key];
-            return next;
-          });
-          setMarkdownModes((current) => {
-            if (!(key in current)) return current;
-            const next = { ...current };
-            delete next[key];
-            return next;
-          });
-          setLspFiles((current) => {
-            if (!(key in current)) return current;
-            const next = { ...current };
-            delete next[key];
-            return next;
-          });
-        },
-        history: () => {
-          // History was published with the committed layout above. Keeping
-          // this stage side-effect free prevents a delayed cleanup from
-          // re-adding an entry that the user already reopened.
-        },
-      };
-      const cleanupPromise = coordinator.executeResourceCleanup(key, cleanupHandlers);
-      if (pendingClosedFile) pendingClosedFile.cleanup = cleanupPromise;
-      try {
-        const outcome = await cleanupPromise;
-        observeResourceCleanupOutcome(outcome, cleanupHandlers);
-
-        if (outcome.status === "committed-with-recovery") {
-          setStatusMessage(outcome.message);
-        }
-      } finally {
-        if (pendingClosedFilesRef.current.get(key) === pendingClosedFile) {
-          pendingClosedFilesRef.current.delete(key);
-        }
-      }
-    },
+    createCloseFile({
+    activeEditorGroupId,
+    workspaceInstanceId,
+    openFilesRef,
+    get mruFileKeysRef() { return mruFileKeysRef; },
+    closeLayoutTabInLeaf,
+    tabPolicyRef,
+    resourceRecoveryCoordinatorRef,
+    pendingClosedFilesRef,
+    get setClosedTabsStack() { return setClosedTabsStack; },
+    closeLspDocumentAndWait,
+    pendingExternalFileEventsRef,
+    saveTransactionRegistryRef,
+    setOpenFiles,
+    setMarkdownModes,
+    setLspFiles,
+    observeResourceCleanupOutcome,
+    setStatusMessage,
+  }),
     [activeEditorGroupId, closeLayoutTabInLeaf, closeLspDocumentAndWait, observeResourceCleanupOutcome, workspaceInstanceId],
   );
   closeFileRef.current = closeFile;
@@ -7792,95 +5742,29 @@ export function CodeWorkspaceTab({
       && isLspDocumentSynced(file.key, file.text);
   }, [isLspDocumentSynced]);
 
-  const openHierarchy = useCallback(async (mode: "call" | "type") => {
-    const file = activeFile;
-    if (!file || file.loading) return;
-    const descriptor = lspDescriptorForFile(file);
-    if (!descriptor) {
-      setStatusMessage("No language service for this file");
-      return;
-    }
-    const capabilities = lspFilesRef.current[file.key]?.status?.capabilities;
-    const supported = mode === "call" ? capabilities?.callHierarchy : capabilities?.typeHierarchy;
-    if (!supported) {
-      setStatusMessage(`${mode === "call" ? "Call" : "Type"} hierarchy is not supported by this language server`);
-      return;
-    }
-    let requestSequence = 0;
-    try {
-      const position = cursorPositionsRef.current[activeEditorGroupId] ?? editorSelectionRef.current.start;
-      const fileKey = file.key;
-      const docRevision = openFilesRef.current[fileKey]?.documentRevision ?? 0;
-      const lspGen = lspSessionGeneration();
-      requestSequence = ++hierarchyRequestSequenceRef.current;
-      const requestId = `${workspaceInstanceId}:${mode}:prepare:${requestSequence}`;
-      const cancelKey = `${workspaceInstanceId}|${fileKey}`;
-      const requestSeq = nextLspRequestSequence();
-      const isCurrent = (identity?: SemanticQueryIdentity) => (
-        workspaceInstanceIdRef.current === workspaceInstanceId
-        && hierarchyRequestSequenceRef.current === requestSequence
-        && (!identity || identity.requestId === requestId)
-        && openFilesRef.current[fileKey]?.documentRevision === docRevision
-        && lspSessionGeneration() === lspGen
-      );
-
-      const prepareResult = await executeHierarchyPrepare(
-        semanticQueryHostRef.current,
-        descriptor,
-        position,
-        mode,
-        {
-          workspaceId: workspaceInstanceId,
-          fileKey,
-          documentRevision: docRevision,
-          lspSessionGeneration: lspGen,
-          projectFingerprint: projectAnalysisSnapshot?.projectFingerprint ?? "",
-          requestId,
-          cancelKey,
-          requestSeq,
-          guards: {
-            getLiveDocumentRevision: () => openFilesRef.current[fileKey]?.documentRevision ?? 0,
-            getLiveLspGeneration: () => lspSessionGeneration(),
-            guardDelivery: (identity) => isCurrent(identity),
-          },
-        },
-      );
-
-      if (!isCurrent()) return;
-      if (prepareResult.cancelled) return;
-      updateLspStatusForFile(file, prepareResult.status);
-
-      const root = prepareResult.root;
-      if (!root) {
-        setStatusMessage(`No ${mode} hierarchy is available at the cursor`);
-        return;
-      }
-      if (!isCurrent()) return;
-      hierarchyProvenanceRef.current = {
-        ...hierarchyProvenanceRef.current,
-        [mode]: {
-          generation: lspGen,
-          projectFingerprint: projectAnalysisSnapshot?.projectFingerprint ?? "",
-        },
-      };
-      setHierarchyProvenanceRevision((revision) => revision + 1);
-      if (mode === "call") {
-        setCallHierarchyRoot(root);
-        setBottomDockTab("call-hierarchy");
-      } else {
-        setTypeHierarchyRoot(root);
-        setBottomDockTab("type-hierarchy");
-      }
-      setBottomDockOpen(true);
-    } catch (cause) {
-      if (
-        requestSequence !== 0
-        && (hierarchyRequestSequenceRef.current !== requestSequence
-          || workspaceInstanceIdRef.current !== workspaceInstanceId)
-      ) return;
-      setStatusMessage(errorMessage(cause));
-    }
-  }, [
+  const openHierarchy = useCallback(createOpenHierarchy({
+    activeFile,
+    lspDescriptorForFile,
+    setStatusMessage,
+    lspFilesRef,
+    cursorPositionsRef,
+    activeEditorGroupId,
+    editorSelectionRef,
+    openFilesRef,
+    lspSessionGeneration,
+    hierarchyRequestSequenceRef,
+    workspaceInstanceId,
+    workspaceInstanceIdRef,
+    semanticQueryHostRef,
+    projectAnalysisSnapshot,
+    updateLspStatusForFile,
+    hierarchyProvenanceRef,
+    setHierarchyProvenanceRevision,
+    setCallHierarchyRoot,
+    setBottomDockTab,
+    setTypeHierarchyRoot,
+    setBottomDockOpen,
+  }), [
     activeEditorGroupId,
     activeFile,
     lspSessionGeneration,
@@ -8943,123 +6827,20 @@ export function CodeWorkspaceTab({
   }, [downloadingSourcesKeys, lspDescriptorForPath, setStatusMessage]);
 
   const openLspLocation = useCallback(
-    async (
-      location: LspLocation,
-      options: LspLocationOpenOptions = {},
-    ) => {
-      const openResolvedPath = async (path: string) => {
-        if (options.isCurrent && !options.isCurrent()) return false;
-        for (const root of rootsRef.current) {
-          const relative = relativePathWithinRoot(root.path, path);
-          if (relative === null) continue;
-          const ref: CodeWorkspaceFileRef = { kind: "root", rootId: root.id, path: relative };
-          if (options.isCurrent && !options.isCurrent()) return false;
-          suppressNextHistoryRecord();
-          await openFile(ref, options);
-          if (options.isCurrent && !options.isCurrent()) return false;
-          // openFile reports read failures on the buffer instead of throwing.
-          if (openFilesRef.current[fileKey(ref)]?.error) return false;
-          if (options.isCurrent && !options.isCurrent()) return false;
-          revealEditorLocation(fileKey(ref), location.range);
-          if (options.isCurrent && !options.isCurrent()) return false;
-          const position = {
-            line: location.range.start.line,
-            character: location.range.start.character,
-          };
-          if (options.onRevealed) {
-            options.onRevealed(ref, position);
-          } else if (options.recordHistory !== false) {
-            recordNavigationLocation(ref, position, { replaceSameFile: false });
-          }
-          return true;
-        }
-        const loose = makeLooseFile(path);
-        const ref: CodeWorkspaceFileRef = { kind: "loose", id: loose.id, path: loose.path };
-        if (options.isCurrent && !options.isCurrent()) return false;
-        setLooseFiles((current) => current.some((item) => item.path === loose.path) ? current : [...current, loose]);
-        suppressNextHistoryRecord();
-        await openFile(ref, options);
-        if (options.isCurrent && !options.isCurrent()) return false;
-        // openFile reports read failures on the buffer instead of throwing.
-        if (openFilesRef.current[fileKey(ref)]?.error) return false;
-        if (options.isCurrent && !options.isCurrent()) return false;
-        revealEditorLocation(fileKey(ref), location.range);
-        if (options.isCurrent && !options.isCurrent()) return false;
-        const position = {
-          line: location.range.start.line,
-          character: location.range.start.character,
-        };
-        if (options.onRevealed) {
-          options.onRevealed(ref, position);
-        } else if (options.recordHistory !== false) {
-          recordNavigationLocation(ref, position, { replaceSameFile: false });
-        }
-        return true;
-      };
-
-      // Workspace-symbol hits fall back to the URI when the server reports no path,
-      // and a URI string is never readable from disk.
-      const diskPath = location.path && !looksLikeDocumentUri(location.path) ? location.path : null;
-      if (diskPath) {
-        try {
-          if (await openResolvedPath(diskPath)) return true;
-        } catch (err) {
-          if (!location.uri) {
-            setStatusMessage(errorMessage(err));
-            return false;
-          }
-        }
-        // Path unreadable (missing source attachment, JAR entry): try the URI below.
-        if (!location.uri) return false;
-      }
-
-      // JDK / third-party JAR / other virtual URIs (jdt://, jar:file:…).
-      if (!location.uri) {
-        setStatusMessage("No definition found");
-        return false;
-      }
-      // Library sources ride the origin project's language-server session: prefer the
-      // active buffer, and fall back to the origin project of a library buffer.
-      const origin = options.originFile
-        ?? activeFile
-        ?? Object.values(openFilesRef.current).find((item) => !item.loading)
-        ?? null;
-      const descriptor = origin ? lspDescriptorForFile(origin) : null;
-      if (!origin || !descriptor) {
-        setStatusMessage("Cannot open library source without an active language server document");
-        return false;
-      }
-      try {
-        const contents = await lspReadUriContents(descriptor, location.uri);
-        if (options.isCurrent && !options.isCurrent()) return false;
-        updateLspStatusForFile(origin, contents.status);
-        // Attached sources that exist on disk open as a normal editable-looking file.
-        if (contents.path) {
-          try {
-            if (await openResolvedPath(contents.path)) return true;
-          } catch {
-            // Keep going and inject the text we already fetched.
-          }
-        }
-        return openLibraryBuffer(
-          {
-            uri: contents.uri || location.uri,
-            title: contents.title,
-            container: contents.container,
-            languageId: contents.languageId,
-            originRootPath: descriptor.rootPath ?? null,
-            originFilePath: descriptor.filePath,
-            decompiled: contents.decompiled,
-          },
-          contents.text,
-          location.range,
-          options,
-        );
-      } catch (err) {
-        setStatusMessage(errorMessage(err));
-        return false;
-      }
-    },
+    createOpenLspLocation({
+    rootsRef,
+    suppressNextHistoryRecord,
+    openFile,
+    openFilesRef,
+    revealEditorLocation,
+    recordNavigationLocation,
+    setLooseFiles,
+    setStatusMessage,
+    activeFile,
+    lspDescriptorForFile,
+    updateLspStatusForFile,
+    openLibraryBuffer,
+  }),
     [
       activeFile,
       lspDescriptorForFile,
@@ -9326,122 +7107,29 @@ export function CodeWorkspaceTab({
     setRightPaneTab,
   ]);
 
-  const openQuickDocumentation = useCallback(async () => {
-    const file = activeFile;
-    if (!file || file.loading) return;
-    const position = editorSelectionRef.current.start;
-    const descriptor = lspDescriptorForFile(file);
-    if (!descriptor) {
-      setStatusMessage("No documentation available");
-      showCodeInsightNotice("No documentation found.");
-      return;
-    }
-    const requestRevision = file.documentRevision;
-    const requestGeneration = lspSessionGeneration();
-    const lines = file.text.split("\n");
-    const line = lines[position.line] ?? "";
-    const left = line.slice(0, position.character);
-    const right = line.slice(position.character);
-    const start = left.search(/[A-Za-z0-9_$]+$/);
-    const endMatch = right.match(/^[A-Za-z0-9_$]*/);
-    const from = start >= 0 ? start : position.character;
-    const to = position.character + (endMatch?.[0].length ?? 0);
-    const word = line.slice(from, to) || file.title;
-    // Display-only facts captured while the provider runs; the V3 payload
-    // itself stays exactly {markdown, source}.
-    let providerLabel = "Language Server";
-    let providerUri: string | null = null;
-    const outcome = await referenceInfoController.requestTyped({
-      kind: "quick-documentation",
-      workspaceId: workspaceInstanceId,
-      fileKey: file.key,
-      uri: descriptor.documentUri ?? lspFilesRef.current[file.key]?.status?.uri ?? descriptor.filePath,
-      languageId: descriptor.languageId ?? "plaintext",
-      position,
-      documentRevision: requestRevision,
-      providerGeneration: requestGeneration,
-    }, async ({ signal }) => {
-      // §8.18.6 provider cancellation: the abort reaches the native layer via
-      // a per-file cancel key + monotonic seq so `$/cancelRequest` is sent
-      // and the in-flight hover stops racing.
-      const cancelKey = `${workspaceInstanceId}|${file.key}`;
-      const requestSeq = nextLspRequestSequence();
-      const onAbort = () => {
-        void lspCancelReferenceRequest(cancelKey, requestSeq).catch(() => 0);
-      };
-      signal.addEventListener("abort", onAbort, { once: true });
-      try {
-        const result = await lspHover(descriptor, position, { cancelKey, requestSeq });
-        if (signal.aborted) return null;
-        const current = openFilesRef.current[file.key];
-        if (
-          !current
-          || current.documentRevision !== requestRevision
-          || lspSessionGeneration() !== requestGeneration
-        ) {
-          return null;
-        }
-        updateLspStatusForFile(file, result.status);
-        if (!result.contents) return null;
-        providerLabel = result.status.displayName ?? "Language Server";
-        providerUri = result.status.uri ?? null;
-        return {
-          state: "payload" as const,
-          payload: {
-            kind: "quick-documentation" as const,
-            markdown: result.contents,
-            source: result.range && result.status.uri
-              ? {
-                  uri: result.status.uri,
-                  path: result.status.path ?? null,
-                  range: result.range,
-                }
-              : null,
-          },
-        };
-      } finally {
-        signal.removeEventListener("abort", onAbort);
-      }
-    });
-    if (outcome.state !== "ready") {
-      if (outcome.state === "unavailable") {
-        setStatusMessage("No documentation available");
-        // DEC-020-01: a popup at the caret names why (IDEA "No documentation found.").
-        const readiness = languageServiceReadiness(lspFilesRef.current[file.key] ?? null);
-        if (readiness.kind === "ready" || readiness.kind === "idle") showCodeInsightNotice("No documentation found.");
-        else showCodeInsightNotice(`Documentation unavailable: ${readiness.message}`, readiness.action === "configure" ? "configure" : null);
-      } else if (outcome.state === "failed") {
-        setStatusMessage(outcome.message);
-        showCodeInsightNotice(outcome.message);
-      }
-      return;
-    }
-    const payload = outcome.payload;
-    if (payload.kind !== "quick-documentation") return;
-    // History only records ready QuickDoc results; failed/unavailable never
-    // enter it (§8.20.2).
-    const content: QuickDocContent = {
-      title: word,
-      body: payload.markdown,
-      source: providerLabel,
-      uri: providerUri,
-      sourceLocation: payload.source,
-      revision: requestRevision,
-      generation: requestGeneration,
-    };
-    setQuickDocContent(content);
-    setReferenceHistory(referenceInfoController.pushHistory(content));
-    if (pinnedDoc && !pinnedDocLocked) setPinnedDoc(content);
-    if (intelligencePreferences.quickDoc.defaultTarget === "tool-window") {
-      setPinnedDoc(content);
-      setPinnedDocLocked(false);
-      setRightPaneTab("documentation");
-      setRightPaneOpen(true);
-      setQuickDocOpen(false);
-    } else {
-      setQuickDocOpen(true);
-    }
-  }, [
+  const openQuickDocumentation = useCallback(createOpenQuickDocumentation({
+    activeFile,
+    editorSelectionRef,
+    lspDescriptorForFile,
+    setStatusMessage,
+    showCodeInsightNotice,
+    lspSessionGeneration,
+    referenceInfoController,
+    workspaceInstanceId,
+    lspFilesRef,
+    openFilesRef,
+    updateLspStatusForFile,
+    setQuickDocContent,
+    setReferenceHistory,
+    pinnedDoc,
+    pinnedDocLocked,
+    setPinnedDoc,
+    intelligencePreferences,
+    setPinnedDocLocked,
+    setRightPaneTab,
+    setRightPaneOpen,
+    setQuickDocOpen,
+  }), [
     activeFile,
     intelligencePreferences.quickDoc.defaultTarget,
     lspDescriptorForFile,
@@ -9652,230 +7340,25 @@ export function CodeWorkspaceTab({
     }
   }, [absolutePathForOpenFile, activeFile, formatFileText, setStatusMessage, updateFileText]);
 
-  const applyLspResourceOperationUnlocked = useCallback(async (
-    operation: Exclude<LspWorkspaceEditOperation, { kind: "text" }>,
-  ) => {
-    flushPendingEditorText();
-    const targetForPath = (absolutePath: string | null) => {
-      if (!absolutePath) throw new Error("Language server resource URI is not a local file");
-      const normalized = normalizeFsPath(absolutePath);
-      const candidates = rootsRef.current.flatMap((root) => {
-        const path = relativePathWithinRoot(root.path, normalized);
-        return path !== null && path !== ""
-          ? [{ root, path, rootLength: normalizeFsPath(root.path).length }]
-          : [];
-      }).sort((left, right) => right.rootLength - left.rootLength);
-      const target = candidates[0];
-      if (target) return { root: target.root, path: target.path };
-      throw new Error(`Language server resource is outside the workspace: ${normalized}`);
-    };
-    const initialOpenFiles = openFilesRef.current;
-    const initialFiles = Object.values(initialOpenFiles);
-    const closeFiles = (files: OpenFileState[]) => {
-      for (const file of files) {
-        // Rename/DeleteFile invalidate in-flight save owners for the removed buffers.
-        saveTransactionRegistryRef.current.discardFile(
-          workspaceInstanceId,
-          file.key,
-          `Buffer ${file.subtitle} was removed by a workspace resource operation`,
-        );
-        closeLspDocument(file);
-      }
-    };
-    const bookmarkRef = (key: string): CodeWorkspaceFileRef | null => {
-      for (const root of rootsRef.current) {
-        const prefix = `root:${root.id}:`;
-        if (key.startsWith(prefix)) {
-          return { kind: "root", rootId: root.id, path: key.slice(prefix.length) };
-        }
-      }
-      return null;
-    };
-    const commitResourceState = (
-      change: WorkspaceResourceUiChange,
-      previousOpenFiles: Record<string, OpenFileState>,
-      nextOpenFiles: Record<string, OpenFileState>,
-      reopenedFiles: OpenFileState[],
-      options: { preserveRemovedBookmarks?: boolean } = {},
-    ) => {
-      const keyChanges: Record<string, string | null> = {};
-      for (const key of Object.keys(previousOpenFiles)) {
-        const nextKey = transformWorkspaceResourceFileKey(key, change);
-        if (nextKey !== key) keyChanges[key] = nextKey;
-      }
-      const nextLspFiles: Record<string, LspFileState> = {};
-      for (const [key, state] of Object.entries(lspFilesRef.current)) {
-        if (transformWorkspaceResourceFileKey(key, change) === key && key in nextOpenFiles) {
-          nextLspFiles[key] = state;
-        }
-      }
-      reconcileNavigationFileReferences((ref) => transformWorkspaceResourceFileRef(ref, change));
-      const currentUi = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
-      setExpandedDirs((current) => transformWorkspaceResourceExpandedDirKeys(current, change));
-      setSelected(transformWorkspaceResourceTreeSelection(currentUi.treeSelection, change));
-      replaceWorkspaceFileState(nextOpenFiles, nextLspFiles, keyChanges);
-      setRevealTarget(null);
-      const currentBookmarks = bookmarksRef.current;
-      let bookmarksChanged = false;
-      const nextBookmarks = currentBookmarks.flatMap((bookmark) => {
-        const nextKey = transformWorkspaceResourceFileKey(bookmark.fileKey, change);
-        if (!nextKey) {
-          if (options.preserveRemovedBookmarks || bookmark.state === "missing") return [bookmark];
-          bookmarksChanged = true;
-          return [{ ...bookmark, state: "missing" as const }];
-        }
-        if (nextKey === bookmark.fileKey) return [bookmark];
-        bookmarksChanged = true;
-        const ref = bookmarkRef(bookmark.fileKey);
-        const nextRef = ref ? transformWorkspaceResourceFileRef(ref, change) : null;
-        const pathLabel = nextRef
-          ? fileMeta(nextRef, rootsRef.current, looseFilesRef.current).subtitle
-          : bookmark.pathLabel;
-        return [{ ...bookmark, fileKey: nextKey, pathLabel, state: "current" as const }];
-      });
-      if (bookmarksChanged) {
-        writeWorkspaceBookmarks(workspaceInstanceId, nextBookmarks);
-        replaceBookmarks(nextBookmarks);
-      }
-      for (const file of reopenedFiles) void syncLspDocument(file, "open");
-    };
-
-    if (operation.kind === "create") {
-      const target = targetForPath(operation.path);
-      const existingBefore = initialFiles.filter((file) => (
-        fileRefUnder(file.ref, target.root.id, target.path)
-      ));
-      if (
-        operation.overwrite
-        && existingBefore.some((file) => file.dirty)
-      ) {
-        throw new Error("CreateFile would overwrite an unsaved editor buffer");
-      }
-      const result = await workspaceApplyResourceOperation(target.root.path, {
-        kind: "create",
-        path: target.path,
-        overwrite: operation.overwrite,
-        ignoreIfExists: operation.ignoreIfExists,
-      });
-      if (result.ignored) return;
-      notifyWorkspacePathGitChanged(target.root.id, target.path);
-      if (!operation.overwrite) return;
-      flushPendingEditorText();
-      const currentOpenFiles = openFilesRef.current;
-      const existing = Object.values(currentOpenFiles).filter((file) => (
-        fileRefUnder(file.ref, target.root.id, target.path)
-      ));
-      closeFiles(existing);
-      const change: WorkspaceResourceUiChange = {
-        kind: "remove",
-        target: { rootId: target.root.id, path: target.path },
-      };
-      const nextOpenFiles = Object.fromEntries(Object.entries(currentOpenFiles).filter(([key]) => (
-        transformWorkspaceResourceFileKey(key, change) !== null
-      )));
-      commitResourceState(change, currentOpenFiles, nextOpenFiles, [], {
-        preserveRemovedBookmarks: true,
-      });
-      return;
-    }
-
-    if (operation.kind === "delete") {
-      const target = targetForPath(operation.path);
-      const affectedBefore = initialFiles.filter((file) => (
-        fileRefUnder(file.ref, target.root.id, target.path)
-      ));
-      if (affectedBefore.some((file) => file.dirty)) {
-        throw new Error("DeleteFile would discard an unsaved editor buffer");
-      }
-      const result = await workspaceApplyResourceOperation(target.root.path, {
-        kind: "delete",
-        path: target.path,
-        recursive: operation.recursive,
-        ignoreIfNotExists: operation.ignoreIfNotExists,
-      });
-      if (result.ignored) return;
-      flushPendingEditorText();
-      const currentOpenFiles = openFilesRef.current;
-      const affected = Object.values(currentOpenFiles).filter((file) => (
-        fileRefUnder(file.ref, target.root.id, target.path)
-      ));
-      closeFiles(affected);
-      const change: WorkspaceResourceUiChange = {
-        kind: "remove",
-        target: { rootId: target.root.id, path: target.path },
-      };
-      const nextOpenFiles = Object.fromEntries(Object.entries(currentOpenFiles).filter(([key]) => (
-        transformWorkspaceResourceFileKey(key, change) !== null
-      )));
-      commitResourceState(change, currentOpenFiles, nextOpenFiles, []);
-      notifyWorkspacePathGitChanged(target.root.id, target.path);
-      return;
-    }
-
-    const source = targetForPath(operation.oldPath);
-    const destination = targetForPath(operation.newPath);
-    const destinationFilesBefore = initialFiles.filter((file) => (
-      fileRefUnder(file.ref, destination.root.id, destination.path)
-      && !fileRefUnder(file.ref, source.root.id, source.path)
-    ));
-    if (
-      operation.overwrite
-      && destinationFilesBefore.some((file) => file.dirty)
-    ) {
-      throw new Error("RenameFile would overwrite an unsaved editor buffer");
-    }
-    const result = await workspaceApplyResourceOperation(source.root.path, {
-      kind: "rename",
-      fromPath: source.path,
-      toPath: destination.path,
-      toRepoRoot: destination.root.path,
-      overwrite: operation.overwrite,
-      ignoreIfExists: operation.ignoreIfExists,
-    });
-    if (result.ignored) return;
-    flushPendingEditorText();
-    const currentOpenFiles = openFilesRef.current;
-    const currentFiles = Object.values(currentOpenFiles);
-    const sourceFiles = currentFiles.filter((file) => (
-      fileRefUnder(file.ref, source.root.id, source.path)
-    ));
-    const destinationFiles = currentFiles.filter((file) => (
-      fileRefUnder(file.ref, destination.root.id, destination.path)
-      && !fileRefUnder(file.ref, source.root.id, source.path)
-    ));
-    closeFiles([...sourceFiles, ...destinationFiles]);
-    const change: WorkspaceResourceUiChange = {
-      kind: "move",
-      source: { rootId: source.root.id, path: source.path },
-      destination: { rootId: destination.root.id, path: destination.path },
-    };
-    const remappedFiles: Record<string, OpenFileState> = {};
-    const reopenedFiles: OpenFileState[] = [];
-    for (const [key, file] of Object.entries(currentOpenFiles)) {
-      const ref = transformWorkspaceResourceFileRef(file.ref, change);
-      if (!ref) continue;
-      const nextKey = fileKey(ref);
-      if (nextKey === key) {
-        remappedFiles[key] = file;
-        continue;
-      }
-      const meta = fileMeta(ref, rootsRef.current, looseFilesRef.current);
-      const nextFile = {
-        ...file,
-        ref,
-        key: nextKey,
-        path: meta.path,
-        title: meta.title,
-        subtitle: meta.subtitle,
-        languagePath: meta.languagePath,
-      };
-      remappedFiles[nextKey] = nextFile;
-      reopenedFiles.push(nextFile);
-    }
-    commitResourceState(change, currentOpenFiles, remappedFiles, reopenedFiles);
-    notifyWorkspacePathGitChanged(source.root.id, source.path);
-    notifyWorkspacePathGitChanged(destination.root.id, destination.path);
-  }, [
+  const applyLspResourceOperationUnlocked = useCallback(createApplyLspResourceOperationUnlocked({
+    flushPendingEditorText,
+    rootsRef,
+    openFilesRef,
+    saveTransactionRegistryRef,
+    workspaceInstanceId,
+    closeLspDocument,
+    lspFilesRef,
+    reconcileNavigationFileReferences,
+    setExpandedDirs,
+    setSelected,
+    replaceWorkspaceFileState,
+    setRevealTarget,
+    bookmarksRef,
+    looseFilesRef,
+    replaceBookmarks,
+    syncLspDocument,
+    notifyWorkspacePathGitChanged,
+  }), [
     closeLspDocument,
     flushPendingEditorText,
     notifyWorkspacePathGitChanged,
@@ -9920,947 +7403,38 @@ export function CodeWorkspaceTab({
     };
   }, [applyLspResourceOperation]);
 
-  type WorkspaceEditApplyOptions = {
-    preview?: boolean;
-    label?: string | null;
-    actionId?: string | null;
-    kind?: RefactorKind;
-    semanticGeneration?: number;
-    semanticRevision?: number;
-    /** Provider command continuations are exact-revision guarded after their first edit. */
-    semanticRequireReady?: boolean;
-    /** Internal history replay must not create another history entry. */
-    recordHistory?: boolean;
-    /** Restrict provider edits to the opened workspace roots. */
-    semanticWorkspaceOnly?: boolean;
-    /** Optional refactoring plan with completeness, conflicts, and required groups. */
-    plan?: RefactorPlanV3 | WorkspaceEditRecoveryPlan;
-    /** Canonical transaction guard, invoked after preview and immediately before mutation. */
-    preflightMutation?: () => Promise<void> | void;
-    /**
-     * ED-PARITY-007: extra synchronous guard evaluated at the exact mutation
-     * boundary, after every read and immediately before the first write. Used
-     * by the Extract naming step to re-verify its owner after async snapshot
-     * reads and the shared preview.
-     */
-    assertOwnerAtMutationBoundary?: () => void;
-    /**
-     * ED-IMPROVE-002: structured transaction facts (effect, postcondition,
-     * history/recovery identity) reported by the shell's apply owner.
-     */
-    onTransactionSummary?: (summary: WorkspaceEditApplyTransactionSummary) => void;
-    /** Reports the exact edit selected by the preview dialog. */
-    onActiveEditResolved?: (edit: LspWorkspaceEdit) => void;
-    /**
-     * ED-MAIN-005: frozen per-file disk hashes (normalized path key -> text
-     * hash) captured when the replace preview opened. The closed-file read
-     * refuses when live disk no longer matches, so an old range can never be
-     * re-anchored onto text read again later.
-     */
-    expectedDiskHashes?: ReadonlyMap<string, string> | null;
-    /**
-     * ED-REPAIR-002: frozen per-file preimages captured when the replace
-     * preview opened. Enforces open buffer revision/dirty integrity and
-     * closed-file disk hash integrity before and during mutation.
-     */
-    expectedPreimages?: readonly ReplaceFilePreimage[] | null;
-  };
-
-  const applyLspWorkspaceEditNow = useCallback(async (
-    edit: LspWorkspaceEdit,
-    options: WorkspaceEditApplyOptions = {},
-  ) => {
-    const orderedOperations = workspaceEditOperations(edit);
-    // ED-MAIN-005: frozen replace-preimage hashes bind the closed-file write to
-    // the text read when the preview opened.
-    const expectedDiskHashes = options.expectedDiskHashes ?? null;
-    const beforeSnapshots = options.recordHistory !== false && orderedOperations.length > 0
-      ? await captureWorkspaceEditPathSnapshots(edit)
-      : null;
-    const beforeBookmarks = beforeSnapshots
-      ? captureWorkspaceEditBookmarkSnapshot(beforeSnapshots.map((snapshot) => snapshot.path))
-      : null;
-    const beforeTabs = beforeSnapshots
-      ? captureWorkspaceEditTabSnapshot(beforeSnapshots.map((snapshot) => snapshot.path))
-      : null;
-    // §8.19.1: the edit actually applied after preview filtering drives any
-    // resume slicing — never the pre-confirmation original.
-    let resolvedEdit = edit;
-    // ED-AUDIT-014: the v2 recovery journal is prepared once per apply run,
-    // inside preflightMutation — after preview confirmation, before the first
-    // mutation — and its typed persistence result gates the transaction.
-    // Held in a holder object because the assignment happens inside a closure.
-    const preparedJournalRef: { current: RefactorRecoveryJournalEntryV2 | null } = { current: null };
-    const assertExpectedDiskHash = (absolutePath: string, diskHash: string | null | undefined): void => {
-      if (!expectedDiskHashes) return;
-      const expected = expectedDiskHashes.get(replacePreimagePathKey(absolutePath));
-      if (expected !== undefined && (diskHash == null || diskHash !== expected)) {
-        throw new Error(`${absolutePath} changed since the frozen replace preview; reopen the preview`);
-      }
-    };
-    // ED-AUDIT-014: the transaction id exists before the first apply pass so
-    // the prepared recovery journal and the effect ledger share one identity.
-    const applyTransactionId = nextSaveTransactionId("tx-wedit");
-    const selectedPreimages = (activeEdit: LspWorkspaceEdit): readonly ReplaceFilePreimage[] => {
-      if (options.kind !== "replace" || !options.expectedPreimages) return [];
-      return workspaceEditOperations(activeEdit).flatMap((operation) => {
-        if (operation.kind !== "text") return [];
-        const path = operation.document.path;
-        const candidates = options.expectedPreimages!.filter((preimage) => path && fsPathEquals(preimage.path, path));
-        if (candidates.length !== 1) throw new Error(`Replace refused: missing or ambiguous frozen preimage for ${path}`);
-        return candidates;
-      });
-    };
-    const assertReplaceIdentity = (preimage: ReplaceFilePreimage) => {
-      if (workspaceInstanceIdRef.current !== workspaceInstanceId
-        || (preimage.workspaceInstanceId && preimage.workspaceInstanceId !== workspaceInstanceIdRef.current)) {
-        throw new Error("Replace refused: workspace changed during apply");
-      }
-      if (!rootsRef.current.some((root) => relativePathWithinRoot(root.path, preimage.path) !== null)) {
-        throw new Error(`${preimage.path} is outside the workspace; replace refused`);
-      }
-      const open = Object.values(openFilesRef.current).find((file) => {
-        const path = absolutePathForOpenFile(file);
-        return path !== null && fsPathEquals(path, preimage.path);
-      });
-      if (workspaceResourceOperationLockedRef.current || open?.library) {
-        throw new Error(`${preimage.path} is read-only; replace refused`);
-      }
-      if (open) {
-        if (preimage.bufferRevision === null) throw new Error(`${preimage.path} was opened since replace preview; please retry`);
-        if (open.dirty) throw new Error(`${preimage.path} has unsaved modifications in the editor`);
-        if (open.documentRevision !== preimage.bufferRevision) throw new Error(`${preimage.path} was modified in the editor since replace preview; please retry`);
-      } else if (preimage.bufferRevision !== null) {
-        throw new Error(`${preimage.path} was closed since replace preview; please retry`);
-      }
-      return open;
-    };
-    const assertPassBoundary = (pass: { edit: LspWorkspaceEdit; mutationStarted: boolean }) => {
-      if (workspaceInstanceIdRef.current !== workspaceInstanceId || workspaceResourceOperationLockedRef.current) {
-        throw new Error("Workspace changed or became read-only before mutation");
-      }
-      if (!pass.mutationStarted) {
-        for (const preimage of selectedPreimages(pass.edit)) assertReplaceIdentity(preimage);
-      }
-    };
-    const buildHooks = (
-      allowPreview: boolean,
-      pass = { edit: resolvedEdit, mutationStarted: false },
-    ): WorkspaceEditApplyHooks => ({
-      resolvePath: (file) => {
-        if (file.path) return normalizeFsPath(file.path);
-        return null;
-      },
-      getOpenBuffer: (absolutePath) => {
-        if (workspaceInstanceIdRef.current !== workspaceInstanceId || workspaceResourceOperationLockedRef.current) return null;
-        const normalized = normalizeFsPath(absolutePath);
-        for (const file of Object.values(openFilesRef.current)) {
-          const path = absolutePathForOpenFile(file);
-          if (path && fsPathEquals(path, normalized)) {
-            if (file.library) return null;
-            return {
-              text: file.text,
-              dirty: file.dirty,
-              key: file.key,
-              version: lspDocumentVersion(file.key),
-              revision: file.documentRevision ?? null,
-              lspSynced: isLspDocumentSynced(file.key, file.text),
-            };
-          }
-        }
-        return null;
-      },
-      assertTextDocumentPreconditions: (path) => {
-        if (options.kind === "replace" && options.expectedPreimages) {
-          const preimage = options.expectedPreimages.find((p) => fsPathEquals(p.path, path));
-          if (!preimage) throw new Error(`${path} is missing a frozen replace preimage`);
-          assertReplaceIdentity(preimage);
-        }
-      },
-      assertMutationBoundary: () => {
-        assertPassBoundary(pass);
-        options.assertOwnerAtMutationBoundary?.();
-      },
-      applyToOpenBuffer: (key, nextText) => {
-        pass.mutationStarted = true;
-        // ED-AUDIT-008: a restore replaying through this funnel must not
-        // create a second undoable document entry beside the journal
-        // transaction that owns the change, so its buffer write is recorded
-        // as a history replay (see replayWorkspaceRestoreRef).
-        if (replayWorkspaceRestoreRef.current) {
-          mutateOpenBuffer(key, { text: nextText, error: null }, "history-replay");
-          return;
-        }
-        updateFileText(key, nextText);
-      },
-      // §5.2.9 open-clean: apply then save so the buffer is not left dirty.
-      // ED-AUDIT-003: the shared committer reports a failed or cancelled disk
-      // write as a typed result (null here), not a rejection. The applier
-      // contract is Promise<void>, so the only truthful failure signal is a
-      // throw — otherwise a readonly or conflicted save would be recorded as
-      // a phantom "applied-open" and the workspace-edit report would claim a
-      // completion the disk never reached. The buffer keeps the applied text,
-      // its dirty flag and the committer's error message for in-editor
-      // recovery.
-      saveOpenBuffer: async (key, nextText) => {
-        const commitResult: { current: SaveCommitResult | null } = { current: null };
-        const saved = await saveOpenBufferText(key, nextText, undefined, (result) => {
-          commitResult.current = result;
-        });
-        if (!saved) {
-          const error = openFilesRef.current[key]?.error;
-          const message = error || `save did not commit for open buffer ${key}`;
-          throw new WorkspaceEditOpenBufferSaveFailure(
-            message,
-            commitResult.current?.diskEffect === "unknown" ? "unknown" : "none",
-          );
-        }
-      },
-      readDisk: async (absolutePath) => {
-        // Prefer workspace APIs via root-relative path when possible.
-        for (const root of rootsRef.current) {
-          const rel = relativePathWithinRoot(root.path, absolutePath);
-          if (rel === null) continue;
-          try {
-            const disk = await workspaceReadFile(root.path, rel);
-            assertExpectedDiskHash(absolutePath, disk.hash);
-            const eol = disk.text.includes("\r\n") ? ("crlf" as const) : disk.text.includes("\r") && !disk.text.includes("\n") ? ("cr" as const) : ("lf" as const);
-            return {
-              text: disk.text,
-              hash: disk.hash,
-              encoding: disk.encoding ?? "UTF-8",
-              bom: disk.bom ?? false,
-              eol,
-            };
-          } catch {
-            return null;
-          }
-        }
-        try {
-          const disk = await workspaceReadLooseFile(absolutePath);
-          assertExpectedDiskHash(absolutePath, disk.hash);
-          const eol = disk.text.includes("\r\n") ? ("crlf" as const) : disk.text.includes("\r") && !disk.text.includes("\n") ? ("cr" as const) : ("lf" as const);
-          return {
-            text: disk.text,
-            hash: disk.hash,
-            encoding: disk.encoding ?? "UTF-8",
-            bom: disk.bom ?? false,
-            eol,
-          };
-        } catch {
-          return null;
-        }
-      },
-      writeDisk: async (
-        absolutePath,
-        text,
-        expectedHash,
-        encoding = "UTF-8",
-        bom = false,
-        eol?: "lf" | "crlf" | "cr",
-      ) => {
-        const replayMetadata = replayWorkspaceEncodingRef.current?.get(fsPathComparisonKey(absolutePath));
-        // Replay metadata is the authoritative prior state for undo; it wins
-        // over applier defaults but both flow through the single policy
-        // resolution shared with open-buffer saves (§8.17.1 step 1). The
-        // closed-file path goes through the same shared committer as every
-        // other write and returns its full typed result (§8.19.1).
-        const prepared = buildPreparedSave({
-          transactionId: nextSaveTransactionId(),
-          workspaceId: workspaceInstanceId,
-          fileKey: `closed:${absolutePath}`,
-          filePath: absolutePath,
-          text,
-          bufferRevision: -1,
-          styleGeneration: workspaceStyleControllerRef.current.getGeneration(),
-          expectedDiskHash: expectedHash ?? null,
-          policy: resolveWritePolicy({
-            explicit: {
-              encoding: replayMetadata?.encoding ?? encoding,
-              bom: replayMetadata?.bom ?? bom,
-              eol: replayMetadata?.eol ?? eol ?? "lf",
-            },
-          }),
-        });
-        return commitClosedFilePreparedSave(prepared, () => {
-          // The committer awaits local-history reads too. Keep the whole-set
-          // guard live until it actually invokes the first byte writer.
-          assertPassBoundary(pass);
-          if (options.kind === "replace" && options.expectedPreimages) {
-            const preimage = options.expectedPreimages.find((candidate) => fsPathEquals(candidate.path, absolutePath));
-            if (!preimage) throw new Error(`${absolutePath} is missing a frozen replace preimage`);
-            assertReplaceIdentity(preimage);
-          }
-          pass.mutationStarted = true;
-        });
-      },
-      confirmChangeAnnotations: async (annotations) => {
-        const visible = annotations.slice(0, 8);
-        const details = visible.map((annotation) => (
-          annotation.description
-            ? `${annotation.label}: ${annotation.description}`
-            : annotation.label
-        ));
-        if (annotations.length > visible.length) {
-          details.push(`And ${annotations.length - visible.length} more changes`);
-        }
-        return confirmAppDialog({
-          title: "Apply language server changes",
-          message: details.join("\n"),
-          confirmLabel: "Apply",
-        });
-      },
-      confirmWorkspaceEdit: allowPreview && options.preview
-        ? (preview: WorkspaceEditPreview, edit: LspWorkspaceEdit) => {
-            if (preview.usages.length > 0) {
-              return (async () => {
-                // ED-PARITY-017 DEC-017-05: real preimage text per affected file.
-                const sourceTexts: Record<string, string | null> = {};
-                for (const path of new Set(preview.usages.map((usage) => usage.path))) {
-                  try {
-                    const snapshot = await readWorkspaceEditPathSnapshot(path.replace(/^file:\/\//, ""));
-                    sourceTexts[path] = snapshot?.exists && typeof snapshot.text === "string" ? snapshot.text : null;
-                  } catch {
-                    sourceTexts[path] = null;
-                  }
-                }
-                return sourceTexts;
-              })().then((sourceTexts) => new Promise<boolean | LspWorkspaceEdit>((resolve) => {
-                setRefactoringPreviewModal({
-                  sourceTexts,
-                  title: options.label?.trim() || preview.label || "Review workspace changes",
-                  preview: {
-                    ...preview,
-                    label: options.label?.trim() || preview.label,
-                  },
-                  originalEdit: edit,
-                  plan: options.plan && "operations" in options.plan ? options.plan : undefined,
-                  resolve,
-                });
-              }));
-            }
-            return confirmAppDialog({
-              title: options.label?.trim() || "Review workspace changes",
-              message: formatWorkspaceEditPreview({
-                ...preview,
-                label: options.label?.trim() || preview.label,
-              }),
-              confirmLabel: "Apply changes",
-            });
-          }
-        : undefined,
-      preflightMutation: options.preflightMutation
-        || (options.semanticGeneration != null && options.semanticRevision != null)
-        || options.recordHistory !== false
-        || (options.kind === "replace" && Boolean(options.expectedPreimages))
-        ? async () => {
-          await options.preflightMutation?.();
-          // ED-REPAIR-002: In replace, verify all preimages before any file is touched
-          if (options.kind === "replace" && options.expectedPreimages) {
-            for (const preimage of selectedPreimages(pass.edit)) {
-              const open = assertReplaceIdentity(preimage);
-              if (!open) {
-                const containing = rootsRef.current.find(
-                  (root) => relativePathWithinRoot(root.path, preimage.path) !== null,
-                );
-                if (containing) {
-                  const rel = relativePathWithinRoot(containing.path, preimage.path) ?? "";
-                  const disk = await workspaceReadFile(containing.path, rel);
-                  if (disk.hash !== preimage.textHash) {
-                    throw new Error(`${preimage.path} changed on disk since replace preview; please retry`);
-                  }
-                }
-              }
-            }
-          }
-          if (options.semanticGeneration == null || options.semanticRevision == null) {
-            // fall through to journal preparation below
-          } else {
-            const current = semanticIndex.current();
-            const semanticToken = {
-              generation: options.semanticGeneration!,
-              revision: options.semanticRevision!,
-            };
-            const valid = options.semanticRequireReady === false
-              ? current.revision === semanticToken.revision
-              : workspaceSemanticIndexBuildIsCurrent(current, semanticToken);
-            if (!valid) {
-              throw new Error("Semantic result became stale before changes were applied; run the action again");
-            }
-          }
-          // ED-AUDIT-014 / ED-REPAIR-004: prepare the v2 recovery journal before the first
-          // mutation. A persistence failure aborts the whole transaction with
-          // zero writes; a text target without a preimage does the same.
-          if (options.recordHistory !== false && !preparedJournalRef.current) {
-            const preImages: RefactorRecoveryPreImageV2[] = [];
-            for (const operation of workspaceEditOperations(resolvedEdit)) {
-              if (operation.kind !== "text") continue;
-              const targetPath = operation.document.path ? normalizeFsPath(operation.document.path) : null;
-              const snapshot = targetPath
-                ? beforeSnapshots?.find((candidate) => fsPathEquals(candidate.path, targetPath))
-                : undefined;
-              if (!snapshot || snapshot.text === null) continue;
-              preImages.push({
-                uri: operation.document.uri,
-                canonicalPath: snapshot.path,
-                preText: snapshot.text,
-                encoding: snapshot.encoding,
-                bom: snapshot.bom,
-                eol: snapshot.eol ?? null,
-              });
-            }
-            const recoveryPlan: WorkspaceEditRecoveryPlan = options.plan ?? buildTextWorkspaceEditRecoveryPlan({
-              actionId: options.actionId ?? undefined,
-              kind: options.kind,
-              label: options.label,
-              transactionId: applyTransactionId,
-            });
-            const preparation = prepareRefactorRecoveryJournalV2({
-              plan: recoveryPlan,
-              edit: resolvedEdit,
-              preImages,
-              workspaceRoot: rootsRef.current[0]?.path ?? "",
-              transactionId: applyTransactionId,
-            });
-            if (preparation.state === "incomplete") {
-              throw new Error(preparation.reason);
-            }
-            if (preparation.state === "prepared") {
-              const writeResult = recordRefactorRecoveryJournalV2(preparation.entry);
-              if (!writeResult.ok) {
-                throw new Error(
-                  `Refactor recovery journal could not be persisted, no changes were applied. `
-                    + `Retry the action. Reason: ${writeResult.reason}`,
-                );
-              }
-              preparedJournalRef.current = preparation.entry;
-            }
-            // "unsupported" (resource operations) keeps the explicit no-recovery boundary.
-          }
-        }
-        : undefined,
-      validateOperationPaths: options.semanticWorkspaceOnly || (options.semanticGeneration != null && options.semanticRevision != null)
-        ? (operations) => validateSemanticWorkspaceEditPaths(
-          operations,
-          rootsRef.current.map((root) => root.path),
-        )
-        : undefined,
-      createFile: (operation) => applyLspResourceOperation(operation),
-      renameFile: (operation) => applyLspResourceOperation(operation),
-      deleteFile: (operation) => applyLspResourceOperation(operation),
-      onActiveEditResolved: (activeEdit) => {
-        pass.edit = activeEdit;
-        if (allowPreview) {
-          resolvedEdit = activeEdit;
-          options.onActiveEditResolved?.(activeEdit);
-        }
-      },
-    });
-    let outcomes = await applyWorkspaceEdit(edit, buildHooks(true));
-    const preMutation = outcomes.find((outcome) => outcome.operationIndex === null);
-    if (preMutation) {
-      setStatusMessage(summarizeWorkspaceEditOutcomes(outcomes));
-      options.onTransactionSummary?.({
-        effect: "none",
-        postcondition: "not-applied",
-        historyId: null,
-        recoveryId: null,
-        affectedPaths: [],
-        reason: ("reason" in preMutation && preMutation.reason) ? preMutation.reason : null,
-      });
-      return outcomes;
-    }
-    const allOutcomesHistory: WorkspaceEditApplyOutcome[] = [...outcomes];
-    const settledOutcomes = new Map<number, WorkspaceEditApplyOutcome>();
-    for (const outcome of outcomes) {
-      if (outcome.operationIndex !== null) {
-        settledOutcomes.set(outcome.operationIndex, outcome);
-      }
-    }
-
-    // §8.19.1: per-operation effect ledger with an explicit resume boundary.
-    // A partial run stops at the failed operation; the user may re-run the
-    // unapplied suffix, and every remaining text operation re-validates its
-    // disk hash / open-buffer version before writing.
-    const historySafePaths = new Set(
-      (beforeSnapshots ?? [])
-        .filter((snapshot) => snapshot.exists && snapshot.text !== null)
-        .map((snapshot) => fsPathComparisonKey(snapshot.path)),
-    );
-    const getSettledOutcomesList = () => Array.from(settledOutcomes.values()).sort(
-      (a, b) => (a.operationIndex ?? 0) - (b.operationIndex ?? 0),
-    );
-    const settleSuffix = (suffix: WorkspaceEditApplyOutcome[], startIndex: number) => {
-      for (const outcome of suffix) {
-        // A suffix-wide preflight failure belongs to its absolute resume
-        // boundary, and must remain visible in the final transaction ledger.
-        const settled = outcome.operationIndex === null
-          ? { ...outcome, operationIndex: startIndex }
-          : outcome;
-        allOutcomesHistory.push(settled);
-        settledOutcomes.set(settled.operationIndex ?? startIndex, settled);
-      }
-    };
-    const buildApplyResult = () => buildWorkspaceEditApplyResultV2({
-      transactionId: applyTransactionId,
-      operations: workspaceEditOperations(resolvedEdit),
-      outcomes: getSettledOutcomesList(),
-      undoAvailability: beforeSnapshots
-        ? (_index, _kind, targetPath) => historySafePaths.has(fsPathComparisonKey(targetPath)) ? "available" : "unavailable"
-        : undefined,
-    });
-    {
-      let applyResult = buildApplyResult();
-      const allOperations = workspaceEditOperations(resolvedEdit);
-      if (
-        applyResult.disposition === "partial"
-        && applyResult.nextOperationIndex !== null
-        && options.recordHistory !== false
-      ) {
-        // Bounded resume loop; ED-REPAIR-001: retry only unexecuted operations or retry persistence safely
-        for (let attempt = 0; attempt < 5; attempt += 1) {
-          const failedIndex = applyResult.nextOperationIndex;
-          const failedOutcome = settledOutcomes.get(failedIndex);
-          if (!failedOutcome || failedOutcome.status !== "failed") {
-            break;
-          }
-          const retryKind = classifyWorkspaceEditOperationRetry(failedOutcome);
-          if (retryKind === "unretryable") {
-            // ED-IMPROVE-002 / ED-REPAIR-001: disk unknown or unretryable state blocks blind retry
-            break;
-          }
-
-          if (retryKind === "retry-save-only") {
-            const failedOp = allOperations[failedIndex];
-            if (failedOp?.kind !== "text" || failedOutcome.expectedPostText === undefined) {
-              break;
-            }
-            const docPath = failedOp.document.path ?? failedOp.document.uri;
-            const resume = await confirmAppDialog({
-              title: "Workspace edit save failed",
-              message: `Edits to ${docPath} were applied to the open buffer, but saving to disk failed (${failedOutcome.reason}). `
-                + `Retry saving and continue remaining operations?`,
-              confirmLabel: "Retry save",
-            });
-            if (!resume) break;
-            const retryOutcome = await retryOpenBufferSave({
-              operationIndex: failedIndex,
-              document: failedOp.document,
-              expectedPostText: failedOutcome.expectedPostText,
-              expectedKey: failedOutcome.openBufferKey,
-              expectedVersion: failedOutcome.openBufferVersion,
-              hooks: buildHooks(false),
-            });
-            allOutcomesHistory.push(retryOutcome);
-            settledOutcomes.set(failedIndex, retryOutcome);
-
-            if (retryOutcome.status.startsWith("applied")) {
-              const nextIndex = failedIndex + 1;
-              if (nextIndex < allOperations.length) {
-                const remainingEdit = sliceWorkspaceEditForResume(resolvedEdit, nextIndex);
-                const suffixOutcomes = await applyWorkspaceEdit(remainingEdit, buildHooks(false), nextIndex);
-                settleSuffix(suffixOutcomes, nextIndex);
-              }
-            }
-          } else {
-            // retry-full
-            const totalCount = allOperations.length;
-            const resume = await confirmAppDialog({
-              title: "Workspace edit partially applied",
-              message: `${failedIndex} of ${totalCount} changes were applied. `
-                + `Retry the remaining ${totalCount - failedIndex} from the failed boundary?`,
-              confirmLabel: "Retry remaining changes",
-            });
-            if (!resume) break;
-            const remainingEdit = sliceWorkspaceEditForResume(resolvedEdit, failedIndex);
-            const suffixOutcomes = await applyWorkspaceEdit(remainingEdit, buildHooks(false), failedIndex);
-            settleSuffix(suffixOutcomes, failedIndex);
-          }
-
-          applyResult = buildApplyResult();
-          if (applyResult.disposition !== "partial" || applyResult.nextOperationIndex === null) break;
-        }
-      }
-    }
-    outcomes = getSettledOutcomesList();
-    const allOutcomes = allOutcomesHistory;
-
-    if (allOutcomes.some((outcome) => (
-      outcome.status === "applied-create"
-      || outcome.status === "applied-rename"
-      || outcome.status === "applied-delete"
-    ))) {
-      refreshTree();
-    }
-    // ED-MAIN-001: an open-buffer edit mutates memory before an awaited save.
-    // A failed save must still count the already-performed buffer effect so the
-    // transaction is never reported as a zero-effect no-op.
-    const bufferEffectPerformed = (outcome: WorkspaceEditApplyOutcome): boolean => (
-      outcome.status === "failed" && outcome.bufferEffect === "performed"
-    );
-    const mutated = allOutcomes.some((outcome) => outcome.status.startsWith("applied") || bufferEffectPerformed(outcome));
-    if (mutated) {
-      semanticIndex.invalidate(
-        "workspace-edit",
-        allOutcomes.flatMap((outcome) => (
-          outcome.status.startsWith("applied") || bufferEffectPerformed(outcome) ? [outcome.path] : []
-        )),
-      );
-    }
-    // ED-IMPROVE-002 / ED-REPAIR-001: one structured summary per apply run. The effect axis is
-    // independent of the execution status: `unknown` marks a write whose OS
-    // result could not be proven even though the operation reported failure.
-    const appliedEffectPaths = Array.from(new Set(
-      allOutcomes
-        .filter((outcome) => outcome.status.startsWith("applied") || bufferEffectPerformed(outcome))
-        .map((outcome) => outcome.path),
-    ));
-    const allOperations = workspaceEditOperations(resolvedEdit);
-    const hasUnsettledOrFailedOperation = allOperations.some((_, index) => {
-      const settled = settledOutcomes.get(index);
-      return !settled || settled.status === "failed" || settled.status === "skipped";
-    });
-    const hasUnknownDiskEffect = allOutcomes.some((outcome) => (
-      outcome.status === "failed" && outcome.diskEffect === "unknown"
-    ));
-    const transactionEffect: WorkspaceEditApplyTransactionSummary["effect"] = hasUnknownDiskEffect
-      ? "unknown"
-      : appliedEffectPaths.length === 0
-        ? "none"
-        : hasUnsettledOrFailedOperation
-          ? "partial"
-          : "performed";
-    let historyEntryId: string | null = null;
-    const emitTransactionSummary = (
-      postcondition: WorkspaceEditApplyTransactionSummary["postcondition"],
-      recoveryId: string | null,
-    ): void => {
-      const failedOutcomes = allOutcomes.filter((outcome) => outcome.status === "failed");
-      const reason = failedOutcomes.find((outcome) => outcome.diskEffect === "unknown")?.reason
-        ?? failedOutcomes[0]?.reason
-        ?? null;
-      options.onTransactionSummary?.({
-        effect: transactionEffect,
-        postcondition,
-        historyId: historyEntryId,
-        recoveryId,
-        affectedPaths: appliedEffectPaths,
-        reason,
-      });
-    };
-    let historyUnavailable = options.recordHistory !== false
-      && orderedOperations.length > 0
-      && beforeSnapshots === null
-      && mutated;
-    let afterSnapshots: WorkspaceEditPathSnapshot[] | null = null;
-    if (beforeSnapshots && mutated) {
-      afterSnapshots = await captureWorkspaceEditPathSnapshots(edit);
-      if (!afterSnapshots) historyUnavailable = true;
-      const afterBookmarks = afterSnapshots
-        ? captureWorkspaceEditBookmarkSnapshot(afterSnapshots.map((snapshot) => snapshot.path))
-        : null;
-      const changed = afterSnapshots?.some((snapshot, index) => (
-        snapshot.path !== beforeSnapshots[index]?.path
-        || snapshot.exists !== beforeSnapshots[index]?.exists
-        || snapshot.text !== beforeSnapshots[index]?.text
-        || snapshot.encoding !== beforeSnapshots[index]?.encoding
-        || snapshot.bom !== beforeSnapshots[index]?.bom
-      ));
-      // ED-AUDIT-014: finalize the prepared journal against the real
-      // post-state before any success is reported or history registered.
-      // Every journalled document (open buffers and closed disk files alike)
-      // is verified; a mismatch or unreadable post-state marks the entry
-      // recovery-required, lists every applied effect, and never registers
-      // the normal success history.
-      let recoveryMessage: string | null = null;
-      const preparedJournal = preparedJournalRef.current;
-      if (preparedJournal) {
-        const actualPostTexts: Record<string, string> = {};
-        for (const snapshot of afterSnapshots ?? []) {
-          if (snapshot.text !== null) actualPostTexts[snapshot.path] = snapshot.text;
-        }
-        // RC-01: identity-based post index (fsPathComparisonKey) plus ordered
-        // move-chain resolution. A document addressed to a pre-move path
-        // verifies against the bytes at the end of its move chain; a
-        // still-present old path or an ambiguous chain fails closed instead
-        // of aliasing a stale buffer into a false success.
-        const postIndex = buildRefactorPostTextIndex(actualPostTexts);
-        const journalMismatches = preparedJournal.documents.flatMap((doc) => {
-          const target = doc.canonicalPath || doc.uri;
-          const resolved = resolveRefactorPostTextForDocument(
-            { uri: doc.uri, canonicalPath: doc.canonicalPath },
-            preparedJournal.resourceMoves ?? [],
-            postIndex,
-          );
-          if (!resolved) {
-            return [{ uri: doc.uri, path: target, unreadable: true }];
-          }
-          return refactorJournalPostImageMatches(doc, resolved.text)
-            ? []
-            : [{ uri: doc.uri, path: target, unreadable: false }];
-        });
-        // RC-01: pure moves need endpoint proof (old gone, new present).
-        const existsByKey = new Map<string, boolean | null>();
-        for (const snapshot of afterSnapshots ?? []) {
-          existsByKey.set(fsPathComparisonKey(snapshot.path), snapshot.exists);
-        }
-        // Ensure both move ends are represented even when a snapshot is
-        // missing for one end (treated as not existing, i.e. verification
-        // fails closed below).
-        for (const move of preparedJournal.resourceMoves ?? []) {
-          for (const raw of [move.oldPath ?? move.oldUri, move.newPath ?? move.newUri]) {
-            if (raw && !existsByKey.has(fsPathComparisonKey(raw))) {
-              existsByKey.set(fsPathComparisonKey(raw), false);
-            }
-          }
-        }
-        const movePostCheck = verifyRefactorMovePostEndpoints(
-          preparedJournal.resourceMoves ?? [],
-          existsByKey,
-        );
-        const postHashCheck = options.plan
-          ? verifyRefactorPostHashes(options.plan, actualPostTexts)
-          : { allMatched: true, mismatches: [], missing: [], verifiedDocuments: 0 };
-        const failureBoundaryIndex = allOutcomes.find((outcome) => (
-          outcome.operationIndex !== null
-          && (outcome.status === "failed" || outcome.status === "skipped")
-        ))?.operationIndex ?? null;
-        const failedOutcomes = allOutcomes.filter((outcome) => outcome.status === "failed" || outcome.status === "skipped");
-        // RC-01/AC-06: a required document without post text (`missing`), a
-        // plan mismatch, a journal mismatch, or an unverified move endpoint
-        // all fail closed. Zero verified documents never stand in for a plan
-        // that expected text.
-        const hasMissingPost = journalMismatches.some((mismatch) => mismatch.unreadable)
-          || postHashCheck.missing.length > 0
-          || !movePostCheck.allVerified;
-        if (!afterSnapshots || journalMismatches.length > 0 || !postHashCheck.allMatched || !movePostCheck.allVerified) {
-          const mismatchedPaths = Array.from(new Set([
-            ...journalMismatches.map((mismatch) => mismatch.path),
-            ...postHashCheck.mismatches.map((mismatch) => {
-              const doc = options.plan?.documents.find((candidate) => candidate.uri === mismatch.uri);
-              return doc?.canonicalPath ?? mismatch.uri;
-            }),
-            ...postHashCheck.missing.map((miss) => {
-              const doc = options.plan?.documents.find((candidate) => candidate.uri === miss.uri);
-              return doc?.canonicalPath ?? miss.uri;
-            }),
-            ...movePostCheck.missing,
-          ]));
-          const appliedEffects = allOutcomes
-            .filter((outcome) => outcome.status.startsWith("applied") || bufferEffectPerformed(outcome))
-            .map((outcome) => outcome.path);
-          const reason = !afterSnapshots
-            ? "post-state could not be read"
-            : `mismatch on ${mismatchedPaths.join(", ")}`;
-          updateRefactorRecoveryJournalV2(preparedJournal.recoveryId, (entry) => ({
-            ...entry,
-            status: "recovery-required",
-            appliedOperationIndex: failureBoundaryIndex,
-            verification: {
-              mismatchedUris: Object.freeze([
-                ...journalMismatches.map((mismatch) => mismatch.uri),
-                ...postHashCheck.mismatches.map((mismatch) => mismatch.uri),
-                ...postHashCheck.missing.map((miss) => miss.uri),
-                ...movePostCheck.missing,
-              ]),
-              checkedAt: Date.now(),
-              appliedEffects: Object.freeze(appliedEffects),
-              failedEffects: Object.freeze(
-                failedOutcomes.map((outcome) => ({
-                  path: outcome.path,
-                  status: outcome.status,
-                  diskEffect: "diskEffect" in outcome ? outcome.diskEffect : undefined,
-                  reason: outcome.reason ?? null,
-                })),
-              ),
-            },
-          }));
-          console.warn("[refactor] Post-refactor postcondition failure detected:", {
-            journalMismatches,
-            planMismatches: postHashCheck.mismatches,
-            planMissing: postHashCheck.missing,
-            moveMissing: movePostCheck.missing,
-            hasMissingPost,
-          });
-          const prefix = preparedJournal.kind === "replace" || preparedJournal.kind === "other"
-            ? "Workspace edit"
-            : "Refactor";
-          const failedDetails = failedOutcomes.map((o) => `${o.path} (${o.reason ?? o.status})`).join("; ");
-          recoveryMessage = `${prefix} postcondition failed (${failedDetails ? `failed: ${failedDetails}` : reason}); recovery required. `
-            + `Applied changes on: ${appliedEffects.length > 0 ? appliedEffects.join(", ") : "none"}. `
-            + `Undo was not registered; the pending recovery entry lists every affected file.`;
-        } else if (hasUnsettledOrFailedOperation) {
-          // ED-MAIN-001: the buffer effect was already performed but a later
-          // await (a disk save) failed. The post-image may match the mutated
-          // buffer, but the transaction is not a verified success, so keep the
-          // prepared journal discoverable for recovery instead of committing it
-          // as a no-op or registering normal success history.
-          const failedEffects = allOutcomes
-            .filter((outcome) => outcome.status === "failed")
-            .map((outcome) => outcome.path);
-          updateRefactorRecoveryJournalV2(preparedJournal.recoveryId, (entry) => ({
-            ...entry,
-            status: "recovery-required",
-            appliedOperationIndex: failureBoundaryIndex,
-            verification: {
-              mismatchedUris: Object.freeze(failedEffects),
-              checkedAt: Date.now(),
-              appliedEffects: Object.freeze(appliedEffectPaths),
-              failedEffects: Object.freeze(
-                failedOutcomes.map((outcome) => ({
-                  path: outcome.path,
-                  status: outcome.status,
-                  diskEffect: "diskEffect" in outcome ? outcome.diskEffect : undefined,
-                  reason: outcome.reason ?? null,
-                })),
-              ),
-            },
-          }));
-          const prefix = preparedJournal.kind === "replace" || preparedJournal.kind === "other"
-            ? "Workspace edit"
-            : "Refactor";
-          const failedDetails = failedOutcomes.map((o) => `${o.path} (${o.reason ?? o.status})`).join("; ");
-          recoveryMessage = `${prefix} is incomplete (${failedDetails ? `failed: ${failedDetails}` : "a write failed after the buffer changed"}); `
-            + `recovery required. Applied changes on: `
-            + `${appliedEffectPaths.length > 0 ? appliedEffectPaths.join(", ") : "none"}. `
-            + `Undo was not registered; the pending recovery entry lists every affected file.`;
-        } else {
-          updateRefactorRecoveryJournalV2(preparedJournal.recoveryId, (entry) => ({
-            ...entry,
-            status: "committed",
-            appliedOperationIndex: null,
-            verification: {
-              mismatchedUris: Object.freeze([]),
-              checkedAt: Date.now(),
-              appliedEffects: Object.freeze(appliedEffectPaths),
-              failedEffects: Object.freeze([]),
-            },
-          }));
-        }
-      }
-      if (recoveryMessage !== null) {
-        setStatusMessage(recoveryMessage);
-        emitTransactionSummary(
-          afterSnapshots ? "mismatch" : "unreadable",
-          preparedJournalRef.current?.recoveryId ?? null,
-        );
-        return outcomes;
-      }
-      if (hasUnsettledOrFailedOperation) {
-        // ED-MAIN-001: a buffer effect was performed but the transaction
-        // failed without a prepared recovery journal (no journal plan). The
-        // transaction must not be reported as a verified success nor register
-        // normal success history.
-        setStatusMessage(
-          `Workspace edit is incomplete: ${summarizeWorkspaceEditOutcomes(outcomes)}`,
-        );
-        emitTransactionSummary(
-          afterSnapshots ? "mismatch" : "unreadable",
-          preparedJournalRef.current?.recoveryId ?? null,
-        );
-        return outcomes;
-      }
-      if (afterSnapshots && changed) {
-        const afterSnapshotList = afterSnapshots;
-        const affectedBookmarkIds = Array.from(new Set([
-          ...(beforeBookmarks ?? []).map((bookmark) => bookmark.id),
-          ...(afterBookmarks ?? []).map((bookmark) => bookmark.id),
-        ]));
-        const afterTabs = captureWorkspaceEditTabSnapshot(
-          afterSnapshotList.map((snapshot) => snapshot.path),
-        );
-        // ED-AUDIT-014 / ED-REPAIR-004: plan-gated or prepared-journal undo verifies the live state still matches
-        // the recorded post-state; later user edits (disk or open buffer)
-        // block the undo instead of being overwritten.
-        const planUndoPaths = (options.plan || preparedJournalRef.current) ? afterSnapshotList : null;
-        workspaceEditHistorySequenceRef.current += 1;
-        const label = options.label?.trim() || "Workspace edit";
-        const entry: WorkspaceEditHistoryEntry = {
-          id: `${workspaceInstanceId}:${workspaceEditHistorySequenceRef.current}`,
-          label,
-          affectedPaths: beforeSnapshots.map((snapshot) => snapshot.path),
-          undo: async () => {
-            if (planUndoPaths) {
-              const currentTexts: Record<string, string> = {};
-              for (const snapshot of planUndoPaths) {
-                const current = await readWorkspaceEditPathSnapshot(snapshot.path);
-                if (current && current.text !== null) currentTexts[snapshot.path] = current.text;
-              }
-              const precondition = workspaceEditUndoPrecondition(planUndoPaths, currentTexts);
-              if (precondition.blocked) {
-                throw new Error(`Undo blocked to protect later edits: ${precondition.reasons.join("; ")}`);
-              }
-            }
-            await replayWorkspacePathSnapshotsRef.current(beforeSnapshots);
-            restoreWorkspaceBookmarkSnapshot(beforeBookmarks ?? [], affectedBookmarkIds);
-            if (beforeTabs) await restoreWorkspaceEditTabs(beforeTabs);
-          },
-          redo: async () => {
-            await replayWorkspacePathSnapshotsRef.current(afterSnapshotList);
-            restoreWorkspaceBookmarkSnapshot(afterBookmarks ?? [], affectedBookmarkIds);
-            await restoreWorkspaceEditTabs(afterTabs);
-          },
-        };
-        workspaceEditHistory.push(entry);
-        setWorkspaceEditHistoryRevision((revision) => revision + 1);
-        historyEntryId = entry.id;
-      }
-    } else {
-      const preparedJournal = preparedJournalRef.current;
-      if (preparedJournal) {
-        if (hasUnknownDiskEffect) {
-          // ED-IMPROVE-002: a failed operation whose OS result could not be
-          // proven must not close the journal as a no-op. Keep the preimages
-          // discoverable for recovery.
-          updateRefactorRecoveryJournalV2(preparedJournal.recoveryId, (entry) => ({
-            ...entry,
-            status: "recovery-required",
-            verification: {
-              mismatchedUris: Object.freeze(
-                allOutcomes
-                  .filter((outcome) => outcome.status === "failed" && outcome.diskEffect === "unknown")
-                  .map((outcome) => outcome.path),
-              ),
-              checkedAt: Date.now(),
-              appliedEffects: Object.freeze([]),
-              failedEffects: Object.freeze(
-                allOutcomes
-                  .filter((outcome) => outcome.status === "failed")
-                  .map((outcome) => ({
-                    path: outcome.path,
-                    status: outcome.status,
-                    diskEffect: outcome.diskEffect,
-                    reason: outcome.reason ?? null,
-                  })),
-              ),
-            },
-          }));
-        } else {
-          // Nothing mutated: postconditions hold trivially; close the journal
-          // so no pending entry lingers for a no-op transaction.
-          updateRefactorRecoveryJournalV2(preparedJournal.recoveryId, (entry) => ({
-            ...entry,
-            status: "committed",
-            verification: {
-              mismatchedUris: Object.freeze([]),
-              checkedAt: Date.now(),
-              appliedEffects: Object.freeze([]),
-              failedEffects: Object.freeze([]),
-            },
-          }));
-        }
-      }
-    }
-    setStatusMessage([
-      summarizeWorkspaceEditOutcomes(outcomes),
-      historyUnavailable ? "Undo unavailable: workspace resource snapshot is incomplete" : null,
-    ].filter(Boolean).join("; "));
-    emitTransactionSummary(
-      !mutated ? "not-applied" : afterSnapshots === null ? "unreadable" : "verified",
-      !mutated && hasUnknownDiskEffect ? preparedJournalRef.current?.recoveryId ?? null : null,
-    );
-    return outcomes;
-  }, [
+  const applyLspWorkspaceEditNow = useCallback(createApplyLspWorkspaceEditNow({
+    captureWorkspaceEditPathSnapshots,
+    captureWorkspaceEditBookmarkSnapshot,
+    captureWorkspaceEditTabSnapshot,
+    workspaceInstanceIdRef,
+    workspaceInstanceId,
+    rootsRef,
+    openFilesRef,
+    absolutePathForOpenFile,
+    workspaceResourceOperationLockedRef,
+    lspDocumentVersion,
+    isLspDocumentSynced,
+    replayWorkspaceRestoreRef,
+    mutateOpenBuffer,
+    updateFileText,
+    saveOpenBufferText,
+    replayWorkspaceEncodingRef,
+    workspaceStyleControllerRef,
+    commitClosedFilePreparedSave,
+    readWorkspaceEditPathSnapshot,
+    get setRefactoringPreviewModal() { return setRefactoringPreviewModal; },
+    semanticIndex,
+    applyLspResourceOperation,
+    setStatusMessage,
+    refreshTree,
+    workspaceEditHistorySequenceRef,
+    replayWorkspacePathSnapshotsRef,
+    restoreWorkspaceBookmarkSnapshot,
+    restoreWorkspaceEditTabs,
+    workspaceEditHistory,
+    setWorkspaceEditHistoryRevision,
+  }), [
     absolutePathForOpenFile,
     applyLspResourceOperation,
     captureWorkspaceEditBookmarkSnapshot,
@@ -10985,209 +7559,21 @@ export function CodeWorkspaceTab({
     },
   }), [readWorkspaceEditPathSnapshot]);
 
-  const runRecoveryRestore = useCallback(async (
-    targetEntry: RefactorRecoveryJournalEntryV2,
-    targetPreconditions: RefactorRecoveryPreconditionSummary,
-    ownerInstanceId: string,
-  ): Promise<void> => {
-    const released = () => workspaceInstanceIdRef.current !== ownerInstanceId;
-    const recoveryId = targetEntry.recoveryId;
-    if (refactorRecoveryBusyRef.current.has(recoveryId)) return;
-    refactorRecoveryBusyRef.current.add(recoveryId);
-    setRefactorRecoveryReview((current) => (
-      current && current.entry.recoveryId === recoveryId ? { ...current, busy: true, error: null } : current
-    ));
-    try {
-      const documentList = targetEntry.documents.map((doc) => doc.canonicalPath ?? doc.uri);
-      const moveList = (targetEntry.resourceMoves ?? [])
-        .filter((move) => move.oldPath && move.newPath)
-        .map((move) => `${move.oldPath} → ${move.newPath} (moved back on restore)`);
-      const resourceList = [...documentList, ...moveList].join("\n");
-      const restore = await confirmAppDialog({
-        title: "Restore pre-refactor content",
-        message: `Restore ${targetEntry.documents.length} file(s) to their pre-refactor content`
-          + `${moveList.length > 0 ? ` and move ${moveList.length} relocated file(s) back` : ""}?\n${resourceList}`,
-        confirmLabel: "Restore files",
-      });
-      if (released()) return;
-      if (!restore) {
-        setRefactorRecoveryReview((current) => (
-          current && current.entry.recoveryId === recoveryId ? { ...current, busy: false } : current
-        ));
-        return;
-      }
-      const execution = await executeRefactorRecovery(targetEntry, targetPreconditions, {
-      restoreText: async (doc) => {        const targetPath = doc.canonicalPath || doc.uri;
-        const current = await readWorkspaceEditPathSnapshot(targetPath);
-        if (!current || !current.exists || current.text === null) {
-          throw new Error(`Cannot restore ${targetPath}: current content unreadable`);
-        }
-        // Re-verify immediately before writing: content changed between the
-        // classification and this write is never overwritten.
-        if (refactorJournalPreImageMatches(doc, current.text)) return; // already restored; read-back confirms
-        if (!refactorJournalPostImageMatches(doc, current.text)) {
-          throw new Error(`${targetPath}: content changed during recovery; file left untouched`);
-        }
-        replayWorkspaceEncodingRef.current = new Map([
-          [fsPathComparisonKey(targetPath), {
-            encoding: doc.encoding,
-            bom: doc.bom,
-            eol: doc.eol ?? undefined,
-          }],
-        ]);
-        try {
-          // ED-AUDIT-008: recovery restores are journal-owned history too.
-          replayWorkspaceRestoreRef.current = true;
-          try {
-            await applyLspWorkspaceEditNow(
-              buildWorkspacePathSnapshotEdit(
-                [current],
-                [{
-                  path: targetPath,
-                  exists: true,
-                  text: doc.preText,
-                  encoding: doc.encoding,
-                  bom: doc.bom,
-                  eol: doc.eol ?? undefined,
-                }],
-              ),
-              { recordHistory: false },
-            );
-            // ED-AUDIT-014: the watcher will echo this own-write back for
-            // closed files; mark it so the echo does not clobber the
-            // restore-complete status set after all writes settle.
-            restoreEchoSuppressorRef.current.markRestored(fsPathComparisonKey(targetPath));
-          } finally {
-            replayWorkspaceRestoreRef.current = false;
-          }
-        } finally {
-          replayWorkspaceEncodingRef.current = null;
-        }
-      },
-      readBack: async (doc) => {
-        const snapshot = await readWorkspaceEditPathSnapshot(doc.canonicalPath || doc.uri);
-        return snapshot && snapshot.text !== null ? { text: snapshot.text } : null;
-      },
-      // ED-FOLLOW-001: reverse one journalled file move (new path back to
-      // the old path) through the same resource-operation path the forward
-      // move used, so locks, buffer remapping, and tree refresh all apply.
-      reverseResourceMove: async (move) => {
-        if (!move.oldPath || !move.newPath) {
-          throw new Error("Journalled move has no resolvable path pair");
-        }
-        await applyLspResourceOperation({
-          kind: "rename",
-          oldUri: move.newUri,
-          oldPath: move.newPath,
-          newUri: move.oldUri,
-          newPath: move.oldPath,
-          overwrite: false,
-          ignoreIfExists: false,
-          annotationId: null,
-        });
-        refreshTree();
-        // The reversal's own watcher echo must not clobber the
-        // restore-complete status (same rationale as the 014 suppressor).
-        restoreEchoSuppressorRef.current.markRestored(fsPathComparisonKey(move.oldPath));
-        restoreEchoSuppressorRef.current.markRestored(fsPathComparisonKey(move.newPath));
-      },
-      pathExists: async (path) => {
-        const snapshot = await readWorkspaceEditPathSnapshot(path);
-        if (snapshot === null) throw new Error(`Cannot stat ${path}: not a regular file`);
-        return snapshot.exists;
-      },
-      readMoveText: async (path) => {
-        const snapshot = await readWorkspaceEditPathSnapshot(path);
-        return snapshot && snapshot.text !== null ? { text: snapshot.text } : null;
-      },
-    });
-    if (released()) {
-      refactorRecoveryBusyRef.current.delete(recoveryId);
-      return;
-    }
-    if (execution.state === "rolled-back") {
-      updateRefactorRecoveryJournalV2(targetEntry.recoveryId, (current) => ({
-        ...current,
-        status: "rolled-back",
-        verification: {
-          mismatchedUris: Object.freeze([]),
-          checkedAt: Date.now(),
-          reversedMoves: Object.freeze([...execution.reversedMoves]),
-          restoredUris: Object.freeze([...execution.restoredUris]),
-        },
-      }));
-      setStatusMessage(
-        `Refactor recovery complete: restored ${execution.restoredUris.length}, `
-          + `already restored ${execution.skippedUris.length}`
-          + `${execution.reversedMoves.length > 0 ? `, moved back ${execution.reversedMoves.length}` : ""}`
-          + `${execution.contentUnverifiedMoves.length > 0 ? ` (${execution.contentUnverifiedMoves.length} move(s) without a content proof)` : ""}.`,
-      );
-      refactorRecoveryBusyRef.current.delete(recoveryId);
-      closeRefactorRecoveryReview(recoveryId);
-      return;
-    }
-    const problems = [
-      ...execution.conflicts.map((conflict) => `${conflict.canonicalPath ?? conflict.uri}: third-party content (not overwritten)`),
-      ...execution.failures.map((failure) => `${failure.canonicalPath ?? failure.uri}: ${failure.reason}`),
-      ...execution.moveConflicts.map((conflict) => `${conflict.newUri}: ${conflict.reason}`),
-      ...execution.moveFailures.map((failure) => `${failure.newUri}: ${failure.reason}`),
-    ];
-    // ED-REPAIR-004: partial recovery failure retains facts, accurate reasons, and progress in persistent journal
-    updateRefactorRecoveryJournalV2(targetEntry.recoveryId, (current) => ({
-      ...current,
-      status: "recovery-required",
-      verification: {
-        ...current.verification,
-        mismatchedUris: Object.freeze(problems.map((p) => p.split(":")[0]?.trim() || p)),
-        checkedAt: Date.now(),
-        reversedMoves: Object.freeze([...(current.verification?.reversedMoves ?? []), ...execution.reversedMoves]),
-        lastRecoveryError: problems.join("; "),
-        restoredUris: Object.freeze([...(current.verification?.restoredUris ?? []), ...execution.restoredUris]),
-      },
-    }));
-    // Keep the review open with a visible error so the user can retry,
-    // keep pending, or abandon this record. Refresh preconditions so the
-    // dialog reflects the post-attempt states.
-    try {
-      const refreshed = await classifyRecoveryEntry(targetEntry);
-      if (!released()) {
-        setRefactorRecoveryReview((current) => (
-          current && current.entry.recoveryId === recoveryId
-            ? {
-              ...current,
-              preconditions: refreshed,
-              loading: false,
-              busy: false,
-              error: `Restore incomplete: restored ${execution.restoredUris.length} of ${targetEntry.documents.length} file(s). ${problems.join("; ")}`,
-            }
-            : current
-        ));
-      }
-    } catch (error) {
-      if (!released()) {
-        setRefactorRecoveryReview((current) => (
-          current && current.entry.recoveryId === recoveryId
-            ? {
-              ...current,
-              busy: false,
-              error: `Restore incomplete: restored ${execution.restoredUris.length} of ${targetEntry.documents.length} file(s). ${problems.join("; ")}`,
-            }
-            : current
-        ));
-      }
-    } finally {
-      refactorRecoveryBusyRef.current.delete(recoveryId);
-    }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      setRefactorRecoveryReview((current) => (
-        current && current.entry.recoveryId === targetEntry.recoveryId
-          ? { ...current, busy: false, error: `Restore failed: ${message}` }
-          : current
-      ));
-      refactorRecoveryBusyRef.current.delete(targetEntry.recoveryId);
-    }
-  }, [applyLspResourceOperation, applyLspWorkspaceEditNow, classifyRecoveryEntry, closeRefactorRecoveryReview, readWorkspaceEditPathSnapshot, refreshTree, setStatusMessage]);
+  const runRecoveryRestore = useCallback(createRunRecoveryRestore({
+    workspaceInstanceIdRef,
+    refactorRecoveryBusyRef,
+    setRefactorRecoveryReview,
+    readWorkspaceEditPathSnapshot,
+    replayWorkspaceEncodingRef,
+    replayWorkspaceRestoreRef,
+    applyLspWorkspaceEditNow,
+    restoreEchoSuppressorRef,
+    applyLspResourceOperation,
+    refreshTree,
+    setStatusMessage,
+    closeRefactorRecoveryReview,
+    classifyRecoveryEntry,
+  }), [applyLspResourceOperation, applyLspWorkspaceEditNow, classifyRecoveryEntry, closeRefactorRecoveryReview, readWorkspaceEditPathSnapshot, refreshTree, setStatusMessage]);
 
   const runRecoveryDismiss = useCallback(async (
     targetEntry: RefactorRecoveryJournalEntryV2,
@@ -11649,134 +8035,17 @@ export function CodeWorkspaceTab({
     setStatusMessage,
   ]);
 
-  const requestCodeActions = useCallback(async (
-    file: OpenFileState,
-    range: LspRange,
-    diagnostics: LspDiagnostic[] = [],
-    only: string[] = [],
-    options: { signal?: AbortSignal; allowCapabilityFallback?: boolean } = {},
-  ): Promise<{
-    actions: LspCodeAction[];
-    providerActions: readonly ProviderActionV4[];
-    context: CodeActionContextIdentity | null;
-    semanticToken: WorkspaceSemanticIndexBuildToken | null;
-    /**
-     * Why the candidates are unusable; null when the request completed
-     * normally. `message` is the accurate user-facing outcome and has already
-     * been surfaced on the status line by the time the caller sees it.
-     */
-    requestFailure: {
-      kind: "stale" | "sync-pending" | "descriptor-missing" | "failed" | "provider";
-      message: string;
-    } | null;
-  }> => {
-    const caps = lspFilesRef.current[file.key]?.status?.capabilities;
-    if (caps && !caps.codeAction && !options.allowCapabilityFallback) {
-      return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: null };
-    }
-    const semanticQuery = only.some((kind) => kind === "refactor" || kind.startsWith("refactor."));
-    const expectedRevision = semanticIndex.current().revision;
-    const live = await ensureWorkspaceSemanticDocumentsSynced(file.key, expectedRevision);
-    if (!live) {
-      const message = `${semanticQuery ? "Refactor" : "Code actions"} require the language server to finish synchronizing current editor buffers`;
-      setStatusMessage(message);
-      return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: { kind: "sync-pending", message } };
-    }
-    const descriptor = lspDescriptorForFile(live);
-    if (!descriptor) {
-      const message = `Cannot resolve the language server for ${semanticQuery ? "refactor" : "code"} actions`;
-      setStatusMessage(message);
-      return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: { kind: "descriptor-missing", message } };
-    }
-    const buildToken = semanticIndex.beginBuild("language-server");
-    try {
-      const context = snapshotCodeActionContext({
-        document: {
-          uri: descriptor.documentUri ?? lspFilesRef.current[live.key]?.status?.uri ?? descriptor.filePath ?? live.key,
-          revision: live.documentRevision,
-          languageId: lspFilesRef.current[live.key]?.status?.languageId ?? descriptor.languageId ?? "plaintext",
-        },
-        provider: {
-          id: descriptor.languageId === "java" || !descriptor.languageId ? "jdtls" : descriptor.languageId,
-          version: null,
-          generation: lspSessionGeneration(),
-          projectFingerprint: projectAnalysisSnapshot?.projectFingerprint ?? "",
-          trusted: true,
-        },
-        range,
-        diagnostics,
-        only: only.length > 0 ? only : undefined,
-      });
-
-      const client: CodeActionProviderClient = {
-        requestCodeActions: async (params) => {
-          const result = await lspCodeActions(
-            descriptor,
-            params.range,
-            params.context.diagnostics.map((item) => ({
-              range: item.range,
-              severity: item.severity,
-              code: item.code,
-              source: item.source,
-              message: item.message,
-              tags: item.tags,
-              relatedInformation: item.relatedInformation,
-              codeDescription: item.codeDescription ? { href: item.codeDescription } : undefined,
-              data: item.data,
-            })),
-            params.context.only ? [...params.context.only] : undefined,
-          );
-          updateLspStatusForFile(live, result.status);
-          return result.actions;
-        },
-      };
-
-      const serviceRes = await canonicalCodeActionServiceRef.current!.requestCandidates(
-        context,
-        client,
-        { signal: options.signal },
-      );
-      const providerActions = serviceRes.state === "ready" ? serviceRes.actions : [];
-      const rawActions = providerActions.map((providerAction) => providerAction.action);
-
-      const completion = semanticIndex.finishQuery(buildToken, {
-        kind: semanticQuery ? "refactor" : "code-action",
-        resultCount: rawActions.length,
-      });
-      if (!completion.accepted) {
-        // The workspace revision moved while the provider was producing these
-        // candidates. The response is unusable; say so instead of falling
-        // through to the generic "no actions" message.
-        const message = `${semanticQuery ? "Refactor actions" : "Code actions"} became stale because the workspace changed while requesting them; request them again`;
-        setStatusMessage(message);
-        return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: { kind: "stale", message } };
-      }
-      // The provider envelope classifies non-ready outcomes (failed / timeout
-      // / malformed / unsupported / cancelled). Surface its message instead of
-      // collapsing the request into a generic "no actions" claim; a null
-      // response ("empty") genuinely means the server offered nothing.
-      if (serviceRes.state !== "ready" && serviceRes.state !== "empty") {
-        const message = serviceRes.state === "malformed" || serviceRes.state === "failed"
-          ? serviceRes.message
-          : serviceRes.state === "unsupported"
-            ? serviceRes.reason
-            : serviceRes.state === "timeout"
-              ? "Code action request timed out before the provider answered; try again"
-              : serviceRes.state === "cancelled" && serviceRes.detail?.includes("document changed")
-                ? "Refactor actions were cancelled because the document changed; try again"
-                : "Code action request was cancelled";
-        setStatusMessage(message);
-        return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: { kind: "provider", message } };
-      }
-      return { actions: rawActions, providerActions, context, semanticToken: buildToken, requestFailure: null };
-    } catch (error) {
-      const detail = errorMessage(error);
-      semanticIndex.failBuild(buildToken, detail);
-      const message = `Code actions request failed: ${detail}`;
-      setStatusMessage(message);
-      return { actions: [], providerActions: [], context: null, semanticToken: null, requestFailure: { kind: "failed", message } };
-    }
-  }, [
+  const requestCodeActions = useCallback(createRequestCodeActions({
+    lspFilesRef,
+    semanticIndex,
+    ensureWorkspaceSemanticDocumentsSynced,
+    setStatusMessage,
+    lspDescriptorForFile,
+    lspSessionGeneration,
+    projectAnalysisSnapshot,
+    updateLspStatusForFile,
+    get canonicalCodeActionServiceRef() { return canonicalCodeActionServiceRef; },
+  }), [
     ensureWorkspaceSemanticDocumentsSynced,
     lspDescriptorForFile,
     lspSessionGeneration,
@@ -11826,389 +8095,28 @@ export function CodeWorkspaceTab({
     setStatusMessage("Suppressed in source by the language server");
   }, [inspectionPathForFileKey, setStatusMessage]);
 
-  const runCodeAction = useCallback(async (
-    action: LspCodeAction,
-    file: OpenFileState,
-    semanticToken: WorkspaceSemanticIndexBuildToken | null = null,
-    intentionCandidateId?: string,
-    intentionContext?: CodeActionContextIdentity,
-    /**
-     * ED-PARITY-007 DEC-07: when the caller owns an Extract Method session, the
-     * applied result carries a frozen B1 receipt keyed by that session so the
-     * naming phase can never be rebound to a later revision.
-     */
-    receiptSessionId?: string,
-  ): Promise<{
-    ok: boolean;
-    message: string | null;
-    retryable: boolean;
-    appliedReceipt?: ExtractReceipt;
-  }> => {
-    try {
-      const assertSemanticCurrent = () => {
-        // Revision-pinned freshness: background provider progress does not
-        // stale an already-produced candidate list (see
-        // workspaceSemanticIndexTokenRevisionCurrent).
-        if (
-          semanticToken
-          && !workspaceSemanticIndexTokenRevisionCurrent(semanticIndex.current(), semanticToken)
-        ) {
-          throw new Error("Refactor result became stale because the workspace changed; request it again");
-        }
-      };
-      assertSemanticCurrent();
-      const descriptor = lspDescriptorForFile(file);
-      if (!descriptor) {
-        const message = "Cannot resolve the language server for this code action";
-        setStatusMessage(message);
-        return { ok: false, message, retryable: false };
-      }
-
-      const session = intentionSessionRef.current;
-      const sessionCandidate = intentionCandidateId
-        ? session?.getCandidate(intentionCandidateId) ?? null
-        : null;
-      if (intentionCandidateId && (!sessionCandidate || !intentionContext)) {
-        const message = "Code action session became stale; request the candidates again";
-        setStatusMessage(message);
-        return { ok: false, message, retryable: false };
-      }
-
-      const context = intentionContext ?? snapshotCodeActionContext({
-        document: {
-          uri: descriptor.documentUri ?? lspFilesRef.current[file.key]?.status?.uri ?? descriptor.filePath ?? file.key,
-          revision: file.documentRevision,
-          languageId: lspFilesRef.current[file.key]?.status?.languageId ?? descriptor.languageId ?? "plaintext",
-        },
-        provider: {
-          id: descriptor.languageId === "java" || !descriptor.languageId ? "jdtls" : descriptor.languageId,
-          version: null,
-          generation: lspSessionGeneration(),
-          projectFingerprint: projectAnalysisSnapshot?.projectFingerprint ?? "",
-          trusted: true,
-        },
-        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
-        diagnostics: [],
-      });
-      const candidate = sessionCandidate ?? candidateFromProviderAction(action, null);
-      const client: CodeActionProviderClient = {
-        requestCodeActions: async () => [action],
-        resolveCodeAction: async (candidateAction) => {
-          if (!candidateAction.raw) return null;
-          const result = await lspCodeActionResolve(descriptor, candidateAction.raw);
-          updateLspStatusForFile(file, result.status);
-          return result.action;
-        },
-      };
-
-      if (intentionCandidateId) session?.markResolving(intentionCandidateId);
-      const resolvingSnapshot = intentionCandidateId ? session?.getState() ?? null : null;
-      const liveFile = openFilesRef.current[file.key];
-      const resolveOutcome = await canonicalCodeActionServiceRef.current!.resolvePlan(
-        { ...candidate, rawAction: action },
-        context,
-        client,
-        liveFile?.documentRevision ?? -1,
-        lspSessionGeneration(),
-        { timeoutMs: INTENTION_RESOLVE_TIMEOUT_MS },
-      );
-      if (
-        intentionCandidateId
-        && intentionSessionRef.current?.getState() !== resolvingSnapshot
-      ) {
-        return {
-          ok: false,
-          message: "Code action session was superseded by a newer request",
-          retryable: false,
-        };
-      }
-      if (resolveOutcome.state === "stale") {
-        if (intentionCandidateId) session?.markStale(intentionCandidateId, resolveOutcome.reason);
-        const message = `Code action became stale: ${resolveOutcome.reason}`;
-        setStatusMessage(message);
-        return { ok: false, message, retryable: false };
-      }
-      if (resolveOutcome.state === "rejected") {
-        const message = `Code action rejected: ${resolveOutcome.reason}`;
-        if (intentionCandidateId) session?.markFailed(intentionCandidateId, message);
-        setStatusMessage(message);
-        return { ok: false, message, retryable: false };
-      }
-      if (resolveOutcome.state === "unresolved") {
-        const message = `Code action resolve failed: ${resolveOutcome.reason} — you can retry`;
-        if (intentionCandidateId) session?.markFailed(intentionCandidateId, resolveOutcome.reason);
-        setStatusMessage(message);
-        return { ok: false, message, retryable: resolveOutcome.retryable };
-      }
-      if (intentionCandidateId) session?.markResolved(intentionCandidateId);
-      assertSemanticCurrent();
-      const executablePlan = resolveOutcome.plan;
-      let refactorPlan: RefactorPlanV3 | undefined;
-      const isRefactorAction = executablePlan.kind.startsWith("refactor")
-        || executablePlan.title.toLowerCase().includes("refactor");
-      if (executablePlan.edit && isRefactorAction) {
-        const refactorKind = executablePlan.kind.includes("extract")
-          ? "extract"
-          : executablePlan.kind.includes("inline")
-            ? "inline"
-            : executablePlan.kind.includes("change-signature")
-              ? "change-signature"
-              : executablePlan.kind.includes("move")
-                ? "move"
-                : "other";
-        const evidence = buildCapabilityEvidence({
-          capabilityId: `refactor.action:${executablePlan.kind || "custom"}`,
-          languageId: descriptor.languageId ?? "java",
-          provider: {
-            id: descriptor.languageId ?? "jdtls",
-            version: null,
-            generation: semanticToken?.generation ?? lspSessionGeneration(),
-          },
-          projectFingerprint: projectAnalysisSnapshot?.projectFingerprint ?? "",
-          uri: context.document.uri,
-          revision: file.documentRevision ?? 0,
-          scope: "project",
-          complete: false,
-          reason: "provider code action edit",
-        });
-        // DEC-07: a method extraction is one semantic edit — the declaration
-        // and the call site can never be excluded independently. Every text
-        // operation is therefore a required group, so the shared preview's
-        // Select None, per-file toggle and checkbox all leave it intact.
-        const isMethodExtraction = isExtractMethodKind(executablePlan.kind)
-          || isExtractMethodKind(action.kind);
-        refactorPlan = buildRefactorPlan({
-          actionId: intentionCandidateId ?? executablePlan.actionId,
-          kind: refactorKind,
-          evidence,
-          edit: executablePlan.edit,
-          roots: rootsRef.current,
-          requiredOperationIndexes: isMethodExtraction
-            ? workspaceEditOperations(executablePlan.edit).map((_, index) => index)
-            : undefined,
-          completeness: {
-            value: "partial",
-            source: "protocol-bounded",
-            proof: "provider code action edit",
-          },
-        });
-        const gate = refactorApplyGate(refactorPlan);
-        if (!gate.allowed) {
-          const message = `Refactoring blocked: ${gate.reason}`;
-          setStatusMessage(message);
-          return { ok: false, message, retryable: false };
-        }
-        if (gate.requiresConfirm) {
-          const confirmed = await confirmAppDialog({
-            title: "Refactoring Warning",
-            message: gate.reason ?? "This refactoring produced warnings. Proceed?",
-            confirmLabel: "Proceed",
-          });
-          if (!confirmed) {
-            setStatusMessage("Refactoring cancelled");
-            return { ok: false, message: "Refactoring cancelled", retryable: false };
-          }
-        }
-      }
-
-      let semanticEditApplied = false;
-      let semanticCommandRevision: number | null = null;
-      const result = await canonicalCodeActionServiceRef.current!.applyPlan(executablePlan, {
-        getLiveDocumentText: (uri) => (
-          uri === context.document.uri ? openFilesRef.current[file.key]?.text ?? null : null
-        ),
-        getLiveDocumentRevision: (uri) => (
-          uri === context.document.uri ? openFilesRef.current[file.key]?.documentRevision ?? null : null
-        ),
-        verifyIdentity: () => {
-          const currentFile = openFilesRef.current[file.key];
-          if (!currentFile) {
-            return { valid: false, status: "stale", reason: "The target document was closed" };
-          }
-          if (currentFile.documentRevision !== context.document.revision) {
-            return {
-              valid: false,
-              status: "stale",
-              reason: `Document revision changed from ${context.document.revision} to ${currentFile.documentRevision}`,
-            };
-          }
-          const currentDescriptor = lspDescriptorForFile(currentFile);
-          const currentUri = currentDescriptor?.documentUri
-            ?? lspFilesRef.current[currentFile.key]?.status?.uri
-            ?? currentDescriptor?.filePath
-            ?? currentFile.key;
-          if (currentUri !== context.document.uri) {
-            return { valid: false, status: "stale", reason: "The language-server document identity changed" };
-          }
-          const currentProviderGeneration = lspSessionGeneration();
-          if (currentProviderGeneration !== context.provider.generation) {
-            return {
-              valid: false,
-              status: "stale",
-              reason: `Provider generation changed from ${context.provider.generation} to ${currentProviderGeneration}`,
-            };
-          }
-          if ((projectAnalysisSnapshot?.projectFingerprint ?? "") !== context.provider.projectFingerprint) {
-            return { valid: false, status: "stale", reason: "Project analysis changed" };
-          }
-          if (
-            semanticToken
-            && !workspaceSemanticIndexTokenRevisionCurrent(semanticIndex.current(), semanticToken)
-          ) {
-            return { valid: false, status: "stale", reason: "The workspace changed after the actions were requested" };
-          }
-          return { valid: true };
-        },
-        captureSnapshot: captureCodeActionTransactionSnapshot,
-        restoreSnapshot: restoreCodeActionTransactionSnapshot,
-        applyWorkspaceEdit: async (edit, transactionOptions) => {
-          let appliedEdit = edit;
-          const outcomes = await applyLspWorkspaceEdit(edit, {
-            preview: true,
-            label: executablePlan.title,
-            semanticGeneration: semanticToken?.generation,
-            semanticRevision: semanticToken?.revision,
-            // Revision-pinned freshness (ED-AUDIT-008): the candidates were
-            // produced against this revision, so background provider progress
-            // (jdtls workDoneProgress) must not abort the apply. Cross-revision
-            // edits are still rejected by the revision equality check.
-            semanticRequireReady: false,
-            plan: refactorPlan,
-            recordHistory: false,
-            // A superseded Extract Method session must never commit: the newer
-            // chord owns the transaction, so the older flow is refused at the
-            // last possible moment instead of writing a second extraction.
-            preflightMutation: async () => {
-              await transactionOptions?.onBeforeCommit?.();
-              if (receiptSessionId && extractSessionRef.current?.id !== receiptSessionId) {
-                throw new Error(
-                  "EXTRACT_OWNER_STALE: this extraction was superseded by a newer request",
-                );
-              }
-            },
-            assertOwnerAtMutationBoundary: () => {
-              if (receiptSessionId && extractSessionRef.current?.id !== receiptSessionId) {
-                throw new Error(
-                  "EXTRACT_OWNER_STALE: this extraction was superseded by a newer request",
-                );
-              }
-            },
-            onActiveEditResolved: (nextEdit) => {
-              appliedEdit = nextEdit;
-            },
-          });
-          semanticEditApplied = !outcomes.some((outcome) => (
-            outcome.status === "failed" || outcome.status === "skipped"
-          ));
-          if (semanticToken && semanticEditApplied) {
-            semanticCommandRevision = semanticIndex.current().revision;
-          }
-          return { outcomes, appliedEdit };
-        },
-        executeCommand: async (command, argumentsValue) => {
-          const descriptor = lspDescriptorForFile(file);
-          if (!descriptor) throw new Error("Cannot resolve the language server for this code action");
-          const execute = async () => {
-            if (semanticToken) {
-              const current = semanticIndex.current();
-              if (semanticEditApplied) {
-                if (semanticCommandRevision == null || current.revision !== semanticCommandRevision) {
-                  throw new Error("Refactor command continuation became stale because the workspace changed");
-                }
-              } else {
-                assertSemanticCurrent();
-              }
-              providerCommandSemanticGuardRef.current = {
-                generation: current.generation,
-                revision: semanticEditApplied ? semanticCommandRevision! : semanticToken.revision,
-                requireReady: !semanticEditApplied,
-              };
-            }
-            try {
-              return await lspExecuteCommand(descriptor, command, argumentsValue);
-            } finally {
-              if (semanticToken) {
-                providerCommandSemanticGuardRef.current = null;
-                semanticIndex.invalidate("provider-command");
-              }
-            }
-          };
-          if (!semanticToken) return execute();
-          const pending = providerCommandQueueRef.current.then(execute);
-          providerCommandQueueRef.current = pending.then(() => undefined, () => undefined);
-          return pending;
-        },
-        registerHistoryEntry: (entry) => {
-          workspaceEditHistory.push({
-            id: entry.id,
-            label: entry.label,
-            affectedPaths: entry.affectedUris,
-            undo: entry.undo,
-            redo: entry.redo,
-          });
-          setWorkspaceEditHistoryRevision((revision) => revision + 1);
-        },
-        registerRecoveryEntry: (entry) => {
-          workspaceEditHistory.push({
-            id: entry.id,
-            label: `Recover ${entry.label}`,
-            affectedPaths: entry.affectedUris,
-            undo: entry.recover,
-            redo: entry.recover,
-          });
-          setWorkspaceEditHistoryRevision((revision) => revision + 1);
-        },
-      });
-      if (result.status === "applied") {
-        if (!executablePlan.edit && !executablePlan.command) {
-          const message = "Code action had no edit or command to apply";
-          setStatusMessage(message);
-          return { ok: false, message, retryable: false };
-        }
-        // DEC-07: freeze B1 at the canonical commit/history boundary. The live
-        // buffer is read synchronously here so a later `symbols-after` await
-        // can never mistake newer user text for the extraction result.
-        const committed = openFilesRef.current[file.key];
-        const appliedReceipt: ExtractReceipt | undefined = receiptSessionId && committed
-          ? {
-              sessionId: receiptSessionId,
-              fileKey: file.key,
-              uri: context.document.uri,
-              postRevision: committed.documentRevision,
-              postText: committed.text,
-              historyId: result.historyId,
-            }
-          : undefined;
-        markProviderSuppressionApplied(action, file);
-        setStatusMessage(result.historyId
-          ? `Applied code action: ${executablePlan.title}; undo transaction ${result.historyId}`
-          : `Executed code action: ${executablePlan.title}`);
-        return { ok: true, message: null, retryable: false, appliedReceipt };
-      }
-      if (result.status === "cancelled") {
-        const message = `Code action cancelled: ${result.reason}`;
-        setStatusMessage(message);
-        return { ok: false, message, retryable: true };
-      }
-      if ("reason" in result) {
-        const message = `Code action ${result.status}: ${result.reason}`;
-        setStatusMessage(message);
-        return { ok: false, message, retryable: true };
-      }
-      const recovery = result.recoveryId
-        ? result.recoveryState === "registered"
-          ? `; recovery ${result.recoveryId} is available through Undo Workspace Edit`
-          : `; recovery ${result.recoveryId} ${result.recoveryState}`
-        : "";
-      const message = `Code action failed: ${result.error}${recovery}`;
-      setStatusMessage(message);
-      return { ok: false, message, retryable: result.recoveryState !== "unavailable" };
-    } catch (error) {
-      const message = errorMessage(error);
-      setStatusMessage(message);
-      return { ok: false, message, retryable: false };
-    }
-  }, [
+  const runCodeAction = useCallback(createRunCodeAction({
+    semanticIndex,
+    lspDescriptorForFile,
+    setStatusMessage,
+    intentionSessionRef,
+    lspFilesRef,
+    lspSessionGeneration,
+    projectAnalysisSnapshot,
+    updateLspStatusForFile,
+    openFilesRef,
+    canonicalCodeActionServiceRef,
+    rootsRef,
+    captureCodeActionTransactionSnapshot,
+    restoreCodeActionTransactionSnapshot,
+    applyLspWorkspaceEdit,
+    extractSessionRef,
+    providerCommandSemanticGuardRef,
+    providerCommandQueueRef,
+    workspaceEditHistory,
+    setWorkspaceEditHistoryRevision,
+    markProviderSuppressionApplied,
+  }), [
     applyLspWorkspaceEdit,
     captureCodeActionTransactionSnapshot,
     lspCodeActionResolve,
@@ -12393,183 +8301,19 @@ export function CodeWorkspaceTab({
     setStatusMessage,
   ]);
 
-  const showCodeActionsMenu = useCallback(async (
-    clientX: number,
-    clientY: number,
-    file: OpenFileState,
-    range: LspRange,
-    diagnostics: LspDiagnostic[] = [],
-    only: string[] = [],
-    sectionLabel = "code actions",
-    /**
-     * ED-PARITY-007 DEC-02: an explicit popup anchor (selection start) for the
-     * frozen candidate menu; the pane +80/+80 origin stays the fallback.
-     */
-    anchor?: { clientX: number; clientY: number },
-    /**
-     * ED-PARITY-007 DEC-02: an already-frozen candidate list (the caller
-     * filtered it) rendered without a second provider request. The Extract
-     * Method multi-candidate path uses it so method-only filtering cannot be
-     * widened back to variable/constant/field proposals.
-     */
-    prefetched?: {
-      providerActions: readonly ProviderActionV4[];
-      context: CodeActionContextIdentity;
-      semanticToken: WorkspaceSemanticIndexBuildToken | null;
-    },
-  ) => {
-    let providerActions: readonly ProviderActionV4[];
-    let actionContext: CodeActionContextIdentity;
-    let menuSemanticToken: WorkspaceSemanticIndexBuildToken | null;
-    let filtered: ProviderActionV4[];
-    if (prefetched) {
-      providerActions = prefetched.providerActions;
-      actionContext = prefetched.context;
-      menuSemanticToken = prefetched.semanticToken;
-      filtered = [...providerActions];
-    } else {
-      const requestAbort = new AbortController();
-      intentionRequestAbortRef.current?.abort();
-      intentionRequestAbortRef.current = requestAbort;
-      const requested = await requestCodeActions(
-        file,
-        range,
-        diagnostics,
-        only,
-        { signal: requestAbort.signal },
-      );
-      if (requestAbort.signal.aborted || intentionRequestAbortRef.current !== requestAbort) return;
-
-      // Request-window staleness is decided by finishQuery acceptance inside
-      // requestCodeActions: the response is revision-pinned, and background
-      // provider progress (jdtls workDoneProgress) must not stale a produced
-      // result. Every requestFailure classification already surfaced its
-      // accurate status message there.
-      if (requested.requestFailure) {
-        showCodeInsightNotice(requested.requestFailure.message);
-        return;
-      }
-      if (!requested.context) {
-        setStatusMessage(`No ${sectionLabel} provided by the language server`);
-        showCodeInsightNotice(`No ${sectionLabel} provided by the language server`);
-        return;
-      }
-      providerActions = requested.providerActions;
-      actionContext = requested.context;
-      menuSemanticToken = requested.semanticToken;
-      filtered = only.length === 0
-        ? [...providerActions]
-        : providerActions.filter((providerAction) => only.some((kind) => (
-          providerAction.action.kind === kind || providerAction.action.kind?.startsWith(`${kind}.`)
-        )));
-    }
-    if (!filtered.length) {
-      setStatusMessage(`No ${sectionLabel} provided by the language server`);
-      showCodeInsightNotice(`No ${sectionLabel} provided by the language server`);
-      return;
-    }
-    const sorted = [...filtered].sort((a, b) => {
-      const aQuick = a.action.kind?.includes("quickfix") ? 0 : 1;
-      const bQuick = b.action.kind?.includes("quickfix") ? 0 : 1;
-      if (aQuick !== bQuick) return aQuick - bQuick;
-      if (a.action.isPreferred !== b.action.isPreferred) return a.action.isPreferred ? -1 : 1;
-      return a.action.title.localeCompare(b.action.title);
-    });
-    // §8.20.4 W3: freeze the candidate list into the shared Intention session
-    // with per-candidate evidence; the menu renders the frozen snapshot so all
-    // entry points see identical ids, resolve states and disabled reasons.
-    const intentionSnapshot = intentionSessionRef.current!.open(
-      sorted.map((providerAction) => candidateFromProviderAction(
-        providerAction.action,
-        providerAction.evidence,
-        providerAction.disabledReason,
-      )),
-      {
-        fileKey: file.key,
-        uri: actionContext.document.uri,
-        documentRevision: actionContext.document.revision,
-        providerGeneration: actionContext.provider.generation,
-        projectFingerprint: actionContext.provider.projectFingerprint,
-      },
-    );
-    // Grouped rendering: provider candidates first, then local editor actions
-    // (none registered in this funnel yet — the group renders only when present).
-    // Candidates were built 1:1 over `sorted`, so index maps back to the action.
-    const actionByCandidateId = new Map<string, LspCodeAction>();
-    sorted.forEach((providerAction, index) => {
-      const candidate = intentionSnapshot.candidates[index];
-      if (candidate) actionByCandidateId.set(candidate.id, providerAction.action);
-    });
-    const openedAt = intentionSnapshot.context.openedAt;
-    const openFrozenMenu = () => {
-      const current = intentionSessionRef.current?.getState();
-      if (!current || current.context.openedAt !== openedAt) return;
-      const menuItems: MenuItem[] = [];
-      for (const group of current.groups) {
-        menuItems.push({ label: group.label, disabled: true });
-        for (const candidate of group.candidates) {
-          const action = actionByCandidateId.get(candidate.id);
-          if (!action) continue;
-          const resolveState = current.resolveStates[candidate.id] ?? { status: "idle" as const };
-          const retryLabel = resolveState.status === "failed"
-            ? `Retry ${candidate.title} (${resolveState.message})`
-            : candidate.title;
-          menuItems.push({
-            testId: `code-workspace-intention-${candidate.id}`,
-            label: candidate.disabledReason
-              ? `${candidate.title} (${candidate.disabledReason})`
-              : retryLabel,
-            disabled: candidate.disabledReason !== null
-              || resolveState.status === "resolving"
-              || resolveState.status === "stale",
-            onClick: () => {
-              // DEC-02: a generic entry (Refactor This / Alt+Enter / lightbulb /
-              // Problems quick fix) that selects a method extraction joins the
-              // same transaction, including the post-extraction naming step.
-              void (async () => {
-                const extractOwner = isExtractMethodKind(action.kind)
-                  ? beginExtractSessionRef.current?.({
-                      file,
-                      range,
-                      uri: actionContext.document.uri,
-                      beforeSymbols: await captureMethodSymbolsRef.current?.(file) ?? null,
-                    }) ?? null
-                  : null;
-                // The owner is past the request window: only the canonical
-                // revision/generation guards decide whether the apply is stale.
-                if (extractOwner) extractOwner.phase = "resolve";
-                const outcome = await runCodeAction(
-                  action,
-                  file,
-                  menuSemanticToken,
-                  candidate.id,
-                  actionContext,
-                  extractOwner?.id,
-                );
-                if (outcome.retryable) openFrozenMenu();
-                if (outcome.appliedReceipt) {
-                  if (extractOwner) extractOwner.receipt = outcome.appliedReceipt;
-                  void continueExtractNamingRef.current?.(outcome.appliedReceipt);
-                } else if (extractOwner) {
-                  finishExtractSessionRef.current?.(extractOwner);
-                }
-              })();
-            },
-          });
-        }
-        if (group.source === "provider-code-action" && current.groups.length > 1) {
-          menuItems.push({ label: "", separator: true });
-        }
-      }
-      openTreeContextMenuAt(
-        anchor?.clientX ?? clientX,
-        anchor?.clientY ?? clientY,
-        menuItems,
-        { appearance: "code-candidates" },
-      );
-    };
-    openFrozenMenu();
-  }, [
+  const showCodeActionsMenu = useCallback(createShowCodeActionsMenu({
+    intentionRequestAbortRef,
+    requestCodeActions,
+    showCodeInsightNotice,
+    setStatusMessage,
+    intentionSessionRef,
+    beginExtractSessionRef,
+    captureMethodSymbolsRef,
+    runCodeAction,
+    continueExtractNamingRef,
+    finishExtractSessionRef,
+    openTreeContextMenuAt,
+  }), [
     openTreeContextMenuAt,
     requestCodeActions,
     runCodeAction,
@@ -13606,91 +9350,20 @@ export function CodeWorkspaceTab({
     if (fileKey === activeFile?.key) setStatusMessage("Rendered documentation disabled");
   }, [activeFile?.key, setRenderedDocMode, setStatusMessage]);
 
-  const navigateDiagnostic = useCallback((direction: 1 | -1) => {
-    const file = activeFile;
-    if (!file) return;
-    const state = lspFilesRef.current[file.key] ?? null;
-    const currentDiagnostics = currentDiagnosticsForFile(file, state);
-    if (!currentDiagnostics) {
-      setStatusMessage(state?.error
-        ? `Diagnostics failed: ${state.error}`
-        : state?.status?.active
-          ? "Diagnostics are still refreshing for the current file"
-          : "Diagnostics unavailable without a language server");
-      return;
-    }
-    const requestScope = diagnosticScopeForFile(file, state);
-    const diags = displayDiagnosticsFor(
-      currentDiagnostics,
-      inspectionPathForFileKey(file.key),
-    ).filter((item) => item.severity === 1 || item.severity === 2).slice().sort((a, b) => {
-      if (a.range.start.line !== b.range.start.line) {
-        return a.range.start.line - b.range.start.line;
-      }
-      return a.range.start.character - b.range.start.character;
-    });
-    if (diags.length === 0) {
-      setStatusMessage("No errors or warnings in current file");
-      return;
-    }
-
-    const cursor = cursorPositionsRef.current[activeEditorGroupId] ?? { line: 0, character: 0 };
-    const currentLine = cursor.line + 1;
-    const currentColumn = cursor.character + 1;
-
-    let targetIndex = -1;
-    if (direction === 1) {
-      targetIndex = diags.findIndex(
-        (d) =>
-          d.range.start.line + 1 > currentLine ||
-          (d.range.start.line + 1 === currentLine && d.range.start.character + 1 > currentColumn),
-      );
-      if (targetIndex === -1) {
-        targetIndex = 0;
-      }
-    } else {
-      for (let i = diags.length - 1; i >= 0; i--) {
-        const d = diags[i];
-        if (
-          d.range.start.line + 1 < currentLine ||
-          (d.range.start.line + 1 === currentLine && d.range.start.character + 1 < currentColumn)
-        ) {
-          targetIndex = i;
-          break;
-        }
-      }
-      if (targetIndex === -1) {
-        targetIndex = diags.length - 1;
-      }
-    }
-
-    const target = diags[targetIndex];
-    if (target) {
-      void openFile(file.ref).then(() => {
-        const latest = openFilesRef.current[file.key];
-        const latestState = lspFilesRef.current[file.key] ?? null;
-        const latestDiagnostics = latest
-          ? currentDiagnosticsForFile(latest, latestState)
-          : null;
-        if (
-          !latest
-          || latest.documentRevision !== file.documentRevision
-          || !isDiagnosticScopeCurrent(latestState?.diagnosticScope, requestScope)
-          || !latestDiagnostics
-          || !displayDiagnosticsFor(latestDiagnostics, inspectionPathForFileKey(file.key)).some((candidate) => (
-            candidate.severity === target.severity
-            && candidate.message === target.message
-            && candidate.range.start.line === target.range.start.line
-            && candidate.range.start.character === target.range.start.character
-          ))
-        ) {
-          return;
-        }
-        revealEditorLocation(file.key, target.range);
-      });
-      setStatusMessage(`${target.severity === 1 ? "Error" : "Warning"}: ${target.message}`);
-    }
-  }, [
+  const navigateDiagnostic = useCallback(createNavigateDiagnostic({
+    activeFile,
+    lspFilesRef,
+    currentDiagnosticsForFile,
+    setStatusMessage,
+    diagnosticScopeForFile,
+    displayDiagnosticsFor,
+    inspectionPathForFileKey,
+    cursorPositionsRef,
+    activeEditorGroupId,
+    openFile,
+    openFilesRef,
+    revealEditorLocation,
+  }), [
     activeEditorGroupId,
     activeFile,
     currentDiagnosticsForFile,
@@ -13738,110 +9411,15 @@ export function CodeWorkspaceTab({
    * enforces package priorities/exclusions, validates project facts generation (A3),
    * and auto-applies unambiguous imports or prompts for ambiguous candidates (A1).
    */
-  const executeAutoImportOnTheFly = useCallback(async (
-    targetFile?: OpenFileState,
-  ): Promise<AutoImportPlanOutcome> => {
-    const file = targetFile ?? activeFile;
-    if (!file || file.loading || Boolean((file as { library?: boolean }).library)) {
-      return { outcome: "none", reason: "disabled" };
-    }
-    const isJava = file.languagePath.endsWith(".java") || lspFilesRef.current[file.key]?.status?.languageId === "java";
-    if (!isJava) {
-      return { outcome: "none", reason: "disabled" };
-    }
-
-    const settings = loadAutoImportPreferences();
-    if (!settings.addUnambiguousImportsOnTheFly) {
-      return { outcome: "none", reason: "disabled" };
-    }
-
-    // Gating against project facts generation (ED-IMPORT-001-A3)
-    const facts = useProjectFactsStore.getState().getWorkspaceFacts(projectFactsRoot);
-    if (facts.status !== "ready") {
-      return {
-        outcome: "none",
-        reason: facts.status === "untrusted" ? "untrusted-facts" : "unready-facts",
-      };
-    }
-    const expectedGeneration = facts.generation;
-
-    const diagnostics = lspFilesRef.current[file.key]?.diagnostics ?? [];
-    const unresolvedDiags = diagnostics.filter((diag) => (
-      /cannot find symbol|cannot be resolved to a type|unknown class|cannot resolve symbol/i.test(diag.message)
-    ));
-
-    if (unresolvedDiags.length === 0) {
-      return { outcome: "none", reason: "no-candidates" };
-    }
-
-    let lastOutcome: AutoImportPlanOutcome = { outcome: "none", reason: "no-candidates" };
-
-    for (const diag of unresolvedDiags) {
-      // Re-verify project facts generation before requesting
-      const currentFacts = useProjectFactsStore.getState().getWorkspaceFacts(projectFactsRoot);
-      if (currentFacts.status !== "ready" || currentFacts.generation !== expectedGeneration) {
-        return { outcome: "none", reason: "stale-generation" };
-      }
-
-      const { actions, semanticToken } = await requestCodeActions(file, diag.range, [diag], ["quickfix"]);
-      const candidates = parseProviderImportCandidates(actions);
-      if (candidates.length === 0) continue;
-
-      const plan = planAutoImport({
-        symbolName: candidates[0].symbolName,
-        candidates,
-        documentText: file.text,
-        settings,
-        isPaste: false,
-        projectFactsStatus: currentFacts.status,
-        generation: currentFacts.generation,
-        expectedGeneration,
-      });
-
-      lastOutcome = plan;
-
-      if (plan.outcome === "auto-apply") {
-        // Re-verify project facts generation immediately before applying (A3)
-        const liveFacts = useProjectFactsStore.getState().getWorkspaceFacts(projectFactsRoot);
-        if (liveFacts.status !== "ready" || liveFacts.generation !== expectedGeneration) {
-          return { outcome: "none", reason: "stale-generation" };
-        }
-
-        const actionToRun = actions.find((a) =>
-          a.title.includes(plan.candidate.fullyQualifiedName) ||
-          a.title.includes(plan.candidate.symbolName),
-        ) ?? actions[0];
-
-        await runCodeAction(actionToRun, file, semanticToken);
-        setStatusMessage(`Auto-imported ${plan.candidate.fullyQualifiedName}`);
-        return plan;
-      }
-
-      if (plan.outcome === "ambiguous") {
-        setAutoImportCandidatePrompt({
-          candidates: plan.candidates,
-          onSelect: (chosen) => {
-            setAutoImportCandidatePrompt(null);
-            const liveFacts = useProjectFactsStore.getState().getWorkspaceFacts(projectFactsRoot);
-            if (liveFacts.status !== "ready" || liveFacts.generation !== expectedGeneration) {
-              setStatusMessage("Auto-import cancelled: project facts changed");
-              return;
-            }
-            const matchedAction = actions.find((a) =>
-              a.title.includes(chosen.fullyQualifiedName) ||
-              a.title.includes(chosen.symbolName),
-            ) ?? actions[0];
-            void runCodeAction(matchedAction, file, semanticToken);
-            setStatusMessage(`Imported ${chosen.fullyQualifiedName}`);
-          },
-          onClose: () => setAutoImportCandidatePrompt(null),
-        });
-        return plan;
-      }
-    }
-
-    return lastOutcome;
-  }, [activeFile, projectFactsRoot, requestCodeActions, runCodeAction, setStatusMessage]);
+  const executeAutoImportOnTheFly = useCallback(createExecuteAutoImportOnTheFly({
+    activeFile,
+    lspFilesRef,
+    projectFactsRoot,
+    requestCodeActions,
+    runCodeAction,
+    setStatusMessage,
+    setAutoImportCandidatePrompt,
+  }), [activeFile, projectFactsRoot, requestCodeActions, runCodeAction, setStatusMessage]);
 
   /**
    * ED-IMPORT-001: Paste with auto-import resolution.
@@ -13849,133 +9427,16 @@ export function CodeWorkspaceTab({
    * enforces independent paste preferences (A2), rejects stale generation (A3),
    * and executes paste + import statements in a single atomic transaction (A4).
    */
-  const executePasteWithAutoImport = useCallback(async (
-    textToPaste?: string,
-    candidatesOverride?: readonly AutoImportCandidate[],
-  ) => {
-    const file = activeFile;
-    if (!file || Boolean((file as { library?: boolean }).library)) return false;
-
-    let text = textToPaste;
-    if (text === undefined) {
-      try {
-        text = await readText();
-      } catch {
-        const session = clipboardHandle.historyEntries()[0];
-        text = session?.plainText ?? "";
-      }
-    }
-
-    if (!text) {
-      executeActiveEditorCommand("paste");
-      return false;
-    }
-
-    const isJava = file.languagePath.endsWith(".java") || lspFilesRef.current[file.key]?.status?.languageId === "java";
-    const settings = loadAutoImportPreferences();
-
-    // ED-IMPORT-001-A2: paste mode "none" means plain paste without imports
-    if (!isJava || settings.pasteImportMode === "none") {
-      executeActiveEditorCommand("paste");
-      return true;
-    }
-
-    // Check project facts status and generation (A3)
-    const facts = useProjectFactsStore.getState().getWorkspaceFacts(projectFactsRoot);
-    if (facts.status !== "ready") {
-      executeActiveEditorCommand("paste");
-      return true;
-    }
-    const expectedGeneration = facts.generation;
-
-    const tokens = scanPastedTypeTokens(text);
-    if (tokens.length === 0) {
-      executeActiveEditorCommand("paste");
-      return true;
-    }
-
-    const candidates: readonly AutoImportCandidate[] = candidatesOverride ?? [];
-
-    const plan = planPasteAutoImports({
-      pastedText: text,
-      documentText: file.text,
-      candidates,
-      settings,
-      projectFactsStatus: facts.status,
-      generation: facts.generation,
-      expectedGeneration,
-    });
-
-    if (plan.outcome === "auto-apply") {
-      const liveFacts = useProjectFactsStore.getState().getWorkspaceFacts(projectFactsRoot);
-      if (liveFacts.status !== "ready" || liveFacts.generation !== expectedGeneration) {
-        executeActiveEditorCommand("paste");
-        return true;
-      }
-
-      const dispatched = executeActiveEditorCommand("pasteWithAutoImports", {
-        pastePayload: {
-          text,
-          importStatements: plan.importStatements,
-        },
-      });
-
-      if (!dispatched) {
-        const insertionOffset = computeImportInsertionOffset(file.text);
-        const { newDocumentText } = buildPasteWithImportsChanges({
-          documentText: file.text,
-          pasteOffset: file.text.length,
-          pastedText: text,
-          importStatements: plan.importStatements,
-          insertionOffset,
-        });
-        updateFileText(file.key, newDocumentText);
-      }
-      setStatusMessage(`Pasted and auto-imported ${plan.appliedCandidates.map((c) => c.fullyQualifiedName).join(", ")}`);
-      return true;
-    }
-
-    if (plan.outcome === "ambiguous" && plan.requiresPrompt) {
-      setAutoImportCandidatePrompt({
-        candidates: plan.ambiguousCandidates,
-        onSelect: (chosen) => {
-          setAutoImportCandidatePrompt(null);
-          const liveFacts = useProjectFactsStore.getState().getWorkspaceFacts(projectFactsRoot);
-          if (liveFacts.status !== "ready" || liveFacts.generation !== expectedGeneration) {
-            executeActiveEditorCommand("paste");
-            return;
-          }
-          const importStatements = [`import ${chosen.fullyQualifiedName};\n`];
-          const dispatched = executeActiveEditorCommand("pasteWithAutoImports", {
-            pastePayload: {
-              text,
-              importStatements,
-            },
-          });
-          if (!dispatched) {
-            const insertionOffset = computeImportInsertionOffset(file.text);
-            const { newDocumentText } = buildPasteWithImportsChanges({
-              documentText: file.text,
-              pasteOffset: file.text.length,
-              pastedText: text,
-              importStatements,
-              insertionOffset,
-            });
-            updateFileText(file.key, newDocumentText);
-          }
-          setStatusMessage(`Pasted and imported ${chosen.fullyQualifiedName}`);
-        },
-        onClose: () => {
-          setAutoImportCandidatePrompt(null);
-          executeActiveEditorCommand("paste");
-        },
-      });
-      return true;
-    }
-
-    executeActiveEditorCommand("paste");
-    return true;
-  }, [
+  const executePasteWithAutoImport = useCallback(createExecutePasteWithAutoImport({
+    activeFile,
+    clipboardHandle,
+    executeActiveEditorCommand,
+    lspFilesRef,
+    projectFactsRoot,
+    updateFileText,
+    setStatusMessage,
+    setAutoImportCandidatePrompt,
+  }), [
     activeFile,
     clipboardHandle,
     executeActiveEditorCommand,
@@ -14042,195 +9503,23 @@ export function CodeWorkspaceTab({
   // provider request, preview confirm, apply and postcondition check lives
   // here and in executeRearrangeTransaction, so a supported decision can
   // never again degrade to a bare status message plus `return true`.
-  const runRearrangeExecute = useCallback(async (file: OpenFileState): Promise<boolean> => {
-    const frozenKey = file.key;
-    const frozenInstanceId = workspaceInstanceId;
-    // ED-IMPROVE-001: a new invocation (double entry) owns the workflow; the
-    // older run's token no longer matches and it fails typed stale.
-    ++rearrangeRequestTokenRef.current;
-    // Absolute target: provider edit entries carry absolute disk paths or
-    // URIs, while file.path is workspace-relative. Match with path-aware
-    // equality so a well-formed provider edit is never filtered out, and a
-    // foreign-path edit never leaks into this file.
-    const targetPath = absolutePathForOpenFile(file) ?? file.path ?? file.key;
-    const descriptor = lspDescriptorForFile(file);
-    if (!descriptor) {
-      const message = `Cannot resolve the language server for ${file.title ?? frozenKey}`;
-      setStatusMessage(message);
-      return false;
-    }
-    // ED-IMPROVE-003: prefer the language-server document URI the provider
-    // will echo back in its payload; descriptor.filePath may be workspace-relative.
-    const targetUri = descriptor.documentUri
-      ?? lspFilesRef.current[frozenKey]?.status?.uri
-      ?? descriptor.filePath
-      ?? frozenKey;
-    const result = await executeRearrangeTransaction(
-      {
-        requestActions: async () => {
-          const live = openFilesRef.current[frozenKey];
-          if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
-            return {
-              state: "cancelled",
-              actions: [],
-              reason: "Rearrange cancelled: the file closed or the workspace changed; nothing applied",
-            };
-          }
-          const lines = live.text.split("\n");
-          const range: LspRange = {
-            start: { line: 0, character: 0 },
-            end: {
-              line: Math.max(0, lines.length - 1),
-              character: lines.length > 0 ? lines[lines.length - 1].length : 0,
-            },
-          };
-          const res = await requestCodeActions(live, range, [], [...REARRANGE_ACTION_KINDS]);
-          if (res.requestFailure) {
-            return {
-              state: res.requestFailure.kind === "stale" ? "stale" : "failed",
-              actions: [],
-              reason: res.requestFailure.message,
-            };
-          }
-          return {
-            state: "ok",
-            actions: res.actions.map((action) => ({ kind: action.kind, title: action.title, raw: action.raw })),
-          };
-        },
-        resolveAction: async (action) => {
-          const live = openFilesRef.current[frozenKey];
-          if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
-            return { state: "stale", edits: [], reason: "Rearrange cancelled: the file closed during resolve; nothing applied" };
-          }
-          try {
-            const resolved = await lspCodeActionResolve(descriptor, action.raw);
-            // ED-IMPROVE-003: validate the complete payload before it can
-            // become a plan; cross-file/resource/command/disabled/malformed
-            // payloads are rejected here with their category and reason.
-            const validation = validateWorkflowProviderAction({
-              action: resolved.action,
-              targetUri,
-              targetPath,
-              documentText: live.text,
-              documentRevision: live.documentRevision,
-              documentVersion: lspDocumentVersion(live.key),
-              isSupportedKind: isRearrangeActionKind,
-              capabilityLabel: "Rearrange Code",
-            });
-            if (!validation.ok) {
-              return { state: validation.state, edits: [], reason: validation.reason };
-            }
-            return {
-              state: "resolved",
-              edits: validation.edits,
-              documentVersion: validation.documentVersion,
-            };
-          } catch (err) {
-            return { state: "failed", edits: [], reason: `Rearrange resolve failed: ${errorMessage(err)}; nothing applied` };
-          }
-        },
-        readLive: () => {
-          const live = openFilesRef.current[frozenKey];
-          if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) return null;
-          return {
-            text: live.text,
-            revision: live.documentRevision,
-            readOnly: !!live.library || workspaceResourceOperationLockedRef.current,
-            dirty: !!live.dirty,
-          };
-        },
-        providerGeneration: () => lspSessionGeneration(),
-        requestToken: () => rearrangeRequestTokenRef.current,
-        confirmPreview: (summary) => confirmAppDialog({
-          title: "Rearrange preview",
-          message: `${summary.targetPath}: ${summary.operationCount} edits. Pre ${summary.preHashShort} → post ${summary.postHashShort}. Apply the rearrangement?`,
-          confirmLabel: "Apply rearrange",
-        }),
-        applyEdit: async (edit, guard, applyContext) => {
-          const summaryHolder: { current: WorkspaceEditApplyTransactionSummary | null } = { current: null };
-          try {
-            const outcomes = await applyLspWorkspaceEdit(edit, {
-              recordHistory: true,
-              label: "Rearrange Code",
-              // ED-IMPROVE-002: the canonical apply boundary prepares the
-              // crash-recovery journal before the first mutation, verifies the
-              // frozen post-hash independently, and registers the single
-              // success history entry only after that verification.
-              plan: {
-                actionId: `rearrange:${frozenKey}`,
-                kind: "other",
-                documents: [{
-                  uri: applyContext.targetUri,
-                  canonicalPath: applyContext.targetPath,
-                  expectedDocumentRevision: null,
-                  expectedDiskHash: null,
-                  owner: "workspace",
-                  preTextSha256: sha256Hex(applyContext.preText),
-                  expectedPostHash: applyContext.expectedPostHash,
-                }],
-              },
-              preflightMutation: () => guard.assertCurrent(),
-              onTransactionSummary: (next) => {
-                summaryHolder.current = next;
-              },
-            });
-            const response = workspaceEditApplyResponse(outcomes);
-            const summary = summaryHolder.current;
-            if (summary && summary.effect === "unknown") {
-              return {
-                state: "unknown-effect",
-                reason: `Rearrange write result is unknown: ${summary.reason ?? response.failureReason ?? "the OS acknowledgement was lost"}`
-                  + `; verify ${targetPath} in the recovery center before retrying`,
-                recoveryId: summary.recoveryId,
-                affectedPaths: summary.affectedPaths,
-              };
-            }
-            if (summary && (summary.postcondition === "mismatch" || summary.postcondition === "unreadable")) {
-              return {
-                state: "recovery-required",
-                reason: `Rearrange postcondition could not be verified after applying`
-                  + ` (${summary.postcondition}: ${summary.reason ?? "unknown cause"});`
-                  + ` recovery ${summary.recoveryId ?? "entry"} lists the affected files`,
-                recoveryId: summary.recoveryId,
-                affectedPaths: summary.affectedPaths,
-              };
-            }
-            if (!response.applied) {
-              return {
-                state: "failed",
-                reason: response.failureReason ?? "Rearrange apply failed; see the workspace-edit ledger",
-                recoveryId: summary?.recoveryId ?? null,
-                affectedPaths: summary?.affectedPaths ?? [],
-              };
-            }
-            const live = openFilesRef.current[frozenKey];
-            if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
-              return { state: "conflict", reason: `${targetPath} closed during apply; verify the disk state before retrying` };
-            }
-            return { state: "applied", postText: live.text, historyId: summary?.historyId ?? null };
-          } catch (err) {
-            return { state: "failed", reason: `Rearrange apply failed: ${errorMessage(err)}` };
-          }
-        },
-      },
-      {
-        scope: "file",
-        targetPath,
-        targetUri,
-        readOnly: !!file.library || workspaceResourceOperationLockedRef.current,
-        hasSelection: false,
-        capabilities: resolveRearrangeCapabilities(activeCapabilities, activeLspState?.status),
-      },
-    );
-    if (result.ok) {
-      setStatusMessage(
-        `Rearranged ${file.title ?? targetPath} (${result.operationCount} edits in one transaction); undo restores the preimage`,
-      );
-      return true;
-    }
-    setStatusMessage(result.reason);
-    return false;
-  }, [
+  const runRearrangeExecute = useCallback(createRunRearrangeExecute({
+    workspaceInstanceId,
+    rearrangeRequestTokenRef,
+    absolutePathForOpenFile,
+    lspDescriptorForFile,
+    setStatusMessage,
+    lspFilesRef,
+    openFilesRef,
+    workspaceInstanceIdRef,
+    requestCodeActions,
+    lspDocumentVersion,
+    workspaceResourceOperationLockedRef,
+    lspSessionGeneration,
+    applyLspWorkspaceEdit,
+    activeCapabilities,
+    activeLspState,
+  }), [
     absolutePathForOpenFile,
     activeCapabilities,
     activeLspState,
@@ -14245,185 +9534,23 @@ export function CodeWorkspaceTab({
   // ED-AUDIT-016: production execute owner for Code Cleanup. The fake
   // success stub is gone: the file-scope default-profile branch performs a
   // real request or a real typed failure, mirroring the rearrange owner.
-  const runCleanupExecute = useCallback(async (file: OpenFileState): Promise<boolean> => {
-    const frozenKey = file.key;
-    const frozenInstanceId = workspaceInstanceId;
-    // ED-IMPROVE-001: same request-token supersession as the rearrange owner.
-    ++cleanupRequestTokenRef.current;
-    const targetPath = absolutePathForOpenFile(file) ?? file.path ?? file.key;
-    const descriptor = lspDescriptorForFile(file);
-    if (!descriptor) {
-      const message = `Cannot resolve the language server for ${file.title ?? frozenKey}`;
-      setStatusMessage(message);
-      return false;
-    }
-    // ED-IMPROVE-003: same URI precedence as the rearrange owner.
-    const targetUri = descriptor.documentUri
-      ?? lspFilesRef.current[frozenKey]?.status?.uri
-      ?? descriptor.filePath
-      ?? frozenKey;
-    const result = await executeCleanupTransaction(
-      {
-        requestActions: async () => {
-          const live = openFilesRef.current[frozenKey];
-          if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
-            return {
-              state: "cancelled",
-              actions: [],
-              reason: "Cleanup cancelled: the file closed or the workspace changed; nothing applied",
-            };
-          }
-          const lines = live.text.split("\n");
-          const range: LspRange = {
-            start: { line: 0, character: 0 },
-            end: {
-              line: Math.max(0, lines.length - 1),
-              character: lines.length > 0 ? lines[lines.length - 1].length : 0,
-            },
-          };
-          const res = await requestCodeActions(live, range, [], [...CLEANUP_ACTION_KINDS]);
-          if (res.requestFailure) {
-            return {
-              state: res.requestFailure.kind === "stale" ? "stale" : "failed",
-              actions: [],
-              reason: res.requestFailure.message,
-            };
-          }
-          return {
-            state: "ok",
-            actions: res.actions.map((action) => ({ kind: action.kind, title: action.title, raw: action.raw })),
-          };
-        },
-        resolveAction: async (action) => {
-          const live = openFilesRef.current[frozenKey];
-          if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
-            return { state: "stale", edits: [], reason: "Cleanup cancelled: the file closed during resolve; nothing applied" };
-          }
-          try {
-            const resolved = await lspCodeActionResolve(descriptor, action.raw);
-            // ED-IMPROVE-003: same complete-payload validation as Rearrange;
-            // generic fixAll/format payloads never pass as Cleanup.
-            const validation = validateWorkflowProviderAction({
-              action: resolved.action,
-              targetUri,
-              targetPath,
-              documentText: live.text,
-              documentRevision: live.documentRevision,
-              documentVersion: lspDocumentVersion(live.key),
-              isSupportedKind: isCleanupActionKind,
-              capabilityLabel: "Code Cleanup",
-            });
-            if (!validation.ok) {
-              return { state: validation.state, edits: [], reason: validation.reason };
-            }
-            return {
-              state: "resolved",
-              edits: validation.edits,
-              documentVersion: validation.documentVersion,
-            };
-          } catch (err) {
-            return { state: "failed", edits: [], reason: `Cleanup resolve failed: ${errorMessage(err)}; nothing applied` };
-          }
-        },
-        readLive: () => {
-          const live = openFilesRef.current[frozenKey];
-          if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) return null;
-          return {
-            text: live.text,
-            revision: live.documentRevision,
-            readOnly: !!live.library || workspaceResourceOperationLockedRef.current,
-            dirty: !!live.dirty,
-          };
-        },
-        providerGeneration: () => lspSessionGeneration(),
-        requestToken: () => cleanupRequestTokenRef.current,
-        confirmPreview: (summary) => confirmAppDialog({
-          title: "Code cleanup preview",
-          message: `${summary.targetPath} [${summary.profileId}]: ${summary.operationCount} edits. Pre ${summary.preHashShort} → post ${summary.postHashShort}. Apply the cleanup?`,
-          confirmLabel: "Apply cleanup",
-        }),
-        applyEdit: async (edit, guard, applyContext) => {
-          const summaryHolder: { current: WorkspaceEditApplyTransactionSummary | null } = { current: null };
-          try {
-            const outcomes = await applyLspWorkspaceEdit(edit, {
-              recordHistory: true,
-              label: "Code Cleanup",
-              // ED-IMPROVE-002: same canonical journal/postcondition/history
-              // contract as the rearrange owner.
-              plan: {
-                actionId: `cleanup:${frozenKey}`,
-                kind: "other",
-                documents: [{
-                  uri: applyContext.targetUri,
-                  canonicalPath: applyContext.targetPath,
-                  expectedDocumentRevision: null,
-                  expectedDiskHash: null,
-                  owner: "workspace",
-                  preTextSha256: sha256Hex(applyContext.preText),
-                  expectedPostHash: applyContext.expectedPostHash,
-                }],
-              },
-              preflightMutation: () => guard.assertCurrent(),
-              onTransactionSummary: (next) => {
-                summaryHolder.current = next;
-              },
-            });
-            const response = workspaceEditApplyResponse(outcomes);
-            const summary = summaryHolder.current;
-            if (summary && summary.effect === "unknown") {
-              return {
-                state: "unknown-effect",
-                reason: `Cleanup write result is unknown: ${summary.reason ?? response.failureReason ?? "the OS acknowledgement was lost"}`
-                  + `; verify ${targetPath} in the recovery center before retrying`,
-                recoveryId: summary.recoveryId,
-                affectedPaths: summary.affectedPaths,
-              };
-            }
-            if (summary && (summary.postcondition === "mismatch" || summary.postcondition === "unreadable")) {
-              return {
-                state: "recovery-required",
-                reason: `Cleanup postcondition could not be verified after applying`
-                  + ` (${summary.postcondition}: ${summary.reason ?? "unknown cause"});`
-                  + ` recovery ${summary.recoveryId ?? "entry"} lists the affected files`,
-                recoveryId: summary.recoveryId,
-                affectedPaths: summary.affectedPaths,
-              };
-            }
-            if (!response.applied) {
-              return {
-                state: "failed",
-                reason: response.failureReason ?? "Cleanup apply failed; see the workspace-edit ledger",
-                recoveryId: summary?.recoveryId ?? null,
-                affectedPaths: summary?.affectedPaths ?? [],
-              };
-            }
-            const live = openFilesRef.current[frozenKey];
-            if (!live || workspaceInstanceIdRef.current !== frozenInstanceId) {
-              return { state: "conflict", reason: `${targetPath} closed during apply; verify the disk state before retrying` };
-            }
-            return { state: "applied", postText: live.text, historyId: summary?.historyId ?? null };
-          } catch (err) {
-            return { state: "failed", reason: `Cleanup apply failed: ${errorMessage(err)}` };
-          }
-        },
-      },
-      {
-        scope: "file",
-        targetPath,
-        targetUri,
-        readOnly: !!file.library || workspaceResourceOperationLockedRef.current,
-        capabilities: resolveCleanupCapabilities(activeCapabilities, activeLspState?.status),
-      },
-    );
-    if (result.ok) {
-      setStatusMessage(
-        `Cleaned up ${file.title ?? targetPath} (${result.operationCount} edits in one transaction); undo restores the preimage`,
-      );
-      return true;
-    }
-    setStatusMessage(result.reason);
-    return false;
-  }, [
+  const runCleanupExecute = useCallback(createRunCleanupExecute({
+    workspaceInstanceId,
+    cleanupRequestTokenRef,
+    absolutePathForOpenFile,
+    lspDescriptorForFile,
+    setStatusMessage,
+    lspFilesRef,
+    openFilesRef,
+    workspaceInstanceIdRef,
+    requestCodeActions,
+    lspDocumentVersion,
+    workspaceResourceOperationLockedRef,
+    lspSessionGeneration,
+    applyLspWorkspaceEdit,
+    activeCapabilities,
+    activeLspState,
+  }), [
     absolutePathForOpenFile,
     activeCapabilities,
     activeLspState,
@@ -14435,2027 +9562,177 @@ export function CodeWorkspaceTab({
     workspaceInstanceId,
   ]);
 
-  const workspaceCommands = useMemo<WorkspaceCommand[]>(() => [
-    {
-      id: "editor.completeStatement",
-      title: "Complete Statement",
-      category: "Edit",
-      keybinding: "Ctrl+Shift+Enter",
-      keywords: ["semicolon", "finish", "statement"],
-      when: (context) => context.focus === "editor" && !!context.hasActiveFile && !context.readOnly,
-      run: (context) => executeEditorCommand("completeStatement", context),
-    },
-    {
-      // §8.19.8: one Surround With entry opens the kind dialog; try/catch is
-      // no longer a hard-wired command and every kind shares the same
-      // plan builder, single transaction and undo entry.
-      id: "editor.surroundWith",
-      title: "Surround With…",
-      category: "Edit",
-      keybinding: "Ctrl+Alt+T",
-      // IDEA XWin lists Ctrl+Alt+Shift+B first (Ctrl+Alt+T opens a terminal on many desktops).
-      keybindings: ["Ctrl+Alt+Shift+B", "Meta+Alt+T"],
-      keywords: ["surround", "wrap", "try", "catch", "if", "while", "runnable"],
-      when: (context) => context.focus === "editor" && !!context.hasActiveFile && !context.readOnly,
-      run: () => {
-        setSurroundWithDialogOpen(true);
-        return true;
-      },
-    },
-    {
-      // §8.19.8 Generate Code: the dialog lists exactly what the provider
-      // returned; without a provider this stays honestly empty.
-      id: "editor.generateCode",
-      title: "Generate Code…",
-      category: "Code",
-      keybinding: "Alt+Insert",
-      keybindings: ["Meta+n"],
-      keywords: ["generate", "constructor", "getter", "setter", "toString", "override"],
-      when: (context) => context.focus === "editor" && !!context.hasActiveFile && !context.readOnly,
-      run: () => {
-        void requestGenerateCandidates();
-        return true;
-      },
-    },
-    {
-      // §8.18.8 Smart completion stays visible but typed-unavailable until a
-      // provider advertises expected types; it never relabels Basic results.
-      id: "editor.smartCompletion",
-      title: "Type-Matching Completion (Smart)",
-      category: "Edit",
-      provenance: "unsupported",
-      keywords: ["smart", "type matching", "completion"],
-      when: () => false,
-      run: () => false,
-    },
-    {
-      id: "workspace.reopenClosedTab",
-      title: "Reopen Closed Tab",
-      category: "File",
-      keybinding: "Ctrl+Shift+T",
-      keywords: ["reopen", "closed", "tab", "undo close"],
-      run: () => {
-        // §8.18.5: pop the newest entry that still resolves to a real file.
-        // §8.19.6: resolve against the LIVE tree — original leaf, then the
-        // nearest surviving ancestor along the recorded route, then the leaf
-        // owning the most former siblings, then the active editor.
-        while (closedTabsStack.length > 0) {
-          const [entry, ...rest] = closedTabsStack;
-          const resolution = entry?.ref && entry.location
-            ? resolveReopenLocation(workspaceUi.layoutTreeV2, entry.location, activeEditorGroupId)
-            : null;
-          setClosedTabsStack(rest);
-          if (entry && entry.ref) {
-            const openPromise = openFile(
-              entry.ref as never,
-              resolution ? { groupId: resolution.leafId } : undefined,
-            );
-            void openPromise.then(() => {
-              const opened = Object.values(openFilesRef.current).some((candidate) => (
-                workspaceFileIdentity(candidate.ref) === entry.fileIdentity
-                && !candidate.loading
-                && !candidate.error
-              ));
-              if (opened && resolution?.kind === "relocated") {
-                setStatusMessage(
-                  resolution.reason === "route"
-                    ? `Reopened ${entry.title} in the nearest surviving split`
-                    : resolution.reason === "sibling"
-                      ? `Reopened ${entry.title} next to its former tab group`
-                      : `Reopened ${entry.title} in the active editor`,
-                );
-              }
-            }).catch((error) => setStatusMessage(errorMessage(error)));
-            return true;
-          }
-        }
-        setStatusMessage("No recently closed tab to reopen");
-        return false;
-      },
-    },
-    {
-      id: "workspace.keymapSettings",
-      title: "Keymap Settings",
-      category: "Help",
-      keywords: ["keymap", "shortcut", "scheme", "keybinding"],
-      run: () => {
-        setKeymapSettingsOpen(true);
-        return true;
-      },
-    },
-    {
-      // §8.19.9 R8-D1: scheme management surface (copy/rename/delete/reset +
-      // provenance); the active scheme feeds effective-style resolution.
-      id: "workspace.codeStyleSettings",
-      title: "Code Style Settings",
-      category: "View",
-      keywords: ["code style", "scheme", "indent", "spaces", "end of line"],
-      run: () => {
-        setCodeStyleSettingsOpen(true);
-        return true;
-      },
-    },
-    {
-      id: "workspace.fileTemplateSettings",
-      title: "File and Code Template Settings",
-      category: "Preferences",
-      keywords: ["file templates", "code templates", "java template", "class template"],
-      run: () => {
-        setFileTemplateSettingsOpen(true);
-        return true;
-      },
-    },
-    {
-      id: "workspace.autoImportSettings",
-      title: "Auto Import Settings",
-      category: "Preferences",
-      keywords: ["auto import", "imports", "on the fly", "paste import"],
-      run: () => {
-        setAutoImportSettingsOpen(true);
-        return true;
-      },
-    },
-    {
-      id: "workspace.autoImportOnTheFly",
-      title: "Auto Import on the Fly",
-      category: "Code",
-      keywords: ["auto import", "import symbol", "resolve imports"],
-      when: (context) => context.focus === "editor" && !!context.hasActiveFile && !context.readOnly,
-      run: () => {
-        void executeAutoImportOnTheFly();
-        return true;
-      },
-    },
-    {
-      id: "workspace.pasteWithAutoImport",
-      title: "Paste with Auto Import",
-      category: "Edit",
-      keywords: ["paste", "auto import", "paste with imports"],
-      when: (context) => context.focus === "editor" && !!context.hasActiveFile && !context.readOnly,
-      run: () => {
-        void executePasteWithAutoImport();
-        return true;
-      },
-    },
-    {
-      id: "workspace.goToFile",
-      title: "Go to File",
-      category: "Navigation",
-      keybinding: "Ctrl+Shift+N",
-      keybindings: ["Meta+Shift+N"],
-      keywords: ["search everywhere", "file", "open"],
-      run: () => openSearchEverywhere("files"),
-    },
-    {
-      id: "workspace.goToClass",
-      title: "Go to Class",
-      category: "Navigation",
-      keybinding: "Ctrl+N",
-      keywords: ["type", "interface", "struct"],
-      run: () => openSearchEverywhere(seSymbolsAvailable ? "classes" : "files"),
-    },
-    {
-      id: "workspace.goToSymbol",
-      title: "Go to Symbol",
-      category: "Navigation",
-      keybinding: "Ctrl+Alt+Shift+N",
-      keywords: ["workspace symbol"],
-      run: () => openSearchEverywhere(seSymbolsAvailable ? "symbols" : "files"),
-    },
-    {
-      id: "workspace.searchEverywhere",
-      title: "Search Everywhere",
-      category: "Navigation",
-      keywords: ["double shift", "all"],
-      run: () => openSearchEverywhere("all"),
-    },
-    {
-      id: "workspace.recentFiles",
-      title: "Recent Files",
-      category: "Navigation",
-      keybinding: "Ctrl+E",
-      keywords: ["previous", "history"],
-      // ED-PARITY-014 DEC-014-03: IDEA toggles "Show edited only" on a
-      // repeated Ctrl+E instead of stepping the selection.
-      run: () => {
-        if (recentFilesOpen) openRecentFiles({ changedOnly: !recentChangedOnly });
-        else openRecentFiles();
-      },
-    },
-    {
-      id: "workspace.recentLocations",
-      title: "Recent Locations",
-      category: "Navigation",
-      keybinding: "Ctrl+Shift+E",
-      keywords: ["recent", "locations", "snippet", "preview", "history"],
-      run: () => {
-        setRecentLocationsChangedOnly(false);
-        setRecentLocationsOpen(true);
-      },
-    },
-    {
-      id: "workspace.recentChangedFiles",
-      title: "Recently Changed Files",
-      category: "Navigation",
-      keywords: ["modified", "changes", "history"],
-      run: () => {
-        setRecentLocationsChangedOnly(true);
-        setRecentLocationsOpen(true);
-      },
-    },
-    {
-      id: "workspace.lastEditLocation",
-      title: "Last Edit Location",
-      category: "Navigation",
-      keybinding: "Ctrl+Shift+Backspace",
-      keywords: ["edit", "history", "previous", "back"],
-      run: () => {
-        navigateLastEditLocation();
-      },
-    },
-    {
-      id: "workspace.nextError",
-      title: "Next Highlighted Error / Warning",
-      category: "Navigation",
-      keybinding: "F2",
-      keywords: ["error", "warning", "diagnostic", "problem", "next"],
-      when: (context) => context.focus !== "tree" && !!activeFile,
-      run: () => navigateDiagnostic(1),
-    },
-    {
-      id: "workspace.prevError",
-      title: "Previous Highlighted Error / Warning",
-      category: "Navigation",
-      keybinding: "Shift+F2",
-      keywords: ["error", "warning", "diagnostic", "problem", "previous"],
-      when: (context) => context.focus !== "tree" && !!activeFile,
-      run: () => navigateDiagnostic(-1),
-    },
-    {
-      id: "workspace.quickDefinition",
-      title: "Quick Definition",
-      category: "Navigation",
-      keybinding: "Ctrl+Shift+I",
-      keybindings: ["Mod-Shift-I"],
-      keywords: ["peek definition", "implementation", "quick"],
-      when: () => !!activeFile,
-      run: () => {
-        const file = activeFile;
-        if (!file) return;
-        const pos = editorSelectionRef.current.end;
-        void peekDefinitionRef.current(file, { line: pos.line, character: pos.character });
-      },
-    },
-    {
-      id: "workspace.parameterInfo",
-      title: "Parameter Info",
-      category: "Code",
-      keybinding: "Ctrl+P",
-      keybindings: ["Mod-P"],
-      keywords: ["signature", "parameters", "arguments"],
-      when: () => !!activeFile,
-      run: () => {
-        if (!activeFile) return;
-        // DEC-020-01: an unavailable service answers with a caret popup.
-        const readiness = languageServiceReadiness(lspFilesRef.current[activeFile.key] ?? null);
-        if (readiness.kind !== "ready" && readiness.kind !== "idle") {
-          showCodeInsightNotice(`Parameter info unavailable: ${readiness.message}`, readiness.action === "configure" ? "configure" : null);
-          return;
-        }
-        setParameterInfoRequestNonce((nonce) => nonce + 1);
-      },
-    },
-    {
-      id: "workspace.editorAppearanceSettings",
-      title: "Editor Appearance Settings",
-      category: "View",
-      keywords: ["font", "theme", "contrast", "wrap", "breadcrumbs", "virtual space", "zoom"],
-      run: () => setEditorAppearanceSettingsOpen(true),
-    },
-    {
-      id: "workspace.editorTabPolicySettings",
-      title: "Editor Tab Policy Settings",
-      category: "View",
-      keywords: ["tab", "policy", "limit", "pinned", "preview", "order", "activate"],
-      run: () => openTabPolicySettings(),
-    },
-    {
-      id: "workspace.editor.copy",
-      title: "Copy",
-      category: "Edit",
-      keybinding: "Ctrl+C",
-      keybindings: ["Meta+C"],
-      keywords: ["clipboard", "selection", "multi-caret"],
-      when: (context) => context.focus === "editor"
-        && editorCommandStateFor(context)?.hasSelection === true,
-      run: (context) => { executeEditorCommand("copy", context); },
-    },
-    {
-      id: "workspace.editor.cut",
-      title: "Cut",
-      category: "Edit",
-      keybinding: "Ctrl+X",
-      keybindings: ["Meta+X"],
-      keywords: ["clipboard", "selection", "multi-caret"],
-      when: (context) => {
-        const state = editorCommandStateFor(context);
-        return context.focus === "editor" && !!state
-          && state.hasSelection && !state.readOnly && !state.composing;
-      },
-      run: (context) => { executeEditorCommand("cut", context); },
-    },
-    {
-      id: "workspace.editor.paste",
-      title: "Paste",
-      category: "Edit",
-      keybinding: "Ctrl+V",
-      keybindings: ["Meta+V"],
-      keywords: ["clipboard", "multi-caret", "distribute"],
-      when: (context) => {
-        const state = editorCommandStateFor(context);
-        return context.focus === "editor" && !!state && !state.readOnly && !state.composing;
-      },
-      run: (context) => {
-        const file = activeFile;
-        if (file && (file.languagePath.endsWith(".java") || lspFilesRef.current[file.key]?.status?.languageId === "java")) {
-          const settings = loadAutoImportPreferences();
-          if (settings.pasteImportMode !== "none") {
-            void executePasteWithAutoImport();
-            return;
-          }
-        }
-        executeEditorCommand("paste", context);
-      },
-    },
-    {
-      // §8.19.5 Plain Paste: rectangular/segment metadata is dropped; the
-      // plain text replaces the selection like any ordinary paste.
-      id: "workspace.editor.pasteAsPlainText",
-      title: "Paste as Plain Text",
-      category: "Edit",
-      keybinding: "Ctrl+Shift+Alt+V",
-      keybindings: ["Meta+Shift+Alt+V"],
-      keywords: ["clipboard", "plain text", "paste without formatting"],
-      when: (context) => {
-        const state = editorCommandStateFor(context);
-        return context.focus === "editor" && !!state && !state.readOnly && !state.composing;
-      },
-      run: (context) => { executeEditorCommand("pasteAsPlainText", context); },
-    },
-    {
-      // §8.19.5 Copy Reference: workspace-relative path:line, with a symbol
-      // candidate only when the provider actually names one.
-      id: "workspace.editor.copyReference",
-      title: "Copy Reference",
-      category: "Edit",
-      keybinding: "Ctrl+Alt+Shift+C",
-      keybindings: ["Meta+Alt+Shift+C"],
-      keywords: ["copy reference", "path line", "qualified name", "symbol"],
-      when: (context) => context.focus === "editor" && !!context.hasActiveFile,
-      run: () => { void copyReferenceAtCursor(); },
-    },
-    {
-      // §8.19.5 Paste from History: session-only ring, searchable popup;
-      // Enter dispatches the full segment plan at the caret as one undo.
-      id: "editor.pasteFromHistory",
-      title: "Paste from History…",
-      category: "Edit",
-      keybinding: "Ctrl+Shift+V",
-      keybindings: ["Meta+Shift+V"],
-      keywords: ["clipboard history", "paste history", "recent copies"],
-      when: (context) => context.focus === "editor" && !!context.hasActiveFile
-        && !context.readOnly,
-      run: () => {
-        const store = clipboardHandle;
-        if (!store.isHistoryEnabled() || store.historyEntries().length === 0) {
-          setStatusMessage("Clipboard history is empty or disabled");
-          return true;
-        }
-        setClipboardHistoryEntries([...store.historyEntries()]);
-        setClipboardHistoryOpen(true);
-        return true;
-      },
-    },
-    {
-      id: "workspace.editor.moveStatementUp",
-      title: "Move Statement Up",
-      category: "Edit",
-      keybinding: "Ctrl+Shift+ArrowUp",
-      keybindings: ["Meta+Shift+ArrowUp"],
-      keywords: ["statement", "line", "syntax", "move"],
-      when: (context) => {
-        const state = editorCommandStateFor(context);
-        return context.focus === "editor" && !!state && !state.readOnly && !state.composing;
-      },
-      run: (context) => { executeEditorCommand("moveStatementUp", context); },
-    },
-    {
-      id: "workspace.editor.moveStatementDown",
-      title: "Move Statement Down",
-      category: "Edit",
-      keybinding: "Ctrl+Shift+ArrowDown",
-      keybindings: ["Meta+Shift+ArrowDown"],
-      keywords: ["statement", "line", "syntax", "move"],
-      when: (context) => {
-        const state = editorCommandStateFor(context);
-        return context.focus === "editor" && !!state && !state.readOnly && !state.composing;
-      },
-      run: (context) => { executeEditorCommand("moveStatementDown", context); },
-    },
-    {
-      id: "workspace.editor.cloneCaretAbove",
-      title: "Clone Caret Above",
-      category: "Edit",
-      keybinding: "Ctrl+Alt+Shift+ArrowUp",
-      keywords: ["caret", "cursor", "multi-caret", "above"],
-      when: (context) => {
-        const state = editorCommandStateFor(context);
-        return context.focus === "editor" && !!state && !state.readOnly && !state.composing;
-      },
-      run: (context) => { executeEditorCommand("cloneCaretAbove", context); },
-    },
-    {
-      id: "workspace.editor.cloneCaretBelow",
-      title: "Clone Caret Below",
-      category: "Edit",
-      keybinding: "Ctrl+Alt+Shift+ArrowDown",
-      keywords: ["caret", "cursor", "multi-caret", "below"],
-      when: (context) => {
-        const state = editorCommandStateFor(context);
-        return context.focus === "editor" && !!state && !state.readOnly && !state.composing;
-      },
-      run: (context) => { executeEditorCommand("cloneCaretBelow", context); },
-    },
-    {
-      id: "workspace.editor.collapseCarets",
-      title: "Collapse Carets",
-      category: "Edit",
-      keybinding: "Escape",
-      keywords: ["caret", "selection", "occurrence", "escape"],
-      when: (context) => {
-        const state = editorCommandStateFor(context);
-        return context.focus === "editor" && !!state
-          && (state.caretCount > 1 || state.occurrenceSessionActive);
-      },
-      run: (context) => { executeEditorCommand("collapseCarets", context); },
-    },
-    {
-      id: "workspace.editor.selectNextOccurrence",
-      title: "Select Next Occurrence",
-      category: "Edit",
-      keybinding: "Alt+J",
-      keywords: ["occurrence", "caret", "selection", "next"],
-      when: (context) => context.focus === "editor"
-        && !!editorCommandStateFor(context),
-      run: (context) => { executeEditorCommand("selectNextOccurrence", context); },
-    },
-    {
-      id: "workspace.editor.selectAllOccurrences",
-      title: "Select All Occurrences",
-      category: "Edit",
-      keybinding: "Ctrl+Alt+Shift+J",
-      keybindings: ["Meta+Alt+Shift+J"],
-      keywords: ["occurrence", "caret", "selection", "all"],
-      when: (context) => context.focus === "editor"
-        && !!editorCommandStateFor(context),
-      run: (context) => { executeEditorCommand("selectAllOccurrences", context); },
-    },
-    {
-      id: "workspace.editor.foldSelection",
-      title: "Fold Selection",
-      category: "Edit",
-      keybinding: "Ctrl+Period",
-      keybindings: ["Meta+Period"],
-      keywords: ["fold", "selection", "collapse"],
-      when: (context) => context.focus === "editor"
-        && editorCommandStateFor(context)?.hasSelection === true,
-      run: (context) => { executeEditorCommand("foldSelection", context); },
-    },
-    {
-      id: "workspace.editor.foldAll",
-      title: "Fold All",
-      category: "Edit",
-      keybinding: "Ctrl+Shift+NumpadSubtract",
-      keybindings: ["Ctrl+Shift+Minus"],
-      keywords: ["fold", "collapse", "all"],
-      when: (context) => context.focus === "editor"
-        && !!editorCommandStateFor(context),
-      run: (context) => { executeEditorCommand("foldAll", context); },
-    },
-    {
-      id: "workspace.editor.unfoldAll",
-      title: "Unfold All",
-      category: "Edit",
-      keybinding: "Ctrl+Shift+NumpadAdd",
-      keybindings: ["Ctrl+Shift+Equal"],
-      keywords: ["fold", "expand", "all"],
-      when: (context) => context.focus === "editor"
-        && !!editorCommandStateFor(context),
-      run: (context) => { executeEditorCommand("unfoldAll", context); },
-    },
-    {
-      id: "workspace.intelligenceSettings",
-      title: "Editor Intelligence Settings",
-      category: "Code",
-      keywords: ["hover", "documentation", "parameter info", "signature", "delay"],
-      run: () => setIntelligenceSettingsOpen(true),
-    },
-    {
-      id: "workspace.optimizeImports",
-      title: "Optimize Imports",
-      category: "Code",
-      keybinding: "Ctrl+Alt+O",
-      keybindings: ["Mod-Alt-O"],
-      keywords: ["organize imports", "clean imports", "sort imports"],
-      when: () => !!activeFile,
-      run: () => void optimizeImports(),
-    },
-    {
-      id: "workspace.rearrangeCode",
-      title: "Rearrange Code",
-      category: "Code",
-      keywords: ["rearrange", "members", "order", "declarations", "structure"],
-      when: () => !!activeFile,
-      run: () => {
-        if (!activeFile) return false;
-        return runRearrangeExecute(activeFile);
-      },
-    },
-    {
-      id: "workspace.codeCleanup",
-      title: "Code Cleanup...",
-      category: "Code",
-      keywords: ["cleanup", "inspect", "batch", "optimize", "profile"],
-      when: () => !!activeFile,
-      run: () => {
-        if (!activeFile) return;
-        return runCleanupExecute(activeFile);
-      },
-    },
-    {
-      id: "workspace.navigateBack",
-      title: "Navigate Back",
-      category: "Navigation",
-      keybinding: "Ctrl+Alt+Left",
-      // Also accept Alt+Left (common IDEA keymap variant) when history is available.
-      keybindings: ["Alt+Left"],
-      when: () => navCan.back,
-      run: () => navigateHistory(-1),
-    },
-    {
-      id: "workspace.navigateForward",
-      title: "Navigate Forward",
-      category: "Navigation",
-      keybinding: "Ctrl+Alt+Right",
-      keybindings: ["Alt+Right"],
-      when: () => navCan.forward,
-      run: () => navigateHistory(1),
-    },
-    {
-      id: "workspace.findInFiles",
-      title: "Find in Files",
-      category: "Search",
-      keybinding: "Ctrl+Shift+F",
-      // macOS uses Command for the workspace-wide search chord.
-      keybindings: ["Meta+Shift+F"],
-      keywords: ["text", "content", "grep"],
-      run: () => openFindInFiles(),
-    },
-    {
-      id: "workspace.replaceInFiles",
-      title: "Replace in Files",
-      category: "Search",
-      keybinding: "Ctrl+Shift+R",
-      keybindings: ["Meta+Shift+R"],
-      keywords: ["bulk replace"],
-      run: () => {
-        openFindInFiles("replace");
-      },
-    },
-    {
-      id: "workspace.searchStructurally",
-      title: "Search Structurally…",
-      category: "Search",
-      keywords: ["structural", "ssr", "template", "ast"],
-      run: () => structuralSearch.open(),
-    },
-    {
-      id: "workspace.fileStructure",
-      title: "File Structure",
-      category: "Navigation",
-      keybinding: "Ctrl+F12",
-      keywords: ["outline", "symbol"],
-      when: () => !!activeFile,
-      run: () => void openStructurePopup(),
-    },
-    {
-      id: "workspace.format",
-      title: "Format Document",
-      category: "Code",
-      keybinding: "Ctrl+Alt+L",
-      keywords: ["format", "prettier", "indent", "reformat"],
-      when: (context) => {
-        if (context.focus === "tree" || context.focus === "terminal") return false;
-        // Capability readiness must not disable the command: an unreported
-        // provider executes and reports its typed unavailable reason instead
-        // (AC-FMT-03), and context menu + shortcut share this one action.
-        return !!activeFile && !activeFile.loading;
-      },
-      run: () => {
-        // §8.19.9 R8-D2 / ED-STYLE-001: one typed planner resolves the
-        // executable scope; everything else surfaces a typed reason.
-        const selection = editorSelectionRef.current;
-        const hasSelection = !!selection && !selection.empty;
-        const absPath = activeFile
-          ? (absolutePathForOpenFile(activeFile) ?? activeFile.languagePath)
-          : null;
-        const languageKey = activeFile?.languagePath.split(".").pop()?.toLowerCase() ?? "";
-        const decision = planReformat({
-          scope: hasSelection ? "selection" : "file",
-          targetPath: absPath,
-          languageId: activeLanguageId ?? (languageKey || null),
-          readOnly: !!activeFile?.library || workspaceResourceOperationLocked,
-          hasSelection,
-          capabilities: {
-            formatting: !!activeCapabilities?.formatting,
-            rangeFormatting: !!activeCapabilities?.rangeFormatting,
-          },
-        });
-        if (activeCapabilities && decision.kind === "unavailable") {
-          setStatusMessage(decision.reason);
-          return false;
-        }
-        void formatActiveFile();
-        return true;
-      },
-    },
-    {
-      id: "workspace.toggleFormatOnSave",
-      title: `${intelligencePreferences.formatOnSave ? "Disable" : "Enable"} Format on Save`,
-      category: "Code",
-      keywords: ["format", "save", "workspace"],
-      run: () => setFormatOnSave(!intelligencePreferences.formatOnSave),
-    },
-    {
-      id: "workspace.quickDocumentation",
-      title: "Quick Documentation",
-      category: "Code",
-      keybinding: "Ctrl+Q",
-      // ED-PARITY-013: F1 is Quick Doc only in IDEA's macOS keymap; on
-      // Windows/Linux IDEA reserves it for Context Help.
-      platformKeybindings: { mac: ["Ctrl+Q", "F1"] },
-      keywords: ["docs", "hover", "javadoc"],
-      when: (context) => context.focus !== "tree" && context.focus !== "terminal" && !!activeFile && !activeFile.loading,
-      run: () => void openQuickDocumentation(),
-    },
-    {
-      // §8.20.2 W1: IDEA 2026.2 Type Info (Ctrl+Shift+P). Honest unavailable
-      // contract until a provider exposes a typed channel.
-      id: "workspace.typeInfo",
-      title: "Type Info",
-      category: "Code",
-      keybinding: "Ctrl+Shift+P",
-      keybindings: ["Mod-Shift-P"],
-      keywords: ["expression type", "reference information"],
-      when: (context) => context.focus !== "tree" && context.focus !== "terminal" && !!activeFile && !activeFile.loading,
-      run: () => void runTypeInfo(),
-    },
-    {
-      // §8.20.2 W1: enabled ONLY from a real provider URL in the last ready
-      // quick documentation — never synthesized from the symbol name.
-      id: "workspace.externalDocumentation",
-      title: "External Documentation",
-      category: "Code",
-      keywords: ["javadoc online", "browser docs", "url"],
-      when: (context) => context.focus !== "tree"
-        && context.focus !== "terminal"
-        && !!activeFile
-        && !activeFile.loading
-        && externalDocTargetFromProvider() !== null,
-      run: () => void runExternalDocumentation(),
-    },
-    {
-      // §8.20.2 W1: discoverable Expression Static Data entry; reports an
-      // explicit provider-unavailable instead of local text guessing.
-      id: "workspace.expressionStaticData",
-      title: "Expression Static Data",
-      category: "Code",
-      keywords: ["static data", "branch", "nullness", "constant", "reference information"],
-      when: (context) => context.focus !== "tree" && context.focus !== "terminal" && !!activeFile && !activeFile.loading,
-      run: () => void runExpressionStaticData(),
-    },
-    {
-      id: "workspace.codeActions",
-      title: "Show Code Actions / Quick Fix",
-      category: "Code",
-      keybinding: "Alt+Enter",
-      keywords: ["quickfix", "bulb", "intention"],
-      when: (context) => context.focus !== "tree" && context.focus !== "terminal" && !!activeFile && !activeFile.loading,
-      run: (context) => openCodeActionsAtCursor(context),
-    },
-    {
-      id: "workspace.gotoTypeDefinition",
-      title: "Go to Type Definition",
-      category: "Navigation",
-      keybinding: "Ctrl+Shift+B",
-      when: (context) => {
-        const target = resolveEditorTarget(context);
-        const capabilities = target.file
-          ? lspFilesRef.current[target.file.key]?.status?.capabilities
-          : null;
-        return context.focus !== "tree" && !!target.file && !target.file.loading
-          && (!capabilities || !!capabilities.typeDefinition);
-      },
-      run: (context) => {
-        const target = resolveEditorTarget(context);
-        if (!target.file || target.position === undefined) return;
-        void goToTypeDefinitionRef.current(target.file, target.position);
-      },
-    },
-    {
-      id: "workspace.gotoImplementation",
-      title: "Go to Implementation",
-      category: "Navigation",
-      keybinding: "Ctrl+Alt+B",
-      when: (context) => {
-        const target = resolveEditorTarget(context);
-        const capabilities = target.file
-          ? lspFilesRef.current[target.file.key]?.status?.capabilities
-          : null;
-        return context.focus !== "tree" && !!target.file && !target.file.loading
-          && (!capabilities || !!capabilities.implementation);
-      },
-      run: (context) => {
-        const target = resolveEditorTarget(context);
-        if (!target.file || target.position === undefined) return;
-        void goToImplementationRef.current(target.file, target.position);
-      },
-    },
-    {
-      id: "workspace.renameSymbol",
-      title: "Rename Symbol",
-      category: "Refactor",
-      keybinding: "Shift+F6",
-      keywords: ["refactor", "rename"],
-      when: (context) => context.focus === "editor" && !!activeFile && !activeFile.loading
-        && (!activeCapabilities || !!activeCapabilities.rename),
-      run: () => void renameSymbolRef.current(),
-    },
-    {
-      id: "workspace.safeDeleteSymbol",
-      title: "Safe Delete Symbol",
-      category: "Refactor",
-      keybinding: "Alt+Delete",
-      keybindings: ["Alt-Delete", "Alt-delete", "Alt+Delete"],
-      keywords: ["refactor", "delete", "safe delete", "usages"],
-      when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading
-        && !activeFile.library,
-      getState: () => {
-        const availability = evaluateDestructiveRefactorAvailability(null);
-        if (availability.state === "disabled") {
-          return {
-            availability: "disabled",
-            disabledReason: availability.message,
-            source: "provider",
-            scope: "workspace",
-            freshness: "current",
-            completeness: "complete",
-          };
-        }
-        return {
-          availability: "available",
-          source: "provider",
-          scope: "workspace",
-          freshness: "current",
-          completeness: "complete",
-        };
-      },
-      run: () => void safeDeleteSymbolRef.current(),
-    },
-    {
-      id: "workspace.refactorThis",
-      title: "Refactor This…",
-      category: "Refactor",
-      keybinding: "Ctrl+Alt+Shift+T",
-      keybindings: ["Meta+Alt+Shift+T", "Meta+Alt+Shift+t", "Ctrl+T"],
-      keywords: ["refactor", "refactor this", "extract", "inline", "rename", "move"],
-      when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading
-        && !activeFile.library && !!activeCapabilities?.codeAction,
-      run: () => void openRefactorActions(["refactor"], "Refactor actions"),
-    },
-    {
-      id: "workspace.extractMethod",
-      title: "Extract Method",
-      category: "Refactor",
-      keybinding: "Ctrl+Alt+M",
-      // Keep the native Ctrl chord while giving macOS an explicit, parser-
-      // compatible Command alias. The action host uses '+'-delimited bindings.
-      keybindings: ["Meta+Alt+M", "Meta+Alt+m"],
-      keywords: ["refactor", "extract", "method", "function"],
-      when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading
-        && !activeFile.library,
-      run: () => void runExtractMethodRef.current(),
-    },
-    {
-      id: "workspace.extractVariable",
-      title: "Extract Variable",
-      category: "Refactor",
-      keybinding: "Ctrl+Alt+V",
-      keybindings: ["Mod-Alt-V", "Mod-Alt-v"],
-      keywords: ["refactor", "extract", "variable", "local"],
-      when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading
-        && !activeFile.library && !!activeCapabilities?.codeAction,
-      run: () => void openRefactorActions(["refactor.extract.variable", "refactor.extract.constant"], "Extract Variable/Constant actions"),
-    },
-    {
-      id: "workspace.inline",
-      title: "Inline",
-      category: "Refactor",
-      keybinding: "Ctrl+Alt+N",
-      keybindings: ["Mod-Alt-N", "Mod-Alt-n"],
-      keywords: ["refactor", "inline", "variable", "method", "function"],
-      when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading
-        && !activeFile.library && !!activeCapabilities?.codeAction,
-      run: () => void openRefactorActions(["refactor.inline"], "Inline actions"),
-    },
-    {
-      id: "workspace.changeSignature",
-      title: "Change Signature",
-      category: "Refactor",
-      keybinding: "Ctrl+F6",
-      keybindings: ["Mod-F6"],
-      keywords: ["refactor", "signature", "parameters", "arguments"],
-      when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading
-        && !activeFile.library && !!activeCapabilities?.codeAction,
-      run: () => void openRefactorActions(["refactor.rewrite.changeSignature", "refactor.changeSignature"], "Change Signature actions"),
-    },
-    {
-      id: "workspace.moveRefactor",
-      title: "Move",
-      category: "Refactor",
-      keybinding: "F6",
-      keywords: ["refactor", "move", "symbol", "class"],
-      when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading
-        && !activeFile.library && !!activeCapabilities?.codeAction,
-      run: () => void openRefactorActions(["refactor.move", "refactor.rewrite"], "Move actions"),
-    },
-    {
-      id: "workspace.aiExplainSyntax",
-      title: t("codeWorkspaceAi.commandExplainSyntax"),
-      category: "AI",
-      // ED-PARITY-013 DEC-013-05: Ctrl+Alt+S is IDEA Settings; the Taomni
-      // Classic keymap scheme keeps the old binding.
-      keywords: ["ai", "syntax", "grammar", "teach", "learn", "explain", "语法", "讲解"],
-      when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading,
-      run: () => void runEditorAiActionAtCursor("syntax"),
-    },
-    {
-      id: "workspace.aiExplainCode",
-      title: t("codeWorkspaceAi.commandExplainCode"),
-      category: "AI",
-      keybinding: "Ctrl+Alt+E",
-      keywords: ["ai", "explain", "describe", "解释"],
-      when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading,
-      run: () => void runEditorAiActionAtCursor("explain"),
-    },
-    {
-      id: "workspace.aiFixSelection",
-      title: t("codeWorkspaceAi.commandFix"),
-      category: "AI",
-      keywords: ["ai", "fix", "repair", "修复"],
-      when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading,
-      run: () => void runEditorAiActionAtCursor("fix"),
-    },
-    {
-      id: "workspace.aiAskSelection",
-      title: t("codeWorkspaceAi.commandAsk"),
-      category: "AI",
-      keywords: ["ai", "ask", "rewrite", "改写", "询问"],
-      when: (context) => context.focus !== "tree" && !!activeFile && !activeFile.loading,
-      run: () => void runEditorAiActionAtCursor("rewrite"),
-    },
-    {
-      // The keyboard path to the explain actions bypasses the selection
-      // toolbar, so without this there is no way to change the answer language
-      // without reaching for the mouse.
-      id: "workspace.aiCycleAnswerLanguage",
-      title: t("codeWorkspaceAi.commandCycleAnswerLanguage", {
-        current: t(answerLanguageLabelKey(editorAiPreferences.answerLanguage)),
-      }),
-      category: "AI",
-      keywords: ["ai", "language", "answer", "chinese", "english", "语言", "回答", "中文", "英文"],
-      run: cycleAiAnswerLanguage,
-    },
-    {
-      id: "workspace.aiSetAnswerLanguage",
-      title: "Set AI Answer Language",
-      category: "AI",
-      keywords: ["ai", "language", "answer", "语言"],
-      run: (context) => {
-        const payload = context.payload as { language?: string } | undefined;
-        if (!payload || typeof payload.language !== "string") return;
-        setAiAnswerLanguage(payload.language as AiAnswerLanguage);
-      },
-    },
-    {
-      id: "workspace.toggleProjectTree",
-      title: languagePanelOpen ? "Hide Project Tree" : "Show Project Tree",
-      category: "View",
-      keybinding: "Alt+1",
-      // IDEA macOS keymap: Cmd+1 activates Project (Option+1 kept as alias).
-      platformKeybindings: { mac: ["Meta+1", "Alt+1"] },
-      keywords: ["project", "explorer", "files", "tree", "sidebar", "collapse"],
-      run: () => handleActivateToolWindow("project"),
-    },
-    {
-      id: "workspace.activateToolWindow",
-      title: "Activate Tool Window",
-      category: "View",
-      keywords: ["tool", "window", "panel", "dock", "activate"],
-      run: (context) => {
-        const payload = context.payload as { toolId?: string } | undefined;
-        const toolId = payload?.toolId ?? "project";
-        handleActivateToolWindow(toolId);
-      },
-    },
-    {
-      id: "workspace.returnToEditor",
-      title: "Focus Editor",
-      category: "View",
-      keybinding: "Escape",
-      keywords: ["focus", "editor", "escape", "return"],
-      when: (context) => context.focus !== "editor" && context.focus !== "modal" && context.focus !== "search" && context.focus !== "completion" && context.focus !== "snippet",
-      run: handleReturnToEditor,
-    },
-    {
-      id: "workspace.restoreToolWindowLayout",
-      title: "Restore Default Layout",
-      category: "View",
-      keybinding: "Shift+F12",
-      keywords: ["layout", "restore", "default", "tool", "window", "reset"],
-      run: handleRestoreToolWindowLayout,
-    },
-    {
-      id: "workspace.jumpToLastToolWindow",
-      title: "Jump to Last Tool Window",
-      category: "View",
-      keybinding: "F12",
-      keywords: ["tool window", "last", "focus", "f12"],
-      when: (context) => context.focus !== "modal",
-      run: jumpToLastToolWindow,
-    },
-    {
-      id: "workspace.hideActiveToolWindow",
-      title: "Hide Active Tool Window",
-      category: "View",
-      keybinding: "Shift+Escape",
-      keywords: ["tool window", "hide", "close", "escape"],
-      when: (context) => context.focus !== "modal" && context.focus !== "completion" && context.focus !== "snippet",
-      run: () => hideActiveToolWindow(),
-    },
-    {
-      id: "workspace.hideAllToolWindows",
-      title: "Hide All Tool Windows",
-      category: "View",
-      keybinding: "Ctrl+Shift+F12",
-      keywords: ["tool windows", "hide", "maximize editor", "restore"],
-      when: (context) => context.focus !== "modal",
-      run: toggleAllToolWindows,
-    },
-    {
-      id: "workspace.findAction",
-      title: "Find Action…",
-      category: "Help",
-      keybinding: "Ctrl+Shift+A",
-      platformKeybindings: { mac: ["Meta+Shift+A", "Ctrl+Shift+A"] },
-      keywords: ["actions", "command", "palette", "find action", "assign shortcut"],
-      // The terminal owns its keys; a modal owns its own keyboard state.
-      when: (context) => context.focus !== "terminal" && context.focus !== "modal",
-      run: () => openSearchEverywhere("actions"),
-    },
-    {
-      id: "workspace.showSettings",
-      title: "Settings…",
-      category: "File",
-      keybinding: "Ctrl+Alt+S",
-      platformKeybindings: { mac: ["Meta+,", "Ctrl+Alt+S"] },
-      keywords: ["settings", "preferences", "options"],
-      when: (context) => context.focus !== "terminal" && context.focus !== "modal",
-      run: () => openSettingsSection("general"),
-    },
-    {
-      id: "workspace.showProblems",
-      title: "Problems",
-      category: "View",
-      keybinding: "Alt+6",
-      keywords: ["problems", "errors", "warnings", "diagnostics", "inspections"],
-      run: () => handleActivateToolWindow("problems"),
-    },
-    {
-      id: "workspace.toggleDocumentationPane",
-      title: "Toggle Outline Pane",
-      category: "View",
-      // IDEA Alt+7 = Structure tool window: show and activate it, or hide
-      // it when it is already the active tool window.
-      keybinding: "Alt+7",
-      keywords: ["right", "outline", "structure", "symbols"],
-      run: () => handleActivateToolWindow("structure"),
-    },
-    {
-      id: "workspace.callHierarchy",
-      title: "Call Hierarchy",
-      category: "Navigation",
-      keybinding: "Ctrl+Alt+H",
-      keywords: ["callers", "callees", "calls"],
-      when: (context) => context.focus === "editor" && !!activeFile
-        && !!activeCapabilities?.callHierarchy,
-      run: () => void openHierarchy("call"),
-    },
-    {
-      id: "workspace.typeHierarchy",
-      title: "Type Hierarchy",
-      category: "Navigation",
-      keybinding: "Ctrl+H",
-      keywords: ["supertypes", "subtypes", "inheritance"],
-      when: (context) => context.focus === "editor" && !!activeFile
-        && !!activeCapabilities?.typeHierarchy,
-      run: () => void openHierarchy("type"),
-    },
-    {
-      id: "workspace.gotoDeclaration",
-      title: "Go to Declaration",
-      category: "Navigation",
-      keybinding: "Ctrl+B",
-      keybindings: ["Meta+B"],
-      keywords: ["declaration", "jump", "navigate"],
-      // ED-PARITY-013: Ctrl+B is the navigation key now, so a blocked press
-      // must name the real reason (loading / provider not ready) instead of
-      // the generic "No selection" fallback.
-      getState: (context) => {
-        const target = resolveEditorTarget(context);
-        const state = (availability: "available" | "disabled", disabledReason?: string) => ({
-          availability,
-          ...(disabledReason ? { disabledReason } : {}),
-          source: "provider" as const,
-          scope: "editor" as const,
-          freshness: "current" as const,
-          completeness: "complete" as const,
-        });
-        if (context.focus === "tree" || !target.file) return state("disabled", "noEditor");
-        if (target.file.loading) return state("disabled", "loading");
-        const status = lspFilesRef.current[target.file.key]?.status;
-        const capabilities = status?.capabilities;
-        const languageId = status?.languageId ?? target.file.languagePath;
-        const isEquivalent = isDeclarationDefinitionEquivalentLanguage(languageId, target.file.path);
-        const supported = !capabilities || (isEquivalent
-          ? capabilities.definition !== false
-          : (capabilities.declaration !== false || capabilities.definition !== false));
-        if (supported) return state("available");
-        return state("disabled", status?.active ? "unsupported" : "providerOffline");
-      },
-      run: (context) => {
-        const target = resolveEditorTarget(context);
-        if (!target.file || target.position === undefined) return;
-        void goToDeclarationRef.current(target.file, target.position);
-      },
-    },
-    {
-      id: "workspace.gotoDefinition",
-      title: "Go to Definition",
-      category: "Navigation",
-      // ED-PARITY-013 DEC-013-05: F12 is IDEA Jump to Last Tool Window; Ctrl+B
-      // (Go to Declaration) routes to the definition where they coincide.
-      keywords: ["declaration", "jump", "navigate"],
-      when: (context) => {
-        const target = resolveEditorTarget(context);
-        const capabilities = target.file
-          ? lspFilesRef.current[target.file.key]?.status?.capabilities
-          : null;
-        return context.focus === "editor"
-          && !!target.file
-          && !target.file.loading
-          && (!capabilities || !!capabilities.definition);
-      },
-      run: (context) => {
-        const target = resolveEditorTarget(context);
-        if (!target.file || target.position === undefined) return;
-        void goToDefinition(target.file, target.position);
-      },
-    },
-    {
-      id: "workspace.findReferences",
-      title: "Find Usages",
-      category: "Navigation",
-      keybinding: "Alt+F7",
-      keywords: ["usages", "references", "callers"],
-      when: (context) => context.focus === "editor"
-        && (!!activeCapabilities || !lspFilesRef.current[activeKey ?? ""]?.status)
-        && !!activeFile,
-      run: (context) => {
-        const target = resolveEditorTarget(context);
-        if (!target.file || target.position === undefined) return;
-        void findReferencesRef.current(target.file, target.position);
-      },
-    },
-    {
-      // §8.20.5 W4: lightweight popup over the SAME immutable session as the
-      // tool window. With a live session it just re-presents it; otherwise a
-      // fresh scoped Find Usages runs first.
-      id: "workspace.showUsages",
-      title: "Show Usages",
-      category: "Navigation",
-      keybinding: "Ctrl+Alt+F7",
-      // XWin: Ctrl+Alt+F7 switches virtual terminals on Linux.
-      platformKeybindings: { linux: ["Ctrl+Alt+7"] },
-      keywords: ["usages", "popup", "lightweight"],
-      when: (context) => context.focus === "editor" && !!activeFile,
-      run: (context) => {
-        const target = resolveEditorTarget(context);
-        if (!target.file || target.position === undefined) return;
-        const snapshot = usageSessionRef.current?.getCurrent();
-        if (snapshot && snapshot.state === "ready" && snapshot.envelope.results.length > 0) {
-          setLocationPeek({
-            title: `Usages of ${snapshot.symbol.displayName} (${snapshot.envelope.results.length})`,
-            locations: snapshot.envelope.results.map(({ role: _role, ...location }) => location),
-          });
-          return;
-        }
-        void findReferencesRef.current(target.file, target.position);
-      },
-    },
-    {
-      id: "workspace.previousMethod",
-      title: "Previous Method",
-      category: "Navigation",
-      keybinding: "Alt+Up",
-      provenance: "unsupported",
-      keywords: ["previous", "method", "function", "navigate"],
-      when: () => false,
-      run: () => {
-        setStatusMessage("Previous Method requires a language-specific syntax model (unsupported)");
-      },
-    },
-    {
-      id: "workspace.nextMethod",
-      title: "Next Method",
-      category: "Navigation",
-      keybinding: "Alt+Down",
-      provenance: "unsupported",
-      keywords: ["next", "method", "function", "navigate"],
-      when: () => false,
-      run: () => {
-        setStatusMessage("Next Method requires a language-specific syntax model (unsupported)");
-      },
-    },
-    {
-      id: "workspace.previousSibling",
-      title: "Previous Sibling",
-      category: "Navigation",
-      provenance: "unsupported",
-      keywords: ["previous", "sibling", "element", "navigate"],
-      when: () => false,
-      run: () => {
-        setStatusMessage("Previous Sibling requires a language-specific syntax model (unsupported)");
-      },
-    },
-    {
-      id: "workspace.nextSibling",
-      title: "Next Sibling",
-      category: "Navigation",
-      provenance: "unsupported",
-      keywords: ["next", "sibling", "element", "navigate"],
-      when: () => false,
-      run: () => {
-        setStatusMessage("Next Sibling requires a language-specific syntax model (unsupported)");
-      },
-    },
-    {
-      id: "workspace.toggleTodosPane",
-      title: "Toggle TODOs / Bookmarks",
-      category: "View",
-      // IDEA Alt+2 = Bookmarks tool window.
-      keybinding: "Alt+2",
-      keywords: ["todo", "fixme", "bookmark", "markers"],
-      run: toggleTodosPane,
-    },
-    {
-      id: "workspace.toggleBookmark",
-      title: "Toggle Bookmark",
-      category: "Edit",
-      keybinding: "F11",
-      keywords: ["bookmark", "mark", "line"],
-      when: (context) => context.focus === "editor" && !!activeFile && !activeFile.loading,
-      run: toggleBookmarkAtCursor,
-    },
-    {
-      id: "workspace.toggleBookmarkWithMnemonic",
-      title: "Toggle Bookmark with Mnemonic",
-      category: "Edit",
-      keybinding: "Ctrl+F11",
-      keywords: ["bookmark", "mnemonic", "mark", "digit"],
-      when: (context) => context.focus === "editor" && !!activeFile && !activeFile.loading,
-      run: () => chooseMnemonicBookmarkAtCursor(),
-    },
-    {
-      id: "workspace.showBookmarks",
-      title: "Show Bookmarks",
-      category: "View",
-      keybinding: "Shift+F11",
-      keywords: ["bookmark", "list", "show"],
-      run: openTodosPane,
-    },
-    {
-      id: "workspace.jumpToMnemonicBookmark",
-      title: "Jump to Mnemonic Bookmark",
-      category: "View",
-      keywords: ["bookmark", "jump", "mnemonic", "go"],
-      run: () => {
-        const mnemonicBookmarks = bookmarks.filter((b) => b.mnemonic);
-        if (mnemonicBookmarks.length === 0) {
-          setStatusMessage("No mnemonic bookmarks set");
-          return;
-        }
-        if (mnemonicBookmarks.length === 1 && mnemonicBookmarks[0].mnemonic) {
-          jumpToMnemonicBookmark(mnemonicBookmarks[0].mnemonic);
-        } else {
-          openTodosPane();
-        }
-      },
-    },
-    ...WORKSPACE_BOOKMARK_MNEMONICS.map((mnemonic): WorkspaceCommand => ({
-      id: `workspace.jumpToBookmark${mnemonic}`,
-      title: `Jump to Bookmark [${mnemonic}]`,
-      category: "Navigation",
-      keybinding: `Ctrl+${mnemonic}`,
-      keybindings: [`Meta+${mnemonic}`],
-      keywords: ["bookmark", "jump", "mnemonic", mnemonic.toLowerCase()],
-      when: () => !!findBookmarkByMnemonic(bookmarks, mnemonic),
-      run: () => jumpToMnemonicBookmark(mnemonic),
-    })),
-    {
-      id: "workspace.activateNavigationBar",
-      title: "Jump to Navigation Bar",
-      category: "Navigate",
-      keybinding: "Alt+Home",
-      keywords: ["navbar", "navigation", "bar", "breadcrumbs", "jump"],
-      when: (context) => context.focus === "editor" && !!activeFile,
-      run: activateNavigationBar,
-    },
-    {
-      id: "workspace.highlightUsagesInFile",
-      title: "Highlight Usages in File",
-      category: "Navigate",
-      keybinding: "Ctrl+Shift+F7",
-      keywords: ["highlight", "usages", "occurrences", "symbol"],
-      when: (context) => context.focus === "editor" && !!activeFile,
-      run: highlightUsagesInFile,
-    },
-    {
-      id: "workspace.nextOccurrence",
-      title: "Next Highlighted Occurrence",
-      category: "Navigate",
-      keybinding: "Ctrl+Alt+Down",
-      keywords: ["next", "occurrence", "highlight"],
-      when: (context) => context.focus === "editor" && !!occurrenceSessionRef.current,
-      run: () => navigateOccurrence("next"),
-    },
-    {
-      id: "workspace.previousOccurrence",
-      title: "Previous Highlighted Occurrence",
-      category: "Navigate",
-      keybinding: "Ctrl+Alt+Up",
-      keywords: ["previous", "occurrence", "highlight"],
-      when: (context) => context.focus === "editor" && !!occurrenceSessionRef.current,
-      run: () => navigateOccurrence("previous"),
-    },
-    {
-      id: "workspace.clearHighlightUsages",
-      title: "Clear Highlight Usages",
-      category: "Navigate",
-      keybinding: "Escape",
-      keywords: ["clear", "highlight", "escape"],
-      when: (context) => context.focus === "editor" && !!occurrenceSessionRef.current,
-      run: clearHighlightUsages,
-    },
-    {
-      id: "workspace.compareWithClipboard",
-      title: "Compare with Clipboard",
-      category: "Diff",
-      keywords: ["diff", "compare", "clipboard"],
-      when: () => !!activeFile,
-      run: compareWithClipboard,
-    },
-    {
-      id: "workspace.compareWithFile",
-      title: "Compare with File…",
-      category: "Diff",
-      keywords: ["diff", "compare", "file"],
-      when: () => !!activeFile,
-      run: compareWithFile,
-    },
-    {
-      id: "workspace.compareWithLocalHistory",
-      title: "Compare with Local History",
-      category: "Diff",
-      keywords: ["diff", "compare", "local", "history", "snapshot"],
-      when: () => !!activeFile,
-      run: compareWithLocalHistory,
-    },
-    {
-      id: "workspace.toggleRenderedDocComments",
-      title: "Toggle Rendered Documentation",
-      category: "View",
-      keybinding: "Ctrl+Alt+Q",
-      keywords: ["doc", "render", "documentation", "reader", "comment", "jsdoc", "javadoc"],
-      when: () => !!activeFile && isDocCommentRenderingSupported(activeRenderedDocLanguageId),
-      run: toggleRenderedDocComments,
-    },
-    {
-      id: "workspace.toggleInlayHints",
-      title: `${intelligencePreferences.inlayHintsEnabled ? "Disable" : "Enable"} Inlay Hints`,
-      category: "View",
-      keywords: ["inlay", "hints", "types", "parameters"],
-      run: toggleInlayHints,
-    },
-    {
-      id: "workspace.toggleLanguageInlayHints",
-      title: `${activeInlayHintsEnabled ? "Disable" : "Enable"} Inlay Hints for ${activeLanguageId ?? "Current Language"}`,
-      category: "View",
-      keywords: ["inlay", "language", "hints"],
-      when: () => !!activeCapabilities?.inlayHint,
-      run: toggleInlayHintsForActiveLanguage,
-    },
-    {
-      id: "workspace.toggleInlineBlame",
-      title: `${intelligencePreferences.inlineBlameEnabled ? "Disable" : "Enable"} Inline Git Blame`,
-      category: "Git",
-      keywords: ["git", "blame", "author", "line"],
-      when: () => !!activeGitRoot,
-      run: toggleInlineBlame,
-    },
-    {
-      id: "workspace.toggleSoftWrap",
-      title: `${activeFileSoftWrap ? "Disable" : "Enable"} Soft Wrap`,
-      category: "View",
-      keywords: ["wrap", "long lines", "line wrapping"],
-      when: (context) => context.focus === "editor" || context.focus === "workspace",
-      run: toggleSoftWrap,
-    },
-    {
-      id: "workspace.toggleColumnSelection",
-      title: `${columnSelectionMode ? "Disable" : "Enable"} Column Selection Mode`,
-      category: "Edit",
-      keybinding: "Alt+Shift+Insert",
-      keywords: ["rectangular", "block selection", "column mode"],
-      when: (context) => context.focus === "editor" || context.focus === "workspace",
-      run: toggleColumnSelectionMode,
-    },
-    {
-      id: "workspace.toggleTerminal",
-      title: "Toggle Workspace Terminal",
-      category: "View",
-      keybinding: "Alt+F12",
-      keywords: ["terminal", "shell", "bottom"],
-      run: () => {
-        const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
-        if (ui.bottomDockOpen && ui.bottomDockTab === "terminal") {
-          setBottomDockOpen(false);
-        } else {
-          setBottomDockTab("terminal");
-          setBottomDockOpen(true);
-          terminalDockRef.current?.focus();
-        }
-      },
-    },
-    {
-      id: "workspace.runActiveJavaFile",
-      title: "Run Current Target",
-      category: "Run",
-      keybinding: "Shift+F10",
-      keybindings: ["Ctrl+Shift+F10"],
-      keywords: ["target", "main", "run", "application"],
-      when: () => !!activeFile
-        && activeFile.ref.kind === "root"
-        && !activeFile.library,
-      run: () => runActiveJavaFileRef.current(),
-    },
-    {
-      id: "workspace.runContextConfiguration",
-      title: "Run Context Configuration",
-      category: "Run",
-      keybinding: "Ctrl+Shift+F10",
-      keybindings: ["Mod-Shift-F10"],
-      keywords: ["run context", "run file", "main", "test", "target"],
-      when: () => !!activeFile
-        && activeFile.ref.kind === "root"
-        && !activeFile.library,
-      run: () => runActiveJavaFileRef.current(),
-    },
-    {
-      id: "workspace.buildProject",
-      title: "Build Project",
-      category: "Build",
-      keybinding: "Ctrl+F9",
-      keywords: ["build", "compile", "maven", "gradle"],
-      when: () => roots.length > 0,
-      run: () => buildActiveProjectRef.current(false),
-    },
-    {
-      id: "workspace.recompileActiveFile",
-      title: activeFile ? `Recompile '${activeFile.title}'` : "Recompile Active File",
-      category: "Build",
-      keybinding: "Ctrl+Shift+F9",
-      keybindings: ["Mod-Shift-F9"],
-      keywords: ["compile", "recompile", "single file", "build", "javac"],
-      when: () => !!activeFile && !activeFile.library,
-      run: () => recompileActiveFileRef.current(),
-    },
-    {
-      id: "workspace.toggleBreakpoint",
-      title: "Toggle Line Breakpoint",
-      category: "Debug",
-      keybinding: "Ctrl+F8",
-      keybindings: ["Mod-F8"],
-      keywords: ["breakpoint", "toggle breakpoint", "debug"],
-      when: () => !!activeFile && !activeFile.library,
-      run: () => {
-        const cursor = cursorPositionsRef.current[activeEditorGroupId];
-        const line = (cursor?.line ?? editorSelectionRef.current.start.line) + 1;
-        toggleActiveBreakpointRef.current(line);
-      },
-    },
-    {
-      id: "workspace.viewBreakpoints",
-      title: "View Breakpoints",
-      category: "Debug",
-      keybinding: "Ctrl+Shift+F8",
-      keybindings: ["Mod-Shift-F8"],
-      keywords: ["breakpoint", "manage breakpoints", "condition", "log", "debug"],
-      run: () => {
-        const cursor = cursorPositionsRef.current[activeEditorGroupId];
-        const line = (cursor?.line ?? editorSelectionRef.current.start.line) + 1;
-        viewBreakpointsAtCaretRef.current(line);
-      },
-    },
-    {
-      id: "workspace.toggleTemporaryBreakpoint",
-      title: "Toggle Temporary Line Breakpoint",
-      category: "Debug",
-      keybinding: "Ctrl+Alt+Shift+F8",
-      keywords: ["breakpoint", "temporary", "remove once hit", "debug"],
-      when: () => !!activeFile && !activeFile.library,
-      run: () => {
-        const cursor = cursorPositionsRef.current[activeEditorGroupId];
-        const line = (cursor?.line ?? editorSelectionRef.current.start.line) + 1;
-        toggleTemporaryBreakpointRef.current(line);
-      },
-    },
-    {
-      id: "workspace.toggleBreakpointEnabled",
-      title: "Toggle Breakpoint Enabled",
-      category: "Debug",
-      keywords: ["breakpoint", "enable", "disable", "debug"],
-      when: () => !!activeFile && !activeFile.library,
-      run: () => {
-        const cursor = cursorPositionsRef.current[activeEditorGroupId];
-        const line = (cursor?.line ?? editorSelectionRef.current.start.line) + 1;
-        toggleActiveBreakpointEnabledRef.current(line);
-      },
-    },
-    {
-      id: "workspace.debug.resume",
-      title: "Resume Program",
-      category: "Debug",
-      keybinding: "F9",
-      keywords: ["debug", "resume", "continue"],
-      when: (context) => context.focus !== "terminal" && debugRef.current?.state?.status === "stopped",
-      run: () => { void debugRef.current?.step("continue"); },
-    },
-    {
-      id: "workspace.debug.stepOver",
-      title: "Step Over",
-      category: "Debug",
-      keybinding: "F8",
-      keywords: ["debug", "step", "next"],
-      when: (context) => context.focus !== "terminal" && debugRef.current?.state?.status === "stopped",
-      run: () => { void debugRef.current?.step("stepOver"); },
-    },
-    {
-      id: "workspace.debug.stepInto",
-      title: "Step Into",
-      category: "Debug",
-      keybinding: "F7",
-      keywords: ["debug", "step", "into"],
-      when: (context) => context.focus !== "terminal" && debugRef.current?.state?.status === "stopped",
-      run: () => { void debugRef.current?.step("stepIn"); },
-    },
-    {
-      id: "workspace.debug.stepOut",
-      title: "Step Out",
-      category: "Debug",
-      keybinding: "Shift+F8",
-      keywords: ["debug", "step", "out", "return"],
-      when: (context) => context.focus !== "terminal" && debugRef.current?.state?.status === "stopped",
-      run: () => { void debugRef.current?.step("stepOut"); },
-    },
-    {
-      id: "workspace.debug.stop",
-      title: "Stop",
-      category: "Debug",
-      keybinding: "Ctrl+F2",
-      keywords: ["debug", "stop", "terminate"],
-      when: (context) => {
-        const status = debugRef.current?.state?.status;
-        return context.focus !== "terminal" && !!status && status !== "terminated";
-      },
-      run: () => debugRef.current?.terminate(),
-    },
-    {
-      id: "workspace.debug.evaluateExpression",
-      title: "Evaluate Expression…",
-      category: "Debug",
-      keybinding: "Alt+F8",
-      keywords: ["debug", "evaluate", "expression", "inspect"],
-      when: (context) => context.focus !== "terminal" && debugRef.current?.state?.status === "stopped",
-      run: () => openEvaluateDialogRef.current(),
-    },
-    {
-      id: "workspace.debug.showExecutionPoint",
-      title: "Show Execution Point",
-      category: "Debug",
-      keybinding: "Alt+F10",
-      keywords: ["debug", "execution point", "current line"],
-      when: () => debugRef.current?.state?.status === "stopped",
-      run: () => showDebugExecutionPointRef.current(),
-    },
-    {
-      id: "workspace.toggleMuteBreakpoints",
-      title: "Mute / Unmute Breakpoints",
-      category: "Debug",
-      keywords: ["debug", "breakpoint", "mute", "disable", "pause"],
-      run: () => {
-        const debugSession = debugRef.current;
-        if (!debugSession) return;
-        const next = !debugSession.breakpointsMuted;
-        debugSession.setBreakpointsMuted(next);
-        setStatusMessage(next ? "Breakpoints muted" : "Breakpoints unmuted");
-      },
-    },
-    {
-      id: "workspace.showRunTasks",
-      title: "Show Run Tasks",
-      category: "Run",
-      keybinding: "Alt+4",
-      keywords: ["run", "task", "script"],
-      run: () => handleActivateToolWindow("run"),
-    },
-    {
-      id: "workspace.showAnalysis",
-      title: "Show Code Analysis",
-      category: "Analyze",
-      keywords: ["inspection", "data flow", "diagnostics", "lsp", "psi"],
-      run: () => {
-        setBottomDockTab("analysis");
-        setBottomDockOpen(true);
-      },
-    },
-    {
-      id: "workspace.rerunLastTask",
-      title: "Rerun Last Task",
-      category: "Run",
-      keybinding: "Ctrl+F5",
-      keywords: ["run", "rerun", "repeat"],
-      run: () => {
-        if (!runPanelRef.current?.rerunLast()) setStatusMessage("No workspace task has run yet");
-      },
-    },
-    {
-      id: "workspace.undoWorkspaceEdit",
-      title: workspaceEditHistoryState.undoLabel
-        ? `Undo ${workspaceEditHistoryState.undoLabel}`
-        : "Undo Workspace Edit",
-      category: "Edit",
-      keybinding: "Ctrl+Z",
-      keybindings: ["Cmd+Z"],
-      keywords: ["undo", "workspace edit", "refactor"],
-      // ED-AUDIT-008: inside the editor surface the shared document undo
-      // (workspace.undo) owns Ctrl+Z and claims the journal through
-      // claimWorkspaceHistory. The Actions popup owns its keys and can offer
-      // workspace Undo even when its default snapshot points at that editor.
-      when: (context) => context.focus !== "tree"
-        && context.focus !== "terminal"
-        && (context.focus !== "editor" || searchEverywhereOpen)
-        && workspaceEditHistoryState.canUndo
-        && !workspaceEditHistoryState.busy,
-      run: () => requestWorkspaceUndoConfirmation(),
-    },
-    {
-      id: "workspace.redoWorkspaceEdit",
-      title: workspaceEditHistoryState.redoLabel
-        ? `Redo ${workspaceEditHistoryState.redoLabel}`
-        : "Redo Workspace Edit",
-      category: "Edit",
-      keybinding: "Ctrl+Shift+Z",
-      keybindings: ["Cmd+Shift+Z", "Ctrl+Y", "Cmd+Y"],
-      keywords: ["redo", "workspace edit", "refactor"],
-      when: (context) => context.focus !== "tree"
-        && context.focus !== "terminal"
-        && context.focus !== "editor"
-        && workspaceEditHistoryState.canRedo
-        && !workspaceEditHistoryState.busy,
-      run: () => void redoWorkspaceEdit(),
-    },
-    {
-      id: "workspace.reviewRefactorRecovery",
-      title: "Review Refactor Recovery Entries",
-      category: "File",
-      keywords: ["recovery", "restore", "refactor", "repair"],
-      run: async () => {
-        const rootPath = roots[0]?.path;
-        if (!rootPath) return;
-        const listing = listRefactorRecoveryJournalsV2(rootPath);
-        const pending = listing.entries.filter(isPendingRefactorRecoveryEntry);
-        if (pending.length === 0) {
-          setStatusMessage("No pending recovery entries found");
-          return;
-        }
-        for (const entry of pending) {
-          await promptRefactorRecoveryEntry(entry, workspaceInstanceId);
-        }
-      },
-    },
-    {
-      id: "workspace.save",
-      title: "Save Active File",
-      category: "File",
-      keybinding: "Ctrl+S",
-      keybindings: ["Meta+S"],
-      when: () => {
-        const file = openFilesRef.current[activeKeyRef.current ?? ""];
-        return !!file?.dirty && !file.loading && !file.saving;
-      },
-      run: () => void saveFile(activeKeyRef.current),
-    },
-    {
-      id: "workspace.closeActiveEditorTab",
-      title: "Close Active Editor Tab",
-      category: "File",
-      keybinding: "Ctrl+F4",
-      when: () => !!activeKey,
-      run: () => {
-        if (activeKey) void closeFile(activeKey, activeEditorGroupId);
-      },
-    },
-    {
-      id: "workspace.revealActiveFileInTree",
-      title: "Reveal Active File in Project Tree",
-      category: "Navigation",
-      keybinding: "Alt+F1",
-      when: () => !!activeKey,
-      run: () => {
-        if (activeKey) revealEditorTabInTree(activeKey);
-      },
-    },
-    {
-      id: "workspace.reload",
-      title: "Reload Active File",
-      category: "File",
-      when: () => !!activeFile && !activeFile.loading,
-      run: () => void reloadFile(),
-    },
-    {
-      id: "workspace.refreshTree",
-      title: "Refresh Project Tree",
-      category: "File",
-      run: refreshTree,
-    },
-    {
-      id: "workspace.openGit",
-      title: "Open in Git Tab",
-      category: "Git",
-      when: () => !gitRootsLoading && !!onOpenGitManager && gitRoots.length > 0,
-      run: openGitManager,
-    },
-    {
-      // ED-PARITY-018 DEC-018-01: IDEA Alt+9 = the Git tool window.
-      id: "workspace.gitToolWindow",
-      title: "Git Tool Window",
-      category: "Git",
-      keybinding: "Alt+9",
-      keywords: ["git", "log", "changes", "vcs"],
-      run: () => handleActivateToolWindow("git"),
-    },
-    {
-      // ED-PARITY-018 DEC-018-02: IDEA Alt+0 = Commit (changes + message).
-      id: "workspace.commitToolWindow",
-      title: "Commit Tool Window",
-      category: "Git",
-      keybinding: "Alt+0",
-      keywords: ["commit", "changes", "vcs"],
-      run: () => handleActivateToolWindow("git"),
-    },
-    {
-      id: "workspace.toggleSyncSplitScroll",
-      title: "View: Toggle Synchronized Split Scrolling",
-      category: "View",
-      when: () => !!splitOrientation,
-      run: () => {
-        setSyncSplitScroll((v) => {
-          const next = !v;
-          setStatusMessage(next ? "Synchronized split scrolling enabled" : "Synchronized split scrolling disabled");
-          return next;
-        });
-      },
-    },
-    // §8.19.6 R5-b split management actions.
-    {
-      id: "workspace.splitRight",
-      title: "Split Editor Right",
-      category: "View",
-      keywords: ["split", "vertical", "editor"],
-      when: () => !!activeKey,
-      run: () => {
-        splitEditor("vertical");
-        return true;
-      },
-    },
-    {
-      id: "workspace.splitDown",
-      title: "Split Editor Down",
-      category: "View",
-      keywords: ["split", "horizontal", "editor"],
-      when: () => !!activeKey,
-      run: () => {
-        splitEditor("horizontal");
-        return true;
-      },
-    },
-    {
-      id: "workspace.goToNextSplit",
-      title: "Go to Next Split",
-      category: "View",
-      keywords: ["next", "splitter", "navigate"],
-      run: () => goToAdjacentSplit(1),
-    },
-    {
-      id: "workspace.goToPreviousSplit",
-      title: "Go to Previous Split",
-      category: "View",
-      keywords: ["previous", "splitter", "navigate"],
-      run: () => goToAdjacentSplit(-1),
-    },
-    {
-      id: "workspace.moveTabToNextSplit",
-      title: "Move Tab to Next Split",
-      category: "View",
-      keywords: ["move", "tab", "next", "split"],
-      when: () => !!activeKey,
-      run: () => moveActiveTabToAdjacentSplit(1),
-    },
-    {
-      id: "workspace.moveTabToPreviousSplit",
-      title: "Move Tab to Previous Split",
-      category: "View",
-      keywords: ["move", "tab", "previous", "split"],
-      when: () => !!activeKey,
-      run: () => moveActiveTabToAdjacentSplit(-1),
-    },
-    {
-      id: "workspace.equalizeSplitProportions",
-      title: "Equalize Split Proportions",
-      category: "View",
-      keywords: ["equalize", "proportions", "ratios", "split"],
-      when: () => !!splitOrientation,
-      run: equalizeActiveSplitRatios,
-    },
-    {
-      id: "workspace.stretchActiveSplit",
-      title: "Stretch Active Split",
-      category: "View",
-      keywords: ["stretch", "widen", "grow", "split"],
-      when: () => !!splitOrientation,
-      run: stretchActiveSplit,
-    },
-    {
-      id: "workspace.unsplitAll",
-      title: "Unsplit All",
-      category: "View",
-      keywords: ["unsplit", "close splits", "single editor"],
-      when: () => !!splitOrientation,
-      run: unsplitAllWindows,
-    },
-    {
-      id: "workspace.tree.openLooseFile",
-      title: "Open Loose File",
-      category: "File",
-      run: () => void openLooseFile(),
-    },
-    {
-      id: "workspace.tree.addFolder",
-      title: "Add Folder to Workspace",
-      category: "File",
-      run: () => void addRoot(),
-    },
-    {
-      id: "workspace.tree.open",
-      title: "Open Selected File",
-      category: "File",
-      when: (context) => context.focus === "tree",
-      run: (context) => {
-        if (treeContextMenuSessionRef.current) {
-          treeContextMenuSessionRef.current.consumed = true;
-        }
-        const payload = context.payload as WorkspaceTreeCommandPayload | undefined;
-        const selection = payload?.selection ?? selected;
-        if (selection?.kind === "file") void requestTreeOpen(selection.ref);
-      },
-    },
-    {
-      id: "workspace.tree.newFile",
-      title: "New File",
-      category: "File",
-      when: (context) => context.focus !== "tree" || !!selectedRootDirectory,
-      run: (context) => {
-        const payload = context.payload as WorkspaceTreeCommandPayload | undefined;
-        void createFile(payload?.directory);
-      },
-    },
-    {
-      id: "workspace.tree.newDirectory",
-      title: "New Directory",
-      category: "File",
-      when: (context) => context.focus !== "tree" || !!selectedRootDirectory,
-      run: (context) => {
-        const payload = context.payload as WorkspaceTreeCommandPayload | undefined;
-        void createDir(payload?.directory);
-      },
-    },
-    {
-      id: "workspace.tree.newJavaClass",
-      title: "New Java Class...",
-      category: "File",
-      when: (context) => context.focus !== "tree" || !!selectedRootDirectory,
-      run: (context) => {
-        const payload = context.payload as WorkspaceTreeCommandPayload | undefined;
-        openNewJavaClassDialog(payload?.directory);
-      },
-    },
-    {
-      id: "workspace.tree.rename",
-      title: "Rename Tree Selection",
-      category: "Refactor",
-      keybinding: "F2",
-      when: (context) => context.focus === "tree" && !!((context.payload as WorkspaceTreeCommandPayload | undefined)?.selection ?? selected),
-      run: (context) => {
-        const payload = context.payload as WorkspaceTreeCommandPayload | undefined;
-        void renameSelected(payload?.selection);
-      },
-    },
-    {
-      id: "workspace.tree.delete",
-      title: "Delete or Remove Tree Selection",
-      category: "File",
-      keybinding: "Delete",
-      when: (context) => context.focus === "tree" && !!((context.payload as WorkspaceTreeCommandPayload | undefined)?.selection ?? selected),
-      run: (context) => {
-        const payload = context.payload as WorkspaceTreeCommandPayload | undefined;
-        void deleteSelected(payload?.selection);
-      },
-    },
-    {
-      id: "workspace.tree.addToGitignore",
-      title: "Add Tree Selection to .gitignore",
-      category: "Git",
-      keywords: ["git", "ignore", "exclude"],
-      when: (context) => {
-        const selection = (context.payload as WorkspaceTreeCommandPayload | undefined)?.selection ?? selected;
-        return context.focus === "tree" && (
-          selection?.kind === "dir"
-          || (selection?.kind === "file" && selection.ref.kind === "root")
-        );
-      },
-      run: (context) => {
-        const selection = (context.payload as WorkspaceTreeCommandPayload | undefined)?.selection ?? selected;
-        if (selection?.kind === "dir") {
-          void ignoreWorkspacePath(selection.rootId, selection.path, true);
-        } else if (selection?.kind === "file" && selection.ref.kind === "root") {
-          void ignoreWorkspacePath(selection.ref.rootId, selection.ref.path, false);
-        }
-      },
-    },
-    {
-      id: "workspace.tree.findInDirectory",
-      title: "Find in Selected Directory",
-      category: "Search",
-      when: (context) => context.focus === "tree",
-      run: (context) => {
-        const payload = context.payload as WorkspaceTreeCommandPayload | undefined;
-        findInDirectory(payload?.path ?? "");
-      },
-    },
-    {
-      id: "workspace.tree.copyPath",
-      title: "Copy Absolute Path",
-      category: "File",
-      when: (context) => context.focus === "tree",
-      run: (context) => {
-        const payload = context.payload as WorkspaceTreeCommandPayload | undefined;
-        if (payload?.rootId !== undefined && payload.path !== undefined) {
-          void copyTreePath(payload.rootId, payload.path, true);
-        }
-      },
-    },
-    {
-      id: "workspace.tree.copyRelativePath",
-      title: "Copy Relative Path",
-      category: "File",
-      when: (context) => context.focus === "tree",
-      run: (context) => {
-        const payload = context.payload as WorkspaceTreeCommandPayload | undefined;
-        if (payload?.rootId !== undefined && payload.path !== undefined) {
-          void copyTreePath(payload.rootId, payload.path, false);
-        }
-      },
-    },
-    {
-      id: "workspace.openKeymapCheatsheet",
-      title: "Keyboard Shortcuts (Keymap)",
-      category: "Help",
-      keybinding: "Ctrl+Alt+/",
-      keybindings: ["Meta+Alt+/", "Meta+K Meta+S"],
-      keywords: ["keymap", "shortcuts", "hotkeys", "cheat sheet", "intellij"],
-      run: () => setKeymapCheatSheetOpen(true),
-    },
-    {
-      id: "workspace.showCoverage",
-      title: "Show Code Coverage",
-      category: "Analyze",
-      keywords: ["coverage", "jacoco", "lcov", "tests", "lines"],
-      run: () => {
-        setBottomDockTab("coverage");
-        setBottomDockOpen(true);
-        if (!coverageReport) void scanWorkspaceCoverage();
-      },
-    },
-    {
-      id: "workspace.openDapAdapterGuide",
-      title: "DAP Debug Adapter Setup Guide",
-      category: "Debug",
-      keywords: ["dap", "debugpy", "delve", "lldb", "gdb", "js-debug", "adapter", "guide", "setup"],
-      run: () => setDapGuideOpen(true),
-    },
-    {
-      id: "workspace.runToCursor",
-      title: "Run to Cursor",
-      category: "Debug",
-      keybinding: "Alt+F9",
-      // IDEA "Default for XWin" moves Run to Cursor off the window-manager key.
-      platformKeybindings: { linux: ["Shift+Alt+9"] },
-      keywords: ["debug", "run", "cursor", "break"],
-      when: (context) => {
-        if (context.focus === "tree" || context.focus === "terminal") return false;
-        const session = debugRef.current;
-        return !!session?.state && session.state.status === "stopped";
-      },
-      run: (context) => {
-        const session = debugRef.current;
-        const target = resolveEditorTarget(context);
-        const absolute = target.file ? absolutePathForOpenFile(target.file) : null;
-        if (!session?.state || !target.file || !absolute || !target.position) return;
-        session.runToCursor(normalizeFsPath(absolute), target.position.line + 1);
-      },
-    },
-    {
-      id: "workspace.addDataBreakpoint",
-      title: "Add Data Breakpoint",
-      category: "Debug",
-      keywords: ["debug", "breakpoint", "field", "watch", "data"],
-      when: (context) => {
-        if (context.focus === "tree" || context.focus === "terminal") return false;
-        const session = debugRef.current;
-        return !!session?.state
-          && session.state.status === "stopped"
-          && session.capabilities.supportsDataBreakpoints === true;
-      },
-      run: (context) => {
-        const payload = context.payload as { name?: string; frameId?: number } | undefined;
-        const name = typeof payload?.name === "string" ? payload.name : null;
-        const session = debugRef.current;
-        if (!name || !session) return;
-        const frameId = payload?.frameId
-          ?? session.state?.selectedFrameId
-          ?? session.state?.frames[0]?.id
-          ?? undefined;
-        void session.addDataBreakpoint({ name, frameId }).then((result) => {
-          setStatusMessage(result.message);
-          if (result.added) {
-            setBottomDockTab("debug");
-            setBottomDockOpen(true);
-          }
-        });
-      },
-    },
-  ], [
+  const workspaceCommands = useMemo<WorkspaceCommand[]>(createWorkspaceCommands({
+    executeEditorCommand,
+    setSurroundWithDialogOpen,
+    requestGenerateCandidates,
+    closedTabsStack,
+    workspaceUi,
+    activeEditorGroupId,
+    setClosedTabsStack,
+    openFile,
+    openFilesRef,
+    setStatusMessage,
+    get setKeymapSettingsOpen() { return setKeymapSettingsOpen; },
+    setCodeStyleSettingsOpen,
+    setFileTemplateSettingsOpen,
+    setAutoImportSettingsOpen,
+    executeAutoImportOnTheFly,
+    executePasteWithAutoImport,
+    openSearchEverywhere,
+    seSymbolsAvailable,
+    recentFilesOpen,
+    openRecentFiles,
+    recentChangedOnly,
+    setRecentLocationsChangedOnly,
+    setRecentLocationsOpen,
+    navigateLastEditLocation,
+    activeFile,
+    navigateDiagnostic,
+    editorSelectionRef,
+    peekDefinitionRef,
+    lspFilesRef,
+    showCodeInsightNotice,
+    setParameterInfoRequestNonce,
+    setEditorAppearanceSettingsOpen,
+    openTabPolicySettings,
+    editorCommandStateFor,
+    copyReferenceAtCursor,
+    clipboardHandle,
+    setClipboardHistoryEntries,
+    setClipboardHistoryOpen,
+    setIntelligenceSettingsOpen,
+    optimizeImports,
+    runRearrangeExecute,
+    runCleanupExecute,
+    navCan,
+    navigateHistory,
+    openFindInFiles,
+    structuralSearch,
+    openStructurePopup,
+    absolutePathForOpenFile,
+    activeLanguageId,
+    workspaceResourceOperationLocked,
+    activeCapabilities,
+    formatActiveFile,
+    intelligencePreferences,
+    setFormatOnSave,
+    openQuickDocumentation,
+    runTypeInfo,
+    externalDocTargetFromProvider,
+    runExternalDocumentation,
+    runExpressionStaticData,
+    openCodeActionsAtCursor,
+    resolveEditorTarget,
+    goToTypeDefinitionRef,
+    goToImplementationRef,
+    renameSymbolRef,
+    safeDeleteSymbolRef,
+    openRefactorActions,
+    runExtractMethodRef,
+    t,
+    runEditorAiActionAtCursor,
+    editorAiPreferences,
+    cycleAiAnswerLanguage,
+    setAiAnswerLanguage,
+    languagePanelOpen,
+    handleActivateToolWindow,
+    handleReturnToEditor,
+    handleRestoreToolWindowLayout,
+    jumpToLastToolWindow,
+    hideActiveToolWindow,
+    toggleAllToolWindows,
+    openHierarchy,
+    goToDeclarationRef,
+    get goToDefinition() { return goToDefinition; },
+    activeKey,
+    findReferencesRef,
+    usageSessionRef,
+    setLocationPeek,
+    toggleTodosPane,
+    toggleBookmarkAtCursor,
+    chooseMnemonicBookmarkAtCursor,
+    openTodosPane,
+    bookmarks,
+    jumpToMnemonicBookmark,
+    activateNavigationBar,
+    highlightUsagesInFile,
+    occurrenceSessionRef,
+    navigateOccurrence,
+    clearHighlightUsages,
+    compareWithClipboard,
+    compareWithFile,
+    compareWithLocalHistory,
+    activeRenderedDocLanguageId,
+    toggleRenderedDocComments,
+    toggleInlayHints,
+    activeInlayHintsEnabled,
+    toggleInlayHintsForActiveLanguage,
+    activeGitRoot,
+    toggleInlineBlame,
+    activeFileSoftWrap,
+    toggleSoftWrap,
+    columnSelectionMode,
+    toggleColumnSelectionMode,
+    workspaceInstanceId,
+    setBottomDockOpen,
+    setBottomDockTab,
+    terminalDockRef,
+    runActiveJavaFileRef,
+    roots,
+    buildActiveProjectRef,
+    recompileActiveFileRef,
+    cursorPositionsRef,
+    toggleActiveBreakpointRef,
+    viewBreakpointsAtCaretRef,
+    toggleTemporaryBreakpointRef,
+    toggleActiveBreakpointEnabledRef,
+    debugRef,
+    openEvaluateDialogRef,
+    showDebugExecutionPointRef,
+    runPanelRef,
+    workspaceEditHistoryState,
+    searchEverywhereOpen,
+    requestWorkspaceUndoConfirmation,
+    redoWorkspaceEdit,
+    promptRefactorRecoveryEntry,
+    get activeKeyRef() { return activeKeyRef; },
+    saveFile,
+    closeFile,
+    revealEditorTabInTree,
+    reloadFile,
+    refreshTree,
+    gitRootsLoading,
+    onOpenGitManager,
+    gitRoots,
+    openGitManager,
+    splitOrientation,
+    setSyncSplitScroll,
+    splitEditor,
+    goToAdjacentSplit,
+    moveActiveTabToAdjacentSplit,
+    equalizeActiveSplitRatios,
+    stretchActiveSplit,
+    unsplitAllWindows,
+    openLooseFile,
+    addRoot,
+    treeContextMenuSessionRef,
+    selected,
+    requestTreeOpen,
+    selectedRootDirectory,
+    createFile,
+    createDir,
+    openNewJavaClassDialog,
+    renameSelected,
+    deleteSelected,
+    ignoreWorkspacePath,
+    findInDirectory,
+    copyTreePath,
+    setKeymapCheatSheetOpen,
+    coverageReport,
+    scanWorkspaceCoverage,
+    setDapGuideOpen,
+  }), [
     activeCapabilities,
     activeEditorCommandState,
     activeEditorGroupId,
@@ -18075,273 +11352,21 @@ export function CodeWorkspaceTab({
     `revision=${snapshot.revision}/${tokenRevision}`,
   ].filter(Boolean).join(" "), []);
 
-  const renameSymbolAt = useCallback(async (
-    file: OpenFileState,
-    position: LspPosition,
-    options: {
-      title?: string;
-      label?: string;
-      confirmLabel?: string;
-      /** Caller-owned prompt (Extract Method naming); defaults to the Rename dialog. */
-      promptName?: (defaultName: string, range: LspRange | null) => Promise<string | null>;
-      /** Re-checked after every await; false aborts without writing. */
-      isCurrent?: () => boolean;
-    } = {},
-  ): Promise<RenameSymbolAtResult> => {
-    const isCurrent = () => (options.isCurrent ? options.isCurrent() : true);
-    const staleResult = (): RenameSymbolAtResult => ({
-      status: "stale",
-      message: "Rename was cancelled because the workspace changed",
-    });
-    if (!isCurrent()) return staleResult();
-    const caps = lspFilesRef.current[file.key]?.status?.capabilities;
-    if (caps && !caps.rename) {
-      const message = "Rename is not supported by this language server";
-      setStatusMessage(message);
-      return { status: "failed", message };
-    }
-    const expectedRevision = semanticIndex.current().revision;
-    const live = await ensureWorkspaceSemanticDocumentsSynced(file.key, expectedRevision);
-    if (!isCurrent()) return staleResult();
-    if (!live) {
-      const message = "Rename requires the language server to finish synchronizing current editor buffers";
-      setStatusMessage(message);
-      return { status: "failed", message };
-    }
-    const descriptor = lspDescriptorForFile(live);
-    if (!descriptor) {
-      return { status: "failed", message: "Cannot resolve the language server for this rename" };
-    }
-    const buildToken = semanticIndex.beginBuild("language-server");
-    try {
-      const prepared = await lspPrepareRename(descriptor, position);
-      updateLspStatusForFile(live, prepared.status);
-      if (!isCurrent()) {
-        semanticIndex.abandonBuild(buildToken);
-        return staleResult();
-      }
-      if (!prepared.allowed && prepared.range == null && !prepared.placeholder) {
-        semanticIndex.abandonBuild(buildToken);
-        const message = prepared.message ?? "Cannot rename symbol here";
-        setStatusMessage(message);
-        return { status: "failed", message };
-      }
-      const defaultName = prepared.placeholder
-        ?? (() => {
-          const lines = live.text.split("\n");
-          const line = lines[position.line] ?? "";
-          if (prepared.range) {
-            return line.slice(prepared.range.start.character, prepared.range.end.character);
-          }
-          return line.slice(position.character).match(/^[A-Za-z0-9_$]+/)?.[0] ?? "";
-        })();
-      const nameRange: LspRange | null = prepared.range ?? (() => {
-        const line = live.text.split("\n")[position.line] ?? "";
-        const before = line.slice(0, position.character).match(/[A-Za-z0-9_$]*$/)?.[0] ?? "";
-        const after = line.slice(position.character).match(/^[A-Za-z0-9_$]*/)?.[0] ?? "";
-        if (!before && !after) return null;
-        return {
-          start: { line: position.line, character: position.character - before.length },
-          end: { line: position.line, character: position.character + after.length },
-        };
-      })();
-      const nextName = options.promptName
-        ? await options.promptName(defaultName, nameRange)
-        : await promptSymbolName({
-            file: live,
-            kind: "rename",
-            range: nameRange,
-            defaultName,
-            dialog: (initialValue) => promptAppDialog({
-              title: options.title ?? "Rename Symbol",
-              label: options.label ?? "New name",
-              initialValue,
-              confirmLabel: options.confirmLabel ?? "Rename",
-            }),
-          });
-      if (!isCurrent()) {
-        semanticIndex.abandonBuild(buildToken);
-        return staleResult();
-      }
-      if (!nextName) {
-        // The user dismissed the naming prompt (Escape/Cancel): keep the
-        // provider default name and never treat this as a provider answer.
-        semanticIndex.abandonBuild(buildToken);
-        return { status: "cancelled" };
-      }
-      if (nextName === defaultName) {
-        semanticIndex.abandonBuild(buildToken);
-        return { status: "unchanged" };
-      }
-      const beforeRename = semanticIndex.current();
-      // ED-AUDIT-008: revision equality is the freshness contract. Unrelated
-      // provider work in flight (jdtls indexing/progress) is not a workspace
-      // change and must not cancel a rename the user already confirmed.
-      if (beforeRename.revision !== buildToken.revision) {
-        semanticIndex.abandonBuild(buildToken);
-        const message = "Rename was cancelled because the workspace changed while the dialog was open "
-          + `(${describeSemanticInvalidation(beforeRename, buildToken.revision)})`;
-        setStatusMessage(message);
-        return { status: "stale", message };
-      }
-      let renamed: LspRenameResult;
-      try {
-        renamed = await lspRename(descriptor, position, nextName);
-      } catch (err) {
-        // The semantic provider rejected the name; nothing was written, so a
-        // caller that owns its own prompt may keep the input and retry.
-        const message = errorMessage(err);
-        semanticIndex.failBuild(buildToken, message);
-        setStatusMessage(message);
-        return { status: "failed", message, retryable: true };
-      }
-      updateLspStatusForFile(live, renamed.status);
-      if (!isCurrent()) return staleResult();
-      let operationCount = workspaceEditOperations(renamed.edit).length;
-      // JDT LS can answer the first rename request with an empty edit while
-      // its cross-file index is finishing a watcher update.  The document
-      // revision is still unchanged, so a short same-token retry is safe and
-      // avoids exposing a transient "Rename produced no edits" result to the
-      // user.  A real edit or a second empty response follows the normal
-      // result path below.
-      if (operationCount === 0 && isCurrent() && semanticIndex.current().revision === buildToken.revision) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        if (isCurrent() && semanticIndex.current().revision === buildToken.revision) {
-          try {
-            renamed = await lspRename(descriptor, position, nextName);
-            updateLspStatusForFile(live, renamed.status);
-            operationCount = workspaceEditOperations(renamed.edit).length;
-          } catch (err) {
-            const message = errorMessage(err);
-            semanticIndex.failBuild(buildToken, message);
-            setStatusMessage(message);
-            return { status: "failed", message, retryable: true };
-          }
-        }
-      }
-      if (operationCount === 0) {
-        semanticIndex.finishQuery(buildToken, { kind: "rename", resultCount: 0 });
-        const message = "Rename produced no edits";
-        setStatusMessage(message);
-        // Only the provider answering with an empty edit is replayable; a user
-        // cancel or an unchanged name must never resubmit a name.
-        return { status: "empty-edit", message, retryable: true };
-      }
-      const completion = semanticIndex.finishQuery(buildToken, {
-        kind: "rename",
-        resultCount: operationCount,
-      });
-      if (
-        !completion.accepted
-        // Provider progress and an already-consumed invalidation can leave
-        // staleReasons populated without changing the pinned workspace
-        // revision. The rename response is still valid in that case; reject
-        // only a real revision change after the provider answered.
-        || !workspaceSemanticIndexTokenRevisionCurrent(completion.snapshot, buildToken)
-      ) {
-        const message = "Rename result became stale because the workspace changed; run Rename again "
-          + `(${describeSemanticInvalidation(completion.snapshot, buildToken.revision)})`;
-        setStatusMessage(message);
-        return { status: "stale", message };
-      }
-      const documentUri = descriptor.documentUri ?? lspFilesRef.current[file.key]?.status?.uri ?? descriptor.filePath;
-      const evidence = buildCapabilityEvidence({
-        capabilityId: "refactor.rename",
-        languageId: descriptor.languageId ?? "java",
-        provider: {
-          id: descriptor.languageId ?? "jdtls",
-          version: null,
-          generation: lspSessionGeneration(),
-        },
-        projectFingerprint: projectAnalysisSnapshot?.projectFingerprint ?? "",
-        uri: documentUri,
-        revision: live.documentRevision ?? 0,
-        position,
-        scope: "project",
-        complete: false,
-        reason: "provider rename response; AST completeness not guaranteed",
-      });
-      const plan = buildRefactorPlan({
-        actionId: `rename:${documentUri}:${position.line}:${position.character}`,
-        kind: "rename",
-        evidence,
-        edit: renamed.edit,
-        roots: rootsRef.current,
-        openFiles: buildPlanOpenFiles(),
-        completeness: {
-          value: "partial",
-          source: "protocol-bounded",
-          proof: "provider rename response; AST completeness not guaranteed",
-        },
-      });
-      const gate = refactorApplyGate(plan);
-      if (!gate.allowed) {
-        semanticIndex.abandonBuild(buildToken);
-        const message = `Rename blocked: ${gate.reason}`;
-        setStatusMessage(message);
-        return { status: "failed", message };
-      }
-      if (gate.requiresConfirm) {
-        const confirmed = await confirmAppDialog({
-          title: "Rename Warning",
-          message: gate.reason ?? "The rename produced warnings. Proceed anyway?",
-          confirmLabel: "Proceed",
-        });
-        if (!isCurrent()) {
-          semanticIndex.abandonBuild(buildToken);
-          return staleResult();
-        }
-        if (!confirmed) {
-          semanticIndex.abandonBuild(buildToken);
-          const message = "Rename cancelled";
-          setStatusMessage(message);
-          return { status: "cancelled", message };
-        }
-      }
-      const guardRenameOwner = (stage: string) => {
-        if (isCurrent()) return;
-        throw new Error(
-          `RENAME_OWNER_STALE: the rename owner changed before ${stage}`,
-        );
-      };
-      const outcomes = await applyLspWorkspaceEdit(renamed.edit, {
-        preview: true,
-        label: `Rename symbol to "${nextName}"`,
-        semanticGeneration: buildToken.generation,
-        semanticRevision: buildToken.revision,
-        // Background provider progress does not change the workspace revision.
-        // Keep the same freshness rule at the final mutation boundary as at
-        // the rename response gate above; owner and preimage checks still run.
-        semanticRequireReady: false,
-        semanticWorkspaceOnly: true,
-        plan,
-        // DEC-07: the Extract owner/receipt guard runs after the preview and
-        // immediately before the first writer, and again at the exact mutation
-        // boundary after any read, so a view/file switch during the async
-        // snapshot or preview can never rename an abandoned document.
-        preflightMutation: () => guardRenameOwner("the first write"),
-        assertOwnerAtMutationBoundary: () => guardRenameOwner("the mutation boundary"),
-      });
-      const rejected = outcomes.find(
-        (outcome) => outcome.status === "failed" || outcome.status === "skipped",
-      );
-      if (rejected) {
-        const reason = "reason" in rejected && rejected.reason
-          ? rejected.reason
-          : "the workspace edit was rejected";
-        if (reason.includes("RENAME_OWNER_STALE")) return staleResult();
-        const message = `Rename failed: ${reason}`;
-        setStatusMessage(message);
-        return { status: "failed", message };
-      }
-      return { status: "applied" };
-    } catch (err) {
-      const message = errorMessage(err);
-      semanticIndex.failBuild(buildToken, message);
-      setStatusMessage(message);
-      return { status: "failed", message };
-    }
-  }, [
+  const renameSymbolAt = useCallback(createRenameSymbolAt({
+    lspFilesRef,
+    setStatusMessage,
+    semanticIndex,
+    ensureWorkspaceSemanticDocumentsSynced,
+    lspDescriptorForFile,
+    updateLspStatusForFile,
+    promptSymbolName,
+    describeSemanticInvalidation,
+    lspSessionGeneration,
+    projectAnalysisSnapshot,
+    rootsRef,
+    buildPlanOpenFiles,
+    applyLspWorkspaceEdit,
+  }), [
     applyLspWorkspaceEdit,
     ensureWorkspaceSemanticDocumentsSynced,
     lspDescriptorForFile,
@@ -18561,122 +11586,20 @@ export function CodeWorkspaceTab({
     focusable[nextIndex]?.focus();
   }, []);
 
-  const continueExtractNaming = useCallback(async (receipt: ExtractReceipt) => {
-    const session = extractSessionRef.current;
-    if (!session || session.id !== receipt.sessionId) return;
-    const ownerMatches = () => extractSessionRef.current === session
-      && extractOwnerMatches(session, extractOwnerSnapshot(session));
-    const receiptMatches = () => {
-      const live = openFilesRef.current[session.fileKey];
-      return live
-        ? extractReceiptMatches(receipt, { revision: live.documentRevision, text: live.text })
-        : false;
-    };
-    try {
-      if (!ownerMatches() || !receiptMatches()) return;
-      session.phase = "symbols-after";
-      // DEC-03: the provider outline can trail the freshly committed extraction,
-      // so a null diff is re-read once before the method is declared unlocatable.
-      let found: LspDocumentSymbol | null = null;
-      for (let read = 0; read < 2 && !found; read += 1) {
-        if (read > 0) {
-          await new Promise((resolve) => { window.setTimeout(resolve, 400); });
-          if (!ownerMatches() || !receiptMatches()) return;
-        }
-        const live = openFilesRef.current[session.fileKey];
-        // A dirty buffer was mutated without a save, so the provider model still
-        // holds the pre-extraction document; push the current buffer before the
-        // post snapshot or the new method cannot be found at all.
-        const synced = live
-          ? await ensureWorkspaceSemanticDocumentsSynced(live.key, semanticIndex.current().revision)
-          : null;
-        const afterSymbols = synced ? await captureMethodSymbolsSettled(synced) : null;
-        // A late symbols reply for a superseded owner or a moved B1 must not
-        // open a prompt or move focus.
-        if (!ownerMatches() || !receiptMatches()) return;
-        found = afterSymbols && session.beforeSymbols
-          ? findExtractedMethodSymbol(session.beforeSymbols, afterSymbols)
-          : null;
-      }
-      const postLive = openFilesRef.current[session.fileKey];
-      if (!postLive) return;
-      if (!found) {
-        setStatusMessage(EXTRACT_NAMING_UNAVAILABLE_MESSAGE);
-        return;
-      }
-      // DEC-03/DEC-08: a dirty buffer keeps the extraction in the buffer; the
-      // Rename chain's dirty gate would refuse it, so no prompt is shown.
-      if (postLive.dirty) {
-        setStatusMessage(extractDirtyBufferMessage(found.name));
-        return;
-      }
-      session.phase = "naming";
-      // DEC-07: a provider rejection keeps the committed extraction, the real
-      // error text and the user's input, so the name can be corrected and
-      // retried without repeating the extraction.
-      let proposed: string | null = null;
-      let replayName: string | null = null;
-      let replays = 0;
-      for (let attempt = 0; attempt < 5; attempt += 1) {
-        const attemptFile = openFilesRef.current[session.fileKey] ?? postLive;
-        const replayed = replayName;
-        replayName = null;
-        const outcome = await renameSymbolAt(attemptFile, found.selectionRange.start, {
-          title: "Extract Method",
-          label: "Method name",
-          confirmLabel: "Rename",
-          isCurrent: () => ownerMatches() && receiptMatches(),
-          promptName: async (defaultName, range) => {
-            if (replayed) return replayed;
-            // ED-PARITY-017: in-place naming on the extracted method; Escape
-            // keeps the provider default name (the extraction stays committed).
-            const value = await promptSymbolName({
-              file: attemptFile,
-              kind: "extract",
-              range,
-              defaultName,
-              initialValue: proposed ?? defaultName,
-              dialog: (initialValue) => promptExtractName(session.id, {
-                title: "Extract Method",
-                label: "Method name",
-                confirmLabel: "Rename",
-                initialValue,
-              }),
-            });
-            if (value && value !== defaultName) proposed = value;
-            return value;
-          },
-        });
-        if (extractSessionRef.current !== session) return;
-        if (outcome.status === "failed" && outcome.retryable && attempt < 4) continue;
-        if (outcome.status === "failed") return; // real reason already surfaced; B1 kept
-        // The owner/receipt was invalidated (possibly at the mutation boundary):
-        // nothing was written and the naming step must not claim otherwise.
-        if (outcome.status === "stale") return;
-        if (outcome.status === "empty-edit" && proposed && replays < 3 && attempt < 4) {
-          // The provider answered the rename with an empty edit (its workspace
-          // model can still trail the freshly written extraction). Replay the
-          // same name against a settled model instead of dropping the naming
-          // step; the extraction and history stay untouched. Escape/Cancel and
-          // an unchanged name return "cancelled"/"unchanged" instead, so a
-          // dismissed prompt can never rename anything.
-          replayName = proposed;
-          replays += 1;
-          await new Promise((resolve) => { window.setTimeout(resolve, 1200); });
-          if (!ownerMatches() || !receiptMatches()) return;
-          continue;
-        }
-        // DEC-03: focus returns to the editor at the call-statement line. The
-        // rename committed a new revision for this same owner, so only the
-        // owner identity is re-checked here — a switched/closed view stays
-        // untouched.
-        revealNavLocation(session.fileKey, session.selection.start);
-        return;
-      }
-    } finally {
-      finishExtractSession(session);
-    }
-  }, [
+  const continueExtractNaming = useCallback(createContinueExtractNaming({
+    extractSessionRef,
+    extractOwnerSnapshot,
+    openFilesRef,
+    ensureWorkspaceSemanticDocumentsSynced,
+    semanticIndex,
+    captureMethodSymbolsSettled,
+    setStatusMessage,
+    renameSymbolAt,
+    promptSymbolName,
+    promptExtractName,
+    revealNavLocation,
+    finishExtractSession,
+  }), [
     captureMethodSymbolsSettled,
     ensureWorkspaceSemanticDocumentsSynced,
     extractOwnerSnapshot,
@@ -18690,145 +11613,25 @@ export function CodeWorkspaceTab({
   ]);
   continueExtractNamingRef.current = continueExtractNaming;
 
-  const runExtractMethod = useCallback(async () => {
-    const file = activeFile;
-    if (!file || file.loading || file.library) return;
-    // DEC-07 repeat protection: while one Extract Method owner is alive — from
-    // its first request through naming and the rename — a repeated chord is a
-    // no-op. Superseding a request that has already applied would commit a
-    // second extraction and history entry (observed as a corrupted double
-    // apply), so the first transaction keeps ownership until it finishes.
-    const inFlight = extractSessionRef.current;
-    if (inFlight && inFlight.phase !== "finished") return;
-    const selection = editorSelectionRef.current;
-    const range: LspRange = {
-      start: selection.start,
-      end: selection.empty ? selection.start : selection.end,
-    };
-    // Reserve the transaction owner synchronously, before any await: a repeated
-    // chord that arrives while this run samples symbols or requests candidates
-    // must see a live owner and become a no-op instead of starting a second
-    // extraction that would commit twice.
-    const session = beginExtractSession({
-      file,
-      range,
-      uri: extractLiveUri(file.key),
-      beforeSymbols: null,
-    });
-    if (!session) return;
-    const abandon = () => {
-      finishExtractSession(session);
-    };
-    // B0 symbols are sampled before any provider write so the post-extraction
-    // snapshot can be diffed against the frozen pre-commit context. The buffer is
-    // synchronized first: an undo or a previous transaction can leave the
-    // provider outline trailing the live buffer, which would poison the diff.
-    await ensureWorkspaceSemanticDocumentsSynced(file.key, semanticIndex.current().revision);
-    if (extractSessionRef.current !== session) return;
-    session.beforeSymbols = await captureMethodSymbolsSettled(file);
-    if (extractSessionRef.current !== session) return;
-    const requestAbort = new AbortController();
-    intentionRequestAbortRef.current?.abort();
-    intentionRequestAbortRef.current = requestAbort;
-    const requested = await requestCodeActions(
-      file,
-      range,
-      [],
-      ["refactor.extract"],
-      { signal: requestAbort.signal, allowCapabilityFallback: true },
-    );
-    if (requestAbort.signal.aborted || intentionRequestAbortRef.current !== requestAbort) {
-      abandon();
-      return;
-    }
-    // DEC-05: request failures already surfaced their accurate message.
-    if (requested.requestFailure) {
-      if (intentionRequestAbortRef.current === requestAbort) intentionRequestAbortRef.current = null;
-      abandon();
-      return;
-    }
-    if (requested.context?.document.uri !== session.uri) {
-      // The document identity moved while the candidates were requested.
-      abandon();
-      return;
-    }
-    const methodCandidates = requested.providerActions.filter(
-      (entry) => isExtractMethodKind(entry.action.kind),
-    );
-    const paneRect = editorPaneRef.current?.getBoundingClientRect();
-    const rect = selection.rect;
-    const anchor = rect
-      ? { clientX: Math.round(rect.left), clientY: Math.round(rect.bottom) }
-      : undefined;
-    if (methodCandidates.length === 0) {
-      // DEC-06: distinguish "nothing selected" from "this selection cannot be
-      // extracted"; never claim the server offered no actions on failure.
-      setStatusMessage(extractMethodBoundaryMessage(selection.empty));
-      if (intentionRequestAbortRef.current === requestAbort) intentionRequestAbortRef.current = null;
-      abandon();
-      return;
-    }
-    if (methodCandidates.length > 1) {
-      // DEC-02: render exactly the frozen method candidates. Re-requesting with
-      // the parent "refactor.extract" prefix here would reintroduce
-      // variable/constant/field/interface proposals into the Extract Method menu.
-      await showCodeActionsMenu(
-        anchor?.clientX ?? (paneRect?.left ?? 0) + 80,
-        anchor?.clientY ?? (paneRect?.top ?? 0) + 80,
-        file,
-        range,
-        [],
-        ["refactor.extract"],
-        "Extract Method",
-        anchor,
-        {
-          providerActions: methodCandidates,
-          context: requested.context!,
-          semanticToken: requested.semanticToken,
-        },
-      );
-      intentionRequestAbortRef.current = null;
-      abandon();
-      return;
-    }
-    const only = methodCandidates[0]!;
-    if (only.disabledReason) {
-      setStatusMessage(only.disabledReason);
-      if (intentionRequestAbortRef.current === requestAbort) intentionRequestAbortRef.current = null;
-      abandon();
-      return;
-    }
-    const intentionSnapshot = intentionSessionRef.current?.open(
-      [candidateFromProviderAction(only.action, only.evidence, only.disabledReason)],
-      {
-        fileKey: file.key,
-        uri: requested.context!.document.uri,
-        documentRevision: requested.context!.document.revision,
-        providerGeneration: requested.context!.provider.generation,
-        projectFingerprint: requested.context!.provider.projectFingerprint,
-      },
-    );
-    const candidateId = intentionSnapshot?.candidates[0]?.id;
-    if (!candidateId) {
-      finishExtractSession(session);
-      return;
-    }
-    session.phase = "resolve";
-    const outcome = await runCodeAction(
-      only.action,
-      file,
-      requested.semanticToken,
-      candidateId,
-      requested.context!,
-      session.id,
-    );
-    if (!outcome.appliedReceipt) {
-      finishExtractSession(session);
-      return;
-    }
-    session.receipt = outcome.appliedReceipt;
-    await continueExtractNaming(outcome.appliedReceipt);
-  }, [
+  const runExtractMethod = useCallback(createRunExtractMethod({
+    activeFile,
+    extractSessionRef,
+    editorSelectionRef,
+    beginExtractSession,
+    extractLiveUri,
+    finishExtractSession,
+    ensureWorkspaceSemanticDocumentsSynced,
+    semanticIndex,
+    captureMethodSymbolsSettled,
+    intentionRequestAbortRef,
+    requestCodeActions,
+    editorPaneRef,
+    setStatusMessage,
+    showCodeActionsMenu,
+    intentionSessionRef,
+    runCodeAction,
+    continueExtractNaming,
+  }), [
     activeFile,
     beginExtractSession,
     captureMethodSymbolsSettled,
@@ -18895,218 +11698,26 @@ export function CodeWorkspaceTab({
     }
   }, []);
 
-  const safeDeleteSymbolAtCursor = useCallback(async () => {
-    const file = activeFile;
-    if (!file || file.loading) return;
-    if (file.library) {
-      setStatusMessage(`${file.title} is a read-only library source`);
-      return;
-    }
-    const availability = evaluateDestructiveRefactorAvailability(null);
-    if (availability.state === "disabled") {
-      setStatusMessage(availability.message);
-      return;
-    }
-    const expectedRevision = semanticIndex.current().revision;
-    const live = await ensureWorkspaceSemanticDocumentsSynced(file.key, expectedRevision);
-    if (!live) {
-      referencesRequestSequenceRef.current += 1;
-      setStatusMessage("Safe Delete requires the language server to finish synchronizing current editor buffers");
-      return;
-    }
-    const descriptor = lspDescriptorForFile(live);
-    if (!descriptor) return;
-    const position = editorSelectionRef.current.start;
-    referencesRequestSequenceRef.current += 1;
-    const referencesRequestId = referencesRequestSequenceRef.current;
-    setBottomDockOpen(true);
-    setBottomDockTab("references");
-    setReferencesResult({
-      loading: true,
-      origin: `Safe Delete · ${live.subtitle}`,
-      locations: [],
-      error: null,
-      semanticGeneration: null,
-      semanticRevision: null,
-    });
-    const buildToken = semanticIndex.beginBuild("language-server");
-    try {
-      const prepared = await lspPrepareRename(descriptor, position);
-      updateLspStatusForFile(live, prepared.status);
-      if (!prepared.range) {
-        semanticIndex.abandonBuild(buildToken);
-        if (referencesRequestSequenceRef.current === referencesRequestId) {
-          setReferencesResult({
-            loading: false,
-            origin: `Safe Delete · ${live.subtitle}`,
-            locations: [],
-            error: prepared.message ?? "Cannot determine a safe symbol range here",
-            semanticGeneration: null,
-            semanticRevision: null,
-          });
-        }
-        setStatusMessage(prepared.message ?? "Cannot determine a safe symbol range here");
-        return;
-      }
-      const [references, definition] = await Promise.all([
-        lspReferences(descriptor, position, true),
-        lspDefinition(descriptor, position).catch(() => null),
-      ]);
-      updateLspStatusForFile(live, references.status);
-      if (definition) updateLspStatusForFile(live, definition.status);
-      const completion = semanticIndex.finishQuery(buildToken, {
-        kind: "safe-delete",
-        resultCount: references.locations.length,
-      });
-      if (completion.accepted && referencesRequestSequenceRef.current === referencesRequestId) {
-        setReferencesResult({
-          loading: false,
-          origin: `Safe Delete · ${live.subtitle}`,
-          locations: references.locations,
-          error: null,
-          semanticGeneration: buildToken.generation,
-          semanticRevision: buildToken.revision,
-        });
-      }
-      if (
-        !completion.accepted
-        || !workspaceSemanticIndexBuildIsCurrent(completion.snapshot, buildToken)
-      ) {
-        if (referencesRequestSequenceRef.current === referencesRequestId) {
-          setReferencesResult({
-            loading: false,
-            origin: `Safe Delete · ${live.subtitle}`,
-            locations: [],
-            error: "Safe Delete references became stale because the workspace changed",
-            semanticGeneration: null,
-            semanticRevision: null,
-          });
-        }
-        setStatusMessage("Safe Delete references became stale because the workspace changed; run Safe Delete again");
-        return;
-      }
-
-      const currentPath = absolutePathForOpenFile(live);
-      if (!currentPath) {
-        setStatusMessage("Safe Delete cannot resolve the active file path");
-        return;
-      }
-      const declarationLocation = definition?.locations.find((location) => location.path) ?? null;
-      const declaration = declarationLocation?.path
-        ? {
-          uri: declarationLocation.uri,
-          path: declarationLocation.path,
-          range: declarationLocation.range,
-        }
-        : {
-          uri: "",
-          path: currentPath,
-          range: prepared.range,
-        };
-      const deletion = buildSafeDeleteWorkspaceEdit(declaration, references.locations, {
-        workspaceRoots: rootsRef.current.map((root) => root.path),
-      });
-      if (!deletion.complete) {
-        const reason = deletion.diagnostics.join("; ") || "Safe Delete references are incomplete";
-        if (referencesRequestSequenceRef.current === referencesRequestId) {
-          setReferencesResult((current) => ({
-            ...current,
-            loading: false,
-            error: reason,
-          }));
-        }
-        setStatusMessage(`Safe Delete blocked: ${reason}`);
-        return;
-      }
-      const line = live.text.split("\n")[prepared.range.start.line] ?? "";
-      const symbol = prepared.range.start.line === prepared.range.end.line
-        ? line.slice(prepared.range.start.character, prepared.range.end.character).trim()
-        : "";
-      const fileCount = safeDeleteFileCount(deletion.locations);
-      const confirmed = await confirmAppDialog({
-        title: "Safe Delete Symbol",
-        message: [
-          `Delete ${symbol ? `"${symbol}"` : "the selected symbol"} and ${deletion.usageCount} reference${deletion.usageCount === 1 ? "" : "s"}?`,
-          `${deletion.locations.length} occurrence${deletion.locations.length === 1 ? "" : "s"} across ${fileCount} file${fileCount === 1 ? "" : "s"} will be changed.`,
-          "The complete operation can be undone as one workspace edit.",
-        ].join("\n"),
-        confirmLabel: "Delete Symbol",
-        danger: true,
-      });
-      if (!confirmed) {
-        setStatusMessage("Safe Delete cancelled; references remain open for review");
-        return;
-      }
-      const documentUri = descriptor.documentUri ?? lspFilesRef.current[file.key]?.status?.uri ?? descriptor.filePath;
-      const evidence = buildCapabilityEvidence({
-        capabilityId: "refactor.safeDelete",
-        languageId: descriptor.languageId ?? "java",
-        provider: {
-          id: descriptor.languageId ?? "jdtls",
-          version: null,
-          generation: lspSessionGeneration(),
-        },
-        projectFingerprint: projectAnalysisSnapshot?.projectFingerprint ?? "",
-        uri: documentUri,
-        revision: live.documentRevision ?? 0,
-        position,
-        scope: "project",
-        complete: deletion.complete,
-        reason: deletion.complete
-          ? "all references resolved within workspace roots"
-          : "references could not be completely resolved",
-      });
-      const plan = buildRefactorPlan({
-        actionId: `safe-delete:${documentUri}:${prepared.range.start.line}:${prepared.range.start.character}`,
-        kind: "safe-delete",
-        evidence,
-        edit: deletion.edit,
-        roots: rootsRef.current,
-        openFiles: buildPlanOpenFiles(),
-        completeness: {
-          value: deletion.complete ? "complete" : "partial",
-          source: "client-observed-bounded",
-          proof: deletion.complete
-            ? "client-observed references within workspace roots"
-            : "references could not be completely resolved",
-        },
-      });
-      const gate = refactorApplyGate(plan);
-      if (!gate.allowed) {
-        semanticIndex.abandonBuild(buildToken);
-        const reason = gate.reason || "Safe Delete blocked by refactor gate";
-        if (referencesRequestSequenceRef.current === referencesRequestId) {
-          setReferencesResult((current) => ({
-            ...current,
-            loading: false,
-            error: reason,
-          }));
-        }
-        setStatusMessage(`Safe Delete blocked: ${reason}`);
-        return;
-      }
-      await applyLspWorkspaceEdit(deletion.edit, {
-        label: "Safe delete symbol",
-        semanticGeneration: buildToken.generation,
-        semanticRevision: buildToken.revision,
-        semanticWorkspaceOnly: true,
-        plan,
-      });
-    } catch (error) {
-      semanticIndex.failBuild(buildToken, errorMessage(error));
-      if (referencesRequestSequenceRef.current === referencesRequestId) {
-        setReferencesResult({
-          loading: false,
-          origin: `Safe Delete · ${live.subtitle}`,
-          locations: [],
-          error: errorMessage(error),
-          semanticGeneration: null,
-          semanticRevision: null,
-        });
-      }
-      setStatusMessage(`Cannot safely delete symbol: ${errorMessage(error)}`);
-    }
-  }, [
+  const safeDeleteSymbolAtCursor = useCallback(createSafeDeleteSymbolAtCursor({
+    activeFile,
+    setStatusMessage,
+    semanticIndex,
+    ensureWorkspaceSemanticDocumentsSynced,
+    referencesRequestSequenceRef,
+    lspDescriptorForFile,
+    editorSelectionRef,
+    setBottomDockOpen,
+    setBottomDockTab,
+    setReferencesResult,
+    updateLspStatusForFile,
+    absolutePathForOpenFile,
+    rootsRef,
+    lspFilesRef,
+    lspSessionGeneration,
+    projectAnalysisSnapshot,
+    buildPlanOpenFiles,
+    applyLspWorkspaceEdit,
+  }), [
     absolutePathForOpenFile,
     activeFile,
     applyLspWorkspaceEdit,
@@ -19123,228 +11734,26 @@ export function CodeWorkspaceTab({
   safeDeleteSymbolRef.current = safeDeleteSymbolAtCursor;
 
   const runFindReferences = useCallback(
-    async (file: OpenFileState, position: LspPosition, selection: UsagesScopeSelection) => {
-      referencesRequestSequenceRef.current += 1;
-      const requestId = referencesRequestSequenceRef.current;
-      setBottomDockOpen(true);
-      setBottomDockTab("references");
-      setReferencesResult({
-        loading: true,
-        origin: file.subtitle,
-        locations: [],
-        error: null,
-        semanticGeneration: null,
-        semanticRevision: null,
-      });
-      usageSessionRef.current?.startLoading(
-        { uri: "", range: { start: position, end: position }, displayName: "", providerSymbolId: null },
-        selection,
-      );
-      const expectedRevision = semanticIndex.current().revision;
-      const live = await ensureWorkspaceSemanticDocumentsSynced(file.key, expectedRevision);
-      if (!live) {
-        if (referencesRequestSequenceRef.current !== requestId) return;
-        setReferencesResult({
-          loading: false,
-          origin: file.subtitle,
-          locations: [],
-          error: "References require the language server to finish synchronizing current editor buffers",
-          semanticGeneration: null,
-          semanticRevision: null,
-        });
-        return;
-      }
-      const descriptor = lspDescriptorForFile(live);
-      if (!descriptor) {
-        if (referencesRequestSequenceRef.current === requestId) {
-          setReferencesResult({
-            loading: false,
-            origin: file.subtitle,
-            locations: [],
-            error: "No language server is available for references",
-            semanticGeneration: null,
-            semanticRevision: null,
-          });
-        }
-        return;
-      }
-      const buildToken = semanticIndex.beginBuild("language-server");
-      let query: ReturnType<typeof beginSemanticQuery> | null = null;
-      try {
-        // §8.19.7 real identity + origin symbol key: name comes from the
-        // provider's rename range when available (fallback: word at caret),
-        // so rerun targets the same symbol rather than whatever sits under
-        // the caret later.
-        let symbolRange: LspRange | null = null;
-        try {
-          const prepared = await lspPrepareRename(descriptor, position);
-          symbolRange = prepared.range ?? null;
-        } catch {
-          symbolRange = null;
-        }
-        if (referencesRequestSequenceRef.current !== requestId) {
-          semanticIndex.abandonBuild(buildToken);
-          return;
-        }
-        const lines = live.text.split("\n");
-        const lineText = lines[position.line] ?? "";
-        const symbolName = (symbolRange
-          && symbolRange.start.line === symbolRange.end.line
-          ? lineText.slice(symbolRange.start.character, symbolRange.end.character).trim()
-          : "")
-          || lineText.slice(position.character).match(/^[A-Za-z0-9_$]+/)?.[0]
-          || "";
-        const identity = makeSemanticRequestIdentity({
-          workspaceId: workspaceInstanceId,
-          fileKey: live.key,
-          uri: descriptor.documentUri ?? descriptor.filePath,
-          position,
-          documentRevision: live.documentRevision ?? 0,
-          providerGeneration: lspSessionGeneration(),
-          workspaceRoots: rootsRef.current.map((root) => root.path),
-        });
-        const queryContext = beginSemanticQuery("references", live, descriptor, position);
-        query = queryContext;
-        // §8.20.5 W4 / §8.26.8 AA7: execute via SemanticQueryHost with cancellation and generation guard
-        const queryRes = await semanticQueryHostRef.current.executeEnvelope<LspLocation>({
-          kind: "references",
-          identity: queryContext.identity,
-          fetcher: async ({ signal }) => {
-            const res = await lspReferences(
-              descriptor,
-              position,
-              selection.includeDeclaration,
-              queryContext.lspOptions(signal),
-            );
-            updateLspStatusForFile(live, res.status);
-            return semanticLocationsFromResult(res);
-          },
-          guards: queryContext.guards,
-        });
-        if (queryRes.status === "cancelled" || queryRes.status === "stale") {
-          semanticIndex.abandonBuild(buildToken);
-          if (referencesRequestSequenceRef.current === requestId) {
-            setReferencesResult({
-              loading: false,
-              origin: live.subtitle,
-              locations: [],
-              error: queryRes.status === "cancelled"
-                ? "References request cancelled"
-                : "References result became stale because the workspace changed",
-              semanticGeneration: null,
-              semanticRevision: null,
-            });
-          }
-          return;
-        }
-        if (referencesRequestSequenceRef.current !== requestId) {
-          semanticIndex.abandonBuild(buildToken);
-          return;
-        }
-        if (!queryContext.isCurrent(queryRes.identity)) {
-          semanticIndex.abandonBuild(buildToken);
-          setReferencesResult({
-            loading: false,
-            origin: live.subtitle,
-            locations: [],
-            error: "References result became stale because the workspace changed",
-            semanticGeneration: null,
-            semanticRevision: null,
-          });
-          return;
-        }
-        if (queryRes.status === "unavailable" || queryRes.status === "error") {
-          const message = queryRes.status === "error"
-            ? queryRes.error ?? "Language server failed to find references"
-            : "References are unavailable from the language server";
-          semanticIndex.failBuild(buildToken, message);
-          setReferencesResult({
-            loading: false,
-            origin: live.subtitle,
-            locations: [],
-            error: message,
-            semanticGeneration: null,
-            semanticRevision: null,
-          });
-          return;
-        }
-        const locations: readonly LspLocation[] = queryRes.items ?? [];
-        const completion = semanticIndex.finishQuery(buildToken, {
-          kind: "references",
-          resultCount: locations.length,
-        });
-        if (!completion.accepted) {
-          const message = "References result became stale because the workspace changed";
-          setReferencesResult({
-            loading: false,
-            origin: live.subtitle,
-            locations: [],
-            error: message,
-            semanticGeneration: null,
-            semanticRevision: null,
-          });
-          return;
-        }
-        if (referencesRequestSequenceRef.current !== requestId || !queryContext.isCurrent()) return;
-        referencesRerunRef.current = { fileKey: live.key, uri: identity.uri, position, symbolName };
-        // §8.20.5 W4: freeze the scoped result into the shared session — the
-        // tool window rows, the Show Usages popup and recents all read THIS
-        // snapshot; nothing copies result truth elsewhere.
-        const snapshot = usageSessionRef.current?.start({
-          symbol: {
-            uri: descriptor.documentUri ?? descriptor.filePath,
-            range: symbolRange ?? { start: position, end: position },
-            displayName: symbolName,
-            providerSymbolId: null,
-          },
-          selection,
-          evidence: {
-            languageId: descriptor.languageId ?? "plaintext",
-            provider: { id: "jdtls", version: null, generation: lspSessionGeneration() },
-            projectFingerprint: projectAnalysisSnapshot?.projectFingerprint ?? identity.projectFingerprint,
-            uri: identity.uri,
-            revision: live.documentRevision ?? 0,
-            scope: "project",
-          },
-          locations,
-          isLibraryUri: libraryUriClassifierForRoots(rootsRef.current, relativePathWithinRoot),
-          workspaceRoots: rootsRef.current.map((root) => root.path),
-          usageCompleteness: "complete",
-        }) ?? null;
-        if (referencesRequestSequenceRef.current !== requestId || !queryContext.isCurrent()) return;
-        const scopedLocations = (snapshot?.envelope.results ?? []).map(({ role: _role, ...location }) => location);
-        setUsagesRecentsRevision((revision) => revision + 1);
-        setReferencesResult({
-          loading: false,
-          origin: live.subtitle,
-          locations: scopedLocations,
-          error: null,
-          semanticGeneration: buildToken.generation,
-          semanticRevision: buildToken.revision,
-          symbolName,
-          identity,
-        });
-        setStatusMessage(`${scopedLocations.length} reference${scopedLocations.length === 1 ? "" : "s"} found${scopedLocations.length !== locations.length ? ` (${locations.length} unscoped)` : ""}${formatUsageEvidenceSuffix(snapshot?.usageEvidence ?? null)}`);
-      } catch (err) {
-        if (
-          referencesRequestSequenceRef.current !== requestId
-          || (query !== null && !query.isCurrent())
-        ) {
-          semanticIndex.abandonBuild(buildToken);
-          return;
-        }
-        semanticIndex.failBuild(buildToken, errorMessage(err));
-        if (referencesRequestSequenceRef.current !== requestId) return;
-        setReferencesResult({
-          loading: false,
-          origin: file.subtitle,
-          locations: [],
-          error: errorMessage(err),
-          semanticGeneration: null,
-          semanticRevision: null,
-        });
-      }
-    },
+    createRunFindReferences({
+    referencesRequestSequenceRef,
+    setBottomDockOpen,
+    setBottomDockTab,
+    setReferencesResult,
+    usageSessionRef,
+    semanticIndex,
+    ensureWorkspaceSemanticDocumentsSynced,
+    lspDescriptorForFile,
+    beginSemanticQuery,
+    workspaceInstanceId,
+    lspSessionGeneration,
+    rootsRef,
+    semanticQueryHostRef,
+    updateLspStatusForFile,
+    referencesRerunRef,
+    projectAnalysisSnapshot,
+    setUsagesRecentsRevision,
+    setStatusMessage,
+  }),
     [
       beginSemanticQuery,
       ensureWorkspaceSemanticDocumentsSynced,
@@ -20135,100 +12544,21 @@ export function CodeWorkspaceTab({
   ]);
 
   /** IDEA-style Ctrl+F9: compile the active root using its real build tool. */
-  const buildActiveProject = useCallback(async (rebuild = false) => {
-    if (projectBuildBusy) return;
-    const file = openFilesRef.current[activeKey ?? ""];
-    const root = file?.ref.kind === "root"
-      ? findRoot(file.ref.rootId)
-      : rootsRef.current[0] ?? null;
-    if (!root) return;
-    setProjectBuildBusy(true);
-    try {
-      const absolute = file ? absolutePathForOpenFile(file) : undefined;
-      const executionModel = await workspaceExecutionModel(root.path, absolute ?? undefined, toolConfigRef.current);
-      const normalizedActive = absolute ? normalizeFsPath(absolute) : null;
-      const project = executionModel.projects
-        .filter((candidate) => !normalizedActive
-          || relativePathWithinRoot(candidate.root, normalizedActive) !== null)
-        .sort((left, right) => right.root.length - left.root.length)[0];
-      const buildTarget = project
-        ? executionModel.buildTargets.find((target) => target.projectId === project.id && target.kind === "build")
-        : null;
-      const cleanTarget = project
-        ? executionModel.buildTargets.find((target) => target.projectId === project.id && target.kind === "clean")
-        : null;
-      if (buildTarget && (!rebuild || cleanTarget)) {
-        const toTask = (target: ExecutionBuildTarget): WorkspaceTaskItem => ({
-          id: target.id,
-          label: target.label,
-          command: target.command.display,
-          cwd: target.command.cwd,
-          source: project ? `${project.languages.join("/")} · ${project.provider}` : "Build target",
-          rootId: root.id,
-          rootName: root.name,
-          execution: {
-            executable: target.command.executable,
-            args: target.command.args,
-            source: target.command.source,
-            error: target.command.error,
-          },
-          environment: Object.fromEntries(Object.entries(target.command.env).map(([name, value]) => [
-            name,
-            { value, mode: "replace" as const },
-          ])),
-          dependsOn: target.dependsOn,
-        });
-        const requestedIds = rebuild && cleanTarget
-          ? [cleanTarget.id, buildTarget.id]
-          : [buildTarget.id];
-        const plan = resolveBuildTargetPlan(requestedIds, executionModel.buildTargets)
-          .map(toTask);
-        const result = await executeTaskPlan(plan, (task, onExit) => launchWorkspaceTask(task, onExit));
-        if (result.exitCode !== 0) {
-          throw new Error(`Build stopped at ${result.failed?.label ?? "a prerequisite"} (exit ${result.exitCode})`);
-        }
-        setStatusMessage(`${rebuild ? "Rebuilt" : "Built"} ${project?.module ?? root.name}`);
-        return;
-      }
-      const groups = await workspaceTaskTree(root.path, toolConfigRef.current);
-      const preferred = rebuild
-        ? [["Maven", "rebuild"], ["Gradle", "rebuild"], ["Cargo.toml", "rebuild"]]
-        : [
-            ["Maven", "compile"],
-            ["Gradle", "classes"],
-            ["Gradle", "build"],
-            ["Cargo.toml", "build"],
-            ["package.json", "build"],
-            ["Makefile", "build"],
-          ];
-      let selected: WorkspaceTaskItem | null = null;
-      for (const [source, label] of preferred) {
-        const task = groups
-          .find((group) => group.source === source)
-          ?.tasks.find((candidate) => candidate.label === label);
-        if (task) {
-          selected = { ...task, rootId: root.id, rootName: root.name };
-          break;
-        }
-      }
-      if (!selected) {
-        setStatusMessage(rebuild
-          ? "No rebuild task was detected for this project"
-          : "No build task was detected for this project");
-        setBottomDockTab("build");
-        setBottomDockOpen(true);
-        return;
-      }
-      await runTaskAndWait(selected);
-      setStatusMessage(`${rebuild ? "Rebuilt" : "Built"} ${root.name}`);
-    } catch (error) {
-      setStatusMessage(errorMessage(error));
-      setBottomDockTab("build");
-      setBottomDockOpen(true);
-    } finally {
-      setProjectBuildBusy(false);
-    }
-  }, [
+  const buildActiveProject = useCallback(createBuildActiveProject({
+    projectBuildBusy,
+    openFilesRef,
+    activeKey,
+    findRoot,
+    rootsRef,
+    setProjectBuildBusy,
+    absolutePathForOpenFile,
+    toolConfigRef,
+    launchWorkspaceTask,
+    setStatusMessage,
+    setBottomDockTab,
+    setBottomDockOpen,
+    runTaskAndWait,
+  }), [
     activeKey,
     absolutePathForOpenFile,
     findRoot,
@@ -20685,114 +13015,28 @@ export function CodeWorkspaceTab({
   );
 
   /** Build a Java launch config for the active file and start debugging. */
-  const startDebugActiveFile = useCallback(() => {
-    const file = openFilesRef.current[activeKey ?? ""];
-    if (!file || file.ref.kind !== "root") return;
-    const root = findRoot(file.ref.rootId);
-    if (!root) return;
-    const absolute = absolutePathForOpenFile(file);
-    if (!absolute) return;
-    const descriptor = lspDescriptorForFile(file);
-    const rootId = file.ref.rootId;
-    const launch: Record<string, unknown> = {
-      workspaceId: descriptor?.workspaceId ?? workspaceInstanceId,
-      rootPath: root.path,
-      filePath: absolute,
-      cwd: root.path,
-      // Bind the debug session to the same jdtls the editor uses (custom command).
-      serverCommandId: descriptor?.serverCommandId ?? null,
-      customServerCommand: descriptor?.customServerCommand ?? null,
-    };
-    setBottomDockTab("debug");
-    setBottomDockOpen(true);
-    // Show the session console from the first click: everything below (save,
-    // build, main-class resolution) happens before an adapter exists and can
-    // take tens of seconds on a cold project.
-    debug.reportStartupProgress(`Starting debug for ${file.title}`);
-    void (async () => {
-      try {
-        if (file.dirty) await saveOpenBufferText(file.key, file.text);
-        await executeBeforeLaunch(
-          activeRunConfiguration?.preLaunchTargets ?? [],
-          activeExecutionModel?.buildTargets ?? [],
-          root,
-        );
-      } catch (error) {
-        const message = `Cannot start debug: ${errorMessage(error)}`;
-        setStatusMessage(message);
-        debug.reportStartupFailure(message);
-        return;
-      }
-      // jdtls remains the Java-specific compiler/diagnostic barrier. When a
-      // structured Before launch build already ran, do not compile twice.
-      if (!(activeRunConfiguration?.preLaunchTargets.length)
-        && !(await prepareJavaLaunch(rootId, descriptor))) return;
-      // Resolve the runnable main up front: launch the active-file / sole main
-      // directly, or prompt when several mains exist (never run an arbitrary one).
-      debug.reportStartupProgress("Resolving main class…");
-      let resolution: JavaMainClassResolution;
-      try {
-        resolution = await dapResolveJavaMainClasses(launch);
-      } catch (err) {
-        // Surface in the Debug panel (not just the status bar): a rejected
-        // resolve is the common "no active jdtls session / no debug bundle"
-        // failure, and the transient status message is easy to miss.
-        const message = errorMessage(err);
-        setStatusMessage(message);
-        debug.reportStartupFailure(`Debug failed to start: ${message}`);
-        return;
-      }
-      if (!mountedRef.current) return;
-      if (resolution.kind === "none") {
-        const message = "No runnable main class found in this Java project";
-        setStatusMessage(message);
-        debug.reportStartupFailure(message);
-        return;
-      }
-      if (resolution.kind === "choose") {
-        let dotenv: Record<string, string> = {};
-        try {
-          dotenv = await readEnvironmentFile(
-            activeRunConfiguration?.command.cwd ?? root.path,
-            activeRunConfiguration?.envFile,
-          );
-        } catch (error) {
-          const message = `Cannot start debug: ${errorMessage(error)}`;
-          setStatusMessage(message);
-          debug.reportStartupFailure(message);
-          return;
-        }
-        debug.reportStartupProgress("Waiting for a main class to be picked…");
-        setJavaMainCandidates({
-          candidates: resolution.candidates,
-          launch,
-          override: activeRunConfigurationOverride,
-          environment: dotenv,
-          runtimeOptions: [...(activeRunConfiguration?.runtimeOptions ?? [])],
-        });
-        return;
-      }
-      let dotenv: Record<string, string> = {};
-      try {
-        dotenv = await readEnvironmentFile(
-          activeRunConfiguration?.command.cwd ?? root.path,
-          activeRunConfiguration?.envFile,
-        );
-      } catch (error) {
-        const message = `Cannot start debug: ${errorMessage(error)}`;
-        setStatusMessage(message);
-        debug.reportStartupFailure(message);
-        return;
-      }
-      launchJavaDebug(
-        launch,
-        resolution.main,
-        activeRunConfigurationOverride,
-        dotenv,
-        activeRunConfiguration?.runtimeOptions,
-      );
-    })();
-  }, [
+  const startDebugActiveFile = useCallback(createStartDebugActiveFile({
+    openFilesRef,
+    activeKey,
+    findRoot,
+    absolutePathForOpenFile,
+    lspDescriptorForFile,
+    workspaceInstanceId,
+    setBottomDockTab,
+    setBottomDockOpen,
+    debug,
+    saveOpenBufferText,
+    executeBeforeLaunch,
+    activeRunConfiguration,
+    activeExecutionModel,
+    setStatusMessage,
+    prepareJavaLaunch,
+    mountedRef,
+    readEnvironmentFile,
+    setJavaMainCandidates,
+    activeRunConfigurationOverride,
+    launchJavaDebug,
+  }), [
     activeExecutionModel,
     activeKey,
     activeRunConfiguration,
@@ -20813,122 +13057,25 @@ export function CodeWorkspaceTab({
   ]);
 
 
-  const startDebugActiveTarget = useCallback(() => {
-    // A Java source without a selected structured debug configuration uses the
-    // compatibility jdtls launch path. Once a configuration supplies a debug
-    // entry, honor its availability first so compound/debug-only entries cannot
-    // silently fall through to the compatibility launcher.
-    const canUseJavaCompatibilityDebug = activeFileIsJava
-      && !activeRunConfiguration?.debugConfigurationId
-      && activeRunConfiguration?.kind !== "debug-only";
-    if (canUseJavaCompatibilityDebug && !activeDebugConfiguration) {
-      startDebugActiveFile();
-      return;
-    }
-    if (activeFileIsJava && !activeDebugConfiguration) {
-      setStatusMessage("No available debug configuration is associated with the selected Run configuration");
-      return;
-    }
-    const configuration = activeDebugConfiguration;
-    if (!configuration?.available) {
-      if (configuration?.diagnostic) setStatusMessage(configuration.diagnostic);
-      return;
-    }
-    const file = openFilesRef.current[activeKey ?? ""];
-    if (!file || file.ref.kind !== "root" || file.library) return;
-    const rootId = file.ref.rootId;
-    setBottomDockTab("debug");
-    setBottomDockOpen(true);
-    debug.reportStartupProgress(`Starting ${configuration.label}`);
-    void (async () => {
-      try {
-        if (file.dirty) await saveOpenBufferText(file.key, file.text);
-        const root = findRoot(rootId);
-        if (!root) throw new Error("Cannot resolve the active workspace root");
-        const catalog = activeDebugConfigurationCatalog;
-        const buildTargets = activeExecutionModel?.buildTargets ?? [];
-        const resolveRoot = (candidate: ExecutionDebugConfiguration): CodeWorkspaceRootInfo => {
-          const project = activeExecutionModel?.projects.find((item) => item.id === candidate.projectId);
-          const projectRoot = project && roots.find((item) => (
-            relativePathWithinRoot(item.path, project.root) !== null
-          ));
-          if (!projectRoot || projectRoot.id !== root.id) {
-            throw new Error(`Compound Debug child belongs to another workspace root: ${candidate.label}`);
-          }
-          return projectRoot;
-        };
-        const nodes = validateCompoundExecutionGraph(
-          configuration,
-          catalog.filter((candidate) => candidate.id !== configuration.id),
-        );
-        const validated = new Map<string, ExecutionDebugConfiguration>();
-        const collectReachable = (candidate: ExecutionDebugConfiguration) => {
-          if (validated.has(candidate.id)) return;
-          if (!candidate.available) {
-            throw new Error(candidate.diagnostic || `Debug configuration is unavailable: ${candidate.label}`);
-          }
-          resolveRoot(candidate);
-          resolveBuildTargetPlan(candidate.preLaunchTargets, buildTargets);
-          validated.set(candidate.id, candidate);
-          for (const childId of candidate.compoundConfigurationIds ?? []) {
-            const child = nodes.get(childId);
-            if (!child) throw new Error(`Compound Debug child is missing: ${childId}`);
-            collectReachable(child);
-          }
-        };
-        collectReachable(configuration);
-        // Resolve every dotenv before any build or adapter process starts. A
-        // malformed/missing later child must never leave a half-launched group.
-        const launches = new Map<string, ExecutionDebugConfiguration>();
-        await Promise.all(Array.from(validated.values()).map(async (candidate) => {
-          if (candidate.compoundConfigurationIds !== undefined) return;
-          const candidateRoot = resolveRoot(candidate);
-          const cwdValue = candidate.launchConfig.adapterCwd;
-          const cwd = typeof cwdValue === "string" && cwdValue.trim() ? cwdValue : candidateRoot.path;
-          const dotenv = await readEnvironmentFile(cwd, candidate.envFile);
-          launches.set(candidate.id, mergeDebugEnvironment(candidate, dotenv));
-        }));
-        const buildPlan = (candidate: ExecutionDebugConfiguration): DebugLaunchNode => {
-          const childIds = candidate.compoundConfigurationIds;
-          if (childIds === undefined) {
-            const launch = launches.get(candidate.id);
-            if (!launch) throw new Error(`Compound Debug launch was not resolved: ${candidate.label}`);
-            return {
-              id: launch.id,
-              label: launch.label,
-              adapterId: launch.adapterId,
-              launchConfig: launch.launchConfig,
-            };
-          }
-          return {
-            id: candidate.id,
-            label: candidate.label,
-            parallel: candidate.compoundParallel,
-            stopOnFailure: candidate.compoundStopOnFailure,
-            children: childIds.map((childId) => {
-              const child = validated.get(childId);
-              if (!child) throw new Error(`Compound Debug child is missing: ${childId}`);
-              return buildPlan(child);
-            }),
-          } satisfies DebugLaunchGroup;
-        };
-        // Before-launch tasks are completed for the validated graph before DAP
-        // startup. Resolve the union once so shared dependencies execute once.
-        await executeBeforeLaunch(
-          Array.from(validated.values()).flatMap((candidate) => candidate.preLaunchTargets),
-          buildTargets,
-          root,
-        );
-        const plan = buildPlan(configuration);
-        if ("children" in plan) await debug.startDebugGroup(plan);
-        else await debug.startDebug(plan.launchConfig, plan.adapterId);
-      } catch (error) {
-        const message = `Debug failed to start: ${errorMessage(error)}`;
-        setStatusMessage(message);
-        debug.reportStartupFailure(message);
-      }
-    })();
-  }, [
+  const startDebugActiveTarget = useCallback(createStartDebugActiveTarget({
+    activeFileIsJava,
+    activeRunConfiguration,
+    activeDebugConfiguration,
+    startDebugActiveFile,
+    setStatusMessage,
+    openFilesRef,
+    activeKey,
+    setBottomDockTab,
+    setBottomDockOpen,
+    debug,
+    saveOpenBufferText,
+    findRoot,
+    activeDebugConfigurationCatalog,
+    activeExecutionModel,
+    roots,
+    readEnvironmentFile,
+    executeBeforeLaunch,
+  }), [
     activeDebugConfiguration,
     activeDebugConfigurationCatalog,
     activeExecutionModel,
@@ -23911,3 +16058,6 @@ export function CodeWorkspaceTab({
     </WorkspaceClipboardSessionContext.Provider>
   );
 }
+
+
+export { type CodeWorkspaceGitManagerPayload, isDeclarationDefinitionEquivalentLanguage, extractContextSnippet, debugCurrentLineForFile } from "./workspace/controller/model";
