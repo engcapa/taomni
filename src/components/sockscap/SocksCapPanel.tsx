@@ -1,23 +1,40 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, AlertTriangle, ArrowDown, ArrowDownLeft, ArrowUp, ArrowUpRight, CheckCircle2, ChevronDown, ChevronRight, Copy, FolderOpen, HelpCircle, Info, Layers, Loader2, Lock, PanelLeftClose, PanelLeftOpen, Pencil, Play, Plus, RefreshCw, Search, Shield, Square, Trash2, X } from "lucide-react";
-import { sockscapCapabilities, sockscapGetConfig, sockscapValidateMacosApp, sockscapGfwlistStatus, sockscapImportRules, sockscapListProcesses, sockscapRefreshGfwlist, sockscapSetConfig, sockscapLaunchedApps, sockscapStatsSnapshot, sockscapStatus, sockscapGetDomainRecords, sockscapClearDomainRecords, sockscapHelperStatus, sockscapTestTarget, sockscapTestUpstream, sockscapTestCoreUpstream, sockscapParseShareLink, sockscapDetectLocalProxies, sockscapDetectTunConflicts, sockscapImportSubscription, sockscapRedirectorInstallStatus, upstreamRequiresCore, type AppSelector, type LocalProxyCandidate, type Decision, type DomainRecord, type GfwListStatus, type HelperStatus, type LaunchedAppInfo, type ProcessInfo, type RedirectorInstallStatus, type RuleMode, type ScopeMode, type SocksCapCapabilities, type SocksCapConfig, type SocksCapProfile, type SocksCapStatus, type StatsSnapshot, type TargetTestResult, type UpstreamKind, type UpstreamParams, type UserRule } from "../../lib/sockscap";
+import { AlertCircle, AlertTriangle, CheckCircle2, Copy, Info, Loader2, PanelLeftOpen, Plus, RefreshCw, Shield, X } from "lucide-react";
+import { sockscapCapabilities, sockscapGetConfig, sockscapValidateMacosApp, sockscapGfwlistStatus, sockscapListProcesses, sockscapLaunchedApps, sockscapStatsSnapshot, sockscapStatus, sockscapGetDomainRecords, sockscapHelperStatus, sockscapDetectLocalProxies, sockscapDetectTunConflicts, sockscapRedirectorInstallStatus, type AppSelector, type LocalProxyCandidate, type DomainRecord, type GfwListStatus, type HelperStatus, type LaunchedAppInfo, type ProcessInfo, type RedirectorInstallStatus, type SocksCapCapabilities, type SocksCapConfig, type SocksCapStatus, type StatsSnapshot, type TargetTestResult, type UserRule } from "../../lib/sockscap";
 import { type UpstreamConfigIssue } from "../../lib/sockscapPreflight";
 import { SocksCapRootPrompt } from "./SocksCapRootPrompt";
 import { SocksCapMacosSetupGuide } from "./SocksCapMacosSetupGuide";
-import { UpstreamSourcePicker, type UpstreamChoice } from "./UpstreamSourcePicker";
-import { listSessions, vaultPut, vaultStatus, VAULT_LOCKED_EVENT } from "../../lib/ipc";
+import { type UpstreamChoice } from "./UpstreamSourcePicker";
+import { listSessions } from "../../lib/ipc";
 import { useT } from "../../lib/i18n";
-import { isTauriRuntime } from "../../lib/runtime";
 import { writeText } from "../../lib/clipboard";
 import { open } from "@tauri-apps/plugin-dialog";
-import { type Props, type MacosSetupGuideMode, hasCompletedMacosSetup, type SessionOpt, type EnvironmentDraft, normalizeFrontendConfig, DEFAULT_CFG, DEFAULT_PROFILE, profilesByPriority, MIN_PROFILE_PRIORITY, MAX_PROFILE_PRIORITY, phaseTone } from "./panel/configuration";
+import { type Props, type MacosSetupGuideMode, hasCompletedMacosSetup, type SessionOpt, normalizeFrontendConfig, DEFAULT_CFG, DEFAULT_PROFILE, profilesByPriority } from "./panel/configuration";
 import { Field } from "./panel/Field";
-import { normalizeLaunchPreparation, formatRootlessArguments, launchPreparationIsEmpty, rootlessAppKey, formatRootlessCommand } from "./panel/launchPolicy";
-import { formatSpeed, formatBytes, formatTime } from "./panel/formatting";
 import { Section } from "./panel/Section";
-import { ManualAppAdd } from "./panel/ManualAppAdd";
 import { createSocksCapLifecycleActions } from "./panel/lifecycleActions";
 import { createApplicationLaunch } from "./panel/applicationLaunch";
+import { SocksCapHeader } from "./panel/SocksCapHeader";
+import { ProfileSidebar } from "./panel/ProfileSidebar";
+import { ApplicationsSection } from "./panel/ApplicationsSection";
+import { UpstreamSection } from "./panel/UpstreamSection";
+import { RulesSection } from "./panel/RulesSection";
+import { TrafficSection } from "./panel/TrafficSection";
+import { createProfileActions } from "./panel/createProfileActions";
+import { createGfwActions } from "./panel/createGfwActions";
+import { createTargetProbe } from "./panel/createTargetProbe";
+import { createUpstreamPasswordActions } from "./panel/createUpstreamPasswordActions";
+import { createUpstreamActions } from "./panel/createUpstreamActions";
+import { createCoreParamsView } from "./panel/createCoreParamsView";
+import { useRootlessApplicationDraft } from "./panel/useRootlessApplicationDraft";
+
+
+
+
+
+
+
+
 
 
 
@@ -41,18 +58,6 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
   const [launchedApps, setLaunchedApps] = useState<LaunchedAppInfo[]>([]);
   const [launchingPath, setLaunchingPath] = useState<string | null>(null);
   const [stoppingPid, setStoppingPid] = useState<number | null>(null);
-  const [rootlessCommand, setRootlessCommand] = useState("");
-  const [rootlessArguments, setRootlessArguments] = useState("");
-  const [rootlessLaunchMode, setRootlessLaunchMode] =
-    useState<"desktop" | "terminal">("desktop");
-  const [rootlessPreparationOpen, setRootlessPreparationOpen] = useState(false);
-  const [rootlessWorkingDirectory, setRootlessWorkingDirectory] = useState("");
-  const [rootlessPreCommand, setRootlessPreCommand] = useState("");
-  const [rootlessLaunchShell, setRootlessLaunchShell] =
-    useState<"sh" | "bash">("sh");
-  const [rootlessEnvironment, setRootlessEnvironment] = useState<EnvironmentDraft[]>([]);
-  const [editingRootlessAppKey, setEditingRootlessAppKey] = useState<string | null>(null);
-  const nextEnvironmentDraftId = useRef(1);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [testHost, setTestHost] = useState("www.google.com");
@@ -331,298 +336,18 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     () => (cfg ? profilesByPriority(cfg.profiles) : []),
     [cfg],
   );
-
-  const persistConfig = async (next: SocksCapConfig) => {
-    if (locked) {
-      report(t("sockscap.lockedTooltip"), false);
-      return false;
-    }
-    try {
-      await sockscapSetConfig(next);
-      setCfg(next);
-      report(t("sockscap.saved"));
-      return true;
-    } catch (e) {
-      report(String(e), false);
-      return false;
-    }
-  };
-
-  const patchSelectedProfile = async (
-    partial: Partial<SocksCapProfile>,
-  ): Promise<SocksCapConfig | null> => {
-    if (!cfg) return null;
-    const profiles = cfg.profiles.map((p) => {
-      if (p.id === cfg.selectedProfileId) {
-        return { ...p, ...partial };
-      }
-      return p;
-    });
-    const updatedSelected = profiles.find((p) => p.id === cfg.selectedProfileId) || profiles[0];
-    const nextCfg: SocksCapConfig = {
-      ...cfg,
-      profiles,
-      mode: updatedSelected.mode,
-      apps: updatedSelected.apps,
-      upstream: updatedSelected.upstream,
-      ruleMode: updatedSelected.ruleMode,
-      userRules: updatedSelected.userRules,
-      defaultAction: updatedSelected.defaultAction,
-    };
-    return (await persistConfig(nextCfg)) ? nextCfg : null;
-  };
-
-  const setProfilePriority = async (id: string, value: number) => {
-    if (!cfg || !Number.isFinite(value)) return;
-    const priority = Math.max(
-      MIN_PROFILE_PRIORITY,
-      Math.min(MAX_PROFILE_PRIORITY, Math.trunc(value)),
-    );
-    const profile = cfg.profiles.find((p) => p.id === id);
-    if (!profile || profile.priority === priority) return;
-    await persistConfig({
-      ...cfg,
-      profiles: cfg.profiles.map((p) => (p.id === id ? { ...p, priority } : p)),
-    });
-  };
-
-  const moveProfilePriority = async (id: string, direction: -1 | 1) => {
-    if (!cfg) return;
-    const from = priorityOrderedProfiles.findIndex(({ profile }) => profile.id === id);
-    const to = from + direction;
-    if (from < 0 || to < 0 || to >= priorityOrderedProfiles.length) return;
-
-    const targetPriority = priorityOrderedProfiles[to].profile.priority;
-    const reordered = [...priorityOrderedProfiles];
-    const [moved] = reordered.splice(from, 1);
-    reordered.splice(to, 0, moved);
-
-    // Preserve the manually chosen values on every other profile. The moved
-    // profile adopts its new neighbour's value; persisting the display order
-    // also makes equal-priority ties deterministic (the backend is stable).
-    await persistConfig({
-      ...cfg,
-      profiles: reordered.map(({ profile }) =>
-        profile.id === id ? { ...profile, priority: targetPriority } : profile,
-      ),
-    });
-  };
-
-  const toggleProfileActive = async (id: string) => {
-    if (!cfg) return;
-    let activeProfileIds: string[];
-    if (cfg.activeProfileIds.includes(id)) {
-      if (cfg.activeProfileIds.length === 1) {
-        report(t("sockscap.atLeastOneActive"), false);
-        return;
-      }
-      activeProfileIds = cfg.activeProfileIds.filter((x) => x !== id);
-    } else {
-      activeProfileIds = [...cfg.activeProfileIds, id];
-    }
-    const nextCfg = { ...cfg, activeProfileIds };
-    await persistConfig(nextCfg);
-  };
-
-  const selectProfile = (id: string) => {
-    if (!cfg) return;
-    const prof = cfg.profiles.find((p) => p.id === id);
-    if (!prof) return;
-    const nextCfg: SocksCapConfig = {
-      ...cfg,
-      selectedProfileId: id,
-      mode: prof.mode,
-      apps: prof.apps,
-      upstream: prof.upstream,
-      ruleMode: prof.ruleMode,
-      userRules: prof.userRules,
-      defaultAction: prof.defaultAction,
-    };
-    setCfg(nextCfg);
-  };
-
-  const addProfile = async () => {
-    if (!cfg || locked) return;
-    const newId = "prof-" + Date.now().toString(36);
-    const newProf: SocksCapProfile = {
-      id: newId,
-      name: `方案 ${cfg.profiles.length + 1}`,
-      icon: "🎮",
-      color: null,
-      enabled: true,
-      priority: cfg.profiles.length,
-      mode: "global",
-      apps: [],
-      upstream: { kind: "socks5", sessionId: "", host: "127.0.0.1", port: 1080, username: "", passwordRef: "" },
-      ruleMode: "gfwList",
-      userRules: [],
-      defaultAction: "direct",
-    };
-    const profiles = [...cfg.profiles, newProf];
-    const activeProfileIds = [...cfg.activeProfileIds, newId];
-    const nextCfg: SocksCapConfig = {
-      ...cfg,
-      profiles,
-      activeProfileIds,
-      selectedProfileId: newId,
-      mode: newProf.mode,
-      apps: newProf.apps,
-      upstream: newProf.upstream,
-      ruleMode: newProf.ruleMode,
-      userRules: newProf.userRules,
-      defaultAction: newProf.defaultAction,
-    };
-    await persistConfig(nextCfg);
-    report(t("sockscap.profileCreated", { name: newProf.name }));
-  };
-
-  /** Import a subscription (URL or pasted blob): fetch+parse into nodes, vault
-   *  each node's secret/uuid, and create one profile per node. Imported profiles
-   *  are NOT auto-activated (avoids spawning many cores at once); the user
-   *  activates the one they want. Selects the first imported node. */
-  const onImportSubscription = async () => {
-    if (!cfg || locked || !subInput.trim()) return;
-    setBusy(true);
-    try {
-      const nodes = await sockscapImportSubscription(subInput.trim());
-      // Vault status once up front (all nodes share the vault gate).
-      const vs = await vaultStatus().catch(() => null);
-      const needsVault = nodes.some((n) => n.secret || n.uuid);
-      if (needsVault && (!vs || vs.state !== "unlocked")) {
-        window.dispatchEvent(
-          new CustomEvent(VAULT_LOCKED_EVENT, {
-            detail: { reason: t("sockscap.vaultLocked") },
-          }),
-        );
-        report(t("sockscap.vaultLocked"), false);
-        return;
-      }
-
-      const newProfiles: SocksCapProfile[] = [];
-      for (let i = 0; i < nodes.length; i++) {
-        const n = nodes[i];
-        const params: UpstreamParams = { ...n.params };
-        let passwordRef = "";
-        if (n.secret) {
-          const res = await vaultPut(
-            "sockscap_upstream_password",
-            "SocksCap Upstream Password",
-            n.secret,
-          );
-          passwordRef = res.reference;
-        }
-        if (n.uuid) {
-          const res = await vaultPut(
-            "sockscap_upstream_uuid",
-            "SocksCap Upstream UUID",
-            n.uuid,
-          );
-          params.uuidRef = res.reference;
-        }
-        newProfiles.push({
-          id: `prof-${Date.now().toString(36)}-${i}`,
-          name: n.name || `${n.host}:${n.port}`,
-          icon: "🌐",
-          color: null,
-          enabled: true,
-          priority: cfg.profiles.length + i,
-          mode: "global",
-          apps: [],
-          upstream: {
-            kind: n.kindTag as UpstreamKind,
-            sessionId: "",
-            host: n.host,
-            port: n.port,
-            username: "",
-            passwordRef,
-            params,
-          },
-          ruleMode: "gfwList",
-          userRules: [],
-          defaultAction: "direct",
-        });
-      }
-
-      const profiles = [...cfg.profiles, ...newProfiles];
-      const firstId = newProfiles[0].id;
-      const sel = profiles.find((p) => p.id === firstId) || profiles[0];
-      const nextCfg: SocksCapConfig = {
-        ...cfg,
-        profiles,
-        selectedProfileId: firstId,
-        mode: sel.mode,
-        apps: sel.apps,
-        upstream: sel.upstream,
-        ruleMode: sel.ruleMode,
-        userRules: sel.userRules,
-        defaultAction: sel.defaultAction,
-      };
-      await persistConfig(nextCfg);
-      setSubInput("");
-      setShowSubImport(false);
-      report(t("sockscap.subImported", { count: String(newProfiles.length) }));
-    } catch (e) {
-      report(String(e), false);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const duplicateProfile = async (prof: SocksCapProfile) => {
-    if (!cfg || locked) return;
-    const newId = "prof-" + Date.now().toString(36);
-    const newProf: SocksCapProfile = {
-      ...prof,
-      id: newId,
-      name: `${prof.name} (副本)`,
-      priority: cfg.profiles.length,
-    };
-    const profiles = [...cfg.profiles, newProf];
-    const activeProfileIds = [...cfg.activeProfileIds, newId];
-    const nextCfg: SocksCapConfig = {
-      ...cfg,
-      profiles,
-      activeProfileIds,
-      selectedProfileId: newId,
-      mode: newProf.mode,
-      apps: newProf.apps,
-      upstream: newProf.upstream,
-      ruleMode: newProf.ruleMode,
-      userRules: newProf.userRules,
-      defaultAction: newProf.defaultAction,
-    };
-    await persistConfig(nextCfg);
-    report(t("sockscap.profileDuplicated", { name: newProf.name }));
-  };
-
-  const deleteProfile = async (id: string) => {
-    if (locked) return;
-    if (!cfg || cfg.profiles.length <= 1) {
-      report(t("sockscap.atLeastOneProfile"), false);
-      return;
-    }
-    const profiles = cfg.profiles.filter((p) => p.id !== id);
-    const activeProfileIds = cfg.activeProfileIds.filter((x) => x !== id);
-    if (activeProfileIds.length === 0 && profiles.length > 0) {
-      activeProfileIds.push(profiles[0].id);
-    }
-    const selectedProfileId = cfg.selectedProfileId === id ? profiles[0].id : cfg.selectedProfileId;
-    const selectedProf = profiles.find((p) => p.id === selectedProfileId) || profiles[0];
-    const nextCfg: SocksCapConfig = {
-      ...cfg,
-      profiles,
-      activeProfileIds,
-      selectedProfileId,
-      mode: selectedProf.mode,
-      apps: selectedProf.apps,
-      upstream: selectedProf.upstream,
-      ruleMode: selectedProf.ruleMode,
-      userRules: selectedProf.userRules,
-      defaultAction: selectedProf.defaultAction,
-    };
-    await persistConfig(nextCfg);
-    report("方案已删除");
-  };
+  const { patchSelectedProfile, persistConfig, addProfile, selectProfile, onImportSubscription, toggleProfileActive, duplicateProfile, deleteProfile, moveProfilePriority, setProfilePriority } = createProfileActions({
+    locked,
+    report,
+    t,
+    setCfg,
+    cfg,
+    priorityOrderedProfiles,
+    subInput,
+    setBusy,
+    setSubInput,
+    setShowSubImport,
+  });
   const { preflightAndStart, onStop, onRefreshStatus, onRecover, copyDiagnostics, refreshRedirectorApproval, installRedirector, continueMacosSetupToStart, onStart } = createSocksCapLifecycleActions({
     setBusy,
     setStatus,
@@ -652,505 +377,65 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     refresh,
     startButtonRef,
   });
-
-  const onRefreshGfw = async () => {
-    if (!cfg || locked) return;
-    setBusy(true);
-    try {
-      const res = await sockscapRefreshGfwlist(cfg.gfwlist.url);
-      setGfw(res);
-      if (res.error) report(res.error, false);
-      else report(t("sockscap.gfwRefreshed", { count: String(res.ruleCount) }));
-      const st = await sockscapStatus().catch(() => null);
-      setStatus(st);
-    } catch (e) {
-      report(String(e), false);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onImportGfw = async () => {
-    if (locked) return;
-    try {
-      if (!isTauriRuntime()) {
-        report(t("sockscap.importDesktopOnly"), false);
-        return;
-      }
-      const selected = await open({
-        multiple: false,
-        filters: [{ name: "GFWList / AutoProxy", extensions: ["txt", "conf", "list"] }],
-      });
-      if (!selected || Array.isArray(selected)) return;
-      setBusy(true);
-      const res = await sockscapImportRules(selected);
-      setGfw(res);
-      report(t("sockscap.gfwImported", { count: String(res.ruleCount) }));
-    } catch (e) {
-      report(String(e), false);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onTestTarget = async () => {
-    setTesting(true);
-    try {
-      const res = await sockscapTestTarget(testHost.trim(), 443);
-      setTestResult(res);
-      const summary = t("sockscap.testTargetResult", {
-        host: res.host,
-        decision: res.decision,
-        reason: res.reason,
-      });
-      report(summary);
-      const body = [
-        `${t("sockscap.host")}: ${res.host}:${res.port}`,
-        `${t("sockscap.testDecision")}: ${res.decision}`,
-        `${t("sockscap.testMatchedRule")}: ${res.matchedRule || "-"}`,
-        `${t("common.message")}: ${res.reason}`,
-      ].join("\n");
-      openTestDetail(t("sockscap.testTargetDetailTitle", { host: res.host }), body);
-    } catch (e) {
-      const err = String(e);
-      report(err, false);
-      openTestDetail(t("sockscap.testTargetDetailTitle", { host: testHost.trim() }), err);
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  const storePassword = async () => {
-    if (!cfg || !password) return;
-    setStoringPass(true);
-    try {
-      const status = await vaultStatus().catch(() => null);
-      if (!status || status.state !== "unlocked") {
-        window.dispatchEvent(
-          new CustomEvent(VAULT_LOCKED_EVENT, {
-            detail: { reason: t("sockscap.vaultLocked") },
-          }),
-        );
-        report(t("sockscap.vaultLocked"), false);
-        return;
-      }
-      const res = await vaultPut(
-        "sockscap_upstream_password",
-        "SocksCap Upstream Password",
-        password,
-      );
-      await patchSelectedProfile({
-        upstream: { ...selectedProf.upstream, passwordRef: res.reference },
-      });
-      setPassword("");
-      report(t("sockscap.passwordSaved"));
-    } catch (e) {
-      report(String(e), false);
-    } finally {
-      setStoringPass(false);
-    }
-  };
-
-  const clearPassword = async () => {
-    if (!cfg) return;
-    setPassword("");
-    await patchSelectedProfile({ upstream: { ...selectedProf.upstream, passwordRef: "" } });
-    report(t("sockscap.passwordCleared"));
-  };
-
-  const onTestUpstream = async () => {
-    if (!cfg) return;
-    setTesting(true);
-    const title = t("sockscap.testUpstreamDetailTitle", {
-      kind: selectedProf.upstream.kind,
-    });
-    try {
-      const u = selectedProf.upstream;
-      let text: string;
-      // Core-backed kinds spawn a throwaway xray sidecar (secrets from vault).
-      if (upstreamRequiresCore(u.kind)) {
-        text = await sockscapTestCoreUpstream({
-          upstream: u,
-          testHost: "www.google.com",
-          testPort: 443,
-        });
-      } else {
-        text = await sockscapTestUpstream({
-          kind: u.kind,
-          host: u.host || "127.0.0.1",
-          port: u.port || 1080,
-          username: u.username,
-          password: password || u.passwordRef || undefined,
-          sessionId: u.sessionId || undefined,
-          testHost: "www.google.com",
-          testPort: 443,
-        });
-      }
-      report(summarize(text));
-      openTestDetail(title, text);
-    } catch (e) {
-      const err = String(e);
-      report(summarize(err), false);
-      openTestDetail(title, err);
-    } finally {
-      setTesting(false);
-    }
-  };
-
-  /** Merge protocol-specific params into the selected profile's upstream. */
-  const patchUpstreamParams = async (patch: Partial<UpstreamParams>) => {
-    await patchSelectedProfile({
-      upstream: {
-        ...selectedProf.upstream,
-        params: { ...(selectedProf.upstream.params || {}), ...patch },
-      },
-    });
-  };
-
-  /** Store a plaintext secret in the vault, returning its `vault:<id>` ref.
-   *  Returns null (and surfaces a message) if the vault is locked. */
-  const vaultStore = async (
-    name: string,
-    label: string,
-    value: string,
-  ): Promise<string | null> => {
-    const status = await vaultStatus().catch(() => null);
-    if (!status || status.state !== "unlocked") {
-      window.dispatchEvent(
-        new CustomEvent(VAULT_LOCKED_EVENT, {
-          detail: { reason: t("sockscap.vaultLocked") },
-        }),
-      );
-      report(t("sockscap.vaultLocked"), false);
-      return null;
-    }
-    const res = await vaultPut(name, label, value);
-    return res.reference;
-  };
-
-  const storeUuid = async () => {
-    if (!cfg || !uuidInput.trim()) return;
-    setBusy(true);
-    try {
-      const ref = await vaultStore(
-        "sockscap_upstream_uuid",
-        "SocksCap Upstream UUID",
-        uuidInput.trim(),
-      );
-      if (ref === null) return;
-      await patchUpstreamParams({ uuidRef: ref });
-      setUuidInput("");
-      report(t("sockscap.secretStored"));
-    } catch (e) {
-      report(String(e), false);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const storeWgKey = async () => {
-    if (!cfg || !wgKeyInput.trim()) return;
-    setBusy(true);
-    try {
-      const ref = await vaultStore(
-        "sockscap_upstream_wg_key",
-        "SocksCap WireGuard Private Key",
-        wgKeyInput.trim(),
-      );
-      if (ref === null) return;
-      await patchUpstreamParams({ privateKeyRef: ref });
-      setWgKeyInput("");
-      report(t("sockscap.secretStored"));
-    } catch (e) {
-      report(String(e), false);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  /** Parse a pasted share link and populate the current profile's upstream,
-   *  vaulting the secret (SS/trojan password) and uuid (vmess/vless). */
-  const onImportShareLink = async () => {
-    if (!cfg || !shareLink.trim()) return;
-    setBusy(true);
-    try {
-      const parsed = await sockscapParseShareLink(shareLink.trim());
-      const kind = parsed.kindTag as UpstreamKind;
-      const params: UpstreamParams = { ...parsed.params };
-
-      // Vault the primary secret (SS/trojan password) → passwordRef.
-      let passwordRef = "";
-      if (parsed.secret) {
-        const ref = await vaultStore(
-          "sockscap_upstream_password",
-          "SocksCap Upstream Password",
-          parsed.secret,
-        );
-        if (ref === null) return; // vault locked
-        passwordRef = ref;
-      }
-      // Vault the uuid (vmess/vless) → params.uuidRef.
-      if (parsed.uuid) {
-        const ref = await vaultStore(
-          "sockscap_upstream_uuid",
-          "SocksCap Upstream UUID",
-          parsed.uuid,
-        );
-        if (ref === null) return;
-        params.uuidRef = ref;
-      }
-
-      await patchSelectedProfile({
-        upstream: {
-          ...selectedProf.upstream,
-          kind,
-          sessionId: "",
-          host: parsed.host,
-          port: parsed.port,
-          passwordRef,
-          params,
-        },
-      });
-      setShareLink("");
-      setPassword("");
-      report(
-        t("sockscap.shareLinkImported", {
-          name: parsed.name || `${parsed.host}:${parsed.port}`,
-        }),
-      );
-    } catch (e) {
-      report(String(e), false);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // Protocol-specific fields for core-backed upstreams. Secrets (uuid, wg key)
-  // are stored in the vault; non-secret transport/TLS params are plain fields.
-  const renderCoreParams = () => {
-    const kind = selectedProf.upstream.kind;
-    if (!upstreamRequiresCore(kind)) return null;
-    const p: UpstreamParams = selectedProf.upstream.params || {};
-    const cls =
-      "w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]";
-    const net = p.network || "tcp";
-    const tls = p.tls || (kind === "trojan" ? "tls" : "none");
-    const hasTransport = kind === "trojan" || kind === "vmess" || kind === "vless";
-    const hasTls = hasTransport;
-
-    const uuidField = (
-      <Field label="UUID">
-        <div className="flex gap-1.5">
-          <input
-            type="password"
-            className={"flex-1 " + cls}
-            placeholder={p.uuidRef ? t("sockscap.passwordStored") : "UUID"}
-            value={uuidInput}
-            onChange={(e) => setUuidInput(e.target.value)}
-          />
-          <button
-            type="button"
-            className="px-2 py-1.5 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] shrink-0"
-            onClick={() => void storeUuid()}
-            disabled={busy || !uuidInput}
-          >
-            {t("sockscap.passwordStore")}
-          </button>
-        </div>
-      </Field>
-    );
-
-    const transportFields = hasTransport && (
-      <>
-        <Field label={t("sockscap.transport")}>
-          <select
-            className={cls}
-            value={net}
-            onChange={(e) => void patchUpstreamParams({ network: e.target.value })}
-          >
-            <option value="tcp">TCP</option>
-            <option value="ws">WebSocket</option>
-            <option value="grpc">gRPC</option>
-            <option value="httpupgrade">HTTPUpgrade</option>
-          </select>
-        </Field>
-        {(net === "ws" || net === "grpc" || net === "httpupgrade") && (
-          <Field label={net === "grpc" ? t("sockscap.grpcService") : t("sockscap.wsPath")}>
-            <input
-              className={cls}
-              value={p.path || ""}
-              onChange={(e) => void patchUpstreamParams({ path: e.target.value })}
-            />
-          </Field>
-        )}
-        {(net === "ws" || net === "httpupgrade") && (
-          <Field label={t("sockscap.wsHost")}>
-            <input
-              className={cls}
-              value={p.wsHost || ""}
-              onChange={(e) => void patchUpstreamParams({ wsHost: e.target.value })}
-            />
-          </Field>
-        )}
-      </>
-    );
-
-    const tlsFields = hasTls && (
-      <>
-        <Field label="TLS">
-          <select
-            className={cls}
-            value={tls}
-            onChange={(e) => void patchUpstreamParams({ tls: e.target.value })}
-          >
-            <option value="none">None</option>
-            <option value="tls">TLS</option>
-            <option value="reality">REALITY</option>
-          </select>
-        </Field>
-        {(tls === "tls" || tls === "reality") && (
-          <Field label="SNI">
-            <input
-              className={cls}
-              value={p.sni || ""}
-              onChange={(e) => void patchUpstreamParams({ sni: e.target.value })}
-            />
-          </Field>
-        )}
-        {tls === "reality" && (
-          <>
-            <Field label={t("sockscap.realityPbk")}>
-              <input
-                className={cls}
-                value={p.realityPublicKey || ""}
-                onChange={(e) =>
-                  void patchUpstreamParams({ realityPublicKey: e.target.value })
-                }
-              />
-            </Field>
-            <Field label={t("sockscap.realitySid")}>
-              <input
-                className={cls}
-                value={p.realityShortId || ""}
-                onChange={(e) =>
-                  void patchUpstreamParams({ realityShortId: e.target.value })
-                }
-              />
-            </Field>
-          </>
-        )}
-      </>
-    );
-
-    const wgFields = kind === "wireguard" && (
-      <>
-        <Field label={t("sockscap.wgPrivateKey")}>
-          <div className="flex gap-1.5">
-            <input
-              type="password"
-              className={"flex-1 " + cls}
-              placeholder={p.privateKeyRef ? t("sockscap.passwordStored") : t("sockscap.wgPrivateKey")}
-              value={wgKeyInput}
-              onChange={(e) => setWgKeyInput(e.target.value)}
-            />
-            <button
-              type="button"
-              className="px-2 py-1.5 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] shrink-0"
-              onClick={() => void storeWgKey()}
-              disabled={busy || !wgKeyInput}
-            >
-              {t("sockscap.passwordStore")}
-            </button>
-          </div>
-        </Field>
-        <Field label={t("sockscap.wgPeerKey")}>
-          <input
-            className={cls}
-            value={p.peerPublicKey || ""}
-            onChange={(e) => void patchUpstreamParams({ peerPublicKey: e.target.value })}
-          />
-        </Field>
-        <Field label={t("sockscap.wgLocalAddr")}>
-          <input
-            className={cls}
-            placeholder="10.0.0.2/32, fd00::2/128"
-            value={(p.localAddress || []).join(", ")}
-            onChange={(e) =>
-              void patchUpstreamParams({
-                localAddress: e.target.value
-                  .split(",")
-                  .map((s) => s.trim())
-                  .filter(Boolean),
-              })
-            }
-          />
-        </Field>
-      </>
-    );
-
-    const vlessFlow = kind === "vless" && (
-      <Field label={t("sockscap.vlessFlow")}>
-        <select
-          className={cls}
-          value={p.flow || ""}
-          onChange={(e) => void patchUpstreamParams({ flow: e.target.value })}
-        >
-          <option value="">None</option>
-          <option value="xtls-rprx-vision">xtls-rprx-vision</option>
-        </select>
-      </Field>
-    );
-
-    const vmessSecurity = kind === "vmess" && (
-      <Field label={t("sockscap.vmessSecurity")}>
-        <select
-          className={cls}
-          value={p.security || "auto"}
-          onChange={(e) => void patchUpstreamParams({ security: e.target.value })}
-        >
-          <option value="auto">auto</option>
-          <option value="aes-128-gcm">aes-128-gcm</option>
-          <option value="chacha20-poly1305">chacha20-poly1305</option>
-          <option value="none">none</option>
-        </select>
-      </Field>
-    );
-
-    return (
-      // A disabled <fieldset> natively disables every descendant control;
-      // `display:contents` keeps the parent grid layout intact. Lets us lock the
-      // whole protocol-params block while running without touching each field.
-      <fieldset
-        disabled={locked}
-        className="contents"
-        title={locked ? t("sockscap.lockedTooltip") : undefined}
-      >
-        {kind === "shadowsocks" && (
-          <Field label={t("sockscap.ssMethod")}>
-            <select
-              className={cls}
-              value={p.method || "aes-256-gcm"}
-              onChange={(e) => void patchUpstreamParams({ method: e.target.value })}
-            >
-              <option value="aes-256-gcm">aes-256-gcm</option>
-              <option value="aes-128-gcm">aes-128-gcm</option>
-              <option value="chacha20-ietf-poly1305">chacha20-ietf-poly1305</option>
-              <option value="2022-blake3-aes-256-gcm">2022-blake3-aes-256-gcm</option>
-              <option value="2022-blake3-chacha20-poly1305">
-                2022-blake3-chacha20-poly1305
-              </option>
-            </select>
-          </Field>
-        )}
-        {(kind === "vmess" || kind === "vless") && uuidField}
-        {vmessSecurity}
-        {vlessFlow}
-        {transportFields}
-        {tlsFields}
-        {wgFields}
-      </fieldset>
-    );
-  };
+  const { onRefreshGfw, onImportGfw } = createGfwActions({
+    cfg,
+    locked,
+    setBusy,
+    setGfw,
+    report,
+    t,
+    setStatus,
+  });
+  const { onTestTarget } = createTargetProbe({
+    setTesting,
+    testHost,
+    setTestResult,
+    t,
+    report,
+    openTestDetail,
+  });
+  const { storePassword, clearPassword } = createUpstreamPasswordActions({
+    cfg,
+    password,
+    setStoringPass,
+    t,
+    report,
+    patchSelectedProfile,
+    selectedProf,
+    setPassword,
+  });
+  const { storeUuid, patchUpstreamParams, storeWgKey, onImportShareLink, onTestUpstream } = createUpstreamActions({
+    cfg,
+    setTesting,
+    t,
+    selectedProf,
+    password,
+    report,
+    summarize,
+    openTestDetail,
+    patchSelectedProfile,
+    uuidInput,
+    setBusy,
+    setUuidInput,
+    wgKeyInput,
+    setWgKeyInput,
+    shareLink,
+    setShareLink,
+    setPassword,
+  });
+  const { renderCoreParams } = createCoreParamsView({
+    selectedProf,
+    t,
+    uuidInput,
+    setUuidInput,
+    storeUuid,
+    busy,
+    patchUpstreamParams,
+    wgKeyInput,
+    setWgKeyInput,
+    storeWgKey,
+    locked,
+  });
 
   /** Detect a local proxy (Clash/v2rayN etc) and set it as the upstream in one
    *  click — no hand-filling host/port. Uses the first candidate found. */
@@ -1241,62 +526,11 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
       report(String(e), false);
     }
   };
-
-  const pickRootlessApplication = async () => {
-    if (locked) return;
-    try {
-      const selected = await open({ multiple: false });
-      if (!selected || Array.isArray(selected)) return;
-      setRootlessCommand(selected);
-    } catch (e) {
-      report(String(e), false);
-    }
-  };
-
-  const pickRootlessWorkingDirectory = async () => {
-    if (locked) return;
-    try {
-      const selected = await open({ directory: true, multiple: false });
-      if (!selected || Array.isArray(selected)) return;
-      setRootlessWorkingDirectory(selected);
-      setRootlessPreparationOpen(true);
-    } catch (e) {
-      report(String(e), false);
-    }
-  };
-
-  const resetRootlessApplicationDraft = () => {
-    setRootlessCommand("");
-    setRootlessArguments("");
-    setRootlessLaunchMode("desktop");
-    setRootlessPreparationOpen(false);
-    setRootlessWorkingDirectory("");
-    setRootlessPreCommand("");
-    setRootlessLaunchShell("sh");
-    setRootlessEnvironment([]);
-    setEditingRootlessAppKey(null);
-  };
-
-  const editRootlessApplication = (app: AppSelector) => {
-    const preparation = normalizeLaunchPreparation(app.launchPreparation);
-    setRootlessCommand(app.path);
-    setRootlessArguments(formatRootlessArguments(app.args));
-    setRootlessLaunchMode(app.launchMode ?? "desktop");
-    setRootlessWorkingDirectory(preparation.workingDirectory ?? "");
-    setRootlessPreCommand(preparation.preCommand ?? "");
-    setRootlessLaunchShell(preparation.shell ?? "sh");
-    setRootlessEnvironment(
-      Object.entries(preparation.environment ?? {}).map(([name, value]) => ({
-        id: nextEnvironmentDraftId.current++,
-        name,
-        value,
-      })),
-    );
-    setRootlessPreparationOpen(!launchPreparationIsEmpty(preparation));
-    setEditingRootlessAppKey(
-      rootlessAppKey(app.path, app.args, app.launchMode, app.launchPreparation),
-    );
-  };
+  const rootlessDraft = useRootlessApplicationDraft({
+    locked,
+    report,
+  });
+  const { rootlessCommand, rootlessArguments, rootlessEnvironment, rootlessWorkingDirectory, rootlessPreCommand, rootlessLaunchShell, rootlessLaunchMode, editingRootlessAppKey, resetRootlessApplicationDraft } = rootlessDraft;
   const { addRootlessApplication, onStopLaunchedApp, onRootlessLaunchApp } = createApplicationLaunch({
     cfg,
     locked,
@@ -1368,193 +602,32 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
       data-testid="sockscap-panel"
     >
       {/* Header */}
-      <div
-        data-testid="sockscap-header"
-        className="flex items-center gap-2.5 px-3 py-2 border-b border-[var(--taomni-divider)] shrink-0 min-h-[52px]"
-      >
-        <Shield className="w-4.5 h-4.5 shrink-0 text-[var(--taomni-accent)]" />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="text-[14px] font-semibold shrink-0">{t("sockscap.title")}</div>
-            {caps && (
-              <span
-                data-testid="sockscap-capability-notes"
-                className="inline-flex items-center gap-1 min-w-0 text-[10px] text-[var(--taomni-text-muted)]"
-                title={caps.notes.join("\n") || t("sockscap.captureBackendLabel", { backend: caps.captureBackend })}
-              >
-                {caps.notes.length > 0 && <Info className="w-3 h-3 shrink-0 text-[var(--taomni-accent)]" />}
-                <span className="truncate">
-                  {t("sockscap.backendCompact", { backend: caps.captureBackend })}
-                </span>
-              </span>
-            )}
-          </div>
-          <div
-            data-testid="sockscap-header-summary"
-            className="mt-0.5 flex items-center gap-2 min-w-0 text-[10px] text-[var(--taomni-text-muted)] whitespace-nowrap"
-          >
-            <span
-              className="inline-flex items-center gap-1 min-w-0"
-              title={activeProfiles
-                .map((p) => `${p.name} (${p.mode === "global" ? t("sockscap.badgeGlobal") : t("sockscap.badgeApps", { count: p.apps.length })})`)
-                .join(", ")}
-            >
-              <Layers className="w-3 h-3 shrink-0 text-[var(--taomni-accent)]" />
-              <span className="truncate">
-                {t("sockscap.activeProfilesCompact", {
-                  count: activeProfiles.length,
-                  names: activeProfiles.map((p) => p.name).join(", "),
-                })}
-              </span>
-            </span>
-            {stats && (
-              <span
-                className="hidden xl:inline shrink-0"
-                title={t("sockscap.trafficDiagnostics", {
-                  lastFlow: stats.lastFlowAt
-                    ? new Date(stats.lastFlowAt * 1000).toLocaleString()
-                    : "-",
-                  quic: stats.quicFlowsDropped ?? 0,
-                  udp: stats.udpDirectDatagrams ?? 0,
-                  mismatch: stats.scopeMismatchFlows ?? 0,
-                })}
-              >
-                {t("sockscap.trafficCompact", {
-                  total: stats.flowsTotal,
-                  proxy: stats.flowsProxy,
-                  direct: stats.flowsDirect,
-                })}
-              </span>
-            )}
-            {helper?.running && (
-              <span className="hidden 2xl:inline shrink-0 font-mono text-emerald-600 dark:text-emerald-400">
-                Helper {helper.pid}
-              </span>
-            )}
-            {running && (
-              <span className="hidden 2xl:inline-flex items-center gap-2 shrink-0 font-mono">
-                <span className="inline-flex items-center gap-0.5 text-emerald-500">
-                  <ArrowUpRight className="w-3 h-3" />
-                  {formatSpeed(upSpeed)}
-                </span>
-                <span className="inline-flex items-center gap-0.5 text-sky-500">
-                  <ArrowDownLeft className="w-3 h-3" />
-                  {formatSpeed(downSpeed)}
-                </span>
-              </span>
-            )}
-          </div>
-        </div>
-        {locked && (
-          <div
-            data-testid="sockscap-locked-banner"
-            className="min-w-0 max-w-[400px] flex items-center gap-1.5 text-[11px] text-sky-700 dark:text-sky-400"
-            title={t(
-              linuxLaunchOnly ? "sockscap.rootlessLockedHint" : "sockscap.lockedHint",
-            )}
-          >
-            <Lock className="w-3.5 h-3.5 shrink-0" />
-            <span className="hidden xl:block truncate">
-              {t(linuxLaunchOnly ? "sockscap.rootlessLockedHint" : "sockscap.lockedHint")}
-            </span>
-          </div>
-        )}
-        {tunConflicts.length > 0 && (
-          <button
-            type="button"
-            data-testid="sockscap-tun-warning"
-            className="p-1.5 rounded text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/20"
-            title={t("sockscap.tunConflictWarning", { adapters: tunConflicts.join(", ") })}
-            aria-label={t("sockscap.tunConflictTitle")}
-            onClick={() => setTunWarningOpen(true)}
-          >
-            <AlertTriangle className="w-4 h-4" />
-          </button>
-        )}
-        <div className={`text-[11px] font-medium ${phaseTone(status?.phase ?? "idle")}`}>
-          {status ? t(`sockscap.phase.${status.phase}`) : t("sockscap.phase.idle")}
-        </div>
-        {busy && <Loader2 className="w-4 h-4 animate-spin text-[var(--taomni-text-muted)]" />}
-        {running ? (
-          <button
-            type="button"
-            data-testid="sockscap-stop"
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-[12px] bg-red-600/90 text-white hover:bg-red-600"
-            onClick={() => void onStop()}
-            disabled={busy}
-          >
-            <Square className="w-3.5 h-3.5" />
-            {t("sockscap.stop")}
-          </button>
-        ) : !linuxLaunchOnly ? (
-          <button
-            type="button"
-            ref={startButtonRef}
-            data-testid="sockscap-start"
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded text-[12px] bg-[var(--taomni-accent)] text-white hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed"
-            onClick={() => void preflightAndStart()}
-            disabled={busy || probing || redirectorApprovalWaiting}
-            title={
-              redirectorApprovalWaiting
-                ? t("sockscap.redirectorApprovalPendingHint")
-                : undefined
-            }
-          >
-            {probing ? (
-              <Loader2 className="w-3.5 h-3.5 animate-spin" />
-            ) : (
-              <Play className="w-3.5 h-3.5" />
-            )}
-            {probing ? t("sockscap.probing") : t("sockscap.start")}
-          </button>
-        ) : null}
-        {caps?.platform === "macos" && (
-          <button
-            type="button"
-            data-testid="sockscap-macos-setup-help"
-            className="inline-flex items-center gap-1 px-2 py-1.5 rounded text-[12px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
-            onClick={() => {
-              setMacosSetupError(null);
-              setMacosSetupGuideMode("help");
-            }}
-            title={t("sockscap.macosSetupHelpHint")}
-            aria-label={t("sockscap.macosSetupHelp")}
-          >
-            <HelpCircle className="w-3.5 h-3.5" />
-            <span>{t("sockscap.macosSetupHelp")}</span>
-          </button>
-        )}
-        <button
-          type="button"
-          data-testid="sockscap-refresh-status"
-          className="inline-flex items-center gap-1 px-2 py-1.5 rounded text-[12px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
-          onClick={() => void onRefreshStatus()}
-          disabled={busy}
-          title={t("sockscap.refreshStatus")}
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${busy ? "animate-spin" : ""}`} />
-        </button>
-        <button
-          type="button"
-          data-testid="sockscap-recover"
-          className="inline-flex items-center gap-1 px-2 py-1.5 rounded text-[12px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"
-          onClick={() => void onRecover()}
-          disabled={busy}
-          title={t("sockscap.recoverHint")}
-        >
-          {t("sockscap.recover")}
-        </button>
-        {onClose && (
-          <button
-            type="button"
-            className="p-1.5 rounded hover:bg-[var(--taomni-hover)]"
-            onClick={onClose}
-            aria-label={t("common.close")}
-          >
-            <X className="w-4 h-4" />
-          </button>
-        )}
-      </div>
+      <SocksCapHeader
+  t={t}
+  caps={caps}
+  activeProfiles={activeProfiles}
+  stats={stats}
+  helper={helper}
+  running={running}
+  upSpeed={upSpeed}
+  downSpeed={downSpeed}
+  locked={locked}
+  linuxLaunchOnly={linuxLaunchOnly}
+  tunConflicts={tunConflicts}
+  setTunWarningOpen={setTunWarningOpen}
+  status={status}
+  busy={busy}
+  onStop={onStop}
+  startButtonRef={startButtonRef}
+  preflightAndStart={preflightAndStart}
+  probing={probing}
+  redirectorApprovalWaiting={redirectorApprovalWaiting}
+  setMacosSetupError={setMacosSetupError}
+  setMacosSetupGuideMode={setMacosSetupGuideMode}
+  onRefreshStatus={onRefreshStatus}
+  onRecover={onRecover}
+  onClose={onClose}
+/>
 
       {status?.phase === "recoveryRequired" && caps?.platform === "macos" && (
         <div className="px-4 py-3 bg-red-500/10 border-b border-red-500/30 text-[11px] text-red-700 dark:text-red-300">
@@ -1689,211 +762,27 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
             </div>
             </div>
           ) : (
-            <div
-            style={{ width: sidebarWidth }}
-            className="shrink-0 flex flex-col bg-[var(--taomni-panel-bg)] p-3 space-y-3 overflow-y-auto border-r border-[var(--taomni-divider)] select-none relative"
-            data-testid="sockscap-profile-list"
-          >
-            <div className="flex items-center justify-between gap-1">
-              <span className="text-[12px] font-bold text-[var(--taomni-text)] truncate">
-                {t("sockscap.profilesTitle")}
-              </span>
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  data-testid="sockscap-add-profile"
-                  className="p-1 rounded text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)] transition-colors flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                  onClick={() => void addProfile()}
-                  disabled={locked}
-                  title={locked ? t("sockscap.lockedTooltip") : t("sockscap.newProfileTooltip")}
-                  aria-label={t("sockscap.newProfileTooltip")}
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  className="p-1 rounded text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)] transition-colors flex items-center justify-center"
-                  onClick={() => setIsRibbon(true)}
-                  title={t("sockscap.collapseProfiles")}
-                  aria-label={t("sockscap.collapseProfiles")}
-                >
-                  <PanelLeftClose className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Subscription import: paste a URL or blob → one profile per node. */}
-            <div className="mb-1.5">
-              <button
-                type="button"
-                data-testid="sockscap-sub-import-toggle"
-                className="w-full text-[11px] px-2 py-1 rounded border border-[var(--taomni-divider)] text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={() => setShowSubImport((v) => !v)}
-                disabled={locked}
-                title={locked ? t("sockscap.lockedTooltip") : undefined}
-              >
-                {t("sockscap.subImportToggle")}
-              </button>
-              {showSubImport && (
-                <div className="mt-1.5 space-y-1.5">
-                  <textarea
-                    data-testid="sockscap-sub-input"
-                    className="w-full text-[11px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] resize-y min-h-[48px]"
-                    placeholder={t("sockscap.subImportPlaceholder")}
-                    value={subInput}
-                    disabled={locked}
-                    title={locked ? t("sockscap.lockedTooltip") : undefined}
-                    onChange={(e) => setSubInput(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    data-testid="sockscap-sub-import"
-                    className="w-full text-[11px] px-2 py-1 rounded border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={() => void onImportSubscription()}
-                    disabled={busy || locked || !subInput.trim()}
-                  >
-                    {t("sockscap.subImportBtn")}
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <div className="space-y-1.5 flex-1 overflow-y-auto">
-              {priorityOrderedProfiles.map(({ profile: p }, priorityIndex) => {
-                const isSelected = p.id === cfg.selectedProfileId;
-                const isActive = p.enabled && cfg.activeProfileIds.includes(p.id);
-                const priorityHint = t("sockscap.priorityHint");
-                return (
-                  <div
-                    key={p.id}
-                    data-testid={`sockscap-profile-item-${p.id}`}
-                    className={`p-2 rounded-lg border text-[11px] transition-all cursor-pointer ${
-                      isSelected
-                        ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/10 shadow-sm"
-                        : "border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] bg-[var(--taomni-bg)]"
-                    }`}
-                    onClick={() => selectProfile(p.id)}
-                  >
-                    <div className="flex items-center justify-between gap-1.5 mb-1">
-                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        <input
-                          type="checkbox"
-                          data-testid={`sockscap-profile-checkbox-${p.id}`}
-                          checked={isActive}
-                          disabled={locked}
-                          onChange={(e) => {
-                            e.stopPropagation();
-                            void toggleProfileActive(p.id);
-                          }}
-                          className="rounded border-[var(--taomni-divider)] text-[var(--taomni-accent)] focus:ring-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                          title={
-                            locked
-                              ? t("sockscap.lockedTooltip")
-                              : isActive
-                                ? t("sockscap.activeTooltipActive")
-                                : t("sockscap.activeTooltipInactive")
-                          }
-                        />
-                        <span className="text-[13px]">{p.icon || "🛡️"}</span>
-                        <span className="font-semibold truncate">{p.name}</span>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          className="p-1 text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] rounded disabled:opacity-40 disabled:cursor-not-allowed"
-                          title={locked ? t("sockscap.lockedTooltip") : t("sockscap.duplicateProfileTooltip")}
-                          onClick={() => void duplicateProfile(p)}
-                          disabled={locked}
-                        >
-                          <Copy className="w-3 h-3" />
-                        </button>
-                        {cfg.profiles.length > 1 && (
-                          <button
-                            type="button"
-                            data-testid={`sockscap-delete-profile-${p.id}`}
-                            className="p-1 text-[var(--taomni-text-muted)] hover:text-red-500 rounded disabled:opacity-40 disabled:cursor-not-allowed"
-                            title={locked ? t("sockscap.lockedTooltip") : t("sockscap.deleteProfileTooltip")}
-                            onClick={() => void deleteProfile(p.id)}
-                            disabled={locked}
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center justify-between text-[10px] text-[var(--taomni-text-muted)]">
-                      <span>
-                        {p.mode === "global"
-                          ? t("sockscap.scopeGlobal")
-                          : t("sockscap.appsBound", { count: p.apps.length })}
-                      </span>
-                      <span className="px-1.5 py-0.2 rounded bg-[var(--taomni-hover)] font-mono">
-                        {p.ruleMode}
-                      </span>
-                    </div>
-                    <div className="mt-1.5 flex items-center gap-1 text-[10px] text-[var(--taomni-text-muted)]">
-                      <span title={priorityHint}>{t("sockscap.priorityLabel")}</span>
-                      <button
-                        type="button"
-                        data-testid={`sockscap-profile-priority-up-${p.id}`}
-                        className="p-0.5 rounded hover:bg-[var(--taomni-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
-                        disabled={locked || priorityIndex === 0}
-                        title={locked ? t("sockscap.lockedTooltip") : t("sockscap.raisePriorityTooltip")}
-                        aria-label={t("sockscap.raisePriorityTooltip")}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void moveProfilePriority(p.id, -1);
-                        }}
-                      >
-                        <ArrowUp className="w-3 h-3" />
-                      </button>
-                      <input
-                        type="number"
-                        step={1}
-                        min={MIN_PROFILE_PRIORITY}
-                        max={MAX_PROFILE_PRIORITY}
-                        data-testid={`sockscap-profile-priority-input-${p.id}`}
-                        className="w-12 px-1 py-0.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] text-center font-mono disabled:opacity-50 disabled:cursor-not-allowed"
-                        value={p.priority}
-                        disabled={locked}
-                        title={locked ? t("sockscap.lockedTooltip") : priorityHint}
-                        aria-label={t("sockscap.priorityInputLabel", { name: p.name })}
-                        onClick={(event) => event.stopPropagation()}
-                        onChange={(event) => {
-                          const raw = event.target.value.trim();
-                          if (!raw) return;
-                          const value = Number(raw);
-                          if (Number.isFinite(value)) {
-                            void setProfilePriority(p.id, value);
-                          }
-                        }}
-                        onBlur={(event) => {
-                          if (!event.currentTarget.value.trim()) {
-                            event.currentTarget.value = String(p.priority);
-                          }
-                        }}
-                      />
-                      <button
-                        type="button"
-                        data-testid={`sockscap-profile-priority-down-${p.id}`}
-                        className="p-0.5 rounded hover:bg-[var(--taomni-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
-                        disabled={locked || priorityIndex === priorityOrderedProfiles.length - 1}
-                        title={locked ? t("sockscap.lockedTooltip") : t("sockscap.lowerPriorityTooltip")}
-                        aria-label={t("sockscap.lowerPriorityTooltip")}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void moveProfilePriority(p.id, 1);
-                        }}
-                      >
-                        <ArrowDown className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            </div>
+            <ProfileSidebar
+  sidebarWidth={sidebarWidth}
+  t={t}
+  addProfile={addProfile}
+  locked={locked}
+  setIsRibbon={setIsRibbon}
+  setShowSubImport={setShowSubImport}
+  showSubImport={showSubImport}
+  subInput={subInput}
+  setSubInput={setSubInput}
+  onImportSubscription={onImportSubscription}
+  busy={busy}
+  priorityOrderedProfiles={priorityOrderedProfiles}
+  cfg={cfg}
+  selectProfile={selectProfile}
+  toggleProfileActive={toggleProfileActive}
+  duplicateProfile={duplicateProfile}
+  deleteProfile={deleteProfile}
+  moveProfilePriority={moveProfilePriority}
+  setProfilePriority={setProfilePriority}
+/>
           ))}
 
         {/* Resizable Handle / Splitter */}
@@ -1964,858 +853,70 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
           )}
 
           {/* Scope Mode */}
-          <Section
-            sectionId={linuxLaunchOnly ? "applications" : "scope"}
-            title={
-              linuxLaunchOnly
-                ? t("sockscap.rootlessApplicationsTitle")
-                : t("sockscap.section.scope")
-            }
-            defaultExpanded={linuxLaunchOnly}
-          >
-            {!linuxLaunchOnly && (
-              <>
-                <div className="flex gap-2">
-                  {(["global", "apps"] as ScopeMode[]).map((m) => {
-                    // The backend refuses app scope when it cannot identify the
-                    // source application, so do not offer it as a choice.
-                    const unsupported = m === "apps" && caps !== null && !caps.appFilter;
-                    const disabled = locked || unsupported;
-                    return (
-                      <button
-                        key={m}
-                        type="button"
-                        data-testid={`sockscap-mode-${m}`}
-                        disabled={disabled}
-                        title={
-                          locked
-                            ? t("sockscap.lockedTooltip")
-                            : unsupported
-                              ? t("sockscap.appModeUnsupported")
-                              : undefined
-                        }
-                        className={`px-3 py-1.5 rounded text-[12px] border disabled:opacity-50 disabled:cursor-not-allowed ${
-                          selectedProf.mode === m
-                            ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)] font-medium"
-                            : "border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)]"
-                        }`}
-                        onClick={() => void patchSelectedProfile({ mode: m })}
-                      >
-                        {t(`sockscap.mode.${m}`)}
-                      </button>
-                    );
-                  })}
-                </div>
-                {caps !== null && !caps.appFilter && (
-                  <p className="mt-2 text-[11px] text-[var(--taomni-text-muted)]">
-                    {t("sockscap.appModeUnsupported")}
-                  </p>
-                )}
-              </>
-            )}
-            {(selectedProf.mode === "apps" || linuxLaunchOnly) && (
-              <div className="mt-3 space-y-2">
-                {linuxLaunchOnly ? (
-                  <div
-                    data-testid="sockscap-rootless-app-editor"
-                    className="rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] p-2.5"
-                  >
-                    <div className="grid grid-cols-1 xl:grid-cols-[minmax(220px,1fr)_minmax(220px,1fr)_140px_auto] gap-2 items-end">
-                      <Field label={t("sockscap.rootlessCommandLabel")}>
-                        <div className="flex gap-1">
-                          <input
-                            data-testid="sockscap-rootless-command"
-                            className="flex-1 min-w-0 text-[11px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
-                            value={rootlessCommand}
-                            disabled={locked}
-                            placeholder={t("sockscap.rootlessCommandPlaceholder")}
-                            onChange={(event) => setRootlessCommand(event.target.value)}
-                          />
-                          <button
-                            type="button"
-                            data-testid="sockscap-pick-linux-application"
-                            className="shrink-0 px-2 py-1.5 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50"
-                            onClick={() => void pickRootlessApplication()}
-                            disabled={locked}
-                          >
-                            {t("sockscap.browseApplication")}
-                          </button>
-                        </div>
-                      </Field>
-                      <Field label={t("sockscap.rootlessArgumentsLabel")}>
-                        <input
-                          data-testid="sockscap-rootless-arguments"
-                          className="w-full text-[11px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
-                          value={rootlessArguments}
-                          disabled={locked}
-                          placeholder={t("sockscap.rootlessArgumentsPlaceholder")}
-                          onChange={(event) => setRootlessArguments(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") void addRootlessApplication();
-                          }}
-                        />
-                      </Field>
-                      <Field label={t("sockscap.rootlessLaunchModeLabel")}>
-                        <select
-                          data-testid="sockscap-rootless-launch-mode"
-                          className="w-full text-[11px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
-                          value={rootlessLaunchMode}
-                          disabled={locked}
-                          onChange={(event) =>
-                            setRootlessLaunchMode(
-                              event.target.value as "desktop" | "terminal",
-                            )
-                          }
-                        >
-                          <option value="desktop">
-                            {t("sockscap.rootlessLaunchModeDesktop")}
-                          </option>
-                          <option value="terminal">
-                            {t("sockscap.rootlessLaunchModeTerminal")}
-                          </option>
-                        </select>
-                      </Field>
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          data-testid="sockscap-add-rootless-application"
-                          className="inline-flex flex-1 items-center justify-center gap-1 px-3 py-1.5 rounded text-[11px] border border-[var(--taomni-accent)] text-[var(--taomni-accent)] hover:bg-[var(--taomni-accent)]/10 disabled:opacity-50"
-                          disabled={locked || !rootlessCommand.trim()}
-                          onClick={() => void addRootlessApplication()}
-                        >
-                          {editingRootlessAppKey ? (
-                            <Pencil className="w-3 h-3" />
-                          ) : (
-                            <Plus className="w-3 h-3" />
-                          )}
-                          {t(
-                            editingRootlessAppKey
-                              ? "sockscap.updateApplication"
-                              : "sockscap.addApplication",
-                          )}
-                        </button>
-                        {editingRootlessAppKey && (
-                          <button
-                            type="button"
-                            data-testid="sockscap-cancel-rootless-application-edit"
-                            className="p-1.5 rounded border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50"
-                            disabled={locked}
-                            title={t("common.cancel")}
-                            aria-label={t("common.cancel")}
-                            onClick={resetRootlessApplicationDraft}
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      data-testid="sockscap-rootless-preparation-toggle"
-                      className="mt-2 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)] hover:text-[var(--taomni-text)] disabled:opacity-50"
-                      disabled={locked}
-                      aria-expanded={rootlessPreparationOpen}
-                      onClick={() => setRootlessPreparationOpen((open) => !open)}
-                    >
-                      {rootlessPreparationOpen ? (
-                        <ChevronDown className="w-3 h-3" />
-                      ) : (
-                        <ChevronRight className="w-3 h-3" />
-                      )}
-                      {t("sockscap.rootlessPreparationTitle")}
-                    </button>
-                    {rootlessPreparationOpen && (
-                      <div
-                        data-testid="sockscap-rootless-preparation"
-                        className="mt-2 border-t border-[var(--taomni-divider)] pt-2 space-y-2"
-                      >
-                        <div className="grid grid-cols-1 xl:grid-cols-[minmax(280px,1fr)_140px] gap-2">
-                          <Field label={t("sockscap.rootlessWorkingDirectoryLabel")}>
-                            <div className="flex gap-1">
-                              <input
-                                data-testid="sockscap-rootless-working-directory"
-                                className="flex-1 min-w-0 text-[11px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
-                                value={rootlessWorkingDirectory}
-                                disabled={locked}
-                                placeholder={t("sockscap.rootlessWorkingDirectoryPlaceholder")}
-                                onChange={(event) =>
-                                  setRootlessWorkingDirectory(event.target.value)
-                                }
-                              />
-                              <button
-                                type="button"
-                                data-testid="sockscap-pick-rootless-working-directory"
-                                className="p-1.5 rounded border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50"
-                                disabled={locked}
-                                title={t("sockscap.browseDirectory")}
-                                aria-label={t("sockscap.browseDirectory")}
-                                onClick={() => void pickRootlessWorkingDirectory()}
-                              >
-                                <FolderOpen className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          </Field>
-                          <Field label={t("sockscap.rootlessShellLabel")}>
-                            <select
-                              data-testid="sockscap-rootless-shell"
-                              className="w-full text-[11px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
-                              value={rootlessLaunchShell}
-                              disabled={locked}
-                              onChange={(event) =>
-                                setRootlessLaunchShell(event.target.value as "sh" | "bash")
-                              }
-                            >
-                              <option value="sh">POSIX sh</option>
-                              <option value="bash">Bash</option>
-                            </select>
-                          </Field>
-                        </div>
-                        <Field label={t("sockscap.rootlessPreCommandLabel")}>
-                          <textarea
-                            data-testid="sockscap-rootless-pre-command"
-                            className="w-full min-h-20 resize-y font-mono text-[11px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
-                            value={rootlessPreCommand}
-                            disabled={locked}
-                            placeholder={t("sockscap.rootlessPreCommandPlaceholder")}
-                            onChange={(event) => setRootlessPreCommand(event.target.value)}
-                          />
-                        </Field>
-                        <div>
-                          <div className="mb-1 flex items-center justify-between gap-2">
-                            <span className="text-[11px] font-medium">
-                              {t("sockscap.rootlessEnvironmentLabel")}
-                            </span>
-                            <button
-                              type="button"
-                              data-testid="sockscap-add-rootless-environment"
-                              className="inline-flex items-center gap-1 text-[10px] text-[var(--taomni-accent)] hover:underline disabled:opacity-50"
-                              disabled={locked}
-                              onClick={() =>
-                                setRootlessEnvironment((entries) => [
-                                  ...entries,
-                                  {
-                                    id: nextEnvironmentDraftId.current++,
-                                    name: "",
-                                    value: "",
-                                  },
-                                ])
-                              }
-                            >
-                              <Plus className="w-3 h-3" />
-                              {t("sockscap.addEnvironmentVariable")}
-                            </button>
-                          </div>
-                          <div className="space-y-1">
-                            {rootlessEnvironment.map((entry, index) => (
-                              <div
-                                key={entry.id}
-                                className="grid grid-cols-[minmax(120px,0.45fr)_minmax(160px,1fr)_auto] gap-1"
-                              >
-                                <input
-                                  data-testid={`sockscap-rootless-environment-name-${index}`}
-                                  aria-label={t("sockscap.environmentName")}
-                                  className="min-w-0 font-mono text-[11px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
-                                  value={entry.name}
-                                  disabled={locked}
-                                  placeholder={t("sockscap.environmentName")}
-                                  onChange={(event) =>
-                                    setRootlessEnvironment((entries) =>
-                                      entries.map((current) =>
-                                        current.id === entry.id
-                                          ? { ...current, name: event.target.value }
-                                          : current,
-                                      ),
-                                    )
-                                  }
-                                />
-                                <input
-                                  data-testid={`sockscap-rootless-environment-value-${index}`}
-                                  aria-label={t("sockscap.environmentValue")}
-                                  className="min-w-0 font-mono text-[11px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] disabled:opacity-60"
-                                  value={entry.value}
-                                  disabled={locked}
-                                  placeholder={t("sockscap.environmentValue")}
-                                  onChange={(event) =>
-                                    setRootlessEnvironment((entries) =>
-                                      entries.map((current) =>
-                                        current.id === entry.id
-                                          ? { ...current, value: event.target.value }
-                                          : current,
-                                      ),
-                                    )
-                                  }
-                                />
-                                <button
-                                  type="button"
-                                  className="p-1.5 rounded hover:text-red-500 disabled:opacity-50"
-                                  disabled={locked}
-                                  title={t("common.remove")}
-                                  aria-label={t("common.remove")}
-                                  onClick={() =>
-                                    setRootlessEnvironment((entries) =>
-                                      entries.filter((current) => current.id !== entry.id),
-                                    )
-                                  }
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <p className="mt-2 text-[10px] text-[var(--taomni-text-muted)]">
-                      {t("sockscap.rootlessCommandHint")}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    {caps?.platform === "macos" && (
-                      <button
-                        type="button"
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
-                        onClick={() => void pickMacosApplication()}
-                        disabled={locked}
-                        title={locked ? t("sockscap.lockedTooltip") : undefined}
-                      >
-                        <Plus className="w-3 h-3" />
-                        {t("sockscap.pickApplication")}
-                      </button>
-                    )}
-                    {caps?.platform === "linux" && (
-                      <button
-                        type="button"
-                        data-testid="sockscap-pick-linux-application"
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
-                        onClick={() => void pickLinuxApplication()}
-                        disabled={locked}
-                        title={locked ? t("sockscap.lockedTooltip") : undefined}
-                      >
-                        <Plus className="w-3 h-3" />
-                        {t("sockscap.pickApplication")}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-50 disabled:cursor-not-allowed"
-                      onClick={() => void loadProcesses()}
-                      disabled={locked}
-                      title={locked ? t("sockscap.lockedTooltip") : undefined}
-                    >
-                      <Plus className="w-3 h-3" />
-                      {t("sockscap.pickProcess")}
-                    </button>
-                    <ManualAppAdd onAdd={(path) => void addAppPath(path)} disabled={locked} />
-                  </div>
-                )}
-                {selectedProf.apps.length === 0 ? (
-                  <div className="text-[11px] text-[var(--taomni-text-muted)]">
-                    {t(linuxLaunchOnly ? "sockscap.rootlessAppsEmpty" : "sockscap.appsEmpty")}
-                  </div>
-                ) : (
-                  <ul className="space-y-1">
-                    {selectedProf.apps.map((a, index) => {
-                      const appKey = rootlessAppKey(
-                        a.path,
-                        a.args,
-                        a.launchMode,
-                        a.launchPreparation,
-                      );
-                      const matchingLaunches = launchedApps.filter(
-                        (app) =>
-                          app.profileId === selectedProf.id &&
-                          rootlessAppKey(
-                            app.path,
-                            app.args,
-                            app.terminalSessionId ? "terminal" : "desktop",
-                            app.launchPreparation,
-                          ) === appKey,
-                      );
-                      const latestLaunch = matchingLaunches.at(-1);
-                      const launched = latestLaunch?.running ? latestLaunch : undefined;
-                      const profileActive =
-                        selectedProf.enabled &&
-                        (cfg?.activeProfileIds.includes(selectedProf.id) ?? false);
-                      return (
-                        <li
-                          key={appKey}
-                          className="flex items-center gap-2 text-[12px] px-2 py-1 rounded bg-[var(--taomni-bg)] border border-[var(--taomni-divider)]"
-                        >
-                          <span className="flex-1 min-w-0" title={a.path}>
-                            <span className="block truncate">{a.name || a.path}</span>
-                            {linuxLaunchOnly && (
-                              <>
-                                <span className="block truncate font-mono text-[10px] text-[var(--taomni-text-muted)]">
-                                  {formatRootlessCommand(a.path, a.args)}
-                                </span>
-                                <span className="block text-[10px] text-sky-700 dark:text-sky-300">
-                                  {t(
-                                    a.launchMode === "terminal"
-                                      ? "sockscap.rootlessLaunchModeTerminal"
-                                      : "sockscap.rootlessLaunchModeDesktop",
-                                  )}
-                                </span>
-                                {a.launchPreparation?.workingDirectory && (
-                                  <span className="block truncate font-mono text-[10px] text-[var(--taomni-text-muted)]">
-                                    {t("sockscap.rootlessWorkingDirectorySummary", {
-                                      path: a.launchPreparation.workingDirectory,
-                                    })}
-                                  </span>
-                                )}
-                                {a.launchPreparation?.preCommand && (
-                                  <span className="block truncate font-mono text-[10px] text-[var(--taomni-text-muted)]">
-                                    {t("sockscap.rootlessPreCommandSummary", {
-                                      command: a.launchPreparation.preCommand.split(/\r?\n/)[0],
-                                    })}
-                                  </span>
-                                )}
-                              </>
-                            )}
-                            {a.macosIdentity && (
-                              <span className="block truncate text-[10px] text-[var(--taomni-text-muted)]">
-                                {a.macosIdentity.mainExecutablePath} ·{" "}
-                                {a.macosIdentity.kind === "executable"
-                                  ? t("sockscap.executableOnlyCoverage")
-                                  : t("sockscap.bundleFamilyCoverage")}
-                              </span>
-                            )}
-                            {launched && (
-                              <span
-                                className={`block text-[10px] ${
-                                  launched.phase === "preparing"
-                                    ? "text-amber-600 dark:text-amber-400"
-                                    : "text-emerald-600 dark:text-emerald-400"
-                                }`}
-                              >
-                                {t(
-                                  launched.phase === "preparing"
-                                    ? "sockscap.applicationPreparing"
-                                    : "sockscap.applicationRunning",
-                                  { pid: launched.pid },
-                                )}
-                              </span>
-                            )}
-                            {!launched && latestLaunch?.phase === "failed" && (
-                              <span
-                                className="block truncate text-[10px] text-red-600 dark:text-red-400"
-                                title={latestLaunch.launchError}
-                              >
-                                {t("sockscap.applicationLaunchFailed", {
-                                  reason: latestLaunch.launchError ?? t("common.unknownError"),
-                                })}
-                              </span>
-                            )}
-                          </span>
-                          {a.macosIdentity?.teamId && (
-                            <span
-                              className="text-[10px] text-[var(--taomni-text-muted)]"
-                              title={a.macosIdentity.designatedRequirement}
-                            >
-                              {a.macosIdentity.teamId}
-                            </span>
-                          )}
-                          {linuxLaunchOnly &&
-                            (launched ? (
-                              <button
-                                type="button"
-                                data-testid={`sockscap-stop-launched-app-${launched.pid}`}
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded border border-red-500/40 text-red-600 dark:text-red-400 hover:bg-red-500/10 disabled:opacity-50"
-                                disabled={stoppingPid !== null || launchingPath !== null}
-                                onClick={() => void onStopLaunchedApp(launched.pid)}
-                              >
-                                {stoppingPid === launched.pid ? (
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                ) : (
-                                  <Square className="w-3 h-3" />
-                                )}
-                                {t("sockscap.stopApplication")}
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                data-testid={`sockscap-launch-app-${index}`}
-                                className="inline-flex items-center gap-1 px-2 py-1 rounded border border-[var(--taomni-accent)] text-[var(--taomni-accent)] hover:bg-[var(--taomni-accent)]/10 disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled={
-                                  (running && !profileActive) ||
-                                  busy ||
-                                  probing ||
-                                  launchingPath !== null ||
-                                  stoppingPid !== null
-                                }
-                                title={
-                                  running && !profileActive
-                                    ? t("sockscap.launchProfileInactive")
-                                    : undefined
-                                }
-                                onClick={() =>
-                                  void onRootlessLaunchApp(
-                                    selectedProf.id,
-                                    a.path,
-                                    a.args ?? [],
-                                    a.launchMode ?? "desktop",
-                                    a.launchPreparation ?? {},
-                                    a.name,
-                                  )
-                                }
-                              >
-                                {launchingPath === appKey ? (
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                ) : (
-                                  <Play className="w-3 h-3" />
-                                )}
-                                {t(
-                                  a.launchMode === "terminal"
-                                    ? running
-                                      ? "sockscap.openTerminalApplication"
-                                      : "sockscap.startTerminalAndCapture"
-                                    : running
-                                      ? "sockscap.launchApplication"
-                                      : "sockscap.startAndCapture",
-                                )}
-                              </button>
-                            ))}
-                          {linuxLaunchOnly && (
-                            <button
-                              type="button"
-                              data-testid={`sockscap-edit-app-${index}`}
-                              className="p-1 hover:text-[var(--taomni-accent)] disabled:opacity-40 disabled:cursor-not-allowed"
-                              disabled={locked || launched !== undefined}
-                              title={t("sockscap.editApplication")}
-                              aria-label={t("sockscap.editApplication")}
-                              onClick={() => editRootlessApplication(a)}
-                            >
-                              <Pencil className="w-3 h-3" />
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            className="p-1 hover:text-red-500 disabled:opacity-40 disabled:cursor-not-allowed"
-                            disabled={locked}
-                            title={locked ? t("sockscap.lockedTooltip") : undefined}
-                            onClick={() =>
-                              void patchSelectedProfile({
-                                apps: selectedProf.apps.filter(
-                                  (item) =>
-                                    rootlessAppKey(
-                                      item.path,
-                                      item.args,
-                                      item.launchMode,
-                                      item.launchPreparation,
-                                    ) !== appKey,
-                                ),
-                              })
-                            }
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
-              </div>
-            )}
-          </Section>
+          <ApplicationsSection
+  draft={rootlessDraft}
+  linuxLaunchOnly={linuxLaunchOnly}
+  t={t}
+  caps={caps}
+  locked={locked}
+  selectedProf={selectedProf}
+  patchSelectedProfile={patchSelectedProfile}
+
+  addRootlessApplication={addRootlessApplication}
+
+
+  pickMacosApplication={pickMacosApplication}
+  pickLinuxApplication={pickLinuxApplication}
+  loadProcesses={loadProcesses}
+  addAppPath={addAppPath}
+  launchedApps={launchedApps}
+  cfg={cfg}
+  stoppingPid={stoppingPid}
+  launchingPath={launchingPath}
+  onStopLaunchedApp={onStopLaunchedApp}
+  running={running}
+  busy={busy}
+  probing={probing}
+  onRootlessLaunchApp={onRootlessLaunchApp}
+
+/>
 
           {/* Upstream */}
-          <Section
-            sectionId="upstream"
-            title={t("sockscap.section.upstream")}
-            defaultExpanded={linuxLaunchOnly}
-          >
-            {/* No local proxy detected → guide the user to run one correctly
-                (proxy/SOCKS inbound only; NOT system-proxy/global, NOT TUN),
-                then rescan or import a share link. Only for native socks5/http
-                upstreams with no saved session picked. */}
-            {detectedProxies.length === 0 &&
-              (selectedProf.upstream.kind === "socks5" ||
-                selectedProf.upstream.kind === "http") &&
-              !selectedProf.upstream.sessionId && (
-                <div
-                  data-testid="sockscap-noproxy-help"
-                  className="mb-3 px-3 py-2 rounded text-[11px] border border-sky-500/40 bg-sky-500/10 text-sky-800 dark:text-sky-300"
-                >
-                  <div className="flex items-center gap-1.5 font-semibold mb-1">
-                    <HelpCircle className="w-3.5 h-3.5 shrink-0" />
-                    {t("sockscap.noProxyHelpTitle")}
-                  </div>
-                  <ol className="list-decimal pl-4 space-y-0.5 text-[var(--taomni-text-muted)]">
-                    <li>{t("sockscap.noProxyHelpStep1")}</li>
-                    <li>{t("sockscap.noProxyHelpStep2")}</li>
-                    <li>{t("sockscap.noProxyHelpStep3")}</li>
-                    <li>{t("sockscap.noProxyHelpStep4")}</li>
-                  </ol>
-                </div>
-              )}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Field label={t("sockscap.upstreamKind")}>
-                <select
-                  data-testid="sockscap-upstream-kind"
-                  className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] disabled:opacity-60 disabled:cursor-not-allowed"
-                  value={selectedProf.upstream.kind}
-                  disabled={locked}
-                  title={locked ? t("sockscap.lockedTooltip") : undefined}
-                  onChange={(e) =>
-                    void patchSelectedProfile({
-                      upstream: {
-                        ...selectedProf.upstream,
-                        kind: e.target.value as UpstreamKind,
-                      },
-                    })
-                  }
-                >
-                  <option value="socks5">SOCKS5</option>
-                  <option value="http">HTTP / HTTPS</option>
-                  <option value="ssh">SSH Tunnel (Dynamic SOCKS)</option>
-                  <option value="shadowsocks">Shadowsocks</option>
-                  <option value="trojan">Trojan</option>
-                  <option value="vmess">VMess</option>
-                  <option value="vless">VLESS</option>
-                  <option value="wireguard">WireGuard</option>
-                </select>
-              </Field>
-
-              {upstreamRequiresCore(selectedProf.upstream.kind) ? (
-                <Field label={t("sockscap.shareLinkImport")}>
-                  <div className="flex gap-1.5">
-                    <input
-                      data-testid="sockscap-sharelink-input"
-                      className="flex-1 text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] disabled:opacity-60 disabled:cursor-not-allowed"
-                      placeholder="ss:// vmess:// vless:// trojan://"
-                      value={shareLink}
-                      disabled={locked}
-                      title={locked ? t("sockscap.lockedTooltip") : undefined}
-                      onChange={(e) => setShareLink(e.target.value)}
-                    />
-                    <button
-                      type="button"
-                      data-testid="sockscap-sharelink-import"
-                      className="px-2 py-1.5 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                      onClick={() => void onImportShareLink()}
-                      disabled={busy || locked || !shareLink.trim()}
-                    >
-                      {t("sockscap.shareLinkImportBtn")}
-                    </button>
-                  </div>
-                </Field>
-              ) : (
-                <Field label={t("sockscap.upstreamSource")}>
-                  <UpstreamSourcePicker
-                    key={selectedProf.id}
-                    mode={selectedProf.upstream.kind === "ssh" ? "ssh" : "proxy"}
-                    detected={detectedProxies}
-                    sessions={sessions}
-                    current={selectedProf.upstream}
-                    onSelect={onSelectUpstreamSource}
-                    onRescan={rescanLocalProxies}
-                    busy={busy}
-                    disabled={locked}
-                    lockedTooltip={locked ? t("sockscap.lockedTooltip") : undefined}
-                    t={t}
-                  />
-                </Field>
-              )}
-
-              <Field label={t("sockscap.host")}>
-                <input
-                  className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] disabled:opacity-60 disabled:cursor-not-allowed"
-                  value={selectedProf.upstream.host}
-                  disabled={locked}
-                  title={locked ? t("sockscap.lockedTooltip") : undefined}
-                  onChange={(e) =>
-                    void patchSelectedProfile({
-                      upstream: { ...selectedProf.upstream, host: e.target.value },
-                    })
-                  }
-                />
-              </Field>
-              <Field label={t("sockscap.port")}>
-                <input
-                  type="number"
-                  className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] disabled:opacity-60 disabled:cursor-not-allowed"
-                  value={selectedProf.upstream.port}
-                  disabled={locked}
-                  title={locked ? t("sockscap.lockedTooltip") : undefined}
-                  onChange={(e) =>
-                    void patchSelectedProfile({
-                      upstream: {
-                        ...selectedProf.upstream,
-                        port: parseInt(e.target.value, 10) || 1080,
-                      },
-                    })
-                  }
-                />
-              </Field>
-              <Field label={t("sockscap.username")}>
-                <input
-                  className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] disabled:opacity-60 disabled:cursor-not-allowed"
-                  value={selectedProf.upstream.username || ""}
-                  disabled={locked}
-                  title={locked ? t("sockscap.lockedTooltip") : undefined}
-                  onChange={(e) =>
-                    void patchSelectedProfile({
-                      upstream: { ...selectedProf.upstream, username: e.target.value },
-                    })
-                  }
-                />
-              </Field>
-              <Field label={t("sockscap.password")}>
-                <div className="flex gap-1.5">
-                  <input
-                    type="password"
-                    className="flex-1 text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] disabled:opacity-60 disabled:cursor-not-allowed"
-                    placeholder={
-                      selectedProf.upstream.passwordRef
-                        ? t("sockscap.passwordStored")
-                        : t("sockscap.passwordPh")
-                    }
-                    value={password}
-                    disabled={locked}
-                    title={locked ? t("sockscap.lockedTooltip") : undefined}
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="px-2 py-1.5 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                    onClick={() => void storePassword()}
-                    disabled={storingPass || locked || !password}
-                  >
-                    {t("sockscap.passwordStore")}
-                  </button>
-                  {selectedProf.upstream.passwordRef && (
-                    <button
-                      type="button"
-                      className="px-2 py-1.5 rounded text-[11px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] text-red-500 shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
-                      onClick={() => void clearPassword()}
-                      disabled={locked}
-                    >
-                      {t("common.clear")}
-                    </button>
-                  )}
-                </div>
-              </Field>
-
-              {renderCoreParams()}
-            </div>
-            <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                data-testid="sockscap-test-upstream"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-[12px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] disabled:opacity-60 disabled:cursor-not-allowed"
-                onClick={() => void onTestUpstream()}
-                disabled={busy || testing}
-              >
-                {testing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                {testing ? t("sockscap.testing") : t("sockscap.testUpstream")}
-              </button>
-            </div>
-          </Section>
+          <UpstreamSection
+  t={t}
+  linuxLaunchOnly={linuxLaunchOnly}
+  detectedProxies={detectedProxies}
+  selectedProf={selectedProf}
+  locked={locked}
+  patchSelectedProfile={patchSelectedProfile}
+  shareLink={shareLink}
+  setShareLink={setShareLink}
+  onImportShareLink={onImportShareLink}
+  busy={busy}
+  sessions={sessions}
+  onSelectUpstreamSource={onSelectUpstreamSource}
+  rescanLocalProxies={rescanLocalProxies}
+  password={password}
+  setPassword={setPassword}
+  storePassword={storePassword}
+  storingPass={storingPass}
+  clearPassword={clearPassword}
+  renderCoreParams={renderCoreParams}
+  onTestUpstream={onTestUpstream}
+  testing={testing}
+/>
 
           {/* Rules Strategy */}
-          <Section
-            sectionId="rules"
-            title={t("sockscap.section.rules")}
-            defaultExpanded={linuxLaunchOnly}
-          >
-            <fieldset
-              data-testid="sockscap-rules-editor"
-              disabled={locked}
-              title={locked ? t("sockscap.lockedTooltip") : undefined}
-              className="disabled:opacity-60"
-            >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-              <Field label={t("sockscap.ruleMode")}>
-                <select
-                  className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
-                  value={selectedProf.ruleMode}
-                  onChange={(e) =>
-                    void patchSelectedProfile({ ruleMode: e.target.value as RuleMode })
-                  }
-                >
-                  <option value="gfwList">{t("sockscap.ruleMode.gfwList")}</option>
-                  <option value="proxyAll">{t("sockscap.ruleMode.proxyAll")}</option>
-                  <option value="off">{t("sockscap.ruleMode.off")}</option>
-                </select>
-              </Field>
-              <Field label={t("sockscap.defaultAction")}>
-                <select
-                  className="w-full text-[12px] px-2 py-1.5 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
-                  value={selectedProf.defaultAction}
-                  onChange={(e) =>
-                    void patchSelectedProfile({ defaultAction: e.target.value as Decision })
-                  }
-                >
-                  <option value="direct">{t("sockscap.action.direct")}</option>
-                  <option value="proxy">{t("sockscap.action.proxy")}</option>
-                  <option value="block">{t("sockscap.action.block")}</option>
-                </select>
-              </Field>
-            </div>
-
-            {/* User rules table for selected profile */}
-            <div className="space-y-2">
-              <div className="text-[11px] font-medium text-[var(--taomni-text-muted)]">
-                {t("sockscap.userRulesTitle")}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  className="flex-1 text-[12px] px-2 py-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
-                  placeholder={t("sockscap.patternPh")}
-                  value={newRule.pattern}
-                  onChange={(e) => setNewRule({ ...newRule, pattern: e.target.value })}
-                />
-                <select
-                  className="text-[12px] px-2 py-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
-                  value={newRule.action}
-                  onChange={(e) =>
-                    setNewRule({ ...newRule, action: e.target.value as Decision })
-                  }
-                >
-                  <option value="direct">{t("sockscap.action.direct")}</option>
-                  <option value="proxy">{t("sockscap.action.proxy")}</option>
-                  <option value="block">{t("sockscap.action.block")}</option>
-                </select>
-                <button
-                  type="button"
-                  className="px-3 py-1 rounded text-[12px] bg-[var(--taomni-accent)] text-white hover:opacity-90"
-                  onClick={() => void addUserRule()}
-                >
-                  {t("common.add")}
-                </button>
-              </div>
-
-              {selectedProf.userRules.length === 0 ? (
-                <div className="text-[11px] text-[var(--taomni-text-muted)]">{t("sockscap.userRulesEmpty")}</div>
-              ) : (
-                <ul className="space-y-1 max-h-36 overflow-auto">
-                  {selectedProf.userRules.map((r, idx) => (
-                    <li
-                      key={`${r.pattern}-${idx}`}
-                      className="flex items-center gap-2 text-[12px] px-2 py-1 rounded bg-[var(--taomni-bg)] border border-[var(--taomni-divider)]"
-                    >
-                      <span className="font-mono flex-1">{r.pattern}</span>
-                      <span className="text-[11px] text-[var(--taomni-text-muted)] uppercase">
-                        {r.action}
-                      </span>
-                      <button
-                        type="button"
-                        className="p-1 hover:text-red-500"
-                        onClick={() =>
-                          void patchSelectedProfile({
-                            userRules: selectedProf.userRules.filter((_, i) => i !== idx),
-                          })
-                        }
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-            </fieldset>
-          </Section>
+          <RulesSection
+  t={t}
+  linuxLaunchOnly={linuxLaunchOnly}
+  locked={locked}
+  selectedProf={selectedProf}
+  patchSelectedProfile={patchSelectedProfile}
+  newRule={newRule}
+  setNewRule={setNewRule}
+  addUserRule={addUserRule}
+/>
 
           {/* Test Target Dry-run */}
           {!linuxLaunchOnly && (
@@ -2921,180 +1022,24 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
           </Section>
 
           {/* Captured Domains & Traffic Table */}
-          <div className="rounded-lg border border-[var(--taomni-divider)] bg-[var(--taomni-bg)] overflow-hidden">
-            <button
-              type="button"
-              data-testid="sockscap-domains-toggle"
-              className="w-full px-3 py-2 text-left text-[11px] font-semibold flex items-center justify-between hover:bg-[var(--taomni-hover)] transition-colors"
-              aria-expanded={domainsExpanded}
-              aria-controls="sockscap-domains-content"
-              onClick={() => setDomainsExpanded(!domainsExpanded)}
-            >
-              <div className="flex items-center gap-2">
-                {domainsExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                <span>Captured Domains & Flow History</span>
-                <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-[var(--taomni-hover)] font-normal text-[var(--taomni-text-muted)]">
-                  {domainRecords.length} entries
-                </span>
-              </div>
-              <span className="text-[10px] font-normal text-[var(--taomni-text-muted)]">
-                {domainsExpanded ? "Click to collapse" : "Click to expand"}
-              </span>
-            </button>
-
-            {domainsExpanded && (
-              <div id="sockscap-domains-content" className="p-3 border-t border-[var(--taomni-divider)] space-y-3">
-                {/* Controls Bar */}
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 flex-1 min-w-[220px]">
-                    <div className="relative flex-1">
-                      <Search className="w-3.5 h-3.5 absolute left-2 top-2 text-[var(--taomni-text-muted)]" />
-                      <input
-                        className="w-full text-[11px] pl-7 pr-2 py-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)]"
-                        placeholder="Search domain, IP, profile or process..."
-                        value={domainFilter}
-                        onChange={(e) => setDomainFilter(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <div className="flex rounded border border-[var(--taomni-divider)] p-0.5 text-[10px]">
-                      {(["all", "proxy", "direct", "block"] as const).map((mode) => (
-                        <button
-                          key={mode}
-                          type="button"
-                          className={`px-2 py-0.5 rounded capitalize transition-colors ${
-                            decisionFilter === mode
-                              ? "bg-[var(--taomni-accent)] text-white font-medium"
-                              : "hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"
-                          }`}
-                          onClick={() => setDecisionFilter(mode)}
-                        >
-                          {mode}
-                        </button>
-                      ))}
-                    </div>
-
-                    <select
-                      className="text-[10px] px-2 py-1 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)]"
-                      value={topNLimit}
-                      onChange={(e) => setTopNLimit(Number(e.target.value))}
-                    >
-                      <option value={50}>Top 50</option>
-                      <option value={100}>Top 100</option>
-                      <option value={200}>All (max 200)</option>
-                    </select>
-
-                    <button
-                      type="button"
-                      className="px-2 py-1 rounded text-[10px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] flex items-center gap-1 text-[var(--taomni-text-muted)]"
-                      onClick={() => {
-                        void sockscapClearDomainRecords();
-                        setDomainRecords([]);
-                      }}
-                    >
-                      <Trash2 className="w-3 h-3" />
-                      Clear
-                    </button>
-                  </div>
-                </div>
-
-                {/* Table */}
-                <div className="max-h-[280px] overflow-auto rounded border border-[var(--taomni-divider)]">
-                  <table className="w-full text-[11px] text-left border-collapse">
-                    <thead className="sticky top-0 bg-[var(--taomni-panel-bg)] border-b border-[var(--taomni-divider)] text-[10px] text-[var(--taomni-text-muted)] uppercase">
-                      <tr>
-                        <th className="py-1.5 px-2">Domain / IP</th>
-                        <th className="py-1.5 px-2">Decision</th>
-                        <th className="py-1.5 px-2">Profile</th>
-                        <th className="py-1.5 px-2">Matched Rule</th>
-                        <th className="py-1.5 px-2">Process (PID)</th>
-                        <th className="py-1.5 px-2 text-right">Hits</th>
-                        <th className="py-1.5 px-2 text-right">Data Transferred</th>
-                        <th className="py-1.5 px-2 text-right">Last Seen</th>
-                        <th className="py-1.5 px-2 text-right">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--taomni-divider)]">
-                      {filteredDomainRecords.length === 0 ? (
-                        <tr>
-                          <td colSpan={9} className="py-4 text-center text-[10px] text-[var(--taomni-text-muted)]">
-                            No domain records captured yet. Start SocksCap and browse network to inspect live domain traffic.
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredDomainRecords.slice(0, topNLimit).map((rec) => (
-                          <tr key={rec.key} className="hover:bg-[var(--taomni-hover)] transition-colors">
-                            <td className="py-1.5 px-2 font-mono font-medium truncate max-w-[180px]" title={rec.domainOrIp}>
-                              {rec.domainOrIp}
-                            </td>
-                            <td className="py-1.5 px-2">
-                              {rec.decision === "proxy" && (
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                                  PROXY
-                                </span>
-                              )}
-                              {rec.decision === "direct" && (
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20">
-                                  DIRECT
-                                </span>
-                              )}
-                              {rec.decision === "block" && (
-                                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20">
-                                  BLOCK
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-1.5 px-2 font-medium text-[var(--taomni-accent)] truncate max-w-[100px]" title={rec.profileName || "-"}>
-                              {rec.profileName || "-"}
-                            </td>
-                            <td className="py-1.5 px-2 text-[var(--taomni-text-muted)] truncate max-w-[140px]" title={rec.matchedRule || "-"}>
-                              {rec.matchedRule || "-"}
-                            </td>
-                            <td className="py-1.5 px-2 text-[var(--taomni-text-muted)]">
-                              {rec.processName ? (
-                                <span>{rec.processName} {rec.pid ? `(${rec.pid})` : ""}</span>
-                              ) : (
-                                "-"
-                              )}
-                            </td>
-                            <td className="py-1.5 px-2 text-right tabular-nums font-mono">{rec.hitCount}</td>
-                            <td className="py-1.5 px-2 text-right tabular-nums font-mono">
-                              {formatBytes(rec.bytesUp + rec.bytesDown)}
-                            </td>
-                            <td className="py-1.5 px-2 text-right tabular-nums font-mono text-[var(--taomni-text-muted)]">
-                              {formatTime(rec.lastSeenUnix)}
-                            </td>
-                            <td className="py-1.5 px-2 text-right">
-                              <button
-                                type="button"
-                                className="px-1.5 py-0.5 rounded text-[9px] border border-[var(--taomni-divider)] hover:bg-[var(--taomni-hover)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                disabled={locked}
-                                title={locked ? t("sockscap.lockedTooltip") : undefined}
-                                onClick={() => {
-                                  if (!cfg) return;
-                                  const pattern = rec.domainOrIp;
-                                  if (selectedProf.userRules.some((r) => r.pattern === pattern)) return;
-                                  const updatedRules = [
-                                    { pattern, action: rec.decision === "proxy" ? ("proxy" as const) : ("direct" as const) },
-                                    ...selectedProf.userRules,
-                                  ];
-                                  void patchSelectedProfile({ userRules: updatedRules });
-                                }}
-                              >
-                                + User Rule
-                              </button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
+          <TrafficSection
+  domainsExpanded={domainsExpanded}
+  setDomainsExpanded={setDomainsExpanded}
+  domainRecords={domainRecords}
+  domainFilter={domainFilter}
+  setDomainFilter={setDomainFilter}
+  decisionFilter={decisionFilter}
+  setDecisionFilter={setDecisionFilter}
+  topNLimit={topNLimit}
+  setTopNLimit={setTopNLimit}
+  setDomainRecords={setDomainRecords}
+  filteredDomainRecords={filteredDomainRecords}
+  locked={locked}
+  t={t}
+  cfg={cfg}
+  selectedProf={selectedProf}
+  patchSelectedProfile={patchSelectedProfile}
+/>
 
           {msg && (
             <div
@@ -3385,6 +1330,14 @@ export function SocksCapPanel({ onStatusMessage, onClose }: Props) {
     </div>
   );
 }
+
+
+
+
+
+
+
+
 
 
 

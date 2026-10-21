@@ -1,45 +1,52 @@
+import { useDatabaseWorkspaceHydration } from "./client/useDatabaseWorkspaceHydration";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent as ReactMouseEvent } from "react";
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle, type PanelImperativeHandle, type PanelSize } from "react-resizable-panels";
 import { Play, SquareDashedMousePointer, Sparkles, Plus, X, Save, AlertTriangle, Loader2, Bot, ExternalLink, Maximize2, Minimize2, ChevronRight, Files, Database, Crosshair, Pencil } from "lucide-react";
-import { checkFileExists, dbConnect, dbDisconnect, dbExecute, dbCancel, dbTxRollback, dbClearHistory, dbDeleteHistory, dbGetSavedQuery, dbCloseQueryWorkspaceTabs, dbLoadQueryWorkspace, dbRewriteResultSql, dbSaveQueryWorkspace, dbUpdateHistoryTabName, selectSaveFilePath, type DbQueryResult, type DbResultSqlRewriteRequest, type DbSavedQuery, type DbSqlHistoryEntry, type DbTxStatus } from "../../lib/ipc";
+import { dbConnect, dbDisconnect, dbCancel, dbTxRollback, dbClearHistory, dbDeleteHistory, dbUpdateHistoryTabName, selectSaveFilePath, type DbSavedQuery, type DbSqlHistoryEntry } from "../../lib/ipc";
 import { SchemaTree, type SchemaTreeSelectedObject } from "./SchemaTree";
 import { QueryLibraryPanel } from "./QueryLibraryPanel";
 import { SqlEditorPanel, type SqlEditorHandle, type SqlEditorRunContext } from "./SqlEditorPanel";
-import { type QueryGridCommitPayload, type QueryGeneratedSqlSyncMode } from "./QueryResultGrid";
 import { formatSql } from "./formatSql";
 import { displaySqlShortcut, loadSqlExecutionPreferences, subscribeSqlExecutionPreferences } from "../../lib/sqlExecutionPreferences";
 import { useAppStore } from "../../stores/appStore";
 import { ScreenshotMenuButton } from "../screenshot/ScreenshotMenuButton";
 import { TabActions } from "../tabbar/TabActionSlot";
-import { useChatStore } from "../../stores/chatStore";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { FT_BUTTON_STYLE, FT_BUTTON_ACTIVE_OVERRIDE, FT_ICON_BUTTON_STYLE } from "../floating-toolbar/floatingToolbarStyles";
 import { useT } from "../../lib/i18n";
 import { AI_ANSWER_LANGUAGES, answerLanguageLabelKey, type AiAnswerLanguage } from "../../lib/ai/answerLanguage";
-import { buildDbAiPrompt, truncateStatement } from "../../lib/database/dbAiPrompts";
-import { registerQueryTab } from "../../lib/queryRegistry";
-import { alertAppDialog } from "../../lib/appDialogs";
-import { explainSqlFor } from "../../lib/sqlExplain";
-import { gridChangePreview, type GridChangePreview } from "../../lib/dbGridChanges";
 import { useDbSessionFontSize } from "./useDbSessionFontSize";
-import { splitSqlStatementRanges, sqlStatementRangesForExecution, type SqlStatementRange } from "../../lib/sqlStatements";
-import { writeText } from "../../lib/clipboard";
+import { sqlStatementRangesForExecution, type SqlStatementRange } from "../../lib/sqlStatements";
 import { createDbMetadataCache } from "../../lib/dbMetadataCache";
-import { sqlNamespaceFromMetadata } from "../../lib/sqlMetadataCompletions";
-import { clampDatabaseTabLimit, readDatabaseTabLimit, writeDatabaseTabLimit } from "../../lib/databaseTabLimit";
+import { clampDatabaseTabLimit, readDatabaseTabLimit } from "../../lib/databaseTabLimit";
 import { asSqlEngine, selectStatement as dialectSelectStatement } from "../../lib/sqlDialect";
 import { type DbClientTabProps, type PanelState, type EditorStatementAction, type ResultSheet, type SqlStatementSourceRef, type ResultSubTab } from "./client/types";
-import { newPanel, initialActiveSchema, supportsManualCommit, workspaceTabFromPanel, newResultSheet, engineUsesDatabaseAsSchema, schemaSwitchSql, hashSqlText, replacementEndWithExistingTerminator, resultToJsonText } from "./client/queryModel";
-import { readIntSetting, DEFAULT_ROW_LIMIT, MIN_ROW_LIMIT, MAX_ROW_LIMIT, createRuntimeDbSessionId, basename, readLegacyWorkspaceCache, readTextFile, writeIntSetting, writeTextFile, MAX_PANEL_NAME_LENGTH, QUERY_AUTO_SAVE_MS, widthKey, clampInt } from "./client/persistence";
+import { newPanel, initialActiveSchema, newResultSheet } from "./client/queryModel";
+import { readIntSetting, DEFAULT_ROW_LIMIT, MIN_ROW_LIMIT, MAX_ROW_LIMIT, createRuntimeDbSessionId, basename, writeTextFile, MAX_PANEL_NAME_LENGTH, QUERY_AUTO_SAVE_MS, widthKey, clampInt } from "./client/persistence";
 import { EditorToolbar } from "./client/EditorToolbar";
 import { HistoryDropdown } from "./client/HistoryDropdown";
 import { StatementDropdown } from "./client/StatementDropdown";
 import { ResultArea } from "./client/ResultArea";
 import { StatusBar } from "./client/StatusBar";
-import { createApplyTxStatus, createRefreshTxStatus, createToggleTxMode, createEndTransaction, createPrepareGridChanges, createCommitGridChanges } from "./client/transactionActions";
 import { createPersistWorkspaceSnapshot, createAutoSaveWorkspace, createScheduleWorkspaceSave } from "./client/workspacePersistence";
 import { createStreamQueryIntoSheet, createRunQuery, createCancelQuery, createRefreshSheet } from "./client/queryExecution";
 import { createRefreshHistory, createAppendSqlHistory } from "./client/history";
+import { useDatabaseTransactions } from "./client/useDatabaseTransactions";
+import { useDatabaseQueryBridge } from "./client/useDatabaseQueryBridge";
+import { useDatabaseGridChanges } from "./client/useDatabaseGridChanges";
+import { useDatabaseSchema } from "./client/useDatabaseSchema";
+import { createQueryPanelActions } from "./client/createQueryPanelActions";
+import { createGeneratedSqlActions } from "./client/generatedSqlActions";
+import { createStatementActions } from "./client/statementActions";
+import { createDatabaseAiActions } from "./client/aiActions";
+
+
+
+
+
+
+
+
 
 
 
@@ -195,162 +202,24 @@ export default function DbClientTab({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
-
-  const [txStatus, setTxStatus] = useState<DbTxStatus | null>(null);
-  const txStatusRef = useRef<DbTxStatus | null>(null);
-  const applyTxStatus = useCallback(createApplyTxStatus({
-    txStatusRef,
-    setTxStatus,
+  const { txStatusRef, refreshTxStatus, txAvailable, txStatus, toggleTxMode, endTransaction } = useDatabaseTransactions({
     setStatusMessage,
-  }), [setStatusMessage]);
-  const txAvailable = supportsManualCommit(info.engine);
-
-  const refreshTxStatus = useCallback(createRefreshTxStatus({
+    info,
     connectionSessionId,
-    txAvailable,
-    applyTxStatus,
-  }), [applyTxStatus, connectionSessionId, txAvailable]);
-
-  useEffect(() => {
-    applyTxStatus(null);
-    void refreshTxStatus();
-  }, [applyTxStatus, refreshTxStatus]);
-
-  const toggleTxMode = useCallback(createToggleTxMode({
-    txStatusRef,
-    connectionSessionId,
-    applyTxStatus,
+  });
+  useDatabaseWorkspaceHydration({
+    setWorkspaceReady,
+    workspaceSessionId,
+    tabLimitRef,
+    savedQueriesRef,
+    lastAutoSavedDocRef,
+    setPanels,
+    setActivePanelId,
     setStatusMessage,
-  }), [applyTxStatus, connectionSessionId, setStatusMessage]);
-
-  const endTransaction = useCallback(
-    createEndTransaction({
-    connectionSessionId,
-    txStatusRef,
-    applyTxStatus,
-    setStatusMessage,
-  }),
-    [applyTxStatus, connectionSessionId, setStatusMessage],
-  );
-
-  useEffect(() => {
-    let cancelled = false;
-    setWorkspaceReady(false);
-    void (async () => {
-      const workspace = await dbLoadQueryWorkspace(workspaceSessionId);
-      if (cancelled) return;
-      if (workspace) {
-        if (workspace.tabs.length === 0) {
-          setWorkspaceReady(true);
-          return;
-        }
-        const restored = await Promise.all(
-          workspace.tabs.slice(0, tabLimitRef.current).map(async (entry) => {
-            const savedQuery = entry.savedQueryId
-              ? await dbGetSavedQuery(entry.savedQueryId).catch(() => null)
-              : null;
-            if (savedQuery) savedQueriesRef.current[entry.panelId] = savedQuery;
-            return newPanel({
-              id: entry.panelId,
-              doc: entry.content,
-              filePath: entry.filePath ?? null,
-              fileName: entry.fileName ?? (entry.filePath ? basename(entry.filePath) : null),
-              savedQuery,
-              displayName: entry.displayName ?? null,
-              dirty: entry.dirty,
-              createdAt: entry.createdAt,
-            });
-          }),
-        );
-        lastAutoSavedDocRef.current = Object.fromEntries(
-          restored.map((panel) => [panel.id, panel.doc]),
-        );
-        setPanels(restored);
-        setActivePanelId(
-          workspace.activePanelId && restored.some((panel) => panel.id === workspace.activePanelId)
-            ? workspace.activePanelId
-            : restored[0].id,
-        );
-        setWorkspaceReady(true);
-        return;
-      }
-
-      const cache = readLegacyWorkspaceCache(workspaceSessionId);
-      if (!cache || cache.panels.length === 0) {
-        setWorkspaceReady(true);
-        return;
-      }
-      const restored: PanelState[] = [];
-      const restoredDocs: Record<string, string> = {};
-      for (const [index, entry] of cache.panels.entries()) {
-        const path = entry.filePath ?? entry.cachePath;
-        if (!path) continue;
-        const exists = await checkFileExists(path).catch(() => false);
-        if (!exists) continue;
-        const doc = await readTextFile(path).catch(() => null);
-        if (doc === null) continue;
-        restoredDocs[entry.id] = doc;
-        restored.push(
-          newPanel({
-            id: entry.id,
-            doc,
-            filePath: entry.filePath,
-            fileName: entry.filePath ? basename(entry.filePath) : entry.fileName,
-            dirty: !entry.filePath,
-            createdAt: Date.now() + index,
-          }),
-        );
-        if (restored.length >= tabLimitRef.current) break;
-        if (index >= tabLimitRef.current - 1) break;
-      }
-      if (cancelled) return;
-      if (restored.length === 0) {
-        setWorkspaceReady(true);
-        return;
-      }
-      const activePanelId =
-        cache.activePanelId && restored.some((panel) => panel.id === cache.activePanelId)
-          ? cache.activePanelId
-          : restored[0].id;
-      const importedAt = Date.now();
-      await dbSaveQueryWorkspace({
-        workspaceId: workspaceSessionId,
-        activePanelId,
-        tabs: restored.map((panel, index) =>
-          workspaceTabFromPanel(
-            workspaceSessionId,
-            panel,
-            index,
-            panel.doc,
-            importedAt,
-          ),
-        ),
-        updatedAt: importedAt,
-      });
-      if (cancelled) return;
-      lastAutoSavedDocRef.current = restoredDocs;
-      setPanels(restored);
-      setActivePanelId(activePanelId);
-      setWorkspaceReady(true);
-    })().catch((err) => {
-      if (!cancelled) {
-        setStatusMessage(`Query workspace restore failed: ${String(err)}`);
-        setWorkspaceReady(true);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [setStatusMessage, workspaceSessionId]);
-
-  useEffect(() => {
-    writeIntSetting(info.engine, "rowLimit", rowLimit);
-  }, [info.engine, rowLimit]);
-
-  useEffect(() => {
-    writeDatabaseTabLimit(info.engine, tabLimit);
-  }, [info.engine, tabLimit]);
+    info,
+    rowLimit,
+    tabLimit,
+  });
 
   const patchPanel = useCallback((id: string, patch: Partial<PanelState>) => {
     setPanels((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
@@ -541,119 +410,22 @@ export default function DbClientTab({
   }),
     [appendSqlHistory, refreshTxStatus, rowLimit, setStatusMessage, statementRangesForRun, streamQueryIntoSheet, tabLimit],
   );
-
-  const insertQueryFromOutside = useCallback(
-    (
-      sql: string,
-      options?: {
-        run?: boolean;
-        destination?: "current" | "new";
-        position?: "caret" | "first" | "last" | "replaceAll";
-      },
-    ) => {
-      const text = sql.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-      if (!text.trim()) return;
-      if (options?.destination === "new" && panels.length < tabLimit) {
-        const panel = newPanel({ doc: text, dirty: true });
-        setPanels((prev) => [...prev, panel]);
-        setActivePanelId(panel.id);
-        if (options.run) {
-          void runQuery(panel.id, text);
-        }
-        return;
-      }
-      const panelId = activePanelId;
-      const editor = editorHandles.current[panelId];
-      const current = editor?.getValue() ?? panels.find((p) => p.id === panelId)?.doc ?? "";
-      const position = options?.position ?? "replaceAll";
-      const next =
-        position === "first"
-          ? `${text}${current ? `\n${current}` : ""}`
-          : position === "last"
-            ? `${current}${current ? "\n" : ""}${text}`
-            : position === "caret"
-              ? null
-              : text;
-      if (next === null) {
-        editor?.insertText(text);
-        patchPanel(panelId, { doc: editor?.getValue() ?? `${current}${text}`, dirty: true });
-      } else {
-        editor?.setValue(next);
-        patchPanel(panelId, { doc: next, dirty: true });
-      }
-      if (options?.run) {
-        void runQuery(panelId, next ?? text);
-      }
-    },
-    [activePanelId, panels, patchPanel, runQuery, tabLimit],
-  );
-
-  // Append a statement echoed from an AI/Claude Code SQL execution to a stable
-  // "echo target" panel — never runs it. The whole chat session's SQL
-  // accumulates in one editor (reusing the remembered panel, else the active
-  // panel, else a fresh one when the tab has none).
-  const appendEchoSqlFromOutside = useCallback((sql: string, note?: string) => {
-    const cleaned = sql.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim();
-    if (!cleaned) return;
-    // Each statement ends with exactly one semicolon; prepend the comment note.
-    const stmt = `${cleaned.replace(/;+\s*$/, "")};`;
-    const block = note ? `${note}\n${stmt}` : stmt;
-
-    const livePanels = panelsRef.current;
-    const remembered =
-      echoPanelIdRef.current && livePanels.some((p) => p.id === echoPanelIdRef.current)
-        ? echoPanelIdRef.current
-        : null;
-    const activeId = activePanelIdRef.current;
-    const targetId =
-      remembered ??
-      (livePanels.some((p) => p.id === activeId) ? activeId : livePanels[0]?.id ?? null);
-
-    if (!targetId) {
-      // Tab has no panel yet → open one seeded with the statement.
-      const panel = newPanel({ doc: block, dirty: true });
-      echoPanelIdRef.current = panel.id;
-      setPanels((prev) => {
-        const next = [...prev, panel].slice(-tabLimit);
-        panelsRef.current = next;
-        return next;
-      });
-      setActivePanelId(panel.id);
-      return;
-    }
-
-    echoPanelIdRef.current = targetId;
-    const editor = editorHandles.current[targetId];
-    const current = editor?.getValue() ?? livePanels.find((p) => p.id === targetId)?.doc ?? "";
-    const joined = current.trim() ? `${current.replace(/\n+$/, "")}\n\n${block}` : block;
-    // `editor` is only live for the mounted (active) panel; for others the doc
-    // patch is enough — the editor picks it up when that panel mounts.
-    editor?.setValue(joined);
-    panelsRef.current = livePanels.map((p) =>
-      p.id === targetId ? { ...p, doc: joined, dirty: true } : p
-    );
-    patchPanel(targetId, { doc: joined, dirty: true });
-    setActivePanelId(targetId);
-    editor?.focus();
-  }, [patchPanel, tabLimit]);
-
-  const queryRegistryTitle = useMemo(() => {
-    const database = info.engine === "Presto"
-      ? [info.catalog, info.database].filter(Boolean).join(".")
-      : info.database;
-    return `${info.engine} ${info.host}:${info.port}${database ? `/${database}` : ""}`;
-  }, [info.catalog, info.database, info.engine, info.host, info.port]);
-
-  useEffect(() => {
-    return registerQueryTab({
-      tabId,
-      title: queryRegistryTitle,
-      engine: info.engine,
-      insertQuery: insertQueryFromOutside,
-      appendEchoSql: appendEchoSqlFromOutside,
-      flushWorkspace,
-    });
-  }, [appendEchoSqlFromOutside, flushWorkspace, info.engine, insertQueryFromOutside, queryRegistryTitle, tabId]);
+  const { insertQueryFromOutside } = useDatabaseQueryBridge({
+    panels,
+    tabLimit,
+    setPanels,
+    setActivePanelId,
+    runQuery,
+    activePanelId,
+    editorHandles,
+    patchPanel,
+    panelsRef,
+    echoPanelIdRef,
+    activePanelIdRef,
+    info,
+    tabId,
+    flushWorkspace,
+  });
 
   const cancelQuery = useCallback(createCancelQuery({
     panelsRef,
@@ -672,134 +444,34 @@ export default function DbClientTab({
   }),
     [patchSheet, rowLimit, streamQueryIntoSheet],
   );
-
-  /** Generate the DML for grid edits so it can be previewed, then executed. */
-  const prepareGridChanges = useCallback(
-    createPrepareGridChanges({
+  const { commitGridChanges, previewGridChanges } = useDatabaseGridChanges({
     panelsRef,
     activeSchema,
     info,
     connectionSessionId,
     metadataCache,
-  }),
-    [activeSchema, connectionSessionId, info.catalog, info.engine, metadataCache],
-  );
-
-  const previewGridChanges = useCallback(
-    async (panelId: string, sheetId: string, payload: QueryGridCommitPayload): Promise<GridChangePreview> =>
-      gridChangePreview(await prepareGridChanges(panelId, sheetId, payload)),
-    [prepareGridChanges],
-  );
-
-  const commitGridChanges = useCallback(
-    createCommitGridChanges({
-    prepareGridChanges,
-    connectionSessionId,
     txStatusRef,
     refreshTxStatus,
     setStatusMessage,
     refreshSheet,
-  }),
-    [connectionSessionId, prepareGridChanges, refreshSheet, refreshTxStatus, setStatusMessage],
-  );
-
-  const onSchemaLoaded = useCallback((tables: Map<string, string[]>) => {
-    setSchemaMap((prev) => {
-      const next = { ...prev };
-      for (const [name, cols] of tables) {
-        if (!next[name] || cols.length > 0) next[name] = cols;
-      }
-      return next;
-    });
-  }, []);
-
-  const onSchemasLoaded = useCallback((names: string[]) => {
-    setSchemas(names);
-    setActiveSchema((current) => {
-      if (current && names.includes(current)) return current;
-      if (engineUsesDatabaseAsSchema(info.engine) && info.database && names.includes(info.database)) return info.database;
-      return names[0] ?? null;
-    });
-  }, [info.database, info.engine]);
-
-  useEffect(() => {
-    if (!metadataCache) return;
-    let cancelled = false;
-    void metadataCache
-      .listSchemas(info.catalog)
-      .then((names) => {
-        if (!cancelled) onSchemasLoaded(names);
-      })
-      .catch((error) => {
-        if (!cancelled) setStatusMessage(`Schema metadata failed: ${String(error)}`);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [info.catalog, metadataCache, onSchemasLoaded, setStatusMessage]);
-
-  const metadataSchema = useMemo(
-    () =>
-      metadataCache
-        ? sqlNamespaceFromMetadata({
-            cache: metadataCache,
-            engine: info.engine,
-            activeSchema,
-            catalog: info.catalog,
-          })
-        : undefined,
-    [activeSchema, info.catalog, info.engine, metadataCache, metadataVersion],
-  );
-
-  const editorSchema = metadataSchema ?? (Object.keys(schemaMap).length > 0 ? schemaMap : undefined);
-
-  const switchSchema = useCallback(
-    async (schema: string) => {
-      if (!schema || schema === activeSchema) return;
-      if (info.engine === "SQLServer") {
-        setActiveSchema(schema);
-        setStatusMessage(`Active schema: ${schema}`);
-        return;
-      }
-      const panelId = activePanelId;
-      const sql = schemaSwitchSql(info.engine, schema, info.catalog);
-      try {
-        if (!connectionSessionId) throw new Error("Database connection is still starting.");
-        await dbExecute(connectionSessionId, sql);
-        // Update UI active schema (toolbar dropdown + tree highlight) without
-        // dumping a success result sheet on every click.
-        setActiveSchema(schema);
-        setStatusMessage(`Active schema: ${schema}`);
-      } catch (err) {
-        const panel = panels.find((p) => p.id === panelId);
-        const sheet = newResultSheet(sql, (panel?.sheets.length ?? 0) + 1, rowLimit);
-        sheet.title = "Schema";
-        setPanels((prev) =>
-          prev.map((p) =>
-            p.id === panelId
-              ? {
-                  ...p,
-                  sheets: [
-                    ...p.sheets,
-                    {
-                      ...sheet,
-                      result: null,
-                      running: false,
-                      error: String(err),
-                      warnings: [],
-                      resultTab: "messages" as ResultSubTab,
-                    },
-                  ].slice(-tabLimit),
-                  activeSheetId: sheet.id,
-                }
-              : p,
-          ),
-        );
-        setStatusMessage(`Schema switch failed: ${String(err)}`);
-      }
-    },
-    [activePanelId, activeSchema, connectionSessionId, info.catalog, info.engine, panels, rowLimit, tabLimit],
-  );
+  });
+  const { switchSchema, onSchemasLoaded, onSchemaLoaded, editorSchema } = useDatabaseSchema({
+    setSchemaMap,
+    setSchemas,
+    setActiveSchema,
+    info,
+    metadataCache,
+    setStatusMessage,
+    activeSchema,
+    metadataVersion,
+    schemaMap,
+    activePanelId,
+    connectionSessionId,
+    panels,
+    rowLimit,
+    setPanels,
+    tabLimit,
+  });
   const insertIntoActive = useCallback(
     (text: string) => {
       editorHandles.current[activePanelId]?.insertText(text);
@@ -835,101 +507,23 @@ export default function DbClientTab({
     },
     [info.catalog, setTabDbSelectedObjects, tabId],
   );
-
-  const addPanel = () => {
-    if (panels.length >= tabLimit) return;
-    const p = newPanel();
-    setPanels((prev) => [...prev, p]);
-    setActivePanelId(p.id);
-  };
-
-  const cleanupClosedPanels = (closingPanels: PanelState[]) => {
-    if (closingPanels.some((panel) => panel.sheets.some((sheet) => sheet.running))) {
-      if (connectionSessionId) {
-        void dbCancel(connectionSessionId).catch(() => undefined);
-      }
-    }
-    closingPanels.forEach((panel) => {
-      panel.sheets.forEach((sheet) => {
-        if (timersRef.current[sheet.id]) {
-          clearInterval(timersRef.current[sheet.id]);
-          delete timersRef.current[sheet.id];
-        }
-      });
-      delete editorHandles.current[panel.id];
-      delete historyRef.current[panel.id];
-      delete lastAutoSavedDocRef.current[panel.id];
-      delete savedQueriesRef.current[panel.id];
-    });
-  };
-
-  const closePanel = async (id: string) => {
-    if (panels.length <= 1) return;
-    const closing = panels.find((p) => p.id === id);
-    if (!closing) return;
-    const next = panels.filter((p) => p.id !== id);
-    const nextActivePanelId = activePanelId === id ? next[0].id : activePanelId;
-    try {
-      await persistWorkspaceSnapshot(panels, activePanelId);
-      await dbCloseQueryWorkspaceTabs(workspaceSessionId, [id], Date.now());
-    } catch (err) {
-      setStatusMessage(`Query tab close failed: ${String(err)}`);
-      return;
-    }
-    cleanupClosedPanels([closing]);
-    panelsRef.current = next;
-    setPanels(next);
-    if (activePanelId === id) setActivePanelId(nextActivePanelId);
-    void persistWorkspaceSnapshot(next, nextActivePanelId).catch((err) => {
-      setStatusMessage(`Query workspace save failed: ${String(err)}`);
-    });
-  };
-
-  const closeOtherPanels = async (id: string) => {
-    const target = panels.find((p) => p.id === id);
-    if (!target || panels.length <= 1) return;
-    const closing = panels.filter((p) => p.id !== id);
-    try {
-      await persistWorkspaceSnapshot(panels, activePanelId);
-      await dbCloseQueryWorkspaceTabs(
-        workspaceSessionId,
-        closing.map((panel) => panel.id),
-        Date.now(),
-      );
-    } catch (err) {
-      setStatusMessage(`Query tabs close failed: ${String(err)}`);
-      return;
-    }
-    cleanupClosedPanels(closing);
-    panelsRef.current = [target];
-    setPanels([target]);
-    setActivePanelId(id);
-    void persistWorkspaceSnapshot([target], id).catch((err) => {
-      setStatusMessage(`Query workspace save failed: ${String(err)}`);
-    });
-  };
-
-  const closeAllPanels = async () => {
-    try {
-      await persistWorkspaceSnapshot(panels, activePanelId);
-      await dbCloseQueryWorkspaceTabs(
-        workspaceSessionId,
-        panels.map((panel) => panel.id),
-        Date.now(),
-      );
-    } catch (err) {
-      setStatusMessage(`Query tabs close failed: ${String(err)}`);
-      return;
-    }
-    cleanupClosedPanels(panels);
-    const p = newPanel();
-    panelsRef.current = [p];
-    setPanels([p]);
-    setActivePanelId(p.id);
-    void persistWorkspaceSnapshot([p], p.id).catch((err) => {
-      setStatusMessage(`Query workspace save failed: ${String(err)}`);
-    });
-  };
+  const { addPanel, closePanel, closeOtherPanels, closeAllPanels } = createQueryPanelActions({
+    panels,
+    tabLimit,
+    setPanels,
+    setActivePanelId,
+    connectionSessionId,
+    timersRef,
+    editorHandles,
+    historyRef,
+    lastAutoSavedDocRef,
+    savedQueriesRef,
+    activePanelId,
+    persistWorkspaceSnapshot,
+    workspaceSessionId,
+    setStatusMessage,
+    panelsRef,
+  });
 
   const panelSql = (panel: PanelState) => editorHandles.current[panel.id]?.getValue() ?? panel.doc;
 
@@ -1149,230 +743,16 @@ export default function DbClientTab({
   }, [info.engine]);
 
   const activePanel = panels.find((panel) => panel.id === activePanelId) ?? panels[0];
-
-  const setPanelDocState = (panelId: string, doc: string) => {
-    setPanels((prev) => {
-      const next = prev.map((panel) => (panel.id === panelId ? { ...panel, doc, dirty: true } : panel));
-      panelsRef.current = next;
-      return next;
-    });
-  };
-
-  const writePanelDocument = (panelId: string, doc: string) => {
-    const editor = activePanelIdRef.current === panelId ? editorHandles.current[panelId] : null;
-    editor?.setValue(doc);
-    setPanelDocState(panelId, doc);
-  };
-
-  const syncGeneratedSqlPanel = (
-    resultPanelId: string,
-    sheetId: string,
-    generatedSql: string,
-    status: string | null = "Synced generated SQL to query editor.",
-    options: { activate?: boolean } = {},
-  ): string | null => {
-    const activate = options.activate ?? true;
-    const livePanels = panelsRef.current;
-    const resultPanel = livePanels.find((panel) => panel.id === resultPanelId);
-    const sheet = resultPanel?.sheets.find((candidate) => candidate.id === sheetId);
-    if (!resultPanel || !sheet) {
-      setStatusMessage("Result sheet is no longer available.");
-      return null;
-    }
-
-    const existingTargetId =
-      sheet.generatedTargetPanelId && livePanels.some((panel) => panel.id === sheet.generatedTargetPanelId)
-        ? sheet.generatedTargetPanelId
-        : null;
-    if (existingTargetId) {
-      writePanelDocument(existingTargetId, generatedSql);
-      if (activate) setActivePanelId(existingTargetId);
-      if (status) setStatusMessage(status);
-      return existingTargetId;
-    }
-
-    if (livePanels.length >= tabLimit) {
-      setStatusMessage(`Maximum query panels reached (${tabLimit}).`);
-      return null;
-    }
-
-    const targetPanel = newPanel({ doc: generatedSql, dirty: true, fileName: "Generated SQL" });
-    setPanels((prev) => {
-      const next = [
-        ...prev.map((panel) =>
-          panel.id === resultPanelId
-            ? {
-                ...panel,
-                sheets: panel.sheets.map((candidate) =>
-                  candidate.id === sheetId
-                    ? { ...candidate, generatedTargetPanelId: targetPanel.id }
-                    : candidate,
-                ),
-              }
-            : panel,
-        ),
-        targetPanel,
-      ];
-      panelsRef.current = next;
-      return next;
-    });
-    if (activate) setActivePanelId(targetPanel.id);
-    if (status) setStatusMessage(status);
-    return targetPanel.id;
-  };
-
-  const replaceGeneratedSqlSource = (
-    resultPanelId: string,
-    sheetId: string,
-    generatedSql: string,
-    options: {
-      activate?: boolean;
-      focus?: boolean;
-      status?: string | null;
-      fallback?: boolean;
-      updateSheetSql?: boolean;
-    } = {},
-  ): boolean => {
-    const activate = options.activate ?? true;
-    const focus = options.focus ?? true;
-    const status = options.status ?? "Replaced source SQL with generated SQL.";
-    const fallbackEnabled = options.fallback ?? true;
-    const updateSheetSql = options.updateSheetSql ?? false;
-    const fallback = () =>
-      fallbackEnabled
-        ? syncGeneratedSqlPanel(
-            resultPanelId,
-            sheetId,
-            generatedSql,
-            "Source SQL changed; synced generated SQL to a query editor instead.",
-          )
-        : null;
-    const livePanels = panelsRef.current;
-    const resultPanel = livePanels.find((panel) => panel.id === resultPanelId);
-    const sheet = resultPanel?.sheets.find((candidate) => candidate.id === sheetId);
-    const sourceRef = sheet?.sourceRef;
-    if (!sheet || !sourceRef || sourceRef.origin !== "editor" || sourceRef.from === null || sourceRef.to === null) {
-      fallback();
-      return false;
-    }
-
-    const sourcePanel = livePanels.find((panel) => panel.id === sourceRef.panelId);
-    if (!sourcePanel) {
-      fallback();
-      return false;
-    }
-
-    const from = sourceRef.from;
-    const to = sourceRef.to;
-    const editor = activePanelIdRef.current === sourcePanel.id ? editorHandles.current[sourcePanel.id] : null;
-    const sourceDoc = editor?.getValue() ?? sourcePanel.doc;
-    if (from < 0 || to < from || to > sourceDoc.length) {
-      fallback();
-      return false;
-    }
-
-    const currentSql = sourceDoc.slice(from, to);
-    if (currentSql !== sourceRef.sql || hashSqlText(currentSql) !== sourceRef.exactHash) {
-      fallback();
-      return false;
-    }
-
-    const replaceTo = replacementEndWithExistingTerminator(sourceDoc, to, generatedSql);
-    const nextDoc = `${sourceDoc.slice(0, from)}${generatedSql}${sourceDoc.slice(replaceTo)}`;
-    const delta = generatedSql.length - (replaceTo - from);
-    editor?.replaceRange(from, replaceTo, generatedSql, { focus });
-    const nextPanels = livePanels.map((panel) => {
-      const patchedPanel =
-        panel.id === sourcePanel.id ? { ...panel, doc: nextDoc, dirty: true } : panel;
-      const sheets = patchedPanel.sheets.map((candidate) => {
-        const candidateRef = candidate.sourceRef;
-        let nextRef = candidateRef;
-        if (
-          candidateRef &&
-          candidateRef.panelId === sourcePanel.id &&
-          candidateRef.from !== null &&
-          candidateRef.to !== null
-        ) {
-          if (candidateRef.id === sourceRef.id) {
-            nextRef = {
-              ...candidateRef,
-              sql: generatedSql,
-              to: from + generatedSql.length,
-              exactHash: hashSqlText(generatedSql),
-              parentSheetId: sheetId,
-            };
-          } else if (candidateRef.from >= replaceTo) {
-            nextRef = {
-              ...candidateRef,
-              from: candidateRef.from + delta,
-              to: candidateRef.to + delta,
-            };
-          }
-        }
-        return {
-          ...candidate,
-          baseSql: updateSheetSql && panel.id === resultPanelId && candidate.id === sheetId
-            ? generatedSql
-            : candidate.baseSql,
-          sql: updateSheetSql && panel.id === resultPanelId && candidate.id === sheetId
-            ? generatedSql
-            : candidate.sql,
-          sourceRef: nextRef,
-        };
-      });
-      return { ...patchedPanel, sheets };
-    });
-    panelsRef.current = nextPanels;
-    setPanels(nextPanels);
-    if (activate) setActivePanelId(sourcePanel.id);
-    if (status) setStatusMessage(status);
-    return true;
-  };
-
-  const queryGeneratedSqlFromSheet = async (
-    resultPanelId: string,
-    sheetId: string,
-    generatedSql: string,
-    rewriteRequest?: DbResultSqlRewriteRequest,
-  ) => {
-    let sql = generatedSql;
-    if (rewriteRequest) {
-      try {
-        const rewritten = await dbRewriteResultSql(rewriteRequest);
-        if (rewritten.mode !== "inline" || !rewritten.sql) {
-          setStatusMessage(rewritten.reason ?? "SQL rewrite is not available for this result.");
-          return;
-        }
-        sql = rewritten.sql;
-      } catch (err) {
-        setStatusMessage(`SQL rewrite failed: ${String(err)}`);
-        return;
-      }
-    }
-
-    const replaced = replaceGeneratedSqlSource(resultPanelId, sheetId, sql, {
-      activate: false,
-      focus: false,
-      status: null,
-      updateSheetSql: true,
-    });
-    if (!replaced) return;
-    setStatusMessage("Applied result filters to SQL; refreshing result.");
-    await refreshSheet(resultPanelId, sheetId, "clearView", sql);
-  };
-
-  const syncGeneratedSqlFromSheet = (
-    resultPanelId: string,
-    sheetId: string,
-    generatedSql: string,
-    mode: QueryGeneratedSqlSyncMode,
-  ) => {
-    if (mode === "replaceSource") {
-      replaceGeneratedSqlSource(resultPanelId, sheetId, generatedSql, { updateSheetSql: true });
-      return;
-    }
-    syncGeneratedSqlPanel(resultPanelId, sheetId, generatedSql);
-  };
+  const { syncGeneratedSqlFromSheet, queryGeneratedSqlFromSheet } = createGeneratedSqlActions({
+    setPanels,
+    panelsRef,
+    activePanelIdRef,
+    editorHandles,
+    setStatusMessage,
+    setActivePanelId,
+    tabLimit,
+    refreshSheet,
+  });
 
   const toggleHistoryPanel = () => {
     const opening = historyPanelId !== activePanel.id;
@@ -1443,181 +823,31 @@ export default function DbClientTab({
     () => subscribeSqlExecutionPreferences(setExecutionPreferences),
     [],
   );
-
-  const currentEditorStatement = (panelId: string = activePanel.id): EditorStatementAction | null => {
-    const panel = panels.find((p) => p.id === panelId) ?? activePanel;
-    const handle = editorHandles.current[panel.id];
-    const doc = handle?.getValue() ?? panel.doc;
-    const selection = handle?.getSelectionRange() ?? null;
-    const position = selection && selection.from !== selection.to
-      ? selection.from
-      : handle?.getCursorPosition() ?? doc.length;
-    const ranges = splitSqlStatementRanges(doc, { splitGo: info.engine === "SQLServer" });
-    const range =
-      ranges.find((candidate) => candidate.from <= position && position <= candidate.to) ??
-      (ranges.length === 1 ? ranges[0] : null);
-    if (!range) {
-      setStatusMessage("No SQL statement at the current cursor.");
-      return null;
-    }
-    return { panelId: panel.id, doc, range };
-  };
-
-  const explainCurrentStatement = async (panelId: string = activePanel.id) => {
-    const action = currentEditorStatement(panelId);
-    if (!action) return;
-    const plan = explainSqlFor(info.engine, action.range.sql);
-    if (!plan.ok) {
-      setStatusMessage(plan.reason);
-      await alertAppDialog({ title: "Explain not available", message: plan.reason });
-      return;
-    }
-    await runQuery(action.panelId, plan.sql, { sheetTitle: "Explain" });
-  };
-
-  const toggleStatementPanel = () => {
-    if (statementAction?.panelId === activePanel.id) {
-      setStatementAction(null);
-      return;
-    }
-    const action = currentEditorStatement();
-    if (!action) return;
-    setHistoryPanelId(null);
-    setStatementAction(action);
-  };
-
-  const runEditorStatement = (action: EditorStatementAction) => {
-    void runQuery(action.panelId, action.range.sql, {
-      context: {
-        doc: action.doc,
-        cursorPosition: action.range.from,
-        selectionRange: { from: action.range.from, to: action.range.to },
-      },
-    });
-    setStatementAction(null);
-  };
-
-  const runCurrentStatement = (panelId: string = activePanel.id) => {
-    const action = currentEditorStatement(panelId);
-    if (!action) return;
-    runEditorStatement(action);
-  };
-
-  const selectEditorStatement = (action: EditorStatementAction) => {
-    setActivePanelId(action.panelId);
-    editorHandles.current[action.panelId]?.selectRange(action.range.from, action.range.to);
-    setStatementAction(null);
-  };
-
-  const openEditorStatementInNewPanel = (action: EditorStatementAction) => {
-    openSqlInNewPanel(action.range.sql, true, "editor");
-    setStatementAction(null);
-  };
-
-  const latestResultForSql = (sql: string): DbQueryResult | null => {
-    const target = sql.trim();
-    for (const panel of [...panelsRef.current].reverse()) {
-      for (const sheet of [...panel.sheets].reverse()) {
-        if (sheet.sql.trim() === target && sheet.result && sheet.result.columns.length > 0) {
-          return sheet.result;
-        }
-      }
-    }
-    return null;
-  };
-
-  const copyHistoryJson = async (entry: DbSqlHistoryEntry) => {
-    const result = latestResultForSql(entry.sqlContent);
-    if (!result) {
-      setStatusMessage("No in-memory result is available for this SQL. Run it again to export JSON.");
-      return;
-    }
-    try {
-      await writeText(resultToJsonText(result));
-      setStatusMessage("Copied query result JSON.");
-    } catch (err) {
-      setStatusMessage(`Copy JSON failed: ${String(err)}`);
-    }
-  };
-
-  const copyStatementJson = async (action: EditorStatementAction) => {
-    const result = latestResultForSql(action.range.sql);
-    if (!result) {
-      setStatusMessage("No in-memory result is available for this statement. Run it again to export JSON.");
-      return;
-    }
-    try {
-      await writeText(resultToJsonText(result));
-      setStatusMessage("Copied statement result JSON.");
-    } catch (err) {
-      setStatusMessage(`Copy JSON failed: ${String(err)}`);
-    }
-  };
-
-  /** Row/column shape of an in-memory result, for the prompt's context block. */
-  const resultShape = (result: DbQueryResult | null): string | null => (
-    result ? `${result.rows.length} row(s), ${result.columns.length} column(s)` : null
-  );
-
-  /**
-   * Hand a built prompt to the tab's chat thread and report what happened. The
-   * queue can refuse when it is full, and silently dropping the prompt would
-   * look like the button did nothing.
-   */
-  const sendDbAiPrompt = async (prompt: string) => {
-    await useChatStore.getState().openTabChat(tabId);
-    // A complete prompt, not a quoted selection — attachToComposer's blockquote
-    // prefix would fold the instructions and the SQL fence together.
-    const outcome = await useChatStore.getState().sendPromptToTabChat(prompt);
-    if (outcome.status === "rejected") {
-      setStatusMessage(t("dbAi.queueFull", { limit: outcome.limit }));
-    } else if (outcome.status === "queued") {
-      setStatusMessage(t("dbAi.queued", { position: outcome.position }));
-    } else {
-      setStatusMessage(t("dbAi.sent"));
-    }
-  };
-
-  const askAiAboutHistory = async (entry: DbSqlHistoryEntry) => {
-    const { text, truncated } = truncateStatement(entry.sqlContent);
-    const prompt = buildDbAiPrompt(
-      {
-        action: "explain",
-        dialect: "sql",
-        engine: entry.engine,
-        statement: text,
-        truncated,
-        database: entry.databaseName,
-        schema: entry.schemaName,
-        durationMs: entry.durationMs,
-        rowCount: entry.rowCount,
-        error: entry.error,
-        resultSummary: resultShape(latestResultForSql(entry.sqlContent)),
-      },
-      aiAnswerLanguage,
-    );
-    await sendDbAiPrompt(prompt);
-    setHistoryPanelId(null);
-  };
-
-  const askAiAboutStatement = async (action: EditorStatementAction) => {
-    const { text, truncated } = truncateStatement(action.range.sql);
-    const prompt = buildDbAiPrompt(
-      {
-        action: "explain",
-        dialect: "sql",
-        engine: info.engine,
-        statement: text,
-        truncated,
-        database: info.database,
-        schema: activeSchema,
-        resultSummary: resultShape(latestResultForSql(action.range.sql)),
-      },
-      aiAnswerLanguage,
-    );
-    await sendDbAiPrompt(prompt);
-    setStatementAction(null);
-  };
+  const { currentEditorStatement, runCurrentStatement, latestResultForSql, explainCurrentStatement, toggleStatementPanel, copyHistoryJson, runEditorStatement, selectEditorStatement, openEditorStatementInNewPanel, copyStatementJson } = createStatementActions({
+    activePanel,
+    panels,
+    editorHandles,
+    info,
+    setStatusMessage,
+    runQuery,
+    statementAction,
+    setStatementAction,
+    setHistoryPanelId,
+    setActivePanelId,
+    openSqlInNewPanel,
+    panelsRef,
+  });
+  const { askAiAboutStatement, askAiAboutHistory } = createDatabaseAiActions({
+    tabId,
+    setStatusMessage,
+    t,
+    latestResultForSql,
+    aiAnswerLanguage,
+    setHistoryPanelId,
+    info,
+    activeSchema,
+    setStatementAction,
+  });
 
   const deleteHistoryEntry = async (entry: DbSqlHistoryEntry) => {
     try {

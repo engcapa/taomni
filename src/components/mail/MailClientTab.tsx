@@ -3,21 +3,18 @@ import { MailArchivePanel } from "./MailArchivePanel";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type SetStateAction, type UIEvent } from "react";
 import { Group as PanelGroup, Separator as PanelResizeHandle, type PanelImperativeHandle, type PanelSize } from "react-resizable-panels";
 import { AlertTriangle, Archive, Ban, BookUser, CalendarDays, CheckCircle2, ChevronDown, Code, Copy, Download, ExternalLink, FileText, Filter as FilterIcon, Folder, FolderInput, FolderPlus, FolderSymlink, FolderX, Forward, ImageOff, Inbox, Link as LinkIcon, ListChecks, Loader2, Mail as MailIcon, MailOpen, MessageSquareReply, PenLine, Printer, RefreshCw, Save, Search, Send, ShieldCheck, Star, Tag, Trash2, X } from "lucide-react";
-import { mailClearCache, mailCreateFolder, mailDeleteFolder, mailDeleteMessages, mailDownloadAttachment, mailExportMbox, isMailCertificateError, mailProbeCertificate, mailImportMessages, mailFetchRaw, mailSendReceipt, MAIL_MDN_SENT, mailGetInvite, mailRespondInvite, mailIdleStart, mailIdleStop, mailIndexCachedContacts, mailDeleteDraft, mailListFolders, mailMarkRead, mailRenameFolder, mailSaveRaw, mailSetFlags, mailSetFolderSubscription, mailSearchContacts, mailSearchMessages, mailSearchServer, mailTestConnection, mailUnsubscribeOneClick, MAIL_IDLE_EVENT, type MailAttachmentInfo, type MailDraft, type MailFolder, type MailCertificateInfo, type MailIdleEvent, type MailInvite, type MailInviteReply, type MailMessageBody, type MailMessageHeader, type MailSearchField, type MailSyncRequestMode } from "../../lib/mail";
-import { listen } from "@tauri-apps/api/event";
+import { mailClearCache, mailExportMbox, isMailCertificateError, mailImportMessages, mailSendReceipt, MAIL_MDN_SENT, mailGetInvite, mailIndexCachedContacts, mailDeleteDraft, mailListFolders, mailMarkRead, mailSetFlags, mailSetFolderSubscription, mailSearchContacts, mailSearchMessages, mailSearchServer, mailTestConnection, mailUnsubscribeOneClick, type MailDraft, type MailFolder, type MailCertificateInfo, type MailInvite, type MailInviteReply, type MailMessageBody, type MailMessageHeader, type MailSearchField, type MailSyncRequestMode } from "../../lib/mail";
 import { notifyDesktop } from "../../lib/lanNotify";
-import { formatInviteRange, hasCalendarPart, myPartstat } from "../../lib/mailInvite";
+import { hasCalendarPart } from "../../lib/mailInvite";
 import { type MailFilter } from "../../lib/mailFilters";
 import { MailFiltersPanel } from "./MailFiltersPanel";
 import { MailAddressBookPanel } from "./MailAddressBookPanel";
 import { MailAgendaPanel } from "./MailAgendaPanel";
-import { agendaKey, agendaTimeLabel, dueReminders, mailAddInviteToCalendar, mailCalDavSync, mailListAgenda, type MailAgendaEvent } from "../../lib/mailCalendar";
+import { agendaKey, agendaTimeLabel, dueReminders, mailCalDavSync, mailListAgenda, type MailAgendaEvent } from "../../lib/mailCalendar";
 import { type MailAddressBookEntry } from "../../lib/mailContacts";
 import { folderLabel, isSelectable, isSubscribed, loadSubscribedOnly, saveSubscribedOnly, visibleFolders } from "../../lib/mailFolders";
 import { isOutbox, outboxNextAttemptAt, outboxState } from "../../lib/mailOutbox";
 import { parseMailto } from "../../lib/mailto";
-import { useAppStore } from "../../stores/appStore";
-import { useSessionStore } from "../../stores/sessionStore";
 import { isEditableTarget, mailShortcutAction, type MailShortcutAction } from "../../lib/mailShortcuts";
 import { buildMailThreads, flattenMailThreads, type MailThreadRow } from "../../lib/mailThreads";
 import { mailIdentities, ownIdentityAddresses, pickReplyIdentity } from "../../lib/mailIdentities";
@@ -25,10 +22,8 @@ import { MAIL_TAGS, messageTags } from "../../lib/mailTags";
 import { mergeFolderMeta } from "../../lib/mailSync";
 import { MailMessageBodyView } from "./MailMessageBodyView";
 import { extractDefaultMailDomain, mergeRecipientSuggestions, parseRecipientsText, searchCachedMessageContacts, type RecipientSuggestion } from "../../lib/mailRecipients";
-import { buildForwardHtml, buildMailReaderSrcDoc, buildReplyHtml, mailHtmlHasRemoteImages, mailHtmlToPlainText, plainTextToMailHtml, quotePlainText } from "../../lib/mailHtml";
-import { formatMailPlainTextHtml } from "../../lib/mailPlainText";
-import { openLocalPath, selectUploadFile, temporaryFilePath } from "../../lib/ipc";
-import { NATIVE_FILE_DROP_EVENT, type NativeFileDropDetail } from "../../lib/osFileDrop";
+import { buildForwardHtml, buildReplyHtml, mailHtmlHasRemoteImages, plainTextToMailHtml, quotePlainText } from "../../lib/mailHtml";
+import { selectUploadFile } from "../../lib/ipc";
 import { useChatStore } from "../../stores/chatStore";
 import { useTaoAlertStore } from "../../stores/taoAlertStore";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
@@ -38,11 +33,11 @@ import { DEFAULT_MAIL_TERMINAL_PROFILE } from "../../lib/terminalProfile";
 import { useAppTheme } from "../../lib/appTheme";
 import { type MailClientTabProps, type OpenMailMessageTab, type BodyWarmState, type ComposeDraft, type ComposePromptState, type RecipientSearchState, type RecipientFieldKey, type AiAction } from "./client/types";
 import { type MailRowActions } from "./client/MailRowActions";
-import { MAIL_THREAD_VIEW_STORAGE_KEY, isOAuthReauthRequired, messagePageSize, refreshBatchSize, catchupStepSize, dedupeMessages, messageKey, sortMessages, mailClientErrorMessage, addressLabel, isFlagged, bodyMatchesMessage, formatFullDate, escapeHtml, formatBytes, formatShortDate } from "./client/messages";
+import { MAIL_THREAD_VIEW_STORAGE_KEY, isOAuthReauthRequired, messagePageSize, refreshBatchSize, catchupStepSize, dedupeMessages, messageKey, sortMessages, mailClientErrorMessage, addressLabel, isFlagged, bodyMatchesMessage, formatFullDate, formatBytes, formatShortDate } from "./client/messages";
 import { EMPTY_DRAFT, isTemplate, emptyComposeDraft, serializeDraftContent, draftHasContent, replyContextFor, normalizedMailAddress, appendUniqueAddress, forwardSubject } from "./client/compose";
 import { MAILBOX_EXPANDED_SIZE, clampMailFontSize, mailAppearanceStyle, MAILBOX_RIBBON_THRESHOLD } from "./client/appearance";
 import { DEFAULT_FOLDER, isUnread, NEW_MAIL_EXCLUDED_KINDS, folderMatchesSpecial, folderIcon, MAIL_DRAG_TYPE, folderDepth } from "./client/folders";
-import { escapeRegExp, suggestedAttachmentName, ALL_ATTACHMENTS_INDEX, uniqueAttachmentName, joinLocalPath } from "./client/attachments";
+import { ALL_ATTACHMENTS_INDEX } from "./client/attachments";
 import { aiPrompt } from "./client/ai";
 import { RemoteImagesBanner } from "./client/RemoteImagesBanner";
 import { MailComposePrompt } from "./client/MailComposePrompt";
@@ -50,7 +45,6 @@ import { MailDraggableDialog } from "./client/MailDraggableDialog";
 import { createLoadCachedFolders, createLoadCachedMessages, createRememberBody, createFetchBodyForMessage, createWarmRecentBodies, createLoadBody, createLoadMoreMessages } from "./client/messageLoading";
 import { createRunFolderSync, createQueueFolderCatchups, createStartBackfill, createSyncFolderNow, createSyncSelectedFolder, createQuietPollSelectedAndInbox, createSyncAllFolders } from "./client/synchronization";
 import { createMarkMessagesReadLocally, createHandleMarkSelectedRead, createHandleMarkFolderRead, createHandleMarkSingleRead } from "./client/readActions";
-import { createAddDraftAttachmentPaths, createInsertInlineImageFromPath, createInsertInlineImageFromFile, createHandlePasteImages, createHandleDropComposeFiles } from "./client/composerAttachments";
 import { MailToolbar } from "./client/MailToolbar";
 import { MailFoldersPane } from "./client/MailFoldersPane";
 import { MailMessagesPane } from "./client/MailMessagesPane";
@@ -59,6 +53,20 @@ import { MailComposer } from "./client/MailComposer";
 import { createDraftActions } from "./client/draftActions";
 import { useMailOutbox } from "./client/useMailOutbox";
 import { createMailMutations } from "./client/mutations";
+import { useMailboxLifecycle } from "./client/useMailboxLifecycle";
+import { useComposerAttachments } from "./client/useComposerAttachments";
+import { createAttachmentActions } from "./client/createAttachmentActions";
+import { createMessageExportActions } from "./client/createMessageExportActions";
+import { createFolderActions } from "./client/createFolderActions";
+import { createInvitationControls } from "./client/createInvitationControls";
+import { createCertificateActions } from "./client/createCertificateActions";
+
+
+
+
+
+
+
 
 
 
@@ -1173,156 +1181,45 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     info,
     markMessagesReadLocally,
   }), [info, markMessagesReadLocally]);
-
-  const loadInitialMessages = useCallback(async (folder: string) => {
-    await loadCachedMessages(folder);
-  }, [loadCachedMessages]);
-
-  useEffect(() => {
-    initialSyncDoneRef.current = false;
-    foldersRef.current = [];
-    bodyWarmSeqRef.current += 1;
-    bodyLoadSeqRef.current += 1;
-    bodyCacheRef.current = new Map();
-    bodyRequestsRef.current.clear();
-    setFolders([]);
-    setMessages([]);
-    setSelectedMessageKey(null);
-    setMailViewKey("mailbox");
-    setMessageTabs([]);
-    setPopupMessageKey(null);
-    setCheckedMessageKeys(new Set());
-    setBody(null);
-    setBodyCache(new Map());
-    setBodyLoadingKey(null);
-    setBodyWarming({ active: false, done: 0, total: 0 });
-    setHasMoreMessages(false);
-    setLoadingMoreMessages(false);
-    setDownloadingAttachmentIndex(null);
-    updateSelectedFolder("INBOX");
-    void loadCachedFolders();
-  }, [info.sessionId, loadCachedFolders, updateSelectedFolder]);
-
-  useEffect(() => {
-    void loadInitialMessages(selectedFolder);
-  }, [loadInitialMessages, selectedFolder]);
-
-  useEffect(() => {
-    if (!visible || !pendingCacheRefreshRef.current) return;
-    pendingCacheRefreshRef.current = false;
-    if (bodyCacheRef.current.size > 0) {
-      setBodyCache(new Map(bodyCacheRef.current));
-    }
-    void loadCachedFolders();
-    void loadCachedMessages(selectedFolder, 0, false, true);
-  }, [loadCachedFolders, loadCachedMessages, selectedFolder, visible]);
-
-  useEffect(() => {
-    if (!visible || !info.sync.onOpen || initialSyncDoneRef.current) return;
-    initialSyncDoneRef.current = true;
-    const folder = selectedFolder;
-    // Catch up everything that arrived while the tab was closed, then keep
-    // backfilling older history for the full local header index.
-    void syncFolderNow(folder, "sync", true)
-      .then(() => refreshFolderTree())
-      .then(() => startBackfill(folder));
-  }, [info.sync.onOpen, refreshFolderTree, selectedFolder, startBackfill, syncFolderNow, visible]);
-
-  // Quiet background poll: most ticks refresh selected folder (+ INBOX when
-  // different) without remote LIST. Every 6th tick does a full-folder scan for
-  // badges / new-mail notifications across the account.
-  const pollTickRef = useRef(0);
-  useEffect(() => {
-    pollTickRef.current = 0;
-    if (info.sync.intervalMinutes <= 0) return;
-    const intervalMs = Math.max(1, info.sync.intervalMinutes) * 60 * 1000;
-    const id = window.setInterval(() => {
-      pollTickRef.current += 1;
-      const fullScan = pollTickRef.current % 6 === 0;
-      if (fullScan) {
-        void syncAllFolders(true, {
-          limit: batchSize,
-          includeBodies: false,
-          indicator: "none",
-        });
-      } else {
-        void quietPollSelectedAndInbox();
-      }
-    }, intervalMs);
-    return () => window.clearInterval(id);
-  }, [batchSize, info.sync.intervalMinutes, quietPollSelectedAndInbox, syncAllFolders]);
-
-  // IMAP IDLE push (TASK-12): while the tab is open a dedicated connection
-  // waits on INBOX; each change runs the normal gap-free quiet catch-up, so a
-  // lost push only delays mail until the next poll. Stopped on close (DEC-01).
-  const quietPollRef = useRef(quietPollSelectedAndInbox);
-  quietPollRef.current = quietPollSelectedAndInbox;
-  const idleConfigRef = useRef(info);
-  idleConfigRef.current = info;
-  const [idleState, setIdleState] = useState<string | null>(null);
-  const idleEnabled = info.sync.idle !== false;
-  useEffect(() => {
-    if (!idleEnabled) return;
-    const accountId = info.sessionId;
-    let disposed = false;
-    let debounce: number | null = null;
-    let unlisten: (() => void) | null = null;
-    const schedulePoll = (waitMs = 400) => {
-      if (debounce != null) window.clearTimeout(debounce);
-      debounce = window.setTimeout(() => {
-        debounce = null;
-        if (disposed) return;
-        // The quiet poll skips while another sync (open catch-up, backfill)
-        // holds the lock; keep the push pending instead of dropping it.
-        if (syncInFlightRef.current) {
-          schedulePoll(500);
-          return;
-        }
-        void quietPollRef.current();
-      }, waitMs);
-    };
-    void listen<MailIdleEvent>(MAIL_IDLE_EVENT, (event) => {
-      const payload = event.payload;
-      if (disposed || payload?.accountId !== accountId) return;
-      // "stopped" may come from a previous watcher replaced by this tab's.
-      if (payload.kind === "stopped") return;
-      setIdleState(payload.kind);
-      if (payload.kind === "changed") schedulePoll();
-    }).then((fn) => {
-      if (disposed) fn();
-      else unlisten = fn;
-    }).catch(() => {});
-    void mailIdleStart(idleConfigRef.current, "INBOX").catch((e) => {
-      console.debug("mail IDLE unavailable; polling only", e);
-      if (!disposed) setIdleState("unsupported");
-    });
-    return () => {
-      disposed = true;
-      if (debounce != null) window.clearTimeout(debounce);
-      unlisten?.();
-      void mailIdleStop(accountId).catch(() => {});
-    };
-  }, [idleEnabled, info.sessionId]);
-
-  useEffect(() => {
-    if (availableMessages.length === 0) {
-      if (!selectedMessageKey || !messageTabs.some((tab) => tab.key === selectedMessageKey)) {
-        setSelectedMessageKey(null);
-      }
-      setBody(null);
-      return;
-    }
-    if (
-      !selectedMessageKey
-      || (
-        !availableMessages.some((message) => messageKey(message) === selectedMessageKey)
-        && !messageTabs.some((tab) => tab.key === selectedMessageKey)
-      )
-    ) {
-      setSelectedMessageKey(messageKey(availableMessages[0]));
-      setBody(null);
-    }
-  }, [availableMessages, messageTabs, selectedMessageKey]);
+  const { idleEnabled, idleState } = useMailboxLifecycle({
+    loadCachedMessages,
+    initialSyncDoneRef,
+    foldersRef,
+    bodyWarmSeqRef,
+    bodyLoadSeqRef,
+    bodyCacheRef,
+    bodyRequestsRef,
+    setFolders,
+    setMessages,
+    setSelectedMessageKey,
+    setMailViewKey,
+    setMessageTabs,
+    setPopupMessageKey,
+    setCheckedMessageKeys,
+    setBody,
+    setBodyCache,
+    setBodyLoadingKey,
+    setBodyWarming,
+    setHasMoreMessages,
+    setLoadingMoreMessages,
+    setDownloadingAttachmentIndex,
+    updateSelectedFolder,
+    loadCachedFolders,
+    info,
+    selectedFolder,
+    visible,
+    pendingCacheRefreshRef,
+    syncFolderNow,
+    refreshFolderTree,
+    startBackfill,
+    syncAllFolders,
+    batchSize,
+    quietPollSelectedAndInbox,
+    syncInFlightRef,
+    availableMessages,
+    selectedMessageKey,
+    messageTabs,
+  });
 
   const autoReadKeyRef = useRef<string | null>(null);
   const remoteImagesMessageKeyRef = useRef<string | null>(null);
@@ -1581,98 +1478,16 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     drafts,
     lastSavedDraftJsonRef,
   });
-
-  const addDraftAttachmentPaths = useCallback(createAddDraftAttachmentPaths({
+  const { handleAddDraftAttachments, addDraftAttachmentPaths, handleDropComposeFiles, handleInsertInlineImage, handlePasteImages, removeDraftAttachment } = useComposerAttachments({
     setAttachProgress,
     setDraft,
     setStatus,
     setError,
-  }), []);
-
-  const handleAddDraftAttachments = async () => {
-    try {
-      const paths = await selectUploadFile();
-      if (!paths.length) return;
-      await addDraftAttachmentPaths(paths);
-    } catch (e) {
-      setError(mailClientErrorMessage(e));
-    }
-  };
-
-  const insertInlineImageFromPath = useCallback(createInsertInlineImageFromPath({
-    setError,
-    setDraft,
-  }), []);
-
-  const insertInlineImageFromFile = useCallback(createInsertInlineImageFromFile({
-    setError,
-    setDraft,
-  }), []);
-
-  const handleInsertInlineImage = async (): Promise<string | null> => {
-    try {
-      const paths = await selectUploadFile();
-      const path = paths[0];
-      if (!path) return null;
-      return await insertInlineImageFromPath(path);
-    } catch (e) {
-      setError(mailClientErrorMessage(e));
-      return null;
-    }
-  };
-
-  const handlePasteImages = useCallback(createHandlePasteImages({
-    setAttachProgress,
-    insertInlineImageFromPath,
-    setStatus,
-    setError,
-    insertInlineImageFromFile,
-  }), [insertInlineImageFromFile, insertInlineImageFromPath]);
-
-  const handleDropComposeFiles = useCallback(createHandleDropComposeFiles({
-    setAttachProgress,
-    addDraftAttachmentPaths,
-    setError,
-  }), [addDraftAttachmentPaths]);
-
-  const removeDraftAttachment = (index: number) => {
-    setDraft((current) => {
-      const removed = current.attachments[index];
-      const attachments = current.attachments.filter((_, i) => i !== index);
-      if (!removed?.inline || !removed.contentId) {
-        return { ...current, attachments };
-      }
-      const cid = escapeRegExp(removed.contentId);
-      const htmlBody = current.htmlBody
-        .replace(new RegExp(`<img\\b[^>]*\\bdata-taomni-cid=["']${cid}["'][^>]*>`, "gi"), "")
-        .replace(new RegExp(`<img\\b[^>]*\\bsrc=["']cid:${cid}["'][^>]*>`, "gi"), "");
-      return {
-        ...current,
-        attachments,
-        htmlBody,
-        textBody: mailHtmlToPlainText(htmlBody),
-      };
-    });
-  };
-
-  useEffect(() => {
-    if (!composeOpen) {
-      setComposeDragActive(false);
-      return;
-    }
-    const handleNativeFileDrop = (event: Event) => {
-      if (sending) return;
-      const detail = (event as CustomEvent<NativeFileDropDetail>).detail;
-      if (!detail?.paths?.length) return;
-      const root = composeRootRef.current;
-      const target = document.elementFromPoint(detail.clientX, detail.clientY);
-      if (!root || !target || !root.contains(target)) return;
-      setComposeDragActive(false);
-      void addDraftAttachmentPaths(detail.paths);
-    };
-    window.addEventListener(NATIVE_FILE_DROP_EVENT, handleNativeFileDrop);
-    return () => window.removeEventListener(NATIVE_FILE_DROP_EVENT, handleNativeFileDrop);
-  }, [addDraftAttachmentPaths, composeOpen, sending]);
+    composeOpen,
+    setComposeDragActive,
+    sending,
+    composeRootRef,
+  });
 
   const discardCurrentDraft = async () => {
     const draftId = draft.id;
@@ -1744,123 +1559,14 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       setError(mailClientErrorMessage(e));
     }
   };
-
-  const handleDownloadAttachment = async (message: MailMessageHeader, attachment: MailAttachmentInfo, index: number) => {
-    setDownloadingAttachmentIndex(index);
-    setError(null);
-    try {
-      const { save } = await import("@tauri-apps/plugin-dialog");
-      const defaultPath = suggestedAttachmentName(attachment, index, message.subject);
-      const targetPath = await save({
-        title: "Save attachment",
-        defaultPath,
-      });
-      if (typeof targetPath !== "string" || !targetPath.trim()) {
-        setStatus("Attachment save cancelled");
-        return;
-      }
-      const result = await mailDownloadAttachment(info, message.folder, message.uid, index, targetPath, attachment.section);
-      setStatus(`Saved attachment to ${result.path}`);
-    } catch (e) {
-      setError(mailClientErrorMessage(e));
-    } finally {
-      setDownloadingAttachmentIndex(null);
-    }
-  };
-
-  const handleOpenAttachment = async (message: MailMessageHeader, attachment: MailAttachmentInfo, index: number) => {
-    setDownloadingAttachmentIndex(index);
-    setError(null);
-    try {
-      const defaultPath = suggestedAttachmentName(attachment, index, message.subject);
-      const targetPath = await temporaryFilePath(defaultPath);
-      const result = await mailDownloadAttachment(info, message.folder, message.uid, index, targetPath, attachment.section);
-      await openLocalPath(result.path);
-      setStatus(`Opened attachment ${result.name || defaultPath}`);
-    } catch (e) {
-      setError(mailClientErrorMessage(e));
-    } finally {
-      setDownloadingAttachmentIndex(null);
-    }
-  };
-
-  const handleSaveAllAttachments = async (message: MailMessageHeader, attachments: MailAttachmentInfo[]) => {
-    if (attachments.length === 0) return;
-    setDownloadingAttachmentIndex(ALL_ATTACHMENTS_INDEX);
-    setError(null);
-    try {
-      const { open } = await import("@tauri-apps/plugin-dialog");
-      const targetDir = await open({
-        title: "Save all attachments",
-        directory: true,
-        multiple: false,
-      });
-      if (typeof targetDir !== "string" || !targetDir.trim()) {
-        setStatus("Save all attachments cancelled");
-        return;
-      }
-      const usedNames = new Set<string>();
-      let saved = 0;
-      for (const [index, attachment] of attachments.entries()) {
-        const fileName = uniqueAttachmentName(
-          suggestedAttachmentName(attachment, index, message.subject),
-          usedNames,
-        );
-        await mailDownloadAttachment(info, message.folder, message.uid, index, joinLocalPath(targetDir, fileName), attachment.section);
-        saved += 1;
-      }
-      setStatus(`Saved ${saved} attachment${saved === 1 ? "" : "s"} to ${targetDir}`);
-    } catch (e) {
-      setError(mailClientErrorMessage(e));
-    } finally {
-      setDownloadingAttachmentIndex(null);
-    }
-  };
-
-  const attachmentMenuItems = (
-    message: MailMessageHeader,
-    attachments: MailAttachmentInfo[],
-    attachment: MailAttachmentInfo,
-    index: number,
-  ): MenuItem[] => {
-    const busy = downloadingAttachmentIndex !== null;
-    const items: MenuItem[] = [
-      {
-        label: "Open with default app",
-        icon: <ExternalLink className="w-3.5 h-3.5" />,
-        disabled: busy,
-        onClick: () => void handleOpenAttachment(message, attachment, index),
-      },
-      {
-        label: "Save attachment as...",
-        icon: <Download className="w-3.5 h-3.5" />,
-        disabled: busy,
-        onClick: () => void handleDownloadAttachment(message, attachment, index),
-      },
-    ];
-    if (attachments.length > 1) {
-      items.push(
-        { label: "", separator: true },
-        {
-          label: "Save all attachments...",
-          icon: <Download className="w-3.5 h-3.5" />,
-          disabled: busy,
-          onClick: () => void handleSaveAllAttachments(message, attachments),
-        },
-      );
-    }
-    return items;
-  };
-
-  const handleAttachmentContextMenu = (
-    event: ReactMouseEvent,
-    message: MailMessageHeader,
-    attachments: MailAttachmentInfo[],
-    attachment: MailAttachmentInfo,
-    index: number,
-  ) => {
-    attachmentMenu.show(event, attachmentMenuItems(message, attachments, attachment, index));
-  };
+  const { handleDownloadAttachment, handleOpenAttachment, handleSaveAllAttachments, handleAttachmentContextMenu } = createAttachmentActions({
+    setDownloadingAttachmentIndex,
+    setError,
+    setStatus,
+    info,
+    downloadingAttachmentIndex,
+    attachmentMenu,
+  });
 
   const copyText = (label: string, value: string | null | undefined) => {
     const text = value?.trim();
@@ -1933,162 +1639,39 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       richFormatUsed: true,
     }, false);
   };
-
-  const handlePrintMessage = (message = selectedMessage) => {
-    if (!message) return;
-    const currentBody = bodyMatchesMessage(body, message) ? body : null;
-    const headerHtml = `
-      <div class="taomni-print-header" style="font-family:system-ui,sans-serif;padding:0 0 12px;margin:0 0 12px;border-bottom:1px solid #ccc;color:#111">
-        <h2 style="margin:0 0 8px">${escapeHtml(message.subject || "(no subject)")}</h2>
-        <div style="font-size:12px;color:#555;margin-bottom:4px">From: ${escapeHtml(addressLabel(message.from) || "(unknown)")}</div>
-        <div style="font-size:12px;color:#555;margin-bottom:4px">To: ${escapeHtml(message.to.map(addressLabel).filter(Boolean).join(", ") || "(none)")}</div>
-        <div style="font-size:12px;color:#555">Date: ${escapeHtml(formatFullDate(message.dateTs) || "(unknown)")}</div>
-      </div>`;
-    const printHtml = currentBody?.html
-      ? buildMailReaderSrcDoc(currentBody.html, {
-        allowRemoteImages: true,
-        fontSize: mailFontSize,
-        preferDark: false,
-      }).replace(
-        /<body([^>]*)>/i,
-        (_full, attrs: string) => `<body${attrs}>${headerHtml}`,
-      )
-      : `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(message.subject || "Message")}</title>
-<style>
-.mail-quote{border-left:2px solid #729fcf;padding-left:.55em;margin:.1em 0}
-.mail-quote-1{color:#1d4ed8}.mail-quote-2{color:#047857}.mail-quote-3{color:#6d28d9}
-.mail-line{white-space:pre-wrap;min-height:1.35em}
-</style>
-</head><body style="font-family:system-ui,sans-serif;padding:24px;color:#111">${headerHtml}${formatMailPlainTextHtml(currentBody?.text ?? message.snippet ?? "")}</body></html>`;
-    const iframe = document.createElement("iframe");
-    iframe.setAttribute("aria-hidden", "true");
-    iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
-    document.body.appendChild(iframe);
-    const doc = iframe.contentWindow?.document;
-    if (!doc) {
-      document.body.removeChild(iframe);
-      setError("Unable to prepare the message for printing.");
-      return;
-    }
-    doc.open();
-    doc.write(printHtml);
-    doc.close();
-    const cleanup = () => {
-      window.setTimeout(() => {
-        if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-      }, 500);
-    };
-    window.setTimeout(() => {
-      try {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-      } catch (e) {
-        setError(mailClientErrorMessage(e));
-      } finally {
-        cleanup();
-      }
-    }, 150);
-  };
-
-  const handleViewSource = (message = selectedMessage) => runMailAction(async () => {
-    if (!message) return;
-    const raw = await mailFetchRaw(info, message.folder, message.uid);
-    setSourceView({ subject: message.subject || "(no subject)", content: raw });
-  });
-
-  const handleSaveEml = (message = selectedMessage) => runMailAction(async () => {
-    if (!message) return;
-    const { save } = await import("@tauri-apps/plugin-dialog");
-    const base = suggestedAttachmentName({ name: `${message.subject || "message"}.eml` }, 0, message.subject);
-    const defaultPath = base.toLowerCase().endsWith(".eml") ? base : `${base}.eml`;
-    const targetPath = await save({ title: "Save message as .eml", defaultPath });
-    if (typeof targetPath !== "string" || !targetPath.trim()) {
-      setStatus("Save cancelled");
-      return;
-    }
-    const result = await mailSaveRaw(info, message.folder, message.uid, targetPath);
-    setStatus(`Saved message to ${result.path}`);
+  const { handleSaveEml, handleViewSource, handlePrintMessage } = createMessageExportActions({
+    selectedMessage,
+    body,
+    mailFontSize,
+    setError,
+    runMailAction,
+    info,
+    setSourceView,
+    setStatus,
   });
 
   const handleSearchInFolder = (folder: MailFolder) => {
     handleFolderSelect(folder);
     window.setTimeout(() => searchInputRef.current?.focus(), 0);
   };
-
-  const handleCreateFolder = (parent?: MailFolder) => runMailAction(async () => {
-    const name = await textInputDialog.promptText({
-      title: parent ? `New subfolder in ${folderLabel(parent)}` : "New folder",
-      label: "Folder name",
-      placeholder: "Folder name",
-    });
-    if (!name || !name.trim()) return;
-    const delimiter = parent?.delimiter || "/";
-    const fullName = parent ? `${parent.name}${delimiter}${name.trim()}` : name.trim();
-    await mailCreateFolder(info, fullName);
-    await loadCachedFolders();
-    setStatus(`Created folder ${name.trim()}`);
-  });
-
-  const handleRenameFolder = (folder: MailFolder) => runMailAction(async () => {
-    const label = folderLabel(folder);
-    const next = await textInputDialog.promptText({
-      title: `Rename ${label}`,
-      label: "New folder name",
-      initialValue: label,
-    });
-    const trimmed = next?.trim();
-    if (!trimmed || trimmed === label) return;
-    const delimiter = folder.delimiter || "/";
-    const idx = folder.name.lastIndexOf(delimiter);
-    const parentPath = idx >= 0 ? folder.name.slice(0, idx + delimiter.length) : "";
-    const target = `${parentPath}${trimmed}`;
-    await mailRenameFolder(info, folder.name, target);
-    if (selectedFolder === folder.name) updateSelectedFolder(target);
-    await loadCachedFolders();
-    setStatus(`Renamed folder to ${trimmed}`);
-  });
-
-  const handleDeleteFolder = (folder: MailFolder) => runMailAction(async () => {
-    const confirmed = await confirmDialog.confirm({
-      title: "Delete folder",
-      message: `Delete folder "${folderLabel(folder)}" and its cached messages? This cannot be undone.`,
-      confirmLabel: "Delete",
-      danger: true,
-    });
-    if (!confirmed) return;
-    await mailDeleteFolder(info, folder.name);
-    if (selectedFolder === folder.name) {
-      setSelectedMessageKey(null);
-      setBody(null);
-    }
-    await loadCachedFolders();
-    setStatus(`Deleted folder ${folderLabel(folder)}`);
-  });
-
-  const handleEmptyFolder = (folder: MailFolder) => runMailAction(async () => {
-    const confirmed = await confirmDialog.confirm({
-      title: "Empty folder",
-      message: `Permanently delete all messages in "${folderLabel(folder)}"? This cannot be undone.`,
-      confirmLabel: "Empty",
-      danger: true,
-    });
-    if (!confirmed) return;
-    const deleted = await mutationSessionRef.current.execute(JSON.stringify(["empty", folder.name]), [],
-      (id) => mailDeleteMessages(info, folder.name, [], true, id),
-      (done) => removeMessagesLocally(folder.name, done, messages.filter((m) => m.folder === folder.name && done.includes(m.uid) && isUnread(m)).length),
-      reportMutationProgress);
-    if (selectedFolder === folder.name) {
-      setMessages([]);
-      setSelectedMessageKey(null);
-      setBody(null);
-      setCheckedMessageKeys(new Set());
-    }
-    setFolders((current) => current.map((entry) => (
-      entry.name === folder.name
-        ? { ...entry, total: 0, unread: 0, updatedAt: Math.floor(Date.now() / 1000) }
-        : entry
-    )));
-    setStatus(`Emptied ${deleted} message${deleted === 1 ? "" : "s"} from ${folderLabel(folder)}`);
+  const { handleCreateFolder, handleRenameFolder, handleEmptyFolder, handleDeleteFolder } = createFolderActions({
+    runMailAction,
+    textInputDialog,
+    info,
+    loadCachedFolders,
+    setStatus,
+    selectedFolder,
+    updateSelectedFolder,
+    confirmDialog,
+    setSelectedMessageKey,
+    setBody,
+    mutationSessionRef,
+    removeMessagesLocally,
+    messages,
+    reportMutationProgress,
+    setMessages,
+    setCheckedMessageKeys,
+    setFolders,
   });
 
   /** A pending read receipt request of `message` (not yet answered, not mine). */
@@ -2199,163 +1782,16 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
       </button>
     );
   };
-
-  /** DEC-14: put the invitation (with my reply) into the CalDAV calendar. */
-  const addInviteToCalendar = async (message: MailMessageHeader, partstat?: string) => {
-    const key = messageKey(message);
-    setInviteView((current) => (current?.key === key ? { ...current, calendar: "adding", calendarError: undefined } : current));
-    try {
-      const written = await mailAddInviteToCalendar(info, message.folder, message.uid, partstat);
-      setInviteView((current) => (current?.key === key ? { ...current, calendar: "added" } : current));
-      setAgendaRevision((value) => value + 1);
-      setStatus(written.created ? "Added to your calendar" : "Updated in your calendar");
-    } catch (e) {
-      const calendarError = mailClientErrorMessage(e);
-      setInviteView((current) => (current?.key === key ? { ...current, calendar: undefined, calendarError } : current));
-    }
-  };
-
-  /** AC-62: Accept / Tentative / Decline sends an iTIP REPLY to the organizer. */
-  const handleRespondInvite = async (message: MailMessageHeader, response: MailInviteReply) => {
-    const key = messageKey(message);
-    setInviteView((current) => (current?.key === key ? { ...current, responding: response, error: undefined } : current));
-    try {
-      const result = await mailRespondInvite(info, message.folder, message.uid, response);
-      setInviteView((current) => (current?.key === key ? { ...current, responding: undefined, responded: result.partstat } : current));
-      setStatus(`Invitation reply (${result.partstat.toLowerCase()}) sent to ${result.sentTo}`);
-      if (info.caldav && response !== "decline") await addInviteToCalendar(message, result.partstat);
-    } catch (e) {
-      const error = mailClientErrorMessage(e);
-      setInviteView((current) => (current?.key === key ? { ...current, responding: undefined, error } : current));
-    }
-  };
-
-  const renderInviteCard = (message: MailMessageHeader) => {
-    const view = inviteView;
-    if (!view || view.key !== messageKey(message)) return null;
-    if (view.loading) {
-      return (
-        <div className="mx-4 mt-3 flex items-center gap-2 text-[12px] text-[var(--taomni-text-muted)]" data-testid="mail-invite-loading">
-          <Loader2 className="w-3.5 h-3.5 animate-spin" /> Reading calendar invitation…
-        </div>
-      );
-    }
-    const invite = view.invite;
-    if (!invite) {
-      return view.error ? (
-        <div className="mx-4 mt-3 text-[12px] text-red-500" data-testid="mail-invite-error">{view.error}</div>
-      ) : null;
-    }
-    const cancelled = invite.method === "CANCEL" || invite.status === "CANCELLED";
-    const canRespond = invite.method === "REQUEST" && !cancelled && !!invite.organizer;
-    const current = view.responded ?? myPartstat(invite, info.emailAddress);
-    const calendarIndex = visibleAttachments.findIndex((attachment) => hasCalendarPart([attachment]));
-    const replies: Array<{ response: MailInviteReply; label: string; partstat: string }> = [
-      { response: "accept", label: "Accept", partstat: "ACCEPTED" },
-      { response: "tentative", label: "Tentative", partstat: "TENTATIVE" },
-      { response: "decline", label: "Decline", partstat: "DECLINED" },
-    ];
-    return (
-      <div
-        className="mx-4 mt-3 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-sidebar-bg)] p-3 text-[12px]"
-        data-testid="mail-invite-card"
-        data-method={invite.method}
-        data-partstat={current ?? undefined}
-      >
-        <div className="flex items-start gap-2">
-          <CalendarDays className="w-4 h-4 mt-0.5 text-[var(--taomni-accent)]" />
-          <div className="min-w-0 flex-1">
-            <div className="font-semibold break-words" data-testid="mail-invite-summary">
-              {cancelled ? "Cancelled: " : invite.method === "REPLY" ? "Reply: " : ""}{invite.summary || "(untitled event)"}
-            </div>
-            <div className="mt-1 grid grid-cols-[72px_1fr] gap-x-2 gap-y-0.5">
-              <span className="text-[var(--taomni-text-muted)]">When</span>
-              <span data-testid="mail-invite-when">{formatInviteRange(invite) || "(not specified)"}</span>
-              {invite.location && (
-                <>
-                  <span className="text-[var(--taomni-text-muted)]">Where</span>
-                  <span className="break-words">{invite.location}</span>
-                </>
-              )}
-              {invite.organizer && (
-                <>
-                  <span className="text-[var(--taomni-text-muted)]">Organizer</span>
-                  <span className="truncate">{invite.organizer.name ? `${invite.organizer.name} <${invite.organizer.email}>` : invite.organizer.email}</span>
-                </>
-              )}
-              {invite.attendees.length > 0 && (
-                <>
-                  <span className="text-[var(--taomni-text-muted)]">Attendees</span>
-                  <span className="break-words">
-                    {invite.attendees.map((attendee) => `${attendee.name || attendee.email} (${attendee.partstat.toLowerCase()})`).join(", ")}
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          {canRespond && replies.map((reply) => (
-            <button
-              key={reply.response}
-              type="button"
-              className={`taomni-btn h-6 px-2 text-[11px] ${current === reply.partstat ? "text-[var(--taomni-accent)] border-[var(--taomni-accent)]" : ""}`}
-              data-testid={`mail-invite-${reply.response}`}
-              aria-pressed={current === reply.partstat}
-              disabled={!!view.responding}
-              onClick={() => void handleRespondInvite(message, reply.response)}
-            >
-              {view.responding === reply.response ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
-              {reply.label}
-            </button>
-          ))}
-          {calendarIndex >= 0 && (
-            <button
-              type="button"
-              className="taomni-btn h-6 px-2 text-[11px]"
-              data-testid="mail-invite-export"
-              title="Save the event as an .ics file"
-              onClick={() => void handleDownloadAttachment(message, visibleAttachments[calendarIndex], calendarIndex)}
-            >
-              <Download className="w-3 h-3" /> Export .ics
-            </button>
-          )}
-          {calendarIndex >= 0 && (
-            <button
-              type="button"
-              className="taomni-btn h-6 px-2 text-[11px]"
-              data-testid="mail-invite-open"
-              title="Open in the system calendar app"
-              onClick={() => void handleOpenAttachment(message, visibleAttachments[calendarIndex], calendarIndex)}
-            >
-              <ExternalLink className="w-3 h-3" /> Open in calendar
-            </button>
-          )}
-          {info.caldav && invite.method === "REQUEST" && !cancelled && view.calendar !== "added" && (
-            <button
-              type="button"
-              className="taomni-btn h-6 px-2 text-[11px] inline-flex items-center gap-1"
-              data-testid="mail-invite-add-calendar"
-              disabled={view.calendar === "adding"}
-              onClick={() => void addInviteToCalendar(message, view.responded)}
-            >
-              {view.calendar === "adding" ? <Loader2 className="w-3 h-3 animate-spin" /> : <CalendarDays className="w-3 h-3" />} Add to calendar
-            </button>
-          )}
-          {view.responded && (
-            <span className="text-[var(--taomni-text-muted)]" data-testid="mail-invite-responded">
-              Reply sent ({view.responded.toLowerCase()})
-            </span>
-          )}
-          {view.calendar === "added" && (
-            <span className="text-[var(--taomni-text-muted)]" data-testid="mail-invite-in-calendar">In your calendar</span>
-          )}
-        </div>
-        {view.error && <div className="mt-1 text-red-500" data-testid="mail-invite-error">{view.error}</div>}
-        {view.calendarError && <div className="mt-1 text-red-500" data-testid="mail-invite-calendar-error">{view.calendarError}</div>}
-      </div>
-    );
-  };
+  const { renderInviteCard } = createInvitationControls({
+    setInviteView,
+    info,
+    setAgendaRevision,
+    setStatus,
+    inviteView,
+    visibleAttachments,
+    handleDownloadAttachment,
+    handleOpenAttachment,
+  });
 
   const handleExportMbox = (folder: MailFolder) => runMailAction(async () => {
     const { save } = await import("@tauri-apps/plugin-dialog");
@@ -2391,57 +1827,15 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     await runFolderSync(folder.name, { maxSteps: 20 }).catch(() => undefined);
     await reloadVisibleFromCache(folder.name);
   });
-
-  /** AC-44: show the server certificate so the user can add an exception. */
-  const openCertReview = async (protocol: "imap" | "smtp") => {
-    setCertReview({ protocol, loading: true });
-    try {
-      const cert = await mailProbeCertificate(info, protocol);
-      setCertReview({ protocol, loading: false, info: cert });
-    } catch (e) {
-      setCertReview({ protocol, loading: false, error: mailClientErrorMessage(e) });
-    }
-  };
-
-  const trustReviewedCertificate = async () => {
-    const review = certReview;
-    if (!review?.info) return;
-    const der = review.info.derBase64;
-    const key = review.protocol === "smtp" ? "mailSmtpTrustedCert" : "mailImapTrustedCert";
-    // Persist on the saved session (quick-connect tabs keep it in memory).
-    const store = useSessionStore.getState();
-    const session = store.sessions.find((entry) => entry.id === info.sessionId);
-    if (session) {
-      let options: Record<string, unknown> = {};
-      try {
-        options = JSON.parse(session.options_json || "{}") as Record<string, unknown>;
-      } catch {
-        options = {};
-      }
-      options[key] = der;
-      try {
-        await store.updateSession({ ...session, options_json: JSON.stringify(options) });
-      } catch (e) {
-        setError(mailClientErrorMessage(e));
-        return;
-      }
-    }
-    useAppStore.setState((state) => ({
-      tabs: state.tabs.map((tab) => {
-        if (tab.id !== tabId || !tab.mail) return tab;
-        const mail = review.protocol === "smtp"
-          ? { ...tab.mail, smtp: { ...tab.mail.smtp, trustedCert: der } }
-          : { ...tab.mail, imap: { ...tab.mail.imap, trustedCert: der } };
-        return { ...tab, mail };
-      }),
-    }));
-    setCertReview(null);
-    setError(null);
-    setStatus(session
-      ? "Certificate trusted for this account; reconnecting…"
-      : "Certificate trusted until this tab closes (save the account to keep it); reconnecting…");
-    retryAfterTrustRef.current = true;
-  };
+  const { openCertReview, trustReviewedCertificate } = createCertificateActions({
+    setCertReview,
+    info,
+    certReview,
+    setError,
+    tabId,
+    setStatus,
+    retryAfterTrustRef,
+  });
 
   const openExternalUrl = async (url: string) => {
     try {
