@@ -4,7 +4,7 @@ import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle, type PanelImperativeHandle, type PanelSize } from "react-resizable-panels";
 import { useSessionImportExport } from "../components/menubar/useSessionImportExport";
 import type { AppCommand } from "../components/menubar/commands";
-import { buildAppMenuSpec, installAppMenu, type MenuActionId } from "../lib/nativeAppMenu";
+import { type MenuActionId } from "../lib/nativeAppMenu";
 import { QuickConnect } from "../components/quickconnect/QuickConnect";
 import { Sidebar } from "../components/sidebar/Sidebar";
 import { useConfirmDialog } from "../components/sidebar/ConfirmDialog";
@@ -15,9 +15,7 @@ import { WindowResizeHandles } from "../components/window/WindowResizeHandles";
 import { type TerminalLocalPathUploadRequest } from "../components/terminal/TerminalPanel";
 import { type CodeWorkspaceGitManagerPayload } from "../components/editor/CodeWorkspaceTab";
 import type { WorkspaceCommandRegistration } from "../components/editor/workspace/workspaceCommands";
-import { resolveShellShortcutRoute } from "../components/editor/workspace/shellShortcutRouter";
 import { decideWorkspaceGitSync } from "../lib/workspaceGitManagerSync";
-import { shellKeyClaimed } from "../lib/shellKeyClaims";
 import { MultiExecBar } from "../components/terminal/MultiExecBar";
 import { SessionEditor } from "../components/session/SessionEditor";
 import { AuthPrompt } from "../components/session/AuthPrompt";
@@ -78,7 +76,7 @@ import { t as tr, useT } from "../lib/i18n";
 import { gitInitRepo, gitProbePath, gitRepoName } from "../lib/git";
 import { alertAppDialog, confirmAppDialog } from "../lib/appDialogs";
 import { type ControlToolExecutor, type PendingAuth, type ConnectQueueEntry, type ResumeWaiter, type ControlToolDispatch } from "./main/types";
-import { readQuickConnectVisible, localShellSupportsCwdProbe, chatBindingIdForTab, normalizeGitWorkspaceRoots, gitWorkspaceRootsKey, browserUrlFromSession, commandTerminalFromSession, writeQuickConnectVisible, macCommandDigitIndex } from "./main/sessionPolicy";
+import { readQuickConnectVisible, localShellSupportsCwdProbe, chatBindingIdForTab, normalizeGitWorkspaceRoots, gitWorkspaceRootsKey, browserUrlFromSession, commandTerminalFromSession, writeQuickConnectVisible } from "./main/sessionPolicy";
 import { SAVED_PASSWORD_VAULT_REASON_KEY, passwordRefFromOptions } from "./main/authentication";
 import { sessionToDbConnectInfo, sessionToHBaseConnectInfo } from "./main/databaseSession";
 import { sessionToMailTabInfo, mailSmtpPasswordRefFromOptions } from "./main/mailSession";
@@ -90,6 +88,8 @@ import { createHandleQuickConnect, createHandleCommand } from "./main/commandAct
 import { createExecuteControlTool } from "./main/controlTools";
 import { TabContentRouter } from "./main/TabContentRouter";
 import { useDetachedWindowEvents } from "./main/useDetachedWindowEvents";
+import { useMainMenuBridge } from "./main/useMainMenuBridge";
+
 
 
 
@@ -2099,112 +2099,18 @@ export function MainLayout() {
         handleCommand(action as AppCommand);
     }
   }, [activeWorkspaceCommandRegistration, handleCommand, importExport]);
-
-  const dispatchMenuActionRef = useRef(dispatchMenuAction);
-  useEffect(() => {
-    dispatchMenuActionRef.current = dispatchMenuAction;
-  }, [dispatchMenuAction]);
-
-  // Build + install the macOS global menu. Rebuilt whenever a piece of state
-  // shown in the menu changes (checkmarks, enabled state) — all low-frequency,
-  // so a full rebuild is simpler and cheaper than mutating individual items.
-  useEffect(() => {
-    if (!nativeMenu) return;
-    let cancelled = false;
-    const spec = buildAppMenuSpec({
-      activeTabClosable: !!activeTab?.closable,
-      hasSessions: importExport.hasSessions,
-      quickConnectVisible,
-      workspaceCommands: activeWorkspaceCommandRegistration?.items ?? [],
-      t,
-    });
-    void installAppMenu(spec, (action) => dispatchMenuActionRef.current(action)).catch((err) => {
-      if (!cancelled) console.error("Failed to install application menu", err);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [
+  useMainMenuBridge({
+    dispatchMenuAction,
     nativeMenu,
-    activeTab?.closable,
-    importExport.hasSessions,
+    activeTab,
+    importExport,
     quickConnectVisible,
-    activeWorkspaceCommandRegistration?.items,
+    activeWorkspaceCommandRegistration,
     t,
-  ]);
-
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      const tabIndex = macCommandDigitIndex(event);
-      // A focused surface that binds the same chord (Code Workspace Cmd+1
-      // Project on macOS) keeps it; its own keymap dispatches the action.
-      if (tabIndex !== null && !shellKeyClaimed(event)) {
-        event.preventDefault();
-        event.stopPropagation();
-
-        const state = useAppStore.getState();
-        const target = tabIndex === -1 ? state.tabs.at(-1) : state.tabs[tabIndex];
-        if (target && target.id !== state.activeTabId) {
-          setActiveTab(target.id);
-        }
-        return;
-      }
-
-      const primary = event.ctrlKey || event.metaKey;
-      if (!primary || !event.shiftKey || event.altKey) return;
-
-      const key = event.key.toLowerCase();
-      if (key !== "t" && key !== "n") return;
-
-      if (key === "t") {
-        // W0 §8.20.1 root routing: the active workspace's reopen claim (via
-        // its command registration) outranks the shell's new-terminal owner.
-        // Read the registration map synchronously because the workspace can
-        // publish a newly available claim during the same interaction in
-        // which the user closes the last editor tab.
-        const currentActiveTabId = useAppStore.getState().activeTabId;
-        const registration = currentActiveTabId
-          ? workspaceCommandRegistrationsRef.current[currentActiveTabId] ?? null
-          : null;
-        const route = resolveShellShortcutRoute(registration?.shellShortcutClaims ?? []);
-        if (route.state === "dispatch") {
-          event.preventDefault();
-          event.stopPropagation();
-          void registration?.executeAction(route.actionId);
-          return;
-        }
-        if (route.state === "blocked") {
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
-        event.preventDefault();
-        event.stopPropagation();
-        handleCommand("new-terminal");
-        return;
-      }
-
-      const state = useAppStore.getState();
-      const current = state.tabs.find((tab) => tab.id === state.activeTabId);
-      if (current?.type === "welcome") {
-        // If a code-workspace tab exists, switch to it and let its Go to File
-        // handler execute Ctrl+Shift+N instead of creating a new session.
-        const workspaceTab = state.tabs.find((tab) => tab.type === "code-workspace");
-        if (workspaceTab) {
-          event.preventDefault();
-          event.stopPropagation();
-          setActiveTab(workspaceTab.id);
-          return;
-        }
-        event.preventDefault();
-        event.stopPropagation();
-        handleCommand("new-session");
-      }
-    };
-
-    window.addEventListener("keydown", handler, true);
-    return () => window.removeEventListener("keydown", handler, true);
-  }, [handleCommand, setActiveTab]);
+    setActiveTab,
+    workspaceCommandRegistrationsRef,
+    handleCommand,
+  });
 
   const terminalTabs = tabs.filter((t) => t.type === "terminal");
   const sftpTabs = tabs.filter((t) => t.type === "sftp" && t.sftp);

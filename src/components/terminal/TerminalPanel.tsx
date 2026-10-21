@@ -16,7 +16,7 @@ import { TabActions } from "../tabbar/TabActionSlot";
 import { useConfirmDialog } from "../sidebar/ConfirmDialog";
 import { FT_BUTTON_STYLE, FT_BUTTON_ACTIVE_OVERRIDE, FT_ICON_BUTTON_STYLE } from "../floating-toolbar/floatingToolbarStyles";
 import { Bot, ExternalLink, FolderOpen, Maximize2, Minimize2 } from "lucide-react";
-import { createOsc7BlankingSuppressor, createTaskStartOutputSuppressor, type InputEchoSuppressor } from "../../lib/terminalOutputFilter";
+import { createTaskStartOutputSuppressor, type InputEchoSuppressor } from "../../lib/terminalOutputFilter";
 import { makeHostKey, useCommandHistory } from "../../lib/history";
 import { submitSshAuthResponse, type SshAuthPromptPayload, writeTerminal, resizeTerminal, sendTerminalSignal, ccTrackTerminal, ccUntrackTerminal, encodeBase64, selectUploadFile } from "../../lib/ipc";
 import { getAppPlatform } from "../../lib/runtime";
@@ -30,7 +30,6 @@ import { CommonCommandsPalette } from "./CommonCommandsPalette";
 import { AiRewriteOverlay } from "./AiRewriteOverlay";
 import { SelectionToolbar } from "./SelectionToolbar";
 import { useChatStore } from "../../stores/chatStore";
-import { useSuggestionSource } from "../../lib/terminal/aiSuggestionSource";
 import { WINDOWS_PRESET_COMMANDS } from "../../lib/commonCommandsPresets";
 import { useAppStore } from "../../stores/appStore";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
@@ -42,12 +41,15 @@ import "@xterm/xterm/css/xterm.css";
 import { type TerminalPanelProps, type TerminalConnectionState, type TerminalBlockSelection, type SearchMatch, type TerminalEventLogEntry, type TerminalReattachState, type TerminalGitState, type TerminalBlockSelectionCell } from "./panel/types";
 import { terminalProfileSignature, formatPasteForTerminal, uniqueNonEmpty, terminalCanPromptForLocalPathUpload, downloadTextFile, safeFilePart, timestampFilePart } from "./panel/transfer";
 import { currentTerminalSize, shouldUseTerminalWebgl, escapeHtml, DEFAULT_FONT_SIZE, terminalCursorCell, isMacPrintableOptionInput, terminalCellFromMouseEvent, isTerminalBlockSelectionMouseEvent } from "./panel/policy";
-import { getBufferText, captureBufferCommand, collectTerminalBlockSelectionText, findAndSelectBufferText, getLastBufferLines, terminalAtIdlePrompt, getVisibleSearchHighlights, getVisibleKeywordHighlights, getVisibleTerminalBlockSelectionHighlights, computeInlineGhost } from "./panel/buffer";
-import { CWD_QUERY_COMMAND, PS_CWD_QUERY_COMMAND, INJECTED_INPUT_HOLD_MAX_MS, encodeBinaryStringBase64, formatZmodemBytes } from "./panel/protocol";
-import { streamInlineAi } from "./panel/inlineAi";
+import { getBufferText, collectTerminalBlockSelectionText, findAndSelectBufferText, getLastBufferLines, terminalAtIdlePrompt, getVisibleSearchHighlights, getVisibleKeywordHighlights, getVisibleTerminalBlockSelectionHighlights, computeInlineGhost } from "./panel/buffer";
+import { CWD_QUERY_COMMAND, PS_CWD_QUERY_COMMAND, formatZmodemBytes } from "./panel/protocol";
 import { CurrentTerminalSettingsDialog } from "./panel/CurrentTerminalSettingsDialog";
 import { createTerminalSessionLifecycle } from "./panel/sessionLifecycle";
 import { useTerminalViewport } from "./panel/useTerminalViewport";
+import { useTerminalSuggestions } from "./panel/useTerminalSuggestions";
+import { useTerminalInput } from "./panel/useTerminalInput";
+
+
 
 
  // ESC [ 3 J
@@ -567,418 +569,39 @@ export function TerminalPanel({
       window.clearTimeout(timer);
     };
   }, [gitToggle?.cwd, isLocal]);
-
-  // Refs decouple the once-mounted xterm.onData callback from the live
-  // history/enabled values. Without this, the initial writeXtermInput closure
-  // captures the empty prewarm cache and never sees later state changes.
-  const historyRef = useRef(history);
-  const suggestionsActiveRef = useRef(suggestionsActive);
-  const inlineSuggestionsSourceRef = useRef(inlineSuggestionsSource);
-  const isLocalRef = useRef(isLocal);
-  /** Last absolute local cwd we already recorded into command history. */
-  const lastRecordedLocalDirRef = useRef<string | null>(null);
-  /** OSC-7 reports can arrive before the async PTY creation result. */
-  const pendingLocalDirectoryReportsRef = useRef<string[]>([]);
-  useEffect(() => {
-    historyRef.current = history;
-    suggestionsActiveRef.current = suggestionsActive;
-    inlineSuggestionsSourceRef.current = inlineSuggestionsSource;
-    isLocalRef.current = isLocal;
-  }, [history, suggestionsActive, inlineSuggestionsSource, isLocal]);
-
-  // AI suggestion source resolver (data sources 2 + 3).
-  // The resolver caches its options on every render; passing a thunk for
-  // recent history keeps it invalidation-free without triggering rerenders.
-  const recentHistoryForSuggestion = useMemo(
-    () => history.recent(5),
-    // The history hook bumps a cache version internally on commit, but we
-    // only want to pull a fresh snapshot for new keystrokes — depending on
-    // history alone here is fine because match() is the keystroke trigger.
-    [history],
-  );
-  const resolveSuggestion = useSuggestionSource({
-    source: inlineSuggestionsSource,
+  const { trackPending, pendingRef, invalidatedRef, refreshSuggestion, suggestionsActiveRef, suggestionRef, ghostVisibleRef, bumpGhost, pendingLocalDirectoryReportsRef, isLocalRef, lastRecordedLocalDirRef, historyRef, ghostTick } = useTerminalSuggestions({
+    history,
+    suggestionsActive,
+    inlineSuggestionsSource,
     isLocal,
-    recentHistory: recentHistoryForSuggestion,
+    termRef,
   });
-
-  // State shared between onData tracking and the ghost renderer.
-  const pendingRef = useRef("");
-  const invalidatedRef = useRef(false);
-  const suggestionRef = useRef<string | null>(null);
-  const [ghostTick, setGhostTick] = useState(0);
-  const ghostVisibleRef = useRef(false);
-
-  const bumpGhost = useCallback(() => setGhostTick((v) => v + 1), []);
-
-  const refreshSuggestion = useCallback(() => {
-    if (!suggestionsActiveRef.current || invalidatedRef.current || pendingRef.current === "") {
-      if (suggestionRef.current !== null) {
-        suggestionRef.current = null;
-      }
-      bumpGhost();
-      return;
-    }
-    const prefix = pendingRef.current;
-    const matches = historyRef.current.match(prefix, 1);
-    const historyMatch = matches[0] && matches[0].length > prefix.length ? matches[0] : null;
-
-    if (historyMatch !== null) {
-      // Source 1 hit — use immediately.
-      suggestionRef.current = historyMatch;
-      bumpGhost();
-      return;
-    }
-
-    // Source 1 miss — try sources 2/3 asynchronously.
-    const source = inlineSuggestionsSourceRef.current;
-    if (source === "history+path" || source === "history+path+ai") {
-      void resolveSuggestion(prefix, null, (result) => {
-        // Only apply if the prefix hasn't changed since we started.
-        if (pendingRef.current === prefix && !invalidatedRef.current) {
-          suggestionRef.current = result;
-          bumpGhost();
-        }
-      });
-    } else {
-      suggestionRef.current = null;
-      bumpGhost();
-    }
-  }, [bumpGhost, resolveSuggestion]);
-
-  const invalidatePending = useCallback(() => {
-    if (invalidatedRef.current && suggestionRef.current === null) return;
-    invalidatedRef.current = true;
-    suggestionRef.current = null;
-    bumpGhost();
-  }, [bumpGhost]);
-
-  const trackPending = useCallback((data: string) => {
-    // History commit on Enter is always needed (Welcome recent-folders reads
-    // host_key=local command history). Ghost-text suggestion tracking is
-    // separate and only runs when suggestions are enabled — PowerShell local
-    // shells disable suggestions (PSReadLine owns that UX) but still must
-    // record typed commands.
-    const suggestionsOn = suggestionsActiveRef.current;
-
-    // Bracketed paste: whole block is shell input, never a typed command.
-    if (data.startsWith("\x1b[200~")) {
-      if (suggestionsOn) invalidatePending();
-      return;
-    }
-
-    // Defensive: large chunk with any control char → treat as paste, invalidate.
-    if (data.length > 64) {
-      if (suggestionsOn) invalidatePending();
-      return;
-    }
-
-    let changed = false;
-    for (let i = 0; i < data.length; i++) {
-      const code = data.charCodeAt(i);
-
-      // CR / LF → Enter: commit the actual command on screen (handles Tab
-      // completion, history recall, etc.), fall back to tracked pending.
-      if (code === 0x0d || code === 0x0a) {
-        let committed: string | null = null;
-        const term = termRef.current;
-        if (term && term.buffer.active.type !== "alternate") {
-          const fromBuffer = captureBufferCommand(term);
-          if (fromBuffer) committed = fromBuffer;
-        }
-        if (!committed && pendingRef.current !== "" && !invalidatedRef.current) {
-          committed = pendingRef.current;
-        }
-        if (committed) historyRef.current.commit(committed);
-        pendingRef.current = "";
-        invalidatedRef.current = false;
-        changed = true;
-        continue;
-      }
-
-      // Below: only track keystrokes for ghost-text when suggestions are on.
-      if (!suggestionsOn) {
-        continue;
-      }
-
-      // Ctrl+C: cancel current line entirely, but re-enable suggestions immediately.
-      if (code === 0x03) {
-        pendingRef.current = "";
-        invalidatedRef.current = false;
-        changed = true;
-        continue;
-      }
-
-      // Backspace / DEL.
-      if (code === 0x08 || code === 0x7f) {
-        if (!invalidatedRef.current && pendingRef.current.length > 0) {
-          pendingRef.current = pendingRef.current.slice(0, -1);
-          changed = true;
-        }
-        continue;
-      }
-
-      // Escape or any CSI-like sequence — arrows, Home/End, Tab completion, function
-      // keys: give up on the current line until the next Enter.
-      if (code === 0x1b || code === 0x09) {
-        invalidatedRef.current = true;
-        changed = true;
-        // Skip rest of this data chunk; it's almost certainly a single escape seq.
-        break;
-      }
-
-      // Other C0 control chars (Ctrl+A/E/U/W/K/L/R/...) → invalidate.
-      if (code < 0x20) {
-        invalidatedRef.current = true;
-        changed = true;
-        break;
-      }
-
-      // Printable: append unless we're already invalidated.
-      if (!invalidatedRef.current) {
-        pendingRef.current += data[i];
-        changed = true;
-      }
-    }
-
-    if (changed && suggestionsOn) refreshSuggestion();
-  }, [invalidatePending, refreshSuggestion]);
-
-  // Rerun suggestion matching whenever the live cache or the on/off toggles
-  // change — this is what picks up a freshly-prewarmed history list.
-  useEffect(() => {
-    refreshSuggestion();
-  }, [suggestionsActive, history, refreshSuggestion]);
-
-  const writeXtermInputRef = useRef<((data: string) => void) | null>(null);
-  const injectedInputHoldRef = useRef<{
-    queue: string[];
-    pump: number | null;
-    expiresAt: number;
-    flushing: boolean;
-  }>({ queue: [], pump: null, expiresAt: 0, flushing: false });
-
-  const flushInjectedInputHold = useCallback(() => {
-    const hold = injectedInputHoldRef.current;
-    if (hold.pump !== null) {
-      window.clearInterval(hold.pump);
-      hold.pump = null;
-    }
-    hold.expiresAt = 0;
-    if (hold.queue.length === 0) return;
-    const queued = hold.queue.join("");
-    hold.queue = [];
-    // Re-enter the normal input path so the interceptor, pending-command
-    // tracking, MultiExec broadcast and send all see the held keystrokes in
-    // order — without holding them again.
-    hold.flushing = true;
-    try {
-      writeXtermInputRef.current?.(queued);
-    } finally {
-      hold.flushing = false;
-    }
-  }, []);
-
-  const holdInjectedInput = useCallback((data: string, inputHoldTimeoutMs: number) => {
-    const hold = injectedInputHoldRef.current;
-    hold.queue.push(data);
-    const expiresAt = Date.now() + Math.max(INJECTED_INPUT_HOLD_MAX_MS, inputHoldTimeoutMs);
-    if (hold.pump !== null) {
-      hold.expiresAt = Math.max(hold.expiresAt, expiresAt);
-      return;
-    }
-    hold.expiresAt = expiresAt;
-    hold.pump = window.setInterval(() => {
-      const suppressor = injectedInputEchoSuppressorRef.current;
-      // Flush as soon as the injected line's own output proves it landed, or
-      // once the bounded hold expires so typing never stalls indefinitely.
-      if (!suppressor || suppressor.done || Date.now() >= hold.expiresAt) {
-        flushInjectedInputHold();
-      }
-    }, 100);
-  }, [flushInjectedInputHold]);
-
-  const sendTerminalInput = useCallback((data: string) => {
-    const sid = sessionIdRef.current;
-    if (!sid || readOnlyRef.current || connectionStateRef.current !== "connected") return;
-    if (macroRecordingRef.current && !macroPlaybackRef.current) {
-      macroBufferRef.current += data;
-    }
-    writeTerminal(sid, encodeBase64(data)).catch(console.error);
-  }, []);
-
-  const writeInput = sendTerminalInput;
-
-  // Broadcast-aware input: used for paste and any injected text so that
-  // MultiExec mode forwards the same data to all selected terminals.
-  const writeBroadcastInput = useCallback((data: string) => {
-    if (readOnlyRef.current) return;
-    if (!sessionIdRef.current || connectionStateRef.current !== "connected") {
-      if (ssh && connectionStateRef.current === "disconnected") {
-        setStatusMessage("SSH disconnected; press Enter to reconnect");
-      }
-      return;
-    }
-    if (tabId && /[\r\n]/.test(data)) {
-      const program = inferTerminalProgram(data.split(/[\r\n]/).find((line) => line.trim()) ?? "");
-      if (program) {
-        setTerminalRuntime(tabId, {
-          state: "running",
-          program,
-          activitySource: "input-heuristic",
-        });
-      }
-    }
-    trackPending(data);
-    if (multiExecActiveRef.current) {
-      onInputBroadcastRef.current?.(data);
-    }
-    sendTerminalInput(data);
-  }, [sendTerminalInput, setStatusMessage, setTerminalRuntime, ssh, tabId, trackPending]);
-
-  const writeXtermInput = useCallback((data: string) => {
-    if (readOnlyRef.current) return;
-    const filtered = imeGuardRef.current?.filterTerminalData(data) ?? data;
-    if (filtered === null) {
-      return;
-    }
-
-    // A hidden setup line (shell integration, cwd probe, task wrapper) is being
-    // written into the same pty. Windows OpenSSH/ConPTY interleaves a concurrent
-    // keystroke write with it and corrupts both (an unterminated shell line),
-    // so hold the keystrokes and flush them once the injected line has landed.
-    const activeSuppressor = injectedInputEchoSuppressorRef.current;
-    if (!injectedInputHoldRef.current.flushing && activeSuppressor && !activeSuppressor.done) {
-      holdInjectedInput(filtered, activeSuppressor.inputHoldTimeoutMs ?? INJECTED_INPUT_HOLD_MAX_MS);
-      return;
-    }
-
-    if (
-      ssh &&
-      !adoptedTerminalRef.current &&
-      connectionStateRef.current === "disconnected" &&
-      (filtered === "\r" || filtered === "\n" || filtered === "\r\n")
-    ) {
-      reconnectSshRef.current?.();
-      return;
-    }
-
-    if (connectionStateRef.current !== "connected") {
-      if (ssh && connectionStateRef.current === "disconnected") {
-        setStatusMessage("SSH disconnected; press Enter to reconnect");
-      }
-      return;
-    }
-
-    // `??` inline interceptor: when the user has typed `?? <question>` and
-    // presses Enter on a normal-screen prompt, capture the question and
-    // route it to the AI Chat Drawer instead of forwarding to the shell.
-    // Disabled in alt-screen mode (vim/less/top), in PowerShell, and during
-    // multi-exec broadcast.
-    const endsWithEnter = filtered.endsWith("\r") || filtered.endsWith("\n");
-    if (endsWithEnter && !multiExecActiveRef.current) {
-      const term = termRef.current;
-      const altScreen = term?.buffer.active.type === "alternate";
-      const candidate = pendingRef.current + filtered.slice(0, filtered.length - 1);
-      if (
-        !altScreen
-        && !isLocalPowerShell
-        && candidate.startsWith("?? ")
-        && candidate.length > 3
-      ) {
-        const question = candidate.slice(3).trim();
-        // Clear the line on the shell (Ctrl+U wipes back to start in bash/zsh).
-        sendTerminalInput("\x15");
-        pendingRef.current = "";
-        invalidatedRef.current = false;
-        refreshSuggestion();
-
-        if (terminalProfile?.aiInlineQqRender) {
-          // Plan §8.4 inline path: render AI response directly into the
-          // terminal as ANSI-styled lines. We write a header, kick the
-          // backend stream, and pipe each token straight into xterm.write.
-          const term = termRef.current;
-          if (term) {
-            void streamInlineAi(term, question);
-          }
-        } else {
-          // Default safe path: route to AI Chat Drawer.
-          void useChatStore.getState().attachToComposer(`?? ${question}`);
-        }
-        return;
-      }
-    }
-
-    if (endsWithEnter && tabId) {
-      const term = termRef.current;
-      const submittedChunk = filtered.replace(/[\r\n]+$/g, "");
-      const command =
-        term && term.buffer.active.type !== "alternate"
-          ? captureBufferCommand(term) || `${pendingRef.current}${submittedChunk}`
-          : `${pendingRef.current}${submittedChunk}`;
-      const program = inferTerminalProgram(command);
-      if (program) {
-        setTerminalRuntime(tabId, {
-          state: "running",
-          program,
-          activitySource: "input-heuristic",
-        });
-      }
-    }
-
-    trackPending(filtered);
-    if (multiExecActiveRef.current) {
-      onInputBroadcastRef.current?.(filtered);
-    }
-    sendTerminalInput(filtered);
-  }, [sendTerminalInput, setStatusMessage, setTerminalRuntime, ssh, tabId, trackPending, refreshSuggestion, isLocalPowerShell, terminalProfile?.aiInlineQqRender, holdInjectedInput]);
-
-  writeXtermInputRef.current = writeXtermInput;
-
-  const writeBinaryInput = useCallback((data: string) => {
-    const sid = sessionIdRef.current;
-    if (!sid || readOnlyRef.current || connectionStateRef.current !== "connected") return;
-    if (macroRecordingRef.current && !macroPlaybackRef.current) {
-      macroBufferRef.current += data;
-    }
-    writeTerminal(sid, encodeBinaryStringBase64(data)).catch(console.error);
-  }, []);
-
-  const requestTerminalCwd = useCallback(() => {
-    const sid = sessionIdRef.current;
-    if (!sid) {
-      setStatusMessage("Terminal is not ready yet");
-      return;
-    }
-    if (readOnlyRef.current) {
-      setStatusMessage("Terminal is read-only");
-      return;
-    }
-
-    const command = cwdProbeCommandRef.current;
-    if (!command) {
-      // No way to read the cwd for this shell (e.g. cmd.exe).
-      setStatusMessage("This shell can't report its working directory");
-      return;
-    }
-
-    // Never inject when a command is already typed but not yet run: the probe
-    // would be appended to it, corrupting both the probe and the user's input.
-    // captureBufferCommand reads the rendered current line, so this is
-    // shell-agnostic and covers PowerShell too (where pendingRef isn't tracked).
-    const term = termRef.current;
-    if (term && captureBufferCommand(term).length > 0) {
-      setStatusMessage("Can't read the working directory while a command is typed");
-      return;
-    }
-
-    // Hide the probe's echo: drop everything until the OSC 7 reply it emits.
-    injectedInputEchoSuppressorRef.current = createOsc7BlankingSuppressor();
-    writeTerminal(sid, encodeBase64(`${command}\r`)).catch((err) => {
-      if (sessionIdRef.current === sid) injectedInputEchoSuppressorRef.current = null;
-      setStatusMessage(err instanceof Error ? err.message : "Terminal cwd request failed");
-    });
-  }, [setStatusMessage]);
+  const { writeBroadcastInput, writeInput, sendTerminalInput, requestTerminalCwd, writeXtermInput, writeBinaryInput, injectedInputHoldRef } = useTerminalInput({
+    injectedInputEchoSuppressorRef,
+    sessionIdRef,
+    readOnlyRef,
+    connectionStateRef,
+    macroRecordingRef,
+    macroPlaybackRef,
+    macroBufferRef,
+    ssh,
+    setStatusMessage,
+    tabId,
+    setTerminalRuntime,
+    trackPending,
+    multiExecActiveRef,
+    onInputBroadcastRef,
+    imeGuardRef,
+    adoptedTerminalRef,
+    reconnectSshRef,
+    termRef,
+    pendingRef,
+    isLocalPowerShell,
+    invalidatedRef,
+    refreshSuggestion,
+    terminalProfile,
+    cwdProbeCommandRef,
+  });
 
   const writeClipboardText = useCallback(async (text: string, successMessage: string) => {
     if (!text) {
@@ -2941,7 +2564,11 @@ export function TerminalPanel({
 
 
 
+
+
 export { type SshConnectInfo, type CommandTerminalConnectInfo, type TerminalReattachState, type AdoptedTerminalSession, type DetachedTerminalWindowControls, type TerminalLocalPathUploadRequest, type TerminalBlockSelectionCell, type TerminalBlockSelection } from "./panel/types";
+
+
 
 
 

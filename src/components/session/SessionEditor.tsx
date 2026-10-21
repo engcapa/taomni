@@ -5,17 +5,16 @@ import { useModalShortcuts, getShortcutSuffixes } from "../../hooks/useModalShor
 import { X, Terminal as TerminalIcon, Monitor, Folder, Wifi, Bookmark, Shield, FlaskConical, FileText, Cloud, Save, RotateCcw, Network, HelpCircle, Database, Mail, Palette } from "lucide-react";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useVaultStore } from "../../stores/vaultStore";
-import { ensureVaultReady } from "../../lib/vaultGate";
 import { MAIL_HEADER_LIMITS_EXPLICIT_KEY, mailHeaderLimitOption } from "../../lib/mailSync";
 import { parseSpecialFolders } from "../../lib/mailFolders";
 import { parseMailIdentities } from "../../lib/mailIdentities";
-import { selectFilePath, selectFolderPath, selectPrivateKeyFile, testSshConnection, testProxyConnection, dbTestConnection, hbaseTestConnection, vaultPut, isVaultReference, isVaultLockedError, listWslDistros, listLocalShells, type WslDistro, type LocalShellOption } from "../../lib/ipc";
-import type { DbConnectInfo, HBaseConnectInfo, MailIdentity } from "../../types";
+import { selectFilePath, selectFolderPath, selectPrivateKeyFile, listWslDistros, listLocalShells, type WslDistro, type LocalShellOption } from "../../lib/ipc";
+import type { MailIdentity } from "../../types";
 import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
-import { DEFAULT_NETWORK_SETTINGS, getSessionNetworkSettings, toNetworkSettingsPayload, type NetworkSettings as NetworkSettingsValue } from "../../lib/networkSettings";
+import { DEFAULT_NETWORK_SETTINGS, getSessionNetworkSettings, type NetworkSettings as NetworkSettingsValue } from "../../lib/networkSettings";
 import { parseSshConnectionCommand, parseUserHostPort } from "../../lib/quickConnect";
-import { SESSION_ROOT_LABEL, collectFolderPaths, folderOptionLabel, normalizeGroupPath, toStoredGroupPath } from "../../lib/sessionPaths";
-import { alertAppDialog, confirmAppDialog, formatUnknownError, promptAppDialog } from "../../lib/appDialogs";
+import { SESSION_ROOT_LABEL, collectFolderPaths, folderOptionLabel, toStoredGroupPath } from "../../lib/sessionPaths";
+import { alertAppDialog } from "../../lib/appDialogs";
 import type { SessionConfig, AuthMethod } from "../../lib/ipc";
 import { SYSTEM_TERMINAL_THEME, parseSessionOptions, type TerminalProfile } from "../../lib/terminalProfile";
 import { supportsTerminalAppearanceSessionType } from "../../lib/sessionTerminalTheme";
@@ -28,14 +27,13 @@ import { engineForProvider } from "../../types/objectStorage";
 import { WslOptionsForm } from "./forms/WslOptionsForm";
 import { LocalShellOptionsForm } from "./forms/LocalShellOptionsForm";
 import { MailAppearanceSettings } from "../mail/MailAppearanceSettings";
-import { mailOAuthAuthorize, mailOAuthDeviceComplete, mailOAuthDeviceStart } from "../../lib/mail";
 import { useT } from "../../lib/i18n";
 import { normalizeVncScaling, VNC_SCALE_PERCENTAGES } from "../../lib/vnc";
 import { parseVncViewerOptions, writeVncViewerOptions, type VncViewerOptions } from "../../lib/vncOptions";
 import { PathMappingsEditor, parsePathMappings as parsePathMappingsFromOptions } from "../filebrowser/PathMappingsEditor";
 import type { SftpPathMapping } from "../../types";
 import { sessionTypeToProto, type Proto, type SectionTab, DEFAULT_PORTS, optionString, extractAuthType, extractKeyPath, optionBoolean, optionStringOrNumber, initialTerminalProfileForProto, DB_PROTOS, PLANNED_CLIENT_PROTOS, protoToSessionType, defaultTerminalProfileForProto, stripSerialOptions, stripLocalShellLaunchOptions, stripDeprecatedCwdOptions, stripTerminalProfileOption, cloneNetworkSettings, PROTOS } from "./editor/sessionPolicy";
-import { type MailProvider, initialMailProvider, type MailAuthMode, normalizeMailAuthMode, type MailSecurityMode, type MailOAuthFlow, initialMailOAuthFlow, type MailOAuthDeviceInfo, defaultMailOAuthFlow, MAIL_PROVIDER_PRESETS, stripMailIdentityOptions, effectiveMailOAuthFlow, mailOAuthClientSecretVisible, mailOAuthClientSecretRequired, supportsMailOAuthProvider } from "./editor/mailPolicy";
+import { type MailProvider, initialMailProvider, type MailAuthMode, normalizeMailAuthMode, type MailSecurityMode, type MailOAuthFlow, initialMailOAuthFlow, type MailOAuthDeviceInfo, defaultMailOAuthFlow, MAIL_PROVIDER_PRESETS, stripMailIdentityOptions, effectiveMailOAuthFlow, mailOAuthClientSecretVisible, mailOAuthClientSecretRequired } from "./editor/mailPolicy";
 import { Field, Select } from "./editor/Fields";
 import { AdvancedSshSettings } from "./editor/SshSettings";
 import { TerminalSettings } from "./editor/TerminalSettings";
@@ -45,6 +43,10 @@ import { HBaseSettings } from "./editor/HBaseSettings";
 import { NetworkSettings, DbNetworkSettings } from "./editor/NetworkSettings";
 import { BookmarkSettings } from "./editor/BookmarkSettings";
 import { SessionConnectionFields } from "./editor/SessionConnectionFields";
+import { createHandleSave, createHandleSaveTemplate, createHandleNewFolder, createHandleDelete, createHandleSaveAsProxySession } from "./editor/persistenceActions";
+import { createHandleMailOAuthConnect } from "./editor/mailAuthentication";
+import { createHandleTestConnection, createBuildDbConnectInfo, createBuildHBaseConnectInfo, createHandleTestDbConnection, createHandleTestHBaseConnection, createHandleTestProxyConnection } from "./editor/connectionProbes";
+
 
 
 
@@ -62,6 +64,7 @@ interface SessionEditorProps {
   initialProto?: string;
   onClose: () => void;
 }
+
 
 
 
@@ -781,284 +784,68 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     return null;
   };
 
-  const handleSave = async () => {
-    const error = validate();
-    if (error) {
-      setSaveError(error);
-      return;
-    }
-    setSaveError(null);
+  const handleSave = createHandleSave({
+    validate,
+    setSaveError,
+    passwordRef,
+    isSSH,
+    isDb,
+    isHBase,
+    proto,
+    isProxy,
+    isMail,
+    authMethod,
+    mailAuthMode,
+    saveInVault,
+    password,
+    t,
+    username,
+    host,
+    port,
+    setPasswordRef,
+    setPassword,
+    networkSettings,
+    setNetworkSettings,
+    mailSmtpPasswordRef,
+    mailSmtpUseImapAuth,
+    mailSmtpSaveInVault,
+    mailSmtpPassword,
+    mailSmtpUsername,
+    mailSmtpHost,
+    mailSmtpPort,
+    setMailSmtpPasswordRef,
+    setMailSmtpPassword,
+    mailOauthClientSecretRef,
+    mailProvider,
+    mailOauthFlow,
+    setMailOauthClientSecretRef,
+    setMailOauthClientSecret,
+    mailOauthClientSecretSaveInVault,
+    mailOauthClientSecret,
+    oss,
+    setOss,
+    buildConfig,
+    buildOptionsJson,
+    mailOauthTokenRef,
+    mailOauthExpiresAt,
+    mailOauthScope,
+    isEdit,
+    updateSession,
+    addSession,
+    onClose,
+  });
 
-    // If the user wants to remember the SSH/database password and typed a
-    // fresh plaintext into the password field, push it into the vault first
-    // and capture the resulting `vault:<id>` reference. We do this *before*
-    // building the config so the reference lands in options_json.
-    let nextPasswordRef = passwordRef;
-    if (
-      (isSSH || isDb || isHBase || proto === "RDP" || proto === "VNC" || isProxy || isMail) &&
-      (isDb || isHBase || proto === "RDP" || proto === "VNC" || isProxy || isMail || authMethod === "Password") &&
-      (!isMail || mailAuthMode === "password") &&
-      saveInVault &&
-      password.length > 0
-    ) {
-      // The vault must be unlocked to encrypt the password. If it is empty or
-      // locked, pop the on-demand gate (set master password / unlock) instead
-      // of failing with a text hint. Bail out of the save if the user cancels.
-      const ready = await ensureVaultReady(t("vault.gateReasonSession"));
-      if (!ready) {
-        setSaveError(t("sessionEditor2.errVaultLockedSave"));
-        return;
-      }
-      try {
-        const kind =
-          proto === "RDP"
-            ? "rdp-password"
-            : proto === "VNC"
-              ? "vnc-password"
-            : isProxy
-              ? "proxy-password"
-              : isMail
-                ? "mail-imap-password"
-              : isHBase
-                  ? "hbase-password"
-                  : isDb
-                    ? "db-password"
-                    : "ssh-password";
-        const label = `${username || "user"}@${host || "?"}:${port}`;
-        const result = await vaultPut(kind, label, password);
-        nextPasswordRef = result.reference;
-        setPasswordRef(result.reference);
-        setPassword("");
-      } catch (err) {
-        if (isVaultLockedError(err)) {
-          setSaveError(t("sessionEditor2.errVaultLockedSave"));
-        } else {
-          setSaveError(err instanceof Error ? err.message : String(err));
-        }
-        return;
-      }
-    } else if (!saveInVault) {
-      // User unchecked Save in vault: forget any previous reference.
-      nextPasswordRef = "";
-    }
-    if (isMail && mailAuthMode === "oauth2") {
-      nextPasswordRef = "";
-      setPasswordRef("");
-      setPassword("");
-    }
-
-    // Same dance for the proxy password when proxySaveAuth is enabled and
-    // the user typed a fresh plaintext (i.e. the value isn't already a
-    // vault: reference).
-    let nextProxyPass = networkSettings.proxyPass;
-    if (
-      networkSettings.proxySaveAuth &&
-      networkSettings.proxyPass.length > 0 &&
-      !isVaultReference(networkSettings.proxyPass)
-    ) {
-      const ready = await ensureVaultReady(t("vault.gateReasonProxy"));
-      if (!ready) {
-        setSaveError(t("sessionEditor2.errVaultLockedProxy"));
-        return;
-      }
-      try {
-        const label = `proxy://${networkSettings.proxyHost}:${networkSettings.proxyPort}`;
-        const result = await vaultPut("proxy-password", label, networkSettings.proxyPass);
-        nextProxyPass = result.reference;
-        setNetworkSettings({ ...networkSettings, proxyPass: result.reference });
-      } catch (err) {
-        if (isVaultLockedError(err)) {
-          setSaveError(t("sessionEditor2.errVaultLockedProxy"));
-        } else {
-          setSaveError(err instanceof Error ? err.message : String(err));
-        }
-        return;
-      }
-    }
-
-    // And once more for the SSH jump-host password (manual mode only — when a
-    // jump session is selected, its own saved credential is resolved
-    // server-side and there is no separate jump password to persist).
-    let nextJumpPass = networkSettings.jumpPassword;
-    if (
-      networkSettings.jumpSaveAuth &&
-      networkSettings.jumpSessionId.trim() === "" &&
-      networkSettings.jumpPassword.length > 0 &&
-      !isVaultReference(networkSettings.jumpPassword)
-    ) {
-      const ready = await ensureVaultReady(t("vault.gateReasonProxy"));
-      if (!ready) {
-        setSaveError(t("sessionEditor2.errVaultLockedProxy"));
-        return;
-      }
-      try {
-        const label = `jump://${networkSettings.jumpUser}@${networkSettings.jumpHost}:${networkSettings.jumpPort}`;
-        const result = await vaultPut("jump-password", label, networkSettings.jumpPassword);
-        nextJumpPass = result.reference;
-        setNetworkSettings({ ...networkSettings, jumpPassword: result.reference });
-      } catch (err) {
-        if (isVaultLockedError(err)) {
-          setSaveError(t("sessionEditor2.errVaultLockedProxy"));
-        } else {
-          setSaveError(err instanceof Error ? err.message : String(err));
-        }
-        return;
-      }
-    }
-
-    setPasswordRef(nextPasswordRef);
-
-    let nextMailSmtpPasswordRef = mailSmtpPasswordRef;
-    if (isMail && mailAuthMode === "password" && !mailSmtpUseImapAuth) {
-      if (mailSmtpSaveInVault && mailSmtpPassword.length > 0) {
-        const ready = await ensureVaultReady(t("vault.gateReasonSession"));
-        if (!ready) {
-          setSaveError(t("sessionEditor2.errVaultLockedSave"));
-          return;
-        }
-        try {
-          const label = `${mailSmtpUsername || username || "mail"}@${mailSmtpHost || "smtp"}:${mailSmtpPort || "465"}`;
-          const result = await vaultPut("mail-smtp-password", label, mailSmtpPassword);
-          nextMailSmtpPasswordRef = result.reference;
-          setMailSmtpPasswordRef(result.reference);
-          setMailSmtpPassword("");
-        } catch (err) {
-          if (isVaultLockedError(err)) {
-            setSaveError(t("sessionEditor2.errVaultLockedSave"));
-          } else {
-            setSaveError(err instanceof Error ? err.message : String(err));
-          }
-          return;
-        }
-      } else if (!mailSmtpSaveInVault) {
-        nextMailSmtpPasswordRef = "";
-      }
-    } else if (isMail && (mailAuthMode === "oauth2" || mailSmtpUseImapAuth)) {
-      nextMailSmtpPasswordRef = "";
-      setMailSmtpPasswordRef("");
-      setMailSmtpPassword("");
-    }
-
-    let nextMailOauthClientSecretRef = mailOauthClientSecretRef;
-    const effectiveMailOauthFlowForSave = effectiveMailOAuthFlow(mailProvider, mailOauthFlow);
-    if (isMail && mailAuthMode === "oauth2" && !mailOAuthClientSecretVisible(mailProvider, effectiveMailOauthFlowForSave)) {
-      nextMailOauthClientSecretRef = "";
-      setMailOauthClientSecretRef("");
-      setMailOauthClientSecret("");
-    } else if (isMail && mailAuthMode === "oauth2") {
-      if (mailOauthClientSecretSaveInVault && mailOauthClientSecret.length > 0) {
-        const ready = await ensureVaultReady(t("vault.gateReasonSession"));
-        if (!ready) {
-          setSaveError(t("sessionEditor2.errVaultLockedSave"));
-          return;
-        }
-        try {
-          const label = `${username || "mail"} OAuth client secret`;
-          const result = await vaultPut("mail-oauth-client-secret", label, mailOauthClientSecret);
-          nextMailOauthClientSecretRef = result.reference;
-          setMailOauthClientSecretRef(result.reference);
-          setMailOauthClientSecret("");
-        } catch (err) {
-          if (isVaultLockedError(err)) {
-            setSaveError(t("sessionEditor2.errVaultLockedSave"));
-          } else {
-            setSaveError(err instanceof Error ? err.message : String(err));
-          }
-          return;
-        }
-      } else if (!mailOauthClientSecretSaveInVault) {
-        nextMailOauthClientSecretRef = "";
-      }
-    } else if (isMail) {
-      nextMailOauthClientSecretRef = "";
-      setMailOauthClientSecret("");
-    }
-
-    // Object-storage secrets: swap freshly-typed plaintext for vault refs when
-    // "Save secrets in vault" is on. When off, secrets are stored as plaintext
-    // in options_json (the backend resolve() accepts either form).
-    let ossConfigValue: Record<string, unknown> | undefined;
-    if (proto === "S3") {
-      const isAzure = engineForProvider(oss.provider) === "azure";
-      const label = oss.defaultBucket || oss.defaultContainer || oss.accountName || oss.endpoint || oss.provider;
-      const secretFields: Array<{ key: keyof OssFormState; kind: string }> = isAzure
-        ? [
-            { key: "accountKey", kind: "azure-account-key" },
-            { key: "sasToken", kind: "azure-sas" },
-            { key: "connectionString", kind: "azure-connstr" },
-            { key: "azureBearerToken", kind: "azure-bearer" },
-          ]
-        : [
-            { key: "secretAccessKey", kind: "s3-secret-key" },
-            { key: "sessionToken", kind: "s3-session-token" },
-          ];
-      const resolved: Record<string, string> = {};
-      for (const { key, kind } of secretFields) {
-        const value = oss[key] as string;
-        if (!value || isVaultReference(value) || !saveInVault) {
-          resolved[key] = value;
-          continue;
-        }
-        const ready = await ensureVaultReady(t("vault.gateReasonSession"));
-        if (!ready) {
-          setSaveError(t("sessionEditor2.errVaultLockedSave"));
-          return;
-        }
-        try {
-          const r = await vaultPut(kind, `${kind} ${label}`, value);
-          resolved[key] = r.reference;
-        } catch (err) {
-          if (isVaultLockedError(err)) setSaveError(t("sessionEditor2.errVaultLockedSave"));
-          else setSaveError(err instanceof Error ? err.message : String(err));
-          return;
-        }
-      }
-      const next: OssFormState = { ...oss, ...(resolved as Partial<OssFormState>) };
-      setOss(next);
-      ossConfigValue = { ...ossFormToConfig(next) };
-    }
-
-    const config = buildConfig({
-      options_json: buildOptionsJson({
-        passwordRefValue: nextPasswordRef,
-        proxyPassValue: nextProxyPass,
-        jumpPasswordValue: nextJumpPass,
-        mailSmtpPasswordRefValue: nextMailSmtpPasswordRef,
-        mailOauthClientSecretRefValue: nextMailOauthClientSecretRef,
-        mailOauthTokenRefValue: mailAuthMode === "oauth2" ? mailOauthTokenRef : "",
-        mailOauthExpiresAtValue: mailAuthMode === "oauth2" ? mailOauthExpiresAt : "",
-        mailOauthScopeValue: mailAuthMode === "oauth2" ? mailOauthScope : "",
-        ossConfigValue,
-      }),
-    });
-
-    try {
-      if (isEdit) {
-        await updateSession(config);
-      } else {
-        await addSession(config);
-      }
-      onClose();
-    } catch (err) {
-      setSaveError(err instanceof Error ? err.message : String(err));
-    }
-  };
-
-  const handleSaveTemplate = async () => {
-    const error = validate();
-    if (error) {
-      setSaveError(error);
-      return;
-    }
-    const config = buildConfig({
-      id: crypto.randomUUID(),
-      name: t("sessionEditor2.templateName", { base: name || host || proto }),
-      group_path: "Templates",
-      last_connected_at: null,
-    });
-    await addSession(config);
-    setTestResult({ ok: true, msg: t("sessionEditor2.templateSaved") });
-  };
+  const handleSaveTemplate = createHandleSaveTemplate({
+    validate,
+    setSaveError,
+    buildConfig,
+    t,
+    name,
+    host,
+    proto,
+    addSession,
+    setTestResult,
+  });
 
   const handleReset = () => {
     const nextOptions = parseSessionOptions(session?.options_json);
@@ -1314,361 +1101,141 @@ export function SessionEditor({ session, defaultGroupPath = null, initialProto, 
     }
   };
 
-  const handleMailOAuthConnect = async () => {
-    setMailOauthStatus(null);
-    if (!supportsMailOAuthProvider(mailProvider)) {
-      setMailOauthStatus({ ok: false, msg: "Select Gmail or Outlook first." });
-      return;
-    }
-    const oauthProvider = mailProvider;
-    const oauthProviderLabel = oauthProvider === "gmail" ? "Gmail" : "Outlook";
-    const selectedMailOauthFlow = effectiveMailOAuthFlow(oauthProvider, mailOauthFlow);
-    if (!username.trim()) {
-      setMailOauthStatus({ ok: false, msg: "Enter the mail email address first." });
-      return;
-    }
-    if (!mailOauthClientId.trim()) {
-      setMailOauthStatus({ ok: false, msg: "Enter the OAuth2 client ID first." });
-      return;
-    }
-    const oauthClientSecretValue = mailOauthClientSecret || mailOauthClientSecretRef || null;
-    if (mailOAuthClientSecretRequired(oauthProvider, selectedMailOauthFlow) && !oauthClientSecretValue) {
-      setMailOauthStatus({ ok: false, msg: "Enter the OAuth2 client secret first." });
-      return;
-    }
-    const ready = await ensureVaultReady(t("vault.gateReasonSession"));
-    if (!ready) {
-      setMailOauthStatus({ ok: false, msg: t("sessionEditor2.errVaultLockedSave") });
-      return;
-    }
+  const handleMailOAuthConnect = createHandleMailOAuthConnect({
+    setMailOauthStatus,
+    mailProvider,
+    mailOauthFlow,
+    username,
+    mailOauthClientId,
+    mailOauthClientSecret,
+    mailOauthClientSecretRef,
+    t,
+    setMailOauthConnecting,
+    setMailOauthDeviceInfo,
+    session,
+    networkSettings,
+    setMailAuthMode,
+    setMailOauthTokenRef,
+    setMailOauthExpiresAt,
+    setMailOauthScope,
+  });
 
-    setMailOauthConnecting(true);
-    setMailOauthDeviceInfo(null);
-    try {
-      const sessionId = session?.id ?? (username.trim() || "mail-editor");
-      const networkPayload =
-        networkSettings.proxyKind !== "none"
-          ? toNetworkSettingsPayload(networkSettings)
-          : null;
-      const result = selectedMailOauthFlow === "device"
-        ? await (async () => {
-            const device = await mailOAuthDeviceStart({
-              sessionId,
-              provider: oauthProvider,
-              emailAddress: username.trim(),
-              clientId: mailOauthClientId.trim(),
-              networkSettings: networkPayload,
-            });
-            setMailOauthDeviceInfo({
-              userCode: device.userCode,
-              verificationUri: device.verificationUri,
-              message: device.message,
-              expiresIn: device.expiresIn,
-            });
-            setMailOauthStatus({
-              ok: true,
-              msg: `Enter code ${device.userCode} to approve ${oauthProviderLabel} access.`,
-            });
-            return mailOAuthDeviceComplete({
-              sessionId,
-              provider: oauthProvider,
-              emailAddress: username.trim(),
-              clientId: mailOauthClientId.trim(),
-              clientSecret: oauthProvider === "gmail" ? oauthClientSecretValue : null,
-              deviceCode: device.deviceCode,
-              interval: device.interval,
-              expiresIn: device.expiresIn,
-              networkSettings: networkPayload,
-            });
-        })()
-        : await mailOAuthAuthorize({
-            sessionId,
-            provider: oauthProvider,
-            emailAddress: username.trim(),
-            clientId: mailOauthClientId.trim(),
-            clientSecret: oauthClientSecretValue,
-            networkSettings: networkPayload,
-          });
-      setMailAuthMode("oauth2");
-      setMailOauthTokenRef(result.tokenRef);
-      setMailOauthExpiresAt(result.expiresAt ? String(result.expiresAt) : "");
-      setMailOauthScope(result.scope ?? "");
-      setMailOauthDeviceInfo(null);
-      setMailOauthStatus({ ok: true, msg: "OAuth2 connected." });
-    } catch (err) {
-      setMailOauthStatus({ ok: false, msg: err instanceof Error ? err.message : String(err) });
-    } finally {
-      setMailOauthConnecting(false);
-    }
-  };
+  const handleNewFolder = createHandleNewFolder({
+    t,
+    groupPath,
+    setGroupPath,
+    createFolderPath,
+  });
 
-  const handleNewFolder = async () => {
-    const next = await promptAppDialog({
-      title: t("sessionEditor2.promptNewFolder"),
-      initialValue: groupPath || t("sessionEditor2.promptNewFolderDefault"),
-      allowEmpty: true,
-    });
-    const normalized = normalizeGroupPath(next);
-    if (!normalized) return;
-    setGroupPath(toStoredGroupPath(normalized) ?? "");
-    void createFolderPath(normalized);
-  };
+  const handleDelete = createHandleDelete({
+    session,
+    t,
+    removeSession,
+    onClose,
+  });
 
-  const handleDelete = async () => {
-    if (!session) return;
-    const confirmed = await confirmAppDialog({
-      title: t("sessionEditor2.confirmDeleteTitle"),
-      message: t("sessionEditor2.confirmDeleteMessage", { name: session.name }),
-      confirmLabel: t("sessionEditor2.delete"),
-      danger: true,
-    });
-    if (!confirmed) return;
-    await removeSession(session.id);
-    onClose();
-  };
-
-  const handleTestConnection = async () => {
-    if (!host || !username) {
-      presentTestOutcome(false, t("sessionEditor2.testHostUserRequired"));
-      return;
-    }
-    const passwordAuthData = password || passwordRef;
-    if (authMethod === "Password" && !passwordAuthData) {
-      presentTestOutcome(false, t("sessionEditor2.testEnterPassword"));
-      return;
-    }
-    setTesting(true);
-    setTestResult(null);
-    try {
-      let authData: string | null = null;
-      if (authMethod === "Password") authData = passwordAuthData;
-      else if (authMethod === "PrivateKey")
-        authData = keyPath || "~/.ssh/id_ed25519";
-      const msg = await testSshConnection(
-        host,
-        parseInt(port) || 22,
-        username,
-        authMethod,
-        authData,
-        JSON.stringify(toNetworkSettingsPayload(networkSettings)),
-      );
-      presentTestOutcome(true, msg);
-    } catch (err) {
-      presentTestOutcome(false, formatUnknownError(err));
-    } finally {
-      setTesting(false);
-    }
-  };
+  const handleTestConnection = createHandleTestConnection({
+    host,
+    username,
+    presentTestOutcome,
+    t,
+    password,
+    passwordRef,
+    authMethod,
+    setTesting,
+    setTestResult,
+    keyPath,
+    port,
+    networkSettings,
+  });
 
   /** Build a one-shot `DbConnectInfo` from the current editor state. The
    *  password prefers the freshly-typed plaintext, falling back to a saved
    *  vault reference (resolved server-side). */
-  const buildDbConnectInfo = (): DbConnectInfo => ({
-    sessionId: session?.id ?? "db-editor-test",
-    engine: proto as DbConnectInfo["engine"],
+  const buildDbConnectInfo = createBuildDbConnectInfo({
+    session,
+    proto,
     host,
-    port: parseInt(port) || DEFAULT_PORTS[proto] || 0,
-    username: username || null,
-    password: password || passwordRef || undefined,
-    catalog: proto === "Presto" ? dbCatalog || null : null,
-    database: dbDatabase || null,
-    ssl: dbSsl,
-    timeoutSecs: parseInt(dbTimeout) || null,
-    httpPort: proto === "ClickHouse" ? parseInt(dbHttpPort) || 8123 : null,
-    protocol: proto === "ClickHouse" ? dbChProtocol.toLowerCase() : null,
-    prestoDialect:
-      proto === "Presto"
-        ? (dbPrestoDialect.toLowerCase() === "trino" ? "trino" : "presto")
-        : null,
-    dbIndex: proto === "Redis" ? parseInt(dbRedisIndex) || 0 : null,
-    // Route the test probe through the same proxy / SSH jump host the saved
-    // connection uses. Only attach when a proxy/jump is actually selected so a
-    // direct connection skips the backend loopback forwarder entirely (mirrors
-    // sessionToDbConnectInfo in MainLayout).
-    networkSettings:
-      networkSettings.proxyKind !== "none"
-        ? toNetworkSettingsPayload(networkSettings)
-        : null,
+    port,
+    username,
+    password,
+    passwordRef,
+    dbCatalog,
+    dbDatabase,
+    dbSsl,
+    dbTimeout,
+    dbHttpPort,
+    dbChProtocol,
+    dbPrestoDialect,
+    dbRedisIndex,
+    networkSettings,
   });
 
-  const buildHBaseConnectInfo = (): HBaseConnectInfo => ({
-    sessionId: session?.id ?? "hbase-editor-test",
+  const buildHBaseConnectInfo = createBuildHBaseConnectInfo({
+    session,
     host,
-    port: parseInt(port) || DEFAULT_PORTS.HBaseShell,
-    username: username || null,
-    password: password || passwordRef || undefined,
-    ssl: dbSsl,
-    timeoutSecs: parseInt(dbTimeout) || null,
-    restPath: hbaseRestPath || null,
-    namespace: hbaseNamespace || null,
-    connectionMode:
-      hbaseConnectionMode === "rest"
-        ? "rest"
-        : hbaseConnectionMode === "thrift"
-          ? "thrift"
-          : "native",
-    zkQuorum: hbaseZkQuorum || null,
-    zkRoot: hbaseZkRoot || null,
-    effectiveUser: hbaseEffectiveUser || null,
-    authMethod: hbaseAuthMethod === "kerberos" ? "kerberos" : "simple",
-    servicePrincipal: hbaseServicePrincipal || null,
-    principal: hbasePrincipal || null,
-    keytabPath: hbaseKeytabPath || null,
-    krb5ConfPath: hbaseKrb5ConfPath || null,
-    hbaseSitePath: hbaseSitePath || null,
+    port,
+    username,
+    password,
+    passwordRef,
+    dbSsl,
+    dbTimeout,
+    hbaseRestPath,
+    hbaseNamespace,
+    hbaseConnectionMode,
+    hbaseZkQuorum,
+    hbaseZkRoot,
+    hbaseEffectiveUser,
+    hbaseAuthMethod,
+    hbaseServicePrincipal,
+    hbasePrincipal,
+    hbaseKeytabPath,
+    hbaseKrb5ConfPath,
+    hbaseSitePath,
   });
 
-  const handleTestDbConnection = async () => {
-    if (!host) {
-      presentTestOutcome(false, t("sessionEditor2.errHostRequired"));
-      return;
-    }
-    if (proto === "Presto" && !dbCatalog.trim()) {
-      presentTestOutcome(false, "Presto catalog is required.");
-      return;
-    }
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const msg = await dbTestConnection(buildDbConnectInfo());
-      presentTestOutcome(true, msg);
-    } catch (err) {
-      presentTestOutcome(false, formatUnknownError(err));
-    } finally {
-      setTesting(false);
-    }
-  };
+  const handleTestDbConnection = createHandleTestDbConnection({
+    host,
+    presentTestOutcome,
+    t,
+    proto,
+    dbCatalog,
+    setTesting,
+    setTestResult,
+    buildDbConnectInfo,
+  });
 
-  const handleTestHBaseConnection = async () => {
-    // Mirror the save-path validation: REST/Thrift need a host; native needs a
-    // ZK quorum, an hbase-site.xml, or a host (host/port hidden in native mode).
-    if ((hbaseConnectionMode === "rest" || hbaseConnectionMode === "thrift") && !host.trim()) {
-      presentTestOutcome(
-        false,
-        hbaseConnectionMode === "thrift"
-          ? "HBase Thrift host is required."
-          : "HBase REST host is required.",
-      );
-      return;
-    }
-    if (
-      hbaseConnectionMode === "native" &&
-      !hbaseSitePath.trim() &&
-      !hbaseZkQuorum.trim() &&
-      !host.trim()
-    ) {
-      presentTestOutcome(
-        false,
-        "HBase ZooKeeper quorum, HBase-site.xml, or Remote host is required.",
-      );
-      return;
-    }
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const msg = await hbaseTestConnection(buildHBaseConnectInfo());
-      presentTestOutcome(true, msg);
-    } catch (err) {
-      presentTestOutcome(false, formatUnknownError(err));
-    } finally {
-      setTesting(false);
-    }
-  };
+  const handleTestHBaseConnection = createHandleTestHBaseConnection({
+    hbaseConnectionMode,
+    host,
+    presentTestOutcome,
+    hbaseSitePath,
+    hbaseZkQuorum,
+    setTesting,
+    setTestResult,
+    buildHBaseConnectInfo,
+  });
 
-  const handleTestProxyConnection = async () => {
-    if (!host) {
-      presentTestOutcome(false, t("sessionEditor2.proxyHostRequired"));
-      return;
-    }
-    setTesting(true);
-    setTestResult(null);
-    try {
-      const [testHost, testPortStr] = (proxyTestUrl || "www.google.com:443").split(":");
-      const testPort = parseInt(testPortStr) || 443;
-      const msg = await testProxyConnection(
-        proxyKind,
-        host,
-        parseInt(port) || 3128,
-        username || "",
-        password || passwordRef || "",
-        testHost,
-        testPort,
-      );
-      presentTestOutcome(true, msg);
-    } catch (err) {
-      presentTestOutcome(false, formatUnknownError(err));
-    } finally {
-      setTesting(false);
-    }
-  };
+  const handleTestProxyConnection = createHandleTestProxyConnection({
+    host,
+    presentTestOutcome,
+    t,
+    setTesting,
+    setTestResult,
+    proxyTestUrl,
+    proxyKind,
+    port,
+    username,
+    password,
+    passwordRef,
+  });
 
-  const handleSaveAsProxySession = async () => {
-    const ns = networkSettings;
-    if (!ns.proxyHost.trim()) {
-      setTestResult({ ok: false, msg: t("sessionEditor2.proxyHostRequired") });
-      return;
-    }
-    const proxyPort = parseInt(ns.proxyPort) || 3128;
-    const now = Math.floor(Date.now() / 1000);
-    const proxyName = `${ns.proxyKind === "http" ? "HTTP" : "SOCKS5"} ${ns.proxyHost}:${proxyPort}`;
-
-    // Carry the proxy password into the new Proxy session as a vault reference,
-    // mirroring how SSH passwords live in options_json.passwordRef. An existing
-    // vault: ref is reused as-is; fresh plaintext is encrypted first (which may
-    // require unlocking / creating the vault). Bail out if the gate is cancelled
-    // so we never drop the secret on the floor or store it in plaintext at rest.
-    let proxyPasswordRef = "";
-    if (ns.proxyPass.length > 0) {
-      if (isVaultReference(ns.proxyPass)) {
-        proxyPasswordRef = ns.proxyPass;
-      } else {
-        const ready = await ensureVaultReady(t("vault.gateReasonProxy"));
-        if (!ready) {
-          setTestResult({ ok: false, msg: t("sessionEditor2.errVaultLockedProxy") });
-          return;
-        }
-        try {
-          const label = `proxy://${ns.proxyHost}:${proxyPort}`;
-          const result = await vaultPut("proxy-password", label, ns.proxyPass);
-          proxyPasswordRef = result.reference;
-        } catch (err) {
-          setTestResult({
-            ok: false,
-            msg: isVaultLockedError(err)
-              ? t("sessionEditor2.errVaultLockedProxy")
-              : err instanceof Error ? err.message : String(err),
-          });
-          return;
-        }
-      }
-    }
-
-    const config: SessionConfig = {
-      id: crypto.randomUUID(),
-      name: proxyName,
-      session_type: "Proxy",
-      group_path: null,
-      host: ns.proxyHost.trim(),
-      port: proxyPort,
-      username: ns.proxyUser || null,
-      auth_method: ns.proxyUser ? "Password" : "None",
-      options_json: JSON.stringify({
-        proxyKind: ns.proxyKind === "http" ? "http" : "socks5",
-        testUrl: "www.google.com:443",
-        ...(proxyPasswordRef ? { passwordRef: proxyPasswordRef } : {}),
-      }),
-      created_at: now,
-      updated_at: now,
-      last_connected_at: null,
-      sort_order: 0,
-    };
-    try {
-      await addSession(config);
-      setTestResult({ ok: true, msg: t("sessionEditor2.proxySessionSaved") });
-    } catch (err) {
-      setTestResult({ ok: false, msg: String(err) });
-    }
-  };
+  const handleSaveAsProxySession = createHandleSaveAsProxySession({
+    networkSettings,
+    setTestResult,
+    t,
+    addSession,
+  });
 
   const sectionTabs: { id: SectionTab; label: string; icon: React.ReactNode }[] = proto === "File"
     ? [
