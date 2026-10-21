@@ -1,9 +1,70 @@
+import json
 import os
 import subprocess
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from qa_ui_auto import host_clipboard
+from qa_ui_auto.rdp_steps import _do_host_clipboard
+from qa_ui_auto.steps import StepError
+
+
+class HostClipboardObservationTests(unittest.TestCase):
+    def assert_snapshot(self, kind, args, snapshots, expected, reads):
+        with TemporaryDirectory() as directory:
+            ctx = SimpleNamespace(case_dir=Path(directory))
+            with patch.object(host_clipboard, f"get_{kind}", side_effect=snapshots) as read, \
+                    patch("qa_ui_auto.rdp_steps.time.sleep"):
+                _do_host_clipboard(ctx, {"action": "assert", "kind": kind, **args})
+            records = json.loads((ctx.case_dir / "host-clipboard-observations.json").read_text())
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["value"], expected)
+        self.assertEqual(read.call_count, reads)
+
+    def test_text_contains_records_the_snapshot_that_satisfied_the_assertion(self):
+        self.assert_snapshot("text", {"contains": "中文🙂"},
+                             ["head\n中文🙂\ntail", "other writer"], "head\n中文🙂\ntail", 1)
+
+    def test_text_equals_records_exactly_the_observed_text(self):
+        self.assert_snapshot("text", {"equals": "\nexact\n"},
+                             ["\nexact\n", "other writer"], "\nexact\n", 1)
+
+    def test_empty_text_equality_remains_an_exact_assertion(self):
+        self.assert_snapshot("text", {"equals": ""}, ["old", ""], "", 2)
+
+    def test_nonmatching_text_is_read_again_instead_of_reusing_a_cached_value(self):
+        self.assert_snapshot("text", {"contains": "new"}, ["old", "new"], "new", 2)
+
+    def test_html_records_the_matching_snapshot_without_a_second_native_read(self):
+        self.assert_snapshot("html", {"contains": "<b>中文🙂</b>"},
+                             ["<b>中文🙂</b>", "other writer"], "<b>中文🙂</b>", 1)
+
+    def test_html_retries_until_a_matching_snapshot(self):
+        self.assert_snapshot("html", {"contains": "<b>new</b>"},
+                             ["<p>old</p>", "<b>new</b>"], "<b>new</b>", 2)
+
+    def test_persistent_mismatch_fails_without_publishing_a_success_observation(self):
+        for kind in ("text", "html"):
+            with self.subTest(kind=kind), TemporaryDirectory() as directory:
+                ctx = SimpleNamespace(case_dir=Path(directory))
+                with patch.object(host_clipboard, f"get_{kind}", return_value="old"), \
+                        patch("qa_ui_auto.rdp_steps.time.time", side_effect=[0, 1]), \
+                        self.assertRaisesRegex(StepError, "not satisfied"):
+                    _do_host_clipboard(ctx, {"action": "assert", "kind": kind,
+                                             "contains": "new", "timeout_sec": 1})
+                self.assertFalse((ctx.case_dir / "host-clipboard-observations.json").exists())
+
+    def test_unavailable_os_oracle_still_fails(self):
+        with TemporaryDirectory() as directory:
+            ctx = SimpleNamespace(case_dir=Path(directory))
+            with patch.object(host_clipboard, "get_text", side_effect=RuntimeError("OS tool unavailable")), \
+                    patch("qa_ui_auto.rdp_steps.time.time", side_effect=[0, 1]), \
+                    self.assertRaisesRegex(StepError, "OS tool unavailable"):
+                _do_host_clipboard(ctx, {"action": "assert", "kind": "text",
+                                         "contains": "new", "timeout_sec": 1})
 
 
 class WaylandTextClipboardTests(unittest.TestCase):

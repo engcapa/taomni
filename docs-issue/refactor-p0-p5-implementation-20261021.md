@@ -742,3 +742,11 @@ Z的`TC-BACKUP-CLOUD-001`在准备阶段`secret-tool store`返回1（约0.1秒�
 修复限定为已验证的GitHub native/Linux私有bus和run-owned storage：先同步三个XDG激活变量，再启动daemon，以5秒预算等待真实store/lookup/clear完成；错误的往返值、成功往返后的清理失败、持续不可用和超时仍失败。每次尝试保留stderr及失败阶段，诊断不记录probe值或lookup stdout；清理/诊断写入错误保留原始失败。产品源码和YAML业务断言不变，继续复用`TC-BACKUP-CLOUD-001`，无搬迁专用新case。
 
 `credential-fixture-unit-final.log` **41 tests passed**，覆盖激活环境拒绝、短暂不可用后完整往返、持续失败截止、错误值、清理失败和诊断写入失败；本地真实Secret Service **30轮新会话+30轮预先激活/替换均通过**，材料为`secret-service-candidate-fresh.json`与`secret-service-candidate-replace.json`。持续锁定的真实服务在约5.047秒按预期失败并保留stderr（`secret-service-persistent-lock.json`），没有将锁定异常转换成pass。新完整提交须再次执行三端scope=all，整体验收仍未结束。
+
+### Windows 剪贴板 oracle 的重复采样
+
+Z的25份报告已收齐，**1786 passed /2 failed /0 skipped**：除上述Linux准备失败，Windows `TC-TERM-TEXT-006`在step19后触发120秒case预算。准备6.375秒、sentinel写入23.140秒，首段/尾段断言分别46.188/46.312秒；两个实际OS文本断言均满足，第二轮Copy All尚未执行。原始`host-clipboard-observations.json`与失败现场保留。Y同用例20.060秒通过，其他Z分片的同类oracle调用也显著更快；现有材料不能确定该宿主每次PowerShell约23秒的底层原因，也不能把它判为产品复制内容错误。
+
+检查发现`host_clipboard`的text/html轮询每次调用两次OS读取：第一次判定，第二次写入日志。这增加helper启动成本，且两次读取之间若有外部写入，日志可能记录未满足断言的另一个快照。改为每轮只读取一个真实OS快照，同时用于原有equals/contains判定及原始观察记录；下一轮仍重新读取，持续不匹配或工具不可用仍失败。保留所有YAML断言、120秒预算、PowerShell/JXA/xclip独立oracle和产品实现。
+
+新增8项工具回归，覆盖Unicode/空文本/精确匹配、外部后续写入、真实轮询更新及持续失败；三个一致性场景在已提交旧handler上失败（`clipboard-snapshot-before.log`），候选及相邻native/Wayland工具共**90 passed /1平台条件skip**（`clipboard-snapshot-unit.log`）。该工具修复不新增产品流程，复用原TC-TERM-TEXT-006与RDP clipboard用例在新完整提交验证；不能以本地mock证明Windows原生已通过。当前AA [39690483542](https://github.com/engcapa/taomni/actions/runs/39690483542)的head为`22dafa546477e12b9dd6d0108adce5d83d1de220`，不包含此修复，结果将单列保留。
