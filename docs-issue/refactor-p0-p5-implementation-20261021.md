@@ -242,3 +242,52 @@ D 补充：`unit-d-node22-final.log` 全量 **540 files passed，5455 passed / 1
 C 凭据 fixture 诊断：Linux job 119139144468 的原日志显示 `secret-tool store` 激活了另一个 `gnome-keyring-daemon --start --foreground`，随后尝试 SystemPrompter 但无 DISPLAY，无法解锁。隔离 D-Bus + 临时 XDG 的本地 probe 复现旧命令返回后 NameHasOwner=false，随后才 true；增加 `--daemonize` 后返回即 true。提交 `b19a671c` 增加等待初始化的参数；store/lookup 失败时不再用 finally 的 clear 错误覆盖原始失败，成功 roundtrip 后清理失败仍使 fixture 失败。5 项 Python 回归通过，包括双重失败保留原错、成功后清理失败不放行。真实 native 应用用例仍需最终 workflow，不能用本地 D-Bus probe 代替。
 
 本批代码提交：`6965cea5`、`b4704fb7`、`23c1b523`，runner 修复 `b19a671c`。GitHub C 下载曾发生 artifact unexpected EOF，保留失败日志并仅补下缺失产物。
+
+## 2026-10-21 批次 D 三端验收结果
+
+[GitHub run 39580464092](https://github.com/engcapa/taomni/actions/runs/39580464092) 实际测试提交 `b75c69f075378dfe5816836d27498bcb11ef27f8`。25 份原始报告的 receipt 签名、summary 哈希及 identity_stable 全部核验；aggregate `passed=true`、`report_ok=true`，无 infrastructure errors。总计 **1787 passed / 0 failed / 0 skipped**：
+
+| 平台 | browser | native |
+|---|---:|---:|
+| Linux | 396 | 215（含 dual-display） |
+| Windows | 396 | 199 |
+| macOS | 394 | 187 |
+
+原 C 的 Linux 云备份凭据 fixture 两项失败在 D 通过。C 完整结果为 25 reports / 1785 passed / 2 failed / 0 skipped，失败均为 TC-BACKUP-CLOUD-001/002 setup；C 的失败日志仍保留。D 仍有 `TC-IDE-C6-06-java-definition-realproject-native` 三平台 capability gaps：仓库没有外部 clickhousecrud / `QA_JAVA_PROJECT_ROOT`，不计为通过。unreviewed / not_applicable 不计入上述通过数。原始报告 `github-d/`、核验结果 `github-d-verification.json`；D 的 `audit-d.log` 全部 gates 通过。
+
+## 2026-10-21 实施批次 E
+
+继续按职责和生命周期拆分，不以 façade 缩短替代功能完成：
+
+- LSP completion：类型、请求 telemetry/invocation、resolve、能力判定、ranking、policy controller、snippet session、acceptance、tooltip information、accept intent、sources 独立。request counter 由 sources 拥有；snippet WeakMap/choice cycle 由 snippets 拥有。原公共导出和 CodeMirror 类型 augmentation 保留。
+- CodeMirrorHost：provider completion 持有候选/查询序号/刷新计时器；document reconciliation 持有本地回显队列、版本和受控文档镜像；presentation/intelligence/decorations 各自持有 compartment 与已渲染状态。IME 注册和释放、文档 update listener、DOM clipboard/contextmenu、模板按键与 mounted actions 独立。保留 effect 顺序、mount-once 行为和清理入口。
+- CodeWorkspaceTab：剪贴板 store/权限 adapter 的 acquire/release、布局 hydration/view snapshots、Java debug main-class choice/launch、停止位置和库源码导航分离。
+- Mail：搜索 query/filter/results/sequence 由 useMailSearch 拥有；远程图片许可由独立 hook 拥有；列表和 popup 共用 reader renderer。
+- HBase：配置/认证初始化、DTO/session model、shell grammar、REST session/HTTP/catalog/operations、结果编码、native/Thrift dispatch 分离；入口保留 IPC、session registry 和 cancellation。显式引用领域模块，新增生产模块不使用 `use super::*`。保留原 live opt-in tests，未配置外部 HBase 不算实集群验证。
+- RD Gateway：RPC framing、HTTP framing、NTLM auth、bootstrap、data payload、authenticated transport、RPC stream reads、双向 stream lifetime、tunnel handshake 分离；原公共 API 显式 re-export。NDR/RTS 直接引用协议模块，不经 façade 回引。
+
+HBase 69 个、Gateway 64 个函数进行 token 级对照，除 visibility 与 rustfmt 尾逗号外实现不变。该对照仅说明移动保真，不代替测试。
+
+| 入口 | D | E |
+|---|---:|---:|
+| CodeWorkspaceTab | 7955 | 7715 |
+| CodeMirrorHost | 2466 | 1348 |
+| lspCompletion | 2428 | 112（公共导出按行展开） |
+| MailClientTab | 3032 | 2761 |
+| hbase/mod.rs | 2537 | 308 |
+| rdp/gateway/mod.rs | 2222 | 72 |
+
+当前全文件清单更新为 2448 个代码文件。CodeWorkspaceTab/Mail 的主编排、其它尚未处理的大模块和跨模块 service 边界仍有剩余，**P0–P5 尚未全部完成**。
+
+### E 本地验证
+
+- `completion-e.log`：66 passed。
+- `cm-e-tests-fixed.log`：9 files / 201 passed，含 IME、completion undo、live templates、参数/焦点和 shared document owner。
+- `e-editor-mail.log`：11 files / 508 passed，覆盖 workspace、CodeMirror 与 Mail。
+- `e-unit-full.log`：Node 22.23.3，540 files / **5455 passed / 1 conditional skip**。
+- `e-build-fixed.log`：生产构建通过；761 native commands / 328 facade exports / 39 literal events 保持，341 implementation modules 无 reverse façade imports / internal runtime cycles。
+- `e-rust-lib.log`：**1868 passed / 25 ignored**；保留原 opt-in 约束，部分 live 测试未提供环境会提前返回，不能以单测汇总证明实集群验证。
+- `browser-e/run-20261021-184845-111013486`：Linux Chromium **7 passed / 0 skipped**。TC-IDE-C2-07/08/10、TC-IDE-C4-01/02、TC-IDE-PARITY-005-04、TC-MAIL-SEARCH-01。receipt signature/hash/identity_stable 核验通过，summary sha256 `dbb3a4347947cbf644a0c796556fcf28c54547e475be40f131f59ffad715222b`。浏览器运行期间没有修改产品源码。邮件 case 验证本地/服务器搜索入口、过滤、选择及删除；completion case 验证 provider null/error/timeout/retry/primary-only/undo。
+- 保留失败：`cm-e-tests.log` 抓到提取时 host context 与 CodeMirror CompletionContext 同名遮蔽，已用显式依赖解构修复；`e-integrated-build.log` 抓到 remote-permission hook 遗留空参数，已移除；`e-hbase-tests.log` 抓到 ResultRow 误导入路径，改回 native/client 后由全量 Rust 通过覆盖。
+
+这是保持行为的重构，复用上述真实入口 cases 和现有 mounted/native tests，不新增只验证新文件/函数存在的测试。三端最终结论以本批提交的新 workflow 为准，不能复用 D 的通过作为 E 的结果。
