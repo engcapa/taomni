@@ -11,7 +11,7 @@ scripts/configure-release-signing.mjs	tooling	mjs	tool-script	209	7	6	0		开发�
 scripts/configure-release-signing.test.mjs	tooling	mjs	test	187	8	0	0		自动化测试/QA 集成测试
 scripts/editor_performance_browser.py	frontend	py	frontend-lib	162	6	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 scripts/macos-runtime-paths.test.mjs	tooling	mjs	test	99	7	0	0		自动化测试/QA 集成测试
-scripts/refactor-boundaries.mjs	frontend	mjs	frontend-lib	101	4	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+scripts/refactor-boundaries.mjs	frontend	mjs	frontend-lib	102	4	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 scripts/refactor-contracts.mjs	frontend	mjs	frontend-lib	91	4	5	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 scripts/release-workflow.test.mjs	tooling	mjs	test	161	8	0	0		自动化测试/QA 集成测试
 scripts/resolve-release-build.mjs	tooling	mjs	tool-script	55	3	2	0		开发、QA、构建或性能工具脚本
@@ -1833,12 +1833,25 @@ src/components/screenshot/ScreenshotFavorites.test.tsx	frontend	tsx	test	71	5	0	
 src/components/screenshot/ScreenshotFavorites.tsx	frontend	tsx	frontend-component	87	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/screenshot/ScreenshotMenuButton.tsx	frontend	tsx	frontend-component	155	7	1	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/screenshot/ScreenshotOverlay.test.tsx	frontend	tsx	test	510	3	0	0		自动化测试/QA 集成测试
-src/components/screenshot/ScreenshotOverlay.tsx	frontend	tsx	frontend-component	1747	15	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/screenshot/ScreenshotOverlay.tsx	frontend	tsx	frontend-component	114	8	2	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/screenshot/ScreenshotQaFixture.tsx	frontend	tsx	frontend-component	178	1	1	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/screenshot/ScrollCaptureBar.test.tsx	frontend	tsx	test	62	3	0	0		自动化测试/QA 集成测试
 src/components/screenshot/ScrollCaptureBar.tsx	frontend	tsx	frontend-component	91	6	1	1		React UI/交互组件，具体职责由目录和文件名定义
 src/components/screenshot/ScrollCaptureResult.test.tsx	frontend	tsx	test	33	3	0	0		自动化测试/QA 集成测试
 src/components/screenshot/ScrollCaptureResult.tsx	frontend	tsx	frontend-component	162	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/screenshot/overlay/Magnifier.tsx	frontend	tsx	frontend-component	81	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/screenshot/overlay/ScreenshotOverlayView.tsx	frontend	tsx	frontend-component	350	13	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/screenshot/overlay/ScreenshotToolbar.tsx	frontend	tsx	frontend-component	333	8	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/screenshot/overlay/ToolButton.tsx	frontend	tsx	frontend-component	37	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/screenshot/overlay/geometry.ts	frontend	ts	frontend-component	43	3	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/screenshot/overlay/images.ts	frontend	ts	frontend-component	49	2	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/screenshot/overlay/tools.ts	frontend	ts	frontend-component	35	3	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/screenshot/overlay/types.ts	frontend	ts	frontend-component	11	2	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/screenshot/overlay/useScreenshotActions.ts	frontend	ts	frontend-component	320	11	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/screenshot/overlay/useScreenshotOverlayKeyboard.ts	frontend	ts	frontend-component	67	2	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/screenshot/overlay/useScreenshotOverlayPlacement.ts	frontend	ts	frontend-component	70	2	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/screenshot/overlay/useScreenshotOverlayState.ts	frontend	ts	frontend-component	331	11	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/screenshot/overlay/useScreenshotSelection.ts	frontend	ts	frontend-component	210	7	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/servers/CommonSettings.tsx	frontend	tsx	frontend-component	78	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/servers/RdpServerApprovalBridge.test.tsx	frontend	tsx	test	81	4	0	0		自动化测试/QA 集成测试
 src/components/servers/RdpServerApprovalBridge.tsx	frontend	tsx	frontend-component	85	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
@@ -1868,7 +1881,7 @@ src/components/session/MfaPrompt.tsx	frontend	tsx	frontend-component	126	4	2	0		
 src/components/session/ObjectStorageSettings.tsx	frontend	tsx	frontend-component	353	6	5	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/session/SessionConnectionCommandMenu.tsx	frontend	tsx	frontend-component	106	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/session/SessionEditor.test.tsx	frontend	tsx	test	1713	7	0	0		自动化测试/QA 集成测试
-src/components/session/SessionEditor.tsx	frontend	tsx	frontend-component	1633	44	1	0		会话编辑器及 SSH/本地/串口/RDP/VNC/数据库/HBase/邮件/对象存储等表单
+src/components/session/SessionEditor.tsx	frontend	tsx	frontend-component	51	6	1	0		会话编辑器及 SSH/本地/串口/RDP/VNC/数据库/HBase/邮件/对象存储等表单
 src/components/session/SessionImportPreview.test.tsx	frontend	tsx	test	145	6	0	0		自动化测试/QA 集成测试
 src/components/session/SessionImportPreview.tsx	frontend	tsx	frontend-component	250	5	2	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/session/SessionTerminalThemeMenu.tsx	frontend	tsx	frontend-component	125	10	1	0		React UI/交互组件，具体职责由目录和文件名定义
@@ -1879,6 +1892,8 @@ src/components/session/editor/HBaseSettings.tsx	frontend	tsx	frontend-component	
 src/components/session/editor/MailSettings.tsx	frontend	tsx	frontend-component	769	9	1	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/session/editor/NetworkSettings.tsx	frontend	tsx	frontend-component	440	5	3	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/session/editor/SessionConnectionFields.tsx	frontend	tsx	frontend-component	153	4	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/session/editor/SessionEditorSections.tsx	frontend	tsx	frontend-component	390	18	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/session/editor/SessionEditorView.tsx	frontend	tsx	frontend-component	433	11	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/session/editor/SshSettings.tsx	frontend	tsx	frontend-component	196	3	1	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/session/editor/TerminalSettings.tsx	frontend	tsx	frontend-component	22	2	1	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/session/editor/connectionProbes.ts	frontend	ts	frontend-component	301	6	12	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
@@ -1891,6 +1906,9 @@ src/components/session/editor/sessionPolicy.tsx	frontend	tsx	frontend-component	
 src/components/session/editor/useDatabaseSessionForm.ts	frontend	ts	frontend-component	43	3	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/session/editor/useLocalShellForm.ts	frontend	ts	frontend-component	85	7	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/session/editor/useMailSessionForm.ts	frontend	ts	frontend-component	96	9	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/session/editor/useSessionEditorActions.ts	frontend	ts	frontend-component	518	14	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/session/editor/useSessionEditorNavigation.tsx	frontend	tsx	frontend-component	136	6	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/session/editor/useSessionEditorState.ts	frontend	ts	frontend-component	363	19	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/session/forms/LocalShellOptionsForm.tsx	frontend	tsx	frontend-component	154	5	2	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/session/forms/RdpOptionsForm.tsx	frontend	tsx	frontend-component	349	2	2	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/session/forms/WslOptionsForm.tsx	frontend	tsx	frontend-component	187	4	2	0		React UI/交互组件，具体职责由目录和文件名定义
@@ -2018,21 +2036,34 @@ src/components/terminal/TerminalAppearanceMenuPanel.tsx	frontend	tsx	frontend-co
 src/components/terminal/TerminalAppearanceSettings.test.tsx	frontend	tsx	test	166	7	0	0		自动化测试/QA 集成测试
 src/components/terminal/TerminalAppearanceSettings.tsx	frontend	tsx	frontend-component	825	13	1	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/terminal/TerminalPanel.test.tsx	frontend	tsx	test	3199	10	0	0	>=2000	自动化测试/QA 集成测试
-src/components/terminal/TerminalPanel.tsx	frontend	tsx	frontend-component	1800	52	3	0		xterm 生命周期、PTY/SSH 输出、键盘/IME、外观、ZMODEM、AI 操作和文件传输
+src/components/terminal/TerminalPanel.tsx	frontend	tsx	frontend-component	150	9	3	0		xterm 生命周期、PTY/SSH 输出、键盘/IME、外观、ZMODEM、AI 操作和文件传输
 src/components/terminal/ZmodemConflictDialog.tsx	frontend	tsx	frontend-component	110	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/terminal/panel/CurrentTerminalSettingsDialog.tsx	frontend	tsx	frontend-component	78	4	1	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/terminal/panel/TerminalPanelView.tsx	frontend	tsx	frontend-component	464	18	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/terminal/panel/backendConnection.ts	frontend	ts	frontend-component	518	16	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/terminal/panel/buffer.tsx	frontend	tsx	frontend-component	445	5	15	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/terminal/panel/inlineAi.tsx	frontend	tsx	frontend-component	63	3	1	1		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/terminal/panel/policy.tsx	frontend	tsx	frontend-component	124	4	12	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/terminal/panel/protocol.tsx	frontend	tsx	frontend-component	86	0	11	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
-src/components/terminal/panel/sessionLifecycle.ts	frontend	ts	frontend-component	1343	24	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/terminal/panel/sessionComposition.ts	frontend	ts	frontend-component	115	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/terminal/panel/sessionContracts.ts	frontend	ts	frontend-component	116	8	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/terminal/panel/sessionCwdIntegration.ts	frontend	ts	frontend-component	175	8	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/terminal/panel/sessionLifecycle.ts	frontend	ts	frontend-component	347	20	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/terminal/panel/sessionProtocols.ts	frontend	ts	frontend-component	116	6	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/terminal/panel/sessionTransfer.ts	frontend	ts	frontend-component	165	7	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/terminal/panel/transfer.tsx	frontend	tsx	frontend-component	65	3	7	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/terminal/panel/types.tsx	frontend	tsx	frontend-component	169	2	14	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/terminal/panel/useTerminalClipboard.tsx	frontend	tsx	frontend-component	339	9	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/terminal/panel/useTerminalCommands.ts	frontend	ts	frontend-component	228	10	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/terminal/panel/useTerminalContextMenu.tsx	frontend	tsx	frontend-component	350	11	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/terminal/panel/useTerminalHighlights.ts	frontend	ts	frontend-component	66	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/terminal/panel/useTerminalInput.ts	frontend	ts	frontend-component	307	12	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/terminal/panel/useTerminalInteraction.ts	frontend	ts	frontend-component	436	16	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/terminal/panel/useTerminalLifecycle.ts	frontend	ts	frontend-component	430	12	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/terminal/panel/useTerminalPanelState.ts	frontend	ts	frontend-component	467	18	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/terminal/panel/useTerminalPointer.tsx	frontend	tsx	frontend-component	168	6	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/terminal/panel/useTerminalRecording.tsx	frontend	tsx	frontend-component	109	4	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/terminal/panel/useTerminalRegistry.ts	frontend	ts	frontend-component	127	10	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/terminal/panel/useTerminalSearchActions.tsx	frontend	tsx	frontend-component	109	5	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/terminal/panel/useTerminalShortcuts.tsx	frontend	tsx	frontend-component	245	5	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/terminal/panel/useTerminalSuggestions.ts	frontend	ts	frontend-component	219	4	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
@@ -2112,7 +2143,8 @@ src/hooks/useWelcomeSessionResume.test.tsx	frontend	tsx	test	386	4	0	0		自动�
 src/hooks/useWelcomeSessionResume.ts	frontend	ts	source	460	4	8	0		源文件
 src/index.css	frontend	css	frontend-style	1936	0	0	0		前端全局/功能样式；按主题、组件和功能边界拆分
 src/layouts/MainLayout.test.tsx	frontend	tsx	test	2073	11	0	0	>=2000	自动化测试/QA 集成测试
-src/layouts/MainLayout.tsx	frontend	tsx	frontend-layout	1615	77	1	0		主窗口编排：Tab 生命周期、连接队列、认证/Vault、菜单、分屏、弹窗和各功能 Tab 路由
+src/layouts/MainLayout.tsx	frontend	tsx	frontend-layout	64	10	1	0		主窗口编排：Tab 生命周期、连接队列、认证/Vault、菜单、分屏、弹窗和各功能 Tab 路由
+src/layouts/main/MainLayoutView.tsx	frontend	tsx	frontend-component	379	37	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/layouts/main/TabContentRouter.tsx	frontend	tsx	frontend-component	853	36	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/layouts/main/TerminalSplitToolbar.tsx	frontend	tsx	frontend-component	75	4	1	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/layouts/main/authentication.tsx	frontend	tsx	frontend-component	89	3	6	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
@@ -2131,7 +2163,16 @@ src/layouts/main/types.tsx	frontend	tsx	frontend-component	69	2	9	0		原生产�
 src/layouts/main/useApplicationExit.ts	frontend	ts	frontend-component	88	6	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/layouts/main/useControlTools.ts	frontend	ts	frontend-component	111	8	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/layouts/main/useDetachedWindowEvents.ts	frontend	ts	frontend-component	203	8	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/layouts/main/useMainConnectionActions.ts	frontend	ts	frontend-component	79	8	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/layouts/main/useMainLayoutChrome.tsx	frontend	tsx	frontend-component	163	13	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/layouts/main/useMainLayoutState.ts	frontend	ts	frontend-component	346	23	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/layouts/main/useMainMenuActions.ts	frontend	ts	frontend-component	115	11	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/layouts/main/useMainMenuBridge.ts	frontend	ts	frontend-component	143	9	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/layouts/main/useMainSessionActions.ts	frontend	ts	frontend-component	154	11	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/layouts/main/useMainTerminalIntegration.ts	frontend	ts	frontend-component	217	11	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/layouts/main/useMainUtilityTabs.ts	frontend	ts	frontend-component	199	13	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/layouts/main/useMainWindowLifecycle.ts	frontend	ts	frontend-component	177	11	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/layouts/main/useMainWorkspaceOpening.ts	frontend	ts	frontend-component	218	11	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/layouts/main/useProtocolTabs.ts	frontend	ts	frontend-component	268	18	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/layouts/main/useSessionResume.ts	frontend	ts	frontend-component	274	10	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/layouts/main/useShellSessionTabs.ts	frontend	ts	frontend-component	104	7	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects

@@ -499,3 +499,22 @@ L 修正后的 `l-build-final.log` 成功：TypeScript、761 commands / 328 faç
 AGENTS.md 的小文件规则已在 `bd8ddb29` 提交：目标 200–500 行、新建/提取 ≤800 行、按状态与生命周期划分，禁止压缩排版或搬成另一个巨型 controller，生成/schema/locale/不可分 fixture 例外需按规则处理。
 
 P0→P5 整体仍在推进，后续继续处理其余大文件，并在最终完整 SHA 上执行全量 Vitest、适用 Rust 回归和三端 scope=all；历史通过不代替最终证据。
+
+
+## 2026-10-22 实施批次 N：Shell、会话、终端与截图 owner
+
+SessionEditor 从 1,633 行降至 51 行，MainLayout 从 1,615 行降至 64 行，TerminalPanel 从 1,800 行降至 150 行，ScreenshotOverlay 从 1,747 行降至 114 行。41 个新生产模块最大 518 行。会话表单、序列化与保存/探测、分节导航、窗口拖动和视图分开；主布局按终端接入、窗口生命周期、会话动作、工作区打开、连接认证、工具页、菜单与 chrome 归属组合。终端按 panel 状态、交互、命令、生命周期、注册、投影与视图连接；截图选择与拖动、图像和输出动作、快捷键、浮层定位、工具栏、视图及几何/图像工具分别拥有明确边界。
+
+终端旧 sessionLifecycle 从 1,343 行降至 347 行。真实连接/MFA/重连和本地/命令/SocksCap/adopted 启动、延迟 CWD 安装、IME 位置锁及复焦、OSC、ZMODEM/输出链分开。输出、连接、CWD installer 与卸载共享同一个 effect 实例的 TerminalSessionLifetime：销毁标志、unlisten 句柄、timer 与 SocksCap PID 均通过对象实时读写，避免移动闭包后捕获布尔/句柄快照。StrictMode 延迟启动、早期输出排序、adopted session 归属和 detach/close 条件保留。
+
+- `n-checks-5.log`：TypeScript、761 commands / 328 façade exports / 39 literal events、518 implementation modules 边界检查通过；原 MainLayout / TerminalPanel / SessionEditor / ScreenshotOverlay **4 files / 218 passed / 1 conditional skip**。常规模式下跳过的 QA 全文镜像路径在 `n-terminal-qa.log` 的 `--mode qa` 选择中通过，**31 passed**，另 56 项因名称过滤未执行，不记为通过。
+- `n-build.log`：完整 production build 成功。未由代码行数或构建成功推导性能改善。
+- `browser-n/run-20261022-010408-105903356`：71 项首轮 **60 passed / 11 failed / 0 skipped**。11 项均在 step1 等待 app root 的 30 秒预算处超时；原 trace 中请求成功，失败捕获时页面已挂载。首轮使用 6 个 worker，并与构建重叠；不修改 timeout、用例断言或生产代码。
+- `browser-n-recheck/run-20261022-011357-127723982`：仅上述 11 项，在构建结束后使用 2 个 worker **11 passed / 0 failed / 0 skipped**。两轮 receipt 签名、summary 哈希、identity_stable 已核验，生产源身份均为 `7b6a51d0f1381c0f7a870bfdf13ff7074ee98614d5ca02e1936e80278ed00ebd`。复核 summary SHA256 `b6ec3cfa3f8ec6dc0e8ac0cbf81f6c4e881eb8916058f5855aafb88c6dcdb0df`。原失败保留，不能声称首轮 71 项全绿。
+- 71 项覆盖 TC-SHOT-001 至 039 的全部 browser 场景，终端菜单/搜索/显示/宏/信号/日志/分屏、SSH 认证取消与重连、附属 SFTP 生命周期、会话高级/网络/认证/外观持久化，以及 TERM-TEXT-001 至 005。SSH 使用 runner 管理的本地 Docker fixture 和随机临时密码；真实 browser service bridge 不记作 native PTY/IME/OS 证据。
+- 新增 `TC-TERM-IME-001`：Linux/X11 的真实 fcitx5 wbpy 提交两个 CJK 字符、Escape 取消后仅 ASCII 到达 PTY、关闭终端后新会话再次提交且无拼音残留。policy/dependencies 与 F2.2 映射同步。尚未执行，不声称新增用例具有改前 native 基线；将通过本批完整提交的 GitHub native job 验证。Windows/macOS 输入法传输不由此 Linux case 证明。
+- 初期 `n-types-1`、`n-types-3`、`n-checks-4` 的 nullable 闭包/unused import 和选择状态命名问题已修复，原失败日志保留。`n-case-gates` 的只读表达式 schema 错误另行修正，不计为产品执行失败或通过。
+
+原有入口行为沿用已有用例，无需为纯搬迁新增重复 case。新增 IME 用例填补此次实际生命周期边界的证据缺口。清单更新到 2,652 项；整体 P0→P5 仍须继续处理其余大文件并完成最终全量与三端验证。
+
+M 三端 run 39636904994 当前已收齐 11 reports：Linux browser5/native8、macOS browser5/native7、Windows browser5，全通过且签名/hash/stable identity 校验成功，统一源码指纹 `dcc373287c86a2a26a5a4607729c10d3da152045e569783912a919265313b6ef`。macOS 的 TC-123 在 M 原生提交上通过。Windows native 尚在执行，完整聚合结论待收齐，不将此部分结果当作 M 完成验收。
