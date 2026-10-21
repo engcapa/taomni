@@ -81,7 +81,9 @@ def summarize(samples: list[float]) -> dict:
     }
 
 
-def assess(results: dict, baseline: dict | None = None, noise_ms: float = 0) -> tuple[int, list[str]]:
+def assess(results: dict, baseline: dict | None = None, noise_ms: float = 0, regression_fraction: float = 0.15) -> tuple[int, list[str]]:
+    if not math.isfinite(regression_fraction) or not 0 <= regression_fraction <= 1:
+        return 2, ["regression fraction must be finite and between 0 and 1"]
     verdict = []
     if baseline is not None and baseline.get("conditions") != results.get("conditions"):
         return 2, ["baseline conditions differ; comparison unverified"]
@@ -96,7 +98,7 @@ def assess(results: dict, baseline: dict | None = None, noise_ms: float = 0) -> 
             old = baseline.get(name, {})
             if not old.get("samples_ms") or old.get("dropped_outliers_ge_1000ms"):
                 return 2, [f"{name}: baseline lacks unfiltered raw samples"]
-            over = over or value > old["p95_ms"] + noise_ms
+            over = over or value > old["p95_ms"] * (1 + regression_fraction) + noise_ms
         failed = failed or over
         verdict.append(f"{name}: {'failed' if over else 'within measured limits'}")
     if baseline is None:
@@ -112,7 +114,10 @@ def main(argv=None) -> int:
     ap.add_argument("--warmup", type=int, default=20)
     ap.add_argument("--baseline", type=Path)
     ap.add_argument("--noise-ms", type=float, default=0, help="previously measured noise allowance")
+    ap.add_argument("--regression-fraction", type=float, default=0.15, help="allowed relative regression against matched baseline (default: 0.15)")
     args = ap.parse_args(argv)
+    if not math.isfinite(args.regression_fraction) or not 0 <= args.regression_fraction <= 1:
+        ap.error("regression fraction must be finite and between 0 and 1")
     if args.keystrokes < 20 or args.warmup < 0 or args.noise_ms < 0:
         ap.error("keystrokes must be >=20; warmup and noise must be nonnegative")
 
@@ -214,8 +219,9 @@ def main(argv=None) -> int:
     ni = results["normal_input_key_to_paint"]
     la = results["local_action_toggle_comment"]
     baseline = json.loads(args.baseline.read_text(encoding="utf-8")) if args.baseline else None
-    exit_code, verdict = assess(results, baseline, args.noise_ms)
+    exit_code, verdict = assess(results, baseline, args.noise_ms, args.regression_fraction)
     results["noise_ms"] = args.noise_ms
+    results["regression_fraction"] = args.regression_fraction
     results["baseline"] = str(args.baseline) if args.baseline else None
     results["exit_code"] = exit_code
     results["targets_verdict"] = verdict

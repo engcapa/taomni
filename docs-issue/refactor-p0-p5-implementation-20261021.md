@@ -403,4 +403,26 @@ QueryResultGrid 从 1813 行降至 952 行（以最终清单为准），保留�
 - browser 的 DB stub 明确不提供真实连接/执行，现有 browser transaction case 只测 offline；不把它计为 grid 行为验证。本批复用 TC-DB-GRID-001-sort-filter-count-native、TC-DB-EDIT-001-grid-sql-preview-native 及既有 DB execution/transaction cases，通过新三端 native job 验证真实 MySQL IPC 与写回。没有为重构伪造网络/SQL stub 的通过证据。
 - 扩展 `refactor-boundaries.mjs` 覆盖 database/grid，禁止反向依赖 QueryResultGrid façade 和内部 runtime cycle。
 
-I 最终构建 `i-build-final.log` 通过，原 contracts 与 386 implementation boundaries 通过。`i-build-fixed.log` 补抓到 selection.activeCell 在 closure 中需局部 narrowing，已修正为捕获当前 activeCell；不更改选择语义。
+I 最终构建 `i-build-final.log` 通过，原 contracts 与 387 implementation boundaries 通过。`i-build-fixed.log` 补抓到 selection.activeCell 在 closure 中需局部 narrowing，已修正为捕获当前 activeCell；不更改选择语义。
+
+## 2026-10-21 性能验收标准调整（用户明确授权）
+
+用户确认“对于性能类用例，偏差在 15% 之内可接受”。从本次变更起，相同条件的基线/候选相对性能回退允许到 15%：吞吐/FPS ≥ 基线 85%，延迟或每帧带宽 ≤ 基线 115%。更好的性能不因偏离基线超过 15% 而失败。
+
+- TC-RDPS-PERF-03 的 FPS ratio 从 0.95 改为 0.85，bandwidth per delivered frame ratio 从 1.05 改为 1.15；同步 description 和 requirement。至少 100 marker frames、真实 RemoteFX 选择、零 bulk 解码错误保留。其它用例的 95% framebuffer painted share 属于画面完整性，不放宽。
+- Chromium renderer proxy 的 `perf_baseline.py` 默认 `--regression-fraction 0.15`，写入结果；保留匹配 conditions、原始慢样本、测得的 noise allowance 和绝对延迟预算。`test_verification_workflow` 18 项通过，包括恰好 15%、超过 15%、改善、显式严格门槛、绝对预算和无效参数。此处只验证判定逻辑，不是新的 native 性能测量。
+- 上文 A–G 和 D/E 对照为当时旧标准下的原始历史结果，保留失败状态、签名与样本，不回写为通过。后续新完整提交运行才作为新标准的验收证据。
+
+## 2026-10-21 实施批次 J：会话树
+
+SessionTree 从 1963 行降至 399 行。`useSessionTreeNavigation` 拥有树过滤、展开、可见顺序/range anchor、外部选中自动展开/scroll timer 和拖动选择；`useSessionFolders` 拥有创建/重命名/删除窗口；`useExternalSessionSecrets` 拥有 Tabby/SecureCRT keychain/decrypt 与外部密码提示；`useSessionImportPreview` 拥有 enrichment→preview→选择过滤→vault preparation→持久化及失败重试。来源适配、导出、文件夹菜单和递归树视图各有独立模块，主入口保留跨领域编排与会话批量菜单。
+
+纯实现重构沿用既有入口 cases，不新增只断言文件搬迁的 case。新增 3 项导入 owner 回归验证选中会话/关联凭据过滤且保留 standalone secrets、保存失败保留预览可重试、等待外部 enrichment 后展示及取消不保存。该补测没有独立改前执行，不声称它提供改前基线。
+
+- `j-build-final.log` 构建通过：761 commands / 328 façade exports / 39 literal events、396 implementation boundaries 无反向依赖和 runtime cycles。
+- `j-tests-final.log`：SessionTree / sessionImportExport / SessionImportPreview **3 files / 70 passed**；`j-import-tests.log` 新增 **3 passed**。此前传入的 sessionImportSecrets.test.ts 路径不存在，不计为执行证据。
+- `browser-j/run-20261021-222335-168746478`：**4 passed / 0 skipped**，TC-SESSION-TREE-01/02、TC-auto-F-FolderName-1、TC-auto-F-ImportPreview-1。多选范围、批量移动和 reload、拖动预览/取消/单独移动、新建文件夹/取消、导入菜单入口通过。导入菜单用例不操作文件选择器，不能据此声称真实文件导入或 OS keychain 已验证。
+- receipt signature、summary hash、identity_stable 核验通过；summary SHA256 `9c19ae220a70c234af95980ea76a3879f804e6bc0861eb3c8d089e840e65e7e5`，source identity `a3284b1fd12a3cc48d7bdad8cc1013e6de0177df77bef82deea3c9419ad27e96`。
+- OS 凭据、文件选择器/磁盘和三端 native 持久化仍以新提交的匹配原生证据为准；P0→P5 整体仍在进行。
+
+J 补充：新增测试后的 `j-types.log` 类型检查通过；`audit-j.log` 全部 gates 通过，清单 2528 项。G 当前已下载的 20 reports 均 signature/hash/stable identity 通过，但仍有 Linux PERF-03（旧 0.95 标准）和 macOS TC-MAIL-BULK-01 的确认框缺失失败；G 尚未结束，以上不是完整三端结果。

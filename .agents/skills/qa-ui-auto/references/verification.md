@@ -114,7 +114,8 @@ Keep QA identity and storage isolation even during fast iteration.
 Measure application performance only for affected hot paths. Use matching
 hardware, OS/WebView, dataset and build profile with explicit warmup, raw samples
 and previously measured noise. `perf_baseline.py --baseline PATH --noise-ms N`
-compares the Chromium renderer proxy under matching conditions and fails on
-regression or absolute-budget violations. Without a baseline, only the absolute
+compares the Chromium renderer proxy under matching conditions. The default
+relative regression allowance is 15% (`--regression-fraction 0.15`), recorded
+in the result alongside measured noise. Absolute latency budgets still apply. Without a baseline, only the absolute
 budget is checked; no-regression is unverified. Native release latency/resource
 measurements remain separate from browser and automation timings.
