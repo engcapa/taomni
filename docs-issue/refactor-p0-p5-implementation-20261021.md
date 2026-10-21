@@ -291,3 +291,53 @@ HBase 69 个、Gateway 64 个函数进行 token 级对照，除 visibility 与 r
 - 保留失败：`cm-e-tests.log` 抓到提取时 host context 与 CodeMirror CompletionContext 同名遮蔽，已用显式依赖解构修复；`e-integrated-build.log` 抓到 remote-permission hook 遗留空参数，已移除；`e-hbase-tests.log` 抓到 ResultRow 误导入路径，改回 native/client 后由全量 Rust 通过覆盖。
 
 这是保持行为的重构，复用上述真实入口 cases 和现有 mounted/native tests，不新增只验证新文件/函数存在的测试。三端最终结论以本批提交的新 workflow 为准，不能复用 D 的通过作为 E 的结果。
+
+E 补充：`e-rust-integration.log` **62 passed**，`audit-e.log` 全部 gates 通过。[三端 run 39589289028](https://github.com/engcapa/taomni/actions/runs/39589289028) 测试 `698b5cdee06790bb0fddd6b15ce923eabceaa447`；workflow 已成功结束，完整 raw receipts / aggregate 核验结果后续追加。
+
+## 2026-10-21 实施批次 F
+
+- WelcomePanel：恢复入口、历史容器、最近会话/工作区、本地目录、启动卡片与菜单分离。history hook 拥有查询/排序/选择，shell hook 拥有 shell/WSL 发现状态和取消；目录启动中的 pending 状态保留在入口。
+- VncPanel：连接 hook 拥有 WebSocket/session、连接 generation、认证重试、自动重连/heartbeat timers、framebuffer/cursor/stats；keyboard、pointer、Windows special keys、fullscreen 和 viewport 生命周期分别独立。跨连接 teardown 仍显式清理共享输入/剪贴板 refs，保持 effect 顺序及异步回调读取时机。
+- MCP HTTP：server 拥有 loopback listener/token registry，model/parameters 保留原 schema，scope/permissions 保留会话约束和授权流水线，handler 负责前端 side-effect 往返，capture 负责命令执行/取消/结果归约，tools 注册保持原名称和描述。原导出保留，新增生产模块不使用 `use super::*`。
+- Screenshot：runtime 拥有 ToolState、session lease、generation、opening/recording guards 和中断收尾；window lifecycle 负责隐藏/等待/恢复、焦点和平台位置；overlay、pin、scroll controls、recording controls 分域。root 保留 IPC 与兼容路径，原窗口隐藏/恢复时序、guard、录制恢复 owner 不变。
+
+| 入口 | E | F |
+|---|---:|---:|
+| WelcomePanel | 2075 | 321 |
+| VncPanel | 2068 | 791 |
+| agent/cc_bridge/mcp_http.rs | 2131 | 64 |
+| screenshot/mod.rs | 2024 | 894 |
+
+MCP 54 个函数、Screenshot 62 个函数逐个 token 对照：差异仅为模块路径、visibility、rustfmt 尾逗号与 closure 外层花括号。结构对照不替代测试。当前清单 2488 个代码文件；CodeWorkspaceTab、Mail、Windows capture helper 等剩余大文件继续处理，P0–P5 尚未全部完成。
+
+### F 本地验证
+
+- `f-shell-tests.log`：原 Welcome/VNC mounted tests **55 passed**。包括认证/自动重连、取消连接、键盘/AltGr/IME、指针采样、剪贴板回显与全屏恢复。
+- `f-shell-types.log`：TypeScript 通过。
+- `f-build.log`：Node 22 生产构建通过；761 commands / 328 façade exports / 39 literal events 保持，364 modules boundary 通过。
+- `f-unit-full.log`：全量 **540 files / 5455 passed / 1 conditional skip**。
+- `browser-f/run-20261021-191832-151427200`：Linux Chromium **10 passed / 0 skipped**；TC-038、TC-151、TC-156、TC-159、TC-WELCOME-RS-01/02/03/04、TC-auto-F1-6、TC-auto-F1-6-welcome-recent-sessions。真实 RFB fixture 验证认证/输入/持续绘制/resize/双向 Unicode 剪贴板，欢迎页验证目录排序/恢复/失败重试/清空/卡片与历史。receipt signature/hash/identity_stable 核验通过；summary sha256 `623cd6343099397a2b04926b98dbde099910ed4e73730b0bc73c9a2db06bb4e9`。此浏览器证据在 Rust 拆分前采集，不替代最终组合 native 证据。
+- `browser-f.log` / `browser-f-fixed.log` 是选择参数错误（filter 不支持 regex、TC-153 仅支持 native），没有执行用例；修正为明确支持 browser 的 10 IDs 后通过。TC-153 仍由三端 native 执行，不改模式。
+- `f-mcp-tests.log` 抓到提取脚本把测试 helper `scope` 误作为生产 import，已移除；`f-rust-combined.log` 抓到 screenshot 的 QA 兼容导入和 Manager trait 遗漏，已补齐，并补查 macOS 的 QA_WINDOW_HIDE_CALLS 条件路径。失败记录保留，最终组合 Rust 结果待追加。
+
+本批纯实现重构，不新增仅断言文件搬迁的测试；沿用上述真实入口与已有 screenshot/agent native cases。窗口、OS 输入/剪贴板、MCP native 行为由最终提交的 GitHub 三端证据验证。
+
+F 补充：`f-rust-final.log` 组合源码 **1868 passed / 25 ignored**，`audit-f.log` 全部 gates 通过。
+
+### E 三端核验结果（有失败，未验收）
+
+25 reports 的签名、summary hash 和 stable identity 全部核验；源码 identity `3b3a980ec9866e50041724f9a02a1bd60c57755e998b0b05998be5801638ef9c`。aggregate `report_ok=true`、`passed=false`、无 infrastructure_errors。实际 **1782 passed / 5 failed / 0 skipped**，不能用 workflow success 覆盖失败：
+
+| 平台 | browser passed | native passed | native failed |
+|---|---:|---:|---:|
+| Linux | 396 | 213 | 2 |
+| Windows | 396 | 196 | 3 |
+| macOS | 394 | 187 | 0 |
+
+- Linux TC-RDPS-PERF-03-photo-content：`fps_ratio=0.9165561619502087` 未达到 0.95，保留阈值和原始性能样本。
+- Linux TC-BACKUP-CLOUD-002：fixture 的 secret-tool store 失败，未执行应用步骤；D 的该项通过不能覆盖本次失败。
+- Windows TC-IDE-CW-ANALYSIS-01-baseline-native：预期 StringUtils diagnostic 未出现，失败快照有 Initialize Workspace (20%)。
+- Windows TC-IDE-PARITY-007-03：Extract Method 未出现命名输入框，最终状态为 RESOLVE_TIMEOUT。
+- Windows TC-IDE-PARITY-005-05：StringUti 补全 popup 未在 120s 内出现。
+
+原始报告 `github-e/`、核验 `github-e-verification.json`。将对失败场景执行同提交与 D 基线的定向对照；当前原因尚未证实，不能归为既有问题。原有 real Java project 三平台 capability gaps 仍不计通过。

@@ -11,7 +11,7 @@ scripts/configure-release-signing.mjs	tooling	mjs	tool-script	209	7	6	0		开发�
 scripts/configure-release-signing.test.mjs	tooling	mjs	test	187	8	0	0		自动化测试/QA 集成测试
 scripts/editor_performance_browser.py	frontend	py	frontend-lib	162	6	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 scripts/macos-runtime-paths.test.mjs	tooling	mjs	test	99	7	0	0		自动化测试/QA 集成测试
-scripts/refactor-boundaries.mjs	frontend	mjs	frontend-lib	97	4	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+scripts/refactor-boundaries.mjs	frontend	mjs	frontend-lib	99	4	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 scripts/refactor-contracts.mjs	frontend	mjs	frontend-lib	91	4	5	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 scripts/release-workflow.test.mjs	tooling	mjs	test	161	8	0	0		自动化测试/QA 集成测试
 scripts/resolve-release-build.mjs	tooling	mjs	tool-script	55	3	2	0		开发、QA、构建或性能工具脚本
@@ -70,7 +70,16 @@ src-tauri/src/agent/capture/reduce.rs	backend	rs	rust-backend	376	7	10	0		Rust �
 src-tauri/src/agent/cc_bridge/commands.rs	backend	rs	rust-backend	713	13	27	12		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/agent/cc_bridge/config.rs	backend	rs	rust-backend	630	5	41	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/agent/cc_bridge/mcp_control.rs	backend	rs	rust-backend	1517	16	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/agent/cc_bridge/mcp_http.rs	backend	rs	rust-backend	2131	33	39	0	>=2000	Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/cc_bridge/mcp_http.rs	backend	rs	rust-backend	64	25	25	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/cc_bridge/mcp_http/capture.rs	backend	rs	rust-module	541	16	8	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/agent/cc_bridge/mcp_http/handler.rs	backend	rs	rust-module	96	16	9	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/agent/cc_bridge/mcp_http/model.rs	backend	rs	rust-module	123	5	17	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/agent/cc_bridge/mcp_http/parameters.rs	backend	rs	rust-module	119	1	46	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/agent/cc_bridge/mcp_http/permissions.rs	backend	rs	rust-module	185	15	8	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/agent/cc_bridge/mcp_http/scope.rs	backend	rs	rust-module	170	6	7	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/agent/cc_bridge/mcp_http/server.rs	backend	rs	rust-module	266	19	14	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/agent/cc_bridge/mcp_http/tests.rs	backend	rs	test	418	24	0	0		行为回归测试
+src-tauri/src/agent/cc_bridge/mcp_http/tools.rs	backend	rs	rust-module	319	32	12	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/agent/cc_bridge/mcp_redis.rs	backend	rs	rust-backend	347	10	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/agent/cc_bridge/mcp_sql.rs	backend	rs	rust-backend	1047	14	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/agent/cc_bridge/mod.rs	backend	rs	rust-backend	332	9	19	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
@@ -491,10 +500,13 @@ src-tauri/src/screenshot/capture.rs	backend	rs	rust-backend	1140	12	47	0		Rust �
 src-tauri/src/screenshot/edit.rs	backend	rs	rust-backend	280	8	6	3		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/screenshot/favorites.rs	backend	rs	rust-backend	253	9	13	5		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/screenshot/mac_snapshot.rs	backend	rs	rust-backend	97	5	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
-src-tauri/src/screenshot/mod.rs	backend	rs	rust-backend	2024	21	89	30	>=2000	Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/mod.rs	backend	rs	rust-backend	894	54	59	30		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/model.rs	backend	rs	rust-module	68	1	36	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/ocr.rs	backend	rs	rust-backend	592	4	28	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/screenshot/ocr_macos.rs	backend	rs	rust-backend	75	5	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/screenshot/ocr_windows.rs	backend	rs	rust-backend	131	6	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/overlay_session.rs	backend	rs	rust-module	277	28	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src-tauri/src/screenshot/pin_window.rs	backend	rs	rust-module	129	15	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/pins.rs	backend	rs	rust-backend	538	4	32	9		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/screenshot/qa.rs	backend	rs	rust-backend	161	17	13	0		截图 QA 驱动、窗口/显示/滚动/Pin 工具和证据采集命令
 src-tauri/src/screenshot/qa/capture_scenarios.rs	backend	rs	rust-backend	774	1	11	7		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
@@ -517,14 +529,19 @@ src-tauri/src/screenshot/qa/wayland.rs	backend	rs	rust-backend	248	6	16	0		Rust 
 src-tauri/src/screenshot/qa/windows_save_dialog.rs	backend	rs	rust-backend	67	4	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/screenshot/qa_oracle.rs	backend	rs	rust-backend	575	3	28	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/screenshot/record.rs	backend	rs	rust-backend	1255	16	29	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/recording_controls.rs	backend	rs	rust-module	132	17	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/recovery_file.rs	backend	rs	rust-backend	144	3	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/runtime.rs	backend	rs	rust-module	169	19	28	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/scroll.rs	backend	rs	rust-backend	1795	17	22	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/scroll_controls.rs	backend	rs	rust-module	122	13	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/screenshot/scroll_input.rs	backend	rs	rust-backend	282	15	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/screenshot/session.rs	backend	rs	rust-backend	46	3	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/screenshot/shortcut.rs	backend	rs	rust-backend	329	6	15	2		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/screenshot/shortcut/portal.rs	backend	rs	rust-backend	170	5	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/screenshot/surface_backend.rs	backend	rs	rust-backend	404	8	8	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/screenshot/surfaces.rs	backend	rs	rust-backend	595	5	23	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/tests.rs	backend	rs	test	70	4	0	0		行为回归测试
+src-tauri/src/screenshot/window_lifecycle.rs	backend	rs	rust-module	377	22	12	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src-tauri/src/sdk/detect.rs	backend	rs	rust-backend	1889	6	45	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/sdk/mod.rs	backend	rs	rust-backend	974	13	83	11		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
 src-tauri/src/sdk/probe.rs	backend	rs	rust-backend	548	7	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
@@ -766,7 +783,7 @@ src/components/ContextMenu.tsx	frontend	tsx	frontend-component	486	4	7	0		React 
 src/components/UpdateDialog.test.tsx	frontend	tsx	test	78	5	0	0		自动化测试/QA 集成测试
 src/components/UpdateDialog.tsx	frontend	tsx	frontend-component	333	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/WelcomePanel.test.tsx	frontend	tsx	test	893	7	0	0		自动化测试/QA 集成测试
-src/components/WelcomePanel.tsx	frontend	tsx	frontend-component	2075	20	2	0	>=2000	React UI/交互组件，具体职责由目录和文件名定义
+src/components/WelcomePanel.tsx	frontend	tsx	frontend-component	321	17	2	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/agent/ActionCard.tsx	frontend	tsx	frontend-component	112	2	3	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/agent/CcAgentBridge.test.tsx	frontend	tsx	test	438	10	0	0		自动化测试/QA 集成测试
 src/components/agent/CcAgentBridge.tsx	frontend	tsx	frontend-component	1296	16	1	5		React UI/交互组件，具体职责由目录和文件名定义
@@ -1915,9 +1932,21 @@ src/components/vnc/VncConnectionOverlay.tsx	frontend	tsx	frontend-component	201	
 src/components/vnc/VncFullScreenToolbar.test.tsx	frontend	tsx	test	64	3	0	0		自动化测试/QA 集成测试
 src/components/vnc/VncFullScreenToolbar.tsx	frontend	tsx	frontend-component	150	3	3	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/vnc/VncPanel.test.tsx	frontend	tsx	test	971	6	0	0		自动化测试/QA 集成测试
-src/components/vnc/VncPanel.tsx	frontend	tsx	frontend-component	2068	24	2	2	>=2000	React UI/交互组件，具体职责由目录和文件名定义
+src/components/vnc/VncPanel.tsx	frontend	tsx	frontend-component	791	27	2	2		React UI/交互组件，具体职责由目录和文件名定义
 src/components/vnc/VncPropertiesDialog.tsx	frontend	tsx	frontend-component	202	6	3	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/vnc/VncSessionInfoDialog.tsx	frontend	tsx	frontend-component	160	6	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/vnc/panel/bell.ts	frontend	ts	frontend-component	22	0	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/vnc/panel/clipboardPolicy.ts	frontend	ts	frontend-component	65	2	11	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/vnc/panel/connectionPolicy.ts	frontend	ts	frontend-component	23	0	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/vnc/panel/fullScreen.ts	frontend	ts	frontend-component	16	1	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/vnc/panel/keyboardPolicy.ts	frontend	ts	frontend-component	14	0	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/vnc/panel/types.ts	frontend	ts	frontend-component	38	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/vnc/panel/useVncConnection.ts	frontend	ts	frontend-component	546	13	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/vnc/panel/useVncFullScreen.ts	frontend	ts	frontend-component	81	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/vnc/panel/useVncKeyboard.ts	frontend	ts	frontend-component	387	10	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/vnc/panel/useVncPointer.ts	frontend	ts	frontend-component	312	6	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/vnc/panel/useVncSpecialKeys.ts	frontend	ts	frontend-component	74	7	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/vnc/panel/useVncViewport.ts	frontend	ts	frontend-component	62	3	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/vnc/vncSessionMenu.test.ts	frontend	ts	test	97	2	0	0		自动化测试/QA 集成测试
 src/components/vnc/vncSessionMenu.ts	frontend	ts	frontend-feature-lib	162	3	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/voice/CommandPreviewCard.tsx	frontend	tsx	frontend-component	218	3	3	0		React UI/交互组件，具体职责由目录和文件名定义
@@ -1925,6 +1954,17 @@ src/components/voice/DictationButton.test.tsx	frontend	tsx	test	187	6	0	0		自�
 src/components/voice/DictationButton.tsx	frontend	tsx	frontend-component	233	8	1	10		React UI/交互组件，具体职责由目录和文件名定义
 src/components/voice/VoiceConsumers.test.tsx	frontend	tsx	test	54	8	0	0		自动化测试/QA 集成测试
 src/components/voice/VoiceSettingsDialog.tsx	frontend	tsx	frontend-component	41	7	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/welcome/LaunchCards.tsx	frontend	tsx	frontend-component	278	3	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/welcome/LocalDirectoriesPanel.tsx	frontend	tsx	frontend-component	207	4	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/welcome/RecentSessionsPanel.tsx	frontend	tsx	frontend-component	368	14	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/welcome/RecentWorkspacesPanel.tsx	frontend	tsx	frontend-component	295	8	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/welcome/RestoreLastSessionRow.tsx	frontend	tsx	frontend-component	174	5	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/welcome/WelcomeHistoryPanel.tsx	frontend	tsx	frontend-component	106	3	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/welcome/sessionMenu.tsx	frontend	tsx	frontend-component	118	9	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/welcome/sessionModel.ts	frontend	ts	frontend-component	74	5	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/welcome/types.ts	frontend	ts	frontend-component	65	3	4	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/welcome/useWelcomeHistory.ts	frontend	ts	frontend-component	101	6	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/welcome/useWelcomeShells.ts	frontend	ts	frontend-component	91	4	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/window/LanguageSwitcher.tsx	frontend	tsx	frontend-component	61	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/window/PttButton.tsx	frontend	tsx	frontend-component	14	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/window/TitleBarTrayControls.test.tsx	frontend	tsx	test	98	3	0	0		自动化测试/QA 集成测试
