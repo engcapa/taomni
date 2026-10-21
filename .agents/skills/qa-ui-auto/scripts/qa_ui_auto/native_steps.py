@@ -644,15 +644,21 @@ def _assert_file_contains(ctx: NativeStepContext, args: Any) -> str:
     path = Path(str(args["path"])).expanduser()
     expected = str(args["contains"])
     timeout = float(args.get("timeout_sec", 15))
-    deadline = time.time() + timeout
-    body = ""
-    while time.time() < deadline:
-        if path.exists():
+    deadline = time.monotonic() + timeout
+    state = "not read"
+    while time.monotonic() < deadline:
+        try:
             body = path.read_text(encoding="utf-8", errors="replace")
+        except (FileNotFoundError, PermissionError) as exc:
+            # An atomic replacement can briefly deny a reader on Windows.
+            # Keep polling within the assertion's existing deadline; a persistent
+            # access failure must still fail with the last filesystem error.
+            state = f"{type(exc).__name__}: {exc}"
+        else:
             if expected in body:
                 return f"disk verified: {path}"
+            state = f"len={len(body)}"
         time.sleep(0.3)
-    state = "missing" if not path.exists() else f"len={len(body)}"
     raise StepError(
         f"assert_file_contains failed after {timeout}s: {path} ({state}) "
         f"does not contain {expected!r}"

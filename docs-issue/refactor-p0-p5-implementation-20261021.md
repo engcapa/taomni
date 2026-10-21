@@ -122,3 +122,23 @@ P0–P5 仍未全部完成：编辑器主壳的大量状态/事件/工具窗口�
 - `browser-extract-isolated`：更新后的 TC-IDE-PARITY-017-02 **82 步全部通过**，有完整 summary/receipt。前一次 `browser-extract-completion` 在并行工具运行期间页面重新导航到 welcome，导致 step49 超时；保留失败报告和 trace，不改断言，在构建/单测结束后隔离重跑。仅证明本地 Linux Chromium。
 - 基线 macOS browser 对照 run `39556543432` 完成；需与重构提交的原始报告比较，单次基线成功不代表负载下不会出现上述 busy 时序。
 - 批次 A native 已发现待定位失败：Linux/macOS `TC-RDPS-PERF-03-photo-content` 的 FPS 比率约 0.90，低于原 0.95 阈值；macOS `TC-MAIL-STORAGE-09` 的 server 18 条与 UI 0 条不一致；macOS `TC-152` VNC 会话菜单未出现。保留原阈值/断言，后续使用最终提交与必要的基线对照定位。
+
+### 批次 B GitHub 原始报告核验（2026-10-21）
+
+Run [39557611607](https://github.com/engcapa/taomni/actions/runs/39557611607)，实际源码 `ef10df6b34163a3bc851c4bc230fc102980d3f72`。从 `github-final/qa-*/run-*/` 核验 25 份 runner receipt 签名、summary SHA-256 及 `identity_stable`；不重复统计 diagnostics 副本。25 份源码指纹一致（`5f0f19306fbe019f37bc6e9649a8718cae6fa335ffe064e9566ae6060546e923`）。
+
+| 平台 | Browser | Native |
+| --- | --- | --- |
+| Linux | 396 passed | 214 passed，另 dual-display 1 passed |
+| Windows | 396 passed | 198 passed / 1 failed |
+| macOS | 394 passed | 186 passed / 1 failed |
+
+合计 **1785 passed / 2 failed / 0 skipped**，另有原有 3 个外部 Java 项目能力缺口。99 个 unreviewed 条目不因运行成功而自动成为已审核覆盖。汇总 `passed=false`、`report_ok=true`：该 workflow 的全量模式有意仅对基础设施/报告完整性设失败门禁，只有 selected 模式要求所有用例通过，因此绿色 workflow 不能说明用例全部通过。
+
+失败与处理：
+
+- Windows `TC-BACKUP-001` step 38，点击禁用自动备份后 `assert_file_contains` 立即因 PermissionError 退出（该步骤耗时 0）。策略保存使用临时文件加原子 rename；读取断言原有 15 秒轮询只处理缺文件/内容未就绪，没有处理原子替换期间 Windows 短暂访问冲突。修复 runner 在原超时内重试 PermissionError/FileNotFoundError，并保留最后错误；不修改应用写入行为、超时、用例内容断言。4 个新回归测试分别验证短暂冲突后读取真实文件、持续拒绝访问失败、缺失后错误内容仍失败、其他 I/O 错误即时失败。
+- macOS `TC-RDPS-PERF-01-performance-budget` step 28，40 个有效输入样本、0 timeout，p95=72.403542 ms > 65 ms。保留阈值与失败样本，安排原基线同用例及 photo-content 对照。性能问题未解决前不算通过。
+- 原批次 A 的 Undo、邮件列表、VNC、photo-content 失败在本轮对应平台原始报告均通过；本轮不能抹去之前失败记录，也不能证明以后没有性能抖动。
+
+原始文件保留在 `qa-ui-auto-report/refactor-p0-p5/github-final/`，汇总 `qa-summary-749f8f80c503487f96d591c6dbde1caa/ci-summary.json`。P0–P5 剩余架构退出条件仍未完成。
