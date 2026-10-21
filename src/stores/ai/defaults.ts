@@ -1,0 +1,121 @@
+import { type AcpProfileConfig, type AiConfig, type AsrProviderConfig } from "./model";
+
+export const DEFAULT_CLAUDE_CODE_MODEL = "claude-sonnet-4-5";
+
+export const DEFAULT_CODEX_MODEL = "gpt-5.4";
+
+export const ACP_PROVIDER_PREFIX = "acp:";
+
+export const DEFAULT_GROK_ACP_PROFILE: AcpProfileConfig = {
+  id: "grok",
+  name: "Grok CLI",
+  enabled: false,
+  command: "grok",
+  args: ["--permission-mode", "default", "agent", "--no-leader", "stdio"],
+  capabilities: {
+    image_generation: true,
+    video_generation: true,
+  },
+  auth_method_id: null,
+  proxy_mode: "inherit",
+  proxy_session_id: null,
+  proxy_url: null,
+};
+
+export const DEFAULT_CONFIG: AiConfig = {
+  asr: {
+    download_proxy: { mode: "app", custom: { enabled: true, mode: "manual", session_id: "", kind: "http", host: "", port: 3128, username: "", password_ref: "" } },
+    active: "local-auto",
+    language_prior: "zh",
+    hotwords: [],
+    experimental: false,
+    cleanup: "off",
+    mode: "local",
+    providers: {
+      ...Object.fromEntries(["base", "small", "medium"].map((size) => [`whisper-${size}`, { engine: "whisper-rs", model: `ggml-${size}.bin` }])),
+      ...Object.fromEntries(["base", "small", "medium"].map((size) => [`whisper-${size}-q8`, { engine: "whisper-rs", model: `ggml-${size}-q8_0.bin` }])),
+      "whisper-turbo-q5": { engine: "whisper-rs", model: "ggml-large-v3-turbo-q5_0.bin" },
+      "sensevoice-small": { engine: "sherpa-onnx", model: "model.int8.onnx" },
+      "sherpa-zipformer-zh-en": { engine: "sherpa-onnx", model: "streaming-zipformer-bilingual-zh-en-2023-02-20", endpoint: "", api_key: "", proxy_mode: "app" },
+      aliyun: { engine: "aliyun-dashscope", model: "paraformer-realtime-v2", endpoint: "wss://dashscope.aliyuncs.com/api-ws/v1/inference/", api_key: "", proxy_mode: "app" },
+      volcengine: { engine: "volcengine", model: "bigmodel", endpoint: "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async", resource_id: "volc.seedasr.sauc.duration", api_key: "", proxy_mode: "app" },
+      soniox: { engine: "soniox", model: "stt-rt-v5", endpoint: "wss://stt-rt.soniox.com/transcribe-websocket", api_key: "", proxy_mode: "app" },
+      deepgram: { engine: "deepgram", model: "nova-3", endpoint: "wss://api.deepgram.com/v1/listen", api_key: "", proxy_mode: "app" },
+      gemini: { engine: "gemini", model: "gemini-3.5-transcribe-live", endpoint: "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent", api_key: "", proxy_mode: "app" },
+    } as Record<string, AsrProviderConfig>,
+    warm_on_startup: false,
+    vad: "none",
+    language: "auto",
+  },
+  llm: {
+    active: "deepseek",
+    providers: {
+      deepseek: { base_url: "https://api.deepseek.com/v1", api_key: "", model: "deepseek-chat", runtime: "openai-compat", capabilities: { chat: true } },
+      anthropic: { base_url: "https://api.anthropic.com/v1", api_key: "", model: "claude-sonnet-4-5", runtime: "anthropic", capabilities: { chat: true } },
+      "opencode-go": { base_url: "https://opencode.ai/inference/go/v1", api_key: "", model: "deepseek-v4.1-flash", runtime: "opencode-go", capabilities: { chat: true }, proxy_mode: "app" },
+      agnes: { base_url: "https://apihub.agnes-ai.com/v1", api_key: "", model: "agnes-2.0-flash", runtime: "openai-compat", capabilities: { chat: true, image_generation: true, video_generation: true }, image_model: "agnes-image-2.1-flash", video_model: "agnes-video-v2.0" },
+      glm: { base_url: "https://open.bigmodel.cn/api/paas/v4", api_key: "", model: "glm-4-flash", runtime: "openai-compat", capabilities: { chat: true } },
+      siliconflow: { base_url: "https://api.siliconflow.cn/v1", api_key: "", model: "Qwen/Qwen2.5-Coder-7B-Instruct", runtime: "openai-compat", capabilities: { chat: true } },
+      groq: { base_url: "https://api.groq.com/openai/v1", api_key: "", model: "llama-3.3-70b-versatile", runtime: "openai-compat", capabilities: { chat: true } },
+      local: { base_url: "http://127.0.0.1:8080/v1", api_key: "local", model: "qwen3-1.7b-q4_k_m", runtime: "llama-server", capabilities: { chat: true } },
+    },
+    provider_groups: {},
+    fallback: { enabled: true, primary: "deepseek", secondary: "local", timeout_ms: 8000 },
+    task_routing: {
+      voice_intent: "deepseek",
+      voice_to_shell: "deepseek",
+      tab_completion: "local",
+      command_rewrite: "deepseek",
+      chat_drawer: "deepseek",
+      inline_qq: "deepseek",
+      agent_default: "deepseek",
+    },
+  },
+  web_search: {
+    client_provider: "searxng",
+    client_enabled: false,
+    confirm_mode: "per_call",
+    byok_key: "",
+    searxng_url: undefined,
+  },
+  cc_bridge: {
+    enabled: false,
+    binary: "auto",
+    min_version: "1.0.0",
+    default_model: DEFAULT_CLAUDE_CODE_MODEL,
+    permission_mode: "default",
+    max_turns: 20,
+    confirm_readonly: false,
+    terminal_echo_enabled: true,
+    proxy_mode: "none",
+    proxy_session_id: undefined,
+    proxy_url: undefined,
+  },
+  codex_bridge: {
+    enabled: false,
+    binary: "auto",
+    min_version: "0.100.0",
+    default_model: DEFAULT_CODEX_MODEL,
+    sandbox: "read-only",
+    approval_policy: "never",
+    network_access: false,
+    proxy_mode: "none",
+    proxy_session_id: undefined,
+    proxy_url: undefined,
+    confirm_readonly: false,
+    terminal_echo_enabled: true,
+  },
+  acp_bridge: {
+    enabled: false,
+    active_profile_id: "grok",
+    proxy_mode: "direct",
+    proxy_session_id: null,
+    proxy_url: null,
+    request_timeout_seconds: 120,
+    profiles: [{ ...DEFAULT_GROK_ACP_PROFILE, args: [...DEFAULT_GROK_ACP_PROFILE.args] }],
+  },
+  full_local_mode: false,
+  fully_disabled: false,
+  chat_output_format: "md",
+  chat_send_shortcut: "ctrl_enter",
+};

@@ -6,6 +6,23 @@ import ts from "typescript";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // These are implementation modules, not alternate application entry points.
 const boundaries = [
+  ["src/stores/chat", "src/stores/chatStore.ts"],
+  ["src/stores/codeWorkspace", "src/stores/codeWorkspaceStore.ts"],
+  ["src/stores/ai", "src/stores/aiStore.ts"],
+  ["src/stores/sftp", "src/stores/sftpStore.ts"],
+  ["src/components/editor/workspace/breadcrumbs", "src/components/editor/workspace/Breadcrumbs.tsx"],
+  ["src/components/editor/workspace/keymapSettings", "src/components/editor/workspace/KeymapSettingsDialog.tsx"],
+  ["src/components/editor/workspace/panels/run", "src/components/editor/workspace/panels/RunPanel.tsx"],
+  ["src/components/editor/workspace/panels/debug/breakpoints", "src/components/editor/workspace/panels/debug/BreakpointsView.tsx"],
+  ["src/components/git/changes", "src/components/git/WorkspaceChangesView.tsx"],
+  ["src/components/lanchat/panel", "src/components/lanchat/LanChatPanel.tsx"],
+  ["src/components/settings/backup", "src/components/settings/BackupSettingsPanel.tsx"],
+  ["src/components/settings/languageServers", "src/components/settings/LanguageServersSettings.tsx"],
+  ["src/components/settings/panel", "src/components/settings/SettingsPanel.tsx"],
+  ["src/components/tabbar/tabs", "src/components/tabbar/TabBar.tsx"],
+  ["src/components/terminal/appearance", "src/components/terminal/TerminalAppearanceSettings.tsx"],
+  ["src/components/tunnel/manager", "src/components/tunnel/TunnelManager.tsx"],
+  ["src/layouts/main/tabs", "src/layouts/main/TabContentRouter.tsx"],
   ["src/lib/editor/workspace", "src/lib/editor/workspace.ts"],
   ["src/lib/vnc", "src/lib/vnc.ts"],
   ["src/stubs/commands/workspace", "src/stubs/commands/workspace.ts"],

@@ -653,3 +653,16 @@ S selected 三端运行的 Windows release 构建已完成，四个 Windows nati
 - 两轮receipt签名、summary hash、stable identity通过，source identity `56c9d74f4b27dd4c8518066750def3a1dd5a2b3a1b2518d674e78ee454b178a7`；summary SHA256分别为`d595e24c1fdc98ddeb636dce6e36829f18d0b1ad31d3569b08c8bb45a32ef319`、`731fd95d3b269e9f29a82ac7a0e30801cb69a1ae2ba55692f144196472ca6916`。最初wrapper使用了不完整case ID，runner执行前拒绝；原日志保留。Rust inherited cfg、serde default、X11/BufRead/FramedWrite/Decode traits、binary test路径与keymap type re-export遗漏已修，未删除测试断言。
 
 S三端最终运行[39659861812](https://github.com/engcapa/taomni/actions/runs/39659861812)的18份报告签名/hash/stable identity通过，head `209f134f58b2be8efbdd272fcb1053ee7a1ed535`，统一source identity `fe59d5f080736171eff4104ac337cbcb6822c5a568fdddf1322b1e5ca21ee9e2`。Linux browser31/native35、macOS browser31/native30、Windows browser31/native31 passed+1failed，总计**189passed /1failed /0skipped**。aggregate `report_ok=true/ passed=false`，无infra errors/gaps，另保留TC012和SocksCap旧用例unreviewed。Windows TC-IDE-PARITY-017-03在rename提交后未出现preview，失败DOM显示“Rename produced no edits”，editor焦点与greet定位正确；仅凭当前证据不能判定是provider索引或产品问题，保留原失败并继续诊断。此前Q的macOS性能失败不被S性能通过抹除。
+
+## 2026-10-22 实施批次 X：状态仓库与剩余前端生产入口
+
+21 个生产入口按职责提取 76 个模块，全部新增/修改实现≤800行，最大 QueryResultGridView 743行。Chat/CodeWorkspace 保留单一 Zustand create、同一 set/get、89个属性的原初始化/注册顺序；发送队列显式接收同一 StoreApi，递归发送、finally清理与线程revision共享不变。AI defaults/provider routing/normalization和SFTP listing/refcounts/in-flight attach分开。
+
+快捷键recording owner、结果grid视图、Run configuration生命周期、Settings/Backup/Git视图、TabItem/scroll、LanChat roster/header、breadcrumbs、各类breakpoint editor、terminal appearance、Git changes与language-server disclosure分别归属。TabContentRouter 853→570行，终端的持续挂载/split/sidebar内容独立为464行组合视图。WorkspaceEdit apply 952→557行，hooks为一次transaction独立owner，live resolvedEdit getter、prepared journal holder、transaction ID与resume effect ledger保持同一生命周期；预览过滤后的edit仍驱动恢复和验证。
+
+- `x-ui-tests.log`：17 files / **517 passed / 0 failed**，覆盖四个store、配置/备份/语言服务、terminal appearance、tabbar、Git、grid、breadcrumbs、run、keymap、workspace edit和CodeWorkspace组合场景。
+- `x-build-final.log`：完整类型检查与production build通过；761 commands /328 façade exports /39 literal events契约和868 implementation modules边界检查通过。静态对照确认21个公共API、290个原声明和89个有序Zustand属性保持；queued runner仅改为显式共享StoreApi输入。
+- `browser-x/run-20261022-044418-246281545`：**18 passed /0 failed /0 skipped**，覆盖隧道编辑/认证显示/重排、快捷键draft/Apply/冲突/键鼠recording、编辑器settings/action/shell、tab policy、virtual space、inline rename/options/undo和Git工具窗口。receipt签名、summary hash和stable identity已核验；source identity `07c263564ab47d1907806c4f1c9001d7412405ca603d90817ad1cdf06e3cba3b`，summary SHA256 `39c80bd68a1ae17f80482f1cf1bab8931896853522402cd7546db7e51ef30329`。
+- 初期导入型别的nested import-type unused诊断、RunPanel闭包null narrowing及defaultTunnel导出来源遗漏已修；原日志保留。复用原有可执行行为场景，没有删除或放宽断言；browser SSH bridge不作为native网络/系统副作用证据。
+
+W三端[39671362228](https://github.com/engcapa/taomni/actions/runs/39671362228)的browser各shard已执行，Linux native仍运行。macOS/Windows release build发现拆分后的平台trait作用域遗漏：macOS bridge的Read/PermissionsExt及SCK lifetime的AnyThread、Windows PTY shell的CommandExt。保留两端原build日志，修复后须在新完整SHA重新编译验证；当前不称三端通过。
