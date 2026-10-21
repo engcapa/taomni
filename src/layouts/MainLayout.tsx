@@ -1,4 +1,4 @@
-import { Fragment, Suspense, useEffect, useMemo, useRef, useState, useCallback, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback, type PointerEvent as ReactPointerEvent } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { Group as PanelGroup, Panel, Separator as PanelResizeHandle, type PanelImperativeHandle, type PanelSize } from "react-resizable-panels";
@@ -12,10 +12,8 @@ import { ControlBar } from "../components/tabbar/ControlBar";
 import { TabActionSlotProvider } from "../components/tabbar/TabActionSlot";
 import { StatusBar } from "../components/statusbar/StatusBar";
 import { WindowResizeHandles } from "../components/window/WindowResizeHandles";
-import { TerminalPanel, type TerminalLocalPathUploadRequest } from "../components/terminal/TerminalPanel";
-import { GitPanel } from "../components/git/GitPanel";
-import { WorkspaceGitManager } from "../components/git/WorkspaceGitManager";
-import { CodeWorkspaceTab, type CodeWorkspaceGitManagerPayload } from "../components/editor/CodeWorkspaceTab";
+import { type TerminalLocalPathUploadRequest } from "../components/terminal/TerminalPanel";
+import { type CodeWorkspaceGitManagerPayload } from "../components/editor/CodeWorkspaceTab";
 import type { WorkspaceCommandRegistration } from "../components/editor/workspace/workspaceCommands";
 import { resolveShellShortcutRoute } from "../components/editor/workspace/shellShortcutRouter";
 import { decideWorkspaceGitSync } from "../lib/workspaceGitManagerSync";
@@ -23,32 +21,19 @@ import { shellKeyClaimed } from "../lib/shellKeyClaims";
 import { MultiExecBar } from "../components/terminal/MultiExecBar";
 import { SessionEditor } from "../components/session/SessionEditor";
 import { AuthPrompt } from "../components/session/AuthPrompt";
-import { SettingsPanel } from "../components/settings/SettingsPanel";
-import { LanChatGate } from "../components/lanchat/LanChatGate";
 import { EdgeDrawer } from "../components/lanchat/EdgeDrawer";
 import { CallOverlay } from "../components/lanchat/CallOverlay";
 import { WhiteboardOverlay } from "../components/lanchat/whiteboard/WhiteboardOverlay";
-import { TunnelManager } from "../components/tunnel/TunnelManager";
-import { SocksCapPanel } from "../components/sockscap/SocksCapPanel";
-import { MfaTab } from "../components/mfa/MfaTab";
-import { FileBrowser, type SftpPendingUploadRequest } from "../components/filebrowser/FileBrowser";
-import { LocalFileBrowserPanel } from "../components/filebrowser/LocalFileBrowserPanel";
-import { ObjectStorageBrowser } from "../components/objectstorage/ObjectStorageBrowser";
-import { MailClientTab } from "../components/mail/MailClientTab";
-import { MailUnifiedTab } from "../components/mail/MailUnifiedTab";
+import { type SftpPendingUploadRequest } from "../components/filebrowser/FileBrowser";
 import { sessionToObjectStorageConfig } from "../lib/objectStorage";
-import { SftpSidebar } from "../components/filebrowser/SftpSidebar";
 import { useSftpStore } from "../stores/sftpStore";
 import { getAppPlatform, isTauriRuntime } from "../lib/runtime";
 import { effectiveFileType, openExternalUrl, sftpOpenPath, sftpStat } from "../lib/sftp";
 import { writeTerminal } from "../lib/ipc";
 import { encodeBase64 } from "../lib/ipc";
-import { subscribeReattach, drainPendingReattach, clearReattachHandoff, type ReattachMessage } from "../lib/detachedSession";
-import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams, DetachedDbParams } from "../components/detached/DetachedSessionWindow";
-import { vncConsumeDetachClaim } from "../lib/vnc";
-import { deserializeVncViewerOptions, parseVncViewerOptions, writeVncViewerOptions } from "../lib/vncOptions";
+import { parseVncViewerOptions, writeVncViewerOptions } from "../lib/vncOptions";
 import type { VncSessionProperties } from "../components/vnc/VncPropertiesDialog";
-import { Bot, FolderOpen, Lock, Unlock } from "lucide-react";
+import { Bot, FolderOpen } from "lucide-react";
 import { createPortal } from "react-dom";
 import { ToolWindowRail, type ToolWindowRailItem } from "../components/editor/workspace/panels/ToolWindowRail";
 import { effectiveStripeWidth } from "../components/editor/workspace/toolWindowLayout";
@@ -58,9 +43,7 @@ import { sidebarRailGroup } from "../stores/sidebarRailPolicy";
 import type { Tab, DbConnectInfo, MailTabInfo, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, RecentWorkspace } from "../types";
 import { computeNewTerminalTitle, newWorkspaceInstanceId, recentWorkspaceIdFromParts, useAppStore } from "../stores/appStore";
 import { terminalCwdTitlePrefix } from "../lib/terminalCwd";
-import { buildTabDetailSummary } from "../lib/tabDetails";
 import { useSessionStore } from "../stores/sessionStore";
-import { WelcomePanel } from "../components/WelcomePanel";
 import { AboutDialog } from "../components/AboutDialog";
 import { UpdateDialog } from "../components/UpdateDialog";
 import { useUpdateStore } from "../stores/updateStore";
@@ -99,14 +82,16 @@ import { readQuickConnectVisible, localShellSupportsCwdProbe, chatBindingIdForTa
 import { SAVED_PASSWORD_VAULT_REASON_KEY, passwordRefFromOptions } from "./main/authentication";
 import { sessionToDbConnectInfo, sessionToHBaseConnectInfo } from "./main/databaseSession";
 import { sessionToMailTabInfo, mailSmtpPasswordRefFromOptions } from "./main/mailSession";
-import { positiveWeight, axisWeights, weightsToGridTemplate, sumWeights, resizeAdjacentWeights, cumulativeWeightPercent } from "./main/splitLayout";
-import { TerminalSplitToolbar } from "./main/TerminalSplitToolbar";
-import { VncLoadingPanel, VncPanel, RdpLoadingPanel, RdpPanel, DbLoadingPanel, DbClientTab, RedisClientTab, HBaseShellTab, ProxyTestTab, UnavailablePanel } from "./main/panels";
+import { positiveWeight, axisWeights, weightsToGridTemplate, sumWeights, resizeAdjacentWeights } from "./main/splitLayout";
 import { createOpenDetachedSftp, createOpenDetachedGenericWindow, createOpenDetachedRdp, createOpenDetachedVnc, createOpenDetachedTerminal, createOpenDetachedDatabase, createHandleDetachActiveTab } from "./main/detachedWindows";
 import { createQueueVaultUnlock, createOpenAfterJumpPassword, createOpenQueuedSession, createContinueConnectQueue, createHandleAuthSubmit } from "./main/connectionQueue";
 import { createResolveResumeWaiter, createCancelResumeWaiter, createCancelAllResumeWaiters, createResolveResumeWaiterForTab, createOpenSavedSessionForRestore, createOpenLocalTerminalForRestore, createCancelPendingAuthForRestore, createBuildRunSnapshotEntries, createCommitRunSnapshotNow } from "./main/restore";
 import { createHandleQuickConnect, createHandleCommand } from "./main/commandActions";
 import { createExecuteControlTool } from "./main/controlTools";
+import { TabContentRouter } from "./main/TabContentRouter";
+import { useDetachedWindowEvents } from "./main/useDetachedWindowEvents";
+
+
 
 
 
@@ -632,188 +617,12 @@ export function MainLayout() {
     openDetachedDatabase,
     openDetachedSftp,
   }), [openDetachedDatabase, openDetachedRdp, openDetachedSftp, openDetachedTerminal, openDetachedVnc]);
-
-  /**
-   * Subscribe to reattach messages broadcast by detached windows. Each
-   * time a detached window asks to come back, recreate the equivalent
-   * tab in this window using the credential payload from the reattach
-   * envelope. localStorage envelopes left behind by abrupt closes are
-   * also drained on subscribe.
-   */
-  useEffect(() => {
-    // Collapse a single close "burst" into one tab. Closing a detached
-    // window can fan a reattach out across several transports/listeners
-    // (BroadcastChannel + localStorage backstop, leaked onCloseRequested
-    // listeners, beforeunload+pagehide double-fire). They all carry the
-    // same (kind,id) within a few hundred ms, so a short per-(kind,id)
-    // window dedupes them without blocking a legitimate later re-detach.
-    const recentReattach = new Map<string, number>();
-    const BURST_WINDOW_MS = 1500;
-    const handle = async (msg: ReattachMessage) => {
-      const burstKey = `${msg.kind}.${msg.id}`;
-      const now = Date.now();
-      const last = recentReattach.get(burstKey);
-      if (last !== undefined && now - last < BURST_WINDOW_MS) {
-        clearReattachHandoff(msg.kind, msg.id);
-        return;
-      }
-      recentReattach.set(burstKey, now);
-      if (msg.kind === "lan-chat") {
-        const p = msg.payload as { activeConvId?: string; title?: string } | undefined;
-        const convId = p?.activeConvId || msg.id;
-        const existing = tabsRef.current.find((tab) => tab.type === "lan-chat");
-        if (existing) {
-          setActiveTab(existing.id);
-        } else {
-          addTab({
-            id: "lan-chat",
-            type: "lan-chat",
-            title: tr("tabs.lanChat"),
-            closable: true,
-          });
-        }
-        if (convId) {
-          if (convId.startsWith("direct:") || convId.startsWith("group:")) {
-            void useLanChatStore.getState().openConversation(convId);
-          }
-        }
-        setStatusMessage(tr("status.reattached"));
-        clearReattachHandoff(msg.kind, msg.id);
-        return;
-      }
-      // Idempotent tab identity: use the original source tab id when the
-      // payload has it so chat threads stay bound across detach/reattach.
-      // Older handoffs fall back to the detached id-derived shape.
-      const payloadTabId =
-        typeof (msg.payload as { tabId?: unknown } | undefined)?.tabId === "string"
-          ? ((msg.payload as { tabId: string }).tabId.trim() || null)
-          : null;
-      const reattachTabId = payloadTabId ?? `${msg.kind}-reattach-${msg.id}`;
-      if (tabsRef.current.some((t) => t.id === reattachTabId)) {
-        setActiveTab(reattachTabId);
-        clearReattachHandoff(msg.kind, msg.id);
-        return;
-      }
-      switch (msg.kind) {
-        case "rdp": {
-          const p = msg.payload as DetachedRdpParams | undefined;
-          if (!p?.host) return;
-          addTab({
-            id: reattachTabId,
-            type: "rdp",
-            title: p.title || `${p.host}:${p.port}`,
-            sessionId: p.sessionId,
-            closable: true,
-            rdp: {
-              sessionId: p.sessionId,
-              host: p.host,
-              port: p.port,
-              username: p.username ?? undefined,
-              password: p.password,
-              options: p.options,
-              networkSettingsJson: p.networkSettingsJson ?? null,
-            },
-          });
-          setStatusMessage(tr("status.reattached"));
-          break;
-        }
-        case "vnc": {
-          let p = msg.payload as DetachedVncParams | undefined;
-          if (p?.claimId && !p.host) {
-            const claim = await vncConsumeDetachClaim(p.claimId);
-            p = {
-              ...p,
-              claimId: undefined,
-              host: claim.host,
-              port: claim.port,
-              username: claim.username,
-              password: claim.password,
-              networkSettingsJson: claim.network_settings_json,
-              securityPolicy: claim.security_policy,
-              viewOnly: claim.view_only,
-              clipboardPolicy: claim.clipboard_policy as DetachedVncParams["clipboardPolicy"],
-              viewerOptions: deserializeVncViewerOptions(claim.viewer_options_json),
-            };
-          }
-          if (!p?.host) return;
-          addTab({
-            id: reattachTabId,
-            type: "vnc",
-            title: p.title || `${p.host}:${p.port}`,
-            sessionId: p.sessionId,
-            closable: true,
-            vnc: {
-              sessionId: p.sessionId,
-              host: p.host,
-              port: p.port,
-              username: p.username ?? undefined,
-              password: p.password,
-              networkSettingsJson: p.networkSettingsJson ?? null,
-              securityPolicy: p.securityPolicy,
-              viewOnly: p.viewOnly,
-              clipboardPolicy: p.clipboardPolicy,
-              viewerOptions: p.viewerOptions,
-            },
-          });
-          setStatusMessage(tr("status.reattached"));
-          break;
-        }
-        case "terminal": {
-          const p = msg.payload as DetachedTerminalParams | undefined;
-          if (!p) return;
-          const adopted = p.reattach?.terminalSessionId
-            ? {
-                sessionId: p.reattach.terminalSessionId,
-                snapshotText: p.reattach.snapshotText,
-              }
-            : undefined;
-          addTab({
-            id: reattachTabId,
-            type: "terminal",
-            title: p.title || tr("tabs.localTerminal"),
-            terminalTitleMode: p.terminalTitleMode,
-            terminalTitleOperation: p.terminalTitleOperation,
-            terminalTitleSessionName: p.terminalTitleSessionName,
-            closable: true,
-            ssh: p.ssh ?? undefined,
-            commandTerminal: p.commandTerminal ?? undefined,
-            localShell: p.localShell ?? undefined,
-            terminalProfile: p.terminalProfile ?? undefined,
-            adoptedTerminal: adopted,
-          });
-          setStatusMessage(tr("status.reattached"));
-          break;
-        }
-        case "database": {
-          const p = msg.payload as DetachedDbParams | undefined;
-          if (!p?.info) return;
-          addTab({
-            id: reattachTabId,
-            type: "database",
-            title: p.title || `${p.info.engine} ${p.info.host}`,
-            sessionId: reattachTabId,
-            closable: true,
-            db: {
-              ...p.info,
-              sessionId: reattachTabId,
-              workspaceSessionId: p.info.workspaceSessionId ?? p.info.sessionId,
-            },
-          });
-          setStatusMessage(tr("status.reattached"));
-          break;
-        }
-        default:
-          /* SFTP reattach not wired — SFTP detach is co-existing, not exclusive. */
-          break;
-      }
-      clearReattachHandoff(msg.kind, msg.id);
-    };
-    const unsub = subscribeReattach((msg) => { void handle(msg); });
-    // Drain any envelopes left by detached windows that closed abruptly
-    // before we subscribed.
-    drainPendingReattach().forEach((msg) => { void handle(msg); });
-    return unsub;
-  }, [addTab, setActiveTab, setStatusMessage]);
+  useDetachedWindowEvents({
+    tabsRef,
+    setActiveTab,
+    addTab,
+    setStatusMessage,
+  });
 
   useEffect(() => {
     void loadSessions();
@@ -2740,715 +2549,108 @@ export function MainLayout() {
                   onClose={toggleMultiExec}
                 />
               )}
-              <div className="flex-1 min-h-0 overflow-hidden relative">
-                {/* Welcome stays mounted so filters, scroll, and shell
-                    selections survive switching to another tab. */}
-                <div
-                  data-testid="welcome-tab-panel"
-                  className="absolute inset-0"
-                  style={{ display: (activeTab?.type === "welcome" || !activeTab) ? "block" : "none" }}
-                >
-                  <WelcomePanel
-                    active={activeTab?.type === "welcome" || !activeTab}
-                    restore={{
-                      view: welcomeRestore.view,
-                      outcomes: welcomeRestore.outcomes,
-                      onStartRestore: welcomeRestore.startRestore,
-                      onRetryFailed: welcomeRestore.retryFailed,
-                      onCancelRestore: welcomeRestore.cancelRestore,
-                      onClearRecord: () => void welcomeRestore.clearRecord(),
-                    }}
-                    onStartLocalTerminal={(localShell, cwd) => openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell, cwd)}
-                    onNewSession={handleNewSession}
-                    onOpenLocalPath={(path, opts) => void handleOpenLocalPath(path, opts)}
-                    onOpenLanChat={openLanChatTab}
-                    recentSessions={welcomeRecentSessions}
-                    recentWorkspaces={recentWorkspaces}
-                    mailSessions={welcomeMailSessions}
-                    onOpenMailSession={handleConnectSession}
-                    onOpenRecentSession={handleConnectSession}
-                    onOpenRecentSessions={handleConnectSessions}
-                    onEditRecentSession={handleEditSession}
-                    onRevealRecentSession={handleRevealRecentSession}
-                    onOpenRecentWorkspace={openRecentCodeWorkspace}
-                    onRemoveRecentWorkspace={(workspace) => removeRecentWorkspace(workspace.id)}
-                    onClearRecentWorkspaces={clearRecentWorkspaces}
-                    onRevealRecentWorkspace={revealRecentCodeWorkspace}
-                    onOpenNewWorkspace={() => void openNewCodeWorkspaceFromWelcome()}
-                    onOpenSettings={openSettingsTab}
-                  />
-                </div>
-
-                {/* All terminal tabs stay mounted. Single-tab mode hides
-                    inactive panes; split mode only changes the pane wrappers. */}
-                <div
-                  data-testid="terminal-split-stage"
-                  data-active={terminalSplitVisible || undefined}
-                  data-split-layout={terminalSplitVisible ? terminalSplitLayout : undefined}
-                  className={terminalSplitVisible ? "absolute inset-0 z-10 flex flex-col" : "contents"}
-                >
-                  <div style={{ display: terminalSplitVisible ? "block" : "none" }}>
-                    <TerminalSplitToolbar
-                      layout={terminalSplitLayout}
-                      lockedCount={terminalSplitInputLockedTabIds.size}
-                      onLayoutChange={setTerminalSplitLayout}
-                      onClearLocks={clearTerminalSplitInputLocks}
-                      onClose={toggleTerminalSplit}
-                    />
-                  </div>
-                  <div
-                    ref={splitPanesRef}
-                    data-testid="terminal-split-panes"
-                    data-layout={terminalSplitVisible ? terminalSplitLayout : undefined}
-                    className={terminalPanesClass}
-                    style={terminalSplitVisible && terminalSplitLayout === "grid"
-                      ? {
-                        gridTemplateColumns: splitGridColumnTemplate,
-                        gridTemplateRows: splitGridRowTemplate,
-                      }
-                      : undefined}
-                  >
-                    {terminalTabs.map((tab, index) => {
-                      const isActive = activeTabId === tab.id;
-                      const inputLocked = terminalSplitVisible && terminalSplitInputLockedTabIds.has(tab.id);
-                      const sidebarOpen = !terminalSplitVisible && !!attachedSidebars[tab.id] && !!tab.ssh;
-                      const liveTerminalProfile = terminalProfileOverrides[tab.id]
-                        ?? (tab.sessionId ? terminalProfilesBySessionId.get(tab.sessionId) : undefined)
-                        ?? tab.terminalProfile;
-                      const tabDetails = buildTabDetailSummary(
-                        tab,
-                        sessions,
-                        terminalRuntimeByTab[tab.id],
-                        terminalCwds[tab.id],
-                        t,
-                      );
-                      const terminalNode = (
-                        <div className="h-full w-full relative">
-                          <TerminalPanel
-                            tabId={tab.id}
-                            tabTitle={tab.title}
-                            ssh={tab.ssh}
-                            commandTerminal={tab.commandTerminal}
-                            localShell={tab.localShell}
-                            sockscapTerminal={tab.sockscapTerminal}
-                            terminalProfile={liveTerminalProfile}
-                            onTerminalProfileChange={(profile) => handleTerminalProfileChange(tab.id, profile)}
-                            adoptedTerminal={tab.adoptedTerminal}
-                            initialCwd={tab.terminalInitialCwd}
-                            visible={terminalSplitVisible || isActive}
-                            activeForShortcuts={isActive}
-                            inputLocked={inputLocked}
-                            onCwdChange={(cwd) => handleTerminalCwd(tab.id, cwd)}
-                            cwdRequestToken={terminalCwdRequestTokens[tab.id] ?? 0}
-                            onSessionReady={(sid) => {
-                              terminalSessionIds.current[tab.id] = sid;
-                              completeLocalLaunch(tab.id, { tabId: tab.id, status: "started" });
-                              resolveResumeWaiterForTab(tab.id, "connected");
-                            }}
-                            onSessionLaunchFailed={(error) => {
-                              completeLocalLaunch(tab.id, {
-                                tabId: tab.id,
-                                status: "failed",
-                                error: String(error),
-                              });
-                              resolveResumeWaiterForTab(tab.id, "failed", error);
-                            }}
-                            onOutput={() => handleTerminalOutput(tab.id)}
-                            onUploadLocalPaths={
-                              tab.ssh
-                                ? (request) => handleTerminalLocalPathUpload(tab.id, request)
-                                : undefined
-                            }
-                            multiExecActive={multiExecActive}
-                            isMultiExecTarget={
-                              multiExecActive &&
-                              multiExecSelectedTabIds.has(tab.id) &&
-                              !inputLocked
-                            }
-                            onInputBroadcast={
-                              multiExecActive && !inputLocked && (terminalSplitVisible || isActive)
-                                ? (data) => broadcastToSelectedTerminals(data, tab.id)
-                                : undefined
-                            }
-                            detachToggle={!terminalSplitVisible ? {
-                              onDetach: () => openDetachedTerminal(tab.id, tab, tab.title),
-                            } : undefined}
-                            chatToggle={!aiFullyDisabled && !(terminalRailMerged && isActive) ? {
-                              open: chatDrawerOpen && activeTabId === tab.id,
-                              onToggle: () => void toggleTabChat(chatBindingIdForTab(tab) ?? tab.id),
-                            } : undefined}
-                            sftpToggle={!terminalSplitVisible && tab.ssh && !(terminalRailMerged && isActive) ? {
-                              open: sidebarOpen,
-                              onToggle: () => toggleTerminalSftp(tab),
-                            } : undefined}
-                            gitToggle={!tab.ssh && !tab.commandTerminal ? {
-                              cwd: terminalCwds[tab.id] ?? null,
-                              onOpen: async () => {
-                                const cwd = terminalCwdsRef.current[tab.id] ?? await queryTerminalCwd(tab.id);
-                                if (!cwd) {
-                                  await alertAppDialog({
-                                    title: "Git Repository",
-                                    message: "The current terminal directory is not available yet.",
-                                  });
-                                  return;
-                                }
-                                await openGitRepository(cwd);
-                              },
-                            } : undefined}
-                          />
-                        </div>
-                      );
-                      const sftpSidebarNode = sidebarOpen && tab.ssh ? (
-                        <SftpSidebar
-                          sessionId={`attached-${tab.id}`}
-                          host={tab.ssh.host}
-                          port={tab.ssh.port}
-                          username={tab.ssh.username}
-                          authMethod={tab.ssh.authMethod}
-                          authData={tab.ssh.authData}
-                          networkSettingsJson={JSON.stringify(
-                            toNetworkSettingsPayload(getSessionNetworkSettings(tab.ssh.optionsJson)),
-                          )}
-                          cwdHint={terminalCwds[tab.id] ?? null}
-                          cwdHintVersion={terminalCwdVersions[tab.id] ?? 0}
-                          title={`SFTP — ${tab.ssh.username}@${tab.ssh.host}`}
-                          onClose={() => toggleAttachedSidebar(tab.id)}
-                          onRequestTerminalCwd={() => requestTerminalCwd(tab.id)}
-                          pendingUploadRequest={pendingSftpUploadRequests[`attached-${tab.id}`] ?? null}
-                          onPendingUploadRequestHandled={(requestId) => {
-                            const sftpSessionId = `attached-${tab.id}`;
-                            setPendingSftpUploadRequests((prev) => {
-                              if (prev[sftpSessionId]?.id !== requestId) return prev;
-                              const next = { ...prev };
-                              delete next[sftpSessionId];
-                              return next;
-                            });
-                          }}
-                          onOpenTerminalHere={(p) => {
-                            const sid = terminalSessionIds.current[tab.id];
-                            if (!sid) return;
-                            const escaped = p.replace(/'/g, "'\\''");
-                            // The leading space is a sacrificial guard: Windows
-                            // OpenSSH/ConPTY intermittently drops the first byte of
-                            // a pty write (observed as "d '<path>'"), and bash
-                            // ignores the extra space. It also keeps the line out of
-                            // history for shells with ignorespace enabled.
-                            void writeTerminal(sid, encodeBase64(` cd '${escaped}'\r`));
-                          }}
-                          onDetach={() => {
-                            setSftpDetachedTabs((prev) => ({ ...prev, [tab.id]: true }));
-                            setAttachedSidebars((prev) => ({ ...prev, [tab.id]: false }));
-                            openDetachedSftp(
-                              {
-                                sessionId: `attached-${tab.id}`,
-                                host: tab.ssh!.host,
-                                port: tab.ssh!.port,
-                                username: tab.ssh!.username,
-                                authMethod: tab.ssh!.authMethod,
-                                authData: tab.ssh!.authData,
-                                networkSettingsJson: JSON.stringify(
-                                  toNetworkSettingsPayload(getSessionNetworkSettings(tab.ssh!.optionsJson)),
-                                ),
-                                initialPath: terminalCwds[tab.id],
-                                attachedToTerminal: true,
-                              },
-                              `${tab.title} — SFTP`,
-                            );
-                          }}
-                        />
-                      ) : null;
-                      const gridColumn = index % splitGridColumns + 1;
-                      const gridRow = Math.floor(index / splitGridColumns) + 1;
-                      return (
-                        <Fragment key={tab.id}>
-                        <div
-                          data-testid="terminal-split-pane"
-                          data-tab-id={tab.id}
-                          data-active={isActive || undefined}
-                          data-input-locked={inputLocked || undefined}
-                          className={
-                            terminalSplitVisible
-                              ? "relative min-w-0 min-h-0 flex flex-col overflow-hidden border-r border-b border-[var(--taomni-divider)]"
-                              : "absolute inset-0"
-                          }
-                          style={terminalSplitVisible
-                            ? terminalSplitLayout === "grid"
-                              ? { gridColumn, gridRow }
-                              : {
-                                flexGrow: splitPaneWeightsForTabs[index],
-                                flexShrink: 1,
-                                flexBasis: 0,
-                              }
-                            : { display: isActive ? "block" : "none" }}
-                          onMouseDownCapture={() => {
-                            if (terminalSplitVisible && activeTabId !== tab.id) {
-                              setActiveTab(tab.id);
-                            }
-                          }}
-                        >
-                          <div
-                            className="h-7 shrink-0 items-center gap-2 px-2 text-[11px]"
-                            style={{
-                              display: terminalSplitVisible ? "flex" : "none",
-                              background: isActive ? "var(--taomni-selected)" : "var(--taomni-chrome-bg)",
-                              borderBottom: "1px solid var(--taomni-divider)",
-                              color: "var(--taomni-text)",
-                            }}
-                          >
-                            <button
-                              type="button"
-                              className="min-w-0 flex-1 truncate text-left"
-                              onClick={() => setActiveTab(tab.id)}
-                              title={tab.title}
-                            >
-                              {tab.title}
-                            </button>
-                            <span
-                              data-testid={`terminal-split-activity-${tab.id}`}
-                              className="max-w-[150px] truncate rounded px-1.5 py-0.5 text-[10px] text-[var(--taomni-text-muted)]"
-                              style={{ background: "var(--taomni-hover)" }}
-                              title={tabDetails.activityLabel}
-                            >
-                              {tabDetails.activityLabel}
-                            </span>
-                            <button
-                              type="button"
-                              data-testid={`terminal-split-lock-${tab.id}`}
-                              aria-label={inputLocked ? t("terminalSplit.unlockInput", { title: tab.title }) : t("terminalSplit.lockInput", { title: tab.title })}
-                              title={inputLocked ? t("terminalSplit.unlockTitle") : t("terminalSplit.lockTitle")}
-                              className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
-                              style={inputLocked ? { color: "var(--taomni-accent)" } : undefined}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                toggleTerminalSplitInputLock(tab.id);
-                              }}
-                            >
-                              {inputLocked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-                            </button>
-                          </div>
-                          {/* Always render the PanelGroup so the terminal Panel
-                              stays mounted across sidebar open/close. */}
-                          <div className={terminalSplitVisible ? "flex-1 min-h-0" : "h-full"}>
-                            <PanelGroup
-                              orientation="horizontal"
-                              id={`terminal-sftp-${tab.id}`}
-                              defaultLayout={loadResizableLayout(
-                                `terminal-sftp-${tab.id}`,
-                                sftpSidebarNode ? ["terminal", "sftp"] : ["terminal"],
-                              )}
-                              onLayoutChanged={saveResizableLayout(`terminal-sftp-${tab.id}`)}
-                            >
-                              <Panel id="terminal" defaultSize="62%" minSize="25%" className="min-w-0">
-                                <div className="h-full">{terminalNode}</div>
-                              </Panel>
-                              {sftpSidebarNode && (
-                                <>
-                                  <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
-                                  <Panel
-                                    id="sftp"
-                                    defaultSize="38%"
-                                    minSize="20%"
-                                    maxSize="70%"
-                                    className="min-w-0"
-                                  >
-                                    <div
-                                      className="h-full"
-                                      style={{
-                                        borderLeft: "1px solid var(--taomni-divider)",
-                                        background: "var(--taomni-bg)",
-                                      }}
-                                    >
-                                      {sftpSidebarNode}
-                                    </div>
-                                  </Panel>
-                                </>
-                              )}
-                            </PanelGroup>
-                          </div>
-                        </div>
-                        {terminalSplitVisible && terminalSplitLayout !== "grid" && index < terminalTabs.length - 1 && (
-                          <div
-                            data-testid="terminal-split-resize-handle"
-                            data-orientation={terminalSplitLayout}
-                            className={
-                              terminalSplitLayout === "horizontal"
-                                ? "w-1.5 shrink-0 cursor-col-resize bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors"
-                                : "h-1.5 shrink-0 cursor-row-resize bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors"
-                            }
-                            onPointerDown={(event) => startLinearSplitResize(index, event)}
-                            role="separator"
-                            aria-orientation={terminalSplitLayout === "horizontal" ? "vertical" : "horizontal"}
-                            title={t("terminalSplit.resizePanes")}
-                          />
-                        )}
-                        </Fragment>
-                      );
-                    })}
-                    {terminalSplitVisible && terminalSplitLayout === "grid" && (
-                      <>
-                        {splitGridColumnWeightsForLayout.slice(0, -1).map((_, index) => (
-                          <div
-                            key={`grid-col-${index}`}
-                            data-testid="terminal-split-grid-column-resize-handle"
-                            className="absolute top-0 bottom-0 z-30 w-1.5 -translate-x-1/2 cursor-col-resize bg-transparent hover:bg-[var(--taomni-accent)]/70"
-                            style={{ left: `${cumulativeWeightPercent(splitGridColumnWeightsForLayout, index)}%` }}
-                            onPointerDown={(event) => startGridSplitResize("column", index, event)}
-                            role="separator"
-                            aria-orientation="vertical"
-                            title={t("terminalSplit.resizeColumn")}
-                          />
-                        ))}
-                        {splitGridRowWeightsForLayout.slice(0, -1).map((_, index) => (
-                          <div
-                            key={`grid-row-${index}`}
-                            data-testid="terminal-split-grid-row-resize-handle"
-                            className="absolute left-0 right-0 z-30 h-1.5 -translate-y-1/2 cursor-row-resize bg-transparent hover:bg-[var(--taomni-accent)]/70"
-                            style={{ top: `${cumulativeWeightPercent(splitGridRowWeightsForLayout, index)}%` }}
-                            onPointerDown={(event) => startGridSplitResize("row", index, event)}
-                            role="separator"
-                            aria-orientation="horizontal"
-                            title={t("terminalSplit.resizeRow")}
-                          />
-                        ))}
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {/* SFTP standalone tabs stay mounted so transfers can finish
-                    even when the user switches to another tab. */}
-                {sftpTabs.map((tab) => {
-                  if (!tab.sftp) return null;
-                  const isActive = activeTabId === tab.id;
-                  return (
-                    <div
-                      key={tab.id}
-                      className="absolute inset-0"
-                      style={{ display: isActive ? "block" : "none" }}
-                    >
-                      <FileBrowser
-                        sessionId={tab.sftp.sessionId}
-                        host={tab.sftp.host}
-                        port={tab.sftp.port}
-                        username={tab.sftp.username}
-                        authMethod={tab.sftp.authMethod}
-                        authData={tab.sftp.authData}
-                        networkSettingsJson={tab.sftp.networkSettingsJson ?? null}
-                        initialPath={tab.sftp.initialPath}
-                        pathMappings={tab.sftp.pathMappings}
-                        detachable
-                        onDetach={() => openDetachedSftp(tab.sftp!, tab.title)}
-                      />
-                    </div>
-                  );
-                })}
-
-                {settingsTabs.map((tab) => {
-                  const isActive = activeTabId === tab.id;
-                  return (
-                    <div
-                      key={tab.id}
-                      data-testid="settings-tab-panel"
-                      className="absolute inset-0"
-                      style={{ display: isActive ? "block" : "none" }}
-                    >
-                      <SettingsPanel />
-                    </div>
-                  );
-                })}
-
-                {/* Git tabs stay mounted so repository views, loaded logs, and
-                    scroll position survive switching to another app tab. */}
-                {gitTabs.map((tab) => {
-                  if (!tab.git) return null;
-                  const isActive = activeTabId === tab.id;
-                  const workspaceRoots = tab.git.workspaceRoots ?? [];
-                  return (
-                    <div
-                      key={tab.id}
-                      className="absolute inset-0"
-                      style={{ display: isActive ? "block" : "none" }}
-                    >
-                      {workspaceRoots.length > 0 ? (
-                        <WorkspaceGitManager
-                          workspaceName={tab.git.workspaceName}
-                          roots={workspaceRoots}
-                          activeRepoRoot={tab.git.activeRepoRoot ?? tab.git.repoRoot}
-                          visible={isActive}
-                          onOpenWorkspace={openCodeWorkspaceTab}
-                        />
-                      ) : (
-                        <GitPanel
-                          repoRoot={tab.git.repoRoot}
-                          visible={isActive}
-                          onOpenWorkspace={openCodeWorkspaceTab}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-
-                {codeWorkspaceTabs.map((tab) => {
-                  if (!tab.codeWorkspace) return null;
-                  const isActive = activeTabId === tab.id;
-                  return (
-                    <div
-                      key={tab.id}
-                      className="absolute inset-0"
-                      style={{ display: isActive ? "block" : "none" }}
-                    >
-                      <CodeWorkspaceTab
-                        tabId={tab.id}
-                        workspace={tab.codeWorkspace}
-                        visible={isActive}
-                        onOpenGitManager={openWorkspaceGitManager}
-                        onSyncGitManager={syncWorkspaceGitManager}
-                        onCommandsChange={handleWorkspaceCommandsChange}
-                      />
-                    </div>
-                  );
-                })}
-
-                {activeTab?.type === "lan-chat" && <LanChatGate />}
-
-                {tabs.some((tab) => tab.type === "mail-unified") && (
-                  <div className="absolute inset-0" style={{ display: activeTab?.type === "mail-unified" ? "block" : "none" }}>
-                    <MailUnifiedTab
-                      accounts={unifiedMailAccounts}
-                      visible={activeTab?.type === "mail-unified"}
-                      onOpenAccount={openMailAccountById}
-                    />
-                  </div>
-                )}
-
-                {/* VNC tabs — always mounted so connection survives tab switches */}
-                {vncTabs.map((tab) => {
-                  const vnc = tab.vnc;
-                  if (!vnc) return null;
-                  const isActive = activeTabId === tab.id;
-                  return (
-                    <div
-                      key={tab.id}
-                      className="absolute inset-0"
-                      style={{ display: isActive ? "block" : "none" }}
-                    >
-                      <Suspense fallback={<VncLoadingPanel />}>
-                        <VncPanel
-                          tabId={tab.id}
-                          host={vnc.host}
-                          port={vnc.port}
-                          username={vnc.username}
-                          password={vnc.password}
-                          networkSettingsJson={vnc.networkSettingsJson}
-                          securityPolicy={vnc.securityPolicy}
-                          viewOnly={vnc.viewOnly}
-                          clipboardPolicy={vnc.clipboardPolicy}
-                          viewerOptions={vnc.viewerOptions}
-                          onSessionPropertiesChange={(properties) => {
-                            void persistVncProperties(tab.id, vnc.sessionId, properties);
-                          }}
-                          onCredentialsChange={({ password: typed }) => {
-                            void rememberVncCredentials(tab.id, vnc.sessionId, typed);
-                          }}
-                          visible={isActive}
-                          onDetach={() => openDetachedVnc(tab.id, vnc, tab.title)}
-                        />
-                      </Suspense>
-                    </div>
-                  );
-                })}
-
-                {/* RDP tabs */}
-                {rdpTabs.map((tab) => {
-                  const rdp = tab.rdp;
-                  if (!rdp) return null;
-                  const isActive = activeTabId === tab.id;
-                  return (
-                    <div
-                      key={tab.id}
-                      className="absolute inset-0"
-                      style={{ display: isActive ? "block" : "none" }}
-                    >
-                      <Suspense fallback={<RdpLoadingPanel />}>
-                        <RdpPanel
-                          tabId={tab.id}
-                          host={rdp.host}
-                          port={rdp.port}
-                          username={rdp.username}
-                          password={rdp.password}
-                          options={rdp.options}
-                          networkSettingsJson={rdp.networkSettingsJson}
-                          visible={isActive}
-                          onDetach={() => openDetachedRdp(tab.id, rdp, tab.title)}
-                        />
-                      </Suspense>
-                    </div>
-                  );
-                })}
-
-                {/* Embedded local file-browser tabs (File session type). */}
-                {fileBrowserTabs.map((tab) => {
-                  if (!tab.fileBrowser) return null;
-                  const isActive = activeTabId === tab.id;
-                  return (
-                    <div
-                      key={tab.id}
-                      className="absolute inset-0"
-                      style={{ display: isActive ? "block" : "none" }}
-                    >
-                      <LocalFileBrowserPanel
-                        tabId={tab.id}
-                        initialPath={tab.fileBrowser.initialPath}
-                      />
-                    </div>
-                  );
-                })}
-
-                {/* Object-storage (S3 / Azure Blob) browser tabs — always
-                    mounted so in-flight transfers survive tab switches. */}
-                {objectStorageTabs.map((tab) => {
-                  if (!tab.objectStorage) return null;
-                  const isActive = activeTabId === tab.id;
-                  return (
-                    <div
-                      key={tab.id}
-                      className="absolute inset-0"
-                      style={{ display: isActive ? "block" : "none" }}
-                    >
-                      <ObjectStorageBrowser
-                        sessionId={tab.objectStorage.sessionId}
-                        config={tab.objectStorage.config}
-                        title={tab.title}
-                      />
-                    </div>
-                  );
-                })}
-
-                {mailTabs.map((tab) => {
-                  if (!tab.mail) return null;
-                  const isActive = activeTabId === tab.id;
-                  return (
-                    <div
-                      key={tab.id}
-                      className="absolute inset-0"
-                      style={{ display: isActive ? "block" : "none" }}
-                    >
-                      <MailClientTab
-                        tabId={tab.id}
-                        info={tab.mail}
-                        visible={isActive}
-                        onEditSession={handleEditSessionById}
-                      />
-                    </div>
-                  );
-                })}
-
-                {/* SQL database client tabs — always mounted so long queries
-                    keep running across tab switches. */}
-                {dbTabs.map((tab) => {
-                  if (!tab.db) return null;
-                  const isActive = activeTabId === tab.id;
-                  return (
-                    <div
-                      key={tab.id}
-                      className="absolute inset-0"
-                      style={{ display: isActive ? "block" : "none" }}
-                    >
-                      <Suspense fallback={<DbLoadingPanel />}>
-                        <DbClientTab
-                          tabId={tab.id}
-                          info={tab.db}
-                          visible={isActive}
-                        />
-                      </Suspense>
-                    </div>
-                  );
-                })}
-
-                {/* Redis client tabs — always mounted (CLI/monitor stay alive). */}
-                {redisTabs.map((tab) => {
-                  if (!tab.db) return null;
-                  const isActive = activeTabId === tab.id;
-                  return (
-                    <div
-                      key={tab.id}
-                      className="absolute inset-0"
-                      style={{ display: isActive ? "block" : "none" }}
-                    >
-                      <Suspense fallback={<DbLoadingPanel />}>
-                        <RedisClientTab
-                          tabId={tab.id}
-                          info={tab.db}
-                          visible={isActive}
-                        />
-                      </Suspense>
-                    </div>
-                  );
-                })}
-
-                {/* HBase shell UI tabs - always mounted so command history and
-                    active REST sessions survive tab switches. */}
-                {hbaseTabs.map((tab) => {
-                  if (!tab.hbase) return null;
-                  const isActive = activeTabId === tab.id;
-                  return (
-                    <div
-                      key={tab.id}
-                      className="absolute inset-0"
-                      style={{ display: isActive ? "block" : "none" }}
-                    >
-                      <Suspense fallback={<DbLoadingPanel />}>
-                        <HBaseShellTab tabId={tab.id} info={tab.hbase} visible={isActive} />
-                      </Suspense>
-                    </div>
-                  );
-                })}
-
-                {activeTab?.type === "nettools" && (
-                  <TunnelManager
-                    onStatusMessage={setStatusMessage}
-                    onClose={() => removeTab(activeTab.id)}
-                  />
-                )}
-
-                {activeTab?.type === "sockscap" && (
-                  <SocksCapPanel
-                    onStatusMessage={setStatusMessage}
-                    onClose={() => removeTab(activeTab.id)}
-                  />
-                )}
-
-                {activeTab?.type === "mfa" && <MfaTab onStatusMessage={setStatusMessage} />}
-
-                {activeTab?.type === "proxy-test" && activeTab.proxyTest && (
-                  <Suspense fallback={null}>
-                    <ProxyTestTab info={activeTab.proxyTest} />
-                  </Suspense>
-                )}
-
-                {/* Non-terminal, non-sftp, non-vnc, non-rdp, non-welcome, non-settings, non-nettools tabs */}
-                {activeTab &&
-                  activeTab.type !== "welcome" &&
-                  activeTab.type !== "terminal" &&
-                  activeTab.type !== "sftp" &&
-                  activeTab.type !== "vnc" &&
-                  activeTab.type !== "rdp" &&
-                  activeTab.type !== "file-browser" &&
-                  activeTab.type !== "database" &&
-                  activeTab.type !== "redis" &&
-                  activeTab.type !== "hbase-shell" &&
-                  activeTab.type !== "mail" &&
-                  activeTab.type !== "mail-unified" &&
-                  activeTab.type !== "settings" &&
-                  activeTab.type !== "git" &&
-                  activeTab.type !== "nettools" &&
-                  activeTab.type !== "sockscap" &&
-                  activeTab.type !== "lan-chat" &&
-                  activeTab.type !== "mfa" &&
-                  activeTab.type !== "proxy-test" && (
-                  <UnavailablePanel title={activeTab.title} message={activeTab.message} />
-                )}
-              </div>
+              <TabContentRouter
+  activeTab={activeTab}
+  welcomeRestore={welcomeRestore}
+  openLocalTab={openLocalTab}
+  handleNewSession={handleNewSession}
+  handleOpenLocalPath={handleOpenLocalPath}
+  openLanChatTab={openLanChatTab}
+  welcomeRecentSessions={welcomeRecentSessions}
+  recentWorkspaces={recentWorkspaces}
+  welcomeMailSessions={welcomeMailSessions}
+  handleConnectSession={handleConnectSession}
+  handleConnectSessions={handleConnectSessions}
+  handleEditSession={handleEditSession}
+  handleRevealRecentSession={handleRevealRecentSession}
+  openRecentCodeWorkspace={openRecentCodeWorkspace}
+  removeRecentWorkspace={removeRecentWorkspace}
+  clearRecentWorkspaces={clearRecentWorkspaces}
+  revealRecentCodeWorkspace={revealRecentCodeWorkspace}
+  openNewCodeWorkspaceFromWelcome={openNewCodeWorkspaceFromWelcome}
+  openSettingsTab={openSettingsTab}
+  terminalSplitVisible={terminalSplitVisible}
+  terminalSplitLayout={terminalSplitLayout}
+  terminalSplitInputLockedTabIds={terminalSplitInputLockedTabIds}
+  setTerminalSplitLayout={setTerminalSplitLayout}
+  clearTerminalSplitInputLocks={clearTerminalSplitInputLocks}
+  toggleTerminalSplit={toggleTerminalSplit}
+  splitPanesRef={splitPanesRef}
+  terminalPanesClass={terminalPanesClass}
+  splitGridColumnTemplate={splitGridColumnTemplate}
+  splitGridRowTemplate={splitGridRowTemplate}
+  terminalTabs={terminalTabs}
+  activeTabId={activeTabId}
+  attachedSidebars={attachedSidebars}
+  terminalProfileOverrides={terminalProfileOverrides}
+  terminalProfilesBySessionId={terminalProfilesBySessionId}
+  sessions={sessions}
+  terminalRuntimeByTab={terminalRuntimeByTab}
+  terminalCwds={terminalCwds}
+  t={t}
+  handleTerminalProfileChange={handleTerminalProfileChange}
+  handleTerminalCwd={handleTerminalCwd}
+  terminalCwdRequestTokens={terminalCwdRequestTokens}
+  terminalSessionIds={terminalSessionIds}
+  completeLocalLaunch={completeLocalLaunch}
+  resolveResumeWaiterForTab={resolveResumeWaiterForTab}
+  handleTerminalOutput={handleTerminalOutput}
+  handleTerminalLocalPathUpload={handleTerminalLocalPathUpload}
+  multiExecActive={multiExecActive}
+  multiExecSelectedTabIds={multiExecSelectedTabIds}
+  broadcastToSelectedTerminals={broadcastToSelectedTerminals}
+  openDetachedTerminal={openDetachedTerminal}
+  aiFullyDisabled={aiFullyDisabled}
+  terminalRailMerged={terminalRailMerged}
+  chatDrawerOpen={chatDrawerOpen}
+  toggleTabChat={toggleTabChat}
+  toggleTerminalSftp={toggleTerminalSftp}
+  terminalCwdsRef={terminalCwdsRef}
+  queryTerminalCwd={queryTerminalCwd}
+  openGitRepository={openGitRepository}
+  terminalCwdVersions={terminalCwdVersions}
+  toggleAttachedSidebar={toggleAttachedSidebar}
+  requestTerminalCwd={requestTerminalCwd}
+  pendingSftpUploadRequests={pendingSftpUploadRequests}
+  setPendingSftpUploadRequests={setPendingSftpUploadRequests}
+  setSftpDetachedTabs={setSftpDetachedTabs}
+  setAttachedSidebars={setAttachedSidebars}
+  openDetachedSftp={openDetachedSftp}
+  splitGridColumns={splitGridColumns}
+  splitPaneWeightsForTabs={splitPaneWeightsForTabs}
+  setActiveTab={setActiveTab}
+  toggleTerminalSplitInputLock={toggleTerminalSplitInputLock}
+  startLinearSplitResize={startLinearSplitResize}
+  splitGridColumnWeightsForLayout={splitGridColumnWeightsForLayout}
+  startGridSplitResize={startGridSplitResize}
+  splitGridRowWeightsForLayout={splitGridRowWeightsForLayout}
+  sftpTabs={sftpTabs}
+  settingsTabs={settingsTabs}
+  gitTabs={gitTabs}
+  openCodeWorkspaceTab={openCodeWorkspaceTab}
+  codeWorkspaceTabs={codeWorkspaceTabs}
+  openWorkspaceGitManager={openWorkspaceGitManager}
+  syncWorkspaceGitManager={syncWorkspaceGitManager}
+  handleWorkspaceCommandsChange={handleWorkspaceCommandsChange}
+  tabs={tabs}
+  unifiedMailAccounts={unifiedMailAccounts}
+  openMailAccountById={openMailAccountById}
+  vncTabs={vncTabs}
+  persistVncProperties={persistVncProperties}
+  rememberVncCredentials={rememberVncCredentials}
+  openDetachedVnc={openDetachedVnc}
+  rdpTabs={rdpTabs}
+  openDetachedRdp={openDetachedRdp}
+  fileBrowserTabs={fileBrowserTabs}
+  objectStorageTabs={objectStorageTabs}
+  mailTabs={mailTabs}
+  handleEditSessionById={handleEditSessionById}
+  dbTabs={dbTabs}
+  redisTabs={redisTabs}
+  hbaseTabs={hbaseTabs}
+  setStatusMessage={setStatusMessage}
+  removeTab={removeTab}
+/>
               </div>
               {chatDrawerInline && chatDrawerPosition === "right" && <ChatDrawer />}
             </div>
