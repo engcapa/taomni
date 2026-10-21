@@ -518,3 +518,19 @@ SessionEditor 从 1,633 行降至 51 行，MainLayout 从 1,615 行降至 64 行
 原有入口行为沿用已有用例，无需为纯搬迁新增重复 case。新增 IME 用例填补此次实际生命周期边界的证据缺口。清单更新到 2,652 项；整体 P0→P5 仍须继续处理其余大文件并完成最终全量与三端验证。
 
 M 三端 run 39636904994 当前已收齐 11 reports：Linux browser5/native8、macOS browser5/native7、Windows browser5，全通过且签名/hash/stable identity 校验成功，统一源码指纹 `dcc373287c86a2a26a5a4607729c10d3da152045e569783912a919265313b6ef`。macOS 的 TC-123 在 M 原生提交上通过。Windows native 尚在执行，完整聚合结论待收齐，不将此部分结果当作 M 完成验收。
+
+M 最终三端结果：完整提交 `3f1143ab8364bf9f69acd7dc87b913d5673fbce5`、[run 39636904994](https://github.com/engcapa/taomni/actions/runs/39636904994)，15 reports 全部下载至 `github-m/` 并核验签名、summary hash 和 stable source identity。Linux browser5/native8、Windows browser5/native8、macOS browser5/native7，总计 **38 passed / 0 failed / 0 skipped**。聚合 `ci-summary.json` 的 head 正确、`report_ok=true`、`passed=true`，failures/gaps/infrastructure_errors/unreviewed 均为空；统一 source identity 与上述部分结果相同。该次 selected planner 未运行 tool/native contracts，不能将 skipped job 算作合约通过。H/I/J 历史失败及其原始证据继续保留。
+
+## 2026-10-22 实施批次 O：工作区模型、事务、Action 与模板
+
+7 个旧门面继续提供兼容 API：dapDebugModel 1735→130、rearrangeCleanupWorkflow 1718→65、refactorPlan 1522→60、codeWorkspaceModel 1577→162、workspaceActionRegistry 1644→23、workspaceActionHost 1482→22、liveTemplates 1475→17。新增 68 个实现模块，最大 591 行；清单 2720 项。公开导出列表保持可读格式，未压缩实现来减少行数。
+
+- Debug 按状态、内存、源断点、函数/指令断点、数据断点和异常断点分层；工作流按能力、计划、变更 guard、action validation、Rearrange/Cleanup 事务分离；重构计划、postconditions、旧 journal 与存储/准备分开。原拒绝过期结果、原子提交和恢复约束保留。
+- 工作区 path/file/tree 与 build/run、LSP、Java 偏好独立；hash identity 与 Java preference keys 抽为共同底层，消除 files↔paths 和 Java↔LSP preferences 的循环。
+- ActionRegistry 与条件求值、领域 metadata 分离，132 个动作的原注册顺序完整保留。ActionHost 使用组合：注册层及 command adapter 有独立 owner，keymap/chord timer/view registry/index/display cache 有独立 owner，原 host 持有 execution/evaluation lifetime；typed callbacks 实时读取 generation、disposed 和 registrations，没有复制状态快照。原晚到 disposer、split owner、busy/stale evaluation 和冲突通知行为保留。
+- Live Templates 按语言目录、偏好订阅、匹配、provider 优先级、展开和 completion 分离。全局偏好订阅只随 cache owner 初始化一次，内置模板顺序及同步设置刷新保留。
+- `o-model-baseline.log`：修改前 10 files / 268 passed；`o-model-regression-1.log`：修改后同组 **268 passed**。`o-model-checks-2.log` 类型检查通过，`o-build.log` 完整 production build 通过；最终契约 761/328/39、586 implementation modules 边界检查通过。初始漏写 type re-export 的 `o-model-checks-1.log` 保留，后已修复。
+- 静态结构对照确认 6 个 model/catalog 门面导出一致、468 个原声明 AST 一致（仅 export/模块相对路径与格式调整）、132 个 metadata 及顺序一致。ActionHost 的组合改造由原 host/keymap 测试及真实 UI 入口验证，未用静态对照代替执行结果。
+- `browser-o/run-20261022-013518-613396492`：**12 passed / 0 failed / 0 skipped**，receipt 签名、summary hash、identity_stable 核验通过，源码身份 `46fa032947f79a27ba2c4a34e8851f93f81535df4516a0f1ba9200c5619633b0`。覆盖 keymap scheme 编辑/Apply、冲突重分配/取消、输入保护/Reset/Delete、tree recorder、Classic scheme、模板 popup/postfix/comment、breakpoint gutter/dialog、不可用 Rearrange/Cleanup、shell Actions 以及 Extract Method/Undo。随后只展开原门面的长 export 列表；最终组合仍需完整 SHA 的全量回归。
+
+本批为保留行为的实现重构，复用上述已执行的原场景，不新增只验证搬文件的用例。真实 JDT LS 整理/清理、refactor journal 磁盘恢复、DAP hit 和 WebView 重启持久化仍由最终组合上的原生场景验证。整体 P0→P5 尚未全部完成。

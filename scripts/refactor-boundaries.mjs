@@ -6,6 +6,13 @@ import ts from "typescript";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // These are implementation modules, not alternate application entry points.
 const boundaries = [
+  ["src/components/editor/workspace/actions", "src/components/editor/workspace/workspaceActionRegistry.ts"],
+  ["src/components/editor/workspace/actions", "src/components/editor/workspace/workspaceActionHost.ts"],
+  ["src/components/editor/workspace/templates", "src/components/editor/workspace/liveTemplates.ts"],
+  ["src/components/editor/workspace/debug/model", "src/components/editor/workspace/dapDebugModel.ts"],
+  ["src/components/editor/workspace/model", "src/components/editor/workspace/codeWorkspaceModel.ts"],
+  ["src/components/editor/workspace/workflow", "src/components/editor/workspace/rearrangeCleanupWorkflow.ts"],
+  ["src/components/editor/workspace/refactor", "src/components/editor/workspace/refactorPlan.ts"],
   ["src/components/screenshot/overlay", "src/components/screenshot/ScreenshotOverlay.tsx"],
   ["src/components/sidebar/sessionTree", "src/components/sidebar/SessionTree.tsx"],
   ["src/components/database/grid", "src/components/database/QueryResultGrid.tsx"],

@@ -11,7 +11,7 @@ scripts/configure-release-signing.mjs	tooling	mjs	tool-script	209	7	6	0		开发�
 scripts/configure-release-signing.test.mjs	tooling	mjs	test	187	8	0	0		自动化测试/QA 集成测试
 scripts/editor_performance_browser.py	frontend	py	frontend-lib	162	6	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 scripts/macos-runtime-paths.test.mjs	tooling	mjs	test	99	7	0	0		自动化测试/QA 集成测试
-scripts/refactor-boundaries.mjs	frontend	mjs	frontend-lib	102	4	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+scripts/refactor-boundaries.mjs	frontend	mjs	frontend-lib	109	4	0	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 scripts/refactor-contracts.mjs	frontend	mjs	frontend-lib	91	4	5	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 scripts/release-workflow.test.mjs	tooling	mjs	test	161	8	0	0		自动化测试/QA 集成测试
 scripts/resolve-release-build.mjs	tooling	mjs	tool-script	55	3	2	0		开发、QA、构建或性能工具脚本
@@ -1032,6 +1032,27 @@ src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-import-fixtu
 src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-rearrange-cleanup-fixture.mjs	frontend	mjs	fixture	205	6	0	0		测试 fixture/运行器
 src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-refactor-fixture.mjs	frontend	mjs	fixture	345	6	0	0		测试 fixture/运行器
 src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-usages-fixture.mjs	frontend	mjs	fixture	276	6	0	0		测试 fixture/运行器
+src/components/editor/workspace/actions/catalog/analysis.ts	frontend	ts	frontend-component	22	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/catalog/debug.ts	frontend	ts	frontend-component	133	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/catalog/editing.ts	frontend	ts	frontend-component	202	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/catalog/execution.ts	frontend	ts	frontend-component	56	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/catalog/files.ts	frontend	ts	frontend-component	74	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/catalog/index.ts	frontend	ts	frontend-component	151	11	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/catalog/movement.ts	frontend	ts	frontend-component	155	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/catalog/navigation.ts	frontend	ts	frontend-component	367	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/catalog/refactoring.ts	frontend	ts	frontend-component	117	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/catalog/search.ts	frontend	ts	frontend-component	37	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/catalog/view.ts	frontend	ts	frontend-component	203	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/conditions.ts	frontend	ts	frontend-component	107	1	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/host/bridge.ts	frontend	ts	frontend-component	20	2	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/host/context.ts	frontend	ts	frontend-component	42	1	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/host/host.ts	frontend	ts	frontend-component	591	8	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/host/keybindings.ts	frontend	ts	frontend-component	480	8	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/host/registrations.ts	frontend	ts	frontend-component	191	3	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/host/strokes.ts	frontend	ts	frontend-component	216	5	14	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/host/types.ts	frontend	ts	frontend-component	181	4	17	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/registry.ts	frontend	ts	frontend-component	185	2	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/actions/types.ts	frontend	ts	frontend-component	154	2	15	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/autoImportModel.test.ts	frontend	ts	test	320	4	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/autoImportModel.ts	frontend	ts	frontend-feature-lib	453	0	17	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/autoImportProvider.test.ts	frontend	ts	test	353	6	0	0		自动化测试/QA 集成测试
@@ -1048,7 +1069,7 @@ src/components/editor/workspace/codeStyleModel.test.ts	frontend	ts	test	148	2	0	
 src/components/editor/workspace/codeStyleModel.ts	frontend	ts	frontend-feature-lib	287	1	8	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/codeWorkspaceModel.buildRunTools.test.ts	frontend	ts	test	106	2	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/codeWorkspaceModel.javaSettings.test.ts	frontend	ts	test	61	2	0	0		自动化测试/QA 集成测试
-src/components/editor/workspace/codeWorkspaceModel.ts	frontend	ts	frontend-feature-lib	1577	8	147	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/codeWorkspaceModel.ts	frontend	ts	frontend-feature-lib	162	0	10	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/commands/ai.ts	frontend	ts	frontend-component	69	3	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/commands/code.ts	frontend	ts	frontend-component	201	4	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/commands/debug.ts	frontend	ts	frontend-component	200	3	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
@@ -1113,12 +1134,20 @@ src/components/editor/workspace/coverageModel.ts	frontend	ts	frontend-feature-li
 src/components/editor/workspace/dapAdapterContracts.test.ts	frontend	ts	test	162	3	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/dapAdapterContracts.ts	frontend	ts	frontend-feature-lib	287	1	10	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/dapDebugModel.test.ts	frontend	ts	test	963	2	0	0		自动化测试/QA 集成测试
-src/components/editor/workspace/dapDebugModel.ts	frontend	ts	frontend-feature-lib	1735	0	109	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/dapDebugModel.ts	frontend	ts	frontend-feature-lib	130	0	8	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/dataBreakpointTarget.test.ts	frontend	ts	test	47	3	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/dataBreakpointTarget.ts	frontend	ts	frontend-feature-lib	72	1	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/debug/breakpointPersistence.ts	frontend	ts	frontend-component	480	2	54	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/debug/errors.ts	frontend	ts	frontend-component	6	0	1	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/debug/launchPlan.ts	frontend	ts	frontend-component	22	1	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
+src/components/editor/workspace/debug/model/dataBreakpoints.ts	frontend	ts	frontend-component	141	2	8	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/debug/model/exceptionBreakpoints.ts	frontend	ts	frontend-component	236	3	10	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/debug/model/functionInstructionBreakpoints.ts	frontend	ts	frontend-component	215	2	12	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/debug/model/memory.ts	frontend	ts	frontend-component	157	2	12	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/debug/model/shared.ts	frontend	ts	frontend-component	21	1	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/debug/model/sourceBreakpoints.ts	frontend	ts	frontend-component	227	3	11	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/debug/model/state.ts	frontend	ts	frontend-component	345	2	16	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/debug/model/types.ts	frontend	ts	frontend-component	459	0	46	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/debug/requestLimits.ts	frontend	ts	frontend-component	22	0	6	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/debug/types.ts	frontend	ts	frontend-component	302	3	11	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/debug/useBreakpointActions.ts	frontend	ts	frontend-component	636	6	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
@@ -1318,7 +1347,7 @@ src/components/editor/workspace/languageServiceReadiness.ts	frontend	ts	frontend
 src/components/editor/workspace/largeFile.test.ts	frontend	ts	test	31	2	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/largeFile.ts	frontend	ts	frontend-feature-lib	29	0	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/liveTemplates.test.ts	frontend	ts	test	345	6	0	0		自动化测试/QA 集成测试
-src/components/editor/workspace/liveTemplates.ts	frontend	ts	frontend-feature-lib	1475	5	26	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/liveTemplates.ts	frontend	ts	frontend-feature-lib	17	0	9	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/lspCompletion.test.ts	frontend	ts	test	2068	7	0	0	>=2000	自动化测试/QA 集成测试
 src/components/editor/workspace/lspCompletion.ts	frontend	ts	frontend-feature-lib	112	0	11	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/lspCompletionChoice.test.ts	frontend	ts	test	100	2	0	0		自动化测试/QA 集成测试
@@ -1334,6 +1363,18 @@ src/components/editor/workspace/lspPositions.ts	frontend	ts	frontend-feature-lib
 src/components/editor/workspace/lspSyncGate.test.ts	frontend	ts	test	81	3	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/lspTextEdits.test.ts	frontend	ts	test	193	3	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/lspTextEdits.ts	frontend	ts	frontend-feature-lib	221	1	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/model/buildRunPreferences.ts	frontend	ts	frontend-component	137	2	9	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/model/files.ts	frontend	ts	frontend-component	266	5	27	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/model/identity.ts	frontend	ts	frontend-component	7	0	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/model/javaPreferences.ts	frontend	ts	frontend-component	204	3	16	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/model/lspBinding.ts	frontend	ts	frontend-component	70	1	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/model/lspPreferenceKeys.ts	frontend	ts	frontend-component	17	0	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/model/lspPreferences.ts	frontend	ts	frontend-component	143	3	12	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/model/mermaid.ts	frontend	ts	frontend-component	73	1	7	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/model/paths.ts	frontend	ts	frontend-component	291	4	29	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/model/treePreferences.ts	frontend	ts	frontend-component	68	2	17	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/model/trees.ts	frontend	ts	frontend-component	217	5	16	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/model/types.ts	frontend	ts	frontend-component	129	7	18	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/navigationBarModel.test.ts	frontend	ts	test	67	4	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/navigationBarModel.ts	frontend	ts	frontend-feature-lib	70	2	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/navigationHistoryModel.test.ts	frontend	ts	test	375	2	0	0		自动化测试/QA 集成测试
@@ -1414,12 +1455,18 @@ src/components/editor/workspace/projectTreeNavigation.ts	frontend	ts	frontend-fe
 src/components/editor/workspace/providerUsageEvidence.test.ts	frontend	ts	test	131	3	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/providerUsageEvidence.ts	frontend	ts	frontend-feature-lib	166	3	9	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/rearrangeCleanupWorkflow.test.ts	frontend	ts	test	1641	3	0	0		自动化测试/QA 集成测试
-src/components/editor/workspace/rearrangeCleanupWorkflow.ts	frontend	ts	frontend-feature-lib	1718	5	62	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/rearrangeCleanupWorkflow.ts	frontend	ts	frontend-feature-lib	65	0	6	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/recursiveLayoutTree.test.ts	frontend	ts	test	696	2	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/recursiveLayoutTree.ts	frontend	ts	frontend-feature-lib	1237	1	34	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/refactor/journalPreparation.ts	frontend	ts	frontend-component	283	7	8	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/refactor/journalStorage.ts	frontend	ts	frontend-component	227	2	10	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/refactor/legacyJournal.ts	frontend	ts	frontend-component	106	3	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/refactor/plan.ts	frontend	ts	frontend-component	431	6	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/refactor/postconditions.ts	frontend	ts	frontend-component	172	3	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/refactor/types.ts	frontend	ts	frontend-component	340	2	25	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/refactorOptions.ts	frontend	ts	frontend-feature-lib	30	0	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/refactorPlan.test.ts	frontend	ts	test	1443	7	0	0		自动化测试/QA 集成测试
-src/components/editor/workspace/refactorPlan.ts	frontend	ts	frontend-feature-lib	1522	8	53	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/refactorPlan.ts	frontend	ts	frontend-feature-lib	60	0	6	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/refactorRecoveryController.test.ts	frontend	ts	test	568	6	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/refactorRecoveryController.ts	frontend	ts	frontend-feature-lib	609	5	13	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/referenceDocumentation.test.ts	frontend	ts	test	89	2	0	0		自动化测试/QA 集成测试
@@ -1466,6 +1513,20 @@ src/components/editor/workspace/structuralSearchTemplates.ts	frontend	ts	fronten
 src/components/editor/workspace/symbolKinds.ts	frontend	ts	frontend-feature-lib	26	0	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/syntaxContext.test.ts	frontend	ts	test	46	4	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/syntaxContext.ts	frontend	ts	frontend-feature-lib	63	2	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/templates/catalog/index.ts	frontend	ts	frontend-component	39	8	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/templates/catalog/java.ts	frontend	ts	frontend-component	312	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/templates/catalog/javascript.ts	frontend	ts	frontend-component	190	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/templates/catalog/jvm.ts	frontend	ts	frontend-component	79	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/templates/catalog/python.ts	frontend	ts	frontend-component	90	1	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/templates/catalog/systems.ts	frontend	ts	frontend-component	143	1	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/templates/catalog/web.ts	frontend	ts	frontend-component	74	1	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/templates/completion.ts	frontend	ts	frontend-component	144	7	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/templates/expansion.ts	frontend	ts	frontend-component	66	6	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/templates/language.ts	frontend	ts	frontend-component	43	2	2	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/templates/matching.ts	frontend	ts	frontend-component	179	6	5	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/templates/preferences.ts	frontend	ts	frontend-component	22	1	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/templates/provider.ts	frontend	ts	frontend-component	66	5	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/templates/types.ts	frontend	ts	frontend-component	46	1	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/tests/atomicSave.cases.tsx	frontend	tsx	test	1383	14	1	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/tests/cleanup.cases.tsx	frontend	tsx	test	405	8	1	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/tests/compare.cases.tsx	frontend	tsx	test	274	10	1	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
@@ -1539,11 +1600,18 @@ src/components/editor/workspace/views/editorGroupView.tsx	frontend	tsx	frontend-
 src/components/editor/workspace/views/toolWindowChrome.tsx	frontend	tsx	frontend-component	240	8	2	0		原生产入口接线的领域模块；按目录职责查看 inputs/state/effects
 src/components/editor/workspace/windowResizeSession.test.ts	frontend	ts	test	52	2	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/windowResizeSession.ts	frontend	ts	frontend-feature-lib	54	0	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workflow/actionValidation.ts	frontend	ts	frontend-component	216	3	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/workflow/capabilities.ts	frontend	ts	frontend-component	229	2	8	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/workflow/cleanupTransaction.ts	frontend	ts	frontend-component	263	6	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/workflow/mutationGuard.ts	frontend	ts	frontend-component	84	2	3	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/workflow/plans.ts	frontend	ts	frontend-component	228	5	6	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/workflow/rearrangeTransaction.ts	frontend	ts	frontend-component	289	6	1	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
+src/components/editor/workspace/workflow/types.ts	frontend	ts	frontend-component	435	2	47	0		按职责拆分并接入原生产入口的领域模块；显式输入与生命周期归属
 src/components/editor/workspace/workspaceActionHost.test.ts	frontend	ts	test	544	4	0	0		自动化测试/QA 集成测试
-src/components/editor/workspace/workspaceActionHost.ts	frontend	ts	frontend-feature-lib	1482	5	18	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceActionHost.ts	frontend	ts	frontend-feature-lib	22	0	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/workspaceActionHostKeymap.test.ts	frontend	ts	test	340	6	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/workspaceActionRegistry.test.ts	frontend	ts	test	225	2	0	0		自动化测试/QA 集成测试
-src/components/editor/workspace/workspaceActionRegistry.ts	frontend	ts	frontend-feature-lib	1644	2	18	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceActionRegistry.ts	frontend	ts	frontend-feature-lib	23	0	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
 src/components/editor/workspace/workspaceChrome.test.tsx	frontend	tsx	test	266	5	0	0		自动化测试/QA 集成测试
 src/components/editor/workspace/workspaceChrome.tsx	frontend	tsx	frontend-component	116	5	3	0		React UI/交互组件，具体职责由目录和文件名定义
 src/components/editor/workspace/workspaceClipboardHistory.test.ts	frontend	ts	test	278	2	0	0		自动化测试/QA 集成测试
