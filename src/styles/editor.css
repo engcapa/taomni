@@ -1,0 +1,154 @@
+
+/*
+ * LSP hover / documentation tooltips live in CodeMirror tooltips (often portaled)
+ * and reuse .taomni-chat-md. Chat-md styles target app chrome vars (--taomni-bg,
+ * --taomni-divider, …) which can clash with the active code theme (e.g. light
+ * pre backgrounds inside a dark code tooltip). Force code-theme tokens here.
+ */
+.cm-tooltip {
+  z-index: 50 !important;
+}
+
+.cm-tooltip.cm-tooltip-hover {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+
+.cm-lsp-hover-container {
+  width: 440px;
+  height: 280px;
+  min-width: 260px;
+  min-height: 100px;
+  max-width: min(560px, 85vw);
+  max-height: min(380px, 45vh);
+  resize: both;
+}
+
+.cm-lsp-hover,
+.cm-tooltip .cm-lsp-hover {
+  background: var(--taomni-code-tooltip-bg) !important;
+  color: var(--taomni-code-text) !important;
+  border-color: var(--taomni-code-border) !important;
+}
+.cm-lsp-hover.taomni-chat-md,
+.cm-tooltip .taomni-chat-md {
+  color: var(--taomni-code-text);
+}
+.cm-lsp-hover.taomni-chat-md a,
+.cm-tooltip .taomni-chat-md a {
+  color: var(--taomni-code-syntax-link);
+  text-decoration-color: color-mix(in srgb, var(--taomni-code-syntax-link) 50%, transparent);
+}
+.cm-lsp-hover.taomni-chat-md h4,
+.cm-lsp-hover.taomni-chat-md h5,
+.cm-lsp-hover.taomni-chat-md h6,
+.cm-tooltip .taomni-chat-md h4,
+.cm-tooltip .taomni-chat-md h5,
+.cm-tooltip .taomni-chat-md h6,
+.cm-lsp-hover.taomni-chat-md blockquote,
+.cm-tooltip .taomni-chat-md blockquote {
+  color: var(--taomni-code-muted);
+}
+.cm-lsp-hover.taomni-chat-md code,
+.cm-tooltip .taomni-chat-md code {
+  background: color-mix(in srgb, var(--taomni-code-border) 70%, transparent);
+  color: var(--taomni-code-text);
+}
+.cm-lsp-hover.taomni-chat-md pre,
+.cm-tooltip .taomni-chat-md pre {
+  background: var(--taomni-code-bg);
+  border: 1px solid var(--taomni-code-border);
+  color: var(--taomni-code-text);
+}
+.cm-lsp-hover.taomni-chat-md pre code,
+.cm-tooltip .taomni-chat-md pre code {
+  background: transparent;
+  color: inherit;
+}
+.cm-lsp-hover.taomni-chat-md th,
+.cm-tooltip .taomni-chat-md th {
+  background: color-mix(in srgb, var(--taomni-code-border) 55%, transparent);
+}
+.cm-lsp-hover.taomni-chat-md th,
+.cm-lsp-hover.taomni-chat-md td,
+.cm-tooltip .taomni-chat-md th,
+.cm-tooltip .taomni-chat-md td {
+  border-color: var(--taomni-code-border);
+}
+.cm-lsp-hover.taomni-chat-md hr,
+.cm-tooltip .taomni-chat-md hr {
+  border-top-color: var(--taomni-code-border);
+}
+/* Completion list detail/info panes share the same tokens. */
+.cm-tooltip-autocomplete,
+.cm-tooltip.cm-completionInfo {
+  background: var(--taomni-code-tooltip-bg) !important;
+  color: var(--taomni-code-text) !important;
+  border-color: var(--taomni-code-border) !important;
+}
+
+/* Editor candidate menus use one surface and selection treatment, whether
+   opened by Completion (Alt+/) or Quick Fix (Alt+Enter). */
+.cm-tooltip-autocomplete,
+[data-taomni-context-menu][data-appearance="code-candidates"] {
+  background: var(--taomni-code-tooltip-bg) !important;
+  color: var(--taomni-code-text) !important;
+  border: 1px solid var(--taomni-code-border) !important;
+  border-radius: 4px;
+  box-shadow: var(--taomni-shadow-lg);
+  padding: 0 !important;
+  font-family: var(--taomni-code-font-family);
+  font-size: var(--taomni-code-font-size);
+  line-height: 1.5;
+  overflow: hidden;
+}
+.cm-tooltip-autocomplete {
+  max-width: min(540px, calc(100vw - 12px));
+}
+.cm-tooltip-autocomplete > ul,
+[data-taomni-context-menu][data-appearance="code-candidates"] {
+  max-height: min(300px, calc(100vh - 12px)) !important;
+  max-width: min(700px, calc(100vw - 12px));
+  overflow-y: auto;
+}
+.cm-tooltip-autocomplete > ul > li[role="option"],
+[data-taomni-context-menu][data-appearance="code-candidates"] button {
+  padding: 2px 8px !important;
+  cursor: pointer;
+  background: transparent !important;
+}
+.cm-tooltip-autocomplete > ul > li[role="option"]:not([aria-selected="true"]):hover,
+[data-taomni-context-menu][data-appearance="code-candidates"] button:not([data-active="true"]):hover {
+  background: transparent !important;
+  color: inherit !important;
+}
+.cm-tooltip-autocomplete > ul > li[aria-selected="true"][role="option"],
+[data-taomni-context-menu][data-appearance="code-candidates"] button[data-active="true"]:enabled,
+[data-taomni-context-menu][data-appearance="code-candidates"] button[data-active="true"]:enabled:hover {
+  background: #1d4ed8 !important;
+  color: #ffffff !important;
+  box-shadow: inset 3px 0 #93c5fd !important;
+}
+.cm-tooltip-autocomplete > ul > li[aria-selected="true"] .cm-completionIcon,
+.cm-tooltip-autocomplete > ul > li[aria-selected="true"] .cm-completionMatchedText,
+[data-taomni-context-menu][data-appearance="code-candidates"] button[data-active="true"]:enabled span {
+  color: inherit !important;
+  opacity: 1 !important;
+}
+.cm-tooltip-autocomplete > ul > li[aria-selected="true"][role="option"] {
+  background: color-mix(in srgb, var(--taomni-code-text) 10%, var(--taomni-code-tooltip-bg)) !important;
+  color: var(--taomni-code-text) !important;
+  box-shadow: none !important;
+}
+.cm-tooltip-autocomplete .cm-completionDetail {
+  color: var(--taomni-code-muted);
+  font-style: normal;
+}
+[data-taomni-context-menu][data-appearance="code-candidates"] button:disabled {
+  cursor: default !important;
+  opacity: 0.55;
+  background: transparent !important;
+}

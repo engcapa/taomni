@@ -35,6 +35,7 @@ Rust uses snake_case modules/functions and rustfmt's four-space indentation with
 - Keep tests focused by behavior/scenario and share fixtures through dedicated harness modules. Move large Rust inline test suites into test modules when they obscure production responsibilities. Do not reduce line counts by compressing formatting, deleting assertions, or hiding code in generated strings.
 - Generated bindings, protocol schemas, locale dictionaries, and indivisible fixtures may exceed the limit. Other exceptions need a concrete technical reason and an explicit follow-up boundary recorded in the relevant design or refactoring document; file size alone is not a reason to split generated or homogeneous declarative data.
 - For each split, run the affected behavior tests and required boundary/contract checks. Verify native side effects in native tests; a successful build or a smaller line count does not establish behavioral equivalence.
+- Run `pnpm check:refactor` before committing. It checks compatibility, dependency boundaries, and the 800-line limit for product sources, tests, fixtures, and build scripts; `pnpm build` runs the same checks. Keep any generated/declarative exceptions explicit in `scripts/source-file-size.mjs` and explain them in the refactoring document.
 
 ## External Network Access & Downloads
 

@@ -9,14 +9,14 @@ import { useAppStore } from "../../../../stores/appStore";
 import { useCodeWorkspaceStatusStore } from "../../../../stores/codeWorkspaceStatusStore";
 import { selectCodeWorkspaceUi, useCodeWorkspaceStore } from "../../../../stores/codeWorkspaceStore";
 import type { CodeWorkspaceTabInfo } from "../../../../types";
-import type { WorkspaceTestFixture } from "../../CodeWorkspaceTab.test";
+import type { WorkspaceTestFixture } from "../../tests/codeWorkspaceTab/harness";
 import { registerAtomicSaveCases } from "./atomicSave.cases";
 import { registerSaveRetryCases } from "./saveRetry.cases";
 
 export type registerSaveCasesFixture = Pick<WorkspaceTestFixture, "documentStatus" | "defaultCapabilities" | "workspaceMocks" | "file" | "lspMocks" | "renderWorkspace" | "writeAck" | "entry" | "runtimeState" | "csharpStatus" | "toolbarControl" | "localHistoryMocks" | "saveCommitObservations" | "saveRaceGate" | "clipboardMocks">;
 
 export function registerSaveCases(workspaceTestHarness: registerSaveCasesFixture) {
-it("uses the canonical plan-only result for organize imports on save", async () => {
+  it("uses the canonical plan-only result for organize imports on save", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
       workspaceId: "ws-action-save-plan",
@@ -162,7 +162,7 @@ it("uses the canonical plan-only result for organize imports on save", async () 
       "save action issue: Organize imports: Code action request failed: provider transport failed",
     ));
   });
-it("ED-PARITY-007 organize imports on save reports provider failure but still saves", async () => {
+  it("ED-PARITY-007 organize imports on save reports provider failure but still saves", async () => {
     const instanceId = "instance-parity007-save-action";
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
@@ -243,7 +243,7 @@ it("ED-PARITY-007 organize imports on save reports provider failure but still sa
     ).openFiles["root:app:src/main.ts"]?.dirty).toBe(false));
     expect(workspaceTestHarness.lspMocks.lspExecuteCommand).not.toHaveBeenCalled();
   });
-it("persists the workspace format-on-save switch and saves formatted text", async () => {
+  it("persists the workspace format-on-save switch and saves formatted text", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
       workspaceId: "ws-format-on-save",
@@ -347,7 +347,7 @@ it("persists the workspace format-on-save switch and saves formatted text", asyn
       [{ path: "/repo/app/src/main.ts", type: 2 }],
     );
   });
-it("preserves unsaved EOL and BOM choices when a save watcher echo arrives", async () => {
+  it("preserves unsaved EOL and BOM choices when a save watcher echo arrives", async () => {
     workspaceTestHarness.runtimeState.tauri = true;
     const instance = "instance-watcher-policy";
     const workspace: CodeWorkspaceTabInfo = {
@@ -380,7 +380,7 @@ it("preserves unsaved EOL and BOM choices when a save watcher echo arrives", asy
     await waitFor(() => expect(current()?.hash).toBe("watcher-refreshed"));
     expect(current()).toMatchObject({ eol: "CRLF", bom: true, dirty: true, text: "first\nsecond" });
   });
-it("queues an external dirty-buffer conflict and applies a merge against the latest disk hash", async () => {
+  it("queues an external dirty-buffer conflict and applies a merge against the latest disk hash", async () => {
     workspaceTestHarness.runtimeState.tauri = true;
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
@@ -444,7 +444,7 @@ it("queues an external dirty-buffer conflict and applies a merge against the lat
     });
     expect(screen.queryByTestId("external-file-conflict-dialog")).not.toBeInTheDocument();
   });
-it("ED-AUDIT-009: split close keeps survivor history, dirty cancel is zero effect, reopen reads saved bytes", async () => {
+  it("ED-AUDIT-009: split close keeps survivor history, dirty cancel is zero effect, reopen reads saved bytes", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
       workspaceId: "ws-audit009-close",
@@ -537,7 +537,7 @@ it("ED-AUDIT-009: split close keeps survivor history, dirty cancel is zero effec
     ).toBe("alpha\nbeta\n"));
     expect(workspaceTestHarness.workspaceMocks.workspaceWriteFile).not.toHaveBeenCalled();
   });
-it("sets mnemonic bookmarks through the mounted prompt and replaces conflicts", async () => {
+  it("sets mnemonic bookmarks through the mounted prompt and replaces conflicts", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
       workspaceId: "ws-mnemonic-mounted",
@@ -574,7 +574,7 @@ it("sets mnemonic bookmarks through the mounted prompt and replaces conflicts", 
     await waitFor(() => {
       const saved = JSON.parse(
         window.localStorage.getItem("taomni.codeWorkspace.bookmarks.v1.instance-mnemonic-mounted") ?? "[]",
-      ) as Array<{ line: number; mnemonic: string | null; group: string | null }>;
+      ) as Array<{ line: number; mnemonic: string | null; group: string | null; }>;
       expect(saved).toHaveLength(1);
       expect(saved[0]).toMatchObject({ line: 0, mnemonic: "A", group: "Mnemonic" });
       expect(panel).toHaveTextContent("A");
@@ -591,7 +591,7 @@ it("sets mnemonic bookmarks through the mounted prompt and replaces conflicts", 
     await waitFor(() => {
       const saved = JSON.parse(
         window.localStorage.getItem("taomni.codeWorkspace.bookmarks.v1.instance-mnemonic-mounted") ?? "[]",
-      ) as Array<{ line: number; mnemonic: string | null }>;
+      ) as Array<{ line: number; mnemonic: string | null; }>;
       expect(saved).toHaveLength(2);
       expect(saved.find((bookmark) => bookmark.line === 0)?.mnemonic).toBeNull();
       expect(saved.find((bookmark) => bookmark.line === 1)?.mnemonic).toBe("A");
@@ -601,7 +601,7 @@ it("sets mnemonic bookmarks through the mounted prompt and replaces conflicts", 
     });
     rendered.unmount();
   });
-it("opens the encoding chooser from workspace status and saves through the encoded writer", async () => {
+  it("opens the encoding chooser from workspace status and saves through the encoded writer", async () => {
     workspaceTestHarness.runtimeState.tauri = true;
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
@@ -676,7 +676,7 @@ it("opens the encoding chooser from workspace status and saves through the encod
         .openFiles["root:app:src/main.txt"],
     ).toMatchObject({ encoding: "ISO-8859-1", dirty: false });
   });
-it("opens a queued encoding chooser after an in-flight save settles", async () => {
+  it("opens a queued encoding chooser after an in-flight save settles", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
       workspaceId: "ws-encoding-save-race",
@@ -715,7 +715,7 @@ it("opens a queued encoding chooser after an in-flight save settles", async () =
     });
     expect(await screen.findByTestId("file-encoding-dialog")).toBeInTheDocument();
   });
-it("reloads the active file with an explicit encoding from the status action", async () => {
+  it("reloads the active file with an explicit encoding from the status action", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
       workspaceId: "ws-encoding-reload",
@@ -762,6 +762,6 @@ it("reloads the active file with an explicit encoding from the status action", a
     });
     expect(screen.queryByTestId("file-encoding-dialog")).toBeNull();
   });
-registerAtomicSaveCases(workspaceTestHarness);
-registerSaveRetryCases(workspaceTestHarness);
+  registerAtomicSaveCases(workspaceTestHarness);
+  registerSaveRetryCases(workspaceTestHarness);
 }

@@ -4,14 +4,16 @@
 
 这是一项进行中的全仓重构。阶段完成要求原实现真正迁出、生产调用接入、保留契约经过验证。新增未接线的 controller 或仅验证自身的测试不算完成。早期未接线草稿已移除。
 
-| 阶段 | 当前状态 | 剩余验收 |
+| 阶段 | 当前状态（截至 Y 批次） | 剩余验收 |
 | --- | --- | --- |
-| P0 基线 | 已记录 761 个实际注册命令、299 个 façade 导出、39 个前端字面量事件；IPC/store 改前 68 项测试通过 | 完成全部受影响工作流映射、回归证据 |
-| P1 IPC/启动/状态 | IPC/slices/native registrar/stub registry/domain runtime 已迁移 | 三端启动与全量 native 回归 |
-| P2 Workspace/LSP | 部分实现，见批次 A | 编辑器、LSP、文件/执行服务实际拆分与回归 |
-| P3 Shell/Session | 部分实现，见批次 A | MainLayout、SessionEditor、TerminalPanel 实际拆分与回归 |
-| P4 Mail/DB/File/Git | 部分实现，见批次 A | UI、服务与传输边界实际拆分与回归 |
-| P5 协议/系统能力 | 部分实现，见批次 A | RDP/VNC、SocksCap、Screenshot、Chat/LanChat/Backup 实际拆分与回归 |
+| P0 基线 | 命令、导出、事件快照及生产边界检查已接入构建；规模规则已提交至 AGENTS.md | 最终提交的全量回归、报告身份与平台缺口核验 |
+| P1 IPC/启动/状态 | IPC、stub registry、Zustand slices、native registrar 和 7 个 AppState domain runtime 已接入原入口 | 最终三端启动、持久化与 native 回归 |
+| P2 Workspace/LSP | 主 shell、编辑器 host、状态/生命周期 owners、保存/恢复/重构、LSP transport/requests/Java、workspace/execution providers 和大型测试已拆分 | 最终组合的真实 JDT LS、磁盘事务、DAP；S 的 Windows rename 失败仍待验证 |
+| P3 Shell/Session | MainLayout、SessionEditor、TerminalPanel 的视图、协议表单、连接/认证队列、窗口/传输/输入/viewport owners 已拆分 | 最终三端 SSH/PTY、IME、窗口、取消/重连与持续会话 |
+| P4 Mail/DB/File/Git | 前端视图与 owners、IMAP/POP3/OAuth/SMTP/cache、查询/事务/grid、文件传输和 Git services 已拆分 | 最终三端真实服务、存储、恢复/取消及交互回归 |
+| P5 协议/系统能力 | RDP/VNC、平台捕获/编码/输入/clipboard、SocksCap、Screenshot、Chat/LanChat/Backup 责任已拆分 | 最终三端 native 系统边界、恢复和 15% 性能门槛 |
+
+原始代码规模基线和早期批次时间线保留在下文。当前所有手维护产品实现、测试及 fixture runner 均已≤800行，例外仅为生成 Thrift 绑定、locale 字典和同构静态命令清单。实施完成与全阶段验收完成分开记录；尚未收齐最终三端证据，不宣称 P0→P5 整体完成。
 
 ## 保留契约
 
@@ -666,3 +668,38 @@ S三端最终运行[39659861812](https://github.com/engcapa/taomni/actions/runs/
 - 初期导入型别的nested import-type unused诊断、RunPanel闭包null narrowing及defaultTunnel导出来源遗漏已修；原日志保留。复用原有可执行行为场景，没有删除或放宽断言；browser SSH bridge不作为native网络/系统副作用证据。
 
 W三端[39671362228](https://github.com/engcapa/taomni/actions/runs/39671362228)的browser各shard已执行，Linux native仍运行。macOS/Windows release build发现拆分后的平台trait作用域遗漏：macOS bridge的Read/PermissionsExt及SCK lifetime的AnyThread、Windows PTY shell的CommandExt。保留两端原build日志，修复后须在新完整SHA重新编译验证；当前不称三端通过。
+
+
+## 2026-10-22 W 三端结果补记
+
+[39671362228](https://github.com/engcapa/taomni/actions/runs/39671362228) 最终为 failure，完整 head `ebd5683c14bca15e13346881893d7fc9122029e8`。三平台 browser 各37项通过，Linux native38项通过，合计 **149 passed /0 case failed /0 skipped**；macOS/Windows release build失败，因此两端native没有执行，不能计为三端通过。10份原始报告的receipt签名、hash、stable identity已核验，source identity `36fe9d9f17afb6ca8a38b918f0400033280a01b1dec549eb24108506264dad92`，aggregate保留两端missing outcomes。原始材料在 `github-w/`。
+
+## 2026-10-22 实施批次 Y：测试、样式和 Java fixture 的职责拆分
+
+- 4个 Rust 大测试入口（LSP、workspace、mail、RDP session）拆出22个场景模块，保留原test/ignore/cfg和同一JAVA_GLOBALS_LOCK。258个原test/helper函数的规范化tokens逐一相等；helper留在原父作用域共享。
+- 29个前端测试入口与9个既有CodeWorkspace case模块按场景拆分，mock/fixture归专用harness。原位置调用registration函数，保留describe和beforeEach/afterEach作用域与顺序。mutable fixture通过getter/setter引用当前值，避免捕获重置前值；harness必须在根测试首行导入，保持mock先于生产入口初始化。
+- 1460个原it/test调用树和全部断言逐一保持，含失败/竞态/恢复场景。没有压缩格式、删除断言或把测试变成对提取实现自身的复述。
+- `src/index.css`1936行拆成12个主题/功能样式模块。按原顺序拼接与原第15行至末尾逐字一致，保持cascade顺序；主题、terminal、notes/chat、editor、mail、SocksCap等实际消费者进行浏览器回归。
+- JDT LS fixture runner1728→67行，拆出paths/toolchain/matrix/session/text edits/analysis/quickfix/completion/language insights/trace/run owner共11个模块；最大462行。paths仍在原runner目录，import.meta.url路径语义保持。真实Java21/JDT LS initialize、didOpen和shutdown探针已通过。
+- 修复W原生编译暴露的trait作用域遗漏：Windows PTY CommandExt，macOS SCK AnyThread，SocksCap bridge PermissionsExt/AsyncReadExt/AsyncBufReadExt。Linux测试不能证明这些平台修复，须新完整SHA重新编译。
+
+当前清单3883项。本批所有新增/修改模块≤800行，最大767行。生成Thrift绑定与locale不手工拆；`commands/mod.rs`807行是761个同构静态命令注册条目，域registrar已独立，Tauri generate_handler!需要编译期完整路由，因此保留此声明性清单；新增行为应进入领域模块，后续Tauri支持组合handler时再消除单清单。
+
+QA runner/技能脚本及vendored第三方代码不属于P0→P5产品边界；原方案P6治理任务保留，不将其算作已重构产品实现。当前验收仍以最终完整提交的全量测试和三端scope=all为准。
+
+本批验证：`y-ui-final.log` 29 files /1551 passed /1原有conditional skip；`y-rust.log` lib1868 passed /25 ignored、integration80 passed、rdp-probe15 passed。原有失败日志保留（共享mock路径、mutable fixture绑定及提取类型缺失已修）；最终build、CSS编译对照、browser与全量Vitest结果随后补记。
+
+
+Y补记：`y-build-final-3.log`完整build通过，契约761/328/39与868 implementation modules边界通过。拆分前后production CSS均为208578 bytes，逐字相等，SHA256 `c6319ea5f63e1413369bcba5627d734bf048b4854c08a744b435bde95d3e1fa4`。
+
+`browser-y/run-20261022-051137-489176621` **13 passed /0 failed /0 skipped**：主题切换/持久化、terminal theme、mail compose/appearance/archive、chat drawer/pin、notes编辑/浮窗、narrow rail、editor shell、DB execution log和SocksCap。receipt签名、summary hash和stable identity通过；source identity `1f6bbd18d447ef2fbd3ac0a2a6c9b022a4e63ba91ffe37660ee85a8cf33d6369`，summary SHA256 `832184d85832218b6943af0a66554f7cc97ddde2a8edfed57a085c1e166f2bf5`。
+
+为使规模规则可执行，新增`source-file-size.mjs`并接入`pnpm check:refactor`/build，扫描3866个产品/测试/fixture/构建脚本文件，4个生成/声明例外显式登记；AGENTS.md同步命令。该静态门槛不证明行为。全仓rustfmt原有52个文件的格式差异统一规范；这些文件独立格式化输出与候选逐字相等，不包含手工逻辑修改。最终Rust lib/integration/probe及fmt check重新执行。
+
+
+最终本地回归：`final-vitest.log` **544 files /5469 passed /1 conditional skip**；`y-terminal-qa.log` QA编译模式 **86 passed /1 conditional skip**，保留两种编译分支的原断言。`final-rust-isolated.log` **lib1868 passed /25 ignored、integration80 passed、rdp-probe15 passed**，仓库级`cargo fmt -- --check`通过。首次`final-rust.log`在与全量Vitest并行时X11 DAMAGE等待预算断言失败（1867passed/1failed），原日志保留；前端全量结束后原源码、原阈值、同一DISPLAY下重跑完整Rust集合通过，尚不足以把该时序失败的原因定为宿主负载，未放宽预算或15%性能标准。
+
+样式边界原有空行移至下一个模块开头以通过`git diff --cached --check`；按import顺序拼接仍与原样式逐字一致。本批采用已有可执行场景保护纯实现搬迁，不新增仅证明文件变小的用例。
+
+
+`y-build-complete.log`最终完整build（含新增规模gate）通过。`y-jdtls-fixtures.log`在隔离fixture副本中用原入口执行，真实Java21/JDT LS1.61与Gradle9.5.1下 **5/5 fixtures green**：Maven单模块、多模块、broken classpath和Gradle单模块、多模块；原场景断言完整保留，原始trace位于`jdtls-y/traces/`，未覆盖仓库基线trace。
