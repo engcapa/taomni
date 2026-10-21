@@ -57,7 +57,7 @@ import {
 import codeWorkspaceTabSource from "../CodeWorkspaceTab.tsx?raw";
 import ts from "typescript";
 
-const controllerSources = import.meta.glob<string>("./controller/*.{ts,tsx}", {
+const controllerSources = import.meta.glob<string>(["./controller/*.{ts,tsx}", "./hooks/*.{ts,tsx}"], {
   query: "?raw",
   import: "default",
   eager: true,
@@ -548,7 +548,7 @@ describe("P0-A / N1.6 Write-Disk Byte Correctness Matrix", () => {
       const writerCalls: string[] = [];
       const sources = { "CodeWorkspaceTab.tsx": codeWorkspaceTabSource, ...controllerSources };
       expect(Object.keys(controllerSources).length).toBeGreaterThan(0);
-      expect(codeWorkspaceTabSource).toContain("useCallback(createWriteTextSnapshot(");
+      expect(Object.values(controllerSources).filter((source) => source.includes("useCallback(createWriteTextSnapshot(")).length).toBe(1);
       for (const [file, content] of Object.entries(sources)) {
         const source = ts.createSourceFile(file, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
         const visit = (node: ts.Node, owner: string | null) => {

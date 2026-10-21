@@ -11,6 +11,7 @@ const boundaries = [
   ["src/stores/app", "src/stores/appStore.ts"],
   ["src/stubs/commands", "src/stubs/tauri-core.ts"],
   ["src/components/editor/workspace/controller", "src/components/editor/CodeWorkspaceTab.tsx"],
+  ["src/components/editor/workspace/hooks", "src/components/editor/CodeWorkspaceTab.tsx"],
   ["src/components/editor/workspace/views", "src/components/editor/CodeWorkspaceTab.tsx"],
   ["src/components/mail/client", "src/components/mail/MailClientTab.tsx"],
   ["src/components/terminal/panel", "src/components/terminal/TerminalPanel.tsx"],
