@@ -86,7 +86,7 @@ pub fn read_stream_open(
         .unwrap_or(0);
     let handle_id = uuid::Uuid::new_v4().to_string();
     let mut handles = state
-        .read_handles
+        .files.read_handles
         .lock()
         .map_err(|e| format!("Read stream lock failed: {}", e))?;
     handles.insert(handle_id.clone(), ReadStreamHandle { file });
@@ -111,7 +111,7 @@ pub fn read_stream_read(
     }
 
     let mut handles = state
-        .read_handles
+        .files.read_handles
         .lock()
         .map_err(|e| format!("Read stream lock failed: {}", e))?;
     let handle = handles
@@ -129,7 +129,7 @@ pub fn read_stream_read(
 #[tauri::command]
 pub fn read_stream_close(handle_id: String, state: State<'_, AppState>) -> Result<(), String> {
     let mut handles = state
-        .read_handles
+        .files.read_handles
         .lock()
         .map_err(|e| format!("Read stream lock failed: {}", e))?;
     handles
@@ -149,7 +149,7 @@ pub fn write_stream_open(path: String, state: State<'_, AppState>) -> Result<Str
         .map_err(|e| format!("Failed to open write stream: {}", e))?;
     let handle_id = uuid::Uuid::new_v4().to_string();
     let mut handles = state
-        .write_handles
+        .files.write_handles
         .lock()
         .map_err(|e| format!("Write stream lock failed: {}", e))?;
     handles.insert(
@@ -175,7 +175,7 @@ pub fn write_stream_append(request: Request<'_>, state: State<'_, AppState>) -> 
     };
 
     let mut handles = state
-        .write_handles
+        .files.write_handles
         .lock()
         .map_err(|e| format!("Write stream lock failed: {}", e))?;
     let handle = handles
@@ -190,7 +190,7 @@ pub fn write_stream_append(request: Request<'_>, state: State<'_, AppState>) -> 
 #[tauri::command]
 pub fn write_stream_close(handle_id: String, state: State<'_, AppState>) -> Result<(), String> {
     let mut handles = state
-        .write_handles
+        .files.write_handles
         .lock()
         .map_err(|e| format!("Write stream lock failed: {}", e))?;
     let mut handle = handles
@@ -206,7 +206,7 @@ pub fn write_stream_close(handle_id: String, state: State<'_, AppState>) -> Resu
 pub fn write_stream_abort(handle_id: String, state: State<'_, AppState>) -> Result<(), String> {
     let handle = {
         let mut handles = state
-            .write_handles
+            .files.write_handles
             .lock()
             .map_err(|e| format!("Write stream lock failed: {}", e))?;
         handles.remove(&handle_id)

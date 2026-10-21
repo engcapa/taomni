@@ -494,7 +494,7 @@ pub fn default_sdk_registry_path() -> PathBuf {
 
 #[tauri::command]
 pub async fn sdk_get_registry(state: State<'_, AppState>) -> Result<SdkRegistry, String> {
-    Ok(state.sdk.snapshot().await)
+    Ok(state.workspace.sdk.snapshot().await)
 }
 
 #[tauri::command]
@@ -522,12 +522,12 @@ pub async fn sdk_save_installation(
     request: SaveSdkInstallationRequest,
     state: State<'_, AppState>,
 ) -> Result<SdkInstallation, String> {
-    state.sdk.save_installation(request).await
+    state.workspace.sdk.save_installation(request).await
 }
 
 #[tauri::command]
 pub async fn sdk_remove_installation(id: String, state: State<'_, AppState>) -> Result<(), String> {
-    state.sdk.remove_installation(&id).await
+    state.workspace.sdk.remove_installation(&id).await
 }
 
 #[tauri::command]
@@ -535,7 +535,7 @@ pub async fn sdk_refresh_installations(
     id: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<SdkInstallation>, String> {
-    state.sdk.refresh_installations(id.as_deref()).await
+    state.workspace.sdk.refresh_installations(id.as_deref()).await
 }
 
 #[tauri::command]
@@ -543,7 +543,7 @@ pub async fn sdk_set_default(
     request: SetSdkDefaultRequest,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state.sdk.set_default(request).await
+    state.workspace.sdk.set_default(request).await
 }
 
 #[tauri::command]
@@ -551,7 +551,7 @@ pub async fn sdk_save_workspace_binding(
     request: SaveWorkspaceSdkBindingRequest,
     state: State<'_, AppState>,
 ) -> Result<WorkspaceSdkBinding, String> {
-    state.sdk.save_binding(request).await
+    state.workspace.sdk.save_binding(request).await
 }
 
 #[tauri::command]
@@ -561,7 +561,7 @@ pub async fn sdk_remove_workspace_binding(
     role: SdkRole,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state.sdk.remove_binding(&scope_path, kind, role).await
+    state.workspace.sdk.remove_binding(&scope_path, kind, role).await
 }
 
 #[tauri::command]
@@ -578,7 +578,7 @@ pub async fn sdk_resolve_workspace(
     workspace_root: String,
     state: State<'_, AppState>,
 ) -> Result<resolve::WorkspaceSdkResolution, String> {
-    state.sdk.resolve_workspace(&workspace_root).await
+    state.workspace.sdk.resolve_workspace(&workspace_root).await
 }
 
 fn load_registry(path: &Path) -> Result<SdkRegistry, String> {

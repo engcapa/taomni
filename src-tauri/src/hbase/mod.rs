@@ -238,7 +238,7 @@ pub async fn hbase_connect(
         inner: session_inner,
         cancel: tokio::sync::Mutex::new(tokio_util::sync::CancellationToken::new()),
     });
-    let mut map = state.hbase_sessions.write().await;
+    let mut map = state.database.hbase_sessions.write().await;
     map.insert(session_id, session);
     Ok(HBaseConnectResult { ok: true })
 }
@@ -263,7 +263,7 @@ pub async fn hbase_disconnect(
     state: State<'_, AppState>,
     session_id: String,
 ) -> Result<(), String> {
-    state.hbase_sessions.write().await.remove(&session_id);
+    state.database.hbase_sessions.write().await.remove(&session_id);
     Ok(())
 }
 
@@ -763,7 +763,7 @@ async fn get_session(
     session_id: &str,
 ) -> Result<Arc<HBaseSession>, String> {
     state
-        .hbase_sessions
+        .database.hbase_sessions
         .read()
         .await
         .get(session_id)

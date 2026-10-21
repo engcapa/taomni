@@ -31,7 +31,7 @@ pub struct TerminalOutputSubscriber {
 type TerminalOutputSubscribers = Arc<Mutex<HashMap<String, Vec<TerminalOutputSubscriber>>>>;
 
 pub(crate) fn revoke_window_outputs(state: &AppState, window_label: &str) {
-    if let Ok(mut outputs) = state.terminal_outputs.lock() {
+    if let Ok(mut outputs) = state.terminal.terminal_outputs.lock() {
         for subscribers in outputs.values_mut() {
             subscribers.retain(|subscriber| subscriber.window_label != window_label);
         }
@@ -95,7 +95,7 @@ pub async fn record_local_directory_use(
     // Only live native-local terminals may record use. Async lock: this runs
     // on the Tokio runtime, where `blocking_read` would panic.
     {
-        let terminals = state.terminals.read().await;
+        let terminals = state.terminal.terminals.read().await;
         match terminals.get(&backend_session_id) {
             Some(ActiveTerminal::Local { .. }) => {}
             _ => {
@@ -124,7 +124,7 @@ pub(crate) fn record_local_directory_use_inner(
         return Err(format!("invalid local directory path: {path}"));
     };
     if let Some(last) = state
-        .local_directory_runtime
+        .terminal.local_directory_runtime
         .lock()
         .ok()
         .and_then(|r| r.get(backend_session_id).cloned())
@@ -145,7 +145,7 @@ pub(crate) fn record_local_directory_use_inner(
         local_directories::SOURCE_LOCAL_CWD,
         now_ms,
     )?;
-    if let Ok(mut runtime) = state.local_directory_runtime.lock() {
+    if let Ok(mut runtime) = state.terminal.local_directory_runtime.lock() {
         runtime.insert(backend_session_id.to_string(), new_key);
     }
     if changed {
@@ -190,7 +190,7 @@ pub(crate) fn record_successful_local_start(
         local_directories::SOURCE_LOCAL_START,
         now_ms,
     );
-    if let Ok(mut runtime) = state.local_directory_runtime.lock() {
+    if let Ok(mut runtime) = state.terminal.local_directory_runtime.lock() {
         runtime.insert(backend_session_id.to_string(), new_key);
     }
     match result {
@@ -274,21 +274,21 @@ pub(crate) async fn register_local_terminal(
     };
 
     {
-        let mut terminals = state.terminals.write().await;
+        let mut terminals = state.terminal.terminals.write().await;
         if terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} already exists", session_id));
         }
         terminals.insert(session_id.clone(), terminal);
     }
     if let Err(error) = crate::webview_recovery::register_output(&app_handle, window_label, output_generation, ||
-        add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output, window_label))
+        add_terminal_output_channel(&state.terminal.terminal_outputs, &session_id, on_output, window_label))
     {
-        state.terminals.write().await.remove(&session_id);
+        state.terminal.terminals.write().await.remove(&session_id);
         return Err(error);
     }
 
     let sid = session_id;
-    let outputs = state.terminal_outputs.clone();
+    let outputs = state.terminal.terminal_outputs.clone();
     std::thread::spawn(move || {
         read_loop_local(reader, sid, app_handle, outputs);
     });
@@ -416,7 +416,7 @@ pub async fn create_local_terminal(
             .as_deref()
             .map(std::path::Path::new)
             .unwrap_or(root_path);
-        match state.sdk.resolve_environment(root_path, scope_path).await {
+        match state.workspace.sdk.resolve_environment(root_path, scope_path).await {
             Ok(environment) => Some(environment),
             Err(error) => {
                 log::warn!(
@@ -448,18 +448,18 @@ pub async fn create_local_terminal(
     };
 
     {
-        let mut terminals = state.terminals.write().await;
+        let mut terminals = state.terminal.terminals.write().await;
         if terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} already exists", session_id));
         }
         terminals.insert(session_id.clone(), terminal);
     }
     crate::webview_recovery::register_output(&app_handle, window.label(), output_generation, ||
-        add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output, window.label()))?;
+        add_terminal_output_channel(&state.terminal.terminal_outputs, &session_id, on_output, window.label()))?;
 
     let sid = session_id.clone();
     let app = app_handle.clone();
-    let outputs = state.terminal_outputs.clone();
+    let outputs = state.terminal.terminal_outputs.clone();
     std::thread::spawn(move || {
         read_loop_local(reader, sid, app, outputs);
     });
@@ -534,7 +534,7 @@ pub async fn create_command_terminal(
     let output_generation = crate::webview_recovery::output_generation(&app_handle, window.label());
     validate_session_id(&session_id)?;
     {
-        let terminals = state.terminals.read().await;
+        let terminals = state.terminal.terminals.read().await;
         if terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} already exists", session_id));
         }
@@ -556,18 +556,18 @@ pub async fn create_command_terminal(
     };
 
     {
-        let mut terminals = state.terminals.write().await;
+        let mut terminals = state.terminal.terminals.write().await;
         if terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} already exists", session_id));
         }
         terminals.insert(session_id.clone(), terminal);
     }
     crate::webview_recovery::register_output(&app_handle, window.label(), output_generation, ||
-        add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output, window.label()))?;
+        add_terminal_output_channel(&state.terminal.terminal_outputs, &session_id, on_output, window.label()))?;
 
     let sid = session_id.clone();
     let app = app_handle.clone();
-    let outputs = state.terminal_outputs.clone();
+    let outputs = state.terminal.terminal_outputs.clone();
     std::thread::spawn(move || {
         read_loop_local(reader, sid, app, outputs);
     });
@@ -710,7 +710,7 @@ pub async fn create_ssh_terminal(
     let output_generation = crate::webview_recovery::output_generation(&app_handle, window.label());
     validate_session_id(&session_id)?;
     {
-        let terminals = state.terminals.read().await;
+        let terminals = state.terminal.terminals.read().await;
         if terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} already exists", session_id));
         }
@@ -749,7 +749,7 @@ pub async fn create_ssh_terminal(
     // below once connect resolves (success or error).
     let prompter = build_kbd_prompter(
         app_handle.clone(),
-        state.ssh_auth_responders.clone(),
+        state.terminal.ssh_auth_responders.clone(),
         session_id.clone(),
     );
 
@@ -801,7 +801,7 @@ pub async fn create_ssh_terminal(
     .await;
     // Drop any responder left dangling for this session (e.g. auth failed
     // while a prompt round was still registered) so the map doesn't leak.
-    clear_session_auth_responders(&state.ssh_auth_responders, &session_id);
+    clear_session_auth_responders(&state.terminal.ssh_auth_responders, &session_id);
     let (handle, channel, mut output_rx) = connect_result?;
 
     let handle_arc = Arc::new(handle);
@@ -831,7 +831,7 @@ pub async fn create_ssh_terminal(
     };
 
     {
-        let mut terminals = state.terminals.write().await;
+        let mut terminals = state.terminal.terminals.write().await;
         if terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} already exists", session_id));
         }
@@ -839,12 +839,12 @@ pub async fn create_ssh_terminal(
     }
 
     crate::webview_recovery::register_output(&app_handle, window.label(), output_generation, ||
-        add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output, window.label()))?;
+        add_terminal_output_channel(&state.terminal.terminal_outputs, &session_id, on_output, window.label()))?;
 
     let sid = session_id.clone();
     let app = app_handle.clone();
-    let terminals = state.terminals.clone();
-    let outputs = state.terminal_outputs.clone();
+    let terminals = state.terminal.terminals.clone();
+    let outputs = state.terminal.terminal_outputs.clone();
     tokio::spawn(async move {
         while let Some(data) = output_rx.recv().await {
             send_terminal_output(&outputs, &sid, data);
@@ -934,13 +934,13 @@ pub async fn attach_terminal_output(
     let output_generation = crate::webview_recovery::output_generation(window.app_handle(), window.label());
     validate_session_id(&session_id)?;
     {
-        let terminals = state.terminals.read().await;
+        let terminals = state.terminal.terminals.read().await;
         if !terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} not found", session_id));
         }
     }
     crate::webview_recovery::register_output(window.app_handle(), window.label(), output_generation, ||
-        add_terminal_output_channel(&state.terminal_outputs, &session_id, on_output, window.label()))
+        add_terminal_output_channel(&state.terminal.terminal_outputs, &session_id, on_output, window.label()))
 }
 
 /// Only remove this caller's particular subscription. Never close a native
@@ -948,7 +948,7 @@ pub async fn attach_terminal_output(
 #[tauri::command]
 pub fn detach_terminal_output(session_id: String, channel_id: u32, window: tauri::WebviewWindow,
     state: State<'_, AppState>) -> Result<(), String> {
-    let mut outputs = state.terminal_outputs.lock().map_err(|_| "Terminal output lock failed")?;
+    let mut outputs = state.terminal.terminal_outputs.lock().map_err(|_| "Terminal output lock failed")?;
     if let Some(subscribers) = outputs.get_mut(&session_id) {
         subscribers.retain(|s| s.window_label != window.label() || s.channel.id() != channel_id);
     }
@@ -972,7 +972,7 @@ pub async fn write_terminal(
         .decode(&data)
         .map_err(|e| format!("Invalid base64: {}", e))?;
 
-    let terminals = state.terminals.read().await;
+    let terminals = state.terminal.terminals.read().await;
     let terminal = terminals
         .get(&session_id)
         .ok_or_else(|| format!("Terminal {} not found", session_id))?;
@@ -1004,7 +1004,7 @@ pub async fn resize_terminal(
     rows: u16,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let terminals = state.terminals.read().await;
+    let terminals = state.terminal.terminals.read().await;
     let terminal = terminals
         .get(&session_id)
         .ok_or_else(|| format!("Terminal {} not found", session_id))?;
@@ -1032,7 +1032,7 @@ pub async fn send_terminal_signal(
     signal: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let terminals = state.terminals.read().await;
+    let terminals = state.terminal.terminals.read().await;
     let terminal = terminals
         .get(&session_id)
         .ok_or_else(|| format!("Terminal {} not found", session_id))?;
@@ -1054,7 +1054,7 @@ pub async fn send_terminal_signal(
 #[tauri::command]
 pub async fn close_terminal(session_id: String, state: State<'_, AppState>) -> Result<(), String> {
     let removed = {
-        let mut terminals = state.terminals.write().await;
+        let mut terminals = state.terminal.terminals.write().await;
         terminals.remove(&session_id)
     };
     if let Some(ActiveTerminal::Ssh { forwards, .. }) = removed {
@@ -1065,12 +1065,12 @@ pub async fn close_terminal(session_id: String, state: State<'_, AppState>) -> R
             h.abort();
         }
     }
-    if let Ok(mut outputs) = state.terminal_outputs.lock() {
+    if let Ok(mut outputs) = state.terminal.terminal_outputs.lock() {
         outputs.remove(&session_id);
     }
     // A closed terminal can never accept late cwd reports; drop its
     // per-runtime dedup entry (design §4.1.5).
-    if let Ok(mut runtime) = state.local_directory_runtime.lock() {
+    if let Ok(mut runtime) = state.terminal.local_directory_runtime.lock() {
         runtime.remove(&session_id);
     }
     Ok(())
@@ -1249,7 +1249,7 @@ pub fn submit_ssh_auth_response(
 ) -> Result<(), String> {
     let responder = {
         let mut guard = state
-            .ssh_auth_responders
+            .terminal.ssh_auth_responders
             .lock()
             .map_err(|_| "auth responder registry poisoned".to_string())?;
         guard.remove(&request_id)

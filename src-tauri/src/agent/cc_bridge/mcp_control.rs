@@ -79,7 +79,7 @@ impl ControlHandler {
         {
             let state = self.app_state();
             state
-                .cc_pending_tool_calls
+                .agent.cc_pending_tool_calls
                 .lock()
                 .unwrap()
                 .insert(call_id.clone(), tx);
@@ -100,7 +100,7 @@ impl ControlHandler {
                     let still_pending = {
                         let state = app.state::<AppState>();
                         state
-                            .cc_pending_tool_calls
+                            .agent.cc_pending_tool_calls
                             .lock()
                             .map(|calls| calls.contains_key(&call_id))
                             .unwrap_or(false)
@@ -120,7 +120,7 @@ impl ControlHandler {
             Ok(Ok(outcome)) => Err(ErrorData::internal_error(outcome.output, None)),
             _ => {
                 let state = self.app_state();
-                state.cc_pending_tool_calls.lock().unwrap().remove(&call_id);
+                state.agent.cc_pending_tool_calls.lock().unwrap().remove(&call_id);
                 Err(ErrorData::internal_error(
                     "control tool call timed out or was cancelled".to_string(),
                     None,

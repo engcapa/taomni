@@ -547,11 +547,11 @@ pub fn save_mail_session(
 ) -> Result<(), String> {
     let target_root = configured_directory(&config.options_json, state.mail_cache_root())?;
     let _changes = state
-        .mail_archive
+        .mail.mail_archive
         .changes
         .lock()
         .map_err(|e| e.to_string())?;
-    state.mail_archive.stop_account(&config.id)?;
+    state.mail.mail_archive.stop_account(&config.id)?;
     let handle = state.mail_db(&config.id)?;
     let mut db = handle.lock().map_err(|e| e.to_string())?;
     let _worker = super::coordination::ProcessLock::try_at(

@@ -563,7 +563,7 @@ async fn get_session(
     state: &State<'_, AppState>,
     session_id: &str,
 ) -> Result<Arc<DbSession>, String> {
-    let map = state.db_connections.read().await;
+    let map = state.database.db_connections.read().await;
     map.get(session_id)
         .cloned()
         .ok_or_else(|| format!("No active database connection for session {session_id}"))
@@ -639,7 +639,7 @@ pub async fn db_connect(
         tx_state,
     ));
     let previous = {
-        let mut map = state.db_connections.write().await;
+        let mut map = state.database.db_connections.write().await;
         // If a stale session exists under this id, close it after releasing the map lock.
         map.insert(session_id, session)
     };
@@ -717,7 +717,7 @@ pub async fn db_ping(state: State<'_, AppState>, session_id: String) -> Result<S
 #[tauri::command]
 pub async fn db_disconnect(state: State<'_, AppState>, session_id: String) -> Result<(), String> {
     let removed = {
-        let mut map = state.db_connections.write().await;
+        let mut map = state.database.db_connections.write().await;
         map.remove(&session_id)
     };
     if let Some(session) = removed {

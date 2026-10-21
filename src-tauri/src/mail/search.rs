@@ -357,7 +357,7 @@ pub async fn mail_search_server(
         .await;
     }
     let account = resolve_config(&state, config)?;
-    let pool = Arc::clone(&state.mail_imap_pool);
+    let pool = Arc::clone(&state.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
         with_imap_session(

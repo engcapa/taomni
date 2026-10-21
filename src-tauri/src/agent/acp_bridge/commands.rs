@@ -55,7 +55,7 @@ pub async fn acp_resolve_permission(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let thread_process = {
-        let registry = state.acp_processes.lock().await;
+        let registry = state.agent.acp_processes.lock().await;
         registry.get(&thread_id).cloned()
     };
     if let Some(process) = thread_process {
@@ -70,7 +70,7 @@ pub async fn acp_resolve_permission(
         }
     }
     let media_process = {
-        let registry = state.acp_media_processes.lock().await;
+        let registry = state.agent.acp_media_processes.lock().await;
         registry.get(&thread_id).cloned()
     };
     if let Some(process) = media_process {
@@ -92,7 +92,7 @@ pub async fn acp_cancel_permission(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let thread_process = {
-        let registry = state.acp_processes.lock().await;
+        let registry = state.agent.acp_processes.lock().await;
         registry.get(&thread_id).cloned()
     };
     if let Some(process) = thread_process {
@@ -103,7 +103,7 @@ pub async fn acp_cancel_permission(
         }
     }
     let media_process = {
-        let registry = state.acp_media_processes.lock().await;
+        let registry = state.agent.acp_media_processes.lock().await;
         registry.get(&thread_id).cloned()
     };
     if let Some(process) = media_process {

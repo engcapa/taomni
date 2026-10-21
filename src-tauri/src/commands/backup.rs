@@ -1,0 +1,29 @@
+pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
+    let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+        crate::backup::backup_create,
+        crate::backup::backup_inspect,
+        crate::backup::backup_stage_restore,
+        crate::backup::backup_get_policy,
+        crate::backup::backup_set_policy,
+        crate::backup::backup_list_history,
+        crate::backup::backup_delete_item,
+        crate::backup::backup_get_default_dir,
+        crate::backup::commands::backup_remote_get_config,
+        crate::backup::commands::backup_remote_clean_cache,
+        crate::backup::commands::backup_remote_discard,
+        crate::backup::batch::backup_run_selected,
+        crate::backup::commands::backup_remote_save_config,
+        crate::backup::commands::backup_feishu_authorize,
+        crate::backup::commands::backup_feishu_apps,
+        crate::backup::commands::backup_feishu_authorization_status,
+        crate::backup::commands::backup_feishu_authorization_cancel,
+        crate::backup::commands::backup_remote_list,
+        crate::backup::commands::backup_remote_start,
+        crate::backup::commands::backup_remote_download,
+        crate::backup::commands::backup_remote_jobs,
+        crate::backup::commands::backup_remote_cancel,
+        crate::backup::commands::backup_remote_retry,
+        crate::backup::commands::backup_remote_history_url,
+    ];
+    handler(invoke)
+}

@@ -601,7 +601,7 @@ impl AgentThreadContext {
     pub async fn refresh_runtime_bindings(&self, state: &AppState) {
         if let Some(cwd) = self.cwd.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
             state
-                .agent_thread_cwd
+                .agent.agent_thread_cwd
                 .lock()
                 .unwrap()
                 .insert(self.thread_id.clone(), cwd.to_string());
@@ -613,7 +613,7 @@ impl AgentThreadContext {
             .map(str::trim)
             .filter(|s| !s.is_empty())
             .map(ToString::to_string);
-        let mut bindings = state.agent_db_bindings.write().await;
+        let mut bindings = state.agent.agent_db_bindings.write().await;
         match conn.as_deref() {
             Some(c) => {
                 bindings.insert(self.thread_id.clone(), c.to_string());
@@ -629,7 +629,7 @@ impl AgentThreadContext {
         } else {
             Vec::new()
         };
-        let mut selected_objects = state.agent_db_selected_objects.write().await;
+        let mut selected_objects = state.agent.agent_db_selected_objects.write().await;
         if selected.is_empty() {
             selected_objects.remove(&self.thread_id);
         } else {
@@ -641,7 +641,7 @@ impl AgentThreadContext {
             .code_workspace
             .as_ref()
             .and_then(AgentCodeWorkspace::normalized);
-        let mut workspaces = state.agent_code_workspaces.write().await;
+        let mut workspaces = state.agent.agent_code_workspaces.write().await;
         match workspace {
             Some(workspace) => {
                 workspaces.insert(self.thread_id.clone(), workspace);

@@ -238,7 +238,7 @@ async fn get_session(
     session_id: &str,
 ) -> Result<Arc<ObjectStorageSession>, String> {
     state
-        .oss_sessions
+        .files.oss_sessions
         .read()
         .await
         .get(session_id)
@@ -256,7 +256,7 @@ pub async fn storage_attach(
 ) -> Result<(), String> {
     let session = build_session(&state, session_id.clone(), config).await?;
     if let Some(old) = state
-        .oss_sessions
+        .files.oss_sessions
         .write()
         .await
         .insert(session_id, Arc::new(session))
@@ -269,7 +269,7 @@ pub async fn storage_attach(
 /// Tear down a live object-storage session. Idempotent.
 #[tauri::command]
 pub async fn storage_detach(session_id: String, state: State<'_, AppState>) -> Result<(), String> {
-    if let Some(sess) = state.oss_sessions.write().await.remove(&session_id) {
+    if let Some(sess) = state.files.oss_sessions.write().await.remove(&session_id) {
         sess.close();
     }
     Ok(())

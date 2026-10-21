@@ -136,7 +136,7 @@ pub async fn cc_send_message(
     // Get or create CC process for this thread. Only a *new* process writes
     // temp config files; a reused one keeps the obscure settings file it was
     // launched with (scrubbed when the session stops).
-    let existing = { state.cc_processes.lock().await.get(&req.thread_id).cloned() };
+    let existing = { state.agent.cc_processes.lock().await.get(&req.thread_id).cloned() };
     let process = match existing {
         Some(p) => p,
         None => {
@@ -210,7 +210,7 @@ pub async fn cc_send_message(
                     .with_proxy_url(effective_proxy)
                     .with_token(cc_token.clone()),
             );
-            let mut registry = state.cc_processes.lock().await;
+            let mut registry = state.agent.cc_processes.lock().await;
             match registry.get(&req.thread_id) {
                 Some(existing) => existing.clone(),
                 None => {
@@ -257,7 +257,7 @@ pub async fn cc_send_message(
 /// Stop the CC process for a thread.
 #[tauri::command]
 pub async fn cc_stop_session(thread_id: String, state: State<'_, AppState>) -> Result<(), String> {
-    let mut registry = state.cc_processes.lock().await;
+    let mut registry = state.agent.cc_processes.lock().await;
     if let Some(process) = registry.remove(&thread_id) {
         process.stop().await;
     }
@@ -275,21 +275,21 @@ pub async fn cc_stop_session(thread_id: String, state: State<'_, AppState>) -> R
 /// The registry lock is released before `stop()` so we don't hold it across the
 /// child kill.
 pub(crate) async fn recycle_thread_process(state: &AppState, thread_id: &str) {
-    let process = { state.cc_processes.lock().await.remove(thread_id) };
+    let process = { state.agent.cc_processes.lock().await.remove(thread_id) };
     if let Some(process) = process {
         process.stop().await;
     }
     // Best-effort `rm -f` of any remote (C-path) capture temp files before we
     // drop the captures; the local scrub in purge_thread can't reach a remote
     // host. The session may already be gone — failures are harmless.
-    let remote = state.captures.remote_files(thread_id);
+    let remote = state.agent.captures.remote_files(thread_id);
     if !remote.is_empty() {
-        let terms = state.terminals.read().await;
+        let terms = state.terminal.terminals.read().await;
         for (session_id, path) in remote {
             // `session_id` is the tab id stored at capture time; `terminals` is
             // keyed by the backend session id, so translate via the live map.
             let backend_sid = state
-                .cc_tab_sessions
+                .agent.cc_tab_sessions
                 .lock()
                 .ok()
                 .and_then(|m| m.get(&session_id).cloned())
@@ -303,7 +303,7 @@ pub(crate) async fn recycle_thread_process(state: &AppState, thread_id: &str) {
     }
     // Drop + scrub this thread's captures (方案4); their files are tied to the
     // process lifetime the same way the temp dir is.
-    state.captures.purge_thread(thread_id);
+    state.agent.captures.purge_thread(thread_id);
 }
 
 /// Cancel an in-flight captured run (方案4). Fires the capture's cancel
@@ -315,7 +315,7 @@ pub async fn cc_cancel_capture(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let notify = state
-        .cc_capture_cancels
+        .agent.cc_capture_cancels
         .lock()
         .map_err(|e| e.to_string())?
         .get(&capture_id)
@@ -328,7 +328,7 @@ pub async fn cc_cancel_capture(
 
 /// Record that a live terminal tab (`tab_id`, the caller-facing id CC's tools
 /// see) is backed by a concrete backend terminal session (`session_id`, the
-/// `state.terminals` key). The frontend calls this from its terminal registry
+/// `state.terminal.terminals` key). The frontend calls this from its terminal registry
 /// as a panel connects, so backend-side CC tools (`run_captured` /
 /// `read_capture`) can resolve the live terminal that `run_in_terminal` reaches
 /// indirectly through the frontend registry. Overwrites on reconnect. Idempotent.
@@ -339,7 +339,7 @@ pub async fn cc_track_terminal(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     state
-        .cc_tab_sessions
+        .agent.cc_tab_sessions
         .lock()
         .map_err(|e| e.to_string())?
         .insert(tab_id, session_id);
@@ -356,7 +356,7 @@ pub async fn cc_untrack_terminal(
     session_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let mut map = state.cc_tab_sessions.lock().map_err(|e| e.to_string())?;
+    let mut map = state.agent.cc_tab_sessions.lock().map_err(|e| e.to_string())?;
     if map.get(&tab_id).is_some_and(|s| *s == session_id) {
         map.remove(&tab_id);
     }
@@ -374,7 +374,7 @@ pub async fn cc_resolve_tool_call(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let sender = state
-        .cc_pending_tool_calls
+        .agent.cc_pending_tool_calls
         .lock()
         .map_err(|e| e.to_string())?
         .remove(&call_id);
@@ -396,7 +396,7 @@ pub async fn cc_resolve_permission(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let sender = state
-        .cc_pending_permissions
+        .agent.cc_pending_permissions
         .lock()
         .map_err(|e| e.to_string())?
         .remove(&call_id);
@@ -446,7 +446,7 @@ pub async fn cc_stream_message(
         }
     };
 
-    let existing = { state.cc_processes.lock().await.get(&req.thread_id).cloned() };
+    let existing = { state.agent.cc_processes.lock().await.get(&req.thread_id).cloned() };
     let process = match existing {
         Some(p) => p,
         None => {
@@ -512,7 +512,7 @@ pub async fn cc_stream_message(
                     .with_proxy_url(effective_proxy)
                     .with_token(cc_token.clone()),
             );
-            let mut registry = state.cc_processes.lock().await;
+            let mut registry = state.agent.cc_processes.lock().await;
             match registry.get(&req.thread_id) {
                 Some(existing) => existing.clone(),
                 None => {
@@ -591,7 +591,7 @@ pub async fn cc_test_settings(
 
     // Kill any existing test process first to clean up
     {
-        let mut registry = state.cc_processes.lock().await;
+        let mut registry = state.agent.cc_processes.lock().await;
         if let Some(old) = registry.remove(&thread_id) {
             old.stop().await;
         }
@@ -644,7 +644,7 @@ pub async fn cc_test_settings(
     );
 
     {
-        let mut registry = state.cc_processes.lock().await;
+        let mut registry = state.agent.cc_processes.lock().await;
         registry.insert(thread_id.clone(), process.clone());
     }
 
@@ -670,7 +670,7 @@ pub async fn cc_test_settings(
     // Clean up registry
     let stderr = process.get_stderr().await.trim().to_string();
     {
-        let mut registry = state.cc_processes.lock().await;
+        let mut registry = state.agent.cc_processes.lock().await;
         if let Some(old) = registry.remove(&thread_id) {
             old.stop().await;
         }

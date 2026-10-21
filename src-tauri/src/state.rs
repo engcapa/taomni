@@ -1,3 +1,5 @@
+mod domains;
+pub use domains::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -73,119 +75,18 @@ pub enum CcPermissionDecision {
 pub type CcPermissionResponder = tokio::sync::oneshot::Sender<CcPermissionDecision>;
 
 pub struct AppState {
-    pub terminals: Arc<RwLock<HashMap<String, ActiveTerminal>>>,
-    pub terminal_outputs: Arc<Mutex<HashMap<String, Vec<TerminalOutputSubscriber>>>>,
-    pub sftp_sessions: Arc<RwLock<HashMap<String, Arc<ActiveSftp>>>>,
-    pub transfers: Arc<RwLock<HashMap<String, Arc<TransferHandle>>>>,
     pub tunnels: Arc<TunnelRegistry>,
     /// OS-level SocksCap engine (rules/egress now; capture in later phases).
     pub sockscap: Arc<SocksCapRuntime>,
     pub servers: Arc<ServerRegistry>,
-    pub vnc_sessions: Arc<RwLock<HashMap<String, VncSession>>>,
-    pub vnc_detach_claims: Arc<RwLock<HashMap<String, crate::vnc::VncDetachClaim>>>,
-    pub rdp_sessions: Arc<RwLock<HashMap<String, RdpSession>>>,
-    /// Live database client connections (MySQL/PostgreSQL/Oracle/SQL Server/StarRocks/ClickHouse/Redis),
-    /// keyed by session id. Each `DbSession` wraps the per-engine connection
-    /// handle plus a cancellation token for in-flight queries.
-    pub db_connections: Arc<RwLock<HashMap<String, Arc<DbSession>>>>,
-    /// Live JVM-free HBase shell sessions over HBase REST/Stargate.
-    pub hbase_sessions: Arc<RwLock<HashMap<String, Arc<HBaseSession>>>>,
-    /// Live object-storage connections (S3 / S3-compatible / Azure Blob),
-    /// keyed by session id. Each holds the per-engine client handle plus a
-    /// cancellation token for in-flight list/transfer operations.
-    pub oss_sessions: Arc<RwLock<HashMap<String, Arc<ObjectStorageSession>>>>,
-    pub read_handles: Arc<Mutex<HashMap<String, ReadStreamHandle>>>,
-    pub write_handles: Arc<Mutex<HashMap<String, WriteStreamHandle>>>,
-    /// Pending keyboard-interactive auth rounds, keyed by request id. See
-    /// [`SshAuthResponder`].
-    pub ssh_auth_responders: Arc<Mutex<HashMap<String, SshAuthResponder>>>,
     pub clipboard: Arc<Mutex<Option<arboard::Clipboard>>>,
     pub db: Mutex<rusqlite::Connection>,
-    /// Per-runtime local-directory dedup state (design §4.1.5): the last
-    /// confirmed directory path key reported by each live native-local
-    /// terminal, keyed by backend session id. `close_terminal` clears it so
-    /// late OSC reports after close can never write.
-    pub local_directory_runtime: Arc<Mutex<HashMap<String, String>>>,
     /// Dedicated connection to the standalone Tao Notes database (`notes.db`),
     /// kept separate from `taomni.db` so note storage can evolve independently.
     pub notes_db: Mutex<rusqlite::Connection>,
     /// MFA authenticator store (`mfa.db`, opened lazily on first MFA use).
     pub mfa: Arc<crate::mfa::store::MfaStore>,
-    /// Directory containing one SQLite cache database per saved or transient mail
-    /// session. Mail caches are intentionally isolated from `taomni.db`, and
-    /// from each other, so mailbox refresh writes cannot block session CRUD.
-    mail_db_dir: PathBuf,
-    mail_dbs: Arc<Mutex<HashMap<String, MailDbHandle>>>,
-    /// Live IMAP sessions keyed by mail account/session id. Reuses TCP/TLS/auth
-    /// and any session-level proxy forwarder across mail commands. Never routes
-    /// through the app global proxy.
-    pub mail_imap_pool: Arc<MailImapPool>,
-    pub mail_archive: crate::mail::archive::ArchiveManager,
     pub vault: Arc<Vault>,
-    /// Per-thread Claude Code process registry (v2.6).
-    pub cc_processes: tokio::sync::Mutex<HashMap<String, Arc<CcProcess>>>,
-    /// Per-thread Codex app-server registry.
-    pub codex_processes: tokio::sync::Mutex<HashMap<String, Arc<CodexAppServer>>>,
-    /// Per-thread ACP process registry, isolated from the legacy bridges.
-    pub acp_processes: tokio::sync::Mutex<HashMap<String, Arc<AcpThreadProcess>>>,
-    /// Short-lived ACP subprocesses used for native image/video generation.
-    /// They participate in the same permission-gate and stop lifecycle as a
-    /// normal ACP chat turn, but do not own MCP credentials or persisted ACP
-    /// sessions.
-    pub acp_media_processes: tokio::sync::Mutex<HashMap<String, Arc<AcpProcess>>>,
-    /// Provider-agnostic stop handles for in-flight chat turns, keyed by thread_id.
-    pub chat_runs: Arc<ChatRunRegistry>,
-    /// Pending CC side-effect tool calls awaiting frontend execution, keyed by
-    /// per-call id. See [`CcToolResponder`].
-    pub cc_pending_tool_calls: Arc<Mutex<HashMap<String, CcToolResponder>>>,
-    /// Pending CC permission prompts awaiting a human decision, keyed by
-    /// per-call id. See [`CcPermissionResponder`].
-    pub cc_pending_permissions: Arc<Mutex<HashMap<String, CcPermissionResponder>>>,
-    /// Per-thread captured-command store (方案4). Holds the full stdout/stderr
-    /// of `run_captured` runs (B path: Taomni-local files) so CC can grep/page
-    /// large output without dumping it into context. Reduction happens here.
-    pub captures: Arc<crate::agent::capture::CaptureRegistry>,
-    /// Cancel handles for in-flight captures, keyed by capture id. Firing the
-    /// `Notify` drops the SSH exec channel / kills the local child.
-    pub cc_capture_cancels: Arc<Mutex<HashMap<String, Arc<tokio::sync::Notify>>>>,
-    /// Last working directory reported for an agent thread (filled each turn from
-    /// `ChatSendRequest.cwd`). The B executor bridges it into `run_captured`
-    /// (`cd <cwd> && …`) since an MCP tool call has no per-turn cwd of its own.
-    pub agent_thread_cwd: Arc<Mutex<HashMap<String, String>>>,
-    /// Maps a terminal *tab id* (the caller-facing id CC's tools see — equal to
-    /// `chat thread.linked_session_id` / the token's `allowed_session_id`) to the
-    /// *backend terminal session id* used as the `terminals` map key (a fresh
-    /// `crypto.randomUUID()` per connection, distinct from the tab id). The
-    /// frontend reports this as terminals connect/disconnect (`cc_track_terminal`
-    /// / `cc_untrack_terminal`), so backend-side CC tools (`run_captured` /
-    /// `read_capture`) can resolve the live terminal that `run_in_terminal`
-    /// reaches indirectly through the frontend registry. Refreshed on reconnect.
-    pub cc_tab_sessions: Arc<Mutex<HashMap<String, String>>>,
-    /// Live DB connection id an agent thread is bound to (Phase 6). The runtime key
-    /// for `db_connections` is generated in the frontend (`createRuntimeDbSessionId`)
-    /// and isn't derivable backend-side, so the frontend bridges it over each
-    /// turn via `ChatSendRequest.bound_db_connection_id`. The SQL/Redis MCP
-    /// handlers resolve their bound connection from here (the model never names a
-    /// connection id, so this is the only target — scope-safe by construction).
-    pub agent_db_bindings: Arc<RwLock<HashMap<String, String>>>,
-    /// Current objects selected in the bound DB tab's schema tree, bridged
-    /// per chat turn just like `agent_db_bindings`. SQL MCP tools use this to
-    /// resolve user phrases such as "selected tables" without reading frontend
-    /// UI state directly. The list can include non-queryable object kinds; SQL
-    /// MCP tools expose a queryable subset for SELECT workflows.
-    pub agent_db_selected_objects:
-        Arc<RwLock<HashMap<String, Vec<crate::agent::context::AgentDbSelectedObject>>>>,
-    /// Current code workspace bound to an agent thread, bridged per chat turn.
-    /// This gives Codex/Claude sidecars a stable repo/file context without
-    /// reading frontend UI state directly.
-    pub agent_code_workspaces:
-        Arc<RwLock<HashMap<String, crate::agent::context::AgentCodeWorkspace>>>,
-    /// Local language-server process registry for code-workspace editor tabs.
-    pub lsp: Arc<LspManager>,
-    /// Debug Adapter Protocol sessions + adapter registry (M8 D1).
-    pub dap: Arc<crate::dap::DapManager>,
-    /// Versioned SDK installations, defaults and per-workspace manual bindings.
-    pub sdk: Arc<SdkManager>,
     /// Top-level AI context — holds AsrManager + LlmRouter.
     /// Wrapped in RwLock so save_ai_config can hot-rebuild the router.
     pub ai_ctx: Arc<RwLock<AppAiCtx>>,
@@ -194,6 +95,13 @@ pub struct AppState {
     /// AI-assistant `chat`/`voice` modules. Holds node identity, peer roster,
     /// and the lanchat.sqlite path; populated by the lanchat background service.
     pub lanchat: Arc<LanChatState>,
+    pub workspace: WorkspaceRuntime,
+    pub mail: MailRuntime,
+    pub terminal: TerminalRuntime,
+    pub files: FileRuntime,
+    pub remote_desktop: RemoteDesktopRuntime,
+    pub database: DatabaseRuntime,
+    pub agent: AgentRuntime,
 }
 
 impl AppState {
@@ -212,65 +120,75 @@ impl AppState {
         let lsp = Arc::new(LspManager::with_sdk(sdk.clone()));
         let dap = Arc::new(crate::dap::DapManager::with_lsp(lsp.clone()));
         Self {
-            terminals: Arc::new(RwLock::new(HashMap::new())),
-            terminal_outputs: Arc::new(Mutex::new(HashMap::new())),
-            sftp_sessions: Arc::new(RwLock::new(HashMap::new())),
-            transfers: Arc::new(RwLock::new(HashMap::new())),
             tunnels: Arc::new(TunnelRegistry::new()),
             sockscap: Arc::new(SocksCapRuntime::new()),
             servers: Arc::new(ServerRegistry::new()),
-            vnc_sessions: Arc::new(RwLock::new(HashMap::new())),
-            vnc_detach_claims: Arc::new(RwLock::new(HashMap::new())),
-            rdp_sessions: Arc::new(RwLock::new(HashMap::new())),
-            db_connections: Arc::new(RwLock::new(HashMap::new())),
-            hbase_sessions: Arc::new(RwLock::new(HashMap::new())),
-            oss_sessions: Arc::new(RwLock::new(HashMap::new())),
-            read_handles: Arc::new(Mutex::new(HashMap::new())),
-            write_handles: Arc::new(Mutex::new(HashMap::new())),
-            ssh_auth_responders: Arc::new(Mutex::new(HashMap::new())),
             clipboard: Arc::new(Mutex::new(None)),
             db: Mutex::new(db),
-            local_directory_runtime: Arc::new(Mutex::new(HashMap::new())),
             notes_db: Mutex::new(notes_db),
             mfa,
-            mail_db_dir,
-            mail_dbs: Arc::new(Mutex::new(HashMap::new())),
-            mail_archive: crate::mail::archive::ArchiveManager::default(),
-            mail_imap_pool: Arc::new(MailImapPool::new()),
             vault,
-            cc_processes: tokio::sync::Mutex::new(HashMap::new()),
-            codex_processes: tokio::sync::Mutex::new(HashMap::new()),
-            acp_processes: tokio::sync::Mutex::new(HashMap::new()),
-            acp_media_processes: tokio::sync::Mutex::new(HashMap::new()),
-            chat_runs: Arc::new(ChatRunRegistry::new(HashMap::new())),
-            cc_pending_tool_calls: Arc::new(Mutex::new(HashMap::new())),
-            cc_pending_permissions: Arc::new(Mutex::new(HashMap::new())),
-            captures: Arc::new(crate::agent::capture::CaptureRegistry::new(
-                std::env::temp_dir().join("taomni-cc-captures"),
-            )),
-            cc_capture_cancels: Arc::new(Mutex::new(HashMap::new())),
-            agent_thread_cwd: Arc::new(Mutex::new(HashMap::new())),
-            cc_tab_sessions: Arc::new(Mutex::new(HashMap::new())),
-            agent_db_bindings: Arc::new(RwLock::new(HashMap::new())),
-            agent_db_selected_objects: Arc::new(RwLock::new(HashMap::new())),
-            agent_code_workspaces: Arc::new(RwLock::new(HashMap::new())),
-            lsp,
-            dap,
-            sdk,
             ai_ctx: Arc::new(RwLock::new(ai_ctx)),
             opencode_go_catalog: crate::llm::opencode_go::catalog::shared_catalog(),
             lanchat,
+            workspace: WorkspaceRuntime { lsp, dap, sdk },
+            mail: MailRuntime {
+                mail_db_dir,
+                mail_dbs: Arc::new(Mutex::new(HashMap::new())),
+                mail_archive: crate::mail::archive::ArchiveManager::default(),
+                mail_imap_pool: Arc::new(MailImapPool::new()),
+            },
+            terminal: TerminalRuntime {
+                terminals: Arc::new(RwLock::new(HashMap::new())),
+                terminal_outputs: Arc::new(Mutex::new(HashMap::new())),
+                ssh_auth_responders: Arc::new(Mutex::new(HashMap::new())),
+                local_directory_runtime: Arc::new(Mutex::new(HashMap::new())),
+            },
+            files: FileRuntime {
+                sftp_sessions: Arc::new(RwLock::new(HashMap::new())),
+                transfers: Arc::new(RwLock::new(HashMap::new())),
+                oss_sessions: Arc::new(RwLock::new(HashMap::new())),
+                read_handles: Arc::new(Mutex::new(HashMap::new())),
+                write_handles: Arc::new(Mutex::new(HashMap::new())),
+            },
+            remote_desktop: RemoteDesktopRuntime {
+                vnc_sessions: Arc::new(RwLock::new(HashMap::new())),
+                vnc_detach_claims: Arc::new(RwLock::new(HashMap::new())),
+                rdp_sessions: Arc::new(RwLock::new(HashMap::new())),
+            },
+            database: DatabaseRuntime {
+                db_connections: Arc::new(RwLock::new(HashMap::new())),
+                hbase_sessions: Arc::new(RwLock::new(HashMap::new())),
+            },
+            agent: AgentRuntime {
+                cc_processes: tokio::sync::Mutex::new(HashMap::new()),
+                codex_processes: tokio::sync::Mutex::new(HashMap::new()),
+                acp_processes: tokio::sync::Mutex::new(HashMap::new()),
+                acp_media_processes: tokio::sync::Mutex::new(HashMap::new()),
+                chat_runs: Arc::new(ChatRunRegistry::new(HashMap::new())),
+                cc_pending_tool_calls: Arc::new(Mutex::new(HashMap::new())),
+                cc_pending_permissions: Arc::new(Mutex::new(HashMap::new())),
+                captures: Arc::new(crate::agent::capture::CaptureRegistry::new(
+                    std::env::temp_dir().join("taomni-cc-captures"),
+                )),
+                cc_capture_cancels: Arc::new(Mutex::new(HashMap::new())),
+                agent_thread_cwd: Arc::new(Mutex::new(HashMap::new())),
+                cc_tab_sessions: Arc::new(Mutex::new(HashMap::new())),
+                agent_db_bindings: Arc::new(RwLock::new(HashMap::new())),
+                agent_db_selected_objects: Arc::new(RwLock::new(HashMap::new())),
+                agent_code_workspaces: Arc::new(RwLock::new(HashMap::new())),
+            },
         }
     }
 
     /// Root of the per-account mail caches (`<app_data>/mail-cache`).
     pub fn mail_cache_root(&self) -> &std::path::Path {
-        &self.mail_db_dir
+        &self.mail.mail_db_dir
     }
 
     pub fn mail_db(&self, account_id: &str) -> Result<MailDbHandle, String> {
         let stem = mail_db_file_stem(account_id);
-        let mut dbs = self.mail_dbs.lock().map_err(|e| e.to_string())?;
+        let mut dbs = self.mail.mail_dbs.lock().map_err(|e| e.to_string())?;
         if let Some(db) = dbs.get(&stem) {
             return Ok(Arc::clone(db));
         }
@@ -282,11 +200,11 @@ impl AppState {
                 .map(|session| {
                     crate::mail::storage::configured_directory(
                         &session.options_json,
-                        &self.mail_db_dir,
+                        &self.mail.mail_db_dir,
                     )
                 })
                 .transpose()?
-                .unwrap_or_else(|| self.mail_db_dir.clone())
+                .unwrap_or_else(|| self.mail.mail_db_dir.clone())
         };
         let path = configured.join(format!("{stem}.db"));
         let handle = Arc::new(crate::mail::coordination::MailDatabase::new(path));

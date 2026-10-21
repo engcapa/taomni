@@ -88,32 +88,32 @@ impl CompletePayload {
 
 pub async fn register(state: &State<'_, AppState>, transfer_id: &str) -> Arc<TransferHandle> {
     let handle = Arc::new(TransferHandle::new());
-    let mut transfers = state.transfers.write().await;
+    let mut transfers = state.files.transfers.write().await;
     transfers.insert(transfer_id.to_string(), handle.clone());
     handle
 }
 
 pub async fn unregister(state: &State<'_, AppState>, transfer_id: &str) {
-    let mut transfers = state.transfers.write().await;
+    let mut transfers = state.files.transfers.write().await;
     transfers.remove(transfer_id);
 }
 
 pub async fn cancel(state: &State<'_, AppState>, transfer_id: &str) {
-    let transfers = state.transfers.read().await;
+    let transfers = state.files.transfers.read().await;
     if let Some(handle) = transfers.get(transfer_id) {
         handle.cancel();
     }
 }
 
 pub async fn pause(state: &State<'_, AppState>, transfer_id: &str) {
-    let transfers = state.transfers.read().await;
+    let transfers = state.files.transfers.read().await;
     if let Some(handle) = transfers.get(transfer_id) {
         handle.pause();
     }
 }
 
 pub async fn resume(state: &State<'_, AppState>, transfer_id: &str) {
-    let transfers = state.transfers.read().await;
+    let transfers = state.files.transfers.read().await;
     if let Some(handle) = transfers.get(transfer_id) {
         handle.resume();
     }

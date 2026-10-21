@@ -567,7 +567,7 @@ pub(crate) async fn await_permission(
     {
         let state = app.state::<AppState>();
         state
-            .cc_pending_permissions
+            .agent.cc_pending_permissions
             .lock()
             .unwrap()
             .insert(call_id.clone(), tx);
@@ -588,7 +588,7 @@ pub(crate) async fn await_permission(
         _ => {
             let state = app.state::<AppState>();
             state
-                .cc_pending_permissions
+                .agent.cc_pending_permissions
                 .lock()
                 .unwrap()
                 .remove(&call_id);
@@ -733,7 +733,7 @@ impl CcHandler {
         {
             let state = self.app_state();
             state
-                .cc_pending_tool_calls
+                .agent.cc_pending_tool_calls
                 .lock()
                 .unwrap()
                 .insert(call_id.clone(), tx);
@@ -756,7 +756,7 @@ impl CcHandler {
             _ => {
                 // Timed out or sender dropped — clean up the registry slot.
                 let state = self.app_state();
-                state.cc_pending_tool_calls.lock().unwrap().remove(&call_id);
+                state.agent.cc_pending_tool_calls.lock().unwrap().remove(&call_id);
                 Err(ErrorData::internal_error(
                     "tool call timed out or was cancelled".to_string(),
                     None,
@@ -790,7 +790,7 @@ impl CcHandler {
             })?;
         let state = self.app_state();
 
-        if state.captures.running_count(&scope.thread_id) >= 2 {
+        if state.agent.captures.running_count(&scope.thread_id) >= 2 {
             return Err(ErrorData::internal_error(
                 "too many captures already running for this thread; retry shortly".to_string(),
                 None,
@@ -806,11 +806,11 @@ impl CcHandler {
             Local,
         }
         let target = {
-            // `sid` is a tab id (token scope / fill_session_id). `state.terminals`
+            // `sid` is a tab id (token scope / fill_session_id). `state.terminal.terminals`
             // is keyed by the backend session id, so translate before lookup —
             // otherwise this always misses and reports a live terminal as dead.
             let backend_sid = resolve_backend_session_id(&state, &sid);
-            let terms = state.terminals.read().await;
+            let terms = state.terminal.terminals.read().await;
             match terms.get(&backend_sid) {
                 Some(ActiveTerminal::Ssh {
                     handle, channel, ..
@@ -826,7 +826,7 @@ impl CcHandler {
         };
 
         let cwd = state
-            .agent_thread_cwd
+            .agent.agent_thread_cwd
             .lock()
             .unwrap()
             .get(&scope.thread_id)
@@ -868,7 +868,7 @@ impl CcHandler {
                     ));
                 }
             };
-            let meta = state.captures.begin(
+            let meta = state.agent.captures.begin(
                 &scope.thread_id,
                 command,
                 CaptureSource::RemoteFile {
@@ -881,11 +881,11 @@ impl CcHandler {
                 .await
                 .map_err(|e| {
                     state
-                        .captures
+                        .agent.captures
                         .finish(&meta.id, CaptureStatus::Failed, None, 0, 0, false);
                     ErrorData::invalid_params(e, None)
                 })?;
-            state.captures.set_source(
+            state.agent.captures.set_source(
                 &meta.id,
                 CaptureSource::RemoteFile {
                     session_id: sid.clone(),
@@ -894,7 +894,7 @@ impl CcHandler {
                 },
             );
             state
-                .cc_capture_cancels
+                .agent.cc_capture_cancels
                 .lock()
                 .unwrap()
                 .insert(meta.id.clone(), cancel.clone());
@@ -917,10 +917,10 @@ impl CcHandler {
                         (CaptureStatus::TimedOut, None)
                     }
                 };
-            state.cc_capture_cancels.lock().unwrap().remove(&meta.id);
+            state.agent.cc_capture_cancels.lock().unwrap().remove(&meta.id);
             let (lines, bytes) = *counts.lock().unwrap();
             state
-                .captures
+                .agent.captures
                 .finish(&meta.id, status, rc, lines, bytes, false);
             self.emit_capture_end(&meta.id, &scope.thread_id, status, lines, bytes, rc, false);
 
@@ -954,8 +954,8 @@ impl CcHandler {
         }
 
         // ---- B path: independent channel / local child, Taomni-local file --
-        let dir = state.captures.thread_dir(&scope.thread_id);
-        let meta = state.captures.begin(
+        let dir = state.agent.captures.thread_dir(&scope.thread_id);
+        let meta = state.agent.captures.begin(
             &scope.thread_id,
             command,
             CaptureSource::LocalFile(dir.join("placeholder")),
@@ -963,10 +963,10 @@ impl CcHandler {
         let writer = crate::agent::capture::CaptureWriter::create(&dir, &meta.id)
             .map_err(|e| ErrorData::internal_error(format!("capture file: {e}"), None))?;
         state
-            .captures
+            .agent.captures
             .set_source(&meta.id, CaptureSource::LocalFile(writer.path()));
         state
-            .cc_capture_cancels
+            .agent.cc_capture_cancels
             .lock()
             .unwrap()
             .insert(meta.id.clone(), cancel.clone());
@@ -995,7 +995,7 @@ impl CcHandler {
             match tokio::time::timeout(Duration::from_secs(CAPTURE_TIMEOUT_SECS), run).await {
                 Ok(Ok(o)) => o,
                 Ok(Err(e)) => {
-                    state.captures.finish(
+                    state.agent.captures.finish(
                         &meta.id,
                         CaptureStatus::Failed,
                         None,
@@ -1003,7 +1003,7 @@ impl CcHandler {
                         writer.bytes(),
                         writer.truncated(),
                     );
-                    state.cc_capture_cancels.lock().unwrap().remove(&meta.id);
+                    state.agent.cc_capture_cancels.lock().unwrap().remove(&meta.id);
                     return Err(ErrorData::internal_error(e, None));
                 }
                 Err(_) => {
@@ -1015,9 +1015,9 @@ impl CcHandler {
                 }
             };
 
-        state.cc_capture_cancels.lock().unwrap().remove(&meta.id);
+        state.agent.cc_capture_cancels.lock().unwrap().remove(&meta.id);
         let truncated = writer.truncated();
-        state.captures.finish(
+        state.agent.captures.finish(
             &meta.id,
             outcome.status,
             outcome.exit_code,
@@ -1146,7 +1146,7 @@ impl CcHandler {
         use crate::agent::capture::CaptureSource;
         let meta = self
             .app_state()
-            .captures
+            .agent.captures
             .get_scoped(&scope.thread_id, &p.capture_id)
             .ok_or_else(|| {
                 ErrorData::invalid_params(
@@ -1176,7 +1176,7 @@ impl CcHandler {
                 let st = self.app_state();
                 let backend_sid = resolve_backend_session_id(&st, session_id);
                 let handle = {
-                    let terms = st.terminals.read().await;
+                    let terms = st.terminal.terminals.read().await;
                     match terms.get(&backend_sid) {
                         Some(ActiveTerminal::Ssh { handle, .. }) => handle.clone(),
                         _ => {
@@ -1391,7 +1391,7 @@ fn capture_summary(
 ///   inject the bound tab id so the effect targets the linked terminal and the
 ///   scope check passes. No-op for a global thread (no bound session).
 /// - Present as the advertised `SessionConfig.id`: rewrite it to the tab id, so
-///   downstream registry / `state.terminals` lookups (which key on the tab id)
+///   downstream registry / `state.terminal.terminals` lookups (which key on the tab id)
 ///   resolve instead of missing. The identity card hands CC the config id, so
 ///   this is the path CC takes when it "helpfully" names the session.
 /// - Present as the tab id already, or as a foreign id: left unchanged (a
@@ -1421,18 +1421,18 @@ fn fill_session_id(args: &mut serde_json::Value, scope: &TokenScope) {
 
 /// Resolve a caller-facing session id (a terminal *tab id* — what the token
 /// scope and `fill_session_id` use) to the *backend terminal session id* that
-/// keys `state.terminals`. The frontend reports this mapping as terminals
+/// keys `state.terminal.terminals`. The frontend reports this mapping as terminals
 /// connect (`cc_track_terminal`). `run_in_terminal` / `read_terminal_tail`
 /// don't need this — they dispatch the tab id to the frontend registry, which
 /// owns the indirection — but the backend-side capture tools (`run_captured` /
-/// `read_capture`) index `state.terminals` directly and must translate first.
+/// `read_capture`) index `state.terminal.terminals` directly and must translate first.
 ///
 /// Falls back to the id unchanged when no mapping exists, so a caller that
 /// already passes a backend session id, or a test/local setup with no tracking,
 /// still resolves (a miss then surfaces as the usual "no live terminal").
 fn resolve_backend_session_id(state: &AppState, sid: &str) -> String {
     state
-        .cc_tab_sessions
+        .agent.cc_tab_sessions
         .lock()
         .ok()
         .and_then(|m| m.get(sid).cloned())
@@ -2054,7 +2054,7 @@ mod tests {
     fn config_id_is_in_scope_and_normalized_to_tab_id() {
         // The identity card hands CC the SessionConfig.id; CC then names it as
         // session_id. It must be accepted (scope) and rewritten to the tab id
-        // (fill) so downstream registry / state.terminals lookups resolve.
+        // (fill) so downstream registry / state.terminal.terminals lookups resolve.
         let s = scope_with_config("t1", "ssh-cfg-123", "cfg-uuid");
         let mut args = json!({ "session_id": "cfg-uuid", "command": "free -h" });
         assert!(enforce_session_scope(&s, &args).is_ok());

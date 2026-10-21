@@ -15,7 +15,7 @@ pub(super) async fn recycle_if_profile_changed(
 ) {
     let selected_profile = profile_id_from_provider_id(provider_id);
     let process = {
-        let mut registry = state.acp_processes.lock().await;
+        let mut registry = state.agent.acp_processes.lock().await;
         let should_remove = registry
             .get(thread_id)
             .is_some_and(|process| Some(process.profile_id()) != selected_profile);
@@ -30,7 +30,7 @@ pub(super) async fn recycle_if_profile_changed(
 /// deleted or rebound to another provider. Unlike normal ACP chat processes,
 /// media processes are not reusable and must never survive their owner.
 pub(super) async fn recycle_media_process(state: &AppState, app: &AppHandle, thread_id: &str) {
-    let process = { state.acp_media_processes.lock().await.remove(thread_id) };
+    let process = { state.agent.acp_media_processes.lock().await.remove(thread_id) };
     if let Some(process) = process {
         let permission_owner_id = process.permission_owner_id().to_string();
         process.stop().await;
@@ -133,7 +133,7 @@ pub(super) async fn stream(
                 }
             };
             state
-                .acp_processes
+                .agent.acp_processes
                 .lock()
                 .await
                 .insert(req.thread_id.clone(), process.clone());
@@ -145,7 +145,7 @@ pub(super) async fn stream(
     }
 
     agent_ctx.refresh_runtime_bindings(state).await;
-    state.chat_runs.lock().await.insert(
+    state.agent.chat_runs.lock().await.insert(
         req.thread_id.clone(),
         run::ChatRunHandle::bridge_process(thread.provider_id.clone(), process.clone()),
     );
@@ -209,7 +209,7 @@ pub(super) async fn stream(
             update,
         );
     }
-    state.chat_runs.lock().await.remove(&req.thread_id);
+    state.agent.chat_runs.lock().await.remove(&req.thread_id);
 
     let result = match prompt_result {
         Ok(result) => result,
@@ -359,7 +359,7 @@ async fn existing_process(
     profile_id: &str,
 ) -> Option<Arc<AcpThreadProcess>> {
     state
-        .acp_processes
+        .agent.acp_processes
         .lock()
         .await
         .get(thread_id)
@@ -368,7 +368,7 @@ async fn existing_process(
 }
 
 async fn recycle_thread_process(state: &AppState, thread_id: &str) {
-    let process = state.acp_processes.lock().await.remove(thread_id);
+    let process = state.agent.acp_processes.lock().await.remove(thread_id);
     if let Some(process) = process {
         process.stop().await;
     }
@@ -509,7 +509,7 @@ pub(super) async fn generate_grok_media(
     );
     let permission_owner_id = process.permission_owner_id().to_string();
     let already_running = {
-        let mut registry = state.acp_media_processes.lock().await;
+        let mut registry = state.agent.acp_media_processes.lock().await;
         if registry.contains_key(thread_id) {
             true
         } else {
@@ -568,7 +568,7 @@ pub(super) async fn generate_grok_media(
     .await;
 
     let was_registered = {
-        let mut registry = state.acp_media_processes.lock().await;
+        let mut registry = state.agent.acp_media_processes.lock().await;
         if registry
             .get(thread_id)
             .is_some_and(|registered| Arc::ptr_eq(registered, &process))

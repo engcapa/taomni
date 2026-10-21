@@ -253,7 +253,7 @@ fn create_backup_locked(
     let flags = resolve_scope_flags(scope, custom_options);
 
     let mail_paths = state
-        .mail_archive
+        .mail.mail_archive
         .changes
         .lock()
         .map_err(|e| e.to_string())?;

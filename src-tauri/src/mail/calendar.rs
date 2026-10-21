@@ -321,7 +321,7 @@ pub async fn mail_get_invite(
         return Ok(invite_from_message(&raw));
     }
     let account = resolve_config(&state, config)?;
-    let pool = Arc::clone(&state.mail_imap_pool);
+    let pool = Arc::clone(&state.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
         with_imap_session(

@@ -398,7 +398,7 @@ pub async fn mail_store_remote_draft(
         },
     )?
     .formatted();
-    let pool = Arc::clone(&state.mail_imap_pool);
+    let pool = Arc::clone(&state.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let op_account_id = account_id.clone();
     let location = tokio::task::spawn_blocking(move || {
@@ -457,7 +457,7 @@ pub async fn mail_discard_remote_draft(
     else {
         return Ok(false);
     };
-    let pool = Arc::clone(&state.mail_imap_pool);
+    let pool = Arc::clone(&state.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let target = location.clone();
     tokio::task::spawn_blocking(move || {

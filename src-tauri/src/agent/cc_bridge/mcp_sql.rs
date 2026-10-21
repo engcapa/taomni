@@ -71,7 +71,7 @@ impl SqlHandler {
     /// — e.g. the DB tab isn't connected yet.
     async fn bound_conn(&self, scope: &TokenScope) -> Result<String, ErrorData> {
         self.state()
-            .agent_db_bindings
+            .agent.agent_db_bindings
             .read()
             .await
             .get(&scope.thread_id)
@@ -484,7 +484,7 @@ impl SqlHandler {
         let conn = self.bound_conn(&scope).await?;
         let selected = self
             .state()
-            .agent_db_selected_objects
+            .agent.agent_db_selected_objects
             .read()
             .await
             .get(&scope.thread_id)
@@ -561,7 +561,7 @@ impl SqlHandler {
         let conn = self.bound_conn(&scope).await?;
         let selected = self
             .state()
-            .agent_db_selected_objects
+            .agent.agent_db_selected_objects
             .read()
             .await
             .get(&scope.thread_id)
@@ -767,7 +767,7 @@ impl SqlHandler {
         enforce_inline_permission(&self.app, &scope, "run_sql_captured", &args, is_readonly)
             .await?;
         let state = self.state();
-        if state.captures.running_count(&scope.thread_id) >= MAX_RUNNING_CAPTURES {
+        if state.agent.captures.running_count(&scope.thread_id) >= MAX_RUNNING_CAPTURES {
             return Err(ErrorData::internal_error(
                 "too many captures already running for this thread; retry shortly".to_string(),
                 None,
@@ -781,8 +781,8 @@ impl SqlHandler {
         let r = res.map_err(err)?;
 
         let state = self.state();
-        let dir = state.captures.thread_dir(&scope.thread_id);
-        let meta = state.captures.begin(
+        let dir = state.agent.captures.thread_dir(&scope.thread_id);
+        let meta = state.agent.captures.begin(
             &scope.thread_id,
             &p.sql,
             CaptureSource::LocalFile(dir.join("placeholder")),
@@ -793,9 +793,9 @@ impl SqlHandler {
         writer.flush();
         let truncated = writer.truncated();
         state
-            .captures
+            .agent.captures
             .set_source(&meta.id, CaptureSource::LocalFile(writer.path()));
-        state.captures.finish(
+        state.agent.captures.finish(
             &meta.id,
             CaptureStatus::Done,
             None,
@@ -842,7 +842,7 @@ impl SqlHandler {
         let scope = self.scope(&ctx)?;
         let meta = self
             .state()
-            .captures
+            .agent.captures
             .get_scoped(&scope.thread_id, &p.capture_id)
             .ok_or_else(|| {
                 ErrorData::invalid_params(
@@ -887,7 +887,7 @@ impl SqlHandler {
         }
         let meta = self
             .state()
-            .captures
+            .agent.captures
             .get_scoped(&scope.thread_id, &p.capture_id)
             .ok_or_else(|| {
                 ErrorData::invalid_params(

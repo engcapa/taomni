@@ -203,7 +203,7 @@ pub async fn mail_list_folders(
     let account = resolve_config(&state, config)?;
     let account_id = account.config.session_id.clone();
     let cache_enabled = account.config.cache.enabled;
-    let pool = std::sync::Arc::clone(&state.mail_imap_pool);
+    let pool = std::sync::Arc::clone(&state.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let listed = tokio::task::spawn_blocking(move || {
         with_imap_session(
@@ -240,7 +240,7 @@ pub async fn mail_set_folder_subscription(
     let account = resolve_config(&state, config)?;
     let account_id = account.config.session_id.clone();
     let cache_enabled = account.config.cache.enabled;
-    let pool = std::sync::Arc::clone(&state.mail_imap_pool);
+    let pool = std::sync::Arc::clone(&state.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let listed = tokio::task::spawn_blocking(move || {
         with_imap_session(

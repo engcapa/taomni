@@ -862,7 +862,7 @@ pub async fn dap_start_session(
     launch_config: Value,
 ) -> Result<DapStartResult, String> {
     let adapter = state
-        .dap
+        .workspace.dap
         .registry
         .get(&adapter_id)
         .ok_or_else(|| format!("No debug adapter registered for `{adapter_id}`"))?;
@@ -896,7 +896,7 @@ pub async fn dap_start_session(
     tokio::spawn(run_reader(
         reader,
         session.clone(),
-        state.dap.clone(),
+        state.workspace.dap.clone(),
         session_id.clone(),
         emit.clone(),
     ));
@@ -947,7 +947,7 @@ pub async fn dap_start_session(
         plan.request
     );
 
-    state.dap.insert(session_id.clone(), session).await;
+    state.workspace.dap.insert(session_id.clone(), session).await;
     Ok(DapStartResult {
         session_id,
         capabilities: init,
@@ -966,7 +966,7 @@ pub async fn dap_send_request(
     arguments: Option<Value>,
 ) -> Result<Value, String> {
     let session = state
-        .dap
+        .workspace.dap
         .get(&session_id)
         .await
         .ok_or_else(|| format!("No debug session `{session_id}`"))?;
@@ -988,7 +988,7 @@ pub async fn dap_send(
     arguments: Option<Value>,
 ) -> Result<(), String> {
     let session = state
-        .dap
+        .workspace.dap
         .get(&session_id)
         .await
         .ok_or_else(|| format!("No debug session `{session_id}`"))?;
@@ -1006,7 +1006,7 @@ pub async fn dap_terminate(
     state: tauri::State<'_, crate::state::AppState>,
     session_id: String,
 ) -> Result<(), String> {
-    if let Some(session) = state.dap.remove(&session_id).await {
+    if let Some(session) = state.workspace.dap.remove(&session_id).await {
         let graceful = session
             .capabilities
             .lock()

@@ -101,7 +101,7 @@ pub async fn mail_archive_status(
     state: State<'_, AppState>,
 ) -> Result<ArchiveStatus, String> {
     {
-        let jobs = state.mail_archive.jobs.lock().map_err(|e| e.to_string())?;
+        let jobs = state.mail.mail_archive.jobs.lock().map_err(|e| e.to_string())?;
         if let Some(job) = jobs
             .get(&account_id)
             .filter(|job| job.running.load(Ordering::Acquire))
@@ -123,7 +123,7 @@ pub async fn mail_archive_status(
     .await?;
     if !shared {
         if let Some(job) = state
-            .mail_archive
+            .mail.mail_archive
             .jobs
             .lock()
             .map_err(|e| e.to_string())?
@@ -161,7 +161,7 @@ pub async fn mail_archive_pause(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state.mail_archive.pause_account(&account_id)?;
+    state.mail.mail_archive.pause_account(&account_id)?;
     with_mail_db_async(&state, &account_id, |db, account| {
         db.execute(
             "INSERT INTO mail_archive_preferences(account_id,paused) VALUES(?1,1)
@@ -205,11 +205,11 @@ pub async fn mail_archive_start(
     }
     let job = {
         let _changes = state
-            .mail_archive
+            .mail.mail_archive
             .changes
             .try_lock()
             .map_err(|_| "Mail settings or backup snapshot is being saved; retry shortly")?;
-        let mut jobs = state.mail_archive.jobs.lock().map_err(|e| e.to_string())?;
+        let mut jobs = state.mail.mail_archive.jobs.lock().map_err(|e| e.to_string())?;
         if let Some(job) = jobs
             .get(&id)
             .filter(|job| job.running.load(Ordering::Acquire))
@@ -612,7 +612,7 @@ pub async fn mail_archive_cleanup(
 ) -> Result<u64, String> {
     // Stop publication before deleting the frozen preview; skip markers prevent
     // other instances from publishing these originals again.
-    state.mail_archive.pause_account(&account_id)?;
+    state.mail.mail_archive.pause_account(&account_id)?;
     with_mail_db_async(&state, &account_id, move |db, account| {
         archive_query::remove_preview(db, account, &token).map_err(storage::as_sql_error)
     })
@@ -701,7 +701,7 @@ pub async fn mail_archive_remove(
     entries: Vec<storage::ArchiveEntry>,
     state: State<'_, AppState>,
 ) -> Result<usize, String> {
-    state.mail_archive.pause_account(&account_id)?;
+    state.mail.mail_archive.pause_account(&account_id)?;
     with_mail_db_async(&state,&account_id,move |db,account| {
         db.execute("INSERT INTO mail_archive_preferences(account_id,paused) VALUES(?1,1) ON CONFLICT(account_id) DO UPDATE SET paused=1",[account])?;
         storage::remove_entries(db,account,&entries).map_err(storage::as_sql_error)
