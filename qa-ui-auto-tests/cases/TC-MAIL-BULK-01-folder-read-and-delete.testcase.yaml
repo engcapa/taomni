@@ -7,7 +7,9 @@ description: Marks the folder read, selects three messages using Ctrl/Cmd and Sh
   finish while All read is clicked; the toolbar must keep its controls in place so native pointer input
   reaches the intended action. Selecting Trash while a prior sync finishes must queue its refresh;
   late cache replies for INBOX must not overwrite the selected folder. A mounted regression also delays
-  the read-completion cache snapshot until after deletion, verifying it cannot restore removed rows.
+  the read-completion cache snapshot until after deletion, verifying it cannot restore removed rows. After cancelling
+  permanent deletion, wait for the async action to release its busy state before clicking Delete again;
+  a native click on a still-disabled button emits no click and must not be counted as an action.
 covers:
 - F-MAIL-3
 - F-MAIL-12
@@ -97,6 +99,9 @@ steps:
 - mail_server_assert_folder_count:
     folder: Trash
     equals: 3
+- wait_for:
+    selector: '[data-testid="mail-delete-selected"]:not(:disabled)'
+    timeout_sec: 10
 - click: '[data-testid="mail-delete-selected"]'
 - wait_for: '[data-testid="confirm-dialog"]'
 - click: '[data-testid="confirm-dialog-confirm"]'
@@ -204,8 +209,8 @@ verification:
     - 29
     - 31
     - 33
-    - 35
-    - 37
+    - 36
+    - 38
     checkpoints:
     - step: 28
       expectation: Switching to Trash during background sync eventually shows all three moved messages
@@ -214,62 +219,62 @@ verification:
       expectation: Select-all selects the three displayed messages.
     - step: 34
       expectation: Cancellation leaves the three messages on the server.
-    - step: 38
+    - step: 39
       expectation: Confirmation removes the three messages from Trash.
-    - step: 40
+    - step: 41
       expectation: The deleted messages disappear from the list.
     results:
     - 28
     - 30
     - 34
-    - 38
-    - 40
+    - 39
+    - 41
   - id: R4
     requirement: A pending folder-read operation must allow deleting a new selection, move exactly those
       three messages and retain all remaining mail.
     actions:
-    - 42
     - 43
     - 44
-    - 46
+    - 45
     - 47
-    - 49
+    - 48
     - 50
-    - 55
+    - 51
+    - 56
     checkpoints:
-    - step: 45
+    - step: 46
       expectation: '{''mail_server_assert_list_matches'': {''timeout_sec'': 30, ''unread'': True}}'
-    - step: 48
+    - step: 49
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-mark-folder-read"]'', ''name'':
         ''aria-busy'', ''equals'': ''true''}}'
-    - step: 51
+    - step: 52
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-selection-count"]'', ''contains'':
         ''3 selected''}}'
-    - step: 52
-      expectation: '{''assert_enabled'': ''[data-testid="mail-delete-selected"]''}'
     - step: 53
+      expectation: '{''assert_enabled'': ''[data-testid="mail-delete-selected"]''}'
+    - step: 54
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-mark-folder-read"]'', ''name'':
         ''aria-busy'', ''equals'': ''true''}}'
-    - step: 56
+    - step: 57
       expectation: '{''mail_server_assert_folder_count'': {''folder'': ''Trash'', ''equals'': 3, ''timeout_sec'':
         40}}'
-    - step: 57
-      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''INBOX'', ''equals'': 30}}'
     - step: 58
-      expectation: '{''mail_server_assert_list_matches'': {''timeout_sec'': 40, ''unread'': True}}'
+      expectation: '{''mail_server_assert_folder_count'': {''folder'': ''INBOX'', ''equals'': 30}}'
     - step: 59
+      expectation: '{''mail_server_assert_list_matches'': {''timeout_sec'': 40, ''unread'': True}}'
+    - step: 60
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-selection-count"]'', ''contains'':
         ''0 selected''}}'
     results:
-    - 45
-    - 48
-    - 51
+    - 46
+    - 49
     - 52
     - 53
-    - 56
+    - 54
     - 57
     - 58
     - 59
+    - 60
   visual:
   - check: Selected rows, selection count and Delete selected button are visible without clipping.
     method: manual

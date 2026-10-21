@@ -1005,19 +1005,38 @@ it("ED-TREEOPEN-001 / DEC-TOF-04: a WebView focus reset after the menu unmounts 
 
     expect(await screen.findByRole("button", { name: "Open" })).toBeInTheDocument();
 
-    fireEvent.keyDown(document, { key: "Escape" });
-
-    await waitFor(() => {
-      expect(screen.queryByRole("button", { name: "Open" })).not.toBeInTheDocument();
+    // Hold the next paint until after the simulated unmount focus reset.
+    // Real timers can paint during waitFor's async settlement under load,
+    // which would simulate a later, unrelated blur instead of this scenario.
+    const frames = new Map<number, FrameRequestCallback>();
+    let nextFrameId = 0;
+    const requestFrame = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      const id = ++nextFrameId;
+      frames.set(id, callback);
+      return id;
     });
+    const cancelFrame = vi.spyOn(window, "cancelAnimationFrame").mockImplementation((id) => {
+      frames.delete(id);
+    });
+    try {
+      fireEvent.keyDown(document, { key: "Escape" });
+      await waitFor(() => {
+        expect(screen.queryByRole("button", { name: "Open" })).not.toBeInTheDocument();
+      });
 
-    // WebView2 drops DOM focus to the body when the focused menu node leaves
-    // the document, after the restore that ran before the unmount commit.
-    (document.activeElement as HTMLElement | null)?.blur();
-
-    await waitFor(() => {
+      // WebView2 resets focus after the focused menu node leaves the DOM.
+      (document.activeElement as HTMLElement | null)?.blur();
+      expect(document.activeElement).toBe(document.body);
+      act(() => {
+        const pending = [...frames.values()];
+        frames.clear();
+        for (const callback of pending) callback(performance.now());
+      });
       expect(document.activeElement).toBe(otherRow);
-    });
+    } finally {
+      requestFrame.mockRestore();
+      cancelFrame.mockRestore();
+    }
   });
 it("ED-TREEOPEN-001 / DEC-TOF-04: context menu Open opens file and grants focus to editor", async () => {
     const workspace: CodeWorkspaceTabInfo = {

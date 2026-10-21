@@ -426,3 +426,25 @@ SessionTree 从 1963 行降至 399 行。`useSessionTreeNavigation` 拥有树过
 - OS 凭据、文件选择器/磁盘和三端 native 持久化仍以新提交的匹配原生证据为准；P0→P5 整体仍在进行。
 
 J 补充：新增测试后的 `j-types.log` 类型检查通过；`audit-j.log` 全部 gates 通过，清单 2528 项。G 当前已下载的 20 reports 均 signature/hash/stable identity 通过，但仍有 Linux PERF-03（旧 0.95 标准）和 macOS TC-MAIL-BULK-01 的确认框缺失失败；G 尚未结束，以上不是完整三端结果。
+
+H/I/J 与 15% 性能标准已提交并 push 到 `4741b43c09dbcc759da24f3ae79f86ec8302f44f`；完整三端 browser/native workflow [39616923665](https://github.com/engcapa/taomni/actions/runs/39616923665) 已触发，尚无验收结论。
+
+G macOS TC-MAIL-BULK-01 定位：第一次永久删除确认框正常打开并取消；20ms 后的第二次 Delete 操作只有 pointerdown/up，没有 click/focus 事件，最终按钮可用且选区仍为 3。`runMailAction` 的 finally 异步解除 busy，而 macOS bridge 的 `el.click()` 对 disabled button 静默无操作。这与取消后尚未恢复可用时就点击一致；现有证据不足以声称产品数据操作失败。用例增加取消后的明确 enabled 等待，再执行原第二次删除/确认/服务器数量验证，原断言全部保留并更新 step indexes；不增加固定 sleep 或自动重试删除。最终通过仍需对应原生执行。
+
+G Windows helper 补充核验：`github-g-windows-build/qa-build-output/capture-contracts.log` 明确运行真实 `sockscap_helper-*.exe`，**26 passed / 0 failed**（capture 18、Windows process selector 2、proc_info 6）。这证明 Windows binary unit contracts，不等同于真实 WinDivert 驱动流量接管。
+
+## 2026-10-21 实施批次 K：编辑器命令归属与展示入口
+
+CodeWorkspaceTab 从 7104 行降至 6791 行。`useWorkspaceEditorCommands` 拥有端口 map、注册 token 检查、command context revision、按活动分栏/固定菜单目标查找及执行、返回编辑器焦点和 provider target 解析；shell 通过校验后的 owner lookup 授予树焦点，不再直接读取可变 map。注册所需 refs 在 hook 调用前建立，避免延迟 getter 初始化依赖。
+
+`useWorkspaceCommandFocus` 集中 terminal/modal/tree/editor 分类及局部快捷键归属保护；`useWorkspaceProblemPresentation` 拥有 provider provenance 展示、inspection baseline/抑制映射和诊断打开；`useWorkspaceCoverage` 拥有报告及 overlay 状态、原候选路径扫描；`useWorkspaceDebugEntryPoints` 保留运行 gutter 的 source-file/facts 判断与远程 JVM attach 流程。实际 Java provider/DAP 连接仍需要 native evidence。
+
+新增 3 项 command owner 回归验证菜单目标固定而键盘跟随活动分栏、旧卸载 token 不移除新端口、文件变化拒绝旧命令、pending tree focus 仅授予匹配 group/canonical key，并读取实时 selection。纯重构沿用原有 browser/native 入口，不新增机械迁移 case。
+
+`k-build.log` 构建与 contracts/boundaries 通过。首次 `browser-k.log` 因使用缩写 TC-IDE-CW-SHELL-01 而未执行用例，已改为 YAML 完整 ID；保留该失败记录，不计为产品失败或通过。组合单测、浏览器、全量 Vitest 和三端结果后续追加。
+
+K 定向验证：`k-editor-tests.log` **8 files / 298 passed**；`k-build.log` **401 implementation boundaries** 与原 command/export/event contracts 通过；`audit-k.log` 全部 gates 通过。
+
+`browser-k/run-20261021-223550-231825961` **8 passed / 0 skipped**：C3-01 跨分栏 clipboard/undo/lease、CW-SHELL-01 编码与无 provider 操作、PARITY-006-02 输入/全局撤销焦点、012-01 弹层返回原 caret、013-01 Find Action、015-01 provider unavailable、022-01 gutter/stripe、025-01 断点弹层/键盘输入归属。报告 signature/hash/identity_stable 全部通过，summary SHA256 `566263d35a61281595dce8eac3429ba3b9d3b44d166cc99b194c5488bccd09d1`，source identity `5f82db08b94bd23daacaf725d8894740b7307701b9b1f8b260951e5f1c1270aa`。没有把这些 browser stub 场景计为真实 Java provider、remote attach 或 OS 剪贴板证据。
+
+K 全量首轮 `k-unit-full.log`：543 files，5465 passed / 1 failed / 1 conditional skip。失败为 tree-menu 卸载后焦点 reset 的测试：其 `await waitFor(menu gone)` 期间下一帧可能已执行，随后才模拟 blur，就把“卸载后、下一帧前失焦”变成了更晚的失焦。产品的 `claimTreeFocus` 原实现没有改动；原定向组合该项通过不能覆盖本次全量失败。测试现显式截取并执行下一帧，先确认菜单卸载及 body 失焦，再执行 RAF 并断言恢复到原 tree row，未放宽断言或增加超时。`k-focus-tests.log` DEC-TOF-04 的 3 项通过；249 项因名称过滤未执行，不计通过。最终全量重跑待完成。
