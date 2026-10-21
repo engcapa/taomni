@@ -613,3 +613,17 @@ HBaseShellTab 1399→323 行、EditorGroup 1251→654 行、FindInFilesPanel 134
 Q 三端最终结果：[39652904042](https://github.com/engcapa/taomni/actions/runs/39652904042)，完整 head `53d56b407df41966e8ed8a2dcd4f887ae1e5c0e7`。18 份原始 reports 签名/hash/stable identity 通过，统一身份 `e38f477021ef029d0a305761c0922fa8c5b133c66233490742ebf118253b0cff`。Linux browser18/native28、Windows browser18/native25、macOS browser18/native22 passed + 1 failed，合计 **129 passed / 1 failed / 0 skipped**。workflow 为 failure，不能以 native 执行 job 成功称整体通过。失败保留为 macOS `TC-RDPS-PERF-03-photo-content`：fps_ratio=0.698785121 未达到0.85；kbps_per_frame_ratio=1.079893889 符合1.15门槛；source animation 两轮帧率也不匹配。保留原采样和截图，未以归一化指标替换失败或放宽15%容差。
 
 S selected 三端运行 [39659861812](https://github.com/engcapa/taomni/actions/runs/39659861812) 绑定完整提交 `209f134f58b2be8efbdd272fcb1053ee7a1ed535`，包含63个 IDs，当前尚未收齐原始报告。整体 P0→P5 仍须处理其余大文件，并完成最终完整提交的全量回归与三端 scope=all。
+
+## 2026-10-22 实施批次 U：Azure、Agent、PTY/SSH、语音与文件/标注边界
+
+10 个 Rust 入口拆出 73 个实现/测试模块：Azure Blob、MCP SQL、PTY、ACP process、语音 streaming、PanWei DB、Chat ACP、RDP client clipboard、SSH 和 AI config。生产模块最大 MCP SQL routes 542 行；原实例、请求表、permission completion、子进程、turn guard、network proxy、文件传输与 staging lifetime 保留。PTY 的 Linux 控制 TTY 测试与 macOS locale/PTY 测试继续按原 cfg 编译，不把平台用例移到错误平台执行。
+
+FileBrowser 1248→373 行、SchemaTree 1247→386 行、AnnotationCanvas 1193→592 行；17 个新前端模块最大 schema actions 619 行。SFTP 连接/认证安装与关闭、终端 CWD request/timeout、一次性 upload request 和视图分离；保留 sidebar 隐藏时不 detach、待处理 MFA 的取消和 upload completion 的一次性归属。Schema cache/展开/加载和 typed actions 分离；标注类型、几何、painting、eraser 与 history 分开，同一个可复用 erase canvas 缓存随 painting owner 迁移，未复制缓存。
+
+- `u-rust-final-3.log`：lib **1868 passed / 0 failed / 25 ignored**，integration **80 passed / 0 failed**；348 个生产函数（包含全部 cfg alternatives）tokens 一致。`u-ui-final.log`：6 files / **130 passed**，覆盖原 SFTP toolbar/polish、schema tree、annotation/eraser 与 ScreenshotOverlay。`u-build-final.log` 完整类型检查、production build 成功，761/328/39 契约和 710 implementation modules 边界检查通过。3 个前端公共 API、74 个原声明和 top-level state 保持一致，除 UI owner 提取和无渲染意义的 JSX 换行缩进。
+- `browser-u/run-20261022-035026-022954788`：标注选择、拖动/缩放/样式/删除/undo、文本编辑、数字、工具和颜色 **7 passed**；SFTP 7 项因该配置未安装 SSH fixture 而 skipped，`--require-pass` 正确失败，未将 skip 计通过。
+- 原源码/断言不变，使用已有 runner 管理的一次性本地 Docker SSH fixture 和随机环境密码，`browser-u-sftp/run-20261022-035335-402240803` 上述 **7 passed / 0 failed / 0 skipped**：attached/standalone、上传/下载/preview/cleanup、chmod、open-terminal-here、手动目录同步与隐藏重开不丢连接。该 bridge 证据不外推为原生 PTY/系统副作用通过。
+- 两轮 receipt 签名、summary hash 和 stable identity 通过，统一 source identity `eb8f5999c7429c6d589adfb56edc3de8ec476a1b7b0fe1de78ee047a7ee8c308`。两份 summary SHA256 分别为 `495493f6f2e4b0e782feb02f8174180613bad357142e563b0fb4281ce981a12f` 和 `154d8c2d7c24ce6cf5ed65661fae9cdb0d003411fee3e04bd0998745ac29f8ff`。清单 3270 项，本批全部新增/修改实现≤800行。
+- 初期 Rust trait/cfg 遗漏、FileBrowser view 的 props 命名冲突、MFA 闭包 narrowing、basename re-export 和 painting 缓存误留门面均已修复，原失败/主动停止日志保留。修改后重新执行上述最终回归；没有删除断言、提高性能容差或新增搬文件专用测试。
+
+Q 聚合 artifact 已收齐，head 正确、`report_ok=true`、`passed=false`、无 infrastructure errors/gaps；原 macOS 性能失败保留。S 已收齐14份签名/hash/stable identity正确的报告：Linux browser31/native35、macOS browser31/native30、Windows browser31，共158 passed，无失败/跳过；macOS PERF-03 此次 fps_ratio=1.023579244，在原0.85门槛内。Windows native 构建尚在执行，S仍无最终结论，也不以重跑通过替代Q失败记录。剩余结构与最终全量三端验收继续推进。
