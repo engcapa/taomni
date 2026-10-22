@@ -147,7 +147,7 @@ jobs:
         run: node --test scripts/compose-updater-manifest.test.mjs .agents/skills/qa-ui-auto/scripts/test_ci_macos_consent.cjs
       - name: Wayland automation contracts
         if: inputs.scope != 'selected'
-        run: python -m unittest test_wayland_tools test_multi_display
+        run: python -m unittest test_wayland_tools test_multi_display test_ci_wayland_startup
 
   plan:
     if: github.event_name != 'pull_request' || inputs.scope != ''

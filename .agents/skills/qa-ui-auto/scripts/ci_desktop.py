@@ -239,7 +239,7 @@ class Desktop:
                 "Mutter DisplayConfig service")
         subprocess.run(["/usr/bin/python3", str(Path(__file__).with_name("ci_multi_display.py")),
                         "configure", "--report", str(self.root / "display-configuration.json")],
-                       check=True, timeout=30)
+                       check=True, timeout=45)
 
     def _xorg_dual(self):
         # Use an independent server: Xvfb does not implement the RandR output

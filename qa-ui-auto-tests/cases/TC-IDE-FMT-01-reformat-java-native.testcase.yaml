@@ -69,7 +69,9 @@ steps:
     selector: '[data-testid="code-workspace-lsp-status-pill"]'
     contains: Java
     timeout_sec: 60
-- wait: 2
+- wait_for:
+    selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
+    timeout_sec: 120
 - native_pointer_drag:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     from:
@@ -168,6 +170,8 @@ verification:
     - step: 11
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
         "Java", "timeout_sec": 60}}'
+    - step: 12
+      expectation: The real Java session finishes initialization before the native formatter shortcut is invoked; the Java name alone can also be shown while starting.
     - step: 14
       expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"10:9\", \"timeout_sec\": 10}}"
     - step: 16

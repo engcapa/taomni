@@ -43,6 +43,17 @@ def configure(report):
             return bus.call_sync("org.gnome.Mutter.DisplayConfig", "/org/gnome/Mutter/DisplayConfig",
                                  "org.gnome.Mutter.DisplayConfig", method, parameters, None,
                                  Gio.DBusCallFlags.NONE, 10000, None).unpack()
+        def evaluate(script):
+            try:
+                success, value = bus.call_sync("org.gnome.Shell", "/org/gnome/Shell", "org.gnome.Shell", "Eval",
+                    GLib.Variant("(s)", (script,)), None, Gio.DBusCallFlags.NONE, 10000, None).unpack()
+            except GLib.Error as error:
+                raise RuntimeError(f"GNOME startup observation unavailable: {error}") from error
+            if not success:
+                raise RuntimeError(f"GNOME startup observation failed: {value}")
+            return json.loads(value)
+        from ci_wayland_startup import wait_for_shell_startup
+        wait_for_shell_startup(evaluate, report.with_name("gnome-startup.json"))
         serial, monitors = monitor_configuration(call("GetCurrentState"))
         call("ApplyMonitorsConfig", GLib.Variant("(uua(iiduba(ssa{sv}))a{sv})",
              (serial, 1, monitors, {"layout-mode": GLib.Variant("u", MUTTER_LOGICAL_LAYOUT)})))
