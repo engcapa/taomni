@@ -16,6 +16,8 @@ mod fixture;
 use fixture::*;
 mod capture_scenarios;
 pub use capture_scenarios::*;
+mod ocr_scenario;
+pub use ocr_scenario::*;
 mod scroll_scenarios;
 pub use scroll_scenarios::*;
 mod recorder_scenarios;

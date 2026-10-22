@@ -20,7 +20,7 @@ verification:
     actions: [1]
     checkpoints:
     - {step: 3, expectation: Real display dimensions and nonblank PNG retained.}
-    - {step: 4, expectation: "Email/phone recognized, sensitive boxes found, UI undo/redo verified and redacted clipboard PNG retained."}
+    - {step: 4, expectation: "Email/phone recognized, sensitive boxes found, UI undo/redo verified, actual page OCR/redaction inputs, OCR text and selection geometry retained alongside the redacted clipboard PNG."}
     - {step: 5, expectation: Main window usable after tool teardown.}
     results: [3, 4, 5]
   visual:
