@@ -70,3 +70,12 @@ class NativePointerReadinessTest(TestCase):
         with self.assertRaisesRegex(WebDriverError, 'stale element'):
             prepare_pointer_target(self.session, self.origin)
         self.session.request.assert_called_once()
+
+    def test_visible_alternate_point_is_stable_and_only_enabled_explicitly(self):
+        self.session.request.return_value = self.geometry(x=68)
+        self.assertEqual(prepare_pointer_target(self.session, self.origin, allow_alternate=True),
+                         {'x': 68, 'y': 217})
+        self.assertTrue(all(c.args[2]['args'] == [self.origin, True] for c in self.session.request.call_args_list))
+        self.session.request.reset_mock()
+        prepare_pointer_target(self.session, self.origin)
+        self.assertTrue(all(c.args[2]['args'] == [self.origin, False] for c in self.session.request.call_args_list))

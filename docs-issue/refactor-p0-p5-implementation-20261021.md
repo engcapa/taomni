@@ -788,3 +788,14 @@ Linux 两个失败保留原始报告：
 本地候选完整TREEOPEN业务断言10/10通过，原生应用/driver/独立WM已退出；该/tmp探针外层清理临时portal挂载时返回OSError，wrapper exit1，因此仅称10份case报告通过，不称整条探针命令成功。后续独立会话的受控移动目标探针验证Ctrl+Shift左键、中键、右键的真实trusted事件与(400,115)最终坐标，持续遮挡均在无输入下失败，完成临时挂载退出等待后wrapper exit0，见 `ad-native-input-clean-probe/observations.json`。更早在同一会话中右键后立即发出左键/中键的额外诊断序列缺少后续事件，原失败 `ad-native-input-probe.log` 保留，尚须与旧handler作同条件对照，不能用独立会话通过覆盖该序列。
 
 本地workflow工具契约382项为381通过/1 Windows条件skip，另24项Wayland及15项Node均通过（合计420通过/1skip）；之后仅增强两个测试的外部状态模型，最终相关48项再次全部通过。`pnpm check:refactor`保留761/328/39契约、868模块边界、3866文件规模/4声明例外，未修改产品源码或性能预算。
+
+
+## 2026-10-22 AD：终端可见目标兼容修正与 GitHub runner 下载失败
+
+run [39704734780](https://github.com/engcapa/taomni/actions/runs/39704734780) 绑定 `7b0b5a75705bb02e484c24b6551580e7babccc9e`，1788项选例与AC的ID/内容摘要逐一相同。AC的Linux凭据初始化与TREEOPEN两项已在AD真实通过。AD的Linux/macOS `TC-150` step44则暴露候选输入准备的兼容回归：主题选项设计为应用后保持菜单打开，终端输入已成功；再次右键时固定中心落在portal菜单上，命中检查等待到期。原截图与HTML明确保留该菜单，不能把它归为不明宿主噪声，也不改业务断言来绕过。
+
+修正仅针对右键：中心不可用时，在同一目标的视口可见矩形内寻找另一个真实DOM命中的位置，仍须两次稳定且发送真实W3C输入；不会点击覆盖目标的兄弟/portal，所有候选都遮挡时仍失败。组合键左键与中键仍要求中心命中。新小模块仍低于800行，未修改产品、YAML、菜单项目、case预算或性能阈值。
+
+私有Xvfb/WebKitGTK的同条件部分遮挡探针中，AD旧模块在中心(400,115)按预期失败，候选在同一button的可见点(348,115)产生trusted pointerdown/contextmenu，完整遮挡时没有新增输入并按预期失败；日志为 `ae-partial-overlay-before.log` 与 `ae-partial-overlay-candidate/observations.json`，control exit1为预期负向结果、候选wrapper exit0。真实Docker SSH服务上的原 `TC-150` 和完整TREEOPEN case均通过，原生报告 `ae-terminal-tree-native/run-20261022-094830-715179928/summary.json`，wrapper exit0；应用/driver/WM与本任务SSH容器均退出。相关49项unit通过；完整工具契约383项为382通过/1 Windows条件skip，另24项Wayland及15项Node全部通过，合计421通过/1skip（`ae-tool-contracts.log`）。
+
+AD Windows native shard2 在任何代码检出、构建导入或应用测试之前失败：GitHub `Set up job` 下载 `actions/download-artifact` 的codeload archive三次连接超时。job [119588526764](https://github.com/engcapa/taomni/actions/runs/39704734780/job/119588526764) 的原始API、annotations、job log保留在 `ad-windows-shard2-provisioning*`；该分片51个选定case没有执行。其它AD分片与原失败继续收齐，不把缺失分片算作通过。修正提交后会在新完整SHA重新执行三端scope=all；当前仍未宣称最终全通过。

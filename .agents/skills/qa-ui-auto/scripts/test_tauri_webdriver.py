@@ -209,7 +209,7 @@ class NativeSessionTransportTest(TestCase):
         )
         actions = actions_call.args[2]["actions"][0]["actions"]
         self.assertEqual(actions[0]["origin"], "viewport")
-        self.prepare_pointer_target.assert_called_once_with(session, {"element-6066-11e4-a52e-4f735466cecf": "row-2"})
+        self.prepare_pointer_target.assert_called_once_with(session, {"element-6066-11e4-a52e-4f735466cecf": "row-2"}, allow_alternate=True)
         self.assertEqual([a["button"] for a in actions[1:]], [2, 2])
 
     def test_double_click_resolves_refreshed_row_before_sending_pointer_actions(self):
@@ -301,7 +301,7 @@ class NativeSessionTransportTest(TestCase):
         )
         actions = actions_call.args[2]["actions"][0]["actions"]
         self.assertEqual(actions[0]["origin"], "viewport")
-        self.prepare_pointer_target.assert_called_once_with(session, {"element-6066-11e4-a52e-4f735466cecf": "row-2"})
+        self.prepare_pointer_target.assert_called_once_with(session, {"element-6066-11e4-a52e-4f735466cecf": "row-2"}, allow_alternate=True)
 
     def test_pointer_click_gives_up_after_three_stale_references(self):
         session = NativeSession("http://driver.invalid", Path("unused"))

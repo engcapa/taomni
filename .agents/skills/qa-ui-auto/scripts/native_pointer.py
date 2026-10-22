@@ -12,13 +12,28 @@ const r = el.getBoundingClientRect();
 const left = Math.max(0, r.left), right = Math.min(innerWidth, r.right);
 const top = Math.max(0, r.top), bottom = Math.min(innerHeight, r.bottom);
 const x = Math.floor((left + right) / 2), y = Math.floor((top + bottom) / 2);
-const hit = document.elementFromPoint(x, y);
-return {x, y, width: r.width, height: r.height,
-        ready: right > left && bottom > top && !!hit && el.contains(hit)};
+const points = [[x, y]];
+if (arguments[1] && right > left && bottom > top) {
+  // A context menu may intentionally stay open while applying terminal
+  // appearance settings. Right-click another visible part of that same
+  // container to reopen it; never click through a covering sibling/portal.
+  const inset = Math.min(8, (right - left) / 4, (bottom - top) / 4);
+  const l = Math.ceil(left + inset), rr = Math.floor(right - inset);
+  const t = Math.ceil(top + inset), b = Math.floor(bottom - inset);
+  points.push([l,y], [rr,y], [x,t], [x,b], [l,t], [rr,t], [l,b], [rr,b]);
+}
+for (const [px, py] of points) {
+  const hit = document.elementFromPoint(px, py);
+  if (right > left && bottom > top && !!hit && el.contains(hit)) {
+    return {x: px, y: py, width: r.width, height: r.height, ready: true};
+  }
+}
+return {x, y, width: r.width, height: r.height, ready: false};
 """
 
 
-def prepare_pointer_target(session, origin: dict, timeout: float = 5.0) -> dict:
+def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
+                           *, allow_alternate: bool = False) -> dict:
     """Wait for two matching points; never activate a target or replay input.
 
     Element-origin actions leave geometry resolution to the driver. Resolve
@@ -33,7 +48,7 @@ def prepare_pointer_target(session, origin: dict, timeout: float = 5.0) -> dict:
         if session.deadline:
             session.deadline.remaining()
         last = session.request("POST", session.endpoint("/execute/sync"), {
-            "script": TARGET_GEOMETRY, "args": [origin],
+            "script": TARGET_GEOMETRY, "args": [origin, allow_alternate],
         })
         if (not isinstance(last, dict) or not isinstance(last.get("ready"), bool)
                 or any(isinstance(last.get(k), bool) or not isinstance(last.get(k), (int, float))

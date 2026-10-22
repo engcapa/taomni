@@ -643,7 +643,7 @@ class NativeSession(WebDriverTransport):
                     "script": "arguments[0].scrollIntoView({block:'nearest', inline:'nearest'});",
                     "args": [origin],
                 })
-                point = prepare_pointer_target(self, origin)
+                point = prepare_pointer_target(self, origin, allow_alternate=button == 2)
             except WebDriverError as exc:
                 if _is_stale_element_error(exc) and attempt < 2:
                     last_stale = exc
