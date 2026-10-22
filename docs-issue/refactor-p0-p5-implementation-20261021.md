@@ -2,18 +2,18 @@
 
 分支：`refactor/p0-p5-architecture`；原始基线：`f3e375eb`。
 
-这是一项进行中的全仓重构。阶段完成要求原实现真正迁出、生产调用接入、保留契约经过验证。新增未接线的 controller 或仅验证自身的测试不算完成。早期未接线草稿已移除。
+P0→P5 的实现拆分、生产接线及本轮约定的组合回归已完成。最终产品与 QA 工具提交为 `c76828a373d4ebe1596c17d5666a7d846361ed0f`，三端全量证据见文末 AE 验收记录。本文早期批次的进行中状态与失败记录按历史保留；生成/声明文件、原方案 P6 和既有外部项目/人工验证缺口另列，不计为已经执行通过。
 
-| 阶段 | 当前状态（截至 Y 批次） | 剩余验收 |
+| 阶段 | 最终状态 | 验收依据 |
 | --- | --- | --- |
-| P0 基线 | 命令、导出、事件快照及生产边界检查已接入构建；规模规则已提交至 AGENTS.md | 最终提交的全量回归、报告身份与平台缺口核验 |
-| P1 IPC/启动/状态 | IPC、stub registry、Zustand slices、native registrar 和 7 个 AppState domain runtime 已接入原入口 | 最终三端启动、持久化与 native 回归 |
-| P2 Workspace/LSP | 主 shell、编辑器 host、状态/生命周期 owners、保存/恢复/重构、LSP transport/requests/Java、workspace/execution providers 和大型测试已拆分 | 最终组合的真实 JDT LS、磁盘事务、DAP；S 的 Windows rename 失败仍待验证 |
-| P3 Shell/Session | MainLayout、SessionEditor、TerminalPanel 的视图、协议表单、连接/认证队列、窗口/传输/输入/viewport owners 已拆分 | 最终三端 SSH/PTY、IME、窗口、取消/重连与持续会话 |
-| P4 Mail/DB/File/Git | 前端视图与 owners、IMAP/POP3/OAuth/SMTP/cache、查询/事务/grid、文件传输和 Git services 已拆分 | 最终三端真实服务、存储、恢复/取消及交互回归 |
-| P5 协议/系统能力 | RDP/VNC、平台捕获/编码/输入/clipboard、SocksCap、Screenshot、Chat/LanChat/Backup 责任已拆分 | 最终三端 native 系统边界、恢复和 15% 性能门槛 |
+| P0 基线 | 完成：契约、依赖边界、规模规则及前后清单已接入构建，AGENTS.md 明确长期约束 | 761 commands /328 façade exports /39 literal events；868 实现模块边界；3866 文件规模检查；3883 项清单行数一致 |
+| P1 IPC/启动/状态 | 完成：领域 IPC、stub registry、Zustand slices、native registrar、7 个 domain runtime 接入原入口 | 本地 IPC/store 行为与三端启动、持久化、native 流程 |
+| P2 Workspace/LSP | 完成：shell、editor host、状态/生命周期 owners、保存/恢复/重构、LSP/Java/execution 和场景测试拆分 | 全量 mounted 测试、真实 Java/JDT LS 五类 fixture、三端 native 保存/重命名/恢复；原 S 失败保留 |
+| P3 Shell/Session | 完成：视图、协议表单、连接/认证队列及 terminal/window/input/viewport owners 拆分 | 两种终端编译模式单测及三端 SSH/PTY、窗口、复制、持续会话与恢复场景 |
+| P4 Mail/DB/File/Git | 完成：视图与 owners、IMAP/POP3/OAuth/SMTP/cache、query/transaction/grid、文件与 Git services 拆分 | 本地 Rust/integration 与三端真实服务、存储、恢复和交互场景 |
+| P5 协议/系统能力 | 完成：RDP/VNC、捕获/编码/输入/clipboard、SocksCap、Screenshot、Chat/LanChat/Backup 拆分 | 三端 release QA、原生系统边界、双屏、独立 clipboard oracle 与 15% 性能回归门槛 |
 
-原始代码规模基线和早期批次时间线保留在下文。当前所有手维护产品实现、测试及 fixture runner 均已≤800行，例外仅为生成 Thrift 绑定、locale 字典和同构静态命令清单。实施完成与全阶段验收完成分开记录；尚未收齐最终三端证据，不宣称 P0→P5 整体完成。
+手维护产品实现、测试及 fixture/build scripts 均≤800物理行；4 个例外为生成 Thrift 绑定、两份 locale 字典、807 行同构静态命令注册表。QA 技能工具及 vendor 不属于本轮 P0→P5 产品重构，原方案 P6 保留。新增文件目标200–500行，800行门槛由 `pnpm check:refactor` 和 `pnpm build` 强制检查；不得压缩格式或删除断言降低行数。
 
 ## 保留契约
 
@@ -799,3 +799,61 @@ run [39704734780](https://github.com/engcapa/taomni/actions/runs/39704734780) �
 私有Xvfb/WebKitGTK的同条件部分遮挡探针中，AD旧模块在中心(400,115)按预期失败，候选在同一button的可见点(348,115)产生trusted pointerdown/contextmenu，完整遮挡时没有新增输入并按预期失败；日志为 `ae-partial-overlay-before.log` 与 `ae-partial-overlay-candidate/observations.json`，control exit1为预期负向结果、候选wrapper exit0。真实Docker SSH服务上的原 `TC-150` 和完整TREEOPEN case均通过，原生报告 `ae-terminal-tree-native/run-20261022-094830-715179928/summary.json`，wrapper exit0；应用/driver/WM与本任务SSH容器均退出。相关49项unit通过；完整工具契约383项为382通过/1 Windows条件skip，另24项Wayland及15项Node全部通过，合计421通过/1skip（`ae-tool-contracts.log`）。
 
 AD Windows native shard2 在任何代码检出、构建导入或应用测试之前失败：GitHub `Set up job` 下载 `actions/download-artifact` 的codeload archive三次连接超时。job [119588526764](https://github.com/engcapa/taomni/actions/runs/39704734780/job/119588526764) 的原始API、annotations、job log保留在 `ad-windows-shard2-provisioning*`；该分片51个选定case没有执行。其它AD分片与原失败继续收齐，不把缺失分片算作通过。修正提交后会在新完整SHA重新执行三端scope=all；当前仍未宣称最终全通过。
+
+
+## 2026-10-22 AE 最终组合验收：P0→P5 完成
+
+最终执行提交 **`c76828a373d4ebe1596c17d5666a7d846361ed0f`** 已推送 `refactor/p0-p5-architecture`。指定 workflow [39708779294](https://github.com/engcapa/taomni/actions/runs/39708779294) 使用 scope=all、linux/windows/macos、browser/native、native_release=true、run_rdp_unit_contracts=true、publish_issues=false；原25分片/7组/1788项选择完整保留。误填 head 的 `39691871823` 在测试前取消；旧工具提交的 AA `39690483542` 为避免重复占用 runner 已取消，任何残余报告单列，不与 AE 拼接为当前通过证据。
+
+| 平台 | browser passed | native passed | failed | skipped |
+| --- | ---: | ---: | ---: | ---: |
+| Linux | 396 | 216 | 0 | 0 |
+| Windows | 396 | 199 | 0 | 0 |
+| macOS | 394 | 187 | 0 | 0 |
+| 合计 | 1186 | 602 | 0 | 0 |
+
+25份runner报告全部收齐，**1788 passed /0 failed /0 skipped**。三端 release 构建、Windows capture helper contracts、Linux native Rust contracts 均成功。aggregate `passed=true /report_ok=true /infrastructure_errors=[]`。未以 scope=all 的 job success 替代 case 结果，逐一验证全部 case IDs、case SHA256、精确选例和 totals；原 S Windows rename、Z Windows Copy All、AB hover文档与Windows welcome、AC Linux credential setup与TREEOPEN、AD TC-150终端菜单保留场景本轮均通过，历史失败和原因未定的部分保留。
+
+- 产品 source identity：`f58137508f7066bb47db1ee47081332a2a42f41dc77faad61fed28c1c345100c`。
+- QA runner identity：`ac6abc0a76ee29d94dbace95bfaa9d276abac22e62c6d4532ebbe3d43d136285`。
+- 原始 selection SHA256：`cce2eb1bd9cdb9dc058f6d19ceb736657f3ba42ca0910688c3a7a69b9998c8dd`。
+- 聚合 ci-summary SHA256：`79066eba0172132b2194fc5ae164cb57a1f307922445de8481d81e1550be0f03`。
+- 本地交付核验文件 SHA256：`68e9b820f72bb4b09821f8ea564b41f1268b6bea5d6e20a8cb261a17af317cc0`。
+
+原始完整目录为 `qa-ui-auto-report/refactor-p0-p5/github-ae/`；核验结果 `delivery-verification.json`。已验证25份签名与summary哈希、稳定源码/runner指纹、head/run/attempt、全部模式/平台、native QA ID `com.taomni.app.qa`、构建源码、release profile、同平台各分片二进制hash、桌面身份和aggregate一致。三端二进制摘要：
+
+```json
+{
+  "native-build-linux-x64-release": "330ae4eae59e4204217fa869770ef585457c6430cdbcb58db19b821a23e53b2e",
+  "native-build-windows-x64-release": "becad4dfc38cb96b8c7d22c24cf2bc87442057385742f710d4081b7cc28eeb8b",
+  "native-build-macos-arm64-release": "d44bd31a061a7aeb5a95f93656368fbcdf3ce17ed02212a39a36abded200c1a8"
+}
+```
+
+按执行提交原有上传策略，**16372 个必须保留工件**（含 **2508 个隐藏工件**）已逐项核验大小与SHA256，未知缺失/哈希错误0。另有 **62 个原策略明确排除的登记fixture文件**（一次性macOS更新包/签名副本/Disposable.app）未上传，期望摘要及具体排除glob列于同一JSON；这些文件没有进行逐字验证，`strict_all_registered_files_retained=false`，不将其计入已留存文件数。Y的意外隐藏文件漏传与上述明确排除项仍区分记录。
+
+### 原始性能与本地回归
+
+所有登记性能用例按原断言通过；raw JSON 与 `performance-evidence.json` 保留在同一目录。RDP photo-content 在同场景基准中的比值如下，原FPS下限0.85、每帧带宽上限1.15保持不变，不替换失败采样或归一化结果：
+
+| 平台 | FPS ratio | kbps/frame ratio | 15%门槛 |
+| --- | ---: | ---: | --- |
+| macOS | 1.068102346 | 0.993671117 | 通过 |
+| Linux | 0.926330863 | 1.023411792 | 通过 |
+| Windows | 1.022382565 | 1.010957122 | 通过 |
+
+本地最终完整产品回归证据复用相同 source identity：Vitest **544 files /5469 passed /1原有conditional skip**；终端QA编译模式 **86 passed /1互补conditional skip**；Rust **lib1868 passed /25 opt-in ignored、integration80 passed、rdp-probe15 passed**；仓库rustfmt、完整production build与refactor gates通过。CSS拆分前后208578 bytes逐字一致；真实Java21/JDT LS/Gradle五类fixture **5/5 green**。最后的改动只涉及QA工具、workflow及文档，未更改产品源码；本地完整workflow工具contracts为421 passed /1 Windows条件skip；最后相关49项全部通过，另有受控真实Chromium鼠标布局探针及原hover文档44步通过；新的传输/隔离/fixture联合61 tests中60 passed /1 Windows条件skip，后者在Windows build job单列执行，原始log为15 tests全部通过（含真实进程树/文件锁）。第一次完整工具命令因本任务PATH遗漏conda依赖而在执行测试前失败，恢复实际Python环境后完整通过，原日志保留。日志摘要保留于 `final-local-evidence.json`、`ac-local-evidence.json`、`ad-local-evidence.json` 与 `ae-local-evidence.json`，原日志路径见前文。首次并行Rust X11 DAMAGE预算失败也保留，未将原因未经证明地归结为宿主负载。
+
+此前AC截图视觉抽查记录为`ac-visual-samples.json`，保持原run和runner身份，不充作AE的新截图。AE截图抽查另存`ae-visual-samples.json`；这是agent的有限视觉抽查，不是逐像素基线比较或所有manual条目的人工验收。
+
+### 已知验证边界
+
+三平台同一外部 `clickhousecrud` 原项目未分发，`TC-IDE-C6-06-java-definition-realproject-native` 的3个平台能力缺口未执行，不合成替代项目。99个legacy/unreviewed IDs的运行通过与验收review状态分开；静态审计仍有44 shallow /4 orphan /21 required control未映射，不能称全部产品能力已覆盖。25项Rust opt-in ignored、用例中明确的manual/native边界未声称执行。Q的macOS性能失败、S的Windows rename失败、W的平台trait构建失败、Y的工件遗漏、Z两项失败、AB两项失败、AC两项失败和AD的TC-150及runner初始化失败均保留；后续当前通过仅证明本轮选定环境和断言，不抹除历史结果。
+
+AB Windows清理超时的底层根因仍未证实；AE保留相同5秒预算和失败门禁，602个native case的DELETE与owner清理均有原始成功诊断，汇集为`ae-native-cleanup-evidence.json`。Windows welcome场景DELETE耗时0.047000秒、owner清理0.078000秒。当前通过不能表述为已经修复该宿主偶发问题。原AB失败、driver日志和真实HTTP超时/截断等负向验证继续保留。
+
+AC的缺失login collection受控复现及8次候选真实恢复、TREEOPEN原handler10次与候选10次case通过、小模块的稳定几何/命中测试均按原身份保留。独立会话中移动目标的组合键左键/中键/右键均产生真实trusted事件，持续遮挡未发送输入。临时portal挂载异步退出导致两条早期探针wrapper清理失败，后续增加owned mount退出等待后命令完整成功，未把wrapper失败算通过。额外连续序列的旧/新handler对照记录`ad-native-continuity-comparison.json`显示五阶段事件逐项相同：prevented右键后均有click但无新的pointerdown，底层WebKit行为尚未诊断；该现象未由本次候选引入，不以独立会话通过覆盖原日志。它也不能被当作AC那次CI点击偏移的已证实根因。
+
+AD的TC-150固定中心命中检查与保持打开的主题菜单不兼容，已作为本任务引入的QA工具回归修正，原三平台失败保留。只有右键可在同一目标可见区域寻找另一个DOM命中点，完整遮挡仍失败；原终端与TREEOPEN用例在真实本地SSH原生检查通过。部分遮挡的旧工具受控探针失败、候选trusted右键命中及完整遮挡负向结果均保留，见`ae-partial-overlay-before.log`和`ae-partial-overlay-candidate/observations.json`。AD最后24份报告为1734 passed /3 failed /0 skipped，TC-150在三平台各失败一次；15822个留存工件（含2305个隐藏文件）大小/哈希均有效，62个原策略排除项仍单列。AD Windows shard2的51项未执行源于GitHub下载action三次连接超时，aggregate passed=false /report_ok=false，原基础设施错误单列；AE用新的完整run重新执行所有25分片，不通过混合attempt或删掉失败拼凑验收。
+
+本轮P0→P5交付完成；上述既有外部/人工/登记边界与原计划P6不在“已执行通过”范围。结束时清理了本任务启动的本地Vite与VNC fixture，未操作个人D-Bus/keyring或其他工作区进程。
