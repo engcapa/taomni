@@ -4,6 +4,8 @@
 **基线提交**：`f3e375eb`（工作区无未提交修改）  
 **分析范围**：Git 跟踪的 `src/`、`src-tauri/src/`、`src-tauri/tests/`、`scripts/`、`src-tauri/proto/`、`src-tauri/thrift/` 和 `src-tauri/build.rs` 中的实现代码、样式与协议 schema。`dist/`、`target/`、`qa-ui-auto-report/`、`src-tauri/vendor/` 和第三方生成物不作为业务重构对象。
 
+本文保留重构前的分析与方案。后续拆分、当前入口规模和实际测试结果见 [P0–P5 实施与验收记录](./refactor-p0-p5-implementation-20261021.md)，当前 3,883 项逐文件清单见 [重构后文件清单](./source-code-inventory-refactor-current.tsv)。持续的文件规模与职责约束已写入仓库根目录 `AGENTS.md`，并由 `pnpm check:refactor` 和构建执行。
+
 ## 结论先行
 
 Taomni 的功能覆盖面已经形成完整产品，但代码边界仍按“入口文件 + 逐次追加功能”增长。最需要处理的是四个耦合点：

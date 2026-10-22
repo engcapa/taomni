@@ -41,6 +41,8 @@ class NativeFixtureCleanupTest(unittest.TestCase):
         session.console_entries.return_value = []
         def close():
             events.append("session-close")
+            session.cleanup_diagnostics = {"delete_attempted": True,
+                                           "owner_cleanup": {"status": "failed" if close_failure else "passed"}}
             if close_failure:
                 raise RuntimeError("owned process cleanup failed")
 
@@ -117,6 +119,7 @@ class NativeFixtureCleanupTest(unittest.TestCase):
                 self.assertEqual(events[-2:], ["second-cleanup", "first-cleanup"])
                 self.assertEqual(result["status"], "failed")
                 self.assertEqual(result["session_cleanup_error"], "owned process cleanup failed")
+                self.assertEqual(result["session_cleanup"]["owner_cleanup"]["status"], "failed")
                 self.assertEqual(result["failure"]["message"],
                                  "original step failure" if failure else "owned process cleanup failed")
 

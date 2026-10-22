@@ -300,6 +300,11 @@ jobs:
           path: qa-contract-output/
           if-no-files-found: warn
           retention-days: 14
+      - name: Windows native session cleanup contracts
+        if: runner.os == 'Windows' && inputs.operation == 'build'
+        run: |
+          mkdir -p qa-build-output
+          python -m unittest test_native_webdriver_transport test_native_fixture_cleanup 2>&1 | tee qa-build-output/session-cleanup-contracts.log
       - name: Build and export the verified native runtime
         if: inputs.operation == 'build'
         env:
@@ -342,6 +347,7 @@ jobs:
           path: |
             qa-build-output/build.log
             qa-build-output/capture-contracts.log
+            qa-build-output/session-cleanup-contracts.log
             qa-ui-auto-report/${{ matrix.id }}/
           retention-days: 14
       - name: Download this invocation's verified native runtime

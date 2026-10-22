@@ -750,3 +750,23 @@ Z的25份报告已收齐，**1786 passed /2 failed /0 skipped**：除上述Linux
 检查发现`host_clipboard`的text/html轮询每次调用两次OS读取：第一次判定，第二次写入日志。这增加helper启动成本，且两次读取之间若有外部写入，日志可能记录未满足断言的另一个快照。改为每轮只读取一个真实OS快照，同时用于原有equals/contains判定及原始观察记录；下一轮仍重新读取，持续不匹配或工具不可用仍失败。保留所有YAML断言、120秒预算、PowerShell/JXA/xclip独立oracle和产品实现。
 
 新增8项工具回归，覆盖Unicode/空文本/精确匹配、外部后续写入、真实轮询更新及持续失败；三个一致性场景在已提交旧handler上失败（`clipboard-snapshot-before.log`），候选及相邻native/Wayland工具共**90 passed /1平台条件skip**（`clipboard-snapshot-unit.log`）。该工具修复不新增产品流程，复用原TC-TERM-TEXT-006与RDP clipboard用例在新完整提交验证；不能以本地mock证明Windows原生已通过。当前AA [39690483542](https://github.com/engcapa/taomni/actions/runs/39690483542)的head为`22dafa546477e12b9dd6d0108adce5d83d1de220`，不包含此修复，结果将单列保留。
+
+## 2026-10-22 AB 全量结果与浮层鼠标路径诊断
+
+[39691946896](https://github.com/engcapa/taomni/actions/runs/39691946896) 的完整执行提交为 `559b21d2e5aa42b5cb887fbffe9acccae87fda7e`，25分片/7组/1788项选例不变，产品source identity `f58137508f7066bb47db1ee47081332a2a42f41dc77faad61fed28c1c345100c`、runner identity `a5e5a382309d5bfbb6d9ad114698c0907090e93550a3f2c08b926cdcdaa4b49d`。最终 **1786 passed /2 failed /0 skipped**：Linux browser396/native216、macOS browser393passed+1failed/native187、Windows browser396/native198passed+1failed。三端release、Windows capture helper与Linux native Rust contracts成功；aggregate仍为passed=false，未将workflow绿色误称为用例全部通过。
+
+`github-ab/delivery-verification.json` 对25份报告身份/receipt/summary/case选例/native build和 **16373个按策略必须保留的工件**（含2509个隐藏工件）核验，无未知工件遗漏、哈希错误或报告身份错误。原策略62个一次性更新fixture排除项仍单列未留存。全部性能场景通过，photo-content FPS比值Linux1.018989645、macOS0.923116095、Windows1.026951937，每帧带宽比值分别1.005068492、1.007572910、0.999662624，满足用户15%门槛，原始数据保留。
+
+原Z的Linux credential准备场景本轮真实store/lookup/clear就绪并完成产品用例；Windows Copy All三端28步均通过（Windows17.0686秒、macOS7.6486秒、Linux8.2351秒）。不能据此确定原宿主PowerShell启动变慢的底层原因。
+
+macOS browser `TC-IDE-PARITY-026-03` step30点击悬浮文档失败。原trace中前一步`mouse_path`读取的是CodeMirror尚未测量的临时矩形：`x=0,y=-10000,width=440,height=280`，随后真实发送`mouseMove(x=220,y=-9860,steps=6)`；指针移出窗口后弹窗按原宽限逻辑关闭，click所持元素脱离DOM。原产品hoverDocTooltip实现未因本次重构改变，现有证据支持修复测试工具的坐标准备过程。
+
+`mouse_path`现在在最多5秒且受剩余case预算约束的时间内等待原请求点进入viewport，再发送真实鼠标输入。保留中心+dx/dy、steps和pause，不滚动、不clamp、不在等待中发事件；永久越界、缺少layout仍失败。8项新回归覆盖临时位置、偏移、持续越界、不clamp、无layout、dry-run、真实窗口尺寸和case预算；候选及邻近工具47项通过，4项新回归在旧handler上明确失败。真实Chromium受控探针中，旧handler向`220,-9860`移动导致popup消失，候选向布局后的`820,260`移动并成功点击；原完整026-03本地44步通过（`browser-mouse-layout/run-20261022-080354-308624268`）。这些是browser证据，最终macOS结果仍需新完整提交验证。
+
+### Windows native会话清理超时：保持失败与增加可区分证据
+
+Windows `TC-WELCOME-RS-N-01-native-smoke` 的17个业务步骤全部通过，session setup6.078秒、cleanup5.078秒，总17.2865秒，唯一失败为`<session-cleanup>: timed out`。前后相邻case的清理约0.14–0.17秒；原teardown未发现残留QA进程。driver日志出现`hyper::Error(IncompleteMessage)`，但无法判断是请求超时断开后的结果还是原因；backup periodic日志同样不足以判定退出阻塞。原Y/Z相同case分别通过，不能用旧pass覆盖此次失败，也不能声称原CI根因已经定位。
+
+将W3C传输和关闭owner责任从巨型tauri_webdriver入口提取到139行的`native_webdriver_transport.py`，NativeSession继续继承相同接口，WebDriverError保留原入口re-export。沿用同一HTTP/1.1连接、代理绕过、5秒DELETE预算、异常时关闭连接、不重试交付状态不明的动作和finally释放owned进程树。额外记录DELETE所处阶段（发送、响应头、响应体、解析）、HTTP状态/错误类型/耗时以及owned owner清理结果；不保存request payload或response body。runner将这些诊断附入原summary，所有cleanup失败仍使case失败，业务失败优先级保留。此项是诊断改进，不是已经证实的Windows产品修复。
+
+新增8项真实loopback HTTP/故障测试：正常DELETE、迟迟无响应头、响应体不结束、截断body、HTTP错误、W3C错误、owner清理失败及敏感payload不进入诊断；每种传输失败仍失败，DELETE只有一次且owner仍清理。联合原传输、隔离与fixture测试 **60 passed /1 Windows条件skip**（61 tests）；Windows真实owned子进程持有文件锁、清理后释放锁且无关进程继续存活的原测试，将与新HTTP故障测试一并在Windows build job执行。原预算和失败门禁不变。完整QA工具contracts及新提交三端全量结果随后追加。

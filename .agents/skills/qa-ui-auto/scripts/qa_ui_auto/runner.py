@@ -541,6 +541,8 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                             session.close()
                         except Exception as exc:
                             r["session_cleanup_error"] = str(exc)
+                        if isinstance(session.cleanup_diagnostics, dict):
+                            r["session_cleanup"] = session.cleanup_diagnostics
                         # ED-FOLLOW-002: the app is dead here (session.close
                         # ends its process), so reaping its orphaned jdtls
                         # children cannot dangle any live session map. Never

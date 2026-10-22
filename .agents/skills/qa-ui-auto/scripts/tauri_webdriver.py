@@ -7,7 +7,6 @@ It speaks the small W3C WebDriver subset needed by the qa-ui-auto DSL.
 from __future__ import annotations
 
 import base64
-import http.client
 from contextlib import suppress
 import json
 import os
@@ -20,12 +19,11 @@ import subprocess
 import sys
 import time
 import urllib.error
-import urllib.parse
-import urllib.request
 from pathlib import Path
 from typing import Any
 
 from native_build import QA_APP_ID, verify_identity
+from native_webdriver_transport import WebDriverError, WebDriverTransport
 
 
 ROOT = Path.cwd()
@@ -236,10 +234,6 @@ def selector_strategy(selector: str, *, interactive: bool = False) -> tuple[str,
     return "css selector", selector
 
 
-class WebDriverError(RuntimeError):
-    pass
-
-
 def _is_stale_element_error(error: BaseException) -> bool:
     """True when re-resolving the element can recover the command.
 
@@ -418,70 +412,14 @@ class TauriDriverProcess:
         self.proc = None
 
 
-class NativeSession:
+class NativeSession(WebDriverTransport):
     #: Non-empty when Linux desktop focus could not be recovered. Focus is a
     #: case assertion, so this is reported and never fails the whole session.
     focus_warning = ""
 
     def __init__(self, driver_url: str, application: Path, on_close: Any | None = None):
-        self.driver_url = driver_url.rstrip("/")
-        self.application = application
-        self._on_close = on_close
-        self.session_id: str | None = None
-        self.deadline = None
+        super().__init__(driver_url, application, on_close)
         self.transport = "macOS WKWebView bridge" if platform.system() == "Darwin" else "tauri-driver"
-        # A local driver must remain reachable when the desktop uses a proxy.
-        host = urllib.parse.urlsplit(self.driver_url).hostname
-        self._local_endpoint = (urllib.parse.urlsplit(self.driver_url)
-                                if host in {"localhost", "127.0.0.1", "::1"} else None)
-        self._connection: http.client.HTTPConnection | None = None
-        self._open = (urllib.request.build_opener(urllib.request.ProxyHandler({})).open
-                      if host in {"localhost", "127.0.0.1", "::1"} else urllib.request.urlopen)
-
-    def request(self, method: str, path: str, payload: dict | None = None) -> Any:
-        body = None
-        headers = {"Content-Type": "application/json"}
-        if payload is not None:
-            body = json.dumps(payload).encode("utf-8")
-        req = urllib.request.Request(
-            f"{self.driver_url}{path}", data=body, headers=headers, method=method
-        )
-        try:
-            timeout = min(120, self.deadline.remaining()) if self.deadline else 120
-            if self._local_endpoint and self._local_endpoint.scheme == "http":
-                # urllib unconditionally adds Connection: close. Forwarded
-                # by tauri-driver, this causes WebKitGTK to reset responses
-                # mid-flight. Keep the sequential W3C session on HTTP/1.1.
-                if self._connection is None:
-                    self._connection = http.client.HTTPConnection(
-                        self._local_endpoint.hostname, self._local_endpoint.port, timeout=timeout)
-                if self._connection.sock:
-                    self._connection.sock.settimeout(timeout)
-                self._connection.timeout = timeout
-                try:
-                    self._connection.request(method, path, body=body, headers=headers)
-                    response = self._connection.getresponse()
-                    data = response.read().decode("utf-8")
-                    if response.status >= 400:
-                        raise WebDriverError(f"HTTP {response.status}: {data}")
-                except Exception:
-                    self._connection.close()
-                    self._connection = None
-                    # Never retry an action whose delivery is uncertain.
-                    raise
-            else:
-                with self._open(req, timeout=timeout) as r:
-                    data = r.read().decode("utf-8")
-        except urllib.error.HTTPError as e:
-            detail = e.read().decode("utf-8", errors="replace")
-            raise WebDriverError(f"HTTP {e.code}: {detail}") from e
-        if not data:
-            return None
-        parsed = json.loads(data)
-        value = parsed.get("value", parsed)
-        if isinstance(value, dict) and "error" in value:
-            raise WebDriverError(value.get("message") or value["error"])
-        return value
 
     def start(self) -> None:
         payload = {
@@ -615,26 +553,6 @@ class NativeSession:
                 time.sleep(sleep_for)
         detail = f": {last_error}" if last_error else ""
         raise WebDriverError(f"native app document did not become ready within {timeout:.1f}s{detail}")
-
-    def close(self) -> None:
-        from qa_ui_auto.deadline import Deadline
-
-        try:
-            if self.session_id:
-                # Case/failure-capture/host-restoration budgets may already
-                # be exhausted. Always give DELETE its own bounded attempt.
-                self.deadline = Deadline(5)
-                self.request("DELETE", f"/session/{self.session_id}")
-        finally:
-            self.session_id = None
-            if self._connection:
-                self._connection.close()
-                self._connection = None
-            # A failed POST can leave an app even without a returned session
-            # ID. The owner must release that tree too; close is idempotent.
-            on_close, self._on_close = self._on_close, None
-            if on_close is not None:
-                on_close()
 
     def endpoint(self, suffix: str) -> str:
         if not self.session_id:
