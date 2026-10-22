@@ -2,7 +2,8 @@ id: TC-MAIL-BULK-02
 title: Adaptive bulk delete preserves partial progress and retries the remainder
 description: Select 200 messages against a provider without MOVE and with a 25-message COPY limit. Fail after the
   first successful batch, inspect error details, then resume. Native checks real provider effects; browser injects
-  equivalent receipts. Exactly 200 destination messages and no source messages must remain.
+  equivalent receipts. Recovery buttons stay anchored to the right edge as background progress changes.
+  Exactly 200 destination messages and no source messages must remain.
 covers:
 - F-MAIL-3
 - F-MAIL-12
@@ -64,6 +65,9 @@ steps:
     equals: 25
     timeout_sec: 30
 - assert_enabled: '[data-testid="mail-mutation-retry"]'
+- eval_readonly:
+    expression: 'Math.abs(document.querySelector(''[data-testid\x3d"mail-mutation-details"]'').parentElement.getBoundingClientRect().right - document.querySelector(''[data-testid\x3d"mail-mutation-details"]'').getBoundingClientRect().right - parseFloat(getComputedStyle(document.querySelector(''[data-testid\x3d"mail-mutation-details"]'').parentElement).paddingRight)) < 1'
+    expect_truthy: true
 - screenshot: mail-bulk-limit-partial.png
 - click: '[data-testid="mail-mutation-details"]'
 - assert_text:
@@ -105,8 +109,8 @@ verification:
     - 12
     - 15
     - 16
-    - 23
-    - 25
+    - 24
+    - 26
     checkpoints:
     - step: 13
       expectation: '{''mail_server_assert_list_matches'': {''timeout_sec'': 30}}'
@@ -126,10 +130,12 @@ verification:
         30}}'
     - step: 21
       expectation: '{''assert_enabled'': ''[data-testid="mail-mutation-retry"]''}'
-    - step: 24
+    - step: 22
+      expectation: Details stays at the status strip right edge while background progress changes, so a pointer cannot land on Retry instead.
+    - step: 25
       expectation: '{''assert_text'': {''selector'': ''[data-testid="confirm-dialog"]'', ''contains'': ''destination
         unavailable''}}'
-    - step: 26
+    - step: 27
       expectation: Closing the details dialog returns to the remaining selection.
     results:
     - 13
@@ -139,34 +145,35 @@ verification:
     - 19
     - 20
     - 21
-    - 24
-    - 26
+    - 22
+    - 25
+    - 27
   - id: R2
     requirement: Retry completes the original action without duplicating the 25 completed messages.
     actions:
-    - 27
     - 28
+    - 29
     checkpoints:
-    - step: 29
+    - step: 30
       expectation: '{''mail_server_assert_folder_count'': {''folder'': ''INBOX'', ''equals'': 0, ''timeout_sec'':
         30}}'
-    - step: 30
+    - step: 31
       expectation: '{''mail_server_assert_folder_count'': {''folder'': ''Trash'', ''equals'': 200, ''timeout_sec'':
         30}}'
-    - step: 31
+    - step: 32
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-selection-count"]'', ''contains'': ''0
         selected''}}'
-    - step: 32
+    - step: 33
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-mutation-progress"]'', ''contains'': ''Processed
         200/200 messages''}}'
-    - step: 33
+    - step: 34
       expectation: '{''assert_count'': {''selector'': ''[data-testid="mail-message-row"]'', ''equal'': 0}}'
     results:
-    - 29
     - 30
     - 31
     - 32
     - 33
+    - 34
   visual:
   - check: Progress, remaining selection, error, Retry and Details are legible without moving the toolbar.
     method: manual
