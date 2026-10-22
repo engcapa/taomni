@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef } from "react";
 import { Compartment } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
-import { autocompletion, completionStatus, type Completion, type CompletionContext, type CompletionResult, type CompletionSource } from "@codemirror/autocomplete";
+import { autocompletion, completionStatus, currentCompletions, selectedCompletion, setSelectedCompletion, type Completion, type CompletionContext, type CompletionResult, type CompletionSource } from "@codemirror/autocomplete";
 import {
   createLiveTemplateCompletionSource,
   isProviderTemplateSnippet,
@@ -199,6 +199,18 @@ export function useProviderCompletion(hostContext: UseProviderCompletionContext)
           () => pathRef.current,
           liveTemplateSourceOptions,
         );
+        // A late provider result replaces the local version of a Java template.
+        // CodeMirror preserves selection by object identity, so transfer the
+        // user's selection to that provider object before removing the local
+        // source. This also survives the brief disabled state during refresh.
+        const selected = selectedCompletion(view.state);
+        const replacement = selected?.section === "Live Templates"
+          ? currentProviderTemplatesRef.current?.items.get(selected.label)
+          : undefined;
+        const replacementIndex = replacement ? currentCompletions(view.state).indexOf(replacement) : -1;
+        if (replacementIndex >= 0) {
+          view.dispatch({ effects: setSelectedCompletion(replacementIndex) });
+        }
         view.dispatch({
           effects: completionCompartment.current.reconfigure(
             buildAutocompletionConfig(newLocalSource, trackedSource),
