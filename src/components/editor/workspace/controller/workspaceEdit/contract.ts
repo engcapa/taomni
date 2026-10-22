@@ -1,0 +1,47 @@
+import type { Dispatch, RefObject, SetStateAction } from "react";
+import { type LspWorkspaceEdit, type LspWorkspaceEditOperation } from "../../../../../lib/editor/lsp";
+import { type WorkspaceFile } from "../../../../../lib/editor/workspace";
+import type { CodeWorkspaceRootInfo } from "../../../../../types";
+import { type OpenFileState } from "../../codeWorkspaceModel";
+import type { OpenFileEol } from "../../editorGroupTypes";
+import { type RefactorPlanV3 } from "../../refactorPlan";
+import { type PreparedSave, type SaveCommitResult } from "../../saveCommit";
+import { type WorkspaceBookmark } from "../../todoBookmarks";
+import { WorkspaceEditHistory, type WorkspaceEditPathSnapshot } from "../../workspaceEditHistory";
+import { type WorkspaceEditPreview } from "../../workspaceEditPreview";
+import { type WorkspaceStyleController } from "../../workspaceStyleController";
+import { type WorkspaceEditTabSnapshot } from "../model";
+import type { BufferMutationPatch } from "../mutationTypes";
+
+export interface ApplyLspWorkspaceEditNowContext {
+  captureWorkspaceEditPathSnapshots: (edit: LspWorkspaceEdit) => Promise<WorkspaceEditPathSnapshot[] | null>;
+  captureWorkspaceEditBookmarkSnapshot: (paths: readonly string[]) => WorkspaceBookmark[];
+  captureWorkspaceEditTabSnapshot: (paths: readonly string[]) => WorkspaceEditTabSnapshot;
+  workspaceInstanceIdRef: RefObject<string>;
+  workspaceInstanceId: string;
+  rootsRef: RefObject<CodeWorkspaceRootInfo[]>;
+  openFilesRef: RefObject<Record<string, import("../../editorGroupTypes").OpenFileViewModel>>;
+  absolutePathForOpenFile: (file: OpenFileState) => string | null;
+  workspaceResourceOperationLockedRef: RefObject<boolean>;
+  lspDocumentVersion: (key: string) => number | null;
+  isLspDocumentSynced: (key: string, text: string) => boolean;
+  replayWorkspaceRestoreRef: RefObject<boolean>;
+  mutateOpenBuffer: (key: string, patch: BufferMutationPatch, reason: "workspace-edit" | "user-edit" | "programmatic" | "reload" | "save-writeback" | "save-metadata" | "history-replay") => OpenFileState | null;
+  updateFileText: (key: string, text: string) => void;
+  saveOpenBufferText: (key: string, textToSave?: string, saveOptions?: { eol?: OpenFileEol | "lf" | "crlf" | "cr"; encoding?: string; bom?: boolean; }, onCommitResult?: (result: SaveCommitResult) => void) => Promise<WorkspaceFile | null>;
+  replayWorkspaceEncodingRef: RefObject<Map<string, { encoding: string; bom: boolean; eol?: "lf" | "crlf" | "cr"; }> | null>;
+  workspaceStyleControllerRef: RefObject<WorkspaceStyleController>;
+  commitClosedFilePreparedSave: (prepared: PreparedSave, assertBeforeWrite?: () => void) => Promise<SaveCommitResult>;
+  readWorkspaceEditPathSnapshot: (absolutePath: string) => Promise<WorkspaceEditPathSnapshot | null>;
+  setRefactoringPreviewModal: Dispatch<SetStateAction<{ title: string; preview: WorkspaceEditPreview; originalEdit: LspWorkspaceEdit; plan?: RefactorPlanV3; sourceTexts?: Record<string, string | null>; resolve: (filtered: LspWorkspaceEdit | boolean) => void; } | null>>;
+  semanticIndex: import("../../useWorkspaceSemanticIndex").WorkspaceSemanticIndexController;
+  applyLspResourceOperation: (operation: Exclude<LspWorkspaceEditOperation, { kind: "text"; }>) => Promise<void>;
+  setStatusMessage: (message: string) => void;
+  refreshTree: () => void;
+  workspaceEditHistorySequenceRef: RefObject<number>;
+  replayWorkspacePathSnapshotsRef: RefObject<(snapshots: readonly WorkspaceEditPathSnapshot[]) => Promise<void>>;
+  restoreWorkspaceBookmarkSnapshot: (snapshot: readonly WorkspaceBookmark[], affectedIds: readonly string[]) => void;
+  restoreWorkspaceEditTabs: (snapshot: WorkspaceEditTabSnapshot) => Promise<void>;
+  workspaceEditHistory: WorkspaceEditHistory;
+  setWorkspaceEditHistoryRevision: Dispatch<SetStateAction<number>>;
+}

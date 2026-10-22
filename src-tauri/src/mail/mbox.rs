@@ -216,7 +216,7 @@ pub async fn mail_export_mbox(
     if target.as_os_str().is_empty() {
         return Err("export path is required".into());
     }
-    let pool = Arc::clone(&state.mail_imap_pool);
+    let pool = Arc::clone(&state.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let target_for_task = target.clone();
     let count = tokio::task::spawn_blocking(move || {
@@ -284,7 +284,7 @@ pub async fn mail_import_messages(
         });
     }
     let account = resolve_config(&state, config)?;
-    let pool = Arc::clone(&state.mail_imap_pool);
+    let pool = Arc::clone(&state.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
         let mut imported = 0usize;

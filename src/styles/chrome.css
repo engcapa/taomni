@@ -1,0 +1,296 @@
+
+.taomni-mono {
+  font-family: var(--taomni-code-font-family);
+}
+
+.taomni-titlebar {
+  background: linear-gradient(to bottom, var(--taomni-titlebar-from), var(--taomni-titlebar-to));
+  border-bottom: 1px solid var(--taomni-chrome-border);
+}
+
+/* PLACEHOLDER_CSS_MORE */
+
+.taomni-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 10px;
+  font-size: var(--taomni-ui-font-size);
+  border: 1px solid var(--taomni-tab-border);
+  border-bottom: none;
+  background: var(--taomni-tab-inactive);
+  color: var(--taomni-text);
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+  margin-right: -1px;
+  cursor: pointer;
+  height: 24px;
+  line-height: 1;
+  transition: var(--taomni-transition);
+}
+.taomni-tab[data-active="true"] {
+  background: var(--taomni-tab-active);
+  font-weight: 600;
+  z-index: 2;
+  box-shadow: 0 -2px 0 0 var(--taomni-accent) inset;
+}
+.taomni-tab:hover:not([data-active="true"]) {
+  background: var(--taomni-hover);
+}
+.taomni-tab[data-multiexec-selected="true"] {
+  border-left: 2px solid var(--taomni-accent);
+  background: color-mix(in srgb, var(--taomni-accent) 12%, var(--taomni-tab-inactive));
+}
+.taomni-tab[data-multiexec-selected="true"][data-active="true"] {
+  background: color-mix(in srgb, var(--taomni-accent) 12%, var(--taomni-tab-active));
+}
+.taomni-tab[data-dragging="true"] {
+  opacity: 0.5;
+}
+.taomni-tab[data-drop-side]::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  background: var(--taomni-accent);
+  border-radius: 1px;
+  pointer-events: none;
+  z-index: 3;
+}
+.taomni-tab[data-drop-side="before"]::after {
+  left: -2px;
+}
+.taomni-tab[data-drop-side="after"]::after {
+  right: -2px;
+}
+
+.taomni-tab-scroll {
+  max-width: 100%;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.taomni-tab-scroll::-webkit-scrollbar {
+  display: none;
+}
+.taomni-tab-scroll .taomni-tab {
+  flex: 0 0 auto;
+}
+
+.taomni-control-bar {
+  /* Pin to a fixed pixel height: the global :root font-size is 12px, so
+     Tailwind's h-8 (2rem) collapses to 24px and the inner tabbar (32px)
+     would spill into the content area below. flex-shrink: 0 keeps the
+     parent flex column from compressing it. */
+  height: 32px;
+  flex-shrink: 0;
+  background: linear-gradient(to bottom, var(--taomni-titlebar-from), var(--taomni-titlebar-to));
+  border-bottom: 1px solid var(--taomni-chrome-border);
+  color: var(--taomni-text);
+  user-select: none;
+}
+
+.taomni-control-bar .taomni-tabbar {
+  height: 32px;
+  padding-top: 5px;
+  background: transparent !important;
+  border-bottom: none;
+  /* Clip tabs that would otherwise spill past the tabbar's right edge
+     into the trailing tray/window-controls area. */
+  overflow: hidden;
+}
+
+.taomni-control-bar .taomni-tab {
+  height: 25px;
+  max-width: min(220px, 28vw);
+}
+
+.taomni-main-window {
+  /* Fractional borders and overlays must stay inside the fixed window frame. */
+  overflow-x: clip;
+}
+/* Keep a visible, stable window-move target outside the scrollable tab strip. */
+.taomni-window-drag-handle {
+  width: 48px;
+  color: var(--taomni-text-muted);
+  cursor: grab;
+  user-select: none;
+  border-left: 1px solid color-mix(in srgb, var(--taomni-divider) 55%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--taomni-divider) 55%, transparent);
+  transition: var(--taomni-transition);
+}
+.taomni-window-drag-handle:hover {
+  color: var(--taomni-text);
+  background: var(--taomni-hover);
+}
+.taomni-window-drag-handle:active {
+  cursor: grabbing;
+}
+
+/* The full tray is useful at normal widths; at the app's narrow-window range
+   its controls are available from the compact overflow menu instead. */
+.taomni-titlebar-actions-overflow {
+  display: none;
+}
+.taomni-titlebar-actions-menu {
+  max-height: calc(100vh - 12px);
+  overflow-y: auto;
+}
+
+@media (max-width: 960px) {
+  .taomni-titlebar-tray {
+    display: none;
+  }
+  .taomni-titlebar-actions-overflow {
+    display: flex;
+  }
+  .taomni-tab-details-button {
+    display: none;
+  }
+}
+
+/* Tab-action slot buttons (the ex-floating toolbar, now docked in the control
+   bar / detached window bar) blend into the chrome; add the hover affordance
+   their inline styles can't express. */
+[data-testid="tab-action-slot"] button:hover {
+  background: var(--taomni-hover) !important;
+}
+
+.taomni-window-controls {
+  border-left: 1px solid color-mix(in srgb, var(--taomni-divider) 80%, transparent);
+}
+
+.taomni-window-controls button[data-danger="true"]:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+
+/* Explicit divider between the tab-related buttons (tab-action slot + the `⋯`
+   overflow) and the main-window controls (tray + window buttons). Slightly
+   stronger than the in-tray group separators so the two clusters read apart. */
+.taomni-control-divider {
+  width: 1px;
+  margin: 5px 0;
+  background: var(--taomni-chrome-border);
+}
+
+/* Visually separate tray groups (terminal layout / chat+voice / locale). The
+   separator is a thin vertical hairline with breathing room so adjacent
+   icons inside a group sit flush, while groups read as distinct clusters. */
+.taomni-titlebar-tray-group-sep {
+  width: 1px;
+  margin: 4px 4px;
+  background: color-mix(in srgb, var(--taomni-divider) 80%, transparent);
+}
+
+.taomni-titlebar-tray-btn[data-active="true"] {
+  background: color-mix(in srgb, var(--taomni-accent) 15%, transparent);
+  color: var(--taomni-accent);
+}
+
+.taomni-tree-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px 3px 4px;
+  font-size: var(--taomni-ui-font-size);
+  font-family: var(--taomni-ui-font-family);
+  cursor: pointer;
+  white-space: nowrap;
+  background-color: var(--taomni-sidebar-bg);
+  color: var(--taomni-text);
+  transition: var(--taomni-transition);
+}
+.taomni-tree-row:hover {
+  background-color: var(--taomni-hover);
+}
+.taomni-tree-row[data-selected="true"] {
+  background-color: var(--taomni-selected);
+  outline: 1px dotted var(--taomni-selected-border);
+}
+
+/* Sidebar and Session Tree Subpixel optimization */
+[data-testid="sidebar"],
+[data-testid="session-tree"] {
+  background-color: var(--taomni-sidebar-bg) !important;
+  font-family: var(--taomni-ui-font-family) !important;
+  font-size: var(--taomni-ui-font-size) !important;
+}
+
+[data-testid="sftp-browser"],
+[data-testid="sftp-detached-window"],
+[data-testid="git-panel"],
+[role="dialog"] {
+  font-family: var(--taomni-ui-font-family) !important;
+}
+
+[data-testid="sftp-browser"] *:not(.taomni-mono):not(.font-mono),
+[data-testid="sftp-detached-window"] *:not(.taomni-mono):not(.font-mono),
+[data-testid="git-panel"] *:not(.taomni-mono):not(.font-mono):not(.taomni-diff-host):not(.taomni-diff-host *),
+[role="dialog"] *:not(.taomni-mono):not(.font-mono) {
+  font-family: inherit;
+}
+
+[data-testid="sftp-browser"] .text-\[12px\],
+[data-testid="sftp-detached-window"] .text-\[12px\],
+[data-testid="git-panel"] .text-\[12px\]:not(.taomni-diff-host *),
+[role="dialog"] .text-\[12px\] {
+  font-size: var(--taomni-ui-font-size) !important;
+}
+
+[data-testid="sftp-browser"] .text-\[11px\],
+[data-testid="sftp-detached-window"] .text-\[11px\],
+[data-testid="git-panel"] .text-\[11px\]:not(.taomni-diff-host *),
+[role="dialog"] .text-\[11px\] {
+  font-size: calc(var(--taomni-ui-font-size) - 1px) !important;
+}
+
+[data-testid="sftp-browser"] .text-\[10px\],
+[data-testid="sftp-detached-window"] .text-\[10px\],
+[data-testid="git-panel"] .text-\[10px\]:not(.taomni-diff-host *),
+[role="dialog"] .text-\[10px\] {
+  font-size: calc(var(--taomni-ui-font-size) - 2px) !important;
+}
+
+[data-testid="sftp-browser"] .text-xs,
+[data-testid="sftp-detached-window"] .text-xs,
+[data-testid="git-panel"] .text-xs:not(.taomni-diff-host *),
+[role="dialog"] .text-xs {
+  font-size: var(--taomni-ui-font-size) !important;
+}
+
+[data-testid="sftp-browser"] .text-sm,
+[data-testid="sftp-detached-window"] .text-sm,
+[data-testid="git-panel"] .text-sm:not(.taomni-diff-host *),
+[role="dialog"] .text-sm {
+  font-size: calc(var(--taomni-ui-font-size) + 2px) !important;
+}
+
+[data-testid="sftp-browser"] .text-\[14px\],
+[data-testid="sftp-detached-window"] .text-\[14px\],
+[data-testid="git-panel"] .text-\[14px\]:not(.taomni-diff-host *),
+[role="dialog"] .text-\[14px\] {
+  font-size: calc(var(--taomni-ui-font-size) + 2px) !important;
+}
+
+[data-testid="sftp-browser"] .text-base,
+[data-testid="sftp-detached-window"] .text-base,
+[data-testid="git-panel"] .text-base:not(.taomni-diff-host *),
+[role="dialog"] .text-base {
+  font-size: calc(var(--taomni-ui-font-size) + 4px) !important;
+}
+
+
+.taomni-status {
+  background: var(--taomni-status-bg);
+  border-top: 1px solid var(--taomni-divider);
+  color: var(--taomni-status-text);
+  font-size: calc(var(--taomni-ui-font-size) - 1px);
+  /* Keep the 24px bar tall enough even at the max UI font size (text stays
+     inside the bar instead of spilling over the border). */
+  line-height: 1.3;
+}
+
+.taomni-divider-h { height: 1px; background: var(--taomni-divider); }
+.taomni-divider-v { width: 1px; background: var(--taomni-divider); }

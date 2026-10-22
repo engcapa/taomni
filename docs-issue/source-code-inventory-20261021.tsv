@@ -1,0 +1,1862 @@
+path	layer	language	kind	lines	imports_or_use	exports_or_pub	ipc_or_commands	hotspot	role
+scripts/buffer_authority_benchmark.ts	tooling	ts	tool-script	247	4	3	0		开发、QA、构建或性能工具脚本
+scripts/collect-tauri-action-artifacts.mjs	tooling	mjs	tool-script	29	2	0	0		开发、QA、构建或性能工具脚本
+scripts/compose-updater-manifest.mjs	tooling	mjs	tool-script	129	3	1	0		开发、QA、构建或性能工具脚本
+scripts/compose-updater-manifest.test.mjs	tooling	mjs	test	139	6	0	0		自动化测试/QA 集成测试
+scripts/configure-release-signing.mjs	tooling	mjs	tool-script	210	7	6	0		开发、QA、构建或性能工具脚本
+scripts/configure-release-signing.test.mjs	tooling	mjs	test	188	8	0	0		自动化测试/QA 集成测试
+scripts/macos-runtime-paths.test.mjs	tooling	mjs	test	100	7	1	0		自动化测试/QA 集成测试
+scripts/release-workflow.test.mjs	tooling	mjs	test	162	8	1	0		自动化测试/QA 集成测试
+scripts/resolve-release-build.mjs	tooling	mjs	tool-script	56	3	2	0		开发、QA、构建或性能工具脚本
+scripts/resolve-release-build.test.mjs	tooling	mjs	test	56	3	0	0		自动化测试/QA 集成测试
+scripts/update-model-inspector-snapshot.mjs	tooling	mjs	tool-script	54	3	2	0		开发、QA、构建或性能工具脚本
+scripts/update-model-inspector-snapshot.test.mjs	tooling	mjs	test	13	3	0	0		自动化测试/QA 集成测试
+scripts/update-opencode-go-snapshot.mjs	tooling	mjs	tool-script	42	3	2	0		开发、QA、构建或性能工具脚本
+scripts/update-opencode-go-snapshot.test.mjs	tooling	mjs	test	16	3	0	0		自动化测试/QA 集成测试
+scripts/verify-macos-release-bundle.test.mjs	tooling	mjs	test	124	8	0	0		自动化测试/QA 集成测试
+scripts/verify-updater-signatures.mjs	tooling	mjs	tool-script	70	4	2	0		开发、QA、构建或性能工具脚本
+scripts/verify-updater-signatures.test.mjs	tooling	mjs	test	70	7	1	0		自动化测试/QA 集成测试
+scripts/windows-input-reentrancy/main.rs	tooling	rs	tool-script	155	4	0	0		开发、QA、构建或性能工具脚本
+scripts/windows-runtime-bundle.test.mjs	tooling	mjs	test	86	7	0	0		自动化测试/QA 集成测试
+src-tauri/build.rs	backend	rs	build-script	220	2	0	0		Tauri/Protobuf/原生构建脚本；只负责生成和编译配置
+src-tauri/proto/AccessControl.proto	backend	proto	schema-definition	144	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/Cell.proto	backend	proto	schema-definition	69	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/Client.proto	backend	proto	schema-definition	558	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/ClusterId.proto	backend	proto	schema-definition	35	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/ClusterStatus.proto	backend	proto	schema-definition	372	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/Comparator.proto	backend	proto	schema-definition	85	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/Encryption.proto	backend	proto	schema-definition	36	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/ErrorHandling.proto	backend	proto	schema-definition	60	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/FS.proto	backend	proto	schema-definition	47	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/Filter.proto	backend	proto	schema-definition	181	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/HBase.proto	backend	proto	schema-definition	277	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/LockService.proto	backend	proto	schema-definition	99	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/MapReduce.proto	backend	proto	schema-definition	39	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/Master.proto	backend	proto	schema-definition	1365	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/Procedure.proto	backend	proto	schema-definition	135	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/Quota.proto	backend	proto	schema-definition	162	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/RPC.proto	backend	proto	schema-definition	166	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/RecentLogs.proto	backend	proto	schema-definition	45	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/RegionServerStatus.proto	backend	proto	schema-definition	239	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/Replication.proto	backend	proto	schema-definition	175	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/Snapshot.proto	backend	proto	schema-definition	89	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/Tracing.proto	backend	proto	schema-definition	35	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/ZooKeeper.proto	backend	proto	schema-definition	110	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/proto/org/apache/hbase/thirdparty/google/protobuf/any.proto	backend	proto	schema-definition	13	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src-tauri/src/agent/acp_bridge/commands.rs	backend	rs	rust-backend	204	7	9	3		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/acp_bridge/config.rs	backend	rs	rust-backend	578	6	39	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/acp_bridge/mod.rs	backend	rs	rust-backend	39	0	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/acp_bridge/presets.rs	backend	rs	rust-backend	116	2	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/acp_bridge/process.rs	backend	rs	rust-backend	1052	15	42	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/acp_bridge/protocol.rs	backend	rs	rust-backend	1875	5	90	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/acp_bridge/thread.rs	backend	rs	rust-backend	208	5	17	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/capture/exec_b.rs	backend	rs	rust-backend	252	7	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/capture/exec_c.rs	backend	rs	rust-backend	308	11	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/capture/mod.rs	backend	rs	rust-backend	522	8	43	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/capture/reduce.rs	backend	rs	rust-backend	377	7	10	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/cc_bridge/commands.rs	backend	rs	rust-backend	714	13	27	12		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/cc_bridge/config.rs	backend	rs	rust-backend	631	5	41	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/cc_bridge/mcp_control.rs	backend	rs	rust-backend	1518	16	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/cc_bridge/mcp_http.rs	backend	rs	rust-backend	2132	33	39	0	medium	Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/cc_bridge/mcp_redis.rs	backend	rs	rust-backend	348	10	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/cc_bridge/mcp_sql.rs	backend	rs	rust-backend	1048	14	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/cc_bridge/mod.rs	backend	rs	rust-backend	333	9	19	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/cc_bridge/process.rs	backend	rs	rust-backend	545	10	13	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/cc_bridge/protocol.rs	backend	rs	rust-backend	326	2	10	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/cc_bridge/session_card.rs	backend	rs	rust-backend	619	4	9	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/cmd_classify.rs	backend	rs	rust-backend	599	1	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/codex_bridge/commands.rs	backend	rs	rust-backend	279	10	10	6		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/codex_bridge/config.rs	backend	rs	rust-backend	689	6	44	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/codex_bridge/mod.rs	backend	rs	rust-backend	381	8	15	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/codex_bridge/process.rs	backend	rs	rust-backend	628	11	27	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/codex_bridge/protocol.rs	backend	rs	rust-backend	161	1	13	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/commands.rs	backend	rs	rust-backend	154	11	4	4		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/context.rs	backend	rs	rust-backend	960	6	79	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/local/adapters.rs	backend	rs	rust-backend	348	5	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/local/mod.rs	backend	rs	rust-backend	12	0	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/local/types.rs	backend	rs	rust-backend	61	1	14	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/mcp_bridge/mod.rs	backend	rs	rust-backend	87	3	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/mod.rs	backend	rs	rust-backend	204	5	28	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/safety.rs	backend	rs	rust-backend	349	5	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/search/brave.rs	backend	rs	rust-backend	102	5	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/search/commands.rs	backend	rs	rust-backend	183	15	10	6		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/search/exa.rs	backend	rs	rust-backend	110	5	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/search/google_cse.rs	backend	rs	rust-backend	122	5	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/search/instances.rs	backend	rs	rust-backend	130	5	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/search/key_storage.rs	backend	rs	rust-backend	87	1	6	3		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/search/mod.rs	backend	rs	rust-backend	44	2	20	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/search/searxng.rs	backend	rs	rust-backend	106	6	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/search/serper.rs	backend	rs	rust-backend	96	5	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/search/tavily.rs	backend	rs	rust-backend	99	5	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/sql_classify.rs	backend	rs	rust-backend	239	1	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/tool_runtime.rs	backend	rs	rust-backend	185	13	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/tools/history.rs	backend	rs	rust-backend	32	4	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/tools/mod.rs	backend	rs	rust-backend	103	3	27	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/tools/rig_native.rs	backend	rs	rust-backend	55	3	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/tools/sessions.rs	backend	rs	rust-backend	144	6	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/tools/sftp_runbook.rs	backend	rs	rust-backend	96	3	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/tools/terminal.rs	backend	rs	rust-backend	104	3	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/tools/web_fetch.rs	backend	rs	rust-backend	235	6	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/agent/tools/web_search.rs	backend	rs	rust-backend	99	7	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/ai/commands.rs	backend	rs	rust-backend	440	14	21	9		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/ai/config.rs	backend	rs	rust-backend	997	5	87	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/ai/mod.rs	backend	rs	rust-backend	108	5	22	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/ai/model_inspector.rs	backend	rs	rust-backend	360	8	45	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/ai/network_policy.rs	backend	rs	rust-backend	44	0	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/ai/session_safety.rs	backend	rs	rust-backend	42	1	2	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/ai/shell_prompt.rs	backend	rs	rust-backend	16	0	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/ai/shell_safety.rs	backend	rs	rust-backend	229	3	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/ai/tools_shell.rs	backend	rs	rust-backend	45	2	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/app_exit.rs	backend	rs	rust-backend	116	3	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/appearance.rs	backend	rs	rust-backend	55	3	1	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/asr/benchmark.rs	backend	rs	rust-backend	64	2	0	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/asr/catalog.rs	backend	rs	rust-backend	150	3	17	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/asr/manager.rs	backend	rs	rust-backend	300	3	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/asr/mod.rs	backend	rs	rust-backend	9	0	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/asr/models.rs	backend	rs	rust-backend	1459	14	43	9		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/asr/sensevoice.rs	backend	rs	rust-backend	122	2	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/batch.rs	backend	rs	rust-backend	92	2	6	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/cache.rs	backend	rs	rust-backend	220	4	11	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/commands.rs	backend	rs	rust-backend	205	4	17	15		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/control.rs	backend	rs	rust-backend	284	6	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/coordination.rs	backend	rs	rust-backend	162	8	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/credentials.rs	backend	rs	rust-backend	338	4	27	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/crypto.rs	backend	rs	rust-backend	210	3	10	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/engine.rs	backend	rs	rust-backend	782	14	46	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/failure.rs	backend	rs	rust-backend	112	4	8	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/feishu/auth.rs	backend	rs	rust-backend	670	6	11	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/feishu/cli_config.rs	backend	rs	rust-backend	227	5	16	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/feishu/cli_secret.rs	backend	rs	rust-backend	265	11	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/feishu/device_flow.rs	backend	rs	rust-backend	607	8	26	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/feishu/mod.rs	backend	rs	rust-backend	596	5	9	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/feishu/naming.rs	backend	rs	rust-backend	54	2	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/feishu/request.rs	backend	rs	rust-backend	304	7	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/jobs.rs	backend	rs	rust-backend	592	5	15	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/manifest.rs	backend	rs	rust-backend	91	5	21	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/mod.rs	backend	rs	rust-backend	145	3	34	8		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/model.rs	backend	rs	rust-backend	219	2	100	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/network.rs	backend	rs	rust-backend	147	5	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/policy.rs	backend	rs	rust-backend	182	4	16	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/provider.rs	backend	rs	rust-backend	49	3	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/qa.rs	backend	rs	rust-backend	62	2	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/restore.rs	backend	rs	rust-backend	528	10	11	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/scheduler.rs	backend	rs	rust-backend	170	7	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/source.rs	backend	rs	rust-backend	60	2	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/tests.rs	backend	rs	rust-backend	588	17	0	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/transfer.rs	backend	rs	rust-backend	280	9	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/backup/worker.rs	backend	rs	rust-backend	112	3	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/mitmproxy-redirector-poc/bridge.rs	backend	rs	rust-backend	569	12	25	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/mitmproxy-redirector-poc/main.rs	backend	rs	rust-backend	267	12	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/rdp-probe/audio.rs	backend	rs	rust-backend	99	5	13	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/rdp-probe/audio_input.rs	backend	rs	rust-backend	245	5	20	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/rdp-probe/clipboard.rs	backend	rs	rust-backend	505	9	43	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/rdp-probe/host_audio.rs	backend	rs	rust-backend	271	6	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/rdp-probe/main.rs	backend	rs	rust-backend	273	4	19	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/rdp-probe/pw_record.rs	backend	rs	rust-backend	106	12	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/rdp-probe/rfx_stats.rs	backend	rs	rust-backend	613	5	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/rdp-probe/scenarios.rs	backend	rs	rust-backend	1366	15	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/rdp-probe/session.rs	backend	rs	rust-backend	903	40	54	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/rdp-probe/stats.rs	backend	rs	rust-backend	208	2	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/sockscap-helper/capture.rs	backend	rs	rust-backend	2178	17	22	0	medium	Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/sockscap-helper/main.rs	backend	rs	rust-backend	646	16	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/sockscap-helper/proc_info.rs	backend	rs	rust-backend	641	13	27	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/bin/sockscap-helper/windivert.rs	backend	rs	rust-backend	477	7	35	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/chat/acp.rs	backend	rs	rust-backend	1032	8	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/chat/inline_qq.rs	backend	rs	rust-backend	122	5	2	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/chat/mod.rs	backend	rs	rust-backend	3557	24	56	16	medium	AI Chat 命令、模型调用、流式运行、媒体生成、工具上下文和消息持久化
+src-tauri/src/chat/redact.rs	backend	rs	rust-backend	52	3	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/chat/run.rs	backend	rs	rust-backend	73	7	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/chat/store.rs	backend	rs	rust-backend	537	4	45	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/config/clipboard_text.rs	backend	rs	rust-backend	35	1	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/config/mod.rs	backend	rs	rust-backend	1647	30	76	25		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/dap.rs	backend	rs	rust-backend	1233	11	34	4		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/database/bookmarks.rs	backend	rs	rust-backend	123	4	16	3		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/database/clickhouse.rs	backend	rs	rust-backend	654	7	14	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/database/forward.rs	backend	rs	rust-backend	197	8	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/database/history.rs	backend	rs	rust-backend	424	5	30	5		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/database/mod.rs	backend	rs	rust-backend	1412	15	121	25		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/database/oracle.rs	backend	rs	rust-backend	666	6	14	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/database/panwei.rs	backend	rs	rust-backend	1040	8	14	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/database/presto.rs	backend	rs	rust-backend	1921	11	14	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/database/query_workspace.rs	backend	rs	rust-backend	607	6	36	5		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/database/redis_ops.rs	backend	rs	rust-backend	469	4	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/database/saved_queries.rs	backend	rs	rust-backend	669	5	39	5		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/database/sql.rs	backend	rs	rust-backend	2644	21	47	0	medium	SQL 引擎执行/元数据/类型转换/事务辅助和驱动适配
+src-tauri/src/database/sql_rewrite.rs	backend	rs	rust-backend	1114	6	26	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/database/tx.rs	backend	rs	rust-backend	268	4	18	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/dependency_index.rs	backend	rs	rust-backend	319	5	14	3		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/filebrowser/local.rs	backend	rs	rust-backend	509	19	28	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/filebrowser/mod.rs	backend	rs	rust-backend	610	8	33	27		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/filebrowser/sftp.rs	backend	rs	rust-backend	1062	17	33	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/filebrowser/transfer.rs	backend	rs	rust-backend	125	6	25	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/git.rs	backend	rs	rust-backend	2879	14	163	48	medium	Git 命令门面：探测、差异、暂存、提交、分支、远端、rebase/stash 等
+src-tauri/src/hbase/mod.rs	backend	rs	rust-backend	2538	15	52	9	medium	HBase 命令门面、REST/Native/Thrift 会话、查询和取消
+src-tauri/src/hbase/native/auth.rs	backend	rs	rust-backend	235	3	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/hbase/native/cell.rs	backend	rs	rust-backend	313	2	21	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/hbase/native/client.rs	backend	rs	rust-backend	1170	14	33	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/hbase/native/mod.rs	backend	rs	rust-backend	25	0	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/hbase/native/proto.rs	backend	rs	generated-protobuf-wrapper	15	0	1	0		源文件
+src-tauri/src/hbase/native/region.rs	backend	rs	rust-backend	413	8	15	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/hbase/native/rpc/codec.rs	backend	rs	rust-backend	378	4	17	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/hbase/native/rpc/conn.rs	backend	rs	rust-backend	458	14	12	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/hbase/native/rpc/mod.rs	backend	rs	rust-backend	6	0	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/hbase/native/zk.rs	backend	rs	rust-backend	240	4	13	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/hbase/thrift/idl.rs	backend	rs	generated-thrift	14213	17	288	0	critical	Apache Thrift 生成绑定；应由生成流程维护，不手工拆分
+src-tauri/src/hbase/thrift/mod.rs	backend	rs	rust-backend	678	10	16	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/hbase/thrift/tests.rs	backend	rs	rust-backend	196	1	0	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/history.rs	backend	rs	rust-backend	175	3	6	4		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/java_bundles.rs	backend	rs	rust-backend	759	5	19	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/java_debug_adapter.rs	backend	rs	rust-backend	763	6	8	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/java_test.rs	backend	rs	test	337	7	16	2		自动化测试/QA 集成测试
+src-tauri/src/lanchat/beacon.rs	backend	rs	rust-backend	307	9	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lanchat/commands.rs	backend	rs	rust-backend	869	12	71	44		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lanchat/discovery.rs	backend	rs	rust-backend	378	11	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lanchat/identity.rs	backend	rs	rust-backend	161	6	10	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lanchat/media/audio.rs	backend	rs	rust-backend	291	11	8	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lanchat/media/mod.rs	backend	rs	rust-backend	283	7	21	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lanchat/media/relay.rs	backend	rs	rust-backend	396	13	9	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lanchat/media/video.rs	backend	rs	rust-backend	372	15	8	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lanchat/messaging.rs	backend	rs	rust-backend	495	8	9	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lanchat/mod.rs	backend	rs	rust-backend	409	17	47	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lanchat/protocol.rs	backend	rs	rust-backend	508	3	87	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lanchat/store.rs	backend	rs	rust-backend	1385	11	79	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lanchat/swarm.rs	backend	rs	rust-backend	1458	20	46	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lanchat/tls.rs	backend	rs	rust-backend	178	9	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lanchat/transfer.rs	backend	rs	rust-backend	166	3	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lanchat/transport.rs	backend	rs	rust-backend	1206	20	10	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lib.rs	backend	rs	rust-backend	1354	7	18	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/llm/anthropic.rs	backend	rs	rust-backend	427	7	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/llm/gpu_detect.rs	backend	rs	rust-backend	157	2	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/llm/llama_server.rs	backend	rs	rust-backend	272	8	30	3		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/llm/mod.rs	backend	rs	rust-backend	298	4	51	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/llm/model_catalog.rs	backend	rs	rust-backend	164	7	15	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/llm/openai_compat.rs	backend	rs	rust-backend	564	7	10	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/llm/opencode_go/catalog.rs	backend	rs	rust-backend	384	8	42	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/llm/opencode_go/google.rs	backend	rs	rust-backend	74	5	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/llm/opencode_go/mod.rs	backend	rs	rust-backend	353	11	8	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/llm/opencode_go/responses.rs	backend	rs	rust-backend	103	4	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/llm/opencode_go/test_gateway.rs	backend	rs	rust-backend	36	2	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/llm/opencode_go/transport.rs	backend	rs	rust-backend	135	7	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/llm/router.rs	backend	rs	rust-backend	869	11	29	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/local_history.rs	backend	rs	rust-backend	422	10	14	4		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/lsp.rs	backend	rs	rust-backend	15200	26	422	61	critical	LSP 进程/JSON-RPC、文档同步、文件监听、诊断、补全、导航、符号、重构和 Java 工具命令
+src-tauri/src/mail/archive.rs	backend	rs	rust-backend	1378	10	25	11		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/archive_metadata.rs	backend	rs	rust-backend	98	2	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/archive_query.rs	backend	rs	rust-backend	655	4	43	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/autoconfig.rs	backend	rs	rust-backend	494	6	11	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/caldav.rs	backend	rs	rust-backend	608	9	27	3		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/calendar.rs	backend	rs	rust-backend	507	11	37	2		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/certs.rs	backend	rs	rust-backend	401	15	18	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/contacts.rs	backend	rs	rust-backend	1237	14	43	6		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/coordination.rs	backend	rs	rust-backend	301	10	9	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/fake_imap.rs	backend	rs	rust-backend	824	5	45	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/filters.rs	backend	rs	rust-backend	1451	10	55	5		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/folders.rs	backend	rs	rust-backend	440	8	20	2		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/idle.rs	backend	rs	rust-backend	317	11	8	2		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/lists.rs	backend	rs	rust-backend	166	4	5	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/local_cmds.rs	backend	rs	rust-backend	418	6	17	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/mbox.rs	backend	rs	rust-backend	391	9	15	2		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/mod.rs	backend	rs	rust-backend	8265	25	342	29	high	邮件命令入口、IMAP/SMTP/OAuth、连接池、MIME、缓存 SQLite、同步和消息变更
+src-tauri/src/mail/mutations.rs	backend	rs	rust-backend	495	2	11	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/mutations/tests.rs	backend	rs	rust-backend	295	1	0	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/outgoing.rs	backend	rs	rust-backend	566	9	15	2		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/parts.rs	backend	rs	rust-backend	428	6	21	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/pop3.rs	backend	rs	rust-backend	940	14	34	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/read_actions.rs	backend	rs	rust-backend	105	2	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/receipts.rs	backend	rs	rust-backend	205	7	5	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/responsiveness_tests.rs	backend	rs	rust-backend	451	3	0	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/search.rs	backend	rs	rust-backend	567	10	16	2		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/storage.rs	backend	rs	rust-backend	950	8	39	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/sync.rs	backend	rs	rust-backend	1580	8	83	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/vcard.rs	backend	rs	rust-backend	297	3	10	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mail/webdav.rs	backend	rs	rust-backend	392	6	27	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/main.rs	backend	rs	rust-backend	19	0	0	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mfa/capture.rs	backend	rs	rust-backend	318	8	14	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mfa/commands.rs	backend	rs	rust-backend	277	8	25	14		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mfa/crypto.rs	backend	rs	rust-backend	184	12	9	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mfa/mod.rs	backend	rs	rust-backend	34	0	14	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mfa/otp.rs	backend	rs	rust-backend	223	4	26	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mfa/store.rs	backend	rs	rust-backend	682	9	90	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/mfa/tests.rs	backend	rs	rust-backend	513	10	0	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/migrate.rs	backend	rs	rust-backend	180	2	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/models/downloader.rs	backend	rs	rust-backend	242	11	8	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/models/manifest.rs	backend	rs	rust-backend	81	2	27	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/models/mod.rs	backend	rs	rust-backend	244	2	23	9		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/models/store.rs	backend	rs	rust-backend	28	2	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/module_lock.rs	backend	rs	rust-backend	152	6	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/nettools/mod.rs	backend	rs	rust-backend	2	0	0	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/notes/commands.rs	backend	rs	rust-backend	140	4	14	14		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/notes/db.rs	backend	rs	rust-backend	1300	6	110	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/notes/mod.rs	backend	rs	rust-backend	9	0	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/objectstorage/azure.rs	backend	rs	rust-backend	1049	15	23	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/objectstorage/config.rs	backend	rs	rust-backend	292	5	27	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/objectstorage/credentials.rs	backend	rs	rust-backend	334	5	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/objectstorage/mod.rs	backend	rs	rust-backend	586	16	31	23		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/objectstorage/s3.rs	backend	rs	rust-backend	1292	19	18	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/objectstorage/session.rs	backend	rs	rust-backend	252	10	26	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/objectstorage/transfer.rs	backend	rs	rust-backend	122	8	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/objectstorage/types.rs	backend	rs	rust-backend	73	1	31	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/perf.rs	backend	rs	rust-backend	103	3	14	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/proxy/mod.rs	backend	rs	rust-backend	474	6	29	3		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/qa_driver.rs	backend	rs	rust-backend	963	12	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/qa_driver_keyboard.js	backend	js	rust-backend	58	0	0	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/qa_driver_pointer.js	backend	js	rust-backend	82	0	0	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/cliprdr.rs	backend	rs	rust-backend	690	2	61	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/frame.rs	backend	rs	rust-backend	139	1	12	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/gateway/mod.rs	backend	rs	rust-backend	2223	11	108	0	medium	Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/gateway/ndr.rs	backend	rs	rust-backend	798	2	56	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/gateway/ntlm.rs	backend	rs	rust-backend	761	1	43	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/gateway/rpch.rs	backend	rs	rust-backend	334	3	50	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/input.rs	backend	rs	rust-backend	120	1	16	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/mod.rs	backend	rs	rust-backend	500	9	55	4		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/pdu/mcs.rs	backend	rs	rust-backend	284	1	17	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/pdu/mod.rs	backend	rs	rust-backend	19	0	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/pdu/nego.rs	backend	rs	rust-backend	294	5	30	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/pdu/tpkt.rs	backend	rs	rust-backend	135	3	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/pdu/x224.rs	backend	rs	rust-backend	173	1	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/qa_graphics_capture.rs	backend	rs	rust-backend	91	5	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/rdpdr.rs	backend	rs	rust-backend	1566	18	51	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/rdpsnd.rs	backend	rs	rust-backend	294	1	33	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/rfx.rs	backend	rs	rust-backend	277	1	39	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/session.rs	backend	rs	rust-backend	3727	48	32	0	medium	RDP 客户端会话、IronRDP 生命周期、重连、输入/显示/剪贴板/音频状态
+src-tauri/src/rdp/tls.rs	backend	rs	rust-backend	569	16	12	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/transport.rs	backend	rs	rust-backend	245	11	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/rdp/ws.rs	backend	rs	rust-backend	1058	24	38	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/capture.rs	backend	rs	rust-backend	1141	12	47	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/edit.rs	backend	rs	rust-backend	281	8	6	3		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/favorites.rs	backend	rs	rust-backend	254	9	13	5		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/mac_snapshot.rs	backend	rs	rust-backend	98	5	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/mod.rs	backend	rs	rust-backend	2025	21	89	30	medium	Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/ocr.rs	backend	rs	rust-backend	593	4	28	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/ocr_macos.rs	backend	rs	rust-backend	76	5	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/ocr_windows.rs	backend	rs	rust-backend	132	6	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/pins.rs	backend	rs	rust-backend	539	4	32	9		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/qa.rs	backend	rs	rust-backend	3759	20	26	18	medium	截图 QA 驱动、窗口/显示/滚动/Pin 工具和证据采集命令
+src-tauri/src/screenshot/qa/colors.rs	backend	rs	rust-backend	68	1	1	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/qa/current_window.rs	backend	rs	rust-backend	149	2	1	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/qa/displays.rs	backend	rs	rust-backend	351	1	1	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/qa/macos_save_dialog.rs	backend	rs	rust-backend	323	8	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/qa/pin_arrangement.rs	backend	rs	rust-backend	225	1	1	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/qa/pin_tools.rs	backend	rs	rust-backend	456	4	1	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/qa/scroll_exit.rs	backend	rs	rust-backend	279	1	1	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/qa/scroll_manual.rs	backend	rs	rust-backend	321	2	1	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/qa/wayland.rs	backend	rs	rust-backend	249	6	16	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/qa/windows_save_dialog.rs	backend	rs	rust-backend	68	4	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/qa_oracle.rs	backend	rs	rust-backend	576	3	28	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/record.rs	backend	rs	rust-backend	1256	16	29	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/recovery_file.rs	backend	rs	rust-backend	145	3	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/scroll.rs	backend	rs	rust-backend	1796	17	22	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/scroll_input.rs	backend	rs	rust-backend	283	14	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/session.rs	backend	rs	rust-backend	47	3	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/shortcut.rs	backend	rs	rust-backend	330	6	15	2		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/shortcut/portal.rs	backend	rs	rust-backend	171	5	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/surface_backend.rs	backend	rs	rust-backend	405	8	8	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/screenshot/surfaces.rs	backend	rs	rust-backend	596	5	23	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sdk/detect.rs	backend	rs	rust-backend	1890	6	45	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sdk/mod.rs	backend	rs	rust-backend	975	12	83	11		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sdk/probe.rs	backend	rs	rust-backend	549	7	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sdk/resolve.rs	backend	rs	rust-backend	681	11	15	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sdk/runtime.rs	backend	rs	rust-backend	917	10	22	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/serial/mod.rs	backend	rs	rust-backend	2	0	0	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/cron.rs	backend	rs	rust-backend	325	8	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/db.rs	backend	rs	rust-backend	82	2	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/engine.rs	backend	rs	rust-backend	112	4	14	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/ftp.rs	backend	rs	rust-backend	620	8	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/http.rs	backend	rs	rust-backend	507	7	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/iperf.rs	backend	rs	rust-backend	64	2	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/mod.rs	backend	rs	rust-backend	851	13	58	13		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/nfs.rs	backend	rs	rust-backend	95	2	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/process.rs	backend	rs	rust-backend	83	4	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp.rs	backend	rs	rust-backend	942	15	9	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/audio_input.rs	backend	rs	rust-backend	759	26	17	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/auth.rs	backend	rs	rust-backend	82	2	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/bulk_loopback_tests.rs	backend	rs	rust-backend	614	19	0	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/capture/mac.rs	backend	rs	rust-backend	344	7	11	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/capture/mac/sck.rs	backend	rs	rust-backend	810	24	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/capture/mod.rs	backend	rs	rust-backend	647	13	37	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/capture/wayland.rs	backend	rs	rust-backend	908	24	8	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/capture/win.rs	backend	rs	rust-backend	520	7	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/capture/win_wgc.rs	backend	rs	rust-backend	370	19	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/capture/x11.rs	backend	rs	rust-backend	989	15	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/capture/xcap_backend.rs	backend	rs	rust-backend	83	2	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/clipboard.rs	backend	rs	rust-backend	1710	21	13	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/clipboard_formats.rs	backend	rs	rust-backend	573	1	18	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/diff.rs	backend	rs	rust-backend	176	1	8	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/display.rs	backend	rs	rust-backend	1699	22	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/gfx.rs	backend	rs	rust-backend	1362	23	22	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/input.rs	backend	rs	rust-backend	1315	21	8	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/loopback_tests.rs	backend	rs	rust-backend	425	19	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/metrics.rs	backend	rs	rust-backend	333	8	16	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/session.rs	backend	rs	rust-backend	122	1	8	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/sound.rs	backend	rs	rust-backend	641	31	20	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/sound_macos.rs	backend	rs	rust-backend	357	17	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/system_rdp.rs	backend	rs	rust-backend	340	12	21	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/rdp/tls.rs	backend	rs	rust-backend	148	7	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/ssh.rs	backend	rs	rust-backend	1875	27	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/telnet.rs	backend	rs	rust-backend	272	8	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/tftp.rs	backend	rs	rust-backend	316	6	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/servers/vnc.rs	backend	rs	rust-backend	143	3	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/session/db.rs	backend	rs	rust-backend	210	2	9	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/session/import.rs	backend	rs	rust-backend	975	22	15	6		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/session/import_secrets/crypto.rs	backend	rs	rust-backend	162	9	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/session/import_secrets/keychain.rs	backend	rs	rust-backend	92	3	10	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/session/import_secrets/mod.rs	backend	rs	rust-backend	23	0	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/session/import_secrets/securecrt.rs	backend	rs	rust-backend	468	9	19	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/session/import_secrets/tabby.rs	backend	rs	rust-backend	381	10	9	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/session/mod.rs	backend	rs	rust-backend	80	3	13	8		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/session/models.rs	backend	rs	rust-backend	268	2	28	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/session/resume.rs	backend	rs	rust-backend	897	6	29	3		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/capture/linux/cgroup.rs	backend	rs	rust-backend	741	7	15	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/capture/linux/exec.rs	backend	rs	rust-backend	7	0	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/capture/linux/launched.rs	backend	rs	rust-backend	1365	26	20	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/capture/linux/mod.rs	backend	rs	rust-backend	711	11	25	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/capture/linux/pid_filter.rs	backend	rs	rust-backend	182	5	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/capture/linux/relay.rs	backend	rs	rust-backend	259	11	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/capture/linux/trace_launcher.c	backend	c	native-helper	88	0	0	0		平台原生辅助代码；通过窄 FFI 接口隔离
+src-tauri/src/sockscap/capture/linux/tracer.rs	backend	rs	rust-backend	1547	16	25	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/capture/linux/tunnel.rs	backend	rs	rust-backend	682	6	20	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/capture/macos/mod.rs	backend	rs	rust-backend	36	6	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/capture/mod.rs	backend	rs	rust-backend	280	3	12	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/config.rs	backend	rs	rust-backend	882	5	110	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/core/config_gen.rs	backend	rs	rust-backend	401	3	10	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/core/mod.rs	backend	rs	rust-backend	524	11	26	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/core/share_link.rs	backend	rs	rust-backend	502	3	10	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/dns_win.rs	backend	rs	rust-backend	97	6	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/egress/http_connect.rs	backend	rs	rust-backend	174	6	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/egress/mod.rs	backend	rs	rust-backend	6	0	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/egress/socks5.rs	backend	rs	rust-backend	199	5	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/egress/ssh_pool.rs	backend	rs	rust-backend	205	6	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/elevate.rs	backend	rs	rust-backend	231	5	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/flow.rs	backend	rs	rust-backend	15	2	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/helper.rs	backend	rs	rust-backend	883	19	47	4		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/ingress/http.rs	backend	rs	rust-backend	207	4	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/ingress/mod.rs	backend	rs	rust-backend	237	9	10	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/ingress/socks5.rs	backend	rs	rust-backend	284	5	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/listener_pid.rs	backend	rs	rust-backend	562	7	11	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/mod.rs	backend	rs	rust-backend	3692	39	111	31	medium	SocksCap 命令、启动/停止/退出恢复、平台捕获、策略、上游和进程编排
+src-tauri/src/sockscap/orchestrator.rs	backend	rs	rust-backend	425	11	43	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/paths.rs	backend	rs	rust-backend	397	2	13	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/policy.rs	backend	rs	rust-backend	671	10	26	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/process.rs	backend	rs	rust-backend	496	27	13	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/recovery.rs	backend	rs	rust-backend	247	6	23	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/redirector/app_identity.rs	backend	rs	rust-backend	753	12	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/redirector/bridge_process.rs	backend	rs	rust-backend	635	15	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/redirector/bridge_protocol.rs	backend	rs	rust-backend	121	2	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/redirector/installer.rs	backend	rs	rust-backend	407	8	11	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/redirector/ipc.rs	backend	rs	rust-backend	220	6	26	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/redirector/mod.rs	backend	rs	rust-backend	543	7	31	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/redirector/runtime.rs	backend	rs	rust-backend	1234	24	20	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/redirector/scope.rs	backend	rs	rust-backend	357	5	9	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/relay.rs	backend	rs	rust-backend	1062	22	52	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/rules/autopxy.rs	backend	rs	rust-backend	213	2	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/rules/dns.rs	backend	rs	rust-backend	211	3	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/rules/dns_map.rs	backend	rs	rust-backend	92	5	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/rules/gfwlist.rs	backend	rs	rust-backend	335	7	13	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/rules/mod.rs	backend	rs	rust-backend	17	0	8	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/rules/sni.rs	backend	rs	rust-backend	228	1	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/rules/source.rs	backend	rs	rust-backend	79	2	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/stats.rs	backend	rs	rust-backend	286	5	58	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/sockscap/tun_detect.rs	backend	rs	rust-backend	181	3	3	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/state.rs	backend	rs	rust-backend	322	27	62	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/structural_search.rs	backend	rs	rust-backend	1655	13	81	3		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/tab/fim_engine.rs	backend	rs	rust-backend	91	3	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/tab/fim_engine_real.rs	backend	rs	rust-backend	27	1	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/tab/mod.rs	backend	rs	rust-backend	210	4	6	3		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/tab/path_scanner.rs	backend	rs	rust-backend	167	4	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/terminal/client.rs	backend	rs	rust-backend	230	2	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/terminal/forwards.rs	backend	rs	rust-backend	237	9	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/terminal/local_directories.rs	backend	rs	rust-backend	1465	10	67	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/terminal/mod.rs	backend	rs	rust-backend	1278	18	42	17		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/terminal/network.rs	backend	rs	rust-backend	890	7	29	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/terminal/pty.rs	backend	rs	rust-backend	1047	12	26	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/terminal/shell_integration.rs	backend	rs	rust-backend	199	3	4	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/terminal/ssh.rs	backend	rs	rust-backend	1015	20	24	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/terminal/x11.rs	backend	rs	rust-backend	683	10	19	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/terminal/x11_forward.rs	backend	rs	rust-backend	248	6	8	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/test_results.rs	backend	rs	rust-backend	588	8	30	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/tunnel/mod.rs	backend	rs	rust-backend	967	14	50	11		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/update.rs	backend	rs	rust-backend	228	2	10	2		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/update/qa.rs	backend	rs	rust-backend	102	6	1	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vault/crypto.rs	backend	rs	rust-backend	91	4	13	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vault/db.rs	backend	rs	rust-backend	245	2	35	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vault/mod.rs	backend	rs	rust-backend	642	8	45	9		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vault/tests.rs	backend	rs	rust-backend	253	2	0	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vnc/clipboard.rs	backend	rs	rust-backend	585	5	27	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vnc/encodings.rs	backend	rs	rust-backend	1375	17	24	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vnc/error.rs	backend	rs	rust-backend	198	2	8	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vnc/framebuffer.rs	backend	rs	rust-backend	314	3	25	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vnc/keyboard_hook.rs	backend	rs	rust-backend	470	19	18	2		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vnc/limits.rs	backend	rs	rust-backend	142	2	20	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vnc/live_bench.rs	backend	rs	rust-backend	496	14	0	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vnc/mod.rs	backend	rs	rust-backend	495	8	40	6		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vnc/native_pointer.rs	backend	rs	rust-backend	335	10	20	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vnc/pixel.rs	backend	rs	rust-backend	335	1	30	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vnc/policy.rs	backend	rs	rust-backend	311	2	16	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vnc/quality.rs	backend	rs	rust-backend	635	8	33	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vnc/queue.rs	backend	rs	rust-backend	281	5	12	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vnc/rfb.rs	backend	rs	rust-backend	2695	32	62	0	medium	VNC RFB 协议握手、认证、帧缓冲更新和输入通道
+src-tauri/src/vnc/tight.rs	backend	rs	rust-backend	544	12	6	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vnc/tls.rs	backend	rs	rust-backend	581	16	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/vnc/ws.rs	backend	rs	rust-backend	2595	31	22	0	medium	VNC WebSocket/会话桥接、事件推送和连接生命周期
+src-tauri/src/voice/capture.rs	backend	rs	rust-backend	273	4	7	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/voice/cleanup.rs	backend	rs	rust-backend	146	5	6	2		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/voice/commands.rs	backend	rs	rust-backend	536	6	9	6		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/voice/mod.rs	backend	rs	rust-backend	9	0	5	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/voice/providers.rs	backend	rs	rust-backend	414	5	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/voice/streaming.rs	backend	rs	rust-backend	1040	14	12	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/voice/vocabulary.rs	backend	rs	rust-backend	233	4	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/webview_recovery/lifecycle.rs	backend	rs	rust-backend	186	2	16	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/webview_recovery/mod.rs	backend	rs	rust-backend	791	10	21	3		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/windowing/mod.rs	backend	rs	rust-backend	161	1	2	2		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/workspace.rs	backend	rs	rust-backend	5597	23	142	22	high	代码工作区文件读写/编码/安全路径、资源操作、Git 根、任务检测和依赖解析
+src-tauri/src/workspace_execution.rs	backend	rs	rust-backend	4695	11	111	1	medium	多语言构建/运行模型、manifest 探测、共享 run/debug 配置和解析
+src-tauri/src/workspace_fs.rs	backend	rs	rust-backend	245	8	14	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/workspace_search.rs	backend	rs	rust-backend	538	12	26	2		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/workspace_tooling/gradle.rs	backend	rs	rust-backend	505	7	33	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/workspace_tooling/maven.rs	backend	rs	rust-backend	585	8	33	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/workspace_tooling/mod.rs	backend	rs	rust-backend	3	0	2	0		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/src/wsl/mod.rs	backend	rs	rust-backend	170	3	9	1		Rust 后端模块；命令、领域服务、协议、驱动或平台适配
+src-tauri/tests/integration/acp_runtime.rs	backend	rs	test	425	5	0	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/asr_llm_isolation.rs	backend	rs	test	72	2	0	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/cloud_only_smoke.rs	backend	rs	test	45	2	0	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/concurrent_three_workloads.rs	backend	rs	test	108	5	0	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/fim_latency.rs	backend	rs	test	44	5	0	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/gpu_detect.rs	backend	rs	test	24	1	0	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/main.rs	backend	rs	test	26	0	0	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/models_downloader.rs	backend	rs	test	19	3	0	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/network_policy.rs	backend	rs	test	29	1	0	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/perf_baseline.rs	backend	rs	test	47	1	0	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/router_routing.rs	backend	rs	test	223	5	0	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/router_vault_lock.rs	backend	rs	test	173	5	0	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/sockscap_win11_scenarios.rs	backend	rs	test	293	7	0	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/sockscap_xray_core.rs	backend	rs	test	418	8	0	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/support/mock_provider.rs	backend	rs	test	97	6	7	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/support/mod.rs	backend	rs	test	2	0	1	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/three_source_probe.rs	backend	rs	test	40	2	0	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/voice_intent_latency.rs	backend	rs	test	43	5	0	0		自动化测试/QA 集成测试
+src-tauri/tests/integration/welcome_recents_resume.rs	backend	rs	test	297	5	0	0		自动化测试/QA 集成测试
+src-tauri/tests/sockscap_ingress.rs	backend	rs	test	202	11	0	0		自动化测试/QA 集成测试
+src-tauri/tests/support/acp_fake_agent.rs	backend	rs	test	319	4	0	0		自动化测试/QA 集成测试
+src-tauri/thrift/hbase.thrift	backend	thrift	schema-definition	1032	0	0	0		协议 schema/IDL 输入；生成 Rust 类型，变更需走生成校验
+src/App.tsx	frontend	tsx	source	254	31	1	0		源文件
+src/components/AboutDialog.tsx	frontend	tsx	frontend-component	106	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/ContextMenu.test.tsx	frontend	tsx	test	241	3	0	0		自动化测试/QA 集成测试
+src/components/ContextMenu.tsx	frontend	tsx	frontend-component	487	4	7	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/UpdateDialog.test.tsx	frontend	tsx	test	79	5	0	0		自动化测试/QA 集成测试
+src/components/UpdateDialog.tsx	frontend	tsx	frontend-component	334	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/WelcomePanel.test.tsx	frontend	tsx	test	894	7	0	0		自动化测试/QA 集成测试
+src/components/WelcomePanel.tsx	frontend	tsx	frontend-component	2076	20	2	0	medium	React UI/交互组件，具体职责由目录和文件名定义
+src/components/agent/ActionCard.tsx	frontend	tsx	frontend-component	113	2	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/agent/CcAgentBridge.test.tsx	frontend	tsx	test	439	12	0	0		自动化测试/QA 集成测试
+src/components/agent/CcAgentBridge.tsx	frontend	tsx	frontend-component	1297	17	1	5		React UI/交互组件，具体职责由目录和文件名定义
+src/components/agent/QuickActions.tsx	frontend	tsx	frontend-component	154	5	1	1		React UI/交互组件，具体职责由目录和文件名定义
+src/components/agent/WebSearchConfirmCard.tsx	frontend	tsx	frontend-component	73	2	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/chat/AttachmentChip.tsx	frontend	tsx	frontend-component	76	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/chat/CcToolCards.tsx	frontend	tsx	frontend-component	59	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/chat/ChatDrawer.test.tsx	frontend	tsx	test	906	11	0	0		自动化测试/QA 集成测试
+src/components/chat/ChatDrawer.tsx	frontend	tsx	frontend-component	1620	25	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/chat/ChatThreadList.tsx	frontend	tsx	frontend-component	79	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/chat/CodeBlockToolbar.component.test.tsx	frontend	tsx	test	93	6	0	0		自动化测试/QA 集成测试
+src/components/chat/CodeBlockToolbar.test.ts	frontend	ts	test	75	2	0	0		自动化测试/QA 集成测试
+src/components/chat/CodeBlockToolbar.tsx	frontend	tsx	frontend-component	599	7	8	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/chat/Composer.test.tsx	frontend	tsx	test	337	6	0	0		自动化测试/QA 集成测试
+src/components/chat/Composer.tsx	frontend	tsx	frontend-component	557	11	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/chat/GoModelPicker.test.tsx	frontend	tsx	test	54	5	0	0		自动化测试/QA 集成测试
+src/components/chat/GoModelPicker.tsx	frontend	tsx	frontend-component	82	3	5	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/chat/MessageBubble.test.tsx	frontend	tsx	test	136	4	0	0		自动化测试/QA 集成测试
+src/components/chat/MessageBubble.tsx	frontend	tsx	frontend-component	540	16	1	1		React UI/交互组件，具体职责由目录和文件名定义
+src/components/chat/NewThreadFormatPicker.tsx	frontend	tsx	frontend-component	182	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/chat/SearchProgressChip.tsx	frontend	tsx	frontend-component	54	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/chat/ToolActivityBlock.tsx	frontend	tsx	frontend-component	129	5	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/chat/toolActivity.test.ts	frontend	ts	test	87	2	0	0		自动化测试/QA 集成测试
+src/components/chat/toolActivity.ts	frontend	ts	frontend-feature-lib	147	0	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/database/DbClientTab.test.tsx	frontend	tsx	test	1421	8	0	0		自动化测试/QA 集成测试
+src/components/database/DbClientTab.tsx	frontend	tsx	frontend-component	3766	34	3	0	medium	数据库 Tab：连接、Schema、SQL 编辑、执行/取消、历史、事务和结果协作
+src/components/database/DbObjectDetailDialog.tsx	frontend	tsx	frontend-component	134	5	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/database/DbTableDetailPanel.test.tsx	frontend	tsx	test	34	3	0	0		自动化测试/QA 集成测试
+src/components/database/DbTableDetailPanel.tsx	frontend	tsx	frontend-component	179	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/database/ExecutionLogView.tsx	frontend	tsx	frontend-component	127	1	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/database/HBaseSchemaTree.test.tsx	frontend	tsx	test	121	3	0	0		自动化测试/QA 集成测试
+src/components/database/HBaseSchemaTree.tsx	frontend	tsx	frontend-component	492	9	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/database/HBaseShellTab.test.tsx	frontend	tsx	test	198	5	0	0		自动化测试/QA 集成测试
+src/components/database/HBaseShellTab.tsx	frontend	tsx	frontend-component	1400	26	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/database/QueryLibraryPanel.test.tsx	frontend	tsx	test	170	4	0	0		自动化测试/QA 集成测试
+src/components/database/QueryLibraryPanel.tsx	frontend	tsx	frontend-component	585	5	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/database/QueryResultGrid.test.tsx	frontend	tsx	test	441	6	0	0		自动化测试/QA 集成测试
+src/components/database/QueryResultGrid.tsx	frontend	tsx	frontend-component	3516	12	18	0	medium	查询结果虚拟表格、排序/过滤/编辑/复制/导出及 SQL 重写交互
+src/components/database/RedisCli.test.tsx	frontend	tsx	test	203	5	0	0		自动化测试/QA 集成测试
+src/components/database/RedisCli.tsx	frontend	tsx	frontend-component	382	7	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/database/RedisClientTab.test.tsx	frontend	tsx	test	151	6	0	0		自动化测试/QA 集成测试
+src/components/database/RedisClientTab.tsx	frontend	tsx	frontend-component	416	21	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/database/RedisKeyBrowser.tsx	frontend	tsx	frontend-component	282	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/database/RedisNewKeyDialog.tsx	frontend	tsx	frontend-component	113	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/database/RedisValuePanel.tsx	frontend	tsx	frontend-component	421	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/database/SchemaTree.test.tsx	frontend	tsx	test	347	3	0	0		自动化测试/QA 集成测试
+src/components/database/SchemaTree.tsx	frontend	tsx	frontend-component	1248	11	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/database/SqlEditorPanel.test.tsx	frontend	tsx	test	323	6	0	0		自动化测试/QA 集成测试
+src/components/database/SqlEditorPanel.tsx	frontend	tsx	frontend-component	646	14	4	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/database/formatSql.test.ts	frontend	ts	test	23	2	0	0		自动化测试/QA 集成测试
+src/components/database/formatSql.ts	frontend	ts	frontend-feature-lib	77	1	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/database/useDbSessionFontSize.test.tsx	frontend	tsx	test	49	4	0	0		自动化测试/QA 集成测试
+src/components/database/useDbSessionFontSize.ts	frontend	ts	frontend-feature-lib	107	1	2	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/detached/DetachedSessionWindow.test.tsx	frontend	tsx	test	183	8	0	0		自动化测试/QA 集成测试
+src/components/detached/DetachedSessionWindow.tsx	frontend	tsx	frontend-component	685	26	7	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/detached/LanChatDetachedWindow.tsx	frontend	tsx	frontend-component	572	14	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/CodeWorkspaceTab.fileTemplate.test.tsx	frontend	tsx	test	648	8	0	0		自动化测试/QA 集成测试
+src/components/editor/CodeWorkspaceTab.test.tsx	frontend	tsx	test	15210	51	13	0	critical	工作区总控集成测试；覆盖保存、恢复、LSP、布局、导航和编辑行为
+src/components/editor/CodeWorkspaceTab.tsx	frontend	tsx	frontend-component	23914	223	5	3	critical	工作区总控组件：文件树、编辑器组、LSP、保存/恢复、WorkspaceEdit、工具窗口、命令绑定与渲染
+src/components/editor/workspace/AutoImportCandidateDialog.test.tsx	frontend	tsx	test	120	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/AutoImportCandidateDialog.tsx	frontend	tsx	frontend-component	145	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/AutoImportSettingsDialog.test.tsx	frontend	tsx	test	74	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/AutoImportSettingsDialog.tsx	frontend	tsx	frontend-component	223	4	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/Breadcrumbs.test.tsx	frontend	tsx	test	386	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/Breadcrumbs.tsx	frontend	tsx	frontend-component	896	5	7	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/ClipboardHistoryPopup.test.tsx	frontend	tsx	test	82	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/ClipboardHistoryPopup.tsx	frontend	tsx	frontend-component	223	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/CodeInsightNotice.tsx	frontend	tsx	frontend-component	110	2	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/CodeMirrorHost.completion-undo.test.tsx	frontend	tsx	test	145	9	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/CodeMirrorHost.completion.test.tsx	frontend	tsx	test	226	7	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/CodeMirrorHost.findFocus.test.tsx	frontend	tsx	test	179	8	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/CodeMirrorHost.ime.test.tsx	frontend	tsx	test	54	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/CodeMirrorHost.live-template-interaction.test.tsx	frontend	tsx	test	1504	9	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/CodeMirrorHost.parity005.test.tsx	frontend	tsx	test	112	7	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/CodeMirrorHost.test.tsx	frontend	tsx	test	2453	16	0	0	medium	自动化测试/QA 集成测试
+src/components/editor/workspace/CodeMirrorHost.tsx	frontend	tsx	frontend-component	4719	50	21	0	medium	CodeMirror 宿主、扩展装配、搜索、补全、诊断、悬浮文档、剪贴板和调试装饰
+src/components/editor/workspace/CodeStyleSettingsDialog.test.tsx	frontend	tsx	test	213	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/CodeStyleSettingsDialog.tsx	frontend	tsx	frontend-component	556	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/CodeWorkspaceSplitter.integration.test.tsx	frontend	tsx	test	533	8	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/DapAdapterGuideDialog.test.tsx	frontend	tsx	test	55	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/DapAdapterGuideDialog.tsx	frontend	tsx	frontend-component	344	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/EditorAiRewriteDialog.tsx	frontend	tsx	frontend-component	150	2	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/EditorBanner.test.tsx	frontend	tsx	test	86	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/EditorBanner.tsx	frontend	tsx	frontend-component	154	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/EditorCompareDialog.test.tsx	frontend	tsx	test	150	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/EditorCompareDialog.tsx	frontend	tsx	frontend-component	282	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/EditorGroup.test.tsx	frontend	tsx	test	498	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/EditorGroup.tsx	frontend	tsx	frontend-component	1252	39	4	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/EditorSelectionAiToolbar.test.tsx	frontend	tsx	test	166	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/EditorSelectionAiToolbar.tsx	frontend	tsx	frontend-component	177	5	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/ExternalFileConflictDialog.test.tsx	frontend	tsx	test	70	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/ExternalFileConflictDialog.tsx	frontend	tsx	frontend-component	219	3	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/FileEncodingDialog.test.tsx	frontend	tsx	test	104	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/FileEncodingDialog.tsx	frontend	tsx	frontend-component	185	2	4	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/FileTemplateSettingsDialog.test.tsx	frontend	tsx	test	65	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/FileTemplateSettingsDialog.tsx	frontend	tsx	frontend-component	191	4	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/FileTreePane.test.tsx	frontend	tsx	test	297	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/FileTreePane.tsx	frontend	tsx	frontend-component	420	4	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/GenerateCodeDialog.test.tsx	frontend	tsx	test	76	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/GenerateCodeDialog.tsx	frontend	tsx	frontend-component	192	3	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/GitDiffPeek.test.tsx	frontend	tsx	test	50	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/GitDiffPeek.tsx	frontend	tsx	frontend-component	153	2	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/GoToLineDialog.test.tsx	frontend	tsx	test	133	6	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/GoToLineDialog.tsx	frontend	tsx	frontend-component	109	2	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/HighlightingWidget.test.tsx	frontend	tsx	test	204	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/HighlightingWidget.tsx	frontend	tsx	frontend-component	269	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/InlineRenamePopup.test.tsx	frontend	tsx	test	83	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/InlineRenamePopup.tsx	frontend	tsx	frontend-component	280	1	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/JavaMainClassPicker.test.tsx	frontend	tsx	test	34	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/JavaMainClassPicker.tsx	frontend	tsx	frontend-component	66	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/KeymapCheatSheetDialog.test.tsx	frontend	tsx	test	152	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/KeymapCheatSheetDialog.tsx	frontend	tsx	frontend-component	288	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/KeymapMigrationNotice.tsx	frontend	tsx	frontend-component	59	1	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/KeymapSettingsDialog.test.tsx	frontend	tsx	test	567	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/KeymapSettingsDialog.tsx	frontend	tsx	frontend-component	1067	8	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/LocalHistoryDialog.tsx	frontend	tsx	frontend-component	205	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/LocationPeek.test.tsx	frontend	tsx	test	40	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/LocationPeek.tsx	frontend	tsx	frontend-component	99	2	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/LspMessageRequestDialog.test.tsx	frontend	tsx	test	64	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/LspMessageRequestDialog.tsx	frontend	tsx	frontend-component	102	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/MarkdownPreview.tsx	frontend	tsx	frontend-component	127	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/NewJavaClassDialog.test.tsx	frontend	tsx	test	120	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/NewJavaClassDialog.tsx	frontend	tsx	frontend-component	242	4	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/OutlinePane.test.tsx	frontend	tsx	test	87	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/OutlinePane.tsx	frontend	tsx	frontend-component	213	5	4	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/ProjectFactsStatusBadge.test.tsx	frontend	tsx	test	85	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/ProjectFactsStatusBadge.tsx	frontend	tsx	frontend-component	105	4	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/ProjectTree.css	frontend	css	frontend-style	20	0	0	0		前端全局/功能样式；按主题、组件和功能边界拆分
+src/components/editor/workspace/ProjectTree.test.tsx	frontend	tsx	test	247	6	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/ProjectTree.tsx	frontend	tsx	frontend-component	588	9	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/QuickDocPopup.test.tsx	frontend	tsx	test	176	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/QuickDocPopup.tsx	frontend	tsx	frontend-component	219	6	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/QuickPickOverlay.tsx	frontend	tsx	frontend-component	359	4	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/RecentFilesPopup.test.tsx	frontend	tsx	test	140	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/RecentFilesPopup.tsx	frontend	tsx	frontend-component	175	5	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/RecentLocationsDialog.test.tsx	frontend	tsx	test	112	4	2	0		自动化测试/QA 集成测试
+src/components/editor/workspace/RecentLocationsDialog.tsx	frontend	tsx	frontend-component	260	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/RefactorRecoveryReviewDialog.test.tsx	frontend	tsx	test	150	6	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/RefactorRecoveryReviewDialog.tsx	frontend	tsx	frontend-component	332	4	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/RefactoringPreviewDialog.test.tsx	frontend	tsx	test	250	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/RefactoringPreviewDialog.tsx	frontend	tsx	frontend-component	440	5	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/ReferenceContentFooter.tsx	frontend	tsx	frontend-component	83	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/SearchEverywhere.test.tsx	frontend	tsx	test	441	7	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/SearchEverywhere.tsx	frontend	tsx	frontend-component	470	8	7	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/ShortcutKeyCaps.tsx	frontend	tsx	frontend-component	40	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/StructuralSearch.parity009.test.tsx	frontend	tsx	test	317	9	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/StructuralSearchDialog.tsx	frontend	tsx	frontend-component	375	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/StructurePopup.test.tsx	frontend	tsx	test	99	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/StructurePopup.tsx	frontend	tsx	frontend-component	146	4	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/SurroundWithDialog.test.tsx	frontend	tsx	test	59	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/SurroundWithDialog.tsx	frontend	tsx	frontend-component	118	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/TabSwitcher.test.tsx	frontend	tsx	test	93	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/TabSwitcher.tsx	frontend	tsx	frontend-component	200	2	4	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/UndoWorkspaceEditConfirmDialog.tsx	frontend	tsx	frontend-component	97	1	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/UsagesScopeDialog.test.tsx	frontend	tsx	test	85	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/UsagesScopeDialog.tsx	frontend	tsx	frontend-component	77	2	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/WorkspaceBuildRunToolsDialog.test.tsx	frontend	tsx	test	96	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/WorkspaceBuildRunToolsDialog.tsx	frontend	tsx	frontend-component	236	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/WorkspaceEditorAppearanceSettingsDialog.test.tsx	frontend	tsx	test	202	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/WorkspaceEditorAppearanceSettingsDialog.tsx	frontend	tsx	frontend-component	443	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/WorkspaceIntelligenceSettingsDialog.test.tsx	frontend	tsx	test	148	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/WorkspaceIntelligenceSettingsDialog.tsx	frontend	tsx	frontend-component	438	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/WorkspaceObservationBoundary.test.tsx	frontend	tsx	test	38	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/WorkspaceObservationBoundary.tsx	frontend	tsx	frontend-component	61	2	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/WorkspacePopupsHost.tsx	frontend	tsx	frontend-component	220	14	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/WorkspaceRecoveryDialog.test.tsx	frontend	tsx	test	65	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/WorkspaceRecoveryDialog.tsx	frontend	tsx	frontend-component	395	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/WorkspaceSdkStatus.test.tsx	frontend	tsx	test	282	7	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/WorkspaceSdkStatus.tsx	frontend	tsx	frontend-component	647	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/WorkspaceTabPolicySettingsDialog.test.tsx	frontend	tsx	test	198	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/WorkspaceTabPolicySettingsDialog.tsx	frontend	tsx	frontend-component	357	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/__fixtures__/experimental/advancedWorkflows.test.ts	frontend	ts	test	37	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/__fixtures__/experimental/dependencyCompletion.test.ts	frontend	ts	test	256	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/__fixtures__/experimental/dependencyCompletion.ts	frontend	ts	fixture	576	1	15	0		测试 fixture/运行器
+src/components/editor/workspace/__fixtures__/experimental/fullLineCompletionModel.ts	frontend	ts	fixture	80	0	4	0		测试 fixture/运行器
+src/components/editor/workspace/__fixtures__/experimental/keymapModel.test.ts	frontend	ts	test	85	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/__fixtures__/experimental/keymapModel.ts	frontend	ts	fixture	204	2	11	0		测试 fixture/运行器
+src/components/editor/workspace/__fixtures__/experimental/surroundGenerateModel.test.ts	frontend	ts	test	72	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/__fixtures__/experimental/surroundGenerateModel.ts	frontend	ts	fixture	187	0	7	0		测试 fixture/运行器
+src/components/editor/workspace/__fixtures__/ideaKeymapAcceptedDifferences.ts	frontend	ts	fixture	14	0	1	0		测试 fixture/运行器
+src/components/editor/workspace/__fixtures__/ideaXWinKeymap.ts	frontend	ts	fixture	130	0	2	0		测试 fixture/运行器
+src/components/editor/workspace/__fixtures__/javaQuickFix.test.ts	frontend	ts	test	132	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/__fixtures__/javaQuickFix.ts	frontend	ts	fixture	492	1	8	0		测试 fixture/运行器
+src/components/editor/workspace/__fixtures__/javaQuickFixImportGuard.test.ts	frontend	ts	test	35	1	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/__fixtures__/jdtls/jdtlsAutoImportContract.test.ts	frontend	ts	test	283	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/__fixtures__/jdtls/jdtlsFixtureExpectations.ts	frontend	ts	fixture	316	0	4	0		测试 fixture/运行器
+src/components/editor/workspace/__fixtures__/jdtls/jdtlsFormatContract.test.ts	frontend	ts	test	83	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/__fixtures__/jdtls/jdtlsRearrangeCleanupContract.test.ts	frontend	ts	test	261	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/__fixtures__/jdtls/jdtlsRefactorContract.test.ts	frontend	ts	test	191	8	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/__fixtures__/jdtls/jdtlsTraceContract.test.ts	frontend	ts	test	325	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/__fixtures__/jdtls/jdtlsUsagesContract.test.ts	frontend	ts	test	76	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/__fixtures__/jdtls/runner/lsp-client.mjs	frontend	mjs	fixture	216	2	2	0		测试 fixture/运行器
+src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-fixture.mjs	frontend	mjs	fixture	1729	7	0	0		测试 fixture/运行器
+src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-format-fixture.mjs	frontend	mjs	fixture	314	6	0	0		测试 fixture/运行器
+src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-import-fixture.mjs	frontend	mjs	fixture	322	6	0	0		测试 fixture/运行器
+src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-rearrange-cleanup-fixture.mjs	frontend	mjs	fixture	206	6	0	0		测试 fixture/运行器
+src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-refactor-fixture.mjs	frontend	mjs	fixture	346	6	0	0		测试 fixture/运行器
+src/components/editor/workspace/__fixtures__/jdtls/runner/run-jdtls-usages-fixture.mjs	frontend	mjs	fixture	277	6	0	0		测试 fixture/运行器
+src/components/editor/workspace/autoImportModel.test.ts	frontend	ts	test	321	6	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/autoImportModel.ts	frontend	ts	frontend-feature-lib	454	0	17	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/autoImportProvider.test.ts	frontend	ts	test	354	6	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/buildReplaceEdits.test.ts	frontend	ts	test	57	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/buildReplaceEdits.ts	frontend	ts	frontend-feature-lib	58	3	2	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/capabilityEvidence.ts	frontend	ts	frontend-feature-lib	108	1	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/clipboardObservationContract.test.ts	frontend	ts	test	208	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/clipboardObservationContract.ts	frontend	ts	frontend-feature-lib	197	1	11	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/codeActionExecution.test.ts	frontend	ts	test	139	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/codeActionExecution.ts	frontend	ts	frontend-feature-lib	173	2	6	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/codeActionProviderAdapter.test.ts	frontend	ts	test	1177	6	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/codeActionProviderAdapter.ts	frontend	ts	frontend-feature-lib	1215	4	29	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/codeStyleModel.test.ts	frontend	ts	test	149	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/codeStyleModel.ts	frontend	ts	frontend-feature-lib	288	1	8	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/codeWorkspaceModel.buildRunTools.test.ts	frontend	ts	test	107	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/codeWorkspaceModel.javaSettings.test.ts	frontend	ts	test	62	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/codeWorkspaceModel.ts	frontend	ts	frontend-feature-lib	1578	10	147	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/companionCapabilities.test.ts	frontend	ts	test	148	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/companionCapabilities.ts	frontend	ts	frontend-feature-lib	162	1	15	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/completionScopeAdapter.test.ts	frontend	ts	test	200	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/completionScopeAdapter.ts	frontend	ts	frontend-feature-lib	124	3	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/coverageEditorChrome.test.ts	frontend	ts	test	50	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/coverageEditorChrome.ts	frontend	ts	frontend-feature-lib	80	3	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/coverageModel.test.ts	frontend	ts	test	80	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/coverageModel.ts	frontend	ts	frontend-feature-lib	236	0	8	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/dapAdapterContracts.test.ts	frontend	ts	test	163	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/dapAdapterContracts.ts	frontend	ts	frontend-feature-lib	288	1	10	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/dapDebugModel.test.ts	frontend	ts	test	964	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/dapDebugModel.ts	frontend	ts	frontend-feature-lib	1736	0	109	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/dataBreakpointTarget.test.ts	frontend	ts	test	48	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/dataBreakpointTarget.ts	frontend	ts	frontend-feature-lib	73	1	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/debugBreakpointProperties.test.ts	frontend	ts	test	151	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/debugBreakpointProperties.ts	frontend	ts	frontend-feature-lib	240	1	22	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/debugEditorChrome.test.ts	frontend	ts	test	192	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/debugEditorChrome.ts	frontend	ts	frontend-feature-lib	484	4	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/diagnosticScopeModel.test.ts	frontend	ts	test	32	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/diagnosticScopeModel.ts	frontend	ts	frontend-feature-lib	24	0	2	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/doubleShift.test.ts	frontend	ts	test	98	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/doubleShift.ts	frontend	ts	frontend-feature-lib	56	0	2	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/editorAiPreferences.test.ts	frontend	ts	test	55	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/editorAiPreferences.ts	frontend	ts	frontend-feature-lib	54	1	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/editorAiPrompts.test.ts	frontend	ts	test	341	4	2	0		自动化测试/QA 集成测试
+src/components/editor/workspace/editorAiPrompts.ts	frontend	ts	frontend-feature-lib	582	3	16	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/editorAppearanceExtension.ts	frontend	ts	frontend-feature-lib	119	4	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/editorAppearanceProfile.test.ts	frontend	ts	test	160	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/editorAppearanceProfile.ts	frontend	ts	frontend-feature-lib	474	2	29	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/editorBannerModel.test.ts	frontend	ts	test	79	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/editorBannerModel.ts	frontend	ts	frontend-feature-lib	50	0	6	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/editorCompareModel.test.ts	frontend	ts	test	84	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/editorCompareModel.ts	frontend	ts	frontend-feature-lib	280	0	20	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/editorConfigParser.test.ts	frontend	ts	test	57	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/editorConfigParser.ts	frontend	ts	frontend-feature-lib	193	0	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/editorConfigResolver.test.ts	frontend	ts	test	235	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/editorConfigResolver.ts	frontend	ts	frontend-feature-lib	375	2	10	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/editorContextMenu.test.ts	frontend	ts	test	399	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/editorContextMenu.ts	frontend	ts	frontend-feature-lib	243	3	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/editorGroupTypes.ts	frontend	ts	frontend-feature-lib	65	1	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/editorPerformance.test.tsx	frontend	tsx	test	368	9	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/editorReleaseScope.test.ts	frontend	ts	test	102	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/editorReleaseScope.ts	frontend	ts	frontend-feature-lib	225	0	9	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/editorSearchPanel.test.ts	frontend	ts	test	391	8	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/editorSearchPanel.ts	frontend	ts	frontend-feature-lib	1072	4	19	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/editorTabScroll.test.ts	frontend	ts	test	105	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/editorTabScroll.ts	frontend	ts	frontend-feature-lib	111	0	11	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/errorStripe.test.ts	frontend	ts	test	104	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/errorStripe.ts	frontend	ts	frontend-feature-lib	238	4	6	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/executionPlan.test.ts	frontend	ts	test	143	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/executionPlan.ts	frontend	ts	frontend-feature-lib	217	1	7	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/extractMethodFlow.test.ts	frontend	ts	test	189	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/extractMethodFlow.ts	frontend	ts	frontend-feature-lib	252	1	17	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/fileTemplateModel.test.ts	frontend	ts	test	210	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/fileTemplateModel.ts	frontend	ts	frontend-feature-lib	312	0	14	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/fileTypeIcon.tsx	frontend	tsx	frontend-component	48	1	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/findInFilesScopeModel.test.ts	frontend	ts	test	182	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/findInFilesScopeModel.ts	frontend	ts	frontend-feature-lib	285	3	7	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/fuzzyMatch.test.ts	frontend	ts	test	57	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/fuzzyMatch.ts	frontend	ts	frontend-feature-lib	94	0	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/generateCodeWorkflow.test.ts	frontend	ts	test	58	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/generateCodeWorkflow.ts	frontend	ts	frontend-feature-lib	56	0	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/gitEditorChrome.test.ts	frontend	ts	test	83	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/gitEditorChrome.ts	frontend	ts	frontend-feature-lib	290	4	8	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/hierarchyQueryModel.test.ts	frontend	ts	test	408	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/hierarchyQueryModel.ts	frontend	ts	frontend-feature-lib	357	3	12	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/highlightingLevelModel.test.ts	frontend	ts	test	37	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/highlightingLevelModel.ts	frontend	ts	frontend-feature-lib	37	0	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/hoverDocTooltip.test.ts	frontend	ts	test	100	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/hoverDocTooltip.ts	frontend	ts	frontend-feature-lib	356	2	12	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/importFold.test.ts	frontend	ts	test	25	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/importFold.ts	frontend	ts	frontend-feature-lib	37	0	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/inlineRename.test.ts	frontend	ts	test	57	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/inlineRename.ts	frontend	ts	frontend-feature-lib	141	2	7	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/inspectionEvidence.test.ts	frontend	ts	test	81	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/inspectionEvidence.ts	frontend	ts	frontend-feature-lib	186	1	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/inspectionProfile.test.ts	frontend	ts	test	144	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/inspectionProfile.ts	frontend	ts	frontend-feature-lib	462	1	34	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/inspectionProviderAdapter.test.ts	frontend	ts	test	73	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/inspectionProviderAdapter.ts	frontend	ts	frontend-feature-lib	55	3	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/intelligencePreferences.test.ts	frontend	ts	test	169	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/intelligencePreferences.ts	frontend	ts	frontend-feature-lib	235	0	16	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/intentionSession.test.ts	frontend	ts	test	394	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/intentionSession.ts	frontend	ts	frontend-feature-lib	254	3	10	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/javaSemanticEvidence.test.ts	frontend	ts	test	130	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/javaSemanticEvidence.ts	frontend	ts	frontend-feature-lib	311	2	22	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/javaSyntaxOutline.test.ts	frontend	ts	test	39	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/javaSyntaxOutline.ts	frontend	ts	frontend-feature-lib	115	2	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/languageServiceReadiness.test.ts	frontend	ts	test	46	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/languageServiceReadiness.ts	frontend	ts	frontend-feature-lib	61	1	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/largeFile.test.ts	frontend	ts	test	32	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/largeFile.ts	frontend	ts	frontend-feature-lib	30	0	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/liveTemplates.test.ts	frontend	ts	test	346	6	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/liveTemplates.ts	frontend	ts	frontend-feature-lib	1476	5	30	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/lspCompletion.test.ts	frontend	ts	test	2069	29	0	0	medium	自动化测试/QA 集成测试
+src/components/editor/workspace/lspCompletion.ts	frontend	ts	frontend-feature-lib	2429	9	71	0	medium	前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/lspCompletionChoice.test.ts	frontend	ts	test	101	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/lspCompletionChoiceSession.test.ts	frontend	ts	test	75	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/lspCompletionResolveGate.test.ts	frontend	ts	test	724	7	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/lspDiagnosticChrome.test.ts	frontend	ts	test	54	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/lspDiagnosticChrome.ts	frontend	ts	frontend-feature-lib	231	4	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/lspHyperlink.test.ts	frontend	ts	test	126	12	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/lspHyperlink.ts	frontend	ts	frontend-feature-lib	293	4	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/lspIntelligenceChrome.test.ts	frontend	ts	test	123	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/lspIntelligenceChrome.ts	frontend	ts	frontend-feature-lib	273	4	11	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/lspPositions.ts	frontend	ts	frontend-feature-lib	18	2	2	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/lspSyncGate.test.ts	frontend	ts	test	82	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/lspTextEdits.test.ts	frontend	ts	test	194	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/lspTextEdits.ts	frontend	ts	frontend-feature-lib	222	1	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/navigationBarModel.test.ts	frontend	ts	test	68	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/navigationBarModel.ts	frontend	ts	frontend-feature-lib	71	2	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/navigationHistoryModel.test.ts	frontend	ts	test	376	2	2	0		自动化测试/QA 集成测试
+src/components/editor/workspace/navigationHistoryModel.ts	frontend	ts	frontend-feature-lib	510	0	15	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/navigationHistoryV2.test.ts	frontend	ts	test	114	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/occurrenceHighlightModel.test.ts	frontend	ts	test	88	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/occurrenceHighlightModel.ts	frontend	ts	frontend-feature-lib	140	1	9	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/panels/AnalysisPanel.test.tsx	frontend	tsx	test	367	7	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/AnalysisPanel.tsx	frontend	tsx	frontend-component	488	9	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/BottomDock.test.tsx	frontend	tsx	test	339	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/BottomDock.tsx	frontend	tsx	frontend-component	681	4	7	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/BuildPanel.test.tsx	frontend	tsx	test	349	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/BuildPanel.tsx	frontend	tsx	frontend-component	606	7	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/CoveragePanel.test.tsx	frontend	tsx	test	94	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/CoveragePanel.tsx	frontend	tsx	frontend-component	189	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/DebugPanel.test.tsx	frontend	tsx	test	1307	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/DebugPanel.tsx	frontend	tsx	frontend-component	485	15	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/DocumentationPane.test.tsx	frontend	tsx	test	49	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/DocumentationPane.tsx	frontend	tsx	frontend-component	109	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/FindInFilesPanel.test.tsx	frontend	tsx	test	1364	14	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/FindInFilesPanel.tsx	frontend	tsx	frontend-component	1345	14	5	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/HierarchyPanel.test.tsx	frontend	tsx	test	178	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/HierarchyPanel.tsx	frontend	tsx	frontend-component	425	6	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/ProblemsPanel.test.tsx	frontend	tsx	test	267	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/ProblemsPanel.tsx	frontend	tsx	frontend-component	341	6	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/ReferencesPanel.test.tsx	frontend	tsx	test	180	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/ReferencesPanel.tsx	frontend	tsx	frontend-component	302	7	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/ReplacePreviewDialog.test.tsx	frontend	tsx	test	189	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/ReplacePreviewDialog.tsx	frontend	tsx	frontend-component	286	3	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/RunPanel.test.tsx	frontend	tsx	test	564	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/RunPanel.tsx	frontend	tsx	frontend-component	945	7	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/StructuralSearchPanel.tsx	frontend	tsx	frontend-component	231	4	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/TerminalDockPanel.test.tsx	frontend	tsx	test	275	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/TerminalDockPanel.tsx	frontend	tsx	frontend-component	317	9	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/TestsPanel.test.tsx	frontend	tsx	test	86	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/TestsPanel.tsx	frontend	tsx	frontend-component	301	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/TodosBookmarksPanel.tsx	frontend	tsx	frontend-component	236	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/ToolWindowHost.tsx	frontend	tsx	frontend-component	278	5	7	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/ToolWindowRail.test.tsx	frontend	tsx	test	118	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/ToolWindowRail.tsx	frontend	tsx	frontend-component	390	5	7	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/debug/BreakpointEditor.tsx	frontend	tsx	frontend-component	78	2	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/debug/BreakpointPopup.tsx	frontend	tsx	frontend-component	140	6	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/debug/BreakpointPropertiesPanel.tsx	frontend	tsx	frontend-component	309	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/debug/BreakpointUi.test.tsx	frontend	tsx	test	258	8	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/debug/BreakpointsDialog.tsx	frontend	tsx	frontend-component	286	9	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/debug/BreakpointsView.tsx	frontend	tsx	frontend-component	888	6	8	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/debug/DebugBreakpointsPane.tsx	frontend	tsx	frontend-component	97	7	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/debug/DebugConsolePane.test.tsx	frontend	tsx	test	199	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/debug/DebugConsolePane.tsx	frontend	tsx	frontend-component	275	4	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/debug/DebugFramesPane.test.tsx	frontend	tsx	test	176	5	0	1		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/debug/DebugFramesPane.tsx	frontend	tsx	frontend-component	330	7	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/debug/DebugMemoryPane.tsx	frontend	tsx	frontend-component	18	2	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/debug/DebugSubTabBar.test.tsx	frontend	tsx	test	55	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/debug/DebugSubTabBar.tsx	frontend	tsx	frontend-component	122	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/debug/DebugToolbar.tsx	frontend	tsx	frontend-component	230	6	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/debug/DebugVariablesPane.test.tsx	frontend	tsx	test	129	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/debug/DebugVariablesPane.tsx	frontend	tsx	frontend-component	355	6	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/debug/EvaluateExpressionDialog.tsx	frontend	tsx	frontend-component	141	6	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/debug/ExceptionBreakpointsView.tsx	frontend	tsx	frontend-component	378	5	4	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/debug/MemoryDisassemblyView.tsx	frontend	tsx	frontend-component	277	5	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/debug/VariableRow.tsx	frontend	tsx	frontend-component	180	4	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/debug/debugActionService.test.ts	frontend	ts	test	67	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/debug/debugActionService.ts	frontend	ts	frontend-feature-lib	329	2	9	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/panels/debug/debugPanelShared.tsx	frontend	tsx	frontend-component	273	3	20	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/debug/useDebugVariables.tsx	frontend	tsx	frontend-component	386	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/panels/javaTestRun.test.ts	frontend	ts	test	33	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/javaTestRun.ts	frontend	ts	frontend-feature-lib	27	1	2	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/panels/testResultTree.test.ts	frontend	ts	test	62	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/panels/testResultTree.ts	frontend	ts	frontend-feature-lib	85	2	7	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/projectAnalysisModel.test.ts	frontend	ts	test	304	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/projectAnalysisModel.ts	frontend	ts	frontend-feature-lib	444	0	17	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/projectFactsConsumers.test.ts	frontend	ts	test	208	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/projectFactsConsumers.ts	frontend	ts	frontend-feature-lib	331	4	9	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/projectStructureModel.test.ts	frontend	ts	test	294	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/projectStructureModel.ts	frontend	ts	frontend-feature-lib	527	3	20	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/projectTreeModel.test.ts	frontend	ts	test	190	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/projectTreeNavigation.ts	frontend	ts	frontend-feature-lib	58	1	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/providerUsageEvidence.test.ts	frontend	ts	test	132	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/providerUsageEvidence.ts	frontend	ts	frontend-feature-lib	167	3	9	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/rearrangeCleanupWorkflow.test.ts	frontend	ts	test	1642	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/rearrangeCleanupWorkflow.ts	frontend	ts	frontend-feature-lib	1719	5	62	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/recursiveLayoutTree.test.ts	frontend	ts	test	697	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/recursiveLayoutTree.ts	frontend	ts	frontend-feature-lib	1238	1	34	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/refactorOptions.ts	frontend	ts	frontend-feature-lib	31	0	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/refactorPlan.test.ts	frontend	ts	test	1444	11	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/refactorPlan.ts	frontend	ts	frontend-feature-lib	1523	8	53	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/refactorRecoveryController.test.ts	frontend	ts	test	569	7	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/refactorRecoveryController.ts	frontend	ts	frontend-feature-lib	610	5	13	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/referenceDocumentation.test.ts	frontend	ts	test	90	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/referenceDocumentation.ts	frontend	ts	frontend-feature-lib	121	3	10	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/referenceInfoCancellation.test.ts	frontend	ts	test	141	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/referenceInfoController.test.ts	frontend	ts	test	209	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/referenceInfoController.ts	frontend	ts	frontend-feature-lib	316	3	15	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/referenceInfoServiceV3.test.ts	frontend	ts	test	110	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/referenceInfoSession.test.ts	frontend	ts	test	206	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/referenceInfoSession.ts	frontend	ts	frontend-feature-lib	221	4	7	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/reformatWorkflow.test.ts	frontend	ts	test	74	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/reformatWorkflow.ts	frontend	ts	frontend-feature-lib	88	0	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/renderedDocCommentsExtension.test.ts	frontend	ts	test	48	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/renderedDocCommentsExtension.ts	frontend	ts	frontend-feature-lib	224	4	6	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/renderedDocCommentsModel.test.ts	frontend	ts	test	117	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/renderedDocCommentsModel.ts	frontend	ts	frontend-feature-lib	215	2	10	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/replaceInFilesModel.test.ts	frontend	ts	test	1455	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/replaceInFilesModel.ts	frontend	ts	frontend-feature-lib	872	6	38	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/runConfigurationPersistence.test.ts	frontend	ts	test	414	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/runConfigurationPersistence.ts	frontend	ts	frontend-feature-lib	615	1	21	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/runGutter.ts	frontend	ts	frontend-feature-lib	124	2	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/safeDelete.test.ts	frontend	ts	test	107	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/safeDelete.ts	frontend	ts	frontend-feature-lib	124	2	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/saveCommit.test.ts	frontend	ts	test	722	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/saveCommit.ts	frontend	ts	frontend-feature-lib	685	4	34	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/saveNormalizationPipeline.test.ts	frontend	ts	test	518	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/saveNormalizationPipeline.ts	frontend	ts	frontend-feature-lib	702	4	18	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/saveObservationContract.test.ts	frontend	ts	test	125	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/saveObservationContract.ts	frontend	ts	frontend-feature-lib	235	3	10	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/saveOrganizeImportsAdapter.test.ts	frontend	ts	test	328	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/saveOrganizeImportsAdapter.ts	frontend	ts	frontend-feature-lib	202	3	2	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/saveRaceProbe.test.ts	frontend	ts	test	253	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/saveRaceProbe.ts	frontend	ts	frontend-feature-lib	428	1	13	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/semanticQueryBehaviorCase.test.ts	frontend	ts	test	179	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/semanticQueryEnvelope.test.ts	frontend	ts	test	119	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/semanticQueryEnvelope.ts	frontend	ts	frontend-feature-lib	142	2	10	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/semanticWorkspaceEdit.test.ts	frontend	ts	test	63	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/semanticWorkspaceEdit.ts	frontend	ts	frontend-feature-lib	55	2	2	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/shellShortcutRouter.test.ts	frontend	ts	test	94	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/shellShortcutRouter.ts	frontend	ts	frontend-feature-lib	73	0	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/stickyLines.test.tsx	frontend	tsx	test	179	4	4	0		自动化测试/QA 集成测试
+src/components/editor/workspace/stickyLines.tsx	frontend	tsx	frontend-component	91	3	4	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/structuralSearchTemplates.ts	frontend	ts	frontend-feature-lib	74	0	8	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/symbolKinds.ts	frontend	ts	frontend-feature-lib	27	0	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/syntaxContext.test.ts	frontend	ts	test	47	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/syntaxContext.ts	frontend	ts	frontend-feature-lib	64	2	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/threeWayMerge.test.ts	frontend	ts	test	55	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/threeWayMerge.ts	frontend	ts	frontend-feature-lib	185	0	2	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/todoBookmarks.test.ts	frontend	ts	test	256	2	1	0		自动化测试/QA 集成测试
+src/components/editor/workspace/todoBookmarks.ts	frontend	ts	frontend-feature-lib	365	0	23	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/toolWindowLayout.ts	frontend	ts	frontend-feature-lib	212	0	28	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/toolWindowRegistry.test.ts	frontend	ts	test	136	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/toolWindowRegistry.ts	frontend	ts	frontend-feature-lib	167	0	13	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/toolWindowStripeStore.ts	frontend	ts	frontend-feature-lib	34	2	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/treeToolbarChrome.test.ts	frontend	ts	test	51	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/treeToolbarChrome.ts	frontend	ts	frontend-feature-lib	88	0	12	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/usageQuerySession.test.ts	frontend	ts	test	276	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/usageQuerySession.ts	frontend	ts	frontend-feature-lib	551	4	20	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/useCodeDebugSession.test.tsx	frontend	tsx	test	2216	4	0	0	medium	自动化测试/QA 集成测试
+src/components/editor/workspace/useCodeDebugSession.ts	frontend	ts	frontend-feature-lib	3313	7	10	0	medium	前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/useDeferredGitLineChanges.test.tsx	frontend	tsx	test	153	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/useDeferredGitLineChanges.ts	frontend	ts	frontend-feature-lib	184	3	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/useDeferredOpenFileTodos.test.tsx	frontend	tsx	test	37	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/useDeferredOpenFileTodos.ts	frontend	ts	frontend-feature-lib	46	2	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/useFocusReturn.ts	frontend	ts	frontend-feature-lib	68	2	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/useLatestHandlers.test.tsx	frontend	tsx	test	62	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/useLatestHandlers.ts	frontend	ts	frontend-feature-lib	40	1	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/useStructuralSearchSession.ts	frontend	ts	frontend-feature-lib	258	3	8	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/useToolWindowLayout.ts	frontend	ts	frontend-feature-lib	275	3	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/useWorkspaceActionsController.test.tsx	frontend	tsx	test	151	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/useWorkspaceActionsController.ts	frontend	ts	frontend-feature-lib	227	4	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/useWorkspaceFileActions.test.tsx	frontend	tsx	test	367	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/useWorkspaceFileActions.ts	frontend	ts	frontend-feature-lib	750	11	2	1		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/useWorkspaceGitSnapshots.test.tsx	frontend	tsx	test	236	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/useWorkspaceGitSnapshots.ts	frontend	ts	frontend-feature-lib	318	6	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/useWorkspaceLspClientEvents.test.ts	frontend	ts	test	222	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/useWorkspaceLspClientEvents.ts	frontend	ts	frontend-feature-lib	309	3	6	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/useWorkspaceLspSession.test.tsx	frontend	tsx	test	843	9	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/useWorkspaceLspSession.ts	frontend	ts	frontend-feature-lib	928	8	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/useWorkspaceNavigation.test.tsx	frontend	tsx	test	387	7	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/useWorkspaceNavigation.ts	frontend	ts	frontend-feature-lib	473	7	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/useWorkspaceProjectAnalysis.ts	frontend	ts	frontend-feature-lib	259	5	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/useWorkspaceSemanticIndex.test.tsx	frontend	tsx	test	88	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/useWorkspaceSemanticIndex.ts	frontend	ts	frontend-feature-lib	165	2	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/useWorkspaceTreeData.test.tsx	frontend	tsx	test	184	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/useWorkspaceTreeData.ts	frontend	ts	frontend-feature-lib	274	4	2	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/windowResizeSession.test.ts	frontend	ts	test	53	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/windowResizeSession.ts	frontend	ts	frontend-feature-lib	55	0	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceActionHost.test.ts	frontend	ts	test	545	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceActionHost.ts	frontend	ts	frontend-feature-lib	1483	5	18	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceActionHostKeymap.test.ts	frontend	ts	test	341	6	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceActionRegistry.test.ts	frontend	ts	test	226	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceActionRegistry.ts	frontend	ts	frontend-feature-lib	1645	2	18	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceChrome.test.tsx	frontend	tsx	test	267	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceChrome.tsx	frontend	tsx	frontend-component	117	5	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/editor/workspace/workspaceClipboardHistory.test.ts	frontend	ts	test	279	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceClipboardPastePlan.test.ts	frontend	ts	test	62	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceClipboardSession.test.ts	frontend	ts	test	698	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceClipboardSession.ts	frontend	ts	frontend-feature-lib	826	4	29	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceCodeMirrorKeymap.ts	frontend	ts	frontend-feature-lib	936	9	12	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceCodeStyleScheme.ts	frontend	ts	frontend-feature-lib	416	0	27	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceCodeStyleSchemes.test.ts	frontend	ts	test	266	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceCodeStyleSchemes.ts	frontend	ts	frontend-feature-lib	283	2	16	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceCommands.test.ts	frontend	ts	test	176	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceCommands.ts	frontend	ts	frontend-feature-lib	191	4	13	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceCopyReference.test.ts	frontend	ts	test	110	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceCopyReference.ts	frontend	ts	frontend-feature-lib	97	0	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceDocumentTransactionOwner.test.ts	frontend	ts	test	508	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceDocumentTransactionOwner.ts	frontend	ts	frontend-feature-lib	557	1	13	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceEditApply.test.ts	frontend	ts	test	1395	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceEditApply.ts	frontend	ts	frontend-feature-lib	876	5	19	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceEditHistory.test.ts	frontend	ts	test	172	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceEditHistory.ts	frontend	ts	frontend-feature-lib	269	2	11	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceEditPreview.test.ts	frontend	ts	test	133	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceEditPreview.ts	frontend	ts	frontend-feature-lib	290	1	8	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceEditorCommands.test.ts	frontend	ts	test	751	8	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceEditorCommands.ts	frontend	ts	frontend-feature-lib	1225	10	50	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceKeymapPlatform.test.ts	frontend	ts	test	67	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceKeymapPlatform.ts	frontend	ts	frontend-feature-lib	215	2	11	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceKeymapRuntime.test.ts	frontend	ts	test	392	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceKeymapScheme.test.ts	frontend	ts	test	197	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceKeymapScheme.ts	frontend	ts	frontend-feature-lib	537	1	36	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceLayoutPersistence.test.ts	frontend	ts	test	458	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceLayoutPersistence.ts	frontend	ts	frontend-feature-lib	707	6	31	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceLayoutV2.test.ts	frontend	ts	test	130	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceLspSessionManager.test.ts	frontend	ts	test	93	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceLspSessionManager.ts	frontend	ts	frontend-feature-lib	40	2	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceMouseDispatcher.test.ts	frontend	ts	test	117	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceMouseDispatcher.ts	frontend	ts	frontend-feature-lib	82	2	2	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceMultiViewState.test.ts	frontend	ts	test	234	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceMultiViewState.ts	frontend	ts	frontend-feature-lib	124	3	5	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceNavigationBar.ts	frontend	ts	frontend-feature-lib	32	3	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceObservationBridge.test.ts	frontend	ts	test	142	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceObservationBridge.ts	frontend	ts	frontend-feature-lib	270	1	7	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceRecovery.test.ts	frontend	ts	test	277	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceRecovery.ts	frontend	ts	frontend-feature-lib	512	3	19	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceResourceRecoveryCoordinator.test.ts	frontend	ts	test	217	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceResourceRecoveryCoordinator.ts	frontend	ts	frontend-feature-lib	399	0	9	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceResourceState.test.ts	frontend	ts	test	54	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceResourceState.ts	frontend	ts	frontend-feature-lib	115	2	6	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceRestoreModel.test.ts	frontend	ts	test	192	4	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceRestoreModel.ts	frontend	ts	frontend-feature-lib	170	3	8	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceSemanticEditing.test.ts	frontend	ts	test	260	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceSemanticEditing.ts	frontend	ts	frontend-feature-lib	465	3	17	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceSemanticIndex.test.ts	frontend	ts	test	168	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceSemanticIndex.ts	frontend	ts	frontend-feature-lib	315	0	23	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceSemanticQueryHost.test.ts	frontend	ts	test	383	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceSemanticQueryHost.ts	frontend	ts	frontend-feature-lib	503	1	10	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceStyleController.test.ts	frontend	ts	test	512	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceStyleController.ts	frontend	ts	frontend-feature-lib	598	7	9	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceSyntaxFacts.test.ts	frontend	ts	test	95	5	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceSyntaxFacts.ts	frontend	ts	frontend-feature-lib	128	5	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceTabPolicy.test.ts	frontend	ts	test	590	3	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceTabPolicy.ts	frontend	ts	frontend-feature-lib	854	1	31	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/workspaceTabPolicyV3.test.ts	frontend	ts	test	78	2	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceVirtualSpace.test.ts	frontend	ts	test	1382	9	0	0		自动化测试/QA 集成测试
+src/components/editor/workspace/workspaceVirtualSpace.ts	frontend	ts	frontend-feature-lib	813	4	42	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/editor/workspace/writeDiskByteCorrectness.test.ts	frontend	ts	test	561	8	0	0		自动化测试/QA 集成测试
+src/components/filebrowser/ChmodDialog.test.tsx	frontend	tsx	test	144	5	0	0		自动化测试/QA 集成测试
+src/components/filebrowser/ChmodDialog.tsx	frontend	tsx	frontend-component	231	3	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/filebrowser/FileBrowser.tsx	frontend	tsx	frontend-component	1249	25	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/filebrowser/FilePanel.tsx	frontend	tsx	frontend-component	1037	11	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/filebrowser/FilePanelPathCompletion.test.tsx	frontend	tsx	test	104	8	0	0		自动化测试/QA 集成测试
+src/components/filebrowser/FileToolbar.tsx	frontend	tsx	frontend-component	275	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/filebrowser/FileToolbarWiring.test.tsx	frontend	tsx	test	937	11	0	0		自动化测试/QA 集成测试
+src/components/filebrowser/FileTransferQueue.tsx	frontend	tsx	frontend-component	427	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/filebrowser/LocalFileBrowserPanel.tsx	frontend	tsx	frontend-component	260	10	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/filebrowser/PathBreadcrumb.test.tsx	frontend	tsx	test	161	4	0	0		自动化测试/QA 集成测试
+src/components/filebrowser/PathBreadcrumb.tsx	frontend	tsx	frontend-component	174	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/filebrowser/PathCompletionInput.tsx	frontend	tsx	frontend-component	178	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/filebrowser/PathMappingsEditor.tsx	frontend	tsx	frontend-component	298	4	4	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/filebrowser/SftpDetachedWindow.tsx	frontend	tsx	frontend-component	309	7	9	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/filebrowser/SftpPolish.test.tsx	frontend	tsx	test	578	14	0	0		自动化测试/QA 集成测试
+src/components/filebrowser/SftpSidebar.tsx	frontend	tsx	frontend-component	58	2	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/floating-toolbar/floatingToolbarStyles.ts	frontend	ts	frontend-feature-lib	60	1	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/git/ChangesTree.tsx	frontend	tsx	frontend-component	273	4	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/git/CommitLog.test.tsx	frontend	tsx	test	122	4	0	0		自动化测试/QA 集成测试
+src/components/git/CommitLog.tsx	frontend	tsx	frontend-component	381	8	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/git/CompareView.tsx	frontend	tsx	frontend-component	142	5	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/git/DiffViewer.eol.test.tsx	frontend	tsx	test	88	5	0	0		自动化测试/QA 集成测试
+src/components/git/DiffViewer.tsx	frontend	tsx	frontend-component	1577	9	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/git/DiffViewer.viewport.test.tsx	frontend	tsx	test	488	5	0	0		自动化测试/QA 集成测试
+src/components/git/GitLogResize.integration.test.tsx	frontend	tsx	test	310	4	0	0		自动化测试/QA 集成测试
+src/components/git/GitPanel.test.tsx	frontend	tsx	test	430	6	0	0		自动化测试/QA 集成测试
+src/components/git/GitPanel.tsx	frontend	tsx	frontend-component	2076	17	1	0	medium	React UI/交互组件，具体职责由目录和文件名定义
+src/components/git/WorkspaceChangesView.tsx	frontend	tsx	frontend-component	824	12	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/git/WorkspaceCommitLog.test.tsx	frontend	tsx	test	122	4	0	0		自动化测试/QA 集成测试
+src/components/git/WorkspaceCommitLog.tsx	frontend	tsx	frontend-component	459	10	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/git/WorkspaceGitManager.parity008.test.tsx	frontend	tsx	test	257	6	0	0		自动化测试/QA 集成测试
+src/components/git/WorkspaceGitManager.test.tsx	frontend	tsx	test	827	5	0	0		自动化测试/QA 集成测试
+src/components/git/WorkspaceGitManager.tsx	frontend	tsx	frontend-component	2500	18	2	0	medium	React UI/交互组件，具体职责由目录和文件名定义
+src/components/git/diffLanguage.ts	frontend	ts	frontend-feature-lib	67	17	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/git/shared/BranchFilterSelect.test.tsx	frontend	tsx	test	61	3	0	0		自动化测试/QA 集成测试
+src/components/git/shared/BranchFilterSelect.tsx	frontend	tsx	frontend-component	171	3	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/git/shared/ChangesListToolbar.tsx	frontend	tsx	frontend-component	454	4	8	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/git/shared/CommitBar.tsx	frontend	tsx	frontend-component	103	2	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/git/shared/CommitMessageHover.test.tsx	frontend	tsx	test	77	3	0	0		自动化测试/QA 集成测试
+src/components/git/shared/CommitMessageHover.tsx	frontend	tsx	frontend-component	212	2	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/git/shared/DiffPane.tsx	frontend	tsx	frontend-component	134	3	4	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/git/workspaceGitKeys.test.ts	frontend	ts	test	47	2	0	0		自动化测试/QA 集成测试
+src/components/git/workspaceGitKeys.ts	frontend	ts	frontend-feature-lib	34	0	4	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/lanchat/Avatar.tsx	frontend	tsx	frontend-component	75	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/lanchat/CallOverlay.tsx	frontend	tsx	frontend-component	432	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/lanchat/EdgeDrawer.tsx	frontend	tsx	frontend-component	425	10	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/lanchat/GroupCreateDialog.tsx	frontend	tsx	frontend-component	109	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/lanchat/IncomingOfferModal.tsx	frontend	tsx	frontend-component	76	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/lanchat/LanChatConversationUi.test.tsx	frontend	tsx	test	334	8	0	0		自动化测试/QA 集成测试
+src/components/lanchat/LanChatGate.test.tsx	frontend	tsx	test	86	3	0	0		自动化测试/QA 集成测试
+src/components/lanchat/LanChatGate.tsx	frontend	tsx	frontend-component	146	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/lanchat/LanChatPanel.tsx	frontend	tsx	frontend-component	902	22	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/lanchat/MessageInput.tsx	frontend	tsx	frontend-component	278	7	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/lanchat/MessageThread.tsx	frontend	tsx	frontend-component	213	7	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/lanchat/PrivacySettings.tsx	frontend	tsx	frontend-component	196	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/lanchat/ProfileEditor.tsx	frontend	tsx	frontend-component	161	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/lanchat/RosterList.tsx	frontend	tsx	frontend-component	182	5	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/lanchat/SecurityAlertBanner.tsx	frontend	tsx	frontend-component	58	2	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/lanchat/TransferPanel.tsx	frontend	tsx	frontend-component	438	4	6	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/lanchat/util.ts	frontend	ts	frontend-feature-lib	93	1	6	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/lanchat/whiteboard/Whiteboard.tsx	frontend	tsx	frontend-component	283	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/lanchat/whiteboard/WhiteboardOverlay.tsx	frontend	tsx	frontend-component	87	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mail/MailAddressBookPanel.test.tsx	frontend	tsx	test	104	6	0	0		自动化测试/QA 集成测试
+src/components/mail/MailAddressBookPanel.tsx	frontend	tsx	frontend-component	303	6	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mail/MailAgendaPanel.test.tsx	frontend	tsx	test	52	5	0	0		自动化测试/QA 集成测试
+src/components/mail/MailAgendaPanel.tsx	frontend	tsx	frontend-component	115	4	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mail/MailAppearanceSettings.test.tsx	frontend	tsx	test	50	5	0	0		自动化测试/QA 集成测试
+src/components/mail/MailAppearanceSettings.tsx	frontend	tsx	frontend-component	332	10	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mail/MailArchiveDialog.test.tsx	frontend	tsx	test	73	4	0	0		自动化测试/QA 集成测试
+src/components/mail/MailArchiveDialog.tsx	frontend	tsx	frontend-component	193	5	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mail/MailArchivePanel.test.tsx	frontend	tsx	test	126	4	3	0		自动化测试/QA 集成测试
+src/components/mail/MailArchivePanel.tsx	frontend	tsx	frontend-component	63	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mail/MailClientTab.test.tsx	frontend	tsx	test	1888	13	1	0		自动化测试/QA 集成测试
+src/components/mail/MailClientTab.tsx	frontend	tsx	frontend-component	6946	51	2	0	high	邮件主界面：文件夹/消息列表、阅读器、线程、搜索、草稿、附件、变更操作和轮询
+src/components/mail/MailFiltersPanel.test.tsx	frontend	tsx	test	132	5	0	0		自动化测试/QA 集成测试
+src/components/mail/MailFiltersPanel.tsx	frontend	tsx	frontend-component	489	6	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mail/MailHtmlReader.test.tsx	frontend	tsx	test	36	3	0	0		自动化测试/QA 集成测试
+src/components/mail/MailHtmlReader.tsx	frontend	tsx	frontend-component	206	2	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mail/MailMessageBodyView.test.tsx	frontend	tsx	test	72	3	0	0		自动化测试/QA 集成测试
+src/components/mail/MailMessageBodyView.tsx	frontend	tsx	frontend-component	320	4	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mail/MailStorageSettings.test.tsx	frontend	tsx	test	96	5	0	0		自动化测试/QA 集成测试
+src/components/mail/MailStorageSettings.tsx	frontend	tsx	frontend-component	96	4	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mail/MailTextReader.tsx	frontend	tsx	frontend-component	112	2	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mail/MailUnifiedTab.test.tsx	frontend	tsx	test	128	5	0	0		自动化测试/QA 集成测试
+src/components/mail/MailUnifiedTab.tsx	frontend	tsx	frontend-component	395	6	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mail/RecipientField.test.tsx	frontend	tsx	test	104	5	0	0		自动化测试/QA 集成测试
+src/components/mail/RecipientField.tsx	frontend	tsx	frontend-component	229	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mail/RichMailEditor.test.tsx	frontend	tsx	test	413	3	0	0		自动化测试/QA 集成测试
+src/components/mail/RichMailEditor.tsx	frontend	tsx	frontend-component	732	8	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/menubar/commands.ts	frontend	ts	frontend-feature-lib	32	0	1	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/menubar/useSessionImportExport.tsx	frontend	tsx	frontend-component	224	12	4	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mfa/MfaAccountRow.tsx	frontend	tsx	frontend-component	267	8	4	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mfa/MfaAddDialog.test.tsx	frontend	tsx	test	90	7	0	0		自动化测试/QA 集成测试
+src/components/mfa/MfaAddDialog.tsx	frontend	tsx	frontend-component	124	9	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mfa/MfaCameraPane.tsx	frontend	tsx	frontend-component	178	6	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mfa/MfaCountdown.tsx	frontend	tsx	frontend-component	49	1	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mfa/MfaEditDialog.test.tsx	frontend	tsx	test	34	4	0	0		自动化测试/QA 集成测试
+src/components/mfa/MfaEditDialog.tsx	frontend	tsx	frontend-component	109	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mfa/MfaImagePane.tsx	frontend	tsx	frontend-component	153	7	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mfa/MfaImportPreview.tsx	frontend	tsx	frontend-component	168	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mfa/MfaPanel.test.tsx	frontend	tsx	test	167	6	1	0		自动化测试/QA 集成测试
+src/components/mfa/MfaPanel.tsx	frontend	tsx	frontend-component	393	15	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mfa/MfaQrDialog.test.tsx	frontend	tsx	test	105	7	0	0		自动化测试/QA 集成测试
+src/components/mfa/MfaQrDialog.tsx	frontend	tsx	frontend-component	242	9	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mfa/MfaScreenPane.tsx	frontend	tsx	frontend-component	65	7	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mfa/MfaSecretForm.tsx	frontend	tsx	frontend-component	201	8	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/mfa/MfaTab.tsx	frontend	tsx	frontend-component	20	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/notes/FloatingNotesPanel.test.tsx	frontend	tsx	test	141	5	0	0		自动化测试/QA 集成测试
+src/components/notes/FloatingNotesPanel.tsx	frontend	tsx	frontend-component	192	9	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/notes/NoteDateTimeField.test.tsx	frontend	tsx	test	72	4	0	0		自动化测试/QA 集成测试
+src/components/notes/NoteDateTimeField.tsx	frontend	tsx	frontend-component	459	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/notes/NoteEditor.tsx	frontend	tsx	frontend-component	568	13	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/notes/NoteFilters.tsx	frontend	tsx	frontend-component	161	4	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/notes/NoteLinkText.tsx	frontend	tsx	frontend-component	22	2	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/notes/NoteThemeSettings.tsx	frontend	tsx	frontend-component	161	9	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/notes/NotesDetachedWindow.tsx	frontend	tsx	frontend-component	157	11	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/notes/NotesList.tsx	frontend	tsx	frontend-component	93	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/notes/NotesPanel.test.tsx	frontend	tsx	test	278	4	0	0		自动化测试/QA 集成测试
+src/components/notes/NotesPanel.tsx	frontend	tsx	frontend-component	191	10	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/notes/NotesSelect.test.tsx	frontend	tsx	test	76	3	0	0		自动化测试/QA 集成测试
+src/components/notes/NotesSelect.tsx	frontend	tsx	frontend-component	148	2	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/objectstorage/ObjectStorageBrowser.tsx	frontend	tsx	frontend-component	247	12	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/proxy/ProxyTestTab.tsx	frontend	tsx	frontend-component	83	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/quickconnect/QuickConnect.tsx	frontend	tsx	frontend-component	121	7	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/rdp/RdpConnectionBar.test.tsx	frontend	tsx	test	137	4	0	0		自动化测试/QA 集成测试
+src/components/rdp/RdpConnectionBar.tsx	frontend	tsx	frontend-component	267	4	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/rdp/RdpPanel.test.tsx	frontend	tsx	test	212	7	0	0		自动化测试/QA 集成测试
+src/components/rdp/RdpPanel.tsx	frontend	tsx	frontend-component	1128	14	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/recovery/RecoveryBackgroundStatus.test.tsx	frontend	tsx	test	54	3	0	0		自动化测试/QA 集成测试
+src/components/recovery/RecoveryBackgroundStatus.tsx	frontend	tsx	frontend-component	54	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/recovery/RecoveryTerminalOutput.tsx	frontend	tsx	frontend-component	36	2	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/recovery/RecoveryWorkspace.test.tsx	frontend	tsx	test	80	5	0	0		自动化测试/QA 集成测试
+src/components/recovery/RecoveryWorkspace.tsx	frontend	tsx	frontend-component	64	6	1	1		React UI/交互组件，具体职责由目录和文件名定义
+src/components/screenshot/AnnotationCanvas.test.ts	frontend	ts	test	249	4	1	0		自动化测试/QA 集成测试
+src/components/screenshot/AnnotationCanvas.tsx	frontend	tsx	frontend-component	1194	4	29	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/screenshot/AnnotationEraser.test.ts	frontend	ts	test	56	2	0	0		自动化测试/QA 集成测试
+src/components/screenshot/ImageEditPanel.tsx	frontend	tsx	frontend-component	61	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/screenshot/PinBoard.tsx	frontend	tsx	frontend-component	74	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/screenshot/PinToolsWindow.test.tsx	frontend	tsx	test	95	4	0	0		自动化测试/QA 集成测试
+src/components/screenshot/PinToolsWindow.tsx	frontend	tsx	frontend-component	140	7	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/screenshot/PinnedImage.test.tsx	frontend	tsx	test	233	3	0	0		自动化测试/QA 集成测试
+src/components/screenshot/PinnedImage.tsx	frontend	tsx	frontend-component	279	9	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/screenshot/RecorderBar.test.tsx	frontend	tsx	test	450	4	0	0		自动化测试/QA 集成测试
+src/components/screenshot/RecorderBar.tsx	frontend	tsx	frontend-component	383	8	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/screenshot/ScreenshotFavorites.test.tsx	frontend	tsx	test	72	5	0	0		自动化测试/QA 集成测试
+src/components/screenshot/ScreenshotFavorites.tsx	frontend	tsx	frontend-component	88	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/screenshot/ScreenshotMenuButton.tsx	frontend	tsx	frontend-component	156	7	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/screenshot/ScreenshotOverlay.test.tsx	frontend	tsx	test	511	4	5	0		自动化测试/QA 集成测试
+src/components/screenshot/ScreenshotOverlay.tsx	frontend	tsx	frontend-component	1748	18	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/screenshot/ScreenshotQaFixture.tsx	frontend	tsx	frontend-component	179	1	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/screenshot/ScrollCaptureBar.test.tsx	frontend	tsx	test	63	3	0	0		自动化测试/QA 集成测试
+src/components/screenshot/ScrollCaptureBar.tsx	frontend	tsx	frontend-component	92	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/screenshot/ScrollCaptureResult.test.tsx	frontend	tsx	test	34	3	0	0		自动化测试/QA 集成测试
+src/components/screenshot/ScrollCaptureResult.tsx	frontend	tsx	frontend-component	163	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/CommonSettings.tsx	frontend	tsx	frontend-component	79	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/RdpServerApprovalBridge.test.tsx	frontend	tsx	test	82	4	0	0		自动化测试/QA 集成测试
+src/components/servers/RdpServerApprovalBridge.tsx	frontend	tsx	frontend-component	86	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/ServerList.tsx	frontend	tsx	frontend-component	43	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/ServerOutputLog.tsx	frontend	tsx	frontend-component	88	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/ServerRow.tsx	frontend	tsx	frontend-component	126	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/ServerSettings.tsx	frontend	tsx	frontend-component	86	16	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/ServersDialog.tsx	frontend	tsx	frontend-component	235	11	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/fields.tsx	frontend	tsx	frontend-component	377	2	19	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/settings/CronSettings.tsx	frontend	tsx	frontend-component	41	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/settings/FtpSettings.tsx	frontend	tsx	frontend-component	41	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/settings/HttpSettings.tsx	frontend	tsx	frontend-component	41	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/settings/IperfSettings.tsx	frontend	tsx	frontend-component	44	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/settings/NfsSettings.tsx	frontend	tsx	frontend-component	41	3	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/settings/RdpSettings.test.tsx	frontend	tsx	test	120	4	0	0		自动化测试/QA 集成测试
+src/components/servers/settings/RdpSettings.tsx	frontend	tsx	frontend-component	285	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/settings/SshSettings.tsx	frontend	tsx	frontend-component	112	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/settings/SystemRdpCard.tsx	frontend	tsx	frontend-component	126	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/settings/TelnetSettings.tsx	frontend	tsx	frontend-component	40	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/settings/TftpSettings.tsx	frontend	tsx	frontend-component	34	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/servers/settings/VncSettings.tsx	frontend	tsx	frontend-component	39	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/session/AuthPrompt.tsx	frontend	tsx	frontend-component	105	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/session/ExternalVaultUnlockDialog.tsx	frontend	tsx	frontend-component	155	2	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/session/MailIdentitiesEditor.tsx	frontend	tsx	frontend-component	83	2	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/session/MfaPrompt.test.tsx	frontend	tsx	test	99	5	0	0		自动化测试/QA 集成测试
+src/components/session/MfaPrompt.tsx	frontend	tsx	frontend-component	127	4	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/session/ObjectStorageSettings.tsx	frontend	tsx	frontend-component	354	6	6	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/session/SessionConnectionCommandMenu.tsx	frontend	tsx	frontend-component	107	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/session/SessionEditor.test.tsx	frontend	tsx	test	1714	7	0	0		自动化测试/QA 集成测试
+src/components/session/SessionEditor.tsx	frontend	tsx	frontend-component	5296	39	1	0	high	会话编辑器及 SSH/本地/串口/RDP/VNC/数据库/HBase/邮件/对象存储等表单
+src/components/session/SessionImportPreview.test.tsx	frontend	tsx	test	146	6	0	0		自动化测试/QA 集成测试
+src/components/session/SessionImportPreview.tsx	frontend	tsx	frontend-component	251	5	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/session/SessionTerminalThemeMenu.tsx	frontend	tsx	frontend-component	126	10	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/session/forms/LocalShellOptionsForm.tsx	frontend	tsx	frontend-component	155	5	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/session/forms/RdpOptionsForm.tsx	frontend	tsx	frontend-component	350	2	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/session/forms/WslOptionsForm.tsx	frontend	tsx	frontend-component	188	4	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/AcpAgentsPanel.test.tsx	frontend	tsx	test	176	5	0	0		自动化测试/QA 集成测试
+src/components/settings/AcpAgentsPanel.tsx	frontend	tsx	frontend-component	475	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/AcpProxyFields.tsx	frontend	tsx	frontend-component	120	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/AgentCustomConfigGate.test.tsx	frontend	tsx	test	165	6	0	0		自动化测试/QA 集成测试
+src/components/settings/AiMasterSwitch.tsx	frontend	tsx	frontend-component	62	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/AiShellPanel.tsx	frontend	tsx	frontend-component	163	8	1	1		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/AppProxyPanel.test.tsx	frontend	tsx	test	21	3	0	0		自动化测试/QA 集成测试
+src/components/settings/AppProxyPanel.tsx	frontend	tsx	frontend-component	406	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/AppThemeSwitcher.test.tsx	frontend	tsx	test	41	5	0	0		自动化测试/QA 集成测试
+src/components/settings/AppThemeSwitcher.tsx	frontend	tsx	frontend-component	80	6	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/AsrPanel.test.tsx	frontend	tsx	test	268	4	0	0		自动化测试/QA 集成测试
+src/components/settings/AsrPanel.tsx	frontend	tsx	frontend-component	332	10	1	5		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/BackupSettingsPanel.test.tsx	frontend	tsx	test	277	5	0	0		自动化测试/QA 集成测试
+src/components/settings/BackupSettingsPanel.tsx	frontend	tsx	frontend-component	903	10	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/ChatHistoryPanel.tsx	frontend	tsx	frontend-component	121	5	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/ChatOutputFormatPanel.tsx	frontend	tsx	frontend-component	71	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/ChatSendShortcutPanel.tsx	frontend	tsx	frontend-component	68	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/ClaudeCodePanel.tsx	frontend	tsx	frontend-component	353	9	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/ClaudeCodeSettingsDialog.tsx	frontend	tsx	frontend-component	679	8	1	3		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/CodeViewAppearanceSettings.tsx	frontend	tsx	frontend-component	294	11	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/CodexCodeConfigDialog.tsx	frontend	tsx	frontend-component	464	8	1	4		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/CodexCodePanel.tsx	frontend	tsx	frontend-component	303	8	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/CodexProxyFields.tsx	frontend	tsx	frontend-component	97	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/EditorAiLanguagePanel.test.tsx	frontend	tsx	test	46	4	0	0		自动化测试/QA 集成测试
+src/components/settings/EditorAiLanguagePanel.tsx	frontend	tsx	frontend-component	72	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/GoProviderFields.test.tsx	frontend	tsx	test	21	5	0	0		自动化测试/QA 集成测试
+src/components/settings/GoProviderFields.tsx	frontend	tsx	frontend-component	42	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/GoProxyFields.test.tsx	frontend	tsx	test	43	5	0	0		自动化测试/QA 集成测试
+src/components/settings/GoProxyFields.tsx	frontend	tsx	frontend-component	37	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/LanChatSettings.tsx	frontend	tsx	frontend-component	65	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/LanguageSection.tsx	frontend	tsx	frontend-component	53	1	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/LanguageServersSettings.test.tsx	frontend	tsx	test	371	4	0	0		自动化测试/QA 集成测试
+src/components/settings/LanguageServersSettings.tsx	frontend	tsx	frontend-component	802	9	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/LiveTemplatesSettings.test.tsx	frontend	tsx	test	79	5	0	0		自动化测试/QA 集成测试
+src/components/settings/LiveTemplatesSettings.tsx	frontend	tsx	frontend-component	542	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/LlmProvidersPanel.tsx	frontend	tsx	frontend-component	592	11	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/ModelInspectorPanel.test.tsx	frontend	tsx	test	173	9	0	0		自动化测试/QA 集成测试
+src/components/settings/ModelInspectorPanel.tsx	frontend	tsx	frontend-component	101	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/ModelsAdvancedPanel.tsx	frontend	tsx	frontend-component	184	4	1	2		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/PrivacyToggle.tsx	frontend	tsx	frontend-component	86	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/RemoteBackupPanel.test.tsx	frontend	tsx	test	117	5	0	0		自动化测试/QA 集成测试
+src/components/settings/RemoteBackupPanel.tsx	frontend	tsx	frontend-component	222	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/ScreenshotSettings.test.tsx	frontend	tsx	test	213	5	0	0		自动化测试/QA 集成测试
+src/components/settings/ScreenshotSettings.tsx	frontend	tsx	frontend-component	141	7	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/SdkSettings.test.tsx	frontend	tsx	test	157	5	0	0		自动化测试/QA 集成测试
+src/components/settings/SdkSettings.tsx	frontend	tsx	frontend-component	450	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/SettingsPanel.test.tsx	frontend	tsx	test	320	9	0	0		自动化测试/QA 集成测试
+src/components/settings/SettingsPanel.tsx	frontend	tsx	frontend-component	934	42	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/SftpSettings.test.tsx	frontend	tsx	test	50	4	0	0		自动化测试/QA 集成测试
+src/components/settings/SftpSettings.tsx	frontend	tsx	frontend-component	228	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/SqlCompletionSettings.test.tsx	frontend	tsx	test	73	6	0	0		自动化测试/QA 集成测试
+src/components/settings/SqlCompletionSettings.tsx	frontend	tsx	frontend-component	176	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/SqlExecutionSettings.test.tsx	frontend	tsx	test	80	6	0	0		自动化测试/QA 集成测试
+src/components/settings/SqlExecutionSettings.tsx	frontend	tsx	frontend-component	192	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/WebSearchPanel.tsx	frontend	tsx	frontend-component	190	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/settings/settingsSearch.test.ts	frontend	ts	test	53	2	0	0		自动化测试/QA 集成测试
+src/components/settings/settingsSearch.ts	frontend	ts	frontend-feature-lib	358	1	11	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/sidebar/ConfirmDialog.tsx	frontend	tsx	frontend-component	517	2	15	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/sidebar/FolderNameDialog.tsx	frontend	tsx	frontend-component	126	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/sidebar/SessionTree.test.tsx	frontend	tsx	test	506	6	0	0		自动化测试/QA 集成测试
+src/components/sidebar/SessionTree.tsx	frontend	tsx	frontend-component	1964	23	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/sidebar/Sidebar.test.tsx	frontend	tsx	test	156	7	0	0		自动化测试/QA 集成测试
+src/components/sidebar/Sidebar.tsx	frontend	tsx	frontend-component	385	14	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/sockscap/SocksCapMacosSetupGuide.tsx	frontend	tsx	frontend-component	322	4	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/sockscap/SocksCapPanel.test.tsx	frontend	tsx	test	1274	8	6	0		自动化测试/QA 集成测试
+src/components/sockscap/SocksCapPanel.tsx	frontend	tsx	frontend-component	4285	13	2	0	medium	SocksCap 配置、运行状态、进程启动、日志、诊断、恢复和平台能力 UI
+src/components/sockscap/SocksCapRootPrompt.test.tsx	frontend	tsx	test	57	3	0	0		自动化测试/QA 集成测试
+src/components/sockscap/SocksCapRootPrompt.tsx	frontend	tsx	frontend-component	135	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/sockscap/UpstreamSourcePicker.test.tsx	frontend	tsx	test	211	4	0	0		自动化测试/QA 集成测试
+src/components/sockscap/UpstreamSourcePicker.tsx	frontend	tsx	frontend-component	560	5	4	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/statusbar/StatusBar.test.tsx	frontend	tsx	test	329	6	0	0		自动化测试/QA 集成测试
+src/components/statusbar/StatusBar.tsx	frontend	tsx	frontend-component	544	10	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/tabbar/ControlBar.test.tsx	frontend	tsx	test	184	5	0	0		自动化测试/QA 集成测试
+src/components/tabbar/ControlBar.tsx	frontend	tsx	frontend-component	346	19	6	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/tabbar/OpenTabsMenu.tsx	frontend	tsx	frontend-component	409	11	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/tabbar/TabActionSlot.tsx	frontend	tsx	frontend-component	45	2	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/tabbar/TabBar.test.tsx	frontend	tsx	test	404	10	0	0		自动化测试/QA 集成测试
+src/components/tabbar/TabBar.tsx	frontend	tsx	frontend-component	942	14	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/tabbar/TabDetailsOverlay.tsx	frontend	tsx	frontend-component	195	7	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/tao/TaoAlertInbox.tsx	frontend	tsx	frontend-component	268	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/tao/TaoAlertPoller.tsx	frontend	tsx	frontend-component	23	2	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/tao/TaoRibbon.tsx	frontend	tsx	frontend-component	12	0	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/terminal/AiRewriteOverlay.tsx	frontend	tsx	frontend-component	151	6	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/terminal/CommonCommandsPalette.test.tsx	frontend	tsx	test	197	5	0	0		自动化测试/QA 集成测试
+src/components/terminal/CommonCommandsPalette.tsx	frontend	tsx	frontend-component	274	5	7	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/terminal/FontPickerPanel.test.tsx	frontend	tsx	test	62	4	0	0		自动化测试/QA 集成测试
+src/components/terminal/FontPickerPanel.tsx	frontend	tsx	frontend-component	312	4	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/terminal/MultiExecBar.tsx	frontend	tsx	frontend-component	514	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/terminal/SelectionToolbar.tsx	frontend	tsx	frontend-component	101	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/terminal/TerminalAppearanceMenuPanel.tsx	frontend	tsx	frontend-component	216	5	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/terminal/TerminalAppearanceSettings.test.tsx	frontend	tsx	test	167	7	0	0		自动化测试/QA 集成测试
+src/components/terminal/TerminalAppearanceSettings.tsx	frontend	tsx	frontend-component	826	13	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/terminal/TerminalPanel.test.tsx	frontend	tsx	test	3200	11	4	0	medium	自动化测试/QA 集成测试
+src/components/terminal/TerminalPanel.tsx	frontend	tsx	frontend-component	5150	54	11	1	high	xterm 生命周期、PTY/SSH 输出、键盘/IME、外观、ZMODEM、AI 操作和文件传输
+src/components/terminal/ZmodemConflictDialog.tsx	frontend	tsx	frontend-component	111	3	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/theme/ThemePreviewSelect.tsx	frontend	tsx	frontend-component	179	2	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/theme/themePreviews.tsx	frontend	tsx	frontend-component	342	11	14	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/tunnel/TunnelEditor.tsx	frontend	tsx	frontend-component	574	11	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/tunnel/TunnelManager.tsx	frontend	tsx	frontend-component	925	8	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/vault/StartupVaultUnlockGate.test.tsx	frontend	tsx	test	142	5	0	0		自动化测试/QA 集成测试
+src/components/vault/StartupVaultUnlockGate.tsx	frontend	tsx	frontend-component	76	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/vault/VaultEntriesDialog.tsx	frontend	tsx	frontend-component	193	6	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/vault/VaultGate.tsx	frontend	tsx	frontend-component	122	5	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/vault/VaultSettings.tsx	frontend	tsx	frontend-component	319	7	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/vault/VaultSetupDialog.test.tsx	frontend	tsx	test	57	4	0	0		自动化测试/QA 集成测试
+src/components/vault/VaultSetupDialog.tsx	frontend	tsx	frontend-component	152	2	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/vault/VaultUnlockDialog.test.tsx	frontend	tsx	test	82	4	0	0		自动化测试/QA 集成测试
+src/components/vault/VaultUnlockDialog.tsx	frontend	tsx	frontend-component	192	2	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/vnc/VncConnectionOverlay.css	frontend	css	frontend-style	154	0	0	0		前端全局/功能样式；按主题、组件和功能边界拆分
+src/components/vnc/VncConnectionOverlay.tsx	frontend	tsx	frontend-component	202	4	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/vnc/VncFullScreenToolbar.test.tsx	frontend	tsx	test	65	3	0	0		自动化测试/QA 集成测试
+src/components/vnc/VncFullScreenToolbar.tsx	frontend	tsx	frontend-component	151	3	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/vnc/VncPanel.test.tsx	frontend	tsx	test	972	6	0	0		自动化测试/QA 集成测试
+src/components/vnc/VncPanel.tsx	frontend	tsx	frontend-component	2069	24	2	2	medium	React UI/交互组件，具体职责由目录和文件名定义
+src/components/vnc/VncPropertiesDialog.tsx	frontend	tsx	frontend-component	203	6	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/vnc/VncSessionInfoDialog.tsx	frontend	tsx	frontend-component	161	6	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/vnc/vncSessionMenu.test.ts	frontend	ts	test	98	2	0	0		自动化测试/QA 集成测试
+src/components/vnc/vncSessionMenu.ts	frontend	ts	frontend-feature-lib	163	3	3	0		前端功能模型、控制器或 adapter；具体边界由文件名和所在 feature 目录决定
+src/components/voice/CommandPreviewCard.tsx	frontend	tsx	frontend-component	219	3	3	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/voice/DictationButton.test.tsx	frontend	tsx	test	188	6	0	0		自动化测试/QA 集成测试
+src/components/voice/DictationButton.tsx	frontend	tsx	frontend-component	234	8	1	5		React UI/交互组件，具体职责由目录和文件名定义
+src/components/voice/VoiceConsumers.test.tsx	frontend	tsx	test	55	8	0	0		自动化测试/QA 集成测试
+src/components/voice/VoiceSettingsDialog.tsx	frontend	tsx	frontend-component	42	7	2	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/window/LanguageSwitcher.tsx	frontend	tsx	frontend-component	62	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/window/PttButton.tsx	frontend	tsx	frontend-component	15	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/window/TitleBarTrayControls.test.tsx	frontend	tsx	test	99	3	0	0		自动化测试/QA 集成测试
+src/components/window/TitleBarTrayControls.tsx	frontend	tsx	frontend-component	338	11	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/window/WindowControls.tsx	frontend	tsx	frontend-component	48	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/window/WindowDragHandle.test.tsx	frontend	tsx	test	38	3	0	0		自动化测试/QA 集成测试
+src/components/window/WindowDragHandle.tsx	frontend	tsx	frontend-component	27	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/components/window/WindowResizeHandles.test.tsx	frontend	tsx	test	59	3	0	0		自动化测试/QA 集成测试
+src/components/window/WindowResizeHandles.tsx	frontend	tsx	frontend-component	145	3	1	0		React UI/交互组件，具体职责由目录和文件名定义
+src/hooks/useModalDraggable.ts	frontend	ts	source	92	1	1	0		源文件
+src/hooks/useModalDraggableAndResizable.ts	frontend	ts	source	229	1	2	0		源文件
+src/hooks/useModalShortcuts.ts	frontend	ts	source	65	2	2	0		源文件
+src/hooks/useMountedRef.test.ts	frontend	ts	test	35	4	0	0		自动化测试/QA 集成测试
+src/hooks/useMountedRef.ts	frontend	ts	source	32	1	1	0		源文件
+src/hooks/useProjectDescriptorDiscovery.test.tsx	frontend	tsx	test	111	5	0	0		自动化测试/QA 集成测试
+src/hooks/useProjectDescriptorDiscovery.ts	frontend	ts	source	147	3	3	0		源文件
+src/hooks/useProjectFacts.ts	frontend	ts	source	60	2	2	0		源文件
+src/hooks/useViewportSize.ts	frontend	ts	source	23	1	2	0		源文件
+src/hooks/useWelcomeDirectories.test.tsx	frontend	tsx	test	189	3	0	0		自动化测试/QA 集成测试
+src/hooks/useWelcomeDirectories.ts	frontend	ts	source	129	2	3	0		源文件
+src/hooks/useWelcomeSessionResume.test.tsx	frontend	tsx	test	387	4	0	0		自动化测试/QA 集成测试
+src/hooks/useWelcomeSessionResume.ts	frontend	ts	source	461	4	8	0		源文件
+src/index.css	frontend	css	frontend-style	1937	0	0	0		前端全局/功能样式；按主题、组件和功能边界拆分
+src/layouts/MainLayout.test.tsx	frontend	tsx	test	2074	12	0	0	medium	自动化测试/QA 集成测试
+src/layouts/MainLayout.tsx	frontend	tsx	frontend-layout	5205	111	6	1	high	主窗口编排：Tab 生命周期、连接队列、认证/Vault、菜单、分屏、弹窗和各功能 Tab 路由
+src/lib/ai/answerLanguage.test.ts	frontend	ts	test	126	3	0	0		自动化测试/QA 集成测试
+src/lib/ai/answerLanguage.ts	frontend	ts	frontend-lib	102	1	12	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/appDialogs.test.tsx	frontend	tsx	test	182	3	0	0		自动化测试/QA 集成测试
+src/lib/appDialogs.tsx	frontend	tsx	frontend-lib	223	2	12	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/appTheme.ts	frontend	ts	frontend-lib	114	1	8	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/autoImportPreferences.test.ts	frontend	ts	test	113	2	0	0		自动化测试/QA 集成测试
+src/lib/autoImportPreferences.ts	frontend	ts	frontend-lib	148	2	9	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/backup.ts	frontend	ts	frontend-lib	120	1	16	2		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/chat/attachments.ts	frontend	ts	frontend-lib	123	3	11	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/chat/chatDock.test.ts	frontend	ts	test	35	2	0	0		自动化测试/QA 集成测试
+src/lib/chat/chatDock.ts	frontend	ts	frontend-lib	35	1	4	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/chat/composerRefs.ts	frontend	ts	frontend-lib	58	0	3	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/chat/renderFormatted.test.ts	frontend	ts	test	59	2	0	0		自动化测试/QA 集成测试
+src/lib/chat/renderFormatted.ts	frontend	ts	frontend-lib	71	2	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/chat/sendShortcut.test.ts	frontend	ts	test	38	2	0	0		自动化测试/QA 集成测试
+src/lib/chat/sendShortcut.ts	frontend	ts	frontend-lib	25	0	4	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/clipboard.test.ts	frontend	ts	test	180	2	0	0		自动化测试/QA 集成测试
+src/lib/clipboard.ts	frontend	ts	frontend-lib	297	2	17	3		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/codeThemes.test.ts	frontend	ts	test	75	3	0	0		自动化测试/QA 集成测试
+src/lib/codeThemes.ts	frontend	ts	frontend-lib	449	1	14	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/codeViewProfile.ts	frontend	ts	frontend-lib	322	6	15	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/codeViewTheme.ts	frontend	ts	frontend-lib	217	4	4	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/commonCommandsPresets.ts	frontend	ts	frontend-lib	59	0	3	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/customDnD.test.ts	frontend	ts	test	73	3	0	0		自动化测试/QA 集成测试
+src/lib/customDnD.ts	frontend	ts	frontend-lib	346	1	8	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/database/dbAiPrompts.test.ts	frontend	ts	test	239	4	0	0		自动化测试/QA 集成测试
+src/lib/database/dbAiPrompts.ts	frontend	ts	frontend-lib	277	1	8	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/databaseTabLimit.test.ts	frontend	ts	test	41	2	0	0		自动化测试/QA 集成测试
+src/lib/databaseTabLimit.ts	frontend	ts	frontend-lib	67	0	6	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/dbExecutionLog.test.ts	frontend	ts	test	48	2	0	0		自动化测试/QA 集成测试
+src/lib/dbExecutionLog.ts	frontend	ts	frontend-lib	129	0	13	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/dbGridChanges.test.ts	frontend	ts	test	79	2	0	0		自动化测试/QA 集成测试
+src/lib/dbGridChanges.ts	frontend	ts	frontend-lib	110	1	9	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/dbMetadataCache.test.ts	frontend	ts	test	229	2	0	0		自动化测试/QA 集成测试
+src/lib/dbMetadataCache.ts	frontend	ts	frontend-lib	481	1	9	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/detachWindowing.ts	frontend	ts	frontend-lib	36	2	3	2		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/detachedSession.test.ts	frontend	ts	test	191	2	0	0		自动化测试/QA 集成测试
+src/lib/detachedSession.ts	frontend	ts	frontend-lib	447	0	13	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/diffWhitespace.test.ts	frontend	ts	test	86	2	0	0		自动化测试/QA 集成测试
+src/lib/diffWhitespace.ts	frontend	ts	frontend-lib	161	1	10	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/editor/dap.ts	frontend	ts	frontend-lib	90	2	10	2		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/editor/lsp.completionResolve.test.ts	frontend	ts	test	60	2	0	0		自动化测试/QA 集成测试
+src/lib/editor/lsp.test.ts	frontend	ts	test	213	2	0	0		自动化测试/QA 集成测试
+src/lib/editor/lsp.ts	frontend	ts	frontend-lib	1570	1	145	3		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/editor/sdk.test.ts	frontend	ts	test	111	2	0	0		自动化测试/QA 集成测试
+src/lib/editor/sdk.ts	frontend	ts	frontend-lib	247	1	40	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/editor/searchLineHighlight.test.ts	frontend	ts	test	61	2	0	0		自动化测试/QA 集成测试
+src/lib/editor/searchLineHighlight.ts	frontend	ts	frontend-lib	222	18	8	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/editor/structuralSearch.ts	frontend	ts	frontend-lib	137	2	18	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/editor/workspace.test.ts	frontend	ts	test	95	2	0	0		自动化测试/QA 集成测试
+src/lib/editor/workspace.ts	frontend	ts	frontend-lib	894	2	63	1		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/editor/workspaceSearch.ts	frontend	ts	frontend-lib	82	2	8	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/editor/workspaceTooling.test.ts	frontend	ts	test	116	2	0	0		自动化测试/QA 集成测试
+src/lib/editor/workspaceTooling.ts	frontend	ts	frontend-lib	94	1	10	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/fileHelpers.ts	frontend	ts	frontend-lib	127	2	6	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/fileTemplatePreferences.test.ts	frontend	ts	test	109	2	0	0		自动化测试/QA 集成测试
+src/lib/fileTemplatePreferences.ts	frontend	ts	frontend-lib	130	2	10	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/git.ts	frontend	ts	frontend-lib	472	3	70	34		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/gitGraph.test.ts	frontend	ts	test	42	3	0	0		自动化测试/QA 集成测试
+src/lib/gitGraph.ts	frontend	ts	frontend-lib	128	1	5	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/gitRefList.test.ts	frontend	ts	test	78	2	0	0		自动化测试/QA 集成测试
+src/lib/gitRefList.ts	frontend	ts	frontend-lib	179	0	20	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/gitRefresh.ts	frontend	ts	frontend-lib	46	0	3	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/gitTree.test.ts	frontend	ts	test	41	3	0	0		自动化测试/QA 集成测试
+src/lib/gitTree.ts	frontend	ts	frontend-lib	92	1	5	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/hbaseCommands.test.ts	frontend	ts	test	197	3	0	0		自动化测试/QA 集成测试
+src/lib/hbaseCommands.ts	frontend	ts	frontend-lib	224	1	27	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/hbaseCompletions.test.ts	frontend	ts	test	102	4	0	0		自动化测试/QA 集成测试
+src/lib/hbaseCompletions.ts	frontend	ts	frontend-lib	121	2	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/hbaseStatements.test.ts	frontend	ts	test	116	2	0	0		自动化测试/QA 集成测试
+src/lib/hbaseStatements.ts	frontend	ts	frontend-lib	166	0	4	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/history.ts	frontend	ts	frontend-lib	123	2	3	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/i18n/index.test.ts	frontend	ts	test	59	2	0	0		自动化测试/QA 集成测试
+src/lib/i18n/index.ts	frontend	ts	frontend-lib	171	3	13	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/i18n/labels.ts	frontend	ts	frontend-lib	20	2	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/i18n/locales/en.ts	frontend	ts	frontend-locale	4366	1	10	0	medium	i18n locale 字典；按命名空间拆分时保持 key 兼容
+src/lib/i18n/locales/modelInspector.ts	frontend	ts	frontend-locale	33	0	2	0		i18n locale 字典；按命名空间拆分时保持 key 兼容
+src/lib/i18n/locales/zh-CN.ts	frontend	ts	frontend-locale	4341	2	2	0	medium	i18n locale 字典；按命名空间拆分时保持 key 兼容
+src/lib/ipc.test.ts	frontend	ts	test	199	3	1	0		自动化测试/QA 集成测试
+src/lib/ipc.ts	frontend	ts	frontend-lib	2114	4	275	60	medium	前端统一 Tauri IPC 门面；按功能混合 245 次 invoke 和大量 DTO/事件封装
+src/lib/lanFilePicker.ts	frontend	ts	frontend-lib	28	3	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/lanNotify.ts	frontend	ts	frontend-lib	30	2	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/lanRtc.ts	frontend	ts	frontend-lib	197	2	1	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/lanScreenCapture.ts	frontend	ts	frontend-lib	65	0	1	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/lanWbProvider.ts	frontend	ts	frontend-lib	131	3	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/liveTemplatePreferences.test.ts	frontend	ts	test	91	2	0	0		自动化测试/QA 集成测试
+src/lib/liveTemplatePreferences.ts	frontend	ts	frontend-lib	236	0	15	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/localHistory.test.ts	frontend	ts	test	13	2	0	0		自动化测试/QA 集成测试
+src/lib/localHistory.ts	frontend	ts	frontend-lib	42	1	6	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/lspInstallGuides.test.ts	frontend	ts	test	80	2	0	0		自动化测试/QA 集成测试
+src/lib/lspInstallGuides.ts	frontend	ts	frontend-lib	622	0	16	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mail.ts	frontend	ts	frontend-lib	910	5	113	2		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailAttachReminder.test.ts	frontend	ts	test	18	2	0	0		自动化测试/QA 集成测试
+src/lib/mailAttachReminder.ts	frontend	ts	frontend-lib	28	0	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailCalendar.test.ts	frontend	ts	test	38	2	0	0		自动化测试/QA 集成测试
+src/lib/mailCalendar.ts	frontend	ts	frontend-lib	103	3	12	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailContacts.ts	frontend	ts	frontend-lib	74	3	11	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailFilters.test.ts	frontend	ts	test	47	2	0	0		自动化测试/QA 集成测试
+src/lib/mailFilters.ts	frontend	ts	frontend-lib	238	4	20	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailFolders.test.ts	frontend	ts	test	65	3	0	0		自动化测试/QA 集成测试
+src/lib/mailFolders.ts	frontend	ts	frontend-lib	135	1	12	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailHtml.test.ts	frontend	ts	test	299	2	0	0		自动化测试/QA 集成测试
+src/lib/mailHtml.ts	frontend	ts	frontend-lib	1004	2	24	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailIdentities.test.ts	frontend	ts	test	67	4	0	0		自动化测试/QA 集成测试
+src/lib/mailIdentities.ts	frontend	ts	frontend-lib	95	2	8	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailInvite.test.ts	frontend	ts	test	40	3	1	0		自动化测试/QA 集成测试
+src/lib/mailInvite.ts	frontend	ts	frontend-lib	64	1	5	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailMutations.test.ts	frontend	ts	test	56	3	0	0		自动化测试/QA 集成测试
+src/lib/mailMutations.ts	frontend	ts	frontend-lib	50	1	2	1		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailOutbox.test.ts	frontend	ts	test	61	3	0	0		自动化测试/QA 集成测试
+src/lib/mailOutbox.ts	frontend	ts	frontend-lib	72	1	9	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailPlainText.test.ts	frontend	ts	test	34	2	0	0		自动化测试/QA 集成测试
+src/lib/mailPlainText.ts	frontend	ts	frontend-lib	108	0	5	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailRecipients.test.ts	frontend	ts	test	68	3	0	0		自动化测试/QA 集成测试
+src/lib/mailRecipients.ts	frontend	ts	frontend-lib	212	1	15	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailShortcuts.test.ts	frontend	ts	test	56	2	0	0		自动化测试/QA 集成测试
+src/lib/mailShortcuts.ts	frontend	ts	frontend-lib	81	0	4	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailSync.test.ts	frontend	ts	test	198	3	0	0		自动化测试/QA 集成测试
+src/lib/mailSync.ts	frontend	ts	frontend-lib	156	1	12	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailTags.test.ts	frontend	ts	test	36	3	0	0		自动化测试/QA 集成测试
+src/lib/mailTags.ts	frontend	ts	frontend-lib	45	1	7	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailTheme.test.ts	frontend	ts	test	33	2	0	0		自动化测试/QA 集成测试
+src/lib/mailTheme.ts	frontend	ts	frontend-lib	38	4	5	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailThreads.test.ts	frontend	ts	test	81	3	0	0		自动化测试/QA 集成测试
+src/lib/mailThreads.ts	frontend	ts	frontend-lib	157	1	4	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailUnified.test.ts	frontend	ts	test	54	3	0	0		自动化测试/QA 集成测试
+src/lib/mailUnified.ts	frontend	ts	frontend-lib	73	2	9	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mailto.test.ts	frontend	ts	test	26	2	0	0		自动化测试/QA 集成测试
+src/lib/mailto.ts	frontend	ts	frontend-lib	43	0	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mediaSession.ts	frontend	ts	frontend-lib	90	3	5	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mfa/base32.ts	frontend	ts	frontend-lib	63	0	6	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mfa/fixtures.test.ts	frontend	ts	test	80	8	0	0		自动化测试/QA 集成测试
+src/lib/mfa/format.ts	frontend	ts	frontend-lib	64	0	7	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mfa/frames.ts	frontend	ts	frontend-lib	55	1	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mfa/ipc.ts	frontend	ts	frontend-lib	57	3	14	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mfa/migration.ts	frontend	ts	frontend-lib	144	2	5	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mfa/otpauth.test.ts	frontend	ts	test	127	7	0	0		自动化测试/QA 集成测试
+src/lib/mfa/otpauth.ts	frontend	ts	frontend-lib	155	3	10	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mfa/qrImage.ts	frontend	ts	frontend-lib	129	3	9	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mfa/qrSvg.test.ts	frontend	ts	test	57	5	1	0		自动化测试/QA 集成测试
+src/lib/mfa/qrSvg.ts	frontend	ts	frontend-lib	37	1	4	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mfa/sort.test.ts	frontend	ts	test	63	3	0	0		自动化测试/QA 集成测试
+src/lib/mfa/sort.ts	frontend	ts	frontend-lib	73	1	6	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mfa/sources.ts	frontend	ts	frontend-lib	69	5	6	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mfa/testing.ts	frontend	ts	frontend-lib	90	2	4	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/mfa/types.ts	frontend	ts	frontend-lib	106	0	15	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/nativeAppMenu.install.test.ts	frontend	ts	test	102	2	0	0		自动化测试/QA 集成测试
+src/lib/nativeAppMenu.test.ts	frontend	ts	test	192	2	6	0		自动化测试/QA 集成测试
+src/lib/nativeAppMenu.ts	frontend	ts	frontend-lib	355	5	23	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/nativeSession.ts	frontend	ts	frontend-lib	301	2	1	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/networkSettings.test.ts	frontend	ts	test	82	2	0	0		自动化测试/QA 集成测试
+src/lib/networkSettings.ts	frontend	ts	frontend-lib	237	1	14	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/notes.ts	frontend	ts	frontend-lib	221	1	30	3		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/notes/noteLinks.test.ts	frontend	ts	test	23	2	0	0		自动化测试/QA 集成测试
+src/lib/notes/noteLinks.ts	frontend	ts	frontend-lib	50	0	4	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/notes/notesTheme.test.ts	frontend	ts	test	83	2	0	0		自动化测试/QA 集成测试
+src/lib/notes/notesTheme.ts	frontend	ts	frontend-lib	409	2	6	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/notes/notesWindowSync.ts	frontend	ts	frontend-lib	86	3	3	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/objectStorage.ts	frontend	ts	frontend-lib	262	8	26	17		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/objectStorageController.ts	frontend	ts	frontend-lib	421	7	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/osFileDrop.test.ts	frontend	ts	test	68	2	0	0		自动化测试/QA 集成测试
+src/lib/osFileDrop.ts	frontend	ts	frontend-lib	148	0	13	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/pathCompletion.test.ts	frontend	ts	test	72	3	0	0		自动化测试/QA 集成测试
+src/lib/pathCompletion.ts	frontend	ts	frontend-lib	89	1	8	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/performanceInstrumentation.test.ts	frontend	ts	test	48	2	0	0		自动化测试/QA 集成测试
+src/lib/performanceInstrumentation.ts	frontend	ts	frontend-lib	57	0	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/qaDriverKeyboard.test.ts	frontend	ts	test	53	2	0	0		自动化测试/QA 集成测试
+src/lib/queryRegistry.ts	frontend	ts	frontend-lib	83	0	7	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/quickConnect.test.ts	frontend	ts	test	203	2	0	0		自动化测试/QA 集成测试
+src/lib/quickConnect.ts	frontend	ts	frontend-lib	759	2	6	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/rdp.test.ts	frontend	ts	test	475	3	0	0		自动化测试/QA 集成测试
+src/lib/rdp.ts	frontend	ts	frontend-lib	624	4	53	1		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/recoveryPolicy.test.ts	frontend	ts	test	21	2	0	0		自动化测试/QA 集成测试
+src/lib/recoveryPolicy.ts	frontend	ts	frontend-lib	33	1	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/recoveryTerminal.test.ts	frontend	ts	test	56	2	0	0		自动化测试/QA 集成测试
+src/lib/recoveryTerminal.ts	frontend	ts	frontend-lib	29	1	3	2		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/release/bundleIdentity.test.ts	frontend	ts	test	207	3	0	0		自动化测试/QA 集成测试
+src/lib/release/bundleIdentity.ts	frontend	ts	frontend-lib	181	0	8	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/release/capabilityMatrixAudit.test.ts	frontend	ts	test	145	2	0	0		自动化测试/QA 集成测试
+src/lib/release/capabilityMatrixAudit.ts	frontend	ts	frontend-lib	146	0	6	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/release/linuxMatrixArtifact.test.ts	frontend	ts	test	84	4	0	0		自动化测试/QA 集成测试
+src/lib/release/releasePlanValidator.test.ts	frontend	ts	test	157	4	0	0		自动化测试/QA 集成测试
+src/lib/release/releasePlanValidator.ts	frontend	ts	frontend-lib	175	1	8	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/release/releaseRollup.test.ts	frontend	ts	test	158	5	0	0		自动化测试/QA 集成测试
+src/lib/release/releaseRollup.ts	frontend	ts	frontend-lib	200	5	6	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/release/runnerReceipt.test.ts	frontend	ts	test	194	3	0	0		自动化测试/QA 集成测试
+src/lib/release/runnerReceipt.ts	frontend	ts	frontend-lib	287	1	11	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/remoteBackup.ts	frontend	ts	frontend-lib	103	3	11	2		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/resizableLayout.ts	frontend	ts	frontend-lib	35	1	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/runtime.ts	frontend	ts	frontend-lib	39	0	5	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/runtimeRecovery.test.ts	frontend	ts	test	163	3	0	0		自动化测试/QA 集成测试
+src/lib/runtimeRecovery.ts	frontend	ts	frontend-lib	146	4	10	1		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/screenshot.test.ts	frontend	ts	test	115	2	0	0		自动化测试/QA 集成测试
+src/lib/screenshot.ts	frontend	ts	frontend-lib	529	4	88	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/screenshotImage.test.ts	frontend	ts	test	59	2	0	0		自动化测试/QA 集成测试
+src/lib/screenshotImage.ts	frontend	ts	frontend-lib	211	0	15	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/screenshotOcr.test.ts	frontend	ts	test	39	2	0	0		自动化测试/QA 集成测试
+src/lib/screenshotOcr.ts	frontend	ts	frontend-lib	31	1	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/screenshotSelection.test.ts	frontend	ts	test	60	2	0	0		自动化测试/QA 集成测试
+src/lib/screenshotSelection.ts	frontend	ts	frontend-lib	90	1	7	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/screenshotShortcut.test.tsx	frontend	tsx	test	285	5	0	0		自动化测试/QA 集成测试
+src/lib/screenshotShortcut.ts	frontend	ts	frontend-lib	170	7	6	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/servers.test.ts	frontend	ts	test	15	2	0	0		自动化测试/QA 集成测试
+src/lib/servers.ts	frontend	ts	frontend-lib	324	3	33	1		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sessionConnectionCommand.test.ts	frontend	ts	test	221	3	0	0		自动化测试/QA 集成测试
+src/lib/sessionConnectionCommand.ts	frontend	ts	frontend-lib	410	3	9	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sessionExportHtml.ts	frontend	ts	frontend-lib	60	3	1	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sessionImportExport.test.ts	frontend	ts	test	1591	3	4	0		自动化测试/QA 集成测试
+src/lib/sessionImportExport.ts	frontend	ts	frontend-lib	3868	5	34	0	medium	会话/分组导入导出、版本迁移、密钥引用和文件格式转换
+src/lib/sessionImportSecrets.ts	frontend	ts	frontend-lib	97	4	1	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sessionPaths.ts	frontend	ts	frontend-lib	151	0	15	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sessionTerminalTheme.ts	frontend	ts	frontend-lib	65	2	7	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sessionTypeLabel.test.ts	frontend	ts	test	44	2	0	0		自动化测试/QA 集成测试
+src/lib/settingsNavigation.test.ts	frontend	ts	test	39	2	0	0		自动化测试/QA 集成测试
+src/lib/settingsNavigation.ts	frontend	ts	frontend-lib	36	0	5	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sftp.ts	frontend	ts	frontend-lib	472	3	53	17		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sftpController.test.tsx	frontend	tsx	test	53	7	0	0		自动化测试/QA 集成测试
+src/lib/sftpController.ts	frontend	ts	frontend-lib	464	7	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sftpPreferences.test.ts	frontend	ts	test	78	2	0	0		自动化测试/QA 集成测试
+src/lib/sftpPreferences.ts	frontend	ts	frontend-lib	90	0	9	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sftpSync.ts	frontend	ts	frontend-lib	167	2	5	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/shellKeyClaims.test.ts	frontend	ts	test	27	2	0	0		自动化测试/QA 集成测试
+src/lib/shellKeyClaims.ts	frontend	ts	frontend-lib	42	0	3	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sockscap.ts	frontend	ts	frontend-lib	518	1	64	34		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sockscapPreflight.test.ts	frontend	ts	test	166	3	0	0		自动化测试/QA 集成测试
+src/lib/sockscapPreflight.ts	frontend	ts	frontend-lib	138	1	7	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sockscapRestart.test.ts	frontend	ts	test	132	3	0	0		自动化测试/QA 集成测试
+src/lib/sockscapRestart.ts	frontend	ts	frontend-lib	60	1	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sqlCompletionPreferences.test.ts	frontend	ts	test	119	2	0	0		自动化测试/QA 集成测试
+src/lib/sqlCompletionPreferences.ts	frontend	ts	frontend-lib	271	0	13	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sqlDangerousStatements.test.ts	frontend	ts	test	41	2	0	0		自动化测试/QA 集成测试
+src/lib/sqlDangerousStatements.ts	frontend	ts	frontend-lib	93	0	5	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sqlDialect.test.ts	frontend	ts	test	267	2	0	0		自动化测试/QA 集成测试
+src/lib/sqlDialect.ts	frontend	ts	frontend-lib	543	0	35	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sqlEditorDialect.test.ts	frontend	ts	test	52	5	0	0		自动化测试/QA 集成测试
+src/lib/sqlEditorDialect.ts	frontend	ts	frontend-lib	132	2	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sqlExecutionPreferences.test.ts	frontend	ts	test	134	3	0	0		自动化测试/QA 集成测试
+src/lib/sqlExecutionPreferences.ts	frontend	ts	frontend-lib	222	1	15	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sqlExplain.test.ts	frontend	ts	test	31	2	0	0		自动化测试/QA 集成测试
+src/lib/sqlExplain.ts	frontend	ts	frontend-lib	26	1	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sqlLocalRelations.test.ts	frontend	ts	test	45	2	0	0		自动化测试/QA 集成测试
+src/lib/sqlLocalRelations.ts	frontend	ts	frontend-lib	290	0	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sqlMetadataCompletions.test.ts	frontend	ts	test	603	6	0	0		自动化测试/QA 集成测试
+src/lib/sqlMetadataCompletions.ts	frontend	ts	frontend-lib	1003	8	5	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sqlQueryScope.test.ts	frontend	ts	test	83	2	0	0		自动化测试/QA 集成测试
+src/lib/sqlQueryScope.ts	frontend	ts	frontend-lib	304	0	3	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sqlStatements.test.ts	frontend	ts	test	198	2	0	0		自动化测试/QA 集成测试
+src/lib/sqlStatements.ts	frontend	ts	frontend-lib	298	0	7	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/sqlStructuredCompletions.test.ts	frontend	ts	test	72	5	0	0		自动化测试/QA 集成测试
+src/lib/sqlStructuredCompletions.ts	frontend	ts	frontend-lib	247	5	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/systemFonts.hook.test.tsx	frontend	tsx	test	64	3	0	0		自动化测试/QA 集成测试
+src/lib/systemFonts.test.ts	frontend	ts	test	61	2	0	0		自动化测试/QA 集成测试
+src/lib/systemFonts.ts	frontend	ts	frontend-lib	236	3	18	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/systemRdpChoice.test.ts	frontend	ts	test	117	4	0	0		自动化测试/QA 集成测试
+src/lib/systemRdpChoice.ts	frontend	ts	frontend-lib	109	3	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/tabDetails.test.ts	frontend	ts	test	123	4	0	0		自动化测试/QA 集成测试
+src/lib/tabDetails.ts	frontend	ts	frontend-lib	154	4	3	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/tabFilter.test.ts	frontend	ts	test	105	4	0	0		自动化测试/QA 集成测试
+src/lib/tabFilter.ts	frontend	ts	frontend-lib	112	3	8	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/tao/ribbonPlacement.test.ts	frontend	ts	test	96	2	0	0		自动化测试/QA 集成测试
+src/lib/tao/ribbonPlacement.ts	frontend	ts	frontend-lib	105	1	9	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/tao/taoAlerts.test.ts	frontend	ts	test	78	3	0	0		自动化测试/QA 集成测试
+src/lib/tao/taoAlerts.ts	frontend	ts	frontend-lib	127	1	10	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/terminal/aiSuggestionSource.ts	frontend	ts	frontend-lib	113	3	1	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/terminal/ccEcho.test.ts	frontend	ts	test	91	2	0	0		自动化测试/QA 集成测试
+src/lib/terminal/ccEcho.ts	frontend	ts	frontend-lib	108	0	3	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/terminal/commandInput.test.ts	frontend	ts	test	132	2	1	0		自动化测试/QA 集成测试
+src/lib/terminal/commandInput.ts	frontend	ts	frontend-lib	255	0	12	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/terminal/keyboardGuards.test.ts	frontend	ts	test	90	2	0	0		自动化测试/QA 集成测试
+src/lib/terminal/keyboardGuards.ts	frontend	ts	frontend-lib	45	0	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/terminal/macImeKeydown.test.ts	frontend	ts	test	171	2	0	0		自动化测试/QA 集成测试
+src/lib/terminal/macImeKeydown.ts	frontend	ts	frontend-lib	78	0	3	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/terminal/terminalRegistry.test.ts	frontend	ts	test	93	2	0	0		自动化测试/QA 集成测试
+src/lib/terminal/terminalRegistry.ts	frontend	ts	frontend-lib	147	1	10	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/terminalActivity.test.ts	frontend	ts	test	27	2	0	0		自动化测试/QA 集成测试
+src/lib/terminalActivity.ts	frontend	ts	frontend-lib	94	0	1	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/terminalCommand.test.ts	frontend	ts	test	39	2	0	0		自动化测试/QA 集成测试
+src/lib/terminalCommand.ts	frontend	ts	frontend-lib	23	0	1	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/terminalCwd.test.ts	frontend	ts	test	77	2	0	0		自动化测试/QA 集成测试
+src/lib/terminalCwd.ts	frontend	ts	frontend-lib	86	1	2	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/terminalImeGuard.test.ts	frontend	ts	test	248	2	0	0		自动化测试/QA 集成测试
+src/lib/terminalImeGuard.ts	frontend	ts	frontend-lib	275	0	3	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/terminalOutputFilter.test.ts	frontend	ts	test	220	3	0	0		自动化测试/QA 集成测试
+src/lib/terminalOutputFilter.ts	frontend	ts	frontend-lib	522	0	8	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/terminalProfile.test.ts	frontend	ts	test	49	3	0	0		自动化测试/QA 集成测试
+src/lib/terminalProfile.ts	frontend	ts	frontend-lib	309	4	28	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/terminalRecoveryPrototype.test.ts	frontend	ts	test	102	4	0	0		自动化测试/QA 集成测试
+src/lib/terminalShellIntegration.test.ts	frontend	ts	test	96	2	0	0		自动化测试/QA 集成测试
+src/lib/terminalShellIntegration.ts	frontend	ts	frontend-lib	88	0	5	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/themes.ts	frontend	ts	frontend-lib	300	1	5	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/tunnel.ts	frontend	ts	frontend-lib	158	3	22	2		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/updateService.test.ts	frontend	ts	test	172	4	0	0		自动化测试/QA 集成测试
+src/lib/updateService.ts	frontend	ts	frontend-lib	304	7	12	1		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/vaultGate.test.tsx	frontend	tsx	test	108	4	0	0		自动化测试/QA 集成测试
+src/lib/vaultGate.tsx	frontend	tsx	frontend-lib	150	4	3	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/vnc.test.ts	frontend	ts	test	348	2	0	0		自动化测试/QA 集成测试
+src/lib/vnc.ts	frontend	ts	frontend-lib	822	1	46	2		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/vncFramePainter.test.ts	frontend	ts	test	105	2	0	0		自动化测试/QA 集成测试
+src/lib/vncFramePainter.ts	frontend	ts	frontend-lib	221	1	5	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/vncOptions.test.ts	frontend	ts	test	60	2	0	0		自动化测试/QA 集成测试
+src/lib/vncOptions.ts	frontend	ts	frontend-lib	131	1	11	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/vncPointerScheduler.test.ts	frontend	ts	test	89	2	0	0		自动化测试/QA 集成测试
+src/lib/vncPointerScheduler.ts	frontend	ts	frontend-lib	94	0	3	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/voice/commandExecutor.ts	frontend	ts	frontend-lib	33	2	3	2		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/webviewCompat.test.ts	frontend	ts	test	60	2	0	0		自动化测试/QA 集成测试
+src/lib/webviewCompat.ts	frontend	ts	frontend-lib	46	0	1	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/welcomeSessionResume.test.ts	frontend	ts	test	167	3	0	0		自动化测试/QA 集成测试
+src/lib/welcomeSessionResume.ts	frontend	ts	frontend-lib	208	2	17	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/windowDrag.ts	frontend	ts	frontend-lib	17	2	1	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/workspaceGitCommitTarget.test.ts	frontend	ts	test	90	3	0	0		自动化测试/QA 集成测试
+src/lib/workspaceGitCommitTarget.ts	frontend	ts	frontend-lib	64	1	5	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/workspaceGitFlatList.test.ts	frontend	ts	test	55	4	0	0		自动化测试/QA 集成测试
+src/lib/workspaceGitFlatList.ts	frontend	ts	frontend-lib	40	2	4	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/workspaceGitManagerSync.test.ts	frontend	ts	test	96	3	0	0		自动化测试/QA 集成测试
+src/lib/workspaceGitManagerSync.ts	frontend	ts	frontend-lib	89	1	6	0		前端领域模型、IPC 适配、工具或副作用服务
+src/lib/zmodem.test.ts	frontend	ts	test	504	3	0	0		自动化测试/QA 集成测试
+src/lib/zmodem.ts	frontend	ts	frontend-lib	585	1	9	0		前端领域模型、IPC 适配、工具或副作用服务
+src/main.tsx	frontend	tsx	source	123	7	0	0		源文件
+src/stores/aiStore.test.ts	frontend	ts	test	245	2	0	0		自动化测试/QA 集成测试
+src/stores/aiStore.ts	frontend	ts	frontend-store	927	4	36	1		Zustand 状态、异步动作和持久化协作
+src/stores/appStore.test.ts	frontend	ts	test	1026	3	0	0		自动化测试/QA 集成测试
+src/stores/appStore.ts	frontend	ts	frontend-store	1642	8	24	0		全局 Zustand 状态：Tabs、终端、布局、UI 偏好、工作区上下文和恢复状态
+src/stores/backupStore.test.ts	frontend	ts	test	288	3	0	0		自动化测试/QA 集成测试
+src/stores/backupStore.ts	frontend	ts	frontend-store	175	2	1	0		Zustand 状态、异步动作和持久化协作
+src/stores/chatStore.test.ts	frontend	ts	test	1153	7	0	0		自动化测试/QA 集成测试
+src/stores/chatStore.ts	frontend	ts	frontend-store	1307	18	13	7		Zustand 状态、异步动作和持久化协作
+src/stores/codeWorkspaceStatusStore.test.ts	frontend	ts	test	71	2	0	0		自动化测试/QA 集成测试
+src/stores/codeWorkspaceStatusStore.ts	frontend	ts	frontend-store	199	1	8	0		Zustand 状态、异步动作和持久化协作
+src/stores/codeWorkspaceStore.test.ts	frontend	ts	test	488	3	0	0		自动化测试/QA 集成测试
+src/stores/codeWorkspaceStore.ts	frontend	ts	frontend-store	1166	10	15	0		Zustand 状态、异步动作和持久化协作
+src/stores/lanCallStore.ts	frontend	ts	frontend-store	474	7	2	0		Zustand 状态、异步动作和持久化协作
+src/stores/lanChatStore.ts	frontend	ts	frontend-store	615	6	7	0		Zustand 状态、异步动作和持久化协作
+src/stores/lanWbStore.ts	frontend	ts	frontend-store	266	6	4	0		Zustand 状态、异步动作和持久化协作
+src/stores/mainRailHostStore.ts	frontend	ts	frontend-store	17	1	1	0		Zustand 状态、异步动作和持久化协作
+src/stores/mfaStore.test.ts	frontend	ts	test	88	3	0	0		自动化测试/QA 集成测试
+src/stores/mfaStore.ts	frontend	ts	frontend-store	245	7	2	0		Zustand 状态、异步动作和持久化协作
+src/stores/modelInspectorStore.test.ts	frontend	ts	test	118	5	0	0		自动化测试/QA 集成测试
+src/stores/modelInspectorStore.ts	frontend	ts	frontend-store	89	3	4	0		Zustand 状态、异步动作和持久化协作
+src/stores/notesStore.test.ts	frontend	ts	test	273	3	0	0		自动化测试/QA 集成测试
+src/stores/notesStore.ts	frontend	ts	frontend-store	502	2	7	0		Zustand 状态、异步动作和持久化协作
+src/stores/objectStorageStore.test.ts	frontend	ts	test	144	3	0	0		自动化测试/QA 集成测试
+src/stores/objectStorageStore.ts	frontend	ts	frontend-store	627	5	4	0		Zustand 状态、异步动作和持久化协作
+src/stores/opencodeGoStore.test.ts	frontend	ts	test	51	3	0	0		自动化测试/QA 集成测试
+src/stores/opencodeGoStore.ts	frontend	ts	frontend-store	65	2	5	0		Zustand 状态、异步动作和持久化协作
+src/stores/projectFactsStore.test.ts	frontend	ts	test	265	3	0	0		自动化测试/QA 集成测试
+src/stores/projectFactsStore.ts	frontend	ts	frontend-store	363	4	4	0		Zustand 状态、异步动作和持久化协作
+src/stores/rdpStore.ts	frontend	ts	frontend-store	128	1	3	0		Zustand 状态、异步动作和持久化协作
+src/stores/serversStore.test.ts	frontend	ts	test	61	2	0	0		自动化测试/QA 集成测试
+src/stores/serversStore.ts	frontend	ts	frontend-store	256	4	3	0		Zustand 状态、异步动作和持久化协作
+src/stores/sessionStore.test.ts	frontend	ts	test	247	3	0	0		自动化测试/QA 集成测试
+src/stores/sessionStore.ts	frontend	ts	frontend-store	396	4	1	0		Zustand 状态、异步动作和持久化协作
+src/stores/sftpStore.test.ts	frontend	ts	test	239	3	0	0		自动化测试/QA 集成测试
+src/stores/sftpStore.ts	frontend	ts	frontend-store	922	3	9	0		Zustand 状态、异步动作和持久化协作
+src/stores/sidebarRailPolicy.test.ts	frontend	ts	test	46	2	0	0		自动化测试/QA 集成测试
+src/stores/sidebarRailPolicy.ts	frontend	ts	frontend-store	80	1	10	0		Zustand 状态、异步动作和持久化协作
+src/stores/taoAlertStore.test.ts	frontend	ts	test	107	3	0	0		自动化测试/QA 集成测试
+src/stores/taoAlertStore.ts	frontend	ts	frontend-store	246	2	5	0		Zustand 状态、异步动作和持久化协作
+src/stores/taoHubStore.ts	frontend	ts	frontend-store	46	1	2	0		Zustand 状态、异步动作和持久化协作
+src/stores/transferStore.ts	frontend	ts	frontend-store	62	2	2	0		Zustand 状态、异步动作和持久化协作
+src/stores/updateStore.test.ts	frontend	ts	test	354	3	0	0		自动化测试/QA 集成测试
+src/stores/updateStore.ts	frontend	ts	frontend-store	294	3	3	0		Zustand 状态、异步动作和持久化协作
+src/stores/vaultStore.ts	frontend	ts	frontend-store	84	2	1	0		Zustand 状态、异步动作和持久化协作
+src/stores/vncStore.test.ts	frontend	ts	test	38	2	0	0		自动化测试/QA 集成测试
+src/stores/vncStore.ts	frontend	ts	frontend-store	132	1	3	0		Zustand 状态、异步动作和持久化协作
+src/stubs/localVfs.ts	frontend	ts	frontend-stub	323	1	16	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/mailArchiveStub.ts	frontend	ts	frontend-stub	92	4	1	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/mailCalendarStub.ts	frontend	ts	frontend-stub	52	2	4	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/mailContactsStub.ts	frontend	ts	frontend-stub	60	1	4	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/mailFiltersStub.ts	frontend	ts	frontend-stub	144	2	3	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/mailServerStub.ts	frontend	ts	frontend-stub	617	3	23	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/mfaStub.test.ts	frontend	ts	test	69	3	0	0		自动化测试/QA 集成测试
+src/stubs/mfaStub.ts	frontend	ts	frontend-stub	288	3	3	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/modelInspectorStub.ts	frontend	ts	frontend-stub	79	3	2	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/opencodeGoStub.ts	frontend	ts	frontend-stub	44	1	2	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/parity005Completion.ts	frontend	ts	frontend-stub	261	5	5	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/parity007Extract.ts	frontend	ts	frontend-stub	640	2	20	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/parity008Git.ts	frontend	ts	frontend-stub	204	2	4	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/parity009StructuralSearch.test.ts	frontend	ts	test	102	6	0	0		自动化测试/QA 集成测试
+src/stubs/parity009StructuralSearch.ts	frontend	ts	frontend-stub	317	3	4	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/react-reconciler-constants.ts	frontend	ts	frontend-stub	10	0	7	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/remoteBackupStub.ts	frontend	ts	frontend-stub	40	1	1	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/screenshotFavoritesFault.test.ts	frontend	ts	test	25	2	0	0		自动化测试/QA 集成测试
+src/stubs/screenshotFavoritesFault.ts	frontend	ts	frontend-stub	11	0	1	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/sftpClient.ts	frontend	ts	frontend-stub	292	1	15	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/sshClient.ts	frontend	ts	frontend-stub	258	1	8	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/tauri-core.ts	frontend	ts	frontend-stub	5458	26	7	5	high	浏览器预览 Tauri invoke 模拟器；覆盖大量后端命令和 QA 状态
+src/stubs/tauri-dialog.ts	frontend	ts	frontend-stub	78	2	10	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/tauri-event.ts	frontend	ts	frontend-stub	58	1	7	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/tauri-notification.ts	frontend	ts	frontend-stub	18	0	4	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/tauri-shell.ts	frontend	ts	frontend-stub	16	0	3	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/tauri-window.ts	frontend	ts	frontend-stub	74	1	4	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/vncClient.ts	frontend	ts	frontend-stub	63	0	4	0		浏览器环境下的 Tauri/原生能力模拟
+src/stubs/voiceStub.ts	frontend	ts	frontend-stub	123	1	1	0		浏览器环境下的 Tauri/原生能力模拟
+src/test/qaDriverKeyboard.test.ts	frontend	ts	test	121	2	0	0		自动化测试/QA 集成测试
+src/test/qaDriverPointer.test.ts	frontend	ts	test	146	2	0	0		自动化测试/QA 集成测试
+src/test/setup.ts	frontend	ts	source	131	4	0	0		源文件
+src/types/index.ts	frontend	ts	frontend-types	604	7	54	0		跨组件 DTO、Tab/会话/功能类型定义
+src/types/localShell.test.ts	frontend	ts	test	48	2	0	0		自动化测试/QA 集成测试
+src/types/localShell.ts	frontend	ts	frontend-types	117	0	6	0		跨组件 DTO、Tab/会话/功能类型定义
+src/types/objectStorage.test.ts	frontend	ts	test	52	2	0	0		自动化测试/QA 集成测试
+src/types/objectStorage.ts	frontend	ts	frontend-types	208	1	14	0		跨组件 DTO、Tab/会话/功能类型定义
+src/types/rdp.ts	frontend	ts	frontend-types	218	0	8	0		跨组件 DTO、Tab/会话/功能类型定义
+src/types/vnc.test.ts	frontend	ts	test	42	2	0	0		自动化测试/QA 集成测试
+src/types/vnc.ts	frontend	ts	frontend-types	111	0	8	0		跨组件 DTO、Tab/会话/功能类型定义
+src/types/wsl.test.ts	frontend	ts	test	177	2	0	0		自动化测试/QA 集成测试
+src/types/wsl.ts	frontend	ts	frontend-types	116	0	5	0		跨组件 DTO、Tab/会话/功能类型定义
+src/vite-env.d.ts	frontend	ts	source	16	0	0	0		源文件
+src/zmodem.js.d.ts	frontend	ts	source	42	0	5	0		源文件

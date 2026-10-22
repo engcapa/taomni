@@ -62,7 +62,7 @@ pub async fn codex_stop_session(
     thread_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let process = { state.codex_processes.lock().await.remove(&thread_id) };
+    let process = { state.agent.codex_processes.lock().await.remove(&thread_id) };
     if let Some(process) = process {
         process.stop().await;
     }
@@ -70,11 +70,11 @@ pub async fn codex_stop_session(
 }
 
 pub(crate) async fn recycle_thread_process(state: &AppState, thread_id: &str) {
-    let process = { state.codex_processes.lock().await.remove(thread_id) };
+    let process = { state.agent.codex_processes.lock().await.remove(thread_id) };
     if let Some(process) = process {
         process.stop().await;
     }
-    state.captures.purge_thread(thread_id);
+    state.agent.captures.purge_thread(thread_id);
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -118,7 +118,7 @@ pub async fn codex_test_config(
     };
 
     {
-        let old = { state.codex_processes.lock().await.remove(&thread_id) };
+        let old = { state.agent.codex_processes.lock().await.remove(&thread_id) };
         if let Some(old) = old {
             old.stop().await;
         }
@@ -205,6 +205,7 @@ pub async fn codex_test_config(
 
     {
         state
+            .agent
             .codex_processes
             .lock()
             .await
@@ -245,7 +246,7 @@ pub async fn codex_test_config(
 
     let stderr = process.get_stderr().await.trim().to_string();
     {
-        let old = { state.codex_processes.lock().await.remove(&thread_id) };
+        let old = { state.agent.codex_processes.lock().await.remove(&thread_id) };
         if let Some(old) = old {
             old.stop().await;
         }

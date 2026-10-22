@@ -17,6 +17,7 @@ from qa_ui_auto.steps.mouse import (
 class MouseStepsTest(TestCase):
     def context(self) -> tuple[StepContext, Mock, Mock]:
         page = Mock()
+        page.viewport_size = {"width": 1440, "height": 900}
         locator = Mock()
         locator.bounding_box.return_value = {"x": 100, "y": 40, "width": 6, "height": 20}
         page.locator.return_value.first = locator
@@ -72,6 +73,72 @@ class MouseStepsTest(TestCase):
         page.wait_for_timeout.assert_called_once_with(50)
         with self.assertRaisesRegex(StepError, "selector"):
             mouse_path_points({"points": [{"dx": 1}]})
+
+    def test_mouse_path_waits_for_the_real_tooltip_position_without_moving_offscreen(self):
+        ctx, page, locator = self.context()
+        locator.bounding_box.side_effect = [
+            {"x": 0, "y": -10000, "width": 440, "height": 280},
+            {"x": 600, "y": 120, "width": 440, "height": 280},
+        ]
+        step_mouse_path(ctx, {"points": [{"selector": "#tooltip", "steps": 6}]})
+        page.mouse.move.assert_called_once_with(820.0, 260.0, steps=6)
+        page.wait_for_timeout.assert_called_once_with(16)
+        locator.scroll_into_view_if_needed.assert_not_called()
+        page.mouse.down.assert_not_called()
+
+    def test_mouse_path_preserves_offsets_after_waiting_for_layout(self):
+        ctx, page, locator = self.context()
+        locator.bounding_box.side_effect = [
+            {"x": 1500, "y": 50, "width": 100, "height": 20},
+            {"x": 300, "y": 50, "width": 100, "height": 20},
+        ]
+        step_mouse_path(ctx, {"points": [{"selector": "#tooltip", "dx": 40, "dy": -10}]})
+        page.mouse.move.assert_called_once_with(390.0, 50.0, steps=1)
+
+    def test_mouse_path_rejects_a_target_that_stays_outside_the_viewport(self):
+        ctx, page, locator = self.context()
+        locator.bounding_box.return_value = {"x": 0, "y": -10000, "width": 440, "height": 280}
+        with patch("qa_ui_auto.steps.mouse.time.monotonic", side_effect=[0, 0, 5, 5]), \
+                self.assertRaisesRegex(StepError, "never entered the viewport"):
+            step_mouse_path(ctx, {"points": [{"selector": "#tooltip"}]})
+        page.mouse.move.assert_not_called()
+        locator.scroll_into_view_if_needed.assert_not_called()
+
+    def test_mouse_path_does_not_clamp_an_invalid_offset_into_the_viewport(self):
+        ctx, page, locator = self.context()
+        with patch("qa_ui_auto.steps.mouse.time.monotonic", side_effect=[0, 0, 5, 5]), \
+                self.assertRaisesRegex(StepError, "never entered the viewport"):
+            step_mouse_path(ctx, {"points": [{"selector": "#tooltip", "dy": -10000}]})
+        page.mouse.move.assert_not_called()
+
+    def test_mouse_path_fails_when_the_target_has_no_layout_box(self):
+        ctx, page, locator = self.context()
+        locator.bounding_box.return_value = None
+        with self.assertRaisesRegex(StepError, "has no layout box"):
+            step_mouse_path(ctx, {"points": [{"selector": "#tooltip"}]})
+        page.mouse.move.assert_not_called()
+
+    def test_mouse_path_dry_run_emits_no_input_or_layout_queries(self):
+        ctx, page, locator = self.context()
+        ctx.dry_run = True
+        step_mouse_path(ctx, {"points": [{"selector": "#tooltip"}]})
+        page.mouse.move.assert_not_called()
+        locator.bounding_box.assert_not_called()
+
+    def test_mouse_path_reads_the_real_window_when_no_viewport_is_configured(self):
+        ctx, page, locator = self.context()
+        page.viewport_size = None
+        page.evaluate.return_value = {"width": 800, "height": 600}
+        step_mouse_path(ctx, {"points": [{"selector": "#tooltip"}]})
+        page.mouse.move.assert_called_once_with(103.0, 50.0, steps=1)
+        page.evaluate.assert_called_once_with("({width: innerWidth, height: innerHeight})")
+
+    def test_mouse_path_layout_wait_is_bounded_by_the_remaining_case_budget(self):
+        ctx, page, locator = self.context()
+        with patch("qa_ui_auto.steps.mouse.remaining_timeout", return_value=0.025), \
+                patch("qa_ui_auto.steps.mouse.time.monotonic", return_value=0):
+            step_mouse_path(ctx, {"points": [{"selector": "#tooltip"}]})
+        locator.bounding_box.assert_called_once_with(timeout=25)
 
     def test_mouse_button_holds_and_releases_browser_input(self):
         ctx, page, _ = self.context()

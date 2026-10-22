@@ -1,0 +1,32 @@
+pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
+    let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+        crate::filebrowser::sftp_attach,
+        crate::filebrowser::sftp_detach,
+        crate::filebrowser::sftp_list_remote,
+        crate::filebrowser::sftp_list_local,
+        crate::filebrowser::sftp_list_local_detailed,
+        crate::filebrowser::sftp_local_home,
+        crate::filebrowser::sftp_local_drives,
+        crate::filebrowser::sftp_mkdir,
+        crate::filebrowser::sftp_remove,
+        crate::filebrowser::sftp_rename,
+        crate::filebrowser::sftp_stat,
+        crate::filebrowser::sftp_chmod,
+        crate::filebrowser::sftp_realpath,
+        crate::filebrowser::sftp_open_path,
+        crate::filebrowser::open_external_url,
+        crate::filebrowser::sftp_read_file_text,
+        crate::filebrowser::sftp_write_file_text,
+        crate::filebrowser::sftp_upload,
+        crate::filebrowser::sftp_download,
+        crate::filebrowser::sftp_upload_dir,
+        crate::filebrowser::sftp_download_dir,
+        crate::filebrowser::sftp_upload_bytes,
+        crate::filebrowser::sftp_download_bytes,
+        crate::filebrowser::sftp_cancel_transfer,
+        crate::filebrowser::sftp_pause_transfer,
+        crate::filebrowser::sftp_resume_transfer,
+        crate::filebrowser::open_sftp_window,
+    ];
+    handler(invoke)
+}

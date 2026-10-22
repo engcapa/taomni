@@ -1,0 +1,30 @@
+pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
+    let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+        crate::config::select_private_key_file,
+        crate::config::select_upload_file,
+        crate::config::select_save_directory,
+        crate::config::select_save_file_path,
+        crate::config::select_file_path,
+        crate::config::select_folder_path,
+        crate::config::get_home_dir,
+        crate::config::read_file_bytes,
+        crate::config::read_stream_open,
+        crate::config::read_stream_read,
+        crate::config::read_stream_close,
+        crate::config::write_stream_open,
+        crate::config::write_stream_append,
+        crate::config::write_stream_close,
+        crate::config::write_stream_abort,
+        crate::config::check_file_exists,
+        crate::config::temporary_file_path,
+        crate::config::clipboard_read_text,
+        crate::config::clipboard_write_text,
+        crate::config::clipboard_read_multi_format,
+        crate::config::clipboard_write_multi_format,
+        crate::config::clipboard_capabilities,
+        crate::config::clipboard_read_files,
+        crate::config::clipboard_parse_file_paths,
+        crate::config::clipboard_write_files,
+    ];
+    handler(invoke)
+}

@@ -118,6 +118,30 @@ pub fn verify(m: &Model, path: &std::path::Path) -> Result<(), String> {
 mod tests {
     use super::*;
     #[test]
+    fn asr_catalog_has_verified_download_inputs() {
+        // ASR moved to the pinned, versioned catalog in 0bc9d88b. Check its real
+        // download inputs rather than expecting removed legacy manifest entries.
+        assert!(!MODELS.is_empty(), "ASR catalog must contain models");
+        for model in MODELS {
+            assert!(
+                model.bytes > 0,
+                "ASR model {} needs an expected size",
+                model.id
+            );
+            assert_eq!(
+                model.sha256.len(),
+                64,
+                "ASR model {} needs SHA-256",
+                model.id
+            );
+            assert!(model.sha256.bytes().all(|byte| byte.is_ascii_hexdigit()));
+            assert!(model.sha256.bytes().any(|byte| byte != b'0'));
+            assert!(download_url(model).starts_with("https://"));
+            assert!(download_url(model).contains(model.filename));
+        }
+    }
+
+    #[test]
     fn runtime_and_inventory_use_the_same_versioned_artifact() {
         let m = model("whisper-base").unwrap();
         // Installation and decoding use path(); inventory uses version_path().

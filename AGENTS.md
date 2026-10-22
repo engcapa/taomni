@@ -26,6 +26,17 @@ Follow nearby code: TypeScript uses two-space indentation, double quotes, and se
 
 Rust uses snake_case modules/functions and rustfmt's four-space indentation with edition 2024. Check formatting with `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check`.
 
+## Source File Size & Responsibility Boundaries
+
+- Keep hand-maintained source files focused on one responsibility. Aim for 200–500 physical lines per file, including comments and blank lines; review the boundaries once a file exceeds 500 lines.
+- New files and modules extracted during refactoring must stay within 800 lines. Split larger implementations before committing, using feature, state ownership, lifecycle, protocol, or platform boundaries. Keep UI shells limited to composing views and connecting feature owners.
+- Existing files above 800 lines are refactoring debt: do not add unrelated responsibilities or increase their size. When changing their behavior, extract the affected responsibility with its state, effects, cancellation, and cleanup; do not just move a large component into another oversized controller.
+- Use explicit, typed module inputs and outputs. Preserve public APIs, IPC/event names, persistence formats, asynchronous ownership, stale-result guards, and failure/retry semantics. Avoid circular dependencies and imports from an implementation module back into its shell or facade.
+- Keep tests focused by behavior/scenario and share fixtures through dedicated harness modules. Move large Rust inline test suites into test modules when they obscure production responsibilities. Do not reduce line counts by compressing formatting, deleting assertions, or hiding code in generated strings.
+- Generated bindings, protocol schemas, locale dictionaries, and indivisible fixtures may exceed the limit. Other exceptions need a concrete technical reason and an explicit follow-up boundary recorded in the relevant design or refactoring document; file size alone is not a reason to split generated or homogeneous declarative data.
+- For each split, run the affected behavior tests and required boundary/contract checks. Verify native side effects in native tests; a successful build or a smaller line count does not establish behavioral equivalence.
+- Run `pnpm check:refactor` before committing. It checks compatibility, dependency boundaries, and the 800-line limit for product sources, tests, fixtures, and build scripts; `pnpm build` runs the same checks. Keep any generated/declarative exceptions explicit in `scripts/source-file-size.mjs` and explain them in the refactoring document.
+
 ## External Network Access & Downloads
 
 Apply these requirements when adding or changing features that access external networks, including downloads, API requests, and update checks.
@@ -40,7 +51,7 @@ Apply these requirements when adding or changing features that access external n
 
 ## Testing Guidelines
 
-Frontend tests use Vitest, jsdom, and Testing Library. Colocate `*.test.ts` or `*.test.tsx` with source; run focused tests with `pnpm test -- src/path/example.test.ts`. Rust unit tests live in `#[cfg(test)]` modules.
+Frontend tests use Vitest, jsdom, and Testing Library. Colocate `*.test.ts` or `*.test.tsx` with source; run focused tests with `pnpm exec vitest run src/path/example.test.ts`. Do not put `--` before file filters: Vitest treats subsequent arguments as passthrough and can run the full suite. Rust unit tests live in `#[cfg(test)]` modules.
 
 Cover changed behavior and regressions; Vitest has no configured numeric coverage threshold. UI cases use `TC-XXX-<slug>.testcase.yaml`; follow `qa-ui-auto-tests/README.md` for browser/native runs. Verify native behavior in the desktop app because browser tests use stubs. Live SSH tests require environment credentials and explicit opt-in; see `src-tauri/tests/README.md`.
 

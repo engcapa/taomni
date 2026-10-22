@@ -1,90 +1,23 @@
+import { Crosshair, Loader2, Play, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from "react";
-import {
-  AlertTriangle,
-  Ban,
-  BookOpen,
-  Bot,
-  Check,
-  ChevronDown,
-  ChevronRight,
-  Clock,
-  Crosshair,
-  Database,
-  Files,
-  HelpCircle,
-  Languages,
-  Loader2,
-  Play,
-  Plus,
-  Sparkles,
-  SquareDashedMousePointer,
-  Star,
-  Trash2,
-  X,
-} from "lucide-react";
-import {
-  Group as PanelGroup,
-  Panel,
-  Separator as PanelResizeHandle,
-  type PanelImperativeHandle,
-  type PanelSize,
-} from "react-resizable-panels";
-import type { HBaseConnectInfo } from "../../types";
-import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
-import { hbaseStatementRangeAt, splitHBaseStatements } from "../../lib/hbaseStatements";
-import {
-  displaySqlShortcut,
-  loadSqlExecutionPreferences,
-  subscribeSqlExecutionPreferences,
-} from "../../lib/sqlExecutionPreferences";
-import {
-  HBASE_COMMANDS,
-  commandSupported,
-  hbaseResultToGrid,
-  writeConfirmMessage,
-  type HBaseCommandCategory,
-  type HBaseTransport,
-} from "../../lib/hbaseCommands";
+import { type PanelImperativeHandle, type PanelSize } from "react-resizable-panels";
+import { AI_ANSWER_LANGUAGES, answerLanguageLabelKey, type AiAnswerLanguage } from "../../lib/ai/answerLanguage";
+import { type HBaseTransport } from "../../lib/hbaseCommands";
 import { hbaseCompletionSource } from "../../lib/hbaseCompletions";
-import {
-  hbaseConnect,
-  hbaseDisconnect,
-  hbaseExecute,
-  hbaseCancel,
-  dbGetSavedQuery,
-  dbSaveSavedQuery,
-  type DbQueryResult,
-  type DbSavedQuery,
-} from "../../lib/ipc";
-import { useAppStore } from "../../stores/appStore";
-import { useChatStore } from "../../stores/chatStore";
+import { hbaseStatementRangeAt } from "../../lib/hbaseStatements";
 import { useT } from "../../lib/i18n";
-import {
-  AI_ANSWER_LANGUAGES,
-  answerLanguageLabelKey,
-  type AiAnswerLanguage,
-} from "../../lib/ai/answerLanguage";
-import { buildDbAiPrompt, truncateStatement } from "../../lib/database/dbAiPrompts";
-import { TabActions } from "../tabbar/TabActionSlot";
-import { FT_BUTTON_ACTIVE_OVERRIDE, FT_ICON_BUTTON_STYLE } from "../floating-toolbar/floatingToolbarStyles";
-import { useConfirmDialog } from "../sidebar/ConfirmDialog";
-import { useContextMenu, type MenuItem } from "../ContextMenu";
-import {
-  QueryResultGrid,
-  type QueryRefreshMode,
-} from "./QueryResultGrid";
-import { SqlEditorPanel, type SqlEditorHandle } from "./SqlEditorPanel";
-import { HBaseSchemaTree } from "./HBaseSchemaTree";
-import { useDbSessionFontSize } from "./useDbSessionFontSize";
-import { QueryLibraryPanel } from "./QueryLibraryPanel";
+import { hbaseConnect, hbaseDisconnect } from "../../lib/ipc";
 import { registerQueryTab } from "../../lib/queryRegistry";
-import {
-  MAX_DATABASE_TAB_LIMIT,
-  MIN_DATABASE_TAB_LIMIT,
-  clampDatabaseTabLimit,
-  readDatabaseTabLimit,
-  writeDatabaseTabLimit,
-} from "../../lib/databaseTabLimit";
+import { loadResizableLayout } from "../../lib/resizableLayout";
+import { useAppStore } from "../../stores/appStore";
+import type { HBaseConnectInfo } from "../../types";
+import { useContextMenu, type MenuItem } from "../ContextMenu";
+import { useConfirmDialog } from "../sidebar/ConfirmDialog";
+import { HBaseWorkspaceView } from "./hbase/HBaseWorkspaceView";
+import { createRuntimeHBaseSessionId, DEFAULT_ROW_LIMIT } from "./hbase/model";
+import { useHBaseExecution } from "./hbase/useHBaseExecution";
+import { useHBaseWorkspace } from "./hbase/useHBaseWorkspace";
+import { useDbSessionFontSize } from "./useDbSessionFontSize";
 
 interface HBaseShellTabProps {
   tabId: string;
@@ -95,368 +28,6 @@ interface HBaseShellTabProps {
     open: boolean;
     onToggle: () => void;
   };
-}
-
-const MAX_HISTORY = 200;
-const DEFAULT_ROW_LIMIT = 50;
-const HBASE_TAB_LIMIT_SCOPE = "HBaseShell";
-
-type ResultSubTab = "results" | "messages";
-
-interface ResultSheet {
-  id: string;
-  title: string;
-  command: string;
-  result: DbQueryResult | null;
-  error: string | null;
-  warnings: string[];
-  running: boolean;
-  cancelling: boolean;
-  elapsedMs: number;
-  resultTab: ResultSubTab;
-  createdAt: number;
-}
-
-interface PanelState {
-  id: string;
-  doc: string;
-  savedQueryId: string | null;
-  savedQuery: DbSavedQuery | null;
-  sheets: ResultSheet[];
-  activeSheetId: string | null;
-}
-
-function uid(): string {
-  return globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-function createRuntimeHBaseSessionId(baseSessionId: string): string {
-  return `${baseSessionId}::${uid()}`;
-}
-
-function newSheet(command: string, ordinal: number): ResultSheet {
-  return {
-    id: uid(),
-    title: `Result ${ordinal}`,
-    command,
-    result: null,
-    error: null,
-    warnings: [],
-    running: true,
-    cancelling: false,
-    elapsedMs: 0,
-    resultTab: "results",
-    createdAt: Date.now(),
-  };
-}
-
-function newPanel(doc = "list", savedQuery: DbSavedQuery | null = null): PanelState {
-  return {
-    id: uid(),
-    doc,
-    savedQueryId: savedQuery?.id ?? null,
-    savedQuery,
-    sheets: [],
-    activeSheetId: null,
-  };
-}
-
-function activeSheet(panel: PanelState): ResultSheet | null {
-  return panel.sheets.find((s) => s.id === panel.activeSheetId) ?? null;
-}
-
-// PLACEHOLDER_REST
-function ResultArea({
-  panel,
-  onSheetSelect,
-  onSheetClose,
-  onCloseSheets,
-  onTabChange,
-  onRefreshSheet,
-  onCancel,
-  onStatus,
-}: {
-  panel: PanelState;
-  onSheetSelect: (sheetId: string) => void;
-  onSheetClose: (sheetId: string) => void;
-  onCloseSheets: (sheetIds: string[]) => void;
-  onTabChange: (sheetId: string, tab: ResultSubTab) => void;
-  onRefreshSheet: (sheetId: string, mode: QueryRefreshMode) => void;
-  onCancel: () => void;
-  onStatus: (message: string) => void;
-}) {
-  const t = useT();
-  const sheetMenu = useContextMenu();
-  const sheet = activeSheet(panel);
-  const tab = "h-6 px-3 text-[11px] inline-flex items-center";
-
-  const openSheetMenu = (event: ReactMouseEvent, sheetId: string) => {
-    const idx = panel.sheets.findIndex((candidate) => candidate.id === sheetId);
-    if (idx < 0) return;
-    const isFirst = idx === 0;
-    const isLast = idx === panel.sheets.length - 1;
-    const onlyOne = panel.sheets.length <= 1;
-    const items: MenuItem[] = [
-      {
-        label: t("tabs.close"),
-        testId: "result-sheet-close",
-        icon: <X className="w-3 h-3" />,
-        onClick: () => onSheetClose(sheetId),
-      },
-      {
-        label: t("tabs.closeOthersShort"),
-        testId: "result-sheet-close-others",
-        icon: <Trash2 className="w-3 h-3" />,
-        onClick: () =>
-          onCloseSheets(panel.sheets.filter((candidate) => candidate.id !== sheetId).map((candidate) => candidate.id)),
-        disabled: onlyOne,
-      },
-      {
-        label: t("tabs.closeLeftShort"),
-        testId: "result-sheet-close-left",
-        icon: <Trash2 className="w-3 h-3" />,
-        onClick: () => onCloseSheets(panel.sheets.slice(0, idx).map((candidate) => candidate.id)),
-        disabled: isFirst,
-      },
-      {
-        label: t("tabs.closeRightShort"),
-        testId: "result-sheet-close-right",
-        icon: <Trash2 className="w-3 h-3" />,
-        onClick: () => onCloseSheets(panel.sheets.slice(idx + 1).map((candidate) => candidate.id)),
-        disabled: isLast,
-      },
-      {
-        label: t("tabs.closeAll"),
-        testId: "result-sheet-close-all",
-        icon: <Trash2 className="w-3 h-3" />,
-        onClick: () => onCloseSheets(panel.sheets.map((candidate) => candidate.id)),
-      },
-    ];
-    sheetMenu.show(event, items);
-  };
-
-  return (
-    <div className="h-full flex flex-col min-h-0" style={{ background: "var(--taomni-bg)", fontSize: "var(--taomni-db-font-size, 12px)" }}>
-      {sheetMenu.render}
-      <div className="h-7 shrink-0 flex items-end gap-1 px-1 overflow-hidden" style={{ background: "var(--taomni-chrome-bg)", borderBottom: "1px solid var(--taomni-divider)" }}>
-        {panel.sheets.length === 0 ? (
-          <span className="px-2 pb-1 text-[11px] text-[var(--taomni-text-muted)]">Result sheets</span>
-        ) : (
-          panel.sheets.map((rs) => {
-            const active = rs.id === sheet?.id;
-            return (
-              <button
-                key={rs.id}
-                type="button"
-                data-testid="result-sheet-tab"
-                data-sheet-id={rs.id}
-                className="h-6 max-w-[170px] px-2 inline-flex items-center gap-1 text-[11px]"
-                style={{
-                  background: active ? "var(--taomni-tab-active)" : "var(--taomni-tab-inactive)",
-                  color: active ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
-                  border: "1px solid var(--taomni-tab-border)",
-                  borderBottom: active ? "1px solid var(--taomni-tab-active)" : "1px solid var(--taomni-divider)",
-                  borderTopLeftRadius: 4,
-                  borderTopRightRadius: 4,
-                }}
-                onClick={() => onSheetSelect(rs.id)}
-                onContextMenu={(event) => openSheetMenu(event, rs.id)}
-                title={rs.command}
-              >
-                <span className="truncate">{rs.title}</span>
-                {rs.running && <Loader2 className="w-3 h-3 shrink-0 animate-spin" />}
-                {(rs.error || rs.warnings.length > 0) && <span className="text-[10px] shrink-0">●</span>}
-                <X className="w-3 h-3 shrink-0 hover:text-[var(--taomni-text)]" onClick={(e) => { e.stopPropagation(); onSheetClose(rs.id); }} />
-              </button>
-            );
-          })
-        )}
-      </div>
-      {sheet && (
-        <div className="h-7 shrink-0 flex items-center gap-1 px-1" style={{ borderBottom: "1px solid var(--taomni-divider)" }}>
-          <button type="button" className={tab} style={{ color: sheet.resultTab === "results" ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }} onClick={() => onTabChange(sheet.id, "results")}>Results</button>
-          <button type="button" className={tab} style={{ color: sheet.resultTab === "messages" ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }} onClick={() => onTabChange(sheet.id, "messages")}>
-            Messages{(sheet.error || sheet.warnings.length > 0) ? " ●" : ""}
-          </button>
-          <span className="ml-auto truncate px-2 text-[10px] text-[var(--taomni-text-muted)] font-mono" title={sheet.command}>{sheet.command.replace(/\s+/g, " ")}</span>
-        </div>
-      )}
-      <div className="flex-1 min-h-0 flex flex-col">
-        {!sheet ? (
-          <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">Run a command to create a result sheet.</div>
-        ) : sheet.resultTab === "results" ? (
-          sheet.result ? (
-            <div className={`flex-1 min-h-0 flex flex-col ${sheet.cancelling ? "opacity-50 pointer-events-none" : ""}`}>
-              <QueryResultGrid
-                result={sheet.result}
-                sourceSql={sheet.command}
-                running={sheet.running}
-                cancelling={sheet.cancelling}
-                onRefresh={(mode) => onRefreshSheet(sheet.id, mode)}
-                onCancel={onCancel}
-                onStatus={onStatus}
-              />
-            </div>
-          ) : (
-            <div className="flex-1 flex items-center justify-center text-[12px] text-[var(--taomni-text-muted)]">{sheet.running ? "Running…" : sheet.error ? "See Messages." : "No result."}</div>
-          )
-        ) : (
-          <div className="flex-1 overflow-auto taomni-scroll-y p-2 text-[12px] font-mono" style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}>
-            {sheet.error && <div style={{ color: "#d9534f" }}>{sheet.error}</div>}
-            {sheet.warnings.map((w, i) => (<div key={i} style={{ color: "#e6a817" }}>{w}</div>))}
-            {!sheet.error && sheet.warnings.length === 0 && <div className="text-[var(--taomni-text-muted)]">{sheet.result?.rowsAffected != null ? sheet.command : "No messages."}</div>}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function StatusBar({ panel }: { panel: PanelState }) {
-  const sheet = activeSheet(panel);
-  const r = sheet?.result ?? null;
-  return (
-    <div className="h-6 shrink-0 flex items-center gap-3 px-2 text-[11px] text-[var(--taomni-text-muted)]" style={{ background: "var(--taomni-quick-bg)", borderTop: "1px solid var(--taomni-divider)" }}>
-      {sheet?.running ? (
-        <span className="inline-flex items-center gap-1"><Loader2 className="w-3 h-3 animate-spin" /> {sheet.cancelling ? "Cancelling" : "Running"} {(sheet.elapsedMs / 1000).toFixed(1)}s</span>
-      ) : r ? (
-        <>
-          {r.columns.length > 0 && <span>{r.rows.length} rows</span>}
-          {r.columns.length > 0 && <span>{r.columns.length} cols</span>}
-          <span>{r.durationMs} ms</span>
-        </>
-      ) : (
-        <span>{panel.sheets.length} result sheet(s)</span>
-      )}
-    </div>
-  );
-}
-
-// PLACEHOLDER_MENU
-const CATEGORY_ORDER: HBaseCommandCategory[] = ["meta", "read", "ddl", "dml"];
-const CATEGORY_LABEL: Record<HBaseCommandCategory, string> = {
-  meta: "Meta",
-  read: "Read",
-  ddl: "DDL (tables)",
-  dml: "DML (cells)",
-};
-
-function CommandsMenu({
-  transport,
-  onPick,
-  onClose,
-}: {
-  transport: HBaseTransport;
-  onPick: (example: string) => void;
-  onClose: () => void;
-}) {
-  return (
-    <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div
-        className="absolute left-2 top-9 z-50 w-[360px] max-w-[calc(100vw-24px)] max-h-[min(420px,calc(100vh-48px))] overflow-auto taomni-scroll-y rounded shadow-lg py-1 text-[12px]"
-        style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)", color: "var(--taomni-text)" }}
-      >
-        {CATEGORY_ORDER.map((cat) => {
-          const cmds = HBASE_COMMANDS.filter((c) => c.category === cat);
-          if (cmds.length === 0) return null;
-          return (
-            <div key={cat}>
-              <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wide text-[var(--taomni-text-muted)]">{CATEGORY_LABEL[cat]}</div>
-              {cmds.map((c) => {
-                const supported = commandSupported(c.verb, transport);
-                return (
-                  <button
-                    key={c.verb}
-                    type="button"
-                    disabled={!supported}
-                    className="w-full text-left px-3 py-1.5 hover:bg-[var(--taomni-hover)] disabled:opacity-40 flex flex-col gap-0.5"
-                    title={supported ? c.description : `${c.description} (not available on the ${transport} transport)`}
-                    onClick={() => { onPick(c.example); onClose(); }}
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span className="taomni-mono font-semibold">{c.verb}</span>
-                      {c.isWrite && <span className="text-[9px] rounded px-1" style={{ background: "var(--taomni-divider)", color: c.destructive ? "#d9534f" : "var(--taomni-text-muted)" }}>{c.destructive ? "destructive" : "write"}</span>}
-                      {!supported && <span className="text-[9px] text-[var(--taomni-text-muted)]">unsupported</span>}
-                    </span>
-                    <span className="taomni-mono text-[10px] text-[var(--taomni-text-muted)] truncate">{c.example}</span>
-                  </button>
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
-function HistoryDropdown({ history, onPick, onClose }: { history: string[]; onPick: (cmd: string) => void; onClose: () => void }) {
-  return (
-    <>
-      <div className="fixed inset-0 z-40" onClick={onClose} />
-      <div className="absolute right-2 top-9 z-50 w-[420px] max-w-[calc(100vw-24px)] max-h-[min(300px,calc(100vh-48px))] overflow-auto rounded shadow-lg taomni-scroll-y flex flex-col" style={{ background: "var(--taomni-panel-bg)", border: "1px solid var(--taomni-divider)" }}>
-        {history.length === 0 ? (
-          <div className="px-3 py-2 text-[11px] text-[var(--taomni-text-muted)]">No command history yet.</div>
-        ) : (
-          history.map((cmd, i) => (
-            <button key={i} type="button" className="text-left px-3 py-2 text-[11px] truncate font-mono hover:bg-[var(--taomni-hover)] border-b border-[var(--taomni-divider)] last:border-0" onClick={() => onPick(cmd)} title={cmd}>
-              {cmd.replace(/\s+/g, " ")}
-            </button>
-          ))
-        )}
-      </div>
-    </>
-  );
-}
-
-function HelpDialog({ transport, onClose }: { transport: HBaseTransport; onClose: () => void }) {
-  const t = useT();
-  return (
-    <div className="fixed inset-0 z-[950] flex items-center justify-center" style={{ background: "rgba(0,0,0,0.4)" }} onClick={onClose}>
-      <div
-        role="dialog"
-        aria-label={t("hbaseObjects.helpTitle")}
-        aria-modal="true"
-        data-testid="hbase-help-dialog"
-        className="w-[640px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-auto taomni-scroll-y rounded shadow-lg p-4"
-        style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)" }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center mb-3">
-          <div className="text-sm font-semibold flex-1">{t("hbaseObjects.helpTitle")}</div>
-          <button type="button" className="h-6 w-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={onClose} aria-label={t("hbaseObjects.helpClose")}>
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-        {CATEGORY_ORDER.map((cat) => {
-          const cmds = HBASE_COMMANDS.filter((c) => c.category === cat);
-          return (
-            <div key={cat} className="mb-3">
-              <div className="text-[10px] uppercase tracking-wide text-[var(--taomni-text-muted)] mb-1">{CATEGORY_LABEL[cat]}</div>
-              <table className="w-full text-[12px] border-collapse">
-                <tbody>
-                  {cmds.map((c) => {
-                    const supported = commandSupported(c.verb, transport);
-                    return (
-                      <tr key={c.verb} className="border-b" style={{ borderColor: "var(--taomni-divider)", opacity: supported ? 1 : 0.55 }}>
-                        <td className="py-1 pr-2 align-top taomni-mono font-semibold whitespace-nowrap">{c.verb}</td>
-                        <td className="py-1 pr-2 align-top taomni-mono text-[11px] text-[var(--taomni-text-muted)]">{c.syntax}</td>
-                        <td className="py-1 align-top text-[11px]">
-                          {c.description}
-                          {!supported && <div className="text-[10px]" style={{ color: "#d9534f" }}>{t("hbaseObjects.helpRestNote")}</div>}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
 }
 
 export default function HBaseShellTab({ tabId, info, visible, chatToggle }: HBaseShellTabProps) {
@@ -472,34 +43,10 @@ export default function HBaseShellTab({ tabId, info, visible, chatToggle }: HBas
   const [connectionSessionId, setConnectionSessionId] = useState<string | null>(null);
   const [connError, setConnError] = useState<string | null>(null);
   const [hasBeenVisible, setHasBeenVisible] = useState(false);
-  const [tabLimit, setTabLimit] = useState(() => readDatabaseTabLimit(HBASE_TAB_LIMIT_SCOPE));
-
-  // --- workspace state (restored from localStorage) ---
-  const workspaceKey = `taomni.hbase.workspace.v1.${info.sessionId}`;
-  const [panels, setPanels] = useState<PanelState[]>(() => {
-    try {
-      const raw = localStorage.getItem(workspaceKey);
-      if (raw) {
-        const parsed = JSON.parse(raw) as {
-          docs?: string[];
-          panels?: Array<{ doc?: string; savedQueryId?: string | null }>;
-        };
-        if (Array.isArray(parsed.panels) && parsed.panels.length > 0) {
-          return parsed.panels.slice(0, tabLimit).map((panel) => ({
-            ...newPanel(typeof panel.doc === "string" ? panel.doc : ""),
-            savedQueryId: panel.savedQueryId ?? null,
-          }));
-        }
-        if (Array.isArray(parsed.docs) && parsed.docs.length > 0) {
-          return parsed.docs.slice(0, tabLimit).map((doc) => newPanel(doc));
-        }
-      }
-    } catch {
-      /* ignore */
-    }
-    return [newPanel("list")];
+  const workspace = useHBaseWorkspace({
+    info,
+    setStatusMessage,
   });
-  const [activePanelId, setActivePanelId] = useState<string>(() => panels[0]?.id ?? "");
   const [refreshSignal, setRefreshSignal] = useState(0);
   const [schemaMap, setSchemaMap] = useState<Record<string, string[]>>({});
   const [showCommands, setShowCommands] = useState(false);
@@ -509,70 +56,7 @@ export default function HBaseShellTab({ tabId, info, visible, chatToggle }: HBas
   const editorMenu = useContextMenu();
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [aiAnswerLanguage, setAiAnswerLanguage] = useState<AiAnswerLanguage>("inherit");
-  const [executionPreferences, setExecutionPreferences] = useState(loadSqlExecutionPreferences);
-
-  const editorHandles = useRef<Record<string, SqlEditorHandle | null>>({});
-  const historyRef = useRef<Record<string, string[]>>({});
   const queryTriggerRef = useRef<(() => void) | null>(null);
-  const panelsRef = useRef(panels);
-  const savedQueryFlushRef = useRef<Promise<void> | null>(null);
-
-  useEffect(
-    () => subscribeSqlExecutionPreferences(setExecutionPreferences),
-    [],
-  );
-
-  const activePanel = useMemo(
-    () => panels.find((p) => p.id === activePanelId) ?? panels[0],
-    [panels, activePanelId],
-  );
-
-  useEffect(() => {
-    panelsRef.current = panels;
-  }, [panels]);
-
-  useEffect(() => {
-    writeDatabaseTabLimit(HBASE_TAB_LIMIT_SCOPE, tabLimit);
-  }, [tabLimit]);
-
-  // Persist panel docs + active panel for restore-on-mount.
-  useEffect(() => {
-    try {
-      localStorage.setItem(workspaceKey, JSON.stringify({
-        panels: panels.map((panel) => ({
-          doc: panel.doc,
-          savedQueryId: panel.savedQueryId,
-        })),
-      }));
-    } catch {
-      /* ignore quota */
-    }
-  }, [panels, workspaceKey]);
-
-  useEffect(() => {
-    let cancelled = false;
-    const linkedPanels = panels.filter((panel) => panel.savedQueryId && !panel.savedQuery);
-    if (linkedPanels.length === 0) return;
-    void Promise.all(
-      linkedPanels.map(async (panel) => ({
-        panelId: panel.id,
-        query: panel.savedQueryId
-          ? await dbGetSavedQuery(panel.savedQueryId).catch(() => null)
-          : null,
-      })),
-    ).then((loaded) => {
-      if (cancelled) return;
-      setPanels((current) => current.map((panel) => {
-        const match = loaded.find((item) => item.panelId === panel.id)?.query;
-        return match ? { ...panel, savedQueryId: match.id, savedQuery: match } : panel;
-      }));
-    });
-    return () => {
-      cancelled = true;
-    };
-    // Query links are loaded from the initial workspace snapshot once per stable session.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspaceKey]);
 
   useEffect(() => {
     if (visible) setHasBeenVisible(true);
@@ -602,185 +86,27 @@ export default function HBaseShellTab({ tabId, info, visible, chatToggle }: HBas
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [info.sessionId]);
 
-  const anyRunning = panels.some((p) => p.sheets.some((s) => s.running));
+  const anyRunning = workspace.panels.some((p) => p.sheets.some((s) => s.running));
   useEffect(() => {
     setTabHasNewOutput(tabId, anyRunning && !visible);
   }, [anyRunning, tabId, visible, setTabHasNewOutput]);
-
-  // --- state patch helpers ---
-  const patchPanel = useCallback((id: string, patch: Partial<PanelState>) => {
-    setPanels((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
-  }, []);
-  const patchSheet = useCallback((panelId: string, sheetId: string, patch: Partial<ResultSheet>) => {
-    setPanels((prev) =>
-      prev.map((p) =>
-        p.id !== panelId ? p : { ...p, sheets: p.sheets.map((s) => (s.id === sheetId ? { ...s, ...patch } : s)) },
-      ),
-    );
-  }, []);
-
-  // EXEC_PLACEHOLDER
-  // Forced confirmation before any write command (editor- or tree-initiated).
-  const confirmWrite = useCallback(
-    async (statement: string): Promise<boolean> => {
-      const built = writeConfirmMessage(statement, {
-        write: t("hbaseObjects.writeWarning"),
-        destructive: t("hbaseObjects.destructiveWarning"),
-      });
-      if (!built) return true;
-      return confirmDialog.confirm({
-        title: t("hbaseObjects.confirmWriteTitle"),
-        message: built.message,
-        confirmLabel: t("hbaseObjects.confirmRun"),
-        danger: built.danger,
-      });
-    },
-    [confirmDialog, t],
-  );
-
-  const executeIntoSheet = useCallback(
-    async (panelId: string, sheetId: string, command: string): Promise<boolean> => {
-      if (!connectionSessionId) return false;
-      patchSheet(panelId, sheetId, { running: true, cancelling: false, error: null, elapsedMs: 0 });
-      const started = Date.now();
-      const timer = window.setInterval(() => patchSheet(panelId, sheetId, { elapsedMs: Date.now() - started }), 100);
-      try {
-        const res = await hbaseExecute(connectionSessionId, command);
-        patchSheet(panelId, sheetId, {
-          result: hbaseResultToGrid(res),
-          warnings: res.warnings ?? [],
-          running: false,
-          error: null,
-          command: res.command || command,
-          elapsedMs: Date.now() - started,
-        });
-        return true;
-      } catch (err) {
-        patchSheet(panelId, sheetId, {
-          error: String(err),
-          running: false,
-          resultTab: "messages",
-          elapsedMs: Date.now() - started,
-        });
-        return false;
-      } finally {
-        window.clearInterval(timer);
-      }
-    },
-    [connectionSessionId, patchSheet],
-  );
-
-  const runStatements = useCallback(
-    async (panelId: string, text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed || !connectionSessionId) return;
-      const panel = panels.find((p) => p.id === panelId);
-      if (panel?.sheets.some((s) => s.running)) return;
-      const statements = splitHBaseStatements(trimmed);
-      if (statements.length === 0) return;
-      const h = historyRef.current[panelId] ?? [];
-      if (h[0] !== trimmed) historyRef.current[panelId] = [trimmed, ...h].slice(0, MAX_HISTORY);
-
-      let mutated = false;
-      let ordinal = panel?.sheets.length ?? 0;
-      for (const statement of statements) {
-        const ok = await confirmWrite(statement);
-        if (!ok) break;
-        ordinal += 1;
-        const sheet = newSheet(statement, ordinal);
-        setPanels((prev) =>
-          prev.map((p) =>
-            p.id !== panelId ? p : { ...p, sheets: [...p.sheets, sheet].slice(-tabLimit), activeSheetId: sheet.id },
-          ),
-        );
-        const success = await executeIntoSheet(panelId, sheet.id, statement);
-        if (/^(create|drop|enable|disable|alter)\b/i.test(statement)) mutated = true;
-        if (!success) break;
-      }
-      if (mutated) setRefreshSignal((s) => s + 1);
-    },
-    [connectionSessionId, panels, confirmWrite, executeIntoSheet, tabLimit],
-  );
-
-  const runCurrentStatement = useCallback(
-    (panelId: string) => {
-      const panel = panels.find((p) => p.id === panelId);
-      if (!panel) return;
-      const handle = editorHandles.current[panelId];
-      const doc = handle?.getValue() ?? panel.doc;
-      const selection = handle?.getSelectionRange() ?? null;
-      const position = selection && selection.from !== selection.to
-        ? selection.from
-        : handle?.getCursorPosition() ?? doc.length;
-      const range = hbaseStatementRangeAt(doc, position);
-      if (!range) {
-        setStatusMessage("No HBase statement at the current cursor.");
-        return;
-      }
-      void runStatements(panelId, range.sql);
-    },
-    [panels, runStatements],
-  );
-
-  /**
-   * Explain the statement at the cursor. Reuses the same range resolution as
-   * Run, so "Explain" and "Run" always act on the statement the user believes
-   * is current. Pulls in the latest result sheet for that command when there is
-   * one, so a failed run gets diagnosed rather than described.
-   */
-  const explainCurrentStatement = useCallback(
-    async (panelId: string) => {
-      const panel = panels.find((p) => p.id === panelId);
-      if (!panel) return;
-      const handle = editorHandles.current[panelId];
-      const doc = handle?.getValue() ?? panel.doc;
-      const selection = handle?.getSelectionRange() ?? null;
-      const position = selection && selection.from !== selection.to
-        ? selection.from
-        : handle?.getCursorPosition() ?? doc.length;
-      const range = hbaseStatementRangeAt(doc, position);
-      if (!range) {
-        setStatusMessage(t("dbAi.noStatement"));
-        return;
-      }
-
-      const target = range.sql.trim();
-      const sheet = [...panel.sheets].reverse().find((s) => s.command.trim() === target && !s.running);
-      const { text, truncated } = truncateStatement(target);
-      const prompt = buildDbAiPrompt(
-        {
-          action: "explain",
-          dialect: "hbase",
-          engine: "HBase",
-          statement: text,
-          truncated,
-          database: info.namespace,
-          transport,
-          durationMs: sheet?.elapsedMs ?? null,
-          rowCount: sheet?.result?.rows.length ?? null,
-          error: sheet?.error ?? null,
-        },
-        aiAnswerLanguage,
-      );
-
-      const chat = useChatStore.getState();
-      await chat.openTabChat(tabId);
-      const outcome = await chat.sendPromptToTabChat(prompt);
-      if (outcome.status === "rejected") {
-        setStatusMessage(t("dbAi.queueFull", { limit: outcome.limit }));
-      } else if (outcome.status === "queued") {
-        setStatusMessage(t("dbAi.queued", { position: outcome.position }));
-      } else {
-        setStatusMessage(t("dbAi.sent"));
-      }
-    },
-    [aiAnswerLanguage, info.namespace, panels, setStatusMessage, t, tabId, transport],
-  );
+  const execution = useHBaseExecution({
+    t,
+    confirmDialog,
+    connectionSessionId,
+    workspace,
+    setRefreshSignal,
+    setStatusMessage,
+    info,
+    transport,
+    aiAnswerLanguage,
+    tabId,
+  });
 
   const openEditorContextMenu = (event: ReactMouseEvent) => {
-    setActivePanelId(activePanel.id);
-    const handle = editorHandles.current[activePanel.id];
-    const doc = handle?.getValue() ?? activePanel.doc;
+    workspace.setActivePanelId(workspace.activePanel.id);
+    const handle = workspace.editorHandles.current[workspace.activePanel.id];
+    const doc = handle?.getValue() ?? workspace.activePanel.doc;
     const selection = handle?.getSelectionRange() ?? null;
     const position = selection && selection.from !== selection.to
       ? selection.from
@@ -793,7 +119,7 @@ export default function HBaseShellTab({ tabId, info, visible, chatToggle }: HBas
         testId: "hbase-context-ai-explain-syntax",
         disabled: !range,
         onClick: () => {
-          if (range) void explainCurrentStatement(activePanel.id);
+          if (range) void execution.explainCurrentStatement(workspace.activePanel.id);
         },
       },
       {
@@ -810,136 +136,23 @@ export default function HBaseShellTab({ tabId, info, visible, chatToggle }: HBas
       {
         label: "Run all commands",
         icon: <Play className="w-3 h-3" style={{ color: "#62d36f" }} />,
-        onClick: () => void runStatements(activePanel.id, handle?.getValue() ?? activePanel.doc),
+        onClick: () => void execution.runStatements(workspace.activePanel.id, handle?.getValue() ?? workspace.activePanel.doc),
         disabled: !connectionSessionId || panelRunning,
       },
       {
         label: "Run current command",
         icon: <Crosshair className="w-3 h-3" />,
-        onClick: () => runCurrentStatement(activePanel.id),
+        onClick: () => execution.runCurrentStatement(workspace.activePanel.id),
         disabled: !connectionSessionId || panelRunning,
       },
     ];
     editorMenu.show(event, items);
   };
 
-  const cancelQuery = useCallback(
-    (panelId: string) => {
-      setPanels((prev) =>
-        prev.map((p) =>
-          p.id !== panelId ? p : { ...p, sheets: p.sheets.map((s) => (s.running ? { ...s, cancelling: true } : s)) },
-        ),
-      );
-      if (connectionSessionId) void hbaseCancel(connectionSessionId);
-    },
-    [connectionSessionId],
-  );
-
-  const refreshSheet = useCallback(
-    (panelId: string, sheetId: string, _mode: QueryRefreshMode) => {
-      const panel = panels.find((p) => p.id === panelId);
-      const sheet = panel?.sheets.find((s) => s.id === sheetId);
-      if (sheet) void executeIntoSheet(panelId, sheetId, sheet.command);
-    },
-    [panels, executeIntoSheet],
-  );
-
-  const closeResultSheets = useCallback((panelId: string, sheetIds: string[]) => {
-    if (sheetIds.length === 0) return;
-    const idSet = new Set(sheetIds);
-    setPanels((prev) =>
-      prev.map((p) => {
-        if (p.id !== panelId) return p;
-        const sheets = p.sheets.filter((s) => !idSet.has(s.id));
-        const activeClosed = !!p.activeSheetId && idSet.has(p.activeSheetId);
-        return {
-          ...p,
-          sheets,
-          activeSheetId: activeClosed ? sheets[sheets.length - 1]?.id ?? null : p.activeSheetId,
-        };
-      }),
-    );
-  }, []);
-
-  const closeResultSheet = useCallback(
-    (panelId: string, sheetId: string) => {
-      closeResultSheets(panelId, [sheetId]);
-    },
-    [closeResultSheets],
-  );
-
-  const addPanel = useCallback(
-    (doc = "", savedQuery: DbSavedQuery | null = null) => {
-      if (panels.length >= tabLimit) return null;
-      const panel = newPanel(doc, savedQuery);
-      setPanels((prev) => [...prev, panel]);
-      setActivePanelId(panel.id);
-      return panel.id;
-    },
-    [panels.length, tabLimit],
-  );
-
   const openQuerySave = useCallback(() => {
     setLeftPanelTab("queries");
     setTimeout(() => queryTriggerRef.current?.(), 0);
   }, []);
-
-  const flushSavedQueries = useCallback(async () => {
-    if (savedQueryFlushRef.current) return savedQueryFlushRef.current;
-    const save = (async () => {
-      const updates = new Map<string, DbSavedQuery>();
-      const errors: string[] = [];
-      for (const panel of panelsRef.current) {
-        const query = panel.savedQuery;
-        const content = editorHandles.current[panel.id]?.getValue() ?? panel.doc;
-        if (!query || query.content === content) continue;
-        try {
-          updates.set(panel.id, await dbSaveSavedQuery({
-            ...query,
-            content,
-            updatedAt: Date.now(),
-          }));
-        } catch (error) {
-          errors.push(`${query.name}: ${String(error)}`);
-        }
-      }
-      if (updates.size > 0) {
-        setPanels((current) => {
-          const next = current.map((panel) => {
-            const query = updates.get(panel.id);
-            return query
-              ? { ...panel, doc: query.content, savedQueryId: query.id, savedQuery: query }
-              : panel;
-          });
-          panelsRef.current = next;
-          return next;
-        });
-      }
-      if (errors.length > 0) {
-        setStatusMessage(`HBase saved query auto-save failed: ${errors.join("; ")}`);
-      }
-    })();
-    savedQueryFlushRef.current = save;
-    try {
-      await save;
-    } finally {
-      if (savedQueryFlushRef.current === save) savedQueryFlushRef.current = null;
-    }
-  }, [setStatusMessage]);
-
-  useEffect(() => {
-    const hasChanges = panels.some((panel) => {
-      const content = editorHandles.current[panel.id]?.getValue() ?? panel.doc;
-      return panel.savedQuery && panel.savedQuery.content !== content;
-    });
-    if (!hasChanges) return;
-    const timer = setTimeout(() => void flushSavedQueries(), 2000);
-    return () => clearTimeout(timer);
-  }, [flushSavedQueries, panels]);
-
-  useEffect(() => () => {
-    void flushSavedQueries();
-  }, [flushSavedQueries]);
 
   useEffect(() => registerQueryTab({
     tabId,
@@ -947,63 +160,51 @@ export default function HBaseShellTab({ tabId, info, visible, chatToggle }: HBas
     engine: "HBaseShell",
     insertQuery: (command, options) => {
       if (options?.destination === "current") {
-        editorHandles.current[activePanelId]?.setValue(command);
-        patchPanel(activePanelId, {
+        workspace.editorHandles.current[workspace.activePanelId]?.setValue(command);
+        workspace.patchPanel(workspace.activePanelId, {
           doc: command,
           savedQueryId: null,
           savedQuery: null,
         });
-        if (options.run) void runStatements(activePanelId, command);
+        if (options.run) void execution.runStatements(workspace.activePanelId, command);
         return;
       }
-      const panelId = addPanel(command);
-      if (panelId && options?.run) setTimeout(() => void runStatements(panelId, command), 0);
+      const panelId = workspace.addPanel(command);
+      if (panelId && options?.run) setTimeout(() => void execution.runStatements(panelId, command), 0);
     },
     appendEchoSql: (command, note) => {
-      const current = editorHandles.current[activePanelId]?.getValue()
-        ?? panelsRef.current.find((panel) => panel.id === activePanelId)?.doc
+      const current = workspace.editorHandles.current[workspace.activePanelId]?.getValue()
+        ?? workspace.panelsRef.current.find((panel) => panel.id === workspace.activePanelId)?.doc
         ?? "";
       const prefix = note ? `# ${note}\n` : "";
       const next = `${current}${current.trim() ? "\n" : ""}${prefix}${command}`;
-      editorHandles.current[activePanelId]?.setValue(next);
-      patchPanel(activePanelId, {
+      workspace.editorHandles.current[workspace.activePanelId]?.setValue(next);
+      workspace.patchPanel(workspace.activePanelId, {
         doc: next,
         savedQueryId: null,
         savedQuery: null,
       });
     },
-    flushWorkspace: flushSavedQueries,
-  }), [activePanelId, addPanel, flushSavedQueries, info.host, info.port, patchPanel, runStatements, tabId]);
-
-  const closePanel = useCallback(
-    (panelId: string) => {
-      setPanels((prev) => {
-        if (prev.length <= 1) return prev;
-        const next = prev.filter((p) => p.id !== panelId);
-        if (panelId === activePanelId) setActivePanelId(next[next.length - 1].id);
-        return next;
-      });
-    },
-    [activePanelId],
-  );
+    flushWorkspace: workspace.flushSavedQueries,
+  }), [workspace.activePanelId, workspace.addPanel, workspace.flushSavedQueries, info.host, info.port, workspace.patchPanel, execution.runStatements, tabId]);
 
   // --- tree → workspace bridge ---
-  const onRunCommand = useCallback((stmt: string) => void runStatements(activePanelId, stmt), [runStatements, activePanelId]);
+  const onRunCommand = useCallback((stmt: string) => void execution.runStatements(workspace.activePanelId, stmt), [execution.runStatements, workspace.activePanelId]);
   const onInsert = useCallback(
     (stmt: string, target: "cursor" | "newPanel" = "cursor") => {
-      if (target === "newPanel" && panels.length < tabLimit) {
-        addPanel(stmt);
+      if (target === "newPanel" && workspace.panels.length < workspace.tabLimit) {
+        workspace.addPanel(stmt);
         return;
       }
-      const editor = editorHandles.current[activePanelId];
+      const editor = workspace.editorHandles.current[workspace.activePanelId];
       if (editor) {
         editor.insertText(`${stmt}\n`);
         editor.focus();
       } else {
-        patchPanel(activePanelId, { doc: `${activePanel?.doc ?? ""}${activePanel?.doc ? "\n" : ""}${stmt}` });
+        workspace.patchPanel(workspace.activePanelId, { doc: `${workspace.activePanel?.doc ?? ""}${workspace.activePanel?.doc ? "\n" : ""}${stmt}` });
       }
     },
-    [panels.length, addPanel, activePanelId, activePanel, patchPanel, tabLimit],
+    [workspace.panels.length, workspace.addPanel, workspace.activePanelId, workspace.activePanel, workspace.patchPanel, workspace.tabLimit],
   );
 
   const onTablesLoaded = useCallback((tables: string[]) => {
@@ -1070,330 +271,53 @@ export default function HBaseShellTab({ tabId, info, visible, chatToggle }: HBas
     );
   }
 
-  const panelRunning = activePanel.sheets.some((s) => s.running);
+  const panelRunning = workspace.activePanel.sheets.some((s) => s.running);
   const btn = "h-6 px-2 inline-flex items-center gap-1 rounded text-[11px] hover:bg-[var(--taomni-hover)] disabled:opacity-40";
 
-  return (
-    <div ref={rootRef} className="h-full w-full flex flex-col relative" style={{ background: "var(--taomni-bg)", color: "var(--taomni-text)" }}>
-      {chatToggle && (
-        <TabActions active={visible}>
-          <button
-            type="button"
-            data-testid="hbase-chat-toggle"
-            onClick={chatToggle.onToggle}
-            title={chatToggle.open ? t("terminal.chatFloatingTitleClose") : t("terminal.chatFloatingTitleOpen")}
-            aria-label={chatToggle.open ? t("terminal.chatFloatingLabelClose") : t("terminal.chatFloatingLabelOpen")}
-            style={{
-              ...FT_ICON_BUTTON_STYLE,
-              ...(chatToggle.open ? FT_BUTTON_ACTIVE_OVERRIDE : {}),
-            }}
-          >
-            <Bot size={14} />
-          </button>
-        </TabActions>
-      )}
-      {connError && (
-        <div
-          className="h-7 shrink-0 px-2 flex items-center gap-2 text-[11px] border-b"
-          style={{ color: "#d9534f", borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
-          title={connError}
-          data-testid="hbase-connection-error-banner"
-        >
-          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-          <span className="font-semibold">HBase connection failed.</span>
-          <span className="truncate text-[var(--taomni-text-muted)]">The Query Library remains available. {connError}</span>
-        </div>
-      )}
-      {sidebarCollapsed && (
-        <button
-          type="button"
-          data-testid="hbase-sidebar-drawer-handle"
-          className="absolute left-0 top-12 z-30 h-24 w-6 inline-flex flex-col items-center justify-center gap-1 rounded-r border-y border-r shadow-sm hover:bg-[var(--taomni-hover)]"
-          style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text-muted)" }}
-          title="Show database objects"
-          aria-label="Show database objects"
-          onClick={expandSidebarPanel}
-        >
-          <ChevronRight className="w-3.5 h-3.5" />
-          <span className="text-[10px] leading-none" style={{ writingMode: "vertical-rl" }}>Objects</span>
-        </button>
-      )}
-      <PanelGroup
-        orientation="horizontal"
-        id={`hbase-shell-${info.sessionId}`}
-        defaultLayout={initialLayout}
-        onLayoutChanged={saveResizableLayout(`hbase-shell-${info.sessionId}`)}
-        className="flex-1 min-h-0"
-      >
-        <Panel panelRef={sidebarPanelRef} id="sidebar" defaultSize="20%" minSize="15%" maxSize="40%" collapsible collapsedSize={0} onResize={handleSidebarResize}>
-          <div className="h-full flex flex-col border-r" style={{ borderColor: "var(--taomni-divider)" }}>
-            <div className="h-7 shrink-0 flex border-b border-[var(--taomni-divider)] bg-[var(--taomni-quick-bg)]">
-              <button
-                type="button"
-                className="flex-1 text-[11px] font-semibold inline-flex items-center justify-center gap-1"
-                style={{ color: leftPanelTab === "objects" ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }}
-                onClick={() => setLeftPanelTab("objects")}
-              >
-                <Database className="w-3.5 h-3.5" /> Objects
-              </button>
-              <button
-                type="button"
-                className="flex-1 text-[11px] font-semibold inline-flex items-center justify-center gap-1 border-l border-[var(--taomni-divider)]"
-                style={{ color: leftPanelTab === "queries" ? "var(--taomni-accent)" : "var(--taomni-text-muted)" }}
-                onClick={() => setLeftPanelTab("queries")}
-                data-testid="hbase-query-library-tab"
-              >
-                <Files className="w-3.5 h-3.5" /> Queries
-              </button>
-            </div>
-            <div className="flex-1 min-h-0">
-              {leftPanelTab === "objects" ? (
-                <HBaseSchemaTree
-                  sessionId={connectionSessionId}
-                  transport={transport}
-                  namespace={info.namespace}
-                  endpoint={endpoint}
-                  refreshSignal={refreshSignal}
-                  scanLimit={rowLimit}
-                  onRunCommand={onRunCommand}
-                  onInsert={onInsert}
-                  onNewQuery={() => addPanel("")}
-                  onStatus={setStatusMessage}
-                  onTablesLoaded={onTablesLoaded}
-                  onFamiliesLoaded={onFamiliesLoaded}
-                />
-              ) : (
-                <QueryLibraryPanel
-                  engine="HBaseShell"
-                  connectionId={info.sessionId}
-                  schemaName={info.namespace}
-                  activeContent={editorHandles.current[activePanel.id]?.getValue() ?? activePanel.doc}
-                  contentLabel="HBase command"
-                  onOpenQuery={(query) => addPanel(query.content, query)}
-                  onRunQuery={(query) => {
-                    const panelId = addPanel(query.content, query);
-                    if (panelId) setTimeout(() => void runStatements(panelId, query.content), 0);
-                  }}
-                  onSavedQuery={(query, created) => {
-                    const targetPanelId = created ? activePanel.id : null;
-                    setPanels((current) => {
-                      const next = current.map((panel) => {
-                        if (panel.id !== targetPanelId && panel.savedQueryId !== query.id) return panel;
-                        if (!created) editorHandles.current[panel.id]?.setValue(query.content);
-                        return {
-                          ...panel,
-                          doc: created ? panel.doc : query.content,
-                          savedQueryId: query.id,
-                          savedQuery: query,
-                        };
-                      });
-                      panelsRef.current = next;
-                      return next;
-                    });
-                  }}
-                  onAddTriggerRef={queryTriggerRef}
-                />
-              )}
-            </div>
-          </div>
-        </Panel>
-        <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize" />
-        <Panel id="workspace">
-          <div className="h-full flex flex-col min-w-0">
-            {/* query-panel tab strip */}
-            <div className="h-7 shrink-0 flex items-center gap-1 px-1 overflow-hidden" style={{ background: "var(--taomni-chrome-bg)", borderBottom: "1px solid var(--taomni-divider)" }}>
-              {panels.map((p, i) => {
-                const running = p.sheets.some((s) => s.running);
-                return (
-                  <button
-                    key={p.id}
-                    type="button"
-                    className="px-2 h-5 max-w-[190px] rounded inline-flex items-center gap-1"
-                    style={{
-                      background: p.id === activePanelId ? "var(--taomni-selected)" : "transparent",
-                      color: p.id === activePanelId ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
-                    }}
-                    onClick={() => setActivePanelId(p.id)}
-                    title={p.savedQuery?.name ?? `Query ${i + 1}`}
-                  >
-                    <span className="truncate">{p.savedQuery?.name ?? `Query ${i + 1}`}</span>
-                    {running && <Loader2 className="w-3 h-3 shrink-0 animate-spin" />}
-                    {panels.length > 1 && (
-                      <X className="w-3 h-3 shrink-0 hover:text-[var(--taomni-text)]" onClick={(e) => { e.stopPropagation(); closePanel(p.id); }} />
-                    )}
-                  </button>
-                );
-              })}
-              {panels.length < tabLimit && (
-                <button type="button" title="New query panel" className="h-5 w-5 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]" onClick={() => addPanel("")}>
-                  <Plus className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-
-            <div key={activePanel.id} className="flex-1 min-h-0 h-full flex flex-col min-w-0 relative">
-              {/* editor toolbar */}
-              <div className="h-8 shrink-0 flex items-center gap-1 px-2 relative" style={{ background: "var(--taomni-quick-bg)", borderBottom: "1px solid var(--taomni-divider)" }}>
-                <button
-                  type="button"
-                  className={btn}
-                  disabled={!connectionSessionId || panelRunning}
-                  title={`Run (${displaySqlShortcut(executionPreferences.runAll)})`}
-                  onClick={() => void runStatements(activePanel.id, editorHandles.current[activePanel.id]?.getValue() ?? activePanel.doc)}
-                >
-                  <Play className="w-3.5 h-3.5" style={{ color: "#62d36f" }} /> Run
-                </button>
-                <button
-                  type="button"
-                  className={btn}
-                  disabled={!connectionSessionId || panelRunning}
-                  title={`Run selection (${displaySqlShortcut(executionPreferences.runSelection)})`}
-                  onClick={() => void runStatements(activePanel.id, editorHandles.current[activePanel.id]?.getSelectionOrAll() ?? activePanel.doc)}
-                >
-                  <SquareDashedMousePointer className="w-3.5 h-3.5" /> Selection
-                </button>
-                <button
-                  type="button"
-                  className={btn}
-                  disabled={!connectionSessionId || panelRunning}
-                  title={`Run current statement (${displaySqlShortcut(executionPreferences.runCurrent)})`}
-                  data-testid="hbase-run-current-statement"
-                  onClick={() => runCurrentStatement(activePanel.id)}
-                >
-                  <Crosshair className="w-3.5 h-3.5" /> Current
-                </button>
-                <button
-                  type="button"
-                  className={btn}
-                  title={t("dbAi.explainStatementTooltip")}
-                  data-testid="hbase-explain-current-statement"
-                  onClick={() => void explainCurrentStatement(activePanel.id)}
-                >
-                  <BookOpen className="w-3.5 h-3.5" /> {t("dbAi.explainStatement")}
-                </button>
-                <div className="relative">
-                  <button
-                    type="button"
-                    className={btn}
-                    data-testid="hbase-ai-answer-language-toggle"
-                    title={t("codeWorkspaceAi.answerLanguageTooltip", { current: t(answerLanguageLabelKey(aiAnswerLanguage)) })}
-                    onClick={() => setLangMenuOpen((v) => !v)}
-                  >
-                    <Languages className="w-3.5 h-3.5" />
-                    <span>{t(answerLanguageLabelKey(aiAnswerLanguage))}</span>
-                    <ChevronDown className="w-3 h-3 opacity-60" />
-                  </button>
-                  {langMenuOpen && (
-                    <div
-                      className="absolute left-0 top-full mt-1 z-50 py-1 rounded shadow-lg border text-[11px] min-w-[120px]"
-                      style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}
-                    >
-                      {AI_ANSWER_LANGUAGES.map((lang) => (
-                        <button
-                          key={lang}
-                          type="button"
-                          data-testid={`hbase-ai-answer-language-option-${lang}`}
-                          className="w-full px-2 py-1 text-left flex items-center justify-between hover:bg-[var(--taomni-hover)]"
-                          onClick={() => {
-                            setAiAnswerLanguage(lang);
-                            setLangMenuOpen(false);
-                          }}
-                        >
-                          <span>{t(answerLanguageLabelKey(lang))}</span>
-                          {lang === aiAnswerLanguage && <Check className="w-3 h-3 text-[var(--taomni-accent)]" />}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <button type="button" className={btn} disabled={!panelRunning} title="Cancel query" onClick={() => cancelQuery(activePanel.id)}>
-                  <Ban className="w-3.5 h-3.5" style={{ color: "#d9534f" }} /> Cancel
-                </button>
-                <span className="w-px h-4 mx-1" style={{ background: "var(--taomni-divider)" }} />
-                <button type="button" className={btn} title="Commands" onClick={() => { setShowCommands((v) => !v); setShowHistory(false); }}>
-                  Commands <ChevronDown className="w-3 h-3" />
-                </button>
-                <button type="button" className={btn} title="Command history" onClick={() => { setShowHistory((v) => !v); setShowCommands(false); }}>
-                  <Clock className="w-3.5 h-3.5" /> History
-                </button>
-                <button type="button" className={btn} title="Save to query library" onClick={openQuerySave} data-testid="hbase-save-query">
-                  <Star className="w-3.5 h-3.5 text-[var(--taomni-accent)]" /> Save Query
-                </button>
-                <button type="button" className={btn} title={t("hbaseObjects.helpTitle")} onClick={() => setShowHelp(true)}>
-                  <HelpCircle className="w-3.5 h-3.5" /> {t("hbaseObjects.help")}
-                </button>
-                <div className="flex-1" />
-                <label className="h-6 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]">
-                  Rows
-                  <input className="taomni-input h-6 w-[68px] text-[11px]" type="number" min={1} max={10000} value={rowLimit}
-                    title="Default scan row limit" onChange={(e) => setRowLimit(Math.max(1, Math.min(10000, Number(e.target.value) || DEFAULT_ROW_LIMIT)))} />
-                </label>
-                <label className="h-6 inline-flex items-center gap-1 text-[11px] text-[var(--taomni-text-muted)]">
-                  Tab limit
-                  <input
-                    data-testid="hbase-tab-limit"
-                    className="taomni-input h-6 w-[68px] text-[11px]"
-                    type="number"
-                    min={MIN_DATABASE_TAB_LIMIT}
-                    max={MAX_DATABASE_TAB_LIMIT}
-                    value={tabLimit}
-                    title="Maximum query tabs per session and result tabs per query"
-                    onChange={(event) => setTabLimit(clampDatabaseTabLimit(Number(event.target.value)))}
-                  />
-                </label>
-                <span className="text-[10px] text-[var(--taomni-text-muted)]">HBase ({transport})</span>
-                {showCommands && <CommandsMenu transport={transport} onPick={(ex) => onInsert(ex, "cursor")} onClose={() => setShowCommands(false)} />}
-                {showHistory && <HistoryDropdown history={historyRef.current[activePanel.id] ?? []} onPick={(cmd) => { editorHandles.current[activePanel.id]?.setValue(cmd); setShowHistory(false); }} onClose={() => setShowHistory(false)} />}
-              </div>
-
-              <PanelGroup
-                orientation="vertical"
-                id={`hbase-workspace-${info.sessionId}`}
-                defaultLayout={loadResizableLayout(`hbase-workspace-${info.sessionId}`, ["editor", "results"])}
-                onLayoutChanged={saveResizableLayout(`hbase-workspace-${info.sessionId}`)}
-                className="flex-1 min-h-0"
-              >
-                <Panel id="editor" defaultSize="35%" minSize="15%">
-                  <div className="h-full w-full" onContextMenu={openEditorContextMenu}>
-                    {editorMenu.render}
-                    <SqlEditorPanel
-                      engine="HBase"
-                      initialDoc={activePanel.doc}
-                      completionSources={completionSources}
-                      handleRef={(h) => { editorHandles.current[activePanel.id] = h; }}
-                      onDocChange={(doc) => patchPanel(activePanel.id, { doc })}
-                      onFocus={() => setActivePanelId(activePanel.id)}
-                      onRun={(sql) => void runStatements(activePanel.id, sql)}
-                      onRunCurrent={() => runCurrentStatement(activePanel.id)}
-                    />
-                  </div>
-                </Panel>
-                <PanelResizeHandle className="h-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-row-resize" />
-                <Panel id="results" minSize="15%">
-                  <ResultArea
-                    panel={activePanel}
-                    onSheetSelect={(sheetId) => patchPanel(activePanel.id, { activeSheetId: sheetId })}
-                    onSheetClose={(sheetId) => closeResultSheet(activePanel.id, sheetId)}
-                    onCloseSheets={(sheetIds) => closeResultSheets(activePanel.id, sheetIds)}
-                    onTabChange={(sheetId, tab) => patchSheet(activePanel.id, sheetId, { resultTab: tab })}
-                    onRefreshSheet={(sheetId, mode) => refreshSheet(activePanel.id, sheetId, mode)}
-                    onCancel={() => cancelQuery(activePanel.id)}
-                    onStatus={setStatusMessage}
-                  />
-                </Panel>
-              </PanelGroup>
-              <StatusBar panel={activePanel} />
-            </div>
-          </div>
-        </Panel>
-
-      </PanelGroup>
-      {showHelp && <HelpDialog transport={transport} onClose={() => setShowHelp(false)} />}
-      {confirmDialog.render}
-    </div>
-  );
+  return <HBaseWorkspaceView
+    rootRef={rootRef}
+    chatToggle={chatToggle}
+    visible={visible}
+    t={t}
+    connError={connError}
+    sidebarCollapsed={sidebarCollapsed}
+    expandSidebarPanel={expandSidebarPanel}
+    info={info}
+    initialLayout={initialLayout}
+    sidebarPanelRef={sidebarPanelRef}
+    handleSidebarResize={handleSidebarResize}
+    leftPanelTab={leftPanelTab}
+    setLeftPanelTab={setLeftPanelTab}
+    connectionSessionId={connectionSessionId}
+    transport={transport}
+    endpoint={endpoint}
+    refreshSignal={refreshSignal}
+    rowLimit={rowLimit}
+    onRunCommand={onRunCommand}
+    onInsert={onInsert}
+    workspace={workspace}
+    setStatusMessage={setStatusMessage}
+    onTablesLoaded={onTablesLoaded}
+    onFamiliesLoaded={onFamiliesLoaded}
+    execution={execution}
+    queryTriggerRef={queryTriggerRef}
+    btn={btn}
+    panelRunning={panelRunning}
+    aiAnswerLanguage={aiAnswerLanguage}
+    setLangMenuOpen={setLangMenuOpen}
+    langMenuOpen={langMenuOpen}
+    setAiAnswerLanguage={setAiAnswerLanguage}
+    setShowCommands={setShowCommands}
+    setShowHistory={setShowHistory}
+    openQuerySave={openQuerySave}
+    setShowHelp={setShowHelp}
+    setRowLimit={setRowLimit}
+    showCommands={showCommands}
+    showHistory={showHistory}
+    openEditorContextMenu={openEditorContextMenu}
+    editorMenu={editorMenu}
+    completionSources={completionSources}
+    showHelp={showHelp}
+    confirmDialog={confirmDialog}
+  />;
 }
-
-
-
-

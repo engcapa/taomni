@@ -9,13 +9,13 @@
 use std::path::Path;
 use std::time::Duration;
 
-use rusqlite::{params, Connection};
+use rusqlite::{Connection, params};
 use taomni_lib::session::resume::{
-    clear_run_snapshot, commit_run_snapshot, get_run_snapshot, init_tables, SnapshotEntry,
+    SnapshotEntry, clear_run_snapshot, commit_run_snapshot, get_run_snapshot, init_tables,
 };
 use taomni_lib::terminal::local_directories::{
-    init_tables as init_directory_tables, list_directory_shortcuts, migrate_legacy_history,
-    record_directory_use, SOURCE_LOCAL_START, SOURCE_LOCAL_CWD,
+    SOURCE_LOCAL_CWD, SOURCE_LOCAL_START, init_tables as init_directory_tables,
+    list_directory_shortcuts, migrate_legacy_history, record_directory_use,
 };
 
 fn open_db(path: &Path) -> Connection {
@@ -89,8 +89,15 @@ fn directory_history_and_snapshot_survive_reopen() {
             saved_session_type: "SSH".to_string(),
             display_name: "prod".to_string(),
         }];
-        let response = commit_run_snapshot(&mut conn, "batch-1".into(), &mut entries, Some("saved:s1".to_string()), None, false)
-            .expect("commit snapshot");
+        let response = commit_run_snapshot(
+            &mut conn,
+            "batch-1".into(),
+            &mut entries,
+            Some("saved:s1".to_string()),
+            None,
+            false,
+        )
+        .expect("commit snapshot");
         assert!(response.applied);
     } // connection released
 
@@ -99,7 +106,11 @@ fn directory_history_and_snapshot_survive_reopen() {
     let mut conn = conn;
     migrate_legacy_history(&mut conn).expect("migration idempotent on reopen");
     let envelope = list_directory_shortcuts(&conn).expect("list after reopen");
-    let paths: Vec<String> = envelope.directories.iter().map(|d| d.path.clone()).collect();
+    let paths: Vec<String> = envelope
+        .directories
+        .iter()
+        .map(|d| d.path.clone())
+        .collect();
     let work_index = paths
         .iter()
         .position(|p| Path::new(p) == work)
@@ -122,7 +133,10 @@ fn directory_history_and_snapshot_survive_reopen() {
     assert_eq!(record.active_identity.as_deref(), Some("saved:s1"));
     assert_eq!(record.entries.len(), 1);
     // Legacy observation never upgraded into confirmed use.
-    assert!(response.legacy_candidate.is_none(), "new record wins over legacy");
+    assert!(
+        response.legacy_candidate.is_none(),
+        "new record wins over legacy"
+    );
 }
 
 /// An uncommitted (panicked/dropped) transaction rolls back completely: no
@@ -153,7 +167,11 @@ fn interrupted_migration_rolls_back() {
         .expect("migration after the rolled-back transaction still succeeds");
 
     let count: i64 = conn
-        .query_row("SELECT COUNT(*) FROM welcome_directory_usage WHERE directory_id = 'x'", [], |r| r.get(0))
+        .query_row(
+            "SELECT COUNT(*) FROM welcome_directory_usage WHERE directory_id = 'x'",
+            [],
+            |r| r.get(0),
+        )
         .unwrap();
     assert_eq!(count, 0, "rolled back rows leave no trace");
     let marker: Option<String> = conn
@@ -216,7 +234,9 @@ fn snapshot_cas_across_connections() {
     let response = get_run_snapshot(&second).unwrap();
     let record = response.record.unwrap();
     match &record.entries[0] {
-        SnapshotEntry::SavedSession { saved_session_id, .. } => {
+        SnapshotEntry::SavedSession {
+            saved_session_id, ..
+        } => {
             assert_eq!(saved_session_id, "b");
         }
         other => panic!("unexpected entry {other:?}"),
@@ -260,7 +280,8 @@ fn clear_tombstone_and_recovery_paths() {
         saved_session_type: "LocalShell".to_string(),
         display_name: "y".to_string(),
     }];
-    let revived = commit_run_snapshot(&mut conn, "b2".into(), &mut entries, None, None, true).unwrap();
+    let revived =
+        commit_run_snapshot(&mut conn, "b2".into(), &mut entries, None, None, true).unwrap();
     assert!(revived.applied);
     let response = get_run_snapshot(&conn).unwrap();
     assert!(response.record.is_some());
@@ -275,11 +296,20 @@ fn availability_probe_is_bounded() {
     let real = dir.path().join("real-dir");
     std::fs::create_dir_all(&real).unwrap();
     record_directory_use(&mut conn, &real, SOURCE_LOCAL_START, 1000).unwrap();
-    record_directory_use(&mut conn, &dir.path().join("missing"), SOURCE_LOCAL_CWD, 900).ok();
+    record_directory_use(
+        &mut conn,
+        &dir.path().join("missing"),
+        SOURCE_LOCAL_CWD,
+        900,
+    )
+    .ok();
 
     let start = std::time::Instant::now();
     let envelope = list_directory_shortcuts(&conn).expect("list");
-    assert!(start.elapsed() < Duration::from_secs(5), "probe must stay bounded");
+    assert!(
+        start.elapsed() < Duration::from_secs(5),
+        "probe must stay bounded"
+    );
     let missing = envelope
         .directories
         .iter()

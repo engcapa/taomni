@@ -4,9 +4,9 @@ pub mod error;
 pub mod framebuffer;
 pub mod keyboard_hook;
 pub mod limits;
-pub mod native_pointer;
 #[cfg(test)]
 mod live_bench;
+pub mod native_pointer;
 pub mod pixel;
 pub mod policy;
 pub mod quality;
@@ -267,11 +267,12 @@ pub async fn vnc_connect(
 
     let reaper_cancel = session.cancel.clone();
     state
+        .remote_desktop
         .vnc_sessions
         .write()
         .await
         .insert(session_id.clone(), session);
-    let reaper_sessions = state.vnc_sessions.clone();
+    let reaper_sessions = state.remote_desktop.vnc_sessions.clone();
     let reaper_id = session_id.clone();
     tokio::spawn(async move {
         reaper_cancel.cancelled().await;
@@ -305,7 +306,7 @@ pub async fn vnc_create_detach_claim(
     claim: VncDetachClaim,
 ) -> Result<VncDetachClaimResult, String> {
     let claim_id = store_detach_claim(
-        &state.vnc_detach_claims,
+        &state.remote_desktop.vnc_detach_claims,
         claim,
         DETACH_CLAIM_TTL,
         MAX_DETACH_CLAIMS,
@@ -319,13 +320,18 @@ pub async fn vnc_consume_detach_claim(
     state: State<'_, AppState>,
     claim_id: String,
 ) -> Result<VncDetachClaim, String> {
-    consume_detach_claim(&state.vnc_detach_claims, &claim_id).await
+    consume_detach_claim(&state.remote_desktop.vnc_detach_claims, &claim_id).await
 }
 
 /// Disconnect a VNC session.
 #[tauri::command]
 pub async fn vnc_disconnect(state: State<'_, AppState>, session_id: String) -> Result<(), String> {
-    let session = state.vnc_sessions.write().await.remove(&session_id);
+    let session = state
+        .remote_desktop
+        .vnc_sessions
+        .write()
+        .await
+        .remove(&session_id);
     if let Some(session) = session {
         let _ = session.control_tx.send(VncControl::Disconnect).await;
         session.cancel.cancel();

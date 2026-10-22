@@ -1,0 +1,49 @@
+
+@layer components {
+  :where(.taomni-input) {
+    padding: 0 6px;
+  }
+  :where(.relative) > :where(svg.absolute) + :where(.taomni-input) {
+    padding-left: 1.75rem;
+  }
+
+  .taomni-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    height: auto;
+    min-height: max(26px, calc(1em + 8px));
+    line-height: 1.25;
+    padding: 0 14px;
+    font-size: var(--taomni-ui-font-size);
+    background: linear-gradient(to bottom, var(--taomni-button-from), var(--taomni-button-to));
+    border: 1px solid var(--taomni-input-border);
+    border-radius: 3px;
+    cursor: pointer;
+    color: var(--taomni-text);
+    transition: var(--taomni-transition);
+  }
+  .taomni-btn:hover { background: linear-gradient(to bottom, var(--taomni-button-hover-from), var(--taomni-button-hover-to)); }
+  .taomni-btn:disabled {
+    opacity: 0.45;
+    cursor: default;
+    background: var(--taomni-button-disabled);
+  }
+  .taomni-btn:disabled:hover { background: var(--taomni-button-disabled); }
+  .taomni-btn[data-primary="true"] {
+    background: linear-gradient(to bottom, var(--taomni-accent-soft), var(--taomni-accent));
+    border-color: var(--taomni-accent); color: #fff; font-weight: 600;
+  }
+  .taomni-btn[data-primary="true"]:hover { background: linear-gradient(to bottom, color-mix(in srgb, var(--taomni-accent-soft) 85%, #fff), color-mix(in srgb, var(--taomni-accent) 85%, #fff)); }
+}
+
+/* Card Hover Environment Shadow Depth Effect */
+.taomni-card-hover {
+  transition: var(--taomni-transition);
+}
+.taomni-card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--taomni-shadow-md);
+  border-color: var(--taomni-accent-soft);
+}

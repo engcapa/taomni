@@ -13,14 +13,22 @@ mod go_compatibility_tests {
     use super::*;
     #[test]
     fn default_headers_and_request_metadata_do_not_change_legacy_body() {
-        let provider = OpenAiCompatProvider::new("deepseek","https://example.invalid","test","configured-model");
+        let provider = OpenAiCompatProvider::new(
+            "deepseek",
+            "https://example.invalid",
+            "test",
+            "configured-model",
+        );
         assert!(provider.extra_headers.is_empty());
-        let mut req = ChatRequest::simple("system","user");
-        let before = openai_request_body("configured-model",&req,false,&[]);
+        let mut req = ChatRequest::simple("system", "user");
+        let before = openai_request_body("configured-model", &req, false, &[]);
         req.model_override = Some("go-model".into());
         req.session_key = Some("hashed-thread".into());
-        assert_eq!(before,openai_request_body("configured-model",&req,false,&[]));
-        assert_eq!(before["model"],"configured-model");
+        assert_eq!(
+            before,
+            openai_request_body("configured-model", &req, false, &[])
+        );
+        assert_eq!(before["model"], "configured-model");
         assert!(before.get("model_override").is_none());
     }
 }
@@ -113,7 +121,9 @@ impl OpenAiCompatProvider {
         model: impl Into<String>,
         proxy_url: Option<String>,
     ) -> Self {
-        let mut builder = Client::builder().no_proxy().timeout(std::time::Duration::from_secs(30));
+        let mut builder = Client::builder()
+            .no_proxy()
+            .timeout(std::time::Duration::from_secs(30));
         if let Some(proxy_url) = proxy_url
             .as_deref()
             .map(str::trim)

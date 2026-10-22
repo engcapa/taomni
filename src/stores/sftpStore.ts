@@ -1,265 +1,20 @@
 import { create } from "zustand";
-import type { StoreApi, UseBoundStore } from "zustand";
+import { sftpAttach, sftpDetach, sftpLocalHome, sftpRealpath } from "../lib/sftp";
+import { inFlightAttaches, sessionRefCounts } from "./sftp/lifetime";
 import {
-  sftpListRemote,
-  sftpListLocalDetailed,
-  sftpLocalHome,
-  sftpLocalDrives,
-  sftpAttach,
-  sftpDetach,
-  sftpRealpath,
-  type FileEntry,
-  type DirectoryListing,
-  type FileEntryDiagnostic,
-  type AttachOptions,
-} from "../lib/sftp";
-
-/**
- * Virtual path used by the local pane on Windows to display the list of
- * available drive letters as if they were folder entries. Reaching it via
- * the breadcrumb's "Up" / Home or via the new drives picker lets users
- * jump back from `C:\foo` to a drives view without typing.
- */
-export const WINDOWS_DRIVES_ROOT = "\\\\";
-
-export type PaneSide = "local" | "remote";
-
-export interface PaneState {
-  path: string;
-  entries: FileEntry[];
-  selection: string[];
-  loading: boolean;
-  error: string | null;
-  skippedEntryCount: number;
-  entryDiagnostics: FileEntryDiagnostic[];
-  history: string[];
-  historyIndex: number;
-  showHidden: boolean;
-}
-
-export interface SftpSessionState {
-  sessionId: string;
-  attached: boolean;
-  attaching: boolean;
-  homeDir: string | null;
-  error: string | null;
-  connectionOpts?: AttachOptions;
-  remote: PaneState;
-  local: PaneState;
-}
-
-/**
- * Minimal per-session shape that `FilePanel` reads. Both `useSftpStore` and
- * the object-storage store satisfy this, so `FilePanel` can be driven by
- * either via its optional `store` prop.
- */
-export interface FilePanelSession {
-  homeDir: string | null;
-  local: PaneState;
-  remote: PaneState;
-}
-
-/**
- * The slice of store actions `FilePanel` invokes. Kept deliberately small so a
- * non-SFTP store (e.g. object storage) only has to implement navigation +
- * selection, not the full attach/detach lifecycle.
- */
-export interface FilePanelStore {
-  sessions: Record<string, FilePanelSession>;
-  listPath: (sessionId: string, side: PaneSide, path: string) => Promise<FileEntry[]>;
-  navigate: (sessionId: string, side: PaneSide, path: string) => Promise<void>;
-  navigateBack: (sessionId: string, side: PaneSide) => Promise<void>;
-  navigateForward: (sessionId: string, side: PaneSide) => Promise<void>;
-  navigateUp: (sessionId: string, side: PaneSide) => Promise<void>;
-  refreshPane: (sessionId: string, side: PaneSide) => Promise<void>;
-  setSelection: (sessionId: string, side: PaneSide, selection: string[]) => void;
-  toggleHidden: (sessionId: string, side: PaneSide) => void;
-}
-
-/** A zustand bound-store hook that exposes the {@link FilePanelStore} surface. */
-export type FilePanelStoreHook = UseBoundStore<StoreApi<FilePanelStore>>;
-
-interface SftpStoreState {
-  sessions: Record<string, SftpSessionState>;
-  listPath: FilePanelStore["listPath"];
-  attach: (opts: AttachOptions) => Promise<void>;
-  reconnect: (sessionId: string) => Promise<void>;
-  /**
-   * Attach a session id to the store without opening any SFTP channel —
-   * used by the embedded local file-browser tab (File session type) so it
-   * can reuse the same `FilePanel` plumbing as the SFTP local pane while
-   * never touching the remote side.
-   */
-  attachLocalOnly: (sessionId: string, initialPath?: string) => Promise<void>;
-  ensureSession: (sessionId: string) => SftpSessionState;
-  detach: (sessionId: string) => Promise<void>;
-  /** Counterpart to `attachLocalOnly` — drops the store entry, no backend. */
-  detachLocalOnly: (sessionId: string) => void;
-  refreshPane: (sessionId: string, side: PaneSide) => Promise<void>;
-  navigate: (sessionId: string, side: PaneSide, path: string) => Promise<void>;
-  navigateBack: (sessionId: string, side: PaneSide) => Promise<void>;
-  navigateForward: (sessionId: string, side: PaneSide) => Promise<void>;
-  navigateUp: (sessionId: string, side: PaneSide) => Promise<void>;
-  navigateHome: (sessionId: string, side: PaneSide) => Promise<void>;
-  setSelection: (sessionId: string, side: PaneSide, selection: string[]) => void;
-  toggleHidden: (sessionId: string, side: PaneSide) => void;
-  setError: (sessionId: string, error: string | null) => void;
-}
-
-function emptyPane(): PaneState {
-  return {
-    path: "",
-    entries: [],
-    selection: [],
-    loading: false,
-    error: null,
-    skippedEntryCount: 0,
-    entryDiagnostics: [],
-    history: [],
-    historyIndex: -1,
-    showHidden: false,
-  };
-}
-
-function freshSession(sessionId: string): SftpSessionState {
-  return {
-    sessionId,
-    attached: false,
-    attaching: false,
-    homeDir: null,
-    error: null,
-    remote: emptyPane(),
-    local: emptyPane(),
-  };
-}
-
-function pushHistory(pane: PaneState, path: string): PaneState {
-  if (pane.history[pane.historyIndex] === path) {
-    return pane;
-  }
-  const trimmed = pane.history.slice(0, pane.historyIndex + 1);
-  trimmed.push(path);
-  return {
-    ...pane,
-    history: trimmed,
-    historyIndex: trimmed.length - 1,
-  };
-}
-
-async function listSide(
-  sessionId: string,
-  side: PaneSide,
-  path: string,
-): Promise<DirectoryListing> {
-  if (side === "local" && path === WINDOWS_DRIVES_ROOT) {
-    // Synthesize folder-like entries from the available Windows drives so
-    // the standard file-list UI (sort, double-click to enter, etc.) works
-    // unchanged for the virtual drives root.
-    const drives = await sftpLocalDrives();
-    return {
-      entries: drives.map<FileEntry>((d) => ({
-        name: d.label,
-        path: d.path,
-        fileType: "dir",
-        size: 0,
-        mtime: 0,
-        mode: 0,
-        isHidden: false,
-      })),
-      skippedCount: 0,
-      diagnostics: [],
-    };
-  }
-  if (side === "local") return sftpListLocalDetailed(path);
-  return {
-    entries: await sftpListRemote(sessionId, path),
-    skippedCount: 0,
-    diagnostics: [],
-  };
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
-
-function listingState(listing: DirectoryListing): Pick<
-  PaneState,
-  "entries" | "skippedEntryCount" | "entryDiagnostics"
-> {
-  return {
-    entries: listing.entries,
-    skippedEntryCount: listing.skippedCount,
-    entryDiagnostics: listing.diagnostics,
-  };
-}
-
-function emptyListing(): DirectoryListing {
-  return { entries: [], skippedCount: 0, diagnostics: [] };
-}
-
-async function loadInitialListing(
-  sessionId: string,
-  side: PaneSide,
-  path: string,
-): Promise<{ listing: DirectoryListing; error: string | null }> {
-  if (!path) return { listing: emptyListing(), error: null };
-  try {
-    return { listing: await listSide(sessionId, side, path), error: null };
-  } catch (error) {
-    return { listing: emptyListing(), error: errorMessage(error) };
-  }
-}
-
-export function isConnectionError(err: unknown): boolean {
-  const msg = errorMessage(err).toLowerCase();
-  return (
-    msg.includes("connection closed") ||
-    msg.includes("socket closed") ||
-    msg.includes("channel closed") ||
-    // russh-sftp raises this once its background I/O task ends (dropped
-    // connection / idle timeout); the backend attempts a transparent
-    // reconnect, but if that fails we still want the reconnect banner.
-    msg.includes("session closed") ||
-    msg.includes("sender dropped") ||
-    msg.includes("broken pipe") ||
-    msg.includes("connection reset") ||
-    msg.includes("not attached") ||
-    msg.includes("not connected") ||
-    msg.includes("ssh error") ||
-    msg.includes("io error") ||
-    msg.includes("timed out") ||
-    msg.includes("eof")
-  );
-}
-
-function isSftpRefreshDirectorySignal(err: unknown): boolean {
-  return errorMessage(err)
-    .toLowerCase()
-    .includes("character is changed please refresh directory");
-}
-
-/**
- * Per-session reference counts. Each component that calls `attach` for a
- * session id holds one reference until it calls `detach`. The backend
- * channel + zustand entry are torn down only when the count reaches zero.
- *
- * This guards against React StrictMode double-invocation (mount → cleanup
- * → mount) where the cleanup detach would otherwise yank the channel out
- * from under the immediately-following remount attach. It also lets two
- * legitimate consumers — e.g. an attached sidebar and a detached window
- * that happen to share an `attached-${tabId}` session id — coexist
- * without one tearing down the other.
- */
-const sessionRefCounts = new Map<string, number>();
-
-/**
- * In-flight backend attach promises, keyed by session id. When a second
- * consumer calls attach before the first one finishes the backend handshake,
- * we await the same promise instead of issuing a duplicate `sftpAttach`
- * IPC call. Keeps the backend channel count at exactly one per session id
- * regardless of how many UI consumers race to mount.
- */
-const inFlightAttaches = new Map<string, Promise<void>>();
+  emptyListing,
+  emptyPane,
+  errorMessage,
+  freshSession,
+  isConnectionError,
+  isSftpRefreshDirectorySignal,
+  listingState,
+  listSide,
+  loadInitialListing,
+  pushHistory,
+  WINDOWS_DRIVES_ROOT,
+} from "./sftp/listing";
+import { type SftpStoreState } from "./sftp/model";
 
 export const useSftpStore = create<SftpStoreState>((set, get) => ({
   sessions: {},
@@ -363,23 +118,23 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
                 remote: remoteAlreadyNavigated
                   ? current.remote
                   : {
-                      ...emptyPane(),
-                      path: realHome,
-                      ...listingState(remoteLoad.listing),
-                      error: remoteLoad.error,
-                      history: [realHome],
-                      historyIndex: 0,
-                    },
+                    ...emptyPane(),
+                    path: realHome,
+                    ...listingState(remoteLoad.listing),
+                    error: remoteLoad.error,
+                    history: [realHome],
+                    historyIndex: 0,
+                  },
                 local: localAlreadyNavigated
                   ? current.local
                   : {
-                      ...emptyPane(),
-                      path: localHome,
-                      ...listingState(localLoad.listing),
-                      error: localLoad.error,
-                      history: localHome ? [localHome] : [],
-                      historyIndex: localHome ? 0 : -1,
-                    },
+                    ...emptyPane(),
+                    path: localHome,
+                    ...listingState(localLoad.listing),
+                    error: localLoad.error,
+                    history: localHome ? [localHome] : [],
+                    historyIndex: localHome ? 0 : -1,
+                  },
               },
             },
           };
@@ -915,7 +670,11 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
     if (!session || !session.connectionOpts) {
       throw new Error("No connection credentials cached for this session");
     }
-    await get().detach(sessionId).catch(() => {});
+    await get().detach(sessionId).catch(() => { });
     await get().attach(session.connectionOpts);
   },
 }));
+
+export { type FilePanelSession, type FilePanelStore, type FilePanelStoreHook, type PaneSide, type PaneState, type SftpSessionState } from "./sftp/model";
+
+export { isConnectionError, WINDOWS_DRIVES_ROOT } from "./sftp/listing";

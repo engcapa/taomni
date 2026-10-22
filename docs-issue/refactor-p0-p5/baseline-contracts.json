@@ -1,0 +1,3428 @@
+{
+  "schema": 1,
+  "baselineCommit": "f3e375eb",
+  "note": "Native registered commands and public facade exports; event names cover literal frontend calls only. Dynamic names and payload compatibility require runtime tests.",
+  "commands": [
+    {
+      "name": "acp_cancel_permission",
+      "handler": "agent::acp_bridge::commands::acp_cancel_permission"
+    },
+    {
+      "name": "acp_probe_profile",
+      "handler": "agent::acp_bridge::commands::acp_probe_profile"
+    },
+    {
+      "name": "acp_resolve_permission",
+      "handler": "agent::acp_bridge::commands::acp_resolve_permission"
+    },
+    {
+      "name": "agent_execute_tool",
+      "handler": "agent::commands::agent_execute_tool"
+    },
+    {
+      "name": "agent_explain_error",
+      "handler": "agent::commands::agent_explain_error"
+    },
+    {
+      "name": "agent_plan_tool",
+      "handler": "agent::commands::agent_plan_tool"
+    },
+    {
+      "name": "agent_run",
+      "handler": "agent::commands::agent_run"
+    },
+    {
+      "name": "attach_terminal_output",
+      "handler": "terminal::attach_terminal_output"
+    },
+    {
+      "name": "backup_create",
+      "handler": "backup::backup_create"
+    },
+    {
+      "name": "backup_delete_item",
+      "handler": "backup::backup_delete_item"
+    },
+    {
+      "name": "backup_feishu_apps",
+      "handler": "backup::commands::backup_feishu_apps"
+    },
+    {
+      "name": "backup_feishu_authorization_cancel",
+      "handler": "backup::commands::backup_feishu_authorization_cancel"
+    },
+    {
+      "name": "backup_feishu_authorization_status",
+      "handler": "backup::commands::backup_feishu_authorization_status"
+    },
+    {
+      "name": "backup_feishu_authorize",
+      "handler": "backup::commands::backup_feishu_authorize"
+    },
+    {
+      "name": "backup_get_default_dir",
+      "handler": "backup::backup_get_default_dir"
+    },
+    {
+      "name": "backup_get_policy",
+      "handler": "backup::backup_get_policy"
+    },
+    {
+      "name": "backup_inspect",
+      "handler": "backup::backup_inspect"
+    },
+    {
+      "name": "backup_list_history",
+      "handler": "backup::backup_list_history"
+    },
+    {
+      "name": "backup_remote_cancel",
+      "handler": "backup::commands::backup_remote_cancel"
+    },
+    {
+      "name": "backup_remote_clean_cache",
+      "handler": "backup::commands::backup_remote_clean_cache"
+    },
+    {
+      "name": "backup_remote_discard",
+      "handler": "backup::commands::backup_remote_discard"
+    },
+    {
+      "name": "backup_remote_download",
+      "handler": "backup::commands::backup_remote_download"
+    },
+    {
+      "name": "backup_remote_get_config",
+      "handler": "backup::commands::backup_remote_get_config"
+    },
+    {
+      "name": "backup_remote_history_url",
+      "handler": "backup::commands::backup_remote_history_url"
+    },
+    {
+      "name": "backup_remote_jobs",
+      "handler": "backup::commands::backup_remote_jobs"
+    },
+    {
+      "name": "backup_remote_list",
+      "handler": "backup::commands::backup_remote_list"
+    },
+    {
+      "name": "backup_remote_retry",
+      "handler": "backup::commands::backup_remote_retry"
+    },
+    {
+      "name": "backup_remote_save_config",
+      "handler": "backup::commands::backup_remote_save_config"
+    },
+    {
+      "name": "backup_remote_start",
+      "handler": "backup::commands::backup_remote_start"
+    },
+    {
+      "name": "backup_run_selected",
+      "handler": "backup::batch::backup_run_selected"
+    },
+    {
+      "name": "backup_set_policy",
+      "handler": "backup::backup_set_policy"
+    },
+    {
+      "name": "backup_stage_restore",
+      "handler": "backup::backup_stage_restore"
+    },
+    {
+      "name": "cc_cancel_capture",
+      "handler": "agent::cc_bridge::commands::cc_cancel_capture"
+    },
+    {
+      "name": "cc_detect",
+      "handler": "agent::cc_bridge::commands::cc_detect"
+    },
+    {
+      "name": "cc_get_custom_settings",
+      "handler": "agent::cc_bridge::commands::cc_get_custom_settings"
+    },
+    {
+      "name": "cc_get_profile_settings",
+      "handler": "agent::cc_bridge::commands::cc_get_profile_settings"
+    },
+    {
+      "name": "cc_resolve_permission",
+      "handler": "agent::cc_bridge::commands::cc_resolve_permission"
+    },
+    {
+      "name": "cc_resolve_tool_call",
+      "handler": "agent::cc_bridge::commands::cc_resolve_tool_call"
+    },
+    {
+      "name": "cc_send_message",
+      "handler": "agent::cc_bridge::commands::cc_send_message"
+    },
+    {
+      "name": "cc_stop_session",
+      "handler": "agent::cc_bridge::commands::cc_stop_session"
+    },
+    {
+      "name": "cc_stream_message",
+      "handler": "agent::cc_bridge::commands::cc_stream_message"
+    },
+    {
+      "name": "cc_test_settings",
+      "handler": "agent::cc_bridge::commands::cc_test_settings"
+    },
+    {
+      "name": "cc_track_terminal",
+      "handler": "agent::cc_bridge::commands::cc_track_terminal"
+    },
+    {
+      "name": "cc_untrack_terminal",
+      "handler": "agent::cc_bridge::commands::cc_untrack_terminal"
+    },
+    {
+      "name": "chat_delete_thread",
+      "handler": "chat::chat_delete_thread"
+    },
+    {
+      "name": "chat_export_archive",
+      "handler": "chat::chat_export_archive"
+    },
+    {
+      "name": "chat_generate_media",
+      "handler": "chat::chat_generate_media"
+    },
+    {
+      "name": "chat_list_messages",
+      "handler": "chat::chat_list_messages"
+    },
+    {
+      "name": "chat_list_threads",
+      "handler": "chat::chat_list_threads"
+    },
+    {
+      "name": "chat_new_thread",
+      "handler": "chat::chat_new_thread"
+    },
+    {
+      "name": "chat_purge_old",
+      "handler": "chat::chat_purge_old"
+    },
+    {
+      "name": "chat_read_clipboard_image_attachment",
+      "handler": "chat::chat_read_clipboard_image_attachment"
+    },
+    {
+      "name": "chat_send",
+      "handler": "chat::chat_send"
+    },
+    {
+      "name": "chat_set_thread_cc_model",
+      "handler": "chat::chat_set_thread_cc_model"
+    },
+    {
+      "name": "chat_set_thread_llm_model",
+      "handler": "chat::chat_set_thread_llm_model"
+    },
+    {
+      "name": "chat_set_thread_output_format",
+      "handler": "chat::chat_set_thread_output_format"
+    },
+    {
+      "name": "chat_set_thread_provider",
+      "handler": "chat::chat_set_thread_provider"
+    },
+    {
+      "name": "chat_stat_attachment_paths",
+      "handler": "chat::chat_stat_attachment_paths"
+    },
+    {
+      "name": "chat_stop_stream",
+      "handler": "chat::chat_stop_stream"
+    },
+    {
+      "name": "chat_stream",
+      "handler": "chat::chat_stream"
+    },
+    {
+      "name": "check_file_exists",
+      "handler": "config::check_file_exists"
+    },
+    {
+      "name": "clear_server_log",
+      "handler": "servers::clear_server_log"
+    },
+    {
+      "name": "clear_welcome_run_snapshot",
+      "handler": "session::resume::clear_welcome_run_snapshot"
+    },
+    {
+      "name": "clipboard_capabilities",
+      "handler": "config::clipboard_capabilities"
+    },
+    {
+      "name": "clipboard_parse_file_paths",
+      "handler": "config::clipboard_parse_file_paths"
+    },
+    {
+      "name": "clipboard_read_files",
+      "handler": "config::clipboard_read_files"
+    },
+    {
+      "name": "clipboard_read_multi_format",
+      "handler": "config::clipboard_read_multi_format"
+    },
+    {
+      "name": "clipboard_read_text",
+      "handler": "config::clipboard_read_text"
+    },
+    {
+      "name": "clipboard_write_files",
+      "handler": "config::clipboard_write_files"
+    },
+    {
+      "name": "clipboard_write_multi_format",
+      "handler": "config::clipboard_write_multi_format"
+    },
+    {
+      "name": "clipboard_write_text",
+      "handler": "config::clipboard_write_text"
+    },
+    {
+      "name": "close_current_detached_window",
+      "handler": "windowing::close_current_detached_window"
+    },
+    {
+      "name": "close_terminal",
+      "handler": "terminal::close_terminal"
+    },
+    {
+      "name": "codex_detect",
+      "handler": "agent::codex_bridge::commands::codex_detect"
+    },
+    {
+      "name": "codex_get_custom_config",
+      "handler": "agent::codex_bridge::commands::codex_get_custom_config"
+    },
+    {
+      "name": "codex_get_profile_config",
+      "handler": "agent::codex_bridge::commands::codex_get_profile_config"
+    },
+    {
+      "name": "codex_stop_session",
+      "handler": "agent::codex_bridge::commands::codex_stop_session"
+    },
+    {
+      "name": "codex_test_config",
+      "handler": "agent::codex_bridge::commands::codex_test_config"
+    },
+    {
+      "name": "codex_validate_config",
+      "handler": "agent::codex_bridge::commands::codex_validate_config"
+    },
+    {
+      "name": "commit_welcome_run_snapshot",
+      "handler": "session::resume::commit_welcome_run_snapshot"
+    },
+    {
+      "name": "create_command_terminal",
+      "handler": "terminal::create_command_terminal"
+    },
+    {
+      "name": "create_local_terminal",
+      "handler": "terminal::create_local_terminal"
+    },
+    {
+      "name": "create_ssh_terminal",
+      "handler": "terminal::create_ssh_terminal"
+    },
+    {
+      "name": "cuda_pack_install",
+      "handler": "models::cuda_pack_install"
+    },
+    {
+      "name": "cuda_pack_status",
+      "handler": "models::cuda_pack_status"
+    },
+    {
+      "name": "cuda_pack_uninstall",
+      "handler": "models::cuda_pack_uninstall"
+    },
+    {
+      "name": "dap_send",
+      "handler": "dap::dap_send"
+    },
+    {
+      "name": "dap_send_request",
+      "handler": "dap::dap_send_request"
+    },
+    {
+      "name": "dap_start_session",
+      "handler": "dap::dap_start_session"
+    },
+    {
+      "name": "dap_terminate",
+      "handler": "dap::dap_terminate"
+    },
+    {
+      "name": "db_append_history",
+      "handler": "database::db_append_history"
+    },
+    {
+      "name": "db_archive_saved_query",
+      "handler": "database::db_archive_saved_query"
+    },
+    {
+      "name": "db_cancel",
+      "handler": "database::db_cancel"
+    },
+    {
+      "name": "db_clear_history",
+      "handler": "database::db_clear_history"
+    },
+    {
+      "name": "db_close_query_workspace_tabs",
+      "handler": "database::db_close_query_workspace_tabs"
+    },
+    {
+      "name": "db_connect",
+      "handler": "database::db_connect"
+    },
+    {
+      "name": "db_delete_bookmark",
+      "handler": "database::db_delete_bookmark"
+    },
+    {
+      "name": "db_delete_history",
+      "handler": "database::db_delete_history"
+    },
+    {
+      "name": "db_delete_saved_query",
+      "handler": "database::db_delete_saved_query"
+    },
+    {
+      "name": "db_describe_table",
+      "handler": "database::db_describe_table"
+    },
+    {
+      "name": "db_disconnect",
+      "handler": "database::db_disconnect"
+    },
+    {
+      "name": "db_execute",
+      "handler": "database::db_execute"
+    },
+    {
+      "name": "db_execute_stream",
+      "handler": "database::db_execute_stream"
+    },
+    {
+      "name": "db_get_saved_query",
+      "handler": "database::db_get_saved_query"
+    },
+    {
+      "name": "db_list_bookmarks",
+      "handler": "database::db_list_bookmarks"
+    },
+    {
+      "name": "db_list_catalogs",
+      "handler": "database::db_list_catalogs"
+    },
+    {
+      "name": "db_list_closed_query_workspace_tabs",
+      "handler": "database::db_list_closed_query_workspace_tabs"
+    },
+    {
+      "name": "db_list_foreign_keys",
+      "handler": "database::db_list_foreign_keys"
+    },
+    {
+      "name": "db_list_history",
+      "handler": "database::db_list_history"
+    },
+    {
+      "name": "db_list_indexes",
+      "handler": "database::db_list_indexes"
+    },
+    {
+      "name": "db_list_objects",
+      "handler": "database::db_list_objects"
+    },
+    {
+      "name": "db_list_saved_queries",
+      "handler": "database::db_list_saved_queries"
+    },
+    {
+      "name": "db_list_schemas",
+      "handler": "database::db_list_schemas"
+    },
+    {
+      "name": "db_list_tables",
+      "handler": "database::db_list_tables"
+    },
+    {
+      "name": "db_load_query_workspace",
+      "handler": "database::db_load_query_workspace"
+    },
+    {
+      "name": "db_object_ddl",
+      "handler": "database::db_object_ddl"
+    },
+    {
+      "name": "db_ping",
+      "handler": "database::db_ping"
+    },
+    {
+      "name": "db_reopen_query_workspace_tab",
+      "handler": "database::db_reopen_query_workspace_tab"
+    },
+    {
+      "name": "db_rewrite_result_sql",
+      "handler": "database::sql_rewrite::db_rewrite_result_sql"
+    },
+    {
+      "name": "db_save_bookmark",
+      "handler": "database::db_save_bookmark"
+    },
+    {
+      "name": "db_save_query_workspace",
+      "handler": "database::db_save_query_workspace"
+    },
+    {
+      "name": "db_save_saved_query",
+      "handler": "database::db_save_saved_query"
+    },
+    {
+      "name": "db_search_tables",
+      "handler": "database::db_search_tables"
+    },
+    {
+      "name": "db_table_stats",
+      "handler": "database::db_table_stats"
+    },
+    {
+      "name": "db_tx_commit",
+      "handler": "database::db_tx_commit"
+    },
+    {
+      "name": "db_tx_rollback",
+      "handler": "database::db_tx_rollback"
+    },
+    {
+      "name": "db_tx_set_manual",
+      "handler": "database::db_tx_set_manual"
+    },
+    {
+      "name": "db_tx_status",
+      "handler": "database::db_tx_status"
+    },
+    {
+      "name": "db_update_history_tab_name",
+      "handler": "database::db_update_history_tab_name"
+    },
+    {
+      "name": "deep_search_execute",
+      "handler": "agent::search::commands::deep_search_execute"
+    },
+    {
+      "name": "delete_session",
+      "handler": "session::delete_session"
+    },
+    {
+      "name": "delete_session_group",
+      "handler": "session::delete_session_group"
+    },
+    {
+      "name": "delete_tunnel",
+      "handler": "tunnel::delete_tunnel"
+    },
+    {
+      "name": "dependency_index_search",
+      "handler": "dependency_index::dependency_index_search"
+    },
+    {
+      "name": "dependency_index_status",
+      "handler": "dependency_index::dependency_index_status"
+    },
+    {
+      "name": "dependency_index_versions",
+      "handler": "dependency_index::dependency_index_versions"
+    },
+    {
+      "name": "detach_terminal_output",
+      "handler": "terminal::detach_terminal_output"
+    },
+    {
+      "name": "detect_x_server",
+      "handler": "terminal::detect_x_server"
+    },
+    {
+      "name": "exit_app",
+      "handler": "exit_app"
+    },
+    {
+      "name": "generate_shell_command",
+      "handler": "ai::commands::generate_shell_command"
+    },
+    {
+      "name": "get_ai_config",
+      "handler": "ai::commands::get_ai_config"
+    },
+    {
+      "name": "get_app_proxy_config",
+      "handler": "proxy::get_app_proxy_config"
+    },
+    {
+      "name": "get_app_proxy_url",
+      "handler": "proxy::get_app_proxy_url"
+    },
+    {
+      "name": "get_home_dir",
+      "handler": "config::get_home_dir"
+    },
+    {
+      "name": "get_opencode_go_catalog",
+      "handler": "ai::commands::get_opencode_go_catalog"
+    },
+    {
+      "name": "get_provider_models",
+      "handler": "ai::commands::get_provider_models"
+    },
+    {
+      "name": "get_server_status",
+      "handler": "servers::get_server_status"
+    },
+    {
+      "name": "get_session",
+      "handler": "session::get_session"
+    },
+    {
+      "name": "get_tunnel_status",
+      "handler": "tunnel::get_tunnel_status"
+    },
+    {
+      "name": "get_welcome_run_snapshot",
+      "handler": "session::resume::get_welcome_run_snapshot"
+    },
+    {
+      "name": "git_blame_lines",
+      "handler": "git::git_blame_lines"
+    },
+    {
+      "name": "git_blob_pair",
+      "handler": "git::git_blob_pair"
+    },
+    {
+      "name": "git_checkout_branch",
+      "handler": "git::git_checkout_branch"
+    },
+    {
+      "name": "git_checkout_tag",
+      "handler": "git::git_checkout_tag"
+    },
+    {
+      "name": "git_cherry_pick",
+      "handler": "git::git_cherry_pick"
+    },
+    {
+      "name": "git_cherry_pick_abort",
+      "handler": "git::git_cherry_pick_abort"
+    },
+    {
+      "name": "git_cherry_pick_continue",
+      "handler": "git::git_cherry_pick_continue"
+    },
+    {
+      "name": "git_clean_untracked",
+      "handler": "git::git_clean_untracked"
+    },
+    {
+      "name": "git_commit",
+      "handler": "git::git_commit"
+    },
+    {
+      "name": "git_commit_files",
+      "handler": "git::git_commit_files"
+    },
+    {
+      "name": "git_compare",
+      "handler": "git::git_compare"
+    },
+    {
+      "name": "git_create_branch",
+      "handler": "git::git_create_branch"
+    },
+    {
+      "name": "git_create_tag",
+      "handler": "git::git_create_tag"
+    },
+    {
+      "name": "git_delete_branch",
+      "handler": "git::git_delete_branch"
+    },
+    {
+      "name": "git_delete_remote",
+      "handler": "git::git_delete_remote"
+    },
+    {
+      "name": "git_delete_tag",
+      "handler": "git::git_delete_tag"
+    },
+    {
+      "name": "git_diff",
+      "handler": "git::git_diff"
+    },
+    {
+      "name": "git_discard",
+      "handler": "git::git_discard"
+    },
+    {
+      "name": "git_fetch",
+      "handler": "git::git_fetch"
+    },
+    {
+      "name": "git_ignore_path",
+      "handler": "git::git_ignore_path"
+    },
+    {
+      "name": "git_init_repo",
+      "handler": "git::git_init_repo"
+    },
+    {
+      "name": "git_log",
+      "handler": "git::git_log"
+    },
+    {
+      "name": "git_merge_branch",
+      "handler": "git::git_merge_branch"
+    },
+    {
+      "name": "git_operation_abort",
+      "handler": "git::git_operation_abort"
+    },
+    {
+      "name": "git_operation_continue",
+      "handler": "git::git_operation_continue"
+    },
+    {
+      "name": "git_operation_state",
+      "handler": "git::git_operation_state"
+    },
+    {
+      "name": "git_probe_path",
+      "handler": "git::git_probe_path"
+    },
+    {
+      "name": "git_pull",
+      "handler": "git::git_pull"
+    },
+    {
+      "name": "git_push",
+      "handler": "git::git_push"
+    },
+    {
+      "name": "git_push_tag",
+      "handler": "git::git_push_tag"
+    },
+    {
+      "name": "git_rebase",
+      "handler": "git::git_rebase"
+    },
+    {
+      "name": "git_rebase_skip",
+      "handler": "git::git_rebase_skip"
+    },
+    {
+      "name": "git_rename_branch",
+      "handler": "git::git_rename_branch"
+    },
+    {
+      "name": "git_reset",
+      "handler": "git::git_reset"
+    },
+    {
+      "name": "git_resolve_conflict",
+      "handler": "git::git_resolve_conflict"
+    },
+    {
+      "name": "git_revert",
+      "handler": "git::git_revert"
+    },
+    {
+      "name": "git_save_remote_auth",
+      "handler": "git::git_save_remote_auth"
+    },
+    {
+      "name": "git_save_settings",
+      "handler": "git::git_save_settings"
+    },
+    {
+      "name": "git_set_remote",
+      "handler": "git::git_set_remote"
+    },
+    {
+      "name": "git_set_upstream",
+      "handler": "git::git_set_upstream"
+    },
+    {
+      "name": "git_snapshot",
+      "handler": "git::git_snapshot"
+    },
+    {
+      "name": "git_stage",
+      "handler": "git::git_stage"
+    },
+    {
+      "name": "git_stash_apply",
+      "handler": "git::git_stash_apply"
+    },
+    {
+      "name": "git_stash_drop",
+      "handler": "git::git_stash_drop"
+    },
+    {
+      "name": "git_stash_list",
+      "handler": "git::git_stash_list"
+    },
+    {
+      "name": "git_stash_save",
+      "handler": "git::git_stash_save"
+    },
+    {
+      "name": "git_stash_show",
+      "handler": "git::git_stash_show"
+    },
+    {
+      "name": "git_unstage",
+      "handler": "git::git_unstage"
+    },
+    {
+      "name": "hbase_cancel",
+      "handler": "hbase::hbase_cancel"
+    },
+    {
+      "name": "hbase_connect",
+      "handler": "hbase::hbase_connect"
+    },
+    {
+      "name": "hbase_describe_table",
+      "handler": "hbase::hbase_describe_table"
+    },
+    {
+      "name": "hbase_disconnect",
+      "handler": "hbase::hbase_disconnect"
+    },
+    {
+      "name": "hbase_execute",
+      "handler": "hbase::hbase_execute"
+    },
+    {
+      "name": "hbase_list_tables",
+      "handler": "hbase::hbase_list_tables"
+    },
+    {
+      "name": "hbase_parse_keytab_principal",
+      "handler": "hbase::hbase_parse_keytab_principal"
+    },
+    {
+      "name": "hbase_parse_site_xml",
+      "handler": "hbase::hbase_parse_site_xml"
+    },
+    {
+      "name": "hbase_ping",
+      "handler": "hbase::hbase_ping"
+    },
+    {
+      "name": "history_append",
+      "handler": "history::history_append"
+    },
+    {
+      "name": "history_clear",
+      "handler": "history::history_clear"
+    },
+    {
+      "name": "history_list",
+      "handler": "local_history::history_list"
+    },
+    {
+      "name": "history_list_recent",
+      "handler": "history::history_list_recent"
+    },
+    {
+      "name": "history_match_prefix",
+      "handler": "history::history_match_prefix"
+    },
+    {
+      "name": "history_prune",
+      "handler": "local_history::history_prune"
+    },
+    {
+      "name": "history_read",
+      "handler": "local_history::history_read"
+    },
+    {
+      "name": "history_snapshot",
+      "handler": "local_history::history_snapshot"
+    },
+    {
+      "name": "import_external_bash_sessions",
+      "handler": "session::import::import_external_bash_sessions"
+    },
+    {
+      "name": "import_putty_sessions",
+      "handler": "session::import::import_putty_sessions"
+    },
+    {
+      "name": "import_wsl_sessions",
+      "handler": "session::import::import_wsl_sessions"
+    },
+    {
+      "name": "inline_qq_stream",
+      "handler": "chat::inline_qq::inline_qq_stream"
+    },
+    {
+      "name": "is_session_ai_write_disabled",
+      "handler": "ai::session_safety::is_session_ai_write_disabled"
+    },
+    {
+      "name": "java_debug_resolve_main_classes",
+      "handler": "java_debug_adapter::java_debug_resolve_main_classes"
+    },
+    {
+      "name": "java_test_discover",
+      "handler": "java_test::java_test_discover"
+    },
+    {
+      "name": "java_test_resolve_launch",
+      "handler": "java_test::java_test_resolve_launch"
+    },
+    {
+      "name": "keychain_lookup_batch",
+      "handler": "session::import_secrets::keychain::keychain_lookup_batch"
+    },
+    {
+      "name": "keyring_delete",
+      "handler": "agent::search::key_storage::keyring_delete"
+    },
+    {
+      "name": "keyring_get",
+      "handler": "agent::search::key_storage::keyring_get"
+    },
+    {
+      "name": "keyring_put",
+      "handler": "agent::search::key_storage::keyring_put"
+    },
+    {
+      "name": "lanchat_accept_file",
+      "handler": "lanchat::commands::lanchat_accept_file"
+    },
+    {
+      "name": "lanchat_clear_all_history",
+      "handler": "lanchat::commands::lanchat_clear_all_history"
+    },
+    {
+      "name": "lanchat_clear_conversation",
+      "handler": "lanchat::commands::lanchat_clear_conversation"
+    },
+    {
+      "name": "lanchat_create_group",
+      "handler": "lanchat::commands::lanchat_create_group"
+    },
+    {
+      "name": "lanchat_delete_message",
+      "handler": "lanchat::commands::lanchat_delete_message"
+    },
+    {
+      "name": "lanchat_get_profile",
+      "handler": "lanchat::commands::lanchat_get_profile"
+    },
+    {
+      "name": "lanchat_get_retention",
+      "handler": "lanchat::commands::lanchat_get_retention"
+    },
+    {
+      "name": "lanchat_get_service_state",
+      "handler": "lanchat::commands::lanchat_get_service_state"
+    },
+    {
+      "name": "lanchat_leave_group",
+      "handler": "lanchat::commands::lanchat_leave_group"
+    },
+    {
+      "name": "lanchat_list_conversations",
+      "handler": "lanchat::commands::lanchat_list_conversations"
+    },
+    {
+      "name": "lanchat_list_groups",
+      "handler": "lanchat::commands::lanchat_list_groups"
+    },
+    {
+      "name": "lanchat_list_messages",
+      "handler": "lanchat::commands::lanchat_list_messages"
+    },
+    {
+      "name": "lanchat_list_peers",
+      "handler": "lanchat::commands::lanchat_list_peers"
+    },
+    {
+      "name": "lanchat_list_pinned",
+      "handler": "lanchat::commands::lanchat_list_pinned"
+    },
+    {
+      "name": "lanchat_mark_read",
+      "handler": "lanchat::commands::lanchat_mark_read"
+    },
+    {
+      "name": "lanchat_open_path",
+      "handler": "lanchat::commands::lanchat_open_path"
+    },
+    {
+      "name": "lanchat_reject_file",
+      "handler": "lanchat::commands::lanchat_reject_file"
+    },
+    {
+      "name": "lanchat_resend_message",
+      "handler": "lanchat::commands::lanchat_resend_message"
+    },
+    {
+      "name": "lanchat_retrust_peer",
+      "handler": "lanchat::commands::lanchat_retrust_peer"
+    },
+    {
+      "name": "lanchat_send_clipboard_image",
+      "handler": "lanchat::commands::lanchat_send_clipboard_image"
+    },
+    {
+      "name": "lanchat_send_dir",
+      "handler": "lanchat::commands::lanchat_send_dir"
+    },
+    {
+      "name": "lanchat_send_file",
+      "handler": "lanchat::commands::lanchat_send_file"
+    },
+    {
+      "name": "lanchat_send_group_file",
+      "handler": "lanchat::commands::lanchat_send_group_file"
+    },
+    {
+      "name": "lanchat_send_group_text",
+      "handler": "lanchat::commands::lanchat_send_group_text"
+    },
+    {
+      "name": "lanchat_send_image_bytes",
+      "handler": "lanchat::commands::lanchat_send_image_bytes"
+    },
+    {
+      "name": "lanchat_send_screenshot",
+      "handler": "lanchat::commands::lanchat_send_screenshot"
+    },
+    {
+      "name": "lanchat_send_signal",
+      "handler": "lanchat::commands::lanchat_send_signal"
+    },
+    {
+      "name": "lanchat_send_text",
+      "handler": "lanchat::commands::lanchat_send_text"
+    },
+    {
+      "name": "lanchat_set_retention",
+      "handler": "lanchat::commands::lanchat_set_retention"
+    },
+    {
+      "name": "lanchat_set_start_on_launch",
+      "handler": "lanchat::commands::lanchat_set_start_on_launch"
+    },
+    {
+      "name": "lanchat_signal_group",
+      "handler": "lanchat::commands::lanchat_signal_group"
+    },
+    {
+      "name": "lanchat_start_service",
+      "handler": "lanchat::commands::lanchat_start_service"
+    },
+    {
+      "name": "lanchat_status",
+      "handler": "lanchat::commands::lanchat_status"
+    },
+    {
+      "name": "lanchat_transfer_control",
+      "handler": "lanchat::commands::lanchat_transfer_control"
+    },
+    {
+      "name": "lanchat_update_profile",
+      "handler": "lanchat::commands::lanchat_update_profile"
+    },
+    {
+      "name": "list_common_local_directories",
+      "handler": "terminal::list_common_local_directories"
+    },
+    {
+      "name": "list_local_shells",
+      "handler": "terminal::list_local_shells"
+    },
+    {
+      "name": "list_server_logs",
+      "handler": "servers::list_server_logs"
+    },
+    {
+      "name": "list_server_statuses",
+      "handler": "servers::list_server_statuses"
+    },
+    {
+      "name": "list_session_groups",
+      "handler": "session::list_session_groups"
+    },
+    {
+      "name": "list_sessions",
+      "handler": "session::list_sessions"
+    },
+    {
+      "name": "list_system_fonts",
+      "handler": "appearance::list_system_fonts"
+    },
+    {
+      "name": "list_tunnel_statuses",
+      "handler": "tunnel::list_tunnel_statuses"
+    },
+    {
+      "name": "list_tunnels",
+      "handler": "tunnel::list_tunnels"
+    },
+    {
+      "name": "list_wsl_distros",
+      "handler": "wsl::list_wsl_distros"
+    },
+    {
+      "name": "load_server_configs",
+      "handler": "servers::load_server_configs"
+    },
+    {
+      "name": "lsp_build_workspace",
+      "handler": "lsp::lsp_build_workspace"
+    },
+    {
+      "name": "lsp_call_hierarchy_incoming",
+      "handler": "lsp::lsp_call_hierarchy_incoming"
+    },
+    {
+      "name": "lsp_call_hierarchy_outgoing",
+      "handler": "lsp::lsp_call_hierarchy_outgoing"
+    },
+    {
+      "name": "lsp_cancel_reference_request",
+      "handler": "lsp::lsp_cancel_reference_request"
+    },
+    {
+      "name": "lsp_cancel_work_done_progress",
+      "handler": "lsp::lsp_cancel_work_done_progress"
+    },
+    {
+      "name": "lsp_change_document",
+      "handler": "lsp::lsp_change_document"
+    },
+    {
+      "name": "lsp_close_document",
+      "handler": "lsp::lsp_close_document"
+    },
+    {
+      "name": "lsp_code_action_resolve",
+      "handler": "lsp::lsp_code_action_resolve"
+    },
+    {
+      "name": "lsp_code_actions",
+      "handler": "lsp::lsp_code_actions"
+    },
+    {
+      "name": "lsp_completion",
+      "handler": "lsp::lsp_completion"
+    },
+    {
+      "name": "lsp_completion_resolve",
+      "handler": "lsp::lsp_completion_resolve"
+    },
+    {
+      "name": "lsp_declaration",
+      "handler": "lsp::lsp_declaration"
+    },
+    {
+      "name": "lsp_definition",
+      "handler": "lsp::lsp_definition"
+    },
+    {
+      "name": "lsp_detect_java_bundles",
+      "handler": "lsp::lsp_detect_java_bundles"
+    },
+    {
+      "name": "lsp_detect_servers",
+      "handler": "lsp::lsp_detect_servers"
+    },
+    {
+      "name": "lsp_discover_java_bundles",
+      "handler": "lsp::lsp_discover_java_bundles"
+    },
+    {
+      "name": "lsp_document_highlights",
+      "handler": "lsp::lsp_document_highlights"
+    },
+    {
+      "name": "lsp_document_status",
+      "handler": "lsp::lsp_document_status"
+    },
+    {
+      "name": "lsp_document_symbols",
+      "handler": "lsp::lsp_document_symbols"
+    },
+    {
+      "name": "lsp_download_sources",
+      "handler": "lsp::lsp_download_sources"
+    },
+    {
+      "name": "lsp_execute_command",
+      "handler": "lsp::lsp_execute_command"
+    },
+    {
+      "name": "lsp_formatting",
+      "handler": "lsp::lsp_formatting"
+    },
+    {
+      "name": "lsp_get_diagnostics",
+      "handler": "lsp::lsp_get_diagnostics"
+    },
+    {
+      "name": "lsp_hover",
+      "handler": "lsp::lsp_hover"
+    },
+    {
+      "name": "lsp_implementation",
+      "handler": "lsp::lsp_implementation"
+    },
+    {
+      "name": "lsp_inlay_hints",
+      "handler": "lsp::lsp_inlay_hints"
+    },
+    {
+      "name": "lsp_java_modules",
+      "handler": "lsp::lsp_java_modules"
+    },
+    {
+      "name": "lsp_java_project_model",
+      "handler": "lsp::lsp_java_project_model"
+    },
+    {
+      "name": "lsp_list_presets",
+      "handler": "lsp::lsp_list_presets"
+    },
+    {
+      "name": "lsp_open_document",
+      "handler": "lsp::lsp_open_document"
+    },
+    {
+      "name": "lsp_prepare_call_hierarchy",
+      "handler": "lsp::lsp_prepare_call_hierarchy"
+    },
+    {
+      "name": "lsp_prepare_rename",
+      "handler": "lsp::lsp_prepare_rename"
+    },
+    {
+      "name": "lsp_prepare_type_hierarchy",
+      "handler": "lsp::lsp_prepare_type_hierarchy"
+    },
+    {
+      "name": "lsp_range_formatting",
+      "handler": "lsp::lsp_range_formatting"
+    },
+    {
+      "name": "lsp_read_uri_contents",
+      "handler": "lsp::lsp_read_uri_contents"
+    },
+    {
+      "name": "lsp_references",
+      "handler": "lsp::lsp_references"
+    },
+    {
+      "name": "lsp_reload_project",
+      "handler": "lsp::lsp_reload_project"
+    },
+    {
+      "name": "lsp_rename",
+      "handler": "lsp::lsp_rename"
+    },
+    {
+      "name": "lsp_resolve_show_message_request",
+      "handler": "lsp::lsp_resolve_show_message_request"
+    },
+    {
+      "name": "lsp_resolve_workspace_edit",
+      "handler": "lsp::lsp_resolve_workspace_edit"
+    },
+    {
+      "name": "lsp_save_document",
+      "handler": "lsp::lsp_save_document"
+    },
+    {
+      "name": "lsp_selection_ranges",
+      "handler": "lsp::lsp_selection_ranges"
+    },
+    {
+      "name": "lsp_semantic_tokens",
+      "handler": "lsp::lsp_semantic_tokens"
+    },
+    {
+      "name": "lsp_set_java_bundles",
+      "handler": "lsp::lsp_set_java_bundles"
+    },
+    {
+      "name": "lsp_set_java_home",
+      "handler": "lsp::lsp_set_java_home"
+    },
+    {
+      "name": "lsp_set_java_settings",
+      "handler": "lsp::lsp_set_java_settings"
+    },
+    {
+      "name": "lsp_set_java_vmargs",
+      "handler": "lsp::lsp_set_java_vmargs"
+    },
+    {
+      "name": "lsp_signature_help",
+      "handler": "lsp::lsp_signature_help"
+    },
+    {
+      "name": "lsp_start_workspace_watcher",
+      "handler": "lsp::lsp_start_workspace_watcher"
+    },
+    {
+      "name": "lsp_stop_workspace",
+      "handler": "lsp::lsp_stop_workspace"
+    },
+    {
+      "name": "lsp_stop_workspace_watcher",
+      "handler": "lsp::lsp_stop_workspace_watcher"
+    },
+    {
+      "name": "lsp_type_definition",
+      "handler": "lsp::lsp_type_definition"
+    },
+    {
+      "name": "lsp_type_hierarchy_subtypes",
+      "handler": "lsp::lsp_type_hierarchy_subtypes"
+    },
+    {
+      "name": "lsp_type_hierarchy_supertypes",
+      "handler": "lsp::lsp_type_hierarchy_supertypes"
+    },
+    {
+      "name": "lsp_workspace_diagnostics",
+      "handler": "lsp::lsp_workspace_diagnostics"
+    },
+    {
+      "name": "lsp_workspace_did_change_watched_files",
+      "handler": "lsp::lsp_workspace_did_change_watched_files"
+    },
+    {
+      "name": "lsp_workspace_did_file_operation",
+      "handler": "lsp::lsp_workspace_did_file_operation"
+    },
+    {
+      "name": "lsp_workspace_symbol_resolve",
+      "handler": "lsp::lsp_workspace_symbol_resolve"
+    },
+    {
+      "name": "lsp_workspace_symbols",
+      "handler": "lsp::lsp_workspace_symbols"
+    },
+    {
+      "name": "lsp_workspace_will_file_operation",
+      "handler": "lsp::lsp_workspace_will_file_operation"
+    },
+    {
+      "name": "mail_add_invite_to_calendar",
+      "handler": "mail::caldav::mail_add_invite_to_calendar"
+    },
+    {
+      "name": "mail_apply_filters",
+      "handler": "mail::filters::mail_apply_filters"
+    },
+    {
+      "name": "mail_archive_attachment",
+      "handler": "mail::archive::mail_archive_attachment"
+    },
+    {
+      "name": "mail_archive_cleanup",
+      "handler": "mail::archive::mail_archive_cleanup"
+    },
+    {
+      "name": "mail_archive_export",
+      "handler": "mail::archive::mail_archive_export"
+    },
+    {
+      "name": "mail_archive_list",
+      "handler": "mail::archive::mail_archive_list"
+    },
+    {
+      "name": "mail_archive_pause",
+      "handler": "mail::archive::mail_archive_pause"
+    },
+    {
+      "name": "mail_archive_preview_cleanup",
+      "handler": "mail::archive::mail_archive_preview_cleanup"
+    },
+    {
+      "name": "mail_archive_query",
+      "handler": "mail::archive::mail_archive_query"
+    },
+    {
+      "name": "mail_archive_read",
+      "handler": "mail::archive::mail_archive_read"
+    },
+    {
+      "name": "mail_archive_remove",
+      "handler": "mail::archive::mail_archive_remove"
+    },
+    {
+      "name": "mail_archive_start",
+      "handler": "mail::archive::mail_archive_start"
+    },
+    {
+      "name": "mail_archive_status",
+      "handler": "mail::archive::mail_archive_status"
+    },
+    {
+      "name": "mail_autoconfig",
+      "handler": "mail::autoconfig::mail_autoconfig"
+    },
+    {
+      "name": "mail_caldav_sync",
+      "handler": "mail::caldav::mail_caldav_sync"
+    },
+    {
+      "name": "mail_carddav_sync",
+      "handler": "mail::contacts::mail_carddav_sync"
+    },
+    {
+      "name": "mail_clear_cache",
+      "handler": "mail::mail_clear_cache"
+    },
+    {
+      "name": "mail_copy_messages",
+      "handler": "mail::mail_copy_messages"
+    },
+    {
+      "name": "mail_create_folder",
+      "handler": "mail::mail_create_folder"
+    },
+    {
+      "name": "mail_delete_address_book_entry",
+      "handler": "mail::contacts::mail_delete_address_book_entry"
+    },
+    {
+      "name": "mail_delete_draft",
+      "handler": "mail::mail_delete_draft"
+    },
+    {
+      "name": "mail_delete_folder",
+      "handler": "mail::mail_delete_folder"
+    },
+    {
+      "name": "mail_delete_messages",
+      "handler": "mail::mail_delete_messages"
+    },
+    {
+      "name": "mail_discard_remote_draft",
+      "handler": "mail::outgoing::mail_discard_remote_draft"
+    },
+    {
+      "name": "mail_download_attachment",
+      "handler": "mail::mail_download_attachment"
+    },
+    {
+      "name": "mail_export_filters",
+      "handler": "mail::filters::mail_export_filters"
+    },
+    {
+      "name": "mail_export_mbox",
+      "handler": "mail::mbox::mail_export_mbox"
+    },
+    {
+      "name": "mail_export_vcards",
+      "handler": "mail::contacts::mail_export_vcards"
+    },
+    {
+      "name": "mail_fetch_raw",
+      "handler": "mail::mail_fetch_raw"
+    },
+    {
+      "name": "mail_get_invite",
+      "handler": "mail::calendar::mail_get_invite"
+    },
+    {
+      "name": "mail_get_message_body",
+      "handler": "mail::mail_get_message_body"
+    },
+    {
+      "name": "mail_idle_start",
+      "handler": "mail::idle::mail_idle_start"
+    },
+    {
+      "name": "mail_idle_stop",
+      "handler": "mail::idle::mail_idle_stop"
+    },
+    {
+      "name": "mail_import_filters",
+      "handler": "mail::filters::mail_import_filters"
+    },
+    {
+      "name": "mail_import_messages",
+      "handler": "mail::mbox::mail_import_messages"
+    },
+    {
+      "name": "mail_import_vcards",
+      "handler": "mail::contacts::mail_import_vcards"
+    },
+    {
+      "name": "mail_index_cached_contacts",
+      "handler": "mail::mail_index_cached_contacts"
+    },
+    {
+      "name": "mail_list_address_book",
+      "handler": "mail::contacts::mail_list_address_book"
+    },
+    {
+      "name": "mail_list_agenda",
+      "handler": "mail::caldav::mail_list_agenda"
+    },
+    {
+      "name": "mail_list_cached_folders",
+      "handler": "mail::mail_list_cached_folders"
+    },
+    {
+      "name": "mail_list_cached_messages",
+      "handler": "mail::mail_list_cached_messages"
+    },
+    {
+      "name": "mail_list_drafts",
+      "handler": "mail::mail_list_drafts"
+    },
+    {
+      "name": "mail_list_filters",
+      "handler": "mail::filters::mail_list_filters"
+    },
+    {
+      "name": "mail_list_folders",
+      "handler": "mail::folders::mail_list_folders"
+    },
+    {
+      "name": "mail_mark_read",
+      "handler": "mail::mail_mark_read"
+    },
+    {
+      "name": "mail_move_messages",
+      "handler": "mail::mail_move_messages"
+    },
+    {
+      "name": "mail_oauth_authorize",
+      "handler": "mail::mail_oauth_authorize"
+    },
+    {
+      "name": "mail_oauth_device_complete",
+      "handler": "mail::mail_oauth_device_complete"
+    },
+    {
+      "name": "mail_oauth_device_start",
+      "handler": "mail::mail_oauth_device_start"
+    },
+    {
+      "name": "mail_prefetch_message_body",
+      "handler": "mail::mail_prefetch_message_body"
+    },
+    {
+      "name": "mail_probe_certificate",
+      "handler": "mail::certs::mail_probe_certificate"
+    },
+    {
+      "name": "mail_rename_folder",
+      "handler": "mail::mail_rename_folder"
+    },
+    {
+      "name": "mail_respond_invite",
+      "handler": "mail::calendar::mail_respond_invite"
+    },
+    {
+      "name": "mail_save_address_book_entry",
+      "handler": "mail::contacts::mail_save_address_book_entry"
+    },
+    {
+      "name": "mail_save_draft",
+      "handler": "mail::mail_save_draft"
+    },
+    {
+      "name": "mail_save_filters",
+      "handler": "mail::filters::mail_save_filters"
+    },
+    {
+      "name": "mail_save_raw",
+      "handler": "mail::mail_save_raw"
+    },
+    {
+      "name": "mail_search_contacts",
+      "handler": "mail::mail_search_contacts"
+    },
+    {
+      "name": "mail_search_messages",
+      "handler": "mail::search::mail_search_messages"
+    },
+    {
+      "name": "mail_search_server",
+      "handler": "mail::search::mail_search_server"
+    },
+    {
+      "name": "mail_send_message",
+      "handler": "mail::mail_send_message"
+    },
+    {
+      "name": "mail_send_receipt",
+      "handler": "mail::receipts::mail_send_receipt"
+    },
+    {
+      "name": "mail_set_flags",
+      "handler": "mail::mail_set_flags"
+    },
+    {
+      "name": "mail_set_folder_subscription",
+      "handler": "mail::folders::mail_set_folder_subscription"
+    },
+    {
+      "name": "mail_store_remote_draft",
+      "handler": "mail::outgoing::mail_store_remote_draft"
+    },
+    {
+      "name": "mail_sync_all_folders",
+      "handler": "mail::mail_sync_all_folders"
+    },
+    {
+      "name": "mail_sync_folder",
+      "handler": "mail::mail_sync_folder"
+    },
+    {
+      "name": "mail_sync_headers",
+      "handler": "mail::mail_sync_headers"
+    },
+    {
+      "name": "mail_test_connection",
+      "handler": "mail::mail_test_connection"
+    },
+    {
+      "name": "mail_unsubscribe_one_click",
+      "handler": "mail::lists::mail_unsubscribe_one_click"
+    },
+    {
+      "name": "mark_session_connected",
+      "handler": "session::mark_session_connected"
+    },
+    {
+      "name": "mfa_add",
+      "handler": "mfa::commands::mfa_add"
+    },
+    {
+      "name": "mfa_capture_screens",
+      "handler": "mfa::commands::mfa_capture_screens"
+    },
+    {
+      "name": "mfa_codes",
+      "handler": "mfa::commands::mfa_codes"
+    },
+    {
+      "name": "mfa_delete",
+      "handler": "mfa::commands::mfa_delete"
+    },
+    {
+      "name": "mfa_export_uri",
+      "handler": "mfa::commands::mfa_export_uri"
+    },
+    {
+      "name": "mfa_hotp_next",
+      "handler": "mfa::commands::mfa_hotp_next"
+    },
+    {
+      "name": "mfa_inspect",
+      "handler": "mfa::commands::mfa_inspect"
+    },
+    {
+      "name": "mfa_list",
+      "handler": "mfa::commands::mfa_list"
+    },
+    {
+      "name": "mfa_mark_used",
+      "handler": "mfa::commands::mfa_mark_used"
+    },
+    {
+      "name": "mfa_read_clipboard_image",
+      "handler": "mfa::commands::mfa_read_clipboard_image"
+    },
+    {
+      "name": "mfa_reorder",
+      "handler": "mfa::commands::mfa_reorder"
+    },
+    {
+      "name": "mfa_reset_store",
+      "handler": "mfa::commands::mfa_reset_store"
+    },
+    {
+      "name": "mfa_set_prefs",
+      "handler": "mfa::commands::mfa_set_prefs"
+    },
+    {
+      "name": "mfa_update",
+      "handler": "mfa::commands::mfa_update"
+    },
+    {
+      "name": "mirror_get_config",
+      "handler": "models::mirror_get_config"
+    },
+    {
+      "name": "mirror_set_config",
+      "handler": "models::mirror_set_config"
+    },
+    {
+      "name": "models_delete",
+      "handler": "models::models_delete"
+    },
+    {
+      "name": "models_download",
+      "handler": "models::models_download"
+    },
+    {
+      "name": "models_list",
+      "handler": "models::models_list"
+    },
+    {
+      "name": "models_verify",
+      "handler": "models::models_verify"
+    },
+    {
+      "name": "nmedia_add_peer",
+      "handler": "lanchat::commands::nmedia_add_peer"
+    },
+    {
+      "name": "nmedia_peer_state",
+      "handler": "lanchat::commands::nmedia_peer_state"
+    },
+    {
+      "name": "nmedia_remove_peer",
+      "handler": "lanchat::commands::nmedia_remove_peer"
+    },
+    {
+      "name": "nmedia_start",
+      "handler": "lanchat::commands::nmedia_start"
+    },
+    {
+      "name": "nmedia_stop",
+      "handler": "lanchat::commands::nmedia_stop"
+    },
+    {
+      "name": "nmedia_toggle_cam",
+      "handler": "lanchat::commands::nmedia_toggle_cam"
+    },
+    {
+      "name": "nmedia_toggle_mic",
+      "handler": "lanchat::commands::nmedia_toggle_mic"
+    },
+    {
+      "name": "nmedia_toggle_screen",
+      "handler": "lanchat::commands::nmedia_toggle_screen"
+    },
+    {
+      "name": "nmedia_ws_port",
+      "handler": "lanchat::commands::nmedia_ws_port"
+    },
+    {
+      "name": "notes_ack_alert",
+      "handler": "notes::commands::notes_ack_alert"
+    },
+    {
+      "name": "notes_archive",
+      "handler": "notes::commands::notes_archive"
+    },
+    {
+      "name": "notes_create",
+      "handler": "notes::commands::notes_create"
+    },
+    {
+      "name": "notes_delete",
+      "handler": "notes::commands::notes_delete"
+    },
+    {
+      "name": "notes_get",
+      "handler": "notes::commands::notes_get"
+    },
+    {
+      "name": "notes_get_prefs",
+      "handler": "notes::commands::notes_get_prefs"
+    },
+    {
+      "name": "notes_list",
+      "handler": "notes::commands::notes_list"
+    },
+    {
+      "name": "notes_list_alerts",
+      "handler": "notes::commands::notes_list_alerts"
+    },
+    {
+      "name": "notes_list_tags",
+      "handler": "notes::commands::notes_list_tags"
+    },
+    {
+      "name": "notes_set_prefs",
+      "handler": "notes::commands::notes_set_prefs"
+    },
+    {
+      "name": "notes_set_steps",
+      "handler": "notes::commands::notes_set_steps"
+    },
+    {
+      "name": "notes_toggle_complete",
+      "handler": "notes::commands::notes_toggle_complete"
+    },
+    {
+      "name": "notes_update",
+      "handler": "notes::commands::notes_update"
+    },
+    {
+      "name": "notes_upsert_tags",
+      "handler": "notes::commands::notes_upsert_tags"
+    },
+    {
+      "name": "open_detached_window",
+      "handler": "windowing::open_detached_window"
+    },
+    {
+      "name": "open_external_url",
+      "handler": "filebrowser::open_external_url"
+    },
+    {
+      "name": "open_local_shell_as_administrator",
+      "handler": "terminal::open_local_shell_as_administrator"
+    },
+    {
+      "name": "open_sftp_window",
+      "handler": "filebrowser::open_sftp_window"
+    },
+    {
+      "name": "open_system_rdp_settings",
+      "handler": "servers::open_system_rdp_settings"
+    },
+    {
+      "name": "perf_baseline_recent",
+      "handler": "perf::perf_baseline_recent"
+    },
+    {
+      "name": "probe_rdp_capture",
+      "handler": "servers::probe_rdp_capture"
+    },
+    {
+      "name": "probe_searxng_instances",
+      "handler": "agent::search::commands::probe_searxng_instances"
+    },
+    {
+      "name": "probe_system_rdp",
+      "handler": "servers::probe_system_rdp"
+    },
+    {
+      "name": "provider_caps",
+      "handler": "agent::search::commands::provider_caps"
+    },
+    {
+      "name": "qa_set_completion_resolve_fault",
+      "handler": "lsp::qa_set_completion_resolve_fault"
+    },
+    {
+      "name": "qa_updater_check",
+      "handler": "update::qa_updater_check"
+    },
+    {
+      "name": "rdp_connect",
+      "handler": "rdp::rdp_connect"
+    },
+    {
+      "name": "rdp_disconnect",
+      "handler": "rdp::rdp_disconnect"
+    },
+    {
+      "name": "rdp_test_connection",
+      "handler": "rdp::rdp_test_connection"
+    },
+    {
+      "name": "rdp_trust_certificate",
+      "handler": "rdp::rdp_trust_certificate"
+    },
+    {
+      "name": "read_dbeaver_credentials_for_data_sources",
+      "handler": "session::import::read_dbeaver_credentials_for_data_sources"
+    },
+    {
+      "name": "read_file_bytes",
+      "handler": "config::read_file_bytes"
+    },
+    {
+      "name": "read_plist_session_file",
+      "handler": "session::import::read_plist_session_file"
+    },
+    {
+      "name": "read_stream_close",
+      "handler": "config::read_stream_close"
+    },
+    {
+      "name": "read_stream_open",
+      "handler": "config::read_stream_open"
+    },
+    {
+      "name": "read_stream_read",
+      "handler": "config::read_stream_read"
+    },
+    {
+      "name": "record_local_directory_use",
+      "handler": "terminal::record_local_directory_use"
+    },
+    {
+      "name": "recovery_get",
+      "handler": "webview_recovery::recovery_get"
+    },
+    {
+      "name": "recovery_ready",
+      "handler": "webview_recovery::recovery_ready"
+    },
+    {
+      "name": "recovery_update",
+      "handler": "webview_recovery::recovery_update"
+    },
+    {
+      "name": "redis_del_key",
+      "handler": "database::redis_del_key"
+    },
+    {
+      "name": "redis_exec",
+      "handler": "database::redis_exec"
+    },
+    {
+      "name": "redis_get_key",
+      "handler": "database::redis_get_key"
+    },
+    {
+      "name": "redis_list_keys",
+      "handler": "database::redis_list_keys"
+    },
+    {
+      "name": "redis_set_key",
+      "handler": "database::redis_set_key"
+    },
+    {
+      "name": "reorder_tunnels",
+      "handler": "tunnel::reorder_tunnels"
+    },
+    {
+      "name": "resize_terminal",
+      "handler": "terminal::resize_terminal"
+    },
+    {
+      "name": "resolve_rdp_connection_request",
+      "handler": "servers::resolve_rdp_connection_request"
+    },
+    {
+      "name": "save_ai_api_key",
+      "handler": "ai::commands::save_ai_api_key"
+    },
+    {
+      "name": "save_ai_config",
+      "handler": "ai::commands::save_ai_config"
+    },
+    {
+      "name": "save_app_proxy_config",
+      "handler": "proxy::save_app_proxy_config"
+    },
+    {
+      "name": "save_server_config",
+      "handler": "servers::save_server_config"
+    },
+    {
+      "name": "save_session",
+      "handler": "session::save_session"
+    },
+    {
+      "name": "save_session_group",
+      "handler": "session::save_session_group"
+    },
+    {
+      "name": "scan_local_session_files",
+      "handler": "session::import::scan_local_session_files"
+    },
+    {
+      "name": "screenshot_add_favorite",
+      "handler": "screenshot::favorites::screenshot_add_favorite"
+    },
+    {
+      "name": "screenshot_arrange_pins",
+      "handler": "screenshot::pins::screenshot_arrange_pins"
+    },
+    {
+      "name": "screenshot_auto_redact",
+      "handler": "screenshot::screenshot_auto_redact"
+    },
+    {
+      "name": "screenshot_board_pins",
+      "handler": "screenshot::pins::screenshot_board_pins"
+    },
+    {
+      "name": "screenshot_cancel_recording",
+      "handler": "screenshot::screenshot_cancel_recording"
+    },
+    {
+      "name": "screenshot_capture_full",
+      "handler": "screenshot::screenshot_capture_full"
+    },
+    {
+      "name": "screenshot_capture_region",
+      "handler": "screenshot::screenshot_capture_region"
+    },
+    {
+      "name": "screenshot_close_overlay",
+      "handler": "screenshot::screenshot_close_overlay"
+    },
+    {
+      "name": "screenshot_close_pin",
+      "handler": "screenshot::screenshot_close_pin"
+    },
+    {
+      "name": "screenshot_close_pin_tools",
+      "handler": "screenshot::pins::screenshot_close_pin_tools"
+    },
+    {
+      "name": "screenshot_copy_image",
+      "handler": "screenshot::screenshot_copy_image"
+    },
+    {
+      "name": "screenshot_current_recording",
+      "handler": "screenshot::screenshot_current_recording"
+    },
+    {
+      "name": "screenshot_edit_pin",
+      "handler": "screenshot::edit::screenshot_edit_pin"
+    },
+    {
+      "name": "screenshot_favorite_thumbnail",
+      "handler": "screenshot::favorites::screenshot_favorite_thumbnail"
+    },
+    {
+      "name": "screenshot_focus_pin",
+      "handler": "screenshot::pins::screenshot_focus_pin"
+    },
+    {
+      "name": "screenshot_list_displays",
+      "handler": "screenshot::screenshot_list_displays"
+    },
+    {
+      "name": "screenshot_list_favorites",
+      "handler": "screenshot::favorites::screenshot_list_favorites"
+    },
+    {
+      "name": "screenshot_list_pins",
+      "handler": "screenshot::pins::screenshot_list_pins"
+    },
+    {
+      "name": "screenshot_ocr",
+      "handler": "screenshot::screenshot_ocr"
+    },
+    {
+      "name": "screenshot_open_editor",
+      "handler": "screenshot::edit::screenshot_open_editor"
+    },
+    {
+      "name": "screenshot_open_overlay",
+      "handler": "screenshot::screenshot_open_overlay"
+    },
+    {
+      "name": "screenshot_open_pin_tools",
+      "handler": "screenshot::pins::screenshot_open_pin_tools"
+    },
+    {
+      "name": "screenshot_overlay_init",
+      "handler": "screenshot::screenshot_overlay_init"
+    },
+    {
+      "name": "screenshot_overlay_update",
+      "handler": "screenshot::screenshot_overlay_update"
+    },
+    {
+      "name": "screenshot_pin_favorite",
+      "handler": "screenshot::favorites::screenshot_pin_favorite"
+    },
+    {
+      "name": "screenshot_pin_init",
+      "handler": "screenshot::screenshot_pin_init"
+    },
+    {
+      "name": "screenshot_pin_to_screen",
+      "handler": "screenshot::screenshot_pin_to_screen"
+    },
+    {
+      "name": "screenshot_pin_tools_init",
+      "handler": "screenshot::pins::screenshot_pin_tools_init"
+    },
+    {
+      "name": "screenshot_pins_batch",
+      "handler": "screenshot::pins::screenshot_pins_batch"
+    },
+    {
+      "name": "screenshot_probe",
+      "handler": "screenshot::screenshot_probe"
+    },
+    {
+      "name": "screenshot_qa_annotation_tools",
+      "handler": "screenshot::qa::screenshot_qa_annotation_tools"
+    },
+    {
+      "name": "screenshot_qa_capture",
+      "handler": "screenshot::qa::screenshot_qa_capture"
+    },
+    {
+      "name": "screenshot_qa_capture_fidelity",
+      "handler": "screenshot::qa::screenshot_qa_capture_fidelity"
+    },
+    {
+      "name": "screenshot_qa_capture_permission_error",
+      "handler": "screenshot::qa::screenshot_qa_capture_permission_error"
+    },
+    {
+      "name": "screenshot_qa_colors",
+      "handler": "screenshot::qa::colors::screenshot_qa_colors"
+    },
+    {
+      "name": "screenshot_qa_controls",
+      "handler": "screenshot::qa::screenshot_qa_controls"
+    },
+    {
+      "name": "screenshot_qa_current_window",
+      "handler": "screenshot::qa::current_window::screenshot_qa_current_window"
+    },
+    {
+      "name": "screenshot_qa_displays",
+      "handler": "screenshot::qa::displays::screenshot_qa_displays"
+    },
+    {
+      "name": "screenshot_qa_escape_entry",
+      "handler": "screenshot::qa::screenshot_qa_escape_entry"
+    },
+    {
+      "name": "screenshot_qa_freehand",
+      "handler": "screenshot::qa::screenshot_qa_freehand"
+    },
+    {
+      "name": "screenshot_qa_full_recorder",
+      "handler": "screenshot::qa::screenshot_qa_full_recorder"
+    },
+    {
+      "name": "screenshot_qa_hotkey",
+      "handler": "screenshot::qa::screenshot_qa_hotkey"
+    },
+    {
+      "name": "screenshot_qa_macos_capture_source",
+      "handler": "screenshot::qa::screenshot_qa_macos_capture_source"
+    },
+    {
+      "name": "screenshot_qa_ocr_redact",
+      "handler": "screenshot::qa::screenshot_qa_ocr_redact"
+    },
+    {
+      "name": "screenshot_qa_overlay_copy",
+      "handler": "screenshot::qa::screenshot_qa_overlay_copy"
+    },
+    {
+      "name": "screenshot_qa_pin",
+      "handler": "screenshot::qa::screenshot_qa_pin"
+    },
+    {
+      "name": "screenshot_qa_pin_arrangement",
+      "handler": "screenshot::qa::pin_arrangement::screenshot_qa_pin_arrangement"
+    },
+    {
+      "name": "screenshot_qa_pin_tools",
+      "handler": "screenshot::qa::pin_tools::screenshot_qa_pin_tools"
+    },
+    {
+      "name": "screenshot_qa_record",
+      "handler": "screenshot::qa::screenshot_qa_record"
+    },
+    {
+      "name": "screenshot_qa_recorder",
+      "handler": "screenshot::qa::screenshot_qa_recorder"
+    },
+    {
+      "name": "screenshot_qa_scroll",
+      "handler": "screenshot::qa::screenshot_qa_scroll"
+    },
+    {
+      "name": "screenshot_qa_scroll_exit",
+      "handler": "screenshot::qa::scroll_exit::screenshot_qa_scroll_exit"
+    },
+    {
+      "name": "screenshot_qa_scroll_manual",
+      "handler": "screenshot::qa::scroll_manual::screenshot_qa_scroll_manual"
+    },
+    {
+      "name": "screenshot_qa_scroll_permission_error",
+      "handler": "screenshot::qa::screenshot_qa_scroll_permission_error"
+    },
+    {
+      "name": "screenshot_qa_x11_compositor_bypass",
+      "handler": "screenshot::qa::screenshot_qa_x11_compositor_bypass"
+    },
+    {
+      "name": "screenshot_read_file",
+      "handler": "screenshot::screenshot_read_file"
+    },
+    {
+      "name": "screenshot_recording_status",
+      "handler": "screenshot::screenshot_recording_status"
+    },
+    {
+      "name": "screenshot_redact_tsv",
+      "handler": "screenshot::ocr::screenshot_redact_tsv"
+    },
+    {
+      "name": "screenshot_remove_favorite",
+      "handler": "screenshot::favorites::screenshot_remove_favorite"
+    },
+    {
+      "name": "screenshot_save_data_url",
+      "handler": "screenshot::screenshot_save_data_url"
+    },
+    {
+      "name": "screenshot_save_image",
+      "handler": "screenshot::screenshot_save_image"
+    },
+    {
+      "name": "screenshot_scroll_capture",
+      "handler": "screenshot::screenshot_scroll_capture"
+    },
+    {
+      "name": "screenshot_scroll_plan",
+      "handler": "screenshot::screenshot_scroll_plan"
+    },
+    {
+      "name": "screenshot_scroll_status",
+      "handler": "screenshot::screenshot_scroll_status"
+    },
+    {
+      "name": "screenshot_scroll_surface",
+      "handler": "screenshot::screenshot_scroll_surface"
+    },
+    {
+      "name": "screenshot_set_pin_compact",
+      "handler": "screenshot::screenshot_set_pin_compact"
+    },
+    {
+      "name": "screenshot_set_pin_note",
+      "handler": "screenshot::pins::screenshot_set_pin_note"
+    },
+    {
+      "name": "screenshot_set_scroll_mode",
+      "handler": "screenshot::screenshot_set_scroll_mode"
+    },
+    {
+      "name": "screenshot_shortcut_set",
+      "handler": "screenshot::shortcut::screenshot_shortcut_set"
+    },
+    {
+      "name": "screenshot_shortcut_status",
+      "handler": "screenshot::shortcut::screenshot_shortcut_status"
+    },
+    {
+      "name": "screenshot_start_recording",
+      "handler": "screenshot::screenshot_start_recording"
+    },
+    {
+      "name": "screenshot_stop_recording",
+      "handler": "screenshot::screenshot_stop_recording"
+    },
+    {
+      "name": "screenshot_stop_scroll_capture",
+      "handler": "screenshot::screenshot_stop_scroll_capture"
+    },
+    {
+      "name": "screenshot_switch_display",
+      "handler": "screenshot::screenshot_switch_display"
+    },
+    {
+      "name": "screenshot_update_pin",
+      "handler": "screenshot::edit::screenshot_update_pin"
+    },
+    {
+      "name": "sdk_analyze_workspace",
+      "handler": "sdk::sdk_analyze_workspace"
+    },
+    {
+      "name": "sdk_discover_installations",
+      "handler": "sdk::sdk_discover_installations"
+    },
+    {
+      "name": "sdk_get_registry",
+      "handler": "sdk::sdk_get_registry"
+    },
+    {
+      "name": "sdk_probe_installation",
+      "handler": "sdk::sdk_probe_installation"
+    },
+    {
+      "name": "sdk_refresh_installations",
+      "handler": "sdk::sdk_refresh_installations"
+    },
+    {
+      "name": "sdk_remove_installation",
+      "handler": "sdk::sdk_remove_installation"
+    },
+    {
+      "name": "sdk_remove_workspace_binding",
+      "handler": "sdk::sdk_remove_workspace_binding"
+    },
+    {
+      "name": "sdk_resolve_workspace",
+      "handler": "sdk::sdk_resolve_workspace"
+    },
+    {
+      "name": "sdk_save_installation",
+      "handler": "sdk::sdk_save_installation"
+    },
+    {
+      "name": "sdk_save_workspace_binding",
+      "handler": "sdk::sdk_save_workspace_binding"
+    },
+    {
+      "name": "sdk_set_default",
+      "handler": "sdk::sdk_set_default"
+    },
+    {
+      "name": "searxng_availability",
+      "handler": "agent::search::commands::searxng_availability"
+    },
+    {
+      "name": "securecrt_decrypt_passwords",
+      "handler": "session::import_secrets::securecrt::securecrt_decrypt_passwords"
+    },
+    {
+      "name": "select_file_path",
+      "handler": "config::select_file_path"
+    },
+    {
+      "name": "select_folder_path",
+      "handler": "config::select_folder_path"
+    },
+    {
+      "name": "select_private_key_file",
+      "handler": "config::select_private_key_file"
+    },
+    {
+      "name": "select_save_directory",
+      "handler": "config::select_save_directory"
+    },
+    {
+      "name": "select_save_file_path",
+      "handler": "config::select_save_file_path"
+    },
+    {
+      "name": "select_upload_file",
+      "handler": "config::select_upload_file"
+    },
+    {
+      "name": "send_terminal_signal",
+      "handler": "terminal::send_terminal_signal"
+    },
+    {
+      "name": "sftp_attach",
+      "handler": "filebrowser::sftp_attach"
+    },
+    {
+      "name": "sftp_cancel_transfer",
+      "handler": "filebrowser::sftp_cancel_transfer"
+    },
+    {
+      "name": "sftp_chmod",
+      "handler": "filebrowser::sftp_chmod"
+    },
+    {
+      "name": "sftp_detach",
+      "handler": "filebrowser::sftp_detach"
+    },
+    {
+      "name": "sftp_download",
+      "handler": "filebrowser::sftp_download"
+    },
+    {
+      "name": "sftp_download_bytes",
+      "handler": "filebrowser::sftp_download_bytes"
+    },
+    {
+      "name": "sftp_download_dir",
+      "handler": "filebrowser::sftp_download_dir"
+    },
+    {
+      "name": "sftp_list_local",
+      "handler": "filebrowser::sftp_list_local"
+    },
+    {
+      "name": "sftp_list_local_detailed",
+      "handler": "filebrowser::sftp_list_local_detailed"
+    },
+    {
+      "name": "sftp_list_remote",
+      "handler": "filebrowser::sftp_list_remote"
+    },
+    {
+      "name": "sftp_local_drives",
+      "handler": "filebrowser::sftp_local_drives"
+    },
+    {
+      "name": "sftp_local_home",
+      "handler": "filebrowser::sftp_local_home"
+    },
+    {
+      "name": "sftp_mkdir",
+      "handler": "filebrowser::sftp_mkdir"
+    },
+    {
+      "name": "sftp_open_path",
+      "handler": "filebrowser::sftp_open_path"
+    },
+    {
+      "name": "sftp_pause_transfer",
+      "handler": "filebrowser::sftp_pause_transfer"
+    },
+    {
+      "name": "sftp_read_file_text",
+      "handler": "filebrowser::sftp_read_file_text"
+    },
+    {
+      "name": "sftp_realpath",
+      "handler": "filebrowser::sftp_realpath"
+    },
+    {
+      "name": "sftp_remove",
+      "handler": "filebrowser::sftp_remove"
+    },
+    {
+      "name": "sftp_rename",
+      "handler": "filebrowser::sftp_rename"
+    },
+    {
+      "name": "sftp_resume_transfer",
+      "handler": "filebrowser::sftp_resume_transfer"
+    },
+    {
+      "name": "sftp_stat",
+      "handler": "filebrowser::sftp_stat"
+    },
+    {
+      "name": "sftp_upload",
+      "handler": "filebrowser::sftp_upload"
+    },
+    {
+      "name": "sftp_upload_bytes",
+      "handler": "filebrowser::sftp_upload_bytes"
+    },
+    {
+      "name": "sftp_upload_dir",
+      "handler": "filebrowser::sftp_upload_dir"
+    },
+    {
+      "name": "sftp_write_file_text",
+      "handler": "filebrowser::sftp_write_file_text"
+    },
+    {
+      "name": "sidecar_start",
+      "handler": "llm::llama_server::sidecar_start"
+    },
+    {
+      "name": "sidecar_status",
+      "handler": "llm::llama_server::sidecar_status"
+    },
+    {
+      "name": "sidecar_stop",
+      "handler": "llm::llama_server::sidecar_stop"
+    },
+    {
+      "name": "sockscap_capabilities",
+      "handler": "sockscap::sockscap_capabilities"
+    },
+    {
+      "name": "sockscap_clear_domain_records",
+      "handler": "sockscap::sockscap_clear_domain_records"
+    },
+    {
+      "name": "sockscap_detect_local_proxies",
+      "handler": "sockscap::sockscap_detect_local_proxies"
+    },
+    {
+      "name": "sockscap_detect_tun_conflicts",
+      "handler": "sockscap::sockscap_detect_tun_conflicts"
+    },
+    {
+      "name": "sockscap_diagnostics",
+      "handler": "sockscap::sockscap_diagnostics"
+    },
+    {
+      "name": "sockscap_get_config",
+      "handler": "sockscap::sockscap_get_config"
+    },
+    {
+      "name": "sockscap_get_domain_records",
+      "handler": "sockscap::sockscap_get_domain_records"
+    },
+    {
+      "name": "sockscap_gfwlist_status",
+      "handler": "sockscap::sockscap_gfwlist_status"
+    },
+    {
+      "name": "sockscap_helper_probe_windivert",
+      "handler": "sockscap::helper::sockscap_helper_probe_windivert"
+    },
+    {
+      "name": "sockscap_helper_start",
+      "handler": "sockscap::helper::sockscap_helper_start"
+    },
+    {
+      "name": "sockscap_helper_status",
+      "handler": "sockscap::helper::sockscap_helper_status"
+    },
+    {
+      "name": "sockscap_helper_stop",
+      "handler": "sockscap::helper::sockscap_helper_stop"
+    },
+    {
+      "name": "sockscap_import_rules",
+      "handler": "sockscap::sockscap_import_rules"
+    },
+    {
+      "name": "sockscap_import_subscription",
+      "handler": "sockscap::sockscap_import_subscription"
+    },
+    {
+      "name": "sockscap_install_redirector",
+      "handler": "sockscap::sockscap_install_redirector"
+    },
+    {
+      "name": "sockscap_launch_app",
+      "handler": "sockscap::sockscap_launch_app"
+    },
+    {
+      "name": "sockscap_launch_terminal_app",
+      "handler": "sockscap::sockscap_launch_terminal_app"
+    },
+    {
+      "name": "sockscap_launched_apps",
+      "handler": "sockscap::sockscap_launched_apps"
+    },
+    {
+      "name": "sockscap_list_processes",
+      "handler": "sockscap::sockscap_list_processes"
+    },
+    {
+      "name": "sockscap_parse_share_link",
+      "handler": "sockscap::sockscap_parse_share_link"
+    },
+    {
+      "name": "sockscap_parse_subscription",
+      "handler": "sockscap::sockscap_parse_subscription"
+    },
+    {
+      "name": "sockscap_prepare_for_update",
+      "handler": "sockscap::sockscap_prepare_for_update"
+    },
+    {
+      "name": "sockscap_recover",
+      "handler": "sockscap::sockscap_recover"
+    },
+    {
+      "name": "sockscap_redirector_install_status",
+      "handler": "sockscap::sockscap_redirector_install_status"
+    },
+    {
+      "name": "sockscap_refresh_gfwlist",
+      "handler": "sockscap::sockscap_refresh_gfwlist"
+    },
+    {
+      "name": "sockscap_set_config",
+      "handler": "sockscap::sockscap_set_config"
+    },
+    {
+      "name": "sockscap_start",
+      "handler": "sockscap::sockscap_start"
+    },
+    {
+      "name": "sockscap_stats_snapshot",
+      "handler": "sockscap::sockscap_stats_snapshot"
+    },
+    {
+      "name": "sockscap_status",
+      "handler": "sockscap::sockscap_status"
+    },
+    {
+      "name": "sockscap_stop",
+      "handler": "sockscap::sockscap_stop"
+    },
+    {
+      "name": "sockscap_stop_launched_app",
+      "handler": "sockscap::sockscap_stop_launched_app"
+    },
+    {
+      "name": "sockscap_test_core_upstream",
+      "handler": "sockscap::sockscap_test_core_upstream"
+    },
+    {
+      "name": "sockscap_test_target",
+      "handler": "sockscap::sockscap_test_target"
+    },
+    {
+      "name": "sockscap_test_upstream",
+      "handler": "sockscap::sockscap_test_upstream"
+    },
+    {
+      "name": "sockscap_validate_macos_app",
+      "handler": "sockscap::sockscap_validate_macos_app"
+    },
+    {
+      "name": "start_all_tunnels",
+      "handler": "tunnel::start_all_tunnels"
+    },
+    {
+      "name": "start_local_server",
+      "handler": "servers::start_local_server"
+    },
+    {
+      "name": "start_tunnel",
+      "handler": "tunnel::start_tunnel"
+    },
+    {
+      "name": "stop_all_tunnels",
+      "handler": "tunnel::stop_all_tunnels"
+    },
+    {
+      "name": "stop_local_server",
+      "handler": "servers::stop_local_server"
+    },
+    {
+      "name": "stop_tunnel",
+      "handler": "tunnel::stop_tunnel"
+    },
+    {
+      "name": "storage_attach",
+      "handler": "objectstorage::storage_attach"
+    },
+    {
+      "name": "storage_cancel_transfer",
+      "handler": "objectstorage::storage_cancel_transfer"
+    },
+    {
+      "name": "storage_copy_object",
+      "handler": "objectstorage::storage_copy_object"
+    },
+    {
+      "name": "storage_create_bucket",
+      "handler": "objectstorage::storage_create_bucket"
+    },
+    {
+      "name": "storage_create_folder",
+      "handler": "objectstorage::storage_create_folder"
+    },
+    {
+      "name": "storage_delete_bucket",
+      "handler": "objectstorage::storage_delete_bucket"
+    },
+    {
+      "name": "storage_delete_object",
+      "handler": "objectstorage::storage_delete_object"
+    },
+    {
+      "name": "storage_delete_prefix",
+      "handler": "objectstorage::storage_delete_prefix"
+    },
+    {
+      "name": "storage_detach",
+      "handler": "objectstorage::storage_detach"
+    },
+    {
+      "name": "storage_download",
+      "handler": "objectstorage::storage_download"
+    },
+    {
+      "name": "storage_get_object_bytes",
+      "handler": "objectstorage::storage_get_object_bytes"
+    },
+    {
+      "name": "storage_head_object",
+      "handler": "objectstorage::storage_head_object"
+    },
+    {
+      "name": "storage_list_buckets",
+      "handler": "objectstorage::storage_list_buckets"
+    },
+    {
+      "name": "storage_list_objects",
+      "handler": "objectstorage::storage_list_objects"
+    },
+    {
+      "name": "storage_move_object",
+      "handler": "objectstorage::storage_move_object"
+    },
+    {
+      "name": "storage_move_prefix",
+      "handler": "objectstorage::storage_move_prefix"
+    },
+    {
+      "name": "storage_pause_transfer",
+      "handler": "objectstorage::storage_pause_transfer"
+    },
+    {
+      "name": "storage_ping",
+      "handler": "objectstorage::storage_ping"
+    },
+    {
+      "name": "storage_put_object_bytes",
+      "handler": "objectstorage::storage_put_object_bytes"
+    },
+    {
+      "name": "storage_resume_transfer",
+      "handler": "objectstorage::storage_resume_transfer"
+    },
+    {
+      "name": "storage_share_url",
+      "handler": "objectstorage::storage_share_url"
+    },
+    {
+      "name": "storage_test_connection",
+      "handler": "objectstorage::storage_test_connection"
+    },
+    {
+      "name": "storage_upload",
+      "handler": "objectstorage::storage_upload"
+    },
+    {
+      "name": "structural_search_cancel",
+      "handler": "structural_search::structural_search_cancel"
+    },
+    {
+      "name": "structural_search_capabilities",
+      "handler": "structural_search::structural_search_capabilities"
+    },
+    {
+      "name": "structural_search_run",
+      "handler": "structural_search::structural_search_run"
+    },
+    {
+      "name": "submit_ssh_auth_response",
+      "handler": "terminal::submit_ssh_auth_response"
+    },
+    {
+      "name": "tab_rewrite_command",
+      "handler": "tab::tab_rewrite_command"
+    },
+    {
+      "name": "tab_suggest_fim",
+      "handler": "tab::tab_suggest_fim"
+    },
+    {
+      "name": "tab_suggest_path",
+      "handler": "tab::tab_suggest_path"
+    },
+    {
+      "name": "tabby_decrypt_vault",
+      "handler": "session::import_secrets::tabby::tabby_decrypt_vault"
+    },
+    {
+      "name": "temporary_file_path",
+      "handler": "config::temporary_file_path"
+    },
+    {
+      "name": "test_llm_connection",
+      "handler": "ai::commands::test_llm_connection"
+    },
+    {
+      "name": "test_llm_model",
+      "handler": "ai::commands::test_llm_model"
+    },
+    {
+      "name": "test_proxy_connection",
+      "handler": "terminal::test_proxy_connection"
+    },
+    {
+      "name": "test_ssh_connection",
+      "handler": "terminal::test_ssh_connection"
+    },
+    {
+      "name": "test_tunnel",
+      "handler": "tunnel::test_tunnel"
+    },
+    {
+      "name": "update_shell_audit_outcome",
+      "handler": "ai::commands::update_shell_audit_outcome"
+    },
+    {
+      "name": "updater_platform",
+      "handler": "update::updater_platform"
+    },
+    {
+      "name": "upsert_tunnel",
+      "handler": "tunnel::upsert_tunnel"
+    },
+    {
+      "name": "vault_change_master",
+      "handler": "vault::vault_change_master"
+    },
+    {
+      "name": "vault_delete",
+      "handler": "vault::vault_delete"
+    },
+    {
+      "name": "vault_init",
+      "handler": "vault::vault_init"
+    },
+    {
+      "name": "vault_list",
+      "handler": "vault::vault_list"
+    },
+    {
+      "name": "vault_lock",
+      "handler": "vault::vault_lock"
+    },
+    {
+      "name": "vault_put",
+      "handler": "vault::vault_put"
+    },
+    {
+      "name": "vault_status",
+      "handler": "vault::vault_status"
+    },
+    {
+      "name": "vault_unlock",
+      "handler": "vault::vault_unlock"
+    },
+    {
+      "name": "vault_update",
+      "handler": "vault::vault_update"
+    },
+    {
+      "name": "vnc_cancel_connect",
+      "handler": "vnc::vnc_cancel_connect"
+    },
+    {
+      "name": "vnc_connect",
+      "handler": "vnc::vnc_connect"
+    },
+    {
+      "name": "vnc_consume_detach_claim",
+      "handler": "vnc::vnc_consume_detach_claim"
+    },
+    {
+      "name": "vnc_create_detach_claim",
+      "handler": "vnc::vnc_create_detach_claim"
+    },
+    {
+      "name": "vnc_disconnect",
+      "handler": "vnc::vnc_disconnect"
+    },
+    {
+      "name": "vnc_set_special_key_capture",
+      "handler": "vnc::keyboard_hook::vnc_set_special_key_capture"
+    },
+    {
+      "name": "vnc_special_key_capture_status",
+      "handler": "vnc::keyboard_hook::vnc_special_key_capture_status"
+    },
+    {
+      "name": "vnc_test_connection",
+      "handler": "vnc::vnc_test_connection"
+    },
+    {
+      "name": "voice_cancel_cleanup",
+      "handler": "voice::cleanup::voice_cancel_cleanup"
+    },
+    {
+      "name": "voice_cancel_model_installation",
+      "handler": "asr::models::voice_cancel_model_installation"
+    },
+    {
+      "name": "voice_cancel_sherpa_model_installation",
+      "handler": "asr::models::voice_cancel_sherpa_model_installation"
+    },
+    {
+      "name": "voice_capture_supported",
+      "handler": "voice::commands::voice_capture_supported"
+    },
+    {
+      "name": "voice_check_models",
+      "handler": "asr::models::voice_check_models"
+    },
+    {
+      "name": "voice_cleanup_text",
+      "handler": "voice::cleanup::voice_cleanup_text"
+    },
+    {
+      "name": "voice_install_model",
+      "handler": "asr::models::voice_install_model"
+    },
+    {
+      "name": "voice_install_sherpa_model",
+      "handler": "asr::models::voice_install_sherpa_model"
+    },
+    {
+      "name": "voice_model_installation",
+      "handler": "asr::models::voice_model_installation"
+    },
+    {
+      "name": "voice_models",
+      "handler": "asr::models::voice_models"
+    },
+    {
+      "name": "voice_sherpa_model_installation",
+      "handler": "asr::models::voice_sherpa_model_installation"
+    },
+    {
+      "name": "voice_sherpa_model_status",
+      "handler": "asr::models::voice_sherpa_model_status"
+    },
+    {
+      "name": "voice_start_capture",
+      "handler": "voice::commands::voice_start_capture"
+    },
+    {
+      "name": "voice_start_stream",
+      "handler": "voice::commands::voice_start_stream"
+    },
+    {
+      "name": "voice_stop_and_transcribe",
+      "handler": "voice::commands::voice_stop_and_transcribe"
+    },
+    {
+      "name": "voice_stop_capture",
+      "handler": "voice::commands::voice_stop_capture"
+    },
+    {
+      "name": "voice_stop_stream",
+      "handler": "voice::commands::voice_stop_stream"
+    },
+    {
+      "name": "web_fetch_execute",
+      "handler": "agent::search::commands::web_fetch_execute"
+    },
+    {
+      "name": "web_search_execute",
+      "handler": "agent::search::commands::web_search_execute"
+    },
+    {
+      "name": "workspace_apply_resource_operation",
+      "handler": "workspace::workspace_apply_resource_operation"
+    },
+    {
+      "name": "workspace_compact_chain",
+      "handler": "workspace::workspace_compact_chain"
+    },
+    {
+      "name": "workspace_create_dir",
+      "handler": "workspace::workspace_create_dir"
+    },
+    {
+      "name": "workspace_create_file",
+      "handler": "workspace::workspace_create_file"
+    },
+    {
+      "name": "workspace_delete_path",
+      "handler": "workspace::workspace_delete_path"
+    },
+    {
+      "name": "workspace_dependency_tree",
+      "handler": "workspace::workspace_dependency_tree"
+    },
+    {
+      "name": "workspace_detect_git_roots",
+      "handler": "workspace::workspace_detect_git_roots"
+    },
+    {
+      "name": "workspace_detect_tasks",
+      "handler": "workspace::workspace_detect_tasks"
+    },
+    {
+      "name": "workspace_execution_model",
+      "handler": "workspace_execution::workspace_execution_model"
+    },
+    {
+      "name": "workspace_ingest_gradle_project",
+      "handler": "workspace_tooling::gradle::workspace_ingest_gradle_project"
+    },
+    {
+      "name": "workspace_ingest_maven_project",
+      "handler": "workspace_tooling::maven::workspace_ingest_maven_project"
+    },
+    {
+      "name": "workspace_java_run_target",
+      "handler": "workspace::workspace_java_run_target"
+    },
+    {
+      "name": "workspace_java_run_targets",
+      "handler": "workspace::workspace_java_run_targets"
+    },
+    {
+      "name": "workspace_list_dir",
+      "handler": "workspace::workspace_list_dir"
+    },
+    {
+      "name": "workspace_list_files_recursive",
+      "handler": "workspace::workspace_list_files_recursive"
+    },
+    {
+      "name": "workspace_read_file",
+      "handler": "workspace::workspace_read_file"
+    },
+    {
+      "name": "workspace_read_file_with_encoding",
+      "handler": "workspace::workspace_read_file_with_encoding"
+    },
+    {
+      "name": "workspace_read_loose_file",
+      "handler": "workspace::workspace_read_loose_file"
+    },
+    {
+      "name": "workspace_read_loose_file_with_encoding",
+      "handler": "workspace::workspace_read_loose_file_with_encoding"
+    },
+    {
+      "name": "workspace_rename_path",
+      "handler": "workspace::workspace_rename_path"
+    },
+    {
+      "name": "workspace_search_cancel",
+      "handler": "workspace_search::workspace_search_cancel"
+    },
+    {
+      "name": "workspace_search_start",
+      "handler": "workspace_search::workspace_search_start"
+    },
+    {
+      "name": "workspace_task_tree",
+      "handler": "workspace::workspace_task_tree"
+    },
+    {
+      "name": "workspace_test_results",
+      "handler": "test_results::workspace_test_results"
+    },
+    {
+      "name": "workspace_write_file",
+      "handler": "workspace::workspace_write_file"
+    },
+    {
+      "name": "workspace_write_file_encoded",
+      "handler": "workspace::workspace_write_file_encoded"
+    },
+    {
+      "name": "workspace_write_loose_file",
+      "handler": "workspace::workspace_write_loose_file"
+    },
+    {
+      "name": "workspace_write_loose_file_encoded",
+      "handler": "workspace::workspace_write_loose_file_encoded"
+    },
+    {
+      "name": "write_stream_abort",
+      "handler": "config::write_stream_abort"
+    },
+    {
+      "name": "write_stream_append",
+      "handler": "config::write_stream_append"
+    },
+    {
+      "name": "write_stream_close",
+      "handler": "config::write_stream_close"
+    },
+    {
+      "name": "write_stream_open",
+      "handler": "config::write_stream_open"
+    },
+    {
+      "name": "write_terminal",
+      "handler": "terminal::write_terminal"
+    }
+  ],
+  "facades": {
+    "src/lib/ipc.ts": [
+      "AppProxyConfig",
+      "AuthMethod",
+      "DbBookmark",
+      "DbCatalog",
+      "DbColumn",
+      "DbColumnDescription",
+      "DbConnectResult",
+      "DbForeignKey",
+      "DbIndex",
+      "DbListSavedQueriesRequest",
+      "DbObject",
+      "DbQueryResult",
+      "DbQueryStreamEvent",
+      "DbQueryWorkspace",
+      "DbQueryWorkspaceTab",
+      "DbResultSqlFilter",
+      "DbResultSqlRewriteRequest",
+      "DbResultSqlRewriteResponse",
+      "DbResultSqlSort",
+      "DbSaveQueryWorkspaceRequest",
+      "DbSavedQuery",
+      "DbSavedQueryScope",
+      "DbSchema",
+      "DbSqlHistoryEntry",
+      "DbTable",
+      "DbTxStatus",
+      "DbeaverCredentialEntry",
+      "DirectoryAvailability",
+      "DirectoryListEnvelope",
+      "DirectoryTimeSource",
+      "ForwardErrorPayload",
+      "HBaseColumnFamily",
+      "HBaseConnectResult",
+      "HBaseShellResult",
+      "HBaseTableInfo",
+      "HBaseTableSchema",
+      "IpcGetRunSnapshotResponse",
+      "IpcRunSnapshotRecord",
+      "IpcSnapshotEntry",
+      "IpcSnapshotEntryLocalTerminal",
+      "IpcSnapshotEntrySavedSession",
+      "KeychainHit",
+      "KeychainQuery",
+      "LocalDirectoryShortcut",
+      "LocalSessionFile",
+      "LocalShellOption",
+      "LocalTerminalCreated",
+      "ReadStreamOpenResult",
+      "RedisKeyEntry",
+      "RedisScanPage",
+      "RedisValue",
+      "SECURECRT_PASSWORD_BAD_PASSPHRASE",
+      "SecureCrtDecryptResponse",
+      "SecureCrtPasswordFailure",
+      "SecureCrtPasswordHit",
+      "SecureCrtPasswordRequest",
+      "SessionConfig",
+      "SessionGroup",
+      "SshAuthPromptEntry",
+      "SshAuthPromptPayload",
+      "TABBY_VAULT_BAD_PASSWORD",
+      "TABBY_VAULT_MISSING",
+      "TabbyDecryptVaultResponse",
+      "TabbySecret",
+      "VAULT_LOCKED_ERROR",
+      "VAULT_LOCKED_EVENT",
+      "VAULT_REF_PREFIX",
+      "VaultEntrySummary",
+      "VaultPutResult",
+      "VaultStateKind",
+      "VaultStatus",
+      "VncConnectResult",
+      "WslDistro",
+      "XServerStatus",
+      "attachTerminalOutput",
+      "ccGetCustomSettings",
+      "ccGetProfileSettings",
+      "ccTrackTerminal",
+      "ccUntrackTerminal",
+      "checkFileExists",
+      "clearWelcomeRunSnapshot",
+      "closeTerminal",
+      "codexGetCustomConfig",
+      "codexGetProfileConfig",
+      "commitWelcomeRunSnapshot",
+      "createCommandTerminal",
+      "createLocalTerminal",
+      "createSshTerminal",
+      "createTerminalSessionId",
+      "dbAppendHistory",
+      "dbArchiveSavedQuery",
+      "dbCancel",
+      "dbClearHistory",
+      "dbCloseQueryWorkspaceTabs",
+      "dbConnect",
+      "dbDeleteBookmark",
+      "dbDeleteHistory",
+      "dbDeleteSavedQuery",
+      "dbDescribeTable",
+      "dbDisconnect",
+      "dbExecute",
+      "dbExecuteStream",
+      "dbGetSavedQuery",
+      "dbListBookmarks",
+      "dbListCatalogs",
+      "dbListClosedQueryWorkspaceTabs",
+      "dbListForeignKeys",
+      "dbListHistory",
+      "dbListIndexes",
+      "dbListObjects",
+      "dbListSavedQueries",
+      "dbListSchemas",
+      "dbListTables",
+      "dbLoadQueryWorkspace",
+      "dbObjectDdl",
+      "dbPing",
+      "dbReopenQueryWorkspaceTab",
+      "dbRewriteResultSql",
+      "dbSaveBookmark",
+      "dbSaveQueryWorkspace",
+      "dbSaveSavedQuery",
+      "dbSearchTables",
+      "dbTableStats",
+      "dbTestConnection",
+      "dbTxCommit",
+      "dbTxRollback",
+      "dbTxSetManual",
+      "dbTxStatus",
+      "dbUpdateHistoryTabName",
+      "deleteSession",
+      "deleteSessionGroup",
+      "detectXServer",
+      "encodeBase64",
+      "exitApp",
+      "getAppProxyConfig",
+      "getAppProxyUrl",
+      "getHomeDir",
+      "getSession",
+      "getWelcomeRunSnapshot",
+      "hbaseCancel",
+      "hbaseConnect",
+      "hbaseDescribeTable",
+      "hbaseDisconnect",
+      "hbaseExecute",
+      "hbaseListTables",
+      "hbaseParseKeytabPrincipal",
+      "hbaseParseSiteXml",
+      "hbasePing",
+      "hbaseTestConnection",
+      "historyAppend",
+      "historyClear",
+      "historyListRecent",
+      "historyMatchPrefix",
+      "importExternalBashSessions",
+      "importPuttySessions",
+      "importWslSessions",
+      "isTabbyBadPasswordError",
+      "isVaultLockedError",
+      "isVaultReference",
+      "keychainLookupBatch",
+      "lanchatAcceptFile",
+      "lanchatClearAllHistory",
+      "lanchatClearConversation",
+      "lanchatCreateGroup",
+      "lanchatDeleteMessage",
+      "lanchatGetProfile",
+      "lanchatGetRetention",
+      "lanchatGetServiceState",
+      "lanchatLeaveGroup",
+      "lanchatListConversations",
+      "lanchatListGroups",
+      "lanchatListMessages",
+      "lanchatListPeers",
+      "lanchatListPinned",
+      "lanchatMarkRead",
+      "lanchatOpenPath",
+      "lanchatRejectFile",
+      "lanchatResendMessage",
+      "lanchatRetrustPeer",
+      "lanchatSendClipboardImage",
+      "lanchatSendDir",
+      "lanchatSendFile",
+      "lanchatSendGroupFile",
+      "lanchatSendGroupText",
+      "lanchatSendImageBytes",
+      "lanchatSendScreenshot",
+      "lanchatSendSignal",
+      "lanchatSendText",
+      "lanchatSetRetention",
+      "lanchatSetStartOnLaunch",
+      "lanchatSignalGroup",
+      "lanchatStartService",
+      "lanchatStatus",
+      "lanchatTransferControl",
+      "lanchatUpdateProfile",
+      "listCommonLocalDirectories",
+      "listLocalShells",
+      "listSessionGroups",
+      "listSessions",
+      "listSystemFonts",
+      "listWslDistros",
+      "listenLanChatConversation",
+      "listenLanChatFileOffer",
+      "listenLanChatGroup",
+      "listenLanChatMessage",
+      "listenLanChatRoster",
+      "listenLanChatSecurity",
+      "listenLanChatService",
+      "listenLanChatSignal",
+      "listenLanChatTransfer",
+      "listenLanChatWb",
+      "listenSshAuthPrompt",
+      "listenTerminalExit",
+      "listenTerminalForwardError",
+      "listenWelcomeDirectoriesChanged",
+      "markSessionConnected",
+      "nmediaAddPeer",
+      "nmediaPeerState",
+      "nmediaRemovePeer",
+      "nmediaStart",
+      "nmediaStop",
+      "nmediaToggleCam",
+      "nmediaToggleMic",
+      "nmediaToggleScreen",
+      "nmediaWsPort",
+      "openLocalPath",
+      "openLocalShellAsAdministrator",
+      "readDbeaverCredentialsForDataSources",
+      "readFileBytes",
+      "readPlistSessionFile",
+      "readStreamClose",
+      "readStreamOpen",
+      "readStreamRead",
+      "recordLocalDirectoryUse",
+      "redisDelKey",
+      "redisExec",
+      "redisGetKey",
+      "redisListKeys",
+      "redisSetKey",
+      "resizeTerminal",
+      "saveAppProxyConfig",
+      "saveSession",
+      "saveSessionGroup",
+      "scanLocalSessionFiles",
+      "secureCrtDecryptPasswords",
+      "selectFilePath",
+      "selectFolderPath",
+      "selectPrivateKeyFile",
+      "selectSaveDirectory",
+      "selectSaveFilePath",
+      "selectUploadFile",
+      "sendTerminalSignal",
+      "submitSshAuthResponse",
+      "tabbyDecryptVault",
+      "temporaryFilePath",
+      "testProxyConnection",
+      "testSshConnection",
+      "vaultChangeMaster",
+      "vaultDelete",
+      "vaultInit",
+      "vaultList",
+      "vaultLock",
+      "vaultPut",
+      "vaultStatus",
+      "vaultUnlock",
+      "vaultUpdate",
+      "vncConnect",
+      "vncDisconnect",
+      "vncTestConnection",
+      "withVaultLockedNotice",
+      "writeStreamAbort",
+      "writeStreamAppend",
+      "writeStreamClose",
+      "writeStreamOpen",
+      "writeTerminal"
+    ],
+    "src/stores/appStore.ts": [
+      "AppState",
+      "CodeWorkspaceContext",
+      "CodeWorkspaceFileContext",
+      "CodeWorkspaceLooseFileContext",
+      "CodeWorkspaceLspContext",
+      "CodeWorkspaceLspDiagnosticContext",
+      "CodeWorkspaceLspStatusContext",
+      "CodeWorkspaceRootContext",
+      "DbObjectKind",
+      "DbSelectedObject",
+      "SideTab",
+      "TerminalActivityState",
+      "TerminalRuntimeInfo",
+      "TerminalSplitLayout",
+      "VAULT_UNLOCK_MODE_KEY",
+      "VaultUnlockMode",
+      "computeDuplicateTitle",
+      "computeNewTerminalTitle",
+      "newWorkspaceInstanceId",
+      "recentWorkspaceIdFromParts",
+      "subscribeUiAppearanceStorage",
+      "syncUiAppearanceFromStorage",
+      "updateDuplicateAutoTitle",
+      "useAppStore"
+    ],
+    "src/lib/sessionImportExport.ts": [
+      "ExternalVaultPrompt",
+      "SecureCrtEncryptedPassword",
+      "SessionExportResult",
+      "SessionImportOptions",
+      "SessionImportResult",
+      "SessionImportSecret",
+      "createSessionImportResult",
+      "decodeImportedText",
+      "detectTabbyVault",
+      "parseCsvSessions",
+      "parseDbeaverSessions",
+      "parseExceedSessions",
+      "parseItermDynamicProfiles",
+      "parseMobaXtermSessions",
+      "parseNavicatSessions",
+      "parseSecureCrtSessions",
+      "parseTabbySessions",
+      "parseTaomniSessions",
+      "parseTerminalAppProfiles",
+      "parseWindTermSessions",
+      "parseXmlConnectionSessions",
+      "parseXshellFile",
+      "parseXshellSessions",
+      "parseXshellZipSessions",
+      "parseZeroOmegaProxies",
+      "serializeCsvSessionTemplate",
+      "serializeCsvSessions",
+      "serializeMobaXtermSessions",
+      "serializeTaomniSessions"
+    ]
+  },
+  "frontendLiteralEvents": [
+    "agent-acp-permission",
+    "agent-acp-permission-dismissed",
+    "agent-cc-capture-end",
+    "agent-cc-capture-progress",
+    "agent-cc-control-tool",
+    "agent-cc-permission",
+    "agent-cc-sql-echo",
+    "agent-cc-terminal-echo",
+    "agent-cc-tool",
+    "backup-authorization",
+    "backup-completed",
+    "backup-connection-changed",
+    "backup-job-progress",
+    "cc-test-settings-stream",
+    "codex-test-config-stream",
+    "lanchat://conversation",
+    "lanchat://file-offer",
+    "lanchat://group",
+    "lanchat://message",
+    "lanchat://roster",
+    "lanchat://security",
+    "lanchat://service",
+    "lanchat://signal",
+    "lanchat://transfer",
+    "lanchat://wb",
+    "lsp://external-file-change",
+    "lsp://workspace-apply-edit",
+    "mail-sent-copy",
+    "server://rdp/connection-request",
+    "server://rdp/session",
+    "taomni-sessions-changed",
+    "tunnel-status",
+    "vnc-special-key",
+    "voice-model-progress",
+    "voice-sherpa-model-progress",
+    "voice-transcript",
+    "voice-transcript-complete",
+    "voice-transcript-error",
+    "welcome-directories-changed"
+  ]
+}

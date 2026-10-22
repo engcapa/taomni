@@ -31,8 +31,13 @@ fn current() -> &'static Mutex<Option<Arc<Session>>> {
 /// A dead main renderer cannot review or stop its microphone session. Reuse
 /// cancellation, retain already persisted material, never automatically transcribe/send.
 pub(crate) fn stop_orphaned_capture() {
-    let id = current().lock().ok().and_then(|session| session.as_ref().map(|s| s.id.clone()));
-    if let Some(id) = id { voice_stop_capture(id); }
+    let id = current()
+        .lock()
+        .ok()
+        .and_then(|session| session.as_ref().map(|s| s.id.clone()));
+    if let Some(id) = id {
+        voice_stop_capture(id);
+    }
 }
 // IPC cancellation can arrive before the async start command is polled.
 // Keep a bounded recent ledger, always accessed while holding current().
@@ -76,12 +81,21 @@ pub async fn voice_start_capture(
     window: tauri::WebviewWindow,
 ) -> Result<(), String> {
     use tauri::Manager as _;
-    let generation = crate::webview_recovery::output_generation(window.app_handle(), window.label());
-    if !crate::webview_recovery::renderer_is_current(window.app_handle(), window.label(), generation) {
+    let generation =
+        crate::webview_recovery::output_generation(window.app_handle(), window.label());
+    if !crate::webview_recovery::renderer_is_current(
+        window.app_handle(),
+        window.label(),
+        generation,
+    ) {
         return Err("Recording owner expired".into());
     }
     let result = voice_start_capture_inner(&session_id, &state, true).await;
-    if !crate::webview_recovery::renderer_is_current(window.app_handle(), window.label(), generation) {
+    if !crate::webview_recovery::renderer_is_current(
+        window.app_handle(),
+        window.label(),
+        generation,
+    ) {
         voice_stop_capture(session_id);
         return Err("Recording owner expired".into());
     }

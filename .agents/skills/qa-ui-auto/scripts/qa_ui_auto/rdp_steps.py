@@ -671,14 +671,22 @@ def _do_host_clipboard(ctx: NativeStepContext, args: Any) -> str:
         if kind == "text":
             wanted = args.get("equals")
             contains = args.get("contains")
-            value = _poll(lambda: ((host_clipboard.get_text() == wanted) if wanted is not None
-                                    else (str(contains) in host_clipboard.get_text()),
-                                   host_clipboard.get_text()), timeout, "text")
-            record["value"] = value
+
+            def check_text() -> tuple[bool, str]:
+                # Compare and retain the same OS snapshot. A second read can
+                # observe a later writer and doubles native helper startup.
+                value = host_clipboard.get_text()
+                return (value == wanted if wanted is not None else str(contains) in value, value)
+
+            record["value"] = _poll(check_text, timeout, "text")
         elif kind == "html":
             contains = str(args["contains"])
-            record["value"] = _poll(lambda: (contains in host_clipboard.get_html(), host_clipboard.get_html()),
-                                    timeout, f"html contains {contains!r}")
+
+            def check_html() -> tuple[bool, str]:
+                value = host_clipboard.get_html()
+                return contains in value, value
+
+            record["value"] = _poll(check_html, timeout, f"html contains {contains!r}")
         elif kind == "image":
             reference = _within_report(ctx, str(args["png_equals"]))
             saved = ctx.case_dir / "host-clipboard-image.png"

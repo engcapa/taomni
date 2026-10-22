@@ -293,5 +293,18 @@ class VerificationTest(unittest.TestCase):
         self.assertEqual(perf_baseline.assess(result, baseline)[0], 2)
 
 
+    def test_performance_relative_tolerance_preserves_absolute_budgets(self):
+        names = ("normal_input_key_to_paint", "local_action_toggle_comment")
+        def metrics(value):
+            return {name: perf_baseline.summarize([value] * 20) for name in names}
+        baseline = metrics(20)
+        self.assertEqual(perf_baseline.assess(metrics(23), baseline)[0], 0)
+        self.assertEqual(perf_baseline.assess(metrics(23.01), baseline)[0], 1)
+        self.assertEqual(perf_baseline.assess(metrics(15), baseline)[0], 0)
+        self.assertEqual(perf_baseline.assess(metrics(23), baseline, regression_fraction=0)[0], 1)
+        self.assertEqual(perf_baseline.assess(metrics(51), metrics(49))[0], 1)
+        self.assertEqual(perf_baseline.assess(metrics(20), baseline, regression_fraction=float("nan"))[0], 2)
+
+
 if __name__ == "__main__":
     unittest.main()

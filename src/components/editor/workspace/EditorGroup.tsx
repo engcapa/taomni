@@ -1,312 +1,22 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-  type MutableRefObject,
-  type ReactNode,
-} from "react";
-import {
-  AlertTriangle,
-  ChevronLeft,
-  ChevronRight,
-  Columns2,
-  Download,
-  Eye,
-  File,
-  Loader2,
-  ChevronDown,
-  Pin,
-  X,
-} from "lucide-react";
-import type {
-  LspCapabilitySummary,
-  LspDiagnostic,
-  LspDocumentHighlight,
-  LspInlayHint,
-  LspPosition,
-  LspRange,
-  LspSemanticToken,
-} from "../../../lib/editor/lsp";
-import type {
-  LspCompletionItem,
-  LspCompletionResolveResult,
-  LspCompletionResult,
-} from "../../../lib/editor/lsp";
-import type { ParameterPopupView } from "./referenceInfoSession";
-import {
-  CodeMirrorHost,
-  type EditorCommandPort,
-  type EditorCommandPortRegistration,
-  type EditorContextMenuRequest,
-  type EditorSelectionRange,
-} from "./CodeMirrorHost";
-import type { ClipboardObservationRecord } from "./clipboardObservationContract";
-import type { WorkspaceDocumentTransactionOwner } from "./workspaceDocumentTransactionOwner";
-import type { EditorAppearanceExtensionProfile } from "./editorAppearanceExtension";
-import { EditorBanner } from "./EditorBanner";
-import { FileTypeIcon } from "./fileTypeIcon";
-import type { BreakpointGutterActions, GoToLineRequest } from "./CodeMirrorHost";
-import { createPortal } from "react-dom";
-import { useCodeWorkspaceStatusStore } from "../../../stores/codeWorkspaceStatusStore";
-import type { EditorBannerItem } from "./editorBannerModel";
-import type { EffectiveCodeStyle } from "./codeStyleModel";
-import type { FileCoverage } from "./coverageModel";
-import {
-  mergeCompletionTriggers,
-  LspCompletionController,
-  type CompletionAcceptanceDiagnostic,
-  type CompletionInvocationRequest,
-  type CompletionRequestIdentity,
-  type CompletionRequestToken,
-} from "./lspCompletion";
-import type { CompletionScopeFactsState } from "./completionScopeAdapter";
-import type { QuickDocContent } from "./referenceDocumentation";
-import type { OpenFileViewModel } from "./editorGroupTypes";
-import { useContextMenu } from "../../ContextMenu";
-import type { EditorGroupId } from "../../../stores/codeWorkspaceStore";
-import type { GitBlameLine } from "../../../lib/git";
-import type { WorkspaceActionHost } from "./workspaceActionHost";
-import type { GitLineChange } from "./gitEditorChrome";
-import type { RunGutterTarget } from "./runGutter";
-import { rollbackGitLineChange } from "./gitEditorChrome";
 import { EditorView } from "@codemirror/view";
+import { AlertTriangle, Columns2, Download, Eye, File, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { writeText } from "../../../lib/clipboard";
-import type { DebugBreakpointMarker } from "./debugEditorChrome";
-import type { DebugStepAction } from "./dapDebugModel";
+import type { LspRange } from "../../../lib/editor/lsp";
+import { useCodeWorkspaceStatusStore } from "../../../stores/codeWorkspaceStatusStore";
+import { CodeMirrorHost, type EditorCommandPort, type EditorCommandPortRegistration } from "./CodeMirrorHost";
+import { EditorBanner } from "./EditorBanner";
 import { GitDiffPeek } from "./GitDiffPeek";
+import type { GitLineChange } from "./gitEditorChrome";
+import { rollbackGitLineChange } from "./gitEditorChrome";
+import { EditorGroupTabs } from "./group/EditorGroupTabs";
+import { ModeButton } from "./group/ModeButton";
+import { type EditorGroupProps } from "./group/types";
+import { useEditorGroupTabs } from "./group/useEditorGroupTabs";
+import { mergeCompletionTriggers } from "./lspCompletion";
 import { computeStickyLines, StickyLinesOverlay } from "./stickyLines";
-import type { LspDocumentSymbol } from "../../../lib/editor/lsp";
-import {
-  computeEditorTabScrollState,
-  editorTabScrollStep,
-  ensureChildVisibleScrollLeft,
-  setScrollLeft,
-  type EditorTabScrollState,
-} from "./editorTabScroll";
-import {
-  orderTabsForDisplay,
-  DEFAULT_WORKSPACE_TAB_POLICY_V3,
-  type TabEvictionMeta,
-  type WorkspaceTabPolicyV3,
-} from "./workspaceTabPolicy";
 import type { RegionFoldingProvenance } from "./workspaceEditorCommands";
-import type { PersistedEditorViewState } from "./workspaceLayoutPersistence";
-
-export type MarkdownViewMode = "edit" | "preview" | "split";
-
-export interface EditorRevealTarget {
-  focus?: boolean;
-  key: string;
-  line: number;
-  character: number;
-  nonce: number;
-  /** When set, the reveal selects [line:character, end) (e.g. a Structural Search match). */
-  end?: { line: number; character: number };
-}
-
-export interface EmptyEditorHint {
-  label: string;
-  /** Effective shortcut label from the keymap; omitted when unbound. */
-  shortcut?: string;
-}
-
-interface EditorGroupProps {
-  /** ED-PARITY-010 DEC-010-03: IDEA empty-editor quick tips. */
-  emptyHints?: readonly EmptyEditorHint[];
-  /** Clipboard degradation notices forwarded to the workspace status bar. */
-  onClipboardUnavailable?: (message: string) => void;
-  /** ED-CLIP-004: typed guarded-clipboard observations for the workspace seam. */
-  onClipboardObservation?: (record: ClipboardObservationRecord) => void;
-
-  groupId: EditorGroupId;
-  workspaceInstanceId: string;
-  visible: boolean;
-  /**
-   * ED-REPAIR-008: whether this editor group is the active editor group in the workspace.
-   * When false, the group's editors are considered inactive even if visible.
-   */
-  isActiveGroup?: boolean;
-  /** Temporarily blocks mutations while an external resource edit is committing. */
-  readOnly?: boolean;
-  tabPolicy?: WorkspaceTabPolicyV3;
-  lastUsedByKey?: ReadonlyMap<string, number>;
-  openOrder: string[];
-  openFiles: Record<string, OpenFileViewModel>;
-  activeKey: string | null;
-  previewKey: string | null;
-  pinnedKeys: string[];
-  activeFile: OpenFileViewModel | null;
-  activeMarkdownMode: MarkdownViewMode;
-  activeDiagnostics: LspDiagnostic[];
-  activeHighlights: LspDocumentHighlight[];
-  activeInlayHints: LspInlayHint[];
-  activeSemanticTokens?: LspSemanticToken[];
-  activeGitChanges: GitLineChange[];
-  activeGitBlame: GitBlameLine | null;
-  /** ED-PARITY-022 DEC-022-02: open HEAD ↔ buffer diff for the active file. */
-  onShowGitDiff?: (key: string) => void;
-  /** ED-PARITY-022 DEC-022-03: run gutter targets of the active file (real run facts only). */
-  activeRunGutterTargets?: RunGutterTarget[];
-  onRunGutterClick?: (target: RunGutterTarget, anchor: { x: number; y: number }) => void;
-  /** Active file code coverage. */
-  activeCoverage?: FileCoverage | null;
-  /** Coverage overlay enabled. */
-  coverageEnabled?: boolean;
-  /** Effective code style for the active buffer. */
-  activeCodeStyle?: EffectiveCodeStyle;
-  /** Breakpoints on the active file (M9), for the breakpoint gutter. */
-  activeDebugBreakpoints?: DebugBreakpointMarker[];
-  /** 1-based current-execution line on the active file (or null). */
-  activeDebugCurrentLine?: number | null;
-  /** Selected-frame locals rendered as inline values on the active file. */
-  activeDebugInlineValues?: Record<string, string>;
-  onToggleBreakpoint?: (line: number) => void;
-  onEditBreakpoint?: (line: number, anchor?: { x: number; y: number }) => void;
-  breakpointGutterActions?: BreakpointGutterActions;
-  /** Debugger keymap actions (F7/F8/F9/Ctrl+F2/Alt+F9); null when idle. */
-  debugStep?: ((action: DebugStepAction) => void) | null;
-  debugRunToCursor?: ((line: number) => void) | null;
-  debugStop?: (() => void) | null;
-  /** Hover evaluation on the active file while stopped there. */
-  debugEvaluate?: ((expression: string) => Promise<{ value: string; type: string | null } | null>) | null;
-  activeCapabilities: LspCapabilitySummary | null;
-  activeLspSyncing: boolean;
-  lspStatusPill: ReactNode;
-  highlightingWidget?: ReactNode;
-  breadcrumbs: ReactNode;
-  breadcrumbsPlacement?: "top" | "bottom" | "status-bar";
-  editorBanners?: EditorBannerItem[];
-  /** ED-PARITY-012 DEC-012-06: host-rendered Go to Line dialog. */
-  onGoToLineRequest?: (request: GoToLineRequest) => void;
-  /** ED-PARITY-020: member completion reached an unavailable provider. */
-  onCompletionUnavailable?: (info: { explicit: boolean }) => void;
-  /** ED-PARITY-011 DEC-011-05: files with error diagnostics (red wavy tab name). */
-  filesWithErrors?: ReadonlySet<string>;
-  onDismissBanner?: (id: string) => void;
-  activeSymbols?: LspDocumentSymbol[];
-  stickyLinesEnabled?: boolean;
-  onRevealTargetLine?: (line: number) => void;
-  revealTarget: EditorRevealTarget | null;
-  editorPaneRef: MutableRefObject<HTMLElement | null>;
-  editorPaneStyle: CSSProperties;
-  softWrap?: boolean;
-  appearance?: EditorAppearanceExtensionProfile;
-  /** Whether doc comments are replaced with safe rendered blocks for this file. */
-  renderedDocEnabled?: boolean;
-  /** Language identity used by the rendered documentation extractor. */
-  renderedDocLanguageId?: string | null;
-  /** Return a rendered documentation block to source mode. */
-  onToggleRenderedDocRaw?: () => void;
-  columnSelectionMode?: boolean;
-  showHoverDocumentation?: boolean;
-  hoverDocumentationDelayMs?: number;
-  parameterInfoRequestNonce?: number;
-  parameterInfoShowFullSignatures?: boolean;
-  onActivate: (key: string) => void;
-  onActivateGroup: () => void;
-  onClose: (key: string) => void;
-  onPin: (key: string, pinned: boolean) => void;
-  onPromotePreview: (key: string) => void;
-  onCloseOthers: (key: string) => void;
-  onCloseRight: (key: string) => void;
-  onCloseUnmodified: () => void;
-  onCloseAll: () => void;
-  onSplitRight: (key: string) => void;
-  onSplitDown: (key: string) => void;
-  /** §8.19.6 move-tab-between-splits; provided only when another leaf exists. */
-  onMoveTabToNextSplit?: (key: string) => void;
-  onMoveTabToPreviousSplit?: (key: string) => void;
-  onCopyPath: (key: string, absolute: boolean) => void;
-  onRevealInTree: (key: string) => void;
-  onRevealInSystem: (key: string) => void;
-  onOpenInTerminal: (key: string) => void;
-  onLocalHistory?: (key: string) => void;
-  /** Fetch attached sources for a decompiled library buffer (jdtls Java classes). */
-  onDownloadSources?: (key: string) => void;
-  /** Keys whose sources are currently downloading (drives the banner spinner). */
-  downloadingSourcesKeys?: string[];
-  onMarkdownModeChange: (mode: MarkdownViewMode) => void;
-  onChangeText: (key: string, text: string, caret?: LspPosition, caretOffset?: number) => void;
-  onSave: (key: string) => void;
-  /** §8.18.2: workspace action host owning the editor.* business actions. */
-  workspaceActionHost?: WorkspaceActionHost | null;
-  /** §8.26 / ED-MULTIVIEW-002: shared document transaction owner across splits. */
-  transactionOwner?: WorkspaceDocumentTransactionOwner | null;
-  /**
-   * ED-AUDIT-008: claim a Ctrl+Z / Ctrl+Shift+Z stroke for the workspace-edit
-   * journal before the document ledger acts. `true` = the journal consumed
-   * the stroke, `false` = the journal is busy and the stroke is blocked,
-   * `undefined` = the journal has nothing in this direction.
-   */
-  onWorkspaceHistoryClaim?: (action: "undo" | "redo") => boolean | undefined;
-  /** Current buffer revision used to seed the shared document owner. */
-  documentRevision?: number;
-  onHover: (
-    file: OpenFileViewModel,
-    position: LspPosition,
-  ) => Promise<QuickDocContent | null>;
-  onPinHoverDoc?: (content: QuickDocContent) => void;
-  onDefinition: (file: OpenFileViewModel, position: LspPosition) => Promise<boolean>;
-  onReferences: (file: OpenFileViewModel, position: LspPosition) => Promise<void>;
-  onComplete: (
-    file: OpenFileViewModel,
-    position: LspPosition,
-    trigger: string | null,
-    token: CompletionRequestToken,
-    invocation?: CompletionInvocationRequest,
-  ) => Promise<LspCompletionResult | null>;
-  onCompleteResolve: (
-    file: OpenFileViewModel,
-    raw: unknown,
-    token: CompletionRequestToken,
-  ) => Promise<LspCompletionResolveResult | LspCompletionItem | null>;
-  /** Live completion request identity per file (§8.16.2). */
-  onCompletionIdentity: (file: OpenFileViewModel) => CompletionRequestIdentity | null;
-  onCompletionDiagnostic: (
-    kind: CompletionAcceptanceDiagnostic,
-    detail?: string,
-  ) => void;
-  /** ED-COMP-004: explicit completion that falls back for missing scope facts. */
-  onScopeFallback?: (state: CompletionScopeFactsState) => void;  completionController?: LspCompletionController;
-  /** §8.20.2 W1 single channel: file-scoped trigger event into the session. */
-  onParameterTrigger?: (
-    file: OpenFileViewModel,
-    event: {
-      position: LspPosition;
-      anchorOffset: number;
-      triggerCharacter: string | null;
-      origin: "explicit" | "typing";
-    },
-  ) => void;
-  onParameterInvalidate?: (reason: "doc-changed" | "caret-moved" | "closing-char") => void;
-  onParameterEscape?: () => boolean;
-  parameterPopup?: ParameterPopupView | null;
-  onSelectionChange: (selection: EditorSelectionRange) => void;
-  onViewportChange: (range: LspRange) => void;
-  /** ED-IMPROVE-007: this leaf/file's persisted caret/scroll/fold snapshot. */
-  initialViewState?: PersistedEditorViewState | null;
-  /** ED-IMPROVE-007: reports view-state changes for in-memory capture. */
-  onViewStateChange?: (
-    groupId: EditorGroupId,
-    fileKey: string,
-    state: PersistedEditorViewState,
-  ) => void;
-  onExpandSelection: (file: OpenFileViewModel, selection: EditorSelectionRange) => Promise<LspRange[] | null>;
-  onLightbulb: (line: number) => void;
-  onEditorContextMenu: (file: OpenFileViewModel, request: EditorContextMenuRequest & { groupId: string }) => void;
-  onEditorCommandPortChange?: (
-    groupId: EditorGroupId,
-    registration: EditorCommandPortRegistration,
-  ) => void;
-  onOpenMarkdownHref: (href: string) => boolean;
-  formatBytes: (size: number) => string;
-  formatMtime: (mtime: number) => string;
-  isMarkdownPath: (path: string) => boolean;
-  renderMarkdownPreview: (file: OpenFileViewModel, onOpenHref: (href: string) => boolean) => ReactNode;
-}
 
 /**
  * Single editor group: tab strip + active buffer chrome + CodeMirror/markdown.
@@ -451,9 +161,31 @@ export function EditorGroup({
     if (!statusBarNavigation || !breadcrumbs) return undefined;
     setNavigationPortalOwner(navigationOwnerId);
     return () => setNavigationPortalOwner(null, navigationOwnerId);
-  }, [breadcrumbs ? 1 : 0, navigationOwnerId, setNavigationPortalOwner, statusBarNavigation]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const tabMenu = useContextMenu();
+  }, [breadcrumbs ? 1 : 0, navigationOwnerId, setNavigationPortalOwner, statusBarNavigation]);
+  const tabs = useEditorGroupTabs({
+    openOrder,
+    openFiles,
+    pinnedKeys,
+    previewKey,
+    lastUsedByKey,
+    tabPolicy,
+    activeKey,
+    onClose,
+    onCloseOthers,
+    onCloseAll,
+    onCloseUnmodified,
+    onCloseRight,
+    onCopyPath,
+    onSplitRight,
+    onSplitDown,
+    onMoveTabToNextSplit,
+    onMoveTabToPreviousSplit,
+    onPin,
+    onRevealInTree,
+    onRevealInSystem,
+    onOpenInTerminal,
+    onLocalHistory,
+  });
   const [gitDiffPeek, setGitDiffPeek] = useState<GitLineChange | null>(null);
   const [topLine, setTopLine] = useState(0);
 
@@ -529,150 +261,9 @@ export function EditorGroup({
     () => activeCapabilities?.signatureTriggerCharacters ?? [],
     [activeCapabilities?.signatureTriggerCharacters],
   );
-
-  const tabScrollRef = useRef<HTMLDivElement>(null);
-  const [tabScrollState, setTabScrollState] = useState<EditorTabScrollState>({
-    overflow: false,
-    atStart: true,
-    atEnd: true,
-  });
   useEffect(() => setGitDiffPeek(null), [activeKey]);
   const [activeFoldProvenance, setActiveFoldProvenance] = useState<RegionFoldingProvenance | null>(null);
   useEffect(() => setActiveFoldProvenance(null), [activeKey]);
-  const tabEvictionMeta = useMemo(() => {
-    const map = new Map<string, TabEvictionMeta>();
-    for (const key of openOrder) {
-      map.set(key, {
-        key,
-        dirty: !!openFiles[key]?.dirty,
-        pinned: pinnedKeys.includes(key),
-        preview: previewKey === key,
-        lastUsedAt: lastUsedByKey?.get(key) ?? 0,
-      });
-    }
-    return map;
-  }, [openOrder, openFiles, pinnedKeys, previewKey, lastUsedByKey]);
-
-  const pinnedSet = useMemo(() => new Set(pinnedKeys), [pinnedKeys]);
-
-  const orderedKeys = useMemo(() => {
-    return [
-      ...orderTabsForDisplay(
-        openOrder,
-        tabEvictionMeta,
-        tabPolicy ?? DEFAULT_WORKSPACE_TAB_POLICY_V3,
-      ),
-    ];
-  }, [openOrder, tabEvictionMeta, tabPolicy]);
-
-  const isSeparatePinnedRow = tabPolicy?.pinnedRow === "separate";
-  const separatePinnedKeys = useMemo(() => {
-    return isSeparatePinnedRow ? orderedKeys.filter((k) => pinnedSet.has(k)) : [];
-  }, [isSeparatePinnedRow, orderedKeys, pinnedSet]);
-
-  const normalDisplayKeys = useMemo(() => {
-    return isSeparatePinnedRow ? orderedKeys.filter((k) => !pinnedSet.has(k)) : orderedKeys;
-  }, [isSeparatePinnedRow, orderedKeys, pinnedSet]);
-
-  const updateTabScrollState = useCallback(() => {
-    const el = tabScrollRef.current;
-    if (!el) return;
-    const next = computeEditorTabScrollState(el);
-    setTabScrollState((prev) =>
-      prev.overflow === next.overflow &&
-      prev.atStart === next.atStart &&
-      prev.atEnd === next.atEnd
-        ? prev
-        : next,
-    );
-  }, []);
-
-  const scrollTabsBy = useCallback(
-    (direction: "left" | "right") => {
-      const el = tabScrollRef.current;
-      if (!el) return;
-      const delta = editorTabScrollStep(el.clientWidth);
-      setScrollLeft(el, el.scrollLeft + (direction === "right" ? delta : -delta));
-      updateTabScrollState();
-    },
-    [updateTabScrollState],
-  );
-
-  useEffect(() => {
-    updateTabScrollState();
-  }, [openOrder, orderedKeys.length, updateTabScrollState]);
-
-  useEffect(() => {
-    const el = tabScrollRef.current;
-    if (!el) return;
-    const ro =
-      typeof ResizeObserver === "undefined"
-        ? null
-        : new ResizeObserver(() => updateTabScrollState());
-    ro?.observe(el);
-    window.addEventListener("resize", updateTabScrollState);
-    return () => {
-      ro?.disconnect();
-      window.removeEventListener("resize", updateTabScrollState);
-    };
-  }, [openOrder.length, updateTabScrollState]);
-
-  useEffect(() => {
-    const container = tabScrollRef.current;
-    if (!container || !activeKey) return;
-    const child = Array.from(container.children).find(
-      (node): node is HTMLElement =>
-        node instanceof HTMLElement && node.dataset.editorTabKey === activeKey,
-    );
-    if (!child) return;
-    const nextLeft = ensureChildVisibleScrollLeft(container, child);
-    if (nextLeft !== container.scrollLeft) {
-      setScrollLeft(container, nextLeft);
-    }
-    updateTabScrollState();
-  }, [activeKey, openOrder, updateTabScrollState]);
-
-  const showTabMenu = (event: React.MouseEvent, key: string) => {
-    const pinned = pinnedSet.has(key);
-    const index = openOrder.indexOf(key);
-    const hasOthers = openOrder.length > 1;
-    const hasRight = index >= 0 && index < openOrder.length - 1;
-    // ED-PARITY-021 DEC-021-02: IDEA tab menu order — close group, copy path,
-    // splits, pin, Open In ›, Local History; availability follows the tab set.
-    tabMenu.show(event, [
-      { label: "Close", shortcut: "Ctrl+F4", onClick: () => onClose(key) },
-      { label: "Close Other Tabs", disabled: !hasOthers, onClick: () => onCloseOthers(key) },
-      { label: "Close All Tabs", onClick: onCloseAll },
-      { label: "Close Unmodified Tabs", onClick: onCloseUnmodified },
-      { label: "Close Tabs to the Right", disabled: !hasRight, onClick: () => onCloseRight(key) },
-      { separator: true, label: "" },
-      { label: "Copy Path", onClick: () => onCopyPath(key, true) },
-      { label: "Copy Relative Path", onClick: () => onCopyPath(key, false) },
-      { separator: true, label: "" },
-      { label: "Split Right", onClick: () => onSplitRight(key) },
-      { label: "Split Down", onClick: () => onSplitDown(key) },
-      ...(onMoveTabToNextSplit ? [
-        { label: "Move Tab to Next Split", onClick: () => onMoveTabToNextSplit(key) },
-      ] : []),
-      ...(onMoveTabToPreviousSplit ? [
-        { label: "Move Tab to Previous Split", onClick: () => onMoveTabToPreviousSplit(key) },
-      ] : []),
-      { separator: true, label: "" },
-      { label: pinned ? "Unpin Tab" : "Pin Tab", onClick: () => onPin(key, !pinned) },
-      { separator: true, label: "" },
-      {
-        label: "Open In",
-        children: [
-          { label: "Project View", shortcut: "Alt+F1", onClick: () => onRevealInTree(key) },
-          { label: "Explorer", onClick: () => onRevealInSystem(key) },
-          { label: "Terminal", onClick: () => onOpenInTerminal(key) },
-        ],
-      },
-      ...(onLocalHistory ? [
-        { label: "Local History…", onClick: () => onLocalHistory(key) },
-      ] : []),
-    ]);
-  };
   return (
     <main
       ref={editorPaneRef}
@@ -682,180 +273,17 @@ export function EditorGroup({
       className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-bg)]"
       style={editorPaneStyle}
     >
-      {openOrder.length > 0 && isSeparatePinnedRow && separatePinnedKeys.length > 0 && (
-        <div
-          data-testid="code-workspace-editor-pinned-tab-strip"
-          role="tablist"
-          aria-label="Pinned editor tabs"
-          className="shrink-0 flex items-stretch border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] overflow-x-auto taomni-tab-scroll"
-          style={{ height: "var(--taomni-code-editor-tab-height)" }}
-        >
-          {separatePinnedKeys.map((key) => {
-            const file = openFiles[key];
-            if (!file) return null;
-            const active = key === activeKey;
-            const preview = key === previewKey;
-            const pinned = true;
-            return (
-              <div
-                key={key}
-                data-editor-tab-key={key}
-                data-active={active || undefined}
-                data-preview={preview || undefined}
-                data-pinned={pinned || undefined}
-                role="tab"
-                aria-selected={active}
-                className="h-full min-w-[96px] max-w-[240px] flex items-center border-r border-[var(--taomni-code-border)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
-              >
-                <button
-                  type="button"
-                  className="min-w-0 flex-1 h-full flex items-center gap-1.5 px-2 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
-                  title={file.subtitle}
-                  onClick={() => onActivate(key)}
-                  onDoubleClick={() => onPromotePreview(key)}
-                  onAuxClick={(event) => {
-                    if (event.button === 1) onClose(key);
-                  }}
-                  onContextMenu={(event) => showTabMenu(event, key)}
-                >
-                  <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-                  <Pin className="h-3 w-3 shrink-0" />
-                  <span className={`truncate ${preview ? "italic" : ""}`}>{file.title}</span>
-                  {file.dirty && <span className="text-[var(--taomni-accent)]">*</span>}
-                </button>
-                <button
-                  type="button"
-                  className="h-full w-6 shrink-0 inline-flex items-center justify-center hover:bg-[var(--taomni-code-active-line-bg)]"
-                  title="Close"
-                  onClick={() => onClose(key)}
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-      {openOrder.length > 0 && (
-        <div
-          data-testid="code-workspace-editor-tab-strip"
-          role="tablist"
-          aria-label="Editor tabs"
-          className="shrink-0 flex items-stretch border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]"
-          style={{ height: "var(--taomni-code-editor-tab-height)" }}
-        >
-          {/*
-            Scroll track is height-matched to tab content via the CSS token (not rem h-8,
-            which collapses to 24px under the 12px app root font). Classic native scrollbars
-            are suppressed via taomni-tab-scroll so they cannot steal vertical space.
-            Chevron buttons and the all-tabs menu stay outside the scroll track.
-          */}
-          {tabScrollState.overflow && (
-            <button
-              type="button"
-              data-testid="code-workspace-editor-tab-scroll-left"
-              aria-label="Scroll editor tabs left"
-              title="Scroll tabs left"
-              disabled={tabScrollState.atStart}
-              className="h-full w-7 shrink-0 inline-flex items-center justify-center border-r border-[var(--taomni-code-border)] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
-              onClick={() => scrollTabsBy("left")}
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-            </button>
-          )}
-          <div
-            ref={tabScrollRef}
-            data-testid="code-workspace-editor-tab-scroll"
-            className="taomni-tab-scroll min-w-0 flex-1 flex items-stretch overflow-x-auto overflow-y-hidden"
-            onScroll={updateTabScrollState}
-          >
-            {normalDisplayKeys.map((key) => {
-              const file = openFiles[key];
-              if (!file) return null;
-              const active = key === activeKey;
-              const preview = key === previewKey;
-              const pinned = pinnedSet.has(key);
-              return (
-                <div
-                  key={key}
-                  data-editor-tab-key={key}
-                  data-active={active || undefined}
-                  data-preview={preview || undefined}
-                  data-pinned={pinned || undefined}
-                  data-dirty={file.dirty || undefined}
-                  data-has-errors={filesWithErrors?.has(key) || undefined}
-                  role="presentation"
-                  className="relative h-full min-w-[96px] max-w-[240px] flex items-center border-r border-[var(--taomni-code-border)] text-[length:var(--taomni-code-editor-ui-small-font-size)] text-[var(--taomni-code-muted)] data-[active=true]:bg-[var(--taomni-code-bg)] data-[active=true]:text-[var(--taomni-code-text)] data-[active=true]:after:pointer-events-none data-[active=true]:after:absolute data-[active=true]:after:inset-x-1 data-[active=true]:after:inset-y-1 data-[active=true]:after:rounded-md data-[active=true]:after:border data-[active=true]:after:border-[var(--taomni-accent)]/70"
-                >
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    className="min-w-0 flex-1 h-full flex items-center gap-1.5 px-2 text-left hover:bg-[var(--taomni-code-active-line-bg)]"
-                    title={file.subtitle}
-                    onClick={() => onActivate(key)}
-                    onDoubleClick={() => onPromotePreview(key)}
-                    onAuxClick={(event) => {
-                      if (event.button === 1) onClose(key);
-                    }}
-                    onContextMenu={(event) => showTabMenu(event, key)}
-                  >
-                    <FileTypeIcon path={file.languagePath ?? file.title} />
-                    {pinned && <Pin className="h-3 w-3 shrink-0" />}
-                    <span
-                      className={`truncate ${preview ? "italic" : ""} ${filesWithErrors?.has(key) ? "underline decoration-wavy decoration-red-500 underline-offset-2" : ""}`}
-                    >
-                      {file.title}
-                    </span>
-                    {file.dirty && <span className="text-[var(--taomni-accent)]">*</span>}
-                  </button>
-                  <button
-                    type="button"
-                    className="h-full w-6 shrink-0 inline-flex items-center justify-center hover:bg-[var(--taomni-code-active-line-bg)]"
-                    title="Close"
-                    aria-label={`Close ${file.title}`}
-                    onClick={() => onClose(key)}
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-          {tabScrollState.overflow && (
-            <button
-              type="button"
-              data-testid="code-workspace-editor-tab-scroll-right"
-              aria-label="Scroll editor tabs right"
-              title="Scroll tabs right"
-              disabled={tabScrollState.atEnd}
-              className="h-full w-7 shrink-0 inline-flex items-center justify-center border-l border-[var(--taomni-code-border)] hover:bg-[var(--taomni-code-active-line-bg)] disabled:opacity-40"
-              onClick={() => scrollTabsBy("right")}
-            >
-              <ChevronRight className="h-3.5 w-3.5" />
-            </button>
-          )}
-          {openOrder.length > 1 && (
-            <button
-              type="button"
-              data-testid="code-workspace-editor-tabs-menu"
-              aria-label="Show all editor tabs"
-              className="h-full w-7 shrink-0 inline-flex items-center justify-center border-l border-[var(--taomni-code-border)] hover:bg-[var(--taomni-code-active-line-bg)]"
-              onClick={(event) => {
-                const rect = event.currentTarget.getBoundingClientRect();
-                tabMenu.showAt(rect.right, rect.bottom, orderedKeys.map((key) => ({
-                  label: openFiles[key]?.title ?? key,
-                  checked: key === activeKey,
-                  onClick: () => onActivate(key),
-                })));
-              }}
-            >
-              <ChevronDown className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-      )}
-      <div
+      <EditorGroupTabs
+        openOrder={openOrder}
+        tabs={tabs}
+        openFiles={openFiles}
+        activeKey={activeKey}
+        previewKey={previewKey}
+        onActivate={onActivate}
+        onPromotePreview={onPromotePreview}
+        onClose={onClose}
+        filesWithErrors={filesWithErrors}
+      /><div
         id={`code-workspace-editor-stack-${workspaceInstanceId}`}
         className="flex-1 min-h-0"
       >
@@ -866,7 +294,7 @@ export function EditorGroup({
                 ? breadcrumbs
                 : null}
               {!floatingBanners && (
-                <EditorBanner banners={editorBanners} onDismiss={onDismissBanner ?? (() => {})} />
+                <EditorBanner banners={editorBanners} onDismiss={onDismissBanner ?? (() => { })} />
               )}
               {activeFile.error && (
                 <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-red-500/30 bg-red-500/10 text-[12px] text-red-500">
@@ -904,7 +332,7 @@ export function EditorGroup({
               )}
               <div data-testid="code-workspace-editor" className="relative flex-1 min-h-0">
                 {floatingBanners && (
-                  <EditorBanner floating banners={editorBanners} onDismiss={onDismissBanner ?? (() => {})} />
+                  <EditorBanner floating banners={editorBanners} onDismiss={onDismissBanner ?? (() => { })} />
                 )}
                 {/* ED-PARITY-011 DEC-011-01: IDEA inspection widget floats at the
                     editor's top-right instead of a permanent status row. */}
@@ -1218,34 +646,9 @@ export function EditorGroup({
           )}
         </div>
       </div>
-      {tabMenu.render}
+      {tabs.tabMenu.render}
     </main>
   );
 }
 
-function ModeButton({
-  label,
-  active,
-  icon,
-  onClick,
-}: {
-  label: string;
-  active?: boolean;
-  icon: ReactNode;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      title={label}
-      aria-label={label}
-      aria-pressed={active}
-      data-active={active || undefined}
-      className="h-6 inline-flex items-center gap-1 rounded px-1.5 text-[10px] text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[active=true]:text-[var(--taomni-code-text)]"
-      onClick={onClick}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
-  );
-}
+export { type EditorRevealTarget, type EmptyEditorHint, type MarkdownViewMode } from "./group/types";

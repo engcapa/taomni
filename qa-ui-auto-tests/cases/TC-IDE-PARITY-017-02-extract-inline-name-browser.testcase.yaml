@@ -90,7 +90,12 @@ steps:
 - assert_text:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     contains: int sum = extracted(values);
-- wait: 0.8
+# Restored buffer text is visible before the multi-file journal finishes its
+# provider/disk bookkeeping. Wait for the completed undo, not a fixed delay;
+# a second undo while the journal is busy is deliberately rejected.
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: 'Undid Rename symbol to "sumOf" (1 files)'
 - press: Mod+z
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
@@ -230,6 +235,8 @@ verification:
       expectation: '{"parity007_trace": {"requests": 1, "resolves": 1, "prepares": 1, "renames": 1, "pending": 0}}'
     - step: 34
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "int sum = extracted(values);"}}'
+    - step: 35
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Undid Rename symbol to \"sumOf\" (1 files)"}}'
     - step: 37
       expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["package demo;", "", "public class ExtractTarget {", "    int total(int[] values) {", "        int sum = 0;", "        for (int v : values) {", "            sum += v;", "        }", "        return sum * 2;", "    }", "", "    String range(int[] values) {", "        int min = Integer.MAX_VALUE;", "        int max = Integer.MIN_VALUE;", "        for (int v : values) {", "            min = Math.min(min, v);", "            max = Math.max(max, v);", "        }", "        return min + \"..\" + max;", "    }", "}", ""]}}'
     results:
@@ -238,6 +245,7 @@ verification:
     - 30
     - 31
     - 34
+    - 35
     - 37
   - id: R3
     requirement: DEC-017-04：命名会话中 Alt+Shift+O 的 Open Extract Method Dialog 把命名交给模态对话框；对话框 Esc 保留默认名，一次 Undo 撤回提取。

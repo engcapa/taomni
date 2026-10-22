@@ -76,6 +76,7 @@ steps:
     selector: '[data-testid="session-name"]'
     value: qa-ui-auto-socks5-keepalive
 - click: '[data-testid="session-save"]'
+- assert_not_visible: '[data-testid="session-editor"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-socks5-keepalive"]'
 - click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-socks5-keepalive"]'
 - click: '[data-testid="session-edit"]'
@@ -155,6 +156,7 @@ steps:
     name: value
     equals: ipv6
 - click: '[data-testid="session-save"]'
+- assert_not_visible: '[data-testid="session-editor"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-socks5-keepalive"]'
 - click: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-socks5-keepalive"]'
 - click: '[data-testid="session-edit"]'
@@ -193,21 +195,21 @@ verification:
     - 18
     - 22
     - 24
-    - 27
     - 28
-    - 30
-    - 40
-    - 43
-    - 46
-    - 49
-    - 51
+    - 29
+    - 31
+    - 41
+    - 44
+    - 47
+    - 50
     - 52
-    - 53
     - 54
     - 55
     - 56
     - 57
     - 58
+    - 59
+    - 60
     checkpoints:
     - step: 10
       expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
@@ -216,55 +218,59 @@ verification:
     - step: 20
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-save-auth\"]", "name": "data-checked", "equals": "false"}}'
     - step: 26
+      expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
+    - step: 27
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-socks5-keepalive\"]"}'
-    - step: 32
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "socks5"}}'
     - step: 33
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy host\"]", "name": "value", "equals": "127.0.0.1"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "socks5"}}'
     - step: 34
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy port\"]", "name": "value", "equals": "1080"}}'
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy host\"]", "name": "value", "equals": "127.0.0.1"}}'
     - step: 35
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy username\"]", "name": "value", "equals": "qa-proxy-user"}}'
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy port\"]", "name": "value", "equals": "1080"}}'
     - step: 36
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy password\"]", "name": "value", "equals": ""}}'
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy username\"]", "name": "value", "equals": "qa-proxy-user"}}'
     - step: 37
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-save-auth\"]", "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy password\"]", "name": "value", "equals": ""}}'
     - step: 38
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-keepalive-toggle\"]", "name": "data-checked", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-save-auth\"]", "name": "data-checked", "equals": "false"}}'
     - step: 39
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-keepalive-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 40
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keep-alive interval\"]", "name": "value", "equals": "47"}}'
-    - step: 41
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 42
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 43
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-nagle-toggle\"]", "name": "data-checked", "equals": "false"}}'
-    - step: 44
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "true"}}'
     - step: 45
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 46
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-nagle-toggle\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 47
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 48
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-nagle-toggle\"]", "name": "data-checked", "equals": "false"}}'
-    - step: 50
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
-    - step: 52
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-socks5-keepalive\"]"}'
-    - step: 55
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 57
-      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
-    - step: 58
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
-    - step: 59
+    - step: 49
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-nagle-toggle\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 51
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
+    - step: 53
+      expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
+    - step: 54
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-socks5-keepalive\"]"}'
+    - step: 57
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 59
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
     - step: 60
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 61
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-nagle-toggle\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 62
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
     results:
     - 10
     - 19
     - 20
     - 26
-    - 32
+    - 27
     - 33
     - 34
     - 35
@@ -272,32 +278,34 @@ verification:
     - 37
     - 38
     - 39
-    - 41
+    - 40
     - 42
-    - 44
+    - 43
     - 45
-    - 47
+    - 46
     - 48
-    - 50
-    - 58
-    - 59
+    - 49
+    - 51
+    - 53
     - 60
+    - 61
+    - 62
   - id: R2
     requirement: Proxy password entry remains masked and is not restored after save when Vault storage is disabled.
     actions:
     - 14
     - 15
     - 16
-    - 27
     - 28
+    - 29
     checkpoints:
     - step: 21
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy password\"]", "name": "type", "equals": "password"}}'
-    - step: 36
+    - step: 37
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy password\"]", "name": "value", "equals": ""}}'
     results:
     - 21
-    - 36
+    - 37
   visual:
   - check: The network editor shows the proxy, keep-alive, and Vault controls without overlap or clipped values.
     method: manual

@@ -1,11 +1,26 @@
 use super::*;
 
-async fn edit_done_branch(app: &AppHandle, pin: &tauri::WebviewWindow, action: &str) -> Result<(), String> {
-    pin.eval("document.querySelector('[data-testid=\"screenshot-pin-menu-toggle\"]').click()").map_err(|e| e.to_string())?;
-    let tools = wait_window(app, &super::super::pins::tools_label(pin.label()), Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+async fn edit_done_branch(
+    app: &AppHandle,
+    pin: &tauri::WebviewWindow,
+    action: &str,
+) -> Result<(), String> {
+    pin.eval("document.querySelector('[data-testid=\"screenshot-pin-menu-toggle\"]').click()")
+        .map_err(|e| e.to_string())?;
+    let tools = wait_window(
+        app,
+        &super::super::pins::tools_label(pin.label()),
+        Duration::from_secs(10),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
     run_js(&tools, "const q=()=>document.querySelector('[data-testid=\"screenshot-pin-edit\"]'); for(let i=0;i<100 && (!q() || q().disabled);i++) await new Promise(r=>setTimeout(r,50)); if(!q() || q().disabled) throw new Error('pin Edit is not ready'); return true;", Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
-    tools.eval("document.querySelector('[data-testid=\"screenshot-pin-edit\"]').click()").map_err(|e| e.to_string())?;
-    let editor = wait_window(app, super::super::OVERLAY_LABEL, Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    tools
+        .eval("document.querySelector('[data-testid=\"screenshot-pin-edit\"]').click()")
+        .map_err(|e| e.to_string())?;
+    let editor = wait_window(app, super::super::OVERLAY_LABEL, Duration::from_secs(10))
+        .await
+        .map_err(|e| e.to_string())?;
     let script = r#"
       const q=id=>document.querySelector('[data-testid="'+id+'"]');
       const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -20,8 +35,14 @@ async fn edit_done_branch(app: &AppHandle, pin: &tauri::WebviewWindow, action: &
       if(!q('screenshot-pin-done-dialog')) throw new Error('Done choice missing');
       return true;
     "#;
-    run_js(&editor, &script, Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
-    editor.eval(&format!("document.querySelector('[data-testid=\"screenshot-pin-done-{action}\"]').click()")).map_err(|e| e.to_string())?;
+    run_js(&editor, &script, Duration::from_secs(15))
+        .await
+        .map_err(|e| e.to_string())?;
+    editor
+        .eval(&format!(
+            "document.querySelector('[data-testid=\"screenshot-pin-done-{action}\"]').click()"
+        ))
+        .map_err(|e| e.to_string())?;
     if !wait_closed(app, super::super::OVERLAY_LABEL, Duration::from_secs(10)).await {
         return Err(format!("Done {action} did not close the editor"));
     }
@@ -181,8 +202,15 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     trace.mark("dragged", drag.clone());
     let scale = pin.scale_factor().map_err(|e| e.to_string())?;
     let before = pin.inner_size().map_err(|e| e.to_string())?;
-    pin.eval("document.querySelector('[data-testid=\"screenshot-pin-menu-toggle\"]').click()").map_err(|e| e.to_string())?;
-    let tools = wait_window(&app, &super::super::pins::tools_label(&label), Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    pin.eval("document.querySelector('[data-testid=\"screenshot-pin-menu-toggle\"]').click()")
+        .map_err(|e| e.to_string())?;
+    let tools = wait_window(
+        &app,
+        &super::super::pins::tools_label(&label),
+        Duration::from_secs(10),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
     let mut controls = run_js(&tools, r#"
       const q=id=>document.querySelector('[data-testid="'+id+'"]');
       for(let i=0;i<100&&!q('screenshot-pin-opacity');i++) await new Promise(r=>setTimeout(r,50));
@@ -201,15 +229,25 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     // accepting a CSS opacity value inside an opaque native window.
     // Drag leaves the OS pointer in the pin centre, where its help tooltip
     // would cover the pixel oracle. Move it outside before both snapshots.
-    park_pointer(input_point((display.x + display.width as i32 - 32,
-        display.y + display.height as i32 - 64), display.scale_factor))
-        .await.map_err(|e| e.to_string())?;
+    park_pointer(input_point(
+        (
+            display.x + display.width as i32 - 32,
+            display.y + display.height as i32 - 64,
+        ),
+        display.scale_factor,
+    ))
+    .await
+    .map_err(|e| e.to_string())?;
     pin.hide().map_err(|e| e.to_string())?;
     tokio::time::sleep(Duration::from_millis(350)).await;
-    let background = read_desktop(&app, &display).await.map_err(|e| e.to_string())?;
+    let background = read_desktop(&app, &display)
+        .await
+        .map_err(|e| e.to_string())?;
     pin.show().map_err(|e| e.to_string())?;
     tokio::time::sleep(Duration::from_millis(400)).await;
-    let composited = read_desktop(&app, &display).await.map_err(|e| e.to_string())?;
+    let composited = read_desktop(&app, &display)
+        .await
+        .map_err(|e| e.to_string())?;
     let (position, native_size) = observed_inner_rect(&pin).await.map_err(|e| e.to_string())?;
     let sample = (
         (position.x - display.x + native_size.width as i32 / 2) as u32,
@@ -307,8 +345,15 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     }
     // The note written through the menu must follow the pin into the
     // persistent favorite so the collection and reopen show the same caption.
-    pin.eval("document.querySelector('[data-testid=\"screenshot-pin-menu-toggle\"]').click()").map_err(|e| e.to_string())?;
-    let tools = wait_window(&app, &super::super::pins::tools_label(&label), Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    pin.eval("document.querySelector('[data-testid=\"screenshot-pin-menu-toggle\"]').click()")
+        .map_err(|e| e.to_string())?;
+    let tools = wait_window(
+        &app,
+        &super::super::pins::tools_label(&label),
+        Duration::from_secs(10),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
     run_js(&tools, r#"
       const q=id=>document.querySelector('[data-testid="'+id+'"]');
       for(let i=0;i<100&&!q('screenshot-pin-note-input');i++) await new Promise(r=>setTimeout(r,50));
@@ -325,7 +370,10 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
     let items = super::super::favorites::screenshot_list_favorites(app.clone()).await?;
     let favorite = items.first().ok_or("favorite write missing")?.clone();
     let favorite_note_saved = favorite.note == "QA pin note";
-    trace.mark("favorite-written", json!({"label":label,"noteSaved":favorite_note_saved}));
+    trace.mark(
+        "favorite-written",
+        json!({"label":label,"noteSaved":favorite_note_saved}),
+    );
     pin.eval("document.querySelector('[data-testid=\"screenshot-pin-close\"]').click()")
         .map_err(|e| e.to_string())?;
     let closed = wait_closed(&app, &label, Duration::from_secs(10)).await;
@@ -379,14 +427,29 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
         .any(|item| item.id == favorite.id);
     let independent_pin = std::path::Path::new(&payload.path).exists();
     // Public re-edit entry, native resizing, annotation, and Done replacement.
-    reopened.eval("document.querySelector('[data-testid=\"screenshot-pin-menu-toggle\"]').click()").map_err(|e| e.to_string())?;
-    let tools = wait_window(&app, &super::super::pins::tools_label(&reopened_label), Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
+    reopened
+        .eval("document.querySelector('[data-testid=\"screenshot-pin-menu-toggle\"]').click()")
+        .map_err(|e| e.to_string())?;
+    let tools = wait_window(
+        &app,
+        &super::super::pins::tools_label(&reopened_label),
+        Duration::from_secs(10),
+    )
+    .await
+    .map_err(|e| e.to_string())?;
     run_js(&tools, "const q=()=>document.querySelector('[data-testid=\"screenshot-pin-edit\"]'); for(let i=0;i<100 && (!q() || q().disabled);i++) await new Promise(r=>setTimeout(r,50)); if(!q() || q().disabled) throw new Error('pin Edit is not ready'); return true;", Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
     // Clicking closes this options window. Do not await a script reply from it.
-    tools.eval("document.querySelector('[data-testid=\"screenshot-pin-edit\"]').click()").map_err(|e| e.to_string())?;
-    let editor = wait_window(&app, super::super::OVERLAY_LABEL, Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
-    let editor_resizable = editor.is_resizable().map_err(|e| e.to_string())? && !editor.is_fullscreen().map_err(|e| e.to_string())?;
-    editor.set_size(tauri::LogicalSize::new(700.0, 600.0)).map_err(|e| e.to_string())?;
+    tools
+        .eval("document.querySelector('[data-testid=\"screenshot-pin-edit\"]').click()")
+        .map_err(|e| e.to_string())?;
+    let editor = wait_window(&app, super::super::OVERLAY_LABEL, Duration::from_secs(10))
+        .await
+        .map_err(|e| e.to_string())?;
+    let editor_resizable = editor.is_resizable().map_err(|e| e.to_string())?
+        && !editor.is_fullscreen().map_err(|e| e.to_string())?;
+    editor
+        .set_size(tauri::LogicalSize::new(700.0, 600.0))
+        .map_err(|e| e.to_string())?;
     let edited = run_js(&editor, r#"
       const q=id=>document.querySelector('[data-testid="'+id+'"]');
       const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -402,27 +465,58 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
       if(!q('screenshot-pin-done-dialog')) throw new Error('Done replacement choice missing');
       return true;
     "#, Duration::from_secs(15)).await.map_err(|e| e.to_string())?;
-    editor.eval("document.querySelector('[data-testid=\"screenshot-pin-done-replace\"]').click()").map_err(|e| e.to_string())?;
+    editor
+        .eval("document.querySelector('[data-testid=\"screenshot-pin-done-replace\"]').click()")
+        .map_err(|e| e.to_string())?;
     let edit_closed = wait_closed(&app, super::super::OVERLAY_LABEL, Duration::from_secs(10)).await;
-    let updated = super::super::tool_state().pins.get(&reopened_label).cloned().ok_or("replacement created another pin")?;
-    let updated_pixels = image::open(&updated.path).map_err(|e| e.to_string())?.to_rgba8();
+    let updated = super::super::tool_state()
+        .pins
+        .get(&reopened_label)
+        .cloned()
+        .ok_or("replacement created another pin")?;
+    let updated_pixels = image::open(&updated.path)
+        .map_err(|e| e.to_string())?
+        .to_rgba8();
     let edited_clipboard = read_clipboard_image(&app).map_err(|e| e.to_string())?;
-    let replacement_ok = editor_resizable && edited == true && edit_closed && updated.path != payload.path
-        && updated.note == payload.note && updated_pixels != source && updated_pixels == edited_clipboard
+    let replacement_ok = editor_resizable
+        && edited == true
+        && edit_closed
+        && updated.path != payload.path
+        && updated.note == payload.note
+        && updated_pixels != source
+        && updated_pixels == edited_clipboard
         && super::super::tool_state().pins.len() == 1;
     let edit_artifact = keep_image(&updated_pixels, "pin-edited-replacement.png");
     edit_done_branch(&app, &reopened, "new").await?;
-    let new_label = super::super::tool_state().pins.keys().find(|label| *label != &reopened_label).cloned().ok_or("Done new did not create another pin")?;
-    let new_pin = super::super::tool_state().pins.get(&new_label).cloned().ok_or("new pin missing")?;
-    let new_pixels = image::open(&new_pin.path).map_err(|e| e.to_string())?.to_rgba8();
+    let new_label = super::super::tool_state()
+        .pins
+        .keys()
+        .find(|label| *label != &reopened_label)
+        .cloned()
+        .ok_or("Done new did not create another pin")?;
+    let new_pin = super::super::tool_state()
+        .pins
+        .get(&new_label)
+        .cloned()
+        .ok_or("new pin missing")?;
+    let new_pixels = image::open(&new_pin.path)
+        .map_err(|e| e.to_string())?
+        .to_rgba8();
     let new_pin_ok = super::super::tool_state().pins.len() == 2
-        && image::open(&updated.path).map_err(|e| e.to_string())?.to_rgba8() == updated_pixels
-        && new_pixels != updated_pixels && new_pixels == read_clipboard_image(&app).map_err(|e| e.to_string())?;
+        && image::open(&updated.path)
+            .map_err(|e| e.to_string())?
+            .to_rgba8()
+            == updated_pixels
+        && new_pixels != updated_pixels
+        && new_pixels == read_clipboard_image(&app).map_err(|e| e.to_string())?;
     super::super::screenshot_close_pin(app.clone(), new_label.clone()).await?;
     wait_closed(&app, &new_label, Duration::from_secs(5)).await;
     edit_done_branch(&app, &reopened, "copy").await?;
     let copy_only_ok = super::super::tool_state().pins.len() == 1
-        && image::open(&updated.path).map_err(|e| e.to_string())?.to_rgba8() == updated_pixels
+        && image::open(&updated.path)
+            .map_err(|e| e.to_string())?
+            .to_rgba8()
+            == updated_pixels
         && read_clipboard_image(&app).map_err(|e| e.to_string())? == new_pixels
         && reopened.is_visible().map_err(|e| e.to_string())?;
     let ok = drag["passed"] == true
@@ -445,7 +539,8 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
         && removed
         && independent_pin
         && replacement_ok
-        && new_pin_ok && copy_only_ok
+        && new_pin_ok
+        && copy_only_ok
         && copy_artifact.is_some()
         && favorite_artifact.is_some();
     Ok(report(

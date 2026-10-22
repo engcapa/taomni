@@ -357,7 +357,10 @@ pub fn update_thread_cc_model(conn: &Connection, id: &str, model: Option<&str>) 
 
 pub fn update_thread_llm_model(conn: &Connection, id: &str, model: Option<&str>) -> SqlResult<()> {
     let model = model.map(str::trim).filter(|s| !s.is_empty());
-    conn.execute("UPDATE ai_chat_threads SET llm_model = ?1 WHERE id = ?2", params![model, id])?;
+    conn.execute(
+        "UPDATE ai_chat_threads SET llm_model = ?1 WHERE id = ?2",
+        params![model, id],
+    )?;
     Ok(())
 }
 
@@ -408,7 +411,10 @@ mod tests {
         .unwrap();
 
         let threads = list_threads(&conn, 10).unwrap();
-        assert_eq!(threads.first().map(|thread| thread.id.as_str()), Some("newer"));
+        assert_eq!(
+            threads.first().map(|thread| thread.id.as_str()),
+            Some("newer")
+        );
     }
 
     #[test]
@@ -419,18 +425,18 @@ mod tests {
             init_chat_tables(&conn).unwrap();
             init_chat_tables(&conn).unwrap();
             conn.execute("INSERT INTO ai_chat_threads (id,title,provider_id,created_at,updated_at,source) VALUES ('a','A','opencode-go',1,1,'drawer'), ('b','B','opencode-go',2,2,'drawer')", []).unwrap();
-            update_thread_llm_model(&conn,"a",Some("kimi-k3")).unwrap();
-            update_thread_cc_model(&conn,"a",Some("bridge-model")).unwrap();
+            update_thread_llm_model(&conn, "a", Some("kimi-k3")).unwrap();
+            update_thread_cc_model(&conn, "a", Some("bridge-model")).unwrap();
         }
         {
             let conn = Connection::open(&path).unwrap();
-            let a = get_thread(&conn,"a").unwrap().unwrap();
-            assert_eq!(a.llm_model.as_deref(),Some("kimi-k3"));
-            assert_eq!(a.cc_model.as_deref(),Some("bridge-model"));
-            assert!(get_thread(&conn,"b").unwrap().unwrap().llm_model.is_none());
-            assert_eq!(list_threads(&conn,10).unwrap().len(),2);
-            update_thread_llm_model(&conn,"a",Some(" ")).unwrap();
-            assert!(get_thread(&conn,"a").unwrap().unwrap().llm_model.is_none());
+            let a = get_thread(&conn, "a").unwrap().unwrap();
+            assert_eq!(a.llm_model.as_deref(), Some("kimi-k3"));
+            assert_eq!(a.cc_model.as_deref(), Some("bridge-model"));
+            assert!(get_thread(&conn, "b").unwrap().unwrap().llm_model.is_none());
+            assert_eq!(list_threads(&conn, 10).unwrap().len(), 2);
+            update_thread_llm_model(&conn, "a", Some(" ")).unwrap();
+            assert!(get_thread(&conn, "a").unwrap().unwrap().llm_model.is_none());
         }
         std::fs::remove_file(path).unwrap();
     }

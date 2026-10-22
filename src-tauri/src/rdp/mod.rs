@@ -325,21 +325,21 @@ pub async fn rdp_connect(
     // `rdp_disconnect`). Without this the `RdpSession` would linger in the
     // map after its backend worker has already exited.
     let reaper_cancel = session.cancel.clone();
-    let reaper_sessions = state.rdp_sessions.clone();
+    let reaper_sessions = state.remote_desktop.rdp_sessions.clone();
     let reaper_id = session_id.clone();
     tokio::spawn(async move {
         reaper_cancel.cancelled().await;
         reaper_sessions.write().await.remove(&reaper_id);
     });
 
-    let mut sessions = state.rdp_sessions.write().await;
+    let mut sessions = state.remote_desktop.rdp_sessions.write().await;
     sessions.insert(session_id, session);
     Ok(result)
 }
 
 #[tauri::command]
 pub async fn rdp_disconnect(state: State<'_, AppState>, session_id: String) -> Result<(), String> {
-    let mut sessions = state.rdp_sessions.write().await;
+    let mut sessions = state.remote_desktop.rdp_sessions.write().await;
     if let Some(s) = sessions.remove(&session_id) {
         let _ = s.control_tx.send(RdpControl::Disconnect);
         s.cancel.cancel();

@@ -9,14 +9,13 @@ use winapi::shared::minwindef::{DWORD, FALSE, MAX_PATH};
 use winapi::um::handleapi::{CloseHandle, INVALID_HANDLE_VALUE};
 use winapi::um::processthreadsapi::OpenProcess;
 use winapi::um::tlhelp32::{
-    CreateToolhelp32Snapshot, Process32FirstW, Process32NextW, PROCESSENTRY32W, TH32CS_SNAPPROCESS,
+    CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW, TH32CS_SNAPPROCESS,
 };
 use winapi::um::winnt::{HANDLE, PROCESS_QUERY_LIMITED_INFORMATION};
 
 #[link(name = "kernel32")]
 unsafe extern "system" {
-    fn QueryFullProcessImageNameW(h: HANDLE, flags: DWORD, buf: *mut u16, size: *mut DWORD)
-        -> i32;
+    fn QueryFullProcessImageNameW(h: HANDLE, flags: DWORD, buf: *mut u16, size: *mut DWORD) -> i32;
 }
 
 #[link(name = "iphlpapi")]
@@ -212,12 +211,8 @@ pub fn list_tcp_owner_rows() -> Vec<TcpOwnerRow> {
             // IP octets stored in network order consecutively.
             let ip = Ipv4Addr::new(buf[off + 4], buf[off + 5], buf[off + 6], buf[off + 7]);
             let port = u16::from_be_bytes([buf[off + 8], buf[off + 9]]);
-            let pid = u32::from_le_bytes([
-                buf[off + 20],
-                buf[off + 21],
-                buf[off + 22],
-                buf[off + 23],
-            ]);
+            let pid =
+                u32::from_le_bytes([buf[off + 20], buf[off + 21], buf[off + 22], buf[off + 23]]);
             if pid != 0 && port != 0 {
                 out.push(TcpOwnerRow {
                     local: IpAddr::V4(ip),
@@ -240,12 +235,8 @@ pub fn list_tcp_owner_rows() -> Vec<TcpOwnerRow> {
             a.copy_from_slice(&buf[off..off + 16]);
             let ip = Ipv6Addr::from(a);
             let port = u16::from_be_bytes([buf[off + 20], buf[off + 21]]);
-            let pid = u32::from_le_bytes([
-                buf[off + 52],
-                buf[off + 53],
-                buf[off + 54],
-                buf[off + 55],
-            ]);
+            let pid =
+                u32::from_le_bytes([buf[off + 52], buf[off + 53], buf[off + 54], buf[off + 55]]);
             if pid != 0 && port != 0 {
                 out.push(TcpOwnerRow {
                     local: IpAddr::V6(ip),
@@ -308,7 +299,11 @@ fn find_owner(rows: &[TcpOwnerRow], local: IpAddr, local_port: u16) -> Option<u3
 }
 
 pub fn tcp_owner_pid(local: IpAddr, local_port: u16) -> Option<u32> {
-    if let Some(pid) = find_owner(&tcp_owner_rows_cached(TCP_TABLE_CACHE_TTL), local, local_port) {
+    if let Some(pid) = find_owner(
+        &tcp_owner_rows_cached(TCP_TABLE_CACHE_TTL),
+        local,
+        local_port,
+    ) {
         return Some(pid);
     }
     // A miss may just mean the snapshot predates this socket. Force one re-read
@@ -364,14 +359,7 @@ fn read_udp_table(af: u32) -> Option<Vec<u8>> {
             return None;
         }
         let mut buf = vec![0u8; size as usize];
-        let r = GetExtendedUdpTable(
-            buf.as_mut_ptr(),
-            &mut size,
-            1,
-            af,
-            UDP_TABLE_OWNER_PID,
-            0,
-        );
+        let r = GetExtendedUdpTable(buf.as_mut_ptr(), &mut size, 1, af, UDP_TABLE_OWNER_PID, 0);
         if r != NO_ERROR || buf.len() < 4 {
             return None;
         }
@@ -396,7 +384,8 @@ pub fn list_udp_owner_rows() -> Vec<TcpOwnerRow> {
             }
             let ip = Ipv4Addr::new(buf[off], buf[off + 1], buf[off + 2], buf[off + 3]);
             let port = u16::from_be_bytes([buf[off + 4], buf[off + 5]]);
-            let pid = u32::from_le_bytes([buf[off + 8], buf[off + 9], buf[off + 10], buf[off + 11]]);
+            let pid =
+                u32::from_le_bytes([buf[off + 8], buf[off + 9], buf[off + 10], buf[off + 11]]);
             if pid != 0 && port != 0 {
                 out.push(TcpOwnerRow {
                     local: IpAddr::V4(ip),
@@ -419,12 +408,8 @@ pub fn list_udp_owner_rows() -> Vec<TcpOwnerRow> {
             let ip = Ipv6Addr::from(a);
             // localAddr[16] + scopeId[4] → port at off+20.
             let port = u16::from_be_bytes([buf[off + 20], buf[off + 21]]);
-            let pid = u32::from_le_bytes([
-                buf[off + 24],
-                buf[off + 25],
-                buf[off + 26],
-                buf[off + 27],
-            ]);
+            let pid =
+                u32::from_le_bytes([buf[off + 24], buf[off + 25], buf[off + 26], buf[off + 27]]);
             if pid != 0 && port != 0 {
                 out.push(TcpOwnerRow {
                     local: IpAddr::V6(ip),
@@ -462,7 +447,11 @@ pub fn udp_owner_rows_cached(max_age: Duration) -> Arc<Vec<TcpOwnerRow>> {
 /// datagram, so the row exists by the time the packet reaches us; a miss forces
 /// one fresh read (at most once per new flow).
 pub fn udp_owner_pid(local: IpAddr, local_port: u16) -> Option<u32> {
-    if let Some(pid) = find_owner(&udp_owner_rows_cached(TCP_TABLE_CACHE_TTL), local, local_port) {
+    if let Some(pid) = find_owner(
+        &udp_owner_rows_cached(TCP_TABLE_CACHE_TTL),
+        local,
+        local_port,
+    ) {
         return Some(pid);
     }
     find_owner(&udp_owner_rows_cached(Duration::ZERO), local, local_port)

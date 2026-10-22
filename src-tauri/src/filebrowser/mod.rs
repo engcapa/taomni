@@ -88,7 +88,7 @@ pub async fn sftp_attach(
     };
     let prompter = build_kbd_prompter(
         app_handle.clone(),
-        state.ssh_auth_responders.clone(),
+        state.terminal.ssh_auth_responders.clone(),
         session_id.clone(),
     );
     let session_result = sftp::open_sftp(
@@ -100,12 +100,12 @@ pub async fn sftp_attach(
         Some(&prompter),
     )
     .await;
-    clear_session_auth_responders(&state.ssh_auth_responders, &session_id);
+    clear_session_auth_responders(&state.terminal.ssh_auth_responders, &session_id);
     let session = session_result?;
     let home = session.home.clone();
 
     {
-        let mut sessions = state.sftp_sessions.write().await;
+        let mut sessions = state.files.sftp_sessions.write().await;
         sessions.insert(session_id.clone(), Arc::new(session));
     }
 
@@ -116,7 +116,7 @@ pub async fn sftp_attach(
 
 #[tauri::command]
 pub async fn sftp_detach(session_id: String, state: State<'_, AppState>) -> Result<(), String> {
-    let mut sessions = state.sftp_sessions.write().await;
+    let mut sessions = state.files.sftp_sessions.write().await;
     sessions.remove(&session_id);
     Ok(())
 }
@@ -589,7 +589,7 @@ async fn get_session(
     state: &State<'_, AppState>,
     session_id: &str,
 ) -> Result<Arc<sftp::ActiveSftp>, String> {
-    let sessions = state.sftp_sessions.read().await;
+    let sessions = state.files.sftp_sessions.read().await;
     sessions
         .get(session_id)
         .cloned()

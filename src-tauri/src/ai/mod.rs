@@ -1,6 +1,6 @@
 pub mod commands;
-pub mod model_inspector;
 pub mod config;
+pub mod model_inspector;
 pub mod network_policy;
 pub mod session_safety;
 pub mod shell_prompt;
@@ -56,7 +56,10 @@ impl AppAiCtx {
         self.update_inspector_policy(&cfg);
         self.llm = build_router_from_ai(&cfg, Some(self.vault.as_ref()));
         if self.config.asr != cfg.asr || cfg.fully_disabled {
-            self.asr = Arc::new(AsrManager::configured(cfg.asr.routed_model(), &cfg.asr.language));
+            self.asr = Arc::new(AsrManager::configured(
+                cfg.asr.routed_model(),
+                &cfg.asr.language,
+            ));
         }
         self.config = cfg;
     }
@@ -65,7 +68,10 @@ impl AppAiCtx {
         self.update_inspector_policy(&cfg);
         self.llm = build_router_from_ai_with_proxy_db(&cfg, Some(self.vault.as_ref()), proxy_db);
         if self.config.asr != cfg.asr || cfg.fully_disabled {
-            self.asr = Arc::new(AsrManager::configured(cfg.asr.routed_model(), &cfg.asr.language));
+            self.asr = Arc::new(AsrManager::configured(
+                cfg.asr.routed_model(),
+                &cfg.asr.language,
+            ));
         }
         self.config = cfg;
     }
@@ -74,7 +80,10 @@ impl AppAiCtx {
         self.update_inspector_policy(&cfg);
         self.llm = llm;
         if self.config.asr != cfg.asr || cfg.fully_disabled {
-            self.asr = Arc::new(AsrManager::configured(cfg.asr.routed_model(), &cfg.asr.language));
+            self.asr = Arc::new(AsrManager::configured(
+                cfg.asr.routed_model(),
+                &cfg.asr.language,
+            ));
         }
         self.config = cfg;
     }

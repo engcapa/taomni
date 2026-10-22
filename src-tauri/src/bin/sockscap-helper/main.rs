@@ -555,7 +555,10 @@ mod windows_main {
         let own = std::process::id();
         let image = std::env::current_exe()
             .ok()
-            .and_then(|p| p.file_name().map(|n| n.to_string_lossy().to_ascii_lowercase()))
+            .and_then(|p| {
+                p.file_name()
+                    .map(|n| n.to_string_lossy().to_ascii_lowercase())
+            })
             .unwrap_or_else(|| "sockscap-helper.exe".to_string());
 
         for &pid in pids {
@@ -601,11 +604,7 @@ mod windows_main {
         use winapi::um::winnt::{PROCESS_QUERY_LIMITED_INFORMATION, SYNCHRONIZE};
 
         unsafe {
-            let h = OpenProcess(
-                SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION,
-                FALSE,
-                ppid,
-            );
+            let h = OpenProcess(SYNCHRONIZE | PROCESS_QUERY_LIMITED_INFORMATION, FALSE, ppid);
             if h.is_null() {
                 // Parent already gone or not openable — do not hang.
                 return;

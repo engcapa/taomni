@@ -86,7 +86,13 @@ pub fn recognize(image: &image::RgbaImage) -> Result<WindowsOcr, String> {
         source.width() as i32,
         source.height() as i32,
     )
-    .and_then(|b| SoftwareBitmap::ConvertWithAlpha(&b, BitmapPixelFormat::Bgra8, BitmapAlphaMode::Premultiplied))
+    .and_then(|b| {
+        SoftwareBitmap::ConvertWithAlpha(
+            &b,
+            BitmapPixelFormat::Bgra8,
+            BitmapAlphaMode::Premultiplied,
+        )
+    })
     .map_err(|e| format!("prepare OCR bitmap: {e}"))?;
     let engines = engines().map_err(|e| {
         format!("Windows OCR has no installed language ({e}). Add a language with OCR support in Settings > Time & language > Language & region.")
@@ -100,7 +106,9 @@ pub fn recognize(image: &image::RgbaImage) -> Result<WindowsOcr, String> {
         let mut words = Vec::new();
         let lines = result.Lines().map_err(|e| e.to_string())?;
         for (line_index, line) in lines.into_iter().enumerate() {
-            let Ok(line_words) = line.Words() else { continue };
+            let Ok(line_words) = line.Words() else {
+                continue;
+            };
             for word in line_words {
                 let (Ok(text), Ok(rect)) = (word.Text(), word.BoundingRect()) else {
                     continue;

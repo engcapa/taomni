@@ -287,7 +287,6 @@ impl WindowsCapturer {
             }
         }
     }
-
 }
 
 impl Drop for WindowsCapturer {

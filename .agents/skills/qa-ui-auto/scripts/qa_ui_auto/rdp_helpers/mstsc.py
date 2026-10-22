@@ -40,7 +40,13 @@ class MstscProcess:
 
     def terminate(self):
         if not self.api.TerminateProcess(self.handle, 1):
-            raise ctypes.WinError(ctypes.get_last_error())
+            error = ctypes.get_last_error()
+            # Win32 returns ACCESS_DENIED when the process already exited.
+            # taskkill or the monitored client can finish after wait timed out.
+            # Keep a real permission failure for a live process observable.
+            if error == 5 and self.poll() is not None:
+                return
+            raise ctypes.WinError(error)
 
     kill = terminate
 

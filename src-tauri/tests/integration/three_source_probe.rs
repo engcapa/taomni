@@ -23,17 +23,14 @@ fn manifest_has_three_sources_per_entry() {
 }
 
 #[test]
-fn manifest_includes_asr_and_llm_kinds() {
+fn manifest_includes_llm_models() {
     use taomni_lib::models::manifest::ModelKind;
     let manifest = load_manifest().expect("models manifest must load");
-    let has_asr = manifest
-        .models
-        .values()
-        .any(|m| matches!(m.kind, ModelKind::Asr));
     let has_llm = manifest
         .models
         .values()
         .any(|m| matches!(m.kind, ModelKind::Llm));
-    assert!(has_asr, "manifest must include at least one ASR model");
     assert!(has_llm, "manifest must include at least one LLM model");
+    // ASR has a separate pinned catalog; its download inputs are checked in
+    // asr::catalog::tests::asr_catalog_has_verified_download_inputs.
 }

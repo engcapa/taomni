@@ -1,0 +1,53 @@
+
+html[data-app-theme="dark"] .bg-white {
+  background-color: var(--taomni-panel-bg) !important;
+}
+html[data-app-theme="dark"] .bg-white\/90 {
+  background-color: color-mix(in srgb, var(--taomni-panel-bg) 90%, transparent) !important;
+}
+html[data-app-theme="dark"] .bg-slate-100,
+html[data-app-theme="dark"] .bg-slate-200 {
+  background-color: var(--taomni-quick-bg) !important;
+}
+html[data-app-theme="dark"] .border-slate-100,
+html[data-app-theme="dark"] .border-slate-200,
+html[data-app-theme="dark"] .border-slate-300,
+html[data-app-theme="dark"] .border-slate-400,
+html[data-app-theme="dark"] .border-slate-500 {
+  border-color: var(--taomni-divider) !important;
+}
+html[data-app-theme="dark"] .text-slate-700 {
+  color: var(--taomni-text) !important;
+}
+html[data-app-theme="dark"] .text-slate-300,
+html[data-app-theme="dark"] .text-slate-400,
+html[data-app-theme="dark"] .text-slate-500,
+html[data-app-theme="dark"] .text-slate-600 {
+  color: var(--taomni-text-muted) !important;
+}
+html[data-app-theme="dark"] .hover\:bg-white\/15:hover,
+html[data-app-theme="dark"] .hover\:bg-white\/20:hover,
+html[data-app-theme="dark"] .hover\:bg-white\/70:hover {
+  background-color: var(--taomni-control-hover) !important;
+}
+
+
+/* AI z-index hierarchy (see ai-native-plan.md)
+ *   100: MainLayout main area (terminal / SFTP / VNC)
+ *   200: AI Chat Drawer (right side)
+ *   300: Ctrl+K AiRewriteOverlay (small input + diff)
+ *   400: ActionCard / CommandPreview / WebSearch confirm (modal-like)
+ *   500: PrivacyToggle "全本地模式" confirm
+ *   900: Toast / errors
+ *
+ * Rule of thumb: at most one z=400 card visible at a time; multiple cards
+ * queue in FIFO order. Components opt in by adding the matching `.ai-z-*`
+ * class — the explicit values keep stacking contexts predictable and let
+ * automated tests (qa-ui-auto) assert the layering.
+ */
+.ai-z-main    { z-index: 100; }
+.ai-z-drawer  { z-index: 200; }
+.ai-z-overlay { z-index: 300; }
+.ai-z-card    { z-index: 400; }
+.ai-z-privacy { z-index: 500; }
+.ai-z-toast   { z-index: 900; }

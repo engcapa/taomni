@@ -1,65 +1,30 @@
+import { Minus, Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Minus, Plus, Trash2 } from "lucide-react";
-import { resolveThemeId } from "../../lib/themes";
+import { confirmAppDialog } from "../../lib/appDialogs";
+import { useAppTheme } from "../../lib/appTheme";
+import { useT } from "../../lib/i18n";
+import { historyClear } from "../../lib/ipc";
+import { getAppPlatform } from "../../lib/runtime";
 import {
-  isCustomTerminalTheme,
-  makeCustomTerminalTheme,
-  resolveTerminalTheme,
-  resolveSystemTerminalThemeId,
-  type TerminalCursorStyle,
-  type TerminalProfile,
-  type TerminalRightClickBehavior,
-  type UserCommonCommand,
-} from "../../lib/terminalProfile";
-import { ThemePreviewSelect } from "../theme/ThemePreviewSelect";
-import { buildTerminalThemeOptions } from "../theme/themePreviews";
-import {
-  getPrimaryFontName,
   getDefaultTerminalFontFamily,
+  getPrimaryFontName,
   isMonospaceFont,
   makeTerminalFontFamily,
   resolveSelectedFontName,
   SAFE_TERMINAL_FONT_FALLBACKS,
-  type SystemFontState,
   useSystemFonts,
   useTerminalFontOptions,
+  type SystemFontState,
 } from "../../lib/systemFonts";
-import { historyClear } from "../../lib/ipc";
-import { useT, type TranslateFn } from "../../lib/i18n";
-import { confirmAppDialog } from "../../lib/appDialogs";
-import { getAppPlatform } from "../../lib/runtime";
-import { useAppTheme } from "../../lib/appTheme";
+import { isCustomTerminalTheme, makeCustomTerminalTheme, resolveSystemTerminalThemeId, resolveTerminalTheme, type TerminalProfile } from "../../lib/terminalProfile";
+import { resolveThemeId } from "../../lib/themes";
+import { ThemePreviewSelect } from "../theme/ThemePreviewSelect";
+import { buildTerminalThemeOptions } from "../theme/themePreviews";
 import { FontPickerSelect, type FontPickerOption } from "./FontPickerPanel";
-
-interface TerminalAppearanceSettingsProps {
-  profile: TerminalProfile;
-  onProfileChange: (profile: TerminalProfile) => void;
-  showCustomColors?: boolean;
-  showPreview?: boolean;
-  allowSystemTheme?: boolean;
-  className?: string;
-  fontState?: SystemFontState;
-  onRequestSystemFonts?: () => void;
-}
-
-function buildCursorOptions(t: TranslateFn): Array<{ label: string; style: TerminalCursorStyle; blink: boolean }> {
-  return [
-    { label: t("terminalAppearance.cursorBlockBlink"), style: "block", blink: true },
-    { label: t("terminalAppearance.cursorBlockSteady"), style: "block", blink: false },
-    { label: t("terminalAppearance.cursorUnderlineBlink"), style: "underline", blink: true },
-    { label: t("terminalAppearance.cursorUnderlineSteady"), style: "underline", blink: false },
-    { label: t("terminalAppearance.cursorBarBlink"), style: "bar", blink: true },
-    { label: t("terminalAppearance.cursorBarSteady"), style: "bar", blink: false },
-  ];
-}
-
-function buildRightClickOptions(t: TranslateFn): Array<{ label: string; value: TerminalRightClickBehavior }> {
-  return [
-    { label: t("terminalAppearance.rightClickContextMenu"), value: "menu" },
-    { label: t("terminalAppearance.rightClickPaste"), value: "paste" },
-    { label: t("terminalAppearance.rightClickCopyOrPaste"), value: "copy-or-paste" },
-  ];
-}
+import { CheckControl, CommonCommandsEditor } from "./appearance/controls";
+import { type TerminalAppearanceSettingsProps } from "./appearance/model";
+import { buildCursorOptions, buildRightClickOptions } from "./appearance/options";
+import { isHexColor, TerminalPreview, themeColor } from "./appearance/preview";
 
 export function TerminalAppearanceSettings(props: TerminalAppearanceSettingsProps) {
   if (props.fontState) {
@@ -89,7 +54,7 @@ function TerminalAppearanceSettingsContent({
   className = "",
   fontState,
   onRequestSystemFonts,
-}: TerminalAppearanceSettingsProps & { fontState: SystemFontState }) {
+}: TerminalAppearanceSettingsProps & { fontState: SystemFontState; }) {
   const t = useT();
   const cursorOptions = useMemo(() => buildCursorOptions(t), [t]);
   const rightClickOptions = useMemo(() => buildRightClickOptions(t), [t]);
@@ -284,7 +249,7 @@ function TerminalAppearanceSettingsContent({
       <section className="rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
         <div className="block">
           <span className="block text-[12px] font-semibold mb-1">{t("terminalAppearance.themeHeading")}</span>
-            <ThemePreviewSelect
+          <ThemePreviewSelect
             ariaLabel={t("terminalAppearance.themeSelectAria")}
             testId="terminal-theme-select"
             value={themeSelectValue}
@@ -555,9 +520,9 @@ function TerminalAppearanceSettingsContent({
             <div className="flex flex-col gap-1.5">
               {(
                 [
-                  { value: "history",          label: t("terminalAppearance.suggestionSourceHistory"),         desc: t("terminalAppearance.suggestionSourceHistoryDesc") },
-                  { value: "history+path",     label: t("terminalAppearance.suggestionSourceHistoryPath"),     desc: t("terminalAppearance.suggestionSourceHistoryPathDesc") },
-                  { value: "history+path+ai",  label: t("terminalAppearance.suggestionSourceHistoryPathAi"),   desc: t("terminalAppearance.suggestionSourceHistoryPathAiDesc") },
+                  { value: "history", label: t("terminalAppearance.suggestionSourceHistory"), desc: t("terminalAppearance.suggestionSourceHistoryDesc") },
+                  { value: "history+path", label: t("terminalAppearance.suggestionSourceHistoryPath"), desc: t("terminalAppearance.suggestionSourceHistoryPathDesc") },
+                  { value: "history+path+ai", label: t("terminalAppearance.suggestionSourceHistoryPathAi"), desc: t("terminalAppearance.suggestionSourceHistoryPathAiDesc") },
                 ] as const
               ).map(({ value, label, desc }) => (
                 <label key={value} className="flex items-start gap-2 cursor-pointer">
@@ -630,196 +595,6 @@ function TerminalAppearanceSettingsContent({
         />
       </section>
 
-    </div>
-  );
-}
-
-function CheckControl({
-  label,
-  checked,
-  onChange,
-  testId,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (checked: boolean) => void;
-  testId?: string;
-}) {
-  return (
-    <label className="inline-flex items-center gap-1.5" data-testid={testId}>
-      <input
-        className="taomni-checkbox"
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-      />
-      <span>{label}</span>
-    </label>
-  );
-}
-
-function TerminalPreview({
-  background,
-  foreground,
-  fontFamily,
-  fontSize,
-  cursorStyle,
-  cursorBlink,
-  theme,
-}: {
-  background: string;
-  foreground: string;
-  fontFamily: string;
-  fontSize: number;
-  cursorStyle: TerminalCursorStyle;
-  cursorBlink: boolean;
-  theme: ReturnType<typeof resolveTerminalTheme>;
-}) {
-  const cursorColor = theme.cursor ?? foreground;
-
-  return (
-    <div
-      data-testid="terminal-preview"
-      className="rounded-md p-3 taomni-mono leading-relaxed border border-black/10"
-      style={{ background, color: foreground, fontFamily, fontSize }}
-    >
-      <span style={{ color: theme.green ?? "#62d36f" }}>user@host</span>
-      <span style={{ color: "#bbbbbb" }}>:</span>
-      <span style={{ color: theme.blue ?? "#83a7d8" }}>~/srv</span>
-      {"$ tail -f /var/log/nginx/error.log"}
-      <br />
-      <span style={{ color: theme.yellow ?? "#e3a85e" }}>warning</span>
-      {": 2 worker connections are not enough"}
-      <br />
-      <span style={{ color: theme.red ?? "#ff6b6b" }}>error</span>
-      {": connect() failed (111: Connection refused)"}
-      <br />
-      <TerminalPreviewCursor
-        color={cursorColor}
-        foreground={foreground}
-        styleName={cursorStyle}
-        blink={cursorBlink}
-      />
-    </div>
-  );
-}
-
-function TerminalPreviewCursor({
-  color,
-  foreground,
-  styleName,
-  blink,
-}: {
-  color: string;
-  foreground: string;
-  styleName: TerminalCursorStyle;
-  blink: boolean;
-}) {
-  const className = blink ? "taomni-blink" : "";
-
-  if (styleName === "underline") {
-    return (
-      <span
-        data-testid="terminal-preview-cursor"
-        className={`inline-block w-[0.65em] h-[1em] align-[-0.1em] ${className}`}
-        style={{ borderBottom: `2px solid ${color}` }}
-      />
-    );
-  }
-
-  if (styleName === "bar") {
-    return (
-      <span
-        data-testid="terminal-preview-cursor"
-        className={`inline-block w-[0.4em] h-[1em] align-[-0.1em] ${className}`}
-        style={{ borderLeft: `2px solid ${color}` }}
-      />
-    );
-  }
-
-  return (
-    <span
-      data-testid="terminal-preview-cursor"
-      className={`inline-block w-[0.65em] h-[1em] align-[-0.1em] ${className}`}
-      style={{ background: color, color: foreground }}
-    />
-  );
-}
-
-function isHexColor(value: string): boolean {
-  return /^#[0-9a-fA-F]{6}$/.test(value);
-}
-
-function themeColor(value: string | undefined, fallback: string): string {
-  return typeof value === "string" && value.trim() ? value : fallback;
-}
-
-interface CommonCommandsEditorProps {
-  value: UserCommonCommand[];
-  onChange: (next: UserCommonCommand[]) => void;
-  t: TranslateFn;
-}
-
-function CommonCommandsEditor({ value, onChange, t }: CommonCommandsEditorProps) {
-  const updateRow = (index: number, patch: Partial<UserCommonCommand>) => {
-    const next = value.slice();
-    const current = next[index] ?? { command: "" };
-    next[index] = { ...current, ...patch };
-    onChange(next);
-  };
-  const removeRow = (index: number) => {
-    const next = value.slice();
-    next.splice(index, 1);
-    onChange(next);
-  };
-  const addRow = () => {
-    onChange([...value, { command: "" }]);
-  };
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      {value.length === 0 ? (
-        <div className="text-[11px] text-[var(--taomni-text-muted)] italic px-1 py-2">
-          {t("terminalAppearance.commonCommandsEmpty")}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-1">
-          {value.map((item, idx) => (
-            <div key={idx} className="flex items-center gap-2">
-              <input
-                className="taomni-input flex-1 min-w-0 font-mono text-[12px]"
-                placeholder={t("terminalAppearance.commonCommandPlaceholder")}
-                value={item.command}
-                onChange={(e) => updateRow(idx, { command: e.target.value })}
-                aria-label={t("terminalAppearance.commonCommandAriaCommand", { index: idx + 1 })}
-              />
-              <input
-                className="taomni-input flex-1 min-w-0 text-[12px]"
-                placeholder={t("terminalAppearance.commonCommandDescriptionPlaceholder")}
-                value={item.description ?? ""}
-                onChange={(e) => updateRow(idx, { description: e.target.value })}
-                aria-label={t("terminalAppearance.commonCommandAriaDescription", { index: idx + 1 })}
-              />
-              <button
-                type="button"
-                className="taomni-btn h-8 w-8 p-0 inline-flex items-center justify-center"
-                onClick={() => removeRow(idx)}
-                aria-label={t("terminalAppearance.commonCommandRemoveAria", { index: idx + 1 })}
-                title={t("terminalAppearance.commonCommandRemove")}
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-      <button
-        type="button"
-        className="taomni-btn h-8 px-2 text-[11px] self-start inline-flex items-center gap-1"
-        onClick={addRow}
-      >
-        <Plus size={12} /> {t("terminalAppearance.commonCommandAddEntry")}
-      </button>
     </div>
   );
 }
