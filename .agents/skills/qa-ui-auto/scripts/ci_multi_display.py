@@ -72,6 +72,16 @@ def paint(context, width, height, index):
             context.fill()
 
 
+def pattern_ready(observed, fact, *, wayland):
+    """Window geometry alone does not establish the child buffer's allocation."""
+    size = {key: fact["logical"][key] for key in ("width", "height")}
+    return (observed["mapped"] and observed["monitor"] == fact["index"]
+            and observed["scale"] == fact["scale"]
+            and all(observed[key] == value for key, value in size.items())
+            and observed.get("painted") == {**size, "scale": fact["scale"]}
+            and (not wayland or observed.get("compositor") == fact["logical"]))
+
+
 def patterns(report):
     import cairo
     import gi
@@ -80,7 +90,12 @@ def patterns(report):
     display = Gdk.Display.get_default()
     if display.get_n_monitors() != 2:
         raise RuntimeError(f"GTK sees {display.get_n_monitors()} monitors, dual fixture is not ready")
-    windows, facts, areas = [], [], []
+    windows, facts, areas, painted = [], [], [], [{}, {}]
+    def draw(widget, context, index):
+        width, height = widget.get_allocated_width(), widget.get_allocated_height()
+        paint(context, width, height, index)
+        painted[index] = {"width": width, "height": height, "scale": widget.get_scale_factor()}
+
     for index in range(2):
         monitor = display.get_monitor(index)
         rect = monitor.get_geometry()
@@ -90,13 +105,12 @@ def patterns(report):
         window.set_keep_above(True)
         window.set_default_size(rect.width, rect.height)
         area = Gtk.DrawingArea()
-        area.connect("draw", lambda widget, context, i=index: paint(
-            context, widget.get_allocated_width(), widget.get_allocated_height(), i))
+        area.connect("draw", draw, index)
         # The 200% output resizes the window after its first draw, and a
         # Wayland compositor can keep that half-allocated buffer on screen for
         # the rest of the run (the capture then matched only the painted half).
         # Repaint on every allocation change and once per readiness tick.
-        area.connect("size-allocate", lambda *_: area.queue_draw())
+        area.connect("size-allocate", lambda widget, _: widget.queue_draw())
         areas.append(area)
         window.add(area)
         window.show_all()
@@ -113,16 +127,24 @@ def patterns(report):
             "x": rect.x, "y": rect.y, "width": rect.width, "height": rect.height},
             "scale": scale, "expected": str(expected.resolve()), "primary": monitor == display.get_primary_monitor()})
     started, last = time.monotonic(), [None]
+    published, stable_since = False, None
     def ready():
+        nonlocal published, stable_since
+        # Keep the external oracle alive and painted for the whole case. A
+        # later fullscreen/unmap on another client can expose an old GTK
+        # buffer, even after the fixture's first correct geometry observation.
         for area in areas:
             area.queue_draw()
+        if published:
+            return True
         observations = []
         for window, fact in zip(windows, facts):
             size = window.get_size()
             monitor = display.get_monitor_at_window(window.get_window()) if window.get_window() else None
             observed_index = next((i for i in range(2) if display.get_monitor(i) == monitor), None)
             observed = {"width": size[0], "height": size[1], "scale": window.get_scale_factor(),
-                        "mapped": window.get_mapped(), "monitor": observed_index}
+                        "mapped": window.get_mapped(), "monitor": observed_index,
+                        "painted": painted[fact["index"]]}
             if os.environ.get("XDG_SESSION_TYPE") == "wayland":
                 from qa_ui_auto.wayland import command
                 try:
@@ -139,14 +161,17 @@ def patterns(report):
                 print(subprocess.check_output(["gdbus", "call", "--session", "--dest", "org.gnome.Mutter.DisplayConfig",
                     "--object-path", "/org/gnome/Mutter/DisplayConfig", "--method",
                     "org.gnome.Mutter.DisplayConfig.GetCurrentState"], text=True, timeout=5), flush=True)
-        if any(not o["mapped"] or o["monitor"] != f["index"] or o["scale"] != f["scale"]
-               or (o["width"], o["height"]) != (f["logical"]["width"], f["logical"]["height"])
-               or (os.environ.get("XDG_SESSION_TYPE") == "wayland" and o.get("compositor") != f["logical"])
+        if any(not pattern_ready(o, f, wayland=os.environ.get("XDG_SESSION_TYPE") == "wayland")
                for o, f in zip(observations, facts)):
+            stable_since = None
             if time.monotonic() - started > 25:
                 print("display pattern mapping timed out", flush=True)
                 Gtk.main_quit()
                 return False
+            return True
+        if stable_since is None:
+            stable_since = time.monotonic()
+        if time.monotonic() - stable_since < 0.5:
             return True
         scales = {fact["scale"] for fact in facts}
         if os.environ.get("XDG_SESSION_TYPE") == "wayland" and scales != {1, 2}:
@@ -154,7 +179,8 @@ def patterns(report):
         report.write_text(json.dumps({"kind": "OS virtual outputs", "pid": os.getpid(), "monitors": facts,
                                       "mixedDpi": scales == {1, 2}}, indent=2))
         print("MULTI-DISPLAY-READY", flush=True)
-        return False
+        published = True
+        return True
     GLib.timeout_add(100, ready)
     Gtk.main()
     if not report.is_file():

@@ -60,9 +60,11 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
         return Ok(json!({"input":"OS keyboard via owned Mutter desktop"}));
     }
     tokio::task::spawn_blocking(move || -> anyhow::Result<Value> {
+        #[cfg(not(target_os = "windows"))]
         use enigo::{Direction, Key, Keyboard};
         let mut input = enigo::Enigo::new(&enigo::Settings::default())
             .map_err(|e| anyhow::anyhow!("OS input: {e}"))?;
+        #[cfg(not(target_os = "windows"))]
         let chord = |input: &mut enigo::Enigo, modifiers: &[Key], key: Key| -> anyhow::Result<()> {
             for modifier in modifiers {
                 input
@@ -147,7 +149,7 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
                 "confirmation":"OS mouse click on the enabled Save button","saveButton":save_button,
                 "pointer":pointer,"pointerWaitedMs":pointer_started.elapsed().as_millis()})
         };
-        #[cfg(not(target_os = "macos"))]
+        #[cfg(target_os = "linux")]
         let stages = json!({"input":"OS keyboard"});
         #[cfg(target_os = "linux")]
         {
@@ -162,13 +164,8 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
                 .map_err(|e| anyhow::anyhow!("{e}"))?;
         }
         #[cfg(target_os = "windows")]
-        {
-            chord(&mut input, &[Key::Control], Key::Unicode('a'))?;
-            input
-                .text(destination.to_string_lossy().as_ref())
-                .map_err(|e| anyhow::anyhow!("{e}"))?;
-        }
-        #[cfg(not(target_os = "macos"))]
+        let stages = super::windows_save_dialog::choose_destination(&mut input, &destination)?;
+        #[cfg(target_os = "linux")]
         input
             .key(Key::Return, Direction::Click)
             .map_err(|e| anyhow::anyhow!("{e}"))?;

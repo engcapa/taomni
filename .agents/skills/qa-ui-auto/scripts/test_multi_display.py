@@ -1,5 +1,5 @@
 import unittest
-from ci_multi_display import MUTTER_LOGICAL_LAYOUT, monitor_configuration
+from ci_multi_display import MUTTER_LOGICAL_LAYOUT, monitor_configuration, pattern_ready
 
 
 class MonitorConfigurationTests(unittest.TestCase):
@@ -28,6 +28,20 @@ class MonitorConfigurationTests(unittest.TestCase):
         state = self.state()
         expected = monitor_configuration(state)
         self.assertEqual(monitor_configuration((42, state[1][::-1], [], {})), expected)
+
+    def test_mixed_dpi_fixture_requires_a_full_draw_at_the_final_scale(self):
+        rect = dict(x=1920, y=0, width=1280, height=720)
+        fact = dict(index=1, scale=2, logical=rect)
+        observed = dict(width=1280, height=720, scale=2, monitor=1, mapped=True,
+                        compositor=rect)
+        self.assertFalse(pattern_ready(observed, fact, wayland=True))
+        for painted in [dict(width=640, height=720, scale=2),
+                        dict(width=1280, height=720, scale=1)]:
+            self.assertFalse(pattern_ready({**observed, "painted": painted}, fact, wayland=True))
+        observed["painted"] = dict(width=1280, height=720, scale=2)
+        self.assertTrue(pattern_ready(observed, fact, wayland=True))
+        self.assertFalse(pattern_ready({**observed, "compositor": {**rect, "x": 0}}, fact, wayland=True))
+        self.assertFalse(pattern_ready({**observed, "mapped": False}, fact, wayland=True))
 
 
 if __name__ == "__main__":
