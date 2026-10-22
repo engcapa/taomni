@@ -4,10 +4,10 @@
 prepare_apt_mirrors() {
   local profile="$1"
   local apt_dir="${2:-/etc/apt}"
-  # Hosted Jammy prefers Azure's HTTP mirror. In run 39761535452 repeated
-  # 30-second stalls exhausted setup. Only replace these job-owned mirror lists;
+  # Hosted Ubuntu prefers Azure's HTTP mirror. Runs 39761535452 and
+  # 39794915674 stalled on Jammy and Resolute. Replace job-owned mirror lists;
   # retain distribution suites, signatures and package version selection.
-  if [[ "${GITHUB_ACTIONS:-}" == true && "$profile" == ubuntu-22.04-* ]]; then
+  if [[ "${GITHUB_ACTIONS:-}" == true && "$profile" == ubuntu-* ]]; then
     local mirror archive
     for mirror in "$apt_dir/apt-mirrors.txt" "$apt_dir/apt-mirrors-security.txt"; do
       if [[ -f "$mirror" ]]; then

@@ -138,7 +138,7 @@ jobs:
         if: inputs.scope != 'selected'
         run: python -m unittest test_native_pointer
       - name: Linux package setup contracts
-        run: python -m unittest test_ci_linux_setup
+        run: python -m unittest test_ci_linux_setup test_ci_setup_protoc
       - uses: actions/setup-node@v4
         with:
           node-version: '24'

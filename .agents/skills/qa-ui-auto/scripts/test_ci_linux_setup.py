@@ -58,19 +58,21 @@ raise SystemExit(int(os.environ.get('QA_APT_EXIT_CODE', '0')))
         self.assertEqual(self.shell("install_packages", "missing-package").returncode, 100)
         self.assertEqual(self.shell("update_package_index").returncode, 100)
 
-    def test_hosted_jammy_uses_official_https_mirrors(self):
+    def test_hosted_ubuntu_profiles_use_official_https_mirrors(self):
         archive = self.apt / "apt-mirrors.txt"
         security = self.apt / "apt-mirrors-security.txt"
-        archive.write_text("http://azure.archive.ubuntu.com/ubuntu/\n")
-        security.write_text("http://azure.archive.ubuntu.com/ubuntu/\n")
-        result = self.shell("prepare_apt_mirrors", "ubuntu-22.04-vnc", str(self.apt))
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(archive.read_text(), "https://archive.ubuntu.com/ubuntu/\n")
-        self.assertEqual(security.read_text(), "https://security.ubuntu.com/ubuntu/\n")
+        for profile in ("ubuntu-22.04-x11", "ubuntu-22.04-vnc", "ubuntu-24.04-xvfb", "ubuntu-26.04-wayland"):
+            with self.subTest(profile=profile):
+                archive.write_text("http://azure.archive.ubuntu.com/ubuntu/\n")
+                security.write_text("http://azure.archive.ubuntu.com/ubuntu/\n")
+                result = self.shell("prepare_apt_mirrors", profile, str(self.apt))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(archive.read_text(), "https://archive.ubuntu.com/ubuntu/\n")
+                self.assertEqual(security.read_text(), "https://security.ubuntu.com/ubuntu/\n")
 
     def test_other_profiles_and_local_machines_keep_their_mirrors(self):
         archive = self.apt / "apt-mirrors.txt"
-        for profile, hosted in (("ubuntu-24.04-xvfb", "true"), ("ubuntu-26.04-wayland", "true"),
+        for profile, hosted in (("debian-13", "true"), ("ubuntu-26.04-wayland", "false"),
                                 ("ubuntu-22.04-x11", "false")):
             with self.subTest(profile=profile, hosted=hosted):
                 self.env["GITHUB_ACTIONS"] = hosted

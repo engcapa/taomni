@@ -8,7 +8,8 @@ description: |
 
   The host copies HTML: the RDP client must never be offered "HTML Format"
   (where the host also holds a plain-text alternative, only that is
-  offered). A host text copy still reaches the client. The client then
+  offered). A host text copy still reaches the client. New connections must
+  immediately read the latest host text after each clipboard change. The client then
   copies its own text: the server must not fetch it, and the host clipboard
   keeps the host's text. Finally the host copies a folder, which must not
   be offered either. On Windows platform_choice picks Taomni over the
@@ -107,6 +108,28 @@ steps:
       expect: text
     expect:
       received.text: 宿主文本 仅文本 ✓
+- host_clipboard:
+    action: set
+    kind: text
+    text: 重连后的新文本 ✓
+- rdp_probe:
+    scenario: clipboard-receive
+    artifact: receive-latest-after-reconnect
+    args:
+      expect: text
+    expect:
+      received.text: 重连后的新文本 ✓
+- host_clipboard:
+    action: set
+    kind: text
+    text: 宿主文本 仅文本 ✓
+- rdp_probe:
+    scenario: clipboard-receive
+    artifact: receive-restored-after-reconnect
+    args:
+      expect: text
+    expect:
+      received.text: 宿主文本 仅文本 ✓
 - rdp_probe:
     scenario: clipboard-send
     artifact: send-blocked
@@ -166,36 +189,44 @@ verification:
     actions:
     - 20
     - 22
+    - 24
+    - 26
     checkpoints:
     - step: 21
       expectation: A host HTML copy is never offered as HTML Format (the probe gives up after five seconds).
     - step: 23
       expectation: A host text copy reaches the client unchanged.
+    - step: 25
+      expectation: A new client immediately reads the new host text, without a stale or missing payload.
+    - step: 27
+      expectation: Another connection immediately reads the restored host text.
     results:
     - 21
     - 23
+    - 25
+    - 27
   - id: R3
     requirement: With "client -> this computer" off, a client copy is not fetched and the host clipboard is unchanged.
     actions:
-    - 24
+    - 28
     checkpoints:
-    - step: 24
+    - step: 28
       expectation: The server requests no clipboard data from the client.
-    - step: 25
+    - step: 29
       expectation: The host clipboard still holds the host's text.
     results:
-    - 24
-    - 25
+    - 28
+    - 29
   - id: R4
     requirement: Files are not offered when the level excludes them.
     actions:
-    - 26
-    - 27
+    - 30
+    - 31
     checkpoints:
-    - step: 28
+    - step: 32
       expectation: No server format list names FileGroupDescriptorW.
     results:
-    - 28
+    - 32
   native:
   - check: Real host clipboard (platform tools) and a real CLIPRDR client against the server's per-direction policy.
     method: automated
