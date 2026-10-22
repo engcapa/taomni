@@ -1,4 +1,5 @@
 import { EditorView } from "@codemirror/view";
+import { emit } from "@tauri-apps/api/event";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { confirmAppDialog } from "../../../../../../lib/appDialogs";
@@ -114,6 +115,7 @@ export function registerinteractionEditing4Cases(caseContext: registerinteractio
     )).toContain("root:app:src/renamed.ts");
   });
   it("runs the same format action from the editor context menu", async () => {
+    caseContext.workspaceTestHarness.runtimeState.tauri = true;
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
       workspaceId: "ws-format-context-menu",
@@ -160,6 +162,17 @@ export function registerinteractionEditing4Cases(caseContext: registerinteractio
       useCodeWorkspaceStore.getState(),
       "instance-format-context-menu",
     ).openFiles["root:app:src/main.ts"]?.text).toBe("const x =1"));
+    expect(useAppStore.getState().statusMessage).toBe("Formatted main.ts");
+    const treeReads = caseContext.workspaceTestHarness.workspaceMocks.workspaceListDir.mock.calls.length;
+    await act(async () => {
+      await emit("lsp://external-file-change", {
+        workspaceId: "instance-format-context-menu", path: "/repo/app/.project", type: 1,
+      });
+    });
+    await waitFor(() => expect(
+      caseContext.workspaceTestHarness.workspaceMocks.workspaceListDir.mock.calls.length,
+    ).toBeGreaterThan(treeReads));
+    expect(useAppStore.getState().statusMessage).toBe("Formatted main.ts");
   });
   it("reports a typed no-provider reason and leaves the buffer untouched", async () => {
     const workspace: CodeWorkspaceTabInfo = {
