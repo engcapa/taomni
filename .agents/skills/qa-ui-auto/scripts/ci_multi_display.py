@@ -91,10 +91,17 @@ def patterns(report):
     if display.get_n_monitors() != 2:
         raise RuntimeError(f"GTK sees {display.get_n_monitors()} monitors, dual fixture is not ready")
     windows, facts, areas, painted = [], [], [], [{}, {}]
+    draw_contexts = [None, None]
     def draw(widget, context, index):
         width, height = widget.get_allocated_width(), widget.get_allocated_height()
         paint(context, width, height, index)
         painted[index] = {"width": width, "height": height, "scale": widget.get_scale_factor()}
+        observed = {"allocation": painted[index], "clip": context.clip_extents(),
+                    "matrix": list(context.get_matrix()),
+                    "deviceScale": context.get_target().get_device_scale()}
+        if draw_contexts[index] != observed:
+            draw_contexts[index] = observed
+            print(json.dumps({"draw": index, **observed}), flush=True)
 
     for index in range(2):
         monitor = display.get_monitor(index)
