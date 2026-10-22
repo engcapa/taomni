@@ -72,7 +72,7 @@ interface UseWorkspaceFileActionsOptions {
   setActiveKey: UpdaterSetter<string | null>;
   loadDir: (rootId: string, path: string) => Promise<void>;
   loadFlatFiles: (rootId: string, force?: boolean) => Promise<void>;
-  resetTreeData: () => void;
+  resetTreeData: (options?: { retainListings?: boolean }) => void;
   removeTreeDataRoot: (rootId: string) => void;
   openFile: (ref: CodeWorkspaceFileRef, options?: { preview?: boolean }) => Promise<unknown>;
   applyResourceOperation: (
@@ -225,13 +225,12 @@ export function useWorkspaceFileActions({
     }
     refreshTreeTimerRef.current = window.setTimeout(() => {
       refreshTreeTimerRef.current = null;
-      resetTreeData();
+      resetTreeData({ retainListings: true });
       rootsRef.current?.forEach((root) => {
         if (expandedRoots.has(root.id)) {
           void loadDir(root.id, "");
-          // Reset clears every listing, including expanded descendants. The
-          // watcher fires for our own saves too; restore those cached listings
-          // without toggling expansion or losing the selected file.
+          // Refresh expanded descendants too. Keep their last listings mounted
+          // while the watcher-triggered disk reads replace each snapshot.
           if (treeViewMode !== "flat") {
             const prefix = `${root.id}:`;
             for (const key of expandedDirs) {

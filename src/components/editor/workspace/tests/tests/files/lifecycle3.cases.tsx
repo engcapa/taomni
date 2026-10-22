@@ -12,6 +12,60 @@ export interface registerfilesLifecycle3CasesContext {
 }
 
 export function registerfilesLifecycle3Cases(caseContext: registerfilesLifecycle3CasesContext) {
+  it("ED-TREEOPEN-001: a pending tree refresh preserves the selected row and its context menu", async () => {
+    const fixture = caseContext.workspaceTestHarness;
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app",
+      workspaceId: "ws-refresh-keeps-row",
+      workspaceInstanceId: "instance-refresh-keeps-row",
+      name: "Refresh keeps row",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }],
+      looseFiles: [],
+      initialFile: { kind: "root", rootId: "app", path: "README.md" },
+    };
+    const entries = [fixture.entry("README.md", "README.md"), fixture.entry("other.txt", "other.txt")];
+    fixture.workspaceMocks.workspaceListDir.mockResolvedValue(entries);
+    fixture.workspaceMocks.workspaceReadFile.mockResolvedValue(fixture.file("README.md", "# Readme\n"));
+    const registration: { current: WorkspaceCommandRegistration | null } = { current: null };
+    fixture.renderWorkspace(workspace, {
+      onCommandsChange: (_tabId: string, next: WorkspaceCommandRegistration | null) => {
+        if (next) registration.current = next;
+      },
+    });
+    const row = await screen.findByTitle(/^app \/ other\.txt(?: -|$)/);
+    fireEvent.click(row);
+    row.focus();
+
+    const resolvers: Array<(value: typeof entries) => void> = [];
+    fixture.workspaceMocks.workspaceListDir.mockImplementation(() => new Promise((resolve) => {
+      resolvers.push(resolve);
+    }));
+    vi.useFakeTimers();
+    try {
+      await act(async () => {
+        await registration.current?.executeAction("workspace.refreshTree");
+        await vi.advanceTimersByTimeAsync(200);
+      });
+      expect(resolvers.length).toBeGreaterThan(0);
+      // The next trusted pointer event must still hit this same mounted row
+      // while the watcher/Refresh action is waiting for its directory response.
+      expect(row).toBeInTheDocument();
+      expect(screen.getByTitle(/^app \/ other\.txt(?: -|$)/)).toBe(row);
+      expect(row).toHaveFocus();
+      fireEvent.contextMenu(row);
+      expect(screen.getByRole("button", { name: "Open" })).toBeInTheDocument();
+      fireEvent.keyDown(document, { key: "Escape" });
+      expect(row).toHaveFocus();
+      expect(row).toHaveAttribute("aria-selected", "true");
+    } finally {
+      await act(async () => {
+        for (const resolve of resolvers) resolve([...entries, fixture.entry("new.txt", "new.txt")]);
+      });
+      vi.useRealTimers();
+    }
+    expect(await screen.findByTitle(/^app \/ new\.txt(?: -|$)/)).toBeInTheDocument();
+    expect(screen.getByTitle(/^app \/ other\.txt(?: -|$)/)).toBe(row);
+  });
   it("ED-TREEOPEN-001 / DEC-TOF-01: single click on tree item only selects without opening or stealing focus", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
