@@ -7,6 +7,7 @@ import math
 import platform
 from typing import Any
 
+from ..deadline import budget_time as time, remaining_timeout
 from . import StepContext, StepError, verb
 
 
@@ -95,6 +96,30 @@ def mouse_path_points(args: Any) -> list[dict[str, Any]]:
     return out
 
 
+def _mouse_path_target(page, point: dict[str, Any]) -> tuple[float, float]:
+    # CodeMirror initially mounts tooltips at top:-10000px until its next
+    # measurement. Moving to that provisional box leaves the document and
+    # closes the popup. Wait for the requested point without scrolling it,
+    # clamping offsets or issuing any pointer input during the layout wait.
+    deadline = time.monotonic() + remaining_timeout(5)
+    locator = page.locator(point["selector"]).first
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise StepError(f"mouse_path: {point['selector']} target never entered the viewport")
+        box = locator.bounding_box(timeout=remaining * 1000)
+        if not box:
+            raise StepError(f"mouse_path: {point['selector']} has no layout box")
+        viewport = page.viewport_size or page.evaluate("({width: innerWidth, height: innerHeight})")
+        x = box["x"] + box["width"] / 2 + point["dx"]
+        y = box["y"] + box["height"] / 2 + point["dy"]
+        if (all(math.isfinite(value) for value in (x, y, box["width"], box["height"]))
+                and box["width"] > 0 and box["height"] > 0
+                and 0 <= x < viewport["width"] and 0 <= y < viewport["height"]):
+            return x, y
+        page.wait_for_timeout(min(16, max(0, deadline - time.monotonic()) * 1000))
+
+
 @verb("mouse_path")
 def step_mouse_path(ctx: StepContext, args: Any) -> None:
     """Move the pointer through element-relative points without clicking."""
@@ -103,11 +128,7 @@ def step_mouse_path(ctx: StepContext, args: Any) -> None:
         return
     page = ctx.page  # type: ignore[attr-defined]
     for point in points:
-        box = page.locator(point["selector"]).first.bounding_box()
-        if not box:
-            raise StepError(f"mouse_path: {point['selector']} has no layout box")
-        x = box["x"] + box["width"] / 2 + point["dx"]
-        y = box["y"] + box["height"] / 2 + point["dy"]
+        x, y = _mouse_path_target(page, point)
         page.mouse.move(x, y, steps=point["steps"])
         if point["pause_ms"]:
             page.wait_for_timeout(point["pause_ms"])
