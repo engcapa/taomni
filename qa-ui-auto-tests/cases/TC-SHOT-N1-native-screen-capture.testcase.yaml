@@ -1,5 +1,6 @@
 id: TC-SHOT-N1
 title: Native full-display capture and real OCR/redaction output
+description: Decode captured and intermediate PNG images before canvas export so the first OCR input retains the captured pixels in WebKit as well as subsequent redaction.
 covers: [F27.1]
 tags: [screenshot, native, p1]
 modes: [native]
@@ -20,7 +21,7 @@ verification:
     actions: [1]
     checkpoints:
     - {step: 3, expectation: Real display dimensions and nonblank PNG retained.}
-    - {step: 4, expectation: "Email/phone recognized, sensitive boxes found, UI undo/redo verified, actual page OCR/redaction inputs, OCR text and selection geometry retained alongside the redacted clipboard PNG."}
+    - {step: 4, expectation: "First page OCR recognizes the email from decoded captured pixels; email/phone boxes, UI undo/redo, actual page OCR/redaction inputs, OCR text and selection geometry are verified or retained alongside the redacted clipboard PNG."}
     - {step: 5, expectation: Main window usable after tool teardown.}
     results: [3, 4, 5]
   visual:

@@ -4,7 +4,9 @@ import { paintWatermark, type WatermarkSettings } from "../../../lib/screenshotI
 export function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const image = new Image();
-    image.onload = () => resolve(image);
+    // WebKit can fire load before the bitmap is ready for drawImage. Publish
+    // only decoded pixels so an immediate export cannot become transparent.
+    image.onload = () => { image.decode().then(() => resolve(image), reject); };
     image.onerror = () => reject(new Error("failed to load screenshot image"));
     image.src = src;
   });
