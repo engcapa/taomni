@@ -770,3 +770,21 @@ Windows `TC-WELCOME-RS-N-01-native-smoke` 的17个业务步骤全部通过，ses
 将W3C传输和关闭owner责任从巨型tauri_webdriver入口提取到139行的`native_webdriver_transport.py`，NativeSession继续继承相同接口，WebDriverError保留原入口re-export。沿用同一HTTP/1.1连接、代理绕过、5秒DELETE预算、异常时关闭连接、不重试交付状态不明的动作和finally释放owned进程树。额外记录DELETE所处阶段（发送、响应头、响应体、解析）、HTTP状态/错误类型/耗时以及owned owner清理结果；不保存request payload或response body。runner将这些诊断附入原summary，所有cleanup失败仍使case失败，业务失败优先级保留。此项是诊断改进，不是已经证实的Windows产品修复。
 
 新增8项真实loopback HTTP/故障测试：正常DELETE、迟迟无响应头、响应体不结束、截断body、HTTP错误、W3C错误、owner清理失败及敏感payload不进入诊断；每种传输失败仍失败，DELETE只有一次且owner仍清理。联合原传输、隔离与fixture测试 **60 passed /1 Windows条件skip**（61 tests）；Windows真实owned子进程持有文件锁、清理后释放锁且无关进程继续存活的原测试，将与新HTTP故障测试一并在Windows build job执行。原预算和失败门禁不变。完整QA工具contracts及新提交三端全量结果随后追加。
+
+
+## 2026-10-22 AC 全量结果与 Linux fixture / pointer 诊断
+
+全量 run [39698996030](https://github.com/engcapa/taomni/actions/runs/39698996030) 绑定 `916c155835bdeefbd96671745c03e3a7ee2bf2e1`。25 份报告共 **1786 passed /2 failed /0 skipped**；Linux browser396、native214通过/2失败，macOS browser394/native187通过，Windows browser396/native199通过。三端 release、Windows cleanup contracts 15项、Linux native Rust contracts 均成功。workflow success 不等于 case 全部通过，aggregate `passed=false /report_ok=true`，本轮不作为最终全通过验收。
+
+`github-ac/delivery-verification.json` 逐项核验 16367 个留存工件（含2510个隐藏文件）的大小与SHA256，未知缺失/哈希错误0；原策略明确排除的62个一次性macOS updater fixture文件仍单列未留存。所有性能用例按原断言通过；photo-content FPS/每帧带宽比值分别为 Linux 0.905357776/0.987225149、macOS 1.138269725/0.998643168、Windows 0.997185293/1.003932168，15%门槛没有修改。此前 AB macOS hover 文档完整44步和 Windows welcome 业务及cleanup本轮均通过；Windows原5秒DELETE超时的底层原因仍未确定，不称为产品退出缺陷已经修复。
+
+Linux 两个失败保留原始报告：
+
+- `TC-BACKUP-CLOUD-001` 在fixture准备阶段失败，50个业务步骤未执行。新增stderr表明前41次store持续返回 `Object does not exist at path …/collection/login`，最后才因剩余预算耗尽超时。临时私有D-Bus中受控删除login collection可复现同一状态：原fixture两次、额外unlock两次均不能恢复；仅再次replace/unlock可恢复真实store/lookup/clear。这说明缺失collection的恢复方式，不证明CI的最初触发因素就是删除collection。候选仅在该明确store错误时重建一次、继续共用原5秒readiness截止时间，不删文件，不接触个人bus，持续缺失/锁定、错误值和cleanup失败仍失败。8次真实缺失collection候选实验全部恢复，耗时0.64–0.84秒；`ad-credential-missing-collection-candidate.json`留存每次原错误和真实恢复trace。
+- `TC-IDE-TREEOPEN-01-project-tree-open-focus-native` 保存、Undo、字节SHA恢复均通过，step40的3个菜单项全部缺失。focus事件显示输入最终落到tree空白容器；原日志无button/坐标，无法唯一确定偏移机制。本地独立Xvfb/Muffin桌面使用导入并验证身份的AC release二进制，原工具完整47步10次通过，没有复现该CI偏移，不能据此称原因已证实。候选输入准备提取为独立小模块 `native_pointer.py`：在原case预算内要求两次稳定几何及DOM命中，再以viewport坐标发送真实W3C输入；只重试输入前的stale准备，输入发出后的不确定错误不得重放点击。focus诊断补充真实button、clientX/Y、mousedown/up/contextmenu，不记录输入值。原case菜单、Esc焦点归还、选中和文件SHA断言全部保留。
+
+新增4项凭据恢复契约、7项pointer readiness契约和1项不确定动作不重放回归；在保留的916c1558旧实现上，2项凭据恢复回归与1项动作不重放回归失败（`ad-regression-controls-before.log/json`），候选相关48项全部通过。纯QA工具修复沿用上述原始入口case，不添加仅证明工具搬迁的业务YAML。产品source identity仍为 `f58137508f7066bb47db1ee47081332a2a42f41dc77faad61fed28c1c345100c`；新runner组合需在新完整SHA重新执行三端全量，当前尚未宣称最终验收完成。
+
+本地候选完整TREEOPEN业务断言10/10通过，原生应用/driver/独立WM已退出；该/tmp探针外层清理临时portal挂载时返回OSError，wrapper exit1，因此仅称10份case报告通过，不称整条探针命令成功。后续独立会话的受控移动目标探针验证Ctrl+Shift左键、中键、右键的真实trusted事件与(400,115)最终坐标，持续遮挡均在无输入下失败，完成临时挂载退出等待后wrapper exit0，见 `ad-native-input-clean-probe/observations.json`。更早在同一会话中右键后立即发出左键/中键的额外诊断序列缺少后续事件，原失败 `ad-native-input-probe.log` 保留，尚须与旧handler作同条件对照，不能用独立会话通过覆盖该序列。
+
+本地workflow工具契约382项为381通过/1 Windows条件skip，另24项Wayland及15项Node均通过（合计420通过/1skip）；之后仅增强两个测试的外部状态模型，最终相关48项再次全部通过。`pnpm check:refactor`保留761/328/39契约、868模块边界、3866文件规模/4声明例外，未修改产品源码或性能预算。

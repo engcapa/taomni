@@ -24,6 +24,7 @@ from typing import Any
 
 from native_build import QA_APP_ID, verify_identity
 from native_webdriver_transport import WebDriverError, WebDriverTransport
+from native_pointer import prepare_pointer_target
 
 
 ROOT = Path.cwd()
@@ -630,11 +631,8 @@ class NativeSession(WebDriverTransport):
             if name not in self.MODIFIER_MAP:
                 raise WebDriverError(f"pointer_button_click: unknown modifier {name!r}")
             modifier_values.append(self.MODIFIER_MAP[name])
-        # The row can be re-rendered (React replaces the node) between the
-        # locator resolution below and the scroll/input dispatch — for example
-        # right after a save or when the context menu mounts. A stale element
-        # then fails the whole case with a raw driver error, so re-resolve and
-        # retry instead of propagating the first stale reference.
+        # Re-resolve stale references during preparation only. Once input
+        # starts, an ambiguous driver failure must never replay a click.
         last_stale: WebDriverError | None = None
         for attempt in range(3):
             element = self.find(selector, interactive=True)
@@ -645,8 +643,16 @@ class NativeSession(WebDriverTransport):
                     "script": "arguments[0].scrollIntoView({block:'nearest', inline:'nearest'});",
                     "args": [origin],
                 })
+                point = prepare_pointer_target(self, origin)
+            except WebDriverError as exc:
+                if _is_stale_element_error(exc) and attempt < 2:
+                    last_stale = exc
+                    time.sleep(0.3)
+                    continue
+                raise
+            try:
                 pointer_core = [
-                    {"type": "pointerMove", "duration": 0, "origin": origin, "x": 0, "y": 0},
+                    {"type": "pointerMove", "duration": 0, "origin": "viewport", **point},
                     {"type": "pointerDown", "button": button},
                     {"type": "pointerUp", "button": button},
                 ]
@@ -663,15 +669,8 @@ class NativeSession(WebDriverTransport):
                         + pointer_core + [{"type": "pause", "duration": 0} for _ in modifier_values],
                 })
                 self.request("POST", self.endpoint("/actions"), {"actions": actions})
-            except WebDriverError as exc:
-                if _is_stale_element_error(exc) and attempt < 2:
-                    last_stale = exc
-                    time.sleep(0.3)
-                    continue
-                raise
             finally:
-                # Best-effort: a failed release must not mask the real error or
-                # abort a stale-element retry.
+                # A failed release must not mask the original input error.
                 with suppress(WebDriverError):
                     self.request("DELETE", self.endpoint("/actions"))
             return f"pointer button {button} clicked {selector}"
@@ -1291,10 +1290,12 @@ class NativeSession(WebDriverTransport):
             testid: el?.getAttribute?.('data-testid') ?? null,
             role: el?.getAttribute?.('role') ?? null
           });
-          for (const type of ['focusin', 'focusout', 'pointerdown', 'pointerup', 'click']) {
+          for (const type of ['focusin', 'focusout', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'contextmenu']) {
             document.addEventListener(type, event => {
               window.__QA_UI_AUTO_FOCUS__.push({
                 type, time: performance.now(), trusted: event.isTrusted,
+                button: event.button ?? null,
+                x: event.clientX ?? null, y: event.clientY ?? null,
                 target: describeFocus(event.target),
                 related: describeFocus(event.relatedTarget),
                 active: describeFocus(document.activeElement),

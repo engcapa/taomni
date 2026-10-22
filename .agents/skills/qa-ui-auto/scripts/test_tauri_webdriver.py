@@ -17,6 +17,12 @@ from tauri_webdriver import NativeHarness, NativeSession, TauriDriverProcess, We
 
 
 class NativeSessionTransportTest(TestCase):
+    def setUp(self):
+        # Geometry polling has separate readiness/real-WebView contracts.
+        target = patch('tauri_webdriver.prepare_pointer_target', return_value={'x': 270, 'y': 217})
+        self.prepare_pointer_target = target.start()
+        self.addCleanup(target.stop)
+
     def test_wayland_auxiliary_backend_is_private_to_the_application_driver(self):
         with TemporaryDirectory() as root, patch("tauri_webdriver.platform.system", return_value="Linux"), \
                 patch.dict(os.environ, {"GDK_BACKEND": "wayland"}), \
@@ -176,7 +182,8 @@ class NativeSessionTransportTest(TestCase):
         with self.assertRaisesRegex(RuntimeError, "input failed"):
             session.right_click("#file")
         actions = session.request.call_args_list[1].args[2]["actions"][0]["actions"]
-        self.assertEqual(actions[0]["origin"], {"element-6066-11e4-a52e-4f735466cecf": "row-1"})
+        self.assertEqual(actions[0]["origin"], "viewport")
+        self.assertEqual((actions[0]["x"], actions[0]["y"]), (270, 217))
         self.assertEqual([a["button"] for a in actions[1:]], [2, 2])
         self.assertEqual(session.request.call_args.args, ("DELETE", "/session/session-1/actions"))
         self.assertNotIn("dispatchEvent", session.request.call_args_list[0].args[2]["script"])
@@ -201,7 +208,8 @@ class NativeSessionTransportTest(TestCase):
             call for call in session.request.call_args_list if call.args[0] == "POST" and call.args[1].endswith("/actions")
         )
         actions = actions_call.args[2]["actions"][0]["actions"]
-        self.assertEqual(actions[0]["origin"], {"element-6066-11e4-a52e-4f735466cecf": "row-2"})
+        self.assertEqual(actions[0]["origin"], "viewport")
+        self.prepare_pointer_target.assert_called_once_with(session, {"element-6066-11e4-a52e-4f735466cecf": "row-2"})
         self.assertEqual([a["button"] for a in actions[1:]], [2, 2])
 
     def test_double_click_resolves_refreshed_row_before_sending_pointer_actions(self):
@@ -292,24 +300,33 @@ class NativeSessionTransportTest(TestCase):
             call for call in session.request.call_args_list if call.args[0] == "POST" and call.args[1].endswith("/actions")
         )
         actions = actions_call.args[2]["actions"][0]["actions"]
-        self.assertEqual(actions[0]["origin"], {"element-6066-11e4-a52e-4f735466cecf": "row-2"})
+        self.assertEqual(actions[0]["origin"], "viewport")
+        self.prepare_pointer_target.assert_called_once_with(session, {"element-6066-11e4-a52e-4f735466cecf": "row-2"})
 
     def test_pointer_click_gives_up_after_three_stale_references(self):
         session = NativeSession("http://driver.invalid", Path("unused"))
         session.session_id = "session-1"
         session.find = Mock(return_value="row-1")
-        session.request = Mock(side_effect=[
-            WebDriverError("stale element reference"),
-            None,
-            WebDriverError("stale element reference"),
-            None,
-            WebDriverError("stale element reference"),
-            None,
-        ])
+        session.request = Mock(side_effect=WebDriverError("stale element reference"))
         with patch("tauri_webdriver.time.sleep"):
             with self.assertRaisesRegex(WebDriverError, "stale element reference"):
                 session.right_click("#file")
         self.assertEqual(session.find.call_count, 3)
+
+    def test_pointer_click_never_replays_an_ambiguous_action_error(self):
+        session = NativeSession("http://driver.invalid", Path("unused"))
+        session.session_id = "session-1"
+        session.find = Mock(return_value="row-1")
+        def request(method, path, *args):
+            if method == 'POST' and path.endswith('/actions'):
+                raise WebDriverError('stale element reference')
+        session.request = Mock(side_effect=request)
+        with self.assertRaisesRegex(WebDriverError, "stale element reference"):
+            session.right_click("#file")
+        session.find.assert_called_once()
+        self.assertEqual(sum(c.args[:2] == ('POST', '/session/session-1/actions')
+                             for c in session.request.call_args_list), 1)
+        self.assertEqual(session.request.call_args, call('DELETE', '/session/session-1/actions'))
 
     def test_count_accepts_empty_but_rejects_invalid_driver_response(self):
         session = NativeSession("http://driver.invalid", Path("unused"))

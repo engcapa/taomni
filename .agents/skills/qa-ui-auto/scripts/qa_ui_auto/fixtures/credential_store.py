@@ -20,6 +20,20 @@ def _failure(error: Exception) -> dict[str, Any]:
     }
 
 
+def _unlock_daemon(timeout: float):
+    return subprocess.run(
+        ["gnome-keyring-daemon", "--replace", "--daemonize", "--unlock", "--components=secrets"],
+        input="qa-disposable-backup-keyring\n", text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=timeout,
+    )
+
+
+def _missing_login_collection(error: subprocess.CalledProcessError) -> bool:
+    stderr = str(error.stderr or "")
+    return ("Object does not exist at path" in stderr
+            and "/org/freedesktop/secrets/collection/login" in stderr)
+
+
 def _roundtrip(attempt: dict[str, Any], token: str, deadline: float) -> None:
     def run(operation: str, *args: str, **extra: Any):
         attempt["operation"] = operation
@@ -70,26 +84,33 @@ def setup(ctx: Any) -> None:
             ["dbus-update-activation-environment", *expected], text=True,
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=20,
         )
-        daemon = subprocess.run(
-            ["gnome-keyring-daemon", "--replace", "--daemonize", "--unlock", "--components=secrets"],
-            input="qa-disposable-backup-keyring\n", text=True,
-            stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=True, timeout=20,
-        )
+        daemon = _unlock_daemon(20)
         trace["daemon_stderr"] = str(getattr(daemon, "stderr", "") or "")[-4000:]
         # The daemon process exiting successfully does not establish writable
         # collection readiness. Wait for a real roundtrip on this private bus.
         deadline = time.monotonic() + READINESS_TIMEOUT_SEC
         token = secrets.token_hex(16)
+        recovered_collection = False
         while True:
             attempt: dict[str, Any] = {}
             trace["attempts"].append(attempt)
             try:
                 _roundtrip(attempt, token, deadline)
-            except subprocess.CalledProcessError:
+            except subprocess.CalledProcessError as error:
                 # Only initial store/lookup readiness is polled. A successful
                 # roundtrip with a failing cleanup is a terminal setup error.
                 if attempt.get("status") != "failed" or time.monotonic() >= deadline:
                     raise
+                if (not recovered_collection and attempt.get("failed_operation") == "store"
+                        and _missing_login_collection(error)):
+                    # A missing login collection cannot become ready by polling
+                    # or unlocking an already initialized daemon. Reinitialize
+                    # this guarded disposable service once, without deleting
+                    # keyring files or extending the readiness deadline.
+                    recovered_collection = True
+                    recovery = trace["collection_recovery"] = {"status": "starting"}
+                    daemon = _unlock_daemon(max(0.01, deadline - time.monotonic()))
+                    recovery.update(status="restarted", daemon_stderr=str(getattr(daemon, "stderr", "") or "")[-4000:])
                 time.sleep(min(READINESS_RETRY_SEC, max(0.0, deadline - time.monotonic())))
                 continue
             trace["status"] = "ready"
