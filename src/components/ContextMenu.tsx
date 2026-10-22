@@ -451,6 +451,15 @@ export function useContextMenu(options?: UseContextMenuOptions) {
   const [menu, setMenu] = useState<ContextMenuAppearance & { x: number; y: number; items: MenuItem[] } | null>(null);
   const onCloseRef = useRef(options?.onClose);
   onCloseRef.current = options?.onClose;
+  const pendingCloseRef = useRef<ContextMenuCloseReason | null>(null);
+  useLayoutEffect(() => {
+    if (menu || pendingCloseRef.current === null) return;
+    const reason = pendingCloseRef.current;
+    pendingCloseRef.current = null;
+    // Focus return must follow removal of the focused menu node. Scheduling
+    // it from close() can run both its microtask and frame before React commits.
+    onCloseRef.current?.(reason);
+  }, [menu]);
 
   const show = useCallback((e: React.MouseEvent, items: MenuItem[]) => {
     e.preventDefault();
@@ -465,8 +474,8 @@ export function useContextMenu(options?: UseContextMenuOptions) {
   }, []);
 
   const close = useCallback((reason?: ContextMenuCloseReason) => {
+    pendingCloseRef.current = reason ?? "programmatic";
     setMenu(null);
-    onCloseRef.current?.(reason ?? "programmatic");
   }, []);
 
   return useMemo(() => ({

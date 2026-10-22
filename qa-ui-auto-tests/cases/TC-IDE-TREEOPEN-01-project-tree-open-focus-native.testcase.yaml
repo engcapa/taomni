@@ -8,7 +8,7 @@ description: 'REQ-02 / CW-PROJ-002: F0 README unique tab -> navigate tree with d
 
   exact original bytes -> return to tree -> right-click context menu -> Esc restores tree
 
-  selection and focus without mutating text.
+  selection and focus after menu DOM removal without mutating text.
 
   '
 covers:

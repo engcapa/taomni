@@ -74,11 +74,11 @@ export function registerfilesLifecycle3Cases(caseContext: registerfilesLifecycle
     expect(otherRow).toHaveAttribute("data-selected", "true");
     expect(document.activeElement).toBe(otherRow);
   });
-  it("ED-TREEOPEN-001 / DEC-TOF-04: a WebView focus reset after the menu unmounts still returns the tree row", async () => {
+  it.each(["document", "new menu"] as const)("ED-TREEOPEN-001 / DEC-TOF-04: delayed focus return respects %s ownership after unmount", async (owner) => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
-      workspaceId: "ws-ctx-esc-reset",
-      workspaceInstanceId: "instance-ctx-esc-reset",
+      workspaceId: `ws-ctx-esc-reset-${owner}`,
+      workspaceInstanceId: `instance-ctx-esc-reset-${owner}`,
       name: "Context Escape Reset",
       roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }],
       looseFiles: [],
@@ -117,15 +117,21 @@ export function registerfilesLifecycle3Cases(caseContext: registerfilesLifecycle
         expect(screen.queryByRole("button", { name: "Open" })).not.toBeInTheDocument();
       });
 
-      // WebView2 resets focus after the focused menu node leaves the DOM.
-      (document.activeElement as HTMLElement | null)?.blur();
-      expect(document.activeElement).toBe(document.body);
+      if (owner === "document") {
+        // WebView2 resets focus after the focused menu node leaves the DOM.
+        (document.activeElement as HTMLElement | null)?.blur();
+        expect(document.activeElement).toBe(document.body);
+      } else {
+        // A new popup owns keyboard navigation before the old retry runs.
+        fireEvent.contextMenu(otherRow);
+        expect(screen.getByTestId("context-menu")).toHaveFocus();
+      }
       act(() => {
         const pending = [...frames.values()];
         frames.clear();
         for (const callback of pending) callback(performance.now());
       });
-      expect(document.activeElement).toBe(otherRow);
+      expect(document.activeElement).toBe(owner === "document" ? otherRow : screen.getByTestId("context-menu"));
     } finally {
       requestFrame.mockRestore();
       cancelFrame.mockRestore();
