@@ -8,11 +8,9 @@ case "$profile" in
   *) echo "Unknown Linux QA profile: $profile" >&2; exit 2 ;;
 esac
 
-install_packages() {
-  sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y "$@"
-}
-
-sudo apt-get update
+source "$(dirname "${BASH_SOURCE[0]}")/ci_linux_apt.sh"
+prepare_apt_mirrors "$profile"
+update_package_index
 webdriver_package=webkit2gtk-driver
 if [[ "$profile" == ubuntu-26.04-wayland ]]; then
   webdriver_package=webkitgtk-webdriver
@@ -29,7 +27,7 @@ if [[ "${QA_OPERATION:-run}" == run ]]; then
     # Prepare the actual Ubuntu GNOME session and portals with a bounded
     # package set; the desktop application metapackage pulls in hundreds of
     # printer/scanner/office packages unrelated to this virtual QA session.
-    install_packages --no-install-recommends gnome-shell ubuntu-session gnome-settings-daemon gnome-control-center yaru-theme-gnome-shell \
+    install_packages gnome-shell ubuntu-session gnome-settings-daemon gnome-control-center yaru-theme-gnome-shell \
       xdg-desktop-portal xdg-desktop-portal-gnome xdg-desktop-portal-gtk \
       pipewire wireplumber wayland-utils wl-clipboard fuse3 \
       at-spi2-core gir1.2-atspi-2.0 fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons \

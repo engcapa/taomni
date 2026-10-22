@@ -10,6 +10,12 @@ description: 'Regression for the "mail missing after the session was closed" iss
 
   requires the fully loaded list to equal the server''s message count.
 
+  Initial open also requires the current cache snapshot when a concurrent
+
+  archive scan has already fetched the headers before foreground sync; a late
+
+  empty initial cache read must not replace the post-sync list.
+
   Browser mode drives the stub server model (renderer orchestration only);
 
   native mode runs the real Tauri backend against the in-process fake IMAP
@@ -44,6 +50,7 @@ steps:
 - click: '[data-testid="mail-folder-row"][data-folder-name="INBOX"]'
 - mail_server_assert_list_matches:
     timeout_sec: 60
+    unread: true
 - click: '[data-testid="tab-item"][data-tab-type="mail"] [data-testid="tab-close"]'
 - wait_for:
     selector: '[data-testid="mail-client-tab"]'

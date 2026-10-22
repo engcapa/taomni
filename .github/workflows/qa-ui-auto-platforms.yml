@@ -137,6 +137,8 @@ jobs:
       - name: Native pointer readiness contracts
         if: inputs.scope != 'selected'
         run: python -m unittest test_native_pointer
+      - name: Linux package setup contracts
+        run: python -m unittest test_ci_linux_setup
       - uses: actions/setup-node@v4
         with:
           node-version: '24'

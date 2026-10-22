@@ -57,6 +57,7 @@ export interface LoadCachedMessagesContext {
   setError: import("react").Dispatch<SetStateAction<string | null>>;
   pageSize: number;
   cacheRemovalVersionsRef: import("react").RefObject<Map<string, number>>;
+  cacheRequestSeqRef: import("react").RefObject<number>;
   info: import("../../../types").MailTabInfo;
   selectedFolderRef: import("react").RefObject<string>;
   foldersRef: import("react").RefObject<MailFolder[]>;
@@ -78,6 +79,8 @@ export function createLoadCachedMessages(controllerContext: LoadCachedMessagesCo
       controllerContext.pendingCacheRefreshRef.current = true;
       return { page: [] as MailMessageHeader[], hasMore: false };
     }
+    const sequence = ++controllerContext.cacheRequestSeqRef.current;
+    const current = () => controllerContext.cacheRequestSeqRef.current === sequence;
     if (append) {
       controllerContext.setLoadingMoreMessages(true);
     } else {
@@ -93,7 +96,7 @@ export function createLoadCachedMessages(controllerContext: LoadCachedMessagesCo
         controllerContext.pendingCacheRefreshRef.current = true;
         return { page: [] as MailMessageHeader[], hasMore: false };
       }
-      if (controllerContext.selectedFolderRef.current !== folder
+      if (!current() || controllerContext.selectedFolderRef.current !== folder
         || (controllerContext.cacheRemovalVersionsRef.current.get(folder) ?? 0) !== removalVersion) {
         // A snapshot started before a successful move/delete can still contain
         // removed rows. Keep the current list until the next fresh query.
@@ -119,13 +122,14 @@ export function createLoadCachedMessages(controllerContext: LoadCachedMessagesCo
       }
       return { page, hasMore };
     } catch (e) {
-      controllerContext.setError(mailClientErrorMessage(e));
+      if (current()) controllerContext.setError(mailClientErrorMessage(e));
       return { page: [] as MailMessageHeader[], hasMore: false };
     } finally {
-      if (append) {
+      // A newer snapshot owns the list and both loading indicators. A late
+      // initial page must not replace post-sync rows or clear its loading state.
+      if (current()) {
         controllerContext.setLoadingMoreMessages(false);
-      } else {
-        if (!quiet) controllerContext.setLoadingMessages(false);
+        controllerContext.setLoadingMessages(false);
       }
     }
   };
