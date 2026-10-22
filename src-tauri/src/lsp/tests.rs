@@ -11,6 +11,7 @@ mod diagnostics_and_operations;
 mod java_runtime_and_paths;
 mod lifecycle_and_configuration;
 mod navigation_and_semantic_tokens;
+mod protocol_errors;
 mod providers_and_requests;
 mod symbols;
 mod watchers_and_capabilities;

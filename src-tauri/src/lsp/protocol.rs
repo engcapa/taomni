@@ -1,5 +1,17 @@
 use super::*;
 
+/// Keep provider exception details in the application log without putting a
+/// stack trace in the status bar or allowing an unbounded log entry.
+pub(super) fn response_error_details(error: &Value) -> String {
+    let mut details = error.to_string();
+    const MAX_BYTES: usize = 8_192;
+    if details.len() > MAX_BYTES {
+        details.truncate(details.floor_char_boundary(MAX_BYTES));
+        details.push_str(" [truncated]");
+    }
+    details
+}
+
 pub(super) fn request_document_uri(params: &Value) -> Option<&str> {
     params
         .pointer("/textDocument/uri")

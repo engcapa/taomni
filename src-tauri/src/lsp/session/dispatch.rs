@@ -15,6 +15,7 @@ use crate::lsp::diagnostics;
 use crate::lsp::diagnostics::parse_diagnostic;
 use crate::lsp::diagnostics::store_diagnostics;
 use crate::lsp::java_runtime::command_is_jdtls;
+use crate::lsp::protocol::response_error_details;
 use crate::lsp::session;
 use serde_json::Value;
 use serde_json::json;
@@ -36,6 +37,11 @@ impl LspSession {
                 };
                 if let Some(pending) = pending {
                     let response = if let Some(error) = message.get("error") {
+                        log::warn!(
+                            "lsp:{}: request {response_id} failed: {}",
+                            self.command.command,
+                            response_error_details(error)
+                        );
                         Err(error
                             .get("message")
                             .and_then(Value::as_str)
