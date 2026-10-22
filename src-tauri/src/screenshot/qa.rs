@@ -46,6 +46,8 @@ pub mod displays;
 mod macos_save_dialog;
 pub mod pin_arrangement;
 pub mod pin_tools;
+#[cfg(any(target_os = "windows", test))]
+mod save_dialog_observation;
 pub mod scroll_exit;
 pub mod scroll_manual;
 #[cfg(target_os = "linux")]

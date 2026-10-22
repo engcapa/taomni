@@ -69,7 +69,8 @@ class BuildPipelineTests(unittest.TestCase):
                     continue
                 root_tests = [c for c in commands if '--lib' in c and '-p' not in c]
                 self.assertEqual(len(root_tests), 1)
-                expected = (['rdp::'] if rdp else []) + (['capture::', 'screenshot::surfaces::'] if dual else [])
+                expected = (['rdp::'] if rdp else []) + (['capture::', 'screenshot::surfaces::',
+                    'screenshot::qa::save_dialog_observation::'] if dual else [])
                 self.assertEqual(root_tests[0], ['test', '--locked', '--release', '--lib', '--', *expected])
                 self.assertEqual(any('rdp-probe' in c for c in commands), rdp)
                 self.assertEqual(any('profile_photo_encoder_costs' in c for c in commands), rdp)

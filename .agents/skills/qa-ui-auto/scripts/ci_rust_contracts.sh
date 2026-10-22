@@ -21,7 +21,7 @@ if [[ "${QA_RDP_CONTRACTS:-false}" == true ]]; then
   filters+=(rdp::)
 fi
 if [[ "${QA_DUAL_CONTRACTS:-false}" == true ]]; then
-  filters+=(capture:: screenshot::surfaces::)
+  filters+=(capture:: screenshot::surfaces:: screenshot::qa::save_dialog_observation::)
 fi
 # libtest accepts multiple OR filters. Compile/link the root test binary once.
 cargo test --locked "${profile[@]}" --lib -- "${filters[@]}"
