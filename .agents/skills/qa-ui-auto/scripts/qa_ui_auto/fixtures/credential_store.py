@@ -34,6 +34,32 @@ def _missing_login_collection(error: subprocess.CalledProcessError) -> bool:
             and "/org/freedesktop/secrets/collection/login" in stderr)
 
 
+def _wait_for_service(trace: dict[str, Any], deadline: float) -> None:
+    # --daemonize returns before PKCS#11/login unlock and D-Bus registration.
+    # Calling secret-tool in that window activates a competing --start daemon
+    # without the supplied password. Ask the bus itself, without activation,
+    # until our replacement has registered the Secret Service instead.
+    observations = trace.setdefault("service_owner_checks", [])
+    while True:
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError("Hosted Secret Service did not acquire its bus name before the readiness deadline")
+        result = subprocess.run(
+            ["gdbus", "call", "--session", "--dest", "org.freedesktop.DBus",
+             "--object-path", "/org/freedesktop/DBus", "--method",
+             "org.freedesktop.DBus.NameHasOwner", "org.freedesktop.secrets"],
+            text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            check=True, timeout=min(20.0, remaining),
+        )
+        reply = result.stdout.strip()
+        if reply not in {"(true,)", "(false,)"}:
+            raise RuntimeError("Hosted Secret Service returned an invalid bus-owner response")
+        observations.append(reply == "(true,)")
+        if observations[-1]:
+            return
+        time.sleep(min(READINESS_RETRY_SEC, max(0.0, deadline - time.monotonic())))
+
+
 def _roundtrip(attempt: dict[str, Any], token: str, deadline: float) -> None:
     def run(operation: str, *args: str, **extra: Any):
         attempt["operation"] = operation
@@ -89,6 +115,7 @@ def setup(ctx: Any) -> None:
         # The daemon process exiting successfully does not establish writable
         # collection readiness. Wait for a real roundtrip on this private bus.
         deadline = time.monotonic() + READINESS_TIMEOUT_SEC
+        _wait_for_service(trace, deadline)
         token = secrets.token_hex(16)
         recovered_collection = False
         while True:
@@ -111,6 +138,7 @@ def setup(ctx: Any) -> None:
                     recovery = trace["collection_recovery"] = {"status": "starting"}
                     daemon = _unlock_daemon(max(0.01, deadline - time.monotonic()))
                     recovery.update(status="restarted", daemon_stderr=str(getattr(daemon, "stderr", "") or "")[-4000:])
+                    _wait_for_service(recovery, deadline)
                 time.sleep(min(READINESS_RETRY_SEC, max(0.0, deadline - time.monotonic())))
                 continue
             trace["status"] = "ready"

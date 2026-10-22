@@ -71,6 +71,10 @@ steps:
 - wait_for:
     selector: '[data-testid="mail-folder-row"][data-folder-name="Sent"]'
     timeout_sec: 60
+- wait_for:
+    selector: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
+    state: detached
+    timeout_sec: 10
 - assert_count:
     selector: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
     equal: 0
@@ -117,9 +121,12 @@ verification:
     - step: 22
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Sent\"]", "timeout_sec": 60}}'
     - step: 23
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Archive\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 24
       expectation: '{"assert_count": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Archive\"]", "equal": 0}}'
     results:
     - 23
+    - 24
   visual:
   - check: 截图中订阅对话框的 Archive 未勾选、“只显示已订阅”已勾选，文件夹树不含 Archive。
     method: manual

@@ -13,6 +13,11 @@ from tauri_webdriver import native_isolation_env
 
 
 class CredentialStoreTest(unittest.TestCase):
+    def setUp(self):
+        owner = patch.object(credential_store, '_wait_for_service')
+        owner.start()
+        self.addCleanup(owner.stop)
+
     def test_local_runs_never_touch_keyring(self):
         with patch.dict(os.environ, {}, clear=True), patch.object(credential_store.subprocess, 'run') as run:
             credential_store.setup(SimpleNamespace(cfg={'app': {'mode': 'native'}}))
@@ -164,6 +169,11 @@ class CredentialStoreTest(unittest.TestCase):
 
 
 class MissingCollectionRecoveryTest(unittest.TestCase):
+    def setUp(self):
+        owner = patch.object(credential_store, '_wait_for_service')
+        owner.start()
+        self.addCleanup(owner.stop)
+
     @contextmanager
     def fixture(self, execute):
         with tempfile.TemporaryDirectory() as directory, \
