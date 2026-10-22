@@ -63,8 +63,9 @@ describe("useWorkspaceLspClientEvents", () => {
     unmount();
   });
 
-  it("dismisses a cancelled request and merges progress reports", async () => {
-    const onStatus = vi.fn();
+  it("dismisses a cancelled request and merges progress without replacing command results", async () => {
+    let status = "Formatted App.java";
+    const onStatus = vi.fn((message: string) => { status = message; });
     const { result, unmount } = renderHook(() => useWorkspaceLspClientEvents({
       workspaceId: "workspace-a",
       visible: true,
@@ -144,7 +145,8 @@ describe("useWorkspaceLspClientEvents", () => {
       });
     });
     await waitFor(() => expect(result.current.progresses).toHaveLength(0));
-    expect(onStatus).toHaveBeenCalledWith("Building: Done");
+    expect(status).toBe("Formatted App.java");
+    expect(onStatus).not.toHaveBeenCalled();
     unmount();
   });
 

@@ -148,7 +148,6 @@ export function useWorkspaceLspClientEvents({
   const pendingProgressesRef = useRef<LspWorkDoneProgressEvent[]>([]);
   const publishedProgressesRef = useRef<LspWorkDoneProgressEvent[]>([]);
   const flushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastStatusTextRef = useRef<string | null>(null);
 
   const flushProgresses = useCallback(() => {
     flushTimerRef.current = null;
@@ -183,7 +182,6 @@ export function useWorkspaceLspClientEvents({
     }
     pendingProgressesRef.current = [];
     publishedProgressesRef.current = [];
-    lastStatusTextRef.current = null;
     setMessageRequests([]);
     setProgresses([]);
   }, [workspaceId]);
@@ -216,38 +214,17 @@ export function useWorkspaceLspClientEvents({
           listen<LspShowMessageNotification>(LSP_SHOW_MESSAGE_EVENT, (event) => {
             const payload = event.payload;
             if (!payload || payload.workspaceId !== workspaceId || !visibleRef.current) return;
-            // Another writer took over the status line, so the progress dedupe
-            // key no longer describes what is on screen.
-            lastStatusTextRef.current = null;
             onStatusRef.current(notificationText(payload));
           }),
           listen<LspWorkDoneProgressEvent>(LSP_WORK_DONE_PROGRESS_EVENT, (event) => {
             const progress = normalizeProgress(event.payload);
             if (!progress || progress.workspaceId !== workspaceId) return;
-            const key = progressKey(progress);
-            // Only tasks that actually surfaced in the UI are worth announcing.
-            // Per-keystroke validations begin and end inside a single flush
-            // window, so they never reach `publishedProgressesRef` and no longer
-            // churn the shared status bar.
-            const wasPublished = publishedProgressesRef.current.some((entry) => progressKey(entry) === key);
+            // The dedicated progress widget owns background task updates.
+            // Their completion must not replace a user's command result in
+            // the shared message line (jdtls initialization can finish after
+            // an independent format request has already succeeded).
             pendingProgressesRef.current = reduceProgress(pendingProgressesRef.current, progress);
             scheduleProgressFlush();
-            const isRoutine = progress.title === progress.message
-              || progress.title === "Publish Diagnostics"
-              || progress.title === "Validate documents";
-            if (
-              visibleRef.current
-              && wasPublished
-              && progress.kind === "end"
-              && (progress.message || progress.title)
-              && !isRoutine
-            ) {
-              const text = `${progress.title ?? "Language server task"}${progress.message ? `: ${progress.message}` : " completed"}`;
-              if (text !== lastStatusTextRef.current) {
-                lastStatusTextRef.current = text;
-                onStatusRef.current(text);
-              }
-            }
           }),
         ]);
         if (disposed) {

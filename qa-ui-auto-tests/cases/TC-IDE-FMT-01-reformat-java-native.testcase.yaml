@@ -14,7 +14,9 @@ description: 'AC-FMT-01/04 Linux provider-backed slice. Opens the in-repo Maven 
 
   case creates a closed background file and waits for the tree to refresh;
 
-  the formatter result must remain visible after its watcher notification.
+  the formatter result must remain visible after its watcher notification and
+  asynchronous language-server initialization. Background task progress has
+  its own status widget and must not replace the command result.
 
   It then opens pom.xml, which has no formatter provider, and proves the
 
@@ -182,7 +184,7 @@ verification:
     - step: 22
       expectation: The background file appears after the native watcher refreshes the tree.
     - step: 23
-      expectation: The formatter result still names Formatted App.java after the background refresh.
+      expectation: The formatter result still names Formatted App.java after background refresh and language-server initialization; task progress belongs to its dedicated widget.
     - step: 27
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"]", "contains":
         "pom.xml", "timeout_sec": 30}}'
