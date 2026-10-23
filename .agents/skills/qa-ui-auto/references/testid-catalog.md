@@ -2149,7 +2149,6 @@
 - `input[aria-label="Keep-alive interval"]` — interactive — F6.3.network-keepalive
 - `[data-testid="session-keepalive-toggle"]` — interactive — F6.3.network-keepalive-toggle
 - `[data-testid="session-tcp-nodelay-toggle"]` — interactive — F6.3.network-tcp-nodelay
-- `[data-testid="session-disable-nagle-toggle"]` — interactive — F6.3.network-disable-nagle
 - `[data-testid="session-ip-version"]` — interactive — F6.3.network-ip-version
 - `input[aria-label="New forward local address"]` — interactive — F6.3.network-new-forward-local
 - `input[aria-label="New forward remote address"]` — interactive — F6.3.network-new-forward-remote

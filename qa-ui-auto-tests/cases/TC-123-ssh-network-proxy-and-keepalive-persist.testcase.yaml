@@ -123,18 +123,18 @@ steps:
     name: data-checked
     equals: 'false'
 - assert_attribute:
-    selector: '[data-testid="session-disable-nagle-toggle"]'
+    selector: '[data-testid="session-tcp-nodelay-toggle"]'
     name: data-checked
     equals: 'false'
 - set_check:
-    selector: '[data-testid="session-disable-nagle-toggle"]'
+    selector: '[data-testid="session-tcp-nodelay-toggle"]'
     checked: true
 - assert_attribute:
     selector: '[data-testid="session-tcp-nodelay-toggle"]'
     name: data-checked
     equals: 'true'
 - assert_attribute:
-    selector: '[data-testid="session-disable-nagle-toggle"]'
+    selector: '[data-testid="session-tcp-nodelay-toggle"]'
     name: data-checked
     equals: 'true'
 - set_check:
@@ -145,7 +145,7 @@ steps:
     name: data-checked
     equals: 'false'
 - assert_attribute:
-    selector: '[data-testid="session-disable-nagle-toggle"]'
+    selector: '[data-testid="session-tcp-nodelay-toggle"]'
     name: data-checked
     equals: 'false'
 - select_option:
@@ -168,7 +168,7 @@ steps:
     name: data-checked
     equals: 'false'
 - assert_attribute:
-    selector: '[data-testid="session-disable-nagle-toggle"]'
+    selector: '[data-testid="session-tcp-nodelay-toggle"]'
     name: data-checked
     equals: 'false'
 - assert_attribute:
@@ -240,15 +240,15 @@ verification:
     - step: 42
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 43
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-nagle-toggle\"]", "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 45
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "true"}}'
     - step: 46
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-nagle-toggle\"]", "name": "data-checked", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "true"}}'
     - step: 48
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 49
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-nagle-toggle\"]", "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 51
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
     - step: 53
@@ -262,7 +262,7 @@ verification:
     - step: 60
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 61
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-nagle-toggle\"]", "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 62
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
     results:

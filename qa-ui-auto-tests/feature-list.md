@@ -1927,9 +1927,6 @@ controls:
   - id: network-tcp-nodelay
     selector: '[data-testid="session-tcp-nodelay-toggle"]'
     kind: interactive
-  - id: network-disable-nagle
-    selector: '[data-testid="session-disable-nagle-toggle"]'
-    kind: interactive
   - id: network-ip-version
     selector: '[data-testid="session-ip-version"]'
     kind: interactive

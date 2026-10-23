@@ -9,6 +9,7 @@ import { Field, Checkbox, Select, Radio } from "./Fields";
 
 export function AdvancedSshSettings({
   t,
+  sessionType = "SSH",
   x11, setX11,
   x11Trusted, setX11Trusted,
   compression, setCompression,
@@ -27,6 +28,7 @@ export function AdvancedSshSettings({
   onBrowseKey,
 }: {
   t: TranslateFn;
+  sessionType?: string;
   x11: boolean; setX11: (v: boolean) => void;
   x11Trusted: boolean; setX11Trusted: (v: boolean) => void;
   compression: boolean; setCompression: (v: boolean) => void;
@@ -46,7 +48,7 @@ export function AdvancedSshSettings({
 }) {
   return (
     <div data-testid="advanced-ssh-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
-      <Field label={t("sessionEditor2.fieldX11")}>
+      {sessionType === "SSH" && <Field label={t("sessionEditor2.fieldX11")}>
         <label className="flex items-center gap-1.5">
           <Checkbox dataTestId="session-x11-forwarding-toggle" checked={x11} onChange={setX11} />
           {t("sessionEditor2.enable")}
@@ -55,7 +57,7 @@ export function AdvancedSshSettings({
           <Checkbox dataTestId="session-x11-trusted-toggle" checked={x11Trusted} onChange={setX11Trusted} disabled={!x11} />
           {t("sessionEditor2.x11Trusted")}
         </label>
-      </Field>
+      </Field>}
 
       <Field label={t("sessionEditor2.fieldCompression")}>
         <label className="flex items-center gap-1.5">
@@ -64,7 +66,7 @@ export function AdvancedSshSettings({
         </label>
       </Field>
 
-      <Field label={t("sessionEditor2.fieldRemoteEnvironment")}>
+      {sessionType === "SSH" && <Field label={t("sessionEditor2.fieldRemoteEnvironment")}>
         <Select
           dataTestId="session-remote-environment"
           value={remoteEnv}
@@ -79,9 +81,9 @@ export function AdvancedSshSettings({
           ]}
           onChange={setRemoteEnv}
         />
-      </Field>
+      </Field>}
 
-      <Field label={t("sessionEditor2.fieldExecuteCommand")}>
+      {sessionType === "SSH" && <Field label={t("sessionEditor2.fieldExecuteCommand")}>
         <input
           className="taomni-input flex-1"
           placeholder={t("sessionEditor2.executeCommandPlaceholder")}
@@ -93,9 +95,9 @@ export function AdvancedSshSettings({
           <Checkbox dataTestId="session-do-not-exit" checked={doNotExit} onChange={setDoNotExit} />
           {t("sessionEditor2.doNotExit")}
         </label>
-      </Field>
+      </Field>}
 
-      <Field label={t("sessionEditor2.fieldSshBrowserType")}>
+      {sessionType === "SSH" && <Field label={t("sessionEditor2.fieldSshBrowserType")}>
         <Select
           dataTestId="session-ssh-browser-type"
           value={sshBrowser}
@@ -107,7 +109,7 @@ export function AdvancedSshSettings({
           ]}
           onChange={setSshBrowser}
         />
-      </Field>
+      </Field>}
 
       <Field label={t("sessionEditor2.fieldAuthentication")}>
         <div className="flex flex-col gap-1.5 w-full">

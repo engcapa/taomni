@@ -1,3 +1,4 @@
+import { sessionCapabilities } from "../../../lib/sessionCapabilities";
 import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
 import { type IpVersion, type NetworkSettings as NetworkSettingsValue, type ProxyKind } from "../../../lib/networkSettings";
@@ -246,6 +247,7 @@ export function DbNetworkSettings({
 
 export function NetworkSettings({
   t,
+  sessionType = "SSH",
   value,
   onChange,
   sessionConfigId,
@@ -254,6 +256,7 @@ export function NetworkSettings({
   onSaveAsProxySession,
 }: {
   t: TranslateFn;
+  sessionType?: string;
   value: NetworkSettingsValue;
   onChange: (next: NetworkSettingsValue) => void;
   /** When set, the Network tab subscribes to runtime forward errors
@@ -265,6 +268,7 @@ export function NetworkSettings({
   proxySessions?: { id: string; name: string; host: string; port: number }[];
   onSaveAsProxySession?: () => void;
 }) {
+  const capabilities = sessionCapabilities(sessionType);
   const [newFwdLocal, setNewFwdLocal] = useState("");
   const [newFwdRemote, setNewFwdRemote] = useState("");
   const [newFwdDesc, setNewFwdDesc] = useState("");
@@ -294,7 +298,6 @@ export function NetworkSettings({
   const keepAlive = value.keepAlive;
   const keepAliveInterval = value.keepAliveIntervalSecs;
   const tcpNodelay = value.tcpNodelay;
-  const disableNagle = value.disableNagle;
   const forwards = value.localForwards;
 
   const setKeepAlive = (v: boolean) => patch({ keepAlive: v });
@@ -324,9 +327,9 @@ export function NetworkSettings({
     <div data-testid="network-settings" className="grid grid-cols-12 gap-x-3 gap-y-2.5 text-[12px]">
       <ProxyJumpFields t={t} value={value} onChange={onChange} sshSessions={sshSessions} proxySessions={proxySessions} onSaveAsProxySession={onSaveAsProxySession} />
 
-      <Field label={t("sessionEditor2.fieldKeepAlive")}>
+      {capabilities.keepAlive && <Field label={t("sessionEditor2.fieldKeepAlive")}>
         <label className="flex items-center gap-1.5">
-          <Checkbox dataTestId="session-keepalive-toggle" checked={keepAlive} onChange={setKeepAlive} />
+          <Checkbox dataTestId="session-keepalive-toggle" checked={sessionType === "SFTP" || keepAlive} disabled={sessionType === "SFTP"} onChange={setKeepAlive} />
           {t("sessionEditor2.keepAliveSend")}
         </label>
         <input
@@ -336,9 +339,9 @@ export function NetworkSettings({
           onChange={(e) => setKeepAliveInterval(e.target.value)}
         />
         <span className="ml-1">{t("sessionEditor2.keepAliveSuffix")}</span>
-      </Field>
+      </Field>}
 
-      <Field label={t("sessionEditor2.fieldTcpOptions")}>
+      {capabilities.transportOptions && <Field label={t("sessionEditor2.fieldTcpOptions")}>
         <label className="flex items-center gap-1.5">
           <Checkbox
             dataTestId="session-tcp-nodelay-toggle"
@@ -346,16 +349,9 @@ export function NetworkSettings({
             onChange={(v) => patch({ tcpNodelay: v, disableNagle: v })}
           /> {t("sessionEditor2.tcpNodelay")}
         </label>
-        <label className="ml-3 flex items-center gap-1.5">
-          <Checkbox
-            dataTestId="session-disable-nagle-toggle"
-            checked={disableNagle}
-            onChange={(v) => patch({ disableNagle: v, tcpNodelay: v })}
-          /> {t("sessionEditor2.disableNagle")}
-        </label>
-      </Field>
+      </Field>}
 
-      <Field label={t("sessionEditor2.fieldIpVersion")}>
+      {capabilities.transportOptions && <Field label={t("sessionEditor2.fieldIpVersion")}>
         <Select
           dataTestId="session-ip-version"
           value={value.ipVersion}
@@ -366,9 +362,9 @@ export function NetworkSettings({
           ]}
           onChange={setIpVersion}
         />
-      </Field>
+      </Field>}
 
-      <Field label={t("sessionEditor2.fieldLocalForwarding")}>
+      {capabilities.localForwards && <Field label={t("sessionEditor2.fieldLocalForwarding")}>
         <div className="flex flex-col gap-1 w-full">
           <div className="flex items-center gap-1.5 text-[var(--taomni-text-muted)]">
             <span className="w-32">{t("sessionEditor2.forwardLocalHeader")}</span>
@@ -434,7 +430,7 @@ export function NetworkSettings({
             <button data-testid="session-forward-add" className="taomni-btn" type="button" onClick={addForward} disabled={!newFwdLocal.trim() || !newFwdRemote.trim()}>{t("sessionEditor2.forwardAdd")}</button>
           </div>
         </div>
-      </Field>
+      </Field>}
     </div>
   );
 }

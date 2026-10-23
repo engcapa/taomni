@@ -2,8 +2,8 @@
   "version": 1,
   "totals": {
     "features_with_controls": 89,
-    "required": 619,
-    "covered_required": 614,
+    "required": 618,
+    "covered_required": 613,
     "shallow": 46,
     "orphans": 9
   },
@@ -114,8 +114,8 @@
       "shallow": 5
     },
     "F6.3": {
-      "required": 81,
-      "covered_required": 81,
+      "required": 80,
+      "covered_required": 80,
       "shallow": 0
     },
     "F6.4": {

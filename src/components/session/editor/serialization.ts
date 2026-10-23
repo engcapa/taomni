@@ -1,3 +1,4 @@
+import { cleanSessionOptions, sessionCapabilities } from "../../../lib/sessionCapabilities";
 import { MAIL_HEADER_LIMITS_EXPLICIT_KEY } from "../../../lib/mailSync";
 import { parseSpecialFolders } from "../../../lib/mailFolders";
 import { parseMailIdentities } from "../../../lib/mailIdentities";
@@ -290,7 +291,7 @@ export function createSessionSerialization(context: CreateSessionSerializationCo
 
     const terminalProfileOverrides = supportsTerminalAppearance || isMail ? { terminalProfile } : {};
 
-    return JSON.stringify({
+    return JSON.stringify(cleanSessionOptions(proto, {
       ...previousOptions,
       x11, x11Trusted, compression, startupCmd,
       description, tags, doNotExit, disableAiWrite,
@@ -323,7 +324,7 @@ export function createSessionSerialization(context: CreateSessionSerializationCo
       ...ossOverrides,
       ...localShellOverrides,
       ...serialOverrides,
-    });
+    }));
   };
 
   const buildConfig = (overrides: Partial<SessionConfig> = {}): SessionConfig => {
@@ -340,10 +341,10 @@ export function createSessionSerialization(context: CreateSessionSerializationCo
         proto === "Mosh"
         ? "None"
         : "Password";
-    if (authMethod === "PrivateKey")
+    if (isSSH && authMethod === "PrivateKey")
       auth = { PrivateKey: { key_path: keyPath || "~/.ssh/id_ed25519" } };
-    else if (authMethod === "Agent") auth = "Agent";
-    else if (authMethod === "None") auth = "None";
+    else if (isSSH && authMethod === "Agent") auth = "Agent";
+    else if (isSSH && authMethod === "None") auth = "None";
 
     const displayName = name
       || (proto === "WSL"
@@ -369,7 +370,7 @@ export function createSessionSerialization(context: CreateSessionSerializationCo
       group_path: toStoredGroupPath(groupPath),
       host: storedHost,
       port: storedPort,
-      username: username || null,
+      username: sessionCapabilities(proto).username && specifyUser ? username || null : null,
       auth_method: auth,
       options_json: buildOptionsJson(),
       created_at: session?.created_at ?? now,
@@ -412,7 +413,7 @@ export function createSessionSerialization(context: CreateSessionSerializationCo
       }
     }
     if (isSSH && specifyUser && !username.trim()) return t("sessionEditor2.errUsernameEmpty");
-    if (authMethod === "PrivateKey" && !keyPath.trim()) return t("sessionEditor2.errKeyPathRequired");
+    if (isSSH && authMethod === "PrivateKey" && !keyPath.trim()) return t("sessionEditor2.errKeyPathRequired");
     if (proto === "HBaseShell") {
       if ((databaseForm.hbaseConnectionMode === "rest" || databaseForm.hbaseConnectionMode === "thrift") && !host.trim()) {
         return databaseForm.hbaseConnectionMode === "thrift"

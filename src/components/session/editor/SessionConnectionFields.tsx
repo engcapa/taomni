@@ -1,3 +1,4 @@
+import { sessionCapabilities } from "../../../lib/sessionCapabilities";
 import { type ClipboardEvent } from "react";
 import { Terminal as TerminalIcon, Shield, Search } from "lucide-react";
 import { type Proto } from "./sessionPolicy";
@@ -56,7 +57,7 @@ export function SessionConnectionFields(viewProps: SessionConnectionFieldsProps)
                   aria-label={proto === "Browser" ? t("sessionEditor2.browserUrl") : t("sessionEditor2.remoteHostAria")}
                   placeholder={proto === "Browser" ? t("sessionEditor2.browserUrlPlaceholder") : t("sessionEditor2.remoteHostPlaceholder")}
                 />
-                <button
+                {proto !== "Browser" && <button
                   data-testid="session-host-lookup"
                   title={t("sessionEditor2.lookup")}
                   className="taomni-btn px-2"
@@ -64,8 +65,9 @@ export function SessionConnectionFields(viewProps: SessionConnectionFieldsProps)
                   type="button"
                 >
                   <Search className="w-3 h-3 inline -mt-0.5" />
-                </button>
+                </button>}
               </div>
+              {sessionCapabilities(proto).username && <>
               <label className="col-span-3 text-[12px] flex items-center gap-1.5 justify-end">
                 <Checkbox checked={specifyUser} onChange={setSpecifyUser} dataTestId="session-specify-username" />
                 <span>{t("sessionEditor2.specifyUsername")}</span>
@@ -79,6 +81,7 @@ export function SessionConnectionFields(viewProps: SessionConnectionFieldsProps)
                 aria-label={t("sessionEditor2.usernameAria")}
                 placeholder={t("sessionEditor2.usernamePlaceholder")}
               />
+              </>}
 
               <label className="col-span-2 text-[12px] text-right">{t("sessionEditor2.portLabel")}</label>
               <input
@@ -88,7 +91,7 @@ export function SessionConnectionFields(viewProps: SessionConnectionFieldsProps)
                 aria-label={t("sessionEditor2.portAria")}
                 onChange={(e) => setPort(e.target.value)}
               />
-              <div className="col-span-8 text-[11px] text-[var(--taomni-text-muted)]">
+              {sessionCapabilities(proto).sshAuthentication && <div className="col-span-8 text-[11px] text-[var(--taomni-text-muted)]">
                 {(() => {
                   const tip = t("sessionEditor2.autofillTip", { snippet: "%SNIPPET%" });
                   const [before, after] = tip.split("%SNIPPET%");
@@ -105,7 +108,8 @@ export function SessionConnectionFields(viewProps: SessionConnectionFieldsProps)
                     </>
                   );
                 })()}
-              </div>
+              </div>}
+
 
               {(proto === "RDP" || proto === "VNC" || isProxy || isMail) && (
                 <>
