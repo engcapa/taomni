@@ -39,7 +39,7 @@ pub fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, host: Stri
     }
     let state = DriverState {
         app,
-        window,
+        window: Arc::new(std::sync::RwLock::new(window)),
         elements: Arc::new(Mutex::new(HashMap::new())),
         next_element: Arc::new(AtomicU64::new(1)),
     };
@@ -89,6 +89,14 @@ pub fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, host: Stri
             .route(
                 "/session/{session_id}/qa/native-about",
                 post(native_about::<R>),
+            )
+            .route(
+                "/session/{session_id}/window/handles",
+                get(super::windows::handles::<R>),
+            )
+            .route(
+                "/session/{session_id}/window",
+                get(super::windows::current::<R>).post(super::windows::switch::<R>),
             )
             .route("/session/{session_id}/refresh", post(refresh::<R>))
             .route("/session/{session_id}/url", get(current_url::<R>))

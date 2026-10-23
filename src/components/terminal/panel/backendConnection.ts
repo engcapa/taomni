@@ -59,7 +59,7 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
     sid,
   } = context;
 
-  const reconnectPolicy = createReconnectPolicy(Boolean(ssh && !adopted && readSessionBookmark(ssh.optionsJson).reconnect),
+  const reconnectPolicy = createReconnectPolicy(Boolean(ssh && readSessionBookmark(ssh.optionsJson).reconnect),
     () => controllerContext.reconnectSshRef.current?.());
   lifetime.disposeReconnect = reconnectPolicy.dispose;
   type ConnectMode = "initial" | "reconnect";
@@ -148,7 +148,7 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
       controllerContext.flushRecordedOutput("Session ended; saved recorded output");
     }
 
-    if (ssh && !adopted) {
+    if (ssh) {
       term.write("\r\n\x1b[33m[SSH disconnected] Press Enter to reconnect.\x1b[0m\r\n");
       controllerContext.setStatusMessage("SSH disconnected; press Enter to reconnect");
       window.setTimeout(controllerContext.focusTerminal, 0);
@@ -200,7 +200,7 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
     controllerContext.onDetachedStateChangeRef.current?.({ terminalSessionId: connectedSid });
     controllerContext.appendEvent(
       "connection",
-      `${adopted ? "Reattached" : mode === "reconnect" ? "Reconnected" : "Connected"} (${connectedSid})`,
+      `${mode === "reconnect" ? "Reconnected" : adopted ? "Reattached" : "Connected"} (${connectedSid})`,
     );
     controllerContext.scheduleTerminalFitAndSync(true);
     const { scheduleCwdIntegrationInstall } = createTerminalCwdInstaller({
@@ -210,7 +210,7 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
       lifetime,
       syncAutomationState,
     });
-    if (ssh && !adopted) {
+    if (ssh) {
       if (mode === "reconnect") {
         controllerContext.setStatusMessage("SSH reconnected");
         window.setTimeout(controllerContext.focusTerminal, 0);
@@ -311,7 +311,7 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
     if (mode === "reconnect") reconnectPolicy.disconnected();
     const label = ssh && mode === "reconnect" ? "Reconnect failed" : "Connection failed";
     controllerContext.appendEvent("error", `${label}: ${message}`);
-    if (ssh && !adopted) {
+    if (ssh) {
       term.write(`\r\n\x1b[31m[${label}] ${message}\x1b[0m\r\n\x1b[33mPress Enter to retry.\x1b[0m\r\n`);
       controllerContext.setStatusMessage(`${label}; press Enter to retry`);
       window.setTimeout(controllerContext.focusTerminal, 0);
@@ -321,7 +321,7 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
   };
 
   const startSshConnection = (targetSid: string, mode: ConnectMode) => {
-    if (!ssh || adopted || lifetime.destroyed) return;
+    if (!ssh || lifetime.destroyed) return;
 
     clearConnectionListeners();
     cancelPendingMfa();
@@ -444,7 +444,7 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
   };
 
   controllerContext.reconnectSshRef.current = () => {
-    if (!ssh || adopted || lifetime.destroyed) return;
+    if (!ssh || lifetime.destroyed) return;
     if (controllerContext.connectionStateRef.current !== "disconnected") return;
     reconnectPolicy.started();
     startSshConnection(createTerminalSessionId(), "reconnect");

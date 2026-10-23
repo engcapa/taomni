@@ -87,6 +87,9 @@ function buildSshCommand(
 
   addPort(args, "-p", session.port);
   addPrivateKey(args, session.auth_method);
+  if (session.auth_method === "Gssapi") {
+    args.push("-o", "GSSAPIAuthentication=yes", "-o", "PreferredAuthentications=gssapi-with-mic");
+  }
 
   if (sshPreset === "jump" || sshPreset === "full") {
     const jump = resolveJumpHost(networkSettings, allSessions);
@@ -128,6 +131,9 @@ function buildSftpCommand(
   const args = [programName("sftp", platform)];
   addPort(args, "-P", session.port);
   addPrivateKey(args, session.auth_method);
+  if (session.auth_method === "Gssapi") {
+    args.push("-o", "GSSAPIAuthentication=yes", "-o", "PreferredAuthentications=gssapi-with-mic");
+  }
 
   if (networkSettings.proxyKind === "ssh-tunnel") {
     const jump = resolveJumpHost(networkSettings, allSessions);

@@ -1,5 +1,9 @@
 import { getAppPlatform } from "./runtime";
 
+const DATABASE_TYPES = new Set(["MySQL", "PostgreSQL", "PanWeiDB", "Oracle", "SQLServer", "StarRocks", "ClickHouse", "Presto", "Redis"]);
+const RDP_KEYS = ["domain", "colorDepth", "screenW", "screenH", "nla", "certificateFingerprint", "performance", "redirectClipboard", "redirectAudio", "redirectDrive", "gateway"];
+const STORAGE_KEYS = ["provider", "endpoint", "region", "pathStyle", "accessKeyId", "secretAccessKey", "sessionToken", "defaultBucket", "awsAuth", "awsProfile", "accountName", "accountKey", "connectionString", "sasToken", "endpointSuffix", "defaultContainer", "azureAuth", "azureBearerToken", "storageClass"];
+
 const ROUTED_TYPES = new Set([
   "MySQL", "PostgreSQL", "PanWeiDB", "Oracle", "SQLServer", "StarRocks",
   "ClickHouse", "Presto", "Redis", "S3", "AzureBlob", "Mail",
@@ -30,6 +34,28 @@ export function sessionCapabilities(type: string, platform = getAppPlatform()) {
 export function cleanSessionOptions(type: string, options: Record<string, unknown>): Record<string, unknown> {
   const next = { ...options };
   const capabilities = sessionCapabilities(type);
+  // These prefixes belong to established protocol schemas. Preserve unrelated
+  // extension keys, but never carry another protocol's credentials or behavior.
+  for (const key of Object.keys(next)) {
+    if ((key.startsWith("mail") && type !== "Mail") ||
+      (key.startsWith("hbase") && type !== "HBaseShell") ||
+      (key.startsWith("vnc") && type !== "VNC") ||
+      (key.startsWith("serial") && type !== "Serial") ||
+      (key.startsWith("wsl") && type !== "WSL") ||
+      (key.startsWith("localShell") && !["LocalShell", "Shell", "WSL"].includes(type)) ||
+      (key.startsWith("db") && !DATABASE_TYPES.has(type) && type !== "HBaseShell")) delete next[key];
+  }
+  if (type !== "RDP") for (const key of RDP_KEYS) delete next[key];
+  if (type !== "S3" && type !== "AzureBlob") for (const key of STORAGE_KEYS) delete next[key];
+  if (type !== "Proxy") { delete next.proxyKind; delete next.testUrl; }
+  if (type !== "ClickHouse") { delete next.dbChProtocol; delete next.dbHttpPort; }
+  if (type !== "Presto") { delete next.dbPrestoDialect; delete next.dbCatalog; }
+  if (type !== "Redis") delete next.dbRedisIndex;
+  if (!capabilities.terminal) { delete next.bgImage; delete next.bgOpacity; }
+  if (!capabilities.detachedWindow) delete next.openNewWindow;
+  if (!capabilities.sshShell) delete next.reconnect;
+  if (type === "Proxy" || type === "File") delete next.autoConnect;
+  if (type === "Proxy") delete next.shortcut;
   if (!capabilities.sshShell) {
     for (const key of ["x11", "x11Trusted", "startupCmd", "doNotExit", "remoteEnv", "sshBrowser"]) delete next[key];
   }
@@ -61,6 +87,7 @@ export function cleanSessionOptions(type: string, options: Record<string, unknow
       delete network.compression;
       delete network.sshExpert;
     }
+    if (!capabilities.sshShell) delete network.sshBrowser;
     delete network.disableNagle;
     next.networkSettings = network;
   }

@@ -145,12 +145,37 @@ steps:
     equals: qa-capability-device
 - assert_not_visible: '[data-testid="session-section-network"]'
 - screenshot: session-capabilities.png
+- click: '[data-testid="session-section-bookmark"]'
+- assert_not_visible: '[data-testid="session-reconnect"]'
+- click: '[data-testid="session-proto-proxy"]'
+- click: '[data-testid="session-section-bookmark"]'
+- assert_not_visible: '[data-testid="session-auto-connect"]'
+- assert_not_visible: '[data-testid="session-open-new-window"]'
+- assert_not_visible: input[aria-label="Keyboard shortcut"]
+- assert_not_visible: input[aria-label="Background image"]
+- click: '[data-testid="session-proto-mail"]'
+- click: '[data-testid="session-section-bookmark"]'
+- assert_not_visible: input[aria-label="Background image"]
+- assert_not_visible: '[data-testid="session-reconnect"]'
+- assert_not_visible: '[data-testid="session-open-new-window"]'
+- click: '[data-testid="session-proto-ssh"]'
+- click: '[data-testid="session-section-advanced"]'
+- set_check:
+    selector: '[data-testid="session-x11-forwarding-toggle"]'
+    checked: false
+- select_option:
+    selector: '[data-testid="session-remote-environment"]'
+    value: xfce
+- assert_attribute:
+    selector: '[data-testid="session-x11-forwarding-toggle"]'
+    name: data-checked
+    equals: 'true'
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Protocol changes cannot expose irrelevant network or SSH-shell controls; real SSH controls remain
-      and Serial configuration survives save/reopen.
+    requirement: Protocol changes cannot expose irrelevant network or SSH-shell controls;
+      real SSH controls remain and Serial configuration survives save/reopen.
     actions:
     - 3
     - 5
@@ -203,6 +228,15 @@ verification:
     - 116
     - 118
     - 119
+    - 124
+    - 126
+    - 127
+    - 132
+    - 133
+    - 137
+    - 138
+    - 139
+    - 140
     checkpoints:
     - step: 6
       expectation: '{"assert_not_visible": "[data-testid=\"session-section-network\"]"}'
@@ -331,18 +365,55 @@ verification:
     - step: 110
       expectation: '{"assert_visible": "[data-testid=\"session-keepalive-toggle\"]"}'
     - step: 111
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]",
+        "equal": 1}}'
     - step: 121
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-serial-device\"]", "name": "value",
-        "equals": "qa-capability-device"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-serial-device\"]",
+        "name": "value", "equals": "qa-capability-device"}}'
     - step: 122
       expectation: '{"assert_not_visible": "[data-testid=\"session-section-network\"]"}'
+    - step: 125
+      expectation: Only applicable bookmark behavior is available, and desktop environment
+        selection enables X11.
+    - step: 128
+      expectation: Only applicable bookmark behavior is available, and desktop environment
+        selection enables X11.
+    - step: 129
+      expectation: Only applicable bookmark behavior is available, and desktop environment
+        selection enables X11.
+    - step: 130
+      expectation: Only applicable bookmark behavior is available, and desktop environment
+        selection enables X11.
+    - step: 131
+      expectation: Only applicable bookmark behavior is available, and desktop environment
+        selection enables X11.
+    - step: 134
+      expectation: Only applicable bookmark behavior is available, and desktop environment
+        selection enables X11.
+    - step: 135
+      expectation: Only applicable bookmark behavior is available, and desktop environment
+        selection enables X11.
+    - step: 136
+      expectation: Only applicable bookmark behavior is available, and desktop environment
+        selection enables X11.
+    - step: 141
+      expectation: Only applicable bookmark behavior is available, and desktop environment
+        selection enables X11.
     results:
     - 121
     - 122
+    - 125
+    - 128
+    - 129
+    - 130
+    - 131
+    - 134
+    - 135
+    - 136
+    - 141
   native:
-  - check: Save/reopen passes through the native session database and the platform WebView. Transport behavior is
-      covered by separate live-service cases.
+  - check: Save/reopen passes through the native session database and the platform
+      WebView. Transport behavior is covered by separate live-service cases.
     method: external
     reason: Browser storage does not establish native SQLite persistence.
   visual:

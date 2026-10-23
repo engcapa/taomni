@@ -112,3 +112,16 @@ failures may be reported separately, per user authorization.
   macOS additionally hit artifact upload timeouts and a rerun identity mismatch. This is failed
   evidence, not a protocol pass. Fix the capability guard for ClickHouse and new SSH fixtures,
   then run a fresh invocation so every receipt shares one selection/run identity.
+
+## Stage 4 follow-ups
+
+- Strip stale mail, database, RDP, VNC, object-storage, local-shell and serial option keys
+  on protocol changes, including their credential references. Keep unknown extension data.
+- Preserve saved session identity when a terminal is reattached, keep the background in both
+  windows, and allow SSH reconnect after adoption. Add real multi-window browser/native
+  acceptance; extend the QA-only macOS W3C adapter to enumerate/switch actual WebViews.
+- Stage 3 browser receipts on macOS/Windows exposed a hidden session-sidebar button after
+  startup automatically selected the file sidebar. Update the case to activate Sessions before
+  New Session, retaining all startup/shortcut/input-protection assertions.
+- Add real disconnect/reconnect to generated-key acceptance and retain certificate identities
+  when authenticating through SSH agent. Remove obsolete import/runtime placeholder text.

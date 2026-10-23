@@ -86,7 +86,10 @@ export function AdvancedSshSettings({
             { value: "awesome", label: t("sessionEditor2.remoteEnvAwesome") },
             { value: "custom", label: t("sessionEditor2.remoteEnvCustom") },
           ]}
-          onChange={setRemoteEnv}
+          onChange={(value) => {
+            setRemoteEnv(value);
+            if (value !== "shell" && value !== "custom") setX11(true);
+          }}
         />
       </Field>}
 

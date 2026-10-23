@@ -68,6 +68,7 @@ steps:
     expect_truthy: true
     timeout_sec: 15
 - assert_visible: '[data-testid="session-terminal-background"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -102,10 +103,11 @@ verification:
     - 18
     - 19
     - 22
-    - 28
-    - 30
+    - 29
     - 31
-    - 33
+    - 32
+    - 34
+    - 28
     checkpoints:
     - step: 17
       expectation: The saved value, rendered state or connection count matches the
@@ -122,10 +124,10 @@ verification:
     - step: 27
       expectation: The saved value, rendered state or connection count matches the
         explicit assertion.
-    - step: 32
+    - step: 33
       expectation: The saved value, rendered state or connection count matches the
         explicit assertion.
-    - step: 34
+    - step: 35
       expectation: The saved value, rendered state or connection count matches the
         explicit assertion.
     results:
@@ -134,8 +136,8 @@ verification:
     - 24
     - 26
     - 27
-    - 32
-    - 34
+    - 33
+    - 35
   visual:
   - check: Bookmark controls and terminal background
     method: automated

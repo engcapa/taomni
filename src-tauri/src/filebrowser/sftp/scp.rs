@@ -257,7 +257,9 @@ impl ActiveSftp {
             let mut remaining = size;
             while remaining > 0 {
                 progress.ready().await?;
-                let length = buffer.len().min(remaining as usize);
+                let length = buffer
+                    .len()
+                    .min(usize::try_from(remaining).unwrap_or(usize::MAX));
                 let count = input
                     .read(&mut buffer[..length])
                     .await
@@ -318,7 +320,9 @@ impl ActiveSftp {
             let mut buffer = vec![0; self.scp_chunk_size()];
             while remaining > 0 {
                 progress.ready().await?;
-                let length = buffer.len().min(remaining as usize);
+                let length = buffer
+                    .len()
+                    .min(usize::try_from(remaining).unwrap_or(usize::MAX));
                 let count = stream
                     .read(&mut buffer[..length])
                     .await

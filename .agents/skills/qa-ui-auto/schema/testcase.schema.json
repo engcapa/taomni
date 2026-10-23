@@ -831,6 +831,11 @@
           },
           "description": "Controlled persistence fixture: write one localStorage entry so native cases can enter a workspace without the undrivable native folder picker."
         },
+        "switch_window": {
+          "type": "object", "additionalProperties": false, "required": ["selector"],
+          "properties": {"selector": {"type": "string", "minLength": 1}, "timeout_sec": {"type": "number", "minimum": 1}},
+          "description": "Switch to a real app-created browser page/native WebView with the matching CSS selector."
+        },
         "reload_window": {
           "oneOf": [
             {

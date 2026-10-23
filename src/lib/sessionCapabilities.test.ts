@@ -43,3 +43,16 @@ describe("session configuration boundaries", () => {
     expect(sessionCapabilities("Browser").username).toBe(false);
   });
 });
+
+it("removes stale protocol credentials and bookmark behavior when changing session type", () => {
+  const result = cleanSessionOptions("SSH", {
+    mailOauthTokenRef: "vault:mail", hbaseKeytabPath: "/private/keytab", dbChProtocol: "Native",
+    accountKey: "vault:azure", secretAccessKey: "vault:s3", gateway: { password: "vault:rdp" },
+    vncViewOnly: true, serialDevice: "COM1", wslDistro: "Ubuntu", localShellPath: "bash",
+    bgImage: "/picture.png", openNewWindow: true, reconnect: true, extension: { version: 3 },
+  });
+  expect(result).toEqual({ bgImage: "/picture.png", openNewWindow: true, reconnect: true, extension: { version: 3 } });
+  expect(cleanSessionOptions("Mail", result)).toEqual({ extension: { version: 3 } });
+  expect(cleanSessionOptions("MySQL", { dbDatabase: "db", dbCatalog: "cat", dbHttpPort: "8123", dbRedisIndex: "2" }))
+    .toEqual({ dbDatabase: "db" });
+});

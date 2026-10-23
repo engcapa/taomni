@@ -30,12 +30,20 @@ pub(super) async fn authenticate(
         } else {
             None
         };
-        if handle
-            .authenticate_publickey_with(username, key, hash, &mut agent)
-            .await
-            .map_err(|e| format!("SSH agent signing failed: {e}"))?
-            .success()
-        {
+        let result = match identity {
+            russh::keys::agent::AgentIdentity::PublicKey { key, .. } => {
+                handle
+                    .authenticate_publickey_with(username, key, hash, &mut agent)
+                    .await
+            }
+            russh::keys::agent::AgentIdentity::Certificate { certificate, .. } => {
+                handle
+                    .authenticate_certificate_with(username, certificate, hash, &mut agent)
+                    .await
+            }
+        }
+        .map_err(|e| format!("SSH agent signing failed: {e}"))?;
+        if result.success() {
             return Ok(());
         }
     }

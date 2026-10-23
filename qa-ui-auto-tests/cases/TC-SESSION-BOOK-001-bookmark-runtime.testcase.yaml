@@ -54,6 +54,7 @@ steps:
 - assert_count:
     selector: '[data-testid="terminal-pane"]'
     equal: 1
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -86,10 +87,11 @@ verification:
     - 16
     - 17
     - 20
-    - 23
-    - 25
+    - 24
     - 26
-    - 28
+    - 27
+    - 29
+    - 23
     checkpoints:
     - step: 15
       expectation: The saved value, rendered state or connection count matches the
@@ -100,18 +102,18 @@ verification:
     - step: 22
       expectation: The saved value, rendered state or connection count matches the
         explicit assertion.
-    - step: 27
+    - step: 28
       expectation: The saved value, rendered state or connection count matches the
         explicit assertion.
-    - step: 29
+    - step: 30
       expectation: The saved value, rendered state or connection count matches the
         explicit assertion.
     results:
     - 15
     - 19
     - 22
-    - 27
-    - 29
+    - 28
+    - 30
   visual:
   - check: Bookmark controls and terminal background
     method: automated

@@ -91,7 +91,7 @@ export function BookmarkSettings({
           {proto.toLowerCase()}
         </span>
         <button data-testid="session-custom-icon" className="taomni-btn ml-2" type="button" onClick={() => setIconPickerOpen((open) => !open)} aria-expanded={iconPickerOpen}>{t("sessionEditor2.customIconChange")}</button>
-        {iconPickerOpen && <input className="taomni-input ml-2 w-32" aria-label="Custom session icon"
+        {iconPickerOpen && <input className="taomni-input ml-2 w-32" aria-label={t("sessionEditor2.customIconAria")}
           maxLength={8} placeholder="★" value={value.customIcon}
           onChange={(event) => patch({ customIcon: event.target.value.trim() })} />}
       </Field>
@@ -190,7 +190,7 @@ export function BookmarkSettings({
         </Field>
       )}
 
-      <Field label={t("sessionEditor2.fieldKeyboardShortcut")}>
+      {proto !== "Proxy" && <Field label={t("sessionEditor2.fieldKeyboardShortcut")}>
         <input
           className="taomni-input w-40"
           value={shortcut}
@@ -201,7 +201,7 @@ export function BookmarkSettings({
         <span className="ml-2 text-[var(--taomni-text-muted)]">
           {t("sessionEditor2.keyboardShortcutHint")}
         </span>
-      </Field>
+      </Field>}
     </div>
   );
 }

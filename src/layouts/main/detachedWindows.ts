@@ -214,6 +214,7 @@ export function createOpenDetachedTerminal(controllerContext: OpenDetachedTermin
         ?? null;
       const bookmark = useSessionStore.getState().sessions.find((session) => session.id === tab.sessionId);
       const payload: DetachedTerminalParams = {
+        savedSessionId: tab.sessionId,
         bookmarkOptionsJson: JSON.stringify(readSessionBookmark(bookmark?.options_json ?? tab.ssh?.optionsJson)),
         tabId,
         title,

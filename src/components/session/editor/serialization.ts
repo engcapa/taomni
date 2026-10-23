@@ -1,3 +1,4 @@
+import { remoteEnvironment } from "../../../lib/sshSessionOptions";
 import type { SessionBookmark } from "../../../lib/sessionBookmark";
 import { cleanSessionOptions, sessionCapabilities } from "../../../lib/sessionCapabilities";
 import { MAIL_HEADER_LIMITS_EXPLICIT_KEY } from "../../../lib/mailSync";
@@ -385,6 +386,7 @@ export function createSessionSerialization(context: CreateSessionSerializationCo
   };
 
   const validate = () => {
+    if (proto === "SSH" && remoteEnvironment(remoteEnv) === "custom" && !startupCmd.trim()) return t("sessionEditor2.errCustomCommandRequired");
     if (needsHost && !host.trim()) return t("sessionEditor2.errHostRequired");
     if (proto === "Serial" && !serialDevice.trim()) return t("sessionEditor2.errSerialDeviceRequired");
     if (proto === "File" && !host.trim()) return t("sessionEditor2.errFilePathRequired");

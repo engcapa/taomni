@@ -93,6 +93,7 @@ export interface DetachedVncParams {
 }
 
 export interface DetachedTerminalParams {
+  savedSessionId?: string;
   bookmarkOptionsJson?: string;
   tabId?: string;
   title?: string;

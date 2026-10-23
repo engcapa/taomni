@@ -109,9 +109,13 @@ pub(super) async fn screenshot<R: Runtime>(
         // window was in a background console session; the previous single 20s
         // attempt failed the whole case on evidence capture alone. Retry once
         // with a longer bound; product assertions still own the outcome.
+        let window = match state.current_window() {
+            Ok(window) => window,
+            Err(message) => return error(message),
+        };
         let mut last = "WKWebView snapshot failed".to_string();
         for attempt in 0..2 {
-            match webview_snapshot(&state.window, Duration::from_secs(30)).await {
+            match webview_snapshot(&window, Duration::from_secs(30)).await {
                 Ok(encoded) => return ok(Value::String(encoded)),
                 Err(message) => {
                     if attempt == 0 {

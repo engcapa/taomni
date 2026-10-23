@@ -70,7 +70,7 @@ def server_config(path, native_port, http_port, password):
 <user_files_path>{escape(str(path))}/user_files/</user_files_path>
 <listen_host>127.0.0.1</listen_host><tcp_port>{native_port}</tcp_port><http_port>{http_port}</http_port>
 <max_connections>128</max_connections><max_thread_pool_size>64</max_thread_pool_size>
-<background_pool_size>4</background_pool_size><background_schedule_pool_size>4</background_schedule_pool_size>
+<background_pool_size>16</background_pool_size><background_schedule_pool_size>4</background_schedule_pool_size>
 <mark_cache_size>16777216</mark_cache_size><uncompressed_cache_size>8388608</uncompressed_cache_size>
 <profiles><default><max_threads>2</max_threads><max_memory_usage>536870912</max_memory_usage>
 <load_balancing>random</load_balancing></default></profiles>
