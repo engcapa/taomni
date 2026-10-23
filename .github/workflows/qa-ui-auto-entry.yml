@@ -363,7 +363,9 @@ jobs:
         run: |
           screen=1920x1080x24
           if [[ "$QA_DUAL_DISPLAY" == true ]]; then screen=3840x1440x24; fi
-          dbus-run-session -- xvfb-run -a -s "-screen 0 $screen -nolisten tcp" \
+          # Preserve the owned display between xdpyinfo and the window manager.
+          # A last-client reset can briefly reject Openbox's initial connection.
+          dbus-run-session -- xvfb-run -a -s "-screen 0 $screen -nolisten tcp -noreset" \
             python .agents/skills/qa-ui-auto/scripts/ci_execute.py \
             --selection qa-ui-auto-report/selection.json --entry "$QA_ENTRY" \
             --report "qa-ui-auto-report/$QA_ENTRY"
