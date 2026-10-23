@@ -164,3 +164,15 @@ failures may be reported separately, per user authorization.
 - Local checks: 64 existing frontend tests and one queue restoration test;
   three Rust SCP boundary tests; 23 Python helper/service tests. Hosted evidence
   for the new recovery behavior is pending.
+
+## Remote desktop transport acceptance
+
+- Add TC-SESSION-X11-001 on all native platforms: persist a custom desktop
+  command, connect through product SSH/X11, launch real xclock and independently
+  observe its named window using xwininfo. No fixture starts that client.
+- Provision native X11 tools on Linux, XQuartz/Xvfb on macOS and Cygwin Xvfb on
+  Windows. Keep Linux on the invocation's existing display; other desktop clients
+  use a private authenticated X server. Hosted execution remains pending.
+- This acceptance proves custom remote graphical commands and X11 transport.
+  Named desktop startup mappings have unit coverage; complete GNOME/KDE/Xfce
+  desktop-session compatibility is not yet established by this case.

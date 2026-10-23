@@ -43,6 +43,7 @@ def install():
             "--site", "https://mirrors.kernel.org/sourceware/cygwin/", "--packages",
             "openssh,krb5-server,krb5-workstation,python3,coreutils"], timeout=900)
         if result.returncode: raise RuntimeError("Cygwin SSH/Kerberos package installation failed")
+        os.environ["QA_CYGWIN_ROOT"] = root.as_posix()
         with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as stream:
             stream.write(f"QA_CYGWIN_ROOT={root.as_posix()}\n")
 
@@ -175,6 +176,7 @@ GSSAPIStrictAcceptorCheck no
 AllowUsers {user}
 AllowTcpForwarding yes
 X11Forwarding yes
+XAuthLocation {path((binary / 'xauth.exe') if cygwin else Path('/opt/X11/bin/xauth') if system == 'Darwin' else Path('/usr/bin/xauth'))}
 Subsystem sftp internal-sftp
 LogLevel DEBUG3
 """, encoding="utf-8")

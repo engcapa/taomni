@@ -59,6 +59,7 @@ from . import ard_required, editor_typing_fixtures, file_move_recovery_fixtures,
 from . import bookmark_assets
 from . import clickhouse_required
 from . import ssh_features_required
+from . import x11_session_required
 from . import project_tree
 from . import parity005_completion
 from . import parity006_replace
@@ -111,6 +112,7 @@ REGISTRY: dict[str, Fixture] = {
     "ssh_required": Fixture("ssh_required", ssh_required.setup),
     "sftp_required": Fixture("sftp_required", sftp_required.setup),
     "ssh_features_required": Fixture("ssh_features_required", ssh_features_required.setup),
+    "x11_session_required": Fixture("x11_session_required", x11_session_required.setup),
     "clickhouse_required": Fixture("clickhouse_required", clickhouse_required.setup),
     "mysql_required": Fixture("mysql_required", mysql_required.setup),
     "vnc_required": Fixture("vnc_required", vnc_required.setup),
