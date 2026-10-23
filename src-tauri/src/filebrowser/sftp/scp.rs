@@ -11,9 +11,9 @@ use std::time::{Duration, Instant};
 use tauri::AppHandle;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
-trait ByteStream: AsyncRead + AsyncWrite + Unpin + Send {}
+pub(super) trait ByteStream: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T: AsyncRead + AsyncWrite + Unpin + Send> ByteStream for T {}
-type Stream = Box<dyn ByteStream>;
+pub(super) type Stream = Box<dyn ByteStream>;
 
 pub(super) struct Progress<'a> {
     pub app: &'a AppHandle,
@@ -24,7 +24,18 @@ pub(super) struct Progress<'a> {
     pub started: Instant,
 }
 impl Progress<'_> {
-    async fn ready(&self) -> Result<(), String> {
+    pub(super) fn phase(&self, phase: &str, resume_bytes: u64, restarted: bool) {
+        use tauri::Emitter;
+        let _ = self.app.emit(
+            &format!("sftp-progress-{}", self.id),
+            serde_json::json!({
+                "bytes": self.completed.load(Ordering::SeqCst), "total": self.total,
+                "rate": 0, "eta": 0, "phase": phase,
+                "resumeBytes": resume_bytes, "restarted": restarted,
+            }),
+        );
+    }
+    pub(super) async fn ready(&self) -> Result<(), String> {
         if self.handle.is_cancelled() {
             return Err("transfer cancelled".into());
         }
@@ -42,20 +53,20 @@ impl Progress<'_> {
         }
         Ok(())
     }
-    fn advance(&self, bytes: usize) {
+    pub(super) fn advance(&self, bytes: usize) {
         let count = self.completed.fetch_add(bytes as u64, Ordering::SeqCst) + bytes as u64;
         emit_progress(self.app, self.id, count, self.total, self.started);
     }
 }
 
-fn quote(value: &str) -> Result<String, String> {
+pub(super) fn quote(value: &str) -> Result<String, String> {
     if value.contains('\0') {
         return Err("Remote path contains NUL".into());
     }
     Ok(format!("'{}'", value.replace('\'', "'\\''")))
 }
 
-async fn line(stream: &mut Stream) -> Result<Vec<u8>, String> {
+pub(super) async fn line(stream: &mut Stream) -> Result<Vec<u8>, String> {
     let mut value = Vec::new();
     loop {
         let byte = stream
@@ -71,7 +82,7 @@ async fn line(stream: &mut Stream) -> Result<Vec<u8>, String> {
         value.push(byte);
     }
 }
-async fn ack(stream: &mut Stream) -> Result<(), String> {
+pub(super) async fn ack(stream: &mut Stream) -> Result<(), String> {
     match stream
         .read_u8()
         .await
@@ -92,7 +103,7 @@ impl ActiveSftp {
             .as_ref()
             .is_some_and(|p| matches!(p.network.ssh_browser.as_str(), "scp" | "scp-fast"))
     }
-    async fn scp_stream(&self, command: &str) -> Result<Stream, String> {
+    pub(super) async fn scp_stream(&self, command: &str) -> Result<Stream, String> {
         let params = self
             .reconnect
             .as_ref()
@@ -110,7 +121,22 @@ impl ActiveSftp {
                 .await?,
             ));
         }
-        let guard = self._handle.lock().await;
+        let mut guard = self._handle.lock().await;
+        if guard.as_ref().is_none_or(|handle| handle.is_closed()) {
+            // Reconnect only before executing a new operation. Retrying an
+            // already-sent rename/delete could repeat a side effect.
+            *guard = Some(
+                crate::terminal::ssh::connect_ssh_authenticated_with_prompter(
+                    &params.host,
+                    params.port,
+                    &params.username,
+                    params.auth.clone(),
+                    Some(&params.network),
+                    None,
+                )
+                .await?,
+            );
+        }
         let handle = guard.as_ref().ok_or("SSH connection closed")?;
         let channel = handle
             .channel_open_session()
@@ -169,7 +195,7 @@ impl ActiveSftp {
         let command = format!(
             "python3 -c {} {}",
             quote(
-                "import sys; f=open(sys.argv[1], 'rb'); sys.stdout.buffer.write(f.read(int(sys.argv[2])+1))"
+                "import sys; f=open(sys.argv[1], 'rb'); data=f.read(int(sys.argv[2])+1); sys.stdout.buffer.write(b'OK\\n'+data)"
             )?,
             quote(path)?
         );
@@ -178,11 +204,17 @@ impl ActiveSftp {
         let mut data = Vec::new();
         tokio::time::timeout(
             Duration::from_secs(30),
-            stream.take(limit.saturating_add(1)).read_to_end(&mut data),
+            stream.take(limit.saturating_add(4)).read_to_end(&mut data),
         )
         .await
         .map_err(|_| "SCP preview timed out")?
         .map_err(|e| e.to_string())?;
+        if !data.starts_with(b"OK\n") {
+            return Err(
+                "SCP preview failed; check the remote file and Python 3 availability".into(),
+            );
+        }
+        data.drain(..3);
         if data.len() as u64 > limit {
             return Err("File grew beyond preview limit".into());
         }
@@ -195,9 +227,10 @@ impl ActiveSftp {
         } else {
             format!("./{path}")
         };
+        let temporary = format!("{path}.taomni-scp-{}.part", uuid::Uuid::new_v4());
         let operation = async {
             let mut stream = self
-                .scp_stream(&format!("scp -t {}", quote(&path)?))
+                .scp_stream(&format!("scp -t {}", quote(&temporary)?))
                 .await?;
             ack(&mut stream).await?;
             stream
@@ -207,14 +240,16 @@ impl ActiveSftp {
             ack(&mut stream).await?;
             stream.write_all(data).await.map_err(|e| e.to_string())?;
             stream.write_all(&[0]).await.map_err(|e| e.to_string())?;
-            ack(&mut stream).await
+            ack(&mut stream).await?;
+            self.scp_metadata::<()>("rename", serde_json::json!([temporary, path]))
+                .await
         };
         tokio::time::timeout(Duration::from_secs(30), operation)
             .await
             .map_err(|_| "SCP save timed out")?
     }
 
-    fn scp_chunk_size(&self) -> usize {
+    pub(super) fn scp_chunk_size(&self) -> usize {
         if self
             .reconnect
             .as_ref()
@@ -283,72 +318,7 @@ impl ActiveSftp {
         self.scp_cancellable(operation, progress.handle).await
     }
 
-    pub(super) async fn scp_download(
-        &self,
-        remote: &str,
-        local: &Path,
-        progress: Progress<'_>,
-    ) -> Result<(), String> {
-        if let Some(parent) = local.parent() {
-            tokio::fs::create_dir_all(parent)
-                .await
-                .map_err(|e| e.to_string())?;
-        }
-        let mut temporary = local.as_os_str().to_os_string();
-        temporary.push(format!(".taomni-scp-{}.part", uuid::Uuid::new_v4()));
-        let temporary = std::path::PathBuf::from(temporary);
-        let operation = async {
-            let path = if remote.starts_with('/') {
-                remote.to_string()
-            } else {
-                format!("./{remote}")
-            };
-            let mut stream = self
-                .scp_stream(&format!("scp -f {}", quote(&path)?))
-                .await?;
-            stream.write_all(&[0]).await.map_err(|e| e.to_string())?;
-            let header = line(&mut stream).await?;
-            let size = parse_file_header(&header)?;
-            let mut output = tokio::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&temporary)
-                .await
-                .map_err(|e| e.to_string())?;
-            stream.write_all(&[0]).await.map_err(|e| e.to_string())?;
-            let mut remaining = size;
-            let mut buffer = vec![0; self.scp_chunk_size()];
-            while remaining > 0 {
-                progress.ready().await?;
-                let length = buffer
-                    .len()
-                    .min(usize::try_from(remaining).unwrap_or(usize::MAX));
-                let count = stream
-                    .read(&mut buffer[..length])
-                    .await
-                    .map_err(|e| e.to_string())?;
-                if count == 0 {
-                    return Err("SCP file ended before its advertised length".into());
-                }
-                output
-                    .write_all(&buffer[..count])
-                    .await
-                    .map_err(|e| e.to_string())?;
-                remaining -= count as u64;
-                progress.advance(count);
-            }
-            ack(&mut stream).await?;
-            stream.write_all(&[0]).await.map_err(|e| e.to_string())?;
-            output.sync_all().await.map_err(|e| e.to_string())?;
-            drop(output);
-            tokio::fs::rename(&temporary, local)
-                .await
-                .map_err(|e| e.to_string())
-        };
-        self.scp_cancellable(operation, progress.handle).await
-    }
-
-    async fn scp_cancellable<T>(
+    pub(super) async fn scp_cancellable<T>(
         &self,
         operation: impl std::future::Future<Output = Result<T, String>>,
         handle: &TransferHandle,
@@ -365,7 +335,7 @@ impl ActiveSftp {
     }
 }
 
-fn parse_file_header(header: &[u8]) -> Result<u64, String> {
+pub(super) fn parse_file_header(header: &[u8]) -> Result<u64, String> {
     if header.first() != Some(&b'C') {
         return Err(format!(
             "Expected SCP file header: {}",

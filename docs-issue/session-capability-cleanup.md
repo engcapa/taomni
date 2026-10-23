@@ -142,6 +142,25 @@ failures may be reported separately, per user authorization.
   terminal wrapper; close each result dialog and type into xterm's textarea.
 - Windows setup diagnosed Cygwin's extensionless PE kadmin.local executable.
   Preserve full SSH probe diagnostics and report missing executable names.
-- ClickHouse startup with 64 global threads starved background pools before
-  opening the TCP listener. Bound each background pool and provide 256 global
+- ClickHouse did not open its TCP listener; background pool starvation with
+  64 global threads is the current hypothesis, pending new service logs. Bound each background pool and provide 256 global
   slots; retain information-level service logs for the next hosted run.
+
+## SCP interrupted-download recovery
+
+- Download partial identities bind destination, endpoint, user and remote path.
+  OS-held file locks reject concurrent writes and recover after process exit;
+  partials cannot follow symlinks or Windows reparse points.
+- Verify the existing prefix against the remote file before resuming a suffix
+  over SCP framing. Restart stale partials with visible feedback. Check SHA256
+  of the complete download before atomic publication, preserving the previous
+  destination on failures/cancellation. Background transfer ownership remains
+  in the existing native transfer manager, independent of the queue view.
+- Explain remote Python/scp prerequisites. Display connecting/verifying and
+  resumed/restarted feedback; retain that evidence after the queue reopens.
+- Native SCP cases seed interrupted/stale files on the runner, assert complete
+  SHA256 bytes and visible recovery outcomes. TC-127 retains browser coverage
+  of mode switching and the prerequisite explanation.
+- Local checks: 64 existing frontend tests and one queue restoration test;
+  three Rust SCP boundary tests; 23 Python helper/service tests. Hosted evidence
+  for the new recovery behavior is pending.

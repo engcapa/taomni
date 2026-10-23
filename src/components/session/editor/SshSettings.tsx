@@ -121,6 +121,10 @@ export function AdvancedSshSettings({
         />
       </Field>}
 
+      {sessionType === "SSH" && sshBrowserMode(sshBrowser).startsWith("scp") && (
+        <p className="text-xs text-[var(--taomni-text-muted)]">{t("fileBrowser.scpPrerequisite")}</p>
+      )}
+
       <Field label={t("sessionEditor2.fieldAuthentication")}>
         <div className="flex flex-col gap-1.5 w-full">
           <div className="flex items-center gap-2 flex-wrap">

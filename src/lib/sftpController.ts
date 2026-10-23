@@ -59,6 +59,9 @@ export function useSftpController(sessionId: string) {
             rate: payload.rate,
             eta: payload.eta,
             state: "running",
+            ...(payload.phase ? { phase: payload.phase } : {}),
+            ...(payload.resumeBytes !== undefined ? { resumeBytes: payload.resumeBytes } : {}),
+            ...(payload.restarted !== undefined ? { restarted: payload.restarted } : {}),
           });
         }),
         listenSftpPaused(transferId, (payload) => {
@@ -338,6 +341,9 @@ export function useSftpController(sessionId: string) {
       error: null,
       startedAt: Date.now(),
       finishedAt: null,
+      phase: undefined,
+      resumeBytes: undefined,
+      restarted: undefined,
     });
     await startTransferTracking(transferId, direction === "upload" ? "remote" : "local");
     try {

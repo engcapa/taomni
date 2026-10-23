@@ -1,6 +1,7 @@
 # Executed remotely by python3. JSON framing preserves spaces/newlines in names;
 # no user path is interpreted by the shell or interpolated into source code.
 import json
+import hashlib
 import os
 import shutil
 import stat
@@ -52,11 +53,24 @@ try:
             os.unlink(path)
         result = None
     elif op == "rename":
-        os.rename(path, args[1])
+        os.replace(path, args[1])
         result = None
     elif op == "chmod":
         os.chmod(path, args[1])
         result = None
+    elif op == "fingerprint":
+        full, prefix = hashlib.sha256(), hashlib.sha256()
+        prefix_remaining = max(0, int(args[1]))
+        with open(path, "rb") as source:
+            before = os.fstat(source.fileno())
+            for block in iter(lambda: source.read(262144), b""):
+                full.update(block)
+                prefix.update(block[:prefix_remaining])
+                prefix_remaining = max(0, prefix_remaining - len(block))
+            after = os.fstat(source.fileno())
+        if (before.st_size, before.st_mtime_ns) != (after.st_size, after.st_mtime_ns):
+            raise ValueError("Remote file changed during integrity verification")
+        result = dict(size=after.st_size, sha256=full.hexdigest(), prefix=prefix.hexdigest())
     else:
         raise ValueError("Unknown file operation")
     print(json.dumps({"ok": result}, ensure_ascii=True))

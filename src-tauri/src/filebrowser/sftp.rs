@@ -64,6 +64,7 @@ use tokio::sync::Mutex;
 
 mod progress;
 mod scp;
+mod scp_download;
 
 mod metadata;
 

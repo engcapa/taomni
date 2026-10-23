@@ -308,6 +308,9 @@ export function FileTransferQueue({
           return (
             <div
               key={it.id}
+              data-transfer-state={it.state}
+              data-resume-bytes={it.resumeBytes}
+              data-transfer-restarted={it.restarted === undefined ? undefined : String(it.restarted)}
               className="px-2 py-1 border-b"
               style={{ borderColor: "var(--taomni-divider)" }}
             >
@@ -321,6 +324,11 @@ export function FileTransferQueue({
                   {it.direction === "upload" ? it.remotePath : it.localPath}
                 </span>
                 <StateBadge state={it.state} />
+                {it.state === "running" && it.phase && it.phase !== "downloading" && (
+                  <span>{t(it.phase === "connecting" ? "fileBrowser.transferConnecting" : "fileBrowser.transferVerifying")}</span>
+                )}
+                {!!it.resumeBytes && <span>{t("fileBrowser.transferResumed")} {formatBytes(it.resumeBytes)}</span>}
+                {it.restarted && <span>{t("fileBrowser.transferRestarted")}</span>}
                 <span className="text-[var(--taomni-text-muted)]">
                   {formatBytes(it.bytes)} / {formatBytes(it.size)}
                 </span>

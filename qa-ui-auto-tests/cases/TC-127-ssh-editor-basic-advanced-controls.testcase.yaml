@@ -126,6 +126,9 @@ steps:
     selector: '[data-testid="session-ssh-browser-type"]'
     name: value
     equals: scp
+- assert_text:
+    selector: '[data-testid="session-editor"]'
+    contains: requires Python 3 and scp
 - select_option:
     selector: '[data-testid="session-ssh-browser-type"]'
     label: Disabled
@@ -206,8 +209,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH advanced controls use stable protocol values, expose key generation
-      and apply expert cipher preferences.
+    requirement: SSH advanced controls use stable protocol values, expose key generation and
+      apply expert cipher preferences.
     actions:
     - 3
     - 12
@@ -224,21 +227,21 @@ verification:
     - 37
     - 39
     - 41
-    - 43
-    - 45
-    - 47
-    - 49
-    - 51
-    - 53
-    - 56
-    - 59
-    - 62
-    - 65
+    - 44
+    - 46
+    - 48
+    - 50
+    - 52
+    - 54
+    - 57
+    - 60
+    - 63
     - 66
-    - 68
-    - 71
+    - 67
+    - 69
     - 72
-    - 75
+    - 73
+    - 76
     checkpoints:
     - step: 5
       expectation: The explicit control value or visibility assertion holds.
@@ -286,38 +289,41 @@ verification:
       expectation: The explicit control value or visibility assertion holds.
     - step: 42
       expectation: The explicit control value or visibility assertion holds.
-    - step: 44
+    - step: 45
       expectation: The explicit control value or visibility assertion holds.
-    - step: 46
+    - step: 47
       expectation: The explicit control value or visibility assertion holds.
-    - step: 48
+    - step: 49
       expectation: The explicit control value or visibility assertion holds.
-    - step: 50
+    - step: 51
       expectation: The explicit control value or visibility assertion holds.
-    - step: 52
-      expectation: The explicit control value or visibility assertion holds.
-    - step: 54
+    - step: 53
       expectation: The explicit control value or visibility assertion holds.
     - step: 55
       expectation: The explicit control value or visibility assertion holds.
-    - step: 57
+    - step: 56
       expectation: The explicit control value or visibility assertion holds.
     - step: 58
       expectation: The explicit control value or visibility assertion holds.
-    - step: 60
+    - step: 59
       expectation: The explicit control value or visibility assertion holds.
     - step: 61
       expectation: The explicit control value or visibility assertion holds.
-    - step: 64
+    - step: 62
       expectation: The explicit control value or visibility assertion holds.
-    - step: 67
+    - step: 65
       expectation: The explicit control value or visibility assertion holds.
-    - step: 69
+    - step: 68
       expectation: The explicit control value or visibility assertion holds.
-    - step: 73
+    - step: 70
       expectation: The explicit control value or visibility assertion holds.
-    - step: 78
+    - step: 74
       expectation: The explicit control value or visibility assertion holds.
+    - step: 79
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 43
+      expectation: SCP explicitly explains its remote prerequisites and interrupted-download
+        recovery.
     results:
     - 5
     - 6
@@ -342,30 +348,30 @@ verification:
     - 38
     - 40
     - 42
-    - 44
-    - 46
-    - 48
-    - 50
-    - 52
-    - 54
+    - 45
+    - 47
+    - 49
+    - 51
+    - 53
     - 55
-    - 57
+    - 56
     - 58
-    - 60
+    - 59
     - 61
-    - 64
-    - 67
-    - 69
-    - 73
-    - 78
+    - 62
+    - 65
+    - 68
+    - 70
+    - 74
+    - 79
+    - 43
   visual:
-  - check: SSH header actions, advanced controls, and dialog text remain readable
-      without overlap.
+  - check: SSH header actions, advanced controls, and dialog text remain readable without overlap.
     method: manual
     reason: Functional assertions do not establish layout fidelity.
   native:
-  - check: This browser case intentionally exercises the browser file-picker stub;
-      packaged native dialog behavior remains unverified.
+  - check: This browser case intentionally exercises the browser file-picker stub; packaged
+      native dialog behavior remains unverified.
     method: external
-    reason: The private-key picker is an OS dialog boundary and is covered here only
-      through the browser fixture.
+    reason: The private-key picker is an OS dialog boundary and is covered here only through
+      the browser fixture.

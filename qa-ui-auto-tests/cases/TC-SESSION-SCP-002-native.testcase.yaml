@@ -77,15 +77,16 @@ steps:
     timeout_sec: 45
 - click: '[data-testid="sftp-remote-list"] tr[title$="/scp-source.txt"]'
 - click: '[data-testid="sftp-remote-download-selected"]'
-- assert_file_contains:
+- assert_file_sha256:
     path: ${cfg.ssh_features.downloaded}
-    contains: qa-scp-roundtrip
+    equals: 054e942b10569af4c2006f997e3e2c40a9a14fc1464329401bf1e44f7560c4d7
     timeout_sec: 45
+- assert_visible: '[data-testid="sftp-transfer-queue"] [data-transfer-state="done"][data-resume-bytes="0"][data-transfer-restarted="true"]'
 - click: '[data-testid="sftp-local-list"] tr[title$="/scp-upload.txt"]'
 - click: '[data-testid="sftp-local-upload-selected"]'
-- assert_file_contains:
+- assert_file_sha256:
     path: ${cfg.ssh_features.uploaded}
-    contains: qa-scp-upload
+    equals: 7ebc6ab39279cf17a71009ebaba8d2c5fe8ac9beca8eeb3167662b8e47db956a
     timeout_sec: 45
 - assert_text:
     selector: '[data-testid="sftp-remote-list"]'
@@ -102,7 +103,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Real scp-fast directory listing, upload, download and deletion
+    requirement: Real scp-fast directory listing, upload, download and deletion; validate persistent
+      partial recovery, complete-byte integrity and visible resume/restart feedback
     actions:
     - 3
     - 5
@@ -126,11 +128,11 @@ verification:
     - 27
     - 29
     - 30
-    - 32
     - 33
-    - 36
+    - 34
     - 37
-    - 39
+    - 38
+    - 40
     checkpoints:
     - step: 24
       expectation: The explicit result matches the real protocol or persisted file.
@@ -138,24 +140,28 @@ verification:
       expectation: The explicit result matches the real protocol or persisted file.
     - step: 31
       expectation: The explicit result matches the real protocol or persisted file.
-    - step: 34
-      expectation: The explicit result matches the real protocol or persisted file.
     - step: 35
       expectation: The explicit result matches the real protocol or persisted file.
-    - step: 40
+    - step: 36
       expectation: The explicit result matches the real protocol or persisted file.
+    - step: 41
+      expectation: The explicit result matches the real protocol or persisted file.
+    - step: 32
+      expectation: A verified retained prefix resumes, or a stale prefix restarts safely; exact
+        SHA256 proves the published bytes.
     results:
     - 24
     - 28
     - 31
-    - 34
     - 35
-    - 40
+    - 36
+    - 41
+    - 32
   native:
   - check: Real SSH server, MIT Kerberos KDC and native filesystem
     method: automated
-    reason: Runner fixture authenticates with a real ticket; product connects through
-      its native IPC and protocol implementation.
+    reason: Runner fixture authenticates with a real ticket; product connects through its native
+      IPC and protocol implementation.
   visual:
   - check: Visible protocol status and file entries
     method: automated
