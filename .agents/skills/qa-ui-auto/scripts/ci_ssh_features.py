@@ -164,7 +164,7 @@ HostKey {path(host_key)}
 PidFile {path(private / 'sshd.pid')}
 AuthorizedKeysFile {path(authorized)}
 StrictModes no
-UsePAM no
+UsePAM {'yes' if system == 'Linux' else 'no'}
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 PubkeyAuthentication yes

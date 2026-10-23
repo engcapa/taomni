@@ -125,3 +125,14 @@ failures may be reported separately, per user authorization.
   New Session, retaining all startup/shortcut/input-protection assertions.
 - Add real disconnect/reconnect to generated-key acceptance and retain certificate identities
   when authenticating through SSH agent. Remove obsolete import/runtime placeholder text.
+
+## Hosted fixture and window corrections
+
+- Run 39984004315 reached real SSH/Kerberos setup on Linux but OpenSSH rejected
+  the hosted runner's locked Unix account before GSSAPI. Enable Linux PAM account
+  checks without enabling password or keyboard-interactive authentication.
+- Run 39985713565 browser receipts passed TC-127, TC-128, BOOK-001, CAP-001 and
+  NET-001 on Linux/macOS. BOOK-003 incorrectly required native local PTY APIs
+  in browser preview. Keep its real local-terminal/window/adoption assertions
+  native-only on all three OSes; TC-128 retains browser new-window persistence
+  coverage. Assert computed shell output to distinguish execution from echo.

@@ -9,7 +9,6 @@ tags:
 - bookmark
 - lifecycle
 modes:
-- browser
 - native
 fixtures:
 - reset_db
@@ -55,11 +54,11 @@ steps:
     equal: 1
 - terminal_input:
     selector: '[data-testid="terminal-pane"]'
-    text: echo QA_DETACHED_BOOKMARK
+    text: echo QA_DETACHED_BOOKMARK_$((17+25))
     submit: true
 - assert_text:
     selector: '[data-testid="terminal-pane"]'
-    contains: QA_DETACHED_BOOKMARK
+    contains: QA_DETACHED_BOOKMARK_42
     timeout_sec: 20
 - click: '[data-testid="detached-reattach"]'
 - switch_window:
@@ -73,7 +72,7 @@ steps:
     equal: 1
 - assert_text:
     selector: '[data-testid="terminal-pane"]'
-    contains: QA_DETACHED_BOOKMARK
+    contains: QA_DETACHED_BOOKMARK_42
     timeout_sec: 20
 - wait: 2
 - assert_count:
@@ -136,5 +135,6 @@ verification:
   native:
   - check: Real OS window and terminal handoff
     method: automated
-    reason: Switches WebDriver contexts between app-created windows; native PTY output
-      survives reattachment.
+    reason: Local PTYs and output adoption are native-only APIs. TC-128 covers
+      save/reopen of the new-window setting in browser mode. This case switches
+      real WebDriver windows and requires computed PTY output after reattachment.
