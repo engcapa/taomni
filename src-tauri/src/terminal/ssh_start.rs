@@ -88,6 +88,12 @@ pub(crate) fn resolve_proxy_session(
     state: &State<'_, AppState>,
     network: &mut network::NetworkSettings,
 ) -> Result<(), String> {
+    if matches!(network.proxy_kind.as_str(), "app" | "custom") {
+        return network::proxy_selection::resolve_application(state.inner(), network);
+    }
+    if !matches!(network.proxy_kind.as_str(), "http" | "socks5") {
+        return Ok(());
+    }
     let id = network.proxy_session_id.trim();
     if id.is_empty() {
         return Ok(());

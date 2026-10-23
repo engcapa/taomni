@@ -101,6 +101,7 @@ export function useSessionEditorState(context: UseSessionEditorStateContext) {
     extractAuthType(session?.auth_method) === "PrivateKey",
   );
 
+
   /* --- bookmark --- */
   const [description, setDescription] = useState(() => optionString(initialOptions, "description", ""));
   const [tags, setTags] = useState(() => optionString(initialOptions, "tags", ""));
@@ -187,7 +188,7 @@ export function useSessionEditorState(context: UseSessionEditorStateContext) {
 
   /* --- network settings --- */
   const [networkSettings, setNetworkSettings] = useState<NetworkSettingsValue>(
-    () => getSessionNetworkSettings(session?.options_json),
+    () => session ? getSessionNetworkSettings(session.options_json) : { ...getSessionNetworkSettings(null), proxyKind: "app" },
   );
 
   /* --- test connection --- */

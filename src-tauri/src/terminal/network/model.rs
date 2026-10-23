@@ -16,6 +16,10 @@ pub struct NetworkSettings {
     #[serde(default = "default_proxy_kind")]
     pub proxy_kind: String,
     #[serde(default)]
+    pub custom_proxy: Option<crate::proxy::AppProxyConfig>,
+    #[serde(default)]
+    pub compression: bool,
+    #[serde(default)]
     pub proxy_host: String,
     #[serde(default)]
     pub proxy_port: u16,

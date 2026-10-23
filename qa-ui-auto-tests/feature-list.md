@@ -1619,6 +1619,18 @@ components: [SessionEditor]
 files:
   - src/components/session/SessionEditor.tsx
 controls:
+  - id: clickhouse-http-port
+    selector: 'input[aria-label="ClickHouse HTTP port"]'
+    kind: interactive
+  - id: database-test-connection
+    selector: '[data-testid="db-test-connection"]'
+    kind: interactive
+  - id: clickhouse-protocol
+    selector: '[data-testid="session-clickhouse-protocol"]'
+    kind: interactive
+  - id: custom-proxy
+    selector: '[data-testid="session-custom-proxy"]'
+    kind: display
   # Dialog frame
   - id: editor
     selector: '[data-testid="session-editor"]'

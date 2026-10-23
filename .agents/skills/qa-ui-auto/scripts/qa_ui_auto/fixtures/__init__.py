@@ -56,6 +56,7 @@ from dataclasses import dataclass
 from typing import Callable, Protocol
 
 from . import ard_required, editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_rename_deleted_fixtures, java_sample_projects, java_test_bundle, jdtls_required, linux_desktop_required, linux_x11_required, mysql_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, vnc_required, welcome_recents, workspace_root
+from . import clickhouse_required
 from . import project_tree
 from . import parity005_completion
 from . import parity006_replace
@@ -106,6 +107,7 @@ REGISTRY: dict[str, Fixture] = {
     "reset_db":     Fixture("reset_db",     reset_db.setup,     reset_db.teardown),
     "ssh_required": Fixture("ssh_required", ssh_required.setup),
     "sftp_required": Fixture("sftp_required", sftp_required.setup),
+    "clickhouse_required": Fixture("clickhouse_required", clickhouse_required.setup),
     "mysql_required": Fixture("mysql_required", mysql_required.setup),
     "vnc_required": Fixture("vnc_required", vnc_required.setup),
     "ard_required": Fixture("ard_required", ard_required.setup, ard_required.teardown),

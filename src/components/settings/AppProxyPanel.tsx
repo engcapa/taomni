@@ -325,6 +325,7 @@ export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Pr
                 <input
                   type="text"
                   className="taomni-input h-7 flex-1 text-[12px]"
+                  aria-label={t("settings.appProxyHost")}
                   placeholder={t("settings.appProxyHost")}
                   value={cfg.host}
                   onChange={(e) => persist({ host: e.target.value })}
@@ -332,6 +333,7 @@ export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Pr
                 <input
                   type="number"
                   className="taomni-input h-7 w-24 text-[12px]"
+                  aria-label={t("settings.appProxyPort")}
                   placeholder={t("settings.appProxyPort")}
                   value={cfg.port || ""}
                   onChange={(e) => persist({ port: parseInt(e.target.value, 10) || 0 })}
@@ -340,7 +342,8 @@ export function AppProxyPanel({ value, onSave, testHost = "www.google.com" }: Pr
               <input
                 type="text"
                 className="taomni-input h-7 w-full text-[12px]"
-                placeholder={t("settings.appProxyUsername")}
+                aria-label={t("settings.appProxyUsername")}
+                  placeholder={t("settings.appProxyUsername")}
                 value={cfg.username}
                 onChange={(e) => persist({ username: e.target.value })}
               />

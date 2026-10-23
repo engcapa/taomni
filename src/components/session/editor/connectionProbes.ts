@@ -20,6 +20,7 @@ export interface HandleTestConnectionContext {
   keyPath: string;
   port: string;
   networkSettings: NetworkSettingsValue;
+  compression?: boolean;
 }
 
 
@@ -47,7 +48,7 @@ export function createHandleTestConnection(controllerContext: HandleTestConnecti
         controllerContext.username,
         controllerContext.authMethod,
         authData,
-        JSON.stringify(toNetworkSettingsPayload(controllerContext.networkSettings)),
+        JSON.stringify(toNetworkSettingsPayload({ ...controllerContext.networkSettings, compression: controllerContext.compression })),
       );
       controllerContext.presentTestOutcome(true, msg);
     } catch (err) {

@@ -184,7 +184,7 @@ export function createSessionReset(context: CreateSessionResetContext) {
     databaseForm.setHBaseKrb5ConfPath(optionString(nextOptions, "hbaseKrb5ConfPath", ""));
     databaseForm.setHBaseSitePath(optionString(nextOptions, "hbaseSitePath", ""));
     setTerminalProfile(initialTerminalProfileForProto(session?.options_json, nextProto));
-    setNetworkSettings(getSessionNetworkSettings(session?.options_json));
+    setNetworkSettings(session ? getSessionNetworkSettings(session.options_json) : { ...getSessionNetworkSettings(null), proxyKind: "app" });
     setSerialDevice(session?.session_type === "Serial" ? session.host : optionString(nextOptions, "serialDevice", ""));
     setSerialBaud(optionString(nextOptions, "serialBaud", "115200"));
     shellForm.setLocalShellOptions(parseLocalShellOptions(session?.options_json));

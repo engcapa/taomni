@@ -1,3 +1,4 @@
+import { AppProxyPanel } from "../../settings/AppProxyPanel";
 import { sessionCapabilities } from "../../../lib/sessionCapabilities";
 import { useEffect, useState } from "react";
 import { Save } from "lucide-react";
@@ -36,6 +37,8 @@ export function ProxyJumpFields({
           dataTestId="session-proxy-kind"
           value={value.proxyKind}
           options={[
+            { value: "app", label: t("voice.proxyApp") },
+            { value: "custom", label: t("voice.proxyCustom") },
             { value: "none", label: t("sessionEditor2.proxyNone") },
             { value: "http", label: t("sessionEditor2.proxyHttp") },
             { value: "socks5", label: t("sessionEditor2.proxySocks5") },
@@ -45,6 +48,11 @@ export function ProxyJumpFields({
           onChange={(kind) => patch({ proxyKind: kind as ProxyKind })}
         />
       </Field>
+
+      {value.proxyKind === "custom" && <div className="col-span-12" data-testid="session-custom-proxy">
+        <AppProxyPanel value={value.customProxy ?? { enabled: true, mode: "manual", kind: "http", host: "", port: 3128, username: "", password_ref: "", session_id: "" }}
+          onSave={async (customProxy) => patch({ customProxy })} />
+      </div>}
 
       {isJump && (
         <>

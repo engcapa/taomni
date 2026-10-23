@@ -56,6 +56,7 @@ export function cleanSessionOptions(type: string, options: Record<string, unknow
       delete network.tcpNodelay;
       delete network.ipVersion;
     }
+    if (!capabilities.sshAuthentication) delete network.compression;
     delete network.disableNagle;
     next.networkSettings = network;
   }

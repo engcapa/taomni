@@ -1,0 +1,199 @@
+id: TC-SESSION-NET-001
+title: ClickHouse ports and independent proxy survive save and reopen
+covers:
+- F6.3
+- F6.2
+tags:
+- session
+- database
+- regression
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-clickhouse"]'
+- assert_not_visible: '[data-testid="session-port"]'
+- fill:
+    selector: input[aria-label="ClickHouse HTTP port"]
+    value: '18123'
+- select_option:
+    selector: '[data-testid="session-clickhouse-protocol"]'
+    value: Native
+- assert_visible: '[data-testid="session-port"]'
+- assert_not_visible: input[aria-label="ClickHouse HTTP port"]
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: clickhouse.example.test
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: '19000'
+- click: '[data-testid="session-section-network"]'
+- assert_attribute:
+    selector: '[data-testid="session-proxy-kind"]'
+    name: value
+    equals: app
+- select_option:
+    selector: '[data-testid="session-proxy-kind"]'
+    value: custom
+- assert_visible: '[data-testid="session-custom-proxy"]'
+- fill:
+    selector: '[data-testid="session-custom-proxy"] input[aria-label="Proxy host"]'
+    value: proxy.example.test
+- fill:
+    selector: '[data-testid="session-custom-proxy"] input[aria-label="Port"]'
+    value: '3129'
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-clickhouse-config
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-clickhouse-config"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-clickhouse-config"]'
+- click: '[data-testid="session-edit"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-section-database"]'
+- assert_attribute:
+    selector: '[data-testid="session-clickhouse-protocol"]'
+    name: value
+    equals: Native
+- assert_attribute:
+    selector: '[data-testid="session-port"]'
+    name: value
+    equals: '19000'
+- select_option:
+    selector: '[data-testid="session-clickhouse-protocol"]'
+    value: HTTP
+- assert_attribute:
+    selector: input[aria-label="ClickHouse HTTP port"]
+    name: value
+    equals: '18123'
+- assert_not_visible: '[data-testid="session-port"]'
+- click: '[data-testid="session-section-network"]'
+- assert_attribute:
+    selector: '[data-testid="session-proxy-kind"]'
+    name: value
+    equals: custom
+- assert_attribute:
+    selector: '[data-testid="session-custom-proxy"] input[aria-label="Proxy host"]'
+    name: value
+    equals: proxy.example.test
+- assert_attribute:
+    selector: '[data-testid="session-custom-proxy"] input[aria-label="Port"]'
+    name: value
+    equals: '3129'
+- select_option:
+    selector: '[data-testid="session-proxy-kind"]'
+    value: none
+- assert_not_visible: '[data-testid="session-custom-proxy"]'
+- select_option:
+    selector: '[data-testid="session-proxy-kind"]'
+    value: app
+- assert_not_visible: '[data-testid="session-custom-proxy"]'
+- click: '[data-testid="session-cancel"]'
+- assert_not_visible: '[data-testid="session-editor"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: HTTP and Native show only their applicable ports and retain both
+      values; a new session inherits the application proxy, independent configuration
+      persists, and direct/application choices hide the independent editor.
+    actions:
+    - 3
+    - 5
+    - 7
+    - 8
+    - 11
+    - 12
+    - 13
+    - 15
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 23
+    - 24
+    - 26
+    - 29
+    - 32
+    - 36
+    - 38
+    - 40
+    checkpoints:
+    - step: 6
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 9
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 10
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 14
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 16
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 27
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 28
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 30
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 31
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 33
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 34
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 35
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 37
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 39
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 41
+      expectation: Cancel closes the editor.
+    results:
+    - 6
+    - 9
+    - 10
+    - 14
+    - 16
+    - 27
+    - 28
+    - 30
+    - 31
+    - 33
+    - 34
+    - 35
+    - 37
+    - 39
+    - 41
+  visual:
+  - check: Conditional connection fields
+    method: automated
+    reason: Visibility and value assertions cover the active protocol controls.
+  native:
+  - check: Real persistence and database transport
+    method: automated
+    reason: Native mode uses SQLite/vault and, for the query case, a real ClickHouse
+      server. Browser mode covers editor behavior only.

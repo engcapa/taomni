@@ -399,6 +399,7 @@ export function useSessionEditorActions(context: UseSessionEditorActionsContext)
     password: form.password,
     passwordRef: form.passwordRef,
     authMethod: form.authMethod,
+    compression: form.compression,
     setTesting: form.setTesting,
     setTestResult: form.setTestResult,
     keyPath: form.keyPath,

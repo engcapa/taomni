@@ -1,0 +1,240 @@
+id: TC-SESSION-CH-001
+title: Real ClickHouse HTTP and Native authentication, proxy failure recovery and
+  queries
+covers:
+- F6.3
+- F6.2
+- F-DB-1
+tags:
+- session
+- database
+- regression
+modes:
+- native
+fixtures:
+- reset_db
+- clickhouse_required
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-clickhouse"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.clickhouse.host}
+- fill:
+    selector: input[aria-label="ClickHouse HTTP port"]
+    value: ${cfg.clickhouse.http_port}
+- fill:
+    selector: input[aria-label="Database username"]
+    value: ${cfg.clickhouse.user}
+- fill:
+    selector: input[aria-label="Database password"]
+    value: ${cfg.clickhouse.password}
+- fill:
+    selector: input[aria-label="Database name"]
+    value: ${cfg.clickhouse.database}
+- click: '[data-testid="db-test-connection"]'
+- assert_text:
+    selector: '[data-testid="session-test-result-summary"]'
+    contains: ClickHouse connection OK
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="session-clickhouse-protocol"]'
+    value: Native
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.clickhouse.port}
+- fill:
+    selector: input[aria-label="Database password"]
+    value: deliberately-incorrect
+- click: '[data-testid="db-test-connection"]'
+- assert_text:
+    selector: '[data-testid="session-test-result-summary"]'
+    contains: ClickHouse native
+    timeout_sec: 60
+- fill:
+    selector: input[aria-label="Database password"]
+    value: ${cfg.clickhouse.password}
+- click: '[data-testid="db-test-connection"]'
+- assert_text:
+    selector: '[data-testid="session-test-result-summary"]'
+    contains: ClickHouse connection OK
+    timeout_sec: 60
+- click: '[data-testid="session-section-network"]'
+- select_option:
+    selector: '[data-testid="session-proxy-kind"]'
+    value: custom
+- fill:
+    selector: '[data-testid="session-custom-proxy"] input[aria-label="Proxy host"]'
+    value: 127.0.0.1
+- fill:
+    selector: '[data-testid="session-custom-proxy"] input[aria-label="Port"]'
+    value: '1'
+- click: '[data-testid="db-test-connection"]'
+- assert_text:
+    selector: '[data-testid="session-test-result-summary"]'
+    contains: connect
+    timeout_sec: 60
+- select_option:
+    selector: '[data-testid="session-proxy-kind"]'
+    value: none
+- click: '[data-testid="db-test-connection"]'
+- assert_text:
+    selector: '[data-testid="session-test-result-summary"]'
+    contains: ClickHouse connection OK
+    timeout_sec: 60
+- click: '[data-testid="session-section-database"]'
+- set_check:
+    selector: '[data-testid="db-save-in-vault"]'
+    checked: true
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-clickhouse-native
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="vault-setup-pw1"]'
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-clickhouse-master-test
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-clickhouse-master-test
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-clickhouse-native"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-clickhouse-native"]'
+- wait_for:
+    selector: '[data-testid="db-query-tab"]'
+    timeout_sec: 60
+- assert_not_visible: '[data-testid="db-connection-error-banner"]'
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: SELECT value, toString(toUInt64(18446744073709551615)) AS exact_integer FROM
+    qa_session.fixture WHERE id=1
+- click: '[data-testid="db-run-all"]'
+- wait_for:
+    selector: '[data-testid="query-result-grid"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: fixture-ready
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: '18446744073709551615'
+    timeout_sec: 60
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: SELECT number AS streamed_number FROM numbers(205)
+- click: '[data-testid="db-run-all"]'
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: streamed_number
+    timeout_sec: 60
+- click: '[data-testid="result-log-tab"]'
+- assert_text:
+    selector: '[data-testid="db-execution-log-summary"]'
+    contains: 'Success: 1'
+    timeout_sec: 60
+- screenshot: clickhouse-native-query.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Authenticate through both real protocols, reject incorrect Native
+      credentials and an unavailable custom proxy, recover through explicit direct
+      mode, persist the credential in the vault, and display real typed and streamed
+      query results.
+    actions:
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 13
+    - 14
+    - 15
+    - 16
+    - 18
+    - 19
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 27
+    - 28
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 36
+    - 37
+    - 38
+    - 40
+    - 43
+    - 44
+    - 45
+    - 46
+    - 50
+    - 51
+    - 52
+    - 53
+    - 55
+    checkpoints:
+    - step: 12
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 17
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 20
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 26
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 29
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 42
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 48
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 49
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 54
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    - step: 56
+      expectation: The explicitly asserted protocol, saved value, error or result
+        is present.
+    results:
+    - 12
+    - 17
+    - 20
+    - 26
+    - 29
+    - 42
+    - 48
+    - 49
+    - 54
+    - 56
+  visual:
+  - check: Conditional connection fields
+    method: automated
+    reason: Visibility and value assertions cover the active protocol controls.
+  native:
+  - check: Real persistence and database transport
+    method: automated
+    reason: Native mode uses SQLite/vault and, for the query case, a real ClickHouse
+      server. Browser mode covers editor behavior only.

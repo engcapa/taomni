@@ -8,6 +8,7 @@ import { Checkbox } from "./Fields";
 export interface SessionConnectionFieldsProps {
   t: import("../../../lib/i18n").TranslateFn;
   proto: Proto;
+  hidePort?: boolean;
   host: string;
   setHost: import("react").Dispatch<import("react").SetStateAction<string>>;
   handleHostPaste: (event: ClipboardEvent<HTMLInputElement>) => void;
@@ -83,6 +84,7 @@ export function SessionConnectionFields(viewProps: SessionConnectionFieldsProps)
               />
               </>}
 
+              {!viewProps.hidePort && <>
               <label className="col-span-2 text-[12px] text-right">{t("sessionEditor2.portLabel")}</label>
               <input
                 data-testid="session-port"
@@ -91,6 +93,7 @@ export function SessionConnectionFields(viewProps: SessionConnectionFieldsProps)
                 aria-label={t("sessionEditor2.portAria")}
                 onChange={(e) => setPort(e.target.value)}
               />
+              </>}
               {sessionCapabilities(proto).sshAuthentication && <div className="col-span-8 text-[11px] text-[var(--taomni-text-muted)]">
                 {(() => {
                   const tip = t("sessionEditor2.autofillTip", { snippet: "%SNIPPET%" });

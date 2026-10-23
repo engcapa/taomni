@@ -2063,6 +2063,10 @@
 
 ## sessions (F6.3)
 
+- `input[aria-label="ClickHouse HTTP port"]` — interactive — F6.3.clickhouse-http-port
+- `[data-testid="db-test-connection"]` — interactive — F6.3.database-test-connection
+- `[data-testid="session-clickhouse-protocol"]` — interactive — F6.3.clickhouse-protocol
+- `[data-testid="session-custom-proxy"]` — display — F6.3.custom-proxy
 - `[data-testid="session-editor"]` — display — F6.3.editor
 - `[data-testid="session-proto-ssh"]` — interactive — F6.3.proto-ssh
 - `[data-testid="session-proto-sftp"]` — interactive — F6.3.proto-sftp

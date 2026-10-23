@@ -58,3 +58,28 @@ failures may be reported separately, per user authorization.
 - TC-SESSION-CAP-001 covers all editor protocol tiles, SSH/SFTP boundaries and
   save/reopen in both browser and native modes. It requires only reset_db; no
   predecessor dependency is needed. Hosted execution is pending.
+
+### Stage 2 implementation and pending native evidence
+
+- Added application inheritance, independently persisted proxy configuration and
+  explicit OS proxy selection. Retained legacy HTTP/SOCKS and jump sessions.
+  New sessions default to application inheritance; legacy sessions retain direct
+  routing. Explicit direct mode bypasses environment proxies.
+- OAuth requests now own their SSH forward and runtime through client teardown.
+  SSH compression is propagated to both saved connections and connection probes.
+- ClickHouse Native uses the actual TCP driver for authentication, typed queries
+  and streaming. Native TLS through a proxy is terminated at the upstream stream
+  with the original hostname and OS trust roots, preserving certificate checks.
+  Database forward tasks now abort on failed or cancelled connection setup.
+- Hosted ClickHouse 25.8.12.129 uses pinned SHA256 packages on Linux/macOS and a
+  disposable WSL2 Linux distribution on Windows. Setup authenticates both TCP
+  and HTTP, verifies UInt64/NULL values and executes real DDL/DML. Windows WSL2
+  startup remains unverified until the hosted run finishes; it is not skipped.
+- TC-SESSION-NET-001 covers protocol-specific ports, custom proxy persistence and
+  mode transitions in browser/native. TC-SESSION-CH-001 uses the real service in
+  native mode for HTTP/Native authentication, bad passwords, unavailable proxy,
+  recovery, vault persistence and query results. Browser database commands are
+  deliberately unavailable in this project; editor coverage uses browser mode.
+- Focused Vitest: 90 passed; ClickHouse Rust value decoding test passed; four
+  fixture package/configuration/fail-closed tests passed. Further transport
+  contracts and hosted execution are in progress.

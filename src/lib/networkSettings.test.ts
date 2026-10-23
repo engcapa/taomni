@@ -79,3 +79,15 @@ describe("toNetworkSettingsPayload jump fields", () => {
     expect(payload.jumpPort).toBe(22);
   });
 });
+
+describe("application and independent proxies", () => {
+  it("retains independent configuration and vault references across serialization", () => {
+    const customProxy = { enabled: true, mode: "manual" as const, kind: "socks5" as const,
+      host: "private.proxy", port: 1081, username: "User", password_ref: "vault:proxy-password", session_id: "" };
+    const payload = toNetworkSettingsPayload(normalizeNetworkSettings({ proxyKind: "custom", customProxy }));
+    expect(payload.proxyKind).toBe("custom");
+    expect(payload.customProxy).toEqual(customProxy);
+    expect(normalizeNetworkSettings({ proxyKind: "app" }).proxyKind).toBe("app");
+    expect(normalizeNetworkSettings({}).proxyKind).toBe("none");
+  });
+});

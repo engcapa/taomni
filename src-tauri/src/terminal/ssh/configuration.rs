@@ -119,7 +119,15 @@ pub(super) fn build_client_config(network: Option<&NetworkSettings>) -> Arc<clie
         key: Cow::Borrowed(COMPAT_HOST_KEY_ORDER),
         cipher: preferred.cipher,
         mac: Cow::Borrowed(COMPAT_MAC_ORDER),
-        compression: preferred.compression,
+        compression: if network.is_some_and(|n| n.compression) {
+            Cow::Borrowed(&[
+                russh::compression::ZLIB_LEGACY,
+                russh::compression::ZLIB,
+                russh::compression::NONE,
+            ])
+        } else {
+            Cow::Borrowed(&[russh::compression::NONE])
+        },
     };
     if let Some(n) = network {
         if let Some(d) = n.keepalive_duration() {

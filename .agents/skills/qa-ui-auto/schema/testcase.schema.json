@@ -69,6 +69,7 @@
           "ssh_required",
           "sftp_required",
           "mysql_required",
+          "clickhouse_required",
           "vnc_required",
           "ard_required",
           "jdtls_required",
