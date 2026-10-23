@@ -37,7 +37,7 @@ steps:
 - assert_attribute:
     selector: '[data-testid="session-proxy-kind"]'
     name: value
-    equals: none
+    equals: app
 - select_option:
     selector: '[data-testid="session-proxy-kind"]'
     value: http

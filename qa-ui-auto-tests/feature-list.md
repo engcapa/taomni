@@ -5338,6 +5338,10 @@ controls:
     selector: '[data-testid="db-execution-log-summary"]'
     kind: display
     optional: true
+  - id: execution-log-message
+    selector: '[data-testid="db-execution-log-message"]'
+    kind: display
+    optional: true       # server/driver errors and successful statement feedback
   - id: result-sheet-tab
     selector: '[data-testid="result-sheet-tab"]'
     kind: interactive

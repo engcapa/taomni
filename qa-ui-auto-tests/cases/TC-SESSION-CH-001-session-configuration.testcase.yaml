@@ -173,14 +173,35 @@ steps:
     selector: '[data-testid="query-result-grid"]'
     contains: native-second
     timeout_sec: 45
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: INSERT INTO qa_session.product_write FORMAT CSV 3,unsupported-format
+- click: '[data-testid="db-run-all"]'
+- click: '[data-testid="result-log-tab"]'
+- assert_text:
+    selector: '[data-testid="db-execution-log-message"]'
+    contains: requires inline VALUES or SELECT
+    timeout_sec: 15
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: SELECT count() AS preserved_rows FROM qa_session.product_write
+- click: '[data-testid="db-run-all"]'
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: preserved_rows
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: '2'
+    timeout_sec: 30
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Authenticate through both real protocols, reject incorrect Native credentials
-      and an unavailable custom proxy, recover through explicit direct mode, persist the credential
-      in the vault, and display real typed and streamed query results. Create a table and write
-      inline VALUES through the product Native driver, then verify both rows.
+    requirement: Authenticate through both real protocols, reject incorrect Native credentials and an
+      unavailable custom proxy, recover through explicit direct mode, persist the credential in the vault,
+      and display real typed and streamed query results. Create a table and write inline VALUES through
+      the product Native driver, then verify both rows.
     actions:
     - 3
     - 5
@@ -262,17 +283,13 @@ verification:
     - step: 61
       expectation: The explicitly asserted protocol, saved value, error or result is present.
     - step: 68
-      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both
-        written values.
+      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both written values.
     - step: 74
-      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both
-        written values.
+      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both written values.
     - step: 79
-      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both
-        written values.
+      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both written values.
     - step: 80
-      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both
-        written values.
+      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both written values.
     results:
     - 12
     - 18
@@ -288,6 +305,30 @@ verification:
     - 74
     - 79
     - 80
+  - id: R2
+    requirement: Unsupported Native FORMAT payloads fail promptly and the next query uses a fresh usable
+      connection without inserting partial data.
+    actions:
+    - 81
+    - 82
+    - 83
+    - 84
+    - 85
+    - 87
+    - 88
+    - 89
+    - 90
+    results:
+    - 86
+    - 91
+    - 92
+    checkpoints:
+    - step: 86
+      expectation: Actionable inline VALUES/SELECT guidance appears without waiting for the network timeout.
+    - step: 91
+      expectation: A subsequent query completes through the Native connection.
+    - step: 92
+      expectation: The original two rows remain; the rejected FORMAT payload inserted nothing.
   visual:
   - check: Conditional connection fields
     method: automated
@@ -295,5 +336,5 @@ verification:
   native:
   - check: Real persistence and database transport
     method: automated
-    reason: Native mode uses SQLite/vault and, for the query case, a real ClickHouse server.
-      Browser mode covers editor behavior only.
+    reason: Native mode uses SQLite/vault and, for the query case, a real ClickHouse server. Browser mode
+      covers editor behavior only.

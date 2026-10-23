@@ -225,3 +225,7 @@ failures may be reported separately, per user authorization.
   host key's inherited 0640 mode. Explicitly chmod Cygwin keys to 0600 and run
   sshd configuration/host-key validation before starting the service. This is
   fixture setup failure, not executed Windows authentication evidence.
+- Reject Native INSERT payload syntax that requires a separate binary upload
+  before sending the SQL. Inline VALUES and INSERT SELECT remain supported;
+  FORMAT imports report actionable HTTP guidance. CH-001 now checks prompt
+  rejection, successful subsequent SELECT and unchanged row count.
