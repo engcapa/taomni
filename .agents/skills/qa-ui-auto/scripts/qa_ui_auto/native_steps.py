@@ -1828,7 +1828,7 @@ def _do_set_check(ctx: NativeStepContext, args: Any) -> str:
     if actual is None:
         raise StepError(f"set_check: missing checkbox/radio {args['selector']}")
     if actual != desired:
-        ctx.session.click(str(args["selector"]))
+        ctx.session.pointer_button_click(str(args["selector"]), 0)
     deadline = time.monotonic() + 10
     while ctx.session.execute(probe) != desired:
         if time.monotonic() >= deadline:

@@ -45,6 +45,16 @@ class NativePointerReadinessTest(TestCase):
         prepare_pointer_target(self.session, self.origin)
         self.assertEqual(self.session.request.call_count, 4)
 
+    def test_layout_growth_scrolls_the_same_target_back_into_view_before_input(self):
+        outside = {**self.geometry(ready=False), "outside": True}
+        self.session.request.side_effect = [self.geometry(y=190), outside, None,
+                                            self.geometry(), self.geometry()]
+        self.assertEqual(prepare_pointer_target(self.session, self.origin), {'x': 270, 'y': 217})
+        scroll = self.session.request.call_args_list[2]
+        self.assertIn('scrollIntoView', scroll.args[2]['script'])
+        self.assertEqual(scroll.args[2]['args'], [self.origin])
+        self.assertTrue(all(c.args[1].endswith('/execute/sync') for c in self.session.request.call_args_list))
+
     def test_persistent_overlay_fails_without_dispatching_input(self):
         self.session.request.return_value = self.geometry(ready=False)
         with self.assertRaisesRegex(WebDriverError, 'hit-testable'):

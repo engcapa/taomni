@@ -28,7 +28,8 @@ for (const [px, py] of points) {
     return {x: px, y: py, width: r.width, height: r.height, ready: true};
   }
 }
-return {x, y, width: r.width, height: r.height, ready: false};
+return {x, y, width: r.width, height: r.height, ready: false,
+  outside: right <= left || bottom <= top};
 """
 
 
@@ -58,6 +59,14 @@ def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
         if current is not None and current == previous:
             return {"x": int(last["x"]), "y": int(last["y"])}
         previous = current
+        if last.get("outside") is True:
+            # Asynchronous content above a scrolled control can move it out
+            # of view during preparation. Scroll again, then recheck geometry
+            # and coverage; never activate a different element or replay input.
+            session.request("POST", session.endpoint("/execute/sync"), {
+                "script": "arguments[0].scrollIntoView({block:'nearest', inline:'nearest'});",
+                "args": [origin],
+            })
         remaining = end - time.monotonic()
         if remaining <= 0:
             raise WebDriverError(f"native pointer target did not become stable and hit-testable: {last}")
