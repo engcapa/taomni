@@ -1,6 +1,5 @@
 id: TC-SESSION-KEY-001
-title: Generate a real SSH key, reject overwrite, negotiate expert algorithms and
-  authenticate
+title: Generate a real SSH key, reject overwrite, negotiate expert algorithms and authenticate
 covers:
 - F6.3
 - F2.2
@@ -42,6 +41,7 @@ steps:
     selector: '[data-testid="session-test-result-summary"]'
     contains: Connection successful
     timeout_sec: 45
+- click: '[data-testid="alert-dialog-ok"]'
 - click: '[data-testid="session-auth-privatekey"]'
 - click: '[data-testid="session-private-key-generate"]'
 - wait_for:
@@ -85,6 +85,7 @@ steps:
     selector: '[data-testid="session-test-result-summary"]'
     contains: Connection successful
     timeout_sec: 45
+- click: '[data-testid="alert-dialog-ok"]'
 - fill:
     selector: '[data-testid="session-ssh-cipher"]'
     value: invalid-cipher
@@ -93,6 +94,7 @@ steps:
     selector: '[data-testid="session-test-result-summary"]'
     contains: Unsupported SSH algorithm
     timeout_sec: 45
+- click: '[data-testid="alert-dialog-ok"]'
 - fill:
     selector: '[data-testid="session-ssh-cipher"]'
     value: aes256-ctr
@@ -110,7 +112,7 @@ steps:
     selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
     timeout_sec: 60
 - terminal_input:
-    selector: '[data-testid="terminal-pane"]'
+    selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
     text: printf '\nQA_GENERATED_KEY_OK\n'
     submit: true
 - assert_pattern:
@@ -118,7 +120,7 @@ steps:
     regex: (?m)^QA_GENERATED_KEY_OK\s*$
     timeout_sec: 45
 - terminal_input:
-    selector: '[data-testid="terminal-pane"]'
+    selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
     text: exit
     submit: true
 - assert_text:
@@ -129,7 +131,7 @@ steps:
     selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
     timeout_sec: 45
 - terminal_input:
-    selector: '[data-testid="terminal-pane"]'
+    selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
     text: printf '\nQA_AFTER_RECONNECT\n'
     submit: true
 - assert_pattern:
@@ -140,8 +142,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Generate a real SSH key, reject overwrite, negotiate expert algorithms
-      and authenticate
+    requirement: Generate a real SSH key, reject overwrite, negotiate expert algorithms and
+      authenticate
     actions:
     - 3
     - 5
@@ -153,70 +155,73 @@ verification:
     - 11
     - 13
     - 14
-    - 16
+    - 15
     - 17
     - 18
     - 19
-    - 22
-    - 24
+    - 20
+    - 23
     - 25
     - 26
     - 27
     - 28
-    - 30
+    - 29
     - 31
+    - 32
     - 33
-    - 34
     - 35
     - 36
     - 37
+    - 38
     - 39
-    - 41
-    - 43
-    - 46
-    checkpoints:
-    - step: 12
-      expectation: The explicit authentication, key file, algorithm or reconnection
-        outcome is observed.
-    - step: 20
-      expectation: The explicit authentication, key file, algorithm or reconnection
-        outcome is observed.
-    - step: 21
-      expectation: The explicit authentication, key file, algorithm or reconnection
-        outcome is observed.
-    - step: 23
-      expectation: The explicit authentication, key file, algorithm or reconnection
-        outcome is observed.
-    - step: 29
-      expectation: The explicit authentication, key file, algorithm or reconnection
-        outcome is observed.
-    - step: 32
-      expectation: The explicit authentication, key file, algorithm or reconnection
-        outcome is observed.
-    - step: 42
-      expectation: The explicit authentication, key file, algorithm or reconnection
-        outcome is observed.
-    - step: 44
-      expectation: The explicit authentication, key file, algorithm or reconnection
-        outcome is observed.
-    - step: 47
-      expectation: The explicit authentication, key file, algorithm or reconnection
-        outcome is observed.
-    results:
-    - 12
-    - 20
-    - 21
-    - 23
-    - 29
-    - 32
+    - 40
     - 42
     - 44
+    - 46
+    - 49
+    checkpoints:
+    - step: 12
+      expectation: The explicit authentication, key file, algorithm or reconnection outcome
+        is observed.
+    - step: 21
+      expectation: The explicit authentication, key file, algorithm or reconnection outcome
+        is observed.
+    - step: 22
+      expectation: The explicit authentication, key file, algorithm or reconnection outcome
+        is observed.
+    - step: 24
+      expectation: The explicit authentication, key file, algorithm or reconnection outcome
+        is observed.
+    - step: 30
+      expectation: The explicit authentication, key file, algorithm or reconnection outcome
+        is observed.
+    - step: 34
+      expectation: The explicit authentication, key file, algorithm or reconnection outcome
+        is observed.
+    - step: 45
+      expectation: The explicit authentication, key file, algorithm or reconnection outcome
+        is observed.
+    - step: 47
+      expectation: The explicit authentication, key file, algorithm or reconnection outcome
+        is observed.
+    - step: 50
+      expectation: The explicit authentication, key file, algorithm or reconnection outcome
+        is observed.
+    results:
+    - 12
+    - 21
+    - 22
+    - 24
+    - 30
+    - 34
+    - 45
     - 47
+    - 50
   native:
   - check: Real SSH server, MIT Kerberos KDC and native filesystem
     method: automated
-    reason: Runner fixture authenticates with a real ticket; product connects through
-      its native IPC and protocol implementation.
+    reason: Runner fixture authenticates with a real ticket; product connects through its native
+      IPC and protocol implementation.
   visual:
   - check: Visible protocol status and file entries
     method: automated

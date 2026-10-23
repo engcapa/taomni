@@ -1,6 +1,5 @@
 id: TC-SESSION-CH-001
-title: Real ClickHouse HTTP and Native authentication, proxy failure recovery and
-  queries
+title: Real ClickHouse HTTP and Native authentication, proxy failure recovery and queries
 covers:
 - F6.3
 - F6.2
@@ -41,6 +40,7 @@ steps:
     selector: '[data-testid="session-test-result-summary"]'
     contains: ClickHouse connection OK
     timeout_sec: 60
+- click: '[data-testid="alert-dialog-ok"]'
 - select_option:
     selector: '[data-testid="session-clickhouse-protocol"]'
     value: Native
@@ -55,6 +55,7 @@ steps:
     selector: '[data-testid="session-test-result-summary"]'
     contains: ClickHouse native
     timeout_sec: 60
+- click: '[data-testid="alert-dialog-ok"]'
 - fill:
     selector: input[aria-label="Database password"]
     value: ${cfg.clickhouse.password}
@@ -63,6 +64,7 @@ steps:
     selector: '[data-testid="session-test-result-summary"]'
     contains: ClickHouse connection OK
     timeout_sec: 60
+- click: '[data-testid="alert-dialog-ok"]'
 - click: '[data-testid="session-section-network"]'
 - select_option:
     selector: '[data-testid="session-proxy-kind"]'
@@ -78,6 +80,7 @@ steps:
     selector: '[data-testid="session-test-result-summary"]'
     contains: connect
     timeout_sec: 60
+- click: '[data-testid="alert-dialog-ok"]'
 - select_option:
     selector: '[data-testid="session-proxy-kind"]'
     value: none
@@ -86,6 +89,7 @@ steps:
     selector: '[data-testid="session-test-result-summary"]'
     contains: ClickHouse connection OK
     timeout_sec: 60
+- click: '[data-testid="alert-dialog-ok"]'
 - click: '[data-testid="session-section-database"]'
 - set_check:
     selector: '[data-testid="db-save-in-vault"]'
@@ -111,8 +115,8 @@ steps:
 - assert_not_visible: '[data-testid="db-connection-error-banner"]'
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
-- type: SELECT value, toString(toUInt64(18446744073709551615)) AS exact_integer FROM
-    qa_session.fixture WHERE id=1
+- type: SELECT value, toString(toUInt64(18446744073709551615)) AS exact_integer FROM qa_session.fixture
+    WHERE id=1
 - click: '[data-testid="db-run-all"]'
 - wait_for:
     selector: '[data-testid="query-result-grid"]'
@@ -173,11 +177,10 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Authenticate through both real protocols, reject incorrect Native
-      credentials and an unavailable custom proxy, recover through explicit direct
-      mode, persist the credential in the vault, and display real typed and streamed
-      query results. Create a table and write inline VALUES through the product Native
-      driver, then verify both rows.
+    requirement: Authenticate through both real protocols, reject incorrect Native credentials
+      and an unavailable custom proxy, recover through explicit direct mode, persist the credential
+      in the vault, and display real typed and streamed query results. Create a table and write
+      inline VALUES through the product Native driver, then verify both rows.
     actions:
     - 3
     - 5
@@ -191,105 +194,100 @@ verification:
     - 14
     - 15
     - 16
-    - 18
+    - 17
     - 19
+    - 20
     - 21
-    - 22
     - 23
     - 24
     - 25
+    - 26
     - 27
     - 28
     - 30
     - 31
     - 32
-    - 33
     - 34
+    - 35
     - 36
     - 37
     - 38
-    - 40
+    - 39
+    - 41
+    - 42
     - 43
-    - 44
     - 45
-    - 46
+    - 48
+    - 49
     - 50
     - 51
-    - 52
-    - 53
     - 55
+    - 56
+    - 57
     - 58
-    - 59
     - 60
-    - 61
-    - 62
+    - 63
     - 64
     - 65
     - 66
     - 67
-    - 68
+    - 69
     - 70
     - 71
     - 72
     - 73
+    - 75
+    - 76
+    - 77
+    - 78
     checkpoints:
     - step: 12
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 17
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 20
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 26
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
+    - step: 18
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
+    - step: 22
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
     - step: 29
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 42
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 48
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 49
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
+    - step: 33
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
+    - step: 47
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
+    - step: 53
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
     - step: 54
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 56
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 63
-      expectation: Native DDL and inline INSERT execute successfully and SELECT returns
-        both written values.
-    - step: 69
-      expectation: Native DDL and inline INSERT execute successfully and SELECT returns
-        both written values.
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
+    - step: 59
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
+    - step: 61
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
+    - step: 68
+      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both
+        written values.
     - step: 74
-      expectation: Native DDL and inline INSERT execute successfully and SELECT returns
-        both written values.
-    - step: 75
-      expectation: Native DDL and inline INSERT execute successfully and SELECT returns
-        both written values.
+      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both
+        written values.
+    - step: 79
+      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both
+        written values.
+    - step: 80
+      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both
+        written values.
     results:
     - 12
-    - 17
-    - 20
-    - 26
+    - 18
+    - 22
     - 29
-    - 42
-    - 48
-    - 49
+    - 33
+    - 47
+    - 53
     - 54
-    - 56
-    - 63
-    - 69
+    - 59
+    - 61
+    - 68
     - 74
-    - 75
+    - 79
+    - 80
   visual:
   - check: Conditional connection fields
     method: automated
@@ -297,5 +295,5 @@ verification:
   native:
   - check: Real persistence and database transport
     method: automated
-    reason: Native mode uses SQLite/vault and, for the query case, a real ClickHouse
-      server. Browser mode covers editor behavior only.
+    reason: Native mode uses SQLite/vault and, for the query case, a real ClickHouse server.
+      Browser mode covers editor behavior only.

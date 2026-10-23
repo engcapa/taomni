@@ -136,3 +136,12 @@ failures may be reported separately, per user authorization.
   in browser preview. Keep its real local-terminal/window/adoption assertions
   native-only on all three OSes; TC-128 retains browser new-window persistence
   coverage. Assert computed shell output to distinguish execution from echo.
+
+- Hosted macOS probes now prove Kerberos, agent and generated-key authentication.
+  GSS/KEY UI cases left the result modal open and addressed a non-focusable
+  terminal wrapper; close each result dialog and type into xterm's textarea.
+- Windows setup diagnosed Cygwin's extensionless PE kadmin.local executable.
+  Preserve full SSH probe diagnostics and report missing executable names.
+- ClickHouse startup with 64 global threads starved background pools before
+  opening the TCP listener. Bound each background pool and provide 256 global
+  slots; retain information-level service logs for the next hosted run.

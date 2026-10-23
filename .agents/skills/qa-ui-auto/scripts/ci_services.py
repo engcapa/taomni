@@ -32,8 +32,12 @@ ARD_USER = "qaard"
 
 def command(argv, **kwargs):
     # Deliberately do not log argv: account setup contains disposable passwords.
-    result = subprocess.run([str(a) for a in argv], capture_output=True, text=True,
-                            encoding="utf-8", errors="replace", timeout=180, **kwargs)
+    try:
+        result = subprocess.run([str(a) for a in argv], capture_output=True, text=True,
+                                encoding="utf-8", errors="replace", timeout=180, **kwargs)
+    except FileNotFoundError as error:
+        # Identify the missing executable without exposing credential arguments.
+        raise RuntimeError(f"Required service executable is missing: {argv[0]}") from error
     if result.returncode:
         raise RuntimeError(f"{Path(str(argv[0])).name} failed ({result.returncode}); {result.stderr[-2000:]}")
     return result.stdout.strip()

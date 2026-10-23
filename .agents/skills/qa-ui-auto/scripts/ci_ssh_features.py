@@ -112,7 +112,8 @@ def start(services):
     os.environ.update(env)
     master = secret("QA_KDC_MASTER")
     command([krb_sbin / ("kdb5_util" + suffix), "create", "-s", "-r", realm, "-P", master])
-    kadmin = krb_sbin / ("kadmin.local" + suffix)
+    # Cygwin ships this PE executable without an .exe extension.
+    kadmin = krb_sbin / "kadmin.local"
     command([kadmin, "-q", f"addprinc -randkey {user}@{realm}"])
     command([kadmin, "-q", f"addprinc -randkey host/localhost@{realm}"])
     command([kadmin, "-q", f"ktadd -k {path(keytab)} host/localhost@{realm}"])
@@ -180,10 +181,13 @@ LogLevel DEBUG3
     prefix = [] if cygwin else ["sudo", "-n", "env", *[f"{key}={value}" for key, value in env.items()]]
     if system == "Linux": command(["sudo", "-n", "mkdir", "-p", "/run/sshd"])
     services.start_process([*prefix, sshd, "-D", "-e", "-f", path(config)], "ssh-features")
-    probe = [ssh, "-F", "none", "-oBatchMode=yes", "-oGSSAPIAuthentication=yes",
+    probe = [ssh, "-vvv", "-F", "none", "-oBatchMode=yes", "-oGSSAPIAuthentication=yes",
              "-oPreferredAuthentications=gssapi-with-mic", "-oStrictHostKeyChecking=accept-new", "-p", str(port), "-l", user, "localhost", "printf QA_GSSAPI_OK"]
     def authenticated():
-        if command(probe) != "QA_GSSAPI_OK": raise RuntimeError("GSSAPI command roundtrip differs")
+        result = subprocess.run([str(arg) for arg in probe], capture_output=True, text=True, timeout=20)
+        (services.root / "ssh-gssapi-probe.log").write_text(result.stderr, encoding="utf-8")
+        if result.returncode or result.stdout != "QA_GSSAPI_OK":
+            raise RuntimeError("GSSAPI command roundtrip failed; see ssh-gssapi-probe.log")
     retry(authenticated)
     remote_dir = private / "remote"
     remote_dir.mkdir()

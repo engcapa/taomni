@@ -42,6 +42,7 @@ steps:
     selector: '[data-testid="session-test-result-summary"]'
     contains: SSH GSSAPI connection OK
     timeout_sec: 45
+- click: '[data-testid="alert-dialog-ok"]'
 - click: '[data-testid="session-section-bookmark"]'
 - fill:
     selector: '[data-testid="session-name"]'
@@ -53,7 +54,7 @@ steps:
     selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
     timeout_sec: 60
 - terminal_input:
-    selector: '[data-testid="terminal-pane"]'
+    selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
     text: printf '\nQA_GSSAPI_TERMINAL_OK\n'
     submit: true
 - assert_pattern:
@@ -90,28 +91,29 @@ verification:
     - 13
     - 14
     - 15
-    - 17
-    - 19
-    - 21
-    - 23
+    - 16
+    - 18
+    - 20
+    - 22
     - 24
     - 25
+    - 26
     checkpoints:
     - step: 12
       expectation: The explicit result matches the real protocol or persisted file.
-    - step: 20
+    - step: 21
       expectation: The explicit result matches the real protocol or persisted file.
-    - step: 26
+    - step: 27
       expectation: The explicit result matches the real protocol or persisted file.
     results:
     - 12
-    - 20
-    - 26
+    - 21
+    - 27
   native:
   - check: Real SSH server, MIT Kerberos KDC and native filesystem
     method: automated
-    reason: Runner fixture authenticates with a real ticket; product connects through
-      its native IPC and protocol implementation.
+    reason: Runner fixture authenticates with a real ticket; product connects through its native
+      IPC and protocol implementation.
   visual:
   - check: Visible protocol status and file entries
     method: automated

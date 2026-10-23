@@ -53,7 +53,7 @@ steps:
     selector: '[data-testid="terminal-pane"]'
     equal: 1
 - terminal_input:
-    selector: '[data-testid="terminal-pane"]'
+    selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
     text: echo QA_DETACHED_BOOKMARK_$((17+25))
     submit: true
 - assert_text:
