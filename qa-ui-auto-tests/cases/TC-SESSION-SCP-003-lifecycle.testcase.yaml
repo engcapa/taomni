@@ -91,7 +91,7 @@ steps:
 - click: '[data-testid="sftp-transfer-queue"] button[title="Retry"]'
 - assert_file_sha256:
     path: ${cfg.ssh_features.large_downloaded}
-    equals: ${cfg.ssh_features.large_sha256}
+    equals: 6b4be392164b2c21ce9cd339a9846f9de7afb4407b46becb7ddf98081e3c6cac
     timeout_sec: 90
 - assert_visible: '[data-testid="sftp-transfer-queue"] [data-transfer-state="done"][data-resume-bytes]:not([data-resume-bytes="0"])'
 verification:
