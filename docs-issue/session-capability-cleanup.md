@@ -234,3 +234,10 @@ failures may be reported separately, per user authorization.
   dbeaverCredentials. A focused persistence unit regression covers unknown keys;
   retained CAP-001 and NET-001 continue covering configuration save/reopen on
   browser/native. No new UI or executable entry is introduced by this correction.
+- Run 40040881435 at 09ad2278: Linux and macOS each passed all 13 selected native
+  cases, including real X11 windows, ClickHouse bad-password recovery, encrypted
+  keys and SCP pause/cancel/retry. This predates the FORMAT and extension-key
+  corrections; latest complete matrix is run 40042252443 at 7042a3b8.
+- Add GSS-002 to remove only the disposable fixture's ticket cache for the case,
+  assert actionable authentication failure, then restore the cache on teardown.
+  No shared credentials or product state are modified by this negative fixture.

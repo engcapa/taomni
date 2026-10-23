@@ -238,6 +238,7 @@ LogLevel DEBUG3
     local_dir.mkdir()
     (local_dir / "scp-upload.txt").write_text("qa-scp-upload\n", encoding="utf-8")
     services.config["ssh_features"] = {"host": "localhost", "port": port, "user": user,
+        "ticket_cache": ccache.as_posix(),
         "key_path": str(client_key).replace("\\", "/"), "generated_key": str(generated).replace("\\", "/"),
         "encrypted_key": encrypted.as_posix(), "encrypted_public_key": encrypted.as_posix() + ".pub",
         "remote_dir": path(remote_dir), "source": path(remote_dir / "scp-source.txt"),

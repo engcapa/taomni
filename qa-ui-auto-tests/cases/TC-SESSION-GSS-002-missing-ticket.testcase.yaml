@@ -1,0 +1,77 @@
+id: TC-SESSION-GSS-002
+title: GSSAPI missing ticket fails without password or public-key fallback
+covers:
+- F6.3
+tags:
+- session
+- native
+- regression
+modes:
+- native
+fixtures:
+- reset_db
+- ssh_features_required
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="sidebar"]'
+    timeout_sec: 45
+- click: '[data-testid="session-new"]'
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    timeout_sec: 45
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.ssh_features.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.ssh_features.port}
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${cfg.ssh_features.user}
+- click: '[data-testid="session-section-advanced"]'
+- click: '[data-testid="session-auth-gssapi"]'
+- click: '[data-testid="session-test-connection"]'
+- assert_text:
+    selector: '[data-testid="session-test-result-summary"]'
+    contains: Obtain a Kerberos ticket
+    timeout_sec: 45
+- click: '[data-testid="alert-dialog-ok"]'
+- assert_visible: '[data-testid="session-editor"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Missing Kerberos tickets fail with actionable guidance without silently trying another
+      authentication method.
+    actions:
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 13
+    results:
+    - 12
+    - 14
+    checkpoints:
+    - step: 12
+      expectation: Native OpenSSH fails without a ticket and the product explains how to obtain one.
+    - step: 14
+      expectation: Editor remains usable after the failed connection test.
+  native:
+  - check: Real Kerberos credential cache absence
+    method: automated
+    reason: The fixture temporarily removes its private credential cache and restores it after the case.
+      Native OpenSSH probes the real SSH server.
+  visual:
+  - check: Actionable authentication error
+    method: automated
+    reason: Visible result message and editor assertions.
