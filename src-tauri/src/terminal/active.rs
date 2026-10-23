@@ -8,6 +8,7 @@ use tokio::task::JoinHandle;
 
 pub enum ActiveTerminal {
     Local {
+        _route: crate::database::forward::ForwardGuard,
         writer: Mutex<Box<dyn Write + Send>>,
         master: Mutex<Box<dyn portable_pty::MasterPty + Send>>,
         #[allow(dead_code)]

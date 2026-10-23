@@ -1619,6 +1619,39 @@ components: [SessionEditor]
 files:
   - src/components/session/SessionEditor.tsx
 controls:
+  - id: key-generator
+    selector: '[data-testid="session-key-generator"]'
+    kind: display
+  - id: key-output-path
+    selector: '[data-testid="session-key-output-path"]'
+    kind: interactive
+  - id: key-passphrase
+    selector: '[data-testid="session-key-passphrase"]'
+    kind: interactive
+  - id: key-comment
+    selector: '[data-testid="session-key-comment"]'
+    kind: interactive
+  - id: key-create
+    selector: '[data-testid="session-key-create"]'
+    kind: interactive
+  - id: key-result
+    selector: '[data-testid="session-key-result"]'
+    kind: display
+  - id: ssh-cipher
+    selector: '[data-testid="session-ssh-cipher"]'
+    kind: interactive
+  - id: ssh-kex
+    selector: '[data-testid="session-ssh-kex"]'
+    kind: interactive
+  - id: ssh-mac
+    selector: '[data-testid="session-ssh-mac"]'
+    kind: interactive
+  - id: custom-icon-value
+    selector: 'input[aria-label="Custom session icon"]'
+    kind: interactive
+  - id: terminal-bookmark-background
+    selector: '[data-testid="session-terminal-background"]'
+    kind: display
   - id: clickhouse-http-port
     selector: 'input[aria-label="ClickHouse HTTP port"]'
     kind: interactive

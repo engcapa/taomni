@@ -52,6 +52,8 @@ impl NativeClient {
         sql: &str,
         token: &CancellationToken,
     ) -> Result<QueryResult, String> {
+        let sql = super::clickhouse_native_sql::native_sql(sql)?;
+        let sql = sql.as_ref();
         let start = Instant::now();
         let pool = Pool::new(self.options.clone().database(database));
         let operation = async {
@@ -79,6 +81,8 @@ impl NativeClient {
         token: &CancellationToken,
         on_event: &QueryStreamChannel,
     ) -> Result<(), String> {
+        let sql = super::clickhouse_native_sql::native_sql(sql)?;
+        let sql = sql.as_ref();
         let start = Instant::now();
         let pool = Pool::new(self.options.clone().database(database));
         let operation = async {

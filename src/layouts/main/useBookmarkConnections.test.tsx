@@ -1,0 +1,41 @@
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { StrictMode } from "react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { useBookmarkConnections } from "./useBookmarkConnections";
+const state = vi.hoisted(() => ({ sessions: [] as any[], tabs: [] as any[], load: vi.fn() }));
+vi.mock("../../stores/sessionStore", () => ({ useSessionStore: { getState: () => ({ sessions: state.sessions, loadSessions: state.load }) } }));
+vi.mock("../../stores/appStore", () => ({ useAppStore: { getState: () => ({ tabs: state.tabs }) } }));
+vi.mock("../../lib/runtime", () => ({ getAppPlatform: () => "linux" }));
+afterEach(cleanup);
+beforeEach(() => { state.sessions = []; state.tabs = []; state.load.mockReset().mockResolvedValue(undefined); });
+const session = (id: string, options: object) => ({ id, session_type: "SSH", options_json: JSON.stringify(options) });
+it("loads and auto-connects once under StrictMode while respecting existing tabs", async () => {
+  state.sessions = [session("old", {}), session("new", { autoConnect: true }), session("open", { autoConnect: true })];
+  state.tabs = [{ sessionId: "open" }];
+  const connect = vi.fn();
+  const hook = renderHook(() => useBookmarkConnections(connect), { wrapper: StrictMode });
+  await waitFor(() => expect(connect).toHaveBeenCalledTimes(1));
+  expect(connect).toHaveBeenCalledWith([state.sessions[1]]);
+  hook.rerender(); expect(connect).toHaveBeenCalledTimes(1);
+});
+it("does not start a connection after unmount during session loading", async () => {
+  let complete!: () => void;
+  state.load.mockImplementation(() => new Promise<void>((resolve) => { complete = resolve; }));
+  state.sessions = [session("new", { autoConnect: true })];
+  const connect = vi.fn(); const hook = renderHook(() => useBookmarkConnections(connect));
+  hook.unmount(); await act(async () => complete()); expect(connect).not.toHaveBeenCalled();
+});
+it("routes only a unique shortcut and protects text input and repeats", async () => {
+  state.sessions = [session("one", { shortcut: "Ctrl+Shift+k" })];
+  const connect = vi.fn(); renderHook(() => useBookmarkConnections(connect));
+  await waitFor(() => expect(connect).toHaveBeenCalled()); connect.mockClear();
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, shiftKey: true }));
+  expect(connect).toHaveBeenCalledWith([state.sessions[0]]); connect.mockClear();
+  const input = document.createElement("input"); document.body.append(input);
+  input.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, shiftKey: true, bubbles: true }));
+  input.remove();
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, shiftKey: true, repeat: true }));
+  state.sessions.push(session("two", { shortcut: "Ctrl+Shift+k" }));
+  window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", ctrlKey: true, shiftKey: true }));
+  expect(connect).not.toHaveBeenCalled();
+});

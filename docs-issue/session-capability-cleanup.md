@@ -83,3 +83,28 @@ failures may be reported separately, per user authorization.
 - Focused Vitest: 90 passed; ClickHouse Rust value decoding test passed; four
   fixture package/configuration/fail-closed tests passed. Further transport
   contracts and hosted execution are in progress.
+
+## Stage 3 implementation checkpoint (2026-10-23)
+
+- Bookmark values now persist and drive startup/shortcut connections, terminal raster backgrounds,
+  custom text icons, SSH retry policy and supported detached windows. Handoffs carry only the
+  bookmark fields needed for presentation, and a reattached tab is not detached again.
+- SSH expert algorithm preferences validate against russh, key generation creates protected
+  Ed25519 files without replacing existing keys, and encrypted private keys prompt through the
+  existing authentication challenge UI. SSH Agent signs through the OS agent.
+- GSSAPI uses a GSSAPI-enabled OpenSSH client and the OS ticket cache, with password/public-key
+  fallback disabled. Terminal and SFTP child/route ownership ends with their runtime. Windows
+  requires a GSSAPI-enabled client on PATH; the hosted fixture provisions Cygwin OpenSSH.
+- SCP modes use the actual SCP transfer protocol with shell metadata (Python 3 required remotely),
+  32 KiB compatibility / 256 KiB fast blocks, explicit progress and cancellation, and partial files
+  published only after completion. Further resume and failure-path verification remains open.
+- ClickHouse inline INSERT VALUES is rewritten using the SQL AST into INSERT SELECT, which the
+  Native query protocol can execute without waiting for a separate binary insert exchange.
+- Added hosted native cases for Kerberos terminal/SFTP, OS agent and generated keys, expert
+  negotiation, both SCP modes and bookmark file loading. The new runner-owned Kerberos fixture
+  performs a real KDC ticket exchange and SSH command probe; no synthetic pass is accepted.
+- Local validation: 233 focused frontend tests; 4 SFTP protocol/unit checks; 1 Native INSERT
+  normalization check; 2 remote metadata subprocess checks. TypeScript and refactoring contracts
+  pass. Browser/native execution remains exclusively in GitHub; this checkpoint is not acceptance.
+- Stage 2 run 39976065183: all case-execution steps passed on Linux/Windows/macOS. macOS shard 2
+  artifact upload failed after five GitHub service timeouts; failed jobs were rerun, evidence pending.

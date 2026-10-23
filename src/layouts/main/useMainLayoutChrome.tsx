@@ -1,3 +1,5 @@
+import { sshBrowserMode } from "../../lib/sshSessionOptions";
+import { parseSessionOptions } from "../../lib/terminalProfile";
 import { Bot, FolderOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { type ToolWindowRailItem } from "../../components/editor/workspace/panels/ToolWindowRail";
@@ -42,6 +44,7 @@ export function useMainLayoutChrome(context: UseMainLayoutChromeContext) {
   const terminalRailMerged = layout.mergeToolWindowRail && layout.sidebarCollapsed && !!layout.mainRailHost
     && layout.activeTab?.type === "terminal" && !terminalSplitVisible;
   const toggleTerminalSftp = (tab: Tab) => {
+    if (sshBrowserMode(parseSessionOptions(tab.ssh?.optionsJson).sshBrowser) === "disabled") return;
     if (layout.sftpDetachedTabs[tab.id] && tab.ssh) {
       windowLifecycle.openDetachedSftp(
         {
@@ -66,7 +69,7 @@ export function useMainLayoutChrome(context: UseMainLayoutChromeContext) {
   const terminalRailItems: ToolWindowRailItem[] = [];
   if (terminalRailMerged && layout.activeTab) {
     const railTab = layout.activeTab;
-    if (railTab.ssh) {
+    if (railTab.ssh && sshBrowserMode(parseSessionOptions(railTab.ssh.optionsJson).sshBrowser) !== "disabled") {
       terminalRailItems.push({
         id: "sftp",
         label: layout.t("terminal.sftpFloatingButtonLabel"),

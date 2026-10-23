@@ -11,6 +11,7 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::terminal::create_ssh_terminal,
         crate::terminal::submit_ssh_auth_response,
         crate::terminal::attach_terminal_output,
+        crate::terminal::keygen::generate_ssh_key,
         crate::terminal::test_ssh_connection,
         crate::terminal::test_proxy_connection,
         crate::terminal::write_terminal,

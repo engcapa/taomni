@@ -63,6 +63,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
 
 mod progress;
+mod scp;
 
 mod metadata;
 

@@ -21,7 +21,7 @@ export interface HandleSaveContext {
   proto: Proto;
   isProxy: boolean;
   isMail: boolean;
-  authMethod: "Password" | "Agent" | "None" | "PrivateKey";
+  authMethod: "Password" | "Agent" | "Gssapi" | "None" | "PrivateKey";
   mailAuthMode: MailAuthMode;
   saveInVault: boolean;
   password: string;

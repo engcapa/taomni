@@ -87,6 +87,8 @@ def capabilities(cases, mode: str) -> list[str]:
         fixtures = set(case.fixtures)
         if fixtures & {"ssh_required", "sftp_required"}:
             result.add("ssh")
+        if "ssh_features_required" in fixtures:
+            result.add("ssh_features")
         if "clickhouse_required" in fixtures:
             result.add("clickhouse")
         if "mysql_required" in fixtures:

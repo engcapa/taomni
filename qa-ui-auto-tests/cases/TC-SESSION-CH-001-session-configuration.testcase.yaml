@@ -139,6 +139,36 @@ steps:
     contains: 'Success: 1'
     timeout_sec: 60
 - screenshot: clickhouse-native-query.png
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: CREATE TABLE qa_session.product_write (id UInt64, value String) ENGINE=Memory
+- click: '[data-testid="db-run-all"]'
+- click: '[data-testid="result-log-tab"]'
+- assert_text:
+    selector: '[data-testid="db-execution-log-summary"]'
+    contains: 'Success: 1'
+    timeout_sec: 45
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: INSERT INTO qa_session.product_write VALUES (1, 'native-write'), (2, 'native-second')
+- click: '[data-testid="db-run-all"]'
+- click: '[data-testid="result-log-tab"]'
+- assert_text:
+    selector: '[data-testid="db-execution-log-summary"]'
+    contains: 'Success: 1'
+    timeout_sec: 45
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: SELECT value FROM qa_session.product_write ORDER BY id
+- click: '[data-testid="db-run-all"]'
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: native-write
+    timeout_sec: 45
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: native-second
+    timeout_sec: 45
 verification:
   review: reviewed
   requirements:
@@ -146,7 +176,8 @@ verification:
     requirement: Authenticate through both real protocols, reject incorrect Native
       credentials and an unavailable custom proxy, recover through explicit direct
       mode, persist the credential in the vault, and display real typed and streamed
-      query results.
+      query results. Create a table and write inline VALUES through the product Native
+      driver, then verify both rows.
     actions:
     - 3
     - 5
@@ -187,6 +218,20 @@ verification:
     - 52
     - 53
     - 55
+    - 58
+    - 59
+    - 60
+    - 61
+    - 62
+    - 64
+    - 65
+    - 66
+    - 67
+    - 68
+    - 70
+    - 71
+    - 72
+    - 73
     checkpoints:
     - step: 12
       expectation: The explicitly asserted protocol, saved value, error or result
@@ -218,6 +263,18 @@ verification:
     - step: 56
       expectation: The explicitly asserted protocol, saved value, error or result
         is present.
+    - step: 63
+      expectation: Native DDL and inline INSERT execute successfully and SELECT returns
+        both written values.
+    - step: 69
+      expectation: Native DDL and inline INSERT execute successfully and SELECT returns
+        both written values.
+    - step: 74
+      expectation: Native DDL and inline INSERT execute successfully and SELECT returns
+        both written values.
+    - step: 75
+      expectation: Native DDL and inline INSERT execute successfully and SELECT returns
+        both written values.
     results:
     - 12
     - 17
@@ -229,6 +286,10 @@ verification:
     - 49
     - 54
     - 56
+    - 63
+    - 69
+    - 74
+    - 75
   visual:
   - check: Conditional connection fields
     method: automated

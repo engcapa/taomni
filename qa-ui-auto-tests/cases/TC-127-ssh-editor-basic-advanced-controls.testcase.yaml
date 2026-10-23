@@ -55,54 +55,54 @@ steps:
 - assert_attribute:
     selector: '[data-testid="session-remote-environment"]'
     name: value
-    equals: Interactive shell
+    equals: shell
 - select_option:
     selector: '[data-testid="session-remote-environment"]'
     label: LXDE / LXQt desktop
 - assert_attribute:
     selector: '[data-testid="session-remote-environment"]'
     name: value
-    equals: LXDE / LXQt desktop
+    equals: lxde
 - select_option:
     selector: '[data-testid="session-remote-environment"]'
     label: Xfce desktop
 - assert_attribute:
     selector: '[data-testid="session-remote-environment"]'
     name: value
-    equals: Xfce desktop
+    equals: xfce
 - select_option:
     selector: '[data-testid="session-remote-environment"]'
     label: GNOME desktop
 - assert_attribute:
     selector: '[data-testid="session-remote-environment"]'
     name: value
-    equals: GNOME desktop
+    equals: gnome
 - select_option:
     selector: '[data-testid="session-remote-environment"]'
     label: KDE Plasma desktop
 - assert_attribute:
     selector: '[data-testid="session-remote-environment"]'
     name: value
-    equals: KDE Plasma desktop
+    equals: kde
 - select_option:
     selector: '[data-testid="session-remote-environment"]'
     label: Awesome WM
 - assert_attribute:
     selector: '[data-testid="session-remote-environment"]'
     name: value
-    equals: Awesome WM
+    equals: awesome
 - select_option:
     selector: '[data-testid="session-remote-environment"]'
     label: Custom command…
 - assert_attribute:
     selector: '[data-testid="session-remote-environment"]'
     name: value
-    equals: Custom command…
+    equals: custom
 - fill:
-    selector: 'input[aria-label="Execute command"]'
+    selector: input[aria-label="Execute command"]
     value: printf 'qa-advanced-control\n'
 - assert_attribute:
-    selector: 'input[aria-label="Execute command"]'
+    selector: input[aria-label="Execute command"]
     name: value
     equals: printf 'qa-advanced-control\n'
 - set_check:
@@ -118,21 +118,21 @@ steps:
 - assert_attribute:
     selector: '[data-testid="session-ssh-browser-type"]'
     name: value
-    equals: SCP (enhanced speed)
+    equals: scp-fast
 - select_option:
     selector: '[data-testid="session-ssh-browser-type"]'
     label: SCP (compatibility)
 - assert_attribute:
     selector: '[data-testid="session-ssh-browser-type"]'
     name: value
-    equals: SCP (compatibility)
+    equals: scp
 - select_option:
     selector: '[data-testid="session-ssh-browser-type"]'
     label: Disabled
 - assert_attribute:
     selector: '[data-testid="session-ssh-browser-type"]'
     name: value
-    equals: Disabled
+    equals: disabled
 - click: '[data-testid="session-auth-agent"]'
 - assert_count:
     selector: '[data-testid="session-auth-agent"]:checked'
@@ -146,10 +146,10 @@ steps:
     selector: '[data-testid="session-auth-password"]:checked'
     equal: 1
 - fill:
-    selector: 'input[aria-label="SSH password"]'
+    selector: input[aria-label="SSH password"]
     value: qa-ui-auto-password
 - assert_attribute:
-    selector: 'input[aria-label="SSH password"]'
+    selector: input[aria-label="SSH password"]
     name: type
     equals: password
 - click: '[data-testid="session-auth-privatekey"]'
@@ -164,7 +164,7 @@ steps:
     selector: '[data-testid="session-private-key-toggle"]'
     name: data-checked
     equals: 'false'
-- assert_disabled: 'input[aria-label="Private key path"]'
+- assert_disabled: input[aria-label="Private key path"]
 - set_check:
     selector: '[data-testid="session-private-key-toggle"]'
     checked: true
@@ -172,7 +172,7 @@ steps:
     selector: '[data-testid="session-private-key-toggle"]'
     name: data-checked
     equals: 'true'
-- assert_enabled: 'input[aria-label="Private key path"]'
+- assert_enabled: input[aria-label="Private key path"]
 - click: '[data-testid="session-private-key-browse"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - assert_visible: '[data-testid="text-input-dialog-input"]'
@@ -181,27 +181,144 @@ steps:
     value: /home/qauser/.ssh/id_ed25519
 - click: '[data-testid="text-input-dialog-confirm"]'
 - assert_attribute:
-    selector: 'input[aria-label="Private key path"]'
+    selector: input[aria-label="Private key path"]
     name: value
     equals: /home/qauser/.ssh/id_ed25519
-- assert_disabled: '[data-testid="session-private-key-generate"]'
+- click: '[data-testid="session-private-key-generate"]'
+- assert_visible: '[data-testid="session-key-generator"]'
 - hover: '[data-testid="session-private-key-generate"]'
-- assert_disabled: '[data-testid="session-expert-settings"]'
+- click: '[data-testid="session-expert-settings"]'
+- fill:
+    selector: '[data-testid="session-ssh-cipher"]'
+    value: aes256-gcm@openssh.com
+- assert_attribute:
+    selector: '[data-testid="session-ssh-cipher"]'
+    name: value
+    equals: aes256-gcm@openssh.com
 - hover: '[data-testid="session-expert-settings"]'
 - click: '[data-testid="session-close"]'
 - wait_for:
     selector: '[data-testid="session-editor"]'
     state: detached
 - screenshot: 127-ssh-editor-basic-advanced-controls.png
+- assert_not_visible: '[data-testid="session-editor"]'
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH editor lookup parses user, host, and port, exposes the header and section actions, and reports the help result.
+    requirement: SSH advanced controls use stable protocol values, expose key generation
+      and apply expert cipher preferences.
     actions:
-    - 2
     - 3
-    - 4
+    - 12
+    - 13
+    - 18
+    - 20
+    - 23
+    - 25
+    - 27
+    - 29
+    - 31
+    - 33
+    - 35
+    - 37
+    - 39
+    - 41
+    - 43
+    - 45
+    - 47
+    - 49
+    - 51
+    - 53
+    - 56
+    - 59
+    - 62
+    - 65
+    - 66
+    - 68
+    - 71
+    - 72
+    - 75
+    checkpoints:
+    - step: 5
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 6
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 7
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 8
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 9
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 10
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 11
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 14
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 15
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 16
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 17
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 19
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 22
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 24
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 26
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 28
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 30
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 32
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 34
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 36
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 38
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 40
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 42
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 44
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 46
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 48
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 50
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 52
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 54
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 55
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 57
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 58
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 60
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 61
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 64
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 67
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 69
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 73
+      expectation: The explicit control value or visibility assertion holds.
+    - step: 78
+      expectation: The explicit control value or visibility assertion holds.
+    results:
     - 5
     - 6
     - 7
@@ -209,106 +326,46 @@ verification:
     - 9
     - 10
     - 11
-    - 12
-    - 13
     - 14
     - 15
     - 16
     - 17
-    - 18
     - 19
-    - 20
-    - 21
     - 22
-    - 23
     - 24
-    - 25
     - 26
-    - 27
     - 28
-    - 29
     - 30
-    - 31
     - 32
-    - 33
     - 34
-    - 35
     - 36
-    - 37
     - 38
-    - 39
     - 40
-    - 41
     - 42
-    - 43
     - 44
-    - 45
     - 46
-    - 47
     - 48
-    - 49
     - 50
-    - 51
     - 52
-    - 53
     - 54
     - 55
-    - 56
     - 57
     - 58
-    - 59
     - 60
     - 61
-    - 62
-    - 63
     - 64
-    - 65
-    - 66
     - 67
-    - 68
     - 69
-    - 70
-    - 71
-    - 72
-    checkpoints:
-    - step: 4
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 5
-      expectation: '{"assert_visible": "[data-testid=\"session-help\"]"}'
-    - step: 6
-      expectation: '{"assert_visible": "[data-testid=\"session-close\"]"}'
-    - step: 7
-      expectation: '{"assert_visible": "[data-testid=\"session-host-lookup\"]"}'
-    - step: 14
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "127.0.0.1"}}'
-    - step: 15
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "2222"}}'
-    - step: 16
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "qauser"}}'
-    - step: 19
-      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Fill required fields"}}'
-    - step: 21
-      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
-    - step: 54
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "name": "value", "equals": "Disabled"}}'
-    - step: 67
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Private key path\"]", "name": "value", "equals": "/home/qauser/.ssh/id_ed25519"}}'
-    - step: 73
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
-    results:
-    - 14
-    - 15
-    - 16
-    - 19
-    - 21
-    - 54
-    - 67
     - 73
+    - 78
   visual:
-  - check: SSH header actions, advanced controls, and dialog text remain readable without overlap.
+  - check: SSH header actions, advanced controls, and dialog text remain readable
+      without overlap.
     method: manual
     reason: Functional assertions do not establish layout fidelity.
   native:
-  - check: This browser case intentionally exercises the browser file-picker stub; packaged native dialog behavior remains unverified.
+  - check: This browser case intentionally exercises the browser file-picker stub;
+      packaged native dialog behavior remains unverified.
     method: external
-    reason: The private-key picker is an OS dialog boundary and is covered here only through the browser fixture.
+    reason: The private-key picker is an OS dialog boundary and is covered here only
+      through the browser fixture.

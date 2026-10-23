@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { sessionCapabilities } from "../../../lib/sessionCapabilities";
+import type { SessionBookmark } from "../../../lib/sessionBookmark";
 import { Terminal as TerminalIcon, FolderPlus } from "lucide-react";
 import { selectFilePath } from "../../../lib/ipc";
 import { type TranslateFn } from "../../../lib/i18n";
@@ -7,6 +9,7 @@ import { Field, Select, Checkbox } from "./Fields";
 
 
 export function BookmarkSettings({
+  value, onChange,
   t,
   name, setName,
   groupPath, setGroupPath,
@@ -19,6 +22,8 @@ export function BookmarkSettings({
   fileExtraArgs, setFileExtraArgs,
   disableAiWrite, setDisableAiWrite,
 }: {
+  value: SessionBookmark;
+  onChange: (value: SessionBookmark) => void;
   t: TranslateFn;
   name: string; setName: (v: string) => void;
   groupPath: string; setGroupPath: (v: string) => void;
@@ -31,12 +36,16 @@ export function BookmarkSettings({
   fileExtraArgs: string; setFileExtraArgs: (v: string) => void;
   disableAiWrite: boolean; setDisableAiWrite: (v: boolean) => void;
 }) {
-  const [bgImage, setBgImage] = useState("");
-  const [bgOpacity, setBgOpacity] = useState("35%");
-  const [autoConnect, setAutoConnect] = useState(true);
-  const [openNewWindow, setOpenNewWindow] = useState(false);
-  const [reconnect, setReconnect] = useState(true);
-  const [shortcut, setShortcut] = useState("");
+  const [iconPickerOpen, setIconPickerOpen] = useState(false);
+  const capabilities = sessionCapabilities(proto);
+  const { bgImage, bgOpacity, autoConnect, openNewWindow, reconnect, shortcut } = value;
+  const patch = (change: Partial<SessionBookmark>) => onChange({ ...value, ...change });
+  const setBgImage = (bgImage: string) => patch({ bgImage });
+  const setBgOpacity = (bgOpacity: string) => patch({ bgOpacity });
+  const setAutoConnect = (autoConnect: boolean) => patch({ autoConnect });
+  const setOpenNewWindow = (openNewWindow: boolean) => patch({ openNewWindow });
+  const setReconnect = (reconnect: boolean) => patch({ reconnect });
+  const setShortcut = (shortcut: string) => patch({ shortcut });
 
   const handleBrowseBgImage = async () => {
     try {
@@ -78,13 +87,16 @@ export function BookmarkSettings({
           className="inline-flex items-center gap-1 px-2 py-1 rounded border"
           style={{ borderColor: "var(--taomni-input-border)", background: "var(--taomni-input-bg)" }}
         >
-          <TerminalIcon className="w-4 h-4" style={{ color: "#2b5d8b" }} />
+          {value.customIcon ? <span>{value.customIcon}</span> : <TerminalIcon className="w-4 h-4" style={{ color: "#2b5d8b" }} />}
           {proto.toLowerCase()}
         </span>
-        <button data-testid="session-custom-icon" className="taomni-btn ml-2" type="button" disabled title={t("sessionEditor2.customIconTitle")}>{t("sessionEditor2.customIconChange")}</button>
+        <button data-testid="session-custom-icon" className="taomni-btn ml-2" type="button" onClick={() => setIconPickerOpen((open) => !open)} aria-expanded={iconPickerOpen}>{t("sessionEditor2.customIconChange")}</button>
+        {iconPickerOpen && <input className="taomni-input ml-2 w-32" aria-label="Custom session icon"
+          maxLength={8} placeholder="★" value={value.customIcon}
+          onChange={(event) => patch({ customIcon: event.target.value.trim() })} />}
       </Field>
 
-      <Field label={t("sessionEditor2.fieldBackgroundImage")}>
+      {capabilities.terminal && <Field label={t("sessionEditor2.fieldBackgroundImage")}>
         <input
           className="taomni-input flex-1"
           placeholder={t("sessionEditor2.backgroundImagePlaceholder")}
@@ -108,7 +120,7 @@ export function BookmarkSettings({
           aria-label={t("sessionEditor2.backgroundOpacityAria")}
           onChange={(e) => setBgOpacity(e.target.value)}
         />
-      </Field>
+      </Field>}
 
       <Field label={t("sessionEditor2.fieldDescriptionNotes")}>
         <textarea
@@ -161,20 +173,20 @@ export function BookmarkSettings({
         </>
       )}
 
-      {proto !== "File" && (
+      {proto !== "File" && proto !== "Proxy" && (
         <Field label={t("sessionEditor2.fieldStartupBehavior")}>
           <label className="flex items-center gap-1.5">
             <Checkbox dataTestId="session-auto-connect" checked={autoConnect} onChange={setAutoConnect} />
             {t("sessionEditor2.autoConnect")}
           </label>
-          <label className="ml-3 flex items-center gap-1.5">
+          {capabilities.detachedWindow && <label className="ml-3 flex items-center gap-1.5">
             <Checkbox dataTestId="session-open-new-window" checked={openNewWindow} onChange={setOpenNewWindow} />
             {t("sessionEditor2.openNewWindow")}
-          </label>
-          <label className="ml-3 flex items-center gap-1.5">
+          </label>}
+          {proto === "SSH" && <label className="ml-3 flex items-center gap-1.5">
             <Checkbox dataTestId="session-reconnect" checked={reconnect} onChange={setReconnect} />
             {t("sessionEditor2.reconnectOnDisconnect")}
-          </label>
+          </label>}
         </Field>
       )}
 

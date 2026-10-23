@@ -1,3 +1,4 @@
+import { sshBrowserMode } from "../../../lib/sshSessionOptions";
 import { Terminal } from "@xterm/xterm";
 import { parseSessionOptions } from "../../../lib/terminalProfile";
 import { getAppPlatform, isTauriRuntime } from "../../../lib/runtime";
@@ -15,7 +16,7 @@ export function formatSshInfoBanner(ssh: SshConnectInfo): string {
   const compression = options.compression === true;
   const x11 = options.x11 !== false;
   const sshBrowser = typeof options.sshBrowser === "string" ? options.sshBrowser : "SFTP protocol (recommended)";
-  const sshBrowserEnabled = sshBrowser !== "Disabled";
+  const sshBrowserEnabled = sshBrowserMode(sshBrowser) !== "disabled";
   const rows = [
     "Taomni SSH terminal",
     "SSH session to " + ssh.username + "@" + ssh.host,

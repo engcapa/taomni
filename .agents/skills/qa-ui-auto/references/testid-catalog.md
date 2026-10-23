@@ -2063,6 +2063,17 @@
 
 ## sessions (F6.3)
 
+- `[data-testid="session-key-generator"]` — display — F6.3.key-generator
+- `[data-testid="session-key-output-path"]` — interactive — F6.3.key-output-path
+- `[data-testid="session-key-passphrase"]` — interactive — F6.3.key-passphrase
+- `[data-testid="session-key-comment"]` — interactive — F6.3.key-comment
+- `[data-testid="session-key-create"]` — interactive — F6.3.key-create
+- `[data-testid="session-key-result"]` — display — F6.3.key-result
+- `[data-testid="session-ssh-cipher"]` — interactive — F6.3.ssh-cipher
+- `[data-testid="session-ssh-kex"]` — interactive — F6.3.ssh-kex
+- `[data-testid="session-ssh-mac"]` — interactive — F6.3.ssh-mac
+- `input[aria-label="Custom session icon"]` — interactive — F6.3.custom-icon-value
+- `[data-testid="session-terminal-background"]` — display — F6.3.terminal-bookmark-background
 - `input[aria-label="ClickHouse HTTP port"]` — interactive — F6.3.clickhouse-http-port
 - `[data-testid="db-test-connection"]` — interactive — F6.3.database-test-connection
 - `[data-testid="session-clickhouse-protocol"]` — interactive — F6.3.clickhouse-protocol

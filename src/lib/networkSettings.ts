@@ -1,4 +1,5 @@
 import type { AppProxyConfig } from "./ipc";
+import { sshBrowserMode } from "./sshSessionOptions";
 import { parseSessionOptions } from "./terminalProfile";
 
 export type ProxyKind = "app" | "custom" | "none" | "http" | "socks5" | "ssh-tunnel" | "system";
@@ -16,6 +17,8 @@ export interface NetworkSettings {
   proxyKind: ProxyKind;
   customProxy?: AppProxyConfig;
   compression?: boolean;
+  sshBrowser?: string;
+  sshExpert?: { kex?: string; cipher?: string; mac?: string };
   proxyHost: string;
   proxyPort: string;
   proxyUser: string;
@@ -149,12 +152,14 @@ export function normalizeNetworkSettings(input: unknown): NetworkSettings {
   const proxyKindRaw = readString(src.proxyKind, DEFAULT_NETWORK_SETTINGS.proxyKind);
   const ipVersionRaw = readString(src.ipVersion, DEFAULT_NETWORK_SETTINGS.ipVersion);
   return {
+    sshBrowser: sshBrowserMode(src.sshBrowser),
     proxyKind: (PROXY_LABEL_TO_KIND[proxyKindRaw] ??
       (Object.values(KIND_TO_PROXY_LABEL).includes(proxyKindRaw)
         ? (Object.entries(KIND_TO_PROXY_LABEL).find(([, l]) => l === proxyKindRaw)?.[0] as ProxyKind)
         : (proxyKindRaw as ProxyKind))) || "none",
     customProxy: isRecord(src.customProxy) ? src.customProxy as unknown as AppProxyConfig : undefined,
     compression: src.compression === true,
+    sshExpert: isRecord(src.sshExpert) ? { kex: readString(src.sshExpert.kex, ""), cipher: readString(src.sshExpert.cipher, ""), mac: readString(src.sshExpert.mac, "") } : undefined,
     proxyHost: readString(src.proxyHost, ""),
     proxyPort: readString(src.proxyPort, ""),
     proxyUser: readString(src.proxyUser, ""),
@@ -187,7 +192,7 @@ export function normalizeNetworkSettings(input: unknown): NetworkSettings {
 
 export function getSessionNetworkSettings(optionsJson: string | null | undefined): NetworkSettings {
   const options = parseSessionOptions(optionsJson);
-  return normalizeNetworkSettings({ ...(isRecord(options.networkSettings) ? options.networkSettings : {}), compression: options.compression });
+  return normalizeNetworkSettings({ ...(isRecord(options.networkSettings) ? options.networkSettings : {}), compression: options.compression, sshBrowser: sshBrowserMode(options.sshBrowser) });
 }
 
 /** Backend-facing payload sent over the IPC bridge. The Rust side
@@ -197,6 +202,8 @@ export interface NetworkSettingsPayload {
   proxyKind: ProxyKind;
   customProxy?: AppProxyConfig;
   compression?: boolean;
+  sshBrowser?: string;
+  sshExpert?: { kex?: string; cipher?: string; mac?: string };
   proxyHost: string;
   proxyPort: number;
   proxyUser: string;
@@ -224,6 +231,8 @@ export function toNetworkSettingsPayload(ns: NetworkSettings): NetworkSettingsPa
     proxyKind: ns.proxyKind,
     customProxy: ns.customProxy,
     compression: ns.compression,
+    sshBrowser: ns.sshBrowser,
+    sshExpert: ns.sshExpert,
     proxyHost: ns.proxyHost.trim(),
     proxyPort: Number.isFinite(port) && port > 0 ? port : 0,
     proxyUser: ns.proxyUser,

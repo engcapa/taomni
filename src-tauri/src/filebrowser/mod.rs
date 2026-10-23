@@ -43,6 +43,7 @@ fn auth_from(method: &str, data: Option<String>) -> SshAuth {
             SshAuth::PrivateKey(data.unwrap_or_else(|| "~/.ssh/id_ed25519".to_string()))
         }
         "Agent" => SshAuth::Agent,
+        "Gssapi" | "None" => SshAuth::Gssapi,
         _ => SshAuth::Password(data.unwrap_or_default()),
     }
 }

@@ -23,13 +23,13 @@ pub(super) struct ReconnectParams {
 }
 
 pub struct ActiveSftp {
-    pub sftp: Arc<Mutex<SftpSession>>,
+    pub sftp: Arc<Mutex<Option<SftpSession>>>,
     pub home: String,
     /// The parent SSH handle is kept alive for the lifetime of the SFTP
     /// session: dropping it would close the underlying connection. Held in a
     /// `Mutex` so `reconnect` can swap in a fresh handle after the old
     /// connection dies.
-    pub(super) _handle: Mutex<client::Handle<SshHandler>>,
+    pub(super) _handle: Mutex<Option<client::Handle<SshHandler>>>,
     /// Credentials + endpoint for transparent reconnect. `None` disables
     /// auto-reconnect (not currently used, but keeps the door open for
     /// sessions where re-auth would need a human, e.g. an agent-only setup).
@@ -59,7 +59,24 @@ pub(super) fn network_with_keepalive(network: Option<&NetworkSettings>) -> Netwo
 pub(super) async fn connect_sftp(
     params: &ReconnectParams,
     prompter: Option<&KbdInteractivePrompter>,
-) -> Result<(SftpSession, client::Handle<SshHandler>), String> {
+) -> Result<(SftpSession, Option<client::Handle<SshHandler>>), String> {
+    if matches!(params.auth, SshAuth::Gssapi) {
+        let stream = crate::terminal::openssh::subsystem(
+            &params.host,
+            params.port,
+            &params.username,
+            Some(&params.network),
+        )
+        .await?;
+        let sftp =
+            tokio::time::timeout(std::time::Duration::from_secs(25), SftpSession::new(stream))
+                .await
+                .map_err(|_| "GSSAPI SFTP handshake timed out; check your Kerberos ticket")?
+                .map_err(|e| {
+                    format!("GSSAPI SFTP failed; check your Kerberos ticket and OpenSSH: {e}")
+                })?;
+        return Ok((sftp, None));
+    }
     let handle = connect_ssh_authenticated_with_prompter(
         &params.host,
         params.port,
@@ -81,7 +98,7 @@ pub(super) async fn connect_sftp(
     let sftp = SftpSession::new(channel.into_stream())
         .await
         .map_err(|e| format!("SFTP handshake failed: {}", e))?;
-    Ok((sftp, handle))
+    Ok((sftp, Some(handle)))
 }
 
 /// True when an error string indicates the transport died (dropped connection,
@@ -118,6 +135,34 @@ pub async fn open_sftp(
         auth,
         network: network_with_keepalive(network),
     };
+    if matches!(params.network.ssh_browser.as_str(), "scp" | "scp-fast") {
+        let handle = if matches!(params.auth, SshAuth::Gssapi) {
+            None
+        } else {
+            Some(
+                connect_ssh_authenticated_with_prompter(
+                    host,
+                    port,
+                    username,
+                    params.auth.clone(),
+                    Some(&params.network),
+                    prompter,
+                )
+                .await?,
+            )
+        };
+        let mut active = ActiveSftp {
+            sftp: Arc::new(Mutex::new(None)),
+            home: String::new(),
+            _handle: Mutex::new(handle),
+            reconnect: Some(params),
+            reconnect_lock: Mutex::new(()),
+        };
+        active.home = active
+            .scp_metadata("realpath", serde_json::json!(["."]))
+            .await?;
+        return Ok(active);
+    }
     let (sftp, handle) = connect_sftp(&params, prompter).await?;
 
     let home = sftp
@@ -126,7 +171,7 @@ pub async fn open_sftp(
         .unwrap_or_else(|_| "/".to_string());
 
     Ok(ActiveSftp {
-        sftp: Arc::new(Mutex::new(sftp)),
+        sftp: Arc::new(Mutex::new(Some(sftp))),
         home,
         _handle: Mutex::new(handle),
         reconnect: Some(params),
@@ -135,6 +180,13 @@ pub async fn open_sftp(
 }
 
 impl ActiveSftp {
+    pub(super) async fn sftp_session(
+        &self,
+    ) -> Result<tokio::sync::MappedMutexGuard<'_, SftpSession>, String> {
+        tokio::sync::MutexGuard::try_map(self.sftp.lock().await, |session| session.as_mut())
+            .map_err(|_| "This operation requires an SFTP session".into())
+    }
+
     /// Re-establish the SSH + SFTP connection in place after it dropped. Swaps
     /// a fresh session and handle into the existing `Mutex`es, so every
     /// outstanding `Arc<Mutex<SftpSession>>` clone keeps working transparently.
@@ -153,9 +205,8 @@ impl ActiveSftp {
         // A prior waiter may have healed the session while we queued on the
         // lock. Probe cheaply; if it responds now, skip the re-handshake.
         if self
-            .sftp
-            .lock()
-            .await
+            .sftp_session()
+            .await?
             .canonicalize(".".to_string())
             .await
             .is_ok()
@@ -163,7 +214,7 @@ impl ActiveSftp {
             return Ok(());
         }
         let (sftp, handle) = connect_sftp(params, None).await?;
-        *self.sftp.lock().await = sftp;
+        *self.sftp.lock().await = Some(sftp);
         *self._handle.lock().await = handle;
         tracing::info!(
             "SFTP session reconnected to {}:{}",

@@ -1,3 +1,4 @@
+import { useBookmarkWindows } from "./useBookmarkWindows";
 import { useCallback, useEffect } from "react";
 import { t as tr } from "../../lib/i18n";
 import { setActiveQueryTab } from "../../lib/queryRegistry";
@@ -75,6 +76,8 @@ export function useMainWindowLifecycle(context: UseMainWindowLifecycleContext) {
     }),
     [openDetachedGenericWindow],
   );
+
+  useBookmarkWindows({ openDetachedTerminal, openDetachedRdp, openDetachedVnc, openDetachedDatabase, openDetachedSftp });
 
   const handleDetachActiveTab = useCallback(createHandleDetachActiveTab({
     openDetachedTerminal,

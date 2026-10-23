@@ -2,6 +2,7 @@ mod transport;
 
 mod connection;
 
+mod agent;
 mod authentication;
 
 mod configuration;

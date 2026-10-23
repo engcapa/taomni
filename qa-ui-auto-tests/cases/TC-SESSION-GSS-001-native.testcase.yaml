@@ -1,0 +1,119 @@
+id: TC-SESSION-GSS-001
+title: GSSAPI ticket authentication, real terminal command and SFTP subsystem
+covers:
+- F6.3
+- F2.2
+- F7.2
+tags:
+- session
+- native
+- regression
+modes:
+- native
+fixtures:
+- reset_db
+- ssh_features_required
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="sidebar"]'
+    timeout_sec: 45
+- click: '[data-testid="session-new"]'
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    timeout_sec: 45
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.ssh_features.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.ssh_features.port}
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${cfg.ssh_features.user}
+- click: '[data-testid="session-section-advanced"]'
+- click: '[data-testid="session-auth-gssapi"]'
+- click: '[data-testid="session-test-connection"]'
+- assert_text:
+    selector: '[data-testid="session-test-result-summary"]'
+    contains: SSH GSSAPI connection OK
+    timeout_sec: 45
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-gssapi
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-gssapi"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-gssapi"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- terminal_input:
+    selector: '[data-testid="terminal-pane"]'
+    text: printf '\nQA_GSSAPI_TERMINAL_OK\n'
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^QA_GSSAPI_TERMINAL_OK\s*$
+    timeout_sec: 45
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for:
+    selector: '[data-testid="sftp-browser"]'
+    timeout_sec: 45
+- click: '[data-testid="sftp-remote-path-edit"]'
+- fill:
+    selector: '[data-testid="sftp-remote-path"]'
+    value: ${cfg.ssh_features.remote_dir}
+- press: Enter
+- assert_text:
+    selector: '[data-testid="sftp-remote-list"]'
+    contains: scp-source.txt
+    timeout_sec: 45
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: GSSAPI ticket authentication, real terminal command and SFTP subsystem
+    actions:
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 13
+    - 14
+    - 15
+    - 17
+    - 19
+    - 21
+    - 23
+    - 24
+    - 25
+    checkpoints:
+    - step: 12
+      expectation: The explicit result matches the real protocol or persisted file.
+    - step: 20
+      expectation: The explicit result matches the real protocol or persisted file.
+    - step: 26
+      expectation: The explicit result matches the real protocol or persisted file.
+    results:
+    - 12
+    - 20
+    - 26
+  native:
+  - check: Real SSH server, MIT Kerberos KDC and native filesystem
+    method: automated
+    reason: Runner fixture authenticates with a real ticket; product connects through
+      its native IPC and protocol implementation.
+  visual:
+  - check: Visible protocol status and file entries
+    method: automated
+    reason: Explicit UI assertions cover the rendered outcomes; file assertions independently
+      verify transferred bytes.

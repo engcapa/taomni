@@ -70,6 +70,8 @@
           "sftp_required",
           "mysql_required",
           "clickhouse_required",
+          "ssh_features_required",
+          "bookmark_assets",
           "vnc_required",
           "ard_required",
           "jdtls_required",

@@ -1,3 +1,7 @@
+import { SshExpertSettings } from "./SshExpertSettings";
+import type { NetworkSettings } from "../../../lib/networkSettings";
+import { SshKeyGenerator } from "./SshKeyGenerator";
+import { remoteEnvironment, sshBrowserMode } from "../../../lib/sshSessionOptions";
 import { Shield } from "lucide-react";
 import { type TranslateFn } from "../../../lib/i18n";
 import { Field, Checkbox, Select, Radio } from "./Fields";
@@ -8,6 +12,7 @@ import { Field, Checkbox, Select, Radio } from "./Fields";
 /* ------------------------------------------------------------------ */
 
 export function AdvancedSshSettings({
+  networkSettings, setNetworkSettings,
   t,
   sessionType = "SSH",
   x11, setX11,
@@ -27,6 +32,8 @@ export function AdvancedSshSettings({
   keyPath, setKeyPath,
   onBrowseKey,
 }: {
+  networkSettings: NetworkSettings;
+  setNetworkSettings: (value: NetworkSettings) => void;
   t: TranslateFn;
   sessionType?: string;
   x11: boolean; setX11: (v: boolean) => void;
@@ -69,15 +76,15 @@ export function AdvancedSshSettings({
       {sessionType === "SSH" && <Field label={t("sessionEditor2.fieldRemoteEnvironment")}>
         <Select
           dataTestId="session-remote-environment"
-          value={remoteEnv}
+          value={remoteEnvironment(remoteEnv)}
           options={[
-            t("sessionEditor2.remoteEnvInteractive"),
-            t("sessionEditor2.remoteEnvLxde"),
-            t("sessionEditor2.remoteEnvXfce"),
-            t("sessionEditor2.remoteEnvGnome"),
-            t("sessionEditor2.remoteEnvKde"),
-            t("sessionEditor2.remoteEnvAwesome"),
-            t("sessionEditor2.remoteEnvCustom"),
+            { value: "shell", label: t("sessionEditor2.remoteEnvInteractive") },
+            { value: "lxde", label: t("sessionEditor2.remoteEnvLxde") },
+            { value: "xfce", label: t("sessionEditor2.remoteEnvXfce") },
+            { value: "gnome", label: t("sessionEditor2.remoteEnvGnome") },
+            { value: "kde", label: t("sessionEditor2.remoteEnvKde") },
+            { value: "awesome", label: t("sessionEditor2.remoteEnvAwesome") },
+            { value: "custom", label: t("sessionEditor2.remoteEnvCustom") },
           ]}
           onChange={setRemoteEnv}
         />
@@ -100,12 +107,12 @@ export function AdvancedSshSettings({
       {sessionType === "SSH" && <Field label={t("sessionEditor2.fieldSshBrowserType")}>
         <Select
           dataTestId="session-ssh-browser-type"
-          value={sshBrowser}
+          value={sshBrowserMode(sshBrowser)}
           options={[
-            t("sessionEditor2.sshBrowserSftp"),
-            t("sessionEditor2.sshBrowserScpSpeed"),
-            t("sessionEditor2.sshBrowserScpCompat"),
-            t("sessionEditor2.sshBrowserDisabled"),
+            { value: "sftp", label: t("sessionEditor2.sshBrowserSftp") },
+            { value: "scp-fast", label: t("sessionEditor2.sshBrowserScpSpeed") },
+            { value: "scp", label: t("sessionEditor2.sshBrowserScpCompat") },
+            { value: "disabled", label: t("sessionEditor2.sshBrowserDisabled") },
           ]}
           onChange={setSshBrowser}
         />
@@ -182,16 +189,11 @@ export function AdvancedSshSettings({
         <button data-testid="session-private-key-browse" className="taomni-btn ml-1" disabled={!usePrivKey} onClick={onBrowseKey} type="button">
           {t("sessionEditor2.browse")}
         </button>
-        <button data-testid="session-private-key-generate" className="taomni-btn ml-1" disabled type="button" title={t("sessionEditor2.generateTitle")}>
-          {t("sessionEditor2.generate")}
-        </button>
+        <SshKeyGenerator onGenerated={(path) => { setAuthRadio("privatekey"); setKeyPath(path); }} />
       </Field>
 
       <Field label={t("sessionEditor2.fieldExpertSsh")}>
-        <button data-testid="session-expert-settings" className="taomni-btn" type="button" disabled title={t("sessionEditor2.expertTitle")}>{t("sessionEditor2.openExpertSettings")}</button>
-        <span className="ml-2 text-[var(--taomni-text-muted)]">
-          {t("sessionEditor2.expertDesc")}
-        </span>
+        <SshExpertSettings value={networkSettings} onChange={setNetworkSettings} />
       </Field>
     </div>
   );

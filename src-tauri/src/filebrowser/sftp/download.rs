@@ -116,8 +116,25 @@ impl ActiveSftp {
         completed: &Arc<AtomicU64>,
         started: Instant,
     ) -> Result<(), String> {
+        if self.is_scp() {
+            return self
+                .scp_download(
+                    remote,
+                    local,
+                    super::scp::Progress {
+                        app,
+                        id: transfer_id,
+                        handle,
+                        total,
+                        completed,
+                        started,
+                    },
+                )
+                .await;
+        }
+
         let mut remote_file = {
-            let sftp = self.sftp.lock().await;
+            let sftp = self.sftp_session().await?;
             sftp.open(remote.to_string())
                 .await
                 .map_err(|e| format!("open {}: {}", remote, e))?
@@ -170,9 +187,28 @@ impl ActiveSftp {
         handle: Arc<TransferHandle>,
         app: AppHandle,
     ) -> Result<(), String> {
+        if self.is_scp() {
+            let completed = AtomicU64::new(0);
+            let total = self.stat(remote).await?.size;
+            return self
+                .scp_download(
+                    remote,
+                    local,
+                    super::scp::Progress {
+                        app: &app,
+                        id: &transfer_id,
+                        handle: &handle,
+                        total,
+                        completed: &completed,
+                        started: Instant::now(),
+                    },
+                )
+                .await;
+        }
+
         // Stat + open under the session lock, then release it.
         let (total, mut remote_file) = {
-            let sftp = self.sftp.lock().await;
+            let sftp = self.sftp_session().await?;
             let attrs = sftp
                 .metadata(remote.to_string())
                 .await

@@ -19,6 +19,7 @@ export function sessionCapabilities(type: string, platform = getAppPlatform()) {
     localForwards: ssh,
     keepAlive: ssh || sftp,
     terminal: TERMINAL_TYPES.has(type),
+    detachedWindow: TERMINAL_TYPES.has(type) || ["SFTP", "RDP", "VNC", "MySQL", "PostgreSQL", "PanWeiDB", "Oracle", "SQLServer", "StarRocks", "ClickHouse", "Presto"].includes(type),
     username: !["Browser", "FTP", "Serial", "File", "LocalShell", "Shell", "WSL"].includes(type)
       && !(type === "Telnet" && platform === "windows"),
     storedPassword: TRANSPORT_TYPES.has(type) || ROUTED_TYPES.has(type) || type === "Proxy",
@@ -56,7 +57,10 @@ export function cleanSessionOptions(type: string, options: Record<string, unknow
       delete network.tcpNodelay;
       delete network.ipVersion;
     }
-    if (!capabilities.sshAuthentication) delete network.compression;
+    if (!capabilities.sshAuthentication) {
+      delete network.compression;
+      delete network.sshExpert;
+    }
     delete network.disableNagle;
     next.networkSettings = network;
   }

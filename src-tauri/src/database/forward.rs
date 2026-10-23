@@ -27,7 +27,7 @@ pub struct LoopbackForward {
     pub task: JoinHandle<()>,
 }
 
-pub(super) struct ForwardGuard(pub Option<JoinHandle<()>>);
+pub struct ForwardGuard(pub Option<JoinHandle<()>>);
 impl Drop for ForwardGuard {
     fn drop(&mut self) {
         if let Some(task) = self.0.take() {

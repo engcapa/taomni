@@ -25,6 +25,7 @@ pub async fn test_ssh_connection(
             ssh::SshAuth::PrivateKey(auth_data.unwrap_or_else(|| "~/.ssh/id_ed25519".to_string()))
         }
         "Agent" => ssh::SshAuth::Agent,
+        "Gssapi" | "None" => ssh::SshAuth::Gssapi,
         _ => {
             let raw = auth_data.unwrap_or_default();
             let resolved = state.vault.resolve(&raw)?;
@@ -43,6 +44,9 @@ pub async fn test_ssh_connection(
         None => None,
     };
 
+    if matches!(auth, ssh::SshAuth::Gssapi) {
+        return super::openssh::probe(&host, port, &username, network.as_ref()).await;
+    }
     let start = std::time::Instant::now();
     let (handle, channel, _rx) = ssh::connect_ssh(
         &host,

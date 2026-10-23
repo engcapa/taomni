@@ -88,6 +88,7 @@ export type AuthMethod =
   | "Password"
   | { PrivateKey: { key_path: string } }
   | "Agent"
+  | "Gssapi"
   | "None";
 
 export interface SessionGroup {

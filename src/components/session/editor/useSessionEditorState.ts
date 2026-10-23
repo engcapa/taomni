@@ -1,3 +1,4 @@
+import { readSessionBookmark } from "../../../lib/sessionBookmark";
 import { useEffect, useMemo, useState } from "react";
 import { alertAppDialog } from "../../../lib/appDialogs";
 import { useT } from "../../../lib/i18n";
@@ -74,7 +75,7 @@ export function useSessionEditorState(context: UseSessionEditorStateContext) {
     const t = extractAuthType(session?.auth_method);
     if (t === "PrivateKey") return "privatekey";
     if (t === "Agent") return "agent";
-    if (t === "None") return "gssapi";
+    if (t === "None" || t === "Gssapi") return "gssapi";
     return "password";
   });
   const [keyPath, setKeyPath] = useState(
@@ -101,6 +102,7 @@ export function useSessionEditorState(context: UseSessionEditorStateContext) {
     extractAuthType(session?.auth_method) === "PrivateKey",
   );
 
+  const [bookmark, setBookmark] = useState(() => readSessionBookmark(session?.options_json));
 
   /* --- bookmark --- */
   const [description, setDescription] = useState(() => optionString(initialOptions, "description", ""));
@@ -251,6 +253,7 @@ export function useSessionEditorState(context: UseSessionEditorStateContext) {
     });
   }, [groupPath, groups, sessions]);
   return {
+    bookmark, setBookmark,
     setProto,
     setPort,
     setSection,

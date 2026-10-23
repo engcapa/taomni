@@ -1,3 +1,6 @@
+import { sshStartupCommand } from "../../../lib/sshSessionOptions";
+import { readSessionBookmark } from "../../../lib/sessionBookmark";
+import { createReconnectPolicy } from "./reconnectPolicy";
 import { Terminal } from "@xterm/xterm";
 import {
   attachTerminalOutput,
@@ -56,6 +59,9 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
     sid,
   } = context;
 
+  const reconnectPolicy = createReconnectPolicy(Boolean(ssh && !adopted && readSessionBookmark(ssh.optionsJson).reconnect),
+    () => controllerContext.reconnectSshRef.current?.());
+  lifetime.disposeReconnect = reconnectPolicy.dispose;
   type ConnectMode = "initial" | "reconnect";
   type ConnectResult = {
     sessionId: string;
@@ -136,6 +142,7 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
     }
     controllerContext.onDetachedStateChangeRef.current?.({ snapshotText: getBufferText(term) });
 
+    reconnectPolicy.disconnected();
     controllerContext.appendEvent("disconnect", "Terminal session ended");
     if (controllerContext.loggingActiveRef.current && controllerContext.outputLogRef.current) {
       controllerContext.flushRecordedOutput("Session ended; saved recorded output");
@@ -251,6 +258,7 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
       scheduleCwdIntegrationInstall(connectedSid, buildLocalZshCwdIntegration());
     }
 
+    reconnectPolicy.connected();
     lifetime.unlistenExit = await listenTerminalExit(connectedSid, () => markDisconnected(connectedSid));
 
     // Surface per-row local-forward errors (parse, bind, accept,
@@ -300,6 +308,7 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
         backendSessionId: undefined,
       });
     }
+    if (mode === "reconnect") reconnectPolicy.disconnected();
     const label = ssh && mode === "reconnect" ? "Reconnect failed" : "Connection failed";
     controllerContext.appendEvent("error", `${label}: ${message}`);
     if (ssh && !adopted) {
@@ -343,7 +352,7 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
 
     const ns = getSessionNetworkSettings(ssh.optionsJson);
     const opts = parseSessionOptions(ssh.optionsJson);
-    const startupCommand = typeof opts.startupCmd === "string" ? opts.startupCmd.trim() : "";
+    const startupCommand = sshStartupCommand(opts);
     const keepStartupCommandOpen = startupCommand.length > 0 && opts.doNotExit !== false;
     const backendStartupCommand = startupCommand && !keepStartupCommandOpen ? startupCommand : null;
     // The native output channel can deliver the shell's first prompt before
@@ -437,6 +446,7 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
   controllerContext.reconnectSshRef.current = () => {
     if (!ssh || adopted || lifetime.destroyed) return;
     if (controllerContext.connectionStateRef.current !== "disconnected") return;
+    reconnectPolicy.started();
     startSshConnection(createTerminalSessionId(), "reconnect");
   };
 

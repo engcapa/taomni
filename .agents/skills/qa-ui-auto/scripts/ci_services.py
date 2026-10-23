@@ -189,6 +189,9 @@ def install(capabilities):
         raise RuntimeError("package/account installation is restricted to GitHub hosted jobs")
     if "vnc" in capabilities:
         command([sys.executable, "-m", "pip", "install", *VNC_FIXTURE_PACKAGES])
+    if "ssh_features" in capabilities:
+        from ci_ssh_features import install as install_ssh_features
+        install_ssh_features()
     if "clickhouse" in capabilities:
         from ci_clickhouse import install as install_clickhouse
         command([sys.executable, "-m", "pip", "install", "clickhouse-driver==0.2.9"])
@@ -634,6 +637,9 @@ class Services:
                 facts["ssh"] = self.ssh()
             if "mysql" in self.capabilities:
                 facts["mysql"] = self.mysql()
+            if "ssh_features" in self.capabilities:
+                from ci_ssh_features import start as start_ssh_features
+                facts["ssh_features"] = start_ssh_features(self)
             if "clickhouse" in self.capabilities:
                 from ci_clickhouse import start as start_clickhouse
                 facts["clickhouse"] = start_clickhouse(self)

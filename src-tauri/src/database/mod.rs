@@ -13,6 +13,7 @@ pub mod bookmarks;
 
 pub mod clickhouse;
 mod clickhouse_native;
+mod clickhouse_native_sql;
 
 pub mod forward;
 

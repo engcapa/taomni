@@ -14,7 +14,7 @@ export interface HandleTestConnectionContext {
   t: import("../../../lib/i18n").TranslateFn;
   password: string;
   passwordRef: string;
-  authMethod: "Password" | "Agent" | "None" | "PrivateKey";
+  authMethod: "Password" | "Agent" | "Gssapi" | "None" | "PrivateKey";
   setTesting: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setTestResult: import("react").Dispatch<import("react").SetStateAction<{ ok: boolean; msg: string; } | null>>;
   keyPath: string;

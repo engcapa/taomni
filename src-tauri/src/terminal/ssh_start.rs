@@ -176,6 +176,7 @@ pub async fn create_ssh_terminal(
             ssh::SshAuth::PrivateKey(auth_data.unwrap_or_else(|| "~/.ssh/id_ed25519".to_string()))
         }
         "Agent" => ssh::SshAuth::Agent,
+        "Gssapi" | "None" => ssh::SshAuth::Gssapi,
         _ => {
             let raw = auth_data.unwrap_or_default();
             let resolved = state.vault.resolve(&raw)?;
@@ -193,6 +194,66 @@ pub async fn create_ssh_terminal(
         }
         None => None,
     };
+
+    if matches!(auth, ssh::SshAuth::Gssapi) {
+        super::openssh::probe(&host, port, &username, network.as_ref()).await?;
+        let mut launch = super::openssh::launch(&host, port, &username, network.as_ref()).await?;
+        launch.args.insert(0, "-tt".into());
+        if x11.unwrap_or(false) {
+            launch.args.insert(
+                0,
+                if x11_trusted.unwrap_or(true) {
+                    "-Y"
+                } else {
+                    "-X"
+                }
+                .into(),
+            );
+        }
+        if let Some(net) = &network {
+            for forward in &net.local_forwards {
+                launch
+                    .args
+                    .insert(0, format!("-L{}:{}", forward.local, forward.remote));
+            }
+            if !net.local_forwards.is_empty() {
+                launch.args.insert(0, "-oExitOnForwardFailure=yes".into());
+            }
+        }
+        let keep_open = keep_open_after_startup_command.unwrap_or(false);
+        let command = startup_command
+            .as_deref()
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
+        if !keep_open {
+            if let Some(command) = command {
+                launch.args.push(command.into());
+            }
+        }
+        let (mut handle, reader) =
+            super::pty::create_command_pty(cols, rows, &launch.program, &launch.args)?;
+        if keep_open {
+            if let Some(command) = command {
+                handle
+                    .writer
+                    .write_all(format!("{command}\r").as_bytes())
+                    .map_err(|e| e.to_string())?;
+            }
+        }
+        super::local_start::register_routed_terminal(
+            session_id.clone(),
+            handle,
+            reader,
+            on_output,
+            state.inner(),
+            app_handle,
+            window.label(),
+            output_generation,
+            launch.route,
+        )
+        .await?;
+        return Ok(session_id);
+    }
 
     // Keyboard-interactive (MFA/OTP) prompter: bridges the SSH auth loop to
     // the frontend so a second factor can be entered mid-connect. Cleaned up
