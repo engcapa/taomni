@@ -37,6 +37,13 @@ describe("session configuration boundaries", () => {
     expect(cleanSessionOptions("SSH", options)).toEqual(options);
   });
 
+  it("preserves unknown extension options even when names share a protocol prefix", () => {
+    const extensions = { dbeaverCredentials: { importId: "external" }, mailLabels: ["work"],
+      dbPluginSettings: { version: 2 }, serializableMetadata: true, vncExtension: "custom" };
+    expect(cleanSessionOptions("SSH", { ...extensions, dbDatabase: "old", mailOauthTokenRef: "vault:old" }))
+      .toEqual(extensions);
+  });
+
   it("exposes Telnet usernames only on supported platforms", () => {
     expect(sessionCapabilities("Telnet", "windows").username).toBe(false);
     expect(sessionCapabilities("Telnet", "linux").username).toBe(true);

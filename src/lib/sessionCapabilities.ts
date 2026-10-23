@@ -11,6 +11,51 @@ const ROUTED_TYPES = new Set([
 const TRANSPORT_TYPES = new Set(["SSH", "SFTP", "RDP", "VNC"]);
 const TERMINAL_TYPES = new Set(["SSH", "LocalShell", "Shell", "WSL", "Serial", "FTP", "Telnet", "Rlogin", "Mosh"]);
 
+// Only delete keys owned by a known protocol schema. Importers/plugins may
+// persist unrelated extension data such as dbeaverCredentials or mailLabels.
+const PROTOCOL_OPTIONS: { types: ReadonlySet<string>; keys: readonly string[] }[] = [
+  { types: new Set(["Mail"]), keys: [
+    "mailProvider", "mailAuthMode", "mailOauthFlow", "mailOauthClientId",
+    "mailOauthClientSecretRef", "mailOauthTokenRef", "mailOauthExpiresAt", "mailOauthScope",
+    "mailDisplayName", "mailReplyTo", "mailSignature", "mailImapSecurity",
+    "mailSmtpHost", "mailSmtpPort", "mailSmtpSecurity", "mailSmtpUsername",
+    "mailSmtpUseImapAuth", "mailSmtpPasswordRef", "mailCacheEnabled", "mailSaveDirectory",
+    "mailStorageDirectory", "mailFullMessageMode", "mailFullMessageFolders", "mailHeaderRetentionDays",
+    "mailHeaderLimitPerFolder", "mailHeaderLimitsExplicit", "mailBodyRecentLimit", "mailBodyMaxBytes",
+    "mailAttachmentCache", "mailSyncOnOpen", "mailIdlePush", "mailSubscribedOnly",
+    "mailIncoming", "mailPop3LeaveDays", "mailUndoSendSeconds", "mailCardDavUrl",
+    "mailCardDavUsername", "mailCalDavUrl", "mailCalDavUsername", "mailReceiptPolicy",
+    "mailSpecialFolders", "mailDesktopNotify", "mailSyncIntervalMinutes", "mailMaxFetchPerSync",
+    "mailSaveSentCopy", "mailIdentities", "mailAiEnabled", "mailAiSkipBodyConfirm",
+  ] },
+  { types: new Set(["HBaseShell"]), keys: [
+    "hbaseNamespace", "hbaseRestPath", "hbaseConnectionMode", "hbaseZkQuorum",
+    "hbaseZkRoot", "hbaseEffectiveUser", "hbaseAuthMethod", "hbaseServicePrincipal",
+    "hbasePrincipal", "hbaseKeytabPath", "hbaseKrb5ConfPath", "hbaseSitePath",
+  ] },
+  { types: new Set(["VNC"]), keys: [
+    "vncSecurityPolicy", "vncViewOnly", "vncClipboardPolicy", "vncPictureQuality",
+    "vncScaling", "vncPreserveAspect", "vncShared", "vncPassSpecialKeys",
+    "vncAcceptBell", "vncMenuKey", "vncSendInitialClipboard", "vncWarnUnencrypted",
+    "vncAutoReconnect", "vncAllowHtmlClipboard", "vncAllowRtfClipboard", "vncMaxClipboardBytes",
+    "vncMaxReconnectAttempts",
+  ] },
+  { types: new Set(["Serial"]), keys: [
+    "serialDevice", "serialBaud",
+  ] },
+  { types: new Set(["WSL"]), keys: [
+    "wslDistro", "wslUser", "wslCwd", "wslInitialCommand",
+    "wslAsAdministrator",
+  ] },
+  { types: new Set(["LocalShell", "Shell", "WSL"]), keys: [
+    "localShellPath", "localShellArgs", "localShellId",
+  ] },
+  { types: new Set([...DATABASE_TYPES, "HBaseShell"]), keys: [
+    "dbDatabase", "dbCatalog", "dbSsl", "dbTimeout",
+    "dbHttpPort", "dbChProtocol", "dbPrestoDialect", "dbRedisIndex",
+  ] },
+];
+
 /** Product capabilities, shared by configuration rendering and persistence. */
 export function sessionCapabilities(type: string, platform = getAppPlatform()) {
   const ssh = type === "SSH";
@@ -34,16 +79,8 @@ export function sessionCapabilities(type: string, platform = getAppPlatform()) {
 export function cleanSessionOptions(type: string, options: Record<string, unknown>): Record<string, unknown> {
   const next = { ...options };
   const capabilities = sessionCapabilities(type);
-  // These prefixes belong to established protocol schemas. Preserve unrelated
-  // extension keys, but never carry another protocol's credentials or behavior.
-  for (const key of Object.keys(next)) {
-    if ((key.startsWith("mail") && type !== "Mail") ||
-      (key.startsWith("hbase") && type !== "HBaseShell") ||
-      (key.startsWith("vnc") && type !== "VNC") ||
-      (key.startsWith("serial") && type !== "Serial") ||
-      (key.startsWith("wsl") && type !== "WSL") ||
-      (key.startsWith("localShell") && !["LocalShell", "Shell", "WSL"].includes(type)) ||
-      (key.startsWith("db") && !DATABASE_TYPES.has(type) && type !== "HBaseShell")) delete next[key];
+  for (const { types, keys } of PROTOCOL_OPTIONS) {
+    if (!types.has(type)) for (const key of keys) delete next[key];
   }
   if (type !== "RDP") for (const key of RDP_KEYS) delete next[key];
   if (type !== "S3" && type !== "AzureBlob") for (const key of STORAGE_KEYS) delete next[key];

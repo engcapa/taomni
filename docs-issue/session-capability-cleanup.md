@@ -229,3 +229,8 @@ failures may be reported separately, per user authorization.
   before sending the SQL. Inline VALUES and INSERT SELECT remain supported;
   FORMAT imports report actionable HTTP guidance. CH-001 now checks prompt
   rejection, successful subsequent SELECT and unchanged row count.
+- Narrow stale-option deletion to explicitly owned protocol keys. Prefix-based
+  deletion could discard unknown importer/plugin settings such as
+  dbeaverCredentials. A focused persistence unit regression covers unknown keys;
+  retained CAP-001 and NET-001 continue covering configuration save/reopen on
+  browser/native. No new UI or executable entry is introduced by this correction.
