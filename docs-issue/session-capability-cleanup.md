@@ -106,5 +106,9 @@ failures may be reported separately, per user authorization.
 - Local validation: 233 focused frontend tests; 4 SFTP protocol/unit checks; 1 Native INSERT
   normalization check; 2 remote metadata subprocess checks. TypeScript and refactoring contracts
   pass. Browser/native execution remains exclusively in GitHub; this checkpoint is not acceptance.
-- Stage 2 run 39976065183: all case-execution steps passed on Linux/Windows/macOS. macOS shard 2
-  artifact upload failed after five GitHub service timeouts; failed jobs were rerun, evidence pending.
+- Stage 2 run 39976065183: execution steps returned success because complete failure reports are
+  intentionally aggregated later. The aggregate revealed TC-SESSION-CH-001 fixture failures on
+  all three platforms: ci_execute omitted ClickHouse from its service-start capability guard.
+  macOS additionally hit artifact upload timeouts and a rerun identity mismatch. This is failed
+  evidence, not a protocol pass. Fix the capability guard for ClickHouse and new SSH fixtures,
+  then run a fresh invocation so every receipt shares one selection/run identity.
