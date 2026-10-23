@@ -55,8 +55,12 @@ pub(super) fn run_worker(shared: Arc<Shared>, commands: Receiver<Command>) {
                     Ok(content) if !content.is_empty() => {
                         last_token = now;
                         known = Some(content.identity());
+                        // The client can request a format as soon as its list
+                        // is queued. Publish the payload first, as on the
+                        // polling path, or a fast first paste reads the old
+                        // empty snapshot and receives CB_RESPONSE_FAIL.
+                        shared.set_snapshot(content.clone());
                         shared.advertise(&content);
-                        shared.set_snapshot(content);
                     }
                     // Busy, or nothing readable yet (another process may be
                     // mid-write): leave the change token alone so the next

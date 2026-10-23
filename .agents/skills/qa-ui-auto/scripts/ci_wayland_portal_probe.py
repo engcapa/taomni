@@ -64,7 +64,12 @@ def verify_portals(report: Path, *, remote_desktop: bool) -> dict:
         width, height = struct.unpack(">II", contents[16:24])
         if min(width, height) <= 0:
             raise RuntimeError("screenshot portal returned an empty display")
-        facts = {"screenshot": {"size": [width, height], "bytes": len(contents)}}
+        # Keep pixels from GNOME's own Screenshot API, independently of the
+        # application's PipeWire reader, to diagnose mixed-DPI fixture damage.
+        retained = report / "portal-preflight.png"
+        retained.write_bytes(contents)
+        facts = {"screenshot": {"size": [width, height], "bytes": len(contents),
+                                "path": str(retained.resolve())}}
         if remote_desktop:
             session = request("RemoteDesktop", "CreateSession", "(a{sv})", (options(
                 session_handle_token=GLib.Variant("s", "qa_session_" + uuid.uuid4().hex)),))["session_handle"]

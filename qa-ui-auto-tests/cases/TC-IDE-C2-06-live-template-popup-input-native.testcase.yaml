@@ -69,17 +69,17 @@ steps:
     selector: .cm-tooltip-autocomplete
     timeout_sec: 30
 - wait_for:
-    selector: .cm-tooltip-autocomplete li:nth-of-type(2) .cm-completionLabel
+    selector: .cm-tooltip-autocomplete li.cm-lsp-provider-option:nth-of-type(2) .cm-completionLabel
     timeout_sec: 30
 - assert_text:
-    selector: .cm-tooltip-autocomplete li:nth-of-type(2) .cm-completionLabel
+    selector: .cm-tooltip-autocomplete li.cm-lsp-provider-option:nth-of-type(2) .cm-completionLabel
     contains: soutm
 - native_keys:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     transport: webdriver
     keys:
     - ArrowDown
-    ready_selector: .cm-tooltip-autocomplete li:nth-of-type(2) .cm-completionLabel
+    ready_selector: .cm-tooltip-autocomplete li.cm-lsp-provider-option:nth-of-type(2) .cm-completionLabel
     ready_timeout_sec: 30
     ready_stable_sec: 1.0
     require_keydown_prevented: true
@@ -91,7 +91,7 @@ steps:
     transport: webdriver
     keys:
     - Enter
-    ready_selector: .cm-tooltip-autocomplete li:nth-of-type(2)[aria-selected="true"] .cm-completionLabel
+    ready_selector: .cm-tooltip-autocomplete li.cm-lsp-provider-option:nth-of-type(2)[aria-selected="true"] .cm-completionLabel
     ready_timeout_sec: 30
     ready_stable_sec: 1.0
     require_keydown_prevented: true
@@ -141,10 +141,10 @@ verification:
     - step: 14
       expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete", "timeout_sec": 30}}'
     - step: 15
-      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li:nth-of-type(2) .cm-completionLabel",
+      expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li.cm-lsp-provider-option:nth-of-type(2) .cm-completionLabel",
         "timeout_sec": 30}}'
     - step: 16
-      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete li:nth-of-type(2) .cm-completionLabel",
+      expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete li.cm-lsp-provider-option:nth-of-type(2) .cm-completionLabel",
         "contains": "soutm"}}'
     - step: 18
       expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete [aria-selected=\"true\"] .cm-completionLabel", "contains":

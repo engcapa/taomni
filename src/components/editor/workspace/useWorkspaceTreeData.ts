@@ -34,7 +34,7 @@ export interface WorkspaceTreeDataController {
   flatFiles: Record<string, FlatFilesState>;
   loadDir: (rootId: string, path: string) => Promise<void>;
   loadFlatFiles: (rootId: string, force?: boolean) => Promise<void>;
-  reset: () => void;
+  reset: (options?: { retainListings?: boolean }) => void;
   removeRoot: (rootId: string) => void;
 }
 
@@ -57,6 +57,9 @@ export function useWorkspaceTreeData({
   const compactChainsRef = useRef(compactChains);
   const flatFilesRef = useRef(flatFiles);
   const generationRef = useRef(0);
+  const compactGenerationsRef = useRef<Record<string, number>>({});
+  const flatGenerationsRef = useRef<Record<string, number>>({});
+  const [reloadVersion, setReloadVersion] = useState(0);
 
   useEffect(() => {
     rootsRef.current = roots;
@@ -120,11 +123,13 @@ export function useWorkspaceTreeData({
     if (!root) return;
     const key = rootDirKey(rootId, path);
     const cached = compactChainsRef.current[key];
-    if (cached?.loading || (cached && !cached.error)) return;
     const generation = generationRef.current;
+    if (compactGenerationsRef.current[key] === generation
+      && (cached?.loading || (cached && !cached.error))) return;
+    compactGenerationsRef.current[key] = generation;
     setCompactChains((current) => ({
       ...current,
-      [key]: { path, entries: current[key]?.entries ?? [], loading: true, error: null },
+      [key]: { path: cached?.path ?? path, entries: cached?.entries ?? [], loading: true, error: null },
     }));
     const result = await workspaceCompactChain(root.path, path, 16);
     if (generation !== generationRef.current) return;
@@ -165,8 +170,10 @@ export function useWorkspaceTreeData({
     const root = findRoot(rootId);
     if (!root) return;
     const cached = flatFilesRef.current[rootId];
-    if (!force && (cached?.loading || cached?.loaded)) return;
     const generation = generationRef.current;
+    if (!force && flatGenerationsRef.current[rootId] === generation
+      && (cached?.loading || cached?.loaded)) return;
+    flatGenerationsRef.current[rootId] = generation;
     setFlatFiles((current) => ({
       ...current,
       [rootId]: {
@@ -211,13 +218,23 @@ export function useWorkspaceTreeData({
     onError(message);
   }, [findRoot, onError]);
 
-  const reset = useCallback(() => {
+  const reset = useCallback((options?: { retainListings?: boolean }) => {
     generationRef.current += 1;
+    compactGenerationsRef.current = {};
+    flatGenerationsRef.current = {};
     compactChainsRef.current = {};
     flatFilesRef.current = {};
-    setDirectories({});
-    setCompactChains({});
-    setFlatFiles({});
+    // A watcher refresh invalidates old requests without unmounting the rows
+    // beneath a pending pointer event or the user's keyboard focus. Each new
+    // listing replaces its snapshot when ready; a workspace reset still clears.
+    const retain = <T extends { loading: boolean }>(current: Record<string, T>) =>
+      options?.retainListings
+        ? Object.fromEntries(Object.entries(current).map(([key, state]) => [key, { ...state, loading: false }]))
+        : {};
+    setDirectories(retain);
+    setCompactChains(retain);
+    setFlatFiles(retain);
+    setReloadVersion((version) => version + 1);
   }, []);
 
   const removeRoot = useCallback((rootId: string) => {
@@ -259,7 +276,7 @@ export function useWorkspaceTreeData({
     const needsFlatIndex = treeViewMode === "flat" || treeFilter.trim().length > 0;
     if (!needsFlatIndex) return;
     roots.forEach((root) => void loadFlatFiles(root.id));
-  }, [loadFlatFiles, roots, treeFilter, treeViewMode]);
+  }, [loadFlatFiles, reloadVersion, roots, treeFilter, treeViewMode]);
 
   return {
     directories,

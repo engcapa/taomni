@@ -11,8 +11,16 @@ import { type TerminalSessionLifecycleContext } from "./sessionContracts";
 export interface CreateTerminalCwdInstallerContext {
   ssh: import("./types").SshConnectInfo | undefined;
   adopted: import("./types").AdoptedTerminalSession | undefined;
-  controllerContext: TerminalSessionLifecycleContext;
-  lifetime: TerminalSessionLifetime;
+  controllerContext: Pick<TerminalSessionLifecycleContext,
+    | "automationInputSettlingRef"
+    | "sessionIdRef"
+    | "termRef"
+    | "installSshCwdIntegrationRef"
+    | "appendEvent"
+    | "initialCwd"
+    | "injectedInputEchoSuppressorRef"
+  >;
+  lifetime: Pick<TerminalSessionLifetime, "destroyed">;
   syncAutomationState: () => void;
 }
 
@@ -90,17 +98,17 @@ export function createTerminalCwdInstaller(context: CreateTerminalCwdInstallerCo
       // xterm allocates blank rows below a short prompt. Inspect the rows
       // ending at the cursor, not the bottom of the viewport.
       const promptBuffer = liveTerm.buffer.active;
-      const isMingwShell = /\bMINGW(?:32|64)\b/.test(
+      const isMsysShell = /\b(?:MINGW(?:32|64)|UCRT64|CLANG(?:32|64|ARM64)|MSYS)\b/.test(
         getLastBufferLines(liveTerm, 3, promptBuffer.baseY + promptBuffer.cursorY + 1),
       );
       // Git Bash can take long enough to echo a prompt hook that the user
       // types into the hidden setup line. A one-shot OSC 7 probe still
       // captures the requested cwd without modifying its prompt.
-      const useMingwCwdProbe = ssh && isMingwShell && integrationCommand.includes("TaomniCwdIntegrationDone");
-      const commandForShell = useMingwCwdProbe
+      const useMsysCwdProbe = ssh && isMsysShell && integrationCommand.includes("TaomniCwdIntegrationDone");
+      const commandForShell = useMsysCwdProbe
         ? (controllerContext.initialCwd ? buildSshInitialCwdProbe(controllerContext.initialCwd) : CWD_QUERY_COMMAND)
         : integrationCommand;
-      const integrationTimeoutMs = isMingwShell && !useMingwCwdProbe ? 30_000 : 4_000;
+      const integrationTimeoutMs = isMsysShell && !useMsysCwdProbe ? 30_000 : 4_000;
       const inputHoldTimeoutMs = Math.min(integrationTimeoutMs, CWD_SETUP_INPUT_HOLD_MAX_MS);
       if (controllerContext.installSshCwdIntegrationRef.current === installCwdIntegration) {
         controllerContext.installSshCwdIntegrationRef.current = null;

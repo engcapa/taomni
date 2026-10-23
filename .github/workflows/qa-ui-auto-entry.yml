@@ -34,7 +34,7 @@ jobs:
         with:
           ref: ${{ inputs.head }}
           persist-credentials: false
-      - uses: actions/download-artifact@v4
+      - uses: ./.github/actions/qa-download-artifact
         with:
           name: qa-selection-${{ inputs.artifact_key }}
           path: qa-ui-auto-report
@@ -64,10 +64,9 @@ jobs:
         run: bash .agents/skills/qa-ui-auto/scripts/ci_linux_setup.sh
       - uses: dtolnay/rust-toolchain@stable
         if: matrix.mode == 'native'
-      - uses: arduino/setup-protoc@v3
+      - name: Install verified fixed protoc
         if: (matrix.mode == 'native') && inputs.operation != 'run'
-        with:
-          repo-token: ${{ github.token }}
+        run: python .agents/skills/qa-ui-auto/scripts/ci_setup_protoc.py
       - uses: swatinem/rust-cache@v2
         if: (matrix.mode == 'native') && inputs.operation != 'run'
         with:
@@ -80,7 +79,7 @@ jobs:
       # Exercise a real Secret Service in the disposable D-Bus session.
       - name: Linux backup credential service
         if: (runner.os == 'Linux' && matrix.mode == 'native' && contains(matrix.capabilities, 'secret-service')) && inputs.operation == 'run'
-        run: sudo apt-get update && sudo apt-get install -y gnome-keyring libsecret-tools
+        run: sudo apt-get update && sudo apt-get install -y gnome-keyring libsecret-tools libglib2.0-bin
       - name: Windows build tools and WebView2 driver
         if: runner.os == 'Windows' && matrix.mode == 'native'
         shell: pwsh
@@ -352,7 +351,7 @@ jobs:
           retention-days: 14
       - name: Download this invocation's verified native runtime
         if: inputs.operation == 'run' && matrix.mode == 'native'
-        uses: actions/download-artifact@v4
+        uses: ./.github/actions/qa-download-artifact
         with:
           name: runtime-${{ matrix.build_id }}-${{ inputs.artifact_key }}
           path: qa-ui-auto-report/native-runtime
@@ -364,7 +363,9 @@ jobs:
         run: |
           screen=1920x1080x24
           if [[ "$QA_DUAL_DISPLAY" == true ]]; then screen=3840x1440x24; fi
-          dbus-run-session -- xvfb-run -a -s "-screen 0 $screen -nolisten tcp" \
+          # Preserve the owned display between xdpyinfo and the window manager.
+          # A last-client reset can briefly reject Openbox's initial connection.
+          dbus-run-session -- xvfb-run -a -s "-screen 0 $screen -nolisten tcp -noreset" \
             python .agents/skills/qa-ui-auto/scripts/ci_execute.py \
             --selection qa-ui-auto-report/selection.json --entry "$QA_ENTRY" \
             --report "qa-ui-auto-report/$QA_ENTRY"

@@ -317,6 +317,7 @@ describe("useWorkspaceFileActions", () => {
         vi.advanceTimersByTime(200);
       });
       expect(props.resetTreeData).toHaveBeenCalledTimes(1);
+      expect(props.resetTreeData).toHaveBeenCalledWith({ retainListings: true });
       expect(props.loadDir).toHaveBeenCalledTimes(1);
       expect(props.loadDir).toHaveBeenCalledWith("root-1", "");
     } finally {

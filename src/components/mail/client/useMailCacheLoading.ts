@@ -37,6 +37,7 @@ export function useMailCacheLoading(context: UseMailCacheLoadingContext) {
     setError,
     pageSize,
     cacheRemovalVersionsRef: cacheOwner.cacheRemovalVersionsRef,
+    cacheRequestSeqRef: cacheOwner.cacheRequestSeqRef,
     info,
     selectedFolderRef: cacheOwner.selectedFolderRef,
     foldersRef: cacheOwner.foldersRef,

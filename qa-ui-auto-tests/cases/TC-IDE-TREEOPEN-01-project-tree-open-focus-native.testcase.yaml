@@ -6,9 +6,11 @@ description: 'REQ-02 / CW-PROJ-002: F0 README unique tab -> navigate tree with d
 
   directly to .cm-content without mouse click -> type into editor -> undo/save restores
 
-  exact original bytes -> return to tree -> right-click context menu -> Esc restores tree
+  exact original bytes -> watcher refresh keeps the selected file row mounted while reading
 
-  selection and focus without mutating text.
+  directory listings -> return to tree -> right-click context menu -> Esc restores tree
+
+  selection and focus after menu DOM removal without mutating text.
 
   '
 covers:
@@ -185,7 +187,7 @@ verification:
       expectation: '{"assert_file_sha256": {"path": "${fixture.project_tree_root}/src/main/example.txt", "equals":
         "bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a"}}'
     - step: 40
-      expectation: '{"assert_menu_items": ["Open", "Rename...", "Delete"]}'
+      expectation: 'After save-triggered refresh, right-click still reaches the selected file and exposes Open, Rename... and Delete.'
     - step: 43
       expectation: '{"assert_not_visible": "[data-testid=\"context-menu\"]"}'
     - step: 44

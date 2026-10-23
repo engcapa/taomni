@@ -34,6 +34,7 @@ beforeEach(() => {
   api.autoRedact.mockResolvedValue({ count: 2, boxes: [{ x: 10, y: 20, w: 40, h: 20 }, { x: 80, y: 20, w: 40, h: 20 }] });
   vi.stubGlobal("Image", function () {
     const image = document.createElement("img");
+    image.decode = vi.fn().mockResolvedValue(undefined);
     let width = 2048, height = 1152;
     Object.defineProperties(image, {
       naturalWidth: { get: () => width }, naturalHeight: { get: () => height },

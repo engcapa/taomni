@@ -46,12 +46,21 @@ class NativeAssertionsTest(TestCase):
         with self.assertRaisesRegex(StepError, "missing checkbox"):
             run_native_step(ctx, "set_check", {"selector": "#check", "checked": False})
         ctx.session.click.assert_not_called()
+        ctx.session.pointer_button_click.assert_not_called()
         ctx.session.execute.side_effect = [False, False]
         with patch("qa_ui_auto.native_steps.time.monotonic", side_effect=[0, 11]), self.assertRaisesRegex(StepError, "did not become"):
             run_native_step(ctx, "set_check", {"selector": "#check", "checked": True})
+        ctx.session.pointer_button_click.assert_called_once_with("#check", 0)
+        ctx.session.pointer_button_click.reset_mock()
         ctx.session.execute.side_effect = [False, False, True]
         with patch("qa_ui_auto.native_steps.time.sleep"):
             run_native_step(ctx, "set_check", {"selector": "#check", "checked": True})
+        ctx.session.pointer_button_click.assert_called_once_with("#check", 0)
+        ctx.session.click.assert_not_called()
+        ctx.session.pointer_button_click.reset_mock()
+        ctx.session.execute.side_effect = [True, True]
+        run_native_step(ctx, "set_check", {"selector": "#check", "checked": True})
+        ctx.session.pointer_button_click.assert_not_called()
 
     def test_menu_click_uses_webdriver_and_rejects_ambiguous_label(self):
         ctx = Mock()

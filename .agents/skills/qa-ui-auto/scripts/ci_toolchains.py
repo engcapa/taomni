@@ -19,6 +19,7 @@ import zipfile
 
 import yaml
 from qa_ui_auto.ci import write_json
+from ci_maven_warmup import warm_maven
 
 
 def download(spec, destination):
@@ -137,7 +138,7 @@ def warm_projects(root, capabilities):
     # The editor fixture intentionally contains incomplete completion targets.
     # Resolve its POM dependencies/plugins without compiling those broken inputs.
     shutil.copy2(source / "pom.xml", project / "pom.xml")
-    checked([mvn, "-q", "dependency:go-offline", "package"], cwd=project)
+    warm_maven([mvn, "-q", "dependency:go-offline", "package"], project, root)
     write_json(root / "warmup.json", {"java25": receipts, "maven_single": "POM dependencies/plugins cached; editor sources intentionally incomplete"})
 
 

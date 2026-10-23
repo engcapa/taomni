@@ -14,7 +14,8 @@ description: '§8.19.10 native gate case (ED-COMP-004 A1). Enters the in-repo
 
   document line 21 through the status-bar cursor checkpoint before firing
 
-  explicit completion with Alt+/ (Ctrl+Space is reserved by the CI IME). It
+  explicit completion with Alt+/ (Ctrl+Space is reserved by the CI IME), gated
+  on the active provider reporting semantic readiness after workspace import. It
   explicitly double-clicks the java.lang.String candidate (provider order varies; one
   click selects and only a second click accepts per the ED-PARITY-005 mouse contract), and proves one undo restores the prefix. The request carries the
 
@@ -113,6 +114,8 @@ steps:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     keys:
     - Alt+/
+    ready_selector: '[data-testid="code-workspace-lsp-status-pill"][data-active="true"][data-semantic-ready="true"]'
+    ready_timeout_sec: 60
     require_keydown_prevented: true
 - wait: 0.3
 - wait_for:

@@ -33,7 +33,6 @@ export function createRunFolderSync(controllerContext: RunFolderSyncContext): (f
   } = {}) => {
     const generation = controllerContext.syncGenerationRef.current;
     const indicator = options.indicator ?? "none";
-    let changed = false;
     try {
       const loop = await runFolderSyncLoop({
         mode: options.mode ?? "auto",
@@ -41,7 +40,6 @@ export function createRunFolderSync(controllerContext: RunFolderSyncContext): (f
         isCancelled: () => controllerContext.syncGenerationRef.current !== generation,
         step: (mode) => mailSyncFolder(controllerContext.info, folder, { mode, limit: controllerContext.catchupBatchSize, includeBodies: false }),
         onStep: (result, progress) => {
-          if (result.fetched > 0 || result.vanished > 0 || result.flagsUpdated > 0) changed = true;
           controllerContext.applySyncedFolder(result.folder);
           if (!controllerContext.visibleRef.current) {
             controllerContext.pendingCacheRefreshRef.current = true;
@@ -69,7 +67,9 @@ export function createRunFolderSync(controllerContext: RunFolderSyncContext): (f
           }
         },
       });
-      if (changed && controllerContext.info.cache.enabled) await controllerContext.reloadVisibleFromCache(folder);
+      // The archive or a peer may have populated the cache after our initial
+      // read. A zero-change foreground sync still needs that current snapshot.
+      if (controllerContext.info.cache.enabled) await controllerContext.reloadVisibleFromCache(folder);
       if (loop.fetched > 0 && folder.trim().toUpperCase() === "INBOX") {
         await controllerContext.incomingFiltersRef.current?.();
       }

@@ -317,46 +317,13 @@ export function MailClientView(props: MailClientViewProps) {
       <div className="h-7 shrink-0 px-3 flex items-center gap-2 border-b border-[var(--taomni-divider)] text-[11px] bg-[var(--taomni-sidebar-bg)]">
         {(mutationFailure?.message || error || status) && (
           <>
-            {(mutationFailure?.message || error) ? <AlertTriangle className="w-3.5 h-3.5 text-red-500" /> : <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
+            {(mutationFailure?.message || error) ? <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-500" /> : <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-500" />}
             <span
               className={`min-w-0 flex-1 truncate ${(mutationFailure?.message || error) ? "text-red-500" : "text-[var(--taomni-text-muted)]"}`}
               title={(mutationFailure?.message || error) ?? status ?? undefined}
             >
               {(mutationFailure?.message || error) ?? status}
             </span>
-            {mutationFailure?.retryable && (
-              <button type="button" className="taomni-btn h-5 px-2 shrink-0" data-testid="mail-mutation-retry"
-                disabled={busyAction} onClick={() => { if (retryMailActionRef.current) void mutationOwner.runMailAction(retryMailActionRef.current, true); }}>
-                Retry remaining
-              </button>
-            )}
-            {mutationFailure?.detail && (
-              <button type="button" className="taomni-btn h-5 px-2 shrink-0" data-testid="mail-mutation-details"
-                onClick={() => void confirmDialog.confirm({ title: "Mail operation details", message: mutationFailure.detail ?? "", confirmLabel: "Close" })}>
-                Details
-              </button>
-            )}
-            {error && isMailCertificateError(error) && (
-              <button
-                type="button"
-                className="ml-auto h-5 px-2 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)]"
-                data-testid="mail-cert-review"
-                onClick={() => void openCertReview(/smtp/i.test(error) ? "smtp" : "imap")}
-              >
-                <ShieldCheck className="w-3 h-3" />
-                Review certificate
-              </button>
-            )}
-            {error && oauthReauthRequired && onEditSession && (
-              <button
-                type="button"
-                className="ml-auto h-5 px-2 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)]"
-                onClick={() => onEditSession(info.sessionId)}
-              >
-                <ShieldCheck className="w-3 h-3" />
-                Reauthorize
-              </button>
-            )}
           </>
         )}
         <div className="ml-auto min-w-0 flex items-center gap-2 overflow-x-auto">
@@ -397,6 +364,40 @@ export function MailClientView(props: MailClientViewProps) {
             </span>
           )}
         </div>
+        {/* Keep recovery controls at the edge while background progress changes width. */}
+        {mutationFailure?.retryable && (
+          <button type="button" className="taomni-btn h-5 px-2 shrink-0" data-testid="mail-mutation-retry"
+            disabled={busyAction} onClick={() => { if (retryMailActionRef.current) void mutationOwner.runMailAction(retryMailActionRef.current, true); }}>
+            Retry remaining
+          </button>
+        )}
+        {mutationFailure?.detail && (
+          <button type="button" className="taomni-btn h-5 px-2 shrink-0" data-testid="mail-mutation-details"
+            onClick={() => void confirmDialog.confirm({ title: "Mail operation details", message: mutationFailure.detail ?? "", confirmLabel: "Close" })}>
+            Details
+          </button>
+        )}
+        {error && isMailCertificateError(error) && (
+          <button
+            type="button"
+            className="h-5 shrink-0 px-2 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)]"
+            data-testid="mail-cert-review"
+            onClick={() => void openCertReview(/smtp/i.test(error) ? "smtp" : "imap")}
+          >
+            <ShieldCheck className="w-3 h-3" />
+            Review certificate
+          </button>
+        )}
+        {error && oauthReauthRequired && onEditSession && (
+          <button
+            type="button"
+            className="h-5 shrink-0 px-2 inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] text-[11px] text-[var(--taomni-accent)] hover:bg-[var(--taomni-hover)]"
+            onClick={() => onEditSession(info.sessionId)}
+          >
+            <ShieldCheck className="w-3 h-3" />
+            Reauthorize
+          </button>
+        )}
       </div>
 
       <div className="flex-1 min-h-0 relative">

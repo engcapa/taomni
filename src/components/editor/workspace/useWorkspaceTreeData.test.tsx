@@ -102,6 +102,61 @@ describe("useWorkspaceTreeData", () => {
     expect(result.current.directories).toEqual({});
   });
 
+  it("retains directory rows during refresh and rejects a response from the previous generation", async () => {
+    const onError = vi.fn();
+    const { result } = renderHook(() => useWorkspaceTreeData({
+      roots, expandedRootIds: noExpandedRoots, treeViewMode: "tree", onError,
+    }));
+    workspaceMocks.workspaceListDir.mockResolvedValueOnce(ready([ENTRY]));
+    await act(async () => result.current.loadDir(root.id, "src"));
+    const pending: Array<(value: WorkspaceTreeLoadResult<unknown>) => void> = [];
+    workspaceMocks.workspaceListDir.mockImplementation(() => new Promise((resolve) => pending.push(resolve)));
+    let oldRequest!: Promise<void>, newRequest!: Promise<void>;
+    act(() => { oldRequest = result.current.loadDir(root.id, "src"); });
+    act(() => result.current.reset({ retainListings: true }));
+    act(() => { newRequest = result.current.loadDir(root.id, "src"); });
+    expect(result.current.directories["root-1:src"]).toMatchObject({ loaded: true, loading: true, entries: [ENTRY] });
+    await act(async () => { pending[0](ready([])); await oldRequest; });
+    expect(result.current.directories["root-1:src"].entries).toEqual([ENTRY]);
+    const updated = { ...ENTRY, size: 20 };
+    await act(async () => { pending[1](ready([updated])); await newRequest; });
+    expect(result.current.directories["root-1:src"]).toMatchObject({ loading: false, entries: [updated] });
+  });
+
+  it("keeps the compact endpoint mounted until its refreshed chain is ready", async () => {
+    const onError = vi.fn();
+    const directory = { ...ENTRY, name: "src", path: "src", fileType: "dir" };
+    workspaceMocks.workspaceListDir.mockResolvedValue(ready([directory]));
+    workspaceMocks.workspaceCompactChain.mockResolvedValue(ready([{ ...ENTRY, path: "src/main/a.ts" }]));
+    const { result } = renderHook(() => useWorkspaceTreeData({
+      roots, expandedRootIds: expandedRoots, treeViewMode: "compact", onError,
+    }));
+    await waitFor(() => expect(result.current.compactChains["root-1:src"]?.path).toBe("src/main"));
+    let resolveChain!: (value: WorkspaceTreeLoadResult<unknown>) => void;
+    workspaceMocks.workspaceCompactChain.mockImplementationOnce(() => new Promise((resolve) => { resolveChain = resolve; }));
+    act(() => result.current.reset({ retainListings: true }));
+    await waitFor(() => expect(resolveChain).toBeTypeOf("function"));
+    expect(result.current.compactChains["root-1:src"]).toMatchObject({ path: "src/main", loading: true });
+    await act(async () => resolveChain(ready([{ ...ENTRY, path: "src/changed/a.ts" }])));
+    expect(result.current.compactChains["root-1:src"]).toMatchObject({ path: "src/changed", loading: false });
+  });
+
+  it.each(["flat", "tree"] as const)("refreshes a retained recursive index in %s view", async (mode) => {
+    const onError = vi.fn();
+    workspaceMocks.workspaceListFilesRecursive.mockResolvedValue(ready([ENTRY]));
+    const { result } = renderHook(() => useWorkspaceTreeData({
+      roots, expandedRootIds: noExpandedRoots, treeViewMode: mode, treeFilter: mode === "tree" ? "a" : "", onError,
+    }));
+    await waitFor(() => expect(result.current.flatFiles[root.id]?.loaded).toBe(true));
+    let resolveIndex!: (value: WorkspaceTreeLoadResult<unknown>) => void;
+    workspaceMocks.workspaceListFilesRecursive.mockImplementationOnce(() => new Promise((resolve) => { resolveIndex = resolve; }));
+    act(() => result.current.reset({ retainListings: true }));
+    await waitFor(() => expect(resolveIndex).toBeTypeOf("function"));
+    expect(result.current.flatFiles[root.id]).toMatchObject({ loaded: true, loading: true, entries: [ENTRY] });
+    await act(async () => resolveIndex(ready([])));
+    expect(result.current.flatFiles[root.id]).toMatchObject({ loading: false, entries: [] });
+  });
+
   // ── W0 §8.20.1 boundary: non-ready unions keep cache + error, never crash ──
 
   it.each([

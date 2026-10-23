@@ -51,16 +51,31 @@ steps:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     transport: webdriver
     keys:
-    - Mod+Home
-    - ArrowDown
-    - ArrowDown
-    - ArrowDown
-    - ArrowDown
-    - ArrowDown
-    - ArrowDown
-    - ArrowDown
-    - ArrowDown
-    - ArrowDown
+    - Control+g
+- wait_for:
+    selector: '[data-testid="code-workspace-goto-line-dialog"]'
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="code-workspace-goto-line-input"]'
+    value: '10:1'
+- press: Enter
+- wait_for:
+    selector: '[data-testid="code-workspace-goto-line-dialog"]'
+    state: detached
+    timeout_sec: 5
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: '10:1'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"] .cm-activeLine'
+    contains: System.out.println(names.size());
+# Move to the logical source line even while default import folding is active.
+# Visual ArrowDown counts can land on main's closing brace after imports fold.
+- native_keys:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    transport: webdriver
+    keys:
+    - Home
     - Home
     - Shift+End
 - type: '        System.out.p'
@@ -114,6 +129,7 @@ steps:
     expression: document.activeElement === document.querySelectorAll(".cm-content")[0]
     expect_truthy: true
 - press: Home
+- press: Home
 - press: Shift+End
 - type: '        System.out.println'
 - wait_for:
@@ -147,18 +163,22 @@ verification:
     - 7
     - 10
     - 11
-    - 12
+    - 13
     - 14
-    - 24
-    - 28
-    - 32
-    - 34
-    - 36
-    - 38
+    - 18
+    - 19
+    - 21
+    - 31
+    - 35
     - 39
-    - 40
+    - 41
     - 43
     - 45
+    - 46
+    - 47
+    - 48
+    - 51
+    - 53
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -167,31 +187,36 @@ verification:
     - step: 9
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"][data-semantic-ready=\"true\"]",
         "timeout_sec": 120}}'
-    - step: 13
+    - step: 16
+      expectation: Go to Line places the caret at logical source position 10:1 regardless of folded imports.
+    - step: 17
+      expectation: The active source line is the existing System.out.println(names.size()); statement inside main,
+        before any edit.
+    - step: 20
       expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li.cm-completion-type-method", "timeout_sec":
         90}}'
-    - step: 27
+    - step: 34
       expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete", "contains": "println("}}'
-    - step: 30
+    - step: 37
       expectation: '{"wait_for": ".cm-tooltip-autocomplete .cm-completionInfo"}'
-    - step: 33
+    - step: 40
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println("}}'
-    - step: 35
+    - step: 42
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content\").innerText.includes(\"System.out.println\\n\")",
         "expect_truthy": true}}'
-    - step: 37
+    - step: 44
       expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelectorAll(\".cm-content\")[0]",
         "expect_truthy": true}}'
-    - step: 41
+    - step: 49
       expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li.cm-completion-type-method", "timeout_sec":
         90}}'
-    - step: 44
+    - step: 52
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println("}}'
-    - step: 46
+    - step: 54
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content\").innerText.includes(\"System.out.println\\n\")",
         "expect_truthy": true}}'
     results:
-    - 46
+    - 54
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

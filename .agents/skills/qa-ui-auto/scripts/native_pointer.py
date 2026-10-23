@@ -28,7 +28,8 @@ for (const [px, py] of points) {
     return {x: px, y: py, width: r.width, height: r.height, ready: true};
   }
 }
-return {x, y, width: r.width, height: r.height, ready: false};
+return {x, y, width: r.width, height: r.height, ready: false,
+  outside: right <= left || bottom <= top};
 """
 
 
@@ -44,6 +45,7 @@ def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
     end = time.monotonic() + timeout
     previous = None
     last = None
+    centered = False
     while True:
         if session.deadline:
             session.deadline.remaining()
@@ -58,6 +60,16 @@ def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
         if current is not None and current == previous:
             return {"x": int(last["x"]), "y": int(last["y"])}
         previous = current
+        if not last["ready"] and (last.get("outside") is True or not centered):
+            # Nearest alignment can leave a control behind a sticky header or
+            # a clipping ancestor despite being inside the viewport. Center
+            # once, then require the same hit test. Layout growth can also
+            # move it outside again; no input has been sent at this stage.
+            centered = True
+            session.request("POST", session.endpoint("/execute/sync"), {
+                "script": "arguments[0].scrollIntoView({block:'center', inline:'center'});",
+                "args": [origin],
+            })
         remaining = end - time.monotonic()
         if remaining <= 0:
             raise WebDriverError(f"native pointer target did not become stable and hit-testable: {last}")

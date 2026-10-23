@@ -20,6 +20,7 @@ import zipfile
 import yaml
 
 from qa_ui_auto.ci import write_json
+from ci_mysql import initialize_mysql
 
 # Scriptable RFB server shared with the VNC skill: it logs every client message
 # and takes control commands, so cases can prove what reached "the remote".
@@ -487,7 +488,7 @@ class Services:
             daemon = binary_dir / ("mysqld.exe" if platform.system() == "Windows" else "mysqld")
             data = self.private / "mysql-data"
             common = [daemon, "--no-defaults", f"--basedir={binary_dir.parent}", f"--datadir={data}"]
-            command([*common, "--initialize-insecure"])
+            initialize_mysql(common, data, self.root)
             self.start_process([*common, "--bind-address=127.0.0.1", f"--port={port}",
                                 f"--socket={self.private / 'mysql.sock'}", "--mysqlx=0"], "mysql")
             def seed():

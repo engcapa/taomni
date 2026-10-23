@@ -9,6 +9,7 @@ import { registerMailClientTabEditing1Cases } from "./tests/mailClientTab/editin
 import { chatState, eventMocks, filterMocks, folder, info, mailMocks, message, messageBody, renderMailbox, stepResult } from "./tests/mailClientTab/harness";
 import { registerMailClientTabHistory3Cases } from "./tests/mailClientTab/history3.cases";
 import { registerMailClientTabHistory4Cases } from "./tests/mailClientTab/history4.cases";
+import { registerMailCacheSynchronizationCases } from "./tests/mailClientTab/cacheSynchronization.cases";
 
 describe("MailClientTab", () => {
   beforeEach(() => {
@@ -126,4 +127,5 @@ describe("MailClientTab", () => {
     get replyAndReach() { return replyAndReach; },
   });
   registerMailClientTabHistory4Cases();
+  registerMailCacheSynchronizationCases();
 });

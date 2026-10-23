@@ -18,6 +18,7 @@ WINDOW_STATE = """(() => ({
     stage_focus: global.stage.get_key_focus()?.get_accessible()?.get_name() ?? null,
     focused_application: imports.gi.Shell.WindowTracker.get_default().focus_app?.get_id() ?? null,
     starting_up: Main.layoutManager._startingUp,
+    window_clip: global.window_group.has_clip ? global.window_group.get_clip() : null,
     windows: global.get_window_actors().map(actor => {
         const window = actor.meta_window;
         return {pid: window.get_pid(), title: window.get_title(),

@@ -288,7 +288,10 @@ export function createHandleExternalFileChange(controllerContext: HandleExternal
     if (controllerContext.restoreEchoSuppressorRef.current.shouldSuppress(fsPathComparisonKey(normalizedPath))) return;
     if (!file) {
       invalidateSemantics();
-      controllerContext.setStatusMessage(`File changed on disk: ${change.path}`);
+      // Background tools also create closed metadata files (for example
+      // jdtls .project). Refresh their consumers without replacing the result
+      // of the user's command. Open-buffer changes below still surface reload,
+      // deletion and conflict feedback.
       return;
     }
     if (file.library) {

@@ -54,6 +54,35 @@ describe("ContextMenu", () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it.each(["escape", "action", "outside", "programmatic"] as const)(
+    "notifies %s close after the focused menu has left the DOM",
+    (reason) => {
+      const observations: Array<{ reason: string | undefined; menuConnected: boolean }> = [];
+      function Harness() {
+        const menu = useContextMenu({
+          onClose: (closedReason) => observations.push({
+            reason: closedReason,
+            menuConnected: !!document.querySelector("[data-taomni-context-menu]"),
+          }),
+        });
+        return <>
+          <button onClick={() => menu.showAt(10, 10, [{ label: "Inspect", onClick: () => {} }])}>Open menu</button>
+          <button onClick={() => menu.close()}>Close menu</button>
+          {menu.render}
+        </>;
+      }
+      render(<Harness />);
+      fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
+      expect(screen.getByTestId("context-menu")).toHaveFocus();
+      if (reason === "escape") fireEvent.keyDown(window, { key: "Escape" });
+      if (reason === "action") fireEvent.click(screen.getByTestId("context-menu-item-inspect"));
+      if (reason === "outside") fireEvent.mouseDown(document.body);
+      if (reason === "programmatic") fireEvent.click(screen.getByRole("button", { name: "Close menu" }));
+      expect(screen.queryByTestId("context-menu")).not.toBeInTheDocument();
+      expect(observations).toEqual([{ reason, menuConnected: false }]);
+    },
+  );
+
   it("opens a submenu on hover and portals its items outside the parent surface", () => {
     const onClose = vi.fn();
     const items: MenuItem[] = [

@@ -46,6 +46,9 @@ export default defineConfig(({ command, mode, isPreview }) => ({
       "react",
       "react-dom",
       "react-dom/client",
+      // The icon barrel otherwise fans out into thousands of module requests
+      // before the app can mount, exhausting cold-start waits on hosted Windows.
+      "lucide-react",
       "gifenc",
       // react-konva's ESM entry imports named exports from the CommonJS
       // scheduler package. Optimizing the top-level entry lets Vite bundle

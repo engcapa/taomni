@@ -1,5 +1,8 @@
 id: TC-IDE-AUDIT-008-intention-quickfix-apply-undo-native
 title: Intention quick fix apply, one undo, and second-entry parity under jdtls
+# The canonical query can recover one JDT LS code-assist cancellation inside
+# its original deadline. Both UI entries must still return provider candidates,
+# apply exact provider bytes and revert them with one undo; assertions stay strict.
 description: "ED-AUDIT-008 A1/A3 native gate case. Enters the in-repo single-module Maven\nsample through persisted\
   \ recents, opens the W3 quick-fix target\n(QuickFixTarget.java references StringUtils without importing it), waits\
   \ for\nthe real JDT LS diagnostic, and proves the canonical intention commit chain\nthrough the packaged app UI\
