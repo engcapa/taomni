@@ -16,6 +16,7 @@ import {
 } from "./types";
 import { snapshotCodeActionContext, cloneAndDeepFreeze, isCommandAllowed, computeStableActionId } from "./identity";
 import { evaluateCodeActionResult, buildCodeActionParams } from "./provider";
+import { requestCandidateActions } from "./requestCandidates";
 import {
   extractAffectedUrisFromWorkspaceEdit,
   verifyCodeActionApplyIdentity,
@@ -99,7 +100,7 @@ export class CanonicalCodeActionService {
     };
     options.signal?.addEventListener("abort", onAbort, { once: true });
     try {
-      const resultPromise = client.requestCodeActions(params, requestAbort.signal);
+      const resultPromise = requestCandidateActions(client, params, provider.id, requestAbort.signal);
       const timeoutPromise = new Promise<never>((_, reject) => {
         timer = setTimeout(() => {
           reject(new Error("CODE_ACTION_TIMEOUT"));
