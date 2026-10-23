@@ -194,3 +194,8 @@ failures may be reported separately, per user authorization.
   the runner cloud DNS search domain. Disable MIT short-host qualification and
   map the actual runner hostnames to the disposable realm, with matching host
   principals. Preserve normal hostname verification; do not disable GSSAPI.
+
+- Add TC-SESSION-KEY-002 for product-generated encrypted keys, cleared generator
+  passphrase state, actionable connection-test guidance, masked runtime unlock
+  prompt and a real authenticated command. Authorize only the generated public
+  key; disposable passphrase is masked in CI and never stored in case YAML.
