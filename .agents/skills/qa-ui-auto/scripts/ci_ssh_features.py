@@ -135,6 +135,11 @@ def start(services):
     keygen = (binary / "ssh-keygen.exe") if cygwin else Path("/usr/bin/ssh-keygen")
     for key in [host_key, client_key]:
         command([keygen, "-t", "ed25519", "-N", "", "-f", path(key)])
+        if cygwin:
+            # Windows temporary directories can inherit a group-readable ACL
+            # even after Cygwin keygen's create mode. Enforce POSIX ownership
+            # before sshd checks the host key (StrictModes does not bypass it).
+            command([binary / "chmod.exe", "0600", path(key)])
     if system == "Windows":
         from ci_services import powershell
         powershell("Set-Service ssh-agent -StartupType Manual; Start-Service ssh-agent")
@@ -199,7 +204,7 @@ HostKey {path(host_key)}
 PidFile {path(private / 'sshd.pid')}
 AuthorizedKeysFile {path(authorized)}
 StrictModes no
-UsePAM {'yes' if system == 'Linux' else 'no'}
+{'UsePAM yes' if system == 'Linux' else 'UsePAM no' if system == 'Darwin' else ''}
 PasswordAuthentication no
 KbdInteractiveAuthentication no
 PubkeyAuthentication yes
@@ -216,6 +221,7 @@ LogLevel DEBUG3
 """, encoding="utf-8")
     prefix = [] if cygwin else ["sudo", "-n", "env", *[f"{key}={value}" for key, value in env.items()]]
     if system == "Linux": command(["sudo", "-n", "mkdir", "-p", "/run/sshd"])
+    command([*prefix, sshd, "-t", "-f", path(config)])
     services.start_process([*prefix, sshd, "-D", "-e", "-f", path(config)], "ssh-features")
     probe = [ssh, "-vvv", "-F", "none", "-oBatchMode=yes", "-oGSSAPIAuthentication=yes",
              "-oPreferredAuthentications=gssapi-with-mic", "-oStrictHostKeyChecking=accept-new", "-p", str(port), "-l", user, "localhost", "printf QA_GSSAPI_OK"]

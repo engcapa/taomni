@@ -221,3 +221,7 @@ failures may be reported separately, per user authorization.
   subscription fails, report connection failure. Closing during registration
   disposes the listener and never starts a new backend. Mounted tests cover all
   three outcomes; KEY-002 supplies real encrypted-key boundary coverage.
+- Windows run 40039391994 passed agent ACL setup but sshd refused the generated
+  host key's inherited 0640 mode. Explicitly chmod Cygwin keys to 0600 and run
+  sshd configuration/host-key validation before starting the service. This is
+  fixture setup failure, not executed Windows authentication evidence.
