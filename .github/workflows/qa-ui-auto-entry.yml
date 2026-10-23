@@ -34,7 +34,7 @@ jobs:
         with:
           ref: ${{ inputs.head }}
           persist-credentials: false
-      - uses: actions/download-artifact@v4
+      - uses: ./.github/actions/qa-download-artifact
         with:
           name: qa-selection-${{ inputs.artifact_key }}
           path: qa-ui-auto-report
@@ -351,7 +351,7 @@ jobs:
           retention-days: 14
       - name: Download this invocation's verified native runtime
         if: inputs.operation == 'run' && matrix.mode == 'native'
-        uses: actions/download-artifact@v4
+        uses: ./.github/actions/qa-download-artifact
         with:
           name: runtime-${{ matrix.build_id }}-${{ inputs.artifact_key }}
           path: qa-ui-auto-report/native-runtime

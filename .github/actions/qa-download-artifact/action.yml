@@ -1,0 +1,30 @@
+name: Download QA artifact with one retry
+description: Retry a read-only artifact transfer once without retrying case execution.
+inputs:
+  name:
+    description: Exact artifact name, when downloading one artifact.
+    default: ''
+  pattern:
+    description: Artifact name pattern, when collecting several artifacts.
+    default: ''
+  path:
+    description: Destination directory.
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Download artifact
+      id: download
+      continue-on-error: true
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.name }}
+        pattern: ${{ inputs.pattern }}
+        path: ${{ inputs.path }}
+    - name: Retry failed artifact download once
+      if: ${{ !cancelled() && steps.download.outcome == 'failure' }}
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.name }}
+        pattern: ${{ inputs.pattern }}
+        path: ${{ inputs.path }}
