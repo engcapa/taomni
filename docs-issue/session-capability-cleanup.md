@@ -189,3 +189,8 @@ failures may be reported separately, per user authorization.
 - Add native SCP lifecycle coverage with a real bandwidth-limited scp command
   and a separate large file: pause, close/reopen the file browser, resume, cancel,
   retry, assert nonzero resumed bytes and exact published SHA256.
+
+- Linux GSSAPI probe diagnostics identified unexpected cross-realm requests for
+  the runner cloud DNS search domain. Disable MIT short-host qualification and
+  map the actual runner hostnames to the disposable realm, with matching host
+  principals. Preserve normal hostname verification; do not disable GSSAPI.

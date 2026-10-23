@@ -14,6 +14,7 @@ from pathlib import Path
 import platform
 import re
 import shlex
+import socket
 import subprocess
 import sys
 import threading
@@ -55,6 +56,12 @@ def start(services):
     private.mkdir()
     port, kdc_port = free_port(), free_port()
     realm = "TAOMNI.QA"
+    # Ubuntu OpenSSH canonicalizes localhost through the runner's cloud DNS
+    # even with libkrb5 canonicalization disabled. Authorize that real host
+    # principal in this disposable realm, never a cross-realm cloud ticket.
+    hostnames = sorted({"localhost", socket.gethostname().lower(), socket.getfqdn().lower(),
+                        socket.getfqdn("localhost").lower(), socket.getfqdn("127.0.0.1").lower()})
+    realm_hosts = "\n".join(f" {host} = {realm}" for host in hostnames)
     cygwin = Path(os.environ["QA_CYGWIN_ROOT"]) if system == "Windows" else None
     if cygwin:
         binary = cygwin / "bin"
@@ -87,13 +94,14 @@ def start(services):
  dns_lookup_realm = false
  rdns = false
  dns_canonicalize_hostname = false
+ qualify_shortname = ""
  udp_preference_limit = 1
 [realms]
  {realm} = {{
   kdc = 127.0.0.1:{kdc_port}
  }}
 [domain_realm]
- localhost = {realm}
+{realm_hosts}
 """, encoding="utf-8")
     kdc_conf.write_text(f"""[kdcdefaults]
  kdc_ports = {kdc_port}
@@ -116,8 +124,9 @@ def start(services):
     # Cygwin ships this PE executable without an .exe extension.
     kadmin = krb_sbin / "kadmin.local"
     command([kadmin, "-q", f"addprinc -randkey {user}@{realm}"])
-    command([kadmin, "-q", f"addprinc -randkey host/localhost@{realm}"])
-    command([kadmin, "-q", f"ktadd -k {path(keytab)} host/localhost@{realm}"])
+    for hostname in hostnames:
+        command([kadmin, "-q", f"addprinc -randkey host/{hostname}@{realm}"])
+        command([kadmin, "-q", f"ktadd -k {path(keytab)} host/{hostname}@{realm}"])
     client_keytab = private / "client.keytab"
     command([kadmin, "-q", f"ktadd -k {path(client_keytab)} {user}@{realm}"])
     services.start_process([krb_sbin / ("krb5kdc" + suffix), "-n", "-r", realm], "kerberos-kdc")
