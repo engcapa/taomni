@@ -199,3 +199,25 @@ failures may be reported separately, per user authorization.
   passphrase state, actionable connection-test guidance, masked runtime unlock
   prompt and a real authenticated command. Authorize only the generated public
   key; disposable passphrase is masked in CI and never stored in case YAML.
+
+## Hosted failure recovery (40039000974 / 40039391994)
+
+- Linux now passes real GSSAPI, generated-key/agent, bookmarks/windows and all
+  three SCP cases. macOS passes encrypted generated-key unlock (KEY-002).
+- SCP cancellation previously exposed Retry before worker shutdown and reused
+  its native transfer identity. A delayed cancellation completion could clobber
+  the retry row/listeners. Await the worker event, replace the row with a fresh
+  attempt ID, and wait for actual bytes before cancelling in SCP-003. Retain
+  partial verification and exact destination hash assertions.
+- X11 acceptance incorrectly waited for an idle shell after exec replaced it
+  with a graphical client. Wait for the terminal view then directly verify the
+  independently observed real X window; graphical execution remains unverified
+  until the corrected hosted case passes.
+- Linux wrong-password acceptance exposed clickhouse-rs panicking on EOF during
+  Hello, leaving IPC unresolved. Contain driver unwinds inside each owned query
+  operation and report an actionable error. Exercise repeated early disconnects
+  using a local TCP unit fixture; hosted authentication recovery remains required.
+- Await SSH auth-event subscription before starting native authentication; if
+  subscription fails, report connection failure. Closing during registration
+  disposes the listener and never starts a new backend. Mounted tests cover all
+  three outcomes; KEY-002 supplies real encrypted-key boundary coverage.

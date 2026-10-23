@@ -87,11 +87,11 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
     lifetime.unlistenAuthPrompt = null;
   };
 
-  const registerSshAuthPrompt = (targetSid: string) => {
+  const registerSshAuthPrompt = async (targetSid: string) => {
     // SSH connections may demand a second factor (MFA/OTP) via
     // keyboard-interactive auth. Register before createSshTerminal, because
     // the backend emits prompts before that call resolves.
-    void listenSshAuthPrompt(targetSid, (payload) => {
+    const un = await listenSshAuthPrompt(targetSid, (payload) => {
       if (lifetime.destroyed) {
         // Window/panel gone — cancel so the backend stops waiting.
         void submitSshAuthResponse(payload.requestId, null).catch(() => { });
@@ -99,18 +99,12 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
       }
       controllerContext.pendingMfaRequestIdRef.current = payload.requestId;
       controllerContext.setMfaPrompt(payload);
-    })
-      .then((un) => {
-        if (lifetime.destroyed) {
-          un();
-        } else {
-          lifetime.unlistenAuthPrompt = un;
-        }
-      })
-      .catch(() => {
-        /* listener registration failed — connect proceeds; if the server
-           demands MFA it'll fail with a clear auth error. */
-      });
+    });
+    if (lifetime.destroyed) {
+      un();
+    } else {
+      lifetime.unlistenAuthPrompt = un;
+    }
   };
 
   const markDisconnected = (endedSid: string) => {
@@ -291,6 +285,7 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
     if (lifetime.destroyed) return;
     console.error("Failed to create terminal:", err);
     controllerContext.onSessionLaunchFailedRef.current?.(err);
+    clearConnectionListeners();
     cancelPendingMfa();
     controllerContext.connectionStateRef.current = ssh ? "disconnected" : "idle";
     controllerContext.automationInputSettlingRef.current = false;
@@ -333,7 +328,6 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
     controllerContext.sessionIdRef.current = null;
     controllerContext.setRegisteredSessionId(null);
     controllerContext.zmodemRef.current = null;
-    registerSshAuthPrompt(targetSid);
 
     controllerContext.appendEvent(
       "connection",
@@ -370,26 +364,30 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
       pendingOutput = null;
       if (!lifetime.destroyed) buffered?.forEach(handleRawOutput);
     };
-    createSshTerminal(
-      targetSid,
-      ssh.host,
-      ssh.port,
-      ssh.username,
-      ssh.authMethod,
-      ssh.authData,
-      cols,
-      rows,
-      JSON.stringify(toNetworkSettingsPayload(ns)),
-      receiveOutput,
-      // X11 forwarding: enabled per-session (defaults on, matching the
-      // SessionEditor default). Trusted mode unless the expert option
-      // explicitly opts into untrusted.
-      opts.x11 !== false,
-      opts.x11Trusted !== false,
-      backendStartupCommand,
-      keepStartupCommandOpen,
-    )
+    registerSshAuthPrompt(targetSid).then(() => {
+      if (lifetime.destroyed) return;
+      return createSshTerminal(
+        targetSid,
+        ssh.host,
+        ssh.port,
+        ssh.username,
+        ssh.authMethod,
+        ssh.authData,
+        cols,
+        rows,
+        JSON.stringify(toNetworkSettingsPayload(ns)),
+        receiveOutput,
+        // X11 forwarding: enabled per-session (defaults on, matching the
+        // SessionEditor default). Trusted mode unless the expert option
+        // explicitly opts into untrusted.
+        opts.x11 !== false,
+        opts.x11Trusted !== false,
+        backendStartupCommand,
+        keepStartupCommandOpen,
+      );
+    })
       .then((sessionId) => {
+        if (!sessionId) return;
         if (!lifetime.destroyed) {
           term.write(mode === "reconnect"
             ? `\r\n\x1b[32m[Reconnected to ${ssh.username}@${ssh.host}:${ssh.port}]\x1b[0m\r\n`

@@ -309,6 +309,7 @@ export function FileTransferQueue({
             <div
               key={it.id}
               data-transfer-state={it.state}
+              data-transfer-bytes={it.bytes}
               data-resume-bytes={it.resumeBytes}
               data-transfer-restarted={it.restarted === undefined ? undefined : String(it.restarted)}
               className="px-2 py-1 border-b"

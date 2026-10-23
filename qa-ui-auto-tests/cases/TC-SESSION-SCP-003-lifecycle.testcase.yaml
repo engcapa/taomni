@@ -85,7 +85,9 @@ steps:
 - wait_for: '[data-testid="sftp-transfer-queue"] [data-transfer-state="paused"]'
 - click: '[data-testid="sftp-transfer-queue"] button[title="Resume"]'
 - wait_for: '[data-testid="sftp-transfer-queue"] [data-transfer-state="running"]'
-- wait: 2
+- wait_for:
+    selector: '[data-testid="sftp-transfer-queue"] [data-transfer-state="running"][data-transfer-bytes]:not([data-transfer-bytes="0"])'
+    timeout_sec: 45
 - click: '[data-testid="sftp-transfer-queue"] button[title="Cancel"]'
 - wait_for: '[data-testid="sftp-transfer-queue"] [data-transfer-state="cancelled"]'
 - click: '[data-testid="sftp-transfer-queue"] button[title="Retry"]'

@@ -6,7 +6,8 @@ use super::{
 };
 use clickhouse_rs::types::{Block, ColumnType, FromSql, FromSqlResult, ValueRef};
 use clickhouse_rs::{Options, Pool};
-use futures::StreamExt;
+use futures::{FutureExt, StreamExt};
+use std::panic::AssertUnwindSafe;
 use std::time::{Duration, Instant};
 use tokio_util::sync::CancellationToken;
 
@@ -69,7 +70,7 @@ impl NativeClient {
         };
         tokio::select! {
             _ = token.cancelled() => Err("Query cancelled".into()),
-            result = tokio::time::timeout(self.timeout, operation) => result.map_err(|_| "ClickHouse native query timed out")?,
+            result = guarded_operation(self.timeout, operation) => result,
         }
     }
 
@@ -136,9 +137,23 @@ impl NativeClient {
         };
         tokio::select! {
             _ = token.cancelled() => Err("Query cancelled".into()),
-            result = tokio::time::timeout(self.timeout, operation) => result.map_err(|_| "ClickHouse native query timed out")?,
+            result = guarded_operation(self.timeout, operation) => result,
         }
     }
+}
+
+// clickhouse-rs can panic on EOF during its Hello exchange (including a server
+// closing after rejecting credentials). Keep that dependency failure inside
+// the per-operation connection owner so the IPC always resolves and retries
+// use a fresh connection. Never reuse the partially decoded stream.
+async fn guarded_operation<T>(
+    timeout: Duration,
+    operation: impl std::future::Future<Output = Result<T, String>>,
+) -> Result<T, String> {
+    tokio::time::timeout(timeout, AssertUnwindSafe(operation).catch_unwind())
+        .await
+        .map_err(|_| "ClickHouse native query timed out")?
+        .map_err(|_| "ClickHouse native connection ended unexpectedly; check credentials, server logs and protocol/TLS settings")?
 }
 
 fn native_error(error: impl std::fmt::Display) -> String {
@@ -187,6 +202,35 @@ fn rows<K: ColumnType>(block: &Block<K>, count: usize) -> Result<Vec<Vec<Option<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn early_server_disconnect_returns_an_error_for_each_fresh_attempt() {
+        use tokio::io::AsyncReadExt;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let config: DbConfig = serde_json::from_value(serde_json::json!({
+            "engine": "ClickHouse", "host": "127.0.0.1",
+            "port": listener.local_addr().unwrap().port(), "timeoutSecs": 2
+        }))
+        .unwrap();
+        let server = tokio::spawn(async move {
+            for _ in 0..2 {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let mut hello = [0; 512];
+                assert!(socket.read(&mut hello).await.unwrap() > 0);
+                // A server may close before returning Hello or an Exception.
+                drop(socket);
+            }
+        });
+        let client = NativeClient::new(&config, Some("rejected")).unwrap();
+        for _ in 0..2 {
+            let error = client
+                .execute("default", "SELECT 1", &CancellationToken::new())
+                .await
+                .unwrap_err();
+            assert!(error.contains("ClickHouse native"), "{error}");
+        }
+        server.await.unwrap();
+    }
 
     #[test]
     fn native_values_keep_null_distinct_from_empty_and_preserve_integer_precision() {
