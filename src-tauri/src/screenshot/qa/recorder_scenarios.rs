@@ -470,13 +470,16 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
         .await
         .map_err(|e| e.to_string())?;
     let script = r#"
+      window.__qaRecorderStage = 'wait-stop';
       const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
       const q = (s) => document.querySelector(s);
       for (let i = 0; i < 50 && !(q('[data-testid="screenshot-recorder-stop"]') && !q('[data-testid="screenshot-recorder-stop"]').disabled); i++) await sleep(100);
       const timerBefore = (q('[data-testid="screenshot-recorder-timer"]') || {}).textContent;
+      window.__qaRecorderStage = 'record';
       await sleep(2300);
       const timerAfter = (q('[data-testid="screenshot-recorder-timer"]') || {}).textContent;
       q('[data-testid="screenshot-recorder-stop"]').click();
+      window.__qaRecorderStage = 'wait-preview';
       let preview = null;
       for (let i = 0; i < 100; i++) {
         preview = q('[data-testid="screenshot-recorder-preview"]');
@@ -493,7 +496,9 @@ pub async fn screenshot_qa_recorder(app: AppHandle, format: String) -> Result<St
         if (preview.readyState < 2 || preview.videoWidth <= 0 || preview.error) throw new Error('MP4 preview did not decode');
         preview.loop = false;
         preview.currentTime = 0;
+        window.__qaRecorderStage = 'play';
         await preview.play();
+        window.__qaRecorderStage = 'observe-playback';
         await sleep(600);
         playbackMoved = preview.currentTime > 0.1;
         if (!playbackMoved) throw new Error('MP4 preview did not play');

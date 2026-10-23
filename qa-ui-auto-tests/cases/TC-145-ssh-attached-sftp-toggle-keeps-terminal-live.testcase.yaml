@@ -66,6 +66,7 @@ steps:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
     timeout_sec: 10
 - terminal_input:
+    # One attempt must preserve the first command byte, including UCRT64 Git Bash.
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: echo qa-ssh-with-sftp-open
     submit: true

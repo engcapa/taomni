@@ -88,7 +88,28 @@ pub(super) async fn run_js(
             }
         }
         if Instant::now() >= deadline {
-            anyhow::bail!("script in '{}' timed out", window.label());
+            let diagnostic = eval_raw(
+                window,
+                r#"({
+                stage: window.__qaRecorderStage ?? null,
+                visibility: document.visibilityState,
+                focused: document.hasFocus(),
+                videos: Array.from(document.querySelectorAll('video'), v => ({
+                    readyState: v.readyState, networkState: v.networkState,
+                    paused: v.paused, ended: v.ended, seeking: v.seeking,
+                    currentTime: v.currentTime, duration: v.duration,
+                    width: v.videoWidth, height: v.videoHeight,
+                    error: v.error && {code: v.error.code, message: v.error.message}
+                }))
+            })"#
+                .into(),
+                Duration::from_secs(2),
+            )
+            .await;
+            anyhow::bail!(
+                "script in '{}' timed out; document={diagnostic:?}",
+                window.label()
+            );
         }
     }
 }
