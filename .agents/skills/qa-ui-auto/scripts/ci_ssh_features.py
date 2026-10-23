@@ -131,7 +131,18 @@ def start(services):
         powershell("Set-Service ssh-agent -StartupType Manual; Start-Service ssh-agent")
         services.cleanup_action("ssh-agent-stop", lambda: powershell("Stop-Service ssh-agent"))
         native_add = Path(os.environ["WINDIR"]) / "System32/OpenSSH/ssh-add.exe"
-        command([native_add, str(client_key)])
+        # Cygwin encodes POSIX group bits as explicit Windows ACEs, which
+        # Microsoft ssh-add rejects even when chmod reports 0600. Give its
+        # native key copy a fresh owner-only DACL; retain the Cygwin key for sshd.
+        agent_key = private / "agent_key"
+        agent_key.write_bytes(client_key.read_bytes())
+        os.environ["QA_AGENT_KEY_PATH"] = str(agent_key)
+        powershell("$sid=[System.Security.Principal.WindowsIdentity]::GetCurrent().User; "
+                   "$acl=New-Object System.Security.AccessControl.FileSecurity; "
+                   "$acl.SetOwner($sid); $acl.SetAccessRuleProtection($true,$false); "
+                   "$rule=New-Object System.Security.AccessControl.FileSystemAccessRule($sid,'FullControl','Allow'); "
+                   "$acl.AddAccessRule($rule); Set-Acl -LiteralPath $env:QA_AGENT_KEY_PATH -AclObject $acl")
+        command([native_add, str(agent_key)])
     else:
         agent_output = command(["ssh-agent", "-s"])
         for key in ["SSH_AUTH_SOCK", "SSH_AGENT_PID"]:
@@ -159,6 +170,11 @@ def start(services):
     watcher = threading.Thread(target=watch_public, daemon=True)
     watcher.start()
     services.cleanup_action("generated-key-watcher", lambda: (stop.set(), watcher.join(2)))
+    commands = private / "commands"
+    commands.mkdir()
+    scp = commands / "scp"
+    scp.write_text("#!/bin/sh\ncase \"$*\" in\n  *scp-large.bin*) exec /usr/bin/scp -l 2048 \"$@\" ;;\n  *) exec /usr/bin/scp \"$@\" ;;\nesac\n", encoding="utf-8")
+    command([binary / "chmod.exe", "+x", path(scp)]) if cygwin else scp.chmod(0o700)
     config = private / "sshd_config"
     config.write_text(f"""Port {port}
 ListenAddress 127.0.0.1
@@ -177,6 +193,7 @@ AllowUsers {user}
 AllowTcpForwarding yes
 X11Forwarding yes
 XAuthLocation {path((binary / 'xauth.exe') if cygwin else Path('/opt/X11/bin/xauth') if system == 'Darwin' else Path('/usr/bin/xauth'))}
+SetEnv "PATH={path(commands)}:/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"
 Subsystem sftp internal-sftp
 LogLevel DEBUG3
 """, encoding="utf-8")
@@ -203,5 +220,13 @@ LogLevel DEBUG3
         "local_dir": local_dir.as_posix(), "downloaded": (local_dir / "scp-source.txt").as_posix(),
         "uploaded": (remote_dir / "scp-upload.txt").as_posix(),
         "native_public_key": str(generated).replace("\\", "/") + ".pub"}
+    # Separate long transfer for pause/cancel/retry acceptance. A real scp
+    # bandwidth limit makes the pause observable without timing a fast loopback.
+    large = remote_dir / "scp-large.bin"
+    payload = b"taomni-scp-cancel-resume\n" * (1024 * 192)
+    large.write_bytes(payload)
+    services.config["ssh_features"].update({"large_source": path(large),
+        "large_downloaded": (local_dir / large.name).as_posix(),
+        "large_sha256": hashlib.sha256(payload).hexdigest()})
     return {"gssapi_command": True, "realm": realm, "port": port, "kdc_port": kdc_port,
             "runtime": "cygwin" if cygwin else "host", "ssh_version": command([ssh, "-V"])[:120]}

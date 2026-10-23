@@ -176,3 +176,16 @@ failures may be reported separately, per user authorization.
 - This acceptance proves custom remote graphical commands and X11 transport.
   Named desktop startup mappings have unit coverage; complete GNOME/KDE/Xfce
   desktop-session compatibility is not yet established by this case.
+
+## Hosted verification checkpoint
+
+- Run 40036370220 (ce00536b) browser: 5/5 cases passed on each OS. macOS native:
+  all 9 selected cases passed, including real ClickHouse HTTP/Native DDL/DML,
+  GSSAPI terminal/SFTP, generated key/agent/expert auth/reconnect, background image,
+  detach/reattach and both SCP modes. This predates SCP resume and X11 additions.
+- Windows CAP/NET passed; protocol fixture failed at Microsoft ssh-add because
+  Cygwin's POSIX group ACL entries are rejected. Create an owner-only native key
+  copy for the Windows agent while retaining the Cygwin key for SSH services.
+- Add native SCP lifecycle coverage with a real bandwidth-limited scp command
+  and a separate large file: pause, close/reopen the file browser, resume, cancel,
+  retry, assert nonzero resumed bytes and exact published SHA256.
