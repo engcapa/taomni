@@ -6,6 +6,7 @@ import { createTerminalSlice } from "./app/terminalSlice";
 import { createAppearanceSlice } from "./app/appearanceSlice";
 import { createWorkspaceSlice } from "./app/workspaceSlice";
 import { createDatabaseSlice } from "./app/databaseSlice";
+import { createPlatformChromeSlice } from "./app/platformChromeSlice";
 import { UI_FONT_FAMILY_KEY, readUiFontFamily, UI_FONT_SIZE_KEY, readUiFontSize, clampUiFontSize } from "./app/preferences";
 
 export { computeDuplicateTitle, computeNewTerminalTitle, updateDuplicateAutoTitle } from "./app/tabTitles";
@@ -17,6 +18,7 @@ export const useAppStore = create<AppState>((...args) => ({
   ...createAppearanceSlice(...args),
   ...createWorkspaceSlice(...args),
   ...createDatabaseSlice(...args),
+  ...createPlatformChromeSlice(...args),
 }));
 
 export function syncUiAppearanceFromStorage(event: Pick<StorageEvent, "key" | "newValue">): void {
@@ -49,6 +51,7 @@ export {
   type SideTab,
   type TerminalSplitLayout,
   type VaultUnlockMode,
+  type FloatingMfaWindowState,
   type DbObjectKind,
   type DbSelectedObject,
   type CodeWorkspaceContext,
@@ -64,5 +67,7 @@ export {
 } from "./app/types";
 
 export { VAULT_UNLOCK_MODE_KEY } from "./app/preferences";
+
+export { DEFAULT_FLOATING_MFA_POSITION, FLOATING_MFA_SIZE } from "./app/platformChromeSlice";
 
 export { recentWorkspaceIdFromParts, newWorkspaceInstanceId } from "./app/recentWorkspaces";

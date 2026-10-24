@@ -58,7 +58,8 @@ export function TitleBarTrayControls() {
     ? <CompactTitleBarTray {...trayProps} />
     : (
     <div className="taomni-titlebar-tray flex items-stretch self-stretch shrink-0" data-testid="titlebar-tray">
-      {/* Terminal layout group */}
+      {/* Terminal layout group (split / multi-exec / voice). Theme and
+          language live at the bottom of the primary navigation rail. */}
       <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
         <TrayButton
           testId="tab-split-view"
@@ -89,21 +90,8 @@ export function TitleBarTrayControls() {
         </>
       )}
 
-      <TrayGroupSeparator />
-
-      {/* Locale + appearance group (theme sits to the right of the language
-          switcher), anchored to the rightmost tray slot. */}
-      <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
-        <LanguageSwitcher />
-        <TrayButton
-          testId="theme-cycle"
-          title={themeTitle}
-          ariaLabel={t("titlebar.cycleThemeAria")}
-          onClick={() => setMode(next.mode)}
-        >
-          {current.icon}
-        </TrayButton>
-      </div>
+      {/* Locale + appearance moved to the primary navigation rail bottom
+          (v6.1); the tray keeps terminal layout and voice controls. */}
     </div>
     );
 }

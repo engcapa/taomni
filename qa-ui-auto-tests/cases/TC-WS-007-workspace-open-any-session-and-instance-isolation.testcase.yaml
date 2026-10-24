@@ -1,0 +1,118 @@
+id: TC-WS-007
+title: Workspace opens any global session as an isolated instance across modes
+description: 'Workspace-first platform redesign AC-07. The workspace + menu and the picker list every global session (not only pinned ones) and open the chosen one as an isolated workspace tab. Switching to Sessions mode and back keeps both runtimes separate: the workspace tab survives while the global tree shows the same session config.'
+covers:
+- F1.5
+- F2.4
+- F-WS-5
+tags:
+- workspace-platform
+- sessions
+- isolation
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.sessions.v1
+    value: '[{"id":"qa-ws-any-01","name":"qa-any-session","session_type":"LocalShell","group_path":null,"host":"","port":0,"username":null,"auth_method":"None","options_json":"{}","created_at":0,"updated_at":0,"last_connected_at":null,"sort_order":0}]'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-sidebar"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- wait_for: '[data-testid="workspace-open-session-plus-menu"]'
+- assert_visible: '[data-testid="workspace-plus-new-terminal"]'
+- assert_visible: '[data-testid="workspace-plus-open-session"]'
+- click: '[data-testid="workspace-plus-open-session"]'
+- wait_for: '[data-testid="workspace-session-picker-modal"]'
+- assert_visible: '[data-testid="workspace-session-picker-search"]'
+- assert_visible: '[data-testid="workspace-session-picker-list"]'
+- fill:
+    selector: '[data-testid="workspace-session-picker-search"]'
+    value: qa-any
+- wait_for: '[data-testid="workspace-session-picker-row-qa-ws-any-01"]'
+- click: '[data-testid="workspace-session-picker-pin"]'
+- click: '[data-testid="workspace-session-picker-row-qa-ws-any-01"]'
+- wait_for: '[data-testid="workspace-tab-item"][data-tab-kind="terminal"]'
+- assert_localstorage:
+    key: taomni.platformWorkspaces.v1
+    contains: qa-ws-any-01
+- click: '[data-testid="sidebar-rail"] [data-testid="code-workspace-tool-rail-sessions"]'
+- wait_for: '[data-testid="workspace-sessions-lens"]'
+- assert_visible: '[data-testid="workspace-pinned-session-qa-ws-any-01"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-any-session"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-sidebar"]'
+- assert_visible: '[data-testid="workspace-tab-item"][data-tab-kind="terminal"]'
+- screenshot: tc-ws-007-isolated-sessions.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 工作区 + 菜单提供新建本地终端与打开任意会话入口；选择器列出全部全局会话并可搜索、可勾选同时关联常用，打开后生成独立工作区标签。
+    actions:
+    - 6
+    - 15
+    - 17
+    - 18
+    checkpoints:
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"workspace-open-session-plus-menu\"]"}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"workspace-plus-new-terminal\"]"}'
+    - step: 10
+      expectation: '{"assert_visible": "[data-testid=\"workspace-plus-open-session\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-picker-modal\"]"}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"workspace-session-picker-search\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-picker-row-qa-ws-any-01\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"workspace-tab-item\"][data-tab-kind=\"terminal\"]"}'
+    - step: 20
+      expectation: '{"assert_localstorage": {"key": "taomni.platformWorkspaces.v1", "contains": "qa-ws-any-01"}}'
+    results:
+    - 8
+    - 9
+    - 10
+    - 12
+    - 16
+    - 19
+    - 20
+  - id: R2
+    requirement: 关联会话置顶展示在左栏 Sessions 面板；同一会话配置同时存在于 Sessions 模式目录树与工作区独立标签，互不影响。
+    actions:
+    - 21
+    - 25
+    - 28
+    checkpoints:
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"workspace-sessions-lens\"]"}'
+    - step: 23
+      expectation: '{"assert_visible": "[data-testid=\"workspace-pinned-session-qa-ws-any-01\"]"}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-any-session\"]"}'
+    - step: 29
+      expectation: '{"assert_visible": "[data-testid=\"workspace-tab-item\"][data-tab-kind=\"terminal\"]"}'
+    results:
+    - 22
+    - 23
+    - 26
+    - 29
+  visual:
+  - check: 检查截图选择器、左栏置顶列表与工作区标签条布局无遮挡。
+    method: manual
+    reason: 像素布局与遮挡需要截图人工评审。
+  native:
+  - check: 原生 WebView 中执行相同步骤；独立 PTY 连接健康度由 TC-WS-012 证明。
+    method: automated
+    reason: browser 无法证明 PTY 运行态，未执行平台不计作通过。

@@ -1,0 +1,146 @@
+id: TC-WS-004
+title: Rail bottom tool order and the bottom-left floating MFA verifier window
+description: Workspace-first platform redesign AC-04. The rail bottom lists MFA, screenshot, chat, theme, language and settings in order. Clicking MFA opens the floating verifier anchored at left 50px / bottom 30px with search, pin, expand-to-full-tab and close; the floating list stays behind the vault gate.
+covers:
+- F-MFA-1
+- F-I18n-1
+- F-WS-1
+- F-WS-3
+tags:
+- workspace-platform
+- mfa
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-mfa-password
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_visible: '[data-testid="rail-bottom-tools"]'
+- eval_readonly:
+    expression: document.querySelectorAll("[data-tool-window-id]").item(5).dataset.toolWindowId==="rail-mfa"&&document.querySelectorAll("[data-tool-window-id]").item(6).dataset.toolWindowId==="rail-chat"&&document.querySelectorAll("[data-tool-window-id]").item(7).dataset.toolWindowId==="theme-cycle"&&document.querySelectorAll("[data-tool-window-id]").item(8).dataset.toolWindowId==="settings"
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"rail-mfa-button\"]").getBoundingClientRect().bottom<document.querySelector("[data-testid" + String.fromCharCode(61) + "\"system-screenshot\"]").getBoundingClientRect().bottom
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"system-screenshot\"]").getBoundingClientRect().bottom<document.querySelector("[data-testid" + String.fromCharCode(61) + "\"rail-chat-button\"]").getBoundingClientRect().bottom
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"theme-cycle\"]").getBoundingClientRect().bottom<document.querySelector("[data-testid" + String.fromCharCode(61) + "\"language-switcher\"]").getBoundingClientRect().bottom
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"language-switcher\"]").getBoundingClientRect().bottom<document.querySelector("[data-testid" + String.fromCharCode(61) + "\"ribbon-settings\"]").getBoundingClientRect().bottom
+    expect_truthy: true
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="mfa-floating-window"]'
+- eval_readonly:
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"mfa-floating-window\"]").style.left==="50px"&&document.querySelector("[data-testid" + String.fromCharCode(61) + "\"mfa-floating-window\"]").style.bottom==="30px"
+    expect_truthy: true
+- assert_visible: '[data-testid="mfa-floating-drag-handle"]'
+- assert_visible: '[data-testid="mfa-floating-search"]'
+- assert_visible: '[data-testid="mfa-floating-list"]'
+- click: '[data-testid="mfa-floating-pin"]'
+- assert_attribute:
+    selector: '[data-testid="mfa-floating-window"]'
+    name: data-pinned
+    equals: 'true'
+- click: '[data-testid="mfa-floating-expand-tab"]'
+- wait_for: '[data-testid="mfa-tab"]'
+- assert_not_visible: '[data-testid="mfa-floating-window"]'
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="mfa-floating-window"]'
+- click: '[data-testid="mfa-floating-close"]'
+- assert_not_visible: '[data-testid="mfa-floating-window"]'
+- assert_visible: '[data-testid="theme-cycle"]'
+- assert_visible: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-switcher"]'
+- assert_visible: '[data-testid="language-option-en"]'
+- click: '[data-testid="language-option-en"]'
+- assert_localstorage:
+    key: taomni.locale.v1
+    exists: true
+- screenshot: tc-ws-004-rail-mfa-float.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 左侧栏底部依次为 MFA、截图、聊天、主题、语言、设置。
+    actions:
+    - 1
+    - 4
+    checkpoints:
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"rail-bottom-tools\"]"}'
+    - step: 5
+      expectation: MFA/聊天/主题/设置四个工具按钮在 rail 中顺序正确。
+    - step: 6
+      expectation: 截图按钮位于 MFA 下方。
+    - step: 7
+      expectation: 聊天按钮位于截图下方。
+    - step: 8
+      expectation: 语言按钮位于主题下方。
+    - step: 9
+      expectation: 设置按钮位于语言下方。
+    results:
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+  - id: R2
+    requirement: 点击 MFA 在左下角 (left:50px, bottom:30px) 打开悬浮窗，支持搜索、置顶、展开全屏页、关闭，展开后悬浮窗关闭且 mfa-tab 可见。
+    actions:
+    - 8
+    - 14
+    - 17
+    - 20
+    checkpoints:
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"mfa-floating-window\"]"}'
+    - step: 12
+      expectation: 悬浮窗内联样式 left=50px 且 bottom=30px。
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"mfa-floating-drag-handle\"]"}'
+    - step: 17
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mfa-floating-window\"]", "name": "data-pinned", "equals": "true"}}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"mfa-tab\"]"}'
+    - step: 20
+      expectation: '{"assert_not_visible": "[data-testid=\"mfa-floating-window\"]"}'
+    - step: 24
+      expectation: '{"assert_not_visible": "[data-testid=\"mfa-floating-window\"]"}'
+    results:
+    - 11
+    - 12
+    - 13
+    - 17
+    - 19
+    - 20
+    - 24
+  - id: R3
+    requirement: 底部语言切换保留双语菜单与持久化。
+    actions:
+    - 23
+    - 24
+    checkpoints:
+    - step: 28
+      expectation: '{"assert_visible": "[data-testid=\"language-option-en\"]"}'
+    - step: 30
+      expectation: '{"assert_localstorage": {"key": "taomni.locale.v1", "exists": true}}'
+    results:
+    - 28
+    - 30
+  visual:
+  - check: 检查截图悬浮窗位于左下角、不遮挡侧栏按钮、头部按钮可用。
+    method: manual
+    reason: 像素布局与遮挡需要截图人工评审。
+  native:
+  - check: 原生 WebView 中执行相同步骤；系统剪贴板写入由 TC-WS-012 与 TC-MFA 原生套件证明。
+    method: automated
+    reason: browser 无法证明 OS 剪贴板行为，未执行平台不计作通过。

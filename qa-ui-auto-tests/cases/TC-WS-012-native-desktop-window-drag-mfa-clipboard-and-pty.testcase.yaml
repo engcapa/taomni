@@ -1,0 +1,110 @@
+id: TC-WS-012
+title: Native desktop window drag, workspace local PTY and the floating MFA anchor
+description: Workspace-first platform redesign native sweep (V-12). In the real desktop WebView the frameless window drags from the shared toolbar, the Workspaces + menu opens a real local PTY that echoes input, and the bottom-left MFA floating window opens at its default anchor and expands to the full tab.
+covers:
+- F1.3
+- F2.4
+- F-MFA-1
+- F-WS-3
+- F-WS-5
+tags:
+- workspace-platform
+- native
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+timeout_sec: 300
+native_platforms:
+- Linux
+- Windows
+- macOS
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="control-bar"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- native_window_drag:
+    selector: '[data-testid="window-drag-handle"]'
+    dx: 40
+    dy: 24
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-sidebar"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- wait_for: '[data-testid="workspace-open-session-plus-menu"]'
+- click: '[data-testid="workspace-plus-new-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- wait: 2
+- click: '[data-testid="terminal-pane"]'
+- type: echo ws-pty-ok
+- press: Enter
+- wait: 2
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: ws-pty-ok
+    timeout_sec: 15
+- vault_first_run: qa-ws-native-mfa
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="mfa-floating-window"]'
+- eval_readonly:
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"mfa-floating-window\"]").style.left==="50px"&&document.querySelector("[data-testid" + String.fromCharCode(61) + "\"mfa-floating-window\"]").style.bottom==="30px"
+    expect_truthy: true
+- click: '[data-testid="mfa-floating-expand-tab"]'
+- wait_for: '[data-testid="mfa-tab"]'
+- assert_not_visible: '[data-testid="mfa-floating-window"]'
+- screenshot: tc-ws-012-native-sweep.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 原生无边框窗口可从共享工具栏抓手拖动。
+    actions:
+    - 1
+    checkpoints:
+    - step: 4
+      expectation: '{"native_window_drag": {"selector": "[data-testid=\"window-drag-handle\"]", "dx": 40, "dy": 24}}'
+    results:
+    - 4
+  - id: R2
+    requirement: 工作区 + 菜单打开的本地终端是独立 PTY 实例并回显输入。
+    actions:
+    - 7
+    - 12
+    checkpoints:
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"workspace-open-session-plus-menu\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 16
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "ws-pty-ok"}}'
+    results:
+    - 8
+    - 10
+    - 16
+  - id: R3
+    requirement: 左下角 MFA 悬浮窗在原生窗口按默认锚点打开并可展开为全屏标签。
+    actions:
+    - 16
+    - 19
+    checkpoints:
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"mfa-floating-window\"]"}'
+    - step: 20
+      expectation: 悬浮窗内联样式 left=50px 且 bottom=30px。
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"mfa-tab\"]"}'
+    - step: 23
+      expectation: '{"assert_not_visible": "[data-testid=\"mfa-floating-window\"]"}'
+    results:
+    - 19
+    - 20
+    - 22
+    - 23
+  visual:
+  - check: 检查截图原生窗口、终端与悬浮窗布局。
+    method: manual
+    reason: 像素布局与遮挡需要截图人工评审。
+  native:
+  - check: 全部步骤在 Linux / Windows / macOS 真实桌面应用中执行；窗口位移由 native_window_drag 独立读取。
+    method: automated
+    reason: browser 无法证明 OS 窗口移动与真实 PTY，未执行平台不计作通过。

@@ -8,6 +8,23 @@ import { ipcMocks, sshInfo, terminalMocks, webglMocks } from "./harness";
 
 export function registerTerminalPanelClipboard4Cases() {
 
+/**
+ * Pin the platform detection to Linux for POSIX SSH-integration cases; on a
+ * Windows host the default jsdom userAgent routes them into the
+ * browser-preview skip branch instead.
+ */
+function stubLinuxNavigator(): () => void {
+  const navigatorObject = window.navigator as Navigator & { platform: string; userAgent: string };
+  const originalPlatform = navigatorObject.platform;
+  const originalUserAgent = navigatorObject.userAgent;
+  Object.defineProperty(navigatorObject, "platform", { configurable: true, value: "Linux x86_64" });
+  Object.defineProperty(navigatorObject, "userAgent", { configurable: true, value: "Mozilla/5.0 (X11; Linux x86_64)" });
+  return () => {
+    Object.defineProperty(navigatorObject, "platform", { configurable: true, value: originalPlatform });
+    Object.defineProperty(navigatorObject, "userAgent", { configurable: true, value: originalUserAgent });
+  };
+}
+
   it("tracks a submitted program and returns to idle on the next shell prompt", async () => {
     render(<TerminalPanel tabId="term-activity" visible />);
 
@@ -35,12 +52,16 @@ export function registerTerminalPanelClipboard4Cases() {
   });
 
   it("installs SSH cwd reporting when a delayed startup later reaches an idle prompt", async () => {
+    // This case covers the POSIX integration path; pin the platform so the
+    // Windows browser-preview skip branch cannot mask the flow.
+    const restoreLinux = stubLinuxNavigator();
     let onOutput: ((data: Uint8Array) => void) | undefined;
     ipcMocks.createSshTerminal.mockImplementation(async (...args: unknown[]) => {
       onOutput = args[9] as (data: Uint8Array) => void;
       return "terminal-session";
     });
     const onSessionReady = vi.fn();
+    try {
     render(<TerminalPanel tabId="slow-ssh" visible ssh={sshInfo} onSessionReady={onSessionReady} />);
 
     await waitFor(() => {
@@ -92,14 +113,19 @@ export function registerTerminalPanelClipboard4Cases() {
     await waitFor(() => {
       expect(panel).toHaveAttribute("data-terminal-ready", "true");
     });
+    } finally {
+      restoreLinux();
+    }
   });
 
   it("holds keystrokes while a hidden SSH setup line is still being installed", async () => {
+    const restoreLinux = stubLinuxNavigator();
     let onOutput: ((data: Uint8Array) => void) | undefined;
     ipcMocks.createSshTerminal.mockImplementation(async (...args: unknown[]) => {
       onOutput = args[9] as (data: Uint8Array) => void;
       return "terminal-session";
     });
+    try {
     render(<TerminalPanel tabId="held-ssh" visible ssh={sshInfo} />);
     await waitFor(() => expect(onOutput).toBeTypeOf("function"));
 
@@ -155,6 +181,9 @@ export function registerTerminalPanelClipboard4Cases() {
       )).toBe(true);
     } finally {
       vi.useRealTimers();
+    }
+    } finally {
+      restoreLinux();
     }
   });
   it("releases SSH readiness when a Windows cwd probe never reports OSC 7", async () => {

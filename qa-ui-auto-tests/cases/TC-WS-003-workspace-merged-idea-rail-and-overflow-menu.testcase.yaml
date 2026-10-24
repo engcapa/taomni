@@ -1,0 +1,103 @@
+id: TC-WS-003
+title: Workspaces mode fuses the IDEA tool window stripe into the primary rail with a full overflow menu
+description: Workspace-first platform redesign AC-03. In Workspaces mode the Project / Sessions / Git / Structure buttons and the More-Tool-Windows overflow render inside the primary navigation rail; the workspace canvas never shows a second vertical tool stripe. The overflow menu keeps the full IDEA tool window list plus Show Tool Window Names and Move to.
+covers:
+- F25.5
+- F-WS-1
+- F-WS-2
+tags:
+- workspace-platform
+- rail
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-sidebar"]'
+- wait_for: '[data-testid="sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
+- assert_visible: '[data-testid="sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]'
+- assert_visible: '[data-testid="sidebar-rail"] [data-testid="code-workspace-tool-rail-sessions"]'
+- assert_visible: '[data-testid="sidebar-rail"] [data-testid="code-workspace-tool-rail-git"]'
+- assert_visible: '[data-testid="sidebar-rail"] [data-testid="code-workspace-tool-rail-structure"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
+    equal: 0
+- click: '[data-testid="sidebar-rail"] [data-testid="code-workspace-bottom-tab-overflow"]'
+- assert_visible: '[data-testid="code-workspace-bottom-tab-overflow-terminal"]'
+- assert_visible: '[data-testid="code-workspace-bottom-tab-overflow-problems"]'
+- assert_visible: '[data-testid="code-workspace-bottom-tab-overflow-run"]'
+- assert_visible: '[data-testid="code-workspace-bottom-tab-overflow-search"]'
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Bookmarks
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Database
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Move to
+- press:
+    selector: '[data-testid="control-bar"]'
+    key: Escape
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- assert_count:
+    selector: '[data-testid="sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]'
+    equal: 0
+- screenshot: tc-ws-003-merged-rail.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Workspaces 模式下 Project/Sessions/Git/Structure 与 ⋯ 融合在主左侧栏，工作区内无第二条工具条。
+    actions:
+    - 3
+    - 5
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
+    - step: 6
+      expectation: '{"assert_visible": "[data-testid=\"sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]"}'
+    - step: 10
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 0}}'
+    results:
+    - 5
+    - 6
+    - 10
+  - id: R2
+    requirement: ⋯ 溢出菜单保留 Terminal/Problems/Run/Find/Bookmarks/TODO/Services/Database/Show Tool Window Names/Move to 全部项；离开 Workspaces 模式后上下文按钮隐藏。
+    actions:
+    - 11
+    - 19
+    - 20
+    checkpoints:
+    - step: 12
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-bottom-tab-overflow-terminal\"]"}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-bottom-tab-overflow-problems\"]"}'
+    - step: 16
+      expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Bookmarks"}}'
+    - step: 18
+      expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Move to"}}'
+    - step: 22
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]", "equal": 0}}'
+    results:
+    - 12
+    - 13
+    - 16
+    - 18
+    - 22
+  visual:
+  - check: 检查截图融合工具条与工作区画布之间无第二条竖向条。
+    method: manual
+    reason: 像素布局与遮挡需要截图人工评审。
+  native:
+  - check: 原生 WebView 中按相同步骤执行。
+    method: automated
+    reason: browser 证据不替代 native，未执行平台不计作通过。

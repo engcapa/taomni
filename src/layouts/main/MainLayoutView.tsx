@@ -1,6 +1,11 @@
 import { createPortal } from "react-dom";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle, type PanelSize } from "react-resizable-panels";
 import { AboutDialog } from "../../components/AboutDialog";
+import { AgentsPlatformView } from "../../components/agents/AgentsPlatformView";
+import { GlobalCommandModal } from "../../components/search/GlobalCommandModal";
+import { MfaFloatingWindow } from "../../components/mfa/MfaFloatingWindow";
+import { WorkspaceMainPanel } from "../../components/workspace/WorkspaceMainPanel";
+import { WorkspaceSessionPickerModal } from "../../components/workspace/WorkspaceSessionPickerModal";
 import { CcAgentBridge } from "../../components/agent/CcAgentBridge";
 import { ChatDrawer } from "../../components/chat/ChatDrawer";
 import { ToolWindowRail } from "../../components/editor/workspace/panels/ToolWindowRail";
@@ -13,6 +18,8 @@ import { QuickConnect } from "../../components/quickconnect/QuickConnect";
 import { AuthPrompt } from "../../components/session/AuthPrompt";
 import { SessionEditor } from "../../components/session/SessionEditor";
 import { Sidebar } from "../../components/sidebar/Sidebar";
+import { useAppStore } from "../../stores/appStore";
+import { useWorkspacePlatformStore as useWorkspacePlatformStoreState } from "../../stores/workspacePlatformStore";
 import { StatusBar } from "../../components/statusbar/StatusBar";
 import { ControlBar } from "../../components/tabbar/ControlBar";
 import { TabActionSlotProvider } from "../../components/tabbar/TabActionSlot";
@@ -34,7 +41,12 @@ import { useMainTerminalIntegration } from "./useMainTerminalIntegration";
 import { useMainUtilityTabs } from "./useMainUtilityTabs";
 import { useMainWindowLifecycle } from "./useMainWindowLifecycle";
 import { useMainWorkspaceOpening } from "./useMainWorkspaceOpening";
+import { usePlatformShell } from "./usePlatformShell";
 
+
+function useAppStoreActiveSideTab() {
+  return useAppStore((s) => s.activeSideTab);
+}
 
 export interface MainLayoutViewProps {
   layout: ReturnType<typeof useMainLayoutState>;
@@ -51,6 +63,12 @@ export interface MainLayoutViewProps {
 export function MainLayoutView(props: MainLayoutViewProps) {
   const { layout, chrome, menuActions, sessionActions, connections, terminals, windowLifecycle, workspaceOpening, utilityTabs } = props;
   const { pendingAuth } = layout;
+  const platform = usePlatformShell({ onOpenGlobalSession: connections.handleConnectSession });
+  const activeSideTab = useAppStoreActiveSideTab();
+  const sessionPickerOpen = useWorkspacePlatformStoreState((s) => s.sessionPickerOpen);
+  const setSessionPickerOpen = useWorkspacePlatformStoreState((s) => s.setSessionPickerOpen);
+  const globalSearchOpen = useAppStore((s) => s.globalSearchOpen);
+  const setGlobalSearchOpen = useAppStore((s) => s.setGlobalSearchOpen);
   return ((
     <TabActionSlotProvider slot={layout.tabActionSlot}>
       <div
@@ -122,6 +140,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                 onConnectSession={connections.handleConnectSession}
                 onOpenSettings={() => menuActions.handleCommand("settings")}
                 onCommand={menuActions.handleCommand}
+                onOpenWorkspaceSession={platform.openWorkspaceSession}
               />
             </div>
           )}
@@ -167,6 +186,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                   onConnectSession={connections.handleConnectSession}
                   onOpenSettings={() => menuActions.handleCommand("settings")}
                   onCommand={menuActions.handleCommand}
+                  onOpenWorkspaceSession={platform.openWorkspaceSession}
                 />
               </div>
             </Panel>
@@ -191,8 +211,14 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                       onClose={layout.toggleMultiExec}
                     />
                   )}
+                  {activeSideTab === "workspaces" ? (
+                    <WorkspaceMainPanel visible />
+                  ) : activeSideTab === "agents" ? (
+                    <AgentsPlatformView visible />
+                  ) : (
                   <TabContentRouter
-                    activeTab={layout.activeTab}
+                    activeTab={activeSideTab === "home" ? undefined : layout.activeTab}
+                    activeTabId={activeSideTab === "home" ? null : layout.activeTabId}
                     welcomeRestore={workspaceOpening.welcomeRestore}
                     openLocalTab={sessionActions.openLocalTab}
                     handleNewSession={sessionActions.handleNewSession}
@@ -222,7 +248,6 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                     splitGridColumnTemplate={chrome.splitGridColumnTemplate}
                     splitGridRowTemplate={chrome.splitGridRowTemplate}
                     terminalTabs={chrome.terminalTabs}
-                    activeTabId={layout.activeTabId}
                     attachedSidebars={layout.attachedSidebars}
                     terminalProfileOverrides={layout.terminalProfileOverrides}
                     terminalProfilesBySessionId={layout.terminalProfilesBySessionId}
@@ -293,6 +318,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                     setStatusMessage={layout.setStatusMessage}
                     removeTab={layout.removeTab}
                   />
+                  )}
                 </div>
                 {chrome.chatDrawerInline && layout.chatDrawerPosition === "right" && <ChatDrawer />}
               </div>
@@ -373,6 +399,21 @@ export function MainLayoutView(props: MainLayoutViewProps) {
         <CallOverlay />
         <WhiteboardOverlay />
         <EdgeDrawer />
+
+        {/* v6.1 platform overlays: bottom-left MFA float, Ctrl+K palette and
+            the workspace "open any session" picker. */}
+        <MfaFloatingWindow onExpandTab={() => menuActions.handleCommand("mfa")} />
+        <GlobalCommandModal
+          open={globalSearchOpen}
+          onClose={() => setGlobalSearchOpen(false)}
+          onOpenWorkspaceSession={platform.openWorkspaceSession}
+          onOpenGlobalSession={connections.handleConnectSession}
+        />
+        <WorkspaceSessionPickerModal
+          open={sessionPickerOpen}
+          onClose={() => setSessionPickerOpen(false)}
+          onOpenSession={(session, pin) => platform.openWorkspaceSession(session, { pinToWorkspace: pin })}
+        />
       </div>
     </TabActionSlotProvider>
   ));

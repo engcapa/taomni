@@ -3,7 +3,21 @@ import { type XServerStatus } from "../../lib/ipc";
 import type { TabFilter } from "../../lib/tabFilter";
 import { type SidebarCollapsedByGroup } from "../sidebarRailPolicy";
 
-export type SideTab = "sessions" | "tools";
+/**
+ * Primary navigation modes of the workspace-first platform shell v6.1.
+ * "sessions" and "tools" keep their historical ids (legacy side tabs);
+ * "home", "workspaces" and "agents" are new first-class modes.
+ */
+export type SideTab = "home" | "workspaces" | "sessions" | "agents" | "tools";
+
+/** One-system floating MFA verifier window state (bottom-left anchor). */
+export interface FloatingMfaWindowState {
+  open: boolean;
+  pinned: boolean;
+  /** Viewport anchor in px; default `{ left: 50, bottom: 30 }`. */
+  position: { left: number; bottom: number };
+  searchQuery: string;
+}
 
 export type TerminalSplitLayout = "horizontal" | "vertical" | "grid";
 
@@ -126,6 +140,16 @@ export interface AppState {
   sidebarCollapsedByGroup: SidebarCollapsedByGroup;
   activeSideTab: SideTab;
   /**
+   * Workspace-first platform redesign (v6.1): collapsible right context
+   * panel next to the main canvas. Starts collapsed; toggled from the
+   * shared ControlBar (`toggle-right-sidebar`).
+   */
+  rightSidebarCollapsed: boolean;
+  /** Bottom-left floating MFA verifier window state (v6.1). */
+  floatingMfa: FloatingMfaWindowState;
+  /** Global Ctrl+K command palette visibility. */
+  globalSearchOpen: boolean;
+  /**
    * Whether a usable local X server is reachable (Xorg / XQuartz / VcXsrv /
    * WSLg). This is now backed by real backend detection via
    * {@link refreshXServer}, not a manual toggle — the value reflects whether
@@ -225,6 +249,16 @@ export interface AppState {
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setActiveSideTab: (tab: SideTab) => void;
+  toggleRightSidebar: () => void;
+  setRightSidebarCollapsed: (collapsed: boolean) => void;
+  toggleFloatingMfa: () => void;
+  setFloatingMfaOpen: (open: boolean) => void;
+  /** Move the floating MFA window; clamps to the viewport bounds. */
+  setFloatingMfaPosition: (left: number, bottom: number) => void;
+  setFloatingMfaPinned: (pinned: boolean) => void;
+  setFloatingMfaSearchQuery: (query: string) => void;
+  setGlobalSearchOpen: (open: boolean) => void;
+  toggleGlobalSearch: () => void;
   setMergeToolWindowRail: (value: boolean) => void;
   /** Apply the remembered sidebar state of the active tab's group (ED-PARITY-027). */
   applySidebarForActiveTab: () => void;

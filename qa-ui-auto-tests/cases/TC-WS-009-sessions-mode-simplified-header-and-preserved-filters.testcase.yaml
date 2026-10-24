@@ -1,0 +1,92 @@
+id: TC-WS-009
+title: Sessions mode keeps a single header and preserves the full sidebar filters
+description: Workspace-first platform redesign AC-09. Sessions mode shows no quick-connect chip row by default and no secondary breadcrumb bar; the sidebar keeps the complete toolbar buttons, the search box and the SessionTree, and the shared toolbar keeps the details hover and the open-tabs menu.
+covers:
+- F1.4
+- F1.5
+- F-Sidebar-1
+tags:
+- workspace-platform
+- sessions
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- wait_for: '[data-testid="session-tree"]'
+- assert_not_visible: '[data-testid="quick-connect"]'
+- assert_visible: '[data-testid="session-new"]'
+- assert_visible: '[data-testid="session-edit"]'
+- assert_visible: '[data-testid="session-duplicate"]'
+- assert_visible: '[data-testid="session-delete"]'
+- assert_visible: '[data-testid="session-search"]'
+- eval_readonly:
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"session-duplicate\"]").parentElement.querySelectorAll("button").length>=6
+    expect_truthy: true
+- assert_visible: '[data-testid="tab-details-hover"]'
+- assert_visible: '[data-testid="tab-more"]'
+- click: '[data-testid="tab-more"]'
+- wait_for: '[data-testid="open-tabs-menu"]'
+- press:
+    selector: '[data-testid="control-bar"]'
+    key: Escape
+- eval_readonly:
+    expression: document.querySelector('.taomni-control-bar').getBoundingClientRect().height <= 33 && document.querySelectorAll('.taomni-control-bar').length === 1
+    expect_truthy: true
+- assert_visible: '[data-testid="status-bar"]'
+- screenshot: tc-ws-009-sessions-simplified.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Sessions 模式默认无快速连接芯片行，仅保留单行 33px 共享工具栏。
+    actions:
+    - 1
+    - 12
+    checkpoints:
+    - step: 4
+      expectation: '{"assert_not_visible": "[data-testid=\"quick-connect\"]"}'
+    - step: 16
+      expectation: ControlBar 高度不超过 33px 且全文档仅一个。
+    results:
+    - 4
+    - 16
+  - id: R2
+    requirement: 左栏保留完整工具按钮、搜索框与 SessionTree，顶栏保留 ℹ️ 与 ⋯ 已打开标签菜单。
+    actions:
+    - 4
+    - 7
+    - 9
+    checkpoints:
+    - step: 5
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"session-search\"]"}'
+    - step: 10
+      expectation: 会话工具栏按钮不少于 6 个。
+    - step: 11
+      expectation: '{"assert_visible": "[data-testid=\"tab-details-hover\"]"}'
+    - step: 12
+      expectation: '{"assert_visible": "[data-testid=\"tab-more\"]"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"open-tabs-menu\"]"}'
+    results:
+    - 5
+    - 9
+    - 10
+    - 11
+    - 12
+    - 14
+  visual:
+  - check: 检查截图会话左栏与终端区域布局、无多余横幅。
+    method: manual
+    reason: 像素布局与遮挡需要截图人工评审。
+  native:
+  - check: 原生 WebView 中按相同步骤执行。
+    method: automated
+    reason: browser 证据不替代 native，未执行平台不计作通过。

@@ -1,0 +1,134 @@
+id: TC-WS-011
+title: Agents worktree orchestrator and the Ctrl+K global command palette
+description: Workspace-first platform redesign TASK-09. The Agents mode renders the worktree orchestrator, dispatches tasks, and its review button jumps to the workspace Git panel. Ctrl+K opens the command palette with fuzzy search over modes, workspaces, sessions and actions.
+covers:
+- F-WS-6
+tags:
+- workspace-platform
+- agents
+- search
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-agents"]'
+- wait_for: '[data-testid="agents-platform-view"]'
+- assert_visible: '[data-testid="agents-dispatch-task"]'
+- assert_visible: '[data-testid="agents-review-diff"]'
+- click: '[data-testid="agents-dispatch-task"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: QA agent task
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="agents-task-list"]'
+- assert_text:
+    selector: '[data-testid="agents-task-list"]'
+    contains: QA agent task
+- click: '[data-testid="agents-review-diff"]'
+- wait_for: '[data-testid="workspace-git-manager"]'
+- press:
+    selector: '[data-testid="control-bar"]'
+    key: Control+k
+- wait_for: '[data-testid="global-search-modal"]'
+- fill:
+    selector: '[data-testid="global-search-input"]'
+    value: home
+- assert_visible: '[data-testid="global-search-go-home"]'
+- assert_attribute:
+    selector: '[data-testid="global-search-go-home"]'
+    name: data-first
+    equals: 'true'
+- press:
+    selector: '[data-testid="global-search-input"]'
+    key: Enter
+- wait_for: '[data-testid="welcome-panel"]'
+- press:
+    selector: '[data-testid="control-bar"]'
+    key: Control+k
+- wait_for: '[data-testid="global-search-modal"]'
+- fill:
+    selector: '[data-testid="global-search-input"]'
+    value: agents
+- click: '[data-testid="global-search-go-agents"]'
+- wait_for: '[data-testid="agents-platform-view"]'
+- press:
+    selector: '[data-testid="control-bar"]'
+    key: Control+k
+- fill:
+    selector: '[data-testid="global-search-input"]'
+    value: Default Workspace
+- assert_visible: '[data-testid="global-search-results"]'
+- press:
+    selector: '[data-testid="control-bar"]'
+    key: Escape
+- assert_not_visible: '[data-testid="global-search-modal"]'
+- screenshot: tc-ws-011-agents-command-palette.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Agents 模式渲染编排台，可派发 Worktree 任务，审阅按钮跳转工作区 Git 面板。
+    actions:
+    - 3
+    - 7
+    - 13
+    checkpoints:
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"agents-platform-view\"]"}'
+    - step: 5
+      expectation: '{"assert_visible": "[data-testid=\"agents-dispatch-task\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"agents-task-list\"]"}'
+    - step: 12
+      expectation: '{"assert_text": {"selector": "[data-testid=\"agents-task-list\"]", "contains": "QA agent task"}}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"workspace-git-manager\"]"}'
+    results:
+    - 4
+    - 5
+    - 11
+    - 12
+    - 14
+  - id: R2
+    requirement: Ctrl+K 打开命令面板，支持过滤并回车/点击执行跳转，Esc 关闭。
+    actions:
+    - 15
+    - 22
+    - 27
+    checkpoints:
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
+    - step: 18
+      expectation: '{"assert_visible": "[data-testid=\"global-search-go-home\"]"}'
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"global-search-go-home\"]", "name": "data-first", "equals": "true"}}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"agents-platform-view\"]"}'
+    - step: 29
+      expectation: '{"assert_visible": "[data-testid=\"global-search-results\"]"}'
+    - step: 31
+      expectation: '{"assert_not_visible": "[data-testid=\"global-search-modal\"]"}'
+    results:
+    - 16
+    - 18
+    - 19
+    - 21
+    - 26
+    - 29
+    - 31
+  visual:
+  - check: 检查截图编排台与命令面板布局、无遮挡。
+    method: manual
+    reason: 像素布局与遮挡需要截图人工评审。
+  native:
+  - check: 本用例为 browser 模式；原生执行由 TC-WS-012 与平台套件覆盖。
+    method: not-applicable
+    reason: 用例仅声明 browser 模式，native 不适用。

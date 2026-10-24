@@ -28,6 +28,7 @@ import {
   X,
   GitBranch,
   Braces,
+  PanelRight,
 } from "lucide-react";
 import { useRef, useState } from "react";
 import { TabBar } from "./TabBar";
@@ -37,7 +38,8 @@ import { WindowControls } from "../window/WindowControls";
 import { WindowDragHandle } from "../window/WindowDragHandle";
 import { startWindowDrag } from "../../lib/windowDrag";
 import { TitleBarTrayControls } from "../window/TitleBarTrayControls";
-import { ScreenshotMenuButton } from "../screenshot/ScreenshotMenuButton";
+import { WorkspaceTabStrip } from "../workspace/WorkspaceTabStrip";
+import { useAppStore } from "../../stores/appStore";
 import { useSessionImportExport } from "../menubar/useSessionImportExport";
 import type { AppCommand } from "../menubar/commands";
 import { getAppPlatform } from "../../lib/runtime";
@@ -93,6 +95,9 @@ export function ControlBar({
   const ctx = useContextMenu();
   const t = useT();
   const [detailsRevealHovered, setDetailsRevealHovered] = useState(false);
+  const workspacesMode = useAppStore((s) => s.activeSideTab === "workspaces");
+  const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
+  const rightSidebarCollapsed = useAppStore((s) => s.rightSidebarCollapsed);
   const {
     hasSessions,
     importJson,
@@ -219,16 +224,26 @@ export function ControlBar({
         {!nativeMenu && (
           <BarButton testId="app-main-menu" title={t("compactTitleBar.mainMenu")} icon={<Menu className="w-4 h-4" />} onClick={openMainMenu} />
         )}
+        <BarButton
+          testId="toggle-left-sidebar"
+          title={`${t("sidebar.headerTitle")} (Ctrl+B)`}
+          icon={<PanelLeft className="w-4 h-4" />}
+          active={!sidebarCollapsed}
+          onClick={onToggleSidebar}
+        />
       </div>
       <WindowDragHandle />
-      <div className="min-w-0 flex-1 self-stretch">
-        <TabBar
-          onStartLocalTerminal={onStartLocalTerminal}
-          onConnectSession={onConnectSession}
-          onOpenSessionEditor={onOpenSessionEditor}
-          onDuplicateTab={onDuplicateTab}
-          detailsRevealExternal={detailsRevealHovered}
-        />
+      <div className="min-w-0 flex-1 self-stretch flex">
+        <div className="min-w-0 flex-1 self-stretch" style={{ display: workspacesMode ? "none" : undefined }}>
+          <TabBar
+            onStartLocalTerminal={onStartLocalTerminal}
+            onConnectSession={onConnectSession}
+            onOpenSessionEditor={onOpenSessionEditor}
+            onDuplicateTab={onDuplicateTab}
+            detailsRevealExternal={detailsRevealHovered}
+          />
+        </div>
+        {workspacesMode && <WorkspaceTabStrip />}
       </div>
       {/* Update hint sits just left of the tab-action group (centre-right of the
           bar). It only appears once a new version is staged. */}
@@ -250,16 +265,28 @@ export function ControlBar({
         <PanelsTopLeft className="w-4 h-4" />
         <Info className="absolute right-0.5 bottom-0.5 w-2.5 h-2.5 rounded-full" style={{ background: "var(--taomni-chrome-bg)" }} />
       </button>
-      {/* Open-tabs `⋯` overflow — also hosts the Screenshot actions. Sits at the
-          right end of the tab-action group. */}
+      {/* Open-tabs `⋯` overflow — sits at the right end of the tab-action
+          group. */}
       <TabMore onDetachActiveTab={onDetachActiveTab} />
+      {/* Global search / command palette (Ctrl+K). */}
+      <BarButton
+        testId="global-search-trigger"
+        title={`${t("globalSearch.title")} (Ctrl+K)`}
+        icon={<Search className="w-4 h-4" />}
+        onClick={() => useAppStore.getState().toggleGlobalSearch()}
+      />
+      <BarButton
+        testId="toggle-right-sidebar"
+        title={t("sidebar.headerTitle")}
+        icon={<PanelRight className="w-4 h-4" />}
+        active={!rightSidebarCollapsed}
+        onClick={() => useAppStore.getState().toggleRightSidebar()}
+      />
       <div className={IS_MAC ? "w-2 self-stretch shrink-0" : "w-3 self-stretch shrink-0"} />
       {/* Divider between the tab-related buttons and the main-window controls. */}
       <div aria-hidden="true" className="taomni-control-divider self-stretch shrink-0" />
-      {/* System screenshot: independent of any tab — global window chrome.
-          Click captures immediately; the chevron offers timed (delayed) capture
-          Flameshot-style. Clicking during a countdown cancels it. */}
-      <ScreenshotMenuButton />
+      {/* System screenshot lives at the bottom of the primary navigation rail
+          (v6.1 DEC-03); the tray keeps split / multi-exec / voice controls. */}
       <TitleBarTrayControls />
       {!IS_MAC && <WindowControls onClose={onCloseWindow} />}
     </div>
@@ -324,11 +351,13 @@ function BarButton({
   title,
   onClick,
   testId,
+  active,
 }: {
   icon: React.ReactNode;
   title: string;
   onClick?: (event: React.MouseEvent) => void;
   testId?: string;
+  active?: boolean;
 }) {
   return (
     <button
@@ -336,7 +365,8 @@ function BarButton({
       type="button"
       title={title}
       aria-label={title}
-      className="h-6 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
+      data-active={active || undefined}
+      className="h-6 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] data-[active=true]:bg-[var(--taomni-selected)]"
       onClick={onClick}
     >
       {icon}

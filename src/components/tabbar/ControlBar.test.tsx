@@ -97,20 +97,15 @@ function renderControlBar(
 }
 
 describe("ControlBar settings button", () => {
-  it("hides windows by default and offers an explicit current-window capture", () => {
+  // v6.1 DEC-03: the screenshot entry moved to the bottom of the primary
+  // navigation rail; the shared toolbar keeps no capture controls.
+  it("keeps the shared toolbar free of the screenshot entry", () => {
     renderControlBar(vi.fn());
-    fireEvent.click(screen.getByTestId("system-screenshot"));
-    expect(captureMocks.open).toHaveBeenCalledWith(undefined, false);
-  });
-
-  it("closes capture options and includes the current window when requested", () => {
-    renderControlBar(vi.fn());
-    fireEvent.click(screen.getByTestId("system-screenshot-delay-toggle"));
-    expect(screen.getByTestId("system-screenshot-current-window")).toHaveTextContent("Alt+A");
-    fireEvent.click(screen.getByTestId("system-screenshot-current-window"));
-    expect(captureMocks.open).toHaveBeenCalledWith(undefined, true);
-    expect(screen.queryByTestId("system-screenshot-delay-menu")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("capture-indicators")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("system-screenshot")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("system-screenshot-delay-toggle")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("toggle-left-sidebar")).toBeInTheDocument();
+    expect(screen.queryByTestId("global-search-trigger")).toBeInTheDocument();
+    expect(screen.queryByTestId("toggle-right-sidebar")).toBeInTheDocument();
   });
   afterEach(() => {
     cleanup();
@@ -128,6 +123,7 @@ describe("ControlBar settings button", () => {
     expect(leftGroup).toBeTruthy();
     expect(within(leftGroup!).getAllByRole("button").map((button) => button.getAttribute("data-testid"))).toEqual([
       "app-main-menu",
+      "toggle-left-sidebar",
     ]);
     expect(screen.queryByTestId("sidebar-toggle")).not.toBeInTheDocument();
     expect(screen.queryByTestId("ribbon-settings")).not.toBeInTheDocument();

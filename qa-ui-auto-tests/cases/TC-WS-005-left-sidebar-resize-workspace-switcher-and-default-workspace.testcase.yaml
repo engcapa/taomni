@@ -1,0 +1,132 @@
+id: TC-WS-005
+title: Workspace switcher sits in the workspace sidebar with an undeletable Default Workspace
+description: Workspace-first platform redesign AC-05. The workspace switcher renders at the top of the Workspaces sidebar. The Default Workspace is always present and badged; new workspaces can be created and selected, and the registry persists across reloads. The main sidebar keeps its drag handle with the width range contract.
+covers:
+- F1.2
+- F-WS-2
+tags:
+- workspace-platform
+- switcher
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_localstorage:
+    key: taomni.platformWorkspaces.v1
+    exists: true
+- assert_localstorage:
+    key: taomni.platformWorkspaces.v1
+    contains: default-workspace
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-sidebar"]'
+- assert_text:
+    selector: '[data-testid="workspace-switcher"]'
+    contains: Default Workspace
+- click: '[data-testid="workspace-switcher"]'
+- wait_for: '[data-testid="workspace-switcher-menu"]'
+- assert_visible: '[data-testid="workspace-switcher-default-badge"]'
+- assert_visible: '[data-testid="workspace-switcher-new"]'
+- assert_visible: '[data-testid="workspace-switcher-add-folder"]'
+- press:
+    selector: '[data-testid="control-bar"]'
+    key: Escape
+- click: '[data-testid="workspace-switcher"]'
+- click: '[data-testid="workspace-switcher-new"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: QA Workspace
+- click: '[data-testid="text-input-dialog-confirm"]'
+- assert_text:
+    selector: '[data-testid="workspace-switcher"]'
+    contains: QA Workspace
+- click: '[data-testid="workspace-switcher"]'
+- wait_for: '[data-testid="workspace-switcher-menu"]'
+- click: '[data-testid="workspace-switcher-menu"] button:nth-child(1)'
+- assert_text:
+    selector: '[data-testid="workspace-switcher"]'
+    contains: Default Workspace
+- assert_visible: '[data-testid="main-sidebar-resize-handle"]'
+- eval_readonly:
+    expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"expanded-sidebar-panel\"]").getBoundingClientRect().width>=160&&document.querySelector("[data-testid" + String.fromCharCode(61) + "\"expanded-sidebar-panel\"]").getBoundingClientRect().width<=560
+    expect_truthy: true
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-sidebar"]'
+- assert_localstorage:
+    key: taomni.platformWorkspaces.v1
+    contains: QA Workspace
+- assert_text:
+    selector: '[data-testid="workspace-switcher"]'
+    contains: Default Workspace
+- screenshot: tc-ws-005-switcher-default-workspace.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 工作区切换器位于工作区左栏顶部，始终包含带 DEFAULT 徽标的 Default Workspace 及新建/添加目录入口。
+    actions:
+    - 5
+    - 8
+    checkpoints:
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"workspace-sidebar\"]"}'
+    - step: 7
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-switcher\"]", "contains": "Default Workspace"}}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"workspace-switcher-menu\"]"}'
+    - step: 10
+      expectation: '{"assert_visible": "[data-testid=\"workspace-switcher-default-badge\"]"}'
+    - step: 4
+      expectation: '{"assert_localstorage": {"key": "taomni.platformWorkspaces.v1", "contains": "default-workspace"}}'
+    results:
+    - 6
+    - 7
+    - 9
+    - 10
+    - 4
+  - id: R2
+    requirement: 可新建并切换工作区，注册表跨 reload 持久化。
+    actions:
+    - 13
+    - 14
+    - 19
+    - 26
+    checkpoints:
+    - step: 19
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-switcher\"]", "contains": "QA Workspace"}}'
+    - step: 23
+      expectation: 切回默认工作区后切换器显示 Default Workspace。
+    - step: 30
+      expectation: '{"assert_localstorage": {"key": "taomni.platformWorkspaces.v1", "contains": "QA Workspace"}}'
+    results:
+    - 19
+    - 23
+    - 30
+  - id: R3
+    requirement: 左栏拖拽分隔条存在且宽度处于合理区间。
+    actions:
+    - 23
+    checkpoints:
+    - step: 24
+      expectation: '{"assert_visible": "[data-testid=\"main-sidebar-resize-handle\"]"}'
+    - step: 25
+      expectation: 左栏宽度在 160–560px 区间内。
+    results:
+    - 24
+    - 25
+  visual:
+  - check: 检查截图切换器、菜单与默认徽标布局无遮挡。
+    method: manual
+    reason: 像素布局与遮挡需要截图人工评审。
+  native:
+  - check: 原生 WebView 中按相同步骤执行；像素级拖拽持久化由 TC-MAIN-RAIL-04 覆盖。
+    method: automated
+    reason: browser 证据不替代 native，未执行平台不计作通过。

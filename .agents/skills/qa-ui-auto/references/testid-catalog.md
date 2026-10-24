@@ -8,6 +8,17 @@
 > controls (only render under conditions) are marked with `[optional]`.
 > Aliases are listed underneath the primary selector indented with `↳`.
 
+## agents/search (F-WS-6)
+
+- `[data-testid="agents-platform-view"]` — display — F-WS-6.agents-platform-view
+- `[data-testid="agents-dispatch-task"]` — interactive — F-WS-6.agents-dispatch-task
+- `[data-testid="agents-review-diff"]` — interactive — F-WS-6.agents-review-diff
+- `[data-testid="agents-task-list"]` — display [optional] — F-WS-6.agents-task-list
+- `[data-testid="global-search-modal"]` — display [optional] — F-WS-6.global-search-modal
+- `[data-testid="global-search-input"]` — interactive [optional] — F-WS-6.global-search-input
+- `[data-testid="global-search-results"]` — display [optional] — F-WS-6.global-search-results
+- `[data-testid="home-sidebar"]` — display [optional] — F-WS-6.home-sidebar
+
 ## ai/agents (F-AI-2.7)
 
 - `[data-testid="acp-settings"]` — display — F-AI-2.7.acp-settings
@@ -1542,6 +1553,16 @@
 - `[data-testid="app-crash"]` — display — F1.10.app-crash
 - `[data-testid="app-crash-detail"]` — display — F1.10.app-crash-detail
 
+## main/shell (F-WS-1)
+
+- `[data-testid="nav-mode-home"]` — interactive — F-WS-1.nav-mode-home
+- `[data-testid="nav-mode-workspaces"]` — interactive — F-WS-1.nav-mode-workspaces
+- `[data-testid="nav-mode-agents"]` — interactive — F-WS-1.nav-mode-agents
+- `[data-testid="toggle-left-sidebar"]` — interactive — F-WS-1.toggle-left-sidebar
+- `[data-testid="toggle-right-sidebar"]` — interactive — F-WS-1.toggle-right-sidebar
+- `[data-testid="global-search-trigger"]` — interactive — F-WS-1.global-search-trigger
+- `[data-testid="rail-bottom-tools"]` — display — F-WS-1.rail-bottom-tools
+
 ## main/statusbar (F1.7)
 
 - `[data-testid="status-bar"]` — display — F1.7.status-bar
@@ -1651,6 +1672,17 @@
 - `[data-testid="window-min"]` — display — F1.3.window-min
 - `[data-testid="window-max"]` — display — F1.3.window-max
 - `[data-testid="window-close"]` — display — F1.3.window-close
+
+## mfa (F-WS-3)
+
+- `[data-testid="rail-mfa-button"]` — interactive — F-WS-3.rail-mfa-button
+- `[data-testid="mfa-floating-window"]` — display [optional] — F-WS-3.mfa-floating-window
+- `[data-testid="mfa-floating-drag-handle"]` — interactive [optional] — F-WS-3.mfa-floating-drag-handle
+- `[data-testid="mfa-floating-search"]` — interactive [optional] — F-WS-3.mfa-floating-search
+- `[data-testid="mfa-floating-pin"]` — interactive [optional] — F-WS-3.mfa-floating-pin
+- `[data-testid="mfa-floating-expand-tab"]` — interactive [optional] — F-WS-3.mfa-floating-expand-tab
+- `[data-testid="mfa-floating-close"]` — interactive [optional] — F-WS-3.mfa-floating-close
+- `[data-testid="mfa-floating-list"]` — display [optional] — F-WS-3.mfa-floating-list
 
 ## network/sockscap (F-Sockscap-1)
 
@@ -2885,3 +2917,35 @@
 - `[data-testid="session-vnc-security-policy"]` — interactive [optional] — F9.6.security-policy
 - `[data-testid="session-vnc-clipboard-policy"]` — interactive [optional] — F9.6.clipboard-policy
 - `[data-testid="session-vnc-view-only"]` — interactive [optional] — F9.6.view-only
+
+## workspace (F-WS-2)
+
+- `[data-testid="workspace-switcher"]` — interactive — F-WS-2.workspace-switcher
+- `[data-testid="workspace-switcher-menu"]` — display [optional] — F-WS-2.workspace-switcher-menu
+- `[data-testid="workspace-switcher-default-badge"]` — display [optional] — F-WS-2.workspace-switcher-default-badge
+- `[data-testid="workspace-switcher-new"]` — interactive [optional] — F-WS-2.workspace-switcher-new
+- `[data-testid="workspace-switcher-add-folder"]` — interactive [optional] — F-WS-2.workspace-switcher-add-folder
+- `[data-testid="workspace-new-file"]` — interactive — F-WS-2.workspace-new-file
+- `[data-testid="workspace-new-folder"]` — interactive — F-WS-2.workspace-new-folder
+- `[data-testid="workspace-add-folder"]` — interactive — F-WS-2.workspace-add-folder
+- `[data-testid="workspace-sidebar"]` — display — F-WS-2.workspace-sidebar
+- `[data-testid="workspace-sidebar-git-bar"]` — interactive — F-WS-2.workspace-sidebar-git-bar
+- `[data-testid="workspace-root-folder"]` — display — F-WS-2.workspace-root-folder
+
+## workspace/git (F-WS-4)
+
+- `[data-testid="workspace-tab-editor"]` — interactive — F-WS-4.workspace-tab-editor
+- `[data-testid="workspace-tab-item"]` — interactive [optional] — F-WS-4.workspace-tab-item
+- `[data-testid="editor-open-git-diff"]` — interactive [optional] — F-WS-4.editor-open-git-diff
+
+## workspace/sessions (F-WS-5)
+
+- `[data-testid="workspace-open-session-plus"]` — interactive — F-WS-5.workspace-open-session-plus
+- `[data-testid="workspace-open-session-plus-menu"]` — display [optional] — F-WS-5.workspace-open-session-plus-menu
+- `[data-testid="workspace-plus-new-terminal"]` — interactive [optional] — F-WS-5.workspace-plus-new-terminal
+- `[data-testid="workspace-plus-open-session"]` — interactive [optional] — F-WS-5.workspace-plus-open-session
+- `[data-testid="workspace-session-picker-modal"]` — display [optional] — F-WS-5.workspace-session-picker-modal
+- `[data-testid="workspace-session-picker-search"]` — interactive [optional] — F-WS-5.workspace-session-picker-search
+- `[data-testid="workspace-session-picker-pin"]` — interactive [optional] — F-WS-5.workspace-session-picker-pin
+- `[data-testid="workspace-session-picker-list"]` — display [optional] — F-WS-5.workspace-session-picker-list
+- `[data-testid="workspace-sessions-lens"]` — display [optional] — F-WS-5.workspace-sessions-lens

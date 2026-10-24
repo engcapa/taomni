@@ -1,0 +1,107 @@
+id: TC-WS-002
+title: Primary rail renders five modes with Home first and switches content per mode
+description: Workspace-first platform redesign AC-02. The primary navigation rail lists Home, Workspaces, Sessions, Agents and Tools in this exact order. Home shows the WelcomePanel content plus the Home sidebar, Workspaces shows the workspace sidebar, Sessions restores the full SessionTree sidebar.
+covers:
+- F1.2
+- F1.6
+- F-WS-1
+tags:
+- workspace-platform
+- navigation
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- wait_for: '[data-testid="session-tree"]'
+- assert_visible: '[data-testid="nav-mode-home"]'
+- assert_visible: '[data-testid="nav-mode-workspaces"]'
+- assert_visible: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="nav-mode-agents"]'
+- assert_visible: '[data-testid="side-tab-tools"]'
+- eval_readonly:
+    expression: document.querySelectorAll("[data-tool-window-id]").item(0).dataset.toolWindowId==="home"&&document.querySelectorAll("[data-tool-window-id]").item(1).dataset.toolWindowId==="workspaces"&&document.querySelectorAll("[data-tool-window-id]").item(2).dataset.toolWindowId==="sessions"
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelectorAll("[data-tool-window-id]").item(3).dataset.toolWindowId==="agents"&&document.querySelectorAll("[data-tool-window-id]").item(4).dataset.toolWindowId==="tools"
+    expect_truthy: true
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="home-sidebar"]'
+- assert_visible: '[data-testid="welcome-panel"]'
+- assert_not_visible: '[data-testid="session-tree"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-sidebar"]'
+- assert_visible: '[data-testid="workspace-switcher"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="nav-mode-agents"]'
+- wait_for: '[data-testid="agents-platform-view"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- screenshot: tc-ws-002-rail-modes.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 左侧主导航条五大模式顺序为 Home、Workspaces、Sessions、Agents、Tools。
+    actions:
+    - 1
+    - 4
+    checkpoints:
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"nav-mode-home\"]"}'
+    - step: 9
+      expectation: rail 前 3 个模式按钮依次为 home/workspaces/sessions。
+    - step: 10
+      expectation: rail 第 4、5 个模式按钮依次为 agents/tools。
+    results:
+    - 4
+    - 9
+    - 10
+  - id: R2
+    requirement: Home 模式显示 WelcomePanel 与 Home 左栏；Workspaces 显示工作区左栏；Sessions 恢复 SessionTree；Agents/Tools 各自渲染。
+    actions:
+    - 11
+    - 15
+    - 18
+    - 20
+    - 22
+    checkpoints:
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"home-sidebar\"]"}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 14
+      expectation: '{"assert_not_visible": "[data-testid=\"session-tree\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"workspace-sidebar\"]"}'
+    - step: 17
+      expectation: '{"assert_visible": "[data-testid=\"workspace-switcher\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"agents-platform-view\"]"}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    results:
+    - 12
+    - 13
+    - 14
+    - 16
+    - 17
+    - 19
+    - 21
+    - 23
+  visual:
+  - check: 检查截图各模式左栏与主区域无重叠、图标与文字无截断。
+    method: manual
+    reason: 像素布局与遮挡需要截图人工评审。
+  native:
+  - check: 原生 WebView 中按相同步骤执行。
+    method: automated
+    reason: browser 证据不替代 native，未执行平台不计作通过。

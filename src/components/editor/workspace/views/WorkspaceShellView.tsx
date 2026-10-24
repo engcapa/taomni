@@ -1,4 +1,5 @@
 import { AlertTriangle } from "lucide-react";
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle, type PanelImperativeHandle } from "react-resizable-panels";
 import { type BottomDockTabId } from "../../../../stores/codeWorkspaceStore";
@@ -13,6 +14,7 @@ import { BottomDock } from "../panels/BottomDock";
 import { ToolWindowPortal } from "../panels/ToolWindowHost";
 import { ToolWindowRail, type ToolWindowRailItem } from "../panels/ToolWindowRail";
 import { WorkspaceClipboardSessionContext } from "../workspaceClipboardSession";
+import { useWorkspaceToolBridgeStore } from "../../../../stores/workspaceToolBridgeStore";
 import { WorkspaceObservationBridge } from "../workspaceObservationBridge";
 import { type ClosedTabEntry } from "../workspaceTabPolicy";
 import { WorkspaceConfigurationPopups } from "./WorkspaceConfigurationPopups";
@@ -122,6 +124,34 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
     workspaceDebugPopupsProps,
     workspaceGenerationPopupsProps,
   } = props;
+
+  // v6.1: platform workspace editors (Workspaces mode) publish their tool
+  // window controls so the primary rail's static Project/… buttons drive the
+  // real editor instead of the sidebar lens.
+  const platformEditor = workspaceInstanceId.startsWith("platform-");
+  useEffect(() => {
+    if (!platformEditor) return;
+    useWorkspaceToolBridgeStore.getState().register({
+      leftToolAreaOpen: toolWindowRouting.leftToolAreaOpen,
+      toggleProjectTree: toolWindowActions.toggleProjectTree,
+      openBottomTool: (tool) => {
+        toolWindowRouting.setBottomDockTab(tool as BottomDockTabId);
+        toolWindowRouting.setBottomDockOpen(true);
+      },
+      bottomDockOpen,
+      moveProjectWindow: (anchor) => toolWindowRouting.toolWindowLayout.move("project", anchor as never),
+    });
+    return () => useWorkspaceToolBridgeStore.getState().register(null);
+  }, [
+    platformEditor,
+    toolWindowRouting.leftToolAreaOpen,
+    toolWindowRouting.toolWindowLayout,
+    toolWindowRouting.setBottomDockTab,
+    toolWindowRouting.setBottomDockOpen,
+    toolWindowActions.toggleProjectTree,
+    bottomDockOpen,
+  ]);
+
   return ((
     <WorkspaceClipboardSessionContext.Provider value={clipboard.clipboardHandle}>
       <WorkspaceObservationBoundary
@@ -187,6 +217,11 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
 
         <div className="flex-1 min-h-0 flex">
           {(() => {
+            if (platformEditor) {
+              // The primary navigation rail renders the workspace tool window
+              // buttons (v6.1 DEC-02); no second vertical stripe here.
+              return null;
+            }
             const merged = visible && mainRailMergeActive && !!mainRailHost;
             const leftStripe = (
               <ToolWindowRail

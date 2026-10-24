@@ -7,7 +7,6 @@ import {
   RefreshCw,
   Star,
   Wrench,
-  Settings,
   GitBranch,
   Server,
   Network,
@@ -16,21 +15,20 @@ import {
   MessageSquare,
   Inbox,
   KeyRound,
-  PanelsTopLeft,
 } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { useState } from "react";
 import { SessionTree } from "./SessionTree";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { useAppStore, type SideTab } from "../../stores/appStore";
+import { PrimaryNavigationRail } from "./PrimaryNavigationRail";
+import { WorkspaceSidebar } from "../workspace/WorkspaceSidebar";
+import { HomeSidebar } from "../welcome/HomeSidebar";
+import { AgentsSidebar } from "../agents/AgentsSidebar";
+import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
-import { useMainRailHostStore } from "../../stores/mainRailHostStore";
 import type { SessionConfig } from "../../lib/ipc";
-import { useT, type TranslateFn } from "../../lib/i18n";
+import { useT } from "../../lib/i18n";
 import type { AppCommand } from "../menubar/commands";
-import { ContextMenu } from "../ContextMenu";
-import { ToolWindowRailButton, ToolWindowRailResizeHandle } from "../editor/workspace/panels/ToolWindowRail";
-import { effectiveStripeWidth } from "../editor/workspace/toolWindowLayout";
-import { useToolWindowStripeStore } from "../editor/workspace/toolWindowStripeStore";
 
 interface SidebarProps {
   onNewSession?: (groupPath?: string | null) => void;
@@ -39,6 +37,8 @@ interface SidebarProps {
   onConnectSession?: (session: SessionConfig) => void;
   onOpenSettings?: () => void;
   onCommand?: (command: AppCommand) => void;
+  /** Open a global session as an isolated tab of the active workspace. */
+  onOpenWorkspaceSession?: (session: SessionConfig) => void;
   compact?: boolean;
 }
 
@@ -48,13 +48,10 @@ export function Sidebar({
   onConnectSession,
   onOpenSettings,
   onCommand,
+  onOpenWorkspaceSession,
   compact = false,
 }: SidebarProps) {
-  const {
-    activeSideTab,
-    setActiveSideTab,
-    setSidebarCollapsed,
-  } = useAppStore();
+  const activeSideTab = useAppStore((s) => s.activeSideTab);
   const {
     sessions,
     selectedSessionIds,
@@ -66,11 +63,6 @@ export function Sidebar({
     moveSessionsToGroup,
   } = useSessionStore();
   const t = useT();
-  const setRailHost = useMainRailHostStore((state) => state.setHost);
-  const stripeSettings = useToolWindowStripeStore((state) => state.settings);
-  const setStripeWidth = useToolWindowStripeStore((state) => state.setWidth);
-  const toggleStripeNames = useToolWindowStripeStore((state) => state.toggleShowNames);
-  const [railMenu, setRailMenu] = useState<{ x: number; y: number } | null>(null);
   const selectedSessions = sessions.filter((session) => selectedSessionIds.includes(session.id));
   const selectionCount = selectedSessions.length;
   const [deleteConfirm, setDeleteConfirm] = useState<SessionConfig[] | null>(null);
@@ -85,105 +77,10 @@ export function Sidebar({
     void moveSessionsToGroup(selectedSessionIds, "User sessions / Favorites");
   };
 
-  const handleSideTabClick = (tab: SideTab, clickCount = 0) => {
-    // The first click can swap the expanded Sidebar for its compact mount.
-    // Keep the second click of the same gesture from reopening that panel.
-    if (clickCount > 1) {
-      setSidebarCollapsed(true);
-      return;
-    }
-    if (compact) {
-      setActiveSideTab(tab);
-      setSidebarCollapsed(false);
-      return;
-    }
-
-    if (activeSideTab === tab) {
-      setSidebarCollapsed(true);
-      return;
-    }
-
-    setActiveSideTab(tab);
-  };
-
-  const handleSideTabCollapse = (event: React.MouseEvent) => {
-    event.preventDefault();
-    setSidebarCollapsed(true);
-  };
-
-  const handleSideTabContextMenu = (event: React.MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setRailMenu({ x: event.clientX, y: event.clientY });
-  };
-
   return (
     <>
     <div data-testid="sidebar" className="h-full flex">
-      <div
-        data-testid="sidebar-rail"
-        data-show-names={stripeSettings.showNames || undefined}
-        className="relative flex min-h-0 flex-col shrink-0"
-        style={{ width: effectiveStripeWidth(stripeSettings, "left"), background: "var(--taomni-tab-inactive)", boxShadow: "inset -1px 0 0 var(--taomni-sidebar-border)" }}
-        onContextMenu={handleSideTabContextMenu}
-      >
-        <div className="flex shrink-0 flex-col gap-1 px-1 py-1">
-          {(["sessions", "tools"] as const).map((tab) => {
-            const label = labelForSideTab(t, tab);
-            return (
-              <ToolWindowRailButton
-                key={tab}
-                item={{
-                  id: tab,
-                  label,
-                  icon: tab === "sessions" ? <PanelsTopLeft /> : <Wrench />,
-                  active: activeSideTab === tab && !compact,
-                  testId: `side-tab-${tab}`,
-                  onSelect: () => handleSideTabClick(tab),
-                }}
-                showNames={stripeSettings.showNames}
-                onClick={(event) => handleSideTabClick(tab, event.detail)}
-                onDoubleClick={handleSideTabCollapse}
-              />
-            );
-          })}
-        </div>
-        {compact ? (
-          // ED-PARITY-027 B: the active tab's tool window buttons render here.
-          <div
-            ref={setRailHost}
-            data-testid="sidebar-tool-window-rail"
-            className="flex min-h-0 flex-1 flex-col"
-          />
-        ) : (
-          <div className="flex-1" />
-        )}
-        <div
-          className="shrink-0 border-t px-1 pb-2 pt-1"
-          style={{ borderColor: "var(--taomni-sidebar-border)" }}
-        >
-          <ToolWindowRailButton
-            item={{
-              id: "settings",
-              label: t("menu.settings"),
-              icon: <Settings />,
-              active: false,
-              testId: "ribbon-settings",
-              onSelect: () => onOpenSettings?.(),
-            }}
-            showNames={stripeSettings.showNames}
-          />
-        </div>
-        {stripeSettings.showNames && (
-          <ToolWindowRailResizeHandle
-            side="left"
-            width={effectiveStripeWidth(stripeSettings, "left")}
-            onResize={(width) => setStripeWidth("left", width)}
-            testId="sidebar-rail-resize"
-          />
-        )}
-      </div>
-      {compact && null}
+      <PrimaryNavigationRail compact={compact} onOpenSettings={onOpenSettings} />
       {!compact && (
       <div className="flex-1 flex flex-col min-w-0" style={{ background: "var(--taomni-sidebar-bg)", borderRight: "1px solid var(--taomni-sidebar-border)" }}>
         {activeSideTab === "sessions" ? (
@@ -213,25 +110,22 @@ export function Sidebar({
             </div>
             <SessionTree onNewSession={onNewSession} onConnectSession={onConnectSession} onEditSession={onEditSession} />
           </>
-        ) : (
+        ) : activeSideTab === "tools" ? (
           <ToolsPanel onCommand={onCommand} />
+        ) : activeSideTab === "workspaces" ? (
+          <WorkspaceSidebar onCommand={onCommand} onOpenWorkspaceSession={onOpenWorkspaceSession} />
+        ) : activeSideTab === "home" ? (
+          <HomeSidebar
+            onNewSession={onNewSession}
+            onConnectSession={onConnectSession}
+            sessions={sessions}
+          />
+        ) : (
+          <AgentsSidebar />
         )}
       </div>
       )}
     </div>
-    {railMenu && (
-      <ContextMenu
-        x={railMenu.x}
-        y={railMenu.y}
-        onClose={() => setRailMenu(null)}
-        items={[{
-          label: t("sidebar.showToolWindowNames"),
-          testId: "sidebar-rail-menu-show-names",
-          checked: stripeSettings.showNames,
-          onClick: toggleStripeNames,
-        }]}
-      />
-    )}
     {deleteConfirm && (
       <ConfirmDialog
         title={t("sidebar.confirmDeleteSessionTitle")}
@@ -364,6 +258,7 @@ function IconBtn({
     <button
       data-testid={testId}
       title={title}
+      aria-label={title}
       onClick={onClick}
       disabled={disabled}
       className="w-6 h-6 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-40 disabled:cursor-default"
@@ -372,13 +267,4 @@ function IconBtn({
       {icon}
     </button>
   );
-}
-
-function labelForSideTab(t: TranslateFn, tab: SideTab): string {
-  switch (tab) {
-    case "sessions":
-      return t("sidebar.sideTabSessions");
-    case "tools":
-      return t("sidebar.sideTabTools");
-  }
 }

@@ -4,8 +4,9 @@ import { LOCALES, useLocale, useT } from "../../lib/i18n";
 
 // Compact globe-style toggle that opens a context menu listing every locale.
 // The same component is used by both the regular and compact title bars so
-// the language switch is always anchored to the top-right area.
-export function LanguageSwitcher() {
+// the language switch is always anchored to the top-right area. `openUp`
+// flips the menu above the button for rail-bottom placements.
+export function LanguageSwitcher({ openUp = false, rail = false }: { openUp?: boolean; rail?: boolean }) {
   const { locale, setLocale } = useLocale();
   const t = useT();
   const ctx = useContextMenu();
@@ -14,9 +15,11 @@ export function LanguageSwitcher() {
     event.preventDefault();
     event.stopPropagation();
     const rect = event.currentTarget.getBoundingClientRect();
+    const menuHeight = LOCALES.length * 30 + 8;
+    const y = openUp ? Math.max(8, rect.top - menuHeight) : rect.bottom;
     ctx.showAt(
       rect.right - 180,
-      rect.bottom,
+      y,
       LOCALES.map((entry) => ({
         label: entry.nativeLabel,
         testId: `language-option-${entry.code}`,
@@ -44,8 +47,10 @@ export function LanguageSwitcher() {
         data-testid="language-switcher"
         title={title}
         aria-label={t("language.ariaLabel")}
-        className="taomni-titlebar-tray-btn h-full w-12 inline-flex items-center justify-center gap-1 hover:bg-[var(--taomni-hover)]"
-        style={{ color: "var(--taomni-text)" }}
+        className={rail
+          ? "h-[32px] w-full min-h-[32px] inline-flex items-center justify-center gap-1 rounded-md hover:bg-[var(--taomni-hover)] text-[var(--taomni-text-muted)]"
+          : "taomni-titlebar-tray-btn h-full w-12 inline-flex items-center justify-center gap-1 hover:bg-[var(--taomni-hover)]"}
+        style={{ color: rail ? undefined : "var(--taomni-text)" }}
         onClick={openMenu}
       >
         <Languages className="w-[16px] h-[16px]" />

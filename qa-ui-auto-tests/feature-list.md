@@ -11797,3 +11797,254 @@ controls:
 > - SFTP 底部的 "Cross-host transfer (remote ↔ remote)" 按钮（disabled 占位）
 
 - TC-MAIL-SYNC-03: native sparse UID command limits, FETCH reconnect, gap-free catch-up and full remote deletion/flag reconciliation (F-MAIL-5/F-MAIL-3).
+
+## Workspace-First 平台级重构（v6.1）
+
+<!-- feature
+id: F-WS-1
+status: done
+area: main/shell
+components: [PrimaryNavigationRail, ControlBar, Sidebar, MainLayoutView, TitleBarTrayControls]
+files:
+  - src/components/sidebar/PrimaryNavigationRail.tsx
+  - src/components/sidebar/Sidebar.tsx
+  - src/components/tabbar/ControlBar.tsx
+  - src/components/window/TitleBarTrayControls.tsx
+  - src/layouts/main/MainLayoutView.tsx
+  - src/stores/app/types.ts
+  - src/stores/app/platformChromeSlice.ts
+  - src/stores/appStore.ts
+controls:
+  - id: nav-mode-home
+    selector: '[data-testid="nav-mode-home"]'
+    kind: interactive
+  - id: nav-mode-workspaces
+    selector: '[data-testid="nav-mode-workspaces"]'
+    kind: interactive
+  - id: nav-mode-agents
+    selector: '[data-testid="nav-mode-agents"]'
+    kind: interactive
+  - id: toggle-left-sidebar
+    selector: '[data-testid="toggle-left-sidebar"]'
+    kind: interactive
+  - id: toggle-right-sidebar
+    selector: '[data-testid="toggle-right-sidebar"]'
+    kind: interactive
+  - id: global-search-trigger
+    selector: '[data-testid="global-search-trigger"]'
+    kind: interactive
+  - id: rail-bottom-tools
+    selector: '[data-testid="rail-bottom-tools"]'
+    kind: display
+-->
+左侧主导航条五大一级模式（Home 第 1）、Workspaces 模式融合 IDEA 工具窗口条、底部六工具，以及单行 33px 共享 ControlBar 的左右栏收缩与全局搜索入口。
+
+<!-- feature
+id: F-WS-2
+status: done
+area: workspace
+components: [WorkspaceSidebar, WorkspaceSwitcher, workspacePlatformStore]
+files:
+  - src/components/workspace/WorkspaceSidebar.tsx
+  - src/components/workspace/WorkspaceSwitcher.tsx
+  - src/stores/workspacePlatformStore.ts
+controls:
+  - id: workspace-switcher
+    selector: '[data-testid="workspace-switcher"]'
+    kind: interactive
+  - id: workspace-switcher-menu
+    selector: '[data-testid="workspace-switcher-menu"]'
+    kind: display
+    optional: true
+  - id: workspace-switcher-default-badge
+    selector: '[data-testid="workspace-switcher-default-badge"]'
+    kind: display
+    optional: true
+  - id: workspace-switcher-new
+    selector: '[data-testid="workspace-switcher-new"]'
+    kind: interactive
+    optional: true
+  - id: workspace-switcher-add-folder
+    selector: '[data-testid="workspace-switcher-add-folder"]'
+    kind: interactive
+    optional: true
+  - id: workspace-new-file
+    selector: '[data-testid="workspace-new-file"]'
+    kind: interactive
+  - id: workspace-new-folder
+    selector: '[data-testid="workspace-new-folder"]'
+    kind: interactive
+  - id: workspace-add-folder
+    selector: '[data-testid="workspace-add-folder"]'
+    kind: interactive
+  - id: workspace-sidebar
+    selector: '[data-testid="workspace-sidebar"]'
+    kind: display
+  - id: workspace-sidebar-git-bar
+    selector: '[data-testid="workspace-sidebar-git-bar"]'
+    kind: interactive
+  - id: workspace-root-folder
+    selector: '[data-testid="workspace-root-folder"]'
+    kind: display
+-->
+工作区左栏：切换器（默认工作区保底）、新建文件/目录、多根目录管理与底部常驻 Git 状态条。
+
+<!-- feature
+id: F-WS-3
+status: done
+area: mfa
+components: [MfaFloatingWindow, platformChromeSlice]
+files:
+  - src/components/mfa/MfaFloatingWindow.tsx
+  - src/stores/app/platformChromeSlice.ts
+controls:
+  - id: rail-mfa-button
+    selector: '[data-testid="rail-mfa-button"]'
+    kind: interactive
+  - id: mfa-floating-window
+    selector: '[data-testid="mfa-floating-window"]'
+    kind: display
+    optional: true
+  - id: mfa-floating-drag-handle
+    selector: '[data-testid="mfa-floating-drag-handle"]'
+    kind: interactive
+    optional: true
+  - id: mfa-floating-search
+    selector: '[data-testid="mfa-floating-search"]'
+    kind: interactive
+    optional: true
+  - id: mfa-floating-pin
+    selector: '[data-testid="mfa-floating-pin"]'
+    kind: interactive
+    optional: true
+  - id: mfa-floating-expand-tab
+    selector: '[data-testid="mfa-floating-expand-tab"]'
+    kind: interactive
+    optional: true
+  - id: mfa-floating-close
+    selector: '[data-testid="mfa-floating-close"]'
+    kind: interactive
+    optional: true
+  - id: mfa-floating-list
+    selector: '[data-testid="mfa-floating-list"]'
+    kind: display
+    optional: true
+-->
+左下角可拖拽 MFA 悬浮验证器窗口（默认 left:50px / bottom:30px，搜索、置顶、展开全屏页、Vault 门禁）。
+
+<!-- feature
+id: F-WS-4
+status: done
+area: workspace/git
+components: [WorkspaceMainPanel, WorkspaceTabStrip]
+files:
+  - src/components/workspace/WorkspaceMainPanel.tsx
+  - src/components/workspace/WorkspaceTabStrip.tsx
+controls:
+  - id: workspace-tab-editor
+    selector: '[data-testid="workspace-tab-editor"]'
+    kind: interactive
+  - id: workspace-tab-item
+    selector: '[data-testid="workspace-tab-item"]'
+    kind: interactive
+    optional: true
+  - id: editor-open-git-diff
+    selector: '[data-testid="editor-open-git-diff"]'
+    kind: interactive
+    optional: true
+-->
+工作区主面板与内置 Git Panel：编辑器 / GIT / 会话 Tab 路由与四条 Git 跳转路径。
+
+<!-- feature
+id: F-WS-5
+status: done
+area: workspace/sessions
+components: [WorkspaceSessionPickerModal, WorkspaceSessionPanes, WorkspaceTabStrip, usePlatformShell, workspaceSessionLaunch]
+files:
+  - src/components/workspace/WorkspaceSessionPickerModal.tsx
+  - src/components/workspace/WorkspaceSessionPanes.tsx
+  - src/components/workspace/WorkspaceTabStrip.tsx
+  - src/layouts/main/usePlatformShell.ts
+  - src/layouts/main/workspaceSessionLaunch.ts
+controls:
+  - id: workspace-open-session-plus
+    selector: '[data-testid="workspace-open-session-plus"]'
+    kind: interactive
+  - id: workspace-open-session-plus-menu
+    selector: '[data-testid="workspace-open-session-plus-menu"]'
+    kind: display
+    optional: true
+  - id: workspace-plus-new-terminal
+    selector: '[data-testid="workspace-plus-new-terminal"]'
+    kind: interactive
+    optional: true
+  - id: workspace-plus-open-session
+    selector: '[data-testid="workspace-plus-open-session"]'
+    kind: interactive
+    optional: true
+  - id: workspace-session-picker-modal
+    selector: '[data-testid="workspace-session-picker-modal"]'
+    kind: display
+    optional: true
+  - id: workspace-session-picker-search
+    selector: '[data-testid="workspace-session-picker-search"]'
+    kind: interactive
+    optional: true
+  - id: workspace-session-picker-pin
+    selector: '[data-testid="workspace-session-picker-pin"]'
+    kind: interactive
+    optional: true
+  - id: workspace-session-picker-list
+    selector: '[data-testid="workspace-session-picker-list"]'
+    kind: display
+    optional: true
+  - id: workspace-sessions-lens
+    selector: '[data-testid="workspace-sessions-lens"]'
+    kind: display
+    optional: true
+-->
+工作区打开全局任意会话（+ 菜单 / Ctrl+Alt+O 选择器 / 左栏 Sessions 工具窗）与运行实例隔离。
+
+<!-- feature
+id: F-WS-6
+status: done
+area: agents/search
+components: [AgentsPlatformView, AgentsSidebar, agentTasksStore, GlobalCommandModal, HomeSidebar]
+files:
+  - src/components/agents/AgentsPlatformView.tsx
+  - src/components/agents/AgentsSidebar.tsx
+  - src/components/agents/agentTasksStore.ts
+  - src/components/search/GlobalCommandModal.tsx
+  - src/components/welcome/HomeSidebar.tsx
+controls:
+  - id: agents-platform-view
+    selector: '[data-testid="agents-platform-view"]'
+    kind: display
+  - id: agents-dispatch-task
+    selector: '[data-testid="agents-dispatch-task"]'
+    kind: interactive
+  - id: agents-review-diff
+    selector: '[data-testid="agents-review-diff"]'
+    kind: interactive
+  - id: agents-task-list
+    selector: '[data-testid="agents-task-list"]'
+    kind: display
+    optional: true
+  - id: global-search-modal
+    selector: '[data-testid="global-search-modal"]'
+    kind: display
+    optional: true
+  - id: global-search-input
+    selector: '[data-testid="global-search-input"]'
+    kind: interactive
+    optional: true
+  - id: global-search-results
+    selector: '[data-testid="global-search-results"]'
+    kind: display
+    optional: true
+  - id: home-sidebar
+    selector: '[data-testid="home-sidebar"]'
+    kind: display
+    optional: true
+-->
+Agents 一级模式（Git Worktree 并行编排、Diff 审阅跳转）与 Ctrl+K 全局命令面板、Home 模式左栏。
