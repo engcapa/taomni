@@ -1,0 +1,108 @@
+id: TC-WS-014
+title: Bottom-left floating MFA copies the plain HOTP code to the real Linux system clipboard
+description: v6.1 AC-04 native clipboard boundary. In the packaged Linux/WebKitGTK app the floating MFA window writes the
+  six plain digits of an HOTP account to the OS CLIPBOARD, read back by an independent process, proving the bottom-left floating
+  surface uses the desktop clipboard path and not a renderer-only copy.
+modes:
+- native
+native_platforms:
+- Linux
+covers:
+- F-MFA-1
+- F-WS-3
+tags:
+- p1
+- workspace-redesign
+- mfa
+- clipboard
+- native-boundary
+fixtures:
+- linux_desktop_required
+- reset_db
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-ws-014
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-ws-014
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="mfa-empty"]'
+    timeout_sec: 30
+- click: '[data-testid="mfa-add"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
+- fill:
+    selector: '[data-testid="mfa-add-issuer"]'
+    value: QA WS Float
+- fill:
+    selector: '[data-testid="mfa-add-secret"]'
+    value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ
+- click: '[data-testid="mfa-add-advanced"]'
+- wait_for: '[data-testid="mfa-add-advanced-panel"]'
+- select_option:
+    selector: '[data-testid="mfa-add-kind"]'
+    value: hotp
+- click: '[data-testid="mfa-add-submit"]'
+- assert_text_equals:
+    selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA WS Float"] *)'
+    equals: 755 224
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="mfa-floating-window"]'
+- assert_visible: '[data-testid="mfa-floating-account"]'
+- click: '[data-testid="mfa-floating-account"]'
+- assert_system_clipboard:
+    equals: '755224'
+- screenshot: ws-014-floating-mfa-system-clipboard.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 左下角悬浮窗读取已添加的 HOTP 账户并显示 counter 0 的 RFC 4226 验证码 755 224。
+    actions:
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    checkpoints:
+    - step: 19
+      expectation: 账户验证码为 755 224
+    - step: 22
+      expectation: 悬浮窗列出该账户
+    results:
+    - 19
+    - 22
+  - id: R2
+    requirement: 单击悬浮窗账户后操作系统剪贴板内容为 755224（无空格）。
+    actions:
+    - 23
+    checkpoints:
+    - step: 24
+      expectation: 独立进程读回 755224
+    results:
+    - 24
+  visual:
+  - check: 悬浮窗位于左下角且验证码清晰可复制。
+    method: manual
+    reason: 截图留档，剪贴板由独立进程断言。
+  native:
+  - check: Linux/WebKitGTK + X11 下真实系统剪贴板写入。
+    method: automated
+    reason: assert_system_clipboard 需要 X11 桌面；其他平台的浮层与复制反馈由 TC-WS-012 覆盖。

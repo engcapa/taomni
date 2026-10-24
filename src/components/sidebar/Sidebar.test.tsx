@@ -18,15 +18,17 @@ afterEach(() => {
 });
 
 describe("Sidebar rail (ED-PARITY-027)", () => {
-  it("publishes the tool window host only in the collapsed rail", () => {
+  it("publishes the tool window host in both rail layouts", () => {
     const { unmount } = render(<Sidebar compact />);
     const host = screen.getByTestId("sidebar-tool-window-rail");
     expect(useMainRailHostStore.getState().host).toBe(host);
     unmount();
     expect(useMainRailHostStore.getState().host).toBeNull();
+    // v6.1: the expanded Workspaces rail also hosts the merged Code Workspace
+    // stripe, so the host is always mounted (AC-03).
     render(<Sidebar />);
-    expect(screen.queryByTestId("sidebar-tool-window-rail")).toBeNull();
-    expect(useMainRailHostStore.getState().host).toBeNull();
+    expect(screen.getByTestId("sidebar-tool-window-rail")).toBeVisible();
+    expect(useMainRailHostStore.getState().host).toBe(screen.getByTestId("sidebar-tool-window-rail"));
   });
 
   it("opens and collapses the permanent panels using the shared tool window buttons", () => {

@@ -73,6 +73,7 @@ function renderControlBar(
   workspace: {
     commands?: Parameters<typeof ControlBar>[0]["workspaceCommands"];
     onCommand?: (commandId: string) => void;
+    onToggleSidebar?: () => void;
   } = {},
   onDetachActiveTab?: () => void,
 ) {
@@ -85,7 +86,7 @@ function renderControlBar(
       workspaceCommands={workspace.commands}
       onCommand={onCommand}
       onWorkspaceCommand={workspace.onCommand}
-      onToggleSidebar={vi.fn()}
+      onToggleSidebar={workspace.onToggleSidebar ?? vi.fn()}
       onStartLocalTerminal={vi.fn()}
       onConnectSession={vi.fn()}
       onOpenSessionEditor={vi.fn()}
@@ -97,20 +98,13 @@ function renderControlBar(
 }
 
 describe("ControlBar settings button", () => {
-  it("hides windows by default and offers an explicit current-window capture", () => {
+  it("moves the screenshot entry out of the shared toolbar (rail owns it now)", () => {
     renderControlBar(vi.fn());
-    fireEvent.click(screen.getByTestId("system-screenshot"));
-    expect(captureMocks.open).toHaveBeenCalledWith(undefined, false);
-  });
-
-  it("closes capture options and includes the current window when requested", () => {
-    renderControlBar(vi.fn());
-    fireEvent.click(screen.getByTestId("system-screenshot-delay-toggle"));
-    expect(screen.getByTestId("system-screenshot-current-window")).toHaveTextContent("Alt+A");
-    fireEvent.click(screen.getByTestId("system-screenshot-current-window"));
-    expect(captureMocks.open).toHaveBeenCalledWith(undefined, true);
-    expect(screen.queryByTestId("system-screenshot-delay-menu")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("capture-indicators")).not.toBeInTheDocument();
+    // v6.1 AC-04: the ScreenshotMenuButton lives in the primary rail's bottom
+    // tools group; the 33px toolbar must not grow a second entry.
+    expect(screen.queryByTestId("system-screenshot")).not.toBeInTheDocument();
+    expect(screen.getByTestId("global-search-trigger")).toBeInTheDocument();
+    expect(screen.getByTestId("toggle-right-sidebar")).toBeInTheDocument();
   });
   afterEach(() => {
     cleanup();
@@ -119,17 +113,20 @@ describe("ControlBar settings button", () => {
     openTabsMocks.props.length = 0;
   });
 
-  it("keeps only the app menu in the left button group", () => {
+  it("keeps the left collapse toggle and the app menu in the left button group", () => {
     const onCommand = vi.fn();
-    renderControlBar(onCommand);
+    const onToggleSidebar = vi.fn();
+    renderControlBar(onCommand, { onToggleSidebar });
 
     const mainMenu = screen.getByTestId("app-main-menu");
     const leftGroup = mainMenu.parentElement;
     expect(leftGroup).toBeTruthy();
     expect(within(leftGroup!).getAllByRole("button").map((button) => button.getAttribute("data-testid"))).toEqual([
+      "toggle-left-sidebar",
       "app-main-menu",
     ]);
-    expect(screen.queryByTestId("sidebar-toggle")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("toggle-left-sidebar"));
+    expect(onToggleSidebar).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId("ribbon-settings")).not.toBeInTheDocument();
     expect(onCommand).not.toHaveBeenCalled();
   });

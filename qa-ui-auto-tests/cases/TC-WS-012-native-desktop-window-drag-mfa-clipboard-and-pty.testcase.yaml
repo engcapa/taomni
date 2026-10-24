@@ -1,0 +1,155 @@
+id: TC-WS-012
+title: Native window drag handle, bottom-left MFA copy and an isolated workspace local PTY
+description: v6.1 native boundary. In the packaged desktop WebView the single toolbar keeps a <=32px window drag handle with no reserved full-height grip padding;
+  the bottom-left floating MFA window copies a HOTP code and announces it; and a workspace-owned local terminal starts a real PTY whose command output is visible,
+  while Sessions mode keeps its own instance list.
+modes:
+- native
+covers:
+- F1.3
+- F2.4
+- F-MFA-1
+- F-WS-3
+tags:
+- smoke
+- p0
+- workspace-redesign
+- native-boundary
+fixtures:
+- reset_db
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-012
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- eval_readonly:
+    expression: document.querySelector('.taomni-control-bar .taomni-window-drag-handle').getBoundingClientRect().height <= 32 && getComputedStyle(document.querySelector('.taomni-main-window')).paddingLeft
+      === '0px'
+    expect_truthy: true
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for:
+    selector: '[data-testid="mfa-empty"]'
+    timeout_sec: 30
+- click: '[data-testid="mfa-add"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="secret"]'
+- fill:
+    selector: '[data-testid="mfa-add-issuer"]'
+    value: QA Float
+- fill:
+    selector: '[data-testid="mfa-add-secret"]'
+    value: GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ
+- click: '[data-testid="mfa-add-advanced"]'
+- wait_for: '[data-testid="mfa-add-advanced-panel"]'
+- select_option:
+    selector: '[data-testid="mfa-add-kind"]'
+    value: hotp
+- click: '[data-testid="mfa-add-submit"]'
+- wait_for: '[data-testid="mfa-account-code"]'
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="mfa-floating-window"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"mfa-floating-window"]').getBoundingClientRect().left >= 40 && (window.innerHeight
+      - document.querySelector('[data-testid' + String.fromCharCode(61) + '"mfa-floating-window"]').getBoundingClientRect().bottom) <= 80
+    expect_truthy: true
+- click: '[data-testid="mfa-floating-account"]'
+- wait_for: '[data-testid="mfa-floating-account"][data-copied="true"]'
+- assert_text:
+    selector: '[data-testid="status-bar"]'
+    contains: Copied
+- click: '[data-testid="mfa-floating-pin"]'
+- assert_attribute:
+    selector: '[data-testid="mfa-floating-pin"]'
+    name: aria-pressed
+    equals: 'true'
+- click: '[data-testid="mfa-floating-close"]'
+- assert_not_visible: '[data-testid="mfa-floating-window"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-main-panel"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- wait_for: '[data-testid="workspace-open-session-menu"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="terminal-pane"]'
+- type: echo QA_WS_PTY_READY
+- press: Enter
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^QA_WS_PTY_READY\s*$
+    timeout_sec: 20
+- assert_visible: '[data-testid="workspace-tab"][data-tab-kind="terminal"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 0
+- screenshot: ws-012-native-workspace-pty.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 单行顶栏的窗口拖拽抓手高度不超过 32px，主窗口内容区没有为全高抓手预留左侧 padding。
+    actions:
+    - 1
+    checkpoints:
+    - step: 4
+      expectation: 抓手高度 <= 32px 且主窗口 paddingLeft 为 0
+    results:
+    - 4
+  - id: R2
+    requirement: 左下角 MFA 悬浮窗复制验证码并给出可见反馈，支持置顶与关闭，且不影响当前工作区。
+    actions:
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    checkpoints:
+    - step: 19
+      expectation: 浮窗挂载于左下角
+    - step: 22
+      expectation: 点击账户后进入已复制状态
+    - step: 25
+      expectation: 浮窗关闭
+    results:
+    - 19
+    - 22
+  - id: R3
+    requirement: 工作区内的本地终端启动真实 PTY 并回显命令输出；Sessions 模式不共享工作区实例标签。
+    actions:
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 37
+    - 38
+    - 39
+    checkpoints:
+    - step: 31
+      expectation: 工作区终端面板激活
+    - step: 37
+      expectation: 终端回显 QA_WS_PTY_READY
+    - step: 40
+      expectation: Sessions 模式没有工作区终端实例
+    results:
+    - 31
+    - 37
+    - 40
+  visual:
+  - check: 真实窗口内顶栏、左下角浮窗与工作区终端布局无遮挡。
+    method: manual
+    reason: 原生窗口边界与浮层层级需要截图评审。
+  native:
+  - check: 打包WebView中拖拽抓手、剪贴板复制反馈与本地 PTY 由本用例自动化验证；操作系统剪贴板字节由 Linux 专用用例 TC-WS-014 覆盖。
+    method: automated
+    reason: 仅 native 模式可验证真实 WebView 与 PTY 行为。

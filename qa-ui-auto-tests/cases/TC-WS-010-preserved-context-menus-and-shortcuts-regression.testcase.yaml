@@ -1,0 +1,199 @@
+id: TC-WS-010
+title: Context menus and import/export stay complete across the redesigned shell
+description: v6.1 AC-10 regression. The app main menu keeps its entries (new local terminal, new remote session, new SFTP,
+  Sessions import/export submenus, View, Tools, Settings, Help, Exit); the primary rail keeps Show Tool Window Names; the
+  session tree, tab strip and workspace file tree keep their full context menus (connect/edit/duplicate/move/delete, close
+  variants, copy path, new file/directory, add/remove root).
+modes:
+- browser
+- native
+covers:
+- F1.2
+- F1.4
+- F1.8
+- F25.5
+tags:
+- p0
+- workspace-redesign
+- right-menu
+- regression
+fixtures:
+- reset_db
+- platform_workspace_root
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-010
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.sessions.v1
+    value: '[{"id":"ws-qa-ssh","name":"prod-api-01","session_type":"SSH","group_path":"QA","host":"10.9.0.1","port":22,"username":"root","auth_method":"None","options_json":"{}","created_at":1,"updated_at":1,"last_connected_at":null,"sort_order":0}]'
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default
+      Workspace (默认工作区)","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"qa-root","path":"${fixture.platform_workspace_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
+- reload_window: null
+- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="app-main-menu"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_visible: '[data-testid="context-menu-item-new-local-terminal"]'
+- assert_visible: '[data-testid="context-menu-item-new-remote-session"]'
+- assert_visible: '[data-testid="context-menu-item-new-sftp"]'
+- assert_visible: '[data-testid="context-menu-item-sessions"]'
+- assert_visible: '[data-testid="context-menu-item-view"]'
+- assert_visible: '[data-testid="context-menu-item-tools"]'
+- assert_visible: '[data-testid="context-menu-item-settings"]'
+- assert_visible: '[data-testid="context-menu-item-help"]'
+- assert_visible: '[data-testid="context-menu-item-exit"]'
+- hover: '[data-testid="context-menu-item-sessions"]'
+- assert_visible: '[data-testid="menu-import-sessions"]'
+- assert_visible: '[data-testid="menu-export-sessions"]'
+- press: Escape
+- right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="sidebar-rail"]'
+- wait_for: '[data-testid="sidebar-rail-menu-show-names"]'
+- click: '[data-testid="sidebar-rail-menu-show-names"]'
+- assert_localstorage:
+    key: taomni.codeWorkspace.toolWindowStripes.v1
+    contains: '"showNames":false'
+- right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="sidebar-rail"]'
+- click: '[data-testid="sidebar-rail-menu-show-names"]'
+- assert_localstorage:
+    key: taomni.codeWorkspace.toolWindowStripes.v1
+    contains: '"showNames":true'
+- right_click: '[data-testid="sessions-sidebar-panel"] >> text="prod-api-01"'
+- wait_for: '[data-testid="context-menu"]'
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Connect
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Edit
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Duplicate
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Move to folder
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Delete
+- press: Escape
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- right_click: '[data-testid="tab-bar"] [data-testid="tab-item"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Close others
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Close to the right
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Duplicate tab
+- press: Escape
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-file-tree"]'
+- click: '[data-testid="workspace-tree-root"]'
+- wait_for: '[data-testid="workspace-tree-file"]'
+- right_click: '[data-testid="workspace-tree-root"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_visible: '[data-testid="workspace-tree-new-file"]'
+- assert_visible: '[data-testid="workspace-tree-new-folder"]'
+- assert_visible: '[data-testid="workspace-tree-add-root"]'
+- assert_visible: '[data-testid="workspace-tree-rename"]'
+- assert_visible: '[data-testid="workspace-tree-delete"]'
+- assert_visible: '[data-testid="workspace-tree-copy-path"]'
+- assert_visible: '[data-testid="workspace-tree-remove-root"]'
+- press: Escape
+- screenshot: ws-010-preserved-context-menus.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 应用主菜单保留全部入口与 Sessions 导入/导出子菜单。
+    actions:
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    checkpoints:
+    - step: 9
+      expectation: 新建本地终端存在
+    - step: 13
+      expectation: Sessions/View/Tools 子菜单存在
+    - step: 20
+      expectation: 导入与导出子菜单存在
+    results:
+    - 9
+    - 13
+    - 20
+  - id: R2
+    requirement: 左栏右键 Show Tool Window Names 双向切换并持久化。
+    actions:
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    checkpoints:
+    - step: 24
+      expectation: 右键菜单包含 Show Tool Window Names
+    - step: 29
+      expectation: 再次切换回 showNames:true
+    results:
+    - 24
+    - 29
+  - id: R3
+    requirement: 会话树、标签栏与工作区文件树的右键菜单完整保留。
+    actions:
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 37
+    - 38
+    - 39
+    - 40
+    - 41
+    - 42
+    - 43
+    - 44
+    - 45
+    - 46
+    - 47
+    - 48
+    - 49
+    - 50
+    checkpoints:
+    - step: 31
+      expectation: 会话右键菜单含 Connect/Edit/Duplicate/Move/Delete
+    - step: 41
+      expectation: 标签右键菜单含关闭其他/右侧/复制
+    - step: 51
+      expectation: 文件树右键菜单含新建/添加/重命名/删除/复制路径/移除根
+    results:
+    - 31
+    - 41
+    - 51
+  visual:
+  - check: 所有右键菜单样式、分组与快捷键提示与 main 一致。
+    method: manual
+    reason: 菜单项完整性与视觉层级需要截图评审。
+  native:
+  - check: 真实 WebView 中右键菜单、文件菜单与标签菜单行为一致。
+    method: automated
+    reason: 用例声明 browser 与 native 两种模式。

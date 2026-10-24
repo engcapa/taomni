@@ -1,0 +1,110 @@
+id: TC-WS-001
+title: Single shared 33px toolbar with left/right sidebar collapse and Ctrl+B
+description: v6.1 AC-01 / DEC-01. The main window renders exactly one 33px ControlBar (data-testid control-bar) with no second title row and no decorative three-dot
+  chrome. The left collapse toggle (◧, Ctrl+B / Cmd+B) and the right toggle (◨) drive the sidebar state, and the global search trigger is present.
+modes:
+- browser
+- native
+covers:
+- F1.2
+- F1.3
+- F-WS-1
+tags:
+- smoke
+- p0
+- workspace-redesign
+- main
+fixtures:
+- reset_db
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-001
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_count:
+    selector: '[data-testid="control-bar"]'
+    equal: 1
+- assert_visible: '[data-testid="toggle-left-sidebar"]'
+- assert_visible: '[data-testid="app-main-menu"]'
+- assert_visible: '[data-testid="global-search-trigger"]'
+- assert_visible: '[data-testid="toggle-right-sidebar"]'
+- assert_visible: '[data-testid="titlebar-tray"]'
+- assert_count:
+    selector: '[data-testid="titlebar-secondary"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="titlebar-three-dots"]'
+    equal: 0
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"control-bar"]').getBoundingClientRect().height <= 34
+    expect_truthy: true
+- click: '[data-testid="toggle-left-sidebar"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- press: Mod+b
+- wait_for: '[data-testid="expanded-sidebar-panel"]'
+- click: '[data-testid="toggle-right-sidebar"]'
+- assert_count:
+    selector: '[data-testid="right-sidebar"]'
+    equal: 0
+- click: '[data-testid="toggle-right-sidebar"]'
+- assert_count:
+    selector: '[data-testid="right-sidebar"]'
+    equal: 1
+- screenshot: ws-001-single-shared-toolbar.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 主窗口只有一行不超过 34px 的共享 ControlBar，无第二行顶栏和右上角装饰圆点，左右收缩按钮与全局搜索可见。
+    actions:
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    checkpoints:
+    - step: 4
+      expectation: 仅存在一个 control-bar
+    - step: 5
+      expectation: 左栏收缩按钮可见
+    - step: 7
+      expectation: 全局搜索按钮可见
+    - step: 8
+      expectation: 右栏收缩按钮可见
+    - step: 10
+      expectation: 顶栏高度 <= 34px 且无额外顶栏/装饰圆点
+    results:
+    - 10
+  - id: R2
+    requirement: 点击 ◧ 或按 Ctrl/Cmd+B 折叠主侧栏，再次触发恢复展开；◨ 切换右侧上下文栏。
+    actions:
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    checkpoints:
+    - step: 14
+      expectation: 折叠后 collapsed-sidebar-rail 出现
+    - step: 16
+      expectation: Ctrl/Cmd+B 后展开面板出现
+    - step: 18
+      expectation: 右栏隐藏
+    - step: 20
+      expectation: 右栏恢复显示
+    results:
+    - 14
+    - 16
+    - 18
+    - 20
+  visual:
+  - check: 顶栏为单行紧凑布局，按钮与标签不截断；无第二顶栏和 3 色装饰圆点。
+    method: manual
+    reason: 视觉对齐需要截图人工评审。
+  native:
+  - check: 在真实桌面 WebView 中验证单行顶栏高度、按钮点击与窗口拖拽区。
+    method: automated
+    reason: 本用例声明 browser 与 native 两种模式，按实际执行模式采集证据。

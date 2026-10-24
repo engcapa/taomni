@@ -299,7 +299,9 @@ export function GitPanelView(inputs: GitPanelViewProps) {
           <button
             key={item}
             type="button"
-            data-testid={item === "log" ? "git-log-tab" : undefined}
+            data-testid={item === "log" ? "git-log-tab" : `git-${item}-tab`}
+            data-git-view={item}
+            aria-pressed={view === item}
             className={`h-7 px-3 rounded text-[12px] capitalize ${view === item ? "bg-[var(--taomni-accent)] text-white" : "hover:bg-[var(--taomni-hover)]"}`}
             onClick={() => switchView(item)}
           >

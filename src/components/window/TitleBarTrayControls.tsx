@@ -1,44 +1,24 @@
 import { createPortal } from "react-dom";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Monitor, Moon, MoreHorizontal, Sun, SplitSquareVertical, Users } from "lucide-react";
-import { useAppTheme, type AppThemeMode } from "../../lib/appTheme";
+import { MoreHorizontal, SplitSquareVertical, Users } from "lucide-react";
 import { useAppStore } from "../../stores/appStore";
 import { useAiStore } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
-import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
 import { useViewportSize } from "../../hooks/useViewportSize";
 import { PttButton } from "./PttButton";
-import { LanguageSwitcher } from "./LanguageSwitcher";
 
 const COMPACT_TITLEBAR_BREAKPOINT = 960;
 
-const THEME_MODES: Array<{ mode: AppThemeMode; icon: React.ReactNode }> = [
-  { mode: "light", icon: <Sun className="w-[16px] h-[16px]" /> },
-  { mode: "dark", icon: <Moon className="w-[16px] h-[16px]" /> },
-  { mode: "system", icon: <Monitor className="w-[16px] h-[16px]" /> },
-];
-
 export function TitleBarTrayControls() {
-  const { mode, resolvedTheme, setMode } = useAppTheme();
   const terminalSplitActive = useAppStore((s) => s.terminalSplitActive);
   const multiExecActive = useAppStore((s) => s.multiExecActive);
   const toggleTerminalSplit = useAppStore((s) => s.toggleTerminalSplit);
   const toggleMultiExec = useAppStore((s) => s.toggleMultiExec);
   const aiFullyDisabled = useAiStore((s) => s.config?.fully_disabled === true);
   const t = useT();
-  const themeLabel = useAppThemeI18nLabel();
-
-  const currentIndex = THEME_MODES.findIndex((item) => item.mode === mode);
-  const current = THEME_MODES[currentIndex] ?? THEME_MODES[0];
-  const next = THEME_MODES[(currentIndex + 1) % THEME_MODES.length] ?? THEME_MODES[0];
 
   const splitTitle = terminalSplitActive ? t("titlebar.disableSplit") : t("titlebar.enableSplit");
   const multiExecTitle = multiExecActive ? t("titlebar.disableMultiExec") : t("titlebar.enableMultiExec");
-  const themeTitle = t("titlebar.cycleTheme", {
-    mode: themeLabel(mode),
-    resolved: resolvedTheme,
-    next: themeLabel(next.mode),
-  });
   const { width } = useViewportSize();
   const trayProps: TrayProps = {
     terminalSplitActive,
@@ -48,10 +28,6 @@ export function TitleBarTrayControls() {
     aiFullyDisabled,
     splitTitle,
     multiExecTitle,
-    themeTitle,
-    themeAriaLabel: t("titlebar.cycleThemeAria"),
-    currentThemeIcon: current.icon,
-    onCycleTheme: () => setMode(next.mode),
   };
 
   return width <= COMPACT_TITLEBAR_BREAKPOINT
@@ -89,21 +65,6 @@ export function TitleBarTrayControls() {
         </>
       )}
 
-      <TrayGroupSeparator />
-
-      {/* Locale + appearance group (theme sits to the right of the language
-          switcher), anchored to the rightmost tray slot. */}
-      <div className="taomni-titlebar-tray-group flex items-stretch self-stretch">
-        <LanguageSwitcher />
-        <TrayButton
-          testId="theme-cycle"
-          title={themeTitle}
-          ariaLabel={t("titlebar.cycleThemeAria")}
-          onClick={() => setMode(next.mode)}
-        >
-          {current.icon}
-        </TrayButton>
-      </div>
     </div>
     );
 }
@@ -116,10 +77,6 @@ interface TrayProps {
   aiFullyDisabled: boolean;
   splitTitle: string;
   multiExecTitle: string;
-  themeTitle: string;
-  themeAriaLabel: string;
-  currentThemeIcon: React.ReactNode;
-  onCycleTheme: () => void;
 }
 
 function CompactTitleBarTray({
@@ -130,10 +87,6 @@ function CompactTitleBarTray({
   aiFullyDisabled,
   splitTitle,
   multiExecTitle,
-  themeTitle,
-  themeAriaLabel,
-  currentThemeIcon,
-  onCycleTheme,
 }: TrayProps) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -244,19 +197,6 @@ function CompactTitleBarTray({
               <PttButton />
             </div>
           )}
-          <div className="h-px mx-2 my-1" style={{ background: "var(--taomni-divider)" }} />
-          <div className="flex items-center justify-between gap-3 px-3 py-1">
-            <span className="truncate">{t("language.label")}</span>
-            <LanguageSwitcher />
-          </div>
-          <CompactActionButton
-            testId="theme-cycle"
-            title={themeTitle}
-            active={false}
-            icon={currentThemeIcon}
-            onClick={() => run(onCycleTheme)}
-            ariaLabel={themeAriaLabel}
-          />
         </div>,
         document.body,
       )}

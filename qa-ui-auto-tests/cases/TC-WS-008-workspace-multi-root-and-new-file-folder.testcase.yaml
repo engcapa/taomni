@@ -1,0 +1,167 @@
+id: TC-WS-008
+title: Workspace multi-root management with new file and new folder creation
+description: v6.1 AC-08 / DEC-04. The workspace file tree toolbar and a folder's context menu create files and directories, mount extra local root folders (multi-root)
+  and remove roots without deleting disk content. A created file opens in the workspace editor and appears in the tree.
+modes:
+- browser
+- native
+covers:
+- F25.1
+- F-WS-2
+tags:
+- smoke
+- p0
+- workspace-redesign
+- files
+fixtures:
+- reset_db
+- platform_workspace_root
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-008
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace (默认工作区)","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"qa-root","path":"${fixture.platform_workspace_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
+- reload_window: null
+- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-file-tree"]'
+- assert_visible: '[data-testid="workspace-new-file"]'
+- assert_visible: '[data-testid="workspace-new-folder"]'
+- assert_visible: '[data-testid="workspace-add-folder"]'
+- assert_count:
+    selector: '[data-testid="workspace-git-toggle-row"]'
+    equal: 0
+- click: '[data-testid="workspace-tree-root"]'
+- wait_for: '[data-testid="workspace-tree-file"][data-path="README.md"]'
+- click: '[data-testid="workspace-new-file"]'
+- wait_for: '[data-testid="workspace-fs-modal"][data-kind="file"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: hello-workspace.ts
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="hello-workspace.ts"]'
+- wait_for: '[data-testid="workspace-tree-file"][data-path="hello-workspace.ts"]'
+- click: '[data-testid="workspace-tree-folder"][data-path="src"]'
+- click: '[data-testid="workspace-new-folder"]'
+- wait_for: '[data-testid="workspace-fs-modal"][data-kind="folder"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: generated
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="workspace-tree-folder"][data-path="generated"]'
+- right_click: '[data-testid="workspace-tree-root"][data-path="${fixture.platform_workspace_root}"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_visible: '[data-testid="workspace-tree-new-file"]'
+- assert_visible: '[data-testid="workspace-tree-new-folder"]'
+- assert_visible: '[data-testid="workspace-tree-add-root"]'
+- assert_visible: '[data-testid="workspace-tree-remove-root"]'
+- press: Escape
+- click: '[data-testid="workspace-add-folder"]'
+- wait_for: '[data-testid="workspace-fs-modal"][data-kind="root"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.platform_workspace_root}/extra-root
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="workspace-tree-root"][data-path="${fixture.platform_workspace_root}/extra-root"]'
+- assert_count:
+    selector: '[data-testid="workspace-tree-root"]'
+    equal: 2
+- right_click: '[data-testid="workspace-tree-root"][data-path="${fixture.platform_workspace_root}/extra-root"]'
+- wait_for: '[data-testid="context-menu"]'
+- click: '[data-testid="workspace-tree-remove-root"]'
+- assert_count:
+    selector: '[data-testid="workspace-tree-root"]'
+    equal: 1
+- assert_visible: '[data-testid="workspace-tree-root"][data-path="${fixture.platform_workspace_root}"]'
+- screenshot: ws-008-workspace-new-file-folder.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 工作区文件树工具栏提供新建文件、新建目录、添加外部文件夹与刷新入口，且无已删除的 [文件管理|Git] 行。
+    actions:
+    - 10
+    - 11
+    - 12
+    - 13
+    checkpoints:
+    - step: 11
+      expectation: 新建文件按钮可见
+    - step: 12
+      expectation: 新建目录按钮可见
+    - step: 14
+      expectation: 添加文件夹按钮可见
+    results:
+    - 11
+    - 12
+    - 14
+  - id: R2
+    requirement: 通过工具栏新建文件后立即在编辑器中打开并出现在文件树中，新建目录也同步出现。
+    actions:
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    checkpoints:
+    - step: 19
+      expectation: 新建文件在编辑器中打开
+    - step: 20
+      expectation: 新建文件出现在文件树
+    - step: 26
+      expectation: 新建目录出现在文件树
+    results:
+    - 19
+    - 20
+    - 26
+  - id: R3
+    requirement: 目录右键菜单提供新建文件/目录、添加外部目录与移除根目录；支持挂载第二个根目录并从工作区移除（不删除磁盘文件）。
+    actions:
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 37
+    - 38
+    - 39
+    - 40
+    - 41
+    - 42
+    - 43
+    checkpoints:
+    - step: 30
+      expectation: 目录右键菜单包含新建与多根目录操作
+    - step: 38
+      expectation: 第二个根目录出现在文件树
+    - step: 43
+      expectation: 移除后仅剩一个根目录
+    - step: 44
+      expectation: 持久化状态仅保留一个根目录
+    results:
+    - 30
+    - 38
+    - 43
+    - 44
+  visual:
+  - check: 多根文件树与新建入口在左栏紧凑对齐，创建后无重复节点。
+    method: manual
+    reason: 树层级与多根标记需要截图评审。
+  native:
+  - check: 真实磁盘目录下的新建文件/目录与多根挂载生效。
+    method: automated
+    reason: platform_workspace_root 在 native 创建真实宿主目录。

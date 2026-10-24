@@ -3,9 +3,10 @@ import { useContextMenu } from "../ContextMenu";
 import { LOCALES, useLocale, useT } from "../../lib/i18n";
 
 // Compact globe-style toggle that opens a context menu listing every locale.
-// The same component is used by both the regular and compact title bars so
-// the language switch is always anchored to the top-right area.
-export function LanguageSwitcher() {
+// The `rail` variant is used by the primary navigation rail's bottom global
+// tools group (v6.1 AC-04); the titlebar variants are kept for detached
+// windows, which have no rail.
+export function LanguageSwitcher({ variant = "titlebar" }: { variant?: "titlebar" | "rail" } = {}) {
   const { locale, setLocale } = useLocale();
   const t = useT();
   const ctx = useContextMenu();
@@ -44,11 +45,13 @@ export function LanguageSwitcher() {
         data-testid="language-switcher"
         title={title}
         aria-label={t("language.ariaLabel")}
-        className="taomni-titlebar-tray-btn h-full w-12 inline-flex items-center justify-center gap-1 hover:bg-[var(--taomni-hover)]"
+        className={variant === "rail"
+          ? "relative flex min-h-[32px] w-full shrink-0 flex-col items-center justify-center gap-0.5 rounded-md px-0 py-1 hover:bg-[var(--taomni-hover)]"
+          : "taomni-titlebar-tray-btn h-full w-12 inline-flex items-center justify-center gap-1 hover:bg-[var(--taomni-hover)]"}
         style={{ color: "var(--taomni-text)" }}
         onClick={openMenu}
       >
-        <Languages className="w-[16px] h-[16px]" />
+        <Languages className={variant === "rail" ? "w-[16px] h-[16px]" : "w-[16px] h-[16px]"} />
         <span
           className="text-[10px] font-semibold uppercase tracking-wide"
           aria-hidden="true"

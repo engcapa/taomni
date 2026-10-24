@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle, type PanelSize } from "react-resizable-panels";
 import { AboutDialog } from "../../components/AboutDialog";
@@ -14,6 +15,16 @@ import { AuthPrompt } from "../../components/session/AuthPrompt";
 import { SessionEditor } from "../../components/session/SessionEditor";
 import { Sidebar } from "../../components/sidebar/Sidebar";
 import { StatusBar } from "../../components/statusbar/StatusBar";
+import { AgentsPlatformView } from "../../components/agents/AgentsPlatformView";
+import { MfaFloatingWindow } from "../../components/mfa/MfaFloatingWindow";
+import { GlobalCommandModal } from "../../components/search/GlobalCommandModal";
+import { RightContextPanel } from "../../components/workspace/RightContextPanel";
+import { WorkspaceMainPanel } from "../../components/workspace/WorkspaceMainPanel";
+import { useAppStore } from "../../stores/appStore";
+import { useWorkspaceUiStore } from "../../stores/workspaceUiStore";
+import { useWorkspaceRailStore } from "../../stores/workspaceRailStore";
+import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
+import type { AppCommand } from "../../components/menubar/commands";
 import { ControlBar } from "../../components/tabbar/ControlBar";
 import { TabActionSlotProvider } from "../../components/tabbar/TabActionSlot";
 import { TaoAlertPoller } from "../../components/tao/TaoAlertPoller";
@@ -34,6 +45,7 @@ import { useMainTerminalIntegration } from "./useMainTerminalIntegration";
 import { useMainUtilityTabs } from "./useMainUtilityTabs";
 import { useMainWindowLifecycle } from "./useMainWindowLifecycle";
 import { useMainWorkspaceOpening } from "./useMainWorkspaceOpening";
+import { usePlatformShortcuts } from "./usePlatformShortcuts";
 
 
 export interface MainLayoutViewProps {
@@ -51,6 +63,58 @@ export interface MainLayoutViewProps {
 export function MainLayoutView(props: MainLayoutViewProps) {
   const { layout, chrome, menuActions, sessionActions, connections, terminals, windowLifecycle, workspaceOpening, utilityTabs } = props;
   const { pendingAuth } = layout;
+  const activeSideTab = useAppStore((s) => s.activeSideTab);
+  const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
+  const setForceRailMerge = useWorkspaceRailStore((s) => s.setForceMerge);
+  const openGlobalSearch = useWorkspaceUiStore((s) => s.openGlobalSearch);
+  usePlatformShortcuts();
+
+  // The sidebar's Code Workspace entry now activates Workspaces mode with the
+  // workspace's own Code Workspace tab (v6.1 AC-03 / design §3.2 B3) while the
+  // app-menu command keeps opening the legacy tab for existing flows.
+  const handleSidebarCommand = (command: AppCommand) => {
+    if (command === "code-workspace") {
+      const workspaceStore = useWorkspacePlatformStore.getState();
+      const activeWorkspace = workspaceStore.workspaces.find((entry) => entry.id === workspaceStore.activeWorkspaceId);
+      // A real platform workspace (with mounted roots) opens its own Code
+      // Workspace tab inside Workspaces mode (v6.1 design §3.2 B3). Without any
+      // root the legacy tab keeps working exactly as before, which preserves
+      // the existing Code Workspace automation on a fresh profile.
+      if (activeWorkspace && activeWorkspace.rootFolders.length > 0) {
+        workspaceStore.openCodeWorkspaceTab(workspaceStore.activeWorkspaceId);
+        useAppStore.getState().setActiveSideTab("workspaces");
+        return;
+      }
+    }
+    menuActions.handleCommand(command);
+  };
+
+  // The command palette is mounted outside the menu-action tree; it asks the
+  // shell to run a command through this event.
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const command = (event as CustomEvent<string>).detail;
+      if (command) menuActions.handleCommand(command as AppCommand);
+    };
+    window.addEventListener("taomni:command", handler);
+    return () => window.removeEventListener("taomni:command", handler);
+  }, [menuActions]);
+
+  // Workspaces mode merges the legacy Code Workspace rail into the primary
+  // rail; other modes restore the ED-PARITY-027 behaviour.
+  useEffect(() => {
+    setForceRailMerge(activeSideTab === "workspaces");
+    return () => setForceRailMerge(false);
+  }, [activeSideTab, setForceRailMerge]);
+
+  // Home mode focuses the welcome surface (the WelcomePanel tab). Sessions mode
+  // keeps whichever terminal is active.
+  useEffect(() => {
+    if (activeSideTab !== "home") return;
+    if (layout.activeTab?.type === "welcome") return;
+    if (layout.tabs.some((tab) => tab.type === "welcome")) layout.setActiveTab("welcome");
+  }, [activeSideTab, layout.activeTab?.type, layout.setActiveTab, layout.tabs]);
+
   return ((
     <TabActionSlotProvider slot={layout.tabActionSlot}>
       <div
@@ -86,6 +150,8 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                 : undefined
             }
             onCloseWindow={sessionActions.requestAppExit}
+            leftSidebarCollapsed={sidebarCollapsed}
+            onOpenGlobalSearch={openGlobalSearch}
             slotRef={layout.setTabActionSlot}
           />
         </div>
@@ -121,7 +187,8 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                 onEditSession={sessionActions.handleEditSession}
                 onConnectSession={connections.handleConnectSession}
                 onOpenSettings={() => menuActions.handleCommand("settings")}
-                onCommand={menuActions.handleCommand}
+                onCommand={handleSidebarCommand}
+                onStartLocalTerminal={() => sessionActions.openLocalTab(tr("tabs.localTerminal"))}
               />
             </div>
           )}
@@ -166,7 +233,8 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                   onEditSession={sessionActions.handleEditSession}
                   onConnectSession={connections.handleConnectSession}
                   onOpenSettings={() => menuActions.handleCommand("settings")}
-                  onCommand={menuActions.handleCommand}
+                  onCommand={handleSidebarCommand}
+                  onStartLocalTerminal={() => sessionActions.openLocalTab(tr("tabs.localTerminal"))}
                 />
               </div>
             </Panel>
@@ -191,6 +259,11 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                       onClose={layout.toggleMultiExec}
                     />
                   )}
+                  {activeSideTab === "workspaces" ? (
+                    <WorkspaceMainPanel />
+                  ) : activeSideTab === "agents" ? (
+                    <AgentsPlatformView />
+                  ) : (
                   <TabContentRouter
                     activeTab={layout.activeTab}
                     welcomeRestore={workspaceOpening.welcomeRestore}
@@ -293,6 +366,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                     setStatusMessage={layout.setStatusMessage}
                     removeTab={layout.removeTab}
                   />
+                  )}
                 </div>
                 {chrome.chatDrawerInline && layout.chatDrawerPosition === "right" && <ChatDrawer />}
               </div>
@@ -300,6 +374,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
           </PanelGroup>
           {chrome.chatDrawerFloating && <ChatDrawer />}
           {!layout.aiFullyDisabled && <TaoRibbon />}
+          {activeSideTab !== "home" && <RightContextPanel />}
           <FloatingNotesPanel />
           <TaoAlertPoller />
         </div>
@@ -307,6 +382,14 @@ export function MainLayoutView(props: MainLayoutViewProps) {
         {chrome.chatDrawerBottomPinned && <ChatDrawer />}
 
         <StatusBar />
+
+        <MfaFloatingWindow
+          onExpand={() => {
+            useAppStore.getState().setActiveSideTab("sessions");
+            menuActions.handleCommand("mfa");
+          }}
+        />
+        <GlobalCommandModal />
 
         <CcAgentBridge />
 

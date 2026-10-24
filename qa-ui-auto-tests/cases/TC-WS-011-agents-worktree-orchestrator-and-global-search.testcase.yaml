@@ -1,0 +1,140 @@
+id: TC-WS-011
+title: Agents worktree orchestrator, Git diff hand-off and the global Ctrl+K command palette
+description: v6.1 TASK-09. Agents mode dispatches a coding-agent task into an isolated Git worktree, shows the sandbox policy, task trace and pending-command gate,
+  and hands the diff to the workspace's built-in Git panel. The global command palette (rail/🔍 or Ctrl+K) searches workspaces, sessions and actions and runs the selected
+  entry.
+modes:
+- browser
+- native
+covers:
+- F-WS-6
+tags:
+- smoke
+- p1
+- workspace-redesign
+- agents
+fixtures:
+- reset_db
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-011
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-agents"]'
+- wait_for: '[data-testid="agents-platform-view"]'
+- assert_visible: '[data-testid="agents-empty-state"]'
+- click: '[data-testid="agents-dispatch-open"]'
+- wait_for: '[data-testid="agents-dispatch-modal"]'
+- assert_visible: '[data-testid="agents-dispatch-workspace"]'
+- assert_visible: '[data-testid="agents-dispatch-model"]'
+- fill:
+    selector: '[data-testid="agents-dispatch-task-input"]'
+    value: Fix the SFTP resume bug
+- click: '[data-testid="agents-dispatch-submit"]'
+- wait_for: '[data-testid="agents-task-detail"]'
+- assert_text:
+    selector: '[data-testid="agents-task-detail"]'
+    contains: Fix the SFTP resume bug
+- assert_text:
+    selector: '[data-testid="agents-task-detail"]'
+    contains: Workspace read/write allowed
+- assert_text:
+    selector: '[data-testid="agents-trace"]'
+    contains: worktree
+- assert_visible: '[data-testid="agents-task-detail"] [data-testid="agents-review-in-git"]'
+- click: '[data-testid="agents-review-in-git"]'
+- wait_for: '[data-testid="workspace-git-panel"]'
+- assert_visible: '[data-testid="workspace-tab"][data-tab-kind="git"]'
+- click: '[data-testid="global-search-trigger"]'
+- wait_for: '[data-testid="global-search-modal"]'
+- assert_visible: '[data-testid="global-search-input"]'
+- fill:
+    selector: '[data-testid="global-search-input"]'
+    value: mfa
+- wait_for: '[data-testid="global-search-result"][data-result-id="floating-mfa"]'
+- fill:
+    selector: '[data-testid="global-search-input"]'
+    value: Default Workspace
+- wait_for: '[data-testid="global-search-result"][data-kind="workspace"]'
+- press: Escape
+- assert_not_visible: '[data-testid="global-search-modal"]'
+- press: Mod+k
+- wait_for: '[data-testid="global-search-modal"]'
+- press: Escape
+- assert_not_visible: '[data-testid="global-search-modal"]'
+- screenshot: ws-011-agents-and-global-search.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Agents 模式派发任务后展示独立 Worktree 路径、分支、沙箱策略、实时轨迹与待授权命令入口。
+    actions:
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    checkpoints:
+    - step: 5
+      expectation: Agents 调度台渲染
+    - step: 13
+      expectation: 派发后任务详情渲染
+    - step: 14
+      expectation: 任务文本与沙箱策略可见
+    - step: 16
+      expectation: 轨迹包含 worktree 信息且审阅按钮可用
+    results:
+    - 5
+    - 13
+    - 14
+  - id: R2
+    requirement: “在 Git 面板审阅 Diff”跳转到 Workspaces 内置 Git 面板并激活 GIT 标签。
+    actions:
+    - 17
+    - 18
+    checkpoints:
+    - step: 19
+      expectation: 工作区 Git 面板出现
+    results:
+    - 19
+  - id: R3
+    requirement: 全局命令面板由 🔍 与 Ctrl/Cmd+K 打开，可检索工具动作与工作区并关闭。
+    actions:
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    checkpoints:
+    - step: 22
+      expectation: 命令面板打开
+    - step: 25
+      expectation: 搜索到 MFA 工具动作
+    - step: 27
+      expectation: 搜索到 Default Workspace
+    - step: 31
+      expectation: Ctrl/Cmd+K 再次打开
+    results:
+    - 22
+    - 25
+    - 27
+    - 31
+  visual:
+  - check: Agents 双栏布局、策略横幅与命令面板层级清晰。
+    method: manual
+    reason: 视觉层级与信息密度需要截图评审。
+  native:
+  - check: 真实 WebView 中派发任务与命令面板快捷键一致。
+    method: automated
+    reason: 用例声明 browser 与 native 两种模式。

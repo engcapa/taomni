@@ -1,0 +1,180 @@
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { WorkspaceSidebar } from "../WorkspaceSidebar";
+import { WorkspaceMainPanel } from "../WorkspaceMainPanel";
+import { useAppStore } from "../../../stores/appStore";
+import {
+  DEFAULT_WORKSPACE_ID,
+  useWorkspacePlatformStore,
+} from "../../../stores/workspacePlatformStore";
+import { useWorkspaceUiStore } from "../../../stores/workspaceUiStore";
+import { useWorkspaceEditorStore } from "../../../stores/workspaceEditorStore";
+import { useSessionStore } from "../../../stores/sessionStore";
+
+vi.mock("../workspaceFs", async () => {
+  const actual = await vi.importActual<typeof import("../workspaceFs")>("../workspaceFs");
+  return {
+    ...actual,
+    listWorkspaceDirectory: vi.fn(async () => [
+      { name: "src", path: "src", fileType: "dir", size: 0, mtime: 0, isHidden: false },
+      { name: "README.md", path: "README.md", fileType: "file", size: 12, mtime: 0, isHidden: false },
+    ]),
+    createWorkspaceFileNode: vi.fn(async (_root: string, path: string) => ({
+      path, text: "", size: 0, mtime: 0, hash: "new-hash",
+    })),
+    createWorkspaceFolderNode: vi.fn(async (_root: string, path: string) => ({
+      name: path, path, fileType: "dir", size: 0, mtime: 0, isHidden: false,
+    })),
+    readWorkspaceText: vi.fn(async (_root: string, path: string) => ({
+      path, text: "export const value = 1;\n", encoding: "utf-8", bom: false, size: 24, mtime: 0, hash: "hash",
+    })),
+    writeWorkspaceText: vi.fn(async (_root: string, path: string, text: string) => ({
+      path, text, size: text.length, mtime: 0, hash: "written",
+    })),
+    deleteWorkspaceEntry: vi.fn(async () => undefined),
+    renameWorkspaceEntry: vi.fn(async () => ({ name: "x", path: "x", fileType: "file", size: 0, mtime: 0, isHidden: false })),
+  };
+});
+
+vi.mock("../../../lib/git", () => ({
+  gitProbePath: vi.fn(async () => ({ path: "/preview", gitAvailable: true, isRepo: true, repoRoot: "/preview", error: null })),
+  gitSnapshot: vi.fn(async () => ({
+    repoRoot: "/preview",
+    currentBranch: "main",
+    headOid: "abc",
+    detached: false,
+    upstream: "origin/main",
+    ahead: 1,
+    behind: 0,
+    changes: [{ path: "README.md", status: "M" }],
+    remotes: [{ name: "origin", url: "git@example.test:repo.git" }],
+    tags: [],
+    branches: [],
+    stash: [],
+  })),
+}));
+
+vi.mock("../WorkspaceFileEditor", () => ({
+  WorkspaceFileEditor: ({ tab }: { tab: { filePath?: string } }) => (
+    <div data-testid="workspace-file-editor" data-path={tab.filePath}>editor</div>
+  ),
+}));
+
+vi.mock("../WorkspaceGitPanel", () => ({
+  WorkspaceGitPanel: () => <div data-testid="workspace-git-panel-mock">git</div>,
+}));
+
+vi.mock("../WorkspaceSessionPane", () => ({
+  WorkspaceSessionPane: () => <div data-testid="workspace-session-pane-mock">session</div>,
+}));
+
+vi.mock("../../editor/CodeWorkspaceTab", () => ({
+  CodeWorkspaceTab: () => <div data-testid="code-workspace-tab">code workspace</div>,
+}));
+
+function Shell() {
+  return (
+    <div>
+      <WorkspaceSidebar onOpenSessionPicker={vi.fn()} />
+      <WorkspaceMainPanel />
+    </div>
+  );
+}
+
+beforeEach(() => {
+  window.localStorage.clear();
+  useWorkspacePlatformStore.getState().reloadFromStorage();
+  useWorkspaceUiStore.setState({ fsModal: null, sessionPickerOpen: false, globalSearchOpen: false, agentDispatchOpen: false });
+  useWorkspaceEditorStore.setState({ documents: {}, activeTabId: null });
+  useAppStore.setState({ activeSideTab: "workspaces", sidebarCollapsed: false, statusMessage: "Ready" });
+  useSessionStore.setState({ sessions: [], groups: [], loading: false, selectedSessionId: null, searchQuery: "" });
+  const workspace = useWorkspacePlatformStore.getState();
+  workspace.addRootFolder(DEFAULT_WORKSPACE_ID, { path: "/preview", name: "preview" });
+});
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
+
+describe("WorkspaceSidebar (TASK-05)", () => {
+  it("UT-WS-05-01 shows the workspace switcher at the top with the undeletable default workspace", () => {
+    const custom = useWorkspacePlatformStore.getState().createWorkspace({ name: "custom-ws" });
+    useWorkspacePlatformStore.getState().setActiveWorkspace(DEFAULT_WORKSPACE_ID);
+    render(<Shell />);
+
+    const switcher = screen.getByTestId("workspace-switcher");
+    expect(switcher).toBeInTheDocument();
+    expect(within(switcher).getByTestId("workspace-default-badge")).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-switcher-button").textContent).toContain("Default Workspace");
+
+    fireEvent.click(screen.getByTestId("workspace-switcher-button"));
+    const menu = screen.getByTestId("workspace-switcher-menu");
+    expect(within(menu).getByTestId(`workspace-switcher-option-${DEFAULT_WORKSPACE_ID}`)).toBeInTheDocument();
+    fireEvent.click(within(menu).getByTestId(`workspace-switcher-option-${custom.id}`));
+    expect(useWorkspacePlatformStore.getState().activeWorkspaceId).toBe(custom.id);
+    expect(useWorkspacePlatformStore.getState().deleteWorkspace(DEFAULT_WORKSPACE_ID)).toBe(false);
+  });
+
+  it("UT-WS-05-02 never renders the removed Files | Git toggle row and keeps the Git status bar", () => {
+    render(<Shell />);
+    expect(screen.queryByTestId("workspace-files-tab")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("workspace-git-toggle-row")).not.toBeInTheDocument();
+    expect(screen.queryByText("文件管理")).not.toBeInTheDocument();
+    expect(screen.getByTestId("workspace-sidebar-git-bar")).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-sidebar-panel")).toBeInTheDocument();
+  });
+
+  it("UT-WS-05-03 creates a file from the toolbar and opens it in the editor", async () => {
+    render(<Shell />);
+    fireEvent.click(screen.getByTestId("workspace-new-file"));
+    const modal = screen.getByTestId("workspace-fs-modal");
+    expect(modal.dataset.kind).toBe("file");
+    fireEvent.change(within(modal).getByTestId("workspace-fs-modal-input"), { target: { value: "notes.ts" } });
+    fireEvent.click(within(modal).getByTestId("workspace-fs-modal-confirm"));
+
+    await waitFor(() => expect(screen.queryByTestId("workspace-fs-modal")).not.toBeInTheDocument());
+    const workspace = useWorkspacePlatformStore.getState().workspaces.find((entry) => entry.id === DEFAULT_WORKSPACE_ID)!;
+    expect(workspace.openTabs.some((tab) => tab.kind === "file" && tab.filePath === "notes.ts")).toBe(true);
+    expect(useWorkspacePlatformStore.getState().createdNodes.some((node) => node.path === "notes.ts" && node.kind === "file")).toBe(true);
+    expect(screen.getByTestId("workspace-file-editor").dataset.path).toBe("notes.ts");
+  });
+
+  it("UT-WS-05-04 creates a directory from the root context menu", async () => {
+    render(<Shell />);
+    fireEvent.click(screen.getByTestId("workspace-tree-root"));
+    await waitFor(() => expect(screen.getAllByTestId("workspace-tree-file").length).toBeGreaterThan(0));
+    fireEvent.contextMenu(screen.getByTestId("workspace-tree-root"));
+    fireEvent.click(screen.getByTestId("workspace-tree-new-folder"));
+    const modal = screen.getByTestId("workspace-fs-modal");
+    expect(modal.dataset.kind).toBe("folder");
+    fireEvent.change(within(modal).getByTestId("workspace-fs-modal-input"), { target: { value: "docs" } });
+    fireEvent.click(within(modal).getByTestId("workspace-fs-modal-confirm"));
+    await waitFor(() => expect(screen.queryByTestId("workspace-fs-modal")).not.toBeInTheDocument());
+    expect(useWorkspacePlatformStore.getState().createdNodes.some((node) => node.path === "docs" && node.kind === "folder")).toBe(true);
+  });
+
+  it("UT-WS-05-05 mounts an extra root folder (multi-root)", async () => {
+    render(<Shell />);
+    fireEvent.click(screen.getByTestId("workspace-add-folder"));
+    const modal = screen.getByTestId("workspace-fs-modal");
+    expect(modal.dataset.kind).toBe("root");
+    fireEvent.change(within(modal).getByTestId("workspace-fs-modal-input"), { target: { value: "/repo/extra" } });
+    fireEvent.click(within(modal).getByTestId("workspace-fs-modal-confirm"));
+    await waitFor(() => expect(screen.queryByTestId("workspace-fs-modal")).not.toBeInTheDocument());
+    const workspace = useWorkspacePlatformStore.getState().workspaces.find((entry) => entry.id === DEFAULT_WORKSPACE_ID)!;
+    expect(workspace.rootFolders.map((root) => root.path)).toContain("/repo/extra");
+    expect(screen.getAllByTestId("workspace-tree-root")).toHaveLength(2);
+  });
+
+  it("UT-WS-05-06 shows branch and change count in the bottom Git bar and opens the Git tab", async () => {
+    render(<Shell />);
+    const bar = screen.getByTestId("workspace-sidebar-git-bar");
+    await waitFor(() => expect(bar.dataset.branch).toBe("main"));
+    expect(bar.dataset.changes).toBe("1");
+    fireEvent.click(bar);
+    const workspace = useWorkspacePlatformStore.getState().workspaces.find((entry) => entry.id === DEFAULT_WORKSPACE_ID)!;
+    expect(workspace.openTabs.some((tab) => tab.kind === "git")).toBe(true);
+    expect(screen.getByTestId("workspace-git-panel-mock")).toBeInTheDocument();
+  });
+});

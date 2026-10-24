@@ -1,0 +1,161 @@
+id: TC-WS-009
+title: Sessions mode keeps the single-line header, SessionTree toolbar and open-tabs filters
+description: 'v6.1 AC-09 / DEC-05. Sessions mode shows no quick-connect chip row and no secondary terminal breadcrumb: the main panel shares the single 33px toolbar.
+  The left panel keeps the seven SessionTree toolbar actions, search, the folder tree and its context menus, while the header keeps the ℹ️ details preview and the
+  ⋯ OpenTabsMenu with directory grouping and fuzzy search.'
+modes:
+- browser
+- native
+covers:
+- F1.4
+- F1.5
+- F-Sidebar-1
+tags:
+- smoke
+- p0
+- workspace-redesign
+- session
+fixtures:
+- reset_db
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-009
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.sessions.v1
+    value: '[{"id":"ws-qa-ssh","name":"prod-api-01","session_type":"SSH","group_path":"QA","host":"10.9.0.1","port":22,"username":"root","auth_method":"None","options_json":"{}","created_at":1,"updated_at":1,"last_connected_at":null,"sort_order":0},{"id":"ws-qa-db","name":"orders-pg","session_type":"PostgreSQL","group_path":"QA","host":"10.9.0.2","port":5432,"username":"root","auth_method":"None","options_json":"{}","created_at":1,"updated_at":1,"last_connected_at":null,"sort_order":1}]'
+- reload_window: null
+- wait_for: '[data-testid="session-tree"]'
+- assert_count:
+    selector: '[data-testid="quick-connect"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="terminal-breadcrumb"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="control-bar"]'
+    equal: 1
+- assert_visible: '[data-testid="session-new"]'
+- assert_visible: '[data-testid="session-edit"]'
+- assert_visible: '[data-testid="session-duplicate"]'
+- assert_visible: '[data-testid="session-delete"]'
+- assert_visible: '[data-testid="session-refresh"]'
+- assert_visible: '[data-testid="session-favorite"]'
+- assert_visible: '[data-testid="session-search"]'
+- assert_items:
+    selector: '[data-testid="sessions-sidebar-panel"] > div:first-child > button'
+    attribute: data-testid
+    equals:
+    - session-new
+    - session-edit
+    - session-duplicate
+    - session-delete
+    - session-refresh
+    - session-favorite
+- assert_visible: '[data-testid="session-tree"]'
+- wait_for: '[data-testid="sessions-sidebar-panel"] >> text="prod-api-01"'
+- fill:
+    selector: '[data-testid="session-search"]'
+    value: orders
+- wait_for: '[data-testid="sessions-sidebar-panel"] >> text="orders-pg"'
+- assert_not_visible: '[data-testid="sessions-sidebar-panel"] >> text="prod-api-01"'
+- fill:
+    selector: '[data-testid="session-search"]'
+    value: ''
+- wait_for: '[data-testid="sessions-sidebar-panel"] >> text="prod-api-01"'
+- right_click: '[data-testid="sessions-sidebar-panel"] >> text="prod-api-01"'
+- wait_for: '[data-testid="context-menu"]'
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Connect
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Move to Folder
+- press: Escape
+- assert_visible: '[data-testid="tab-details-hover"]'
+- click: '[data-testid="tab-more"]'
+- wait_for: '[data-testid="open-tabs-menu"]'
+- assert_visible: '[data-testid="open-tabs-filter"]'
+- fill:
+    selector: '[data-testid="open-tabs-filter"]'
+    value: zzz-no-match
+- assert_count:
+    selector: '[data-testid="open-tabs-menu"] [data-testid^="open-tabs-tab-"]'
+    equal: 0
+- press: Escape
+- assert_not_visible: '[data-testid="open-tabs-menu"]'
+- screenshot: ws-009-sessions-compact-header-and-filters.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Sessions 模式不显示快速连接芯片行或终端次级面包屑，主面板共享单行 33px 工具栏。
+    actions:
+    - 7
+    - 8
+    checkpoints:
+    - step: 7
+      expectation: quick-connect 未渲染
+    - step: 8
+      expectation: 终端面包屑未渲染
+    - step: 9
+      expectation: 仅一个 control-bar
+    results:
+    - 7
+    - 8
+    - 9
+  - id: R2
+    requirement: 左栏完整保留 7 个会话工具按钮、搜索框、目录树与右键菜单。
+    actions:
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    checkpoints:
+    - step: 17
+      expectation: 会话搜索可用
+    - step: 19
+      expectation: 搜索过滤 prod-api-01
+    - step: 27
+      expectation: 会话右键菜单包含 Connect 与 Move to Folder
+    results:
+    - 17
+    - 19
+    - 27
+  - id: R3
+    requirement: 顶栏 ℹ️ 详情与 ⋯ OpenTabsMenu（目录分组 + 模糊搜索）保持可用。
+    actions:
+    - 33
+    - 34
+    - 35
+    - 36
+    checkpoints:
+    - step: 35
+      expectation: 标签详情按钮可见
+    - step: 37
+      expectation: OpenTabsMenu 打开
+    results:
+    - 35
+    - 37
+  visual:
+  - check: Sessions 模式垂直空间完全留给画布，左栏工具与过滤器密度一致。
+    method: manual
+    reason: 单行头部与左栏布局需要截图评审。
+  native:
+  - check: 真实 WebView 中工具栏、右键菜单与标签过滤一致。
+    method: automated
+    reason: 用例声明 browser 与 native 两种模式。

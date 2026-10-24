@@ -1,0 +1,144 @@
+id: TC-WS-004
+title: Rail bottom tools order and the bottom-left floating MFA window
+description: v6.1 AC-04 / DEC-03. The primary rail's bottom group renders MFA → Screenshot → Chat → Theme → Language → Settings top-to-bottom. Clicking MFA opens
+  the floating authenticator at the bottom-left (left 50px / bottom 30px equivalents) which can be pinned, expanded to the full MFA tab and closed without touching
+  the active terminal.
+modes:
+- browser
+- native
+covers:
+- F5.5
+- F27.1
+- F-MFA-1
+- F-I18n-1
+- F-WS-3
+tags:
+- smoke
+- p0
+- workspace-redesign
+- mfa
+fixtures:
+- reset_db
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-004
+- wait_for: '[data-testid="welcome-panel"]'
+- wait_for: '[data-testid="sidebar-rail"]'
+- assert_visible: '[data-testid="rail-mfa-button"]'
+- assert_visible: '[data-testid="system-screenshot"]'
+- assert_visible: '[data-testid="rail-chat-button"]'
+- assert_visible: '[data-testid="theme-cycle"]'
+- assert_visible: '[data-testid="language-switcher"]'
+- assert_visible: '[data-testid="ribbon-settings"]'
+- assert_items:
+    selector: '[data-testid="rail-bottom-tools"] [data-testid]'
+    attribute: data-testid
+    equals:
+    - rail-mfa-button
+    - system-screenshot
+    - rail-chat-button
+    - theme-cycle
+    - language-switcher
+    - ribbon-settings
+- assert_count:
+    selector: '[data-testid="control-bar"] [data-testid="system-screenshot"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="control-bar"] [data-testid="language-switcher"]'
+    equal: 0
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="mfa-floating-window"]'
+- assert_visible: '[data-testid="mfa-floating-drag-handle"]'
+- assert_visible: '[data-testid="mfa-floating-search"]'
+- assert_visible: '[data-testid="mfa-floating-pin"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"mfa-floating-window"]').getBoundingClientRect().left >= 40 && (window.innerHeight
+      - document.querySelector('[data-testid' + String.fromCharCode(61) + '"mfa-floating-window"]').getBoundingClientRect().bottom) <= 80
+    expect_truthy: true
+- click: '[data-testid="mfa-floating-pin"]'
+- assert_attribute:
+    selector: '[data-testid="mfa-floating-pin"]'
+    name: aria-pressed
+    equals: 'true'
+- click: '[data-testid="mfa-floating-expand-tab"]'
+- wait_for: '[data-testid="mfa-tab"]'
+- assert_not_visible: '[data-testid="mfa-floating-window"]'
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="mfa-floating-window"]'
+- press: Escape
+- assert_not_visible: '[data-testid="mfa-floating-window"]'
+- screenshot: ws-004-rail-bottom-and-floating-mfa.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 左栏底部严格按 MFA → 截图 → 聊天 → 主题 → 语言 → 设置自上而下排列，标题栏不再保留截图与语言按钮。
+    actions:
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    checkpoints:
+    - step: 7
+      expectation: 截图按钮出现在左栏底部
+    - step: 12
+      expectation: 标题栏无重复截图/语言按钮
+    - step: 11
+      expectation: 六个底部工具的纵向顺序符合契约
+    results:
+    - 11
+    - 12
+  - id: R2
+    requirement: 点击 MFA 在左下角弹出可拖拽浮窗，支持置顶、Esc 关闭且默认位置在视口左下角。
+    actions:
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    checkpoints:
+    - step: 15
+      expectation: 浮窗挂载
+    - step: 19
+      expectation: 浮窗位于左下角
+    - step: 21
+      expectation: 置顶开关生效
+    - step: 26
+      expectation: Esc 关闭浮窗
+    results:
+    - 15
+    - 19
+    - 21
+    - 26
+  - id: R3
+    requirement: 展开按钮从浮窗切换到全屏 MFA 标签页并关闭浮窗（既有 MFA 流程保持兼容）。
+    actions:
+    - 22
+    - 23
+    checkpoints:
+    - step: 23
+      expectation: mfa-tab 出现
+    - step: 24
+      expectation: 浮窗关闭
+    results:
+    - 23
+    - 24
+  visual:
+  - check: 底部工具排列紧凑、图标清晰，浮窗位于左下角且不遮挡终端主体。
+    method: manual
+    reason: 绝对定位与视觉层级需要截图评审。
+  native:
+  - check: 真实 WebView 中浮窗定位、拖拽与置顶层级正确。
+    method: automated
+    reason: 用例声明 browser 与 native 两种模式；剪贴板复制由 TC-WS-012 覆盖。

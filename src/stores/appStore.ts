@@ -46,7 +46,9 @@ export function subscribeUiAppearanceStorage(): () => void {
 }
 
 export {
+  type PrimaryNavMode,
   type SideTab,
+  type FloatingMfaWindowState,
   type TerminalSplitLayout,
   type VaultUnlockMode,
   type DbObjectKind,

@@ -7,7 +7,7 @@ import { CURRENT_WINDOW_SCREENSHOT_SHORTCUT_LABEL, screenshotShortcutLabel, useS
 import { ScreenshotFavorites } from "./ScreenshotFavorites";
 
 /** Unified screen capture entry shared by the main and detached windows. */
-export function ScreenshotMenuButton() {
+export function ScreenshotMenuButton({ variant = "titlebar" }: { variant?: "titlebar" | "rail" } = {}) {
   const t = useT();
   const dialogs = useAppDialogs();
   const [screenshotBusy, setScreenshotBusy] = useState(false);
@@ -84,7 +84,9 @@ export function ScreenshotMenuButton() {
     }, 1000);
   };
   return (
-      <div ref={delayMenuRef} className="relative shrink-0 self-center flex items-center">
+      <div ref={delayMenuRef} className={variant === "rail"
+        ? "relative w-full shrink-0 flex flex-col items-center"
+        : "relative shrink-0 self-center flex items-center"}>
         <button
           type="button"
           data-testid="system-screenshot"
@@ -101,7 +103,9 @@ export function ScreenshotMenuButton() {
             if (screenshotCountdown !== null) clearScreenshotCountdown();
             else void handleScreenshot();
           }}
-          className="h-6 w-7 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-50 self-center"
+          className={variant === "rail"
+            ? "h-8 w-full shrink-0 inline-flex items-center justify-center rounded-md hover:bg-[var(--taomni-hover)] disabled:opacity-50"
+            : "h-6 w-7 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-50 self-center"}
         >
           {screenshotCountdown !== null ? (
             <span className="text-[12px] font-semibold tabular-nums" data-testid="system-screenshot-countdown">
@@ -120,7 +124,9 @@ export function ScreenshotMenuButton() {
           aria-expanded={screenshotDelayMenu}
           aria-haspopup="menu"
           onClick={() => setScreenshotDelayMenu((v) => !v)}
-          className="h-6 w-4 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-50"
+          className={variant === "rail"
+            ? "absolute bottom-0 right-0.5 h-3 w-3 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-50"
+            : "h-6 w-4 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] disabled:opacity-50"}
         >
           <ChevronDown className="w-3 h-3" />
         </button>
@@ -128,7 +134,9 @@ export function ScreenshotMenuButton() {
           <div
             data-testid="system-screenshot-delay-menu"
             role="menu"
-            className="absolute right-0 top-7 z-50 min-w-48 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] py-1 shadow-xl"
+            className={variant === "rail"
+            ? "absolute left-full bottom-0 z-50 ml-1 min-w-48 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] py-1 shadow-xl"
+            : "absolute right-0 top-7 z-50 min-w-48 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] py-1 shadow-xl"}
           >
             <button type="button" data-testid="system-screenshot-current-window" role="menuitem" onClick={() => void handleScreenshot(true)}
               className="block w-full px-3 py-1.5 text-left text-[12px] hover:bg-[var(--taomni-hover)]">{t("screenshot.currentWindow")} ({CURRENT_WINDOW_SCREENSHOT_SHORTCUT_LABEL})</button>

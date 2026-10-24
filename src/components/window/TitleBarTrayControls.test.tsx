@@ -76,7 +76,8 @@ describe("TitleBarTrayControls responsive layout", () => {
     expect(screen.getByTestId("titlebar-actions-menu")).toBeInTheDocument();
     expect(screen.getByTestId("tab-split-view")).toBeInTheDocument();
     expect(screen.getByTestId("tab-multiexec-toggle")).toBeInTheDocument();
-    expect(screen.getByTestId("theme-cycle")).toBeInTheDocument();
+    // v6.1 AC-04: theme/language moved to the primary rail bottom group.
+    expect(screen.queryByTestId("theme-cycle")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("tab-split-view"));
     expect(mocks.app.toggleTerminalSplit).toHaveBeenCalledTimes(1);
