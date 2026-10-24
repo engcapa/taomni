@@ -241,3 +241,8 @@ failures may be reported separately, per user authorization.
 - Add GSS-002 to remove only the disposable fixture's ticket cache for the case,
   assert actionable authentication failure, then restore the cache on teardown.
   No shared credentials or product state are modified by this negative fixture.
+- Windows run 40041216988 proves real GSSAPI, agent/generated-key authentication,
+  encrypted key unlock and X11 windows. SCP fixture scripts and text samples were
+  written with platform CRLF translation: the shell wrapper failed to execute
+  and sample byte hashes differed. Write runner-owned POSIX scripts/configs and
+  deterministic text samples with explicit LF on every OS; retain failed runs.

@@ -45,7 +45,7 @@ def install():
             "openssh,krb5-server,krb5-workstation,python3,coreutils"], timeout=900)
         if result.returncode: raise RuntimeError("Cygwin SSH/Kerberos package installation failed")
         os.environ["QA_CYGWIN_ROOT"] = root.as_posix()
-        with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as stream:
+        with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8", newline="\n") as stream:
             stream.write(f"QA_CYGWIN_ROOT={root.as_posix()}\n")
 
 
@@ -102,7 +102,7 @@ def start(services):
  }}
 [domain_realm]
 {realm_hosts}
-""", encoding="utf-8")
+""", encoding="utf-8", newline="\n")
     kdc_conf.write_text(f"""[kdcdefaults]
  kdc_ports = {kdc_port}
  kdc_tcp_ports = {kdc_port}
@@ -115,7 +115,7 @@ def start(services):
   acl_file = {path(private / 'kadm5.acl')}
   max_life = 1h
  }}
-""", encoding="utf-8")
+""", encoding="utf-8", newline="\n")
     env = {"KRB5_CONFIG": path(conf), "KRB5_KDC_PROFILE": path(kdc_conf),
            "KRB5_KTNAME": "FILE:" + path(keytab), "KRB5CCNAME": "FILE:" + path(ccache)}
     os.environ.update(env)
@@ -168,7 +168,7 @@ def start(services):
         command(["ssh-add", str(client_key)])
     authorized = private / "authorized_keys"
     original_public = Path(str(client_key) + ".pub").read_text()
-    authorized.write_text(original_public)
+    authorized.write_text(original_public, encoding="utf-8", newline="\n")
     generated = private / "generated_key"
     encrypted = private / "encrypted_key"
     secret("QA_SSH_KEY_PASSPHRASE")
@@ -187,7 +187,7 @@ def start(services):
                         keys.append(value + "\n")
             current = "".join(keys)
             if current != previous:
-                authorized.write_text(current)
+                authorized.write_text(current, encoding="utf-8", newline="\n")
                 previous = current
     watcher = threading.Thread(target=watch_public, daemon=True)
     watcher.start()
@@ -195,7 +195,7 @@ def start(services):
     commands = private / "commands"
     commands.mkdir()
     scp = commands / "scp"
-    scp.write_text("#!/bin/sh\ncase \"$*\" in\n  *scp-large.bin*) exec /usr/bin/scp -l 2048 \"$@\" ;;\n  *) exec /usr/bin/scp \"$@\" ;;\nesac\n", encoding="utf-8")
+    scp.write_text("#!/bin/sh\ncase \"$*\" in\n  *scp-large.bin*) exec /usr/bin/scp -l 2048 \"$@\" ;;\n  *) exec /usr/bin/scp \"$@\" ;;\nesac\n", encoding="utf-8", newline="\n")
     command([binary / "chmod.exe", "+x", path(scp)]) if cygwin else scp.chmod(0o700)
     config = private / "sshd_config"
     config.write_text(f"""Port {port}
@@ -218,7 +218,7 @@ XAuthLocation {path((binary / 'xauth.exe') if cygwin else Path('/opt/X11/bin/xau
 SetEnv "PATH={path(commands)}:/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"
 Subsystem sftp internal-sftp
 LogLevel DEBUG3
-""", encoding="utf-8")
+""", encoding="utf-8", newline="\n")
     prefix = [] if cygwin else ["sudo", "-n", "env", *[f"{key}={value}" for key, value in env.items()]]
     if system == "Linux": command(["sudo", "-n", "mkdir", "-p", "/run/sshd"])
     command([*prefix, sshd, "-t", "-f", path(config)])
@@ -227,16 +227,16 @@ LogLevel DEBUG3
              "-oPreferredAuthentications=gssapi-with-mic", "-oStrictHostKeyChecking=accept-new", "-p", str(port), "-l", user, "localhost", "printf QA_GSSAPI_OK"]
     def authenticated():
         result = subprocess.run([str(arg) for arg in probe], capture_output=True, text=True, timeout=20)
-        (services.root / "ssh-gssapi-probe.log").write_text(result.stderr, encoding="utf-8")
+        (services.root / "ssh-gssapi-probe.log").write_text(result.stderr, encoding="utf-8", newline="\n")
         if result.returncode or result.stdout != "QA_GSSAPI_OK":
             raise RuntimeError("GSSAPI command roundtrip failed; see ssh-gssapi-probe.log")
     retry(authenticated)
     remote_dir = private / "remote"
     remote_dir.mkdir()
-    (remote_dir / "scp-source.txt").write_text("qa-scp-roundtrip\n", encoding="utf-8")
+    (remote_dir / "scp-source.txt").write_text("qa-scp-roundtrip\n", encoding="utf-8", newline="\n")
     local_dir = private / "local"
     local_dir.mkdir()
-    (local_dir / "scp-upload.txt").write_text("qa-scp-upload\n", encoding="utf-8")
+    (local_dir / "scp-upload.txt").write_text("qa-scp-upload\n", encoding="utf-8", newline="\n")
     services.config["ssh_features"] = {"host": "localhost", "port": port, "user": user,
         "ticket_cache": ccache.as_posix(),
         "key_path": str(client_key).replace("\\", "/"), "generated_key": str(generated).replace("\\", "/"),
