@@ -87,7 +87,6 @@ steps:
 - assert_visible: '[data-testid="tab-details-hover"]'
 - click: '[data-testid="tab-more"]'
 - wait_for: '[data-testid="open-tabs-menu"]'
-- click: '[data-testid="session-tree-item"][data-session-name="prod-api-01"]'
 - assert_visible: '[data-testid="open-tabs-filter"]'
 - fill:
     selector: '[data-testid="open-tabs-filter"]'
