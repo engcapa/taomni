@@ -1,5 +1,5 @@
 import { AlertTriangle } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle, type PanelImperativeHandle } from "react-resizable-panels";
 import { type BottomDockTabId } from "../../../../stores/codeWorkspaceStore";
@@ -140,39 +140,52 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
   // v6.1: platform workspace editors (Workspaces mode) publish their tool
   // window controls so the primary rail's static Project/… buttons drive the
   // real editor instead of the sidebar lens.
+  //
+  // The controller is registered only when a boolean it exposes changes. The
+  // functions it calls are read through a ref so re-renders (which recreate
+  // `openFile`/`refreshProjectTree` closures) never re-register the bridge:
+  // registering publishes to a store that this tree subscribes to, so a
+  // per-render identity here used to close an infinite update loop.
   const platformEditor = workspaceInstanceId.startsWith("platform-");
+  const bridgeContextRef = useRef({
+    routing: toolWindowRouting,
+    actions: toolWindowActions,
+    openFile,
+    refreshProjectTree,
+    roots: workspaceNavigationPopupsProps.roots,
+  });
+  useEffect(() => {
+    bridgeContextRef.current = {
+      routing: toolWindowRouting,
+      actions: toolWindowActions,
+      openFile,
+      refreshProjectTree,
+      roots: workspaceNavigationPopupsProps.roots,
+    };
+  });
   useEffect(() => {
     if (!platformEditor) return;
     const controller = {
       leftToolAreaOpen: toolWindowRouting.leftToolAreaOpen,
-      toggleProjectTree: toolWindowActions.toggleProjectTree,
+      toggleProjectTree: () => bridgeContextRef.current.actions.toggleProjectTree(),
       openBottomTool: (tool: string) => {
-        toolWindowRouting.setBottomDockTab(tool as BottomDockTabId);
-        toolWindowRouting.setBottomDockOpen(true);
+        const routing = bridgeContextRef.current.routing;
+        routing.setBottomDockTab(tool as BottomDockTabId);
+        routing.setBottomDockOpen(true);
       },
       bottomDockOpen,
-      moveProjectWindow: (anchor: string) => toolWindowRouting.toolWindowLayout.move("project", anchor as never),
+      moveProjectWindow: (anchor: string) => bridgeContextRef.current.routing.toolWindowLayout.move("project", anchor as never),
       openFile: async (path: string, rootFolderId?: string) => {
-        const rootId = rootFolderId ?? workspaceNavigationPopupsProps.roots[0]?.id;
+        const bridge = bridgeContextRef.current;
+        const rootId = rootFolderId ?? bridge.roots[0]?.id;
         if (!rootId) return;
-        await openFile({ kind: "root", rootId, path });
+        await bridge.openFile({ kind: "root", rootId, path });
       },
-      refreshProjectTree,
+      refreshProjectTree: () => bridgeContextRef.current.refreshProjectTree(),
     };
     useWorkspaceToolBridgeStore.getState().register(controller);
     return () => useWorkspaceToolBridgeStore.getState().unregister(controller);
-  }, [
-    platformEditor,
-    toolWindowRouting.leftToolAreaOpen,
-    toolWindowRouting.toolWindowLayout,
-    toolWindowRouting.setBottomDockTab,
-    toolWindowRouting.setBottomDockOpen,
-    toolWindowActions.toggleProjectTree,
-    bottomDockOpen,
-    openFile,
-    refreshProjectTree,
-    workspaceNavigationPopupsProps.roots,
-  ]);
+  }, [platformEditor, toolWindowRouting.leftToolAreaOpen, bottomDockOpen]);
 
   return ((
     <WorkspaceClipboardSessionContext.Provider value={clipboard.clipboardHandle}>
