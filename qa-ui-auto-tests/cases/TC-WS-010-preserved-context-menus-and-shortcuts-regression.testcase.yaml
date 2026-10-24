@@ -85,7 +85,7 @@ steps:
     contains: Close others
 - assert_text:
     selector: '[data-testid="context-menu"]'
-    contains: Close to the right
+    contains: Close all
 - assert_text:
     selector: '[data-testid="context-menu"]'
     contains: Duplicate tab

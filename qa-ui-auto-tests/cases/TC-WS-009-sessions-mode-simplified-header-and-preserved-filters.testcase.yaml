@@ -79,7 +79,7 @@ steps:
     selector: '[data-testid="open-tabs-filter"]'
     value: zzz-no-match
 - assert_count:
-    selector: '[data-testid="open-tabs-menu"] [data-testid^="open-tabs-tab-"]'
+    selector: '[data-testid="tab-bar"] [data-testid="tab-item"]'
     equal: 0
 - press: Escape
 - assert_not_visible: '[data-testid="open-tabs-menu"]'

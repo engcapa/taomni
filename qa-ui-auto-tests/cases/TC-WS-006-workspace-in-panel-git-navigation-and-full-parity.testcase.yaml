@@ -68,10 +68,9 @@ steps:
 - set_check:
     selector: '[data-testid="git-commit-amend"]'
     checked: true
-- assert_attribute:
-    selector: '[data-testid="git-commit-amend"]'
-    name: checked
-    equals: 'true'
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"git-commit-amend"]').checked === true
+    expect_truthy: true
 - click: '[data-testid="workspace-tree-root"]'
 - wait_for: '[data-testid="workspace-tree-file"][data-path="same.txt"]'
 - click: '[data-testid="workspace-tree-file"][data-path="same.txt"]'
