@@ -30,6 +30,18 @@ def setup(ctx: Any) -> None:
     values: dict[str, str] = getattr(ctx, "values")
 
     if mode != "native":
+        page = getattr(ctx, "page", None)
+        if page is None:
+            raise RuntimeError("platform_workspace_root needs a browser page")
+        page.goto(cfg["app"]["base_url"], wait_until="commit")
+        page.evaluate(
+            """async ({root, files}) => {
+              const vfs = await import('/src/stubs/localVfs.ts');
+              try { await vfs.vfsStat(root + '/src'); } catch { await vfs.vfsMkdir(root + '/src'); }
+              for (const [name, text] of Object.entries(files)) await vfs.vfsWriteText(root + '/' + name, text);
+            }""",
+            {"root": BROWSER_ROOT, "files": SEED_FILES},
+        )
         values["platform_workspace_root"] = BROWSER_ROOT
         return
 

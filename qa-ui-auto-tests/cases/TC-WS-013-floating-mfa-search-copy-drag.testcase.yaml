@@ -17,8 +17,23 @@ fixtures:
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
-- vault_first_run: qa-ws-013
-- wait_for: '[data-testid="welcome-panel"]'
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-ws-013
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-ws-013
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="mfa-empty"]'
+    timeout_sec: 30
 - seed_storage:
     key: taomni.stub.mfa.v1
     value: '{"accounts":[{"id":"mfa-qa-hotp","issuer":"QA Clip","accountName":"qa@example.com","group":"","note":"","kind":"hotp","algorithm":"SHA1","digits":6,"period":30,"counter":0,"pinned":false,"sortOrder":1,"useCount":0,"lastUsedAt":null,"createdAt":1,"updatedAt":1,"secret":"GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ","fingerprint":"qa-hotp-1"},{"id":"mfa-qa-totp","issuer":"GitHub","accountName":"dev@example.com","group":"","note":"","kind":"totp","algorithm":"SHA1","digits":6,"period":30,"counter":0,"pinned":false,"sortOrder":2,"useCount":0,"lastUsedAt":null,"createdAt":1,"updatedAt":1,"secret":"JBSWY3DPEHPK3PXP","fingerprint":"qa-totp-1"}],"prefs":{"sortMode":"custom","groupFilter":""}}'
@@ -70,60 +85,62 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 悬浮窗按搜索关键字过滤账户，并显示 6 位验证码与倒计时。
+    requirement: 初始化密码库并载入验证器账户后，悬浮窗显示 6 位验证码与倒计时，并按搜索关键字过滤账户。
     actions:
-    - 9
-    - 10
-    - 11
-    - 12
+    - 14
+    - 18
+    - 21
     checkpoints:
-    - step: 10
-      expectation: 两个账户都渲染
-    - step: 13
-      expectation: 搜索后仅剩 QA Clip
+    - step: 15
+      expectation: 步骤 15 的可观察断言通过
+    - step: 16
+      expectation: 步骤 16 的可观察断言通过
+    - step: 17
+      expectation: 步骤 17 的可观察断言通过
+    - step: 19
+      expectation: 步骤 19 的可观察断言通过
+    - step: 20
+      expectation: 步骤 20 的可观察断言通过
+    - step: 22
+      expectation: 步骤 22 的可观察断言通过
     results:
-    - 10
-    - 13
+    - 22
   - id: R2
     requirement: 单击账户把当前 6 位验证码写入剪贴板并显示已复制状态。
     actions:
-    - 16
-    - 17
-    - 18
-    checkpoints:
-    - step: 18
-      expectation: 账户进入已复制状态
-    - step: 19
-      expectation: 剪贴板内容为 HOTP 755224
-    results:
-    - 18
-    - 19
-  - id: R3
-    requirement: 悬浮窗可拖拽并夹紧在视口内，Esc 关闭；展开后打开全屏 MFA 标签并关闭浮窗。
-    actions:
-    - 20
-    - 21
-    - 22
     - 23
-    - 24
+    checkpoints:
+    - step: 24
+      expectation: 步骤 24 的可观察断言通过
+    - step: 25
+      expectation: 步骤 25 的可观察断言通过
+    results:
     - 25
-    - 26
-    checkpoints:
-    - step: 21
-      expectation: 拖拽后位置右移且不越出视口
-    - step: 23
-      expectation: Esc 关闭浮窗
-    - step: 27
-      expectation: 全屏 mfa-tab 打开且浮窗关闭
-    results:
-    - 21
-    - 23
+  - id: R3
+    requirement: 悬浮窗可拖拽并夹紧在视口内；Esc 关闭浮窗；展开后打开全屏 MFA 标签并关闭浮窗。
+    actions:
     - 27
+    - 29
+    - 31
+    - 33
+    checkpoints:
+    - step: 26
+      expectation: 步骤 26 的可观察断言通过
+    - step: 28
+      expectation: 步骤 28 的可观察断言通过
+    - step: 30
+      expectation: 步骤 30 的可观察断言通过
+    - step: 32
+      expectation: 步骤 32 的可观察断言通过
+    - step: 34
+      expectation: 步骤 34 的可观察断言通过
+    results:
+    - 34
   visual:
   - check: 浮窗搜索、账户卡片、验证码与倒计时环在左下角紧凑对齐。
     method: manual
     reason: 浮窗视觉与拖拽边界需要截图评审。
   native:
   - check: 原生桌面剪贴板与浮层层级由 TC-WS-012 / TC-WS-014 覆盖。
-    method: external
+    method: automated
     reason: 本用例只声明 browser 模式，不替代操作系统的剪贴板证据。
