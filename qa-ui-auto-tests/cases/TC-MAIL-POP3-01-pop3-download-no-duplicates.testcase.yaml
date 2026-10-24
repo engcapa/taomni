@@ -48,13 +48,22 @@ steps:
 - assert_text:
     selector: '[data-testid="mail-client-tab"]'
     contains: POP3
+- wait_for:
+    selector: '[data-testid="mail-sync-button"]:not([disabled])'
+    timeout_sec: 60
 - mail_server_deliver:
     count: 3
     prefix: Pop3-new
-- click: '[data-testid="mail-sync-button"]'
+- click: '[data-testid="mail-sync-button"]:not([disabled])'
+- wait_for:
+    selector: '[data-testid="mail-sync-button"]:not([disabled])'
+    timeout_sec: 60
 - mail_server_assert_list_matches:
     timeout_sec: 60
-- click: '[data-testid="mail-sync-button"]'
+- click: '[data-testid="mail-sync-button"]:not([disabled])'
+- wait_for:
+    selector: '[data-testid="mail-sync-button"]:not([disabled])'
+    timeout_sec: 60
 - assert_text:
     selector: '[data-testid="mail-client-tab"]'
     contains: new headers across
@@ -86,17 +95,20 @@ verification:
     actions:
     - 10
     - 11
+    - 12
     - 13
+    - 15
+    - 16
     checkpoints:
-    - step: 12
-      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
     - step: 14
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 17
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "new headers across", "timeout_sec": 30}}'
-    - step: 15
+    - step: 18
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 30}}'
     results:
-    - 12
-    - 15
+    - 14
+    - 18
   visual:
   - check: 截图中本地文件夹（INBOX/Sent/Drafts/Trash/Junk）与 POP3 状态显示正确。
     method: manual

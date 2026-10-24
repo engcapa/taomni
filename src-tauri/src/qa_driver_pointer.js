@@ -17,10 +17,15 @@ function dispatchQaElementClick(el) {
   return true;
 }
 
-function dispatchQaActions(sources, emitKey, modifiers, resolveOrigin, targetAtPoint) {
+async function dispatchQaActions(sources, emitKey, modifiers, resolveOrigin, targetAtPoint, cancelled = () => false) {
   const states = sources.map(() => ({ x: 0, y: 0, buttons: 0, down: null, dragged: false, clicks: 0, suppressMouse: false }));
   const ticks = Math.max(0, ...sources.map((source) => (source.actions || []).length));
   for (let tick = 0; tick < ticks; tick++) {
+    if (cancelled()) return;
+    // A tick runs all sources together, then waits for its longest duration.
+    // In particular a pointer pause must keep down/up in separate event-loop
+    // turns so native protocol consumers observe the declared input timing.
+    const duration = Math.max(0, ...sources.map(source => Number(source.actions?.[tick]?.duration) || 0));
     for (let index = 0; index < sources.length; index++) {
       const source = sources[index];
       const action = source.actions?.[tick];
@@ -77,5 +82,6 @@ function dispatchQaActions(sources, emitKey, modifiers, resolveOrigin, targetAtP
         state.suppressMouse = false;
       }
     }
+    if (duration > 0) await new Promise(resolve => setTimeout(resolve, duration));
   }
 }

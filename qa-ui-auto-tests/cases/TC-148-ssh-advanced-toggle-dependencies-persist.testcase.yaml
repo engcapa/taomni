@@ -15,7 +15,6 @@ modes:
 - native
 fixtures:
 - reset_db
-- ssh_required
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
@@ -81,7 +80,7 @@ steps:
 - assert_attribute:
     selector: '[data-testid="session-remote-environment"]'
     name: value
-    equals: Custom command…
+    equals: custom
 - fill:
     selector: 'input[aria-label="Execute command"]'
     value: printf qa-ssh-advanced-toggle
@@ -98,7 +97,7 @@ steps:
 - assert_attribute:
     selector: '[data-testid="session-ssh-browser-type"]'
     name: value
-    equals: Disabled
+    equals: disabled
 - click: '[data-testid="session-auth-privatekey"]'
 - assert_attribute:
     selector: '[data-testid="session-private-key-toggle"]'
@@ -140,7 +139,7 @@ steps:
 - assert_attribute:
     selector: '[data-testid="session-remote-environment"]'
     name: value
-    equals: Custom command…
+    equals: custom
 - assert_attribute:
     selector: 'input[aria-label="Execute command"]'
     name: value
@@ -152,7 +151,7 @@ steps:
 - assert_attribute:
     selector: '[data-testid="session-ssh-browser-type"]'
     name: value
-    equals: Disabled
+    equals: disabled
 - assert_count:
     selector: '[data-testid="session-auth-password"]:checked'
     equal: 1
@@ -192,44 +191,102 @@ verification:
     - 43
     - 44
     - 46
+    - 56
     checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
     - step: 12
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 13
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 14
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 16
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 17
       expectation: '{"assert_disabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
+    - step: 19
+      expectation: '{"assert_enabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
+    - step: 21
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 23
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
     - step: 25
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "Custom command…"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "custom"}}'
+    - step: 28
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
     - step: 30
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "name": "value", "equals": "Disabled"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "name": "value", "equals": "disabled"}}'
+    - step: 32
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-private-key-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 33
+      expectation: '{"assert_enabled": "input[aria-label=\"Private key path\"]"}'
+    - step: 36
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-password\"]:checked", "equal": 1}}'
+    - step: 37
+      expectation: '{"assert_disabled": "input[aria-label=\"Private key path\"]"}'
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
     - step: 42
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-advanced-dependencies\"]"}'
+    - step: 45
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 47
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 48
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
     - step: 49
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 50
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
     - step: 51
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "Custom command…"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "custom"}}'
     - step: 52
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf qa-ssh-advanced-toggle"}}'
+    - step: 53
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
     - step: 54
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "name": "value", "equals": "Disabled"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "name": "value", "equals": "disabled"}}'
     - step: 55
       expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-password\"]:checked", "equal": 1}}'
+    - step: 57
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
     results:
+    - 2
+    - 4
+    - 11
     - 12
+    - 13
+    - 14
+    - 16
     - 17
+    - 19
+    - 21
     - 23
     - 25
+    - 28
     - 30
+    - 32
+    - 33
+    - 36
+    - 37
+    - 39
     - 42
+    - 45
+    - 47
+    - 48
     - 49
     - 50
     - 51
     - 52
+    - 53
     - 54
     - 55
+    - 57
   visual:
   - check: Inspect the advanced SSH form screenshot for visible dependency state, aligned controls, and no clipped labels.
     method: manual
