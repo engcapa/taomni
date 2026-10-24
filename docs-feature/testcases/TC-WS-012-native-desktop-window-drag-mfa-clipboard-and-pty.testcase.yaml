@@ -1,0 +1,71 @@
+id: TC-WS-012
+title: Native desktop verifies 33px titlebar drag handle geometry, bottom-left MFA
+  overlay, and isolated workspace PTY
+description: 'Verifies V-12 in packaged native WebView: checks window drag handle
+  geometry in the single 33px ControlBar, opens bottom-left floating MFA overlay,
+  and spawns a real local PTY inside Workspaces.'
+covers:
+- F1.3
+- F2.4
+- F-MFA-1
+tags:
+- p0
+- native
+- workspace-redesign
+modes:
+- native
+fixtures:
+- reset_db
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="control-bar"]'
+- eval_readonly:
+    expression: document.querySelector('.taomni-control-bar .taomni-window-drag-handle').getBoundingClientRect().height
+      <= 32 && getComputedStyle(document.querySelector('.taomni-main-window')).paddingLeft
+      === '0px'
+    expect_truthy: true
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="mfa-floating-window"]'
+- click: '[data-testid="mfa-floating-close"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-open-local-terminal-item"]'
+- wait_for: '[data-testid="workspace-isolated-terminal-pane"]'
+- screenshot: ws-012-native-workspace-pty.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 原生桌面窗口顶栏抓手高度 <=32px，左下角 MFA 悬浮窗正常开关，且在工作区内可独立启动本地 PTY 终端。
+    actions:
+    - 1
+    - 4
+    - 6
+    - 7
+    - 9
+    - 10
+    checkpoints:
+    - step: 2
+      expectation: 主工具栏挂载
+    - step: 3
+      expectation: 原生顶栏拖拽抓手高度 <=32px 且窗口左内边距为 0
+    - step: 5
+      expectation: 左下角 MFA 悬浮窗口打开
+    - step: 8
+      expectation: 切换到 Workspaces 模式
+    - step: 11
+      expectation: 工作区内独立本地 PTY 终端挂载成功
+    results:
+    - 3
+    - 5
+    - 11
+  visual:
+  - check: 原生桌面窗口内工作区终端与顶栏无错位。
+    method: manual
+    reason: 截图需人工复核。
+  native:
+  - check: 在真实桌面 WebView (WebKitGTK / WebView2 / WKWebView) 中执行。
+    method: automated
+    reason: 原生 PTY 与窗口几何需桌面端执行。
