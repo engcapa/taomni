@@ -18,6 +18,10 @@ description: |
   accepts an independent probe connection, so it went back to waiting (it
   serves one client at a time). On Windows platform_choice picks Taomni over
   the runner's system Remote Desktop.
+
+  The canvas click retains the W3C move and button-pause durations on macOS;
+  its QA bridge must await all ticks before reporting completion. Connection
+  status alone cannot pass the independent host target's flip assertion.
 covers:
 - F-RdpServer-1
 - F9.7

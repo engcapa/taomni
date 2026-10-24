@@ -834,7 +834,7 @@
         },
         "switch_window": {
           "type": "object", "additionalProperties": false, "required": ["selector"],
-          "properties": {"selector": {"type": "string", "minLength": 1}, "timeout_sec": {"type": "number", "minimum": 1}},
+          "properties": {"selector": {"type": "string", "minLength": 1}, "timeout_sec": {"type": "number", "minimum": 1}, "close_with": {"type": "string", "minLength": 1}},
           "description": "Switch to a real app-created browser page/native WebView with the matching CSS selector."
         },
         "reload_window": {

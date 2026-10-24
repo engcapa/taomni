@@ -161,7 +161,7 @@ class NativeSessionTransportTest(TestCase):
     def test_wayland_activation_verifies_desktop_even_when_document_is_focused(self):
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
         session.session_id = "session-1"
-        session.request = Mock(side_effect=["window-qa", None])
+        session.request = Mock(side_effect=[{"title": "Taomni"}, "window-qa", None])
         session.execute = Mock(return_value=True)
         with patch.dict(os.environ, {"QA_WAYLAND_INPUT_SOCKET": "/qa/private/input.sock"}), \
                 patch("tauri_webdriver.socket.AF_UNIX", 1, create=True), \
@@ -171,7 +171,8 @@ class NativeSessionTransportTest(TestCase):
             session.activate_wayland_window()
         connection.connect.assert_called_once_with("/qa/private/input.sock")
         request = json.loads(connection.sendall.call_args.args[0])
-        self.assertEqual(request, {"command": "activate", "application": str(Path("/tmp/taomni").resolve())})
+        self.assertEqual(request, {"command": "activate", "application": str(Path("/tmp/taomni").resolve()),
+                                   "title": "Taomni"})
         session.request.assert_called_with("POST", "/session/session-1/window", {"handle": "window-qa"})
 
     def test_right_click_uses_right_button_and_releases_on_failure(self):

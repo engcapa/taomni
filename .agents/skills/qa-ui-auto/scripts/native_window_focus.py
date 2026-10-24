@@ -66,7 +66,19 @@ class NativeWindowFocus:
         session = self.session
         input_socket = os.environ.get("QA_WAYLAND_INPUT_SOCKET")
         if input_socket:
-            request = {"command": "activate", "application": str(session.application.resolve())}
+            # A single app/profile can own both the main and detached windows.
+            # Read the native title of the current WebDriver context, rather
+            # than document.title (which is shared by all packaged pages).
+            title = session.request("POST", session.endpoint("/execute/async"), {"script": (
+                "const done = arguments[arguments.length - 1];"
+                "const api = window.__TAURI_INTERNALS__;"
+                "api.invoke('plugin:window|title', {label: api.metadata.currentWindow.label})"
+                ".then(title => done({title}), error => done({error: String(error)}));"
+            ), "args": []})
+            if not isinstance(title, dict) or not isinstance(title.get("title"), str) or not title["title"]:
+                raise WebDriverError(f"Wayland could not identify the native window title: {title!r}")
+            request = {"command": "activate", "application": str(session.application.resolve()),
+                       "title": title["title"]}
             if self.data_home:
                 request["data_home"] = self.data_home
             with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:

@@ -28,7 +28,7 @@ steps:
     value: ${cfg.ssh_features.host}
 - fill:
     selector: '[data-testid="session-port"]'
-    value: ${cfg.ssh_features.port}
+    value: ${cfg.ssh_features.throttled_port}
 - set_check:
     selector: '[data-testid="session-specify-username"]'
     checked: true
@@ -167,7 +167,7 @@ verification:
   native:
   - check: Real native SCP lifecycle
     method: automated
-    reason: Real scp is bandwidth-limited only for the large fixture. OS bytes and visible queue
+    reason: A dedicated real SSH link limits bytes for initial and resumed transfers. OS bytes and visible queue
       states prove pause/cancel/retry rather than command stubs.
   visual:
   - check: Queue lifecycle and recovered state

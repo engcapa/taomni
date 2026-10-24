@@ -1,7 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import pointerScript from "../../src-tauri/src/qa_driver_pointer.js?raw";
 
-type Action = { type: string; x?: number; y?: number; button?: number; value?: string };
+type Action = { type: string; x?: number; y?: number; button?: number; value?: string; duration?: number };
 type Source = { type: string; actions: Action[] };
 type Modifiers = { Control: boolean; Shift: boolean; Alt: boolean; Meta: boolean };
 type Dispatch = (
@@ -10,17 +10,18 @@ type Dispatch = (
   modifiers: Modifiers,
   resolveOrigin: (origin: unknown, x: number, y: number) => [number, number],
   targetAtPoint: (x: number, y: number) => HTMLElement,
-) => void;
+  cancelled?: () => boolean,
+) => Promise<void>;
 
 // Execute the exact JavaScript embedded by the QA-only Rust bridge.
 const dispatch = new Function(
-  "sources", "emitKey", "modifiers", "resolveOrigin", "targetAtPoint",
-  `${pointerScript}\nreturn dispatchQaActions(sources, emitKey, modifiers, resolveOrigin, targetAtPoint);`,
+  "sources", "emitKey", "modifiers", "resolveOrigin", "targetAtPoint", "cancelled",
+  `${pointerScript}\nreturn dispatchQaActions(sources, emitKey, modifiers, resolveOrigin, targetAtPoint, cancelled);`,
 ) as Dispatch;
 
 const elementClick = new Function("el", `${pointerScript}\nreturn dispatchQaElementClick(el);`) as (el: HTMLElement) => boolean;
 
-function fixture(sources: Source[]) {
+function fixture(sources: Source[], cancelled?: () => boolean) {
   const root = document.createElement("div");
   const cell = document.createElement("span");
   root.append(cell);
@@ -32,7 +33,7 @@ function fixture(sources: Source[]) {
   }
   const run = () => dispatch(sources, (type, key) => {
     modifiers[key] = type === "keyDown";
-  }, modifiers, (_origin, x, y) => [x, y], (x) => x < 8 ? root : cell);
+  }, modifiers, (_origin, x, y) => [x, y], (x) => x < 8 ? root : cell, cancelled);
   return { root, events, modifiers, run };
 }
 
@@ -48,11 +49,55 @@ describe("macOS QA WebView pointer actions", () => {
     document.body.replaceChildren();
     if (typeof PointerEvent === "undefined") vi.stubGlobal("PointerEvent", MouseEvent);
   });
+  afterEach(() => vi.useRealTimers());
 
-  it("delivers the compatibility mouse events needed by terminal selection", () => {
+  it("honors the longest source duration in each tick before sending button edges", async () => {
+    vi.useFakeTimers();
+    const { root, run } = fixture([
+      { type: "pointer", actions: [
+        { type: "pointerMove", x: 20, y: 10, duration: 50 },
+        { type: "pointerDown", button: 0 },
+        { type: "pause", duration: 60 },
+        { type: "pointerUp", button: 0 },
+      ] },
+      { type: "key", actions: [{ type: "pause" }, { type: "pause" }, { type: "pause", duration: 90 }] },
+    ]);
+    const started = Date.now();
+    const edges: [string, number][] = [];
+    for (const type of ["pointerdown", "pointerup"]) {
+      root.addEventListener(type, () => edges.push([type, Date.now() - started]));
+    }
+    const completion = run();
+    expect(edges).toEqual([]);
+    await vi.advanceTimersByTimeAsync(49);
+    expect(edges).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(edges).toEqual([["pointerdown", 50]]);
+    await vi.advanceTimersByTimeAsync(89);
+    expect(edges).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(1);
+    await completion;
+    expect(edges).toEqual([["pointerdown", 50], ["pointerup", 140]]);
+  });
+
+  it("stops later ticks when the bridge releases a timed-out action owner", async () => {
+    vi.useFakeTimers();
+    let cancelled = false;
+    const { events, run } = fixture([{ type: "pointer", actions: [
+      { type: "pointerMove", x: 20, y: 10, duration: 50 },
+      { type: "pointerDown", button: 0 }, { type: "pointerUp", button: 0 },
+    ] }], () => cancelled);
+    const completion = run();
+    cancelled = true;
+    await vi.advanceTimersByTimeAsync(50);
+    await completion;
+    expect(events.some(event => event.type === "mousedown" || event.type === "click")).toBe(false);
+  });
+
+  it("delivers the compatibility mouse events needed by terminal selection", async () => {
     const { events, root, run } = fixture([{ type: "pointer", actions: drag }]);
     root.addEventListener("mousedown", (event) => event.preventDefault());
-    run();
+    await run();
     const selectionEvents = events.filter((event) => ["mousedown", "mousemove", "mouseup"].includes(event.type));
     expect(selectionEvents.map((event) => [event.type, event.clientX, event.buttons, event.detail])).toEqual([
       ["mousemove", 4, 0, 0], ["mousedown", 4, 1, 1], ["mousemove", 128, 1, 0], ["mouseup", 128, 0, 1],
@@ -60,7 +105,7 @@ describe("macOS QA WebView pointer actions", () => {
     expect(events.some((event) => event.type === "click")).toBe(false);
   });
 
-  it("clears an existing xterm selection with a single element click before dragging", () => {
+  it("clears an existing xterm selection with a single element click before dragging", async () => {
     const { root, events, run } = fixture([{ type: "pointer", actions: drag }]);
     let selected = true;
     // xterm recognises only detail 1/2/3; detail 0 leaves the old selection in place.
@@ -73,7 +118,7 @@ describe("macOS QA WebView pointer actions", () => {
       .map((event) => [event.type, event.buttons, event.detail])).toEqual([
       ["mousedown", 1, 1], ["mouseup", 0, 1],
     ]);
-    run();
+    await run();
     expect(events.filter((event) => event.type === "click")).toHaveLength(1);
   });
 
@@ -87,7 +132,7 @@ describe("macOS QA WebView pointer actions", () => {
     expect(events.filter((event) => event.type === "click")).toHaveLength(1);
   });
 
-  it("holds Control and Shift throughout a block drag and releases them after it", () => {
+  it("holds Control and Shift throughout a block drag and releases them after it", async () => {
     const { events, modifiers, run } = fixture([
       { type: "key", actions: [
         { type: "keyDown", value: "Control" }, { type: "keyDown", value: "Shift" },
@@ -96,50 +141,50 @@ describe("macOS QA WebView pointer actions", () => {
       ] },
       { type: "pointer", actions: [{ type: "pause" }, { type: "pause" }, ...drag, { type: "pause" }, { type: "pause" }] },
     ]);
-    run();
+    await run();
     expect(events.filter((event) => ["mousedown", "mousemove", "mouseup"].includes(event.type))
       .every((event) => event.ctrlKey && event.shiftKey)).toBe(true);
     expect(modifiers).toEqual({ Control: false, Shift: false, Alt: false, Meta: false });
   });
 
-  it("retains hover, click and double-click behavior", () => {
+  it("retains hover, click and double-click behavior", async () => {
     const { events, run } = fixture([{ type: "pointer", actions: [
       { type: "pointerMove", x: 20, y: 10 },
       { type: "pointerDown", button: 0 }, { type: "pointerUp", button: 0 },
       { type: "pointerDown", button: 0 }, { type: "pointerUp", button: 0 },
     ] }]);
-    run();
+    await run();
     expect(events.filter((event) => event.type === "mouseover")).toHaveLength(1);
     expect(events.filter((event) => event.type === "click")).toHaveLength(2);
     expect(events.filter((event) => event.type === "dblclick")).toHaveLength(1);
   });
 
-  it("uses the right-button mask and opens the context menu", () => {
+  it("uses the right-button mask and opens the context menu", async () => {
     const { events, run } = fixture([{ type: "pointer", actions: [
       { type: "pointerMove", x: 20, y: 10 },
       { type: "pointerDown", button: 2 }, { type: "pointerUp", button: 2 },
     ] }]);
-    run();
+    await run();
     expect(events.find((event) => event.type === "mousedown")?.buttons).toBe(2);
     expect(events.filter((event) => event.type === "contextmenu")).toHaveLength(1);
     expect(events.some((event) => event.type === "click")).toBe(false);
   });
 
-  it("uses the middle-button mask and emits auxclick", () => {
+  it("uses the middle-button mask and emits auxclick", async () => {
     const { events, run } = fixture([{ type: "pointer", actions: [
       { type: "pointerMove", x: 20, y: 10 },
       { type: "pointerDown", button: 1 }, { type: "pointerUp", button: 1 },
     ] }]);
-    run();
+    await run();
     expect(events.find((event) => event.type === "mousedown")?.buttons).toBe(4);
     expect(events.filter((event) => event.type === "auxclick")).toHaveLength(1);
     expect(events.some((event) => event.type === "click")).toBe(false);
   });
 
-  it("suppresses compatibility mouse events when pointerdown is canceled", () => {
+  it("suppresses compatibility mouse events when pointerdown is canceled", async () => {
     const { root, events, run } = fixture([{ type: "pointer", actions: drag }]);
     root.addEventListener("pointerdown", (event) => event.preventDefault());
-    run();
+    await run();
     expect(events.some((event) => event.type === "mousedown" || event.type === "mouseup")).toBe(false);
   });
 });

@@ -252,6 +252,18 @@ class WaylandToolsTests(unittest.TestCase):
         self.assertIn("hideOverview()", evaluate.call_args_list[2].args[0])
         self.assertFalse(diagnostics["after"]["overview"])
 
+    def test_focus_matches_the_requested_toplevel_within_one_process(self):
+        main = {"pid": 42, "title": "Taomni", "focused": True}
+        detached = {"pid": 42, "title": "qa-gssapi · runner — SFTP", "focused": False}
+        evaluate = Mock(side_effect=[True,
+            {"overview": False, "windows": [main, detached]},
+            {"overview": False, "windows": [dict(main, focused=False), dict(detached, focused=True)]}])
+        with patch("ci_wayland_input.time.sleep"):
+            result = focus_window(evaluate, 42, {}, title=detached["title"])
+        self.assertEqual(result["title"], detached["title"])
+        self.assertEqual(evaluate.call_count, 3)
+        self.assertIn("window.get_title()", evaluate.call_args_list[0].args[0])
+
     def test_portal_automation_rejects_other_runtime_and_non_portal_processes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

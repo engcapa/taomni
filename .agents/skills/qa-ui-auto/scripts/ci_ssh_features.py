@@ -192,11 +192,6 @@ def start(services):
     watcher = threading.Thread(target=watch_public, daemon=True)
     watcher.start()
     services.cleanup_action("generated-key-watcher", lambda: (stop.set(), watcher.join(2)))
-    commands = private / "commands"
-    commands.mkdir()
-    scp = commands / "scp"
-    scp.write_text("#!/bin/sh\ncase \"$*\" in\n  *scp-large.bin*) exec /usr/bin/scp -l 2048 \"$@\" ;;\n  *) exec /usr/bin/scp \"$@\" ;;\nesac\n", encoding="utf-8", newline="\n")
-    command([binary / "chmod.exe", "+x", path(scp)]) if cygwin else scp.chmod(0o700)
     config = private / "sshd_config"
     config.write_text(f"""Port {port}
 ListenAddress 127.0.0.1
@@ -215,7 +210,7 @@ AllowUsers {user}
 AllowTcpForwarding yes
 X11Forwarding yes
 XAuthLocation {path((binary / 'xauth.exe') if cygwin else Path('/opt/X11/bin/xauth') if system == 'Darwin' else Path('/usr/bin/xauth'))}
-SetEnv "PATH={path(commands)}:/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"
+SetEnv "PATH=/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin"
 Subsystem sftp internal-sftp
 LogLevel DEBUG3
 """, encoding="utf-8", newline="\n")
@@ -245,8 +240,13 @@ LogLevel DEBUG3
         "local_dir": local_dir.as_posix(), "downloaded": (local_dir / "scp-source.txt").as_posix(),
         "uploaded": (remote_dir / "scp-upload.txt").as_posix(),
         "native_public_key": str(generated).replace("\\", "/") + ".pub"}
-    # Separate long transfer for pause/cancel/retry acceptance. A real scp
-    # bandwidth limit makes the pause observable without timing a fast loopback.
+    # Pace the encrypted SSH stream, including the Python SCP resume source.
+    # Only the lifecycle case selects this port; other SSH tests stay direct.
+    from ci_tcp_throttle import ThrottledTcpLink
+    link = ThrottledTcpLink(port)
+    services.cleanup_action("ssh-features-throttled-link", link.close)
+    services.config["ssh_features"]["throttled_port"] = link.port
+    # Separate long transfer for pause/cancel/retry acceptance.
     large = remote_dir / "scp-large.bin"
     payload = b"taomni-scp-cancel-resume\n" * (1024 * 192)
     large.write_bytes(payload)

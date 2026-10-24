@@ -67,21 +67,23 @@ def owned_window_pid(windows, application: Path, runtime: Path, proc: Path = Pat
 
 
 def activate_window(evaluate, application: Path, runtime: Path, diagnostics: dict, *,
-                    data_home: str | None = None) -> None:
+                    data_home: str | None = None, title: str | None = None) -> None:
     # WebDriver can focus a page without activating its GTK Wayland toplevel.
     # GNOME's own window activation also leaves its startup Overview first.
     # Match /proc identity instead of selecting an arbitrary Alt+Tab target.
     before = evaluate(WINDOW_STATE)
     diagnostics["before"] = before
-    pid = owned_window_pid(before["windows"], application, runtime, data_home=data_home)
+    pid = owned_window_pid(before["windows"], application, runtime, data_home=data_home, title=title)
     diagnostics["pid"] = pid
-    focus_window(evaluate, pid, diagnostics)
+    diagnostics["title"] = title
+    focus_window(evaluate, pid, diagnostics, title=title)
 
 
-def focus_window(evaluate, pid: int, diagnostics: dict) -> dict:
+def focus_window(evaluate, pid: int, diagnostics: dict, *, title: str | None = None) -> dict:
     """Activate and observe the mapped toplevel, including Overview dismissal."""
+    title_match = "" if title is None else f" && window.get_title() === {json.dumps(title)}"
     evaluate(f"(() => {{ Main.overview.hide(); const window = global.get_window_actors()"
-             f".map(actor => actor.meta_window).find(window => window.get_pid() === {pid}); "
+             f".map(actor => actor.meta_window).find(window => window.get_pid() === {pid}{title_match}); "
              "if (!window) throw new Error('QA window disappeared'); "
              "Main.activateWindow(window); return true; })()")
     end = time.monotonic() + 5
@@ -89,7 +91,8 @@ def focus_window(evaluate, pid: int, diagnostics: dict) -> dict:
         after = evaluate(WINDOW_STATE)
         diagnostics["after"] = after
         focused = next((window for window in after["windows"]
-                        if window["pid"] == pid and window["focused"]), None)
+                        if window["pid"] == pid and window["focused"]
+                        and (title is None or window["title"] == title)), None)
         if not after["overview"] and focused:
             return focused
         if (after.get("overview_actor_visible") and not after.get("overview_visible")
@@ -254,7 +257,7 @@ def main() -> None:
                     value = None
                     if name == "activate":
                         activate_window(evaluate, Path(request["application"]), args.socket.parent, diagnostics,
-                                        data_home=request.get("data_home"))
+                                        data_home=request.get("data_home"), title=request.get("title"))
                     elif name == "focus_pid":
                         pid = int(request["pid"])
                         environment = (Path("/proc") / str(pid) / "environ").read_bytes().split(b"\0")
