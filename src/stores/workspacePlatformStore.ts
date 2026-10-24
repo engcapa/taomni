@@ -240,9 +240,12 @@ async function ensureWorkspaceDirectories(rootPath: string, segments: string[]):
   const absoluteParts = rootPath.replace(/\\/g, "/").split("/").filter(Boolean);
   let prefix = rootPath.startsWith("/") ? "/" : "";
   for (const part of absoluteParts) {
+    const parent = prefix;
     prefix = prefix.endsWith("/") || prefix === "" ? `${prefix}${part}` : `${prefix}/${part}`;
+    // Native rejects an empty relative path ("cannot write the workspace
+    // root"), so create each level relative to its own parent instead.
     try {
-      await workspaceCreateDir(prefix, "");
+      await workspaceCreateDir(parent || "/", part);
     } catch {
       // Level already exists - continue downwards.
     }

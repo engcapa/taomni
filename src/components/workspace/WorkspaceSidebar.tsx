@@ -136,9 +136,11 @@ export function WorkspaceSidebar({ onOpenWorkspaceSession }: WorkspaceSidebarPro
           onConfirm={(value) => {
             const typed = value.trim();
             if (!typed) return;
+            // Close the modal immediately: the tilde expansion is an IPC
+            // roundtrip on native, and a lingering modal breaks the next step.
+            setModal(null);
             void resolveWorkspaceFolderPath(typed).then((path) => {
               useWorkspacePlatformStore.getState().addRootFolder(workspace.id, { path });
-              setModal(null);
               setNotice(`${t("workspace.addFolderTitle")}: ${path}`);
             });
           }}
