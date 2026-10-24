@@ -9,6 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from native_build import QA_APP_ID
 from tauri_webdriver import native_isolation_env
 from qa_ui_auto.fixtures import session_config
 from qa_ui_auto.fixtures.backup_policy import isolated_data_root
@@ -59,6 +60,8 @@ class SessionConfigFixtureTest(unittest.TestCase):
     def test_proxy_teardown_restores_preexisting_qa_settings(self):
         expected = native_isolation_env(self.root)
         config = Path(expected.get("NEWMOB_CONFIG_DIR") or expected["XDG_CONFIG_HOME"])
+        if "NEWMOB_CONFIG_DIR" in expected:
+            config = config / QA_APP_ID
         path = config / "taomni" / "proxy.json"
         path.parent.mkdir(parents=True)
         original = b'{"enabled":false}\n'
@@ -68,6 +71,20 @@ class SessionConfigFixtureTest(unittest.TestCase):
         self.assertNotEqual(path.read_bytes(), original)
         session_config.teardown_unreachable_proxy(self.ctx)
         self.assertEqual(path.read_bytes(), original)
+
+    def test_proxy_location_matches_product_roots_on_all_three_platforms(self):
+        for system in ("Linux", "Windows", "Darwin"):
+            with self.subTest(system=system), patch("tauri_webdriver.platform.system", return_value=system):
+                expected = native_isolation_env(self.root)
+                with patch.dict(os.environ, expected):
+                    session_config.setup_unreachable_proxy(self.ctx)
+                    path = Path(self.ctx.values["unreachable_proxy_path"])
+                    base = self.root / "native-appconfig"
+                    if system != "Linux":
+                        base = base / QA_APP_ID
+                    self.assertEqual(path, base / "taomni" / "proxy.json")
+                    self.assertTrue(json.loads(path.read_text())["enabled"])
+                    session_config.teardown_unreachable_proxy(self.ctx)
 
     def test_setup_refuses_a_profile_without_the_matching_isolation_environment(self):
         self.ctx.report_root = self.root / "different-run"

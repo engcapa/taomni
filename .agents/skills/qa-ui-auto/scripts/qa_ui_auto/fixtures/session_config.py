@@ -6,6 +6,7 @@ import socket
 import sqlite3
 from pathlib import Path
 
+from native_build import QA_APP_ID
 from tauri_webdriver import native_isolation_env
 from .backup_policy import isolated_data_root
 
@@ -45,6 +46,10 @@ def setup_unreachable_proxy(ctx):
     isolated_data_root(ctx)
     expected = native_isolation_env(Path(ctx.report_root))
     config_root = Path(expected.get("NEWMOB_CONFIG_DIR") or expected["XDG_CONFIG_HOME"])
+    # Match resolved_config_dir -> qa_override_path in src-tauri/src/lib.rs:
+    # macOS/Windows explicit overrides add the QA identifier; Linux XDG does not.
+    if "NEWMOB_CONFIG_DIR" in expected:
+        config_root = config_root / QA_APP_ID
     proxy_path = config_root / "taomni" / "proxy.json"
     if not proxy_path.resolve().is_relative_to(Path(ctx.report_root).resolve()):
         raise RuntimeError("Proxy fixture refuses a path outside the QA profile")
