@@ -152,8 +152,8 @@ export function WorkspaceFileTree({
     return createdNodes
       .filter((node) => node.rootFolderId === rootId)
       .filter((node) => (node.path.includes("/") ? node.path.slice(0, node.path.lastIndexOf("/")) : "") === directory)
-      .filter((node) => !known.has(node.path) && node.kind === "folder")
-      .map((node) => ({ name: node.name, path: node.path, kind: "folder" as const }));
+      .filter((node) => !known.has(node.path))
+      .map((node) => ({ name: node.name, path: node.path, kind: node.kind }));
   }, [createdNodes, directories]);
 
   const openEntryMenu = (event: React.MouseEvent, root: WorkspaceRootFolder, path: string, kind: "file" | "folder") => {

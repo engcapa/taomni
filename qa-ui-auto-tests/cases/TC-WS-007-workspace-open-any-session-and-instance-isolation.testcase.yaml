@@ -24,7 +24,7 @@ steps:
 - wait_for: '[data-testid="welcome-panel"]'
 - seed_storage:
     key: taomni.sessions.v1
-    value: '[{"id":"ws-qa-ssh","name":"prod-api-01","session_type":"SSH","group_path":"QA","host":"127.0.0.1","port":22,"username":"root","auth_method":"None","options_json":"{}","created_at":1,"updated_at":1,"last_connected_at":null,"sort_order":0},{"id":"ws-qa-db","name":"orders-pg","session_type":"PostgreSQL","group_path":"QA","host":"127.0.0.1","port":5432,"username":"root","auth_method":"None","options_json":"{}","created_at":1,"updated_at":1,"last_connected_at":null,"sort_order":1}]'
+    value: '[{"id":"ws-qa-ssh","name":"prod-api-01","session_type":"SSH","group_path":null,"host":"127.0.0.1","port":22,"username":"root","auth_method":"None","options_json":"{}","created_at":1,"updated_at":1,"last_connected_at":null,"sort_order":0},{"id":"ws-qa-db","name":"orders-pg","session_type":"PostgreSQL","group_path":null,"host":"127.0.0.1","port":5432,"username":"root","auth_method":"None","options_json":"{}","created_at":1,"updated_at":1,"last_connected_at":null,"sort_order":1}]'
 - reload_window: null
 - wait_for: '[data-testid="session-tree"]'
 - click: '[data-testid="nav-mode-workspaces"]'

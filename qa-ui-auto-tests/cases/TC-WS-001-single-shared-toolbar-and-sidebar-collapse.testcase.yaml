@@ -39,11 +39,11 @@ steps:
 - click: '[data-testid="toggle-right-sidebar"]'
 - assert_count:
     selector: '[data-testid="right-sidebar"]'
-    equal: 0
+    equal: 1
 - click: '[data-testid="toggle-right-sidebar"]'
 - assert_count:
     selector: '[data-testid="right-sidebar"]'
-    equal: 1
+    equal: 0
 - screenshot: ws-001-single-shared-toolbar.png
 verification:
   review: reviewed
@@ -86,9 +86,9 @@ verification:
     - step: 14
       expectation: Ctrl/Cmd+B 后展开面板出现
     - step: 16
-      expectation: 右栏隐藏
+      expectation: 首次点击后右侧上下文栏显示
     - step: 18
-      expectation: 右栏恢复显示
+      expectation: 再次点击后右侧上下文栏隐藏
     results:
     - 12
     - 14

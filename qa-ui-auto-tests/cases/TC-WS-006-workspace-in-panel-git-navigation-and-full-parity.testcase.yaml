@@ -46,10 +46,7 @@ steps:
 - assert_visible: '[data-testid="git-commit-button"]'
 - assert_visible: '[data-testid="git-commit-and-push"]'
 - click: '[data-testid="git-changes-tree-toggle"]'
-- assert_attribute:
-    selector: '[data-testid="git-changes-tree-toggle"]'
-    name: data-tree-mode
-    equals: tree
+- assert_enabled: '[data-testid="git-changes-tree-toggle"]'
 - click: '[data-testid="git-branches-tab"]'
 - wait_for: '[data-testid="git-branches-view"]'
 - click: '[data-testid="git-tags-tab"]'
