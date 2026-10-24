@@ -82,7 +82,7 @@ steps:
 - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
 - wait: 2
 - terminal_input:
-    selector: '[data-testid="terminal-pane"]'
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: echo QA_WS_PTY_READY
     submit: true
     verify:
