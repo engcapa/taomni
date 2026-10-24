@@ -75,7 +75,8 @@ def activate_window(evaluate, application: Path, runtime: Path, diagnostics: dic
     diagnostics["before"] = before
     pid = owned_window_pid(before["windows"], application, runtime, data_home=data_home, title=title)
     diagnostics["pid"] = pid
-    diagnostics["title"] = title
+    if title is not None:
+        diagnostics["title"] = title
     focus_window(evaluate, pid, diagnostics, title=title)
 
 
