@@ -48,6 +48,7 @@ def setup_unreachable_proxy(ctx):
     proxy_path = config_root / "taomni" / "proxy.json"
     if not proxy_path.resolve().is_relative_to(Path(ctx.report_root).resolve()):
         raise RuntimeError("Proxy fixture refuses a path outside the QA profile")
+    ctx._session_proxy_previous = proxy_path.read_bytes() if proxy_path.exists() else None
     listener = socket.socket()
     listener.bind(("127.0.0.1", 0))
     ctx._session_proxy_socket = listener
@@ -65,6 +66,13 @@ def teardown_unreachable_proxy(ctx):
     if listener:
         listener.close()
         ctx._session_proxy_socket = None
+    path = ctx.values.get("unreachable_proxy_path")
+    if path:
+        previous = ctx._session_proxy_previous
+        if previous is None:
+            Path(path).unlink(missing_ok=True)
+        else:
+            Path(path).write_bytes(previous)
 
 
 def seed_legacy_scp(ctx, config):

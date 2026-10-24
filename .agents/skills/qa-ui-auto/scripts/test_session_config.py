@@ -52,8 +52,22 @@ class SessionConfigFixtureTest(unittest.TestCase):
             socket.create_connection((proxy["host"], proxy["port"]), timeout=1)
         session_config.teardown_unreachable_proxy(self.ctx)
         self.assertIsNone(self.ctx._session_proxy_socket)
+        self.assertFalse(path.exists())
         # Fixture interpolation/report values remain JSON serializable.
         json.dumps(self.ctx.values)
+
+    def test_proxy_teardown_restores_preexisting_qa_settings(self):
+        expected = native_isolation_env(self.root)
+        config = Path(expected.get("NEWMOB_CONFIG_DIR") or expected["XDG_CONFIG_HOME"])
+        path = config / "taomni" / "proxy.json"
+        path.parent.mkdir(parents=True)
+        original = b'{"enabled":false}\n'
+        path.write_bytes(original)
+        self.addCleanup(session_config.teardown_unreachable_proxy, self.ctx)
+        session_config.setup_unreachable_proxy(self.ctx)
+        self.assertNotEqual(path.read_bytes(), original)
+        session_config.teardown_unreachable_proxy(self.ctx)
+        self.assertEqual(path.read_bytes(), original)
 
     def test_setup_refuses_a_profile_without_the_matching_isolation_environment(self):
         self.ctx.report_root = self.root / "different-run"
