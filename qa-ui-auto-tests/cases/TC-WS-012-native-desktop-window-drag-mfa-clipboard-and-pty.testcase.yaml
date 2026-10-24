@@ -1,8 +1,9 @@
 id: TC-WS-012
 title: Native window drag handle, bottom-left MFA copy and an isolated workspace local PTY
 description: v6.1 native boundary. In the packaged desktop WebView the single toolbar keeps a <=32px window drag handle with no reserved full-height grip padding;
-  the bottom-left floating MFA window copies a HOTP code and announces it; and a workspace-owned local terminal starts a real PTY whose command output is visible,
-  while Sessions mode keeps its own instance list.
+  the bottom-left floating MFA window copies a HOTP code and announces it; and a workspace-owned local terminal starts a real PTY that reaches an interactive shell
+  prompt, while Sessions mode keeps its own instance list. Command echo through the workspace PTY is covered by TC-WS-015 on the platforms whose WebDriver delivers
+  synthetic text reliably.
 modes:
 - native
 covers:
@@ -81,15 +82,10 @@ steps:
 - click: '[data-testid="workspace-plus-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
 - wait: 2
-- terminal_input:
-    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-    text: echo QA_WS_PTY_READY
-    submit: true
-    verify:
-      selector: '[data-testid="terminal-pane"]'
-      regex: (?m)^\s*QA_WS_PTY_READY\r?\s*$
-      timeout_sec: 20
-      attempts: 3
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)[$#%]\s*$
+    timeout_sec: 20
 - assert_visible: '[data-testid="workspace-tab"][data-tab-kind="terminal"]'
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
@@ -165,18 +161,14 @@ verification:
     - 28
     - 30
   - id: R3
-    requirement: 工作区内的本地终端启动真实 PTY 并回显命令输出；Sessions 模式不共享工作区实例标签。
+    requirement: 工作区内的本地终端启动真实 PTY 并到达可交互 Shell 提示符；Sessions 模式不共享工作区实例标签。
     actions:
     - 31
     - 32
     - 33
     - 34
     - 35
-    - 36
     - 37
-    - 38
-    - 39
-    - 40
     checkpoints:
     - step: 32
       expectation: 工作区主面板就绪
@@ -184,19 +176,20 @@ verification:
       expectation: + 菜单打开
     - step: 36
       expectation: 工作区终端面板激活
+    - step: 38
+      expectation: 终端出现可交互 Shell 提示符
     - step: 39
       expectation: 工作区标签条含终端标签
-    - step: 41
-      expectation: 切回 Sessions 模式
     - step: 42
       expectation: Sessions 模式没有工作区终端实例
     results:
+    - 38
     - 42
   visual:
   - check: 真实窗口内顶栏、左下角浮窗与工作区终端布局无遮挡。
     method: manual
     reason: 原生窗口边界与浮层层级需要截图评审。
   native:
-  - check: 打包 WebView 中拖拽抓手、复制反馈与本地 PTY 由本用例自动化验证；操作系统剪贴板字节由 Linux 专用用例 TC-WS-014 覆盖。
+  - check: 打包 WebView 中拖拽抓手、复制反馈与工作区本地 PTY 由本用例自动化验证；命令回显由 TC-WS-015（Linux/Windows）覆盖，操作系统剪贴板字节由 Linux 专用用例 TC-WS-014 覆盖。
     method: automated
     reason: 仅 native 模式可验证真实 WebView 与 PTY 行为。

@@ -1,0 +1,97 @@
+id: TC-WS-015
+title: Workspace-owned local PTY echoes a command on Linux and Windows
+description: 'v6.1 native boundary. A local terminal opened from the Workspaces tab-strip menu starts a real PTY, accepts a synthetic command through xterm''s helper
+  textarea and echoes the exact output line. Sessions mode does not inherit the workspace instance. Linux and Windows only: the macOS WebDriver cannot deliver synthetic
+  text to the WKWebView xterm reliably (TC-WS-012 proves the shell prompt there instead).'
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+covers:
+- F-WS-5
+tags:
+- p1
+- workspace-redesign
+- native-boundary
+- terminal
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-main-panel"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- wait_for: '[data-testid="workspace-open-session-menu"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- wait: 2
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo QA_WS_PTY_READY
+    submit: true
+    verify:
+      selector: '[data-testid="terminal-pane"]'
+      regex: (?m)^\s*QA_WS_PTY_READY\r?\s*$
+      timeout_sec: 20
+      attempts: 3
+- assert_visible: '[data-testid="workspace-tab"][data-tab-kind="terminal"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 0
+- screenshot: ws-015-workspace-pty-echo.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 工作区 + 菜单打开的本地终端启动真实 PTY，输入命令后回显精确结果行。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    checkpoints:
+    - step: 2
+      expectation: 应用进入 Welcome
+    - step: 4
+      expectation: 工作区主面板就绪
+    - step: 6
+      expectation: + 菜单打开
+    - step: 8
+      expectation: 工作区终端激活
+    - step: 11
+      expectation: 工作区标签条含终端标签
+    results:
+    - 11
+  - id: R2
+    requirement: Sessions 模式不共享工作区终端实例。
+    actions:
+    - 12
+    - 13
+    checkpoints:
+    - step: 13
+      expectation: Sessions 模式显示会话树
+    - step: 14
+      expectation: 没有工作区 terminal-pane
+    results:
+    - 14
+  visual:
+  - check: 工作区终端完整填充画布，无被侧栏遮挡。
+    method: manual
+    reason: 截图留档，视觉评审不替代功能断言。
+  native:
+  - check: Linux WebKitGTK 与 Windows WebView2 下真实本地 PTY 的输入与回显。
+    method: automated
+    reason: macOS WKWebView 的合成文本投递不稳定，改由 TC-WS-012 验证提示符。
