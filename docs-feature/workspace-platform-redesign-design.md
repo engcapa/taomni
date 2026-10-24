@@ -1,102 +1,206 @@
-# Taomni 工作区优先与 One-System 多 Agent 平台 UI/交互重构设计（v2）
+# Taomni 工作区优先 (Workspace-First) 与 One-System 开发者平台 UI/交互重构概要设计 (v4)
 
-- **状态**：Phase 1（v2 迭代）— 已按最新 5 项反馈更新**左边栏拖拽调宽、完整保留全部 Session 目录树/工具按钮/右键菜单/分类过滤、树状 Workspace 导航与内置默认工作区 (`Default Workspace`)、以及工作区内 Code 与 Git 全量功能对齐**。
-- **交互原型文件**：[workspace-platform-redesign-prototype.html](file:///data-raw-ssd/code-src/person/taomni/docs-feature/workspace-platform-redesign-prototype.html)
+> **分支**：`feat/workspace-platform-redesign`  
+> **配套高保真可交互单文件 HTML 原型**：[`docs-feature/workspace-platform-redesign-prototype.html`](./workspace-platform-redesign-prototype.html)  
+> **设计基线**：基于 `main` 分支真实代码模型（`Workspace`、`SessionTree`、`GitPanelView`、`WelcomePanel`、`Tao`、`GlobalTools`）与配色体系（`src/styles/theme.css`），不依赖旧实验分支实现。
 
 ---
 
-## 1. 本次 v2 重点对齐的 5 项核心演进
+## 0. 核心前提声明：纯 UI 与交互重构，100% 既有功能与右键菜单完整保留
 
-| 序号 | 核心要求 | 设计与原型落地方案 |
+> [!IMPORTANT]
+> **当前设计的核心定位是 UI 布局、信息层级与高频交互重构，而非功能删减。`main` 分支上已有的全部业务功能、工具栏能力、快捷键、导入/导出能力以及全部右键上下文菜单（Context Menus）在实现时必须 100% 完整支持与对齐！**
+
+具体必须 100% 继承与支持的既有能力清单如下：
+
+| 模块维度 | 必须 100% 完整保留的 `main` 既有能力与交互 | 对应现有源码参照 |
 | :--- | :--- | :--- |
-| **1** | **左边栏支持拖拽调整大小** | • 在左边栏 (`navigator-panel`) 右缘提供独立的 **`ew-resize` 拖拽分隔条**（宽度范围 `200px ~ 540px`，默认 `288px`，支持**双击分隔条一键重置为默认宽度**，并在顶栏与底部状态栏实时回显宽度并持久化至 `localStorage`）。<br>• 同时为**右侧伴随坞 (`ew-resize`)** 与 **Code 底部工具坞 (`ns-resize`)** 配备同款拖拽调宽/调高能力，采用单一宽度状态源避免旧分支的面板归零 bug。 |
-| **2** | **左边栏「全部 Session」保持现有目录树结构、工具按钮、右键菜单、分类过滤** | • **100% 保留 [Sidebar.tsx](file:///data-raw-ssd/code-src/person/taomni/src/components/sidebar/Sidebar.tsx) 与 [SessionTree.tsx](file:///data-raw-ssd/code-src/person/taomni/src/components/sidebar/SessionTree.tsx) 的全部能力**：<br>  1. **顶部 7 按钮工具栏 + 搜索框**：新建 (`+`)、编辑 (`✎`)、克隆 (`⧉`)、删除 (`🗑`)、分隔线、刷新 (`↻`)、收藏 (`★`)、实时搜索框 (`session-search`)。<br>  2. **分类/协议过滤条**：`全部` \| `★ 收藏` \| `SSH` \| `SFTP` \| `数据库` \| `RDP/VNC` \| `邮件`。<br>  3. **多级目录树 (`group_path`)**：完整保留 `Bookmarks`、`User sessions / Favorites`、自定义多级目录、`Imported / MobaXterm` 等层级与拖拽移动。<br>  4. **完整右键菜单**：文件夹右键保留新建会话/子目录、重命名/删除、创建桌面快捷方式、导入（Taomni / MobaXterm / Xshell / Tabby / WindTerm / Navicat / DBeaver / SecureCRT / Termius / iTerm2 / CSV）、导出（JSON / Moba / CSV / HTML）、批量连接目录下全部会话，并新增**「将目录关联到工作区」**；会话右键保留连接、复制命令、编辑、克隆、移动目录、终端主题配色、删除，并新增**「关联到工作区 / 右侧分屏连接」**。 |
-| **3** | **左边栏 Workspace 采用树状展示，且内置「默认工作区 (`Default Workspace`)」** | • **内置 `Default Workspace (默认工作区)` 兜底机制**：系统永久内置 `id: "ws-default"` 的默认工作区。当用户首次启动或未创建任何自定义工作区时（原型中可点击 `🏠 演示:仅默认工作区` 按钮一键体验），所有临时打开的文件、代码目录、SSH/SFTP/DB 会话与笔记自动归入 `Default Workspace`，零配置即可使用。<br>• **四级树状结构 (`Workspace Tree`)**：每个工作区节点可展开为：`📁 代码目录与文件`、`🌿 Git 版本控制 (Changes / Log / Branches / Diff)`、`🖥️ 关联会话`、`🤖 并行 Coding Agents`、`📬 邮件与笔记`，支持树节点过滤与右键菜单。 |
-| **4** | **工作区内部 Code 与 Git 与当前全量功能 100% 对齐，不删减功能但优化布局与交互** | • **Code Workspace 全量保留并合理布局**：完整保留 [WorkspaceToolbar.tsx](file:///data-raw-ssd/code-src/person/taomni/src/components/editor/workspace/views/WorkspaceToolbar.tsx)（SDK/Project Facts 徽章、Build `Ctrl+F9`、Run 配置下拉、Run `Shift+F10`、Debug `Shift+F9`、Search Everywhere、行内 Git Blame、LSP Inlay Hints、软换行、列选择、编辑器内分屏与同步滚动、右侧 Structure/Outline/Docs 面板）以及 [BottomDock.tsx](file:///data-raw-ssd/code-src/person/taomni/src/components/editor/workspace/panels/BottomDock.tsx) 的 **全部 13 个底部工具窗**（`Problems` / `Terminal` / `Git` / `Find in Files` / `Structural Search` / `Run` / `Debug` / `Build` / `Tests` / `Coverage` / `References` / `Hierarchy` / `Analysis` / `TODO & Bookmarks`）。<br>• **Git 全量保留并三处联动**：完整保留 [WorkspaceGitManagerView.tsx](file:///data-raw-ssd/code-src/person/taomni/src/components/git/workspace/WorkspaceGitManagerView.tsx) 的多仓作用域选择 (`RepoSelector`)、远端选择、`Fetch / Pull / Push`、目录树/扁平切换、勾选暂存、目标分支选择、`Commit / Commit & Push`、`Commit Log` 分支拓扑图、`Branches & Worktrees`、`Stash & Tags`、以及 `Side-by-Side / Unified DiffViewer` 与 `F4` 跳转源码。 |
+| **1. 会话目录树 (`SessionTree`)** | 多级嵌套文件夹、搜索框、协议分类过滤（All / Favorites / SSH / SFTP / DB / RDP / Other）、7 个顶部操作按钮（新建会话、新建文件夹、多格式导入、导出备份、展开/折叠全部、收藏过滤、搜索）、拖拽排序、**目录右键菜单**（新建会话、新建子目录、批量打开目录下全部会话、重命名 `F2`、导出目录、删除）与**会话节点右键菜单**（连接、分屏打开、打开伴随 SFTP、关联到工作区、克隆会话、编辑配置、删除） | `src/components/sidebar/Sidebar.tsx`<br/>`src/components/sidebar/SessionTree.tsx`<br/>`src/components/sidebar/sessionTree/createFolderContextMenu.tsx` |
+| **2. 工作区专用 Git 面板 (`GitPanel`)** | 多仓库选择器（`RepoSelector`：All Repositories / 单仓库 / 子模块 / Worktrees）、分支徽章（`BranchBadge`）、变更数统计、`Remote` 选择器、`Fetch` / `Pull` / `Push` / `⋯ 更多操作菜单`（Sync、Checkout、Create Branch、Force Push、Clean）/ `Refresh`、**6 大子视图标签**（`Changes` / `Log` / `Branches` / `Tags` / `Stash` / `Settings`）、冲突/变基状态横幅（`Continue` / `Skip` / `Abort` / `Ours` / `Theirs`）、`Tree/Flat` 切换、勾选暂存/取消暂存/丢弃、`Amend` 勾选、提交框、`Commit` / `Commit & Push`、`DiffViewer`（并排/统一对比、`F4` 跳源文件）及**变更文件右键菜单**与**提交记录右键菜单**（Cherry-pick / Revert / Reset / Create Branch/Tag） | `src/components/git/GitPanel.tsx`<br/>`src/components/git/panel/GitPanelView.tsx`<br/>`src/components/git/workspace/WorkspaceGitManagerView.tsx` |
+| **3. 主页 (`Home`，原 `WelcomePanel`)** | 本地终端快速启动卡（`LocalTerminalCard`：Shell 选择器 `zsh/bash/fish/pwsh`、启动终端 `Ctrl+Shift+T`、**以管理员身份运行**、**打开主目录 `~`**）、WSL 终端启动卡（`WslCard`：发行版选择与启动）、新建/导入会话卡（`NewSessionCard`）、局域网传书与邮件快捷卡（`LanChat` / `Mail`）、**恢复上次会话横幅（`RestoreLastSessionRow`）**、底部历史记录面板（`WelcomeHistoryPanel`：最近工作区 / 最近会话 / 本地常用目录、搜索与排序过滤） | `src/components/WelcomePanel.tsx` |
+| **4. 工作区文件管理与编辑器 (`Workspace`)** | 类 IntelliJ IDEA 的文件/目录树管理（支持任意文件工作区与代码工作区）、**文件/目录右键菜单**（打开、分屏打开、Git 对比、复制路径、重命名、删除）、编辑器视图模式切换（`Code` / `Inline Diff` / `Split Preview`）、符号大纲（`Structure`）、底部折叠 Dock（`Terminal Alt+F12`、`Problems`、`Run/Debug`、`Git 摘要 Alt+9`、`Global Search`、`Ports`） | `src/components/editor/workspace/views/WorkspaceToolbar.tsx`<br/>`src/components/editor/workspace/views/createWorkspaceDockContents.tsx` |
+| **5. 多类型远程会话工作台 (`Sessions`)** | SSH 终端（含多终端广播输入条、伴随 SFTP 自动跟随目录）、SFTP（断点续传、HTTP Range 校验、后台队列）、Database（DBeaver 风格 SQL 编辑器、结果网格、EXPLAIN、DDL）、RDP/VNC（Smart Sizing 自适应缩放、全屏、Ctrl+Alt+Del）、Email、**标签页右键菜单**（向右/向下分屏、关闭当前/其他/右侧标签） | `src/components/terminal/`<br/>`src/components/sftp/`<br/>`src/components/database/`<br/>`src/components/rdp/` |
+| **6. 全局独立工具箱与三级网络代理** | 截图与标注（`Ctrl+Alt+A`）、MFA 验证器、网络诊断箱（Ping/MTR/PortScan/Whois）、SSH 隧道管理器、SocksCap、本地服务（HTTP/TFTP/Syslog）、LAN Chat；以及外部网络访问的**三级代理模式**（跟随全局设置默认 `10.1.0.80:3228` / 功能独立持久化代理 / 强制直连 No Proxy 绕过系统环境变量） | `AGENTS.md` External Network Access & Downloads 规范 |
 
 ---
 
-## 2. 左边栏双核心树模型与可调宽交互设计
+## 1. 本轮迭代 (v4) 关键优化对齐清单
+
+针对最新一轮三张截图与反馈意见，v4 原型与设计完成了以下 5 项核心对齐：
+
+1. **Git 回归工作区内部专用面板（不再作为脱离工作区的独立顶层模式），并 100% 对齐 `main` 的 `GitPanelView` + 新增增强功能**：
+   - **问题修复**：移除了左侧主导航栏上孤立的顶层 Git 模式，避免查看 Git 时脱离当前工作区上下文。
+   - **工作区内快速一跳**：
+     - 在**工作区左边栏顶部**提供 `[📁 文件管理 | 🌿 Git 面板 (4)]` 分段切换器；
+     - 在**工作区主画布右上角**提供常驻 `🌿 Git (4)` 快速跳转按钮（快捷键 `Ctrl+Shift+G`），同时在工作区标签栏中作为内置专用标签页 `GIT Git (feat/workspace-platform*)` 存在；
+     - 在**工作区底部 Dock** 保留 `🌿 Git 摘要 (Alt+9)` 并支持一键展开全尺寸工作区 Git 面板。
+   - **功能全量对齐 + 增强**：完整包含 `main` 分支 `GitPanelView.tsx` 与 `WorkspaceGitManagerView.tsx` 的全部能力（多仓库/子模块选择器 `RepoSelector`、分支徽章、远端选择器、`Fetch / Pull / Push / ⋯ 更多操作 / Refresh`、`Changes | Log | Branches | Tags | Stash | Settings` 6 大标签页、Rebase/Merge 冲突处理横幅、`Tree/Flat` 视图切换、暂存/取消暂存/丢弃、`Amend` 勾选、并排/统一 `DiffViewer`、`F4` 跳源文件、文件与提交右键菜单），并新增 **✨ AI 一键生成 Commit Message** 与 **Coding Agent Worktree 分支审查关联**。
+2. **`Welcome` 正式更名为 `Home`（`🏠 Home`），完整包含 `WelcomePanel.tsx` 能力与新设计增强**：
+   - 窗口左上角常驻入口按钮更名为 **`🏠 Home`**；
+   - 主页内部完整包含 `WelcomePanel.tsx` 的全部卡片与历史能力：
+     - **恢复上次会话横幅 (`RestoreLastSessionRow`)**：一键恢复上次退出时的工作区与会话标签；
+     - **本地终端卡 (`LocalTerminalCard`)**：Shell 选择下拉框（`zsh` / `bash` / `fish` / `pwsh`）、启动按钮（`Ctrl+Shift+T`）、**以管理员身份运行 (`Run as Administrator`)**、**打开主目录 (`Open Home Folder ~`)**；
+     - **WSL 终端卡 (`WslCard`)**：WSL 发行版选择与一键连接；
+     - **新建/导入远程会话卡 (`NewSessionCard`)**：快速新建会话（`Ctrl+Shift+N`）或从 Xshell / `~/.ssh/config` / DBeaver 导入；
+     - **工作区与 Coding Agents 卡**：新建/打开工作区、一键进入工作区 Git 面板或查看并行运行的 Coding Agents；
+     - **协作与全局工具卡**：局域网传书（`LAN Chat`）、邮件客户端（`Mail`）、网络诊断箱、MFA；
+     - **底部历史与快速访问面板 (`WelcomeHistoryPanel`)**：支持 `最近工作区`、`最近连接会话`、`本地常用目录` 三标签切换与实时搜索过滤。
+3. **工作区切换器从顶部标题栏移入工作区左边栏顶部（简洁、易用）**：
+   - 从窗口顶部标题栏移除了工作区切换胶囊，使顶部标题栏保持极简（左侧：`☰ 菜单`、`◧ 侧栏开关`、`🏠 Home`；中间：`Ctrl+K` 搜索框；右侧：`Agents 状态`、`⊞ 大预览`、高频工具与主题开关）；
+   - 将**工作区切换器 (`Workspace Switcher`)** 安置在**工作区左边栏最顶部**：点击即可下拉切换 `Default Workspace (默认工作区)` 与各自定义工作区，并提供 `+ 新建` 与 `默认工作区演示` 快捷按钮。
+4. **`Sessions (会话总览)` 极简单栏头部（删除快速连接栏与冗余状态横条，释放纵向空间）**：
+   - **问题修复**：此前 `Sessions` 模式下终端上方堆叠了 3 层横条（快速连接栏 + 标签栏 + 终端面包屑栏），严重挤压了终端纵向显示高度；
+   - **极简重构**：彻底**删除了顶部的快速连接/常用收藏栏**，并**删除了单视图下终端上方的重复状态面包屑栏**；
+   - 整个 `Sessions` 主画布顶部**仅保留唯一一行 34px 的会话标签与快捷控制栏**（协议过滤胶囊 + 打开的会话标签页 + 右侧紧凑的 `伴随 SFTP` / `广播` / `分屏预设` / `⊞ 大预览`），下方直接进入全高度终端/数据库/SFTP 画布！
+5. **工作区关联会话与 `Sessions (会话总览)` 实例完全隔离（各自打开各自的）**：
+   - 工作区左边栏底部可折叠保留**工作区关联会话链接（`linkedSessionIds`）**，方便在开发时快速连入该项目关联的服务器或数据库；
+   - 在工作区中点击关联会话打开的是**该工作区私有的会话运行实例（`ws.openTabs`）**，与 `Sessions (会话总览)` 模式下打开的会话实例（`sessionWorkbench.openTabs`）完全隔离，互不干扰。
+
+---
+
+## 2. 总体界面架构图 (v5 — 零额外顶栏高度、Home 置于左侧主导航第 1 位、极简共享工具栏)
 
 ```mermaid
 flowchart LR
-    subgraph LeftSidebar["可拖拽调宽左边栏 (200px ~ 540px, 默认 288px, 双击分隔条重置)"]
-        direction TB
-        Rail["主导航栏 (44px)\n1. Workspaces 树\n2. Sessions 树\n3. All Terminals\n4. Agent Fleet\n5. Global Tools"]
-        
-        subgraph WsTree["维度 1: Workspaces 树视图"]
-            W0["▾ 🏠 Default Workspace [内置默认兜底]"]
-            W1["▾ 📦 taomni-core [Rust + Tauri]"]
-            W1C["  ├─ ▾ 📁 代码目录与文件 (LSP)"]
-            W1G["  ├─ ▾ 🌿 Git 版本控制 (Changes/Log/Branches/Diff)"]
-            W1S["  ├─ ▾ 🖥️ 关联会话 (引用自全局 Session 树)"]
-            W1A["  └─ ▾ 🤖 并行 Coding Agents (.worktrees/*)"]
-        end
+  Rail["左侧主导航窄栏 (42px)\n☰ 应用主菜单\n---\n1. 🏠 Home (主页 #1)\n2. 🟣 Workspaces (工作区)\n3. 🖥️ Sessions (会话总览)\n4. 🤖 Agents (Coding Agents)\n5. 🛠️ Tools (全局工具箱)\n---\n💬 Tao | 🌗 主题 | ⚙️ 设置"]
+  
+  LeftNav["可拖拽左边栏 (默认 260px)\n• Workspaces 模式:\n  1) 顶部工作区切换器 (含默认工作区)\n  2) 已删除 [文件管理|Git] 冗余横条\n  3) IDEA 风格文件树 + 可折叠关联会话\n  4) 底部栏: 🌿 分支状态 + 打开 Git 面板 →\n• Sessions 模式:\n  100% 保留现有目录树 + 7 按钮工具栏 + 过滤 + 右键菜单"]
+  
+  subgraph Center["中央主面板 (单行 33px 共享工具栏 — 无额外顶栏高度占用!)"]
+    SharedBar["主面板顶部 33px 共享工具栏:\n左侧: [◧ 左栏收缩按钮] + 打开的标签页条 (或 Sessions 过滤 + OpenTabsMenu ⋯)\n右侧: 分屏预设 + [🔍 搜索 Ctrl+K] + [⊞ 大预览] + [📷 截图] + [◨ 右栏收缩按钮]"]
+    Viewport["全高度主视图画布 (文件编辑器 / 工作区内置全功能 Git 面板 / 全高度终端 / DB / SFTP)"]
+    SharedBar --> Viewport
+  end
+  
+  RightDock["右侧可拖拽伴侣栏 (默认收起)\n• 📂 伴随 SFTP\n• 🤖 Agent 状态\n• 🧭 代码 Structure\n• 💬 Tao 笔记/对话"]
 
-        subgraph SessTree["维度 2: 全部 Sessions 目录树 (100% 保留现有结构)"]
-            STBar["工具栏: [+] [✎] [⧉] [🗑] | [↻] [★] [🔍搜索]"]
-            SFilter["分类过滤: 全部 | ★收藏 | SSH | SFTP | 数据库 | RDP/VNC | 邮件"]
-            SF1["▾ 📂 Bookmarks"]
-            SF2["▾ 📂 User sessions / Favorites"]
-            SF3["▾ 📂 User sessions / 生产集群 (Prod)"]
-            SF4["▸ 📁 Imported / MobaXterm"]
-        end
-    end
+  Rail --> LeftNav --> Center --> RightDock
 ```
 
-### 2.1 默认工作区 (`Default Workspace`) 生命周期与自动升降级规则
+---
 
-1. **零配置开箱即用**：
-   - 应用初始化时，`workspaceStore` 确保 `ws-default`（`Default Workspace / 默认工作区`）始终存在且不可被彻底删除（只可清空其内部临时绑定）。
-   - 当用户没有创建任何自定义工作区时，顶栏工作区胶囊显示 `Default Workspace (默认)`，用户在全局 `Sessions` 树双击连接的任何 SSH/SFTP/DB 会话，或通过菜单打开的任何代码目录/Git 仓库，均在 `Default Workspace` 内打开并呈现在左侧工作区树中。
-2. **一键升级为命名工作区 (`Promote to Named Workspace`)**：
-   - 当用户在 `Default Workspace` 中积累了代码目录与关联会话后，可右键 `Default Workspace` 节点选择 **「保存/另存为正式工作区 (Save as Custom Workspace...)」**，无缝沉淀为独立项目工作区。
+## 3. 各核心视图与交互详细规范 (v5 极简对齐版)
+
+### 3.1 零额外顶栏高度：主面板单行 `33px` 共享工具栏（含左右边栏收缩按钮）
+
+- **彻底移除多出的顶部独立标题栏**：与 `main` 分支保持相同的纵向紧凑度，不再在主面板上方额外叠加一行 `36px` 顶栏，并移除了右上角无用的 3 个颜色圆点。
+- **左右边栏收缩按钮内置于主面板共享工具栏**：
+  - 主面板 `33px` 共享工具栏**最左侧**固定放置 `◧` **左边栏展开/收起按钮 (`Ctrl+B`)**；
+  - 主面板 `33px` 共享工具栏**最右侧**固定放置 `◨` **右边栏展开/收起按钮**（以及 `🔍 搜索 Ctrl+K`、`⊞ 大预览`、`📷 截图`）。
+
+### 3.2 `🏠 Home` 主页（移至左侧主导航窄栏第 1 个，与 `Workspaces` 并列）
+
+- **常驻位置**：位于左侧主导航窄栏（`Primary Rail`）顶部主菜单 `☰` 下方的**第 1 个核心入口**（紧邻第 2 个 `Workspaces` 与第 3 个 `Sessions`）。
+- **恢复上次会话横幅 (`RestoreLastSessionRow`)**：当检测到上次退出存在未恢复的工作区或远程会话时，在顶部展示一键恢复横幅（`[一键恢复 (Restore)]` / `[忽略]`）。
+- **5 大快速启动卡片（100% 对齐 `WelcomePanel.tsx`）**：
+  1. **本地终端卡 (`LocalTerminalCard`)**：提供 Shell 选择器（`zsh` / `bash` / `fish` / `pwsh`）、`▶ 启动 (Ctrl+Shift+T)`、**`🛡️ 管理员运行`** 与 **`📂 打开 ~ 目录`**。
+  2. **WSL 终端卡 (`WslCard`)**：WSL 发行版下拉选择与一键连接。
+  3. **新建/导入远程会话卡 (`NewSessionCard`)**：`+ 新建会话配置 (Ctrl+Shift+N)`、`📥 导入` 与 `🌳 打开完整会话目录树`。
+  4. **工作区与 Coding Agents 卡**：`+ 新建/打开工作区`、`🌿 Git` 快速入口、以及查看并行运行的 Coding Agents。
+  5. **协作与全局工具卡**：`💬 局域网传书 (LAN Chat)`、`✉️ 邮件客户端 (Mail)`、`🛠️ 网络诊断箱` 与 `🔐 MFA 验证器`。
+- **底部历史与快速访问面板 (`WelcomeHistoryPanel`)**：提供 **`🟣 最近工作区`**、**`🖥️ 最近连接会话`**、**`📁 本地常用目录`** 三个标签页及实时搜索框。
 
 ---
 
-## 3. 工作区内部 Code 与 Git 全量功能对齐与合理化布局
+### 3.3 `Workspaces (工作区)`：删繁就简（删除冗余 Git 按钮 `1` 与 `3`，保留 `2` 与 `4` 及 Git 标签页）
 
-为确保重构后**不减少任何现有 Code Workspace 与 Git 能力**，同时解决原有界面按钮拥挤和层级重复的问题，采用以下布局与交互整合方案：
-
-### 3.1 Code Workspace 功能对齐矩阵（零删减 + 层次理顺）
-
-| 既有功能模块（源码定位） | 保留的全部功能明细 | 新版合理化布局位置与交互方式 |
-| :--- | :--- | :--- |
-| **工程与文件树管理**<br>(`CodeWorkspaceTab.tsx`) | 多根目录 (`roots[]`)、零散文件 (`looseFiles[]`)、刷新树、新建/重命名/删除文件 | 直接融合进左侧 **`Workspaces 树 -> 📁 代码目录与文件`** 子树中（无需在编辑器左侧再套第二层重复文件树侧栏），单击打开文件，右键呼出编辑器分屏/Git Blame/查找引用菜单。 |
-| **顶部构建/运行/调试工具栏**<br>(`WorkspaceToolbar.tsx`) | • SDK 状态与 `ProjectFactsStatusBadge`<br>• `Build Project (Ctrl+F9)`<br>• `Active Run Configuration` 下拉选择<br>• `Run (Shift+F10)` / `Debug (Shift+F9)`<br>• `Search Everywhere (Double Shift)` | 作为 `Code` 画布内部的单行紧凑上下文顶栏 (`34px`)，左侧显示工程语言环境徽章与 Git 分支胶囊，右侧集中放置 `🔨 Build` + `运行配置下拉` + `▶ Run` + `🐞 Debug`。 |
-| **编辑器高级辅助与内部分屏**<br>(`editorGroupView.tsx` + `WorkspaceToolbar.tsx`) | • 行号断点点击切换 (`useBreakpointControls`)<br>• 行内 Git Blame (`inlineBlameEnabled`)<br>• LSP `Inlay Hints` 开关<br>• 软换行 (`Soft Wrap`)、列选择 (`Column Selection`)、字号缩放<br>• 编辑器内垂直/水平分屏 (`splitEditor`) 与同步滚动 (`syncSplitScroll`)<br>• 右侧 `Structure / Outline / Documentation` 面板 | • 常用开关（`Blame`、`Inlay`、`◫ 编辑器分屏`、`Structure`）直接置于 Code 顶栏右侧，低频项（缩放、列选择、Tab 策略）收纳于 `⋮` 菜单。<br>• 编辑器文件子标签栏 (`code-editor-subtabs`) 右侧内嵌面包屑 (`Breadcrumbs`)。 |
-| **底部 13 个 IDEA 对齐工具窗**<br>(`BottomDock.tsx` + `createWorkspaceDockContents.tsx`) | 1. `Problems`（含 Quick Fix `Alt+Enter`）<br>2. `Terminal`（工作区终端）<br>3. `Git`（内嵌版本控制）<br>4. `Find in Files`（含替换预览 `ReplacePreviewDialog`）<br>5. `Structural Search`（结构化搜索）<br>6. `Run`（运行输出）<br>7. `Debug`（断点/帧/变量）<br>8. `Build`（构建日志）<br>9. `Tests`（测试结果树）<br>10. `Coverage`（覆盖率）<br>11. `References`（查找引用 Usages）<br>12. `Hierarchy`（调用/类型层级）<br>13. `Analysis`（代码检查）<br>14. `TODO & Bookmarks` | • 位于 Code 画布底部，支持**顶部 `ns-resize` 分隔条自由拖拽高度**。<br>• 继续使用 `KeepAliveToolPanel` 保活机制，切换 Tab 不丢失终端会话、测试树与搜索结果。 |
-
-### 3.2 Git 版本控制功能对齐矩阵（零删减 + 三处联动）
-
-| 既有功能模块（源码定位） | 保留的全部功能明细 | 新版合理化布局位置与交互方式 |
-| :--- | :--- | :--- |
-| **多仓库与 Worktree 作用域管理**<br>(`WorkspaceGitManagerView.tsx` + `RepoSelector.tsx`) | • 作用域切换：`All Repositories` / `Single Repo` / `Custom` / **新增 `Agent Worktrees (.worktrees/*)`**<br>• 远端选择 (`origin`)、领先/落后计数 (`↑ahead ↓behind`)<br>• 批量 `Fetch`、`Pull`、`Push`、`Refresh` | 在 `Git` 画布顶栏左起第一顺位展示 `RepoSelector` 下拉框与远端同步状态，右侧直接提供 `Fetch` / `↓ Pull` / `↑ Push` 按钮。 |
-| **本地变更与提交工作流**<br>(`WorkspaceChangesView.tsx` + `ChangesTree.tsx`) | • **目录树模式 (`treeMode`) vs 扁平列表 (`flat`)** 切换<br>• 文件级勾选 (`checkedChangeKeys`)、Stage/Unstage、回滚丢弃 (`Rollback`)、暂存 (`Stash`)<br>• **提交目标分支选择 (`targetBranch`)**<br>• 提交信息输入、`Commit` 与 `Commit and Push` | 在左栏 `Workspaces 树 -> 🌿 Git 版本控制 -> 本地变更` 点击即可进入左变更树 + 下方提交框 + 右侧实时 Diff 的双栏高效布局；同时也可在右侧伴随坞 (`Right Context Dock -> Git 变更`) 快速操作。 |
-| **提交历史图、分支与标签**<br>(`WorkspaceCommitLog.tsx` + `BranchesView.tsx` + `TagsView.tsx`) | • SVG 分支拓扑图 (`CommitLog`)、按作者/分支/Hash 搜索、Cherry-pick / Revert / Reset<br>• 本地与远端分支检出、新建、合并、Rebase、Worktree 管理<br>• Stash 列表与 Tags 管理 | 在 Git 顶栏提供清晰的五档视图分段控制器：`本地变更` \| `提交历史图 (Log)` \| `分支/Worktrees` \| `Stash/Tags` \| `并排 Diff`，无需层层翻找菜单。 |
-| **专业 Diff 与对比检视器**<br>(`DiffViewer.tsx` + `CompareView.tsx`) | • **并排对比 (`Side-by-Side`) vs 统一视图 (`Unified`)** 一键切换<br>• 空白字符忽略、行尾符 (`EOL`) 提示、语法高亮<br>• 一键跳转源码 (`Jump to Source / F4`) | 置于 Git 管理器的右侧主视口，点击左侧任意变更文件或历史提交即时渲染并排或统一 Diff，右上角直接提供 `◫ 并排/统一切换` 与 `跳转源码 (F4)`。 |
+1. **左边栏顶部工作区切换器 (`Workspace Switcher`)**：
+   - 固定在**工作区左边栏最顶部**，默认内置不可删除的 **`Default Workspace (默认工作区)`**。
+2. **删除冗余切换行 `1` 与右上角按钮 `3`**：
+   - **已删除 `1`**：移除了工作区左边栏中冗余的 `[📁 文件管理 | 🌿 Git 面板]` 整行切换按钮；工作区左边栏始终纯粹展示 **IDEA 风格文件树 + 底部可折叠的工作区关联会话**。
+   - **已删除 `3`**：移除了工作区主画布标签栏右上角重复的 `🌿 Git (4)` 按钮。
+3. **保留自然、清晰的 Git 入口（`2`、`4` 与工作区 `GIT` 标签页）**：
+   - **入口 `2`（左边栏底栏）**：工作区左边栏底部常驻显示 `🌿 feat/workspace-platform* (4)   打开 Git 面板 →`，点击即可在工作区主画布中激活专用 `GIT` 标签页；
+   - **入口 `4`（文件编辑器工具栏）**：在代码/文件编辑器的右上角保留 `🌿 在 Git 面板对比` 按钮；
+   - **工作区专用 `GIT` 标签页**：100% 具备 `main` 分支 `GitPanelView.tsx` 的全部能力（多仓库选择器 `RepoSelector`、分支徽章、`Remote` 选择器、`Fetch / Pull / Push / ⋯ 更多操作 / Refresh`、`Changes | Log | Branches | Tags | Stash | Settings` 6 大标签页、Rebase/Merge 冲突处理横幅、`Tree/Flat` 切换、暂存/取消暂存/丢弃、`Amend`、**✨ AI 生成提交信息**、并排/统一 `DiffViewer`、`F4` 跳源文件，以及完整的文件与提交右键菜单）。
 
 ---
 
-## 4. 整体四区布局、多 Tab 大预览与 One-System Agent 扩展总结
+### 3.4 `Sessions (会话总览)`：完整保留 `main` 的会话目录树与标签过滤 (`OpenTabsMenu ⋯`)
 
-1. **三段式精简顶栏 + 永久固定 `Welcome`**：
-   - 左段固定 `菜单` + `左栏折叠` + `🏠 Welcome` + `当前工作区切换胶囊（含 Default Workspace）`；中段为 `Ctrl+K` 全局搜索；右段收敛为 `Agent 状态胶囊`、`⊞ Tab 大预览`、`截图/MFA 全局浮窗`、`右坞开关`、`主题` 与窗口按钮。
-2. **多 Tab 大卡片实时内容预览 (`Ctrl+Shift+O`) + 类型透镜 + 四档智能分屏**：
-   - Tab 栏首部提供 `全部 / 代码·Git / 终端·SFTP / 数据库 / Agents / 邮件·笔记` 过滤透镜；
-   - 点击 `⊞ 大预览` 展开全画布大卡片实时预览网格（直接看到终端输出、代码片段、Git Diff、SQL 结果、Agent 进度），支持按类型/按工作区/最近关闭恢复分组，以及卡片一键 `◫ 分屏并排`。
-3. **One-System 多 Coding Agent 并行协同台**：
-   - 支持在同一工作区并行调度 `Claude Code`、`Codex CLI`、`OpenCode ACP`，每个任务自动分配独立 Git Worktree (`.worktrees/*`)，变更直接接入 `WorkspaceGitManager` 统一审阅 Diff 与合并。
+1. **左边栏 100% 保留 `main` 的会话目录树 (`SessionTree.tsx`)**：
+   - 完整保留 7 按钮工具栏（新建会话、新建文件夹、多格式导入、导出、全部展开/折叠、收藏筛选、搜索框）、协议分类胶囊（`全部 / SSH / SFTP / DB / RDP / 其他`）、多级嵌套目录树以及完整的**目录与会话节点右键菜单**。
+2. **主面板单行 `33px` 共享会话标签栏 + 完整保留 `main` 的标签过滤能力**：
+   - 最左侧为 `◧` 左边栏收缩按钮与协议快速过滤胶囊（`全部 / SSH / DB / SFTP / RDP`）；
+   - 中间为独立打开的会话标签条（与工作区内部打开的会话实例完全隔离）；
+   - 右侧完整保留 `main` 分支 `ControlBar.tsx` 与 `OpenTabsMenu.tsx` 的核心能力：
+     - **`ℹ️` 标签详情摘要开关 (`Ctrl+Shift+H`)**：一键在标签页上内联显示主机 IP 与端口详情；
+     - **`⋯` 已打开标签按目录组/关键字过滤菜单 (`OpenTabsMenu`)**：点击 `⋯` 可按会话所属目录路径（如 `生产环境集群 / 北京可用区`、`核心数据库与缓存`）或关键字过滤当前标签栏显示的会话标签（隐藏非匹配标签而不关闭连接），并支持一键弹出为独立窗口 (`Detach Tab`)。
 
 ---
 
-## 5. 原型体验指南与确认项
+### 3.4 核心实体数据模型 (TypeScript 接口定义)
 
-请重新打开或刷新浏览器中的 [workspace-platform-redesign-prototype.html](file:///data-raw-ssd/code-src/person/taomni/docs-feature/workspace-platform-redesign-prototype.html) 重点体验以下新增交互：
+```typescript
+export interface WorkspaceEntity {
+  id: string;                 // 'ws-default' (系统默认工作区) 或自定义工作区 UUID
+  name: string;
+  isDefault: boolean;         // 默认工作区不可删除
+  rootPath: string;           // 工作区本地文件夹根路径 (支持通用文件管理与代码项目)
+  gitRepos: string[];         // 工作区内发现的 Git 仓库路径列表
+  linkedSessionIds: string[]; // 关联的 SessionTree 配置 ID (仅配置引用)
+  openTabs: WorkbenchTab[];   // 该工作区私有的已打开标签实例 (含文件、内置 Git 面板、工作区独立终端实例)
+  activeTabId: string;
+  sidebarLens: 'files' | 'git';
+}
 
-1. **拖拽调整大小**：拖动左边栏右侧分隔条、右侧伴随坞左侧分隔条、以及 Code 画布内底部工具坞上沿分隔条（双击左边栏分隔条可恢复默认 `288px`）。
-2. **工作区树与「默认工作区 (`Default Workspace`)」**：在左栏 `Workspaces` 维度展开多层树节点（代码目录、Git 子项、关联会话、Agent）；点击工具栏上的 `🏠` 按钮或 `演示:仅默认工作区` 胶囊，验证未创建自定义工作区时系统自动回退到 `Default Workspace` 的完整形态；右键任意树节点查看上下文菜单。
-3. **完整保留的 `Sessions` 目录树**：点击最左栏第 2 个图标进入 `Sessions` 维度，体验完整的 7 按钮工具栏（新建、编辑、克隆、删除、刷新、收藏、搜索）、协议过滤胶囊、多级目录树（`Bookmarks` / `User sessions / Favorites` / `生产集群` / `Imported / MobaXterm`），以及**在目录或会话上点击鼠标右键**弹出的完整导入/导出/批量连接/移动目录/终端配色/绑定工作区菜单。
-4. **Code 与 Git 全量功能交互**：在工作区树点击任意代码文件或 `Code · taomni-core` 标签，体验 `🔨 Build`、`▶ Run`、`🐞 Debug`、行号点击下断点、`Blame` / `Inlay` / `◫ 编辑器分屏` / `Structure` 开关，以及底部 **13 个工具窗**切换；点击 `Git · taomni-core` 标签或左侧 `🌿 Git 版本控制` 子节点，体验多仓选择、`本地变更 / 提交历史图 / 分支 / Stash / 并排 Diff` 切换与勾选提交。
+export interface SessionWorkbenchState {
+  // 与各工作区 openTabs 完全隔离的「会话总览」独立打开实例列表
+  openTabs: WorkbenchTab[];
+  activeTabId: string;
+  typeFilter: 'all' | 'ssh' | 'db' | 'sftp' | 'rdp';
+  broadcastEnabled: boolean;
+}
+```
 
-如以上 5 点调整均符合预期，请告知确认，我将立即为您输出**详细设计文档、分阶段实施计划与任务拆解 (`TASK-*`)，以及 Unit / Browser / Native 测试用例 (`TC-*`)**。
+---
+
+## 4. 原型交互自检清单 (打开 `docs-feature/workspace-platform-redesign-prototype.html`)
+
+1. **验证 `🏠 Home` 主页（原 Welcome）**：
+   - 点击左上角 `🏠 Home` 按钮，查看顶部恢复上次会话横幅、5 大启动卡片（本地终端 Shell 选择 / 管理员运行 / 打开 `~` 目录、WSL 终端、新建/导入会话、工作区与 Agent、局域网传书与邮件）及底部历史记录面板（最近工作区 / 最近会话 / 本地目录）。
+2. **验证工作区切换器已移入工作区左边栏**：
+   - 切换到左侧主导航第 1 项 `Workspaces`，观察窗口顶部标题栏已无工作区下拉框；工作区左边栏最顶部提供简洁的工作区切换器（支持切换 `Default Workspace` 与自定义工作区、点击 `默认工作区演示`、点击 `+ 新建`）。
+3. **验证工作区内置专用 Git 面板（快速跳转 + 全功能对齐 `main`）**：
+   - 在工作区左边栏顶部点击 `🌿 Git 面板 (4)`，或点击主画布右上角 `🌿 Git (4)` 按钮（或按 `Ctrl+Shift+G`），立即在当前工作区内切换到专用 Git 面板；
+   - 在 Git 面板中点击切换 `Changes`、`Log`、`Branches`、`Tags`、`Stash`、`Settings` 6 个子标签页，点击 `🧪 演示 Rebase/冲突处理条`，点击 `✨ AI 生成提交信息`，切换 `Side-by-Side / Unified` Diff，右键点击变更文件或提交记录验证完整的 Git 右键菜单。
+4. **验证 `Sessions (会话总览)` 单栏 34px 极简头部与实例隔离**：
+   - 切换到左侧主导航第 2 项 `Sessions`，确认主画布顶部**只有唯一一行 34px 的会话标签栏**（快速连接栏与终端上方冗余横条已删除），且打开的会话实例与工作区中的会话标签完全独立。
+5. **验证左右边栏拖拽调宽与全部右键菜单**：
+   - 拖拽左边栏或右边栏分割线调整宽度（双击分割线复位）；在工作区文件树、会话目录树文件夹/节点、Git 变更/提交、以及顶部标签页上点击鼠标右键，验证所有上下文菜单完整可用。
+
+---
+
+## 5. v6 增量设计（左栏工具归位、任意会话打开、目录添加、IDEA 工具窗口整合）
+
+> 仍为 **UI 与交互重构**：原有功能、右键菜单、快捷键 100% 保留（见第 0 节）。
+
+### 5.1 左侧主导航底部：全局工具集中，右上角不再放工具
+自上而下：`🔐 MFA` → `📷 截图` → `💬 Tao` → `🌗 主题` → `🌐 语言` → `⚙️ 设置`。
+- 截图从主面板右上角移到此处（点击弹出：区域 / 窗口 / 全屏 / 延时 / 贴图板，`Ctrl+Alt+A` 不变）。
+- **MFA 以悬浮窗口呈现**：可拖动、实时 30s 倒计时、点击卡片复制验证码，不占用主界面，再次点击图标关闭。
+- 主面板右侧共享工具栏因此只剩：搜索、大预览、右栏开关。
+
+### 5.2 Workspace 中打开任意会话（不限关联）
+- **三个入口**：① 标签栏 `＋` 菜单（收藏会话 + `浏览/搜索全部会话…`，`Ctrl+Alt+O` 选择器）；② IDEA 工具条 `🖥️ Sessions` 面板（完整目录树，点击即在本工作区打开）；③ 工作区文件树下方的关联区。
+- **关联降级为「常用」**：Sessions 面板顶部 `★ 本工作区常用`，悬停 ☆/★ 切换关联；关联仅是快捷入口，不影响会话配置，也不限制可打开范围。
+- 打开的仍是**工作区私有实例**，与「会话总览」实例互相独立；右键菜单：打开 / 右侧分屏 / 关联 / 编辑 / 克隆。
+
+### 5.3 Workspace 中便捷添加文件与目录
+- 文件树工具栏：`新建文件`、`新建目录`、`添加目录到工作区（多根）`、`全部折叠`、过滤框。
+- 目录右键：`在此新建文件… (Alt+Insert)` / `在此新建目录…`；标签栏 `＋` 菜单同样提供。
+- 新建文件立即打开为标签并标记 `A`；添加根目录支持路径输入与拖拽目录到文件树。
+
+### 5.4 与原 Code Workspace（IDEA）左侧工具窗口条整合
+在 Workspace 左栏**最左侧嵌入 30px 的 IDEA 式工具窗口条**（仅 Workspaces 模式显示，其它模式隐藏），不新增任何顶部行：
+
+| 位置 | 按钮 | 行为 |
+| :-- | :-- | :-- |
+| 上组 | `📁 Project` | 文件树；再次点击收起左栏（IDEA 行为） |
+| 上组 | `🖥️ Sessions` | 打开任意会话面板 |
+| 上组 | `🌿 Git (变更数)` | 激活工作区 `GIT` 标签（`Ctrl+Shift+G`/`Alt+9`） |
+| 上组 | `🧭 Structure` | 右栏结构大纲 |
+| 下组 | `⌨️ Terminal` `⚠️ Problems` `▶️ Run` `🔍 Find` | 切换底部 Dock 对应页签（`Alt+F12` 等） |
+| 下组 | `⋯` | 其余窗口：Bookmarks / TODO / Services / Database / Git Log，及「显示名称」「移动到…」（沿用 `toolWindowLayout` 六个锚点） |
+
+原则：工具条只做入口；底部 Dock、右栏、`toolWindowLayout` 的拖拽/移动/记忆行为保持原实现，默认折叠，保证首屏简洁。
