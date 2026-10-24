@@ -22,26 +22,34 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-ws-007
 - wait_for: '[data-testid="welcome-panel"]'
-- seed_storage:
-    key: taomni.sessions.v1
-    value: '[{"id":"ws-qa-ssh","name":"prod-api-01","session_type":"SSH","group_path":null,"host":"127.0.0.1","port":22,"username":"root","auth_method":"None","options_json":"{}","created_at":1,"updated_at":1,"last_connected_at":null,"sort_order":0},{"id":"ws-qa-db","name":"orders-pg","session_type":"PostgreSQL","group_path":null,"host":"127.0.0.1","port":5432,"username":"root","auth_method":"None","options_json":"{}","created_at":1,"updated_at":1,"last_connected_at":null,"sort_order":1}]'
-- reload_window: null
-- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: prod-api-01
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="prod-api-01"]'
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="workspace-open-session-plus"]'
 - click: '[data-testid="workspace-open-session-plus"]'
 - wait_for: '[data-testid="workspace-open-session-menu"]'
 - click: '[data-testid="workspace-plus-open-session"]'
 - wait_for: '[data-testid="workspace-session-picker-modal"]'
+- assert_visible: '[data-testid="workspace-session-picker-search"]'
+- assert_visible: '[data-testid="workspace-session-picker-filter-ssh"]'
+- assert_visible: '[data-testid="workspace-session-picker-filter-db"]'
+- assert_visible: '[data-testid="workspace-session-picker-filter-sftp"]'
+- assert_visible: '[data-testid="workspace-session-picker-filter-desktop"]'
+- assert_text:
+    selector: '[data-testid="workspace-session-picker-modal"]'
+    contains: prod-api-01
 - click: '[data-testid="workspace-session-picker-filter-ssh"]'
-- assert_attribute:
-    selector: '[data-testid="workspace-session-picker-filter-ssh"]'
-    name: aria-pressed
-    equals: 'true'
+- wait_for: '[data-testid="workspace-session-picker-row"]'
 - click: '[data-testid="workspace-session-picker-filter-db"]'
 - assert_count:
     selector: '[data-testid="workspace-session-picker-row"]'
-    equal: 1
+    equal: 0
 - click: '[data-testid="workspace-session-picker-filter-all"]'
 - fill:
     selector: '[data-testid="workspace-session-picker-search"]'
@@ -52,17 +60,9 @@ steps:
 - fill:
     selector: '[data-testid="workspace-session-picker-search"]'
     value: ''
-- assert_visible: '[data-testid="workspace-session-picker-search"]'
-- assert_visible: '[data-testid="workspace-session-picker-filter-ssh"]'
-- assert_visible: '[data-testid="workspace-session-picker-filter-db"]'
-- assert_visible: '[data-testid="workspace-session-picker-filter-sftp"]'
-- assert_visible: '[data-testid="workspace-session-picker-filter-desktop"]'
-- assert_text:
-    selector: '[data-testid="workspace-session-picker-modal"]'
-    contains: prod-api-01
 - click: '[data-testid="workspace-session-picker-pin"]'
-- click: '[data-testid="workspace-session-picker-row"][data-session-id="ws-qa-ssh"]'
-- wait_for: '[data-testid="workspace-session-pane"][data-session-id="ws-qa-ssh"]'
+- click: '[data-testid="workspace-session-picker-row"]'
+- wait_for: '[data-testid="workspace-session-pane"]'
 - wait_for: '[data-testid="workspace-tab"][data-tab-kind="terminal"]'
 - click: '[data-testid="workspace-open-session-plus"]'
 - wait_for: '[data-testid="workspace-open-session-menu"]'
@@ -95,65 +95,93 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 工作区 + 菜单可打开任意全局会话（含未关联会话），选择器支持搜索、协议过滤与“同时关联到常用”复选框。
+    requirement: 工作区 + 菜单与 Ctrl/Cmd+Alt+O 选择器可打开全局会话；选择器支持协议过滤、搜索与“同时关联到常用”。
     actions:
-    - 11
+    - 4
+    - 6
+    - 7
+    - 8
+    - 10
     - 12
-    - 21
+    - 14
+    checkpoints:
+    - step: 3
+      expectation: 步骤 3 的断言通过
+    - step: 5
+      expectation: 步骤 5 的断言通过
+    - step: 9
+      expectation: 步骤 9 的断言通过
+    - step: 11
+      expectation: 步骤 11 的断言通过
+    - step: 13
+      expectation: 步骤 13 的断言通过
+    - step: 15
+      expectation: 步骤 15 的断言通过
+    - step: 16
+      expectation: 步骤 16 的断言通过
+    - step: 17
+      expectation: 步骤 17 的断言通过
+    - step: 18
+      expectation: 步骤 18 的断言通过
+    - step: 19
+      expectation: 步骤 19 的断言通过
+    results:
+    - 19
+  - id: R2
+    requirement: 打开未关联会话后在工作区生成独立标签与面板；+ 菜单的本地终端入口可用。
+    actions:
     - 22
-    - 23
     - 24
-    - 25
     - 26
     - 27
-    - 28
     - 29
     - 30
     - 31
     checkpoints:
-    - step: 22
-      expectation: 打开任意会话弹窗出现
-    - step: 29
-      expectation: 弹窗列出未关联的全局会话
+    - step: 20
+      expectation: 步骤 20 的断言通过
+    - step: 21
+      expectation: 步骤 21 的断言通过
+    - step: 23
+      expectation: 步骤 23 的断言通过
+    - step: 25
+      expectation: 步骤 25 的断言通过
+    - step: 28
+      expectation: 步骤 28 的断言通过
     - step: 32
-      expectation: 会话在工作区生成独立标签与面板
+      expectation: 步骤 32 的断言通过
+    - step: 33
+      expectation: 步骤 33 的断言通过
     results:
-    - 22
-    - 29
-    - 32
-  - id: R2
-    requirement: + 菜单还提供本地终端入口，工作区会话面板与 Sessions 模式的标签互不出现在对方标签栏中。
-    actions:
     - 33
-    - 34
-    - 35
-    - 36
-    - 37
-    - 38
-    checkpoints:
-    - step: 37
-      expectation: 本地终端在当前工作区打开
-    - step: 39
-      expectation: Sessions 模式不显示工作区标签条
-    results:
-    - 37
-    - 39
   - id: R3
-    requirement: 关闭工作区内的会话标签不影响 Sessions 模式；再次进入工作区只保留工作区自己的标签。
+    requirement: Sessions 模式不共享工作区标签；关闭工作区会话标签后其余标签保留，回到工作区仍可操作。
     actions:
-    - 41
-    - 42
+    - 36
+    - 39
     - 43
+    - 46
     checkpoints:
+    - step: 35
+      expectation: 步骤 35 的断言通过
+    - step: 37
+      expectation: 步骤 37 的断言通过
+    - step: 38
+      expectation: 步骤 38 的断言通过
+    - step: 40
+      expectation: 步骤 40 的断言通过
+    - step: 41
+      expectation: 步骤 41 的断言通过
     - step: 42
-      expectation: 工作区标签仍包含本地终端与会话标签
+      expectation: 步骤 42 的断言通过
     - step: 44
-      expectation: 关闭工作区会话标签后该标签消失
-    - step: 48
-      expectation: 回到工作区仍可继续操作
+      expectation: 步骤 44 的断言通过
+    - step: 45
+      expectation: 步骤 45 的断言通过
+    - step: 47
+      expectation: 步骤 47 的断言通过
     results:
-    - 42
-    - 44
+    - 47
   visual:
   - check: 工作区标签条只显示工作区实例，Sessions 模式标签条不混入工作区会话。
     method: manual

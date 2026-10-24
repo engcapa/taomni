@@ -49,15 +49,9 @@ steps:
     selector: '[data-testid="control-bar"] [data-testid="language-switcher"]'
     equal: 0
 - click: '[data-testid="rail-chat-button"]'
-- assert_attribute:
-    selector: '[data-testid="rail-chat-button"]'
-    name: aria-pressed
-    equals: 'true'
+- wait_for: '[data-testid="rail-chat-button"][aria-pressed="true"]'
 - click: '[data-testid="rail-chat-button"]'
-- assert_attribute:
-    selector: '[data-testid="rail-chat-button"]'
-    name: aria-pressed
-    equals: 'false'
+- wait_for: '[data-testid="rail-chat-button"][aria-pressed="false"]'
 - click: '[data-testid="rail-mfa-button"]'
 - wait_for: '[data-testid="mfa-floating-window"]'
 - assert_visible: '[data-testid="mfa-floating-locked"]'

@@ -24,9 +24,14 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-ws-010
 - wait_for: '[data-testid="welcome-panel"]'
-- seed_storage:
-    key: taomni.sessions.v1
-    value: '[{"id":"ws-qa-ssh","name":"prod-api-01","session_type":"SSH","group_path":null,"host":"10.9.0.1","port":22,"username":"root","auth_method":"None","options_json":"{}","created_at":1,"updated_at":1,"last_connected_at":null,"sort_order":0}]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: prod-api-01
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="prod-api-01"]'
 - seed_storage:
     key: taomni.platformWorkspaces.v1
     value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace (默认工作区)","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"qa-root","path":"${fixture.platform_workspace_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
@@ -58,7 +63,7 @@ steps:
 - assert_localstorage:
     key: taomni.codeWorkspace.toolWindowStripes.v1
     contains: '"showNames":true'
-- right_click: '[data-testid="sessions-sidebar-panel"] >> text="prod-api-01"'
+- right_click: '[data-testid="session-tree-item"][data-session-name="prod-api-01"]'
 - wait_for: '[data-testid="context-menu"]'
 - assert_text:
     selector: '[data-testid="context-menu"]'
@@ -111,87 +116,107 @@ verification:
   - id: R1
     requirement: 应用主菜单保留全部入口与 Sessions 导入/导出子菜单。
     actions:
-    - 9
-    - 10
-    - 11
-    - 12
     - 13
-    - 14
-    - 15
-    - 16
-    - 17
-    - 18
-    - 19
+    - 24
     checkpoints:
-    - step: 9
-      expectation: 新建本地终端存在
-    - step: 13
-      expectation: Sessions/View/Tools 子菜单存在
+    - step: 12
+      expectation: 步骤 12 的断言通过
+    - step: 14
+      expectation: 步骤 14 的断言通过
+    - step: 15
+      expectation: 步骤 15 的断言通过
+    - step: 16
+      expectation: 步骤 16 的断言通过
+    - step: 17
+      expectation: 步骤 17 的断言通过
+    - step: 18
+      expectation: 步骤 18 的断言通过
+    - step: 19
+      expectation: 步骤 19 的断言通过
     - step: 20
-      expectation: 导入与导出子菜单存在
+      expectation: 步骤 20 的断言通过
+    - step: 21
+      expectation: 步骤 21 的断言通过
+    - step: 22
+      expectation: 步骤 22 的断言通过
+    - step: 23
+      expectation: 步骤 23 的断言通过
+    - step: 25
+      expectation: 步骤 25 的断言通过
     results:
-    - 9
-    - 13
-    - 20
+    - 25
   - id: R2
     requirement: 左栏右键 Show Tool Window Names 双向切换并持久化。
     actions:
-    - 22
-    - 23
-    - 24
-    - 25
-    - 26
     - 27
     - 28
+    - 30
     checkpoints:
-    - step: 24
-      expectation: 右键菜单包含 Show Tool Window Names
+    - step: 26
+      expectation: 步骤 26 的断言通过
     - step: 29
-      expectation: 再次切换回 showNames:true
+      expectation: 步骤 29 的断言通过
+    - step: 31
+      expectation: 步骤 31 的断言通过
     results:
-    - 24
-    - 29
+    - 31
   - id: R3
     requirement: 会话树、标签栏与工作区文件树的右键菜单完整保留。
     actions:
-    - 29
-    - 30
-    - 31
-    - 32
     - 33
-    - 34
     - 35
-    - 36
-    - 37
-    - 38
-    - 39
-    - 40
-    - 41
     - 42
     - 43
-    - 44
     - 45
-    - 46
-    - 47
-    - 48
-    - 49
     - 50
-    checkpoints:
-    - step: 31
-      expectation: 会话右键菜单含 Connect/Edit/Duplicate/Move/Delete
-    - step: 41
-      expectation: 标签右键菜单含关闭其他/右侧/复制
-    - step: 51
-      expectation: 文件树右键菜单含新建/添加/重命名/删除/复制路径/移除根
-    results:
-    - 31
-    - 41
     - 51
+    - 53
+    - 55
+    checkpoints:
+    - step: 34
+      expectation: 步骤 34 的断言通过
+    - step: 36
+      expectation: 步骤 36 的断言通过
+    - step: 37
+      expectation: 步骤 37 的断言通过
+    - step: 38
+      expectation: 步骤 38 的断言通过
+    - step: 39
+      expectation: 步骤 39 的断言通过
+    - step: 40
+      expectation: 步骤 40 的断言通过
+    - step: 41
+      expectation: 步骤 41 的断言通过
+    - step: 44
+      expectation: 步骤 44 的断言通过
+    - step: 46
+      expectation: 步骤 46 的断言通过
+    - step: 47
+      expectation: 步骤 47 的断言通过
+    - step: 48
+      expectation: 步骤 48 的断言通过
+    - step: 49
+      expectation: 步骤 49 的断言通过
+    - step: 52
+      expectation: 步骤 52 的断言通过
+    - step: 54
+      expectation: 步骤 54 的断言通过
+    - step: 56
+      expectation: 步骤 56 的断言通过
+    - step: 57
+      expectation: 步骤 57 的断言通过
+    - step: 58
+      expectation: 步骤 58 的断言通过
+    results:
+    - 58
   visual:
   - check: 所有右键菜单样式、分组与快捷键提示与 main 一致。
     method: manual
     reason: 菜单项完整性与视觉层级需要截图评审。
   native:
-  - check: 真实 WebView 中右键菜单、文件菜单与标签菜单行为一致。
+  - check: 真实 WebView 中右键菜单、文件菜单与标签菜单行为一致；macOS 使用原生应用菜单，故 native 本用例限定 Linux/Windows。
     method: automated
-    reason: 用例声明 browser 与 native 两种模式。
+    reason: app-main-menu 在 macOS 原生构建中由系统菜单承载。
+native_platforms:
+- Linux
+- Windows

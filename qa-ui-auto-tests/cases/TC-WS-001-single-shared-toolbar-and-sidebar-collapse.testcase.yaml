@@ -25,7 +25,7 @@ steps:
     selector: '[data-testid="control-bar"]'
     equal: 1
 - assert_visible: '[data-testid="toggle-left-sidebar"]'
-- assert_visible: '[data-testid="app-main-menu"]'
+- assert_visible: '[data-testid="window-drag-handle"]'
 - assert_visible: '[data-testid="global-search-trigger"]'
 - assert_visible: '[data-testid="toggle-right-sidebar"]'
 - assert_visible: '[data-testid="titlebar-tray"]'
