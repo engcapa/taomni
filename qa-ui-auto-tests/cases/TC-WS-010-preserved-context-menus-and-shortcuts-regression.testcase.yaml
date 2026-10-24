@@ -26,6 +26,9 @@ steps:
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: 127.0.0.1
 - click: '[data-testid="session-section-bookmark"]'
 - fill:
     selector: '[data-testid="session-name"]'
@@ -116,99 +119,99 @@ verification:
   - id: R1
     requirement: 应用主菜单保留全部入口与 Sessions 导入/导出子菜单。
     actions:
-    - 13
-    - 24
+    - 14
+    - 25
     checkpoints:
-    - step: 12
+    - step: 13
       expectation: 步骤 12 的断言通过
-    - step: 14
-      expectation: 步骤 14 的断言通过
     - step: 15
-      expectation: 步骤 15 的断言通过
+      expectation: 步骤 14 的断言通过
     - step: 16
-      expectation: 步骤 16 的断言通过
+      expectation: 步骤 15 的断言通过
     - step: 17
-      expectation: 步骤 17 的断言通过
+      expectation: 步骤 16 的断言通过
     - step: 18
-      expectation: 步骤 18 的断言通过
+      expectation: 步骤 17 的断言通过
     - step: 19
-      expectation: 步骤 19 的断言通过
+      expectation: 步骤 18 的断言通过
     - step: 20
-      expectation: 步骤 20 的断言通过
+      expectation: 步骤 19 的断言通过
     - step: 21
-      expectation: 步骤 21 的断言通过
+      expectation: 步骤 20 的断言通过
     - step: 22
-      expectation: 步骤 22 的断言通过
+      expectation: 步骤 21 的断言通过
     - step: 23
+      expectation: 步骤 22 的断言通过
+    - step: 24
       expectation: 步骤 23 的断言通过
-    - step: 25
+    - step: 26
       expectation: 步骤 25 的断言通过
     results:
-    - 25
+    - 26
   - id: R2
     requirement: 左栏右键 Show Tool Window Names 双向切换并持久化。
     actions:
-    - 27
     - 28
-    - 30
+    - 29
+    - 31
     checkpoints:
-    - step: 26
+    - step: 27
       expectation: 步骤 26 的断言通过
-    - step: 29
+    - step: 30
       expectation: 步骤 29 的断言通过
-    - step: 31
+    - step: 32
       expectation: 步骤 31 的断言通过
     results:
-    - 31
+    - 32
   - id: R3
     requirement: 会话树、标签栏与工作区文件树的右键菜单完整保留。
     actions:
-    - 33
-    - 35
-    - 42
+    - 34
+    - 36
     - 43
-    - 45
-    - 50
+    - 44
+    - 46
     - 51
-    - 53
-    - 55
+    - 52
+    - 54
+    - 56
     checkpoints:
-    - step: 34
+    - step: 35
       expectation: 步骤 34 的断言通过
-    - step: 36
-      expectation: 步骤 36 的断言通过
     - step: 37
-      expectation: 步骤 37 的断言通过
+      expectation: 步骤 36 的断言通过
     - step: 38
-      expectation: 步骤 38 的断言通过
+      expectation: 步骤 37 的断言通过
     - step: 39
-      expectation: 步骤 39 的断言通过
+      expectation: 步骤 38 的断言通过
     - step: 40
-      expectation: 步骤 40 的断言通过
+      expectation: 步骤 39 的断言通过
     - step: 41
+      expectation: 步骤 40 的断言通过
+    - step: 42
       expectation: 步骤 41 的断言通过
-    - step: 44
+    - step: 45
       expectation: 步骤 44 的断言通过
-    - step: 46
-      expectation: 步骤 46 的断言通过
     - step: 47
-      expectation: 步骤 47 的断言通过
+      expectation: 步骤 46 的断言通过
     - step: 48
-      expectation: 步骤 48 的断言通过
+      expectation: 步骤 47 的断言通过
     - step: 49
+      expectation: 步骤 48 的断言通过
+    - step: 50
       expectation: 步骤 49 的断言通过
-    - step: 52
+    - step: 53
       expectation: 步骤 52 的断言通过
-    - step: 54
+    - step: 55
       expectation: 步骤 54 的断言通过
-    - step: 56
-      expectation: 步骤 56 的断言通过
     - step: 57
-      expectation: 步骤 57 的断言通过
+      expectation: 步骤 56 的断言通过
     - step: 58
+      expectation: 步骤 57 的断言通过
+    - step: 59
       expectation: 步骤 58 的断言通过
     results:
-    - 58
+    - 59
   visual:
   - check: 所有右键菜单样式、分组与快捷键提示与 main 一致。
     method: manual

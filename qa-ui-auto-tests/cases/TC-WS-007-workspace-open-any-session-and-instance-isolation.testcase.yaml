@@ -24,6 +24,9 @@ steps:
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: 127.0.0.1
 - click: '[data-testid="session-section-bookmark"]'
 - fill:
     selector: '[data-testid="session-name"]'
@@ -98,90 +101,88 @@ verification:
     requirement: 工作区 + 菜单与 Ctrl/Cmd+Alt+O 选择器可打开全局会话；选择器支持协议过滤、搜索与“同时关联到常用”。
     actions:
     - 4
-    - 6
     - 7
     - 8
-    - 10
-    - 12
-    - 14
+    - 9
+    - 11
+    - 13
+    - 15
     checkpoints:
     - step: 3
       expectation: 步骤 3 的断言通过
-    - step: 5
+    - step: 10
       expectation: 步骤 5 的断言通过
-    - step: 9
-      expectation: 步骤 9 的断言通过
-    - step: 11
+    - step: 12
       expectation: 步骤 11 的断言通过
-    - step: 13
+    - step: 14
       expectation: 步骤 13 的断言通过
-    - step: 15
-      expectation: 步骤 15 的断言通过
     - step: 16
-      expectation: 步骤 16 的断言通过
+      expectation: 步骤 15 的断言通过
     - step: 17
-      expectation: 步骤 17 的断言通过
+      expectation: 步骤 16 的断言通过
     - step: 18
-      expectation: 步骤 18 的断言通过
+      expectation: 步骤 17 的断言通过
     - step: 19
+      expectation: 步骤 18 的断言通过
+    - step: 20
       expectation: 步骤 19 的断言通过
     results:
-    - 19
+    - 20
   - id: R2
     requirement: 打开未关联会话后在工作区生成独立标签与面板；+ 菜单的本地终端入口可用。
     actions:
-    - 22
-    - 24
-    - 26
+    - 23
+    - 25
     - 27
-    - 29
+    - 28
     - 30
     - 31
+    - 32
     checkpoints:
-    - step: 20
-      expectation: 步骤 20 的断言通过
     - step: 21
+      expectation: 步骤 20 的断言通过
+    - step: 22
       expectation: 步骤 21 的断言通过
-    - step: 23
+    - step: 24
       expectation: 步骤 23 的断言通过
-    - step: 25
+    - step: 26
       expectation: 步骤 25 的断言通过
-    - step: 28
+    - step: 29
       expectation: 步骤 28 的断言通过
-    - step: 32
-      expectation: 步骤 32 的断言通过
     - step: 33
+      expectation: 步骤 32 的断言通过
+    - step: 34
       expectation: 步骤 33 的断言通过
     results:
-    - 33
+    - 34
   - id: R3
     requirement: Sessions 模式不共享工作区标签；关闭工作区会话标签后其余标签保留，回到工作区仍可操作。
     actions:
-    - 36
-    - 39
-    - 43
-    - 46
+    - 37
+    - 40
+    - 44
+    - 47
     checkpoints:
-    - step: 35
+    - step: 36
       expectation: 步骤 35 的断言通过
-    - step: 37
-      expectation: 步骤 37 的断言通过
     - step: 38
+      expectation: 步骤 37 的断言通过
+    - step: 39
       expectation: 步骤 38 的断言通过
-    - step: 40
-      expectation: 步骤 40 的断言通过
     - step: 41
-      expectation: 步骤 41 的断言通过
+      expectation: 步骤 40 的断言通过
     - step: 42
+      expectation: 步骤 41 的断言通过
+    - step: 43
       expectation: 步骤 42 的断言通过
-    - step: 44
-      expectation: 步骤 44 的断言通过
     - step: 45
+      expectation: 步骤 44 的断言通过
+    - step: 46
       expectation: 步骤 45 的断言通过
-    - step: 47
+    - step: 48
       expectation: 步骤 47 的断言通过
     results:
-    - 47
+    - 48
   visual:
   - check: 工作区标签条只显示工作区实例，Sessions 模式标签条不混入工作区会话。
     method: manual
