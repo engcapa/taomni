@@ -213,7 +213,7 @@
     .tw-btn.active { background: var(--taomni-selected); color: var(--taomni-accent); }
     .tw-btn .tw-dot { position: absolute; top: 1px; right: 0; min-width: 11px; height: 11px; border-radius: 99px; font-size: 8px; font-weight: 700; background: var(--taomni-accent); color: #fff; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); }
     .nav-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-    .mfa-float { position: fixed; right: 70px; top: 90px; width: 280px; z-index: 150; background: var(--taomni-panel-bg); border: 1px solid var(--taomni-selected-border); border-radius: 10px; box-shadow: var(--taomni-shadow-lg); display: none; flex-direction: column; overflow: hidden; }
+    .mfa-float { position: fixed; left: 50px; bottom: 30px; width: 280px; z-index: 150; background: var(--taomni-panel-bg); border: 1px solid var(--taomni-selected-border); border-radius: 10px; box-shadow: var(--taomni-shadow-lg); display: none; flex-direction: column; overflow: hidden; }
     .mfa-float.open { display: flex; }
     .mfa-head { height: 30px; padding: 0 8px; display: flex; align-items: center; justify-content: space-between; background: var(--taomni-chrome-bg); border-bottom: 1px solid var(--taomni-chrome-border); cursor: move; font-weight: 700; font-size: 12px; }
     .navigator-panel {
@@ -776,6 +776,9 @@
         <button class="rail-btn" data-mode="tools" onclick="switchMode('tools')" title="全局独立工具箱 (截图 / MFA / 网络诊断 / 端口转发 / SocksCap / 本地服务)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
         </button>
+
+        <!-- Workspace tool windows merged into the main rail (visible only in Workspaces mode) -->
+        <div id="rail-ctx" class="rail-group"></div>
       </div>
 
       <div class="rail-group">
@@ -803,8 +806,6 @@
 
     <!-- 2. Resizable Left Navigator Sidebar -->
     <aside class="navigator-panel" id="left-navigator">
-      <!-- IDEA-style tool window stripe (Workspaces mode only) -->
-      <div class="tw-stripe" id="tw-stripe"></div>
       <div class="nav-main">
       <div id="nav-top-dynamic"></div>
       <div class="nav-action-toolbar" id="nav-action-toolbar"></div>
@@ -1285,8 +1286,7 @@
       document.getElementById('status-git-branch').textContent = `🌿 ${ws.gitBranch} (${ws.gitStatus})`;
       document.getElementById('status-sidebar-width').textContent = `左边栏: ${STATE.leftNavWidth}px (可拖拽)`;
 
-      document.getElementById('tw-stripe').style.display = STATE.mode === 'workspace' ? 'flex' : 'none';
-      if (STATE.mode === 'workspace') renderToolStripe();
+      renderToolStripe();
       if (!hideLeftForHome) renderLeftNavigator();
       renderCenterCanvas();
       if (!hideRightForHome) renderRightDock();
@@ -3038,25 +3038,18 @@
     // v6: IDEA-style tool window stripe, any-session opening, add file/dir, floating MFA, language
     // ============================================================================
     function renderToolStripe() {
-      const el = document.getElementById('tw-stripe');
-      const ws = getActiveWorkspace();
+      const el = document.getElementById('rail-ctx');
+      if (STATE.mode !== 'workspace') { el.innerHTML = ''; return; }
       const at = getActiveTab();
       const gitActive = at && at.proto === 'git';
-      const btn = (icon, title, on, active, badge) => `<button class="tw-btn ${active ? 'active' : ''}" title="${title}" onclick="${on}">${icon}${badge ? `<span class="tw-dot">${badge}</span>` : ''}</button>`;
+      const btn = (icon, title, on, active, badge) => `<button class="rail-btn ${active ? 'active' : ''}" style="font-size:15px;" title="${title}" onclick="${on}">${icon}${badge ? `<span class="rail-badge">${badge}</span>` : ''}</button>`;
       el.innerHTML = `
-        <div class="tw-group">
-          ${btn('📁', 'Project 文件管理 (Alt+1)', "setWsLens('project')", STATE.wsLens === 'project' && !STATE.leftNavCollapsed)}
-          ${btn('🖥️', 'Sessions 打开任意会话 (Alt+2)', "setWsLens('sessions')", STATE.wsLens === 'sessions')}
-          ${btn('🌿', 'Git 面板 (Alt+9 / Ctrl+Shift+G)', "openWorkspaceGitSurface()", gitActive, STATE.gitState.changes.length)}
-          ${btn('🧭', 'Structure 结构大纲 (Alt+7)', "openRightInspectorTab('structure')", !STATE.rightDockCollapsed && STATE.rightDockTab === 'structure')}
-        </div>
-        <div class="tw-group">
-          ${btn('⌨️', 'Terminal (Alt+F12)', "setWsBottomTab('terminal')", STATE.wsBottomDockOpen && STATE.wsBottomDockTab === 'terminal')}
-          ${btn('⚠️', 'Problems (Alt+6)', "setWsBottomTab('problems')", STATE.wsBottomDockOpen && STATE.wsBottomDockTab === 'problems')}
-          ${btn('▶️', 'Run / Debug (Alt+4)', "setWsBottomTab('run')", STATE.wsBottomDockOpen && STATE.wsBottomDockTab === 'run')}
-          ${btn('🔍', 'Find / 全局搜索 (Alt+3)', "setWsBottomTab('search')", STATE.wsBottomDockOpen && STATE.wsBottomDockTab === 'search')}
-          ${btn('⋯', '更多工具窗口 (Bookmarks / TODO / Services / Database ...)', "openMoreToolWindowsMenu(event)", false)}
-        </div>`;
+        <div class="rail-divider"></div>
+        ${btn('📁', 'Project 文件管理 (Alt+1)', "setWsLens('project')", STATE.wsLens === 'project' && !STATE.leftNavCollapsed)}
+        ${btn('🖥️', 'Sessions 打开任意会话 (Alt+2)', "setWsLens('sessions')", STATE.wsLens === 'sessions' && !STATE.leftNavCollapsed)}
+        ${btn('🌿', 'Git 面板 (Alt+9 / Ctrl+Shift+G)', "openWorkspaceGitSurface()", gitActive, STATE.gitState.changes.length)}
+        ${btn('🧭', 'Structure 结构大纲 (Alt+7)', "openRightInspectorTab('structure')", !STATE.rightDockCollapsed && STATE.rightDockTab === 'structure')}
+        ${btn('⋯', '更多工具窗口 (Terminal / Problems / Run / Find / Bookmarks / TODO / Services ...)', "openMoreToolWindowsMenu(event)", STATE.wsBottomDockOpen)}`;
     }
 
     function setWsLens(lens) {
@@ -3069,8 +3062,14 @@
     function openMoreToolWindowsMenu(e) {
       e.stopPropagation();
       const r = e.currentTarget.getBoundingClientRect();
-      showContextMenuAt(r.right + 4, r.top - 120, `
-        <div style="padding:4px 8px;font-size:10.5px;font-weight:700;color:var(--taomni-text-muted);">更多工具窗口 (沿用原 Code Workspace)</div>
+      showContextMenuAt(r.right + 4, Math.max(8, r.top - 220), `
+        <div style="padding:4px 8px;font-size:10.5px;font-weight:700;color:var(--taomni-text-muted);">底部工具窗口 (同底栏页签)</div>
+        <div class="ctx-item" onclick="setWsBottomTab('terminal')"><span>⌨️ Terminal</span><span class="kbd-badge">Alt+F12</span></div>
+        <div class="ctx-item" onclick="setWsBottomTab('problems')"><span>⚠️ Problems</span><span class="kbd-badge">Alt+6</span></div>
+        <div class="ctx-item" onclick="setWsBottomTab('run')"><span>▶️ Run / Debug</span><span class="kbd-badge">Alt+4</span></div>
+        <div class="ctx-item" onclick="setWsBottomTab('search')"><span>🔍 Find / 全局搜索</span><span class="kbd-badge">Alt+3</span></div>
+        <div class="ctx-sep"></div>
+        <div style="padding:4px 8px;font-size:10.5px;font-weight:700;color:var(--taomni-text-muted);">更多 (沿用原 Code Workspace)</div>
         <div class="ctx-item" onclick="showToast('Bookmarks 已打开 (Alt+2)')"><span>🔖 Bookmarks</span></div>
         <div class="ctx-item" onclick="showToast('TODO 已打开 (Alt+6)')"><span>☑️ TODO</span></div>
         <div class="ctx-item" onclick="showToast('Services / Ports 已打开')"><span>🔌 Services / Ports</span></div>
@@ -3276,7 +3275,7 @@
       const head = el.querySelector('.mfa-head'); let d = null;
       head.onmousedown = ev => { d = { x: ev.clientX - el.offsetLeft, y: ev.clientY - el.offsetTop }; window.__mfaDrag = d; };
     }
-    window.addEventListener('mousemove', ev => { const el = document.getElementById('mfa-float'); const d = window.__mfaDrag; if (d) { el.style.left = (ev.clientX - d.x) + 'px'; el.style.top = (ev.clientY - d.y) + 'px'; el.style.right = 'auto'; } });
+    window.addEventListener('mousemove', ev => { const el = document.getElementById('mfa-float'); const d = window.__mfaDrag; if (d) { el.style.left = (ev.clientX - d.x) + 'px'; el.style.top = (ev.clientY - d.y) + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto'; } });
     window.addEventListener('mouseup', () => { window.__mfaDrag = null; });
 
     // Draggable Left & Right Sidebar Resizers

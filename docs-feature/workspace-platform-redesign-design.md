@@ -191,16 +191,21 @@ export interface SessionWorkbenchState {
 - 目录右键：`在此新建文件… (Alt+Insert)` / `在此新建目录…`；标签栏 `＋` 菜单同样提供。
 - 新建文件立即打开为标签并标记 `A`；添加根目录支持路径输入与拖拽目录到文件树。
 
-### 5.4 与原 Code Workspace（IDEA）左侧工具窗口条整合
-在 Workspace 左栏**最左侧嵌入 30px 的 IDEA 式工具窗口条**（仅 Workspaces 模式显示，其它模式隐藏），不新增任何顶部行：
+### 5.4 与原 Code Workspace（IDEA）左侧工具窗口条整合（v6.1：并入主导航，不再单独成条）
+- **取消独立的 30px 工具条**：它与主导航窄栏并列，形成两条竖条，视觉重复。
+- **融合方式**：进入 Workspaces 模式时，主导航窄栏在 5 个模式入口下方出现一组「工作区工具」（分隔线隔开，其它模式自动消失）：
 
-| 位置 | 按钮 | 行为 |
-| :-- | :-- | :-- |
-| 上组 | `📁 Project` | 文件树；再次点击收起左栏（IDEA 行为） |
-| 上组 | `🖥️ Sessions` | 打开任意会话面板 |
-| 上组 | `🌿 Git (变更数)` | 激活工作区 `GIT` 标签（`Ctrl+Shift+G`/`Alt+9`） |
-| 上组 | `🧭 Structure` | 右栏结构大纲 |
-| 下组 | `⌨️ Terminal` `⚠️ Problems` `▶️ Run` `🔍 Find` | 切换底部 Dock 对应页签（`Alt+F12` 等） |
-| 下组 | `⋯` | 其余窗口：Bookmarks / TODO / Services / Database / Git Log，及「显示名称」「移动到…」（沿用 `toolWindowLayout` 六个锚点） |
+| 按钮 | 行为 |
+| :-- | :-- |
+| `📁 Project` | 文件树；已激活时再次点击收起左栏（IDEA 行为） |
+| `🖥️ Sessions` | 打开任意会话面板 |
+| `🌿 Git (变更数)` | 激活工作区 `GIT` 标签（`Ctrl+Shift+G` / `Alt+9`） |
+| `🧭 Structure` | 右栏结构大纲 |
+| `⋯` | 菜单（保留）：底部窗口 Terminal / Problems / Run / Find，及 Bookmarks / TODO / Services / Database / Git Log、「显示名称」「移动到…」 |
 
-原则：工具条只做入口；底部 Dock、右栏、`toolWindowLayout` 的拖拽/移动/记忆行为保持原实现，默认折叠，保证首屏简洁。
+- **底部窗口不再占独立图标**：Terminal / Problems / Run / Find 已是底部 Dock 页签（工具栏 `⬓ 底栏` 开关），`⋯` 菜单只是同一入口的快捷方式，避免重复。
+- 竖向高度约 12 + 6 个按钮，小窗口时 `⋯` 之后的工作区工具优先折叠。
+- 底部 Dock、右栏及 `toolWindowLayout` 的拖拽/移动/记忆行为保持原实现，默认折叠。
+
+### 5.5 MFA 悬浮窗位置
+默认出现在窗口**左下角**（紧邻主导航底部的 MFA 图标上方），可拖动，再次点击图标关闭。
