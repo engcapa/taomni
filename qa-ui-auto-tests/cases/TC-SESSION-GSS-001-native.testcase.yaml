@@ -79,6 +79,11 @@ steps:
 - switch_window:
     selector: '[data-testid="sftp-detached-window"]'
     timeout_sec: 60
+- click: '[data-testid="sftp-remote-path-edit"]'
+- fill:
+    selector: '[data-testid="sftp-remote-path"]'
+    value: ${cfg.ssh_features.remote_dir}
+- press: Enter
 - assert_text:
     selector: '[data-testid="sftp-remote-list"]'
     contains: scp-source.txt
