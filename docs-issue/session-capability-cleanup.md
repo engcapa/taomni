@@ -262,3 +262,35 @@ failures may be reported separately, per user authorization.
 - Use a portable echo command and anchored output-line assertions in BOOK-003;
   both detached and reattached views must contain actual output, not command echo.
   Hosted verification of these corrections remains pending.
+
+## Final hosted acceptance (2026-10-24)
+
+- Workflow: [40048753290](https://github.com/engcapa/taomni/actions/runs/40048753290),
+  source commit `110debdb6e6c5a88d30ea80fba25dba4dc40580d`, aggregate success.
+  This checkpoint supersedes the pending statements above. Earlier failed runs
+  remain available for diagnosis.
+- Selected scope: 20 affected case IDs across Linux, macOS and Windows. Each OS
+  executed 8 browser and 15 native cases: 69 passed, zero failed, zero skipped.
+  This is the affected session/window matrix, not the full application case catalog.
+- Downloaded all 15 per-platform/shard summaries and their runner receipts;
+  verified summary hashes, successful exit codes, stable source/runner identities,
+  and native execution mode. All reports share production source fingerprint
+  `0e355a693f9ba27bcaee3e80d75cd2e77427dd2f267c44a49f368c7d8e3cc973`.
+- Native acceptance includes real ClickHouse HTTP/Native DDL/DML and authentication
+  recovery; Kerberos success and missing-ticket failure; generated encrypted keys
+  and OS agent authentication; SCP compatibility/fast transfer byte hashes and
+  interrupted-download recovery; real X11 windows; bookmark background, startup,
+  shortcuts, reconnect, detached terminal adoption and screenshot focus.
+- GSS-001 also creates a real detached SFTP window on each OS, then navigates its
+  independent channel to the fixture directory and reads the remote listing.
+  The popup begins in the remote home directory; the test does not establish
+  automatic adoption of the attached view's current path. Update its requirement
+  wording to reflect this executed boundary and revalidate the case on all OSes.
+- Browser/native suites were run only on GitHub, using
+  `.github/workflows/qa-ui-auto-platforms.yml`. Local validation used focused unit
+  tests, `cargo check`, `cargo fmt --check`, `pnpm check:refactor`, and the QA
+  catalog contract gate. No performance failures were excluded from this matrix.
+- Scope limits: the X11 case runs a real custom graphical command; full named
+  GNOME/KDE/Xfce desktop distributions were not provisioned. Native SQL supports
+  inline VALUES/SELECT insertion; FORMAT payload imports receive actionable HTTP
+  guidance. SCP resume evidence covers downloads, not interrupted upload resume.

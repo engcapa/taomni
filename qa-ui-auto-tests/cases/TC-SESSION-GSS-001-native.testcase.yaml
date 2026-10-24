@@ -124,8 +124,8 @@ verification:
     - 21
     - 27
   - id: R2
-    requirement: Detaching the authenticated SFTP browser creates a real usable window and preserves the remote directory.
-    actions: [28, 29]
+    requirement: Detaching creates a real independent SFTP window that can navigate and list remote files with the Kerberos ticket.
+    actions: [28, 29, 30, 31, 32]
     checkpoints:
     - step: 33
       expectation: The detached native window lists the same real server file using the Kerberos ticket.
