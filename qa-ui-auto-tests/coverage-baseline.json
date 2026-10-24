@@ -1,13 +1,18 @@
 {
   "version": 1,
   "totals": {
-    "features_with_controls": 89,
-    "required": 619,
-    "covered_required": 614,
-    "shallow": 46,
-    "orphans": 9
+    "features_with_controls": 105,
+    "required": 1156,
+    "covered_required": 1120,
+    "shallow": 60,
+    "orphans": 4
   },
   "features": {
+    "F1.10": {
+      "required": 18,
+      "covered_required": 18,
+      "shallow": 0
+    },
     "F1.2": {
       "required": 1,
       "covered_required": 1,
@@ -26,7 +31,7 @@
     "F1.6": {
       "required": 24,
       "covered_required": 24,
-      "shallow": 2
+      "shallow": 1
     },
     "F1.7": {
       "required": 1,
@@ -34,14 +39,14 @@
       "shallow": 0
     },
     "F1.8": {
-      "required": 1,
-      "covered_required": 1,
+      "required": 3,
+      "covered_required": 3,
       "shallow": 2
     },
     "F1.9": {
       "required": 4,
       "covered_required": 4,
-      "shallow": 0
+      "shallow": 2
     },
     "F2.2": {
       "required": 2,
@@ -51,12 +56,12 @@
     "F4.1": {
       "required": 0,
       "covered_required": 0,
-      "shallow": 2
+      "shallow": 1
     },
     "F4.2": {
       "required": 0,
       "covered_required": 0,
-      "shallow": 4
+      "shallow": 2
     },
     "F4.3": {
       "required": 4,
@@ -93,11 +98,6 @@
       "covered_required": 0,
       "shallow": 0
     },
-    "F4.13": {
-      "required": 2,
-      "covered_required": 2,
-      "shallow": 0
-    },
     "F5.2": {
       "required": 29,
       "covered_required": 29,
@@ -109,8 +109,8 @@
       "shallow": 0
     },
     "F6.2": {
-      "required": 9,
-      "covered_required": 9,
+      "required": 10,
+      "covered_required": 10,
       "shallow": 5
     },
     "F6.3": {
@@ -164,7 +164,7 @@
       "shallow": 0
     },
     "F9.7": {
-      "required": 7,
+      "required": 8,
       "covered_required": 7,
       "shallow": 0
     },
@@ -188,6 +188,11 @@
       "covered_required": 6,
       "shallow": 0
     },
+    "F-Update-1": {
+      "required": 7,
+      "covered_required": 7,
+      "shallow": 1
+    },
     "F-AI-2.1": {
       "required": 1,
       "covered_required": 1,
@@ -199,8 +204,8 @@
       "shallow": 0
     },
     "F-AI-2.3": {
-      "required": 0,
-      "covered_required": 0,
+      "required": 52,
+      "covered_required": 49,
       "shallow": 1
     },
     "F-AI-2.4": {
@@ -256,7 +261,7 @@
     "F-I18n-1": {
       "required": 4,
       "covered_required": 4,
-      "shallow": 1
+      "shallow": 0
     },
     "F-Detach-1": {
       "required": 1,
@@ -272,6 +277,11 @@
       "required": 0,
       "covered_required": 0,
       "shallow": 1
+    },
+    "F-RdpServer-1": {
+      "required": 0,
+      "covered_required": 0,
+      "shallow": 0
     },
     "F-DB-1": {
       "required": 0,
@@ -309,8 +319,8 @@
       "shallow": 0
     },
     "F-MAIL-3": {
-      "required": 1,
-      "covered_required": 1,
+      "required": 2,
+      "covered_required": 2,
       "shallow": 0
     },
     "F-MAIL-4": {
@@ -324,8 +334,8 @@
       "shallow": 0
     },
     "F-MAIL-6": {
-      "required": 1,
-      "covered_required": 1,
+      "required": 2,
+      "covered_required": 2,
       "shallow": 0
     },
     "F-MAIL-7": {
@@ -354,8 +364,8 @@
       "shallow": 0
     },
     "F-MAIL-12": {
-      "required": 2,
-      "covered_required": 2,
+      "required": 8,
+      "covered_required": 8,
       "shallow": 0
     },
     "F-MAIL-13": {
@@ -369,8 +379,8 @@
       "shallow": 0
     },
     "F-MAIL-15": {
-      "required": 2,
-      "covered_required": 2,
+      "required": 4,
+      "covered_required": 4,
       "shallow": 0
     },
     "F-MAIL-16": {
@@ -406,6 +416,11 @@
     "F-MAIL-22": {
       "required": 3,
       "covered_required": 3,
+      "shallow": 0
+    },
+    "F-MAIL-23": {
+      "required": 52,
+      "covered_required": 52,
       "shallow": 0
     },
     "F-Sockscap-1": {
@@ -448,9 +463,74 @@
       "covered_required": 9,
       "shallow": 1
     },
-    "F27.1": {
+    "F-MFA-1": {
+      "required": 46,
+      "covered_required": 46,
+      "shallow": 0
+    },
+    "F-MFA-2": {
       "required": 39,
-      "covered_required": 36,
+      "covered_required": 39,
+      "shallow": 0
+    },
+    "F-MFA-3": {
+      "required": 7,
+      "covered_required": 7,
+      "shallow": 0
+    },
+    "F-BACKUP-2": {
+      "required": 28,
+      "covered_required": 20,
+      "shallow": 3
+    },
+    "F-BACKUP-1": {
+      "required": 8,
+      "covered_required": 8,
+      "shallow": 0
+    },
+    "F27.1": {
+      "required": 182,
+      "covered_required": 177,
+      "shallow": 1
+    },
+    "F27.2": {
+      "required": 6,
+      "covered_required": 6,
+      "shallow": 0
+    },
+    "F-AI-2.8": {
+      "required": 24,
+      "covered_required": 22,
+      "shallow": 0
+    },
+    "F-WS-1": {
+      "required": 9,
+      "covered_required": 8,
+      "shallow": 0
+    },
+    "F-WS-2": {
+      "required": 43,
+      "covered_required": 34,
+      "shallow": 9
+    },
+    "F-WS-3": {
+      "required": 11,
+      "covered_required": 11,
+      "shallow": 0
+    },
+    "F-WS-4": {
+      "required": 13,
+      "covered_required": 11,
+      "shallow": 2
+    },
+    "F-WS-5": {
+      "required": 3,
+      "covered_required": 2,
+      "shallow": 1
+    },
+    "F-WS-6": {
+      "required": 16,
+      "covered_required": 14,
       "shallow": 2
     }
   }

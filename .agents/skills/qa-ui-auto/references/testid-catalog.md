@@ -1652,6 +1652,119 @@
 - `[data-testid="window-max"]` — display — F1.3.window-max
 - `[data-testid="window-close"]` — display — F1.3.window-close
 
+## main/workspace-platform (F-WS-1)
+
+- `[data-testid="global-search-trigger"]` — interactive — F-WS-1.global-search-trigger
+- `[data-testid="home-sidebar-panel"]` — display — F-WS-1.home-sidebar-panel
+- `[data-testid="nav-mode-agents"]` — interactive — F-WS-1.nav-mode-agents
+- `[data-testid="nav-mode-home"]` — interactive — F-WS-1.nav-mode-home
+- `[data-testid="nav-mode-workspaces"]` — interactive — F-WS-1.nav-mode-workspaces
+- `[data-testid="right-sidebar"]` — display — F-WS-1.right-sidebar
+- `[data-testid="sidebar-rail"]` — interactive — F-WS-1.sidebar-rail
+- `[data-testid="toggle-left-sidebar"]` — interactive — F-WS-1.toggle-left-sidebar
+- `[data-testid="toggle-right-sidebar"]` — interactive — F-WS-1.toggle-right-sidebar
+
+## main/workspace-platform (F-WS-2)
+
+- `[data-testid="workspace-add-folder"]` — interactive — F-WS-2.workspace-add-folder
+- `[data-testid="workspace-default-badge"]` — display — F-WS-2.workspace-default-badge
+- `[data-testid="workspace-file-editor"]` — display — F-WS-2.workspace-file-editor
+- `[data-testid="workspace-file-tree"]` — display — F-WS-2.workspace-file-tree
+- `[data-testid="workspace-fs-modal"]` — display — F-WS-2.workspace-fs-modal
+- `[data-testid="workspace-fs-modal-confirm"]` — interactive — F-WS-2.workspace-fs-modal-confirm
+- `[data-testid="workspace-fs-modal-input"]` — display — F-WS-2.workspace-fs-modal-input
+- `[data-testid="workspace-git-panel"]` — display — F-WS-2.workspace-git-panel
+- `[data-testid="workspace-main-panel"]` — display — F-WS-2.workspace-main-panel
+- `[data-testid="workspace-new-file"]` — interactive — F-WS-2.workspace-new-file
+- `[data-testid="workspace-new-folder"]` — interactive — F-WS-2.workspace-new-folder
+- `[data-testid="workspace-open-session-menu"]` — display — F-WS-2.workspace-open-session-menu
+- `[data-testid="workspace-open-session-plus"]` — interactive — F-WS-2.workspace-open-session-plus
+- `[data-testid="workspace-plus-local-terminal"]` — interactive — F-WS-2.workspace-plus-local-terminal
+- `[data-testid="workspace-plus-open-session"]` — interactive — F-WS-2.workspace-plus-open-session
+- `[data-testid="workspace-repo-selector"]` — interactive — F-WS-2.workspace-repo-selector
+- `[data-testid="workspace-session-pane"]` — display — F-WS-2.workspace-session-pane
+- `[data-testid="workspace-session-picker-filter-db"]` — interactive — F-WS-2.workspace-session-picker-filter-db
+- `[data-testid="workspace-session-picker-filter-desktop"]` — interactive — F-WS-2.workspace-session-picker-filter-desktop
+- `[data-testid="workspace-session-picker-filter-sftp"]` — interactive — F-WS-2.workspace-session-picker-filter-sftp
+- `[data-testid="workspace-session-picker-filter-ssh"]` — interactive — F-WS-2.workspace-session-picker-filter-ssh
+- `[data-testid="workspace-session-picker-modal"]` — display — F-WS-2.workspace-session-picker-modal
+- `[data-testid="workspace-session-picker-pin"]` — interactive — F-WS-2.workspace-session-picker-pin
+- `[data-testid="workspace-session-picker-row"]` — display — F-WS-2.workspace-session-picker-row
+- `[data-testid="workspace-session-picker-search"]` — interactive — F-WS-2.workspace-session-picker-search
+- `[data-testid="workspace-sidebar-git-bar"]` — display — F-WS-2.workspace-sidebar-git-bar
+- `[data-testid="workspace-sidebar-panel"]` — display — F-WS-2.workspace-sidebar-panel
+- `[data-testid="workspace-switcher"]` — display — F-WS-2.workspace-switcher
+- `[data-testid="workspace-switcher-button"]` — interactive — F-WS-2.workspace-switcher-button
+- `[data-testid="workspace-switcher-menu"]` — display — F-WS-2.workspace-switcher-menu
+- `[data-testid="workspace-tab"]` — interactive — F-WS-2.workspace-tab
+- `[data-testid="workspace-tab-strip"]` — display — F-WS-2.workspace-tab-strip
+- `[data-testid="workspace-tree-add-root"]` — interactive — F-WS-2.workspace-tree-add-root
+- `[data-testid="workspace-tree-copy-path"]` — interactive — F-WS-2.workspace-tree-copy-path
+- `[data-testid="workspace-tree-delete"]` — interactive — F-WS-2.workspace-tree-delete
+- `[data-testid="workspace-tree-file"]` — interactive — F-WS-2.workspace-tree-file
+- `[data-testid="workspace-tree-folder"]` — interactive — F-WS-2.workspace-tree-folder
+- `[data-testid="workspace-tree-new-file"]` — interactive — F-WS-2.workspace-tree-new-file
+- `[data-testid="workspace-tree-new-folder"]` — interactive — F-WS-2.workspace-tree-new-folder
+- `[data-testid="workspace-tree-remove-root"]` — interactive — F-WS-2.workspace-tree-remove-root
+- `[data-testid="workspace-tree-rename"]` — interactive — F-WS-2.workspace-tree-rename
+- `[data-testid="workspace-tree-root"]` — display — F-WS-2.workspace-tree-root
+- `[data-testid="workspace-session-picker-filter-all"]` — interactive — F-WS-2.workspace-session-picker-filter-all
+
+## main/workspace-platform (F-WS-3)
+
+- `[data-testid="mfa-floating-account"]` — interactive — F-WS-3.mfa-floating-account
+- `[data-testid="mfa-floating-close"]` — interactive — F-WS-3.mfa-floating-close
+- `[data-testid="mfa-floating-drag-handle"]` — interactive — F-WS-3.mfa-floating-drag-handle
+- `[data-testid="mfa-floating-expand-tab"]` — interactive — F-WS-3.mfa-floating-expand-tab
+- `[data-testid="mfa-floating-locked"]` — display — F-WS-3.mfa-floating-locked
+- `[data-testid="mfa-floating-pin"]` — interactive — F-WS-3.mfa-floating-pin
+- `[data-testid="mfa-floating-search"]` — interactive — F-WS-3.mfa-floating-search
+- `[data-testid="mfa-floating-window"]` — display — F-WS-3.mfa-floating-window
+- `[data-testid="rail-bottom-tools"]` — display — F-WS-3.rail-bottom-tools
+- `[data-testid="rail-chat-button"]` — interactive — F-WS-3.rail-chat-button
+- `[data-testid="rail-mfa-button"]` — interactive — F-WS-3.rail-mfa-button
+
+## main/workspace-platform (F-WS-4)
+
+- `[data-testid="editor-open-git-diff"]` — interactive — F-WS-4.editor-open-git-diff
+- `[data-testid="git-branches-tab"]` — interactive — F-WS-4.git-branches-tab
+- `[data-testid="git-changes-tab"]` — interactive — F-WS-4.git-changes-tab
+- `[data-testid="git-changes-tree-toggle"]` — interactive — F-WS-4.git-changes-tree-toggle
+- `[data-testid="git-commit-amend"]` — interactive — F-WS-4.git-commit-amend
+- `[data-testid="git-commit-and-push"]` — interactive — F-WS-4.git-commit-and-push
+- `[data-testid="git-commit-button"]` — interactive — F-WS-4.git-commit-button
+- `[data-testid="git-commit-message"]` — interactive — F-WS-4.git-commit-message
+- `[data-testid="git-settings-tab"]` — interactive — F-WS-4.git-settings-tab
+- `[data-testid="git-stash-tab"]` — interactive — F-WS-4.git-stash-tab
+- `[data-testid="git-tags-tab"]` — interactive — F-WS-4.git-tags-tab
+- `[data-testid="git-branches-view"]` — display — F-WS-4.git-branches-view
+- `[data-testid="git-tags-view"]` — display — F-WS-4.git-tags-view
+
+## main/workspace-platform (F-WS-5)
+
+- `[data-testid="session-favorite"]` — interactive — F-WS-5.session-favorite
+- `[data-testid="session-refresh"]` — interactive — F-WS-5.session-refresh
+- `[data-testid="sessions-sidebar-panel"]` — display — F-WS-5.sessions-sidebar-panel
+
+## main/workspace-platform (F-WS-6)
+
+- `[data-testid="agents-dispatch-modal"]` — display — F-WS-6.agents-dispatch-modal
+- `[data-testid="agents-dispatch-model"]` — interactive — F-WS-6.agents-dispatch-model
+- `[data-testid="agents-dispatch-open"]` — interactive — F-WS-6.agents-dispatch-open
+- `[data-testid="agents-dispatch-submit"]` — interactive — F-WS-6.agents-dispatch-submit
+- `[data-testid="agents-dispatch-task-input"]` — interactive — F-WS-6.agents-dispatch-task-input
+- `[data-testid="agents-dispatch-workspace"]` — interactive — F-WS-6.agents-dispatch-workspace
+- `[data-testid="agents-empty-state"]` — display — F-WS-6.agents-empty-state
+- `[data-testid="agents-platform-view"]` — display — F-WS-6.agents-platform-view
+- `[data-testid="agents-review-in-git"]` — interactive — F-WS-6.agents-review-in-git
+- `[data-testid="agents-task-detail"]` — display — F-WS-6.agents-task-detail
+- `[data-testid="agents-trace"]` — display — F-WS-6.agents-trace
+- `[data-testid="global-search-input"]` — interactive — F-WS-6.global-search-input
+- `[data-testid="global-search-modal"]` — display — F-WS-6.global-search-modal
+- `[data-testid="global-search-result"]` — display — F-WS-6.global-search-result
+- `[data-testid="menu-export-sessions"]` — display — F-WS-6.menu-export-sessions
+- `[data-testid="open-tabs-filter"]` — interactive — F-WS-6.open-tabs-filter
+
 ## network/sockscap (F-Sockscap-1)
 
 - `[data-testid="side-tab-tools"]` — interactive — F-Sockscap-1.tools-side-tab

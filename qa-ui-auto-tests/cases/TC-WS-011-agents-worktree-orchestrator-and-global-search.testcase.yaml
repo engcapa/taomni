@@ -41,7 +41,7 @@ steps:
 - assert_text:
     selector: '[data-testid="agents-trace"]'
     contains: worktree
-- assert_visible: '[data-testid="agents-task-detail"] [data-testid="agents-review-in-git"]'
+- assert_visible: '[data-testid="agents-review-in-git"]'
 - click: '[data-testid="agents-review-in-git"]'
 - wait_for: '[data-testid="workspace-git-panel"]'
 - assert_visible: '[data-testid="workspace-tab"][data-tab-kind="git"]'

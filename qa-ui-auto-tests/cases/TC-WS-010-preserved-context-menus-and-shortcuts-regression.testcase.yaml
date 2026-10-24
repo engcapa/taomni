@@ -1,9 +1,8 @@
 id: TC-WS-010
 title: Context menus and import/export stay complete across the redesigned shell
-description: v6.1 AC-10 regression. The app main menu keeps its entries (new local terminal, new remote session, new SFTP,
-  Sessions import/export submenus, View, Tools, Settings, Help, Exit); the primary rail keeps Show Tool Window Names; the
-  session tree, tab strip and workspace file tree keep their full context menus (connect/edit/duplicate/move/delete, close
-  variants, copy path, new file/directory, add/remove root).
+description: v6.1 AC-10 regression. The app main menu keeps its entries (new local terminal, new remote session, new SFTP, Sessions import/export submenus, View,
+  Tools, Settings, Help, Exit); the primary rail keeps Show Tool Window Names; the session tree, tab strip and workspace file tree keep their full context menus (connect/edit/duplicate/move/delete,
+  close variants, copy path, new file/directory, add/remove root).
 modes:
 - browser
 - native
@@ -30,8 +29,7 @@ steps:
     value: '[{"id":"ws-qa-ssh","name":"prod-api-01","session_type":"SSH","group_path":"QA","host":"10.9.0.1","port":22,"username":"root","auth_method":"None","options_json":"{}","created_at":1,"updated_at":1,"last_connected_at":null,"sort_order":0}]'
 - seed_storage:
     key: taomni.platformWorkspaces.v1
-    value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default
-      Workspace (默认工作区)","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"qa-root","path":"${fixture.platform_workspace_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
+    value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace (默认工作区)","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"qa-root","path":"${fixture.platform_workspace_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
 - reload_window: null
 - wait_for: '[data-testid="session-tree"]'
 - click: '[data-testid="app-main-menu"]'

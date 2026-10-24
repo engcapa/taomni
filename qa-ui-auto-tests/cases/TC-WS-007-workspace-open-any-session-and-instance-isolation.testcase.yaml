@@ -33,6 +33,25 @@ steps:
 - wait_for: '[data-testid="workspace-open-session-menu"]'
 - click: '[data-testid="workspace-plus-open-session"]'
 - wait_for: '[data-testid="workspace-session-picker-modal"]'
+- click: '[data-testid="workspace-session-picker-filter-ssh"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-session-picker-filter-ssh"]'
+    name: aria-pressed
+    equals: 'true'
+- click: '[data-testid="workspace-session-picker-filter-db"]'
+- assert_count:
+    selector: '[data-testid="workspace-session-picker-row"]'
+    equal: 1
+- click: '[data-testid="workspace-session-picker-filter-all"]'
+- fill:
+    selector: '[data-testid="workspace-session-picker-search"]'
+    value: prod
+- assert_count:
+    selector: '[data-testid="workspace-session-picker-row"]'
+    equal: 1
+- fill:
+    selector: '[data-testid="workspace-session-picker-search"]'
+    value: ''
 - assert_visible: '[data-testid="workspace-session-picker-search"]'
 - assert_visible: '[data-testid="workspace-session-picker-filter-ssh"]'
 - assert_visible: '[data-testid="workspace-session-picker-filter-db"]'
@@ -80,61 +99,61 @@ verification:
     actions:
     - 11
     - 12
-    - 13
-    - 14
-    - 15
-    - 16
-    - 17
-    - 18
-    - 19
-    - 20
     - 21
     - 22
     - 23
-    checkpoints:
-    - step: 14
-      expectation: 打开任意会话弹窗出现
-    - step: 21
-      expectation: 弹窗列出未关联的全局会话
-    - step: 24
-      expectation: 会话在工作区生成独立标签与面板
-    results:
-    - 14
-    - 21
     - 24
-  - id: R2
-    requirement: + 菜单还提供本地终端入口，工作区会话面板与 Sessions 模式的标签互不出现在对方标签栏中。
-    actions:
     - 25
     - 26
     - 27
     - 28
     - 29
     - 30
-    checkpoints:
-    - step: 29
-      expectation: 本地终端在当前工作区打开
-    - step: 31
-      expectation: Sessions 模式不显示工作区标签条
-    results:
-    - 29
     - 31
-  - id: R3
-    requirement: 关闭工作区内的会话标签不影响 Sessions 模式；再次进入工作区只保留工作区自己的标签。
+    checkpoints:
+    - step: 22
+      expectation: 打开任意会话弹窗出现
+    - step: 29
+      expectation: 弹窗列出未关联的全局会话
+    - step: 32
+      expectation: 会话在工作区生成独立标签与面板
+    results:
+    - 22
+    - 29
+    - 32
+  - id: R2
+    requirement: + 菜单还提供本地终端入口，工作区会话面板与 Sessions 模式的标签互不出现在对方标签栏中。
     actions:
     - 33
     - 34
     - 35
+    - 36
+    - 37
+    - 38
     checkpoints:
-    - step: 34
+    - step: 37
+      expectation: 本地终端在当前工作区打开
+    - step: 39
+      expectation: Sessions 模式不显示工作区标签条
+    results:
+    - 37
+    - 39
+  - id: R3
+    requirement: 关闭工作区内的会话标签不影响 Sessions 模式；再次进入工作区只保留工作区自己的标签。
+    actions:
+    - 41
+    - 42
+    - 43
+    checkpoints:
+    - step: 42
       expectation: 工作区标签仍包含本地终端与会话标签
-    - step: 36
+    - step: 44
       expectation: 关闭工作区会话标签后该标签消失
-    - step: 40
+    - step: 48
       expectation: 回到工作区仍可继续操作
     results:
-    - 34
-    - 36
+    - 42
+    - 44
   visual:
   - check: 工作区标签条只显示工作区实例，Sessions 模式标签条不混入工作区会话。
     method: manual

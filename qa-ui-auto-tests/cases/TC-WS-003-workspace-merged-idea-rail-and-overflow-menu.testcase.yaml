@@ -1,9 +1,8 @@
 id: TC-WS-003
 title: Workspaces mode merges the IDEA tool windows into the primary rail with the full overflow menu
-description: v6.1 AC-03 / DEC-02. Switching to Workspaces mode renders the IDEA tool window group (Project, Sessions, Git,
-  Structure, More) inside the window's single primary rail, never as a second vertical stripe in the canvas. The overflow
-  button keeps every IDEA tool window entry plus Show Tool Window Names and Move to. Non-Workspaces modes hide the whole contextual
-  group.
+description: v6.1 AC-03 / DEC-02. Switching to Workspaces mode renders the IDEA tool window group (Project, Sessions, Git, Structure, More) inside the window's single
+  primary rail, never as a second vertical stripe in the canvas. The overflow button keeps every IDEA tool window entry plus Show Tool Window Names and Move to. Non-Workspaces
+  modes hide the whole contextual group.
 modes:
 - browser
 - native

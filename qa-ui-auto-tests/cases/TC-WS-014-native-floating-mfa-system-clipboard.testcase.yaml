@@ -1,8 +1,7 @@
 id: TC-WS-014
 title: Bottom-left floating MFA copies the plain HOTP code to the real Linux system clipboard
-description: v6.1 AC-04 native clipboard boundary. In the packaged Linux/WebKitGTK app the floating MFA window writes the
-  six plain digits of an HOTP account to the OS CLIPBOARD, read back by an independent process, proving the bottom-left floating
-  surface uses the desktop clipboard path and not a renderer-only copy.
+description: v6.1 AC-04 native clipboard boundary. In the packaged Linux/WebKitGTK app the floating MFA window writes the six plain digits of an HOTP account to the
+  OS CLIPBOARD, read back by an independent process, proving the bottom-left floating surface uses the desktop clipboard path and not a renderer-only copy.
 modes:
 - native
 native_platforms:

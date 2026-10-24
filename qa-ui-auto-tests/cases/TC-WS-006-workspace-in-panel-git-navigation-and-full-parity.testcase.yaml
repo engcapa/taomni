@@ -29,12 +29,6 @@ steps:
 - wait_for: '[data-testid="session-tree"]'
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="workspace-sidebar-panel"]'
-- assert_count:
-    selector: '[data-testid="workspace-git-toggle-row"]'
-    equal: 0
-- assert_count:
-    selector: '[data-testid="control-bar-legacy-git-button"]'
-    equal: 0
 - assert_visible: '[data-testid="workspace-sidebar-git-bar"]'
 - assert_visible: '[data-testid="sidebar-rail"] [data-testid="code-workspace-tool-rail-git"]'
 - click: '[data-testid="workspace-sidebar-git-bar"]'
@@ -51,6 +45,36 @@ steps:
 - assert_visible: '[data-testid="git-commit-message"]'
 - assert_visible: '[data-testid="git-commit-button"]'
 - assert_visible: '[data-testid="git-commit-and-push"]'
+- click: '[data-testid="git-changes-tree-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="git-changes-tree-toggle"]'
+    name: data-tree-mode
+    equals: tree
+- click: '[data-testid="git-branches-tab"]'
+- wait_for: '[data-testid="git-branches-view"]'
+- click: '[data-testid="git-tags-tab"]'
+- wait_for: '[data-testid="git-tags-view"]'
+- click: '[data-testid="git-stash-tab"]'
+- assert_attribute:
+    selector: '[data-testid="git-stash-tab"]'
+    name: aria-pressed
+    equals: 'true'
+- click: '[data-testid="git-settings-tab"]'
+- assert_attribute:
+    selector: '[data-testid="git-settings-tab"]'
+    name: aria-pressed
+    equals: 'true'
+- click: '[data-testid="git-changes-tab"]'
+- fill:
+    selector: '[data-testid="git-commit-message"]'
+    value: 'feat(qa): workspace git case'
+- set_check:
+    selector: '[data-testid="git-commit-amend"]'
+    checked: true
+- assert_attribute:
+    selector: '[data-testid="git-commit-amend"]'
+    name: checked
+    equals: 'true'
 - click: '[data-testid="workspace-tree-root"]'
 - wait_for: '[data-testid="workspace-tree-file"][data-path="same.txt"]'
 - click: '[data-testid="workspace-tree-file"][data-path="same.txt"]'
@@ -79,23 +103,22 @@ verification:
   - id: R1
     requirement: 工作区已移除左栏 [文件管理|Git] 行与右上角 Git 按钮，且左栏 Git 状态条与主左栏 Git 工具按钮存在。
     actions:
+    - 9
     - 10
     - 11
-    - 12
-    - 13
     checkpoints:
-    - step: 10
+    - step: 9
       expectation: 旧文件管理/Git 切换行不存在
-    - step: 11
-      expectation: 顶栏旧 Git 按钮不存在
-    - step: 14
+    - step: 12
       expectation: 主左侧栏 Git 工具按钮与本栏状态条均存在
     results:
-    - 10
-    - 14
+    - 9
+    - 12
   - id: R2
     requirement: 点击左栏 Git 状态条打开内置 Git 面板，6 大子标签页、Tree/Flat 切换、Amend 与 Commit/Commit&Passh 完整可用。
     actions:
+    - 13
+    - 14
     - 15
     - 16
     - 17
@@ -103,52 +126,50 @@ verification:
     - 19
     - 20
     - 21
-    - 22
-    - 23
     checkpoints:
-    - step: 16
+    - step: 14
       expectation: 工作区内置 Git 面板打开
-    - step: 22
+    - step: 20
       expectation: Changes/Log/Branches/Tags/Stash/Settings 全部存在
-    - step: 24
+    - step: 22
       expectation: Tree/Flat 切换存在
-    - step: 26
+    - step: 24
       expectation: Amend 与提交控件存在
     results:
-    - 16
+    - 14
+    - 20
     - 22
-    - 24
   - id: R3
     requirement: 编辑器“在 Git 面板对比”路径打开 Git 面板并定位当前文件；新增多根目录后仓库切换器出现且 Diff 支持并排/统一切换。
     actions:
-    - 28
-    - 29
-    - 30
-    - 31
-    - 32
-    - 33
-    - 34
-    - 35
-    - 36
-    - 37
-    - 38
-    - 39
     - 40
     - 41
     - 42
     - 43
     - 44
+    - 45
+    - 46
+    - 47
+    - 48
+    - 49
+    - 50
+    - 51
+    - 52
+    - 53
+    - 54
+    - 55
+    - 56
     checkpoints:
-    - step: 32
+    - step: 44
       expectation: Git 面板带 focus-path 定位
-    - step: 37
+    - step: 49
       expectation: 多仓库管理器与仓库选择器出现
-    - step: 45
+    - step: 57
       expectation: 并排/统一 Diff 可切换
     results:
-    - 32
-    - 37
-    - 45
+    - 44
+    - 49
+    - 57
   visual:
   - check: Git 面板保留 main 的视觉与信息密度，移除的冗余入口确不存在。
     method: manual

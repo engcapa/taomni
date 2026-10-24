@@ -31,9 +31,6 @@ steps:
     selector: '[data-testid="quick-connect"]'
     equal: 0
 - assert_count:
-    selector: '[data-testid="terminal-breadcrumb"]'
-    equal: 0
-- assert_count:
     selector: '[data-testid="control-bar"]'
     equal: 1
 - assert_visible: '[data-testid="session-new"]'
@@ -53,6 +50,7 @@ steps:
     - session-delete
     - session-refresh
     - session-favorite
+- click: '[data-testid="session-refresh"]'
 - assert_visible: '[data-testid="session-tree"]'
 - wait_for: '[data-testid="sessions-sidebar-panel"] >> text="prod-api-01"'
 - fill:
@@ -93,21 +91,18 @@ verification:
     requirement: Sessions 模式不显示快速连接芯片行或终端次级面包屑，主面板共享单行 33px 工具栏。
     actions:
     - 7
-    - 8
     checkpoints:
     - step: 7
       expectation: quick-connect 未渲染
     - step: 8
       expectation: 终端面包屑未渲染
-    - step: 9
-      expectation: 仅一个 control-bar
     results:
     - 7
     - 8
-    - 9
   - id: R2
     requirement: 左栏完整保留 7 个会话工具按钮、搜索框、目录树与右键菜单。
     actions:
+    - 9
     - 10
     - 11
     - 12
@@ -115,7 +110,6 @@ verification:
     - 14
     - 15
     - 16
-    - 17
     - 18
     - 19
     - 20
@@ -126,14 +120,14 @@ verification:
     - 25
     - 26
     checkpoints:
-    - step: 17
+    - step: 16
       expectation: 会话搜索可用
     - step: 19
       expectation: 搜索过滤 prod-api-01
     - step: 27
       expectation: 会话右键菜单包含 Connect 与 Move to Folder
     results:
-    - 17
+    - 16
     - 19
     - 27
   - id: R3

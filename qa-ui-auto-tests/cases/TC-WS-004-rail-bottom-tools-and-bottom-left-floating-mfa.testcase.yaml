@@ -48,6 +48,16 @@ steps:
 - assert_count:
     selector: '[data-testid="control-bar"] [data-testid="language-switcher"]'
     equal: 0
+- click: '[data-testid="rail-chat-button"]'
+- assert_attribute:
+    selector: '[data-testid="rail-chat-button"]'
+    name: aria-pressed
+    equals: 'true'
+- click: '[data-testid="rail-chat-button"]'
+- assert_attribute:
+    selector: '[data-testid="rail-chat-button"]'
+    name: aria-pressed
+    equals: 'false'
 - click: '[data-testid="rail-mfa-button"]'
 - wait_for: '[data-testid="mfa-floating-window"]'
 - assert_visible: '[data-testid="mfa-floating-locked"]'
@@ -117,55 +127,55 @@ verification:
   - id: R2
     requirement: 点击 MFA 在左下角弹出浮窗；未解锁时展示紧凑解锁入口，展开后在 MFA 标签页完成主密码初始化。
     actions:
-    - 12
     - 16
-    - 19
     - 20
-    - 21
+    - 23
+    - 24
+    - 25
     checkpoints:
-    - step: 13
-      expectation: 步骤 13 的可观察断言通过
-    - step: 14
-      expectation: 步骤 14 的可观察断言通过
-    - step: 15
-      expectation: 步骤 15 的可观察断言通过
     - step: 17
-      expectation: 步骤 17 的可观察断言通过
+      expectation: 步骤 13 的可观察断言通过
     - step: 18
-      expectation: 步骤 18 的可观察断言通过
+      expectation: 步骤 14 的可观察断言通过
+    - step: 19
+      expectation: 步骤 15 的可观察断言通过
+    - step: 21
+      expectation: 步骤 17 的可观察断言通过
     - step: 22
+      expectation: 步骤 18 的可观察断言通过
+    - step: 26
       expectation: 步骤 22 的可观察断言通过
     results:
-    - 22
+    - 26
   - id: R3
     requirement: 初始化后浮窗提供搜索、置顶、拖拽栏与展开；展开切换到全屏 MFA 标签页并关闭浮窗，Esc 可关闭浮窗。
     actions:
-    - 23
-    - 28
-    - 30
-    - 33
-    - 35
+    - 27
+    - 32
+    - 34
+    - 37
+    - 39
     checkpoints:
-    - step: 24
+    - step: 28
       expectation: 步骤 24 的可观察断言通过
-    - step: 25
-      expectation: 步骤 25 的可观察断言通过
-    - step: 26
-      expectation: 步骤 26 的可观察断言通过
-    - step: 27
-      expectation: 步骤 27 的可观察断言通过
     - step: 29
-      expectation: 步骤 29 的可观察断言通过
+      expectation: 步骤 25 的可观察断言通过
+    - step: 30
+      expectation: 步骤 26 的可观察断言通过
     - step: 31
+      expectation: 步骤 27 的可观察断言通过
+    - step: 33
+      expectation: 步骤 29 的可观察断言通过
+    - step: 35
       expectation: 步骤 31 的可观察断言通过
-    - step: 32
-      expectation: 步骤 32 的可观察断言通过
-    - step: 34
-      expectation: 步骤 34 的可观察断言通过
     - step: 36
+      expectation: 步骤 32 的可观察断言通过
+    - step: 38
+      expectation: 步骤 34 的可观察断言通过
+    - step: 40
       expectation: 步骤 36 的可观察断言通过
     results:
-    - 36
+    - 40
   visual:
   - check: 底部工具排列紧凑、图标清晰，浮窗位于左下角且不遮挡终端主体。
     method: manual

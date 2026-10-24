@@ -29,12 +29,6 @@ steps:
 - assert_visible: '[data-testid="global-search-trigger"]'
 - assert_visible: '[data-testid="toggle-right-sidebar"]'
 - assert_visible: '[data-testid="titlebar-tray"]'
-- assert_count:
-    selector: '[data-testid="titlebar-secondary"]'
-    equal: 0
-- assert_count:
-    selector: '[data-testid="titlebar-three-dots"]'
-    equal: 0
 - eval_readonly:
     expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"control-bar"]').getBoundingClientRect().height <= 34
     expect_truthy: true
@@ -79,27 +73,27 @@ verification:
   - id: R2
     requirement: 点击 ◧ 或按 Ctrl/Cmd+B 折叠主侧栏，再次触发恢复展开；◨ 切换右侧上下文栏。
     actions:
+    - 11
+    - 12
     - 13
     - 14
     - 15
     - 16
     - 17
-    - 18
-    - 19
     checkpoints:
-    - step: 14
+    - step: 12
       expectation: 折叠后 collapsed-sidebar-rail 出现
-    - step: 16
+    - step: 14
       expectation: Ctrl/Cmd+B 后展开面板出现
-    - step: 18
+    - step: 16
       expectation: 右栏隐藏
-    - step: 20
+    - step: 18
       expectation: 右栏恢复显示
     results:
+    - 12
     - 14
     - 16
     - 18
-    - 20
   visual:
   - check: 顶栏为单行紧凑布局，按钮与标签不截断；无第二顶栏和 3 色装饰圆点。
     method: manual

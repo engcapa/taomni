@@ -11797,3 +11797,463 @@ controls:
 > - SFTP 底部的 "Cross-host transfer (remote ↔ remote)" 按钮（disabled 占位）
 
 - TC-MAIL-SYNC-03: native sparse UID command limits, FETCH reconnect, gap-free catch-up and full remote deletion/flag reconciliation (F-MAIL-5/F-MAIL-3).
+
+---
+
+## 12. Workspace-First 平台重构（v6.1）
+
+> 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents 调度台与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-014`。
+
+### 12.1 Workspace-first 主壳层：单行工具栏、主导航条 5 大模式与右栏收纳
+
+<!-- feature
+id: F-WS-1
+status: done
+area: main/workspace-platform
+components: [ControlBar, Sidebar, PrimaryNavigationRail, WorkspaceSidebar, WorkspaceMainPanel, MfaFloatingWindow, AgentsPlatformView, GlobalCommandModal]
+files:
+  - src/components/tabbar/ControlBar.tsx
+  - src/components/sidebar/PrimaryNavigationRail.tsx
+  - src/components/sidebar/Sidebar.tsx
+  - src/components/workspace/WorkspaceSidebar.tsx
+  - src/components/workspace/WorkspaceMainPanel.tsx
+  - src/components/workspace/WorkspaceGitPanel.tsx
+  - src/components/workspace/WorkspaceSessionPickerModal.tsx
+  - src/components/workspace/WorkspaceSessionPane.tsx
+  - src/components/mfa/MfaFloatingWindow.tsx
+  - src/components/agents/AgentsPlatformView.tsx
+  - src/components/search/GlobalCommandModal.tsx
+  - src/stores/workspacePlatformStore.ts
+  - src/stores/agentsStore.ts
+  - src/stores/workspaceEditorStore.ts
+  - src/stores/workspaceUiStore.ts
+controls:
+  - id: global-search-trigger
+    selector: '[data-testid="global-search-trigger"]'
+    kind: interactive
+  - id: home-sidebar-panel
+    selector: '[data-testid="home-sidebar-panel"]'
+    kind: display
+  - id: nav-mode-agents
+    selector: '[data-testid="nav-mode-agents"]'
+    kind: interactive
+  - id: nav-mode-home
+    selector: '[data-testid="nav-mode-home"]'
+    kind: interactive
+  - id: nav-mode-workspaces
+    selector: '[data-testid="nav-mode-workspaces"]'
+    kind: interactive
+  - id: right-sidebar
+    selector: '[data-testid="right-sidebar"]'
+    kind: display
+  - id: sidebar-rail
+    selector: '[data-testid="sidebar-rail"]'
+    kind: interactive
+  - id: toggle-left-sidebar
+    selector: '[data-testid="toggle-left-sidebar"]'
+    kind: interactive
+  - id: toggle-right-sidebar
+    selector: '[data-testid="toggle-right-sidebar"]'
+    kind: interactive
+-->
+
+主窗口只有单行 33px 共享 ControlBar；左侧主导航条提供 Home / Workspaces / Sessions / Agents / Tools 五大一级模式，支持左右侧栏收缩与 Ctrl/Cmd+K 全局搜索。
+
+### 12.2 Workspaces 工作区左栏：切换器、多根文件树、标签条与新建入口
+
+<!-- feature
+id: F-WS-2
+status: done
+area: main/workspace-platform
+components: [ControlBar, Sidebar, PrimaryNavigationRail, WorkspaceSidebar, WorkspaceMainPanel, MfaFloatingWindow, AgentsPlatformView, GlobalCommandModal]
+files:
+  - src/components/tabbar/ControlBar.tsx
+  - src/components/sidebar/PrimaryNavigationRail.tsx
+  - src/components/sidebar/Sidebar.tsx
+  - src/components/workspace/WorkspaceSidebar.tsx
+  - src/components/workspace/WorkspaceMainPanel.tsx
+  - src/components/workspace/WorkspaceGitPanel.tsx
+  - src/components/workspace/WorkspaceSessionPickerModal.tsx
+  - src/components/workspace/WorkspaceSessionPane.tsx
+  - src/components/mfa/MfaFloatingWindow.tsx
+  - src/components/agents/AgentsPlatformView.tsx
+  - src/components/search/GlobalCommandModal.tsx
+  - src/stores/workspacePlatformStore.ts
+  - src/stores/agentsStore.ts
+  - src/stores/workspaceEditorStore.ts
+  - src/stores/workspaceUiStore.ts
+controls:
+  - id: workspace-add-folder
+    selector: '[data-testid="workspace-add-folder"]'
+    kind: interactive
+  - id: workspace-default-badge
+    selector: '[data-testid="workspace-default-badge"]'
+    kind: display
+  - id: workspace-file-editor
+    selector: '[data-testid="workspace-file-editor"]'
+    kind: display
+  - id: workspace-file-tree
+    selector: '[data-testid="workspace-file-tree"]'
+    kind: display
+  - id: workspace-fs-modal
+    selector: '[data-testid="workspace-fs-modal"]'
+    kind: display
+  - id: workspace-fs-modal-confirm
+    selector: '[data-testid="workspace-fs-modal-confirm"]'
+    kind: interactive
+  - id: workspace-fs-modal-input
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    kind: display
+  - id: workspace-git-panel
+    selector: '[data-testid="workspace-git-panel"]'
+    kind: display
+  - id: workspace-main-panel
+    selector: '[data-testid="workspace-main-panel"]'
+    kind: display
+  - id: workspace-new-file
+    selector: '[data-testid="workspace-new-file"]'
+    kind: interactive
+  - id: workspace-new-folder
+    selector: '[data-testid="workspace-new-folder"]'
+    kind: interactive
+  - id: workspace-open-session-menu
+    selector: '[data-testid="workspace-open-session-menu"]'
+    kind: display
+  - id: workspace-open-session-plus
+    selector: '[data-testid="workspace-open-session-plus"]'
+    kind: interactive
+  - id: workspace-plus-local-terminal
+    selector: '[data-testid="workspace-plus-local-terminal"]'
+    kind: interactive
+  - id: workspace-plus-open-session
+    selector: '[data-testid="workspace-plus-open-session"]'
+    kind: interactive
+  - id: workspace-repo-selector
+    selector: '[data-testid="workspace-repo-selector"]'
+    kind: interactive
+  - id: workspace-session-pane
+    selector: '[data-testid="workspace-session-pane"]'
+    kind: display
+  - id: workspace-session-picker-filter-db
+    selector: '[data-testid="workspace-session-picker-filter-db"]'
+    kind: interactive
+  - id: workspace-session-picker-filter-desktop
+    selector: '[data-testid="workspace-session-picker-filter-desktop"]'
+    kind: interactive
+  - id: workspace-session-picker-filter-sftp
+    selector: '[data-testid="workspace-session-picker-filter-sftp"]'
+    kind: interactive
+  - id: workspace-session-picker-filter-ssh
+    selector: '[data-testid="workspace-session-picker-filter-ssh"]'
+    kind: interactive
+  - id: workspace-session-picker-modal
+    selector: '[data-testid="workspace-session-picker-modal"]'
+    kind: display
+  - id: workspace-session-picker-pin
+    selector: '[data-testid="workspace-session-picker-pin"]'
+    kind: interactive
+  - id: workspace-session-picker-row
+    selector: '[data-testid="workspace-session-picker-row"]'
+    kind: display
+  - id: workspace-session-picker-search
+    selector: '[data-testid="workspace-session-picker-search"]'
+    kind: interactive
+  - id: workspace-sidebar-git-bar
+    selector: '[data-testid="workspace-sidebar-git-bar"]'
+    kind: display
+  - id: workspace-sidebar-panel
+    selector: '[data-testid="workspace-sidebar-panel"]'
+    kind: display
+  - id: workspace-switcher
+    selector: '[data-testid="workspace-switcher"]'
+    kind: display
+  - id: workspace-switcher-button
+    selector: '[data-testid="workspace-switcher-button"]'
+    kind: interactive
+  - id: workspace-switcher-menu
+    selector: '[data-testid="workspace-switcher-menu"]'
+    kind: display
+  - id: workspace-tab
+    selector: '[data-testid="workspace-tab"]'
+    kind: interactive
+  - id: workspace-tab-strip
+    selector: '[data-testid="workspace-tab-strip"]'
+    kind: display
+  - id: workspace-tree-add-root
+    selector: '[data-testid="workspace-tree-add-root"]'
+    kind: interactive
+  - id: workspace-tree-copy-path
+    selector: '[data-testid="workspace-tree-copy-path"]'
+    kind: interactive
+  - id: workspace-tree-delete
+    selector: '[data-testid="workspace-tree-delete"]'
+    kind: interactive
+  - id: workspace-tree-file
+    selector: '[data-testid="workspace-tree-file"]'
+    kind: interactive
+  - id: workspace-tree-folder
+    selector: '[data-testid="workspace-tree-folder"]'
+    kind: interactive
+  - id: workspace-tree-new-file
+    selector: '[data-testid="workspace-tree-new-file"]'
+    kind: interactive
+  - id: workspace-tree-new-folder
+    selector: '[data-testid="workspace-tree-new-folder"]'
+    kind: interactive
+  - id: workspace-tree-remove-root
+    selector: '[data-testid="workspace-tree-remove-root"]'
+    kind: interactive
+  - id: workspace-tree-rename
+    selector: '[data-testid="workspace-tree-rename"]'
+    kind: interactive
+  - id: workspace-tree-root
+    selector: '[data-testid="workspace-tree-root"]'
+    kind: display
+  - id: workspace-session-picker-filter-all
+    selector: '[data-testid="workspace-session-picker-filter-all"]'
+    kind: interactive
+-->
+
+Workspaces 模式左栏提供工作区切换器（默认工作区不可删除）、多根文件树（新建文件/目录、添加/移除根目录）、工作区标签条与打开任意会话入口；画布内含编辑器、Git 面板与隔离会话。
+
+### 12.3 左侧主导航条底部工具与左下角 MFA 悬浮窗
+
+<!-- feature
+id: F-WS-3
+status: done
+area: main/workspace-platform
+components: [ControlBar, Sidebar, PrimaryNavigationRail, WorkspaceSidebar, WorkspaceMainPanel, MfaFloatingWindow, AgentsPlatformView, GlobalCommandModal]
+files:
+  - src/components/tabbar/ControlBar.tsx
+  - src/components/sidebar/PrimaryNavigationRail.tsx
+  - src/components/sidebar/Sidebar.tsx
+  - src/components/workspace/WorkspaceSidebar.tsx
+  - src/components/workspace/WorkspaceMainPanel.tsx
+  - src/components/workspace/WorkspaceGitPanel.tsx
+  - src/components/workspace/WorkspaceSessionPickerModal.tsx
+  - src/components/workspace/WorkspaceSessionPane.tsx
+  - src/components/mfa/MfaFloatingWindow.tsx
+  - src/components/agents/AgentsPlatformView.tsx
+  - src/components/search/GlobalCommandModal.tsx
+  - src/stores/workspacePlatformStore.ts
+  - src/stores/agentsStore.ts
+  - src/stores/workspaceEditorStore.ts
+  - src/stores/workspaceUiStore.ts
+controls:
+  - id: mfa-floating-account
+    selector: '[data-testid="mfa-floating-account"]'
+    kind: interactive
+  - id: mfa-floating-close
+    selector: '[data-testid="mfa-floating-close"]'
+    kind: interactive
+  - id: mfa-floating-drag-handle
+    selector: '[data-testid="mfa-floating-drag-handle"]'
+    kind: interactive
+  - id: mfa-floating-expand-tab
+    selector: '[data-testid="mfa-floating-expand-tab"]'
+    kind: interactive
+  - id: mfa-floating-locked
+    selector: '[data-testid="mfa-floating-locked"]'
+    kind: display
+  - id: mfa-floating-pin
+    selector: '[data-testid="mfa-floating-pin"]'
+    kind: interactive
+  - id: mfa-floating-search
+    selector: '[data-testid="mfa-floating-search"]'
+    kind: interactive
+  - id: mfa-floating-window
+    selector: '[data-testid="mfa-floating-window"]'
+    kind: display
+  - id: rail-bottom-tools
+    selector: '[data-testid="rail-bottom-tools"]'
+    kind: display
+  - id: rail-chat-button
+    selector: '[data-testid="rail-chat-button"]'
+    kind: interactive
+  - id: rail-mfa-button
+    selector: '[data-testid="rail-mfa-button"]'
+    kind: interactive
+-->
+
+左侧主导航条底部依次为 MFA → 截图 → 聊天 → 主题 → 语言 → 设置；点击 MFA 在左下角弹出可拖拽悬浮验证器，支持搜索、复制、置顶、Esc 关闭与展开全屏 MFA 页。
+
+### 12.4 工作区内置 Git 面板与四路跳转
+
+<!-- feature
+id: F-WS-4
+status: done
+area: main/workspace-platform
+components: [ControlBar, Sidebar, PrimaryNavigationRail, WorkspaceSidebar, WorkspaceMainPanel, MfaFloatingWindow, AgentsPlatformView, GlobalCommandModal]
+files:
+  - src/components/tabbar/ControlBar.tsx
+  - src/components/sidebar/PrimaryNavigationRail.tsx
+  - src/components/sidebar/Sidebar.tsx
+  - src/components/workspace/WorkspaceSidebar.tsx
+  - src/components/workspace/WorkspaceMainPanel.tsx
+  - src/components/workspace/WorkspaceGitPanel.tsx
+  - src/components/workspace/WorkspaceSessionPickerModal.tsx
+  - src/components/workspace/WorkspaceSessionPane.tsx
+  - src/components/mfa/MfaFloatingWindow.tsx
+  - src/components/agents/AgentsPlatformView.tsx
+  - src/components/search/GlobalCommandModal.tsx
+  - src/stores/workspacePlatformStore.ts
+  - src/stores/agentsStore.ts
+  - src/stores/workspaceEditorStore.ts
+  - src/stores/workspaceUiStore.ts
+controls:
+  - id: editor-open-git-diff
+    selector: '[data-testid="editor-open-git-diff"]'
+    kind: interactive
+  - id: git-branches-tab
+    selector: '[data-testid="git-branches-tab"]'
+    kind: interactive
+  - id: git-changes-tab
+    selector: '[data-testid="git-changes-tab"]'
+    kind: interactive
+  - id: git-changes-tree-toggle
+    selector: '[data-testid="git-changes-tree-toggle"]'
+    kind: interactive
+  - id: git-commit-amend
+    selector: '[data-testid="git-commit-amend"]'
+    kind: interactive
+  - id: git-commit-and-push
+    selector: '[data-testid="git-commit-and-push"]'
+    kind: interactive
+  - id: git-commit-button
+    selector: '[data-testid="git-commit-button"]'
+    kind: interactive
+  - id: git-commit-message
+    selector: '[data-testid="git-commit-message"]'
+    kind: interactive
+  - id: git-settings-tab
+    selector: '[data-testid="git-settings-tab"]'
+    kind: interactive
+  - id: git-stash-tab
+    selector: '[data-testid="git-stash-tab"]'
+    kind: interactive
+  - id: git-tags-tab
+    selector: '[data-testid="git-tags-tab"]'
+    kind: interactive
+  - id: git-branches-view
+    selector: '[data-testid="git-branches-view"]'
+    kind: display
+  - id: git-tags-view
+    selector: '[data-testid="git-tags-view"]'
+    kind: display
+-->
+
+工作区内置专用 Git 面板可通过主左栏 Git 按钮、左栏 Git 状态条、编辑器“在 Git 面板对比”与工作区 GIT 标签进入，保留 main 的 6 大子面板、Tree/Flat、Amend 与并排/统一 Diff。
+
+### 12.5 工作区打开全局任意会话与会话选择器
+
+<!-- feature
+id: F-WS-5
+status: done
+area: main/workspace-platform
+components: [ControlBar, Sidebar, PrimaryNavigationRail, WorkspaceSidebar, WorkspaceMainPanel, MfaFloatingWindow, AgentsPlatformView, GlobalCommandModal]
+files:
+  - src/components/tabbar/ControlBar.tsx
+  - src/components/sidebar/PrimaryNavigationRail.tsx
+  - src/components/sidebar/Sidebar.tsx
+  - src/components/workspace/WorkspaceSidebar.tsx
+  - src/components/workspace/WorkspaceMainPanel.tsx
+  - src/components/workspace/WorkspaceGitPanel.tsx
+  - src/components/workspace/WorkspaceSessionPickerModal.tsx
+  - src/components/workspace/WorkspaceSessionPane.tsx
+  - src/components/mfa/MfaFloatingWindow.tsx
+  - src/components/agents/AgentsPlatformView.tsx
+  - src/components/search/GlobalCommandModal.tsx
+  - src/stores/workspacePlatformStore.ts
+  - src/stores/agentsStore.ts
+  - src/stores/workspaceEditorStore.ts
+  - src/stores/workspaceUiStore.ts
+controls:
+  - id: session-favorite
+    selector: '[data-testid="session-favorite"]'
+    kind: interactive
+  - id: session-refresh
+    selector: '[data-testid="session-refresh"]'
+    kind: interactive
+  - id: sessions-sidebar-panel
+    selector: '[data-testid="sessions-sidebar-panel"]'
+    kind: display
+-->
+
+工作区可通过 + 菜单、Ctrl/Cmd+Alt+O 选择器与左栏 Sessions 工具窗口打开任意全局会话，运行实例与 Sessions 模式完全隔离。
+
+### 12.6 Agents Worktree 调度台与全局 Ctrl+K 命令面板
+
+<!-- feature
+id: F-WS-6
+status: done
+area: main/workspace-platform
+components: [ControlBar, Sidebar, PrimaryNavigationRail, WorkspaceSidebar, WorkspaceMainPanel, MfaFloatingWindow, AgentsPlatformView, GlobalCommandModal]
+files:
+  - src/components/tabbar/ControlBar.tsx
+  - src/components/sidebar/PrimaryNavigationRail.tsx
+  - src/components/sidebar/Sidebar.tsx
+  - src/components/workspace/WorkspaceSidebar.tsx
+  - src/components/workspace/WorkspaceMainPanel.tsx
+  - src/components/workspace/WorkspaceGitPanel.tsx
+  - src/components/workspace/WorkspaceSessionPickerModal.tsx
+  - src/components/workspace/WorkspaceSessionPane.tsx
+  - src/components/mfa/MfaFloatingWindow.tsx
+  - src/components/agents/AgentsPlatformView.tsx
+  - src/components/search/GlobalCommandModal.tsx
+  - src/stores/workspacePlatformStore.ts
+  - src/stores/agentsStore.ts
+  - src/stores/workspaceEditorStore.ts
+  - src/stores/workspaceUiStore.ts
+controls:
+  - id: agents-dispatch-modal
+    selector: '[data-testid="agents-dispatch-modal"]'
+    kind: display
+  - id: agents-dispatch-model
+    selector: '[data-testid="agents-dispatch-model"]'
+    kind: interactive
+  - id: agents-dispatch-open
+    selector: '[data-testid="agents-dispatch-open"]'
+    kind: interactive
+  - id: agents-dispatch-submit
+    selector: '[data-testid="agents-dispatch-submit"]'
+    kind: interactive
+  - id: agents-dispatch-task-input
+    selector: '[data-testid="agents-dispatch-task-input"]'
+    kind: interactive
+  - id: agents-dispatch-workspace
+    selector: '[data-testid="agents-dispatch-workspace"]'
+    kind: interactive
+  - id: agents-empty-state
+    selector: '[data-testid="agents-empty-state"]'
+    kind: display
+  - id: agents-platform-view
+    selector: '[data-testid="agents-platform-view"]'
+    kind: display
+  - id: agents-review-in-git
+    selector: '[data-testid="agents-review-in-git"]'
+    kind: interactive
+  - id: agents-task-detail
+    selector: '[data-testid="agents-task-detail"]'
+    kind: display
+  - id: agents-trace
+    selector: '[data-testid="agents-trace"]'
+    kind: display
+  - id: global-search-input
+    selector: '[data-testid="global-search-input"]'
+    kind: interactive
+  - id: global-search-modal
+    selector: '[data-testid="global-search-modal"]'
+    kind: display
+  - id: global-search-result
+    selector: '[data-testid="global-search-result"]'
+    kind: display
+  - id: menu-export-sessions
+    selector: '[data-testid="menu-export-sessions"]'
+    kind: display
+  - id: open-tabs-filter
+    selector: '[data-testid="open-tabs-filter"]'
+    kind: interactive
+-->
+
+Agents 模式派发独立 Git Worktree 任务、展示沙箱策略与执行轨迹，并可跳转工作区 Git 面板审阅 Diff；全局 Ctrl/Cmd+K 命令面板检索工作区、会话与工具动作。
+
