@@ -11,6 +11,23 @@ configuration that does not apply to the selected session transport. Preserve
 SSH X11, startup commands, forwarding, authentication, connection ownership,
 secrets in the vault, and independent per-session networking.
 
+## Delivered configuration boundaries
+
+| Session family | Effective configuration after cleanup |
+| --- | --- |
+| SSH | SSH authentication, compression/expert algorithms, X11/remote environment, startup command, browser protocol, keepalive and local port forwarding. Implemented Kerberos, agent/key generation and both SCP modes. |
+| SFTP | SSH authentication, compression/expert algorithms, routing and keepalive. Remove shell startup, remote desktop, X11, local forwarding and SSH file-browser mode options. |
+| Mail | Preserve implemented mail/OAuth proxy routing. Remove SSH authentication, shell, local forwarding, SSH keepalive, TCP_NODELAY and IP-family controls. |
+| SQL/Redis and object storage | Preserve implemented protocol fields and routing. Remove SSH shell/local forwarding and unsupported low-level TCP/keepalive fields. ClickHouse HTTP/Native each use their own effective port. |
+| RDP/VNC | Preserve routing and supported TCP/IP options, plus protocol-specific settings. Remove SSH authentication, startup/X11, local forwarding and SSH keepalive. |
+| Local shell/WSL/serial and command/browser/file sessions | Hide unified network configuration when their runtime does not consume it; strip stale saved networking and inapplicable credential references. Retain each session's own launch/device fields. |
+| Bookmarks | Gate background images by terminal support and new-window controls by implemented window support. Activate startup auto-connect, shortcut, appearance and SSH reconnect settings where supported. |
+
+Protocol changes remove explicitly owned incompatible keys while preserving
+unknown importer/plugin extension data. The editor, validation, credential
+serialization and runtime capability gates use the shared policy. TCP_NODELAY
+owns the former duplicate Disable Nagle setting, including legacy import values.
+
 ## Delivery stages
 
 1. Centralize capability policy for editor navigation, validation, secrets and
@@ -284,8 +301,11 @@ failures may be reported separately, per user authorization.
 - GSS-001 also creates a real detached SFTP window on each OS, then navigates its
   independent channel to the fixture directory and reads the remote listing.
   The popup begins in the remote home directory; the test does not establish
-  automatic adoption of the attached view's current path. Update its requirement
-  wording to reflect this executed boundary and revalidate the case on all OSes.
+  automatic adoption of the attached view's current path. After aligning the
+  requirement wording, [40061591446](https://github.com/engcapa/taomni/actions/runs/40061591446)
+  at `4a2b2dec698597dc89cd486cf5bd4cef47b61353` passed GSS-001 on all three native
+  platforms. Its current case hashes, signed receipts and native build identities
+  were independently verified; production and runner fingerprints are unchanged.
 - Browser/native suites were run only on GitHub, using
   `.github/workflows/qa-ui-auto-platforms.yml`. Local validation used focused unit
   tests, `cargo check`, `cargo fmt --check`, `pnpm check:refactor`, and the QA
