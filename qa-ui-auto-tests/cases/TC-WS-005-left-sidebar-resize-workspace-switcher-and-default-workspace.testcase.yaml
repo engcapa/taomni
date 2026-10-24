@@ -33,9 +33,7 @@ steps:
 - assert_visible: '[data-testid="workspace-switcher-default-badge"]'
 - assert_visible: '[data-testid="workspace-switcher-new"]'
 - assert_visible: '[data-testid="workspace-switcher-add-folder"]'
-- press:
-    selector: '[data-testid="control-bar"]'
-    key: Escape
+- press: Escape
 - click: '[data-testid="workspace-switcher"]'
 - click: '[data-testid="workspace-switcher-new"]'
 - wait_for: '[data-testid="text-input-dialog"]'

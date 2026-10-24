@@ -14,6 +14,7 @@ import { useT } from "../../lib/i18n";
 import type { SessionConfig } from "../../lib/ipc";
 import type { AppCommand } from "../menubar/commands";
 import { useSessionStore } from "../../stores/sessionStore";
+import { getHomeDir } from "../../lib/ipc";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
@@ -130,14 +131,16 @@ export function WorkspaceSidebar({ onOpenWorkspaceSession }: WorkspaceSidebarPro
         <TextInputDialog
           title={t("workspace.addFolderTitle")}
           label={t("workspace.addFolderPathLabel")}
-          placeholder="/home/user/project"
+          placeholder="~/project"
           onCancel={() => setModal(null)}
           onConfirm={(value) => {
-            const path = value.trim();
-            if (!path) return;
-            useWorkspacePlatformStore.getState().addRootFolder(workspace.id, { path });
-            setModal(null);
-            setNotice(`${t("workspace.addFolderTitle")}: ${path}`);
+            const typed = value.trim();
+            if (!typed) return;
+            void resolveWorkspaceFolderPath(typed).then((path) => {
+              useWorkspacePlatformStore.getState().addRootFolder(workspace.id, { path });
+              setModal(null);
+              setNotice(`${t("workspace.addFolderTitle")}: ${path}`);
+            });
           }}
         />
       )}
@@ -166,6 +169,15 @@ export function WorkspaceSidebar({ onOpenWorkspaceSession }: WorkspaceSidebarPro
       )}
     </div>
   );
+}
+
+/** Expand a leading `~` to the OS home directory (browser preview: VFS root). */
+async function resolveWorkspaceFolderPath(typed: string): Promise<string> {
+  if (typed !== "~" && !typed.startsWith("~/") && !typed.startsWith("~\\")) return typed;
+  const home = await getHomeDir().catch(() => null);
+  if (!home) return typed;
+  const expanded = typed.replace(/^~[\/]?/, `${home.replace(/[\/]+$/, "")}/`);
+  return expanded.replace(/\/+$/, "");
 }
 
 function ProjectLens({ workspaceId, roots, onAddFolder }: { workspaceId: string; roots: { id: string; name: string; path: string }[]; onAddFolder: () => void }) {
@@ -298,7 +310,9 @@ function PinnedSessionRow({
     <div className="flex items-center gap-1">
       <button
         type="button"
-        data-testid={`workspace-pinned-session-${session.id}`}
+        data-testid="workspace-pinned-session"
+        data-session-id={session.id}
+        data-session-name={session.name || session.host || ""}
         className="flex min-w-0 flex-1 items-center gap-2 rounded px-2 py-1 text-left text-[12px] hover:bg-[var(--taomni-hover)]"
         style={{ color: "var(--taomni-text)" }}
         onClick={() => onOpenSession?.(session)}
@@ -356,7 +370,9 @@ function GlobalSessionsList({ onOpenSession, excludeIds }: { onOpenSession?: (se
           <button
             key={session.id}
             type="button"
-            data-testid={`workspace-global-session-${session.id}`}
+            data-testid="workspace-global-session"
+            data-session-id={session.id}
+            data-session-name={session.name || session.host || ""}
             className="flex w-full items-center gap-2 rounded px-2 py-1 text-left text-[12px] hover:bg-[var(--taomni-hover)]"
             style={{ color: "var(--taomni-text)" }}
             onClick={() => onOpenSession?.(session)}

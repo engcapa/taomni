@@ -75,19 +75,23 @@ describe("WorkspaceSidebar (TASK-05)", () => {
     expect(useWorkspacePlatformStore.getState().workspaces[0].openTabs).toHaveLength(0);
   });
 
-  it("adds and removes multi-root folders", () => {
+  it("adds and removes multi-root folders", async () => {
     render(<WorkspaceSidebar />);
     fireEvent.click(screen.getByTestId("workspace-add-folder"));
     const input = screen.getByTestId("text-input-dialog-input");
     fireEvent.change(input, { target: { value: "/repo/first" } });
     fireEvent.click(screen.getByTestId("text-input-dialog-confirm"));
-    expect(useWorkspacePlatformStore.getState().workspaces[0].rootFolders).toHaveLength(1);
+    await waitFor(() => {
+      expect(useWorkspacePlatformStore.getState().workspaces[0].rootFolders).toHaveLength(1);
+    });
 
     fireEvent.click(screen.getByTestId("workspace-add-folder"));
     const input2 = screen.getByTestId("text-input-dialog-input");
     fireEvent.change(input2, { target: { value: "/repo/second" } });
     fireEvent.click(screen.getByTestId("text-input-dialog-confirm"));
-    expect(useWorkspacePlatformStore.getState().workspaces[0].rootFolders.map((root) => root.path)).toEqual(["/repo/first", "/repo/second"]);
+    await waitFor(() => {
+      expect(useWorkspacePlatformStore.getState().workspaces[0].rootFolders.map((root) => root.path)).toEqual(["/repo/first", "/repo/second"]);
+    });
 
     const rootId = useWorkspacePlatformStore.getState().workspaces[0].rootFolders[0].id;
     fireEvent.click(screen.getByTestId(`workspace-remove-root-${rootId}`));

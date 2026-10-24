@@ -87,6 +87,8 @@ export function concatChunks(chunks: Uint8Array[]): ArrayBuffer {
 
 export async function invokeFiles<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
   switch (cmd) {
+    case "get_home_dir":
+      return "/preview" as T;
 
     case "select_private_key_file": {
       const current = (args?.currentPath as string | null) || "~/.ssh/id_ed25519";

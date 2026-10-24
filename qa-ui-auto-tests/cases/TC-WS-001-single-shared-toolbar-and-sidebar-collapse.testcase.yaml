@@ -34,13 +34,9 @@ steps:
 - assert_not_visible: '[data-testid="expanded-sidebar-panel"]'
 - click: '[data-testid="toggle-left-sidebar"]'
 - wait_for: '[data-testid="expanded-sidebar-panel"]'
-- press:
-    selector: '[data-testid="control-bar"]'
-    key: Control+b
+- press: Control+b
 - wait_for: '[data-testid="collapsed-sidebar-rail"]'
-- press:
-    selector: '[data-testid="control-bar"]'
-    key: Control+b
+- press: Control+b
 - wait_for: '[data-testid="expanded-sidebar-panel"]'
 - assert_visible: '[data-testid="toggle-right-sidebar"]'
 - click: '[data-testid="toggle-right-sidebar"]'
@@ -52,9 +48,7 @@ steps:
 - assert_visible: '[data-testid="global-search-trigger"]'
 - click: '[data-testid="global-search-trigger"]'
 - wait_for: '[data-testid="global-search-modal"]'
-- press:
-    selector: '[data-testid="control-bar"]'
-    key: Escape
+- press: Escape
 - assert_not_visible: '[data-testid="global-search-modal"]'
 - screenshot: tc-ws-001-shared-toolbar.png
 verification:

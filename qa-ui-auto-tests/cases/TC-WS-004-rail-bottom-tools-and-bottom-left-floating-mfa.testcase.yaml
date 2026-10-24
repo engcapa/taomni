@@ -1,6 +1,6 @@
 id: TC-WS-004
 title: Rail bottom tool order and the bottom-left floating MFA verifier window
-description: Workspace-first platform redesign AC-04. The rail bottom lists MFA, screenshot, chat, theme, language and settings in order. Clicking MFA opens the floating verifier anchored at left 50px / bottom 30px with search, pin, expand-to-full-tab and close; the floating list stays behind the vault gate.
+description: Workspace-first platform redesign AC-04. The rail bottom lists MFA, screenshot, chat, theme, language and settings in order. Clicking MFA opens the floating verifier anchored at left 50px / bottom 30px; its vault gate completes the first-run setup and then exposes search, pin, expand and close.
 covers:
 - F-MFA-1
 - F-I18n-1
@@ -18,7 +18,6 @@ fixtures:
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
-- vault_first_run: qa-ws-mfa-password
 - wait_for: '[data-testid="welcome-panel"]'
 - assert_visible: '[data-testid="rail-bottom-tools"]'
 - eval_readonly:
@@ -38,11 +37,12 @@ steps:
     expect_truthy: true
 - click: '[data-testid="rail-mfa-button"]'
 - wait_for: '[data-testid="mfa-floating-window"]'
+- vault_first_run: qa-ws-mfa-password
+- wait_for: '[data-testid="mfa-floating-search"]'
 - eval_readonly:
     expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"mfa-floating-window\"]").style.left==="50px"&&document.querySelector("[data-testid" + String.fromCharCode(61) + "\"mfa-floating-window\"]").style.bottom==="30px"
     expect_truthy: true
 - assert_visible: '[data-testid="mfa-floating-drag-handle"]'
-- assert_visible: '[data-testid="mfa-floating-search"]'
 - assert_visible: '[data-testid="mfa-floating-list"]'
 - click: '[data-testid="mfa-floating-pin"]'
 - assert_attribute:
@@ -60,10 +60,10 @@ steps:
 - assert_visible: '[data-testid="language-switcher"]'
 - click: '[data-testid="language-switcher"]'
 - assert_visible: '[data-testid="language-option-en"]'
-- click: '[data-testid="language-option-en"]'
+- click: '[data-testid="language-option-zh-CN"]'
 - assert_localstorage:
     key: taomni.locale.v1
-    exists: true
+    equals: zh-CN
 - screenshot: tc-ws-004-rail-mfa-float.png
 verification:
   review: reviewed
@@ -74,38 +74,40 @@ verification:
     - 1
     - 4
     checkpoints:
-    - step: 4
+    - step: 3
       expectation: '{"assert_visible": "[data-testid=\"rail-bottom-tools\"]"}'
-    - step: 5
+    - step: 4
       expectation: MFA/聊天/主题/设置四个工具按钮在 rail 中顺序正确。
-    - step: 6
+    - step: 5
       expectation: 截图按钮位于 MFA 下方。
-    - step: 7
+    - step: 6
       expectation: 聊天按钮位于截图下方。
-    - step: 8
+    - step: 7
       expectation: 语言按钮位于主题下方。
-    - step: 9
+    - step: 8
       expectation: 设置按钮位于语言下方。
     results:
+    - 3
     - 4
     - 5
     - 6
     - 7
     - 8
-    - 9
   - id: R2
-    requirement: 点击 MFA 在左下角 (left:50px, bottom:30px) 打开悬浮窗，支持搜索、置顶、展开全屏页、关闭，展开后悬浮窗关闭且 mfa-tab 可见。
+    requirement: 点击 MFA 在左下角 (left:50px, bottom:30px) 打开悬浮窗，Vault 门禁完成后显示搜索，支持置顶、展开全屏页、关闭，展开后悬浮窗关闭且 mfa-tab 可见。
     actions:
     - 8
-    - 14
-    - 17
-    - 20
+    - 15
+    - 18
+    - 21
     checkpoints:
-    - step: 11
+    - step: 10
       expectation: '{"wait_for": "[data-testid=\"mfa-floating-window\"]"}'
     - step: 12
-      expectation: 悬浮窗内联样式 left=50px 且 bottom=30px。
+      expectation: '{"wait_for": "[data-testid=\"mfa-floating-search\"]"}'
     - step: 13
+      expectation: 悬浮窗内联样式 left=50px 且 bottom=30px。
+    - step: 14
       expectation: '{"assert_visible": "[data-testid=\"mfa-floating-drag-handle\"]"}'
     - step: 17
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"mfa-floating-window\"]", "name": "data-pinned", "equals": "true"}}'
@@ -116,9 +118,10 @@ verification:
     - step: 24
       expectation: '{"assert_not_visible": "[data-testid=\"mfa-floating-window\"]"}'
     results:
-    - 11
+    - 10
     - 12
     - 13
+    - 14
     - 17
     - 19
     - 20
@@ -126,13 +129,13 @@ verification:
   - id: R3
     requirement: 底部语言切换保留双语菜单与持久化。
     actions:
-    - 23
     - 24
+    - 25
     checkpoints:
     - step: 28
       expectation: '{"assert_visible": "[data-testid=\"language-option-en\"]"}'
     - step: 30
-      expectation: '{"assert_localstorage": {"key": "taomni.locale.v1", "exists": true}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.locale.v1", "equals": "zh-CN"}}'
     results:
     - 28
     - 30

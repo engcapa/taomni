@@ -55,16 +55,18 @@ describe("Workspace isolated sessions (TASK-07)", () => {
     const onOpenSession = vi.fn();
     render(<WorkspaceSessionPickerModal open onClose={vi.fn()} onOpenSession={onOpenSession} />);
     // Every global session is listed, not only pinned ones.
-    expect(screen.getByTestId("workspace-session-picker-row-global-mysql-01")).toBeInTheDocument();
-    expect(screen.getByTestId("workspace-session-picker-row-global-ssh-01")).toBeInTheDocument();
+    const mysqlRow = screen.getAllByTestId("workspace-session-picker-row").find((row) => row.getAttribute("data-session-id") === "global-mysql-01");
+    const sshRow = screen.getAllByTestId("workspace-session-picker-row").find((row) => row.getAttribute("data-session-id") === "global-ssh-01");
+    expect(mysqlRow).toBeTruthy();
+    expect(sshRow).toBeTruthy();
 
     // Search filters by name.
     fireEvent.change(screen.getByTestId("workspace-session-picker-search"), { target: { value: "prod-mysql" } });
-    expect(screen.queryByTestId("workspace-session-picker-row-global-ssh-01")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("workspace-session-picker-row").some((row) => row.getAttribute("data-session-id") === "global-ssh-01")).toBe(false);
 
     // The pin checkbox rides along with the open call.
     fireEvent.click(screen.getByTestId("workspace-session-picker-pin"));
-    fireEvent.click(screen.getByTestId("workspace-session-picker-row-global-mysql-01"));
+    fireEvent.click(screen.getAllByTestId("workspace-session-picker-row").find((row) => row.getAttribute("data-session-id") === "global-mysql-01")!);
     expect(onOpenSession).toHaveBeenCalledWith(
       expect.objectContaining({ id: "global-mysql-01" }),
       true,

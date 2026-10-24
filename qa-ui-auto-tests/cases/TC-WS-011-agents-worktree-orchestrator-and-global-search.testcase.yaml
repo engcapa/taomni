@@ -32,9 +32,7 @@ steps:
     contains: QA agent task
 - click: '[data-testid="agents-review-diff"]'
 - wait_for: '[data-testid="workspace-git-manager"]'
-- press:
-    selector: '[data-testid="control-bar"]'
-    key: Control+k
+- press: Control+k
 - wait_for: '[data-testid="global-search-modal"]'
 - fill:
     selector: '[data-testid="global-search-input"]'
@@ -44,29 +42,21 @@ steps:
     selector: '[data-testid="global-search-go-home"]'
     name: data-first
     equals: 'true'
-- press:
-    selector: '[data-testid="global-search-input"]'
-    key: Enter
+- press: Enter
 - wait_for: '[data-testid="welcome-panel"]'
-- press:
-    selector: '[data-testid="control-bar"]'
-    key: Control+k
+- press: Control+k
 - wait_for: '[data-testid="global-search-modal"]'
 - fill:
     selector: '[data-testid="global-search-input"]'
     value: agents
 - click: '[data-testid="global-search-go-agents"]'
 - wait_for: '[data-testid="agents-platform-view"]'
-- press:
-    selector: '[data-testid="control-bar"]'
-    key: Control+k
+- press: Control+k
 - fill:
     selector: '[data-testid="global-search-input"]'
     value: Default Workspace
 - assert_visible: '[data-testid="global-search-results"]'
-- press:
-    selector: '[data-testid="control-bar"]'
-    key: Escape
+- press: Escape
 - assert_not_visible: '[data-testid="global-search-modal"]'
 - screenshot: tc-ws-011-agents-command-palette.png
 verification:

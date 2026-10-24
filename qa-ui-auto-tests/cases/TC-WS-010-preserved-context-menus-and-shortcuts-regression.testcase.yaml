@@ -19,6 +19,10 @@ fixtures:
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.codeWorkspace.toolWindowStripes.v1
+    value: '{"showNames":false,"leftWidth":59,"rightWidth":59}'
+- reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="app-main-menu"]'
 - assert_visible: '[data-testid="context-menu-item-new-local-terminal"]'
@@ -36,10 +40,7 @@ steps:
 - hover: '[data-testid="menu-import-sessions"]'
 - assert_visible: '[data-testid="import-json"]'
 - assert_visible: '[data-testid="import-openssh"]'
-- assert_visible: '[data-testid="export-json"]'
-- press:
-    selector: '[data-testid="control-bar"]'
-    key: Escape
+- press: Escape
 - right_click: '[data-testid="sidebar-rail"]'
 - assert_visible: '[data-testid="sidebar-rail-menu-show-names"]'
 - click: '[data-testid="sidebar-rail-menu-show-names"]'
@@ -54,9 +55,7 @@ steps:
     selector: '[data-testid="context-menu"]'
     contains: Close
 - assert_visible: '[data-testid="tab-context-copy-session-info"]'
-- press:
-    selector: '[data-testid="control-bar"]'
-    key: Escape
+- press: Escape
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - assert_visible: '[data-testid="sidebar-tool-code-workspace"]'
@@ -67,65 +66,65 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: app-main-menu 保留全部菜单项，Sessions 子菜单保留导入导出全部入口。
+    requirement: app-main-menu 保留全部菜单项，Sessions 子菜单保留导入/导出入口与导入子项（完整导出流由 TC-054 覆盖）。
     actions:
-    - 3
-    - 13
+    - 5
+    - 15
     checkpoints:
-    - step: 4
+    - step: 6
       expectation: '{"assert_visible": "[data-testid=\"context-menu-item-new-local-terminal\"]"}'
-    - step: 7
+    - step: 9
       expectation: '{"assert_visible": "[data-testid=\"context-menu-item-sessions\"]"}'
-    - step: 14
+    - step: 16
       expectation: '{"assert_visible": "[data-testid=\"menu-import-sessions\"]"}'
     - step: 17
-      expectation: '{"assert_visible": "[data-testid=\"import-json\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"menu-export-sessions\"]"}'
     - step: 19
-      expectation: '{"assert_visible": "[data-testid=\"export-json\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"import-json\"]"}'
     results:
-    - 4
-    - 7
-    - 14
+    - 6
+    - 9
+    - 16
     - 17
     - 19
   - id: R2
     requirement: 左侧主导航条右键 Show Tool Window Names 双向切换并显示按钮文字。
     actions:
-    - 21
-    - 23
-    checkpoints:
-    - step: 22
-      expectation: '{"assert_visible": "[data-testid=\"sidebar-rail-menu-show-names\"]"}'
-    - step: 24
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"sidebar-rail\"] [data-testid=\"side-tab-sessions\"]", "equals": "Sessions"}}'
-    results:
     - 22
     - 24
+    checkpoints:
+    - step: 23
+      expectation: '{"assert_visible": "[data-testid=\"sidebar-rail-menu-show-names\"]"}'
+    - step: 25
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"sidebar-rail\"] [data-testid=\"side-tab-sessions\"]", "equals": "Sessions"}}'
+    results:
+    - 23
+    - 25
   - id: R3
     requirement: TabBar 标签右键菜单保留关闭等管理项；Tools 面板保留全部工具入口。
     actions:
     - 28
-    - 34
+    - 33
     checkpoints:
-    - step: 28
-      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 29
-      expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Close"}}'
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 30
+      expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Close"}}'
+    - step: 31
       expectation: '{"assert_visible": "[data-testid=\"tab-context-copy-session-info\"]"}'
-    - step: 33
-      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
     - step: 34
-      expectation: '{"assert_visible": "[data-testid=\"sidebar-tool-code-workspace\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
     - step: 35
+      expectation: '{"assert_visible": "[data-testid=\"sidebar-tool-code-workspace\"]"}'
+    - step: 36
       expectation: '{"assert_visible": "[data-testid=\"sidebar-tool-mfa\"]"}'
     results:
-    - 28
     - 29
     - 30
-    - 33
+    - 31
     - 34
     - 35
+    - 36
   visual:
   - check: 检查截图各菜单展开态、层级与高亮无异常。
     method: manual

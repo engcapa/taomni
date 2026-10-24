@@ -231,7 +231,7 @@ function joinWorkspacePathValue(rootPath: string, relative: string): string {
  */
 async function ensureWorkspaceDirectories(rootPath: string, segments: string[]): Promise<void> {
   try {
-    await workspaceCreateDir(rootPath, ".");
+    await workspaceCreateDir(rootPath, "");
   } catch {
     // Root already exists (or cannot be created) - proceed.
   }

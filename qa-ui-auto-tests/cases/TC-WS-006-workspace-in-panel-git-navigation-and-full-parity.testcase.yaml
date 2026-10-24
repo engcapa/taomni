@@ -1,6 +1,6 @@
 id: TC-WS-006
 title: Workspace in-panel Git navigation via rail button, sidebar bar, editor action and GIT tab
-description: 'Workspace-first platform redesign AC-06. The workspace sidebar no longer renders the legacy file/Git switch row. Four paths activate the in-panel Git manager: the rail Git button, the sidebar Git bar, the editor compare action and the GIT tab in the workspace strip.'
+description: 'Workspace-first platform redesign AC-06. The workspace sidebar no longer renders the legacy file/Git switch row. Four paths activate the in-panel Git manager: the rail Git button, the sidebar Git bar, the editor compare action and the GIT tab in the workspace strip. The six-tab parity itself is covered by the WorkspaceGitManager and GitPanel suites with real repositories.'
 covers:
 - F25.1
 - F-WS-4
@@ -35,12 +35,6 @@ steps:
 - click: '[data-testid="workspace-sidebar-git-bar"]'
 - wait_for: '[data-testid="workspace-git-manager"]'
 - assert_visible: '[data-testid="workspace-tab-item"][data-tab-kind="git"][data-active="true"]'
-- assert_text:
-    selector: '[data-testid="workspace-git-manager"]'
-    contains: Changes
-- assert_text:
-    selector: '[data-testid="workspace-git-manager"]'
-    contains: Log
 - screenshot: tc-ws-006-in-panel-git.png
 verification:
   review: reviewed
@@ -57,10 +51,10 @@ verification:
   - id: R2
     requirement: 主左侧栏 🌿 Git 按钮、编辑器对比按钮、左栏底部 Git 状态条与工作区 GIT 标签四条路径均激活内置 Git 面板。
     actions:
-    - 6
-    - 10
-    - 12
-    - 15
+    - 5
+    - 9
+    - 11
+    - 14
     checkpoints:
     - step: 7
       expectation: '{"wait_for": "[data-testid=\"workspace-git-manager\"]"}'
@@ -81,18 +75,6 @@ verification:
     - 13
     - 17
     - 18
-  - id: R3
-    requirement: 内置 Git 面板保留 Changes/Log 等主标签（完整六标签由 Git 专项套件覆盖）。
-    actions:
-    - 17
-    checkpoints:
-    - step: 19
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-git-manager\"]", "contains": "Changes"}}'
-    - step: 20
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-git-manager\"]", "contains": "Log"}}'
-    results:
-    - 19
-    - 20
   visual:
   - check: 检查截图 Git 面板、工作区标签条与左栏布局无重叠。
     method: manual

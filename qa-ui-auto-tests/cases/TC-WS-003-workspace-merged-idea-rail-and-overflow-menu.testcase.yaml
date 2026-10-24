@@ -42,9 +42,7 @@ steps:
 - assert_text:
     selector: '[data-testid="context-menu"]'
     contains: Move to
-- press:
-    selector: '[data-testid="control-bar"]'
-    key: Escape
+- press: Escape
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
 - assert_count:

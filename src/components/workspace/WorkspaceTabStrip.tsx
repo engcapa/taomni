@@ -212,7 +212,7 @@ function PinnedMenuRow({ workspaceId, sessionId, onDone }: { workspaceId: string
   const label = session?.name || session?.host || sessionId;
   return (
     <MenuRow
-      testId={`workspace-plus-pinned-${sessionId}`}
+      testId="workspace-plus-pinned"
       icon={<span className="text-[10px]">★</span>}
       label={label}
       onClick={() => {

@@ -1,6 +1,6 @@
 id: TC-WS-008
 title: Workspace multi-root folders and new file/folder creation
-description: Workspace-first platform redesign AC-08. The workspace sidebar toolbar adds external folders (Multi-Root), creates files (Alt+Insert) and folders, and every created file opens as a workspace editor tab. The registry persists the root folders.
+description: Workspace-first platform redesign AC-08. The workspace sidebar toolbar adds external folders (Multi-Root, tilde expands to the OS home directory), creates files (Alt+Insert) and folders, and every created file opens as a workspace editor tab. The registry persists the root folders.
 covers:
 - F25.1
 - F-WS-2
@@ -13,7 +13,7 @@ modes:
 - native
 fixtures:
 - reset_db
-timeout_sec: 180
+timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
@@ -23,13 +23,13 @@ steps:
 - wait_for: '[data-testid="text-input-dialog"]'
 - fill:
     selector: '[data-testid="text-input-dialog-input"]'
-    value: /preview/qa-ws-root-a
+    value: ~/qa-ws-root-a
 - click: '[data-testid="text-input-dialog-confirm"]'
 - click: '[data-testid="workspace-add-folder"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - fill:
     selector: '[data-testid="text-input-dialog-input"]'
-    value: /preview/qa-ws-root-b
+    value: ~/qa-ws-root-b
 - click: '[data-testid="text-input-dialog-confirm"]'
 - wait_for: '[data-testid="workspace-root-folder"]'
 - assert_count:
@@ -42,14 +42,13 @@ steps:
     value: demo.ts
 - click: '[data-testid="text-input-dialog-confirm"]'
 - wait_for: '[data-testid="workspace-tab-item"][data-tab-kind="file"]'
-- press:
-    selector: '[data-testid="control-bar"]'
-    key: Alt+Insert
+- press: Alt+Insert
 - wait_for: '[data-testid="text-input-dialog"]'
 - fill:
     selector: '[data-testid="text-input-dialog-input"]'
     value: notes.md
 - click: '[data-testid="text-input-dialog-confirm"]'
+- wait: 1
 - assert_count:
     selector: '[data-testid="workspace-tab-item"][data-tab-kind="file"]'
     equal: 2
@@ -71,25 +70,25 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 通过左栏工具栏添加两个外部文件夹形成 Multi-Root，并持久化。
+    requirement: 通过左栏工具栏添加两个外部文件夹（~ 展开到家目录）形成 Multi-Root，并持久化。
     actions:
     - 4
     - 8
-    - 24
+    - 25
     checkpoints:
     - step: 13
       expectation: '{"wait_for": "[data-testid=\"workspace-root-folder\"]"}'
     - step: 14
       expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-root-folder\"]", "equal": 2}}'
-    - step: 30
-      expectation: '{"assert_localstorage": {"key": "taomni.platformWorkspaces.v1", "contains": "qa-ws-root-a"}}'
     - step: 31
+      expectation: '{"assert_localstorage": {"key": "taomni.platformWorkspaces.v1", "contains": "qa-ws-root-a"}}'
+    - step: 32
       expectation: '{"assert_localstorage": {"key": "taomni.platformWorkspaces.v1", "contains": "qa-ws-root-b"}}'
     results:
     - 13
     - 14
-    - 30
     - 31
+    - 32
   - id: R2
     requirement: 工具栏与 Alt+Insert 均可新建文件且文件以工作区编辑器标签打开；新建目录产生确认提示。
     actions:
@@ -99,19 +98,19 @@ verification:
     checkpoints:
     - step: 19
       expectation: '{"wait_for": "[data-testid=\"workspace-tab-item\"][data-tab-kind=\"file\"]"}'
-    - step: 24
+    - step: 25
       expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab-item\"][data-tab-kind=\"file\"]", "equal": 2}}'
-    - step: 29
+    - step: 30
       expectation: '{"wait_for": "[data-testid=\"workspace-sidebar-notice\"]"}'
     results:
     - 19
-    - 24
-    - 29
+    - 25
+    - 30
   visual:
   - check: 检查截图根目录列表、工具栏按钮与标签条无遮挡。
     method: manual
     reason: 像素布局与遮挡需要截图人工评审。
   native:
-  - check: 原生 WebView 中按相同步骤执行；原生文件系统写入由真实 QA 应用验证。
+  - check: 原生 WebView 中按相同步骤执行；~ 展开为真实家目录并执行原生文件写入。
     method: automated
     reason: browser VFS 与原生文件系统行为不同，未执行平台不计作通过。

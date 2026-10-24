@@ -159,7 +159,9 @@ export function WorkspaceSessionPickerModal({
                 <button
                   key={session.id}
                   type="button"
-                  data-testid={`workspace-session-picker-row-${session.id}`}
+                  data-testid="workspace-session-picker-row"
+                  data-session-id={session.id}
+                  data-session-name={session.name || session.host || ""}
                   className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-[12px] hover:bg-[var(--taomni-hover)]"
                   style={{ color: "var(--taomni-text)" }}
                   onClick={() => {

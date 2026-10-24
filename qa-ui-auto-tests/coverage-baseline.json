@@ -4,7 +4,7 @@
     "features_with_controls": 105,
     "required": 1081,
     "covered_required": 1060,
-    "shallow": 52,
+    "shallow": 51,
     "orphans": 14
   },
   "features": {
@@ -241,7 +241,7 @@
     "F-ImportPreview-1": {
       "required": 0,
       "covered_required": 0,
-      "shallow": 6
+      "shallow": 5
     },
     "F-ExternalVault-1": {
       "required": 0,

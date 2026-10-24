@@ -1,6 +1,6 @@
 id: TC-WS-012
 title: Native desktop window drag, workspace local PTY and the floating MFA anchor
-description: Workspace-first platform redesign native sweep (V-12). In the real desktop WebView the frameless window drags from the shared toolbar, the Workspaces + menu opens a real local PTY that echoes input, and the bottom-left MFA floating window opens at its default anchor and expands to the full tab.
+description: Workspace-first platform redesign native sweep (V-12). In the real desktop WebView the frameless window drags from the shared toolbar, the Workspaces + menu opens a real local PTY that echoes input, and the bottom-left MFA floating window completes the vault first-run gate and expands to the full tab.
 covers:
 - F1.3
 - F2.4
@@ -43,9 +43,10 @@ steps:
     selector: '[data-testid="terminal-pane"]'
     regex: ws-pty-ok
     timeout_sec: 15
-- vault_first_run: qa-ws-native-mfa
 - click: '[data-testid="rail-mfa-button"]'
 - wait_for: '[data-testid="mfa-floating-window"]'
+- vault_first_run: qa-ws-native-mfa
+- wait_for: '[data-testid="mfa-floating-search"]'
 - eval_readonly:
     expression: document.querySelector("[data-testid" + String.fromCharCode(61) + "\"mfa-floating-window\"]").style.left==="50px"&&document.querySelector("[data-testid" + String.fromCharCode(61) + "\"mfa-floating-window\"]").style.bottom==="30px"
     expect_truthy: true
@@ -68,8 +69,8 @@ verification:
   - id: R2
     requirement: 工作区 + 菜单打开的本地终端是独立 PTY 实例并回显输入。
     actions:
-    - 7
-    - 12
+    - 6
+    - 11
     checkpoints:
     - step: 8
       expectation: '{"wait_for": "[data-testid=\"workspace-open-session-plus-menu\"]"}'
@@ -82,24 +83,27 @@ verification:
     - 10
     - 16
   - id: R3
-    requirement: 左下角 MFA 悬浮窗在原生窗口按默认锚点打开并可展开为全屏标签。
+    requirement: 左下角 MFA 悬浮窗在原生窗口按默认锚点打开，完成 Vault 首跑后显示搜索并可展开为全屏标签。
     actions:
     - 16
-    - 19
+    - 20
     checkpoints:
-    - step: 19
+    - step: 18
       expectation: '{"wait_for": "[data-testid=\"mfa-floating-window\"]"}'
     - step: 20
+      expectation: '{"wait_for": "[data-testid=\"mfa-floating-search\"]"}'
+    - step: 21
       expectation: 悬浮窗内联样式 left=50px 且 bottom=30px。
-    - step: 22
-      expectation: '{"wait_for": "[data-testid=\"mfa-tab\"]"}'
     - step: 23
+      expectation: '{"wait_for": "[data-testid=\"mfa-tab\"]"}'
+    - step: 24
       expectation: '{"assert_not_visible": "[data-testid=\"mfa-floating-window\"]"}'
     results:
-    - 19
+    - 18
     - 20
-    - 22
+    - 21
     - 23
+    - 24
   visual:
   - check: 检查截图原生窗口、终端与悬浮窗布局。
     method: manual

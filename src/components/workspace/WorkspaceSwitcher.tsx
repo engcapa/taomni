@@ -26,10 +26,11 @@ export function WorkspaceSwitcher({ onAddFolder, onCreateWorkspace }: { onAddFol
       if (event.key === "Escape") setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
-    window.addEventListener("keydown", onKey);
+    // Capture: workspace editor keymaps may stopPropagation on Escape.
+    window.addEventListener("keydown", onKey, true);
     return () => {
       document.removeEventListener("mousedown", onDown);
-      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keydown", onKey, true);
     };
   }, [open]);
 
