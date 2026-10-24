@@ -169,6 +169,19 @@ export function GlobalCommandModal() {
     setActiveIndex(0);
   }, [query]);
 
+  // Escape must close the palette even when focus left the dialog (e.g. after a
+  // native click or a fill that did not refocus the input).
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      close();
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [close, open]);
+
   if (!open) return null;
 
   const runResult = (result: CommandResult | undefined) => {

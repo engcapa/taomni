@@ -81,14 +81,15 @@ steps:
 - click: '[data-testid="workspace-plus-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
 - wait: 2
-- click: '[data-testid="terminal-pane"]'
-- wait: 0.5
-- type: echo QA_WS_PTY_READY
-- press: Enter
-- assert_pattern:
+- terminal_input:
     selector: '[data-testid="terminal-pane"]'
-    regex: (?m)^\s*QA_WS_PTY_READY\r?\s*$
-    timeout_sec: 20
+    text: echo QA_WS_PTY_READY
+    submit: true
+    verify:
+      selector: '[data-testid="terminal-pane"]'
+      regex: (?m)^\s*QA_WS_PTY_READY\r?\s*$
+      timeout_sec: 20
+      attempts: 3
 - assert_visible: '[data-testid="workspace-tab"][data-tab-kind="terminal"]'
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
@@ -113,74 +114,84 @@ verification:
     requirement: MFA 标签页完成主密码初始化后可添加 HOTP 账户；左下角浮窗位于视口左下角，点击账户复制验证码并显示已复制状态，支持置顶与关闭。
     actions:
     - 4
+    - 5
     - 6
+    - 7
     - 8
     - 9
     - 10
+    - 11
     - 12
+    - 13
     - 14
     - 15
     - 16
+    - 17
     - 18
     - 19
+    - 20
     - 21
+    - 22
+    - 23
     - 24
     - 27
     - 29
     checkpoints:
     - step: 5
-      expectation: 步骤 5 的可观察断言通过
+      expectation: Tools 面板就绪
     - step: 7
-      expectation: 步骤 7 的可观察断言通过
+      expectation: 首次打开 MFA 展示主密码初始化
     - step: 11
-      expectation: 步骤 11 的可观察断言通过
+      expectation: 初始化后显示空 MFA 面板
     - step: 13
-      expectation: 步骤 13 的可观察断言通过
+      expectation: 添加对话框打开
     - step: 17
-      expectation: 步骤 17 的可观察断言通过
+      expectation: 高级选项展开
     - step: 20
-      expectation: 步骤 20 的可观察断言通过
+      expectation: HOTP 账户创建完成
     - step: 22
-      expectation: 步骤 22 的可观察断言通过
-    - step: 23
-      expectation: 步骤 23 的可观察断言通过
+      expectation: 左下角浮窗打开
     - step: 25
-      expectation: 步骤 25 的可观察断言通过
+      expectation: 复制后进入已复制状态
     - step: 26
-      expectation: 步骤 26 的可观察断言通过
+      expectation: 状态栏显示复制反馈
     - step: 28
-      expectation: 步骤 28 的可观察断言通过
+      expectation: 置顶开关生效
     - step: 30
-      expectation: 步骤 30 的可观察断言通过
+      expectation: 关闭后浮窗消失
     results:
+    - 25
+    - 26
+    - 28
     - 30
   - id: R3
     requirement: 工作区内的本地终端启动真实 PTY 并回显命令输出；Sessions 模式不共享工作区实例标签。
     actions:
     - 31
+    - 32
     - 33
+    - 34
     - 35
+    - 36
+    - 37
     - 38
     - 39
-    - 41
-    - 44
+    - 40
     checkpoints:
     - step: 32
-      expectation: 步骤 32 的可观察断言通过
+      expectation: 工作区主面板就绪
     - step: 34
-      expectation: 步骤 34 的可观察断言通过
+      expectation: + 菜单打开
     - step: 36
-      expectation: 步骤 36 的可观察断言通过
+      expectation: 工作区终端面板激活
+    - step: 39
+      expectation: 工作区标签条含终端标签
+    - step: 41
+      expectation: 切回 Sessions 模式
     - step: 42
-      expectation: 步骤 40 的可观察断言通过
-    - step: 43
-      expectation: 步骤 41 的可观察断言通过
-    - step: 45
-      expectation: 步骤 43 的可观察断言通过
-    - step: 46
-      expectation: 步骤 44 的可观察断言通过
+      expectation: Sessions 模式没有工作区终端实例
     results:
-    - 46
+    - 42
   visual:
   - check: 真实窗口内顶栏、左下角浮窗与工作区终端布局无遮挡。
     method: manual

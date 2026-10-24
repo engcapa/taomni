@@ -143,4 +143,13 @@ describe("Agents platform mode (TASK-09)", () => {
     fireEvent.keyDown(screen.getByTestId("global-search-input"), { key: "Enter" });
     expect(useAppStore.getState().activeSideTab).toBe("workspaces");
   });
+
+  it("UT-WS-09-06 closes the palette with Escape even when focus left the dialog", () => {
+    act(() => useWorkspaceUiStore.getState().openGlobalSearch());
+    render(<GlobalCommandModal />);
+    expect(screen.getByTestId("global-search-modal")).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: "Escape" });
+    expect(useWorkspaceUiStore.getState().globalSearchOpen).toBe(false);
+    expect(screen.queryByTestId("global-search-modal")).not.toBeInTheDocument();
+  });
 });
