@@ -112,30 +112,12 @@ steps:
     selector: '[data-testid="session-do-not-exit"]'
     name: data-checked
     equals: 'false'
-- select_option:
+- assert_text_equals:
     selector: '[data-testid="session-ssh-browser-type"]'
-    label: SCP (enhanced speed)
-- assert_attribute:
-    selector: '[data-testid="session-ssh-browser-type"]'
-    name: value
-    equals: scp-fast
-- select_option:
-    selector: '[data-testid="session-ssh-browser-type"]'
-    label: SCP (compatibility)
-- assert_attribute:
-    selector: '[data-testid="session-ssh-browser-type"]'
-    name: value
-    equals: scp
-- assert_text:
-    selector: '[data-testid="session-editor"]'
-    contains: requires Python 3 and scp
-- select_option:
-    selector: '[data-testid="session-ssh-browser-type"]'
-    label: Disabled
-- assert_attribute:
-    selector: '[data-testid="session-ssh-browser-type"]'
-    name: value
-    equals: disabled
+    equals: SFTP protocol (recommended)
+- assert_count:
+    selector: '[data-testid="session-ssh-browser-type"]:is(select)'
+    equal: 0
 - click: '[data-testid="session-auth-agent"]'
 - assert_count:
     selector: '[data-testid="session-auth-agent"]:checked'
@@ -209,9 +191,11 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH advanced controls use stable protocol values, expose key generation and
-      apply expert cipher preferences.
+    requirement: SSH advanced settings retain remote environment, authentication and toggle behavior;
+      the SSH browser displays only SFTP without a protocol selector, including after save/reopen where
+      present.
     actions:
+    - 1
     - 3
     - 12
     - 13
@@ -225,105 +209,122 @@ verification:
     - 33
     - 35
     - 37
-    - 39
     - 41
-    - 44
-    - 46
-    - 48
-    - 50
+    - 43
+    - 45
+    - 47
+    - 49
     - 52
-    - 54
-    - 57
-    - 60
-    - 63
-    - 66
+    - 55
+    - 58
+    - 61
+    - 62
+    - 64
     - 67
-    - 69
-    - 72
-    - 73
-    - 76
+    - 68
+    - 71
     checkpoints:
     - step: 5
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_visible": "[data-testid=\"session-help\"]"}'
     - step: 6
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_visible": "[data-testid=\"session-close\"]"}'
     - step: 7
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_visible": "[data-testid=\"session-host-lookup\"]"}'
     - step: 8
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_visible": "[data-testid=\"session-proto-ssh\"]"}'
     - step: 9
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_visible": "[data-testid=\"session-section-advanced\"]"}'
     - step: 10
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_visible": "[data-testid=\"session-section-network\"]"}'
     - step: 11
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_visible": "[data-testid=\"session-section-bookmark\"]"}'
     - step: 14
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value",
+        "equals": "127.0.0.1"}}'
     - step: 15
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value",
+        "equals": "2222"}}'
     - step: 16
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value",
+        "equals": "qauser"}}'
     - step: 17
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-specify-username\"]", "name":
+        "data-checked", "equals": "true"}}'
     - step: 19
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains":
+        "Fill required fields, then OK to save this session."}}'
     - step: 22
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
+        "name": "value", "equals": "shell"}}'
     - step: 24
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
+        "name": "value", "equals": "lxde"}}'
     - step: 26
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
+        "name": "value", "equals": "xfce"}}'
     - step: 28
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
+        "name": "value", "equals": "gnome"}}'
     - step: 30
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
+        "name": "value", "equals": "kde"}}'
     - step: 32
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
+        "name": "value", "equals": "awesome"}}'
     - step: 34
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
+        "name": "value", "equals": "custom"}}'
     - step: 36
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name":
+        "value", "equals": "printf ''qa-advanced-control\\n''"}}'
     - step: 38
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name":
+        "data-checked", "equals": "false"}}'
+    - step: 39
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"session-ssh-browser-type\"]",
+        "equals": "SFTP protocol (recommended)"}}'
     - step: 40
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-ssh-browser-type\"]:is(select)",
+        "equal": 0}}'
     - step: 42
-      expectation: The explicit control value or visibility assertion holds.
-    - step: 45
-      expectation: The explicit control value or visibility assertion holds.
-    - step: 47
-      expectation: The explicit control value or visibility assertion holds.
-    - step: 49
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-agent\"]:checked", "equal":
+        1}}'
+    - step: 44
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-gssapi\"]:checked", "equal":
+        1}}'
+    - step: 46
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-password\"]:checked", "equal":
+        1}}'
+    - step: 48
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"SSH password\"]", "name": "type",
+        "equals": "password"}}'
+    - step: 50
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-privatekey\"]:checked",
+        "equal": 1}}'
     - step: 51
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_enabled": "[data-testid=\"session-private-key-toggle\"]"}'
     - step: 53
-      expectation: The explicit control value or visibility assertion holds.
-    - step: 55
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-private-key-toggle\"]",
+        "name": "data-checked", "equals": "false"}}'
+    - step: 54
+      expectation: '{"assert_disabled": "input[aria-label=\"Private key path\"]"}'
     - step: 56
-      expectation: The explicit control value or visibility assertion holds.
-    - step: 58
-      expectation: The explicit control value or visibility assertion holds.
-    - step: 59
-      expectation: The explicit control value or visibility assertion holds.
-    - step: 61
-      expectation: The explicit control value or visibility assertion holds.
-    - step: 62
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-private-key-toggle\"]",
+        "name": "data-checked", "equals": "true"}}'
+    - step: 57
+      expectation: '{"assert_enabled": "input[aria-label=\"Private key path\"]"}'
+    - step: 60
+      expectation: '{"assert_visible": "[data-testid=\"text-input-dialog-input\"]"}'
+    - step: 63
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Private key path\"]", "name":
+        "value", "equals": "/home/qauser/.ssh/id_ed25519"}}'
     - step: 65
-      expectation: The explicit control value or visibility assertion holds.
-    - step: 68
-      expectation: The explicit control value or visibility assertion holds.
-    - step: 70
-      expectation: The explicit control value or visibility assertion holds.
+      expectation: '{"assert_visible": "[data-testid=\"session-key-generator\"]"}'
+    - step: 69
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ssh-cipher\"]", "name":
+        "value", "equals": "aes256-gcm@openssh.com"}}'
     - step: 74
-      expectation: The explicit control value or visibility assertion holds.
-    - step: 79
-      expectation: The explicit control value or visibility assertion holds.
-    - step: 43
-      expectation: SCP explicitly explains its remote prerequisites and interrupted-download
-        recovery.
+      expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
     results:
     - 5
     - 6
@@ -346,32 +347,29 @@ verification:
     - 34
     - 36
     - 38
+    - 39
     - 40
     - 42
-    - 45
-    - 47
-    - 49
+    - 44
+    - 46
+    - 48
+    - 50
     - 51
     - 53
-    - 55
+    - 54
     - 56
-    - 58
-    - 59
-    - 61
-    - 62
+    - 57
+    - 60
+    - 63
     - 65
-    - 68
-    - 70
+    - 69
     - 74
-    - 79
-    - 43
   visual:
-  - check: SSH header actions, advanced controls, and dialog text remain readable without overlap.
-    method: manual
-    reason: Functional assertions do not establish layout fidelity.
+  - check: Configuration and workflow state
+    method: automated
+    reason: Exact SFTP text and absence of a select are asserted alongside the retained control assertions.
+      Layout fidelity is not claimed.
   native:
-  - check: This browser case intentionally exercises the browser file-picker stub; packaged
-      native dialog behavior remains unverified.
+  - check: Native boundary
     method: external
-    reason: The private-key picker is an OS dialog boundary and is covered here only through
-      the browser fixture.
+    reason: Browser file-picker stub only; native file dialogs are covered separately.

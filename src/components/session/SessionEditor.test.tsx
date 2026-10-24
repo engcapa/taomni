@@ -1,5 +1,6 @@
 import "./tests/sessionEditor/harness";
 import { registerSessionCapabilityCases } from "./tests/sessionEditor/capability.cases";
+import { registerSessionDefaultCases } from "./tests/sessionEditor/defaults.cases";
 import { cleanup } from "@testing-library/react";
 import { afterEach, beforeEach, describe } from "vitest";
 import { setLocale } from "../../lib/i18n";
@@ -74,6 +75,7 @@ describe("SessionEditor SSH settings tabs", { timeout: 15_000 }, () => {
   });
   registerSessionEditorClipboard1Cases();
   registerSessionCapabilityCases();
+  registerSessionDefaultCases();
   registerSessionEditorClipboard2Cases();
   registerSessionEditorLifecycle3Cases();
   registerSessionEditorLifecycle4Cases();

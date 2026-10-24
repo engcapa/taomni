@@ -54,7 +54,6 @@ export interface CreateSessionResetContext {
   setDoNotExit: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setDisableAiWrite: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setRemoteEnv: import("react").Dispatch<import("react").SetStateAction<string>>;
-  setSshBrowser: import("react").Dispatch<import("react").SetStateAction<string>>;
   setUsePrivKey: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setDescription: import("react").Dispatch<import("react").SetStateAction<string>>;
   setTags: import("react").Dispatch<import("react").SetStateAction<string>>;
@@ -103,7 +102,6 @@ export function createSessionReset(context: CreateSessionResetContext) {
     setDoNotExit,
     setDisableAiWrite,
     setRemoteEnv,
-    setSshBrowser,
     setUsePrivKey,
     setDescription,
     setTags,
@@ -157,7 +155,6 @@ export function createSessionReset(context: CreateSessionResetContext) {
     setDoNotExit(optionBoolean(nextOptions, "doNotExit", true));
     setDisableAiWrite(optionBoolean(nextOptions, "disableAiWrite", false));
     setRemoteEnv(optionString(nextOptions, "remoteEnv", "Interactive shell"));
-    setSshBrowser(optionString(nextOptions, "sshBrowser", "SFTP protocol (recommended)"));
     setUsePrivKey(nextAuth === "PrivateKey");
     setDescription(optionString(nextOptions, "description", ""));
     setTags(optionString(nextOptions, "tags", ""));
@@ -187,7 +184,7 @@ export function createSessionReset(context: CreateSessionResetContext) {
     databaseForm.setHBaseKrb5ConfPath(optionString(nextOptions, "hbaseKrb5ConfPath", ""));
     databaseForm.setHBaseSitePath(optionString(nextOptions, "hbaseSitePath", ""));
     setTerminalProfile(initialTerminalProfileForProto(session?.options_json, nextProto));
-    setNetworkSettings(session ? getSessionNetworkSettings(session.options_json) : { ...getSessionNetworkSettings(null), proxyKind: "app" });
+    setNetworkSettings(getSessionNetworkSettings(session?.options_json));
     setSerialDevice(session?.session_type === "Serial" ? session.host : optionString(nextOptions, "serialDevice", ""));
     setSerialBaud(optionString(nextOptions, "serialBaud", "115200"));
     shellForm.setLocalShellOptions(parseLocalShellOptions(session?.options_json));

@@ -1725,6 +1725,27 @@ controls:
     selector: '[data-testid="session-proto-panweidb"]'
     kind: interactive
     optional: true        # DB session type — form body owned by F-DB-1
+  - id: proto-oracle
+    selector: '[data-testid="session-proto-oracle"]'
+    kind: interactive
+  - id: proto-sqlserver
+    selector: '[data-testid="session-proto-sqlserver"]'
+    kind: interactive
+  - id: proto-starrocks
+    selector: '[data-testid="session-proto-starrocks"]'
+    kind: interactive
+  - id: proto-presto
+    selector: '[data-testid="session-proto-presto"]'
+    kind: interactive
+  - id: proto-s3
+    selector: '[data-testid="session-proto-s3"]'
+    kind: interactive
+  - id: objectstorage-section
+    selector: '[data-testid="session-section-objectstorage"]'
+    kind: interactive
+  - id: storage-provider
+    selector: '[data-testid="session-storage-provider"]'
+    kind: interactive
   - id: proto-clickhouse
     selector: '[data-testid="session-proto-clickhouse"]'
     kind: interactive
@@ -1883,7 +1904,7 @@ controls:
     kind: interactive
   - id: advanced-ssh-browser-type
     selector: '[data-testid="session-ssh-browser-type"]'
-    kind: interactive
+    kind: display
   - id: advanced-ssh-password
     selector: 'input[aria-label="SSH password"]'
     kind: interactive

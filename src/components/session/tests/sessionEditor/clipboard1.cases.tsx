@@ -101,7 +101,7 @@ export function registerSessionEditorClipboard1Cases() {
     expect(checkboxInLabel("Trusted")).toBeDisabled();
     expect(screen.getByLabelText("Execute command")).toHaveValue("tmux new -A -s main");
     expect(screen.getByLabelText("Do not exit after command ends")).toBeChecked();
-    expect(screen.getByDisplayValue("Disabled")).toBeInTheDocument();
+    expect(screen.getByTestId("session-ssh-browser-type")).toHaveTextContent("SFTP protocol (recommended)");
     expect(screen.queryByText("Follow SSH path (experimental)")).not.toBeInTheDocument();
     expect(screen.queryByText("Auto-inject OSC 7 cwd reporting")).not.toBeInTheDocument();
 
@@ -114,7 +114,7 @@ export function registerSessionEditorClipboard1Cases() {
       compression: true,
       startupCmd: "tmux new -A -s main",
       doNotExit: true,
-      sshBrowser: "Disabled",
+      sshBrowser: "sftp",
     });
     expect(JSON.parse(savedConfig.options_json)).not.toHaveProperty("followPath");
     expect(JSON.parse(savedConfig.options_json)).not.toHaveProperty("osc7AutoInject");

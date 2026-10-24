@@ -82,7 +82,7 @@ steps:
     name: value
     equals: custom
 - fill:
-    selector: 'input[aria-label="Execute command"]'
+    selector: input[aria-label="Execute command"]
     value: printf qa-ssh-advanced-toggle
 - set_check:
     selector: '[data-testid="session-do-not-exit"]'
@@ -91,27 +91,26 @@ steps:
     selector: '[data-testid="session-do-not-exit"]'
     name: data-checked
     equals: 'false'
-- select_option:
+- assert_text_equals:
     selector: '[data-testid="session-ssh-browser-type"]'
-    label: Disabled
-- assert_attribute:
-    selector: '[data-testid="session-ssh-browser-type"]'
-    name: value
-    equals: disabled
+    equals: SFTP protocol (recommended)
+- assert_count:
+    selector: '[data-testid="session-ssh-browser-type"]:is(select)'
+    equal: 0
 - click: '[data-testid="session-auth-privatekey"]'
 - assert_attribute:
     selector: '[data-testid="session-private-key-toggle"]'
     name: data-checked
     equals: 'true'
-- assert_enabled: 'input[aria-label="Private key path"]'
+- assert_enabled: input[aria-label="Private key path"]
 - fill:
-    selector: 'input[aria-label="Private key path"]'
+    selector: input[aria-label="Private key path"]
     value: /tmp/qa-ssh-advanced-toggle-key
 - click: '[data-testid="session-auth-password"]'
 - assert_count:
     selector: '[data-testid="session-auth-password"]:checked'
     equal: 1
-- assert_disabled: 'input[aria-label="Private key path"]'
+- assert_disabled: input[aria-label="Private key path"]
 - click: '[data-testid="session-section-bookmark"]'
 - wait_for: '[data-testid="bookmark-settings"]'
 - fill:
@@ -141,17 +140,19 @@ steps:
     name: value
     equals: custom
 - assert_attribute:
-    selector: 'input[aria-label="Execute command"]'
+    selector: input[aria-label="Execute command"]
     name: value
     equals: printf qa-ssh-advanced-toggle
 - assert_attribute:
     selector: '[data-testid="session-do-not-exit"]'
     name: data-checked
     equals: 'false'
-- assert_attribute:
+- assert_text_equals:
     selector: '[data-testid="session-ssh-browser-type"]'
-    name: value
-    equals: disabled
+    equals: SFTP protocol (recommended)
+- assert_count:
+    selector: '[data-testid="session-ssh-browser-type"]:is(select)'
+    equal: 0
 - assert_count:
     selector: '[data-testid="session-auth-password"]:checked'
     equal: 1
@@ -160,11 +161,14 @@ steps:
     selector: '[data-testid="session-editor"]'
     state: detached
 - screenshot: 148-ssh-advanced-toggle-dependencies.png
+- assert_not_visible: '[data-testid="session-editor"]'
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH advanced X11, compression, remote environment, startup, browser mode, and authentication controls change their visible state and persist after saving and reopening.
+    requirement: SSH advanced settings retain remote environment, authentication and toggle behavior;
+      the SSH browser displays only SFTP without a protocol selector, including after save/reopen where
+      present.
     actions:
     - 1
     - 3
@@ -181,7 +185,6 @@ verification:
     - 24
     - 26
     - 27
-    - 29
     - 31
     - 34
     - 35
@@ -191,74 +194,82 @@ verification:
     - 43
     - 44
     - 46
-    - 56
+    - 57
     checkpoints:
-    - step: 2
-      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
-    - step: 4
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 11
-      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
     - step: 12
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]",
+        "name": "data-checked", "equals": "true"}}'
     - step: 13
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]",
+        "name": "data-checked", "equals": "true"}}'
     - step: 14
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]",
+        "name": "data-checked", "equals": "false"}}'
     - step: 16
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]",
+        "name": "data-checked", "equals": "false"}}'
     - step: 17
       expectation: '{"assert_disabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
     - step: 19
       expectation: '{"assert_enabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
     - step: 21
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]",
+        "name": "data-checked", "equals": "false"}}'
     - step: 23
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]",
+        "name": "data-checked", "equals": "true"}}'
     - step: 25
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "custom"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
+        "name": "value", "equals": "custom"}}'
     - step: 28
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name":
+        "data-checked", "equals": "false"}}'
+    - step: 29
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"session-ssh-browser-type\"]",
+        "equals": "SFTP protocol (recommended)"}}'
     - step: 30
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "name": "value", "equals": "disabled"}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-ssh-browser-type\"]:is(select)",
+        "equal": 0}}'
     - step: 32
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-private-key-toggle\"]", "name": "data-checked", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-private-key-toggle\"]",
+        "name": "data-checked", "equals": "true"}}'
     - step: 33
       expectation: '{"assert_enabled": "input[aria-label=\"Private key path\"]"}'
     - step: 36
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-password\"]:checked", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-password\"]:checked", "equal":
+        1}}'
     - step: 37
       expectation: '{"assert_disabled": "input[aria-label=\"Private key path\"]"}'
-    - step: 39
-      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 42
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-advanced-dependencies\"]"}'
-    - step: 45
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 47
-      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
     - step: 48
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]",
+        "name": "data-checked", "equals": "true"}}'
     - step: 49
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]",
+        "name": "data-checked", "equals": "false"}}'
     - step: 50
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]",
+        "name": "data-checked", "equals": "true"}}'
     - step: 51
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "custom"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
+        "name": "value", "equals": "custom"}}'
     - step: 52
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf qa-ssh-advanced-toggle"}}'
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name":
+        "value", "equals": "printf qa-ssh-advanced-toggle"}}'
     - step: 53
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name":
+        "data-checked", "equals": "false"}}'
     - step: 54
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "name": "value", "equals": "disabled"}}'
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"session-ssh-browser-type\"]",
+        "equals": "SFTP protocol (recommended)"}}'
     - step: 55
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-password\"]:checked", "equal": 1}}'
-    - step: 57
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-ssh-browser-type\"]:is(select)",
+        "equal": 0}}'
+    - step: 56
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-password\"]:checked", "equal":
+        1}}'
+    - step: 60
+      expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
     results:
-    - 2
-    - 4
-    - 11
     - 12
     - 13
     - 14
@@ -269,15 +280,12 @@ verification:
     - 23
     - 25
     - 28
+    - 29
     - 30
     - 32
     - 33
     - 36
     - 37
-    - 39
-    - 42
-    - 45
-    - 47
     - 48
     - 49
     - 50
@@ -286,12 +294,14 @@ verification:
     - 53
     - 54
     - 55
-    - 57
+    - 56
+    - 60
   visual:
-  - check: Inspect the advanced SSH form screenshot for visible dependency state, aligned controls, and no clipped labels.
-    method: manual
-    reason: Screenshot review is required for cross-WebView form layout.
+  - check: Configuration and workflow state
+    method: automated
+    reason: Exact SFTP text and absence of a select are asserted alongside the retained control assertions.
+      Layout fidelity is not claimed.
   native:
-  - check: Execute the same editor interactions in the declared native modes; browser evidence does not certify Tauri WebViews.
-    method: external
-    reason: Native execution is collected by the platform workflow.
+  - check: Native boundary
+    method: automated
+    reason: Native mode verifies SQLite save/reopen for the retained SSH settings and fixed SFTP display.

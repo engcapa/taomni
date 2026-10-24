@@ -61,6 +61,7 @@
       "items": {
         "enum": [
           "reset_db",
+          "unreachable_app_proxy",
           "backup_policy",
           "backup_cloud",
           "model_inspector_gateway",
