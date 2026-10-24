@@ -229,11 +229,23 @@ function joinWorkspacePathValue(rootPath: string, relative: string): string {
  * root folder may not exist there yet. Errors (already exists, native root
  * present) are swallowed - the following file write surfaces real failures.
  */
+/**
+ * Best-effort `mkdir -p`. The browser VFS requires every parent entry, and a
+ * freshly registered root folder may not exist on disk yet. Walking the
+ * absolute chain top-down (then the workspace-relative segments) creates each
+ * missing level while "already exists" errors are swallowed; the following
+ * file write surfaces real failures.
+ */
 async function ensureWorkspaceDirectories(rootPath: string, segments: string[]): Promise<void> {
-  try {
-    await workspaceCreateDir(rootPath, "");
-  } catch {
-    // Root already exists (or cannot be created) - proceed.
+  const absoluteParts = rootPath.replace(/\\/g, "/").split("/").filter(Boolean);
+  let prefix = rootPath.startsWith("/") ? "/" : "";
+  for (const part of absoluteParts) {
+    prefix = prefix.endsWith("/") || prefix === "" ? `${prefix}${part}` : `${prefix}/${part}`;
+    try {
+      await workspaceCreateDir(prefix, "");
+    } catch {
+      // Level already exists - continue downwards.
+    }
   }
   for (let index = 0; index < segments.length; index += 1) {
     try {

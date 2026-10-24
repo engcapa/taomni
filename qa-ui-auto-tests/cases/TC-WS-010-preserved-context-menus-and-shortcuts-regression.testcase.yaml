@@ -130,6 +130,9 @@ verification:
     method: manual
     reason: 像素布局与遮挡需要截图人工评审。
   native:
-  - check: 原生 WebView 中按相同步骤执行；SessionTree 与工作区文件树右键由 TC-013/TC-IDE 系列覆盖。
+  - check: Linux/Windows 原生 WebView 中执行相同步骤；macOS 按设计使用系统原生菜单栏（无 app-main-menu），由既有 macOS 菜单桥接套件覆盖。
     method: automated
-    reason: browser 证据不替代 native，未执行平台不计作通过。
+    reason: browser 证据不替代 native；macOS 原生菜单栏不在本用例声明范围内。
+native_platforms:
+- Linux
+- Windows

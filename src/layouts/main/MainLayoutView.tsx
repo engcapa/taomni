@@ -402,7 +402,14 @@ export function MainLayoutView(props: MainLayoutViewProps) {
 
         {/* v6.1 platform overlays: bottom-left MFA float, Ctrl+K palette and
             the workspace "open any session" picker. */}
-        <MfaFloatingWindow onExpandTab={() => menuActions.handleCommand("mfa")} />
+        <MfaFloatingWindow
+          onExpandTab={() => {
+            menuActions.handleCommand("mfa");
+            // Workspaces mode hides the global tab area; switch back so the
+            // expanded mfa-tab is actually visible.
+            useAppStore.getState().setActiveSideTab("sessions");
+          }}
+        />
         <GlobalCommandModal
           open={globalSearchOpen}
           onClose={() => setGlobalSearchOpen(false)}

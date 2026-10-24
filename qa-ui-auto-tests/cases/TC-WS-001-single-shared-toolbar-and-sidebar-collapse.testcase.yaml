@@ -27,7 +27,6 @@ steps:
 - eval_readonly:
     expression: document.querySelector('.taomni-control-bar').getBoundingClientRect().height <= 33 && document.querySelectorAll('.taomni-control-bar').length === 1
     expect_truthy: true
-- assert_visible: '[data-testid="app-main-menu"]'
 - assert_visible: '[data-testid="toggle-left-sidebar"]'
 - click: '[data-testid="toggle-left-sidebar"]'
 - wait_for: '[data-testid="collapsed-sidebar-rail"]'
@@ -74,36 +73,36 @@ verification:
   - id: R2
     requirement: 左栏收缩按钮与 Ctrl+B 均可折叠/展开主侧栏；右侧栏按钮切换状态；全局搜索入口打开 Ctrl+K 面板并可 Esc 关闭。
     actions:
-    - 8
-    - 11
-    - 13
-    - 18
-    - 22
-    checkpoints:
-    - step: 9
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 10
-      expectation: '{"assert_not_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
-    - step: 12
-      expectation: '{"wait_for": "[data-testid=\"expanded-sidebar-panel\"]"}'
-    - step: 14
-      expectation: Ctrl+B 折叠侧栏。
-    - step: 16
-      expectation: Ctrl+B 再次展开侧栏。
-    - step: 19
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"toggle-right-sidebar\"]", "name": "data-active", "equals": "true"}}'
-    - step: 23
-      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
-    - step: 25
-      expectation: '{"assert_not_visible": "[data-testid=\"global-search-modal\"]"}'
-    results:
-    - 9
+    - 7
     - 10
     - 12
-    - 16
-    - 19
-    - 23
-    - 25
+    - 17
+    - 21
+    checkpoints:
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 9
+      expectation: '{"assert_not_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 13
+      expectation: Ctrl+B 折叠侧栏。
+    - step: 15
+      expectation: Ctrl+B 再次展开侧栏。
+    - step: 18
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"toggle-right-sidebar\"]", "name": "data-active", "equals": "true"}}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
+    - step: 24
+      expectation: '{"assert_not_visible": "[data-testid=\"global-search-modal\"]"}'
+    results:
+    - 8
+    - 9
+    - 11
+    - 15
+    - 18
+    - 22
+    - 24
   visual:
   - check: 检查截图中工具栏单行、无遮挡、按钮间距正常。
     method: manual
