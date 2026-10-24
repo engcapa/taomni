@@ -246,3 +246,19 @@ failures may be reported separately, per user authorization.
   written with platform CRLF translation: the shell wrapper failed to execute
   and sample byte hashes differed. Write runner-owned POSIX scripts/configs and
   deterministic text samples with explicit LF on every OS; retain failed runs.
+
+## Windows window and path recovery (40043236205)
+
+- At 02539282, all three browser platforms passed 8/8 selected cases; Linux and
+  macOS native each passed 14/14. Windows native passed 11/14, including real SCP
+  pause/resume/cancel/retry, ClickHouse recovery, Kerberos and encrypted keys.
+- SCP-001/002 completed verified downloads but upload selectors assumed POSIX
+  separators. Match the filename suffix on either native path representation.
+- BOOK-003 failed creating its WebView2 window with HRESULT 0x8007139F. Centralize
+  the isolated QA profile and driver arguments across main, detached, SFTP and
+  screenshot builders so every view uses the same browser environment. Retain
+  BOOK-003 and SHOT-N24 as native window lifecycle acceptance; extend GSS-001
+  to detach its authenticated SFTP view and verify the real remote listing.
+- Use a portable echo command and anchored output-line assertions in BOOK-003;
+  both detached and reattached views must contain actual output, not command echo.
+  Hosted verification of these corrections remains pending.

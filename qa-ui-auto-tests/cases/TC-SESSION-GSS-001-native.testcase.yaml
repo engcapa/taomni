@@ -4,6 +4,7 @@ covers:
 - F6.3
 - F2.2
 - F7.2
+- F7.4
 tags:
 - session
 - native
@@ -74,6 +75,14 @@ steps:
     selector: '[data-testid="sftp-remote-list"]'
     contains: scp-source.txt
     timeout_sec: 45
+- click: '[data-testid="sftp-detach"]'
+- switch_window:
+    selector: '[data-testid="sftp-detached-window"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="sftp-remote-list"]'
+    contains: scp-source.txt
+    timeout_sec: 45
 verification:
   review: reviewed
   requirements:
@@ -109,6 +118,13 @@ verification:
     - 12
     - 21
     - 27
+  - id: R2
+    requirement: Detaching the authenticated SFTP browser creates a real usable window and preserves the remote directory.
+    actions: [28, 29]
+    checkpoints:
+    - step: 30
+      expectation: The detached native window lists the same real server file using the Kerberos ticket.
+    results: [30]
   native:
   - check: Real SSH server, MIT Kerberos KDC and native filesystem
     method: automated

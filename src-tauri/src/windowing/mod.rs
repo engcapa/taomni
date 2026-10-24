@@ -106,12 +106,15 @@ pub async fn open_detached_window(
     let (default_w, default_h, min_w, min_h) = default_size(&kind);
     let final_w = width.unwrap_or(default_w);
     let final_h = height.unwrap_or(default_h);
-    let builder = WebviewWindowBuilder::new(&app_handle, &label, url)
-        .title(&resolved_title)
-        .inner_size(final_w, final_h)
-        .min_inner_size(min_w, min_h)
-        .resizable(true)
-        .enable_clipboard_access();
+    let builder = crate::webview_environment::configure(
+        &app_handle,
+        WebviewWindowBuilder::new(&app_handle, &label, url),
+    )
+    .title(&resolved_title)
+    .inner_size(final_w, final_h)
+    .min_inner_size(min_w, min_h)
+    .resizable(true)
+    .enable_clipboard_access();
 
     let builder = match (x, y) {
         (Some(x), Some(y)) if x.is_finite() && y.is_finite() => {

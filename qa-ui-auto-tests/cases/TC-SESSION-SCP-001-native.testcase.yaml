@@ -82,7 +82,7 @@ steps:
     equals: 054e942b10569af4c2006f997e3e2c40a9a14fc1464329401bf1e44f7560c4d7
     timeout_sec: 45
 - assert_visible: '[data-testid="sftp-transfer-queue"] [data-transfer-state="done"][data-resume-bytes="7"][data-transfer-restarted="false"]'
-- click: '[data-testid="sftp-local-list"] tr[title$="/scp-upload.txt"]'
+- click: '[data-testid="sftp-local-list"] tr[title$="scp-upload.txt"]'
 - click: '[data-testid="sftp-local-upload-selected"]'
 - assert_file_sha256:
     path: ${cfg.ssh_features.uploaded}

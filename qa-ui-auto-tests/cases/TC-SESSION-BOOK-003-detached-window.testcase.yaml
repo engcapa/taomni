@@ -54,11 +54,11 @@ steps:
     equal: 1
 - terminal_input:
     selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
-    text: echo QA_DETACHED_BOOKMARK_$((17+25))
+    text: echo QA_DETACHED_BOOKMARK_42
     submit: true
-- assert_text:
+- assert_pattern:
     selector: '[data-testid="terminal-pane"]'
-    contains: QA_DETACHED_BOOKMARK_42
+    regex: (?m)^QA_DETACHED_BOOKMARK_42\s*$
     timeout_sec: 20
 - click: '[data-testid="detached-reattach"]'
 - switch_window:
@@ -70,9 +70,9 @@ steps:
 - assert_count:
     selector: '[data-testid="terminal-pane"]'
     equal: 1
-- assert_text:
+- assert_pattern:
     selector: '[data-testid="terminal-pane"]'
-    contains: QA_DETACHED_BOOKMARK_42
+    regex: (?m)^QA_DETACHED_BOOKMARK_42\s*$
     timeout_sec: 20
 - wait: 2
 - assert_count:
@@ -137,4 +137,5 @@ verification:
     method: automated
     reason: Local PTYs and output adoption are native-only APIs. TC-128 covers
       save/reopen of the new-window setting in browser mode. This case switches
-      real WebDriver windows and requires computed PTY output after reattachment.
+      real WebDriver windows and requires a standalone PTY output line before and after reattachment,
+      excluding the echoed command line on POSIX and Windows shells.
