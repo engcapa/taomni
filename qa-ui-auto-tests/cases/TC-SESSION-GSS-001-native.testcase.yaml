@@ -127,9 +127,9 @@ verification:
     requirement: Detaching the authenticated SFTP browser creates a real usable window and preserves the remote directory.
     actions: [28, 29]
     checkpoints:
-    - step: 35
+    - step: 33
       expectation: The detached native window lists the same real server file using the Kerberos ticket.
-    results: [35]
+    results: [33]
   native:
   - check: Real SSH server, MIT Kerberos KDC and native filesystem
     method: automated
