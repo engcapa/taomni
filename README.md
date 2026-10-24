@@ -6,7 +6,7 @@
 
 # Taomni
 
-Taomni is an AI-native remote workspace for developers. It is built with Tauri 2, React 19, TypeScript, and Rust, and is designed to run across Linux, macOS, and Windows. The app brings local terminals, SSH, SFTP, RDP/VNC, tunnels, database clients, mail, and AI-assisted workflows into one compact desktop workspace.
+Taomni is an AI-native remote workspace for developers. It is built with Tauri 2, React 19, TypeScript, and Rust, and is designed to run across Linux, macOS, and Windows. The app brings local terminals, SSH, SFTP, RDP/VNC, tunnels, database clients, mail, and AI-assisted workflows into a single compact desktop workspace.
 
 ## Screenshots
 
