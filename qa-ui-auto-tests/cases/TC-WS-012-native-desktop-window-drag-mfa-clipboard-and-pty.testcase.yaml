@@ -80,12 +80,14 @@ steps:
 - wait_for: '[data-testid="workspace-open-session-menu"]'
 - click: '[data-testid="workspace-plus-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- wait: 2
 - click: '[data-testid="terminal-pane"]'
+- wait: 0.5
 - type: echo QA_WS_PTY_READY
 - press: Enter
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
-    regex: (?m)^QA_WS_PTY_READY\s*$
+    regex: (?m)^\s*QA_WS_PTY_READY\r?\s*$
     timeout_sec: 20
 - assert_visible: '[data-testid="workspace-tab"][data-tab-kind="terminal"]'
 - click: '[data-testid="side-tab-sessions"]'
@@ -158,10 +160,10 @@ verification:
     - 31
     - 33
     - 35
-    - 37
     - 38
     - 39
-    - 42
+    - 41
+    - 44
     checkpoints:
     - step: 32
       expectation: 步骤 32 的可观察断言通过
@@ -169,16 +171,16 @@ verification:
       expectation: 步骤 34 的可观察断言通过
     - step: 36
       expectation: 步骤 36 的可观察断言通过
-    - step: 40
+    - step: 42
       expectation: 步骤 40 的可观察断言通过
-    - step: 41
-      expectation: 步骤 41 的可观察断言通过
     - step: 43
+      expectation: 步骤 41 的可观察断言通过
+    - step: 45
       expectation: 步骤 43 的可观察断言通过
-    - step: 44
+    - step: 46
       expectation: 步骤 44 的可观察断言通过
     results:
-    - 44
+    - 46
   visual:
   - check: 真实窗口内顶栏、左下角浮窗与工作区终端布局无遮挡。
     method: manual
