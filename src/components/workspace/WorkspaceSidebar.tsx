@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   FilePlus2,
   FolderPlus,
@@ -16,6 +16,8 @@ import type { AppCommand } from "../menubar/commands";
 import { useSessionStore } from "../../stores/sessionStore";
 import { getHomeDir } from "../../lib/ipc";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
+import { useWorkspaceToolBridgeStore } from "../../stores/workspaceToolBridgeStore";
+import { useWorkspaceGitSummaryStore } from "../../stores/workspaceGitSummaryStore";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 type FsModal =
@@ -43,10 +45,22 @@ export function WorkspaceSidebar({ onOpenWorkspaceSession }: WorkspaceSidebarPro
   const workspace = workspaces.find((ws) => ws.id === activeWorkspaceId) ?? workspaces[0];
   const [modal, setModal] = useState<FsModal>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const bridge = useWorkspaceToolBridgeStore((s) => s.controller);
+  const newFileRequest = useWorkspacePlatformStore((s) => s.newFileRequest);
+
+  // Alt+Insert raises a store request instead of clicking a DOM node; consume
+  // it here (survives the sidebar mounting after the shortcut).
+  useEffect(() => {
+    if (newFileRequest === 0) return;
+    useWorkspacePlatformStore.getState().consumeNewFileRequest();
+    setModal({ kind: "new-file" });
+  }, [newFileRequest]);
 
   if (!workspace) return null;
   const lens = workspace.activeLeftToolWindow;
   const openAddFolder = () => setModal({ kind: "add-folder" });
+  const openProjectTree = () => bridge?.toggleProjectTree();
+  const refreshProjectTree = () => bridge?.refreshProjectTree?.();
 
   return (
     <div data-testid="workspace-sidebar" className="relative flex min-h-0 flex-1 flex-col" style={{ background: "var(--taomni-sidebar-bg)" }}>
@@ -77,13 +91,19 @@ export function WorkspaceSidebar({ onOpenWorkspaceSession }: WorkspaceSidebarPro
           testId="workspace-refresh"
           title={t("workspace.refreshRoots")}
           icon={<RefreshCw className="h-3.5 w-3.5" />}
-          onClick={() => setNotice(t("workspace.refreshRoots"))}
+          disabled={!bridge?.refreshProjectTree}
+          onClick={refreshProjectTree}
         />
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {lens === "project" ? (
-          <ProjectLens workspaceId={workspace.id} roots={workspace.rootFolders} onAddFolder={openAddFolder} />
+          <ProjectLens
+            workspaceId={workspace.id}
+            roots={workspace.rootFolders}
+            onAddFolder={openAddFolder}
+            onOpenProjectTree={openProjectTree}
+          />
         ) : lens === "sessions" ? (
           <WorkspaceSessionsLens workspaceId={workspace.id} pinnedSessionIds={workspace.pinnedSessionIds} onOpenSession={onOpenWorkspaceSession} />
         ) : (
@@ -91,7 +111,7 @@ export function WorkspaceSidebar({ onOpenWorkspaceSession }: WorkspaceSidebarPro
         )}
       </div>
 
-      <WorkspaceGitBar workspaceId={workspace.id} roots={workspace.rootFolders} />
+      <WorkspaceGitBar workspaceId={workspace.id} />
 
       {modal?.kind === "new-file" && (
         <TextInputDialog
@@ -182,7 +202,17 @@ async function resolveWorkspaceFolderPath(typed: string): Promise<string> {
   return expanded.replace(/\/+$/, "");
 }
 
-function ProjectLens({ workspaceId, roots, onAddFolder }: { workspaceId: string; roots: { id: string; name: string; path: string }[]; onAddFolder: () => void }) {
+function ProjectLens({
+  workspaceId,
+  roots,
+  onAddFolder,
+  onOpenProjectTree,
+}: {
+  workspaceId: string;
+  roots: { id: string; name: string; path: string }[];
+  onAddFolder: () => void;
+  onOpenProjectTree?: () => void;
+}) {
   const t = useT();
   const removeRootFolder = useWorkspacePlatformStore((s) => s.removeRootFolder);
   return (
@@ -228,6 +258,16 @@ function ProjectLens({ workspaceId, roots, onAddFolder }: { workspaceId: string;
           </div>
         ))
       )}
+      <button
+        type="button"
+        data-testid="workspace-open-project-tree"
+        disabled={!onOpenProjectTree}
+        onClick={onOpenProjectTree}
+        className="mt-2 flex w-full items-center justify-center gap-1.5 rounded border px-2 py-1 text-[11px] hover:bg-[var(--taomni-hover)] disabled:opacity-40"
+        style={{ borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}
+      >
+        {t("workspace.openProjectTree")}
+      </button>
     </div>
   );
 }
@@ -241,21 +281,43 @@ function StructureLens() {
   );
 }
 
-function WorkspaceGitBar({ workspaceId, roots }: { workspaceId: string; roots: { id: string; name: string }[] }) {
+function WorkspaceGitBar({ workspaceId }: { workspaceId: string }) {
   const t = useT();
   const openGitPanel = useWorkspacePlatformStore((s) => s.openGitPanel);
-  const repoName = roots[0]?.name ?? t("workspace.gitBarNoRepo");
+  const summary = useWorkspaceGitSummaryStore((s) => s.summary);
+  const repoName = summary.repoRoot
+    ? summary.repoRoot.replace(/[\\/]+$/, "").split(/[\\/]/).pop() || summary.repoRoot
+    : t("workspace.gitBarNoRepo");
+  const branchLabel = summary.branch || (summary.repoRoot ? t("workspace.gitBarDetached") : "");
   return (
     <button
       type="button"
       data-testid="workspace-sidebar-git-bar"
-      title={t("workspace.gitBarOpen")}
+      title={summary.repoRoot || t("workspace.gitBarOpen")}
       className="flex h-7 shrink-0 items-center gap-2 border-t px-2 text-[11px]"
       style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)", color: "var(--taomni-text)" }}
       onClick={() => openGitPanel(workspaceId)}
     >
       <GitBranch className="h-3.5 w-3.5 shrink-0" />
       <span className="min-w-0 flex-1 truncate text-left font-medium">{repoName}</span>
+      {branchLabel && (
+        <span
+          data-testid="workspace-sidebar-git-branch"
+          className="max-w-[90px] shrink-0 truncate"
+          style={{ color: "var(--taomni-text-muted)" }}
+        >
+          {branchLabel}
+        </span>
+      )}
+      {summary.changeCount > 0 && (
+        <span
+          data-testid="workspace-sidebar-git-changes"
+          className="shrink-0 rounded px-1 text-[9px] font-semibold tabular-nums"
+          style={{ background: "var(--taomni-hover)", color: "var(--taomni-text-muted)" }}
+        >
+          {summary.changeCount}
+        </span>
+      )}
       <span className="shrink-0" style={{ color: "var(--taomni-accent)" }}>{t("workspace.gitBarOpen")} →</span>
     </button>
   );

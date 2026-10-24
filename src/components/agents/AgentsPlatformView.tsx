@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bot, GitBranch, Plus, ShieldCheck, ShieldX } from "lucide-react";
+import { Bot, GitBranch, Info, Plus, ShieldCheck, ShieldX } from "lucide-react";
 import { TextInputDialog } from "../sidebar/ConfirmDialog";
 import { useT } from "../../lib/i18n";
 import { useAppStore } from "../../stores/appStore";
@@ -58,6 +58,17 @@ export function AgentsPlatformView({ visible }: { visible: boolean }) {
             <Plus className="h-3.5 w-3.5" />
             {t("agentsPlatform.dispatch")}
           </button>
+        </div>
+        {/* Honest state: this mode is a UI scaffold until an agent/worktree
+            backend exists (v6.1 review H7). */}
+        <div
+          data-testid="agents-preview-notice"
+          role="status"
+          className="flex shrink-0 items-start gap-2 border-b px-3 py-1.5 text-[11px]"
+          style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-panel-bg)", color: "var(--taomni-text-muted)" }}
+        >
+          <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          <span className="min-w-0 flex-1">{t("agentsPlatform.localOnlyNotice")}</span>
         </div>
         {tasks.length === 0 ? (
           <div className="flex flex-1 items-center justify-center text-[12px]" style={{ color: "var(--taomni-text-muted)" }}>

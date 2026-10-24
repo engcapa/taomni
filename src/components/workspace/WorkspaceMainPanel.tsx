@@ -1,9 +1,21 @@
+import { useEffect } from "react";
 import { CodeWorkspaceTab } from "../editor/CodeWorkspaceTab";
 import { WorkspaceGitManager } from "../git/WorkspaceGitManager";
 import { useT } from "../../lib/i18n";
 import type { CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, GitWorkspaceRootInfo } from "../../types";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
+import { useWorkspaceToolBridgeStore } from "../../stores/workspaceToolBridgeStore";
 import { WorkspaceSessionPane } from "./WorkspaceSessionPanes";
+import { useWorkspaceGitSummaryReporter } from "./useWorkspaceGitSummaryReporter";
+
+function isSessionTabKind(kind: string): boolean {
+  return kind !== "file" && kind !== "git";
+}
+
+function absoluteRepoPath(repoRoot: string, path: string): string {
+  if (path.startsWith("/") || /^[A-Za-z]:[\\/]/.test(path)) return path;
+  return `${repoRoot.replace(/[\\/]+$/, "")}/${path.replace(/^[\\/]+/, "")}`;
+}
 
 /**
  * Workspaces-mode main canvas (v6.1 TASK-06/07): routes the active platform
@@ -11,65 +23,93 @@ import { WorkspaceSessionPane } from "./WorkspaceSessionPanes";
  * (tree, tool windows, Monaco) under a stable per-workspace instance; the Git
  * tab reuses the multi-repo WorkspaceGitManager; session tabs render isolated
  * panes that never share runtime with Sessions-mode tabs.
+ *
+ * Every session pane of every workspace stays mounted (hidden when inactive)
+ * so switching workspace or mode does not tear down live terminal/SFTP/DB
+ * connections (v6.1 review H1/H8).
  */
 export function WorkspaceMainPanel({ visible }: { visible: boolean }) {
   const t = useT();
   const workspaces = useWorkspacePlatformStore((s) => s.workspaces);
   const activeWorkspaceId = useWorkspacePlatformStore((s) => s.activeWorkspaceId);
   const workspace = workspaces.find((ws) => ws.id === activeWorkspaceId) ?? workspaces[0];
+  const controller = useWorkspaceToolBridgeStore((s) => s.controller);
+  useWorkspaceGitSummaryReporter(workspace?.rootFolders ?? []);
+
+  const activeTab = workspace?.openTabs.find((tab) => tab.id === workspace.activeTabId);
+  const gitTab = workspace?.openTabs.find((tab) => tab.kind === "git");
+  const activeIsSession = !!activeTab && isSessionTabKind(activeTab.kind);
+  const activeFileTab = activeTab?.kind === "file" ? activeTab : null;
+  const sessionTabs = workspaces.flatMap((entry) => entry.openTabs
+    .filter((tab) => isSessionTabKind(tab.kind))
+    .map((tab) => ({ workspaceId: entry.id, tab })));
+
+  // Platform file tabs only mark the active tab; the mounted editor instance
+  // performs the actual open through the workspace tool bridge.
+  const activeFilePath = activeFileTab?.filePath;
+  const activeFileRootId = activeFileTab?.rootFolderId;
+  useEffect(() => {
+    if (!controller?.openFile || !activeFilePath) return;
+    void controller.openFile(activeFilePath, activeFileRootId);
+  }, [controller, activeFilePath, activeFileRootId]);
+
   if (!workspace) return null;
 
-  const activeTab = workspace.openTabs.find((tab) => tab.id === workspace.activeTabId);
-  const isSessionTab = !!activeTab && activeTab.kind !== "git" && activeTab.kind !== "file";
+  const openFileFromGit = (repoRoot: string, path?: string | null) => {
+    if (!path || !controller?.openFile) return;
+    void controller.openFile(absoluteRepoPath(repoRoot, path));
+  };
 
   return (
     <div data-testid="workspace-main-panel" className="relative h-full min-h-0 w-full">
-      {/* The workspace editor stays mounted across Git / session tab switches. */}
-      <div
-        className="absolute inset-0"
-        style={{ display: isSessionTab ? "none" : "block" }}
-      >
-        {activeTab?.kind === "git" ? (
-          <WorkspaceGitManager
-            workspaceName={workspace.name}
-            roots={gitRootsFor(workspace.rootFolders)}
-            activeRepoRoot={workspace.rootFolders[0]?.path}
-            visible={visible && activeTab?.kind === "git"}
-          />
-        ) : (
+      {/* The workspace editor and its Git panel stay mounted across tab
+          switches; session tabs only hide them. */}
+      <div className="absolute inset-0" style={{ display: activeIsSession ? "none" : "block" }}>
+        <div className="absolute inset-0" style={{ display: activeTab?.kind === "git" ? "none" : "block" }}>
           <CodeWorkspaceTab
             tabId={`platform-ws-${workspace.id}`}
             workspace={editorInfoFor(workspace)}
-            visible={visible && !isSessionTab}
+            visible={visible && !activeIsSession && activeTab?.kind !== "git"}
+            onOpenGitManager={() => useWorkspacePlatformStore.getState().openGitPanel(workspace.id)}
           />
+        </div>
+        {gitTab && (
+          <div className="absolute inset-0" style={{ display: activeTab?.kind === "git" ? "block" : "none" }}>
+            <WorkspaceGitManager
+              workspaceName={workspace.name}
+              roots={gitRootsFor(workspace.rootFolders)}
+              activeRepoRoot={workspace.rootFolders[0]?.path}
+              visible={visible && activeTab?.kind === "git"}
+              initialChangePath={gitTab.focusPath}
+              onOpenWorkspace={openFileFromGit}
+            />
+          </div>
+        )}
+        {/* Path C into the Git panel: the editor-corner "compare in Git panel"
+            action (v6.1 AC-06). It lives inside the editor surface, so it is
+            hidden while a session pane or the Git panel itself is active. */}
+        {!activeIsSession && activeTab?.kind !== "git" && (
+          <button
+            type="button"
+            data-testid="editor-open-git-diff"
+            title={t("workspace.gitBarOpen")}
+            className="absolute right-3 top-9 z-20 flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] shadow-sm"
+            style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}
+            onClick={() => useWorkspacePlatformStore.getState().openGitPanel(workspace.id, activeFileTab?.filePath)}
+          >
+            <span aria-hidden="true">🌿</span>
+            {t("workspace.gitBarOpen")}
+          </button>
         )}
       </div>
-      {workspace.openTabs
-        .filter((tab) => tab.kind !== "git" && tab.kind !== "file")
-        .map((tab) => (
-          <div
-            key={tab.id}
-            className="absolute inset-0"
-            style={{ display: activeTab?.id === tab.id ? "block" : "none" }}
-          >
-            <WorkspaceSessionPane tab={tab} visible={activeTab?.id === tab.id && visible} />
+      {sessionTabs.map(({ workspaceId, tab }) => {
+        const active = workspaceId === workspace.id && activeTab?.id === tab.id;
+        return (
+          <div key={tab.id} className="absolute inset-0" style={{ display: active ? "block" : "none" }}>
+            <WorkspaceSessionPane tab={tab} visible={active && visible} />
           </div>
-        ))}
-      {/* Path C into the Git panel: the editor-corner "compare in Git panel"
-          action (v6.1 AC-06); hidden while the Git panel itself is active. */}
-      {activeTab?.kind !== "git" && (
-      <button
-        type="button"
-        data-testid="editor-open-git-diff"
-        title={t("workspace.gitBarOpen")}
-        className="absolute right-3 top-[46px] z-20 flex items-center gap-1.5 rounded border px-2 py-1 text-[11px] shadow-sm"
-        style={{ background: "var(--taomni-panel-bg)", borderColor: "var(--taomni-divider)", color: "var(--taomni-text)" }}
-        onClick={() => useWorkspacePlatformStore.getState().openGitPanel(workspace.id)}
-      >
-        <span aria-hidden="true">🌿</span>
-        {t("workspace.gitBarOpen")}
-      </button>
-      )}
+        );
+      })}
       {workspace.openTabs.length === 0 && workspace.rootFolders.length === 0 && (
         <div
           data-testid="workspace-empty-hint"

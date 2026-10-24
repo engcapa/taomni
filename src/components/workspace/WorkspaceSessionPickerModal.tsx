@@ -11,7 +11,8 @@ type ProtocolFilter = (typeof PROTOCOL_FILTERS)[number];
 function protocolGroup(session: SessionConfig): Exclude<ProtocolFilter, "all"> | null {
   switch (session.session_type) {
     case "SSH": return "ssh";
-    case "SFTP": return "sftp";
+    case "SFTP":
+    case "FTP": return "sftp";
     case "Database":
     case "MySQL":
     case "PostgreSQL":
@@ -25,7 +26,7 @@ function protocolGroup(session: SessionConfig): Exclude<ProtocolFilter, "all"> |
     case "HBase":
     case "HBaseShell":
       return "db";
-    case "Rdp":
+    case "RDP":
     case "VNC":
       return "desktop";
     default:
@@ -55,6 +56,10 @@ export function WorkspaceSessionPickerModal({
   const [filter, setFilter] = useState<ProtocolFilter>("all");
   const [pin, setPin] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -66,7 +71,7 @@ export function WorkspaceSessionPickerModal({
       if (event.key === "Escape") {
         event.preventDefault();
         event.stopPropagation();
-        onClose();
+        onCloseRef.current();
       }
     };
     window.addEventListener("keydown", onKey, true);
@@ -74,7 +79,7 @@ export function WorkspaceSessionPickerModal({
       cancelAnimationFrame(frame);
       window.removeEventListener("keydown", onKey, true);
     };
-  }, [open, onClose]);
+  }, [open]);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();

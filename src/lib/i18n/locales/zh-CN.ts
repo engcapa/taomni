@@ -299,6 +299,10 @@ export const zhCN: DeepPartial<typeof en> = {
     pickerEmpty: "没有符合条件的会话。",
     editorTab: "编辑器",
     closeTab: "关闭标签",
+    openProjectTree: "打开 Project 树",
+    gitBarChanges: "{count} 项变更",
+    gitBarDetached: "游离 HEAD",
+    openUnsupported: "工作区暂不支持该会话类型：{type}",
   },
   agentsPlatform: {
     title: "Coding Agents",
@@ -309,6 +313,7 @@ export const zhCN: DeepPartial<typeof en> = {
     sandboxAllowed: "工作区文件：可读写",
     sandboxDenied: "生产 SSH：已禁止",
     worktreeBranch: "分支",
+    localOnlyNotice: "界面脚手架：智能体执行与 Git Worktree 尚未接入后端，任务只保存在本机。",
     statusWaiting: "等待审批",
     statusRunning: "运行中",
     statusDone: "已完成",

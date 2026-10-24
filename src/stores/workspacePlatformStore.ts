@@ -50,6 +50,8 @@ export interface WorkspaceIsolatedTab {
   rootFolderId?: string;
   sessionId?: string;
   protocol?: string;
+  /** Git tab: repository-relative or absolute path to focus in the diff view. */
+  focusPath?: string;
   /** Connection payloads for session tabs; plain JSON so tabs survive reload. */
   ssh?: SshConnectInfo;
   commandTerminal?: CommandTerminalConnectInfo;
@@ -67,6 +69,8 @@ export interface WorkspaceSessionLaunch {
   session: SessionConfig;
   kind?: WorkspaceTabKind;
   title?: string;
+  /** Set when the session type has no isolated workspace pane yet. */
+  unsupported?: string;
   ssh?: SshConnectInfo;
   commandTerminal?: CommandTerminalConnectInfo;
   localShell?: LocalShellSelection;
@@ -101,6 +105,10 @@ interface WorkspacePlatformState {
   /** Ctrl+Alt+O "open any session" picker visibility (session state). */
   sessionPickerOpen: boolean;
   setSessionPickerOpen: (open: boolean) => void;
+  /** Monotonic "new file" requests raised by the Alt+Insert shortcut. */
+  newFileRequest: number;
+  requestNewFile: () => void;
+  consumeNewFileRequest: () => void;
   createWorkspace: (name: string) => PlatformWorkspace;
   deleteWorkspace: (id: string) => boolean;
   renameWorkspace: (id: string, name: string) => void;
@@ -110,7 +118,7 @@ interface WorkspacePlatformState {
   createFileInWorkspace: (workspaceId: string, rootId: string, relativePath: string) => Promise<WorkspaceIsolatedTab | null>;
   createFolderInWorkspace: (workspaceId: string, rootId: string, relativePath: string) => Promise<boolean>;
   openWorkspaceFileTab: (workspaceId: string, filePath: string, title?: string) => WorkspaceIsolatedTab;
-  openGitPanel: (workspaceId: string) => WorkspaceIsolatedTab;
+  openGitPanel: (workspaceId: string, focusPath?: string) => WorkspaceIsolatedTab;
   /** Open a default-shell local terminal as an isolated workspace tab. */
   openLocalTerminalInWorkspace: (workspaceId: string, title?: string) => WorkspaceIsolatedTab;
   openSessionInWorkspace: (
@@ -126,6 +134,40 @@ interface WorkspacePlatformState {
 }
 
 const BOTTOM_DOCK_TOOLS = ["terminal", "problems", "run", "find", "bookmarks", "todo", "services", "database"] as const;
+
+/**
+ * Only editor/Git tabs survive a reload. Session tabs own live connections and
+ * their launch payloads can carry credentials (proxy/jump passwords); keeping
+ * them in webview localStorage both leaked secrets at rest and reconnected
+ * production hosts on restore (v6.1 review H8).
+ */
+const RESTORABLE_TAB_KINDS: ReadonlySet<WorkspaceTabKind> = new Set<WorkspaceTabKind>(["file", "git"]);
+
+function persistableTab(tab: WorkspaceIsolatedTab): WorkspaceIsolatedTab {
+  const {
+    ssh: _ssh,
+    commandTerminal: _commandTerminal,
+    localShell: _localShell,
+    terminalProfile: _terminalProfile,
+    sftp: _sftp,
+    db: _db,
+    hbase: _hbase,
+    vnc: _vnc,
+    rdp: _rdp,
+    ...rest
+  } = tab;
+  return rest;
+}
+
+function persistableWorkspaces(workspaces: PlatformWorkspace[]): PlatformWorkspace[] {
+  return workspaces.map((workspace) => ({
+    ...workspace,
+    openTabs: workspace.openTabs
+      .filter((tab) => RESTORABLE_TAB_KINDS.has(tab.kind))
+      .map(persistableTab),
+  }));
+}
+
 
 function makeId(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -150,6 +192,15 @@ function sanitizeWorkspace(raw: unknown): PlatformWorkspace | null {
   if (!raw || typeof raw !== "object") return null;
   const candidate = raw as Partial<PlatformWorkspace>;
   if (typeof candidate.id !== "string" || typeof candidate.name !== "string") return null;
+  const restoredTabs = Array.isArray(candidate.openTabs)
+    ? candidate.openTabs
+      .filter((tab): tab is WorkspaceIsolatedTab => (
+        !!tab
+        && typeof (tab as WorkspaceIsolatedTab).id === "string"
+        && RESTORABLE_TAB_KINDS.has((tab as WorkspaceIsolatedTab).kind)
+      ))
+      .map(persistableTab)
+    : [];
   return {
     id: candidate.id,
     name: candidate.name,
@@ -172,10 +223,10 @@ function sanitizeWorkspace(raw: unknown): PlatformWorkspace | null {
         : "terminal",
       heightPx: typeof candidate.bottomDock?.heightPx === "number" ? candidate.bottomDock.heightPx : 165,
     },
-    openTabs: Array.isArray(candidate.openTabs)
-      ? candidate.openTabs.filter((tab): tab is WorkspaceIsolatedTab => !!tab && typeof (tab as WorkspaceIsolatedTab).id === "string")
-      : [],
-    activeTabId: typeof candidate.activeTabId === "string" ? candidate.activeTabId : "",
+    openTabs: restoredTabs,
+    activeTabId: restoredTabs.some((tab) => tab.id === candidate.activeTabId)
+      ? candidate.activeTabId as string
+      : (restoredTabs[restoredTabs.length - 1]?.id ?? ""),
   };
 }
 
@@ -208,7 +259,7 @@ function loadPersisted(): PlatformWorkspace[] {
 function persist(workspaces: PlatformWorkspace[]): void {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(PLATFORM_WORKSPACES_STORAGE_KEY, JSON.stringify(workspaces));
+    window.localStorage.setItem(PLATFORM_WORKSPACES_STORAGE_KEY, JSON.stringify(persistableWorkspaces(workspaces)));
   } catch {
     // Storage quota or privacy mode: keep the in-memory state authoritative.
   }
@@ -261,12 +312,22 @@ async function ensureWorkspaceDirectories(rootPath: string, segments: string[]):
 
 function sessionKind(session: SessionConfig): WorkspaceTabKind {
   switch (session.session_type) {
-    case "Sftp": return "sftp";
-    case "Database": return "database";
+    case "SFTP": return "sftp";
+    case "Database":
+    case "MySQL":
+    case "PostgreSQL":
+    case "PanWeiDB":
+    case "Oracle":
+    case "SQLServer":
+    case "StarRocks":
+    case "ClickHouse":
+    case "Presto":
+      return "database";
     case "Redis": return "redis";
+    case "HBaseShell":
     case "HBase": return "hbase-shell";
-    case "Rdp": return "rdp";
-    case "Vnc": return "vnc";
+    case "RDP": return "rdp";
+    case "VNC": return "vnc";
     default: return "terminal";
   }
 }
@@ -298,6 +359,9 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
       : initial[0].id,
     sessionPickerOpen: false,
     setSessionPickerOpen: (open) => set((state) => (state.sessionPickerOpen === open ? state : { sessionPickerOpen: open })),
+    newFileRequest: 0,
+    requestNewFile: () => set((state) => ({ newFileRequest: state.newFileRequest + 1 })),
+    consumeNewFileRequest: () => set((state) => (state.newFileRequest === 0 ? state : { newFileRequest: 0 })),
 
     createWorkspace: (name) => {
       const workspace: PlatformWorkspace = {
@@ -416,13 +480,18 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
       return tab;
     },
 
-    openGitPanel: (workspaceId) => {
+    openGitPanel: (workspaceId, focusPath) => {
       const existing = get().workspaces
         .find((item) => item.id === workspaceId)
         ?.openTabs.find((tab) => tab.kind === "git");
       if (existing) {
-        get().setActiveWorkspaceTab(workspaceId, existing.id);
-        return existing;
+        const nextTab = { ...existing, focusPath };
+        commit((workspaces) => updateWorkspace(workspaces, workspaceId, (item) => ({
+          ...item,
+          openTabs: item.openTabs.map((tab) => (tab.id === existing.id ? nextTab : tab)),
+          activeTabId: existing.id,
+        })));
+        return nextTab;
       }
       const tab: WorkspaceIsolatedTab = {
         id: makeId(`ws:${workspaceId}:git`),
@@ -430,6 +499,7 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
         kind: "git",
         title: "Git",
         closable: true,
+        focusPath,
       };
       commit((workspaces) => updateWorkspace(workspaces, workspaceId, (item) => ({
         ...item,
@@ -524,7 +594,7 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
     resetForTests: () => {
       const fresh = [createDefaultWorkspace()];
       persist(fresh);
-      set({ workspaces: fresh, activeWorkspaceId: DEFAULT_WORKSPACE_ID });
+      set({ workspaces: fresh, activeWorkspaceId: DEFAULT_WORKSPACE_ID, sessionPickerOpen: false, newFileRequest: 0 });
     },
   };
 });

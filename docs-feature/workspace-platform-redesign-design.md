@@ -575,8 +575,8 @@ flowchart LR
   - 按需适配既有受影响用例（详见 [`docs-feature/workspace-platform-redesign-testcases.md`](./workspace-platform-redesign-testcases.md) 第三部分）
 - **依赖任务**：`TASK-01` ~ `TASK-09`
 - **详细开发要求**：
-  1. 严格遵循 `.agents/skills/qa-ui-auto/SKILL.md` 与 `references/authoring.md` 规范，确保所有新增的 `TC-WS-001` ~ `TC-WS-012` 包含完整的 `verification.requirements`、`verification.visual`、`verification.native` 字段，并通过 `PYTHONPATH=.agents/skills/qa-ui-auto/scripts python3 -m qa_ui_auto contracts --cases docs-feature/testcases --gate
-PYTHONPATH=.agents/skills/qa-ui-auto/scripts python3 -m qa_ui_auto.lint --cases docs-feature/testcases --skip-features --skip-orphans` 审计。
+  1. 严格遵循 `.agents/skills/qa-ui-auto/SKILL.md` 与 `references/authoring.md` 规范，确保所有新增的 `TC-WS-001` ~ `TC-WS-012` 包含完整的 `verification.requirements`、`verification.visual`、`verification.native` 字段，并通过 `PYTHONPATH=.agents/skills/qa-ui-auto/scripts python3 -m qa_ui_auto contracts --cases qa-ui-auto-tests/cases --gate
+PYTHONPATH=.agents/skills/qa-ui-auto/scripts python3 -m qa_ui_auto.lint --cases qa-ui-auto-tests/cases --skip-features --skip-orphans` 审计。
   2. 在 Browser 模式与 Linux/Windows/macOS Native 模式下执行全量新增用例与受影响回归用例集，确保 100% 通过。
 
 ---
@@ -624,8 +624,8 @@ cargo test --manifest-path src-tauri/Cargo.toml --lib
 ### 8.2 Browser 自动化验证（快速迭代与全量 E2E）
 ```bash
 # 1. 审计所有新增与修改的 YAML 测试用例契约
-PYTHONPATH=.agents/skills/qa-ui-auto/scripts python3 -m qa_ui_auto contracts --cases docs-feature/testcases --gate
-PYTHONPATH=.agents/skills/qa-ui-auto/scripts python3 -m qa_ui_auto.lint --cases docs-feature/testcases --skip-features --skip-orphans
+PYTHONPATH=.agents/skills/qa-ui-auto/scripts python3 -m qa_ui_auto contracts --cases qa-ui-auto-tests/cases --gate
+PYTHONPATH=.agents/skills/qa-ui-auto/scripts python3 -m qa_ui_auto.lint --cases qa-ui-auto-tests/cases --skip-features --skip-orphans
 
 # 2. 运行新增的 Workspace-First 平台重构专项用例集 (TC-WS-001 ~ TC-WS-011)
 PYTHONPATH=.agents/skills/qa-ui-auto/scripts python3 -m qa_ui_auto run --mode browser \
@@ -680,3 +680,40 @@ PYTHONPATH=.agents/skills/qa-ui-auto/scripts python3 -m qa_ui_auto run --mode na
    - **对策**：按第 5 节的文件拆分表将 `PrimaryNavigationRail.tsx`、`MfaFloatingWindow.tsx`、`WorkspaceSidebar.tsx`、`WorkspaceMainPanel.tsx`、`WorkspaceSessionPickerModal.tsx` 独立成单一职责模块，每个文件控制在 220–370 行，并在每个 `TASK-*` 完成时强制执行 `pnpm check:refactor`。
 3. **误删 `main` 原有功能风险**：
    - **对策**：每个 `TASK-*` 均设有“⚠️ 强制 `main` 功能保留清单”，且 `TC-WS-010` 专门对所有右键上下文菜单、导入导出和快捷键进行逐项断言；任何导致既有功能缺失的改动均无法通过回归门禁。
+
+
+---
+
+## 11. Review 修复记录与已知偏差（v6.1.1）
+
+> 本节记录 `feat/workspace-platform-redesign` 首轮 code review 后的修复项与仍未交付的能力，避免文档继续宣称尚未实现的行为。
+
+### 11.1 已修复
+
+- **画布常驻**：`TabContentRouter` / Workspaces / Agents 画布改为首次访问后保持挂载，仅切换可见性；切换一级模式不再关闭正在运行的终端、SFTP、DB、VNC、RDP 会话（对应 review H1）。
+- **模式可见性**：在 Home / Workspaces / Agents 下打开或激活全局标签时自动切回 Sessions 画布，点击标签不再“无反应”（H2）。
+- **工作区文件标签**：新增 `workspaceToolBridge.openFile`，激活 `kind:"file"` 标签会真正在编辑器打开该文件；编辑器根目录在工作区增删根目录后即时同步，不再显示 “No project roots”（H3/H4）。
+- **Workspaces 唯一 Project 面**：画布内 Project 树为唯一文件树；左栏 Project lens 收敛为“工作区根目录管理 + 打开 Project 树”，刷新按钮改为真实刷新展开节点；rail 的 Project 按钮同时切换 lens 与画布树；Git 状态条展示仓库名、分支与变更数，rail Git 按钮显示变更徽标（H4、AC-03/AC-06）。
+- **会话协议分派**：`buildWorkspaceSessionLaunch` 改用规范 `session_type`（`RDP`/`VNC`/`SFTP`/`HBaseShell`/`FTP` 等），未支持的 File/Browser/Mail/S3/Proxy 显式提示而不是静默打开本地终端；工作区 SFTP 使用每次实例唯一的运行 id（H5、M3）。
+- **Git Panel 联动**：`CodeWorkspaceTab` 接回 `onOpenGitManager`；工作区 Git 面板接回 `onOpenWorkspace`（从变更打开文件）；编辑器内 “在 Git 面板对比” 按钮只覆盖编辑区，并携带当前文件路径聚焦对应变更；停靠菜单中无底部页签的 Bookmarks/Services/Database 改为禁用而不是打开空停靠（H6、M6）。
+- **持久化与恢复**：`taomni.platformWorkspaces.v1` 只持久化编辑器/Git 标签身份字段，移除会话标签及其连接载荷（含代理/跳板密码）在 localStorage 的静态副本；恢复时不再自动重连（H8、M11）。
+- **跨工作区保活**：Workspaces 画布为所有工作区保持会话 pane 挂载（仅隐藏非活动工作区），切换工作区不再杀掉另一个工作区的终端（M2）。
+- **快捷键**：Ctrl+B / Ctrl+K / Ctrl+Alt+O / Alt+Insert 增加编辑器/终端/输入框焦点守卫，避免与 Go to Declaration、Optimize Imports、Generate、readline/tmux 冲突；Alt+Insert 改为 store 请求而不是 DOM 查询点击（H9、M8）。
+- **Agents 模式诚实化**：模式顶部标注“UI 脚手架、尚未接入执行后端”，任务元数据保存在本机 localStorage；真实 worktree/agent 后端仍未接入（H7 的占位实现）。
+- **测试资产**：TC-WS-007 的创建会话步骤改用 `session-specify-username` 点击，恢复其在 native 平台的可执行性；持久化断言改为校验 `pinnedSessionIds`；重复的 `docs-feature/testcases/TC-WS-*` 副本已移除，统一使用 `qa-ui-auto-tests/cases/`。
+
+### 11.2 已知偏差 / 后续项
+
+- **TASK-06 的 AI Commit Message**：当前后端没有一次性 LLM completion 接口（AI 仅经 chat/stream），本轮未实现 ✨ 生成提交信息，待新增后端接口后补齐。
+- **ControlBar 工作区命令菜单**：平台编辑器尚未向 `handleWorkspaceCommandsChange` 发布命令注册，Workspaces 模式下顶栏“工作区操作”子菜单仍为空。
+- **Agents Worktree/执行后端**：见 11.1，仅保留可验证的 UI 与本地任务记录。
+- **工作区文件树位置**：按 11.1，画布 Project 树为唯一文件树；未把 `ProjectTreePane` 迁入主左侧栏。侧栏“新建文件/目录”仍默认落在第一个根目录，目录级右键创建由画布 Project 树提供。
+- **截图延时菜单**：rail 宽度 40–100px 下 `absolute right-0 min-w-48` 仍可能被视口左侧裁切，后续改为 portal + 视口夹紧。
+- **MFA 悬浮窗**：倒计时环仍需独立时钟驱动（当前依赖 500ms 轮询的最后 5 秒才重绘），复制反馈与 “+” 添加密钥未实现。
+- **工作区会话恢复**：会话标签不再持久化（安全与自动重连考虑），重开应用后只会恢复编辑器/Git 标签。
+
+### 11.3 验证入口
+
+- 单元测试：`pnpm test`（本地；CI 仅跑 qa-ui-auto browser/native）。
+- 静态门禁：`pnpm check:refactor`、`pnpm build`。
+- Browser/Native：`.github/workflows/qa-ui-auto-platforms.yml`，`scope=selected`，先跑 `TC-WS-001..012`，再跑受影响回归集（`TC-001`…`TC-auto-F1-5`、`TC-MAIN-RAIL-*`、`TC-IDE-PARITY-027-*`、`TC-MFA-001` 等）。

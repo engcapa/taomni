@@ -18,6 +18,8 @@ interface WorkspaceGitManagerProps {
   activeRepoRoot?: string | null;
   visible?: boolean;
   onOpenWorkspace?: (repoRoot: string, path?: string | null) => void;
+  /** Absolute path to focus in the diff view once the repository snapshot lands. */
+  initialChangePath?: string | null;
 }
 
 export function WorkspaceGitManager({
@@ -26,6 +28,7 @@ export function WorkspaceGitManager({
   activeRepoRoot,
   visible = true,
   onOpenWorkspace,
+  initialChangePath,
 }: WorkspaceGitManagerProps) {
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
@@ -67,6 +70,27 @@ export function WorkspaceGitManager({
   );
   const allChangeKeys = useMemo(() => allChanges.map((entry) => entry.key), [allChanges]);
   const validChangeKeys = useMemo(() => new Set(allChangeKeys), [allChangeKeys]);
+  // The editor's "compare in Git panel" action targets the current file; focus
+  // its change once the repository snapshot has loaded (v6.1 review H6). The
+  // focus is applied once per requested path so later refreshes do not steal
+  // the user's selection.
+  const appliedFocusPathRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!initialChangePath) {
+      appliedFocusPathRef.current = null;
+      return;
+    }
+    if (appliedFocusPathRef.current === initialChangePath) return;
+    const normalized = initialChangePath.replace(/\\/g, "/");
+    const match = allChanges.find((entry) => {
+      const absolute = `${entry.repoRoot.replace(/\\/g, "/").replace(/\/+$/, "")}/${entry.change.path.replace(/^\/+/, "")}`;
+      return absolute === normalized;
+    });
+    if (match) {
+      appliedFocusPathRef.current = initialChangePath;
+      setFocusedChangeKey(match.key);
+    }
+  }, [allChanges, initialChangePath]);
   const checkedChangeKeys = useMemo(
     () => new Set(allChanges.filter((entry) => !uncheckedChangeKeys.has(entry.key)).map((entry) => entry.key)),
     [allChanges, uncheckedChangeKeys],

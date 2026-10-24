@@ -76,6 +76,16 @@ export interface WorkspaceShellViewProps {
   bottomDockTab: BottomDockTabId;
   dockContents: ReturnType<typeof createWorkspaceDockContents>;
   rightStripeTop: ToolWindowRailItem[];
+  /** Opens a workspace file in the editor (platform sidebar → editor bridge). */
+  openFile: (ref: import("../../../../types").CodeWorkspaceFileRef, options?: {
+    preview?: boolean;
+    groupId?: import("../../../../stores/codeWorkspaceStore").EditorGroupId;
+    activate?: boolean;
+    restoring?: boolean;
+    isCurrent?: () => boolean;
+  }) => Promise<{ canonicalFileKey: string; groupId: string; error: string | null } | null>;
+  /** Re-reads the expanded project tree nodes from disk. */
+  refreshProjectTree: () => void;
 }
 
 export function WorkspaceShellView(props: WorkspaceShellViewProps) {
@@ -123,6 +133,8 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
     workspaceEditingPopupsProps,
     workspaceDebugPopupsProps,
     workspaceGenerationPopupsProps,
+    openFile,
+    refreshProjectTree,
   } = props;
 
   // v6.1: platform workspace editors (Workspaces mode) publish their tool
@@ -131,17 +143,24 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
   const platformEditor = workspaceInstanceId.startsWith("platform-");
   useEffect(() => {
     if (!platformEditor) return;
-    useWorkspaceToolBridgeStore.getState().register({
+    const controller = {
       leftToolAreaOpen: toolWindowRouting.leftToolAreaOpen,
       toggleProjectTree: toolWindowActions.toggleProjectTree,
-      openBottomTool: (tool) => {
+      openBottomTool: (tool: string) => {
         toolWindowRouting.setBottomDockTab(tool as BottomDockTabId);
         toolWindowRouting.setBottomDockOpen(true);
       },
       bottomDockOpen,
-      moveProjectWindow: (anchor) => toolWindowRouting.toolWindowLayout.move("project", anchor as never),
-    });
-    return () => useWorkspaceToolBridgeStore.getState().register(null);
+      moveProjectWindow: (anchor: string) => toolWindowRouting.toolWindowLayout.move("project", anchor as never),
+      openFile: async (path: string, rootFolderId?: string) => {
+        const rootId = rootFolderId ?? workspaceNavigationPopupsProps.roots[0]?.id;
+        if (!rootId) return;
+        await openFile({ kind: "root", rootId, path });
+      },
+      refreshProjectTree,
+    };
+    useWorkspaceToolBridgeStore.getState().register(controller);
+    return () => useWorkspaceToolBridgeStore.getState().unregister(controller);
   }, [
     platformEditor,
     toolWindowRouting.leftToolAreaOpen,
@@ -150,6 +169,9 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
     toolWindowRouting.setBottomDockOpen,
     toolWindowActions.toggleProjectTree,
     bottomDockOpen,
+    openFile,
+    refreshProjectTree,
+    workspaceNavigationPopupsProps.roots,
   ]);
 
   return ((

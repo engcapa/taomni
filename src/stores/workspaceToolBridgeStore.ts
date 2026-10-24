@@ -17,14 +17,21 @@ export interface WorkspaceToolBridgeController {
   bottomDockOpen: boolean;
   /** Re-dock the primary left tool window (project tree) to another anchor. */
   moveProjectWindow: (anchor: string) => void;
+  /** Open a workspace file (absolute path) in the editor. */
+  openFile?: (path: string, rootFolderId?: string) => Promise<void> | void;
+  /** Re-read the expanded project tree nodes from disk. */
+  refreshProjectTree?: () => void;
 }
 
 interface WorkspaceToolBridgeState {
   controller: WorkspaceToolBridgeController | null;
   register: (controller: WorkspaceToolBridgeController | null) => void;
+  /** Clear only when `controller` is still the registered one. */
+  unregister: (controller: WorkspaceToolBridgeController | null) => void;
 }
 
 export const useWorkspaceToolBridgeStore = create<WorkspaceToolBridgeState>((set) => ({
   controller: null,
   register: (controller) => set((state) => (state.controller === controller ? state : { controller })),
+  unregister: (controller) => set((state) => (state.controller === controller ? { controller: null } : state)),
 }));

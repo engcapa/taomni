@@ -290,6 +290,21 @@ export function createWorkspaceShellProps(context: CreateWorkspaceShellPropsCont
     bottomDockTab: session.workspaceUi.bottomDockTab,
     dockContents: surfaces.dockContents,
     rightStripeTop: surfaces.rightStripeTop,
+    // Platform shell bridge: the workspace sidebar can open a file and refresh
+    // the project tree without reaching into editor internals.
+    openFile: files.openFile,
+    refreshProjectTree: () => {
+      const treeData = project.projectTree.treeData;
+      treeData.reset();
+      project.projectTree.roots.forEach((root) => { void treeData.loadDir(root.id, ""); });
+      session.workspaceUi.expandedDirKeys.forEach((key) => {
+        const separator = key.indexOf(":");
+        if (separator <= 0) return;
+        const rootId = key.slice(0, separator);
+        const path = key.slice(separator + 1);
+        if (path) void treeData.loadDir(rootId, path);
+      });
+    },
   };
   return { shellProps };
 }

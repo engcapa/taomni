@@ -29,12 +29,42 @@ interface AgentTasksState {
   updateTask: (id: string, patch: Partial<Omit<AgentTask, "id">>) => void;
 }
 
+const AGENT_TASKS_STORAGE_KEY = "taomni.agentTasks.v1";
+
 function nextBranch(index: number): string {
   return `agent/task-${index + 1}`;
 }
 
+function sanitizeTasks(raw: unknown): AgentTask[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((task): task is AgentTask => (
+    !!task
+    && typeof (task as AgentTask).id === "string"
+    && typeof (task as AgentTask).title === "string"
+    && typeof (task as AgentTask).branch === "string"
+  ));
+}
+
+function loadTasks(): AgentTask[] {
+  if (typeof window === "undefined") return [];
+  try {
+    return sanitizeTasks(JSON.parse(window.localStorage.getItem(AGENT_TASKS_STORAGE_KEY) ?? "[]"));
+  } catch {
+    return [];
+  }
+}
+
+function persistTasks(tasks: AgentTask[]): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(AGENT_TASKS_STORAGE_KEY, JSON.stringify(tasks));
+  } catch {
+    // Storage quota or privacy mode: keep the in-memory tasks authoritative.
+  }
+}
+
 export const useAgentTasksStore = create<AgentTasksState>((set) => ({
-  tasks: [],
+  tasks: loadTasks(),
   selectedTaskId: null,
 
   dispatchTask: ({ title, workspaceId, worktreePath, branch }) => {
@@ -48,13 +78,20 @@ export const useAgentTasksStore = create<AgentTasksState>((set) => ({
       changes: { files: 0, insertions: 0, deletions: 0 },
       trace: [],
     };
-    set((state) => ({ tasks: [...state.tasks, task], selectedTaskId: task.id }));
+    set((state) => {
+      const tasks = [...state.tasks, task];
+      persistTasks(tasks);
+      return { tasks, selectedTaskId: task.id };
+    });
     return task;
   },
 
   selectTask: (id) => set((state) => (state.selectedTaskId === id ? state : { selectedTaskId: id })),
 
-  updateTask: (id, patch) => set((state) => ({
-    tasks: state.tasks.map((task) => (task.id === id ? { ...task, ...patch } : task)),
-  })),
+  updateTask: (id, patch) => set((state) => {
+    const tasks = state.tasks.map((task) => (task.id === id ? { ...task, ...patch } : task));
+    persistTasks(tasks);
+    return { tasks };
+  }),
 }));
+

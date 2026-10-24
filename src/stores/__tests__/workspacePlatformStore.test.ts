@@ -170,4 +170,90 @@ describe("workspacePlatformStore (TASK-01)", () => {
     useAppStore.getState().setFloatingMfaSearchQuery("github");
     expect(useAppStore.getState().floatingMfa.searchQuery).toBe("github");
   });
+
+  it("UT-WS-01-09: persistence keeps editor/Git tabs only and never writes credentials", () => {
+    const session = makeSession();
+    useWorkspacePlatformStore.getState().openSessionInWorkspace(DEFAULT_WORKSPACE_ID, {
+      session,
+      kind: "sftp",
+      title: "prod sftp",
+      sftp: {
+        sessionId: "ws-sftp-runtime-1",
+        host: session.host,
+        port: session.port,
+        username: "root",
+        authMethod: "Password",
+        authData: "vault:prod",
+        networkSettingsJson: JSON.stringify({ proxyPass: "proxy-secret", jumpPassword: "jump-secret" }),
+        attachedToTerminal: false,
+      },
+    });
+    useWorkspacePlatformStore.getState().openWorkspaceFileTab(DEFAULT_WORKSPACE_ID, "/repo/src/a.ts");
+    useWorkspacePlatformStore.getState().openGitPanel(DEFAULT_WORKSPACE_ID);
+
+    const stored = readStoredWorkspaces()[0];
+    expect(stored.openTabs.map((tab) => tab.kind).sort()).toEqual(["file", "git"]);
+    const serialized = window.localStorage.getItem(PLATFORM_WORKSPACES_STORAGE_KEY) ?? "";
+    expect(serialized).not.toContain("proxy-secret");
+    expect(serialized).not.toContain("jump-secret");
+    expect(serialized).not.toContain("\"sftp\"");
+  });
+
+  it("UT-WS-01-10: a restored registry drops session tabs and repairs the active tab", async () => {
+    const sessionTab = {
+      id: "ws:default-workspace:sess:ssh-1",
+      workspaceId: DEFAULT_WORKSPACE_ID,
+      kind: "terminal",
+      title: "prod",
+      closable: true,
+      sessionId: "ssh-1",
+      ssh: { sessionId: "ssh-1", host: "10.0.0.8", port: 22, username: "root", authMethod: "None", authData: null, optionsJson: "{}" },
+    };
+    const fileTab = {
+      id: "ws:default-workspace:file-1",
+      workspaceId: DEFAULT_WORKSPACE_ID,
+      kind: "file",
+      title: "a.ts",
+      closable: true,
+      filePath: "/repo/a.ts",
+    };
+    window.localStorage.setItem(PLATFORM_WORKSPACES_STORAGE_KEY, JSON.stringify([{
+      id: DEFAULT_WORKSPACE_ID,
+      name: "Default Workspace",
+      description: "",
+      isDefault: true,
+      rootFolders: [],
+      pinnedSessionIds: [],
+      activeLeftToolWindow: "project",
+      bottomDock: { open: false, activeTool: "terminal", heightPx: 165 },
+      openTabs: [sessionTab, fileTab],
+      activeTabId: sessionTab.id,
+    }]));
+
+    vi.resetModules();
+    const reloaded = await import("../workspacePlatformStore");
+    const workspace = reloaded.useWorkspacePlatformStore.getState().workspaces[0];
+    expect(workspace.openTabs.map((tab) => tab.id)).toEqual([fileTab.id]);
+    expect(workspace.activeTabId).toBe(fileTab.id);
+    const serialized = window.localStorage.getItem(PLATFORM_WORKSPACES_STORAGE_KEY) ?? "";
+    expect(serialized).not.toContain("\"ssh\"");
+    expect(serialized).not.toContain(sessionTab.id);
+  });
+
+  it("UT-WS-01-11: openGitPanel reuses one Git tab and updates the focused path", () => {
+    const first = useWorkspacePlatformStore.getState().openGitPanel(DEFAULT_WORKSPACE_ID, "/repo/a.ts");
+    const second = useWorkspacePlatformStore.getState().openGitPanel(DEFAULT_WORKSPACE_ID, "/repo/b.ts");
+    const gitTabs = useWorkspacePlatformStore.getState().workspaces[0].openTabs.filter((tab) => tab.kind === "git");
+    expect(gitTabs).toHaveLength(1);
+    expect(second.id).toBe(first.id);
+    expect(gitTabs[0].focusPath).toBe("/repo/b.ts");
+  });
+
+  it("UT-WS-01-12: Alt+Insert file requests are consumed once", () => {
+    const app = useWorkspacePlatformStore.getState();
+    app.requestNewFile();
+    expect(useWorkspacePlatformStore.getState().newFileRequest).toBe(1);
+    useWorkspacePlatformStore.getState().consumeNewFileRequest();
+    expect(useWorkspacePlatformStore.getState().newFileRequest).toBe(0);
+  });
 });

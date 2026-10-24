@@ -33,6 +33,41 @@ export function useWorkspaceTreeModel(context: UseWorkspaceTreeModelContext) {
   const rootsRef = useRef(roots);
   const looseFilesRef = useRef(looseFiles);
 
+  // Platform workspaces add/remove roots while this editor stays mounted, so
+  // the `useState` seed above is not enough: re-seed whenever the workspace
+  // root list actually changes and expand the newly added roots. Without this
+  // the Project tool window kept reporting "No project roots" after the user
+  // added folders in the workspace sidebar (v6.1 review H4).
+  const workspaceRootsSignature = useMemo(
+    () => (workspace.roots ?? []).map((root) => `${root.id}:${root.path}`).join("|"),
+    [workspace.roots],
+  );
+  const workspaceRef = useRef(workspace);
+  const storeActionsRef = useRef(storeActions);
+  useEffect(() => {
+    workspaceRef.current = workspace;
+    storeActionsRef.current = storeActions;
+  }, [storeActions, workspace]);
+  const initialRootsSignatureRef = useRef(workspaceRootsSignature);
+  useEffect(() => {
+    const next = initialRoots(workspaceRef.current);
+    setRoots((current) => (
+      current.length === next.length
+        && current.every((root, index) => root.id === next[index].id && root.path === next[index].path)
+        ? current
+        : next
+    ));
+    // The editor's own layout hydration owns the initial expansion state; only
+    // roots added later (the platform sidebar) are auto-expanded here.
+    if (workspaceRootsSignature === initialRootsSignatureRef.current) return;
+    if (next.length === 0) return;
+    const nextRootIds = next.map((root) => root.id);
+    storeActionsRef.current.updateStoreExpandedRootIds(workspaceInstanceId, (current) => {
+      const missing = nextRootIds.filter((rootId) => !current.includes(rootId));
+      return missing.length === 0 ? current : [...current, ...missing];
+    });
+  }, [workspaceInstanceId, workspaceRootsSignature]);
+
   useEffect(() => {
     rootsRef.current = roots;
   }, [roots]);

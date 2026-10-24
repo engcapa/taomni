@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle, type PanelSize } from "react-resizable-panels";
 import { AboutDialog } from "../../components/AboutDialog";
@@ -65,6 +66,17 @@ export function MainLayoutView(props: MainLayoutViewProps) {
   const { pendingAuth } = layout;
   const platform = usePlatformShell({ onOpenGlobalSession: connections.handleConnectSession });
   const activeSideTab = useAppStoreActiveSideTab();
+  // `home` still owns the welcome workbench canvas; only Workspaces/Agents swap it.
+  const workbenchVisible = activeSideTab !== "workspaces" && activeSideTab !== "agents";
+  // Mount each alternate canvas on first visit and then keep it mounted: the
+  // panes own their backend connections, so unmounting would close live
+  // sessions (v6.1 review H1).
+  const [workspaceCanvasMounted, setWorkspaceCanvasMounted] = useState(activeSideTab === "workspaces");
+  const [agentsCanvasMounted, setAgentsCanvasMounted] = useState(activeSideTab === "agents");
+  useEffect(() => {
+    if (activeSideTab === "workspaces") setWorkspaceCanvasMounted(true);
+    if (activeSideTab === "agents") setAgentsCanvasMounted(true);
+  }, [activeSideTab]);
   const sessionPickerOpen = useWorkspacePlatformStoreState((s) => s.sessionPickerOpen);
   const setSessionPickerOpen = useWorkspacePlatformStoreState((s) => s.setSessionPickerOpen);
   const globalSearchOpen = useAppStore((s) => s.globalSearchOpen);
@@ -211,11 +223,13 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                       onClose={layout.toggleMultiExec}
                     />
                   )}
-                  {activeSideTab === "workspaces" ? (
-                    <WorkspaceMainPanel visible />
-                  ) : activeSideTab === "agents" ? (
-                    <AgentsPlatformView visible />
-                  ) : (
+                  {/* Every mode canvas stays mounted: unmounting the workbench
+                      closes live terminal/SFTP/DB/VNC sessions (the panes own
+                      their backend lifecycle), and unmounting the workspace
+                      canvas does the same for workspace sessions. Hidden
+                      canvases keep running and are revealed on mode switch. */}
+                  <div className="relative min-h-0 flex-1">
+                  <div className="absolute inset-0 flex flex-col" style={{ display: workbenchVisible ? undefined : "none" }}>
                   <TabContentRouter
                     activeTab={activeSideTab === "home" ? undefined : layout.activeTab}
                     activeTabId={activeSideTab === "home" ? null : layout.activeTabId}
@@ -318,7 +332,14 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                     setStatusMessage={layout.setStatusMessage}
                     removeTab={layout.removeTab}
                   />
-                  )}
+                  </div>
+                  <div className="absolute inset-0" style={{ display: activeSideTab === "workspaces" ? undefined : "none" }}>
+                    {workspaceCanvasMounted && <WorkspaceMainPanel visible={activeSideTab === "workspaces"} />}
+                  </div>
+                  <div className="absolute inset-0" style={{ display: activeSideTab === "agents" ? undefined : "none" }}>
+                    {agentsCanvasMounted && <AgentsPlatformView visible={activeSideTab === "agents"} />}
+                  </div>
+                  </div>
                 </div>
                 {chrome.chatDrawerInline && layout.chatDrawerPosition === "right" && <ChatDrawer />}
               </div>

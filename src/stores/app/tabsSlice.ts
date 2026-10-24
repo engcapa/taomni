@@ -8,6 +8,16 @@ import { type AppState } from "./types";
 import { upsertRecentWorkspaceForTab, writeRecentWorkspaces, newWorkspaceInstanceId } from "./recentWorkspaces";
 import { terminalAutoTitleBase, activeTabIsTerminal, pruneSet, omitRecordKeys } from "./policies";
 
+/**
+ * Modes whose canvas hides the global tab workbench. Activating or opening a
+ * global tab from one of them must reveal that tab, otherwise the action looks
+ * like a no-op (v6.1 review H2).
+ */
+function revealWorkbenchMode(mode: AppState["activeSideTab"], tab: Tab | undefined): AppState["activeSideTab"] | undefined {
+  if (!tab || tab.type === "welcome") return undefined;
+  return mode === "home" || mode === "workspaces" || mode === "agents" ? "sessions" : undefined;
+}
+
 export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tabs" | "activeTabId" | "tabFilter" | "addTab" | "duplicateTab" | "removeTab" | "removeTabs" | "updateTabVnc" | "updateTabTitle" | "assignTerminalAutoTitle" | "updateGitTabInfo" | "setActiveTab" | "moveTab" | "moveTabToIndex" | "setTabFilter" | "clearTabFilter">> = (set) => ({
   tabs: [
     {
@@ -34,9 +44,11 @@ export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tab
       if (recentResult.recentWorkspaces !== s.recentWorkspaces) {
         writeRecentWorkspaces(recentResult.recentWorkspaces);
       }
+      const revealedMode = revealWorkbenchMode(s.activeSideTab, tab);
       return {
         tabs: nextTabs,
         activeTabId: tab.id,
+        activeSideTab: revealedMode ?? s.activeSideTab,
         recentWorkspaces: recentResult.recentWorkspaces,
         recentWorkspaceIdByWorkspaceInstance: recentResult.recentWorkspaceIdByWorkspaceInstance,
         // A freshly opened tab must be visible, so drop any active focus filter.
@@ -277,8 +289,10 @@ export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tab
       if (recentResult.recentWorkspaces !== s.recentWorkspaces) {
         writeRecentWorkspaces(recentResult.recentWorkspaces);
       }
+      const revealedMode = revealWorkbenchMode(s.activeSideTab, tab);
       return {
         activeTabId: id,
+        activeSideTab: revealedMode ?? s.activeSideTab,
         recentWorkspaces: recentResult.recentWorkspaces,
         recentWorkspaceIdByWorkspaceInstance: recentResult.recentWorkspaceIdByWorkspaceInstance,
         terminalSplitActive: tab?.type === "terminal" ? s.terminalSplitActive : false,

@@ -300,6 +300,10 @@ const dict = {
     pickerEmpty: "No sessions match the current filter.",
     editorTab: "Editor",
     closeTab: "Close tab",
+    openProjectTree: "Open Project tree",
+    gitBarChanges: "{count} changes",
+    gitBarDetached: "detached",
+    openUnsupported: "This session type is not supported in a workspace yet: {type}",
   },
   agentsPlatform: {
     title: "Coding Agents",
@@ -310,6 +314,7 @@ const dict = {
     sandboxAllowed: "Workspace files: read/write",
     sandboxDenied: "Production SSH: blocked",
     worktreeBranch: "Branch",
+    localOnlyNotice: "UI scaffold: agent execution and Git worktrees are not connected to a backend yet. Tasks are stored locally on this device.",
     statusWaiting: "Waiting for approval",
     statusRunning: "Running",
     statusDone: "Completed",

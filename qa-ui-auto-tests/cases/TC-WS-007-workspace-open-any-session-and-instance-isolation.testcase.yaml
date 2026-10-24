@@ -27,9 +27,7 @@ steps:
 - fill:
     selector: '[data-testid="session-port"]'
     value: '22'
-- send_text_via_label:
-    label_contains: Specify username
-    checked: true
+- click: '[data-testid="session-specify-username"]'
 - fill:
     selector: '[data-testid="session-user"]'
     value: qa
@@ -59,7 +57,7 @@ steps:
 - wait_for: '[data-testid="workspace-tab-item"][data-tab-kind="terminal"]'
 - assert_localstorage:
     key: taomni.platformWorkspaces.v1
-    contains: qa-any
+    contains: pinnedSessionIds
 - click: '[data-testid="sidebar-rail"] [data-testid="code-workspace-tool-rail-sessions"]'
 - wait_for: '[data-testid="workspace-sessions-lens"]'
 - assert_visible: '[data-testid="workspace-pinned-session"][data-session-name="qa-any-session"]'
@@ -97,7 +95,7 @@ verification:
     - step: 28
       expectation: '{"wait_for": "[data-testid=\"workspace-tab-item\"][data-tab-kind=\"terminal\"]"}'
     - step: 29
-      expectation: '{"assert_localstorage": {"key": "taomni.platformWorkspaces.v1", "contains": "qa-any"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.platformWorkspaces.v1", "contains": "pinnedSessionIds"}}'
     results:
     - 13
     - 17

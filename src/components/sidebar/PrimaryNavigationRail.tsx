@@ -28,6 +28,7 @@ import { useChatStore } from "../../stores/chatStore";
 import { useMainRailHostStore } from "../../stores/mainRailHostStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { useWorkspaceToolBridgeStore } from "../../stores/workspaceToolBridgeStore";
+import { useWorkspaceGitSummaryStore } from "../../stores/workspaceGitSummaryStore";
 
 const THEME_MODES: Array<{ mode: AppThemeMode; icon: React.ReactNode }> = [
   { mode: "light", icon: <Sun className="w-[16px] h-[16px]" /> },
@@ -109,39 +110,39 @@ export function PrimaryNavigationRail({ compact, onOpenSettings }: PrimaryNaviga
       style={{ width: effectiveStripeWidth(stripeSettings, "left"), background: "var(--taomni-tab-inactive)", boxShadow: "inset -1px 0 0 var(--taomni-sidebar-border)" }}
       onContextMenu={handleContextMenu}
     >
-      <div className="flex shrink-0 flex-col gap-1 px-1 py-1">
-        {PRIMARY_MODES.map((tab) => (
-          <ToolWindowRailButton
-            key={tab}
-            item={{
-              id: tab,
-              label: labelForSideTab(t, tab),
-              icon: <ModeIcon tab={tab} />,
-              active: activeSideTab === tab && !compact,
-              testId: MODE_TEST_IDS[tab],
-              onSelect: () => handleModeClick(tab),
-            }}
-            showNames={stripeSettings.showNames}
-            onClick={(event) => handleModeClick(tab, event.detail)}
-            onDoubleClick={(event) => {
-              event.preventDefault();
-              setSidebarCollapsed(true);
-            }}
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto taomni-scroll-y">
+        <div className="flex shrink-0 flex-col gap-1 px-1 py-1">
+          {PRIMARY_MODES.map((tab) => (
+            <ToolWindowRailButton
+              key={tab}
+              item={{
+                id: tab,
+                label: labelForSideTab(t, tab),
+                icon: <ModeIcon tab={tab} />,
+                active: activeSideTab === tab && !compact,
+                testId: MODE_TEST_IDS[tab],
+                onSelect: () => handleModeClick(tab),
+              }}
+              showNames={stripeSettings.showNames}
+              onClick={(event) => handleModeClick(tab, event.detail)}
+              onDoubleClick={(event) => {
+                event.preventDefault();
+                setSidebarCollapsed(true);
+              }}
+            />
+          ))}
+        </div>
+        {activeSideTab === "workspaces" && <WorkspaceContextRail showNames={stripeSettings.showNames} />}
+        {compact && (
+          // ED-PARITY-027 B: the active tab's tool window buttons render here
+          // when the sidebar collapses outside the Workspaces mode.
+          <div
+            ref={setRailHost}
+            data-testid="sidebar-tool-window-rail"
+            className="flex min-h-0 flex-1 flex-col"
           />
-        ))}
+        )}
       </div>
-      {activeSideTab === "workspaces" && <WorkspaceContextRail showNames={stripeSettings.showNames} />}
-      {compact ? (
-        // ED-PARITY-027 B: the active tab's tool window buttons render here
-        // when the sidebar collapses outside the Workspaces mode.
-        <div
-          ref={setRailHost}
-          data-testid="sidebar-tool-window-rail"
-          className="flex min-h-0 flex-1 flex-col"
-        />
-      ) : (
-        <div className="flex-1" />
-      )}
       <div
         className="shrink-0 border-t px-1 pb-2 pt-1"
         style={{ borderColor: "var(--taomni-sidebar-border)" }}
@@ -193,6 +194,7 @@ function WorkspaceContextRail({ showNames }: { showNames: boolean }) {
   const setLeftToolWindow = useWorkspacePlatformStore((s) => s.setLeftToolWindow);
   const openGitPanel = useWorkspacePlatformStore((s) => s.openGitPanel);
   const bridge = useWorkspaceToolBridgeStore((s) => s.controller);
+  const gitSummary = useWorkspaceGitSummaryStore((s) => s.summary);
   const lens = workspace?.activeLeftToolWindow ?? "project";
   const activeTab = workspace?.openTabs.find((tab) => tab.id === workspace.activeTabId);
   const workspaceId = activeWorkspaceId;
@@ -206,19 +208,29 @@ function WorkspaceContextRail({ showNames }: { showNames: boolean }) {
     if (sidebarCollapsed) setSidebarCollapsed(false);
   };
 
+  // The Project tool window is the editor's own pane; select the sidebar lens
+  // too so the rail and the sidebar never point at different surfaces.
+  const toggleProjectTree = () => {
+    setLeftToolWindow(workspaceId, "project");
+    if (sidebarCollapsed) setSidebarCollapsed(false);
+    if (bridge) bridge.toggleProjectTree();
+  };
+
   const overflowItems: MenuItem[] = [
     { label: "Terminal (Alt+F12)", testId: "code-workspace-bottom-tab-overflow-terminal", onClick: () => bridge?.openBottomTool("terminal") },
     { label: "Problems (Alt+6)", testId: "code-workspace-bottom-tab-overflow-problems", onClick: () => bridge?.openBottomTool("problems") },
     { label: "Run / Debug (Alt+4)", testId: "code-workspace-bottom-tab-overflow-run", onClick: () => bridge?.openBottomTool("run") },
     { label: "Find", testId: "code-workspace-bottom-tab-overflow-search", onClick: () => bridge?.openBottomTool("search") },
-    { label: "Bookmarks", testId: "code-workspace-bottom-tab-overflow-bookmarks", onClick: () => bridge?.openBottomTool("bookmarks") },
+    // No corresponding bottom-dock tab exists yet; keep the IDEA menu shape but
+    // do not open an empty dock (v6.1 review M6).
+    { label: "Bookmarks", testId: "code-workspace-bottom-tab-overflow-bookmarks", disabled: true, onClick: () => {} },
     { label: "TODO", testId: "code-workspace-bottom-tab-overflow-todos", onClick: () => bridge?.openBottomTool("todos") },
-    { label: "Services", testId: "code-workspace-bottom-tab-overflow-services", onClick: () => bridge?.openBottomTool("services") },
-    { label: "Database", testId: "code-workspace-bottom-tab-overflow-database", onClick: () => bridge?.openBottomTool("database") },
+    { label: "Services", testId: "code-workspace-bottom-tab-overflow-services", disabled: true, onClick: () => {} },
+    { label: "Database", testId: "code-workspace-bottom-tab-overflow-database", disabled: true, onClick: () => {} },
     { label: "", separator: true, onClick: () => {} },
     {
       label: t("sidebar.showToolWindowNames"),
-      testId: "code-workspace-bottom-tab-overflow-show-names",
+      testId: "code-workspace-tool-rail-menu-show-names",
       checked: showNames,
       onClick: () => useToolWindowStripeStore.getState().toggleShowNames(),
     },
@@ -249,7 +261,7 @@ function WorkspaceContextRail({ showNames }: { showNames: boolean }) {
             active: bridge ? bridge.leftToolAreaOpen : lens === "project" && !sidebarCollapsed,
             shortcut: "Alt+1",
             testId: "code-workspace-tool-rail-project",
-            onSelect: () => (bridge ? bridge.toggleProjectTree() : toggleLens("project")),
+            onSelect: toggleProjectTree,
           }}
           showNames={showNames}
         />
@@ -273,6 +285,7 @@ function WorkspaceContextRail({ showNames }: { showNames: boolean }) {
             active: activeTab?.kind === "git",
             shortcut: "Alt+9",
             testId: "code-workspace-tool-rail-git",
+            badge: gitSummary.changeCount > 0 ? gitSummary.changeCount : undefined,
             onSelect: () => openGitPanel(workspaceId),
           }}
           showNames={showNames}
