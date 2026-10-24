@@ -1,4 +1,5 @@
 """Unit contracts for isolated session inputs used by the hosted native cases."""
+from contextlib import closing
 import json
 import os
 import socket
@@ -35,11 +36,20 @@ class SessionConfigFixtureTest(unittest.TestCase):
                 database = data / "taomni.db"
                 database.unlink(missing_ok=True)
                 session_config.seed_legacy_scp(self.ctx, config)
-                with sqlite3.connect(database) as db:
+                with closing(sqlite3.connect(database)) as db:
                     row = db.execute("SELECT host, port, username, auth_method, options_json FROM sessions").fetchone()
                 self.assertEqual(row[:3], ("127.0.0.1", port, "qa"))
                 self.assertEqual(json.loads(row[3]), {"PrivateKey": {"key_path": "/run-owned/key"}})
                 self.assertEqual(json.loads(row[4]), {"sshBrowser": mode, "networkSettings": {"proxyKind": "none"}})
+
+    def test_seed_releases_database_handle_before_the_app_starts_or_profile_resets(self):
+        data = isolated_data_root(self.ctx)
+        connection = sqlite3.connect(data / "taomni.db")
+        self.addCleanup(connection.close)
+        with patch.object(session_config.sqlite3, "connect", return_value=connection):
+            session_config.seed_sessions(self.ctx, [session_config.ssh_session("saved", {})])
+        with self.assertRaises(sqlite3.ProgrammingError):
+            connection.execute("SELECT 1")
 
     def test_proxy_is_enabled_but_cannot_accept_connections_and_teardown_releases_port(self):
         self.addCleanup(session_config.teardown_unreachable_proxy, self.ctx)

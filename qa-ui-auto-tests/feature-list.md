@@ -3491,6 +3491,10 @@ controls:
   - id: unlock-mode-hint
     selector: '[data-testid="vault-unlock-mode-hint"]'
     kind: display
+  - id: startup-check
+    selector: '[data-testid="startup-vault-check"]'
+    kind: display
+    optional: true       # only while startup status is pending
   - id: init-button
     selector: '[data-testid="vault-init-button"]'
     kind: interactive

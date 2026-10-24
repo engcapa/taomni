@@ -20,6 +20,10 @@ steps:
     selector: '[data-testid="sidebar"]'
     timeout_sec: 45
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-scp"]'
+- wait_for:
+    selector: '[data-testid="startup-vault-check"]'
+    state: hidden
+    timeout_sec: 45
 - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-scp"]'
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
@@ -76,39 +80,39 @@ verification:
       only SFTP.
     actions:
     - 1
-    - 4
-    - 6
-    - 8
+    - 5
+    - 7
     - 9
     - 10
-    - 12
+    - 11
     - 13
     - 14
-    - 16
+    - 15
     - 17
-    - 19
-    - 21
+    - 18
+    - 20
     - 22
-    - 24
-    - 27
-    - 29
+    - 23
+    - 25
+    - 28
+    - 30
     checkpoints:
-    - step: 11
+    - step: 12
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "scp-source.txt",
         "timeout_sec": 45}}'
-    - step: 15
+    - step: 16
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "scp-upload.txt",
         "timeout_sec": 45}}'
-    - step: 30
+    - step: 31
       expectation: '{"assert_file_sha256": {"path": "${cfg.ssh_features.large_downloaded}", "equals":
         "6b4be392164b2c21ce9cd339a9846f9de7afb4407b46becb7ddf98081e3c6cac", "timeout_sec": 90}}'
-    - step: 31
+    - step: 32
       expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"done\"][data-resume-bytes]:not([data-resume-bytes=\"0\"])"}'
     results:
-    - 11
-    - 15
-    - 30
+    - 12
+    - 16
     - 31
+    - 32
   visual:
   - check: Configuration and workflow state
     method: automated

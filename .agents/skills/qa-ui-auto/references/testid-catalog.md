@@ -2859,6 +2859,7 @@
 - `[data-testid="vault-unlock-mode-startup"]` — interactive — F12.1.unlock-mode-startup
 - `[data-testid="vault-unlock-mode-on-demand"]` — interactive — F12.1.unlock-mode-on-demand
 - `[data-testid="vault-unlock-mode-hint"]` — display — F12.1.unlock-mode-hint
+- `[data-testid="startup-vault-check"]` — display [optional] — F12.1.startup-check
 - `[data-testid="vault-init-button"]` — interactive [optional] — F12.1.init-button
 - `[data-testid="vault-unlock-button"]` — interactive [optional] — F12.1.unlock-button
 - `[data-testid="vault-lock-button"]` — interactive [optional] — F12.1.lock-button

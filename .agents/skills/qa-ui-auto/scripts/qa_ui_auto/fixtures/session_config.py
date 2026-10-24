@@ -1,6 +1,7 @@
 """Legacy session inputs and an unreachable proxy, confined to each QA profile."""
 from __future__ import annotations
 
+from contextlib import closing
 import json
 import socket
 import sqlite3
@@ -23,7 +24,9 @@ def ssh_session(name, options, *, host="ssh.example.test", port=22, user="qa", a
 def seed_sessions(ctx, sessions):
     """Seed previous-version rows before startup; subsequent saves use production IPC."""
     data = isolated_data_root(ctx)
-    with sqlite3.connect(data / "taomni.db") as db:
+    # sqlite3's transaction context commits but does not close the file handle.
+    # Release it before native startup and the next Windows profile reset.
+    with closing(sqlite3.connect(data / "taomni.db")) as db, db:
         # Same persisted row contract as src-tauri/src/session/db.rs. The app
         # initializes the remaining tables when this disposable profile starts.
         db.execute("""CREATE TABLE IF NOT EXISTS sessions (

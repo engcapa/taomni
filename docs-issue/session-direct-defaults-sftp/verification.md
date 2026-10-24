@@ -28,6 +28,9 @@ The initial regression probe failed on the old code: the new SSH session chose
 checks cover the editor, network normalization, capabilities, SSH options,
 connection commands and the session store. Python fixture unit checks cover
 SQLite/auth serialization, the isolated proxy endpoint and isolation refusal.
+The saved-row fixture closes its SQLite handle before native startup and profile
+cleanup. Saved SCP cases wait for the startup vault check to finish before their
+first pointer action, so WebView2 cannot deliver the double-click to that overlay.
 
 Only unit tests and static checks run locally. Browser and native execution uses
 `qa-ui-auto-platforms.yml` on Linux, Windows and macOS with `scope=selected`,
