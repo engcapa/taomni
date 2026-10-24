@@ -1,5 +1,5 @@
 id: TC-SESSION-SCP-003
-title: SCP pause, background ownership, cancellation and retry preserve exact bytes
+title: Previously saved SCP pause, background ownership, cancellation and retry preserve exact bytes
 covers:
 - F6.3
 - F7.2
@@ -19,36 +19,11 @@ steps:
 - wait_for:
     selector: '[data-testid="sidebar"]'
     timeout_sec: 45
-- click: '[data-testid="session-new"]'
-- wait_for:
-    selector: '[data-testid="session-editor"]'
-    timeout_sec: 45
-- fill:
-    selector: '[data-testid="session-host"]'
-    value: ${cfg.ssh_features.host}
-- fill:
-    selector: '[data-testid="session-port"]'
-    value: ${cfg.ssh_features.throttled_port}
-- set_check:
-    selector: '[data-testid="session-specify-username"]'
-    checked: true
-- fill:
-    selector: '[data-testid="session-user"]'
-    value: ${cfg.ssh_features.user}
-- click: '[data-testid="session-section-advanced"]'
-- click: '[data-testid="session-auth-privatekey"]'
-- fill:
-    selector: input[aria-label="Private key path"]
-    value: ${cfg.ssh_features.key_path}
-- select_option:
-    selector: '[data-testid="session-ssh-browser-type"]'
-    value: scp
-- click: '[data-testid="session-section-bookmark"]'
-- fill:
-    selector: '[data-testid="session-name"]'
-    value: qa-scp
-- click: '[data-testid="session-save"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-scp"]'
+- wait_for:
+    selector: '[data-testid="startup-vault-check"]'
+    state: hidden
+    timeout_sec: 45
 - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-scp"]'
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
@@ -100,76 +75,51 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SCP pause, background ownership, cancellation and retry preserve exact bytes
+    requirement: Previously saved SCP sessions continue to exercise the original SCP pause, background
+      ownership, cancellation and retry preserve exact bytes workflow; new session configuration offers
+      only SFTP.
     actions:
-    - 3
+    - 1
     - 5
-    - 6
     - 7
-    - 8
     - 9
     - 10
     - 11
-    - 12
     - 13
     - 14
     - 15
     - 17
-    - 19
-    - 21
+    - 18
+    - 20
     - 22
     - 23
     - 25
-    - 26
-    - 27
-    - 29
-    - 30
-    - 32
-    - 34
-    - 35
-    - 37
-    - 40
-    - 42
-    results:
-    - 24
     - 28
-    - 33
-    - 36
-    - 38
-    - 41
-    - 43
-    - 44
+    - 30
     checkpoints:
-    - step: 24
-      expectation: Real transfer pauses, retains ownership across view closure, cancels and
-        resumes a verified partial to the exact source SHA256.
-    - step: 28
-      expectation: Real transfer pauses, retains ownership across view closure, cancels and
-        resumes a verified partial to the exact source SHA256.
-    - step: 33
-      expectation: Real transfer pauses, retains ownership across view closure, cancels and
-        resumes a verified partial to the exact source SHA256.
-    - step: 36
-      expectation: Real transfer pauses, retains ownership across view closure, cancels and
-        resumes a verified partial to the exact source SHA256.
-    - step: 38
-      expectation: Real transfer pauses, retains ownership across view closure, cancels and
-        resumes a verified partial to the exact source SHA256.
-    - step: 41
-      expectation: Real transfer pauses, retains ownership across view closure, cancels and
-        resumes a verified partial to the exact source SHA256.
-    - step: 43
-      expectation: Real transfer pauses, retains ownership across view closure, cancels and
-        resumes a verified partial to the exact source SHA256.
-    - step: 44
-      expectation: Real transfer pauses, retains ownership across view closure, cancels and
-        resumes a verified partial to the exact source SHA256.
-  native:
-  - check: Real native SCP lifecycle
-    method: automated
-    reason: A dedicated real SSH link limits bytes for initial and resumed transfers. OS bytes and visible queue
-      states prove pause/cancel/retry rather than command stubs.
+    - step: 12
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "scp-source.txt",
+        "timeout_sec": 45}}'
+    - step: 16
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "scp-upload.txt",
+        "timeout_sec": 45}}'
+    - step: 31
+      expectation: '{"assert_file_sha256": {"path": "${cfg.ssh_features.large_downloaded}", "equals":
+        "6b4be392164b2c21ce9cd339a9846f9de7afb4407b46becb7ddf98081e3c6cac", "timeout_sec": 90}}'
+    - step: 32
+      expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"done\"][data-resume-bytes]:not([data-resume-bytes=\"0\"])"}'
+    results:
+    - 12
+    - 16
+    - 31
+    - 32
   visual:
-  - check: Queue lifecycle and recovered state
+  - check: Configuration and workflow state
     method: automated
-    reason: Explicit queue state assertions remain after closing and reopening the file browser.
+    reason: Visible fields and exact values are asserted at each decisive state.
+  native:
+  - check: Native boundary
+    method: automated
+    reason: Fixture seeds a previous-version SSH row before native startup; actual protocol transfers,
+      independent SHA256 checks and queue lifecycle assertions are retained. No removed editor control
+      is used.

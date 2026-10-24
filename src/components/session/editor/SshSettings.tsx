@@ -1,7 +1,7 @@
 import { SshExpertSettings } from "./SshExpertSettings";
 import type { NetworkSettings } from "../../../lib/networkSettings";
 import { SshKeyGenerator } from "./SshKeyGenerator";
-import { remoteEnvironment, sshBrowserMode } from "../../../lib/sshSessionOptions";
+import { remoteEnvironment } from "../../../lib/sshSessionOptions";
 import { Shield } from "lucide-react";
 import { type TranslateFn } from "../../../lib/i18n";
 import { Field, Checkbox, Select, Radio } from "./Fields";
@@ -21,7 +21,6 @@ export function AdvancedSshSettings({
   startupCmd, setStartupCmd,
   doNotExit, setDoNotExit,
   remoteEnv, setRemoteEnv,
-  sshBrowser, setSshBrowser,
   authRadio, setAuthRadio,
   password, setPassword,
   passwordRef,
@@ -42,7 +41,6 @@ export function AdvancedSshSettings({
   startupCmd: string; setStartupCmd: (v: string) => void;
   doNotExit: boolean; setDoNotExit: (v: boolean) => void;
   remoteEnv: string; setRemoteEnv: (v: string) => void;
-  sshBrowser: string; setSshBrowser: (v: string) => void;
   authRadio: string; setAuthRadio: (v: string) => void;
   password: string; setPassword: (v: string) => void;
   passwordRef: string;
@@ -108,22 +106,8 @@ export function AdvancedSshSettings({
       </Field>}
 
       {sessionType === "SSH" && <Field label={t("sessionEditor2.fieldSshBrowserType")}>
-        <Select
-          dataTestId="session-ssh-browser-type"
-          value={sshBrowserMode(sshBrowser)}
-          options={[
-            { value: "sftp", label: t("sessionEditor2.sshBrowserSftp") },
-            { value: "scp-fast", label: t("sessionEditor2.sshBrowserScpSpeed") },
-            { value: "scp", label: t("sessionEditor2.sshBrowserScpCompat") },
-            { value: "disabled", label: t("sessionEditor2.sshBrowserDisabled") },
-          ]}
-          onChange={setSshBrowser}
-        />
+        <span data-testid="session-ssh-browser-type">{t("sessionEditor2.sshBrowserSftp")}</span>
       </Field>}
-
-      {sessionType === "SSH" && sshBrowserMode(sshBrowser).startsWith("scp") && (
-        <p className="text-xs text-[var(--taomni-text-muted)]">{t("fileBrowser.scpPrerequisite")}</p>
-      )}
 
       <Field label={t("sessionEditor2.fieldAuthentication")}>
         <div className="flex flex-col gap-1.5 w-full">

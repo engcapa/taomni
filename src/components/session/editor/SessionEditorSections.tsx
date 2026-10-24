@@ -64,7 +64,6 @@ export function SessionEditorSections(props: SessionEditorSectionsProps) {
         startupCmd={form.startupCmd} setStartupCmd={form.setStartupCmd}
         doNotExit={form.doNotExit} setDoNotExit={form.setDoNotExit}
         remoteEnv={form.remoteEnv} setRemoteEnv={form.setRemoteEnv}
-        sshBrowser={form.sshBrowser} setSshBrowser={form.setSshBrowser}
         authRadio={form.authRadio} setAuthRadio={actions.handleAuthRadio}
         password={form.password} setPassword={form.setPassword}
         passwordRef={form.passwordRef}

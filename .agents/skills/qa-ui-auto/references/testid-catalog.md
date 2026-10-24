@@ -2097,6 +2097,13 @@
 - `[data-testid="session-proto-mysql"]` — interactive [optional] — F6.3.proto-mysql
 - `[data-testid="session-proto-postgresql"]` — interactive [optional] — F6.3.proto-postgresql
 - `[data-testid="session-proto-panweidb"]` — interactive [optional] — F6.3.proto-panweidb
+- `[data-testid="session-proto-oracle"]` — interactive — F6.3.proto-oracle
+- `[data-testid="session-proto-sqlserver"]` — interactive — F6.3.proto-sqlserver
+- `[data-testid="session-proto-starrocks"]` — interactive — F6.3.proto-starrocks
+- `[data-testid="session-proto-presto"]` — interactive — F6.3.proto-presto
+- `[data-testid="session-proto-s3"]` — interactive — F6.3.proto-s3
+- `[data-testid="session-section-objectstorage"]` — interactive — F6.3.objectstorage-section
+- `[data-testid="session-storage-provider"]` — interactive — F6.3.storage-provider
 - `[data-testid="session-proto-clickhouse"]` — interactive [optional] — F6.3.proto-clickhouse
 - `[data-testid="session-proto-redis"]` — interactive [optional] — F6.3.proto-redis
 - `[data-testid="session-proto-hbaseshell"]` — interactive [optional] — F6.3.proto-hbaseshell
@@ -2139,7 +2146,7 @@
 - `[data-testid="bookmark-settings"]` — display — F6.3.bookmark-body
 - `input[aria-label="Execute command"]` — interactive — F6.3.advanced-execute-command
 - `[data-testid="session-remote-environment"]` — interactive — F6.3.advanced-remote-environment
-- `[data-testid="session-ssh-browser-type"]` — interactive — F6.3.advanced-ssh-browser-type
+- `[data-testid="session-ssh-browser-type"]` — display — F6.3.advanced-ssh-browser-type
 - `input[aria-label="SSH password"]` — interactive [optional] — F6.3.advanced-ssh-password
 - `[data-testid="session-save-in-vault"]` — interactive [optional] — F6.3.save-in-vault
 - `input[aria-label="Private key path"]` — interactive [optional] — F6.3.advanced-private-key
@@ -2852,6 +2859,7 @@
 - `[data-testid="vault-unlock-mode-startup"]` — interactive — F12.1.unlock-mode-startup
 - `[data-testid="vault-unlock-mode-on-demand"]` — interactive — F12.1.unlock-mode-on-demand
 - `[data-testid="vault-unlock-mode-hint"]` — display — F12.1.unlock-mode-hint
+- `[data-testid="startup-vault-check"]` — display [optional] — F12.1.startup-check
 - `[data-testid="vault-init-button"]` — interactive [optional] — F12.1.init-button
 - `[data-testid="vault-unlock-button"]` — interactive [optional] — F12.1.unlock-button
 - `[data-testid="vault-lock-button"]` — interactive [optional] — F12.1.lock-button

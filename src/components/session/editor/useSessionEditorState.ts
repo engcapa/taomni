@@ -97,7 +97,6 @@ export function useSessionEditorState(context: UseSessionEditorStateContext) {
   const [startupCmd, setStartupCmd] = useState(() => optionString(initialOptions, "startupCmd", ""));
   const [doNotExit, setDoNotExit] = useState(() => optionBoolean(initialOptions, "doNotExit", true));
   const [remoteEnv, setRemoteEnv] = useState(() => optionString(initialOptions, "remoteEnv", "Interactive shell"));
-  const [sshBrowser, setSshBrowser] = useState(() => optionString(initialOptions, "sshBrowser", "SFTP protocol (recommended)"));
   const [usePrivKey, setUsePrivKey] = useState(
     extractAuthType(session?.auth_method) === "PrivateKey",
   );
@@ -190,7 +189,7 @@ export function useSessionEditorState(context: UseSessionEditorStateContext) {
 
   /* --- network settings --- */
   const [networkSettings, setNetworkSettings] = useState<NetworkSettingsValue>(
-    () => session ? getSessionNetworkSettings(session.options_json) : { ...getSessionNetworkSettings(null), proxyKind: "app" },
+    () => getSessionNetworkSettings(session?.options_json),
   );
 
   /* --- test connection --- */
@@ -295,7 +294,6 @@ export function useSessionEditorState(context: UseSessionEditorStateContext) {
     doNotExit,
     disableAiWrite,
     remoteEnv,
-    sshBrowser,
     usePrivKey,
     fileEmbedInTab,
     fileExtraArgs,
@@ -333,7 +331,6 @@ export function useSessionEditorState(context: UseSessionEditorStateContext) {
     setDoNotExit,
     setDisableAiWrite,
     setRemoteEnv,
-    setSshBrowser,
     setDescription,
     setTags,
     setFileEmbedInTab,

@@ -38,7 +38,7 @@ steps:
 - assert_attribute:
     selector: '[data-testid="session-proxy-kind"]'
     name: value
-    equals: app
+    equals: none
 - select_option:
     selector: '[data-testid="session-proxy-kind"]'
     value: custom
@@ -103,7 +103,7 @@ verification:
   requirements:
   - id: R1
     requirement: HTTP and Native show only their applicable ports and retain both
-      values; a new session inherits the application proxy, independent configuration
+      values; a new session starts with a direct connection, independent configuration
       persists, and direct/application choices hide the independent editor.
     actions:
     - 3

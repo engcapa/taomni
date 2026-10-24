@@ -19,6 +19,8 @@ def setup(ctx):
         ctx.values["gss_ticket_cache"] = str(cache)
         ctx.values["gss_ticket_retained"] = str(retained)
     if str(getattr(ctx, "case_id", "")).startswith("TC-SESSION-SCP-"):
+        from .session_config import seed_legacy_scp
+        seed_legacy_scp(ctx, config)
         # Represent a previous interrupted process without invoking product
         # transfer APIs. Compatibility resumes a verified prefix; fast mode
         # must safely restart a stale one. Native bytes prove both outcomes.

@@ -61,7 +61,6 @@ export interface CreateSessionSerializationContext {
   doNotExit: boolean;
   disableAiWrite: boolean;
   remoteEnv: string;
-  sshBrowser: string;
   usePrivKey: boolean;
   fileEmbedInTab: boolean;
   fileExtraArgs: string;
@@ -115,7 +114,6 @@ export function createSessionSerialization(context: CreateSessionSerializationCo
     doNotExit,
     disableAiWrite,
     remoteEnv,
-    sshBrowser,
     usePrivKey,
     fileEmbedInTab,
     fileExtraArgs,
@@ -299,7 +297,7 @@ export function createSessionSerialization(context: CreateSessionSerializationCo
       ...context.bookmark,
       x11, x11Trusted, compression, startupCmd,
       description, tags, doNotExit, disableAiWrite,
-      remoteEnv, sshBrowser, usePrivKey,
+      remoteEnv, sshBrowser: "sftp", usePrivKey,
       fileEmbedInTab, fileExtraArgs,
       ...terminalProfileOverrides,
       // SSH password vault reference (vault:<id>). Empty string means no
@@ -313,6 +311,7 @@ export function createSessionSerialization(context: CreateSessionSerializationCo
       // password is gated the same way via jumpSaveAuth.
       networkSettings: {
         ...networkSettingsValue,
+        sshBrowser: "sftp",
         proxyPass: networkSettingsValue.proxySaveAuth ? proxyPassValue : "",
         jumpPassword: networkSettingsValue.jumpSaveAuth ? jumpPasswordValue : "",
       },
