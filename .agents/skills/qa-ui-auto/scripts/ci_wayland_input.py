@@ -38,7 +38,8 @@ WINDOW_STATE = """(() => ({
 }))()"""
 
 
-def owned_window_pid(windows, application: Path, runtime: Path, proc: Path = Path("/proc"), *, title=None) -> int:
+def owned_window_pid(windows, application: Path, runtime: Path, proc: Path = Path("/proc"), *,
+                     title=None, data_home: str | None = None) -> int:
     """Match a mapped window to the executable in this private compositor."""
     matches = []
     for window in windows:
@@ -55,6 +56,8 @@ def owned_window_pid(windows, application: Path, runtime: Path, proc: Path = Pat
             environment = (directory / "environ").read_bytes().split(b"\0")
         except OSError:
             continue
+        if data_home is not None and b"XDG_DATA_HOME=" + data_home.encode() not in environment:
+            continue
         if executable == application.resolve(strict=True) and (
                 b"XDG_RUNTIME_DIR=" + str(runtime).encode()) in environment:
             matches.append(pid)
@@ -63,13 +66,14 @@ def owned_window_pid(windows, application: Path, runtime: Path, proc: Path = Pat
     return matches[0]
 
 
-def activate_window(evaluate, application: Path, runtime: Path, diagnostics: dict) -> None:
+def activate_window(evaluate, application: Path, runtime: Path, diagnostics: dict, *,
+                    data_home: str | None = None) -> None:
     # WebDriver can focus a page without activating its GTK Wayland toplevel.
     # GNOME's own window activation also leaves its startup Overview first.
     # Match /proc identity instead of selecting an arbitrary Alt+Tab target.
     before = evaluate(WINDOW_STATE)
     diagnostics["before"] = before
-    pid = owned_window_pid(before["windows"], application, runtime)
+    pid = owned_window_pid(before["windows"], application, runtime, data_home=data_home)
     diagnostics["pid"] = pid
     focus_window(evaluate, pid, diagnostics)
 
@@ -249,7 +253,8 @@ def main() -> None:
                     name = request.get("command")
                     value = None
                     if name == "activate":
-                        activate_window(evaluate, Path(request["application"]), args.socket.parent, diagnostics)
+                        activate_window(evaluate, Path(request["application"]), args.socket.parent, diagnostics,
+                                        data_home=request.get("data_home"))
                     elif name == "focus_pid":
                         pid = int(request["pid"])
                         environment = (Path("/proc") / str(pid) / "environ").read_bytes().split(b"\0")

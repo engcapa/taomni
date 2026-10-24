@@ -169,6 +169,32 @@ class WaylandToolsTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, 'found 2'):
                     owned_window_pid([main, dict(main, title='Other')], executable, runtime, root)
 
+    def test_two_instances_match_their_own_profile_in_the_same_compositor(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            executable = root / 'taomni-qa'
+            executable.touch()
+            runtime = root / 'runtime'
+            primary, peer = root / 'primary', root / 'peer'
+            for pid, data in ((42, primary), (43, peer)):
+                process = root / str(pid)
+                process.mkdir()
+                (process / 'exe').symlink_to(executable)
+                (process / 'environ').write_bytes(
+                    f'XDG_RUNTIME_DIR={runtime}\0XDG_DATA_HOME={data}\0'.encode())
+            windows = [dict(pid=42, title='Taomni', normal=True),
+                       dict(pid=43, title='Taomni', normal=True)]
+            for pid, data in ((42, primary), (43, peer)):
+                self.assertEqual(owned_window_pid(windows, executable, runtime, root,
+                                                 data_home=str(data)), pid)
+            with self.assertRaisesRegex(RuntimeError, 'found 0'):
+                owned_window_pid(windows, executable, runtime, root, data_home=str(root / 'other'))
+            with self.assertRaisesRegex(RuntimeError, 'found 2'):
+                owned_window_pid(windows, executable, runtime, root)
+            with self.assertRaisesRegex(RuntimeError, 'found 2'):
+                owned_window_pid(windows + [windows[0]], executable, runtime, root,
+                                 data_home=str(primary))
+
     def test_consent_only_accepts_known_dialogs_from_their_owning_process(self):
         def records(name, showing=True):
             return [{"name": name, "showing": showing}]
