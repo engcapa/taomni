@@ -1,0 +1,126 @@
+id: TC-SESSION-BOOK-001
+title: Bookmark shortcut, input protection and startup connection
+covers:
+- F6.3
+- F6.2
+- F2.2
+tags:
+- session
+- bookmark
+- lifecycle
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-shell"]'
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-bookmark-runtime
+- click: '[data-testid="session-custom-icon"]'
+- fill:
+    selector: input[aria-label="Custom session icon"]
+    value: ★
+- fill:
+    selector: input[aria-label="Keyboard shortcut"]
+    value: Ctrl+Alt+9
+- set_check:
+    selector: '[data-testid="session-auto-connect"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="session-open-new-window"]'
+    checked: false
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-bookmark-runtime"]'
+- assert_text:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-bookmark-runtime"]'
+    contains: ★
+- click: '[data-testid="session-tree-item"][data-session-name="qa-bookmark-runtime"]'
+- press: Control+Alt+9
+- wait_for: '[data-testid="terminal-pane"]'
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 1
+- reload_window: null
+- wait_for:
+    selector: '[data-testid="terminal-pane"]'
+    timeout_sec: 60
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 1
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: do-not-connect
+- press: Control+Alt+9
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 1
+- click: '[data-testid="session-cancel"]'
+- assert_not_visible: '[data-testid="session-editor"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: An explicit bookmark shortcut opens exactly one terminal, reload
+      auto-connects once, editable fields do not trigger the shortcut, and native
+      background loading decodes the fixture image from disk.
+    actions:
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 16
+    - 17
+    - 20
+    - 24
+    - 26
+    - 27
+    - 29
+    - 23
+    checkpoints:
+    - step: 15
+      expectation: The saved value, rendered state or connection count matches the
+        explicit assertion.
+    - step: 19
+      expectation: The saved value, rendered state or connection count matches the
+        explicit assertion.
+    - step: 22
+      expectation: The saved value, rendered state or connection count matches the
+        explicit assertion.
+    - step: 28
+      expectation: The saved value, rendered state or connection count matches the
+        explicit assertion.
+    - step: 30
+      expectation: The saved value, rendered state or connection count matches the
+        explicit assertion.
+    results:
+    - 15
+    - 19
+    - 22
+    - 28
+    - 30
+  visual:
+  - check: Bookmark controls and terminal background
+    method: automated
+    reason: Assertions verify values, visibility and decoded image dimensions where
+      applicable.
+  native:
+  - check: Persistence and terminal lifecycle
+    method: not-applicable
+    reason: Native cases exercise SQLite, real local PTY and file IPC. Browser-only
+      TC-128 verifies the dialog workflow.

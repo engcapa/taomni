@@ -1,0 +1,340 @@
+id: TC-SESSION-CH-001
+title: Real ClickHouse HTTP and Native authentication, proxy failure recovery and queries
+covers:
+- F6.3
+- F6.2
+- F-DB-1
+tags:
+- session
+- database
+- regression
+modes:
+- native
+fixtures:
+- reset_db
+- clickhouse_required
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-clickhouse"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.clickhouse.host}
+- fill:
+    selector: input[aria-label="ClickHouse HTTP port"]
+    value: ${cfg.clickhouse.http_port}
+- fill:
+    selector: input[aria-label="Database username"]
+    value: ${cfg.clickhouse.user}
+- fill:
+    selector: input[aria-label="Database password"]
+    value: ${cfg.clickhouse.password}
+- fill:
+    selector: input[aria-label="Database name"]
+    value: ${cfg.clickhouse.database}
+- click: '[data-testid="db-test-connection"]'
+- assert_text:
+    selector: '[data-testid="session-test-result-summary"]'
+    contains: ClickHouse connection OK
+    timeout_sec: 60
+- click: '[data-testid="alert-dialog-ok"]'
+- select_option:
+    selector: '[data-testid="session-clickhouse-protocol"]'
+    value: Native
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.clickhouse.port}
+- fill:
+    selector: input[aria-label="Database password"]
+    value: deliberately-incorrect
+- click: '[data-testid="db-test-connection"]'
+- assert_text:
+    selector: '[data-testid="session-test-result-summary"]'
+    contains: ClickHouse native
+    timeout_sec: 60
+- click: '[data-testid="alert-dialog-ok"]'
+- fill:
+    selector: input[aria-label="Database password"]
+    value: ${cfg.clickhouse.password}
+- click: '[data-testid="db-test-connection"]'
+- assert_text:
+    selector: '[data-testid="session-test-result-summary"]'
+    contains: ClickHouse connection OK
+    timeout_sec: 60
+- click: '[data-testid="alert-dialog-ok"]'
+- click: '[data-testid="session-section-network"]'
+- select_option:
+    selector: '[data-testid="session-proxy-kind"]'
+    value: custom
+- fill:
+    selector: '[data-testid="session-custom-proxy"] input[aria-label="Proxy host"]'
+    value: 127.0.0.1
+- fill:
+    selector: '[data-testid="session-custom-proxy"] input[aria-label="Port"]'
+    value: '1'
+- click: '[data-testid="db-test-connection"]'
+- assert_text:
+    selector: '[data-testid="session-test-result-summary"]'
+    contains: connect
+    timeout_sec: 60
+- click: '[data-testid="alert-dialog-ok"]'
+- select_option:
+    selector: '[data-testid="session-proxy-kind"]'
+    value: none
+- click: '[data-testid="db-test-connection"]'
+- assert_text:
+    selector: '[data-testid="session-test-result-summary"]'
+    contains: ClickHouse connection OK
+    timeout_sec: 60
+- click: '[data-testid="alert-dialog-ok"]'
+- click: '[data-testid="session-section-database"]'
+- set_check:
+    selector: '[data-testid="db-save-in-vault"]'
+    checked: true
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-clickhouse-native
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="vault-setup-pw1"]'
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-clickhouse-master-test
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-clickhouse-master-test
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-clickhouse-native"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-clickhouse-native"]'
+- wait_for:
+    selector: '[data-testid="db-query-tab"]'
+    timeout_sec: 60
+- assert_not_visible: '[data-testid="db-connection-error-banner"]'
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: SELECT value, toString(toUInt64(18446744073709551615)) AS exact_integer FROM qa_session.fixture
+    WHERE id=1
+- click: '[data-testid="db-run-all"]'
+- wait_for:
+    selector: '[data-testid="query-result-grid"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: fixture-ready
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: '18446744073709551615'
+    timeout_sec: 60
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: SELECT number AS streamed_number FROM numbers(205)
+- click: '[data-testid="db-run-all"]'
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: streamed_number
+    timeout_sec: 60
+- click: '[data-testid="result-log-tab"]'
+- assert_text:
+    selector: '[data-testid="db-execution-log-summary"]'
+    contains: 'Success: 1'
+    timeout_sec: 60
+- screenshot: clickhouse-native-query.png
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: CREATE TABLE qa_session.product_write (id UInt64, value String) ENGINE=Memory
+- click: '[data-testid="db-run-all"]'
+- click: '[data-testid="result-log-tab"]'
+- assert_text:
+    selector: '[data-testid="db-execution-log-summary"]'
+    contains: 'Success: 1'
+    timeout_sec: 45
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: INSERT INTO qa_session.product_write VALUES (1, 'native-write'), (2, 'native-second')
+- click: '[data-testid="db-run-all"]'
+- click: '[data-testid="result-log-tab"]'
+- assert_text:
+    selector: '[data-testid="db-execution-log-summary"]'
+    contains: 'Success: 1'
+    timeout_sec: 45
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: SELECT value FROM qa_session.product_write ORDER BY id
+- click: '[data-testid="db-run-all"]'
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: native-write
+    timeout_sec: 45
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: native-second
+    timeout_sec: 45
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: INSERT INTO qa_session.product_write FORMAT CSV 3,unsupported-format
+- click: '[data-testid="db-run-all"]'
+- click: '[data-testid="result-log-tab"]'
+- assert_text:
+    selector: '[data-testid="db-execution-log-message"]'
+    contains: requires inline VALUES or SELECT
+    timeout_sec: 15
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: SELECT count() AS preserved_rows FROM qa_session.product_write
+- click: '[data-testid="db-run-all"]'
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: preserved_rows
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="query-result-grid"]'
+    contains: '2'
+    timeout_sec: 30
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Authenticate through both real protocols, reject incorrect Native credentials and an
+      unavailable custom proxy, recover through explicit direct mode, persist the credential in the vault,
+      and display real typed and streamed query results. Create a table and write inline VALUES through
+      the product Native driver, then verify both rows.
+    actions:
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 19
+    - 20
+    - 21
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 30
+    - 31
+    - 32
+    - 34
+    - 35
+    - 36
+    - 37
+    - 38
+    - 39
+    - 41
+    - 42
+    - 43
+    - 45
+    - 48
+    - 49
+    - 50
+    - 51
+    - 55
+    - 56
+    - 57
+    - 58
+    - 60
+    - 63
+    - 64
+    - 65
+    - 66
+    - 67
+    - 69
+    - 70
+    - 71
+    - 72
+    - 73
+    - 75
+    - 76
+    - 77
+    - 78
+    checkpoints:
+    - step: 12
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
+    - step: 18
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
+    - step: 22
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
+    - step: 29
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
+    - step: 33
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
+    - step: 47
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
+    - step: 53
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
+    - step: 54
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
+    - step: 59
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
+    - step: 61
+      expectation: The explicitly asserted protocol, saved value, error or result is present.
+    - step: 68
+      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both written values.
+    - step: 74
+      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both written values.
+    - step: 79
+      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both written values.
+    - step: 80
+      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both written values.
+    results:
+    - 12
+    - 18
+    - 22
+    - 29
+    - 33
+    - 47
+    - 53
+    - 54
+    - 59
+    - 61
+    - 68
+    - 74
+    - 79
+    - 80
+  - id: R2
+    requirement: Unsupported Native FORMAT payloads fail promptly and the next query uses a fresh usable
+      connection without inserting partial data.
+    actions:
+    - 81
+    - 82
+    - 83
+    - 84
+    - 85
+    - 87
+    - 88
+    - 89
+    - 90
+    results:
+    - 86
+    - 91
+    - 92
+    checkpoints:
+    - step: 86
+      expectation: Actionable inline VALUES/SELECT guidance appears without waiting for the network timeout.
+    - step: 91
+      expectation: A subsequent query completes through the Native connection.
+    - step: 92
+      expectation: The original two rows remain; the rejected FORMAT payload inserted nothing.
+  visual:
+  - check: Conditional connection fields
+    method: automated
+    reason: Visibility and value assertions cover the active protocol controls.
+  native:
+  - check: Real persistence and database transport
+    method: automated
+    reason: Native mode uses SQLite/vault and, for the query case, a real ClickHouse server. Browser mode
+      covers editor behavior only.

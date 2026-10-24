@@ -6,6 +6,15 @@ use tokio::io::AsyncWriteExt;
 
 impl ActiveSftp {
     pub async fn read_bytes(&self, path: &str, max_bytes: u64) -> Result<Vec<u8>, String> {
+        if self.is_scp() {
+            let size = self.stat(path).await?.size;
+            if size > max_bytes {
+                return Err(format!(
+                    "File is {size} bytes, exceeds preview limit of {max_bytes} bytes"
+                ));
+            }
+            return self.scp_read_bytes(path, max_bytes).await;
+        }
         retry_reconnect!(self, self.read_bytes_once(path, max_bytes).await)
     }
 
@@ -15,7 +24,7 @@ impl ActiveSftp {
         max_bytes: u64,
     ) -> Result<Vec<u8>, String> {
         let (size, mut file) = {
-            let sftp = self.sftp.lock().await;
+            let sftp = self.sftp_session().await?;
             let attrs = sftp
                 .metadata(path.to_string())
                 .await
@@ -41,12 +50,15 @@ impl ActiveSftp {
     }
 
     pub async fn write_bytes(&self, path: &str, data: &[u8]) -> Result<(), String> {
+        if self.is_scp() {
+            return self.scp_write_bytes(path, data).await;
+        }
         retry_reconnect!(self, self.write_bytes_once(path, data).await)
     }
 
     pub(super) async fn write_bytes_once(&self, path: &str, data: &[u8]) -> Result<(), String> {
         let mut file = {
-            let sftp = self.sftp.lock().await;
+            let sftp = self.sftp_session().await?;
             sftp.open_with_flags(
                 path.to_string(),
                 OpenFlags::WRITE | OpenFlags::CREATE | OpenFlags::TRUNCATE,

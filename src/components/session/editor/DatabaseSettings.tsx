@@ -152,7 +152,7 @@ export function DatabaseSettings({
 
       {isClickHouse && (
         <>
-          <Field label="HTTP port">
+          {chProtocol.toLowerCase() !== "native" && <Field label="HTTP port">
             <input
               className="taomni-input w-24"
               value={httpPort}
@@ -160,9 +160,10 @@ export function DatabaseSettings({
               placeholder="8123"
               onChange={(e) => setHttpPort(e.target.value)}
             />
-          </Field>
+          </Field>}
           <Field label="Protocol">
             <Select
+              dataTestId="session-clickhouse-protocol"
               value={chProtocol}
               className="w-40"
               options={["HTTP", "Native"]}

@@ -52,6 +52,7 @@ pub async fn db_connect(
         None => (config, None),
     };
 
+    let mut forward_guard = forward::ForwardGuard(forward_task);
     let active_schema = sql::new_active_schema_slot(&config);
     let tx_state = tx::TxState::shared();
     let handle = match config.engine.as_str() {
@@ -83,15 +84,12 @@ pub async fn db_connect(
         "Presto" => presto::connect(&config, password.as_deref()).await?,
         "Redis" => redis_ops::connect(&config, password.as_deref()).await?,
         other => {
-            if let Some(task) = forward_task {
-                task.abort();
-            }
             return Err(format!("Unsupported database engine: {other}"));
         }
     };
     let session = Arc::new(DbSession::with_forward(
         handle,
-        forward_task,
+        forward_guard.0.take(),
         active_schema,
         tx_state,
     ));
@@ -109,7 +107,12 @@ pub async fn db_connect(
 /// The TCP port an engine actually dials for `config` — ClickHouse uses its
 /// HTTP port (default 8123); every other engine uses `config.port`.
 pub(super) fn engine_target_port(config: &DbConfig) -> u16 {
-    if config.engine == "ClickHouse" {
+    if config.engine == "ClickHouse"
+        && !config
+            .protocol
+            .as_deref()
+            .is_some_and(|p| p.eq_ignore_ascii_case("native"))
+    {
         config.http_port.unwrap_or(8123)
     } else {
         config.port
@@ -124,12 +127,19 @@ pub(super) async fn prepare_network_forward(
     state: &State<'_, AppState>,
     config: &DbConfig,
 ) -> Result<Option<(DbConfig, JoinHandle<()>)>, String> {
+    let native_tls = config.engine == "ClickHouse"
+        && config.ssl
+        && config
+            .protocol
+            .as_deref()
+            .is_some_and(|p| p.eq_ignore_ascii_case("native"));
     let mut net = match &config.network_settings {
         Some(n) => n.clone(),
+        None if native_tls => Default::default(),
         None => return Ok(None),
     };
     let uses_proxy = !matches!(net.proxy_kind.as_str(), "" | "none");
-    if !uses_proxy {
+    if !uses_proxy && !native_tls {
         return Ok(None);
     }
 
@@ -141,13 +151,21 @@ pub(super) async fn prepare_network_forward(
 
     let target_host = config.host.clone();
     let target_port = engine_target_port(config);
-    let fwd = forward::start(target_host, target_port, net).await?;
+    let fwd = forward::start_with_tls(target_host, target_port, net, native_tls).await?;
 
     // Rewrite the effective config to dial the loopback listener. ClickHouse
     // keys off http_port, so redirect that; everyone else uses `port`.
     let mut effective = config.clone();
     effective.host = "127.0.0.1".to_string();
-    if config.engine == "ClickHouse" {
+    if native_tls {
+        effective.ssl = false;
+    }
+    if config.engine == "ClickHouse"
+        && !config
+            .protocol
+            .as_deref()
+            .is_some_and(|p| p.eq_ignore_ascii_case("native"))
+    {
         effective.http_port = Some(fwd.local_port);
     } else {
         effective.port = fwd.local_port;

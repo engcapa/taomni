@@ -293,7 +293,6 @@ export function tabbyAuthMethod(
   const password = cleanText(firstNonEmptyString(optionsRecord.password), MAX_OPTION_LENGTH);
 
   if (auth === "agent") {
-    warnings.push("Imported Tabby SSH agent authentication, but Taomni SSH agent authentication is not implemented at runtime yet.");
     return { authMethod: "Agent" };
   }
 

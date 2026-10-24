@@ -148,4 +148,5 @@ export type PortableAuth =
   | { kind: "password" }
   | { kind: "private-key"; private_key_path: string }
   | { kind: "agent" }
+  | { kind: "gssapi" }
   | { kind: "none" };

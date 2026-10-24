@@ -37,7 +37,7 @@ steps:
 - assert_attribute:
     selector: '[data-testid="session-proxy-kind"]'
     name: value
-    equals: none
+    equals: app
 - select_option:
     selector: '[data-testid="session-proxy-kind"]'
     value: http
@@ -182,14 +182,14 @@ steps:
     name: data-checked
     equals: 'true'
 - assert_attribute:
-    selector: '[data-testid="session-disable-nagle-toggle"]'
+    selector: '[data-testid="session-tcp-nodelay-toggle"]'
     name: data-checked
     equals: 'true'
 - set_check:
-    selector: '[data-testid="session-disable-nagle-toggle"]'
+    selector: '[data-testid="session-tcp-nodelay-toggle"]'
     checked: false
 - assert_attribute:
-    selector: '[data-testid="session-disable-nagle-toggle"]'
+    selector: '[data-testid="session-tcp-nodelay-toggle"]'
     name: data-checked
     equals: 'false'
 - assert_attribute:
@@ -487,7 +487,7 @@ verification:
     - step: 60
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "true"}}'
     - step: 63
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-nagle-toggle\"]", "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 64
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 66

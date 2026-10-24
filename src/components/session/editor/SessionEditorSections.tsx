@@ -55,6 +55,8 @@ export function SessionEditorSections(props: SessionEditorSectionsProps) {
 
     {navigation.activeSection === "advanced" && form.isSSH && (
       <AdvancedSshSettings
+        networkSettings={form.networkSettings} setNetworkSettings={form.setNetworkSettings}
+        sessionType={form.proto}
         t={form.t}
         x11={form.x11} setX11={form.setX11}
         x11Trusted={form.x11Trusted} setX11Trusted={form.setX11Trusted}
@@ -344,6 +346,7 @@ export function SessionEditorSections(props: SessionEditorSectionsProps) {
     )}
     {navigation.activeSection === "network" && !form.isDb && !form.isObjectStorage && (
       <NetworkSettings
+        sessionType={form.proto}
         t={form.t}
         value={form.networkSettings}
         onChange={form.setNetworkSettings}
@@ -373,6 +376,7 @@ export function SessionEditorSections(props: SessionEditorSectionsProps) {
     )}
     {navigation.activeSection === "bookmark" && (
       <BookmarkSettings
+        value={form.bookmark} onChange={form.setBookmark}
         t={form.t}
         name={form.name} setName={form.setName}
         groupPath={form.groupPath} setGroupPath={form.setGroupPath}

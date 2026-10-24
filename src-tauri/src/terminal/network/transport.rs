@@ -100,6 +100,13 @@ pub async fn establish_transport(
     port: u16,
     network: Option<&NetworkSettings>,
 ) -> Result<TcpStream, String> {
+    let resolved;
+    let network = if let Some(settings) = network.filter(|n| n.proxy_kind == "system") {
+        resolved = super::proxy_selection::resolve_system(settings, host)?;
+        Some(&resolved)
+    } else {
+        network
+    };
     let ip_pref = network.map(|n| n.ip_version.as_str()).unwrap_or("auto");
     let proxy_kind = network.map(|n| n.proxy_kind.as_str()).unwrap_or("none");
     let nodelay = network.map(|n| n.tcp_nodelay).unwrap_or(true);

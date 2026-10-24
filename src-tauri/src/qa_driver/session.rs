@@ -51,7 +51,11 @@ pub(super) async fn refresh<R: Runtime>(
     if !session_is_valid(&session_id) {
         return error("unknown WebDriver session");
     }
-    match state.window.eval("window.location.reload()") {
+    let window = match state.current_window() {
+        Ok(window) => window,
+        Err(message) => return error(message),
+    };
+    match window.eval("window.location.reload()") {
         Ok(()) => ok(Value::Null),
         Err(e) => error(format!("failed to reload WebView: {e}")),
     }

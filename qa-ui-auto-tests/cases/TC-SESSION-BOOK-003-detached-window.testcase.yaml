@@ -1,0 +1,141 @@
+id: TC-SESSION-BOOK-003
+title: Bookmark opens a real independent window and reattaches the same terminal once
+covers:
+- F6.3
+- F6.2
+- F2.2
+tags:
+- session
+- bookmark
+- lifecycle
+modes:
+- native
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-shell"]'
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-bookmark-runtime
+- click: '[data-testid="session-custom-icon"]'
+- fill:
+    selector: input[aria-label="Custom session icon"]
+    value: ★
+- fill:
+    selector: input[aria-label="Keyboard shortcut"]
+    value: Ctrl+Alt+9
+- set_check:
+    selector: '[data-testid="session-auto-connect"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="session-open-new-window"]'
+    checked: true
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-bookmark-runtime"]'
+- assert_text:
+    selector: '[data-testid="session-tree-item"][data-session-name="qa-bookmark-runtime"]'
+    contains: ★
+- click: '[data-testid="session-tree-item"][data-session-name="qa-bookmark-runtime"]'
+- press: Control+Alt+9
+- switch_window:
+    selector: '[data-testid="detached-reattach"]'
+    timeout_sec: 60
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+    timeout_sec: 45
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 1
+- terminal_input:
+    selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
+    text: echo QA_DETACHED_BOOKMARK_42
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^QA_DETACHED_BOOKMARK_42\s*$
+    timeout_sec: 20
+- click: '[data-testid="detached-reattach"]'
+- switch_window:
+    selector: '[data-testid="sidebar"]'
+    timeout_sec: 45
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+    timeout_sec: 45
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 1
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"]'
+    regex: (?m)^QA_DETACHED_BOOKMARK_42\s*$
+    timeout_sec: 20
+- wait: 2
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 1
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Bookmark opens a real independent window and reattaches the same
+      terminal once
+    actions:
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 16
+    - 17
+    - 18
+    - 21
+    - 23
+    - 24
+    checkpoints:
+    - step: 15
+      expectation: A real detached window owns one terminal; reattach preserves output
+        and stays in the main window.
+    - step: 20
+      expectation: A real detached window owns one terminal; reattach preserves output
+        and stays in the main window.
+    - step: 22
+      expectation: A real detached window owns one terminal; reattach preserves output
+        and stays in the main window.
+    - step: 26
+      expectation: A real detached window owns one terminal; reattach preserves output
+        and stays in the main window.
+    - step: 27
+      expectation: A real detached window owns one terminal; reattach preserves output
+        and stays in the main window.
+    - step: 29
+      expectation: A real detached window owns one terminal; reattach preserves output
+        and stays in the main window.
+    results:
+    - 15
+    - 20
+    - 22
+    - 26
+    - 27
+    - 29
+  visual:
+  - check: Bookmark controls and terminal background
+    method: automated
+    reason: Assertions verify values, visibility and decoded image dimensions where
+      applicable.
+  native:
+  - check: Real OS window and terminal handoff
+    method: automated
+    reason: Local PTYs and output adoption are native-only APIs. TC-128 covers
+      save/reopen of the new-window setting in browser mode. This case switches
+      real WebDriver windows and requires a standalone PTY output line before and after reattachment,
+      excluding the echoed command line on POSIX and Windows shells.

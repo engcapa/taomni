@@ -1,3 +1,5 @@
+import { useSessionStore } from "../../stores/sessionStore";
+import { readSessionBookmark } from "../../lib/sessionBookmark";
 import { isTauriRuntime } from "../../lib/runtime";
 import { openSftpWindow } from "../../lib/sftp";
 import { openDetachedWindow } from "../../lib/detachWindowing";
@@ -210,7 +212,10 @@ export function createOpenDetachedTerminal(controllerContext: OpenDetachedTermin
         ?? (tab.sessionId ? controllerContext.terminalProfilesBySessionId.get(tab.sessionId) : undefined)
         ?? tab.terminalProfile
         ?? null;
+      const bookmark = useSessionStore.getState().sessions.find((session) => session.id === tab.sessionId);
       const payload: DetachedTerminalParams = {
+        savedSessionId: tab.sessionId,
+        bookmarkOptionsJson: JSON.stringify(readSessionBookmark(bookmark?.options_json ?? tab.ssh?.optionsJson)),
         tabId,
         title,
         terminalTitleMode: tab.terminalTitleMode,

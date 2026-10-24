@@ -8,12 +8,15 @@ use russh_sftp::protocol::FileType as SftpFileType;
 
 impl ActiveSftp {
     pub async fn list_dir(&self, path: &str) -> Result<Vec<FileEntryDto>, String> {
+        if self.is_scp() {
+            return self.scp_metadata("list", serde_json::json!([path])).await;
+        }
         retry_reconnect!(self, self.list_dir_once(path).await)
     }
 
     pub(super) async fn list_dir_once(&self, path: &str) -> Result<Vec<FileEntryDto>, String> {
         let dir_entries = {
-            let sftp = self.sftp.lock().await;
+            let sftp = self.sftp_session().await?;
             sftp.read_dir(path.to_string())
                 .await
                 .map_err(|e| format!("Failed to read {}: {}", path, e))?
@@ -30,7 +33,7 @@ impl ActiveSftp {
             // Resolve symlink targets for display. Best-effort: failures
             // (broken links, permission denied) leave the field empty.
             if dto.file_type == "symlink" {
-                let sftp = self.sftp.lock().await;
+                let sftp = self.sftp_session().await?;
                 if let Ok(target) = sftp.read_link(full.clone()).await {
                     dto.symlink_target = Some(target);
                 }
@@ -55,22 +58,30 @@ impl ActiveSftp {
     }
 
     pub async fn read_link(&self, path: &str) -> Result<String, String> {
+        if self.is_scp() {
+            return self
+                .scp_metadata("readlink", serde_json::json!([path]))
+                .await;
+        }
         retry_reconnect!(self, self.read_link_once(path).await)
     }
 
     pub(super) async fn read_link_once(&self, path: &str) -> Result<String, String> {
-        let sftp = self.sftp.lock().await;
+        let sftp = self.sftp_session().await?;
         sftp.read_link(path.to_string())
             .await
             .map_err(|e| format!("readlink {}: {}", path, e))
     }
 
     pub async fn stat(&self, path: &str) -> Result<FileEntryDto, String> {
+        if self.is_scp() {
+            return self.scp_metadata("stat", serde_json::json!([path])).await;
+        }
         retry_reconnect!(self, self.stat_once(path).await)
     }
 
     pub(super) async fn stat_once(&self, path: &str) -> Result<FileEntryDto, String> {
-        let sftp = self.sftp.lock().await;
+        let sftp = self.sftp_session().await?;
         let attrs = sftp
             .metadata(path.to_string())
             .await
@@ -80,11 +91,16 @@ impl ActiveSftp {
     }
 
     pub async fn realpath(&self, path: &str) -> Result<String, String> {
+        if self.is_scp() {
+            return self
+                .scp_metadata("realpath", serde_json::json!([path]))
+                .await;
+        }
         retry_reconnect!(self, self.realpath_once(path).await)
     }
 
     pub(super) async fn realpath_once(&self, path: &str) -> Result<String, String> {
-        let sftp = self.sftp.lock().await;
+        let sftp = self.sftp_session().await?;
         sftp.canonicalize(path.to_string())
             .await
             .map_err(|e| format!("realpath {}: {}", path, e))

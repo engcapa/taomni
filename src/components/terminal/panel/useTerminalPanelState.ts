@@ -1,3 +1,5 @@
+import { useSessionStore } from "../../../stores/sessionStore";
+import { useBookmarkBackground } from "./useBookmarkBackground";
 import { FitAddon } from "@xterm/addon-fit";
 import { SearchAddon } from "@xterm/addon-search";
 import { WebglAddon } from "@xterm/addon-webgl";
@@ -36,6 +38,7 @@ export interface UseTerminalPanelStateContext {
   ssh: import("./types").SshConnectInfo | undefined;
   commandTerminal: import("./types").CommandTerminalConnectInfo | undefined;
   sockscapTerminal: import("../../../types").SocksCapTerminalLaunchInfo | undefined;
+  bookmarkOptionsJson?: string;
   terminalProfile: TerminalProfile | undefined;
   tabId: string | undefined;
   theme: string;
@@ -61,6 +64,7 @@ export function useTerminalPanelState(context: UseTerminalPanelStateContext) {
     ssh,
     commandTerminal,
     sockscapTerminal,
+    bookmarkOptionsJson,
     terminalProfile,
     tabId,
     theme,
@@ -156,9 +160,15 @@ export function useTerminalPanelState(context: UseTerminalPanelStateContext) {
   const [themeName, setThemeName] = useState(initialProfile.theme || theme);
   const { resolvedTheme: resolvedAppTheme } = useAppTheme();
   const appPrefersDark = resolvedAppTheme === "dark";
+  const savedOptions = useSessionStore((state) => {
+    const sessionId = useAppStore.getState().tabs.find((tab) => tab.id === tabId)?.sessionId;
+    return state.sessions.find((session) => session.id === sessionId)?.options_json;
+  });
+  const background = useBookmarkBackground(bookmarkOptionsJson ?? savedOptions ?? ssh?.optionsJson);
   const resolvePanelTheme = useCallback(
-    (name: string) => resolveTerminalThemeWithSystem(name, appPrefersDark),
-    [appPrefersDark],
+    (name: string) => ({ ...resolveTerminalThemeWithSystem(name, appPrefersDark),
+      ...(background.url ? { background: "#00000000" } : {}) }),
+    [appPrefersDark, background.url],
   );
   const [cursorStyle, setCursorStyle] = useState(initialProfile.cursorStyle);
   const [cursorBlink, setCursorBlink] = useState(initialProfile.cursorBlink);
@@ -321,6 +331,7 @@ export function useTerminalPanelState(context: UseTerminalPanelStateContext) {
   const lastTerminalSizeSyncRef = useRef<{ sessionId: string; cols: number; rows: number; } | null>(null);
   const lastCwdRequestTokenRef = useRef(cwdRequestToken);
   return {
+    background,
     sessionIdRef,
     termRef,
     lastTerminalSizeSyncRef,

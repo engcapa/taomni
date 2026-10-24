@@ -1,3 +1,4 @@
+import { sessionCapabilities } from "../../../lib/sessionCapabilities";
 import { ensureVaultReady } from "../../../lib/vaultGate";
 import { vaultPut, isVaultReference, isVaultLockedError } from "../../../lib/ipc";
 import { type NetworkSettings as NetworkSettingsValue } from "../../../lib/networkSettings";
@@ -20,7 +21,7 @@ export interface HandleSaveContext {
   proto: Proto;
   isProxy: boolean;
   isMail: boolean;
-  authMethod: "Password" | "Agent" | "None" | "PrivateKey";
+  authMethod: "Password" | "Agent" | "Gssapi" | "None" | "PrivateKey";
   mailAuthMode: MailAuthMode;
   saveInVault: boolean;
   password: string;
@@ -134,6 +135,8 @@ export function createHandleSave(controllerContext: HandleSaveContext): () => Pr
     // vault: reference).
     let nextProxyPass = controllerContext.networkSettings.proxyPass;
     if (
+      sessionCapabilities(controllerContext.proto).network &&
+      ["http", "socks5"].includes(controllerContext.networkSettings.proxyKind) &&
       controllerContext.networkSettings.proxySaveAuth &&
       controllerContext.networkSettings.proxyPass.length > 0 &&
       !isVaultReference(controllerContext.networkSettings.proxyPass)
@@ -163,6 +166,8 @@ export function createHandleSave(controllerContext: HandleSaveContext): () => Pr
     // server-side and there is no separate jump password to persist).
     let nextJumpPass = controllerContext.networkSettings.jumpPassword;
     if (
+      sessionCapabilities(controllerContext.proto).network &&
+      controllerContext.networkSettings.proxyKind === "ssh-tunnel" &&
       controllerContext.networkSettings.jumpSaveAuth &&
       controllerContext.networkSettings.jumpSessionId.trim() === "" &&
       controllerContext.networkSettings.jumpPassword.length > 0 &&

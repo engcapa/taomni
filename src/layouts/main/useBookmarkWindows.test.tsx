@@ -1,0 +1,25 @@
+import { cleanup, renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { useBookmarkWindows } from "./useBookmarkWindows";
+import type { Tab } from "../../types";
+const state = vi.hoisted(() => ({ tabs: [] as Tab[], runtime: {} as Record<string, { backendSessionId?: string }>, sessions: [] as { id: string; options_json: string }[] }));
+vi.mock("../../stores/appStore", () => ({ useAppStore: (selector: (state: unknown) => unknown) => selector({ tabs: state.tabs, terminalRuntimeByTab: state.runtime }) }));
+vi.mock("../../stores/sessionStore", () => ({ useSessionStore: { getState: () => ({ sessions: state.sessions }) } }));
+afterEach(cleanup);
+beforeEach(() => { state.tabs = []; state.runtime = {}; state.sessions = []; });
+it("waits for backend ownership, detaches once, and keeps a reattached tab in the main window", () => {
+  const tab = { id: "one", sessionId: "saved", type: "terminal", title: "One", closable: true } satisfies Tab;
+  state.tabs = [tab];
+  state.sessions = [{ id: "saved", options_json: '{"openNewWindow":true}' }];
+  const actions = { openDetachedTerminal: vi.fn(), openDetachedSftp: vi.fn(), openDetachedRdp: vi.fn(), openDetachedVnc: vi.fn(), openDetachedDatabase: vi.fn() };
+  const hook = renderHook(() => useBookmarkWindows(actions));
+  expect(actions.openDetachedTerminal).not.toHaveBeenCalled();
+  state.runtime = { one: { backendSessionId: "backend-one" } };
+  hook.rerender();
+  expect(actions.openDetachedTerminal).toHaveBeenCalledWith("one", tab, "One");
+  state.tabs = []; hook.rerender();
+  state.tabs = [tab]; hook.rerender();
+  expect(actions.openDetachedTerminal).toHaveBeenCalledTimes(1);
+  state.tabs = [{ ...tab, id: "two" }]; state.runtime = { two: { backendSessionId: "backend-two" } };
+  hook.rerender(); expect(actions.openDetachedTerminal).toHaveBeenCalledTimes(2);
+});

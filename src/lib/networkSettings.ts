@@ -1,6 +1,8 @@
+import type { AppProxyConfig } from "./ipc";
+import { sshBrowserMode } from "./sshSessionOptions";
 import { parseSessionOptions } from "./terminalProfile";
 
-export type ProxyKind = "none" | "http" | "socks5" | "ssh-tunnel" | "system";
+export type ProxyKind = "app" | "custom" | "none" | "http" | "socks5" | "ssh-tunnel" | "system";
 export type IpVersion = "auto" | "ipv4" | "ipv6";
 export type JumpAuthKind = "Password" | "PrivateKey";
 
@@ -13,6 +15,10 @@ export interface NetworkForward {
 
 export interface NetworkSettings {
   proxyKind: ProxyKind;
+  customProxy?: AppProxyConfig;
+  compression?: boolean;
+  sshBrowser?: string;
+  sshExpert?: { kex?: string; cipher?: string; mac?: string };
   proxyHost: string;
   proxyPort: string;
   proxyUser: string;
@@ -77,6 +83,8 @@ const PROXY_LABEL_TO_KIND: Record<string, ProxyKind> = {
   "SOCKS 5": "socks5",
   "Local SSH tunnel": "ssh-tunnel",
   "System proxy": "system",
+  "Application proxy": "app",
+  "Independent proxy": "custom",
 };
 
 const KIND_TO_PROXY_LABEL: Record<ProxyKind, string> = {
@@ -85,6 +93,8 @@ const KIND_TO_PROXY_LABEL: Record<ProxyKind, string> = {
   socks5: "SOCKS 5",
   "ssh-tunnel": "Local SSH tunnel",
   system: "System proxy",
+  app: "Application proxy",
+  custom: "Independent proxy",
 };
 
 const IP_LABEL_TO_KIND: Record<string, IpVersion> = {
@@ -142,10 +152,14 @@ export function normalizeNetworkSettings(input: unknown): NetworkSettings {
   const proxyKindRaw = readString(src.proxyKind, DEFAULT_NETWORK_SETTINGS.proxyKind);
   const ipVersionRaw = readString(src.ipVersion, DEFAULT_NETWORK_SETTINGS.ipVersion);
   return {
+    sshBrowser: sshBrowserMode(src.sshBrowser),
     proxyKind: (PROXY_LABEL_TO_KIND[proxyKindRaw] ??
       (Object.values(KIND_TO_PROXY_LABEL).includes(proxyKindRaw)
         ? (Object.entries(KIND_TO_PROXY_LABEL).find(([, l]) => l === proxyKindRaw)?.[0] as ProxyKind)
         : (proxyKindRaw as ProxyKind))) || "none",
+    customProxy: isRecord(src.customProxy) ? src.customProxy as unknown as AppProxyConfig : undefined,
+    compression: src.compression === true,
+    sshExpert: isRecord(src.sshExpert) ? { kex: readString(src.sshExpert.kex, ""), cipher: readString(src.sshExpert.cipher, ""), mac: readString(src.sshExpert.mac, "") } : undefined,
     proxyHost: readString(src.proxyHost, ""),
     proxyPort: readString(src.proxyPort, ""),
     proxyUser: readString(src.proxyUser, ""),
@@ -178,7 +192,7 @@ export function normalizeNetworkSettings(input: unknown): NetworkSettings {
 
 export function getSessionNetworkSettings(optionsJson: string | null | undefined): NetworkSettings {
   const options = parseSessionOptions(optionsJson);
-  return normalizeNetworkSettings(options.networkSettings);
+  return normalizeNetworkSettings({ ...(isRecord(options.networkSettings) ? options.networkSettings : {}), compression: options.compression, sshBrowser: sshBrowserMode(options.sshBrowser) });
 }
 
 /** Backend-facing payload sent over the IPC bridge. The Rust side
@@ -186,6 +200,10 @@ export function getSessionNetworkSettings(optionsJson: string | null | undefined
  *  understand, so we always serialise the full normalised shape. */
 export interface NetworkSettingsPayload {
   proxyKind: ProxyKind;
+  customProxy?: AppProxyConfig;
+  compression?: boolean;
+  sshBrowser?: string;
+  sshExpert?: { kex?: string; cipher?: string; mac?: string };
   proxyHost: string;
   proxyPort: number;
   proxyUser: string;
@@ -211,6 +229,10 @@ export function toNetworkSettingsPayload(ns: NetworkSettings): NetworkSettingsPa
   const jumpPort = parseInt(ns.jumpPort, 10);
   return {
     proxyKind: ns.proxyKind,
+    customProxy: ns.customProxy,
+    compression: ns.compression,
+    sshBrowser: ns.sshBrowser,
+    sshExpert: ns.sshExpert,
     proxyHost: ns.proxyHost.trim(),
     proxyPort: Number.isFinite(port) && port > 0 ? port : 0,
     proxyUser: ns.proxyUser,

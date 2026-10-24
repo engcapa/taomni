@@ -111,7 +111,9 @@ pub(super) const DEFAULT_PTY_MODES: &[(Pty, u32)] = &[
     (Pty::TTY_OP_OSPEED, 38400),
 ];
 
-pub(super) fn build_client_config(network: Option<&NetworkSettings>) -> Arc<client::Config> {
+pub(super) fn build_client_config(
+    network: Option<&NetworkSettings>,
+) -> Result<Arc<client::Config>, String> {
     let mut cfg = client::Config::default();
     let preferred = cfg.preferred.clone();
     cfg.preferred = russh::Preferred {
@@ -119,7 +121,15 @@ pub(super) fn build_client_config(network: Option<&NetworkSettings>) -> Arc<clie
         key: Cow::Borrowed(COMPAT_HOST_KEY_ORDER),
         cipher: preferred.cipher,
         mac: Cow::Borrowed(COMPAT_MAC_ORDER),
-        compression: preferred.compression,
+        compression: if network.is_some_and(|n| n.compression) {
+            Cow::Borrowed(&[
+                russh::compression::ZLIB_LEGACY,
+                russh::compression::ZLIB,
+                russh::compression::NONE,
+            ])
+        } else {
+            Cow::Borrowed(&[russh::compression::NONE])
+        },
     };
     if let Some(n) = network {
         if let Some(d) = n.keepalive_duration() {
@@ -127,5 +137,71 @@ pub(super) fn build_client_config(network: Option<&NetworkSettings>) -> Arc<clie
             cfg.keepalive_max = 3;
         }
     }
-    Arc::new(cfg)
+    if let Some(expert) = network.and_then(|network| network.ssh_expert.as_ref()) {
+        if let Some(kex) = preferences(&expert.kex, russh::kex::Name::try_from)? {
+            let mut kex = kex;
+            kex.extend([
+                russh::kex::EXTENSION_SUPPORT_AS_CLIENT,
+                russh::kex::EXTENSION_OPENSSH_STRICT_KEX_AS_CLIENT,
+            ]);
+            cfg.preferred.kex = Cow::Owned(kex);
+        }
+        if let Some(cipher) = preferences(&expert.cipher, russh::cipher::Name::try_from)? {
+            cfg.preferred.cipher = Cow::Owned(cipher);
+        }
+        if let Some(mac) = preferences(&expert.mac, russh::mac::Name::try_from)? {
+            cfg.preferred.mac = Cow::Owned(mac);
+        }
+    }
+    Ok(Arc::new(cfg))
+}
+
+fn preferences<'a, T, E>(
+    text: &'a str,
+    parse: impl Fn(&'a str) -> Result<T, E>,
+) -> Result<Option<Vec<T>>, String> {
+    if text.trim().is_empty() {
+        return Ok(None);
+    }
+    let values = text
+        .split(',')
+        .map(str::trim)
+        .map(|name| {
+            if name == "none" || name.is_empty() {
+                return Err("SSH algorithms must not be empty or none".into());
+            }
+            parse(name).map_err(|_| format!("Unsupported SSH algorithm: {name}"))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    Ok(Some(values))
+}
+
+#[cfg(test)]
+mod preference_tests {
+    use super::*;
+    #[test]
+    fn expert_preferences_are_applied_and_invalid_values_fail_closed() {
+        let valid = NetworkSettings::from_json(Some(r#"{"sshExpert":{"cipher":"aes256-gcm@openssh.com","kex":"curve25519-sha256","mac":"hmac-sha2-256"},"compression":true}"#)).unwrap();
+        let config = build_client_config(Some(&valid)).unwrap();
+        assert_eq!(config.preferred.cipher.len(), 1);
+        assert_eq!(
+            config.preferred.cipher[0].as_ref(),
+            "aes256-gcm@openssh.com"
+        );
+        assert_eq!(config.preferred.kex[0].as_ref(), "curve25519-sha256");
+        assert!(
+            config
+                .preferred
+                .compression
+                .iter()
+                .any(|name| *name == russh::compression::ZLIB)
+        );
+        for value in ["none", "invalid-cipher", "aes256-gcm@openssh.com,"] {
+            let invalid = NetworkSettings::from_json(Some(&format!(
+                r#"{{"sshExpert":{{"cipher":"{value}"}}}}"#
+            )))
+            .unwrap();
+            assert!(build_client_config(Some(&invalid)).is_err());
+        }
+    }
 }

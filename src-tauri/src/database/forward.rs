@@ -27,6 +27,15 @@ pub struct LoopbackForward {
     pub task: JoinHandle<()>,
 }
 
+pub struct ForwardGuard(pub Option<JoinHandle<()>>);
+impl Drop for ForwardGuard {
+    fn drop(&mut self) {
+        if let Some(task) = self.0.take() {
+            task.abort();
+        }
+    }
+}
+
 /// Start a loopback forwarder to `target_host:target_port` through `network`
 /// (proxy or SSH jump host). Returns the local port to dial and the listener
 /// task. Each accepted local connection opens its own transport to the target
@@ -39,6 +48,24 @@ pub async fn start(
     target_port: u16,
     network: NetworkSettings,
 ) -> Result<LoopbackForward, String> {
+    start_with_tls(target_host, target_port, network, false).await
+}
+
+/// Upgrade the upstream stream using the original hostname, preserving certificate
+/// verification and SNI even when the database driver dials a loopback endpoint.
+pub(super) async fn start_with_tls(
+    target_host: String,
+    target_port: u16,
+    network: NetworkSettings,
+    tls: bool,
+) -> Result<LoopbackForward, String> {
+    let connector = if tls {
+        Some(tokio_native_tls::TlsConnector::from(
+            native_tls::TlsConnector::new().map_err(|e| format!("db TLS configuration: {e}"))?,
+        ))
+    } else {
+        None
+    };
     let listener = TcpListener::bind(("127.0.0.1", 0))
         .await
         .map_err(|e| format!("db forward: bind 127.0.0.1:0 failed: {e}"))?;
@@ -52,7 +79,16 @@ pub async fn start(
     // probe stream is dropped immediately; the per-connection bridges below
     // each open their own.
     let probe = build_ssh_transport(&target_host, target_port, Some(&network)).await?;
-    drop(probe);
+    if let Some(connector) = &connector {
+        drop(
+            connector
+                .connect(&target_host, probe)
+                .await
+                .map_err(|e| format!("db TLS handshake: {e}"))?,
+        );
+    } else {
+        drop(probe);
+    }
 
     let network = Arc::new(network);
     let task = tokio::spawn(async move {
@@ -68,10 +104,19 @@ pub async fn start(
             };
             let host = target_host.clone();
             let net = network.clone();
+            let connector = connector.clone();
             bridges.spawn(async move {
                 match build_ssh_transport(&host, target_port, Some(&net)).await {
                     Ok(mut upstream) => {
-                        if let Err(e) =
+                        if let Some(connector) = connector {
+                            match connector.connect(&host, upstream).await {
+                                Ok(mut secured) => {
+                                    let _ = tokio::io::copy_bidirectional(&mut local, &mut secured)
+                                        .await;
+                                }
+                                Err(e) => tracing::warn!("db forward TLS handshake failed: {e}"),
+                            }
+                        } else if let Err(e) =
                             tokio::io::copy_bidirectional(&mut local, &mut upstream).await
                         {
                             tracing::debug!("db forward bridge ended: {e}");

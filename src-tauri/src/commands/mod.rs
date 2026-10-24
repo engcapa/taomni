@@ -66,6 +66,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "create_ssh_terminal"
         | "submit_ssh_auth_response"
         | "attach_terminal_output"
+        | "generate_ssh_key"
         | "test_ssh_connection"
         | "test_proxy_connection"
         | "write_terminal"

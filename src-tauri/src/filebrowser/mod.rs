@@ -43,6 +43,7 @@ fn auth_from(method: &str, data: Option<String>) -> SshAuth {
             SshAuth::PrivateKey(data.unwrap_or_else(|| "~/.ssh/id_ed25519".to_string()))
         }
         "Agent" => SshAuth::Agent,
+        "Gssapi" | "None" => SshAuth::Gssapi,
         _ => SshAuth::Password(data.unwrap_or_default()),
     }
 }
@@ -566,12 +567,15 @@ pub async fn open_sftp_window(
     log::info!("Opening SFTP window with path: {}", path_str);
     let url = WebviewUrl::App(std::path::PathBuf::from(path_str));
     let title = title.unwrap_or_else(|| format!("SFTP — {}", session_id));
-    let builder = WebviewWindowBuilder::new(&app_handle, &label, url)
-        .title(&title)
-        .inner_size(1200.0, 760.0)
-        .min_inner_size(720.0, 420.0)
-        .resizable(true)
-        .enable_clipboard_access();
+    let builder = crate::webview_environment::configure(
+        &app_handle,
+        WebviewWindowBuilder::new(&app_handle, &label, url),
+    )
+    .title(&title)
+    .inner_size(1200.0, 760.0)
+    .min_inner_size(720.0, 420.0)
+    .resizable(true)
+    .enable_clipboard_access();
     // Disable Tauri's native drag-drop interception only on Windows so the
     // webview's own HTML5 dragstart/dragover/drop events fire normally there.
     // Linux/macOS keep Tauri file-drop enabled because it provides absolute

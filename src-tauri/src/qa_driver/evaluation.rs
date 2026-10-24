@@ -85,7 +85,7 @@ pub(super) async fn eval_js<R: Runtime>(
     let sender = Arc::new(StdMutex::new(Some(sender)));
     let callback_sender = sender.clone();
     state
-        .window
+        .current_window()?
         .eval_with_callback(script, move |result| {
             if let Ok(mut sender) = callback_sender.lock() {
                 if let Some(sender) = sender.take() {

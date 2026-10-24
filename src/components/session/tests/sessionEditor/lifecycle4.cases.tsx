@@ -81,7 +81,7 @@ export function registerSessionEditorLifecycle4Cases() {
     expect(screen.queryByLabelText("OAuth client secret")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /network settings/i }));
-    const proxySelect = screen.getByDisplayValue("None — direct connection");
+    const proxySelect = screen.getByTestId("session-proxy-kind");
     await user.selectOptions(proxySelect, "SOCKS 5");
     await user.type(screen.getByLabelText("Proxy host"), "socks.mail.corp");
     await user.type(screen.getByLabelText("Proxy port"), "1080");

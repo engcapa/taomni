@@ -320,6 +320,7 @@ export function rowToSession(
 
 export function authMethodToPortable(authMethod: AuthMethod): PortableAuth {
   if (authMethod === "Password") return { kind: "password" };
+  if (authMethod === "Gssapi") return { kind: "gssapi" };
   if (authMethod === "Agent") return { kind: "agent" };
   if (authMethod === "None") return { kind: "none" };
   return {
@@ -335,6 +336,7 @@ export function portableAuthToAuthMethod(value: unknown): AuthMethod {
     const keyPath = cleanText(firstString(value.private_key_path), MAX_PATH_LENGTH);
     return keyPath ? { PrivateKey: { key_path: keyPath } } : "Password";
   }
+  if (value.kind === "gssapi") return "Gssapi";
   if (value.kind === "agent") return "Agent";
   if (value.kind === "none") return "None";
   return "Password";

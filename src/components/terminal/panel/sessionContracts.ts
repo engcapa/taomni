@@ -102,6 +102,7 @@ export interface TerminalSessionLifecycleContext {
 
 /** Shared by output, connection, timers and cleanup for one effect instance. */
 export interface TerminalSessionLifetime {
+  disposeReconnect?: () => void;
   destroyed: boolean;
   unlistenExit: import("@tauri-apps/api/event").UnlistenFn | null;
   unlistenForwardError: import("@tauri-apps/api/event").UnlistenFn | null;

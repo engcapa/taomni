@@ -2,7 +2,7 @@ use russh_sftp::protocol::FileAttributes;
 use russh_sftp::protocol::FileType as SftpFileType;
 use serde::Serialize;
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, serde::Deserialize, Clone)]
 pub struct FileEntryDto {
     pub name: String,
     pub path: String,

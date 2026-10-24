@@ -59,6 +59,9 @@ export function useSftpController(sessionId: string) {
             rate: payload.rate,
             eta: payload.eta,
             state: "running",
+            ...(payload.phase ? { phase: payload.phase } : {}),
+            ...(payload.resumeBytes !== undefined ? { resumeBytes: payload.resumeBytes } : {}),
+            ...(payload.restarted !== undefined ? { restarted: payload.restarted } : {}),
           });
         }),
         listenSftpPaused(transferId, (payload) => {
@@ -294,11 +297,12 @@ export function useSftpController(sessionId: string) {
   const cancelTransfer = useCallback(async (transferId: string) => {
     try {
       await sftpCancelTransfer(transferId);
-      setTransferState(transferId, "cancelled");
+      // The IPC acknowledges the cancellation request, not worker shutdown.
+      // Let its completion event enable Retry after file handles are released.
     } catch (err) {
       setStatus(`Cancel failed: ${err instanceof Error ? err.message : err}`);
     }
-  }, [setStatus, setTransferState]);
+  }, [setStatus]);
 
   const pauseTransfer = useCallback(async (transferId: string) => {
     try {
@@ -320,17 +324,20 @@ export function useSftpController(sessionId: string) {
     }
   }, [patchTransfer, setStatus]);
 
-  const retryTransfer = useCallback(async (transferId: string) => {
-    const item = useTransferStore.getState().byId(transferId);
-    if (!item) return;
+  const retryTransfer = useCallback(async (previousId: string) => {
+    const item = useTransferStore.getState().byId(previousId);
+    if (!item || !["cancelled", "error"].includes(item.state)) return;
+    const transferId = newTransferId();
     const { direction, remotePath, localPath, kind, openAfter } = item;
     // Use the explicit `kind` recorded at enqueue time. The previous
     // `size === 0` heuristic mis-classified legitimate empty files as
     // directories and routed them through the dir command.
     const isDir = kind === "dir";
-    // Reset the existing row instead of stacking duplicates so the user keeps
-    // a clean history of one entry per logical file.
-    patchTransfer(transferId, {
+    // Replace the existing row but give the backend attempt a fresh identity.
+    // Cancellation completes asynchronously; late events and cleanup from the
+    // old worker must never cancel the retry or remove its native handle.
+    patchTransfer(previousId, {
+      id: transferId,
       state: "queued",
       bytes: 0,
       rate: 0,
@@ -338,6 +345,9 @@ export function useSftpController(sessionId: string) {
       error: null,
       startedAt: Date.now(),
       finishedAt: null,
+      phase: undefined,
+      resumeBytes: undefined,
+      restarted: undefined,
     });
     await startTransferTracking(transferId, direction === "upload" ? "remote" : "local");
     try {

@@ -177,7 +177,7 @@ export function registerSessionEditorClipboard1Cases() {
     await user.type(screen.getByLabelText("Remote host"), "net.example.com");
     await user.click(screen.getByRole("button", { name: /network settings/i }));
 
-    const proxySelect = screen.getByDisplayValue("None — direct connection");
+    const proxySelect = screen.getByTestId("session-proxy-kind");
     await user.selectOptions(proxySelect, "HTTP CONNECT");
     await user.type(screen.getByLabelText("Proxy host"), "proxy.corp");
     await user.type(screen.getByLabelText("Proxy port"), "3128");
@@ -300,7 +300,7 @@ export function registerSessionEditorClipboard1Cases() {
     await user.type(screen.getByLabelText("远程主机"), "app.internal");
     await user.click(screen.getByRole("button", { name: "网络设置" }));
 
-    const proxySelect = screen.getByDisplayValue("无 — 直连");
+    const proxySelect = screen.getByTestId("session-proxy-kind");
     await user.selectOptions(proxySelect, screen.getByRole("option", { name: "本地 SSH 隧道" }));
     await user.type(screen.getByLabelText("跳板机主机"), "bastion.internal");
     await user.type(screen.getByLabelText("跳板机用户"), "ops");

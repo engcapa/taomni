@@ -160,6 +160,7 @@ pub enum AuthMethod {
     Password,
     PrivateKey { key_path: String },
     Agent,
+    Gssapi,
     None,
 }
 
@@ -169,6 +170,7 @@ impl AuthMethod {
             Self::Password => "Password",
             Self::PrivateKey { .. } => "PrivateKey",
             Self::Agent => "Agent",
+            Self::Gssapi => "Gssapi",
             Self::None => "None",
         }
     }

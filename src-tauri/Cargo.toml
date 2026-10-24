@@ -71,8 +71,10 @@ portable-pty = "0.9"
 base64 = "0.22"
 rusqlite = { version = "0.40", features = ["bundled"] }
 chrono = "0.4"
-russh = { version = "0.61", features = ["async-trait"] }
+russh = { version = "0.61", features = ["async-trait", "flate2"] }
 russh-sftp = "2.3"
+proxy_cfg = "0.4.2"
+clickhouse-rs = { version = "1.1.0-alpha.1", features = ["tls"] }
 tokio-util = { version = "0.7", features = ["compat", "io", "codec"] }
 futures = "0.3"
 async-trait = "0.1"

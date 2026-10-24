@@ -1,3 +1,4 @@
+import { useBookmarkConnections } from "./useBookmarkConnections";
 import { useCallback } from "react";
 import { t as tr } from "../../lib/i18n";
 import { type SessionConfig } from "../../lib/ipc";
@@ -33,6 +34,8 @@ export function useMainConnectionActions(context: UseMainConnectionActionsContex
     layout.connectQueueRef.current.push(...unique.map((session) => ({ session })));
     workspaceOpening.continueConnectQueue();
   }, [workspaceOpening.continueConnectQueue]);
+
+  useBookmarkConnections(handleConnectSessions);
 
   const handleRevealRecentSession = useCallback((session: SessionConfig) => {
     layout.setActiveSideTab("sessions");

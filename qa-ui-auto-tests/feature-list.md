@@ -1619,6 +1619,51 @@ components: [SessionEditor]
 files:
   - src/components/session/SessionEditor.tsx
 controls:
+  - id: key-generator
+    selector: '[data-testid="session-key-generator"]'
+    kind: display
+  - id: key-output-path
+    selector: '[data-testid="session-key-output-path"]'
+    kind: interactive
+  - id: key-passphrase
+    selector: '[data-testid="session-key-passphrase"]'
+    kind: interactive
+  - id: key-comment
+    selector: '[data-testid="session-key-comment"]'
+    kind: interactive
+  - id: key-create
+    selector: '[data-testid="session-key-create"]'
+    kind: interactive
+  - id: key-result
+    selector: '[data-testid="session-key-result"]'
+    kind: display
+  - id: ssh-cipher
+    selector: '[data-testid="session-ssh-cipher"]'
+    kind: interactive
+  - id: ssh-kex
+    selector: '[data-testid="session-ssh-kex"]'
+    kind: interactive
+  - id: ssh-mac
+    selector: '[data-testid="session-ssh-mac"]'
+    kind: interactive
+  - id: custom-icon-value
+    selector: 'input[aria-label="Custom session icon"]'
+    kind: interactive
+  - id: terminal-bookmark-background
+    selector: '[data-testid="session-terminal-background"]'
+    kind: display
+  - id: clickhouse-http-port
+    selector: 'input[aria-label="ClickHouse HTTP port"]'
+    kind: interactive
+  - id: database-test-connection
+    selector: '[data-testid="db-test-connection"]'
+    kind: interactive
+  - id: clickhouse-protocol
+    selector: '[data-testid="session-clickhouse-protocol"]'
+    kind: interactive
+  - id: custom-proxy
+    selector: '[data-testid="session-custom-proxy"]'
+    kind: display
   # Dialog frame
   - id: editor
     selector: '[data-testid="session-editor"]'
@@ -1926,9 +1971,6 @@ controls:
     kind: interactive
   - id: network-tcp-nodelay
     selector: '[data-testid="session-tcp-nodelay-toggle"]'
-    kind: interactive
-  - id: network-disable-nagle
-    selector: '[data-testid="session-disable-nagle-toggle"]'
     kind: interactive
   - id: network-ip-version
     selector: '[data-testid="session-ip-version"]'
@@ -5296,6 +5338,10 @@ controls:
     selector: '[data-testid="db-execution-log-summary"]'
     kind: display
     optional: true
+  - id: execution-log-message
+    selector: '[data-testid="db-execution-log-message"]'
+    kind: display
+    optional: true       # server/driver errors and successful statement feedback
   - id: result-sheet-tab
     selector: '[data-testid="result-sheet-tab"]'
     kind: interactive

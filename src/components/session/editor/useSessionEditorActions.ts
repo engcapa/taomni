@@ -87,11 +87,12 @@ export function useSessionEditorActions(context: UseSessionEditorActionsContext)
       form.setAuthMethod("Agent");
       form.setUsePrivKey(false);
     } else {
-      form.setAuthMethod("None");
+      form.setAuthMethod("Gssapi");
       form.setUsePrivKey(false);
     }
   };
   const { validate, buildConfig, buildOptionsJson } = createSessionSerialization({
+    bookmark: form.bookmark,
     passwordRef: form.passwordRef,
     networkSettings: form.networkSettings,
     mailForm: form.mailForm,
@@ -207,6 +208,7 @@ export function useSessionEditorActions(context: UseSessionEditorActionsContext)
     setTestResult: form.setTestResult,
   });
   const { handleReset } = createSessionReset({
+    setBookmark: form.setBookmark,
     session,
     setProto: form.setProto,
     setSection: form.setSection,
@@ -399,6 +401,7 @@ export function useSessionEditorActions(context: UseSessionEditorActionsContext)
     password: form.password,
     passwordRef: form.passwordRef,
     authMethod: form.authMethod,
+    compression: form.compression,
     setTesting: form.setTesting,
     setTestResult: form.setTestResult,
     keyPath: form.keyPath,

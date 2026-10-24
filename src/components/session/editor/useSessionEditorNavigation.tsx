@@ -1,3 +1,4 @@
+import { sessionCapabilities } from "../../../lib/sessionCapabilities";
 import { Bookmark, Cloud, Database, Folder, Mail, Monitor, Network, Palette, Shield, Terminal as TerminalIcon } from "lucide-react";
 import { useModalDraggableAndResizable } from "../../../hooks/useModalDraggableAndResizable";
 import { useModalShortcuts } from "../../../hooks/useModalShortcuts";
@@ -14,6 +15,8 @@ export interface UseSessionEditorNavigationContext {
 
 export function useSessionEditorNavigation(context: UseSessionEditorNavigationContext) {
   const { form, actions, onClose } = context;
+
+  const capabilities = sessionCapabilities(form.proto);
 
   const sectionTabs: { id: SectionTab; label: string; icon: React.ReactNode; }[] = form.proto === "File"
     ? [
@@ -66,7 +69,7 @@ export function useSessionEditorNavigation(context: UseSessionEditorNavigationCo
                   : form.supportsTerminalAppearance
                     ? [{ id: "terminal" as SectionTab, label: form.t("sessionEditor2.sectionTerminal"), icon: <TerminalIcon className="w-3 h-3 inline -mt-0.5 mr-1" /> }]
                     : []),
-              { id: "network", label: form.t("sessionEditor2.sectionNetwork"), icon: <Network className="w-3 h-3 inline -mt-0.5 mr-1" /> },
+              ...(capabilities.network ? [{ id: "network" as SectionTab, label: form.t("sessionEditor2.sectionNetwork"), icon: <Network className="w-3 h-3 inline -mt-0.5 mr-1" /> }] : []),
               { id: "bookmark", label: form.t("sessionEditor2.sectionBookmark"), icon: <Bookmark className="w-3 h-3 inline -mt-0.5 mr-1" /> },
             ];
 
@@ -78,12 +81,12 @@ export function useSessionEditorNavigation(context: UseSessionEditorNavigationCo
         ? "terminal"
         : form.isSSH
           ? "advanced"
-          : "network";
+          : capabilities.network ? "network" : "bookmark";
 
   /* If we switched away from SSH and were on the advanced tab, fall back.
    * Likewise default RDP to its own options tab and bounce non-RDP protos
    * off the rdp tab, and DB protos onto the database tab. */
-  const activeSection =
+  const requestedSection =
     form.proto === "File"
       ? "bookmark"
       : form.isProxy
@@ -109,6 +112,10 @@ export function useSessionEditorNavigation(context: UseSessionEditorNavigationCo
                           : form.section === "appearance"
                             ? fallbackSection
                             : form.section;
+
+  const activeSection = sectionTabs.some((tab) => tab.id === requestedSection)
+    ? requestedSection
+    : sectionTabs[0].id;
 
   const { containerRef, handleRef } = useModalDraggableAndResizable({ minWidth: 600, minHeight: 400 });
 
