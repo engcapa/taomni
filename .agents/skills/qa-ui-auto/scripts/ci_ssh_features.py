@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePath
 import platform
 import re
 import shlex
@@ -21,6 +21,17 @@ import threading
 import time
 import urllib.request
 import shutil
+
+
+def transfer_paths(remote_dir: PurePath, remote_posix: str, local_dir: PurePath) -> dict[str, str]:
+    """Keep SSH paths separate from native paths used to verify actual bytes."""
+    return {
+        "remote_dir": remote_posix,
+        "source": remote_posix + "/scp-source.txt",
+        "local_dir": local_dir.as_posix(),
+        "downloaded": (local_dir / "scp-source.txt").as_posix(),
+        "uploaded": (remote_dir / "scp-upload.txt").as_posix(),
+    }
 
 
 def install():
@@ -252,9 +263,7 @@ LogLevel DEBUG3
         "ticket_cache": ccache.as_posix(),
         "key_path": str(client_key).replace("\\", "/"), "generated_key": str(generated).replace("\\", "/"),
         "encrypted_key": encrypted.as_posix(), "encrypted_public_key": encrypted.as_posix() + ".pub",
-        "remote_dir": remote_posix, "source": remote_posix + "/scp-source.txt",
-        "local_dir": local_dir.as_posix(), "downloaded": (local_dir / "scp-source.txt").as_posix(),
-        "uploaded": remote_posix + "/scp-upload.txt",
+        **transfer_paths(remote_dir, remote_posix, local_dir),
         "native_public_key": str(generated).replace("\\", "/") + ".pub"}
     # Pace the encrypted SSH stream, including the Python SCP resume source.
     # Only the lifecycle case selects this port; other SSH tests stay direct.
