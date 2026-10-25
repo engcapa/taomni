@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useTabOverviewStore } from "../../stores/tabOverviewStore";
 import { getAppPlatform } from "../../lib/runtime";
 import { useAppStore } from "../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
@@ -28,6 +29,12 @@ export function usePlatformShortcuts(): void {
       const state = useAppStore.getState();
       const inWorkspace = state.activeSideTab === "workspaces";
 
+      if (mod && event.shiftKey && !event.altKey && key === "e") {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (!event.repeat) useTabOverviewStore.getState().toggle();
+        return;
+      }
       if (mod && !event.shiftKey && !event.altKey && key === "b") {
         event.preventDefault();
         state.toggleSidebar();

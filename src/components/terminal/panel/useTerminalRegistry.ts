@@ -5,7 +5,7 @@ import { buildInteractiveCommandInput, renderTerminalTask, type TerminalTaskVari
 import { registerTerminal } from "../../../lib/terminal/terminalRegistry";
 import { inferTerminalProgram } from "../../../lib/terminalActivity";
 import { createTaskStartOutputSuppressor } from "../../../lib/terminalOutputFilter";
-import { getBufferText, getLastBufferLines, terminalAtIdlePrompt } from "./buffer";
+import { getBufferText, getLastBufferLines, getTerminalPreviewText, terminalAtIdlePrompt } from "./buffer";
 import { useTerminalInteraction } from "./useTerminalInteraction";
 import { useTerminalPanelState } from "./useTerminalPanelState";
 
@@ -55,6 +55,10 @@ export function useTerminalRegistry(context: UseTerminalRegistryContext) {
       getLastLines: (n: number) => {
         const t = panel.termRef.current;
         return t ? getLastBufferLines(t, n) : "";
+      },
+      getPreviewText: (n: number) => {
+        const t = panel.termRef.current;
+        return t ? getTerminalPreviewText(t, n) : "";
       },
       writeInput: (data: string) => {
         if (panel.readOnlyRef.current) return;

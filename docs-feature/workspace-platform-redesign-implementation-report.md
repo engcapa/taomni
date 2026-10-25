@@ -5,26 +5,31 @@
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
 
-## 0. 本轮原型对齐（2026-10-25）
+## 0. 本轮原型对齐（2026-10-25，本机完成，GitHub 验证进行中）
 
-本轮按 HTML 原型统一为全高 42px 导航条、260px 初始左栏、6px 分隔、独立圆角框架、33px 画布工具栏和紧凑 Home。右侧上下文栏可调宽并保存。Home 保留原有启动、历史、导入、邮件和工具能力；会话协议继续使用原有后端与运行组件。
+本轮按 HTML 原型统一为全高 42px 导航条、260px 初始左栏、6px 分隔、独立圆角框架、33px 画布工具栏和紧凑 Home。Home 独立于 Sessions，全宽展示；Sessions 不再显示 Welcome 标签或欢迎画布。四种视图右上角按原型的模式操作、布局、搜索、大预览、侧栏、更多排列。语音设置保留在更多菜单，协议专属操作仍使用原有 TabActionSlot。
 
-按用户确认，Agents / Crew 暂时只提供“开发中”提示；下文历史 TASK-09 的编排界面不属于本轮交付能力。工作区和模式切换改为隐藏已访问的运行实例，保留 PTY 输出、未保存文本与撤销历史，未访问工作区不自动连接持久化会话。StrictMode 加载和异步保存期间继续编辑由专门的组件回归保护。
+新增覆盖画布的大预览：Home 支持全局范围，Sessions 支持会话范围，Workspaces 支持当前工作区或全部范围；卡片展示真实终端摘要与未保存文本，点击激活已有实例，Esc 关闭并恢复焦点。删除主窗口旧工具栏小预览和 Tao 贴边悬浮入口，Tao 从主导航条进入。逐标签 hover 和详情快捷键保留；独立会话窗口保留既有入口。
 
-新增 `TC-WS-016/017`，同步更新原有工作区、永久工具栏和模式切换回归；仅调整明确暂缓的 Agents 控件覆盖基线，其余功能基线不变。
+按用户确认，Agents / Crew 暂时只提供“开发中”提示；下文历史 TASK-09 的编排界面不属于本轮交付能力。工作区和模式切换隐藏已访问的运行实例，保留 PTY 输出、未保存文本与撤销历史；未访问工作区不自动连接持久化会话。工作区单/分/网格布局均使用原运行实例。Home 的恢复会话快照按模式刷新；终端摘要跳过视口末尾空白而保留实际短输出。
 
-本机验证已完成（Linux；所有自动化执行保留原始 summary / receipt）：
+新增 `TC-WS-016`～`TC-WS-020`，并迁移既有会话、邮件、VNC、数据库、语音、Notes 和 Code Workspace 的导航操作，保留其功能断言。最终相关范围为 197 个精确 ID；三平台各模式仅选择其声明适用的用例，不将能力缺口计为通过。覆盖门禁不降低基线。
+
+本机最终证据：
 
 | 检查 | 结果与证据 |
 | --- | --- |
-| Browser 相关与保留行为 | **27/27 passed，0 failed / skipped**；`workspace-browser/run-20261025-121338-264649156`，2 workers，`identity_stable=true` |
-| Native 工作区与系统边界 | **16/16 passed**；`workspace-native/run-20261025-114114-931871726`，含真实磁盘、PTY、剪贴板和窗口拖动 |
-| Native 保留行为补充 | `run-20261025-120542-502973460` 中 3 项 passed；工具栏名称切换旧默认断言修正后，`run-20261025-121215-309609564` **1/1 passed**。合计 20 项适用 native 用例通过，输入身份稳定 |
-| 全量单元 / 组件 | **558 files passed；5,563 passed / 1 existing skipped**；`_local/workspace-unit-all2.log`，1 worker |
-| 构建与静态检查 | QA native 构建（含 `pnpm build`）、`pnpm check:refactor`、开发用例契约、`audit --gate` 通过；覆盖门禁无回退 |
-| 视觉复核 | `_local/workspace-visual/final-workspaces-dark.png`、`final-workspaces-light.png`、`final-home-dark.png`、`final-home-narrow.png`；1440×900 / 960×720，真实编辑器语法高亮 |
+| Browser 相关与保留行为 | **159 个不同 ID 全部 passed**：最终 UI 批次 `workspace-browser/run-20261025-143241-657380700` 为 **131/131 passed**，与服务批次 `run-20261025-142514-676472465` 的 28 个当前通过结果合并。服务批次唯一旧导航失败 `TC-IDE-PARITY-027-01` 已修复并在最终 UI 批次完整通过；失败记录保留 |
+| Native 工作区与系统边界 | **26/26 passed，0 failed / skipped**；`workspace-native/run-20261025-145157-982159024`，`identity_stable=true`；含真实 SSH/SFTP、磁盘、PTY、大预览、剪贴板、窗口拖动、会话恢复及侧栏切换 |
+| 单元 / 组件 | 最终聚焦 MainLayout / appStore / PrimaryNavigationRail **3 files / 120 passed**（`_local/workspace-final-controls-unit.log`）。全量扫描 560 文件，559 通过、邮件文件 1 项失败（5573 passed / 1 failed / 1 既有 skipped，`workspace-final-unit-v4.log`）；同输入完整复跑邮件文件 **67/67 passed**（`workspace-mail-receipt-unit.log`）。按各文件最新结果为 **5574 passed / 1 既有 skipped**，不将首次全量命令记为成功 |
+| 构建与静态检查 | `_local/workspace-final-native-build-v3.log` QA 构建成功，包含 `pnpm build`、`pnpm check:refactor`；`native_build.py --check` 确认 inputs match。`workspace-final-audit-v7.log`：580 IDs、0 schema errors、catalog up to date、覆盖门禁通过（1161/1198 required，57 shallow / 4 既有 orphans）。提交后再核验开发契约 |
+| 视觉复核 | `_local/workspace-visual/final-workspaces-dark.png`、`final-workspaces-light.png`、`final-home-dark.png`、`final-home-narrow.png`；1440×900 / 960×720。最终 native `run-20261025-145157-982159024/TC-WS-019/ws-019-sessions-large-overview.png` 已人工检查真实两会话输出与选中态 |
 
-本机 worker 总数始终不超过 2，native 顺序执行并使用独立 QA 应用、临时目录及私有 X11 会话。GitHub 将先执行 32 项相关用例的三平台 browser/native 矩阵，再执行整个用例目录；当前结果待补充。下文第 1–3 节仅记录此前实现与历史选定运行，不能替代本轮最终证据。
+本轮修复了隐藏侧栏后分隔条不可拖动、程序展开侧栏覆盖标签组折叠偏好，以及 Home 快照刷新和短终端输出摘要问题。保留失败记录，迁移旧导航后完整重跑受影响用例；没有删除原功能断言或降低覆盖基线。首次全量单测的邮件回执确认文本失败未在完整文件复跑中再现，未对邮件代码或断言作规避修改。
+
+三个最终 UI 批次均为 `identity_stable=true`；使用 runner 的 `load_observations` 核验签名、summary hash、执行配置、源码/runner/用例指纹及 native 构建身份，159 browser + 26 native 无缺失、失败、跳过或陈旧结果。核验记录：`_local/workspace-final-local-evidence.json`。最终源码身份为 `84c7d53c6d43a7196871938bbed2be843b11f6ac50ba40ed285614bca49fe1a0`。
+
+本机测试 worker 总数不超过 2，native 顺序执行，使用独立 QA 应用、临时目录及私有 X11 会话。GitHub 先执行相关三平台 browser/native 矩阵，再执行整个用例目录，结果将在完成后补充。下文第 1–3 节仅记录此前实现与历史选定运行，不能替代本轮最终证据。
 
 ## 1. 交付范围（TASK-01 ~ TASK-10）
 

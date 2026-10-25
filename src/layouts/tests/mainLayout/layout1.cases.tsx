@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { commitWelcomeRunSnapshot, listSessions, type SessionConfig } from "../../../lib/ipc";
+import { commitWelcomeRunSnapshot, getWelcomeRunSnapshot, listSessions, type SessionConfig } from "../../../lib/ipc";
+import { savedSessionEntry } from "../../../lib/welcomeSessionResume";
 import { useAppStore } from "../../../stores/appStore";
 import { useMainRailHostStore } from "../../../stores/mainRailHostStore";
 import { useSessionStore } from "../../../stores/sessionStore";
@@ -32,6 +33,7 @@ export function registerMainLayoutLayout1Cases() {
           },
         ],
         activeTabId: "welcome",
+        activeSideTab: "sessions",
         sidebarCollapsed: false,
         mergeToolWindowRail: true,
         sidebarCollapsedByGroup: { "code-workspace": true, terminal: true, other: false },
@@ -47,13 +49,14 @@ export function registerMainLayoutLayout1Cases() {
       useMainRailHostStore.setState({ host: null });
     });
 
-    it("collapses the sidebar for a terminal tab and restores it for other tabs", async () => {
+    it("restores terminal collapse preferences while Home remains full width", async () => {
       render(<MainLayout />);
       expect(useAppStore.getState().sidebarCollapsed).toBe(false);
       act(() => useAppStore.getState().setActiveTab("ssh-tab"));
       await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(true));
       act(() => useAppStore.getState().setActiveTab("welcome"));
-      await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(false));
+      await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(true));
+      expect(useAppStore.getState().sidebarCollapsedByGroup.other).toBe(false);
     });
 
     it("keeps the store's state over a restored collapsed layout and syncs later drags", async () => {
@@ -65,11 +68,24 @@ export function registerMainLayoutLayout1Cases() {
       expect(useAppStore.getState().sidebarCollapsed).toBe(false);
       expect(useAppStore.getState().sidebarCollapsedByGroup.other).toBe(false);
       expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBeNull();
-      // A later report is a drag on the divider: a manual change for Welcome.
+      // A later report is a drag on the divider: a manual change for the empty Sessions canvas.
       act(() => onResize?.({ asPercentage: 0, inPixels: 0 }, "sidebar", { asPercentage: 22, inPixels: 220 }));
       expect(useAppStore.getState().sidebarCollapsed).toBe(true);
       expect(useAppStore.getState().sidebarCollapsedByGroup.other).toBe(true);
       expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBe("true");
+    });
+
+    it("keeps the terminal preference when a programmatic Home return expands the panel", () => {
+      render(<MainLayout />);
+      act(() => useAppStore.getState().setActiveTab("ssh-tab"));
+      act(() => useAppStore.getState().setActiveSideTab("home"));
+      act(() => useAppStore.getState().setActiveSideTab("sessions"));
+      const onResize = panelResizeMock.handlers.get("sidebar");
+      act(() => onResize?.({ asPercentage: 22, inPixels: 220 }, "sidebar", { asPercentage: 0, inPixels: 0 }));
+      expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+      expect(useAppStore.getState().sidebarCollapsedByGroup.terminal).toBe(true);
+      act(() => useAppStore.getState().setActiveTab("ssh-tab"));
+      expect(useAppStore.getState().sidebarCollapsed).toBe(true);
     });
 
     it("remembers a manual expand for terminal tabs only", async () => {
@@ -137,6 +153,7 @@ export function registerMainLayoutLayout1Cases() {
         activeTabId: "welcome",
       });
       (commitWelcomeRunSnapshot as ReturnType<typeof vi.fn>).mockClear();
+      vi.mocked(getWelcomeRunSnapshot).mockResolvedValue({ record: null, legacyCandidate: null, issue: null });
       (commitWelcomeRunSnapshot as ReturnType<typeof vi.fn>).mockResolvedValue({
         record: { schemaVersion: 1, revision: 1, runSequence: 1, batchId: "b", committedAtMs: 1, entries: [], activeIdentity: null },
         applied: true,
@@ -208,6 +225,28 @@ export function registerMainLayoutLayout1Cases() {
     it("never writes an empty snapshot when only Welcome is open", async () => {
       await new Promise((resolve) => setTimeout(resolve, 700));
       expect(commitWelcomeRunSnapshot).not.toHaveBeenCalled();
+    });
+
+    it("refreshes the saved run when Home opens while retaining the active session", async () => {
+      await act(async () => {
+        useAppStore.setState({
+          tabs: [
+            { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+            { id: "saved-local", type: "terminal", title: "prod", sessionId: sshSession.id, closable: true },
+          ],
+          activeTabId: "saved-local",
+          activeSideTab: "sessions",
+        });
+      });
+      vi.mocked(getWelcomeRunSnapshot).mockResolvedValue({
+        record: { schemaVersion: 1, revision: 2, runSequence: 1, batchId: "home-refresh", committedAtMs: 1, entries: [savedSessionEntry(sshSession)], activeIdentity: "saved:sess-1" },
+        legacyCandidate: null,
+        issue: null,
+      });
+      act(() => useAppStore.getState().setActiveSideTab("home"));
+      await waitFor(() => expect(screen.getByTestId("welcome-restore-status")).toHaveAttribute("data-state", "available"));
+      expect(useAppStore.getState().activeTabId).toBe("saved-local");
+      vi.mocked(getWelcomeRunSnapshot).mockResolvedValue({ record: null, legacyCandidate: null, issue: null });
     });
 
     it("keeps whitelist local terminals with a confirmed cwd in the snapshot", async () => {

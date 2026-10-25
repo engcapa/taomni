@@ -35,7 +35,7 @@ steps:
 - seed_storage:
     key: taomni.quickConnectVisible
     value: 'true'
-- reload_window: null
+- reload_window:
 - wait_for: '[data-testid="qc-input"]'
 - fill:
     selector: '[data-testid="qc-input"]'
@@ -66,6 +66,7 @@ steps:
     contains: Pushed 0003
     timeout_sec: 10
 - screenshot: mail-idle-01-pushed.png
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="tab-item"][data-tab-type="mail"] [data-testid="tab-close"]'
 - wait_for:
     selector: '[data-testid="mail-client-tab"]'
@@ -103,14 +104,14 @@ verification:
   - id: R2
     requirement: 关闭标签后 IDLE 连接在 10 秒内释放（AC-37，DEC-01 不做后台收信）。
     actions:
-    - 16
+    - 17
     checkpoints:
-    - step: 17
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-client-tab\"]", "state": "detached"}}'
     - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-client-tab\"]", "state": "detached"}}'
+    - step: 19
       expectation: '{"mail_server_assert_idle_clients": {"equals": 0, "timeout_sec": 10}}'
     results:
-    - 17
+    - 18
   visual:
   - check: 截图中 Sync 旁显示 Push 状态，推送的邮件出现在列表顶部。
     method: manual

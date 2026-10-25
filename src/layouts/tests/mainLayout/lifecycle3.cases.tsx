@@ -18,7 +18,11 @@ export function registerMainLayoutLifecycle3Cases() {
     render(<MainLayout />);
 
     expect(screen.getByTestId("collapsed-sidebar-rail")).toBeInTheDocument();
-    expect(screen.getByTestId("main-sidebar-resize-handle")).toHaveClass("hidden");
+    expect(screen.getByTestId("main-sidebar-resize-handle")).toHaveStyle({
+      width: "0px",
+      visibility: "hidden",
+      pointerEvents: "none",
+    });
   });
 
   it("shows all terminal panes in split mode and switches layouts without remounting terminals", async () => {

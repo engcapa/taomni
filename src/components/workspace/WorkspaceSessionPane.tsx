@@ -52,6 +52,7 @@ export interface WorkspaceSessionPaneProps {
   workspace: PlatformWorkspace;
   tab: WorkspaceIsolatedTab;
   visible: boolean;
+  active?: boolean;
 }
 
 /**
@@ -61,7 +62,7 @@ export interface WorkspaceSessionPaneProps {
  * menus, toolbars and shortcuts inside a workspace session are the same as in
  * Sessions mode. Its runtime id is the workspace tab id, never an app tab id.
  */
-export function WorkspaceSessionPane({ tab, visible }: WorkspaceSessionPaneProps) {
+export function WorkspaceSessionPane({ tab, visible, active = visible }: WorkspaceSessionPaneProps) {
   const session = useSessionStore((state) => (tab.sessionId ? state.sessions.find((entry) => entry.id === tab.sessionId) : undefined));
   const setActiveSideTab = useAppStore((s) => s.setActiveSideTab);
   const protocol = session?.session_type ?? tab.protocol ?? "Local";
@@ -73,6 +74,7 @@ export function WorkspaceSessionPane({ tab, visible }: WorkspaceSessionPaneProps
           tabId={tab.id}
           tabTitle={tab.title}
           visible={visible}
+          activeForShortcuts={active}
           workspaceRoot={undefined}
           commandTerminal={session ? commandTerminalFromSession(session) ?? undefined : undefined}
           localShell={session && protocol === "Local" ? localShellSelectionFromSession(session) : undefined}
@@ -91,6 +93,7 @@ export function WorkspaceSessionPane({ tab, visible }: WorkspaceSessionPaneProps
           tabId={tab.id}
           tabTitle={tab.title}
           visible={visible}
+          activeForShortcuts={active}
           terminalProfile={getSessionTerminalProfile(session.options_json) ?? loadTerminalDefaultProfile()}
           ssh={{
             sessionId: session.id,

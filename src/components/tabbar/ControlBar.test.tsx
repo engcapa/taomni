@@ -1,5 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useAppStore } from "../../stores/appStore";
+import { useTabOverviewStore } from "../../stores/tabOverviewStore";
 import { ControlBar } from "./ControlBar";
 import type { AppCommand } from "../menubar/commands";
 
@@ -98,6 +100,7 @@ function renderControlBar(
 }
 
 describe("ControlBar settings button", () => {
+  beforeEach(() => { useAppStore.setState({ activeSideTab: "sessions" }); useTabOverviewStore.getState().close(); });
   it("moves the screenshot entry out of the shared toolbar (rail owns it now)", () => {
     renderControlBar(vi.fn());
     // v6.1 AC-04: the ScreenshotMenuButton lives in the primary rail's bottom
@@ -147,15 +150,13 @@ describe("ControlBar settings button", () => {
     expect(onWorkspaceCommand).toHaveBeenCalledWith("workspace.findInFiles");
   });
 
-  it("uses the button before More to reveal tab details on hover", () => {
+  it("opens the large overview and removes the small hover-preview button", () => {
     renderControlBar(vi.fn());
-    const button = screen.getByTestId("tab-details-hover");
-
-    expect(tabBarMocks.props.at(-1)?.detailsRevealExternal).toBe(false);
-    fireEvent.mouseEnter(button);
-    expect(tabBarMocks.props.at(-1)?.detailsRevealExternal).toBe(true);
-    fireEvent.mouseLeave(button);
-    expect(tabBarMocks.props.at(-1)?.detailsRevealExternal).toBe(false);
+    expect(screen.queryByTestId("tab-details-hover")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("tab-overview-trigger"));
+    expect(useTabOverviewStore.getState().open).toBe(true);
+    fireEvent.click(screen.getByTestId("tab-overview-trigger"));
+    expect(useTabOverviewStore.getState().open).toBe(false);
   });
 
   it("preserves dragging and maximize gestures in the tab strip filler", () => {

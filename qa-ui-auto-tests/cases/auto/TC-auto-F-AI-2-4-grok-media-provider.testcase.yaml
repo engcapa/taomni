@@ -33,10 +33,10 @@ steps:
 - wait_for: '[data-testid="acp-settings"]'
 - click: '[data-testid="acp-bridge-enabled"]'
 - click: '[data-testid="acp-save"]'
-- click: '[data-testid="tab-item"][data-tab-id="welcome"]'
+- click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="welcome-open-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"]'
-- click: '[data-testid="ai-chat-drawer-ribbon"]'
+- click: '[data-testid="rail-chat-button"]'
 - wait_for: '[data-testid="ai-chat-drawer"]'
 - click: '[data-testid="chat-mode-image"]'
 - wait_for: select[aria-label="Thread LLM provider"]
@@ -91,15 +91,13 @@ verification:
     - step: 15
       expectation: '{"wait_for": "select[aria-label=\"Thread LLM provider\"]"}'
     - step: 17
-      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Thread LLM provider\"]", "name": "value",
-        "equals": "acp:grok"}}'
+      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Thread LLM provider\"]", "name": "value", "equals": "acp:grok"}}'
     - step: 18
       expectation: '{"assert_visible": "[data-testid=\"ai-chat-attach-button\"]"}'
     - step: 20
       expectation: '{"wait_for": "select[aria-label=\"Thread LLM provider\"]"}'
     - step: 22
-      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Thread LLM provider\"]", "name": "value",
-        "equals": "acp:grok"}}'
+      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Thread LLM provider\"]", "name": "value", "equals": "acp:grok"}}'
     - step: 23
       expectation: '{"assert_visible": "[data-testid=\"ai-chat-attach-button\"]"}'
     results:

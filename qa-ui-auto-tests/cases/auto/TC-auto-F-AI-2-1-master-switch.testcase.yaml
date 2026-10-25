@@ -36,6 +36,7 @@ steps:
     state: detached
     timeout_sec: 10
 - click: '[data-testid="ai-master-switch"]'
+- click: '[data-testid="titlebar-actions-more"]'
 - wait_for:
     selector: '[data-testid="ptt-button"]'
     timeout_sec: 10
@@ -61,12 +62,11 @@ verification:
     - step: 7
       expectation: '{"assert_visible": "[data-testid=\"ai-master-switch\"]"}'
     - step: 9
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ptt-button\"]", "state": "detached", "timeout_sec":
-        10}}'
-    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"ptt-button\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 12
       expectation: '{"wait_for": {"selector": "[data-testid=\"ptt-button\"]", "timeout_sec": 10}}'
     results:
-    - 11
+    - 12
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

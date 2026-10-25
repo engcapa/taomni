@@ -27,7 +27,7 @@ steps:
 - click: '[data-testid="welcome-open-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"]'
 - wait: 1
-- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- click: '[data-testid="nav-mode-home"]'
 - wait: 1
 - assert_text:
     selector: '[data-testid="welcome-panel"]'

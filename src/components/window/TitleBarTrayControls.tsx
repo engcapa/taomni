@@ -5,11 +5,12 @@ import { useAppStore } from "../../stores/appStore";
 import { useAiStore } from "../../stores/aiStore";
 import { useT } from "../../lib/i18n";
 import { useViewportSize } from "../../hooks/useViewportSize";
+import { useVoiceSettingsStore } from "../voice/VoiceSettingsDialog";
 import { PttButton } from "./PttButton";
 
 const COMPACT_TITLEBAR_BREAKPOINT = 960;
 
-export function TitleBarTrayControls() {
+export function TitleBarTrayControls({ compact = false, layoutActions = true }: { compact?: boolean; layoutActions?: boolean } = {}) {
   const terminalSplitActive = useAppStore((s) => s.terminalSplitActive);
   const multiExecActive = useAppStore((s) => s.multiExecActive);
   const toggleTerminalSplit = useAppStore((s) => s.toggleTerminalSplit);
@@ -21,6 +22,7 @@ export function TitleBarTrayControls() {
   const multiExecTitle = multiExecActive ? t("titlebar.disableMultiExec") : t("titlebar.enableMultiExec");
   const { width } = useViewportSize();
   const trayProps: TrayProps = {
+    layoutActions,
     terminalSplitActive,
     multiExecActive,
     toggleTerminalSplit,
@@ -30,7 +32,7 @@ export function TitleBarTrayControls() {
     multiExecTitle,
   };
 
-  return width <= COMPACT_TITLEBAR_BREAKPOINT
+  return compact || width <= COMPACT_TITLEBAR_BREAKPOINT
     ? <CompactTitleBarTray {...trayProps} />
     : (
     <div className="taomni-titlebar-tray flex items-stretch self-stretch shrink-0" data-testid="titlebar-tray">
@@ -70,6 +72,7 @@ export function TitleBarTrayControls() {
 }
 
 interface TrayProps {
+  layoutActions: boolean;
   terminalSplitActive: boolean;
   multiExecActive: boolean;
   toggleTerminalSplit: () => void;
@@ -80,6 +83,7 @@ interface TrayProps {
 }
 
 function CompactTitleBarTray({
+  layoutActions,
   terminalSplitActive,
   multiExecActive,
   toggleTerminalSplit,
@@ -90,6 +94,8 @@ function CompactTitleBarTray({
 }: TrayProps) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  const voiceSettingsOpen = useVoiceSettingsStore((s) => s.open);
+  useEffect(() => { if (voiceSettingsOpen) setOpen(false); }, [voiceSettingsOpen]);
   const anchorRef = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ top: 0, right: 4 });
@@ -177,6 +183,7 @@ function CompactTitleBarTray({
             color: "var(--taomni-text)",
           }}
         >
+          {layoutActions && <>
           <CompactActionButton
             testId="tab-split-view"
             title={splitTitle}
@@ -191,6 +198,7 @@ function CompactTitleBarTray({
             icon={<Users className="w-4 h-4" />}
             onClick={() => run(toggleMultiExec)}
           />
+          </>}
           {!aiFullyDisabled && (
             <div className="flex items-center justify-between gap-3 px-3 py-1">
               <span className="truncate">{t("voice.start")}</span>

@@ -20,6 +20,7 @@ timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -196,7 +197,6 @@ verification:
   - id: R1
     requirement: SSH proxy kind transitions show and hide the matching HTTP/SOCKS fields, support a saved proxy source, and restore manual SSH jump fields after switching back.
     actions:
-    - 32
     - 33
     - 34
     - 35
@@ -246,40 +246,41 @@ verification:
     - 79
     - 80
     - 81
+    - 82
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
-    - step: 13
+    - step: 14
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-jump-source\"]"}'
-    - step: 25
+    - step: 26
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-proxy-source\"]"}'
-    - step: 38
+    - step: 39
       expectation: '{"assert_visible": "input[aria-label=\"Proxy host\"]"}'
-    - step: 46
+    - step: 47
       expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Proxy session saved"}}'
-    - step: 48
+    - step: 49
       expectation: '{"assert_not_visible": "input[aria-label=\"Proxy host\"]"}'
-    - step: 63
-      expectation: '{"assert_visible": "[data-testid=\"session-jump-key\"]"}'
-    - step: 66
+    - step: 64
+      expectation: '{"assert_not_visible": "[data-testid=\"session-jump-password\"]"}'
+    - step: 67
       expectation: '{"assert_visible": "[data-testid=\"session-jump-password\"]"}'
-    - step: 73
+    - step: 74
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-proxy-jump-switching\"]"}'
-    - step: 80
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "ssh-tunnel"}}'
     - step: 81
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump host\"]", "name": "value", "equals": "manual-jump.example.test"}}'
-    - step: 83
+    - step: 82
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump port\"]", "name": "value", "equals": "2200"}}'
+    - step: 84
       expectation: '{"assert_visible": "[data-testid=\"session-jump-password\"]"}'
     results:
-    - 38
-    - 46
-    - 48
-    - 63
-    - 66
-    - 80
+    - 39
+    - 47
+    - 49
+    - 64
+    - 67
     - 81
-    - 83
+    - 82
+    - 84
   visual:
   - check: Proxy and jump source selectors, conditional fields, and restored values remain readable without overlap.
     method: manual

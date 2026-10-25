@@ -138,10 +138,10 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
     <div
       data-testid="welcome-tab-panel"
       className="absolute inset-0"
-      style={{ display: (activeTab?.type === "welcome" || !activeTab) ? "block" : "none" }}
+      style={{ display: (viewProps.showHome ?? (activeTab?.type === "welcome" || !activeTab)) ? "block" : "none" }}
     >
       <WelcomePanel
-        active={activeTab?.type === "welcome" || !activeTab}
+        active={viewProps.showHome ?? (activeTab?.type === "welcome" || !activeTab)}
         restore={{
           view: welcomeRestore.view,
           outcomes: welcomeRestore.outcomes,
@@ -170,6 +170,13 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
         onOpenSettings={openSettingsTab}
       />
     </div>
+
+    {viewProps.showHome === false && (!activeTab || activeTab.type === "welcome") && (
+      <div data-testid={viewProps.toolsView ? "tools-empty-state" : "sessions-empty-state"} className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-[12px]">
+        <span className="text-[14px] font-semibold">{t(viewProps.toolsView ? "platform.toolsEmpty" : "platform.sessionsEmpty")}</span>
+        {!viewProps.toolsView && <button data-testid="sessions-empty-new-session" className="taomni-btn" onClick={() => handleNewSession()}>{t("menu.newSession")}</button>}
+      </div>
+    )}
 
     {/* All terminal tabs stay mounted. Single-tab mode hides
                     inactive panes; split mode only changes the pane wrappers. */}

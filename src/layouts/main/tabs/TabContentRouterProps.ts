@@ -10,6 +10,8 @@ import type { LocalLaunchOutcome, LocalShellSelection, MailTabInfo, RecentWorksp
 
 export interface TabContentRouterProps {
   activeTab: Tab | undefined;
+  showHome?: boolean;
+  toolsView?: boolean;
   welcomeRestore: import("../../../hooks/useWelcomeSessionResume").UseWelcomeSessionResumeResult;
   openLocalTab: (title?: string, sessionId?: string, terminalProfile?: TerminalProfile, localShell?: LocalShellSelection, initialCwd?: string, chatTabId?: string) => Promise<LocalLaunchOutcome>;
   handleNewSession: (groupPath?: string | null) => void;

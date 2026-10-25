@@ -20,6 +20,7 @@ timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-ssh"]'
@@ -160,10 +161,10 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH terminal font-size and scrollback inputs clamp values to their supported ranges, stepper controls update the visible value, and cursor/right-click controls expose the selected state.
+    requirement: SSH terminal font-size and scrollback inputs clamp values to their supported ranges, stepper controls update the visible value, and cursor/right-click controls
+      expose the selected state.
     actions:
-    - 3
-    - 5
+    - 4
     - 6
     - 7
     - 8
@@ -201,61 +202,61 @@ verification:
     - 40
     - 41
     - 42
+    - 43
     checkpoints:
-    - step: 4
+    - step: 5
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 11
-      expectation: '{"wait_for": "[data-testid=\"terminal-settings\"]"}'
     - step: 12
-      expectation: '{"assert_visible": "[data-testid=\"terminal-appearance-settings\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"terminal-settings\"]"}'
     - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"terminal-appearance-settings\"]"}'
+    - step: 14
       expectation: '{"assert_visible": "[data-testid=\"terminal-preview\"]"}'
-    - step: 16
+    - step: 17
       expectation: '{"wait_for": "input[aria-label=\"Terminal font size\"][value=\"8\"]"}'
-    - step: 19
+    - step: 20
       expectation: '{"wait_for": "input[aria-label=\"Terminal font size\"][value=\"32\"]"}'
-    - step: 21
+    - step: 22
       expectation: '{"wait_for": "input[aria-label=\"Terminal font size\"][value=\"31\"]"}'
-    - step: 23
+    - step: 24
       expectation: '{"wait_for": "input[aria-label=\"Terminal font size\"][value=\"32\"]"}'
-    - step: 26
+    - step: 27
       expectation: '{"wait_for": "input[aria-label=\"Scrollback lines\"][value=\"100\"]"}'
-    - step: 29
+    - step: 30
       expectation: '{"wait_for": "input[aria-label=\"Scrollback lines\"][value=\"200000\"]"}'
-    - step: 31
+    - step: 32
       expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Terminal cursor\"]", "name": "value", "equals": "Block (blink)"}}'
-    - step: 33
+    - step: 34
       expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Terminal cursor\"]", "name": "value", "equals": "Underline (blink)"}}'
-    - step: 35
+    - step: 36
       expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Terminal cursor\"]", "name": "value", "equals": "Vertical bar (blink)"}}'
-    - step: 37
+    - step: 38
       expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Right click behavior\"]", "name": "value", "equals": "Show context menu"}}'
-    - step: 39
+    - step: 40
       expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Right click behavior\"]", "name": "value", "equals": "Copy selection or paste"}}'
-    - step: 42
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal background hex\"]", "name": "value", "equals": "#112233"}}'
     - step: 43
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal background hex\"]", "name": "value", "equals": "#112233"}}'
+    - step: 44
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal foreground hex\"]", "name": "value", "equals": "#ddeeff"}}'
     results:
-    - 12
     - 13
-    - 16
-    - 19
-    - 21
-    - 23
-    - 26
-    - 29
-    - 31
-    - 33
-    - 35
-    - 37
-    - 39
-    - 42
+    - 14
+    - 17
+    - 20
+    - 22
+    - 24
+    - 27
+    - 30
+    - 32
+    - 34
+    - 36
+    - 38
+    - 40
     - 43
+    - 44
   - id: R2
     requirement: The final SSH terminal appearance values persist after saving the bookmark and reopening its editor.
     actions:
-    - 44
     - 45
     - 46
     - 47
@@ -273,37 +274,38 @@ verification:
     - 59
     - 60
     - 61
+    - 62
     checkpoints:
-    - step: 48
+    - step: 49
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-terminal-appearance-boundaries\"]"}'
-    - step: 51
+    - step: 52
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 53
-      expectation: '{"wait_for": "[data-testid=\"terminal-settings\"]"}'
     - step: 54
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "32"}}'
+      expectation: '{"wait_for": "[data-testid=\"terminal-settings\"]"}'
     - step: 55
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Scrollback lines\"]", "name": "value", "equals": "200000"}}'
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "32"}}'
     - step: 56
-      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Terminal cursor\"]", "name": "value", "equals": "Vertical bar (blink)"}}'
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Scrollback lines\"]", "name": "value", "equals": "200000"}}'
     - step: 57
-      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Right click behavior\"]", "name": "value", "equals": "Copy selection or paste"}}'
+      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Terminal cursor\"]", "name": "value", "equals": "Vertical bar (blink)"}}'
     - step: 58
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal background hex\"]", "name": "value", "equals": "#112233"}}'
+      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Right click behavior\"]", "name": "value", "equals": "Copy selection or paste"}}'
     - step: 59
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal background hex\"]", "name": "value", "equals": "#112233"}}'
+    - step: 60
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal foreground hex\"]", "name": "value", "equals": "#ddeeff"}}'
-    - step: 61
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
     - step: 62
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    - step: 63
       expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
     results:
-    - 54
     - 55
     - 56
     - 57
     - 58
     - 59
-    - 62
+    - 60
+    - 63
   visual:
   - check: SSH terminal appearance controls and preview remain readable without clipping or overlap at the clamped values.
     method: manual

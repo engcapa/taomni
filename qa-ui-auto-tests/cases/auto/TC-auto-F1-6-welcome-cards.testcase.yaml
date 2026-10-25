@@ -30,7 +30,7 @@ steps:
 - assert_not_visible: '[data-testid="welcome-panel"] >> text="Refresh sessions"'
 - assert_visible: '[data-testid="welcome-open-home-folder"]'
 - assert_visible: text="Tips"
-- click: text="New session…"
+- click: '[data-testid="welcome-new-session"]'
 - wait_for: '[data-testid="session-editor"]'
 - press: Escape
 - wait_for:
@@ -63,8 +63,7 @@ verification:
     - step: 9
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 11
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached", "timeout_sec":
-        5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached", "timeout_sec": 5}}'
     results:
     - 11
   visual:

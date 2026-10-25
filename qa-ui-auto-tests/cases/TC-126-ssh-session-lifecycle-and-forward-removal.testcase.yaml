@@ -20,6 +20,7 @@ steps:
 - wait_for:
     selector: '[data-testid="sidebar"]'
     timeout_sec: 45
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-ssh"]'
@@ -187,8 +188,7 @@ verification:
   - id: R1
     requirement: SSH forward rows can be removed and bookmark fields, startup toggles, and a new folder are accepted before saving.
     actions:
-    - 3
-    - 5
+    - 4
     - 6
     - 7
     - 8
@@ -226,24 +226,24 @@ verification:
     - 40
     - 41
     - 42
+    - 43
     checkpoints:
-    - step: 23
+    - step: 24
       expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 2}}'
-    - step: 25
+    - step: 26
       expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 1}}'
-    - step: 38
+    - step: 39
       expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
-    - step: 43
+    - step: 44
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-lifecycle\"]"}'
     results:
-    - 23
-    - 25
-    - 38
-    - 43
+    - 24
+    - 26
+    - 39
+    - 44
   - id: R2
     requirement: Reset restores the saved SSH draft, Cancel discards edits, Save as template creates a template, and Delete requires confirmation.
     actions:
-    - 49
     - 50
     - 51
     - 52
@@ -278,35 +278,36 @@ verification:
     - 81
     - 82
     - 83
+    - 84
     checkpoints:
-    - step: 49
+    - step: 50
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "ssh-lifecycle.example.test"}}'
-    - step: 52
+    - step: 53
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf ''qa-lifecycle-command\\n''"}}'
-    - step: 57
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
     - step: 58
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    - step: 59
       expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-lifecycle\"]"}'
-    - step: 70
+    - step: 71
       expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Template saved"}}'
-    - step: 77
+    - step: 78
       expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 80
+    - step: 81
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "state": "detached"}}'
-    - step: 82
+    - step: 83
       expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 84
+    - step: 85
       expectation: '{"wait_for": {"selector": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-lifecycle\"]", "state": "detached"}}'
     results:
-    - 49
-    - 52
-    - 57
+    - 50
+    - 53
     - 58
-    - 70
-    - 77
-    - 80
-    - 82
-    - 84
+    - 59
+    - 71
+    - 78
+    - 81
+    - 83
+    - 85
   visual:
   - check: Lifecycle dialogs, bookmark values, and forward rows remain readable and do not overlap in the editor.
     method: manual

@@ -21,7 +21,7 @@ steps:
     selector: '[data-testid="terminal-pane"]'
     timeout_sec: 30
 - wait: 8
-- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- click: '[data-testid="nav-mode-home"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="welcome-history-tab-directories"]'
 - wait_for: '[data-testid="welcome-local-directories"]'

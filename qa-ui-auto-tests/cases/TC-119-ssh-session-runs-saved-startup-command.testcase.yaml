@@ -19,6 +19,7 @@ timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -87,64 +88,64 @@ verification:
   - id: R1
     requirement: The SSH Execute command survives saving and reopening the session editor.
     actions:
-    - 3
-    - 5
+    - 4
     - 6
     - 7
     - 8
     - 9
-    - 11
-    - 13
-    - 15
+    - 10
+    - 12
+    - 14
     - 16
-    - 18
+    - 17
     - 19
-    - 21
+    - 20
+    - 22
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
-    - step: 4
+    - step: 5
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 10
+    - step: 11
       expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
-    - step: 14
+    - step: 15
       expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 17
+    - step: 18
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-startup-command\"]"}'
-    - step: 20
+    - step: 21
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 22
-      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
     - step: 23
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 24
       expectation: >-
         {"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf 'qa-ssh-startup-command-ran\\n'"}}
     results:
-    - 17
-    - 23
+    - 18
+    - 24
   - id: R2
     requirement: The saved startup command runs after authentication and leaves the remote shell available for interactive commands.
     actions:
-    - 12
-    - 24
-    - 26
-    - 28
+    - 13
+    - 25
+    - 27
     - 29
-    - 32
+    - 30
+    - 33
     checkpoints:
-    - step: 25
+    - step: 26
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-startup-command\"]"}'
-    - step: 27
+    - step: 28
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
-    - step: 30
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 40}}'
     - step: 31
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 40}}'
+    - step: 32
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-command\\-ran\\r?$", "timeout_sec": 60}}'
-    - step: 33
+    - step: 34
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-interactive\\-ready\\r?$", "timeout_sec": 60}}'
     results:
-    - 25
-    - 31
-    - 33
+    - 26
+    - 32
+    - 34
   visual:
   - check: The startup command output and the following interactive command output are visible as separate readable terminal lines.
     method: manual

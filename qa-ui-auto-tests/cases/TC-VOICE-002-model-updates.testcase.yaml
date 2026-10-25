@@ -8,6 +8,7 @@ fixtures: [reset_db]
 timeout_sec: 75
 steps:
 - open: '${cfg.app.base_url}/?voiceFixture=1&voiceOldBase=1'
+- click: '[data-testid="titlebar-actions-more"]'
 - wait_for: '[data-testid="ptt-button"]'
 - click: '[data-testid="ptt-button"]'
 - wait_for: '[data-testid="asr-settings"]'
@@ -27,15 +28,24 @@ verification:
   requirements:
   - id: R1
     requirement: Selecting Chinese persists, checking never installs implicitly, explicit updating replaces the displayed revision and integrity status.
-    actions: [3, 7, 9, 11, 13]
+    actions:
+    - 4
+    - 8
+    - 10
+    - 12
+    - 14
     checkpoints:
-    - {step: 5, expectation: Old weights require an update.}
-    - {step: 6, expectation: The previous revision is visible.}
-    - {step: 8, expectation: Chinese is persisted.}
-    - {step: 10, expectation: Checking alone does not install the new version.}
-    - {step: 12, expectation: Explicit updating makes the selected weights ready.}
-    - {step: 14, expectation: The downloaded version passes the explicit integrity check.}
-    results: [8, 10, 12, 14]
+    - {step: 6, expectation: '{"assert_text": {"selector": "[data-testid=\"asr-model-whisper-base\"]", "contains": "Model data update available"}}'}
+    - {step: 7, expectation: '{"assert_text": {"selector": "[data-testid=\"asr-model-whisper-base\"]", "contains": "fixture-v1"}}'}
+    - {step: 9, expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"language\":\"zh\""}}'}
+    - {step: 11, expectation: '{"assert_text": {"selector": "[data-testid=\"asr-model-whisper-base\"]", "contains": "Model data update available"}}'}
+    - {step: 13, expectation: '{"assert_text": {"selector": "[data-testid=\"asr-model-whisper-base\"]", "contains": "Downloaded"}}'}
+    - {step: 15, expectation: '{"assert_text": {"selector": "[data-testid=\"asr-model-whisper-base\"]", "contains": "Downloaded and verified"}}'}
+    results:
+    - 9
+    - 11
+    - 13
+    - 15
   visual:
   - {check: Model settings layout, method: manual, reason: Inspect retained screenshot for clipping.}
   native:

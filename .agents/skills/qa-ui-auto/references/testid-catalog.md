@@ -62,7 +62,6 @@
 - `button[title="History"]` — interactive [optional] — F-AI-2.4.ai-chat-history
 - `button[aria-label="Copy entire conversation"]` — interactive [optional] — F-AI-2.4.ai-chat-copy-all
 - `[data-testid="ai-chat-drawer-hide"]` — interactive [optional] — F-AI-2.4.ai-chat-close
-- `[data-testid="ai-chat-drawer-ribbon"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-ribbon
 - `[data-testid="ai-chat-drawer-position"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-position
 - `[data-testid="ai-chat-drawer-pin"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-pin
 - `[data-testid="ai-chat-drawer-opacity"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-opacity
@@ -1567,7 +1566,14 @@
 - `[data-testid="new-tab-launch-menu"]` — interactive — F1.5.new-tab-launch-menu
 - `[data-testid="launch-menu-new-session"]` — interactive [optional] — F1.5.launch-menu-new-session
 - `[data-testid="tab-more"]` — interactive — F1.5.tabs-more
-- `[data-testid="tab-details-hover"]` — interactive — F1.5.tab-details-hover
+- `[data-testid="tab-overview-trigger"]` — interactive — F1.5.tab-overview-trigger
+- `[data-testid="tab-overview"]` — display — F1.5.tab-overview
+- `[data-testid="tab-overview-card"]` — interactive — F1.5.tab-overview-card
+- `[data-testid="tab-overview-summary"]` — display — F1.5.tab-overview-summary
+- `[data-testid="tab-overview-close"]` — interactive — F1.5.tab-overview-close
+- `[data-testid="tab-overview-current"]` — interactive — F1.5.tab-overview-current
+- `[data-testid="tab-overview-all"]` — interactive — F1.5.tab-overview-all
+- `[data-testid="tab-overview-empty"]` — display — F1.5.tab-overview-empty
 - `[data-testid="tab-details-overlay"]` — display [optional] — F1.5.tab-details-overlay
 - `[data-testid^="tab-details-card-"]` — display [optional] — F1.5.tab-details-card
 - `[data-testid^="tab-details-program-"]` — display [optional] — F1.5.tab-details-program
@@ -1580,6 +1586,8 @@
 - `span[aria-label="New output"]` — display [optional] — F1.5.tab-new-output-dot
 - `[data-testid="context-menu-item-tools"]` — interactive [optional] — F1.5.context-menu-item-tools
 - `[data-testid="context-menu-item-tunneling"]` — interactive [optional] — F1.5.context-menu-item-tunneling
+- `[data-testid="tab-details-hover"]` — display [optional] — F1.5.tab-details-hover
+- `[data-testid="ai-chat-drawer-ribbon"]` — display [optional] — F1.5.ai-chat-drawer-ribbon
 
 ## main/theme (F5.5)
 
@@ -1598,7 +1606,7 @@
 - `select[aria-label="Terminal shell"]` — interactive [optional] — F1.6.shell-select
 - `[data-testid="welcome-open-home-folder"]` — interactive [optional] — F1.6.open-home-folder
 - `button[aria-label="Open as administrator"]` — interactive [optional] — F1.6.open-as-administrator
-- `text="New session…"` — interactive — F1.6.new-session-card
+- `text="New session…"` — display — F1.6.new-session-card
 - `[data-testid="welcome-new-session"]` — interactive — F1.6.new-session-card-testid
 - `[data-testid="welcome-recent-sessions"]` — display — F1.6.recent-sessions-panel
 - `[data-testid="welcome-recent-filter"]` — interactive — F1.6.recent-filter
@@ -1639,7 +1647,7 @@
 ## main/window (F1.3)
 
 - `[data-testid="app-titlebar"]` — display — F1.3.titlebar
-- `[data-testid="titlebar-tray"]` — display — F1.3.tray
+- `[data-testid="control-bar"] [data-testid="platform-toolbar-actions"]` — display — F1.3.tray
 - `[data-testid="control-bar"]` — display — F1.3.control-bar
 - `[data-testid="tab-action-slot"]` — display [optional] — F1.3.tab-action-slot
 - `[data-testid="window-drag-handle"]` — display — F1.3.window-drag-handle
@@ -1687,6 +1695,15 @@
 - `[data-testid="home-open-mfa"]` — interactive — F-WS-1.home-open-mfa
 - `[data-testid="welcome-open-lanchat"]` — interactive — F-WS-1.welcome-open-lanchat
 - `[data-testid="lanchat-roster-panel"]` — display — F-WS-1.lanchat-roster-panel
+- `[data-testid="platform-toolbar-actions"]` — display — F-WS-1.platform-toolbar-actions
+- `[data-testid="home-toolbar-workspaces"]` — interactive — F-WS-1.home-toolbar-workspaces
+- `[data-testid="home-toolbar-sessions"]` — interactive — F-WS-1.home-toolbar-sessions
+- `[data-testid="tools-toolbar-workspaces"]` — interactive — F-WS-1.tools-toolbar-workspaces
+- `[data-testid="platform-layout-single"]` — interactive — F-WS-1.platform-layout-single
+- `[data-testid="platform-layout-grid"]` — interactive — F-WS-1.platform-layout-grid
+- `[data-testid="sessions-empty-state"]` — display — F-WS-1.sessions-empty-state
+- `[data-testid="sessions-empty-new-session"]` — interactive — F-WS-1.sessions-empty-new-session
+- `[data-testid="tools-empty-state"]` — display — F-WS-1.tools-empty-state
 
 ## main/workspace-platform (F-WS-2)
 
@@ -1741,6 +1758,11 @@
 - `[data-testid="workspace-editor-save"]` — interactive — F-WS-2.workspace-editor-save
 - `[data-testid="workspace-switcher-option-default-workspace"]` — interactive — F-WS-2.workspace-switcher-option-default-workspace
 - `[data-testid="workspace-switcher-option-second-workspace"]` — interactive — F-WS-2.workspace-switcher-option-second-workspace
+- `[data-testid="workspace-layout-split"]` — interactive — F-WS-2.workspace-layout-split
+- `[data-testid="workspace-toolbar-bottom-dock"]` — interactive — F-WS-2.workspace-toolbar-bottom-dock
+- `[data-testid="workspace-canvas-panes"]` — display — F-WS-2.workspace-canvas-panes
+- `[data-testid="workspace-canvas-pane"]` — display — F-WS-2.workspace-canvas-pane
+- `[data-testid="workspace-bottom-dock"]` — display — F-WS-2.workspace-bottom-dock
 
 ## main/workspace-platform (F-WS-3)
 
@@ -1780,8 +1802,6 @@
 
 ## main/workspace-platform (F-WS-6)
 
-- `[data-testid="agents-dispatch-open"]` — interactive — F-WS-6.agents-dispatch-open
-- `[data-testid="agents-platform-view"]` — display — F-WS-6.agents-platform-view
 - `[data-testid="global-search-input"]` — interactive — F-WS-6.global-search-input
 - `[data-testid="global-search-modal"]` — display — F-WS-6.global-search-modal
 - `[data-testid="global-search-result"]` — display — F-WS-6.global-search-result
@@ -1871,7 +1891,6 @@
 - `[data-testid="notes-floating-toggle"]` — interactive [optional] — F-TAO-1.notes-floating-toggle
 - `[data-testid="floating-notes-panel"]` — display [optional] — F-TAO-1.floating-notes-panel
 - `[data-testid="floating-notes-dock"]` — interactive [optional] — F-TAO-1.floating-notes-dock
-- `[data-testid="tao-ribbon-badge"]` — display [optional] — F-TAO-1.tao-ribbon-badge
 
 ## rdp (F9.7)
 

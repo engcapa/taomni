@@ -15,7 +15,7 @@ export function registerMainLayoutLifecycle2Cases() {
     render(<MainLayout />);
 
     expect(screen.getByTestId("terminal-panel")).toBeInTheDocument();
-    expect(screen.getByTestId("ai-chat-drawer-ribbon")).toBeInTheDocument();
+    expect(screen.queryByTestId("ai-chat-drawer-ribbon")).not.toBeInTheDocument();
     expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
     expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
 
@@ -149,6 +149,7 @@ export function registerMainLayoutLifecycle2Cases() {
         { id: "ssh-tab", type: "terminal", title: "SSH", closable: true },
       ],
       activeTabId: "welcome",
+      activeSideTab: "home",
     });
 
     render(<MainLayout />);

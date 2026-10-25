@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PrimaryNavigationRail } from "../PrimaryNavigationRail";
 import { useAppStore } from "../../../stores/appStore";
@@ -63,6 +63,26 @@ describe("PrimaryNavigationRail (TASK-02)", () => {
       "code-workspace-tool-rail-structure",
       "code-workspace-bottom-tab-overflow",
     ]);
+  });
+
+  it("opens Sessions from Home without replacing the active editor group's preference", () => {
+    useAppStore.setState({
+      activeSideTab: "home",
+      sidebarCollapsed: true,
+      tabs: [{ id: "code", type: "code-workspace", title: "Code", closable: true }],
+      activeTabId: "code",
+      mergeToolWindowRail: true,
+      sidebarCollapsedByGroup: { "code-workspace": true, terminal: true, other: false },
+    });
+    render(<PrimaryNavigationRail compact />);
+    fireEvent.click(screen.getByTestId("side-tab-sessions"));
+    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+    expect(useAppStore.getState().sidebarCollapsedByGroup["code-workspace"]).toBe(true);
+    act(() => useAppStore.getState().setActiveTab("code"));
+    expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+    // Explicitly expanding the rail in Sessions still saves the user's choice.
+    fireEvent.click(screen.getByTestId("side-tab-sessions"));
+    expect(useAppStore.getState().sidebarCollapsedByGroup["code-workspace"]).toBe(false);
   });
 
   it("UT-WS-02-03 hides the workspace tool windows outside Workspaces mode", () => {

@@ -1,7 +1,6 @@
 id: TC-WS-001
 title: Single shared 33px toolbar with left/right sidebar collapse and Ctrl+B
-description: 'Prototype shell: a full-height rail beside aligned rounded navigator and main canvas, one 33px toolbar inside the canvas, 6px gutters and
-  functional sidebar toggles.'
+description: 'Prototype shell: a full-height rail beside aligned rounded navigator and main canvas, one 33px toolbar inside the canvas, 6px gutters and functional sidebar toggles.'
 modes:
 - browser
 - native
@@ -21,6 +20,8 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-ws-001
 - wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="sessions-empty-state"]'
 - assert_count:
     selector: '[data-testid="control-bar"]'
     equal: 1
@@ -28,13 +29,13 @@ steps:
 - assert_visible: '[data-testid="window-drag-handle"]'
 - assert_visible: '[data-testid="global-search-trigger"]'
 - assert_visible: '[data-testid="toggle-right-sidebar"]'
-- assert_visible: '[data-testid="titlebar-tray"]'
+- assert_visible: '[data-testid="titlebar-actions-more"]'
 - eval_readonly:
     expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"control-bar"]').getBoundingClientRect().height <= 34
     expect_truthy: true
 - eval_readonly:
-    expression: Math.abs(document.querySelector('.taomni-navigator-frame').getBoundingClientRect().top - document.querySelector('.taomni-main-canvas-frame').getBoundingClientRect().top)
-      < 1 && document.querySelector('.taomni-platform-resizer').getBoundingClientRect().width === 6
+    expression: Math.abs(document.querySelector('.taomni-navigator-frame').getBoundingClientRect().top -
+      document.querySelector('.taomni-main-canvas-frame').getBoundingClientRect().top) < 1 && document.querySelector('.taomni-platform-resizer').getBoundingClientRect().width === 6
     expect_truthy: true
 - assert_visible: '[data-testid="sidebar-rail"] [data-testid="rail-app-menu-host"]'
 - click: '[data-testid="toggle-left-sidebar"]'
@@ -54,36 +55,50 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 单行 33px 工具栏位于主画布中；侧栏与画布顶部对齐，6px 分隔条，菜单在全高主导航条。
+    requirement: Home 与 Sessions 按原型独立呈现；共享工具栏、对应模式的侧栏控制、保留启动入口和响应式布局均满足断言。
     actions:
     - 1
     - 2
+    - 4
+    - 15
+    - 17
+    - 19
+    - 21
     checkpoints:
     - step: 3
-      expectation: 'wait_for: [data-testid="welcome-panel"]'
-    - step: 4
-      expectation: 'assert_count: [data-testid="control-bar"]'
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 5
-      expectation: 'assert_visible: [data-testid="toggle-left-sidebar"]'
+      expectation: '{"wait_for": "[data-testid=\"sessions-empty-state\"]"}'
     - step: 6
-      expectation: 'assert_visible: [data-testid="window-drag-handle"]'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"control-bar\"]", "equal": 1}}'
     - step: 7
-      expectation: 'assert_visible: [data-testid="global-search-trigger"]'
+      expectation: '{"assert_visible": "[data-testid=\"toggle-left-sidebar\"]"}'
     - step: 8
-      expectation: 'assert_visible: [data-testid="toggle-right-sidebar"]'
+      expectation: '{"assert_visible": "[data-testid=\"window-drag-handle\"]"}'
     - step: 9
-      expectation: 'assert_visible: [data-testid="titlebar-tray"]'
+      expectation: '{"assert_visible": "[data-testid=\"global-search-trigger\"]"}'
     - step: 10
-      expectation: 'eval_readonly: document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''"control-bar"]'').getBoundingClientRect().height
-        <= 34'
+      expectation: '{"assert_visible": "[data-testid=\"toggle-right-sidebar\"]"}'
     - step: 11
-      expectation: 'eval_readonly: Math.abs(document.querySelector(''.taomni-navigator-frame'').getBoundingClientRect().top - document.querySelector(''.taomni-main-canvas-frame'').getBoundingClientRect().top)
-        < 1 && document.querySelector(''.taomni-platform-resizer'').getBoundingClientRect().width === 6'
+      expectation: '{"assert_visible": "[data-testid=\"titlebar-actions-more\"]"}'
     - step: 12
-      expectation: 'assert_visible: [data-testid="sidebar-rail"] [data-testid="rail-app-menu-host"]'
+      expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('[data-testid' + String.fromCharCode(61) + '\\\"control-bar\\\"]').getBoundingClientRect().height <=
+        34\", \"expect_truthy\": true}}"
+    - step: 13
+      expectation: "{\"eval_readonly\": {\"expression\": \"Math.abs(document.querySelector('.taomni-navigator-frame').getBoundingClientRect().top - document.querySelector('.taomni-main-canvas-frame').getBoundingClientRect().top)
+        < 1 && document.querySelector('.taomni-platform-resizer').getBoundingClientRect().width === 6\", \"expect_truthy\": true}}"
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"sidebar-rail\"] [data-testid=\"rail-app-menu-host\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 20
+      expectation: '{"assert_count": {"selector": "[data-testid=\"right-sidebar\"]", "equal": 1}}'
+    - step: 22
+      expectation: '{"assert_count": {"selector": "[data-testid=\"right-sidebar\"]", "equal": 0}}'
     results:
     - 3
-    - 4
     - 5
     - 6
     - 7
@@ -92,27 +107,12 @@ verification:
     - 10
     - 11
     - 12
-  - id: R2
-    requirement: 左右侧栏按钮与 Ctrl/Cmd+B 可收起恢复，不丢失导航条。
-    actions:
     - 13
-    - 15
-    - 17
-    - 19
-    checkpoints:
-    - step: 14
-      expectation: 'wait_for: [data-testid="collapsed-sidebar-rail"]'
-    - step: 16
-      expectation: 'wait_for: [data-testid="expanded-sidebar-panel"]'
-    - step: 18
-      expectation: 'assert_count: [data-testid="right-sidebar"]'
-    - step: 20
-      expectation: 'assert_count: [data-testid="right-sidebar"]'
-    results:
     - 14
     - 16
     - 18
     - 20
+    - 22
   visual:
   - check: 与 HTML 原型比较圆角框架、紧凑尺寸、无溢出和可用操作入口。
     method: manual

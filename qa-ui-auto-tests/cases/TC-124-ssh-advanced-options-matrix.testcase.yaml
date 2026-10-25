@@ -17,6 +17,7 @@ timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-ssh"]'
@@ -150,7 +151,6 @@ verification:
   - id: R1
     requirement: Every SSH advanced remote-environment and SSH-browser option can be selected and the final choices persist after saving and reopening.
     actions:
-    - 12
     - 13
     - 14
     - 15
@@ -188,42 +188,43 @@ verification:
     - 47
     - 48
     - 49
+    - 50
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
-    - step: 4
+    - step: 5
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 11
+    - step: 12
       expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
-    - step: 24
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"advanced-ssh-settings\"] > div:nth-of-type(6) select", "name": "value", "equals": "Custom command…"}}'
-    - step: 24
+    - step: 25
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"advanced-ssh-settings\"] > div:nth-of-type(10) select", "name": "value", "equals": "Disabled"}}'
-    - step: 44
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"advanced-ssh-settings\"] > div:nth-of-type(10) select", "name": "value", "equals": "Disabled"}}'
+    - step: 45
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-advanced-matrix\"]"}'
-    - step: 47
-      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
-    - step: 50
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"advanced-ssh-settings\"] > div:nth-of-type(6) select", "name": "value", "equals": "Custom command…"}}'
+    - step: 48
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 51
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"advanced-ssh-settings\"] > div:nth-of-type(10) select", "name": "value", "equals": "Disabled"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"advanced-ssh-settings\"] > div:nth-of-type(6) select", "name": "value", "equals": "Custom command…"}}'
     - step: 52
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf ''qa-advanced-command\\n''"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"advanced-ssh-settings\"] > div:nth-of-type(10) select", "name": "value", "equals": "Disabled"}}'
     - step: 53
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf ''qa-advanced-command\\n''"}}'
     - step: 54
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-privatekey\"]:checked", "equal": 1}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
     - step: 55
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-privatekey\"]:checked", "equal": 1}}'
+    - step: 56
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Private key path\"]", "name": "value", "equals": "/home/qauser/.ssh/id_ed25519"}}'
     results:
-    - 24
-    - 44
-    - 50
+    - 25
+    - 45
     - 51
     - 52
     - 53
     - 54
     - 55
+    - 56
   visual:
   - check: Advanced SSH controls, option text, and the restored private-key state remain readable without clipping.
     method: manual

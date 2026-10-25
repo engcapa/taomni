@@ -1,8 +1,7 @@
 id: TC-PATH-SFTP-02
 title: Attached SFTP remote and local breadcrumbs use one compact scroller without vertical overflow
-description: Create disposable wide directories through SSH and open the attached SFTP pane. On both remote and local sides
-  assert actual overflow, compact horizontal scrollbar styling, no vertical or outer overflow, a fixed edit button, focused
-  editing, Escape, ancestor navigation and Back. Navigate remote to root and ensure local stays independent.
+description: Create disposable wide directories through SSH and open the attached SFTP pane. On both remote and local sides assert actual overflow, compact horizontal scrollbar
+  styling, no vertical or outer overflow, a fixed edit button, focused editing, Escape, ancestor navigation and Back. Navigate remote to root and ensure local stays independent.
 covers:
 - F7.2
 - F7.5
@@ -22,6 +21,7 @@ fixtures:
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for:
     selector: '[data-testid="session-new"]'
     timeout_sec: 60
@@ -55,10 +55,9 @@ steps:
     timeout_sec: 60
 - terminal_input:
     selector: '[data-testid="terminal-pane"] .xterm-helper-textarea'
-    text: mkdir -p '${fixture.sftp_shell_test_dir}/qa-path-overflow/${fixture.path_overflow_relative}' && printf 'overflow
-      directory\n' > '${fixture.sftp_shell_test_dir}/qa-path-overflow/${fixture.path_overflow_relative}/overflow-marker.txt'
-      && printf 'overflow parent\n' > '${fixture.sftp_shell_test_dir}/qa-path-overflow/${fixture.path_overflow_directory}/parent-marker.txt'
-      && printf '\nQA_PATH_OVERFLOW_READY\n'
+    text: mkdir -p '${fixture.sftp_shell_test_dir}/qa-path-overflow/${fixture.path_overflow_relative}' && printf 'overflow directory\n' >
+      '${fixture.sftp_shell_test_dir}/qa-path-overflow/${fixture.path_overflow_relative}/overflow-marker.txt' && printf 'overflow parent\n' >
+      '${fixture.sftp_shell_test_dir}/qa-path-overflow/${fixture.path_overflow_directory}/parent-marker.txt' && printf '\nQA_PATH_OVERFLOW_READY\n'
     submit: true
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
@@ -105,23 +104,25 @@ steps:
     expression: document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].scrollWidth > document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientWidth
     expect_truthy: true
 - eval_readonly:
-    expression: JSON.stringify([document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].scrollHeight - document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientHeight,
-      document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientHeight, document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].scrollHeight])
+    expression: JSON.stringify([document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].scrollHeight -
+      document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientHeight, document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientHeight,
+      document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].scrollHeight])
     expect_truthy: true
     contains: '[0,'
 - eval_readonly:
     expression: getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0]).overflowY === "hidden"
     expect_truthy: true
 - eval_readonly:
-    expression: getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0], "::-webkit-scrollbar").height
-      === "4px" || getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0]).scrollbarWidth === "thin"
+    expression: getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0], "::-webkit-scrollbar").height === "4px" ||
+      getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0]).scrollbarWidth === "thin"
     expect_truthy: true
 - eval_readonly:
     expression: document.querySelectorAll(".taomni-path-breadcrumb")[0].lastElementChild.getBoundingClientRect().right <=
       document.querySelectorAll(".taomni-path-breadcrumb")[0].getBoundingClientRect().right
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".taomni-path-breadcrumb")[0].lastElementChild.getBoundingClientRect().left >= document.querySelectorAll(".taomni-path-breadcrumb")[0].getBoundingClientRect().left
+    expression: document.querySelectorAll(".taomni-path-breadcrumb")[0].lastElementChild.getBoundingClientRect().left >=
+      document.querySelectorAll(".taomni-path-breadcrumb")[0].getBoundingClientRect().left
     expect_truthy: true
 - click: '[data-testid="sftp-remote-path-edit"]'
 - eval_readonly:
@@ -158,23 +159,25 @@ steps:
     expression: document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].scrollWidth > document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientWidth
     expect_truthy: true
 - eval_readonly:
-    expression: JSON.stringify([document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].scrollHeight - document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientHeight,
-      document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientHeight, document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].scrollHeight])
+    expression: JSON.stringify([document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].scrollHeight -
+      document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientHeight, document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientHeight,
+      document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].scrollHeight])
     expect_truthy: true
     contains: '[0,'
 - eval_readonly:
     expression: getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0]).overflowY === "hidden"
     expect_truthy: true
 - eval_readonly:
-    expression: getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0], "::-webkit-scrollbar").height
-      === "4px" || getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0]).scrollbarWidth === "thin"
+    expression: getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0], "::-webkit-scrollbar").height === "4px" ||
+      getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0]).scrollbarWidth === "thin"
     expect_truthy: true
 - eval_readonly:
     expression: document.querySelectorAll(".taomni-path-breadcrumb")[0].lastElementChild.getBoundingClientRect().right <=
       document.querySelectorAll(".taomni-path-breadcrumb")[0].getBoundingClientRect().right
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".taomni-path-breadcrumb")[0].lastElementChild.getBoundingClientRect().left >= document.querySelectorAll(".taomni-path-breadcrumb")[0].getBoundingClientRect().left
+    expression: document.querySelectorAll(".taomni-path-breadcrumb")[0].lastElementChild.getBoundingClientRect().left >=
+      document.querySelectorAll(".taomni-path-breadcrumb")[0].getBoundingClientRect().left
     expect_truthy: true
 - wait_for: '[data-testid="sftp-local-path-segments"]'
 - eval_readonly:
@@ -195,23 +198,25 @@ steps:
     expression: document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].scrollWidth > document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].clientWidth
     expect_truthy: true
 - eval_readonly:
-    expression: JSON.stringify([document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].scrollHeight - document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].clientHeight,
-      document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].clientHeight, document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].scrollHeight])
+    expression: JSON.stringify([document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].scrollHeight -
+      document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].clientHeight, document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].clientHeight,
+      document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].scrollHeight])
     expect_truthy: true
     contains: '[0,'
 - eval_readonly:
     expression: getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1]).overflowY === "hidden"
     expect_truthy: true
 - eval_readonly:
-    expression: getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1], "::-webkit-scrollbar").height
-      === "4px" || getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1]).scrollbarWidth === "thin"
+    expression: getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1], "::-webkit-scrollbar").height === "4px" ||
+      getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1]).scrollbarWidth === "thin"
     expect_truthy: true
 - eval_readonly:
     expression: document.querySelectorAll(".taomni-path-breadcrumb")[1].lastElementChild.getBoundingClientRect().right <=
       document.querySelectorAll(".taomni-path-breadcrumb")[1].getBoundingClientRect().right
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".taomni-path-breadcrumb")[1].lastElementChild.getBoundingClientRect().left >= document.querySelectorAll(".taomni-path-breadcrumb")[1].getBoundingClientRect().left
+    expression: document.querySelectorAll(".taomni-path-breadcrumb")[1].lastElementChild.getBoundingClientRect().left >=
+      document.querySelectorAll(".taomni-path-breadcrumb")[1].getBoundingClientRect().left
     expect_truthy: true
 - click: '[data-testid="sftp-local-path-edit"]'
 - eval_readonly:
@@ -248,23 +253,25 @@ steps:
     expression: document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].scrollWidth > document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].clientWidth
     expect_truthy: true
 - eval_readonly:
-    expression: JSON.stringify([document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].scrollHeight - document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].clientHeight,
-      document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].clientHeight, document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].scrollHeight])
+    expression: JSON.stringify([document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].scrollHeight -
+      document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].clientHeight, document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].clientHeight,
+      document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1].scrollHeight])
     expect_truthy: true
     contains: '[0,'
 - eval_readonly:
     expression: getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1]).overflowY === "hidden"
     expect_truthy: true
 - eval_readonly:
-    expression: getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1], "::-webkit-scrollbar").height
-      === "4px" || getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1]).scrollbarWidth === "thin"
+    expression: getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1], "::-webkit-scrollbar").height === "4px" ||
+      getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[1]).scrollbarWidth === "thin"
     expect_truthy: true
 - eval_readonly:
     expression: document.querySelectorAll(".taomni-path-breadcrumb")[1].lastElementChild.getBoundingClientRect().right <=
       document.querySelectorAll(".taomni-path-breadcrumb")[1].getBoundingClientRect().right
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".taomni-path-breadcrumb")[1].lastElementChild.getBoundingClientRect().left >= document.querySelectorAll(".taomni-path-breadcrumb")[1].getBoundingClientRect().left
+    expression: document.querySelectorAll(".taomni-path-breadcrumb")[1].lastElementChild.getBoundingClientRect().left >=
+      document.querySelectorAll(".taomni-path-breadcrumb")[1].getBoundingClientRect().left
     expect_truthy: true
 - screenshot: sftp-long-paths.png
 - click: '[data-testid="sftp-remote-path-segments"] button[data-path="/"]'
@@ -294,15 +301,16 @@ steps:
     expression: document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].offsetHeight === document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0].clientHeight
     expect_truthy: true
 - eval_readonly:
-    expression: getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0], "::-webkit-scrollbar").height
-      === "4px" || getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0]).scrollbarWidth === "thin"
+    expression: getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0], "::-webkit-scrollbar").height === "4px" ||
+      getComputedStyle(document.querySelectorAll(".taomni-path-breadcrumb-scroll")[0]).scrollbarWidth === "thin"
     expect_truthy: true
 - eval_readonly:
     expression: document.querySelectorAll(".taomni-path-breadcrumb")[0].lastElementChild.getBoundingClientRect().right <=
       document.querySelectorAll(".taomni-path-breadcrumb")[0].getBoundingClientRect().right
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelectorAll(".taomni-path-breadcrumb")[0].lastElementChild.getBoundingClientRect().left >= document.querySelectorAll(".taomni-path-breadcrumb")[0].getBoundingClientRect().left
+    expression: document.querySelectorAll(".taomni-path-breadcrumb")[0].lastElementChild.getBoundingClientRect().left >=
+      document.querySelectorAll(".taomni-path-breadcrumb")[0].getBoundingClientRect().left
     expect_truthy: true
 - assert_text:
     selector: '[data-testid="sftp-local-list"]'
@@ -318,8 +326,7 @@ verification:
     requirement: Attached SFTP remote and local breadcrumbs use one compact scroller without vertical overflow
     actions:
     - 1
-    - 3
-    - 5
+    - 4
     - 6
     - 7
     - 8
@@ -327,257 +334,234 @@ verification:
     - 10
     - 11
     - 12
-    - 14
-    - 16
+    - 13
+    - 15
     - 17
-    - 19
-    - 21
-    - 23
+    - 18
+    - 20
+    - 22
     - 24
     - 25
-    - 27
+    - 26
     - 28
     - 29
-    - 42
-    - 44
-    - 46
-    - 48
-    - 72
-    - 74
-    - 76
-    - 78
-    - 92
+    - 30
+    - 43
+    - 45
+    - 47
+    - 49
+    - 73
+    - 75
+    - 77
+    - 79
+    - 93
     checkpoints:
-    - step: 2
+    - step: 3
       expectation: '{"wait_for": {"selector": "[data-testid=\"session-new\"]", "timeout_sec": 60}}'
-    - step: 4
+    - step: 5
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 13
+    - step: 14
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-path-overflow-ssh\"]"}'
-    - step: 15
+    - step: 16
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
-    - step: 18
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "timeout_sec":
-        60}}'
-    - step: 20
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_PATH_OVERFLOW_READY\\r?$",
-        "timeout_sec": 60}}'
-    - step: 22
+    - step: 19
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+    - step: 21
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_PATH_OVERFLOW_READY\\r?$", "timeout_sec": 60}}'
+    - step: 23
       expectation: '{"wait_for": "[data-testid=\"sftp-remote-path-edit\"]"}'
-    - step: 26
+    - step: 27
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "overflow-marker.txt"}}'
-    - step: 30
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "overflow-marker.txt"}}'
     - step: 31
-      expectation: '{"wait_for": "[data-testid=\"sftp-remote-path-segments\"]"}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "overflow-marker.txt"}}'
     - step: 32
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollWidth
-        === document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientWidth", "expect_truthy": true}}'
+      expectation: '{"wait_for": "[data-testid=\"sftp-remote-path-segments\"]"}'
     - step: 33
-      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight
-        - document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight,
-        document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight])", "expect_truthy": true, "contains": "[0,"}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollWidth === document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientWidth",
+        "expect_truthy": true}}'
     - step: 34
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].offsetHeight
-        <= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].parentElement.clientHeight", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight - document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight,
+        document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight])", "expect_truthy": true, "contains":
+        "[0,"}}'
     - step: 35
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb\")[0]).overflowY
-        === \"hidden\"", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].offsetHeight <= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].parentElement.clientHeight",
+        "expect_truthy": true}}'
     - step: 36
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollWidth
-        > document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientWidth", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb\")[0]).overflowY === \"hidden\"", "expect_truthy": true}}'
     - step: 37
-      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollHeight
-        - document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientHeight,
-        document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollHeight])", "expect_truthy": true, "contains":
-        "[0,"}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollWidth > document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientWidth",
+        "expect_truthy": true}}'
     - step: 38
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0]).overflowY
-        === \"hidden\"", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollHeight - document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientHeight,
+        document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollHeight])", "expect_truthy":
+        true, "contains": "[0,"}}'
     - step: 39
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0],
-        \"::-webkit-scrollbar\").height === \"4px\" || getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0]).scrollbarWidth
-        === \"thin\"", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0]).overflowY === \"hidden\"", "expect_truthy": true}}'
     - step: 40
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].lastElementChild.getBoundingClientRect().right
-        <= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].getBoundingClientRect().right", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0], \"::-webkit-scrollbar\").height === \"4px\" ||
+        getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0]).scrollbarWidth === \"thin\"", "expect_truthy": true}}'
     - step: 41
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].lastElementChild.getBoundingClientRect().left
-        >= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].getBoundingClientRect().left", "expect_truthy": true}}'
-    - step: 43
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.dataset.testid === \"sftp-remote-path\"", "expect_truthy":
-        true}}'
-    - step: 45
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].lastElementChild.getBoundingClientRect().right <= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].getBoundingClientRect().right",
+        "expect_truthy": true}}'
+    - step: 42
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].lastElementChild.getBoundingClientRect().left >= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].getBoundingClientRect().left",
+        "expect_truthy": true}}'
+    - step: 44
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.dataset.testid === \"sftp-remote-path\"", "expect_truthy": true}}'
+    - step: 46
       expectation: '{"wait_for": "[data-testid=\"sftp-remote-path-segments\"]"}'
-    - step: 47
+    - step: 48
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "parent-marker.txt"}}'
-    - step: 49
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "overflow-marker.txt"}}'
     - step: 50
-      expectation: '{"wait_for": "[data-testid=\"sftp-remote-path-segments\"]"}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "overflow-marker.txt"}}'
     - step: 51
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollWidth
-        === document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientWidth", "expect_truthy": true}}'
-    - step: 52
-      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight
-        - document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight,
-        document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight])", "expect_truthy": true, "contains": "[0,"}}'
-    - step: 53
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].offsetHeight
-        <= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].parentElement.clientHeight", "expect_truthy": true}}'
-    - step: 54
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb\")[0]).overflowY
-        === \"hidden\"", "expect_truthy": true}}'
-    - step: 55
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollWidth
-        > document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientWidth", "expect_truthy": true}}'
-    - step: 56
-      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollHeight
-        - document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientHeight,
-        document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollHeight])", "expect_truthy": true, "contains":
-        "[0,"}}'
-    - step: 57
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0]).overflowY
-        === \"hidden\"", "expect_truthy": true}}'
-    - step: 58
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0],
-        \"::-webkit-scrollbar\").height === \"4px\" || getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0]).scrollbarWidth
-        === \"thin\"", "expect_truthy": true}}'
-    - step: 59
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].lastElementChild.getBoundingClientRect().right
-        <= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].getBoundingClientRect().right", "expect_truthy": true}}'
-    - step: 60
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].lastElementChild.getBoundingClientRect().left
-        >= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].getBoundingClientRect().left", "expect_truthy": true}}'
-    - step: 61
-      expectation: '{"wait_for": "[data-testid=\"sftp-local-path-segments\"]"}'
-    - step: 62
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[1].scrollWidth
-        === document.querySelectorAll(\".taomni-path-breadcrumb\")[1].clientWidth", "expect_truthy": true}}'
-    - step: 63
-      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb\")[1].scrollHeight
-        - document.querySelectorAll(\".taomni-path-breadcrumb\")[1].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb\")[1].clientHeight,
-        document.querySelectorAll(\".taomni-path-breadcrumb\")[1].scrollHeight])", "expect_truthy": true, "contains": "[0,"}}'
-    - step: 64
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[1].offsetHeight
-        <= document.querySelectorAll(\".taomni-path-breadcrumb\")[1].parentElement.clientHeight", "expect_truthy": true}}'
-    - step: 65
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb\")[1]).overflowY
-        === \"hidden\"", "expect_truthy": true}}'
-    - step: 66
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].scrollWidth
-        > document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].clientWidth", "expect_truthy": true}}'
-    - step: 67
-      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].scrollHeight
-        - document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].clientHeight,
-        document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].scrollHeight])", "expect_truthy": true, "contains":
-        "[0,"}}'
-    - step: 68
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1]).overflowY
-        === \"hidden\"", "expect_truthy": true}}'
-    - step: 69
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1],
-        \"::-webkit-scrollbar\").height === \"4px\" || getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1]).scrollbarWidth
-        === \"thin\"", "expect_truthy": true}}'
-    - step: 70
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[1].lastElementChild.getBoundingClientRect().right
-        <= document.querySelectorAll(\".taomni-path-breadcrumb\")[1].getBoundingClientRect().right", "expect_truthy": true}}'
-    - step: 71
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[1].lastElementChild.getBoundingClientRect().left
-        >= document.querySelectorAll(\".taomni-path-breadcrumb\")[1].getBoundingClientRect().left", "expect_truthy": true}}'
-    - step: 73
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.dataset.testid === \"sftp-local-path\"", "expect_truthy":
-        true}}'
-    - step: 75
-      expectation: '{"wait_for": "[data-testid=\"sftp-local-path-segments\"]"}'
-    - step: 77
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "parent-marker.txt"}}'
-    - step: 79
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "overflow-marker.txt"}}'
-    - step: 80
-      expectation: '{"wait_for": "[data-testid=\"sftp-local-path-segments\"]"}'
-    - step: 81
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[1].scrollWidth
-        === document.querySelectorAll(\".taomni-path-breadcrumb\")[1].clientWidth", "expect_truthy": true}}'
-    - step: 82
-      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb\")[1].scrollHeight
-        - document.querySelectorAll(\".taomni-path-breadcrumb\")[1].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb\")[1].clientHeight,
-        document.querySelectorAll(\".taomni-path-breadcrumb\")[1].scrollHeight])", "expect_truthy": true, "contains": "[0,"}}'
-    - step: 83
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[1].offsetHeight
-        <= document.querySelectorAll(\".taomni-path-breadcrumb\")[1].parentElement.clientHeight", "expect_truthy": true}}'
-    - step: 84
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb\")[1]).overflowY
-        === \"hidden\"", "expect_truthy": true}}'
-    - step: 85
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].scrollWidth
-        > document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].clientWidth", "expect_truthy": true}}'
-    - step: 86
-      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].scrollHeight
-        - document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].clientHeight,
-        document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].scrollHeight])", "expect_truthy": true, "contains":
-        "[0,"}}'
-    - step: 87
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1]).overflowY
-        === \"hidden\"", "expect_truthy": true}}'
-    - step: 88
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1],
-        \"::-webkit-scrollbar\").height === \"4px\" || getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1]).scrollbarWidth
-        === \"thin\"", "expect_truthy": true}}'
-    - step: 89
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[1].lastElementChild.getBoundingClientRect().right
-        <= document.querySelectorAll(\".taomni-path-breadcrumb\")[1].getBoundingClientRect().right", "expect_truthy": true}}'
-    - step: 90
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[1].lastElementChild.getBoundingClientRect().left
-        >= document.querySelectorAll(\".taomni-path-breadcrumb\")[1].getBoundingClientRect().left", "expect_truthy": true}}'
-    - step: 93
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"sftp-remote-path\"]", "equals": "/", "timeout_sec":
-        10}}'
-    - step: 94
       expectation: '{"wait_for": "[data-testid=\"sftp-remote-path-segments\"]"}'
-    - step: 95
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollWidth
-        === document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientWidth", "expect_truthy": true}}'
-    - step: 96
-      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight
-        - document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight,
-        document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight])", "expect_truthy": true, "contains": "[0,"}}'
-    - step: 97
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].offsetHeight
-        <= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].parentElement.clientHeight", "expect_truthy": true}}'
-    - step: 98
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb\")[0]).overflowY
-        === \"hidden\"", "expect_truthy": true}}'
-    - step: 99
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollWidth
-        === document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientWidth", "expect_truthy": true}}'
-    - step: 100
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].offsetHeight
-        === document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientHeight", "expect_truthy": true}}'
-    - step: 101
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0],
-        \"::-webkit-scrollbar\").height === \"4px\" || getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0]).scrollbarWidth
-        === \"thin\"", "expect_truthy": true}}'
-    - step: 102
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].lastElementChild.getBoundingClientRect().right
-        <= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].getBoundingClientRect().right", "expect_truthy": true}}'
-    - step: 103
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].lastElementChild.getBoundingClientRect().left
-        >= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].getBoundingClientRect().left", "expect_truthy": true}}'
-    - step: 104
+    - step: 52
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollWidth === document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientWidth",
+        "expect_truthy": true}}'
+    - step: 53
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight - document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight,
+        document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight])", "expect_truthy": true, "contains":
+        "[0,"}}'
+    - step: 54
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].offsetHeight <= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].parentElement.clientHeight",
+        "expect_truthy": true}}'
+    - step: 55
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb\")[0]).overflowY === \"hidden\"", "expect_truthy": true}}'
+    - step: 56
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollWidth > document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientWidth",
+        "expect_truthy": true}}'
+    - step: 57
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollHeight - document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientHeight,
+        document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollHeight])", "expect_truthy":
+        true, "contains": "[0,"}}'
+    - step: 58
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0]).overflowY === \"hidden\"", "expect_truthy": true}}'
+    - step: 59
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0], \"::-webkit-scrollbar\").height === \"4px\" ||
+        getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0]).scrollbarWidth === \"thin\"", "expect_truthy": true}}'
+    - step: 60
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].lastElementChild.getBoundingClientRect().right <= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].getBoundingClientRect().right",
+        "expect_truthy": true}}'
+    - step: 61
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].lastElementChild.getBoundingClientRect().left >= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].getBoundingClientRect().left",
+        "expect_truthy": true}}'
+    - step: 62
+      expectation: '{"wait_for": "[data-testid=\"sftp-local-path-segments\"]"}'
+    - step: 63
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[1].scrollWidth === document.querySelectorAll(\".taomni-path-breadcrumb\")[1].clientWidth",
+        "expect_truthy": true}}'
+    - step: 64
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb\")[1].scrollHeight - document.querySelectorAll(\".taomni-path-breadcrumb\")[1].clientHeight,
+        document.querySelectorAll(\".taomni-path-breadcrumb\")[1].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb\")[1].scrollHeight])", "expect_truthy": true, "contains":
+        "[0,"}}'
+    - step: 65
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[1].offsetHeight <= document.querySelectorAll(\".taomni-path-breadcrumb\")[1].parentElement.clientHeight",
+        "expect_truthy": true}}'
+    - step: 66
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb\")[1]).overflowY === \"hidden\"", "expect_truthy": true}}'
+    - step: 67
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].scrollWidth > document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].clientWidth",
+        "expect_truthy": true}}'
+    - step: 68
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].scrollHeight - document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].clientHeight,
+        document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].scrollHeight])", "expect_truthy":
+        true, "contains": "[0,"}}'
+    - step: 69
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1]).overflowY === \"hidden\"", "expect_truthy": true}}'
+    - step: 70
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1], \"::-webkit-scrollbar\").height === \"4px\" ||
+        getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1]).scrollbarWidth === \"thin\"", "expect_truthy": true}}'
+    - step: 71
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[1].lastElementChild.getBoundingClientRect().right <= document.querySelectorAll(\".taomni-path-breadcrumb\")[1].getBoundingClientRect().right",
+        "expect_truthy": true}}'
+    - step: 72
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[1].lastElementChild.getBoundingClientRect().left >= document.querySelectorAll(\".taomni-path-breadcrumb\")[1].getBoundingClientRect().left",
+        "expect_truthy": true}}'
+    - step: 74
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.dataset.testid === \"sftp-local-path\"", "expect_truthy": true}}'
+    - step: 76
+      expectation: '{"wait_for": "[data-testid=\"sftp-local-path-segments\"]"}'
+    - step: 78
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "parent-marker.txt"}}'
+    - step: 80
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "overflow-marker.txt"}}'
-    - step: 106
+    - step: 81
+      expectation: '{"wait_for": "[data-testid=\"sftp-local-path-segments\"]"}'
+    - step: 82
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[1].scrollWidth === document.querySelectorAll(\".taomni-path-breadcrumb\")[1].clientWidth",
+        "expect_truthy": true}}'
+    - step: 83
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb\")[1].scrollHeight - document.querySelectorAll(\".taomni-path-breadcrumb\")[1].clientHeight,
+        document.querySelectorAll(\".taomni-path-breadcrumb\")[1].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb\")[1].scrollHeight])", "expect_truthy": true, "contains":
+        "[0,"}}'
+    - step: 84
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[1].offsetHeight <= document.querySelectorAll(\".taomni-path-breadcrumb\")[1].parentElement.clientHeight",
+        "expect_truthy": true}}'
+    - step: 85
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb\")[1]).overflowY === \"hidden\"", "expect_truthy": true}}'
+    - step: 86
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].scrollWidth > document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].clientWidth",
+        "expect_truthy": true}}'
+    - step: 87
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].scrollHeight - document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].clientHeight,
+        document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1].scrollHeight])", "expect_truthy":
+        true, "contains": "[0,"}}'
+    - step: 88
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1]).overflowY === \"hidden\"", "expect_truthy": true}}'
+    - step: 89
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1], \"::-webkit-scrollbar\").height === \"4px\" ||
+        getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[1]).scrollbarWidth === \"thin\"", "expect_truthy": true}}'
+    - step: 90
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[1].lastElementChild.getBoundingClientRect().right <= document.querySelectorAll(\".taomni-path-breadcrumb\")[1].getBoundingClientRect().right",
+        "expect_truthy": true}}'
+    - step: 91
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[1].lastElementChild.getBoundingClientRect().left >= document.querySelectorAll(\".taomni-path-breadcrumb\")[1].getBoundingClientRect().left",
+        "expect_truthy": true}}'
+    - step: 94
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"sftp-remote-path\"]", "equals": "/", "timeout_sec": 10}}'
+    - step: 95
+      expectation: '{"wait_for": "[data-testid=\"sftp-remote-path-segments\"]"}'
+    - step: 96
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollWidth === document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientWidth",
+        "expect_truthy": true}}'
+    - step: 97
+      expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight - document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight,
+        document.querySelectorAll(\".taomni-path-breadcrumb\")[0].clientHeight, document.querySelectorAll(\".taomni-path-breadcrumb\")[0].scrollHeight])", "expect_truthy": true, "contains":
+        "[0,"}}'
+    - step: 98
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].offsetHeight <= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].parentElement.clientHeight",
+        "expect_truthy": true}}'
+    - step: 99
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb\")[0]).overflowY === \"hidden\"", "expect_truthy": true}}'
+    - step: 100
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].scrollWidth === document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientWidth",
+        "expect_truthy": true}}'
+    - step: 101
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].offsetHeight === document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0].clientHeight",
+        "expect_truthy": true}}'
+    - step: 102
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0], \"::-webkit-scrollbar\").height === \"4px\" ||
+        getComputedStyle(document.querySelectorAll(\".taomni-path-breadcrumb-scroll\")[0]).scrollbarWidth === \"thin\"", "expect_truthy": true}}'
+    - step: 103
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].lastElementChild.getBoundingClientRect().right <= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].getBoundingClientRect().right",
+        "expect_truthy": true}}'
+    - step: 104
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".taomni-path-breadcrumb\")[0].lastElementChild.getBoundingClientRect().left >= document.querySelectorAll(\".taomni-path-breadcrumb\")[0].getBoundingClientRect().left",
+        "expect_truthy": true}}'
+    - step: 105
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "overflow-marker.txt"}}'
+    - step: 107
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"sftp-remote-path\"]", "equals": "/"}}'
     results:
-    - 106
+    - 107
   visual:
-  - check: Short paths have no scrollbar; overflowing paths use one 4px horizontal scrollbar with readable text and a reachable
-      edit button. No vertical thumb or scrollbar corner appears.
+  - check: Short paths have no scrollbar; overflowing paths use one 4px horizontal scrollbar with readable text and a reachable edit button. No vertical thumb or scrollbar corner
+      appears.
     method: automated
     reason: Read-only geometry/style assertions and retained short/long path screenshots cover the actual renderer.
   native:
-  - check: List disposable remote wide-path marker files through packaged russh-sftp and local marker files through native
-      filesystem IPC; verify scrollbar geometry in each platform WebView.
+  - check: List disposable remote wide-path marker files through packaged russh-sftp and local marker files through native filesystem IPC; verify scrollbar geometry in each
+      platform WebView.
     method: automated
-    reason: Classic WebView2/WebKitGTK/WKWebView scrollbar layout and real filesystem/SFTP listings require the packaged app;
-      browser evidence cannot establish them.
+    reason: Classic WebView2/WebKitGTK/WKWebView scrollbar layout and real filesystem/SFTP listings require the packaged app; browser evidence cannot establish them.

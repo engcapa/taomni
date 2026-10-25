@@ -22,6 +22,7 @@ timeout_sec: 150
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-ssh"]'
@@ -243,11 +244,11 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH terminal profile controls expose selected theme, behavior toggles, suggestion limits, AI controls, history cancellation, and custom command editing with observable persistence after reopen.
+    requirement: SSH terminal profile controls expose selected theme, behavior toggles, suggestion limits, AI controls, history cancellation, and custom command editing with
+      observable persistence after reopen.
     actions:
     - 1
     - 2
-    - 3
     - 4
     - 5
     - 6
@@ -338,62 +339,63 @@ verification:
     - 91
     - 92
     - 93
+    - 94
     checkpoints:
-    - step: 12
+    - step: 13
       expectation: '{"assert_visible": "[data-testid=\"terminal-appearance-settings\"]"}'
-    - step: 17
+    - step: 18
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-theme-select\"]", "name": "aria-expanded", "equals": "false"}}'
-    - step: 19
+    - step: 20
       expectation: '{"assert_count": {"selector": "input[aria-label=\"Enable font ligatures\"]:checked", "equal": 1}}'
-    - step: 32
+    - step: 33
       expectation: '{"assert_enabled": "input[aria-label=\"Maximum command history entries per host\"]"}'
-    - step: 35
-      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
     - step: 36
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 37
       expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains": "Clear all command history"}}'
-    - step: 38
-      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "state": "detached"}}'
     - step: 39
+      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "state": "detached"}}'
+    - step: 40
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "100"}}'
-    - step: 42
-      expectation: '{"wait_for": "input[aria-label=\"Maximum command history entries per host\"][value=\"50000\"]"}'
     - step: 43
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "50000"}}'
+      expectation: '{"wait_for": "input[aria-label=\"Maximum command history entries per host\"][value=\"50000\"]"}'
     - step: 44
-      expectation: '{"assert_count": {"selector": "input[name=\"inlineSuggestionsSource\"][value=\"history+path\"]:checked", "equal": 1}}'
-    - step: 45
-      expectation: '{"assert_enabled": "input[aria-label=\"Maximum command history entries per host\"]"}'
-    - step: 59
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Command 1\"]", "name": "value", "equals": "printf qa-custom-ssh-command"}}'
-    - step: 70
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-terminal-profile\"]"}'
-    - step: 76
-      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-theme-select\"]", "contains": "Kanagawa Wave"}}'
-    - step: 86
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "50000"}}'
-    - step: 91
+    - step: 45
+      expectation: '{"assert_count": {"selector": "input[name=\"inlineSuggestionsSource\"][value=\"history+path\"]:checked", "equal": 1}}'
+    - step: 46
+      expectation: '{"assert_enabled": "input[aria-label=\"Maximum command history entries per host\"]"}'
+    - step: 60
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Command 1\"]", "name": "value", "equals": "printf qa-custom-ssh-command"}}'
-    - step: 94
+    - step: 71
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-terminal-profile\"]"}'
+    - step: 77
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-theme-select\"]", "contains": "Kanagawa Wave"}}'
+    - step: 87
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "50000"}}'
+    - step: 92
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Command 1\"]", "name": "value", "equals": "printf qa-custom-ssh-command"}}'
+    - step: 95
       expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
     results:
-    - 12
-    - 17
-    - 19
-    - 32
-    - 35
+    - 13
+    - 18
+    - 20
+    - 33
     - 36
-    - 38
+    - 37
     - 39
-    - 42
+    - 40
     - 43
     - 44
     - 45
-    - 59
-    - 70
-    - 76
-    - 86
-    - 91
-    - 94
+    - 46
+    - 60
+    - 71
+    - 77
+    - 87
+    - 92
+    - 95
   visual:
   - check: Inspect the terminal profile screenshot for readable sections, selected controls, and no clipped labels.
     method: manual

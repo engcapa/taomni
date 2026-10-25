@@ -9,8 +9,6 @@ import {
   Monitor,
   MoreHorizontal,
   Network,
-  PanelsTopLeft,
-  Info,
   KeyRound,
   PanelLeft,
   PanelRight,
@@ -39,7 +37,7 @@ import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { WindowControls } from "../window/WindowControls";
 import { WindowDragHandle } from "../window/WindowDragHandle";
 import { startWindowDrag } from "../../lib/windowDrag";
-import { TitleBarTrayControls } from "../window/TitleBarTrayControls";
+import { PlatformToolbarActions } from "./PlatformToolbarActions";
 import { WorkspaceTabStrip } from "../workspace/WorkspaceTabStrip";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionImportExport } from "../menubar/useSessionImportExport";
@@ -103,10 +101,7 @@ export function ControlBar({
   const ctx = useContextMenu();
   const menuHost = useMainRailHostStore((s) => s.menuHost);
   const activeSideTab = useAppStore((state) => state.activeSideTab);
-  const rightSidebarCollapsed = useAppStore((state) => state.rightSidebarCollapsed);
-  const toggleRightSidebar = useAppStore((state) => state.toggleRightSidebar);
   const t = useT();
-  const [detailsRevealHovered, setDetailsRevealHovered] = useState(false);
   const {
     hasSessions,
     importJson,
@@ -230,13 +225,13 @@ export function ControlBar({
         <div className="shrink-0 self-stretch" style={{ width: MAC_TRAFFIC_LIGHT_INSET }} data-window-drag />
       )}
       <div className="flex items-center gap-1 px-1.5 shrink-0">
-        <BarButton
+        {activeSideTab !== "home" && <BarButton
           testId="toggle-left-sidebar"
           title={`${t("platform.toggleLeftSidebar")} (${IS_MAC ? "Cmd+B" : "Ctrl+B"})`}
           icon={leftSidebarCollapsed ? <PanelRight className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
           active={!leftSidebarCollapsed}
           onClick={onToggleSidebar}
-        />
+        />}
         {!nativeMenu && (
           menuHost ? createPortal(
             <BarButton testId="app-main-menu" title={t("compactTitleBar.mainMenu")} icon={<Menu className="w-4 h-4" />} onClick={openMainMenu} />,
@@ -250,9 +245,9 @@ export function ControlBar({
           <div className="flex h-full min-w-0 items-center gap-1">
             <WorkspaceTabStrip />
           </div>
-        ) : activeSideTab === "home" || activeSideTab === "agents" ? (
+        ) : activeSideTab === "home" || activeSideTab === "agents" || activeSideTab === "tools" ? (
           <div className="flex h-full items-center gap-2 px-2 text-[12px] font-semibold" data-testid="platform-mode-title">
-            {t(activeSideTab === "home" ? "platform.homeTitle" : "platform.agentsTitle")}
+            {t(activeSideTab === "home" ? "platform.homeTitle" : activeSideTab === "tools" ? "platform.tools" : "platform.agentsTitle")}
           </div>
         ) : (
           <TabBar
@@ -260,7 +255,6 @@ export function ControlBar({
             onConnectSession={onConnectSession}
             onOpenSessionEditor={onOpenSessionEditor}
             onDuplicateTab={onDuplicateTab}
-            detailsRevealExternal={detailsRevealHovered}
           />
         )}
       </div>
@@ -268,41 +262,10 @@ export function ControlBar({
           bar). It only appears once a new version is staged. */}
       <UpdateHint />
       {/* Per-tab contextual actions portal in here (SFTP / Chat / detach …). */}
-      <div ref={slotRef} data-testid="tab-action-slot" className="flex items-center gap-0.5 self-stretch shrink-0 pr-1" />
-      <button
-        type="button"
-        data-testid="tab-details-hover"
-        aria-label={t("tabs.detailsShortcutHint", { shortcut: IS_MAC ? "Cmd+Shift+H" : "Ctrl+Shift+H" })}
-        title={t("tabs.detailsShortcutHint", { shortcut: IS_MAC ? "Cmd+Shift+H" : "Ctrl+Shift+H" })}
-        data-active={detailsRevealHovered || undefined}
-        className="taomni-tab-details-button relative h-6 w-7 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] data-[active=true]:bg-[var(--taomni-selected)]"
-        onMouseEnter={() => setDetailsRevealHovered(true)}
-        onMouseLeave={() => setDetailsRevealHovered(false)}
-        onFocus={() => setDetailsRevealHovered(true)}
-        onBlur={() => setDetailsRevealHovered(false)}
-      >
-        <PanelsTopLeft className="w-4 h-4" />
-        <Info className="absolute right-0.5 bottom-0.5 w-2.5 h-2.5 rounded-full" style={{ background: "var(--taomni-chrome-bg)" }} />
-      </button>
-      {/* Open-tabs `⋯` overflow (OpenTabsMenu). */}
-      <TabMore onDetachActiveTab={onDetachActiveTab} />
-      <BarButton
-        testId="global-search-trigger"
-        title={`${t("platform.globalSearch")} (${IS_MAC ? "Cmd+K" : "Ctrl+K"})`}
-        icon={<Search className="w-4 h-4" />}
-        onClick={() => onOpenGlobalSearch?.()}
-      />
-      <BarButton
-        testId="toggle-right-sidebar"
-        title={t("platform.toggleRightSidebar")}
-        active={!rightSidebarCollapsed}
-        icon={<PanelRight className="w-4 h-4" />}
-        onClick={toggleRightSidebar}
-      />
-      <div className={IS_MAC ? "w-2 self-stretch shrink-0" : "w-3 self-stretch shrink-0"} />
-      {/* Divider between the tab-related buttons and the main-window controls. */}
-      <div aria-hidden="true" className="taomni-control-divider self-stretch shrink-0" />
-      <TitleBarTrayControls />
+      <div ref={slotRef} data-testid="tab-action-slot" className="flex items-center gap-0.5 self-stretch shrink-0 pr-1" style={{ display: activeSideTab === "home" ? "none" : undefined }} />
+      <PlatformToolbarActions onOpenSearch={onOpenGlobalSearch}>
+        {activeSideTab === "sessions" && <TabMore onDetachActiveTab={onDetachActiveTab} />}
+      </PlatformToolbarActions>
       {!IS_MAC && <WindowControls onClose={onCloseWindow} />}
     </div>
   );

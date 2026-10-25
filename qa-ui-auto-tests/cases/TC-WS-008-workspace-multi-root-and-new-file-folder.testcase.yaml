@@ -1,7 +1,7 @@
 id: TC-WS-008
 title: Workspace multi-root management with new file and new folder creation
-description: v6.1 AC-08 / DEC-04. The workspace file tree toolbar and a folder's context menu create files and directories, mount extra local root folders (multi-root)
-  and remove roots without deleting disk content. A created file opens in the workspace editor and appears in the tree.
+description: v6.1 AC-08 / DEC-04. The workspace file tree toolbar and a folder's context menu create files and directories, mount extra local root folders (multi-root) and remove
+  roots without deleting disk content. A created file opens in the workspace editor and appears in the tree.
 modes:
 - browser
 - native
@@ -24,7 +24,8 @@ steps:
 - seed_storage:
     key: taomni.platformWorkspaces.v1
     value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace (默认工作区)","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"qa-root","path":"${fixture.platform_workspace_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
-- reload_window: null
+- reload_window:
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="workspace-file-tree"]'
@@ -83,21 +84,20 @@ verification:
   - id: R1
     requirement: 工作区文件树工具栏提供新建文件、新建目录、添加外部文件夹与刷新入口，且无已删除的 [文件管理|Git] 行。
     actions:
-    - 10
     - 11
     - 12
-    checkpoints:
-    - step: 11
-      expectation: 新建文件按钮可见
-    - step: 13
-      expectation: 新建目录按钮可见
-    results:
-    - 11
     - 13
+    checkpoints:
+    - step: 12
+      expectation: '{"assert_visible": "[data-testid=\"workspace-add-folder\"]"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"workspace-tree-file\"][data-path=\"README.md\"]"}'
+    results:
+    - 12
+    - 14
   - id: R2
     requirement: 通过工具栏新建文件后立即在编辑器中打开并出现在文件树中，新建目录也同步出现。
     actions:
-    - 14
     - 15
     - 16
     - 17
@@ -108,21 +108,21 @@ verification:
     - 22
     - 23
     - 24
-    checkpoints:
-    - step: 18
-      expectation: 新建文件在编辑器中打开
-    - step: 19
-      expectation: 新建文件出现在文件树
-    - step: 25
-      expectation: 新建目录出现在文件树
-    results:
-    - 18
-    - 19
     - 25
+    checkpoints:
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-path=\"hello-workspace.ts\"]"}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"workspace-tree-file\"][data-path=\"hello-workspace.ts\"]"}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"workspace-tree-folder\"][data-path=\"generated\"]"}'
+    results:
+    - 19
+    - 20
+    - 26
   - id: R3
     requirement: 目录右键菜单提供新建文件/目录、添加外部目录与移除根目录；支持挂载第二个根目录并从工作区移除（不删除磁盘文件）。
     actions:
-    - 26
     - 27
     - 28
     - 29
@@ -139,20 +139,21 @@ verification:
     - 40
     - 41
     - 42
-    checkpoints:
-    - step: 29
-      expectation: 目录右键菜单包含新建与多根目录操作
-    - step: 37
-      expectation: 第二个根目录出现在文件树
-    - step: 42
-      expectation: 移除后仅剩一个根目录
-    - step: 43
-      expectation: 持久化状态仅保留一个根目录
-    results:
-    - 29
-    - 37
-    - 42
     - 43
+    checkpoints:
+    - step: 30
+      expectation: '{"assert_visible": "[data-testid=\"workspace-tree-new-folder\"]"}'
+    - step: 38
+      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-fs-modal\"]", "state": "hidden", "timeout_sec": 10}}'
+    - step: 43
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tree-root\"]", "equal": 1}}'
+    - step: 44
+      expectation: '{"assert_visible": "[data-testid=\"workspace-tree-root\"][data-path=\"${fixture.platform_workspace_root}\"]"}'
+    results:
+    - 30
+    - 38
+    - 43
+    - 44
   visual:
   - check: 多根文件树与新建入口在左栏紧凑对齐，创建后无重复节点。
     method: manual

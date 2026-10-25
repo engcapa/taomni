@@ -51,6 +51,18 @@ export function getLastBufferLines(term: Terminal, lineCount: number, end = term
 }
 
 
+/** Skip unused screen rows before selecting the tail, without scanning history. */
+export function getTerminalPreviewText(term: Terminal, lineCount: number): string {
+  const buffer = term.buffer.active;
+  let end = buffer.length;
+  while (end > buffer.baseY) {
+    if (buffer.getLine(end - 1)?.translateToString(true).trim()) break;
+    end -= 1;
+  }
+  return getLastBufferLines(term, lineCount, end);
+}
+
+
 export function collectTerminalBlockSelectionText(
   term: Pick<Terminal, "buffer" | "cols">,
   selection: TerminalBlockSelection,

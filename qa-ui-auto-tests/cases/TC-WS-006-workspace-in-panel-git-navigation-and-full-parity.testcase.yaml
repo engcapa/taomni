@@ -1,8 +1,8 @@
 id: TC-WS-006
 title: In-workspace Git panel reachable from four entries with the full main parity surface
-description: 'v6.1 AC-06 / DEC-04. The removed [Files | Git] row (marker 1) and the removed top-right Git button (marker 3) stay absent. The built-in Git panel opens
-  from the workspace status bar, the primary rail Git button, the workspace tab strip and the editor''s compare-in-Git action, and keeps every main Git capability:
-  repository selector, six views (Changes/Log/Branches/Tags/Stash/Settings), tree/flat switch, amend and commit, and side-by-side/unified diffs.'
+description: 'v6.1 AC-06 / DEC-04. The removed [Files | Git] row (marker 1) and the removed top-right Git button (marker 3) stay absent. The built-in Git panel opens from the workspace
+  status bar, the primary rail Git button, the workspace tab strip and the editor''s compare-in-Git action, and keeps every main Git capability: repository selector, six views (Changes/Log/Branches/Tags/Stash/Settings),
+  tree/flat switch, amend and commit, and side-by-side/unified diffs.'
 modes:
 - browser
 - native
@@ -25,7 +25,8 @@ steps:
 - seed_storage:
     key: taomni.platformWorkspaces.v1
     value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace (默认工作区)","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"repo-a","path":"${fixture.parity008_root}/repo-a","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
-- reload_window: null
+- reload_window:
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="workspace-sidebar-panel"]'
@@ -99,21 +100,20 @@ verification:
   - id: R1
     requirement: 工作区已移除左栏 [文件管理|Git] 行与右上角 Git 按钮，且左栏 Git 状态条与主左栏 Git 工具按钮存在。
     actions:
-    - 9
     - 10
     - 11
-    checkpoints:
-    - step: 9
-      expectation: 旧文件管理/Git 切换行不存在
-    - step: 12
-      expectation: 主左侧栏 Git 工具按钮与本栏状态条均存在
-    results:
-    - 9
     - 12
+    checkpoints:
+    - step: 10
+      expectation: '{"assert_visible": "[data-testid=\"workspace-sidebar-git-bar\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"workspace-git-panel\"]"}'
+    results:
+    - 10
+    - 13
   - id: R2
     requirement: 点击左栏 Git 状态条打开内置 Git 面板，6 大子标签页、Tree/Flat 切换、Amend 与 Commit/Commit&Passh 完整可用。
     actions:
-    - 13
     - 14
     - 15
     - 16
@@ -122,23 +122,23 @@ verification:
     - 19
     - 20
     - 21
-    checkpoints:
-    - step: 14
-      expectation: 工作区内置 Git 面板打开
-    - step: 20
-      expectation: Changes/Log/Branches/Tags/Stash/Settings 全部存在
-    - step: 22
-      expectation: Tree/Flat 切换存在
-    - step: 24
-      expectation: Amend 与提交控件存在
-    results:
-    - 14
-    - 20
     - 22
+    checkpoints:
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"git-changes-tab\"]"}'
+    - step: 21
+      expectation: '{"assert_visible": "[data-testid=\"git-changes-tree-toggle\"]"}'
+    - step: 23
+      expectation: '{"assert_visible": "[data-testid=\"git-commit-message\"]"}'
+    - step: 25
+      expectation: '{"assert_visible": "[data-testid=\"git-commit-and-push\"]"}'
+    results:
+    - 15
+    - 21
+    - 23
   - id: R3
     requirement: 编辑器“在 Git 面板对比”路径打开 Git 面板并定位当前文件；新增多根目录后仓库切换器出现且 Diff 支持并排/统一切换。
     actions:
-    - 40
     - 41
     - 42
     - 43
@@ -155,17 +155,18 @@ verification:
     - 54
     - 55
     - 56
-    checkpoints:
-    - step: 44
-      expectation: Git 面板带 focus-path 定位
-    - step: 49
-      expectation: 多仓库管理器与仓库选择器出现
-    - step: 57
-      expectation: 并排/统一 Diff 可切换
-    results:
-    - 44
-    - 49
     - 57
+    checkpoints:
+    - step: 45
+      expectation: '{"wait_for": "[data-testid=\"workspace-git-panel\"][data-focus-path=\"same.txt\"]"}'
+    - step: 50
+      expectation: '{"wait_for": "[data-testid=\"workspace-git-manager\"]"}'
+    - step: 58
+      expectation: '{"assert_visible": "[data-testid=\"git-diff-mode-split\"]"}'
+    results:
+    - 45
+    - 50
+    - 58
   visual:
   - check: Git 面板保留 main 的视觉与信息密度，移除的冗余入口确不存在。
     method: manual

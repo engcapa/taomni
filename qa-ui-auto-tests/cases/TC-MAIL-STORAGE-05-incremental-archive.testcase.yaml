@@ -1,11 +1,9 @@
 id: TC-MAIL-STORAGE-05
 title: Publish complete originals before large mailbox history finishes and resume safely
-description: Native loopback IMAP with 350 messages, multiple header pages, and controlled FETCH latency.
-  Independent SQLite/gzip observations require readable complete originals while the header watermark
-  is still incomplete. Pause, read an original, reopen the tab, resume, verify every original and attachment,
-  and rescan without duplicates. Renderer progress checks are also covered by browser TC-MAIL-STORAGE-04;
-  browser stubs cannot prove IMAP batch ordering or persisted bytes. The independent header sync may continue
-  after full-original storage is paused; incomplete history is asserted at the first publication observation.
+description: Native loopback IMAP with 350 messages, multiple header pages, and controlled FETCH latency. Independent SQLite/gzip observations require readable complete originals
+  while the header watermark is still incomplete. Pause, read an original, reopen the tab, resume, verify every original and attachment, and rescan without duplicates. Renderer
+  progress checks are also covered by browser TC-MAIL-STORAGE-04; browser stubs cannot prove IMAP batch ordering or persisted bytes. The independent header sync may continue after
+  full-original storage is paused; incomplete history is asserted at the first publication observation.
 covers:
 - F-MAIL-23
 tags:
@@ -20,6 +18,7 @@ fixtures:
 timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-mail"]'
@@ -173,13 +172,11 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Complete MIME is published while history is incomplete; paused progress and original
-      reading survive tab reopen; resume completes every message exactly once and repeat scans preserve
-      originals.
+    requirement: Complete MIME is published while history is incomplete; paused progress and original reading survive tab reopen; resume completes every message exactly once and
+      repeat scans preserve originals.
     actions:
     - 1
-    - 2
-    - 4
+    - 3
     - 5
     - 6
     - 7
@@ -190,99 +187,86 @@ verification:
     - 12
     - 13
     - 14
-    - 17
+    - 15
     - 18
     - 19
     - 20
     - 21
-    - 23
-    - 26
-    - 28
-    - 33
-    - 35
-    - 37
-    - 40
-    - 42
+    - 22
+    - 24
+    - 27
+    - 29
+    - 34
+    - 36
+    - 38
+    - 41
     - 43
+    - 44
+    - 47
+    - 51
+    - 54
+    - 57
+    - 59
+    checkpoints:
+    - step: 16
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-settings\"]", "contains": "No cached folders. Connect and sync this account first"}}'
+    - step: 17
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-storage-folders\"] input", "equal": 0}}'
+    - step: 28
+      expectation: '{"mail_storage_assert": {"kind": "incremental", "root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}", "timeout_sec": 30}}'
+    - step: 30
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains": "paused", "timeout_sec": 60}}'
+    - step: 31
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-header-progress\"]", "contains": "/350", "timeout_sec": 60}}'
+    - step: 32
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-original-progress\"]", "contains": "Saved this scan:", "timeout_sec": 60}}'
+    - step: 37
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-preview\"]", "contains": "batch.bin", "timeout_sec": 60}}'
+    - step: 39
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-preview\"]", "contains": "Readable before history completes", "timeout_sec": 60}}'
+    - step: 42
+      expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
+    - step: 45
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains": "paused", "timeout_sec": 60}}'
+    - step: 46
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-header-progress\"]", "contains": "/350", "timeout_sec": 60}}'
+    - step: 49
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains": "completed", "timeout_sec": 60}}'
+    - step: 50
+      expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}", "full": {"INBOX": 350}, "headers": {"INBOX": 350}, "timeout_sec":
+        60}}'
+    - step: 53
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 200}}'
+    - step: 56
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 150}}'
+    - step: 58
+      expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
+    - step: 61
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains": "completed", "timeout_sec": 60}}'
+    - step: 62
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-original-progress\"]", "contains": "Saved this scan: 0", "timeout_sec": 60}}'
+    - step: 63
+      expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}", "full": {"INBOX": 350}, "headers": {"INBOX": 350}}}'
+    results:
+    - 16
+    - 17
+    - 28
+    - 30
+    - 31
+    - 32
+    - 37
+    - 39
+    - 42
+    - 45
     - 46
+    - 49
     - 50
     - 53
     - 56
     - 58
-    checkpoints:
-    - step: 15
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-settings\"]", "contains":
-        "No cached folders. Connect and sync this account first"}}'
-    - step: 16
-      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-storage-folders\"] input", "equal":
-        0}}'
-    - step: 27
-      expectation: '{"mail_storage_assert": {"kind": "incremental", "root": "${fixture.mail_storage_a}",
-        "expected": "${fixture.mail_expected}", "timeout_sec": 30}}'
-    - step: 29
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
-        "paused", "timeout_sec": 60}}'
-    - step: 30
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-header-progress\"]", "contains":
-        "/350", "timeout_sec": 60}}'
-    - step: 31
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-original-progress\"]", "contains":
-        "Saved this scan:", "timeout_sec": 60}}'
-    - step: 36
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-preview\"]", "contains":
-        "batch.bin", "timeout_sec": 60}}'
-    - step: 38
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-preview\"]", "contains":
-        "Readable before history completes", "timeout_sec": 60}}'
-    - step: 41
-      expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
-    - step: 44
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
-        "paused", "timeout_sec": 60}}'
-    - step: 45
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-header-progress\"]", "contains":
-        "/350", "timeout_sec": 60}}'
-    - step: 48
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
-        "completed", "timeout_sec": 60}}'
-    - step: 49
-      expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}",
-        "full": {"INBOX": 350}, "headers": {"INBOX": 350}, "timeout_sec": 60}}'
-    - step: 52
-      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 200}}'
-    - step: 55
-      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 150}}'
-    - step: 57
-      expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
-    - step: 60
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains":
-        "completed", "timeout_sec": 60}}'
-    - step: 61
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-original-progress\"]", "contains":
-        "Saved this scan: 0", "timeout_sec": 60}}'
-    - step: 62
-      expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}",
-        "full": {"INBOX": 350}, "headers": {"INBOX": 350}}}'
-    results:
-    - 15
-    - 16
-    - 27
-    - 29
-    - 30
-    - 31
-    - 36
-    - 38
-    - 41
-    - 44
-    - 45
-    - 48
-    - 49
-    - 52
-    - 55
-    - 57
-    - 60
     - 61
     - 62
+    - 63
   visual:
   - check: Retained paused header progress, scan counts, and a readable early saved original
     method: manual

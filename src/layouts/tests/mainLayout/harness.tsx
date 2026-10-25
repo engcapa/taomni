@@ -104,8 +104,8 @@ vi.mock("react-resizable-panels", () => {
     useImperativeHandle(panelRef, () => handle);
     return <div data-testid="panel">{children}</div>;
   });
-  const Separator = ({ className, "data-testid": testId }: React.HTMLAttributes<HTMLDivElement> & { "data-testid"?: string; }) => (
-    <div className={className} data-testid={testId ?? "panel-resize-handle"} />
+  const Separator = ({ className, style, "data-testid": testId }: React.HTMLAttributes<HTMLDivElement> & { "data-testid"?: string; }) => (
+    <div className={className} style={style} data-testid={testId ?? "panel-resize-handle"} />
   );
   return {
     Group,

@@ -247,7 +247,7 @@ export function TabBar({
   // Tabs actually rendered in the strip. The focus filter (issue #121) hides
   // non-matching tabs here without closing them; the `…` menu still lists all.
   const visibleTabs = useMemo(
-    () => filterVisibleTabs(tabs, sessions, tabFilter),
+    () => filterVisibleTabs(tabs.filter((tab) => tab.type !== "welcome"), sessions, tabFilter),
     [tabs, sessions, tabFilter],
   );
 
@@ -378,9 +378,14 @@ export function TabBar({
   );
 
   const handleTabContext = (e: React.MouseEvent, tab: Tab) => {
-    const idx = tabs.findIndex((t) => t.id === tab.id);
+    const sessionTabs = tabs.filter((item) => item.type !== "welcome");
+    const idx = sessionTabs.findIndex((item) => item.id === tab.id);
     const isFirst = idx === 0;
-    const isLast = idx === tabs.length - 1;
+    const isLast = idx === sessionTabs.length - 1;
+    const moveToSessionIndex = (index: number) => {
+      const target = sessionTabs[index];
+      if (target) moveTabToIndex(tab.id, tabs.findIndex((item) => item.id === target.id));
+    };
     ctx.show(e, [
       { label: t("tabs.close"), icon: <X className="w-3 h-3" />, onClick: () => removeTab(tab.id), disabled: !tab.closable },
       { label: t("tabs.closeOthersShort"), icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.id !== tab.id && t.closable).map((t) => t.id)) },
@@ -399,10 +404,10 @@ export function TabBar({
         onClick: () => copyTabSessionInfo(tab),
       },
       { label: "", separator: true, onClick: () => { } },
-      { label: t("tabs.moveToFirst"), icon: <ChevronFirst className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, 0), disabled: isFirst },
-      { label: t("tabs.moveLeft"), icon: <ChevronLeft className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, idx - 1), disabled: isFirst },
-      { label: t("tabs.moveRight"), icon: <ChevronRight className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, idx + 1), disabled: isLast },
-      { label: t("tabs.moveToLast"), icon: <ChevronLast className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, tabs.length - 1), disabled: isLast },
+      { label: t("tabs.moveToFirst"), icon: <ChevronFirst className="w-3 h-3" />, onClick: () => moveToSessionIndex(0), disabled: isFirst },
+      { label: t("tabs.moveLeft"), icon: <ChevronLeft className="w-3 h-3" />, onClick: () => moveToSessionIndex(idx - 1), disabled: isFirst },
+      { label: t("tabs.moveRight"), icon: <ChevronRight className="w-3 h-3" />, onClick: () => moveToSessionIndex(idx + 1), disabled: isLast },
+      { label: t("tabs.moveToLast"), icon: <ChevronLast className="w-3 h-3" />, onClick: () => moveToSessionIndex(sessionTabs.length - 1), disabled: isLast },
     ]);
   };
 

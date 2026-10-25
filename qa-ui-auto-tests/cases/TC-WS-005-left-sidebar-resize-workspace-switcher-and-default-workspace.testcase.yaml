@@ -1,7 +1,7 @@
 id: TC-WS-005
 title: Resizable left sidebar with the workspace switcher, default workspace and persisted width
-description: v6.1 AC-05 / DEC-04. The left sidebar keeps its 6px drag handle and can be widened continuously; the width survives a reload. The workspace
-  switcher sits at the top of the Workspaces sidebar, always offers the undeletable Default Workspace, and can create and switch workspaces.
+description: v6.1 AC-05 / DEC-04. The left sidebar keeps its 6px drag handle and can be widened continuously; the width survives a reload. The workspace switcher sits at the top of
+  the Workspaces sidebar, always offers the undeletable Default Workspace, and can create and switch workspaces.
 modes:
 - browser
 - native
@@ -24,7 +24,8 @@ steps:
 - seed_storage:
     key: taomni.platformWorkspaces.v1
     value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace (默认工作区)","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"qa-root","path":"${fixture.platform_workspace_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
-- reload_window: null
+- reload_window:
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="workspace-switcher"]'
@@ -40,16 +41,18 @@ steps:
     selector: '[data-testid="main-sidebar-resize-handle"]'
     key: ArrowRight
 - eval_readonly:
-    expression: JSON.parse(localStorage.getItem('taomni.resizable-panels.v4.main-layout') || '{}').sidebar > 0 && document.querySelector('.taomni-navigator-frame').getBoundingClientRect().width
-      > 260
+    expression: JSON.parse(localStorage.getItem('taomni.resizable-panels.v4.main-layout') || '{}').sidebar > 0 &&
+      document.querySelector('.taomni-navigator-frame').getBoundingClientRect().width > 260
     expect_truthy: true
-- reload_window: null
+    timeout_sec: 5
+- reload_window:
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="workspace-switcher"]'
 - eval_readonly:
-    expression: Math.abs(document.querySelector('[data-testid' + String.fromCharCode(61) + '"expanded-sidebar-panel"]').getBoundingClientRect().width -
-      window.innerWidth * JSON.parse(localStorage.getItem('taomni.resizable-panels.v4.main-layout') || '{}').sidebar / 100) < 80
+    expression: Math.abs(document.querySelector('[data-testid' + String.fromCharCode(61) + '"expanded-sidebar-panel"]').getBoundingClientRect().width - window.innerWidth *
+      JSON.parse(localStorage.getItem('taomni.resizable-panels.v4.main-layout') || '{}').sidebar / 100) < 80
     expect_truthy: true
 - click: '[data-testid="workspace-switcher-button"]'
 - wait_for: '[data-testid="workspace-switcher-menu"]'
@@ -69,64 +72,64 @@ verification:
     - 2
     - 4
     - 5
-    - 7
-    - 13
-    - 15
-    - 17
+    - 8
+    - 14
+    - 16
+    - 19
     checkpoints:
     - step: 3
-      expectation: 'wait_for: [data-testid="welcome-panel"]'
-    - step: 6
-      expectation: 'wait_for: [data-testid="session-tree"]'
-    - step: 8
-      expectation: 'wait_for: [data-testid="workspace-switcher"]'
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
     - step: 9
-      expectation: 'assert_text: [data-testid="workspace-switcher"]'
+      expectation: '{"wait_for": "[data-testid=\"workspace-switcher\"]"}'
     - step: 10
-      expectation: 'assert_visible: [data-testid="workspace-default-badge"]'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-switcher\"]", "contains": "Default Workspace"}}'
     - step: 11
-      expectation: 'assert_visible: [data-testid="main-sidebar-resize-handle"]'
+      expectation: '{"assert_visible": "[data-testid=\"workspace-default-badge\"]"}'
     - step: 12
-      expectation: 'eval_readonly: document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''"expanded-sidebar-panel"]'').getBoundingClientRect().width
-        >= 180'
-    - step: 14
-      expectation: 'eval_readonly: JSON.parse(localStorage.getItem(''taomni.resizable-panels.v4.main-layout'') || ''{}'').sidebar > 0 && document.querySelector(''.taomni-navigator-frame'').getBoundingClientRect().width
-        > 260'
-    - step: 16
-      expectation: 'wait_for: [data-testid="session-tree"]'
+      expectation: '{"assert_visible": "[data-testid=\"main-sidebar-resize-handle\"]"}'
+    - step: 13
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"expanded-sidebar-panel\"]'').getBoundingClientRect().width
+        >= 180", "expect_truthy": true}}'
+    - step: 15
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(''taomni.resizable-panels.v4.main-layout'') || ''{}'').sidebar > 0 && document.querySelector(''.taomni-navigator-frame'').getBoundingClientRect().width
+        > 260", "expect_truthy": true, "timeout_sec": 5}}'
     - step: 18
-      expectation: 'wait_for: [data-testid="workspace-switcher"]'
-    - step: 19
-      expectation: 'eval_readonly: Math.abs(document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''"expanded-sidebar-panel"]'').getBoundingClientRect().width
-        - window.innerWidth * JSON.parse(localStorage.getItem(''taomni.resizable-panels.v4.main-layout'') || ''{}'').sidebar / 100) < 80'
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"workspace-switcher\"]"}'
+    - step: 21
+      expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"expanded-sidebar-panel\"]'').getBoundingClientRect().width
+        - window.innerWidth * JSON.parse(localStorage.getItem(''taomni.resizable-panels.v4.main-layout'') || ''{}'').sidebar / 100) < 80", "expect_truthy": true}}'
     results:
     - 3
-    - 6
-    - 8
+    - 7
     - 9
     - 10
     - 11
     - 12
-    - 14
-    - 16
+    - 13
+    - 15
     - 18
-    - 19
+    - 20
+    - 21
   - id: R2
     requirement: 切换器显示默认工作区并支持 Escape 关闭。
     actions:
-    - 20
-    - 23
-    checkpoints:
-    - step: 21
-      expectation: 'wait_for: [data-testid="workspace-switcher-menu"]'
-    - step: 22
-      expectation: 'assert_text: [data-testid="workspace-switcher-menu"]'
-    - step: 24
-      expectation: 'assert_not_visible: [data-testid="workspace-switcher-menu"]'
-    results:
-    - 21
     - 22
+    - 25
+    checkpoints:
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"workspace-switcher-menu\"]"}'
+    - step: 24
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-switcher-menu\"]", "contains": "Default Workspace"}}'
+    - step: 26
+      expectation: '{"assert_not_visible": "[data-testid=\"workspace-switcher-menu\"]"}'
+    results:
+    - 23
     - 24
+    - 26
   visual:
   - check: 与 HTML 原型比较圆角框架、紧凑尺寸、无溢出和可用操作入口。
     method: manual

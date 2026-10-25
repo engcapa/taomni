@@ -21,12 +21,13 @@ steps:
 - wait_for: '[data-testid="welcome-panel"]'
 - seed_storage:
     key: taomni.platformWorkspaces.v1
-    value: '{"version": 1, "activeWorkspaceId": "default-workspace", "createdNodes": [], "workspaces": [{"id": "default-workspace", "name": "Default Workspace",
-      "description": "", "isDefault": true, "rootFolders": [{"id": "root-1", "name": "qa-root", "path": "${fixture.platform_workspace_root}", "addedAt":
-      1}], "pinnedSessionIds": [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs":
-      [], "activeTabId": ""}, {"id": "second-workspace", "name": "Second Workspace", "description": "", "isDefault": false, "rootFolders": [], "pinnedSessionIds":
-      [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId": ""}]}'
-- reload_window: null
+    value: '{"version": 1, "activeWorkspaceId": "default-workspace", "createdNodes": [], "workspaces": [{"id": "default-workspace", "name": "Default Workspace", "description": "", "isDefault":
+      true, "rootFolders": [{"id": "root-1", "name": "qa-root", "path": "${fixture.platform_workspace_root}", "addedAt": 1}], "pinnedSessionIds": [], "activeLeftToolWindow": "project",
+      "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId": ""}, {"id": "second-workspace", "name": "Second Workspace", "description":
+      "", "isDefault": false, "rootFolders": [], "pinnedSessionIds": [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220},
+      "openTabs": [], "activeTabId": ""}]}'
+- reload_window:
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="workspace-file-tree"]'
@@ -83,7 +84,8 @@ steps:
 - assert_count:
     selector: '[data-testid="workspace-file-editor"][data-dirty]'
     equal: 0
-- reload_window: null
+- reload_window:
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="workspace-file-editor"] .cm-content'
@@ -119,110 +121,110 @@ verification:
     - 2
     - 4
     - 5
-    - 7
-    - 9
-    - 11
-    - 14
-    - 15
-    - 17
-    - 18
-    - 20
-    - 21
-    checkpoints:
-    - step: 3
-      expectation: 'wait_for: [data-testid="welcome-panel"]'
-    - step: 6
-      expectation: 'wait_for: [data-testid="session-tree"]'
-    - step: 8
-      expectation: 'wait_for: [data-testid="workspace-file-tree"]'
-    - step: 10
-      expectation: 'wait_for: [data-testid="workspace-tree-file"][data-path="README.md"]'
-    - step: 12
-      expectation: 'wait_for: [data-testid="workspace-file-editor"] .cm-content'
-    - step: 13
-      expectation: 'assert_text: [data-testid="workspace-file-editor"] .cm-content'
-    - step: 16
-      expectation: 'assert_attribute: [data-testid="workspace-file-editor"]'
-    - step: 19
-      expectation: 'assert_not_visible: [data-testid="workspace-file-editor"]'
-    - step: 22
-      expectation: 'assert_text: [data-testid="workspace-file-editor"] .cm-content'
-    results:
-    - 3
-    - 6
     - 8
     - 10
     - 12
-    - 13
+    - 15
     - 16
+    - 18
     - 19
+    - 21
     - 22
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-tree\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"workspace-tree-file\"][data-path=\"README.md\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
+    - step: 14
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "platform workspace root"}}'
+    - step: 17
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"]", "name": "data-dirty", "equals": "true"}}'
+    - step: 20
+      expectation: '{"assert_not_visible": "[data-testid=\"workspace-file-editor\"]"}'
+    - step: 23
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "export const continuity = true;"}}'
+    results:
+    - 3
+    - 7
+    - 9
+    - 11
+    - 13
+    - 14
+    - 17
+    - 20
+    - 23
   - id: R2
     requirement: Home、Sessions 再返回工作区保留未保存内容与撤销重做历史。
     actions:
-    - 23
-    - 25
-    - 27
-    - 29
-    - 31
-    checkpoints:
-    - step: 24
-      expectation: 'wait_for: [data-testid="welcome-panel"]'
-    - step: 26
-      expectation: 'wait_for: [data-testid="session-tree"]'
-    - step: 28
-      expectation: 'assert_text: [data-testid="workspace-file-editor"] .cm-content'
-    - step: 30
-      expectation: 'assert_text: [data-testid="workspace-file-editor"] .cm-content'
-    - step: 32
-      expectation: 'assert_text: [data-testid="workspace-file-editor"] .cm-content'
-    results:
     - 24
     - 26
     - 28
     - 30
     - 32
+    checkpoints:
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 29
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "export const continuity = true;"}}'
+    - step: 31
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "platform workspace root"}}'
+    - step: 33
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "export const continuity = true;"}}'
+    results:
+    - 25
+    - 27
+    - 29
+    - 31
+    - 33
   - id: R3
     requirement: 保存完成后重载仍可读取编辑后的文件；native 经过真实磁盘 IPC。
     actions:
-    - 33
-    - 36
-    - 38
-    checkpoints:
-    - step: 35
-      expectation: 'assert_count: [data-testid="workspace-file-editor"][data-dirty]'
-    - step: 37
-      expectation: 'wait_for: [data-testid="session-tree"]'
-    - step: 39
-      expectation: 'wait_for: [data-testid="workspace-file-editor"] .cm-content'
-    - step: 40
-      expectation: 'assert_text: [data-testid="workspace-file-editor"] .cm-content'
-    results:
-    - 35
+    - 34
     - 37
-    - 39
     - 40
+    checkpoints:
+    - step: 36
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"][data-dirty]", "equal": 0}}'
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 41
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
+    - step: 42
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "export const continuity = true;"}}'
+    results:
+    - 36
+    - 39
+    - 41
+    - 42
   - id: R4
     requirement: 文件过滤只展示匹配的已加载文件，清空后恢复文件树。
     actions:
-    - 42
     - 44
     - 46
     - 48
+    - 50
     checkpoints:
-    - step: 43
-      expectation: '[data-testid="workspace-tree-file"]'
     - step: 45
-      expectation: '{''selector'': ''[data-testid="workspace-tree-file"]'', ''equal'': 0}'
+      expectation: '{"wait_for": "[data-testid=\"workspace-tree-file\"]"}'
     - step: 47
-      expectation: '{''selector'': ''[data-testid="workspace-tree-file"]'', ''equal'': 1}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tree-file\"]", "equal": 0}}'
     - step: 49
-      expectation: '[data-testid="workspace-tree-file"]'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tree-file\"]", "equal": 1}}'
+    - step: 51
+      expectation: '{"assert_visible": "[data-testid=\"workspace-tree-file\"]"}'
     results:
-    - 43
     - 45
     - 47
     - 49
+    - 51
   visual:
   - check: 与 HTML 原型比较圆角框架、紧凑尺寸、无溢出和可用操作入口。
     method: manual

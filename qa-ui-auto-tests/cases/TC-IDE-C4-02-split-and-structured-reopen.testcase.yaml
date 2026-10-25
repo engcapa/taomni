@@ -86,9 +86,10 @@ steps:
 - wait_for: '[data-testid="code-workspace-editor-pane"]'
 - assert_visible: '[data-testid="code-workspace-editor-tab-strip"]'
 - screenshot: tc-ide-c4-reopened.png
-- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- click: '[data-testid="nav-mode-home"]'
 - wait: 0.3
 - press: Control+Shift+T
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="terminal"][data-active="true"]'
 - screenshot: tc-ide-c4-welcome-chord.png
 verification:
@@ -147,10 +148,10 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
     - step: 40
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-tab-strip\"]"}'
-    - step: 45
+    - step: 46
       expectation: '{"wait_for": "[data-testid=\"tab-item\"][data-tab-type=\"terminal\"][data-active=\"true\"]"}'
     results:
-    - 45
+    - 46
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

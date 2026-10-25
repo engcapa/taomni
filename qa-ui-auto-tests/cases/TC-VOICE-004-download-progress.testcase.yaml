@@ -7,6 +7,7 @@ fixtures: [reset_db]
 timeout_sec: 160
 steps:
 - open: '${cfg.app.base_url}/?voiceFixture=1&voiceDownloadSlow=1'
+- click: '[data-testid="titlebar-actions-more"]'
 - wait_for: '[data-testid="ptt-button"]'
 - click: '[data-testid="ptt-button"]'
 - wait_for: '[data-testid="asr-download-url-whisper-base"]'
@@ -19,6 +20,7 @@ steps:
 - wait_for: '[data-testid="asr-installation-progress"]'
 - assert_text: {selector: '[data-testid="asr-installation-progress"]', contains: '14.8 /', timeout_sec: 5}
 - click: '[data-testid="voice-settings-close"]'
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="ptt-button"]'
 - assert_text: {selector: '[data-testid="asr-installation-progress"]', contains: Downloading}
 - assert_attribute: {selector: '[data-testid="asr-download-whisper-base"]', name: disabled, equals: ''}
@@ -41,6 +43,7 @@ steps:
 - click: '[data-testid="asr-download-sherpa-zipformer-zh-en"]'
 - assert_text: {selector: '[data-testid="asr-sherpa-installation-progress"]', contains: '19.9 /', timeout_sec: 5}
 - click: '[data-testid="voice-settings-close"]'
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="ptt-button"]'
 - assert_text: {selector: '[data-testid="asr-sherpa-installation-progress"]', contains: Downloading}
 - assert_attribute: {selector: '[data-testid="asr-download-whisper-base"]', name: disabled, equals: ''}
@@ -63,36 +66,78 @@ verification:
   requirements:
   - id: R1
     requirement: Official links are copyable, background progress survives reopening, active downloads cannot be duplicated, and cancelled downloads can be resumed.
-    actions: [3, 6, 10, 13, 14, 18, 21, 24]
+    actions:
+    - 4
+    - 7
+    - 11
+    - 14
+    - 16
+    - 20
+    - 23
+    - 26
     checkpoints:
-    - {step: 5, expectation: Link matches the pinned official artifact.}
-    - {step: 7, expectation: Copy reports success.}
-    - {step: 8, expectation: Wide modal fits the viewport.}
-    - {step: 15, expectation: Reopened modal restores the active download.}
-    - {step: 16, expectation: Duplicate download is disabled.}
-    - {step: 19, expectation: Cancellation is shown.}
-    - {step: 20, expectation: Partial data can be resumed.}
-    - {step: 22, expectation: Resume completes and verifies.}
-    - {step: 25, expectation: Narrow viewport modal remains inside the screen.}
-    - {step: 27, expectation: Close icon remains visible and clickable in the narrow modal.}
-    results: [5, 7, 8, 15, 16, 19, 20, 22, 25, 27]
+    - {step: 6, expectation: '{"assert_attribute": {"selector": "[data-testid=\"asr-download-url-whisper-base\"]", "name": "href", "equals": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-base.bin?download=true"}}'}
+    - {step: 8, expectation: '{"assert_text": {"selector": "[data-testid=\"asr-copy-url-whisper-base\"]", "contains": "Copied"}}'}
+    - {step: 9, expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"voice-settings-dialog\"]", "min_width": 850, "min_height": 400, "viewport_margin": 8}}'}
+    - {step: 17, expectation: '{"assert_text": {"selector": "[data-testid=\"asr-installation-progress\"]", "contains": "Downloading"}}'}
+    - {step: 18, expectation: '{"assert_attribute": {"selector": "[data-testid=\"asr-download-whisper-base\"]", "name": "disabled", "equals": ""}}'}
+    - {step: 21, expectation: '{"assert_text": {"selector": "[data-testid=\"asr-installation-progress\"]", "contains": "Download cancelled"}}'}
+    - {step: 22, expectation: '{"assert_text": {"selector": "[data-testid=\"asr-download-whisper-base\"]", "contains": "Resume download"}}'}
+    - {step: 24, expectation: '{"assert_text": {"selector": "[data-testid=\"asr-installation-progress\"]", "contains": "Downloaded and verified", "timeout_sec": 20}}'}
+    - {step: 27, expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"voice-settings-dialog\"]", "min_width": 550, "min_height": 400, "viewport_margin": 8}}'}
+    - {step: 29, expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"voice-settings-close\"]", "min_width": 28, "min_height": 26, "icon_size": 16, "tolerance": 2,
+        "viewport_margin": 8}}'}
+    results:
+    - 6
+    - 8
+    - 9
+    - 17
+    - 18
+    - 21
+    - 22
+    - 24
+    - 27
+    - 29
   - id: R2
     requirement: Zipformer is available alongside Whisper with matching download controls; progress restores after reopening and cancellation retains resumable bytes.
-    actions: [29, 31, 33, 35, 36, 40, 43, 45, 47, 50, 51]
+    actions:
+    - 31
+    - 33
+    - 35
+    - 37
+    - 39
+    - 43
+    - 46
+    - 48
+    - 50
+    - 53
+    - 54
     checkpoints:
-    - {step: 30, expectation: Zipformer exposes its official model bundle page.}
-    - {step: 32, expectation: Copy uses the same feedback as Whisper.}
-    - {step: 37, expectation: Reopening restores the Zipformer running job.}
-    - {step: 38, expectation: Other downloads remain disabled during the running job.}
-    - {step: 41, expectation: Cancellation retains progress.}
-    - {step: 42, expectation: The common download action offers resume.}
-    - {step: 44, expectation: Resume reaches verified completion.}
-    - {step: 46, expectation: The shared use-model action selects Zipformer.}
-    - {step: 48, expectation: All model cards remain inside the narrow dialog.}
-    - {step: 52, expectation: Link and open actions retain the settings page; exact IPC target is covered by the mounted test.}
-    results: [30, 32, 37, 38, 41, 42, 44, 46, 48, 52]
+    - {step: 32, expectation: '{"assert_attribute": {"selector": "[data-testid=\"asr-download-url-sherpa-zipformer-zh-en\"]", "name": "href", "equals": "https://huggingface.co/csukuangfj/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20/tree/98590b7ed6443e77b714204da2757d75e1a642f4"}}'}
+    - {step: 34, expectation: '{"assert_text": {"selector": "[data-testid=\"asr-copy-url-sherpa-zipformer-zh-en\"]", "contains": "Copied"}}'}
+    - {step: 40, expectation: '{"assert_text": {"selector": "[data-testid=\"asr-sherpa-installation-progress\"]", "contains": "Downloading"}}'}
+    - {step: 41, expectation: '{"assert_attribute": {"selector": "[data-testid=\"asr-download-whisper-base\"]", "name": "disabled", "equals": ""}}'}
+    - {step: 44, expectation: '{"assert_text": {"selector": "[data-testid=\"asr-sherpa-installation-progress\"]", "contains": "Download cancelled"}}'}
+    - {step: 45, expectation: '{"assert_text": {"selector": "[data-testid=\"asr-download-sherpa-zipformer-zh-en\"]", "contains": "Resume download"}}'}
+    - {step: 47, expectation: '{"assert_text": {"selector": "[data-testid=\"asr-sherpa-installation-progress\"]", "contains": "Downloaded and verified", "timeout_sec": 20}}'}
+    - {step: 49, expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"active\":\"sherpa-zipformer-zh-en\""}}'}
+    - {step: 51, expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"voice-settings-dialog\"]", "min_width": 550, "min_height": 400, "viewport_margin": 8}}'}
+    - {step: 55, expectation: '{"assert_visible": "[data-testid=\"asr-model-sherpa-zipformer-zh-en\"]"}'}
+    results:
+    - 32
+    - 34
+    - 40
+    - 41
+    - 44
+    - 45
+    - 47
+    - 49
+    - 51
+    - 55
   visual:
   - {check: "Model cards, progress and narrow layout", method: manual, reason: Inspect the three retained screenshots.}
   native:
-  - {check: "Range requests, cancellation and hash publication", method: external, reason: Rust local-server tests exercise real file transfer; browser uses explicit delayed fixture.}
-  - {check: System browser and clipboard, method: manual, reason: UI tests check exact IPC URL and existing shared helpers; Win11 OS opening and clipboard need a real desktop check.}
+  - {check: "Range requests, cancellation and hash publication", method: external, reason: Rust local-server tests exercise real file transfer; browser uses explicit delayed
+      fixture.}
+  - {check: System browser and clipboard, method: manual, reason: UI tests check exact IPC URL and existing shared helpers; Win11 OS opening and clipboard need a real desktop
+      check.}

@@ -13,6 +13,7 @@ id: TC-VOICE-008
 title: Volcengine and Soniox selection, neutral hotwords and experimental Gemini
 steps:
 - open: ${cfg.app.base_url}/?voiceFixture=1
+- click: '[data-testid="titlebar-actions-more"]'
 - wait_for: '[data-testid="ptt-button"]'
 - click: '[data-testid="ptt-button"]'
 - wait_for: '[data-testid="asr-settings"]'
@@ -61,48 +62,46 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Volcengine and Soniox selection, neutral hotwords and experimental
-      Gemini
+    requirement: Volcengine and Soniox selection, neutral hotwords and experimental Gemini
     actions:
-    - 5
-    - 7
-    - 8
-    - 10
-    - 13
-    - 14
-    checkpoints:
-    - step: 6
-      expectation: Volcengine uses the official async endpoint.
-    - step: 9
-      expectation: Duplicate terms are removed before persistence.
-    - step: 11
-      expectation: Soniox uses a realtime model.
-    - step: 12
-      expectation: Gemini is hidden by default.
-    - step: 15
-      expectation: Explicit experimental selection persists.
-    results:
     - 6
+    - 8
     - 9
     - 11
-    - 12
+    - 14
     - 15
+    checkpoints:
+    - step: 7
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"asr-provider-endpoint\"]", "name": "value", "equals": "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"}}'
+    - step: 10
+      expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"hotwords\":[\"Taomni\",\"src/main.rs\"]"}}'
+    - step: 12
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"asr-realtime-settings\"] label:has-text(\"Model\") input", "name": "value", "equals": "stt-rt-v5"}}'
+    - step: 13
+      expectation: '{"assert_not_visible": "[data-testid=\"asr-realtime-provider\"] option[value=\"gemini\"]"}'
+    - step: 16
+      expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"active\":\"gemini\""}}'
+    results:
+    - 7
+    - 10
+    - 12
+    - 13
+    - 16
   - id: R2
     requirement: Custom endpoints persist only after explicitly saving the provider.
     actions:
-    - 17
     - 18
-    checkpoints:
-    - step: 19
-      expectation: Saved endpoint is retained in the provider configuration.
-    results:
     - 19
+    checkpoints:
+    - step: 20
+      expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "wss://example.invalid/experimental"}}'
+    results:
+    - 20
   visual:
   - method: manual
     reason: Inspect retained screenshots.
     check: Settings and original transcript remain readable
   native:
   - method: external
-    reason: Native socket/config/cleanup tests establish backend behavior; browser
-      fixtures do not validate vendor service availability.
+    reason: Native socket/config/cleanup tests establish backend behavior; browser fixtures do not validate vendor service availability.
     check: Provider transport, credentials and LLM protection

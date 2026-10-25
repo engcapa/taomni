@@ -1,8 +1,8 @@
 id: TC-WS-009
 title: Sessions mode keeps the single-line header, SessionTree toolbar and open-tabs filters
-description: 'v6.1 AC-09 / DEC-05. Sessions mode shows no quick-connect chip row and no secondary terminal breadcrumb: the main panel shares the single 33px toolbar.
-  The left panel keeps the seven SessionTree toolbar actions, search, the folder tree and its context menus, while the header keeps the ℹ️ details preview and the
-  ⋯ OpenTabsMenu with directory grouping and fuzzy search.'
+description: 'v6.1 AC-09 / DEC-05. Sessions mode shows no quick-connect chip row and no secondary terminal breadcrumb: the main panel shares the single 33px toolbar. The left panel keeps
+  the seven SessionTree toolbar actions, search, the folder tree and its context menus, while the header keeps the large live overview and the ⋯ OpenTabsMenu with directory grouping
+  and fuzzy search.'
 modes:
 - browser
 - native
@@ -22,6 +22,7 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-ws-009
 - wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -84,7 +85,7 @@ steps:
 - click: '[data-testid="session-refresh"]'
 - click: '[data-testid="session-tree-item"][data-session-name="prod-api-01"]'
 - click: '[data-testid="session-favorite"]'
-- assert_visible: '[data-testid="tab-details-hover"]'
+- assert_visible: '[data-testid="tab-overview-trigger"]'
 - click: '[data-testid="tab-more"]'
 - wait_for: '[data-testid="open-tabs-menu"]'
 - assert_visible: '[data-testid="open-tabs-filter"]'
@@ -103,66 +104,67 @@ verification:
   - id: R1
     requirement: Sessions 模式不显示快速连接芯片行，主面板共享单行 33px 工具栏。
     actions:
-    - 10
-    checkpoints:
-    - step: 10
-      expectation: 步骤 9 的断言通过
-    - step: 11
-      expectation: 步骤 10 的断言通过
-    results:
     - 11
+    checkpoints:
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"prod-api-01\"]"}'
+    - step: 12
+      expectation: '{"assert_count": {"selector": "[data-testid=\"quick-connect\"]", "equal": 0}}'
+    results:
+    - 12
   - id: R2
     requirement: 左栏完整保留 7 个会话工具按钮、搜索过滤、目录树与右键菜单。
     actions:
-    - 23
-    - 25
-    - 27
-    checkpoints:
-    - step: 12
-      expectation: 步骤 11 的断言通过
-    - step: 13
-      expectation: 步骤 12 的断言通过
-    - step: 14
-      expectation: 步骤 13 的断言通过
-    - step: 15
-      expectation: 步骤 14 的断言通过
-    - step: 16
-      expectation: 步骤 15 的断言通过
-    - step: 17
-      expectation: 步骤 16 的断言通过
-    - step: 18
-      expectation: 步骤 17 的断言通过
-    - step: 19
-      expectation: 步骤 18 的断言通过
-    - step: 20
-      expectation: 步骤 19 的断言通过
-    - step: 21
-      expectation: 步骤 20 的断言通过
-    - step: 22
-      expectation: 步骤 21 的断言通过
-    - step: 24
-      expectation: 步骤 23 的断言通过
-    - step: 26
-      expectation: 步骤 25 的断言通过
-    - step: 28
-      expectation: 步骤 27 的断言通过
-    results:
+    - 24
+    - 26
     - 28
-  - id: R3
-    requirement: 顶栏 ℹ️ 详情与 ⋯ OpenTabsMenu（目录分组 + 模糊搜索）保持可用。
-    actions:
-    - 31
-    - 35
-    - 37
     checkpoints:
-    - step: 32
-      expectation: 步骤 29 的断言通过
-    - step: 33
-      expectation: 步骤 30 的断言通过
-    - step: 39
-      expectation: 步骤 31 的断言通过
+    - step: 13
+      expectation: '{"assert_count": {"selector": "[data-testid=\"control-bar\"]", "equal": 1}}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"session-edit\"]"}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"session-duplicate\"]"}'
+    - step: 17
+      expectation: '{"assert_visible": "[data-testid=\"session-delete\"]"}'
+    - step: 18
+      expectation: '{"assert_visible": "[data-testid=\"session-refresh\"]"}'
+    - step: 19
+      expectation: '{"assert_visible": "[data-testid=\"session-favorite\"]"}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"session-search\"]"}'
+    - step: 21
+      expectation: '{"assert_items": {"selector": "[data-testid=\"sessions-sidebar-panel\"] > div:first-child > button", "attribute": "data-testid", "equals": ["session-new", "session-edit",
+        "session-duplicate", "session-delete", "session-refresh", "session-favorite"]}}'
+    - step: 22
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"prod-api-01\"]"}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"prod-api-01\"]"}'
+    - step: 27
+      expectation: '{"assert_not_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"prod-api-01\"]"}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"prod-api-01\"]"}'
     results:
-    - 39
+    - 29
+  - id: R3
+    requirement: 顶栏 大预览与 ⋯ OpenTabsMenu（目录分组 + 模糊搜索）保持可用。
+    actions:
+    - 32
+    - 36
+    - 38
+    checkpoints:
+    - step: 33
+      expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Connect"}}'
+    - step: 34
+      expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Move to folder"}}'
+    - step: 40
+      expectation: '{"assert_visible": "[data-testid=\"tab-overview-trigger\"]"}'
+    results:
+    - 40
   visual:
   - check: Sessions 模式垂直空间完全留给画布，左栏工具与过滤器密度一致。
     method: manual

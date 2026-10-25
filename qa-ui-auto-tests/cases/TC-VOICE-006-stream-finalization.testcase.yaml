@@ -1,8 +1,6 @@
 id: TC-VOICE-006
-title: Streaming dictation waits for final acknowledgement and cancels provisional
-  text
-description: Browser fixture delays the final by 700 ms; native sockets and microphone
-  are validated separately.
+title: Streaming dictation waits for final acknowledgement and cancels provisional text
+description: Browser fixture delays the final by 700 ms; native sockets and microphone are validated separately.
 covers:
 - F-AI-2.3
 tags:
@@ -16,6 +14,7 @@ fixtures:
 timeout_sec: 60
 steps:
 - open: ${cfg.app.base_url}/?voiceFixture=1
+- click: '[data-testid="titlebar-actions-more"]'
 - wait_for: '[data-testid="ptt-button"]'
 - click: '[data-testid="ptt-button"]'
 - wait_for: '[data-testid="asr-settings"]'
@@ -23,6 +22,7 @@ steps:
     selector: '[data-testid="asr-realtime-provider"]'
     value: sherpa-zipformer-zh-en
 - click: '[data-testid="voice-settings-close"]'
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="ptt-button"]'
 - wait_for: '[data-testid="ptt-button"][data-state="recording"]'
 - assert_text:
@@ -41,8 +41,7 @@ steps:
     name: data-state
     equals: idle
 - eval_readonly:
-    expression: document.querySelector("#chat-composer-textarea").value === "Final
-      stream fixture."
+    expression: document.querySelector("#chat-composer-textarea").value === "Final stream fixture."
     expect_truthy: true
 verification:
   review: reviewed
@@ -50,25 +49,25 @@ verification:
   - id: R1
     requirement: A delayed final is delivered and cancellation retains the draft.
     actions:
-    - 5
-    - 7
-    - 10
-    - 13
-    - 15
-    checkpoints:
-    - step: 9
-      expectation: Partial text is visible separately.
-    - step: 12
-      expectation: The delayed final reaches the editable draft.
-    - step: 16
-      expectation: Cancellation ends the session.
-    - step: 17
-      expectation: Provisional text did not alter the draft.
-    results:
+    - 6
     - 9
     - 12
-    - 16
+    - 15
     - 17
+    checkpoints:
+    - step: 11
+      expectation: '{"assert_text": {"selector": "[data-testid=\"ptt-button-interim\"]", "contains": "Provisional fixture"}}'
+    - step: 14
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"#chat-composer-textarea\").value", "contains": "Final stream fixture."}}'
+    - step: 18
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"chat-voice-button\"]", "name": "data-state", "equals": "idle"}}'
+    - step: 19
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"#chat-composer-textarea\").value === \"Final stream fixture.\"", "expect_truthy": true}}'
+    results:
+    - 11
+    - 14
+    - 18
+    - 19
   visual:
   - check: Provisional transcript is visibly separated from the draft
     method: manual
@@ -76,5 +75,4 @@ verification:
   native:
   - check: Native provider flush and socket cancellation
     method: external
-    reason: Browser fixture does not establish provider or microphone behavior; focused
-      Rust tests cover native boundaries.
+    reason: Browser fixture does not establish provider or microphone behavior; focused Rust tests cover native boundaries.

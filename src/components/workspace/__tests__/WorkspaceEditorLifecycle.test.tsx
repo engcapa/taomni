@@ -1,6 +1,7 @@
 import { StrictMode, useEffect } from "react";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { useWorkspaceUiStore } from "../../../stores/workspaceUiStore";
 import { EditorView } from "@codemirror/view";
 import { undo } from "@codemirror/commands";
 import { WorkspaceMainPanel } from "../WorkspaceMainPanel";
@@ -26,6 +27,7 @@ vi.mock("../../terminal/TerminalPanel", () => ({ TerminalPanel: () => null }));
 
 beforeEach(() => {
   localStorage.clear();
+  useWorkspaceUiStore.setState({ canvasLayouts: {} });
   vi.clearAllMocks();
   useWorkspacePlatformStore.getState().reloadFromStorage();
   useWorkspaceEditorStore.setState({ documents: {}, activeTabId: null });
@@ -95,4 +97,28 @@ it("keeps edits made while a save is pending dirty and saves them on the next re
   await waitFor(() => expect(screen.getByTestId("workspace-file-editor")).not.toHaveAttribute("data-dirty"));
   expect(vi.mocked(writeWorkspaceText).mock.calls[1][2]).toContain("// second");
   expect(vi.mocked(writeWorkspaceText).mock.calls[1][3]).toBe("h2");
+});
+
+
+it("retains both editors and undo while changing split/grid/single layouts", async () => {
+  render(<WorkspaceMainPanel />);
+  const firstView = await editor();
+  act(() => firstView.dispatch({ changes: { from: 0, insert: "// unsaved split\n" } }));
+  const store = useWorkspacePlatformStore.getState();
+  const root = store.workspaces[0].rootFolders[0];
+  act(() => store.openFileInWorkspace(DEFAULT_WORKSPACE_ID, { rootId: root.id, path: "second.ts" }));
+  await waitFor(() => expect(document.querySelectorAll(".cm-editor")).toHaveLength(2));
+  for (const layout of ["split", "grid"] as const) {
+    act(() => useWorkspaceUiStore.getState().setCanvasLayout(DEFAULT_WORKSPACE_ID, layout));
+    expect(screen.getAllByTestId("workspace-canvas-pane").filter((pane) => pane.style.display !== "none")).toHaveLength(2);
+    expect(EditorView.findFromDOM(document.querySelector(".cm-editor") as HTMLElement)).toBe(firstView);
+    expect(firstView.state.doc.toString()).toContain("// unsaved split");
+  }
+  act(() => useWorkspaceUiStore.getState().setCanvasLayout(DEFAULT_WORKSPACE_ID, "single"));
+  expect(screen.getAllByTestId("workspace-canvas-pane").filter((pane) => pane.style.display !== "none")).toHaveLength(1);
+  act(() => store.setActiveWorkspaceTab(DEFAULT_WORKSPACE_ID, store.workspaces[0].openTabs[0].id));
+  expect(screen.getAllByTestId("workspace-file-editor")[0]).toBeVisible();
+  act(() => undo(firstView));
+  expect(firstView.state.doc.toString()).toBe("const original = 1;\n");
+  expect(vi.mocked(readWorkspaceText)).toHaveBeenCalledTimes(2);
 });

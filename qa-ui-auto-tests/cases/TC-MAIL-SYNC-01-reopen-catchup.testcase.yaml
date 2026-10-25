@@ -40,7 +40,7 @@ steps:
 - seed_storage:
     key: taomni.quickConnectVisible
     value: 'true'
-- reload_window: null
+- reload_window:
 - wait_for: '[data-testid="qc-input"]'
 - fill:
     selector: '[data-testid="qc-input"]'
@@ -51,6 +51,7 @@ steps:
 - mail_server_assert_list_matches:
     timeout_sec: 60
     unread: true
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="tab-item"][data-tab-type="mail"] [data-testid="tab-close"]'
 - wait_for:
     selector: '[data-testid="mail-client-tab"]'
@@ -81,24 +82,24 @@ verification:
     - 5
     - 6
     - 8
-    - 10
-    - 12
+    - 11
     - 13
     - 14
+    - 15
     checkpoints:
     - step: 7
       expectation: '{"wait_for": "[data-testid=\"mail-client-tab\"]"}'
     - step: 9
-      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
-    - step: 11
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60, "unread": true}}'
+    - step: 12
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-client-tab\"]", "state": "detached"}}'
-    - step: 16
-      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 120}}'
     - step: 17
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 120}}'
+    - step: 18
       expectation: '{"assert_count": {"selector": "[data-testid=\"mail-message-row\"]", "min": 450}}'
     results:
-    - 16
     - 17
+    - 18
   visual:
   - check: 截图中邮件列表、文件夹与计数显示完整，无同步进度残留或遮挡。
     method: manual

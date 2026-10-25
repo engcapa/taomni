@@ -46,7 +46,8 @@ interface TabGroup {
  */
 export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab }: OpenTabsMenuProps) {
   const t = useT();
-  const tabs = useAppStore((s) => s.tabs);
+  const allTabs = useAppStore((s) => s.tabs);
+  const tabs = useMemo(() => allTabs.filter((tab) => tab.type !== "welcome"), [allTabs]);
   const activeTabId = useAppStore((s) => s.activeTabId);
   const tabFilter = useAppStore((s) => s.tabFilter);
   const setActiveTab = useAppStore((s) => s.setActiveTab);

@@ -1,3 +1,5 @@
+> 2026-10-25 补充验收：全局/Sessions 实时大预览（Ctrl/Cmd+Shift+E）、移除 Sessions Welcome 与右上角小预览、移除 Tao 贴边悬浮条、按模式对齐右上角工具栏。TC-WS-018 覆盖文件缓冲区预览与工作区分屏，TC-WS-019 通过原生 PTY 输出验证 Sessions 大预览；TC-NOTES-005 改验主导航入口和无悬浮条，原 Chat/Notes/通知用例保留。旧会话用例显式进入 Sessions，历史启动/恢复用例回到 Home；不由 runner 隐式更改模式。本机测试 worker 总数不超过 2。
+
 # Taomni Workspace-First & One-System 平台级 UI/交互重构全量测试规范（Unit / Browser / Native & 既有回归适配专册）
 
 > **关联详细设计文档**：[`docs-feature/workspace-platform-redesign-design.md`](./workspace-platform-redesign-design.md)
@@ -5,6 +7,15 @@
 > **新增 YAML 用例路径**：`qa-ui-auto-tests/cases/TC-WS-001*.testcase.yaml` ~ `TC-WS-012*.testcase.yaml`
 
 ---
+
+## 本轮执行范围补充（2026-10-25）
+
+- 按用户确认，Agents / Crew 仅保留按钮及“开发中”反馈。`TC-WS-011` 验证主导航、Home、命令面板入口均提示且保留当前画布；下文历史 TASK-09 编排与授权场景属于后续设计。
+- `TC-WS-016`（browser）验证 Home 默认全宽、独立圆角框架、紧凑卡片、导入菜单、原有启动/工具入口、右栏调宽与持久化和窄窗口布局；视觉复核包含主操作蓝色填充、次操作中性色、深浅主题及真实编辑器语法高亮。
+- `TC-WS-017`（browser/native）验证跨工作区和 Home/Sessions 模式切换后，未保存文档、撤销/重做与保存重载均保持；native 使用真实临时目录读写。
+- `TC-WS-012/015` 验证 PTY 在模式切换后保留输出并继续工作；Linux `TC-WS-014` 验证系统剪贴板；`TC-MAIN-RAIL-03` 验证真实原生窗口拖动。浏览器 stub 不替代这些系统边界证据。
+- `WorkspaceEditorLifecycle.test.tsx` 保护未访问工作区不启动会话、StrictMode 异步加载/撤销保持及保存期间继续编辑的 dirty 状态。`TC-IDE-PARITY-024-01/027-03` 同步图标默认值，并保留双向名称切换、调宽、Move、Remove 与恢复行为。
+- 本机自动化 worker 总数不超过 2，native 顺序执行；GitHub 使用 `qa-ui-auto-platforms` 先跑相关选定矩阵，再跑完整目录，核对逐例统计及原始 receipts。准确结果和执行边界见实现报告第 0 节。
 
 ## ⚠️ 测试与验收核心原则（多 Coding Agent 必读）
 

@@ -45,6 +45,7 @@ steps:
 - screenshot: current-window-manual-selection.png
 - click: '[data-testid="screenshot-cancel"]'
 - wait_for: '[data-testid="system-screenshot"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -85,68 +86,68 @@ verification:
   review: reviewed
   requirements:
   - id: current-window-and-default
-    requirement: Menu and Alt+A with a modal input focused request inclusion and start unselected; manual drags select exactly the requested region.
-      Ordinary capture still requests hiding and Escape exits.
+    requirement: Menu and Alt+A with a modal input focused request inclusion and start unselected; manual drags select exactly the requested region. Ordinary capture still requests
+      hiding and Escape exits.
     actions:
     - 1
     - 4
     - 7
     - 12
     - 16
-    - 18
-    - 20
-    - 22
-    - 27
-    - 31
-    - 33
-    - 37
+    - 19
+    - 21
+    - 23
+    - 28
+    - 32
+    - 34
+    - 38
     checkpoints:
     - step: 3
-      expectation: '[data-testid="system-screenshot"]'
+      expectation: '{"wait_for": "[data-testid=\"system-screenshot\"]"}'
     - step: 5
-      expectation: '{''selector'': ''[data-testid="system-screenshot-current-window"]'', ''regex'': ''.*\((?:Alt\+A|⌥A)\).*''}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"system-screenshot-current-window\"]", "regex": ".*\\((?:Alt\\+A|⌥A)\\).*"}}'
     - step: 6
-      expectation: '{''selector'': ''[data-testid="system-screenshot-default-hint"]'', ''contains'': ''Default capture hides Taomni''}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"system-screenshot-default-hint\"]", "contains": "Default capture hides Taomni"}}'
     - step: 8
-      expectation: '[data-testid="screenshot-overlay"][data-phase="select"]'
+      expectation: '{"wait_for": "[data-testid=\"screenshot-overlay\"][data-phase=\"select\"]"}'
     - step: 9
-      expectation: '[data-testid="screenshot-selection"]'
+      expectation: '{"assert_not_visible": "[data-testid=\"screenshot-selection\"]"}'
     - step: 10
-      expectation: '[data-testid="screenshot-toolbar"]'
+      expectation: '{"assert_not_visible": "[data-testid=\"screenshot-toolbar\"]"}'
     - step: 11
-      expectation: '{''expression'': ''window.__taomniStubScreenshotCalls.at(-1).args.includeCurrentWindow === true''}'
+      expectation: '{"eval_readonly": {"expression": "window.__taomniStubScreenshotCalls.at(-1).args.includeCurrentWindow === true"}}'
     - step: 13
-      expectation: '[data-testid="screenshot-toolbar"]'
+      expectation: '{"wait_for": "[data-testid=\"screenshot-toolbar\"]"}'
     - step: 14
-      expectation: '{''selector'': ''[data-testid="screenshot-size-hint"]'', ''equals'': ''160 × 120''}'
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"screenshot-size-hint\"]", "equals": "160 × 120"}}'
     - step: 17
-      expectation: '[data-testid="system-screenshot"]'
-    - step: 19
-      expectation: '[data-testid="session-editor"]'
-    - step: 21
-      expectation: '{''expression'': ''document.activeElement?.dataset.testid === "session-host"''}'
-    - step: 23
-      expectation: '[data-testid="screenshot-overlay"][data-phase="select"]'
+      expectation: '{"wait_for": "[data-testid=\"system-screenshot\"]"}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 22
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.dataset.testid === \"session-host\""}}'
     - step: 24
-      expectation: '[data-testid="screenshot-selection"]'
+      expectation: '{"wait_for": "[data-testid=\"screenshot-overlay\"][data-phase=\"select\"]"}'
     - step: 25
-      expectation: '[data-testid="screenshot-toolbar"]'
+      expectation: '{"assert_not_visible": "[data-testid=\"screenshot-selection\"]"}'
     - step: 26
-      expectation: '{''expression'': ''window.__taomniStubScreenshotCalls.at(-1).args.includeCurrentWindow === true''}'
-    - step: 28
-      expectation: '[data-testid="screenshot-toolbar"]'
+      expectation: '{"assert_not_visible": "[data-testid=\"screenshot-toolbar\"]"}'
+    - step: 27
+      expectation: '{"eval_readonly": {"expression": "window.__taomniStubScreenshotCalls.at(-1).args.includeCurrentWindow === true"}}'
     - step: 29
-      expectation: '{''selector'': ''[data-testid="screenshot-size-hint"]'', ''equals'': ''160 × 120''}'
-    - step: 32
-      expectation: '[data-testid="system-screenshot"]'
-    - step: 34
-      expectation: '[data-testid="screenshot-overlay"][data-phase="select"]'
+      expectation: '{"wait_for": "[data-testid=\"screenshot-toolbar\"]"}'
+    - step: 30
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"screenshot-size-hint\"]", "equals": "160 × 120"}}'
+    - step: 33
+      expectation: '{"wait_for": "[data-testid=\"system-screenshot\"]"}'
     - step: 35
-      expectation: '[data-testid="screenshot-selection"]'
+      expectation: '{"wait_for": "[data-testid=\"screenshot-overlay\"][data-phase=\"select\"]"}'
     - step: 36
-      expectation: '{''expression'': ''window.__taomniStubScreenshotCalls.at(-1).args.includeCurrentWindow === false''}'
-    - step: 38
-      expectation: '[data-testid="system-screenshot"]'
+      expectation: '{"assert_not_visible": "[data-testid=\"screenshot-selection\"]"}'
+    - step: 37
+      expectation: '{"eval_readonly": {"expression": "window.__taomniStubScreenshotCalls.at(-1).args.includeCurrentWindow === false"}}'
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"system-screenshot\"]"}'
     results:
     - 3
     - 5
@@ -158,19 +159,19 @@ verification:
     - 13
     - 14
     - 17
-    - 19
-    - 21
-    - 23
+    - 20
+    - 22
     - 24
     - 25
     - 26
-    - 28
+    - 27
     - 29
-    - 32
-    - 34
+    - 30
+    - 33
     - 35
     - 36
-    - 38
+    - 37
+    - 39
   visual:
   - check: Observable capture UI and operation results
     method: automated

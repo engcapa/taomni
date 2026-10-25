@@ -28,7 +28,7 @@ import type { AppCommand } from "../../components/menubar/commands";
 import { ControlBar } from "../../components/tabbar/ControlBar";
 import { TabActionSlotProvider } from "../../components/tabbar/TabActionSlot";
 import { TaoAlertPoller } from "../../components/tao/TaoAlertPoller";
-import { TaoRibbon } from "../../components/tao/TaoRibbon";
+import { TabOverview } from "../../components/tabbar/TabOverview";
 import { MultiExecBar } from "../../components/terminal/MultiExecBar";
 import { UpdateDialog } from "../../components/UpdateDialog";
 import { VaultUnlockDialog } from "../../components/vault/VaultUnlockDialog";
@@ -175,7 +175,12 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                 // tab group's collapsed sidebar (ED-PARITY-027); the store's state
                 // wins and the sync effect resizes the panel to it.
                 if (!prevSize) return;
-                layout.setSidebarCollapsed(percentage <= 2);
+                const collapsed = percentage <= 2;
+                // A resize that applies the store's current state is not a
+                // manual preference change (for example returning from Home).
+                if (collapsed !== useAppStore.getState().sidebarCollapsed) {
+                  layout.setSidebarCollapsed(collapsed);
+                }
               }}
             >
               <div data-testid="expanded-sidebar-panel" className="taomni-navigator-frame h-full overflow-clip" style={layout.sidebarCollapsed ? { display: "none" } : undefined}>
@@ -195,7 +200,10 @@ export function MainLayoutView(props: MainLayoutViewProps) {
             <PanelResizeHandle
               id="main-sidebar-resize-handle"
               data-testid="main-sidebar-resize-handle"
-              className={layout.sidebarCollapsed ? "hidden" : "taomni-platform-resizer"}
+              className="taomni-platform-resizer"
+              // Keep the separator in layout so the panel library retains its
+              // adjacent-panel mapping when Home collapses the navigator.
+              style={layout.sidebarCollapsed ? { width: 0, visibility: "hidden", pointerEvents: "none" } : undefined}
             />
 
             <Panel id="content">
@@ -261,6 +269,8 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                   <div data-testid="global-session-surface" className="flex min-h-0 flex-1 flex-col" style={{ display: activeSideTab === "workspaces" || activeSideTab === "agents" ? "none" : "flex" }}>
                   <TabContentRouter
                     activeTab={activeSideTab === "home" ? undefined : layout.activeTab}
+                    showHome={activeSideTab === "home"}
+                    toolsView={activeSideTab === "tools"}
                     welcomeRestore={workspaceOpening.welcomeRestore}
                     openLocalTab={sessionActions.openLocalTab}
                     handleNewSession={sessionActions.handleNewSession}
@@ -368,7 +378,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
             </Panel>
           </PanelGroup>
           {chrome.chatDrawerFloating && <ChatDrawer />}
-          {!layout.aiFullyDisabled && <TaoRibbon />}
+          <TabOverview />
           <RightContextPanel />
           <FloatingNotesPanel />
           <TaoAlertPoller />

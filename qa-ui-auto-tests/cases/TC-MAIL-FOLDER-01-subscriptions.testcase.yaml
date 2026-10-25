@@ -36,7 +36,7 @@ steps:
 - seed_storage:
     key: taomni.quickConnectVisible
     value: 'true'
-- reload_window: null
+- reload_window:
 - wait_for: '[data-testid="qc-input"]'
 - fill:
     selector: '[data-testid="qc-input"]'
@@ -59,6 +59,7 @@ steps:
     timeout_sec: 10
 - assert_visible: '[data-testid="mail-folder-row"][data-folder-name="Sent"]'
 - screenshot: mail-folder-01-subscriptions.png
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="tab-item"][data-tab-type="mail"] [data-testid="tab-close"]'
 - wait_for:
     selector: '[data-testid="mail-client-tab"]'
@@ -110,23 +111,23 @@ verification:
   - id: R2
     requirement: 重开账户后偏好与服务器订阅保持，Archive 仍然隐藏。
     actions:
-    - 17
-    - 19
+    - 18
     - 20
+    - 21
     checkpoints:
-    - step: 18
+    - step: 19
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-client-tab\"]", "state": "detached"}}'
-    - step: 21
-      expectation: '{"wait_for": "[data-testid=\"mail-client-tab\"]"}'
     - step: 22
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Sent\"]", "timeout_sec": 60}}'
+      expectation: '{"wait_for": "[data-testid=\"mail-client-tab\"]"}'
     - step: 23
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Archive\"]", "state": "detached", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Sent\"]", "timeout_sec": 60}}'
     - step: 24
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Archive\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 25
       expectation: '{"assert_count": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Archive\"]", "equal": 0}}'
     results:
-    - 23
     - 24
+    - 25
   visual:
   - check: 截图中订阅对话框的 Archive 未勾选、“只显示已订阅”已勾选，文件夹树不含 Archive。
     method: manual

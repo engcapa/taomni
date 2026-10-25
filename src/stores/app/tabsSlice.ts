@@ -1,6 +1,7 @@
 import { type StateCreator } from "zustand";
 import type { Tab } from "../../types";
 import { t as tr } from "../../lib/i18n";
+import { sidebarRailGroup } from "../sidebarRailPolicy";
 import { terminalCwdTitlePrefix } from "../../lib/terminalCwd";
 import { getQueryTab } from "../../lib/queryRegistry";
 import { computeDuplicateTitle, computeNewTerminalTitle, updateDuplicateAutoTitle } from "./tabTitles";
@@ -280,7 +281,8 @@ export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tab
       }
       return {
         activeTabId: id,
-        activeSideTab: s.activeSideTab === "home" || s.activeSideTab === "workspaces" || s.activeSideTab === "agents" ? "sessions" : s.activeSideTab,
+        ...(s.mergeToolWindowRail && tab?.type !== "welcome" ? { sidebarCollapsed: s.sidebarCollapsedByGroup[sidebarRailGroup(tab?.type)] } : {}),
+        activeSideTab: tab?.type === "welcome" ? "home" : s.activeSideTab === "home" || s.activeSideTab === "workspaces" || s.activeSideTab === "agents" ? "sessions" : s.activeSideTab,
         recentWorkspaces: recentResult.recentWorkspaces,
         recentWorkspaceIdByWorkspaceInstance: recentResult.recentWorkspaceIdByWorkspaceInstance,
         terminalSplitActive: tab?.type === "terminal" ? s.terminalSplitActive : false,

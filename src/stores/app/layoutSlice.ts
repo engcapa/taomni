@@ -41,7 +41,7 @@ export const createLayoutSlice: StateCreator<AppState, [], [], Pick<AppState, "s
   sidebarCollapsed: readSidebarCollapsed(),
   mergeToolWindowRail: readMergeToolWindowRail(),
   sidebarCollapsedByGroup: readSidebarCollapsedByGroup(readSidebarCollapsed()),
-  activeSideTab: "sessions",
+  activeSideTab: "home",
   rightSidebarCollapsed: true,
   floatingMfa: createInitialFloatingMfaState(),
   statusMessage: tr("status.ready"),
@@ -49,13 +49,20 @@ export const createLayoutSlice: StateCreator<AppState, [], [], Pick<AppState, "s
   toggleSidebar: () =>
     set((s) => {
       const sidebarCollapsed = !s.sidebarCollapsed;
-      return { sidebarCollapsed, ...rememberSidebarForActiveGroup(s, sidebarCollapsed) };
+      return { sidebarCollapsed, ...(s.activeSideTab === "home" ? {} : rememberSidebarForActiveGroup(s, sidebarCollapsed)) };
     }),
   setSidebarCollapsed: (collapsed) => {
-    set((s) => ({ sidebarCollapsed: collapsed, ...rememberSidebarForActiveGroup(s, collapsed) }));
+    set((s) => ({ sidebarCollapsed: collapsed, ...(s.activeSideTab === "home" ? {} : rememberSidebarForActiveGroup(s, collapsed)) }));
   },
   setActiveSideTab: (tab) => {
-    set((s) => ({ activeSideTab: tab, sidebarCollapsed: false, ...rememberSidebarForActiveGroup(s, false) }));
+    set((s) => ({
+      activeSideTab: tab,
+      ...(tab === "sessions" && s.tabs.find((candidate) => candidate.id === s.activeTabId)?.type === "welcome"
+        ? { activeTabId: [...s.tabs].reverse().find((candidate) => candidate.type !== "welcome")?.id ?? s.activeTabId }
+        : {}),
+      sidebarCollapsed: tab === "home",
+      ...(tab === "home" || s.activeSideTab === "home" ? {} : rememberSidebarForActiveGroup(s, false)),
+    }));
   },
   toggleRightSidebar: () => set((s) => ({ rightSidebarCollapsed: !s.rightSidebarCollapsed })),
   setRightSidebarCollapsed: (collapsed) => set({ rightSidebarCollapsed: collapsed }),
@@ -72,7 +79,7 @@ export const createLayoutSlice: StateCreator<AppState, [], [], Pick<AppState, "s
   },
   applySidebarForActiveTab: () => {
     const s = get();
-    if (!s.mergeToolWindowRail) return;
+    if (!s.mergeToolWindowRail || s.activeSideTab === "home") return;
     const active = s.tabs.find((tab) => tab.id === s.activeTabId);
     const collapsed = s.sidebarCollapsedByGroup[sidebarRailGroup(active?.type)];
     if (collapsed === s.sidebarCollapsed) return;

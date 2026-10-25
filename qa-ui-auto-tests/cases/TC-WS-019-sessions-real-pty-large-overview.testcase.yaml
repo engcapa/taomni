@@ -1,0 +1,151 @@
+id: TC-WS-019
+title: Sessions large overview reads real PTY output and activates existing sessions
+description: 'Native boundary: echo markers travel through real local shells, PTYs and terminal buffers into overview cards. Opening, closing and choosing cards preserves both running
+  sessions; Sessions never shows Welcome.'
+modes:
+- native
+covers:
+- F1.5
+- F-WS-1
+- F-WS-3
+tags:
+- p0
+- workspace-redesign
+- terminal
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-019
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="sessions-empty-state"]'
+- assert_not_visible: '[data-testid="welcome-panel"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="welcome"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="tab-details-hover"]'
+    equal: 0
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo TAOMNI_OVERVIEW_FIRST
+    submit: true
+    verify:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+      regex: TAOMNI_OVERVIEW_FIRST
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo TAOMNI_OVERVIEW_SECOND
+    submit: true
+    verify:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+      regex: TAOMNI_OVERVIEW_SECOND
+- click: '[data-testid="tab-overview-trigger"]'
+- wait_for: '[data-testid="tab-overview"][data-scope="sessions"]'
+- assert_count:
+    selector: '[data-testid="tab-overview-card"]'
+    equal: 2
+- assert_text:
+    selector: '[data-testid="tab-overview"]'
+    contains: TAOMNI_OVERVIEW_FIRST
+- assert_text:
+    selector: '[data-testid="tab-overview"]'
+    contains: TAOMNI_OVERVIEW_SECOND
+- assert_element_geometry:
+    selector: '[data-testid="tab-overview"]'
+    min_width: 900
+    min_height: 600
+- screenshot: ws-019-sessions-large-overview.png
+- click: '[data-testid="tab-overview-card"]:nth-child(1)'
+- assert_text:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    contains: TAOMNI_OVERVIEW_FIRST
+- press: Mod+Shift+E
+- wait_for: '[data-testid="tab-overview"]'
+- press: Escape
+- assert_not_visible: '[data-testid="tab-overview"]'
+- assert_count:
+    selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+    equal: 2
+- screenshot: ws-019-real-pty-overview.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Sessions 大预览展示两个真实终端的输出，按钮/快捷键均可打开并可点击切换，关闭预览不销毁会话。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 9
+    - 11
+    - 12
+    - 14
+    - 15
+    - 22
+    - 24
+    - 26
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"sessions-empty-state\"]"}'
+    - step: 6
+      expectation: '{"assert_not_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 7
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"welcome\"]", "equal": 0}}'
+    - step: 8
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-details-hover\"]", "equal": 0}}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"tab-overview\"][data-scope=\"sessions\"]"}'
+    - step: 17
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-overview-card\"]", "equal": 2}}'
+    - step: 18
+      expectation: '{"assert_text": {"selector": "[data-testid=\"tab-overview\"]", "contains": "TAOMNI_OVERVIEW_FIRST"}}'
+    - step: 19
+      expectation: '{"assert_text": {"selector": "[data-testid=\"tab-overview\"]", "contains": "TAOMNI_OVERVIEW_SECOND"}}'
+    - step: 20
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"tab-overview\"]", "min_width": 900, "min_height": 600}}'
+    - step: 23
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "contains": "TAOMNI_OVERVIEW_FIRST"}}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"tab-overview\"]"}'
+    - step: 27
+      expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
+    - step: 28
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "equal": 2}}'
+    results:
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 10
+    - 13
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 23
+    - 25
+    - 27
+    - 28
+  visual:
+  - check: 工具栏顺序、大预览卡片与画布无重叠或裁切，匹配原型。
+    method: manual
+    reason: 截图需要人工评审，功能断言不代替视觉结论。
+  native:
+  - check: 真实 PTY 的输出进入预览，选择卡片保留两个终端。
+    method: automated
+    reason: Native 模式直接运行隔离 QA 应用，browser 不替代原生边界证据。

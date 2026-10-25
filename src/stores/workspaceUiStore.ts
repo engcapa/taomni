@@ -6,6 +6,8 @@
  */
 import { create } from "zustand";
 
+export type WorkspaceCanvasLayout = "single" | "split" | "grid";
+
 export type WorkspaceFsModalKind = "file" | "folder" | "root";
 
 export interface WorkspaceFsModalRequest {
@@ -17,6 +19,8 @@ export interface WorkspaceFsModalRequest {
 }
 
 export interface WorkspaceUiState {
+  canvasLayouts: Record<string, WorkspaceCanvasLayout>;
+  setCanvasLayout: (workspaceId: string, layout: WorkspaceCanvasLayout) => void;
   sessionPickerOpen: boolean;
   /** Workspace id the picker targets (defaults to the active workspace). */
   sessionPickerWorkspaceId: string | null;
@@ -34,6 +38,8 @@ export interface WorkspaceUiState {
 }
 
 export const useWorkspaceUiStore = create<WorkspaceUiState>((set) => ({
+  canvasLayouts: {},
+  setCanvasLayout: (workspaceId, layout) => set((state) => ({ canvasLayouts: { ...state.canvasLayouts, [workspaceId]: layout } })),
   sessionPickerOpen: false,
   sessionPickerWorkspaceId: null,
   fsModal: null,

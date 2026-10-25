@@ -1,9 +1,7 @@
 id: TC-TERM-IME-001
 title: Real terminal IME commit and cancel stay intact after closing and reopening the PTY
-description: Linux/X11 fcitx5 wbpy supplies physical composition keys to the real xterm textarea and PTY.
-  Two committed CJK characters appear exactly once in printf output; cancellation leaves only ASCII. A
-  fresh terminal repeats composition after the first owner has unmounted. This does not establish Windows/macOS
-  IME transport behavior.
+description: Linux/X11 fcitx5 wbpy supplies physical composition keys to the real xterm textarea and PTY. Two committed CJK characters appear exactly once in printf output;
+  cancellation leaves only ASCII. A fresh terminal repeats composition after the first owner has unmounted. This does not establish Windows/macOS IME transport behavior.
 covers:
 - F2.1
 - F2.2
@@ -79,8 +77,8 @@ steps:
 - wait_for:
     selector: '[data-testid="terminal-pane"]'
     state: detached
-- wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="sessions-empty-state"]'
+- click: '[data-testid="new-local-terminal"]'
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
     timeout_sec: 60
@@ -107,8 +105,7 @@ steps:
     regex: (?m)^qa-ime-reopened-<[\u4e00-\u9fff]{2}>\r?$
     timeout_sec: 20
 - eval_readonly:
-    expression: '!(/nihao/.test(document.querySelector("[data-terminal-text]").getAttribute("data-terminal-text")
-      || ""))'
+    expression: '!(/nihao/.test(document.querySelector("[data-terminal-text]").getAttribute("data-terminal-text") || ""))'
     expect_truthy: true
 - assert_count:
     selector: '[data-testid="terminal-pane"]'
@@ -118,8 +115,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Physical fcitx commit reaches the local PTY once, Escape sends no preedit, and a newly
-      opened terminal accepts another composition without stale listeners or duplicate input.
+    requirement: Physical fcitx commit reaches the local PTY once, Escape sends no preedit, and a newly opened terminal accepts another composition without stale listeners or
+      duplicate input.
     actions:
     - 1
     - 4
@@ -142,24 +139,22 @@ verification:
     - 25
     checkpoints:
     - step: 9
-      expectation: '{''assert_pattern'': {''selector'': ''[data-testid="terminal-pane"][data-terminal-active="true"]'',
-        ''regex'': ''(?m)^qa-ime-first-<[\\u4e00-\\u9fff]{2}>\\r?$'', ''timeout_sec'': 20}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^qa-ime-first-<[\\u4e00-\\u9fff]{2}>\\r?$", "timeout_sec":
+        20}}'
     - step: 14
-      expectation: '{''assert_pattern'': {''selector'': ''[data-testid="terminal-pane"][data-terminal-active="true"]'',
-        ''regex'': ''(?m)^qa-ime-cancel-<ASCII>\\r?$'', ''timeout_sec'': 20}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^qa-ime-cancel-<ASCII>\\r?$", "timeout_sec": 20}}'
     - step: 23
-      expectation: '{''assert_pattern'': {''selector'': ''[data-testid="terminal-pane"][data-terminal-active="true"]'',
-        ''regex'': ''(?m)^qa-ime-reopened-<[\\u4e00-\\u9fff]{2}>\\r?$'', ''timeout_sec'': 20}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^qa-ime-reopened-<[\\u4e00-\\u9fff]{2}>\\r?$", "timeout_sec":
+        20}}'
     - step: 24
-      expectation: '{''eval_readonly'': {''expression'': ''!(/nihao/.test(document.querySelector("[data-terminal-text]").getAttribute("data-terminal-text")
-        || ""))'', ''expect_truthy'': True}}'
+      expectation: '{"eval_readonly": {"expression": "!(/nihao/.test(document.querySelector(\"[data-terminal-text]\").getAttribute(\"data-terminal-text\") || \"\"))", "expect_truthy":
+        true}}'
     - step: 25
-      expectation: '{''assert_count'': {''selector'': ''[data-testid="terminal-pane"]'', ''equal'': 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"]", "equal": 1}}'
   native:
   - check: Real X11 XTest → fcitx5 wbpy → WebKitGTK/xterm → local PTY composition, cancellation and remount.
     method: automated
-    reason: Browser and synthetic composition events cannot establish real input-method delivery. Windows/macOS
-      IME remains outside this Linux case.
+    reason: Browser and synthetic composition events cannot establish real input-method delivery. Windows/macOS IME remains outside this Linux case.
   visual:
   - check: Candidate popup location and caret appearance.
     method: manual

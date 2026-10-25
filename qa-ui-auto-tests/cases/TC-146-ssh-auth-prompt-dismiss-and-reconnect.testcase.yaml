@@ -21,6 +21,7 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -108,15 +109,15 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A saved SSH session opens an authentication prompt with a disabled empty submit, exposes the save-to-vault state, and both close and cancel dismiss the prompt without losing the saved session.
+    requirement: A saved SSH session opens an authentication prompt with a disabled empty submit, exposes the save-to-vault state, and both close and cancel dismiss the prompt
+      without losing the saved session.
     actions:
-    - 3
-    - 5
+    - 4
     - 6
     - 7
     - 8
     - 9
-    - 11
+    - 10
     - 12
     - 13
     - 14
@@ -133,44 +134,45 @@ verification:
     - 25
     - 26
     - 27
+    - 28
     checkpoints:
-    - step: 4
+    - step: 5
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 10
+    - step: 11
       expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 13
+    - step: 14
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-auth-dismiss-reconnect\"]"}'
-    - step: 15
-      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
     - step: 16
-      expectation: '{"assert_disabled": "[data-testid=\"auth-submit\"]"}'
-    - step: 17
-      expectation: '{"assert_count": {"selector": "[data-testid=\"auth-save-to-vault\"]:checked", "equal": 0}}'
-    - step: 19
-      expectation: '{"assert_count": {"selector": "[data-testid=\"auth-save-to-vault\"]:checked", "equal": 1}}'
-    - step: 21
-      expectation: '{"wait_for": {"selector": "[data-testid=\"auth-prompt\"]", "state": "detached"}}'
-    - step: 22
-      expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-auth-dismiss-reconnect\"]"}'
-    - step: 24
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
-    - step: 25
+    - step: 17
+      expectation: '{"assert_disabled": "[data-testid=\"auth-submit\"]"}'
+    - step: 18
       expectation: '{"assert_count": {"selector": "[data-testid=\"auth-save-to-vault\"]:checked", "equal": 0}}'
-    - step: 27
+    - step: 20
+      expectation: '{"assert_count": {"selector": "[data-testid=\"auth-save-to-vault\"]:checked", "equal": 1}}'
+    - step: 22
       expectation: '{"wait_for": {"selector": "[data-testid=\"auth-prompt\"]", "state": "detached"}}'
+    - step: 23
+      expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-auth-dismiss-reconnect\"]"}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 26
+      expectation: '{"assert_count": {"selector": "[data-testid=\"auth-save-to-vault\"]:checked", "equal": 0}}'
     - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"auth-prompt\"]", "state": "detached"}}'
+    - step: 29
       expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-auth-dismiss-reconnect\"]"}'
     results:
-    - 16
     - 17
-    - 19
-    - 22
-    - 25
-    - 28
-  - id: R2
-    requirement: Reopening the saved session after dismissal accepts the configured password, reaches a ready SSH terminal, executes a command with an exact output line, and records connection and authentication events.
-    actions:
+    - 18
+    - 20
+    - 23
+    - 26
     - 29
+  - id: R2
+    requirement: Reopening the saved session after dismissal accepts the configured password, reaches a ready SSH terminal, executes a command with an exact output line, and
+      records connection and authentication events.
+    actions:
     - 30
     - 31
     - 32
@@ -186,30 +188,31 @@ verification:
     - 42
     - 43
     - 44
+    - 45
     checkpoints:
-    - step: 30
+    - step: 31
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
-    - step: 33
+    - step: 34
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
-    - step: 36
+    - step: 37
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-auth\\-dismiss\\-reconnect\\r?$", "timeout_sec": 60}}'
-    - step: 38
+    - step: 39
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
-    - step: 40
-      expectation: '{"wait_for": "[data-testid=\"terminal-event-log\"]"}'
     - step: 41
-      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-event-log\"]", "contains": "connection"}}'
+      expectation: '{"wait_for": "[data-testid=\"terminal-event-log\"]"}'
     - step: 42
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-event-log\"]", "contains": "connection"}}'
+    - step: 43
       expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-event-log\"]", "contains": "auth"}}'
-    - step: 44
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-event-log\"]", "state": "detached"}}'
     - step: 45
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-event-log\"]", "state": "detached"}}'
+    - step: 46
       expectation: '{"assert_not_visible": "[data-testid=\"terminal-event-log\"]"}'
     results:
-    - 36
-    - 41
+    - 37
     - 42
-    - 45
+    - 43
+    - 46
   visual:
   - check: Authentication prompt states, terminal output, and event-log rows remain readable without clipping.
     method: manual

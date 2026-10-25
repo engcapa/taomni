@@ -10,7 +10,7 @@ vi.mock("../../window/WindowControls", () => ({
 }));
 
 vi.mock("../../window/TitleBarTrayControls", () => ({
-  TitleBarTrayControls: () => <div data-testid="titlebar-tray"><button data-testid="tab-split-view" /></div>,
+  TitleBarTrayControls: () => <div data-testid="titlebar-tray" />,
 }));
 
 vi.mock("../OpenTabsMenu", () => ({
@@ -153,9 +153,10 @@ describe("ControlBar shared toolbar (TASK-03)", () => {
     expect(screen.getByTestId("menu-export-sessions")).toBeInTheDocument();
   });
 
-  it("UT-WS-03-05 keeps the tab details preview and the open-tabs filter menu", () => {
+  it("UT-WS-03-05 keeps the large overview and the open-tabs filter menu", () => {
     renderShell();
-    expect(screen.getByTestId("tab-details-hover")).toBeInTheDocument();
+    expect(screen.queryByTestId("tab-details-hover")).not.toBeInTheDocument();
+    expect(screen.getByTestId("tab-overview-trigger")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("tab-more"));
     expect(screen.getByTestId("open-tabs-menu")).toBeInTheDocument();
   });

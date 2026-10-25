@@ -25,6 +25,7 @@ timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="sidebar"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -80,50 +81,50 @@ verification:
   - id: R1
     requirement: An OpenSSH command entered in the host field populates the endpoint and enables the parsed username.
     actions:
-    - 5
     - 6
+    - 7
     checkpoints:
-    - step: 7
-      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "SSH command imported into this session."}}'
     - step: 8
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "${cfg.ssh.host}"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "SSH command imported into this session."}}'
     - step: 9
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "${cfg.ssh.port}"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "${cfg.ssh.host}"}}'
     - step: 10
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-specify-username\"]", "name": "data-checked", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "${cfg.ssh.port}"}}'
     - step: 11
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-specify-username\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 12
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "${cfg.ssh.user}"}}'
     results:
-    - 7
     - 8
     - 9
     - 10
     - 11
+    - 12
   - id: R2
     requirement: The parsed SSH endpoint is saved, used to authenticate, and accepts a remote command after connection.
     actions:
-    - 12
-    - 14
+    - 13
     - 15
     - 16
     - 17
-    - 19
-    - 21
-    checkpoints:
-    - step: 13
-      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 16
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-command-parsed-ssh\"]"}'
-    - step: 18
-      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
-    - step: 20
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 40}}'
-    - step: 22
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-command\\-parsed\\-live\\r?$", "timeout_sec": 60}}'
-    results:
-    - 16
+    - 18
     - 20
     - 22
+    checkpoints:
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-command-parsed-ssh\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 21
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 40}}'
+    - step: 23
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-command\\-parsed\\-live\\r?$", "timeout_sec": 60}}'
+    results:
+    - 17
+    - 21
+    - 23
   visual:
   - check: The parsed connection fields, authentication prompt, and terminal marker remain readable without clipping.
     method: manual

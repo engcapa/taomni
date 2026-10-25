@@ -102,13 +102,17 @@ export function PrimaryNavigationRail({
       showAgentsComingSoon();
       return;
     }
+    if (mode === "home") {
+      setActiveSideTab("home");
+      setSidebarCollapsed(true);
+      return;
+    }
     if (clickCount > 1) {
       setSidebarCollapsed(true);
       return;
     }
     if (compact) {
       setActiveSideTab(mode);
-      setSidebarCollapsed(false);
       return;
     }
     if (activeSideTab === mode) {

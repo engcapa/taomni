@@ -24,7 +24,7 @@ fixtures:
 timeout_sec: 60
 steps:
 - open: ${cfg.app.base_url}
-- wait_for: '[data-testid="titlebar-tray"]'
+- wait_for: '[data-testid="titlebar-actions-more"]'
 - assert_visible: '[data-testid="app-main-menu"]'
 - click: '[data-testid="app-main-menu"]'
 - wait_for: '[data-testid="context-menu"]'
@@ -36,7 +36,7 @@ steps:
     state: detached
     timeout_sec: 5
 - reload: null
-- wait_for: '[data-testid="titlebar-tray"]'
+- wait_for: '[data-testid="titlebar-actions-more"]'
 - assert_visible: '[data-testid="app-main-menu"]'
 - screenshot: 101-unified-app-menu.png
 verification:
@@ -51,7 +51,7 @@ verification:
     - 10
     checkpoints:
     - step: 2
-      expectation: '{"wait_for": "[data-testid=\"titlebar-tray\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"titlebar-actions-more\"]"}'
     - step: 3
       expectation: '{"assert_visible": "[data-testid=\"app-main-menu\"]"}'
     - step: 5
@@ -64,7 +64,7 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"context-menu\"]", "state": "detached", "timeout_sec":
         5}}'
     - step: 11
-      expectation: '{"wait_for": "[data-testid=\"titlebar-tray\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"titlebar-actions-more\"]"}'
     - step: 12
       expectation: '{"assert_visible": "[data-testid=\"app-main-menu\"]"}'
     results:

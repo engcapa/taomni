@@ -1,8 +1,6 @@
 id: TC-WS-015
 title: Workspace-owned local PTY echoes a command on Linux and Windows
-description: 'v6.1 native boundary. A local terminal opened from the Workspaces tab-strip menu starts a real PTY, accepts a synthetic command through xterm''s
-  helper textarea and echoes the exact output line. Sessions mode does not inherit the workspace instance. Linux and Windows only: the macOS WebDriver cannot
-  deliver synthetic text to the WKWebView xterm reliably (TC-WS-012 proves the shell prompt there instead).'
+description: 'v6.1 native boundary. A local terminal opened from the Workspaces tab-strip menu starts a real PTY, accepts a synthetic command through xterm''s helper textarea and echoes the exact output line. Sessions mode does not inherit the workspace instance. Linux and Windows only: the macOS WebDriver cannot deliver synthetic text to the WKWebView xterm reliably (TC-WS-012 proves the shell prompt there instead).'
 modes:
 - native
 native_platforms:
@@ -25,6 +23,10 @@ steps:
     timeout_sec: 60
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="workspace-main-panel"]'
+- eval_readonly:
+    expression: document.querySelector('.taomni-navigator-frame').getBoundingClientRect().width >= 180
+    expect_truthy: true
+    timeout_sec: 10
 - click: '[data-testid="workspace-open-session-plus"]'
 - wait_for: '[data-testid="workspace-open-session-menu"]'
 - click: '[data-testid="workspace-plus-local-terminal"]'
@@ -70,56 +72,59 @@ verification:
     actions:
     - 1
     - 3
-    - 5
-    - 7
-    - 9
-    - 13
+    - 6
+    - 8
     - 10
+    - 14
+    - 11
     checkpoints:
     - step: 2
-      expectation: 'wait_for: [data-testid="welcome-panel"]'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-panel\"]", "timeout_sec": 60}}'
     - step: 4
-      expectation: 'wait_for: [data-testid="workspace-main-panel"]'
-    - step: 6
-      expectation: 'wait_for: [data-testid="workspace-open-session-menu"]'
-    - step: 8
-      expectation: 'wait_for: [data-testid="terminal-pane"][data-terminal-active="true"]'
-    - step: 11
-      expectation: 独立读取终端输出，精确命令结果行匹配
+      expectation: '{"wait_for": "[data-testid=\"workspace-main-panel\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"workspace-open-session-menu\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
     - step: 12
-      expectation: 'assert_visible: [data-testid="workspace-tab"][data-tab-kind="terminal"]'
-    - step: 14
-      expectation: 'wait_for: [data-testid="session-tree"]'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^\\s*QA_WS_PTY_READY\\r?\\s*$", "timeout_sec": 20}}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"workspace-tab\"][data-tab-kind=\"terminal\"]"}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 5
+      expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('.taomni-navigator-frame').getBoundingClientRect().width >= 180\", \"expect_truthy\": true, \"timeout_sec\": 10}}"
     results:
     - 2
     - 4
-    - 6
-    - 8
+    - 7
+    - 9
+    - 13
+    - 15
     - 12
-    - 14
-    - 11
+    - 5
   - id: R2
     requirement: 离开工作区时终端隐藏且不加入全局标签，返回后保留原 PTY 并可继续使用。
     actions:
-    - 17
-    - 20
-    checkpoints:
-    - step: 15
-      expectation: 'assert_not_visible: [data-testid="workspace-session-pane"]'
-    - step: 16
-      expectation: 'assert_count: [data-testid="global-session-surface"] [data-testid="terminal-pane"]'
-    - step: 18
-      expectation: 'wait_for: [data-testid="terminal-pane"][data-terminal-active="true"]'
-    - step: 19
-      expectation: 'assert_pattern: [data-testid="workspace-session-pane"] [data-testid="terminal-pane"]'
-    - step: 21
-      expectation: 独立读取终端输出，精确命令结果行匹配
-    results:
-    - 15
-    - 16
     - 18
-    - 19
     - 21
+    checkpoints:
+    - step: 16
+      expectation: '{"assert_not_visible": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 17
+      expectation: '{"assert_count": {"selector": "[data-testid=\"global-session-surface\"] [data-testid=\"terminal-pane\"]", "equal": 0}}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 20
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"workspace-session-pane\"] [data-testid=\"terminal-pane\"]", "regex": "(?m)^\\s*QA_WS_PTY_READY\\r?\\s*$", "timeout_sec": 20}}'
+    - step: 22
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^\\s*QA_WS_PTY_RETAINED\\r?\\s*$", "timeout_sec": 20}}'
+    results:
+    - 16
+    - 17
+    - 19
+    - 20
+    - 22
   visual:
   - check: 与 HTML 原型比较圆角框架、紧凑尺寸、无溢出和可用操作入口。
     method: manual

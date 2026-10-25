@@ -1,7 +1,7 @@
 id: TC-WS-011
 title: Agents / Crew placeholder from rail, Home and command palette; global search remains usable
-description: Agents / Crew is deferred by product scope. Each entry shows the development notice without changing the active canvas or creating tasks. Global
-  search still finds workspaces and tools, and executes selected entries.
+description: Agents / Crew is deferred by product scope. Each entry shows the development notice without changing the active canvas or creating tasks. Global search still finds
+  workspaces and tools, and executes selected entries.
 modes:
 - browser
 - native
@@ -25,7 +25,7 @@ steps:
     selector: '[data-testid="alert-dialog-message"]'
     contains: under development
 - click: '[data-testid="alert-dialog-ok"]'
-- assert_visible: '[data-testid="session-tree"]'
+- assert_visible: '[data-testid="welcome-panel"]'
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="home-open-agents"]'
 - wait_for: '[data-testid="alert-dialog-message"]'
@@ -77,23 +77,23 @@ verification:
     - 19
     checkpoints:
     - step: 3
-      expectation: 'wait_for: [data-testid="welcome-panel"]'
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 5
-      expectation: 'wait_for: [data-testid="alert-dialog-message"]'
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog-message\"]"}'
     - step: 6
-      expectation: 'assert_text: [data-testid="alert-dialog-message"]'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"alert-dialog-message\"]", "contains": "under development"}}'
     - step: 8
-      expectation: 'assert_visible: [data-testid="session-tree"]'
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
     - step: 11
-      expectation: 'wait_for: [data-testid="alert-dialog-message"]'
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog-message\"]"}'
     - step: 13
-      expectation: 'assert_visible: [data-testid="welcome-panel"]'
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
     - step: 15
-      expectation: 'wait_for: [data-testid="global-search-modal"]'
+      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
     - step: 18
-      expectation: 'wait_for: [data-testid="alert-dialog-message"]'
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog-message\"]"}'
     - step: 20
-      expectation: 关闭后 [data-testid="alert-dialog-message"] 隐藏
+      expectation: '{"assert_not_visible": "[data-testid=\"alert-dialog-message\"]"}'
     results:
     - 3
     - 5
@@ -115,19 +115,19 @@ verification:
     - 32
     checkpoints:
     - step: 22
-      expectation: 'wait_for: [data-testid="global-search-modal"]'
+      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
     - step: 24
-      expectation: 'wait_for: [data-testid="global-search-result"][data-result-id="floating-mfa"]'
+      expectation: '{"wait_for": "[data-testid=\"global-search-result\"][data-result-id=\"floating-mfa\"]"}'
     - step: 26
-      expectation: 'wait_for: [data-testid="global-search-result"][data-kind="workspace"]'
+      expectation: '{"wait_for": "[data-testid=\"global-search-result\"][data-kind=\"workspace\"]"}'
     - step: 28
-      expectation: 'wait_for: [data-testid="workspace-switcher"]'
+      expectation: '{"wait_for": "[data-testid=\"workspace-switcher\"]"}'
     - step: 29
-      expectation: 'assert_not_visible: [data-testid="global-search-modal"]'
+      expectation: '{"assert_not_visible": "[data-testid=\"global-search-modal\"]"}'
     - step: 31
-      expectation: 'wait_for: [data-testid="global-search-modal"]'
+      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
     - step: 33
-      expectation: 'assert_not_visible: [data-testid="global-search-modal"]'
+      expectation: '{"assert_not_visible": "[data-testid=\"global-search-modal\"]"}'
     results:
     - 22
     - 24

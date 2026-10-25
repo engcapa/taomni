@@ -169,7 +169,7 @@ controls:
     selector: '[data-testid="app-titlebar"]'
     kind: display
   - id: tray
-    selector: '[data-testid="titlebar-tray"]'
+    selector: '[data-testid="control-bar"] [data-testid="platform-toolbar-actions"]'
     kind: display
   - id: control-bar
     selector: '[data-testid="control-bar"]'
@@ -215,7 +215,7 @@ controls:
 
 - 取消原生 decorations，前端自绘 `AppTitleBar` + `WindowControls`（最小化 / 最大化 / 关闭）
 - 标题栏左侧固定 `WindowDragHandle`（48px）作为可识别的窗口移动锚点；Tab 数量不会挤掉该区域
-- 标题栏托盘 `TitleBarTrayControls`：常规宽度分组排列 — Voice (PTT) | View (主题循环) | Terminal (Split + MultiExec) | Language (locale 切换)；窄窗口收进 `More window actions`
+- 标题栏操作区 `PlatformToolbarActions` 按 Home / Sessions / Workspaces / Tools 排列导航、布局、搜索、大预览和更多操作；语音 (PTT) 保留在 `More window actions`，主题与语言入口移至主导航条。
 - `WindowResizeHandles` 在无 decorations 模式下提供 8 向窗口缩放（North/South/East/West/四个角）
 - 主菜单 / Sessions / View / Tunneling / Settings / Help / Exit 入口接入
 
@@ -238,12 +238,15 @@ controls: []
 id: F1.5
 status: done
 area: main/tabs
-components: [TabBar, ControlBar, OpenTabsMenu, TabDetailsOverlay]
+components: [TabBar, ControlBar, OpenTabsMenu, TabDetailsOverlay, TabOverview, PlatformToolbarActions]
 files:
   - src/components/tabbar/TabBar.tsx
   - src/components/tabbar/ControlBar.tsx
   - src/components/tabbar/OpenTabsMenu.tsx
   - src/components/tabbar/TabDetailsOverlay.tsx
+  - src/components/tabbar/TabOverview.tsx
+  - src/components/tabbar/PlatformToolbarActions.tsx
+  - src/stores/tabOverviewStore.ts
   - src/lib/customDnD.ts
   - src/lib/tabDetails.ts
   - src/lib/terminalActivity.ts
@@ -279,9 +282,30 @@ controls:
   - id: tabs-more
     selector: '[data-testid="tab-more"]'
     kind: interactive
-  - id: tab-details-hover
-    selector: '[data-testid="tab-details-hover"]'
+  - id: tab-overview-trigger
+    selector: '[data-testid="tab-overview-trigger"]'
     kind: interactive
+  - id: tab-overview
+    selector: '[data-testid="tab-overview"]'
+    kind: display
+  - id: tab-overview-card
+    selector: '[data-testid="tab-overview-card"]'
+    kind: interactive
+  - id: tab-overview-summary
+    selector: '[data-testid="tab-overview-summary"]'
+    kind: display
+  - id: tab-overview-close
+    selector: '[data-testid="tab-overview-close"]'
+    kind: interactive
+  - id: tab-overview-current
+    selector: '[data-testid="tab-overview-current"]'
+    kind: interactive
+  - id: tab-overview-all
+    selector: '[data-testid="tab-overview-all"]'
+    kind: interactive
+  - id: tab-overview-empty
+    selector: '[data-testid="tab-overview-empty"]'
+    kind: display
   - id: tab-details-overlay
     selector: '[data-testid="tab-details-overlay"]'
     kind: display
@@ -330,6 +354,14 @@ controls:
     selector: '[data-testid="context-menu-item-tunneling"]'
     kind: interactive
     optional: true
+  - id: tab-details-hover
+    selector: '[data-testid="tab-details-hover"]'
+    kind: display
+    optional: true # removed UI; only negative regression assertions remain
+  - id: ai-chat-drawer-ribbon
+    selector: '[data-testid="ai-chat-drawer-ribbon"]'
+    kind: display
+    optional: true # removed UI; only negative regression assertions remain
 -->
 
 - 多标签：本地终端 / SSH 终端 / SFTP / VNC / 设置 / 隧道管理 / Welcome / 占位标签
@@ -374,7 +406,7 @@ controls:
     optional: true       # only rendered when selected shell canElevate
   - id: new-session-card
     selector: 'text="New session…"'
-    kind: interactive
+    kind: display # card heading; the action is welcome-new-session below
   - id: new-session-card-testid
     selector: '[data-testid="welcome-new-session"]'
     kind: interactive
@@ -3964,10 +3996,6 @@ controls:
     selector: '[data-testid="ai-chat-drawer-hide"]'
     kind: interactive
     optional: true
-  - id: ai-chat-drawer-ribbon
-    selector: '[data-testid="ai-chat-drawer-ribbon"]'
-    kind: interactive
-    optional: true       # shown when a chat-capable active tab has drawer hidden
   - id: ai-chat-drawer-position
     selector: '[data-testid="ai-chat-drawer-position"]'
     kind: interactive
@@ -4027,7 +4055,7 @@ controls:
 -->
 
 - 全局唯一抽屉（每窗口一个），由 `chatStore.drawerOpen` + `drawerScope/tabId` + `drawerPosition` 控制状态机；线程始终绑定到 tab
-- **打开方式**：Welcome 的 `Chat Tao` 卡片、当前 tab 的 `tab-chat-toggle` / `Ctrl+Shift+L`、或隐藏态 `ai-chat-drawer-ribbon` 打开 tab-bound drawer
+- **打开方式**：Welcome 的 `Chat Tao` 卡片、当前 tab 的 `tab-chat-toggle` / `Ctrl+Shift+L`、或主导航条 `rail-chat-button` 打开 tab-bound drawer
 - **抽屉头部**：位置切换 / 固定切换 / 顶部或底部悬浮透明度 / 复制全部对话 / 新对话 / 历史对话 / 隐藏到 ribbon
 - **Thread badge 区**：显示 thread 绑定的 tab (`Link2` 图标 + tab 标题)；Provider 选择器在配置了多 provider 时显示；output format 选择器在 thread 仍空时可改、有消息后锁定
 - **Composer**：`Ctrl+Enter` 发送、附件按钮（paperclip）/ 拖拽文件到输入区 / 粘贴剪贴板图片添加本地附件，最多 10 个文件且总计最多 100 MiB；`@terminal:last-N` / `@file:./X` / `@session:Q` 解析为 `attachment-chip`，其中 `@file` 在发送前转为结构化文件附件
@@ -5622,7 +5650,7 @@ controls:
 id: F-TAO-1
 status: done
 area: notes
-components: [TaoRibbon, NotesPanel, NotesList, NoteEditor, NoteFilters, NoteThemeSettings, FloatingNotesPanel, TaoAlertInbox, TaoAlertPoller]
+components: [NotesPanel, NotesList, NoteEditor, NoteFilters, NoteThemeSettings, FloatingNotesPanel, TaoAlertInbox, TaoAlertPoller]
 files:
   - src-tauri/src/notes/db.rs
   - src-tauri/src/notes/commands.rs
@@ -5640,7 +5668,6 @@ files:
   - src/components/notes/NoteFilters.tsx
   - src/components/notes/NoteThemeSettings.tsx
   - src/components/notes/FloatingNotesPanel.tsx
-  - src/components/tao/TaoRibbon.tsx
   - src/components/tao/TaoAlertInbox.tsx
   - src/components/tao/TaoAlertPoller.tsx
 controls:
@@ -5760,13 +5787,9 @@ controls:
     selector: '[data-testid="floating-notes-dock"]'
     kind: interactive
     optional: true
-  - id: tao-ribbon-badge
-    selector: '[data-testid="tao-ribbon-badge"]'
-    kind: display
-    optional: true
 -->
 
-- 统一 `TaoRibbon` 四边任意位置悬浮入口，拖动落点决定 edge + offsetRatio（`localStorage: taomni.chatDrawer.layout.v1`），带节制的临期/过期/AI 完成 badge 与跳动提示
+- 主导航条 `rail-chat-button` 统一打开 Tao Hub；按照工作区原型移除贴边悬浮条，Chat / 便签 / 通知与抽屉布局功能保留。
 - `Tao Hub`：单一抽屉三个主 tab（`Chat` / `便签` / `通知`），记住上次非通知 tab（`localStorage: taomni.taoHub.lastTab.v1`）
 - `便签`：独立 `notes.db` + 统一便签模型（完成 / 置顶 / 归档 / 颜色 / 优先级 / due / reminder / 步骤 / 标签）；默认「最近未完成」视图；搜索、过滤视图；主题 taomni/system/light/dark/paper/compact
 - 单例 `FloatingNotesPanel`：hub ↔ floating 模式切换，可拖拽 / 调整大小，Taomni 内部置顶（层级低于 vault / 认证弹窗）
@@ -11802,7 +11825,7 @@ controls:
 
 ## 12. Workspace-First 平台重构（v6.1）
 
-> 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents / Crew 开发中入口与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-017`。
+> 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents / Crew 开发中入口与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-020`。
 
 ### 12.1 Workspace-first 主壳层：单行工具栏、主导航条 5 大模式与右栏收纳
 
@@ -11940,6 +11963,33 @@ controls:
   kind: interactive
 - id: lanchat-roster-panel
   selector: '[data-testid="lanchat-roster-panel"]'
+  kind: display
+- id: platform-toolbar-actions
+  selector: '[data-testid="platform-toolbar-actions"]'
+  kind: display
+- id: home-toolbar-workspaces
+  selector: '[data-testid="home-toolbar-workspaces"]'
+  kind: interactive
+- id: home-toolbar-sessions
+  selector: '[data-testid="home-toolbar-sessions"]'
+  kind: interactive
+- id: tools-toolbar-workspaces
+  selector: '[data-testid="tools-toolbar-workspaces"]'
+  kind: interactive
+- id: platform-layout-single
+  selector: '[data-testid="platform-layout-single"]'
+  kind: interactive
+- id: platform-layout-grid
+  selector: '[data-testid="platform-layout-grid"]'
+  kind: interactive
+- id: sessions-empty-state
+  selector: '[data-testid="sessions-empty-state"]'
+  kind: display
+- id: sessions-empty-new-session
+  selector: '[data-testid="sessions-empty-new-session"]'
+  kind: interactive
+- id: tools-empty-state
+  selector: '[data-testid="tools-empty-state"]'
   kind: display
 -->
 
@@ -12130,6 +12180,21 @@ controls:
 - id: workspace-switcher-option-second-workspace
   selector: '[data-testid="workspace-switcher-option-second-workspace"]'
   kind: interactive
+- id: workspace-layout-split
+  selector: '[data-testid="workspace-layout-split"]'
+  kind: interactive
+- id: workspace-toolbar-bottom-dock
+  selector: '[data-testid="workspace-toolbar-bottom-dock"]'
+  kind: interactive
+- id: workspace-canvas-panes
+  selector: '[data-testid="workspace-canvas-panes"]'
+  kind: display
+- id: workspace-canvas-pane
+  selector: '[data-testid="workspace-canvas-pane"]'
+  kind: display
+- id: workspace-bottom-dock
+  selector: '[data-testid="workspace-bottom-dock"]'
+  kind: display
 -->
 
 Workspaces 模式左栏提供工作区切换器（默认工作区不可删除）、多根文件树（新建文件/目录、添加/移除根目录）、工作区标签条与打开任意会话入口；画布内含编辑器、Git 面板与隔离会话。
@@ -12332,12 +12397,6 @@ files:
 - src/stores/workspaceUiStore.ts
 - src/components/agents/comingSoon.ts
 controls:
-- id: agents-dispatch-open
-  selector: '[data-testid="agents-dispatch-open"]'
-  kind: interactive
-- id: agents-platform-view
-  selector: '[data-testid="agents-platform-view"]'
-  kind: display
 - id: global-search-input
   selector: '[data-testid="global-search-input"]'
   kind: interactive
