@@ -68,4 +68,41 @@ history rollback. No personal or enterprise account was changed during local ver
 
 ## Final evidence
 
-Pending hosted execution; this section is updated with actual receipts rather than plan status.
+The hosted runs use `qa-ui-auto-platforms.yml`, selected cases, one shard per platform/mode,
+and `publish_issues=false`. No issue comments or state changes were published.
+
+- [Initial implementation run 40155353434](https://github.com/engcapa/taomni/actions/runs/40155353434), tested commit `cd638a000e116731ab10b06f3ef3efc5b758d76f`: browser 20 passed; native 24 passed, 6 failed, 0 skipped. Windows native passed all 10. Linux/macOS mail failed because the case operated the include-mail checkbox before the settings snapshot loaded. Four macOS cloud cases inherited Chinese from the authorization case and failed English text assertions; failure captures show the expected translated UI.
+- The layout attempts [40156374590](https://github.com/engcapa/taomni/actions/runs/40156374590) and [40157092320](https://github.com/engcapa/taomni/actions/runs/40157092320) exposed stale theme/language selectors in the newly authored case. The corrected case uses the existing General settings controls, which remain available at narrow widths.
+- [Focused rerun 40157945707](https://github.com/engcapa/taomni/actions/runs/40157945707), tested commit `74f3b832b28f1597032a3d44ba761ae931d756b9`: re-executes CLOUD-001/002/003/004 and MAIL-STORAGE-02 natively on all three systems, and CLOUD-002 plus SETTINGS-004 in browsers. English initialization and settings-load waits were added without weakening assertions. All 6 browser and 15 native executions passed, 0 failed/skipped. The workflow completed successfully; its aggregate has no infrastructure errors, gaps or unreviewed cases.
+
+The latest matching results, including unchanged cases from the initial run, are:
+
+| Host | Browser passed | Native passed | Failed / skipped |
+| --- | --- | --- | --- |
+| Linux | 8 | 10 | 0 / 0 |
+| Windows | 8 | 10 | 0 / 0 |
+| macOS | 7 | 10 | 0 / 0 |
+| Total | 23 | 30 | 0 / 0 |
+
+Only YAML and documentation changed after the implementation commit. All runs have the same
+production source fingerprint `e9e5171f38f606b4943bb04a28c7297fbe8b2b0179962218fe814a36e079a8e7`
+and runner fingerprint `eed6832f8be50f9ec834c012fa4e18cd62e71921978c9c00aab97b89793e3638`.
+Unchanged passing cases are reused only with matching source/runner/case identities;
+changed cases require the rerun. A newer matching failure or skip takes precedence over an older pass.
+
+Downloaded evidence is retained under `qa-ui-auto-report/backup-settings-unification/ci-<run-id>/`.
+`hosted-evidence.json` records 53 current passing case cells, stale case reports and no missing results.
+Report receipt signatures, summary hashes, configuration hashes and native QA/build source/binary
+identities were checked. Available receipt-listed artifact hashes were checked as well;
+some raw QA profile/diagnostic files are omitted from hosted artifacts and are not claimed as retained evidence.
+
+The four SETTINGS-004 screenshots were reviewed: English/light at 950 pixels, Chinese/dark
+at 600 pixels, the expanded inherited cloud destination at 600 pixels, and manual controls
+at 950 pixels. Labels wrap, fields stay within their sections, and no overlap/clipping was observed.
+Windows native authorization recovery and saved-full screenshots were also reviewed.
+
+Evidence boundaries: native COMPAT-001 inspects the fixed legacy files through the real reader;
+the Rust compatibility unit additionally applies/restores each archive and checks payload/hash.
+Native CLOUD/AUTH cases exercise a loopback service, not real Feishu account authorization.
+The retained TC-045 exit regression passes on its declared Linux/Windows browser platforms,
+but retains its existing `legacy-imported` review tag and does not certify a full release scope.

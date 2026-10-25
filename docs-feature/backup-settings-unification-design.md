@@ -2,13 +2,15 @@
 
 ## 1. 范围、决定与状态
 
-- 日期：2026-10-25。调研基线：`65a822785a86c52671983076cd0a244c59626260`；开始调研时工作区干净。本轮仅产出设计、图稿和调研证据，未修改产品代码。
+- 日期：2026-10-25。调研基线：`65a822785a86c52671983076cd0a244c59626260`；开始调研时工作区干净。设计阶段先产出设计、图稿和调研证据，随后按用户要求实施。
 - 实施状态：已在 `feat/backup-settings-unification` 实施，单元测试与 GitHub browser/native 验证结果见文末实现记录。用户已选择同页折叠布局，随后明确限定只改 Backup 部分、支持多语言、保持备份文件格式及旧备份兼容。
-- 固定平台：Windows、macOS、Linux 的 Tauri 桌面应用。当前调研环境为 Windows；产品真机验证尚未执行。
+- 固定平台：Windows、macOS、Linux 的 Tauri 桌面应用。调研环境为 Windows；browser/native 验证按用户要求在 GitHub 执行，本地只运行单元测试及静态检查。
 - 问题来源：本轮设置截图、用户三项备份设置要求，以及 [GitHub #714](https://github.com/engcapa/taomni/issues/714)。授权问题的独立证据、因果链与修复任务见 [#714 修复设计](../docs-issue/714-feishu-authorization-cancel-design.md)。
 - 历史背景：[统一备份设计](unified-backup-design.md)、[原生飞书连接设计](unified-backup/feishu-native-auth-design.md)。仅本设计列出的设置与交互规则取代相关旧规则，其他有效决定继续适用。
 
 本次把现有 Backup 分组内部整理成“全局默认、备份渠道、手工备份、任务与记录、恢复备份”。范围规则为：**手工备份使用全局范围；自动备份使用渠道范围，渠道默认继承全局，可以显式覆盖。** 所有非敏感配置真实落盘，保存中、成功和失败可见。密码仍由系统凭据库或单次操作持有。
+
+下文验证计划与真机手册保留设计阶段的目标和执行前状态。实施后的实际结果、测试边界及报告以 [实现与验证记录](backup-settings-unification/implementation-status.md) 为准。
 
 ### 1.1 硬边界
 
