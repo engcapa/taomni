@@ -11,11 +11,17 @@ shell.includeStandardAdditions = true;
 const log = (stage) => console.log("native_folder_dialog: " + stage);
 // Resolve the executable once. Recursing through the main window's complete
 // accessibility tree walks the whole WebView and can take minutes on CI.
-const owners = shell.doShellScript("ps -axo pid=,comm=").split("\n").map((line) => {
+// Darwin ps truncates the command at its default column width even through
+// a pipe. Hosted executable paths reach that boundary; -ww retains the path.
+const processes = shell.doShellScript("ps -axww -o pid=,comm=").split("\n").map((line) => {
   const match = line.trim().match(/^(\d+)\s+(.+)$/);
-  return match && match[2] === application ? Number(match[1]) : null;
-}).filter((pid) => pid !== null);
-if (owners.length !== 1) throw new Error("No unique process for the QA executable");
+  return match ? { pid: Number(match[1]), path: match[2] } : null;
+}).filter((process) => process !== null);
+const owners = processes.filter((process) => process.path === application).map((process) => process.pid);
+if (owners.length !== 1) {
+  log("expected executable " + application + "; candidates " + JSON.stringify(processes.filter((process) => process.path.includes("taomni"))));
+  throw new Error("No unique process for the QA executable");
+}
 const process = events.processes.whose({ unixId: owners[0] })[0];
 log("owned process " + owners[0]);
 function buttons(owner, name, enabled = false) {

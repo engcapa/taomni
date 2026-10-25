@@ -13,7 +13,8 @@ from pathlib import Path
 HARNESS = r"""
 const fs = require('fs'), vm = require('vm');
 const config = JSON.parse(process.argv[1]), actions = [];
-const env = { QA_PICKER_APPLICATION:'/qa/taomni', QA_PICKER_PATH:'/qa/fixture/project with spaces',
+const application = '/Users/runner/work/taomni/taomni/src-tauri/target/qa-ui-auto/debug/taomni';
+const env = { QA_PICKER_APPLICATION:application, QA_PICKER_PATH:'/qa/fixture/project with spaces',
   QA_PICKER_TITLE:'Select folder to open', QA_PICKER_ACTION:config.action };
 let navigated = false, now = 0;
 const button = (name) => ({enabled:()=>name === 'Cancel' || navigated, click:()=>actions.push(name)});
@@ -26,7 +27,10 @@ const main = {sheets:()=>config.standalone ? [] : [panel],
 const owner = {windows:()=>[main],unixId:()=>123};
 const events = {processes:{whose:({unixId})=>{if(unixId !== 123) throw new Error('unowned PID'); return [owner]}},
   keystroke:(key)=>actions.push(key), keyCode:(key)=>{actions.push(key);if(key===36)navigated=true;}};
-const shell = {doShellScript:()=>config.duplicate ? '123 /qa/taomni\n124 /qa/taomni' : '123 /qa/taomni\n456 /other/taomni'};
+const shell = {doShellScript:(command)=>{
+  if(command !== 'ps -axww -o pid=,comm=') return ('  123 ' + application).slice(0,79);
+  return config.duplicate ? '123 ' + application + '\n124 ' + application : '123 ' + application + '\n456 /other/taomni';
+}};
 const context = {$:{NSProcessInfo:{processInfo:{environment:{objectForKey:(key)=>env[key]}}}},
   ObjC:{import:()=>{},unwrap:(value)=>value}, Application:(name)=>name==='System Events'?events:shell,
   delay:(seconds)=>{now+=seconds*1000},Date:{now:()=>now},console:{log:()=>{}},JSON};

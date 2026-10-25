@@ -52,6 +52,18 @@ class NativeApplicationRestartTest(unittest.TestCase):
         result = restart_owned_application(driver, session)
         self.assertEqual(result["shutdown"], "application-window-close")
 
+    def test_intercepted_titlebar_click_dispatches_the_same_production_handler(self):
+        session, driver, _ = self.scenario()
+        session.click.side_effect = WebDriverError("element click intercepted")
+        session.execute.side_effect = [True, WebDriverError("no such window")]
+        result = restart_owned_application(driver, session)
+        self.assertEqual(result["shutdown"], "application-window-close")
+        session.execute.assert_any_call(
+            'const button = document.querySelector("[data-testid=window-close]");'
+            'if (!button) throw new Error("QA application close control is missing");'
+            'button.click(); return true;'
+        )
+
     def test_unexpected_exit_dialog_is_not_automatically_confirmed(self):
         session, driver, _ = self.scenario()
         session.execute.side_effect = None
