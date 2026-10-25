@@ -1,7 +1,7 @@
 use super::coordination::BackupProcessLock;
 use super::crypto::{encrypt_stream, is_encrypted_bytes};
 use super::manifest::{BackupManifest, file_sha256};
-use super::policy::{BackupPolicy, load_policy, resolve_backup_dir, save_policy};
+use super::policy::{BackupPolicy, load_policy_result, resolve_backup_dir, save_policy};
 use super::scheduler::{BackupCoordinator, BackupTrigger, is_backup_due};
 use crate::state::AppState;
 use rusqlite::OptionalExtension;
@@ -13,84 +13,7 @@ use tauri::{AppHandle, Emitter, Manager};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BackupCustomOptions {
-    #[serde(default)]
-    pub include_sessions: bool,
-    #[serde(default)]
-    pub include_notes: bool,
-    #[serde(default)]
-    pub include_vault: bool,
-    #[serde(default)]
-    pub include_lanchat: bool,
-    #[serde(default)]
-    pub include_configs: bool,
-    #[serde(default)]
-    pub include_mail: bool,
-    #[serde(default)]
-    pub include_local_history: bool,
-    #[serde(default)]
-    pub include_mfa: bool,
-}
-
-/// What a backup scope stages. MFA secrets are sealed with a data key held in
-/// the vault, so including `mfa.db` always includes `vault.db` as well.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BackupScopeFlags {
-    pub sessions: bool,
-    pub notes: bool,
-    pub vault: bool,
-    pub lanchat: bool,
-    pub configs: bool,
-    pub mail: bool,
-    pub local_history: bool,
-    pub mfa: bool,
-}
-
-pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> BackupScopeFlags {
-    let mail_override = custom.as_ref().map(|opts| opts.include_mail);
-    let core = BackupScopeFlags {
-        sessions: true,
-        notes: true,
-        vault: true,
-        lanchat: false,
-        configs: true,
-        mail: false,
-        local_history: false,
-        mfa: true,
-    };
-    let mut flags = match scope {
-        "full" => BackupScopeFlags {
-            lanchat: true,
-            mail: true,
-            ..core
-        },
-        "custom" => match custom {
-            Some(opts) => BackupScopeFlags {
-                sessions: opts.include_sessions,
-                notes: opts.include_notes,
-                vault: opts.include_vault,
-                lanchat: opts.include_lanchat,
-                configs: opts.include_configs,
-                mail: opts.include_mail,
-                local_history: opts.include_local_history,
-                mfa: opts.include_mfa,
-            },
-            None => core,
-        },
-        _ => core,
-    };
-    if scope != "custom" {
-        if let Some(mail) = mail_override {
-            flags.mail = mail;
-        }
-    }
-    if flags.mfa {
-        flags.vault = true;
-    }
-    flags
-}
+pub use super::range::{BackupCustomOptions, BackupScopeFlags, resolve_scope_flags};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -153,7 +76,7 @@ pub fn create_backup(
         custom_options,
         target_path,
         password,
-        load_policy(app),
+        load_policy_result(app)?,
         true,
     )
 }
@@ -165,18 +88,29 @@ pub fn create_scheduled_backup(
     let coordinator = app.state::<BackupCoordinator>();
     let _operation = coordinator.operation.lock().map_err(|e| e.to_string())?;
     let _process_operation = BackupProcessLock::acquire(app)?;
-    let policy = load_policy(app);
+    let policy = super::policy::load_policy_result(app)?;
     // Recheck inside both locks: any instance may have just completed a backup.
-    if !is_backup_due(&policy, chrono::Utc::now().timestamp_millis(), trigger) {
+    if !policy.local_channel_enabled
+        || !is_backup_due(&policy, chrono::Utc::now().timestamp_millis(), trigger)
+    {
         return Ok(None);
     }
     let state = app.state::<AppState>();
-    let scope = policy.default_scope.clone();
-    let custom = policy.include_mail.map(|include_mail| BackupCustomOptions {
-        include_mail,
-        ..Default::default()
-    });
-    create_backup_locked(&state, app, &scope, custom, None, None, policy, true).map(Some)
+    let range = policy
+        .local_range_override
+        .clone()
+        .unwrap_or_else(|| super::range::global(&policy));
+    create_backup_locked(
+        &state,
+        app,
+        &range.scope,
+        range.custom_options,
+        None,
+        None,
+        policy,
+        true,
+    )
+    .map(Some)
 }
 
 pub fn create_cloud_snapshot(
@@ -201,7 +135,7 @@ pub fn create_cloud_snapshot(
         source.custom_options.clone(),
         Some(path),
         Some(password),
-        load_policy(app),
+        load_policy_result(app)?,
         false,
     )
 }

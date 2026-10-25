@@ -1,0 +1,121 @@
+id: TC-BACKUP-SETTINGS-003
+title: Failed settings writes preserve drafts and block manual backup until retry
+description: Explicit browser fault model fails one settings patch; the production settings queue and controls must
+  retain full data through remount and only execute after successful persistence. Native write errors are covered
+  by backend units.
+covers:
+- F-BACKUP-1
+- F-BACKUP-2
+- F-Confirm-1
+tags:
+- backup
+- settings
+- recovery
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- backup_cloud
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- wait_for: '[data-testid="backup-global-scope"]'
+- select_option:
+    selector: '[data-testid="backup-global-scope"]'
+    value: full
+- wait_for: '[data-testid="backup-settings-retry"]'
+- assert_attribute:
+    selector: '[data-testid="backup-global-scope"]'
+    name: value
+    equals: full
+- assert_attribute:
+    selector: '[data-testid="backup-selected-start"]'
+    name: disabled
+    equals: ''
+- click: '[data-testid="settings-group-toggle-backup"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- assert_attribute:
+    selector: '[data-testid="backup-global-scope"]'
+    name: value
+    equals: full
+- click: '[data-testid="app-main-menu"]'
+- click: '[data-testid="context-menu-item-exit"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: backup settings could not be saved
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_not_visible: '[data-testid="confirm-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="backup-global-scope"]'
+    name: value
+    equals: full
+- click: '[data-testid="backup-settings-retry"]'
+- assert_text:
+    selector: '[data-testid="backup-settings-save-status"]'
+    contains: Saved
+    timeout_sec: 30
+- wait_for: '[data-testid="backup-selected-start"]:not([disabled])'
+- click: '[data-testid="backup-selected-start"]'
+- wait_for: '[data-testid="backup-action-success"]'
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem("taomni.qa.backup.lastManual")).range.scope === "full"
+    expect_truthy: true
+- screenshot: backup-settings-save-recovery.png
+verification:
+  review: reviewed
+  native:
+  - check: Renderer error recovery
+    method: not-applicable
+    reason: Browser deliberately injects one IPC failure; Rust persistence errors have focused unit tests.
+  requirements:
+  - id: R1
+    requirement: Failed full-data draft survives remount and blocks execution
+    actions:
+    - 7
+    - 11
+    - 12
+    - 14
+    - 15
+    - 17
+    - 19
+    checkpoints:
+    - step: 9
+      expectation: Full remains selected
+    - step: 10
+      expectation: Execution disabled
+    - step: 13
+      expectation: Draft retained on remount
+    - step: 18
+      expectation: Exit reports unsaved backup settings
+    - step: 21
+      expectation: Cancelling exit keeps the full-data draft visible
+    results:
+    - 9
+    - 10
+    - 13
+    - 18
+    - 21
+  - id: R2
+    requirement: Retry saves the retained draft before the manual action executes
+    actions:
+    - 22
+    - 25
+    checkpoints:
+    - step: 23
+      expectation: Write acknowledged as saved
+    - step: 27
+      expectation: Executed range is full
+    results:
+    - 23
+    - 27
+  visual:
+  - check: Save failure, retained draft and retry status are readable
+    method: manual
+    reason: Review retained GitHub screenshot.

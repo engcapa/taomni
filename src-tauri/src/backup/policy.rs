@@ -33,6 +33,14 @@ pub struct BackupPolicy {
     /// None preserves the legacy core/full default.
     #[serde(default)]
     pub include_mail: Option<bool>,
+    #[serde(default)]
+    pub default_custom_options: Option<super::range::BackupCustomOptions>,
+    #[serde(default)]
+    pub local_range_override: Option<super::range::BackupRange>,
+    #[serde(default = "default_auto_backup")]
+    pub local_channel_enabled: bool,
+    #[serde(default)]
+    pub settings_revision: u64,
     /// Timestamp (ms) of the last successful backup.
     #[serde(default)]
     pub last_backup_at: Option<i64>,
@@ -59,6 +67,10 @@ impl Default for BackupPolicy {
             max_retained_copies: default_max_copies(),
             default_scope: default_scope(),
             include_mail: None,
+            default_custom_options: None,
+            local_range_override: None,
+            local_channel_enabled: true,
+            settings_revision: 0,
             last_backup_at: None,
         }
     }
@@ -128,6 +140,21 @@ pub fn load_policy(app: &AppHandle) -> BackupPolicy {
     }
 }
 
+/// Settings must distinguish a missing policy from a damaged or unreadable one.
+pub fn load_policy_result(app: &AppHandle) -> Result<BackupPolicy, String> {
+    read_policy_at(&crate::resolved_app_data_dir(app)?.join(POLICY_FILE_NAME))
+}
+
+pub(super) fn read_policy_at(path: &Path) -> Result<BackupPolicy, String> {
+    match std::fs::read(path) {
+        Ok(bytes) => serde_json::from_slice(&bytes).map_err(|_| {
+            "Backup policy is damaged; restore the settings file before continuing".into()
+        }),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(BackupPolicy::default()),
+        Err(error) => Err(format!("Cannot read backup policy: {error}")),
+    }
+}
+
 /// Persist the backup policy to disk.
 pub fn save_policy(app: &AppHandle, policy: &BackupPolicy) -> Result<(), String> {
     let app_data = crate::resolved_app_data_dir(app)?;
@@ -173,6 +200,7 @@ mod tests {
             default_scope: "full".into(),
             include_mail: Some(true),
             last_backup_at: Some(1730000000),
+            ..Default::default()
         };
         let json = serde_json::to_string(&policy).unwrap();
         let deserialized: BackupPolicy = serde_json::from_str(&json).unwrap();

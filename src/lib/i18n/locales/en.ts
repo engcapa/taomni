@@ -7,6 +7,49 @@ type Dict = {
 };
 
 const dict = {
+  backupUnified: {
+    "unsavedTitle": "Backup settings are not saved",
+    "unsavedExit": "Taomni stayed open because your backup settings could not be saved. Retry saving, or cancel exit to review them.",
+    "introduction": "Manage a shared backup scope, automatic destinations, and manual backup in one place.",
+    "globalDefaults": "Global defaults",
+    "globalHint": "Manual backups always use this scope. Automatic destinations inherit it unless they have a custom scope.",
+    "destinations": "Backup destinations",
+    "automaticRange": "Scope for automatic backups",
+    "inherit": "Use global scope",
+    "customRange": "Custom scope",
+    "core": "Core data",
+    "full": "Full data",
+    "custom": "Custom selection",
+    "includeSessions": "Sessions and server keys",
+    "includeNotes": "Notes",
+    "includeVault": "Credential vault",
+    "includeMfa": "MFA accounts",
+    "includeConfigs": "Application settings",
+    "includeLanchat": "LAN chat",
+    "includeMail": "Mail",
+    "includeLocalHistory": "Local file history",
+    "emptyRange": "No data selected",
+    "rangeHint": "Full data adds LAN chat and mail to core data. Local file history requires a custom selection. MFA accounts also require the credential vault.",
+    "loading": "Loading settings…",
+    "saving": "Saving…",
+    "saved": "Saved",
+    "error": "Not saved — retry required",
+    "retrySave": "Retry saving",
+    "authorization": "Feishu authorization",
+    "cancelling": "Cancelling… waiting for background cleanup",
+    "dismissAuthorization": "Dismiss local status",
+    "removedDestination": "Removed destination",
+    "enableDestination": "Enable this destination",
+    "manualGlobal": "Uses the saved global scope shown below. Destination overrides apply only to automatic backups.",
+    "localEncryption": "Encrypt local backup / exported file",
+    "cloudEncryption": "Each cloud destination uses its independently saved archive password.",
+    "passwordConfigured": "An archive password is saved in the system credential store. Enter a new one to replace it.",
+    "savePassword": "Save archive password",
+    "removeDestination": "Remove destination",
+    "removeConfirm": "Remove this destination from local settings? Existing cloud backup files will remain available.",
+    "tasksHistory": "Cloud tasks and history",
+    "retentionHint": "Retention applies to local scheduled snapshots. Cloud file history is managed by the provider."
+},
   modelInspector: modelInspectorEn,
 
   app: {
@@ -3575,6 +3618,7 @@ const dict = {
       "interrupted": "Interrupted; reconnect to continue"
     },
     "errors": {
+      "conflict": "Settings changed in another window. Review your retained draft and retry saving.",
       "storage": "Local cloud backup cache is full. Clear completed cache or discard an unfinished task you no longer need, then retry.",
       "otherInstance": "Another Taomni window is processing cloud backups for this database. Wait for it to finish, or manage the task in that window.",
       "failed": "Operation failed. Check the details, then retry.",

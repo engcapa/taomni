@@ -55,6 +55,8 @@ export interface StageRestoreResult {
   message: string;
 }
 
+export interface BackupRange { scope: BackupScope; customOptions: BackupCustomOptions | null }
+
 export interface BackupPolicy {
   autoBackupEnabled: boolean;
   frequency: "daily" | "weekly" | "on_exit";
@@ -63,6 +65,10 @@ export interface BackupPolicy {
   defaultScope: string;
   includeMail?: boolean | null;
   lastBackupAt?: number | null;
+  defaultCustomOptions?: BackupCustomOptions | null;
+  localRangeOverride?: BackupRange | null;
+  localChannelEnabled?: boolean;
+  settingsRevision?: number;
 }
 
 export async function createBackup(params: {

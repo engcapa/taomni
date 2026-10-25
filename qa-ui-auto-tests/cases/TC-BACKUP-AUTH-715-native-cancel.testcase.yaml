@@ -1,0 +1,118 @@
+id: TC-BACKUP-AUTH-715
+title: Cancel authorization A after adding B; cleanup and dismissal survive reopening
+description: 'Issue #714 regression. Native uses production polling and locks against loopback; browser is an explicit
+  renderer model. Cancellation never deletes cloud applications or backup files.'
+covers:
+- F-BACKUP-1
+- F-BACKUP-2
+tags:
+- backup
+- settings
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- backup_cloud
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- wait_for: '[data-testid="backup-global-scope"]'
+- click: '[data-testid="backup-cloud-destination"]:nth-of-type(1) > summary'
+- click: '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-feishu-authorize"]'
+- assert_file_contains:
+    path: ${fixture.backup_service_events}
+    contains: authorization_started
+- wait_for: '[data-testid="backup-feishu-session"][data-phase="awaiting_authorization"]'
+- click: '[data-testid="backup-feishu-add"]'
+- assert_count:
+    selector: '[data-testid="backup-cloud-destination"]'
+    equal: 2
+- assert_visible: '[data-testid="backup-authorization-cancel"]'
+- click: '[data-testid="backup-authorization-cancel"]'
+- wait_for:
+    selector: '[data-testid="backup-feishu-session"][data-phase="cancelled"][data-cleanup-complete="true"]'
+    timeout_sec: 30
+- click: '[data-testid="settings-group-toggle-backup"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- assert_visible: '[data-testid="backup-feishu-session"][data-phase="cancelled"][data-cleanup-complete="true"]'
+- click: '[data-testid="backup-authorization-forget"]'
+- assert_not_visible: '[data-testid="backup-feishu-session"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- assert_not_visible: '[data-testid="backup-feishu-session"]'
+- click: '[data-testid="backup-cloud-destination"]:nth-of-type(1) > summary'
+- assert_visible: '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-feishu-authorize"]:not([disabled])'
+- click: '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-feishu-authorize"]'
+- wait_for:
+    selector: '[data-testid="backup-feishu-session"][data-phase="awaiting_authorization"]'
+    timeout_sec: 30
+- click: '[data-testid="backup-authorization-cancel"]'
+- wait_for: '[data-testid="backup-feishu-session"][data-phase="cancelled"][data-cleanup-complete="true"]'
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-zh-CN"]'
+- assert_text:
+    selector: '[data-testid="backup-global-defaults"]'
+    contains: 全局默认配置
+- screenshot: backup-authorization-recovery.png
+verification:
+  review: reviewed
+  native:
+  - check: Disk persistence and native task cleanup
+    method: automated
+    reason: Production IPC and isolated profile; loopback Feishu is synthetic, not live service evidence.
+  visual:
+  - check: Backup layout and translated controls
+    method: manual
+    reason: Review retained workflow screenshots.
+  requirements:
+  - id: R1
+    requirement: Adding another destination never hides the active cancellation control
+    actions:
+    - 11
+    - 14
+    checkpoints:
+    - step: 12
+      expectation: twoTargets
+    - step: 13
+      expectation: cancelReachable
+    - step: 15
+      expectation: cleaned
+    results:
+    - 12
+    - 13
+    - 15
+  - id: R2
+    requirement: Cleanup releases ownership and dismissing local status prevents resurrection
+    actions:
+    - 17
+    - 19
+    checkpoints:
+    - step: 18
+      expectation: cancelPersisted
+    - step: 20
+      expectation: dismissed
+    - step: 23
+      expectation: dismissPersisted
+    - step: 25
+      expectation: released
+    results:
+    - 18
+    - 20
+    - 23
+    - 25
+  - id: R3
+    requirement: A fresh authorization actually polls after cleanup
+    actions:
+    - 26
+    checkpoints:
+    - step: 27
+      expectation: newSession
+    results:
+    - 27

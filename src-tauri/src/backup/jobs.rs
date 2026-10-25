@@ -190,7 +190,15 @@ pub fn start(
     remote: Option<RemoteBackup>,
     retry: Option<&str>,
 ) -> Result<String, String> {
-    start_inner(app, target_id, remote, retry, false)
+    start_inner(app, target_id, remote, retry, false, None)
+}
+
+pub fn start_manual(
+    app: &tauri::AppHandle,
+    target_id: &str,
+    source: SourceSpec,
+) -> Result<String, String> {
+    start_inner(app, target_id, None, None, false, Some(source))
 }
 fn start_inner(
     app: &tauri::AppHandle,
@@ -198,6 +206,7 @@ fn start_inner(
     remote: Option<RemoteBackup>,
     retry: Option<&str>,
     automatic_retry: bool,
+    source: Option<SourceSpec>,
 ) -> Result<String, String> {
     let owner = claim(app)?;
     let service = app.state::<BackupJobs>();
@@ -229,6 +238,11 @@ fn start_inner(
         .iter()
         .find(|j| j.target_id == target_id && running.contains_key(&j.id))
     {
+        if source.is_some() {
+            return Err(
+                "Another transfer is running for this target; finish or cancel it first".into(),
+            );
+        }
         if job.remote.as_ref().map(|r| &r.file_token) == remote.as_ref().map(|r| &r.file_token) {
             return Ok(job.id.clone());
         }
@@ -279,6 +293,10 @@ fn start_inner(
             attempts: 0,
             next_retry_at: None,
             failure_kind: None,
+            execution_source: Some(match source {
+                Some(source) => source,
+                None => super::range::scheduled(&super::policy::load_policy_result(app)?, &target),
+            }),
         }
     };
     job.phase = "queued".into();
@@ -361,7 +379,10 @@ async fn execute(
         } else {
             ctx.progress("preparing", 0, None);
             let snapshot_app = app.clone();
-            let source = target.source.clone();
+            // Legacy journals without a plan keep their original explicit source.
+            let source = state
+                .execution_source
+                .unwrap_or_else(|| target.source.clone());
             let path = path.clone();
             let artifact = tauri::async_runtime::spawn_blocking(move || {
                 TaomniSource.snapshot(&snapshot_app, &source, &path, &secrets.archive_password)
@@ -474,7 +495,14 @@ pub async fn scheduled(app: &tauri::AppHandle, trigger: super::scheduler::Backup
             for job in jobs.iter().filter(|j| {
                 j.phase == "retry_wait" && j.next_retry_at.is_some_and(|at| at <= now_ms())
             }) {
-                let _ = start_inner(app, &job.target_id, job.remote.clone(), Some(&job.id), true);
+                let _ = start_inner(
+                    app,
+                    &job.target_id,
+                    job.remote.clone(),
+                    Some(&job.id),
+                    true,
+                    None,
+                );
             }
         }
     }

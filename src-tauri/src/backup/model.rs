@@ -82,6 +82,9 @@ pub struct BackupTarget {
     pub proxy: NetworkConfig,
     #[serde(default)]
     pub source: SourceSpec,
+    /// Missing in older configurations means the explicitly configured range.
+    #[serde(default = "default_range_mode")]
+    pub range_mode: String,
     /// A web-history workflow pauses writes until the user explicitly resumes.
     #[serde(default)]
     pub writes_paused: bool,
@@ -115,12 +118,20 @@ pub struct AuthorizationSession {
     pub verification_url: Option<String>,
     pub user_code: Option<String>,
     pub error: Option<String>,
+    #[serde(default)]
+    pub cleanup_complete: Option<bool>,
+    #[serde(default)]
+    pub cancel_requested: bool,
+    #[serde(default)]
+    pub dismissed_at: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ControlConfig {
     pub format_version: u32,
+    #[serde(default)]
+    pub settings_revision: u64,
     pub device: DeviceIdentity,
     pub targets: Vec<BackupTarget>,
     #[serde(default)]
@@ -195,6 +206,13 @@ pub struct BackupJob {
     pub next_retry_at: Option<i64>,
     #[serde(default)]
     pub failure_kind: Option<super::failure::FailureKind>,
+    /// The concrete source is frozen at enqueue, never added to the archive.
+    #[serde(default)]
+    pub execution_source: Option<SourceSpec>,
+}
+
+fn default_range_mode() -> String {
+    "custom".into()
 }
 
 pub fn now_ms() -> i64 {

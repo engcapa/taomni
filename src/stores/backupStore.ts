@@ -1,12 +1,12 @@
 import { create } from "zustand";
+import { useBackupSettingsStore } from "./backupSettingsStore";
+import { globalRange } from "../lib/backupSettings";
 import {
   createBackup,
   deleteBackupItem,
-  getBackupPolicy,
   getDefaultBackupDir,
   inspectBackup,
   listBackupHistory,
-  setBackupPolicy,
   stageRestore,
   type BackupCustomOptions,
   type BackupEntryInfo,
@@ -47,10 +47,6 @@ interface BackupStore {
 }
 
 let latestHistoryRequest = 0;
-let policyEditVersion = 0;
-let pendingPolicyWrites = 0;
-let policyWriteQueue: Promise<void> = Promise.resolve();
-
 export const useBackupStore = create<BackupStore>((set, get) => ({
   policy: null,
   defaultBackupDir: "",
@@ -81,15 +77,9 @@ export const useBackupStore = create<BackupStore>((set, get) => ({
   refreshHistory: async () => {
     const request = ++latestHistoryRequest;
     try {
-      while (pendingPolicyWrites > 0) await policyWriteQueue;
-      const editVersion = policyEditVersion;
-      const [history, policy] = await Promise.all([
-        listBackupHistory(),
-        getBackupPolicy(),
-      ]);
-      if (request === latestHistoryRequest && editVersion === policyEditVersion && pendingPolicyWrites === 0) {
-        set({ history, policy });
-      }
+      const [history] = await Promise.all([listBackupHistory(), useBackupSettingsStore.getState().refresh()]);
+      if (request === latestHistoryRequest) set({ history });
+
     } catch (e) {
       if (request === latestHistoryRequest) {
         set({ error: e instanceof Error ? e.message : String(e) });
@@ -98,40 +88,18 @@ export const useBackupStore = create<BackupStore>((set, get) => ({
   },
 
   updatePolicy: async (patch) => {
-    const current = get().policy;
-    if (!current) return;
-    const next: BackupPolicy = { ...current, ...patch };
-    const version = ++policyEditVersion;
-    pendingPolicyWrites += 1;
-    // Keep controlled inputs at the latest choice while IPC/disk is pending.
-    set({ policy: next, error: null });
-    const operation = policyWriteQueue.then(async () => {
-      try {
-        await setBackupPolicy(next);
-        // The backend preserves timestamps written by automatic backups.
-        const policy = await getBackupPolicy();
-        if (version === policyEditVersion) set({ policy });
-      } catch (e) {
-        if (version === policyEditVersion) {
-          const policy = await getBackupPolicy().catch(() => current);
-          if (version === policyEditVersion) {
-            set({ policy, error: e instanceof Error ? e.message : String(e) });
-          }
-        }
-        throw e;
-      } finally {
-        pendingPolicyWrites -= 1;
-      }
-    });
-    // A failed write must not prevent subsequent edits from being saved.
-    policyWriteQueue = operation.catch(() => {});
-    await operation;
+    const settings = useBackupSettingsStore.getState();
+    settings.editPolicy(patch);
+    const saved = await settings.flush();
+    set({ policy: saved.policy });
   },
 
   triggerBackup: async (params) => {
     set({ creating: true, error: null });
     try {
-      const result = await createBackup(params);
+      const saved = await useBackupSettingsStore.getState().flush();
+      const range = globalRange(saved.policy);
+      const result = await createBackup({ ...params, scope: range.scope, customOptions: range.customOptions ?? undefined });
       set({ lastResult: result });
       await get().loadAll();
       return result;
@@ -172,3 +140,6 @@ export const useBackupStore = create<BackupStore>((set, get) => ({
     }
   },
 }));
+
+// Compatibility consumers observe the same optimistic draft as the settings UI.
+useBackupSettingsStore.subscribe((state) => useBackupStore.setState({ policy: state.draft?.policy ?? null }));

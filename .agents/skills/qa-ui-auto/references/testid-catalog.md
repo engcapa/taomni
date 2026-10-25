@@ -2306,32 +2306,57 @@
 
 ## settings/backup (F-BACKUP-1)
 
-- `[data-testid="backup-scope"]` — interactive — F-BACKUP-1.backup-scope
-- `[data-testid="backup-include-mail"]` — interactive — F-BACKUP-1.backup-include-mail
-- `[data-testid="backup-auto-include-mail"]` — interactive — F-BACKUP-1.backup-auto-include-mail
-- `[data-testid="backup-auto-toggle"]` — interactive — F-BACKUP-1.auto-toggle
-- `[data-testid="backup-frequency"]` — interactive — F-BACKUP-1.frequency
-- `[data-testid="backup-retained-copies"]` — interactive — F-BACKUP-1.retained-copies
+- `[data-testid="backup-global-scope"]` — interactive — F-BACKUP-1.backup-global-scope
+- `[data-testid="backup-global-include-mail"]` — interactive — F-BACKUP-1.backup-global-include-mail
+- `[data-testid="backup-auto-enabled"]` — interactive — F-BACKUP-1.auto-toggle
+- `[data-testid="backup-auto-frequency"]` — interactive — F-BACKUP-1.frequency
+- `[data-testid="backup-auto-retention"]` — interactive — F-BACKUP-1.retained-copies
 - `[data-testid="backup-last-success"]` — display — F-BACKUP-1.last-success
 - `[data-testid="backup-history-refresh"]` — interactive — F-BACKUP-1.history-refresh
+- `[data-testid="backup-global-defaults"]` — display — F-BACKUP-1.global-defaults
+- `[data-testid="backup-settings-save-status"]` — display — F-BACKUP-1.save-status
+- `[data-testid="backup-local-destination"] > summary` — interactive — F-BACKUP-1.local-expand
+- `[data-testid="backup-local-range-mode"]` — interactive — F-BACKUP-1.local-range
+- `[data-testid="backup-local-scope"]` — interactive — F-BACKUP-1.local-scope
+- `[data-testid="backup-local-select"]` — interactive — F-BACKUP-1.local-select
+- `[data-testid="backup-global-includeLocalHistory"]` — interactive — F-BACKUP-1.global-history
+- `[data-testid="backup-global-includeVault"]` — interactive — F-BACKUP-1.global-vault
+- `[data-testid="backup-manual"]` — display — F-BACKUP-1.manual
+- `[data-testid="backup-restore-password"]` — interactive — F-BACKUP-1.restore-password
+- `[data-testid="backup-restore-unlock"]` — interactive — F-BACKUP-1.restore-unlock
+- `[data-testid="backup-restore-dialog"]` — display — F-BACKUP-1.restore-dialog
+- `[data-testid="backup-range-summary"]` — display — F-BACKUP-1.range-summary
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-range-summary"]` — alias
+  ↳ `[data-testid="backup-manual"] [data-testid="backup-range-summary"]` — alias
+- `[data-testid="backup-settings-retry"]` — interactive — F-BACKUP-1.save-retry
 
 ## settings/backup (F-BACKUP-2)
 
-- `[data-testid="backup-selected-include-mail"]` — interactive — F-BACKUP-2.backup-selected-include-mail
 - `[data-testid="backup-cloud-include-mail"]` — interactive — F-BACKUP-2.backup-cloud-include-mail
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-include-mail"]` — alias
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-include-mail"]` — alias
 - `[data-testid="backup-cloud-panel"]` — display — F-BACKUP-2.cloud-panel
 - `[data-testid="backup-feishu-add"]` — interactive — F-BACKUP-2.feishu-add
 - `[data-testid="backup-cloud-target"]` — interactive — F-BACKUP-2.cloud-target
 - `[data-testid="backup-cloud-name"]` — interactive — F-BACKUP-2.cloud-name
-- `[data-testid="backup-cloud-edit"]` — interactive — F-BACKUP-2.cloud-edit
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-name"]` — alias
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-name"]` — alias
 - `[data-testid="backup-cloud-proxy"]` — interactive — F-BACKUP-2.cloud-proxy
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-proxy"]` — alias
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-proxy"]` — alias
 - `[data-testid="backup-cloud-save"]` — interactive — F-BACKUP-2.cloud-save
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-save"]` — alias
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-save"]` — alias
 - `[data-testid="backup-feishu-folder"]` — interactive — F-BACKUP-2.feishu-folder
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-feishu-folder"]` — alias
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-feishu-folder"]` — alias
 - `[data-testid="backup-device-name"]` — interactive — F-BACKUP-2.device-name
 - `[data-testid="backup-source-device"]` — interactive — F-BACKUP-2.source-device
 - `[data-testid="backup-cloud-row"]` — display — F-BACKUP-2.cloud-row
 - `[data-testid="backup-feishu-app-id"]` — display — F-BACKUP-2.feishu-app-id-legacy
 - `[data-testid="backup-feishu-authorize"]` — interactive — F-BACKUP-2.feishu-authorize
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-feishu-authorize"]` — alias
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-feishu-authorize"]` — alias
 - `[data-testid="backup-connection-recovery"]` — display — F-BACKUP-2.recovery
 - `[data-testid="backup-restart-confirm"]` — interactive — F-BACKUP-2.restart-confirm
 - `[data-testid="backup-restart-application"]` — interactive — F-BACKUP-2.restart-application
@@ -2343,13 +2368,33 @@
 - `[data-testid="backup-discard-confirm"]` — interactive — F-BACKUP-2.discard-confirm
 - `[data-testid="backup-retry-notice"]` — display — F-BACKUP-2.retry-notice
 - `[data-testid="backup-cloud-job"]` — display — F-BACKUP-2.job
-- `[data-testid="backup-cloud-start"]` — interactive — F-BACKUP-2.cloud-start
 - `[data-testid="backup-cloud-refresh"]` — interactive — F-BACKUP-2.cloud-refresh
+- `[data-testid="backup-cloud-destination"] > summary` — interactive — F-BACKUP-2.destination-expand
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(1) > summary` — alias
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(2) > summary` — alias
+- `[data-testid="backup-cloud-range-mode"]` — interactive — F-BACKUP-2.cloud-range-mode
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-range-mode"]` — alias
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-range-mode"]` — alias
+- `[data-testid="backup-cloud-scope"]` — interactive — F-BACKUP-2.cloud-scope
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-scope"]` — alias
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-scope"]` — alias
+- `[data-testid="backup-cloud-password"]` — interactive — F-BACKUP-2.cloud-password
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-password"]` — alias
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-password"]` — alias
+- `[data-testid="backup-cloud-enabled"]` — interactive — F-BACKUP-2.cloud-enabled
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-enabled"]` — alias
+  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-enabled"]` — alias
+- `[data-testid="backup-authorization-banner"]` — display — F-BACKUP-2.authorization-banner
+- `[data-testid="backup-feishu-session"]` — display — F-BACKUP-2.authorization-session
+- `[data-testid="backup-authorization-cancel"]` — interactive — F-BACKUP-2.authorization-cancel
+- `[data-testid="backup-authorization-forget"]` — interactive — F-BACKUP-2.authorization-forget
+- `[data-testid="backup-device-settings"] > summary` — interactive — F-BACKUP-2.device-settings
+- `[data-testid="backup-cloud-destination"]` — display — F-BACKUP-2.destination
 
 ## settings/backup (F-MFA-3)
 
 - `[data-testid="settings-group-toggle-backup"]` — interactive — F-MFA-3.group-toggle-backup
-- `[data-testid="backup-create-now"]` — interactive — F-MFA-3.create-now
+- `[data-testid="backup-selected-start"]` — interactive — F-MFA-3.create-now
 - `[data-testid="backup-action-success"]` — display — F-MFA-3.action-success
 - `[data-testid="backup-history-row"]` — display — F-MFA-3.history-row
 - `[data-testid="backup-history-restore"]` — interactive — F-MFA-3.history-restore
