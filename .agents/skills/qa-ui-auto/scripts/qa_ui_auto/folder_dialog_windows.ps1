@@ -26,16 +26,24 @@ do {
 } while ([DateTime]::UtcNow -lt $deadline)
 if (-not $dialog) { throw "No unique folder chooser owned by the QA executable" }
 $pidObserved = $dialog.Current.ProcessId
-function Button([string] $id) {
-    $idCondition = New-Object System.Windows.Automation.PropertyCondition($automation::AutomationIdProperty, $id)
+function Button([string] $id, [string[]] $names, [bool] $waitEnabled = $true) {
     $typeCondition = New-Object System.Windows.Automation.PropertyCondition($automation::ControlTypeProperty, [System.Windows.Automation.ControlType]::Button)
-    $condition = New-Object System.Windows.Automation.AndCondition($idCondition, $typeCondition)
-    $element = $dialog.FindFirst($scope::Descendants, $condition)
-    if (-not $element -or -not $element.Current.IsEnabled) { throw "Chooser button $id unavailable" }
-    return $element
+    $buttons = @($dialog.FindAll($scope::Descendants, $typeCondition))
+    $describe = ($buttons | ForEach-Object { "id=$($_.Current.AutomationId),name=$($_.Current.Name),enabled=$($_.Current.IsEnabled)" }) -join '; '
+    [Console]::Error.WriteLine("Chooser buttons: $describe")
+    $element = $buttons | Where-Object {
+        $_.Current.AutomationId -eq $id -or $names -contains $_.Current.Name
+    } | Select-Object -First 1
+    if (-not $element) { throw "Chooser button $id unavailable" }
+    $deadline = [DateTime]::UtcNow.AddSeconds($(if ($waitEnabled) { 10 } else { 1 }))
+    do {
+        try { if ($element.Current.IsEnabled) { return $element } } catch [System.Windows.Automation.ElementNotAvailableException] { }
+        Start-Sleep -Milliseconds 100
+    } while ([DateTime]::UtcNow -lt $deadline)
+    throw "Chooser button $id unavailable"
 }
-function Invoke-ChooserButton([string] $id) {
-    $button = Button $id
+function Invoke-ChooserButton([string] $id, [string[]] $names, [bool] $waitEnabled = $true) {
+    $button = Button $id $names $waitEnabled
     [Console]::Error.WriteLine("Chooser button {0}: {1} ({2})", $id, $button.Current.Name, $button.Current.ClassName)
     $pattern = $null
     if ($button.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref] $pattern)) {
@@ -47,7 +55,7 @@ function Invoke-ChooserButton([string] $id) {
     }
 }
 if ($env:QA_PICKER_ACTION -eq "cancel") {
-    Invoke-ChooserButton "2"
+    Invoke-ChooserButton "2" @("Cancel", "取消") $false
 } else {
     $editCondition = New-Object System.Windows.Automation.PropertyCondition($automation::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)
     $edits = @($dialog.FindAll($scope::Descendants, $editCondition) | Where-Object { $_.Current.IsEnabled -and -not $_.Current.IsOffscreen })
@@ -57,11 +65,11 @@ if ($env:QA_PICKER_ACTION -eq "cancel") {
     $value = $edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
     $value.SetValue($env:QA_PICKER_PATH)
     if ($value.Current.Value -ne $env:QA_PICKER_PATH) { throw "Folder path was not entered completely" }
-    Invoke-ChooserButton "1"
+    Invoke-ChooserButton "1" @("Open", "Select Folder", "Add", "Choose", "打开", "选择文件夹")
     Start-Sleep -Milliseconds 600
     try {
         if (-not $dialog.Current.IsOffscreen) {
-            Invoke-ChooserButton "1"
+            Invoke-ChooserButton "1" @("Open", "Select Folder", "Add", "Choose", "打开", "选择文件夹")
         }
     } catch [System.Windows.Automation.ElementNotAvailableException] { }
 }
