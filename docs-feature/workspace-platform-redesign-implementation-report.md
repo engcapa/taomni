@@ -78,14 +78,24 @@
 | [40145294238](https://github.com/engcapa/taomni/actions/runs/40145294238) | 三端 · native · TC-WS-012 | 通过（含 Windows PowerShell 提示符） |
 | [40149432172](https://github.com/engcapa/taomni/actions/runs/40149432172) | 三端 · browser+native · 42 条 | 41/42 通过；Linux native `TC-WS-008` 因 WebDriver 将 `_` 输入为 `-` 导致路径不匹配 |
 | [40151860983](https://github.com/engcapa/taomni/actions/runs/40151860983) | 三端 · browser+native · TC-WS-008 | 通过（fixture 目录名与选择器均已修复） |
-| [40153251124](https://github.com/engcapa/taomni/actions/runs/40153251124) | 三端 · browser+native · 42 条（最终全量） | 见下方“最终全量回归” |
+| [40153251124](https://github.com/engcapa/taomni/actions/runs/40153251124) | 三端 · browser+native · 42 条（最终全量） | **通过**：161 次执行全部 passed（0 failed / 0 skipped / 0 infrastructure errors） |
 
 ### 最终全量回归
 
-- 最终全量运行：[`40153251124`](https://github.com/engcapa/taomni/actions/runs/40153251124)（提交 `docs/workspace-platform-redesign` 最新 HEAD）。
-- 覆盖组合：`linux-browser`、`linux-native`、`windows-browser`、`windows-native`、`macos-browser`、`macos-native`。
-- 选中的 42 条用例包含 15 条重构用例（`TC-WS-001` ~ `TC-WS-015`）与 27 条既有 browser/native 回归用例；每条用例在其声明的平台与模式下通过，平台/模式不适用时由用例的 `modes` / `native_platforms` 声明排除，而不是执行失败。
-- Windows 原生构建曾在一次运行中因 QA 工具自身的临时文件锁单测失败（`test_native_fixture_cleanup`，与本变更无关），重跑后通过；最终运行不再包含该基础设施错误。
+- 最终全量运行：[`40153251124`](https://github.com/engcapa/taomni/actions/runs/40153251124)（`docs/workspace-platform-redesign` 分支，结论 **success**）。
+- 结果表：
+
+  | Combination | Selected | Passed | Failed | Skipped | Infrastructure errors |
+  |---|---:|---:|---:|---:|---:|
+  | linux-browser | 35 | 35 | 0 | 0 | 0 |
+  | linux-native | 22 | 22 | 0 | 0 | 0 |
+  | windows-browser | 35 | 35 | 0 | 0 | 0 |
+  | windows-native | 19 | 19 | 0 | 0 | 0 |
+  | macos-browser | 34 | 34 | 0 | 0 | 0 |
+  | macos-native | 16 | 16 | 0 | 0 | 0 |
+
+- 共 161 次用例执行全部通过；选中的 42 条用例包含 15 条重构用例（`TC-WS-001` ~ `TC-WS-015`）与 27 条既有 browser/native 回归用例。平台/模式不适用时由用例的 `modes` / `native_platforms` 声明排除，不计为 skip 或失败。
+- 过程中的失败均已修复并复跑验证：选择器标签（Close all / Move to folder）、受控 checkbox 属性、OpenTabsMenu 过滤对象、macOS 原生菜单、UI 建会话的主机必填、原生驱动不支持文本管道与 `_` 输入、xterm 焦点与 macOS 合成文本、以及一次与本变更无关的 Windows QA 工具临时文件锁单测抖动（重跑通过）。
 
 ### 3.4 未验证 / 边界
 
