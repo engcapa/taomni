@@ -9,6 +9,7 @@ const events = Application("System Events");
 const shell = Application.currentApplication();
 shell.includeStandardAdditions = true;
 const log = (stage) => console.log("native_folder_dialog: " + stage);
+const actionNames = ["Open", "Choose", "Select", "Select Folder"];
 // Resolve the executable once. Recursing through the main window's complete
 // accessibility tree walks the whole WebView and can take minutes on CI.
 // Darwin's `comm` field is only the executable basename. Use the unbounded
@@ -47,6 +48,15 @@ function buttons(owner, name, enabled = false) {
   // the panel, never Home's unrelated Open button in the underlying WebView.
   return owner.buttons.whose({ name })().filter((button) => !enabled || button.enabled());
 }
+function actionButtons(owner, enabled = false) {
+  for (const name of actionNames) {
+    try {
+      const found = buttons(owner, name, enabled);
+      if (found.length) return found;
+    } catch (_) { }
+  }
+  return [];
+}
 function findPanel() {
   const panels = [];
   for (const window of process.windows()) {
@@ -59,7 +69,7 @@ function findPanel() {
   }
   const owned = panels.filter((owner) => {
     try {
-      return buttons(owner, "Open").length === 1 && buttons(owner, "Cancel").length === 1;
+      return actionButtons(owner).length === 1 && buttons(owner, "Cancel").length === 1;
     } catch (_) {
       // NSOpenPanel may replace its sheet accessibility node while Go to
       // Folder is resolving a path. Let the caller retry with a fresh node.
@@ -94,7 +104,7 @@ if (readEnv("QA_PICKER_ACTION") === "cancel") {
   while (Date.now() < openDeadline && !submitted) {
     const currentPanel = findPanel() || panel;
     try {
-      const open = buttons(currentPanel, "Open", true);
+      const open = actionButtons(currentPanel, true);
       if (open.length === 1) {
         open[0].click();
         submitted = true;

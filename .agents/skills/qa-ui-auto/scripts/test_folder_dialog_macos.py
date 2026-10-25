@@ -17,8 +17,9 @@ const application = '/Users/runner/work/taomni/taomni/src-tauri/target/qa-ui-aut
 const env = { QA_PICKER_APPLICATION:application, QA_PICKER_PATH:'/qa/fixture/project with spaces',
   QA_PICKER_TITLE:'Select folder to open', QA_PICKER_ACTION:config.action };
 let navigated = false, now = 0;
+const actionName = config.actionName || 'Open';
 const button = (name) => ({enabled:()=>name === 'Cancel' || navigated, click:()=>actions.push(name)});
-const panel = {buttons:{whose:({name})=>()=>[button(name)]}};
+const panel = {buttons:{whose:({name})=>()=>name === actionName || name === 'Cancel' ? [button(name)] : []}};
 const main = {sheets:()=>config.standalone ? [] : [panel],
   subrole:()=>config.standalone ? 'AXDialog' : 'AXStandardWindow',
   name:()=>config.standalone ? env.QA_PICKER_TITLE : 'Taomni',
@@ -69,6 +70,11 @@ class MacFolderDialogContracts(unittest.TestCase):
         observed = self.run_helper(action="choose", standalone=True)
         self.assertNotIn("error", observed)
         self.assertEqual(observed["actions"][-1], "Open")
+
+    def test_folder_chooser_alternate_action_label_is_supported(self):
+        observed = self.run_helper(action="choose", actionName="Choose")
+        self.assertNotIn("error", observed)
+        self.assertEqual(observed["actions"][-1], "Choose")
 
     def test_ambiguous_executable_owner_prevents_all_os_input(self):
         observed = self.run_helper(action="choose", duplicate=True)

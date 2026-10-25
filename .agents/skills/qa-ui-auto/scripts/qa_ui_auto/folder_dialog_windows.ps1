@@ -63,6 +63,12 @@ function Invoke-ChooserButton([string] $id, [string[]] $names, [bool] $waitEnabl
         throw "Chooser button $id has no accessible default action"
     }
 }
+function Find-CurrentChooser {
+    $windows = @($automation::RootElement.FindAll($scope::Descendants, $windowCondition))
+    $windows | Where-Object {
+        try { $_.Current.ProcessId -eq $pidObserved -and $_.Current.Name -eq $env:QA_PICKER_TITLE } catch { $false }
+    } | Select-Object -First 1
+}
 function Activate-Chooser {
     try {
         $handle = [IntPtr]$dialog.Current.NativeWindowHandle
@@ -119,7 +125,9 @@ if ($env:QA_PICKER_ACTION -eq "cancel") {
 }
 $deadline = [DateTime]::UtcNow.AddSeconds(10)
 do {
-    try { $closed = $dialog.Current.IsOffscreen } catch [System.Windows.Automation.ElementNotAvailableException] { $closed = $true }
+    # The cached UIA element can remain queryable after Common Item Dialog
+    # closes. Re-query the title under the owning process to observe reality.
+    $closed = -not (Find-CurrentChooser)
     if ($closed) { break }
     Start-Sleep -Milliseconds 100
 } while ([DateTime]::UtcNow -lt $deadline)
