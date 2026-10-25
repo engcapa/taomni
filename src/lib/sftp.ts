@@ -85,6 +85,9 @@ export interface TransferItem {
   startedAt: number;
   finishedAt?: number | null;
   openAfter?: boolean;
+  phase?: "connecting" | "downloading" | "verifying";
+  resumeBytes?: number;
+  restarted?: boolean;
 }
 
 export interface TransferProgressPayload {
@@ -92,6 +95,9 @@ export interface TransferProgressPayload {
   total: number;
   rate: number;
   eta: number;
+  phase?: TransferItem["phase"];
+  resumeBytes?: number;
+  restarted?: boolean;
 }
 
 export interface TransferCompletePayload {

@@ -101,7 +101,7 @@ export function registerSessionEditorClipboard1Cases() {
     expect(checkboxInLabel("Trusted")).toBeDisabled();
     expect(screen.getByLabelText("Execute command")).toHaveValue("tmux new -A -s main");
     expect(screen.getByLabelText("Do not exit after command ends")).toBeChecked();
-    expect(screen.getByDisplayValue("Disabled")).toBeInTheDocument();
+    expect(screen.getByTestId("session-ssh-browser-type")).toHaveTextContent("SFTP protocol (recommended)");
     expect(screen.queryByText("Follow SSH path (experimental)")).not.toBeInTheDocument();
     expect(screen.queryByText("Auto-inject OSC 7 cwd reporting")).not.toBeInTheDocument();
 
@@ -114,7 +114,7 @@ export function registerSessionEditorClipboard1Cases() {
       compression: true,
       startupCmd: "tmux new -A -s main",
       doNotExit: true,
-      sshBrowser: "Disabled",
+      sshBrowser: "sftp",
     });
     expect(JSON.parse(savedConfig.options_json)).not.toHaveProperty("followPath");
     expect(JSON.parse(savedConfig.options_json)).not.toHaveProperty("osc7AutoInject");
@@ -177,7 +177,7 @@ export function registerSessionEditorClipboard1Cases() {
     await user.type(screen.getByLabelText("Remote host"), "net.example.com");
     await user.click(screen.getByRole("button", { name: /network settings/i }));
 
-    const proxySelect = screen.getByDisplayValue("None — direct connection");
+    const proxySelect = screen.getByTestId("session-proxy-kind");
     await user.selectOptions(proxySelect, "HTTP CONNECT");
     await user.type(screen.getByLabelText("Proxy host"), "proxy.corp");
     await user.type(screen.getByLabelText("Proxy port"), "3128");
@@ -300,7 +300,7 @@ export function registerSessionEditorClipboard1Cases() {
     await user.type(screen.getByLabelText("远程主机"), "app.internal");
     await user.click(screen.getByRole("button", { name: "网络设置" }));
 
-    const proxySelect = screen.getByDisplayValue("无 — 直连");
+    const proxySelect = screen.getByTestId("session-proxy-kind");
     await user.selectOptions(proxySelect, screen.getByRole("option", { name: "本地 SSH 隧道" }));
     await user.type(screen.getByLabelText("跳板机主机"), "bastion.internal");
     await user.type(screen.getByLabelText("跳板机用户"), "ops");

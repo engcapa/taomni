@@ -6,6 +6,7 @@
 //! TCP socket and when configuring the russh client.
 
 mod model;
+pub(crate) mod proxy_selection;
 
 mod transport;
 

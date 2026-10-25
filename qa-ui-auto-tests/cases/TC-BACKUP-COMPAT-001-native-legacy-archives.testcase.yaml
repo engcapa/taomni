@@ -1,0 +1,127 @@
+id: TC-BACKUP-COMPAT-001
+title: Native restore reads unchanged plain, V1 and V2 backups
+description: Inspects fixed independently encoded version-1 archives using the real native archive reader. Cancelled
+  inspection stages no restore; unit tests also apply each archive and verify checksums and payloads.
+covers:
+- F-BACKUP-1
+- F-BACKUP-2
+tags:
+- backup
+- settings
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- backup_cloud
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- wait_for: '[data-testid="backup-global-scope"]'
+- click: '[data-testid="backup-history-row"][data-file-name="legacy-plain.taobak"] [data-testid="backup-history-restore"]'
+- wait_for:
+    selector: '[data-testid="backup-restore-files"]'
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="backup-restore-files"]'
+    contains: databases/notes.db
+- assert_text:
+    selector: '[data-testid="backup-restore-files"]'
+    contains: configs/tunnels.json
+- click: '[data-testid="backup-restore-cancel"]'
+- assert_not_visible: '[data-testid="backup-restore-dialog"]'
+- click: '[data-testid="backup-history-row"][data-file-name="legacy-v1.taobak"] [data-testid="backup-history-restore"]'
+- wait_for: '[data-testid="backup-restore-password"]'
+- fill:
+    selector: '[data-testid="backup-restore-password"]'
+    value: compat-password
+- click: '[data-testid="backup-restore-unlock"]'
+- wait_for:
+    selector: '[data-testid="backup-restore-files"]'
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="backup-restore-files"]'
+    contains: databases/notes.db
+- assert_text:
+    selector: '[data-testid="backup-restore-files"]'
+    contains: configs/tunnels.json
+- click: '[data-testid="backup-restore-cancel"]'
+- assert_not_visible: '[data-testid="backup-restore-dialog"]'
+- click: '[data-testid="backup-history-row"][data-file-name="legacy-v2.taobak"] [data-testid="backup-history-restore"]'
+- wait_for: '[data-testid="backup-restore-password"]'
+- fill:
+    selector: '[data-testid="backup-restore-password"]'
+    value: compat-password
+- click: '[data-testid="backup-restore-unlock"]'
+- wait_for:
+    selector: '[data-testid="backup-restore-files"]'
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="backup-restore-files"]'
+    contains: databases/notes.db
+- assert_text:
+    selector: '[data-testid="backup-restore-files"]'
+    contains: configs/tunnels.json
+- click: '[data-testid="backup-restore-cancel"]'
+- assert_not_visible: '[data-testid="backup-restore-dialog"]'
+- screenshot: backup-legacy-archives.png
+verification:
+  review: reviewed
+  native:
+  - check: Disk persistence and native task cleanup
+    method: automated
+    reason: Production IPC and isolated profile; loopback Feishu is synthetic, not live service evidence.
+  visual:
+  - check: Backup layout and translated controls
+    method: manual
+    reason: Review retained workflow screenshots.
+  requirements:
+  - id: R1
+    requirement: All three legacy envelope formats retain their version-1 path mapping
+    actions:
+    - 7
+    - 13
+    - 22
+    checkpoints:
+    - step: 9
+      expectation: notesplain
+    - step: 10
+      expectation: tunnelsplain
+    - step: 18
+      expectation: notesv1
+    - step: 19
+      expectation: tunnelsv1
+    - step: 27
+      expectation: notesv2
+    - step: 28
+      expectation: tunnelsv2
+    results:
+    - 9
+    - 10
+    - 18
+    - 19
+    - 27
+    - 28
+  - id: R2
+    requirement: Cancelling inspection closes without staging a restore
+    actions:
+    - 11
+    - 20
+    - 29
+    checkpoints:
+    - step: 12
+      expectation: closedplain
+    - step: 21
+      expectation: closedv1
+    - step: 30
+      expectation: closedv2
+    results:
+    - 12
+    - 21
+    - 30

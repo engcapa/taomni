@@ -1,3 +1,4 @@
+import { readSessionBookmark, type SessionBookmark } from "../../../lib/sessionBookmark";
 import { mailStorageOptions } from "../../mail/MailStorageSettings";
 import { mailHeaderLimitOption } from "../../../lib/mailSync";
 import { parseSpecialFolders } from "../../../lib/mailFolders";
@@ -29,6 +30,7 @@ import { type MailProvider, initialMailProvider, normalizeMailAuthMode, initialM
 
 
 export interface CreateSessionResetContext {
+  setBookmark: (value: SessionBookmark) => void;
   session: SessionConfig | undefined;
   setProto: import("react").Dispatch<import("react").SetStateAction<Proto>>;
   setSection: import("react").Dispatch<import("react").SetStateAction<SectionTab>>;
@@ -39,7 +41,7 @@ export interface CreateSessionResetContext {
   setSpecifyUser: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setGroupPath: import("react").Dispatch<import("react").SetStateAction<string>>;
   defaultGroupPath: string | null;
-  setAuthMethod: import("react").Dispatch<import("react").SetStateAction<"Password" | "Agent" | "None" | "PrivateKey">>;
+  setAuthMethod: import("react").Dispatch<import("react").SetStateAction<"Password" | "Agent" | "Gssapi" | "None" | "PrivateKey">>;
   setAuthRadio: import("react").Dispatch<import("react").SetStateAction<string>>;
   setKeyPath: import("react").Dispatch<import("react").SetStateAction<string>>;
   setPassword: import("react").Dispatch<import("react").SetStateAction<string>>;
@@ -52,7 +54,6 @@ export interface CreateSessionResetContext {
   setDoNotExit: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setDisableAiWrite: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setRemoteEnv: import("react").Dispatch<import("react").SetStateAction<string>>;
-  setSshBrowser: import("react").Dispatch<import("react").SetStateAction<string>>;
   setUsePrivKey: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setDescription: import("react").Dispatch<import("react").SetStateAction<string>>;
   setTags: import("react").Dispatch<import("react").SetStateAction<string>>;
@@ -101,7 +102,6 @@ export function createSessionReset(context: CreateSessionResetContext) {
     setDoNotExit,
     setDisableAiWrite,
     setRemoteEnv,
-    setSshBrowser,
     setUsePrivKey,
     setDescription,
     setTags,
@@ -126,6 +126,7 @@ export function createSessionReset(context: CreateSessionResetContext) {
   } = context;
 
   const handleReset = () => {
+    context.setBookmark(readSessionBookmark(session?.options_json));
     const nextOptions = parseSessionOptions(session?.options_json);
     const nextProto = sessionTypeToProto(session?.session_type, session?.options_json);
     setProto(nextProto);
@@ -141,7 +142,7 @@ export function createSessionReset(context: CreateSessionResetContext) {
     setGroupPath(toStoredGroupPath(session?.group_path ?? defaultGroupPath) ?? "");
     const nextAuth = extractAuthType(session?.auth_method);
     setAuthMethod(nextAuth);
-    setAuthRadio(nextAuth === "PrivateKey" ? "privatekey" : nextAuth === "Agent" ? "agent" : nextAuth === "None" ? "gssapi" : "password");
+    setAuthRadio(nextAuth === "PrivateKey" ? "privatekey" : nextAuth === "Agent" ? "agent" : (nextAuth === "None" || nextAuth === "Gssapi") ? "gssapi" : "password");
     setKeyPath(extractKeyPath(session?.auth_method));
     setPassword("");
     const restoredRef = optionString(nextOptions, "passwordRef", "");
@@ -154,7 +155,6 @@ export function createSessionReset(context: CreateSessionResetContext) {
     setDoNotExit(optionBoolean(nextOptions, "doNotExit", true));
     setDisableAiWrite(optionBoolean(nextOptions, "disableAiWrite", false));
     setRemoteEnv(optionString(nextOptions, "remoteEnv", "Interactive shell"));
-    setSshBrowser(optionString(nextOptions, "sshBrowser", "SFTP protocol (recommended)"));
     setUsePrivKey(nextAuth === "PrivateKey");
     setDescription(optionString(nextOptions, "description", ""));
     setTags(optionString(nextOptions, "tags", ""));

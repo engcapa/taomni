@@ -188,6 +188,7 @@ export function ObjectStorageSettings({ value, onChange, saveInVault, setSaveInV
     <div data-testid="session-objectstorage-section" className="grid grid-cols-2 gap-x-3 gap-y-2.5 text-[12px]">
       <Row label="Provider">
         <select
+          data-testid="session-storage-provider"
           className={input}
           value={value.provider}
           onChange={(e) => {

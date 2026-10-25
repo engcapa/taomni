@@ -42,33 +42,33 @@ steps:
 - select_option:
     selector: '[data-testid="session-proxy-kind"]'
     value: http
-- assert_visible: 'input[aria-label="Proxy host"]'
+- assert_visible: input[aria-label="Proxy host"]
 - fill:
-    selector: 'input[aria-label="Proxy host"]'
+    selector: input[aria-label="Proxy host"]
     value: proxy.example.test
 - assert_attribute:
-    selector: 'input[aria-label="Proxy host"]'
+    selector: input[aria-label="Proxy host"]
     name: value
     equals: proxy.example.test
 - fill:
-    selector: 'input[aria-label="Proxy port"]'
+    selector: input[aria-label="Proxy port"]
     value: '8080'
 - assert_attribute:
-    selector: 'input[aria-label="Proxy port"]'
+    selector: input[aria-label="Proxy port"]
     name: value
     equals: '8080'
 - fill:
-    selector: 'input[aria-label="Proxy username"]'
+    selector: input[aria-label="Proxy username"]
     value: proxy-user
 - assert_attribute:
-    selector: 'input[aria-label="Proxy username"]'
+    selector: input[aria-label="Proxy username"]
     name: value
     equals: proxy-user
 - fill:
-    selector: 'input[aria-label="Proxy password"]'
+    selector: input[aria-label="Proxy password"]
     value: proxy-password-not-for-storage
 - assert_attribute:
-    selector: 'input[aria-label="Proxy password"]'
+    selector: input[aria-label="Proxy password"]
     name: type
     equals: password
 - set_check:
@@ -85,7 +85,7 @@ steps:
     selector: '[data-testid="session-proxy-kind"]'
     name: value
     equals: socks5
-- assert_visible: 'input[aria-label="Proxy host"]'
+- assert_visible: input[aria-label="Proxy host"]
 - select_option:
     selector: '[data-testid="session-proxy-kind"]'
     value: system
@@ -93,7 +93,7 @@ steps:
     selector: '[data-testid="session-proxy-kind"]'
     name: value
     equals: system
-- assert_not_visible: 'input[aria-label="Proxy host"]'
+- assert_not_visible: input[aria-label="Proxy host"]
 - select_option:
     selector: '[data-testid="session-proxy-kind"]'
     value: none
@@ -112,26 +112,26 @@ steps:
 - select_option:
     selector: '[data-testid="session-jump-source"]'
     label: Enter manually…
-- assert_visible: 'input[aria-label="Jump host"]'
+- assert_visible: input[aria-label="Jump host"]
 - fill:
-    selector: 'input[aria-label="Jump host"]'
+    selector: input[aria-label="Jump host"]
     value: bastion.example.test
 - assert_attribute:
-    selector: 'input[aria-label="Jump host"]'
+    selector: input[aria-label="Jump host"]
     name: value
     equals: bastion.example.test
 - fill:
-    selector: 'input[aria-label="Jump port"]'
+    selector: input[aria-label="Jump port"]
     value: '2200'
 - assert_attribute:
-    selector: 'input[aria-label="Jump port"]'
+    selector: input[aria-label="Jump port"]
     name: value
     equals: '2200'
 - fill:
-    selector: 'input[aria-label="Jump user"]'
+    selector: input[aria-label="Jump user"]
     value: bastion-user
 - assert_attribute:
-    selector: 'input[aria-label="Jump user"]'
+    selector: input[aria-label="Jump user"]
     name: value
     equals: bastion-user
 - select_option:
@@ -169,10 +169,10 @@ steps:
     name: data-checked
     equals: 'true'
 - fill:
-    selector: 'input[aria-label="Keep-alive interval"]'
+    selector: input[aria-label="Keep-alive interval"]
     value: '47'
 - assert_attribute:
-    selector: 'input[aria-label="Keep-alive interval"]'
+    selector: input[aria-label="Keep-alive interval"]
     name: value
     equals: '47'
 - set_check:
@@ -183,14 +183,14 @@ steps:
     name: data-checked
     equals: 'true'
 - assert_attribute:
-    selector: '[data-testid="session-disable-nagle-toggle"]'
+    selector: '[data-testid="session-tcp-nodelay-toggle"]'
     name: data-checked
     equals: 'true'
 - set_check:
-    selector: '[data-testid="session-disable-nagle-toggle"]'
+    selector: '[data-testid="session-tcp-nodelay-toggle"]'
     checked: false
 - assert_attribute:
-    selector: '[data-testid="session-disable-nagle-toggle"]'
+    selector: '[data-testid="session-tcp-nodelay-toggle"]'
     name: data-checked
     equals: 'false'
 - assert_attribute:
@@ -213,13 +213,13 @@ steps:
     equals: ipv6
 - assert_disabled: '[data-testid="session-forward-add"]'
 - fill:
-    selector: 'input[aria-label="New forward local address"]'
+    selector: input[aria-label="New forward local address"]
     value: 127.0.0.1:19200
 - fill:
-    selector: 'input[aria-label="New forward remote address"]'
+    selector: input[aria-label="New forward remote address"]
     value: service.internal:80
 - fill:
-    selector: 'input[aria-label="New forward description"]'
+    selector: input[aria-label="New forward description"]
     value: matrix-forward
 - assert_enabled: '[data-testid="session-forward-add"]'
 - click: '[data-testid="session-forward-add"]'
@@ -227,22 +227,22 @@ steps:
     selector: '[data-testid="network-settings"] input[aria-label="Forward local address"]'
     equal: 1
 - assert_attribute:
-    selector: 'input[aria-label="Forward local address"]'
+    selector: input[aria-label="Forward local address"]
     name: value
     equals: 127.0.0.1:19200
 - assert_attribute:
-    selector: 'input[aria-label="Forward remote address"]'
+    selector: input[aria-label="Forward remote address"]
     name: value
     equals: service.internal:80
 - assert_attribute:
-    selector: 'input[aria-label="Forward description"]'
+    selector: input[aria-label="Forward description"]
     name: value
     equals: matrix-forward
 - fill:
-    selector: 'input[aria-label="Forward local address"]'
+    selector: input[aria-label="Forward local address"]
     value: 127.0.0.1:19201
 - assert_attribute:
-    selector: 'input[aria-label="Forward local address"]'
+    selector: input[aria-label="Forward local address"]
     name: value
     equals: 127.0.0.1:19201
 - click: '[data-testid^="session-forward-remove-"]'
@@ -266,15 +266,15 @@ steps:
     name: value
     equals: ssh-tunnel
 - assert_attribute:
-    selector: 'input[aria-label="Jump host"]'
+    selector: input[aria-label="Jump host"]
     name: value
     equals: bastion.example.test
 - assert_attribute:
-    selector: 'input[aria-label="Jump port"]'
+    selector: input[aria-label="Jump port"]
     name: value
     equals: '2200'
 - assert_attribute:
-    selector: 'input[aria-label="Jump user"]'
+    selector: input[aria-label="Jump user"]
     name: value
     equals: bastion-user
 - assert_attribute:
@@ -282,7 +282,7 @@ steps:
     name: data-checked
     equals: 'true'
 - assert_attribute:
-    selector: 'input[aria-label="Keep-alive interval"]'
+    selector: input[aria-label="Keep-alive interval"]
     name: value
     equals: '47'
 - assert_attribute:
@@ -303,6 +303,7 @@ verification:
   - id: R1
     requirement: SSH proxy and jump controls expose the selected mode's fields, preserve entered values, and restore them after save and reopen.
     actions:
+    - 3
     - 14
     - 15
     - 16
@@ -488,7 +489,7 @@ verification:
     - step: 61
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "true"}}'
     - step: 64
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-nagle-toggle\"]", "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 65
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 67

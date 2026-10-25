@@ -22,6 +22,7 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `open` | string URL **or** `{url}` | Navigates and waits for `domcontentloaded`. Auto-runs at step 0 if first step isn't `open`/`goto`. |
 | `goto` | same as `open` | Alias. |
 | `wait` | seconds (number or `"3s"`) | Hard sleep; use sparingly. |
+| `switch_window` | `{selector, timeout_sec?, close_with?}` | Browser/native. Enumerates real app-created pages/WebViews and selects the one containing the CSS selector. Optional `close_with` clicks a control once in the source window and requires that window to disappear before selecting the target; a native `no such window` response is accepted only with this observed closure. Never creates a synthetic window or replays an uncertain click. |
 | `wait_for` | selector string **or** `{selector, timeout_sec?, state?}` | `state` ∈ `attached/detached/visible/hidden`, default `visible`. |
 | `screenshot` | filename string **or** `{path, selector?, full_page?}` | Saved under `qa-ui-auto-report/<run>/<TC-id>/`. |
 

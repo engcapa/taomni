@@ -297,7 +297,7 @@ export function registersessionImportExportLifecycle5Cases() {
       jumpUser: "jump",
       jumpPort: "2200",
     });
-    expect(result.warnings.join("\n")).toContain("agent authentication is not implemented");
+    expect(result.warnings.join("\n")).not.toContain("agent authentication is not implemented");
     expect(result.warnings.join("\n")).toContain("agent forwarding");
     expect(result.warnings.join("\n")).toContain("jump-host settings");
   });

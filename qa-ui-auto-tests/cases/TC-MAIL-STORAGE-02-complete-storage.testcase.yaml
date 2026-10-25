@@ -1,8 +1,8 @@
 id: TC-MAIL-STORAGE-02
 title: Native complete MIME, resumable storage, relocation, backup selection and physical cleanup
-description: Uses only a disposable QA profile, loopback IMAP/SMTP, independent MIME checksums and read-only SQLite/gzip/ZIP observations. Runs on Linux/WebKitGTK, Windows/WebView2
-  and macOS/WKWebView. Restore inspection is exercised; restart/apply and encrypted backup compatibility are covered by Rust tests and require follow-up native restore execution.
-  Linux native is exercised with a separate QA profile; Windows/macOS remain pending.
+description: Uses only a disposable QA profile, loopback IMAP/SMTP, independent MIME checksums and read-only SQLite/gzip/ZIP observations. Runs on Linux/WebKitGTK, Windows/WebView2 and
+  macOS/WKWebView. Restore inspection is exercised; restart/apply and encrypted backup compatibility are covered by Rust tests and require follow-up native restore execution. Linux native
+  is exercised with a separate QA profile; Windows/macOS remain pending.
 covers:
 - F-MAIL-23
 - F-BACKUP-1
@@ -149,10 +149,11 @@ steps:
       Archive: 2
 - click: '[data-testid="ribbon-settings"]'
 - click: '[data-testid="settings-group-toggle-backup"]'
+- wait_for: '[data-testid="backup-global-include-mail"]'
 - set_check:
-    selector: '[data-testid="backup-include-mail"]'
+    selector: '[data-testid="backup-global-include-mail"]'
     checked: true
-- click: '[data-testid="backup-create-now"]'
+- click: '[data-testid="backup-selected-start"]'
 - wait_for:
     selector: '[data-testid="backup-action-success"]'
     timeout_sec: 60
@@ -170,9 +171,9 @@ steps:
     timeout_sec: 30
 - click: '[data-testid="backup-restore-cancel"]'
 - set_check:
-    selector: '[data-testid="backup-include-mail"]'
+    selector: '[data-testid="backup-global-include-mail"]'
     checked: false
-- click: '[data-testid="backup-create-now"]'
+- click: '[data-testid="backup-selected-start"]'
 - wait_for:
     selector: '[data-testid="backup-action-success"]'
     timeout_sec: 60
@@ -183,7 +184,7 @@ steps:
     include_mail: false
     objects: 0
 - set_check:
-    selector: '[data-testid="backup-auto-include-mail"]'
+    selector: '[data-testid="backup-global-include-mail"]'
     checked: true
 - assert_file_contains:
     path: ${fixture.mail_qa_data}/backup_policy.json
@@ -284,6 +285,7 @@ verification:
   - id: R1
     requirement: Selected INBOX downloads complete MIME and attachments, Archive keeps summaries, pause/resume and directory relocation retain exact bytes.
     actions:
+    - 2
     - 3
     - 5
     - 6
@@ -333,22 +335,22 @@ verification:
     - 52
     - 54
     - 55
-    - 56
     - 57
-    - 60
-    - 63
+    - 58
+    - 61
     - 64
     - 65
-    - 68
-    - 70
+    - 66
+    - 69
     - 71
     - 72
     - 73
     - 74
     - 75
-    - 77
+    - 76
     - 78
-    - 82
+    - 79
+    - 83
     - 50
     checkpoints:
     - step: 44
@@ -361,23 +363,23 @@ verification:
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-preview\"]", "contains": "Offline body", "timeout_sec": 30}}'
     - step: 53
       expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_b}", "expected": "${fixture.mail_expected}", "full": {"INBOX": 2}, "headers": {"INBOX": 0, "Archive": 2}}}'
-    - step: 59
+    - step: 60
       expectation: '{"mail_storage_assert": {"root": "${fixture.mail_qa_data}/backups", "expected": "${fixture.mail_expected}", "kind": "backup", "include_mail": true, "objects": 2}}'
-    - step: 62
+    - step: 63
       expectation: '{"assert_text": {"selector": "[data-testid=\"backup-restore-files\"]", "contains": ".eml.gz", "timeout_sec": 30}}'
-    - step: 67
+    - step: 68
       expectation: '{"mail_storage_assert": {"root": "${fixture.mail_qa_data}/backups", "expected": "${fixture.mail_expected}", "kind": "backup", "include_mail": false, "objects": 0}}'
-    - step: 69
+    - step: 70
       expectation: '{"assert_file_contains": {"path": "${fixture.mail_qa_data}/backup_policy.json", "contains": "\"includeMail\": true"}}'
-    - step: 76
+    - step: 77
       expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_b}", "expected": "${fixture.mail_expected}", "full": {"INBOX": 2}, "headers": {"Archive": 2}}}'
-    - step: 79
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-notice\"]", "contains": "Removed 2 local originals", "timeout_sec": 30}}'
     - step: 80
-      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 0}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-notice\"]", "contains": "Removed 2 local originals", "timeout_sec": 30}}'
     - step: 81
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 0}}'
+    - step: 82
       expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_b}", "expected": "${fixture.mail_expected}", "full": {}, "headers": {"Archive": 2}}}'
-    - step: 83
+    - step: 84
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains": "paused", "timeout_sec": 30}}'
     results:
     - 44
@@ -385,15 +387,15 @@ verification:
     - 49
     - 51
     - 53
-    - 59
-    - 62
-    - 67
-    - 69
-    - 76
-    - 79
+    - 60
+    - 63
+    - 68
+    - 70
+    - 77
     - 80
     - 81
-    - 83
+    - 82
+    - 84
   - id: R3
     requirement: A new unconnected session has no discovered folders and explains how to populate the local cache; manual exact names remain supported by the main flow.
     actions:
@@ -409,41 +411,41 @@ verification:
   - id: R4
     requirement: After syncing, encoded IMAP names display decoded labels; selected exact server keys persist when saved and reopened, and survive switching include/exclude mode.
     actions:
-    - 85
     - 86
     - 87
-    - 89
+    - 88
     - 90
-    - 92
+    - 91
     - 93
-    - 95
-    - 97
-    - 99
-    - 101
-    - 102
-    - 103
-    - 106
-    - 111
-    checkpoints:
-    - step: 96
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-settings\"]", "contains": "Folders from the last sync; available offline"}}'
-    - step: 98
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mail-storage-folder-names\"]", "name": "value", "equals": "&U,BTFw-"}}'
-    - step: 104
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mail-storage-folders\"] input[aria-label=\"台北\"]", "name": "value", "equals": "&U,BTFw-"}}'
-    - step: 105
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mail-storage-folder-names\"]", "name": "value", "equals": "&U,BTFw-"}}'
-    - step: 107
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mail-storage-folder-names\"]", "name": "value", "equals": "&U,BTFw-"}}'
-    - step: 112
-      expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
-    results:
+    - 94
     - 96
     - 98
+    - 100
+    - 102
+    - 103
     - 104
-    - 105
     - 107
     - 112
+    checkpoints:
+    - step: 97
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-settings\"]", "contains": "Folders from the last sync; available offline"}}'
+    - step: 99
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mail-storage-folder-names\"]", "name": "value", "equals": "&U,BTFw-"}}'
+    - step: 105
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mail-storage-folders\"] input[aria-label=\"台北\"]", "name": "value", "equals": "&U,BTFw-"}}'
+    - step: 106
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mail-storage-folder-names\"]", "name": "value", "equals": "&U,BTFw-"}}'
+    - step: 108
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mail-storage-folder-names\"]", "name": "value", "equals": "&U,BTFw-"}}'
+    - step: 113
+      expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
+    results:
+    - 97
+    - 99
+    - 105
+    - 106
+    - 108
+    - 113
   visual:
   - check: Storage settings, progress and archive list remain readable without clipping.
     method: manual

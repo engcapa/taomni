@@ -113,6 +113,7 @@ export function SessionEditorView(props: SessionEditorViewProps) {
             setUsername={form.setUsername}
             port={form.port}
             setPort={form.setPort}
+            hidePort={form.proto === "ClickHouse" && form.databaseForm.dbChProtocol.toLowerCase() !== "native"}
             isProxy={form.isProxy}
             isMail={form.isMail}
             password={form.password}

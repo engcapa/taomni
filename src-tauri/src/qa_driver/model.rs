@@ -19,7 +19,7 @@ pub(super) struct ElementRef {
 
 pub(super) struct DriverState<R: Runtime> {
     pub(super) app: AppHandle<R>,
-    pub(super) window: WebviewWindow<R>,
+    pub(super) window: Arc<std::sync::RwLock<WebviewWindow<R>>>,
     pub(super) elements: Arc<Mutex<HashMap<String, ElementRef>>>,
     pub(super) next_element: Arc<AtomicU64>,
 }
@@ -32,5 +32,14 @@ impl<R: Runtime> Clone for DriverState<R> {
             elements: self.elements.clone(),
             next_element: self.next_element.clone(),
         }
+    }
+}
+
+impl<R: Runtime> DriverState<R> {
+    pub(super) fn current_window(&self) -> Result<WebviewWindow<R>, String> {
+        self.window
+            .read()
+            .map(|window| window.clone())
+            .map_err(|_| "QA window lock poisoned".into())
     }
 }

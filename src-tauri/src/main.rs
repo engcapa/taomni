@@ -2,6 +2,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("--ssh-stdio-forward") {
+        std::process::exit(taomni_lib::terminal::openssh::stdio_forward());
+    }
     #[cfg(windows)]
     if std::env::args().nth(1).as_deref() == Some("--screenshot-scroll-input") {
         std::process::exit(taomni_lib::run_screenshot_scroll_input());

@@ -82,7 +82,10 @@ export function TerminalPanelView(props: TerminalPanelViewProps) {
       onMouseUpCapture={lifecycle.handleTerminalMouseUpCapture}
       onAuxClick={lifecycle.handleMiddleClick}
     >
-      <div ref={panel.containerRef} className="terminal-host w-full h-full overflow-hidden" />
+      {panel.background.url && <img data-testid="session-terminal-background" src={panel.background.url}
+        alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ opacity: panel.background.opacity }} />}
+      {panel.background.error && <span role="status" className="absolute top-1 right-2 z-10 text-xs">{panel.background.error}</span>}
+      <div ref={panel.containerRef} className="terminal-host relative w-full h-full overflow-hidden" />
 
       <TabActions active={activeForShortcuts}>
         {sftpToggle && (

@@ -411,7 +411,7 @@ export function registerSessionEditorLifecycle3Cases() {
     await user.type(screen.getByLabelText("Mail password or app password token"), "gmail-app-secret");
 
     await user.click(screen.getByRole("button", { name: /network settings/i }));
-    const proxySelect = screen.getByDisplayValue("None — direct connection");
+    const proxySelect = screen.getByTestId("session-proxy-kind");
     await user.selectOptions(proxySelect, "HTTP CONNECT");
     await user.type(screen.getByLabelText("Proxy host"), "proxy.mail.corp");
     await user.type(screen.getByLabelText("Proxy port"), "8080");
@@ -443,7 +443,7 @@ export function registerSessionEditorLifecycle3Cases() {
     await user.type(screen.getByLabelText("OAuth client ID"), "google-client-id");
 
     await user.click(screen.getByRole("button", { name: /network settings/i }));
-    const proxySelect = screen.getByDisplayValue("None — direct connection");
+    const proxySelect = screen.getByTestId("session-proxy-kind");
     await user.selectOptions(proxySelect, "SOCKS 5");
     await user.type(screen.getByLabelText("Proxy host"), "socks.mail.corp");
     await user.type(screen.getByLabelText("Proxy port"), "1080");

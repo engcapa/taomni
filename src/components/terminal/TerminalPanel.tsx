@@ -12,6 +12,7 @@ import { useTerminalRegistry } from "./panel/useTerminalRegistry";
 // ESC [ 3 J
 
 export function TerminalPanel({
+  bookmarkOptionsJson,
   tabId,
   tabTitle = "Terminal",
   theme = "classic",
@@ -46,6 +47,7 @@ export function TerminalPanel({
   detachToggle,
 }: TerminalPanelProps) {
   const panel = useTerminalPanelState({
+    bookmarkOptionsJson,
     onCwdChange,
     onSessionReady,
     onSessionLaunchFailed,

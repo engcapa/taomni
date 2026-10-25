@@ -24,6 +24,28 @@ impl ActiveSftp {
         handle: Arc<TransferHandle>,
         app: AppHandle,
     ) -> Result<(), String> {
+        if self.is_scp() {
+            let completed = AtomicU64::new(0);
+            let total = tokio::fs::metadata(local)
+                .await
+                .map_err(|e| e.to_string())?
+                .len();
+            return self
+                .scp_upload(
+                    local,
+                    remote,
+                    super::scp::Progress {
+                        app: &app,
+                        id: &transfer_id,
+                        handle: &handle,
+                        total,
+                        completed: &completed,
+                        started: Instant::now(),
+                    },
+                )
+                .await;
+        }
+
         use tokio::io::AsyncReadExt as _;
 
         let mut file = tokio::fs::File::open(local)
@@ -34,7 +56,7 @@ impl ActiveSftp {
         // Open the remote file under the session lock, then release the lock
         // so other ops (list, stat) can interleave with the chunked transfer.
         let mut remote_file = {
-            let sftp = self.sftp.lock().await;
+            let sftp = self.sftp_session().await?;
             sftp.open_with_flags(
                 remote.to_string(),
                 OpenFlags::WRITE | OpenFlags::CREATE | OpenFlags::TRUNCATE,
@@ -101,7 +123,10 @@ impl ActiveSftp {
     /// caller still sees the actionable cause (permission denied, read-only
     /// filesystem, etc.) instead of a generic message.
     pub(super) async fn mkdir_idempotent(&self, path: &str) -> Result<(), String> {
-        let sftp = self.sftp.lock().await;
+        if self.is_scp() {
+            return self.scp_metadata("mkdirs", serde_json::json!([path])).await;
+        }
+        let sftp = self.sftp_session().await?;
         let create_err = match sftp.create_dir(path.to_string()).await {
             Ok(()) => return Ok(()),
             Err(e) => e,
@@ -227,11 +252,28 @@ impl ActiveSftp {
         completed: &Arc<AtomicU64>,
         started: Instant,
     ) -> Result<(), String> {
+        if self.is_scp() {
+            return self
+                .scp_upload(
+                    local,
+                    remote,
+                    super::scp::Progress {
+                        app,
+                        id: transfer_id,
+                        handle,
+                        total,
+                        completed,
+                        started,
+                    },
+                )
+                .await;
+        }
+
         let mut file = tokio::fs::File::open(local)
             .await
             .map_err(|e| format!("open {}: {}", local.display(), e))?;
         let mut remote_file = {
-            let sftp = self.sftp.lock().await;
+            let sftp = self.sftp_session().await?;
             sftp.open_with_flags(
                 remote.to_string(),
                 OpenFlags::WRITE | OpenFlags::CREATE | OpenFlags::TRUNCATE,

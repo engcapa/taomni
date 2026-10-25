@@ -227,6 +227,7 @@ fn auth_label(auth: &SshAuth) -> &'static str {
         SshAuth::Password(_) => "Password",
         SshAuth::PrivateKey(_) => "PrivateKey",
         SshAuth::Agent => "Agent",
+        SshAuth::Gssapi => "Gssapi",
     }
 }
 

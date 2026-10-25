@@ -1,7 +1,7 @@
 id: TC-MAIL-STORAGE-01
 title: Configure complete storage and explicitly clean retained local originals
-description: Renderer-only workflow with preview mail. Native file migration, MIME integrity, backup contents and cleanup are separately asserted by TC-MAIL-STORAGE-02. Linux
-  browser is exercised locally; Windows/macOS remain pending.
+description: Renderer-only workflow with preview mail. Native file migration, MIME integrity, backup contents and cleanup are separately asserted by TC-MAIL-STORAGE-02. Linux browser
+  is exercised locally; Windows/macOS remain pending.
 covers:
 - F-MAIL-23
 - F-BACKUP-1
@@ -214,20 +214,20 @@ steps:
 - click: '[data-testid="ribbon-settings"]'
 - click: '[data-testid="settings-group-toggle-backup"]'
 - set_check:
-    selector: '[data-testid="backup-include-mail"]'
+    selector: '[data-testid="backup-global-include-mail"]'
     checked: true
 - select_option:
-    selector: '[data-testid="backup-scope"]'
+    selector: '[data-testid="backup-global-scope"]'
     value: full
 - set_check:
-    selector: '[data-testid="backup-include-mail"]'
+    selector: '[data-testid="backup-global-include-mail"]'
     checked: false
 - set_check:
-    selector: '[data-testid="backup-auto-include-mail"]'
+    selector: '[data-testid="backup-global-include-mail"]'
     checked: true
 - screenshot: mail-storage-settings.png
 - eval_readonly:
-    expression: document.getElementById("backup-auto-include-mail").checked
+    expression: document.getElementById("backup-global-include-mail").checked
     expect_truthy: true
 - click: '[data-testid="tab-item"][data-tab-type="mail"]'
 - mail_server_deliver:
@@ -291,6 +291,7 @@ verification:
   - id: R1
     requirement: Save/reopen directory and include/exclude settings; read saved originals; cancellation preserves them and confirmed cleanup pauses storage.
     actions:
+    - 2
     - 3
     - 5
     - 6
@@ -375,7 +376,7 @@ verification:
     - step: 80
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-storage-progress\"]", "contains": "completed", "timeout_sec": 30}}'
     - step: 100
-      expectation: '{"eval_readonly": {"expression": "document.getElementById(\"backup-auto-include-mail\").checked", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.getElementById(\"backup-global-include-mail\").checked", "expect_truthy": true}}'
     - step: 16
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"mail-storage-directory\"]", "name": "value", "equals": "${fixture.mail_storage_a}"}}'
     - step: 37

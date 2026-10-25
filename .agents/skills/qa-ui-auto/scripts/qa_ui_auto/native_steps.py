@@ -1429,6 +1429,9 @@ VERBS.update(assert_count=assert_count, assert_menu_items=assert_menu_items)
 VERBS["terminal_drag_selection"] = _terminal_drag_selection
 
 
+from .window_context import native_switch
+VERBS["switch_window"] = native_switch
+
 def _verb(name: str) -> Callable[[Callable[[NativeStepContext, Any], str]], Callable[[NativeStepContext, Any], str]]:
     def deco(fn: Callable[[NativeStepContext, Any], str]) -> Callable[[NativeStepContext, Any], str]:
         VERBS[name] = fn

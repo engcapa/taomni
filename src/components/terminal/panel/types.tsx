@@ -52,6 +52,7 @@ export interface TerminalLocalPathUploadRequest {
 
 
 export interface TerminalPanelProps {
+  bookmarkOptionsJson?: string;
   tabId?: string;
   tabTitle?: string;
   theme?: string;

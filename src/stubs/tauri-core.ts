@@ -40,7 +40,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
   }
   if (cmd === "backup_list_history") return [] as T;
   if (cmd === "backup_get_default_dir") return "/preview/backups" as T;
-  if (cmd.startsWith("backup_remote_") || cmd.startsWith("backup_feishu_")) {
+  if (cmd.startsWith("backup_settings_") || ["backup_target_set_password", "backup_run_manual"].includes(cmd) || cmd.startsWith("backup_remote_") || cmd.startsWith("backup_feishu_")) {
     return await (await import("./remoteBackupStub")).remoteBackupStub(cmd, args) as T;
   }
   // ED-PARITY-008 isolated two-repository Git fixture (opt-in via localStorage).

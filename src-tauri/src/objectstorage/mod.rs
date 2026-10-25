@@ -202,6 +202,13 @@ async fn build_http_client(
 
     if uses_proxy {
         let mut net = network.cloned().expect("uses_proxy implies Some");
+        crate::terminal::resolve_proxy_session(state, &mut net)?;
+        if net.proxy_kind == "system" {
+            net = crate::terminal::network::proxy_selection::resolve_system(
+                &net,
+                endpoint.host_str().ok_or("Endpoint host is missing")?,
+            )?;
+        }
         if net.uses_jump_host() {
             crate::terminal::resolve_jump_credentials(state, &mut net)?;
             let host = endpoint
@@ -213,8 +220,7 @@ async fn build_http_client(
             let addr = std::net::SocketAddr::from(([127, 0, 0, 1], fwd.local_port));
             builder = builder.resolve(&host, addr);
             forward_task = Some(fwd.task);
-        } else {
-            crate::terminal::resolve_proxy_session(state, &mut net)?;
+        } else if !matches!(net.proxy_kind.as_str(), "" | "none") {
             net.resolve_proxy_pass(&state.vault)?;
             let proxy = ResolvedProxy {
                 kind: net.proxy_kind.clone(),
@@ -223,7 +229,9 @@ async fn build_http_client(
                 username: net.proxy_user.clone(),
                 password: net.proxy_pass.clone(),
             };
-            builder = proxy.apply_to(builder);
+            builder = builder.proxy(
+                reqwest::Proxy::all(proxy.to_url()).map_err(|_| "Invalid session proxy URL")?,
+            );
         }
     }
 

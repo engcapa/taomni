@@ -57,9 +57,9 @@ pub(in crate::mail) fn refresh_oauth_token_blocking(
         params.push(("scope", scope.to_string()));
     }
 
-    let client = build_oauth_http_client_blocking(network)?;
+    let client = build_oauth_http_client_blocking(network, token_url)?;
     let response = client
-        .post(token_url)
+        .post()
         .header(
             reqwest::header::CONTENT_TYPE,
             "application/x-www-form-urlencoded",
@@ -91,9 +91,9 @@ pub(in crate::mail) fn exchange_oauth_code_blocking(
         params.push(("client_secret", secret.to_string()));
     }
 
-    let client = build_oauth_http_client_blocking(network)?;
+    let client = build_oauth_http_client_blocking(network, token_url)?;
     let response = client
-        .post(token_url)
+        .post()
         .header(
             reqwest::header::CONTENT_TYPE,
             "application/x-www-form-urlencoded",
@@ -115,9 +115,9 @@ pub(in crate::mail) fn start_oauth_device_code_blocking(
         ("scope", oauth_scope(provider)?.to_string()),
     ];
 
-    let client = build_oauth_http_client_blocking(network)?;
+    let client = build_oauth_http_client_blocking(network, device_url)?;
     let response = client
-        .post(device_url)
+        .post()
         .header(
             reqwest::header::CONTENT_TYPE,
             "application/x-www-form-urlencoded",
@@ -145,7 +145,7 @@ pub(in crate::mail) fn complete_oauth_device_code_blocking(
                 .into(),
         );
     }
-    let client = build_oauth_http_client_blocking(network)?;
+    let client = build_oauth_http_client_blocking(network, token_url)?;
     let deadline = Instant::now() + Duration::from_secs(expires_in.clamp(1, 3600) as u64);
     let mut poll_interval = Duration::from_secs(interval.clamp(1, 30) as u64);
 
@@ -166,7 +166,7 @@ pub(in crate::mail) fn complete_oauth_device_code_blocking(
             params.push(("client_secret", secret.to_string()));
         }
         let response = client
-            .post(token_url)
+            .post()
             .header(
                 reqwest::header::CONTENT_TYPE,
                 "application/x-www-form-urlencoded",

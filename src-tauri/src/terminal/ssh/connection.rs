@@ -125,7 +125,7 @@ pub async fn connect_ssh(
 > {
     let (output_tx, output_rx) = tokio::sync::mpsc::unbounded_channel();
 
-    let config = build_client_config(network);
+    let config = build_client_config(network)?;
 
     let handler = SshHandler {
         output_tx: Arc::new(Mutex::new(None)),
@@ -260,7 +260,7 @@ pub async fn connect_ssh_authenticated_with_prompter(
     network: Option<&NetworkSettings>,
     prompter: Option<&KbdInteractivePrompter>,
 ) -> Result<client::Handle<SshHandler>, String> {
-    let config = build_client_config(network);
+    let config = build_client_config(network)?;
     let handler = SshHandler {
         output_tx: Arc::new(Mutex::new(None)),
         x11: None,

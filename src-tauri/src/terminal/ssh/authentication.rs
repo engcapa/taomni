@@ -15,6 +15,7 @@ pub enum SshAuth {
     Password(String),
     PrivateKey(String),
     Agent,
+    Gssapi,
 }
 
 /// A single prompt inside a keyboard-interactive auth round (e.g. the
@@ -83,13 +84,36 @@ pub(super) async fn authenticate(
         }
         SshAuth::PrivateKey(key_path) => {
             let key_path = shellexpand::tilde(&key_path).to_string();
-            let key = keys::load_secret_key(&key_path, None)
+            let encrypted = PrivateKey::read_openssh_file(&key_path)
+                .ok()
+                .is_some_and(|key| key.is_encrypted());
+            let passphrase = if encrypted {
+                let prompt = prompter.ok_or("Encrypted private key requires a passphrase; connect the session to unlock it or add it to SSH agent")?;
+                let answer = prompt(KbdInteractiveRequest {
+                    name: "Unlock SSH private key".into(),
+                    instructions: key_path.clone(),
+                    prompts: vec![KbdPrompt {
+                        prompt: "Passphrase".into(),
+                        echo: false,
+                    }],
+                })
+                .await
+                .ok_or("Private key unlock cancelled")?;
+                Some(zeroize::Zeroizing::new(
+                    answer
+                        .into_iter()
+                        .next()
+                        .ok_or("Private key passphrase missing")?,
+                ))
+            } else {
+                None
+            };
+            let key = keys::load_secret_key(&key_path, passphrase.as_deref().map(String::as_str))
                 .map_err(|e| format!("Failed to load key {}: {}", key_path, e))?;
             authenticate_private_key(handle, username, key).await?;
         }
-        SshAuth::Agent => {
-            return Err("SSH agent auth not yet implemented".to_string());
-        }
+        SshAuth::Agent => return super::agent::authenticate(handle, username).await,
+        SshAuth::Gssapi => return Err("GSSAPI requires the OpenSSH transport".into()),
     }
     Ok(())
 }

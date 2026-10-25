@@ -1,276 +1,115 @@
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { BackupSettingsPanel } from "./BackupSettingsPanel";
 import { useBackupStore } from "../../stores/backupStore";
+import { useBackupSettingsStore as settings } from "../../stores/backupSettingsStore";
 import { useVaultStore } from "../../stores/vaultStore";
-
-const invokeMock = vi.hoisted(() => vi.fn());
-const listenMock = vi.hoisted(() => vi.fn());
-
-vi.mock("@tauri-apps/api/event", () => ({
-  listen: listenMock,
-}));
-
-vi.mock("@tauri-apps/api/core", () => ({
-  invoke: invokeMock,
-}));
-
-vi.mock("../../lib/ipc", () => ({
-  openLocalPath: vi.fn(),
-  selectFilePath: vi.fn(),
-  selectSaveDirectory: vi.fn(),
-  selectSaveFilePath: vi.fn(),
-}));
-
-vi.mock("../../lib/updateService", () => ({
-  relaunchApp: vi.fn(),
-}));
-
-describe("BackupSettingsPanel", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    listenMock.mockResolvedValue(vi.fn());
-    const policy = {
-      autoBackupEnabled: false,
-      frequency: "weekly" as const,
-      customBackupDir: null,
-      maxRetainedCopies: 7,
-      defaultScope: "core",
-      lastBackupAt: null,
-    };
-    const defaultBackupDir = "C:\\Users\\test\\AppData\\Roaming\\com.taomni.app\\backups";
-    const history = [
-      {
-        fileName: "taomni_backup_20260904_120000.taobak",
-        filePath: "C:\\Users\\test\\AppData\\Roaming\\com.taomni.app\\backups\\taomni_backup_20260904_120000.taobak",
-        sizeBytes: 2097152,
-        modifiedAt: 1788500000000,
-        isEncrypted: false,
-      },
-    ];
-
-    invokeMock.mockImplementation((cmd: string) => {
-      if (cmd === "backup_get_policy") return Promise.resolve(useBackupStore.getState().policy ?? policy);
-      if (cmd === "backup_get_default_dir") return Promise.resolve(defaultBackupDir);
-      if (cmd === "backup_list_history") return Promise.resolve(useBackupStore.getState().history.length > 0 ? useBackupStore.getState().history : history);
-      return Promise.resolve(null);
-    });
-
-    useBackupStore.setState({
-      policy,
-      defaultBackupDir,
-      history,
-      loading: false,
-      creating: false,
-      restoring: false,
-      lastResult: null,
-      error: null,
-    });
-
-    useVaultStore.setState({
-      state: "unlocked",
-      entryCount: 1,
-      loading: false,
-      entries: [],
-      refresh: vi.fn().mockResolvedValue(undefined),
-    });
-  });
-
-  afterEach(() => {
-    cleanup();
-    vi.useRealTimers();
-  });
-
-  it("sends the explicit mail selection and persists automatic inclusion", async () => {
-    render(<BackupSettingsPanel />);
-    fireEvent.click(screen.getByTestId("backup-include-mail"));
-    fireEvent.click(screen.getByTestId("backup-create-now"));
-    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("backup_create", expect.objectContaining({ scope: "core", customOptions: { includeMail: true } })));
-    fireEvent.change(screen.getByTestId("backup-scope"), { target: { value: "full" } });
-    fireEvent.click(screen.getByTestId("backup-include-mail"));
-    fireEvent.click(screen.getByTestId("backup-create-now"));
-    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("backup_create", expect.objectContaining({ scope: "full", customOptions: { includeMail: false } })));
-    fireEvent.click(screen.getByTestId("backup-auto-include-mail"));
-    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith("backup_set_policy", expect.objectContaining({ policy: expect.objectContaining({ includeMail: true }) })));
-  });
-
-  it("keeps rapid frequency choices visible while their saves are pending", async () => {
-    let disk = { ...useBackupStore.getState().policy!, autoBackupEnabled: true, frequency: "daily" as "daily" | "weekly" | "on_exit" };
-    useBackupStore.setState({ policy: disk });
-    let release!: () => void;
-    const held = new Promise<void>((resolve) => { release = resolve; });
-    let writes = 0;
-    invokeMock.mockImplementation(async (cmd: string, args?: { policy: typeof disk }) => {
-      if (cmd === "backup_set_policy") {
-        if (++writes === 1) await held;
-        disk = { ...args!.policy };
-      }
-      if (cmd === "backup_get_policy") return { ...disk };
-      if (cmd === "backup_list_history") return [];
-      if (cmd === "backup_get_default_dir") return "/qa/backups";
-      return null;
-    });
-    render(<BackupSettingsPanel />);
-    const select = screen.getByTestId("backup-frequency");
-    try {
-      fireEvent.change(select, { target: { value: "weekly" } });
-      expect(select).toHaveValue("weekly");
-      fireEvent.change(select, { target: { value: "daily" } });
-      expect(select).toHaveValue("daily");
-    } finally {
-      await act(async () => release());
-    }
-    await waitFor(() => expect(writes).toBe(2));
-    expect(disk.frequency).toBe("daily");
-    expect(select).toHaveValue("daily");
-  });
-
-  it("renders backup storage directory and default path badge", () => {
-    render(<BackupSettingsPanel />);
-
-    expect(screen.getByText("Backup Storage Directory")).toBeDefined();
-    expect(screen.getByText("Default Path")).toBeDefined();
-    expect(
-      screen.getByDisplayValue("C:\\Users\\test\\AppData\\Roaming\\com.taomni.app\\backups"),
-    ).toBeDefined();
-  });
-
-  it("shows custom directory badge and reset button when customBackupDir is set", () => {
-    useBackupStore.setState({
-      policy: {
-        autoBackupEnabled: false,
-        frequency: "weekly",
-        customBackupDir: "D:\\OneDrive\\TaomniBackups",
-        maxRetainedCopies: 7,
-        defaultScope: "core",
-        lastBackupAt: null,
-      },
-    });
-
-    render(<BackupSettingsPanel />);
-
-    expect(screen.getByText("Custom Directory")).toBeDefined();
-    expect(screen.getByDisplayValue("D:\\OneDrive\\TaomniBackups")).toBeDefined();
-    expect(screen.getByText("Reset to Default")).toBeDefined();
-  });
-
-  it("renders backup history and actions", () => {
-    render(<BackupSettingsPanel />);
-
-    expect(screen.getByText(/Historical Snapshots/)).toBeDefined();
-    expect(screen.getByText("taomni_backup_20260904_120000.taobak")).toBeDefined();
-    expect(screen.getByText("2.00 MB")).toBeDefined();
-    expect(screen.getByText("Restore")).toBeDefined();
-    expect(screen.getByText("Delete")).toBeDefined();
-  });
-
-  it("renders the restore dialog on an opaque theme surface", () => {
-    render(<BackupSettingsPanel />);
-
-    fireEvent.click(screen.getByRole("button", { name: "Restore" }));
-
-    const dialog = screen.getByTestId("backup-restore-dialog");
-    expect(dialog).toHaveAttribute("aria-modal", "true");
-    expect(dialog).toHaveProperty("style.background", "var(--taomni-bg)");
-    expect(dialog).toHaveProperty("style.borderColor", "var(--taomni-card-border)");
-  });
-
-  it("renders manual backup controls with Backup Now and Export to... buttons without requiring vault password during creation", () => {
-    useVaultStore.setState({ state: "unlocked" });
-    render(<BackupSettingsPanel />);
-
-    expect(screen.getByText("Manual Instant Backup")).toBeDefined();
-    expect(screen.getByText("Backup Now")).toBeDefined();
-    expect(screen.getByText("Export to...")).toBeDefined();
-    // Manual backup should not have vault master password requirement
-    expect(screen.queryByText("Vault Master Password Verification")).toBeNull();
-  });
-
-  it("renders auto-backup toggle card and weekly retention hint", () => {
-    useBackupStore.setState({
-      policy: {
-        autoBackupEnabled: true,
-        frequency: "weekly",
-        customBackupDir: null,
-        maxRetainedCopies: 7,
-        defaultScope: "core",
-        lastBackupAt: null,
-      },
-    });
-
-    render(<BackupSettingsPanel />);
-    expect(screen.getByText("Enable scheduled rolling backup in background")).toBeDefined();
-    expect(
-      screen.getByText("Weekly backup, defaults to keeping 7 weeks of historical snapshots"),
-    ).toBeDefined();
-  });
-
-  it("updates the open history and last backup time after a background backup completes", async () => {
-    render(<BackupSettingsPanel />);
-    await waitFor(() => expect(useBackupStore.getState().loading).toBe(false));
-    const policy = { ...useBackupStore.getState().policy!, lastBackupAt: 1788501000000 };
-    const history = [{
-      fileName: "taomni_backup_auto_daily.taobak",
-      filePath: "/backups/taomni_backup_auto_daily.taobak",
-      sizeBytes: 2048,
-      modifiedAt: policy.lastBackupAt,
-      isEncrypted: false,
-    }];
-    invokeMock.mockImplementation((cmd: string) => {
-      if (cmd === "backup_get_policy") return Promise.resolve(policy);
-      if (cmd === "backup_list_history") return Promise.resolve(history);
-      return Promise.resolve(null);
-    });
-
-    expect(listenMock).toHaveBeenCalledWith("backup-completed", expect.any(Function));
-    await act(async () => {
-      listenMock.mock.calls.find(([event]) => event === "backup-completed")![1]({ payload: {} });
-    });
-
-    expect(screen.getByText(history[0].fileName)).toBeDefined();
-    expect(screen.getByTestId("backup-last-success")).toHaveTextContent(new Date(policy.lastBackupAt).toLocaleString());
-    expect(screen.queryByText("taomni_backup_20260904_120000.taobak")).toBeNull();
-  });
-
-  it("observes another instance's backup without a local event and stops polling when closed", async () => {
-    vi.useFakeTimers();
-    const { unmount } = render(<BackupSettingsPanel />);
-    await act(async () => {});
-    const policy = { ...useBackupStore.getState().policy!, lastBackupAt: 1788501000000 };
-    const history = [{
-      fileName: "taomni_backup_other_instance.taobak",
-      filePath: "/backups/taomni_backup_other_instance.taobak",
-      sizeBytes: 2048,
-      modifiedAt: policy.lastBackupAt,
-      isEncrypted: false,
-    }];
-    invokeMock.mockImplementation((cmd: string) => {
-      if (cmd === "backup_get_policy") return Promise.resolve(policy);
-      if (cmd === "backup_list_history") return Promise.resolve(history);
-      return Promise.resolve(null);
-    });
-
-    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
-
-    expect(screen.getByText(history[0].fileName)).toBeDefined();
-    expect(screen.getByTestId("backup-last-success")).toHaveTextContent(new Date(policy.lastBackupAt).toLocaleString());
-    unmount();
-    invokeMock.mockClear();
-    await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
-    expect(invokeMock).not.toHaveBeenCalled();
-  });
-
-  it("removes a listener whose registration finishes after the panel closes", async () => {
-    const unlisten = vi.fn();
-    let registered!: (unlisten: () => void) => void;
-    listenMock.mockImplementation((event: string) => event === "backup-completed"
-      ? new Promise<() => void>((resolve) => { registered = resolve; })
-      : Promise.resolve(vi.fn()));
-    const { unmount } = render(<BackupSettingsPanel />);
-    unmount();
-
-    await act(async () => { registered(unlisten); });
-
-    expect(unlisten).toHaveBeenCalledOnce();
-  });
+import { backupHarness, deferred } from "../../test/backupHarness";
+import { setLocale } from "../../lib/i18n";
+const mocks = vi.hoisted(() => ({ invoke: vi.fn(), listen: vi.fn(), saveFile: vi.fn(), directory: vi.fn(), open: vi.fn() }));
+vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
+vi.mock("@tauri-apps/api/event", () => ({ listen: mocks.listen }));
+vi.mock("@tauri-apps/plugin-shell", () => ({ open: mocks.open }));
+vi.mock("../../lib/ipc", () => ({ selectFilePath: vi.fn(), selectSaveDirectory: mocks.directory, selectSaveFilePath: mocks.saveFile }));
+vi.mock("../../lib/updateService", () => ({ relaunchApp: vi.fn() }));
+let h: ReturnType<typeof backupHarness>;
+beforeEach(() => {
+  vi.clearAllMocks(); setLocale("en"); h = backupHarness();
+  mocks.invoke.mockImplementation(h.invoke); mocks.listen.mockResolvedValue(vi.fn());
+  useBackupStore.setState({ history: h.history, defaultBackupDir: "/backups", error: null, creating: false, restoring: false });
+  useVaultStore.setState({ state: "unlocked", refresh: vi.fn().mockResolvedValue(undefined) });
+});
+afterEach(() => { cleanup(); vi.useRealTimers(); setLocale("en"); });
+it("saves full data with mail, restores it after remount, and removes manual scope inputs", async () => {
+  const view = render(<BackupSettingsPanel />);
+  fireEvent.change(screen.getByTestId("backup-global-scope"), { target: { value: "full" } });
+  expect(screen.getByTestId("backup-global-include-mail")).toBeChecked();
+  await settings.getState().flush(); view.unmount();
+  settings.setState({ draft: null });
+  render(<BackupSettingsPanel />);
+  await waitFor(() => expect(screen.getByTestId("backup-global-scope")).toHaveValue("full"));
+  expect(within(screen.getByTestId("backup-manual")).queryByRole("combobox")).toBeNull();
+  fireEvent.click(screen.getByTestId("backup-global-include-mail"));
+  fireEvent.click(screen.getByTestId("backup-selected-start"));
+  await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith("backup_run_manual", expect.objectContaining({ request: expect.objectContaining({ expectedPolicyRevision: 2 }) })));
+  expect(h.disk.policy).toMatchObject({ defaultScope: "full", includeMail: false });
+});
+it("keeps rapid frequency changes visible while saving", async () => {
+  const held = deferred<unknown>(); let writes = 0;
+  mocks.invoke.mockImplementation(async (cmd, args) => { if (cmd === "backup_settings_patch" && ++writes === 1) await held.promise; return h.invoke(cmd, args); });
+  render(<BackupSettingsPanel />);
+  fireEvent.change(screen.getByTestId("backup-auto-frequency"), { target: { value: "daily" } });
+  fireEvent.change(screen.getByTestId("backup-auto-frequency"), { target: { value: "on_exit" } });
+  expect(screen.getByTestId("backup-auto-frequency")).toHaveValue("on_exit");
+  expect(screen.getByTestId("backup-settings-save-status")).toHaveTextContent("Saving");
+  await act(async () => { held.resolve(null); await settings.getState().flush(); });
+  expect(h.disk.policy.frequency).toBe("on_exit");
+});
+it("preserves failed drafts visibly, blocks execution and offers retry", async () => {
+  mocks.invoke.mockImplementation((cmd, args) => cmd === "backup_settings_patch" ? Promise.reject(new Error("disk failed")) : h.invoke(cmd, args));
+  render(<BackupSettingsPanel />);
+  fireEvent.change(screen.getByTestId("backup-global-scope"), { target: { value: "full" } });
+  await screen.findByTestId("backup-settings-retry");
+  expect(screen.getByTestId("backup-global-scope")).toHaveValue("full");
+  expect(screen.getByTestId("backup-selected-start")).toBeDisabled();
+  mocks.invoke.mockImplementation(h.invoke);
+  fireEvent.click(screen.getByTestId("backup-settings-retry"));
+  await waitFor(() => expect(screen.getByTestId("backup-settings-save-status")).toHaveTextContent("Saved"));
+});
+it("switches languages without resetting range or pending edits", async () => {
+  render(<BackupSettingsPanel />);
+  fireEvent.change(screen.getByTestId("backup-global-scope"), { target: { value: "full" } });
+  await act(async () => { await settings.getState().flush(); setLocale("zh-CN"); });
+  expect(screen.getByText("全局默认配置")).toBeDefined();
+  expect(screen.getByTestId("backup-global-scope")).toHaveValue("full");
+  expect(screen.getByTestId("backup-settings-save-status")).toHaveTextContent("已保存");
+});
+it("uses the global revision for file export and retains local encryption", async () => {
+  mocks.saveFile.mockResolvedValue("/exports/full.taobak");
+  render(<BackupSettingsPanel />);
+  fireEvent.click(screen.getByTestId("backup-local-encryption"));
+  fireEvent.change(screen.getByTestId("backup-local-password"), { target: { value: "archive-password" } });
+  fireEvent.click(screen.getByTestId("backup-export"));
+  await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith("backup_run_manual", { request: { destination: { kind: "file", path: "/exports/full.taobak", password: "archive-password" }, expectedPolicyRevision: 0, expectedControlRevision: 0 } }));
+});
+it("keeps custom directory changes and local history operations", async () => {
+  h.disk.policy.customBackupDir = "/custom"; h.reset(); mocks.directory.mockResolvedValue("/new");
+  render(<BackupSettingsPanel />);
+  expect(screen.getByTestId("backup-effective-directory")).toHaveTextContent("/custom");
+  expect(screen.getByText("2.00 MB")).toBeDefined(); expect(screen.getByText("legacy.taobak")).toBeDefined();
+  fireEvent.click(screen.getByTestId("backup-change-directory"));
+  await waitFor(() => expect(h.disk.policy.customBackupDir).toBe("/new"));
+});
+it("keeps the opaque restore dialog and requires current vault verification", async () => {
+  render(<BackupSettingsPanel />); fireEvent.click(screen.getByTestId("backup-history-restore"));
+  const dialog = screen.getByTestId("backup-restore-dialog");
+  expect(dialog).toHaveAttribute("aria-modal", "true");
+  expect(dialog).toHaveProperty("style.background", "var(--taomni-bg)");
+  expect(dialog).toHaveProperty("style.borderColor", "var(--taomni-card-border)");
+  await screen.findByText("0.3.0");
+  fireEvent.click(screen.getByText("Confirm Restore & Restart Now"));
+  expect(screen.getByText("Vault master password is required.")).toBeDefined();
+  expect(mocks.invoke.mock.calls.some(([cmd]) => cmd === "backup_stage_restore")).toBe(false);
+});
+it("refreshes history and background timestamp on completion", async () => {
+  render(<BackupSettingsPanel />);
+  await waitFor(() => expect(useBackupStore.getState().loading).toBe(false));
+  h.disk.policy.lastBackupAt = 1788501000000; h.history = [{ ...h.history[0], fileName: "auto.taobak" }];
+  await act(async () => { await mocks.listen.mock.calls.find(([event]) => event === "backup-completed")![1]({ payload: {} }); });
+  await screen.findByText("auto.taobak");
+  expect(screen.getByTestId("backup-last-success")).not.toHaveTextContent("Never");
+});
+it("polls shared disk history and stops all observers when closed", async () => {
+  vi.useFakeTimers(); const view = render(<BackupSettingsPanel />); await act(async () => {});
+  h.history = [{ ...h.history[0], fileName: "other-instance.taobak" }];
+  await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
+  expect(screen.getByText("other-instance.taobak")).toBeDefined();
+  view.unmount(); mocks.invoke.mockClear(); await act(async () => { await vi.advanceTimersByTimeAsync(15000); });
+  expect(mocks.invoke).not.toHaveBeenCalled();
+});
+it("cleans listeners registered after the panel was closed", async () => {
+  const held = deferred<() => void>(), stop = vi.fn();
+  mocks.listen.mockImplementation((event) => event === "backup-completed" ? held.promise : Promise.resolve(vi.fn()));
+  const view = render(<BackupSettingsPanel />); view.unmount();
+  await act(async () => held.resolve(stop)); expect(stop).toHaveBeenCalledOnce();
 });

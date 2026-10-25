@@ -295,6 +295,7 @@ export function csvAuthMethod(
   const normalized = cleanText(authValue, 32).toLowerCase().replace(/[^a-z0-9]/g, "");
   if (!normalized) return undefined;
   if (normalized === "password" || normalized === "pass") return "Password";
+  if (normalized === "gssapi" || normalized === "kerberos") return "Gssapi";
   if (normalized === "agent" || normalized === "sshagent") return "Agent";
   if (normalized === "none" || normalized === "noauth") return "None";
   if (normalized === "privatekey" || normalized === "publickey" || normalized === "key") {
@@ -331,6 +332,7 @@ export function csvBooleanValue(value: unknown): string {
 
 export function authMethodToCsv(authMethod: AuthMethod): string {
   if (authMethod === "Password") return "password";
+  if (authMethod === "Gssapi") return "gssapi";
   if (authMethod === "Agent") return "agent";
   if (authMethod === "None") return "none";
   return "private-key";

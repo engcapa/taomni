@@ -1,0 +1,130 @@
+id: TC-BACKUP-SETTINGS-002
+title: Native global scope is durable and manual cloud jobs freeze it
+description: Real policy/config disk reads plus a loopback upload prove manual range planning. Fixed legacy restore
+  samples and scheduled local behavior are covered by dedicated cases.
+covers:
+- F-BACKUP-1
+- F-BACKUP-2
+tags:
+- backup
+- settings
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- backup_cloud
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- wait_for: '[data-testid="backup-global-scope"]'
+- select_option:
+    selector: '[data-testid="backup-global-scope"]'
+    value: full
+- assert_file_contains:
+    path: ${fixture.backup_policy_path}
+    contains: '"defaultScope": "full"'
+- assert_file_contains:
+    path: ${fixture.backup_policy_path}
+    contains: '"includeMail": true'
+- click: '[data-testid="backup-cloud-destination"]:nth-of-type(1) > summary'
+- assert_attribute:
+    selector: '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-range-mode"]'
+    name: value
+    equals: custom
+- assert_attribute:
+    selector: '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-scope"]'
+    name: value
+    equals: core
+- wait_for: '[data-testid="backup-selected-start"]:not([disabled])'
+- click: '[data-testid="backup-selected-start"]'
+- wait_for:
+    selector: '[data-testid="backup-cloud-job"][data-operation="upload"][data-phase="completed"]'
+    timeout_sec: 120
+- assert_file_contains:
+    path: ${fixture.backup_service_events}
+    contains: execution_scope=full
+- set_check:
+    selector: '[data-testid="backup-global-include-mail"]'
+    checked: false
+- assert_file_contains:
+    path: ${fixture.backup_policy_path}
+    contains: '"includeMail": false'
+- select_option:
+    selector: '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-range-mode"]'
+    value: inherit
+- assert_file_contains:
+    path: ${fixture.backup_control_path}
+    contains: '"rangeMode": "inherit"'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- assert_attribute:
+    selector: '[data-testid="backup-global-scope"]'
+    name: value
+    equals: full
+- eval_readonly:
+    expression: '!document.getElementById("backup-global-include-mail").checked'
+    expect_truthy: true
+- screenshot: backup-native-global-range.png
+verification:
+  review: reviewed
+  native:
+  - check: Disk persistence and native task cleanup
+    method: automated
+    reason: Production IPC and isolated profile; loopback Feishu is synthetic, not live service evidence.
+  visual:
+  - check: Backup layout and translated controls
+    method: manual
+    reason: Review retained workflow screenshots.
+  requirements:
+  - id: R1
+    requirement: Saved global full scope drives manual execution despite a destination core override
+    actions:
+    - 7
+    - 14
+    checkpoints:
+    - step: 8
+      expectation: fullDisk
+    - step: 9
+      expectation: mailDisk
+    - step: 11
+      expectation: legacy
+    - step: 12
+      expectation: core
+    - step: 15
+      expectation: completed
+    - step: 16
+      expectation: frozenFull
+    results:
+    - 8
+    - 9
+    - 11
+    - 12
+    - 15
+    - 16
+  - id: R2
+    requirement: Explicit mail exclusion and inheritance persist through real disk writes and remount
+    actions:
+    - 17
+    - 19
+    - 22
+    checkpoints:
+    - step: 18
+      expectation: excludeDisk
+    - step: 20
+      expectation: inheritDisk
+    - step: 23
+      expectation: persisted
+    - step: 24
+      expectation: persistedMail
+    results:
+    - 18
+    - 20
+    - 23
+    - 24

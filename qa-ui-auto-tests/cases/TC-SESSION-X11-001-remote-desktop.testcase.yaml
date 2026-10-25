@@ -1,0 +1,106 @@
+id: TC-SESSION-X11-001
+title: Remote desktop custom command opens a real X11 window through SSH forwarding
+covers:
+- F6.3
+- F2.2
+tags:
+- session
+- native
+- regression
+modes:
+- native
+fixtures:
+- reset_db
+- ssh_features_required
+- x11_session_required
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="sidebar"]'
+    timeout_sec: 45
+- click: '[data-testid="session-new"]'
+- wait_for:
+    selector: '[data-testid="session-editor"]'
+    timeout_sec: 45
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.ssh_features.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.ssh_features.port}
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${cfg.ssh_features.user}
+- click: '[data-testid="session-section-advanced"]'
+- click: '[data-testid="session-auth-privatekey"]'
+- fill:
+    selector: input[aria-label="Private key path"]
+    value: ${cfg.ssh_features.key_path}
+- select_option:
+    selector: '[data-testid="session-remote-environment"]'
+    value: custom
+- set_check:
+    selector: '[data-testid="session-x11-forwarding-toggle"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="session-x11-trusted-toggle"]'
+    checked: true
+- fill:
+    selector: input[aria-label="Execute command"]
+    value: ${cfg.ssh_features.desktop_command}
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-remote-desktop
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-remote-desktop"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-remote-desktop"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"]'
+    timeout_sec: 60
+- assert_file_contains:
+    path: ${cfg.ssh_features.desktop_windows}
+    contains: TaomniQADesktop
+    timeout_sec: 60
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The saved custom desktop command executes remotely and its real X11 client
+      creates a window on the local X server through the product SSH X11 bridge.
+    actions:
+    - 3
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    results:
+    - 22
+    checkpoints:
+    - step: 22
+      expectation: Independent xwininfo observation sees the named remote-created window; no
+        product stub generates this evidence.
+  native:
+  - check: Real SSH X11 channel and X server
+    method: automated
+    reason: Linux uses the owned native Xvfb; macOS/Windows provision a private Xvfb. A real
+      xclock renders through SSH and is observed independently.
+  visual:
+  - check: Remote graphical application window exists
+    method: automated
+    reason: xwininfo inspects the actual X server window tree.

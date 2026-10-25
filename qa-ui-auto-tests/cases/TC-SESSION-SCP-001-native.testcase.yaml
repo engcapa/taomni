@@ -1,0 +1,137 @@
+id: TC-SESSION-SCP-001
+title: Previously saved Real scp directory listing, upload, download and deletion
+covers:
+- F6.3
+- F7.2
+- F7.3
+tags:
+- session
+- native
+- regression
+modes:
+- native
+fixtures:
+- reset_db
+- ssh_features_required
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="sidebar"]'
+    timeout_sec: 45
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-scp"]'
+- wait_for:
+    selector: '[data-testid="startup-vault-check"]'
+    state: hidden
+    timeout_sec: 45
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-scp"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for:
+    selector: '[data-testid="sftp-browser"]'
+    timeout_sec: 45
+- click: '[data-testid="sftp-remote-path-edit"]'
+- fill:
+    selector: '[data-testid="sftp-remote-path"]'
+    value: ${cfg.ssh_features.remote_dir}
+- press: Enter
+- assert_text:
+    selector: '[data-testid="sftp-remote-list"]'
+    contains: scp-source.txt
+    timeout_sec: 45
+- click: '[data-testid="sftp-local-path-edit"]'
+- fill:
+    selector: '[data-testid="sftp-local-path"]'
+    value: ${cfg.ssh_features.local_dir}
+- press: Enter
+- assert_text:
+    selector: '[data-testid="sftp-local-list"]'
+    contains: scp-upload.txt
+    timeout_sec: 45
+- click: '[data-testid="sftp-remote-list"] tr[title$="/scp-source.txt"]'
+- click: '[data-testid="sftp-remote-download-selected"]'
+- assert_file_sha256:
+    path: ${cfg.ssh_features.downloaded}
+    equals: 054e942b10569af4c2006f997e3e2c40a9a14fc1464329401bf1e44f7560c4d7
+    timeout_sec: 45
+- assert_visible: '[data-testid="sftp-transfer-queue"] [data-transfer-state="done"][data-resume-bytes="7"][data-transfer-restarted="false"]'
+- click: '[data-testid="sftp-local-list"] tr[title$="scp-upload.txt"]'
+- click: '[data-testid="sftp-local-upload-selected"]'
+- assert_file_sha256:
+    path: ${cfg.ssh_features.uploaded}
+    equals: 7ebc6ab39279cf17a71009ebaba8d2c5fe8ac9beca8eeb3167662b8e47db956a
+    timeout_sec: 45
+- assert_text:
+    selector: '[data-testid="sftp-remote-list"]'
+    contains: scp-upload.txt
+    timeout_sec: 45
+- click: '[data-testid="sftp-remote-list"] tr[title$="/scp-upload.txt"]'
+- click: '[data-testid="sftp-remote-delete"]'
+- wait_for:
+    selector: '[data-testid="confirm-dialog"]'
+    timeout_sec: 45
+- click: '[data-testid="confirm-dialog-confirm"]'
+- assert_not_visible: '[data-testid="sftp-remote-list"] tr[title$="/scp-upload.txt"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Previously saved SCP sessions continue to exercise the original Real scp directory listing,
+      upload, download and deletion workflow; new session configuration offers only SFTP.
+    actions:
+    - 1
+    - 5
+    - 7
+    - 9
+    - 10
+    - 11
+    - 13
+    - 14
+    - 15
+    - 17
+    - 18
+    - 21
+    - 22
+    - 25
+    - 26
+    - 28
+    checkpoints:
+    - step: 12
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "scp-source.txt",
+        "timeout_sec": 45}}'
+    - step: 16
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "scp-upload.txt",
+        "timeout_sec": 45}}'
+    - step: 19
+      expectation: '{"assert_file_sha256": {"path": "${cfg.ssh_features.downloaded}", "equals": "054e942b10569af4c2006f997e3e2c40a9a14fc1464329401bf1e44f7560c4d7",
+        "timeout_sec": 45}}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"done\"][data-resume-bytes=\"7\"][data-transfer-restarted=\"false\"]"}'
+    - step: 23
+      expectation: '{"assert_file_sha256": {"path": "${cfg.ssh_features.uploaded}", "equals": "7ebc6ab39279cf17a71009ebaba8d2c5fe8ac9beca8eeb3167662b8e47db956a",
+        "timeout_sec": 45}}'
+    - step: 24
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "scp-upload.txt",
+        "timeout_sec": 45}}'
+    - step: 29
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-remote-list\"] tr[title$=\"/scp-upload.txt\"]"}'
+    results:
+    - 12
+    - 16
+    - 19
+    - 20
+    - 23
+    - 24
+    - 29
+  visual:
+  - check: Configuration and workflow state
+    method: automated
+    reason: Visible fields and exact values are asserted at each decisive state.
+  native:
+  - check: Native boundary
+    method: automated
+    reason: Fixture seeds a previous-version SSH row before native startup; actual protocol transfers,
+      independent SHA256 checks and queue lifecycle assertions are retained. No removed editor control
+      is used.

@@ -18,3 +18,12 @@ it("retains application Settings persistence and its existing connection test", 
   expect(await screen.findByText("Connected")).toBeVisible();
   expect(ipc).toHaveBeenCalledWith("test_proxy_connection", expect.objectContaining({ testHost: "www.google.com" }));
 });
+it("persists an embedded proxy without reading or overwriting application settings", async () => {
+  ipc.mockClear();
+  ipc.mockImplementation(async (command) => command === "list_sessions" ? [] : null);
+  const save = vi.fn().mockResolvedValue(undefined);
+  render(<AppProxyPanel value={{ enabled: true, mode: "manual", kind: "http", host: "feature.proxy", port: 3128, username: "", password_ref: "vault:feature", session_id: "" }} onSave={save} />);
+  fireEvent.change(screen.getByLabelText("Proxy host"), { target: { value: "independent.proxy" } });
+  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ host: "independent.proxy", password_ref: "vault:feature" })));
+  expect(ipc.mock.calls.some(([command]) => command === "get_app_proxy_config" || command === "save_app_proxy_config")).toBe(false);
+});

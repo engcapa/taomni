@@ -1,9 +1,12 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useEffect, useState } from "react";
-import type { BackupManifest, BackupScope } from "../../lib/backup";
+import type { BackupManifest } from "../../lib/backup";
 import { useT } from "../../lib/i18n";
 import { selectFilePath, selectSaveDirectory, selectSaveFilePath } from "../../lib/ipc";
 import { relaunchApp } from "../../lib/updateService";
+import { useBackupSettingsStore } from "../../stores/backupSettingsStore";
+import { observeBackupControl } from "../../stores/backupControlStore";
+import type { DestinationResult, ManualDestination } from "../../lib/backupSettings";
 import { useBackupStore } from "../../stores/backupStore";
 import { useVaultStore } from "../../stores/vaultStore";
 import { BackupSettingsView } from "./backup/BackupSettingsView";
@@ -14,25 +17,23 @@ export function BackupSettingsPanel() {
   const refreshVault = useVaultStore((s) => s.refresh);
 
   const {
-    policy,
     defaultBackupDir,
     history,
-    creating,
     restoring,
     error,
     loadAll,
     refreshHistory,
-    updatePolicy,
-    triggerBackup,
     inspectArchive,
     performStageRestore,
     deleteBackup,
     clearError,
   } = useBackupStore();
 
-  // Create backup form state
-  const [scope, setScope] = useState<BackupScope>("core");
-  const [includeMail, setIncludeMail] = useState(false);
+  const { draft, editPolicy, flush, runManual, refresh: refreshSettings } = useBackupSettingsStore();
+  const policy = draft?.policy ?? null;
+  const updatePolicy = async (patch: Partial<import("../../lib/backup").BackupPolicy>) => { editPolicy(patch); await flush(); };
+  const [creating, setCreating] = useState(false);
+  const [manualResults, setManualResults] = useState<DestinationResult[]>([]);
   const [usePassword, setUsePassword] = useState(false);
   const [password, setPassword] = useState("");
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
@@ -51,7 +52,9 @@ export function BackupSettingsPanel() {
   useEffect(() => {
     void loadAll();
     void refreshVault();
-  }, [loadAll, refreshVault]);
+    void refreshSettings();
+    return observeBackupControl();
+  }, [loadAll, refreshVault, refreshSettings]);
 
   useEffect(() => {
     let disposed = false;
@@ -107,48 +110,25 @@ export function BackupSettingsPanel() {
     }
   };
 
-  // Handle instant backup directly into the configured backup directory
-  const handleBackupNow = async () => {
-    setActionSuccess(null);
-    setActionError(null);
-    clearError();
-
+  const executeManual = async (destination: ManualDestination) => {
+    setCreating(true); setActionSuccess(null); setActionError(null); setManualResults([]); clearError();
     try {
-      await triggerBackup({
-        scope,
-        customOptions: { includeMail },
-        password: usePassword && password.trim() ? password.trim() : undefined,
-      });
-      setActionSuccess(t("backupSettings.createSuccess"));
-    } catch (e) {
-      console.error("Failed to create backup", e);
-      setActionError(e instanceof Error ? e.message : String(e));
-    }
+      const results = await runManual(destination);
+      setManualResults(results);
+      await refreshHistory();
+      if (results.every((result) => !result.error)) setActionSuccess(results.some((result) => result.jobId) ? "remoteBackup.started" : "backupSettings.createSuccess");
+    } catch (e) { setActionError(e instanceof Error ? e.message : String(e)); }
+    finally { setCreating(false); }
   };
-
-  // Handle backup export to custom path chosen by user
+  const handleBackupNow = async () => executeManual({ kind: "selected", localPassword: usePassword ? password : undefined });
   const handleExportBackup = async () => {
-    setActionSuccess(null);
     setActionError(null);
-    clearError();
-
-    const nowStr = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
-    const defaultName = `taomni_backup_${nowStr}.taobak`;
     try {
-      const target = await selectSaveFilePath(defaultName, effectiveBackupDir);
-      if (!target) return;
-
-      await triggerBackup({
-        scope,
-        customOptions: { includeMail },
-        targetPath: target,
-        password: usePassword && password.trim() ? password.trim() : undefined,
-      });
-      setActionSuccess(t("backupSettings.createSuccess"));
-    } catch (e) {
-      console.error("Failed to export backup", e);
-      setActionError(e instanceof Error ? e.message : String(e));
-    }
+      await flush();
+      const nowStr = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14);
+      const target = await selectSaveFilePath(`taomni_backup_${nowStr}.taobak`, effectiveBackupDir);
+      if (target) await executeManual({ kind: "file", path: target, password: usePassword ? password : undefined });
+    } catch (e) { setActionError(String(e)); }
   };
 
   // Trigger file selection for restore
@@ -179,7 +159,7 @@ export function BackupSettingsPanel() {
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes("BACKUP_PASSWORD_REQUIRED")) {
-        setInspectError(t("backupSettings.inputPasswordForDecrypt"));
+        setInspectError("backupSettings.inputPasswordForDecrypt");
       } else {
         setInspectError(msg);
       }
@@ -200,7 +180,7 @@ export function BackupSettingsPanel() {
       const msg = e instanceof Error ? e.message : String(e);
       setInspectError(
         msg.includes("BACKUP_BAD_PASSWORD")
-          ? t("backupSettings.badArchivePassword")
+          ? "backupSettings.badArchivePassword"
           : msg,
       );
     } finally {
@@ -214,7 +194,7 @@ export function BackupSettingsPanel() {
     setInspectError(null);
 
     if (vaultState !== "empty" && !restoreVaultPassword.trim()) {
-      setInspectError(t("backupSettings.vaultPasswordRequired"));
+      setInspectError("backupSettings.vaultPasswordRequired");
       return;
     }
 
@@ -236,9 +216,9 @@ export function BackupSettingsPanel() {
       console.error("Failed to stage restore", e);
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes("VAULT_BAD_PASSWORD")) {
-        setInspectError(t("backupSettings.vaultBadPassword"));
+        setInspectError("backupSettings.vaultBadPassword");
       } else if (msg.includes("VAULT_PASSWORD_REQUIRED")) {
-        setInspectError(t("backupSettings.vaultPasswordRequired"));
+        setInspectError("backupSettings.vaultPasswordRequired");
       } else {
         setInspectError(e instanceof Error ? e.message : String(e));
       }
@@ -259,15 +239,12 @@ export function BackupSettingsPanel() {
     t={t}
     error={error}
     actionSuccess={actionSuccess}
+    manualResults={manualResults}
     openRestoreModal={openRestoreModal}
     isCustomDir={isCustomDir}
     effectiveBackupDir={effectiveBackupDir}
     handleChangeDirectory={handleChangeDirectory}
     handleResetDefaultDirectory={handleResetDefaultDirectory}
-    scope={scope}
-    setScope={setScope}
-    setIncludeMail={setIncludeMail}
-    includeMail={includeMail}
     usePassword={usePassword}
     setUsePassword={setUsePassword}
     password={password}
@@ -276,8 +253,6 @@ export function BackupSettingsPanel() {
     creating={creating}
     handleExportBackup={handleExportBackup}
     handleBackupNow={handleBackupNow}
-    policy={policy}
-    updatePolicy={updatePolicy}
     handleSelectRestoreFile={handleSelectRestoreFile}
     history={history}
     refreshHistory={refreshHistory}

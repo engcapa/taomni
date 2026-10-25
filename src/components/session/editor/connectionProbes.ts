@@ -14,12 +14,13 @@ export interface HandleTestConnectionContext {
   t: import("../../../lib/i18n").TranslateFn;
   password: string;
   passwordRef: string;
-  authMethod: "Password" | "Agent" | "None" | "PrivateKey";
+  authMethod: "Password" | "Agent" | "Gssapi" | "None" | "PrivateKey";
   setTesting: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   setTestResult: import("react").Dispatch<import("react").SetStateAction<{ ok: boolean; msg: string; } | null>>;
   keyPath: string;
   port: string;
   networkSettings: NetworkSettingsValue;
+  compression?: boolean;
 }
 
 
@@ -47,7 +48,7 @@ export function createHandleTestConnection(controllerContext: HandleTestConnecti
         controllerContext.username,
         controllerContext.authMethod,
         authData,
-        JSON.stringify(toNetworkSettingsPayload(controllerContext.networkSettings)),
+        JSON.stringify(toNetworkSettingsPayload({ ...controllerContext.networkSettings, compression: controllerContext.compression })),
       );
       controllerContext.presentTestOutcome(true, msg);
     } catch (err) {

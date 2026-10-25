@@ -1,3 +1,5 @@
+import { sshBrowserMode } from "../../../lib/sshSessionOptions";
+import { parseSessionOptions } from "../../../lib/terminalProfile";
 import { Lock, Unlock } from "lucide-react";
 import { Fragment } from "react";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
@@ -224,7 +226,7 @@ export function TerminalTabContents(inputs: TerminalTabContentsProps) {
                 open: chatDrawerOpen && activeTabId === tab.id,
                 onToggle: () => void toggleTabChat(chatBindingIdForTab(tab) ?? tab.id),
               } : undefined}
-              sftpToggle={!terminalSplitVisible && tab.ssh && !(terminalRailMerged && isActive) ? {
+              sftpToggle={!terminalSplitVisible && tab.ssh && sshBrowserMode(parseSessionOptions(tab.ssh.optionsJson).sshBrowser) !== "disabled" && !(terminalRailMerged && isActive) ? {
                 open: sidebarOpen,
                 onToggle: () => toggleTerminalSftp(tab),
               } : undefined}
@@ -245,7 +247,7 @@ export function TerminalTabContents(inputs: TerminalTabContentsProps) {
             />
           </div>
         );
-        const sftpSidebarNode = sidebarOpen && tab.ssh ? (
+        const sftpSidebarNode = sidebarOpen && tab.ssh && sshBrowserMode(parseSessionOptions(tab.ssh.optionsJson).sshBrowser) !== "disabled" ? (
           <SftpSidebar
             sessionId={`attached-${tab.id}`}
             host={tab.ssh.host}

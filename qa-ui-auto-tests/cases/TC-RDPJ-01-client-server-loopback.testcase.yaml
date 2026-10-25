@@ -33,6 +33,13 @@ description: 'V-18 and V-20 (docs-feature/rdp-server-parity-design.md §4.6, §4
 
   the runner''s system Remote Desktop.
 
+
+  The canvas click retains the W3C move and button-pause durations on macOS;
+
+  its QA bridge must await all ticks before reporting completion. Connection
+
+  status alone cannot pass the independent host target''s flip assertion.
+
   '
 covers:
 - F-RdpServer-1
@@ -194,7 +201,10 @@ verification:
   - id: R1
     requirement: The product client completes NLA against the product server after confirming its certificate and shows the host desktop.
     actions:
+    - 3
     - 25
+    - 34
+    - 35
     - 37
     - 40
     - 42
@@ -219,8 +229,7 @@ verification:
     results:
     - 45
   - id: R3
-    requirement: In OS full screen the connection bar shows the server-measured connection quality, comes back from the top edge, restores the window and
-      disconnects the session.
+    requirement: In OS full screen the connection bar shows the server-measured connection quality, comes back from the top edge, restores the window and disconnects the session.
     actions:
     - 46
     - 49
@@ -244,8 +253,7 @@ verification:
     - step: 58
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Disconnected", "timeout_sec": 20}}'
     - step: 59
-      expectation: '{"rdp_probe": {"scenario": "connect", "artifact": "still-serving", "args": {"seconds": 2}, "expect": {"first_graphics_ms": {"exists":
-        true}}}}'
+      expectation: '{"rdp_probe": {"scenario": "connect", "artifact": "still-serving", "args": {"seconds": 2}, "expect": {"first_graphics_ms": {"exists": true}}}}'
     results:
     - 48
     - 52

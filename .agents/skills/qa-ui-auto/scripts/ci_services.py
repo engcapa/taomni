@@ -32,8 +32,12 @@ ARD_USER = "qaard"
 
 def command(argv, **kwargs):
     # Deliberately do not log argv: account setup contains disposable passwords.
-    result = subprocess.run([str(a) for a in argv], capture_output=True, text=True,
-                            encoding="utf-8", errors="replace", timeout=180, **kwargs)
+    try:
+        result = subprocess.run([str(a) for a in argv], capture_output=True, text=True,
+                                encoding="utf-8", errors="replace", timeout=kwargs.pop("timeout", 180), **kwargs)
+    except FileNotFoundError as error:
+        # Identify the missing executable without exposing credential arguments.
+        raise RuntimeError(f"Required service executable is missing: {argv[0]}") from error
     if result.returncode:
         raise RuntimeError(f"{Path(str(argv[0])).name} failed ({result.returncode}); {result.stderr[-2000:]}")
     return result.stdout.strip()
@@ -189,6 +193,16 @@ def install(capabilities):
         raise RuntimeError("package/account installation is restricted to GitHub hosted jobs")
     if "vnc" in capabilities:
         command([sys.executable, "-m", "pip", "install", *VNC_FIXTURE_PACKAGES])
+    if "ssh_features" in capabilities:
+        from ci_ssh_features import install as install_ssh_features
+        install_ssh_features()
+    if "x11_session" in capabilities:
+        from ci_x11_session import install as install_x11_session
+        install_x11_session()
+    if "clickhouse" in capabilities:
+        from ci_clickhouse import install as install_clickhouse
+        command([sys.executable, "-m", "pip", "install", "clickhouse-driver==0.2.9"])
+        install_clickhouse()
     system = platform.system()
     if system == "Linux":
         if "xrdp" in capabilities:
@@ -630,6 +644,15 @@ class Services:
                 facts["ssh"] = self.ssh()
             if "mysql" in self.capabilities:
                 facts["mysql"] = self.mysql()
+            if "ssh_features" in self.capabilities:
+                from ci_ssh_features import start as start_ssh_features
+                facts["ssh_features"] = start_ssh_features(self)
+            if "x11_session" in self.capabilities:
+                from ci_x11_session import start as start_x11_session
+                facts["x11_session"] = start_x11_session(self)
+            if "clickhouse" in self.capabilities:
+                from ci_clickhouse import start as start_clickhouse
+                facts["clickhouse"] = start_clickhouse(self)
             if "vnc" in self.capabilities:
                 facts["vnc"] = self.vnc()
             if "ard" in self.capabilities:

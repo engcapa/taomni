@@ -87,11 +87,12 @@ export function useSessionEditorActions(context: UseSessionEditorActionsContext)
       form.setAuthMethod("Agent");
       form.setUsePrivKey(false);
     } else {
-      form.setAuthMethod("None");
+      form.setAuthMethod("Gssapi");
       form.setUsePrivKey(false);
     }
   };
   const { validate, buildConfig, buildOptionsJson } = createSessionSerialization({
+    bookmark: form.bookmark,
     passwordRef: form.passwordRef,
     networkSettings: form.networkSettings,
     mailForm: form.mailForm,
@@ -124,7 +125,6 @@ export function useSessionEditorActions(context: UseSessionEditorActionsContext)
     doNotExit: form.doNotExit,
     disableAiWrite: form.disableAiWrite,
     remoteEnv: form.remoteEnv,
-    sshBrowser: form.sshBrowser,
     usePrivKey: form.usePrivKey,
     fileEmbedInTab: form.fileEmbedInTab,
     fileExtraArgs: form.fileExtraArgs,
@@ -207,6 +207,7 @@ export function useSessionEditorActions(context: UseSessionEditorActionsContext)
     setTestResult: form.setTestResult,
   });
   const { handleReset } = createSessionReset({
+    setBookmark: form.setBookmark,
     session,
     setProto: form.setProto,
     setSection: form.setSection,
@@ -230,7 +231,6 @@ export function useSessionEditorActions(context: UseSessionEditorActionsContext)
     setDoNotExit: form.setDoNotExit,
     setDisableAiWrite: form.setDisableAiWrite,
     setRemoteEnv: form.setRemoteEnv,
-    setSshBrowser: form.setSshBrowser,
     setUsePrivKey: form.setUsePrivKey,
     setDescription: form.setDescription,
     setTags: form.setTags,
@@ -399,6 +399,7 @@ export function useSessionEditorActions(context: UseSessionEditorActionsContext)
     password: form.password,
     passwordRef: form.passwordRef,
     authMethod: form.authMethod,
+    compression: form.compression,
     setTesting: form.setTesting,
     setTestResult: form.setTestResult,
     keyPath: form.keyPath,

@@ -51,7 +51,6 @@ pub(super) fn terminal_task_environment(
 /// Register an already-spawned local PTY in the shared terminal runtime and
 /// start forwarding its output. SocksCap uses this after it has prepared the
 /// rootless capture environment and spawned an interactive TUI command.
-#[cfg(target_os = "linux")]
 pub(crate) async fn register_local_terminal(
     session_id: String,
     handle: pty::PtyHandle,
@@ -62,8 +61,34 @@ pub(crate) async fn register_local_terminal(
     window_label: &str,
     output_generation: Option<u64>,
 ) -> Result<(), String> {
+    register_routed_terminal(
+        session_id,
+        handle,
+        reader,
+        on_output,
+        state,
+        app_handle,
+        window_label,
+        output_generation,
+        crate::database::forward::ForwardGuard(None),
+    )
+    .await
+}
+
+pub(crate) async fn register_routed_terminal(
+    session_id: String,
+    handle: pty::PtyHandle,
+    reader: Box<dyn Read + Send>,
+    on_output: TerminalOutputChannel,
+    state: &AppState,
+    app_handle: AppHandle,
+    window_label: &str,
+    output_generation: Option<u64>,
+    route: crate::database::forward::ForwardGuard,
+) -> Result<(), String> {
     validate_session_id(&session_id)?;
     let terminal = ActiveTerminal::Local {
+        _route: route,
         writer: Mutex::new(handle.writer),
         master: Mutex::new(handle.master),
         child: Mutex::new(handle.child),
@@ -94,9 +119,12 @@ pub(crate) async fn register_local_terminal(
     }
 
     let sid = session_id;
+    let terminals = state.terminal.terminals.clone();
     let outputs = state.terminal.terminal_outputs.clone();
     std::thread::spawn(move || {
-        read_loop_local(reader, sid, app_handle, outputs);
+        read_loop_local(reader, sid.clone(), app_handle, outputs);
+        // Drop the route and child after EOF, including a remote network loss.
+        terminals.blocking_write().remove(&sid);
     });
     Ok(())
 }
@@ -158,6 +186,7 @@ pub async fn create_local_terminal(
     )?;
 
     let terminal = ActiveTerminal::Local {
+        _route: crate::database::forward::ForwardGuard(None),
         writer: Mutex::new(handle.writer),
         master: Mutex::new(handle.master),
         child: Mutex::new(handle.child),
@@ -236,6 +265,7 @@ pub async fn create_command_terminal(
     let (handle, reader) = pty::create_command_pty(cols, rows, &launch.program, &launch.args)?;
 
     let terminal = ActiveTerminal::Local {
+        _route: crate::database::forward::ForwardGuard(None),
         writer: Mutex::new(handle.writer),
         master: Mutex::new(handle.master),
         child: Mutex::new(handle.child),

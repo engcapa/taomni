@@ -21,6 +21,7 @@ const STREAM_BATCH_ROWS: usize = 100;
 /// A configured ClickHouse HTTP endpoint plus credentials.
 #[derive(Clone)]
 pub struct ClickHouseClient {
+    native: Option<super::clickhouse_native::NativeClient>,
     client: reqwest::Client,
     base_url: String,
     user: Option<String>,
@@ -47,18 +48,17 @@ impl ClickHouseClient {
 }
 
 pub async fn connect(config: &DbConfig, password: Option<&str>) -> Result<DbHandle, String> {
-    // Only the HTTP interface is implemented. The native binary protocol
-    // (default port 9000) is not supported yet — fail with a clear message
-    // rather than silently connecting over HTTP on a different port.
-    if config
+    let native = if config
         .protocol
         .as_deref()
         .is_some_and(|p| p.eq_ignore_ascii_case("native"))
     {
-        return Err(
-            "ClickHouse native protocol is not supported yet — switch the protocol to HTTP.".into(),
-        );
-    }
+        Some(super::clickhouse_native::NativeClient::new(
+            config, password,
+        )?)
+    } else {
+        None
+    };
     let scheme = if config.ssl { "https" } else { "http" };
     // HTTP interface port: explicit http_port wins, else 8123.
     let port = config.http_port.unwrap_or(8123);
@@ -80,6 +80,7 @@ pub async fn connect(config: &DbConfig, password: Option<&str>) -> Result<DbHand
         .build()
         .map_err(|e| format!("ClickHouse client build failed: {e}"))?;
     let ch = ClickHouseClient {
+        native,
         client,
         base_url,
         user: config.username.clone().filter(|u| !u.is_empty()),
@@ -162,7 +163,13 @@ async fn post_sql_response(
 }
 
 pub async fn ping(client: &ClickHouseClient) -> Result<String, String> {
-    post_sql(client, "SELECT 1", None).await?;
+    if let Some(native) = &client.native {
+        native
+            .execute(&client.database(), "SELECT 1", &CancellationToken::new())
+            .await?;
+    } else {
+        post_sql(client, "SELECT 1", None).await?;
+    }
     Ok("ClickHouse connection OK".into())
 }
 
@@ -213,6 +220,21 @@ pub async fn execute(
     token: &CancellationToken,
 ) -> Result<QueryResult, String> {
     let start = Instant::now();
+    if let Some(native) = &client.native {
+        if let Some(database) = sql::parse_default_schema_switch(sql) {
+            // Verify the target DB exists before changing session state.
+            native.execute(&database, "SELECT 1", token).await?;
+            client.set_database(database);
+            return Ok(QueryResult {
+                columns: vec![],
+                rows: vec![],
+                rows_affected: 0,
+                duration_ms: start.elapsed().as_millis() as u64,
+                warnings: vec![],
+            });
+        }
+        return native.execute(&client.database(), sql, token).await;
+    }
     if is_select(sql) {
         // Append the JSONCompact format unless the user already specified one.
         let has_format = sql.to_uppercase().contains("FORMAT ");
@@ -392,6 +414,14 @@ pub async fn execute_stream(
     on_event: &QueryStreamChannel,
 ) -> Result<(), String> {
     let start = Instant::now();
+    if let Some(native) = &client.native {
+        if sql::parse_default_schema_switch(sql).is_some() {
+            return emit_query_result_stream(on_event, execute(client, sql, token).await?);
+        }
+        return native
+            .execute_stream(&client.database(), sql, max_rows, token, on_event)
+            .await;
+    }
     if is_select(sql) {
         let has_format = sql.to_uppercase().contains("FORMAT ");
         if has_format {

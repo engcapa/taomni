@@ -15,7 +15,6 @@ modes:
 - native
 fixtures:
 - reset_db
-- ssh_required
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
@@ -82,9 +81,9 @@ steps:
 - assert_attribute:
     selector: '[data-testid="session-remote-environment"]'
     name: value
-    equals: Custom command…
+    equals: custom
 - fill:
-    selector: 'input[aria-label="Execute command"]'
+    selector: input[aria-label="Execute command"]
     value: printf qa-ssh-advanced-toggle
 - set_check:
     selector: '[data-testid="session-do-not-exit"]'
@@ -93,27 +92,26 @@ steps:
     selector: '[data-testid="session-do-not-exit"]'
     name: data-checked
     equals: 'false'
-- select_option:
+- assert_text_equals:
     selector: '[data-testid="session-ssh-browser-type"]'
-    label: Disabled
-- assert_attribute:
-    selector: '[data-testid="session-ssh-browser-type"]'
-    name: value
-    equals: Disabled
+    equals: SFTP protocol (recommended)
+- assert_count:
+    selector: '[data-testid="session-ssh-browser-type"]:is(select)'
+    equal: 0
 - click: '[data-testid="session-auth-privatekey"]'
 - assert_attribute:
     selector: '[data-testid="session-private-key-toggle"]'
     name: data-checked
     equals: 'true'
-- assert_enabled: 'input[aria-label="Private key path"]'
+- assert_enabled: input[aria-label="Private key path"]
 - fill:
-    selector: 'input[aria-label="Private key path"]'
+    selector: input[aria-label="Private key path"]
     value: /tmp/qa-ssh-advanced-toggle-key
 - click: '[data-testid="session-auth-password"]'
 - assert_count:
     selector: '[data-testid="session-auth-password"]:checked'
     equal: 1
-- assert_disabled: 'input[aria-label="Private key path"]'
+- assert_disabled: input[aria-label="Private key path"]
 - click: '[data-testid="session-section-bookmark"]'
 - wait_for: '[data-testid="bookmark-settings"]'
 - fill:
@@ -141,19 +139,21 @@ steps:
 - assert_attribute:
     selector: '[data-testid="session-remote-environment"]'
     name: value
-    equals: Custom command…
+    equals: custom
 - assert_attribute:
-    selector: 'input[aria-label="Execute command"]'
+    selector: input[aria-label="Execute command"]
     name: value
     equals: printf qa-ssh-advanced-toggle
 - assert_attribute:
     selector: '[data-testid="session-do-not-exit"]'
     name: data-checked
     equals: 'false'
-- assert_attribute:
+- assert_text_equals:
     selector: '[data-testid="session-ssh-browser-type"]'
-    name: value
-    equals: Disabled
+    equals: SFTP protocol (recommended)
+- assert_count:
+    selector: '[data-testid="session-ssh-browser-type"]:is(select)'
+    equal: 0
 - assert_count:
     selector: '[data-testid="session-auth-password"]:checked'
     equal: 1
@@ -162,14 +162,16 @@ steps:
     selector: '[data-testid="session-editor"]'
     state: detached
 - screenshot: 148-ssh-advanced-toggle-dependencies.png
+- assert_not_visible: '[data-testid="session-editor"]'
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH advanced X11, compression, remote environment, startup, browser mode, and authentication controls change their visible state and persist after saving and
-      reopening.
+    requirement: SSH advanced settings retain remote environment, authentication and toggle behavior; the SSH browser displays only SFTP without a protocol selector, including after
+      save/reopen where present.
     actions:
     - 1
+    - 3
     - 4
     - 6
     - 7
@@ -184,7 +186,6 @@ verification:
     - 25
     - 27
     - 28
-    - 30
     - 32
     - 35
     - 36
@@ -194,49 +195,92 @@ verification:
     - 44
     - 45
     - 47
+    - 58
     checkpoints:
     - step: 13
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 14
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 15
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 17
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 18
       expectation: '{"assert_disabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
+    - step: 20
+      expectation: '{"assert_enabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 24
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
     - step: 26
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "Custom command…"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "custom"}}'
+    - step: 29
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 30
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "equals": "SFTP protocol (recommended)"}}'
     - step: 31
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "name": "value", "equals": "Disabled"}}'
-    - step: 43
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-advanced-dependencies\"]"}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-ssh-browser-type\"]:is(select)", "equal": 0}}'
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-private-key-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 34
+      expectation: '{"assert_enabled": "input[aria-label=\"Private key path\"]"}'
+    - step: 37
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-password\"]:checked", "equal": 1}}'
+    - step: 38
+      expectation: '{"assert_disabled": "input[aria-label=\"Private key path\"]"}'
+    - step: 49
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
     - step: 50
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 51
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
     - step: 52
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "Custom command…"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "custom"}}'
     - step: 53
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf qa-ssh-advanced-toggle"}}'
+    - step: 54
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
     - step: 55
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "name": "value", "equals": "Disabled"}}'
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "equals": "SFTP protocol (recommended)"}}'
     - step: 56
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-ssh-browser-type\"]:is(select)", "equal": 0}}'
+    - step: 57
       expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-password\"]:checked", "equal": 1}}'
+    - step: 61
+      expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
     results:
     - 13
+    - 14
+    - 15
+    - 17
     - 18
+    - 20
+    - 22
     - 24
     - 26
+    - 29
+    - 30
     - 31
-    - 43
+    - 33
+    - 34
+    - 37
+    - 38
+    - 49
     - 50
     - 51
     - 52
     - 53
+    - 54
     - 55
     - 56
+    - 57
+    - 61
   visual:
-  - check: Inspect the advanced SSH form screenshot for visible dependency state, aligned controls, and no clipped labels.
-    method: manual
-    reason: Screenshot review is required for cross-WebView form layout.
+  - check: Configuration and workflow state
+    method: automated
+    reason: Exact SFTP text and absence of a select are asserted alongside the retained control assertions. Layout fidelity is not claimed.
   native:
-  - check: Execute the same editor interactions in the declared native modes; browser evidence does not certify Tauri WebViews.
-    method: external
-    reason: Native execution is collected by the platform workflow.
+  - check: Native boundary
+    method: automated
+    reason: Native mode verifies SQLite save/reopen for the retained SSH settings and fixed SFTP display.

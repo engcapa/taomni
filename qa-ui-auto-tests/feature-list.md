@@ -1651,6 +1651,51 @@ components: [SessionEditor]
 files:
   - src/components/session/SessionEditor.tsx
 controls:
+  - id: key-generator
+    selector: '[data-testid="session-key-generator"]'
+    kind: display
+  - id: key-output-path
+    selector: '[data-testid="session-key-output-path"]'
+    kind: interactive
+  - id: key-passphrase
+    selector: '[data-testid="session-key-passphrase"]'
+    kind: interactive
+  - id: key-comment
+    selector: '[data-testid="session-key-comment"]'
+    kind: interactive
+  - id: key-create
+    selector: '[data-testid="session-key-create"]'
+    kind: interactive
+  - id: key-result
+    selector: '[data-testid="session-key-result"]'
+    kind: display
+  - id: ssh-cipher
+    selector: '[data-testid="session-ssh-cipher"]'
+    kind: interactive
+  - id: ssh-kex
+    selector: '[data-testid="session-ssh-kex"]'
+    kind: interactive
+  - id: ssh-mac
+    selector: '[data-testid="session-ssh-mac"]'
+    kind: interactive
+  - id: custom-icon-value
+    selector: 'input[aria-label="Custom session icon"]'
+    kind: interactive
+  - id: terminal-bookmark-background
+    selector: '[data-testid="session-terminal-background"]'
+    kind: display
+  - id: clickhouse-http-port
+    selector: 'input[aria-label="ClickHouse HTTP port"]'
+    kind: interactive
+  - id: database-test-connection
+    selector: '[data-testid="db-test-connection"]'
+    kind: interactive
+  - id: clickhouse-protocol
+    selector: '[data-testid="session-clickhouse-protocol"]'
+    kind: interactive
+  - id: custom-proxy
+    selector: '[data-testid="session-custom-proxy"]'
+    kind: display
   # Dialog frame
   - id: editor
     selector: '[data-testid="session-editor"]'
@@ -1712,6 +1757,27 @@ controls:
     selector: '[data-testid="session-proto-panweidb"]'
     kind: interactive
     optional: true        # DB session type — form body owned by F-DB-1
+  - id: proto-oracle
+    selector: '[data-testid="session-proto-oracle"]'
+    kind: interactive
+  - id: proto-sqlserver
+    selector: '[data-testid="session-proto-sqlserver"]'
+    kind: interactive
+  - id: proto-starrocks
+    selector: '[data-testid="session-proto-starrocks"]'
+    kind: interactive
+  - id: proto-presto
+    selector: '[data-testid="session-proto-presto"]'
+    kind: interactive
+  - id: proto-s3
+    selector: '[data-testid="session-proto-s3"]'
+    kind: interactive
+  - id: objectstorage-section
+    selector: '[data-testid="session-section-objectstorage"]'
+    kind: interactive
+  - id: storage-provider
+    selector: '[data-testid="session-storage-provider"]'
+    kind: interactive
   - id: proto-clickhouse
     selector: '[data-testid="session-proto-clickhouse"]'
     kind: interactive
@@ -1870,7 +1936,7 @@ controls:
     kind: interactive
   - id: advanced-ssh-browser-type
     selector: '[data-testid="session-ssh-browser-type"]'
-    kind: interactive
+    kind: display
   - id: advanced-ssh-password
     selector: 'input[aria-label="SSH password"]'
     kind: interactive
@@ -1958,9 +2024,6 @@ controls:
     kind: interactive
   - id: network-tcp-nodelay
     selector: '[data-testid="session-tcp-nodelay-toggle"]'
-    kind: interactive
-  - id: network-disable-nagle
-    selector: '[data-testid="session-disable-nagle-toggle"]'
     kind: interactive
   - id: network-ip-version
     selector: '[data-testid="session-ip-version"]'
@@ -3460,6 +3523,10 @@ controls:
   - id: unlock-mode-hint
     selector: '[data-testid="vault-unlock-mode-hint"]'
     kind: display
+  - id: startup-check
+    selector: '[data-testid="startup-vault-check"]'
+    kind: display
+    optional: true       # only while startup status is pending
   - id: init-button
     selector: '[data-testid="vault-init-button"]'
     kind: interactive
@@ -5324,6 +5391,10 @@ controls:
     selector: '[data-testid="db-execution-log-summary"]'
     kind: display
     optional: true
+  - id: execution-log-message
+    selector: '[data-testid="db-execution-log-message"]'
+    kind: display
+    optional: true       # server/driver errors and successful statement feedback
   - id: result-sheet-tab
     selector: '[data-testid="result-sheet-tab"]'
     kind: interactive
@@ -10829,7 +10900,7 @@ controls:
     selector: '[data-testid="settings-group-toggle-backup"]'
     kind: interactive
   - id: create-now
-    selector: '[data-testid="backup-create-now"]'
+    selector: '[data-testid="backup-selected-start"]'
     kind: interactive
   - id: action-success
     selector: '[data-testid="backup-action-success"]'
@@ -10865,13 +10936,20 @@ files:
   - src-tauri/src/backup/control.rs
   - src-tauri/src/backup/credentials.rs
   - src-tauri/src/backup/feishu/auth.rs
+  - src/components/settings/backup/BackupDestination.tsx
+  - src/components/settings/backup/BackupAuthorizationBanner.tsx
+  - src/components/settings/backup/BackupCloudActivity.tsx
+  - src/stores/backupControlStore.ts
+  - src-tauri/src/backup/feishu/auth_session.rs
+  - src-tauri/src/backup/feishu/auth_service.rs
+  - src-tauri/src/backup/feishu/auth_connect.rs
 controls:
-  - id: backup-selected-include-mail
-    selector: '[data-testid="backup-selected-include-mail"]'
-    kind: interactive
   - id: backup-cloud-include-mail
     selector: '[data-testid="backup-cloud-include-mail"]'
     kind: interactive
+    aliases:
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-include-mail"]'
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-include-mail"]'
   - id: cloud-panel
     selector: '[data-testid="backup-cloud-panel"]'
     kind: display
@@ -10884,18 +10962,27 @@ controls:
   - id: cloud-name
     selector: '[data-testid="backup-cloud-name"]'
     kind: interactive
-  - id: cloud-edit
-    selector: '[data-testid="backup-cloud-edit"]'
-    kind: interactive
+    aliases:
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-name"]'
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-name"]'
   - id: cloud-proxy
     selector: '[data-testid="backup-cloud-proxy"]'
     kind: interactive
+    aliases:
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-proxy"]'
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-proxy"]'
   - id: cloud-save
     selector: '[data-testid="backup-cloud-save"]'
     kind: interactive
+    aliases:
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-save"]'
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-save"]'
   - id: feishu-folder
     selector: '[data-testid="backup-feishu-folder"]'
     kind: interactive
+    aliases:
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-feishu-folder"]'
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-feishu-folder"]'
   - id: device-name
     selector: '[data-testid="backup-device-name"]'
     kind: interactive
@@ -10911,6 +10998,9 @@ controls:
   - id: feishu-authorize
     selector: '[data-testid="backup-feishu-authorize"]'
     kind: interactive
+    aliases:
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-feishu-authorize"]'
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-feishu-authorize"]'
   - id: recovery
     selector: '[data-testid="backup-connection-recovery"]'
     kind: display
@@ -10944,16 +11034,62 @@ controls:
   - id: job
     selector: '[data-testid="backup-cloud-job"]'
     kind: display
-  - id: cloud-start
-    selector: '[data-testid="backup-cloud-start"]'
-    kind: interactive
   - id: cloud-refresh
     selector: '[data-testid="backup-cloud-refresh"]'
     kind: interactive
+  - id: destination-expand
+    selector: '[data-testid="backup-cloud-destination"] > summary'
+    kind: interactive
+    aliases:
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) > summary'
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) > summary'
+  - id: cloud-range-mode
+    selector: '[data-testid="backup-cloud-range-mode"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-range-mode"]'
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-range-mode"]'
+  - id: cloud-scope
+    selector: '[data-testid="backup-cloud-scope"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-scope"]'
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-scope"]'
+  - id: cloud-password
+    selector: '[data-testid="backup-cloud-password"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-password"]'
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-password"]'
+  - id: cloud-enabled
+    selector: '[data-testid="backup-cloud-enabled"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-enabled"]'
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-enabled"]'
+  - id: authorization-banner
+    selector: '[data-testid="backup-authorization-banner"]'
+    kind: display
+  - id: authorization-session
+    selector: '[data-testid="backup-feishu-session"]'
+    kind: display
+  - id: authorization-cancel
+    selector: '[data-testid="backup-authorization-cancel"]'
+    kind: interactive
+  - id: authorization-forget
+    selector: '[data-testid="backup-authorization-forget"]'
+    kind: interactive
+  - id: device-settings
+    selector: '[data-testid="backup-device-settings"] > summary'
+    kind: interactive
+  - id: destination
+    selector: '[data-testid="backup-cloud-destination"]'
+    kind: display
 -->
 
 - 飞书使用原生应用复用/浏览器注册和设备授权，目标可保存独立代理；不需要手工应用密钥或回调设置。
 - `TC-BACKUP-CLOUD-001` 验证原生目标配置保存/重开与中英文切换；个人真实授权、上传、历史回退及重启恢复已有专门实测，具体范围与未完成项见 `docs-feature/unified-backup/implementation-status.md`，该 UI case 不代替云端链路验收。
+- `TC-BACKUP-SETTINGS-004` 验证 600/950 像素宽度的全局/渠道/手工区域、中英文与深浅主题，保存可供检查的区域截图；不代替原生落盘或真实飞书服务验证。
 
 ### 27.4 后台自动备份 ✅
 
@@ -10970,24 +11106,34 @@ files:
   - src-tauri/src/backup/engine.rs
   - src/stores/backupStore.ts
   - src/components/settings/BackupSettingsPanel.tsx
+  - src/components/settings/backup/BackupSettingsView.tsx
+  - src/components/settings/backup/BackupSections.tsx
+  - src/components/settings/backup/BackupRangeEditor.tsx
+  - src/components/settings/backup/BackupLocalHistory.tsx
+  - src/components/settings/backup/BackupRestoreDialog.tsx
+  - src/components/settings/backup/BackupError.tsx
+  - src/components/settings/backup/BackupSettingsTypes.ts
+  - src/stores/backupSettingsStore.ts
+  - src/lib/backupSettings.ts
+  - src/stubs/remoteBackupStub.ts
+  - src-tauri/src/backup/settings.rs
+  - src-tauri/src/backup/settings_model.rs
+  - src-tauri/src/backup/range.rs
 controls:
-  - id: backup-scope
-    selector: '[data-testid="backup-scope"]'
+  - id: backup-global-scope
+    selector: '[data-testid="backup-global-scope"]'
     kind: interactive
-  - id: backup-include-mail
-    selector: '[data-testid="backup-include-mail"]'
-    kind: interactive
-  - id: backup-auto-include-mail
-    selector: '[data-testid="backup-auto-include-mail"]'
+  - id: backup-global-include-mail
+    selector: '[data-testid="backup-global-include-mail"]'
     kind: interactive
   - id: auto-toggle
-    selector: '[data-testid="backup-auto-toggle"]'
+    selector: '[data-testid="backup-auto-enabled"]'
     kind: interactive
   - id: frequency
-    selector: '[data-testid="backup-frequency"]'
+    selector: '[data-testid="backup-auto-frequency"]'
     kind: interactive
   - id: retained-copies
-    selector: '[data-testid="backup-retained-copies"]'
+    selector: '[data-testid="backup-auto-retention"]'
     kind: interactive
   - id: last-success
     selector: '[data-testid="backup-last-success"]'
@@ -10995,10 +11141,55 @@ controls:
   - id: history-refresh
     selector: '[data-testid="backup-history-refresh"]'
     kind: interactive
+  - id: global-defaults
+    selector: '[data-testid="backup-global-defaults"]'
+    kind: display
+  - id: save-status
+    selector: '[data-testid="backup-settings-save-status"]'
+    kind: display
+  - id: local-expand
+    selector: '[data-testid="backup-local-destination"] > summary'
+    kind: interactive
+  - id: local-range
+    selector: '[data-testid="backup-local-range-mode"]'
+    kind: interactive
+  - id: local-scope
+    selector: '[data-testid="backup-local-scope"]'
+    kind: interactive
+  - id: local-select
+    selector: '[data-testid="backup-local-select"]'
+    kind: interactive
+  - id: global-history
+    selector: '[data-testid="backup-global-includeLocalHistory"]'
+    kind: interactive
+  - id: global-vault
+    selector: '[data-testid="backup-global-includeVault"]'
+    kind: interactive
+  - id: manual
+    selector: '[data-testid="backup-manual"]'
+    kind: display
+  - id: restore-password
+    selector: '[data-testid="backup-restore-password"]'
+    kind: interactive
+  - id: restore-unlock
+    selector: '[data-testid="backup-restore-unlock"]'
+    kind: interactive
+  - id: restore-dialog
+    selector: '[data-testid="backup-restore-dialog"]'
+    kind: display
+  - id: range-summary
+    selector: '[data-testid="backup-range-summary"]'
+    kind: display
+    aliases:
+    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-range-summary"]'
+    - '[data-testid="backup-manual"] [data-testid="backup-range-summary"]'
+  - id: save-retry
+    selector: '[data-testid="backup-settings-retry"]'
+    kind: interactive
 -->
 
 - 原生后台在启动时及运行中每分钟检查到期备份；daily/weekly 距上次成功备份满 24 小时/7 天触发，休眠恢复后补做一次当前快照，失败后下次检查重试。`on_exit` 在正常退出前完成备份。
-- 备份设置立即显示最新编辑，连续修改按顺序保存；旧策略回读及历史刷新不能覆盖新选择，失败恢复已保存策略并允许重试。
+- 备份设置立即显示最新编辑，连续修改按顺序保存；旧策略回读及历史刷新不能覆盖新选择，失败保留草稿、阻止执行并允许重试。
 - 手动与自动备份串行执行，自动备份使用配置范围、目录和保留数量；完成后设置页自动刷新历史和上次成功时间。策略更新保留后台最新时间戳。
 - 共用同一数据目录的实例以系统文件锁协调备份、策略更新、轮转、删除和恢复读取；获得锁后重读策略，daily/weekly 每个到期周期只生成一次。锁在进程退出或崩溃后自动释放。设置页打开期间每 15 秒读取共享历史和策略，显示其他实例的结果。
 

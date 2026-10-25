@@ -104,9 +104,9 @@ export function extractKeyPath(auth: AuthMethod | undefined): string {
 
 export function extractAuthType(
   auth: AuthMethod | undefined,
-): "Password" | "PrivateKey" | "Agent" | "None" {
+): "Password" | "PrivateKey" | "Agent" | "Gssapi" | "None" {
   if (!auth) return "Password";
-  if (typeof auth === "string") return auth as "Password" | "Agent" | "None";
+  if (typeof auth === "string") return auth as "Password" | "Agent" | "Gssapi" | "None";
   if (typeof auth === "object" && "PrivateKey" in auth) return "PrivateKey";
   return "Password";
 }

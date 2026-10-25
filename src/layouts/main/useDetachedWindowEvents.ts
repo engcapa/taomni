@@ -156,6 +156,7 @@ export function useDetachedWindowEvents(context: UseDetachedWindowEventsContext)
             id: reattachTabId,
             type: "terminal",
             title: p.title || tr("tabs.localTerminal"),
+            sessionId: p.savedSessionId,
             terminalTitleMode: p.terminalTitleMode,
             terminalTitleOperation: p.terminalTitleOperation,
             terminalTitleSessionName: p.terminalTitleSessionName,

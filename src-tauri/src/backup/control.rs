@@ -98,6 +98,7 @@ fn read_at(root: &Path) -> Result<ControlConfig, String> {
     }
     let config = ControlConfig {
         format_version: 1,
+        settings_revision: 0,
         device: DeviceIdentity {
             id: uuid::Uuid::new_v4().to_string(),
             name: default_device_name(),
@@ -166,6 +167,7 @@ pub fn save(app: &tauri::AppHandle, mut config: ControlConfig) -> Result<(), Str
     let current = read_at(&dir)?;
     // A frontend form or a foreign archive must never replace device identity.
     config.device.id = current.device.id;
+    config.settings_revision = current.settings_revision.saturating_add(1);
     // Application bindings and identity are backend-owned, never editable via a form.
     config.connections = current.connections;
     for target in &mut config.targets {
@@ -226,6 +228,7 @@ pub fn update(
     let _process = process_lock(&dir)?;
     let mut config = read_at(&dir)?;
     change(&mut config)?;
+    config.settings_revision = config.settings_revision.saturating_add(1);
     write_json(&dir.join("config.json"), &config)
 }
 pub fn target(app: &tauri::AppHandle, id: &str) -> Result<BackupTarget, String> {

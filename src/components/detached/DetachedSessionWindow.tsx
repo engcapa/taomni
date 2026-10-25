@@ -93,6 +93,8 @@ export interface DetachedVncParams {
 }
 
 export interface DetachedTerminalParams {
+  savedSessionId?: string;
+  bookmarkOptionsJson?: string;
   tabId?: string;
   title?: string;
   terminalTitleMode?: Tab["terminalTitleMode"];
@@ -642,6 +644,7 @@ function renderInner(
           ssh={p.ssh ?? undefined}
           commandTerminal={p.commandTerminal ?? undefined}
           localShell={p.localShell ?? undefined}
+          bookmarkOptionsJson={p.bookmarkOptionsJson}
           terminalProfile={p.terminalProfile ?? undefined}
           adoptedTerminal={adopted}
           preserveSessionOnUnmount

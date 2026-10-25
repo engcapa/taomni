@@ -11,11 +11,14 @@ use axum::extract::State;
 use axum::response::Response;
 use serde_json::Value;
 use serde_json::json;
+use std::time::Duration;
+use std::time::Instant;
 use tauri::Runtime;
 
 pub(super) async fn actions_script<R: Runtime>(
     state: &DriverState<R>,
     payload: &Value,
+    key: &str,
 ) -> Result<String, String> {
     let actions = payload
         .get("actions")
@@ -147,10 +150,14 @@ pub(super) async fn actions_script<R: Runtime>(
           return [ox, oy];
         }};
         {pointer_script}
+        const task = {{done: false}};
+        window[{key}] = task;
         dispatchQaActions(__qaActions, __qaEmitKey, __qaModifiers, (origin, ox, oy) => {{
           [lastX, lastY] = __qaOrigin(origin, ox, oy);
           return [lastX, lastY];
-        }}, __qaPoint);
+        }}, __qaPoint, () => window[{key}] !== task).then(
+          () => Object.assign(task, {{done: true}}),
+          error => Object.assign(task, {{done: true, error: String(error)}}));
         return true;"#,
         helper = lookup_helper(),
         pointer_script = include_str!("../qa_driver_pointer.js"),
@@ -166,11 +173,34 @@ pub(super) async fn actions<R: Runtime>(
     if !session_is_valid(&session_id) {
         return error("unknown WebDriver session");
     }
-    let script = match actions_script(&state, &payload).await {
+    let key = json!(format!("__qaActions_{}", uuid::Uuid::new_v4().simple())).to_string();
+    let script = match actions_script(&state, &payload, &key).await {
         Ok(script) => script,
         Err(message) => return error(message),
     };
-    match eval_js(&state, script).await {
+    // WKWebView serializes a pending Promise as an empty object. Own the
+    // asynchronous action sequence until it finishes, and cancel its later
+    // ticks on timeout instead of returning success before pointer-up.
+    let result: Result<Value, String> = async {
+        eval_js(&state, script).await?;
+        let deadline = Instant::now() + Duration::from_secs(30);
+        loop {
+            let task = eval_js(&state, format!("return window[{key}] || null;")).await?;
+            if task.get("done").and_then(Value::as_bool) == Some(true) {
+                if let Some(message) = task.get("error").and_then(Value::as_str) {
+                    return Err(message.to_string());
+                }
+                return Ok(Value::Bool(true));
+            }
+            if Instant::now() >= deadline {
+                return Err("WebView actions timed out".into());
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    }
+    .await;
+    let _ = eval_js(&state, format!("delete window[{key}]; return true;")).await;
+    match result {
         Ok(value) => ok(value),
         Err(message) => error(message),
     }

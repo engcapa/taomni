@@ -15,12 +15,17 @@ pub mod network;
 pub mod policy;
 pub mod provider;
 pub mod qa;
+pub mod range;
 pub mod restore;
 pub mod scheduler;
+pub mod settings;
+pub mod settings_model;
 pub mod source;
 pub mod transfer;
 pub mod worker;
 
+#[cfg(test)]
+mod compat_tests;
 #[cfg(test)]
 mod tests;
 
@@ -94,7 +99,7 @@ pub async fn backup_stage_restore(
 /// Get the current backup policy.
 #[tauri::command]
 pub async fn backup_get_policy(app: AppHandle) -> Result<BackupPolicy, String> {
-    Ok(policy::load_policy(&app))
+    policy::load_policy_result(&app)
 }
 
 /// Update and save the backup policy.
@@ -106,7 +111,9 @@ pub async fn backup_set_policy(app: AppHandle, mut policy: BackupPolicy) -> Resu
         let _process_operation = coordination::BackupProcessLock::acquire(&app)?;
         // Settings may still hold the timestamp from before a background backup.
         // Only a successful backup is allowed to update this backend-owned value.
-        policy.last_backup_at = policy::load_policy(&app).last_backup_at;
+        let current = policy::load_policy(&app);
+        policy.last_backup_at = current.last_backup_at;
+        policy.settings_revision = current.settings_revision.saturating_add(1);
         policy::save_policy(&app, &policy)
     })
     .await

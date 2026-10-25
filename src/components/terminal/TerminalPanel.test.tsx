@@ -11,6 +11,7 @@ import { registerTerminalPanelClipboard8Cases } from "./tests/terminalPanel/clip
 import { clipboardMocks, ipcMocks, ResizeObserverMock, sockscapMocks, terminalMocks, webglMocks } from "./tests/terminalPanel/harness";
 import { registerTerminalPanelLayout2Cases } from "./tests/terminalPanel/layout2.cases";
 import { registerTerminalPanelNavigation1Cases } from "./tests/terminalPanel/navigation1.cases";
+import { registerAuthListenerCases } from "./tests/terminalPanel/authListener.cases";
 
 registerTerminalPanelNavigation1Cases();
 
@@ -64,6 +65,7 @@ describe("TerminalPanel focus behavior", () => {
   registerTerminalPanelClipboard6Cases();
   registerTerminalPanelClipboard7Cases();
   registerTerminalPanelClipboard8Cases();
+  registerAuthListenerCases();
 });
 
 registerTerminalPanelLayout2Cases();

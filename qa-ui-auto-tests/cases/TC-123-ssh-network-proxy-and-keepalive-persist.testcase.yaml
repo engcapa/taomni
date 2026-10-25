@@ -39,16 +39,16 @@ steps:
     selector: '[data-testid="session-proxy-kind"]'
     value: socks5
 - fill:
-    selector: 'input[aria-label="Proxy host"]'
+    selector: input[aria-label="Proxy host"]
     value: 127.0.0.1
 - fill:
-    selector: 'input[aria-label="Proxy port"]'
+    selector: input[aria-label="Proxy port"]
     value: '1080'
 - fill:
-    selector: 'input[aria-label="Proxy username"]'
+    selector: input[aria-label="Proxy username"]
     value: qa-proxy-user
 - fill:
-    selector: 'input[aria-label="Proxy password"]'
+    selector: input[aria-label="Proxy password"]
     value: qa-proxy-secret-not-for-storage
 - set_check:
     selector: '[data-testid="session-proxy-save-auth"]'
@@ -57,7 +57,7 @@ steps:
     selector: '[data-testid="session-keepalive-toggle"]'
     checked: true
 - fill:
-    selector: 'input[aria-label="Keep-alive interval"]'
+    selector: input[aria-label="Keep-alive interval"]
     value: '47'
 - assert_attribute:
     selector: '[data-testid="session-keepalive-toggle"]'
@@ -68,7 +68,7 @@ steps:
     name: data-checked
     equals: 'false'
 - assert_attribute:
-    selector: 'input[aria-label="Proxy password"]'
+    selector: input[aria-label="Proxy password"]
     name: type
     equals: password
 - click: '[data-testid="session-section-bookmark"]'
@@ -89,19 +89,19 @@ steps:
     name: value
     equals: socks5
 - assert_attribute:
-    selector: 'input[aria-label="Proxy host"]'
+    selector: input[aria-label="Proxy host"]
     name: value
     equals: 127.0.0.1
 - assert_attribute:
-    selector: 'input[aria-label="Proxy port"]'
+    selector: input[aria-label="Proxy port"]
     name: value
     equals: '1080'
 - assert_attribute:
-    selector: 'input[aria-label="Proxy username"]'
+    selector: input[aria-label="Proxy username"]
     name: value
     equals: qa-proxy-user
 - assert_attribute:
-    selector: 'input[aria-label="Proxy password"]'
+    selector: input[aria-label="Proxy password"]
     name: value
     equals: ''
 - assert_attribute:
@@ -113,7 +113,7 @@ steps:
     name: data-checked
     equals: 'true'
 - assert_attribute:
-    selector: 'input[aria-label="Keep-alive interval"]'
+    selector: input[aria-label="Keep-alive interval"]
     name: value
     equals: '47'
 - set_check:
@@ -124,18 +124,18 @@ steps:
     name: data-checked
     equals: 'false'
 - assert_attribute:
-    selector: '[data-testid="session-disable-nagle-toggle"]'
+    selector: '[data-testid="session-tcp-nodelay-toggle"]'
     name: data-checked
     equals: 'false'
 - set_check:
-    selector: '[data-testid="session-disable-nagle-toggle"]'
+    selector: '[data-testid="session-tcp-nodelay-toggle"]'
     checked: true
 - assert_attribute:
     selector: '[data-testid="session-tcp-nodelay-toggle"]'
     name: data-checked
     equals: 'true'
 - assert_attribute:
-    selector: '[data-testid="session-disable-nagle-toggle"]'
+    selector: '[data-testid="session-tcp-nodelay-toggle"]'
     name: data-checked
     equals: 'true'
 - set_check:
@@ -146,7 +146,7 @@ steps:
     name: data-checked
     equals: 'false'
 - assert_attribute:
-    selector: '[data-testid="session-disable-nagle-toggle"]'
+    selector: '[data-testid="session-tcp-nodelay-toggle"]'
     name: data-checked
     equals: 'false'
 - select_option:
@@ -169,7 +169,7 @@ steps:
     name: data-checked
     equals: 'false'
 - assert_attribute:
-    selector: '[data-testid="session-disable-nagle-toggle"]'
+    selector: '[data-testid="session-tcp-nodelay-toggle"]'
     name: data-checked
     equals: 'false'
 - assert_attribute:
@@ -183,6 +183,7 @@ verification:
   - id: R1
     requirement: SOCKS5, keep-alive, TCP_NODELAY, and IPv6 settings survive saving and reopening an SSH bookmark.
     actions:
+    - 3
     - 6
     - 7
     - 10
@@ -241,15 +242,15 @@ verification:
     - step: 43
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 44
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-nagle-toggle\"]", "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 46
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "true"}}'
     - step: 47
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-nagle-toggle\"]", "name": "data-checked", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "true"}}'
     - step: 49
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 50
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-nagle-toggle\"]", "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 52
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
     - step: 54
@@ -263,7 +264,7 @@ verification:
     - step: 61
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 62
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-nagle-toggle\"]", "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 63
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
     results:

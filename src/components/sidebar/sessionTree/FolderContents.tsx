@@ -1,3 +1,4 @@
+import { readSessionBookmark } from "../../../lib/sessionBookmark";
 import { useRef } from "react";
 import { Terminal as TerminalIcon, Monitor, Folder, Wifi, ChevronRight, ChevronDown, FolderOpen, FileText, Database, Globe, Server, Mail } from "lucide-react";
 import type { SessionConfig } from "../../../lib/ipc";
@@ -181,7 +182,8 @@ export function SessionItem({
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
   const typeLabel = sessionTypeLabel(session.session_type, session.options_json);
-  const icon = sessionIcon(typeLabel);
+  const customIcon = readSessionBookmark(session.options_json).customIcon;
+  const icon = customIcon ? <span className="w-3.5 text-center" aria-label="Custom session icon">{customIcon}</span> : sessionIcon(typeLabel);
   return (
     <div
       data-testid="session-tree-item"

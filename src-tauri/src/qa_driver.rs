@@ -12,6 +12,7 @@ mod response;
 mod evaluation;
 
 mod session;
+mod windows;
 
 mod elements;
 

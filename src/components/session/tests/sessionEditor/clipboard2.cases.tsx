@@ -156,7 +156,7 @@ export function registerSessionEditorClipboard2Cases() {
   it.each([
     ["SFTP", "advanced-ssh-settings"],
     ["VNC", "session-vnc-policies"],
-    ["Browser", "network-settings"],
+    ["Browser", "bookmark-settings"],
   ])("hides Terminal settings for %s sessions", async (initialProto, expectedSectionTestId) => {
     renderEditor(undefined, { initialProto });
 

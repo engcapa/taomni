@@ -73,6 +73,7 @@ function setupTerminalSession(controllerContext: TerminalSessionLifecycleContext
   const safeFontFamily = isMonospaceFont(primaryFont) ? controllerContext.fontFamily : getDefaultTerminalFontFamily();
 
   const term = new Terminal({
+    allowTransparency: true,
     theme: controllerContext.resolvePanelTheme(controllerContext.themeName),
     fontFamily: safeFontFamily,
     fontSize: controllerContext.fontSize,
@@ -282,6 +283,7 @@ function setupTerminalSession(controllerContext: TerminalSessionLifecycleContext
 
   return () => {
     lifetime.destroyed = true;
+    lifetime.disposeReconnect?.();
     observer.disconnect();
     el.removeEventListener("scroll", onContainerScroll);
     selectionDisposable.dispose();

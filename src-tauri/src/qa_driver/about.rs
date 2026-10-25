@@ -24,7 +24,10 @@ pub(super) async fn native_about<R: Runtime>(
     }
     #[cfg(target_os = "macos")]
     {
-        let window = state.window.clone();
+        let window = match state.current_window() {
+            Ok(window) => window,
+            Err(message) => return error(message),
+        };
         let (tx, rx) = oneshot::channel();
         if let Err(err) = state.app.run_on_main_thread(move || {
             let result = (|| -> Result<String, String> {

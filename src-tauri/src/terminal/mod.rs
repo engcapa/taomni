@@ -1,4 +1,6 @@
 pub mod client;
+pub mod keygen;
+pub mod openssh;
 
 pub mod forwards;
 

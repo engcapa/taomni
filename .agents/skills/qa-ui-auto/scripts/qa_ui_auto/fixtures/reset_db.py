@@ -5,7 +5,8 @@ taomni.tunnels.v1, taomni.appTheme.v1, taomni.terminalProfile.v1, taomni.compact
 taomni.sftp.*).
 
 Native mode: clear only the QA application's state under the current run's
-verified data/config/cache roots. Never resolve or clear the production profile.
+verified data/config/cache roots, including Linux's taomni configuration and
+cache namespaces. Never resolve or clear the production profile.
 """
 
 from __future__ import annotations
@@ -115,6 +116,12 @@ def _native_profile_targets(ctx: Any) -> list[Path]:
     if any(os.environ.get(key) != value for key, value in expected.items()):
         raise RuntimeError("reset_db requires the current run's native isolation environment")
     targets = [Path(value) / QA_APP_ID for value in set(expected.values())]
+    # Linux config/cache helpers use XDG_*/taomni directly, outside the
+    # Tauri application ID. AI gateway cases leave a loopback app proxy here;
+    # retaining it after the fixture closes breaks subsequent network cases.
+    for key in ("XDG_CONFIG_HOME", "XDG_CACHE_HOME"):
+        if key in expected:
+            targets.append(Path(expected[key]) / "taomni")
     # Validate every target before deleting any; rmtree does not follow child symlinks.
     if any(target.resolve() != target for target in targets):
         raise RuntimeError("reset_db refuses symlinked QA profile paths")

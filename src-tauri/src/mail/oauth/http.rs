@@ -1,48 +1,12 @@
-use crate::mail::limits::DEFAULT_TIMEOUT_SECS;
 use crate::mail::oauth_model::OAuthDeviceCodeResponse;
 use crate::mail::oauth_model::OAuthTokenResponse;
 use crate::terminal::network::NetworkSettings;
-use rusqlite::params;
-use std::time::Duration;
 
 pub(in crate::mail) fn build_oauth_http_client_blocking(
     network: Option<&NetworkSettings>,
-) -> Result<reqwest::blocking::Client, String> {
-    let mut builder =
-        reqwest::blocking::Client::builder().timeout(Duration::from_secs(DEFAULT_TIMEOUT_SECS));
-    if let Some(net) = network {
-        match net.proxy_kind.as_str() {
-            "" | "none" => {}
-            "http" => {
-                let url = format!("http://{}:{}", net.proxy_host, net.proxy_port);
-                let mut proxy = reqwest::Proxy::all(&url)
-                    .map_err(|e| format!("OAuth HTTP proxy config failed: {e}"))?;
-                if !net.proxy_user.is_empty() {
-                    proxy = proxy.basic_auth(&net.proxy_user, &net.proxy_pass);
-                }
-                builder = builder.proxy(proxy);
-            }
-            "socks5" => {
-                let url = format!("socks5h://{}:{}", net.proxy_host, net.proxy_port);
-                let mut proxy = reqwest::Proxy::all(&url)
-                    .map_err(|e| format!("OAuth SOCKS5 proxy config failed: {e}"))?;
-                if !net.proxy_user.is_empty() {
-                    proxy = proxy.basic_auth(&net.proxy_user, &net.proxy_pass);
-                }
-                builder = builder.proxy(proxy);
-            }
-            "ssh-tunnel" => {
-                return Err("OAuth2 token requests through SSH tunnel are not supported yet; use HTTP or SOCKS5 proxy for this Mail session.".into());
-            }
-            "system" => {
-                return Err("System proxy is not supported for Mail OAuth yet; use HTTP or SOCKS5 proxy in this session's Network tab.".into());
-            }
-            other => return Err(format!("Unsupported Mail OAuth proxy type: {other}")),
-        }
-    }
-    builder
-        .build()
-        .map_err(|e| format!("failed to build OAuth client: {e}"))
+    endpoint: &str,
+) -> Result<super::transport::OAuthHttpClient, String> {
+    super::transport::client(network, endpoint)
 }
 
 pub(in crate::mail) fn parse_oauth_token_response(

@@ -13,10 +13,32 @@ import subprocess
 import sys
 import time
 import urllib.request
+from typing import TYPE_CHECKING
 
 import yaml
 
 from qa_ui_auto.ci import selection_digest, selection_entry, write_json
+
+if TYPE_CHECKING:
+    from ci_desktop import Desktop
+
+
+def _prepare_runtime(stack: ExitStack, entry: dict, report: Path, config: dict) -> Desktop | None:
+    """Own the desktop before services that observe or forward its X display.
+
+    VNC and Wayland create DISPLAY inside Desktop, whereas Xvfb wrappers
+    already supply it. Services must also close before that desktop exits.
+    """
+    desktop = None
+    if entry["mode"] == "native":
+        from ci_desktop import Desktop
+        from qa_ui_auto.linux_profiles import DEFAULT_LINUX_PROFILE
+        desktop = stack.enter_context(Desktop(report / "desktop", entry["capabilities"],
+                                              entry.get("linux_profile") or DEFAULT_LINUX_PROFILE))
+    if set(entry["capabilities"]) & {"ssh", "ssh_features", "clickhouse", "mysql", "vnc", "ard"}:
+        from ci_services import Services
+        stack.enter_context(Services(report / "services", entry["capabilities"], config))
+    return desktop
 
 
 def _runner_report_complete(report: Path) -> tuple[bool, str | None]:
@@ -115,13 +137,11 @@ def main():
                                  stdout=log, stderr=subprocess.STDOUT)
             # The SSH account, the VNC fixture's per-case event log and the
             # macOS console session behind Screen Sharing are shared.
-            serial = set(entry["capabilities"]) & {"ssh", "vnc", "ard"}
+            serial = set(entry["capabilities"]) & {"ssh", "ssh_features", "clickhouse", "vnc", "ard"}
             config = {"app": {"base_url": "http://127.0.0.1:5000", "mode": entry["mode"]},
                       "worker": {"parallel": 1 if serial else entry.get("workers", 2)},
                       "report": {"dir": str(args.report), "keep_runs": 0}}
-            if set(entry["capabilities"]) & {"ssh", "mysql", "vnc", "ard"}:
-                from ci_services import Services
-                stack.enter_context(Services(args.report / "services", entry["capabilities"], config))
+            desktop = _prepare_runtime(stack, entry, args.report, config)
             if "java" in entry["capabilities"]:
                 from ci_toolchains import prepare_java
                 prepare_java(args.report / "java", entry["capabilities"])
@@ -150,10 +170,6 @@ def main():
             cfg_path = args.report / "config.yaml"
             cfg_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
             if entry["mode"] == "native":
-                from ci_desktop import Desktop
-                from qa_ui_auto.linux_profiles import DEFAULT_LINUX_PROFILE
-                desktop = stack.enter_context(Desktop(args.report / "desktop", entry["capabilities"],
-                                                       entry.get("linux_profile") or DEFAULT_LINUX_PROFILE))
                 outcome["stage"] = "build"
                 write_json(args.report / "ci-outcome.json", outcome)
                 build_log = stack.enter_context((args.report / "build.log").open("w", encoding="utf-8"))
