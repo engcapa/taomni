@@ -72,6 +72,14 @@ class NativeApplicationRestartTest(unittest.TestCase):
             restart_owned_application(driver, session)
         driver.start.assert_not_called()
 
+    def test_intercepted_close_can_destroy_its_context_before_script_acknowledgement(self):
+        session, driver, _ = self.scenario()
+        session.click.side_effect = WebDriverError("element click intercepted")
+        session.execute.side_effect = WebDriverError("invalid session id: session deleted because of page crash or hang")
+        result = restart_owned_application(driver, session)
+        self.assertEqual(result["after_session"], "new")
+        self.assertEqual(session.execute.call_count, 1)
+
     def test_unrelated_transport_failure_does_not_claim_a_graceful_close(self):
         session, _, _ = self.scenario()
         session.execute.side_effect = WebDriverError("evaluation timed out")

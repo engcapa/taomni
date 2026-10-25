@@ -30,11 +30,18 @@ def close_application_window(session, timeout: float = 15) -> None:
             # a pane commits its last update. The production close handler is
             # still the boundary; dispatch it on the owned DOM node after the
             # real pointer action was rejected, then verify the context closes.
-            dispatched = session.execute(
-                'const button = document.querySelector("[data-testid=window-close]");'
-                'if (!button) throw new Error("QA application close control is missing");'
-                'button.click(); return true;'
-            )
+            try:
+                dispatched = session.execute(
+                    'const button = document.querySelector("[data-testid=window-close]");'
+                    'if (!button) throw new Error("QA application close control is missing");'
+                    'button.click(); return true;'
+                )
+            except (WebDriverError, OSError) as dispatch_error:
+                # This is the same close handler: WebKit can terminate its
+                # context before returning the script acknowledgement too.
+                if closed(dispatch_error):
+                    return
+                raise
             if dispatched is not True:
                 raise error
         elif closed(error):

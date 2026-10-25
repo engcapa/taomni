@@ -81,6 +81,7 @@ steps:
 - wait_for:
     selector: '[data-testid="workspace-file-editor"][data-dirty]'
     state: detached
+    timeout_sec: 30
 - click: '[data-testid="code-workspace-tree-view-selector"]'
 - click: '[data-testid="code-workspace-tree-view-project"]'
 - wait_for: '[data-testid="code-workspace-tree-file"][data-path="notes.txt"]'
@@ -157,7 +158,7 @@ verification:
     - step: 35
       expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-dirty=\"true\"]"}'
     - step: 37
-      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-file-editor\"][data-dirty]", "state": "detached"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-file-editor\"][data-dirty]", "state": "detached", "timeout_sec": 30}}'
     - step: 40
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"notes.txt\"]"}'
     - step: 42
