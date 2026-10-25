@@ -17,11 +17,13 @@
 
 上述工具修复通过 29 项契约，本机 `TC-WS-006` browser 和 `TC-WS-030` native 完整复跑通过，均 `identity_stable=true`：`workspace-browser/run-20261026-045751-797253612`、`workspace-native/run-20261026-045751-351481537`。此前 browser 配置启动不需要的 SSH 容器时与并行 native 服务撞名，保留 setup 失败日志，改用无需服务的 Git 场景配置后通过。Windows/macOS 系统边界继续定向实测；通过后执行 373 ID 相关集，再执行全量。已核对全量为 619 个适用 ID，唯一外部项目缺口仍为用户确认单列的 `TC-IDE-C6-06`。
 
-系统边界续验 [40233391400](https://github.com/engcapa/taomni/actions/runs/40233391400) 为 1 passed / 3 failed、0 基础设施错误：macOS 目录选择通过，第一次真实冷启动及恢复通过，第二次启动的初始连接被拒绝；Windows 已消除动态绑定异常，但原生 Edit 的 WM_SETTEXT 仅更新显示文本，未更新 Common Item Dialog 的真实选择。Windows 辅助工具改为向已确认所有权和焦点的目录字段发送原生键盘输入，再点击系统按钮；不向产品输入框回填结果。macOS 只在尚未创建会话且初始连接明确被拒绝时等待同一进程的 bridge；进程退出或已创建会话后的错误直接失败，并记录阶段与 PID。
+系统边界续验 [40233391400](https://github.com/engcapa/taomni/actions/runs/40233391400) 为 1 passed / 3 failed、0 基础设施错误：macOS 目录选择通过，第一次真实冷启动及恢复通过，第二次启动的初始连接被拒绝；Windows 已消除动态绑定异常，但原生 Edit 的 WM_SETTEXT 仅更新显示文本，未更新 Common Item Dialog 的真实选择。Windows 辅助工具改为向已确认所有权和焦点的目录字段发送原生键盘输入，再点击系统按钮；不向产品输入框回填结果。macOS 通过原生关闭按钮和所属进程退出码确认正常退出，再启动新 PID；连接错误分阶段记录，避免清理请求掩盖原始关闭错误。
 
 本机续验 `workspace-native/run-20261026-051455-217700493` 暴露一次最新活动文件没有落盘的问题。重启工具此前在 WebDriver 上下文消失后立即结束进程组，可能打断仍在退出的 WebKit 存储子进程。现在正常关闭后检查所属应用和存储子进程实际结束，再释放适配器；不使用固定等待替代进程观察。首次观察误含仍需保留的 WebKitWebDriver 适配器而失败，已明确排除并加入所有权/适配器边界测试。完整复跑 `workspace-native/run-20261026-052420-817244670` 通过，两次重启分别观察到应用及两个 WebKit 子进程结束；标签顺序、活动文件、草稿和真实 SSH/SFTP/PTY 断言全部保留。
 
 最终本机边界批次 `workspace-native/run-20261026-052700-755631105` 为 `TC-WS-022/026/030` **3/3 passed**，`workspace-browser/run-20261026-052700-646280947` 的 Git 回归 **1/1 passed**；回执与当前源码/runner 身份匹配，均无 skipped。工具契约 **57 tests passed**，包括实际子进程正常退出/超时、WebKit 适配器排除、macOS 初始连接与失败保留；`pnpm check:refactor` 通过。系统边界的 Windows/macOS 仍由下一次 GitHub 实测确认。
+
+定向运行 [40236197565](https://github.com/engcapa/taomni/actions/runs/40236197565) 的 Linux 3/3、macOS 目录选择/入口归属 2/2 已通过；Windows 仍在执行，macOS 第二次冷启动失败。新阶段记录证明错误发生于第二次原生关闭后的 Broken pipe，之后 DELETE 的 ConnectionRefused 掩盖了该原始错误。移除未命中的启动重试，只在已取得所属原生关闭观察后接受 Broken pipe/连接重置，并要求该进程正常退出；清理错误单独保留，原始错误不能被替换。58 项契约通过，本机 `workspace-native/run-20261026-054543-828013276` 与 `workspace-browser/run-20261026-054543-633429900` 的完整冷启动/Git 回归各 1/1 通过。相关集和全量仍未通过，不以 job 的软成功代替用例结果。
 
 本机 QA v13 二进制 `src-tauri/target/qa-ui-auto/debug/taomni` 的构建输入匹配当前产品源码；源码指纹为 `1381198413aefe6d9838904adacbf374f951f41c171afb42b56224ad15615302`。最新静态审计（620 ID）、覆盖门禁、Rust 格式检查和 `pnpm check:refactor` 通过。所有本机测试保持最多 2 个 worker，native 顺序执行；此处本机通过不替代仍在进行的三平台相关集与全量验收。
 

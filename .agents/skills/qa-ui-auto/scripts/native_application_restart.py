@@ -40,7 +40,8 @@ def close_application_window(session, timeout: float = 15) -> dict | None:
                        "session terminated without a reply")
 
     def closed(error):
-        return any(message in str(error).lower() for message in closed_messages)
+        return (observation is not None and isinstance(error, (BrokenPipeError, ConnectionResetError))) \
+            or any(message in str(error).lower() for message in closed_messages)
 
     observation = None
     try:
@@ -100,6 +101,7 @@ def restart_owned_application(driver, session) -> dict:
                    "before_owner_pid": before_owner, "stage": "close-window"}
     session.application_restart_observation = observation
     processes = linux_storage_processes(driver, session.application) if platform.system() == "Linux" else {}
+    primary_error = None
     try:
         close_observation = close_application_window(session)
         observation["native_close"] = close_observation
@@ -109,15 +111,24 @@ def restart_owned_application(driver, session) -> dict:
         observation["stage"] = "wait-for-application-exit"
         observation["native_shutdown"] = wait_for_application_shutdown(driver, session, processes)
     except Exception as error:
+        primary_error = error
         observation["error_stage"] = observation["stage"]
         observation["close_error"] = str(error)
         raise
     finally:
         observation["stage"] = "release-owner"
-        try:
-            session.close()
-        finally:
-            driver.stop()
+        release_error = None
+        for release in (session.close, driver.stop):
+            try:
+                release()
+            except Exception as error:
+                observation.setdefault("cleanup_errors", []).append(str(error))
+                if primary_error is not None:
+                    primary_error.add_note("Restart cleanup: " + str(error))
+                elif release_error is None:
+                    release_error = error
+        if release_error is not None:
+            raise release_error
     # A reaped launcher does not establish that its adapter has released its
     # socket yet. Starting immediately races WebKitWebDriver on Linux.
     ports = (driver.port,) if session.transport == "macOS WKWebView bridge" else (driver.port, driver.native_port)
@@ -129,29 +140,7 @@ def restart_owned_application(driver, session) -> dict:
     session._on_close = driver.mark_session_closed
     session.deadline = deadline
     observation.update(stage="start-session", after_owner_pid=getattr(getattr(driver, "proc", None), "pid", None))
-    connect_retries = 0
-    ready_deadline = time.monotonic() + 10
-    while True:
-        try:
-            session.start()
-            break
-        except ConnectionRefusedError:
-            # Only a refused initial connect is known not to have delivered
-            # its request. Never retry a created session or an uncertain action.
-            if not macos_bridge or session.session_id:
-                raise
-            connect_retries += 1
-            observation["startup_connect_retries"] = connect_retries
-            process = driver.proc
-            code = process.poll()
-            observation["owner_exit_code"] = code
-            if code is not None:
-                raise RuntimeError(f"Owned QA app exited during macOS bridge startup (exit {code})")
-            if session.deadline:
-                session.deadline.remaining()
-            if time.monotonic() >= ready_deadline:
-                raise
-            time.sleep(0.1)
+    session.start()
     after_owner = getattr(getattr(driver, "proc", None), "pid", None)
     if not session.session_id:
         raise RuntimeError("QA application restart did not create a new native session")
@@ -168,6 +157,5 @@ def restart_owned_application(driver, session) -> dict:
             "after_session": session.session_id, "profile_retained": True,
             "shutdown": "application-window-close",
             "native_shutdown": observation["native_shutdown"],
-            **({"before_owner_pid": before_owner, "after_owner_pid": after_owner,
-                "startup_connect_retries": connect_retries} if macos_bridge else {}),
+            **({"before_owner_pid": before_owner, "after_owner_pid": after_owner} if macos_bridge else {}),
             **({"native_close": close_observation} if close_observation else {})}

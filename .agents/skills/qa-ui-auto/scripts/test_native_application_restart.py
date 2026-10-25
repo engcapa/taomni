@@ -144,41 +144,42 @@ class NativeApplicationRestartTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "new owned macOS process"):
                 restart_owned_application(driver, session)
 
-    def test_macos_retries_only_a_refused_initial_session_connection(self):
+    def test_macos_broken_pipe_after_native_close_requires_normal_process_exit(self):
         session, driver, _ = self.scenario()
         session.transport = "macOS WKWebView bridge"
-        def start():
-            if session.start.call_count == 1:
-                raise ConnectionRefusedError("bridge not yet accepting connections")
-            session.session_id = "new"
-        session.start.side_effect = start
-        with patch("native_application_restart.close_macos_application_window", return_value={"pid": 100}), \
-                patch("native_application_restart.time.sleep"):
+        session.execute.side_effect = BrokenPipeError("bridge closed with the app")
+        with patch("native_application_restart.close_macos_application_window", return_value={"pid": 100}):
+            result = restart_owned_application(driver, session)
+        self.shutdown.assert_called_once_with(driver, session, {})
+        self.assertEqual(result["native_close"], {"pid": 100})
+        self.assertEqual(result["after_owner_pid"], 200)
+
+    def test_broken_pipe_without_an_observed_native_close_stays_failed(self):
+        session, driver, _ = self.scenario()
+        session.execute.side_effect = BrokenPipeError("unverified transport loss")
+        with self.assertRaisesRegex(BrokenPipeError, "unverified"):
             restart_owned_application(driver, session)
-        self.assertEqual(session.start.call_count, 2)
+        driver.start.assert_not_called()
 
-    def test_macos_exited_owner_is_a_failure_and_never_retried(self):
+    def test_broken_pipe_after_native_close_never_hides_an_abnormal_exit(self):
         session, driver, _ = self.scenario()
         session.transport = "macOS WKWebView bridge"
-        driver.start.side_effect = lambda: setattr(driver, "proc", SimpleNamespace(pid=200, poll=Mock(return_value=9)))
-        session.start.side_effect = ConnectionRefusedError("bridge connection refused")
+        session.execute.side_effect = BrokenPipeError("bridge closed")
+        self.shutdown.side_effect = RuntimeError("QA application did not exit normally (exit 9)")
         with patch("native_application_restart.close_macos_application_window", return_value={"pid": 100}):
-            with self.assertRaisesRegex(RuntimeError, "startup \\(exit 9\\)"):
+            with self.assertRaisesRegex(RuntimeError, "exit 9"):
                 restart_owned_application(driver, session)
-        self.assertEqual(session.start.call_count, 1)
-        self.assertEqual(session.application_restart_observation["stage"], "start-session")
+        driver.start.assert_not_called()
 
-    def test_created_session_does_not_retry_a_refused_transport(self):
+    def test_cleanup_failure_preserves_the_original_close_error(self):
         session, driver, _ = self.scenario()
-        session.transport = "macOS WKWebView bridge"
-        def start():
-            session.session_id = "created"
-            raise ConnectionRefusedError("connection refused after session creation")
-        session.start.side_effect = start
-        with patch("native_application_restart.close_macos_application_window", return_value={"pid": 100}):
-            with self.assertRaises(ConnectionRefusedError):
-                restart_owned_application(driver, session)
-        self.assertEqual(session.start.call_count, 1)
+        session.click.side_effect = BrokenPipeError("original close failure")
+        session.close.side_effect = ConnectionRefusedError("cleanup connection refused")
+        with self.assertRaisesRegex(BrokenPipeError, "original close failure"):
+            restart_owned_application(driver, session)
+        self.assertEqual(session.application_restart_observation["cleanup_errors"], ["cleanup connection refused"])
+        driver.stop.assert_called_once()
+        driver.start.assert_not_called()
 
     def test_reused_session_cannot_claim_a_cold_start(self):
         session, driver, _ = self.scenario()
