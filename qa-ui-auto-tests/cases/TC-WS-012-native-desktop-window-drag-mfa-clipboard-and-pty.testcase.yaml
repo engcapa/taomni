@@ -84,7 +84,7 @@ steps:
 - wait: 2
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
-    regex: (?m)[$#%]\s*$
+    regex: (?m)[$#%>]\s*$
     timeout_sec: 20
 - assert_visible: '[data-testid="workspace-tab"][data-tab-kind="terminal"]'
 - click: '[data-testid="side-tab-sessions"]'
@@ -177,7 +177,7 @@ verification:
     - step: 36
       expectation: 工作区终端面板激活
     - step: 38
-      expectation: 终端出现可交互 Shell 提示符
+      expectation: 终端出现可交互 Shell 提示符（含 Windows PowerShell 的 >）
     - step: 39
       expectation: 工作区标签条含终端标签
     - step: 42
