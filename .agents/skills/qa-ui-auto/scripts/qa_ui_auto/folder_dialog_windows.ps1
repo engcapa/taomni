@@ -2,6 +2,14 @@ $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 Add-Type -AssemblyName System.Windows.Forms
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+public static class QaWindowActivation {
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+}
+"@
 $automation = [System.Windows.Automation.AutomationElement]
 $scope = [System.Windows.Automation.TreeScope]
 $titleCondition = New-Object System.Windows.Automation.PropertyCondition($automation::NameProperty, $env:QA_PICKER_TITLE)
@@ -55,11 +63,29 @@ function Invoke-ChooserButton([string] $id, [string[]] $names, [bool] $waitEnabl
         throw "Chooser button $id has no accessible default action"
     }
 }
+function Activate-Chooser {
+    try {
+        $handle = [IntPtr]$dialog.Current.NativeWindowHandle
+        if ($handle -eq [IntPtr]::Zero) {
+            $owner = Get-Process -Id $pidObserved -ErrorAction SilentlyContinue
+            if ($owner) { $handle = [IntPtr]$owner.MainWindowHandle }
+        }
+        if ($handle -ne [IntPtr]::Zero) {
+            [QaWindowActivation]::ShowWindow($handle, 5) | Out-Null
+            [QaWindowActivation]::SetForegroundWindow($handle) | Out-Null
+        }
+    } catch { }
+    try {
+        $shell = New-Object -ComObject WScript.Shell
+        $shell.AppActivate([int]$pidObserved) | Out-Null
+    } catch { }
+    Start-Sleep -Milliseconds 100
+}
 if ($env:QA_PICKER_ACTION -eq "cancel") {
     try { Invoke-ChooserButton "2" @("Cancel") $false }
     catch {
         [Console]::Error.WriteLine("UIA Cancel unavailable; sending Escape to the owned chooser")
-        $dialog.SetFocus()
+        Activate-Chooser
         [System.Windows.Forms.SendKeys]::SendWait("{ESC}")
     }
 } else {
@@ -75,7 +101,7 @@ if ($env:QA_PICKER_ACTION -eq "cancel") {
         Invoke-ChooserButton "1" @("Open", "Select Folder", "Add", "Choose")
     } catch {
         [Console]::Error.WriteLine("UIA Open unavailable; sending Alt+O to the owned chooser")
-        $dialog.SetFocus()
+        Activate-Chooser
         [System.Windows.Forms.SendKeys]::SendWait("%o")
         [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
     }
@@ -84,7 +110,7 @@ if ($env:QA_PICKER_ACTION -eq "cancel") {
         if (-not $dialog.Current.IsOffscreen) {
             try { Invoke-ChooserButton "1" @("Open", "Select Folder", "Add", "Choose") }
             catch {
-                $dialog.SetFocus()
+                Activate-Chooser
                 [System.Windows.Forms.SendKeys]::SendWait("%o")
                 [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
             }

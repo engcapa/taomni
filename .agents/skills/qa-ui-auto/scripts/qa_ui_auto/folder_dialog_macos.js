@@ -57,7 +57,15 @@ function findPanel() {
       if (window.subrole() === "AXDialog" || window.name() === title) panels.push(window);
     } catch (_) { }
   }
-  const owned = panels.filter((owner) => buttons(owner, "Open").length === 1 && buttons(owner, "Cancel").length === 1);
+  const owned = panels.filter((owner) => {
+    try {
+      return buttons(owner, "Open").length === 1 && buttons(owner, "Cancel").length === 1;
+    } catch (_) {
+      // NSOpenPanel may replace its sheet accessibility node while Go to
+      // Folder is resolving a path. Let the caller retry with a fresh node.
+      return false;
+    }
+  });
   return owned.length === 1 ? owned[0] : null;
 }
 let panel = null;
@@ -78,10 +86,26 @@ if (readEnv("QA_PICKER_ACTION") === "cancel") {
   events.keystroke(path);
   events.keyCode(36);
   log("Go to Folder submitted");
-  delay(0.6);
-  const open = buttons(panel, "Open", true);
-  if (open.length !== 1) throw new Error("Folder chooser Open button unavailable");
-  open[0].click();
+  // The sheet's accessibility node is briefly replaced after Go to Folder.
+  // Re-resolve it and wait for Open; Return is a safe keyboard fallback when
+  // the native button is temporarily absent from the AX tree.
+  let submitted = false;
+  const openDeadline = Date.now() + 10000;
+  while (Date.now() < openDeadline && !submitted) {
+    const currentPanel = findPanel() || panel;
+    try {
+      const open = buttons(currentPanel, "Open", true);
+      if (open.length === 1) {
+        open[0].click();
+        submitted = true;
+        break;
+      }
+    } catch (_) { }
+    events.keyCode(36);
+    delay(0.25);
+    if (!findPanel()) submitted = true;
+  }
+  if (!submitted) throw new Error("Folder chooser Open button unavailable");
 }
 log("chooser action submitted");
 JSON.stringify({ transport: "macOS Accessibility and OS keyboard", pid: process.unixId(), application });
