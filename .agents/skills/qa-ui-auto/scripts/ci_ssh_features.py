@@ -233,7 +233,10 @@ LogLevel DEBUG3
         # product's Windows SSH client may normalize differently. Keep the
         # protocol fixture in Cygwin's canonical /tmp mount and pass that
         # exact POSIX path to the app.
-        remote_posix = f"/tmp/taomni-qa-{private.name}"
+        # Keep the fixture below the account home. Windows' Cygwin sshd and
+        # the native SFTP client agree on this namespace; /tmp can resolve to
+        # different mounts for the Cygwin shell and internal-sftp subsystem.
+        remote_posix = f"/home/{user}/taomni-qa-{private.name}"
         remote_dir = Path(command([binary / "cygpath.exe", "-w", remote_posix]))
         command([binary / "mkdir.exe", "-p", remote_posix])
     else:
