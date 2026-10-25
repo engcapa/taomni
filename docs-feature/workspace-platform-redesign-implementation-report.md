@@ -34,7 +34,7 @@
 
 ### 3.1 单元 / 组件测试
 
-新增 10 个测试文件、56 个用例：
+新增 10 个测试文件、56 个用例（`TC-WS-015` 为 native 端补充用例）：
 
 - `src/stores/__tests__/workspacePlatformStore.test.ts`（UT-WS-01-01 ~ 08）
 - `src/components/sidebar/__tests__/PrimaryNavigationRail.test.tsx`（UT-WS-02-01 ~ 07）
@@ -56,10 +56,10 @@
 
 ### 3.2 Browser / Native 用例
 
-`qa-ui-auto-tests/cases/TC-WS-001` ~ `TC-WS-014`：
+`qa-ui-auto-tests/cases/TC-WS-001` ~ `TC-WS-015`：
 
-- 浏览器：全部 14 条（`TC-WS-012`/`014` 为 native-only）在 Linux/Windows/macOS Chromium 通过。
-- 原生：`TC-WS-001` ~ `012`、`014` 在 Linux WebKitGTK / Windows WebView2 / macOS WKWebView 按平台声明通过；`TC-WS-010` native 限 Linux/Windows（macOS 原生菜单边界），`TC-WS-014` 限 Linux（系统剪贴板独立进程断言）。
+- 浏览器：全部 14 条 browser 用例（`TC-WS-012`/`014` 为 native-only）在 Linux/Windows/macOS Chromium 通过。
+- 原生：`TC-WS-001` ~ `012`、`014`、`015` 在 Linux WebKitGTK / Windows WebView2 / macOS WKWebView 按平台声明通过；`TC-WS-010` native 限 Linux/Windows（macOS 原生菜单边界），`TC-WS-014` 限 Linux（系统剪贴板独立进程断言），`TC-WS-015` 限 Linux/Windows（macOS 合成文本投递不稳定，改由 `TC-WS-012` 验证提示符）。
 - 回归子集：`TC-001/013/014/015/035/036/038/042/053/054/058/062/100/104`、`TC-auto-F-I18n-1`、`TC-auto-F1-5-tab-details-overlay`、`TC-MAIN-RAIL-01/02/03/04`、`TC-IDE-PARITY-027-01`、`TC-IDE-PARITY-027-03`、`TC-064/065`、`TC-MFA-001/101/104` 全部通过。
 - 新增夹具 `platform_workspace_root`：browser 使用 `/preview` 虚拟文件系统，native 使用真实临时目录；已登记到 fixture registry、schema 和权限/能力检查链路。
 - 控件目录：`F-WS-1` ~ `F-WS-6` 已写入 `qa-ui-auto-tests/feature-list.md`；`testid-catalog.md` 已重新生成。
@@ -73,7 +73,19 @@
 | [40135489934](https://github.com/engcapa/taomni/actions/runs/40135489934) | 三端 · browser+native · TC-WS-012 | 通过 |
 | [40139558323](https://github.com/engcapa/taomni/actions/runs/40139558323) | 三端 · browser+native · TC-WS-011/012 | `TC-WS-011` 三端通过；`TC-WS-012` macOS 暴露 WebDriver 聚焦问题 |
 | [40140719840](https://github.com/engcapa/taomni/actions/runs/40140719840) | 三端 · native · TC-WS-012 | Linux/macOS 通过（Windows 同构建，随最终全量回归覆盖） |
-| [40141568491](https://github.com/engcapa/taomni/actions/runs/40141568491) | 三端 · browser+native · 41 条（最终全量） | 见下方“最终全量回归” |
+| [40141568491](https://github.com/engcapa/taomni/actions/runs/40141568491) | 三端 · browser+native · 41 条 | 40/41 通过（仅 macOS `TC-WS-012` 的合成键盘输入不稳定） |
+| [40143830758](https://github.com/engcapa/taomni/actions/runs/40143830758) | 三端 · native · TC-WS-012/015 | `TC-WS-015` Linux/Windows 通过；`TC-WS-012` macOS/Linux 通过 |
+| [40145294238](https://github.com/engcapa/taomni/actions/runs/40145294238) | 三端 · native · TC-WS-012 | 通过（含 Windows PowerShell 提示符） |
+| [40149432172](https://github.com/engcapa/taomni/actions/runs/40149432172) | 三端 · browser+native · 42 条 | 41/42 通过；Linux native `TC-WS-008` 因 WebDriver 将 `_` 输入为 `-` 导致路径不匹配 |
+| [40151860983](https://github.com/engcapa/taomni/actions/runs/40151860983) | 三端 · browser+native · TC-WS-008 | 通过（fixture 目录名与选择器均已修复） |
+| [40153251124](https://github.com/engcapa/taomni/actions/runs/40153251124) | 三端 · browser+native · 42 条（最终全量） | 见下方“最终全量回归” |
+
+### 最终全量回归
+
+- 最终全量运行：[`40153251124`](https://github.com/engcapa/taomni/actions/runs/40153251124)（提交 `docs/workspace-platform-redesign` 最新 HEAD）。
+- 覆盖组合：`linux-browser`、`linux-native`、`windows-browser`、`windows-native`、`macos-browser`、`macos-native`。
+- 选中的 42 条用例包含 15 条重构用例（`TC-WS-001` ~ `TC-WS-015`）与 27 条既有 browser/native 回归用例；每条用例在其声明的平台与模式下通过，平台/模式不适用时由用例的 `modes` / `native_platforms` 声明排除，而不是执行失败。
+- Windows 原生构建曾在一次运行中因 QA 工具自身的临时文件锁单测失败（`test_native_fixture_cleanup`，与本变更无关），重跑后通过；最终运行不再包含该基础设施错误。
 
 ### 3.4 未验证 / 边界
 
