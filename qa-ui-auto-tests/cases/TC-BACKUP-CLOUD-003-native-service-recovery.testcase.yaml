@@ -24,6 +24,14 @@ steps:
     timeout_sec: 60
 - click: '[data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-general"]'
+- wait_for: '[data-testid="settings-language-en"]'
+- click: '[data-testid="settings-language-en"]'
+- assert_attribute:
+    selector: html
+    name: lang
+    equals: en
+- click: '[data-testid="settings-group-toggle-general"]'
 - click: '[data-testid="settings-group-toggle-backup"]'
 - wait_for: '[data-testid="backup-selected-start"]:not([disabled])'
 - click: '[data-testid="backup-selected-start"]'
@@ -77,43 +85,43 @@ verification:
   - id: R1
     requirement: Expired access token refreshes once and transient failure creates a persisted automatic retry.
     actions:
-    - 7
-    - 11
     - 12
+    - 16
+    - 17
     checkpoints:
-    - step: 9
-      expectation: Real HTTP refresh reaches the fixture
-    - step: 13
-      expectation: Retry state survives panel remount
     - step: 14
+      expectation: Real HTTP refresh reaches the fixture
+    - step: 18
+      expectation: Retry state survives panel remount
+    - step: 19
       expectation: Scheduler completes the encrypted upload without manual retry
-    - step: 15
+    - step: 20
       expectation: Fixture receives encrypted archive bytes
-    - step: 16
+    - step: 21
       expectation: Native provider downloads bytes for integrity verification
     results:
-    - 9
-    - 13
     - 14
-    - 15
-    - 16
+    - 18
+    - 19
+    - 20
+    - 21
   - id: R2
     requirement: Cleanup preserves unfinished data and permanent refresh rejection disables cloud actions.
     actions:
-    - 17
-    - 20
-    - 21
+    - 22
+    - 25
+    - 26
     checkpoints:
-    - step: 19
+    - step: 24
       expectation: Unfinished task remains resumable
-    - step: 22
+    - step: 27
       expectation: Real refresh receives invalid_grant
-    - step: 23
+    - step: 28
       expectation: Upload disabled after authorization invalidation
-    - step: 25
+    - step: 30
       expectation: Reauthorization remains available
     results:
-    - 19
-    - 22
-    - 23
-    - 25
+    - 24
+    - 27
+    - 28
+    - 30

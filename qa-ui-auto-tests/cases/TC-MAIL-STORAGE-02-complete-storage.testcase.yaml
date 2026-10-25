@@ -149,6 +149,7 @@ steps:
       Archive: 2
 - click: '[data-testid="ribbon-settings"]'
 - click: '[data-testid="settings-group-toggle-backup"]'
+- wait_for: '[data-testid="backup-global-include-mail"]'
 - set_check:
     selector: '[data-testid="backup-global-include-mail"]'
     checked: true
@@ -339,22 +340,22 @@ verification:
     - 51
     - 53
     - 54
-    - 55
     - 56
-    - 59
-    - 62
+    - 57
+    - 60
     - 63
     - 64
-    - 67
-    - 69
+    - 65
+    - 68
     - 70
     - 71
     - 72
     - 73
     - 74
-    - 76
+    - 75
     - 77
-    - 81
+    - 78
+    - 82
     - 49
     checkpoints:
     - step: 43
@@ -370,30 +371,30 @@ verification:
     - step: 52
       expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_b}'', ''expected'': ''${fixture.mail_expected}'',
         ''full'': {''INBOX'': 2}, ''headers'': {''INBOX'': 0, ''Archive'': 2}}}'
-    - step: 58
+    - step: 59
       expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_qa_data}/backups'', ''expected'': ''${fixture.mail_expected}'',
         ''kind'': ''backup'', ''include_mail'': True, ''objects'': 2}}'
-    - step: 61
+    - step: 62
       expectation: '{''assert_text'': {''selector'': ''[data-testid="backup-restore-files"]'', ''contains'': ''.eml.gz'',
         ''timeout_sec'': 30}}'
-    - step: 66
+    - step: 67
       expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_qa_data}/backups'', ''expected'': ''${fixture.mail_expected}'',
         ''kind'': ''backup'', ''include_mail'': False, ''objects'': 0}}'
-    - step: 68
+    - step: 69
       expectation: '{''assert_file_contains'': {''path'': ''${fixture.mail_qa_data}/backup_policy.json'', ''contains'':
         ''"includeMail": true''}}'
-    - step: 75
+    - step: 76
       expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_b}'', ''expected'': ''${fixture.mail_expected}'',
         ''full'': {''INBOX'': 2}, ''headers'': {''Archive'': 2}}}'
-    - step: 78
+    - step: 79
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-notice"]'', ''contains'': ''Removed
         2 local originals'', ''timeout_sec'': 30}}'
-    - step: 79
-      expectation: '{''assert_count'': {''selector'': ''[data-testid="mail-archive-row"]'', ''equal'': 0}}'
     - step: 80
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="mail-archive-row"]'', ''equal'': 0}}'
+    - step: 81
       expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_b}'', ''expected'': ''${fixture.mail_expected}'',
         ''full'': {}, ''headers'': {''Archive'': 2}}}'
-    - step: 82
+    - step: 83
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'': ''paused'',
         ''timeout_sec'': 30}}'
     results:
@@ -402,15 +403,15 @@ verification:
     - 48
     - 50
     - 52
-    - 58
-    - 61
-    - 66
-    - 68
-    - 75
-    - 78
+    - 59
+    - 62
+    - 67
+    - 69
+    - 76
     - 79
     - 80
-    - 82
+    - 81
+    - 83
   - id: R3
     requirement: A new unconnected session has no discovered folders and explains how to populate the local cache;
       manual exact names remain supported by the main flow.
@@ -428,46 +429,46 @@ verification:
     requirement: After syncing, encoded IMAP names display decoded labels; selected exact server keys persist when
       saved and reopened, and survive switching include/exclude mode.
     actions:
-    - 84
     - 85
     - 86
-    - 88
+    - 87
     - 89
-    - 91
+    - 90
     - 92
-    - 94
-    - 96
-    - 98
-    - 100
-    - 101
-    - 102
-    - 105
-    - 110
-    checkpoints:
-    - step: 95
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-settings"]'', ''contains'': ''Folders
-        from the last sync; available offline''}}'
-    - step: 97
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'', ''name'':
-        ''value'', ''equals'': ''&U,BTFw-''}}'
-    - step: 103
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folders"] input[aria-label="台北"]'',
-        ''name'': ''value'', ''equals'': ''&U,BTFw-''}}'
-    - step: 104
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'', ''name'':
-        ''value'', ''equals'': ''&U,BTFw-''}}'
-    - step: 106
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'', ''name'':
-        ''value'', ''equals'': ''&U,BTFw-''}}'
-    - step: 111
-      expectation: Settings close normally after inspecting cached folder selections.
-    results:
+    - 93
     - 95
     - 97
+    - 99
+    - 101
+    - 102
     - 103
-    - 104
     - 106
     - 111
+    checkpoints:
+    - step: 96
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-settings"]'', ''contains'': ''Folders
+        from the last sync; available offline''}}'
+    - step: 98
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'', ''name'':
+        ''value'', ''equals'': ''&U,BTFw-''}}'
+    - step: 104
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folders"] input[aria-label="台北"]'',
+        ''name'': ''value'', ''equals'': ''&U,BTFw-''}}'
+    - step: 105
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'', ''name'':
+        ''value'', ''equals'': ''&U,BTFw-''}}'
+    - step: 107
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'', ''name'':
+        ''value'', ''equals'': ''&U,BTFw-''}}'
+    - step: 112
+      expectation: Settings close normally after inspecting cached folder selections.
+    results:
+    - 96
+    - 98
+    - 104
+    - 105
+    - 107
+    - 112
   visual:
   - check: Storage settings, progress and archive list remain readable without clipping.
     method: manual

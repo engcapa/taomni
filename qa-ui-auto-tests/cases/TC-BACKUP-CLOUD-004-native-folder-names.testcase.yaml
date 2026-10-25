@@ -22,6 +22,14 @@ steps:
     timeout_sec: 60
 - click: '[data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-general"]'
+- wait_for: '[data-testid="settings-language-en"]'
+- click: '[data-testid="settings-language-en"]'
+- assert_attribute:
+    selector: html
+    name: lang
+    equals: en
+- click: '[data-testid="settings-group-toggle-general"]'
 - click: '[data-testid="settings-group-toggle-backup"]'
 - wait_for: '[data-testid="backup-selected-start"]:not([disabled])'
 - click: '[data-testid="backup-selected-start"]'
@@ -84,41 +92,41 @@ verification:
   - id: R1
     requirement: Legacy UUID folders are renamed without replacing their cloud tokens.
     actions:
-    - 7
+    - 12
     checkpoints:
-    - step: 8
+    - step: 13
       expectation: Initial encrypted upload completed
-    - step: 9
+    - step: 14
       expectation: Original device folder token receives a readable title
-    - step: 10
+    - step: 15
       expectation: Original destination folder token receives a readable title
     results:
-    - 8
-    - 9
-    - 10
+    - 13
+    - 14
+    - 15
   - id: R2
     requirement: Editing names updates the original folders and preserves the backup file identity.
     actions:
-    - 12
-    - 13
-    - 15
-    - 16
+    - 17
     - 18
-    - 22
-    checkpoints:
-    - step: 19
-      expectation: Second upload reused the original archive token
-    - step: 20
-      expectation: Device rename reused its folder token
-    - step: 21
-      expectation: Destination rename reused its folder token
-    - step: 24
-      expectation: Restore row displays the source name
-    - step: 25
-      expectation: Restore row displays the destination name
-    results:
-    - 19
     - 20
     - 21
+    - 23
+    - 27
+    checkpoints:
+    - step: 24
+      expectation: Second upload reused the original archive token
+    - step: 25
+      expectation: Device rename reused its folder token
+    - step: 26
+      expectation: Destination rename reused its folder token
+    - step: 29
+      expectation: Restore row displays the source name
+    - step: 30
+      expectation: Restore row displays the destination name
+    results:
     - 24
     - 25
+    - 26
+    - 29
+    - 30

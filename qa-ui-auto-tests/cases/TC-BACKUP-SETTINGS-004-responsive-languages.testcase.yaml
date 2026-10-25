@@ -50,9 +50,12 @@ steps:
     selector: html
     name: data-app-theme
     equals: dark
+- click: '[data-testid="settings-language-zh-CN"]'
 - click: '[data-testid="settings-group-toggle-general"]'
-- click: '[data-testid="language-switcher"]'
-- click: '[data-testid="language-option-zh-CN"]'
+- assert_attribute:
+    selector: html
+    name: lang
+    equals: zh-CN
 - set_viewport:
     width: 600
     height: 1000
@@ -107,10 +110,12 @@ verification:
     results: [9, 13]
   - id: R2
     requirement: Narrow Chinese dark layout has no global-section overflow and inheritance retains the global full scope
-    actions: [15, 16, 18, 19, 20, 21, 26, 27]
+    actions: [15, 16, 18, 19, 21, 26, 27]
     checkpoints:
     - step: 17
       expectation: Dark theme is active
+    - step: 20
+      expectation: Chinese is active through the language control in Settings
     - step: 22
       expectation: Section follows the selected language
     - step: 23
@@ -119,4 +124,4 @@ verification:
       expectation: Global section remains inside the viewport
     - step: 28
       expectation: Channel range editing does not reset the global full scope
-    results: [17, 22, 23, 24, 28]
+    results: [17, 20, 22, 23, 24, 28]

@@ -22,6 +22,14 @@ steps:
     timeout_sec: 60
 - click: '[data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-general"]'
+- wait_for: '[data-testid="settings-language-en"]'
+- click: '[data-testid="settings-language-en"]'
+- assert_attribute:
+    selector: html
+    name: lang
+    equals: en
+- click: '[data-testid="settings-group-toggle-general"]'
 - click: '[data-testid="settings-group-toggle-backup"]'
 - wait_for: '[data-testid="backup-global-scope"]'
 - click: '[data-testid="backup-feishu-add"]'
@@ -122,53 +130,53 @@ verification:
   - id: R1
     requirement: Targets retain names, separate proxy modes and inherited scope after reopening
     actions:
-    - 7
-    - 9
-    - 13
+    - 12
+    - 14
     - 18
+    - 23
     checkpoints:
-    - step: 12
+    - step: 17
       expectation: noSecrets
-    - step: 21
-      expectation: name1
-    - step: 22
-      expectation: proxy1Saved
-    - step: 24
-      expectation: name2
-    - step: 25
-      expectation: proxy2Saved
-    - step: 23
-      expectation: inherit1
     - step: 26
-      expectation: inherit2
+      expectation: name1
     - step: 27
+      expectation: proxy1Saved
+    - step: 29
+      expectation: name2
+    - step: 30
+      expectation: proxy2Saved
+    - step: 28
+      expectation: inherit1
+    - step: 31
+      expectation: inherit2
+    - step: 32
       expectation: emptyRoot
     results:
-    - 12
-    - 21
-    - 22
-    - 24
-    - 25
-    - 23
+    - 17
     - 26
     - 27
+    - 29
+    - 30
+    - 28
+    - 31
+    - 32
   - id: R2
     requirement: Independent password enables a destination and controls translate live
     actions:
-    - 29
-    - 31
     - 34
+    - 36
+    - 39
     checkpoints:
-    - step: 30
-      expectation: passwordSaved
-    - step: 32
-      expectation: enabledSaved
     - step: 35
+      expectation: passwordSaved
+    - step: 37
+      expectation: enabledSaved
+    - step: 40
       expectation: translated
-    - step: 39
+    - step: 44
       expectation: en
     results:
-    - 30
-    - 32
     - 35
-    - 39
+    - 37
+    - 40
+    - 44

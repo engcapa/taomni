@@ -24,6 +24,14 @@ steps:
     timeout_sec: 60
 - click: '[data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-general"]'
+- wait_for: '[data-testid="settings-language-en"]'
+- click: '[data-testid="settings-language-en"]'
+- assert_attribute:
+    selector: html
+    name: lang
+    equals: en
+- click: '[data-testid="settings-group-toggle-general"]'
 - click: '[data-testid="settings-group-toggle-backup"]'
 - wait_for: '[data-testid="backup-retry-notice"]'
 - assert_text:
@@ -85,53 +93,53 @@ verification:
   - id: R1
     requirement: Cancel a waiting retry and restore the cancelled state on reopening.
     actions:
-    - 8
-    - 10
-    - 11
+    - 13
+    - 15
+    - 16
     checkpoints:
-    - step: 12
+    - step: 17
       expectation: Cancelled task persists
-    - step: 13
+    - step: 18
       expectation: Retry countdown is absent
     results:
-    - 12
-    - 13
+    - 17
+    - 18
   - id: R2
     requirement: Explicit discard and completed-cache cleanup preserve other unfinished tasks.
     actions:
-    - 14
-    - 16
     - 19
+    - 21
+    - 24
     checkpoints:
-    - step: 17
-      expectation: Discarded task is terminal
-    - step: 21
-      expectation: Cleared completed archive no longer offers restore
     - step: 22
+      expectation: Discarded task is terminal
+    - step: 26
+      expectation: Cleared completed archive no longer offers restore
+    - step: 27
       expectation: Other unfinished task remains resumable
     results:
-    - 17
-    - 21
     - 22
+    - 26
+    - 27
   - id: R3
     requirement: Registration restart requires acknowledgement and all recovery controls follow language changes.
     actions:
-    - 26
-    - 28
-    - 29
+    - 31
     - 33
     - 34
+    - 38
+    - 39
     checkpoints:
-    - step: 25
-      expectation: Restart disabled before acknowledgement
-    - step: 27
-      expectation: Restart available after acknowledgement
     - step: 30
-      expectation: Recovery action translated to Chinese
+      expectation: Restart disabled before acknowledgement
+    - step: 32
+      expectation: Restart available after acknowledgement
     - step: 35
+      expectation: Recovery action translated to Chinese
+    - step: 40
       expectation: Recovery action translated back to English
     results:
-    - 25
-    - 27
     - 30
+    - 32
     - 35
+    - 40
