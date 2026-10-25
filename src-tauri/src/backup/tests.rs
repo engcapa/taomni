@@ -369,6 +369,7 @@ fn test_scope_flags_include_mfa_with_its_vault_key() {
         include_mail: false,
         include_local_history: false,
         include_mfa: true,
+        ..Default::default()
     };
     let flags = resolve_scope_flags("custom", Some(mfa_only));
     assert!(

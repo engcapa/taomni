@@ -1,7 +1,7 @@
 id: TC-BACKUP-SETTINGS-003
 title: Failed settings writes preserve drafts and block manual backup until retry
-description: Explicit browser fault model fails one settings patch; the production settings queue and controls must
-  retain full data through remount and only execute after successful persistence. Native write errors are covered
+description: Explicit browser fault model fails one settings patch; the production settings queue and controls must retain
+  selected mail categories through remount and only execute after successful persistence. Native write errors are covered
   by backend units.
 covers:
 - F-BACKUP-1
@@ -24,15 +24,15 @@ steps:
 - click: '[data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - click: '[data-testid="settings-group-toggle-backup"]'
-- wait_for: '[data-testid="backup-global-scope"]'
-- select_option:
-    selector: '[data-testid="backup-global-scope"]'
-    value: full
+- wait_for: '[data-testid="backup-global-categories"]'
+- set_check:
+    selector: '[data-testid="backup-global-include-mail"]'
+    checked: true
 - wait_for: '[data-testid="backup-settings-retry"]'
 - assert_attribute:
-    selector: '[data-testid="backup-global-scope"]'
-    name: value
-    equals: full
+    selector: '[data-testid="backup-global-include-mail"]'
+    name: aria-checked
+    equals: 'true'
 - assert_attribute:
     selector: '[data-testid="backup-selected-start"]'
     name: disabled
@@ -40,9 +40,9 @@ steps:
 - click: '[data-testid="settings-group-toggle-backup"]'
 - click: '[data-testid="settings-group-toggle-backup"]'
 - assert_attribute:
-    selector: '[data-testid="backup-global-scope"]'
-    name: value
-    equals: full
+    selector: '[data-testid="backup-global-include-mail"]'
+    name: aria-checked
+    equals: 'true'
 - click: '[data-testid="app-main-menu"]'
 - click: '[data-testid="context-menu-item-exit"]'
 - wait_for: '[data-testid="confirm-dialog"]'
@@ -53,9 +53,9 @@ steps:
 - click: '[data-testid="confirm-dialog-cancel"]'
 - assert_not_visible: '[data-testid="confirm-dialog"]'
 - assert_attribute:
-    selector: '[data-testid="backup-global-scope"]'
-    name: value
-    equals: full
+    selector: '[data-testid="backup-global-include-mail"]'
+    name: aria-checked
+    equals: 'true'
 - click: '[data-testid="backup-settings-retry"]'
 - assert_text:
     selector: '[data-testid="backup-settings-save-status"]'
@@ -65,7 +65,7 @@ steps:
 - click: '[data-testid="backup-selected-start"]'
 - wait_for: '[data-testid="backup-action-success"]'
 - eval_readonly:
-    expression: JSON.parse(localStorage.getItem("taomni.qa.backup.lastManual")).range.scope === "full"
+    expression: JSON.parse(localStorage.getItem("taomni.qa.backup.lastManual")).range.scope === "custom" && JSON.parse(localStorage.getItem("taomni.qa.backup.lastManual")).range.customOptions.includeMailOriginals
     expect_truthy: true
 - screenshot: backup-settings-save-recovery.png
 verification:
@@ -76,7 +76,7 @@ verification:
     reason: Browser deliberately injects one IPC failure; Rust persistence errors have focused unit tests.
   requirements:
   - id: R1
-    requirement: Failed full-data draft survives remount and blocks execution
+    requirement: Failed mail category draft survives remount and blocks execution
     actions:
     - 7
     - 11
@@ -87,7 +87,7 @@ verification:
     - 19
     checkpoints:
     - step: 9
-      expectation: Full remains selected
+      expectation: Mail remains selected
     - step: 10
       expectation: Execution disabled
     - step: 13
@@ -95,7 +95,7 @@ verification:
     - step: 18
       expectation: Exit reports unsaved backup settings
     - step: 21
-      expectation: Cancelling exit keeps the full-data draft visible
+      expectation: Cancelling exit keeps the mail category draft visible
     results:
     - 9
     - 10

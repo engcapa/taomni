@@ -69,7 +69,7 @@ tracing-subscriber = "0.3"
 log = "0.4"
 portable-pty = "0.9"
 base64 = "0.22"
-rusqlite = { version = "0.40", features = ["bundled"] }
+rusqlite = { version = "0.40", features = ["bundled", "hooks"] }
 chrono = "0.4"
 russh = { version = "0.61", features = ["async-trait", "flate2"] }
 russh-sftp = "2.3"

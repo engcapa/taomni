@@ -23,7 +23,7 @@ steps:
 - click: '[data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - click: '[data-testid="settings-group-toggle-backup"]'
-- wait_for: '[data-testid="backup-global-scope"]'
+- wait_for: '[data-testid="backup-global-categories"]'
 - wait_for: '[data-testid="backup-feishu-session"][data-phase="awaiting_authorization"]'
 - click: '[data-testid="backup-feishu-add"]'
 - assert_count:

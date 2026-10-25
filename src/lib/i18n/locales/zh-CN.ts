@@ -7,6 +7,11 @@ type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } 
 
 export const zhCN: DeepPartial<typeof en> = {
   backupUnified: {
+    "categories": "备份分类",
+    "mailCache": "邮件列表、设置与缓存",
+    "includeMailOriginals": "完整邮件原件",
+    "includeMailAttachments": "已下载附件",
+    "includeServerCertificates": "服务端证书与密钥",
     "unsavedTitle": "备份设置尚未保存",
     "unsavedExit": "备份设置保存失败，Taomni 已保持打开。请重试保存，或取消退出后检查设置。",
     "introduction": "统一管理备份范围、自动备份渠道和手工备份。",
@@ -19,7 +24,7 @@ export const zhCN: DeepPartial<typeof en> = {
     "core": "核心数据",
     "full": "完整数据",
     "custom": "自定义选择",
-    "includeSessions": "会话与服务器密钥",
+    "includeSessions": "会话",
     "includeNotes": "笔记",
     "includeVault": "凭据保险库",
     "includeMfa": "MFA 账户",
@@ -28,7 +33,7 @@ export const zhCN: DeepPartial<typeof en> = {
     "includeMail": "邮件",
     "includeLocalHistory": "本地文件历史",
     "emptyRange": "未选择数据",
-    "rangeHint": "完整数据在核心数据上增加局域网聊天和邮件。本地文件历史需自定义勾选；包含 MFA 账户时也会包含凭据保险库。",
+    "rangeHint": "完整邮件原件包含原文内的附件；已下载附件指单独保存的附件缓存。两者均需要邮件列表与缓存。MFA 账户需要同时包含凭据保险库。",
     "loading": "正在加载配置…",
     "saving": "正在保存…",
     "saved": "已保存",
@@ -3564,6 +3569,10 @@ export const zhCN: DeepPartial<typeof en> = {
     "historyNotice": "在飞书网页选择并恢复历史版本，然后回此页重新下载。本机已暂停上传；若是其他设备的备份，请暂停源设备上传，避免再次覆盖。",
     "errorDetails": "技术详情",
     "phases": {
+      "cancelling": "正在取消",
+      "encrypting": "正在加密",
+      "packing": "正在打包",
+      "snapshotting": "正在复制数据",
       "retrying": "服务暂时失败，正在重试",
       "retry_wait": "等待自动重试",
       "discarded": "已丢弃本地任务",

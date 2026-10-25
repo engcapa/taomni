@@ -277,13 +277,11 @@ pub async fn backup_run_manual(
     let range = range::global(&policy);
     range.validate()?;
     if let ManualDestination::File { path, password } = request.destination {
-        let result =
-            super::backup_create(app, range.scope, range.custom_options, Some(path), password)
-                .await?;
+        let id = super::local_jobs::start(&app, range.source(), Some(path), password, None)?;
         return Ok(vec![DestinationResult {
             target_id: "local".into(),
-            job_id: None,
-            local_path: Some(result.file_path),
+            job_id: Some(id),
+            local_path: None,
             error: None,
         }]);
     }
@@ -335,20 +333,14 @@ pub async fn backup_run_manual(
     let mut results = Vec::new();
     for id in config.selected_target_ids {
         let outcome = if id == "local" {
-            super::backup_create(
-                app.clone(),
-                range.scope.clone(),
-                range.custom_options.clone(),
-                None,
-                local_password.clone(),
+            super::local_jobs::start(&app, range.source(), None, local_password.clone(), None).map(
+                |job| DestinationResult {
+                    target_id: id.clone(),
+                    job_id: Some(job),
+                    local_path: None,
+                    error: None,
+                },
             )
-            .await
-            .map(|r| DestinationResult {
-                target_id: id.clone(),
-                job_id: None,
-                local_path: Some(r.file_path),
-                error: None,
-            })
         } else {
             jobs::start_manual(&app, &id, range.source()).map(|job| DestinationResult {
                 target_id: id.clone(),

@@ -158,6 +158,14 @@ impl LanChatState {
         self.store.backup_to(dest_path)
     }
 
+    pub(crate) fn backup_to_with_context(
+        &self,
+        dest_path: &Path,
+        context: &crate::backup::snapshot_context::SnapshotContext,
+    ) -> Result<(), String> {
+        self.store.backup_to_with_context(dest_path, context)
+    }
+
     /// This node's stable id.
     pub async fn node_id(&self) -> String {
         self.node_id.read().await.clone()

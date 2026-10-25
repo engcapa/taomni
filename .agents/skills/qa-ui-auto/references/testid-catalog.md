@@ -2306,7 +2306,6 @@
 
 ## settings/backup (F-BACKUP-1)
 
-- `[data-testid="backup-global-scope"]` — interactive — F-BACKUP-1.backup-global-scope
 - `[data-testid="backup-global-include-mail"]` — interactive — F-BACKUP-1.backup-global-include-mail
 - `[data-testid="backup-auto-enabled"]` — interactive — F-BACKUP-1.auto-toggle
 - `[data-testid="backup-auto-frequency"]` — interactive — F-BACKUP-1.frequency
@@ -2317,7 +2316,6 @@
 - `[data-testid="backup-settings-save-status"]` — display — F-BACKUP-1.save-status
 - `[data-testid="backup-local-destination"] > summary` — interactive — F-BACKUP-1.local-expand
 - `[data-testid="backup-local-range-mode"]` — interactive — F-BACKUP-1.local-range
-- `[data-testid="backup-local-scope"]` — interactive — F-BACKUP-1.local-scope
 - `[data-testid="backup-local-select"]` — interactive — F-BACKUP-1.local-select
 - `[data-testid="backup-global-includeLocalHistory"]` — interactive — F-BACKUP-1.global-history
 - `[data-testid="backup-global-includeVault"]` — interactive — F-BACKUP-1.global-vault
@@ -2329,6 +2327,31 @@
   ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-range-summary"]` — alias
   ↳ `[data-testid="backup-manual"] [data-testid="backup-range-summary"]` — alias
 - `[data-testid="backup-settings-retry"]` — interactive — F-BACKUP-1.save-retry
+- `[data-testid="backup-global-categories"]` — display — F-BACKUP-1.backup-global-categories
+- `[data-testid="backup-global-includeSessions"]` — interactive — F-BACKUP-1.backup-global-includeSessions
+- `[data-testid="backup-global-includeNotes"]` — interactive — F-BACKUP-1.backup-global-includeNotes
+- `[data-testid="backup-global-includeMfa"]` — interactive — F-BACKUP-1.backup-global-includeMfa
+- `[data-testid="backup-global-includeConfigs"]` — interactive — F-BACKUP-1.backup-global-includeConfigs
+- `[data-testid="backup-global-includeServerCertificates"]` — interactive — F-BACKUP-1.backup-global-includeServerCertificates
+- `[data-testid="backup-global-includeLanchat"]` — interactive — F-BACKUP-1.backup-global-includeLanchat
+- `[data-testid="backup-global-includeMail"]` — interactive — F-BACKUP-1.backup-global-includeMail
+- `[data-testid="backup-global-includeMailOriginals"]` — interactive — F-BACKUP-1.backup-global-includeMailOriginals
+- `[data-testid="backup-global-includeMailAttachments"]` — interactive — F-BACKUP-1.backup-global-includeMailAttachments
+- `[data-testid="backup-local-categories"]` — display — F-BACKUP-1.backup-local-categories
+- `[data-testid="backup-local-include-mail"]` — interactive — F-BACKUP-1.backup-local-include-mail
+- `[data-testid="backup-local-includeSessions"]` — interactive — F-BACKUP-1.backup-local-includeSessions
+- `[data-testid="backup-local-includeNotes"]` — interactive — F-BACKUP-1.backup-local-includeNotes
+- `[data-testid="backup-local-includeVault"]` — interactive — F-BACKUP-1.backup-local-includeVault
+- `[data-testid="backup-local-includeMfa"]` — interactive — F-BACKUP-1.backup-local-includeMfa
+- `[data-testid="backup-local-includeConfigs"]` — interactive — F-BACKUP-1.backup-local-includeConfigs
+- `[data-testid="backup-local-includeServerCertificates"]` — interactive — F-BACKUP-1.backup-local-includeServerCertificates
+- `[data-testid="backup-local-includeLanchat"]` — interactive — F-BACKUP-1.backup-local-includeLanchat
+- `[data-testid="backup-local-includeLocalHistory"]` — interactive — F-BACKUP-1.backup-local-includeLocalHistory
+- `[data-testid="backup-local-includeMail"]` — interactive — F-BACKUP-1.backup-local-includeMail
+- `[data-testid="backup-local-includeMailOriginals"]` — interactive — F-BACKUP-1.backup-local-includeMailOriginals
+- `[data-testid="backup-local-includeMailAttachments"]` — interactive — F-BACKUP-1.backup-local-includeMailAttachments
+- `[data-testid="backup-local-restore"]` — interactive — F-BACKUP-1.local-completed-restore
+- `[data-testid="backup-destination-select"]` — interactive — F-BACKUP-1.destination-select
 
 ## settings/backup (F-BACKUP-2)
 
@@ -2375,9 +2398,6 @@
 - `[data-testid="backup-cloud-range-mode"]` — interactive — F-BACKUP-2.cloud-range-mode
   ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-range-mode"]` — alias
   ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-range-mode"]` — alias
-- `[data-testid="backup-cloud-scope"]` — interactive — F-BACKUP-2.cloud-scope
-  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-scope"]` — alias
-  ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-scope"]` — alias
 - `[data-testid="backup-cloud-password"]` — interactive — F-BACKUP-2.cloud-password
   ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-password"]` — alias
   ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-password"]` — alias
@@ -2390,6 +2410,18 @@
 - `[data-testid="backup-authorization-forget"]` — interactive — F-BACKUP-2.authorization-forget
 - `[data-testid="backup-device-settings"] > summary` — interactive — F-BACKUP-2.device-settings
 - `[data-testid="backup-cloud-destination"]` — display — F-BACKUP-2.destination
+- `[data-testid="backup-cloud-categories"]` — display — F-BACKUP-2.backup-cloud-categories
+- `[data-testid="backup-cloud-includeSessions"]` — interactive — F-BACKUP-2.backup-cloud-includeSessions
+- `[data-testid="backup-cloud-includeNotes"]` — interactive — F-BACKUP-2.backup-cloud-includeNotes
+- `[data-testid="backup-cloud-includeVault"]` — interactive — F-BACKUP-2.backup-cloud-includeVault
+- `[data-testid="backup-cloud-includeMfa"]` — interactive — F-BACKUP-2.backup-cloud-includeMfa
+- `[data-testid="backup-cloud-includeConfigs"]` — interactive — F-BACKUP-2.backup-cloud-includeConfigs
+- `[data-testid="backup-cloud-includeServerCertificates"]` — interactive — F-BACKUP-2.backup-cloud-includeServerCertificates
+- `[data-testid="backup-cloud-includeLanchat"]` — interactive — F-BACKUP-2.backup-cloud-includeLanchat
+- `[data-testid="backup-cloud-includeLocalHistory"]` — interactive — F-BACKUP-2.backup-cloud-includeLocalHistory
+- `[data-testid="backup-cloud-includeMail"]` — interactive — F-BACKUP-2.backup-cloud-includeMail
+- `[data-testid="backup-cloud-includeMailOriginals"]` — interactive — F-BACKUP-2.backup-cloud-includeMailOriginals
+- `[data-testid="backup-cloud-includeMailAttachments"]` — interactive — F-BACKUP-2.backup-cloud-includeMailAttachments
 
 ## settings/backup (F-MFA-3)
 

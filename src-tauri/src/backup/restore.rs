@@ -26,7 +26,12 @@ struct RestoreIntent {
 
 /// New archives and V2 encryption are streamed through files, independent of
 /// mailbox size. V1 remains readable with its original 1 GiB format limit.
-fn archive_file(path: &Path, password: Option<&str>) -> Result<File, String> {
+fn archive_file(
+    path: &Path,
+    password: Option<&str>,
+    context: &super::snapshot_context::SnapshotContext,
+) -> Result<File, String> {
+    context.check()?;
     let mut file = File::open(path).map_err(|e| e.to_string())?;
     let mut magic = [0u8; 13];
     let n = file.read(&mut magic).map_err(|e| e.to_string())?;
@@ -40,7 +45,7 @@ fn archive_file(path: &Path, password: Option<&str>) -> Result<File, String> {
     }
     let mut decoded = tempfile::tempfile().map_err(|e| e.to_string())?;
     if &magic == super::crypto::BACKUP_ENC_STREAM_MAGIC {
-        super::crypto::decrypt_stream(file, password, &mut decoded)?;
+        super::crypto::decrypt_stream(context.reader(file), password, &mut decoded)?;
     } else {
         if file.metadata().map_err(|e| e.to_string())?.len() > 1024 * 1024 * 1024 {
             return Err("Legacy encrypted backup exceeds 1 GiB".into());
@@ -145,16 +150,17 @@ fn destination(app_data: &Path, name: &str) -> Result<PathBuf, String> {
     Ok(target)
 }
 
-fn verified_archive(
+fn verified_archive_with_context(
     path: &Path,
     password: Option<&str>,
+    context: &super::snapshot_context::SnapshotContext,
 ) -> Result<(BackupManifest, ZipArchive<File>), String> {
     if std::fs::metadata(path).map_err(|e| e.to_string())?.len() > MAX_ARCHIVE_BYTES {
         return Err("Archive exceeds the supported 1 TiB limit".into());
     }
     let encrypted =
         super::crypto::is_encrypted_stream(File::open(path).map_err(|e| e.to_string())?);
-    let mut archive = ZipArchive::new(archive_file(path, password)?)
+    let mut archive = ZipArchive::new(archive_file(path, password, context)?)
         .map_err(|e| format!("Invalid archive: {e}"))?;
     if archive.len() > 1_000_000 {
         return Err("Too many archive entries".into());
@@ -202,6 +208,7 @@ fn verified_archive(
     }
     let mut seen = std::collections::HashSet::new();
     for i in 0..archive.len() {
+        context.check()?;
         let mut file = archive.by_index(i).map_err(|e| e.to_string())?;
         let name = file.name().to_owned();
         if !seen.insert(name.to_lowercase()) {
@@ -225,7 +232,9 @@ fn verified_archive(
         let mut buffer = [0u8; 65536];
         let mut length = 0u64;
         loop {
+            context.check()?;
             let n = file.read(&mut buffer).map_err(|e| e.to_string())?;
+            context.advance(n as u64).map_err(|e| e.to_string())?;
             if n == 0 {
                 break;
             }
@@ -243,6 +252,26 @@ fn verified_archive(
         return Err("Archive is missing a manifest entry".into());
     }
     Ok((manifest, archive))
+}
+
+fn verified_archive(
+    path: &Path,
+    password: Option<&str>,
+) -> Result<(BackupManifest, ZipArchive<File>), String> {
+    verified_archive_with_context(
+        path,
+        password,
+        &super::snapshot_context::SnapshotContext::default(),
+    )
+}
+
+pub(crate) fn inspect_archive_with_context(
+    path: &Path,
+    password: Option<&str>,
+    context: &super::snapshot_context::SnapshotContext,
+) -> Result<BackupManifest, String> {
+    context.begin("verifying", None)?;
+    verified_archive_with_context(path, password, context).map(|(manifest, _)| manifest)
 }
 
 pub fn inspect_archive(path: &Path, password: Option<&str>) -> Result<BackupManifest, String> {

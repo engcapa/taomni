@@ -23,13 +23,13 @@ steps:
 - click: '[data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - click: '[data-testid="settings-group-toggle-backup"]'
-- wait_for: '[data-testid="backup-global-scope"]'
+- wait_for: '[data-testid="backup-global-categories"]'
 - set_viewport:
     width: 950
     height: 1000
-- select_option:
-    selector: '[data-testid="backup-global-scope"]'
-    value: full
+- set_check:
+    selector: '[data-testid="backup-global-include-mail"]'
+    checked: true
 - assert_text:
     selector: '[data-testid="backup-settings-save-status"]'
     contains: Saved
@@ -66,7 +66,8 @@ steps:
     expression: document.getElementById("backup-global-include-mail").closest("section").scrollWidth <= document.getElementById("backup-global-include-mail").closest("section").clientWidth
     expect_truthy: true
 - eval_readonly:
-    expression: document.getElementById("backup-global-include-mail").closest("section").getBoundingClientRect().right <= innerWidth
+    expression: document.getElementById("backup-global-include-mail").closest("section").getBoundingClientRect().right
+      <= innerWidth
     expect_truthy: true
 - screenshot:
     path: backup-global-zh-dark-600.png
@@ -76,9 +77,9 @@ steps:
     selector: '[data-testid="backup-cloud-range-mode"]'
     value: inherit
 - assert_attribute:
-    selector: '[data-testid="backup-global-scope"]'
-    name: value
-    equals: full
+    selector: '[data-testid="backup-global-include-mail"]'
+    name: aria-checked
+    equals: 'true'
 - screenshot:
     path: backup-channel-zh-dark-600.png
     selector: '[data-testid="backup-cloud-destination"]'
@@ -100,17 +101,31 @@ verification:
     reason: Review the four retained screenshots; geometry assertions alone do not establish visual quality.
   requirements:
   - id: R1
-    requirement: Full scope saves and remains usable in the English light layout at 950 pixels
-    actions: [7, 8, 10, 11, 12]
+    requirement: Mail categories saves and remains usable in the English light layout at 950 pixels
+    actions:
+    - 7
+    - 8
+    - 10
+    - 11
+    - 12
     checkpoints:
     - step: 9
-      expectation: Full data write acknowledged
+      expectation: Mail category write acknowledged
     - step: 13
       expectation: Light theme is active
-    results: [9, 13]
+    results:
+    - 9
+    - 13
   - id: R2
-    requirement: Narrow Chinese dark layout has no global-section overflow and inheritance retains the global full scope
-    actions: [15, 16, 18, 19, 21, 26, 27]
+    requirement: Narrow Chinese dark layout has no global-section overflow and inheritance retains the global mail selection
+    actions:
+    - 15
+    - 16
+    - 18
+    - 19
+    - 21
+    - 26
+    - 27
     checkpoints:
     - step: 17
       expectation: Dark theme is active
@@ -124,4 +139,10 @@ verification:
       expectation: Global section remains inside the viewport
     - step: 28
       expectation: Channel range editing does not reset the global full scope
-    results: [17, 20, 22, 23, 24, 28]
+    results:
+    - 17
+    - 20
+    - 22
+    - 23
+    - 24
+    - 28

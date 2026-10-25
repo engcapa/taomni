@@ -42,9 +42,16 @@ def setup(ctx: Any) -> None:
                 "verificationUrl": None, "userCode": "QA714", "error": None}]
         if ctx.case_id == "TC-BACKUP-CLOUD-005":
             state["files"] = [{"targetId": target, "deviceId": id, "deviceName": name, "sourceKind": "taomni", "fileToken": "file" + id[0], "name": "Daily / current.taobak", "modifiedAt": ""} for id, name in [("11111111-1111-4111-8111-111111111111", "Office laptop"), ("22222222-2222-4222-8222-222222222222", "Home desktop")]]
+        if ctx.case_id == "TC-BACKUP-CANCEL-001":
+            state["jobs"] = [{**jobs[0], "phase": "snapshotting", "operation": "upload", "error": None, "nextRetryAt": None}, {**jobs[1], "phase": "packing", "operation": "local", "error": None, "nextRetryAt": None}]
         script = "if (!sessionStorage.getItem('qa.backup.seeded')) { localStorage.setItem('taomni.qa.backup.v1', " + json.dumps(json.dumps(state)) + "); sessionStorage.setItem('qa.backup.seeded','1'); }"
         if ctx.case_id == "TC-BACKUP-SETTINGS-003":
             script = "if (!sessionStorage.getItem('qa.backup.failure.seeded')) { localStorage.setItem('taomni.qa.backup.failSaves','1'); sessionStorage.setItem('qa.backup.failure.seeded','1'); }" + script
+        if ctx.case_id == "TC-BACKUP-SETTINGS-001":
+            policy = {"autoBackupEnabled": False, "frequency": "weekly", "maxRetainedCopies": 7, "defaultScope": "full", "includeMail": False}
+            script = "if (!sessionStorage.getItem('qa.backup.policy.seeded')) { localStorage.setItem('taomni.backup.policy', " + json.dumps(json.dumps(policy)) + "); sessionStorage.setItem('qa.backup.policy.seeded','1'); }" + script
+        if ctx.case_id == "TC-BACKUP-CANCEL-001":
+            script = "localStorage.setItem('taomni.qa.backup.cancelDelayMs','10000');" + script
         ctx.page.context.add_init_script(script)
         return
     root = isolated_data_root(ctx) / "backup-control"
@@ -60,6 +67,9 @@ def setup(ctx: Any) -> None:
             shutil.copyfile(sample, history / sample.name)
     (root.parent / "backup_policy.json").write_text(json.dumps({"autoBackupEnabled": False, "frequency": "daily", "maxRetainedCopies": 7, "defaultScope": "core", "customBackupDir": None, "lastBackupAt": None}), encoding="utf-8")
     (root / "config.json").write_text(json.dumps(config), encoding="utf-8")
+    if ctx.case_id in {"TC-BACKUP-CANCEL-002", "TC-BACKUP-MAIL-001"}:
+        from . import backup_snapshot
+        backup_snapshot.setup(ctx, root, config)
     for job in jobs:
         folder = root / "artifacts" / job["id"]
         folder.mkdir(parents=True)
@@ -189,6 +199,8 @@ def setup(ctx: Any) -> None:
 
 
 def teardown(ctx: Any) -> None:
+    from . import backup_snapshot
+    backup_snapshot.teardown(ctx)
     server = getattr(ctx, "_backup_server", None)
     if server:
         server.shutdown()

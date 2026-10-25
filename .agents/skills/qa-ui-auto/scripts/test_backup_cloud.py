@@ -5,10 +5,15 @@ from unittest import TestCase, main
 from unittest.mock import Mock, patch
 import json
 import tempfile
+import sqlite3
+import time
 import urllib.error
 import urllib.request
+import zipfile
+from contextlib import closing
 
 from qa_ui_auto.fixtures import backup_cloud
+from qa_ui_auto.fixtures.backup_snapshot import inspect_selection
 
 
 class BackupCloudFixtureTest(TestCase):
@@ -56,6 +61,57 @@ class BackupCloudFixtureTest(TestCase):
             backup_cloud.setup(ctx)
             script = context.add_init_script.call_args.args[0]
             self.assertEqual("taomni.qa.backup.failSaves" in script, expected)
+
+    def test_native_snapshot_observer_uses_an_external_releasable_os_lock(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ctx = self.native(root, "TC-BACKUP-CANCEL-002")
+            command = Path(ctx.values["backup_snapshot_control"])
+            events = Path(ctx.values["backup_snapshot_events"])
+            command.write_text("hold-unit", encoding="utf-8")
+            deadline = time.monotonic() + 5
+            while "hold-unit=locked" not in events.read_text():
+                self.assertLess(time.monotonic(), deadline)
+                time.sleep(0.01)
+            journal = json.loads(Path(ctx.values["backup_recovered_journal"]).read_text())
+            self.assertTrue(journal["cancelRequested"])
+            self.assertEqual(journal["phase"], "preparing")
+            command.write_text("release-unit", encoding="utf-8")
+            while "release-unit=released" not in events.read_text():
+                self.assertLess(time.monotonic(), deadline)
+                time.sleep(0.01)
+            self.assertNotIn("ORACLE_ERROR", events.read_text())
+            backup_cloud.teardown(ctx)
+
+    def test_mail_oracle_rejects_missing_objects_and_wrong_attachment_bytes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ctx = self.native(root, "TC-BACKUP-MAIL-001")
+            mail = root / "mail-cache"
+            original = b"From: qa@example.com\r\nSubject: Backup original\r\n\r\nOriginal retained offline.\r\n"
+            attachment = b"independent downloaded attachment"
+            db_path = next(mail.glob("*.db"))
+            with closing(sqlite3.connect(db_path)) as db, db:
+                db.execute("CREATE TABLE mail_archive_index (uid INTEGER)")
+                db.execute("INSERT INTO mail_archive_index VALUES (1)")
+            output = root / "sample.taobak"
+            files = [p for p in mail.rglob("*") if p.is_file()]
+            def write(*, no_object=False, wrong_attachment=False):
+                with zipfile.ZipFile(output, "w") as archive:
+                    for path in files:
+                        if no_object and path.name.endswith(".eml.gz"):
+                            continue
+                        payload = b"wrong" if wrong_attachment and path.suffix == ".bin" else path.read_bytes()
+                        archive.writestr("mail-cache/" + path.relative_to(mail).as_posix(), payload)
+            write()
+            self.assertEqual(inspect_selection(output, root, original, attachment), "mail_db=1,originals=1,attachments=1,original_rows=1")
+            write(no_object=True)
+            with self.assertRaisesRegex(AssertionError, "missing objects"):
+                inspect_selection(output, root, original, attachment)
+            write(wrong_attachment=True)
+            with self.assertRaisesRegex(AssertionError, "attachment bytes"):
+                inspect_selection(output, root, original, attachment)
+            backup_cloud.teardown(ctx)
 
 
 if __name__ == "__main__":
