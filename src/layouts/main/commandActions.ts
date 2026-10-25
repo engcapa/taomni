@@ -1,6 +1,8 @@
 import type { AppCommand } from "../../components/menubar/commands";
 import type { Tab } from "../../types";
 import { useServersStore } from "../../stores/serversStore";
+import { useAppStore } from "../../stores/appStore";
+import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { parseQuickConnectInput } from "../../lib/quickConnect";
 import { type SessionConfig } from "../../lib/ipc";
 import { type TerminalProfile } from "../../lib/terminalProfile";
@@ -119,6 +121,13 @@ export function createHandleCommand(controllerContext: HandleCommandContext): (c
         controllerContext.openLocalTab();
         break;
       case "close-active":
+        if (useAppStore.getState().activeSideTab === "workspaces") {
+          const platform = useWorkspacePlatformStore.getState();
+          const workspace = platform.getWorkspace();
+          const tab = workspace?.openTabs.find((item) => item.id === workspace.activeTabId);
+          if (workspace && tab?.closable) platform.closeWorkspaceTab(workspace.id, tab.id);
+          break;
+        }
         if (controllerContext.activeTab?.closable) controllerContext.removeTab(controllerContext.activeTab.id);
         break;
       case "reload-sessions":

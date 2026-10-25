@@ -12,10 +12,26 @@ import { normalizeGroupPath } from "./sessionPaths";
  *   normalized `group_path`; `""` is the ungrouped/local bucket).
  * - `query` keeps only tabs whose title or host contains `text`.
  */
-export type TabFilter =
+export type SessionTabCategory = "all" | "ssh" | "database" | "sftp" | "remote" | "local" | "other";
+
+export function sessionTabCategory(tab: Tab, sessions: readonly SessionConfig[]): SessionTabCategory {
+  if (tab.type === "database" || tab.type === "redis" || tab.type === "hbase-shell") return "database";
+  if (tab.type === "sftp") return "sftp";
+  if (tab.type === "rdp" || tab.type === "vnc") return "remote";
+  if (tab.type === "terminal") {
+    const protocol = sessions.find((session) => session.id === tab.sessionId)?.session_type;
+    if (tab.ssh || protocol === "SSH") return "ssh";
+    if (!tab.sessionId || protocol === "Local" || protocol === "LocalShell") return "local";
+  }
+  return "other";
+}
+
+export type TabFilter = (
   | { kind: "group"; path: string }
   | { kind: "query"; text: string }
-  | { kind: "multi"; paths: string[]; tabIds: string[] };
+  | { kind: "multi"; paths: string[]; tabIds: string[] }
+  | { kind: "protocol" }
+) & { protocol?: SessionTabCategory };
 
 /**
  * The directory a tab belongs to, derived from its saved session's
@@ -63,6 +79,8 @@ export function tabMatchesFilter(
   filter: TabFilter | null,
 ): boolean {
   if (!filter) return true;
+  if (filter.protocol && filter.protocol !== "all" && sessionTabCategory(tab, sessions) !== filter.protocol) return false;
+  if (filter.kind === "protocol") return true;
   if (filter.kind === "query") {
     const q = filter.text.trim().toLowerCase();
     if (!q) return true;
@@ -73,7 +91,7 @@ export function tabMatchesFilter(
     const key = tabGroupKey(tab, sessions);
     return paths.includes(key) || tabIds.includes(tab.id);
   }
-  return tabGroupKey(tab, sessions) === (filter as any).path;
+  return tabGroupKey(tab, sessions) === filter.path;
 }
 
 export function filterVisibleTabs(
@@ -92,6 +110,7 @@ export function getFilterChipText(
   t: (key: string, args?: any) => string,
 ): string {
   if (filter.kind === "query") return filter.text;
+  if (filter.kind === "protocol") return t(`tabs.category.${filter.protocol ?? "all"}`);
   if (filter.kind === "multi") {
     const parts: string[] = [];
     for (const p of filter.paths) {

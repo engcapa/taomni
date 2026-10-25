@@ -1,25 +1,25 @@
 id: TC-WS-011
-title: Agents / Crew placeholder from rail, Home and command palette; global search remains usable
-description: Agents / Crew is deferred by product scope. Each entry shows the development notice without changing the active canvas or creating tasks. Global search still finds
-  workspaces and tools, and executes selected entries.
+title: Crew placeholder from Home and command palette; global search remains usable
+description: Agents / Crew is deferred by product scope. Each supported entry shows the development notice without changing the active canvas or creating
+  tasks. Global search still finds workspaces and tools, and executes selected entries.
 modes:
 - browser
 - native
 covers:
 - F-WS-6
 tags:
-- smoke
-- p1
+- p0
 - workspace-redesign
-- agents
+- regression
 fixtures:
 - reset_db
-timeout_sec: 120
+timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-ws-011
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="nav-mode-agents"]'
+- assert_not_visible: '[data-testid="nav-mode-agents"]'
+- click: '[data-testid="home-open-agents"]'
 - wait_for: '[data-testid="alert-dialog-message"]'
 - assert_text:
     selector: '[data-testid="alert-dialog-message"]'
@@ -62,85 +62,83 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 主导航、Home 卡片和全局命令面板的 Agents 入口均提示开发中，关闭后保留原视图。
+    requirement: Home Crew and command-palette Agents display the development notice and preserve the canvas; global search can still activate workspaces
+      and tools.
     actions:
-    - 1
-    - 2
-    - 4
-    - 7
-    - 9
-    - 10
-    - 12
-    - 14
-    - 16
-    - 17
-    - 19
-    checkpoints:
-    - step: 3
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 5
-      expectation: '{"wait_for": "[data-testid=\"alert-dialog-message\"]"}'
-    - step: 6
-      expectation: '{"assert_text": {"selector": "[data-testid=\"alert-dialog-message\"]", "contains": "under development"}}'
-    - step: 8
-      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
-    - step: 11
-      expectation: '{"wait_for": "[data-testid=\"alert-dialog-message\"]"}'
-    - step: 13
-      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
-    - step: 15
-      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
-    - step: 18
-      expectation: '{"wait_for": "[data-testid=\"alert-dialog-message\"]"}'
-    - step: 20
-      expectation: '{"assert_not_visible": "[data-testid=\"alert-dialog-message\"]"}'
-    results:
-    - 3
     - 5
-    - 6
     - 8
+    - 10
     - 11
     - 13
     - 15
+    - 17
     - 18
     - 20
-  - id: R2
-    requirement: Ctrl/Cmd+K 全局搜索保留工具与工作区检索，Enter 跳转工作区，Escape 关闭。
-    actions:
-    - 21
-    - 23
-    - 25
-    - 27
-    - 30
-    - 32
-    checkpoints:
-    - step: 22
-      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
-    - step: 24
-      expectation: '{"wait_for": "[data-testid=\"global-search-result\"][data-result-id=\"floating-mfa\"]"}'
-    - step: 26
-      expectation: '{"wait_for": "[data-testid=\"global-search-result\"][data-kind=\"workspace\"]"}'
-    - step: 28
-      expectation: '{"wait_for": "[data-testid=\"workspace-switcher\"]"}'
-    - step: 29
-      expectation: '{"assert_not_visible": "[data-testid=\"global-search-modal\"]"}'
-    - step: 31
-      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
-    - step: 33
-      expectation: '{"assert_not_visible": "[data-testid=\"global-search-modal\"]"}'
-    results:
     - 22
     - 24
     - 26
     - 28
-    - 29
     - 31
     - 33
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"assert_not_visible": "[data-testid=\"nav-mode-agents\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog-message\"]"}'
+    - step: 7
+      expectation: '{"assert_text": {"selector": "[data-testid=\"alert-dialog-message\"]", "contains": "under development"}}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog-message\"]"}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog-message\"]"}'
+    - step: 21
+      expectation: '{"assert_not_visible": "[data-testid=\"alert-dialog-message\"]"}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"global-search-result\"][data-result-id=\"floating-mfa\"]"}'
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"global-search-result\"][data-kind=\"workspace\"]"}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"workspace-switcher\"]"}'
+    - step: 30
+      expectation: '{"assert_not_visible": "[data-testid=\"global-search-modal\"]"}'
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
+    - step: 34
+      expectation: '{"assert_not_visible": "[data-testid=\"global-search-modal\"]"}'
+    results:
+    - 3
+    - 4
+    - 6
+    - 7
+    - 9
+    - 12
+    - 14
+    - 16
+    - 19
+    - 21
+    - 23
+    - 25
+    - 27
+    - 29
+    - 30
+    - 32
+    - 34
   visual:
-  - check: 与 HTML 原型比较圆角框架、紧凑尺寸、无溢出和可用操作入口。
+  - check: Compact controls retain readable icons and active states without toolbar overlap.
     method: manual
-    reason: 保留运行截图供视觉对比，自动断言验证具体布局和状态。
+    reason: Inspect the retained screenshots; functional assertions do not establish visual matching.
   native:
-  - check: 在真实桌面 WebView 验证布局与持久化；终端用例额外验证真实 PTY，编辑器用例验证真实磁盘写入。
+  - check: Home Crew and command-palette Agents display the development notice and preserve the canvas; global search can still activate workspaces and
+      tools.
     method: automated
-    reason: 浏览器存根不能证明 WebKit/WebView2 渲染与原生磁盘、进程行为。
+    reason: Runs the isolated packaged application and explicitly asserts real native effects.

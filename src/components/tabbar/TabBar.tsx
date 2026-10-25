@@ -29,6 +29,7 @@ import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import type { LocalShellSelection, Tab } from "../../types";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
+import { SessionTabFilters } from "./SessionTabFilters";
 import { TabDetailsOverlay } from "./TabDetailsOverlay";
 import { type DropIndicator, type TabBarProps, type TabScrollState } from "./tabs/model";
 import { maxScrollLeft, setTabScrollLeft, TAB_DRAG_MIME, TAB_SCROLL_EDGE_TOLERANCE, TAB_SCROLL_PADDING, TAB_SCROLL_STEP_MIN } from "./tabs/scroll";
@@ -220,7 +221,7 @@ export function TabBar({
       setTabScrollLeft(container, tabRight - container.clientWidth + TAB_SCROLL_PADDING);
     }
     updateTabScrollState();
-  }, [activeTabId, tabs, updateTabScrollState]);
+  }, [activeTabId, tabs, tabFilter, updateTabScrollState]);
 
   const mergedShells = useMemo<LocalShellOption[]>(() => {
     if (wslDistros.length === 0) return localShells;
@@ -459,13 +460,14 @@ export function TabBar({
         scrollRef={tabScrollRef}
         tabId={detailsReveal ? null : hoveredDetailsTabId}
       />
-      {tabFilter && (
+      <SessionTabFilters />
+      {tabFilter && tabFilter.kind !== "protocol" && (
         <button
           type="button"
           data-testid="tab-filter-chip"
-          onClick={() => setTabFilter(null)}
+          onClick={() => setTabFilter(tabFilter?.protocol && tabFilter.protocol !== "all" ? { kind: "protocol", protocol: tabFilter.protocol } : null)}
           title={t("tabs.filterClear")}
-          className="flex items-center gap-1 mb-0.5 mr-1 px-2 h-6 rounded text-[11px] max-w-[180px] shrink-0"
+          className="flex items-center gap-1 mb-0.5 mr-1 px-2 h-6 rounded text-[11px] max-w-[112px] shrink-0"
           style={{ background: "var(--taomni-hover)", color: "var(--taomni-text)" }}
         >
           {tabFilter.kind === "group" || tabFilter.kind === "multi" ? (
@@ -497,7 +499,21 @@ export function TabBar({
       <div
         ref={tabScrollRef}
         data-testid="tab-scroll-area"
+        role="tablist"
+        aria-label={t("tabs.openTabs")}
         className="taomni-tab-scroll flex items-end min-w-0 overflow-x-auto overflow-y-hidden"
+        onWheel={(event) => {
+          const el = event.currentTarget;
+          if (maxScrollLeft(el) > 0 && Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+            el.scrollLeft += event.deltaY;
+          }
+        }}
+        onKeyDown={(event) => {
+          if (editingTabId || event.altKey || event.ctrlKey || event.metaKey || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+          const index = visibleTabs.findIndex((tab) => tab.id === activeTabId);
+          const target = event.key === "Home" ? visibleTabs[0] : event.key === "End" ? visibleTabs.at(-1) : visibleTabs[(index + (event.key === "ArrowRight" ? 1 : -1) + visibleTabs.length) % visibleTabs.length];
+          if (target) { event.preventDefault(); setActiveTab(target.id); tabElementRefs.current.get(target.id)?.focus(); }
+        }}
         onScroll={updateTabScrollState}
       >
         {tabFilter && visibleTabs.length === 0 && (

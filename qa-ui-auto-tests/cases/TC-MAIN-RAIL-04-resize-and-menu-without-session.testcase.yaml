@@ -1,66 +1,105 @@
 id: TC-MAIN-RAIL-04
 title: Main sidebar owns resizing and the names menu in every tab and panel state
-description: >-
-  Renderer regression for Welcome with no open sessions, expanded and collapsed
-  panels, Code Workspace and a local terminal. The full-height main rail edge
-  resizes independently of embedded tab tools. Background, Settings and permanent
-  buttons expose the names preference; tool buttons retain their own context menu.
-  Width and names remain shared across tab switches and survive reload.
-covers: [F1.2, F1.9, F6.2, F25.5]
-tags: [main, sidebar, p1]
-modes: [browser]
-fixtures: [reset_db]
+description: Renderer regression for Welcome with no open sessions, expanded and collapsed panels, Code Workspace and a local terminal. The full-height
+  main rail edge resizes independently of embedded tab tools. Background, Settings and permanent buttons expose the names preference; tool buttons retain
+  their own context menu. Width and names remain shared across tab switches and survive reload.
+covers:
+- F1.2
+- F1.9
+- F6.2
+- F25.5
+tags:
+- main
+- sidebar
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- seed_storage: {key: taomni.sidebarCollapsed, value: 'false'}
-- seed_storage: {key: taomni.sidebarCollapsedByGroup.v1, value: '{"code-workspace":true,"terminal":true}'}
-- seed_storage: {key: taomni.mergeToolWindowRail, value: 'true'}
-- seed_storage: {key: taomni.codeWorkspace.toolWindowStripes.v1, value: '{"showNames":true,"leftWidth":59,"rightWidth":59}'}
-- reload_window:
+- seed_storage:
+    key: taomni.sidebarCollapsed
+    value: 'false'
+- seed_storage:
+    key: taomni.sidebarCollapsedByGroup.v1
+    value: '{"code-workspace":true,"terminal":true}'
+- seed_storage:
+    key: taomni.mergeToolWindowRail
+    value: 'true'
+- seed_storage:
+    key: taomni.codeWorkspace.toolWindowStripes.v1
+    value: '{"showNames":true,"leftWidth":59,"rightWidth":59}'
+- reload_window: null
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
 - right_click: '[data-testid="sidebar-rail"]'
-- assert_count: {selector: '[data-testid="context-menu"]', equal: 1}
+- assert_count:
+    selector: '[data-testid="context-menu"]'
+    equal: 1
 - click: '[data-testid="sidebar-rail-menu-show-names"]'
-- assert_localstorage: {key: taomni.codeWorkspace.toolWindowStripes.v1, contains: '"showNames":false'}
-- assert_text_equals: {selector: '[data-testid="side-tab-tools"]', equals: ''}
+- assert_localstorage:
+    key: taomni.codeWorkspace.toolWindowStripes.v1
+    contains: '"showNames":false'
+- assert_text_equals:
+    selector: '[data-testid="side-tab-tools"]'
+    equals: ''
 - right_click: '[data-testid="ribbon-settings"]'
 - click: '[data-testid="sidebar-rail-menu-show-names"]'
 - eval_readonly:
     expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 59
     expect_truthy: true
-- drag_to: {from: '[data-testid="sidebar-rail-resize"]', by: {dx: 20}}
+- drag_to:
+    from: '[data-testid="sidebar-rail-resize"]'
+    by:
+      dx: 20
 - eval_readonly:
     expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 79
     expect_truthy: true
-- press: {selector: '[data-testid="sidebar-rail-resize"]', key: ArrowRight}
-- assert_localstorage: {key: taomni.codeWorkspace.toolWindowStripes.v1, contains: '"leftWidth":83'}
+- press:
+    selector: '[data-testid="sidebar-rail-resize"]'
+    key: ArrowRight
+- assert_localstorage:
+    key: taomni.codeWorkspace.toolWindowStripes.v1
+    contains: '"leftWidth":83'
 - eval_readonly:
     expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 83
     expect_truthy: true
 - click: '[data-testid="side-tab-sessions"]:visible'
 - wait_for: '[data-testid="collapsed-sidebar-rail"]'
-- assert_count: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]', equal: 0}
+- assert_count:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
+    equal: 0
 - eval_readonly:
     expression: document.querySelector('[aria-valuenow]').getBoundingClientRect().height > 500
     expect_truthy: true
-- drag_to: {from: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]', by: {dx: 100}}
+- drag_to:
+    from: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]'
+    by:
+      dx: 100
 - eval_readonly:
     expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 100
     expect_truthy: true
-- drag_to: {from: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]', by: {dx: -200}}
+- drag_to:
+    from: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]'
+    by:
+      dx: -200
 - eval_readonly:
     expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 40
     expect_truthy: true
-- press: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]', key: ArrowRight}
+- press:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]'
+    key: ArrowRight
 - eval_readonly:
     expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 44
     expect_truthy: true
 - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail"]'
 - click: '[data-testid="sidebar-rail-menu-show-names"]'
-- assert_count: {selector: '[data-testid="sidebar-rail-resize"]', equal: 0}
+- assert_count:
+    selector: '[data-testid="sidebar-rail-resize"]'
+    equal: 0
 - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
 - click: '[data-testid="sidebar-rail-menu-show-names"]'
 - eval_readonly:
@@ -69,22 +108,35 @@ steps:
 - screenshot: main-rail-welcome-resized.png
 - click: '[data-testid="side-tab-tools"]:visible'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
-- drag_to: {from: '[data-testid="sidebar-rail-resize"]', by: {dx: 20}}
+- drag_to:
+    from: '[data-testid="sidebar-rail-resize"]'
+    by:
+      dx: 20
 - eval_readonly:
     expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 64
     expect_truthy: true
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
-- assert_count: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]', equal: 1}
-- assert_count: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left-resize"]', equal: 0}
-- press: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]', key: ArrowRight}
+- assert_count:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left-resize"]'
+    equal: 0
+- press:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]'
+    key: ArrowRight
 - eval_readonly:
     expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 68
     expect_truthy: true
 - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]'
-- assert_count: {selector: '[data-testid="sidebar-rail-menu-show-names"]', equal: 0}
+- assert_count:
+    selector: '[data-testid="sidebar-rail-menu-show-names"]'
+    equal: 0
 - click: '[data-testid="code-workspace-tool-rail-menu-show-names"]'
-- assert_text_equals: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]', equals: ''}
+- assert_text_equals:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]'
+    equals: ''
 - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
 - click: '[data-testid="sidebar-rail-menu-show-names"]'
 - click: '[data-testid="nav-mode-home"]'
@@ -94,36 +146,49 @@ steps:
     expect_truthy: true
 - click: '[data-testid="welcome-open-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
-- assert_count: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]', equal: 1}
-- drag_to: {from: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]', by: {dx: 12}}
+- assert_count:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]'
+    equal: 1
+- drag_to:
+    from: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]'
+    by:
+      dx: 12
 - eval_readonly:
     expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 80
     expect_truthy: true
 - right_click: '[data-testid="side-tab-tools"]:visible'
 - click: '[data-testid="sidebar-rail-menu-show-names"]'
-- assert_text_equals: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]', equals: ''}
+- assert_text_equals:
+    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]'
+    equals: ''
 - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-settings"]'
 - click: '[data-testid="sidebar-rail-menu-show-names"]'
 - click: '[data-testid="nav-mode-home"]'
 - eval_readonly:
     expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 80
     expect_truthy: true
-- reload_window:
+- reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - wait_for: '[data-testid="sidebar-rail-resize"]'
 - eval_readonly:
     expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 80
     expect_truthy: true
-- assert_localstorage: {key: taomni.codeWorkspace.toolWindowStripes.v1, contains: '"showNames":true'}
+- assert_localstorage:
+    key: taomni.codeWorkspace.toolWindowStripes.v1
+    contains: '"showNames":true'
 - screenshot: main-rail-welcome-restored.png
 - click: '[data-testid="side-tab-tools"]:visible'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
 - wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
-- click: '[data-testid="side-tab-sessions"]:visible'
-- wait_for: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
-- press: {selector: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left-resize"]', key: ArrowLeft}
-- assert_localstorage: {key: taomni.codeWorkspace.toolWindowStripes.v1, contains: '"leftWidth":76'}
+- click: '[data-testid="toggle-left-sidebar"]'
+- wait_for: '[data-testid="sidebar-tool-window-rail"]'
+- press:
+    selector: '[data-testid="sidebar-rail-resize"]'
+    key: ArrowLeft
+- assert_localstorage:
+    key: taomni.codeWorkspace.toolWindowStripes.v1
+    contains: '"leftWidth":76'
 - eval_readonly:
     expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 76
     expect_truthy: true
@@ -141,13 +206,23 @@ verification:
     - 18
     - 20
     checkpoints:
-    - {step: 11, expectation: '{"assert_count": {"selector": "[data-testid=\"context-menu\"]", "equal": 1}}'}
-    - {step: 13, expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"showNames\":false"}}'}
-    - {step: 14, expectation: '{"assert_text_equals": {"selector": "[data-testid=\"side-tab-tools\"]", "equals": ""}}'}
-    - {step: 17, expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('[data-show-names]').getBoundingClientRect().width === 59\", \"expect_truthy\": true}}"}
-    - {step: 19, expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('[data-show-names]').getBoundingClientRect().width === 79\", \"expect_truthy\": true}}"}
-    - {step: 21, expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"leftWidth\":83"}}'}
-    - {step: 22, expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('[data-show-names]').getBoundingClientRect().width === 83\", \"expect_truthy\": true}}"}
+    - step: 11
+      expectation: '{"assert_count": {"selector": "[data-testid=\"context-menu\"]", "equal": 1}}'
+    - step: 13
+      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"showNames\":false"}}'
+    - step: 14
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"side-tab-tools\"]", "equals": ""}}'
+    - step: 17
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-show-names]'').getBoundingClientRect().width === 59", "expect_truthy":
+        true}}'
+    - step: 19
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-show-names]'').getBoundingClientRect().width === 79", "expect_truthy":
+        true}}'
+    - step: 21
+      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"leftWidth\":83"}}'
+    - step: 22
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-show-names]'').getBoundingClientRect().width === 83", "expect_truthy":
+        true}}'
     results:
     - 11
     - 13
@@ -170,14 +245,28 @@ verification:
     - 40
     - 42
     checkpoints:
-    - {step: 25, expectation: '{"assert_count": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 0}}'}
-    - {step: 26, expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('[aria-valuenow]').getBoundingClientRect().height > 500\", \"expect_truthy\": true}}"}
-    - {step: 28, expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('[data-show-names]').getBoundingClientRect().width === 100\", \"expect_truthy\": true}}"}
-    - {step: 30, expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('[data-show-names]').getBoundingClientRect().width === 40\", \"expect_truthy\": true}}"}
-    - {step: 32, expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('[data-show-names]').getBoundingClientRect().width === 44\", \"expect_truthy\": true}}"}
-    - {step: 35, expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail-resize\"]", "equal": 0}}'}
-    - {step: 38, expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('[data-show-names]').getBoundingClientRect().width === 44\", \"expect_truthy\": true}}"}
-    - {step: 43, expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('[data-show-names]').getBoundingClientRect().width === 64\", \"expect_truthy\": true}}"}
+    - step: 25
+      expectation: '{"assert_count": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 0}}'
+    - step: 26
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[aria-valuenow]'').getBoundingClientRect().height > 500", "expect_truthy":
+        true}}'
+    - step: 28
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-show-names]'').getBoundingClientRect().width === 100", "expect_truthy":
+        true}}'
+    - step: 30
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-show-names]'').getBoundingClientRect().width === 40", "expect_truthy":
+        true}}'
+    - step: 32
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-show-names]'').getBoundingClientRect().width === 44", "expect_truthy":
+        true}}'
+    - step: 35
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail-resize\"]", "equal": 0}}'
+    - step: 38
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-show-names]'').getBoundingClientRect().width === 44", "expect_truthy":
+        true}}'
+    - step: 43
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-show-names]'').getBoundingClientRect().width === 64", "expect_truthy":
+        true}}'
     results:
     - 25
     - 26
@@ -206,18 +295,36 @@ verification:
     - 69
     - 71
     checkpoints:
-    - {step: 46, expectation: '{"assert_count": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"sidebar-rail-resize\"]", "equal": 1}}'}
-    - {step: 47, expectation: '{"assert_count": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left-resize\"]", "equal": 0}}'}
-    - {step: 49, expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('[data-show-names]').getBoundingClientRect().width === 68\", \"expect_truthy\": true}}"}
-    - {step: 51, expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail-menu-show-names\"]", "equal": 0}}'}
-    - {step: 53, expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-tools\"]", "equals": ""}}'}
-    - {step: 58, expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('[data-show-names]').getBoundingClientRect().width === 68\", \"expect_truthy\": true}}"}
-    - {step: 61, expectation: '{"assert_count": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"sidebar-rail-resize\"]", "equal": 1}}'}
-    - {step: 63, expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('[data-show-names]').getBoundingClientRect().width === 80\", \"expect_truthy\": true}}"}
-    - {step: 66, expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-tools\"]", "equals": ""}}'}
-    - {step: 70, expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('[data-show-names]').getBoundingClientRect().width === 80\", \"expect_truthy\": true}}"}
-    - {step: 74, expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('[data-show-names]').getBoundingClientRect().width === 80\", \"expect_truthy\": true}}"}
-    - {step: 75, expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"showNames\":true"}}'}
+    - step: 46
+      expectation: '{"assert_count": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"sidebar-rail-resize\"]", "equal": 1}}'
+    - step: 47
+      expectation: '{"assert_count": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left-resize\"]", "equal":
+        0}}'
+    - step: 49
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-show-names]'').getBoundingClientRect().width === 68", "expect_truthy":
+        true}}'
+    - step: 51
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail-menu-show-names\"]", "equal": 0}}'
+    - step: 53
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-tools\"]", "equals": ""}}'
+    - step: 58
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-show-names]'').getBoundingClientRect().width === 68", "expect_truthy":
+        true}}'
+    - step: 61
+      expectation: '{"assert_count": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"sidebar-rail-resize\"]", "equal": 1}}'
+    - step: 63
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-show-names]'').getBoundingClientRect().width === 80", "expect_truthy":
+        true}}'
+    - step: 66
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"side-tab-tools\"]", "equals": ""}}'
+    - step: 70
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-show-names]'').getBoundingClientRect().width === 80", "expect_truthy":
+        true}}'
+    - step: 74
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-show-names]'').getBoundingClientRect().width === 80", "expect_truthy":
+        true}}'
+    - step: 75
+      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"showNames\":true"}}'
     results:
     - 46
     - 47
@@ -232,16 +339,20 @@ verification:
     - 74
     - 75
   - id: R4
-    requirement: 展开主侧栏后 Code Workspace 独立工具栏仍可用原有边缘及方向键调整宽度，共享设置同步至主侧栏。
+    requirement: Workspaces始终使用主窗口合并工具栏；展开主侧栏后同一调宽手柄、名称偏好和宽度持久化仍生效。
     actions:
     - 77
     - 79
     - 81
     - 83
     checkpoints:
-    - {step: 82, expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'}
-    - {step: 84, expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"leftWidth\":76"}}'}
-    - {step: 85, expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('[data-show-names]').getBoundingClientRect().width === 76\", \"expect_truthy\": true}}"}
+    - step: 82
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tool-window-rail\"]"}'
+    - step: 84
+      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"leftWidth\":76"}}'
+    - step: 85
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-show-names]'').getBoundingClientRect().width === 76", "expect_truthy":
+        true}}'
     results:
     - 82
     - 84

@@ -111,20 +111,27 @@ html[data-app-theme="dark"] .taomni-main-window {
   gap: 4px;
   padding: 0 5px;
 }
-.taomni-main-window [data-testid="workspace-merged-tool-rail"] {
-  padding: 8px 5px 4px;
-  margin-top: 6px;
+.taomni-main-window .taomni-ide-tool-group:not(:empty) {
+  margin: 16px 3px 4px;
+  padding: 6px 2px 4px;
+  border-top: 1px solid var(--taomni-chrome-border);
+  border-radius: 6px;
+  background: var(--taomni-panel-bg);
 }
-.taomni-main-window [data-testid="workspace-merged-tool-rail"]::before {
-  content: "";
+.taomni-main-window .taomni-ide-tool-group:not(:empty)::before {
+  content: "IDE";
   display: block;
-  width: 20px;
-  height: 1px;
-  background: var(--taomni-chrome-border);
-  margin: -8px auto 8px;
+  flex-shrink: 0;
+  margin: 0 auto 6px;
+  color: var(--taomni-text-muted);
+  font-size: 8px;
+  font-weight: 600;
+  line-height: 12px;
+  letter-spacing: 0.08em;
 }
-.taomni-main-window [data-testid="workspace-merged-tool-rail"] {
+.taomni-main-window [data-testid="sidebar-tool-window-rail"] > [data-testid="code-workspace-tool-rail-left"] {
   border-top: none;
+  padding: 0;
 }
 .taomni-workspace-tab-strip { scrollbar-width: none; }
 .taomni-workspace-tab-strip::-webkit-scrollbar { display: none; }
@@ -159,12 +166,20 @@ html[data-app-theme="dark"] .taomni-main-window {
   border-radius: 6px 6px 0 0;
   background: transparent;
   border-color: transparent;
+  min-width: 96px;
+  max-width: 176px;
 }
 .taomni-main-window .taomni-control-bar .taomni-tab[data-active="true"] {
   background: var(--taomni-bg);
   border-color: var(--taomni-chrome-border);
   box-shadow: inset 0 2px var(--taomni-accent);
+  max-width: 220px;
 }
+.taomni-main-window .taomni-control-bar .taomni-tab:focus-visible {
+  outline: 1px solid var(--taomni-accent);
+  outline-offset: -2px;
+}
+.taomni-main-window .taomni-control-bar .taomni-tab [data-testid="tab-title"] { min-width: 0; }
 .taomni-main-window [data-testid="status-bar"] {
   min-height: 23px;
   background: var(--taomni-chrome-bg);

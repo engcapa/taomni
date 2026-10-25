@@ -4,6 +4,7 @@ import { useT } from "../../lib/i18n";
 import type { GitWorkspaceRootInfo } from "../../types";
 import { useWorkspaceUiStore } from "../../stores/workspaceUiStore";
 import type { PlatformWorkspace } from "../../stores/workspacePlatformStore";
+import { useWorkspaceGitContextStore } from "../../stores/workspaceGitContextStore";
 
 export interface WorkspaceGitPanelProps {
   workspace: PlatformWorkspace;
@@ -23,7 +24,8 @@ export interface WorkspaceGitPanelProps {
 export function WorkspaceGitPanel({ workspace, visible, focusPath, onOpenFile }: WorkspaceGitPanelProps) {
   const t = useT();
   const openFsModal = useWorkspaceUiStore((s) => s.openFsModal);
-  const roots: GitWorkspaceRootInfo[] = workspace.rootFolders.map((root) => ({
+  const context = useWorkspaceGitContextStore((state) => state.byWorkspace[workspace.id]);
+  const roots: GitWorkspaceRootInfo[] = context?.roots ?? workspace.rootFolders.map((root) => ({
     id: root.id,
     name: root.name,
     path: root.path,
@@ -54,11 +56,13 @@ export function WorkspaceGitPanel({ workspace, visible, focusPath, onOpenFile }:
       <WorkspaceGitManager
         workspaceName={workspace.name}
         roots={roots}
-        activeRepoRoot={roots[0]?.repoRoot ?? null}
+        activeRepoRoot={context?.activeRepoRoot ?? roots[0]?.repoRoot ?? null}
         visible={visible}
         onOpenWorkspace={(repoRoot, path) => {
-          const root = workspace.rootFolders.find((folder) => folder.path === repoRoot);
-          if (root && path) onOpenFile?.(root.id, path);
+          if (!path) return;
+          const absolute = `${repoRoot.replace(/\\/g, "/").replace(/\/$/, "")}/${path}`;
+          const root = workspace.rootFolders.find((folder) => absolute.startsWith(`${folder.path.replace(/\\/g, "/").replace(/\/$/, "")}/`));
+          if (root) onOpenFile?.(root.id, absolute.slice(root.path.replace(/[\\/]$/, "").length + 1));
         }}
       />
     </div>

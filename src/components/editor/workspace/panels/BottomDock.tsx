@@ -12,6 +12,7 @@ import {
 import { createPortal } from "react-dom";
 import { ChevronDown, ChevronUp, Minus, MoreHorizontal, MoreVertical } from "lucide-react";
 import { toolWindowRailButtonClass } from "./ToolWindowRail";
+import { useToolWindowStripeStore } from "../toolWindowStripeStore";
 
 export interface BottomDockTab {
   id: string;
@@ -129,6 +130,7 @@ export function BottomDock({
   renderPane,
   secondaryTab = null,
 }: BottomDockProps) {
+  const showNames = useToolWindowStripeStore((state) => state.settings.showNames);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const active = tabs.find((tab) => tab.id === activeTab) ?? tabs[0];
   const [uncontrolledHeight, setUncontrolledHeight] = useState(readStoredHeight);
@@ -446,7 +448,7 @@ export function BottomDock({
                     onClick={() => selectTab(tab.id)}
                   >
                     {tab.icon}
-                    <span className="w-full truncate px-0.5 text-center text-[9px] leading-3">{tab.label}</span>
+                    {showNames && <span className="w-full truncate px-0.5 text-center text-[9px] leading-3">{tab.label}</span>}
                     {showBadge && (
                       <span className="absolute right-0 top-0 rounded bg-[var(--taomni-code-active-line-bg)] px-0.5 text-[8px] leading-3 tabular-nums text-[var(--taomni-code-text)]">
                         {tab.badge}

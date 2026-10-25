@@ -16,6 +16,7 @@ import {
   filterVisibleTabs,
   tabGroupKey,
   tabMatchesFilter,
+  tabSearchText,
   type TabFilter,
 } from "../../lib/tabFilter";
 import { TabIcon } from "./TabBar";
@@ -40,9 +41,8 @@ interface TabGroup {
  * The `…` overflow dropdown for the tab strip. Lists every open tab grouped by
  * its saved session's directory, and lets the user focus the strip on one
  * directory (click a group header) or a fuzzy query (type in the box). The
- * filter hides non-matching tabs from the strip without closing them; this
- * panel always shows the full list (hidden ones dimmed) so any tab stays
- * reachable. See issue #121.
+ * filter hides non-matching tabs from the strip without closing them. Search
+ * narrows this list too; clearing it reveals every group again. See issue #121.
  */
 export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab }: OpenTabsMenuProps) {
   const t = useT();
@@ -58,6 +58,7 @@ export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab }: Op
   const sessions = useSessionStore((s) => s.sessions);
 
   const [query, setQuery] = useState("");
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -102,7 +103,7 @@ export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab }: Op
       onClose();
     };
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") { e.preventDefault(); onClose(); anchorRef.current?.querySelector<HTMLButtonElement>("button")?.focus(); }
     };
     document.addEventListener("mousedown", onPointerDown);
     document.addEventListener("keydown", onKeyDown);
@@ -124,14 +125,21 @@ export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab }: Op
       .sort((a, b) => (a === "" ? 1 : b === "" ? -1 : a.localeCompare(b)))
       .map((key) => ({ key, tabs: map.get(key)! }));
   }, [tabs, sessions]);
+  const matchingGroups = useMemo(() => groups.map((group) => ({
+    ...group,
+    tabs: group.tabs.filter((tab) => tabSearchText(tab).includes(query.trim().toLowerCase())),
+  })).filter((group) => group.tabs.length > 0), [groups, query]);
 
   if (!open) return null;
 
   // Keep the active tab visible: jump to the first match when it would hide.
   const applyFilter = (filter: TabFilter | null) => {
-    setTabFilter(filter);
-    if (!filter) return;
-    const visible = filterVisibleTabs(tabs, sessions, filter);
+    const protocol = tabFilter?.protocol;
+    const combined: TabFilter | null = protocol && protocol !== "all"
+      ? { ...(filter ?? { kind: "protocol" }), protocol } : filter;
+    setTabFilter(combined);
+    if (!combined) return;
+    const visible = filterVisibleTabs(tabs, sessions, combined);
     if (visible.length && !visible.some((tab) => tab.id === activeTabId)) {
       setActiveTab(visible[0].id);
     }
@@ -218,6 +226,7 @@ export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab }: Op
 
   const onQueryChange = (text: string) => {
     setQuery(text);
+    setHighlightedId(null);
     applyFilter(text.trim() ? { kind: "query", text } : null);
   };
 
@@ -295,6 +304,21 @@ export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab }: Op
           onChange={(e) => onQueryChange(e.target.value)}
           placeholder={t("tabs.filterPlaceholder")}
           data-testid="open-tabs-filter"
+          onKeyDown={(event) => {
+            const matches = matchingGroups.flatMap((group) => group.tabs);
+            if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+              event.preventDefault();
+              const index = matches.findIndex((tab) => tab.id === highlightedId);
+              const next = index < 0 ? (event.key === "ArrowDown" ? 0 : matches.length - 1)
+                : (index + (event.key === "ArrowDown" ? 1 : -1) + matches.length) % matches.length;
+              const target = matches[next];
+              setHighlightedId(target?.id ?? null);
+              if (target) Array.from(menuRef.current?.querySelectorAll<HTMLElement>("[data-tab-id]") ?? []).find((row) => row.dataset.tabId === target.id)?.scrollIntoView?.({ block: "nearest" });
+            } else if (event.key === "Enter" && !event.nativeEvent.isComposing) {
+              const target = matches.find((tab) => tab.id === highlightedId) ?? matches[0];
+              if (target) { event.preventDefault(); pickTab(target); }
+            }
+          }}
           className="flex-1 min-w-0 bg-transparent outline-none"
           aria-label={t("tabs.filterPlaceholder")}
         />
@@ -303,7 +327,8 @@ export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab }: Op
       <div className="h-px mx-2" style={{ background: "var(--taomni-divider)" }} />
 
       <div className="overflow-y-auto py-1">
-        {groups.map((group) => {
+        {matchingGroups.length === 0 && <div data-testid="open-tabs-empty" className="px-3 py-4 text-[var(--taomni-text-muted)]">{t("tabs.filterNoMatch")}</div>}
+        {matchingGroups.map((group) => {
           const slug =
             (group.key || "ungrouped").replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "") ||
             "ungrouped";
@@ -379,10 +404,13 @@ export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab }: Op
                       />
                       <button
                         type="button"
+                        data-tab-id={tab.id}
+                        data-highlighted={highlightedId === tab.id || undefined}
+                        aria-current={isActive ? "page" : undefined}
                         data-testid={`open-tabs-tab-${tab.id}`}
                         onClick={() => pickTab(tab)}
                         title={`${tab.title}\n${details.sessionLabel}\n${details.activityLabel}`}
-                        className="flex-1 flex items-center gap-2 min-w-0 text-left"
+                        className="flex-1 flex items-center gap-2 min-w-0 rounded text-left data-[highlighted=true]:bg-[var(--taomni-selected)]"
                       >
                         <span className="w-4 flex-shrink-0 flex items-center justify-center">
                           {isActive ? <Check className="w-3 h-3" /> : <TabIcon tab={tab} />}

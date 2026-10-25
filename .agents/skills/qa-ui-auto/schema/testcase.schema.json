@@ -660,6 +660,15 @@
             "tolerance": {"type": "number", "minimum": 0, "maximum": 2}
           }
         },
+        "native_folder_dialog": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["action"],
+          "properties": {
+            "action": {"enum": ["choose", "cancel"]},
+            "path": {"type": "string", "minLength": 1}
+          }
+        },
         "native_window_drag": {
           "type": "object",
           "additionalProperties": false,

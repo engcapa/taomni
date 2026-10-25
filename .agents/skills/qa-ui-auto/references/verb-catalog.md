@@ -89,6 +89,13 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 
 ## App-specific helpers (use these instead of inlining selector chains)
 
+`native_folder_dialog: {action: choose|cancel, path?}` operates an already opened
+system folder chooser in native mode. `choose` requires an existing directory
+inside the current QA report. It verifies that the chooser belongs to the QA
+executable and uses OS input/accessibility on Linux X11, Windows and macOS;
+records ownership, action and failures in `native-folder-dialogs.jsonl`.
+The testcase must separately assert the returned path and mounted directory.
+
 | Verb | Args | Notes |
 |------|------|-------|
 | `quick_connect` | `{url}` (must match `(ssh\|sftp)://user@host[:port]`) | Fills + submits the QuickConnect bar. |

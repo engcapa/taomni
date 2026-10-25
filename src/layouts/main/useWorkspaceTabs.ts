@@ -2,8 +2,11 @@ import { useEffect, useCallback } from "react";
 import { type CodeWorkspaceGitManagerPayload } from "../../components/editor/CodeWorkspaceTab";
 import { decideWorkspaceGitSync } from "../../lib/workspaceGitManagerSync";
 import type { Tab, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, RecentWorkspace } from "../../types";
-import { newWorkspaceInstanceId, recentWorkspaceIdFromParts } from "../../stores/appStore";
+import { recentWorkspaceIdFromParts } from "../../stores/appStore";
 import { selectFolderPath } from "../../lib/ipc";
+import { useAppStore } from "../../stores/appStore";
+import { openPlatformCodeWorkspace } from "../../lib/openPlatformCodeWorkspace";
+import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { gitInitRepo, gitProbePath, gitRepoName } from "../../lib/git";
 import { alertAppDialog, confirmAppDialog } from "../../lib/appDialogs";
 import { normalizeGitWorkspaceRoots, gitWorkspaceRootsKey } from "./sessionPolicy";
@@ -21,6 +24,9 @@ export interface UseWorkspaceTabsContext {
 
 export function useWorkspaceTabs(context: UseWorkspaceTabsContext) {
   const { tabsRef, setActiveTab, addTab, updateGitTabInfo, removeTab, tabs, setStatusMessage } = context;
+  const activeTabId = useAppStore((state) => state.activeTabId);
+  const activeMode = useAppStore((state) => state.activeSideTab);
+  const platformWorkspaces = useWorkspacePlatformStore((state) => state.workspaces);
 
   const openGitTab = useCallback((repoRoot: string) => {
     const normalized = repoRoot.trim();
@@ -131,56 +137,30 @@ export function useWorkspaceTabs(context: UseWorkspaceTabsContext) {
           return ws.workspaceInstanceId ?? ws.workspaceId ?? ws.repoRoot?.trim() ?? tab.id;
         }),
     );
+    for (const workspace of platformWorkspaces) {
+      if (!workspace.openTabs.some((tab) => tab.kind === "code")) continue;
+      openWorkspaceInstanceIds.add(workspace.codeWorkspace?.workspaceInstanceId ?? `platform:${workspace.id}`);
+    }
     for (const tab of tabs) {
       if (tab.type !== "git" || !tab.git?.sourceWorkspaceInstanceId) continue;
       if (!tab.git.workspaceRoots?.length) continue;
       if (openWorkspaceInstanceIds.has(tab.git.sourceWorkspaceInstanceId)) continue;
       removeTab(tab.id);
     }
-  }, [removeTab, tabs]);
+  }, [removeTab, tabs, platformWorkspaces]);
 
   const openCodeWorkspaceInfo = useCallback((workspace: CodeWorkspaceTabInfo) => {
-    const roots = workspace.roots ?? [];
-    const looseFiles = workspace.looseFiles ?? [];
-    const identity = recentWorkspaceIdFromParts(roots, looseFiles);
-    const existing = tabsRef.current.find(
-      (tab) => {
-        if (tab.type !== "code-workspace" || !tab.codeWorkspace) return false;
-        if (workspace.workspaceId && tab.codeWorkspace.workspaceId === workspace.workspaceId) return true;
-        if (tab.codeWorkspace.workspaceId === identity) return true;
-        const tabRoots = tab.codeWorkspace.roots ?? [];
-        const tabLooseFiles = tab.codeWorkspace.looseFiles ?? [];
-        if (tabRoots.length === 0 && tabLooseFiles.length === 0) return false;
-        return recentWorkspaceIdFromParts(tabRoots, tabLooseFiles) === identity;
-      },
-    );
-    if (existing) {
-      setActiveTab(existing.id);
-      return;
-    }
-    const title = workspace.name?.trim()
-      || (roots.length === 1 && looseFiles.length === 0 ? roots[0].name : "")
-      || (roots.length === 0 && looseFiles.length > 0 ? "Editor Workspace" : "Code Workspace");
-    addTab({
-      id: `code-workspace-${Date.now()}`,
-      type: "code-workspace",
-      title: `Code · ${title}`,
-      closable: true,
-      codeWorkspace: {
-        ...workspace,
-        workspaceId: workspace.workspaceId ?? identity,
-        // Derive the instance id from the workspace identity (the same
-        // deterministic recents id the tab already carries) instead of minting
-        // a fresh uuid per entry: the layout v2 snapshot and the bounded
-        // recovery copies are keyed by this id, so a fresh uuid per re-entry
-        // orphaned every snapshot/recovery entry across a reload or app
-        // restart. An explicit workspaceInstanceId (duplicate tab, detached
-        // window) still wins.
-        workspaceInstanceId: workspace.workspaceInstanceId ?? (identity || newWorkspaceInstanceId()),
-        name: title,
-      },
-    });
-  }, [addTab, setActiveTab]);
+    openPlatformCodeWorkspace(workspace);
+  }, []);
+
+  // Old persisted Sessions editor tabs are redirected without losing their
+  // recovery identity. Other Sessions tabs keep their independent instances.
+  useEffect(() => {
+    const active = tabsRef.current.find((tab) => tab.id === useAppStore.getState().activeTabId);
+    if (activeMode !== "sessions" || active?.type !== "code-workspace" || !active.codeWorkspace) return;
+    openPlatformCodeWorkspace(active.codeWorkspace);
+    removeTab(active.id);
+  }, [tabs, removeTab, activeTabId, activeMode]);
 
   const openCodeWorkspaceTab = useCallback((repoRoot: string, initialPath?: string | null) => {
     const normalized = repoRoot.trim();
@@ -214,23 +194,8 @@ export function useWorkspaceTabs(context: UseWorkspaceTabsContext) {
   }, [openCodeWorkspaceInfo]);
 
   const openEmptyCodeWorkspaceTab = useCallback(() => {
-    const id = `code-workspace-${Date.now()}`;
-    addTab({
-      id,
-      type: "code-workspace",
-      title: "Code · Editor Workspace",
-      closable: true,
-      codeWorkspace: {
-        repoRoot: "",
-        workspaceId: id,
-        workspaceInstanceId: newWorkspaceInstanceId(),
-        name: "Editor Workspace",
-        roots: [],
-        looseFiles: [],
-        initialFile: null,
-      },
-    });
-  }, [addTab]);
+    openCodeWorkspaceInfo({ repoRoot: "", roots: [], looseFiles: [], initialFile: null });
+  }, [openCodeWorkspaceInfo]);
 
   const openNewCodeWorkspaceFromWelcome = useCallback(async () => {
     const path = await selectFolderPath();

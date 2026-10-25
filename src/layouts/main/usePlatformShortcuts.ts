@@ -36,7 +36,10 @@ export function usePlatformShortcuts(): void {
         return;
       }
       if (mod && !event.shiftKey && !event.altKey && key === "b") {
+        // Code editors own Go to Definition and terminals own their input.
+        if (isTypingTarget(event.target)) return;
         event.preventDefault();
+        event.stopImmediatePropagation();
         state.toggleSidebar();
         return;
       }

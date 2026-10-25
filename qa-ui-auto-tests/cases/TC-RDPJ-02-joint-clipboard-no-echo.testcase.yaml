@@ -1,21 +1,35 @@
 id: TC-RDPJ-02-joint-clipboard-no-echo
 title: Taomni RDP client and server on one computer share the clipboard without an echo loop
-description: |
-  V-19 (docs-feature/rdp-server-parity-design.md §4.2, AC-19, DEC-15). One
+description: 'V-19 (docs-feature/rdp-server-parity-design.md §4.2, AC-19, DEC-15). One
+
   QA build starts the RDP server and connects its own RDP client to it over
+
   127.0.0.1, so both ends share the same OS clipboard: every server
+
   announcement makes the client write the text back, which the server sees
+
   as a new host change. DEC-15 says the server recognises content it already
+
   holds (or wrote) and announces it only once.
 
+
   The host clipboard is cleared before the client connects. Once connected,
-  the host copies a Unicode text with the platform's own tools. The text must
+
+  the host copies a Unicode text with the platform''s own tools. The text must
+
   stay on the clipboard, the clipboard must then stay unchanged for six
+
   seconds (Windows sequence number, macOS change count, X11 XFixes owner
+
   changes), and the server log, read back from the Local servers window
+
   after the session ends, must show the text announced to the client at
+
   least once and at most twice. On Windows platform_choice picks Taomni over
-  the runner's system Remote Desktop.
+
+  the runner''s system Remote Desktop.
+
+  '
 covers:
 - F-RdpServer-1
 - F9.7
@@ -57,7 +71,7 @@ steps:
     value: qa-rdp-joint-clipboard
 - click: '[data-testid="session-save"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-rdp-joint-clipboard"]'
-- open_route: '?servers=main'
+- open_route: ?servers=main
 - wait_for:
     selector: '[data-testid="servers-dialog"]'
     timeout_sec: 30
@@ -102,6 +116,8 @@ steps:
 - host_clipboard:
     action: clear
 - open_route: /
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
 - wait_for:
     selector: '[data-testid="sidebar"]'
     timeout_sec: 30
@@ -138,7 +154,7 @@ steps:
     action: assert
     kind: text
     equals: joint-clipboard 联合 ✓ no-echo
-- open_route: '?servers=main'
+- open_route: ?servers=main
 - wait_for:
     selector: '[data-testid="servers-dialog"]'
     timeout_sec: 30
@@ -149,7 +165,6 @@ steps:
     timeout_sec: 15
 - assert_pattern:
     selector: '[data-testid="server-log"]'
-    # At least one announcement of the copied text, and no third one.
     regex: '^(?!(?:[\s\S]*?this computer -> client: text \(28 chars\)){3})[\s\S]*?this computer -> client: text \(28 chars\)'
     timeout_sec: 5
 - assert_text:
@@ -167,47 +182,48 @@ verification:
     requirement: The product client completes NLA against the product server on the same computer.
     actions:
     - 25
-    - 35
-    - 38
+    - 37
     - 40
+    - 42
     checkpoints:
     - step: 31
       expectation: '{"wait_for": {"selector": "[data-testid=\"server-row-rdp\"][data-status=\"running\"]", "timeout_sec": 90}}'
-    - step: 41
+    - step: 43
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Connected", "timeout_sec": 60}}'
     results:
-    - 41
+    - 43
   - id: R2
     requirement: A host copy reaches the shared clipboard once and does not bounce between client and server.
     actions:
     - 32
-    - 43
+    - 45
     checkpoints:
-    - step: 44
-      expectation: '{"host_clipboard": {"action": "assert", "kind": "text", "equals": "joint-clipboard 联合 ✓ no-echo", "timeout_sec": 10}}'
     - step: 46
+      expectation: '{"host_clipboard": {"action": "assert", "kind": "text", "equals": "joint-clipboard 联合 ✓ no-echo", "timeout_sec": 10}}'
+    - step: 48
       expectation: '{"host_clipboard": {"action": "quiet", "seconds": 6, "max_changes": 0}}'
-    - step: 47
+    - step: 49
       expectation: '{"host_clipboard": {"action": "assert", "kind": "text", "equals": "joint-clipboard 联合 ✓ no-echo"}}'
     results:
-    - 46
-    - 47
+    - 48
+    - 49
   - id: R3
     requirement: The server announced the copied text to the client a bounded number of times and noticed the client leave.
     actions:
-    - 48
+    - 50
     checkpoints:
-    - step: 51
-      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "this computer -> client: text (28 chars)", "timeout_sec": 15}}'
-    - step: 52
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"server-log\"]", "regex": "^(?!(?:[\\s\\S]*?this computer -> client: text \\(28 chars\\)){3})[\\s\\S]*?this computer
-        -> client: text \\(28 chars\\)", "timeout_sec": 5}}'
     - step: 53
+      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "this computer -> client: text (28 chars)", "timeout_sec":
+        15}}'
+    - step: 54
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"server-log\"]", "regex": "^(?!(?:[\\s\\S]*?this computer -> client: text \\(28 chars\\)){3})[\\s\\S]*?this
+        computer -> client: text \\(28 chars\\)", "timeout_sec": 5}}'
+    - step: 55
       expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "disconnected after", "timeout_sec": 30}}'
     results:
-    - 51
-    - 52
     - 53
+    - 54
+    - 55
   native:
   - check: Real OS clipboard shared by the product RDP client and server in one QA build, observed with platform tools and the OS change counters.
     method: automated

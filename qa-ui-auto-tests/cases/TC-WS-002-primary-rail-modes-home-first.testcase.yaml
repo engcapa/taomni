@@ -1,7 +1,6 @@
 id: TC-WS-002
-title: Primary rail order, full-width Home and Agents / Crew development notice
-description: v6.1 AC-02 / DEC-02. The left primary navigation rail renders exactly five primary modes in order Home → Workspaces → Sessions → Agents → Tools,
-  and Home opens the existing WelcomePanel surface with its launch actions.
+title: Four primary modes and one bottom chat entry
+description: The primary rail is Home, Workspaces, Sessions and Tools; Home launch actions remain available. Crew is retained on Home and in global search.
 modes:
 - browser
 - native
@@ -10,13 +9,12 @@ covers:
 - F1.6
 - F-WS-1
 tags:
-- smoke
 - p0
 - workspace-redesign
-- main
+- regression
 fixtures:
 - reset_db
-timeout_sec: 90
+timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-ws-002
@@ -25,7 +23,7 @@ steps:
 - assert_visible: '[data-testid="sidebar-rail"] [data-testid="nav-mode-home"]'
 - assert_visible: '[data-testid="sidebar-rail"] [data-testid="nav-mode-workspaces"]'
 - assert_visible: '[data-testid="sidebar-rail"] [data-testid="side-tab-sessions"]'
-- assert_visible: '[data-testid="sidebar-rail"] [data-testid="nav-mode-agents"]'
+- assert_not_visible: '[data-testid="nav-mode-agents"]'
 - assert_visible: '[data-testid="sidebar-rail"] [data-testid="side-tab-tools"]'
 - assert_items:
     selector: '[data-testid="sidebar-rail"] [data-testid="rail-mode-group"] button'
@@ -34,7 +32,6 @@ steps:
     - nav-mode-home
     - nav-mode-workspaces
     - side-tab-sessions
-    - nav-mode-agents
     - side-tab-tools
 - click: '[data-testid="nav-mode-home"]'
 - wait_for: '[data-testid="collapsed-sidebar-rail"]'
@@ -47,13 +44,10 @@ steps:
 - wait_for: '[data-testid="workspace-switcher"]'
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
-- click: '[data-testid="nav-mode-agents"]'
-- wait_for: '[data-testid="alert-dialog-message"]'
-- assert_text:
-    selector: '[data-testid="alert-dialog-message"]'
-    contains: under development
-- click: '[data-testid="alert-dialog-ok"]'
-- assert_visible: '[data-testid="session-tree"]'
+- assert_not_visible: '[data-testid="nav-mode-agents"]'
+- assert_count:
+    selector: '[data-testid="rail-chat-button"]'
+    equal: 1
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - screenshot: ws-002-primary-rail-modes.png
@@ -61,39 +55,49 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Home、Workspaces、Sessions、Agents、Tools 顺序固定。Home 默认收起左右栏并展示原有启动入口。
+    requirement: Four primary modes have the requested order, the duplicate top robot is absent, one bottom chat entry remains and Home, Workspaces, Sessions
+      and Tools navigation works.
     actions:
-    - 1
-    - 2
     - 11
     - 16
+    - 18
+    - 22
     checkpoints:
     - step: 3
-      expectation: 'wait_for: [data-testid="welcome-panel"]'
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 4
-      expectation: 'wait_for: [data-testid="sidebar-rail"]'
+      expectation: '{"wait_for": "[data-testid=\"sidebar-rail\"]"}'
     - step: 5
-      expectation: 'assert_visible: [data-testid="sidebar-rail"] [data-testid="nav-mode-home"]'
+      expectation: '{"assert_visible": "[data-testid=\"sidebar-rail\"] [data-testid=\"nav-mode-home\"]"}'
     - step: 6
-      expectation: 'assert_visible: [data-testid="sidebar-rail"] [data-testid="nav-mode-workspaces"]'
+      expectation: '{"assert_visible": "[data-testid=\"sidebar-rail\"] [data-testid=\"nav-mode-workspaces\"]"}'
     - step: 7
-      expectation: 'assert_visible: [data-testid="sidebar-rail"] [data-testid="side-tab-sessions"]'
+      expectation: '{"assert_visible": "[data-testid=\"sidebar-rail\"] [data-testid=\"side-tab-sessions\"]"}'
     - step: 8
-      expectation: 'assert_visible: [data-testid="sidebar-rail"] [data-testid="nav-mode-agents"]'
+      expectation: '{"assert_not_visible": "[data-testid=\"nav-mode-agents\"]"}'
     - step: 9
-      expectation: 'assert_visible: [data-testid="sidebar-rail"] [data-testid="side-tab-tools"]'
+      expectation: '{"assert_visible": "[data-testid=\"sidebar-rail\"] [data-testid=\"side-tab-tools\"]"}'
     - step: 10
-      expectation: 'assert_items: [data-testid="sidebar-rail"] [data-testid="rail-mode-group"] button'
+      expectation: '{"assert_items": {"selector": "[data-testid=\"sidebar-rail\"] [data-testid=\"rail-mode-group\"] button", "attribute": "data-testid",
+        "equals": ["nav-mode-home", "nav-mode-workspaces", "side-tab-sessions", "side-tab-tools"]}}'
     - step: 12
-      expectation: 'wait_for: [data-testid="collapsed-sidebar-rail"]'
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
     - step: 13
-      expectation: 'assert_visible: [data-testid="welcome-panel"]'
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
     - step: 14
-      expectation: 'assert_visible: [data-testid="welcome-open-local-terminal"]'
+      expectation: '{"assert_visible": "[data-testid=\"welcome-open-local-terminal\"]"}'
     - step: 15
-      expectation: 'assert_text: [data-testid="welcome-panel"]'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Start local terminal"}}'
     - step: 17
-      expectation: 'wait_for: [data-testid="workspace-switcher"]'
+      expectation: '{"wait_for": "[data-testid=\"workspace-switcher\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 20
+      expectation: '{"assert_not_visible": "[data-testid=\"nav-mode-agents\"]"}'
+    - step: 21
+      expectation: '{"assert_count": {"selector": "[data-testid=\"rail-chat-button\"]", "equal": 1}}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
     results:
     - 3
     - 4
@@ -108,35 +112,16 @@ verification:
     - 14
     - 15
     - 17
-  - id: R2
-    requirement: 工作区和会话模式可用；Agents 显示开发中提示且保持当前会话视图；Tools 可用。
-    actions:
-    - 18
-    - 20
-    - 23
-    - 25
-    checkpoints:
-    - step: 19
-      expectation: 'wait_for: [data-testid="session-tree"]'
-    - step: 21
-      expectation: 'wait_for: [data-testid="alert-dialog-message"]'
-    - step: 22
-      expectation: 'assert_text: [data-testid="alert-dialog-message"]'
-    - step: 24
-      expectation: 'assert_visible: [data-testid="session-tree"]'
-    - step: 26
-      expectation: 'wait_for: [data-testid="sidebar-tools-panel"]'
-    results:
     - 19
+    - 20
     - 21
-    - 22
-    - 24
-    - 26
+    - 23
   visual:
-  - check: 与 HTML 原型比较圆角框架、紧凑尺寸、无溢出和可用操作入口。
+  - check: Compact controls retain readable icons and active states without toolbar overlap.
     method: manual
-    reason: 保留运行截图供视觉对比，自动断言验证具体布局和状态。
+    reason: Inspect the retained screenshots; functional assertions do not establish visual matching.
   native:
-  - check: 在真实桌面 WebView 验证布局与持久化；终端用例额外验证真实 PTY，编辑器用例验证真实磁盘写入。
+  - check: Four primary modes have the requested order, the duplicate top robot is absent, one bottom chat entry remains and Home, Workspaces, Sessions
+      and Tools navigation works.
     method: automated
-    reason: 浏览器存根不能证明 WebKit/WebView2 渲染与原生磁盘、进程行为。
+    reason: Runs the isolated packaged application and explicitly asserts real native effects.

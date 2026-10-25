@@ -42,7 +42,7 @@ export function PlatformToolbarActions({ children, onOpenSearch }: { children?: 
         <ToolbarButton testId={sessionMode ? "tab-split-view" : "workspace-layout-split"} title={t("platform.splitView")} active={currentLayout === "split"} onClick={() => setLayout(currentLayout === "split" ? "single" : "split")}><Columns2 /></ToolbarButton>
         <ToolbarButton testId="platform-layout-grid" title={t("platform.gridView")} active={currentLayout === "grid"} onClick={() => setLayout("grid")}><Grid2X2 /></ToolbarButton>
       </div>}
-      {workspaceMode && workspace && <ToolbarButton testId="workspace-toolbar-bottom-dock" title={t("platform.toggleBottomDock")} active={workspace.bottomDock.open} onClick={() => useWorkspacePlatformStore.getState().setBottomDockOpen(workspace.id, !workspace.bottomDock.open)}><PanelBottom /><span>{t("platform.bottomDock")}</span></ToolbarButton>}
+      {workspaceMode && workspace && <ToolbarButton testId="workspace-toolbar-bottom-dock" title={t("platform.toggleBottomDock")} active={workspace.bottomDock.open} onClick={() => useWorkspacePlatformStore.getState().setBottomDockOpen(workspace.id, !workspace.bottomDock.open)}><PanelBottom /></ToolbarButton>}
       {children}
       <span className="taomni-toolbar-divider" />
       <ToolbarButton testId="global-search-trigger" title={`${t("platform.globalSearch")} (Ctrl/Cmd+K)`} onClick={onOpenSearch}><Search /></ToolbarButton>

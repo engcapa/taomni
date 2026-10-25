@@ -11825,7 +11825,7 @@ controls:
 
 ## 12. Workspace-First 平台重构（v6.1）
 
-> 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents / Crew 开发中入口与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-020`。
+> 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents / Crew 开发中入口与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-028`。
 
 ### 12.1 Workspace-first 主壳层：单行工具栏、主导航条 5 大模式与右栏收纳
 
@@ -11871,9 +11871,6 @@ controls:
 - id: home-sidebar-panel
   selector: '[data-testid="home-sidebar-panel"]'
   kind: display
-- id: nav-mode-agents
-  selector: '[data-testid="nav-mode-agents"]'
-  kind: interactive
 - id: nav-mode-home
   selector: '[data-testid="nav-mode-home"]'
   kind: interactive
@@ -11991,6 +11988,52 @@ controls:
 - id: tools-empty-state
   selector: '[data-testid="tools-empty-state"]'
   kind: display
+
+# The removed upper Agents button is retained only as a negative regression selector.
+- id: removed-nav-mode-agents
+  selector: '[data-testid="nav-mode-agents"]'
+  kind: display
+  optional: true
+- id: tab-filter-chip
+  selector: '[data-testid="tab-filter-chip"]'
+  kind: interactive
+  optional: true
+- id: tab-filter-empty
+  selector: '[data-testid="tab-filter-empty"]'
+  kind: display
+  optional: true
+- id: tab-scroll-left
+  selector: '[data-testid="tab-scroll-left"]'
+  kind: interactive
+  optional: true
+- id: tab-scroll-right
+  selector: '[data-testid="tab-scroll-right"]'
+  kind: interactive
+  optional: true
+- id: workspace-code-tab
+  selector: '[data-testid="workspace-code-tab"]'
+  kind: display
+  optional: true
+- id: workspace-create-button
+  selector: '[data-testid="workspace-create-button"]'
+  kind: interactive
+  optional: true
+- id: workspace-empty-add-folder
+  selector: '[data-testid="workspace-empty-add-folder"]'
+  kind: interactive
+  optional: true
+- id: workspace-empty-state
+  selector: '[data-testid="workspace-empty-state"]'
+  kind: display
+  optional: true
+- id: open-tabs-search-result
+  selector: '[data-testid^="open-tabs-tab-"]:not([data-testid^="open-tabs-tab-checkbox-"])'
+  kind: interactive
+  optional: true
+- id: workspace-custom-switcher-option
+  selector: '[data-testid^="workspace-switcher-option-"]:not([data-testid="workspace-switcher-option-default-workspace"])'
+  kind: interactive
+  optional: true
 -->
 
 主窗口只有单行 33px 共享 ControlBar；左侧主导航条提供 Home / Workspaces / Sessions / Agents / Tools 五大一级模式，支持左右侧栏收缩与 Ctrl/Cmd+K 全局搜索。
@@ -12045,6 +12088,132 @@ controls:
 - id: workspace-fs-modal-confirm
   selector: '[data-testid="workspace-fs-modal-confirm"]'
   kind: interactive
+- id: workspace-tab-context-menu
+  selector: '[data-testid="workspace-tab-context-menu"]'
+  kind: display
+  optional: true
+- id: workspace-tab-context-close
+  selector: '[data-testid="workspace-tab-context-close"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-context-close-others
+  selector: '[data-testid="workspace-tab-context-close-others"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-context-close-all
+  selector: '[data-testid="workspace-tab-context-close-all"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-context-rename
+  selector: '[data-testid="workspace-tab-context-rename"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-context-duplicate
+  selector: '[data-testid="workspace-tab-context-duplicate"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-context-copy-info
+  selector: '[data-testid="workspace-tab-context-copy-info"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-context-move-first
+  selector: '[data-testid="workspace-tab-context-move-first"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-context-move-left
+  selector: '[data-testid="workspace-tab-context-move-left"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-context-move-right
+  selector: '[data-testid="workspace-tab-context-move-right"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-context-move-last
+  selector: '[data-testid="workspace-tab-context-move-last"]'
+  kind: interactive
+  optional: true
+- id: session-tab-filter
+  selector: '[data-testid="session-tab-filter"]'
+  kind: interactive
+  optional: true
+- id: session-tab-filter-menu
+  selector: '[data-testid="session-tab-filter-menu"]'
+  kind: display
+  optional: true
+- id: session-tab-filter-all
+  selector: '[data-testid="session-tab-filter-all"]'
+  kind: interactive
+  optional: true
+- id: session-tab-filter-ssh
+  selector: '[data-testid="session-tab-filter-ssh"]'
+  kind: interactive
+  optional: true
+- id: session-tab-filter-database
+  selector: '[data-testid="session-tab-filter-database"]'
+  kind: interactive
+  optional: true
+- id: session-tab-filter-sftp
+  selector: '[data-testid="session-tab-filter-sftp"]'
+  kind: interactive
+  optional: true
+- id: session-tab-filter-remote
+  selector: '[data-testid="session-tab-filter-remote"]'
+  kind: interactive
+  optional: true
+- id: session-tab-filter-local
+  selector: '[data-testid="session-tab-filter-local"]'
+  kind: interactive
+  optional: true
+- id: session-tab-filter-other
+  selector: '[data-testid="session-tab-filter-other"]'
+  kind: interactive
+  optional: true
+- id: open-tabs-empty
+  selector: '[data-testid="open-tabs-empty"]'
+  kind: display
+  optional: true
+- id: workspace-dock-tab-terminal
+  selector: '[data-testid="workspace-dock-tab-terminal"]'
+  kind: interactive
+  optional: true
+- id: workspace-dock-tab-problems
+  selector: '[data-testid="workspace-dock-tab-problems"]'
+  kind: interactive
+  optional: true
+- id: workspace-dock-tab-run
+  selector: '[data-testid="workspace-dock-tab-run"]'
+  kind: interactive
+  optional: true
+- id: workspace-dock-tab-find
+  selector: '[data-testid="workspace-dock-tab-find"]'
+  kind: interactive
+  optional: true
+- id: workspace-dock-tab-bookmarks
+  selector: '[data-testid="workspace-dock-tab-bookmarks"]'
+  kind: interactive
+  optional: true
+- id: workspace-dock-tab-todo
+  selector: '[data-testid="workspace-dock-tab-todo"]'
+  kind: interactive
+  optional: true
+- id: workspace-dock-tab-services
+  selector: '[data-testid="workspace-dock-tab-services"]'
+  kind: interactive
+  optional: true
+- id: workspace-dock-tab-database
+  selector: '[data-testid="workspace-dock-tab-database"]'
+  kind: interactive
+  optional: true
+- id: workspace-fs-modal-browse
+  selector: '[data-testid="workspace-fs-modal-browse"]'
+  kind: interactive
+- id: workspace-fs-modal-cancel
+  selector: '[data-testid="workspace-fs-modal-cancel"]'
+  kind: interactive
+- id: workspace-fs-modal-error
+  selector: '[data-testid="workspace-fs-modal-error"]'
+  kind: display
+  optional: true
 - id: workspace-fs-modal-input
   selector: '[data-testid="workspace-fs-modal-input"]'
   kind: display

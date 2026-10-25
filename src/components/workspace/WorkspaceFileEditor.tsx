@@ -1,6 +1,6 @@
 import { EditorState, StateEffect } from "@codemirror/state";
 import { EditorView, drawSelection, highlightActiveLine, keymap, lineNumbers } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, redo } from "@codemirror/commands";
 import { GitBranch, Save } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useT } from "../../lib/i18n";
@@ -118,7 +118,7 @@ export function WorkspaceFileEditor({ workspace, tab, visible, onOpenGitDiff }: 
         highlightActiveLine(),
         drawSelection(),
         history(),
-        keymap.of([...defaultKeymap, ...historyKeymap]),
+        keymap.of([{ key: "Mod-Shift-z", run: redo }, ...defaultKeymap, ...historyKeymap]),
         ...codeViewExtensions(),
         editorTheme,
         EditorView.updateListener.of((update) => {

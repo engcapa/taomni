@@ -1,15 +1,15 @@
-import { FilePlus2, FolderPlus, MonitorSmartphone, X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
-import { CodeWorkspaceTab } from "../editor/CodeWorkspaceTab";
+import { Bookmark, Bug, Database, FilePlus2, FolderPlus, ListTodo, MonitorSmartphone, Search, Server, Terminal, TriangleAlert, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { WorkspaceCodeEditor, type WorkspaceCodeEditorProps } from "./WorkspaceCodeEditor";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { useT } from "../../lib/i18n";
 import { useAppStore } from "../../stores/appStore";
 import { useWorkspaceUiStore } from "../../stores/workspaceUiStore";
+import { openPlatformCodeWorkspace } from "../../lib/openPlatformCodeWorkspace";
 import {
   useWorkspacePlatformStore,
   type WorkspaceBottomTool,
 } from "../../stores/workspacePlatformStore";
-import type { CodeWorkspaceTabInfo } from "../../types";
 import { createWorkspaceFileNode, createWorkspaceFolderNode } from "./workspaceFs";
 import { WorkspaceFileEditor } from "./WorkspaceFileEditor";
 import { WorkspaceFsModals } from "./WorkspaceFsModals";
@@ -28,6 +28,8 @@ const DOCK_TOOLS: WorkspaceBottomTool[] = [
   "database",
 ];
 
+const DOCK_ICONS = { terminal: Terminal, problems: TriangleAlert, run: Bug, find: Search, bookmarks: Bookmark, todo: ListTodo, services: Server, database: Database };
+
 /**
  * Main canvas of the Workspaces mode (AC-06/07/08).
  *
@@ -36,26 +38,28 @@ const DOCK_TOOLS: WorkspaceBottomTool[] = [
  * surface, and the legacy Code Workspace editor stays available as its own tab
  * for full IDEA parity. A collapsible bottom dock mirrors IDEA's tool windows.
  */
-export function WorkspaceMainPanel({ visible = true }: { visible?: boolean }) {
+type CommandProps = Pick<WorkspaceCodeEditorProps, "onCommandsChange">;
+
+export function WorkspaceMainPanel({ visible = true, onCommandsChange }: { visible?: boolean } & CommandProps) {
   const workspaces = useWorkspacePlatformStore((s) => s.workspaces);
   const activeId = useWorkspacePlatformStore((s) => s.activeWorkspaceId);
   return (
     <div data-testid="workspace-main-panel" className="relative flex min-h-0 flex-1 flex-col">
       {workspaces.map((workspace) => (
-        <WorkspaceCanvas key={workspace.id} workspaceId={workspace.id} visible={visible && workspace.id === activeId} />
+        <WorkspaceCanvas key={workspace.id} workspaceId={workspace.id} visible={visible && workspace.id === activeId} onCommandsChange={onCommandsChange} />
       ))}
     </div>
   );
 }
 
-function WorkspaceCanvas({ workspaceId, visible }: { workspaceId: string; visible: boolean }) {
+function WorkspaceCanvas({ workspaceId, visible, onCommandsChange }: { workspaceId: string; visible: boolean } & CommandProps) {
   const [started, setStarted] = useState(visible);
   useEffect(() => { if (visible) setStarted(true); }, [visible]);
   if (!started && !visible) return null;
-  return <WorkspaceCanvasContents workspaceId={workspaceId} visible={visible} />;
+  return <WorkspaceCanvasContents workspaceId={workspaceId} visible={visible} onCommandsChange={onCommandsChange} />;
 }
 
-function WorkspaceCanvasContents({ workspaceId, visible }: { workspaceId: string; visible: boolean }) {
+function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange }: { workspaceId: string; visible: boolean } & CommandProps) {
   const t = useT();
   const workspace = useWorkspacePlatformStore((s) => s.workspaces.find((candidate) => candidate.id === workspaceId));
   const setActiveTab = useWorkspacePlatformStore((s) => s.setActiveWorkspaceTab);
@@ -73,23 +77,6 @@ function WorkspaceCanvasContents({ workspaceId, visible }: { workspaceId: string
   const fsModal = useWorkspaceUiStore((s) => s.fsModal);
   const closeFsModal = useWorkspaceUiStore((s) => s.closeFsModal);
   const canvasLayout = useWorkspaceUiStore((s) => s.canvasLayouts[workspaceId] ?? "single");
-
-  const codeWorkspaceInfo = useMemo<CodeWorkspaceTabInfo | null>(() => {
-    if (!workspace) return null;
-    return {
-      repoRoot: workspace.rootFolders[0]?.path ?? "",
-      workspaceId: workspace.id,
-      workspaceInstanceId: `platform:${workspace.id}`,
-      name: workspace.name,
-      roots: workspace.rootFolders.map((root) => ({
-        id: root.id,
-        name: root.name,
-        path: root.path,
-        kind: "folder" as const,
-      })),
-      looseFiles: [],
-    };
-  }, [workspace?.id, workspace?.name, workspace?.rootFolders]);
 
   if (!workspace) return null;
 
@@ -171,7 +158,16 @@ function WorkspaceCanvasContents({ workspaceId, visible }: { workspaceId: string
               workspace={workspace}
               visible={paneVisible(tab.id)}
               focusPath={tab.focusPath}
-              onOpenFile={(rootId, path) => openFileInWorkspace(workspace.id, { rootId, path })}
+              onOpenFile={(rootId, path) => {
+                if (codeTab && workspace.codeWorkspace) {
+                  openPlatformCodeWorkspace({
+                    ...workspace.codeWorkspace,
+                    initialFile: { kind: "root", rootId, path },
+                  });
+                } else {
+                  openFileInWorkspace(workspace.id, { rootId, path });
+                }
+              }}
             />
           </div>
         ))}
@@ -182,23 +178,17 @@ function WorkspaceCanvasContents({ workspaceId, visible }: { workspaceId: string
           </div>
         ))}
 
-        {codeTab && codeWorkspaceInfo && (
+        {codeTab && (
           <div
             data-testid="workspace-code-tab"
             className="h-full min-h-0 w-full"
             style={paneStyle(codeTab.id)}
           >
-            <CodeWorkspaceTab
+            <WorkspaceCodeEditor
               tabId={codeTab.id}
-              workspace={codeWorkspaceInfo}
+              workspace={workspace}
               visible={paneVisible(codeTab.id)}
-              onOpenGitManager={(payload) => {
-                const firstWithChanges = payload.roots[0];
-                void firstWithChanges;
-                openGitTab(workspace.id);
-              }}
-              onSyncGitManager={() => undefined}
-              onCommandsChange={() => undefined}
+              onCommandsChange={onCommandsChange}
             />
           </div>
         )}
@@ -207,22 +197,28 @@ function WorkspaceCanvasContents({ workspaceId, visible }: { workspaceId: string
       {dock.open && (
         <div data-testid="workspace-bottom-dock" className="flex shrink-0 flex-col border-t" style={{ borderColor: "var(--taomni-divider)", height: dock.heightPx, background: "var(--taomni-panel-bg)" }}>
           <div className="flex h-7 shrink-0 items-center gap-1 border-b px-2" style={{ borderColor: "var(--taomni-divider)" }}>
-            {DOCK_TOOLS.map((tool) => (
+            {DOCK_TOOLS.map((tool) => {
+              const Icon = DOCK_ICONS[tool];
+              const label = t(`platform.${tool === "run" ? "runDebug" : tool}` as never) || tool;
+              return (
               <button
                 key={tool}
                 type="button"
                 data-testid={`workspace-dock-tab-${tool}`}
+                title={label}
+                aria-label={label}
                 aria-pressed={dock.activeTool === tool}
-                className="rounded px-1.5 py-0.5 text-[10.5px] font-semibold capitalize"
+                className="flex h-6 w-7 shrink-0 items-center justify-center rounded"
                 style={{
                   background: dock.activeTool === tool ? "var(--taomni-selected)" : "transparent",
                   color: dock.activeTool === tool ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
                 }}
                 onClick={() => setBottomDockTool(workspace.id, tool)}
               >
-                {t(`platform.${tool === "run" ? "runDebug" : tool}` as never) || tool}
+                <Icon className="h-3.5 w-3.5" />
               </button>
-            ))}
+              );
+            })}
             <div className="flex-1" />
             <button
               type="button"
@@ -251,7 +247,7 @@ function WorkspaceCanvasContents({ workspaceId, visible }: { workspaceId: string
         workspaceId={sessionPickerWorkspaceId ?? workspace.id}
         onClose={closeSessionPicker}
       />
-      <WorkspaceFsModals request={visible ? fsModal : null} onCancel={closeFsModal} onSubmit={submitFsModal} />
+      <WorkspaceFsModals request={visible ? fsModal : null} initialPath={workspace.rootFolders[0]?.path} onCancel={closeFsModal} onSubmit={submitFsModal} />
     </div>
   );
 }

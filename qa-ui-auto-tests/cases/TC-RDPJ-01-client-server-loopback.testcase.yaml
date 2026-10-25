@@ -1,23 +1,39 @@
 id: TC-RDPJ-01-client-server-loopback
 title: Taomni RDP client connects to Taomni's own RDP server - desktop, input on the host and the full-screen connection bar
-description: |
-  V-18 and V-20 (docs-feature/rdp-server-parity-design.md §4.6, §4.8,
+description: 'V-18 and V-20 (docs-feature/rdp-server-parity-design.md §4.6, §4.8,
+
   AC-15, AC-19). One QA build plays both roles: it starts the RDP server
+
   from Local servers and opens a saved RDP session to 127.0.0.1 on the same
+
   port, so the product client is tested against the product server.
 
+
   Starting the server creates the credential vault. After NLA and the
+
   first-use certificate confirmation the client shows the host desktop. A
-  click on the client canvas at the Tk target's desktop position must flip
+
+  click on the client canvas at the Tk target''s desktop position must flip
+
   the target on the host (its state file counts the flips), proving client
+
   input reaches the host through the server. In OS full screen the
-  connection bar appears with a connection quality taken from the server's
+
+  connection bar appears with a connection quality taken from the server''s
+
   Network Characteristics Result (auto-detect RTT); pointing at the top edge
+
   brings it back after it slides away, restore leaves full screen, and in a
-  second full screen the bar's disconnect ends the session. The server then
+
+  second full screen the bar''s disconnect ends the session. The server then
+
   accepts an independent probe connection, so it went back to waiting (it
+
   serves one client at a time). On Windows platform_choice picks Taomni over
-  the runner's system Remote Desktop.
+
+  the runner''s system Remote Desktop.
+
+  '
 covers:
 - F-RdpServer-1
 - F9.7
@@ -58,7 +74,7 @@ steps:
     value: qa-rdp-loopback
 - click: '[data-testid="session-save"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-rdp-loopback"]'
-- open_route: '?servers=main'
+- open_route: ?servers=main
 - wait_for:
     selector: '[data-testid="servers-dialog"]'
     timeout_sec: 30
@@ -106,6 +122,8 @@ steps:
     mode: flip
     geometry: 480x320+40+80
 - open_route: /
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
 - wait_for:
     selector: '[data-testid="sidebar"]'
     timeout_sec: 30
@@ -177,60 +195,62 @@ verification:
     requirement: The product client completes NLA against the product server after confirming its certificate and shows the host desktop.
     actions:
     - 25
-    - 35
-    - 38
+    - 37
     - 40
+    - 42
     checkpoints:
     - step: 27
       expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-dialog\"]", "timeout_sec": 30}}'
     - step: 31
       expectation: '{"wait_for": {"selector": "[data-testid=\"server-row-rdp\"][data-status=\"running\"]", "timeout_sec": 90}}'
-    - step: 39
-      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
     - step: 41
+      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
+    - step: 43
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Connected", "timeout_sec": 60}}'
     results:
-    - 41
+    - 43
   - id: R2
     requirement: A click on the client canvas reaches the host desktop through the server.
     actions:
-    - 42
-    checkpoints:
-    - step: 43
-      expectation: '{"assert_json_file": {"path": "target-state.json", "timeout_sec": 20, "expect": {"flips": {"min": 1}}}}'
-    results:
-    - 43
-  - id: R3
-    requirement: In OS full screen the connection bar shows the server-measured connection quality, comes back from the top edge, restores the window and disconnects the session.
-    actions:
     - 44
-    - 47
-    - 49
-    - 51
-    - 52
-    - 54
     checkpoints:
     - step: 45
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
-    - step: 46
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-bar-quality\"]:not([data-level=\"0\"])", "timeout_sec": 45}}'
-    - step: 48
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 10}}'
-    - step: 50
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
-    - step: 53
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
-    - step: 55
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
-    - step: 56
-      expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Disconnected", "timeout_sec": 20}}'
-    - step: 57
-      expectation: '{"rdp_probe": {"scenario": "connect", "artifact": "still-serving", "args": {"seconds": 2}, "expect": {"first_graphics_ms": {"exists": true}}}}'
+      expectation: '{"assert_json_file": {"path": "target-state.json", "timeout_sec": 20, "expect": {"flips": {"min": 1}}}}'
     results:
+    - 45
+  - id: R3
+    requirement: In OS full screen the connection bar shows the server-measured connection quality, comes back from the top edge, restores the window and
+      disconnects the session.
+    actions:
     - 46
-    - 50
+    - 49
+    - 51
+    - 53
+    - 54
     - 56
-    - 57
+    checkpoints:
+    - step: 47
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
+    - step: 48
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-bar-quality\"]:not([data-level=\"0\"])", "timeout_sec": 45}}'
+    - step: 50
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 10}}'
+    - step: 52
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
+    - step: 55
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
+    - step: 57
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
+    - step: 58
+      expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Disconnected", "timeout_sec": 20}}'
+    - step: 59
+      expectation: '{"rdp_probe": {"scenario": "connect", "artifact": "still-serving", "args": {"seconds": 2}, "expect": {"first_graphics_ms": {"exists":
+        true}}}}'
+    results:
+    - 48
+    - 52
+    - 58
+    - 59
   native:
   - check: Real desktop session on the runner with the product RDP client and server in one QA build, OS-level input injection and OS full screen.
     method: automated

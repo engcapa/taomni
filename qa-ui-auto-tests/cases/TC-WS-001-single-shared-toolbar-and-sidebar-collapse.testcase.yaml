@@ -1,6 +1,7 @@
 id: TC-WS-001
 title: Single shared 33px toolbar with left/right sidebar collapse and Ctrl+B
-description: 'Prototype shell: a full-height rail beside aligned rounded navigator and main canvas, one 33px toolbar inside the canvas, 6px gutters and functional sidebar toggles.'
+description: 'Prototype shell: a full-height rail beside aligned rounded navigator and main canvas, one 33px toolbar inside the canvas, 6px gutters and
+  functional sidebar toggles.'
 modes:
 - browser
 - native
@@ -34,8 +35,8 @@ steps:
     expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"control-bar"]').getBoundingClientRect().height <= 34
     expect_truthy: true
 - eval_readonly:
-    expression: Math.abs(document.querySelector('.taomni-navigator-frame').getBoundingClientRect().top -
-      document.querySelector('.taomni-main-canvas-frame').getBoundingClientRect().top) < 1 && document.querySelector('.taomni-platform-resizer').getBoundingClientRect().width === 6
+    expression: Math.abs(document.querySelector('.taomni-navigator-frame').getBoundingClientRect().top - document.querySelector('.taomni-main-canvas-frame').getBoundingClientRect().top)
+      < 1 && document.querySelector('.taomni-platform-resizer').getBoundingClientRect().width === 6
     expect_truthy: true
 - assert_visible: '[data-testid="sidebar-rail"] [data-testid="rail-app-menu-host"]'
 - click: '[data-testid="toggle-left-sidebar"]'
@@ -82,11 +83,11 @@ verification:
     - step: 11
       expectation: '{"assert_visible": "[data-testid=\"titlebar-actions-more\"]"}'
     - step: 12
-      expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('[data-testid' + String.fromCharCode(61) + '\\\"control-bar\\\"]').getBoundingClientRect().height <=
-        34\", \"expect_truthy\": true}}"
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"control-bar\"]'').getBoundingClientRect().height
+        <= 34", "expect_truthy": true}}'
     - step: 13
-      expectation: "{\"eval_readonly\": {\"expression\": \"Math.abs(document.querySelector('.taomni-navigator-frame').getBoundingClientRect().top - document.querySelector('.taomni-main-canvas-frame').getBoundingClientRect().top)
-        < 1 && document.querySelector('.taomni-platform-resizer').getBoundingClientRect().width === 6\", \"expect_truthy\": true}}"
+      expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(''.taomni-navigator-frame'').getBoundingClientRect().top - document.querySelector(''.taomni-main-canvas-frame'').getBoundingClientRect().top)
+        < 1 && document.querySelector(''.taomni-platform-resizer'').getBoundingClientRect().width === 6", "expect_truthy": true}}'
     - step: 14
       expectation: '{"assert_visible": "[data-testid=\"sidebar-rail\"] [data-testid=\"rail-app-menu-host\"]"}'
     - step: 16

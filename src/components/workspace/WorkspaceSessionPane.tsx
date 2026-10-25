@@ -73,6 +73,7 @@ export function WorkspaceSessionPane({ tab, visible, active = visible }: Workspa
         <TerminalPanel
           tabId={tab.id}
           tabTitle={tab.title}
+          initialCwd={tab.terminalInitialCwd}
           visible={visible}
           activeForShortcuts={active}
           workspaceRoot={undefined}
@@ -92,6 +93,7 @@ export function WorkspaceSessionPane({ tab, visible, active = visible }: Workspa
         <TerminalPanel
           tabId={tab.id}
           tabTitle={tab.title}
+          initialCwd={tab.terminalInitialCwd}
           visible={visible}
           activeForShortcuts={active}
           terminalProfile={getSessionTerminalProfile(session.options_json) ?? loadTerminalDefaultProfile()}

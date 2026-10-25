@@ -1,5 +1,7 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
+> 当前追加验收进行中：目录选择、终端标签菜单、工作区入口路由与大量 Sessions 标签已完成实现，新增 browser 用例 4/4 通过；native 与跨平台验收仍在推进。新增工作区混合标签冷启动恢复要求，最终证据以本轮后续记录为准。下文已有源码和运行编号属于历史阶段，不能视为当前未提交版本的全量通过证明。
+
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)

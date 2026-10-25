@@ -23,6 +23,16 @@ export function useWorkspaceTreeModel(context: UseWorkspaceTreeModelContext) {
   const expandedDirs = useMemo(() => new Set(workspaceUi.expandedDirKeys), [workspaceUi.expandedDirKeys]);
   const [roots, setRoots] = useState<CodeWorkspaceRootInfo[]>(() => initialRoots(workspace));
   const [looseFiles, setLooseFiles] = useState<CodeWorkspaceLooseFileInfo[]>(() => initialLooseFiles(workspace));
+  // A platform sidebar can edit the project definition while this editor stays
+  // mounted. Only new input definitions replace local state; internal edits
+  // still publish through the normal workspace context without resetting buffers.
+  const inputRoots = JSON.stringify(initialRoots(workspace));
+  const previousInputRoots = useRef(inputRoots);
+  useEffect(() => {
+    if (previousInputRoots.current === inputRoots) return;
+    previousInputRoots.current = inputRoots;
+    setRoots((current) => JSON.stringify(current) === inputRoots ? current : initialRoots(workspace));
+  }, [inputRoots, workspace]);
   const treeData = useWorkspaceTreeData({
     roots,
     expandedRootIds: expandedRoots,

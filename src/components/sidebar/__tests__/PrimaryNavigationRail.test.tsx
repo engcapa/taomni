@@ -10,7 +10,6 @@ const MODE_ORDER = [
   "nav-mode-home",
   "nav-mode-workspaces",
   "side-tab-sessions",
-  "nav-mode-agents",
   "side-tab-tools",
 ];
 
@@ -40,7 +39,7 @@ afterEach(() => {
 });
 
 describe("PrimaryNavigationRail (TASK-02)", () => {
-  it("UT-WS-02-01 renders the five primary modes in order with Home first", () => {
+  it("UT-WS-02-01 renders the four primary modes in order with Home first", () => {
     render(<PrimaryNavigationRail />);
     const rail = screen.getByTestId("sidebar-rail");
     const modeGroup = within(rail).getByTestId("rail-mode-group");

@@ -2,7 +2,6 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentsPlatformView } from "../AgentsPlatformView";
 import { PrimaryNavigationRail } from "../../sidebar/PrimaryNavigationRail";
-import { AppDialogProvider } from "../../../lib/appDialogs";
 import { GlobalCommandModal } from "../../search/GlobalCommandModal";
 import { useAgentsStore } from "../../../stores/agentsStore";
 import { useAppStore } from "../../../stores/appStore";
@@ -46,15 +45,12 @@ afterEach(() => {
 });
 
 describe("Agents platform mode (TASK-09)", () => {
-  it("keeps Crew as a coming-soon entry without starting tasks or changing the current mode", async () => {
+  it("keeps only the bottom chat entry in the primary rail", () => {
     useAppStore.setState({ activeSideTab: "sessions" });
-    render(<AppDialogProvider><PrimaryNavigationRail /></AppDialogProvider>);
-    fireEvent.click(screen.getByTestId("nav-mode-agents"));
-    expect(await screen.findByTestId("alert-dialog-message")).toHaveTextContent("under development");
+    render(<PrimaryNavigationRail />);
+    expect(screen.queryByTestId("nav-mode-agents")).not.toBeInTheDocument();
+    expect(screen.getByTestId("rail-chat-button")).toBeInTheDocument();
     expect(useAgentsStore.getState().tasks).toHaveLength(0);
-    expect(useAppStore.getState().activeSideTab).toBe("sessions");
-    fireEvent.click(screen.getByTestId("alert-dialog-ok"));
-    expect(screen.queryByTestId("alert-dialog")).not.toBeInTheDocument();
   });
 
   it("shows only the placeholder when a legacy Agents mode is restored", () => {

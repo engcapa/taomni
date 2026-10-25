@@ -155,6 +155,9 @@ export function TabItem(props: TabItemProps) {
   return (
     <div
       ref={ref}
+      role="tab"
+      aria-selected={active}
+      tabIndex={active ? 0 : -1}
       data-testid="tab-item"
       data-tab-id={tab.id}
       data-tab-title={tab.title}
@@ -165,6 +168,7 @@ export function TabItem(props: TabItemProps) {
       className="taomni-tab relative"
       data-active={active}
       onClick={() => onActivate(tab)}
+      onKeyDown={(event) => { if (!editing && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onActivate(tab); } }}
       onMouseDown={(e) => {
         if (editing) return;
         onMouseDown(e, tab);

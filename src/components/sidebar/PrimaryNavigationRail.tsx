@@ -1,5 +1,4 @@
 import {
-  Bot,
   Boxes,
   FolderTree,
   GitBranch,
@@ -15,7 +14,6 @@ import {
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useMainRailHostStore } from "../../stores/mainRailHostStore";
-import { showAgentsComingSoon } from "../agents/comingSoon";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
 import { ScreenshotMenuButton } from "../screenshot/ScreenshotMenuButton";
 import { ToolWindowRailButton, ToolWindowRailResizeHandle } from "../editor/workspace/panels/ToolWindowRail";
@@ -93,15 +91,10 @@ export function PrimaryNavigationRail({
     { mode: "home", testId: "nav-mode-home", label: t("platform.home"), icon: <Home /> },
     { mode: "workspaces", testId: "nav-mode-workspaces", label: t("platform.workspaces"), icon: <Boxes /> },
     { mode: "sessions", testId: "side-tab-sessions", label: t("sidebar.sideTabSessions"), icon: <PanelsTopLeft /> },
-    { mode: "agents", testId: "nav-mode-agents", label: t("platform.agents"), icon: <Bot /> },
     { mode: "tools", testId: "side-tab-tools", label: t("sidebar.sideTabTools"), icon: <Wrench /> },
   ];
 
   const activateMode = (mode: PrimaryNavMode, clickCount = 0) => {
-    if (mode === "agents") {
-      showAgentsComingSoon();
-      return;
-    }
     if (mode === "home") {
       setActiveSideTab("home");
       setSidebarCollapsed(true);
@@ -208,12 +201,12 @@ export function PrimaryNavigationRail({
         </div>
 
         {showWorkspaceTools && (
-          <div data-testid="workspace-merged-tool-rail" className="shrink-0 border-t px-1 py-1" style={{ borderColor: "var(--taomni-sidebar-border)" }}>
+          <div data-testid="workspace-merged-tool-rail" aria-label="IDE tools" className="taomni-ide-tool-group flex min-h-0 flex-col">
             <div
               data-testid="code-workspace-tool-rail-left"
               data-embedded="true"
               aria-label="Workspace tool windows"
-              className="flex w-full flex-col items-stretch gap-1"
+              className="flex min-h-0 w-full flex-col items-stretch gap-1 overflow-y-auto overflow-x-hidden"
             >
               <ToolWindowRailButton
                 item={{
@@ -300,7 +293,7 @@ export function PrimaryNavigationRail({
         )}
 
         <div className="flex min-h-1 flex-1 flex-col">
-          <div ref={railHostRef} data-testid="sidebar-tool-window-rail" className="flex min-h-0 flex-col" />
+          <div ref={railHostRef} data-testid="sidebar-tool-window-rail" aria-label="IDE tools" className="taomni-ide-tool-group flex min-h-0 flex-col" />
         </div>
 
         <div data-testid="rail-bottom-tools" className="flex shrink-0 flex-col gap-1 border-t px-1 pb-2 pt-1" style={{ borderColor: "var(--taomni-sidebar-border)" }}>

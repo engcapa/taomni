@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { useMainRailHostStore } from "../../stores/mainRailHostStore";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TabBar } from "./TabBar";
 import { OpenTabsMenu } from "./OpenTabsMenu";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
@@ -276,6 +276,16 @@ function TabMore({ onDetachActiveTab }: { onDetachActiveTab?: () => void }) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const primary = IS_MAC ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+      if (!event.isComposing && primary && event.shiftKey && !event.altKey && event.key.toLowerCase() === "a") {
+        event.preventDefault(); event.stopPropagation(); setOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   return (
     <div ref={wrapRef} className="relative shrink-0 pr-1">
       <BarButton

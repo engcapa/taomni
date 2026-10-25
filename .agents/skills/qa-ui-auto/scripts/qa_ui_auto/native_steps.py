@@ -3302,6 +3302,7 @@ def run_native_step(ctx: NativeStepContext, verb: str, args: Any) -> str:
 # them in VERBS (it imports `_verb`/`NativeStepContext` defined above).
 from . import rdp_steps  # noqa: E402,F401
 from . import updater_steps  # noqa: E402,F401
+from . import folder_dialog  # noqa: E402,F401
 
 
 @_verb("mail_storage_assert")

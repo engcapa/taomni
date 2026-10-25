@@ -23,7 +23,6 @@ import { WorkspaceMainPanel } from "../../components/workspace/WorkspaceMainPane
 import { useAppStore } from "../../stores/appStore";
 import { useWorkspaceUiStore } from "../../stores/workspaceUiStore";
 import { useWorkspaceRailStore } from "../../stores/workspaceRailStore";
-import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import type { AppCommand } from "../../components/menubar/commands";
 import { ControlBar } from "../../components/tabbar/ControlBar";
 import { TabActionSlotProvider } from "../../components/tabbar/TabActionSlot";
@@ -69,25 +68,8 @@ export function MainLayoutView(props: MainLayoutViewProps) {
   const openGlobalSearch = useWorkspaceUiStore((s) => s.openGlobalSearch);
   usePlatformShortcuts();
 
-  // The sidebar's Code Workspace entry now activates Workspaces mode with the
-  // workspace's own Code Workspace tab (v6.1 AC-03 / design §3.2 B3) while the
-  // app-menu command keeps opening the legacy tab for existing flows.
-  const handleSidebarCommand = (command: AppCommand) => {
-    if (command === "code-workspace") {
-      const workspaceStore = useWorkspacePlatformStore.getState();
-      const activeWorkspace = workspaceStore.workspaces.find((entry) => entry.id === workspaceStore.activeWorkspaceId);
-      // A real platform workspace (with mounted roots) opens its own Code
-      // Workspace tab inside Workspaces mode (v6.1 design §3.2 B3). Without any
-      // root the legacy tab keeps working exactly as before, which preserves
-      // the existing Code Workspace automation on a fresh profile.
-      if (activeWorkspace && activeWorkspace.rootFolders.length > 0) {
-        workspaceStore.openCodeWorkspaceTab(workspaceStore.activeWorkspaceId);
-        useAppStore.getState().setActiveSideTab("workspaces");
-        return;
-      }
-    }
-    menuActions.handleCommand(command);
-  };
+  // Tools and the main menu share the context-free editor entry point.
+  const handleSidebarCommand = menuActions.handleCommand;
 
   // The command palette is mounted outside the menu-action tree; it asks the
   // shell to run a command through this event.
@@ -212,7 +194,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                 <div data-testid="main-canvas-frame" className="taomni-main-canvas-frame h-full flex flex-col min-w-0 flex-1">
         <div data-testid="app-titlebar" className="min-w-0">
           <ControlBar
-            activeTabClosable={!!layout.activeTab?.closable}
+            activeTabClosable={layout.activeTabClosable}
             nativeMenu={layout.nativeMenu}
             xServerEnabled={layout.xServerEnabled}
             quickConnectVisible={layout.quickConnectVisible}
@@ -263,7 +245,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                     />
                   )}
                   <div className="flex min-h-0 flex-1 flex-col" style={{ display: activeSideTab === "workspaces" ? "flex" : "none" }}>
-                    <WorkspaceMainPanel visible={activeSideTab === "workspaces"} />
+                    <WorkspaceMainPanel visible={activeSideTab === "workspaces"} onCommandsChange={layout.handleWorkspaceCommandsChange} />
                   </div>
                   {activeSideTab === "agents" && <AgentsPlatformView />}
                   <div data-testid="global-session-surface" className="flex min-h-0 flex-1 flex-col" style={{ display: activeSideTab === "workspaces" || activeSideTab === "agents" ? "none" : "flex" }}>

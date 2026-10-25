@@ -10,6 +10,8 @@
  */
 import { create } from "zustand";
 import type { SessionConfig } from "../lib/ipc/session";
+import { createWorkspaceTabActions } from "./workspacePlatformTabActions";
+import type { CodeWorkspaceTabInfo } from "../types";
 
 export const PLATFORM_WORKSPACES_STORAGE_KEY = "taomni.platformWorkspaces.v1";
 export const DEFAULT_WORKSPACE_ID = "default-workspace";
@@ -53,6 +55,8 @@ export interface WorkspaceIsolatedTab {
   /** Git tab: path to focus when opened from the editor. */
   focusPath?: string;
   createdAt: number;
+  /** One-shot working directory for an independent duplicate terminal. */
+  terminalInitialCwd?: string;
 }
 
 export type WorkspaceToolWindow = "project" | "sessions" | "structure";
@@ -86,6 +90,8 @@ export interface PlatformWorkspace {
   bottomDock: WorkspaceBottomDock;
   openTabs: WorkspaceIsolatedTab[];
   activeTabId: string;
+  /** IDEA project definition and stable recovery identity, including loose files. */
+  codeWorkspace?: CodeWorkspaceTabInfo;
 }
 
 export type WorkspaceTreeNodeKind = "file" | "folder";
@@ -105,6 +111,7 @@ export interface CreateWorkspaceOptions {
   name: string;
   description?: string;
   rootPath?: string;
+  codeWorkspace?: CodeWorkspaceTabInfo;
 }
 
 export interface OpenWorkspaceSessionOptions {
@@ -133,6 +140,7 @@ export interface WorkspacePlatformState {
   openFileInWorkspace: (workspaceId: string, file: { rootId: string; path: string; name?: string }) => WorkspaceIsolatedTab;
   openGitTab: (workspaceId: string, focusPath?: string) => WorkspaceIsolatedTab;
   openCodeWorkspaceTab: (workspaceId: string) => WorkspaceIsolatedTab;
+  updateCodeWorkspace: (workspaceId: string, info: CodeWorkspaceTabInfo) => void;
   openLocalTerminalInWorkspace: (workspaceId: string) => WorkspaceIsolatedTab;
   openSessionInWorkspace: (
     workspaceId: string,
@@ -143,6 +151,9 @@ export interface WorkspacePlatformState {
   unpinSession: (workspaceId: string, sessionId: string) => void;
   togglePinSession: (workspaceId: string, sessionId: string) => void;
   closeWorkspaceTab: (workspaceId: string, tabId: string) => void;
+  renameWorkspaceTab: (workspaceId: string, tabId: string, title: string) => void;
+  moveWorkspaceTab: (workspaceId: string, tabId: string, index: number) => void;
+  duplicateWorkspaceTab: (workspaceId: string, tabId: string, cwd?: string) => WorkspaceIsolatedTab | null;
   setActiveWorkspaceTab: (workspaceId: string, tabId: string) => void;
   setActiveLeftToolWindow: (workspaceId: string, toolWindow: WorkspaceToolWindow) => void;
   setBottomDockOpen: (workspaceId: string, open: boolean) => void;
@@ -324,14 +335,15 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
       name,
       description: options.description ?? "",
       isDefault: false,
-      rootFolders: [],
+      rootFolders: options.codeWorkspace?.roots?.map((root) => ({ ...root, addedAt: Date.now() })) ?? [],
+      codeWorkspace: options.codeWorkspace,
       pinnedSessionIds: [],
       activeLeftToolWindow: "project",
       bottomDock: emptyDock(),
       openTabs: [],
       activeTabId: "",
     };
-    if (options.rootPath?.trim()) {
+    if (options.rootPath?.trim() && !workspace.rootFolders.length) {
       workspace.rootFolders.push({
         id: newId("root"),
         name: baseName(options.rootPath),
@@ -529,6 +541,11 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
   },
 
   openCodeWorkspaceTab: (workspaceId) => {
+    const existing = get().getWorkspace(workspaceId)?.openTabs.find((tab) => tab.kind === "code");
+    if (existing) {
+      get().setActiveWorkspaceTab(workspaceId, existing.id);
+      return existing;
+    }
     const tab: WorkspaceIsolatedTab = {
       id: `ws:${workspaceId}:code`,
       workspaceId,
@@ -544,6 +561,23 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
       return next;
     });
     return tab;
+  },
+
+  updateCodeWorkspace: (workspaceId, info) => {
+    set((state) => {
+      const current = state.workspaces.find((workspace) => workspace.id === workspaceId);
+      if (!current || JSON.stringify(current.codeWorkspace) === JSON.stringify(info)) return state;
+      const workspaces = updateWorkspace(state.workspaces, workspaceId, (workspace) => ({
+        ...workspace,
+        codeWorkspace: info,
+        rootFolders: (info.roots ?? []).map((root) => ({
+          ...root,
+          addedAt: workspace.rootFolders.find((folder) => folder.id === root.id)?.addedAt ?? Date.now(),
+        })),
+      }));
+      persist({ ...state, workspaces });
+      return { workspaces };
+    });
   },
 
   openLocalTerminalInWorkspace: (workspaceId) => {
@@ -631,33 +665,7 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
     else get().pinSession(workspaceId, sessionId);
   },
 
-  closeWorkspaceTab: (workspaceId, tabId) => {
-    set((state) => {
-      const workspaces = updateWorkspace(state.workspaces, workspaceId, (workspace) => {
-        if (!workspace.openTabs.some((tab) => tab.id === tabId)) return workspace;
-        const index = workspace.openTabs.findIndex((tab) => tab.id === tabId);
-        const openTabs = workspace.openTabs.filter((tab) => tab.id !== tabId);
-        const activeTabId = workspace.activeTabId === tabId
-          ? (openTabs[Math.min(index, openTabs.length - 1)]?.id ?? fallbackActiveTabId(openTabs))
-          : workspace.activeTabId;
-        return { ...workspace, openTabs, activeTabId };
-      });
-      const next = { workspaces };
-      persist({ ...state, ...next });
-      return next;
-    });
-  },
-
-  setActiveWorkspaceTab: (workspaceId, tabId) => {
-    set((state) => {
-      const workspaces = updateWorkspace(state.workspaces, workspaceId, (workspace) => (
-        workspace.openTabs.some((tab) => tab.id === tabId) ? { ...workspace, activeTabId: tabId } : workspace
-      ));
-      const next = { workspaces };
-      persist({ ...state, ...next });
-      return next;
-    });
-  },
+  ...createWorkspaceTabActions(set, get, persist),
 
   setActiveLeftToolWindow: (workspaceId, toolWindow) => {
     set((state) => {

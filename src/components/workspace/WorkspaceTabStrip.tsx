@@ -1,5 +1,6 @@
 import { FilePlus2, FolderPlus, MonitorSmartphone, Plus, Search } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { WorkspaceTabContextMenu } from "./WorkspaceTabContextMenu";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
 import { useT } from "../../lib/i18n";
 import { useSessionStore } from "../../stores/sessionStore";
@@ -53,6 +54,8 @@ export function WorkspaceTabStrip() {
   const openFsModal = useWorkspaceUiStore((s) => s.openFsModal);
   const openSessionPicker = useWorkspaceUiStore((s) => s.openSessionPicker);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [tabMenu, setTabMenu] = useState<{ tabId: string; x: number; y: number } | null>(null);
+  useEffect(() => { setMenu(null); setTabMenu(null); }, [workspace?.id]);
 
   if (!workspace) return null;
 
@@ -122,6 +125,11 @@ export function WorkspaceTabStrip() {
       title={tab.title}
       className="taomni-workspace-tab group flex max-w-[185px] shrink-0 items-center gap-1 px-2 text-[12px]"
       onClick={() => setActiveTab(workspace.id, tab.id)}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        setMenu(null);
+        setTabMenu({ tabId: tab.id, x: event.clientX, y: event.clientY });
+      }}
       onKeyDown={(event) => {
         if (event.key === "Enter") setActiveTab(workspace.id, tab.id);
       }}
@@ -153,6 +161,14 @@ export function WorkspaceTabStrip() {
   return (
     <div data-testid="workspace-tab-strip" className="taomni-workspace-tab-strip flex h-full min-w-0 flex-1 items-end gap-0.5 overflow-x-auto">
       {workspace.openTabs.map(tabButton)}
+      {tabMenu && workspace.openTabs.find((tab) => tab.id === tabMenu.tabId) && <WorkspaceTabContextMenu
+        key={`${workspace.id}:${tabMenu.tabId}`}
+        workspace={workspace}
+        tab={workspace.openTabs.find((tab) => tab.id === tabMenu.tabId)!}
+        x={tabMenu.x}
+        y={tabMenu.y}
+        onClose={() => setTabMenu(null)}
+      />}
       <button
         type="button"
         data-testid="workspace-open-session-plus"
@@ -161,6 +177,7 @@ export function WorkspaceTabStrip() {
         title={t("platform.openSessionPlus")}
         className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
         onClick={(event) => {
+          setTabMenu(null);
           const rect = event.currentTarget.getBoundingClientRect();
           setMenu({ x: rect.left, y: rect.bottom + 2 });
         }}
