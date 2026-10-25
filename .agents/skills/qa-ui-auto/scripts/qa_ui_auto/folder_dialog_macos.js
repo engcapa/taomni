@@ -4,6 +4,7 @@ const env = $.NSProcessInfo.processInfo.environment;
 const readEnv = (key) => ObjC.unwrap(env.objectForKey(key));
 const application = readEnv("QA_PICKER_APPLICATION");
 const path = readEnv("QA_PICKER_PATH");
+const title = readEnv("QA_PICKER_TITLE");
 const events = Application("System Events");
 const shell = Application.currentApplication();
 shell.includeStandardAdditions = true;
@@ -32,9 +33,18 @@ while (Date.now() < deadline && !panel) {
     catch (_) { continue; }
     if (executable !== application) continue;
     for (const window of candidate.windows()) {
-      if (buttons(window, "Open").length === 1 && buttons(window, "Cancel").length === 1) {
+      // NSOpenPanel usually attaches an AXSheet to the app window. Searching
+      // the entire window also counts Home's ordinary "Open" button.
+      const sheets = nodes(window).filter((node) => {
+        try { return node.role() === "AXSheet"; } catch (_) { return false; }
+      });
+      let standalone = false;
+      try { standalone = window.subrole() === "AXDialog" || window.name() === title; } catch (_) { }
+      const panels = sheets.concat(standalone ? [window] : []);
+      const owned = panels.filter((owner) => buttons(owner, "Open").length === 1 && buttons(owner, "Cancel").length === 1);
+      if (owned.length === 1) {
         process = candidate;
-        panel = window;
+        panel = owned[0];
         break;
       }
     }

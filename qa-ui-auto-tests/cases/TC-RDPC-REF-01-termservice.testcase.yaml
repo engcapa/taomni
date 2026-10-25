@@ -1,7 +1,8 @@
 id: TC-RDPC-REF-01-termservice
 title: Taomni RDP client renders and controls a real termservice reference desktop
-description: 'AC-E07/E08: connect the product client to a disposable reference account, confirm its certificate, assert decoded magenta/cyan pixels and click to flip
-  the target. Exercise full screen, quality evidence, restore and disconnect. DEC-07 authorizes sudo xrdp provisioning only on the hosted Linux runner.'
+description: 'AC-E07/E08: connect the product client to a disposable reference account, confirm its certificate, assert decoded magenta/cyan pixels and
+  click to flip the target. Exercise full screen, quality evidence, restore and disconnect. DEC-07 authorizes sudo xrdp provisioning only on the hosted
+  Linux runner.'
 covers:
 - F9.7
 tags:
@@ -22,7 +23,7 @@ steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
-- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-rdp"]'
@@ -155,7 +156,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -186,6 +186,8 @@ verification:
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 16
@@ -212,6 +214,7 @@ verification:
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Disconnected", "timeout_sec": 20}}'
     results:
     - 3
+    - 4
     - 6
     - 16
     - 19
@@ -229,7 +232,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -303,7 +305,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8

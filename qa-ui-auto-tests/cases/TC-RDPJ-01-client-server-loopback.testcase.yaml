@@ -61,7 +61,7 @@ steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
-- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-rdp"]'
@@ -204,7 +204,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -244,6 +243,8 @@ verification:
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 13
@@ -284,6 +285,7 @@ verification:
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Disconnected", "timeout_sec": 20}}'
     results:
     - 3
+    - 4
     - 6
     - 13
     - 16
@@ -308,7 +310,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -408,12 +409,11 @@ verification:
     - 58
     - 59
   - id: R3
-    requirement: In OS full screen the connection bar shows the server-measured connection quality, comes back from the top edge, restores the window and disconnects
-      the session.
+    requirement: In OS full screen the connection bar shows the server-measured connection quality, comes back from the top edge, restores the window and
+      disconnects the session.
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8

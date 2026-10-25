@@ -56,6 +56,10 @@ export function openPlatformCodeWorkspace(info: CodeWorkspaceTabInfo): string {
   }
   store.setActiveWorkspace(workspace.id);
   store.openCodeWorkspaceTab(workspace.id);
+  const initialFile = info.initialFile && store.getWorkspace(workspace.id)?.codeWorkspace?.initialFile;
+  if (initialFile?.kind === "root") {
+    store.openFileInWorkspace(workspace.id, { rootId: initialFile.rootId, path: initialFile.path });
+  }
   const app = useAppStore.getState();
   app.setActiveSideTab("workspaces");
   app.setSidebarCollapsed(!hasProject);

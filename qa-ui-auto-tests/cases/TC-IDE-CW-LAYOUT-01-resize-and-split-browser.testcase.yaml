@@ -36,15 +36,38 @@ steps:
 - wait_for: '[data-testid="code-workspace-tab"]'
 - assert_visible: '[data-testid="code-workspace-tree-pane"]'
 - assert_visible: '[data-testid="code-workspace-project-resize-handle"]'
+- press:
+    selector: '[data-testid="code-workspace-project-resize-handle"]'
+    key: End
+- eval_readonly:
+    expression: Number(document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-project-resize-handle"]').getAttribute('aria-valuenow'))
+      === Number(document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-project-resize-handle"]').getAttribute('aria-valuemax'))
+    expect_truthy: true
+- press:
+    selector: '[data-testid="code-workspace-project-resize-handle"]'
+    key: ArrowLeft
+- eval_readonly:
+    expression: Number(document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-project-resize-handle"]').getAttribute('aria-valuenow'))
+      < Number(document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-project-resize-handle"]').getAttribute('aria-valuemax'))
+    expect_truthy: true
 - click: '[data-testid="code-workspace-tree-add-folder"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - click: '[data-testid="text-input-dialog-confirm"]'
 - wait_for: '[data-testid="code-workspace-tree-file"]'
 - dblclick: '[data-testid="code-workspace-tree-file"]'
 - wait_for: '[data-testid="code-workspace-editor-pane"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"expanded-sidebar-panel"]')?.getBoundingClientRect().width < 350
+    expect_truthy: true
+- press:
+    selector: '[data-testid="main-sidebar-resize-handle"]'
+    key: ArrowRight
 - drag_to:
-    from: '[data-testid="code-workspace-project-resize-handle"]'
+    from: '[data-testid="main-sidebar-resize-handle"]'
     to: '[data-testid="code-workspace-editor-pane"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"expanded-sidebar-panel"]')?.getBoundingClientRect().width > 350
+    expect_truthy: true
 - click: '[data-testid="code-workspace-toolbar-more"]'
 - click: '[data-testid="code-workspace-split-right"]'
 - wait_for: '[data-testid="code-workspace-editor-split"]'
@@ -119,25 +142,28 @@ verification:
     - 1
     - 3
     - 5
-    - 9
-    - 11
     - 13
     - 15
     - 17
+    - 20
     - 21
-    - 23
-    - 26
-    - 29
-    - 31
+    - 24
+    - 28
+    - 30
+    - 33
     - 36
-    - 37
     - 38
-    - 40
-    - 42
+    - 43
     - 44
-    - 46
-    - 48
-    - 50
+    - 45
+    - 47
+    - 49
+    - 51
+    - 53
+    - 55
+    - 57
+    - 9
+    - 11
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -149,54 +175,68 @@ verification:
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-pane\"]"}'
     - step: 8
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-project-resize-handle\"]"}'
-    - step: 10
-      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
-    - step: 12
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
     - step: 14
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
     - step: 18
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-split\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
     - step: 19
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"expanded-sidebar-panel\"]'')?.getBoundingClientRect().width
+        < 350", "expect_truthy": true}}'
+    - step: 22
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"expanded-sidebar-panel\"]'')?.getBoundingClientRect().width
+        > 350", "expect_truthy": true}}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-split\"]"}'
+    - step: 26
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "min": 2}}'
-    - step: 24
+    - step: 31
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "min": 3}}'
-    - step: 27
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "min": 2}}'
-    - step: 30
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
-    - step: 32
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-dock-resize\"]"}'
-    - step: 33
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-dock-resize\"]", "name":
-        "aria-valuemin", "equals": "49"}}'
     - step: 34
-      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-testid'' + String.fromCharCode(61)
-        + ''\"code-workspace-bottom-dock-resize\"]'')?.getAttribute(''aria-valuemax'')) > Number(document.querySelector(''[data-testid''
-        + String.fromCharCode(61) + ''\"code-workspace-bottom-dock-resize\"]'')?.getAttribute(''aria-valuemin''))",
-        "expect_truthy": true}}'
-    - step: 35
-      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-testid'' + String.fromCharCode(61)
-        + ''\"code-workspace-bottom-dock-resize\"]'')?.getAttribute(''aria-valuenow'')) > 48", "expect_truthy":
-        true}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "min": 2}}'
+    - step: 37
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
     - step: 39
-      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-testid'' + String.fromCharCode(61)
-        + ''\"code-workspace-bottom-dock-resize\"]'')?.getAttribute(''aria-valuenow'')) < 850", "expect_truthy":
-        true}}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-dock-resize\"]"}'
+    - step: 40
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-dock-resize\"]", "name": "aria-valuemin", "equals": "49"}}'
     - step: 41
+      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-bottom-dock-resize\"]'')?.getAttribute(''aria-valuemax''))
+        > Number(document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-bottom-dock-resize\"]'')?.getAttribute(''aria-valuemin''))",
+        "expect_truthy": true}}'
+    - step: 42
+      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-bottom-dock-resize\"]'')?.getAttribute(''aria-valuenow''))
+        > 48", "expect_truthy": true}}'
+    - step: 46
+      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-bottom-dock-resize\"]'')?.getAttribute(''aria-valuenow''))
+        < 850", "expect_truthy": true}}'
+    - step: 48
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
+    - step: 50
       expectation: '{"wait_for": "[data-testid=\"code-workspace-build-panel\"]"}'
-    - step: 43
+    - step: 52
       expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
-    - step: 45
+    - step: 54
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tests-panel\"]"}'
-    - step: 47
+    - step: 56
       expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-tab-overflow-menu\"]"}'
-    - step: 49
+    - step: 58
       expectation: '{"wait_for": "[data-testid=\"debug-panel\"]"}'
-    - step: 51
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-dock-body\"]"}'
+    - step: 10
+      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-project-resize-handle\"]'').getAttribute(''aria-valuenow''))
+        === Number(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-project-resize-handle\"]'').getAttribute(''aria-valuemax''))",
+        "expect_truthy": true}}'
+    - step: 12
+      expectation: '{"eval_readonly": {"expression": "Number(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-project-resize-handle\"]'').getAttribute(''aria-valuenow''))
+        < Number(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-project-resize-handle\"]'').getAttribute(''aria-valuemax''))",
+        "expect_truthy": true}}'
     results:
-    - 51
+    - 19
+    - 22
+    - 58
+    - 10
+    - 12
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

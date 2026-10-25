@@ -20,7 +20,7 @@ steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
-- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -91,7 +91,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -114,6 +113,8 @@ verification:
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 12
@@ -133,14 +134,17 @@ verification:
     - step: 29
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
     - step: 32
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 40}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        40}}'
     - step: 33
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-command\\-ran\\r?$", "timeout_sec": 60}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-command\\-ran\\r?$", "timeout_sec":
+        60}}'
     - step: 35
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-interactive\\-ready\\r?$", "timeout_sec":
         60}}'
     results:
     - 3
+    - 4
     - 6
     - 12
     - 16
@@ -158,7 +162,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -200,9 +203,11 @@ verification:
     - step: 29
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
     - step: 32
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 40}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        40}}'
     - step: 33
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-command\\-ran\\r?$", "timeout_sec": 60}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-command\\-ran\\r?$", "timeout_sec":
+        60}}'
     - step: 35
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-interactive\\-ready\\r?$", "timeout_sec":
         60}}'

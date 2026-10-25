@@ -50,7 +50,13 @@ export function useWorkspaceHostFiles(dependencies: Dependencies) {
         const key = fileKey(ref);
         const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), current.session.workspaceInstanceId);
         const groupId = Object.values(ui.editorGroups).find((group) => group.openOrder.includes(key))?.id;
-        await current.files.openFile(ref, { preview: false, activate: false, restoring: true, groupId, isCurrent });
+        // Selection-only host updates must not reinsert a file closed inside
+        // the editor while this reconciliation was queued. Its next snapshot
+        // will remove that outer tab. Existing buffers need no redundant open.
+        if (!groupId && previousWanted.current?.has(key)) continue;
+        if (!groupId || !ui.openFiles[key] || ui.openFiles[key].loading) {
+          await current.files.openFile(ref, { preview: false, activate: false, restoring: true, groupId, isCurrent });
+        }
         if (!isCurrent()) return;
         const draft = !recovered.current.has(key) ? requested.recoverDraft(ref) : null;
         const buffer = current.session.bufferState.openFilesRef.current[key];
@@ -97,7 +103,7 @@ export function useWorkspaceHostFiles(dependencies: Dependencies) {
         // a buffer in whichever editor group happened to have focus before.
         const groupId = ui.editorGroups[ui.activeEditorGroupId]?.openOrder.includes(key) ? ui.activeEditorGroupId
           : Object.values(ui.editorGroups).find((group) => group.openOrder.includes(key))?.id;
-        if (ui.activeKey !== key) await current.files.openFile(requested.activeFile, { preview: false, restoring: true, groupId, isCurrent });
+        if (groupId && ui.activeKey !== key) await current.files.openFile(requested.activeFile, { preview: false, restoring: true, groupId, isCurrent });
       }
       if (isCurrent()) {
         current.project.buffers.flushPendingEditorText();
@@ -116,10 +122,11 @@ export function useWorkspaceHostFiles(dependencies: Dependencies) {
 
   useEffect(() => {
     if (!host || applying.current || settledRequest !== request) return;
-    const openFiles = session.workspaceUi.openOrder.map((key) => session.workspaceUi.openFiles[key])
+    const keys = [...new Set(Object.values(session.workspaceUi.editorGroups).flatMap((group) => group.openOrder))];
+    const openFiles = keys.map((key) => session.workspaceUi.openFiles[key])
       .filter((file): file is OpenFileState => !!file && !file.library && file.ref.kind === "root");
     if (openFiles.some((file) => file.loading)) return;
     const active = session.workspaceUi.openFiles[session.workspaceUi.activeKey ?? ""];
     host.onSnapshot({ files: openFiles, activeFile: active?.ref ?? null });
-  }, [host, request, settledRequest, session.workspaceUi.openFiles, session.workspaceUi.openOrder, session.workspaceUi.activeKey]);
+  }, [host, request, settledRequest, session.workspaceUi.openFiles, session.workspaceUi.editorGroups, session.workspaceUi.activeKey]);
 }

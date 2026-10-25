@@ -160,6 +160,7 @@ export function useWorkspaceStatusBridge(context: UseWorkspaceStatusBridgeContex
     telemetry.breadcrumbSymbolsByGroup,
     roots,
     activeEditorGroupId,
+    activeKey,
     activeFile?.bom,
     activeFile?.encoding,
     activeFile?.eol,

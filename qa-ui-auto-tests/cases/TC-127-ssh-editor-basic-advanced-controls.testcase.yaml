@@ -18,7 +18,7 @@ steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
-- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - assert_visible: '[data-testid="session-help"]'
@@ -193,12 +193,11 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH advanced settings retain remote environment, authentication and toggle behavior; the SSH browser displays only SFTP without a protocol selector,
-      including after save/reopen where present.
+    requirement: SSH advanced settings retain remote environment, authentication and toggle behavior; the SSH browser displays only SFTP without a protocol
+      selector, including after save/reopen where present.
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 14
     - 15
@@ -231,6 +230,8 @@ verification:
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 7
@@ -256,7 +257,8 @@ verification:
     - step: 19
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-specify-username\"]", "name": "data-checked", "equals": "true"}}'
     - step: 21
-      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Fill required fields, then OK to save this session."}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Fill required fields, then OK to save this
+        session."}}'
     - step: 23
       expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
     - step: 24
@@ -317,6 +319,7 @@ verification:
       expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
     results:
     - 3
+    - 4
     - 6
     - 7
     - 8

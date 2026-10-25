@@ -21,7 +21,7 @@ steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
-- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -196,12 +196,11 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH proxy kind transitions show and hide the matching HTTP/SOCKS fields, support a saved proxy source, and restore manual SSH jump fields after switching
-      back.
+    requirement: SSH proxy kind transitions show and hide the matching HTTP/SOCKS fields, support a saved proxy source, and restore manual SSH jump fields
+      after switching back.
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -258,6 +257,8 @@ verification:
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 12
@@ -316,6 +317,7 @@ verification:
       expectation: '{"assert_visible": "[data-testid=\"session-jump-password\"]"}'
     results:
     - 3
+    - 4
     - 6
     - 12
     - 15

@@ -69,7 +69,8 @@ export function useTerminalViewport(context: UseTerminalViewportContext) {
     const timer = window.setTimeout(() => {
       frame = window.requestAnimationFrame(() => {
         fitVisibleTerminal();
-        if (activeForShortcuts && !searchOpen) {
+        const navigatingTabs = document.activeElement?.closest('[role="tablist"][data-keyboard-navigation="true"]');
+        if (activeForShortcuts && !searchOpen && !navigatingTabs) {
           focusTerminal();
         }
       });

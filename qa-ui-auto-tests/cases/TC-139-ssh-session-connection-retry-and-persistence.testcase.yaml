@@ -24,7 +24,7 @@ steps:
 - wait_for:
     selector: '[data-testid="sidebar"]'
     timeout_sec: 45
-- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-ssh"]'
@@ -107,12 +107,11 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH connection testing reports a missing password, rejects a wrong password, then reports a successful authenticated connection and exposes the same
-      result in the editor summary.
+    requirement: SSH connection testing reports a missing password, rejects a wrong password, then reports a successful authenticated connection and exposes
+      the same result in the editor summary.
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -137,6 +136,8 @@ verification:
     checkpoints:
     - step: 3
       expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 13
@@ -175,6 +176,7 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
     results:
     - 3
+    - 4
     - 6
     - 13
     - 14
@@ -197,7 +199,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8

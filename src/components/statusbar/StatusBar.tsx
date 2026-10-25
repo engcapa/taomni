@@ -21,6 +21,8 @@ import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouse
 import { useAppTheme } from "../../lib/appTheme";
 import { writeText } from "../../lib/clipboard";
 import { useAppStore } from "../../stores/appStore";
+import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
+import { activeWorkspaceRuntimeTabId } from "../../lib/workspaceRuntimeIdentity";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useAiStore } from "../../stores/aiStore";
 import {
@@ -198,6 +200,8 @@ export function StatusBar() {
   // `statusMessage` often enough for that to matter while typing.
   const tabs = useAppStore((s) => s.tabs);
   const activeTabId = useAppStore((s) => s.activeTabId);
+  const activeSideTab = useAppStore((s) => s.activeSideTab);
+  const platformRuntimeTabId = useWorkspacePlatformStore((s) => activeWorkspaceRuntimeTabId(s.getWorkspace()));
   const xServerEnabled = useAppStore((s) => s.xServerEnabled);
   const xServerStatus = useAppStore((s) => s.xServerStatus);
   const statusMessage = useAppStore((s) => s.statusMessage);
@@ -222,8 +226,10 @@ export function StatusBar() {
   const searchEnabled = !!aiConfig?.web_search.client_enabled;
   const t = useT();
   const themeLabel = useAppThemeI18nLabel();
-  const showWorkspaceSegments = activeTab?.type === "code-workspace"
-    && workspaceStatus?.tabId === activeTabId;
+  const showWorkspaceSegments = !!workspaceStatus && (activeSideTab === "workspaces"
+    ? workspaceStatus.tabId === platformRuntimeTabId
+    : activeSideTab === "sessions" && activeTab?.type === "code-workspace"
+      && workspaceStatus.tabId === activeTabId);
 
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);

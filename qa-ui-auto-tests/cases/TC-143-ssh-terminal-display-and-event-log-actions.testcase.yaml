@@ -22,7 +22,7 @@ steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
-- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -158,12 +158,11 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 'SSH terminal display actions produce observable state changes: read-only blocks input and can be reversed, scrollbar and fullscreen classes toggle
-      in both directions, and the event log exposes connection/auth records and closes.'
+    requirement: 'SSH terminal display actions produce observable state changes: read-only blocks input and can be reversed, scrollbar and fullscreen classes
+      toggle in both directions, and the event log exposes connection/auth records and closes.'
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -206,6 +205,8 @@ verification:
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 12
@@ -215,9 +216,11 @@ verification:
     - step: 17
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
     - step: 20
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        60}}'
     - step: 23
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-display\\-before\\r?$", "timeout_sec": 60}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-display\\-before\\r?$", "timeout_sec":
+        60}}'
     - step: 25
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 28
@@ -259,6 +262,7 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-event-log\"]", "state": "detached"}}'
     results:
     - 3
+    - 4
     - 6
     - 12
     - 15

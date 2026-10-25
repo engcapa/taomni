@@ -20,7 +20,7 @@ steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
-- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-ssh"]'
@@ -148,12 +148,11 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: The SSH forward Add control stays disabled until both endpoints are present, added rows expose observable values, row edits and removal work, and
-      the remaining row persists after save and reopen.
+    requirement: The SSH forward Add control stays disabled until both endpoints are present, added rows expose observable values, row edits and removal
+      work, and the remaining row persists after save and reopen.
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -183,6 +182,8 @@ verification:
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 13
@@ -235,6 +236,7 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
     results:
     - 3
+    - 4
     - 6
     - 13
     - 14

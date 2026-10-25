@@ -1,28 +1,23 @@
 id: TC-IDE-AUDIT-009-split-close-reopen-native
-title: Same-document split shares one history; close/cancel/discard/reopen/restart semantics
-description: "ED-AUDIT-009 A1/A2/A3 native gate case. Enters a disposable fixture workspace\nthrough persisted recents\
-  \ and proves the split/close/reopen contract through\nthe packaged app UI:\n\n1. One logical history across split\
-  \ leaves (A1): Split Right renders a second\n   editor pane for the same notes.txt buffer. Typing \"SPLIT1\" in\
-  \ the new\n   leaf appears in the primary leaf in real time. A single-char edit \"X\"\n   typed in the new leaf\
-  \ mirrors to the primary; Ctrl+Z pressed in the new\n   leaf removes it from BOTH leaves; Ctrl+Shift+Z re-applies\
-  \ it to BOTH -\n   edit/undo/redo are one shared history while each leaf keeps its own\n   caret/scroll state.\
-  \ (The shared ledger records per-keystroke entries, so\n   the undo target is one typed char rather than the whole\
-  \ burst.)\n2. Close semantics (A2): Ctrl+S writes the buffer (disk sha proves the exact\n   bytes). Closing the\
-  \ non-last leaf's tab needs no confirm, keeps the\n   survivor's text AND its history (undo/redo still work there),\
-  \ and never\n   touches the disk. Closing the LAST view while dirty raises the\n   \"Discard unsaved changes\"\
-  \ confirm: Cancel is zero effect (buffer intact,\n   tab still open, disk unchanged); Confirm discards without\
-  \ any write (disk\n   keeps the last save). Ctrl+Shift+T reopens the tab and the editor reads\n   the CURRENT\
-  \ disk bytes (an external host_write_file between close and\n   reopen proves the read is fresh - the discarded\
-  \ dirty text is not\n   revived and no write happens during reopen).\n3. Restart read through the persisted layout\
-  \ snapshot (A3): reload_window\n   destroys the webview JS context; re-entering the workspace through\n   recents\
-  \ restores the session from the localStorage layout snapshot\n   (taomni.codeWorkspace.layout.v2.<workspace-identity>,\
-  \ the identity\n   derived from the workspace roots) and re-reads the file from disk. The\n   same-document split\
-  \ re-created before the reload comes back as two\n   editor panes - something the recents lastActiveFile alone\
-  \ cannot do -\n   proving the snapshot drove the restore. A subsequent unsaved edit is\n   captured by the bounded\
-  \ recovery copy\n   (taomni.codeWorkspace.recovery.v1:<workspace-identity>, 400ms debounce);\n   the next reload\
-  \ opens the Workspace recovery dialog, and Recover all\n   restores the unsaved buffer text while the disk stays\
-  \ untouched.\n\nHighest claim on green: L2 native (Linux), packaged app UI, real webview\nlocalStorage persistence\
-  \ and real disk bytes. IDEA comparison (required\nkind) is recorded separately as unrun on this box.\n"
+title: Same-document split shares history; close, reopen and automatic workspace draft recovery
+description: "ED-AUDIT-009 A1/A2/A3 native gate case. Enters a disposable fixture workspace\nthrough persisted recents and proves the split/close/reopen\
+  \ contract through\nthe packaged app UI:\n\n1. One logical history across split leaves (A1): Split Right renders a second\n   editor pane for the same\
+  \ notes.txt buffer. Typing \"SPLIT1\" in the new\n   leaf appears in the primary leaf in real time. A single-char edit \"X\"\n   typed in the new leaf\
+  \ mirrors to the primary; Ctrl+Z pressed in the new\n   leaf removes it from BOTH leaves; Ctrl+Shift+Z re-applies it to BOTH -\n   edit/undo/redo are\
+  \ one shared history while each leaf keeps its own\n   caret/scroll state. (The shared ledger records per-keystroke entries, so\n   the undo target is\
+  \ one typed char rather than the whole burst.)\n2. Close semantics (A2): Ctrl+S writes the buffer (disk sha proves the exact\n   bytes). Closing the non-last\
+  \ leaf's tab needs no confirm, keeps the\n   survivor's text AND its history (undo/redo still work there), and never\n   touches the disk. Closing the\
+  \ LAST view while dirty raises the\n   \"Discard unsaved changes\" confirm: Cancel is zero effect (buffer intact,\n   tab still open, disk unchanged);\
+  \ Confirm discards without any write (disk\n   keeps the last save). Ctrl+Shift+T reopens the tab and the editor reads\n   the CURRENT disk bytes (an\
+  \ external host_write_file between close and\n   reopen proves the read is fresh - the discarded dirty text is not\n   revived and no write happens during\
+  \ reopen).\n3. Restart read through the persisted layout snapshot (A3): reload_window\n   destroys the webview JS context; re-entering the workspace through\n\
+  \   recents restores the session from the localStorage layout snapshot\n   (taomni.codeWorkspace.layout.v2.<workspace-identity>, the identity\n   derived\
+  \ from the workspace roots) and re-reads the file from disk. The\n   same-document split re-created before the reload comes back as two\n   editor panes\
+  \ - something the recents lastActiveFile alone cannot do -\n   proving the snapshot drove the restore. A subsequent unsaved edit is\n   captured by the\
+  \ bounded recovery copy\n   (taomni.codeWorkspace.recovery.v1:<workspace-identity>, 400ms debounce);\n   the next reload automatically restores matching drafts into both editor\
+  \ groups without a duplicate recovery dialog, while the disk stays untouched.\n\nHighest claim on green: L2 native (Linux), packaged\
+  \ app UI, real webview\nlocalStorage persistence and real disk bytes. IDEA comparison (required\nkind) is recorded separately as unrun on this box.\n\n\
+  Workspace hosts restore matching drafts automatically into both editor groups without a duplicate recovery dialog; disk bytes remain untouched."
 covers:
 - F25.1
 - F25.5
@@ -234,11 +229,15 @@ steps:
 - click: '[data-testid="welcome-history-tab-workspaces"]'
 - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
-- wait_for:
-    selector: '[data-testid="workspace-recovery-dialog"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
+    contains: RECOVERYDIRTY
     timeout_sec: 60
-- screenshot: tc-ide-audit-009-recovery-dialog.png
-- click: '[data-testid="workspace-recovery-recover-all"]'
+- screenshot: tc-ide-audit-009-automatic-recovery.png
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-pane"]:not([data-editor-group-id="primary"]) .cm-content'
+    contains: RECOVERYDIRTY
+    timeout_sec: 30
 - assert_not_visible: '[data-testid="workspace-recovery-dialog"]'
 - assert_text:
     selector: '[data-testid="code-workspace-editor"]'
@@ -253,7 +252,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Same-document split shares one history; close/cancel/discard/reopen/restart semantics：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: Same-document split shares one history; close/cancel/discard/reopen/restart and automatic draft recovery：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
     - 2
@@ -295,7 +294,6 @@ verification:
     - 84
     - 85
     - 86
-    - 90
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -304,58 +302,48 @@ verification:
     - step: 9
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "timeout_sec": 60}}'
     - step: 10
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "scratch
-        notes", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "scratch notes", "timeout_sec": 60}}'
     - step: 15
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]:not([data-editor-group-id=\"primary\"])",
-        "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]:not([data-editor-group-id=\"primary\"])", "timeout_sec": 15}}'
     - step: 16
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''.cm-editor'').length === 2", "expect_truthy":
-        true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''.cm-editor'').length === 2", "expect_truthy": true}}'
     - step: 21
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"]
-        .cm-editor", "contains": "SPLIT1", "timeout_sec": 30}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"] .cm-editor", "contains":
+        "SPLIT1", "timeout_sec": 30}}'
     - step: 25
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"]
-        .cm-editor", "contains": "XSPLIT1", "timeout_sec": 30}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"] .cm-editor", "contains":
+        "XSPLIT1", "timeout_sec": 30}}'
     - step: 27
-      expectation: '{"eval_readonly": {"expression": "!document.querySelectorAll(''.cm-editor'')[0].innerText.includes(''XSPLIT1'')",
-        "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "!document.querySelectorAll(''.cm-editor'')[0].innerText.includes(''XSPLIT1'')", "expect_truthy": true}}'
     - step: 28
-      expectation: '{"eval_readonly": {"expression": "!document.querySelectorAll(''.cm-editor'')[1].innerText.includes(''XSPLIT1'')",
-        "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "!document.querySelectorAll(''.cm-editor'')[1].innerText.includes(''XSPLIT1'')", "expect_truthy": true}}'
     - step: 30
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"]
-        .cm-editor", "contains": "XSPLIT1", "timeout_sec": 30}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"] .cm-editor", "contains":
+        "XSPLIT1", "timeout_sec": 30}}'
     - step: 31
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''.cm-editor'')[1].innerText.includes(''XSPLIT1'')",
-        "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''.cm-editor'')[1].innerText.includes(''XSPLIT1'')", "expect_truthy": true}}'
     - step: 33
       expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "bf93ec7aa56bdc61fc4621c86c95bd0c38cd646b171f260410d3fa06178a78db",
         "timeout_sec": 30}}'
     - step: 35
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"] .cm-editor", "timeout_sec":
-        15}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"] .cm-editor", "timeout_sec": 15}}'
     - step: 36
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''.cm-editor'').length === 1", "expect_truthy":
-        true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''.cm-editor'').length === 1", "expect_truthy": true}}'
     - step: 37
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"]
-        .cm-editor", "contains": "XSPLIT1", "timeout_sec": 15}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"] .cm-editor", "contains":
+        "XSPLIT1", "timeout_sec": 15}}'
     - step: 40
-      expectation: '{"eval_readonly": {"expression": "!document.querySelector(''.cm-editor'').innerText.includes(''XSPLIT1'')",
-        "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "!document.querySelector(''.cm-editor'').innerText.includes(''XSPLIT1'')", "expect_truthy": true}}'
     - step: 42
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"]
-        .cm-editor", "contains": "XSPLIT1", "timeout_sec": 30}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"] .cm-editor", "contains":
+        "XSPLIT1", "timeout_sec": 30}}'
     - step: 46
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"]
-        .cm-editor", "contains": "TAILDIRTY", "timeout_sec": 30}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"] .cm-editor", "contains":
+        "TAILDIRTY", "timeout_sec": 30}}'
     - step: 48
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 15}}'
     - step: 50
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.cm-editor'').innerText.includes(''TAILDIRTY'')",
-        "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.cm-editor'').innerText.includes(''TAILDIRTY'')", "expect_truthy": true}}'
     - step: 51
       expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "bf93ec7aa56bdc61fc4621c86c95bd0c38cd646b171f260410d3fa06178a78db",
         "timeout_sec": 30}}'
@@ -369,52 +357,50 @@ verification:
     - step: 60
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"]", "timeout_sec": 30}}'
     - step: 61
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "reloaded-from-disk",
-        "timeout_sec": 30}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "reloaded-from-disk", "timeout_sec": 30}}'
     - step: 62
-      expectation: '{"eval_readonly": {"expression": "!document.querySelector(''.cm-editor'').innerText.includes(''TAILDIRTY'')",
-        "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "!document.querySelector(''.cm-editor'').innerText.includes(''TAILDIRTY'')", "expect_truthy": true}}'
     - step: 63
       expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "def2bdd6fe376421f97ec0d11cd08e6c81f5e6ee299586561ee09c9310ac8858",
         "timeout_sec": 30}}'
     - step: 66
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]:not([data-editor-group-id=\"primary\"])",
-        "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]:not([data-editor-group-id=\"primary\"])", "timeout_sec": 15}}'
     - step: 68
-      expectation: '{"eval_readonly": {"expression": "Object.keys(localStorage).join(''|'').indexOf(''taomni.codeWorkspace.layout.v2.'')
-        > -1 && Object.values(localStorage).join(''|'').indexOf(''notes.txt'') > -1", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "Object.keys(localStorage).join(''|'').indexOf(''taomni.codeWorkspace.layout.v2.'') > -1 && Object.values(localStorage).join(''|'').indexOf(''notes.txt'')
+        > -1", "expect_truthy": true}}'
     - step: 72
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 73
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"]", "timeout_sec": 60}}'
     - step: 74
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''.cm-editor'').length === 2", "expect_truthy":
-        true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''.cm-editor'').length === 2", "expect_truthy": true}}'
     - step: 76
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "reloaded-from-disk",
-        "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "reloaded-from-disk", "timeout_sec": 60}}'
     - step: 77
-      expectation: '{"eval_readonly": {"expression": "!document.querySelector(''.cm-editor'').innerText.includes(''TAILDIRTY'')",
-        "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "!document.querySelector(''.cm-editor'').innerText.includes(''TAILDIRTY'')", "expect_truthy": true}}'
     - step: 78
       expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "def2bdd6fe376421f97ec0d11cd08e6c81f5e6ee299586561ee09c9310ac8858",
         "timeout_sec": 30}}'
     - step: 82
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "RECOVERYDIRTY",
-        "timeout_sec": 30}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "RECOVERYDIRTY", "timeout_sec": 30}}'
     - step: 87
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 88
-      expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-recovery-dialog\"]", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"][data-editor-group-id=\"primary\"] .cm-content", "contains":
+        "RECOVERYDIRTY", "timeout_sec": 60}}'
+    - step: 90
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"]:not([data-editor-group-id=\"primary\"]) .cm-content", "contains":
+        "RECOVERYDIRTY", "timeout_sec": 30}}'
     - step: 91
       expectation: '{"assert_not_visible": "[data-testid=\"workspace-recovery-dialog\"]"}'
     - step: 92
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "RECOVERYDIRTY",
-        "timeout_sec": 30}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "RECOVERYDIRTY", "timeout_sec": 30}}'
     - step: 94
       expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/notes.txt", "equals": "def2bdd6fe376421f97ec0d11cd08e6c81f5e6ee299586561ee09c9310ac8858",
         "timeout_sec": 30}}'
     results:
+    - 88
+    - 90
     - 91
     - 92
     - 94

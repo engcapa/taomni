@@ -19,7 +19,7 @@ steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
-- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-ssh"]'
@@ -142,12 +142,11 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Cancelling the background-file and new-folder dialogs leaves the SSH bookmark draft unchanged, while confirming a folder and saving restores the
-      persistent bookmark fields.
+    requirement: Cancelling the background-file and new-folder dialogs leaves the SSH bookmark draft unchanged, while confirming a folder and saving restores
+      the persistent bookmark fields.
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -175,6 +174,8 @@ verification:
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 13
@@ -202,13 +203,15 @@ verification:
     - step: 32
       expectation: '{"wait_for": {"selector": "[data-testid=\"text-input-dialog\"]", "state": "detached"}}'
     - step: 33
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-folder-select\"]", "name": "value", "equals": "User sessions / QA SSH Dialog Recovery"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-folder-select\"]", "name": "value", "equals": "User sessions / QA SSH Dialog
+        Recovery"}}'
     - step: 38
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-name\"]", "name": "value", "equals": "qa-ui-auto-ssh-dialog-recovery"}}'
     - step: 39
       expectation: '{"assert_attribute": {"selector": "textarea[aria-label=\"Description notes\"]", "name": "value", "equals": "dialog cancel recovery"}}'
     - step: 40
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-folder-select\"]", "name": "value", "equals": "User sessions / QA SSH Dialog Recovery"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-folder-select\"]", "name": "value", "equals": "User sessions / QA SSH Dialog
+        Recovery"}}'
     - step: 41
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-ai-write\"]", "name": "data-checked", "equals": "true"}}'
     - step: 43
@@ -218,7 +221,8 @@ verification:
     - step: 48
       expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
     - step: 49
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-folder-select\"]", "name": "value", "equals": "User sessions / QA SSH Dialog Recovery"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-folder-select\"]", "name": "value", "equals": "User sessions / QA SSH Dialog
+        Recovery"}}'
     - step: 50
       expectation: '{"assert_attribute": {"selector": "textarea[aria-label=\"Description notes\"]", "name": "value", "equals": "dialog cancel recovery"}}'
     - step: 51
@@ -229,6 +233,7 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
     results:
     - 3
+    - 4
     - 6
     - 13
     - 14

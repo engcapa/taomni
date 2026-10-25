@@ -69,7 +69,7 @@ export function WorkspaceDocumentPopups(props: WorkspaceDocumentPopupsProps) {
       onCancel={() => fileLifecycle.dismissExternalFileConflict(externalFileConflicts[0]!.key)}
     />
   )}
-    {visible && recoveryState.workspaceRecoveryOpen && (recoveryState.workspaceRecoveryEntries.length > 0 || recoveryState.diskEffectLedgerEntries.length > 0) && externalFileConflicts.length === 0 && (
+    {visible && recoveryState.workspaceRecoveryOpen && externalFileConflicts.length === 0 && (
       <WorkspaceRecoveryDialog
         entries={recoveryState.workspaceRecoveryEntries}
         onRecover={(entry) => {

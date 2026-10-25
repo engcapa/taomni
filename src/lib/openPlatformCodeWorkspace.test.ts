@@ -61,4 +61,18 @@ describe("editor entry point ownership", () => {
     const id = openPlatformCodeWorkspace({ ...project, workspaceInstanceId: "old-session-instance" });
     expect(useWorkspacePlatformStore.getState().getWorkspace(id)?.codeWorkspace?.workspaceInstanceId).toBe("old-session-instance");
   });
+
+  it("reveals an explicit file through the shared host in an existing project with mapped root IDs", () => {
+    const info = { ...project, looseFiles: [], initialFile: { kind: "root" as const, rootId: "root-a", path: "first.ts" } };
+    const id = openPlatformCodeWorkspace(info);
+    const store = useWorkspacePlatformStore.getState();
+    expect(store.getWorkspace(id)?.openTabs.find((tab) => tab.id === store.getWorkspace(id)?.activeTabId)?.filePath).toBe("first.ts");
+    openPlatformCodeWorkspace({ ...info, roots: [{ ...info.roots![0], id: "replacement-id" }],
+      initialFile: { kind: "root", rootId: "replacement-id", path: "second.ts" } });
+    const current = store.getWorkspace(id)!;
+    expect(current.openTabs.find((tab) => tab.id === current.activeTabId)).toMatchObject({
+      kind: "file", rootFolderId: "root-a", filePath: "second.ts",
+    });
+    expect(current.openTabs.filter((tab) => tab.kind === "code")).toHaveLength(1);
+  });
 });

@@ -14,6 +14,7 @@ from __future__ import annotations
 import errno
 import json
 import os
+import platform
 import shutil
 import time
 import urllib.error
@@ -40,12 +41,24 @@ LOCAL_STORAGE_KEYS = [
     "taomni.compactMode",
     "taomni.stub.sdkRegistry.v1",
     "taomni.ai.config.v1",
+    "taomni.platformWorkspaces.v1",
+    "taomni.workspaceDocuments.recovery.v1",
+    "taomni.platform.rightContextWidth.v1",
+    "taomni.mergeToolWindowRail",
+    "taomni.sidebarCollapsed",
+    "taomni.sidebarCollapsedByGroup.v1",
+    "taomni.quickConnectVisible",
+    "taomni.uiFontFamily",
+    "taomni.uiFontSize",
+    "taomni.terminalSplitLayout",
+    "taomni.recentWorkspaces.v1",
 ]
 LOCAL_STORAGE_PREFIXES = [
     "taomni.mail.archive.",
     "taomni.sftp.",
     "taomni.tab.",
     "taomni.recent.",
+    "taomni.codeWorkspace.",
 ]
 
 # WebView2 can mutate its LevelDB/profile directory while EdgeDriver is
@@ -134,23 +147,35 @@ def _reset_native(ctx: Any) -> None:
         _remove_native_profile(target)
 
 
-def reset_native_renderer(ctx: Any, session: Any, timeout_sec: float = 20.0) -> None:
+def reset_case_renderer(ctx: Any, session: Any, fixtures: list[str], tooling_java_home: str | None) -> float | None:
+    """Reset only the persistent WKWebView belonging to an isolated QA case."""
+    if platform.system() != "Darwin" or "reset_db" not in fixtures:
+        return None
+    started = time.monotonic()
+    reset_native_renderer(ctx, session, tooling_java_home=tooling_java_home)
+    return time.monotonic() - started
+
+
+def reset_native_renderer(ctx: Any, session: Any, timeout_sec: float = 20.0,
+                          tooling_java_home: str | None = None) -> None:
     """Reset macOS WKWebView state once before this case's steps.
 
     WKWebView's persistent website data store can outlive the run-owned app
-    directories. Clear the same explicit keys/prefixes as browser reset_db in
-    the verified QA session, then reload to reinitialize renderer singletons.
+    directories. Clear Taomni's renderer namespace in the verified QA session,
+    restore the current case's tooling JDK, then reload renderer singletons.
     Later reloads in the case must retain state for persistence assertions.
     """
     _native_profile_targets(ctx)
     session.execute(
         "const keys = " + json.dumps(LOCAL_STORAGE_KEYS) + ";"
-        "const prefixes = " + json.dumps(LOCAL_STORAGE_PREFIXES) + ";"
+        "const prefixes = " + json.dumps(["taomni."]) + ";"
         "for (const key of keys) localStorage.removeItem(key);"
         "for (let i = localStorage.length - 1; i >= 0; i--) {"
         " const key = localStorage.key(i);"
         " if (key && prefixes.some(prefix => key.startsWith(prefix))) localStorage.removeItem(key);"
         "}"
+        "const toolingJavaHome = " + json.dumps(tooling_java_home) + ";"
+        "if (toolingJavaHome) localStorage.setItem('taomni.codeWorkspace.lspJavaHome.v1', toolingJavaHome);"
         "window.__QA_UI_AUTO_RESET_PENDING__ = true;"
         "window.setTimeout(() => window.location.reload(), 0); return true;"
     )

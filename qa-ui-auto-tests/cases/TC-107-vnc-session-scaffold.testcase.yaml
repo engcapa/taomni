@@ -36,7 +36,7 @@ steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
-- click: '[data-testid="welcome-new-session"]'
+- click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-vnc"]'
 - fill:
@@ -51,7 +51,7 @@ steps:
     selector: '[data-testid="session-name"]'
     value: qa-ui-auto-vnc
 - click: '[data-testid="session-save"]'
-- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc"]'
 - open_session:
     name: qa-ui-auto-vnc
@@ -81,7 +81,6 @@ verification:
     - 9
     - 11
     - 12
-    - 13
     - 15
     checkpoints:
     - step: 3

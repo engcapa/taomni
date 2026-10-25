@@ -204,6 +204,47 @@ it("retains both editors and undo while changing split/grid/single layouts", asy
   expect(vi.mocked(readWorkspaceText).mock.calls.filter(([, path]) => path.endsWith(".ts"))).toHaveLength(2);
 });
 
+it("retains the source editor and all open files when the IDE splits the active buffer", async () => {
+  render(<Panel />);
+  const initial = await editor();
+  act(() => useWorkspacePlatformStore.getState().openCodeWorkspaceTab(DEFAULT_WORKSPACE_ID));
+  act(() => initial.focus());
+  await act(async () => { await commands!.executeAction("workspace.splitRight"); });
+  await waitFor(() => expect(document.querySelectorAll(".cm-content")).toHaveLength(2));
+  const ui = useCodeWorkspaceStore.getState().getInstance("platform:default-workspace");
+  expect(Object.values(ui.editorGroups).filter((group) => group.openOrder.length)).toHaveLength(2);
+  expect(Object.values(ui.editorGroups).filter((group) => group.openOrder.length).every((group) => !!group.activeKey)).toBe(true);
+  const views = Array.from(document.querySelectorAll(".cm-editor")).map((element) => EditorView.findFromDOM(element as HTMLElement)!);
+  act(() => views[1].dispatch({ userEvent: "input.type", changes: { from: 0, insert: "// shared edit\n" } }));
+  await waitFor(() => expect(views[0].state.doc.toString()).toContain("// shared edit"));
+  const platform = useWorkspacePlatformStore.getState();
+  const workspace = platform.getWorkspace()!;
+  act(() => platform.openFileInWorkspace(workspace.id, { rootId: workspace.rootFolders[0].id, path: "second.ts" }));
+  await waitFor(() => expect(platform.getWorkspace()!.openTabs.filter((tab) => tab.kind === "file")).toHaveLength(2));
+  const sourceTab = platform.getWorkspace()!.openTabs.find((tab) => tab.filePath === "index.ts")!;
+  act(() => platform.setActiveWorkspaceTab(workspace.id, sourceTab.id));
+  await waitFor(() => expect(document.querySelectorAll(".cm-content")).toHaveLength(2));
+  expect(platform.getWorkspace()!.openTabs.filter((tab) => tab.kind === "file")).toHaveLength(2);
+});
+
+it("does not reopen a closed editor from active-file metadata published during a transaction", async () => {
+  render(<Panel />);
+  await editor();
+  const platform = useWorkspacePlatformStore.getState();
+  act(() => platform.openCodeWorkspaceTab(DEFAULT_WORKSPACE_ID));
+  await act(async () => { await commands!.executeAction("workspace.closeActiveEditorTab"); });
+  await waitFor(() => expect(platform.getWorkspace()!.openTabs.filter((tab) => tab.kind === "file")).toHaveLength(0));
+  const current = platform.getWorkspace()!;
+  act(() => platform.updateCodeWorkspace(current.id, {
+    repoRoot: current.rootFolders[0].path,
+    roots: current.rootFolders.map((root) => ({ ...root, kind: "folder" as const })),
+    initialFile: { kind: "root", rootId: current.rootFolders[0].id, path: "index.ts" },
+  }));
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+  expect(platform.getWorkspace()!.openTabs.filter((tab) => tab.kind === "file")).toHaveLength(0);
+  expect(document.querySelector(".cm-content")).toBeNull();
+});
+
 it("keeps a newly mounted owner when an old component's deferred teardown runs", async () => {
   const first = render(<Panel />);
   const initial = await editor();

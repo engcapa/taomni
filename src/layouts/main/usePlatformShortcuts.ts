@@ -4,6 +4,7 @@ import { getAppPlatform } from "../../lib/runtime";
 import { useAppStore } from "../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { useWorkspaceUiStore } from "../../stores/workspaceUiStore";
+import { shellKeyClaimed } from "../../lib/shellKeyClaims";
 
 const IS_MAC = getAppPlatform() === "macos";
 
@@ -28,6 +29,7 @@ export function usePlatformShortcuts(): void {
       const key = event.key.toLowerCase();
       const state = useAppStore.getState();
       const inWorkspace = state.activeSideTab === "workspaces";
+      if (shellKeyClaimed(event)) return;
 
       if (mod && event.shiftKey && !event.altKey && key === "e") {
         event.preventDefault();

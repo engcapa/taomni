@@ -30,7 +30,7 @@ steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
-- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
@@ -101,7 +101,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 6
     - 8
     - 11
@@ -126,6 +125,8 @@ verification:
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 5
       expectation: '{"wait_for": "[data-testid=\"session-new\"]"}'
     - step: 7
@@ -152,6 +153,7 @@ verification:
       expectation: '{"assert_count": {"selector": "[data-testid^=\"saved-query-\"]", "equal": 1}}'
     results:
     - 3
+    - 4
     - 5
     - 7
     - 9

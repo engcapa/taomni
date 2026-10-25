@@ -1,5 +1,5 @@
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
-import { workspaceEditorRuntimeId } from "../../components/workspace/useWorkspaceCodeHost";
+import { activeWorkspaceRuntimeTabId } from "../../lib/workspaceRuntimeIdentity";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type PanelImperativeHandle } from "react-resizable-panels";
 import { useToolWindowStripeStore } from "../../components/editor/workspace/toolWindowStripeStore";
@@ -146,11 +146,7 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
       return next;
     });
   }, []);
-  const platformActiveTabId = useWorkspacePlatformStore((state) => {
-    const workspace = state.getWorkspace();
-    const tab = workspace?.openTabs.find((item) => item.id === workspace.activeTabId);
-    return workspace && (tab?.kind === "file" || tab?.kind === "code") ? workspaceEditorRuntimeId(workspace) : tab?.id;
-  });
+  const platformActiveTabId = useWorkspacePlatformStore((state) => activeWorkspaceRuntimeTabId(state.getWorkspace()));
   const commandTabId = primaryMode === "workspaces" ? platformActiveTabId : primaryMode === "sessions" ? activeTabId : undefined;
   const activeWorkspaceCommandRegistration = commandTabId ? workspaceCommandRegistrations[commandTabId] ?? null : null;
   // On macOS we render a native global menu bar instead of the in-app app menu.

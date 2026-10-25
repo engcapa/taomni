@@ -250,6 +250,7 @@ export function TabBar({
     () => filterVisibleTabs(tabs.filter((tab) => tab.type !== "welcome"), sessions, tabFilter),
     [tabs, sessions, tabFilter],
   );
+  const [keyboardNavigation, setKeyboardNavigation] = useState(false);
 
   useEffect(() => {
     if (editingTabId && !tabs.some((t) => t.id === editingTabId)) {
@@ -500,8 +501,10 @@ export function TabBar({
         ref={tabScrollRef}
         data-testid="tab-scroll-area"
         role="tablist"
+        data-keyboard-navigation={keyboardNavigation ? "true" : undefined}
         aria-label={t("tabs.openTabs")}
         className="taomni-tab-scroll flex items-end min-w-0 overflow-x-auto overflow-y-hidden"
+        onPointerDownCapture={() => setKeyboardNavigation(false)}
         onWheel={(event) => {
           const el = event.currentTarget;
           if (maxScrollLeft(el) > 0 && Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
@@ -512,7 +515,12 @@ export function TabBar({
           if (editingTabId || event.altKey || event.ctrlKey || event.metaKey || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
           const index = visibleTabs.findIndex((tab) => tab.id === activeTabId);
           const target = event.key === "Home" ? visibleTabs[0] : event.key === "End" ? visibleTabs.at(-1) : visibleTabs[(index + (event.key === "ArrowRight" ? 1 : -1) + visibleTabs.length) % visibleTabs.length];
-          if (target) { event.preventDefault(); setActiveTab(target.id); tabElementRefs.current.get(target.id)?.focus(); }
+          if (target) {
+            event.preventDefault();
+            setKeyboardNavigation(true);
+            setActiveTab(target.id);
+            tabElementRefs.current.get(target.id)?.focus();
+          }
         }}
         onScroll={updateTabScrollState}
       >

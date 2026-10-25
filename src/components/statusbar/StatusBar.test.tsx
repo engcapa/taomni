@@ -1,8 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { StatusBar } from "./StatusBar";
 import { useAppStore } from "../../stores/appStore";
 import { useCodeWorkspaceStatusStore } from "../../stores/codeWorkspaceStatusStore";
+import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
+import { workspaceEditorRuntimeId } from "../../lib/workspaceRuntimeIdentity";
 
 vi.mock("../../lib/i18n", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../lib/i18n")>();
@@ -70,6 +72,7 @@ describe("StatusBar code-workspace segments", () => {
         },
       } as never],
       activeTabId: "ws-tab",
+      activeSideTab: "sessions",
       xServerEnabled: false,
       xServerStatus: null,
       statusMessage: "",
@@ -123,6 +126,37 @@ describe("StatusBar code-workspace segments", () => {
     expect(openGitManager).toHaveBeenCalledTimes(1);
     // Normal-size file: no large-file indicator.
     expect(screen.queryByTestId("status-bar-workspace-large-file")).toBeNull();
+  });
+
+  it("follows the shared editor owner across file tabs, workspaces and modes", () => {
+    const platform = useWorkspacePlatformStore.getState();
+    const workspace = platform.createWorkspace({ name: "Documents", rootPath: "/docs" });
+    const root = workspace.rootFolders[0]!;
+    platform.openFileInWorkspace(workspace.id, { rootId: root.id, path: "notes.txt" });
+    const chooseEncoding = vi.fn();
+    useAppStore.setState({ activeSideTab: "workspaces", activeTabId: "welcome" });
+    useCodeWorkspaceStatusStore.setState({ status: {
+      tabId: workspaceEditorRuntimeId(workspace), line: 3, column: 8,
+      encoding: "UTF-8", eol: "LF", languageId: null, lspActive: false,
+      lspLabel: null, lspError: false, gitBranch: null, gitAhead: 0,
+      gitBehind: 0, fontSize: 14, largeFile: false,
+      navigation: [{ label: "notes.txt", kind: "file" }],
+    }, actions: { chooseEncoding } });
+    render(<StatusBar />);
+    expect(screen.getByTestId("status-bar-workspace-navbar-host")).toHaveTextContent("notes.txt");
+    expect(screen.getByTestId("status-bar-workspace-cursor")).toHaveTextContent("3:8");
+    fireEvent.click(screen.getByTestId("status-bar-workspace-encoding"));
+    expect(chooseEncoding).toHaveBeenCalledTimes(1);
+    act(() => platform.openFileInWorkspace(workspace.id, { rootId: root.id, path: "other.txt" }));
+    expect(screen.getByTestId("status-bar-workspace-cursor")).toHaveTextContent("3:8");
+    act(() => useAppStore.setState({ activeSideTab: "sessions" }));
+    expect(screen.queryByTestId("status-bar-workspace-cursor")).toBeNull();
+    act(() => useAppStore.setState({ activeSideTab: "workspaces" }));
+    expect(screen.getByTestId("status-bar-workspace-cursor")).toHaveTextContent("3:8");
+    act(() => platform.openLocalTerminalInWorkspace(workspace.id));
+    expect(screen.queryByTestId("status-bar-workspace-cursor")).toBeNull();
+    act(() => platform.createWorkspace({ name: "Other" }));
+    expect(screen.queryByTestId("status-bar-workspace-navbar-host")).toBeNull();
   });
 
   it("ED-PARITY-010: renders the IDEA workspace layout (navigation bar, selection count, lock)", () => {
@@ -244,6 +278,7 @@ describe("StatusBar copyable/truncated text", () => {
     useAppStore.setState({
       tabs: [],
       activeTabId: null,
+      activeSideTab: "sessions",
       xServerEnabled: false,
       xServerStatus: null,
       statusMessage: "",

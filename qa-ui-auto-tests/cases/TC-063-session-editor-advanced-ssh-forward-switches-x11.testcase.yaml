@@ -18,7 +18,7 @@ steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
-- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-ssh"]'
@@ -108,7 +108,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -129,6 +128,8 @@ verification:
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 13
@@ -167,6 +168,7 @@ verification:
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
     results:
     - 3
+    - 4
     - 6
     - 13
     - 14
@@ -190,7 +192,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8

@@ -51,7 +51,7 @@ steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
-- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-rdp"]'
@@ -184,7 +184,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -226,6 +225,8 @@ verification:
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 13
@@ -251,7 +252,8 @@ verification:
     - step: 52
       expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 30}}'
     - step: 54
-      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "this computer -> client: text (28 chars)", "timeout_sec": 15}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "this computer -> client: text (28 chars)", "timeout_sec":
+        15}}'
     - step: 55
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"server-log\"]", "regex": "^(?!(?:[\\s\\S]*?this computer -> client: text \\(28 chars\\)){3})[\\s\\S]*?this
         computer -> client: text \\(28 chars\\)", "timeout_sec": 5}}'
@@ -261,6 +263,7 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"server-row-rdp\"][data-status=\"stopped\"]", "timeout_sec": 30}}'
     results:
     - 3
+    - 4
     - 6
     - 13
     - 16
@@ -282,7 +285,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -349,7 +351,8 @@ verification:
     - step: 52
       expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 30}}'
     - step: 54
-      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "this computer -> client: text (28 chars)", "timeout_sec": 15}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "this computer -> client: text (28 chars)", "timeout_sec":
+        15}}'
     - step: 55
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"server-log\"]", "regex": "^(?!(?:[\\s\\S]*?this computer -> client: text \\(28 chars\\)){3})[\\s\\S]*?this
         computer -> client: text \\(28 chars\\)", "timeout_sec": 5}}'
@@ -380,7 +383,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -447,7 +449,8 @@ verification:
     - step: 52
       expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 30}}'
     - step: 54
-      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "this computer -> client: text (28 chars)", "timeout_sec": 15}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "this computer -> client: text (28 chars)", "timeout_sec":
+        15}}'
     - step: 55
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"server-log\"]", "regex": "^(?!(?:[\\s\\S]*?this computer -> client: text \\(28 chars\\)){3})[\\s\\S]*?this
         computer -> client: text \\(28 chars\\)", "timeout_sec": 5}}'

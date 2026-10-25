@@ -1,7 +1,7 @@
 id: TC-122
 title: SSH session parses an OpenSSH command, saves the endpoint, and connects
-description: Enter an OpenSSH command in the session host field, verify its endpoint and username are parsed, save the bookmark, connect, authenticate, and run a
-  remote marker command.
+description: Enter an OpenSSH command in the session host field, verify its endpoint and username are parsed, save the bookmark, connect, authenticate,
+  and run a remote marker command.
 covers:
 - F6.2
 - F6.3
@@ -24,7 +24,7 @@ steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
-- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -82,7 +82,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -95,6 +94,8 @@ verification:
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 9
@@ -114,11 +115,14 @@ verification:
     - step: 20
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
     - step: 22
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 40}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        40}}'
     - step: 24
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-command\\-parsed\\-live\\r?$", "timeout_sec": 60}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-command\\-parsed\\-live\\r?$", "timeout_sec":
+        60}}'
     results:
     - 3
+    - 4
     - 6
     - 9
     - 10
@@ -135,7 +139,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -167,9 +170,11 @@ verification:
     - step: 20
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
     - step: 22
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 40}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        40}}'
     - step: 24
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-command\\-parsed\\-live\\r?$", "timeout_sec": 60}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-command\\-parsed\\-live\\r?$", "timeout_sec":
+        60}}'
     results:
     - 3
     - 6

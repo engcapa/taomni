@@ -11,8 +11,7 @@ import { GitBranch, MonitorSmartphone } from "lucide-react";
 import { createElement } from "react";
 import { useWorkspaceUiStore } from "../../stores/workspaceUiStore";
 
-export const workspaceEditorRuntimeId = (workspace: PlatformWorkspace) =>
-  `ws:${workspace.id}:editor`;
+export { workspaceEditorRuntimeId } from "../../lib/workspaceRuntimeIdentity";
 
 export function usesSharedWorkspaceEditor(workspace: PlatformWorkspace): boolean {
   return workspace.rootFolders.length > 0 || workspace.openTabs.some((tab) => tab.kind === "file");

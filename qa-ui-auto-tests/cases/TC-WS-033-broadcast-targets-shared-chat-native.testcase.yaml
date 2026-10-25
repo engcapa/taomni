@@ -1,8 +1,8 @@
 id: TC-WS-033
 title: Sessions broadcast subset, filtered target picker and shared Chat entry (native PTY)
-description: Selects individual sessions through inline checkboxes and the searchable broadcast picker while protocol filters hide their tabs. Keeps active tab,
-  selection and live instances; the shared bottom Chat button reopens the current session thread. Real shell output reaches only the chosen Alpha/Gamma sessions;
-  Beta independently prints a barrier without the broadcast marker.
+description: Selects individual sessions through inline checkboxes and the searchable broadcast picker while protocol filters hide their tabs. Keeps active
+  tab, selection and live instances; the shared bottom Chat button reopens the current session thread. Real shell output reaches only the chosen Alpha/Gamma
+  sessions; Beta independently prints a barrier without the broadcast marker.
 modes:
 - native
 covers:
@@ -123,6 +123,10 @@ steps:
     verify:
       selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
       regex: (?s)\A(?!.*QA_BROADCAST_SUBSET).*QA_BROADCAST_BARRIER
+- wait_for:
+    selector: '[data-testid="terminal-pane"]:not([data-terminal-ready="true"])'
+    state: detached
+    timeout_sec: 15
 - assert_count:
     selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
     equal: 3
@@ -140,9 +144,9 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Broadcast checkboxes remain reachable in the tab body. The target picker searches all live terminals including filtered tabs, selects a subset
-      without switching focus, and Escape dismisses only the picker. The bottom Chat control preserves session chat access without duplicate toolbar/rail controls.
-      Actual PTYs prove output for the selected subset and exclusion of the unselected session.
+    requirement: Broadcast checkboxes remain reachable in the tab body. The target picker searches all live terminals including filtered tabs, selects a
+      subset without switching focus, and Escape dismisses only the picker. The bottom Chat control preserves session chat access without duplicate toolbar/rail
+      controls. Actual PTYs prove output for the selected subset and exclusion of the unselected session.
     actions:
     - 1
     - 2
@@ -179,9 +183,9 @@ verification:
     - 50
     - 52
     - 53
-    - 56
-    - 58
-    - 60
+    - 57
+    - 59
+    - 61
     checkpoints:
     - step: 5
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]"}'
@@ -196,7 +200,8 @@ verification:
     - step: 23
       expectation: '{"assert_text": {"selector": "[data-testid=\"multiexec-targets\"]", "contains": "1 / 3"}}'
     - step: 24
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "QA Broadcast Gamma"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "QA Broadcast
+        Gamma"}}'
     - step: 26
       expectation: '{"assert_text": {"selector": "[data-testid=\"multiexec-targets\"]", "contains": "0 / 3"}}'
     - step: 30
@@ -212,24 +217,25 @@ verification:
     - step: 42
       expectation: '{"assert_visible": "[data-testid=\"multiexec-bar\"]"}'
     - step: 44
-      expectation: '{"assert_items": {"selector": "[data-testid=\"tab-item\"][data-multiexec-selected=\"true\"]", "attribute": "data-tab-title", "equals": ["QA
-        Broadcast Alpha", "QA Broadcast Gamma"]}}'
+      expectation: '{"assert_items": {"selector": "[data-testid=\"tab-item\"][data-multiexec-selected=\"true\"]", "attribute": "data-tab-title", "equals":
+        ["QA Broadcast Alpha", "QA Broadcast Gamma"]}}'
     - step: 45
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "QA Broadcast Gamma"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "QA Broadcast
+        Gamma"}}'
     - step: 49
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^\\s*QA_BROADCAST_SUBSET\\r?\\s*$"}}'
     - step: 51
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^\\s*QA_BROADCAST_SUBSET\\r?\\s*$"}}'
-    - step: 54
-      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "equal": 3}}'
     - step: 55
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"tab-chat-toggle\"]'') === null", "expect_truthy":
-        true}}'
-    - step: 57
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "equal": 3}}'
+    - step: 56
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"tab-chat-toggle\"]'') === null",
+        "expect_truthy": true}}'
+    - step: 58
       expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
-    - step: 59
+    - step: 60
       expectation: '{"assert_not_visible": "[data-testid=\"ai-chat-drawer\"]"}'
-    - step: 61
+    - step: 62
       expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
     results:
     - 5
@@ -250,11 +256,11 @@ verification:
     - 45
     - 49
     - 51
-    - 54
     - 55
-    - 57
-    - 59
-    - 61
+    - 56
+    - 58
+    - 60
+    - 62
   visual:
   - check: Review readable target checkboxes and compact unified controls.
     method: manual

@@ -60,7 +60,7 @@ steps:
     contains: Weekly notes
 - assert_count:
     selector: '[data-testid="code-workspace-highlighting-widget"]'
-    equal: 0
+    equal: 1
 - assert_count:
     selector: '[data-testid^="code-workspace-banner-lsp-error:"]'
     equal: 0
@@ -138,7 +138,7 @@ verification:
     - step: 28
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "Weekly notes"}}'
     - step: 29
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-highlighting-widget\"]", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-highlighting-widget\"]", "equal": 1}}'
     - step: 30
       expectation: '{"assert_count": {"selector": "[data-testid^=\"code-workspace-banner-lsp-error:\"]", "equal": 0}}'
     - step: 31

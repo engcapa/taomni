@@ -4,13 +4,22 @@ Add-Type -AssemblyName UIAutomationTypes
 $automation = [System.Windows.Automation.AutomationElement]
 $scope = [System.Windows.Automation.TreeScope]
 $titleCondition = New-Object System.Windows.Automation.PropertyCondition($automation::NameProperty, $env:QA_PICKER_TITLE)
+$windowCondition = New-Object System.Windows.Automation.PropertyCondition($automation::ControlTypeProperty, [System.Windows.Automation.ControlType]::Window)
+$applicationPath = [System.IO.Path]::GetFullPath($env:QA_PICKER_APPLICATION)
 $deadline = [DateTime]::UtcNow.AddSeconds(20)
 $dialog = $null
 do {
-    $windows = $automation::RootElement.FindAll($scope::Children, $titleCondition)
+    $windows = $automation::RootElement.FindAll($scope::Children, $windowCondition)
     $owned = @($windows | Where-Object {
         $process = Get-Process -Id $_.Current.ProcessId -ErrorAction SilentlyContinue
-        $process -and $process.Path -eq $env:QA_PICKER_APPLICATION
+        $process -and $process.Path -and [System.IO.Path]::GetFullPath($process.Path) -eq $applicationPath
+    } | ForEach-Object {
+        # Common Item Dialog can be a child window of its owner in UIA's
+        # control tree. Keep the executable boundary and search that subtree.
+        if ($_.Current.Name -eq $env:QA_PICKER_TITLE) { $_ }
+        $_.FindAll($scope::Descendants, $titleCondition) | Where-Object {
+            $_.Current.ControlType -eq [System.Windows.Automation.ControlType]::Window
+        }
     })
     if ($owned.Count -eq 1) { $dialog = $owned[0]; break }
     Start-Sleep -Milliseconds 100

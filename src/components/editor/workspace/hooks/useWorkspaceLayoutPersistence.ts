@@ -229,6 +229,10 @@ export function useWorkspaceLayoutPersistence(context: UseWorkspaceLayoutPersist
     if (host && !host.showEditorTabs) return;
     const ref=initialFileRef(workspace,roots,looseFiles);
     if(!ref) return;
+    // Root-file requests belong to the host. Its active-file publications are
+    // recent-workspace metadata, not another open command during transactions.
+    // Loose files still use the editor's initial target once per lifetime.
+    if (host && (ref.kind === "root" || initialOpenedKeyRef.current !== null)) return;
     const key=fileKey(ref);
     if(initialOpenedKeyRef.current===key) return;
     initialOpenedKeyRef.current=key;

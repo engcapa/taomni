@@ -75,8 +75,15 @@ def linux_dialog(ctx, path: Path | None) -> dict:
     deadline = time.monotonic() + 10
     while window in command("xdotool", "search", "--onlyvisible", "--name", "^" + TITLE + "$", check=False).splitlines():
         if time.monotonic() > deadline:
+            ImageGrab.grab(xdisplay=os.environ["DISPLAY"]).save(ctx.case_dir / "native-folder-dialog-timeout.png")
             raise StepError("native_folder_dialog: chooser did not close")
-        time.sleep(0.1)
+        # GTK validates a location asynchronously. Open can still be disabled
+        # immediately after typing, especially when Recent contains a folder
+        # removed by a preceding case. Retry the same explicit selection while
+        # this owned chooser remains visible; do not navigate into its children.
+        time.sleep(0.25)
+        if path is not None and window in command("xdotool", "search", "--onlyvisible", "--name", "^" + TITLE + "$", check=False).splitlines():
+            command("xdotool", "key", "--clearmodifiers", "alt+o")
     return {"transport": "X11 OS keyboard", "window": window, "pid": pid, "application": str(application)}
 
 

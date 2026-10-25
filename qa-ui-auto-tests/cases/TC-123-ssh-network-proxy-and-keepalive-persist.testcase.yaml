@@ -19,7 +19,7 @@ steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
-- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -186,7 +186,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -218,6 +217,8 @@ verification:
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 12
@@ -284,6 +285,7 @@ verification:
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
     results:
     - 3
+    - 4
     - 6
     - 12
     - 21
@@ -321,7 +323,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -456,6 +457,7 @@ verification:
     method: manual
     reason: Attribute and value assertions do not assess the layout or text clipping.
   native:
-  - check: The packaged session database persists SOCKS5, keep-alive, TCP_NODELAY, and IP version settings and excludes the proxy password when Vault save is off.
+  - check: The packaged session database persists SOCKS5, keep-alive, TCP_NODELAY, and IP version settings and excludes the proxy password when Vault save
+      is off.
     method: automated
     reason: Browser mode uses local-storage stubs and cannot establish SQLite persistence or the packaged storage boundary.

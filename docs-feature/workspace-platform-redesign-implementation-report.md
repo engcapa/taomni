@@ -1,11 +1,36 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前追加验收进行中：目录选择、终端标签菜单、工作区入口路由与大量 Sessions 标签已完成实现，新增 browser 用例 4/4 通过；native 与跨平台验收仍在推进。新增工作区混合标签冷启动恢复要求，最终证据以本轮后续记录为准。下文已有源码和运行编号属于历史阶段，不能视为当前未提交版本的全量通过证明。
+> 当前追加验收进行中：共享 Code Workspace/LSP、混合文件浏览、文件/会话冷启动恢复、广播目标选择、紧凑 Sessions 导航及重复 Git 按钮修复均已实现。本机已完成多批 browser/native 回归；三平台相关集和全量验收仍在推进。以本节最新记录为准，下文历史源码与运行编号不能视为当前版本的全量通过证明。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
+
+## 追加反馈与跨平台回归（2026-10-25）
+
+工作区复用主 Code Workspace 的编辑器、LSP、Project/All Files、查找、导航、分屏、撤销、Git 和工具窗口；不再维护另一套能力不足的代码编辑器。多根目录同时支持普通文档、图片等文件的浏览及系统默认程序打开。字体、字号、主题沿用全局设置。文件和各类会话保存到所属工作区，恢复时保留未保存内容与独立的会话实例。
+
+Home/Tools 的编辑器入口路由至对应工作区或默认工作区；Sessions 不承载工作区或 Welcome。Sessions 筛选合并到既有溢出菜单，支持搜索、协议筛选、键盘导航及大量标签。广播目标通过标签复选框和可搜索选择器选择，筛选不销毁运行实例。大预览激活已有会话时保留侧栏折叠状态。Chat 统一复用左下入口，IDE 工具与全局入口以分隔线、间距和提示区分。Agents/Crew 按用户要求显示“开发中”。
+
+本轮回归另修复：文件标签与共享编辑器运行时的状态栏/重开命令路由、分屏各组文件集合同步、编辑器快捷键优先级，以及键盘切换标签后被终端延迟聚焦打断的问题。编辑器活动文件元数据不再触发重复打开，避免文件移动/撤销和关闭期间重新插入旧缓冲区；显式打开文件统一经过宿主请求。恢复中心在确认最后一条磁盘结果后保持当前页。工作区自动恢复草稿时，既有保存竞态用例改为通过关闭确认明确丢弃草稿并重开磁盘文件，原保存回执、哈希及竞态断言全部保留。工具栏只保留 Git Diff，完整 Git 功能仍由主工具栏侧边入口提供。
+
+当前本机证据（均保留完整报告）：
+
+| 范围 | 结果 |
+| --- | --- |
+| 核心工作区 browser / native | 37/37、30/30：`workspace-browser/run-20261025-201521-181082186`、`workspace-native/run-20261025-201739-461573604` |
+| 旧导航迁移 browser | 41/41：`workspace-browser/run-20261025-205906-690748968` |
+| 编辑器 browser | 16/16：`workspace-browser/run-20261025-212951-463647971`，包含分屏共享编辑/撤销、状态栏、关闭重开、Recent Locations |
+| 紧凑导航与广播 browser | 3/3：`workspace-browser/run-20261025-214923-804747472` |
+| 关键 native 最终修复 | QA v9：`workspace-native/run-20261025-222815-908282466` 9 passed / 1 failed；剩余保存用例调整为显式处理自动恢复草稿后，在 `run-20261025-224710-684944341` 完整通过（397 步）。10 个不同 ID 最终通过；包括系统目录选择、24 文件恢复、分屏、补全、重命名移动/撤销、保存竞态和磁盘结果恢复 |
+| Browser 最终修复 | QA v9 同源码：`workspace-browser/run-20261025-222733-723909341` 50 passed / 1 failed；普通文件检查控件的旧隐藏预期在 `run-20261025-224710-880501583` 复测通过；另 `run-20261025-223619-489819249` 两条 SSH 通过，共 53 个不同 ID 最终通过。保留原失败记录 |
+| Native 保留行为修复过程 | `workspace-native/run-20261025-215339-155126895` 35 passed / 2 failed，已按以上当前 QA v9 的 10 条定向用例修复并复测；不将该历史批次称为全绿 |
+| 单元与工具契约 | 最终 7 文件 / 40 tests 通过（`_local/workspace-ci-repair-unit-final.log`）；QA 重置/目录选择/隔离/验证契约 61/61。`pnpm build` 和 `pnpm check:refactor` 通过，QA v9 构建成功（`_local/workspace-qa-build-v9.log`） |
+
+三平台相关集首次运行 [40194175843](https://github.com/engcapa/taomni/actions/runs/40194175843)，范围为 373 个精确 ID。聚合结果有 292 次 case 失败、0 infrastructure errors，已依据截图、DOM 和日志逐类修复，不以 job 的软成功代表用例成功。macOS 的跨用例工作区残留、系统目录选择的原生窗口层级也纳入修复：仅在已验证隔离身份的 QA 会话中清理 Taomni renderer 命名空间，并在重载前重新写入当前用例的 JDK；系统目录选择分别支持 GTK、Windows 所属主窗口内的原生对话框、macOS NSOpenPanel 的 AXSheet/AXDialog。相关集全部通过后才执行三平台全量，并追加最终证据。
+
+外部项目缺口：`TC-IDE-C6-06-java-definition-realproject-native` 依赖未随仓库提供的 clickhousecrud 源码，按用户确认沿用 `qa-ui-auto-tests/ci/policy.yaml` 的既有策略单独报告，不计作通过。
 
 ## 0. 本轮原型对齐（2026-10-25，本机完成，GitHub 验证进行中）
 

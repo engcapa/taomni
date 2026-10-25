@@ -23,7 +23,7 @@ steps:
 - wait_for:
     selector: '[data-testid="sidebar"]'
     timeout_sec: 45
-- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-ssh"]'
@@ -179,12 +179,11 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: OpenSSH command lookup imports endpoint, private-key, startup, X11, compression, jump-host, keep-alive, IP-version, and forwarding state with observable
-      values.
+    requirement: OpenSSH command lookup imports endpoint, private-key, startup, X11, compression, jump-host, keep-alive, IP-version, and forwarding state
+      with observable values.
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -201,6 +200,8 @@ verification:
     checkpoints:
     - step: 3
       expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 10
@@ -283,6 +284,7 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
     results:
     - 3
+    - 4
     - 6
     - 10
     - 11
@@ -328,7 +330,6 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8

@@ -22,7 +22,7 @@ steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
-- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -110,12 +110,11 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A saved SSH session opens an authentication prompt with a disabled empty submit, exposes the save-to-vault state, and both close and cancel dismiss
-      the prompt without losing the saved session.
+    requirement: A saved SSH session opens an authentication prompt with a disabled empty submit, exposes the save-to-vault state, and both close and cancel
+      dismiss the prompt without losing the saved session.
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -140,6 +139,8 @@ verification:
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 12
@@ -169,7 +170,8 @@ verification:
     - step: 32
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
     - step: 35
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        60}}'
     - step: 38
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-auth\\-dismiss\\-reconnect\\r?$", "timeout_sec":
         60}}'
@@ -187,6 +189,7 @@ verification:
       expectation: '{"assert_not_visible": "[data-testid=\"terminal-event-log\"]"}'
     results:
     - 3
+    - 4
     - 6
     - 12
     - 15
@@ -210,12 +213,11 @@ verification:
     - 46
     - 47
   - id: R2
-    requirement: Reopening the saved session after dismissal accepts the configured password, reaches a ready SSH terminal, executes a command with an exact output
-      line, and records connection and authentication events.
+    requirement: Reopening the saved session after dismissal accepts the configured password, reaches a ready SSH terminal, executes a command with an exact
+      output line, and records connection and authentication events.
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -269,7 +271,8 @@ verification:
     - step: 32
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
     - step: 35
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        60}}'
     - step: 38
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-auth\\-dismiss\\-reconnect\\r?$", "timeout_sec":
         60}}'

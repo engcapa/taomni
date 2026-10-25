@@ -7,7 +7,7 @@ import { shellKeyClaimed } from "../../lib/shellKeyClaims";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { useAppStore } from "../../stores/appStore";
 import { macCommandDigitIndex } from "./sessionPolicy";
-import { workspaceEditorRuntimeId } from "../../components/workspace/useWorkspaceCodeHost";
+import { activeWorkspaceRuntimeTabId, workspaceEditorRuntimeId } from "../../lib/workspaceRuntimeIdentity";
 
 export interface UseMainMenuBridgeContext {
   dispatchMenuAction: (action: MenuActionId) => void;
@@ -108,7 +108,7 @@ export function useMainMenuBridge(context: UseMainMenuBridgeContext) {
         // which the user closes the last editor tab.
         const appState = useAppStore.getState();
         const currentActiveTabId = appState.activeSideTab === "workspaces"
-          ? useWorkspacePlatformStore.getState().getWorkspace()?.activeTabId
+          ? activeWorkspaceRuntimeTabId(useWorkspacePlatformStore.getState().getWorkspace())
           : appState.activeSideTab === "sessions" ? appState.activeTabId : undefined;
         const registration = currentActiveTabId
           ? workspaceCommandRegistrationsRef.current[currentActiveTabId] ?? null

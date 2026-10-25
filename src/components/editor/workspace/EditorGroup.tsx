@@ -376,7 +376,7 @@ export function EditorGroup({
                     {activeFile.loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-code-muted)]" />}
                     {activeLspSyncing && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-code-muted)]" />}
                     {showLanguageTools && lspStatusPill}
-                    {showLanguageTools && highlightingWidget}
+                    {highlightingWidget}
                   </div>
                   {isMarkdownPath(activeFile.languagePath) && (
                     <div className="flex items-center gap-0.5">

@@ -38,7 +38,13 @@ steps:
     expression: Math.abs(document.querySelector('.taomni-navigator-frame').getBoundingClientRect().top - document.querySelector('.taomni-main-canvas-frame').getBoundingClientRect().top)
       < 1 && document.querySelector('.taomni-platform-resizer').getBoundingClientRect().width === 6
     expect_truthy: true
-- assert_visible: '[data-testid="sidebar-rail"] [data-testid="rail-app-menu-host"]'
+- assert_count:
+    selector: '[data-testid="sidebar-rail"] [data-testid="rail-app-menu-host"]'
+    equal: 1
+- eval_readonly:
+    expression: 'typeof window.__TAURI_INTERNALS__ !== ''undefined'' && /Mac/.test(navigator.platform) ? document.querySelector(''[data-testid''+String.fromCharCode(61)+''"rail-app-menu-host"]'').childElementCount
+      === 0 : document.querySelector(''[data-testid''+String.fromCharCode(61)+''"rail-app-menu-host"]'').getBoundingClientRect().width > 0'
+    expect_truthy: true
 - click: '[data-testid="toggle-left-sidebar"]'
 - wait_for: '[data-testid="collapsed-sidebar-rail"]'
 - press: Mod+b
@@ -61,10 +67,10 @@ verification:
     - 1
     - 2
     - 4
-    - 15
-    - 17
-    - 19
-    - 21
+    - 16
+    - 18
+    - 20
+    - 22
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -88,16 +94,19 @@ verification:
     - step: 13
       expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(''.taomni-navigator-frame'').getBoundingClientRect().top - document.querySelector(''.taomni-main-canvas-frame'').getBoundingClientRect().top)
         < 1 && document.querySelector(''.taomni-platform-resizer'').getBoundingClientRect().width === 6", "expect_truthy": true}}'
-    - step: 14
-      expectation: '{"assert_visible": "[data-testid=\"sidebar-rail\"] [data-testid=\"rail-app-menu-host\"]"}'
-    - step: 16
+    - step: 15
+      expectation: macOS native uses the system application menu and leaves the rail host empty; browser and other native hosts show the rail application
+        menu.
+    - step: 17
       expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 18
+    - step: 19
       expectation: '{"wait_for": "[data-testid=\"expanded-sidebar-panel\"]"}'
-    - step: 20
+    - step: 21
       expectation: '{"assert_count": {"selector": "[data-testid=\"right-sidebar\"]", "equal": 1}}'
-    - step: 22
+    - step: 23
       expectation: '{"assert_count": {"selector": "[data-testid=\"right-sidebar\"]", "equal": 0}}'
+    - step: 14
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail\"] [data-testid=\"rail-app-menu-host\"]", "equal": 1}}'
     results:
     - 3
     - 5
@@ -109,11 +118,12 @@ verification:
     - 11
     - 12
     - 13
+    - 15
+    - 17
+    - 19
+    - 21
+    - 23
     - 14
-    - 16
-    - 18
-    - 20
-    - 22
   visual:
   - check: 与 HTML 原型比较圆角框架、紧凑尺寸、无溢出和可用操作入口。
     method: manual

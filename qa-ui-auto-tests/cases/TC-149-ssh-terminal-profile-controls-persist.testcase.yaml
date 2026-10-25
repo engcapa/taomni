@@ -23,7 +23,7 @@ steps:
 - open: ${cfg.app.base_url}
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
-- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-ssh"]'
@@ -245,12 +245,11 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH terminal profile controls expose selected theme, behavior toggles, suggestion limits, AI controls, history cancellation, and custom command editing
-      with observable persistence after reopen.
+    requirement: SSH terminal profile controls expose selected theme, behavior toggles, suggestion limits, AI controls, history cancellation, and custom
+      command editing with observable persistence after reopen.
     actions:
     - 1
     - 2
-    - 4
     - 5
     - 7
     - 8
@@ -297,6 +296,8 @@ verification:
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 13
@@ -374,11 +375,13 @@ verification:
     - step: 84
       expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-bracketed-paste-toggle\"] input[type=\"checkbox\"]:checked", "equal": 0}}'
     - step: 85
-      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-multiline-paste-confirm-toggle\"] input[type=\"checkbox\"]:checked", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-multiline-paste-confirm-toggle\"] input[type=\"checkbox\"]:checked", "equal":
+        0}}'
     - step: 86
       expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-keyword-highlighting-toggle\"] input[type=\"checkbox\"]:checked", "equal": 1}}'
     - step: 87
-      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-save-scrollback-on-disconnect-toggle\"] input[type=\"checkbox\"]:checked", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-save-scrollback-on-disconnect-toggle\"] input[type=\"checkbox\"]:checked", "equal":
+        1}}'
     - step: 88
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "50000"}}'
     - step: 89
@@ -397,6 +400,7 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
     results:
     - 3
+    - 4
     - 6
     - 13
     - 14
