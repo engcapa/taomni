@@ -2,7 +2,8 @@ id: TC-SESSION-X11-001
 title: Remote desktop custom command opens a real X11 window through SSH forwarding
 description: Observe the real forwarded window with an independent xwininfo poller. A transient command
   timeout must invalidate the previous sample and allow later observations, rather than kill the observer
-  and leave a stale empty tree for the rest of a native suite.
+  and leave a stale empty tree for the rest of a native suite. On a fresh Windows fixture, prepare the
+  Cygwin user's home before sshd installs the forwarded X11 cookie, without relying on a prior login.
 covers:
 - F6.3
 - F2.2
