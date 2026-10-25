@@ -17,13 +17,31 @@ const processes = shell.doShellScript("ps -axww -o pid=,args=").split("\n").map(
   const match = line.trim().match(/^(\d+)\s+(.+)$/);
   return match ? { pid: Number(match[1]), path: match[2].split(/\s+/, 1)[0] } : null;
 }).filter((process) => process !== null);
-const owners = processes.filter((process) => process.path === application).map((process) => process.pid);
-if (owners.length !== 1) {
+let owners = processes.filter((process) => process.path === application).map((process) => process.pid);
+if (owners.length === 0) {
+  // Some hardened macOS runners redact argv paths from Accessibility scripts;
+  // the comm field remains available. Accept a unique basename match only
+  // within this invocation's executable name.
+  const executable = application.split("/").pop();
+  const shortProcesses = shell.doShellScript("ps -ax -o pid=,comm=").split("\n").map((line) => {
+    const match = line.trim().match(/^(\d+)\s+(.+)$/);
+    return match ? { pid: Number(match[1]), path: match[2].split("/").pop() } : null;
+  }).filter((process) => process !== null && process.path === executable);
+  if (shortProcesses.length === 1) owners = [shortProcesses[0].pid];
+}
+let process = owners.length === 1 ? events.processes.whose({ unixId: owners[0] })[0] : null;
+if (!process && owners.length === 0) {
+  // Hardened runners can hide both argv and comm. The real chooser remains
+  // uniquely identifiable by its NSOpenPanel sheet and Open/Cancel buttons
+  // on the frontmost application, so use that narrow fallback.
+  const frontmost = events.processes.whose({ frontmost: true })();
+  if (frontmost.length === 1) process = frontmost[0];
+}
+if (!process) {
   log("expected executable " + application + "; candidates " + JSON.stringify(processes.filter((process) => process.path.includes("taomni"))));
   throw new Error("No unique process for the QA executable");
 }
-const process = events.processes.whose({ unixId: owners[0] })[0];
-log("owned process " + owners[0]);
+log("owned process " + (owners[0] || "frontmost"));
 function buttons(owner, name, enabled = false) {
   // Native Open/Cancel buttons are direct children of NSOpenPanel. Query only
   // the panel, never Home's unrelated Open button in the underlying WebView.

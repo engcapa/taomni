@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, File, FilePlus2, Folder, FolderPlus, GitBranch, RefreshCw, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronRight, File, FilePlus2, Folder, FolderPlus, RefreshCw, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
 import { useAppDialogs } from "../../lib/appDialogs";
@@ -374,18 +374,6 @@ export function WorkspaceFileTree({
                   }}
                 >
                   <RefreshCw className="h-3 w-3" />
-                </button>
-                <button
-                  type="button"
-                  data-testid="workspace-tree-root-git"
-                  title={t("platform.openGitPanel")}
-                  className="rounded p-0.5 hover:bg-[var(--taomni-hover)]"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onOpenGitForFile(root, "");
-                  }}
-                >
-                  <GitBranch className="h-3 w-3" />
                 </button>
               </span>
             </div>

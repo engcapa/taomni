@@ -1,6 +1,7 @@
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+Add-Type -AssemblyName System.Windows.Forms
 $automation = [System.Windows.Automation.AutomationElement]
 $scope = [System.Windows.Automation.TreeScope]
 $titleCondition = New-Object System.Windows.Automation.PropertyCondition($automation::NameProperty, $env:QA_PICKER_TITLE)
@@ -55,7 +56,12 @@ function Invoke-ChooserButton([string] $id, [string[]] $names, [bool] $waitEnabl
     }
 }
 if ($env:QA_PICKER_ACTION -eq "cancel") {
-    Invoke-ChooserButton "2" @("Cancel") $false
+    try { Invoke-ChooserButton "2" @("Cancel") $false }
+    catch {
+        [Console]::Error.WriteLine("UIA Cancel unavailable; sending Escape to the owned chooser")
+        $dialog.SetFocus()
+        [System.Windows.Forms.SendKeys]::SendWait("{ESC}")
+    }
 } else {
     $editCondition = New-Object System.Windows.Automation.PropertyCondition($automation::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)
     $edits = @($dialog.FindAll($scope::Descendants, $editCondition) | Where-Object { $_.Current.IsEnabled -and -not $_.Current.IsOffscreen })
@@ -65,11 +71,23 @@ if ($env:QA_PICKER_ACTION -eq "cancel") {
     $value = $edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
     $value.SetValue($env:QA_PICKER_PATH)
     if ($value.Current.Value -ne $env:QA_PICKER_PATH) { throw "Folder path was not entered completely" }
-    Invoke-ChooserButton "1" @("Open", "Select Folder", "Add", "Choose")
+    try {
+        Invoke-ChooserButton "1" @("Open", "Select Folder", "Add", "Choose")
+    } catch {
+        [Console]::Error.WriteLine("UIA Open unavailable; sending Alt+O to the owned chooser")
+        $dialog.SetFocus()
+        [System.Windows.Forms.SendKeys]::SendWait("%o")
+        [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+    }
     Start-Sleep -Milliseconds 600
     try {
         if (-not $dialog.Current.IsOffscreen) {
-            Invoke-ChooserButton "1" @("Open", "Select Folder", "Add", "Choose")
+            try { Invoke-ChooserButton "1" @("Open", "Select Folder", "Add", "Choose") }
+            catch {
+                $dialog.SetFocus()
+                [System.Windows.Forms.SendKeys]::SendWait("%o")
+                [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+            }
         }
     } catch [System.Windows.Automation.ElementNotAvailableException] { }
 }

@@ -25,9 +25,14 @@ const main = {sheets:()=>config.standalone ? [] : [panel],
   uiElements:()=>{throw new Error('must never traverse the main WebView')},
   buttons: config.standalone ? panel.buttons : {whose:()=>{throw new Error('Home is not NSOpenPanel')}}};
 const owner = {windows:()=>[main],unixId:()=>123};
-const events = {processes:{whose:({unixId})=>{if(unixId !== 123) throw new Error('unowned PID'); return [owner]}},
+const events = {processes:{whose:(query)=>{
+  if(query.unixId !== undefined && query.unixId !== 123) throw new Error('unowned PID');
+  if(query.frontmost) return ()=>[owner];
+  return [owner];
+}},
   keystroke:(key)=>actions.push(key), keyCode:(key)=>{actions.push(key);if(key===36)navigated=true;}};
 const shell = {doShellScript:(command)=>{
+  if(command === 'ps -ax -o pid=,comm=') return '123 taomni';
   if(command !== 'ps -axww -o pid=,args=') return ('  123 ' + application).slice(0,79);
   return config.duplicate ? '123 ' + application + '\n124 ' + application : '123 ' + application + '\n456 /other/taomni';
 }};
