@@ -1,13 +1,31 @@
 """Restart only this run's owned QA application, retaining its isolated profile."""
 from __future__ import annotations
 
+import json
+import os
+from pathlib import Path
+import subprocess
 import time
 
 from native_process_group import wait_for_driver_ports
 from native_webdriver_transport import WebDriverError
 
 
-def close_application_window(session, timeout: float = 15) -> None:
+def close_macos_application_window(application: Path) -> dict:
+    env = dict(os.environ, QA_CLOSE_APPLICATION=str(application.resolve()))
+    result = subprocess.run(
+        ["osascript", "-l", "JavaScript", str(Path(__file__).with_name("native_window_close_macos.js"))],
+        env=env, text=True, capture_output=True, timeout=15,
+    )
+    if result.returncode:
+        raise WebDriverError("Native QA window close failed: " + result.stderr.strip())
+    observation = json.loads(result.stdout)
+    if observation.get("application") != str(application.resolve()) or not isinstance(observation.get("pid"), int):
+        raise WebDriverError("Native window close did not identify the owned QA executable")
+    return observation
+
+
+def close_application_window(session, timeout: float = 15) -> dict | None:
     """Use the production close path before releasing the owned driver tree.
 
     DELETE-session/kill is teardown, not a normal application close. In
@@ -22,8 +40,12 @@ def close_application_window(session, timeout: float = 15) -> None:
     def closed(error):
         return any(message in str(error).lower() for message in closed_messages)
 
+    observation = None
     try:
-        session.click('[data-testid="window-close"]')
+        if session.transport == "macOS WKWebView bridge":
+            observation = close_macos_application_window(session.application)
+        else:
+            session.click('[data-testid="window-close"]')
     except (WebDriverError, OSError) as error:
         if "element click intercepted" in str(error).lower():
             # A transient native overlay can cover the titlebar control while
@@ -40,12 +62,12 @@ def close_application_window(session, timeout: float = 15) -> None:
                 # This is the same close handler: WebKit can terminate its
                 # context before returning the script acknowledgement too.
                 if closed(dispatch_error):
-                    return
+                    return observation
                 raise
             if dispatched is not True:
                 raise error
         elif closed(error):
-            return
+            return observation
         else:
             raise
     end = time.monotonic() + timeout
@@ -58,7 +80,7 @@ def close_application_window(session, timeout: float = 15) -> None:
             )
         except (WebDriverError, OSError) as error:
             if closed(error):
-                return
+                return observation
             raise
         if dialog:
             raise RuntimeError("QA application close needs confirmation; handle the exit dialog explicitly before restarting")
@@ -69,9 +91,11 @@ def close_application_window(session, timeout: float = 15) -> None:
 def restart_owned_application(driver, session) -> dict:
     deadline = session.deadline
     before = session.session_id
+    macos_bridge = session.transport == "macOS WKWebView bridge"
+    before_owner = getattr(getattr(driver, "proc", None), "pid", None)
     application = str(session.application.resolve())
     try:
-        close_application_window(session)
+        close_observation = close_application_window(session)
         # The WebView has closed normally. Release transport/ownership without
         # sending DELETE to an already closed browsing context.
         session.session_id = None
@@ -89,8 +113,19 @@ def restart_owned_application(driver, session) -> dict:
     session._on_close = driver.mark_session_closed
     session.deadline = deadline
     session.start()
-    if not session.session_id or session.session_id == before:
+    after_owner = getattr(getattr(driver, "proc", None), "pid", None)
+    if not session.session_id:
+        raise RuntimeError("QA application restart did not create a new native session")
+    if macos_bridge:
+        # The in-process bridge deliberately uses one protocol session ID.
+        # A different owned launcher PID, after the old bridge socket closed,
+        # proves a cold start without treating that constant ID as a reuse.
+        if not isinstance(before_owner, int) or not isinstance(after_owner, int) or before_owner == after_owner:
+            raise RuntimeError("QA application restart did not create a new owned macOS process")
+    elif session.session_id == before:
         raise RuntimeError("QA application restart did not create a new native session")
     return {"application": application, "before_session": before,
             "after_session": session.session_id, "profile_retained": True,
-            "shutdown": "application-window-close"}
+            "shutdown": "application-window-close",
+            **({"before_owner_pid": before_owner, "after_owner_pid": after_owner} if macos_bridge else {}),
+            **({"native_close": close_observation} if close_observation else {})}

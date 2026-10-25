@@ -27,7 +27,11 @@ class NativeApplicationRestartTest(unittest.TestCase):
         driver = SimpleNamespace(stop=Mock(side_effect=lambda: events.append("stop-owner")),
                                  start=Mock(side_effect=lambda: events.append("start-owner")),
                                  mark_session_closed=Mock(), _restart_required=True,
-                                 host="127.0.0.1", port=0, native_port=0)
+                                 host="127.0.0.1", port=0, native_port=0, proc=SimpleNamespace(pid=100))
+        def launch():
+            events.append("start-owner")
+            driver.proc = SimpleNamespace(pid=200)
+        driver.start.side_effect = launch
         return session, driver, events
 
     def test_restarts_the_owned_process_without_resetting_profile_and_keeps_case_budget(self):
@@ -99,6 +103,42 @@ class NativeApplicationRestartTest(unittest.TestCase):
         session.start.side_effect = RuntimeError("launch failed")
         with self.assertRaisesRegex(RuntimeError, "launch failed"):
             restart_owned_application(driver, session)
+
+    def test_macos_uses_its_owned_native_close_button_and_keeps_the_os_observation(self):
+        session, driver, events = self.scenario()
+        session.transport = "macOS WKWebView bridge"
+        observed = {"application": str(session.application.resolve()), "pid": 123, "transport": "macOS native close button"}
+        with patch("native_application_restart.close_macos_application_window", return_value=observed) as close:
+            result = restart_owned_application(driver, session)
+        close.assert_called_once_with(session.application)
+        session.click.assert_not_called()
+        self.assertEqual(result["native_close"], observed)
+        self.assertEqual(events, ["close", "stop-owner", "start-owner", "start-session"])
+
+    def test_macos_native_close_failure_never_starts_a_second_application(self):
+        session, driver, _ = self.scenario()
+        session.transport = "macOS WKWebView bridge"
+        with patch("native_application_restart.close_macos_application_window", side_effect=WebDriverError("no owned window")):
+            with self.assertRaisesRegex(WebDriverError, "no owned window"):
+                restart_owned_application(driver, session)
+        driver.stop.assert_called_once()
+        driver.start.assert_not_called()
+
+    def test_macos_constant_protocol_session_requires_a_different_owned_process(self):
+        session, driver, _ = self.scenario()
+        session.transport = "macOS WKWebView bridge"
+        session.start.side_effect = lambda: setattr(session, "session_id", "old")
+        with patch("native_application_restart.close_macos_application_window", return_value={"pid": 100}):
+            result = restart_owned_application(driver, session)
+        self.assertEqual((result["before_owner_pid"], result["after_owner_pid"]), (100, 200))
+
+    def test_macos_reused_owner_cannot_claim_a_cold_start(self):
+        session, driver, _ = self.scenario()
+        session.transport = "macOS WKWebView bridge"
+        driver.start.side_effect = None
+        with patch("native_application_restart.close_macos_application_window", return_value={"pid": 100}):
+            with self.assertRaisesRegex(RuntimeError, "new owned macOS process"):
+                restart_owned_application(driver, session)
 
     def test_reused_session_cannot_claim_a_cold_start(self):
         session, driver, _ = self.scenario()

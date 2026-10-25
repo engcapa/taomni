@@ -2,6 +2,9 @@ $ErrorActionPreference = "Stop"
 Add-Type @"
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Threading;
 using System.Runtime.InteropServices;
 using System.Text;
 public static class QaFolderDialog {
@@ -23,79 +26,100 @@ public static class QaFolderDialog {
     public static string Class(IntPtr window) {
         var value = new StringBuilder(256); GetClassName(window, value, value.Capacity); return value.ToString();
     }
-    public static int Process(IntPtr window) { uint pid; GetWindowThreadProcessId(window, out pid); return (int)pid; }
+    private static int ProcessId(IntPtr window) { uint pid; GetWindowThreadProcessId(window, out pid); return (int)pid; }
     public static IntPtr[] Windows(IntPtr owner) {
         var found = new List<IntPtr>();
         Enumerate collect = (window, data) => { found.Add(window); return true; };
         if (owner == IntPtr.Zero) EnumWindows(collect, IntPtr.Zero); else EnumChildWindows(owner, collect, IntPtr.Zero);
         return found.ToArray();
     }
+    private static IntPtr FindOwnedDialog(string application, string title) {
+        var deadline = DateTime.UtcNow.AddSeconds(20);
+        do {
+            var owned = new List<IntPtr>();
+            foreach (var window in Windows(IntPtr.Zero)) {
+                if (!IsWindowVisible(window) || Class(window) != "#32770" || Text(window) != title) continue;
+                try {
+                    using (var process = Process.GetProcessById(ProcessId(window))) {
+                        if (String.Equals(Path.GetFullPath(process.MainModule.FileName), application, StringComparison.OrdinalIgnoreCase)) {
+                            owned.Add(window);
+                        }
+                    }
+                } catch (System.ComponentModel.Win32Exception) { }
+                  catch (ArgumentException) { }
+                  catch (InvalidOperationException) { }
+            }
+            if (owned.Count == 1) return owned[0];
+            Thread.Sleep(100);
+        } while (DateTime.UtcNow < deadline);
+        throw new InvalidOperationException("No unique Common Item Dialog owned by the QA executable");
+    }
+
+    private static IntPtr Control(IntPtr dialog, int id, string type) {
+        var found = new List<IntPtr>();
+        var details = new StringBuilder();
+        foreach (var window in Windows(dialog)) {
+            var controlId = GetDlgCtrlID(window);
+            var controlClass = Class(window);
+            if (controlId == id && controlClass == type && IsWindowVisible(window)) found.Add(window);
+            details.AppendFormat("id={0},class={1},text={2}; ", controlId, controlClass, Text(window));
+        }
+        if (found.Count != 1) throw new InvalidOperationException("Chooser control " + id + "/" + type + " is not unique: " + details);
+        return found[0];
+    }
+
+    private static bool Open(IntPtr dialog) {
+        return IsWindow(dialog) && IsWindowVisible(dialog);
+    }
+
+    private static bool Click(IntPtr dialog, int id) {
+        var button = Control(dialog, id, "Button");
+        if (!IsWindowEnabled(button)) return false;
+        // BM_CLICK operates the native button once. Enter must not leak into
+        // the application's Add modal after the system dialog has closed.
+        if (!PostMessage(button, 0x00F5, IntPtr.Zero, IntPtr.Zero)) {
+            throw new InvalidOperationException("Chooser button could not receive BM_CLICK: " + id);
+        }
+        Console.Error.WriteLine("Chooser button {0}: {1}", id, Text(button));
+        return true;
+    }
+
+    public static Dictionary<string, object> Run(string application, string title, string action, string path) {
+        application = Path.GetFullPath(application);
+        var dialog = FindOwnedDialog(application, title);
+        int pid = ProcessId(dialog);
+        Console.Error.WriteLine("Owned chooser HWND={0}, pid={1}, title={2}", dialog, pid, Text(dialog));
+        if (action == "cancel") {
+            if (!Click(dialog, 2)) throw new InvalidOperationException("Chooser Cancel is disabled");
+        } else if (action == "choose") {
+            // 1152 is the folder field; the last UIA Edit is the Search box.
+            var edit = Control(dialog, 1152, "Edit");
+            if (!SetWindowText(edit, path) || Text(edit) != path) {
+                throw new InvalidOperationException("Folder path was not entered completely");
+            }
+            var deadline = DateTime.UtcNow.AddSeconds(10);
+            bool invoked = false;
+            do {
+                if (!Open(dialog)) throw new InvalidOperationException("Chooser closed before accepting the path");
+                invoked = Click(dialog, 1);
+                if (invoked) break;
+                Thread.Sleep(100);
+            } while (DateTime.UtcNow < deadline);
+            if (!invoked) throw new InvalidOperationException("Chooser Open is disabled");
+        } else {
+            throw new ArgumentException("Unknown chooser action: " + action);
+        }
+        var closedDeadline = DateTime.UtcNow.AddSeconds(10);
+        while (Open(dialog) && DateTime.UtcNow < closedDeadline) Thread.Sleep(100);
+        if (Open(dialog)) throw new InvalidOperationException("Folder chooser did not close");
+        return new Dictionary<string, object> {
+            { "transport", "Windows Common Item Dialog controls" },
+            { "window", dialog.ToInt64() }, { "pid", pid }, { "application", application }
+        };
+    }
 }
 "@
-$applicationPath = [System.IO.Path]::GetFullPath($env:QA_PICKER_APPLICATION)
-$deadline = [DateTime]::UtcNow.AddSeconds(20)
-$dialog = [IntPtr]::Zero
-do {
-    # UIA can expose only the Explorer child of Common Item Dialog. Resolve
-    # the actual top-level #32770 HWND before looking up its native controls.
-    $owned = @([QaFolderDialog]::Windows([IntPtr]::Zero) | Where-Object {
-        if (-not [QaFolderDialog]::IsWindowVisible($_) -or [QaFolderDialog]::Class($_) -ne "#32770") { return $false }
-        $owner = Get-Process -Id ([QaFolderDialog]::Process($_)) -ErrorAction SilentlyContinue
-        $owner -and $owner.Path -and [System.IO.Path]::GetFullPath($owner.Path) -eq $applicationPath -and
-            [QaFolderDialog]::Text($_) -eq $env:QA_PICKER_TITLE
-    })
-    if ($owned.Count -eq 1) { $dialog = $owned[0]; break }
-    Start-Sleep -Milliseconds 100
-} while ([DateTime]::UtcNow -lt $deadline)
-if ($dialog -eq [IntPtr]::Zero) { throw "No unique Common Item Dialog owned by the QA executable" }
-$pidObserved = [QaFolderDialog]::Process($dialog)
-function Chooser-Open {
-    [QaFolderDialog]::IsWindow($dialog) -and [QaFolderDialog]::IsWindowVisible($dialog)
-}
-function Control([int] $id, [string] $class) {
-    $found = @([QaFolderDialog]::Windows($dialog) | Where-Object {
-        [QaFolderDialog]::GetDlgCtrlID($_) -eq $id -and [QaFolderDialog]::Class($_) -eq $class -and
-            [QaFolderDialog]::IsWindowVisible($_)
-    })
-    if ($found.Count -ne 1) {
-        $details = ([QaFolderDialog]::Windows($dialog) | ForEach-Object {
-            "id=$([QaFolderDialog]::GetDlgCtrlID($_)),class=$([QaFolderDialog]::Class($_)),text=$([QaFolderDialog]::Text($_))"
-        }) -join '; '
-        throw "Chooser control $id/$class is not unique: $details"
-    }
-    return $found[0]
-}
-function Invoke-Control([int] $id) {
-    $button = Control $id "Button"
-    if (-not [QaFolderDialog]::IsWindowEnabled($button)) { return $false }
-    # BM_CLICK operates the real native button. Post once, then observe the
-    # dialog: no keyboard fallback can leak Enter into the app's Add modal.
-    if (-not [QaFolderDialog]::PostMessage($button, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)) {
-        throw "Chooser button $id could not receive BM_CLICK"
-    }
-    [Console]::Error.WriteLine("Chooser button {0}: {1}", $id, [QaFolderDialog]::Text($button))
-    return $true
-}
-[Console]::Error.WriteLine("Owned chooser HWND={0}, pid={1}, title={2}", $dialog, $pidObserved, [QaFolderDialog]::Text($dialog))
-if ($env:QA_PICKER_ACTION -eq "cancel") {
-    if (-not (Invoke-Control 2)) { throw "Chooser Cancel is disabled" }
-} else {
-    # 1152 is Common Item Dialog's filename/folder field. Never type into the
-    # last UIA Edit: that is the Search box on Windows 2025.
-    $edit = Control 1152 "Edit"
-    if (-not [QaFolderDialog]::SetWindowText($edit, $env:QA_PICKER_PATH) -or
-        [QaFolderDialog]::Text($edit) -ne $env:QA_PICKER_PATH) { throw "Folder path was not entered completely" }
-    $deadline = [DateTime]::UtcNow.AddSeconds(10)
-    $invoked = $false
-    do {
-        if (-not (Chooser-Open)) { throw "Chooser closed before accepting the path" }
-        $invoked = Invoke-Control 1
-        if ($invoked) { break }
-        Start-Sleep -Milliseconds 100
-    } while ([DateTime]::UtcNow -lt $deadline)
-    if (-not $invoked) { throw "Chooser Open is disabled" }
-}
-$deadline = [DateTime]::UtcNow.AddSeconds(10)
-while ((Chooser-Open) -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 100 }
-if (Chooser-Open) { throw "Folder chooser did not close" }
-@{transport="Windows Common Item Dialog controls"; window=$dialog.ToInt64(); pid=$pidObserved; application=$env:QA_PICKER_APPLICATION} | ConvertTo-Json -Compress
+# Keep primitive Win32 calls inside typed C#. PowerShell's dynamic pipeline
+# binder otherwise rejects native Int32 return values on the hosted desktop.
+[QaFolderDialog]::Run($env:QA_PICKER_APPLICATION, $env:QA_PICKER_TITLE, $env:QA_PICKER_ACTION, $env:QA_PICKER_PATH) |
+    ConvertTo-Json -Depth 4 -Compress

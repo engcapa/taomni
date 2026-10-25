@@ -107,9 +107,8 @@ def run_folder_dialog(ctx, args) -> str:
                        QA_PICKER_ACTION=args["action"])
             helper = Path(__file__).parent
             if platform.system() == "Windows":
-                # Hosted runners provide PowerShell 7. Windows PowerShell
-                # 5.1's dynamic binder rejects the helper's native Int32
-                # return values inside Where-Object on Windows 2025.
+                # Use the maintained runner runtime to compile and invoke
+                # the typed Common Item Dialog helper.
                 runtime = shutil.which("pwsh")
                 if not runtime:
                     raise StepError("native_folder_dialog: PowerShell 7 (pwsh) is required for Windows chooser automation")
