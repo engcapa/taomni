@@ -91,6 +91,9 @@ steps:
     equal: 3
 - set_check:
     selector: '[data-testid="backup-global-include-mail"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="backup-global-include-mail"]'
     checked: false
 - assert_text:
     selector: '[data-testid="backup-settings-save-status"]'
@@ -175,29 +178,29 @@ verification:
   - id: R4
     requirement: Actual excluded selection matches published archive contents
     actions:
-    - 27
-    - 30
+    - 28
+    - 31
     checkpoints:
-    - step: 32
+    - step: 33
       expectation: Real local job completed
-    - step: 31
+    - step: 32
       expectation: Independent ZIP/SQLite oracle confirms selected files, index references and original bytes
     results:
+    - 33
     - 32
-    - 31
   - id: R5
     requirement: Actual all selection matches published archive contents
     actions:
-    - 33
-    - 36
+    - 34
+    - 37
     checkpoints:
-    - step: 38
+    - step: 39
       expectation: Real local job completed
-    - step: 37
+    - step: 38
       expectation: Independent ZIP/SQLite oracle confirms selected files, index references and original bytes
     results:
+    - 39
     - 38
-    - 37
   visual:
   - check: Category and task controls remain readable in retained screenshots
     method: manual
