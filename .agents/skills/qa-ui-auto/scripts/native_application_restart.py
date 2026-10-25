@@ -133,7 +133,7 @@ def restart_owned_application(driver, session) -> dict:
     # socket yet. Starting immediately races WebKitWebDriver on Linux.
     ports = (driver.port,) if session.transport == "macOS WKWebView bridge" else (driver.port, driver.native_port)
     observation["stage"] = "wait-for-old-ports"
-    wait_for_driver_ports(driver.host, ports)
+    observation["driver_port_release"] = wait_for_driver_ports(driver.host, ports)
     driver._restart_required = False
     observation["stage"] = "start-owner"
     driver.start()
@@ -157,5 +157,6 @@ def restart_owned_application(driver, session) -> dict:
             "after_session": session.session_id, "profile_retained": True,
             "shutdown": "application-window-close",
             "native_shutdown": observation["native_shutdown"],
+            **({"driver_port_release": observation["driver_port_release"]} if observation["driver_port_release"] else {}),
             **({"before_owner_pid": before_owner, "after_owner_pid": after_owner} if macos_bridge else {}),
             **({"native_close": close_observation} if close_observation else {})}

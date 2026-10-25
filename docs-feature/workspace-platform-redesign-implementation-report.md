@@ -29,6 +29,8 @@ Windows 在 [40236197565](https://github.com/engcapa/taomni/actions/runs/4023619
 
 macOS 完整冷启动定向 [40237170175](https://github.com/engcapa/taomni/actions/runs/40237170175) 已通过，聚合 `passed=true`、0 failures / infrastructure errors；两次关闭退出码均 0，所属 PID 6307→7433→8081。Windows [40237590690](https://github.com/engcapa/taomni/actions/runs/40237590690) 的目录选择和入口归属 2/2 通过，冷启动首次重启停在驱动端口释放：100ms 连接探测早于 Windows 对关闭 loopback 端口的明确拒绝。探测增加到最多 2s，仍必须收到拒绝才继续，超时/实际监听继续失败并保留探测原因。26 项定向进程/重启契约通过，本机 `workspace-native/run-20261026-061247-462240219` 两次重启及所有恢复断言完整通过。此前本机 workflow 工具集为 512 项中 511 passed / 1 平台 skipped，命令成功；该结果不是 UI 全量通过。
 
+Windows 冷启动 [40239289178](https://github.com/engcapa/taomni/actions/runs/40239289178) 仍失败，诊断显示 2s 探测也只有超时而没有明确拒绝。故 Windows 改读实际 TCP 监听表：只有两个端口均无监听记录才继续；查询失败、结果不合法或尚有监听进程均明确失败，不以连接超时当作端口已释放。30 项进程/重启契约通过；本机 `workspace-native/run-20261026-063644-324532334` 完整冷启动回归通过。相关集 [40239319086](https://github.com/engcapa/taomni/actions/runs/40239319086) 的三平台 browser 已全部通过，Linux/Windows/macOS 分别 258/258、258/258、257/257，native 仍在执行；该运行使用此前 runner，保留结果而不作为最终全量通过。
+
 本机 QA v13 二进制 `src-tauri/target/qa-ui-auto/debug/taomni` 的构建输入匹配当前产品源码；源码指纹为 `1381198413aefe6d9838904adacbf374f951f41c171afb42b56224ad15615302`。最新静态审计（620 ID）、覆盖门禁、Rust 格式检查和 `pnpm check:refactor` 通过。所有本机测试保持最多 2 个 worker，native 顺序执行；此处本机通过不替代仍在进行的三平台相关集与全量验收。
 
 2026-10-26 续验：相关集 [40204276862](https://github.com/engcapa/taomni/actions/runs/40204276862) 的 browser 为 Linux 258/258、Windows 258/258、macOS 257/257；native 为 Linux 162/166、Windows 141/147、macOS 130/135，15 项失败，基础设施错误 0。该运行未通过，尚不能启动全量验收。目录选择修复覆盖 GTK Recent、macOS NSOpenPanel 查找和 Windows UIA 按钮类型；邮件关闭重开恢复直接关闭标签的原有操作；普通文件保留检查控件；独立 SFTP 窗口补充真实输入焦点与完整地址断言。

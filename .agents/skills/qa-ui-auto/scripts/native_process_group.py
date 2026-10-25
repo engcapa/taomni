@@ -3,15 +3,43 @@ from __future__ import annotations
 
 from contextlib import suppress
 import os
+import platform
 import signal
 import socket
 import subprocess
 import time
 
 
-def wait_for_driver_ports(host: str, ports: tuple[int, ...], timeout: float = 5) -> None:
+def windows_listeners(ports: tuple[int, ...]) -> list[dict]:
+    """Read the OS TCP table; Windows may silently drop closed-port SYNs."""
+    import json
+    script = (
+        "$ErrorActionPreference = 'Stop'; "
+        f"$ports = @({','.join(str(int(port)) for port in ports)}); "
+        "$listeners = @(Get-NetTCPConnection -State Listen -ErrorAction Stop | "
+        "Where-Object { $_.LocalPort -in $ports } | Select-Object LocalAddress,LocalPort,OwningProcess); "
+        "ConvertTo-Json -InputObject $listeners -Compress"
+    )
+    result = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
+                            check=True, capture_output=True, text=True, timeout=10)
+    listeners = json.loads(result.stdout)
+    if not isinstance(listeners, list) or any(not isinstance(row, dict) or row.get("LocalPort") not in ports
+                                             or not isinstance(row.get("OwningProcess"), int) for row in listeners):
+        raise RuntimeError("Windows TCP listener observation is invalid")
+    return listeners
+
+
+def wait_for_driver_ports(host: str, ports: tuple[int, ...], timeout: float = 5) -> dict | None:
     """After stopping an owned driver, wait for its adapters to release TCP."""
     deadline = time.monotonic() + timeout
+    if platform.system() == "Windows":
+        while True:
+            listeners = windows_listeners(ports)
+            if not listeners:
+                return {"transport": "Windows TCP listener table", "ports": list(ports), "listeners": []}
+            if time.monotonic() >= deadline:
+                raise RuntimeError(f"Owned native driver ports still have listeners: {listeners}")
+            time.sleep(0.1)
     for port in ports:
         while True:
             try:

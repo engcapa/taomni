@@ -10,10 +10,41 @@ import time
 import unittest
 from unittest.mock import patch
 
-from native_process_group import stop_owned_process_group, wait_for_driver_ports
+from native_process_group import stop_owned_process_group, wait_for_driver_ports, windows_listeners
 
 
 class NativePortReleaseTest(unittest.TestCase):
+    def test_windows_observes_the_os_listener_table_without_a_connection_probe(self):
+        with patch("native_process_group.platform.system", return_value="Windows"), \
+                patch("native_process_group.windows_listeners", return_value=[]), \
+                patch("native_process_group.socket.create_connection") as connect:
+            observation = wait_for_driver_ports("127.0.0.1", (4444, 4445))
+        self.assertEqual(observation["listeners"], [])
+        connect.assert_not_called()
+
+    def test_windows_waits_for_the_actual_listener_to_disappear(self):
+        listener = {"LocalPort": 4444, "OwningProcess": 10}
+        with patch("native_process_group.platform.system", return_value="Windows"), \
+                patch("native_process_group.windows_listeners", side_effect=[[listener], []]) as read, \
+                patch("native_process_group.time.sleep"):
+            wait_for_driver_ports("127.0.0.1", (4444,))
+        self.assertEqual(read.call_count, 2)
+
+    def test_windows_live_listener_still_fails_without_terminating_any_process(self):
+        with patch("native_process_group.platform.system", return_value="Windows"), \
+                patch("native_process_group.windows_listeners", return_value=[{"LocalPort": 4444, "OwningProcess": 10}]):
+            with self.assertRaisesRegex(RuntimeError, "still have listeners"):
+                wait_for_driver_ports("127.0.0.1", (4444,), timeout=0)
+
+    def test_windows_failed_or_invalid_os_observations_cannot_mean_a_free_port(self):
+        with patch("native_process_group.subprocess.run", side_effect=subprocess.CalledProcessError(1, "powershell")):
+            with self.assertRaises(subprocess.CalledProcessError):
+                windows_listeners((4444,))
+        for value in ['null', '{}', '[{"LocalPort": 1234,"OwningProcess": 10}]', '[{"LocalPort":4444}]']:
+            with self.subTest(value=value), patch("native_process_group.subprocess.run", return_value=subprocess.CompletedProcess([], 0, value, "")):
+                with self.assertRaises(RuntimeError):
+                    windows_listeners((4444,))
+
     def test_closed_loopback_can_take_longer_than_a_short_probe_to_refuse(self):
         def connect(address, timeout):
             if timeout < 1:
