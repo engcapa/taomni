@@ -29,8 +29,18 @@ impl ProcessLock {
     }
 
     pub fn access(database: &Path) -> Result<Self, String> {
+        Self::access_cancellable(database, &tokio_util::sync::CancellationToken::new())
+    }
+
+    fn access_cancellable(
+        database: &Path,
+        cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<Self, String> {
         let start = Instant::now();
         loop {
+            if cancel.is_cancelled() {
+                return Err("BACKUP_CANCELLED".into());
+            }
             if let Some(lock) = Self::try_at(database, "access")? {
                 return Ok(lock);
             }
@@ -67,6 +77,7 @@ pub fn write_redirect(source: &Path, target: &Path) -> Result<(), String> {
 struct MailConnection {
     path: PathBuf,
     connection: Option<Connection>,
+    initialized: bool,
     generation: Option<Vec<u8>>,
 }
 
@@ -78,18 +89,54 @@ impl MailDatabase {
         Self(Mutex::new(MailConnection {
             path,
             connection: None,
+            initialized: false,
             generation: None,
         }))
     }
 
     pub fn lock(&self) -> Result<MailGuard<'_>, String> {
-        let mut inner = self.0.lock().map_err(|e| e.to_string())?;
+        self.lock_cancellable(&tokio_util::sync::CancellationToken::new())
+    }
+
+    pub fn lock_cancellable(
+        &self,
+        cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<MailGuard<'_>, String> {
+        self.lock_inner(cancel, true)
+    }
+
+    /// Backups copy existing data without running migrations that inspect MIME
+    /// objects, especially when the original-message category is excluded.
+    pub(crate) fn lock_for_snapshot(
+        &self,
+        cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<MailGuard<'_>, String> {
+        self.lock_inner(cancel, false)
+    }
+
+    fn lock_inner(
+        &self,
+        cancel: &tokio_util::sync::CancellationToken,
+        initialize: bool,
+    ) -> Result<MailGuard<'_>, String> {
+        let mut inner = loop {
+            if cancel.is_cancelled() {
+                return Err("BACKUP_CANCELLED".into());
+            }
+            match self.0.try_lock() {
+                Ok(guard) => break guard,
+                Err(std::sync::TryLockError::WouldBlock) => {
+                    std::thread::sleep(Duration::from_millis(10))
+                }
+                Err(error) => return Err(error.to_string()),
+            }
+        };
         // Migration updates the existing Connection while holding this guard.
         if let Some(connection) = inner.connection.as_ref() {
             inner.path = PathBuf::from(connection.path().ok_or("Mail storage has no disk path")?);
         }
         for _ in 0..32 {
-            let lock = ProcessLock::access(&inner.path)?;
+            let lock = ProcessLock::access_cancellable(&inner.path, cancel)?;
             let redirect = redirect_path(&inner.path);
             if redirect.exists() {
                 let target: PathBuf =
@@ -119,8 +166,22 @@ impl MailDatabase {
                     .map_err(|e| format!("Open mail database: {e}"))?;
                 db.busy_timeout(Duration::from_secs(3))
                     .map_err(|e| e.to_string())?;
-                super::init_mail_tables(&db).map_err(|e| e.to_string())?;
                 inner.connection = Some(db);
+                inner.initialized = false;
+            }
+            if initialize && !inner.initialized {
+                let db = inner.connection.as_ref().unwrap();
+                let cancellation = cancel.clone();
+                db.progress_handler(1_000, Some(move || cancellation.is_cancelled()))
+                    .map_err(|e| e.to_string())?;
+                let result = super::init_mail_tables(&db).map_err(|e| e.to_string());
+                db.progress_handler(0, None::<fn() -> bool>)
+                    .map_err(|e| e.to_string())?;
+                if cancel.is_cancelled() {
+                    return Err("BACKUP_CANCELLED".into());
+                }
+                result?;
+                inner.initialized = true;
             }
             return Ok(MailGuard {
                 inner,

@@ -33,14 +33,19 @@ impl LanChatStore {
 
     /// Perform a consistent SQLite online hot-backup of the lanchat database.
     pub fn backup_to(&self, dest_path: &Path) -> Result<(), String> {
-        let conn = self.conn.lock().map_err(|e| e.to_string())?;
-        if dest_path.exists() {
-            let _ = std::fs::remove_file(dest_path);
-        }
-        let dest_str = dest_path.to_str().ok_or("invalid destination path")?;
-        conn.execute("VACUUM INTO ?1", rusqlite::params![dest_str])
-            .map_err(|e| format!("lanchat backup failed: {e}"))?;
-        Ok(())
+        self.backup_to_with_context(
+            dest_path,
+            &crate::backup::snapshot_context::SnapshotContext::default(),
+        )
+    }
+
+    pub(crate) fn backup_to_with_context(
+        &self,
+        dest_path: &Path,
+        context: &crate::backup::snapshot_context::SnapshotContext,
+    ) -> Result<(), String> {
+        let conn = context.lock(&self.conn)?;
+        crate::backup::snapshot_context::hot_backup_conn(&conn, dest_path, context)
     }
 
     #[cfg(test)]

@@ -16,6 +16,13 @@ pub struct BackupCustomOptions {
     pub include_configs: bool,
     #[serde(default)]
     pub include_mail: bool,
+    /// Missing fields preserve the contents of legacy all-mail backups.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub include_mail_originals: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub include_mail_attachments: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub include_server_certificates: Option<bool>,
     #[serde(default)]
     pub include_local_history: bool,
     #[serde(default)]
@@ -32,12 +39,27 @@ pub struct BackupScopeFlags {
     pub lanchat: bool,
     pub configs: bool,
     pub mail: bool,
+    pub mail_originals: bool,
+    pub mail_attachments: bool,
+    pub server_certificates: bool,
     pub local_history: bool,
     pub mfa: bool,
 }
 
 pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> BackupScopeFlags {
     let mail_override = custom.as_ref().map(|opts| opts.include_mail);
+    let originals = custom
+        .as_ref()
+        .and_then(|opts| opts.include_mail_originals)
+        .unwrap_or(true);
+    let attachments = custom
+        .as_ref()
+        .and_then(|opts| opts.include_mail_attachments)
+        .unwrap_or(true);
+    let certificates = custom
+        .as_ref()
+        .and_then(|opts| opts.include_server_certificates)
+        .unwrap_or(scope != "custom");
     let core = BackupScopeFlags {
         sessions: true,
         notes: true,
@@ -45,6 +67,9 @@ pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> 
         lanchat: false,
         configs: true,
         mail: false,
+        mail_originals: false,
+        mail_attachments: false,
+        server_certificates: certificates,
         local_history: false,
         mfa: true,
     };
@@ -62,6 +87,9 @@ pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> 
                 lanchat: opts.include_lanchat,
                 configs: opts.include_configs,
                 mail: opts.include_mail,
+                mail_originals: false,
+                mail_attachments: false,
+                server_certificates: certificates,
                 local_history: opts.include_local_history,
                 mfa: opts.include_mfa,
             },
@@ -77,6 +105,8 @@ pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> 
     if flags.mfa {
         flags.vault = true;
     }
+    flags.mail_originals = flags.mail && originals;
+    flags.mail_attachments = flags.mail && attachments;
     flags
 }
 

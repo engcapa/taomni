@@ -44,6 +44,24 @@ impl Drop for ProfileLease {
 pub struct BackupProcessLock(File);
 
 impl BackupProcessLock {
+    pub fn acquire_cancellable(
+        app: &AppHandle,
+        cancel: &tokio_util::sync::CancellationToken,
+    ) -> Result<Self, String> {
+        let file = Self::open(&crate::resolved_app_data_dir(app)?)?;
+        loop {
+            if cancel.is_cancelled() {
+                return Err("BACKUP_CANCELLED".into());
+            }
+            match file.try_lock() {
+                Ok(()) => return Ok(Self(file)),
+                Err(std::fs::TryLockError::WouldBlock) => {
+                    std::thread::sleep(std::time::Duration::from_millis(10))
+                }
+                Err(error) => return Err(format!("Acquire backup lock: {error}")),
+            }
+        }
+    }
     pub fn acquire(app: &AppHandle) -> Result<Self, String> {
         Self::acquire_at(&crate::resolved_app_data_dir(app)?)
     }

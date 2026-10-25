@@ -52,13 +52,29 @@ impl MfaStore {
     /// Consistent snapshot for backups. Returns `false` when MFA was never
     /// used (no file on disk and no open connection), so nothing is staged.
     pub fn backup_to(&self, dest: &Path) -> Result<bool, String> {
-        {
-            let guard = self.conn.lock().map_err(|e| format!("mfa db lock: {e}"))?;
-            if guard.is_none() && !self.path.is_file() {
-                return Ok(false);
-            }
+        self.backup_to_with_context(
+            dest,
+            &crate::backup::snapshot_context::SnapshotContext::default(),
+        )
+    }
+
+    pub(crate) fn backup_to_with_context(
+        &self,
+        dest: &Path,
+        context: &crate::backup::snapshot_context::SnapshotContext,
+    ) -> Result<bool, String> {
+        let mut guard = context.lock(&self.conn)?;
+        if guard.is_none() && !self.path.is_file() {
+            return Ok(false);
         }
-        self.with_conn(|conn| crate::backup::engine::hot_backup_conn(conn, dest))?;
+        if guard.is_none() {
+            *guard = Some(open_db(&self.path)?);
+        }
+        crate::backup::snapshot_context::hot_backup_conn(
+            guard.as_ref().expect("MFA connection initialized"),
+            dest,
+            context,
+        )?;
         Ok(true)
     }
 }

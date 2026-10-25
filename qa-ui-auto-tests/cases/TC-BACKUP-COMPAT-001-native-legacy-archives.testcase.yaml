@@ -23,7 +23,7 @@ steps:
 - click: '[data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - click: '[data-testid="settings-group-toggle-backup"]'
-- wait_for: '[data-testid="backup-global-scope"]'
+- wait_for: '[data-testid="backup-global-categories"]'
 - click: '[data-testid="backup-history-row"][data-file-name="legacy-plain.taobak"] [data-testid="backup-history-restore"]'
 - wait_for:
     selector: '[data-testid="backup-restore-files"]'

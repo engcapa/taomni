@@ -1,0 +1,204 @@
+id: TC-BACKUP-MAIL-001
+title: Mail child selections control actual archive files and indexes
+description: Seeds an isolated cached mailbox with one original and one downloaded attachment. A standard-library ZIP/SQLite
+  oracle validates five real manual archives and original bytes.
+covers:
+- F-BACKUP-1
+- F-BACKUP-2
+tags:
+- backup
+- settings
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- backup_cloud
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- click: '[data-testid="ribbon-settings"]'
+- wait_for:
+    selector: '[data-testid="settings-panel"]'
+    timeout_sec: 30
+- click: '[data-testid="settings-group-toggle-backup"]'
+- wait_for:
+    selector: '[data-testid="backup-global-categories"]'
+    timeout_sec: 30
+- assert_attribute:
+    selector: '[data-testid="backup-global-include-mail"]'
+    name: aria-checked
+    equals: 'false'
+- set_check:
+    selector: '[data-testid="backup-global-includeMail"]'
+    checked: true
+- assert_text:
+    selector: '[data-testid="backup-settings-save-status"]'
+    contains: Saved
+    timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="backup-selected-start"]:not([disabled])'
+    timeout_sec: 30
+- click: '[data-testid="backup-selected-start"]'
+- assert_file_contains:
+    path: ${fixture.backup_snapshot_events}
+    contains: mail_db=1,originals=0,attachments=0,original_rows=0
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="backup-cloud-job"][data-operation="local"][data-phase="completed"]'
+    equal: 1
+- set_check:
+    selector: '[data-testid="backup-global-includeMailOriginals"]'
+    checked: true
+- assert_text:
+    selector: '[data-testid="backup-settings-save-status"]'
+    contains: Saved
+    timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="backup-selected-start"]:not([disabled])'
+    timeout_sec: 30
+- click: '[data-testid="backup-selected-start"]'
+- assert_file_contains:
+    path: ${fixture.backup_snapshot_events}
+    contains: mail_db=1,originals=1,attachments=0,original_rows=1
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="backup-cloud-job"][data-operation="local"][data-phase="completed"]'
+    equal: 2
+- set_check:
+    selector: '[data-testid="backup-global-includeMailOriginals"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-global-includeMailAttachments"]'
+    checked: true
+- assert_text:
+    selector: '[data-testid="backup-settings-save-status"]'
+    contains: Saved
+    timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="backup-selected-start"]:not([disabled])'
+    timeout_sec: 30
+- click: '[data-testid="backup-selected-start"]'
+- assert_file_contains:
+    path: ${fixture.backup_snapshot_events}
+    contains: mail_db=1,originals=0,attachments=1,original_rows=0
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="backup-cloud-job"][data-operation="local"][data-phase="completed"]'
+    equal: 3
+- set_check:
+    selector: '[data-testid="backup-global-include-mail"]'
+    checked: false
+- assert_text:
+    selector: '[data-testid="backup-settings-save-status"]'
+    contains: Saved
+    timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="backup-selected-start"]:not([disabled])'
+    timeout_sec: 30
+- click: '[data-testid="backup-selected-start"]'
+- assert_file_contains:
+    path: ${fixture.backup_snapshot_events}
+    contains: mail_db=0,originals=0,attachments=0,original_rows=0
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="backup-cloud-job"][data-operation="local"][data-phase="completed"]'
+    equal: 4
+- set_check:
+    selector: '[data-testid="backup-global-include-mail"]'
+    checked: true
+- assert_text:
+    selector: '[data-testid="backup-settings-save-status"]'
+    contains: Saved
+    timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="backup-selected-start"]:not([disabled])'
+    timeout_sec: 30
+- click: '[data-testid="backup-selected-start"]'
+- assert_file_contains:
+    path: ${fixture.backup_snapshot_events}
+    contains: mail_db=1,originals=1,attachments=1,original_rows=1
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="backup-cloud-job"][data-operation="local"][data-phase="completed"]'
+    equal: 5
+- screenshot: backup-native-mail-subcategories.png
+verification:
+  review: reviewed
+  native:
+  - check: Real isolated IPC, OS lock, journal and archive effects
+    method: automated
+    reason: Hosted native runs use disposable profiles and independent filesystem observations.
+  requirements:
+  - id: R1
+    requirement: Actual cache selection matches published archive contents
+    actions:
+    - 8
+    - 11
+    checkpoints:
+    - step: 13
+      expectation: Real local job completed
+    - step: 12
+      expectation: Independent ZIP/SQLite oracle confirms selected files, index references and original bytes
+    results:
+    - 13
+    - 12
+  - id: R2
+    requirement: Actual originals selection matches published archive contents
+    actions:
+    - 14
+    - 17
+    checkpoints:
+    - step: 19
+      expectation: Real local job completed
+    - step: 18
+      expectation: Independent ZIP/SQLite oracle confirms selected files, index references and original bytes
+    results:
+    - 19
+    - 18
+  - id: R3
+    requirement: Actual attachments selection matches published archive contents
+    actions:
+    - 21
+    - 24
+    checkpoints:
+    - step: 26
+      expectation: Real local job completed
+    - step: 25
+      expectation: Independent ZIP/SQLite oracle confirms selected files, index references and original bytes
+    results:
+    - 26
+    - 25
+  - id: R4
+    requirement: Actual excluded selection matches published archive contents
+    actions:
+    - 27
+    - 30
+    checkpoints:
+    - step: 32
+      expectation: Real local job completed
+    - step: 31
+      expectation: Independent ZIP/SQLite oracle confirms selected files, index references and original bytes
+    results:
+    - 32
+    - 31
+  - id: R5
+    requirement: Actual all selection matches published archive contents
+    actions:
+    - 33
+    - 36
+    checkpoints:
+    - step: 38
+      expectation: Real local job completed
+    - step: 37
+      expectation: Independent ZIP/SQLite oracle confirms selected files, index references and original bytes
+    results:
+    - 38
+    - 37
+  visual:
+  - check: Category and task controls remain readable in retained screenshots
+    method: manual
+    reason: Review screenshots from the hosted workflow; filesystem assertions establish native effects.

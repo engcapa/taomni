@@ -36,11 +36,15 @@ export function globalRange(policy: BackupPolicy): BackupRange {
 
 export function rangeOptions(range: BackupRange): Required<BackupCustomOptions> {
   const core = { includeSessions: true, includeNotes: true, includeVault: true, includeConfigs: true,
-    includeMfa: true, includeLanchat: false, includeMail: false, includeLocalHistory: false };
+    includeMfa: true, includeLanchat: false, includeMail: false, includeLocalHistory: false,
+    includeServerCertificates: true, includeMailOriginals: false, includeMailAttachments: false };
   const options = range.scope === "custom" && range.customOptions
     ? { ...Object.fromEntries(Object.keys(core).map((k) => [k, false])), ...range.customOptions } as typeof core
     : { ...core, includeLanchat: range.scope === "full", includeMail: range.customOptions?.includeMail ?? range.scope === "full" };
   if (options.includeMfa) options.includeVault = true;
+  options.includeServerCertificates = range.customOptions?.includeServerCertificates ?? range.scope !== "custom";
+  options.includeMailOriginals = options.includeMail && (range.customOptions?.includeMailOriginals ?? true);
+  options.includeMailAttachments = options.includeMail && (range.customOptions?.includeMailAttachments ?? true);
   return options;
 }
 

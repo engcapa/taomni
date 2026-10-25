@@ -22,17 +22,17 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.useRealTimers(); setLocale("en"); });
 it("saves full data with mail, restores it after remount, and removes manual scope inputs", async () => {
   const view = render(<BackupSettingsPanel />);
-  fireEvent.change(screen.getByTestId("backup-global-scope"), { target: { value: "full" } });
+  fireEvent.click(screen.getByTestId("backup-global-include-mail"));
   expect(screen.getByTestId("backup-global-include-mail")).toBeChecked();
   await settings.getState().flush(); view.unmount();
   settings.setState({ draft: null });
   render(<BackupSettingsPanel />);
-  await waitFor(() => expect(screen.getByTestId("backup-global-scope")).toHaveValue("full"));
+  await waitFor(() => expect(screen.getByTestId("backup-global-include-mail")).toBeChecked());
   expect(within(screen.getByTestId("backup-manual")).queryByRole("combobox")).toBeNull();
   fireEvent.click(screen.getByTestId("backup-global-include-mail"));
   fireEvent.click(screen.getByTestId("backup-selected-start"));
   await waitFor(() => expect(mocks.invoke).toHaveBeenCalledWith("backup_run_manual", expect.objectContaining({ request: expect.objectContaining({ expectedPolicyRevision: 2 }) })));
-  expect(h.disk.policy).toMatchObject({ defaultScope: "full", includeMail: false });
+  expect(h.disk.policy).toMatchObject({ defaultScope: "custom", includeMail: false });
 });
 it("keeps rapid frequency changes visible while saving", async () => {
   const held = deferred<unknown>(); let writes = 0;
@@ -48,9 +48,9 @@ it("keeps rapid frequency changes visible while saving", async () => {
 it("preserves failed drafts visibly, blocks execution and offers retry", async () => {
   mocks.invoke.mockImplementation((cmd, args) => cmd === "backup_settings_patch" ? Promise.reject(new Error("disk failed")) : h.invoke(cmd, args));
   render(<BackupSettingsPanel />);
-  fireEvent.change(screen.getByTestId("backup-global-scope"), { target: { value: "full" } });
+  fireEvent.click(screen.getByTestId("backup-global-include-mail"));
   await screen.findByTestId("backup-settings-retry");
-  expect(screen.getByTestId("backup-global-scope")).toHaveValue("full");
+  expect(screen.getByTestId("backup-global-include-mail")).toBeChecked();
   expect(screen.getByTestId("backup-selected-start")).toBeDisabled();
   mocks.invoke.mockImplementation(h.invoke);
   fireEvent.click(screen.getByTestId("backup-settings-retry"));
@@ -58,10 +58,10 @@ it("preserves failed drafts visibly, blocks execution and offers retry", async (
 });
 it("switches languages without resetting range or pending edits", async () => {
   render(<BackupSettingsPanel />);
-  fireEvent.change(screen.getByTestId("backup-global-scope"), { target: { value: "full" } });
+  fireEvent.click(screen.getByTestId("backup-global-include-mail"));
   await act(async () => { await settings.getState().flush(); setLocale("zh-CN"); });
   expect(screen.getByText("全局默认配置")).toBeDefined();
-  expect(screen.getByTestId("backup-global-scope")).toHaveValue("full");
+  expect(screen.getByTestId("backup-global-include-mail")).toBeChecked();
   expect(screen.getByTestId("backup-settings-save-status")).toHaveTextContent("已保存");
 });
 it("uses the global revision for file export and retains local encryption", async () => {

@@ -1,3 +1,4 @@
+mod archive_writer;
 pub mod batch;
 pub mod cache;
 pub mod commands;
@@ -8,7 +9,10 @@ pub mod crypto;
 pub mod engine;
 pub mod failure;
 pub mod feishu;
+mod job_lifecycle;
 pub mod jobs;
+mod local_jobs;
+mod mail_snapshot;
 pub mod manifest;
 pub mod model;
 pub mod network;
@@ -20,12 +24,15 @@ pub mod restore;
 pub mod scheduler;
 pub mod settings;
 pub mod settings_model;
+pub(crate) mod snapshot_context;
 pub mod source;
 pub mod transfer;
 pub mod worker;
 
 #[cfg(test)]
 mod compat_tests;
+#[cfg(test)]
+mod snapshot_tests;
 #[cfg(test)]
 mod tests;
 

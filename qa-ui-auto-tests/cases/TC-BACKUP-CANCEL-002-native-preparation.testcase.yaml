@@ -1,0 +1,224 @@
+id: TC-BACKUP-CANCEL-002
+title: Native cancellation interrupts OS lock waits and persisted requests do not replay
+description: An external process-style file lock blocks the real snapshot worker. UI cancellation must persist and stop
+  local/cloud jobs before publication; a later local backup must still succeed.
+covers:
+- F-BACKUP-1
+- F-BACKUP-2
+tags:
+- backup
+- settings
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- backup_cloud
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- click: '[data-testid="ribbon-settings"]'
+- wait_for:
+    selector: '[data-testid="settings-panel"]'
+    timeout_sec: 30
+- click: '[data-testid="settings-group-toggle-backup"]'
+- wait_for:
+    selector: '[data-testid="backup-global-categories"]'
+    timeout_sec: 30
+- assert_file_contains:
+    path: ${fixture.backup_recovered_journal}
+    contains: '"phase": "cancelled"'
+    timeout_sec: 30
+- assert_file_contains:
+    path: ${fixture.backup_recovered_journal}
+    contains: '"cancelRequested": true'
+    timeout_sec: 30
+- host_write_file:
+    path: ${fixture.backup_snapshot_control}
+    text: hold-local
+- assert_file_contains:
+    path: ${fixture.backup_snapshot_events}
+    contains: hold-local=locked
+    timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="backup-selected-start"]:not([disabled])'
+    timeout_sec: 30
+- click: '[data-testid="backup-selected-start"]'
+- wait_for:
+    selector: '[data-testid="backup-cloud-job"][data-operation="local"][data-phase="preparing"]'
+    timeout_sec: 30
+- click: '[data-testid="backup-cloud-job"][data-operation="local"][data-phase="preparing"] [data-testid="backup-job-cancel"]'
+- wait_for:
+    selector: '[data-testid="backup-cloud-job"][data-operation="local"][data-phase="cancelled"]'
+    timeout_sec: 10
+- assert_file_contains:
+    path: ${fixture.backup_snapshot_events}
+    contains: cancelled:local:requested=true:artifact=false
+    timeout_sec: 30
+- host_write_file:
+    path: ${fixture.backup_snapshot_control}
+    text: release-local
+- assert_file_contains:
+    path: ${fixture.backup_snapshot_events}
+    contains: release-local=released
+    timeout_sec: 30
+- set_check:
+    selector: '[data-testid="backup-local-select"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-destination-select"]'
+    checked: true
+- assert_text:
+    selector: '[data-testid="backup-settings-save-status"]'
+    contains: Saved
+    timeout_sec: 30
+- host_write_file:
+    path: ${fixture.backup_snapshot_control}
+    text: hold-upload
+- assert_file_contains:
+    path: ${fixture.backup_snapshot_events}
+    contains: hold-upload=locked
+    timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="backup-selected-start"]:not([disabled])'
+    timeout_sec: 30
+- click: '[data-testid="backup-selected-start"]'
+- wait_for:
+    selector: '[data-testid="backup-cloud-job"][data-operation="upload"][data-phase="preparing"]'
+    timeout_sec: 30
+- click: '[data-testid="backup-cloud-job"][data-operation="upload"][data-phase="preparing"] [data-testid="backup-job-cancel"]'
+- wait_for:
+    selector: '[data-testid="backup-cloud-job"][data-operation="upload"][data-phase="cancelled"]'
+    timeout_sec: 10
+- assert_file_contains:
+    path: ${fixture.backup_snapshot_events}
+    contains: cancelled:upload:requested=true:artifact=false
+    timeout_sec: 30
+- host_write_file:
+    path: ${fixture.backup_snapshot_control}
+    text: release-upload
+- assert_file_contains:
+    path: ${fixture.backup_snapshot_events}
+    contains: release-upload=released
+    timeout_sec: 30
+- set_check:
+    selector: '[data-testid="backup-destination-select"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-local-select"]'
+    checked: true
+- assert_text:
+    selector: '[data-testid="backup-settings-save-status"]'
+    contains: Saved
+    timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="backup-selected-start"]:not([disabled])'
+    timeout_sec: 30
+- click: '[data-testid="backup-selected-start"]'
+- wait_for:
+    selector: '[data-testid="backup-cloud-job"][data-operation="local"][data-phase="completed"]'
+    timeout_sec: 60
+- assert_file_contains:
+    path: ${fixture.backup_snapshot_events}
+    contains: local_completed:valid_archive=true
+    timeout_sec: 30
+- click: '[data-testid="settings-group-toggle-backup"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- assert_count:
+    selector: '[data-testid="backup-cloud-job"][data-operation="local"][data-phase="cancelled"]'
+    equal: 1
+- click: '[data-testid="backup-local-restore"]'
+- wait_for:
+    selector: '[data-testid="backup-restore-files"]'
+    timeout_sec: 30
+- assert_text:
+    selector: '[data-testid="backup-restore-files"]'
+    contains: databases/taomni.db
+- click: '[data-testid="backup-restore-cancel"]'
+- screenshot: backup-native-cancellation.png
+verification:
+  review: reviewed
+  native:
+  - check: Real isolated IPC, OS lock, journal and archive effects
+    method: automated
+    reason: Hosted native runs use disposable profiles and independent filesystem observations.
+  requirements:
+  - id: R1
+    requirement: Startup completes a persisted cancellation instead of replaying preparation
+    actions:
+    - 5
+    checkpoints:
+    - step: 7
+      expectation: Recovered journal cancelled
+    - step: 8
+      expectation: Cancellation intent retained
+    results:
+    - 7
+    - 8
+  - id: R2
+    requirement: local cancellation interrupts real OS lock waiting before publication
+    actions:
+    - 9
+    - 12
+    - 14
+    checkpoints:
+    - step: 10
+      expectation: External OS lock acquired
+    - step: 13
+      expectation: Production job waits for lock
+    - step: 15
+      expectation: Cancellation finishes within ten seconds
+    - step: 16
+      expectation: No completed artifact and durable cancellation
+    results:
+    - 10
+    - 13
+    - 15
+    - 16
+  - id: R3
+    requirement: upload cancellation interrupts real OS lock waiting before publication
+    actions:
+    - 22
+    - 25
+    - 27
+    checkpoints:
+    - step: 23
+      expectation: External OS lock acquired
+    - step: 26
+      expectation: Production job waits for lock
+    - step: 28
+      expectation: Cancellation finishes within ten seconds
+    - step: 29
+      expectation: No completed artifact and durable cancellation
+    results:
+    - 23
+    - 26
+    - 28
+    - 29
+  - id: R4
+    requirement: A fresh local backup works after cancellation and old jobs stay cancelled
+    actions:
+    - 36
+    - 40
+    - 42
+    checkpoints:
+    - step: 37
+      expectation: Fresh backup completed
+    - step: 38
+      expectation: Independent ZIP reader accepts output
+    - step: 41
+      expectation: Cancelled task not replayed
+    - step: 44
+      expectation: Local completed archive opens a valid restore preview
+    results:
+    - 37
+    - 38
+    - 41
+    - 44
+  visual:
+  - check: Category and task controls remain readable in retained screenshots
+    method: manual
+    reason: Review screenshots from the hosted workflow; filesystem assertions establish native effects.
