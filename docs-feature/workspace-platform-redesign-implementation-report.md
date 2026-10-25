@@ -25,6 +25,8 @@
 
 定向运行 [40236197565](https://github.com/engcapa/taomni/actions/runs/40236197565) 的 Linux 3/3、macOS 目录选择/入口归属 2/2 已通过；Windows 仍在执行，macOS 第二次冷启动失败。新阶段记录证明错误发生于第二次原生关闭后的 Broken pipe，之后 DELETE 的 ConnectionRefused 掩盖了该原始错误。移除未命中的启动重试，只在已取得所属原生关闭观察后接受 Broken pipe/连接重置，并要求该进程正常退出；清理错误单独保留，原始错误不能被替换。58 项契约通过，本机 `workspace-native/run-20261026-054543-828013276` 与 `workspace-browser/run-20261026-054543-633429900` 的完整冷启动/Git 回归各 1/1 通过。相关集和全量仍未通过，不以 job 的软成功代替用例结果。
 
+Windows 在 [40236197565](https://github.com/engcapa/taomni/actions/runs/40236197565) 的 3 条目录相关用例均因辅助工具的字段读取失败，尚未通过。实际桌面截图证明路径已成功键入；`GetWindowText` 无法读取另一进程中 Edit 的实际内容，改用带超时的 WM_GETTEXT 读取，保留原生输入、所有权/焦点检查和产品返回路径断言。15 项目录工具契约通过，下一轮 Windows 原生执行验证最终选择路径；产品源码与 QA 构建未改变，无需为单独的 Windows 辅助读取重新编译应用。
+
 本机 QA v13 二进制 `src-tauri/target/qa-ui-auto/debug/taomni` 的构建输入匹配当前产品源码；源码指纹为 `1381198413aefe6d9838904adacbf374f951f41c171afb42b56224ad15615302`。最新静态审计（620 ID）、覆盖门禁、Rust 格式检查和 `pnpm check:refactor` 通过。所有本机测试保持最多 2 个 worker，native 顺序执行；此处本机通过不替代仍在进行的三平台相关集与全量验收。
 
 2026-10-26 续验：相关集 [40204276862](https://github.com/engcapa/taomni/actions/runs/40204276862) 的 browser 为 Linux 258/258、Windows 258/258、macOS 257/257；native 为 Linux 162/166、Windows 141/147、macOS 130/135，15 项失败，基础设施错误 0。该运行未通过，尚不能启动全量验收。目录选择修复覆盖 GTK Recent、macOS NSOpenPanel 查找和 Windows UIA 按钮类型；邮件关闭重开恢复直接关闭标签的原有操作；普通文件保留检查控件；独立 SFTP 窗口补充真实输入焦点与完整地址断言。

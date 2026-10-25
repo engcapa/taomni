@@ -25,6 +25,9 @@ public static class QaFolderDialog {
     [DllImport("user32.dll")] static extern bool AttachThreadInput(uint from, uint to, bool attach);
     [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
     [DllImport("user32.dll", SetLastError = true)] static extern uint SendInput(uint count, Input[] inputs, int size);
+    [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern IntPtr ReadTextMessage(IntPtr window, uint message, UIntPtr capacity, StringBuilder text,
+                                        uint flags, uint timeout, out UIntPtr result);
     [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
     [StructLayout(LayoutKind.Sequential)] struct MouseInput {
         public int x, y; public uint data, flags, time; public UIntPtr extra;
@@ -105,6 +108,17 @@ public static class QaFolderDialog {
         return new Input { type = 1, data = new InputData { keyboard = new KeyInput { key = key, scan = scan, flags = flags } } };
     }
 
+    private static string EditText(IntPtr edit) {
+        // GetWindowText cannot read another process's Edit contents. WM_GETTEXT
+        // is marshalled by Windows and observes the actual native field value.
+        var value = new StringBuilder(32768);
+        UIntPtr result;
+        if (ReadTextMessage(edit, 0x000D, new UIntPtr((uint)value.Capacity), value, 2, 1000, out result) == IntPtr.Zero) {
+            throw new InvalidOperationException("Owned chooser folder field did not respond to WM_GETTEXT");
+        }
+        return value.ToString();
+    }
+
     private static void EnterPath(IntPtr dialog, IntPtr edit, string path) {
         SetForegroundWindow(dialog);
         uint ignored;
@@ -131,9 +145,9 @@ public static class QaFolderDialog {
             throw new InvalidOperationException("Native chooser keyboard input was not delivered completely");
         }
         var deadline = DateTime.UtcNow.AddSeconds(5);
-        while (Text(edit) != path && DateTime.UtcNow < deadline) Thread.Sleep(50);
-        if (Text(edit) != path) throw new InvalidOperationException("Folder path was not entered completely: " + Text(edit));
-        Console.Error.WriteLine("Native folder field input: {0}", Text(edit));
+        while (EditText(edit) != path && DateTime.UtcNow < deadline) Thread.Sleep(50);
+        if (EditText(edit) != path) throw new InvalidOperationException("Folder path was not entered completely: " + EditText(edit));
+        Console.Error.WriteLine("Native folder field input: {0}", EditText(edit));
     }
 
     public static Dictionary<string, object> Run(string application, string title, string action, string path) {
