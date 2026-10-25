@@ -1,121 +1,112 @@
 // Operates only the NSOpenPanel belonging to this invocation's QA executable.
-ObjC.import("Foundation");
+ObjC.import("AppKit");
 const env = $.NSProcessInfo.processInfo.environment;
 const readEnv = (key) => ObjC.unwrap(env.objectForKey(key));
 const application = readEnv("QA_PICKER_APPLICATION");
 const path = readEnv("QA_PICKER_PATH");
 const title = readEnv("QA_PICKER_TITLE");
 const events = Application("System Events");
-const shell = Application.currentApplication();
-shell.includeStandardAdditions = true;
 const log = (stage) => console.log("native_folder_dialog: " + stage);
 const actionNames = ["Open", "Choose", "Select", "Select Folder"];
-// Resolve the executable once. Recursing through the main window's complete
-// accessibility tree walks the whole WebView and can take minutes on CI.
-// Darwin's `comm` field is only the executable basename. Use the unbounded
-// command line so the QA app's full path remains available for ownership.
-const processes = shell.doShellScript("ps -axww -o pid=,args=").split("\n").map((line) => {
-  const match = line.trim().match(/^(\d+)\s+(.+)$/);
-  return match ? { pid: Number(match[1]), path: match[2].split(/\s+/, 1)[0] } : null;
-}).filter((process) => process !== null);
-let owners = processes.filter((process) => process.path === application).map((process) => process.pid);
-if (owners.length === 0) {
-  // Some hardened macOS runners redact argv paths from Accessibility scripts;
-  // the comm field remains available. Accept a unique basename match only
-  // within this invocation's executable name.
-  const executable = application.split("/").pop();
-  const shortProcesses = shell.doShellScript("ps -ax -o pid=,comm=").split("\n").map((line) => {
-    const match = line.trim().match(/^(\d+)\s+(.+)$/);
-    return match ? { pid: Number(match[1]), path: match[2].split("/").pop() } : null;
-  }).filter((process) => process !== null && process.path === executable);
-  if (shortProcesses.length === 1) owners = [shortProcesses[0].pid];
+// NSWorkspace supplies the executable URL without ps argv truncation or a
+// frontmost-process fallback, which can resolve to the automation host itself.
+const applications = $.NSWorkspace.sharedWorkspace.runningApplications;
+const owners = [];
+for (let i = 0; i < applications.count; i++) {
+  const candidate = applications.objectAtIndex(i);
+  try {
+    if (ObjC.unwrap(candidate.executableURL.path) === application) owners.push(Number(candidate.processIdentifier));
+  } catch (_) { }
 }
-let process = owners.length === 1 ? events.processes.whose({ unixId: owners[0] })[0] : null;
-if (!process && owners.length === 0) {
-  // Hardened runners can hide both argv and comm. The real chooser remains
-  // uniquely identifiable by its NSOpenPanel sheet and Open/Cancel buttons
-  // on the frontmost application, so use that narrow fallback.
-  const frontmost = events.processes.whose({ frontmost: true })();
-  if (frontmost.length === 1) process = frontmost[0];
-}
-if (!process) {
-  log("expected executable " + application + "; candidates " + JSON.stringify(processes.filter((process) => process.path.includes("taomni"))));
-  throw new Error("No unique process for the QA executable");
-}
-log("owned process " + (owners[0] || "frontmost"));
+if (owners.length !== 1) throw new Error("No unique process for the QA executable: " + JSON.stringify(owners));
+const process = events.processes.whose({ unixId: owners[0] })[0];
+log("owned process " + owners[0]);
 function buttons(owner, name, enabled = false) {
-  // Native Open/Cancel buttons are direct children of NSOpenPanel. Query only
-  // the panel, never Home's unrelated Open button in the underlying WebView.
   return owner.buttons.whose({ name })().filter((button) => !enabled || button.enabled());
 }
 function actionButtons(owner, enabled = false) {
   for (const name of actionNames) {
-    try {
-      const found = buttons(owner, name, enabled);
-      if (found.length) return found;
-    } catch (_) { }
+    try { const found = buttons(owner, name, enabled); if (found.length) return found; } catch (_) { }
   }
   return [];
 }
 function findPanel() {
   const panels = [];
   for (const window of process.windows()) {
-    let sheets = [];
-    try { sheets = window.sheets(); } catch (_) { }
-    panels.push(...sheets);
-    try {
-      if (window.subrole() === "AXDialog" || window.name() === title) panels.push(window);
-    } catch (_) { }
+    try { panels.push(...window.sheets()); } catch (_) { }
+    try { if (window.subrole() === "AXDialog" || window.name() === title) panels.push(window); } catch (_) { }
   }
   const owned = panels.filter((owner) => {
-    try {
-      return actionButtons(owner).length === 1 && buttons(owner, "Cancel").length === 1;
-    } catch (_) {
-      // NSOpenPanel may replace its sheet accessibility node while Go to
-      // Folder is resolving a path. Let the caller retry with a fresh node.
-      return false;
-    }
+    try { return actionButtons(owner).length === 1 && buttons(owner, "Cancel").length === 1; } catch (_) { return false; }
   });
   return owned.length === 1 ? owned[0] : null;
 }
-let panel = null;
-const deadline = Date.now() + 20000;
-while (Date.now() < deadline && !panel) {
-  panel = findPanel();
-  if (!panel) delay(0.1);
+function waitFor(probe, description, timeout = 10000) {
+  const deadline = Date.now() + timeout;
+  while (Date.now() < deadline) {
+    try { const result = probe(); if (result) return result; } catch (_) { }
+    delay(0.1);
+  }
+  throw new Error(description);
 }
-if (!panel) throw new Error("No unique folder chooser owned by the QA executable");
+function locationField(panel) {
+  // Only descend native sheets/groups of NSOpenPanel. Never recurse through
+  // the underlying application's WebView accessibility tree.
+  const sheets = panel.sheets();
+  const candidates = [...sheets];
+  for (const window of process.windows()) {
+    try { if (window.subrole() === "AXDialog" && window.name() !== title) candidates.push(window); } catch (_) { }
+  }
+  for (const sheet of candidates) {
+    const nodes = [sheet];
+    for (let depth = 0, start = 0; depth < 3; depth++) {
+      const end = nodes.length;
+      for (let i = start; i < end; i++) {
+        try { const fields = nodes[i].textFields(); if (fields.length === 1) return fields[0]; } catch (_) { }
+        try {
+          const combos = nodes[i].comboBoxes();
+          if (combos.length === 1) {
+            const fields = combos[0].textFields();
+            return fields.length === 1 ? fields[0] : combos[0];
+          }
+        } catch (_) { }
+        try { nodes.push(...nodes[i].groups()); } catch (_) { }
+      }
+      start = end;
+    }
+  }
+  return null;
+}
+function describePanel(panel) {
+  try {
+    return JSON.stringify({ buttons: panel.buttons().map((button) => ({ name: button.name(), enabled: button.enabled() })),
+      sheets: panel.sheets().map((sheet) => ({ name: sheet.name(), role: sheet.role() })) });
+  } catch (error) { return String(error); }
+}
+const panel = waitFor(findPanel, "No unique folder chooser owned by the QA executable", 20000);
 log("owned NSOpenPanel found");
 process.frontmost = true;
-if (readEnv("QA_PICKER_ACTION") === "cancel") {
-  buttons(panel, "Cancel", true)[0].click();
-} else {
-  events.keystroke("g", { using: ["command down", "shift down"] });
-  delay(0.4);
-  events.keystroke("a", { using: ["command down"] });
-  events.keystroke(path);
-  events.keyCode(36);
-  log("Go to Folder submitted");
-  // The sheet's accessibility node is briefly replaced after Go to Folder.
-  // Re-resolve it and wait for Open; Return is a safe keyboard fallback when
-  // the native button is temporarily absent from the AX tree.
-  let submitted = false;
-  const openDeadline = Date.now() + 10000;
-  while (Date.now() < openDeadline && !submitted) {
-    const currentPanel = findPanel() || panel;
-    try {
-      const open = actionButtons(currentPanel, true);
-      if (open.length === 1) {
-        open[0].click();
-        submitted = true;
-        break;
-      }
-    } catch (_) { }
+try {
+  if (readEnv("QA_PICKER_ACTION") === "cancel") {
+    buttons(panel, "Cancel", true)[0].click();
+  } else {
+    events.keystroke("g", { using: ["command down", "shift down"] });
+    const field = waitFor(() => locationField(findPanel() || panel), "Go to Folder location field unavailable");
+    field.value = path;
+    if (field.value() !== path) throw new Error("Go to Folder did not retain the complete path");
     events.keyCode(36);
-    delay(0.25);
-    if (!findPanel()) submitted = true;
+    log("Go to Folder submitted");
+    waitFor(() => !locationField(findPanel() || panel), "Go to Folder did not finish navigation");
+    const open = waitFor(() => {
+      const current = findPanel();
+      return current && actionButtons(current, true)[0];
+    }, "Folder chooser Open button unavailable");
+    open.click();
   }
-  if (!submitted) throw new Error("Folder chooser Open button unavailable");
+  waitFor(() => !findPanel(), "Folder chooser did not close");
+} catch (error) {
+  log("AX state " + describePanel(findPanel() || panel));
+  throw error;
 }
 log("chooser action submitted");
-JSON.stringify({ transport: "macOS Accessibility and OS keyboard", pid: process.unixId(), application });
+JSON.stringify({ transport: "macOS Accessibility and OS keyboard", pid: owners[0], application });

@@ -1,135 +1,101 @@
 $ErrorActionPreference = "Stop"
-Add-Type -AssemblyName UIAutomationClient
-Add-Type -AssemblyName UIAutomationTypes
-Add-Type -AssemblyName System.Windows.Forms
 Add-Type @"
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
-public static class QaWindowActivation {
-    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
-    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+using System.Text;
+public static class QaFolderDialog {
+    public delegate bool Enumerate(IntPtr window, IntPtr data);
+    [DllImport("user32.dll")] static extern bool EnumWindows(Enumerate callback, IntPtr data);
+    [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr owner, Enumerate callback, IntPtr data);
+    [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window, out uint processId);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr window, StringBuilder text, int count);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr window, StringBuilder text, int count);
+    [DllImport("user32.dll")] public static extern int GetDlgCtrlID(IntPtr window);
+    [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
+    [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr window);
+    [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr window);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern bool SetWindowText(IntPtr window, string text);
+    [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+    public static string Text(IntPtr window) {
+        var value = new StringBuilder(32768); GetWindowText(window, value, value.Capacity); return value.ToString();
+    }
+    public static string Class(IntPtr window) {
+        var value = new StringBuilder(256); GetClassName(window, value, value.Capacity); return value.ToString();
+    }
+    public static int Process(IntPtr window) { uint pid; GetWindowThreadProcessId(window, out pid); return (int)pid; }
+    public static IntPtr[] Windows(IntPtr owner) {
+        var found = new List<IntPtr>();
+        Enumerate collect = (window, data) => { found.Add(window); return true; };
+        if (owner == IntPtr.Zero) EnumWindows(collect, IntPtr.Zero); else EnumChildWindows(owner, collect, IntPtr.Zero);
+        return found.ToArray();
+    }
 }
 "@
-$automation = [System.Windows.Automation.AutomationElement]
-$scope = [System.Windows.Automation.TreeScope]
-$titleCondition = New-Object System.Windows.Automation.PropertyCondition($automation::NameProperty, $env:QA_PICKER_TITLE)
-$windowCondition = New-Object System.Windows.Automation.PropertyCondition($automation::ControlTypeProperty, [System.Windows.Automation.ControlType]::Window)
 $applicationPath = [System.IO.Path]::GetFullPath($env:QA_PICKER_APPLICATION)
 $deadline = [DateTime]::UtcNow.AddSeconds(20)
-$dialog = $null
+$dialog = [IntPtr]::Zero
 do {
-    $windows = $automation::RootElement.FindAll($scope::Children, $windowCondition)
-    $owned = @($windows | Where-Object {
-        $process = Get-Process -Id $_.Current.ProcessId -ErrorAction SilentlyContinue
-        $process -and $process.Path -and [System.IO.Path]::GetFullPath($process.Path) -eq $applicationPath
-    } | ForEach-Object {
-        # Common Item Dialog can be a child window of its owner in UIA's
-        # control tree. Keep the executable boundary and search that subtree.
-        if ($_.Current.Name -eq $env:QA_PICKER_TITLE) { $_ }
-        $_.FindAll($scope::Descendants, $titleCondition) | Where-Object {
-            $_.Current.ControlType -eq [System.Windows.Automation.ControlType]::Window
-        }
+    # UIA can expose only the Explorer child of Common Item Dialog. Resolve
+    # the actual top-level #32770 HWND before looking up its native controls.
+    $owned = @([QaFolderDialog]::Windows([IntPtr]::Zero) | Where-Object {
+        if (-not [QaFolderDialog]::IsWindowVisible($_) -or [QaFolderDialog]::Class($_) -ne "#32770") { return $false }
+        $owner = Get-Process -Id ([QaFolderDialog]::Process($_)) -ErrorAction SilentlyContinue
+        $owner -and $owner.Path -and [System.IO.Path]::GetFullPath($owner.Path) -eq $applicationPath -and
+            [QaFolderDialog]::Text($_) -eq $env:QA_PICKER_TITLE
     })
     if ($owned.Count -eq 1) { $dialog = $owned[0]; break }
     Start-Sleep -Milliseconds 100
 } while ([DateTime]::UtcNow -lt $deadline)
-if (-not $dialog) { throw "No unique folder chooser owned by the QA executable" }
-$pidObserved = $dialog.Current.ProcessId
-function Button([string] $id, [string[]] $names, [bool] $waitEnabled = $true) {
-    $typeCondition = New-Object System.Windows.Automation.PropertyCondition($automation::ControlTypeProperty, [System.Windows.Automation.ControlType]::Button)
-    $buttons = @($dialog.FindAll($scope::Descendants, $typeCondition))
-    $describe = ($buttons | ForEach-Object { "id=$($_.Current.AutomationId),name=$($_.Current.Name),enabled=$($_.Current.IsEnabled)" }) -join '; '
-    [Console]::Error.WriteLine("Chooser buttons: $describe")
-    $element = $buttons | Where-Object {
-        $_.Current.AutomationId -eq $id -or $names -contains $_.Current.Name
-    } | Select-Object -First 1
-    if (-not $element) { throw "Chooser button $id unavailable" }
-    $deadline = [DateTime]::UtcNow.AddSeconds($(if ($waitEnabled) { 10 } else { 1 }))
+if ($dialog -eq [IntPtr]::Zero) { throw "No unique Common Item Dialog owned by the QA executable" }
+$pidObserved = [QaFolderDialog]::Process($dialog)
+function Chooser-Open {
+    [QaFolderDialog]::IsWindow($dialog) -and [QaFolderDialog]::IsWindowVisible($dialog)
+}
+function Control([int] $id, [string] $class) {
+    $found = @([QaFolderDialog]::Windows($dialog) | Where-Object {
+        [QaFolderDialog]::GetDlgCtrlID($_) -eq $id -and [QaFolderDialog]::Class($_) -eq $class -and
+            [QaFolderDialog]::IsWindowVisible($_)
+    })
+    if ($found.Count -ne 1) {
+        $details = ([QaFolderDialog]::Windows($dialog) | ForEach-Object {
+            "id=$([QaFolderDialog]::GetDlgCtrlID($_)),class=$([QaFolderDialog]::Class($_)),text=$([QaFolderDialog]::Text($_))"
+        }) -join '; '
+        throw "Chooser control $id/$class is not unique: $details"
+    }
+    return $found[0]
+}
+function Invoke-Control([int] $id) {
+    $button = Control $id "Button"
+    if (-not [QaFolderDialog]::IsWindowEnabled($button)) { return $false }
+    # BM_CLICK operates the real native button. Post once, then observe the
+    # dialog: no keyboard fallback can leak Enter into the app's Add modal.
+    if (-not [QaFolderDialog]::PostMessage($button, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)) {
+        throw "Chooser button $id could not receive BM_CLICK"
+    }
+    [Console]::Error.WriteLine("Chooser button {0}: {1}", $id, [QaFolderDialog]::Text($button))
+    return $true
+}
+[Console]::Error.WriteLine("Owned chooser HWND={0}, pid={1}, title={2}", $dialog, $pidObserved, [QaFolderDialog]::Text($dialog))
+if ($env:QA_PICKER_ACTION -eq "cancel") {
+    if (-not (Invoke-Control 2)) { throw "Chooser Cancel is disabled" }
+} else {
+    # 1152 is Common Item Dialog's filename/folder field. Never type into the
+    # last UIA Edit: that is the Search box on Windows 2025.
+    $edit = Control 1152 "Edit"
+    if (-not [QaFolderDialog]::SetWindowText($edit, $env:QA_PICKER_PATH) -or
+        [QaFolderDialog]::Text($edit) -ne $env:QA_PICKER_PATH) { throw "Folder path was not entered completely" }
+    $deadline = [DateTime]::UtcNow.AddSeconds(10)
+    $invoked = $false
     do {
-        try { if ($element.Current.IsEnabled) { return $element } } catch [System.Windows.Automation.ElementNotAvailableException] { }
+        if (-not (Chooser-Open)) { throw "Chooser closed before accepting the path" }
+        $invoked = Invoke-Control 1
+        if ($invoked) { break }
         Start-Sleep -Milliseconds 100
     } while ([DateTime]::UtcNow -lt $deadline)
-    throw "Chooser button $id unavailable"
-}
-function Invoke-ChooserButton([string] $id, [string[]] $names, [bool] $waitEnabled = $true) {
-    $button = Button $id $names $waitEnabled
-    [Console]::Error.WriteLine("Chooser button {0}: {1} ({2})", $id, $button.Current.Name, $button.Current.ClassName)
-    $pattern = $null
-    if ($button.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref] $pattern)) {
-        $pattern.Invoke()
-    } elseif ($button.TryGetCurrentPattern([System.Windows.Automation.LegacyIAccessiblePattern]::Pattern, [ref] $pattern)) {
-        $pattern.DoDefaultAction()
-    } else {
-        throw "Chooser button $id has no accessible default action"
-    }
-}
-function Find-CurrentChooser {
-    $windows = @($automation::RootElement.FindAll($scope::Descendants, $windowCondition))
-    $windows | Where-Object {
-        try { $_.Current.ProcessId -eq $pidObserved -and $_.Current.Name -eq $env:QA_PICKER_TITLE } catch { $false }
-    } | Select-Object -First 1
-}
-function Activate-Chooser {
-    try {
-        $handle = [IntPtr]$dialog.Current.NativeWindowHandle
-        if ($handle -eq [IntPtr]::Zero) {
-            $owner = Get-Process -Id $pidObserved -ErrorAction SilentlyContinue
-            if ($owner) { $handle = [IntPtr]$owner.MainWindowHandle }
-        }
-        if ($handle -ne [IntPtr]::Zero) {
-            [QaWindowActivation]::ShowWindow($handle, 5) | Out-Null
-            [QaWindowActivation]::SetForegroundWindow($handle) | Out-Null
-        }
-    } catch { }
-    try {
-        $shell = New-Object -ComObject WScript.Shell
-        $shell.AppActivate([int]$pidObserved) | Out-Null
-    } catch { }
-    Start-Sleep -Milliseconds 100
-}
-if ($env:QA_PICKER_ACTION -eq "cancel") {
-    try { Invoke-ChooserButton "2" @("Cancel") $false }
-    catch {
-        [Console]::Error.WriteLine("UIA Cancel unavailable; sending Escape to the owned chooser")
-        Activate-Chooser
-        [System.Windows.Forms.SendKeys]::SendWait("{ESC}")
-    }
-} else {
-    $editCondition = New-Object System.Windows.Automation.PropertyCondition($automation::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)
-    $edits = @($dialog.FindAll($scope::Descendants, $editCondition) | Where-Object { $_.Current.IsEnabled -and -not $_.Current.IsOffscreen })
-    $edit = $edits | Where-Object { $_.Current.AutomationId -eq "1152" } | Select-Object -First 1
-    if (-not $edit) { $edit = $edits | Select-Object -Last 1 }
-    if (-not $edit) { throw "Folder location field missing" }
-    $value = $edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
-    $value.SetValue($env:QA_PICKER_PATH)
-    if ($value.Current.Value -ne $env:QA_PICKER_PATH) { throw "Folder path was not entered completely" }
-    try {
-        Invoke-ChooserButton "1" @("Open", "Select Folder", "Add", "Choose")
-    } catch {
-        [Console]::Error.WriteLine("UIA Open unavailable; sending Alt+O to the owned chooser")
-        Activate-Chooser
-        [System.Windows.Forms.SendKeys]::SendWait("%o")
-        [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
-    }
-    Start-Sleep -Milliseconds 600
-    try {
-        if (-not $dialog.Current.IsOffscreen) {
-            try { Invoke-ChooserButton "1" @("Open", "Select Folder", "Add", "Choose") }
-            catch {
-                Activate-Chooser
-                [System.Windows.Forms.SendKeys]::SendWait("%o")
-                [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
-            }
-        }
-    } catch [System.Windows.Automation.ElementNotAvailableException] { }
+    if (-not $invoked) { throw "Chooser Open is disabled" }
 }
 $deadline = [DateTime]::UtcNow.AddSeconds(10)
-do {
-    # The cached UIA element can remain queryable after Common Item Dialog
-    # closes. Re-query the title under the owning process to observe reality.
-    $closed = -not (Find-CurrentChooser)
-    if ($closed) { break }
-    Start-Sleep -Milliseconds 100
-} while ([DateTime]::UtcNow -lt $deadline)
-if (-not $closed) { throw "Folder chooser did not close" }
-@{transport="Windows UI Automation"; pid=$pidObserved; application=$env:QA_PICKER_APPLICATION} | ConvertTo-Json -Compress
+while ((Chooser-Open) -and [DateTime]::UtcNow -lt $deadline) { Start-Sleep -Milliseconds 100 }
+if (Chooser-Open) { throw "Folder chooser did not close" }
+@{transport="Windows Common Item Dialog controls"; window=$dialog.ToInt64(); pid=$pidObserved; application=$env:QA_PICKER_APPLICATION} | ConvertTo-Json -Compress

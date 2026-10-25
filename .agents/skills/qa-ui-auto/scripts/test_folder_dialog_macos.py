@@ -16,31 +16,36 @@ const config = JSON.parse(process.argv[1]), actions = [];
 const application = '/Users/runner/work/taomni/taomni/src-tauri/target/qa-ui-auto/debug/taomni';
 const env = { QA_PICKER_APPLICATION:application, QA_PICKER_PATH:'/qa/fixture/project with spaces',
   QA_PICKER_TITLE:'Select folder to open', QA_PICKER_ACTION:config.action };
-let navigated = false, now = 0;
+let navigated = false, now = 0, opened = true, goTo = false, location = '';
 const actionName = config.actionName || 'Open';
-const button = (name) => ({enabled:()=>name === 'Cancel' || navigated, click:()=>actions.push(name)});
-const panel = {buttons:{whose:({name})=>()=>name === actionName || name === 'Cancel' ? [button(name)] : []}};
-const main = {sheets:()=>config.standalone ? [] : [panel],
+const button = (name) => ({name:()=>name, enabled:()=>name === 'Cancel' || navigated,
+  click:()=>{actions.push(name);opened=false;}});
+const field = {};
+Object.defineProperty(field,'value',{get:()=>()=>location,set:(value)=>{location=value;actions.push(value);}});
+const locationSheet = {textFields:()=>now >= (config.slowGoTo ? 800 : 0) ? [field] : []};
+const panel = {buttons:Object.assign(()=>[button(actionName),button('Cancel')],
+  {whose:({name})=>()=>name === actionName || name === 'Cancel' ? [button(name)] : []}),
+  sheets:()=>goTo ? [locationSheet] : []};
+const main = {sheets:()=>!opened ? [] : config.standalone ? (goTo ? [locationSheet] : []) : [panel],
   subrole:()=>config.standalone ? 'AXDialog' : 'AXStandardWindow',
   name:()=>config.standalone ? env.QA_PICKER_TITLE : 'Taomni',
   uiElements:()=>{throw new Error('must never traverse the main WebView')},
-  buttons: config.standalone ? panel.buttons : {whose:()=>{throw new Error('Home is not NSOpenPanel')}}};
-const owner = {windows:()=>[main],unixId:()=>123};
+  buttons: config.standalone ? panel.buttons : {whose:()=>{throw new Error('Home is not NSOpenPanel')}},
+  textFields:()=>[],comboBoxes:()=>[]};
+const owner = {windows:()=>config.standalone && !opened ? [] : [main],unixId:()=>123};
 const events = {processes:{whose:(query)=>{
   if(query.unixId !== undefined && query.unixId !== 123) throw new Error('unowned PID');
   if(query.frontmost) return ()=>[owner];
   return [owner];
 }},
-  keystroke:(key)=>actions.push(key), keyCode:(key)=>{actions.push(key);if(key===36)navigated=true;}};
-const shell = {doShellScript:(command)=>{
-  if(command === 'ps -ax -o pid=,comm=') return '123 taomni';
-  if(command !== 'ps -axww -o pid=,args=') return ('  123 ' + application).slice(0,79);
-  return config.duplicate ? '123 ' + application + '\n124 ' + application : '123 ' + application + '\n456 /other/taomni';
-}};
-const context = {$:{NSProcessInfo:{processInfo:{environment:{objectForKey:(key)=>env[key]}}}},
-  ObjC:{import:()=>{},unwrap:(value)=>value}, Application:(name)=>name==='System Events'?events:shell,
+  keystroke:(key)=>{actions.push(key);if(key==='g')goTo=true;},
+  keyCode:(key)=>{actions.push(key);if(key===36){navigated=location===env.QA_PICKER_PATH;goTo=false;}}};
+const nativeApps = [{executableURL:{path:application},processIdentifier:123}];
+if(config.duplicate) nativeApps.push({executableURL:{path:application},processIdentifier:124});
+const context = {$:{NSProcessInfo:{processInfo:{environment:{objectForKey:(key)=>env[key]}}},
+  NSWorkspace:{sharedWorkspace:{runningApplications:{count:nativeApps.length,objectAtIndex:(i)=>nativeApps[i]}}}},
+  ObjC:{import:()=>{},unwrap:(value)=>value}, Application:(name)=>events,
   delay:(seconds)=>{now+=seconds*1000},Date:{now:()=>now},console:{log:()=>{}},JSON};
-context.Application.currentApplication=()=>shell;
 let result, error;
 try {result=JSON.parse(vm.runInNewContext(fs.readFileSync(process.argv[2],'utf8'),context));}
 catch(e){error=e.message;}
@@ -59,7 +64,12 @@ class MacFolderDialogContracts(unittest.TestCase):
         observed = self.run_helper(action="choose")
         self.assertNotIn("error", observed)
         self.assertEqual(observed["result"]["pid"], 123)
-        self.assertEqual(observed["actions"], ["g", "a", "/qa/fixture/project with spaces", 36, "Open"])
+        self.assertEqual(observed["actions"], ["g", "/qa/fixture/project with spaces", 36, "Open"])
+
+    def test_waits_for_the_go_to_folder_field_before_entering_the_path(self):
+        observed = self.run_helper(action="choose", slowGoTo=True)
+        self.assertNotIn("error", observed)
+        self.assertEqual(observed["actions"], ["g", "/qa/fixture/project with spaces", 36, "Open"])
 
     def test_cancel_never_types_or_accepts_a_directory(self):
         observed = self.run_helper(action="cancel")

@@ -113,7 +113,7 @@ def run_folder_dialog(ctx, args) -> str:
             else:
                 raise StepError("native_folder_dialog: unsupported OS")
             try:
-                result = subprocess.run(cmd, env=env, text=True, capture_output=True, timeout=40)
+                result = subprocess.run(cmd, env=env, text=True, capture_output=True, timeout=60)
             except subprocess.TimeoutExpired as error:
                 output = error.stderr or error.stdout or ""
                 if isinstance(output, bytes):
@@ -127,6 +127,17 @@ def run_folder_dialog(ctx, args) -> str:
         observation["passed"] = True
     except Exception as error:
         observation.update(passed=False, error=str(error))
+        # WebView screenshots exclude system sheets/dialogs. Retain the actual
+        # desktop after a failed native operation, before teardown closes it.
+        try:
+            destination = ctx.case_dir / "native-folder-dialog-failure.png"
+            if platform.system() == "Darwin":
+                command("screencapture", "-x", str(destination), check=False)
+            elif platform.system() == "Windows":
+                from PIL import ImageGrab
+                ImageGrab.grab(all_screens=True).save(destination)
+        except Exception as capture_error:
+            observation["desktop_capture_error"] = str(capture_error)
         raise
     finally:
         with (ctx.case_dir / "native-folder-dialogs.jsonl").open("a", encoding="utf-8") as stream:
