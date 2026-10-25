@@ -3,7 +3,8 @@ title: Search, filter and bulk clean local archive across pages with native inde
   originals
 description: Whole-archive search, combined filters, sorting, retained cross-page selection, keyboard
   shortcuts and frozen cleanup preview. Real Tauri SQLite/FTS5, MIME files and hashes verify storage deletion,
-  shared-object retention and skip markers; browser stubs cannot prove these.
+  shared-object retention and skip markers; browser stubs cannot prove these. Native checkbox input must
+  hit the archive dialog at the fixture's enlarged mail font, including WKWebView top-layer zoom geometry.
 covers:
 - F-MAIL-23
 tags:
