@@ -1,0 +1,118 @@
+id: TC-BACKUP-SETTINGS-004
+title: Backup layout remains usable at 600 and 950 pixels across languages and themes
+description: Operates the saved global and inherited channel controls at both widths, checks for global-section overflow,
+  and retains focused screenshots for visual review. Browser layout evidence does not establish native persistence.
+covers:
+- F-BACKUP-1
+- F-BACKUP-2
+- F5.5
+tags:
+- backup
+- settings
+- i18n
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- backup_cloud
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- wait_for: '[data-testid="backup-global-scope"]'
+- set_viewport:
+    width: 950
+    height: 1000
+- select_option:
+    selector: '[data-testid="backup-global-scope"]'
+    value: full
+- assert_text:
+    selector: '[data-testid="backup-settings-save-status"]'
+    contains: Saved
+    timeout_sec: 30
+- click: button[aria-label="Cycle application theme"]
+- assert_attribute:
+    selector: html
+    name: data-app-theme
+    equals: light
+- screenshot:
+    path: backup-global-en-light-950.png
+    selector: '[data-testid="backup-global-defaults"]'
+- click: button[aria-label="Cycle application theme"]
+- assert_attribute:
+    selector: html
+    name: data-app-theme
+    equals: dark
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-zh-CN"]'
+- set_viewport:
+    width: 600
+    height: 1000
+- assert_text:
+    selector: '[data-testid="backup-global-defaults"]'
+    contains: 全局默认配置
+- eval_readonly:
+    expression: document.getElementById("backup-global-include-mail").closest("section").scrollWidth <= document.getElementById("backup-global-include-mail").closest("section").clientWidth
+    expect_truthy: true
+- eval_readonly:
+    expression: document.getElementById("backup-global-include-mail").closest("section").getBoundingClientRect().right <= innerWidth
+    expect_truthy: true
+- screenshot:
+    path: backup-global-zh-dark-600.png
+    selector: '[data-testid="backup-global-defaults"]'
+- click: '[data-testid="backup-cloud-destination"] > summary'
+- select_option:
+    selector: '[data-testid="backup-cloud-range-mode"]'
+    value: inherit
+- assert_attribute:
+    selector: '[data-testid="backup-global-scope"]'
+    name: value
+    equals: full
+- screenshot:
+    path: backup-channel-zh-dark-600.png
+    selector: '[data-testid="backup-cloud-destination"]'
+- set_viewport:
+    width: 950
+    height: 1000
+- screenshot:
+    path: backup-manual-zh-dark-950.png
+    selector: '[data-testid="backup-manual"]'
+verification:
+  review: reviewed
+  native:
+  - check: Renderer layout only
+    method: not-applicable
+    reason: Production IPC and disk behavior have separate native settings and authorization cases.
+  visual:
+  - check: Global, expanded channel and manual controls wrap without overlap or clipped labels at both widths
+    method: manual
+    reason: Review the four retained screenshots; geometry assertions alone do not establish visual quality.
+  requirements:
+  - id: R1
+    requirement: Full scope saves and remains usable in the English light layout at 950 pixels
+    actions: [7, 8, 10]
+    checkpoints:
+    - step: 9
+      expectation: Full data write acknowledged
+    - step: 11
+      expectation: Light theme is active
+    results: [9, 11]
+  - id: R2
+    requirement: Narrow Chinese dark layout has no global-section overflow and inheritance retains the global full scope
+    actions: [13, 15, 16, 17, 22, 23]
+    checkpoints:
+    - step: 14
+      expectation: Dark theme is active
+    - step: 18
+      expectation: Section follows the selected language
+    - step: 19
+      expectation: Global controls fit their section
+    - step: 20
+      expectation: Global section remains inside the viewport
+    - step: 24
+      expectation: Channel range editing does not reset the global full scope
+    results: [14, 18, 19, 20, 24]
