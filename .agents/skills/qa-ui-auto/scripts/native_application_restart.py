@@ -4,10 +4,12 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import platform
 import subprocess
 import time
 
 from native_process_group import wait_for_driver_ports
+from native_application_shutdown import linux_storage_processes, wait_for_application_shutdown
 from native_webdriver_transport import WebDriverError
 
 
@@ -94,12 +96,24 @@ def restart_owned_application(driver, session) -> dict:
     macos_bridge = session.transport == "macOS WKWebView bridge"
     before_owner = getattr(getattr(driver, "proc", None), "pid", None)
     application = str(session.application.resolve())
+    observation = {"application": application, "before_session": before,
+                   "before_owner_pid": before_owner, "stage": "close-window"}
+    session.application_restart_observation = observation
+    processes = linux_storage_processes(driver, session.application) if platform.system() == "Linux" else {}
     try:
         close_observation = close_application_window(session)
+        observation["native_close"] = close_observation
         # The WebView has closed normally. Release transport/ownership without
         # sending DELETE to an already closed browsing context.
         session.session_id = None
+        observation["stage"] = "wait-for-application-exit"
+        observation["native_shutdown"] = wait_for_application_shutdown(driver, session, processes)
+    except Exception as error:
+        observation["error_stage"] = observation["stage"]
+        observation["close_error"] = str(error)
+        raise
     finally:
+        observation["stage"] = "release-owner"
         try:
             session.close()
         finally:
@@ -107,12 +121,37 @@ def restart_owned_application(driver, session) -> dict:
     # A reaped launcher does not establish that its adapter has released its
     # socket yet. Starting immediately races WebKitWebDriver on Linux.
     ports = (driver.port,) if session.transport == "macOS WKWebView bridge" else (driver.port, driver.native_port)
+    observation["stage"] = "wait-for-old-ports"
     wait_for_driver_ports(driver.host, ports)
     driver._restart_required = False
+    observation["stage"] = "start-owner"
     driver.start()
     session._on_close = driver.mark_session_closed
     session.deadline = deadline
-    session.start()
+    observation.update(stage="start-session", after_owner_pid=getattr(getattr(driver, "proc", None), "pid", None))
+    connect_retries = 0
+    ready_deadline = time.monotonic() + 10
+    while True:
+        try:
+            session.start()
+            break
+        except ConnectionRefusedError:
+            # Only a refused initial connect is known not to have delivered
+            # its request. Never retry a created session or an uncertain action.
+            if not macos_bridge or session.session_id:
+                raise
+            connect_retries += 1
+            observation["startup_connect_retries"] = connect_retries
+            process = driver.proc
+            code = process.poll()
+            observation["owner_exit_code"] = code
+            if code is not None:
+                raise RuntimeError(f"Owned QA app exited during macOS bridge startup (exit {code})")
+            if session.deadline:
+                session.deadline.remaining()
+            if time.monotonic() >= ready_deadline:
+                raise
+            time.sleep(0.1)
     after_owner = getattr(getattr(driver, "proc", None), "pid", None)
     if not session.session_id:
         raise RuntimeError("QA application restart did not create a new native session")
@@ -124,8 +163,11 @@ def restart_owned_application(driver, session) -> dict:
             raise RuntimeError("QA application restart did not create a new owned macOS process")
     elif session.session_id == before:
         raise RuntimeError("QA application restart did not create a new native session")
+    observation["stage"] = "complete"
     return {"application": application, "before_session": before,
             "after_session": session.session_id, "profile_retained": True,
             "shutdown": "application-window-close",
-            **({"before_owner_pid": before_owner, "after_owner_pid": after_owner} if macos_bridge else {}),
+            "native_shutdown": observation["native_shutdown"],
+            **({"before_owner_pid": before_owner, "after_owner_pid": after_owner,
+                "startup_connect_retries": connect_retries} if macos_bridge else {}),
             **({"native_close": close_observation} if close_observation else {})}

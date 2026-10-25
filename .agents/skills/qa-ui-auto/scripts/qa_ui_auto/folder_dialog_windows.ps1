@@ -18,8 +18,25 @@ public static class QaFolderDialog {
     [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr window);
     [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr window);
-    [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern bool SetWindowText(IntPtr window, string text);
+    [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr window);
+    [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll")] static extern IntPtr SetFocus(IntPtr window);
+    [DllImport("user32.dll")] static extern IntPtr GetFocus();
+    [DllImport("user32.dll")] static extern bool AttachThreadInput(uint from, uint to, bool attach);
+    [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+    [DllImport("user32.dll", SetLastError = true)] static extern uint SendInput(uint count, Input[] inputs, int size);
     [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
+    [StructLayout(LayoutKind.Sequential)] struct MouseInput {
+        public int x, y; public uint data, flags, time; public UIntPtr extra;
+    }
+    [StructLayout(LayoutKind.Sequential)] struct KeyInput {
+        public ushort key, scan; public uint flags, time; public UIntPtr extra;
+    }
+    [StructLayout(LayoutKind.Explicit)] struct InputData {
+        [FieldOffset(0)] public MouseInput mouse;
+        [FieldOffset(0)] public KeyInput keyboard;
+    }
+    [StructLayout(LayoutKind.Sequential)] struct Input { public uint type; public InputData data; }
     public static string Text(IntPtr window) {
         var value = new StringBuilder(32768); GetWindowText(window, value, value.Capacity); return value.ToString();
     }
@@ -84,6 +101,41 @@ public static class QaFolderDialog {
         return true;
     }
 
+    private static Input Key(ushort key, ushort scan = 0, uint flags = 0) {
+        return new Input { type = 1, data = new InputData { keyboard = new KeyInput { key = key, scan = scan, flags = flags } } };
+    }
+
+    private static void EnterPath(IntPtr dialog, IntPtr edit, string path) {
+        SetForegroundWindow(dialog);
+        uint ignored;
+        uint ownerThread = GetWindowThreadProcessId(edit, out ignored);
+        uint currentThread = GetCurrentThreadId();
+        if (!AttachThreadInput(currentThread, ownerThread, true)) {
+            throw new InvalidOperationException("Could not attach to the owned chooser input thread");
+        }
+        try {
+            SetFocus(edit);
+            if (GetForegroundWindow() != dialog || GetFocus() != edit) {
+                throw new InvalidOperationException("Owned chooser folder field did not receive native focus");
+            }
+        } finally { AttachThreadInput(currentThread, ownerThread, false); }
+        // Real keyboard input is required: WM_SETTEXT changes the rendered
+        // Edit text but leaves IFileDialog's internal selection unchanged.
+        var inputs = new List<Input> { Key(0x11), Key(0x41), Key(0x41, 0, 2), Key(0x11, 0, 2) };
+        foreach (char character in path) {
+            inputs.Add(Key(0, character, 4));
+            inputs.Add(Key(0, character, 6));
+        }
+        var values = inputs.ToArray();
+        if (SendInput((uint)values.Length, values, Marshal.SizeOf(typeof(Input))) != values.Length) {
+            throw new InvalidOperationException("Native chooser keyboard input was not delivered completely");
+        }
+        var deadline = DateTime.UtcNow.AddSeconds(5);
+        while (Text(edit) != path && DateTime.UtcNow < deadline) Thread.Sleep(50);
+        if (Text(edit) != path) throw new InvalidOperationException("Folder path was not entered completely: " + Text(edit));
+        Console.Error.WriteLine("Native folder field input: {0}", Text(edit));
+    }
+
     public static Dictionary<string, object> Run(string application, string title, string action, string path) {
         application = Path.GetFullPath(application);
         var dialog = FindOwnedDialog(application, title);
@@ -94,9 +146,7 @@ public static class QaFolderDialog {
         } else if (action == "choose") {
             // 1152 is the folder field; the last UIA Edit is the Search box.
             var edit = Control(dialog, 1152, "Edit");
-            if (!SetWindowText(edit, path) || Text(edit) != path) {
-                throw new InvalidOperationException("Folder path was not entered completely");
-            }
+            EnterPath(dialog, edit, path);
             var deadline = DateTime.UtcNow.AddSeconds(10);
             bool invoked = false;
             do {

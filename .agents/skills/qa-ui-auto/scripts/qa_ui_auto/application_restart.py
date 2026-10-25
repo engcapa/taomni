@@ -12,7 +12,15 @@ def restart_application(ctx, args):
     restart = getattr(ctx.session, "application_restarter", None)
     if not callable(restart):
         raise StepError("native_restart_app: this session has no owned application launcher")
-    result = restart()
+    try:
+        result = restart()
+    except Exception as error:
+        result = {**getattr(ctx.session, "application_restart_observation", {}),
+                  "status": "failed", "error": str(error),
+                  "last_request": getattr(ctx.session, "last_request", {})}
+        with (ctx.case_dir / "native-application-restarts.jsonl").open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(result) + "\n")
+        raise
     with (ctx.case_dir / "native-application-restarts.jsonl").open("a", encoding="utf-8") as stream:
         stream.write(json.dumps(result) + "\n")
     return "restarted the owned QA process with the same isolated profile"

@@ -8,6 +8,10 @@ from native_webdriver_transport import WebDriverError
 
 
 class NativeApplicationRestartTest(unittest.TestCase):
+    def setUp(self):
+        self.shutdown = patch("native_application_restart.wait_for_application_shutdown", return_value={"process_ids": []}).start()
+        self.addCleanup(patch.stopall)
+
     def scenario(self):
         events = []
         deadline = SimpleNamespace(remaining=Mock(return_value=20))
@@ -30,7 +34,7 @@ class NativeApplicationRestartTest(unittest.TestCase):
                                  host="127.0.0.1", port=0, native_port=0, proc=SimpleNamespace(pid=100))
         def launch():
             events.append("start-owner")
-            driver.proc = SimpleNamespace(pid=200)
+            driver.proc = SimpleNamespace(pid=200, poll=Mock(return_value=None))
         driver.start.side_effect = launch
         return session, driver, events
 
@@ -139,6 +143,42 @@ class NativeApplicationRestartTest(unittest.TestCase):
         with patch("native_application_restart.close_macos_application_window", return_value={"pid": 100}):
             with self.assertRaisesRegex(RuntimeError, "new owned macOS process"):
                 restart_owned_application(driver, session)
+
+    def test_macos_retries_only_a_refused_initial_session_connection(self):
+        session, driver, _ = self.scenario()
+        session.transport = "macOS WKWebView bridge"
+        def start():
+            if session.start.call_count == 1:
+                raise ConnectionRefusedError("bridge not yet accepting connections")
+            session.session_id = "new"
+        session.start.side_effect = start
+        with patch("native_application_restart.close_macos_application_window", return_value={"pid": 100}), \
+                patch("native_application_restart.time.sleep"):
+            restart_owned_application(driver, session)
+        self.assertEqual(session.start.call_count, 2)
+
+    def test_macos_exited_owner_is_a_failure_and_never_retried(self):
+        session, driver, _ = self.scenario()
+        session.transport = "macOS WKWebView bridge"
+        driver.start.side_effect = lambda: setattr(driver, "proc", SimpleNamespace(pid=200, poll=Mock(return_value=9)))
+        session.start.side_effect = ConnectionRefusedError("bridge connection refused")
+        with patch("native_application_restart.close_macos_application_window", return_value={"pid": 100}):
+            with self.assertRaisesRegex(RuntimeError, "startup \\(exit 9\\)"):
+                restart_owned_application(driver, session)
+        self.assertEqual(session.start.call_count, 1)
+        self.assertEqual(session.application_restart_observation["stage"], "start-session")
+
+    def test_created_session_does_not_retry_a_refused_transport(self):
+        session, driver, _ = self.scenario()
+        session.transport = "macOS WKWebView bridge"
+        def start():
+            session.session_id = "created"
+            raise ConnectionRefusedError("connection refused after session creation")
+        session.start.side_effect = start
+        with patch("native_application_restart.close_macos_application_window", return_value={"pid": 100}):
+            with self.assertRaises(ConnectionRefusedError):
+                restart_owned_application(driver, session)
+        self.assertEqual(session.start.call_count, 1)
 
     def test_reused_session_cannot_claim_a_cold_start(self):
         session, driver, _ = self.scenario()
