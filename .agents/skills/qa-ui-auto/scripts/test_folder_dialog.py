@@ -85,5 +85,16 @@ class FolderDialogContracts(unittest.TestCase):
             self.assertEqual((ctx.case_dir / "native-folder-dialog-helper.log").read_text(), "owned NSOpenPanel found\n")
             self.assertFalse(json.loads((ctx.case_dir / "native-folder-dialogs.jsonl").read_text())["passed"])
 
+    def test_windows_uses_the_available_powershell_7_runtime(self):
+        with TemporaryDirectory() as directory:
+            ctx = SimpleNamespace(case_dir=Path(directory), session=SimpleNamespace(application="/qa/taomni"))
+            result = subprocess.CompletedProcess([], 0, '{"pid":123,"transport":"Windows Common Item Dialog controls"}', "")
+            with patch.object(folder_dialog.platform, "system", return_value="Windows"), \
+                    patch.object(folder_dialog.shutil, "which", return_value="C:/pwsh/pwsh.exe"), \
+                    patch.object(folder_dialog.subprocess, "run", return_value=result) as run:
+                folder_dialog.run_folder_dialog(ctx, {"action": "cancel"})
+            self.assertEqual(run.call_args.args[0][0], "C:/pwsh/pwsh.exe")
+            self.assertEqual(run.call_args.kwargs["env"]["QA_PICKER_ACTION"], "cancel")
+
 if __name__ == "__main__":
     unittest.main()
