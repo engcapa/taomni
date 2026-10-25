@@ -94,6 +94,15 @@ steps:
 - click: '[data-testid="git-diff-mode-unified"]'
 - click: '[data-testid="git-diff-mode-split"]'
 - assert_visible: '[data-testid="git-diff-mode-split"]'
+- assert_count:
+    selector: '[data-testid="sidebar-rail"] [data-testid="code-workspace-tool-rail-git"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="editor-open-git-diff"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="code-workspace-git-panel-toggle"]'
+    equal: 0
 - screenshot: ws-006-in-workspace-git-panel.png
 verification:
   review: reviewed
@@ -169,6 +178,21 @@ verification:
     - 45
     - 51
     - 59
+  - id: R4
+    requirement: 'Each toolbar has one Git entry: the merged rail and editor compare action stay available, while the duplicate legacy editor Git button stays absent.'
+    actions:
+    - 44
+    checkpoints:
+    - step: 60
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="sidebar-rail"] [data-testid="code-workspace-tool-rail-git"]'', ''equal'': 1}}'
+    - step: 61
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="editor-open-git-diff"]'', ''equal'': 1}}'
+    - step: 62
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="code-workspace-git-panel-toggle"]'', ''equal'': 0}}'
+    results:
+    - 60
+    - 61
+    - 62
   visual:
   - check: Git 面板保留 main 的视觉与信息密度，移除的冗余入口确不存在。
     method: manual

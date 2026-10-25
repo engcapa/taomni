@@ -9,6 +9,14 @@
 
 ## 追加反馈与跨平台回归（2026-10-25）
 
+2026-10-26 最新续验：同一栏的重复 Git 按钮已删除；共享编辑工具栏只保留“在 Git 中比较”，主导航条保留完整 Git 管理入口。`TC-WS-006` 增加数量断言，并继续执行六种 Git 视图、提交选项、多仓库和 Diff 切换，browser/native 定向复跑均通过。根目录行的重复入口也已移除，组件回归保护该边界。
+
+当前本机有效回执核验结果为 **25 个 browser ID、6 个 native ID 全部通过**，无拒绝、过期或缺失结果，记录为 `_local/workspace-current-local-evidence.json`。Browser 主批次为 `workspace-browser/run-20261026-042552-094346821`，更新后的 Git 用例为 `run-20261026-043939-150540769`。Native 为 `workspace-native/run-20261026-042551-971492851`（4 passed / 1 SSH 服务未启动而 skipped）、`run-20261026-042848-716576587`（使用独立服务完整重跑冷启动恢复并通过）、`run-20261026-043110-456493505`（真实 GSS/SSH 与 SFTP 通过）及 `run-20261026-043939-464029535`（最终 Git 用例通过）。保留首次服务缺口，不计作通过；6 个 ID 的最新适用结果均为 passed。
+
+目录选择定向运行 [40228782682](https://github.com/engcapa/taomni/actions/runs/40228782682) 的 macOS 已通过；Windows 失败为 PowerShell 5.1 调用原生辅助方法时的 Int32 动态绑定错误。辅助脚本改用 runner 已安装的 PowerShell 7，并通过 15 项目录选择工具契约。后续三平台 5 ID 定向运行 [40230884973](https://github.com/engcapa/taomni/actions/runs/40230884973) 正在执行，尚未视为通过。通过后执行 373 ID 相关集，再执行全量；已核对全量为 619 个适用 ID，唯一外部项目缺口仍为用户确认单列的 `TC-IDE-C6-06`。
+
+本机 QA v13 二进制 `src-tauri/target/qa-ui-auto/debug/taomni` 的构建输入匹配当前产品源码；源码指纹为 `1381198413aefe6d9838904adacbf374f951f41c171afb42b56224ad15615302`。最新静态审计（620 ID）、覆盖门禁、Rust 格式检查和 `pnpm check:refactor` 通过。所有本机测试保持最多 2 个 worker，native 顺序执行；此处本机通过不替代仍在进行的三平台相关集与全量验收。
+
 2026-10-26 续验：相关集 [40204276862](https://github.com/engcapa/taomni/actions/runs/40204276862) 的 browser 为 Linux 258/258、Windows 258/258、macOS 257/257；native 为 Linux 162/166、Windows 141/147、macOS 130/135，15 项失败，基础设施错误 0。该运行未通过，尚不能启动全量验收。目录选择修复覆盖 GTK Recent、macOS NSOpenPanel 查找和 Windows UIA 按钮类型；邮件关闭重开恢复直接关闭标签的原有操作；普通文件保留检查控件；独立 SFTP 窗口补充真实输入焦点与完整地址断言。
 
 Windows 编码弹窗改为挂载到 body，避免 `react-resizable-panels` 的文档级指针监听在弹窗覆盖分隔线时抢焦点。外部文件通知处理从 `controller/fileActions.tsx` 提取到 `controller/externalFileChanges.ts`，保持原入口导出、事件和磁盘冲突流程；删除通知先读取当前磁盘，原子替换后仍存在的文件走正常快照校验，真实删除继续保留本地缓冲区与恢复操作。新增测试验证未变化/替换/删除/关闭期间的结果，原生保存与重排用例继续保护真实副作用。
