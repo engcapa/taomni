@@ -23,12 +23,12 @@ steps:
       expect_truthy: true
   - native_window_drag: {selector: '[data-testid="window-drag-handle"]', y_fraction: 0.35, dx: 24, dy: 18}
   - native_window_drag: {selector: '[data-testid="window-drag-handle"]', y_fraction: 0.5, dx: 24, dy: 18}
-  - click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
+  - click: '[data-testid="side-tab-sessions"]'
   - wait_for: '[data-testid="collapsed-sidebar-rail"]'
   - native_window_drag: {selector: '[data-testid="window-drag-handle"]', y_fraction: 0.85, dx: 24, dy: 18}
   - click: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]'
   - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
+  - click: '[data-testid="side-tab-sessions"]'
   - wait_for: '[data-testid="session-tree"]'
   - screenshot: main-rail-linux-after-window-moves.png
 verification:

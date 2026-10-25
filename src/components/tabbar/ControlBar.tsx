@@ -30,6 +30,8 @@ import {
   GitBranch,
   Braces,
 } from "lucide-react";
+import { createPortal } from "react-dom";
+import { useMainRailHostStore } from "../../stores/mainRailHostStore";
 import { useRef, useState } from "react";
 import { TabBar } from "./TabBar";
 import { OpenTabsMenu } from "./OpenTabsMenu";
@@ -99,6 +101,7 @@ export function ControlBar({
   slotRef,
 }: ControlBarProps) {
   const ctx = useContextMenu();
+  const menuHost = useMainRailHostStore((s) => s.menuHost);
   const activeSideTab = useAppStore((state) => state.activeSideTab);
   const rightSidebarCollapsed = useAppStore((state) => state.rightSidebarCollapsed);
   const toggleRightSidebar = useAppStore((state) => state.toggleRightSidebar);
@@ -235,7 +238,10 @@ export function ControlBar({
           onClick={onToggleSidebar}
         />
         {!nativeMenu && (
-          <BarButton testId="app-main-menu" title={t("compactTitleBar.mainMenu")} icon={<Menu className="w-4 h-4" />} onClick={openMainMenu} />
+          menuHost ? createPortal(
+            <BarButton testId="app-main-menu" title={t("compactTitleBar.mainMenu")} icon={<Menu className="w-4 h-4" />} onClick={openMainMenu} />,
+            menuHost,
+          ) : <BarButton testId="app-main-menu" title={t("compactTitleBar.mainMenu")} icon={<Menu className="w-4 h-4" />} onClick={openMainMenu} />
         )}
       </div>
       <WindowDragHandle />
@@ -243,6 +249,10 @@ export function ControlBar({
         {activeSideTab === "workspaces" ? (
           <div className="flex h-full min-w-0 items-center gap-1">
             <WorkspaceTabStrip />
+          </div>
+        ) : activeSideTab === "home" || activeSideTab === "agents" ? (
+          <div className="flex h-full items-center gap-2 px-2 text-[12px] font-semibold" data-testid="platform-mode-title">
+            {t(activeSideTab === "home" ? "platform.homeTitle" : "platform.agentsTitle")}
           </div>
         ) : (
           <TabBar

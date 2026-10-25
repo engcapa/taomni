@@ -8,7 +8,7 @@ import { rememberSidebarForActiveGroup } from "./policies";
 /** Default bottom-left placement of the floating MFA window (design DEC-03). */
 export const FLOATING_MFA_DEFAULT_POSITION = { left: 50, bottom: 30 } as const;
 /** Width reserved on the right for the right context sidebar toggle target. */
-export const FLOATING_MFA_WIDTH = 310;
+export const FLOATING_MFA_WIDTH = 280;
 
 export function clampFloatingMfaPosition(
   left: number,

@@ -130,7 +130,7 @@ export function useMainWindowLifecycle(context: UseMainWindowLifecycleContext) {
       if (layout.sidebarCollapsed) {
         panel.collapse();
       } else {
-        panel.resize(`${layout.lastSidebarSizeRef.current}%`);
+        panel.resize(layout.lastSidebarSizeRef.current > 0 ? `${layout.lastSidebarSizeRef.current}%` : "260px");
       }
     });
 

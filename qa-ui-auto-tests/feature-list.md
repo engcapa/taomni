@@ -11802,7 +11802,7 @@ controls:
 
 ## 12. Workspace-First 平台重构（v6.1）
 
-> 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents 调度台与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-014`。
+> 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents / Crew 开发中入口与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-017`。
 
 ### 12.1 Workspace-first 主壳层：单行工具栏、主导航条 5 大模式与右栏收纳
 
@@ -11810,51 +11810,137 @@ controls:
 id: F-WS-1
 status: done
 area: main/workspace-platform
-components: [ControlBar, Sidebar, PrimaryNavigationRail, WorkspaceSidebar, WorkspaceMainPanel, MfaFloatingWindow, AgentsPlatformView, GlobalCommandModal]
+components:
+- ControlBar
+- Sidebar
+- PrimaryNavigationRail
+- WorkspaceSidebar
+- WorkspaceMainPanel
+- MfaFloatingWindow
+- AgentsPlatformView
+- GlobalCommandModal
 files:
-  - src/components/tabbar/ControlBar.tsx
-  - src/components/sidebar/PrimaryNavigationRail.tsx
-  - src/components/sidebar/Sidebar.tsx
-  - src/components/workspace/WorkspaceSidebar.tsx
-  - src/components/workspace/WorkspaceMainPanel.tsx
-  - src/components/workspace/WorkspaceGitPanel.tsx
-  - src/components/workspace/WorkspaceSessionPickerModal.tsx
-  - src/components/workspace/WorkspaceSessionPane.tsx
-  - src/components/mfa/MfaFloatingWindow.tsx
-  - src/components/agents/AgentsPlatformView.tsx
-  - src/components/search/GlobalCommandModal.tsx
-  - src/stores/workspacePlatformStore.ts
-  - src/stores/agentsStore.ts
-  - src/stores/workspaceEditorStore.ts
-  - src/stores/workspaceUiStore.ts
+- src/components/tabbar/ControlBar.tsx
+- src/components/sidebar/PrimaryNavigationRail.tsx
+- src/components/sidebar/Sidebar.tsx
+- src/components/workspace/WorkspaceSidebar.tsx
+- src/components/workspace/WorkspaceMainPanel.tsx
+- src/components/workspace/WorkspaceGitPanel.tsx
+- src/components/workspace/WorkspaceSessionPickerModal.tsx
+- src/components/workspace/WorkspaceSessionPane.tsx
+- src/components/mfa/MfaFloatingWindow.tsx
+- src/components/agents/AgentsPlatformView.tsx
+- src/components/search/GlobalCommandModal.tsx
+- src/stores/workspacePlatformStore.ts
+- src/stores/agentsStore.ts
+- src/stores/workspaceEditorStore.ts
+- src/stores/workspaceUiStore.ts
+- src/layouts/main/MainLayoutView.tsx
+- src/styles/platform.css
+- src/styles/platform-home.css
+- src/components/workspace/RightContextPanel.tsx
+- src/components/workspace/useContextPanelWidth.ts
+- src/components/welcome/PlatformLaunchCards.tsx
 controls:
-  - id: global-search-trigger
-    selector: '[data-testid="global-search-trigger"]'
-    kind: interactive
-  - id: home-sidebar-panel
-    selector: '[data-testid="home-sidebar-panel"]'
-    kind: display
-  - id: nav-mode-agents
-    selector: '[data-testid="nav-mode-agents"]'
-    kind: interactive
-  - id: nav-mode-home
-    selector: '[data-testid="nav-mode-home"]'
-    kind: interactive
-  - id: nav-mode-workspaces
-    selector: '[data-testid="nav-mode-workspaces"]'
-    kind: interactive
-  - id: right-sidebar
-    selector: '[data-testid="right-sidebar"]'
-    kind: display
-  - id: sidebar-rail
-    selector: '[data-testid="sidebar-rail"]'
-    kind: interactive
-  - id: toggle-left-sidebar
-    selector: '[data-testid="toggle-left-sidebar"]'
-    kind: interactive
-  - id: toggle-right-sidebar
-    selector: '[data-testid="toggle-right-sidebar"]'
-    kind: interactive
+- id: global-search-trigger
+  selector: '[data-testid="global-search-trigger"]'
+  kind: interactive
+- id: home-sidebar-panel
+  selector: '[data-testid="home-sidebar-panel"]'
+  kind: display
+- id: nav-mode-agents
+  selector: '[data-testid="nav-mode-agents"]'
+  kind: interactive
+- id: nav-mode-home
+  selector: '[data-testid="nav-mode-home"]'
+  kind: interactive
+- id: nav-mode-workspaces
+  selector: '[data-testid="nav-mode-workspaces"]'
+  kind: interactive
+- id: right-sidebar
+  selector: '[data-testid="right-sidebar"]'
+  kind: display
+- id: sidebar-rail
+  selector: '[data-testid="sidebar-rail"]'
+  kind: interactive
+- id: toggle-left-sidebar
+  selector: '[data-testid="toggle-left-sidebar"]'
+  kind: interactive
+- id: toggle-right-sidebar
+  selector: '[data-testid="toggle-right-sidebar"]'
+  kind: interactive
+- id: main-canvas-frame
+  selector: '[data-testid="main-canvas-frame"]'
+  kind: display
+- id: platform-mode-title
+  selector: '[data-testid="platform-mode-title"]'
+  kind: display
+- id: global-session-surface
+  selector: '[data-testid="global-session-surface"]'
+  kind: display
+- id: right-sidebar-resize-handle
+  selector: '[data-testid="right-sidebar-resize-handle"]'
+  kind: interactive
+- id: right-sidebar-close
+  selector: '[data-testid="right-sidebar-close"]'
+  kind: interactive
+- id: right-sidebar-ai-tab
+  selector: '[data-testid="right-sidebar-ai-tab"]'
+  kind: interactive
+- id: right-sidebar-structure-tab
+  selector: '[data-testid="right-sidebar-structure-tab"]'
+  kind: interactive
+- id: right-sidebar-content
+  selector: '[data-testid="right-sidebar-content"]'
+  kind: display
+- id: right-sidebar-open-chat
+  selector: '[data-testid="right-sidebar-open-chat"]'
+  kind: interactive
+- id: rail-app-menu-host
+  selector: '[data-testid="rail-app-menu-host"]'
+  kind: display
+- id: home-import-sessions
+  selector: '[data-testid="home-import-sessions"]'
+  kind: interactive
+- id: home-import-json
+  selector: '[data-testid="home-import-json"]'
+  kind: interactive
+- id: home-import-mobaxterm
+  selector: '[data-testid="home-import-mobaxterm"]'
+  kind: interactive
+- id: home-import-csv
+  selector: '[data-testid="home-import-csv"]'
+  kind: interactive
+- id: home-import-openssh
+  selector: '[data-testid="home-import-openssh"]'
+  kind: interactive
+- id: home-download-csv-template
+  selector: '[data-testid="home-download-csv-template"]'
+  kind: interactive
+- id: home-open-workspace
+  selector: '[data-testid="home-open-workspace"]'
+  kind: interactive
+- id: home-open-git
+  selector: '[data-testid="home-open-git"]'
+  kind: interactive
+- id: home-open-agents
+  selector: '[data-testid="home-open-agents"]'
+  kind: interactive
+- id: home-open-mail
+  selector: '[data-testid="home-open-mail"]'
+  kind: interactive
+- id: home-open-network-tools
+  selector: '[data-testid="home-open-network-tools"]'
+  kind: interactive
+- id: home-open-mfa
+  selector: '[data-testid="home-open-mfa"]'
+  kind: interactive
+- id: welcome-open-lanchat
+  selector: '[data-testid="welcome-open-lanchat"]'
+  kind: interactive
+- id: lanchat-roster-panel
+  selector: '[data-testid="lanchat-roster-panel"]'
+  kind: display
 -->
 
 主窗口只有单行 33px 共享 ControlBar；左侧主导航条提供 Home / Workspaces / Sessions / Agents / Tools 五大一级模式，支持左右侧栏收缩与 Ctrl/Cmd+K 全局搜索。
@@ -11865,153 +11951,185 @@ controls:
 id: F-WS-2
 status: done
 area: main/workspace-platform
-components: [ControlBar, Sidebar, PrimaryNavigationRail, WorkspaceSidebar, WorkspaceMainPanel, MfaFloatingWindow, AgentsPlatformView, GlobalCommandModal]
+components:
+- ControlBar
+- Sidebar
+- PrimaryNavigationRail
+- WorkspaceSidebar
+- WorkspaceMainPanel
+- MfaFloatingWindow
+- AgentsPlatformView
+- GlobalCommandModal
 files:
-  - src/components/tabbar/ControlBar.tsx
-  - src/components/sidebar/PrimaryNavigationRail.tsx
-  - src/components/sidebar/Sidebar.tsx
-  - src/components/workspace/WorkspaceSidebar.tsx
-  - src/components/workspace/WorkspaceMainPanel.tsx
-  - src/components/workspace/WorkspaceGitPanel.tsx
-  - src/components/workspace/WorkspaceSessionPickerModal.tsx
-  - src/components/workspace/WorkspaceSessionPane.tsx
-  - src/components/mfa/MfaFloatingWindow.tsx
-  - src/components/agents/AgentsPlatformView.tsx
-  - src/components/search/GlobalCommandModal.tsx
-  - src/stores/workspacePlatformStore.ts
-  - src/stores/agentsStore.ts
-  - src/stores/workspaceEditorStore.ts
-  - src/stores/workspaceUiStore.ts
+- src/components/tabbar/ControlBar.tsx
+- src/components/sidebar/PrimaryNavigationRail.tsx
+- src/components/sidebar/Sidebar.tsx
+- src/components/workspace/WorkspaceSidebar.tsx
+- src/components/workspace/WorkspaceMainPanel.tsx
+- src/components/workspace/WorkspaceGitPanel.tsx
+- src/components/workspace/WorkspaceSessionPickerModal.tsx
+- src/components/workspace/WorkspaceSessionPane.tsx
+- src/components/mfa/MfaFloatingWindow.tsx
+- src/components/agents/AgentsPlatformView.tsx
+- src/components/search/GlobalCommandModal.tsx
+- src/stores/workspacePlatformStore.ts
+- src/stores/agentsStore.ts
+- src/stores/workspaceEditorStore.ts
+- src/stores/workspaceUiStore.ts
 controls:
-  - id: workspace-add-folder
-    selector: '[data-testid="workspace-add-folder"]'
-    kind: interactive
-  - id: workspace-default-badge
-    selector: '[data-testid="workspace-default-badge"]'
-    kind: display
-  - id: workspace-file-editor
-    selector: '[data-testid="workspace-file-editor"]'
-    kind: display
-  - id: workspace-file-tree
-    selector: '[data-testid="workspace-file-tree"]'
-    kind: display
-  - id: workspace-fs-modal
-    selector: '[data-testid="workspace-fs-modal"]'
-    kind: display
-  - id: workspace-fs-modal-confirm
-    selector: '[data-testid="workspace-fs-modal-confirm"]'
-    kind: interactive
-  - id: workspace-fs-modal-input
-    selector: '[data-testid="workspace-fs-modal-input"]'
-    kind: display
-  - id: workspace-git-panel
-    selector: '[data-testid="workspace-git-panel"]'
-    kind: display
-  - id: workspace-main-panel
-    selector: '[data-testid="workspace-main-panel"]'
-    kind: display
-  - id: workspace-new-file
-    selector: '[data-testid="workspace-new-file"]'
-    kind: interactive
-  - id: workspace-new-folder
-    selector: '[data-testid="workspace-new-folder"]'
-    kind: interactive
-  - id: workspace-open-session-menu
-    selector: '[data-testid="workspace-open-session-menu"]'
-    kind: display
-  - id: workspace-open-session-plus
-    selector: '[data-testid="workspace-open-session-plus"]'
-    kind: interactive
-  - id: workspace-plus-local-terminal
-    selector: '[data-testid="workspace-plus-local-terminal"]'
-    kind: interactive
-  - id: workspace-plus-open-session
-    selector: '[data-testid="workspace-plus-open-session"]'
-    kind: interactive
-  - id: workspace-repo-selector
-    selector: '[data-testid="workspace-repo-selector"]'
-    kind: interactive
-  - id: workspace-session-pane
-    selector: '[data-testid="workspace-session-pane"]'
-    kind: display
-  - id: workspace-session-picker-filter-db
-    selector: '[data-testid="workspace-session-picker-filter-db"]'
-    kind: interactive
-  - id: workspace-session-picker-filter-desktop
-    selector: '[data-testid="workspace-session-picker-filter-desktop"]'
-    kind: interactive
-  - id: workspace-session-picker-filter-sftp
-    selector: '[data-testid="workspace-session-picker-filter-sftp"]'
-    kind: interactive
-  - id: workspace-session-picker-filter-ssh
-    selector: '[data-testid="workspace-session-picker-filter-ssh"]'
-    kind: interactive
-  - id: workspace-session-picker-modal
-    selector: '[data-testid="workspace-session-picker-modal"]'
-    kind: display
-  - id: workspace-session-picker-pin
-    selector: '[data-testid="workspace-session-picker-pin"]'
-    kind: interactive
-  - id: workspace-session-picker-row
-    selector: '[data-testid="workspace-session-picker-row"]'
-    kind: display
-  - id: workspace-session-picker-search
-    selector: '[data-testid="workspace-session-picker-search"]'
-    kind: interactive
-  - id: workspace-sidebar-git-bar
-    selector: '[data-testid="workspace-sidebar-git-bar"]'
-    kind: display
-  - id: workspace-sidebar-panel
-    selector: '[data-testid="workspace-sidebar-panel"]'
-    kind: display
-  - id: workspace-switcher
-    selector: '[data-testid="workspace-switcher"]'
-    kind: display
-  - id: workspace-switcher-button
-    selector: '[data-testid="workspace-switcher-button"]'
-    kind: interactive
-  - id: workspace-switcher-menu
-    selector: '[data-testid="workspace-switcher-menu"]'
-    kind: display
-  - id: workspace-tab
-    selector: '[data-testid="workspace-tab"]'
-    kind: interactive
-  - id: workspace-tab-strip
-    selector: '[data-testid="workspace-tab-strip"]'
-    kind: display
-  - id: workspace-tree-add-root
-    selector: '[data-testid="workspace-tree-add-root"]'
-    kind: interactive
-  - id: workspace-tree-copy-path
-    selector: '[data-testid="workspace-tree-copy-path"]'
-    kind: interactive
-  - id: workspace-tree-delete
-    selector: '[data-testid="workspace-tree-delete"]'
-    kind: interactive
-  - id: workspace-tree-file
-    selector: '[data-testid="workspace-tree-file"]'
-    kind: interactive
-  - id: workspace-tree-folder
-    selector: '[data-testid="workspace-tree-folder"]'
-    kind: interactive
-  - id: workspace-tree-new-file
-    selector: '[data-testid="workspace-tree-new-file"]'
-    kind: interactive
-  - id: workspace-tree-new-folder
-    selector: '[data-testid="workspace-tree-new-folder"]'
-    kind: interactive
-  - id: workspace-tree-remove-root
-    selector: '[data-testid="workspace-tree-remove-root"]'
-    kind: interactive
-  - id: workspace-tree-rename
-    selector: '[data-testid="workspace-tree-rename"]'
-    kind: interactive
-  - id: workspace-tree-root
-    selector: '[data-testid="workspace-tree-root"]'
-    kind: display
-  - id: workspace-session-picker-filter-all
-    selector: '[data-testid="workspace-session-picker-filter-all"]'
-    kind: interactive
+- id: workspace-add-folder
+  selector: '[data-testid="workspace-add-folder"]'
+  kind: interactive
+- id: workspace-default-badge
+  selector: '[data-testid="workspace-default-badge"]'
+  kind: display
+- id: workspace-file-editor
+  selector: '[data-testid="workspace-file-editor"]'
+  kind: display
+- id: workspace-file-tree
+  selector: '[data-testid="workspace-file-tree"]'
+  kind: display
+- id: workspace-fs-modal
+  selector: '[data-testid="workspace-fs-modal"]'
+  kind: display
+- id: workspace-fs-modal-confirm
+  selector: '[data-testid="workspace-fs-modal-confirm"]'
+  kind: interactive
+- id: workspace-fs-modal-input
+  selector: '[data-testid="workspace-fs-modal-input"]'
+  kind: display
+- id: workspace-git-panel
+  selector: '[data-testid="workspace-git-panel"]'
+  kind: display
+- id: workspace-main-panel
+  selector: '[data-testid="workspace-main-panel"]'
+  kind: display
+- id: workspace-new-file
+  selector: '[data-testid="workspace-new-file"]'
+  kind: interactive
+- id: workspace-new-folder
+  selector: '[data-testid="workspace-new-folder"]'
+  kind: interactive
+- id: workspace-open-session-menu
+  selector: '[data-testid="workspace-open-session-menu"]'
+  kind: display
+- id: workspace-open-session-plus
+  selector: '[data-testid="workspace-open-session-plus"]'
+  kind: interactive
+- id: workspace-plus-local-terminal
+  selector: '[data-testid="workspace-plus-local-terminal"]'
+  kind: interactive
+- id: workspace-plus-open-session
+  selector: '[data-testid="workspace-plus-open-session"]'
+  kind: interactive
+- id: workspace-repo-selector
+  selector: '[data-testid="workspace-repo-selector"]'
+  kind: interactive
+- id: workspace-session-pane
+  selector: '[data-testid="workspace-session-pane"]'
+  kind: display
+- id: workspace-session-picker-filter-db
+  selector: '[data-testid="workspace-session-picker-filter-db"]'
+  kind: interactive
+- id: workspace-session-picker-filter-desktop
+  selector: '[data-testid="workspace-session-picker-filter-desktop"]'
+  kind: interactive
+- id: workspace-session-picker-filter-sftp
+  selector: '[data-testid="workspace-session-picker-filter-sftp"]'
+  kind: interactive
+- id: workspace-session-picker-filter-ssh
+  selector: '[data-testid="workspace-session-picker-filter-ssh"]'
+  kind: interactive
+- id: workspace-session-picker-modal
+  selector: '[data-testid="workspace-session-picker-modal"]'
+  kind: display
+- id: workspace-session-picker-pin
+  selector: '[data-testid="workspace-session-picker-pin"]'
+  kind: interactive
+- id: workspace-session-picker-row
+  selector: '[data-testid="workspace-session-picker-row"]'
+  kind: display
+- id: workspace-session-picker-search
+  selector: '[data-testid="workspace-session-picker-search"]'
+  kind: interactive
+- id: workspace-sidebar-git-bar
+  selector: '[data-testid="workspace-sidebar-git-bar"]'
+  kind: display
+- id: workspace-sidebar-panel
+  selector: '[data-testid="workspace-sidebar-panel"]'
+  kind: display
+- id: workspace-switcher
+  selector: '[data-testid="workspace-switcher"]'
+  kind: display
+- id: workspace-switcher-button
+  selector: '[data-testid="workspace-switcher-button"]'
+  kind: interactive
+- id: workspace-switcher-menu
+  selector: '[data-testid="workspace-switcher-menu"]'
+  kind: display
+- id: workspace-tab
+  selector: '[data-testid="workspace-tab"]'
+  kind: interactive
+- id: workspace-tab-strip
+  selector: '[data-testid="workspace-tab-strip"]'
+  kind: display
+- id: workspace-tree-add-root
+  selector: '[data-testid="workspace-tree-add-root"]'
+  kind: interactive
+- id: workspace-tree-copy-path
+  selector: '[data-testid="workspace-tree-copy-path"]'
+  kind: interactive
+- id: workspace-tree-delete
+  selector: '[data-testid="workspace-tree-delete"]'
+  kind: interactive
+- id: workspace-tree-file
+  selector: '[data-testid="workspace-tree-file"]'
+  kind: interactive
+- id: workspace-tree-folder
+  selector: '[data-testid="workspace-tree-folder"]'
+  kind: interactive
+- id: workspace-tree-new-file
+  selector: '[data-testid="workspace-tree-new-file"]'
+  kind: interactive
+- id: workspace-tree-new-folder
+  selector: '[data-testid="workspace-tree-new-folder"]'
+  kind: interactive
+- id: workspace-tree-remove-root
+  selector: '[data-testid="workspace-tree-remove-root"]'
+  kind: interactive
+- id: workspace-tree-rename
+  selector: '[data-testid="workspace-tree-rename"]'
+  kind: interactive
+- id: workspace-tree-root
+  selector: '[data-testid="workspace-tree-root"]'
+  kind: display
+- id: workspace-session-picker-filter-all
+  selector: '[data-testid="workspace-session-picker-filter-all"]'
+  kind: interactive
+- id: workspace-file-filter
+  selector: '[data-testid="workspace-file-filter"]'
+  kind: interactive
+- id: workspace-linked-sessions
+  selector: '[data-testid="workspace-linked-sessions"]'
+  kind: display
+- id: workspace-linked-sessions-toggle
+  selector: '[data-testid="workspace-linked-sessions-toggle"]'
+  kind: interactive
+- id: workspace-link-session
+  selector: '[data-testid="workspace-link-session"]'
+  kind: interactive
+- id: workspace-linked-session
+  selector: '[data-testid="workspace-linked-session"]'
+  kind: interactive
+- id: workspace-editor-save
+  selector: '[data-testid="workspace-editor-save"]'
+  kind: interactive
+- id: workspace-switcher-option-default-workspace
+  selector: '[data-testid="workspace-switcher-option-default-workspace"]'
+  kind: interactive
+- id: workspace-switcher-option-second-workspace
+  selector: '[data-testid="workspace-switcher-option-second-workspace"]'
+  kind: interactive
 -->
 
 Workspaces 模式左栏提供工作区切换器（默认工作区不可删除）、多根文件树（新建文件/目录、添加/移除根目录）、工作区标签条与打开任意会话入口；画布内含编辑器、Git 面板与隔离会话。
@@ -12181,79 +12299,61 @@ controls:
 
 工作区可通过 + 菜单、Ctrl/Cmd+Alt+O 选择器与左栏 Sessions 工具窗口打开任意全局会话，运行实例与 Sessions 模式完全隔离。
 
-### 12.6 Agents Worktree 调度台与全局 Ctrl+K 命令面板
+### 12.6 Agents / Crew 开发中入口与全局 Ctrl+K 命令面板
 
 <!-- feature
 id: F-WS-6
 status: done
 area: main/workspace-platform
-components: [ControlBar, Sidebar, PrimaryNavigationRail, WorkspaceSidebar, WorkspaceMainPanel, MfaFloatingWindow, AgentsPlatformView, GlobalCommandModal]
+components:
+- ControlBar
+- Sidebar
+- PrimaryNavigationRail
+- WorkspaceSidebar
+- WorkspaceMainPanel
+- MfaFloatingWindow
+- AgentsPlatformView
+- GlobalCommandModal
 files:
-  - src/components/tabbar/ControlBar.tsx
-  - src/components/sidebar/PrimaryNavigationRail.tsx
-  - src/components/sidebar/Sidebar.tsx
-  - src/components/workspace/WorkspaceSidebar.tsx
-  - src/components/workspace/WorkspaceMainPanel.tsx
-  - src/components/workspace/WorkspaceGitPanel.tsx
-  - src/components/workspace/WorkspaceSessionPickerModal.tsx
-  - src/components/workspace/WorkspaceSessionPane.tsx
-  - src/components/mfa/MfaFloatingWindow.tsx
-  - src/components/agents/AgentsPlatformView.tsx
-  - src/components/search/GlobalCommandModal.tsx
-  - src/stores/workspacePlatformStore.ts
-  - src/stores/agentsStore.ts
-  - src/stores/workspaceEditorStore.ts
-  - src/stores/workspaceUiStore.ts
+- src/components/tabbar/ControlBar.tsx
+- src/components/sidebar/PrimaryNavigationRail.tsx
+- src/components/sidebar/Sidebar.tsx
+- src/components/workspace/WorkspaceSidebar.tsx
+- src/components/workspace/WorkspaceMainPanel.tsx
+- src/components/workspace/WorkspaceGitPanel.tsx
+- src/components/workspace/WorkspaceSessionPickerModal.tsx
+- src/components/workspace/WorkspaceSessionPane.tsx
+- src/components/mfa/MfaFloatingWindow.tsx
+- src/components/agents/AgentsPlatformView.tsx
+- src/components/search/GlobalCommandModal.tsx
+- src/stores/workspacePlatformStore.ts
+- src/stores/agentsStore.ts
+- src/stores/workspaceEditorStore.ts
+- src/stores/workspaceUiStore.ts
+- src/components/agents/comingSoon.ts
 controls:
-  - id: agents-dispatch-modal
-    selector: '[data-testid="agents-dispatch-modal"]'
-    kind: display
-  - id: agents-dispatch-model
-    selector: '[data-testid="agents-dispatch-model"]'
-    kind: interactive
-  - id: agents-dispatch-open
-    selector: '[data-testid="agents-dispatch-open"]'
-    kind: interactive
-  - id: agents-dispatch-submit
-    selector: '[data-testid="agents-dispatch-submit"]'
-    kind: interactive
-  - id: agents-dispatch-task-input
-    selector: '[data-testid="agents-dispatch-task-input"]'
-    kind: interactive
-  - id: agents-dispatch-workspace
-    selector: '[data-testid="agents-dispatch-workspace"]'
-    kind: interactive
-  - id: agents-empty-state
-    selector: '[data-testid="agents-empty-state"]'
-    kind: display
-  - id: agents-platform-view
-    selector: '[data-testid="agents-platform-view"]'
-    kind: display
-  - id: agents-review-in-git
-    selector: '[data-testid="agents-review-in-git"]'
-    kind: interactive
-  - id: agents-task-detail
-    selector: '[data-testid="agents-task-detail"]'
-    kind: display
-  - id: agents-trace
-    selector: '[data-testid="agents-trace"]'
-    kind: display
-  - id: global-search-input
-    selector: '[data-testid="global-search-input"]'
-    kind: interactive
-  - id: global-search-modal
-    selector: '[data-testid="global-search-modal"]'
-    kind: display
-  - id: global-search-result
-    selector: '[data-testid="global-search-result"]'
-    kind: display
-  - id: menu-export-sessions
-    selector: '[data-testid="menu-export-sessions"]'
-    kind: display
-  - id: open-tabs-filter
-    selector: '[data-testid="open-tabs-filter"]'
-    kind: interactive
+- id: agents-dispatch-open
+  selector: '[data-testid="agents-dispatch-open"]'
+  kind: interactive
+- id: agents-platform-view
+  selector: '[data-testid="agents-platform-view"]'
+  kind: display
+- id: global-search-input
+  selector: '[data-testid="global-search-input"]'
+  kind: interactive
+- id: global-search-modal
+  selector: '[data-testid="global-search-modal"]'
+  kind: display
+- id: global-search-result
+  selector: '[data-testid="global-search-result"]'
+  kind: display
+- id: menu-export-sessions
+  selector: '[data-testid="menu-export-sessions"]'
+  kind: display
+- id: open-tabs-filter
+  selector: '[data-testid="open-tabs-filter"]'
+  kind: interactive
 -->
 
-Agents 模式派发独立 Git Worktree 任务、展示沙箱策略与执行轨迹，并可跳转工作区 Git 面板审阅 Diff；全局 Ctrl/Cmd+K 命令面板检索工作区、会话与工具动作。
+按当前产品范围，Agents / Crew 各入口显示“开发中”提示并保留当前画布；任务编排暂缓。全局 Ctrl/Cmd+K 命令面板仍可检索工作区、会话与工具动作并执行跳转。
 

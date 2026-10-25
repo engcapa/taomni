@@ -2,8 +2,8 @@
   "version": 1,
   "totals": {
     "features_with_controls": 105,
-    "required": 1156,
-    "covered_required": 1120,
+    "required": 1147,
+    "covered_required": 1111,
     "shallow": 60,
     "orphans": 4
   },
@@ -529,8 +529,8 @@
       "shallow": 1
     },
     "F-WS-6": {
-      "required": 16,
-      "covered_required": 14,
+      "required": 7,
+      "covered_required": 5,
       "shallow": 2
     }
   }

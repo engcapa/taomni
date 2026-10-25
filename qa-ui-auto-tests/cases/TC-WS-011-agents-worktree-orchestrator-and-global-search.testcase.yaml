@@ -1,8 +1,7 @@
 id: TC-WS-011
-title: Agents worktree orchestrator, Git diff hand-off and the global Ctrl+K command palette
-description: v6.1 TASK-09. Agents mode dispatches a coding-agent task into an isolated Git worktree, shows the sandbox policy, task trace and pending-command gate,
-  and hands the diff to the workspace's built-in Git panel. The global command palette (rail/🔍 or Ctrl+K) searches workspaces, sessions and actions and runs the selected
-  entry.
+title: Agents / Crew placeholder from rail, Home and command palette; global search remains usable
+description: Agents / Crew is deferred by product scope. Each entry shows the development notice without changing the active canvas or creating tasks. Global
+  search still finds workspaces and tools, and executes selected entries.
 modes:
 - browser
 - native
@@ -21,33 +20,28 @@ steps:
 - vault_first_run: qa-ws-011
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="nav-mode-agents"]'
-- wait_for: '[data-testid="agents-platform-view"]'
-- assert_visible: '[data-testid="agents-empty-state"]'
-- click: '[data-testid="agents-dispatch-open"]'
-- wait_for: '[data-testid="agents-dispatch-modal"]'
-- assert_visible: '[data-testid="agents-dispatch-workspace"]'
-- assert_visible: '[data-testid="agents-dispatch-model"]'
-- fill:
-    selector: '[data-testid="agents-dispatch-task-input"]'
-    value: Fix the SFTP resume bug
-- click: '[data-testid="agents-dispatch-submit"]'
-- wait_for: '[data-testid="agents-task-detail"]'
+- wait_for: '[data-testid="alert-dialog-message"]'
 - assert_text:
-    selector: '[data-testid="agents-task-detail"]'
-    contains: Fix the SFTP resume bug
-- assert_text:
-    selector: '[data-testid="agents-task-detail"]'
-    contains: Workspace read/write allowed
-- assert_text:
-    selector: '[data-testid="agents-trace"]'
-    contains: worktree
-- assert_visible: '[data-testid="agents-review-in-git"]'
-- click: '[data-testid="agents-review-in-git"]'
-- wait_for: '[data-testid="workspace-git-panel"]'
-- assert_visible: '[data-testid="workspace-tab"][data-tab-kind="git"]'
+    selector: '[data-testid="alert-dialog-message"]'
+    contains: under development
+- click: '[data-testid="alert-dialog-ok"]'
+- assert_visible: '[data-testid="session-tree"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="home-open-agents"]'
+- wait_for: '[data-testid="alert-dialog-message"]'
+- click: '[data-testid="alert-dialog-ok"]'
+- assert_visible: '[data-testid="welcome-panel"]'
 - click: '[data-testid="global-search-trigger"]'
 - wait_for: '[data-testid="global-search-modal"]'
-- assert_visible: '[data-testid="global-search-input"]'
+- fill:
+    selector: '[data-testid="global-search-input"]'
+    value: agents
+- click: '[data-testid="global-search-result"][data-result-id="mode-agents"]'
+- wait_for: '[data-testid="alert-dialog-message"]'
+- click: '[data-testid="alert-dialog-ok"]'
+- assert_not_visible: '[data-testid="alert-dialog-message"]'
+- press: Mod+k
+- wait_for: '[data-testid="global-search-modal"]'
 - fill:
     selector: '[data-testid="global-search-input"]'
     value: mfa
@@ -56,85 +50,97 @@ steps:
     selector: '[data-testid="global-search-input"]'
     value: Default Workspace
 - wait_for: '[data-testid="global-search-result"][data-kind="workspace"]'
-- press: Escape
+- press: Enter
+- wait_for: '[data-testid="workspace-switcher"]'
 - assert_not_visible: '[data-testid="global-search-modal"]'
 - press: Mod+k
 - wait_for: '[data-testid="global-search-modal"]'
 - press: Escape
 - assert_not_visible: '[data-testid="global-search-modal"]'
-- screenshot: ws-011-agents-and-global-search.png
+- screenshot: ws-011-agents-placeholder-and-global-search.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Agents 模式派发任务后展示独立 Worktree 路径、分支、沙箱策略、实时轨迹与待授权命令入口。
+    requirement: 主导航、Home 卡片和全局命令面板的 Agents 入口均提示开发中，关闭后保留原视图。
     actions:
+    - 1
+    - 2
     - 4
-    - 5
-    - 6
     - 7
-    - 8
     - 9
     - 10
-    - 11
     - 12
-    - 13
-    checkpoints:
-    - step: 5
-      expectation: Agents 调度台渲染
-    - step: 13
-      expectation: 派发后任务详情渲染
-    - step: 14
-      expectation: 任务文本与沙箱策略可见
-    - step: 16
-      expectation: 轨迹包含 worktree 信息且审阅按钮可用
-    results:
-    - 5
-    - 13
     - 14
-  - id: R2
-    requirement: “在 Git 面板审阅 Diff”跳转到 Workspaces 内置 Git 面板并激活 GIT 标签。
-    actions:
+    - 16
     - 17
-    - 18
-    checkpoints:
-    - step: 19
-      expectation: 工作区 Git 面板出现
-    results:
     - 19
-  - id: R3
-    requirement: 全局命令面板由 🔍 与 Ctrl/Cmd+K 打开，可检索工具动作与工作区并关闭。
-    actions:
+    checkpoints:
+    - step: 3
+      expectation: 'wait_for: [data-testid="welcome-panel"]'
+    - step: 5
+      expectation: 'wait_for: [data-testid="alert-dialog-message"]'
+    - step: 6
+      expectation: 'assert_text: [data-testid="alert-dialog-message"]'
+    - step: 8
+      expectation: 'assert_visible: [data-testid="session-tree"]'
+    - step: 11
+      expectation: 'wait_for: [data-testid="alert-dialog-message"]'
+    - step: 13
+      expectation: 'assert_visible: [data-testid="welcome-panel"]'
+    - step: 15
+      expectation: 'wait_for: [data-testid="global-search-modal"]'
+    - step: 18
+      expectation: 'wait_for: [data-testid="alert-dialog-message"]'
+    - step: 20
+      expectation: 关闭后 [data-testid="alert-dialog-message"] 隐藏
+    results:
+    - 3
+    - 5
+    - 6
+    - 8
+    - 11
+    - 13
+    - 15
+    - 18
     - 20
+  - id: R2
+    requirement: Ctrl/Cmd+K 全局搜索保留工具与工作区检索，Enter 跳转工作区，Escape 关闭。
+    actions:
     - 21
-    - 22
     - 23
-    - 24
     - 25
-    - 26
     - 27
-    - 28
-    - 29
     - 30
+    - 32
     checkpoints:
     - step: 22
-      expectation: 命令面板打开
-    - step: 25
-      expectation: 搜索到 MFA 工具动作
-    - step: 27
-      expectation: 搜索到 Default Workspace
+      expectation: 'wait_for: [data-testid="global-search-modal"]'
+    - step: 24
+      expectation: 'wait_for: [data-testid="global-search-result"][data-result-id="floating-mfa"]'
+    - step: 26
+      expectation: 'wait_for: [data-testid="global-search-result"][data-kind="workspace"]'
+    - step: 28
+      expectation: 'wait_for: [data-testid="workspace-switcher"]'
+    - step: 29
+      expectation: 'assert_not_visible: [data-testid="global-search-modal"]'
     - step: 31
-      expectation: Ctrl/Cmd+K 再次打开
+      expectation: 'wait_for: [data-testid="global-search-modal"]'
+    - step: 33
+      expectation: 'assert_not_visible: [data-testid="global-search-modal"]'
     results:
     - 22
-    - 25
-    - 27
+    - 24
+    - 26
+    - 28
+    - 29
     - 31
+    - 33
   visual:
-  - check: Agents 双栏布局、策略横幅与命令面板层级清晰。
+  - check: 与 HTML 原型比较圆角框架、紧凑尺寸、无溢出和可用操作入口。
     method: manual
-    reason: 视觉层级与信息密度需要截图评审。
+    reason: 保留运行截图供视觉对比，自动断言验证具体布局和状态。
   native:
-  - check: 真实 WebView 中派发任务与命令面板快捷键一致。
+  - check: 在真实桌面 WebView 验证布局与持久化；终端用例额外验证真实 PTY，编辑器用例验证真实磁盘写入。
     method: automated
-    reason: 用例声明 browser 与 native 两种模式。
+    reason: 浏览器存根不能证明 WebKit/WebView2 渲染与原生磁盘、进程行为。

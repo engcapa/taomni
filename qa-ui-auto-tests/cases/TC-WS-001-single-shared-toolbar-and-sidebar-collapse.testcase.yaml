@@ -1,7 +1,7 @@
 id: TC-WS-001
 title: Single shared 33px toolbar with left/right sidebar collapse and Ctrl+B
-description: v6.1 AC-01 / DEC-01. The main window renders exactly one 33px ControlBar (data-testid control-bar) with no second title row and no decorative three-dot
-  chrome. The left collapse toggle (◧, Ctrl+B / Cmd+B) and the right toggle (◨) drive the sidebar state, and the global search trigger is present.
+description: 'Prototype shell: a full-height rail beside aligned rounded navigator and main canvas, one 33px toolbar inside the canvas, 6px gutters and
+  functional sidebar toggles.'
 modes:
 - browser
 - native
@@ -32,6 +32,11 @@ steps:
 - eval_readonly:
     expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"control-bar"]').getBoundingClientRect().height <= 34
     expect_truthy: true
+- eval_readonly:
+    expression: Math.abs(document.querySelector('.taomni-navigator-frame').getBoundingClientRect().top - document.querySelector('.taomni-main-canvas-frame').getBoundingClientRect().top)
+      < 1 && document.querySelector('.taomni-platform-resizer').getBoundingClientRect().width === 6
+    expect_truthy: true
+- assert_visible: '[data-testid="sidebar-rail"] [data-testid="rail-app-menu-host"]'
 - click: '[data-testid="toggle-left-sidebar"]'
 - wait_for: '[data-testid="collapsed-sidebar-rail"]'
 - press: Mod+b
@@ -49,56 +54,70 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 主窗口只有一行不超过 34px 的共享 ControlBar，无第二行顶栏和右上角装饰圆点，左右收缩按钮与全局搜索可见。
+    requirement: 单行 33px 工具栏位于主画布中；侧栏与画布顶部对齐，6px 分隔条，菜单在全高主导航条。
     actions:
+    - 1
+    - 2
+    checkpoints:
+    - step: 3
+      expectation: 'wait_for: [data-testid="welcome-panel"]'
+    - step: 4
+      expectation: 'assert_count: [data-testid="control-bar"]'
+    - step: 5
+      expectation: 'assert_visible: [data-testid="toggle-left-sidebar"]'
+    - step: 6
+      expectation: 'assert_visible: [data-testid="window-drag-handle"]'
+    - step: 7
+      expectation: 'assert_visible: [data-testid="global-search-trigger"]'
+    - step: 8
+      expectation: 'assert_visible: [data-testid="toggle-right-sidebar"]'
+    - step: 9
+      expectation: 'assert_visible: [data-testid="titlebar-tray"]'
+    - step: 10
+      expectation: 'eval_readonly: document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''"control-bar"]'').getBoundingClientRect().height
+        <= 34'
+    - step: 11
+      expectation: 'eval_readonly: Math.abs(document.querySelector(''.taomni-navigator-frame'').getBoundingClientRect().top - document.querySelector(''.taomni-main-canvas-frame'').getBoundingClientRect().top)
+        < 1 && document.querySelector(''.taomni-platform-resizer'').getBoundingClientRect().width === 6'
+    - step: 12
+      expectation: 'assert_visible: [data-testid="sidebar-rail"] [data-testid="rail-app-menu-host"]'
+    results:
+    - 3
     - 4
     - 5
     - 6
     - 7
     - 8
     - 9
-    checkpoints:
-    - step: 4
-      expectation: 仅存在一个 control-bar
-    - step: 5
-      expectation: 左栏收缩按钮可见
-    - step: 7
-      expectation: 全局搜索按钮可见
-    - step: 8
-      expectation: 右栏收缩按钮可见
-    - step: 10
-      expectation: 顶栏高度 <= 34px 且无额外顶栏/装饰圆点
-    results:
     - 10
-  - id: R2
-    requirement: 点击 ◧ 或按 Ctrl/Cmd+B 折叠主侧栏，再次触发恢复展开；◨ 切换右侧上下文栏。
-    actions:
     - 11
     - 12
+  - id: R2
+    requirement: 左右侧栏按钮与 Ctrl/Cmd+B 可收起恢复，不丢失导航条。
+    actions:
     - 13
-    - 14
     - 15
-    - 16
     - 17
+    - 19
     checkpoints:
-    - step: 12
-      expectation: 折叠后 collapsed-sidebar-rail 出现
     - step: 14
-      expectation: Ctrl/Cmd+B 后展开面板出现
+      expectation: 'wait_for: [data-testid="collapsed-sidebar-rail"]'
     - step: 16
-      expectation: 首次点击后右侧上下文栏显示
+      expectation: 'wait_for: [data-testid="expanded-sidebar-panel"]'
     - step: 18
-      expectation: 再次点击后右侧上下文栏隐藏
+      expectation: 'assert_count: [data-testid="right-sidebar"]'
+    - step: 20
+      expectation: 'assert_count: [data-testid="right-sidebar"]'
     results:
-    - 12
     - 14
     - 16
     - 18
+    - 20
   visual:
-  - check: 顶栏为单行紧凑布局，按钮与标签不截断；无第二顶栏和 3 色装饰圆点。
+  - check: 与 HTML 原型比较圆角框架、紧凑尺寸、无溢出和可用操作入口。
     method: manual
-    reason: 视觉对齐需要截图人工评审。
+    reason: 保留运行截图供视觉对比，自动断言验证具体布局和状态。
   native:
-  - check: 在真实桌面 WebView 中验证单行顶栏高度、按钮点击与窗口拖拽区。
+  - check: 在真实桌面 WebView 验证布局与持久化；终端用例额外验证真实 PTY，编辑器用例验证真实磁盘写入。
     method: automated
-    reason: 本用例声明 browser 与 native 两种模式，按实际执行模式采集证据。
+    reason: 浏览器存根不能证明 WebKit/WebView2 渲染与原生磁盘、进程行为。

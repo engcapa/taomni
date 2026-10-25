@@ -1,5 +1,5 @@
 import { FilePlus2, FolderPlus, MonitorSmartphone, X } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CodeWorkspaceTab } from "../editor/CodeWorkspaceTab";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { useT } from "../../lib/i18n";
@@ -36,9 +36,28 @@ const DOCK_TOOLS: WorkspaceBottomTool[] = [
  * surface, and the legacy Code Workspace editor stays available as its own tab
  * for full IDEA parity. A collapsible bottom dock mirrors IDEA's tool windows.
  */
-export function WorkspaceMainPanel() {
+export function WorkspaceMainPanel({ visible = true }: { visible?: boolean }) {
+  const workspaces = useWorkspacePlatformStore((s) => s.workspaces);
+  const activeId = useWorkspacePlatformStore((s) => s.activeWorkspaceId);
+  return (
+    <div data-testid="workspace-main-panel" className="relative flex min-h-0 flex-1 flex-col">
+      {workspaces.map((workspace) => (
+        <WorkspaceCanvas key={workspace.id} workspaceId={workspace.id} visible={visible && workspace.id === activeId} />
+      ))}
+    </div>
+  );
+}
+
+function WorkspaceCanvas({ workspaceId, visible }: { workspaceId: string; visible: boolean }) {
+  const [started, setStarted] = useState(visible);
+  useEffect(() => { if (visible) setStarted(true); }, [visible]);
+  if (!started && !visible) return null;
+  return <WorkspaceCanvasContents workspaceId={workspaceId} visible={visible} />;
+}
+
+function WorkspaceCanvasContents({ workspaceId, visible }: { workspaceId: string; visible: boolean }) {
   const t = useT();
-  const workspace = useWorkspacePlatformStore((s) => s.workspaces.find((candidate) => candidate.id === s.activeWorkspaceId));
+  const workspace = useWorkspacePlatformStore((s) => s.workspaces.find((candidate) => candidate.id === workspaceId));
   const openFileInWorkspace = useWorkspacePlatformStore((s) => s.openFileInWorkspace);
   const openGitTab = useWorkspacePlatformStore((s) => s.openGitTab);
   const openLocalTerminal = useWorkspacePlatformStore((s) => s.openLocalTerminalInWorkspace);
@@ -103,7 +122,7 @@ export function WorkspaceMainPanel() {
   };
 
   return (
-    <div data-testid="workspace-main-panel" data-workspace-id={workspace.id} className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col">
+    <div data-workspace-id={workspace.id} className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col" style={{ display: visible ? "flex" : "none" }}>
       <div className="relative flex min-h-0 flex-1">
         {!activeTab && codeTab === undefined && (
           <div data-testid="workspace-empty-state" className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
@@ -134,7 +153,7 @@ export function WorkspaceMainPanel() {
             key={tab.id}
             workspace={workspace}
             tab={tab}
-            visible={activeTab?.id === tab.id}
+            visible={visible && activeTab?.id === tab.id}
             onOpenGitDiff={(path) => openGitTab(workspace.id, path)}
           />
         ))}
@@ -143,7 +162,7 @@ export function WorkspaceMainPanel() {
           <div key={tab.id} className="h-full min-h-0 w-full" style={{ display: activeTab?.id === tab.id ? "block" : "none" }}>
             <WorkspaceGitPanel
               workspace={workspace}
-              visible={activeTab?.id === tab.id}
+              visible={visible && activeTab?.id === tab.id}
               focusPath={tab.focusPath}
               onOpenFile={(rootId, path) => openFileInWorkspace(workspace.id, { rootId, path })}
             />
@@ -152,7 +171,7 @@ export function WorkspaceMainPanel() {
 
         {workspace.openTabs.filter((tab) => ["terminal", "sftp", "database", "rdp", "vnc"].includes(tab.kind)).map((tab) => (
           <div key={tab.id} className="h-full min-h-0 w-full" style={{ display: activeTab?.id === tab.id ? "block" : "none" }}>
-            <WorkspaceSessionPane workspace={workspace} tab={tab} visible={activeTab?.id === tab.id} />
+            <WorkspaceSessionPane workspace={workspace} tab={tab} visible={visible && activeTab?.id === tab.id} />
           </div>
         ))}
 
@@ -165,7 +184,7 @@ export function WorkspaceMainPanel() {
             <CodeWorkspaceTab
               tabId={codeTab.id}
               workspace={codeWorkspaceInfo}
-              visible={activeTab?.id === codeTab.id}
+              visible={visible && activeTab?.id === codeTab.id}
               onOpenGitManager={(payload) => {
                 const firstWithChanges = payload.roots[0];
                 void firstWithChanges;
@@ -210,7 +229,7 @@ export function WorkspaceMainPanel() {
           </div>
           <div className="min-h-0 flex-1 overflow-auto" data-testid="workspace-dock-content" data-tool={dock.activeTool}>
             {dock.activeTool === "terminal" ? (
-              <TerminalPanel tabId={`${workspace.id}:dock-terminal`} tabTitle="Workspace terminal" />
+              <TerminalPanel tabId={`${workspace.id}:dock-terminal`} tabTitle="Workspace terminal" visible={visible} />
             ) : (
               <div className="p-3 text-[11.5px]" style={{ color: "var(--taomni-text-muted)" }}>
                 {t("platform.emptyWorkspaceHint")}
@@ -221,11 +240,11 @@ export function WorkspaceMainPanel() {
       )}
 
       <WorkspaceSessionPickerModal
-        open={sessionPickerOpen}
+        open={visible && sessionPickerOpen}
         workspaceId={sessionPickerWorkspaceId ?? workspace.id}
         onClose={closeSessionPicker}
       />
-      <WorkspaceFsModals request={fsModal} onCancel={closeFsModal} onSubmit={submitFsModal} />
+      <WorkspaceFsModals request={visible ? fsModal : null} onCancel={closeFsModal} onSubmit={submitFsModal} />
     </div>
   );
 }

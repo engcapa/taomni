@@ -57,13 +57,13 @@ export function SessionsSidebarPanel({
         <IconBtn testId="session-refresh" title={t("sidebar.refreshTitle")} icon={<RefreshCw className="w-3.5 h-3.5" />} onClick={() => void loadSessions()} />
         <IconBtn testId="session-favorite" title={t("sidebar.favoriteTitle")} icon={<Star className="w-3.5 h-3.5" />} onClick={handleFavorite} disabled={selectionCount === 0} />
         <div className="flex-1" />
-        <div className="relative">
+        <div className="relative min-w-[60px] flex-1">
           <Search className="w-3 h-3 absolute left-1.5 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
           <input
             type="search"
             data-testid="session-search"
             aria-label={t("sidebar.searchSessions")}
-            className="taomni-input pl-6 w-[140px]"
+            className="taomni-input pl-6 w-full min-w-0"
             style={{ paddingLeft: "24px" }}
             placeholder={t("sidebar.searchPlaceholder")}
             value={searchQuery}

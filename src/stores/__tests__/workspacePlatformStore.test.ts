@@ -170,7 +170,7 @@ describe("workspacePlatformStore (TASK-01)", () => {
 
     useAppStore.getState().setFloatingMfaPosition(99999, 99999);
     const clamped = useAppStore.getState().floatingMfa.position;
-    expect(clamped.left).toBeLessThanOrEqual(window.innerWidth - 310);
+    expect(clamped.left).toBeLessThanOrEqual(window.innerWidth - 280);
     expect(clamped.bottom).toBeLessThanOrEqual(window.innerHeight);
 
     useAppStore.getState().setFloatingMfaPinned(true);

@@ -31,32 +31,32 @@ steps:
   - eval_readonly:
       expression: document.querySelector('.taomni-window-drag-handle').getBoundingClientRect().bottom <= document.querySelector('button[data-tool-window-id]').getBoundingClientRect().top
       expect_truthy: true
-  - assert_count: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"] svg', equal: 1}
-  - assert_count: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"] svg', equal: 1}
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]', equals: Sessions}
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', equals: Tools}
-  - press: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', key: Enter}
+  - assert_count: {selector: '[data-testid="side-tab-sessions"] svg', equal: 1}
+  - assert_count: {selector: '[data-testid="side-tab-tools"] svg', equal: 1}
+  - assert_text_equals: {selector: '[data-testid="side-tab-sessions"]', equals: Sessions}
+  - assert_text_equals: {selector: '[data-testid="side-tab-tools"]', equals: Tools}
+  - press: {selector: '[data-testid="side-tab-tools"]', key: Enter}
   - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - assert_attribute: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', name: aria-pressed, equals: 'true'}
-  - press: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', key: Space}
+  - assert_attribute: {selector: '[data-testid="side-tab-tools"]', name: aria-pressed, equals: 'true'}
+  - press: {selector: '[data-testid="side-tab-tools"]', key: Space}
   - wait_for: '[data-testid="collapsed-sidebar-rail"]'
-  - assert_attribute: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]', name: aria-pressed, equals: 'false'}
+  - assert_attribute: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]', name: aria-pressed, equals: 'true'}
   - press: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-sessions"]', key: Enter}
   - wait_for: '[data-testid="session-tree"]'
-  - assert_attribute: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]', name: aria-pressed, equals: 'true'}
-  - right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
+  - assert_attribute: {selector: '[data-testid="side-tab-sessions"]', name: aria-pressed, equals: 'true'}
+  - right_click: '[data-testid="side-tab-tools"]'
   - click: '[data-testid="sidebar-rail-menu-show-names"]'
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]', equals: ''}
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', equals: ''}
-  - assert_attribute: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]', name: aria-label, equals: Sessions}
+  - assert_text_equals: {selector: '[data-testid="side-tab-sessions"]', equals: ''}
+  - assert_text_equals: {selector: '[data-testid="side-tab-tools"]', equals: ''}
+  - assert_attribute: {selector: '[data-testid="side-tab-sessions"]', name: aria-label, equals: Sessions}
   - assert_localstorage: {key: taomni.codeWorkspace.toolWindowStripes.v1, contains: '"showNames":false'}
   - reload_window: null
   - wait_for: '[data-testid="session-tree"]'
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]', equals: ''}
-  - right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
+  - assert_text_equals: {selector: '[data-testid="side-tab-sessions"]', equals: ''}
+  - right_click: '[data-testid="side-tab-sessions"]'
   - click: '[data-testid="sidebar-rail-menu-show-names"]'
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', equals: Tools}
-  - click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
+  - assert_text_equals: {selector: '[data-testid="side-tab-tools"]', equals: Tools}
+  - click: '[data-testid="side-tab-tools"]'
   - click: '[data-testid="sidebar-tool-code-workspace"]'
   - wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
   - assert_visible: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-sessions"]'
@@ -93,22 +93,22 @@ steps:
   - click: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-sessions"]'
   - wait_for: '[data-testid="session-tree"]'
   - assert_visible: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
-  - dblclick: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
+  - dblclick: '[data-testid="side-tab-sessions"]'
   - wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'
   - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-  - assert_visible: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
-  - assert_visible: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
+  - assert_visible: '[data-testid="side-tab-sessions"]'
+  - assert_visible: '[data-testid="side-tab-tools"]'
   - eval_readonly:
       expression: document.querySelector('.taomni-control-bar .taomni-window-drag-handle').getBoundingClientRect().height <= 32 && getComputedStyle(document.querySelector('.taomni-main-window')).paddingLeft === '0px'
       expect_truthy: true
   - screenshot: main-rail-welcome.png
-  - right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]'
+  - right_click: '[data-testid="ribbon-settings"]'
   - click: '[data-testid="sidebar-rail-menu-show-names"]'
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]', equals: ''}
-  - right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]'
+  - assert_text_equals: {selector: '[data-testid="ribbon-settings"]', equals: ''}
+  - right_click: '[data-testid="ribbon-settings"]'
   - click: '[data-testid="sidebar-rail-menu-show-names"]'
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]', equals: Settings}
-  - press: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]', key: Enter}
+  - assert_text_equals: {selector: '[data-testid="ribbon-settings"]', equals: Settings}
+  - press: {selector: '[data-testid="ribbon-settings"]', key: Enter}
   - wait_for: '[data-testid="settings-panel"]'
   - click: '[data-testid="tab-item"][data-tab-type="welcome"]'
   - click: '[data-testid="welcome-open-local-terminal"]'

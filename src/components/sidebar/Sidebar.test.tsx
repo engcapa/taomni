@@ -8,7 +8,7 @@ import { defaultStripeSettings } from "../editor/workspace/toolWindowLayout";
 
 beforeEach(() => {
   useAppStore.setState({ activeSideTab: "sessions", sidebarCollapsed: false });
-  useToolWindowStripeStore.setState({ settings: defaultStripeSettings() });
+  useToolWindowStripeStore.setState({ settings: { ...defaultStripeSettings(), showNames: true } });
 });
 
 afterEach(() => {
@@ -37,7 +37,7 @@ describe("Sidebar rail (ED-PARITY-027)", () => {
     const tools = screen.getByTestId("side-tab-tools");
     expect(sessions.tagName).toBe("BUTTON");
     expect(tools.querySelector("svg")).toBeTruthy();
-    expect(sessions).toHaveAttribute("aria-pressed", "false");
+    expect(sessions).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(tools);
     expect(useAppStore.getState()).toMatchObject({ activeSideTab: "tools", sidebarCollapsed: false });
     rerender(<Sidebar />);
@@ -59,7 +59,7 @@ describe("Sidebar rail (ED-PARITY-027)", () => {
     fireEvent.click(screen.getByTestId("sidebar-rail-menu-show-names"));
     expect(useToolWindowStripeStore.getState().settings.showNames).toBe(false);
     expect(JSON.parse(localStorage.getItem("taomni.codeWorkspace.toolWindowStripes.v1")!).showNames).toBe(false);
-    expect(screen.getByTestId("sidebar-rail")).toHaveStyle({ width: "40px" });
+    expect(screen.getByTestId("sidebar-rail")).toHaveStyle({ width: "42px" });
     expect(screen.getByTestId("side-tab-sessions").textContent).toBe("");
     expect(screen.getByTestId("side-tab-tools")).toHaveAttribute("aria-label");
     rerender(<Sidebar />);

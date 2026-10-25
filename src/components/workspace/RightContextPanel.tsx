@@ -1,3 +1,4 @@
+import { useContextPanelWidth } from "./useContextPanelWidth";
 import { Bot, X } from "lucide-react";
 import { useState } from "react";
 import { useT } from "../../lib/i18n";
@@ -15,6 +16,7 @@ import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
  */
 export function RightContextPanel() {
   const t = useT();
+  const panelWidth = useContextPanelWidth();
   const collapsed = useAppStore((s) => s.rightSidebarCollapsed);
   const toggleRightSidebar = useAppStore((s) => s.toggleRightSidebar);
   const setDrawerOpen = useChatStore((s) => s.setDrawerOpen);
@@ -29,12 +31,14 @@ export function RightContextPanel() {
   const symbols = document ? outlineSymbols(document.text, 120) : [];
 
   return (
+    <>
+    <div data-testid="right-sidebar-resize-handle" role="separator" tabIndex={0} aria-label={t("platform.toggleRightSidebar")} aria-orientation="vertical" aria-valuenow={panelWidth.width} aria-valuemin={220} aria-valuemax={480} className="taomni-platform-resizer" onPointerDown={panelWidth.onPointerDown} onKeyDown={panelWidth.onKeyDown} onDoubleClick={panelWidth.reset} />
     <aside
       data-testid="right-sidebar"
-      className="flex h-full w-[280px] shrink-0 flex-col border-l"
-      style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-sidebar-bg)" }}
+      className="taomni-right-context-frame flex h-full shrink-0 flex-col"
+      style={{ width: panelWidth.width, maxWidth: "40vw" }}
     >
-      <div className="flex h-7 shrink-0 items-center gap-1 border-b px-2" style={{ borderColor: "var(--taomni-divider)" }}>
+      <div className="flex h-[33px] shrink-0 items-center gap-1 border-b px-2" style={{ borderColor: "var(--taomni-divider)" }}>
         <button
           type="button"
           data-testid="right-sidebar-structure-tab"
@@ -92,5 +96,6 @@ export function RightContextPanel() {
         )}
       </div>
     </aside>
+    </>
   );
 }

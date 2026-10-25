@@ -37,6 +37,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tab
       return {
         tabs: nextTabs,
         activeTabId: tab.id,
+        activeSideTab: ["home", "workspaces", "agents"].includes(s.activeSideTab) ? "sessions" : s.activeSideTab,
         recentWorkspaces: recentResult.recentWorkspaces,
         recentWorkspaceIdByWorkspaceInstance: recentResult.recentWorkspaceIdByWorkspaceInstance,
         // A freshly opened tab must be visible, so drop any active focus filter.
@@ -279,6 +280,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tab
       }
       return {
         activeTabId: id,
+        activeSideTab: s.activeSideTab === "home" || s.activeSideTab === "workspaces" || s.activeSideTab === "agents" ? "sessions" : s.activeSideTab,
         recentWorkspaces: recentResult.recentWorkspaces,
         recentWorkspaceIdByWorkspaceInstance: recentResult.recentWorkspaceIdByWorkspaceInstance,
         terminalSplitActive: tab?.type === "terminal" ? s.terminalSplitActive : false,

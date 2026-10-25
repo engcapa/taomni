@@ -1,8 +1,8 @@
 id: TC-WS-007
 title: Open any global session inside a workspace and keep runtime instances isolated
-description: v6.1 AC-07 / DEC-04. Workspaces mode opens global sessions that are not linked to the workspace through the tab-strip + menu, the Ctrl+Alt+O picker and
-  the rail Sessions tool window. The workspace-owned instance lives only in the workspace's tab list, so opening/closing it never creates, closes or reconnects the
-  Sessions-mode tab for the same saved session.
+description: v6.1 AC-07 / DEC-04. Workspaces mode opens global sessions that are not linked to the workspace through the tab-strip + menu, the Ctrl+Alt+O
+  picker and the rail Sessions tool window. The workspace-owned instance lives only in the workspace's tab list, so opening/closing it never creates, closes
+  or reconnects the Sessions-mode tab for the same saved session.
 modes:
 - browser
 - native
@@ -94,6 +94,20 @@ steps:
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="workspace-open-session-plus"]'
 - screenshot: ws-007-workspace-isolated-session.png
+- assert_visible: '[data-testid="workspace-linked-session"]'
+- click: '[data-testid="workspace-linked-sessions-toggle"]'
+- assert_not_visible: '[data-testid="workspace-linked-session"]'
+- click: '[data-testid="workspace-linked-sessions-toggle"]'
+- assert_visible: '[data-testid="workspace-linked-session"]'
+- click: '[data-testid="workspace-link-session"]'
+- wait_for: '[data-testid="workspace-session-picker-modal"]'
+- press: Escape
+- assert_not_visible: '[data-testid="workspace-session-picker-modal"]'
+- click: '[data-testid="workspace-linked-session"]'
+- assert_text:
+    selector: '[data-testid="workspace-tab-strip"]'
+    contains: prod-api-01
+- assert_visible: '[data-testid="workspace-session-pane"][data-session-id]'
 verification:
   review: reviewed
   requirements:
@@ -183,6 +197,37 @@ verification:
       expectation: 步骤 47 的断言通过
     results:
     - 48
+  - id: R4
+    requirement: 项目常用会话区域支持收起/展开，添加入口打开选择器，点击已关联会话恢复独立实例。
+    actions:
+    - 55
+    - 57
+    - 59
+    - 61
+    - 63
+    checkpoints:
+    - step: 54
+      expectation: '[data-testid="workspace-linked-session"]'
+    - step: 56
+      expectation: '[data-testid="workspace-linked-session"]'
+    - step: 58
+      expectation: '[data-testid="workspace-linked-session"]'
+    - step: 60
+      expectation: '[data-testid="workspace-session-picker-modal"]'
+    - step: 62
+      expectation: '[data-testid="workspace-session-picker-modal"]'
+    - step: 64
+      expectation: '{''selector'': ''[data-testid="workspace-tab-strip"]'', ''contains'': ''prod-api-01''}'
+    - step: 65
+      expectation: '[data-testid="workspace-session-pane"]'
+    results:
+    - 54
+    - 56
+    - 58
+    - 60
+    - 62
+    - 64
+    - 65
   visual:
   - check: 工作区标签条只显示工作区实例，Sessions 模式标签条不混入工作区会话。
     method: manual

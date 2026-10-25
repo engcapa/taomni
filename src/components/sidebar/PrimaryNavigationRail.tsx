@@ -1,7 +1,6 @@
 import {
   Bot,
   Boxes,
-  FolderPlus,
   FolderTree,
   GitBranch,
   Home,
@@ -15,6 +14,8 @@ import {
   Wrench,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
+import { useMainRailHostStore } from "../../stores/mainRailHostStore";
+import { showAgentsComingSoon } from "../agents/comingSoon";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
 import { ScreenshotMenuButton } from "../screenshot/ScreenshotMenuButton";
 import { ToolWindowRailButton, ToolWindowRailResizeHandle } from "../editor/workspace/panels/ToolWindowRail";
@@ -56,9 +57,9 @@ export function PrimaryNavigationRail({
   compact = false,
   railHostRef,
   onOpenSettings,
-  onOpenWorkspaceSessionPicker,
 }: PrimaryNavigationRailProps) {
   const t = useT();
+  const setMenuHost = useMainRailHostStore((s) => s.setMenuHost);
   const { mode: themeMode, setMode: setThemeMode } = useAppTheme();
   const themeLabel = useAppThemeI18nLabel();
   const activeSideTab = useAppStore((s) => s.activeSideTab);
@@ -97,6 +98,10 @@ export function PrimaryNavigationRail({
   ];
 
   const activateMode = (mode: PrimaryNavMode, clickCount = 0) => {
+    if (mode === "agents") {
+      showAgentsComingSoon();
+      return;
+    }
     if (clickCount > 1) {
       setSidebarCollapsed(true);
       return;
@@ -166,9 +171,8 @@ export function PrimaryNavigationRail({
         data-show-names={showNames || undefined}
         className="relative flex min-h-0 flex-col shrink-0"
         style={{
-          width: effectiveStripeWidth(stripeSettings, "left"),
-          background: "var(--taomni-tab-inactive)",
-          boxShadow: "inset -1px 0 0 var(--taomni-sidebar-border)",
+          width: showNames ? effectiveStripeWidth(stripeSettings, "left") : 42,
+          background: "var(--taomni-chrome-bg)",
         }}
         onContextMenu={(event) => {
           event.preventDefault();
@@ -176,6 +180,7 @@ export function PrimaryNavigationRail({
           setRailMenu({ x: event.clientX, y: event.clientY });
         }}
       >
+        <div ref={setMenuHost} data-testid="rail-app-menu-host" className="flex shrink-0 items-center justify-center" />
         <div data-testid="rail-mode-group" className="flex shrink-0 flex-col gap-1 px-1 py-1">
           {modes.map((entry) => (
             <ToolWindowRailButton
@@ -184,7 +189,7 @@ export function PrimaryNavigationRail({
                 id: entry.mode,
                 label: entry.label,
                 icon: entry.icon,
-                active: activeSideTab === entry.mode && !compact,
+                active: activeSideTab === entry.mode,
                 testId: entry.testId,
                 onSelect: () => activateMode(entry.mode),
               }}
@@ -329,7 +334,7 @@ export function PrimaryNavigationRail({
             <ThemeIcon mode={themeMode} />
           </RailIconButton>
           <div className="w-full">
-            <LanguageSwitcher variant="rail" />
+            <LanguageSwitcher variant="rail" showLabel={showNames} />
           </div>
           <RailIconButton
             testId="ribbon-settings"
@@ -339,16 +344,7 @@ export function PrimaryNavigationRail({
           >
             <Settings className="w-[16px] h-[16px]" />
           </RailIconButton>
-          {isWorkspaces && (
-            <RailIconButton
-              testId="rail-workspace-picker"
-              label={t("platform.openAnySession")}
-              showNames={showNames}
-              onClick={() => onOpenWorkspaceSessionPicker?.()}
-            >
-              <FolderPlus className="w-[16px] h-[16px]" />
-            </RailIconButton>
-          )}
+
         </div>
 
         {stripeSettings.showNames && (

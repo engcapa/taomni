@@ -641,6 +641,10 @@ const dict = {
     wslDetectFailed: "Failed to detect WSL distros: {error}",
   },
   platform: {
+    filterFiles: "Filter files…",
+    isolatedSessionHint: "Independent instances from Sessions mode.",
+
+    agentsComingSoon: "Agents / Crew is under development.",
     home: "Home",
     workspaces: "Workspaces",
     sessions: "Sessions",

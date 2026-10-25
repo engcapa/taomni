@@ -640,6 +640,10 @@ export const zhCN: DeepPartial<typeof en> = {
     wslDetectFailed: "检测 WSL 发行版失败：{error}",
   },
   platform: {
+    filterFiles: "过滤文件…",
+    isolatedSessionHint: "独立实例：与会话总览各自打开，互不干扰。",
+
+    agentsComingSoon: "Agents / Crew 功能开发中，敬请期待。",
     home: "主页",
     workspaces: "工作区",
     sessions: "会话",

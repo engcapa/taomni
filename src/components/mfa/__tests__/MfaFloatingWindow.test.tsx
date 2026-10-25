@@ -116,7 +116,7 @@ describe("MfaFloatingWindow (TASK-04)", () => {
 
     fireEvent.pointerMove(window, { clientX: 99999, clientY: -99999 });
     const position = useAppStore.getState().floatingMfa.position;
-    expect(position.left).toBeLessThanOrEqual(window.innerWidth - 310);
+    expect(position.left).toBeLessThanOrEqual(window.innerWidth - 280);
     expect(position.bottom).toBeLessThanOrEqual(window.innerHeight);
     expect(position.bottom).toBeGreaterThan(0);
     fireEvent.pointerUp(window);

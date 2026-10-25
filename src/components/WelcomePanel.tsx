@@ -1,11 +1,10 @@
-import { MessageCircle, Plus } from "lucide-react";
 import { useState } from "react";
 import { useT } from "../lib/i18n";
 import { openLocalShellAsAdministrator, type LocalDirectoryShortcut, type SessionConfig } from "../lib/ipc";
 import { sftpLocalHome } from "../lib/sftp";
 import { useAppStore } from "../stores/appStore";
 import type { RecentWorkspace } from "../types";
-import { ActionCard, LocalTerminalCard, MailSessionsCard, WslCard } from "./welcome/LaunchCards";
+import { LocalTerminalCard, MailSessionsCard, WslCard } from "./welcome/LaunchCards";
 import { LocalDirectoriesPanel } from "./welcome/LocalDirectoriesPanel";
 import { RecentSessionsPanel } from "./welcome/RecentSessionsPanel";
 import { RecentWorkspacesPanel } from "./welcome/RecentWorkspacesPanel";
@@ -14,6 +13,7 @@ import { localShellSelectionFromOption } from "./welcome/sessionModel";
 import { type WelcomeHistoryTab, type WelcomePanelProps } from "./welcome/types";
 import { useWelcomeHistory } from "./welcome/useWelcomeHistory";
 import { useWelcomeShells } from "./welcome/useWelcomeShells";
+import { PlatformLaunchCards } from "./welcome/PlatformLaunchCards";
 import { WelcomeHistoryPanel } from "./welcome/WelcomeHistoryPanel";
 
 const EMPTY_RECENT_SESSIONS: SessionConfig[] = [];
@@ -130,34 +130,9 @@ export function WelcomePanel({
 
   return (
     <div data-testid="welcome-panel" className="w-full h-full min-w-0 overflow-auto" style={{ background: "var(--taomni-bg)" }}>
-      <div className="w-full max-w-[1320px] mx-auto px-6 sm:px-8 lg:px-10 py-8">
-        <div className="flex items-center gap-3 mb-5">
-          <div
-            data-testid="welcome-brand-mark"
-            className="w-12 h-12 rounded-lg flex items-center justify-center text-white font-bold text-xl"
-            style={{ background: "linear-gradient(135deg, #1e5fa8, #62d36f)" }}
-          >
-            T
-          </div>
-          <div>
-            <div className="text-xl font-semibold">{t("app.welcomeTitle")}</div>
-            <div className="text-[12px] text-[var(--taomni-text-muted)]">
-              {t("app.tagline")}
-            </div>
-            <div
-              data-testid="welcome-version"
-              className="text-[11px] mt-0.5 taomni-mono"
-              style={{ color: "var(--taomni-text-muted)" }}
-            >
-              {t("welcome.versionLabel", { version: __APP_VERSION__ })}
-            </div>
-          </div>
-        </div>
-
-        <div
-          className="grid gap-4 items-stretch"
-          style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))" }}
-        >
+      <div className="taomni-home-content">
+        {restore ? <RestoreLastSessionRow restore={restore} translate={t} /> : null}
+        <div className="taomni-home-launch-grid">
           <LocalTerminalCard
             translate={t}
             shells={mergedShells}
@@ -188,24 +163,7 @@ export function WelcomePanel({
               }}
             />
           )}
-          <ActionCard
-            testId="welcome-new-session"
-            icon={<Plus className="w-5 h-5" />}
-            title={t("welcome.newSessionTitle")}
-            desc={t("welcome.newSessionDesc")}
-            kbd="Ctrl+Shift+N"
-            onClick={() => onNewSession()}
-          />
-          {onOpenLanChat ? (
-            <ActionCard
-              testId="welcome-open-lanchat"
-              icon={<MessageCircle className="w-5 h-5" />}
-              title={t("welcome.lanChatTitle")}
-              desc={t("welcome.lanChatDesc")}
-              kbd=""
-              onClick={onOpenLanChat}
-            />
-          ) : null}
+          <PlatformLaunchCards onNewSession={onNewSession} onOpenLanChat={onOpenLanChat} onOpenNewWorkspace={onOpenNewWorkspace} />
           {mailSessions.length > 0 ? (
             <MailSessionsCard
               translate={t}
@@ -214,10 +172,6 @@ export function WelcomePanel({
             />
           ) : null}
         </div>
-        {restore ? (
-          <RestoreLastSessionRow restore={restore} translate={t} />
-        ) : null}
-
         <WelcomeHistoryPanel
           translate={t}
           activeTab={historyTab}
@@ -287,8 +241,8 @@ export function WelcomePanel({
           )}
         />
 
-        <div className="mt-7 text-[12px] text-[var(--taomni-text-muted)]">
-          <div className="font-semibold text-[var(--taomni-text)] mb-1">{t("welcome.tipsHeading")}</div>
+        <details className="text-[11px] text-[var(--taomni-text-muted)]">
+          <summary className="cursor-pointer font-semibold text-[var(--taomni-text)]">{t("welcome.tipsHeading")}</summary>
           <ul className="list-disc pl-5 space-y-0.5">
             <li
               dangerouslySetInnerHTML={{
@@ -300,18 +254,18 @@ export function WelcomePanel({
             <li>{t("welcome.tipRightClick")}</li>
             <li>{t("welcome.tipDrag")}</li>
           </ul>
-        </div>
+        </details>
 
         <div
           data-testid="welcome-version-footer"
-          className="mt-7 pt-3 flex items-center justify-between text-[11px] taomni-mono"
+          className="flex items-center justify-between gap-2 text-[11px] taomni-mono"
           style={{
-            borderTop: "1px solid var(--taomni-divider)",
+
             color: "var(--taomni-text-muted)",
           }}
         >
-          <span>{t("app.name")}</span>
-          <span>v{__APP_VERSION__}</span>
+          <span className="inline-flex items-center gap-2"><span data-testid="welcome-brand-mark">T</span><span>{t("app.welcomeTitle")}</span></span>
+          <span data-testid="welcome-version">{t("welcome.versionLabel", { version: __APP_VERSION__ })} · v{__APP_VERSION__}</span>
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { FilePlus2, FolderPlus, GitBranch, ListTree, RefreshCw } from "lucide-react";
+import { FilePlus2, FolderPlus, GitBranch, ListTree, RefreshCw, Search, ChevronDown, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useT } from "../../lib/i18n";
 import { gitProbePath, gitSnapshot } from "../../lib/git";
@@ -13,6 +13,7 @@ import { outlineSymbols, useWorkspaceEditorStore } from "../../stores/workspaceE
 import { useWorkspaceUiStore } from "../../stores/workspaceUiStore";
 import { WorkspaceFileTree } from "./WorkspaceFileTree";
 import { WorkspaceSessionsPanel } from "./WorkspaceSessionsPanel";
+import { useSessionStore } from "../../stores/sessionStore";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 
 export interface WorkspaceSidebarProps {
@@ -76,6 +77,9 @@ export function WorkspaceSidebar({ onOpenSessionPicker }: WorkspaceSidebarProps)
   const store = useWorkspacePlatformStore.getState;
   const openFsModal = useWorkspaceUiStore((s) => s.openFsModal);
   const [refreshToken, setRefreshToken] = useState(0);
+  const [fileQuery, setFileQuery] = useState("");
+  const [linkedOpen, setLinkedOpen] = useState(true);
+  const sessions = useSessionStore((s) => s.sessions);
   const documents = useWorkspaceEditorStore((s) => s.documents);
   const gitBar = useWorkspaceGitBar(workspace);
 
@@ -115,10 +119,10 @@ export function WorkspaceSidebar({ onOpenSessionPicker }: WorkspaceSidebarProps)
       <ToolbarButton testId="workspace-refresh-tree" label={t("platform.refreshTree")} onClick={() => setRefreshToken((token) => token + 1)}>
         <RefreshCw className="h-3.5 w-3.5" />
       </ToolbarButton>
-      <div className="flex-1" />
-      <ToolbarButton testId="workspace-open-git" label={t("platform.openGitPanel")} onClick={() => store().openGitTab(workspace.id)}>
-        <GitBranch className="h-3.5 w-3.5" />
-      </ToolbarButton>
+      <label className="relative ml-1 min-w-[50px] flex-1">
+        <Search className="absolute left-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
+        <input type="search" data-testid="workspace-file-filter" aria-label={t("platform.filterFiles")} placeholder={t("platform.filterFiles")} className="taomni-input h-[21px] w-full min-w-0 pl-6 text-[11px]" value={fileQuery} onChange={(event) => setFileQuery(event.target.value)} />
+      </label>
     </div>
   ) : lens === "sessions" ? null : (
     <div className="flex shrink-0 items-center gap-1 px-1.5 py-1" style={{ borderBottom: "1px solid var(--taomni-divider)" }}>
@@ -134,6 +138,8 @@ export function WorkspaceSidebar({ onOpenSessionPicker }: WorkspaceSidebarProps)
       <WorkspaceSwitcher onAddFolder={() => openModal("root")} />
       {toolbar}
       {lens === "project" && (
+        <>
+        <div className="flex h-7 shrink-0 items-center justify-between px-2 text-[10.5px] text-[var(--taomni-text-muted)]"><span className="truncate font-semibold">{t("platform.project")} {workspace.rootFolders[0] ? `(${workspace.rootFolders[0].path})` : ""}</span></div>
         <WorkspaceFileTree
           workspace={workspace}
           createdNodes={workspaceNodes}
@@ -145,7 +151,21 @@ export function WorkspaceSidebar({ onOpenSessionPicker }: WorkspaceSidebarProps)
           onRemoveRoot={(rootId) => store().removeRootFolder(workspace.id, rootId)}
           onOpenGitForFile={openGitForFile}
           refreshToken={refreshToken}
+          query={fileQuery}
         />
+        <section data-testid="workspace-linked-sessions" className="shrink-0 border-t p-1.5" style={{ borderColor: "var(--taomni-chrome-border)" }}>
+          <div className="flex items-center justify-between gap-1 text-[10.5px] text-[var(--taomni-text-muted)]">
+            <button type="button" data-testid="workspace-linked-sessions-toggle" aria-expanded={linkedOpen} className="inline-flex min-w-0 items-center gap-1 py-1 font-semibold" onClick={() => setLinkedOpen(!linkedOpen)}><ChevronDown className={`h-3 w-3 ${linkedOpen ? "" : "-rotate-90"}`} />{t("platform.frequentSessions")} ({workspace.pinnedSessionIds.length})</button>
+            <button type="button" data-testid="workspace-link-session" className="inline-flex shrink-0 items-center gap-0.5 rounded p-1 hover:bg-[var(--taomni-hover)]" title={t("platform.openAnySession")} onClick={onOpenSessionPicker}><Plus className="h-3 w-3" /></button>
+          </div>
+          {linkedOpen && <div className="max-h-[180px] overflow-auto">
+            <p className="px-1 pb-1 text-[10.5px] text-[var(--taomni-text-muted)]">{t("platform.isolatedSessionHint")}</p>
+            {sessions.filter((session) => workspace.pinnedSessionIds.includes(session.id)).map((session) => (
+              <button key={session.id} type="button" data-testid="workspace-linked-session" data-session-id={session.id} className="flex h-[24px] w-full items-center gap-1.5 rounded px-1 text-left text-[11.5px] hover:bg-[var(--taomni-hover)]" onClick={() => store().openSessionInWorkspace(workspace.id, session)}><span className="rounded bg-[var(--taomni-selected)] px-1 text-[9px] font-bold text-[var(--taomni-accent)]">{session.session_type.slice(0, 4).toUpperCase()}</span><span className="min-w-0 flex-1 truncate">{session.name}</span><span className="max-w-[90px] truncate font-mono text-[9px] text-[var(--taomni-text-muted)]">{session.host}</span></button>
+            ))}
+          </div>}
+        </section>
+        </>
       )}
       {lens === "sessions" && (
         <WorkspaceSessionsPanel
@@ -186,7 +206,7 @@ export function WorkspaceSidebar({ onOpenSessionPicker }: WorkspaceSidebarProps)
         data-testid="workspace-sidebar-git-bar"
         data-branch={gitBar.branch ?? ""}
         data-changes={gitBar.changeCount}
-        className="mt-1 flex h-7 w-full shrink-0 items-center justify-between gap-1 border-t px-2 text-left hover:bg-[var(--taomni-hover)]"
+        className="mt-auto flex h-7 w-full shrink-0 items-center justify-between gap-1 border-t px-2 text-left hover:bg-[var(--taomni-hover)]"
         style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-card-bg)" }}
         title={t("platform.openGitPanel")}
         onClick={() => {

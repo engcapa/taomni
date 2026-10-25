@@ -178,7 +178,7 @@ export function clampStripeWidth(width: number): number {
 }
 
 export function defaultStripeSettings(): ToolWindowStripeSettings {
-  return { showNames: true, leftWidth: STRIPE_NAMED_DEFAULT_WIDTH, rightWidth: STRIPE_NAMED_DEFAULT_WIDTH };
+  return { showNames: false, leftWidth: STRIPE_NAMED_DEFAULT_WIDTH, rightWidth: STRIPE_NAMED_DEFAULT_WIDTH };
 }
 
 export function readStripeSettings(): ToolWindowStripeSettings {
@@ -187,7 +187,7 @@ export function readStripeSettings(): ToolWindowStripeSettings {
     if (!raw) return defaultStripeSettings();
     const parsed = JSON.parse(raw) as Partial<ToolWindowStripeSettings>;
     return {
-      showNames: typeof parsed.showNames === "boolean" ? parsed.showNames : true,
+      showNames: typeof parsed.showNames === "boolean" ? parsed.showNames : false,
       leftWidth: clampStripeWidth(typeof parsed.leftWidth === "number" ? parsed.leftWidth : STRIPE_NAMED_DEFAULT_WIDTH),
       rightWidth: clampStripeWidth(typeof parsed.rightWidth === "number" ? parsed.rightWidth : STRIPE_NAMED_DEFAULT_WIDTH),
     };

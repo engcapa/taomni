@@ -120,7 +120,7 @@ export function WorkspaceTabStrip() {
       data-tab-kind={tab.kind}
       data-active={tab.id === workspace.activeTabId || undefined}
       title={tab.title}
-      className="group flex h-6 max-w-[220px] shrink-0 items-center gap-1 rounded px-1.5 text-[11.5px] hover:bg-[var(--taomni-hover)] data-[active=true]:bg-[var(--taomni-selected)]"
+      className="taomni-workspace-tab group flex max-w-[185px] shrink-0 items-center gap-1 px-2 text-[12px]"
       onClick={() => setActiveTab(workspace.id, tab.id)}
       onKeyDown={(event) => {
         if (event.key === "Enter") setActiveTab(workspace.id, tab.id);
@@ -151,7 +151,7 @@ export function WorkspaceTabStrip() {
   );
 
   return (
-    <div data-testid="workspace-tab-strip" className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
+    <div data-testid="workspace-tab-strip" className="taomni-workspace-tab-strip flex h-full min-w-0 flex-1 items-end gap-0.5 overflow-x-auto">
       {workspace.openTabs.map(tabButton)}
       <button
         type="button"

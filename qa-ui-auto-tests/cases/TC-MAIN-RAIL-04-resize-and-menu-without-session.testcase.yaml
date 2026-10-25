@@ -20,21 +20,21 @@ steps:
   - seed_storage: {key: taomni.codeWorkspace.toolWindowStripes.v1, value: '{"showNames":true,"leftWidth":59,"rightWidth":59}'}
   - reload_window: null
   - wait_for: '[data-testid="session-tree"]'
-  - right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="sidebar-rail"]'
+  - right_click: '[data-testid="sidebar-rail"]'
   - assert_count: {selector: '[data-testid="context-menu"]', equal: 1}
   - click: '[data-testid="sidebar-rail-menu-show-names"]'
   - assert_localstorage: {key: taomni.codeWorkspace.toolWindowStripes.v1, contains: '"showNames":false'}
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', equals: ''}
-  - right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="ribbon-settings"]'
+  - assert_text_equals: {selector: '[data-testid="side-tab-tools"]', equals: ''}
+  - right_click: '[data-testid="ribbon-settings"]'
   - click: '[data-testid="sidebar-rail-menu-show-names"]'
   - eval_readonly:
       expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 59
       expect_truthy: true
-  - drag_to: {from: '[data-testid="expanded-sidebar-panel"] [data-testid="sidebar-rail-resize"]', by: {dx: 20}}
+  - drag_to: {from: '[data-testid="sidebar-rail-resize"]', by: {dx: 20}}
   - eval_readonly:
       expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 79
       expect_truthy: true
-  - press: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="sidebar-rail-resize"]', key: ArrowRight}
+  - press: {selector: '[data-testid="sidebar-rail-resize"]', key: ArrowRight}
   - assert_localstorage: {key: taomni.codeWorkspace.toolWindowStripes.v1, contains: '"leftWidth":83'}
   - eval_readonly:
       expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 83
@@ -68,7 +68,7 @@ steps:
   - screenshot: main-rail-welcome-resized.png
   - click: '[data-testid="side-tab-tools"]:visible'
   - wait_for: '[data-testid="sidebar-tools-panel"]'
-  - drag_to: {from: '[data-testid="expanded-sidebar-panel"] [data-testid="sidebar-rail-resize"]', by: {dx: 20}}
+  - drag_to: {from: '[data-testid="sidebar-rail-resize"]', by: {dx: 20}}
   - eval_readonly:
       expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 64
       expect_truthy: true
@@ -109,7 +109,7 @@ steps:
       expect_truthy: true
   - reload_window: null
   - wait_for: '[data-testid="welcome-panel"]'
-  - wait_for: '[data-testid="expanded-sidebar-panel"] [data-testid="sidebar-rail-resize"]'
+  - wait_for: '[data-testid="sidebar-rail-resize"]'
   - eval_readonly:
       expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 80
       expect_truthy: true

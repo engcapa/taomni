@@ -1,3 +1,4 @@
+import { showAgentsComingSoon } from "../agents/comingSoon";
 import { Boxes, Bot, MonitorSmartphone, Play, Plus, Server, Wrench } from "lucide-react";
 import { useT } from "../../lib/i18n";
 import { useAppStore } from "../../stores/appStore";
@@ -36,7 +37,7 @@ export function HomeSidebar({
       data-testid={testId}
       className="w-full flex items-center gap-2 px-2 py-1.5 rounded text-left text-[var(--taomni-text)] hover:bg-[var(--taomni-hover)]"
       style={{ fontSize: "var(--taomni-ui-font-size)" }}
-      onClick={() => setActiveSideTab(mode)}
+      onClick={() => mode === "agents" ? showAgentsComingSoon() : setActiveSideTab(mode)}
     >
       <span className="text-[var(--taomni-text-muted)]">{icon}</span>
       <span className="truncate">{label}</span>

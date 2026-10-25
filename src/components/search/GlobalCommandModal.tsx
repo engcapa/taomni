@@ -1,3 +1,4 @@
+import { showAgentsComingSoon } from "../agents/comingSoon";
 import { Boxes, FileText, KeyRound, MonitorSmartphone, Search, Settings, Terminal, Wrench } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useT } from "../../lib/i18n";
@@ -74,7 +75,7 @@ export function GlobalCommandModal() {
       title: t("platform.agentsTitle"),
       detail: t("platform.commandTool"),
       icon: <Wrench className="h-3.5 w-3.5" />,
-      run: () => setActiveSideTab("agents"),
+      run: showAgentsComingSoon,
     });
     list.push({
       id: "open-any-session",

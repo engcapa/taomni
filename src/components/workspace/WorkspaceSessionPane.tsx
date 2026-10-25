@@ -2,7 +2,8 @@ import { lazy, Suspense } from "react";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { FileBrowser } from "../filebrowser/FileBrowser";
 import { LocalFileBrowserPanel } from "../filebrowser/LocalFileBrowserPanel";
-import { parseSessionOptions } from "../../lib/terminalProfile";
+import { getSessionTerminalProfile, loadTerminalDefaultProfile, parseSessionOptions } from "../../lib/terminalProfile";
+import { commandTerminalFromSession, localShellSelectionFromSession } from "../../layouts/main/sessionPolicy";
 import { getSessionNetworkSettings, toNetworkSettingsPayload } from "../../lib/networkSettings";
 import { parseRdpOptions } from "../../types/rdp";
 import { parseVncViewerOptions } from "../../lib/vncOptions";
@@ -65,7 +66,7 @@ export function WorkspaceSessionPane({ tab, visible }: WorkspaceSessionPaneProps
   const setActiveSideTab = useAppStore((s) => s.setActiveSideTab);
   const protocol = session?.session_type ?? tab.protocol ?? "Local";
 
-  if (protocol === "Local" || !session) {
+  if (protocol === "Local" || !session || commandTerminalFromSession(session)) {
     return (
       <div data-testid="workspace-session-pane" data-kind="terminal" className="h-full min-h-0 w-full" style={{ display: visible ? "block" : "none" }}>
         <TerminalPanel
@@ -73,6 +74,9 @@ export function WorkspaceSessionPane({ tab, visible }: WorkspaceSessionPaneProps
           tabTitle={tab.title}
           visible={visible}
           workspaceRoot={undefined}
+          commandTerminal={session ? commandTerminalFromSession(session) ?? undefined : undefined}
+          localShell={session && protocol === "Local" ? localShellSelectionFromSession(session) : undefined}
+          terminalProfile={session ? getSessionTerminalProfile(session.options_json) ?? loadTerminalDefaultProfile() : undefined}
           preserveSessionOnUnmount={false}
         />
       </div>
@@ -87,6 +91,7 @@ export function WorkspaceSessionPane({ tab, visible }: WorkspaceSessionPaneProps
           tabId={tab.id}
           tabTitle={tab.title}
           visible={visible}
+          terminalProfile={getSessionTerminalProfile(session.options_json) ?? loadTerminalDefaultProfile()}
           ssh={{
             sessionId: session.id,
             host: session.host,

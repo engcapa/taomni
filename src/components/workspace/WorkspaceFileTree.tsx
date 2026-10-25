@@ -32,6 +32,7 @@ export interface WorkspaceFileTreeProps {
   onOpenGitForFile: (root: WorkspaceRootFolder, path: string) => void;
   /** Bumped by the sidebar refresh button to discard cached listings. */
   refreshToken?: number;
+  query?: string;
 }
 
 function directoryKey(rootId: string, path: string): string {
@@ -56,6 +57,7 @@ export function WorkspaceFileTree({
   onRemoveRoot,
   onOpenGitForFile,
   refreshToken = 0,
+  query = "",
 }: WorkspaceFileTreeProps) {
   const t = useT();
   const dialogs = useAppDialogs();
@@ -233,7 +235,7 @@ export function WorkspaceFileTree({
     const state = directories[key];
     const entries = [...(state?.entries ?? []), ...extrasFor(root.id, path)];
     const unique = new Map(entries.map((entry) => [entry.path, entry]));
-    const list = [...unique.values()].sort((a, b) => {
+    const list = [...unique.values()].filter((entry) => entry.kind === "folder" || !query.trim() || entry.path.toLowerCase().includes(query.trim().toLowerCase())).sort((a, b) => {
       if (a.kind !== b.kind) return a.kind === "folder" ? -1 : 1;
       return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     });
@@ -299,7 +301,7 @@ export function WorkspaceFileTree({
   const rootList = useMemo(() => roots, [roots]);
 
   return (
-    <div data-testid="workspace-file-tree" role="tree" aria-label="Workspace files" className="min-h-0 flex-1 overflow-auto py-1">
+    <div data-testid="workspace-file-tree" role="tree" aria-label="Workspace files" className="min-h-0 overflow-auto py-1">
       {rootList.length === 0 && (
         <div className="px-2 py-2 text-[11px] text-[var(--taomni-text-muted)]" data-testid="workspace-file-tree-empty">
           {t("platform.noWorkspaceRoot")}

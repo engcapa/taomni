@@ -6,6 +6,18 @@
 
 ---
 
+## 当前实现范围补充（2026-10-25）
+
+用户确认 Agents / Crew 暂时仅保留入口按钮，点击显示“开发中”，保留当前视图；本文后续完整 Worktree 编排方案属于后续设计，不作为本次交付的已实现能力。原型对齐以全高 42px 图标栏、260px 初始侧栏、6px 分隔条、独立圆角框架、画布内 33px 工具栏、默认全宽 Home 为准，保留主分支已有菜单、导入导出、启动、会话与工具能力。
+
+模式与工作区切换仅隐藏运行实例，继续保留 PTY、文档文本及撤销历史。关闭标签才释放对应实例；全局 Sessions 与工作区实例彼此隔离。右侧上下文栏支持键盘/指针调宽及持久化，MFA 浮窗宽度为 280px。
+
+新增验收：`TC-WS-016` 验证紧凑 Home、导入入口、右栏调整、窄窗口与启动导航；`TC-WS-017` 验证工作区/模式切换后未保存文档、撤销重做及保存重载。`TC-WS-011` 改为多入口开发中提示和真实全局搜索。`TC-WS-012/015` 验证离开工作区时隐藏 PTY、返回后保留输出并继续执行命令。单元回归 `WorkspaceEditorLifecycle.test.tsx` 覆盖 StrictMode 异步加载、编辑器实例保持及保存期间继续编辑的 dirty 状态。
+
+控件覆盖基线仅调整 `F-WS-6` 中已明确暂缓的 Agents 编排控件（16→7 个必需控件、14→5 个已覆盖控件），其他功能基线不变；新增入口和保留能力继续执行真实回归，未通过的运行原样保留。
+
+截图及本机运行证据保留在 `qa-ui-auto-report/_local/workspace-visual/` 与 `qa-ui-auto-report/workspace-browser/`；执行结果以本轮最终报告和 GitHub workflow receipts 为准。
+
 ## 1. 设计概述
 
 - **标题**：Taomni Workspace-First & One-System 平台级 UI 与交互架构重构（v6.1 用户确认版）
@@ -598,7 +610,7 @@ PYTHONPATH=.agents/skills/qa-ui-auto/scripts python3 -m qa_ui_auto.lint --cases 
 | **`V-08`** | `AC-08` | `TASK-05` | Unit + Browser + Native | `TC-WS-008` / `WorkspaceSidebar.test.tsx` | 验证工作区文件树新建文件（`Alt+Insert`）、新建目录、添加外部文件夹到工作区（Multi-Root）及目录右键菜单 |
 | **`V-09`** | `AC-09`, `AC-10` | `TASK-08` | Browser + Native | `TC-WS-009` | 验证 `Sessions` 模式单行头部极简化，左栏 `SessionTree` 7 按钮/分类过滤/目录树/右键菜单与顶栏 `ℹ️`、`⋯` `OpenTabsMenu` 100% 保留 |
 | **`V-10`** | `AC-10` | `TASK-03`, `TASK-05`, `TASK-08` | Browser + Native | `TC-WS-010` | 全量右键上下文菜单专项回归（主菜单、左侧导航条 Show Names、SessionTree、TabBar、Workspace 文件树、Git 面板右键菜单） |
-| **`V-11`** | `AC-01`..`AC-09` | `TASK-09` | Unit + Browser | `TC-WS-011` / `AgentsPlatformView.test.tsx` | 验证 `Agents` 模式 Git Worktree 任务编排、Diff 审阅跳转与 `Ctrl+K` 全局命令面板搜索 |
+| **`V-11`** | `AC-01`..`AC-09` | `TASK-09` | Unit + Browser | `TC-WS-011` / `AgentsPlatformView.test.tsx` | 验证 Agents / Crew 开发中提示与 `Ctrl+K` 全局命令面板搜索 |
 | **`V-12`** | `AC-01`..`AC-11` | `TASK-10` | Native (Linux / Windows / macOS) | `TC-WS-012` | 原生桌面 WebView 窗口拖拽、左下角 MFA 悬浮窗剪贴板写入、工作区本地 PTY 启动与多根目录原生文件读写验证 |
 | **`V-13`** | `AC-11` | `TASK-10` | Browser + Native | 既有受影响用例集（`TC-001`, `TC-013`..`TC-015`, `TC-034`..`TC-065`, `TC-100`, `TC-104`, `TC-MAIN-RAIL-01..04`, `TC-IDE-PARITY-027-01..03`, `TC-MFA-001..108`, `TC-auto-F-I18n-1`） | 验证全部既有回归用例 100% 通过，无任何功能回退或未授权删减 |
 

@@ -1,4 +1,4 @@
-import { EditorState } from "@codemirror/state";
+import { EditorState, StateEffect } from "@codemirror/state";
 import { EditorView, drawSelection, highlightActiveLine, keymap, lineNumbers } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { GitBranch, Save } from "lucide-react";
@@ -8,6 +8,8 @@ import { useAppStore } from "../../stores/appStore";
 import { languageFromPath, useWorkspaceEditorStore } from "../../stores/workspaceEditorStore";
 import type { PlatformWorkspace, WorkspaceIsolatedTab } from "../../stores/workspacePlatformStore";
 import { readWorkspaceText, writeWorkspaceText } from "./workspaceFs";
+import { languageForPath } from "../git/diffLanguage";
+import { codeViewExtensions } from "../../lib/codeViewTheme";
 
 const editorTheme = EditorView.theme({
   "&": {
@@ -58,17 +60,19 @@ export function WorkspaceFileEditor({ workspace, tab, visible, onOpenGitDiff }: 
   const root = workspace.rootFolders.find((folder) => folder.id === tab.rootFolderId);
   const path = tab.filePath ?? "";
   const language = languageFromPath(path);
+  const rootId = root?.id;
+  const rootPath = root?.path;
 
   useEffect(() => {
-    if (!root || !path) return;
-    const loadKey = `${root.id}:${path}`;
+    if (!rootId || !rootPath || !path) return;
+    const loadKey = `${rootId}:${path}`;
     if (loadedPathRef.current === loadKey) return;
     loadedPathRef.current = loadKey;
     let cancelled = false;
     setDocument(tab.id, { path, language, loading: true, error: null });
     void (async () => {
       try {
-        const file = await readWorkspaceText(root.path, path);
+        const file = await readWorkspaceText(rootPath, path);
         if (cancelled) return;
         savedHashRef.current = file.hash ?? null;
         setDocument(tab.id, {
@@ -92,8 +96,9 @@ export function WorkspaceFileEditor({ workspace, tab, visible, onOpenGitDiff }: 
     })();
     return () => {
       cancelled = true;
+      if (loadedPathRef.current === loadKey) loadedPathRef.current = null;
     };
-  }, [language, path, root, setDocument, tab.id]);
+  }, [language, path, rootId, rootPath, setDocument, tab.id]);
 
   useEffect(() => {
     if (!document || document.loading) return;
@@ -114,6 +119,7 @@ export function WorkspaceFileEditor({ workspace, tab, visible, onOpenGitDiff }: 
         drawSelection(),
         history(),
         keymap.of([...defaultKeymap, ...historyKeymap]),
+        ...codeViewExtensions(),
         editorTheme,
         EditorView.updateListener.of((update) => {
           if (!update.docChanged) return;
@@ -124,7 +130,11 @@ export function WorkspaceFileEditor({ workspace, tab, visible, onOpenGitDiff }: 
         }),
       ],
     });
-    viewRef.current = new EditorView({ state, parent: host });
+    const view = new EditorView({ state, parent: host });
+    viewRef.current = view;
+    void languageForPath(path).then((extension) => {
+      if (extension && viewRef.current === view) view.dispatch({ effects: StateEffect.appendConfig.of(extension) });
+    });
     return () => {
       viewRef.current?.destroy();
       viewRef.current = null;
@@ -147,7 +157,8 @@ export function WorkspaceFileEditor({ workspace, tab, visible, onOpenGitDiff }: 
     try {
       const file = await writeWorkspaceText(root.path, path, current.text, savedHashRef.current);
       savedHashRef.current = file.hash ?? null;
-      setDocument(tab.id, { savedText: current.text, dirty: false });
+      const latest = useWorkspaceEditorStore.getState().documents[tab.id];
+      if (latest) setDocument(tab.id, { savedText: current.text, dirty: latest.text !== current.text });
       setStatusMessage(`Saved ${path}`);
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : String(error));
@@ -171,7 +182,7 @@ export function WorkspaceFileEditor({ workspace, tab, visible, onOpenGitDiff }: 
       }}
     >
       <div
-        className="flex h-8 shrink-0 items-center gap-2 border-b px-2"
+        className="flex h-[26px] shrink-0 items-center gap-2 border-b px-2"
         style={{ borderColor: "var(--taomni-code-border)", background: "var(--taomni-card-bg)" }}
       >
         <span className="truncate text-[11.5px] font-semibold" data-testid="workspace-editor-title">

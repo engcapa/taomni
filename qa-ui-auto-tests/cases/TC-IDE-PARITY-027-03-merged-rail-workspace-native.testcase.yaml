@@ -71,12 +71,12 @@ steps:
 - click: '[data-testid="code-workspace-tool-rail-menu-show-names"]'
 - wait_for:
     selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"][data-show-names="true"]'
-    state: detached
     timeout_sec: 5
 - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]'
 - click: '[data-testid="code-workspace-tool-rail-menu-show-names"]'
 - wait_for:
     selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"][data-show-names="true"]'
+    state: detached
     timeout_sec: 5
 - click: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
@@ -132,7 +132,7 @@ verification:
     - 17
     - 18
   - id: R2
-    requirement: B：工具条中的 Project 按钮隐藏/显示 Project 窗口；右键菜单 Show Tool Window Names 在工具条里同样生效（可关可开）。
+    requirement: B：工具条中的 Project 按钮隐藏/显示 Project 窗口；右键菜单 Show Tool Window Names 在工具条里同样生效（默认隐藏名称，可开启后再关闭）。
     actions:
     - 20
     - 22
@@ -146,9 +146,9 @@ verification:
     - step: 23
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-pane\"]", "timeout_sec": 5}}'
     - step: 26
-      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"][data-show-names=\"true\"]", "state": "detached", "timeout_sec": 5}}'
-    - step: 29
       expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"][data-show-names=\"true\"]", "timeout_sec": 5}}'
+    - step: 29
+      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"][data-show-names=\"true\"]", "state": "detached", "timeout_sec": 5}}'
     results:
     - 21
     - 23

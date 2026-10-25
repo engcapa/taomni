@@ -1,7 +1,8 @@
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgentsPlatformView } from "../AgentsPlatformView";
-import { AgentsSidebar } from "../../sidebar/AgentsSidebar";
+import { PrimaryNavigationRail } from "../../sidebar/PrimaryNavigationRail";
+import { AppDialogProvider } from "../../../lib/appDialogs";
 import { GlobalCommandModal } from "../../search/GlobalCommandModal";
 import { useAgentsStore } from "../../../stores/agentsStore";
 import { useAppStore } from "../../../stores/appStore";
@@ -45,68 +46,22 @@ afterEach(() => {
 });
 
 describe("Agents platform mode (TASK-09)", () => {
-  it("UT-WS-09-01 dispatches a new worktree task from the modal", async () => {
-    render(<AgentsPlatformView />);
-    expect(screen.getByTestId("agents-empty-state")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("agents-dispatch-open"));
-    const modal = screen.getByTestId("agents-dispatch-modal");
-    expect(within(modal).getByTestId("agents-dispatch-workspace")).toBeInTheDocument();
-    fireEvent.change(within(modal).getByTestId("agents-dispatch-task-input"), {
-      target: { value: "Fix the SFTP resume bug" },
-    });
-    fireEvent.click(within(modal).getByTestId("agents-dispatch-submit"));
-
-    await waitFor(() => expect(useAgentsStore.getState().tasks).toHaveLength(1));
-    const task = useAgentsStore.getState().tasks[0];
-    expect(task.task).toBe("Fix the SFTP resume bug");
-    expect(task.worktree).toContain(".worktrees/");
-    expect(task.branch.startsWith("worktree/")).toBe(true);
-    expect(useAppStore.getState().activeSideTab).toBe("agents");
-
-    expect(screen.getByTestId("agents-task-detail")).toBeInTheDocument();
-    expect(screen.getByTestId("agents-task-detail").textContent).toContain("SFTP resume");
-    expect(screen.getByTestId("agents-trace")).toBeInTheDocument();
-    expect(screen.getByTestId("agents-task-detail").textContent).toContain("Workspace read/write allowed");
+  it("keeps Crew as a coming-soon entry without starting tasks or changing the current mode", async () => {
+    useAppStore.setState({ activeSideTab: "sessions" });
+    render(<AppDialogProvider><PrimaryNavigationRail /></AppDialogProvider>);
+    fireEvent.click(screen.getByTestId("nav-mode-agents"));
+    expect(await screen.findByTestId("alert-dialog-message")).toHaveTextContent("under development");
+    expect(useAgentsStore.getState().tasks).toHaveLength(0);
+    expect(useAppStore.getState().activeSideTab).toBe("sessions");
+    fireEvent.click(screen.getByTestId("alert-dialog-ok"));
+    expect(screen.queryByTestId("alert-dialog")).not.toBeInTheDocument();
   });
 
-  it("UT-WS-09-02 reviews the worktree diff in the workspace Git panel", async () => {
-    const task = useAgentsStore.getState().dispatchTask({
-      task: "Update docs",
-      model: "OpenAI Codex CLI",
-      workspaceId: DEFAULT_WORKSPACE_ID,
-      workspaceName: "Default Workspace",
-      workspaceRoot: "/preview",
-    });
+  it("shows only the placeholder when a legacy Agents mode is restored", () => {
     render(<AgentsPlatformView />);
-    expect(useAppStore.getState().activeSideTab).toBe("agents");
-    fireEvent.click(screen.getByTestId("agents-review-in-git"));
-
-    expect(useAppStore.getState().activeSideTab).toBe("workspaces");
-    const workspace = useWorkspacePlatformStore.getState().workspaces.find((entry) => entry.id === DEFAULT_WORKSPACE_ID)!;
-    const gitTab = workspace.openTabs.find((tab) => tab.kind === "git");
-    expect(gitTab).toBeTruthy();
-    expect(gitTab?.focusPath).toBe(task.worktree);
-    expect(workspace.activeTabId).toBe(gitTab?.id);
-  });
-
-  it("UT-WS-09-03 lists agent tasks in the sidebar and opens dispatch through the shared store", () => {
-    const onDispatchTask = vi.fn(() => useWorkspaceUiStore.getState().openAgentDispatch());
-    const task = useAgentsStore.getState().dispatchTask({
-      task: "Refactor parser",
-      model: "Claude Code",
-      workspaceId: DEFAULT_WORKSPACE_ID,
-      workspaceName: "Default Workspace",
-      workspaceRoot: "/preview",
-    });
-    render(<AgentsSidebar onDispatchTask={onDispatchTask} />);
-    const rows = screen.getAllByTestId("agents-task-row");
-    expect(rows).toHaveLength(1);
-    expect(rows[0].dataset.taskId).toBe(task.id);
-    fireEvent.click(rows[0]);
-    expect(useAgentsStore.getState().selectedTaskId).toBe(task.id);
-    fireEvent.click(screen.getByTestId("agents-dispatch-task"));
-    expect(onDispatchTask).toHaveBeenCalledTimes(1);
-    expect(useWorkspaceUiStore.getState().agentDispatchOpen).toBe(true);
+    expect(screen.getByTestId("agents-coming-soon")).toHaveTextContent("under development");
+    expect(screen.queryByTestId("agents-dispatch-modal")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("agents-task-detail")).not.toBeInTheDocument();
   });
 
   it("UT-WS-09-04 filters workspaces, sessions and actions in the Ctrl+K palette", async () => {

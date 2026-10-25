@@ -73,7 +73,7 @@ export function registerWelcomePanelLayout1Cases() {
       const brandMark = screen.getByTestId("welcome-brand-mark");
       expect(brandMark).toHaveTextContent("T");
       expect(brandMark).not.toHaveTextContent("N");
-      expect(brandMark).toHaveClass("w-12", "h-12");
+      expect(screen.getByTestId("welcome-version-footer")).toContainElement(brandMark);
 
       expect(screen.getByTestId("welcome-version")).toHaveTextContent(`Version ${__APP_VERSION__}`);
       expect(screen.getByTestId("welcome-version-footer")).toHaveTextContent(`v${__APP_VERSION__}`);

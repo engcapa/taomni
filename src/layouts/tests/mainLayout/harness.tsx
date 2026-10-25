@@ -24,6 +24,7 @@ const sidebarMock = vi.hoisted(() => ({
   props: [] as Array<{
     onConnectSession?: (session: SessionConfig) => void;
     onOpenSettings?: () => void;
+    panelOnly?: boolean;
   }>,
 }));
 
@@ -163,13 +164,14 @@ vi.mock("../../../components/sidebar/Sidebar", () => ({
   Sidebar: (props: {
     onConnectSession?: (session: SessionConfig) => void;
     onOpenSettings?: () => void;
+    panelOnly?: boolean;
   }) => {
     sidebarMock.props.push(props);
     return (
       <div data-testid="sidebar">
-        <button type="button" data-testid="ribbon-settings" onClick={props.onOpenSettings}>
+        {!props.panelOnly && <button type="button" data-testid="ribbon-settings" onClick={props.onOpenSettings}>
           Settings
-        </button>
+        </button>}
       </div>
     );
   },

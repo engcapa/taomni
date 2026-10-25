@@ -1,7 +1,7 @@
 id: TC-WS-002
-title: Primary rail exposes Home, Workspaces, Sessions, Agents and Tools with Home first
-description: v6.1 AC-02 / DEC-02. The left primary navigation rail renders exactly five primary modes in order Home → Workspaces → Sessions → Agents → Tools, and
-  Home opens the existing WelcomePanel surface with its launch actions.
+title: Primary rail order, full-width Home and Agents / Crew development notice
+description: v6.1 AC-02 / DEC-02. The left primary navigation rail renders exactly five primary modes in order Home → Workspaces → Sessions → Agents → Tools,
+  and Home opens the existing WelcomePanel surface with its launch actions.
 modes:
 - browser
 - native
@@ -37,7 +37,7 @@ steps:
     - nav-mode-agents
     - side-tab-tools
 - click: '[data-testid="nav-mode-home"]'
-- wait_for: '[data-testid="home-sidebar-panel"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
 - assert_visible: '[data-testid="welcome-panel"]'
 - assert_visible: '[data-testid="welcome-open-local-terminal"]'
 - assert_text:
@@ -48,7 +48,12 @@ steps:
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
 - click: '[data-testid="nav-mode-agents"]'
-- wait_for: '[data-testid="agents-platform-view"]'
+- wait_for: '[data-testid="alert-dialog-message"]'
+- assert_text:
+    selector: '[data-testid="alert-dialog-message"]'
+    contains: under development
+- click: '[data-testid="alert-dialog-ok"]'
+- assert_visible: '[data-testid="session-tree"]'
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - screenshot: ws-002-primary-rail-modes.png
@@ -56,59 +61,82 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 左侧主导航条顶部严格按 Home → Workspaces → Sessions → Agents → Tools 顺序渲染五个一级模式，Home 位于第 1 位。
+    requirement: Home、Workspaces、Sessions、Agents、Tools 顺序固定。Home 默认收起左右栏并展示原有启动入口。
     actions:
+    - 1
+    - 2
+    - 11
+    - 16
+    checkpoints:
+    - step: 3
+      expectation: 'wait_for: [data-testid="welcome-panel"]'
+    - step: 4
+      expectation: 'wait_for: [data-testid="sidebar-rail"]'
+    - step: 5
+      expectation: 'assert_visible: [data-testid="sidebar-rail"] [data-testid="nav-mode-home"]'
+    - step: 6
+      expectation: 'assert_visible: [data-testid="sidebar-rail"] [data-testid="nav-mode-workspaces"]'
+    - step: 7
+      expectation: 'assert_visible: [data-testid="sidebar-rail"] [data-testid="side-tab-sessions"]'
+    - step: 8
+      expectation: 'assert_visible: [data-testid="sidebar-rail"] [data-testid="nav-mode-agents"]'
+    - step: 9
+      expectation: 'assert_visible: [data-testid="sidebar-rail"] [data-testid="side-tab-tools"]'
+    - step: 10
+      expectation: 'assert_items: [data-testid="sidebar-rail"] [data-testid="rail-mode-group"] button'
+    - step: 12
+      expectation: 'wait_for: [data-testid="collapsed-sidebar-rail"]'
+    - step: 13
+      expectation: 'assert_visible: [data-testid="welcome-panel"]'
+    - step: 14
+      expectation: 'assert_visible: [data-testid="welcome-open-local-terminal"]'
+    - step: 15
+      expectation: 'assert_text: [data-testid="welcome-panel"]'
+    - step: 17
+      expectation: 'wait_for: [data-testid="workspace-switcher"]'
+    results:
+    - 3
+    - 4
     - 5
     - 6
     - 7
     - 8
     - 9
-    checkpoints:
-    - step: 4
-      expectation: 主导航条已挂载
-    - step: 10
-      expectation: DOM 顺序与契约一致
-    results:
     - 10
-  - id: R2
-    requirement: 点击 Home 展示 WelcomePanel 的启动动作且不占用会话标签栏；其余四个模式各自展示对应左栏与主视图。
-    actions:
-    - 11
     - 12
     - 13
     - 14
     - 15
-    - 16
     - 17
+  - id: R2
+    requirement: 工作区和会话模式可用；Agents 显示开发中提示且保持当前会话视图；Tools 可用。
+    actions:
     - 18
-    - 19
     - 20
+    - 23
+    - 25
+    checkpoints:
+    - step: 19
+      expectation: 'wait_for: [data-testid="session-tree"]'
+    - step: 21
+      expectation: 'wait_for: [data-testid="alert-dialog-message"]'
+    - step: 22
+      expectation: 'assert_text: [data-testid="alert-dialog-message"]'
+    - step: 24
+      expectation: 'assert_visible: [data-testid="session-tree"]'
+    - step: 26
+      expectation: 'wait_for: [data-testid="sidebar-tools-panel"]'
+    results:
+    - 19
     - 21
     - 22
-    checkpoints:
-    - step: 12
-      expectation: Home 左栏出现
-    - step: 14
-      expectation: welcome-open-local-terminal 可用
-    - step: 17
-      expectation: Workspaces 模式显示工作区切换器
-    - step: 19
-      expectation: Sessions 模式显示会话树
-    - step: 21
-      expectation: Agents 模式显示调度台
-    - step: 23
-      expectation: Tools 模式显示工具箱
-    results:
-    - 12
-    - 17
-    - 19
-    - 21
-    - 23
+    - 24
+    - 26
   visual:
-  - check: 主导航条按钮顺序、选中态与图标清晰，Home 位于 Workspaces 之上。
+  - check: 与 HTML 原型比较圆角框架、紧凑尺寸、无溢出和可用操作入口。
     method: manual
-    reason: 顺序与视觉层级需要截图评审。
+    reason: 保留运行截图供视觉对比，自动断言验证具体布局和状态。
   native:
-  - check: 真实桌面 WebView 中五个模式切换与主区域渲染一致。
+  - check: 在真实桌面 WebView 验证布局与持久化；终端用例额外验证真实 PTY，编辑器用例验证真实磁盘写入。
     method: automated
-    reason: 用例声明 browser 与 native 两种模式。
+    reason: 浏览器存根不能证明 WebKit/WebView2 渲染与原生磁盘、进程行为。

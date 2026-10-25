@@ -1663,6 +1663,30 @@
 - `[data-testid="sidebar-rail"]` — interactive — F-WS-1.sidebar-rail
 - `[data-testid="toggle-left-sidebar"]` — interactive — F-WS-1.toggle-left-sidebar
 - `[data-testid="toggle-right-sidebar"]` — interactive — F-WS-1.toggle-right-sidebar
+- `[data-testid="main-canvas-frame"]` — display — F-WS-1.main-canvas-frame
+- `[data-testid="platform-mode-title"]` — display — F-WS-1.platform-mode-title
+- `[data-testid="global-session-surface"]` — display — F-WS-1.global-session-surface
+- `[data-testid="right-sidebar-resize-handle"]` — interactive — F-WS-1.right-sidebar-resize-handle
+- `[data-testid="right-sidebar-close"]` — interactive — F-WS-1.right-sidebar-close
+- `[data-testid="right-sidebar-ai-tab"]` — interactive — F-WS-1.right-sidebar-ai-tab
+- `[data-testid="right-sidebar-structure-tab"]` — interactive — F-WS-1.right-sidebar-structure-tab
+- `[data-testid="right-sidebar-content"]` — display — F-WS-1.right-sidebar-content
+- `[data-testid="right-sidebar-open-chat"]` — interactive — F-WS-1.right-sidebar-open-chat
+- `[data-testid="rail-app-menu-host"]` — display — F-WS-1.rail-app-menu-host
+- `[data-testid="home-import-sessions"]` — interactive — F-WS-1.home-import-sessions
+- `[data-testid="home-import-json"]` — interactive — F-WS-1.home-import-json
+- `[data-testid="home-import-mobaxterm"]` — interactive — F-WS-1.home-import-mobaxterm
+- `[data-testid="home-import-csv"]` — interactive — F-WS-1.home-import-csv
+- `[data-testid="home-import-openssh"]` — interactive — F-WS-1.home-import-openssh
+- `[data-testid="home-download-csv-template"]` — interactive — F-WS-1.home-download-csv-template
+- `[data-testid="home-open-workspace"]` — interactive — F-WS-1.home-open-workspace
+- `[data-testid="home-open-git"]` — interactive — F-WS-1.home-open-git
+- `[data-testid="home-open-agents"]` — interactive — F-WS-1.home-open-agents
+- `[data-testid="home-open-mail"]` — interactive — F-WS-1.home-open-mail
+- `[data-testid="home-open-network-tools"]` — interactive — F-WS-1.home-open-network-tools
+- `[data-testid="home-open-mfa"]` — interactive — F-WS-1.home-open-mfa
+- `[data-testid="welcome-open-lanchat"]` — interactive — F-WS-1.welcome-open-lanchat
+- `[data-testid="lanchat-roster-panel"]` — display — F-WS-1.lanchat-roster-panel
 
 ## main/workspace-platform (F-WS-2)
 
@@ -1709,6 +1733,14 @@
 - `[data-testid="workspace-tree-rename"]` — interactive — F-WS-2.workspace-tree-rename
 - `[data-testid="workspace-tree-root"]` — display — F-WS-2.workspace-tree-root
 - `[data-testid="workspace-session-picker-filter-all"]` — interactive — F-WS-2.workspace-session-picker-filter-all
+- `[data-testid="workspace-file-filter"]` — interactive — F-WS-2.workspace-file-filter
+- `[data-testid="workspace-linked-sessions"]` — display — F-WS-2.workspace-linked-sessions
+- `[data-testid="workspace-linked-sessions-toggle"]` — interactive — F-WS-2.workspace-linked-sessions-toggle
+- `[data-testid="workspace-link-session"]` — interactive — F-WS-2.workspace-link-session
+- `[data-testid="workspace-linked-session"]` — interactive — F-WS-2.workspace-linked-session
+- `[data-testid="workspace-editor-save"]` — interactive — F-WS-2.workspace-editor-save
+- `[data-testid="workspace-switcher-option-default-workspace"]` — interactive — F-WS-2.workspace-switcher-option-default-workspace
+- `[data-testid="workspace-switcher-option-second-workspace"]` — interactive — F-WS-2.workspace-switcher-option-second-workspace
 
 ## main/workspace-platform (F-WS-3)
 
@@ -1748,17 +1780,8 @@
 
 ## main/workspace-platform (F-WS-6)
 
-- `[data-testid="agents-dispatch-modal"]` — display — F-WS-6.agents-dispatch-modal
-- `[data-testid="agents-dispatch-model"]` — interactive — F-WS-6.agents-dispatch-model
 - `[data-testid="agents-dispatch-open"]` — interactive — F-WS-6.agents-dispatch-open
-- `[data-testid="agents-dispatch-submit"]` — interactive — F-WS-6.agents-dispatch-submit
-- `[data-testid="agents-dispatch-task-input"]` — interactive — F-WS-6.agents-dispatch-task-input
-- `[data-testid="agents-dispatch-workspace"]` — interactive — F-WS-6.agents-dispatch-workspace
-- `[data-testid="agents-empty-state"]` — display — F-WS-6.agents-empty-state
 - `[data-testid="agents-platform-view"]` — display — F-WS-6.agents-platform-view
-- `[data-testid="agents-review-in-git"]` — interactive — F-WS-6.agents-review-in-git
-- `[data-testid="agents-task-detail"]` — display — F-WS-6.agents-task-detail
-- `[data-testid="agents-trace"]` — display — F-WS-6.agents-trace
 - `[data-testid="global-search-input"]` — interactive — F-WS-6.global-search-input
 - `[data-testid="global-search-modal"]` — display — F-WS-6.global-search-modal
 - `[data-testid="global-search-result"]` — display — F-WS-6.global-search-result

@@ -7,10 +7,14 @@ import { create } from "zustand";
  */
 interface MainRailHostState {
   host: HTMLElement | null;
+  menuHost: HTMLElement | null;
+  setMenuHost: (host: HTMLElement | null) => void;
   setHost: (host: HTMLElement | null) => void;
 }
 
 export const useMainRailHostStore = create<MainRailHostState>((set) => ({
   host: null,
+  menuHost: null,
+  setMenuHost: (menuHost) => set((state) => (state.menuHost === menuHost ? state : { menuHost })),
   setHost: (host) => set((state) => (state.host === host ? state : { host })),
 }));

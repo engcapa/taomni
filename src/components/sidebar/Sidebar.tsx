@@ -21,6 +21,8 @@ interface SidebarProps {
   onCommand?: (command: AppCommand) => void;
   onStartLocalTerminal?: () => void;
   compact?: boolean;
+  railOnly?: boolean;
+  panelOnly?: boolean;
 }
 
 /**
@@ -38,6 +40,8 @@ export function Sidebar({
   onCommand,
   onStartLocalTerminal,
   compact = false,
+  railOnly = false,
+  panelOnly = false,
 }: SidebarProps) {
   const activeSideTab = useAppStore((state) => state.activeSideTab);
   const setRailHost = useMainRailHostStore((state) => state.setHost);
@@ -47,10 +51,13 @@ export function Sidebar({
 
   // Workspaces mode owns the rail: the legacy Code Workspace tool window rail
   // merges into it so the canvas never grows a second stripe (AC-03).
-  useEffect(() => () => setRailHost(null), [setRailHost]);
+  useEffect(() => {
+    if (panelOnly) return;
+    return () => setRailHost(null);
+  }, [panelOnly, setRailHost]);
 
   const panel = (() => {
-    if (compact) return null;
+    if (compact || railOnly) return null;
     switch (activeSideTab) {
       case "home":
         return (
@@ -63,14 +70,7 @@ export function Sidebar({
       case "workspaces":
         return <WorkspaceSidebar onOpenSessionPicker={() => openSessionPicker(activeWorkspaceId)} />;
       case "agents":
-        return (
-          <AgentsSidebar
-            onDispatchTask={() => {
-              useAppStore.getState().setActiveSideTab("agents");
-              useWorkspaceUiStore.getState().openAgentDispatch();
-            }}
-          />
-        );
+        return <AgentsSidebar />;
       case "tools":
         return <ToolsPanel onCommand={onCommand} />;
       case "sessions":
@@ -86,8 +86,8 @@ export function Sidebar({
   })();
 
   return (
-    <div data-testid="sidebar" className="h-full flex">
-      <PrimaryNavigationRail
+    <div data-testid={panelOnly ? undefined : "sidebar"} className="h-full flex">
+      {!panelOnly && <PrimaryNavigationRail
         compact={compact}
         railHostRef={setRailHost}
         onOpenSettings={onOpenSettings}
@@ -96,12 +96,12 @@ export function Sidebar({
           useAppStore.getState().setActiveSideTab("workspaces");
           openSessionPicker(activeWorkspaceId);
         }}
-      />
-      {!compact && (
+      />}
+      {!compact && !railOnly && (
         <div
           data-testid="sidebar-mode-panel"
           className="flex min-w-0 flex-1 flex-col"
-          style={{ background: "var(--taomni-sidebar-bg)", borderRight: "1px solid var(--taomni-sidebar-border)" }}
+          style={{ background: "var(--taomni-panel-bg)" }}
         >
           {panel}
         </div>

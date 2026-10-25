@@ -8,9 +8,9 @@ import { useMfaStore } from "../../stores/mfaStore";
 import { useVaultStore } from "../../stores/vaultStore";
 import { VaultSetupDialog } from "../vault/VaultSetupDialog";
 import { VaultUnlockDialog } from "../vault/VaultUnlockDialog";
+import { FLOATING_MFA_WIDTH } from "../../stores/app/layoutSlice";
 
 const TICK_MS = 500;
-const WINDOW_WIDTH = 310;
 
 /**
  * Bottom-left floating MFA authenticator (AC-04, TASK-04).
@@ -151,7 +151,7 @@ export function MfaFloatingWindow({ onExpand }: { onExpand: () => void }) {
         position: "fixed",
         left: floating.position.left,
         bottom: floating.position.bottom,
-        width: WINDOW_WIDTH,
+        width: FLOATING_MFA_WIDTH,
         maxHeight: "min(70vh, 520px)",
         zIndex: floating.pinned ? 960 : 950,
         borderColor: "var(--taomni-card-border)",

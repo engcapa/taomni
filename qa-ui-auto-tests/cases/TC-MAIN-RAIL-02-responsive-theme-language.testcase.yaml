@@ -18,8 +18,8 @@ steps:
   - click: '[data-testid="language-option-zh-CN"]'
   - click: '[data-testid="theme-cycle"]'
   - assert_localstorage: {key: taomni.appTheme.v1, equals: light}
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]', equals: 会话}
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', equals: 工具}
+  - assert_text_equals: {selector: '[data-testid="side-tab-sessions"]', equals: 会话}
+  - assert_text_equals: {selector: '[data-testid="side-tab-tools"]', equals: 工具}
   - eval_readonly:
       expression: getComputedStyle(document.querySelector('button[data-tool-window-id]')).writingMode === 'horizontal-tb'
       expect_truthy: true
@@ -34,7 +34,7 @@ steps:
       expression: JSON.stringify({fits:document.documentElement.scrollWidth<=innerWidth,viewport:innerWidth,document:document.documentElement.scrollWidth,main:document.querySelector('.taomni-main-window').scrollWidth,status:document.querySelector('.taomni-status').scrollWidth,title:document.querySelector('.taomni-control-bar').scrollWidth})
       contains: '"fits":true'
       timeout_sec: 3
-  - click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-sessions"]'
+  - click: '[data-testid="side-tab-sessions"]'
   - wait_for: '[data-testid="collapsed-sidebar-rail"]'
   - assert_visible: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]'
   - right_click: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]'
@@ -45,9 +45,9 @@ steps:
   - press: {selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-tools"]', key: Enter}
   - wait_for: '[data-testid="sidebar-tools-panel"]'
   - assert_visible: '[data-testid="sidebar-tool-code-workspace"]'
-  - right_click: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]'
+  - right_click: '[data-testid="side-tab-tools"]'
   - click: '[data-testid="sidebar-rail-menu-show-names"]'
-  - assert_text_equals: {selector: '[data-testid="expanded-sidebar-panel"] [data-testid="side-tab-tools"]', equals: 工具}
+  - assert_text_equals: {selector: '[data-testid="side-tab-tools"]', equals: 工具}
   - screenshot: main-rail-narrow-dark-names.png
   - click: '[data-testid="sidebar-tool-code-workspace"]'
   - wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="code-workspace-tool-rail-left"]'

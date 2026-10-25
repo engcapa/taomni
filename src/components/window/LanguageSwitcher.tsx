@@ -1,4 +1,4 @@
-import { Languages } from "lucide-react";
+import { Globe, Languages } from "lucide-react";
 import { useContextMenu } from "../ContextMenu";
 import { LOCALES, useLocale, useT } from "../../lib/i18n";
 
@@ -6,7 +6,7 @@ import { LOCALES, useLocale, useT } from "../../lib/i18n";
 // The `rail` variant is used by the primary navigation rail's bottom global
 // tools group (v6.1 AC-04); the titlebar variants are kept for detached
 // windows, which have no rail.
-export function LanguageSwitcher({ variant = "titlebar" }: { variant?: "titlebar" | "rail" } = {}) {
+export function LanguageSwitcher({ variant = "titlebar", showLabel = true }: { variant?: "titlebar" | "rail"; showLabel?: boolean } = {}) {
   const { locale, setLocale } = useLocale();
   const t = useT();
   const ctx = useContextMenu();
@@ -51,13 +51,13 @@ export function LanguageSwitcher({ variant = "titlebar" }: { variant?: "titlebar
         style={{ color: "var(--taomni-text)" }}
         onClick={openMenu}
       >
-        <Languages className={variant === "rail" ? "w-[16px] h-[16px]" : "w-[16px] h-[16px]"} />
-        <span
+        {variant === "rail" ? <Globe className="w-[16px] h-[16px]" /> : <Languages className="w-[16px] h-[16px]" />}
+        {showLabel && <span
           className="text-[10px] font-semibold uppercase tracking-wide"
           aria-hidden="true"
         >
           {locale === "en" ? "EN" : "中"}
-        </span>
+        </span>}
       </button>
     </>
   );

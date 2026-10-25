@@ -103,7 +103,7 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
   const executeControlToolRef = useRef<ControlToolExecutor | null>(null);
   const seenControlToolCallsRef = useRef<Set<string>>(new Set());
   const sidebarPanelRef = useRef<PanelImperativeHandle>(null);
-  const lastSidebarSizeRef = useRef(22);
+  const lastSidebarSizeRef = useRef(0);
   const [showSessionEditor, setShowSessionEditor] = useState(false);
   const [editingSession, setEditingSession] = useState<SessionConfig | undefined>();
   const [newSessionGroupPath, setNewSessionGroupPath] = useState<string | null>(null);
