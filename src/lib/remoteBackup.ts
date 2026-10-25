@@ -13,9 +13,12 @@ export interface BackupTarget {
   proxy: { mode: "app" | "custom" | "none"; custom: AppProxyConfig };
   source: { kind: string; schemaVersion: number; scope: string; customOptions: BackupCustomOptions | null };
   writesPaused: boolean;
+  /** Missing in legacy configurations means explicit per-target scope. */
+  rangeMode?: "inherit" | "custom";
 }
 export interface BackupControlConfig {
   formatVersion: number;
+  settingsRevision?: number;
   device: { id: string; name: string };
   targets: BackupTarget[];
   connections: FeishuConnection[];
@@ -37,6 +40,9 @@ export interface AuthorizationSession {
   revision: number;
   createdAt: number;
   phase: string;
+  cleanupComplete?: boolean | null;
+  cancelRequested?: boolean;
+  dismissedAt?: number | null;
   verificationUrl: string | null;
   userCode: string | null;
   error: string | null;
@@ -70,7 +76,7 @@ export interface BackupJob {
 }
 export interface RemoteConfiguration {
   config: BackupControlConfig;
-  statuses: { targetId: string; connected: boolean; passwordConfigured: boolean }[];
+  statuses: { targetId: string; connected: boolean; passwordConfigured: boolean; error?: string | null }[];
   cache?: { usedBytes: number; limitBytes: number; retentionDays: number };
 }
 export const remoteBackup = {
@@ -86,6 +92,8 @@ export const remoteBackup = {
   list: (targetId: string) => invoke<RemoteBackup[]>("backup_remote_list", { targetId }),
   start: (targetId: string) => invoke<string>("backup_remote_start", { targetId }),
   download: (remote: RemoteBackup) => invoke<string>("backup_remote_download", { remote }),
+  forgetAuthorization: (sessionId: string) => invoke<AuthorizationSession>("backup_feishu_authorization_forget", { sessionId }),
+  resumeWrites: (targetId: string) => invoke<void>("backup_remote_resume_writes", { targetId }),
   jobs: () => invoke<BackupJob[]>("backup_remote_jobs"),
   cancel: (jobId: string) => invoke<void>("backup_remote_cancel", { jobId }),
   retry: (jobId: string) => invoke<string>("backup_remote_retry", { jobId }),
@@ -95,7 +103,7 @@ export const remoteBackup = {
 export function newFeishuTarget(): BackupTarget {
   return {
     id: crypto.randomUUID(), name: "Feishu", kind: "feishu", enabled: false,
-    connectionId: null, rootToken: "", writesPaused: false,
+    connectionId: null, rangeMode: "inherit", rootToken: "", writesPaused: false,
     source: { kind: "taomni", schemaVersion: 1, scope: "core", customOptions: null },
     proxy: { mode: "app", custom: { enabled: true, mode: "manual", session_id: "", kind: "http", host: "", port: 3128, username: "", password_ref: "" } },
   };

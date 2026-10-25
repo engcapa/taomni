@@ -31,17 +31,33 @@ def setup(ctx: Any) -> None:
         job_id = str(uuid.uuid4())
         jobs.append({"id": job_id, "revision": 1, "targetId": target, "operation": operation, "phase": phase, "bytes": 128, "total": 128, "error": "BACKUP_TRANSIENT: synthetic connection failure" if phase != "completed" else None, "artifact": {"path": "fixture", "size": 128, "sha256": "fixture", "snapshotId": "fixture", "sourceKind": "taomni"}, "remote": None, "receipt": None, "createdAt": now - 1000 * len(jobs), "updatedAt": now, "attempts": 1, "nextRetryAt": now + 3600_000 if phase == "retry_wait" else None, "failureKind": "transient" if phase != "completed" else None})
     sessions = [{"id": str(uuid.uuid4()), "targetId": target, "revision": 1, "createdAt": now, "phase": "expired", "verificationUrl": None, "userCode": None, "error": "BACKUP_REGISTRATION_RECOVERY: Previous synthetic registration expired"}]
-    ctx.values.update(backup_waiting_id=jobs[0]["id"], backup_failed_id=jobs[1]["id"], backup_completed_id=jobs[2]["id"])
+    ctx.values.update(backup_target_id=target, backup_waiting_id=jobs[0]["id"], backup_failed_id=jobs[1]["id"], backup_completed_id=jobs[2]["id"])
+    if ctx.case_id in {"TC-BACKUP-AUTH-714", "TC-BACKUP-AUTH-715"}:
+        sessions = []
     if (ctx.cfg.get("app") or {}).get("mode") != "native":
         state = {"config": {"config": config, "statuses": [{"targetId": target, "connected": True, "passwordConfigured": True}], "cache": {"usedBytes": 384, "limitBytes": 2147483648, "retentionDays": 7}}, "jobs": jobs, "sessions": sessions, "files": []}
+        if ctx.case_id in {"TC-BACKUP-AUTH-714", "TC-BACKUP-AUTH-715"}:
+            state["sessions"] = [{"id": str(uuid.uuid4()), "targetId": target, "revision": 1, "createdAt": now,
+                "phase": "awaiting_authorization", "cleanupComplete": False, "cancelRequested": False,
+                "verificationUrl": None, "userCode": "QA714", "error": None}]
         if ctx.case_id == "TC-BACKUP-CLOUD-005":
             state["files"] = [{"targetId": target, "deviceId": id, "deviceName": name, "sourceKind": "taomni", "fileToken": "file" + id[0], "name": "Daily / current.taobak", "modifiedAt": ""} for id, name in [("11111111-1111-4111-8111-111111111111", "Office laptop"), ("22222222-2222-4222-8222-222222222222", "Home desktop")]]
         script = "if (!sessionStorage.getItem('qa.backup.seeded')) { localStorage.setItem('taomni.qa.backup.v1', " + json.dumps(json.dumps(state)) + "); sessionStorage.setItem('qa.backup.seeded','1'); }"
+        if ctx.case_id == "TC-BACKUP-SETTINGS-003":
+            script = "if (!sessionStorage.getItem('qa.backup.failure.seeded')) { localStorage.setItem('taomni.qa.backup.failSaves','1'); sessionStorage.setItem('qa.backup.failure.seeded','1'); }" + script
         ctx.page.context.add_init_script(script)
         return
     root = isolated_data_root(ctx) / "backup-control"
     setup_credential_store(ctx)
     root.mkdir(parents=True, exist_ok=True)
+    ctx.values.update(backup_policy_path=str(root.parent / "backup_policy.json"), backup_control_path=str(root / "config.json"))
+    if ctx.case_id == "TC-BACKUP-COMPAT-001":
+        import shutil
+        samples = Path(__file__).resolve().parents[6] / "src-tauri/tests/fixtures/backup"
+        history = root.parent / "backups"
+        history.mkdir(exist_ok=True)
+        for sample in samples.glob("*.taobak"):
+            shutil.copyfile(sample, history / sample.name)
     (root.parent / "backup_policy.json").write_text(json.dumps({"autoBackupEnabled": False, "frequency": "daily", "maxRetainedCopies": 7, "defaultScope": "core", "customBackupDir": None, "lastBackupAt": None}), encoding="utf-8")
     (root / "config.json").write_text(json.dumps(config), encoding="utf-8")
     for job in jobs:
@@ -54,7 +70,8 @@ def setup(ctx: Any) -> None:
         journal.parent.mkdir(exist_ok=True)
         journal.write_text(json.dumps(job), encoding="utf-8")
     (root / "authorization").mkdir(exist_ok=True)
-    (root / "authorization" / (sessions[0]["id"] + ".json")).write_text(json.dumps(sessions[0]), encoding="utf-8")
+    for session in sessions:
+        (root / "authorization" / (session["id"] + ".json")).write_text(json.dumps(session), encoding="utf-8")
     mode_path = Path(ctx.case_dir) / "backup-service-mode.txt"
     events_path = Path(ctx.case_dir) / "backup-service-events.txt"
     mode_path.write_text("normal", encoding="utf-8")
@@ -109,6 +126,13 @@ def setup(ctx: Any) -> None:
         def do_POST(self) -> None:
             body = self.rfile.read(int(self.headers.get("Content-Length", "0")))
             with mutex:
+                if self.path == "/authorization":
+                    self.event("authorization_started")
+                    return self.reply(200, {"device_code": "qa-714-device", "user_code": "QA714", "expires_in": 600, "interval": 1,
+                        "verification_uri_complete": "https://accounts.feishu.cn/oauth/v1/device/verify?flow_id=qa714"})
+                if self.path == "/token" and b"device_code" in body:
+                    self.event("authorization_pending")
+                    return self.reply(400, {"error": "authorization_pending"})
                 if self.path == "/token":
                     if mode_path.read_text().strip() == "revoked":
                         self.event("refresh_rejected")
@@ -132,6 +156,11 @@ def setup(ctx: Any) -> None:
                     state["files"][token] = {"token": token, "name": parts["file_name"].decode(), "type": "file", "parent": parts["parent_node"].decode(), "bytes": data}
                     if parts["file_name"] == b"current.taobak":
                         self.event("upload_sha256=" + hashlib.sha256(data).hexdigest())
+                        for journal in (root / "jobs").glob("*.json"):
+                            job = json.loads(journal.read_text(encoding="utf-8"))
+                            if job.get("operation") == "upload" and job.get("phase") not in {"completed", "discarded"}:
+                                source = job.get("executionSource") or {}
+                                self.event("execution_scope=" + source.get("scope", "legacy"))
                         if state["archive_token"] is not None:
                             if token != state["archive_token"]:
                                 self.event("ERROR: archive identity changed")

@@ -1,10 +1,9 @@
 id: TC-MAIL-STORAGE-02
 title: Native complete MIME, resumable storage, relocation, backup selection and physical cleanup
-description: Uses only a disposable QA profile, loopback IMAP/SMTP, independent MIME checksums and read-only
-  SQLite/gzip/ZIP observations. Runs on Linux/WebKitGTK, Windows/WebView2 and macOS/WKWebView. Restore
-  inspection is exercised; restart/apply and encrypted backup compatibility are covered by Rust tests
-  and require follow-up native restore execution. Linux native is exercised with a separate QA profile;
-  Windows/macOS remain pending.
+description: Uses only a disposable QA profile, loopback IMAP/SMTP, independent MIME checksums and read-only SQLite/gzip/ZIP
+  observations. Runs on Linux/WebKitGTK, Windows/WebView2 and macOS/WKWebView. Restore inspection is exercised;
+  restart/apply and encrypted backup compatibility are covered by Rust tests and require follow-up native restore
+  execution. Linux native is exercised with a separate QA profile; Windows/macOS remain pending.
 covers:
 - F-MAIL-23
 - F-BACKUP-1
@@ -151,9 +150,9 @@ steps:
 - click: '[data-testid="ribbon-settings"]'
 - click: '[data-testid="settings-group-toggle-backup"]'
 - set_check:
-    selector: '[data-testid="backup-include-mail"]'
+    selector: '[data-testid="backup-global-include-mail"]'
     checked: true
-- click: '[data-testid="backup-create-now"]'
+- click: '[data-testid="backup-selected-start"]'
 - wait_for:
     selector: '[data-testid="backup-action-success"]'
     timeout_sec: 60
@@ -171,9 +170,9 @@ steps:
     timeout_sec: 30
 - click: '[data-testid="backup-restore-cancel"]'
 - set_check:
-    selector: '[data-testid="backup-include-mail"]'
+    selector: '[data-testid="backup-global-include-mail"]'
     checked: false
-- click: '[data-testid="backup-create-now"]'
+- click: '[data-testid="backup-selected-start"]'
 - wait_for:
     selector: '[data-testid="backup-action-success"]'
     timeout_sec: 60
@@ -184,7 +183,7 @@ steps:
     include_mail: false
     objects: 0
 - set_check:
-    selector: '[data-testid="backup-auto-include-mail"]'
+    selector: '[data-testid="backup-global-include-mail"]'
     checked: true
 - assert_file_contains:
     path: ${fixture.mail_qa_data}/backup_policy.json
@@ -283,8 +282,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Selected INBOX downloads complete MIME and attachments, Archive keeps summaries, pause/resume
-      and directory relocation retain exact bytes.
+    requirement: Selected INBOX downloads complete MIME and attachments, Archive keeps summaries, pause/resume and
+      directory relocation retain exact bytes.
     actions:
     - 2
     - 4
@@ -313,27 +312,25 @@ verification:
     - 38
     checkpoints:
     - step: 29
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'':
-        ''paused'', ''timeout_sec'': 60}}'
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'': ''paused'',
+        ''timeout_sec'': 60}}'
     - step: 31
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'':
-        ''completed'', ''timeout_sec'': 120}}'
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'': ''completed'',
+        ''timeout_sec'': 120}}'
     - step: 32
-      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_a}'', ''expected'':
-        ''${fixture.mail_expected}'', ''full'': {''INBOX'': 2}, ''headers'': {''INBOX'': 2, ''Archive'':
-        2}}}'
+      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_a}'', ''expected'': ''${fixture.mail_expected}'',
+        ''full'': {''INBOX'': 2}, ''headers'': {''INBOX'': 2, ''Archive'': 2}}}'
     - step: 40
-      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_b}'', ''expected'':
-        ''${fixture.mail_expected}'', ''full'': {''INBOX'': 2}, ''headers'': {''INBOX'': 2, ''Archive'':
-        2}}}'
+      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_b}'', ''expected'': ''${fixture.mail_expected}'',
+        ''full'': {''INBOX'': 2}, ''headers'': {''INBOX'': 2, ''Archive'': 2}}}'
     results:
     - 29
     - 31
     - 32
     - 40
   - id: R2
-    requirement: Server expunge retains readable originals; backups include/exclude mail as selected;
-      explicit cleanup frees gzip objects and preserves other-folder summaries.
+    requirement: Server expunge retains readable originals; backups include/exclude mail as selected; explicit cleanup
+      frees gzip objects and preserves other-folder summaries.
     actions:
     - 23
     - 42
@@ -363,45 +360,42 @@ verification:
     - step: 43
       expectation: '{''mail_server_assert_list_matches'': {''timeout_sec'': 60}}'
     - step: 46
-      expectation: '{''assert_count'': {''selector'': ''[data-testid="mail-archive-row"]'', ''equal'':
-        2}}'
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="mail-archive-row"]'', ''equal'': 2}}'
     - step: 48
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-preview"]'', ''contains'':
-        ''complete.bin'', ''timeout_sec'': 30}}'
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-preview"]'', ''contains'': ''complete.bin'',
+        ''timeout_sec'': 30}}'
     - step: 50
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-preview"]'', ''contains'':
-        ''Offline body'', ''timeout_sec'': 30}}'
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-preview"]'', ''contains'': ''Offline
+        body'', ''timeout_sec'': 30}}'
     - step: 52
-      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_b}'', ''expected'':
-        ''${fixture.mail_expected}'', ''full'': {''INBOX'': 2}, ''headers'': {''INBOX'': 0, ''Archive'':
-        2}}}'
+      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_b}'', ''expected'': ''${fixture.mail_expected}'',
+        ''full'': {''INBOX'': 2}, ''headers'': {''INBOX'': 0, ''Archive'': 2}}}'
     - step: 58
-      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_qa_data}/backups'', ''expected'':
-        ''${fixture.mail_expected}'', ''kind'': ''backup'', ''include_mail'': True, ''objects'': 2}}'
+      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_qa_data}/backups'', ''expected'': ''${fixture.mail_expected}'',
+        ''kind'': ''backup'', ''include_mail'': True, ''objects'': 2}}'
     - step: 61
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="backup-restore-files"]'', ''contains'':
-        ''.eml.gz'', ''timeout_sec'': 30}}'
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="backup-restore-files"]'', ''contains'': ''.eml.gz'',
+        ''timeout_sec'': 30}}'
     - step: 66
-      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_qa_data}/backups'', ''expected'':
-        ''${fixture.mail_expected}'', ''kind'': ''backup'', ''include_mail'': False, ''objects'': 0}}'
+      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_qa_data}/backups'', ''expected'': ''${fixture.mail_expected}'',
+        ''kind'': ''backup'', ''include_mail'': False, ''objects'': 0}}'
     - step: 68
-      expectation: '{''assert_file_contains'': {''path'': ''${fixture.mail_qa_data}/backup_policy.json'',
-        ''contains'': ''"includeMail": true''}}'
+      expectation: '{''assert_file_contains'': {''path'': ''${fixture.mail_qa_data}/backup_policy.json'', ''contains'':
+        ''"includeMail": true''}}'
     - step: 75
-      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_b}'', ''expected'':
-        ''${fixture.mail_expected}'', ''full'': {''INBOX'': 2}, ''headers'': {''Archive'': 2}}}'
+      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_b}'', ''expected'': ''${fixture.mail_expected}'',
+        ''full'': {''INBOX'': 2}, ''headers'': {''Archive'': 2}}}'
     - step: 78
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-notice"]'', ''contains'':
-        ''Removed 2 local originals'', ''timeout_sec'': 30}}'
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-archive-notice"]'', ''contains'': ''Removed
+        2 local originals'', ''timeout_sec'': 30}}'
     - step: 79
-      expectation: '{''assert_count'': {''selector'': ''[data-testid="mail-archive-row"]'', ''equal'':
-        0}}'
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="mail-archive-row"]'', ''equal'': 0}}'
     - step: 80
-      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_b}'', ''expected'':
-        ''${fixture.mail_expected}'', ''full'': {}, ''headers'': {''Archive'': 2}}}'
+      expectation: '{''mail_storage_assert'': {''root'': ''${fixture.mail_storage_b}'', ''expected'': ''${fixture.mail_expected}'',
+        ''full'': {}, ''headers'': {''Archive'': 2}}}'
     - step: 82
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'':
-        ''paused'', ''timeout_sec'': 30}}'
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-progress"]'', ''contains'': ''paused'',
+        ''timeout_sec'': 30}}'
     results:
     - 43
     - 46
@@ -418,8 +412,8 @@ verification:
     - 80
     - 82
   - id: R3
-    requirement: A new unconnected session has no discovered folders and explains how to populate the
-      local cache; manual exact names remain supported by the main flow.
+    requirement: A new unconnected session has no discovered folders and explains how to populate the local cache;
+      manual exact names remain supported by the main flow.
     actions:
     - 14
     checkpoints:
@@ -431,8 +425,8 @@ verification:
     - 15
     - 16
   - id: R4
-    requirement: After syncing, encoded IMAP names display decoded labels; selected exact server keys
-      persist when saved and reopened, and survive switching include/exclude mode.
+    requirement: After syncing, encoded IMAP names display decoded labels; selected exact server keys persist when
+      saved and reopened, and survive switching include/exclude mode.
     actions:
     - 84
     - 85
@@ -451,20 +445,20 @@ verification:
     - 110
     checkpoints:
     - step: 95
-      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-settings"]'', ''contains'':
-        ''Folders from the last sync; available offline''}}'
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-storage-settings"]'', ''contains'': ''Folders
+        from the last sync; available offline''}}'
     - step: 97
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'',
-        ''name'': ''value'', ''equals'': ''&U,BTFw-''}}'
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'', ''name'':
+        ''value'', ''equals'': ''&U,BTFw-''}}'
     - step: 103
       expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folders"] input[aria-label="台北"]'',
         ''name'': ''value'', ''equals'': ''&U,BTFw-''}}'
     - step: 104
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'',
-        ''name'': ''value'', ''equals'': ''&U,BTFw-''}}'
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'', ''name'':
+        ''value'', ''equals'': ''&U,BTFw-''}}'
     - step: 106
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'',
-        ''name'': ''value'', ''equals'': ''&U,BTFw-''}}'
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="mail-storage-folder-names"]'', ''name'':
+        ''value'', ''equals'': ''&U,BTFw-''}}'
     - step: 111
       expectation: Settings close normally after inspecting cached folder selections.
     results:

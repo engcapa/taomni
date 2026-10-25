@@ -4,6 +4,7 @@ import type { Tab } from "../../types";
 import { exitApp } from "../../lib/ipc";
 import { listQueryTabs } from "../../lib/queryRegistry";
 import { t as tr } from "../../lib/i18n";
+import { saveBackupSettingsBeforeExit } from "../../stores/backupSettingsStore";
 
 
 export interface UseApplicationExitContext {
@@ -45,6 +46,12 @@ export function useApplicationExit(context: UseApplicationExitContext) {
     void (async () => {
       try {
         if (!(await confirmExitWithOpenTabs())) return;
+        if (!await saveBackupSettingsBeforeExit(() => confirmAppExit({
+          title: tr("backupUnified.unsavedTitle"),
+          message: tr("backupUnified.unsavedExit"),
+          confirmLabel: tr("backupUnified.retrySave"),
+          cancelLabel: tr("exit.cancelExit"),
+        }))) return;
         await Promise.allSettled(
           listQueryTabs().map((entry) => entry.flushWorkspace?.()),
         );

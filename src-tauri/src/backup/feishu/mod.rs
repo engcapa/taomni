@@ -1,4 +1,7 @@
 pub mod auth;
+mod auth_connect;
+mod auth_service;
+mod auth_session;
 pub mod cli_config;
 mod cli_secret;
 mod device_flow;

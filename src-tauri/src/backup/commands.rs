@@ -13,28 +13,37 @@ pub struct TargetStatus {
     target_id: String,
     connected: bool,
     password_configured: bool,
+    error: Option<String>,
 }
 #[derive(Serialize)]
 pub struct Configuration {
-    config: ControlConfig,
-    statuses: Vec<TargetStatus>,
-    cache: super::cache::CacheStatus,
+    pub(crate) config: ControlConfig,
+    pub(crate) statuses: Vec<TargetStatus>,
+    pub(crate) cache: super::cache::CacheStatus,
 }
 #[tauri::command]
 pub async fn backup_remote_get_config(app: AppHandle) -> Result<Configuration, String> {
     let config = control::load(&app)?;
     let mut statuses = vec![];
     for target in &config.targets {
-        let secrets = credentials::get(&config.device.id, &target.id)?;
-        let connected = if let Some(id) = &target.connection_id {
-            feishu::auth::connected(&credentials::get_connection(&config.device.id, id)?)
-        } else {
-            false
+        let outcome = (|| -> Result<(bool, bool), String> {
+            let secrets = credentials::get(&config.device.id, &target.id)?;
+            let connected = if let Some(id) = &target.connection_id {
+                feishu::auth::connected(&credentials::get_connection(&config.device.id, id)?)
+            } else {
+                false
+            };
+            Ok((connected, !secrets.archive_password.is_empty()))
+        })();
+        let (connected, password_configured, error) = match outcome {
+            Ok((connected, password)) => (connected, password, None),
+            Err(error) => (false, false, Some(error)),
         };
         statuses.push(TargetStatus {
             target_id: target.id.clone(),
             connected,
-            password_configured: !secrets.archive_password.is_empty(),
+            password_configured,
+            error,
         });
     }
     Ok(Configuration {
@@ -131,6 +140,28 @@ pub fn backup_feishu_authorization_cancel(
     feishu::auth::cancel(&app, &session_id)
 }
 #[tauri::command]
+pub fn backup_feishu_authorization_forget(
+    app: AppHandle,
+    session_id: String,
+) -> Result<AuthorizationSession, String> {
+    feishu::auth::forget(&app, &session_id)
+}
+#[tauri::command]
+pub fn backup_remote_resume_writes(app: AppHandle, target_id: String) -> Result<(), String> {
+    let _owner = jobs::claim(&app)?;
+    app.state::<BackupJobs>().while_idle(|| {
+        control::update(&app, |config| {
+            let target = config
+                .targets
+                .iter_mut()
+                .find(|t| t.id == target_id)
+                .ok_or("Backup target not found")?;
+            target.writes_paused = false;
+            Ok(())
+        })
+    })
+}
+#[tauri::command]
 pub async fn backup_remote_list(
     app: AppHandle,
     target_id: String,
@@ -143,7 +174,8 @@ pub async fn backup_remote_list(
 }
 #[tauri::command]
 pub fn backup_remote_start(app: AppHandle, target_id: String) -> Result<String, String> {
-    jobs::start(&app, &target_id, None, None)
+    let policy = super::policy::load_policy_result(&app)?;
+    jobs::start_manual(&app, &target_id, super::range::global(&policy).source())
 }
 #[tauri::command]
 pub fn backup_remote_download(app: AppHandle, remote: RemoteBackup) -> Result<String, String> {

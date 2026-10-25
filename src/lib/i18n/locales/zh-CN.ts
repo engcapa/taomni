@@ -6,6 +6,49 @@ import { modelInspectorZh } from "./modelInspector";
 type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
 export const zhCN: DeepPartial<typeof en> = {
+  backupUnified: {
+    "unsavedTitle": "备份设置尚未保存",
+    "unsavedExit": "备份设置保存失败，Taomni 已保持打开。请重试保存，或取消退出后检查设置。",
+    "introduction": "统一管理备份范围、自动备份渠道和手工备份。",
+    "globalDefaults": "全局默认配置",
+    "globalHint": "手工备份始终使用此范围。自动备份渠道默认继承，也可单独覆盖。",
+    "destinations": "备份渠道",
+    "automaticRange": "自动备份范围",
+    "inherit": "继承全局范围",
+    "customRange": "自定义范围",
+    "core": "核心数据",
+    "full": "完整数据",
+    "custom": "自定义选择",
+    "includeSessions": "会话与服务器密钥",
+    "includeNotes": "笔记",
+    "includeVault": "凭据保险库",
+    "includeMfa": "MFA 账户",
+    "includeConfigs": "应用配置",
+    "includeLanchat": "局域网聊天",
+    "includeMail": "邮件",
+    "includeLocalHistory": "本地文件历史",
+    "emptyRange": "未选择数据",
+    "rangeHint": "完整数据在核心数据上增加局域网聊天和邮件。本地文件历史需自定义勾选；包含 MFA 账户时也会包含凭据保险库。",
+    "loading": "正在加载配置…",
+    "saving": "正在保存…",
+    "saved": "已保存",
+    "error": "未保存，请重试",
+    "retrySave": "重试保存",
+    "authorization": "飞书授权",
+    "cancelling": "正在取消…等待后台清理完成",
+    "dismissAuthorization": "清除本地授权提示",
+    "removedDestination": "已移除的渠道",
+    "enableDestination": "启用此渠道",
+    "manualGlobal": "使用下方显示的已保存全局范围，渠道的自定义范围仅用于自动备份。",
+    "localEncryption": "加密本地备份／导出文件",
+    "cloudEncryption": "各云端渠道使用其独立保存的备份加密密码。",
+    "passwordConfigured": "已在系统凭据库中保存备份密码，可输入新密码替换。",
+    "savePassword": "保存备份密码",
+    "removeDestination": "移除渠道",
+    "removeConfirm": "从本地配置移除此渠道？已有云端备份文件仍会保留。",
+    "tasksHistory": "云端任务与历史",
+    "retentionHint": "保留份数用于本地自动备份快照，云端文件历史由服务商管理。"
+},
   modelInspector: modelInspectorZh,
 
   app: {
@@ -3552,6 +3595,7 @@ export const zhCN: DeepPartial<typeof en> = {
       "interrupted": "已中断，请重新连接"
     },
     "errors": {
+      "conflict": "配置已在其他窗口变更，请检查保留的修改并重试保存。",
       "storage": "本地云备份缓存已满。请清理已完成的缓存，或丢弃不再需要的未完成任务后重试。",
       "otherInstance": "另一个 Taomni 窗口正在处理此数据库的云备份。请等待其完成，或在该窗口管理任务。",
       "failed": "操作失败。展开详情查看原因，再重试。",
