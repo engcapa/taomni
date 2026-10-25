@@ -8,6 +8,23 @@ import subprocess
 import threading
 
 
+def observe_window_tree(argv, report, stop):
+    """Keep polling after a transient X client failure; never retain stale evidence."""
+    pending = report.with_suffix(".tmp")
+    while not stop.wait(.25):
+        try:
+            result = subprocess.run(argv, capture_output=True, text=True, timeout=5)
+            text = result.stdout if result.returncode == 0 else (
+                f"X11 window observation unavailable (exit {result.returncode}): {result.stderr}\n"
+            )
+        except (subprocess.TimeoutExpired, OSError) as error:
+            text = f"X11 window observation unavailable: {error}\n"
+        # Both successful samples and failures replace the previous observation.
+        # Atomic publication keeps assertions from reading a truncated snapshot.
+        pending.write_text(text, encoding="utf-8")
+        pending.replace(report)
+
+
 def install():
     from ci_services import command
     system = platform.system()
@@ -51,12 +68,8 @@ def start(services):
     retry(lambda: command([tool("xdpyinfo")]))
     report = services.root / "x11-window-tree.txt"
     stop = threading.Event()
-    def observe():
-        while not stop.wait(.25):
-            result = subprocess.run([str(tool("xwininfo")), "-root", "-tree"], capture_output=True, text=True, timeout=5)
-            if result.returncode == 0:
-                report.write_text(result.stdout, encoding="utf-8")
-    watcher = threading.Thread(target=observe, daemon=True)
+    watcher = threading.Thread(target=observe_window_tree,
+        args=([str(tool("xwininfo")), "-root", "-tree"], report, stop), daemon=True)
     watcher.start()
     services.cleanup_action("x11-window-observer", lambda: (stop.set(), watcher.join(6)))
     services.config["ssh_features"]["desktop_command"] = f"exec {shlex.quote(path(tool('xclock')))} -title TaomniQADesktop"

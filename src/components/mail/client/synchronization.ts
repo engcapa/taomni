@@ -447,14 +447,15 @@ export function createSyncAllFolders(controllerContext: SyncAllFoldersContext): 
         controllerContext.updateSelectedFolder(nextFolder);
       }
       const loaded = controllerContext.messagesRef.current.filter((message) => message.folder === nextFolder).length;
-      await controllerContext.loadCachedMessages(nextFolder, 0, false, quiet || indicator === "none", Math.max(controllerContext.pageSize, loaded));
+      // Refresh the list without publishing a cache-load notice: a read/delete
+      // action may already have completed while this scan was in flight.
+      await controllerContext.loadCachedMessages(nextFolder, 0, false, true, Math.max(controllerContext.pageSize, loaded));
       const failed = result.failedFolders ?? [];
       if (indicator !== "none") {
-        controllerContext.setStatus(
-          `Synced ${result.fetchedMessages} new headers across ${result.folders.length} folders`
+        const completion = `Synced ${result.fetchedMessages} new headers across ${result.folders.length} folders`
           + (failed.length > 0 ? `; ${failed.length} folder${failed.length === 1 ? "" : "s"} failed` : "")
-          + (pending.length > 0 ? "; remaining headers syncing in background" : ""),
-        );
+          + (pending.length > 0 ? "; remaining headers syncing in background" : "");
+        controllerContext.setStatus((current) => manual && current !== null ? current : completion);
       }
       void controllerContext.warmRecentBodies(controllerContext.foldersRef.current, nextFolder);
       controllerContext.startBackfill(nextFolder);
