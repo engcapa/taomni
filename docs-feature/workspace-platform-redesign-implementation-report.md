@@ -9,6 +9,14 @@
 
 ## 追加反馈与跨平台回归（2026-10-25）
 
+2026-10-26 手工反馈的 Workspaces 点击崩溃已定位：`WorkspaceShellView` 将 Project 的开关状态传给编辑器面板的 `defaultSize`。编辑器在终端标签后隐藏时，修改该初始参数会重新注册面板；所有隐藏面板的尺寸均为零，注册顺序变为 Documentation → Editor，而 DOM 仍为 Editor → Documentation，分隔条计算抛出 `Panel constraints not found for index 2`。编辑器初始尺寸改为在挂载时固定，后续尺寸继续由已有面板 ref 与工具窗口状态管理，不重挂载工作区或清除保存数据。
+
+新增 `TC-WS-038`（browser/native），从真实 UI 添加目录、编辑草稿、打开终端并隐藏 Project，覆盖从 Home 重载后恢复、活动终端和草稿保留、Project/Documentation 操作及重复模式切换。修复前 browser `workspace-browser/run-20261026-065630-378365475` 和 native `workspace-native/run-20261026-065651-938619483` 均出现与用户截图相同的崩溃；另将用户保存布局只读复制到隔离浏览器重现，保留 `_local/workspace-panel-debug/` 证据。修复后本机 browser `workspace-browser/run-20261026-070051-774089364` 的 4 个 ID 全部通过、`identity_stable=true`，包含新增回归、编辑器撤销/保存、Project 宽度保持和分隔条/分屏。最新三平台相关集及全量继续执行；本机结果不代表最终 GitHub 验收已完成。
+
+QA v14 构建完成，`pnpm build --mode qa`（包含 `pnpm check:refactor`）通过。修复后的 native `TC-WS-038` 在 `workspace-native/run-20261026-070414-014308167` 通过、`identity_stable=true`，与 browser 使用相同源码指纹 `aa073f2b470cdd68cf1839c5f97fe304dcc7d543f81ded3c83e3e9bca3284356`。本机手测二进制为 `src-tauri/target/qa-ui-auto/debug/taomni`。原生保留行为批次 `workspace-native/run-20261026-070543-921207439` 的 3 个 ID 全部通过、`identity_stable=true`，包含 `TC-WS-017` 编辑器撤销/保存、`TC-IDE-PARITY-027-03-merged-rail-workspace-native` 导航宽度/工具窗口和 `TC-WS-030` 两次真实冷启动、SSH/SFTP/PTY 与磁盘冲突。新修复本机总计 4 browser + 4 native 全部通过；全程 browser 不超过 2 workers、native 顺序执行，静态 QA 审计通过。
+
+Windows 冷启动工具修复在 [40241207602](https://github.com/engcapa/taomni/actions/runs/40241207602) 完整通过，聚合为 1 passed、0 failures、0 infrastructure errors。两次真实重启均记录 `Windows TCP listener table`、端口 `[4444, 4445]` 无监听及正常关闭观察。旧相关集 [40239319086](https://github.com/engcapa/taomni/actions/runs/40239319086) 已回收的 browser 为 773/773、Linux native 166/166、macOS native 135/135；Windows native 尚在执行。该旧运行尚未覆盖新增的隐藏编辑器布局场景，因此此前未发现本次手工反馈的崩溃；最终相关集需纳入新用例后重新执行。
+
 2026-10-26 最新续验：同一栏的重复 Git 按钮已删除；共享编辑工具栏只保留“在 Git 中比较”，主导航条保留完整 Git 管理入口。`TC-WS-006` 增加数量断言，并继续执行六种 Git 视图、提交选项、多仓库和 Diff 切换，browser/native 定向复跑均通过。根目录行的重复入口也已移除，组件回归保护该边界。
 
 在 `9fc7f4aa` 时本机有效回执核验结果为 **25 个 browser ID、6 个 native ID 全部通过**，无拒绝、过期或缺失结果，记录为 `_local/workspace-current-local-evidence.json`。Browser 主批次为 `workspace-browser/run-20261026-042552-094346821`，更新后的 Git 用例为 `run-20261026-043939-150540769`。Native 为 `workspace-native/run-20261026-042551-971492851`（4 passed / 1 SSH 服务未启动而 skipped）、`run-20261026-042848-716576587`（使用独立服务完整重跑冷启动恢复并通过）、`run-20261026-043110-456493505`（真实 GSS/SSH 与 SFTP 通过）及 `run-20261026-043939-464029535`（最终 Git 用例通过）。保留首次服务缺口，不计作通过；6 个 ID 在该版本的最新适用结果均为 passed。

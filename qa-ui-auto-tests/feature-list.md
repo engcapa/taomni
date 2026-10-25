@@ -12878,3 +12878,5 @@ controls:
 工作区普通目录复用完整编辑器、LSP 与全局外观设置：`TC-WS-034`（browser），`TC-WS-035`（native、真实 Java LSP 与磁盘）。
 
 普通文件 workspace 浏览与编辑：`TC-WS-036`（browser），`TC-WS-037`（native 复制与磁盘保存）；保留递归搜索、源码视图和完整编辑器，顶部仅保留当前文件 Git 差异入口。
+
+隐藏编辑器布局恢复：`TC-WS-038`（browser/native），通过用户入口隐藏 Project、切换到终端、从 Home 重载并恢复，保留草稿、活动标签及工具窗口；覆盖零尺寸面板注册顺序导致的崩溃。

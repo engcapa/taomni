@@ -1,0 +1,182 @@
+id: TC-WS-038
+title: Restore a workspace with a terminal selected and its editor hidden
+description: Create the saved layout through the UI, reload on Home, then return to a workspace whose file editor is mounted behind a terminal. Retain the
+  draft, terminal, navigator and tool controls.
+modes:
+- browser
+- native
+covers:
+- F-WS-1
+- F-WS-2
+- F-WS-5
+- F25.3
+tags:
+- p0
+- workspace-redesign
+- regression
+fixtures:
+- reset_db
+- platform_workspace_root
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-hidden-editor
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="workspace-empty-add-folder"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.platform_workspace_root}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree"]'
+- click: '[data-testid="code-workspace-tree-root"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- wait_for: '[data-testid="workspace-file-editor"] .cm-content'
+- press:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    key: Mod+End
+- type:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    text: QA_HIDDEN_EDITOR_DRAFT
+- wait_for: '[data-testid="workspace-file-editor"][data-dirty="true"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="workspace-session-pane"]'
+- click: '[data-testid="code-workspace-tool-rail-project"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-session-pane"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-tab-title
+    equals: Local Terminal
+- assert_visible: '[data-testid="collapsed-sidebar-rail"]'
+- click: '[data-testid="workspace-tab"][data-tab-title="README.md"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-dirty="true"] .cm-content'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    contains: QA_HIDDEN_EDITOR_DRAFT
+- click: '[data-testid="code-workspace-tool-rail-project"]'
+- wait_for: '[data-testid="code-workspace-tree"]'
+- assert_visible: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- click: '[data-testid="code-workspace-tool-rail-documentation"]'
+- assert_visible: '[data-testid="code-workspace-right-pane"]'
+- click: '[data-testid="code-workspace-tool-rail-documentation"]'
+- assert_not_visible: '[data-testid="code-workspace-right-pane"]'
+- click: '[data-testid="workspace-tab"][data-tab-title="Local Terminal"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-session-pane"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 1
+- click: '[data-testid="workspace-tab"][data-tab-title="README.md"]'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    contains: QA_HIDDEN_EDITOR_DRAFT
+- screenshot: workspace-hidden-editor-restored.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A terminal-selected workspace with a hidden editor can be restored from Home without crashing. Its active terminal, collapsed sidebar and
+      dirty draft survive; Project and Documentation still toggle and repeated mode switches keep one editor runtime.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 8
+    - 9
+    - 11
+    - 12
+    - 14
+    - 15
+    - 17
+    - 19
+    - 21
+    - 23
+    - 27
+    - 30
+    - 33
+    - 35
+    - 37
+    - 38
+    - 39
+    - 40
+    - 43
+    checkpoints:
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-dirty=\"true\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "Local
+        Terminal"}}'
+    - step: 26
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-dirty=\"true\"] .cm-content"}'
+    - step: 29
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_HIDDEN_EDITOR_DRAFT"}}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
+    - step: 32
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
+    - step: 34
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
+    - step: 36
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
+    - step: 41
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 42
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
+    - step: 44
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_HIDDEN_EDITOR_DRAFT"}}'
+    results:
+    - 7
+    - 10
+    - 13
+    - 16
+    - 18
+    - 20
+    - 22
+    - 24
+    - 25
+    - 26
+    - 28
+    - 29
+    - 31
+    - 32
+    - 34
+    - 36
+    - 41
+    - 42
+    - 44
+  native:
+  - check: Restore the hidden editor behind the active terminal in the packaged WebView.
+    method: automated
+    reason: The reported desktop crash depends on mounting and resizing invisible panels. Browser geometry cannot certify packaged WebView behavior; real
+      PTY commands remain covered by TC-WS-015 and TC-WS-024.
+  visual:
+  - check: Restored file, terminal and compact navigator remain usable.
+    method: manual
+    reason: Retain the screenshot; assertions establish restoration and control behavior.

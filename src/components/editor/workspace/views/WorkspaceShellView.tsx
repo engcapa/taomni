@@ -80,6 +80,11 @@ export interface WorkspaceShellViewProps {
 
 export function WorkspaceShellView(props: WorkspaceShellViewProps) {
   const host = useWorkspaceHost();
+  // defaultSize is a mount-time input. Changing it re-registers the panel;
+  // when a terminal hides this group, every panel has zero geometry and the
+  // library can put the re-registered editor after Documentation. Its separator
+  // then targets a nonexistent panel. Live tool visibility uses panel refs.
+  const initialEditorPanelSize = useRef(props.languagePanelOpen ? "56%" : "80%").current;
   const previousLeftOpen = useRef<boolean | null>(null);
   useEffect(() => {
     const open = props.toolWindowRouting.leftToolAreaOpen;
@@ -112,7 +117,6 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
     initialProjectPanelSize,
     toolWindowActions,
     renderToolWindowSideArea,
-    languagePanelOpen,
     workspaceUi,
     editorLayout,
     renderEditorGroup,
@@ -265,7 +269,7 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
                 />}
                 <Panel
                   id="editor"
-                  defaultSize={languagePanelOpen ? "56%" : "80%"}
+                  defaultSize={initialEditorPanelSize}
                   minSize="37px"
                   className="min-w-0"
                 >
