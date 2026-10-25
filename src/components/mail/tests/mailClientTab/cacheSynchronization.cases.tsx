@@ -1,10 +1,49 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { expect, it } from "vitest";
-import type { MailMessageHeader, MailSyncAllResult } from "../../../../lib/mail";
+import type { MailMessageBody, MailMessageHeader, MailSyncAllResult } from "../../../../lib/mail";
 import { MailClientTab } from "../../MailClientTab";
-import { folder, info, mailMocks, message, renderMailbox, stepResult } from "./harness";
+import { folder, info, mailMocks, message, messageBody, renderMailbox, stepResult } from "./harness";
 
 export function registerMailCacheSynchronizationCases() {
+  for (const source of ["cache", "server"] as const) {
+    it(`retains a folder-read notice when a ${source} body finishes afterward`, async () => {
+      let finishBody!: (body: MailMessageBody) => void;
+      mailMocks.mailListCachedFolders.mockResolvedValue([{ ...folder, unread: 1 }]);
+      mailMocks.mailGetMessageBody.mockImplementationOnce(() => new Promise((resolve) => { finishBody = resolve; }));
+      mailMocks.mailMarkRead.mockImplementation(async () => {
+        mailMocks.mailListCachedFolders.mockResolvedValue([{ ...folder, unread: 0 }]);
+        mailMocks.mailListCachedMessages.mockResolvedValue([{ ...message, flags: ["\\Seen"] }]);
+        return { folder: "INBOX", marked: 1 };
+      });
+      renderMailbox();
+      await waitFor(() => expect(finishBody).toBeDefined());
+      fireEvent.click(screen.getByTestId("mail-mark-folder-read"));
+      await screen.findByText("Marked 1 messages as read");
+      await act(async () => finishBody({ ...messageBody, source }));
+      await screen.findByText(/Second line stays visible/);
+      expect(screen.getByTestId("mail-client-tab")).toHaveTextContent("Marked 1 messages as read");
+      expect(screen.getByTestId("mail-message-row")).toHaveAttribute("data-unread", "false");
+    });
+
+    it(`retains normal ${source} body loading feedback without a completed operation`, async () => {
+      mailMocks.mailGetMessageBody.mockResolvedValue({ ...messageBody, source });
+      renderMailbox();
+      await screen.findByText(`Loaded body from ${source}`);
+      await screen.findByText(/Second line stays visible/);
+    });
+  }
+
+  it("shows a new manual sync result after a completed folder-read operation", async () => {
+    mailMocks.mailListCachedFolders.mockResolvedValue([{ ...folder, unread: 1 }]);
+    mailMocks.mailMarkRead.mockResolvedValue({ folder: "INBOX", marked: 1 });
+    renderMailbox();
+    await screen.findByText(/Second line stays visible/);
+    fireEvent.click(screen.getByTestId("mail-mark-folder-read"));
+    await screen.findByText("Marked 1 messages as read");
+    fireEvent.click(screen.getByTestId("mail-sync-button"));
+    await screen.findByText("Synced 0 new headers across 1 folders");
+  });
+
   it("retains a completed folder-read notice when an earlier manual sync finishes", async () => {
     let finishSync!: (result: MailSyncAllResult) => void;
     const readFolder = { ...folder, unread: 0 };

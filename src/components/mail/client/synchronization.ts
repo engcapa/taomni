@@ -213,6 +213,7 @@ export interface SyncFolderNowContext {
   syncInFlightRef: import("react").RefObject<boolean>;
   visibleRef: import("react").RefObject<boolean>;
   setStatus: import("react").Dispatch<SetStateAction<string | null>>;
+  setLoadingStatus: import("react").Dispatch<SetStateAction<string | null>>;
   syncGenerationRef: import("react").RefObject<number>;
   setSyncing: import("react").Dispatch<SetStateAction<boolean>>;
   setError: import("react").Dispatch<SetStateAction<string | null>>;
@@ -253,7 +254,7 @@ export function createSyncFolderNow(controllerContext: SyncFolderNowContext): (f
       }
       if (notify) controllerContext.notifyNewMail(newUnseen);
       if (indicator !== "none" && controllerContext.visibleRef.current) {
-        controllerContext.setStatus(fetched > 0 ? `Synced ${fetched} headers` : "Mailbox up to date");
+        controllerContext.setLoadingStatus(fetched > 0 ? `Synced ${fetched} headers` : "Mailbox up to date");
       }
       return primary;
     } catch (e) {
@@ -356,6 +357,7 @@ export interface SyncAllFoldersContext {
   setSyncing: import("react").Dispatch<SetStateAction<boolean>>;
   visibleRef: import("react").RefObject<boolean>;
   setStatus: import("react").Dispatch<SetStateAction<string | null>>;
+  setLoadingStatus: import("react").Dispatch<SetStateAction<string | null>>;
   setError: import("react").Dispatch<SetStateAction<string | null>>;
   info: import("../../../types").MailTabInfo;
   subscribedOnlyRef: import("react").RefObject<boolean>;
@@ -386,6 +388,7 @@ export function createSyncAllFolders(controllerContext: SyncAllFoldersContext): 
     const activeBeforeSync = controllerContext.selectedFolderRef.current;
     const manual = !quiet && indicator !== "none";
     if (manual) {
+      controllerContext.setStatus(null);
       controllerContext.manualSyncPendingRef.current = true;
       // Existing catch-up loops yield after their current bounded step.
       controllerContext.syncGenerationRef.current += 1;
@@ -397,7 +400,7 @@ export function createSyncAllFolders(controllerContext: SyncAllFoldersContext): 
       // being dropped, so a click always ends with fresh server state.
       if (quiet || indicator === "none") return null;
       if (indicator === "sync") controllerContext.setSyncing(true);
-      if (controllerContext.visibleRef.current) controllerContext.setStatus("Waiting for current mail sync…");
+      if (controllerContext.visibleRef.current) controllerContext.setLoadingStatus("Waiting for current mail sync…");
       const deadline = Date.now() + 120_000;
       while (controllerContext.syncInFlightRef.current && Date.now() < deadline) {
         await delay(150);
@@ -415,7 +418,6 @@ export function createSyncAllFolders(controllerContext: SyncAllFoldersContext): 
     if (indicator === "sync") {
       controllerContext.setSyncing(true);
     }
-    if (!quiet && indicator !== "none") controllerContext.setStatus(null);
     if (indicator !== "none") controllerContext.setError(null);
 
     try {
@@ -455,7 +457,7 @@ export function createSyncAllFolders(controllerContext: SyncAllFoldersContext): 
         const completion = `Synced ${result.fetchedMessages} new headers across ${result.folders.length} folders`
           + (failed.length > 0 ? `; ${failed.length} folder${failed.length === 1 ? "" : "s"} failed` : "")
           + (pending.length > 0 ? "; remaining headers syncing in background" : "");
-        controllerContext.setStatus((current) => manual && current !== null ? current : completion);
+        controllerContext.setLoadingStatus(completion);
       }
       void controllerContext.warmRecentBodies(controllerContext.foldersRef.current, nextFolder);
       controllerContext.startBackfill(nextFolder);

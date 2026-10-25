@@ -28,6 +28,7 @@ export interface UseMailSynchronizationContext {
   pageSize: number;
   setMessages: (next: SetStateAction<MailMessageHeader[]>) => void;
   setStatus: import("react").Dispatch<SetStateAction<string | null>>;
+  setLoadingStatus: import("react").Dispatch<SetStateAction<string | null>>;
   reloadVisibleFromCache: (folder: string) => Promise<void>;
   incomingFiltersRef: import("react").RefObject<(() => Promise<void>) | null>;
   setError: import("react").Dispatch<SetStateAction<string | null>>;
@@ -52,6 +53,7 @@ export function useMailSynchronization(context: UseMailSynchronizationContext) {
     pageSize,
     setMessages,
     setStatus,
+    setLoadingStatus,
     reloadVisibleFromCache,
     incomingFiltersRef,
     setError,
@@ -197,6 +199,7 @@ export function useMailSynchronization(context: UseMailSynchronizationContext) {
     syncInFlightRef,
     visibleRef,
     setStatus,
+    setLoadingStatus,
     syncGenerationRef,
     setSyncing,
     setError,
@@ -239,6 +242,7 @@ export function useMailSynchronization(context: UseMailSynchronizationContext) {
     setSyncing,
     visibleRef,
     setStatus,
+    setLoadingStatus,
     setError,
     info,
     subscribedOnlyRef,

@@ -8,7 +8,8 @@ description: Marks the folder read, selects three messages using Ctrl/Cmd and Sh
   reaches the intended action. Selecting Trash while a prior sync finishes must queue its refresh;
   late cache replies for INBOX must not overwrite the selected folder. A mounted regression also delays
   the read-completion cache snapshot until after deletion, verifying it cannot restore removed rows.
-  An earlier manual sync finishing after All read must retain the newer read-completion notice. After cancelling
+  Manual sync, header-cache and body loads finishing after All read must retain the read-completion notice;
+  loading from either cache or server must still render the message body and preserve its read flag. After cancelling
   permanent deletion, wait for the async action to release its busy state before clicking Delete again;
   a native click on a still-disabled button emits no click and must not be counted as an action.
 covers:
