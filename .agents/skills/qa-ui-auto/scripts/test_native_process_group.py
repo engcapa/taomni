@@ -8,11 +8,20 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 
 from native_process_group import stop_owned_process_group, wait_for_driver_ports
 
 
 class NativePortReleaseTest(unittest.TestCase):
+    def test_closed_loopback_can_take_longer_than_a_short_probe_to_refuse(self):
+        def connect(address, timeout):
+            if timeout < 1:
+                raise TimeoutError("Windows loopback refusal is still pending")
+            raise ConnectionRefusedError("Windows loopback has no listener")
+        with patch("native_process_group.socket.create_connection", side_effect=connect):
+            wait_for_driver_ports("127.0.0.1", (4444, 4445))
+
     def test_restart_waits_for_a_late_adapter_socket_close(self):
         listener = socket.socket()
         listener.bind(("127.0.0.1", 0))

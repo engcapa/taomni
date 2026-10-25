@@ -15,14 +15,18 @@ def wait_for_driver_ports(host: str, ports: tuple[int, ...], timeout: float = 5)
     for port in ports:
         while True:
             try:
-                with socket.create_connection((host, port), timeout=0.1):
+                # Windows can take about a second to reject a closed loopback
+                # port. A 100ms probe keeps timing out before ECONNREFUSED and
+                # incorrectly reports an already stopped driver as listening.
+                with socket.create_connection((host, port), timeout=min(2, max(0.1, deadline - time.monotonic()))):
                     pass
+                last_probe = "connection opened"
             except ConnectionRefusedError:
                 break
             except TimeoutError:
-                pass
+                last_probe = "connection timed out without a refusal"
             if time.monotonic() >= deadline:
-                raise RuntimeError(f"Owned native driver did not release port {port}")
+                raise RuntimeError(f"Owned native driver did not release port {port}: {last_probe}")
             time.sleep(0.02)
 
 
