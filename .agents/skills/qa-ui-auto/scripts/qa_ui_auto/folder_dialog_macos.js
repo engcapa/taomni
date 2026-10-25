@@ -11,11 +11,11 @@ shell.includeStandardAdditions = true;
 const log = (stage) => console.log("native_folder_dialog: " + stage);
 // Resolve the executable once. Recursing through the main window's complete
 // accessibility tree walks the whole WebView and can take minutes on CI.
-// Darwin ps truncates the command at its default column width even through
-// a pipe. Hosted executable paths reach that boundary; -ww retains the path.
-const processes = shell.doShellScript("ps -axww -o pid=,comm=").split("\n").map((line) => {
+// Darwin's `comm` field is only the executable basename. Use the unbounded
+// command line so the QA app's full path remains available for ownership.
+const processes = shell.doShellScript("ps -axww -o pid=,args=").split("\n").map((line) => {
   const match = line.trim().match(/^(\d+)\s+(.+)$/);
-  return match ? { pid: Number(match[1]), path: match[2] } : null;
+  return match ? { pid: Number(match[1]), path: match[2].split(/\s+/, 1)[0] } : null;
 }).filter((process) => process !== null);
 const owners = processes.filter((process) => process.path === application).map((process) => process.pid);
 if (owners.length !== 1) {

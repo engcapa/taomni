@@ -28,7 +28,7 @@ const owner = {windows:()=>[main],unixId:()=>123};
 const events = {processes:{whose:({unixId})=>{if(unixId !== 123) throw new Error('unowned PID'); return [owner]}},
   keystroke:(key)=>actions.push(key), keyCode:(key)=>{actions.push(key);if(key===36)navigated=true;}};
 const shell = {doShellScript:(command)=>{
-  if(command !== 'ps -axww -o pid=,comm=') return ('  123 ' + application).slice(0,79);
+  if(command !== 'ps -axww -o pid=,args=') return ('  123 ' + application).slice(0,79);
   return config.duplicate ? '123 ' + application + '\n124 ' + application : '123 ' + application + '\n456 /other/taomni';
 }};
 const context = {$:{NSProcessInfo:{processInfo:{environment:{objectForKey:(key)=>env[key]}}}},

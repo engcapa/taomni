@@ -55,7 +55,7 @@ function Invoke-ChooserButton([string] $id, [string[]] $names, [bool] $waitEnabl
     }
 }
 if ($env:QA_PICKER_ACTION -eq "cancel") {
-    Invoke-ChooserButton "2" @("Cancel", "取消") $false
+    Invoke-ChooserButton "2" @("Cancel") $false
 } else {
     $editCondition = New-Object System.Windows.Automation.PropertyCondition($automation::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)
     $edits = @($dialog.FindAll($scope::Descendants, $editCondition) | Where-Object { $_.Current.IsEnabled -and -not $_.Current.IsOffscreen })
@@ -65,11 +65,11 @@ if ($env:QA_PICKER_ACTION -eq "cancel") {
     $value = $edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
     $value.SetValue($env:QA_PICKER_PATH)
     if ($value.Current.Value -ne $env:QA_PICKER_PATH) { throw "Folder path was not entered completely" }
-    Invoke-ChooserButton "1" @("Open", "Select Folder", "Add", "Choose", "打开", "选择文件夹")
+    Invoke-ChooserButton "1" @("Open", "Select Folder", "Add", "Choose")
     Start-Sleep -Milliseconds 600
     try {
         if (-not $dialog.Current.IsOffscreen) {
-            Invoke-ChooserButton "1" @("Open", "Select Folder", "Add", "Choose", "打开", "选择文件夹")
+            Invoke-ChooserButton "1" @("Open", "Select Folder", "Add", "Choose")
         }
     } catch [System.Windows.Automation.ElementNotAvailableException] { }
 }
