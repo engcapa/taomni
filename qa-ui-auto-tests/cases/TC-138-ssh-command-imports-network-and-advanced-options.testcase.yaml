@@ -19,6 +19,7 @@ fixtures:
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for:
     selector: '[data-testid="sidebar"]'
     timeout_sec: 45
@@ -51,7 +52,7 @@ steps:
     selector: '[data-testid="session-auth-privatekey"]:checked'
     equal: 1
 - assert_attribute:
-    selector: 'input[aria-label="Private key path"]'
+    selector: input[aria-label="Private key path"]
     name: value
     equals: /home/qauser/.ssh/parser_key
 - wait_for: '[data-testid="advanced-ssh-settings"]'
@@ -68,7 +69,7 @@ steps:
     name: data-checked
     equals: 'true'
 - assert_attribute:
-    selector: 'input[aria-label="Execute command"]'
+    selector: input[aria-label="Execute command"]
     name: value
     equals: tmux new -A -s qa
 - assert_attribute:
@@ -82,15 +83,15 @@ steps:
     name: value
     equals: ssh-tunnel
 - assert_attribute:
-    selector: 'input[aria-label="Jump host"]'
+    selector: input[aria-label="Jump host"]
     name: value
     equals: bastion.example.test
 - assert_attribute:
-    selector: 'input[aria-label="Jump port"]'
+    selector: input[aria-label="Jump port"]
     name: value
     equals: '2200'
 - assert_attribute:
-    selector: 'input[aria-label="Jump user"]'
+    selector: input[aria-label="Jump user"]
     name: value
     equals: jump-user
 - assert_attribute:
@@ -98,7 +99,7 @@ steps:
     name: data-checked
     equals: 'true'
 - assert_attribute:
-    selector: 'input[aria-label="Keep-alive interval"]'
+    selector: input[aria-label="Keep-alive interval"]
     name: value
     equals: '45'
 - assert_attribute:
@@ -109,15 +110,15 @@ steps:
     selector: '[data-testid="network-settings"] input[aria-label="Forward local address"]'
     equal: 1
 - assert_attribute:
-    selector: 'input[aria-label="Forward local address"]'
+    selector: input[aria-label="Forward local address"]
     name: value
     equals: 127.0.0.1:15432
 - assert_attribute:
-    selector: 'input[aria-label="Forward remote address"]'
+    selector: input[aria-label="Forward remote address"]
     name: value
     equals: db.internal:5432
 - assert_attribute:
-    selector: 'input[aria-label="Forward description"]'
+    selector: input[aria-label="Forward description"]
     name: value
     equals: ''
 - click: '[data-testid="session-section-bookmark"]'
@@ -133,11 +134,11 @@ steps:
 - click: '[data-testid="session-section-advanced"]'
 - wait_for: '[data-testid="advanced-ssh-settings"]'
 - assert_attribute:
-    selector: 'input[aria-label="Private key path"]'
+    selector: input[aria-label="Private key path"]
     name: value
     equals: /home/qauser/.ssh/parser_key
 - assert_attribute:
-    selector: 'input[aria-label="Execute command"]'
+    selector: input[aria-label="Execute command"]
     name: value
     equals: tmux new -A -s qa
 - assert_attribute:
@@ -155,11 +156,11 @@ steps:
     name: value
     equals: ssh-tunnel
 - assert_attribute:
-    selector: 'input[aria-label="Jump host"]'
+    selector: input[aria-label="Jump host"]
     name: value
     equals: bastion.example.test
 - assert_attribute:
-    selector: 'input[aria-label="Keep-alive interval"]'
+    selector: input[aria-label="Keep-alive interval"]
     name: value
     equals: '45'
 - assert_attribute:
@@ -178,73 +179,123 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: OpenSSH command lookup imports endpoint, private-key, startup, X11, compression, jump-host, keep-alive, IP-version, and forwarding state with observable values.
+    requirement: OpenSSH command lookup imports endpoint, private-key, startup, X11, compression, jump-host, keep-alive, IP-version, and forwarding state with observable
+      values.
     actions:
+    - 1
+    - 2
+    - 4
+    - 5
     - 7
     - 8
-    - 21
-    - 22
-    checkpoints:
-    - step: 9
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "app-parser.example.test"}}'
-    - step: 10
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "2201"}}'
-    - step: 11
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "deploy"}}'
-    - step: 12
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-specify-username\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 13
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-privatekey\"]:checked", "equal": 1}}'
-    - step: 14
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Private key path\"]", "name": "value", "equals": "/home/qauser/.ssh/parser_key"}}'
-    - step: 15
-      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
-    - step: 16
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 17
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 18
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 19
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "tmux new -A -s qa"}}'
-    - step: 20
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
-    - step: 22
-      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
-    - step: 23
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "ssh-tunnel"}}'
-    - step: 24
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump host\"]", "name": "value", "equals": "bastion.example.test"}}'
-    - step: 25
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump port\"]", "name": "value", "equals": "2200"}}'
-    - step: 26
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump user\"]", "name": "value", "equals": "jump-user"}}'
-    - step: 27
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-keepalive-toggle\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 28
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keep-alive interval\"]", "name": "value", "equals": "45"}}'
-    - step: 29
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
-    - step: 30
-      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 1}}'
-    - step: 31
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:15432"}}'
-    - step: 32
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "db.internal:5432"}}'
-    - step: 33
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": ""}}'
-    results:
     - 9
+    - 22
+    - 35
+    - 37
+    - 38
+    - 40
+    - 41
+    - 43
+    - 49
+    - 56
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 10
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "app-parser.example.test"}}'
+    - step: 11
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "2201"}}'
+    - step: 12
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "deploy"}}'
+    - step: 13
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-specify-username\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 14
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-privatekey\"]:checked", "equal": 1}}'
+    - step: 15
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Private key path\"]", "name": "value", "equals": "/home/qauser/.ssh/parser_key"}}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 17
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 18
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 20
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "tmux new -A -s qa"}}'
+    - step: 21
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "ssh-tunnel"}}'
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump host\"]", "name": "value", "equals": "bastion.example.test"}}'
+    - step: 26
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump port\"]", "name": "value", "equals": "2200"}}'
+    - step: 27
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump user\"]", "name": "value", "equals": "jump-user"}}'
+    - step: 28
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-keepalive-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 29
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keep-alive interval\"]", "name": "value", "equals": "45"}}'
+    - step: 30
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
+    - step: 31
+      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 1}}'
+    - step: 32
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:15432"}}'
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "db.internal:5432"}}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": ""}}'
+    - step: 36
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-command-options\"]"}'
+    - step: 42
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 44
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 45
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Private key path\"]", "name": "value", "equals": "/home/qauser/.ssh/parser_key"}}'
+    - step: 46
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "tmux new -A -s qa"}}'
+    - step: 47
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 48
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 50
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 51
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "ssh-tunnel"}}'
+    - step: 52
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump host\"]", "name": "value", "equals": "bastion.example.test"}}'
+    - step: 53
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keep-alive interval\"]", "name": "value", "equals": "45"}}'
+    - step: 54
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
+    - step: 55
+      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 1}}'
+    - step: 57
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    results:
+    - 3
+    - 6
     - 10
     - 11
     - 12
     - 13
     - 14
+    - 15
     - 16
     - 17
     - 18
     - 19
     - 20
+    - 21
     - 23
     - 24
     - 25
@@ -256,67 +307,166 @@ verification:
     - 31
     - 32
     - 33
-  - id: R2
-    requirement: The imported SSH command options survive save, reopen, section switching, and editor cancellation.
-    actions:
+    - 34
     - 36
-    - 37
-    - 38
     - 39
-    - 40
-    - 41
     - 42
-    - 48
-    - 49
-    - 50
-    - 51
-    - 52
-    - 53
-    - 54
-    checkpoints:
-    - step: 38
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-command-options\"]"}'
-    - step: 41
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 43
-      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
-    - step: 44
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Private key path\"]", "name": "value", "equals": "/home/qauser/.ssh/parser_key"}}'
-    - step: 45
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "tmux new -A -s qa"}}'
-    - step: 46
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
-    - step: 47
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 49
-      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
-    - step: 50
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "ssh-tunnel"}}'
-    - step: 51
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump host\"]", "name": "value", "equals": "bastion.example.test"}}'
-    - step: 52
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keep-alive interval\"]", "name": "value", "equals": "45"}}'
-    - step: 53
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
-    - step: 54
-      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 1}}'
-    - step: 56
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
-    results:
-    - 38
-    - 41
-    - 43
     - 44
     - 45
     - 46
     - 47
-    - 49
+    - 48
     - 50
     - 51
     - 52
     - 53
     - 54
+    - 55
+    - 57
+  - id: R2
+    requirement: The imported SSH command options survive save, reopen, section switching, and editor cancellation.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 22
+    - 35
+    - 37
+    - 38
+    - 40
+    - 41
+    - 43
+    - 49
     - 56
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 10
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "app-parser.example.test"}}'
+    - step: 11
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "2201"}}'
+    - step: 12
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "deploy"}}'
+    - step: 13
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-specify-username\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 14
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-privatekey\"]:checked", "equal": 1}}'
+    - step: 15
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Private key path\"]", "name": "value", "equals": "/home/qauser/.ssh/parser_key"}}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 17
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 18
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 20
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "tmux new -A -s qa"}}'
+    - step: 21
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "ssh-tunnel"}}'
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump host\"]", "name": "value", "equals": "bastion.example.test"}}'
+    - step: 26
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump port\"]", "name": "value", "equals": "2200"}}'
+    - step: 27
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump user\"]", "name": "value", "equals": "jump-user"}}'
+    - step: 28
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-keepalive-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 29
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keep-alive interval\"]", "name": "value", "equals": "45"}}'
+    - step: 30
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
+    - step: 31
+      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 1}}'
+    - step: 32
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:15432"}}'
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "db.internal:5432"}}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": ""}}'
+    - step: 36
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-command-options\"]"}'
+    - step: 42
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 44
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 45
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Private key path\"]", "name": "value", "equals": "/home/qauser/.ssh/parser_key"}}'
+    - step: 46
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "tmux new -A -s qa"}}'
+    - step: 47
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 48
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 50
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 51
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "ssh-tunnel"}}'
+    - step: 52
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump host\"]", "name": "value", "equals": "bastion.example.test"}}'
+    - step: 53
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keep-alive interval\"]", "name": "value", "equals": "45"}}'
+    - step: 54
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
+    - step: 55
+      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 1}}'
+    - step: 57
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    results:
+    - 3
+    - 6
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 36
+    - 39
+    - 42
+    - 44
+    - 45
+    - 46
+    - 47
+    - 48
+    - 50
+    - 51
+    - 52
+    - 53
+    - 54
+    - 55
+    - 57
   visual:
   - check: Imported command values and the advanced/network sections remain readable without clipping.
     method: manual

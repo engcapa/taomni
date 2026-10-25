@@ -1,8 +1,8 @@
 id: TC-WS-006
 title: In-workspace Git panel reachable from four entries with the full main parity surface
-description: 'v6.1 AC-06 / DEC-04. The removed [Files | Git] row (marker 1) and the removed top-right Git button (marker 3) stay absent. The built-in Git panel opens from the workspace
-  status bar, the primary rail Git button, the workspace tab strip and the editor''s compare-in-Git action, and keeps every main Git capability: repository selector, six views (Changes/Log/Branches/Tags/Stash/Settings),
-  tree/flat switch, amend and commit, and side-by-side/unified diffs.'
+description: 'v6.1 AC-06 / DEC-04. The removed [Files | Git] row (marker 1) and the removed top-right Git button (marker 3) stay absent. The built-in Git panel
+  opens from the workspace status bar, the primary rail Git button, the workspace tab strip and the editor''s compare-in-Git action, and keeps every main Git
+  capability: repository selector, six views (Changes/Log/Branches/Tags/Stash/Settings), tree/flat switch, amend and commit, and side-by-side/unified diffs.'
 modes:
 - browser
 - native
@@ -25,7 +25,7 @@ steps:
 - seed_storage:
     key: taomni.platformWorkspaces.v1
     value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace (默认工作区)","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"repo-a","path":"${fixture.parity008_root}/repo-a","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
-- reload_window:
+- reload_window: null
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
 - click: '[data-testid="nav-mode-workspaces"]'
@@ -72,13 +72,14 @@ steps:
 - eval_readonly:
     expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"git-commit-amend"]').checked === true
     expect_truthy: true
-- click: '[data-testid="workspace-tree-root"]'
-- wait_for: '[data-testid="workspace-tree-file"][data-path="same.txt"]'
-- click: '[data-testid="workspace-tree-file"][data-path="same.txt"]'
+- click: '[data-testid="code-workspace-tree-root"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="same.txt"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="same.txt"]'
 - wait_for: '[data-testid="workspace-file-editor"][data-path="same.txt"]'
 - click: '[data-testid="editor-open-git-diff"]'
 - wait_for: '[data-testid="workspace-git-panel"][data-focus-path="same.txt"]'
-- click: '[data-testid="workspace-add-folder"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
 - wait_for: '[data-testid="workspace-fs-modal"]'
 - fill:
     selector: '[data-testid="workspace-fs-modal-input"]'
@@ -156,17 +157,18 @@ verification:
     - 55
     - 56
     - 57
+    - 58
     checkpoints:
     - step: 45
       expectation: '{"wait_for": "[data-testid=\"workspace-git-panel\"][data-focus-path=\"same.txt\"]"}'
-    - step: 50
+    - step: 51
       expectation: '{"wait_for": "[data-testid=\"workspace-git-manager\"]"}'
-    - step: 58
+    - step: 59
       expectation: '{"assert_visible": "[data-testid=\"git-diff-mode-split\"]"}'
     results:
     - 45
-    - 50
-    - 58
+    - 51
+    - 59
   visual:
   - check: Git 面板保留 main 的视觉与信息密度，移除的冗余入口确不存在。
     method: manual

@@ -34,6 +34,7 @@ fixtures:
 timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
 - click: '[data-testid="welcome-new-session"]'
 - wait_for: '[data-testid="session-editor"]'
@@ -72,35 +73,42 @@ verification:
     requirement: A saved VNC session without a stored password opens the VNC panel scaffolding directly, without a pre-connect password prompt.
     actions:
     - 1
-    - 3
-    - 5
+    - 2
+    - 4
     - 6
     - 7
     - 8
-    - 10
+    - 9
     - 11
-    - 14
+    - 12
+    - 13
+    - 15
     checkpoints:
-    - step: 2
+    - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
-    - step: 4
+    - step: 5
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 9
+    - step: 10
       expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 13
+    - step: 14
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-vnc\"]"}'
-    - step: 15
-      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-panel\"]", "timeout_sec": 10}}'
     - step: 16
-      expectation: '{"assert_visible": "[data-testid=\"vnc-panel\"]"}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-panel\"]", "timeout_sec": 10}}'
     - step: 17
-      expectation: '{"assert_not_visible": "[data-testid=\"auth-prompt\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"vnc-panel\"]"}'
     - step: 18
+      expectation: '{"assert_not_visible": "[data-testid=\"auth-prompt\"]"}'
+    - step: 19
       expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"]", "state": "attached", "timeout_sec": 5}}'
     results:
-    - 15
+    - 3
+    - 5
+    - 10
+    - 14
+    - 16
     - 17
     - 18
+    - 19
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

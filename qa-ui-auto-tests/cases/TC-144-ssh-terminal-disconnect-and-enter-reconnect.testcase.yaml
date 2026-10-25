@@ -19,6 +19,7 @@ fixtures:
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
 - click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
@@ -102,72 +103,79 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Exiting the remote shell exposes the SSH disconnected recovery prompt; pressing Enter creates a ready connection, a post-reconnect command produces an exact output
-      line, and the event log records the reconnect.
+    requirement: Exiting the remote shell exposes the SSH disconnected recovery prompt; pressing Enter creates a ready connection, a post-reconnect command produces
+      an exact output line, and the event log records the reconnect.
     actions:
     - 1
+    - 2
     - 4
-    - 6
+    - 5
     - 7
     - 8
     - 9
     - 10
-    - 12
+    - 11
     - 13
+    - 14
+    - 16
+    - 18
+    - 19
+    - 21
+    - 22
+    - 24
+    - 27
+    - 29
+    - 30
+    - 32
+    - 34
+    - 37
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-reconnect\"]"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 20
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+    - step: 23
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-before\\-exit\\r?$", "timeout_sec": 60}}'
+    - step: 25
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-text*=\"SSH disconnected\"]", "timeout_sec": 30}}'
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-pane\"]", "contains": "SSH disconnected"}}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+    - step: 31
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-after\\-reconnect\\r?$", "timeout_sec": 60}}'
+    - step: 33
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 35
+      expectation: '{"wait_for": "[data-testid=\"terminal-event-log\"]"}'
+    - step: 36
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-event-log\"]", "contains": "Reconnected"}}'
+    - step: 38
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-event-log\"]", "state": "detached"}}'
+    results:
+    - 3
+    - 6
+    - 12
     - 15
     - 17
-    - 18
     - 20
     - 23
+    - 25
     - 26
     - 28
     - 31
     - 33
-    - 36
-    checkpoints:
-    - step: 5
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 11
-      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 14
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-reconnect\"]"}'
-    - step: 16
-      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
-    - step: 19
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
-    - step: 22
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-before\\-exit\\r?$", "timeout_sec": 60}}'
-    - step: 24
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-text*=\"SSH disconnected\"]", "timeout_sec": 30}}'
-    - step: 25
-      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-pane\"]", "contains": "SSH disconnected"}}'
-    - step: 27
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
-    - step: 30
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-after\\-reconnect\\r?$", "timeout_sec": 60}}'
-    - step: 32
-      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
-    - step: 34
-      expectation: '{"wait_for": "[data-testid=\"terminal-event-log\"]"}'
-    - step: 35
-      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-event-log\"]", "contains": "Reconnected"}}'
-    - step: 37
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-event-log\"]", "state": "detached"}}'
-    results:
-    - 5
-    - 11
-    - 14
-    - 16
-    - 19
-    - 22
-    - 24
-    - 25
-    - 27
-    - 30
-    - 32
-    - 34
     - 35
-    - 37
+    - 36
+    - 38
   visual:
   - check: Disconnect and reconnect status text, terminal output, and event-log rows remain readable.
     method: manual

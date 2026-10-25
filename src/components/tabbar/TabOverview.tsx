@@ -81,16 +81,20 @@ function OpenTabOverview() {
     }
   }
   const activate = (item: PreviewItem) => {
+    const app = useAppStore.getState();
+    const sameMode = app.activeSideTab === (item.workspaceId ? "workspaces" : "sessions");
+    const sidebarCollapsed = app.sidebarCollapsed;
     if (item.workspaceId) {
       const store = useWorkspacePlatformStore.getState();
       store.setActiveWorkspace(item.workspaceId);
       store.setActiveWorkspaceTab(item.workspaceId, item.id);
-      useAppStore.getState().setActiveSideTab("workspaces");
+      if (!sameMode) app.setActiveSideTab("workspaces");
     } else {
       useAppStore.getState().setTabFilter(null);
       useAppStore.getState().setActiveTab(item.id);
-      useAppStore.getState().setActiveSideTab("sessions");
+      if (!sameMode) app.setActiveSideTab("sessions");
     }
+    if (sameMode) app.setSidebarCollapsed(sidebarCollapsed);
     close();
   };
   return createPortal(

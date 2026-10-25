@@ -42,6 +42,7 @@ import {
   type TreeViewMode,
 } from "./codeWorkspaceModel";
 import { treeFileDetails } from "./treeToolbarChrome";
+import { WorkspaceFileIcon } from "./WorkspaceFileIcon";
 import { getLocale } from "../../../lib/i18n";
 
 export interface ProjectTreeOpenFileHint {
@@ -210,7 +211,7 @@ function renderMatchingFlatFiles(
                 }}
                 onContextMenu={(event) => onContextMenu(event, { kind: "file", ref })}
               >
-                <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+                <WorkspaceFileIcon path={entry.path} />
                 <span className="truncate">{label}</span>
                 {props.showDetails && (
                   <span data-testid="code-workspace-tree-file-details" className="min-w-0 truncate text-[var(--taomni-code-muted)]">
@@ -348,7 +349,7 @@ function renderEntries(
                 <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
               )}
             </span>
-            <Folder className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+            <WorkspaceFileIcon path={displayPath} folder expanded={isExpanded} />
             <span className="truncate">{displayName}</span>
             {(changeCount > 0 || childState?.loading || chain?.loading) && (
               <span className="ml-auto flex shrink-0 items-center gap-1">
@@ -397,7 +398,7 @@ function renderEntries(
         onContextMenu={(event) => onContextMenu(event, { kind: "file", ref })}
       >
         <span className="w-3.5 shrink-0" />
-        <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+        <WorkspaceFileIcon path={entry.path} />
         <span className="truncate">{entry.name}</span>
         {props.showDetails && (
           <span data-testid="code-workspace-tree-file-details" className="min-w-0 truncate text-[var(--taomni-code-muted)]">
@@ -478,6 +479,7 @@ export const ProjectTree = memo(function ProjectTree(props: ProjectTreeProps) {
               type="button"
               data-testid="code-workspace-tree-root"
               data-root-id={root.id}
+              data-root-path={root.path}
               data-tree-kind="root"
               data-selected={selectedRoot || undefined}
               role="treeitem"
@@ -511,7 +513,7 @@ export const ProjectTree = memo(function ProjectTree(props: ProjectTreeProps) {
                   <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
                 )}
               </span>
-              <Folder className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+              <WorkspaceFileIcon path={root.path} folder expanded={expanded} />
               <span className="shrink-0 max-w-[60%] truncate">{root.name}</span>
               {/* IDEA shows the project root's location after its name. */}
               <span data-testid="code-workspace-tree-root-path" className="min-w-0 truncate font-normal text-[var(--taomni-code-muted)]">
@@ -528,7 +530,7 @@ export const ProjectTree = memo(function ProjectTree(props: ProjectTreeProps) {
             {expanded && (
               treeViewMode === "flat"
                 ? renderFlatEntries(root, props)
-                : treeFilter.trim()
+                : treeViewMode === "files" || treeFilter.trim()
                   ? renderMatchingFlatFiles(root, props, { groupBySource: false })
                   : renderEntries(root, "", 1, props)
             )}
@@ -574,7 +576,7 @@ export const ProjectTree = memo(function ProjectTree(props: ProjectTreeProps) {
                 }}
                 onContextMenu={(event) => onContextMenu(event, { kind: "file", ref })}
               >
-                <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+                <WorkspaceFileIcon path={file.path} />
                 <span className="truncate">{file.name}</span>
                 {open?.dirty && <span className="ml-auto text-[var(--taomni-accent)]">*</span>}
               </button>

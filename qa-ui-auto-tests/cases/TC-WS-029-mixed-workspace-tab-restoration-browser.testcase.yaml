@@ -1,0 +1,400 @@
+id: TC-WS-029
+title: Mixed workspace files and saved protocol tabs restore their owner, order and active document
+description: Opens file and nine saved protocols through UI, reorders/renames, reloads, checks draft and tab identity, excludes explicitly closed tabs and handles
+  a deleted saved session without opening a local shell. Browser protocol surfaces use stubs; native reconnect is TC-WS-030.
+modes:
+- browser
+covers:
+- F-WS-1
+- F-WS-2
+- F-WS-5
+tags:
+- p0
+- workspace-redesign
+- regression
+- persistence
+fixtures:
+- reset_db
+- platform_workspace_root
+- workspace_restore_sessions
+timeout_sec: 420
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-29
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="workspace-empty-add-folder"]'
+- wait_for: '[data-testid="workspace-fs-modal"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.platform_workspace_root}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- click: '[data-testid="code-workspace-tree-root"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+- press:
+    selector: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+    key: Mod+End
+- type:
+    selector: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+    text: '
+
+      QA_RESTORED_UNSAVED_DRAFT'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="README.md"][data-dirty="true"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-file-editor"][data-path="README.md"]'
+    name: data-dirty
+    equals: 'true'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-open-session"]'
+- wait_for: '[data-testid="workspace-session-picker-modal"]'
+- click: '[data-testid="workspace-session-picker-row"][data-session-id="qa-restore-ssh"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-ssh"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-open-session"]'
+- wait_for: '[data-testid="workspace-session-picker-modal"]'
+- click: '[data-testid="workspace-session-picker-row"][data-session-id="qa-restore-sftp"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-sftp"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-open-session"]'
+- wait_for: '[data-testid="workspace-session-picker-modal"]'
+- click: '[data-testid="workspace-session-picker-row"][data-session-id="qa-restore-localshell"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-localshell"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-open-session"]'
+- wait_for: '[data-testid="workspace-session-picker-modal"]'
+- click: '[data-testid="workspace-session-picker-row"][data-session-id="qa-restore-postgresql"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-postgresql"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-open-session"]'
+- wait_for: '[data-testid="workspace-session-picker-modal"]'
+- click: '[data-testid="workspace-session-picker-row"][data-session-id="qa-restore-redis"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-redis"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-open-session"]'
+- wait_for: '[data-testid="workspace-session-picker-modal"]'
+- click: '[data-testid="workspace-session-picker-row"][data-session-id="qa-restore-hbaseshell"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-hbaseshell"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-open-session"]'
+- wait_for: '[data-testid="workspace-session-picker-modal"]'
+- click: '[data-testid="workspace-session-picker-row"][data-session-id="qa-restore-rdp"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-rdp"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-open-session"]'
+- wait_for: '[data-testid="workspace-session-picker-modal"]'
+- click: '[data-testid="workspace-session-picker-row"][data-session-id="qa-restore-vnc"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-vnc"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-open-session"]'
+- wait_for: '[data-testid="workspace-session-picker-modal"]'
+- click: '[data-testid="workspace-session-picker-row"][data-session-id="qa-restore-file"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-file"]'
+- click: '[data-testid="workspace-tab"][data-session-id="qa-restore-localshell"]'
+- right_click: '[data-testid="workspace-tab"][data-session-id="qa-restore-localshell"]'
+- click: '[data-testid="workspace-tab-context-rename"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: Restored shell
+- click: '[data-testid="text-input-dialog-confirm"]'
+- right_click: '[data-testid="workspace-tab"][data-session-id="qa-restore-localshell"]'
+- click: '[data-testid="workspace-tab-context-move-first"]'
+- click: '[data-testid="workspace-tab"][data-tab-title="README.md"]'
+- assert_items:
+    selector: '[data-testid="workspace-tab"]'
+    attribute: data-tab-title
+    equals:
+    - Restored shell
+    - README.md
+    - qa-restore-ssh
+    - qa-restore-sftp
+    - qa-restore-postgresql
+    - qa-restore-redis
+    - qa-restore-hbaseshell
+    - qa-restore-rdp
+    - qa-restore-vnc
+    - qa-restore-file
+- reload_window: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- assert_items:
+    selector: '[data-testid="workspace-tab"]'
+    attribute: data-tab-title
+    equals:
+    - Restored shell
+    - README.md
+    - qa-restore-ssh
+    - qa-restore-sftp
+    - qa-restore-postgresql
+    - qa-restore-redis
+    - qa-restore-hbaseshell
+    - qa-restore-rdp
+    - qa-restore-vnc
+    - qa-restore-file
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-tab-title
+    equals: README.md
+- wait_for: '[data-testid="workspace-file-editor"][data-path="README.md"][data-dirty="true"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-file-editor"][data-path="README.md"]'
+    name: data-dirty
+    equals: 'true'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+    contains: QA_RESTORED_UNSAVED_DRAFT
+- click: '[data-testid="workspace-tab"][data-session-id="qa-restore-ssh"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-ssh"]'
+- click: '[data-testid="workspace-tab"][data-session-id="qa-restore-sftp"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-sftp"]'
+- click: '[data-testid="workspace-tab"][data-session-id="qa-restore-localshell"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-localshell"]'
+- click: '[data-testid="workspace-tab"][data-session-id="qa-restore-postgresql"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-postgresql"]'
+- click: '[data-testid="workspace-tab"][data-session-id="qa-restore-redis"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-redis"]'
+- click: '[data-testid="workspace-tab"][data-session-id="qa-restore-hbaseshell"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-hbaseshell"]'
+- click: '[data-testid="workspace-tab"][data-session-id="qa-restore-rdp"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-rdp"]'
+- click: '[data-testid="workspace-tab"][data-session-id="qa-restore-vnc"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-vnc"]'
+- click: '[data-testid="workspace-tab"][data-session-id="qa-restore-file"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-file"]'
+- click: '[data-testid="workspace-tab"][data-session-id="qa-restore-sftp"] [data-testid="workspace-tab-close"]'
+- reload_window: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- assert_items:
+    selector: '[data-testid="workspace-tab"]'
+    attribute: data-tab-title
+    equals:
+    - Restored shell
+    - README.md
+    - qa-restore-ssh
+    - qa-restore-postgresql
+    - qa-restore-redis
+    - qa-restore-hbaseshell
+    - qa-restore-rdp
+    - qa-restore-vnc
+    - qa-restore-file
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-tree-item"][data-session-name="qa-restore-ssh"]'
+- click: '[data-testid="session-delete"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- assert_not_visible: '[data-testid="session-tree-item"][data-session-name="qa-restore-ssh"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="workspace-tab"][data-session-id="qa-restore-ssh"]'
+- wait_for: '[data-testid="workspace-session-unavailable"][data-state="missing"]'
+- assert_count:
+    selector: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-ssh"]'
+    equal: 0
+- click: '[data-testid="workspace-tab"][data-tab-title="README.md"]'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+    contains: QA_RESTORED_UNSAVED_DRAFT
+- screenshot: workspace-mixed-tabs-restored.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: UI-created mixed tabs and dirty file survive storage bootstrap in exact order with the active tab. A closed tab stays closed and a deleted saved
+      record leaves an explicit missing state without affecting other documents.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 15
+    - 16
+    - 18
+    - 20
+    - 21
+    - 23
+    - 25
+    - 26
+    - 28
+    - 30
+    - 31
+    - 33
+    - 35
+    - 36
+    - 38
+    - 40
+    - 41
+    - 43
+    - 45
+    - 46
+    - 48
+    - 50
+    - 51
+    - 53
+    - 55
+    - 56
+    - 58
+    - 60
+    - 61
+    - 62
+    - 63
+    - 64
+    - 65
+    - 66
+    - 67
+    - 69
+    - 70
+    - 76
+    - 78
+    - 80
+    - 82
+    - 84
+    - 86
+    - 88
+    - 90
+    - 92
+    - 94
+    - 95
+    - 96
+    - 98
+    - 99
+    - 100
+    - 101
+    - 103
+    - 104
+    - 107
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"workspace-fs-modal\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"] .cm-content"}'
+    - step: 14
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"]", "name": "data-dirty", "equals": "true"}}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-picker-modal\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-ssh\"]"}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-picker-modal\"]"}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-sftp\"]"}'
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-picker-modal\"]"}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-localshell\"]"}'
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-picker-modal\"]"}'
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-postgresql\"]"}'
+    - step: 37
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-picker-modal\"]"}'
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-redis\"]"}'
+    - step: 42
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-picker-modal\"]"}'
+    - step: 44
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-hbaseshell\"]"}'
+    - step: 47
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-picker-modal\"]"}'
+    - step: 49
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-rdp\"]"}'
+    - step: 52
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-picker-modal\"]"}'
+    - step: 54
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-vnc\"]"}'
+    - step: 57
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-picker-modal\"]"}'
+    - step: 59
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-file\"]"}'
+    - step: 68
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "data-tab-title", "equals": ["Restored shell", "README.md",
+        "qa-restore-ssh", "qa-restore-sftp", "qa-restore-postgresql", "qa-restore-redis", "qa-restore-hbaseshell", "qa-restore-rdp", "qa-restore-vnc", "qa-restore-file"]}}'
+    - step: 71
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "data-tab-title", "equals": ["Restored shell", "README.md",
+        "qa-restore-ssh", "qa-restore-sftp", "qa-restore-postgresql", "qa-restore-redis", "qa-restore-hbaseshell", "qa-restore-rdp", "qa-restore-vnc", "qa-restore-file"]}}'
+    - step: 72
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "README.md"}}'
+    - step: 74
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"]", "name": "data-dirty", "equals": "true"}}'
+    - step: 75
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"] .cm-content", "contains": "QA_RESTORED_UNSAVED_DRAFT"}}'
+    - step: 77
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-ssh\"]"}'
+    - step: 79
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-sftp\"]"}'
+    - step: 81
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-localshell\"]"}'
+    - step: 83
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-postgresql\"]"}'
+    - step: 85
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-redis\"]"}'
+    - step: 87
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-hbaseshell\"]"}'
+    - step: 89
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-rdp\"]"}'
+    - step: 91
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-vnc\"]"}'
+    - step: 93
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-file\"]"}'
+    - step: 97
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "data-tab-title", "equals": ["Restored shell", "README.md",
+        "qa-restore-ssh", "qa-restore-postgresql", "qa-restore-redis", "qa-restore-hbaseshell", "qa-restore-rdp", "qa-restore-vnc", "qa-restore-file"]}}'
+    - step: 102
+      expectation: '{"assert_not_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-restore-ssh\"]"}'
+    - step: 105
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-unavailable\"][data-state=\"missing\"]"}'
+    - step: 106
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-ssh\"]", "equal": 0}}'
+    - step: 108
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"] .cm-content", "contains": "QA_RESTORED_UNSAVED_DRAFT"}}'
+    results:
+    - 5
+    - 10
+    - 14
+    - 17
+    - 19
+    - 22
+    - 24
+    - 27
+    - 29
+    - 32
+    - 34
+    - 37
+    - 39
+    - 42
+    - 44
+    - 47
+    - 49
+    - 52
+    - 54
+    - 57
+    - 59
+    - 68
+    - 71
+    - 72
+    - 74
+    - 75
+    - 77
+    - 79
+    - 81
+    - 83
+    - 85
+    - 87
+    - 89
+    - 91
+    - 93
+    - 97
+    - 102
+    - 105
+    - 106
+    - 108
+  native:
+  - check: Real IPC/disk/SSH/SFTP and process restart are covered by TC-WS-030.
+    method: external
+    reason: Browser checks renderer state. Native cold-start and disk/process effects are separately asserted; configured saved records are fixtures, open workspace
+      tabs are created only through production UI.
+  visual:
+  - check: Restored mixed tabs fit the workspace toolbar.
+    method: manual
+    reason: Review the retained screenshot; functionality is independently asserted.

@@ -3,7 +3,7 @@ import type { WorkspacePlatformState, WorkspaceIsolatedTab } from "./workspacePl
 import { computeDuplicateTitle } from "./app/tabTitles";
 
 type TabActions = Pick<WorkspacePlatformState,
-  "closeWorkspaceTab" | "renameWorkspaceTab" | "moveWorkspaceTab" | "duplicateWorkspaceTab" | "setActiveWorkspaceTab">;
+  "closeWorkspaceTab" | "renameWorkspaceTab" | "moveWorkspaceTab" | "duplicateWorkspaceTab" | "setActiveWorkspaceTab" | "syncWorkspaceFiles">;
 
 export function createWorkspaceTabActions(
   set: StoreApi<WorkspacePlatformState>["setState"],
@@ -16,6 +16,29 @@ export function createWorkspaceTabActions(
   const fallbackActiveTabId = (tabs: WorkspaceIsolatedTab[]) => tabs[0]?.id ?? "";
   const newRuntimeId = (prefix: string) => `${prefix}:${crypto.randomUUID()}`;
   return {
+  syncWorkspaceFiles: (workspaceId, files, active) => {
+    set((state) => {
+      const workspaces = updateWorkspace(state.workspaces, workspaceId, (workspace) => {
+        const idFor = (file: { rootId: string; path: string }) => `ws:${workspaceId}:file:${file.rootId}:${file.path}`;
+        const wanted = new Set(files.map(idFor));
+        const openTabs = workspace.openTabs.filter((tab) => tab.kind !== "file" || wanted.has(tab.id));
+        for (const file of files) {
+          const id = idFor(file);
+          if (openTabs.some((tab) => tab.id === id)) continue;
+          openTabs.push({ id, workspaceId, kind: "file", rootFolderId: file.rootId, filePath: file.path,
+            title: file.path.split("/").pop() || file.path, closable: true, createdAt: Date.now() });
+        }
+        const activeTabId = active ? idFor(active) : openTabs.some((tab) => tab.id === workspace.activeTabId)
+          ? workspace.activeTabId : openTabs[0]?.id ?? "";
+        if (activeTabId === workspace.activeTabId && openTabs.length === workspace.openTabs.length
+          && openTabs.every((tab, index) => tab === workspace.openTabs[index])) return workspace;
+        return { ...workspace, openTabs, activeTabId };
+      });
+      if (workspaces.every((workspace, index) => workspace === state.workspaces[index])) return state;
+      persist({ ...state, workspaces });
+      return { workspaces };
+    });
+  },
   closeWorkspaceTab: (workspaceId, tabId) => {
     set((state) => {
       const workspaces = updateWorkspace(state.workspaces, workspaceId, (workspace) => {

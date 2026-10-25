@@ -1,5 +1,5 @@
 id: TC-WS-027
-title: Compact Sessions category filter and searchable many-tab navigation
+title: Unified Sessions overflow filters and searchable many-tab navigation
 description: Creates many real UI tabs, checks compact protocol selection, no-match recovery, searchable picker keyboard activation, Home/End tab navigation
   and full overview without closing sessions.
 modes:
@@ -66,27 +66,34 @@ steps:
     equal: 20
 - assert_visible: '[data-testid="tab-scroll-left"]'
 - assert_visible: '[data-testid="tab-scroll-right"]'
+- click: '[data-testid="tab-scroll-left"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"tab-scroll-area"]').scrollLeft < document.querySelector('[data-testid'+String.fromCharCode(61)+'"tab-scroll-area"]').scrollWidth
+      - document.querySelector('[data-testid'+String.fromCharCode(61)+'"tab-scroll-area"]').clientWidth - 10
+    expect_truthy: true
+- click: '[data-testid="tab-scroll-right"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"tab-scroll-area"]').scrollLeft > 10
+    expect_truthy: true
 - dblclick: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
 - fill:
     selector: '[data-testid="tab-title-input"]'
     value: QA Many target
 - press: Enter
-- click: '[data-testid="session-tab-filter"]'
+- click: '[data-testid="tab-more"]'
 - click: '[data-testid="session-tab-filter-ssh"]'
 - assert_count:
     selector: '[data-testid="tab-item"]'
     equal: 0
 - assert_visible: '[data-testid="tab-filter-empty"]'
-- click: '[data-testid="session-tab-filter"]'
 - click: '[data-testid="session-tab-filter-local"]'
 - assert_count:
     selector: '[data-testid="tab-item"]'
     equal: 20
 - assert_attribute:
-    selector: '[data-testid="session-tab-filter"]'
+    selector: '[data-testid="session-tab-categories"]'
     name: data-category
     equals: local
-- click: '[data-testid="tab-more"]'
 - wait_for: '[data-testid="open-tabs-menu"]'
 - fill:
     selector: '[data-testid="open-tabs-filter"]'
@@ -100,6 +107,16 @@ steps:
 - press:
     selector: '[data-testid="open-tabs-filter"]'
     key: Enter
+- assert_not_visible: '[data-testid="open-tabs-menu"]'
+- assert_attribute:
+    selector: '[data-testid="tab-item"][data-active="true"]'
+    name: data-tab-title
+    equals: QA Many target
+- click: '[data-testid="tab-more"]'
+- fill:
+    selector: '[data-testid="open-tabs-filter"]'
+    value: QA Many target
+- click: '[data-testid^="open-tabs-tab-"]:not([data-testid^="open-tabs-tab-checkbox-"])'
 - assert_not_visible: '[data-testid="open-tabs-menu"]'
 - assert_attribute:
     selector: '[data-testid="tab-item"][data-active="true"]'
@@ -122,18 +139,21 @@ steps:
     selector: '[data-testid="tab-item"][data-active="true"]'
     name: data-tab-title
     equals: QA Many target
-- click: '[data-testid="session-tab-filter"]'
+- click: '[data-testid="tab-more"]'
 - click: '[data-testid="session-tab-filter-all"]'
+- press: Escape
 - assert_count:
     selector: '[data-testid="tab-item"]'
     equal: 20
 - eval_readonly:
-    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"session-tab-filter"]').getBoundingClientRect().width <= 90
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"session-tab-filter"]') === null
     expect_truthy: true
 - eval_readonly:
     expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"control-bar"]').getBoundingClientRect().height <= 34
     expect_truthy: true
 - screenshot: sessions-many-tabs-compact-filter.png
+- click: '[data-testid="side-tab-sessions"]'
+- assert_visible: '[data-testid="expanded-sidebar-panel"]'
 - click: '[data-testid="tab-overview-trigger"]'
 - wait_for: '[data-testid="tab-overview"]'
 - assert_count:
@@ -143,13 +163,32 @@ steps:
 - assert_count:
     selector: '[data-testid="tab-item"]'
     equal: 20
+- click: '[data-testid="toggle-left-sidebar"]'
+- assert_visible: '[data-testid="collapsed-sidebar-rail"]'
+- click: '[data-testid="tab-overview-trigger"]'
+- click: '[data-testid="tab-overview-card"]:nth-child(1)'
+- assert_not_visible: '[data-testid="tab-overview"]'
+- assert_visible: '[data-testid="collapsed-sidebar-rail"]'
+- assert_not_visible: '[data-testid="expanded-sidebar-panel"]'
+- click: '[data-testid="toggle-left-sidebar"]'
+- assert_visible: '[data-testid="expanded-sidebar-panel"]'
+- click: '[data-testid="tab-overview-trigger"]'
+- click: '[data-testid="tab-overview-card"]:nth-child(20)'
+- assert_not_visible: '[data-testid="tab-overview"]'
+- assert_visible: '[data-testid="expanded-sidebar-panel"]'
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    equal: 20
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Many tabs stay in one 33px toolbar. Protocol selection is <=90px, hides without closing, search+arrows+Enter switches to the target, Home/End
-      reveals boundary tabs and the large overview retains every session.
+    requirement: Many tabs stay in one compact toolbar. The existing overflow menu combines protocol categories, search and directory selection, without a separate
+      category trigger. Filtering retains all running sessions; search+arrows+Enter and Home/End navigate existing tabs. Selecting overview cards retains both
+      collapsed and expanded sidebar states.
     actions:
+    - 1
+    - 2
     - 3
     - 6
     - 8
@@ -171,23 +210,35 @@ verification:
     - 40
     - 42
     - 44
-    - 50
+    - 49
     - 51
-    - 52
     - 53
+    - 54
+    - 55
     - 56
     - 57
     - 60
-    - 62
     - 64
-    - 65
-    - 68
+    - 66
+    - 67
     - 70
+    - 71
     - 72
-    - 74
     - 75
-    - 80
+    - 77
+    - 79
+    - 81
+    - 82
     - 83
+    - 88
+    - 90
+    - 93
+    - 95
+    - 97
+    - 98
+    - 102
+    - 104
+    - 105
     checkpoints:
     - step: 4
       expectation: '{"assert_not_visible": "[data-testid=\"nav-mode-agents\"]"}'
@@ -239,42 +290,71 @@ verification:
       expectation: '{"assert_visible": "[data-testid=\"tab-scroll-left\"]"}'
     - step: 48
       expectation: '{"assert_visible": "[data-testid=\"tab-scroll-right\"]"}'
-    - step: 54
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 0}}'
-    - step: 55
-      expectation: '{"assert_visible": "[data-testid=\"tab-filter-empty\"]"}'
+    - step: 50
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"tab-scroll-area\"]'').scrollLeft <
+        document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"tab-scroll-area\"]'').scrollWidth - document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"tab-scroll-area\"]'').clientWidth
+        - 10", "expect_truthy": true}}'
+    - step: 52
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"tab-scroll-area\"]'').scrollLeft >
+        10", "expect_truthy": true}}'
     - step: 58
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 20}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 0}}'
     - step: 59
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tab-filter\"]", "name": "data-category", "equals": "local"}}'
+      expectation: '{"assert_visible": "[data-testid=\"tab-filter-empty\"]"}'
     - step: 61
-      expectation: '{"wait_for": "[data-testid=\"open-tabs-menu\"]"}'
-    - step: 63
-      expectation: '{"assert_count": {"selector": "[data-testid^=\"open-tabs-tab-\"]:not([data-testid^=\"open-tabs-tab-checkbox-\"])", "equal": 1}}'
-    - step: 66
-      expectation: '{"assert_not_visible": "[data-testid=\"open-tabs-menu\"]"}'
-    - step: 67
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "QA Many target"}}'
-    - step: 69
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 20}}'
-    - step: 71
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"tab-scroll-area\"]'').scrollLeft
-        < 5", "expect_truthy": true}}'
+    - step: 62
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tab-categories\"]", "name": "data-category", "equals": "local"}}'
+    - step: 63
+      expectation: '{"wait_for": "[data-testid=\"open-tabs-menu\"]"}'
+    - step: 65
+      expectation: '{"assert_count": {"selector": "[data-testid^=\"open-tabs-tab-\"]:not([data-testid^=\"open-tabs-tab-checkbox-\"])", "equal": 1}}'
+    - step: 68
+      expectation: '{"assert_not_visible": "[data-testid=\"open-tabs-menu\"]"}'
+    - step: 69
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "QA Many target"}}'
     - step: 73
+      expectation: '{"assert_not_visible": "[data-testid=\"open-tabs-menu\"]"}'
+    - step: 74
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "QA Many target"}}'
     - step: 76
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 20}}'
-    - step: 77
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"session-tab-filter\"]'').getBoundingClientRect().width
-        <= 90", "expect_truthy": true}}'
     - step: 78
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"tab-scroll-area\"]'').scrollLeft <
+        5", "expect_truthy": true}}'
+    - step: 80
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "QA Many target"}}'
+    - step: 84
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 20}}'
+    - step: 85
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"session-tab-filter\"]'') === null",
+        "expect_truthy": true}}'
+    - step: 86
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"control-bar\"]'').getBoundingClientRect().height
         <= 34", "expect_truthy": true}}'
-    - step: 81
+    - step: 89
+      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 91
       expectation: '{"wait_for": "[data-testid=\"tab-overview\"]"}'
-    - step: 82
+    - step: 92
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-overview-card\"]", "equal": 20}}'
-    - step: 84
+    - step: 94
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 20}}'
+    - step: 96
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 99
+      expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
+    - step: 100
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 101
+      expectation: '{"assert_not_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 103
+      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 106
+      expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
+    - step: 107
+      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 108
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 20}}'
     results:
     - 4
@@ -302,23 +382,36 @@ verification:
     - 46
     - 47
     - 48
-    - 54
-    - 55
+    - 50
+    - 52
     - 58
     - 59
     - 61
+    - 62
     - 63
-    - 66
-    - 67
+    - 65
+    - 68
     - 69
-    - 71
     - 73
+    - 74
     - 76
-    - 77
     - 78
-    - 81
-    - 82
+    - 80
     - 84
+    - 85
+    - 86
+    - 89
+    - 91
+    - 92
+    - 94
+    - 96
+    - 99
+    - 100
+    - 101
+    - 103
+    - 106
+    - 107
+    - 108
   visual:
   - check: Compact controls retain readable icons and active states without toolbar overlap.
     method: manual

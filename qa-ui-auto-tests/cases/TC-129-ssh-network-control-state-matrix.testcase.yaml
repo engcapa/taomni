@@ -16,6 +16,7 @@ fixtures:
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
 - click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
@@ -303,87 +304,214 @@ verification:
   - id: R1
     requirement: SSH proxy and jump controls expose the selected mode's fields, preserve entered values, and restore them after save and reopen.
     actions:
-    - 3
-    - 14
+    - 1
+    - 2
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
     - 15
-    - 16
     - 17
-    - 18
     - 19
-    - 20
     - 21
-    - 22
     - 23
-    - 24
     - 25
-    - 26
     - 27
-    - 28
-    - 29
     - 30
-    - 31
-    - 32
     - 33
-    - 34
     - 35
-    - 36
-    - 37
     - 38
-    - 39
     - 40
-    - 41
     - 42
-    - 43
     - 44
-    - 45
     - 46
-    - 47
-    - 48
     - 49
-    - 50
     - 51
-    - 52
-    - 53
     - 54
-    - 55
     - 56
     - 57
-    - 58
     - 59
-    - 60
     - 61
-    - 62
-    - 63
     - 64
-    - 65
-    - 66
     - 67
-    - 68
     - 69
-    - 70
-    - 71
     - 72
     - 73
     - 74
-    - 75
     - 76
+    - 81
+    - 83
+    - 85
+    - 87
+    - 88
+    - 90
+    - 91
+    - 93
+    - 103
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 14
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "none"}}'
+    - step: 16
+      expectation: '{"assert_visible": "input[aria-label=\"Proxy host\"]"}'
+    - step: 18
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy host\"]", "name": "value", "equals": "proxy.example.test"}}'
+    - step: 20
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy port\"]", "name": "value", "equals": "8080"}}'
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy username\"]", "name": "value", "equals": "proxy-user"}}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy password\"]", "name": "type", "equals": "password"}}'
+    - step: 26
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-save-auth\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 28
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "socks5"}}'
+    - step: 29
+      expectation: '{"assert_visible": "input[aria-label=\"Proxy host\"]"}'
+    - step: 31
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "system"}}'
+    - step: 32
+      expectation: '{"assert_not_visible": "input[aria-label=\"Proxy host\"]"}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "none"}}'
+    - step: 36
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "ssh-tunnel"}}'
+    - step: 37
+      expectation: '{"assert_visible": "[data-testid=\"session-jump-source\"]"}'
+    - step: 39
+      expectation: '{"assert_visible": "input[aria-label=\"Jump host\"]"}'
+    - step: 41
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump host\"]", "name": "value", "equals": "bastion.example.test"}}'
+    - step: 43
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump port\"]", "name": "value", "equals": "2200"}}'
+    - step: 45
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump user\"]", "name": "value", "equals": "bastion-user"}}'
+    - step: 47
+      expectation: '{"assert_visible": "[data-testid=\"session-jump-key\"]"}'
+    - step: 48
+      expectation: '{"assert_not_visible": "[data-testid=\"session-jump-password\"]"}'
+    - step: 50
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-jump-key\"]", "name": "value", "equals": "/home/qauser/.ssh/jump_ed25519"}}'
+    - step: 52
+      expectation: '{"assert_visible": "[data-testid=\"session-jump-password\"]"}'
+    - step: 53
+      expectation: '{"assert_not_visible": "[data-testid=\"session-jump-key\"]"}'
+    - step: 55
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-jump-password\"]", "name": "type", "equals": "password"}}'
+    - step: 58
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-keepalive-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 60
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keep-alive interval\"]", "name": "value", "equals": "47"}}'
+    - step: 62
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 63
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 65
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 66
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 68
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv4"}}'
+    - step: 70
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
+    - step: 71
+      expectation: '{"assert_disabled": "[data-testid=\"session-forward-add\"]"}'
+    - step: 75
+      expectation: '{"assert_enabled": "[data-testid=\"session-forward-add\"]"}'
+    - step: 77
+      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 1}}'
+    - step: 78
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19200"}}'
+    - step: 79
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "service.internal:80"}}'
+    - step: 80
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": "matrix-forward"}}'
+    - step: 82
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19201"}}'
+    - step: 84
+      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 0}}'
+    - step: 86
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 89
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-network-matrix\"]"}'
+    - step: 92
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 94
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 95
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "ssh-tunnel"}}'
+    - step: 96
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump host\"]", "name": "value", "equals": "bastion.example.test"}}'
+    - step: 97
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump port\"]", "name": "value", "equals": "2200"}}'
+    - step: 98
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump user\"]", "name": "value", "equals": "bastion-user"}}'
+    - step: 99
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-keepalive-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 100
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keep-alive interval\"]", "name": "value", "equals": "47"}}'
+    - step: 101
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
+    - step: 102
+      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 0}}'
+    - step: 104
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    results:
+    - 3
+    - 6
+    - 13
+    - 14
+    - 16
+    - 18
+    - 20
+    - 22
+    - 24
+    - 26
+    - 28
+    - 29
+    - 31
+    - 32
+    - 34
+    - 36
+    - 37
+    - 39
+    - 41
+    - 43
+    - 45
+    - 47
+    - 48
+    - 50
+    - 52
+    - 53
+    - 55
+    - 58
+    - 60
+    - 62
+    - 63
+    - 65
+    - 66
+    - 68
+    - 70
+    - 71
+    - 75
     - 77
     - 78
     - 79
     - 80
-    - 81
     - 82
-    - 83
     - 84
-    - 85
     - 86
-    - 87
-    - 88
     - 89
-    - 90
-    - 91
     - 92
-    - 93
     - 94
     - 95
     - 96
@@ -393,132 +521,228 @@ verification:
     - 100
     - 101
     - 102
-    checkpoints:
-    - step: 12
-      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
-    - step: 13
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "none"}}'
-    - step: 19
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy port\"]", "name": "value", "equals": "8080"}}'
-    - step: 27
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "socks5"}}'
-    - step: 31
-      expectation: '{"assert_not_visible": "input[aria-label=\"Proxy host\"]"}'
-    - step: 36
-      expectation: '{"assert_visible": "[data-testid=\"session-jump-source\"]"}'
-    - step: 38
-      expectation: '{"assert_visible": "input[aria-label=\"Jump host\"]"}'
-    - step: 46
-      expectation: '{"assert_visible": "[data-testid=\"session-jump-key\"]"}'
-    - step: 57
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-keepalive-toggle\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 74
-      expectation: '{"assert_enabled": "[data-testid=\"session-forward-add\"]"}'
-    - step: 76
-      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 1}}'
-    - step: 83
-      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 0}}'
-    - step: 88
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-network-matrix\"]"}'
-    - step: 93
-      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
-    - step: 94
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "ssh-tunnel"}}'
-    - step: 95
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump host\"]", "name": "value", "equals": "bastion.example.test"}}'
-    - step: 97
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump user\"]", "name": "value", "equals": "bastion-user"}}'
-    - step: 101
-      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 0}}'
-    - step: 103
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
-    results:
-    - 12
-    - 13
-    - 19
-    - 27
-    - 31
-    - 36
-    - 38
-    - 46
-    - 57
-    - 74
-    - 76
-    - 83
-    - 88
-    - 93
-    - 94
-    - 95
-    - 97
-    - 101
-    - 103
+    - 104
   - id: R2
     requirement: SSH keep-alive, TCP coupling, IP version, and forward add/edit/remove controls report their resulting state.
     actions:
-    - 52
-    - 53
+    - 1
+    - 2
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 15
+    - 17
+    - 19
+    - 21
+    - 23
+    - 25
+    - 27
+    - 30
+    - 33
+    - 35
+    - 38
+    - 40
+    - 42
+    - 44
+    - 46
+    - 49
+    - 51
     - 54
-    - 55
     - 56
     - 57
-    - 58
     - 59
-    - 60
     - 61
-    - 62
-    - 63
     - 64
-    - 65
-    - 66
     - 67
-    - 68
     - 69
-    - 70
-    - 71
     - 72
     - 73
     - 74
-    - 75
     - 76
-    - 77
-    checkpoints:
-    - step: 57
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-keepalive-toggle\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 59
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keep-alive interval\"]", "name": "value", "equals": "47"}}'
-    - step: 61
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 64
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
-    - step: 65
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
-    - step: 67
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv4"}}'
-    - step: 69
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
-    - step: 74
-      expectation: '{"assert_enabled": "[data-testid=\"session-forward-add\"]"}'
-    - step: 76
-      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 1}}'
-    - step: 77
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19200"}}'
-    - step: 81
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19201"}}'
-    - step: 83
-      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 0}}'
-    results:
-    - 57
-    - 59
-    - 61
-    - 64
-    - 65
-    - 67
-    - 69
-    - 74
-    - 76
-    - 77
     - 81
     - 83
+    - 85
+    - 87
+    - 88
+    - 90
+    - 91
+    - 93
+    - 103
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 14
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "none"}}'
+    - step: 16
+      expectation: '{"assert_visible": "input[aria-label=\"Proxy host\"]"}'
+    - step: 18
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy host\"]", "name": "value", "equals": "proxy.example.test"}}'
+    - step: 20
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy port\"]", "name": "value", "equals": "8080"}}'
+    - step: 22
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy username\"]", "name": "value", "equals": "proxy-user"}}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy password\"]", "name": "type", "equals": "password"}}'
+    - step: 26
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-save-auth\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 28
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "socks5"}}'
+    - step: 29
+      expectation: '{"assert_visible": "input[aria-label=\"Proxy host\"]"}'
+    - step: 31
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "system"}}'
+    - step: 32
+      expectation: '{"assert_not_visible": "input[aria-label=\"Proxy host\"]"}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "none"}}'
+    - step: 36
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "ssh-tunnel"}}'
+    - step: 37
+      expectation: '{"assert_visible": "[data-testid=\"session-jump-source\"]"}'
+    - step: 39
+      expectation: '{"assert_visible": "input[aria-label=\"Jump host\"]"}'
+    - step: 41
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump host\"]", "name": "value", "equals": "bastion.example.test"}}'
+    - step: 43
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump port\"]", "name": "value", "equals": "2200"}}'
+    - step: 45
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump user\"]", "name": "value", "equals": "bastion-user"}}'
+    - step: 47
+      expectation: '{"assert_visible": "[data-testid=\"session-jump-key\"]"}'
+    - step: 48
+      expectation: '{"assert_not_visible": "[data-testid=\"session-jump-password\"]"}'
+    - step: 50
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-jump-key\"]", "name": "value", "equals": "/home/qauser/.ssh/jump_ed25519"}}'
+    - step: 52
+      expectation: '{"assert_visible": "[data-testid=\"session-jump-password\"]"}'
+    - step: 53
+      expectation: '{"assert_not_visible": "[data-testid=\"session-jump-key\"]"}'
+    - step: 55
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-jump-password\"]", "name": "type", "equals": "password"}}'
+    - step: 58
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-keepalive-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 60
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keep-alive interval\"]", "name": "value", "equals": "47"}}'
+    - step: 62
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 63
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 65
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 66
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-tcp-nodelay-toggle\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 68
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv4"}}'
+    - step: 70
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
+    - step: 71
+      expectation: '{"assert_disabled": "[data-testid=\"session-forward-add\"]"}'
+    - step: 75
+      expectation: '{"assert_enabled": "[data-testid=\"session-forward-add\"]"}'
+    - step: 77
+      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 1}}'
+    - step: 78
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19200"}}'
+    - step: 79
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "service.internal:80"}}'
+    - step: 80
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": "matrix-forward"}}'
+    - step: 82
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19201"}}'
+    - step: 84
+      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 0}}'
+    - step: 86
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 89
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-network-matrix\"]"}'
+    - step: 92
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 94
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 95
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "ssh-tunnel"}}'
+    - step: 96
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump host\"]", "name": "value", "equals": "bastion.example.test"}}'
+    - step: 97
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump port\"]", "name": "value", "equals": "2200"}}'
+    - step: 98
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Jump user\"]", "name": "value", "equals": "bastion-user"}}'
+    - step: 99
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-keepalive-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 100
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keep-alive interval\"]", "name": "value", "equals": "47"}}'
+    - step: 101
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ip-version\"]", "name": "value", "equals": "ipv6"}}'
+    - step: 102
+      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 0}}'
+    - step: 104
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    results:
+    - 3
+    - 6
+    - 13
+    - 14
+    - 16
+    - 18
+    - 20
+    - 22
+    - 24
+    - 26
+    - 28
+    - 29
+    - 31
+    - 32
+    - 34
+    - 36
+    - 37
+    - 39
+    - 41
+    - 43
+    - 45
+    - 47
+    - 48
+    - 50
+    - 52
+    - 53
+    - 55
+    - 58
+    - 60
+    - 62
+    - 63
+    - 65
+    - 66
+    - 68
+    - 70
+    - 71
+    - 75
+    - 77
+    - 78
+    - 79
+    - 80
+    - 82
+    - 84
+    - 86
+    - 89
+    - 92
+    - 94
+    - 95
+    - 96
+    - 97
+    - 98
+    - 99
+    - 100
+    - 101
+    - 102
+    - 104
   visual:
   - check: Proxy, jump, keep-alive, and forwarding rows remain readable without overlap as conditional fields change.
     method: manual

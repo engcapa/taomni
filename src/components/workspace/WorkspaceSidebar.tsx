@@ -15,6 +15,8 @@ import { WorkspaceFileTree } from "./WorkspaceFileTree";
 import { WorkspaceSessionsPanel } from "./WorkspaceSessionsPanel";
 import { useSessionStore } from "../../stores/sessionStore";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
+import { useWorkspaceEditorHostStore } from "../../stores/workspaceEditorHostStore";
+import { usesSharedWorkspaceEditor } from "./useWorkspaceCodeHost";
 
 export interface WorkspaceSidebarProps {
   onOpenSessionPicker: () => void;
@@ -78,7 +80,12 @@ export function WorkspaceSidebar({ onOpenSessionPicker }: WorkspaceSidebarProps)
   const openFsModal = useWorkspaceUiStore((s) => s.openFsModal);
   const [refreshToken, setRefreshToken] = useState(0);
   const [fileQuery, setFileQuery] = useState("");
-  const [linkedOpen, setLinkedOpen] = useState(true);
+  const [linkedOpenByWorkspace, setLinkedOpenByWorkspace] = useState<Record<string, boolean>>({});
+  const setHost = useWorkspaceEditorHostStore((state) => state.setHost);
+  const workspaceId = workspace?.id;
+  const editorHostRef = useCallback((element: HTMLDivElement | null) => {
+    if (workspaceId) setHost(workspaceId, element);
+  }, [setHost, workspaceId]);
   const sessions = useSessionStore((s) => s.sessions);
   const documents = useWorkspaceEditorStore((s) => s.documents);
   const gitBar = useWorkspaceGitBar(workspace);
@@ -104,6 +111,8 @@ export function WorkspaceSidebar({ onOpenSessionPicker }: WorkspaceSidebarProps)
   };
 
   if (!workspace) return null;
+  const sharedEditor = usesSharedWorkspaceEditor(workspace);
+  const linkedOpen = linkedOpenByWorkspace[workspace.id] ?? workspace.openTabs.some((tab) => tab.kind === "file");
 
   const toolbar = lens === "project" ? (
     <div className="flex shrink-0 items-center gap-1 px-1.5 py-1" style={{ borderBottom: "1px solid var(--taomni-divider)" }}>
@@ -136,9 +145,12 @@ export function WorkspaceSidebar({ onOpenSessionPicker }: WorkspaceSidebarProps)
   return (
     <div data-testid="workspace-sidebar-panel" className="flex min-h-0 flex-1 flex-col">
       <WorkspaceSwitcher onAddFolder={() => openModal("root")} />
-      {toolbar}
+      {!sharedEditor && toolbar}
+      {sharedEditor && <div ref={editorHostRef} data-testid="workspace-editor-tool-host"
+        className="min-h-0 flex-1 overflow-hidden" style={{ display: lens === "sessions" ? "none" : undefined }} />}
       {lens === "project" && (
         <>
+        {!sharedEditor && <>
         <div className="flex h-7 shrink-0 items-center justify-between px-2 text-[10.5px] text-[var(--taomni-text-muted)]"><span className="truncate font-semibold">{t("platform.project")} {workspace.rootFolders[0] ? `(${workspace.rootFolders[0].path})` : ""}</span></div>
         <WorkspaceFileTree
           workspace={workspace}
@@ -153,9 +165,10 @@ export function WorkspaceSidebar({ onOpenSessionPicker }: WorkspaceSidebarProps)
           refreshToken={refreshToken}
           query={fileQuery}
         />
+        </>}
         <section data-testid="workspace-linked-sessions" className="shrink-0 border-t p-1.5" style={{ borderColor: "var(--taomni-chrome-border)" }}>
           <div className="flex items-center justify-between gap-1 text-[10.5px] text-[var(--taomni-text-muted)]">
-            <button type="button" data-testid="workspace-linked-sessions-toggle" aria-expanded={linkedOpen} className="inline-flex min-w-0 items-center gap-1 py-1 font-semibold" onClick={() => setLinkedOpen(!linkedOpen)}><ChevronDown className={`h-3 w-3 ${linkedOpen ? "" : "-rotate-90"}`} />{t("platform.frequentSessions")} ({workspace.pinnedSessionIds.length})</button>
+            <button type="button" data-testid="workspace-linked-sessions-toggle" aria-expanded={linkedOpen} className="inline-flex min-w-0 items-center gap-1 py-1 font-semibold" onClick={() => setLinkedOpenByWorkspace((current) => ({ ...current, [workspace.id]: !linkedOpen }))}><ChevronDown className={`h-3 w-3 ${linkedOpen ? "" : "-rotate-90"}`} />{t("platform.frequentSessions")} ({workspace.pinnedSessionIds.length})</button>
             <button type="button" data-testid="workspace-link-session" className="inline-flex shrink-0 items-center gap-0.5 rounded p-1 hover:bg-[var(--taomni-hover)]" title={t("platform.openAnySession")} onClick={onOpenSessionPicker}><Plus className="h-3 w-3" /></button>
           </div>
           {linkedOpen && <div className="max-h-[180px] overflow-auto">
@@ -178,7 +191,7 @@ export function WorkspaceSidebar({ onOpenSessionPicker }: WorkspaceSidebarProps)
           }}
         />
       )}
-      {lens === "structure" && (
+      {!sharedEditor && lens === "structure" && (
         <div data-testid="workspace-structure-panel" className="min-h-0 flex-1 overflow-auto py-1">
           {(!activeDocument || activeDocument.loading) && (
             <div className="px-2 py-2 text-[11px] text-[var(--taomni-text-muted)]">{t("platform.structureEmpty")}</div>

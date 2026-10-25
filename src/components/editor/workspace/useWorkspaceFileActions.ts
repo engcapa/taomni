@@ -231,14 +231,14 @@ export function useWorkspaceFileActions({
           void loadDir(root.id, "");
           // Refresh expanded descendants too. Keep their last listings mounted
           // while the watcher-triggered disk reads replace each snapshot.
-          if (treeViewMode !== "flat") {
+          if (treeViewMode !== "flat" && treeViewMode !== "files") {
             const prefix = `${root.id}:`;
             for (const key of expandedDirs) {
               if (key.startsWith(prefix)) void loadDir(root.id, key.slice(prefix.length));
             }
           }
         }
-        if (treeViewMode === "flat") void loadFlatFiles(root.id, true);
+        if (treeViewMode === "flat" || treeViewMode === "files") void loadFlatFiles(root.id, true);
       });
     }, 200);
   }, [expandedDirs, expandedRoots, loadDir, loadFlatFiles, resetTreeData, rootsRef, treeViewMode]);
@@ -685,6 +685,7 @@ export function useWorkspaceFileActions({
           notificationError,
         ].filter(Boolean).join("; "));
       }
+      void loadFlatFiles(root.id, true);
     } catch (error) {
       onStatus(errorMessage(error));
     }
@@ -692,6 +693,7 @@ export function useWorkspaceFileActions({
     applyResourceOperation,
     findRoot,
     loadDir,
+    loadFlatFiles,
     notifyWorkspacePathGitChanged,
     onStatus,
     notifyWorkspaceFileOperationCompleted,

@@ -3306,6 +3306,7 @@ def run_native_step(ctx: NativeStepContext, verb: str, args: Any) -> str:
 from . import rdp_steps  # noqa: E402,F401
 from . import updater_steps  # noqa: E402,F401
 from . import folder_dialog  # noqa: E402,F401
+from . import application_restart  # noqa: E402,F401 — registers the native cold-start boundary
 
 
 @_verb("mail_storage_assert")

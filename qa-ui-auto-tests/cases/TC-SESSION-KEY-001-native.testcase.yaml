@@ -15,6 +15,7 @@ fixtures:
 timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for:
     selector: '[data-testid="sidebar"]'
     timeout_sec: 45
@@ -142,88 +143,96 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Generate a real SSH key, reject overwrite, negotiate expert algorithms and
-      authenticate
+    requirement: Generate a real SSH key, reject overwrite, negotiate expert algorithms and authenticate
     actions:
-    - 3
-    - 5
+    - 1
+    - 2
+    - 4
     - 6
     - 7
     - 8
     - 9
     - 10
     - 11
-    - 13
+    - 12
     - 14
     - 15
-    - 17
+    - 16
     - 18
     - 19
     - 20
-    - 23
-    - 25
+    - 21
+    - 24
     - 26
     - 27
     - 28
     - 29
-    - 31
+    - 30
     - 32
     - 33
-    - 35
+    - 34
     - 36
     - 37
     - 38
     - 39
     - 40
-    - 42
-    - 44
-    - 46
-    - 49
-    checkpoints:
-    - step: 12
-      expectation: The explicit authentication, key file, algorithm or reconnection outcome
-        is observed.
-    - step: 21
-      expectation: The explicit authentication, key file, algorithm or reconnection outcome
-        is observed.
-    - step: 22
-      expectation: The explicit authentication, key file, algorithm or reconnection outcome
-        is observed.
-    - step: 24
-      expectation: The explicit authentication, key file, algorithm or reconnection outcome
-        is observed.
-    - step: 30
-      expectation: The explicit authentication, key file, algorithm or reconnection outcome
-        is observed.
-    - step: 34
-      expectation: The explicit authentication, key file, algorithm or reconnection outcome
-        is observed.
-    - step: 45
-      expectation: The explicit authentication, key file, algorithm or reconnection outcome
-        is observed.
-    - step: 47
-      expectation: The explicit authentication, key file, algorithm or reconnection outcome
-        is observed.
-    - step: 50
-      expectation: The explicit authentication, key file, algorithm or reconnection outcome
-        is observed.
-    results:
-    - 12
-    - 21
-    - 22
-    - 24
-    - 30
-    - 34
+    - 41
+    - 43
     - 45
     - 47
     - 50
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
+    - step: 5
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "timeout_sec": 45}}'
+    - step: 13
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Connection successful", "timeout_sec": 45}}'
+    - step: 17
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-key-generator\"]", "timeout_sec": 45}}'
+    - step: 22
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-key-result\"]", "contains": "Key created:", "timeout_sec": 45}}'
+    - step: 23
+      expectation: '{"assert_file_contains": {"path": "${cfg.ssh_features.native_public_key}", "contains": "ssh-ed25519", "timeout_sec": 20}}'
+    - step: 25
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-key-result\"]", "contains": "already exists", "timeout_sec": 45}}'
+    - step: 31
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Connection successful", "timeout_sec": 45}}'
+    - step: 35
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Unsupported SSH algorithm", "timeout_sec": 45}}'
+    - step: 42
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-generated-key\"]"}'
+    - step: 44
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+    - step: 46
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_GENERATED_KEY_OK\\s*$", "timeout_sec": 45}}'
+    - step: 48
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-pane\"]", "contains": "Reconnected to", "timeout_sec": 45}}'
+    - step: 49
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "timeout_sec": 45}}'
+    - step: 51
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_AFTER_RECONNECT\\s*$", "timeout_sec": 45}}'
+    results:
+    - 3
+    - 5
+    - 13
+    - 17
+    - 22
+    - 23
+    - 25
+    - 31
+    - 35
+    - 42
+    - 44
+    - 46
+    - 48
+    - 49
+    - 51
   native:
   - check: Real SSH server, MIT Kerberos KDC and native filesystem
     method: automated
-    reason: Runner fixture authenticates with a real ticket; product connects through its native
-      IPC and protocol implementation.
+    reason: Runner fixture authenticates with a real ticket; product connects through its native IPC and protocol implementation.
   visual:
   - check: Visible protocol status and file entries
     method: automated
-    reason: Explicit UI assertions cover the rendered outcomes; file assertions independently
-      verify transferred bytes.
+    reason: Explicit UI assertions cover the rendered outcomes; file assertions independently verify transferred bytes.

@@ -17,6 +17,7 @@ fixtures:
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for:
     selector: '[data-testid="sidebar"]'
     timeout_sec: 45
@@ -39,28 +40,28 @@ steps:
 - click: '[data-testid="session-section-advanced"]'
 - wait_for: '[data-testid="advanced-ssh-settings"]'
 - fill:
-    selector: 'input[aria-label="Execute command"]'
+    selector: input[aria-label="Execute command"]
     value: printf 'qa-lifecycle-command\n'
 - click: '[data-testid="session-section-network"]'
 - wait_for: '[data-testid="network-settings"]'
 - fill:
-    selector: 'input[aria-label="New forward local address"]'
+    selector: input[aria-label="New forward local address"]
     value: 127.0.0.1:19100
 - fill:
-    selector: 'input[aria-label="New forward remote address"]'
+    selector: input[aria-label="New forward remote address"]
     value: service.internal:80
 - fill:
-    selector: 'input[aria-label="New forward description"]'
+    selector: input[aria-label="New forward description"]
     value: lifecycle-forward-one
 - click: '[data-testid="session-forward-add"]'
 - fill:
-    selector: 'input[aria-label="New forward local address"]'
+    selector: input[aria-label="New forward local address"]
     value: 127.0.0.1:19101
 - fill:
-    selector: 'input[aria-label="New forward remote address"]'
+    selector: input[aria-label="New forward remote address"]
     value: service.internal:81
 - fill:
-    selector: 'input[aria-label="New forward description"]'
+    selector: input[aria-label="New forward description"]
     value: lifecycle-forward-two
 - click: '[data-testid="session-forward-add"]'
 - assert_count:
@@ -76,28 +77,28 @@ steps:
     selector: '[data-testid="session-name"]'
     value: qa-ui-auto-ssh-lifecycle
 - fill:
-    selector: 'input[aria-label="Background image"]'
+    selector: input[aria-label="Background image"]
     value: /tmp/qa-ui-auto-terminal.png
 - fill:
-    selector: 'input[aria-label="Background opacity"]'
-    value: '42%'
+    selector: input[aria-label="Background opacity"]
+    value: 42%
 - fill:
-    selector: 'textarea[aria-label="Description notes"]'
+    selector: textarea[aria-label="Description notes"]
     value: lifecycle description
 - fill:
-    selector: 'input[aria-label="Tags"]'
+    selector: input[aria-label="Tags"]
     value: ssh, lifecycle, qa
 - fill:
-    selector: 'input[aria-label="Keyboard shortcut"]'
+    selector: input[aria-label="Keyboard shortcut"]
     value: Ctrl+Alt+9
 - set_check:
-    selector: 'label:has-text("Auto-connect when Taomni starts") input[type="checkbox"]'
+    selector: label:has-text("Auto-connect when Taomni starts") input[type="checkbox"]
     checked: false
 - set_check:
-    selector: 'label:has-text("Open in new window") input[type="checkbox"]'
+    selector: label:has-text("Open in new window") input[type="checkbox"]
     checked: true
 - set_check:
-    selector: 'label:has-text("Reconnect on disconnection") input[type="checkbox"]'
+    selector: label:has-text("Reconnect on disconnection") input[type="checkbox"]
     checked: false
 - click: '[data-testid="session-new-folder"]'
 - wait_for: '[data-testid="text-input-dialog"]'
@@ -124,7 +125,7 @@ steps:
 - click: '[data-testid="session-section-advanced"]'
 - wait_for: '[data-testid="advanced-ssh-settings"]'
 - assert_attribute:
-    selector: 'input[aria-label="Execute command"]'
+    selector: input[aria-label="Execute command"]
     name: value
     equals: printf 'qa-lifecycle-command\n'
 - click: '[data-testid="session-section-bookmark"]'
@@ -132,7 +133,7 @@ steps:
 - fill:
     selector: '[data-testid="session-name"]'
     value: discarded-session-name
-- click: 'button[aria-label="Cancel"]'
+- click: button[aria-label="Cancel"]
 - wait_for:
     selector: '[data-testid="session-editor"]'
     state: detached
@@ -161,7 +162,7 @@ steps:
 - assert_text:
     selector: '[data-testid="session-test-result-summary"]'
     contains: Template saved
-- click: 'button[aria-label="Cancel"]'
+- click: button[aria-label="Cancel"]
 - wait_for:
     selector: '[data-testid="session-editor"]'
     state: detached
@@ -188,18 +189,18 @@ verification:
   - id: R1
     requirement: SSH forward rows can be removed and bookmark fields, startup toggles, and a new folder are accepted before saving.
     actions:
+    - 1
+    - 2
     - 4
-    - 6
+    - 5
     - 7
     - 8
     - 9
     - 10
     - 11
     - 12
-    - 13
     - 14
     - 15
-    - 16
     - 17
     - 18
     - 19
@@ -208,11 +209,8 @@ verification:
     - 22
     - 23
     - 24
-    - 25
     - 26
-    - 27
     - 28
-    - 29
     - 30
     - 31
     - 32
@@ -223,91 +221,265 @@ verification:
     - 37
     - 38
     - 39
-    - 40
     - 41
     - 42
-    - 43
-    checkpoints:
-    - step: 24
-      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 2}}'
-    - step: 26
-      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 1}}'
-    - step: 39
-      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
-    - step: 44
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-lifecycle\"]"}'
-    results:
-    - 24
-    - 26
-    - 39
     - 44
-  - id: R2
-    requirement: Reset restores the saved SSH draft, Cancel discards edits, Save as template creates a template, and Delete requires confirmation.
-    actions:
+    - 46
+    - 47
+    - 49
     - 50
-    - 51
     - 52
-    - 53
-    - 54
     - 55
-    - 56
     - 57
     - 58
-    - 59
-    - 60
-    - 61
     - 62
-    - 63
     - 64
     - 65
     - 66
     - 67
     - 68
-    - 69
     - 70
     - 71
-    - 72
     - 73
-    - 74
     - 75
     - 76
-    - 77
-    - 78
-    - 79
-    - 80
-    - 81
-    - 82
-    - 83
-    - 84
-    checkpoints:
-    - step: 50
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "ssh-lifecycle.example.test"}}'
-    - step: 53
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf ''qa-lifecycle-command\\n''"}}'
-    - step: 58
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
-    - step: 59
-      expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-lifecycle\"]"}'
-    - step: 71
-      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Template saved"}}'
-    - step: 78
-      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 81
-      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "state": "detached"}}'
-    - step: 83
-      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 85
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-lifecycle\"]", "state": "detached"}}'
-    results:
-    - 50
-    - 53
-    - 58
-    - 59
-    - 71
     - 78
     - 81
     - 83
     - 85
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 25
+      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 2}}'
+    - step: 27
+      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 1}}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 40
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 43
+      expectation: '{"wait_for": {"selector": "[data-testid=\"text-input-dialog\"]", "state": "detached"}}'
+    - step: 45
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-lifecycle\"]"}'
+    - step: 48
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 51
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "ssh-lifecycle.example.test"}}'
+    - step: 53
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 54
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf ''qa-lifecycle-command\\n''"}}'
+    - step: 56
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 59
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    - step: 60
+      expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-lifecycle\"]"}'
+    - step: 61
+      expectation: '{"assert_not_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"discarded-session-name\"]"}'
+    - step: 63
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 69
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 72
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Template saved"}}'
+    - step: 74
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    - step: 77
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 79
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 80
+      expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-lifecycle\"]"}'
+    - step: 82
+      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "state": "detached"}}'
+    - step: 84
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 86
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-lifecycle\"]", "state": "detached"}}'
+    results:
+    - 3
+    - 6
+    - 13
+    - 16
+    - 25
+    - 27
+    - 29
+    - 40
+    - 43
+    - 45
+    - 48
+    - 51
+    - 53
+    - 54
+    - 56
+    - 59
+    - 60
+    - 61
+    - 63
+    - 69
+    - 72
+    - 74
+    - 77
+    - 79
+    - 80
+    - 82
+    - 84
+    - 86
+  - id: R2
+    requirement: Reset restores the saved SSH draft, Cancel discards edits, Save as template creates a template, and Delete requires confirmation.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 14
+    - 15
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 26
+    - 28
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 37
+    - 38
+    - 39
+    - 41
+    - 42
+    - 44
+    - 46
+    - 47
+    - 49
+    - 50
+    - 52
+    - 55
+    - 57
+    - 58
+    - 62
+    - 64
+    - 65
+    - 66
+    - 67
+    - 68
+    - 70
+    - 71
+    - 73
+    - 75
+    - 76
+    - 78
+    - 81
+    - 83
+    - 85
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 25
+      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 2}}'
+    - step: 27
+      expectation: '{"assert_count": {"selector": "[data-testid=\"network-settings\"] input[aria-label=\"Forward local address\"]", "equal": 1}}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 40
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 43
+      expectation: '{"wait_for": {"selector": "[data-testid=\"text-input-dialog\"]", "state": "detached"}}'
+    - step: 45
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-lifecycle\"]"}'
+    - step: 48
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 51
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "ssh-lifecycle.example.test"}}'
+    - step: 53
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 54
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf ''qa-lifecycle-command\\n''"}}'
+    - step: 56
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 59
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    - step: 60
+      expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-lifecycle\"]"}'
+    - step: 61
+      expectation: '{"assert_not_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"discarded-session-name\"]"}'
+    - step: 63
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 69
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 72
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Template saved"}}'
+    - step: 74
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    - step: 77
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 79
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 80
+      expectation: '{"assert_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-lifecycle\"]"}'
+    - step: 82
+      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "state": "detached"}}'
+    - step: 84
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 86
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-lifecycle\"]", "state": "detached"}}'
+    results:
+    - 3
+    - 6
+    - 13
+    - 16
+    - 25
+    - 27
+    - 29
+    - 40
+    - 43
+    - 45
+    - 48
+    - 51
+    - 53
+    - 54
+    - 56
+    - 59
+    - 60
+    - 61
+    - 63
+    - 69
+    - 72
+    - 74
+    - 77
+    - 79
+    - 80
+    - 82
+    - 84
+    - 86
   visual:
   - check: Lifecycle dialogs, bookmark values, and forward rows remain readable and do not overlap in the editor.
     method: manual

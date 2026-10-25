@@ -12,6 +12,7 @@ import type { CodeWorkspaceFileRef, CodeWorkspaceRootInfo } from "../../../../ty
 import { type OpenFileState, type TreeSelection, type WorkspaceTreeCommandPayload, errorMessage, normalizeFsPath, parentPath, relativePathWithinRoot, rootDirKey, shouldHideEntry } from "../codeWorkspaceModel";
 import { type BreadcrumbPathAction, type BreadcrumbPathChild, type BreadcrumbPathSegment } from "../Breadcrumbs";
 import { type WorkspaceEditApplyOptions } from "./mutationTypes";
+import { t } from "../../../../lib/i18n";
 
 
 
@@ -213,14 +214,17 @@ export function createShowTreeContextMenu(controllerContext: ShowTreeContextMenu
       ) => [
         {
           label: "Cut",
+          testId: "code-workspace-tree-cut",
           onClick: () => controllerContext.stageTreeClipboard("cut", rootId, path, isDirectory),
         },
         {
           label: "Copy",
+          testId: "code-workspace-tree-copy",
           onClick: () => controllerContext.stageTreeClipboard("copy", rootId, path, isDirectory),
         },
         {
           label: "Paste",
+          testId: "code-workspace-tree-paste",
           disabled: !controllerContext.canPasteTreeClipboard(),
           onClick: () => void controllerContext.pasteTreeClipboard(directory),
         },
@@ -231,12 +235,15 @@ export function createShowTreeContextMenu(controllerContext: ShowTreeContextMenu
           const absolute = normalizeFsPath(ref.path);
           controllerContext.openTreeContextMenu(event, [
             { label: "Open", onClick: run("workspace.tree.open", { selection }) },
+            { label: t("sftp.openWithDefault"), testId: "code-workspace-tree-open-default", onClick: () => {
+              void invoke("sftp_open_path", { path: absolute }).catch((err) => controllerContext.setStatusMessage(errorMessage(err)));
+            } },
             { separator: true, label: "" },
             { label: "Copy Path", onClick: () => void writeText(absolute) },
             {
               label: "Reveal in Explorer",
               onClick: () => {
-                void invoke("sftp_open_path", { path: absolute })
+                void invoke("sftp_open_path", { path: parentPath(absolute) })
                   .then(() => controllerContext.setStatusMessage(`Opened ${absolute}`))
                   .catch((err) => controllerContext.setStatusMessage(errorMessage(err)));
               },
@@ -248,6 +255,7 @@ export function createShowTreeContextMenu(controllerContext: ShowTreeContextMenu
         const dir = parentPath(ref.path);
         controllerContext.openTreeContextMenu(event, [
           { label: "Open", onClick: run("workspace.tree.open", { selection }) },
+          { label: t("sftp.openWithDefault"), testId: "code-workspace-tree-open-default", onClick: () => void controllerContext.revealInExplorer(ref.rootId, ref.path) },
           { separator: true, label: "" },
           { label: "New File...", onClick: run("workspace.tree.newFile", { directory: { rootId: ref.rootId, path: dir } }) },
           { label: "New Java Class...", onClick: run("workspace.tree.newJavaClass", { directory: { rootId: ref.rootId, path: dir } }) },
@@ -262,7 +270,7 @@ export function createShowTreeContextMenu(controllerContext: ShowTreeContextMenu
           { label: "Copy Relative Path", onClick: run("workspace.tree.copyRelativePath", { rootId: ref.rootId, path: ref.path }) },
           {
             label: "Reveal in Explorer",
-            onClick: () => void controllerContext.revealInExplorer(ref.rootId, ref.path),
+            onClick: () => void controllerContext.revealInExplorer(ref.rootId, dir),
           },
           { label: "Open in Terminal", onClick: () => controllerContext.openTerminalAt(ref.rootId, ref.path, true) },
         ]);
@@ -298,13 +306,14 @@ export function createShowTreeContextMenu(controllerContext: ShowTreeContextMenu
       }
       if (selection.kind === "root") {
         controllerContext.openTreeContextMenu(event, [
-          { label: "New File...", onClick: run("workspace.tree.newFile", { directory: { rootId: selection.rootId, path: "" } }) },
+          { label: "New File...", testId: "code-workspace-tree-new-file", onClick: run("workspace.tree.newFile", { directory: { rootId: selection.rootId, path: "" } }) },
           { label: "New Java Class...", onClick: run("workspace.tree.newJavaClass", { directory: { rootId: selection.rootId, path: "" } }) },
-          { label: "New Directory...", onClick: run("workspace.tree.newDirectory", { directory: { rootId: selection.rootId, path: "" } }) },
+          { label: "New Directory...", testId: "code-workspace-tree-new-directory", onClick: run("workspace.tree.newDirectory", { directory: { rootId: selection.rootId, path: "" } }) },
           { label: "Rename Root...", onClick: run("workspace.tree.rename", { selection }) },
           { separator: true, label: "" },
           {
             label: "Paste",
+            testId: "code-workspace-tree-paste",
             disabled: !controllerContext.canPasteTreeClipboard(),
             onClick: () => void controllerContext.pasteTreeClipboard({ rootId: selection.rootId, path: "" }),
           },
@@ -316,7 +325,7 @@ export function createShowTreeContextMenu(controllerContext: ShowTreeContextMenu
           },
           { label: "Open in Terminal", onClick: () => controllerContext.openTerminalAt(selection.rootId, "") },
           { separator: true, label: "" },
-          { label: "Remove from Workspace", danger: true, onClick: run("workspace.tree.delete", { selection }) },
+          { label: "Remove from Workspace", testId: "code-workspace-tree-remove-root", danger: true, onClick: run("workspace.tree.delete", { selection }) },
         ]);
       }
     };

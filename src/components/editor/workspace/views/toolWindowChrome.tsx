@@ -6,8 +6,10 @@ import { BOTTOM_DOCK_MIN_HEIGHT, type BottomDockTab } from "../panels/BottomDock
 import { MoreToolWindowsButton, type ToolWindowRailItem } from "../panels/ToolWindowRail";
 import { ToolWindowPane, ToolWindowSlot, ToolWindowSplitArea } from "../panels/ToolWindowHost";
 import { TOOL_WINDOW_ANCHORS, TOOL_WINDOW_ANCHOR_LABELS, anchorSide, type ToolWindowAnchor } from "../toolWindowLayout";
+import type { WorkspaceHostIntegration } from "../workspaceHostIntegration";
 
 export interface CreateToolWindowChromeContext {
+  host?: WorkspaceHostIntegration | null;
   toolWindowContents: { id: string; label: string; content: ReactNode; }[];
   toolWindowLayout: import("../useToolWindowLayout").ToolWindowLayoutController;
   currentBottomDockHeight: number;
@@ -161,6 +163,12 @@ export function createToolWindowChrome(context: CreateToolWindowChromeContext) {
   for (const tab of bottomDockTabs) stripeMeta.set(tab.id, { label: tab.label, icon: tab.icon, badge: tab.badge });
   const stripeToolIds = ["project", "structure", "documentation", ...bottomDockTabs.map((tab) => tab.id)];
   const toggleToolWindowFromStripe = (id: string) => {
+    const side = anchorSide(toolWindowLayout.anchorOf(id));
+    if (context.host && (side === "left" ? !context.host.leftToolAreaVisible : !context.host.editorVisible)) {
+      context.host.onActivateToolWindow(id, side);
+      toolWindowLayout.show(id);
+      return;
+    }
     if (toolWindowLayout.isVisible(id)) {
       toolWindowLayout.hide(id);
       handleReturnToEditor();
@@ -181,7 +189,7 @@ export function createToolWindowChrome(context: CreateToolWindowChromeContext) {
       badge: meta.badge,
       shortcut: meta.shortcut,
       anchor: toolWindowLayout.anchorOf(id),
-      active: toolWindowLayout.isVisible(id),
+      active: toolWindowLayout.isVisible(id) && (anchorSide(toolWindowLayout.anchorOf(id)) !== "left" || !context.host || context.host.leftToolAreaVisible),
       testId: bottomTool ? `code-workspace-bottom-tab-${id}` : `code-workspace-tool-rail-${id}`,
       onSelect: () => toggleToolWindowFromStripe(id),
     };
@@ -192,8 +200,10 @@ export function createToolWindowChrome(context: CreateToolWindowChromeContext) {
     .filter((item): item is ToolWindowRailItem => item !== null);
   const commitStripeItem = leftToolRailItems.find((item) => item.id === "commit");
   const leftStripeTop = [
-    ...stripeItemsAt("left-top"),
-    ...(commitStripeItem ? [{ ...commitStripeItem, active: toolWindowLayout.isVisible("git") }] : []),
+    ...stripeItemsAt("left-top").filter((item) => !context.host || item.id === "project"),
+    ...(context.host?.navigationItems ?? []),
+    ...stripeItemsAt("left-top").filter((item) => !!context.host && item.id !== "project"),
+    ...(commitStripeItem && !context.host ? [{ ...commitStripeItem, active: toolWindowLayout.isVisible("git") }] : []),
     ...stripeItemsAt("left-bottom"),
   ];
   const rightStripeTop = [...stripeItemsAt("right-top"), ...stripeItemsAt("right-bottom")];

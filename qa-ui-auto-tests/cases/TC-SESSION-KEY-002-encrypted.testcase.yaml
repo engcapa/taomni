@@ -15,6 +15,7 @@ fixtures:
 timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for:
     selector: '[data-testid="sidebar"]'
     timeout_sec: 45
@@ -97,57 +98,71 @@ verification:
   - id: R1
     requirement: Encrypted generated SSH key unlocks through a masked native prompt
     actions:
-    - 3
-    - 5
+    - 1
+    - 2
+    - 4
     - 6
     - 7
     - 8
     - 9
     - 10
     - 11
-    - 13
+    - 12
     - 14
     - 15
-    - 19
-    - 21
+    - 16
+    - 20
     - 22
     - 23
     - 24
-    - 26
-    - 29
+    - 25
+    - 27
     - 30
-    - 32
+    - 31
+    - 33
     results:
-    - 16
+    - 3
+    - 5
+    - 13
     - 17
     - 18
-    - 20
+    - 19
+    - 21
+    - 26
     - 28
-    - 33
+    - 29
+    - 32
+    - 34
     checkpoints:
-    - step: 16
-      expectation: Key generation clears its passphrase; a real encrypted private key requires
-        a masked unlock prompt and authenticates to the runner SSH server.
+    - step: 3
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
+    - step: 5
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "timeout_sec": 45}}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"session-key-generator\"]"}'
     - step: 17
-      expectation: Key generation clears its passphrase; a real encrypted private key requires
-        a masked unlock prompt and authenticates to the runner SSH server.
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-key-result\"]", "contains": "Key created:", "timeout_sec": 45}}'
     - step: 18
-      expectation: Key generation clears its passphrase; a real encrypted private key requires
-        a masked unlock prompt and authenticates to the runner SSH server.
-    - step: 20
-      expectation: Key generation clears its passphrase; a real encrypted private key requires
-        a masked unlock prompt and authenticates to the runner SSH server.
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-key-passphrase\"]", "name": "value", "equals": ""}}'
+    - step: 19
+      expectation: '{"assert_file_contains": {"path": "${cfg.ssh_features.encrypted_public_key}", "contains": "ssh-ed25519"}}'
+    - step: 21
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Encrypted private key requires a passphrase", "timeout_sec":
+        45}}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-encrypted-key\"]"}'
     - step: 28
-      expectation: Key generation clears its passphrase; a real encrypted private key requires
-        a masked unlock prompt and authenticates to the runner SSH server.
-    - step: 33
-      expectation: Key generation clears its passphrase; a real encrypted private key requires
-        a masked unlock prompt and authenticates to the runner SSH server.
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mfa-prompt\"]", "timeout_sec": 45}}'
+    - step: 29
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"mfa-answer-0\"]", "name": "type", "equals": "password"}}'
+    - step: 32
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+    - step: 34
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_ENCRYPTED_KEY_OK\\s*$", "timeout_sec": 45}}'
   native:
   - check: Encrypted key file and real SSH authentication
     method: automated
-    reason: The product writes and decrypts the encrypted OpenSSH key; the fixture authorizes
-      only its public key.
+    reason: The product writes and decrypts the encrypted OpenSSH key; the fixture authorizes only its public key.
   visual:
   - check: Passphrase masking and clearing
     method: automated

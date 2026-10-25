@@ -34,7 +34,7 @@ steps:
     name: value
     equals: ${fixture.platform_workspace_root}
 - assert_count:
-    selector: '[data-testid="workspace-tree-root"]'
+    selector: '[data-testid="code-workspace-tree-root"]'
     equal: 0
 - click: '[data-testid="workspace-fs-modal-browse"]'
 - native_folder_dialog:
@@ -45,25 +45,26 @@ steps:
       '') === '${fixture.platform_workspace_root}/src'
     expect_truthy: true
 - assert_count:
-    selector: '[data-testid="workspace-tree-root"]'
+    selector: '[data-testid="code-workspace-tree-root"]'
     equal: 0
 - click: '[data-testid="workspace-fs-modal-confirm"]'
 - assert_not_visible: '[data-testid="workspace-fs-modal"]'
 - assert_count:
-    selector: '[data-testid="workspace-tree-root"]'
+    selector: '[data-testid="code-workspace-tree-root"]'
     equal: 1
-- assert_visible: '[data-testid="workspace-tree-root"][data-path="${fixture.platform_workspace_root}/src"]'
-- click: '[data-testid="workspace-tree-root"]'
-- wait_for: '[data-testid="workspace-tree-file"][data-path="index.ts"]'
-- click: '[data-testid="workspace-add-folder"]'
+- assert_visible: '[data-testid="code-workspace-tree-root"][title="${fixture.platform_workspace_root}/src"]'
+- click: '[data-testid="code-workspace-tree-root"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="index.ts"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
 - wait_for: '[data-testid="workspace-fs-modal"]'
 - click: '[data-testid="workspace-fs-modal-cancel"]'
 - assert_count:
-    selector: '[data-testid="workspace-tree-root"]'
+    selector: '[data-testid="code-workspace-tree-root"]'
     equal: 1
 - reload_window: null
 - click: '[data-testid="nav-mode-workspaces"]'
-- assert_visible: '[data-testid="workspace-tree-root"][data-path="${fixture.platform_workspace_root}/src"]'
+- assert_visible: '[data-testid="code-workspace-tree-root"][title="${fixture.platform_workspace_root}/src"]'
 - screenshot: workspace-folder-picker.png
 verification:
   review: reviewed
@@ -73,8 +74,8 @@ verification:
     reason: native_folder_dialog operates only a chooser owned by the QA executable and records OS observations.
   requirements:
   - id: R1
-    requirement: Browse opens the folder chooser; cancellation retains the typed path; choosing a directory waits for Add, mounts exactly that existing
-      directory, lists its files and survives reload. Cancelling Add mounts nothing else.
+    requirement: Browse opens the folder chooser; cancellation retains the typed path; choosing a directory waits for Add, mounts exactly that existing directory,
+      lists its files and survives reload. Cancelling Add mounts nothing else.
     actions:
     - 3
     - 5
@@ -86,9 +87,10 @@ verification:
     - 16
     - 20
     - 22
-    - 24
-    - 26
+    - 23
+    - 25
     - 27
+    - 28
     checkpoints:
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"workspace-empty-state\"]"}'
@@ -97,26 +99,26 @@ verification:
     - step: 10
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-fs-modal-input\"]", "name": "value", "equals": "${fixture.platform_workspace_root}"}}'
     - step: 11
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tree-root\"]", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree-root\"]", "equal": 0}}'
     - step: 14
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-fs-modal-input\"]'').value.split(String.fromCharCode(92)).join(''/'').replace(/\\/$/,
         '''') === ''${fixture.platform_workspace_root}/src''", "expect_truthy": true}}'
     - step: 15
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tree-root\"]", "equal": 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree-root\"]", "equal": 0}}'
     - step: 17
       expectation: '{"assert_not_visible": "[data-testid=\"workspace-fs-modal\"]"}'
     - step: 18
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tree-root\"]", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree-root\"]", "equal": 1}}'
     - step: 19
-      expectation: '{"assert_visible": "[data-testid=\"workspace-tree-root\"][data-path=\"${fixture.platform_workspace_root}/src\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-root\"][title=\"${fixture.platform_workspace_root}/src\"]"}'
     - step: 21
-      expectation: '{"wait_for": "[data-testid=\"workspace-tree-file\"][data-path=\"index.ts\"]"}'
-    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"index.ts\"]"}'
+    - step: 24
       expectation: '{"wait_for": "[data-testid=\"workspace-fs-modal\"]"}'
-    - step: 25
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tree-root\"]", "equal": 1}}'
-    - step: 28
-      expectation: '{"assert_visible": "[data-testid=\"workspace-tree-root\"][data-path=\"${fixture.platform_workspace_root}/src\"]"}'
+    - step: 26
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree-root\"]", "equal": 1}}'
+    - step: 29
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-root\"][title=\"${fixture.platform_workspace_root}/src\"]"}'
     results:
     - 4
     - 6
@@ -128,9 +130,9 @@ verification:
     - 18
     - 19
     - 21
-    - 23
-    - 25
-    - 28
+    - 24
+    - 26
+    - 29
   visual:
   - check: The path field and Browse action fit the compact Add folder dialog.
     method: manual

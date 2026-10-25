@@ -1,0 +1,152 @@
+id: TC-WS-031
+title: Mail, proxy, object-storage and browser session surfaces restore inside their workspace
+description: Opens five additional session kinds with loopback-only fixture endpoints; verifies workspace ownership and concrete protocol surfaces after renderer
+  bootstrap. This case checks restoration/routing, not successful remote protocol connections. Existing service cases protect their connectors.
+modes:
+- browser
+- native
+covers:
+- F-WS-1
+- F-WS-2
+- F-WS-5
+tags:
+- p0
+- workspace-redesign
+- regression
+- persistence
+fixtures:
+- reset_db
+- workspace_restore_sessions
+timeout_sec: 420
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-31
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-open-session"]'
+- wait_for: '[data-testid="workspace-session-picker-modal"]'
+- click: '[data-testid="workspace-session-picker-row"][data-session-id="qa-restore-mail"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-kind="mail"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-open-session"]'
+- wait_for: '[data-testid="workspace-session-picker-modal"]'
+- click: '[data-testid="workspace-session-picker-row"][data-session-id="qa-restore-proxy"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-kind="proxy"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-open-session"]'
+- wait_for: '[data-testid="workspace-session-picker-modal"]'
+- click: '[data-testid="workspace-session-picker-row"][data-session-id="qa-restore-s3"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-kind="s3"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-open-session"]'
+- wait_for: '[data-testid="workspace-session-picker-modal"]'
+- click: '[data-testid="workspace-session-picker-row"][data-session-id="qa-restore-azureblob"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-kind="azureblob"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-open-session"]'
+- wait_for: '[data-testid="workspace-session-picker-modal"]'
+- click: '[data-testid="workspace-session-picker-row"][data-session-id="qa-restore-browser"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-kind="browser"]'
+- assert_items:
+    selector: '[data-testid="workspace-tab"]'
+    attribute: data-tab-title
+    equals: &id001
+    - qa-restore-mail
+    - qa-restore-proxy
+    - qa-restore-s3
+    - qa-restore-azureblob
+    - qa-restore-browser
+- reload_window: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- assert_items:
+    selector: '[data-testid="workspace-tab"]'
+    attribute: data-tab-title
+    equals: *id001
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-tab-title
+    equals: qa-restore-browser
+- click: '[data-testid="workspace-tab"][data-session-id="qa-restore-mail"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-kind="mail"]'
+- click: '[data-testid="workspace-tab"][data-session-id="qa-restore-proxy"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-kind="proxy"]'
+- click: '[data-testid="workspace-tab"][data-session-id="qa-restore-s3"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-kind="s3"]'
+- click: '[data-testid="workspace-tab"][data-session-id="qa-restore-azureblob"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-kind="azureblob"]'
+- click: '[data-testid="workspace-tab"][data-session-id="qa-restore-browser"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-kind="browser"]'
+- click: '[data-testid="side-tab-sessions"]'
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    equal: 0
+- click: '[data-testid="nav-mode-workspaces"]'
+- assert_items:
+    selector: '[data-testid="workspace-tab"]'
+    attribute: data-tab-title
+    equals: *id001
+- screenshot: additional-workspace-sessions-restored.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Additional saved session kinds retain protocol surfaces, active tab and workspace ownership across reload. Opening them creates no Sessions-mode
+      tabs.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 7
+    - 9
+    - 10
+    - 12
+    - 14
+    - 15
+    - 17
+    - 19
+    - 20
+    - 22
+    - 24
+    - 25
+    - 27
+    - 30
+    - 31
+    - 34
+    - 36
+    - 38
+    - 40
+    - 42
+    - 44
+    - 46
+    checkpoints:
+    - step: 29
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "data-tab-title", "equals": ["qa-restore-mail", "qa-restore-proxy",
+        "qa-restore-s3", "qa-restore-azureblob", "qa-restore-browser"]}}'
+    - step: 32
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "data-tab-title", "equals": ["qa-restore-mail", "qa-restore-proxy",
+        "qa-restore-s3", "qa-restore-azureblob", "qa-restore-browser"]}}'
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "qa-restore-browser"}}'
+    - step: 45
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 0}}'
+    - step: 47
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "data-tab-title", "equals": ["qa-restore-mail", "qa-restore-proxy",
+        "qa-restore-s3", "qa-restore-azureblob", "qa-restore-browser"]}}'
+    results:
+    - 29
+    - 32
+    - 33
+    - 45
+    - 47
+  native:
+  - check: Packaged WebView restoration and protocol routing; successful mail/object-storage transport remains covered by their existing dedicated native service
+      cases.
+    method: automated
+    reason: Browser checks renderer state. Native cold-start and disk/process effects are separately asserted; configured saved records are fixtures, open workspace
+      tabs are created only through production UI.
+  visual:
+  - check: Workspace tabs keep the restored order and active state.
+    method: manual
+    reason: Review retained screenshots; automated functional checks assert state and ownership.

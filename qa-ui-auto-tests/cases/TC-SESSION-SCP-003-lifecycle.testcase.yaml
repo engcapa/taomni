@@ -16,6 +16,7 @@ fixtures:
 timeout_sec: 360
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for:
     selector: '[data-testid="sidebar"]'
     timeout_sec: 45
@@ -75,44 +76,76 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Previously saved SCP sessions continue to exercise the original SCP pause, background
-      ownership, cancellation and retry preserve exact bytes workflow; new session configuration offers
-      only SFTP.
+    requirement: Previously saved SCP sessions continue to exercise the original SCP pause, background ownership, cancellation and retry preserve exact bytes workflow;
+      new session configuration offers only SFTP.
     actions:
     - 1
+    - 2
+    - 6
+    - 8
+    - 10
+    - 11
+    - 12
+    - 14
+    - 15
+    - 16
+    - 18
+    - 19
+    - 21
+    - 23
+    - 24
+    - 26
+    - 29
+    - 31
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-scp\"]"}'
+    - step: 5
+      expectation: '{"wait_for": {"selector": "[data-testid=\"startup-vault-check\"]", "state": "hidden", "timeout_sec": 45}}'
+    - step: 7
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+    - step: 9
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "timeout_sec": 45}}'
+    - step: 13
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "scp-source.txt", "timeout_sec": 45}}'
+    - step: 17
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "scp-upload.txt", "timeout_sec": 45}}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"running\"] button[title=\"Pause\"]"}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"paused\"]"}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"paused\"]"}'
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"running\"]"}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"running\"][data-transfer-bytes]:not([data-transfer-bytes=\"0\"])",
+        "timeout_sec": 45}}'
+    - step: 30
+      expectation: '{"wait_for": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"cancelled\"]"}'
+    - step: 32
+      expectation: '{"assert_file_sha256": {"path": "${cfg.ssh_features.large_downloaded}", "equals": "6b4be392164b2c21ce9cd339a9846f9de7afb4407b46becb7ddf98081e3c6cac",
+        "timeout_sec": 90}}'
+    - step: 33
+      expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"done\"][data-resume-bytes]:not([data-resume-bytes=\"0\"])"}'
+    results:
+    - 3
+    - 4
     - 5
     - 7
     - 9
-    - 10
-    - 11
     - 13
-    - 14
-    - 15
     - 17
-    - 18
     - 20
     - 22
-    - 23
     - 25
+    - 27
     - 28
     - 30
-    checkpoints:
-    - step: 12
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "scp-source.txt",
-        "timeout_sec": 45}}'
-    - step: 16
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "scp-upload.txt",
-        "timeout_sec": 45}}'
-    - step: 31
-      expectation: '{"assert_file_sha256": {"path": "${cfg.ssh_features.large_downloaded}", "equals":
-        "6b4be392164b2c21ce9cd339a9846f9de7afb4407b46becb7ddf98081e3c6cac", "timeout_sec": 90}}'
-    - step: 32
-      expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"done\"][data-resume-bytes]:not([data-resume-bytes=\"0\"])"}'
-    results:
-    - 12
-    - 16
-    - 31
     - 32
+    - 33
   visual:
   - check: Configuration and workflow state
     method: automated
@@ -120,6 +153,5 @@ verification:
   native:
   - check: Native boundary
     method: automated
-    reason: Fixture seeds a previous-version SSH row before native startup; actual protocol transfers,
-      independent SHA256 checks and queue lifecycle assertions are retained. No removed editor control
-      is used.
+    reason: Fixture seeds a previous-version SSH row before native startup; actual protocol transfers, independent SHA256 checks and queue lifecycle assertions are
+      retained. No removed editor control is used.

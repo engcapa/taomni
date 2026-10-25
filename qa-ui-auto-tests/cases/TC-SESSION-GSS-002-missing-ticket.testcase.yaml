@@ -14,6 +14,7 @@ fixtures:
 timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for:
     selector: '[data-testid="sidebar"]'
     timeout_sec: 45
@@ -46,31 +47,37 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Missing Kerberos tickets fail with actionable guidance without silently trying another
-      authentication method.
+    requirement: Missing Kerberos tickets fail with actionable guidance without silently trying another authentication method.
     actions:
-    - 3
-    - 5
+    - 1
+    - 2
+    - 4
     - 6
     - 7
     - 8
     - 9
     - 10
     - 11
-    - 13
-    results:
     - 12
     - 14
+    results:
+    - 3
+    - 5
+    - 13
+    - 15
     checkpoints:
-    - step: 12
-      expectation: Native OpenSSH fails without a ticket and the product explains how to obtain one.
-    - step: 14
-      expectation: Editor remains usable after the failed connection test.
+    - step: 3
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
+    - step: 5
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "timeout_sec": 45}}'
+    - step: 13
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Obtain a Kerberos ticket", "timeout_sec": 45}}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"session-editor\"]"}'
   native:
   - check: Real Kerberos credential cache absence
     method: automated
-    reason: The fixture temporarily removes its private credential cache and restores it after the case.
-      Native OpenSSH probes the real SSH server.
+    reason: The fixture temporarily removes its private credential cache and restores it after the case. Native OpenSSH probes the real SSH server.
   visual:
   - check: Actionable authentication error
     method: automated

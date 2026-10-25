@@ -23,6 +23,7 @@ import {
   X,
 } from "lucide-react";
 import { useContextMenu, type MenuItem } from "../../ContextMenu";
+import { useT } from "../../../lib/i18n";
 import {
   treeToolbarDensity,
   treeToolbarVisibility,
@@ -133,6 +134,7 @@ export function FileTreePane({
   showDetails = false,
   onShowDetailsChange,
 }: FileTreePaneProps) {
+  const t = useT();
   const toolbarMenu = useContextMenu();
   const [toolbarWidth, setToolbarWidth] = useState(TREE_DEFAULT_WIDTH_ASSUMPTION);
   const density = treeToolbarDensity(toolbarWidth);
@@ -205,8 +207,14 @@ export function FileTreePane({
       {
         label: "Project",
         testId: "code-workspace-tree-view-project",
-        checked: viewMode !== "flat",
-        onClick: () => { if (viewMode === "flat") onViewModeChange("tree"); },
+        checked: viewMode === "tree" || viewMode === "compact",
+        onClick: () => { if (viewMode === "flat" || viewMode === "files") onViewModeChange("tree"); },
+      },
+      {
+        label: t("platform.allFiles"),
+        testId: "code-workspace-tree-view-all-files",
+        checked: viewMode === "files",
+        onClick: () => onViewModeChange("files"),
       },
       {
         label: "Project Files",
@@ -250,7 +258,7 @@ export function FileTreePane({
           label: "Compact Directories",
           testId: "code-workspace-tree-menu-compact",
           checked: viewMode === "compact",
-          disabled: viewMode === "flat",
+          disabled: viewMode === "flat" || viewMode === "files",
           onClick: () => onViewModeChange(viewMode === "compact" ? "tree" : "compact"),
         },
         { separator: true, label: "" },
@@ -290,7 +298,7 @@ export function FileTreePane({
       tabIndex={0}
       data-testid="code-workspace-tree-pane"
       data-tree-toolbar-density={density}
-      className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-gutter-bg)] outline-none focus-visible:ring-1 focus-visible:ring-[var(--taomni-accent)]"
+      className="taomni-file-explorer h-full min-h-0 flex flex-col bg-[var(--taomni-code-gutter-bg)] outline-none focus-visible:ring-1 focus-visible:ring-[var(--taomni-accent)]"
       style={style}
       onKeyDown={handlePaneKeyDown}
     >
@@ -319,6 +327,13 @@ export function FileTreePane({
             <ChevronDown className="w-3 h-3 shrink-0 text-[var(--taomni-code-muted)]" />
           </button>
           <div className="flex-1 min-w-0" />
+          <TreeIconButton
+            label={t("platform.filterFiles")}
+            testId="code-workspace-tree-search"
+            icon={<Search className="w-3.5 h-3.5" />}
+            active={speedSearchVisible}
+            onClick={() => openSpeedSearch()}
+          />
           <TreeIconButton
             label="New…"
             testId="code-workspace-tree-new"

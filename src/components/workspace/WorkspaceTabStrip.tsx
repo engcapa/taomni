@@ -21,6 +21,7 @@ const KIND_LABEL: Record<WorkspaceTabKind, string> = {
   database: "DB",
   rdp: "RDP",
   vnc: "VNC",
+  session: "SESS",
 };
 
 const KIND_COLOR: Record<WorkspaceTabKind, string> = {
@@ -32,6 +33,7 @@ const KIND_COLOR: Record<WorkspaceTabKind, string> = {
   database: "var(--taomni-accent)",
   rdp: "#3b82f6",
   vnc: "#ec4899",
+  session: "var(--taomni-accent)",
 };
 
 /**
@@ -119,6 +121,8 @@ export function WorkspaceTabStrip() {
       tabIndex={0}
       aria-selected={tab.id === workspace.activeTabId}
       data-testid="workspace-tab"
+      data-tab-title={tab.title}
+      data-session-id={tab.sessionId}
       data-tab-id={tab.id}
       data-tab-kind={tab.kind}
       data-active={tab.id === workspace.activeTabId || undefined}

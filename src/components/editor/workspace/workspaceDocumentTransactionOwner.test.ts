@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { EditorState, ChangeSet } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import {
@@ -202,6 +202,34 @@ describe("§8.26 / ED-MULTIVIEW-002: WorkspaceDocumentTransactionOwner", () => {
       redoDepth: 0,
     });
     unsubscribe();
+  });
+
+  it("retains undo across a gap without views and frees it when the buffer closes", () => {
+    const leaseChanged = vi.fn();
+    const owner = new WorkspaceDocumentTransactionOwner({ onViewLeaseChanged: leaseChanged });
+    owner.retainDocument("notes.txt");
+    owner.acquireView("notes.txt", "first", "hello");
+    owner.dispatchTransaction("notes.txt", "first", [{ from: 5, to: 5, insert: " world" }], "user-input");
+    expect(owner.releaseView("notes.txt", "first")).toBe(false);
+    expect(owner.getHistoryState("notes.txt").canUndo).toBe(true);
+    expect(owner.acquireView("notes.txt", "remounted", "stale")).toBe("hello world");
+    expect(owner.undo("notes.txt", "remounted")?.origin).toBe("undo");
+    expect(owner.getDocument("notes.txt")).toBe("hello");
+    owner.releaseView("notes.txt", "remounted");
+    owner.releaseDocument("notes.txt");
+    expect(owner.getDocument("notes.txt")).toBeNull();
+    expect(owner.getHistoryState("notes.txt").canRedo).toBe(false);
+    expect(leaseChanged.mock.calls.map(([event]) => event.delta)).toEqual([1, -1, 1, -1]);
+  });
+
+  it("waits for a final live view when the buffer owner releases first", () => {
+    const owner = new WorkspaceDocumentTransactionOwner();
+    owner.retainDocument("notes.txt");
+    owner.acquireView("notes.txt", "first", "hello");
+    owner.releaseDocument("notes.txt");
+    expect(owner.getDocument("notes.txt")).toBe("hello");
+    expect(owner.releaseView("notes.txt", "first")).toBe(true);
+    expect(owner.getDocument("notes.txt")).toBeNull();
   });
 
   it("restores a completion caret only in the view that accepted it", () => {

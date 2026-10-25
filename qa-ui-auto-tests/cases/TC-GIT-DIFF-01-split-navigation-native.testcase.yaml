@@ -40,8 +40,8 @@ steps:
 - click: '[data-testid="welcome-history-tab-workspaces"]'
 - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.git_diff_repo}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
-- wait_for: '[data-testid="code-workspace-git-panel-toggle"]'
-- click: '[data-testid="code-workspace-git-panel-toggle"]'
+- wait_for: '[data-testid="code-workspace-tool-rail-git"]'
+- click: '[data-testid="code-workspace-tool-rail-git"]'
 - wait_for: '[data-testid="git-panel"]'
 - click: '[data-testid="git-log-tab"]'
 - wait_for: '[data-testid="git-log-commit"][data-oid="${fixture.git_diff_commit_b}"]'
@@ -128,7 +128,7 @@ verification:
     - step: 8
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 9
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-git-panel-toggle\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tool-rail-git\"]"}'
     - step: 11
       expectation: '{"wait_for": "[data-testid=\"git-panel\"]"}'
     - step: 13

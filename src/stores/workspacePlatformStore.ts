@@ -32,7 +32,8 @@ export type WorkspaceTabKind =
   | "sftp"
   | "database"
   | "rdp"
-  | "vnc";
+  | "vnc"
+  | "session";
 
 export interface WorkspaceIsolatedTab {
   /** Runtime instance id: `ws:${workspaceId}:${kind}:${uuid}`. */
@@ -155,6 +156,7 @@ export interface WorkspacePlatformState {
   moveWorkspaceTab: (workspaceId: string, tabId: string, index: number) => void;
   duplicateWorkspaceTab: (workspaceId: string, tabId: string, cwd?: string) => WorkspaceIsolatedTab | null;
   setActiveWorkspaceTab: (workspaceId: string, tabId: string) => void;
+  syncWorkspaceFiles: (workspaceId: string, files: Array<{ rootId: string; path: string }>, active?: { rootId: string; path: string } | null) => void;
   setActiveLeftToolWindow: (workspaceId: string, toolWindow: WorkspaceToolWindow) => void;
   setBottomDockOpen: (workspaceId: string, open: boolean) => void;
   setBottomDockTool: (workspaceId: string, tool: WorkspaceBottomTool) => void;
@@ -215,7 +217,8 @@ function sessionTabKind(sessionType: string): WorkspaceTabKind {
   if (type === "SFTP" || type === "FILE") return "sftp";
   if (type === "RDP") return "rdp";
   if (type === "VNC") return "vnc";
-  if (["SSH", "TELNET", "RLOGIN", "SERIAL", "MOSH", "FTP"].includes(type)) return "terminal";
+  if (["LOCAL", "LOCALSHELL", "SSH", "TELNET", "RLOGIN", "SERIAL", "MOSH", "FTP"].includes(type)) return "terminal";
+  if (["MAIL", "BROWSER", "PROXY", "S3", "AZUREBLOB"].includes(type)) return "session";
   return "database";
 }
 
@@ -229,6 +232,8 @@ function isPlatformWorkspace(value: unknown): value is PlatformWorkspace {
 }
 
 function normalizeWorkspace(workspace: PlatformWorkspace): PlatformWorkspace {
+  const openTabs = (workspace.openTabs ?? []).filter((tab) => tab && typeof tab.id === "string")
+    .map((tab) => tab.sessionId && tab.protocol ? { ...tab, kind: sessionTabKind(tab.protocol) } : tab);
   return {
     ...workspace,
     isDefault: workspace.id === DEFAULT_WORKSPACE_ID || workspace.isDefault === true,
@@ -239,8 +244,8 @@ function normalizeWorkspace(workspace: PlatformWorkspace): PlatformWorkspace {
       ...emptyDock(),
       ...(workspace.bottomDock ?? {}),
     },
-    openTabs: Array.isArray(workspace.openTabs) ? workspace.openTabs : [],
-    activeTabId: workspace.activeTabId ?? "",
+    openTabs,
+    activeTabId: openTabs.some((tab) => tab.id === workspace.activeTabId) ? workspace.activeTabId : openTabs[0]?.id ?? "",
     rootFolders: (workspace.rootFolders ?? []).filter((folder) => typeof folder?.path === "string"),
   };
 }

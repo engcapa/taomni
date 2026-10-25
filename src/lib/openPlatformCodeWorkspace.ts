@@ -58,6 +58,6 @@ export function openPlatformCodeWorkspace(info: CodeWorkspaceTabInfo): string {
   store.openCodeWorkspaceTab(workspace.id);
   const app = useAppStore.getState();
   app.setActiveSideTab("workspaces");
-  app.setSidebarCollapsed(true);
+  app.setSidebarCollapsed(!hasProject);
   return workspace.id;
 }

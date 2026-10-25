@@ -1,0 +1,223 @@
+id: TC-WS-032
+title: Sessions broadcast subset, filtered target picker and shared Chat entry (browser)
+description: Selects individual sessions through inline checkboxes and the searchable broadcast picker while protocol filters hide their tabs. Keeps active tab,
+  selection and live instances; the shared bottom Chat button reopens the current session thread.
+modes:
+- browser
+covers:
+- F4.11
+- F1.5
+- F-WS-1
+- F-AI-2.4
+tags:
+- p0
+- workspace-redesign
+- regression
+- broadcast
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-32
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- dblclick: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
+- fill:
+    selector: '[data-testid="tab-title-input"]'
+    value: QA Broadcast Alpha
+- press: Enter
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- dblclick: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
+- fill:
+    selector: '[data-testid="tab-title-input"]'
+    value: QA Broadcast Beta
+- press: Enter
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- dblclick: '[data-testid="tab-item"][data-active="true"] [data-testid="tab-title"]'
+- fill:
+    selector: '[data-testid="tab-title-input"]'
+    value: QA Broadcast Gamma
+- press: Enter
+- click: '[data-testid="tab-multiexec-toggle"]'
+- wait_for: '[data-testid="multiexec-bar"]'
+- assert_count:
+    selector: '[data-testid="tab-multiexec-checkbox"]'
+    equal: 3
+- click: '[data-testid="tab-multiexec-checkbox"]'
+- assert_text:
+    selector: '[data-testid="multiexec-targets"]'
+    contains: 1 / 3
+- assert_attribute:
+    selector: '[data-testid="tab-item"][data-active="true"]'
+    name: data-tab-title
+    equals: QA Broadcast Gamma
+- click: '[data-testid="tab-multiexec-checkbox"]'
+- assert_text:
+    selector: '[data-testid="multiexec-targets"]'
+    contains: 0 / 3
+- click: '[data-testid="tab-more"]'
+- click: '[data-testid="session-tab-filter-ssh"]'
+- press: Escape
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    equal: 0
+- click: '[data-testid="multiexec-targets"]'
+- fill:
+    selector: '[data-testid="multiexec-target-search"]'
+    value: missing-target
+- assert_visible: '[data-testid="multiexec-target-empty"]'
+- fill:
+    selector: '[data-testid="multiexec-target-search"]'
+    value: Gamma
+- assert_count:
+    selector: '[data-testid="multiexec-target-checkbox"]'
+    equal: 1
+- click: '[data-testid="multiexec-target-checkbox"]'
+- fill:
+    selector: '[data-testid="multiexec-target-search"]'
+    value: Alpha
+- click: '[data-testid="multiexec-target-checkbox"]'
+- assert_text:
+    selector: '[data-testid="multiexec-targets"]'
+    contains: 2 / 3
+- press:
+    selector: '[data-testid="multiexec-target-search"]'
+    key: Escape
+- assert_not_visible: '[data-testid="multiexec-target-menu"]'
+- assert_visible: '[data-testid="multiexec-bar"]'
+- click: '[data-testid="tab-filter-chip"]'
+- assert_items:
+    selector: '[data-testid="tab-item"][data-multiexec-selected="true"]'
+    attribute: data-tab-title
+    equals:
+    - QA Broadcast Alpha
+    - QA Broadcast Gamma
+- assert_attribute:
+    selector: '[data-testid="tab-item"][data-active="true"]'
+    name: data-tab-title
+    equals: QA Broadcast Gamma
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"tab-chat-toggle"]') === null
+    expect_truthy: true
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- assert_not_visible: '[data-testid="ai-chat-drawer"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- screenshot: workspace-broadcast-targets-32.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Broadcast checkboxes remain reachable in the tab body. The target picker searches all live terminals including filtered tabs, selects a subset
+      without switching focus, and Escape dismisses only the picker. The bottom Chat control preserves session chat access without duplicate toolbar/rail controls.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 16
+    - 17
+    - 18
+    - 19
+    - 22
+    - 25
+    - 27
+    - 28
+    - 29
+    - 31
+    - 32
+    - 34
+    - 36
+    - 37
+    - 38
+    - 40
+    - 43
+    - 47
+    - 49
+    - 51
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"multiexec-bar\"]"}'
+    - step: 21
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-multiexec-checkbox\"]", "equal": 3}}'
+    - step: 23
+      expectation: '{"assert_text": {"selector": "[data-testid=\"multiexec-targets\"]", "contains": "1 / 3"}}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "QA Broadcast Gamma"}}'
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"multiexec-targets\"]", "contains": "0 / 3"}}'
+    - step: 30
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 0}}'
+    - step: 33
+      expectation: '{"assert_visible": "[data-testid=\"multiexec-target-empty\"]"}'
+    - step: 35
+      expectation: '{"assert_count": {"selector": "[data-testid=\"multiexec-target-checkbox\"]", "equal": 1}}'
+    - step: 39
+      expectation: '{"assert_text": {"selector": "[data-testid=\"multiexec-targets\"]", "contains": "2 / 3"}}'
+    - step: 41
+      expectation: '{"assert_not_visible": "[data-testid=\"multiexec-target-menu\"]"}'
+    - step: 42
+      expectation: '{"assert_visible": "[data-testid=\"multiexec-bar\"]"}'
+    - step: 44
+      expectation: '{"assert_items": {"selector": "[data-testid=\"tab-item\"][data-multiexec-selected=\"true\"]", "attribute": "data-tab-title", "equals": ["QA
+        Broadcast Alpha", "QA Broadcast Gamma"]}}'
+    - step: 45
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "QA Broadcast Gamma"}}'
+    - step: 46
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"tab-chat-toggle\"]'') === null", "expect_truthy":
+        true}}'
+    - step: 48
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
+    - step: 50
+      expectation: '{"assert_not_visible": "[data-testid=\"ai-chat-drawer\"]"}'
+    - step: 52
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
+    results:
+    - 5
+    - 10
+    - 15
+    - 20
+    - 21
+    - 23
+    - 24
+    - 26
+    - 30
+    - 33
+    - 35
+    - 39
+    - 41
+    - 42
+    - 44
+    - 45
+    - 46
+    - 48
+    - 50
+    - 52
+  visual:
+  - check: Review readable target checkboxes and compact unified controls.
+    method: manual
+    reason: Retain screenshot; DOM state assertions independently protect the workflow.
+  native:
+  - check: Browser renderer selection only; real PTYs are covered by TC-WS-033.
+    method: external
+    reason: Browser terminal stubs do not prove execution or per-process input routing.

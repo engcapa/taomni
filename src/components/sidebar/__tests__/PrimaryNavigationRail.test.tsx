@@ -5,6 +5,7 @@ import { useAppStore } from "../../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../../stores/workspacePlatformStore";
 import { useToolWindowStripeStore } from "../../editor/workspace/toolWindowStripeStore";
 import { defaultStripeSettings } from "../../editor/workspace/toolWindowLayout";
+import { useChatStore } from "../../../stores/chatStore";
 
 const MODE_ORDER = [
   "nav-mode-home",
@@ -35,10 +36,24 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
 describe("PrimaryNavigationRail (TASK-02)", () => {
+  it("reuses the bottom Chat button for the active session's remembered chat identity", async () => {
+    const toggle = vi.spyOn(useChatStore.getState(), "toggleTabChat").mockResolvedValue();
+    useAppStore.setState({ activeTabId: "session-a", tabs: [
+      { id: "session-a", type: "terminal", title: "A", closable: true, chatTabId: "remembered-a" },
+      { id: "session-b", type: "database", title: "B", closable: true },
+    ] });
+    render(<PrimaryNavigationRail />);
+    fireEvent.click(screen.getByTestId("rail-chat-button"));
+    expect(toggle).toHaveBeenLastCalledWith("remembered-a");
+    act(() => useAppStore.getState().setActiveTab("session-b"));
+    fireEvent.click(screen.getByTestId("rail-chat-button"));
+    expect(toggle).toHaveBeenLastCalledWith("session-b");
+  });
   it("UT-WS-02-01 renders the four primary modes in order with Home first", () => {
     render(<PrimaryNavigationRail />);
     const rail = screen.getByTestId("sidebar-rail");

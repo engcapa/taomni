@@ -28,7 +28,7 @@ function session(overrides: Partial<SessionConfig>): SessionConfig {
     host: "10.0.0.10",
     port: 22,
     username: "root",
-    auth_method: "Password",
+    auth_method: { PrivateKey: { key_path: "/qa/key" } },
     options_json: "{}",
     created_at: 1,
     updated_at: 1,
@@ -53,7 +53,7 @@ beforeEach(() => {
   useWorkspacePlatformStore.getState().reloadFromStorage();
   useWorkspaceUiStore.setState({ fsModal: null, sessionPickerOpen: false, sessionPickerWorkspaceId: null, globalSearchOpen: false, agentDispatchOpen: false });
   useAppStore.setState({ activeSideTab: "workspaces", sidebarCollapsed: false, tabs: [], activeTabId: null, statusMessage: "Ready" });
-  useSessionStore.setState({ sessions, groups: [], loading: false, selectedSessionId: null, searchQuery: "" });
+  useSessionStore.setState({ sessions, groups: [], loading: false, selectedSessionId: null, searchQuery: "", markConnected: vi.fn(async () => {}) });
 });
 
 afterEach(() => {

@@ -29,7 +29,6 @@ import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import type { LocalShellSelection, Tab } from "../../types";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
-import { SessionTabFilters } from "./SessionTabFilters";
 import { TabDetailsOverlay } from "./TabDetailsOverlay";
 import { type DropIndicator, type TabBarProps, type TabScrollState } from "./tabs/model";
 import { maxScrollLeft, setTabScrollLeft, TAB_DRAG_MIME, TAB_SCROLL_EDGE_TOLERANCE, TAB_SCROLL_PADDING, TAB_SCROLL_STEP_MIN } from "./tabs/scroll";
@@ -460,12 +459,11 @@ export function TabBar({
         scrollRef={tabScrollRef}
         tabId={detailsReveal ? null : hoveredDetailsTabId}
       />
-      <SessionTabFilters />
-      {tabFilter && tabFilter.kind !== "protocol" && (
+      {tabFilter && (
         <button
           type="button"
           data-testid="tab-filter-chip"
-          onClick={() => setTabFilter(tabFilter?.protocol && tabFilter.protocol !== "all" ? { kind: "protocol", protocol: tabFilter.protocol } : null)}
+          onClick={() => setTabFilter(tabFilter.kind !== "protocol" && tabFilter.protocol && tabFilter.protocol !== "all" ? { kind: "protocol", protocol: tabFilter.protocol } : null)}
           title={t("tabs.filterClear")}
           className="flex items-center gap-1 mb-0.5 mr-1 px-2 h-6 rounded text-[11px] max-w-[112px] shrink-0"
           style={{ background: "var(--taomni-hover)", color: "var(--taomni-text)" }}
@@ -476,7 +474,9 @@ export function TabBar({
             <Search className="w-3 h-3 shrink-0" />
           )}
           <span className="truncate">
-            {tabFilter.kind === "query"
+            {tabFilter.kind === "protocol"
+              ? t(`tabs.category.${tabFilter.protocol ?? "all"}`)
+              : tabFilter.kind === "query"
               ? tabFilter.text
               : tabFilter.kind === "multi"
                 ? getFilterChipText(tabFilter, sessions, tabs, t)

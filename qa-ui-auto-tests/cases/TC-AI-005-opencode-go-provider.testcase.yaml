@@ -57,7 +57,7 @@ steps:
     expression: JSON.parse(localStorage.getItem('taomni.ai.config.v1')).llm.providers['opencode-go'].protocol_overrides['deepseek-v4.1-flash']
       === undefined
     expect_truthy: true
-- click: '[data-testid="tab-chat-toggle"]'
+- click: '[data-testid="rail-chat-button"]'
 - wait_for: '[data-testid="ai-chat-drawer"]'
 - select_option:
     selector: '[data-testid="ai-chat-provider-select"]'

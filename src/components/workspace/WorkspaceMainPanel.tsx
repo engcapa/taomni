@@ -1,6 +1,7 @@
 import { Bookmark, Bug, Database, FilePlus2, FolderPlus, ListTodo, MonitorSmartphone, Search, Server, Terminal, TriangleAlert, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { WorkspaceCodeEditor, type WorkspaceCodeEditorProps } from "./WorkspaceCodeEditor";
+import { type WorkspaceCodeEditorProps } from "./WorkspaceCodeEditor";
+import { WorkspaceFileSurface } from "./WorkspaceFileSurface";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { useT } from "../../lib/i18n";
 import { useAppStore } from "../../stores/appStore";
@@ -11,7 +12,6 @@ import {
   type WorkspaceBottomTool,
 } from "../../stores/workspacePlatformStore";
 import { createWorkspaceFileNode, createWorkspaceFolderNode } from "./workspaceFs";
-import { WorkspaceFileEditor } from "./WorkspaceFileEditor";
 import { WorkspaceFsModals } from "./WorkspaceFsModals";
 import { WorkspaceGitPanel } from "./WorkspaceGitPanel";
 import { WorkspaceSessionPane } from "./WorkspaceSessionPane";
@@ -38,33 +38,32 @@ const DOCK_ICONS = { terminal: Terminal, problems: TriangleAlert, run: Bug, find
  * surface, and the legacy Code Workspace editor stays available as its own tab
  * for full IDEA parity. A collapsible bottom dock mirrors IDEA's tool windows.
  */
-type CommandProps = Pick<WorkspaceCodeEditorProps, "onCommandsChange">;
+type CommandProps = Pick<WorkspaceCodeEditorProps, "onCommandsChange"> & { onEditSession?: (sessionId: string) => void };
 
-export function WorkspaceMainPanel({ visible = true, onCommandsChange }: { visible?: boolean } & CommandProps) {
+export function WorkspaceMainPanel({ visible = true, onCommandsChange, onEditSession }: { visible?: boolean } & CommandProps) {
   const workspaces = useWorkspacePlatformStore((s) => s.workspaces);
   const activeId = useWorkspacePlatformStore((s) => s.activeWorkspaceId);
   return (
     <div data-testid="workspace-main-panel" className="relative flex min-h-0 flex-1 flex-col">
       {workspaces.map((workspace) => (
-        <WorkspaceCanvas key={workspace.id} workspaceId={workspace.id} visible={visible && workspace.id === activeId} onCommandsChange={onCommandsChange} />
+        <WorkspaceCanvas key={workspace.id} workspaceId={workspace.id} visible={visible && workspace.id === activeId} onCommandsChange={onCommandsChange} onEditSession={onEditSession} />
       ))}
     </div>
   );
 }
 
-function WorkspaceCanvas({ workspaceId, visible, onCommandsChange }: { workspaceId: string; visible: boolean } & CommandProps) {
+function WorkspaceCanvas({ workspaceId, visible, onCommandsChange, onEditSession }: { workspaceId: string; visible: boolean } & CommandProps) {
   const [started, setStarted] = useState(visible);
   useEffect(() => { if (visible) setStarted(true); }, [visible]);
   if (!started && !visible) return null;
-  return <WorkspaceCanvasContents workspaceId={workspaceId} visible={visible} onCommandsChange={onCommandsChange} />;
+  return <WorkspaceCanvasContents workspaceId={workspaceId} visible={visible} onCommandsChange={onCommandsChange} onEditSession={onEditSession} />;
 }
 
-function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange }: { workspaceId: string; visible: boolean } & CommandProps) {
+function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange, onEditSession }: { workspaceId: string; visible: boolean } & CommandProps) {
   const t = useT();
   const workspace = useWorkspacePlatformStore((s) => s.workspaces.find((candidate) => candidate.id === workspaceId));
   const setActiveTab = useWorkspacePlatformStore((s) => s.setActiveWorkspaceTab);
   const openFileInWorkspace = useWorkspacePlatformStore((s) => s.openFileInWorkspace);
-  const openGitTab = useWorkspacePlatformStore((s) => s.openGitTab);
   const openLocalTerminal = useWorkspacePlatformStore((s) => s.openLocalTerminalInWorkspace);
   const setBottomDockOpen = useWorkspacePlatformStore((s) => s.setBottomDockOpen);
   const setBottomDockTool = useWorkspacePlatformStore((s) => s.setBottomDockTool);
@@ -85,6 +84,8 @@ function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange }: { w
   const dock = workspace.bottomDock;
   const ordered = activeTab ? [activeTab, ...workspace.openTabs.filter((tab) => tab.id !== activeTab.id)] : workspace.openTabs;
   const paneIds = new Set(ordered.slice(0, canvasLayout === "single" ? 1 : canvasLayout === "split" ? 2 : 4).map((tab) => tab.id));
+  const surfaceCount = ordered.filter((tab) => paneIds.has(tab.id) && tab.kind !== "file" && tab.kind !== "code").length
+    + (ordered.some((tab) => paneIds.has(tab.id) && (tab.kind === "file" || tab.kind === "code")) ? 1 : 0);
   const paneVisible = (id: string) => visible && paneIds.has(id);
   const paneStyle = (id: string) => ({ display: paneIds.has(id) ? "block" : "none", minWidth: 0, overflow: "hidden" as const });
 
@@ -116,7 +117,7 @@ function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange }: { w
 
   return (
     <div data-workspace-id={workspace.id} className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col" style={{ display: visible ? "flex" : "none" }}>
-      <div data-testid="workspace-canvas-panes" data-layout={canvasLayout} className="relative grid min-h-0 flex-1 gap-px" style={{ gridTemplateColumns: canvasLayout === "single" || paneIds.size < 2 ? "minmax(0, 1fr)" : "repeat(2, minmax(0, 1fr))", gridTemplateRows: canvasLayout === "grid" && paneIds.size > 2 ? "repeat(2, minmax(0, 1fr))" : "minmax(0, 1fr)", background: "var(--taomni-divider)" }}>
+      <div data-testid="workspace-canvas-panes" data-layout={canvasLayout} className="relative grid min-h-0 flex-1 gap-px" style={{ gridTemplateColumns: canvasLayout === "single" || surfaceCount < 2 ? "minmax(0, 1fr)" : "repeat(2, minmax(0, 1fr))", gridTemplateRows: canvasLayout === "grid" && surfaceCount > 2 ? "repeat(2, minmax(0, 1fr))" : "minmax(0, 1fr)", background: "var(--taomni-divider)" }}>
         {!activeTab && codeTab === undefined && (
           <div data-testid="workspace-empty-state" className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
             <div className="text-[14px] font-semibold">{t("platform.emptyWorkspaceTitle")}</div>
@@ -141,16 +142,13 @@ function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange }: { w
           </div>
         )}
 
-        {workspace.openTabs.filter((tab) => tab.kind === "file").map((tab) => (
-          <div key={tab.id} data-testid="workspace-canvas-pane" data-tab-id={tab.id} onMouseDownCapture={() => setActiveTab(workspace.id, tab.id)} style={paneStyle(tab.id)}>
-          <WorkspaceFileEditor
-            workspace={workspace}
-            tab={tab}
-            visible={paneVisible(tab.id)}
-            onOpenGitDiff={(path) => openGitTab(workspace.id, path)}
-          />
-          </div>
-        ))}
+        {(workspace.rootFolders.length > 0 || codeTab || workspace.openTabs.some((tab) => tab.kind === "file")) && (() => {
+          const editorTab = ordered.find((tab) => (tab.kind === "file" || tab.kind === "code") && paneIds.has(tab.id));
+          return <div data-testid="workspace-canvas-pane" data-tab-id={editorTab?.id}
+            style={{ display: editorTab ? "block" : "none", minWidth: 0, overflow: "hidden" }}>
+            <WorkspaceFileSurface workspace={workspace} visible={!!editorTab && visible} onCommandsChange={onCommandsChange} />
+          </div>;
+        })()}
 
         {workspace.openTabs.filter((tab) => tab.kind === "git").map((tab) => (
           <div key={tab.id} data-testid="workspace-canvas-pane" data-tab-id={tab.id} onMouseDownCapture={() => setActiveTab(workspace.id, tab.id)} className="h-full min-h-0 w-full" style={paneStyle(tab.id)}>
@@ -172,26 +170,12 @@ function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange }: { w
           </div>
         ))}
 
-        {workspace.openTabs.filter((tab) => ["terminal", "sftp", "database", "rdp", "vnc"].includes(tab.kind)).map((tab) => (
+        {workspace.openTabs.filter((tab) => ["terminal", "sftp", "database", "rdp", "vnc", "session"].includes(tab.kind)).map((tab) => (
           <div key={tab.id} data-testid="workspace-canvas-pane" data-tab-id={tab.id} onMouseDownCapture={() => setActiveTab(workspace.id, tab.id)} className="h-full min-h-0 w-full" style={paneStyle(tab.id)}>
-            <WorkspaceSessionPane workspace={workspace} tab={tab} visible={paneVisible(tab.id)} active={visible && workspace.activeTabId === tab.id} />
+            <WorkspaceSessionPane workspace={workspace} tab={tab} visible={paneVisible(tab.id)} active={visible && workspace.activeTabId === tab.id} onEditSession={onEditSession} />
           </div>
         ))}
 
-        {codeTab && (
-          <div
-            data-testid="workspace-code-tab"
-            className="h-full min-h-0 w-full"
-            style={paneStyle(codeTab.id)}
-          >
-            <WorkspaceCodeEditor
-              tabId={codeTab.id}
-              workspace={workspace}
-              visible={paneVisible(codeTab.id)}
-              onCommandsChange={onCommandsChange}
-            />
-          </div>
-        )}
       </div>
 
       {dock.open && (

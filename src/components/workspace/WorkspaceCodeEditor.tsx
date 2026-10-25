@@ -6,16 +6,19 @@ import { fileRefFromContext, recentWorkspaceFromTab } from "../../stores/app/rec
 import { useWorkspacePlatformStore, type PlatformWorkspace } from "../../stores/workspacePlatformStore";
 import type { CodeWorkspaceTabInfo } from "../../types";
 import { useWorkspaceGitContextStore } from "../../stores/workspaceGitContextStore";
+import { useWorkspaceCodeHost } from "./useWorkspaceCodeHost";
 
 export interface WorkspaceCodeEditorProps {
   workspace: PlatformWorkspace;
   tabId: string;
   visible: boolean;
   onCommandsChange?: (tabId: string, registration: WorkspaceCommandRegistration | null) => void;
+  sharedFiles?: boolean;
 }
 
 /** Preserve the full editor's publication, recents and command ownership. */
-export function WorkspaceCodeEditor({ workspace, tabId, visible, onCommandsChange }: WorkspaceCodeEditorProps) {
+export function WorkspaceCodeEditor({ workspace, tabId, visible, onCommandsChange, sharedFiles = false }: WorkspaceCodeEditorProps) {
+  const hostIntegration = useWorkspaceCodeHost(workspace, visible, sharedFiles);
   const context = useAppStore((state) => state.codeWorkspaceByTab[tabId]);
   const syncGitManager = useCallback((payload: CodeWorkspaceGitManagerPayload) => {
     const git = useWorkspaceGitContextStore.getState();
@@ -76,5 +79,6 @@ export function WorkspaceCodeEditor({ workspace, tabId, visible, onCommandsChang
     onOpenGitManager={openGitManager}
     onSyncGitManager={syncGitManager}
     onCommandsChange={onCommandsChange}
+    hostIntegration={hostIntegration}
   />;
 }

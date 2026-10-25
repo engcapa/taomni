@@ -1,7 +1,7 @@
 id: TC-WS-008
 title: Workspace multi-root management with new file and new folder creation
-description: v6.1 AC-08 / DEC-04. The workspace file tree toolbar and a folder's context menu create files and directories, mount extra local root folders (multi-root) and remove
-  roots without deleting disk content. A created file opens in the workspace editor and appears in the tree.
+description: The shared Project explorer creates a file and a directory under the selected folder, retains root context actions, and adds/removes a second
+  root through the workspace menu. Native validates the created paths through the Project explorer real filesystem listing.
 modes:
 - browser
 - native
@@ -24,136 +24,161 @@ steps:
 - seed_storage:
     key: taomni.platformWorkspaces.v1
     value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace (默认工作区)","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"qa-root","path":"${fixture.platform_workspace_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
-- reload_window:
+- reload_window: null
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
 - click: '[data-testid="nav-mode-workspaces"]'
-- wait_for: '[data-testid="workspace-file-tree"]'
-- assert_visible: '[data-testid="workspace-new-file"]'
-- assert_visible: '[data-testid="workspace-new-folder"]'
-- assert_visible: '[data-testid="workspace-add-folder"]'
-- click: '[data-testid="workspace-tree-root"]'
-- wait_for: '[data-testid="workspace-tree-file"][data-path="README.md"]'
-- click: '[data-testid="workspace-new-file"]'
-- wait_for: '[data-testid="workspace-fs-modal"][data-kind="file"]'
+- wait_for: '[data-testid="code-workspace-tree"]'
+- click: '[data-testid="code-workspace-tree-root"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- click: '[data-testid="code-workspace-tree-new"]'
+- wait_for: '[data-testid="code-workspace-tree-new-file"]'
+- assert_enabled: '[data-testid="code-workspace-tree-new-directory"]'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
 - fill:
-    selector: '[data-testid="workspace-fs-modal-input"]'
+    selector: '[data-testid="text-input-dialog-input"]'
     value: hello-workspace.ts
-- click: '[data-testid="workspace-fs-modal-confirm"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
 - wait_for: '[data-testid="workspace-file-editor"][data-path="hello-workspace.ts"]'
-- wait_for: '[data-testid="workspace-tree-file"][data-path="hello-workspace.ts"]'
-- click: '[data-testid="workspace-tree-folder"][data-path="src"]'
-- click: '[data-testid="workspace-new-folder"]'
-- wait_for: '[data-testid="workspace-fs-modal"][data-kind="folder"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="hello-workspace.ts"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src"]'
+- click: '[data-testid="code-workspace-tree-new"]'
+- click: '[data-testid="code-workspace-tree-new-directory"]'
 - fill:
-    selector: '[data-testid="workspace-fs-modal-input"]'
+    selector: '[data-testid="text-input-dialog-input"]'
     value: generated
-- click: '[data-testid="workspace-fs-modal-confirm"]'
-- wait_for: '[data-testid="workspace-tree-folder"][data-path="generated"]'
-- right_click: '[data-testid="workspace-tree-root"][data-path="${fixture.platform_workspace_root}"]'
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/generated"]'
+- right_click: '[data-testid="code-workspace-tree-root"]'
 - wait_for: '[data-testid="context-menu"]'
-- assert_visible: '[data-testid="workspace-tree-new-file"]'
-- assert_visible: '[data-testid="workspace-tree-new-folder"]'
-- assert_visible: '[data-testid="workspace-tree-add-root"]'
-- assert_visible: '[data-testid="workspace-tree-remove-root"]'
+- assert_visible: '[data-testid="code-workspace-tree-new-file"]'
+- assert_visible: '[data-testid="code-workspace-tree-new-directory"]'
+- assert_visible: '[data-testid="code-workspace-tree-remove-root"]'
 - press: Escape
-- click: '[data-testid="workspace-add-folder"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
 - wait_for: '[data-testid="workspace-fs-modal"][data-kind="root"]'
 - fill:
     selector: '[data-testid="workspace-fs-modal-input"]'
-    value: ${fixture.platform_workspace_root}/extra-root
+    value: ${fixture.platform_workspace_root}/src/generated
 - click: '[data-testid="workspace-fs-modal-confirm"]'
 - wait_for:
     selector: '[data-testid="workspace-fs-modal"]'
     state: hidden
     timeout_sec: 10
 - assert_count:
-    selector: '[data-testid="workspace-tree-root"]'
+    selector: '[data-testid="code-workspace-tree-root"]'
     equal: 2
-- right_click: '[data-testid="workspace-file-tree"] > div:last-child [data-testid="workspace-tree-root"]'
-- wait_for: '[data-testid="context-menu"]'
-- click: '[data-testid="workspace-tree-remove-root"]'
+- right_click: '[data-testid="code-workspace-tree-root"][data-root-path="${fixture.platform_workspace_root}/src/generated"]'
+- click: '[data-testid="code-workspace-tree-remove-root"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-tree-root"][data-root-path="${fixture.platform_workspace_root}/src/generated"]'
+    state: detached
 - assert_count:
-    selector: '[data-testid="workspace-tree-root"]'
+    selector: '[data-testid="code-workspace-tree-root"]'
     equal: 1
-- assert_visible: '[data-testid="workspace-tree-root"][data-path="${fixture.platform_workspace_root}"]'
+- assert_visible: '[data-testid="code-workspace-tree-root"][data-root-path="${fixture.platform_workspace_root}"]'
 - screenshot: ws-008-workspace-new-file-folder.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 工作区文件树工具栏提供新建文件、新建目录、添加外部文件夹与刷新入口，且无已删除的 [文件管理|Git] 行。
+    requirement: 共享 Project 树的新建菜单提供文件和目录操作，创建并打开文件，树同步显示。
     actions:
-    - 11
+    - 10
     - 12
-    - 13
-    checkpoints:
-    - step: 12
-      expectation: '{"assert_visible": "[data-testid=\"workspace-add-folder\"]"}'
-    - step: 14
-      expectation: '{"wait_for": "[data-testid=\"workspace-tree-file\"][data-path=\"README.md\"]"}'
-    results:
-    - 12
-    - 14
-  - id: R2
-    requirement: 通过工具栏新建文件后立即在编辑器中打开并出现在文件树中，新建目录也同步出现。
-    actions:
     - 15
-    - 16
     - 17
     - 18
+    results:
+    - 9
+    - 11
+    - 13
+    - 14
+    - 16
     - 19
     - 20
+    checkpoints:
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-new-file\"]"}'
+    - step: 14
+      expectation: '{"assert_enabled": "[data-testid=\"code-workspace-tree-new-directory\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-path=\"hello-workspace.ts\"]"}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"hello-workspace.ts\"]"}'
+  - id: R2
+    requirement: 在选中 src 目录内创建 generated 子目录；真实 Project 树同步列出创建结果。
+    actions:
     - 21
     - 22
     - 23
     - 24
     - 25
-    checkpoints:
-    - step: 19
-      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-path=\"hello-workspace.ts\"]"}'
-    - step: 20
-      expectation: '{"wait_for": "[data-testid=\"workspace-tree-file\"][data-path=\"hello-workspace.ts\"]"}'
-    - step: 26
-      expectation: '{"wait_for": "[data-testid=\"workspace-tree-folder\"][data-path=\"generated\"]"}'
-    results:
-    - 19
-    - 20
     - 26
-  - id: R3
-    requirement: 目录右键菜单提供新建文件/目录、添加外部目录与移除根目录；支持挂载第二个根目录并从工作区移除（不删除磁盘文件）。
-    actions:
+    results:
     - 27
+    checkpoints:
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/generated\"]"}'
+  - id: R3
+    requirement: 根目录右键保留新建和移除操作，工作区菜单添加第二个根，移除后保留原始根。
+    actions:
     - 28
+    - 33
+    - 34
+    - 35
+    - 37
+    - 38
+    - 41
+    - 42
+    - 44
+    results:
     - 29
     - 30
     - 31
     - 32
-    - 33
-    - 34
-    - 35
     - 36
-    - 37
-    - 38
     - 39
     - 40
-    - 41
-    - 42
     - 43
+    - 45
+    - 46
+    - 47
     checkpoints:
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 30
-      expectation: '{"assert_visible": "[data-testid=\"workspace-tree-new-folder\"]"}'
-    - step: 38
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-new-file\"]"}'
+    - step: 31
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-new-directory\"]"}'
+    - step: 32
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-remove-root\"]"}'
+    - step: 36
+      expectation: '{"wait_for": "[data-testid=\"workspace-fs-modal\"][data-kind=\"root\"]"}'
+    - step: 39
       expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-fs-modal\"]", "state": "hidden", "timeout_sec": 10}}'
+    - step: 40
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree-root\"]", "equal": 2}}'
     - step: 43
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tree-root\"]", "equal": 1}}'
-    - step: 44
-      expectation: '{"assert_visible": "[data-testid=\"workspace-tree-root\"][data-path=\"${fixture.platform_workspace_root}\"]"}'
-    results:
-    - 30
-    - 38
-    - 43
-    - 44
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 45
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-root\"][data-root-path=\"${fixture.platform_workspace_root}/src/generated\"]",
+        "state": "detached"}}'
+    - step: 46
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree-root\"]", "equal": 1}}'
+    - step: 47
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-root\"][data-root-path=\"${fixture.platform_workspace_root}\"]"}'
   visual:
   - check: 多根文件树与新建入口在左栏紧凑对齐，创建后无重复节点。
     method: manual

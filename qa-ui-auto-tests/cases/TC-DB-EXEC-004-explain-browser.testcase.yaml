@@ -1,9 +1,12 @@
 id: TC-DB-EXEC-004-explain-browser
 title: Explain on DDL explains why it is unavailable and runs nothing
-description: |
-  DB-EXEC-004 V5. In the offline MySQL scaffold, Explain on CREATE TABLE shows
+description: 'DB-EXEC-004 V5. In the offline MySQL scaffold, Explain on CREATE TABLE shows
+
   the "Explain not available" alert with the supported statement list and does
+
   not start a run (no Log tab).
+
+  '
 covers:
 - F-DB-1
 tags:
@@ -18,6 +21,7 @@ fixtures:
 timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-new"]'

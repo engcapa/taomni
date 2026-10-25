@@ -16,6 +16,7 @@ fixtures:
 timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
@@ -115,8 +116,7 @@ steps:
 - assert_not_visible: '[data-testid="db-connection-error-banner"]'
 - click: '[data-testid="sql-editor"] .cm-content'
 - press: Mod+a
-- type: SELECT value, toString(toUInt64(18446744073709551615)) AS exact_integer FROM qa_session.fixture
-    WHERE id=1
+- type: SELECT value, toString(toUInt64(18446744073709551615)) AS exact_integer FROM qa_session.fixture WHERE id=1
 - click: '[data-testid="db-run-all"]'
 - wait_for:
     selector: '[data-testid="query-result-grid"]'
@@ -198,137 +198,293 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Authenticate through both real protocols, reject incorrect Native credentials and an
-      unavailable custom proxy, recover through explicit direct mode, persist the credential in the vault,
-      and display real typed and streamed query results. Create a table and write inline VALUES through
-      the product Native driver, then verify both rows.
+    requirement: Authenticate through both real protocols, reject incorrect Native credentials and an unavailable custom proxy, recover through explicit direct mode,
+      persist the credential in the vault, and display real typed and streamed query results. Create a table and write inline VALUES through the product Native driver,
+      then verify both rows.
     actions:
-    - 3
-    - 5
+    - 1
+    - 2
+    - 4
     - 6
     - 7
     - 8
     - 9
     - 10
     - 11
-    - 13
+    - 12
     - 14
     - 15
     - 16
     - 17
-    - 19
+    - 18
     - 20
     - 21
-    - 23
+    - 22
     - 24
     - 25
     - 26
     - 27
     - 28
-    - 30
+    - 29
     - 31
     - 32
-    - 34
+    - 33
     - 35
     - 36
     - 37
     - 38
     - 39
-    - 41
+    - 40
     - 42
     - 43
-    - 45
-    - 48
+    - 44
+    - 46
     - 49
     - 50
     - 51
-    - 55
+    - 52
     - 56
     - 57
     - 58
-    - 60
-    - 63
+    - 59
+    - 61
     - 64
     - 65
     - 66
     - 67
-    - 69
+    - 68
     - 70
     - 71
     - 72
     - 73
-    - 75
+    - 74
     - 76
     - 77
     - 78
-    checkpoints:
-    - step: 12
-      expectation: The explicitly asserted protocol, saved value, error or result is present.
-    - step: 18
-      expectation: The explicitly asserted protocol, saved value, error or result is present.
-    - step: 22
-      expectation: The explicitly asserted protocol, saved value, error or result is present.
-    - step: 29
-      expectation: The explicitly asserted protocol, saved value, error or result is present.
-    - step: 33
-      expectation: The explicitly asserted protocol, saved value, error or result is present.
-    - step: 47
-      expectation: The explicitly asserted protocol, saved value, error or result is present.
-    - step: 53
-      expectation: The explicitly asserted protocol, saved value, error or result is present.
-    - step: 54
-      expectation: The explicitly asserted protocol, saved value, error or result is present.
-    - step: 59
-      expectation: The explicitly asserted protocol, saved value, error or result is present.
-    - step: 61
-      expectation: The explicitly asserted protocol, saved value, error or result is present.
-    - step: 68
-      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both written values.
-    - step: 74
-      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both written values.
-    - step: 79
-      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both written values.
-    - step: 80
-      expectation: Native DDL and inline INSERT execute successfully and SELECT returns both written values.
-    results:
-    - 12
-    - 18
-    - 22
-    - 29
-    - 33
-    - 47
-    - 53
-    - 54
-    - 59
-    - 61
-    - 68
-    - 74
     - 79
-    - 80
-  - id: R2
-    requirement: Unsupported Native FORMAT payloads fail promptly and the next query uses a fresh usable
-      connection without inserting partial data.
-    actions:
-    - 81
     - 82
     - 83
     - 84
     - 85
-    - 87
+    - 86
     - 88
     - 89
     - 90
-    results:
-    - 86
     - 91
-    - 92
     checkpoints:
-    - step: 86
-      expectation: Actionable inline VALUES/SELECT guidance appears without waiting for the network timeout.
-    - step: 91
-      expectation: A subsequent query completes through the Native connection.
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 13
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "ClickHouse connection OK", "timeout_sec": 60}}'
+    - step: 19
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "ClickHouse native", "timeout_sec": 60}}'
+    - step: 23
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "ClickHouse connection OK", "timeout_sec": 60}}'
+    - step: 30
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "connect", "timeout_sec": 60}}'
+    - step: 34
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "ClickHouse connection OK", "timeout_sec": 60}}'
+    - step: 41
+      expectation: '{"wait_for": "[data-testid=\"vault-setup-pw1\"]"}'
+    - step: 45
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-clickhouse-native\"]"}'
+    - step: 47
+      expectation: '{"wait_for": {"selector": "[data-testid=\"db-query-tab\"]", "timeout_sec": 60}}'
+    - step: 48
+      expectation: '{"assert_not_visible": "[data-testid=\"db-connection-error-banner\"]"}'
+    - step: 53
+      expectation: '{"wait_for": {"selector": "[data-testid=\"query-result-grid\"]", "timeout_sec": 60}}'
+    - step: 54
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "fixture-ready", "timeout_sec": 60}}'
+    - step: 55
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "18446744073709551615", "timeout_sec": 60}}'
+    - step: 60
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "streamed_number", "timeout_sec": 60}}'
+    - step: 62
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-execution-log-summary\"]", "contains": "Success: 1", "timeout_sec": 60}}'
+    - step: 69
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-execution-log-summary\"]", "contains": "Success: 1", "timeout_sec": 45}}'
+    - step: 75
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-execution-log-summary\"]", "contains": "Success: 1", "timeout_sec": 45}}'
+    - step: 80
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "native-write", "timeout_sec": 45}}'
+    - step: 81
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "native-second", "timeout_sec": 45}}'
+    - step: 87
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-execution-log-message\"]", "contains": "requires inline VALUES or SELECT", "timeout_sec": 15}}'
     - step: 92
-      expectation: The original two rows remain; the rejected FORMAT payload inserted nothing.
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "preserved_rows", "timeout_sec": 30}}'
+    - step: 93
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "2", "timeout_sec": 30}}'
+    results:
+    - 3
+    - 5
+    - 13
+    - 19
+    - 23
+    - 30
+    - 34
+    - 41
+    - 45
+    - 47
+    - 48
+    - 53
+    - 54
+    - 55
+    - 60
+    - 62
+    - 69
+    - 75
+    - 80
+    - 81
+    - 87
+    - 92
+    - 93
+  - id: R2
+    requirement: Unsupported Native FORMAT payloads fail promptly and the next query uses a fresh usable connection without inserting partial data.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    - 21
+    - 22
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 31
+    - 32
+    - 33
+    - 35
+    - 36
+    - 37
+    - 38
+    - 39
+    - 40
+    - 42
+    - 43
+    - 44
+    - 46
+    - 49
+    - 50
+    - 51
+    - 52
+    - 56
+    - 57
+    - 58
+    - 59
+    - 61
+    - 64
+    - 65
+    - 66
+    - 67
+    - 68
+    - 70
+    - 71
+    - 72
+    - 73
+    - 74
+    - 76
+    - 77
+    - 78
+    - 79
+    - 82
+    - 83
+    - 84
+    - 85
+    - 86
+    - 88
+    - 89
+    - 90
+    - 91
+    results:
+    - 3
+    - 5
+    - 13
+    - 19
+    - 23
+    - 30
+    - 34
+    - 41
+    - 45
+    - 47
+    - 48
+    - 53
+    - 54
+    - 55
+    - 60
+    - 62
+    - 69
+    - 75
+    - 80
+    - 81
+    - 87
+    - 92
+    - 93
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 13
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "ClickHouse connection OK", "timeout_sec": 60}}'
+    - step: 19
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "ClickHouse native", "timeout_sec": 60}}'
+    - step: 23
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "ClickHouse connection OK", "timeout_sec": 60}}'
+    - step: 30
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "connect", "timeout_sec": 60}}'
+    - step: 34
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "ClickHouse connection OK", "timeout_sec": 60}}'
+    - step: 41
+      expectation: '{"wait_for": "[data-testid=\"vault-setup-pw1\"]"}'
+    - step: 45
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-clickhouse-native\"]"}'
+    - step: 47
+      expectation: '{"wait_for": {"selector": "[data-testid=\"db-query-tab\"]", "timeout_sec": 60}}'
+    - step: 48
+      expectation: '{"assert_not_visible": "[data-testid=\"db-connection-error-banner\"]"}'
+    - step: 53
+      expectation: '{"wait_for": {"selector": "[data-testid=\"query-result-grid\"]", "timeout_sec": 60}}'
+    - step: 54
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "fixture-ready", "timeout_sec": 60}}'
+    - step: 55
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "18446744073709551615", "timeout_sec": 60}}'
+    - step: 60
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "streamed_number", "timeout_sec": 60}}'
+    - step: 62
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-execution-log-summary\"]", "contains": "Success: 1", "timeout_sec": 60}}'
+    - step: 69
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-execution-log-summary\"]", "contains": "Success: 1", "timeout_sec": 45}}'
+    - step: 75
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-execution-log-summary\"]", "contains": "Success: 1", "timeout_sec": 45}}'
+    - step: 80
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "native-write", "timeout_sec": 45}}'
+    - step: 81
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "native-second", "timeout_sec": 45}}'
+    - step: 87
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-execution-log-message\"]", "contains": "requires inline VALUES or SELECT", "timeout_sec": 15}}'
+    - step: 92
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "preserved_rows", "timeout_sec": 30}}'
+    - step: 93
+      expectation: '{"assert_text": {"selector": "[data-testid=\"query-result-grid\"]", "contains": "2", "timeout_sec": 30}}'
   visual:
   - check: Conditional connection fields
     method: automated
@@ -336,5 +492,4 @@ verification:
   native:
   - check: Real persistence and database transport
     method: automated
-    reason: Native mode uses SQLite/vault and, for the query case, a real ClickHouse server. Browser mode
-      covers editor behavior only.
+    reason: Native mode uses SQLite/vault and, for the query case, a real ClickHouse server. Browser mode covers editor behavior only.

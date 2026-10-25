@@ -1,9 +1,12 @@
 id: TC-DB-TX-001-manual-commit-browser
 title: Transaction mode toggle is shown for MySQL and disabled while offline
-description: |
-  DB-TX-001 V5. In the offline MySQL scaffold the editor toolbar shows the
+description: 'DB-TX-001 V5. In the offline MySQL scaffold the editor toolbar shows the
+
   transaction mode toggle in Auto mode, disabled because there is no live
+
   connection; the Commit / Rollback controls stay hidden.
+
+  '
 covers:
 - F-DB-1
 tags:
@@ -18,6 +21,7 @@ fixtures:
 timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-new"]'

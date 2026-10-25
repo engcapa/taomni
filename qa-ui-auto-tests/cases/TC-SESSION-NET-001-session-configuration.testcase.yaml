@@ -15,6 +15,7 @@ fixtures:
 timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
@@ -102,92 +103,91 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: HTTP and Native show only their applicable ports and retain both
-      values; a new session starts with a direct connection, independent configuration
+    requirement: HTTP and Native show only their applicable ports and retain both values; a new session starts with a direct connection, independent configuration
       persists, and direct/application choices hide the independent editor.
     actions:
-    - 3
-    - 5
-    - 7
+    - 1
+    - 2
+    - 4
+    - 6
     - 8
-    - 11
+    - 9
     - 12
     - 13
-    - 15
-    - 17
+    - 14
+    - 16
     - 18
     - 19
     - 20
     - 21
-    - 23
+    - 22
     - 24
-    - 26
-    - 29
-    - 32
-    - 36
-    - 38
-    - 40
-    checkpoints:
-    - step: 6
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 9
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 10
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 14
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 16
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 27
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 28
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 30
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 31
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 33
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 34
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 35
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 37
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 39
-      expectation: The explicitly asserted protocol, saved value, error or result
-        is present.
-    - step: 41
-      expectation: Cancel closes the editor.
-    results:
-    - 6
-    - 9
-    - 10
-    - 14
-    - 16
+    - 25
     - 27
-    - 28
     - 30
-    - 31
     - 33
-    - 34
-    - 35
     - 37
     - 39
     - 41
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 7
+      expectation: '{"assert_not_visible": "[data-testid=\"session-port\"]"}'
+    - step: 10
+      expectation: '{"assert_visible": "[data-testid=\"session-port\"]"}'
+    - step: 11
+      expectation: '{"assert_not_visible": "input[aria-label=\"ClickHouse HTTP port\"]"}'
+    - step: 15
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "none"}}'
+    - step: 17
+      expectation: '{"assert_visible": "[data-testid=\"session-custom-proxy\"]"}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-clickhouse-config\"]"}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 28
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-clickhouse-protocol\"]", "name": "value", "equals": "Native"}}'
+    - step: 29
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "19000"}}'
+    - step: 31
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"ClickHouse HTTP port\"]", "name": "value", "equals": "18123"}}'
+    - step: 32
+      expectation: '{"assert_not_visible": "[data-testid=\"session-port\"]"}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "custom"}}'
+    - step: 35
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-custom-proxy\"] input[aria-label=\"Proxy host\"]", "name": "value", "equals": "proxy.example.test"}}'
+    - step: 36
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-custom-proxy\"] input[aria-label=\"Port\"]", "name": "value", "equals": "3129"}}'
+    - step: 38
+      expectation: '{"assert_not_visible": "[data-testid=\"session-custom-proxy\"]"}'
+    - step: 40
+      expectation: '{"assert_not_visible": "[data-testid=\"session-custom-proxy\"]"}'
+    - step: 42
+      expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
+    results:
+    - 3
+    - 5
+    - 7
+    - 10
+    - 11
+    - 15
+    - 17
+    - 23
+    - 26
+    - 28
+    - 29
+    - 31
+    - 32
+    - 34
+    - 35
+    - 36
+    - 38
+    - 40
+    - 42
   visual:
   - check: Conditional connection fields
     method: automated
@@ -195,5 +195,4 @@ verification:
   native:
   - check: Real persistence and database transport
     method: automated
-    reason: Native mode uses SQLite/vault and, for the query case, a real ClickHouse
-      server. Browser mode covers editor behavior only.
+    reason: Native mode uses SQLite/vault and, for the query case, a real ClickHouse server. Browser mode covers editor behavior only.

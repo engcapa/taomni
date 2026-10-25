@@ -33,6 +33,7 @@ fixtures:
 timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-new"]'
@@ -99,54 +100,70 @@ verification:
     requirement: Query tab rename updates the label and the browser query-workspace stub：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
-    - 5
-    - 7
-    - 9
+    - 2
+    - 4
+    - 6
+    - 8
     - 10
     - 11
     - 12
     - 13
-    - 15
+    - 14
     - 16
+    - 17
+    - 19
+    - 22
+    - 24
+    - 25
+    - 27
+    - 29
+    - 31
+    - 33
+    - 34
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"session-new\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 9
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-database-section\"]", "timeout_sec": 10}}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-rename\"]"}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"db-connection-error-banner\"]"}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"db-query-tab\"]"}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"db-query-tab-input\"]"}'
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-query-tab\"]", "contains": "qa-rename-orders"}}'
+    - step: 28
+      expectation: '{"assert_localstorage": {"key": "taomni.stub.dbQueryWorkspaces.v1", "contains": "qa-rename-orders"}}'
+    - step: 30
+      expectation: '{"assert_menu_items": ["Rename tab"]}'
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"db-query-tab-input\"]"}'
+    - step: 35
+      expectation: '{"assert_text": {"selector": "[data-testid=\"db-query-tab\"]", "contains": "qa-rename-orders"}}'
+    results:
+    - 3
+    - 5
+    - 7
+    - 9
+    - 15
     - 18
+    - 20
     - 21
     - 23
-    - 24
+    - 26
     - 28
     - 30
     - 32
-    - 33
-    checkpoints:
-    - step: 2
-      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
-    - step: 4
-      expectation: '{"wait_for": "[data-testid=\"session-new\"]"}'
-    - step: 6
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 8
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-database-section\"]", "timeout_sec": 10}}'
-    - step: 14
-      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 17
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-rename\"]"}'
-    - step: 19
-      expectation: '{"wait_for": "[data-testid=\"db-connection-error-banner\"]"}'
-    - step: 20
-      expectation: '{"wait_for": "[data-testid=\"db-query-tab\"]"}'
-    - step: 22
-      expectation: '{"wait_for": "[data-testid=\"db-query-tab-input\"]"}'
-    - step: 25
-      expectation: '{"assert_text": {"selector": "[data-testid=\"db-query-tab\"]", "contains": "qa-rename-orders"}}'
-    - step: 27
-      expectation: '{"assert_localstorage": {"key": "taomni.stub.dbQueryWorkspaces.v1", "contains": "qa-rename-orders"}}'
-    - step: 29
-      expectation: '{"assert_menu_items": ["Rename tab"]}'
-    - step: 31
-      expectation: '{"wait_for": "[data-testid=\"db-query-tab-input\"]"}'
-    - step: 34
-      expectation: '{"assert_text": {"selector": "[data-testid=\"db-query-tab\"]", "contains": "qa-rename-orders"}}'
-    results:
-    - 34
+    - 35
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

@@ -27,6 +27,17 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); useTabOverviewStore.getState().close(); });
 
+it.each([false, true])("keeps the Sessions sidebar collapsed=%s when selecting a card", (sidebarCollapsed) => {
+  useAppStore.setState({ sidebarCollapsed, tabFilter: { kind: "protocol", protocol: "ssh" } });
+  render(<TabOverview />);
+  fireEvent.click(screen.getByTestId("tab-overview-card"));
+  expect(useAppStore.getState().sidebarCollapsed).toBe(sidebarCollapsed);
+  expect(useAppStore.getState().activeSideTab).toBe("sessions");
+  expect(useAppStore.getState().activeTabId).toBe("session-1");
+  expect(useAppStore.getState().tabFilter).toBeNull();
+  expect(screen.queryByTestId("tab-overview")).not.toBeInTheDocument();
+});
+
 it("shows live session output without Welcome and stops refreshing when closed", () => {
   render(<TabOverview />);
   expect(screen.getByTestId("tab-overview")).toHaveAttribute("data-scope", "sessions");

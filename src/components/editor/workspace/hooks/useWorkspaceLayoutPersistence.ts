@@ -1,4 +1,5 @@
-import { useCallback,useEffect,useMemo } from "react";
+import { useCallback,useEffect,useMemo,useState } from "react";
+import { useWorkspaceHost } from "../workspaceHostIntegration";
 import { type BottomDockTabId,type CodeWorkspaceEditorGroupState,type EditorGroupId,type EditorSplitOrientation,type RightPaneTabId } from "../../../../stores/codeWorkspaceStore";
 import { type WorkspaceTabPolicyV3 } from "../workspaceTabPolicy";
 import { isPathContainedInRoot,NavigationHistoryFacade,workspacePathComparisonKey,type BackForwardHistoryBridge,type WorkspaceLocationController } from "../navigationHistoryModel";
@@ -46,6 +47,8 @@ export interface UseWorkspaceLayoutPersistenceContext {
 }
 
 export function useWorkspaceLayoutPersistence(context: UseWorkspaceLayoutPersistenceContext) {
+  const host = useWorkspaceHost();
+  const [restoreReady, setRestoreReady] = useState(false);
   const {
     rootsRef,
     workspaceLocationControllerRef,
@@ -216,11 +219,14 @@ export function useWorkspaceLayoutPersistence(context: UseWorkspaceLayoutPersist
             });
           }).finally(() => {
             layoutRestoredOpenFilesRef.current=false;
+            setRestoreReady(true);
           });
           return;
         }
       }
     }
+    setRestoreReady(true);
+    if (host && !host.showEditorTabs) return;
     const ref=initialFileRef(workspace,roots,looseFiles);
     if(!ref) return;
     const key=fileKey(ref);
@@ -301,5 +307,5 @@ export function useWorkspaceLayoutPersistence(context: UseWorkspaceLayoutPersist
       persistWorkspaceLayoutNowRef.current?.(workspaceInstanceId);
     };
   },[workspaceInstanceId]);
-  return { navigationHistoryFacade };
+  return { navigationHistoryFacade, restoreReady };
 }

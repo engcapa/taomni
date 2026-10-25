@@ -4,6 +4,7 @@ import { WorkspaceGitPanel } from "../WorkspaceGitPanel";
 import { WorkspaceFileEditor } from "../WorkspaceFileEditor";
 import { WorkspaceTabStrip } from "../WorkspaceTabStrip";
 import { WorkspaceSidebar } from "../WorkspaceSidebar";
+import { WorkspaceMainPanel } from "../WorkspaceMainPanel";
 import { PrimaryNavigationRail } from "../../sidebar/PrimaryNavigationRail";
 import { useAppStore } from "../../../stores/appStore";
 import {
@@ -12,6 +13,24 @@ import {
 } from "../../../stores/workspacePlatformStore";
 import { useWorkspaceEditorStore } from "../../../stores/workspaceEditorStore";
 import { useWorkspaceUiStore } from "../../../stores/workspaceUiStore";
+import { useCodeWorkspaceStore } from "../../../stores/codeWorkspaceStore";
+import { useWorkspaceRailStore } from "../../../stores/workspaceRailStore";
+import { useMainRailHostStore } from "../../../stores/mainRailHostStore";
+import { AppDialogProvider } from "../../../lib/appDialogs";
+import { workspaceBoundary } from "./workspaceBoundary";
+
+vi.mock("@tauri-apps/api/core", async () => {
+  const { workspaceBoundary } = await import("./workspaceBoundary");
+  return { invoke: vi.fn(async (command: string, args: Record<string, unknown>) => {
+    if (command === "workspace_detect_git_roots") {
+      return (args.roots as { id: string; name: string; path: string }[]).map((root) => ({
+        ...root, repoRoot: root.path, rootIds: [root.id],
+      }));
+    }
+    return workspaceBoundary.invoke(command, args);
+  }) };
+});
+vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
 
 const snapshot = {
   repoRoot: "/preview",
@@ -84,12 +103,23 @@ function activeWorkspace() {
   return useWorkspacePlatformStore.getState().workspaces.find((entry) => entry.id === DEFAULT_WORKSPACE_ID)!;
 }
 
+function Shell() {
+  return <AppDialogProvider>
+    <PrimaryNavigationRail railHostRef={useMainRailHostStore.getState().setHost} />
+    <WorkspaceSidebar onOpenSessionPicker={vi.fn()} />
+    <WorkspaceMainPanel />
+  </AppDialogProvider>;
+}
+
 beforeEach(() => {
   window.localStorage.clear();
+  workspaceBoundary.reset();
+  useCodeWorkspaceStore.setState({ byInstanceId: {} });
+  useWorkspaceRailStore.setState({ forceMerge: true });
   useWorkspacePlatformStore.getState().reloadFromStorage();
   useWorkspaceUiStore.setState({ fsModal: null, sessionPickerOpen: false, globalSearchOpen: false, agentDispatchOpen: false });
   useWorkspaceEditorStore.setState({ documents: {}, activeTabId: null });
-  useAppStore.setState({ activeSideTab: "workspaces", sidebarCollapsed: false, statusMessage: "Ready" });
+  useAppStore.setState({ activeSideTab: "workspaces", sidebarCollapsed: false, statusMessage: "Ready", codeWorkspaceByTab: {} });
   useWorkspacePlatformStore.getState().addRootFolder(DEFAULT_WORKSPACE_ID, { path: "/preview", name: "preview" });
   onOpenFile.mockClear();
 });
@@ -100,28 +130,25 @@ afterEach(() => {
 });
 
 describe("Workspace Git integration (TASK-06)", () => {
-  it("UT-WS-06-01 has no redundant Git button in the workspace chrome", () => {
-    render(
-      <>
-        <PrimaryNavigationRail />
-        <WorkspaceSidebar onOpenSessionPicker={vi.fn()} />
-      </>,
-    );
+  it("UT-WS-06-01 has no redundant Git button in the workspace chrome", async () => {
+    render(<Shell />);
     // The old top-right `🌿 Git` button (marker 3) and the removed
     // [Files | Git] row (marker 1) are gone; the rail button and the bottom bar
     // are the only workspace entries.
     expect(screen.queryByTestId("workspace-topbar-git-button")).not.toBeInTheDocument();
     expect(screen.queryByTestId("workspace-git-toggle-row")).not.toBeInTheDocument();
-    expect(screen.getByTestId("code-workspace-tool-rail-git")).toBeInTheDocument();
+    expect(await screen.findByTestId("code-workspace-tool-rail-git")).toBeInTheDocument();
     expect(screen.getByTestId("workspace-sidebar-git-bar")).toBeInTheDocument();
   });
 
-  it("UT-WS-06-02 opens the Git panel from the primary rail Git button", () => {
-    render(<PrimaryNavigationRail />);
-    fireEvent.click(screen.getByTestId("code-workspace-tool-rail-git"));
+  it("UT-WS-06-02 opens the Git panel from the primary rail Git button", async () => {
+    render(<Shell />);
+    fireEvent.click(await screen.findByTestId("code-workspace-tool-rail-git"));
     const workspace = activeWorkspace();
     expect(workspace.openTabs.some((tab) => tab.kind === "git")).toBe(true);
     expect(workspace.activeTabId).toBe(`ws:${DEFAULT_WORKSPACE_ID}:git`);
+    expect(await screen.findByTestId("git-panel")).toBeVisible();
+    expect(screen.queryByTestId("workspace-file-editor")).not.toBeInTheDocument();
   });
 
   it("UT-WS-06-03 opens the Git panel from the sidebar status bar", () => {

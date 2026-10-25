@@ -16,6 +16,7 @@ fixtures:
 timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
 - click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
@@ -40,7 +41,7 @@ steps:
 - click: '[data-testid="session-section-advanced"]'
 - wait_for: '[data-testid="advanced-ssh-settings"]'
 - fill:
-    selector: 'input[aria-label="Execute command"]'
+    selector: input[aria-label="Execute command"]
     value: printf 'qa-protocol-switch\n'
 - click: '[data-testid="session-section-network"]'
 - wait_for: '[data-testid="network-settings"]'
@@ -48,10 +49,10 @@ steps:
     selector: '[data-testid="session-proxy-kind"]'
     value: socks5
 - fill:
-    selector: 'input[aria-label="Proxy host"]'
+    selector: input[aria-label="Proxy host"]
     value: protocol-proxy.example.test
 - fill:
-    selector: 'input[aria-label="Proxy port"]'
+    selector: input[aria-label="Proxy port"]
     value: '1080'
 - assert_attribute:
     selector: '[data-testid="session-proxy-kind"]'
@@ -112,7 +113,7 @@ steps:
 - click: '[data-testid="session-section-advanced"]'
 - wait_for: '[data-testid="advanced-ssh-settings"]'
 - assert_attribute:
-    selector: 'input[aria-label="Execute command"]'
+    selector: input[aria-label="Execute command"]
     name: value
     equals: printf 'qa-protocol-switch\n'
 - click: '[data-testid="session-section-network"]'
@@ -122,7 +123,7 @@ steps:
     name: value
     equals: socks5
 - assert_attribute:
-    selector: 'input[aria-label="Proxy host"]'
+    selector: input[aria-label="Proxy host"]
     name: value
     equals: protocol-proxy.example.test
 - click: '[data-testid="session-cancel"]'
@@ -137,104 +138,112 @@ verification:
     requirement: Switching SSH to SFTP and Serial changes the visible protocol-specific controls while retaining shared SSH draft values when switching back.
     actions:
     - 1
+    - 2
     - 4
-    - 6
+    - 5
     - 7
     - 8
     - 9
     - 10
-    - 12
-    - 14
-    - 15
-    - 17
-    - 18
-    - 19
-    - 21
-    - 25
-    - 28
-    - 32
-    - 33
-    - 36
-    - 42
-    - 45
-    - 49
-    checkpoints:
-    - step: 11
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proto-ssh\"]", "name": "data-active", "equals": "true"}}'
-    - step: 13
-      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
-    - step: 16
-      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
-    - step: 20
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "socks5"}}'
-    - step: 22
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proto-sftp\"]", "name": "data-active", "equals": "true"}}'
-    - step: 23
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "ssh-protocol-switch.example.test"}}'
-    - step: 24
-      expectation: '{"assert_visible": "[data-testid=\"session-section-mappings\"]"}'
-    - step: 26
-      expectation: '{"wait_for": "[data-testid=\"session-sftp-mappings-section\"]"}'
-    - step: 27
-      expectation: '{"assert_visible": "[data-testid=\"session-sftp-mappings-section\"]"}'
-    - step: 29
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proto-serial\"]", "name": "data-active", "equals": "true"}}'
-    - step: 30
-      expectation: '{"assert_visible": "[data-testid=\"session-serial-section\"]"}'
-    - step: 31
-      expectation: '{"assert_not_visible": "[data-testid=\"session-host\"]"}'
-    - step: 34
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-serial-device\"]", "name": "value", "equals": "/dev/ttyUSB0"}}'
-    - step: 35
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-serial-baud\"]", "name": "value", "equals": "115200"}}'
-    - step: 37
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proto-ssh\"]", "name": "data-active", "equals": "true"}}'
-    - step: 38
-      expectation: '{"assert_visible": "[data-testid=\"session-host\"]"}'
-    - step: 39
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "ssh-protocol-switch.example.test"}}'
-    - step: 40
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "qa-protocol-switch"}}'
-    - step: 41
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "22"}}'
-    - step: 43
-      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
-    - step: 44
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf ''qa-protocol-switch\\n''"}}'
-    - step: 46
-      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
-    - step: 47
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "socks5"}}'
-    - step: 48
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy host\"]", "name": "value", "equals": "protocol-proxy.example.test"}}'
-    - step: 50
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
-    results:
     - 11
     - 13
+    - 15
     - 16
+    - 18
+    - 19
     - 20
     - 22
+    - 26
+    - 29
+    - 33
+    - 34
+    - 37
+    - 43
+    - 46
+    - 50
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 12
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proto-ssh\"]", "name": "data-active", "equals": "true"}}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 21
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "socks5"}}'
+    - step: 23
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proto-sftp\"]", "name": "data-active", "equals": "true"}}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "ssh-protocol-switch.example.test"}}'
+    - step: 25
+      expectation: '{"assert_visible": "[data-testid=\"session-section-mappings\"]"}'
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"session-sftp-mappings-section\"]"}'
+    - step: 28
+      expectation: '{"assert_visible": "[data-testid=\"session-sftp-mappings-section\"]"}'
+    - step: 30
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proto-serial\"]", "name": "data-active", "equals": "true"}}'
+    - step: 31
+      expectation: '{"assert_visible": "[data-testid=\"session-serial-section\"]"}'
+    - step: 32
+      expectation: '{"assert_not_visible": "[data-testid=\"session-host\"]"}'
+    - step: 35
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-serial-device\"]", "name": "value", "equals": "/dev/ttyUSB0"}}'
+    - step: 36
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-serial-baud\"]", "name": "value", "equals": "115200"}}'
+    - step: 38
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proto-ssh\"]", "name": "data-active", "equals": "true"}}'
+    - step: 39
+      expectation: '{"assert_visible": "[data-testid=\"session-host\"]"}'
+    - step: 40
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "ssh-protocol-switch.example.test"}}'
+    - step: 41
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "qa-protocol-switch"}}'
+    - step: 42
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "22"}}'
+    - step: 44
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 45
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf ''qa-protocol-switch\\n''"}}'
+    - step: 47
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 48
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-proxy-kind\"]", "name": "value", "equals": "socks5"}}'
+    - step: 49
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy host\"]", "name": "value", "equals": "protocol-proxy.example.test"}}'
+    - step: 51
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    results:
+    - 3
+    - 6
+    - 12
+    - 14
+    - 17
+    - 21
     - 23
     - 24
-    - 26
+    - 25
     - 27
-    - 29
+    - 28
     - 30
     - 31
-    - 34
+    - 32
     - 35
-    - 37
+    - 36
     - 38
     - 39
     - 40
     - 41
-    - 43
+    - 42
     - 44
-    - 46
+    - 45
     - 47
     - 48
-    - 50
+    - 49
+    - 51
   visual:
   - check: Protocol-specific sections appear without overlap when the editor switches between SSH, SFTP, and Serial.
     method: manual

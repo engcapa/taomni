@@ -123,6 +123,7 @@ describe("FileTreePane", () => {
     const order = Array.from(actions.querySelectorAll("button")).map((button) => button.getAttribute("data-testid"));
     expect(order).toEqual([
       "code-workspace-tree-view-selector",
+      "code-workspace-tree-search",
       "code-workspace-tree-new",
       "code-workspace-tree-toolbar-more",
       "code-workspace-tree-collapse",

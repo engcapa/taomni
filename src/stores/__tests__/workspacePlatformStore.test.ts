@@ -202,4 +202,24 @@ describe("workspacePlatformStore (TASK-01)", () => {
     expect(reread.workspaces[0].id).toBe(DEFAULT_WORKSPACE_ID);
     expect(reread.activeWorkspaceId).toBe(DEFAULT_WORKSPACE_ID);
   });
+
+  it("restores mixed file/session tabs, ordering, active tab and closed-tab removal", () => {
+    const store = useWorkspacePlatformStore.getState();
+    const workspace = store.createWorkspace({ name: "restored", rootPath: "/qa/project" });
+    const file = store.openFileInWorkspace(workspace.id, { rootId: workspace.rootFolders[0].id, path: "README.md" });
+    const local = store.openLocalTerminalInWorkspace(workspace.id);
+    const protocols = ["SSH", "SFTP", "MySQL", "Redis", "HBaseShell", "RDP", "VNC", "LocalShell", "Mail", "Proxy", "S3", "AzureBlob"];
+    const tabs = protocols.map((protocol) => store.openSessionInWorkspace(workspace.id, session({ id: protocol, session_type: protocol, options_json: '{"passwordRef":"vault:qa"}' })));
+    store.renameWorkspaceTab(workspace.id, local.id, "Restored local");
+    store.moveWorkspaceTab(workspace.id, local.id, 0);
+    store.closeWorkspaceTab(workspace.id, tabs[2].id);
+    store.setActiveWorkspaceTab(workspace.id, file.id);
+    const expected = useWorkspacePlatformStore.getState().getWorkspace(workspace.id)!;
+    store.reloadFromStorage();
+    expect(useWorkspacePlatformStore.getState().getWorkspace(workspace.id)).toEqual(expected);
+    expect(expected.openTabs.map((tab) => tab.protocol).filter(Boolean)).not.toContain("MySQL");
+    expect(expected.openTabs[0].title).toBe("Restored local");
+    expect(expected.activeTabId).toBe(file.id);
+    expect(window.localStorage.getItem(PLATFORM_WORKSPACES_STORAGE_KEY)).not.toContain("passwordRef");
+  });
 });

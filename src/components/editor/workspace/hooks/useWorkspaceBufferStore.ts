@@ -4,6 +4,9 @@ import { type LspFileState, type OpenFileState } from "../codeWorkspaceModel";
 import { reconcileWorkspaceRecoveryEntries } from "../workspaceRecovery";
 import { changedWorkspaceSemanticBufferPaths } from "../workspaceSemanticIndex";
 
+// A new component can adopt the same workspace before an old component's
+// deferred teardown runs. Lifetime ownership must span component instances.
+const instanceOwners = new Map<string, Set<symbol>>();
 
 export interface UseWorkspaceBufferStoreContext {
   pendingEditorTextTimerRef: import("react").RefObject<number | null>;
@@ -86,6 +89,10 @@ export function useWorkspaceBufferStore(context: UseWorkspaceBufferStoreContext)
   /** Pending store teardown, so a StrictMode remount can cancel it (below). */
   const disposeTimerRef = useRef<{ timer: number; instanceId: string; } | null>(null);
   useEffect(() => {
+    const owner = Symbol(workspaceInstanceId);
+    const owners = instanceOwners.get(workspaceInstanceId) ?? new Set<symbol>();
+    owners.add(owner);
+    instanceOwners.set(workspaceInstanceId, owners);
     // A remount of the SAME workspace cancels a teardown scheduled by the
     // previous cleanup. React StrictMode runs mount → cleanup → mount in
     // development, and disposing the store instance is NOT idempotent: it
@@ -106,6 +113,8 @@ export function useWorkspaceBufferStore(context: UseWorkspaceBufferStoreContext)
       disposeTimerRef.current = null;
     }
     return () => {
+      owners.delete(owner);
+      if (!owners.size) instanceOwners.delete(workspaceInstanceId);
       // Capture this workspace's flush callback in the effect closure. A tab can
       // be rebound to a different workspace without unmounting, and a ref read
       // during cleanup would then point at the new instance.
@@ -125,7 +134,7 @@ export function useWorkspaceBufferStore(context: UseWorkspaceBufferStoreContext)
       liveLspSyncTimersRef.current = {};
       const timer = window.setTimeout(() => {
         if (disposeTimerRef.current?.timer === timer) disposeTimerRef.current = null;
-        disposeWorkspaceUi(instanceId);
+        if (!instanceOwners.get(instanceId)?.size) disposeWorkspaceUi(instanceId);
       }, 0);
       disposeTimerRef.current = { timer, instanceId };
     };

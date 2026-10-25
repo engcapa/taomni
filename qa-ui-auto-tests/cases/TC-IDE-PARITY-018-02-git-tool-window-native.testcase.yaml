@@ -44,7 +44,7 @@ steps:
 - type: edit-kept
 - wait_for: '[data-editor-tab-key][data-active="true"][data-dirty="true"]'
 - wait_for:
-    selector: '[data-testid="code-workspace-git-panel-toggle"]:not([disabled])'
+    selector: '[data-testid="code-workspace-tool-rail-git"]:not([disabled])'
     timeout_sec: 60
 - press:
     key: Alt+9

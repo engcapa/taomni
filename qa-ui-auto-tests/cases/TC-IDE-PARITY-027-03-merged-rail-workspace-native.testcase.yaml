@@ -32,12 +32,12 @@ steps:
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="welcome-history-tab-workspaces"]'
 - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
-- wait_for: '[data-testid="workspace-code-tab"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
 - assert_attribute:
     selector: '[data-testid="nav-mode-workspaces"]'
     name: aria-pressed
     equals: 'true'
-- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- wait_for: '[data-testid="expanded-sidebar-panel"]'
 - wait_for: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-tool-rail-left"]'
 - assert_count:
     selector: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
@@ -45,7 +45,7 @@ steps:
 - assert_visible: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-right"]'
 - wait_for: '[data-testid="code-workspace-tree-file"]'
 - eval_readonly:
-    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-tree-pane"]').getBoundingClientRect().width > 300 && document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-tree-pane"]').getBoundingClientRect().width
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-tree-pane"]').getBoundingClientRect().width >= 180 && document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-tree-pane"]').getBoundingClientRect().width
       < 500
     expect_truthy: true
 - click: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-tool-rail-project"]'
@@ -67,7 +67,10 @@ steps:
     selector: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-tool-rail-project"]'
     equals: ''
 - screenshot: TC-IDE-PARITY-027-03-merged.png
-- click: '[data-testid="toggle-left-sidebar"]'
+- assert_attribute:
+    selector: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-tool-rail-project"]'
+    name: aria-pressed
+    equals: 'true'
 - wait_for: '[data-testid="expanded-sidebar-panel"]'
 - wait_for: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-tool-rail-left"]'
 - assert_count:
@@ -82,7 +85,7 @@ steps:
     selector: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
     equal: 0
 - click: '[data-testid="nav-mode-workspaces"]'
-- wait_for: '[data-testid="workspace-code-tab"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for: '[data-testid="code-workspace-tree-file"]'
 - click: '[data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
@@ -94,7 +97,7 @@ steps:
     key: taomni.mergeToolWindowRail
     equals: 'false'
 - click: '[data-testid="nav-mode-workspaces"]'
-- wait_for: '[data-testid="workspace-code-tab"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-tool-rail-left"]'
 - assert_count:
     selector: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
@@ -102,7 +105,7 @@ steps:
 - reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="nav-mode-workspaces"]'
-- wait_for: '[data-testid="workspace-code-tab"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for: '[data-testid="code-workspace-tree-file"]'
 - wait_for: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-tool-rail-left"]'
 - assert_count:
@@ -113,7 +116,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 打开Code Workspace进入Workspaces。Project窗口宽度保持300–500px且可隐藏/恢复，名称偏好可切换。展开侧栏、切换Home/Sessions、关闭旧合并设置和重载都只保留一条带IDE分组的左工具条，项目及会话分区隔离。
+    requirement: 打开Code Workspace进入Workspaces。Project窗口宽度保持180–500px且可隐藏/恢复，名称偏好可切换。展开侧栏、切换Home/Sessions、关闭旧合并设置和重载都只保留一条带IDE分组的左工具条，项目及会话分区隔离。
     actions:
     - 5
     - 7
@@ -124,7 +127,6 @@ verification:
     - 22
     - 25
     - 26
-    - 29
     - 33
     - 35
     - 39
@@ -140,11 +142,11 @@ verification:
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 9
-      expectation: '{"wait_for": "[data-testid=\"workspace-code-tab\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 10
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"nav-mode-workspaces\"]", "name": "aria-pressed", "equals": "true"}}'
     - step: 11
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"expanded-sidebar-panel\"]"}'
     - step: 12
       expectation: '{"wait_for": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
     - step: 13
@@ -155,7 +157,7 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
     - step: 16
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree-pane\"]'').getBoundingClientRect().width
-        > 300 && document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree-pane\"]'').getBoundingClientRect().width < 500",
+        >= 180 && document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree-pane\"]'').getBoundingClientRect().width < 500",
         "expect_truthy": true}}'
     - step: 18
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-pane\"]", "state": "hidden", "timeout_sec": 5}}'
@@ -169,6 +171,9 @@ verification:
     - step: 27
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]",
         "equals": ""}}'
+    - step: 29
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]", "name":
+        "aria-pressed", "equals": "true"}}'
     - step: 30
       expectation: '{"wait_for": "[data-testid=\"expanded-sidebar-panel\"]"}'
     - step: 31
@@ -184,7 +189,7 @@ verification:
     - step: 38
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"code-workspace\"]", "equal": 0}}'
     - step: 40
-      expectation: '{"wait_for": "[data-testid=\"workspace-code-tab\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 41
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
     - step: 43
@@ -192,7 +197,7 @@ verification:
     - step: 46
       expectation: '{"assert_localstorage": {"key": "taomni.mergeToolWindowRail", "equals": "false"}}'
     - step: 48
-      expectation: '{"wait_for": "[data-testid=\"workspace-code-tab\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 49
       expectation: '{"wait_for": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
     - step: 50
@@ -200,7 +205,7 @@ verification:
     - step: 52
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 54
-      expectation: '{"wait_for": "[data-testid=\"workspace-code-tab\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 55
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
     - step: 56
@@ -223,6 +228,7 @@ verification:
     - 23
     - 24
     - 27
+    - 29
     - 30
     - 31
     - 32

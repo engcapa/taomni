@@ -1,4 +1,8 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
+import { useT } from "../../lib/i18n";
+import { useWorkspaceSessionAccess } from "./useWorkspaceSessionAccess";
+import { WorkspaceAdditionalSessionPane } from "./WorkspaceAdditionalSessionPane";
+import { parsePathMappings } from "../filebrowser/PathMappingsEditor";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { FileBrowser } from "../filebrowser/FileBrowser";
 import { LocalFileBrowserPanel } from "../filebrowser/LocalFileBrowserPanel";
@@ -7,7 +11,7 @@ import { commandTerminalFromSession, localShellSelectionFromSession } from "../.
 import { getSessionNetworkSettings, toNetworkSettingsPayload } from "../../lib/networkSettings";
 import { parseRdpOptions } from "../../types/rdp";
 import { parseVncViewerOptions } from "../../lib/vncOptions";
-import { sessionToDbConnectInfo } from "../../layouts/main/databaseSession";
+import { sessionToDbConnectInfo, sessionToHBaseConnectInfo } from "../../layouts/main/databaseSession";
 import type { SessionConfig } from "../../lib/ipc";
 import { useAppStore } from "../../stores/appStore";
 import type { PlatformWorkspace, WorkspaceIsolatedTab } from "../../stores/workspacePlatformStore";
@@ -40,19 +44,12 @@ function networkSettingsJson(session: SessionConfig): string {
   return JSON.stringify(toNetworkSettingsPayload(getSessionNetworkSettings(session.options_json)));
 }
 
-function sshAuth(session: SessionConfig): { method: string; data: string | null } {
-  const method = typeof session.auth_method === "string" ? session.auth_method : "PrivateKey";
-  const data = typeof session.auth_method === "object" && session.auth_method && "PrivateKey" in session.auth_method
-    ? session.auth_method.PrivateKey.key_path
-    : null;
-  return { method, data };
-}
-
 export interface WorkspaceSessionPaneProps {
   workspace: PlatformWorkspace;
   tab: WorkspaceIsolatedTab;
   visible: boolean;
   active?: boolean;
+  onEditSession?: (sessionId: string) => void;
 }
 
 /**
@@ -62,14 +59,49 @@ export interface WorkspaceSessionPaneProps {
  * menus, toolbars and shortcuts inside a workspace session are the same as in
  * Sessions mode. Its runtime id is the workspace tab id, never an app tab id.
  */
-export function WorkspaceSessionPane({ tab, visible, active = visible }: WorkspaceSessionPaneProps) {
-  const session = useSessionStore((state) => (tab.sessionId ? state.sessions.find((entry) => entry.id === tab.sessionId) : undefined));
+export function WorkspaceSessionPane(props: WorkspaceSessionPaneProps) {
+  const { tab, visible } = props;
+  const session = useSessionStore((state) => state.sessions.find((entry) => entry.id === tab.sessionId));
+  const loaded = useSessionStore((state) => state.loaded);
+  const loading = useSessionStore((state) => state.loading);
+  const loadError = useSessionStore((state) => state.loadError);
+  const t = useT();
+  if (tab.sessionId && !session) {
+    const waiting = !loaded && !loadError;
+    return (
+      <div data-testid="workspace-session-unavailable" data-state={waiting ? "loading" : loadError ? "failed" : "missing"}
+        className="flex h-full flex-col items-center justify-center gap-3 p-4" style={{ display: visible ? "flex" : "none" }}>
+        <span>{waiting ? t("common.loading") : loadError ?? t("platform.savedSessionMissing")}</span>
+        {!waiting && <button type="button" data-testid="workspace-session-retry" className="taomni-btn" disabled={loading}
+          onClick={() => void useSessionStore.getState().loadSessions()}>{t("platform.retrySessions")}</button>}
+      </div>
+    );
+  }
+  if (session) return <SavedWorkspaceSession key={tab.id + session.id} {...props} session={session} />;
+  return <WorkspaceProtocolPane {...props} />;
+}
+
+function SavedWorkspaceSession(props: WorkspaceSessionPaneProps & { session: SessionConfig }) {
+  const access = useWorkspaceSessionAccess(props.session, props.visible);
+  if (access.gate) return access.gate;
+  return <WorkspaceProtocolPane {...props} session={access.session} auth={access.auth} password={access.password} />;
+}
+
+function WorkspaceProtocolPane({ tab, visible, active = visible, session, auth, password, onEditSession }: WorkspaceSessionPaneProps & {
+  session?: SessionConfig;
+  auth?: { method: string; data: string | null };
+  password?: string;
+}) {
   const setActiveSideTab = useAppStore((s) => s.setActiveSideTab);
   const protocol = session?.session_type ?? tab.protocol ?? "Local";
+  useEffect(() => {
+    if (session) void useSessionStore.getState().markConnected(session.id)
+      .catch((error) => useAppStore.getState().setStatusMessage(String(error)));
+  }, [session?.id]);
 
-  if (protocol === "Local" || !session || commandTerminalFromSession(session)) {
+  if ((protocol === "Local" || protocol === "LocalShell") || !session || commandTerminalFromSession(session)) {
     return (
-      <div data-testid="workspace-session-pane" data-kind="terminal" className="h-full min-h-0 w-full" style={{ display: visible ? "block" : "none" }}>
+      <div data-testid="workspace-session-pane" data-kind="terminal" data-session-id={session?.id} className="h-full min-h-0 w-full" style={{ display: visible ? "block" : "none" }}>
         <TerminalPanel
           tabId={tab.id}
           tabTitle={tab.title}
@@ -78,7 +110,7 @@ export function WorkspaceSessionPane({ tab, visible, active = visible }: Workspa
           activeForShortcuts={active}
           workspaceRoot={undefined}
           commandTerminal={session ? commandTerminalFromSession(session) ?? undefined : undefined}
-          localShell={session && protocol === "Local" ? localShellSelectionFromSession(session) : undefined}
+          localShell={session && (protocol === "Local" || protocol === "LocalShell") ? localShellSelectionFromSession(session) : undefined}
           terminalProfile={session ? getSessionTerminalProfile(session.options_json) ?? loadTerminalDefaultProfile() : undefined}
           preserveSessionOnUnmount={false}
         />
@@ -87,7 +119,7 @@ export function WorkspaceSessionPane({ tab, visible, active = visible }: Workspa
   }
 
   if (protocol === "SSH") {
-    const auth = sshAuth(session);
+    if (!auth) return null;
     return (
       <div data-testid="workspace-session-pane" data-kind="terminal" data-session-id={session.id} className="h-full min-h-0 w-full" style={{ display: visible ? "block" : "none" }}>
         <TerminalPanel
@@ -112,7 +144,7 @@ export function WorkspaceSessionPane({ tab, visible, active = visible }: Workspa
   }
 
   if (protocol === "SFTP") {
-    const auth = sshAuth(session);
+    if (!auth) return null;
     return (
       <div data-testid="workspace-session-pane" data-kind="sftp" data-session-id={session.id} className="h-full min-h-0 w-full" style={{ display: visible ? "block" : "none" }}>
         <FileBrowser
@@ -123,6 +155,7 @@ export function WorkspaceSessionPane({ tab, visible, active = visible }: Workspa
           authMethod={auth.method}
           authData={auth.data}
           networkSettingsJson={networkSettingsJson(session)}
+          pathMappings={parsePathMappings(session.options_json)}
         />
       </div>
     );
@@ -146,7 +179,7 @@ export function WorkspaceSessionPane({ tab, visible, active = visible }: Workspa
             host={session.host}
             port={session.port}
             username={session.username ?? undefined}
-            password={undefined}
+            password={password}
             options={options}
             networkSettingsJson={networkSettingsJson(session)}
             visible={visible}
@@ -175,7 +208,7 @@ export function WorkspaceSessionPane({ tab, visible, active = visible }: Workspa
             host={session.host}
             port={session.port}
             username={session.username ?? undefined}
-            password={undefined}
+            password={password}
             networkSettingsJson={networkSettingsJson(session)}
             securityPolicy={securityPolicy}
             viewOnly={options.vncViewOnly === true}
@@ -192,7 +225,7 @@ export function WorkspaceSessionPane({ tab, visible, active = visible }: Workspa
     return (
       <div data-testid="workspace-session-pane" data-kind="redis" data-session-id={session.id} className="h-full min-h-0 w-full" style={{ display: visible ? "block" : "none" }}>
         <Suspense fallback={<DbLoadingPanel />}>
-          <RedisClientTab tabId={tab.id} info={sessionToDbConnectInfo(session)} visible={visible} />
+          <RedisClientTab tabId={tab.id} info={sessionToDbConnectInfo(session, password)} visible={visible} />
         </Suspense>
       </div>
     );
@@ -202,7 +235,7 @@ export function WorkspaceSessionPane({ tab, visible, active = visible }: Workspa
     return (
       <div data-testid="workspace-session-pane" data-kind="hbase" data-session-id={session.id} className="h-full min-h-0 w-full" style={{ display: visible ? "block" : "none" }}>
         <Suspense fallback={<DbLoadingPanel />}>
-          <HBaseShellTab tabId={tab.id} info={sessionToDbConnectInfo(session) as never} visible={visible} />
+          <HBaseShellTab tabId={tab.id} info={sessionToHBaseConnectInfo(session, password)} visible={visible} />
         </Suspense>
       </div>
     );
@@ -212,10 +245,14 @@ export function WorkspaceSessionPane({ tab, visible, active = visible }: Workspa
     return (
       <div data-testid="workspace-session-pane" data-kind="database" data-session-id={session.id} className="h-full min-h-0 w-full" style={{ display: visible ? "block" : "none" }}>
         <Suspense fallback={<DbLoadingPanel />}>
-          <DbClientTab tabId={tab.id} info={sessionToDbConnectInfo(session)} visible={visible} />
+          <DbClientTab tabId={tab.id} info={sessionToDbConnectInfo(session, password)} visible={visible} />
         </Suspense>
       </div>
     );
+  }
+
+  if (["Mail", "Browser", "Proxy", "S3", "AzureBlob"].includes(protocol)) {
+    return <WorkspaceAdditionalSessionPane session={session} tab={tab} visible={visible} password={password} onEditSession={onEditSession} />;
   }
 
   return (

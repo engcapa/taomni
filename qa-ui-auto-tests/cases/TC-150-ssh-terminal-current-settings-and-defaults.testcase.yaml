@@ -21,6 +21,7 @@ fixtures:
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
 - click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
@@ -53,8 +54,6 @@ steps:
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
     timeout_sec: 60
-# The verify block re-sends the probe when Windows OpenSSH/ConPTY drops part
-# of the typed write; the assert_pattern below still decides the outcome.
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: echo qa-ssh-current-settings
@@ -146,73 +145,116 @@ verification:
       feedback, and remains ready for subsequent command input.
     actions:
     - 1
+    - 2
     - 4
-    - 6
+    - 5
+    - 7
     - 8
+    - 9
     - 10
-    - 12
+    - 11
+    - 13
     - 14
     - 16
     - 18
-    - 20
-    - 22
-    - 24
+    - 19
+    - 21
+    - 23
     - 26
-    - 28
     - 30
-    - 32
-    - 34
-    - 36
-    - 38
-    - 40
+    - 31
+    - 33
+    - 35
+    - 37
+    - 39
+    - 41
     - 42
     - 44
     - 46
     - 48
     - 50
     - 52
-    - 54
+    - 55
     checkpoints:
-    - step: 19
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-current-settings\"]"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 20
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
-    - step: 21
+    - step: 22
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa-ssh-current-settings\\r?$", "timeout_sec": 60}}'
-    - step: 26
-      expectation: '{"wait_for": "[data-testid=\"terminal-current-settings-dialog\"]"}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 25
+      expectation: '{"assert_visible": "[data-testid=\"terminal-context-change-settings\"]"}'
     - step: 27
+      expectation: '{"wait_for": "[data-testid=\"terminal-current-settings-dialog\"]"}'
+    - step: 28
       expectation: '{"assert_visible": "[data-testid=\"terminal-current-settings-dialog\"] [data-testid=\"terminal-appearance-settings\"]"}'
-    - step: 31
+    - step: 29
+      expectation: '{"assert_visible": "[data-testid=\"terminal-current-settings-dialog\"] [data-testid=\"terminal-preview\"]"}'
+    - step: 32
       expectation: '{"wait_for": "[data-testid=\"terminal-current-settings-dialog\"] input[aria-label=\"Terminal font size\"][value=\"19\"]"}'
-    - step: 33
+    - step: 34
       expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains": "Save this terminal''s appearance"}}'
-    - step: 35
+    - step: 36
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "state": "detached"}}'
-    - step: 37
+    - step: 38
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-current-settings-dialog\"]", "state": "detached"}}'
-    - step: 44
+    - step: 40
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 43
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 20}}'
+    - step: 45
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa-ssh-after-current-settings\\r?$", "timeout_sec": 60}}'
-    - step: 48
+    - step: 47
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 49
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "Default appearance for new terminals updated"}}'
-    - step: 52
+    - step: 51
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 53
       expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 55
-      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "state": "detached"}}'
+    - step: 54
+      expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains": "Save this terminal''s appearance"}}'
     - step: 56
+      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "state": "detached"}}'
+    - step: 57
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "data-terminal-ready", "equals": "true"}}'
     results:
-    - 19
-    - 21
-    - 26
+    - 3
+    - 6
+    - 12
+    - 15
+    - 17
+    - 20
+    - 22
+    - 24
+    - 25
     - 27
-    - 31
-    - 33
-    - 35
-    - 37
-    - 44
-    - 48
-    - 52
-    - 55
+    - 28
+    - 29
+    - 32
+    - 34
+    - 36
+    - 38
+    - 40
+    - 43
+    - 45
+    - 47
+    - 49
+    - 51
+    - 53
+    - 54
     - 56
+    - 57
   visual:
   - check: Inspect the SSH terminal settings and live terminal screenshot for dialog layout, status feedback, and no overlap.
     method: manual

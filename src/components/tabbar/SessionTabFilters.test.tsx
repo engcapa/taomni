@@ -22,7 +22,6 @@ const visible = () => {
   return filterVisibleTabs(state.tabs, [], state.tabFilter).map((tab) => tab.id);
 };
 function select(category: string) {
-  fireEvent.click(screen.getByTestId("session-tab-filter"));
   fireEvent.click(screen.getByTestId(`session-tab-filter-${category}`));
 }
 
@@ -32,7 +31,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-describe("Sessions compact category selector", () => {
+describe("Sessions overflow category filters", () => {
   it("classifies protocols and keeps database and remote desktop families together", () => {
     expect(tabs.map((tab) => sessionTabCategory(tab, []))).toEqual(["local", "ssh", "database", "database", "database", "sftp", "remote", "remote", "other"]);
   });

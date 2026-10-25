@@ -19,9 +19,6 @@ html[data-app-theme="dark"] .taomni-main-window {
   --taomni-text: #e6eaf0;
   --taomni-text-muted: #9ca3ad;
   --taomni-divider: #2e3138;
-  --taomni-code-bg: #1e1f22;
-  --taomni-code-gutter-bg: #212328;
-  --taomni-code-active-line-bg: #262930;
 }
 .taomni-platform-workbench {
   padding: 4px 6px 4px 0;
@@ -112,22 +109,16 @@ html[data-app-theme="dark"] .taomni-main-window {
   padding: 0 5px;
 }
 .taomni-main-window .taomni-ide-tool-group:not(:empty) {
-  margin: 16px 3px 4px;
-  padding: 6px 2px 4px;
-  border-top: 1px solid var(--taomni-chrome-border);
+  margin: 20px 0 4px;
+  padding: 12px 0 4px;
+  border-top: 2px solid var(--taomni-chrome-border);
   border-radius: 6px;
   background: var(--taomni-panel-bg);
 }
-.taomni-main-window .taomni-ide-tool-group:not(:empty)::before {
-  content: "IDE";
-  display: block;
-  flex-shrink: 0;
-  margin: 0 auto 6px;
-  color: var(--taomni-text-muted);
-  font-size: 8px;
-  font-weight: 600;
-  line-height: 12px;
-  letter-spacing: 0.08em;
+.taomni-main-window [data-testid="workspace-merged-tool-rail"] > div,
+.taomni-main-window [data-testid="sidebar-tool-window-rail"] > .taomni-tool-window-rail > .shrink-0 {
+  padding-left: 5px;
+  padding-right: 5px;
 }
 .taomni-main-window [data-testid="sidebar-tool-window-rail"] > [data-testid="code-workspace-tool-rail-left"] {
   border-top: none;
@@ -208,3 +199,12 @@ html[data-app-theme="dark"] .taomni-main-window {
 .taomni-overview-kind { flex-shrink: 0; border-radius: 3px; padding: 0 3px; font-size: 9px; font-weight: bold; color: var(--taomni-accent); background: var(--taomni-selected); }
 .taomni-overview-summary { height: 120px; overflow: hidden; padding: 10px; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--taomni-mono-font-family, monospace); font-size: 11px; color: var(--taomni-code-text); background: var(--taomni-code-bg); }
 @media (max-width: 800px) { .taomni-platform-toolbar-actions { gap: 1px; padding: 0 2px; } .taomni-platform-toolbar-actions .taomni-toolbar-pill { max-width: 100px; overflow: hidden; } .taomni-overview-header { flex-wrap: wrap; } }
+
+/* Keep compact chrome proportional to Settings' UI size. Editor and terminal
+   document fonts retain their own appearance profiles. */
+.taomni-main-window :is([data-testid="workspace-sidebar-panel"], [data-testid="workspace-tab-strip"], [data-testid="tab-overview"], [data-testid="control-bar"]) :is(.text-\[12px\], .text-\[11\.5px\], .text-xs) { font-size: var(--taomni-ui-font-size); }
+.taomni-main-window :is([data-testid="workspace-sidebar-panel"], [data-testid="workspace-tab-strip"], [data-testid="tab-overview"], [data-testid="control-bar"]) :is(.text-\[11px\], .text-\[10\.5px\]) { font-size: calc(var(--taomni-ui-font-size) - 1px); }
+.taomni-main-window :is([data-testid="workspace-sidebar-panel"], [data-testid="workspace-tab-strip"], [data-testid="tab-overview"], [data-testid="control-bar"]) :is(.text-\[10px\], .text-\[9\.5px\], .text-\[9px\]) { font-size: max(9px, calc(var(--taomni-ui-font-size) - 2px)); }
+.taomni-platform-toolbar-button, .taomni-toolbar-pill { font-size: calc(var(--taomni-ui-font-size) - 1px); }
+.taomni-main-window .taomni-control-bar { min-height: max(33px, calc(var(--taomni-ui-font-size) + 17px)); height: max(33px, calc(var(--taomni-ui-font-size) + 17px)); }
+.taomni-workspace-tab, .taomni-main-window .taomni-control-bar .taomni-tab { height: max(28px, calc(var(--taomni-ui-font-size) + 13px)); }

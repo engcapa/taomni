@@ -16,6 +16,7 @@ fixtures:
 timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
 - click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
@@ -105,61 +106,167 @@ verification:
   - id: R1
     requirement: Disabling X11 forwarding disables trusted forwarding, and enabling X11 restores the trusted-forwarding control.
     actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
     - 11
-    - 16
-    - 19
-    checkpoints:
-    - step: 14
-      expectation: '{"assert_enabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
-    - step: 15
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 17
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "false"}}'
-    - step: 18
-      expectation: '{"assert_disabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
-    - step: 20
-      expectation: '{"assert_enabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
-    results:
+    - 12
     - 17
-    - 18
     - 20
-  - id: R2
-    requirement: X11 forwarding, trusted mode, and SSH compression values persist when the bookmark is reopened for editing.
-    actions:
     - 22
-    - 26
-    - 28
+    - 23
+    - 27
     - 29
     - 30
-    - 31
     - 32
-    - 34
+    - 33
+    - 35
     checkpoints:
-    - step: 23
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 24
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "false"}}'
-    - step: 25
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 30
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-advanced-settings\"]"}'
-    - step: 33
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 35
+    - step: 13
       expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
-    - step: 36
+    - step: 14
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 37
+    - step: 15
+      expectation: '{"assert_enabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
+    - step: 16
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 18
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 19
+      expectation: '{"assert_disabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
+    - step: 21
+      expectation: '{"assert_enabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 25
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 26
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-advanced-settings\"]"}'
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 36
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 37
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
     - step: 38
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 39
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
     results:
-    - 23
+    - 3
+    - 6
+    - 13
+    - 14
+    - 15
+    - 16
+    - 18
+    - 19
+    - 21
     - 24
     - 25
+    - 26
+    - 28
+    - 31
+    - 34
     - 36
     - 37
     - 38
+    - 39
+  - id: R2
+    requirement: X11 forwarding, trusted mode, and SSH compression values persist when the bookmark is reopened for editing.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 17
+    - 20
+    - 22
+    - 23
+    - 27
+    - 29
+    - 30
+    - 32
+    - 33
+    - 35
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 14
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 15
+      expectation: '{"assert_enabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
+    - step: 16
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 18
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 19
+      expectation: '{"assert_disabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
+    - step: 21
+      expectation: '{"assert_enabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 26
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-advanced-settings\"]"}'
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 36
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 37
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 38
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 39
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    results:
+    - 3
+    - 6
+    - 13
+    - 14
+    - 15
+    - 16
+    - 18
+    - 19
+    - 21
+    - 24
+    - 25
+    - 26
+    - 28
+    - 31
+    - 34
+    - 36
+    - 37
+    - 38
+    - 39
   visual:
   - check: The advanced SSH editor shows the X11 forwarding, trusted-mode, and compression controls without clipping or overlap.
     method: manual

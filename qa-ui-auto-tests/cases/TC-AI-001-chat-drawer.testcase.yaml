@@ -37,7 +37,7 @@ steps:
 - assert_visible: '[data-testid="ptt-button"]'
 - click: '[data-testid="welcome-open-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"]'
-- click: '[data-testid="tab-chat-toggle"]'
+- click: '[data-testid="rail-chat-button"]'
 - wait_for: '[data-testid="ai-chat-drawer"]'
 - assert_visible: button[title="New chat"]
 - assert_visible: button[title="History"]

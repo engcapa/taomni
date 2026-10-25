@@ -1,10 +1,14 @@
 id: TC-DB-EXEC-003-dangerous-confirm-browser
 title: DROP asks for confirmation; Cancel runs nothing and Execute runs the statement
-description: |
-  DB-EXEC-003 V4. In the offline MySQL scaffold, running DROP TABLE opens the
+description: 'DB-EXEC-003 V4. In the offline MySQL scaffold, running DROP TABLE opens the
+
   danger confirmation listing the statement. Cancel leaves no Log tab (nothing
+
   ran); running again and choosing Execute runs it (it fails because browser
+
   preview has no database), producing one FAILED log entry.
+
+  '
 covers:
 - F-DB-1
 tags:
@@ -19,6 +23,7 @@ fixtures:
 timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-new"]'

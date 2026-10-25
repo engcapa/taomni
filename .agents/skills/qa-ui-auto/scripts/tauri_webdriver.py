@@ -317,7 +317,8 @@ class TauriDriverProcess:
                 # canonical 'wayland': GNOME portal rejects backend lists.
                 env["GDK_BACKEND"] = "wayland,x11"
             with out.open("a", encoding="utf-8") as stdout, err.open("a", encoding="utf-8") as stderr:
-                self.proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=stdout, stderr=stderr, text=True)
+                self.proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=stdout, stderr=stderr,
+                                             text=True, start_new_session=platform.system() == "Linux")
         deadline = time.time() + self.startup_timeout
         while time.time() < deadline:
             if self.proc.poll() is not None:
@@ -379,6 +380,11 @@ class TauriDriverProcess:
 
     def stop(self) -> None:
         if not self.proc:
+            return
+        if platform.system() == "Linux":
+            from native_process_group import stop_owned_process_group
+            stop_owned_process_group(self.proc)
+            self.proc = None
             return
         if platform.system() == "Windows" and self.proc.poll() is None:
             result = subprocess.run(
@@ -1385,6 +1391,8 @@ class NativeHarness:
                 encoding="utf-8",
             )
         session = NativeSession(self.driver.url, self.application, self.driver.mark_session_closed)
+        from native_application_restart import restart_owned_application
+        session.application_restarter = lambda: restart_owned_application(self.driver, session)
         session.deadline = getattr(self, "deadline", None)
         try:
             session.start()

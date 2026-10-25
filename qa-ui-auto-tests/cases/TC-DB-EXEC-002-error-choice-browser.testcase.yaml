@@ -1,9 +1,12 @@
 id: TC-DB-EXEC-002-error-choice-browser
 title: Failed statement asks Stop / Skip / Skip all and follows the choice
-description: |
-  DB-EXEC-002 V4. In the offline MySQL scaffold every statement fails. Running
+description: 'DB-EXEC-002 V4. In the offline MySQL scaffold every statement fails. Running
+
   three statements shows the "Statement failed" choice; Skip runs the next
+
   statement, Stop on the second prompt leaves the third as NOT RUN.
+
+  '
 covers:
 - F-DB-1
 tags:
@@ -18,6 +21,7 @@ fixtures:
 timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-new"]'

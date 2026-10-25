@@ -32,6 +32,8 @@ interface SessionState {
   sessions: SessionConfig[];
   groups: SessionGroup[];
   loading: boolean;
+  loaded: boolean;
+  loadError: string | null;
   // Anchor selection (last clicked). Kept for single-selection consumers.
   selectedSessionId: string | null;
   // Full multi-selection. Always includes the anchor when non-empty.
@@ -105,6 +107,8 @@ export const useSessionStore: UseBoundStore<StoreApi<SessionState>> = create<Ses
   sessions: [],
   groups: [],
   loading: false,
+  loaded: false,
+  loadError: null,
   selectedSessionId: null,
   selectedSessionIds: [],
   searchQuery: "",
@@ -112,7 +116,7 @@ export const useSessionStore: UseBoundStore<StoreApi<SessionState>> = create<Ses
   loadSessions: async () => {
     if (pendingLoadSessions) return pendingLoadSessions;
 
-    set({ loading: true });
+    set({ loading: true, loadError: null });
     pendingLoadSessions = (async () => {
       try {
         const [sessions, groups] = await Promise.all([
@@ -120,10 +124,10 @@ export const useSessionStore: UseBoundStore<StoreApi<SessionState>> = create<Ses
           listSessionGroups(),
         ]);
         const { selectedSessionIds, selectedSessionId } = useSessionStore.getState();
-        set({ sessions, groups, loading: false, ...pruneSelection(sessions, selectedSessionIds, selectedSessionId) });
+        set({ sessions, groups, loading: false, loaded: true, ...pruneSelection(sessions, selectedSessionIds, selectedSessionId) });
       } catch (err) {
         console.error("Failed to load sessions:", err);
-        set({ loading: false });
+        set({ loading: false, loadError: err instanceof Error ? err.message : String(err) });
       } finally {
         pendingLoadSessions = null;
       }

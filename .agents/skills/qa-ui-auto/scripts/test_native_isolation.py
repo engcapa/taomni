@@ -425,10 +425,12 @@ class NativeIsolationTest(unittest.TestCase):
             driver = native.TauriDriverProcess({"webdriver": {"port": 4450, "native_port": 4451}}, Path(directory))
             proc = Mock()
             proc.poll.return_value = None
-            with patch.object(native.platform, "system", return_value="Linux"), patch.object(native, "_tcp_ok", side_effect=[False, False, True, True]), patch.object(native.subprocess, "Popen", return_value=proc) as spawn:
+            with patch.object(native.platform, "system", return_value="Linux"), patch.object(native, "_tcp_ok", side_effect=[False, False, True, True]), patch.object(native.subprocess, "Popen", return_value=proc) as spawn, patch("native_process_group.stop_owned_process_group") as stop_group:
                 driver.start()
                 self.assertEqual(spawn.call_args.args[0], ["tauri-driver", "--port", "4450", "--native-port", "4451"])
+                self.assertTrue(spawn.call_args.kwargs["start_new_session"])
                 driver.stop()
+                stop_group.assert_called_once_with(proc)
 
     def test_macos_driver_restarts_after_previous_qa_app_exits(self):
         with TemporaryDirectory() as directory:

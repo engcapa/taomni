@@ -416,6 +416,7 @@
 - `[data-testid="project-facts-failed-icon"]` — display [optional] — F25.5.project-facts-failed-icon
 - `[data-testid="code-workspace-tree-new-file"]` — interactive [optional] — F25.5.tree-new-file
 - `[data-testid="code-workspace-tree-new-directory"]` — interactive [optional] — F25.5.tree-new-directory
+- `[data-testid="code-workspace-tree-remove-root"]` — interactive [optional] — F25.5.tree-remove-root
 - `[data-testid="code-workspace-search-everywhere"]` — display [optional] — F25.5.search-everywhere
 - `[data-testid="code-workspace-find-in-files-panel"]` — display [optional] — F25.5.find-panel
 - `[aria-label="Search query"]` — interactive [optional] — F25.5.find-query-input
@@ -590,6 +591,7 @@
 - `[data-testid="code-workspace-hover-doc-pin"]` — interactive [optional] — F25.5.hover-doc-pin
 - `[data-testid="code-workspace-documentation-pane"]` — display [optional] — F25.5.documentation-pane
 - `[data-testid="code-workspace-editor-banners"]` — display [optional] — F25.5.editor-banners
+  ↳ `[data-testid^="code-workspace-banner-lsp-error:"]` — alias
 - `[data-testid="banner-action-open-settings"]` — interactive [optional] — F25.5.editor-banner-open-settings
 - `[data-testid="banner-action-error-open-settings"]` — display [optional] — F25.5.editor-banner-action-error
 - `[data-testid^="banner-dismiss-"]` — interactive [optional] — F25.5.editor-banner-dismiss
@@ -660,6 +662,7 @@
 - `[data-testid="sidebar-tool-code-workspace"]` — interactive — F25.1.sidebar-entry
 - `[data-testid="code-workspace-tab"]` — display — F25.1.workspace
 - `[data-testid="code-workspace-git-panel-toggle"]` — interactive [optional] — F25.1.git-panel-toggle
+  ↳ `[data-testid="code-workspace-tool-rail-git"]` — alias
 - `[data-testid="code-workspace-tree"]` — display [optional] — F25.1.tree-container
 - `[data-testid="debug-subtab-breakpoints"]` — interactive [optional] — F25.1.debug-subtab-breakpoints
 - `[data-testid="code-workspace-split-equalize"]` — interactive [optional] — F25.1.split-equalize
@@ -1704,9 +1707,35 @@
 - `[data-testid="sessions-empty-state"]` — display — F-WS-1.sessions-empty-state
 - `[data-testid="sessions-empty-new-session"]` — interactive — F-WS-1.sessions-empty-new-session
 - `[data-testid="tools-empty-state"]` — display — F-WS-1.tools-empty-state
+- `[data-testid="nav-mode-agents"]` — display [optional] — F-WS-1.removed-nav-mode-agents
+- `[data-testid="tab-filter-chip"]` — interactive [optional] — F-WS-1.tab-filter-chip
+- `[data-testid="tab-filter-empty"]` — display [optional] — F-WS-1.tab-filter-empty
+- `[data-testid="tab-scroll-left"]` — interactive [optional] — F-WS-1.tab-scroll-left
+- `[data-testid="tab-scroll-right"]` — interactive [optional] — F-WS-1.tab-scroll-right
+- `[data-testid="workspace-code-tab"]` — display [optional] — F-WS-1.workspace-code-tab
+- `[data-testid="workspace-create-button"]` — interactive [optional] — F-WS-1.workspace-create-button
+- `[data-testid="workspace-empty-add-folder"]` — interactive [optional] — F-WS-1.workspace-empty-add-folder
+- `[data-testid="workspace-empty-state"]` — display [optional] — F-WS-1.workspace-empty-state
+- `[data-testid^="open-tabs-tab-"]:not([data-testid^="open-tabs-tab-checkbox-"])` — interactive [optional] — F-WS-1.open-tabs-search-result
+- `[data-testid^="workspace-switcher-option-"]:not([data-testid="workspace-switcher-option-default-workspace"])` — interactive [optional] — F-WS-1.workspace-custom-switcher-option
 
 ## main/workspace-platform (F-WS-2)
 
+- `[data-testid="code-workspace-tree-view-all-files"]` — interactive — F-WS-2.code-workspace-tree-view-all-files
+- `[data-testid="code-workspace-tree-search"]` — interactive — F-WS-2.code-workspace-tree-search
+- `[data-testid="code-workspace-tree-open-default"]` — interactive — F-WS-2.code-workspace-tree-open-default
+- `[data-testid="code-workspace-tree-copy"]` — interactive — F-WS-2.code-workspace-tree-copy
+- `[data-testid="code-workspace-tree-paste"]` — interactive — F-WS-2.code-workspace-tree-paste
+- `[data-testid="workspace-plus-add-folder"]` — interactive — F-WS-2.workspace-plus-add-folder
+- `[data-testid="ui-font-family-select"]` — interactive — F-WS-2.ui-font-family-select
+- `#ui-font-size-slider` — interactive — F-WS-2.ui-font-size-slider
+- `[data-testid="code-theme-select"]` — interactive — F-WS-2.code-theme-select
+- `[data-testid="code-theme-option-terminal-kanagawa-lotus"]` — interactive — F-WS-2.code-theme-kanagawa-lotus
+- `button[aria-label="Code font"]` — interactive — F-WS-2.global-code-font
+- `input[aria-label="Code font size"]` — interactive — F-WS-2.global-code-font-size
+- `input[aria-label="Search fonts..."]` — interactive — F-WS-2.font-picker-search
+- `[role="option"]:has-text("Outfit")` — interactive — F-WS-2.font-picker-outfit
+- `[role="option"] >> text="Consolas"` — interactive — F-WS-2.font-picker-consolas
 - `[data-testid="workspace-add-folder"]` — interactive — F-WS-2.workspace-add-folder
 - `[data-testid="workspace-default-badge"]` — display — F-WS-2.workspace-default-badge
 - `[data-testid="workspace-file-editor"]` — display — F-WS-2.workspace-file-editor
@@ -1724,8 +1753,19 @@
 - `[data-testid="workspace-tab-context-move-left"]` — interactive [optional] — F-WS-2.workspace-tab-context-move-left
 - `[data-testid="workspace-tab-context-move-right"]` — interactive [optional] — F-WS-2.workspace-tab-context-move-right
 - `[data-testid="workspace-tab-context-move-last"]` — interactive [optional] — F-WS-2.workspace-tab-context-move-last
-- `[data-testid="session-tab-filter"]` — interactive [optional] — F-WS-2.session-tab-filter
-- `[data-testid="session-tab-filter-menu"]` — display [optional] — F-WS-2.session-tab-filter-menu
+- `[data-testid="workspace-session-unavailable"]` — display [optional] — F-WS-2.workspace-session-unavailable
+- `[data-testid="workspace-session-retry"]` — interactive [optional] — F-WS-2.workspace-session-retry
+- `[data-testid="workspace-session-access"]` — display [optional] — F-WS-2.workspace-session-access
+- `[data-testid="workspace-session-connect"]` — interactive [optional] — F-WS-2.workspace-session-connect
+- `[data-testid="workspace-editor-recovery-error"]` — display [optional] — F-WS-2.workspace-editor-recovery-error
+- `[data-testid="workspace-open-browser"]` — interactive [optional] — F-WS-2.workspace-open-browser
+- `[data-testid="tab-multiexec-checkbox"]` — interactive [optional] — F-WS-2.tab-multiexec-checkbox
+- `[data-testid="multiexec-targets"]` — interactive [optional] — F-WS-2.multiexec-targets
+- `[data-testid="multiexec-target-menu"]` — display [optional] — F-WS-2.multiexec-target-menu
+- `[data-testid="multiexec-target-search"]` — interactive [optional] — F-WS-2.multiexec-target-search
+- `[data-testid="multiexec-target-checkbox"]` — interactive [optional] — F-WS-2.multiexec-target-checkbox
+- `[data-testid="multiexec-target-empty"]` — display [optional] — F-WS-2.multiexec-target-empty
+- `[data-testid="session-tab-categories"]` — display [optional] — F-WS-2.session-tab-categories
 - `[data-testid="session-tab-filter-all"]` — interactive [optional] — F-WS-2.session-tab-filter-all
 - `[data-testid="session-tab-filter-ssh"]` — interactive [optional] — F-WS-2.session-tab-filter-ssh
 - `[data-testid="session-tab-filter-database"]` — interactive [optional] — F-WS-2.session-tab-filter-database
@@ -2507,6 +2547,7 @@
 - `[data-testid="backup-local-select"]` — interactive — F-BACKUP-1.local-select
 - `[data-testid="backup-global-includeLocalHistory"]` — interactive — F-BACKUP-1.global-history
 - `[data-testid="backup-global-includeVault"]` — interactive — F-BACKUP-1.global-vault
+- `[data-testid="backup-global-includeMfa"]` — interactive — F-BACKUP-1.global-mfa
 - `[data-testid="backup-manual"]` — display — F-BACKUP-1.manual
 - `[data-testid="backup-restore-password"]` — interactive — F-BACKUP-1.restore-password
 - `[data-testid="backup-restore-unlock"]` — interactive — F-BACKUP-1.restore-unlock

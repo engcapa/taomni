@@ -24,7 +24,7 @@ steps:
 - native_folder_dialog:
     action: choose
     path: ${fixture.platform_workspace_root}
-- wait_for: '[data-testid="workspace-code-tab"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
 - assert_attribute:
     selector: '[data-testid="nav-mode-workspaces"]'
     name: aria-pressed
@@ -55,7 +55,8 @@ steps:
     path: ${fixture.platform_workspace_root}/README.md
     contains: QA_HOME_ROUTE_SAVE
 - eval_readonly:
-    expression: getComputedStyle(document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]'),'::before').content.includes('IDE')
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]').title.length > 0 && parseFloat(getComputedStyle(document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]')).borderTopWidth)
+      >= 1
     expect_truthy: true
 - eval_readonly:
     expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]').getBoundingClientRect().top - document.querySelector('[data-testid'+String.fromCharCode(61)+'"rail-mode-group"]').getBoundingClientRect().bottom
@@ -65,7 +66,7 @@ steps:
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="welcome-history-tab-workspaces"]'
 - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
-- wait_for: '[data-testid="workspace-code-tab"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
 - assert_text:
     selector: '[data-testid="code-workspace-editor"]'
     contains: QA_HOME_ROUTE_SAVE
@@ -81,7 +82,7 @@ steps:
 - assert_visible: '[data-testid="rail-chat-button"]'
 - click: '[data-testid="side-tab-tools"]'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
-- wait_for: '[data-testid="workspace-code-tab"]'
+- wait_for: '[data-testid="code-workspace-tab"]'
 - assert_attribute:
     selector: '[data-testid="nav-mode-workspaces"]'
     name: aria-pressed
@@ -100,8 +101,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Home new/recent opens the same full editor inside Workspaces, save survives re-entry, Sessions contains no code tabs, and context-free
-      Code Editor routes to the default workspace. IDE tools are separated by at least 12px with an IDE label.
+    requirement: Home new/recent opens the same full editor inside Workspaces, save survives re-entry, Sessions contains no code tabs, and context-free Code
+      Editor routes to the default workspace. IDE tools are separated by at least 12px with a divider and tooltip.
     actions:
     - 3
     - 4
@@ -118,7 +119,7 @@ verification:
     - 36
     checkpoints:
     - step: 5
-      expectation: '{"wait_for": "[data-testid=\"workspace-code-tab\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 6
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"nav-mode-workspaces\"]", "name": "aria-pressed", "equals": "true"}}'
     - step: 7
@@ -134,14 +135,14 @@ verification:
     - step: 17
       expectation: '{"assert_file_contains": {"path": "${fixture.platform_workspace_root}/README.md", "contains": "QA_HOME_ROUTE_SAVE"}}'
     - step: 18
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]''),''::before'').content.includes(''IDE'')",
-        "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'').title.length
+        > 0 && parseFloat(getComputedStyle(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'')).borderTopWidth)
+        >= 1", "expect_truthy": true}}'
     - step: 19
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'').getBoundingClientRect().top
-        - document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"rail-mode-group\"]'').getBoundingClientRect().bottom >= 12", "expect_truthy":
-        true}}'
+        - document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"rail-mode-group\"]'').getBoundingClientRect().bottom >= 12", "expect_truthy": true}}'
     - step: 24
-      expectation: '{"wait_for": "[data-testid=\"workspace-code-tab\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 25
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "QA_HOME_ROUTE_SAVE"}}'
     - step: 26
@@ -155,7 +156,7 @@ verification:
     - step: 31
       expectation: '{"assert_visible": "[data-testid=\"rail-chat-button\"]"}'
     - step: 34
-      expectation: '{"wait_for": "[data-testid=\"workspace-code-tab\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 35
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"nav-mode-workspaces\"]", "name": "aria-pressed", "equals": "true"}}'
     - step: 37

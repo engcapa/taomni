@@ -34,8 +34,8 @@ steps:
     - shared line
     - edit-kept
 - wait_for: '[data-editor-tab-key][data-active="true"][data-dirty="true"]'
-- wait_for: '[data-testid="code-workspace-git-panel-toggle"]:not([disabled])'
-- click: '[data-testid="code-workspace-git-panel-toggle"]'
+- wait_for: '[data-testid="code-workspace-tool-rail-git"]:not([disabled])'
+- click: '[data-testid="code-workspace-tool-rail-git"]'
 - wait_for: '[data-testid="workspace-git-manager"]'
 - wait_for: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-b"][data-path="same.txt"]'
 - assert_items:

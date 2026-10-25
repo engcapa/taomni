@@ -797,7 +797,7 @@ controls:
 - ResizeObserver + debounce 自动 fit
 - 终端第一列保留 8px 左侧留白；留白位于 xterm 内部，支持从留白处正向/反向拖选与矩形选区，FitAddon 按留白后的宽度计算列数。TC-154（browser）和 TC-155（native）验证首字符、复制内容、搜索/选区高亮及缩放/全屏后的布局，TC-110 覆盖分屏布局。
 - 容器卸载时正确 dispose 终端实例与监听器
-- 浮动工具栏包含当前 tab 绑定 Chat 入口（`tab-chat-toggle` / Ctrl+Shift+L）；全局 Chat 入口已移除
+- Sessions 复用主导航条底部 `rail-chat-button` 与 Ctrl+Shift+L，打开当前 tab 绑定 Chat；标签工具栏和临时终端 rail 不重复显示 Chat。
 - 命令历史持久化：每条 host 维度记录到 SQLite (`command_history` 表)，支持 `history_append / history_match_prefix / history_list_recent / history_clear`
 - Inline ghost-text 自动补全：基于 host 命令历史的前缀匹配，按右箭头 / End / Tab 接受建议（PowerShell 本地终端关闭以避免与 PSReadLine 冲突）
 - Common commands 调色板（`CommonCommandsPalette`）：合并历史 + 用户自定义 + 平台预置命令（Windows / Unix），在本地终端中可调出
@@ -7566,7 +7566,8 @@ controls:
   - id: git-panel-toggle
     selector: '[data-testid="code-workspace-git-panel-toggle"]'
     kind: interactive
-    optional: true       # only enabled for a workspace with a detected Git root
+    optional: true
+    aliases: ['[data-testid="code-workspace-tool-rail-git"]']       # only enabled for a workspace with a detected Git root
   - id: tree-container
     selector: '[data-testid="code-workspace-tree"]'
     kind: display
@@ -8960,6 +8961,10 @@ controls:
     selector: '[data-testid="code-workspace-tree-new-directory"]'
     kind: interactive
     optional: true       # enabled when a workspace root/directory is selected
+  - id: tree-remove-root
+    selector: '[data-testid="code-workspace-tree-remove-root"]'
+    kind: interactive
+    optional: true       # root context menu
   - id: search-everywhere
     selector: '[data-testid="code-workspace-search-everywhere"]'
     kind: display
@@ -9594,6 +9599,7 @@ controls:
     selector: '[data-testid="code-workspace-editor-banners"]'
     kind: display
     optional: true       # rendered only when a file/workspace condition is active
+    aliases: ['[data-testid^="code-workspace-banner-lsp-error:"]']
   - id: editor-banner-open-settings
     selector: '[data-testid="banner-action-open-settings"]'
     kind: interactive
@@ -11165,6 +11171,9 @@ controls:
   - id: global-vault
     selector: '[data-testid="backup-global-includeVault"]'
     kind: interactive
+  - id: global-mfa
+    selector: '[data-testid="backup-global-includeMfa"]'
+    kind: interactive
   - id: manual
     selector: '[data-testid="backup-manual"]'
     kind: display
@@ -12016,7 +12025,7 @@ controls:
 
 ## 12. Workspace-First 平台重构（v6.1）
 
-> 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents / Crew 开发中入口与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-028`。
+> 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents / Crew 开发中入口与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-033`。
 
 ### 12.1 Workspace-first 主壳层：单行工具栏、主导航条 5 大模式与右栏收纳
 
@@ -12261,6 +12270,51 @@ files:
 - src/stores/workspaceEditorStore.ts
 - src/stores/workspaceUiStore.ts
 controls:
+- id: code-workspace-tree-view-all-files
+  selector: '[data-testid="code-workspace-tree-view-all-files"]'
+  kind: interactive
+- id: code-workspace-tree-search
+  selector: '[data-testid="code-workspace-tree-search"]'
+  kind: interactive
+- id: code-workspace-tree-open-default
+  selector: '[data-testid="code-workspace-tree-open-default"]'
+  kind: interactive
+- id: code-workspace-tree-copy
+  selector: '[data-testid="code-workspace-tree-copy"]'
+  kind: interactive
+- id: code-workspace-tree-paste
+  selector: '[data-testid="code-workspace-tree-paste"]'
+  kind: interactive
+- id: workspace-plus-add-folder
+  selector: '[data-testid="workspace-plus-add-folder"]'
+  kind: interactive
+- id: ui-font-family-select
+  selector: '[data-testid="ui-font-family-select"]'
+  kind: interactive
+- id: ui-font-size-slider
+  selector: '#ui-font-size-slider'
+  kind: interactive
+- id: code-theme-select
+  selector: '[data-testid="code-theme-select"]'
+  kind: interactive
+- id: code-theme-kanagawa-lotus
+  selector: '[data-testid="code-theme-option-terminal-kanagawa-lotus"]'
+  kind: interactive
+- id: global-code-font
+  selector: button[aria-label="Code font"]
+  kind: interactive
+- id: global-code-font-size
+  selector: input[aria-label="Code font size"]
+  kind: interactive
+- id: font-picker-search
+  selector: input[aria-label="Search fonts..."]
+  kind: interactive
+- id: font-picker-outfit
+  selector: '[role="option"]:has-text("Outfit")'
+  kind: interactive
+- id: font-picker-consolas
+  selector: '[role="option"] >> text="Consolas"'
+  kind: interactive
 - id: workspace-add-folder
   selector: '[data-testid="workspace-add-folder"]'
   kind: interactive
@@ -12323,12 +12377,56 @@ controls:
   selector: '[data-testid="workspace-tab-context-move-last"]'
   kind: interactive
   optional: true
-- id: session-tab-filter
-  selector: '[data-testid="session-tab-filter"]'
+- id: workspace-session-unavailable
+  selector: '[data-testid="workspace-session-unavailable"]'
+  kind: display
+  optional: true
+- id: workspace-session-retry
+  selector: '[data-testid="workspace-session-retry"]'
   kind: interactive
   optional: true
-- id: session-tab-filter-menu
-  selector: '[data-testid="session-tab-filter-menu"]'
+- id: workspace-session-access
+  selector: '[data-testid="workspace-session-access"]'
+  kind: display
+  optional: true
+- id: workspace-session-connect
+  selector: '[data-testid="workspace-session-connect"]'
+  kind: interactive
+  optional: true
+- id: workspace-editor-recovery-error
+  selector: '[data-testid="workspace-editor-recovery-error"]'
+  kind: display
+  optional: true
+- id: workspace-open-browser
+  selector: '[data-testid="workspace-open-browser"]'
+  kind: interactive
+  optional: true
+- id: tab-multiexec-checkbox
+  selector: '[data-testid="tab-multiexec-checkbox"]'
+  kind: interactive
+  optional: true
+- id: multiexec-targets
+  selector: '[data-testid="multiexec-targets"]'
+  kind: interactive
+  optional: true
+- id: multiexec-target-menu
+  selector: '[data-testid="multiexec-target-menu"]'
+  kind: display
+  optional: true
+- id: multiexec-target-search
+  selector: '[data-testid="multiexec-target-search"]'
+  kind: interactive
+  optional: true
+- id: multiexec-target-checkbox
+  selector: '[data-testid="multiexec-target-checkbox"]'
+  kind: interactive
+  optional: true
+- id: multiexec-target-empty
+  selector: '[data-testid="multiexec-target-empty"]'
+  kind: display
+  optional: true
+- id: session-tab-categories
+  selector: '[data-testid="session-tab-categories"]'
   kind: display
   optional: true
 - id: session-tab-filter-all
@@ -12776,3 +12874,7 @@ controls:
 
 按当前产品范围，Agents / Crew 各入口显示“开发中”提示并保留当前画布；任务编排暂缓。全局 Ctrl/Cmd+K 命令面板仍可检索工作区、会话与工具动作并执行跳转。
 
+
+工作区普通目录复用完整编辑器、LSP 与全局外观设置：`TC-WS-034`（browser），`TC-WS-035`（native、真实 Java LSP 与磁盘）。
+
+普通文件 workspace 浏览与编辑：`TC-WS-036`（browser），`TC-WS-037`（native 复制与磁盘保存）；保留递归搜索、源码视图和完整编辑器，顶部仅保留当前文件 Git 差异入口。

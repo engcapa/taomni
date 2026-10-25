@@ -12,6 +12,15 @@ unavailable:
     windows/native: External clickhousecrud project (QA_JAVA_PROJECT_ROOT) is not distributed with the repository; run locally with the original project.
     macos/native: External clickhousecrud project (QA_JAVA_PROJECT_ROOT) is not distributed with the repository; run locally with the original project.
 cases:
+- TC-WS-036
+- TC-WS-037
+- TC-WS-034
+- TC-WS-035
+- TC-WS-032
+- TC-WS-033
+- TC-WS-029
+- TC-WS-030
+- TC-WS-031
 - TC-WS-023
 - TC-WS-024
 - TC-WS-025

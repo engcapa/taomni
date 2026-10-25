@@ -6,6 +6,7 @@ import { useT } from "../../lib/i18n";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import { useWorkspacePlatformStore, type PlatformWorkspace, type WorkspaceIsolatedTab } from "../../stores/workspacePlatformStore";
+import { useWorkspaceEditorHostStore } from "../../stores/workspaceEditorHostStore";
 
 interface Props {
   workspace: PlatformWorkspace;
@@ -19,6 +20,10 @@ export function WorkspaceTabContextMenu({ workspace, tab, x, y, onClose }: Props
   const t = useT();
   const index = workspace.openTabs.findIndex((item) => item.id === tab.id);
   const store = useWorkspacePlatformStore.getState();
+  const fileMenus = useWorkspaceEditorHostStore((state) => state.fileMenus[workspace.id]);
+  const fileItems = tab.kind === "file" && tab.rootFolderId && tab.filePath
+    ? Object.values(fileMenus ?? {}).map((menu) => menu({ kind: "root", rootId: tab.rootFolderId!, path: tab.filePath! })).find(Boolean)
+    : null;
   const closeTabs = (others: boolean) => {
     for (const item of workspace.openTabs) {
       if (item.closable && (!others || item.id !== tab.id)) store.closeWorkspaceTab(workspace.id, item.id);
@@ -53,6 +58,7 @@ export function WorkspaceTabContextMenu({ workspace, tab, x, y, onClose }: Props
   };
   const move = (position: number) => store.moveWorkspaceTab(workspace.id, tab.id, position);
   const items: MenuItem[] = [
+    ...(fileItems ? [{ label: t("platform.fileActions"), testId: "workspace-tab-file-actions", children: fileItems }, { label: "", separator: true }] : []),
     { label: t("tabs.close"), testId: "workspace-tab-context-close", icon: <X className="h-3 w-3" />, disabled: !tab.closable, onClick: () => store.closeWorkspaceTab(workspace.id, tab.id) },
     { label: t("tabs.closeOthersShort"), testId: "workspace-tab-context-close-others", icon: <Trash2 className="h-3 w-3" />, onClick: () => closeTabs(true) },
     { label: t("tabs.closeAll"), testId: "workspace-tab-context-close-all", icon: <Trash2 className="h-3 w-3" />, onClick: () => closeTabs(false) },

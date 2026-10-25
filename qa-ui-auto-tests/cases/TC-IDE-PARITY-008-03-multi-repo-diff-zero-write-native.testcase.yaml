@@ -43,9 +43,9 @@ steps:
 - type: edit-kept
 - wait_for: '[data-editor-tab-key][data-active="true"][data-dirty="true"]'
 - wait_for:
-    selector: '[data-testid="code-workspace-git-panel-toggle"]:not([disabled])'
+    selector: '[data-testid="code-workspace-tool-rail-git"]:not([disabled])'
     timeout_sec: 60
-- click: '[data-testid="code-workspace-git-panel-toggle"]'
+- click: '[data-testid="code-workspace-tool-rail-git"]'
 - wait_for:
     selector: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
     timeout_sec: 60
@@ -94,7 +94,7 @@ steps:
 - click: '[data-testid="confirm-dialog-cancel"]'
 - assert_not_visible: '[data-testid="confirm-dialog"]'
 - click: '[data-testid="nav-mode-workspaces"]'
-- click: '[data-testid="tab-item"][data-tab-type="git"] [data-testid="tab-close"]'
+- click: '[data-testid="workspace-tab"][data-tab-kind="git"] [data-testid="workspace-tab-close"]'
 - assert_count:
     selector: '[data-testid="workspace-git-manager"]'
     equal: 0

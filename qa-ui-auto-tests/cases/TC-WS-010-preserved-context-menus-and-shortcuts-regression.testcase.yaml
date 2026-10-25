@@ -1,8 +1,8 @@
 id: TC-WS-010
 title: Context menus and import/export stay complete across the redesigned shell
-description: v6.1 AC-10 regression. The app main menu keeps its entries (new local terminal, new remote session, new SFTP, Sessions import/export submenus, View, Tools, Settings,
-  Help, Exit); the primary rail keeps Show Tool Window Names; the session tree, tab strip and workspace file tree keep their full context menus (connect/edit/duplicate/move/delete,
-  close variants, copy path, new file/directory, add/remove root).
+description: v6.1 AC-10 regression. The app main menu keeps its entries (new local terminal, new remote session, new SFTP, Sessions import/export submenus, View,
+  Tools, Settings, Help, Exit); the primary rail keeps Show Tool Window Names; the session tree, tab strip and workspace file tree keep their full context menus
+  (connect/edit/duplicate/move/delete, close variants, copy path, new file/directory, add/remove root).
 modes:
 - browser
 - native
@@ -39,7 +39,7 @@ steps:
 - seed_storage:
     key: taomni.platformWorkspaces.v1
     value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace (默认工作区)","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"qa-root","path":"${fixture.platform_workspace_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
-- reload_window:
+- reload_window: null
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
 - click: '[data-testid="app-main-menu"]'
@@ -101,18 +101,25 @@ steps:
     contains: Duplicate tab
 - press: Escape
 - click: '[data-testid="nav-mode-workspaces"]'
-- wait_for: '[data-testid="workspace-file-tree"]'
-- click: '[data-testid="workspace-tree-root"]'
-- wait_for: '[data-testid="workspace-tree-file"]'
-- right_click: '[data-testid="workspace-tree-root"]'
+- wait_for: '[data-testid="code-workspace-tree"]'
+- click: '[data-testid="code-workspace-tree-root"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- right_click: '[data-testid="code-workspace-tree-root"]'
 - wait_for: '[data-testid="context-menu"]'
-- assert_visible: '[data-testid="workspace-tree-new-file"]'
-- assert_visible: '[data-testid="workspace-tree-new-folder"]'
-- assert_visible: '[data-testid="workspace-tree-add-root"]'
-- assert_visible: '[data-testid="workspace-tree-rename"]'
-- assert_visible: '[data-testid="workspace-tree-delete"]'
-- assert_visible: '[data-testid="workspace-tree-copy-path"]'
-- assert_visible: '[data-testid="workspace-tree-remove-root"]'
+- assert_menu_items:
+  - New File...
+- assert_menu_items:
+  - New Directory...
+- assert_menu_items:
+  - Open in Terminal
+- assert_menu_items:
+  - Rename Root...
+- assert_menu_items:
+  - Remove from Workspace
+- assert_menu_items:
+  - Copy Path
+- assert_menu_items:
+  - Remove from Workspace
 - press: Escape
 - assert_not_visible: '[data-testid="context-menu"]'
 - screenshot: ws-010-preserved-context-menus.png
@@ -233,25 +240,25 @@ verification:
     - step: 52
       expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Duplicate tab"}}'
     - step: 55
-      expectation: '{"wait_for": "[data-testid=\"workspace-file-tree\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
     - step: 57
-      expectation: '{"wait_for": "[data-testid=\"workspace-tree-file\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
     - step: 59
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 60
-      expectation: '{"assert_visible": "[data-testid=\"workspace-tree-new-file\"]"}'
+      expectation: '{"assert_menu_items": ["New File..."]}'
     - step: 61
-      expectation: '{"assert_visible": "[data-testid=\"workspace-tree-new-folder\"]"}'
+      expectation: '{"assert_menu_items": ["New Directory..."]}'
     - step: 62
-      expectation: '{"assert_visible": "[data-testid=\"workspace-tree-add-root\"]"}'
+      expectation: '{"assert_menu_items": ["Open in Terminal"]}'
     - step: 63
-      expectation: '{"assert_visible": "[data-testid=\"workspace-tree-rename\"]"}'
+      expectation: '{"assert_menu_items": ["Rename Root..."]}'
     - step: 64
-      expectation: '{"assert_visible": "[data-testid=\"workspace-tree-delete\"]"}'
+      expectation: '{"assert_menu_items": ["Remove from Workspace"]}'
     - step: 65
-      expectation: '{"assert_visible": "[data-testid=\"workspace-tree-copy-path\"]"}'
+      expectation: '{"assert_menu_items": ["Copy Path"]}'
     - step: 66
-      expectation: '{"assert_visible": "[data-testid=\"workspace-tree-remove-root\"]"}'
+      expectation: '{"assert_menu_items": ["Remove from Workspace"]}'
     - step: 68
       expectation: '{"assert_not_visible": "[data-testid=\"context-menu\"]"}'
     results:

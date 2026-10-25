@@ -22,8 +22,9 @@ import { useToolWindowStripeStore } from "../editor/workspace/toolWindowStripeSt
 import { useAppTheme } from "../../lib/appTheme";
 import { useT } from "../../lib/i18n";
 import { useAppStore, type PrimaryNavMode } from "../../stores/appStore";
-import { useChatStore } from "../../stores/chatStore";
+import { isChatCapableTabType, useChatStore } from "../../stores/chatStore";
 import { useWorkspacePlatformStore, type WorkspaceToolWindow } from "../../stores/workspacePlatformStore";
+import { usesSharedWorkspaceEditor } from "../workspace/useWorkspaceCodeHost";
 import { LanguageSwitcher } from "../window/LanguageSwitcher";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
 
@@ -67,6 +68,7 @@ export function PrimaryNavigationRail({
   const floatingMfaOpen = useAppStore((s) => s.floatingMfa.open);
   const toggleDrawer = useChatStore((s) => s.toggleDrawer);
   const chatDrawerOpen = useChatStore((s) => s.drawerOpen);
+  const activeTab = useAppStore((s) => s.tabs.find((tab) => tab.id === s.activeTabId));
   const stripeSettings = useToolWindowStripeStore((s) => s.settings);
   const setStripeWidth = useToolWindowStripeStore((s) => s.setWidth);
   const toggleStripeNames = useToolWindowStripeStore((s) => s.toggleShowNames);
@@ -86,7 +88,8 @@ export function PrimaryNavigationRail({
   const legacyCodeTabActive = Boolean(
     workspace?.openTabs.some((tab) => tab.kind === "code" && tab.id === workspace.activeTabId),
   );
-  const showWorkspaceTools = isWorkspaces && !legacyCodeTabActive;
+  const sharedEditor = !!workspace && usesSharedWorkspaceEditor(workspace);
+  const showWorkspaceTools = isWorkspaces && !legacyCodeTabActive && !sharedEditor;
   const modes: RailMode[] = [
     { mode: "home", testId: "nav-mode-home", label: t("platform.home"), icon: <Home /> },
     { mode: "workspaces", testId: "nav-mode-workspaces", label: t("platform.workspaces"), icon: <Boxes /> },
@@ -201,7 +204,7 @@ export function PrimaryNavigationRail({
         </div>
 
         {showWorkspaceTools && (
-          <div data-testid="workspace-merged-tool-rail" aria-label="IDE tools" className="taomni-ide-tool-group flex min-h-0 flex-col">
+          <div data-testid="workspace-merged-tool-rail" aria-label={t("platform.workspaceToolWindows")} title={t("platform.workspaceToolWindows")} className="taomni-ide-tool-group flex min-h-0 flex-col">
             <div
               data-testid="code-workspace-tool-rail-left"
               data-embedded="true"
@@ -293,7 +296,7 @@ export function PrimaryNavigationRail({
         )}
 
         <div className="flex min-h-1 flex-1 flex-col">
-          <div ref={railHostRef} data-testid="sidebar-tool-window-rail" aria-label="IDE tools" className="taomni-ide-tool-group flex min-h-0 flex-col" />
+          <div ref={railHostRef} data-testid="sidebar-tool-window-rail" aria-label={t("platform.workspaceToolWindows")} title={t("platform.workspaceToolWindows")} className="taomni-ide-tool-group flex min-h-0 flex-col" />
         </div>
 
         <div data-testid="rail-bottom-tools" className="flex shrink-0 flex-col gap-1 border-t px-1 pb-2 pt-1" style={{ borderColor: "var(--taomni-sidebar-border)" }}>
@@ -314,7 +317,11 @@ export function PrimaryNavigationRail({
             label={t("platform.chat")}
             active={chatDrawerOpen}
             showNames={showNames}
-            onClick={toggleDrawer}
+            onClick={() => {
+              if (activeSideTab === "sessions" && activeTab && isChatCapableTabType(activeTab.type)) {
+                void useChatStore.getState().toggleTabChat(activeTab.chatTabId ?? activeTab.id);
+              } else toggleDrawer();
+            }}
           >
             <MessageSquare className="w-[16px] h-[16px]" />
           </RailIconButton>

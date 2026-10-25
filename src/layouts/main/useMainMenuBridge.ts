@@ -7,6 +7,7 @@ import { shellKeyClaimed } from "../../lib/shellKeyClaims";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { useAppStore } from "../../stores/appStore";
 import { macCommandDigitIndex } from "./sessionPolicy";
+import { workspaceEditorRuntimeId } from "../../components/workspace/useWorkspaceCodeHost";
 
 export interface UseMainMenuBridgeContext {
   dispatchMenuAction: (action: MenuActionId) => void;
@@ -134,15 +135,17 @@ export function useMainMenuBridge(context: UseMainMenuBridgeContext) {
       const platform = useWorkspacePlatformStore.getState();
       const workspace = platform.getWorkspace();
       const codeTab = workspace?.openTabs.find((tab) => tab.kind === "code");
-      if (state.activeSideTab === "workspaces" && workspace?.activeTabId === codeTab?.id) return;
+      const editorTab = workspace?.openTabs.find((tab) => tab.id === workspace.activeTabId && (tab.kind === "file" || tab.kind === "code"));
+      if (state.activeSideTab === "workspaces" && editorTab) return;
       const current = state.tabs.find((tab) => tab.id === state.activeTabId);
       if (current?.type === "welcome") {
-        if (workspace && codeTab) {
+        const fileTab = workspace?.openTabs.find((tab) => tab.kind === "file");
+        if (workspace && (fileTab || codeTab)) {
           event.preventDefault();
           event.stopImmediatePropagation();
-          platform.setActiveWorkspaceTab(workspace.id, codeTab.id);
+          platform.setActiveWorkspaceTab(workspace.id, (fileTab ?? codeTab)!.id);
           state.setActiveSideTab("workspaces");
-          void workspaceCommandRegistrationsRef.current[codeTab.id]?.executeAction("workspace.goToFile");
+          void workspaceCommandRegistrationsRef.current[workspaceEditorRuntimeId(workspace)]?.executeAction("workspace.goToFile");
           return;
         }
         // If a code-workspace tab exists, switch to it and let its Go to File

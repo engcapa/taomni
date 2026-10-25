@@ -26,6 +26,7 @@ export interface CodeWorkspaceTabProps {
   onOpenGitManager?: (payload: CodeWorkspaceGitManagerPayload) => void;
   onSyncGitManager?: (payload: CodeWorkspaceGitManagerPayload) => void;
   onCommandsChange?: (tabId: string, registration: WorkspaceCommandRegistration | null) => void;
+  hostIntegration?: import("../workspaceHostIntegration").WorkspaceHostIntegration;
 }
 
 

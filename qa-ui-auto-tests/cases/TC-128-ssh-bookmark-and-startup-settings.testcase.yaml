@@ -16,6 +16,7 @@ fixtures:
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for:
     selector: '[data-testid="sidebar"]'
     timeout_sec: 45
@@ -212,25 +213,129 @@ verification:
   - id: R1
     requirement: Bookmark appearance, icon, folder, safety, startup and shortcut settings survive save/reopen; browsing a background retains the selected path.
     actions:
-    - 3
+    - 1
+    - 2
     - 4
-    - 6
+    - 5
     - 7
     - 8
     - 9
     - 10
     - 11
-    - 14
+    - 12
     - 15
+    - 16
+    - 18
+    - 20
+    - 22
+    - 24
+    - 25
+    - 27
+    - 29
+    - 31
+    - 32
+    - 34
+    - 36
+    - 38
+    - 40
+    - 42
+    - 44
+    - 46
+    - 48
+    - 50
+    - 52
+    - 53
+    - 55
+    - 62
+    - 63
+    - 71
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"session-folder-select\"]"}'
+    - step: 17
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Custom session icon\"]", "name": "value", "equals": "★"}}'
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-name\"]", "name": "value", "equals": "qa-ui-auto-ssh-bookmark"}}'
+    - step: 21
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-folder-select\"]", "name": "value", "equals": "User sessions / Development"}}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 26
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-folder-select\"]", "name": "value", "equals": "User sessions / QA SSH / Bookmark"}}'
+    - step: 28
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Background image\"]", "name": "value", "equals": "/tmp/qa-ssh-bookmark.png"}}'
+    - step: 30
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Background image\"]", "name": "value", "equals": "/tmp/qa-ssh-selected-background.png"}}'
+    - step: 35
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Background opacity\"]", "name": "value", "equals": "42%"}}'
+    - step: 37
+      expectation: '{"assert_attribute": {"selector": "textarea[aria-label=\"Description notes\"]", "name": "value", "equals": "SSH bookmark description"}}'
+    - step: 39
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Tags\"]", "name": "value", "equals": "ssh,bookmark,qa"}}'
+    - step: 41
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-ai-write\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 43
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-auto-connect\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 45
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-open-new-window\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 47
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-reconnect\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 49
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keyboard shortcut\"]", "name": "value", "equals": "Ctrl+Alt+9"}}'
+    - step: 51
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-bookmark\"]"}'
+    - step: 54
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 56
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 57
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-name\"]", "name": "value", "equals": "qa-ui-auto-ssh-bookmark"}}'
+    - step: 58
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-folder-select\"]", "name": "value", "equals": "User sessions / QA SSH / Bookmark"}}'
+    - step: 59
+      expectation: '{"assert_attribute": {"selector": "textarea[aria-label=\"Description notes\"]", "name": "value", "equals": "SSH bookmark description"}}'
+    - step: 60
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Tags\"]", "name": "value", "equals": "ssh,bookmark,qa"}}'
+    - step: 61
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-ai-write\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 64
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Custom session icon\"]", "name": "value", "equals": "★"}}'
+    - step: 65
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Background image\"]", "name": "value", "equals": "/tmp/qa-ssh-selected-background.png"}}'
+    - step: 66
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Background opacity\"]", "name": "value", "equals": "42%"}}'
+    - step: 67
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keyboard shortcut\"]", "name": "value", "equals": "Ctrl+Alt+9"}}'
+    - step: 68
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-auto-connect\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 69
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-open-new-window\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 70
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-reconnect\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 72
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    - step: 74
+      expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
+    results:
+    - 3
+    - 6
+    - 13
+    - 14
     - 17
     - 19
     - 21
     - 23
-    - 24
     - 26
     - 28
     - 30
-    - 31
     - 33
     - 35
     - 37
@@ -241,96 +346,22 @@ verification:
     - 47
     - 49
     - 51
-    - 52
     - 54
-    - 62
-    - 70
-    checkpoints:
-    - step: 13
-      expectation: '{"assert_visible": "[data-testid=\"session-folder-select\"]"}'
-    - step: 16
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Custom session icon\"]", "name": "value", "equals": "★"}}'
-    - step: 18
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-name\"]", "name": "value", "equals": "qa-ui-auto-ssh-bookmark"}}'
-    - step: 20
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-folder-select\"]", "name": "value", "equals": "User sessions / Development"}}'
-    - step: 25
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-folder-select\"]", "name": "value", "equals": "User sessions / QA SSH / Bookmark"}}'
-    - step: 27
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Background image\"]", "name": "value", "equals": "/tmp/qa-ssh-bookmark.png"}}'
-    - step: 32
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Background image\"]", "name": "value", "equals": "/tmp/qa-ssh-selected-background.png"}}'
-    - step: 34
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Background opacity\"]", "name": "value", "equals": "42%"}}'
-    - step: 36
-      expectation: '{"assert_attribute": {"selector": "textarea[aria-label=\"Description notes\"]", "name": "value", "equals": "SSH bookmark description"}}'
-    - step: 38
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Tags\"]", "name": "value", "equals": "ssh,bookmark,qa"}}'
-    - step: 40
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-ai-write\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 42
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-auto-connect\"]", "name": "data-checked", "equals": "false"}}'
-    - step: 44
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-open-new-window\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 46
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-reconnect\"]", "name": "data-checked", "equals": "false"}}'
-    - step: 48
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keyboard shortcut\"]", "name": "value", "equals": "Ctrl+Alt+9"}}'
-    - step: 56
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-name\"]", "name": "value", "equals": "qa-ui-auto-ssh-bookmark"}}'
-    - step: 57
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-folder-select\"]", "name": "value", "equals": "User sessions / QA SSH / Bookmark"}}'
-    - step: 58
-      expectation: '{"assert_attribute": {"selector": "textarea[aria-label=\"Description notes\"]", "name": "value", "equals": "SSH bookmark description"}}'
-    - step: 59
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Tags\"]", "name": "value", "equals": "ssh,bookmark,qa"}}'
-    - step: 60
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-disable-ai-write\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 63
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Custom session icon\"]", "name": "value", "equals": "★"}}'
-    - step: 64
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Background image\"]", "name": "value", "equals": "/tmp/qa-ssh-selected-background.png"}}'
-    - step: 65
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Background opacity\"]", "name": "value", "equals": "42%"}}'
-    - step: 66
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Keyboard shortcut\"]", "name": "value", "equals": "Ctrl+Alt+9"}}'
-    - step: 67
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-auto-connect\"]", "name": "data-checked", "equals": "false"}}'
-    - step: 68
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-open-new-window\"]", "name": "data-checked", "equals": "true"}}'
-    - step: 69
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-reconnect\"]", "name": "data-checked", "equals": "false"}}'
-    - step: 73
-      expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
-    results:
-    - 13
-    - 16
-    - 18
-    - 20
-    - 25
-    - 27
-    - 32
-    - 34
-    - 36
-    - 38
-    - 40
-    - 42
-    - 44
-    - 46
-    - 48
     - 56
     - 57
     - 58
     - 59
     - 60
-    - 63
+    - 61
     - 64
     - 65
     - 66
     - 67
     - 68
     - 69
-    - 73
+    - 70
+    - 72
+    - 74
   visual:
   - check: Bookmark controls and terminal background
     method: automated

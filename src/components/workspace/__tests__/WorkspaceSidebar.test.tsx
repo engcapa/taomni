@@ -9,6 +9,9 @@ import {
 } from "../../../stores/workspacePlatformStore";
 import { useWorkspaceUiStore } from "../../../stores/workspaceUiStore";
 import { useWorkspaceEditorStore } from "../../../stores/workspaceEditorStore";
+import { AppDialogProvider } from "../../../lib/appDialogs";
+import { useCodeWorkspaceStore } from "../../../stores/codeWorkspaceStore";
+import { workspaceBoundary } from "./workspaceBoundary";
 import { useSessionStore } from "../../../stores/sessionStore";
 
 vi.mock("../workspaceFs", async () => {
@@ -36,7 +39,8 @@ vi.mock("../workspaceFs", async () => {
   };
 });
 
-vi.mock("../../../lib/git", () => ({
+vi.mock("../../../lib/git", async (importOriginal) => ({
+  ...await importOriginal<typeof import("../../../lib/git")>(),
   gitProbePath: vi.fn(async () => ({ path: "/preview", gitAvailable: true, isRepo: true, repoRoot: "/preview", error: null })),
   gitSnapshot: vi.fn(async () => ({
     repoRoot: "/preview",
@@ -68,25 +72,30 @@ vi.mock("../WorkspaceSessionPane", () => ({
   WorkspaceSessionPane: () => <div data-testid="workspace-session-pane-mock">session</div>,
 }));
 
-vi.mock("../../editor/CodeWorkspaceTab", () => ({
-  CodeWorkspaceTab: () => <div data-testid="code-workspace-tab">code workspace</div>,
-}));
+vi.mock("@tauri-apps/api/core", async () => {
+  const { workspaceBoundary } = await import("./workspaceBoundary");
+  return { invoke: vi.fn(workspaceBoundary.invoke) };
+});
+vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
+vi.mock("@tauri-apps/plugin-dialog", () => ({ open: vi.fn(async () => "/repo/extra") }));
 
 function Shell() {
   return (
-    <div>
+    <AppDialogProvider>
       <WorkspaceSidebar onOpenSessionPicker={vi.fn()} />
       <WorkspaceMainPanel />
-    </div>
+    </AppDialogProvider>
   );
 }
 
 beforeEach(() => {
   window.localStorage.clear();
+  workspaceBoundary.reset();
+  useCodeWorkspaceStore.setState({ byInstanceId: {} });
   useWorkspacePlatformStore.getState().reloadFromStorage();
   useWorkspaceUiStore.setState({ fsModal: null, sessionPickerOpen: false, globalSearchOpen: false, agentDispatchOpen: false });
   useWorkspaceEditorStore.setState({ documents: {}, activeTabId: null });
-  useAppStore.setState({ activeSideTab: "workspaces", sidebarCollapsed: false, statusMessage: "Ready" });
+  useAppStore.setState({ activeSideTab: "workspaces", sidebarCollapsed: false, statusMessage: "Ready", codeWorkspaceByTab: {} });
   useSessionStore.setState({ sessions: [], groups: [], loading: false, selectedSessionId: null, searchQuery: "" });
   const workspace = useWorkspacePlatformStore.getState();
   workspace.addRootFolder(DEFAULT_WORKSPACE_ID, { path: "/preview", name: "preview" });
@@ -127,44 +136,36 @@ describe("WorkspaceSidebar (TASK-05)", () => {
 
   it("UT-WS-05-03 creates a file from the toolbar and opens it in the editor", async () => {
     render(<Shell />);
-    fireEvent.click(screen.getByTestId("workspace-new-file"));
-    const modal = screen.getByTestId("workspace-fs-modal");
-    expect(modal.dataset.kind).toBe("file");
-    fireEvent.change(within(modal).getByTestId("workspace-fs-modal-input"), { target: { value: "notes.ts" } });
-    fireEvent.click(within(modal).getByTestId("workspace-fs-modal-confirm"));
-
-    await waitFor(() => expect(screen.queryByTestId("workspace-fs-modal")).not.toBeInTheDocument());
-    const workspace = useWorkspacePlatformStore.getState().workspaces.find((entry) => entry.id === DEFAULT_WORKSPACE_ID)!;
-    expect(workspace.openTabs.some((tab) => tab.kind === "file" && tab.filePath === "notes.ts")).toBe(true);
-    expect(useWorkspacePlatformStore.getState().createdNodes.some((node) => node.path === "notes.ts" && node.kind === "file")).toBe(true);
+    const tree = await screen.findByTestId("code-workspace-tree");
+    expect(screen.getByTestId("workspace-editor-tool-host")).toContainElement(tree);
+    fireEvent.click(await screen.findByTestId("code-workspace-tree-root"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-new"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-new-file"));
+    const modal = await screen.findByTestId("text-input-dialog");
+    fireEvent.change(within(modal).getByTestId("text-input-dialog-input"), { target: { value: "notes.ts" } });
+    fireEvent.click(within(modal).getByTestId("text-input-dialog-confirm"));
+    await waitFor(() => expect(useWorkspacePlatformStore.getState().getWorkspace()!.openTabs.some((tab) => tab.kind === "file" && tab.filePath === "notes.ts")).toBe(true));
+    expect(workspaceBoundary.files.has("notes.ts")).toBe(true);
     expect(screen.getByTestId("workspace-file-editor").dataset.path).toBe("notes.ts");
+    expect(screen.queryByTestId("workspace-new-file")).not.toBeInTheDocument();
   });
 
-  it("UT-WS-05-04 creates a directory from the root context menu", async () => {
+  it("UT-WS-05-04 creates a directory from the shared root context menu", async () => {
     render(<Shell />);
-    fireEvent.click(screen.getByTestId("workspace-tree-root"));
-    await waitFor(() => expect(screen.getAllByTestId("workspace-tree-file").length).toBeGreaterThan(0));
-    fireEvent.contextMenu(screen.getByTestId("workspace-tree-root"));
-    fireEvent.click(screen.getByTestId("workspace-tree-new-folder"));
-    const modal = screen.getByTestId("workspace-fs-modal");
-    expect(modal.dataset.kind).toBe("folder");
-    fireEvent.change(within(modal).getByTestId("workspace-fs-modal-input"), { target: { value: "docs" } });
-    fireEvent.click(within(modal).getByTestId("workspace-fs-modal-confirm"));
-    await waitFor(() => expect(screen.queryByTestId("workspace-fs-modal")).not.toBeInTheDocument());
-    expect(useWorkspacePlatformStore.getState().createdNodes.some((node) => node.path === "docs" && node.kind === "folder")).toBe(true);
+    fireEvent.contextMenu(await screen.findByTestId("code-workspace-tree-root"));
+    fireEvent.click(screen.getByText("New Directory..."));
+    const modal = await screen.findByTestId("text-input-dialog");
+    fireEvent.change(within(modal).getByTestId("text-input-dialog-input"), { target: { value: "docs" } });
+    fireEvent.click(within(modal).getByTestId("text-input-dialog-confirm"));
+    await waitFor(() => expect(workspaceBoundary.directories.has("docs")).toBe(true));
   });
 
-  it("UT-WS-05-05 mounts an extra root folder (multi-root)", async () => {
+  it("UT-WS-05-05 mounts an extra root through the shared folder picker", async () => {
     render(<Shell />);
-    fireEvent.click(screen.getByTestId("workspace-add-folder"));
-    const modal = screen.getByTestId("workspace-fs-modal");
-    expect(modal.dataset.kind).toBe("root");
-    fireEvent.change(within(modal).getByTestId("workspace-fs-modal-input"), { target: { value: "/repo/extra" } });
-    fireEvent.click(within(modal).getByTestId("workspace-fs-modal-confirm"));
-    await waitFor(() => expect(screen.queryByTestId("workspace-fs-modal")).not.toBeInTheDocument());
-    const workspace = useWorkspacePlatformStore.getState().workspaces.find((entry) => entry.id === DEFAULT_WORKSPACE_ID)!;
-    expect(workspace.rootFolders.map((root) => root.path)).toContain("/repo/extra");
-    expect(screen.getAllByTestId("workspace-tree-root")).toHaveLength(2);
+    fireEvent.click(await screen.findByTestId("code-workspace-tree-new"));
+    fireEvent.click(screen.getByTestId("code-workspace-tree-add-folder"));
+    await waitFor(() => expect(useWorkspacePlatformStore.getState().getWorkspace()!.rootFolders.map((root) => root.path)).toContain("/repo/extra"));
+    expect(screen.getAllByTestId("code-workspace-tree-root")).toHaveLength(2);
   });
 
   it("UT-WS-05-06 shows branch and change count in the bottom Git bar and opens the Git tab", async () => {

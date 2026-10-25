@@ -1,7 +1,7 @@
 id: TC-BACKUP-SETTINGS-001
 title: Global scope persists; legacy and inherited channels remain distinct
-description: Renderer model verifies persisted global choices, custom channel semantics, manual summary and live
-  translations. Native disk and range execution have separate cases.
+description: Renderer model verifies persisted global choices, custom channel semantics, manual summary and live translations. Native disk and range execution
+  have separate cases.
 covers:
 - F-BACKUP-1
 - F-BACKUP-2
@@ -95,6 +95,25 @@ steps:
 - set_check:
     selector: '[data-testid="backup-global-includeLocalHistory"]'
     checked: true
+- set_check:
+    selector: '[data-testid="backup-global-includeMfa"]'
+    checked: false
+- assert_enabled: '[data-testid="backup-global-includeVault"]'
+- set_check:
+    selector: '[data-testid="backup-global-includeVault"]'
+    checked: false
+- eval_readonly:
+    expression: '!document.querySelector(''[data-testid''+String.fromCharCode(61)+''"backup-global-includeVault"]'').checked'
+    expect_truthy: true
+- set_check:
+    selector: '[data-testid="backup-global-includeVault"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="backup-global-includeMfa"]'
+    checked: true
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"backup-global-includeVault"]').checked
+    expect_truthy: true
 - assert_attribute:
     selector: '[data-testid="backup-global-includeVault"]'
     name: disabled
@@ -130,13 +149,13 @@ verification:
     - 23
     checkpoints:
     - step: 9
-      expectation: mailOn
+      expectation: '{"eval_readonly": {"expression": "document.getElementById(\"backup-global-include-mail\").checked", "expect_truthy": true}}'
     - step: 10
       expectation: saved
     - step: 24
       expectation: fullPersisted
     - step: 25
-      expectation: excludedPersisted
+      expectation: '{"eval_readonly": {"expression": "!document.getElementById(\"backup-global-include-mail\").checked", "expect_truthy": true}}'
     results:
     - 9
     - 10
@@ -173,15 +192,30 @@ verification:
     - 29
     - 31
     - 32
+    - 33
     - 35
+    - 37
+    - 38
+    - 42
     checkpoints:
-    - step: 33
-      expectation: mfaVault
+    - step: 34
+      expectation: '{"assert_enabled": "[data-testid=\"backup-global-includeVault\"]"}'
     - step: 36
+      expectation: '{"eval_readonly": {"expression": "!document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"backup-global-includeVault\"]'').checked",
+        "expect_truthy": true}}'
+    - step: 39
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"backup-global-includeVault\"]'').checked",
+        "expect_truthy": true}}'
+    - step: 40
+      expectation: mfaVault
+    - step: 43
       expectation: translated
-    - step: 37
+    - step: 44
       expectation: customRetained
     results:
-    - 33
+    - 34
     - 36
-    - 37
+    - 39
+    - 40
+    - 43
+    - 44

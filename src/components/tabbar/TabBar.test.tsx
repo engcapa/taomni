@@ -102,6 +102,16 @@ function mockHorizontalOverflow(
 }
 
 describe("TabBar overflow navigation", () => {
+  it("selects individual broadcast targets inside the tab without activating or dragging it", () => {
+    useAppStore.setState({ multiExecActive: true });
+    renderTabBar();
+    const checkbox = screen.getAllByTestId("tab-multiexec-checkbox")[1];
+    fireEvent.pointerDown(checkbox, { button: 0 });
+    fireEvent.click(checkbox);
+    expect(useAppStore.getState().multiExecSelectedTabIds.has("tab-1")).toBe(true);
+    expect(useAppStore.getState().activeTabId).toBe("tab-0");
+    expect(checkbox).toBeChecked();
+  });
   beforeEach(() => {
     useSessionStore.setState({ sessions: [] });
     useAppStore.setState({

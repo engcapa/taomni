@@ -155,9 +155,7 @@ steps:
     equals: Project
 - click: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
-- assert_count:
-    selector: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
-    equal: 0
+- assert_not_visible: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
 - click: '[data-testid="nav-mode-workspaces"]'
 - click: '[data-testid="toggle-left-sidebar"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
@@ -358,7 +356,7 @@ verification:
     - step: 65
       expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
     - step: 66
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 0}}'
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
     - step: 71
       expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
     - step: 73

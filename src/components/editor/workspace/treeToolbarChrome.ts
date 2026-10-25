@@ -27,7 +27,7 @@ export function treeToolbarVisibility(density: TreeToolbarDensity): TreeToolbarV
   return { showExpandAll: density !== "narrow" };
 }
 
-export type FileTreeViewMode = "tree" | "compact" | "flat";
+export type FileTreeViewMode = "tree" | "compact" | "flat" | "files";
 
 const VIEW_CYCLE: FileTreeViewMode[] = ["tree", "compact", "flat"];
 
@@ -44,12 +44,14 @@ export function treeViewModeLabel(mode: FileTreeViewMode): string {
       return "Compact tree view";
     case "flat":
       return "Flat file view";
+    case "files":
+      return "All files";
   }
 }
 
 /** Header title of the view selector: IDEA "Project", or the flat file list. */
 export function treeViewTitle(mode: FileTreeViewMode): string {
-  return mode === "flat" ? "Project Files" : "Project";
+  return mode === "files" ? "All Files" : mode === "flat" ? "Project Files" : "Project";
 }
 
 /**

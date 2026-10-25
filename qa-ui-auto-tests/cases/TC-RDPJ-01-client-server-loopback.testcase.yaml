@@ -59,6 +59,7 @@ fixtures:
 timeout_sec: 480
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
 - click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
@@ -201,62 +202,314 @@ verification:
   - id: R1
     requirement: The product client completes NLA against the product server after confirming its certificate and shows the host desktop.
     actions:
-    - 3
+    - 1
+    - 2
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 14
+    - 15
+    - 17
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
     - 25
+    - 26
+    - 27
+    - 29
+    - 30
+    - 31
+    - 33
     - 34
     - 35
-    - 37
+    - 38
     - 40
-    - 42
-    checkpoints:
-    - step: 27
-      expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-dialog\"]", "timeout_sec": 30}}'
-    - step: 31
-      expectation: '{"wait_for": {"selector": "[data-testid=\"server-row-rdp\"][data-status=\"running\"]", "timeout_sec": 90}}'
-    - step: 41
-      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
-    - step: 43
-      expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Connected", "timeout_sec": 60}}'
-    results:
+    - 41
     - 43
-  - id: R2
-    requirement: A click on the client canvas reaches the host desktop through the server.
-    actions:
-    - 44
-    checkpoints:
-    - step: 45
-      expectation: '{"assert_json_file": {"path": "target-state.json", "timeout_sec": 20, "expect": {"flips": {"min": 1}}}}'
-    results:
     - 45
-  - id: R3
-    requirement: In OS full screen the connection bar shows the server-measured connection quality, comes back from the top edge, restores the window and disconnects the session.
-    actions:
+    - 47
+    - 50
+    - 52
+    - 54
+    - 55
+    - 57
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-rdp-loopback\"]"}'
+    - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 30}}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-dialog\"]", "timeout_sec": 30}}'
+    - step: 32
+      expectation: '{"wait_for": {"selector": "[data-testid=\"server-row-rdp\"][data-status=\"running\"]", "timeout_sec": 90}}'
+    - step: 36
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 37
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 30}}'
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
+    - step: 44
+      expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Connected", "timeout_sec": 60}}'
+    - step: 46
+      expectation: '{"assert_json_file": {"path": "target-state.json", "timeout_sec": 20, "expect": {"flips": {"min": 1}}}}'
+    - step: 48
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
+    - step: 49
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-bar-quality\"]:not([data-level=\"0\"])", "timeout_sec": 45}}'
+    - step: 51
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 10}}'
+    - step: 53
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
+    - step: 56
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
+    - step: 58
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
+    - step: 59
+      expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Disconnected", "timeout_sec": 20}}'
+    results:
+    - 3
+    - 6
+    - 13
+    - 16
+    - 18
+    - 28
+    - 32
+    - 36
+    - 37
+    - 39
+    - 42
+    - 44
     - 46
+    - 48
     - 49
     - 51
     - 53
-    - 54
     - 56
-    checkpoints:
-    - step: 47
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
-    - step: 48
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-bar-quality\"]:not([data-level=\"0\"])", "timeout_sec": 45}}'
-    - step: 50
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 10}}'
-    - step: 52
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
-    - step: 55
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
-    - step: 57
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
-    - step: 58
-      expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Disconnected", "timeout_sec": 20}}'
-    - step: 59
-      expectation: '{"rdp_probe": {"scenario": "connect", "artifact": "still-serving", "args": {"seconds": 2}, "expect": {"first_graphics_ms": {"exists": true}}}}'
-    results:
-    - 48
+    - 58
+    - 59
+  - id: R2
+    requirement: A click on the client canvas reaches the host desktop through the server.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 14
+    - 15
+    - 17
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 29
+    - 30
+    - 31
+    - 33
+    - 34
+    - 35
+    - 38
+    - 40
+    - 41
+    - 43
+    - 45
+    - 47
+    - 50
     - 52
+    - 54
+    - 55
+    - 57
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-rdp-loopback\"]"}'
+    - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 30}}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-dialog\"]", "timeout_sec": 30}}'
+    - step: 32
+      expectation: '{"wait_for": {"selector": "[data-testid=\"server-row-rdp\"][data-status=\"running\"]", "timeout_sec": 90}}'
+    - step: 36
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 37
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 30}}'
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
+    - step: 44
+      expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Connected", "timeout_sec": 60}}'
+    - step: 46
+      expectation: '{"assert_json_file": {"path": "target-state.json", "timeout_sec": 20, "expect": {"flips": {"min": 1}}}}'
+    - step: 48
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
+    - step: 49
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-bar-quality\"]:not([data-level=\"0\"])", "timeout_sec": 45}}'
+    - step: 51
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 10}}'
+    - step: 53
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
+    - step: 56
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
+    - step: 58
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
+    - step: 59
+      expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Disconnected", "timeout_sec": 20}}'
+    results:
+    - 3
+    - 6
+    - 13
+    - 16
+    - 18
+    - 28
+    - 32
+    - 36
+    - 37
+    - 39
+    - 42
+    - 44
+    - 46
+    - 48
+    - 49
+    - 51
+    - 53
+    - 56
+    - 58
+    - 59
+  - id: R3
+    requirement: In OS full screen the connection bar shows the server-measured connection quality, comes back from the top edge, restores the window and disconnects
+      the session.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 14
+    - 15
+    - 17
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 29
+    - 30
+    - 31
+    - 33
+    - 34
+    - 35
+    - 38
+    - 40
+    - 41
+    - 43
+    - 45
+    - 47
+    - 50
+    - 52
+    - 54
+    - 55
+    - 57
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-rdp-loopback\"]"}'
+    - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 30}}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-dialog\"]", "timeout_sec": 30}}'
+    - step: 32
+      expectation: '{"wait_for": {"selector": "[data-testid=\"server-row-rdp\"][data-status=\"running\"]", "timeout_sec": 90}}'
+    - step: 36
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 37
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 30}}'
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
+    - step: 44
+      expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Connected", "timeout_sec": 60}}'
+    - step: 46
+      expectation: '{"assert_json_file": {"path": "target-state.json", "timeout_sec": 20, "expect": {"flips": {"min": 1}}}}'
+    - step: 48
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
+    - step: 49
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-bar-quality\"]:not([data-level=\"0\"])", "timeout_sec": 45}}'
+    - step: 51
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 10}}'
+    - step: 53
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
+    - step: 56
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
+    - step: 58
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
+    - step: 59
+      expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Disconnected", "timeout_sec": 20}}'
+    results:
+    - 3
+    - 6
+    - 13
+    - 16
+    - 18
+    - 28
+    - 32
+    - 36
+    - 37
+    - 39
+    - 42
+    - 44
+    - 46
+    - 48
+    - 49
+    - 51
+    - 53
+    - 56
     - 58
     - 59
   native:

@@ -1,11 +1,12 @@
 /**
  * Transient view state of the Workspaces editor surface (v6.1 TASK-05/06).
  *
- * Kept outside the platform store because it is derived, never persisted:
- * the open document mirrors that live editor text, its dirty flag and (for the
- * Structure lens) a cheap symbol outline.
+ * Kept outside the platform store because the open document mirrors the live
+ * editor. Dirty drafts have a separate recovery journal; tab lists and saved
+ * session identities stay in the platform store.
  */
 import { create } from "zustand";
+import { persistWorkspaceDocumentRecovery, readWorkspaceDocumentRecovery } from "./workspaceDocumentRecovery";
 
 export interface WorkspaceDocumentState {
   tabId: string;
@@ -14,6 +15,7 @@ export interface WorkspaceDocumentState {
   text: string;
   dirty: boolean;
   savedText: string;
+  savedHash: string | null;
   loading: boolean;
   error: string | null;
 }
@@ -27,6 +29,7 @@ export interface WorkspaceOutlineSymbol {
 export interface WorkspaceEditorState {
   documents: Record<string, WorkspaceDocumentState>;
   activeTabId: string | null;
+  recoveryError: string | null;
   setDocument: (tabId: string, patch: Partial<WorkspaceDocumentState> & { path?: string }) => void;
   removeDocument: (tabId: string) => void;
   setActiveTab: (tabId: string | null) => void;
@@ -39,24 +42,27 @@ export const EMPTY_DOCUMENT: WorkspaceDocumentState = {
   text: "",
   dirty: false,
   savedText: "",
+  savedHash: null,
   loading: false,
   error: null,
 };
 
 export const useWorkspaceEditorStore = create<WorkspaceEditorState>((set) => ({
-  documents: {},
+  documents: readWorkspaceDocumentRecovery(),
   activeTabId: null,
+  recoveryError: null,
 
   setDocument: (tabId, patch) => set((state) => {
     const current = state.documents[tabId] ?? { ...EMPTY_DOCUMENT, tabId };
-    return { documents: { ...state.documents, [tabId]: { ...current, ...patch, tabId } } };
+    const documents = { ...state.documents, [tabId]: { ...current, ...patch, tabId } };
+    return { documents, recoveryError: persistWorkspaceDocumentRecovery(documents) };
   }),
 
   removeDocument: (tabId) => set((state) => {
     if (!state.documents[tabId]) return state;
     const documents = { ...state.documents };
     delete documents[tabId];
-    return { documents, activeTabId: state.activeTabId === tabId ? null : state.activeTabId };
+    return { documents, activeTabId: state.activeTabId === tabId ? null : state.activeTabId, recoveryError: persistWorkspaceDocumentRecovery(documents) };
   }),
 
   setActiveTab: (tabId) => set({ activeTabId: tabId }),

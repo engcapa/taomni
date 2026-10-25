@@ -1,8 +1,9 @@
 id: TC-IDE-PARITY-027-02
 title: SSH terminal tool windows (SFTP, Chat) live in the collapsed sidebar rail like Code Workspace
-description: 'ED-PARITY-027 browser + native case. Activating an SSH terminal collapses the main sidebar to its rail and moves the terminal''s tool windows (attached SFTP, Chat) from
-  the control bar''s tab actions into that rail while actions such as Detach stay in the control bar; the rail SFTP button opens and closes the attached browser without losing the terminal.
-  Expanding the sidebar returns the toggles to the terminal and is remembered for terminal tabs only.
+description: 'ED-PARITY-027 browser + native case. Activating an SSH terminal collapses the main sidebar to its rail and moves the terminal''s tool windows
+  (attached SFTP, Chat) from the control bar''s tab actions into that rail while actions such as Detach stay in the control bar; the rail SFTP button opens
+  and closes the attached browser without losing the terminal. Expanding the sidebar returns the toggles to the terminal and is remembered for terminal
+  tabs only.
 
   '
 covers:
@@ -33,9 +34,10 @@ steps:
 - seed_storage:
     key: taomni.sidebarCollapsedByGroup.v1
     value: '{"code-workspace":true,"terminal":true}'
-- reload_window:
-- wait_for: '[data-testid="sidebar"]'
+- reload_window: null
 - click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="sidebar"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -66,8 +68,6 @@ steps:
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
     timeout_sec: 60
-# Exercise the shell after the initial notice and prompt have settled. An
-# early backend prompt must not be stranded above the local SSH banner.
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
     text: printf '\nQA_ED027_READY\n'
@@ -127,80 +127,318 @@ verification:
   - id: R1
     requirement: A+B：SSH 终端就绪后主侧栏折叠为工具条，终端的 SFTP 开关出现在工具条里，控制栏的标签操作区不再重复显示（Detach 等操作仍在控制栏）。
     actions:
-    - 19
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 17
+    - 18
+    - 20
     - 22
-    - 24
-    checkpoints:
-    - step: 23
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
-    - step: 25
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_ED027_READY\\r?$", "timeout_sec": 30}}'
-    - step: 26
-      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "timeout_sec": 10}}'
-    - step: 27
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"attached-sftp-toggle\"]"}'
-    - step: 28
-      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]", "state": "detached", "timeout_sec": 5}}'
-    - step: 29
-      expectation: '{"assert_visible": "[data-testid=\"tab-action-slot\"] [data-testid=\"terminal-detach\"]"}'
-    results:
     - 23
     - 25
+    - 32
+    - 35
+    - 38
+    - 42
+    - 44
+    - 45
+    checkpoints:
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ed027-rail\"]"}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 24
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        60}}'
+    - step: 26
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_ED027_READY\\r?$",
+        "timeout_sec": 30}}'
+    - step: 27
+      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "timeout_sec": 10}}'
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"attached-sftp-toggle\"]"}'
+    - step: 29
+      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]", "state": "detached", "timeout_sec":
+        5}}'
+    - step: 30
+      expectation: '{"assert_visible": "[data-testid=\"tab-action-slot\"] [data-testid=\"terminal-detach\"]"}'
+    - step: 33
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "timeout_sec": 30}}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"attached-sftp-toggle\"]", "name": "aria-pressed",
+        "equals": "true"}}'
+    - step: 36
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 37
+      expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]"}'
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 40
+      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 41
+      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]", "timeout_sec": 5}}'
+    - step: 43
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 46
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 47
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
+    - step: 48
+      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"terminal\":false"}}'
+    - step: 49
+      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"code-workspace\":true"}}'
+    results:
+    - 7
+    - 8
+    - 10
+    - 16
+    - 19
+    - 21
+    - 24
     - 26
     - 27
     - 28
     - 29
-  - id: R2
-    requirement: B：工具条里的 SFTP 按钮打开附加 SFTP 浏览器（按钮呈按下态），再次点击关闭，终端保持就绪。
-    actions:
-    - 31
-    - 34
-    checkpoints:
-    - step: 32
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "timeout_sec": 30}}'
-    - step: 33
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"attached-sftp-toggle\"]", "name": "aria-pressed", "equals": "true"}}'
-    - step: 35
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached", "timeout_sec": 10}}'
-    - step: 36
-      expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]"}'
-    results:
-    - 32
+    - 30
     - 33
-    - 35
+    - 34
     - 36
-  - id: R3
-    requirement: A：展开主侧栏后开关回到控制栏的标签操作区；切到 Welcome 再回到终端仍保持展开，只记住终端组（Code Workspace 组仍为折叠）。
-    actions:
     - 37
-    - 41
-    - 44
-    checkpoints:
-    - step: 38
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 39
-      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "state": "detached", "timeout_sec": 5}}'
-    - step: 40
-      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]", "timeout_sec": 5}}'
-    - step: 42
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 45
-      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
-    - step: 46
-      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
-    - step: 47
-      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"terminal\":false"}}'
-    - step: 48
-      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"code-workspace\":true"}}'
-    results:
-    - 38
     - 39
     - 40
-    - 42
-    - 45
+    - 41
+    - 43
     - 46
     - 47
     - 48
+    - 49
+  - id: R2
+    requirement: B：工具条里的 SFTP 按钮打开附加 SFTP 浏览器（按钮呈按下态），再次点击关闭，终端保持就绪。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 17
+    - 18
+    - 20
+    - 22
+    - 23
+    - 25
+    - 32
+    - 35
+    - 38
+    - 42
+    - 44
+    - 45
+    checkpoints:
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ed027-rail\"]"}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 24
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        60}}'
+    - step: 26
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_ED027_READY\\r?$",
+        "timeout_sec": 30}}'
+    - step: 27
+      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "timeout_sec": 10}}'
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"attached-sftp-toggle\"]"}'
+    - step: 29
+      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]", "state": "detached", "timeout_sec":
+        5}}'
+    - step: 30
+      expectation: '{"assert_visible": "[data-testid=\"tab-action-slot\"] [data-testid=\"terminal-detach\"]"}'
+    - step: 33
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "timeout_sec": 30}}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"attached-sftp-toggle\"]", "name": "aria-pressed",
+        "equals": "true"}}'
+    - step: 36
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 37
+      expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]"}'
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 40
+      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 41
+      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]", "timeout_sec": 5}}'
+    - step: 43
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 46
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 47
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
+    - step: 48
+      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"terminal\":false"}}'
+    - step: 49
+      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"code-workspace\":true"}}'
+    results:
+    - 7
+    - 8
+    - 10
+    - 16
+    - 19
+    - 21
+    - 24
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 33
+    - 34
+    - 36
+    - 37
+    - 39
+    - 40
+    - 41
+    - 43
+    - 46
+    - 47
+    - 48
+    - 49
+  - id: R3
+    requirement: A：展开主侧栏后开关回到控制栏的标签操作区；切到 Welcome 再回到终端仍保持展开，只记住终端组（Code Workspace 组仍为折叠）。
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 17
+    - 18
+    - 20
+    - 22
+    - 23
+    - 25
+    - 32
+    - 35
+    - 38
+    - 42
+    - 44
+    - 45
+    checkpoints:
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ed027-rail\"]"}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 24
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        60}}'
+    - step: 26
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_ED027_READY\\r?$",
+        "timeout_sec": 30}}'
+    - step: 27
+      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "timeout_sec": 10}}'
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"attached-sftp-toggle\"]"}'
+    - step: 29
+      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]", "state": "detached", "timeout_sec":
+        5}}'
+    - step: 30
+      expectation: '{"assert_visible": "[data-testid=\"tab-action-slot\"] [data-testid=\"terminal-detach\"]"}'
+    - step: 33
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "timeout_sec": 30}}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"attached-sftp-toggle\"]", "name": "aria-pressed",
+        "equals": "true"}}'
+    - step: 36
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 37
+      expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]"}'
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 40
+      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "state": "detached", "timeout_sec": 5}}'
+    - step: 41
+      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]", "timeout_sec": 5}}'
+    - step: 43
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 46
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 47
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
+    - step: 48
+      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"terminal\":false"}}'
+    - step: 49
+      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"code-workspace\":true"}}'
+    results:
+    - 7
+    - 8
+    - 10
+    - 16
+    - 19
+    - 21
+    - 24
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 33
+    - 34
+    - 36
+    - 37
+    - 39
+    - 40
+    - 41
+    - 43
+    - 46
+    - 47
+    - 48
+    - 49
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

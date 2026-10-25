@@ -16,8 +16,8 @@ steps:
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="welcome-history-tab-workspaces"]'
 - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity008_root}"]'
-- wait_for: '[data-testid="code-workspace-git-panel-toggle"]:not([disabled])'
-- click: '[data-testid="code-workspace-git-panel-toggle"]'
+- wait_for: '[data-testid="code-workspace-tool-rail-git"]:not([disabled])'
+- click: '[data-testid="code-workspace-tool-rail-git"]'
 - wait_for: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-b"][data-path="same.txt"]'
 - click: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-b"][data-path="same.txt"]'
 - wait_for: '[data-testid="git-diff-viewer"][data-repo-root="${fixture.parity008_root}/repo-b"]'
@@ -54,8 +54,8 @@ steps:
 - click: '[data-testid="confirm-dialog-cancel"]'
 - assert_not_visible: '[data-testid="confirm-dialog"]'
 - parity008_trace: {writes: 0, pending: 0}
-- click: '[data-testid="side-tab-sessions"]'
-- click: '[data-testid="tab-item"][data-tab-type="git"] [data-testid="tab-close"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="workspace-tab"][data-tab-kind="git"] [data-testid="workspace-tab-close"]'
 - assert_count:
     selector: '[data-testid="workspace-git-manager"]'
     equal: 0

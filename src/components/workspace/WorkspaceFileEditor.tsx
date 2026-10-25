@@ -51,6 +51,7 @@ export function WorkspaceFileEditor({ workspace, tab, visible, onOpenGitDiff }: 
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const setDocument = useWorkspaceEditorStore((s) => s.setDocument);
   const document = useWorkspaceEditorStore((s) => s.documents[tab.id]);
+  const recoveryError = useWorkspaceEditorStore((s) => s.recoveryError);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const savedHashRef = useRef<string | null>(null);
@@ -64,23 +65,30 @@ export function WorkspaceFileEditor({ workspace, tab, visible, onOpenGitDiff }: 
   const rootPath = root?.path;
 
   useEffect(() => {
-    if (!rootId || !rootPath || !path) return;
+    if (!rootId || !rootPath || !path) {
+      setDocument(tab.id, { path, language, loading: false, error: t("platform.workspaceFolderMissing") });
+      return;
+    }
     const loadKey = `${rootId}:${path}`;
     if (loadedPathRef.current === loadKey) return;
     loadedPathRef.current = loadKey;
     let cancelled = false;
+    savedHashRef.current = useWorkspaceEditorStore.getState().documents[tab.id]?.savedHash ?? null;
     setDocument(tab.id, { path, language, loading: true, error: null });
     void (async () => {
       try {
         const file = await readWorkspaceText(rootPath, path);
         if (cancelled) return;
-        savedHashRef.current = file.hash ?? null;
+        const draft = useWorkspaceEditorStore.getState().documents[tab.id];
+        const recovered = draft?.dirty && draft.path === path;
+        savedHashRef.current = recovered ? draft.savedHash : file.hash ?? null;
         setDocument(tab.id, {
           path,
           language,
-          text: file.text,
-          savedText: file.text,
-          dirty: false,
+          text: recovered ? draft.text : file.text,
+          savedText: recovered ? draft.savedText : file.text,
+          savedHash: savedHashRef.current,
+          dirty: !!recovered,
           loading: false,
           error: null,
         });
@@ -152,13 +160,13 @@ export function WorkspaceFileEditor({ workspace, tab, visible, onOpenGitDiff }: 
   const save = async () => {
     if (!root || !path || saving) return;
     const current = useWorkspaceEditorStore.getState().documents[tab.id];
-    if (!current || !current.dirty) return;
+    if (!current || !current.dirty || current.error) return;
     setSaving(true);
     try {
       const file = await writeWorkspaceText(root.path, path, current.text, savedHashRef.current);
       savedHashRef.current = file.hash ?? null;
       const latest = useWorkspaceEditorStore.getState().documents[tab.id];
-      if (latest) setDocument(tab.id, { savedText: current.text, dirty: latest.text !== current.text });
+      if (latest) setDocument(tab.id, { savedText: current.text, savedHash: savedHashRef.current, dirty: latest.text !== current.text });
       setStatusMessage(`Saved ${path}`);
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : String(error));
@@ -194,7 +202,7 @@ export function WorkspaceFileEditor({ workspace, tab, visible, onOpenGitDiff }: 
             type="button"
             data-testid="workspace-editor-save"
             className="taomni-btn h-6 px-1.5 inline-flex items-center gap-1"
-            disabled={!document?.dirty || saving}
+            disabled={!document?.dirty || !!document?.error || saving}
             onClick={() => void save()}
           >
             <Save className="h-3.5 w-3.5" />
@@ -211,13 +219,16 @@ export function WorkspaceFileEditor({ workspace, tab, visible, onOpenGitDiff }: 
           </button>
         </span>
       </div>
-      <div className="relative min-h-0 flex-1">
+      {recoveryError && <div role="alert" data-testid="workspace-editor-recovery-error" className="px-2 text-xs" style={{ color: "var(--taomni-danger)" }}>
+        {t("platform.draftRecoveryFailed")} {recoveryError}
+      </div>}
+      <div className="relative flex min-h-0 flex-1 flex-col">
         {document?.error && (
           <div data-testid="workspace-editor-error" className="p-3 text-[12px]" style={{ color: "var(--taomni-danger)" }}>
             {document.error}
           </div>
         )}
-        {!document?.error && <div ref={hostRef} className="h-full min-h-0 w-full overflow-hidden" />}
+        {(!document?.error || document.dirty) && <div ref={hostRef} className="min-h-0 w-full flex-1 overflow-hidden" />}
       </div>
     </div>
   );

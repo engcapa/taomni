@@ -22,6 +22,7 @@ import {
 import { TabIcon } from "./TabBar";
 import { buildTabDetailSummary } from "../../lib/tabDetails";
 import { getAppPlatform } from "../../lib/runtime";
+import { SessionTabFilters } from "./SessionTabFilters";
 
 interface OpenTabsMenuProps {
   open: boolean;
@@ -292,6 +293,8 @@ export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab }: Op
         <span>{t("tabs.detailsVisibleCount", { visible: stripVisibleCount, total: tabs.length })}</span>
         <span>{t("tabs.detailsShortcutHint", { shortcut: detailsShortcut })}</span>
       </div>
+
+      <SessionTabFilters />
 
       <div className="h-px mx-2" style={{ background: "var(--taomni-divider)" }} />
 

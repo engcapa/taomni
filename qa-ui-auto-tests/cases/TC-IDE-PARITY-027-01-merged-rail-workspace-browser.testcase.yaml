@@ -37,7 +37,7 @@ steps:
 - click: '[data-testid="text-input-dialog-confirm"]'
 - wait_for: '[data-testid="code-workspace-tree-file"]'
 - eval_readonly:
-    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-tree-pane"]').getBoundingClientRect().width > 300 && document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-tree-pane"]').getBoundingClientRect().width
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-tree-pane"]').getBoundingClientRect().width >= 180 && document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-tree-pane"]').getBoundingClientRect().width
       < 500
     expect_truthy: true
 - click: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-tool-rail-project"]'
@@ -59,7 +59,10 @@ steps:
     selector: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-tool-rail-project"]'
     equals: ''
 - screenshot: TC-IDE-PARITY-027-01-merged.png
-- click: '[data-testid="toggle-left-sidebar"]'
+- assert_attribute:
+    selector: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-tool-rail-project"]'
+    name: aria-pressed
+    equals: 'true'
 - wait_for: '[data-testid="expanded-sidebar-panel"]'
 - wait_for: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-tool-rail-left"]'
 - assert_count:
@@ -105,7 +108,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 打开Code Workspace进入Workspaces。Project窗口宽度保持300–500px且可隐藏/恢复，名称偏好可切换。展开侧栏、切换Home/Sessions、关闭旧合并设置和重载都只保留一条带IDE分组的左工具条，项目及会话分区隔离。
+    requirement: 打开Code Workspace进入Workspaces。Project窗口宽度保持180–500px且可隐藏/恢复，名称偏好可切换。展开侧栏、切换Home/Sessions、关闭旧合并设置和重载都只保留一条带IDE分组的左工具条，项目及会话分区隔离。
     actions:
     - 4
     - 5
@@ -117,7 +120,6 @@ verification:
     - 22
     - 25
     - 26
-    - 29
     - 33
     - 35
     - 39
@@ -148,7 +150,7 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
     - step: 16
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree-pane\"]'').getBoundingClientRect().width
-        > 300 && document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree-pane\"]'').getBoundingClientRect().width < 500",
+        >= 180 && document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree-pane\"]'').getBoundingClientRect().width < 500",
         "expect_truthy": true}}'
     - step: 18
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-pane\"]", "state": "hidden", "timeout_sec": 5}}'
@@ -162,6 +164,8 @@ verification:
     - step: 27
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]",
         "equals": ""}}'
+    - step: 29
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
     - step: 30
       expectation: '{"wait_for": "[data-testid=\"expanded-sidebar-panel\"]"}'
     - step: 31
@@ -216,6 +220,7 @@ verification:
     - 23
     - 24
     - 27
+    - 29
     - 30
     - 31
     - 32

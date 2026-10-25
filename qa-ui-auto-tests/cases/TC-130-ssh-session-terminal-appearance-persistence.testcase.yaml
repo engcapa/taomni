@@ -18,6 +18,7 @@ fixtures:
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
 - click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
@@ -49,79 +50,79 @@ steps:
     name: aria-selected
     equals: 'true'
 - fill:
-    selector: 'input[aria-label="Terminal font size"]'
+    selector: input[aria-label="Terminal font size"]
     value: '16'
 - press:
-    selector: 'input[aria-label="Terminal font size"]'
+    selector: input[aria-label="Terminal font size"]
     key: Tab
 - assert_attribute:
-    selector: 'input[aria-label="Terminal font size"]'
+    selector: input[aria-label="Terminal font size"]
     name: value
     equals: '16'
-- click: 'button[aria-label="Decrease text size"]'
+- click: button[aria-label="Decrease text size"]
 - wait: 0.5
 - assert_attribute:
-    selector: 'input[aria-label="Terminal font size"]'
+    selector: input[aria-label="Terminal font size"]
     name: value
     equals: '15'
-- click: 'button[aria-label="Increase text size"]'
+- click: button[aria-label="Increase text size"]
 - wait: 0.5
 - assert_attribute:
-    selector: 'input[aria-label="Terminal font size"]'
+    selector: input[aria-label="Terminal font size"]
     name: value
     equals: '16'
 - set_check:
-    selector: 'input[aria-label="Enable font ligatures"]'
+    selector: input[aria-label="Enable font ligatures"]
     checked: true
 - assert_count:
-    selector: 'input[aria-label="Enable font ligatures"]:checked'
+    selector: input[aria-label="Enable font ligatures"]:checked
     equal: 1
 - fill:
-    selector: 'input[aria-label="Scrollback lines"]'
+    selector: input[aria-label="Scrollback lines"]
     value: '12000'
 - press:
-    selector: 'input[aria-label="Scrollback lines"]'
+    selector: input[aria-label="Scrollback lines"]
     key: Tab
 - assert_attribute:
-    selector: 'input[aria-label="Scrollback lines"]'
+    selector: input[aria-label="Scrollback lines"]
     name: value
     equals: '12000'
 - select_option:
-    selector: 'select[aria-label="Terminal cursor"]'
+    selector: select[aria-label="Terminal cursor"]
     label: Vertical bar (steady)
 - assert_attribute:
-    selector: 'select[aria-label="Terminal cursor"]'
+    selector: select[aria-label="Terminal cursor"]
     name: value
     equals: Vertical bar (steady)
 - select_option:
-    selector: 'select[aria-label="Right click behavior"]'
+    selector: select[aria-label="Right click behavior"]
     label: Paste clipboard
 - assert_attribute:
-    selector: 'select[aria-label="Right click behavior"]'
+    selector: select[aria-label="Right click behavior"]
     name: value
     equals: Paste clipboard
 - fill:
-    selector: 'input[aria-label="Terminal background hex"]'
+    selector: input[aria-label="Terminal background hex"]
     value: '#112233'
 - fill:
-    selector: 'input[aria-label="Terminal foreground hex"]'
+    selector: input[aria-label="Terminal foreground hex"]
     value: '#ddeeff'
 - assert_attribute:
-    selector: 'input[aria-label="Terminal background hex"]'
+    selector: input[aria-label="Terminal background hex"]
     name: value
     equals: '#112233'
 - assert_attribute:
-    selector: 'input[aria-label="Terminal foreground hex"]'
+    selector: input[aria-label="Terminal foreground hex"]
     name: value
     equals: '#ddeeff'
 - fill:
-    selector: 'input[aria-label="Maximum command history entries per host"]'
+    selector: input[aria-label="Maximum command history entries per host"]
     value: '2500'
 - press:
-    selector: 'input[aria-label="Maximum command history entries per host"]'
+    selector: input[aria-label="Maximum command history entries per host"]
     key: Tab
 - assert_attribute:
-    selector: 'input[aria-label="Maximum command history entries per host"]'
+    selector: input[aria-label="Maximum command history entries per host"]
     name: value
     equals: '2500'
 - click: '[data-testid="session-section-bookmark"]'
@@ -137,34 +138,34 @@ steps:
 - click: '[data-testid="session-section-terminal"]'
 - wait_for: '[data-testid="terminal-settings"]'
 - assert_attribute:
-    selector: 'input[aria-label="Terminal font size"]'
+    selector: input[aria-label="Terminal font size"]
     name: value
     equals: '16'
 - assert_count:
-    selector: 'input[aria-label="Enable font ligatures"]:checked'
+    selector: input[aria-label="Enable font ligatures"]:checked
     equal: 1
 - assert_attribute:
-    selector: 'input[aria-label="Scrollback lines"]'
+    selector: input[aria-label="Scrollback lines"]
     name: value
     equals: '12000'
 - assert_attribute:
-    selector: 'select[aria-label="Terminal cursor"]'
+    selector: select[aria-label="Terminal cursor"]
     name: value
     equals: Vertical bar (steady)
 - assert_attribute:
-    selector: 'select[aria-label="Right click behavior"]'
+    selector: select[aria-label="Right click behavior"]
     name: value
     equals: Paste clipboard
 - assert_attribute:
-    selector: 'input[aria-label="Terminal background hex"]'
+    selector: input[aria-label="Terminal background hex"]
     name: value
     equals: '#112233'
 - assert_attribute:
-    selector: 'input[aria-label="Terminal foreground hex"]'
+    selector: input[aria-label="Terminal foreground hex"]
     name: value
     equals: '#ddeeff'
 - assert_attribute:
-    selector: 'input[aria-label="Maximum command history entries per host"]'
+    selector: input[aria-label="Maximum command history entries per host"]
     name: value
     equals: '2500'
 - click: '[data-testid="session-cancel"]'
@@ -179,108 +180,125 @@ verification:
     requirement: SSH session terminal appearance controls change their visible values immediately and restore the saved profile after the session is reopened.
     actions:
     - 1
+    - 2
     - 4
-    - 6
+    - 5
     - 7
     - 8
     - 9
     - 10
     - 11
+    - 12
+    - 17
+    - 19
+    - 20
+    - 22
+    - 23
+    - 25
+    - 26
+    - 28
+    - 29
+    - 31
+    - 33
+    - 34
+    - 36
+    - 38
+    - 40
+    - 41
+    - 44
+    - 45
+    - 47
+    - 49
+    - 50
+    - 52
+    - 53
+    - 55
+    - 65
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"terminal-settings\"]"}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"terminal-appearance-settings\"]"}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"terminal-preview\"]"}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"terminal-preview-cursor\"]"}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"terminal-theme-option-kanagawa-wave\"]"}'
+    - step: 21
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-theme-option-kanagawa-wave\"]", "name": "aria-selected", "equals": "true"}}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "16"}}'
+    - step: 27
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "15"}}'
+    - step: 30
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "16"}}'
+    - step: 32
+      expectation: '{"assert_count": {"selector": "input[aria-label=\"Enable font ligatures\"]:checked", "equal": 1}}'
+    - step: 35
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Scrollback lines\"]", "name": "value", "equals": "12000"}}'
+    - step: 37
+      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Terminal cursor\"]", "name": "value", "equals": "Vertical bar (steady)"}}'
+    - step: 39
+      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Right click behavior\"]", "name": "value", "equals": "Paste clipboard"}}'
+    - step: 42
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal background hex\"]", "name": "value", "equals": "#112233"}}'
+    - step: 43
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal foreground hex\"]", "name": "value", "equals": "#ddeeff"}}'
+    - step: 46
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "2500"}}'
+    - step: 48
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 51
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-terminal-appearance\"]"}'
+    - step: 54
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 56
+      expectation: '{"wait_for": "[data-testid=\"terminal-settings\"]"}'
+    - step: 57
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "16"}}'
+    - step: 58
+      expectation: '{"assert_count": {"selector": "input[aria-label=\"Enable font ligatures\"]:checked", "equal": 1}}'
+    - step: 59
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Scrollback lines\"]", "name": "value", "equals": "12000"}}'
+    - step: 60
+      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Terminal cursor\"]", "name": "value", "equals": "Vertical bar (steady)"}}'
+    - step: 61
+      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Right click behavior\"]", "name": "value", "equals": "Paste clipboard"}}'
+    - step: 62
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal background hex\"]", "name": "value", "equals": "#112233"}}'
+    - step: 63
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal foreground hex\"]", "name": "value", "equals": "#ddeeff"}}'
+    - step: 64
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "2500"}}'
+    - step: 66
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    results:
+    - 3
+    - 6
+    - 13
+    - 14
+    - 15
     - 16
     - 18
-    - 19
     - 21
-    - 22
     - 24
     - 27
     - 30
     - 32
-    - 33
     - 35
     - 37
     - 39
-    - 40
+    - 42
     - 43
-    - 44
     - 46
     - 48
-    - 49
     - 51
-    - 52
     - 54
-    - 55
-    checkpoints:
-    - step: 13
-      expectation: '{"assert_visible": "[data-testid=\"terminal-appearance-settings\"]"}'
-    - step: 14
-      expectation: '{"assert_visible": "[data-testid=\"terminal-preview\"]"}'
-    - step: 15
-      expectation: '{"assert_visible": "[data-testid=\"terminal-preview-cursor\"]"}'
-    - step: 17
-      expectation: '{"wait_for": "[data-testid=\"terminal-theme-option-kanagawa-wave\"]"}'
-    - step: 20
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-theme-option-kanagawa-wave\"]", "name": "aria-selected", "equals": "true"}}'
-    - step: 23
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "16"}}'
-    - step: 26
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "15"}}'
-    - step: 29
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "16"}}'
-    - step: 31
-      expectation: '{"assert_count": {"selector": "input[aria-label=\"Enable font ligatures\"]:checked", "equal": 1}}'
-    - step: 34
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Scrollback lines\"]", "name": "value", "equals": "12000"}}'
-    - step: 36
-      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Terminal cursor\"]", "name": "value", "equals": "Vertical bar (steady)"}}'
-    - step: 38
-      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Right click behavior\"]", "name": "value", "equals": "Paste clipboard"}}'
-    - step: 41
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal background hex\"]", "name": "value", "equals": "#112233"}}'
-    - step: 42
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal foreground hex\"]", "name": "value", "equals": "#ddeeff"}}'
-    - step: 45
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "2500"}}'
-    - step: 50
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-terminal-appearance\"]"}'
-    - step: 53
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 55
-      expectation: '{"wait_for": "[data-testid=\"terminal-settings\"]"}'
-    - step: 56
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal font size\"]", "name": "value", "equals": "16"}}'
-    - step: 57
-      expectation: '{"assert_count": {"selector": "input[aria-label=\"Enable font ligatures\"]:checked", "equal": 1}}'
-    - step: 58
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Scrollback lines\"]", "name": "value", "equals": "12000"}}'
-    - step: 59
-      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Terminal cursor\"]", "name": "value", "equals": "Vertical bar (steady)"}}'
-    - step: 60
-      expectation: '{"assert_attribute": {"selector": "select[aria-label=\"Right click behavior\"]", "name": "value", "equals": "Paste clipboard"}}'
-    - step: 61
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal background hex\"]", "name": "value", "equals": "#112233"}}'
-    - step: 62
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Terminal foreground hex\"]", "name": "value", "equals": "#ddeeff"}}'
-    - step: 63
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Maximum command history entries per host\"]", "name": "value", "equals": "2500"}}'
-    results:
-    - 13
-    - 14
-    - 15
-    - 17
-    - 20
-    - 23
-    - 26
-    - 29
-    - 31
-    - 34
-    - 36
-    - 38
-    - 41
-    - 42
-    - 45
-    - 50
-    - 53
-    - 55
     - 56
     - 57
     - 58
@@ -289,6 +307,8 @@ verification:
     - 61
     - 62
     - 63
+    - 64
+    - 66
   visual:
   - check: The embedded terminal appearance controls and preview remain readable without clipping or overlap.
     method: manual

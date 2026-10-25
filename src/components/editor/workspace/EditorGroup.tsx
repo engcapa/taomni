@@ -1,6 +1,6 @@
 import { EditorView } from "@codemirror/view";
 import { AlertTriangle, Columns2, Download, Eye, File, Loader2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { writeText } from "../../../lib/clipboard";
 import type { LspRange } from "../../../lib/editor/lsp";
@@ -17,6 +17,9 @@ import { useEditorGroupTabs } from "./group/useEditorGroupTabs";
 import { mergeCompletionTriggers } from "./lspCompletion";
 import { computeStickyLines, StickyLinesOverlay } from "./stickyLines";
 import type { RegionFoldingProvenance } from "./workspaceEditorCommands";
+import { useWorkspaceHost } from "./workspaceHostIntegration";
+import { selectCodeWorkspaceUi, useCodeWorkspaceStore } from "../../../stores/codeWorkspaceStore";
+import { fileKey, lspPresetIdForPath } from "./codeWorkspaceModel";
 
 /**
  * Single editor group: tab strip + active buffer chrome + CodeMirror/markdown.
@@ -145,12 +148,18 @@ export function EditorGroup({
   isMarkdownPath,
   renderMarkdownPreview,
 }: EditorGroupProps) {
+  const workbenchHost = useWorkspaceHost();
+  const showLanguageTools = !workbenchHost || !activeFile
+    || !!lspPresetIdForPath(activeFile.languagePath) || !!activeCapabilities;
+  const visibleBanners = showLanguageTools ? editorBanners
+    : editorBanners.filter((banner) => banner.category !== "indexing-degraded");
+  const split = useCodeWorkspaceStore((state) => selectCodeWorkspaceUi(state, workspaceInstanceId).layoutTreeV2.type === "split");
   // ED-PARITY-011 DEC-011-02: the active group's breadcrumbs become the IDEA
   // status-bar navigation bar; without a status bar they stay at the top.
   // ED-PARITY-011 DEC-011-03: language-service notices are IDEA balloons;
   // file-level conditions (read-only, encoding) keep the inline editor bar.
-  const floatingBanners = (editorBanners?.length ?? 0) > 0
-    && (editorBanners ?? []).every((banner) => banner.category === "indexing-degraded" || banner.category === "sdk-import");
+  const floatingBanners = visibleBanners.length > 0
+    && visibleBanners.every((banner) => banner.category === "indexing-degraded" || banner.category === "sdk-import");
   const navigationHost = useCodeWorkspaceStatusStore((state) => state.navigationHost);
   const setNavigationPortalOwner = useCodeWorkspaceStatusStore((state) => state.setNavigationPortalOwner);
   const statusBarNavigation = breadcrumbsPlacement === "status-bar" && isActiveGroup && visible
@@ -187,6 +196,17 @@ export function EditorGroup({
     onLocalHistory,
   });
   const [gitDiffPeek, setGitDiffPeek] = useState<GitLineChange | null>(null);
+  const menuState = useRef({ tabs, openOrder });
+  menuState.current = { tabs, openOrder };
+  useEffect(() => {
+    if (!workbenchHost) return;
+    workbenchHost.registerFileMenu(groupId, (ref) => {
+      const key = fileKey(ref);
+      const current = menuState.current;
+      return current.openOrder.includes(key) ? current.tabs.getTabMenuItems(key) : null;
+    });
+    return () => workbenchHost.registerFileMenu(groupId, null);
+  }, [workbenchHost?.registerFileMenu, groupId]);
   const [topLine, setTopLine] = useState(0);
 
   const handleViewportChange = useCallback((range: LspRange) => {
@@ -273,7 +293,7 @@ export function EditorGroup({
       className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-bg)]"
       style={editorPaneStyle}
     >
-      <EditorGroupTabs
+      {(!workbenchHost || workbenchHost.showEditorTabs || split) && <EditorGroupTabs
         openOrder={openOrder}
         tabs={tabs}
         openFiles={openFiles}
@@ -283,7 +303,7 @@ export function EditorGroup({
         onPromotePreview={onPromotePreview}
         onClose={onClose}
         filesWithErrors={filesWithErrors}
-      /><div
+      />}<div
         id={`code-workspace-editor-stack-${workspaceInstanceId}`}
         className="flex-1 min-h-0"
       >
@@ -294,7 +314,7 @@ export function EditorGroup({
                 ? breadcrumbs
                 : null}
               {!floatingBanners && (
-                <EditorBanner banners={editorBanners} onDismiss={onDismissBanner ?? (() => { })} />
+                <EditorBanner banners={visibleBanners} onDismiss={onDismissBanner ?? (() => { })} />
               )}
               {activeFile.error && (
                 <div className="shrink-0 flex items-center gap-2 px-3 py-1.5 border-b border-red-500/30 bg-red-500/10 text-[12px] text-red-500">
@@ -332,7 +352,7 @@ export function EditorGroup({
               )}
               <div data-testid="code-workspace-editor" className="relative flex-1 min-h-0">
                 {floatingBanners && (
-                  <EditorBanner floating banners={editorBanners} onDismiss={onDismissBanner ?? (() => { })} />
+                  <EditorBanner floating banners={visibleBanners} onDismiss={onDismissBanner ?? (() => { })} />
                 )}
                 {/* ED-PARITY-011 DEC-011-01: IDEA inspection widget floats at the
                     editor's top-right instead of a permanent status row. */}
@@ -355,8 +375,8 @@ export function EditorGroup({
                   <div className="flex min-w-0 items-center gap-1.5">
                     {activeFile.loading && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-code-muted)]" />}
                     {activeLspSyncing && <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--taomni-code-muted)]" />}
-                    {lspStatusPill}
-                    {highlightingWidget}
+                    {showLanguageTools && lspStatusPill}
+                    {showLanguageTools && highlightingWidget}
                   </div>
                   {isMarkdownPath(activeFile.languagePath) && (
                     <div className="flex items-center gap-0.5">
