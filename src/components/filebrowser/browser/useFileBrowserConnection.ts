@@ -76,7 +76,14 @@ export function useFileBrowserConnection(context: UseFileBrowserConnectionContex
         networkSettingsJson: props.networkSettingsJson ?? null,
       })
         .then(() => {
-          if (!cancelled && props.initialPath) {
+          const session = useSftpStore.getState().sessions[props.sessionId];
+          const remote = session?.remote;
+          // The pane is already editable while attach resolves. An address
+          // entered there owns navigation, including its pending listing;
+          // a late initialPath must not restore Home over that user request.
+          const untouched = remote && !remote.loading && remote.history.length <= 1
+            && (!remote.path || remote.path === session.homeDir);
+          if (!cancelled && props.initialPath && untouched) {
             void navigate(props.sessionId, "remote", props.initialPath);
           }
         })
