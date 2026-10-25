@@ -75,6 +75,16 @@ class FolderDialogContracts(unittest.TestCase):
             self.assertTrue(result["passed"])
             self.assertEqual(result["pid"], 123)
 
+    def test_helper_timeout_preserves_its_last_os_stage(self):
+        with TemporaryDirectory() as directory:
+            ctx = SimpleNamespace(case_dir=Path(directory), session=SimpleNamespace(application="/qa/taomni"))
+            error = subprocess.TimeoutExpired(["osascript"], 40, stderr=b"owned NSOpenPanel found\n")
+            with patch.object(folder_dialog.platform, "system", return_value="Darwin"), patch.object(folder_dialog, "command"), patch.object(folder_dialog.subprocess, "run", side_effect=error):
+                with self.assertRaises(subprocess.TimeoutExpired):
+                    folder_dialog.run_folder_dialog(ctx, {"action": "cancel"})
+            self.assertEqual((ctx.case_dir / "native-folder-dialog-helper.log").read_text(), "owned NSOpenPanel found\n")
+            self.assertFalse(json.loads((ctx.case_dir / "native-folder-dialogs.jsonl").read_text())["passed"])
+
 
 if __name__ == "__main__":
     unittest.main()

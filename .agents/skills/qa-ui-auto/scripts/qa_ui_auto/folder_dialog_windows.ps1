@@ -27,13 +27,27 @@ do {
 if (-not $dialog) { throw "No unique folder chooser owned by the QA executable" }
 $pidObserved = $dialog.Current.ProcessId
 function Button([string] $id) {
-    $condition = New-Object System.Windows.Automation.PropertyCondition($automation::AutomationIdProperty, $id)
+    $idCondition = New-Object System.Windows.Automation.PropertyCondition($automation::AutomationIdProperty, $id)
+    $typeCondition = New-Object System.Windows.Automation.PropertyCondition($automation::ControlTypeProperty, [System.Windows.Automation.ControlType]::Button)
+    $condition = New-Object System.Windows.Automation.AndCondition($idCondition, $typeCondition)
     $element = $dialog.FindFirst($scope::Descendants, $condition)
     if (-not $element -or -not $element.Current.IsEnabled) { throw "Chooser button $id unavailable" }
     return $element
 }
+function Invoke-ChooserButton([string] $id) {
+    $button = Button $id
+    [Console]::Error.WriteLine("Chooser button {0}: {1} ({2})", $id, $button.Current.Name, $button.Current.ClassName)
+    $pattern = $null
+    if ($button.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern, [ref] $pattern)) {
+        $pattern.Invoke()
+    } elseif ($button.TryGetCurrentPattern([System.Windows.Automation.LegacyIAccessiblePattern]::Pattern, [ref] $pattern)) {
+        $pattern.DoDefaultAction()
+    } else {
+        throw "Chooser button $id has no accessible default action"
+    }
+}
 if ($env:QA_PICKER_ACTION -eq "cancel") {
-    (Button "2").GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+    Invoke-ChooserButton "2"
 } else {
     $editCondition = New-Object System.Windows.Automation.PropertyCondition($automation::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)
     $edits = @($dialog.FindAll($scope::Descendants, $editCondition) | Where-Object { $_.Current.IsEnabled -and -not $_.Current.IsOffscreen })
@@ -43,11 +57,11 @@ if ($env:QA_PICKER_ACTION -eq "cancel") {
     $value = $edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern)
     $value.SetValue($env:QA_PICKER_PATH)
     if ($value.Current.Value -ne $env:QA_PICKER_PATH) { throw "Folder path was not entered completely" }
-    (Button "1").GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+    Invoke-ChooserButton "1"
     Start-Sleep -Milliseconds 600
     try {
         if (-not $dialog.Current.IsOffscreen) {
-            (Button "1").GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+            Invoke-ChooserButton "1"
         }
     } catch [System.Windows.Automation.ElementNotAvailableException] { }
 }

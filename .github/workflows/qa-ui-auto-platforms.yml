@@ -142,6 +142,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: macOS folder chooser automation contracts
+        if: inputs.scope != 'selected'
+        run: python -m unittest test_folder_dialog_macos
       - name: Updater packaging unit contracts
         if: inputs.scope != 'selected'
         run: node --test scripts/compose-updater-manifest.test.mjs .agents/skills/qa-ui-auto/scripts/test_ci_macos_consent.cjs

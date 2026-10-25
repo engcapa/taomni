@@ -106,6 +106,27 @@ it("starts only visited workspaces and retains their session owners while hidden
   expect(runtime.released).not.toHaveBeenCalled();
 });
 
+it("preserves the selected file when a cold workspace also restores a terminal before it", async () => {
+  const platform = useWorkspacePlatformStore.getState();
+  const file = platform.getWorkspace()!.openTabs[0];
+  const terminal = platform.openLocalTerminalInWorkspace(DEFAULT_WORKSPACE_ID);
+  platform.moveWorkspaceTab(DEFAULT_WORKSPACE_ID, terminal.id, 0);
+  platform.setActiveWorkspaceTab(DEFAULT_WORKSPACE_ID, file.id);
+  const first = render(<Panel />);
+  await editor();
+  first.unmount();
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+  useCodeWorkspaceStore.setState({ byInstanceId: {} });
+  platform.reloadFromStorage();
+  expect(platform.getWorkspace()!.activeTabId).toBe(file.id);
+  const { rerender } = render(<Panel visible={false} />);
+  rerender(<Panel />);
+  await editor();
+  await waitFor(() => expect(screen.getByTestId("workspace-file-editor")).toHaveAttribute("data-path", "index.ts"));
+  expect(platform.getWorkspace()!.activeTabId).toBe(file.id);
+  expect(platform.getWorkspace()!.openTabs.map((tab) => tab.id)).toEqual([terminal.id, file.id]);
+});
+
 it("keeps a recovered draft readable when its file cannot be reopened and prevents unsafe saving", async () => {
   const first = render(<Panel />);
   const view = await editor();

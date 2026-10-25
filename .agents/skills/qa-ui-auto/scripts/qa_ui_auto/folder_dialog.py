@@ -66,6 +66,11 @@ def linux_dialog(ctx, path: Path | None) -> dict:
     if path is None:
         command("xdotool", "key", "--clearmodifiers", "Escape")
     else:
+        # GTK disables Open on Recent until an item is selected. Start from
+        # the filesystem view, then submit the location entry directly so
+        # navigating cannot accidentally select the first child directory.
+        command("xdotool", "key", "--clearmodifiers", "alt+Home")
+        time.sleep(0.25)
         command("xdotool", "key", "--clearmodifiers", "ctrl+l")
         command("xdotool", "type", "--clearmodifiers", "--delay", "15", "--", str(path))
         # Activate Open while the location entry still owns the typed path.
@@ -104,9 +109,18 @@ def run_folder_dialog(ctx, args) -> str:
                 cmd = ["powershell", "-NoProfile", "-NonInteractive", "-File", str(helper / "folder_dialog_windows.ps1")]
             elif platform.system() == "Darwin":
                 cmd = ["osascript", "-l", "JavaScript", str(helper / "folder_dialog_macos.js")]
+                command("screencapture", "-x", str(ctx.case_dir / "native-folder-dialog.png"), check=False)
             else:
                 raise StepError("native_folder_dialog: unsupported OS")
-            result = subprocess.run(cmd, env=env, text=True, capture_output=True, timeout=40)
+            try:
+                result = subprocess.run(cmd, env=env, text=True, capture_output=True, timeout=40)
+            except subprocess.TimeoutExpired as error:
+                output = error.stderr or error.stdout or ""
+                if isinstance(output, bytes):
+                    output = output.decode("utf-8", errors="replace")
+                (ctx.case_dir / "native-folder-dialog-helper.log").write_text(output, encoding="utf-8")
+                raise
+            (ctx.case_dir / "native-folder-dialog-helper.log").write_text(result.stderr, encoding="utf-8")
             if result.returncode:
                 raise StepError(f"native_folder_dialog: {result.stderr.strip() or result.stdout.strip()}")
             observation.update(json.loads(result.stdout))

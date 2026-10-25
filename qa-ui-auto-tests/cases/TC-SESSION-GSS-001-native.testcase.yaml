@@ -68,10 +68,17 @@ steps:
     selector: '[data-testid="sftp-browser"]'
     timeout_sec: 45
 - click: '[data-testid="sftp-remote-path-edit"]'
+- wait_for: input[data-testid="sftp-remote-path"]
 - fill:
-    selector: '[data-testid="sftp-remote-path"]'
+    selector: input[data-testid="sftp-remote-path"]
     value: ${cfg.ssh_features.remote_dir}
-- press: Enter
+- assert_attribute:
+    selector: input[data-testid="sftp-remote-path"]
+    name: value
+    equals: ${cfg.ssh_features.remote_dir}
+- press:
+    selector: input[data-testid="sftp-remote-path"]
+    key: Enter
 - assert_text:
     selector: '[data-testid="sftp-remote-list"]'
     contains: scp-source.txt
@@ -80,11 +87,22 @@ steps:
 - switch_window:
     selector: '[data-testid="sftp-detached-window"]'
     timeout_sec: 60
+- eval_readonly:
+    expression: document.hasFocus()
+    expect_truthy: true
+    timeout_sec: 10
 - click: '[data-testid="sftp-remote-path-edit"]'
+- wait_for: input[data-testid="sftp-remote-path"]
 - fill:
-    selector: '[data-testid="sftp-remote-path"]'
+    selector: input[data-testid="sftp-remote-path"]
     value: ${cfg.ssh_features.remote_dir}
-- press: Enter
+- assert_attribute:
+    selector: input[data-testid="sftp-remote-path"]
+    name: value
+    equals: ${cfg.ssh_features.remote_dir}
+- press:
+    selector: input[data-testid="sftp-remote-path"]
+    key: Enter
 - assert_text:
     selector: '[data-testid="sftp-remote-list"]'
     contains: scp-source.txt
@@ -113,13 +131,13 @@ verification:
     - 21
     - 23
     - 25
-    - 26
     - 27
     - 29
-    - 30
     - 31
     - 32
-    - 33
+    - 34
+    - 36
+    - 38
     checkpoints:
     - step: 3
       expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
@@ -135,9 +153,19 @@ verification:
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_GSSAPI_TERMINAL_OK\\s*$", "timeout_sec": 45}}'
     - step: 24
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "timeout_sec": 45}}'
+    - step: 26
+      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 28
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${cfg.ssh_features.remote_dir}"}}'
+    - step: 30
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "scp-source.txt", "timeout_sec": 45}}'
-    - step: 34
+    - step: 33
+      expectation: '{"eval_readonly": {"expression": "document.hasFocus()", "expect_truthy": true, "timeout_sec": 10}}'
+    - step: 35
+      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 37
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${cfg.ssh_features.remote_dir}"}}'
+    - step: 39
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "scp-source.txt", "timeout_sec": 45}}'
     results:
     - 3
@@ -147,8 +175,13 @@ verification:
     - 20
     - 22
     - 24
+    - 26
     - 28
-    - 34
+    - 30
+    - 33
+    - 35
+    - 37
+    - 39
   - id: R2
     requirement: Detaching creates a real independent SFTP window that can navigate and list remote files with the Kerberos ticket.
     actions:
@@ -170,13 +203,13 @@ verification:
     - 21
     - 23
     - 25
-    - 26
     - 27
     - 29
-    - 30
     - 31
     - 32
-    - 33
+    - 34
+    - 36
+    - 38
     checkpoints:
     - step: 3
       expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
@@ -192,9 +225,19 @@ verification:
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_GSSAPI_TERMINAL_OK\\s*$", "timeout_sec": 45}}'
     - step: 24
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "timeout_sec": 45}}'
+    - step: 26
+      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 28
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${cfg.ssh_features.remote_dir}"}}'
+    - step: 30
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "scp-source.txt", "timeout_sec": 45}}'
-    - step: 34
+    - step: 33
+      expectation: '{"eval_readonly": {"expression": "document.hasFocus()", "expect_truthy": true, "timeout_sec": 10}}'
+    - step: 35
+      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 37
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${cfg.ssh_features.remote_dir}"}}'
+    - step: 39
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "scp-source.txt", "timeout_sec": 45}}'
     results:
     - 3
@@ -204,8 +247,13 @@ verification:
     - 20
     - 22
     - 24
+    - 26
     - 28
-    - 34
+    - 30
+    - 33
+    - 35
+    - 37
+    - 39
   native:
   - check: Real SSH server, MIT Kerberos KDC and native filesystem
     method: automated

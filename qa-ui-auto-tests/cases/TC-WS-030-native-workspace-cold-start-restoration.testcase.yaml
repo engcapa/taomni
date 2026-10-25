@@ -1,7 +1,7 @@
 id: TC-WS-030
 title: Native cold start restores workspace files and reconnects independent SSH, SFTP and saved local shells
-description: Uses an actual OS chooser and UI-created workspace tabs. Saves SSH/SFTP credentials in vault, restarts the owned QA process twice without profile
-  reset, verifies real SSH command output, SFTP marker, local PTY, unsaved draft, active tab and disk conflict protection.
+description: Uses an actual OS chooser and UI-created workspace tabs. Saves SSH/SFTP credentials in vault, restarts the owned QA process twice without profile reset,
+  verifies real SSH command output, SFTP marker, local PTY, unsaved draft, active tab and disk conflict protection.
 modes:
 - native
 covers:
@@ -113,6 +113,14 @@ steps:
 - right_click: '[data-testid="workspace-tab"][data-session-id="qa-restore-localshell"]'
 - click: '[data-testid="workspace-tab-context-move-first"]'
 - click: '[data-testid="workspace-tab"][data-tab-title="README.md"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-tab-title
+    equals: README.md
+- &id001
+  eval_readonly:
+    expression: JSON.parse(localStorage.getItem("taomni.platformWorkspaces.v1")).workspaces[0].activeTabId === JSON.parse(localStorage.getItem("taomni.platformWorkspaces.v1")).workspaces[0].openTabs[1].id
+    expect_truthy: true
 - assert_items:
     selector: '[data-testid="workspace-tab"]'
     attribute: data-tab-title
@@ -128,6 +136,7 @@ steps:
     value: qa-ws-30
 - click: '[data-testid="vault-unlock-confirm"]'
 - wait_for: '[data-testid="welcome-panel"]'
+- *id001
 - click: '[data-testid="nav-mode-workspaces"]'
 - assert_items:
     selector: '[data-testid="workspace-tab"]'
@@ -240,8 +249,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Native app restart retains exact tab order/current document and reuses saved credential references for independent SSH/SFTP reconnection. A
-      saved LocalShell starts a PTY. Dirty draft survives, externally changed disk bytes are protected and explicitly closed tabs do not return.
+    requirement: Native app restart retains exact tab order/current document and reuses saved credential references for independent SSH/SFTP reconnection. A saved
+      LocalShell starts a PTY. Dirty draft survives, externally changed disk bytes are protected and explicitly closed tabs do not return.
     actions:
     - 1
     - 2
@@ -281,26 +290,26 @@ verification:
     - 52
     - 53
     - 54
-    - 56
     - 58
-    - 59
+    - 60
     - 61
-    - 68
-    - 70
+    - 64
     - 71
     - 73
     - 74
-    - 75
+    - 76
     - 77
-    - 79
+    - 78
     - 80
-    - 81
     - 82
     - 83
-    - 88
-    - 90
+    - 84
+    - 85
+    - 86
     - 91
     - 93
+    - 94
+    - 96
     checkpoints:
     - step: 5
       expectation: '{"wait_for": "[data-testid=\"workspace-fs-modal\"]"}'
@@ -317,8 +326,7 @@ verification:
     - step: 26
       expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-ssh\"]"}'
     - step: 27
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
-        60}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
     - step: 31
       expectation: '{"wait_for": "[data-testid=\"workspace-session-picker-modal\"]"}'
     - step: 33
@@ -334,51 +342,56 @@ verification:
     - step: 47
       expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"][data-session-id=\"qa-restore-localshell\"]"}'
     - step: 55
-      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "data-tab-title", "equals": ["Restored shell", "README.md",
-        "qa-restore-ssh", "qa-restore-sftp"]}}'
-    - step: 57
-      expectation: '{"wait_for": "[data-testid=\"vault-unlock-dialog\"]"}'
-    - step: 60
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 62
-      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "data-tab-title", "equals": ["Restored shell", "README.md",
-        "qa-restore-ssh", "qa-restore-sftp"]}}'
-    - step: 63
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "README.md"}}'
-    - step: 65
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"]", "name": "data-dirty", "equals": "true"}}'
-    - step: 66
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"] .cm-content", "contains": "QA_RESTORED_UNSAVED_DRAFT"}}'
-    - step: 67
-      expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/README.md", "equals": "6ca435cf0d8229dbdf644e898118d87017d6da85701851dcdcdaaf7d384ace82"}}'
-    - step: 69
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
-        60}}'
-    - step: 72
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-path-edit\"]", "timeout_sec": 60}}'
-    - step: 76
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "${fixture.workspace_restore_marker}"}}'
-    - step: 78
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
-        60}}'
-    - step: 84
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "changed"}}'
-    - step: 85
-      expectation: '{"assert_file_contains": {"path": "${fixture.platform_workspace_root}/README.md", "contains": "EXTERNAL_RESTORE_CONFLICT"}}'
-    - step: 87
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"]", "name": "data-dirty", "equals": "true"}}'
-    - step: 89
+    - step: 56
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(\"taomni.platformWorkspaces.v1\")).workspaces[0].activeTabId === JSON.parse(localStorage.getItem(\"taomni.platformWorkspaces.v1\")).workspaces[0].openTabs[1].id",
+        "expect_truthy": true}}'
+    - step: 57
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "data-tab-title", "equals": ["Restored shell", "README.md", "qa-restore-ssh",
+        "qa-restore-sftp"]}}'
+    - step: 59
       expectation: '{"wait_for": "[data-testid=\"vault-unlock-dialog\"]"}'
-    - step: 92
+    - step: 62
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 94
-      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "data-tab-title", "equals": ["Restored shell", "README.md",
-        "qa-restore-ssh"]}}'
-    - step: 96
+    - step: 63
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(\"taomni.platformWorkspaces.v1\")).workspaces[0].activeTabId === JSON.parse(localStorage.getItem(\"taomni.platformWorkspaces.v1\")).workspaces[0].openTabs[1].id",
+        "expect_truthy": true}}'
+    - step: 65
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "data-tab-title", "equals": ["Restored shell", "README.md", "qa-restore-ssh",
+        "qa-restore-sftp"]}}'
+    - step: 66
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "README.md"}}'
+    - step: 68
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"]", "name": "data-dirty", "equals": "true"}}'
-    - step: 97
+    - step: 69
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"] .cm-content", "contains": "QA_RESTORED_UNSAVED_DRAFT"}}'
-    - step: 98
+    - step: 70
+      expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/README.md", "equals": "6ca435cf0d8229dbdf644e898118d87017d6da85701851dcdcdaaf7d384ace82"}}'
+    - step: 72
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+    - step: 75
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-path-edit\"]", "timeout_sec": 60}}'
+    - step: 79
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "${fixture.workspace_restore_marker}"}}'
+    - step: 81
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
+    - step: 87
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "changed"}}'
+    - step: 88
+      expectation: '{"assert_file_contains": {"path": "${fixture.platform_workspace_root}/README.md", "contains": "EXTERNAL_RESTORE_CONFLICT"}}'
+    - step: 90
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"]", "name": "data-dirty", "equals": "true"}}'
+    - step: 92
+      expectation: '{"wait_for": "[data-testid=\"vault-unlock-dialog\"]"}'
+    - step: 95
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 97
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "data-tab-title", "equals": ["Restored shell", "README.md", "qa-restore-ssh"]}}'
+    - step: 99
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"]", "name": "data-dirty", "equals": "true"}}'
+    - step: 100
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"] .cm-content", "contains": "QA_RESTORED_UNSAVED_DRAFT"}}'
+    - step: 101
       expectation: '{"eval_readonly": {"expression": "!window.localStorage.getItem(''taomni.platformWorkspaces.v1'').includes(''passwordRef'')", "expect_truthy":
         true}}'
     results:
@@ -398,26 +411,29 @@ verification:
     - 45
     - 47
     - 55
+    - 56
     - 57
-    - 60
+    - 59
     - 62
     - 63
     - 65
     - 66
-    - 67
+    - 68
     - 69
+    - 70
     - 72
-    - 76
-    - 78
-    - 84
-    - 85
+    - 75
+    - 79
+    - 81
     - 87
-    - 89
+    - 88
+    - 90
     - 92
-    - 94
-    - 96
+    - 95
     - 97
-    - 98
+    - 99
+    - 100
+    - 101
   native:
   - check: Actual QA process replacement with the same isolated profile; host SHA-256 and real SSH/SFTP/PTY effects, not a renderer reload.
     method: automated

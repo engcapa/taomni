@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { HardDrive, RefreshCw, Save, X } from "lucide-react";
 
 export const WORKSPACE_FILE_ENCODINGS = [
@@ -73,7 +74,9 @@ export function FileEncodingDialog({
     }
   };
 
-  return (
+  // Keep modal input outside panel groups, whose document pointer listener
+  // otherwise claims clicks aligned with a separator behind the dialog.
+  return createPortal(
     <div
       className="fixed inset-0 z-[980] flex items-center justify-center p-4"
       style={{ background: "rgba(0,0,0,0.46)" }}
@@ -179,6 +182,7 @@ export function FileEncodingDialog({
           </button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

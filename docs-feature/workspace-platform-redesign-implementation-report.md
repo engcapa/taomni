@@ -9,6 +9,16 @@
 
 ## 追加反馈与跨平台回归（2026-10-25）
 
+2026-10-26 续验：相关集 [40204276862](https://github.com/engcapa/taomni/actions/runs/40204276862) 的 browser 为 Linux 258/258、Windows 258/258、macOS 257/257；native 为 Linux 162/166、Windows 141/147、macOS 130/135，15 项失败，基础设施错误 0。该运行未通过，尚不能启动全量验收。目录选择修复覆盖 GTK Recent、macOS NSOpenPanel 查找和 Windows UIA 按钮类型；邮件关闭重开恢复直接关闭标签的原有操作；普通文件保留检查控件；独立 SFTP 窗口补充真实输入焦点与完整地址断言。
+
+Windows 编码弹窗改为挂载到 body，避免 `react-resizable-panels` 的文档级指针监听在弹窗覆盖分隔线时抢焦点。外部文件通知处理从 `controller/fileActions.tsx` 提取到 `controller/externalFileChanges.ts`，保持原入口导出、事件和磁盘冲突流程；删除通知先读取当前磁盘，原子替换后仍存在的文件走正常快照校验，真实删除继续保留本地缓冲区与恢复操作。新增测试验证未变化/替换/删除/关闭期间的结果，原生保存与重排用例继续保护真实副作用。
+
+本机冷启动探针显示：直接 DELETE WebDriver 会话并结束进程会丢失 WebKitGTK 尚未提交的最近 localStorage 事务，包括标签重命名、排序和当前选择。`native_restart_app` 改为通过产品关闭按钮正常退出，等待上下文关闭后释放驱动并启动同一 profile；不使用延时、重载或数据回填代替持久化。用例增加关闭前及重启后 Home 阶段的存储断言，保留原文件/会话/草稿/磁盘冲突断言。QA v11 本机冷启动用例 `workspace-native/run-20261026-001649-611608683` 的 102 步全部通过，包含两次正常退出并保留 profile 的重启。
+
+2026-10-26 本机修复验证：QA v11 `workspace-native/run-20261026-002103-500756976` 为 8 passed / 1 setup failed；唯一失败为 GSS 专用服务未配置、未执行 UI。补齐用户拥有的高端口 KDC/SSH、私有票据及独立 known_hosts 后，真实 GSS 认证探针和 `workspace-native/run-20261026-003448-643214252` 的完整 `TC-SESSION-GSS-001` 均通过，包含终端命令、附属及独立 SFTP 列表。因此本轮 9 个不同回归 ID 最终全部通过；连同冷启动共 10 个 native ID，均 `identity_stable=true`。保留首次服务缺口和历史失败报告。产品二进制为 `src-tauri/target/qa-ui-auto/debug/taomni`，构建日志 `_local/workspace-qa-build-v11b.log`。
+
+同批 browser 的邮件同步、默认工作区和文件浏览通过；外观用例首次选择字体后导航失败，未查明稳定复现，保留报告 `workspace-browser/run-20261026-000958-437770346`，同源码完整复跑 `run-20261026-001722-724798469` 通过。4 个不同 browser ID 最终通过。新增组件/外部文件通知 21 tests、原编辑器 external/workflow/recovery 定向 35 tests 通过（其余 219 项为显式过滤未运行）；工具契约 59 项通过。`pnpm build`、`pnpm check:refactor`、620 ID 的静态审计与覆盖门禁通过。下一步先验证三平台定向原生修复，再执行 373 ID 完整相关集，通过后执行全量。
+
 工作区复用主 Code Workspace 的编辑器、LSP、Project/All Files、查找、导航、分屏、撤销、Git 和工具窗口；不再维护另一套能力不足的代码编辑器。多根目录同时支持普通文档、图片等文件的浏览及系统默认程序打开。字体、字号、主题沿用全局设置。文件和各类会话保存到所属工作区，恢复时保留未保存内容与独立的会话实例。
 
 Home/Tools 的编辑器入口路由至对应工作区或默认工作区；Sessions 不承载工作区或 Welcome。Sessions 筛选合并到既有溢出菜单，支持搜索、协议筛选、键盘导航及大量标签。广播目标通过标签复选框和可搜索选择器选择，筛选不销毁运行实例。大预览激活已有会话时保留侧栏折叠状态。Chat 统一复用左下入口，IDE 工具与全局入口以分隔线、间距和提示区分。Agents/Crew 按用户要求显示“开发中”。
