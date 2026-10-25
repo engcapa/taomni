@@ -51,6 +51,13 @@ def setup(ctx: Any) -> None:
     case_id = str(getattr(ctx, "case_id", "case"))
     worker = int(getattr(ctx, "worker_id", 0))
     root = Path(tempfile.mkdtemp(prefix=f"{case_id}-w{worker}-", dir=str(base)))
+    # WebDriver `fill` sends Shift+- for `_` as a plain `-` in some native
+    # drivers, so paths typed into app dialogs would not round-trip. Keep the
+    # fixture directory name to [a-z0-9-] only.
+    if "_" in root.name:
+        cleaned = root.with_name(root.name.replace("_", "-"))
+        root.rename(cleaned)
+        root = cleaned
     for name, content in SEED_FILES.items():
         dest = root / name
         dest.parent.mkdir(parents=True, exist_ok=True)

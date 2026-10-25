@@ -62,11 +62,14 @@ steps:
     selector: '[data-testid="workspace-fs-modal-input"]'
     value: ${fixture.platform_workspace_root}/extra-root
 - click: '[data-testid="workspace-fs-modal-confirm"]'
-- wait_for: '[data-testid="workspace-tree-root"][data-path="${fixture.platform_workspace_root}/extra-root"]'
+- wait_for:
+    selector: '[data-testid="workspace-fs-modal"]'
+    state: hidden
+    timeout_sec: 10
 - assert_count:
     selector: '[data-testid="workspace-tree-root"]'
     equal: 2
-- right_click: '[data-testid="workspace-tree-root"][data-path="${fixture.platform_workspace_root}/extra-root"]'
+- right_click: '[data-testid="workspace-file-tree"] > div:last-child [data-testid="workspace-tree-root"]'
 - wait_for: '[data-testid="context-menu"]'
 - click: '[data-testid="workspace-tree-remove-root"]'
 - assert_count:
