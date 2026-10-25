@@ -8,9 +8,23 @@ import subprocess
 import threading
 
 
-def observe_window_tree(argv, report, stop):
-    """Keep polling after a transient X client failure; never retain stale evidence."""
+def publish_window_tree(report: Path, text: str, stop: threading.Event) -> None:
     pending = report.with_suffix(".tmp")
+    pending.write_text(text, encoding="utf-8")
+    while True:
+        try:
+            pending.replace(report)
+            return
+        except PermissionError:
+            # A Windows assertion can hold the destination open without delete
+            # sharing. Wait for that reader; shutdown must still interrupt us.
+            if stop.wait(.05):
+                pending.unlink(missing_ok=True)
+                return
+
+
+def observe_window_tree(argv: list[str], report: Path, stop: threading.Event) -> None:
+    """Keep polling after a transient X client failure; never retain stale evidence."""
     while not stop.wait(.25):
         try:
             result = subprocess.run(argv, capture_output=True, text=True, timeout=5)
@@ -21,8 +35,7 @@ def observe_window_tree(argv, report, stop):
             text = f"X11 window observation unavailable: {error}\n"
         # Both successful samples and failures replace the previous observation.
         # Atomic publication keeps assertions from reading a truncated snapshot.
-        pending.write_text(text, encoding="utf-8")
-        pending.replace(report)
+        publish_window_tree(report, text, stop)
 
 
 def install():

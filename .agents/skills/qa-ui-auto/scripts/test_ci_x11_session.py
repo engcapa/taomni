@@ -1,10 +1,11 @@
 from pathlib import Path
 import subprocess
 import tempfile
+import threading
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
-from ci_x11_session import observe_window_tree
+from ci_x11_session import observe_window_tree, publish_window_tree
 
 
 class X11WindowObserverTest(TestCase):
@@ -60,3 +61,62 @@ class X11WindowObserverTest(TestCase):
             observe_window_tree(self.argv, report, stop)
             run.assert_not_called()
             self.assertFalse(report.exists())
+
+
+class X11WindowPublicationTest(TestCase):
+    def test_reader_sharing_violation_is_retried_before_publication(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report = Path(directory) / "x11-window-tree.txt"
+            report.write_text("old sample", encoding="utf-8")
+            original = Path.replace
+            attempts = 0
+
+            def replace(path, target):
+                nonlocal attempts
+                attempts += 1
+                if attempts == 1:
+                    raise PermissionError("reader still has the Windows file open")
+                return original(path, target)
+
+            with patch.object(Path, "replace", replace):
+                publish_window_tree(report, "fresh sample", threading.Event())
+            self.assertEqual(attempts, 2)
+            self.assertEqual(report.read_text(encoding="utf-8"), "fresh sample")
+            self.assertFalse(report.with_suffix(".tmp").exists())
+
+    def test_shutdown_interrupts_a_locked_destination_and_removes_the_pending_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report = Path(directory) / "x11-window-tree.txt"
+            stop = threading.Event()
+            stop.set()
+            with patch.object(Path, "replace", side_effect=PermissionError("reader open")) as replace:
+                publish_window_tree(report, "fresh sample", stop)
+            replace.assert_called_once()
+            self.assertFalse(report.exists())
+            self.assertFalse(report.with_suffix(".tmp").exists())
+
+    def test_actual_reader_can_close_while_the_observer_waits(self):
+        with tempfile.TemporaryDirectory() as directory:
+            report = Path(directory) / "x11-window-tree.txt"
+            report.write_text("old sample", encoding="utf-8")
+            stop = threading.Event()
+            started = threading.Event()
+            errors = []
+
+            def publish():
+                started.set()
+                try:
+                    publish_window_tree(report, "fresh sample", stop)
+                except BaseException as error:
+                    errors.append(error)
+
+            with report.open("r", encoding="utf-8") as reader:
+                worker = threading.Thread(target=publish, daemon=True)
+                worker.start()
+                self.assertTrue(started.wait(2))
+                self.assertEqual(reader.read(), "old sample")
+            worker.join(2)
+            stop.set()
+            self.assertFalse(worker.is_alive())
+            self.assertEqual(errors, [])
+            self.assertEqual(report.read_text(encoding="utf-8"), "fresh sample")
