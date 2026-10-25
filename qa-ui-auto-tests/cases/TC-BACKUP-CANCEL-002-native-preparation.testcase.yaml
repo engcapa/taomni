@@ -24,6 +24,14 @@ steps:
 - wait_for:
     selector: '[data-testid="settings-panel"]'
     timeout_sec: 30
+- click: '[data-testid="settings-group-toggle-general"]'
+- wait_for: '[data-testid="settings-language-en"]'
+- click: '[data-testid="settings-language-en"]'
+- assert_attribute:
+    selector: html
+    name: lang
+    equals: en
+- click: '[data-testid="settings-group-toggle-general"]'
 - click: '[data-testid="settings-group-toggle-backup"]'
 - wait_for:
     selector: '[data-testid="backup-global-categories"]'
@@ -149,75 +157,75 @@ verification:
   - id: R1
     requirement: Startup completes a persisted cancellation instead of replaying preparation
     actions:
-    - 5
+    - 10
     checkpoints:
-    - step: 7
+    - step: 12
       expectation: Recovered journal cancelled
-    - step: 8
+    - step: 13
       expectation: Cancellation intent retained
     results:
-    - 7
-    - 8
+    - 12
+    - 13
   - id: R2
     requirement: local cancellation interrupts real OS lock waiting before publication
     actions:
-    - 9
-    - 12
     - 14
+    - 17
+    - 19
     checkpoints:
-    - step: 10
-      expectation: External OS lock acquired
-    - step: 13
-      expectation: Production job waits for lock
     - step: 15
+      expectation: External OS lock acquired
+    - step: 18
+      expectation: Production job waits for lock
+    - step: 20
       expectation: Cancellation finishes within ten seconds
-    - step: 16
+    - step: 21
       expectation: No completed artifact and durable cancellation
     results:
-    - 10
-    - 13
     - 15
-    - 16
+    - 18
+    - 20
+    - 21
   - id: R3
     requirement: upload cancellation interrupts real OS lock waiting before publication
     actions:
-    - 22
-    - 25
     - 27
+    - 30
+    - 32
     checkpoints:
-    - step: 23
-      expectation: External OS lock acquired
-    - step: 26
-      expectation: Production job waits for lock
     - step: 28
+      expectation: External OS lock acquired
+    - step: 31
+      expectation: Production job waits for lock
+    - step: 33
       expectation: Cancellation finishes within ten seconds
-    - step: 29
+    - step: 34
       expectation: No completed artifact and durable cancellation
     results:
-    - 23
-    - 26
     - 28
-    - 29
+    - 31
+    - 33
+    - 34
   - id: R4
     requirement: A fresh local backup works after cancellation and old jobs stay cancelled
     actions:
-    - 36
-    - 40
-    - 42
+    - 41
+    - 45
+    - 47
     checkpoints:
-    - step: 37
+    - step: 42
       expectation: Fresh backup completed
-    - step: 38
+    - step: 43
       expectation: Independent ZIP reader accepts output
-    - step: 41
+    - step: 46
       expectation: Cancelled task not replayed
-    - step: 44
+    - step: 49
       expectation: Local completed archive opens a valid restore preview
     results:
-    - 37
-    - 38
-    - 41
-    - 44
+    - 42
+    - 43
+    - 46
+    - 49
   visual:
   - check: Category and task controls remain readable in retained screenshots
     method: manual

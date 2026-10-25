@@ -24,6 +24,14 @@ steps:
 - wait_for:
     selector: '[data-testid="settings-panel"]'
     timeout_sec: 30
+- click: '[data-testid="settings-group-toggle-general"]'
+- wait_for: '[data-testid="settings-language-en"]'
+- click: '[data-testid="settings-language-en"]'
+- assert_attribute:
+    selector: html
+    name: lang
+    equals: en
+- click: '[data-testid="settings-group-toggle-general"]'
 - click: '[data-testid="settings-group-toggle-backup"]'
 - wait_for:
     selector: '[data-testid="backup-global-categories"]'
@@ -139,68 +147,68 @@ verification:
   - id: R1
     requirement: Actual cache selection matches published archive contents
     actions:
-    - 8
-    - 11
+    - 13
+    - 16
     checkpoints:
-    - step: 13
+    - step: 18
       expectation: Real local job completed
-    - step: 12
+    - step: 17
       expectation: Independent ZIP/SQLite oracle confirms selected files, index references and original bytes
     results:
-    - 13
-    - 12
+    - 18
+    - 17
   - id: R2
     requirement: Actual originals selection matches published archive contents
     actions:
-    - 14
-    - 17
+    - 19
+    - 22
     checkpoints:
-    - step: 19
+    - step: 24
       expectation: Real local job completed
-    - step: 18
+    - step: 23
       expectation: Independent ZIP/SQLite oracle confirms selected files, index references and original bytes
     results:
-    - 19
-    - 18
+    - 24
+    - 23
   - id: R3
     requirement: Actual attachments selection matches published archive contents
     actions:
-    - 21
-    - 24
+    - 26
+    - 29
     checkpoints:
-    - step: 26
+    - step: 31
       expectation: Real local job completed
-    - step: 25
+    - step: 30
       expectation: Independent ZIP/SQLite oracle confirms selected files, index references and original bytes
     results:
-    - 26
-    - 25
+    - 31
+    - 30
   - id: R4
     requirement: Actual excluded selection matches published archive contents
     actions:
-    - 28
-    - 31
+    - 33
+    - 36
     checkpoints:
-    - step: 33
+    - step: 38
       expectation: Real local job completed
-    - step: 32
+    - step: 37
       expectation: Independent ZIP/SQLite oracle confirms selected files, index references and original bytes
     results:
-    - 33
-    - 32
+    - 38
+    - 37
   - id: R5
     requirement: Actual all selection matches published archive contents
     actions:
-    - 34
-    - 37
+    - 39
+    - 42
     checkpoints:
-    - step: 39
+    - step: 44
       expectation: Real local job completed
-    - step: 38
+    - step: 43
       expectation: Independent ZIP/SQLite oracle confirms selected files, index references and original bytes
     results:
-    - 39
-    - 38
+    - 44
+    - 43
   visual:
   - check: Category and task controls remain readable in retained screenshots
     method: manual
