@@ -86,7 +86,7 @@ steps:
     selector: '[data-testid="nav-mode-workspaces"]'
     name: aria-pressed
     equals: 'true'
-- click: '[data-testid="toggle-left-sidebar"]'
+- assert_visible: '[data-testid="expanded-sidebar-panel"]'
 - wait_for: '[data-testid="workspace-switcher"]'
 - assert_visible: '[data-testid="workspace-default-badge"]'
 - assert_count:
@@ -116,7 +116,6 @@ verification:
     - 28
     - 33
     - 34
-    - 37
     checkpoints:
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
@@ -159,6 +158,8 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 36
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"nav-mode-workspaces\"]", "name": "aria-pressed", "equals": "true"}}'
+    - step: 37
+      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
     - step: 38
       expectation: '{"wait_for": "[data-testid=\"workspace-switcher\"]"}'
     - step: 39
@@ -187,6 +188,7 @@ verification:
     - 32
     - 35
     - 36
+    - 37
     - 38
     - 39
     - 40

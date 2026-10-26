@@ -27,6 +27,8 @@ QA 原生构建、`pnpm check:refactor`、Rust 格式及 630 个目录 ID 的静
 
 Native `workspace-native/run-20261026-181135-743400216` 为 **14/14 passed**，包含系统目录选择、LSP 等待、冷启动、目录恢复、主边栏及新增入口。三个批次均 `identity_stable=true`；签名回执与 source/runner/case/native build 身份由 `load_observations` 独立核验，**71 个 browser ID、14 个 native ID** 最新结果全部 passed，记录在 `_local/workspace-empty-entry-local-evidence.json`。当前 QA 二进制 SHA-256 为 `e9bf3f859f80e655015e8051c242241900622ec7f48153341771d92490b6cb5d`，源码指纹 `8e995322a4cd9fb01882821f166c4f707445ba694c2943f57f81f5211c61e585`。6 项入口单测、QA 原生构建（含 `pnpm check:refactor`）及 631 ID 静态门禁通过。托管完整相关集新增 `TC-WS-045`，共 395 个精确 ID，通过后才执行整体。
 
+相关集 [40306481232](https://github.com/engcapa/taomni/actions/runs/40306481232) 的三平台 browser 原始回执为 806 passed / 3 failed，失败均为 `TC-WS-025`：显式编辑器入口已经展开文件区，旧用例随后再次点击收缩按钮，导致切换器不可见。迁移该操作及对应 native `TC-WS-026` 为直接断言展开；目录选择、保存、重新进入和默认工作区归属断言均保留。新 browser `workspace-browser/run-20261026-183858-583230263` 与 native `workspace-native/run-20261026-183957-568677518` 各 **1/1 passed**，`identity_stable=true`，签名回执及当前 source/runner/case/build 身份已核验，记录在 `_local/workspace-route-entry-local-evidence.json`。这一迁移仅改用例，不改变产品源码或 QA 二进制；GitHub native 余下回执与新完整相关集继续跟踪。
+
 ## 空工作区文件浏览器追加实现（2026-10-26）
 
 空工作区现在挂载与有目录工作区相同的 Code Workspace 文件区及工具窗口，支持直接打开文件或系统目录选择器；初始不挂载 HOME，选择器默认定位 HOME，未打开文件时常用会话默认收起。删除空工作区的降级工具栏和重复 Add Folder 菜单，复用真实 Project、Sessions、Git 与完整工具窗口溢出菜单。
