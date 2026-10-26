@@ -40,6 +40,14 @@ steps:
 - right_click: '[data-testid="mail-message-row"]'
 - click: '[data-testid="mail-menu-tag"]'
 - click: '[data-testid="mail-menu-tag-label1"]'
+# STORE must finish before the subsequent full reconciliation is requested.
+- wait_for:
+    selector: '[data-testid="mail-message-tag"][data-tag="$label1"]'
+    timeout_sec: 60
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: Tagged 1
+    timeout_sec: 30
 - click: '[data-testid="mail-sync-button"]'
 - assert_text:
     selector: '[data-testid="mail-client-tab"]'
@@ -78,27 +86,32 @@ verification:
     - 9
     - 10
     - 11
-    - 12
-    - 16
+    - 14
+    - 18
     checkpoints:
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
     - step: 8
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+    - step: 12
+      expectation: 'The tag dot appears after IMAP STORE succeeds.'
     - step: 13
-      expectation: '{"assert_text": {"contains": "new headers across"}}'
-    - step: 14
-      expectation: '{"wait_for": "tag dot"}'
+      expectation: 'Tag completion is visible before manual full reconciliation.'
     - step: 15
-      expectation: '{"assert_count": {"equal": 1}}'
+      expectation: '{"assert_text": {"contains": "new headers across"}}'
+    - step: 16
+      expectation: '{"wait_for": "tag dot"}'
     - step: 17
       expectation: '{"assert_count": {"equal": 1}}'
     - step: 19
       expectation: '{"assert_count": {"equal": 1}}'
+    - step: 21
+      expectation: '{"assert_count": {"equal": 1}}'
     results:
-    - 15
+    - 13
     - 17
     - 19
+    - 21
   visual:
   - check: 截图中标签色点与过滤状态清晰。
     method: manual

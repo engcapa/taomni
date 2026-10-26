@@ -278,6 +278,8 @@ jobs:
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-macos.result == 'success' && needs.plan.outputs.has_macos_native == 'true' }}
     uses: ./.github/workflows/qa-ui-auto-entry.yml
     with:
+      # Bound the burst on hosted ARM runners; retain every planned shard.
+      max_parallel: 2
       matrix: ${{ needs.plan.outputs.macos_native_matrix }}
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}

@@ -268,16 +268,32 @@ class NativeSessionTransportTest(TestCase):
             WebDriverError('HTTP 400: {"message":"JavaScript error: Error: stale element"}'),
             None,
             None,
+            None,
         ])
         with patch("tauri_webdriver.time.sleep") as sleep:
             session.click("#section")
         self.assertEqual(session.find.call_count, 2)
         sleep.assert_called_once_with(0.3)
-        click_urls = [
+        action_urls = [
             call.args[1] for call in session.request.call_args_list
-            if call.args[0] == "POST" and call.args[1].endswith("/click")
+            if call.args[0] == "POST" and call.args[1].endswith("/actions")
         ]
-        self.assertEqual(click_urls, ["/session/session-1/element/button-1/click", "/session/session-1/element/button-2/click"])
+        self.assertEqual(action_urls, ["/session/session-1/actions"])
+        self.prepare_pointer_target.assert_called_once_with(
+            session, {"element-6066-11e4-a52e-4f735466cecf": "button-2"}, allow_alternate=False)
+
+    def test_click_keeps_intercepted_target_a_failure_without_synthetic_activation(self):
+        session = NativeSession("http://driver.invalid", Path("unused"))
+        session.session_id = "session-1"
+        session.find = Mock(return_value="button-1")
+        session.request = Mock(side_effect=[None, WebDriverError("element click intercepted"), None])
+        session.execute = Mock()
+        with self.assertRaisesRegex(WebDriverError, "element click intercepted"):
+            session.click("#section")
+        session.find.assert_called_once()
+        session.execute.assert_not_called()
+        self.assertEqual(sum(request.args[1].endswith("/actions") and request.args[0] == "POST"
+                             for request in session.request.call_args_list), 1)
 
     def test_pointer_click_retries_a_null_element_scroll_error(self):
         session = NativeSession("http://driver.invalid", Path("unused"))

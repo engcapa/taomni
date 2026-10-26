@@ -314,7 +314,9 @@ export function FileBrowserView(inputs: FileBrowserViewProps) {
           defaultLayout={loadResizableLayout(`sftp-browser-v2-${orientationScope}-${orientation}`, ["remote", "local"])}
           onLayoutChanged={saveResizableLayout(`sftp-browser-v2-${orientationScope}-${orientation}`)}
         >
-          <Panel id="remote" defaultSize="50%" minSize="15%" className="flex flex-col min-h-0 min-w-0">
+          {/* FilePanel owns list scrolling. An outer auto scrollbar can cover
+              path controls when fractional pane sizes overflow by one pixel. */}
+          <Panel id="remote" defaultSize="50%" minSize="15%" className="flex flex-col min-h-0 min-w-0" style={{ overflow: "hidden" }}>
             <FilePanel
               sessionId={props.sessionId}
               side="remote"
@@ -372,7 +374,7 @@ export function FileBrowserView(inputs: FileBrowserViewProps) {
                 : "h-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-row-resize"
             }
           />
-          <Panel id="local" defaultSize="50%" minSize="15%" className="flex flex-col min-h-0 min-w-0">
+          <Panel id="local" defaultSize="50%" minSize="15%" className="flex flex-col min-h-0 min-w-0" style={{ overflow: "hidden" }}>
             <FilePanel
               sessionId={props.sessionId}
               side="local"

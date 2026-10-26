@@ -1,11 +1,27 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 上一轮 `9f3ada0f` 已在合并 main 后通过三平台 browser/native 相关集 **1,276/1,276** 与全量 **2,036/2,036**。本轮追加空工作区共享文件区、列表/排序/包平铺及 LSP 非阻塞验收，并修复 Home 恢复子目录 Empty、空编辑器入口、侧栏几何及 Windows 备份原子记录替换问题。GTK 输入法快捷键修复后的本机完整单测为 **5,770 passed / 1 既有 skipped**；最新相关集 **1,300 passed / 1 failed**，全部快捷键回归通过，唯一失败是 Windows 独立归档观察器未识别 CRT 的 errno=13。观察器修复后的本机两条备份原生回归已通过，下一轮托管验证继续执行。以下历史结果不代表当前托管全量或性能结论。
+> 此前完整相关集 [40344676416](https://github.com/engcapa/taomni/actions/runs/40344676416) 已通过 **1,301/1,301**，随后同步远程 main（`a5743792`，Already up to date）。后续全量尚未通过：共四条 native 失败，macOS 分片另有 runner 容量取消。修复后本机 browser **12/12**、native **13/13** 已通过；下一轮托管相关集扩大为 402 个精确 ID。下述历史通过不代表当前全量或性能结论。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
+
+## 全量原生点击和焦点回归（2026-10-27，验证进行中）
+
+相关集 `40344676416` 的 source/runner/case/build 身份、签名回执和聚合已核验，Linux browser/native 为 270/181、Windows 270/162、macOS 269/149，合计 1,301 passed，0 failed/skipped。Windows CRT reader 真实句柄契约 8/8、原子 writer 4/4 通过。按用户要求随后 fetch/merge main，无新增提交或冲突，证据为 `_local/workspace-main-sync-20261026.json`。
+
+全量 `40351595065` 收到 2,001 项，2,000 passed / 1 failed；另 60 项因 macOS ARM runner 从未分配而缺失。失败为 macOS `TC-RDPS-PERF-01-performance-budget`：40/40 样本、0 timeout，M2 p95 70.661ms 超过原 65ms 预算；保留全部样本，未放宽预算。继续执行的 `40360000951` 降为四分片，Linux native 三项失败：`TC-AI-021` 请求 DeepSeek header 却打开 Local 行，`TC-IDE-PARITY-009-06` Enter 后未打开 Structural Search 对话框，以及 `TC-012` 路径输入获得焦点后被终端 textarea 抢走。不能将这些失败计为环境跳过。旧运行、截图、DOM 和焦点历史完整保留。
+
+本机同输入法三项旧实现复跑为 3/3 passed（`workspace-native/run-20261027-011159-140258116`），说明时间条件不同，不能反证托管失败。新增两条确定性组件测试均先失败：延迟终端激活抢新路径框焦点，布局重测再次抢焦点。现在测量与激活焦点分开，焦点请求在另一控件接管后失效，卸载/隐藏取消待执行工作；滚动条或全屏变化只重新测量。`TC-012` 增加路径编辑保持焦点断言，保留真实远端 PWD 验收。
+
+原生通用 click 复用既有稳定坐标和 DOM 命中检查的 W3C pointer 路径，取消坐标变化时的 DOM click/focus 降级；陈旧引用只在输入前重取，输入开始后不重放。`TC-IDE-PARITY-009-06` 使用稳定 Actions tab ID，增加完整查询值和被选中动作断言后再按 Enter，继续保留全部 dirty buffer/encoding/磁盘哈希断言；本轮对该失败的确切输入时序原因仍待进一步证据。没有修改查询排序或 SSR 产品行为。
+
+当前聚焦焦点单测 5/5、WebDriver/pointer 契约 92/92、四个组件文件 122 passed / 1 既有 skipped 通过。第一轮修复 browser 11/11 passed；native 11/12 passed，稳定命中检查在 `TC-012` 第 15 步暴露此前被 DOM click 降级掩盖的真实遮挡：分割面板外层为 overflow:auto，子内容仅溢出 1px，WebKit 外层覆盖式滚动条挡住路径编辑按钮。隔离原生诊断保持同一坐标，将该外层临时改为 hidden 后，命中立即从外层 DIV 恢复到真实按钮，见 `_local/workspace-pointer-probe.json`（诊断注入不计有效通过）。现在两个 FilePanel 外层禁止滚动，由原有内部文件列表负责滚动；接下来以未注入的真实二进制复验。
+
+未注入诊断的最终本机复验：browser `workspace-browser/run-20261027-014003-822921275` 为 **12/12 passed**，native `workspace-native/run-20261027-014343-207486184` 为 **13/13 passed**，覆盖四条托管失败、路径编辑焦点、真实远端 PWD、原生 Search Everywhere、真实输入法及 PTY、大预览、Home 目录恢复与面板崩溃回归。两批 `identity_stable=true`，签名回执和当前 source/runner/case/build 身份由 `load_observations` 独立核验，见 `_local/workspace-focus-local-evidence.json`。另 37 项托管规划/分片/聚合/构建契约通过。当前 QA 二进制 SHA-256 为 `51301c6365f023e4ea5df8fbc755bd7ecbc5bc468a41a6a1915b36cfe7d75bae`，产品源码指纹为 `b62dc2884092ab0837199620cd2a4f77bb383e3fb748d9be6571fbfe78112a31`。下一轮完整相关集为 402 个精确 ID，相关集全部通过后再执行全量。当前挂载点使用率 93%，未触发用户指定的超过 95% 临时产物清理条件。
+
+全量 `40360000951` 最终 2,001 执行，1,997 passed / 4 failed，macOS 被取消的一个分片缺少 60 项。第四条失败是 `TC-MAIL-TAG-01`：用例在 IMAP STORE 尚未完成时就触发 Full Sync，迟到的 Tagged 状态覆盖了它要观察的同步状态。用例先断言 STORE 完成后的标签及 Tagged 提示，再触发全量对账；保留同步完成、重对账后标签和标签过滤断言。macOS RDP 在原 65ms 预算下本轮通过，前次超预算样本仍保留。本次只将 macOS native 同时运行的分片限制为 2，全部分片及适用用例仍执行，以减少 ARM runner 容量取消。适用用例 ID 未增删，沿用 policy/dependencies 与既有 controls，无目录重生成需求。完整功能全量通过后才进行正式 main/candidate 性能对照；目前尚无“性能无退化”结论。
 
 ## Home 恢复目录内容修复（2026-10-26）
 

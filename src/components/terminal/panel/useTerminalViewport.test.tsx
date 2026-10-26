@@ -62,3 +62,29 @@ it("cancels a pending activation focus when the terminal becomes hidden", () => 
   act(() => vi.advanceTimersByTime(100));
   expect(state.focusTerminal).not.toHaveBeenCalled();
 });
+
+it("keeps a path input that receives focus before delayed terminal activation", () => {
+  const state = context();
+  renderHook(() => useTerminalViewport(state));
+  const path = document.createElement("input");
+  document.body.append(path);
+  path.focus();
+  act(() => vi.advanceTimersByTime(100));
+  expect(state.fitVisibleTerminal).toHaveBeenCalled();
+  expect(state.focusTerminal).not.toHaveBeenCalled();
+  expect(document.activeElement).toBe(path);
+});
+
+it("remeasures layout changes without taking focus from another control", () => {
+  const state = context();
+  const { rerender } = renderHook((value) => useTerminalViewport(value), { initialProps: state });
+  act(() => vi.advanceTimersByTime(100));
+  expect(state.focusTerminal).toHaveBeenCalledTimes(1);
+  const path = document.createElement("input");
+  document.body.append(path);
+  path.focus();
+  rerender({ ...state, showScrollbar: false, fullscreen: true });
+  act(() => vi.advanceTimersByTime(100));
+  expect(state.focusTerminal).toHaveBeenCalledTimes(1);
+  expect(document.activeElement).toBe(path);
+});

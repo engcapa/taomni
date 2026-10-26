@@ -6,6 +6,7 @@ on:
       head: {type: string, required: true}
       artifact_key: {type: string, required: true}
       operation: {type: string, default: run}
+      max_parallel: {type: number, default: 8}
       run_rdp_unit_contracts: {type: boolean, default: true}
 permissions:
   contents: read
@@ -23,6 +24,7 @@ jobs:
     name: ${{ matrix.id }}
     strategy:
       fail-fast: false
+      max-parallel: ${{ inputs.max_parallel }}
       matrix: ${{ fromJSON(inputs.matrix) }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 360

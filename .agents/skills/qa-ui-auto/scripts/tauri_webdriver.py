@@ -514,28 +514,10 @@ class NativeSession(WebDriverTransport):
         return self.endpoint(f"/element/{element_id}{suffix}")
 
     def click(self, selector: str) -> str:
-        for attempt in range(3):
-            try:
-                element = self.find(selector, interactive=True)
-                self.request("POST", self.element_path(element, "/click"), {})
-                return f"clicked {selector}"
-            except WebDriverError as exc:
-                if _is_stale_element_error(exc) and attempt < 2:
-                    time.sleep(0.3)
-                    continue
-                if ("element not interactable" in str(exc) or "element click intercepted" in str(exc)) and attempt < 2:
-                    # A synthetic click() does not move focus the way a real
-                    # pointer press does, so focus editable/focusable targets
-                    # (e.g. a CodeMirror `.cm-content` whose center sits under
-                    # a sticky gutter) explicitly.
-                    with suppress(Exception):
-                        self.execute(
-                            f"const el = document.querySelector({json.dumps(selector)});"
-                            "if (el) { el.scrollIntoView({block:'center', inline:'center'}); el.click();"
-                            " if (el.isContentEditable || el.tabIndex >= 0) el.focus(); }"
-                        )
-                        return f"clicked {selector}"
-                raise
+        # WebKit's element /click can use pre-scroll coordinates and activate
+        # a neighbouring settings row. Reuse stable, hit-tested W3C input;
+        # do not turn an intercepted pointer action into a synthetic click.
+        self.pointer_button_click(selector, 0)
         return f"clicked {selector}"
 
     def count(self, selector: str) -> int:
