@@ -165,8 +165,10 @@ export function registereditTransactionsLifecycle3Cases(caseContext: registeredi
       if (scenario === "excluded") {
         await waitFor(() => expect(disk["src/a.ts"]).toBe("hello REPLACED"));
         expect(disk["src/b.ts"]).toBe("hello modified");
-        await waitFor(() => expect(registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled).toBe(true));
-        await act(async () => { await registrationRef.current?.executeAction("workspace.undoWorkspaceEdit"); });
+        // ED-AUDIT-008: editor focus reserves the journal action for shared
+        // document undo. Use the workspace shortcut, as the retained history
+        // cases do, to verify the selected replacement remains one transaction.
+        await act(async () => { fireEvent.keyDown(window, { key: "z", ctrlKey: true }); });
         fireEvent.click(await screen.findByTestId("code-workspace-undo-confirm-ok"));
         await waitFor(() => expect(disk["src/a.ts"]).toBe("hello needle"));
         expect(disk["src/b.ts"]).toBe("hello modified");
