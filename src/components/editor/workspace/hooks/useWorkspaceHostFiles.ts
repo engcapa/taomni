@@ -78,7 +78,9 @@ export function useWorkspaceHostFiles(dependencies: Dependencies) {
             }
           }
           if (!restored.error && current.session.bufferState.lspFilesRef.current[key]?.status?.active) {
-            await current.project.lsp.syncDocument(restored, "change");
+            // The LSP owner serializes document notifications itself. A slow
+            // provider must not hold the host file/selection reconciliation.
+            void current.project.lsp.syncDocument(restored, "change");
           }
         }
       }

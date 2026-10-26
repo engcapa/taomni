@@ -61,8 +61,12 @@ pub fn lsp_set_java_bundles(config: crate::java_bundles::JavaBundleConfig) -> Re
 /// Probe the configured jdtls extension bundles (java-debug / java-test) for the
 /// Settings UI: which are found and the resolved jar path.
 #[tauri::command]
-pub fn lsp_detect_java_bundles() -> Vec<crate::java_bundles::BundleStatus> {
-    crate::java_bundles::probe_bundles(&crate::java_bundles::get_configured_bundles())
+pub async fn lsp_detect_java_bundles() -> Result<Vec<crate::java_bundles::BundleStatus>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::java_bundles::probe_bundles(&crate::java_bundles::get_configured_bundles())
+    })
+    .await
+    .map_err(|error| format!("lsp_detect_java_bundles: {error}"))
 }
 
 /// Scan installed VS Code / Cursor / VSCodium extensions for the java-debug and
@@ -70,20 +74,27 @@ pub fn lsp_detect_java_bundles() -> Vec<crate::java_bundles::BundleStatus> {
 /// hunting for a path or downloading anything (the common "setup is complex"
 /// case — the jar already ships with a Java extension they have installed).
 #[tauri::command]
-pub fn lsp_discover_java_bundles() -> Vec<crate::java_bundles::DiscoveredBundle> {
-    crate::java_bundles::discover_bundles()
+pub async fn lsp_discover_java_bundles()
+-> Result<Vec<crate::java_bundles::DiscoveredBundle>, String> {
+    tauri::async_runtime::spawn_blocking(move || crate::java_bundles::discover_bundles())
+        .await
+        .map_err(|error| format!("lsp_discover_java_bundles: {error}"))
 }
 
 #[tauri::command]
-pub fn lsp_detect_servers(java_home: Option<String>) -> Vec<LspServerStatus> {
-    // Accept an optional override so Settings can probe without waiting for a
-    // separate set-home round-trip; also keep the process-global config in sync.
-    if let Some(ref home) = java_home {
-        set_configured_java_home(Some(home.as_str()));
-    }
-    clear_command_availability_cache();
-    lsp_presets()
-        .iter()
-        .map(|preset| server_status(preset, None, false, None))
-        .collect()
+pub async fn lsp_detect_servers(java_home: Option<String>) -> Result<Vec<LspServerStatus>, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        // Accept an optional override so Settings can probe without waiting for a
+        // separate set-home round-trip; also keep the process-global config in sync.
+        if let Some(ref home) = java_home {
+            set_configured_java_home(Some(home.as_str()));
+        }
+        clear_command_availability_cache();
+        lsp_presets()
+            .iter()
+            .map(|preset| server_status(preset, None, false, None))
+            .collect()
+    })
+    .await
+    .map_err(|error| format!("lsp_detect_servers: {error}"))
 }

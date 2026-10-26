@@ -1,20 +1,15 @@
 import {
   Boxes,
-  FolderTree,
-  GitBranch,
   Home,
   KeyRound,
-  ListTree,
   MessageSquare,
-  MonitorSmartphone,
-  MoreHorizontal,
   PanelsTopLeft,
   Settings,
   Wrench,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { useMainRailHostStore } from "../../stores/mainRailHostStore";
-import { ContextMenu, type MenuItem } from "../ContextMenu";
+import { ContextMenu } from "../ContextMenu";
 import { ScreenshotMenuButton } from "../screenshot/ScreenshotMenuButton";
 import { ToolWindowRailButton, ToolWindowRailResizeHandle } from "../editor/workspace/panels/ToolWindowRail";
 import { effectiveStripeWidth } from "../editor/workspace/toolWindowLayout";
@@ -23,8 +18,6 @@ import { useAppTheme } from "../../lib/appTheme";
 import { useT } from "../../lib/i18n";
 import { useAppStore, type PrimaryNavMode } from "../../stores/appStore";
 import { isChatCapableTabType, useChatStore } from "../../stores/chatStore";
-import { useWorkspacePlatformStore, type WorkspaceToolWindow } from "../../stores/workspacePlatformStore";
-import { usesSharedWorkspaceEditor } from "../workspace/useWorkspaceCodeHost";
 import { LanguageSwitcher } from "../window/LanguageSwitcher";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
 
@@ -72,24 +65,10 @@ export function PrimaryNavigationRail({
   const stripeSettings = useToolWindowStripeStore((s) => s.settings);
   const setStripeWidth = useToolWindowStripeStore((s) => s.setWidth);
   const toggleStripeNames = useToolWindowStripeStore((s) => s.toggleShowNames);
-  const activeWorkspaceId = useWorkspacePlatformStore((s) => s.activeWorkspaceId);
-  const workspace = useWorkspacePlatformStore((s) => s.workspaces.find((candidate) => candidate.id === s.activeWorkspaceId));
-  const setActiveLeftToolWindow = useWorkspacePlatformStore((s) => s.setActiveLeftToolWindow);
-  const openGitTab = useWorkspacePlatformStore((s) => s.openGitTab);
-  const setBottomDockTool = useWorkspacePlatformStore((s) => s.setBottomDockTool);
   const [railMenu, setRailMenu] = useState<{ x: number; y: number } | null>(null);
-  const [moreMenu, setMoreMenu] = useState<{ x: number; y: number } | null>(null);
-
   const showNames = stripeSettings.showNames;
-  const isWorkspaces = activeSideTab === "workspaces";
-  // While the legacy Code Workspace editor tab is active, its own tool window
-  // rail merges into this rail (ED-PARITY-027) and provides these buttons; our
-  // workspace group then stays hidden so no control is rendered twice.
-  const legacyCodeTabActive = Boolean(
-    workspace?.openTabs.some((tab) => tab.kind === "code" && tab.id === workspace.activeTabId),
-  );
-  const sharedEditor = !!workspace && usesSharedWorkspaceEditor(workspace);
-  const showWorkspaceTools = isWorkspaces && !legacyCodeTabActive && !sharedEditor;
+  // The shared editor owns workspace tools, including in an empty workspace.
+  // It portals its real controls into railHostRef instead of duplicating them.
   const modes: RailMode[] = [
     { mode: "home", testId: "nav-mode-home", label: t("platform.home"), icon: <Home /> },
     { mode: "workspaces", testId: "nav-mode-workspaces", label: t("platform.workspaces"), icon: <Boxes /> },
@@ -116,52 +95,6 @@ export function PrimaryNavigationRail({
       return;
     }
     setActiveSideTab(mode);
-  };
-
-  const activateWorkspaceTool = (toolWindow: WorkspaceToolWindow) => {
-    setActiveSideTab("workspaces");
-    setSidebarCollapsed(false);
-    setActiveLeftToolWindow(activeWorkspaceId, toolWindow);
-  };
-
-  const openWorkspaceGit = () => {
-    setActiveSideTab("workspaces");
-    openGitTab(activeWorkspaceId);
-  };
-
-  const moreToolWindowItems: MenuItem[] = [
-    { label: t("platform.terminal"), shortcut: "Alt+F12", testId: "code-workspace-tool-menu-terminal", onClick: () => setBottomDockTool(activeWorkspaceId, "terminal") },
-    { label: t("platform.problems"), shortcut: "Alt+6", testId: "code-workspace-tool-menu-problems", onClick: () => setBottomDockTool(activeWorkspaceId, "problems") },
-    { label: t("platform.runDebug"), shortcut: "Alt+4", testId: "code-workspace-tool-menu-run", onClick: () => setBottomDockTool(activeWorkspaceId, "run") },
-    { label: t("platform.find"), testId: "code-workspace-tool-menu-find", onClick: () => setBottomDockTool(activeWorkspaceId, "find") },
-    { label: t("platform.bookmarks"), testId: "code-workspace-tool-menu-bookmarks", onClick: () => setBottomDockTool(activeWorkspaceId, "bookmarks") },
-    { label: t("platform.todo"), testId: "code-workspace-tool-menu-todo", onClick: () => setBottomDockTool(activeWorkspaceId, "todo") },
-    { label: t("platform.services"), testId: "code-workspace-tool-menu-services", onClick: () => setBottomDockTool(activeWorkspaceId, "services") },
-    { label: t("platform.database"), testId: "code-workspace-tool-menu-database", onClick: () => setBottomDockTool(activeWorkspaceId, "database") },
-    { label: "", separator: true, onClick: () => undefined },
-    {
-      label: t("platform.showNames"),
-      testId: "sidebar-rail-menu-show-names",
-      checked: showNames,
-      onClick: toggleStripeNames,
-    },
-    {
-      label: t("platform.moveTo"),
-      testId: "code-workspace-tool-menu-move",
-      children: [
-        { label: t("platform.moveToLeftTop"), testId: "code-workspace-tool-menu-move-left-top", onClick: () => undefined },
-        { label: t("platform.moveToBottomLeft"), testId: "code-workspace-tool-menu-move-bottom-left", onClick: () => undefined },
-        { label: t("platform.moveToRightTop"), testId: "code-workspace-tool-menu-move-right-top", onClick: () => undefined },
-        { label: t("platform.moveToBottomRight"), testId: "code-workspace-tool-menu-move-bottom-right", onClick: () => undefined },
-      ],
-    },
-  ];
-
-  const openMoreMenu = (event: React.MouseEvent<HTMLButtonElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    const rect = event.currentTarget.getBoundingClientRect();
-    setMoreMenu({ x: rect.right + 4, y: Math.max(8, rect.top - 160) });
   };
 
   return (
@@ -202,98 +135,6 @@ export function PrimaryNavigationRail({
             />
           ))}
         </div>
-
-        {showWorkspaceTools && (
-          <div data-testid="workspace-merged-tool-rail" aria-label={t("platform.workspaceToolWindows")} title={t("platform.workspaceToolWindows")} className="taomni-ide-tool-group flex min-h-0 flex-col">
-            <div
-              data-testid="code-workspace-tool-rail-left"
-              data-embedded="true"
-              aria-label="Workspace tool windows"
-              className="flex min-h-0 w-full flex-col items-stretch gap-1 overflow-y-auto overflow-x-hidden"
-            >
-              <ToolWindowRailButton
-                item={{
-                  id: "project",
-                  label: t("platform.project"),
-                  icon: <FolderTree />,
-                  active: workspace?.activeLeftToolWindow === "project" && !compact,
-                  shortcut: "Alt+1",
-                  testId: "code-workspace-tool-rail-project",
-                  onSelect: () => activateWorkspaceTool("project"),
-                }}
-                showNames={showNames}
-                onClick={() => activateWorkspaceTool("project")}
-                onDoubleClick={(event) => {
-                  event.preventDefault();
-                  setSidebarCollapsed(true);
-                }}
-              />
-              <ToolWindowRailButton
-                item={{
-                  id: "sessions",
-                  label: t("platform.sessions"),
-                  icon: <MonitorSmartphone />,
-                  active: workspace?.activeLeftToolWindow === "sessions" && !compact,
-                  shortcut: "Alt+2",
-                  testId: "code-workspace-tool-rail-sessions",
-                  onSelect: () => activateWorkspaceTool("sessions"),
-                }}
-                showNames={showNames}
-                onClick={() => activateWorkspaceTool("sessions")}
-                onDoubleClick={(event) => {
-                  event.preventDefault();
-                  setSidebarCollapsed(true);
-                }}
-              />
-              <ToolWindowRailButton
-                item={{
-                  id: "git",
-                  label: t("platform.gitRepo"),
-                  icon: <GitBranch />,
-                  active: workspace?.activeTabId === `ws:${activeWorkspaceId}:git`,
-                  shortcut: "Alt+9",
-                  testId: "code-workspace-tool-rail-git",
-                  onSelect: openWorkspaceGit,
-                }}
-                showNames={showNames}
-                onClick={openWorkspaceGit}
-                onDoubleClick={(event) => {
-                  event.preventDefault();
-                  setSidebarCollapsed(true);
-                }}
-              />
-              <ToolWindowRailButton
-                item={{
-                  id: "structure",
-                  label: t("platform.structure"),
-                  icon: <ListTree />,
-                  active: workspace?.activeLeftToolWindow === "structure" && !compact,
-                  shortcut: "Alt+7",
-                  testId: "code-workspace-tool-rail-structure",
-                  onSelect: () => activateWorkspaceTool("structure"),
-                }}
-                showNames={showNames}
-                onClick={() => activateWorkspaceTool("structure")}
-                onDoubleClick={(event) => {
-                  event.preventDefault();
-                  setSidebarCollapsed(true);
-                }}
-              />
-              <ToolWindowRailButton
-                item={{
-                  id: "more-tool-windows",
-                  label: t("platform.moreToolWindows"),
-                  icon: <MoreHorizontal />,
-                  active: false,
-                  testId: "code-workspace-bottom-tab-overflow",
-                  onSelect: () => undefined,
-                }}
-                showNames={showNames}
-                onClick={(event) => openMoreMenu(event as unknown as React.MouseEvent<HTMLButtonElement>)}
-              />
-            </div>
-          </div>
-        )}
 
         <div className="flex min-h-1 flex-1 flex-col">
           <div ref={railHostRef} data-testid="sidebar-tool-window-rail" aria-label={t("platform.workspaceToolWindows")} title={t("platform.workspaceToolWindows")} className="taomni-ide-tool-group flex min-h-0 flex-col" />
@@ -371,14 +212,6 @@ export function PrimaryNavigationRail({
             checked: showNames,
             onClick: toggleStripeNames,
           }]}
-        />
-      )}
-      {moreMenu && (
-        <ContextMenu
-          x={moreMenu.x}
-          y={moreMenu.y}
-          onClose={() => setMoreMenu(null)}
-          items={moreToolWindowItems}
         />
       )}
     </>

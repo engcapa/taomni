@@ -53,7 +53,7 @@ export function writeCodeWorkspaceTreeFontSize(size: number): void {
 export function readCodeWorkspaceTreeViewMode(): TreeViewMode {
   try {
     const raw = window.localStorage.getItem(TREE_VIEW_MODE_KEY);
-    return raw === "compact" || raw === "flat" || raw === "tree" || raw === "files" ? raw : "tree";
+    return raw === "compact" || raw === "flat" || raw === "tree" || raw === "files" || raw === "list" || raw === "packages" ? raw : "tree";
   } catch {
     return "tree";
   }

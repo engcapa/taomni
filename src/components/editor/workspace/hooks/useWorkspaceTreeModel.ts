@@ -2,10 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { lspStartWorkspaceWatcher, lspStopWorkspaceWatcher } from "../../../../lib/editor/lsp";
 import { isTauriRuntime } from "../../../../lib/runtime";
 import type { CodeWorkspaceLooseFileInfo, CodeWorkspaceRootInfo } from "../../../../types";
-import { errorMessage, initialLooseFiles, initialRoots, writeCodeWorkspaceTreeViewMode, type TreeViewMode } from "../codeWorkspaceModel";
+import { errorMessage, initialLooseFiles, initialRoots, rootDirKey, writeCodeWorkspaceTreeViewMode, type TreeViewMode } from "../codeWorkspaceModel";
 import { TREE_DETAILS_STORAGE_KEY } from "../controller/model";
 import { useWorkspaceTreeData } from "../useWorkspaceTreeData";
 import { useWorkspaceStoreActions } from "./useWorkspaceStoreActions";
+import { readExplorerSort, writeExplorerSort, type ExplorerSort } from "../explorerPreferences";
 
 
 export interface UseWorkspaceTreeModelContext {
@@ -27,12 +28,22 @@ export function useWorkspaceTreeModel(context: UseWorkspaceTreeModelContext) {
   // mounted. Only new input definitions replace local state; internal edits
   // still publish through the normal workspace context without resetting buffers.
   const inputRoots = JSON.stringify(initialRoots(workspace));
-  const previousInputRoots = useRef(inputRoots);
-  useEffect(() => {
-    if (previousInputRoots.current === inputRoots) return;
-    previousInputRoots.current = inputRoots;
+  const [previousInputRoots, setPreviousInputRoots] = useState(inputRoots);
+  if (previousInputRoots !== inputRoots) {
+    // Apply a new host definition before committing effects. An effect-based
+    // update publishes the previous roots alongside the new repoRoot, which
+    // can overwrite the host definition and start a registration feedback loop.
+    setPreviousInputRoots(inputRoots);
     setRoots((current) => JSON.stringify(current) === inputRoots ? current : initialRoots(workspace));
-  }, [inputRoots, workspace]);
+  }
+  const knownRootIds = useRef(new Set(roots.map((root) => root.id)));
+  useEffect(() => {
+    const added = roots.filter((root) => !knownRootIds.current.has(root.id));
+    knownRootIds.current = new Set(roots.map((root) => root.id));
+    if (!added.length) return;
+    storeActions.updateStoreExpandedRootIds(workspaceInstanceId, (current) => [...new Set([...current, ...added.map((root) => root.id)])]);
+    storeActions.updateStoreExpandedDirKeys(workspaceInstanceId, (current) => [...new Set([...current, ...added.map((root) => rootDirKey(root.id, ""))])]);
+  }, [roots, storeActions.updateStoreExpandedRootIds, storeActions.updateStoreExpandedDirKeys, workspaceInstanceId]);
   const treeData = useWorkspaceTreeData({
     roots,
     expandedRootIds: expandedRoots,
@@ -88,6 +99,11 @@ export function useWorkspaceTreeModel(context: UseWorkspaceTreeModelContext) {
   }, []);
 
   const findRoot = useCallback((rootId: string) => rootsRef.current.find((root) => root.id === rootId) ?? null, []);
+  const [treeSort, setTreeSortState] = useState(readExplorerSort);
+  const setTreeSort = useCallback((value: ExplorerSort) => {
+    setTreeSortState(value);
+    writeExplorerSort(value);
+  }, []);
   return {
     roots,
     rootsRef,
@@ -102,5 +118,7 @@ export function useWorkspaceTreeModel(context: UseWorkspaceTreeModelContext) {
     setTreeViewMode,
     treeShowDetails,
     setTreeShowDetails,
+    treeSort,
+    setTreeSort,
   };
 }

@@ -9288,6 +9288,7 @@ controls:
       - '[data-testid="code-workspace-tool-rail-structure"]'
       - '[data-testid="code-workspace-tool-rail-commit"]'
       - '[data-testid="code-workspace-tool-rail-documentation"]'
+      - '[data-testid="code-workspace-tool-rail-sessions"]'
   - id: tool-rail-resize              # ED-PARITY-024 stripe width handle (names shown)
     selector: '[data-testid="code-workspace-tool-rail-left-resize"]'
     kind: interactive
@@ -9310,6 +9311,10 @@ controls:
     aliases:
       - '[data-testid="code-workspace-tool-window-structure"]'
       - '[data-testid="code-workspace-left-tool-area"] [data-testid="code-workspace-tool-window-structure"]'
+      - '[data-testid="code-workspace-tool-window-terminal"]'
+      - '[data-testid="code-workspace-tool-window-search"]'
+      - '[data-testid="code-workspace-tool-window-todos"]'
+      - '[data-testid="code-workspace-tool-window-coverage"]'
   - id: tool-window-options-menu      # ED-PARITY-024 ⋮ Options: View Mode / Move to / Resize / Remove
     selector: '[data-testid="code-workspace-tool-window-options-problems"]'
     kind: interactive
@@ -9357,6 +9362,11 @@ controls:
     selector: '[data-testid="code-workspace-bottom-tab-overflow-problems"]'
     kind: interactive
     optional: true
+    aliases:
+      - '[data-testid="code-workspace-bottom-tab-overflow-search"]'
+      - '[data-testid="code-workspace-bottom-tab-overflow-todos"]'
+      - '[data-testid="code-workspace-bottom-tab-overflow-coverage"]'
+      - '[data-testid="code-workspace-bottom-tab-overflow-structure"]'
   - id: terminal-dock-panel
     selector: '[data-testid="code-workspace-terminal-dock"]'
     kind: display
@@ -12132,7 +12142,7 @@ controls:
 
 ## 12. Workspace-First 平台重构（v6.1）
 
-> 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents / Crew 开发中入口与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-033`。
+> 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents / Crew 开发中入口与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-043`。
 
 ### 12.1 Workspace-first 主壳层：单行工具栏、主导航条 5 大模式与右栏收纳
 
@@ -12325,14 +12335,6 @@ controls:
   selector: '[data-testid="workspace-create-button"]'
   kind: interactive
   optional: true
-- id: workspace-empty-add-folder
-  selector: '[data-testid="workspace-empty-add-folder"]'
-  kind: interactive
-  optional: true
-- id: workspace-empty-state
-  selector: '[data-testid="workspace-empty-state"]'
-  kind: display
-  optional: true
 - id: open-tabs-search-result
   selector: '[data-testid^="open-tabs-tab-"]:not([data-testid^="open-tabs-tab-checkbox-"])'
   kind: interactive
@@ -12376,6 +12378,14 @@ files:
 - src/stores/agentsStore.ts
 - src/stores/workspaceEditorStore.ts
 - src/stores/workspaceUiStore.ts
+- src/components/editor/workspace/explorerPreferences.ts
+- src/components/editor/workspace/ExplorerSortControls.tsx
+- src/components/editor/workspace/ProjectTreeFlat.tsx
+- src/components/editor/workspace/ProjectTreeEntryDetails.tsx
+- src/components/editor/workspace/ProjectTree.tsx
+- src/components/editor/workspace/FileTreePane.tsx
+- src/components/editor/workspace/hooks/useWorkspaceHostFiles.ts
+- src/lib/ipc/files.ts
 controls:
 - id: code-workspace-tree-view-all-files
   selector: '[data-testid="code-workspace-tree-view-all-files"]'
@@ -12619,12 +12629,6 @@ controls:
 - id: workspace-main-panel
   selector: '[data-testid="workspace-main-panel"]'
   kind: display
-- id: workspace-new-file
-  selector: '[data-testid="workspace-new-file"]'
-  kind: interactive
-- id: workspace-new-folder
-  selector: '[data-testid="workspace-new-folder"]'
-  kind: interactive
 - id: workspace-open-session-menu
   selector: '[data-testid="workspace-open-session-menu"]'
   kind: display
@@ -12682,6 +12686,17 @@ controls:
 - id: workspace-switcher-menu
   selector: '[data-testid="workspace-switcher-menu"]'
   kind: display
+- id: workspace-switcher-add-folder
+  selector: '[data-testid="workspace-switcher-add-folder"]'
+  kind: interactive
+- id: workspace-switcher-removed-duplicate-add-folder
+  selector: '[data-testid="workspace-switcher-menu-add-folder"]'
+  kind: display
+  optional: true  # negative regression probe: no duplicate folder menu
+- id: workspace-sessions-panel
+  selector: '[data-testid="workspace-sessions-panel"]'
+  kind: display
+  optional: true
 - id: workspace-tab
   selector: '[data-testid="workspace-tab"]'
   kind: interactive
@@ -12760,6 +12775,77 @@ controls:
 - id: workspace-bottom-dock
   selector: '[data-testid="workspace-bottom-dock"]'
   kind: display
+
+- id: code-workspace-tree-view-list
+  selector: '[data-testid="code-workspace-tree-view-list"]'
+  kind: interactive
+- id: code-workspace-tree-view-packages
+  selector: '[data-testid="code-workspace-tree-view-packages"]'
+  kind: interactive
+- id: code-workspace-tree-menu-flatten-packages
+  selector: '[data-testid="code-workspace-tree-menu-flatten-packages"]'
+  kind: interactive
+- id: code-workspace-list-columns
+  selector: '[data-testid="code-workspace-list-columns"]'
+  kind: display
+- id: code-workspace-list-name
+  selector: '[data-testid="code-workspace-list-name"]'
+  kind: display
+- id: code-workspace-file-list-order
+  selector: '[data-tree-kind][data-path]'
+  kind: display
+  optional: true  # visible row sequence shared by tree and detailed list
+- id: code-workspace-list-metadata
+  selector: '[data-testid="code-workspace-list-metadata"]'
+  kind: display
+- id: code-workspace-list-size
+  selector: '[data-testid="code-workspace-list-size"]'
+  kind: display
+- id: code-workspace-list-type
+  selector: '[data-testid="code-workspace-list-type"]'
+  kind: display
+- id: code-workspace-list-modified
+  selector: '[data-testid="code-workspace-list-modified"]'
+  kind: display
+- id: code-workspace-package-group
+  selector: '[data-testid="code-workspace-package-group"]'
+  kind: display
+- id: code-workspace-tree-sort
+  selector: '[data-testid="code-workspace-tree-sort"]'
+  kind: interactive
+- id: code-workspace-list-sort-name
+  selector: '[data-testid="code-workspace-list-sort-name"]'
+  kind: interactive
+- id: code-workspace-list-sort-size
+  selector: '[data-testid="code-workspace-list-sort-size"]'
+  kind: interactive
+- id: code-workspace-list-sort-type
+  selector: '[data-testid="code-workspace-list-sort-type"]'
+  kind: interactive
+- id: code-workspace-list-sort-modified
+  selector: '[data-testid="code-workspace-list-sort-modified"]'
+  kind: interactive
+- id: code-workspace-tree-sort-name
+  selector: '[data-testid="code-workspace-tree-sort-name"]'
+  kind: interactive
+- id: code-workspace-tree-sort-size
+  selector: '[data-testid="code-workspace-tree-sort-size"]'
+  kind: interactive
+- id: code-workspace-tree-sort-type
+  selector: '[data-testid="code-workspace-tree-sort-type"]'
+  kind: interactive
+- id: code-workspace-tree-sort-modified
+  selector: '[data-testid="code-workspace-tree-sort-modified"]'
+  kind: interactive
+- id: code-workspace-tree-sort-ascending
+  selector: '[data-testid="code-workspace-tree-sort-ascending"]'
+  kind: interactive
+- id: code-workspace-tree-sort-descending
+  selector: '[data-testid="code-workspace-tree-sort-descending"]'
+  kind: interactive
+- id: code-workspace-tree-sort-folders-first
+  selector: '[data-testid="code-workspace-tree-sort-folders-first"]'
+  kind: interactive
 -->
 
 Workspaces 模式左栏提供工作区切换器（默认工作区不可删除）、多根文件树（新建文件/目录、添加/移除根目录）、工作区标签条与打开任意会话入口；画布内含编辑器、Git 面板与隔离会话。

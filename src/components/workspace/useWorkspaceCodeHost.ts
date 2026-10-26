@@ -13,10 +13,6 @@ import { useWorkspaceUiStore } from "../../stores/workspaceUiStore";
 
 export { workspaceEditorRuntimeId } from "../../lib/workspaceRuntimeIdentity";
 
-export function usesSharedWorkspaceEditor(workspace: PlatformWorkspace): boolean {
-  return workspace.rootFolders.length > 0 || workspace.openTabs.some((tab) => tab.kind === "file");
-}
-
 /** Adapt the platform's file tabs to the editor's existing buffer owner. */
 export function useWorkspaceCodeHost(workspace: PlatformWorkspace, visible: boolean, enabled: boolean): WorkspaceHostIntegration | undefined {
   const t = useT();

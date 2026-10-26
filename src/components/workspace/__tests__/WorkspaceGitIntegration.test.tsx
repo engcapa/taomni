@@ -1,4 +1,6 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { useCallback, useState } from "react";
+import type { WorkspaceCommandRegistration } from "../../editor/workspace/workspaceCommands";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceGitPanel } from "../WorkspaceGitPanel";
 import { WorkspaceFileEditor } from "../WorkspaceFileEditor";
@@ -111,6 +113,24 @@ function Shell() {
   </AppDialogProvider>;
 }
 
+function RegisteredShell() {
+  const [commands, setCommands] = useState<Record<string, WorkspaceCommandRegistration>>({});
+  const onCommandsChange = useCallback((tabId: string, registration: WorkspaceCommandRegistration | null) => {
+    setCommands((current) => {
+      if (registration) return current[tabId] === registration ? current : { ...current, [tabId]: registration };
+      const next = { ...current };
+      delete next[tabId];
+      return next;
+    });
+  }, []);
+  return <AppDialogProvider>
+    <output data-testid="registered-workspaces">{Object.keys(commands).length}</output>
+    <PrimaryNavigationRail railHostRef={useMainRailHostStore.getState().setHost} />
+    <WorkspaceSidebar onOpenSessionPicker={vi.fn()} />
+    <WorkspaceMainPanel onCommandsChange={onCommandsChange} />
+  </AppDialogProvider>;
+}
+
 beforeEach(() => {
   window.localStorage.clear();
   workspaceBoundary.reset();
@@ -130,6 +150,54 @@ afterEach(() => {
 });
 
 describe("Workspace Git integration (TASK-06)", () => {
+  it("keeps directory additions stable with the main window's command registration loop", async () => {
+    for (const root of activeWorkspace().rootFolders) {
+      useWorkspacePlatformStore.getState().removeRootFolder(DEFAULT_WORKSPACE_ID, root.id);
+    }
+    render(<RegisteredShell />);
+    await screen.findByTestId("code-workspace-tree-empty");
+    await waitFor(() => expect(screen.getByTestId("registered-workspaces")).toHaveTextContent("1"));
+    act(() => {
+      useWorkspacePlatformStore.getState().addRootFolder(DEFAULT_WORKSPACE_ID, { path: "/preview", name: "preview" });
+    });
+    await waitFor(() => expect(screen.queryByTestId("code-workspace-tree-empty")).not.toBeInTheDocument());
+    await screen.findByTestId("code-workspace-tree-root-arrow");
+    await waitFor(() => expect(screen.getByTestId("code-workspace-tree-root")).toHaveAttribute("aria-expanded", "true"));
+    expect(activeWorkspace().rootFolders.map((root) => root.path)).toEqual(["/preview"]);
+    act(() => {
+      useWorkspacePlatformStore.getState().addRootFolder(DEFAULT_WORKSPACE_ID, { path: "/preview-two", name: "second" });
+    });
+    await waitFor(() => expect(screen.getAllByTestId("code-workspace-tree-root-arrow")).toHaveLength(2));
+    expect(activeWorkspace().rootFolders.map((root) => root.path)).toEqual(["/preview", "/preview-two"]);
+  });
+
+  it.each([false, true])("uses the real shared rail and overflow with folders=%s", async (hasFolders) => {
+    if (!hasFolders) useWorkspacePlatformStore.getState().reloadFromStorage();
+    if (!hasFolders) {
+      for (const root of activeWorkspace().rootFolders) {
+        useWorkspacePlatformStore.getState().removeRootFolder(DEFAULT_WORKSPACE_ID, root.id);
+      }
+    }
+    render(<Shell />);
+    const project = await screen.findByTestId("code-workspace-tool-rail-project");
+    const rail = screen.getByTestId("sidebar-tool-window-rail");
+    expect(rail).toContainElement(project);
+    for (const id of ["project", "sessions", "git"]) {
+      expect(screen.getAllByTestId(`code-workspace-tool-rail-${id}`)).toHaveLength(1);
+    }
+    fireEvent.click(within(rail).getByTestId("code-workspace-bottom-tab-overflow"));
+    const menu = await screen.findByTestId("code-workspace-bottom-tab-overflow-menu");
+    for (const id of ["terminal", "problems", "run", "search", "todos", "build", "tests", "coverage", "debug", "structure"]) {
+      expect(within(menu).getByTestId(`code-workspace-bottom-tab-overflow-${id}`)).toBeVisible();
+    }
+    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent.click(project);
+    expect(screen.getByTestId("code-workspace-tree")).not.toBeVisible();
+    fireEvent.click(project);
+    expect(await screen.findByTestId("code-workspace-tree")).toBeVisible();
+    if (!hasFolders) expect(screen.getByTestId("code-workspace-tree-empty")).toBeVisible();
+  });
+
   it("UT-WS-06-01 has no redundant Git button in the workspace chrome", async () => {
     render(<Shell />);
     // The old top-right `🌿 Git` button (marker 3) and the removed

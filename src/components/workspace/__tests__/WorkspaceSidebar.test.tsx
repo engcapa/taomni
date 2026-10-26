@@ -1,4 +1,6 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { invoke } from "@tauri-apps/api/core";
+import { open as chooseFolder } from "@tauri-apps/plugin-dialog";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WorkspaceSidebar } from "../WorkspaceSidebar";
 import { WorkspaceMainPanel } from "../WorkspaceMainPanel";
@@ -178,4 +180,56 @@ describe("WorkspaceSidebar (TASK-05)", () => {
     expect(workspace.openTabs.some((tab) => tab.kind === "git")).toBe(true);
     expect(screen.getByTestId("workspace-git-panel-mock")).toBeInTheDocument();
   });
+});
+
+
+it("keeps an empty default workspace as a file explorer with a HOME chooser and collapsed sessions", async () => {
+  const store = useWorkspacePlatformStore.getState();
+  for (const root of store.getWorkspace()!.rootFolders) store.removeRootFolder(DEFAULT_WORKSPACE_ID, root.id);
+  vi.mocked(invoke).mockImplementation(async (command, args) => command === "get_home_dir"
+    ? "/home/qa" : workspaceBoundary.invoke(command, args as Record<string, unknown>) as never);
+  render(<Shell />);
+  expect(await screen.findByTestId("code-workspace-tree-empty")).toBeVisible();
+  expect(screen.getByTestId("workspace-linked-sessions-toggle")).toHaveAttribute("aria-expanded", "false");
+  expect(screen.getByTestId("code-workspace-tree-open-file")).toBeVisible();
+  fireEvent.click(screen.getByTestId("code-workspace-tree-add-folder"));
+  await waitFor(() => expect(chooseFolder).toHaveBeenCalledWith(expect.objectContaining({ directory: true, defaultPath: "/home/qa" })));
+  expect(await screen.findByTestId("code-workspace-tree-root")).toHaveAttribute("data-root-path", "/repo/extra");
+  expect(store.getWorkspace()!.rootFolders.map((root) => root.path)).toEqual(["/repo/extra"]);
+  fireEvent.click(screen.getByTestId("workspace-switcher-button"));
+  expect(screen.getAllByTestId("workspace-switcher-add-folder")).toHaveLength(1);
+  expect(screen.queryByTestId("workspace-switcher-menu-add-folder")).not.toBeInTheDocument();
+});
+
+it("opens folders, ordinary files and sort controls while code and Git discovery are unresolved", async () => {
+  const pending: Array<() => void> = [];
+  vi.mocked(invoke).mockImplementation((command, args) => {
+    if (["lsp_detect_servers", "workspace_list_files_recursive", "workspace_detect_git_roots", "project_structure_get"].includes(command)) {
+      return new Promise((resolve) => pending.push(() => resolve([] as never)));
+    }
+    return workspaceBoundary.invoke(command, args as Record<string, unknown>) as never;
+  });
+  render(<Shell />);
+  const arrow = await screen.findByTestId("code-workspace-tree-dir-arrow");
+  fireEvent.click(arrow);
+  // README and nested source are visible before any discovery result lands.
+  const source = await waitFor(() => {
+    const row = document.querySelector<HTMLElement>('[data-testid="code-workspace-tree-file"][data-path="src/index.ts"]');
+    expect(row).toBeVisible();
+    return row!;
+  });
+  fireEvent.doubleClick(source);
+  await waitFor(() => expect(screen.getByTestId("workspace-file-editor").querySelector(".cm-content")).toHaveTextContent("export const value = 1;"));
+  expect(pending.length).toBeGreaterThan(0);
+  fireEvent.click(screen.getByTestId("code-workspace-tree-view-selector"));
+  fireEvent.click(screen.getByTestId("code-workspace-tree-view-list"));
+  fireEvent.click(screen.getByTestId("code-workspace-list-sort-size"));
+  expect(screen.getByTestId("code-workspace-list-sort-size")).toHaveAttribute("aria-pressed", "true");
+  // A late old scan must not replace the active workspace or its empty tree.
+  let next = "";
+  act(() => { next = useWorkspacePlatformStore.getState().createWorkspace({ name: "Empty next" }).id; });
+  await act(async () => pending.splice(0).forEach((resolve) => resolve()));
+  expect(useWorkspacePlatformStore.getState().activeWorkspaceId).toBe(next);
+  expect(screen.getByTestId("code-workspace-tree-empty")).toBeVisible();
+  expect(useWorkspacePlatformStore.getState().getWorkspace()!.rootFolders).toEqual([]);
 });

@@ -499,6 +499,7 @@
   ↳ `[data-testid="code-workspace-tool-rail-structure"]` — alias
   ↳ `[data-testid="code-workspace-tool-rail-commit"]` — alias
   ↳ `[data-testid="code-workspace-tool-rail-documentation"]` — alias
+  ↳ `[data-testid="code-workspace-tool-rail-sessions"]` — alias
 - `[data-testid="code-workspace-tool-rail-left-resize"]` — interactive [optional] — F25.5.tool-rail-resize
   ↳ `[data-testid="code-workspace-tool-rail-right-resize"]` — alias
 - `[data-testid="code-workspace-tool-rail-menu-move"]` — interactive [optional] — F25.5.tool-rail-menu
@@ -509,6 +510,10 @@
 - `[data-testid="code-workspace-tool-window-problems"]` — display [optional] — F25.5.tool-window-pane
   ↳ `[data-testid="code-workspace-tool-window-structure"]` — alias
   ↳ `[data-testid="code-workspace-left-tool-area"] [data-testid="code-workspace-tool-window-structure"]` — alias
+  ↳ `[data-testid="code-workspace-tool-window-terminal"]` — alias
+  ↳ `[data-testid="code-workspace-tool-window-search"]` — alias
+  ↳ `[data-testid="code-workspace-tool-window-todos"]` — alias
+  ↳ `[data-testid="code-workspace-tool-window-coverage"]` — alias
 - `[data-testid="code-workspace-tool-window-options-problems"]` — interactive [optional] — F25.5.tool-window-options-menu
   ↳ `[data-testid="code-workspace-tool-window-options-terminal"]` — alias
   ↳ `[data-testid="code-workspace-tool-window-move"]` — alias
@@ -526,6 +531,10 @@
 - `[data-testid="code-workspace-tool-window-hide"]` — interactive [optional] — F25.5.tool-window-hide
 - `[data-testid="code-workspace-tool-window-options"]` — interactive [optional] — F25.5.tool-window-options
 - `[data-testid="code-workspace-bottom-tab-overflow-problems"]` — interactive [optional] — F25.5.bottom-tool-overflow-item
+  ↳ `[data-testid="code-workspace-bottom-tab-overflow-search"]` — alias
+  ↳ `[data-testid="code-workspace-bottom-tab-overflow-todos"]` — alias
+  ↳ `[data-testid="code-workspace-bottom-tab-overflow-coverage"]` — alias
+  ↳ `[data-testid="code-workspace-bottom-tab-overflow-structure"]` — alias
 - `[data-testid="code-workspace-terminal-dock"]` — display [optional] — F25.5.terminal-dock-panel
   ↳ `[data-testid="code-workspace-terminal-dock"] [data-terminal-ready="true"]` — alias
   ↳ `[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]` — alias
@@ -1714,8 +1723,6 @@
 - `[data-testid="tab-scroll-right"]` — interactive [optional] — F-WS-1.tab-scroll-right
 - `[data-testid="workspace-code-tab"]` — display [optional] — F-WS-1.workspace-code-tab
 - `[data-testid="workspace-create-button"]` — interactive [optional] — F-WS-1.workspace-create-button
-- `[data-testid="workspace-empty-add-folder"]` — interactive [optional] — F-WS-1.workspace-empty-add-folder
-- `[data-testid="workspace-empty-state"]` — display [optional] — F-WS-1.workspace-empty-state
 - `[data-testid^="open-tabs-tab-"]:not([data-testid^="open-tabs-tab-checkbox-"])` — interactive [optional] — F-WS-1.open-tabs-search-result
 - `[data-testid^="workspace-switcher-option-"]:not([data-testid="workspace-switcher-option-default-workspace"])` — interactive [optional] — F-WS-1.workspace-custom-switcher-option
 
@@ -1788,8 +1795,6 @@
 - `[data-testid="workspace-fs-modal-input"]` — display — F-WS-2.workspace-fs-modal-input
 - `[data-testid="workspace-git-panel"]` — display — F-WS-2.workspace-git-panel
 - `[data-testid="workspace-main-panel"]` — display — F-WS-2.workspace-main-panel
-- `[data-testid="workspace-new-file"]` — interactive — F-WS-2.workspace-new-file
-- `[data-testid="workspace-new-folder"]` — interactive — F-WS-2.workspace-new-folder
 - `[data-testid="workspace-open-session-menu"]` — display — F-WS-2.workspace-open-session-menu
 - `[data-testid="workspace-open-session-plus"]` — interactive — F-WS-2.workspace-open-session-plus
 - `[data-testid="workspace-plus-local-terminal"]` — interactive — F-WS-2.workspace-plus-local-terminal
@@ -1809,6 +1814,9 @@
 - `[data-testid="workspace-switcher"]` — display — F-WS-2.workspace-switcher
 - `[data-testid="workspace-switcher-button"]` — interactive — F-WS-2.workspace-switcher-button
 - `[data-testid="workspace-switcher-menu"]` — display — F-WS-2.workspace-switcher-menu
+- `[data-testid="workspace-switcher-add-folder"]` — interactive — F-WS-2.workspace-switcher-add-folder
+- `[data-testid="workspace-switcher-menu-add-folder"]` — display [optional] — F-WS-2.workspace-switcher-removed-duplicate-add-folder
+- `[data-testid="workspace-sessions-panel"]` — display [optional] — F-WS-2.workspace-sessions-panel
 - `[data-testid="workspace-tab"]` — interactive — F-WS-2.workspace-tab
 - `[data-testid="workspace-tab-strip"]` — display — F-WS-2.workspace-tab-strip
 - `[data-testid="workspace-tree-add-root"]` — interactive — F-WS-2.workspace-tree-add-root
@@ -1835,6 +1843,29 @@
 - `[data-testid="workspace-canvas-panes"]` — display — F-WS-2.workspace-canvas-panes
 - `[data-testid="workspace-canvas-pane"]` — display — F-WS-2.workspace-canvas-pane
 - `[data-testid="workspace-bottom-dock"]` — display — F-WS-2.workspace-bottom-dock
+- `[data-testid="code-workspace-tree-view-list"]` — interactive — F-WS-2.code-workspace-tree-view-list
+- `[data-testid="code-workspace-tree-view-packages"]` — interactive — F-WS-2.code-workspace-tree-view-packages
+- `[data-testid="code-workspace-tree-menu-flatten-packages"]` — interactive — F-WS-2.code-workspace-tree-menu-flatten-packages
+- `[data-testid="code-workspace-list-columns"]` — display — F-WS-2.code-workspace-list-columns
+- `[data-testid="code-workspace-list-name"]` — display — F-WS-2.code-workspace-list-name
+- `[data-tree-kind][data-path]` — display [optional] — F-WS-2.code-workspace-file-list-order
+- `[data-testid="code-workspace-list-metadata"]` — display — F-WS-2.code-workspace-list-metadata
+- `[data-testid="code-workspace-list-size"]` — display — F-WS-2.code-workspace-list-size
+- `[data-testid="code-workspace-list-type"]` — display — F-WS-2.code-workspace-list-type
+- `[data-testid="code-workspace-list-modified"]` — display — F-WS-2.code-workspace-list-modified
+- `[data-testid="code-workspace-package-group"]` — display — F-WS-2.code-workspace-package-group
+- `[data-testid="code-workspace-tree-sort"]` — interactive — F-WS-2.code-workspace-tree-sort
+- `[data-testid="code-workspace-list-sort-name"]` — interactive — F-WS-2.code-workspace-list-sort-name
+- `[data-testid="code-workspace-list-sort-size"]` — interactive — F-WS-2.code-workspace-list-sort-size
+- `[data-testid="code-workspace-list-sort-type"]` — interactive — F-WS-2.code-workspace-list-sort-type
+- `[data-testid="code-workspace-list-sort-modified"]` — interactive — F-WS-2.code-workspace-list-sort-modified
+- `[data-testid="code-workspace-tree-sort-name"]` — interactive — F-WS-2.code-workspace-tree-sort-name
+- `[data-testid="code-workspace-tree-sort-size"]` — interactive — F-WS-2.code-workspace-tree-sort-size
+- `[data-testid="code-workspace-tree-sort-type"]` — interactive — F-WS-2.code-workspace-tree-sort-type
+- `[data-testid="code-workspace-tree-sort-modified"]` — interactive — F-WS-2.code-workspace-tree-sort-modified
+- `[data-testid="code-workspace-tree-sort-ascending"]` — interactive — F-WS-2.code-workspace-tree-sort-ascending
+- `[data-testid="code-workspace-tree-sort-descending"]` — interactive — F-WS-2.code-workspace-tree-sort-descending
+- `[data-testid="code-workspace-tree-sort-folders-first"]` — interactive — F-WS-2.code-workspace-tree-sort-folders-first
 
 ## main/workspace-platform (F-WS-3)
 

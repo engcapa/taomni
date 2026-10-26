@@ -2,7 +2,7 @@ import type { PlatformWorkspace } from "../../stores/workspacePlatformStore";
 import { useWorkspaceEditorStore } from "../../stores/workspaceEditorStore";
 import { useT } from "../../lib/i18n";
 import { WorkspaceCodeEditor, type WorkspaceCodeEditorProps } from "./WorkspaceCodeEditor";
-import { workspaceEditorRuntimeId, usesSharedWorkspaceEditor } from "./useWorkspaceCodeHost";
+import { workspaceEditorRuntimeId } from "./useWorkspaceCodeHost";
 
 /** One complete editor/LSP runtime per workspace, shared by every file type. */
 export function WorkspaceFileSurface({ workspace, visible, onCommandsChange }: {
@@ -14,7 +14,6 @@ export function WorkspaceFileSurface({ workspace, visible, onCommandsChange }: {
   const active = workspace.openTabs.find((tab) => tab.id === workspace.activeTabId && tab.kind === "file");
   const document = useWorkspaceEditorStore((state) => active ? state.documents[active.id] : undefined);
   const recoveryError = useWorkspaceEditorStore((state) => state.recoveryError);
-  const shared = usesSharedWorkspaceEditor(workspace);
   return <div data-testid={active ? "workspace-file-editor" : "workspace-code-tab"}
     data-path={active?.filePath} data-dirty={document?.dirty || undefined}
     className="flex h-full min-h-0 w-full flex-col">
@@ -23,6 +22,6 @@ export function WorkspaceFileSurface({ workspace, visible, onCommandsChange }: {
       {t("platform.draftRecoveryFailed")} {recoveryError}
     </div>}
     <div className="min-h-0 flex-1"><WorkspaceCodeEditor tabId={workspaceEditorRuntimeId(workspace)} workspace={workspace}
-      visible={visible} sharedFiles={shared} onCommandsChange={onCommandsChange} /></div>
+      visible={visible} sharedFiles onCommandsChange={onCommandsChange} /></div>
   </div>;
 }

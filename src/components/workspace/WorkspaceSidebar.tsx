@@ -1,4 +1,4 @@
-import { FilePlus2, FolderPlus, GitBranch, ListTree, RefreshCw, Search, ChevronDown, Plus } from "lucide-react";
+import { GitBranch, ChevronDown, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useT } from "../../lib/i18n";
 import { gitProbePath, gitSnapshot } from "../../lib/git";
@@ -6,17 +6,12 @@ import { useAppStore } from "../../stores/appStore";
 import {
   useWorkspacePlatformStore,
   type PlatformWorkspace,
-  type WorkspaceRootFolder,
-  type WorkspaceTreeNode,
 } from "../../stores/workspacePlatformStore";
-import { outlineSymbols, useWorkspaceEditorStore } from "../../stores/workspaceEditorStore";
 import { useWorkspaceUiStore } from "../../stores/workspaceUiStore";
-import { WorkspaceFileTree } from "./WorkspaceFileTree";
 import { WorkspaceSessionsPanel } from "./WorkspaceSessionsPanel";
 import { useSessionStore } from "../../stores/sessionStore";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { useWorkspaceEditorHostStore } from "../../stores/workspaceEditorHostStore";
-import { usesSharedWorkspaceEditor } from "./useWorkspaceCodeHost";
 
 export interface WorkspaceSidebarProps {
   onOpenSessionPicker: () => void;
@@ -73,13 +68,10 @@ function useWorkspaceGitBar(workspace: PlatformWorkspace | undefined): GitBarSta
 export function WorkspaceSidebar({ onOpenSessionPicker }: WorkspaceSidebarProps) {
   const t = useT();
   const workspace = useWorkspacePlatformStore((s) => s.workspaces.find((candidate) => candidate.id === s.activeWorkspaceId));
-  const createdNodes = useWorkspacePlatformStore((s) => s.createdNodes);
   const setActiveSideTab = useAppStore((s) => s.setActiveSideTab);
   const setSidebarCollapsed = useAppStore((s) => s.setSidebarCollapsed);
   const store = useWorkspacePlatformStore.getState;
   const openFsModal = useWorkspaceUiStore((s) => s.openFsModal);
-  const [refreshToken, setRefreshToken] = useState(0);
-  const [fileQuery, setFileQuery] = useState("");
   const [linkedOpenByWorkspace, setLinkedOpenByWorkspace] = useState<Record<string, boolean>>({});
   const setHost = useWorkspaceEditorHostStore((state) => state.setHost);
   const workspaceId = workspace?.id;
@@ -87,85 +79,19 @@ export function WorkspaceSidebar({ onOpenSessionPicker }: WorkspaceSidebarProps)
     if (workspaceId) setHost(workspaceId, element);
   }, [setHost, workspaceId]);
   const sessions = useSessionStore((s) => s.sessions);
-  const documents = useWorkspaceEditorStore((s) => s.documents);
   const gitBar = useWorkspaceGitBar(workspace);
 
   const lens = workspace?.activeLeftToolWindow ?? "project";
-  const activeTab = workspace?.openTabs.find((tab) => tab.id === workspace.activeTabId);
-  const activeDocument = activeTab ? documents[activeTab.id] : undefined;
-  const workspaceNodes: WorkspaceTreeNode[] = createdNodes.filter((node) => node.workspaceId === workspace?.id);
-
-  const openModal = useCallback((kind: "file" | "folder" | "root", root?: WorkspaceRootFolder, directory = "") => {
-    openFsModal({ kind, directory, rootFolderId: root?.id });
-  }, [openFsModal]);
-
-  const openFile = (root: WorkspaceRootFolder, path: string) => {
-    if (!workspace) return;
-    store().openFileInWorkspace(workspace.id, { rootId: root.id, path, name: path.split("/").pop() });
-  };
-
-  const openGitForFile = (root: WorkspaceRootFolder, path: string) => {
-    if (!workspace) return;
-    void root;
-    store().openGitTab(workspace.id, path || undefined);
-  };
-
   if (!workspace) return null;
-  const sharedEditor = usesSharedWorkspaceEditor(workspace);
   const linkedOpen = linkedOpenByWorkspace[workspace.id] ?? workspace.openTabs.some((tab) => tab.kind === "file");
-
-  const toolbar = lens === "project" ? (
-    <div className="flex shrink-0 items-center gap-1 px-1.5 py-1" style={{ borderBottom: "1px solid var(--taomni-divider)" }}>
-      <ToolbarButton testId="workspace-new-file" label={t("platform.newFile")} shortcut="Alt+Insert" onClick={() => openModal("file", workspace.rootFolders[0], "")}>
-        <FilePlus2 className="h-3.5 w-3.5" />
-      </ToolbarButton>
-      <ToolbarButton testId="workspace-new-folder" label={t("platform.newFolder")} onClick={() => openModal("folder", workspace.rootFolders[0], "")}>
-        <FolderPlus className="h-3.5 w-3.5" />
-      </ToolbarButton>
-      <ToolbarButton testId="workspace-add-folder" label={t("platform.addRootFolder")} onClick={() => openModal("root")}>
-        <FolderPlus className="h-3.5 w-3.5" />
-      </ToolbarButton>
-      <ToolbarButton testId="workspace-refresh-tree" label={t("platform.refreshTree")} onClick={() => setRefreshToken((token) => token + 1)}>
-        <RefreshCw className="h-3.5 w-3.5" />
-      </ToolbarButton>
-      <label className="relative ml-1 min-w-[50px] flex-1">
-        <Search className="absolute left-1.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
-        <input type="search" data-testid="workspace-file-filter" aria-label={t("platform.filterFiles")} placeholder={t("platform.filterFiles")} className="taomni-input h-[21px] w-full min-w-0 pl-6 text-[11px]" value={fileQuery} onChange={(event) => setFileQuery(event.target.value)} />
-      </label>
-    </div>
-  ) : lens === "sessions" ? null : (
-    <div className="flex shrink-0 items-center gap-1 px-1.5 py-1" style={{ borderBottom: "1px solid var(--taomni-divider)" }}>
-      <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-[var(--taomni-text-muted)]">
-        <ListTree className="h-3.5 w-3.5" />
-        {t("platform.structure")}
-      </span>
-    </div>
-  );
 
   return (
     <div data-testid="workspace-sidebar-panel" className="flex min-h-0 flex-1 flex-col">
-      <WorkspaceSwitcher onAddFolder={() => openModal("root")} />
-      {!sharedEditor && toolbar}
-      {sharedEditor && <div ref={editorHostRef} data-testid="workspace-editor-tool-host"
-        className="min-h-0 flex-1 overflow-hidden" style={{ display: lens === "sessions" ? "none" : undefined }} />}
+      <WorkspaceSwitcher onAddFolder={() => openFsModal({ kind: "root", directory: "" })} />
+      <div ref={editorHostRef} data-testid="workspace-editor-tool-host"
+        className="min-h-0 flex-1 overflow-hidden" style={{ display: lens === "sessions" ? "none" : undefined }} />
       {lens === "project" && (
         <>
-        {!sharedEditor && <>
-        <div className="flex h-7 shrink-0 items-center justify-between px-2 text-[10.5px] text-[var(--taomni-text-muted)]"><span className="truncate font-semibold">{t("platform.project")} {workspace.rootFolders[0] ? `(${workspace.rootFolders[0].path})` : ""}</span></div>
-        <WorkspaceFileTree
-          workspace={workspace}
-          createdNodes={workspaceNodes}
-          activeRootId={activeTab?.rootFolderId}
-          activePath={activeTab?.kind === "file" ? activeTab.filePath : undefined}
-          onOpenFile={openFile}
-          onCreate={(kind, root, directory) => openModal(kind, root, directory)}
-          onAddRoot={() => openModal("root")}
-          onRemoveRoot={(rootId) => store().removeRootFolder(workspace.id, rootId)}
-          onOpenGitForFile={openGitForFile}
-          refreshToken={refreshToken}
-          query={fileQuery}
-        />
-        </>}
         <section data-testid="workspace-linked-sessions" className="shrink-0 border-t p-1.5" style={{ borderColor: "var(--taomni-chrome-border)" }}>
           <div className="flex items-center justify-between gap-1 text-[10.5px] text-[var(--taomni-text-muted)]">
             <button type="button" data-testid="workspace-linked-sessions-toggle" aria-expanded={linkedOpen} className="inline-flex min-w-0 items-center gap-1 py-1 font-semibold" onClick={() => setLinkedOpenByWorkspace((current) => ({ ...current, [workspace.id]: !linkedOpen }))}><ChevronDown className={`h-3 w-3 ${linkedOpen ? "" : "-rotate-90"}`} />{t("platform.frequentSessions")} ({workspace.pinnedSessionIds.length})</button>
@@ -190,29 +116,6 @@ export function WorkspaceSidebar({ onOpenSessionPicker }: WorkspaceSidebarProps)
             setSidebarCollapsed(false);
           }}
         />
-      )}
-      {!sharedEditor && lens === "structure" && (
-        <div data-testid="workspace-structure-panel" className="min-h-0 flex-1 overflow-auto py-1">
-          {(!activeDocument || activeDocument.loading) && (
-            <div className="px-2 py-2 text-[11px] text-[var(--taomni-text-muted)]">{t("platform.structureEmpty")}</div>
-          )}
-          {activeDocument && !activeDocument.loading && outlineSymbols(activeDocument.text).map((symbol) => (
-            <div
-              key={`${symbol.line}-${symbol.label}`}
-              data-testid="workspace-structure-symbol"
-              data-kind={symbol.kind}
-              className="flex h-[22px] items-center gap-1.5 rounded px-2 hover:bg-[var(--taomni-hover)]"
-              style={{ fontSize: "var(--taomni-ui-font-size)" }}
-            >
-              <span className="w-12 shrink-0 text-[9.5px] uppercase text-[var(--taomni-text-muted)]">{symbol.kind}</span>
-              <span className="truncate">{symbol.label}</span>
-              <span className="ml-auto text-[9.5px] text-[var(--taomni-text-muted)]">{symbol.line}</span>
-            </div>
-          ))}
-          {activeDocument && !activeDocument.loading && outlineSymbols(activeDocument.text).length === 0 && (
-            <div className="px-2 py-2 text-[11px] text-[var(--taomni-text-muted)]">{t("platform.structureEmpty")}</div>
-          )}
-        </div>
       )}
       <button
         type="button"
@@ -239,32 +142,5 @@ export function WorkspaceSidebar({ onOpenSessionPicker }: WorkspaceSidebarProps)
         <span className="shrink-0 text-[10px]" style={{ color: "var(--taomni-accent)" }}>→</span>
       </button>
     </div>
-  );
-}
-
-function ToolbarButton({
-  testId,
-  label,
-  shortcut,
-  onClick,
-  children,
-}: {
-  testId: string;
-  label: string;
-  shortcut?: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      data-testid={testId}
-      aria-label={label}
-      title={shortcut ? `${label} (${shortcut})` : label}
-      className="inline-flex h-6 w-6 items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
-      onClick={onClick}
-    >
-      {children}
-    </button>
   );
 }

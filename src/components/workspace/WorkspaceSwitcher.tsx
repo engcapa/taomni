@@ -33,17 +33,8 @@ export function WorkspaceSwitcher({ onAddFolder }: WorkspaceSwitcherProps) {
   if (!active) return null;
 
   const workspaceMenu = (workspace: PlatformWorkspace) => workspace.id === DEFAULT_WORKSPACE_ID
-    ? [{
-        label: t("platform.addFolderToWorkspace"),
-        testId: "workspace-switcher-menu-add-folder",
-        onClick: onAddFolder,
-      }]
+    ? []
     : [
-        {
-          label: t("platform.addFolderToWorkspace"),
-          testId: "workspace-switcher-menu-add-folder",
-          onClick: onAddFolder,
-        },
         {
           label: t("platform.rename"),
           testId: "workspace-switcher-menu-rename",

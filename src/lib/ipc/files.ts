@@ -79,10 +79,11 @@ export async function getHomeDir(): Promise<string | null> {
 }
 
 export async function selectFolderPath(currentPath?: string): Promise<string | null> {
+  const defaultPath = optionalDialogPath(currentPath) ?? optionalDialogPath(await getHomeDir() ?? undefined);
   return selectOnePath({
     title: "Select folder to open",
     directory: true,
-    defaultPath: optionalDialogPath(currentPath),
+    defaultPath,
   });
 }
 

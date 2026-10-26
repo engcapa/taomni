@@ -6,6 +6,8 @@ mod java_targets;
 use java_targets::*;
 mod task_commands;
 pub use task_commands::*;
+mod listing_commands;
+pub use listing_commands::*;
 mod file_commands;
 pub use file_commands::*;
 mod resource_operations;

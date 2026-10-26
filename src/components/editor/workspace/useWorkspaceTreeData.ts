@@ -273,7 +273,7 @@ export function useWorkspaceTreeData({
   useEffect(() => {
     // Flat view always indexes; tree/compact only index when the filter needs
     // nested matches (substring search cannot walk unloaded directories).
-    const needsFlatIndex = treeViewMode === "flat" || treeViewMode === "files" || treeFilter.trim().length > 0;
+    const needsFlatIndex = treeViewMode === "flat" || treeViewMode === "files" || treeViewMode === "packages" || treeFilter.trim().length > 0;
     if (!needsFlatIndex) return;
     roots.forEach((root) => void loadFlatFiles(root.id));
   }, [loadFlatFiles, reloadVersion, roots, treeFilter, treeViewMode]);

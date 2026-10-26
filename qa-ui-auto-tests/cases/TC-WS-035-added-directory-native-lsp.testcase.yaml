@@ -23,7 +23,8 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-ws-35
 - click: '[data-testid="nav-mode-workspaces"]'
-- click: '[data-testid="workspace-empty-add-folder"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
 - fill:
     selector: '[data-testid="workspace-fs-modal-input"]'
     value: ${fixture.maven_single_root}
@@ -75,10 +76,9 @@ verification:
     - 1
     - 2
     - 3
-    - 4
     - 5
     - 6
-    - 8
+    - 7
     - 9
     - 10
     - 11
@@ -86,37 +86,38 @@ verification:
     - 13
     - 14
     - 15
-    - 19
-    - 20
-    - 22
-    - 24
-    - 25
-    checkpoints:
-    - step: 7
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
-    - step: 16
-      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content[data-language=\"java\"]"}'
-    - step: 17
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"][data-semantic-ready=\"true\"]", "timeout_sec": 180}}'
-    - step: 18
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
-    - step: 21
-      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-dirty=\"true\"]"}'
-    - step: 23
-      expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/App.java", "contains": "// QA_SHARED_NATIVE_LSP"}}'
-    - step: 26
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "// QA_SHARED_NATIVE_LSP"}}'
-    - step: 27
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"][data-semantic-ready=\"true\"]", "timeout_sec": 90}}'
-    results:
-    - 7
     - 16
-    - 17
-    - 18
+    - 20
     - 21
     - 23
+    - 25
     - 26
+    checkpoints:
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content[data-language=\"java\"]"}'
+    - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"][data-semantic-ready=\"true\"]", "timeout_sec": 120}}'
+    - step: 19
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-dirty=\"true\"]"}'
+    - step: 24
+      expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/App.java", "contains": "// QA_SHARED_NATIVE_LSP"}}'
+    - step: 27
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "// QA_SHARED_NATIVE_LSP"}}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"][data-semantic-ready=\"true\"]", "timeout_sec": 90}}'
+    results:
+    - 8
+    - 17
+    - 18
+    - 19
+    - 22
+    - 24
     - 27
+    - 28
   visual:
   - check: Review compact shared editor chrome, tree, tabs and chosen appearance in the retained screenshot.
     method: manual

@@ -63,20 +63,15 @@ describe("PrimaryNavigationRail (TASK-02)", () => {
     expect(within(rail).getByTestId("nav-mode-home").getAttribute("aria-label")).toBe("Home");
   });
 
-  it("UT-WS-02-02 merges the IDEA workspace tool windows into the primary rail", () => {
+  it("provides one shared tool host even before an empty workspace has files", () => {
     useAppStore.setState({ activeSideTab: "workspaces" });
-    render(<PrimaryNavigationRail />);
-    const merged = screen.getByTestId("workspace-merged-tool-rail");
-    expect(merged).toBeInTheDocument();
-    expect(within(merged).getByTestId("code-workspace-tool-rail-left")).toBeInTheDocument();
-    const order = Array.from(merged.querySelectorAll<HTMLElement>("button")).map((button) => button.dataset.testid);
-    expect(order).toEqual([
-      "code-workspace-tool-rail-project",
-      "code-workspace-tool-rail-sessions",
-      "code-workspace-tool-rail-git",
-      "code-workspace-tool-rail-structure",
-      "code-workspace-bottom-tab-overflow",
-    ]);
+    const attach = vi.fn();
+    render(<PrimaryNavigationRail railHostRef={attach} />);
+    expect(attach).toHaveBeenCalledWith(screen.getByTestId("sidebar-tool-window-rail"));
+    expect(screen.queryByTestId("workspace-merged-tool-rail")).not.toBeInTheDocument();
+    // Real workspace tools and actions are exercised with their runtime in
+    // WorkspaceGitIntegration, rather than a second mock tool implementation.
+    expect(screen.queryByTestId("code-workspace-tool-rail-project")).not.toBeInTheDocument();
   });
 
   it("opens Sessions from Home without replacing the active editor group's preference", () => {
@@ -106,18 +101,6 @@ describe("PrimaryNavigationRail (TASK-02)", () => {
       expect(screen.queryByTestId("code-workspace-tool-rail-project")).not.toBeInTheDocument();
       expect(screen.queryByTestId("workspace-merged-tool-rail")).not.toBeInTheDocument();
       unmount();
-    }
-  });
-
-  it("UT-WS-02-04 keeps every IDEA tool window entry in the overflow menu", () => {
-    useAppStore.setState({ activeSideTab: "workspaces" });
-    render(<PrimaryNavigationRail />);
-    fireEvent.click(screen.getByTestId("code-workspace-bottom-tab-overflow"));
-    const menu = screen.getByTestId("context-menu");
-    const labels = Array.from(menu.querySelectorAll<HTMLElement>('[role="menuitem"], button')).map((entry) => entry.textContent ?? "");
-    const flat = labels.join(" | ");
-    for (const expected of ["Terminal", "Problems", "Run / Debug", "Find", "Bookmarks", "TODO", "Services", "Database", "Show Tool Window Names", "Move to"]) {
-      expect(flat).toContain(expected);
     }
   });
 

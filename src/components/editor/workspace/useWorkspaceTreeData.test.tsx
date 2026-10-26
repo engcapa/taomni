@@ -141,7 +141,7 @@ describe("useWorkspaceTreeData", () => {
     expect(result.current.compactChains["root-1:src"]).toMatchObject({ path: "src/changed", loading: false });
   });
 
-  it.each(["flat", "files", "tree"] as const)("refreshes a retained recursive index in %s view", async (mode) => {
+  it.each(["flat", "files", "tree", "packages"] as const)("refreshes a retained recursive index in %s view", async (mode) => {
     const onError = vi.fn();
     workspaceMocks.workspaceListFilesRecursive.mockResolvedValue(ready([ENTRY]));
     const { result } = renderHook(() => useWorkspaceTreeData({

@@ -280,6 +280,8 @@ export function useWorkspaceSurfaceComposition(context: UseWorkspaceSurfaceCompo
     get toolWindowOptionsItems() { return toolWindowOptionsItems; },
     treeShowDetails: project.projectTree.treeShowDetails,
     setTreeShowDetails: project.projectTree.setTreeShowDetails,
+    treeSort: project.projectTree.treeSort,
+    setTreeSort: project.projectTree.setTreeSort,
     roots: project.projectTree.roots,
     looseFiles: project.projectTree.looseFiles,
     treeData: project.projectTree.treeData,

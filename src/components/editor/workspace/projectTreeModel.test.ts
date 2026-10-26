@@ -88,6 +88,11 @@ describe("project tree model helpers", () => {
     expect(isFlatViewSourceFile("target/debug/foo.rs")).toBe(false);
     expect(isFlatViewSourceFile("output/build.log")).toBe(false);
     expect(isFlatViewSourceFile("src/README.md")).toBe(false);
+    expect(isFlatViewSourceFile("src/main/java/com/example/App.java")).toBe(true);
+    expect(isFlatViewSourceFile("src/test/java/org/doc/AppTest.java")).toBe(true);
+    expect(isFlatViewSourceFile("module/src/main/kotlin/org/example/App.kt")).toBe(true);
+    expect(isFlatViewSourceFile("examples/demo/src/main/java/org/demo/App.java")).toBe(false);
+    expect(isFlatViewSourceFile("src/main/java/node_modules/App.java")).toBe(false);
 
     expect(flatSourceGroup("src/http2_connect.rs")).toBe("src");
     expect(flatSourceGroup("src-tauri/src/lib.rs")).toBe("src-tauri/src");

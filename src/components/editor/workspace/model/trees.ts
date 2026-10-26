@@ -156,8 +156,13 @@ export function isDocumentationPath(path: string): boolean {
  */
 export function isFlatViewSourceFile(path: string): boolean {
   const normalized = normalizeWorkspacePath(path);
-  if (!normalized || pathHasExcludedSegment(normalized)) return false;
-  if (isDocumentationPath(normalized)) return false;
+  // Java/Kotlin package segments are namespace names: com.example, org.doc,
+  // etc. are real source packages, not sample/documentation containers.
+  const packageSource = /^((?:.*\/)?src\/(?:main|test)\/(?:java|kotlin))\//.exec(normalized)?.[1];
+  const containers = packageSource ?? normalized;
+  if (!normalized || pathHasExcludedSegment(containers)) return false;
+  if (normalized.split("/").some((segment) => HEAVY_DIR_NAMES.has(segment))) return false;
+  if (isDocumentationPath(containers)) return false;
   if (!lspPresetIdForPath(normalized)) return false;
   return languageSourceRootFor(normalized) != null;
 }

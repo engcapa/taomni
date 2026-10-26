@@ -31,7 +31,7 @@ function TreeHarness({ mode }: { mode: ProjectTreeProps["treeViewMode"] }) {
 
 describe("ProjectTree navigation across views", () => {
   afterEach(cleanup);
-  it.each(["tree", "compact", "flat"] as const)("keeps selection and visible ancestry in %s view, including loose files", (mode) => {
+  it.each(["tree", "compact", "flat", "list", "packages"] as const)("keeps selection and visible ancestry in %s view, including loose files", (mode) => {
     open.mockClear();
     render(<TreeHarness mode={mode} />);
     const tree = screen.getByRole("tree");
@@ -39,12 +39,12 @@ describe("ProjectTree navigation across views", () => {
     press("Home");
     expect(screen.getByTestId("code-workspace-tree-root")).toHaveAttribute("aria-selected", "true");
     press("ArrowRight");
-    if (mode !== "flat") press("ArrowRight");
-    const file = screen.getByTestId(mode === "flat" ? "code-workspace-flat-file" : "code-workspace-tree-file");
+    if (mode !== "flat" && mode !== "packages") press("ArrowRight");
+    const file = screen.getByTestId((mode === "flat" || mode === "packages") ? "code-workspace-flat-file" : "code-workspace-tree-file");
     expect(file).toHaveFocus();
     expect(file).toHaveAttribute("aria-selected", "true");
     press("ArrowLeft");
-    expect(screen.getByTestId(mode === "flat" ? "code-workspace-tree-root" : "code-workspace-tree-dir")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId((mode === "flat" || mode === "packages") ? "code-workspace-tree-root" : "code-workspace-tree-dir")).toHaveAttribute("aria-selected", "true");
     press("End");
     const loose = screen.getByTestId("code-workspace-tree-loose-file");
     expect(loose).toHaveFocus();

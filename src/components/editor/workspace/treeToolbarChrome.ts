@@ -27,7 +27,7 @@ export function treeToolbarVisibility(density: TreeToolbarDensity): TreeToolbarV
   return { showExpandAll: density !== "narrow" };
 }
 
-export type FileTreeViewMode = "tree" | "compact" | "flat" | "files";
+export type FileTreeViewMode = "tree" | "compact" | "flat" | "files" | "list" | "packages";
 
 const VIEW_CYCLE: FileTreeViewMode[] = ["tree", "compact", "flat"];
 
@@ -46,12 +46,16 @@ export function treeViewModeLabel(mode: FileTreeViewMode): string {
       return "Flat file view";
     case "files":
       return "All files";
+    case "list":
+      return "Details list";
+    case "packages":
+      return "Packages";
   }
 }
 
 /** Header title of the view selector: IDEA "Project", or the flat file list. */
 export function treeViewTitle(mode: FileTreeViewMode): string {
-  return mode === "files" ? "All Files" : mode === "flat" ? "Project Files" : "Project";
+  return mode === "list" ? "Details List" : mode === "packages" ? "Packages" : mode === "files" ? "All Files" : mode === "flat" ? "Project Files" : "Project";
 }
 
 /**
@@ -60,20 +64,29 @@ export function treeViewTitle(mode: FileTreeViewMode): string {
  */
 export function treeFileDetails(size: number, mtime: number, locale?: string): string {
   const parts: string[] = [];
-  if (Number.isFinite(mtime) && mtime > 0) {
-    const ms = mtime < 1e12 ? mtime * 1000 : mtime;
-    const date = new Date(ms);
-    parts.push(new Intl.DateTimeFormat(locale, {
+  const date = treeModifiedDate(mtime, locale);
+  if (date) parts.push(date);
+  if (Number.isFinite(size) && size >= 0) parts.push(formatTreeBytes(size));
+  return parts.join(", ");
+}
+
+const dateFormats = new Map<string, Intl.DateTimeFormat>();
+export function treeModifiedDate(mtime: number, locale?: string): string {
+  if (!Number.isFinite(mtime) || mtime <= 0) return "";
+  const key = locale ?? "default";
+  let formatter = dateFormats.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat(locale, {
       year: "numeric",
       month: "numeric",
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
-    }).format(date).replace(/,\s*/, " "));
+    });
+    dateFormats.set(key, formatter);
   }
-  if (Number.isFinite(size) && size >= 0) parts.push(formatTreeBytes(size));
-  return parts.join(", ");
+  return formatter.format(new Date(mtime < 1e12 ? mtime * 1000 : mtime)).replace(/,\s*/, " ");
 }
 
 export function formatTreeBytes(size: number): string {

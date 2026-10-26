@@ -1,11 +1,59 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前追加验收进行中：共享 Code Workspace/LSP、混合文件浏览、文件/会话冷启动恢复、广播目标选择、紧凑 Sessions 导航及重复 Git 按钮修复均已实现。本机已完成多批 browser/native 回归；三平台相关集和全量验收仍在推进。以本节最新记录为准，下文历史源码与运行编号不能视为当前版本的全量通过证明。
+> 上一轮 `9f3ada0f` 已在合并 main 后通过三平台 browser/native 相关集 **1,276/1,276** 与全量 **2,036/2,036**。本轮追加空工作区共享文件区、列表/排序/包平铺及 LSP 非阻塞验收，本机 browser **9/9**、native **9/9** 已通过；GitHub 三平台复验待执行，以下历史通过结果不代表本轮托管结果。性能对照将在新增功能全量通过后完成。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
+
+## 空工作区文件浏览器追加实现（2026-10-26）
+
+空工作区现在挂载与有目录工作区相同的 Code Workspace 文件区及工具窗口，支持直接打开文件或系统目录选择器；初始不挂载 HOME，选择器默认定位 HOME，未打开文件时常用会话默认收起。删除空工作区的降级工具栏和重复 Add Folder 菜单，复用真实 Project、Sessions、Git 与完整工具窗口溢出菜单。
+
+新增 Detailed List 的名称、大小、类型、修改时间列，以及自然排序、升降序、目录优先和偏好恢复；名称列在横向滚动时固定可见，宽度跟随侧栏。新增 Packages 和 Appearance → Flatten Packages，同名包按 main/test 源码根区分，仍可打开原文件、重命名、编辑和保存。修复旧源码过滤把 `com.example` 误判为 examples 容器的问题，继续排除实际示例项目及构建/依赖目录。
+
+目录读取、递归索引、Git 发现和语言服务/扩展探测均通过原生后台任务执行。恢复草稿不等待语言服务初始化；真实 stdio 测试服务将 initialize 暂停，在释放前完成目录展开、普通文档打开、排序及工作区切换，并检查迟到回复不切回旧文档。
+
+Browser 曾实际复现首次添加目录的 `Maximum update depth exceeded`：编辑器在同步新 host 根目录的提交中发布了旧 roots 与新 repoRoot，父窗口命令注册触发状态回写循环。现在在提交 effect 之前同步新输入定义，新增根自动展开、已有根保留原展开状态；挂载测试使用真实父窗口命令注册状态，保留修复前失败日志。
+
+新增 `TC-WS-040/041` browser 与 `TC-WS-042/043` native，迁移既有文件区、恢复、主题和崩溃回归的入口；`TC-WS-003` 实际打开 Terminal、Search、TODO、Coverage、Structure 并切换 Sessions/Project。
+
+最终本机 browser `workspace-browser/run-20261026-164121-553892673` 为 **9/9 passed**（2 workers），native `workspace-native/run-20261026-163507-030400079` 为 **9/9 passed**（顺序执行）。两批均 `identity_stable=true`，签名回执、源码/runner/用例及原生构建身份由 `load_observations` 独立核验；记录在 `_local/workspace-explorer-local-evidence.json`。Browser 首批保留的两个页面重载失败随后在单独批次和完整 9 条批次中均通过，没有修改断言。Native 覆盖真实系统目录选择、磁盘读写、JDTLS 补全、冷启动、面板恢复和真实 stdio 服务初始化等待。
+
+112 项相关 frontend 测试、14 项源码过滤测试、74 项 Rust workspace 测试及慢 LSP fixture 契约通过；`pnpm build --mode qa`（含 `pnpm check:refactor`）、Rust 格式和 QA 静态覆盖门禁通过。当前 QA 二进制 `src-tauri/target/qa-ui-auto/debug/taomni` 的 SHA-256 为 `cc32aa46218aef608e6398e03004f5512e9aae13fd64fc4520fb8acecf210ae7`，产品源码指纹为 `c047370f9e53dc1084dd418366813fa6eac1dbf0253212d08986470e774cce58`。下一轮使用 393 个精确相关 ID，三平台全绿后再跑整体。
+
+## 上一轮功能验收（2026-10-26，9f3ada0f）
+
+已拉取并合并远程 main `a57437927b62d6036a6d473eddccc053a4b4c0e8`，合并提交为 `f1297db1`。合并后修复侧栏状态和跨平台测试工具边界，再以同一最终提交 `9f3ada0f685b01a391f54fdd62dc2061d23ba4b3` 执行完整相关集，全部通过后才启动全量。两次运行均使用 `qa-ui-auto-platforms` workflow；下表是用例回执结果，并非仅依据 job 的 success。
+
+交付包含 Home / Sessions / Workspaces 的入口归属、全局及 Sessions 大预览、合并筛选与紧凑标签导航、广播目标选择、系统目录选择、终端右键菜单，以及共享 Code Workspace 的文件树、编辑器、LSP、外部磁盘变更与文件/会话/草稿恢复。全局主题与字体设置继续生效；重复 Chat / Git 入口及 Tao 靠边悬浮已清理。Agents Crew 按用户要求保留“开发中”按钮，不宣称其调度功能已交付。
+
+| 平台 | 相关 browser / native | 全量 browser / native |
+| --- | ---: | ---: |
+| Linux | 266 / 176 | 432 / 264（含 1 条双屏用例） |
+| Windows | 266 / 158 | 432 / 246 |
+| macOS | 265 / 145 | 430 / 232 |
+| 合计 | **1,276 / 1,276 passed** | **2,036 / 2,036 passed** |
+
+- 相关集：[40269136009](https://github.com/engcapa/taomni/actions/runs/40269136009)，389 个适用 ID。
+- 全量：[40273044230](https://github.com/engcapa/taomni/actions/runs/40273044230)，625 个目录 ID 中的 624 个适用 ID。
+- 独立核验 `_local/verify-workspace-hosted-evidence.py` 读取原始签名回执，重新检查选择、执行配置、source/runner/case/native build 身份、summary hash 及聚合一致性；结果为 `_local/workspace-final-hosted-evidence.json`。两次执行均为 0 failed / case skipped / infrastructure errors，未用不同 runner 的历史通过结果拼接最终全绿。
+- 唯一外部缺口：`TC-IDE-C6-06-java-definition-realproject-native` 依赖仓库未提供的 clickhousecrud（`QA_JAVA_PROJECT_ROOT`）；按用户确认的既有 policy 在三个 native 平台单列 gap，不计为通过。
+
+`TC-WS-038/039` 在上述两次三平台 browser/native 运行中均通过，覆盖用户手工发现的隐藏编辑器恢复崩溃，以及真实面板组件的嵌套分栏、拖动、键盘调整、模式切换、预览和重载。每个平台 native 的两个用例共有 13 个已安装的运行时检查点；未捕获异常、未处理 Promise、生产 React 根错误或崩溃页都会失败，监控缺失也会失败。具体修复和检测负控制见后面的历史记录。
+
+本机最新补充批次 browser `workspace-browser/run-20261026-122400-614861793`（WS-038/039 2/2）与 native `workspace-native/run-20261026-122433-182786478`（MAIL-001、CANCEL-002、WS-038/039 4/4）均通过且 `identity_stable=true`；更早合并后的受影响功能覆盖共 56 个不同 ID，见对应批次记录。本机始终最多 2 个 UI worker，native 独占顺序执行，使用隔离 QA profile 与私有 Secret Service，不清理个人数据。
+
+该轮 QA v15 的 ID 为 `com.taomni.app.qa`，SHA-256 为 `830f9d952ca304ceaca5a5f910b525614ca8202632af9a6d12357b4a91739847`，产品 source SHA-256 为 `0f145a26430319575478de9cdc84fc63f667bc7b8be21373a7a3e4fa982bce94`。`src-tauri/target/qa-ui-auto/debug/taomni` 会随当前构建更新，不以此历史哈希说明当前文件。
+
+## 性能审查与实测
+
+在全量回执独立核验通过后进行。main 与候选版本在独立桌面、相同工具链和构建输入下交错采样；原始结果位于 `qa-ui-auto-report/workspace-performance/`，方法、构建条件及失败诊断保留于 `_local/workspace-perf-plan.json`、`workspace-perf-conditions.json`。最终对照结果将在本节补全。
+
+## 历史实现与修复记录
+
+以下记录保留各阶段的失败、定位与复验过程。诸如“下一轮”“仍在执行”等措辞描述当时状态；当前功能结论以上面的最终验收为准。
 
 ## Windows 备份独立校验竞态（2026-10-26）
 

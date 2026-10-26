@@ -1,8 +1,9 @@
 use super::*;
-#[test]
-fn rejects_parent_dir_escape() {
+#[tokio::test]
+async fn rejects_parent_dir_escape() {
     let dir = tempfile::tempdir().unwrap();
     let err = workspace_list_dir(dir.path().to_string_lossy().to_string(), Some("../".into()))
+        .await
         .unwrap_err();
     assert!(err.contains(".."));
 }

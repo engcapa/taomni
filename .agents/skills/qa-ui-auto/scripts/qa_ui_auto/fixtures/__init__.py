@@ -64,7 +64,7 @@ from . import ssh_features_required
 from . import session_config
 from . import x11_session_required
 from . import project_tree
-from . import workspace_explorer
+from . import workspace_explorer, workspace_slow_lsp
 from . import parity005_completion
 from . import parity006_replace
 from . import parity008_git
@@ -128,6 +128,7 @@ REGISTRY: dict[str, Fixture] = {
     "linux_desktop_required": Fixture("linux_desktop_required", linux_desktop_required.setup),
     "workspace_root": Fixture("workspace_root", workspace_root.setup, workspace_root.teardown),
     "workspace_explorer": Fixture("workspace_explorer", workspace_explorer.setup),
+    "workspace_slow_lsp": Fixture("workspace_slow_lsp", workspace_slow_lsp.setup),
     "platform_workspace_root": Fixture("platform_workspace_root", platform_workspace_root.setup, platform_workspace_root.teardown),
     "workspace_restore_sessions": Fixture("workspace_restore_sessions", workspace_restore_sessions.setup, workspace_restore_sessions.teardown),
     "java_sample_projects": Fixture("java_sample_projects", java_sample_projects.setup),

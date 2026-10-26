@@ -1,4 +1,4 @@
-import { Bookmark, Bug, Database, FilePlus2, FolderPlus, ListTodo, MonitorSmartphone, Search, Server, Terminal, TriangleAlert, X } from "lucide-react";
+import { Bookmark, Bug, Database, ListTodo, Search, Server, Terminal, TriangleAlert, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { type WorkspaceCodeEditorProps } from "./WorkspaceCodeEditor";
 import { WorkspaceFileSurface } from "./WorkspaceFileSurface";
@@ -64,15 +64,12 @@ function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange, onEdi
   const workspace = useWorkspacePlatformStore((s) => s.workspaces.find((candidate) => candidate.id === workspaceId));
   const setActiveTab = useWorkspacePlatformStore((s) => s.setActiveWorkspaceTab);
   const openFileInWorkspace = useWorkspacePlatformStore((s) => s.openFileInWorkspace);
-  const openLocalTerminal = useWorkspacePlatformStore((s) => s.openLocalTerminalInWorkspace);
   const setBottomDockOpen = useWorkspacePlatformStore((s) => s.setBottomDockOpen);
   const setBottomDockTool = useWorkspacePlatformStore((s) => s.setBottomDockTool);
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const sessionPickerOpen = useWorkspaceUiStore((s) => s.sessionPickerOpen);
   const sessionPickerWorkspaceId = useWorkspaceUiStore((s) => s.sessionPickerWorkspaceId);
   const closeSessionPicker = useWorkspaceUiStore((s) => s.closeSessionPicker);
-  const openSessionPicker = useWorkspaceUiStore((s) => s.openSessionPicker);
-  const openFsModal = useWorkspaceUiStore((s) => s.openFsModal);
   const fsModal = useWorkspaceUiStore((s) => s.fsModal);
   const closeFsModal = useWorkspaceUiStore((s) => s.closeFsModal);
   const canvasLayout = useWorkspaceUiStore((s) => s.canvasLayouts[workspaceId] ?? "single");
@@ -118,35 +115,11 @@ function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange, onEdi
   return (
     <div data-workspace-id={workspace.id} className="relative flex h-full min-h-0 min-w-0 flex-1 flex-col" style={{ display: visible ? "flex" : "none" }}>
       <div data-testid="workspace-canvas-panes" data-layout={canvasLayout} className="relative grid min-h-0 flex-1 gap-px" style={{ gridTemplateColumns: canvasLayout === "single" || surfaceCount < 2 ? "minmax(0, 1fr)" : "repeat(2, minmax(0, 1fr))", gridTemplateRows: canvasLayout === "grid" && surfaceCount > 2 ? "repeat(2, minmax(0, 1fr))" : "minmax(0, 1fr)", background: "var(--taomni-divider)" }}>
-        {!activeTab && codeTab === undefined && (
-          <div data-testid="workspace-empty-state" className="flex flex-1 flex-col items-center justify-center gap-3 p-6">
-            <div className="text-[14px] font-semibold">{t("platform.emptyWorkspaceTitle")}</div>
-            <div className="text-[11.5px]" style={{ color: "var(--taomni-text-muted)" }}>{t("platform.emptyWorkspaceHint")}</div>
-            <div className="flex flex-wrap items-center justify-center gap-2">
-              <button type="button" data-testid="workspace-empty-add-folder" className="taomni-btn h-7 px-2 inline-flex items-center gap-1" onClick={() => openFsModal({ kind: "root", directory: "" })}>
-                <FolderPlus className="h-3.5 w-3.5" />
-                {t("platform.addRootFolder")}
-              </button>
-              <button type="button" data-testid="workspace-empty-new-file" className="taomni-btn h-7 px-2 inline-flex items-center gap-1" onClick={() => openFsModal({ kind: "file", directory: "" })}>
-                <FilePlus2 className="h-3.5 w-3.5" />
-                {t("platform.newFile")}
-              </button>
-              <button type="button" data-testid="workspace-empty-open-session" className="taomni-btn h-7 px-2 inline-flex items-center gap-1" onClick={() => openSessionPicker(workspace.id)}>
-                <MonitorSmartphone className="h-3.5 w-3.5" />
-                {t("platform.openAnySession")}
-              </button>
-              <button type="button" data-testid="workspace-empty-local-terminal" className="taomni-btn h-7 px-2 inline-flex items-center gap-1" onClick={() => openLocalTerminal(workspace.id)}>
-                {t("platform.newLocalTerminal")}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {(workspace.rootFolders.length > 0 || codeTab || workspace.openTabs.some((tab) => tab.kind === "file")) && (() => {
+        {(() => {
           const editorTab = ordered.find((tab) => (tab.kind === "file" || tab.kind === "code") && paneIds.has(tab.id));
           return <div data-testid="workspace-canvas-pane" data-tab-id={editorTab?.id}
-            style={{ display: editorTab ? "block" : "none", minWidth: 0, overflow: "hidden" }}>
-            <WorkspaceFileSurface workspace={workspace} visible={!!editorTab && visible} onCommandsChange={onCommandsChange} />
+            style={{ display: editorTab || !activeTab ? "block" : "none", minWidth: 0, overflow: "hidden" }}>
+            <WorkspaceFileSurface workspace={workspace} visible={visible && (!!editorTab || !activeTab)} onCommandsChange={onCommandsChange} />
           </div>;
         })()}
 
