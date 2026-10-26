@@ -1,6 +1,6 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 上一轮 `9f3ada0f` 已在合并 main 后通过三平台 browser/native 相关集 **1,276/1,276** 与全量 **2,036/2,036**。本轮追加空工作区共享文件区、列表/排序/包平铺及 LSP 非阻塞验收，并修复手测发现的 Home 恢复子目录 Empty 问题。本机当前源码的 **10 个 browser ID、12 个 native ID** 最新适用结果全部通过；GitHub 三平台复验待执行，以下历史通过结果不代表本轮托管结果。性能对照将在新增功能全量通过后完成。
+> 上一轮 `9f3ada0f` 已在合并 main 后通过三平台 browser/native 相关集 **1,276/1,276** 与全量 **2,036/2,036**。本轮追加空工作区共享文件区、列表/排序/包平铺及 LSP 非阻塞验收，并修复手测发现的 Home 恢复子目录 Empty 问题。本机当前源码的 **71 个 browser ID、14 个 native ID** 最新适用结果全部通过；GitHub 首轮相关集发现空编辑器入口退化，已修复并准备重跑三平台，以下历史通过结果不代表本轮托管结果。性能对照将在新增功能全量通过后完成。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
@@ -18,6 +18,14 @@
 当前源码本机 native `workspace-native/run-20261026-171519-113425853` 为 **12/12 passed**，包含全部新增文件区用例、冷启动和原有 Code Workspace 的原生树键盘导航及焦点转移。Browser 主批次 `workspace-browser/run-20261026-170915-852827221` 为 9 passed / 1 页面意外重载失败，原断言不变的 `TC-WS-036` 在 `run-20261026-171519-039833829` 通过；10 个 browser ID 的最新适用结果全部 passed。三个批次均 `identity_stable=true`，签名回执及所有身份由 `load_observations` 核验，记录在 `_local/workspace-restored-tree-local-evidence.json`；没有删除首次失败。
 
 QA 原生构建、`pnpm check:refactor`、Rust 格式及 630 个目录 ID 的静态 QA 门禁通过。当前 `com.taomni.app.qa` 二进制为 `src-tauri/target/qa-ui-auto/debug/taomni`，SHA-256 `c0b34cad944fa390d7f30c09d878a481e5bc2f94ac3a5b23ffb62e0365765f3b`，产品源码指纹 `48f19b2cf00af8679ab43f6e21ebc0ab31f87e774d3a1a96a079b9d733666bdf`。新一轮三平台相关集使用 394 个精确 ID，全部通过后再执行整体。
+
+## 显式编辑器入口文件区回归（2026-10-26）
+
+相关集 [40299441030](https://github.com/engcapa/taomni/actions/runs/40299441030) 的三平台 browser 回执为 608 passed / 198 failed，涉及 66 个不同失败 ID。截图、DOM 和 trace 确认：Tools → Code Workspace 在没有目录时仍主动收起主左栏；文件区改为共享 Code Workspace 并移入该左栏后，添加目录及打开文件按钮随之隐藏。主边栏用例另保留了旧的“收起状态首次点击 Project 继续隐藏”的预期。原生构建与契约完成后取消剩余旧源码执行，不将该运行计为通过。
+
+显式编辑器入口现在选择 Project 并展开文件区，包括从工作区 Sessions 工具返回的情况。普通模式切换仍使用既有独立折叠偏好；大预览激活会话的行为不受此次入口修复影响。新增双模式 `TC-WS-045` 覆盖空编辑器、折叠/Project、Sessions 工具、Tools 与 Home 再进入以及单一运行实例，原边栏用例改为显式收起后验证收起布局，并同时保留 Project 展开/收起断言。当前修复本机 browser 主批次 `workspace-browser/run-20261026-175251-105079829` 为 67 passed / 4 failed；布局和边栏选择器迁移后，`run-20261026-180539-300355761` 的原 4 条全部通过。另两条失败的 trace 显示 document 请求分别发生在 09:56:23.939Z 与 09:56:24.121Z，与更新本报告（09:56:23.849Z）触发的开发服务器刷新相符；随后冻结文件写入，分屏及 keymap 原断言通过。没有修改产品实现规避此测试干扰。
+
+Native `workspace-native/run-20261026-181135-743400216` 为 **14/14 passed**，包含系统目录选择、LSP 等待、冷启动、目录恢复、主边栏及新增入口。三个批次均 `identity_stable=true`；签名回执与 source/runner/case/native build 身份由 `load_observations` 独立核验，**71 个 browser ID、14 个 native ID** 最新结果全部 passed，记录在 `_local/workspace-empty-entry-local-evidence.json`。当前 QA 二进制 SHA-256 为 `e9bf3f859f80e655015e8051c242241900622ec7f48153341771d92490b6cb5d`，源码指纹 `8e995322a4cd9fb01882821f166c4f707445ba694c2943f57f81f5211c61e585`。6 项入口单测、QA 原生构建（含 `pnpm check:refactor`）及 631 ID 静态门禁通过。托管完整相关集新增 `TC-WS-045`，共 395 个精确 ID，通过后才执行整体。
 
 ## 空工作区文件浏览器追加实现（2026-10-26）
 

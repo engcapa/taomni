@@ -1,7 +1,7 @@
 id: TC-IDE-PARITY-027-01
 title: Code Workspace belongs to Workspaces with one grouped rail, persistent names and Project width
-description: Retains Project show/hide, names, pixel width, cross-mode isolation and reload recovery. The Workspaces design always merges the editor rail,
-  including with the legacy merge preference off.
+description: Retains Project show/hide, names, pixel width, cross-mode isolation and reload recovery. The Workspaces design always merges the editor rail, including
+  with the legacy merge preference off. Explicit Code Workspace entry reveals the file area; collapsed rail checks use the sidebar toggle explicitly.
 covers:
 - F1.2
 - F25.5
@@ -26,7 +26,7 @@ steps:
     selector: '[data-testid="nav-mode-workspaces"]'
     name: aria-pressed
     equals: 'true'
-- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- wait_for: '[data-testid="expanded-sidebar-panel"]'
 - wait_for: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-tool-rail-left"]'
 - assert_count:
     selector: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
@@ -137,7 +137,7 @@ verification:
     - step: 7
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"nav-mode-workspaces\"]", "name": "aria-pressed", "equals": "true"}}'
     - step: 8
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"expanded-sidebar-panel\"]"}'
     - step: 9
       expectation: '{"wait_for": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
     - step: 10
@@ -150,8 +150,8 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
     - step: 16
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree-pane\"]'').getBoundingClientRect().width
-        >= 180 && document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree-pane\"]'').getBoundingClientRect().width < 500",
-        "expect_truthy": true}}'
+        >= 180 && document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree-pane\"]'').getBoundingClientRect().width < 500", "expect_truthy":
+        true}}'
     - step: 18
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-pane\"]", "state": "hidden", "timeout_sec": 5}}'
     - step: 20
@@ -159,13 +159,14 @@ verification:
     - step: 23
       expectation: '{"wait_for": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"][data-show-names=\"true\"]"}'
     - step: 24
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]",
-        "equals": "Project"}}'
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]", "equals":
+        "Project"}}'
     - step: 27
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]",
-        "equals": ""}}'
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]", "equals":
+        ""}}'
     - step: 29
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]", "name":
+        "aria-pressed", "equals": "true"}}'
     - step: 30
       expectation: '{"wait_for": "[data-testid=\"expanded-sidebar-panel\"]"}'
     - step: 31

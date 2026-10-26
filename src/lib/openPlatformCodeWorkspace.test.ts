@@ -50,8 +50,12 @@ describe("editor entry point ownership", () => {
   });
 
   it("routes context-free Code Editor to the default workspace without creating duplicate code tabs", () => {
+    useWorkspacePlatformStore.getState().setActiveLeftToolWindow(DEFAULT_WORKSPACE_ID, "sessions");
+    useAppStore.getState().setSidebarCollapsed(true);
     const id = openPlatformCodeWorkspace({ repoRoot: "" });
     expect(id).toBe(DEFAULT_WORKSPACE_ID);
+    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+    expect(useWorkspacePlatformStore.getState().getWorkspace(id)?.activeLeftToolWindow).toBe("project");
     expect(openPlatformCodeWorkspace({ repoRoot: "" })).toBe(id);
     expect(useWorkspacePlatformStore.getState().workspaces).toHaveLength(1);
     expect(useWorkspacePlatformStore.getState().getWorkspace(id)?.openTabs).toHaveLength(1);

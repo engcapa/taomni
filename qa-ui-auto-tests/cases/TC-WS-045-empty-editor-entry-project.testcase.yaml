@@ -1,0 +1,126 @@
+id: TC-WS-045
+title: Explicit Code Workspace entry reveals empty files after collapsed or Sessions navigator
+description: Open the context-free editor from Tools, retain the empty file area and one editor runtime; collapse/reopen Project, select workspace Sessions,
+  and reenter from Tools and Home. Explicit editor entry reveals Project without mounting a directory.
+modes:
+- browser
+- native
+covers:
+- F-WS-2
+- F25.1
+- F25.5
+- F6.2
+tags:
+- p0
+- workspace-redesign
+- file-explorer
+- regression
+- sidebar
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-empty-editor-entry
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tree-empty"]'
+- assert_attribute:
+    selector: '[data-testid="nav-mode-workspaces"]'
+    name: aria-pressed
+    equals: 'true'
+- assert_visible: '[data-testid="code-workspace-tree-add-folder"]'
+- assert_visible: '[data-testid="code-workspace-tree-open-file"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 1
+- click: '[data-testid="toggle-left-sidebar"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- assert_not_visible: '[data-testid="code-workspace-tree-empty"]'
+- click: '[data-testid="code-workspace-tool-rail-project"]'
+- wait_for: '[data-testid="code-workspace-tree-empty"]'
+- assert_visible: '[data-testid="expanded-sidebar-panel"]'
+- click: '[data-testid="code-workspace-tool-rail-sessions"]'
+- wait_for: '[data-testid="workspace-sessions-panel"]'
+- assert_not_visible: '[data-testid="code-workspace-tree-empty"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tree-empty"]'
+- assert_not_visible: '[data-testid="workspace-sessions-panel"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tool-rail-project"]'
+    name: aria-pressed
+    equals: 'true'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="code-workspace-tree-empty"]'
+- assert_visible: '[data-testid="code-workspace-tree-add-folder"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 1
+- assert_no_runtime_errors: null
+- screenshot: workspace-empty-editor-entry.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The explicit editor entry shows the empty Project controls after collapsed or workspace Sessions states, reuses one editor and keeps sidebar
+      toggles usable.
+    actions:
+    - 3
+    - 4
+    - 10
+    - 13
+    - 16
+    - 19
+    - 20
+    - 24
+    - 25
+    - 26
+    results:
+    - 6
+    - 7
+    - 8
+    - 9
+    - 12
+    - 15
+    - 18
+    - 22
+    - 23
+    - 28
+    - 29
+    - 30
+    checkpoints:
+    - step: 6
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"nav-mode-workspaces\"]", "name": "aria-pressed", "equals": "true"}}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-add-folder\"]"}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-open-file\"]"}'
+    - step: 9
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
+    - step: 12
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree-empty\"]"}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 18
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree-empty\"]"}'
+    - step: 22
+      expectation: '{"assert_not_visible": "[data-testid=\"workspace-sessions-panel\"]"}'
+    - step: 23
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
+    - step: 28
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-add-folder\"]"}'
+    - step: 29
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
+    - step: 30
+      expectation: '{"assert_no_runtime_errors": null}'
+  visual:
+  - check: Review the visible empty file area, grouped rail and one editor in the retained screenshot.
+    method: manual
+    reason: Visibility assertions do not establish visual fidelity.
+  native:
+  - check: Run the same entry and collapse/Project/Sessions interactions in the packaged WebView.
+    method: automated
+    reason: This validates native WebView layout and input; disk/chooser behavior remains in TC-WS-042/043/044.
