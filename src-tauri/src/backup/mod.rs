@@ -1,4 +1,5 @@
 mod archive_writer;
+mod atomic_replace;
 pub mod batch;
 pub mod cache;
 pub mod commands;

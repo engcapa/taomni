@@ -136,6 +136,12 @@ steps:
 - assert_count:
     selector: '[data-testid="backup-cloud-job"][data-operation="local"][data-phase="completed"]'
     equal: 5
+- assert_count:
+    selector: '[data-testid="backup-cloud-job"][data-operation="local"][data-phase="packing"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="backup-cloud-job"][data-operation="local"][data-phase="failed"]'
+    equal: 0
 - screenshot: backup-native-mail-subcategories.png
 verification:
   review: reviewed
@@ -209,6 +215,18 @@ verification:
     results:
     - 44
     - 43
+  - id: R6
+    requirement: Publishing completed task journals leaves no local task stuck in packing or failed.
+    actions:
+    - 42
+    checkpoints:
+    - step: 45
+      expectation: No local task remains in packing after all five independent archive checks.
+    - step: 46
+      expectation: No local backup task failed while publishing its result.
+    results:
+    - 45
+    - 46
   visual:
   - check: Category and task controls remain readable in retained screenshots
     method: manual

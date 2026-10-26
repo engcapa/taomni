@@ -1,6 +1,6 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 上一轮 `9f3ada0f` 已在合并 main 后通过三平台 browser/native 相关集 **1,276/1,276** 与全量 **2,036/2,036**。本轮追加空工作区共享文件区、列表/排序/包平铺及 LSP 非阻塞验收，并修复手测发现的 Home 恢复子目录 Empty 问题。本机当前源码的 **71 个 browser ID、14 个 native ID** 最新适用结果全部通过；GitHub 首轮相关集发现空编辑器入口退化，已修复并准备重跑三平台，以下历史通过结果不代表本轮托管结果。性能对照将在新增功能全量通过后完成。
+> 上一轮 `9f3ada0f` 已在合并 main 后通过三平台 browser/native 相关集 **1,276/1,276** 与全量 **2,036/2,036**。本轮追加空工作区共享文件区、列表/排序/包平铺及 LSP 非阻塞验收，并修复手测发现的 Home 恢复子目录 Empty 问题。托管相关集又发现空编辑器入口和侧栏几何延后应用的问题；随后修复 Windows 备份任务原子记录替换失败；当前版本追加本机 **2/2 browser、7/7 native** 通过并核验签名回执，整体单测及新完整相关集继续执行。以下历史结果不代表当前托管全量或性能结论。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
@@ -28,6 +28,24 @@ QA 原生构建、`pnpm check:refactor`、Rust 格式及 630 个目录 ID 的静
 Native `workspace-native/run-20261026-181135-743400216` 为 **14/14 passed**，包含系统目录选择、LSP 等待、冷启动、目录恢复、主边栏及新增入口。三个批次均 `identity_stable=true`；签名回执与 source/runner/case/native build 身份由 `load_observations` 独立核验，**71 个 browser ID、14 个 native ID** 最新结果全部 passed，记录在 `_local/workspace-empty-entry-local-evidence.json`。当前 QA 二进制 SHA-256 为 `e9bf3f859f80e655015e8051c242241900622ec7f48153341771d92490b6cb5d`，源码指纹 `8e995322a4cd9fb01882821f166c4f707445ba694c2943f57f81f5211c61e585`。6 项入口单测、QA 原生构建（含 `pnpm check:refactor`）及 631 ID 静态门禁通过。托管完整相关集新增 `TC-WS-045`，共 395 个精确 ID，通过后才执行整体。
 
 相关集 [40306481232](https://github.com/engcapa/taomni/actions/runs/40306481232) 的三平台 browser 原始回执为 806 passed / 3 failed，失败均为 `TC-WS-025`：显式编辑器入口已经展开文件区，旧用例随后再次点击收缩按钮，导致切换器不可见。迁移该操作及对应 native `TC-WS-026` 为直接断言展开；目录选择、保存、重新进入和默认工作区归属断言均保留。新 browser `workspace-browser/run-20261026-183858-583230263` 与 native `workspace-native/run-20261026-183957-568677518` 各 **1/1 passed**，`identity_stable=true`，签名回执及当前 source/runner/case/build 身份已核验，记录在 `_local/workspace-route-entry-local-evidence.json`。这一迁移仅改用例，不改变产品源码或 QA 二进制；GitHub native 余下回执与新完整相关集继续跟踪。
+
+## Home 返回后的标签点击稳定性（2026-10-26）
+
+`40306481232` 最终为 **1,292 passed / 8 failed**。除 WS-025/026 六次旧操作失败外，Linux native `TC-MFA-102` 和 `TC-MAIL-FOLDER-01` 各失败一次。原始焦点事件记录显示：Home → Sessions 后，前者 pointerdown 命中 MFA 标签、pointerup 落到 session-favorite；后者 pointerdown 命中关闭按钮、pointerup 落到侧栏分隔条。新布局将标题栏放进内容面板，而侧栏尺寸仍延迟到下一帧更新，导致同一次按下/松开间目标换位。
+
+侧栏尺寸现在在 layout effect 中、绘制之前同步，保留原尺寸记忆、折叠偏好和面板映射。新增确定性测试在不执行 RAF 的条件下检查初始、Home 折叠和 Sessions 恢复；旧实现先失败，修复后主布局 **52/52** 通过。迁移其中仍期待已删除上部 Chat 的旧断言，复用底部 Chat 的要求不变。`TC-WS-039` 增加 Home/Sessions 后立即激活 MFA、关闭 Settings 的双模式流程，不添加睡眠或点击重试。
+
+当前 browser `workspace-browser/run-20261026-191953-315214230` 为 4 passed / 1 failed；新增尾部 MFA 流程在前面窗口重载后需要重新完成 vault gate，补齐后 `workspace-browser/run-20261026-192359-724642968` 为 **1/1 passed**。原生 `workspace-native/run-20261026-192817-770210175` 为 **6/6 passed**，包含 MFA、邮件订阅、Home 目录选择及磁盘保存、隐藏编辑器崩溃恢复、嵌套分栏和主边栏。三个批次 `identity_stable=true`，当前 source/runner/case/build 与签名回执由 `load_observations` 核验，**5 个 browser ID、6 个 native ID** 最新适用结果通过，记录在 `_local/workspace-geometry-local-evidence.json`。QA 构建（含 TypeScript 与重构门禁）通过；当前二进制 SHA-256 为 `ac08843b14f1d9922b1306bbff2c32eca0d17331671ebafee0d2577d3bf2a32f`，源码指纹 `3384b29e4033077a77fc1c235f08200a3457c1158bc934ea4a750a3ca5486c50`。完整单测及包含此修复的新 395 ID 托管相关集继续执行。
+
+## Windows 备份结果记录替换修复（2026-10-26）
+
+相关集 [40312042123](https://github.com/engcapa/taomni/actions/runs/40312042123) 以 `a60b1696` 执行 395 个精确 ID，最终 **1,299 passed / 1 failed**，无基础设施错误。三平台 browser 809/809、Linux native 180/180、macOS native 149/149、Windows native 161/162；唯一失败为 `TC-BACKUP-MAIL-001`。原生日志明确记录 `Failed to persist transfer result: Access is denied (os error 5)`；归档已生成，但最终任务记录原子替换失败，磁盘仍是 packing，独立 ZIP/SQLite oracle 因而没有接受该结果。没有把此次失败归为外部缺口，也没有删除五份归档及 MIME/附件字节的校验。
+
+`backup::control::write_json` 继续同步临时文件后原子替换；Windows 仅对 5/32/33 三类访问/共享锁错误，在两秒期限内重试同一份已同步临时文件。其余平台和错误立即返回，永久锁到期仍报错，原完整记录不会被截断或删除。新增不依赖 Tauri 的真实 Windows 文件句柄契约，检查首次替换确实被 reader 阻挡、释放后发布完整新记录，以及长期锁超时仍保留两份完整文件；`qa-ui-auto-platforms` 的 Windows 备份构建显式运行该生产重试模块的契约并保留日志。原生用例增加全部完成后无 local packing/failed 任务的断言。当前版本本机 browser `workspace-browser/run-20261026-201707-565413576` 为 **2/2 passed**，native `workspace-native/run-20261026-202118-440178236` 为 **7/7 passed**；包括原始失败用例及五份归档独立校验、备份取消/恢复、MFA/邮件标签、共享布局和空编辑器入口。两批 `identity_stable=true`，签名回执及 source/runner/case/native build 身份由 `load_observations` 独立核验，记录在 `_local/workspace-backup-local-evidence.json`。本机三项原子替换契约、18 项 workflow 工具契约、QA 原生构建（含 TypeScript/重构门禁）、631 ID 静态 QA 门禁及 Rust 格式检查通过；Windows 真实 reader 锁的两项平台分支将在托管构建运行，不冒充本机 Linux 结果。
+
+当前 QA 二进制路径为 `src-tauri/target/qa-ui-auto/debug/taomni`，SHA-256 `fcc6b5cf34fe5b8d254f48f48e157b078c5d6bcb906544f602b7c091068c2e98`，产品源码指纹 `6c511e6a29cf36d9e1342809a6ea88099d1fe0fd054849b81ef06986b2f0319e`。新 395 ID 三平台相关集继续执行，全部通过后再同步 main 和执行整体。
+
+整体 Node 22 单测初次为 5,766 passed / 2 failed / 1 既有 skip。两个失败均是既有 Code Workspace 测试仍使用重构前的操作：默认名称排序下的树选择顺序，以及 editor 焦点占用共享 Undo 时的独立 action。迁移为正确的名称顺序与已有工作区 Undo 快捷键，保留“不读取仅选择目标”“整笔事务撤销及排除文件不变”的断言；两条定向复验通过。整体复验为 5,767 passed / 1 failed / 1 既有 skip；新失败的 Extract Method 重试测试没有先等待 provider 拒绝后再操作重开的输入框，补齐 provider 调用和错误状态检查后定向 1/1 通过。仍保留整体失败日志，下一轮整体复验将包含此同步修正。
 
 ## 空工作区文件浏览器追加实现（2026-10-26）
 
