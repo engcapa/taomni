@@ -84,6 +84,7 @@
           "workspace_root",
           "platform_workspace_root",
           "workspace_explorer",
+          "workspace_hidden_entries",
           "workspace_slow_lsp",
           "workspace_restore_sessions",
           "java_sample_projects",

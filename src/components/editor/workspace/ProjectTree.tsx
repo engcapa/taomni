@@ -25,7 +25,6 @@ import {
   gitDirectoryChangeCount,
   isRootRef,
   rootDirKey,
-  shouldHideEntry,
 } from "./codeWorkspaceModel";
 import { WorkspaceFileIcon } from "./WorkspaceFileIcon";
 import type { ProjectTreeProps } from "./projectTreeTypes";
@@ -77,7 +76,12 @@ function renderEntries(
       </div>
     );
   }
-  const entries = state.entries.filter((entry) => !shouldHideEntry(entry));
+  // The hierarchical Project view is also the general file explorer. Heavy
+  // directories are excluded from recursive indexes (flat/packages/search)
+  // to keep scans bounded, but they must remain visible here: hiding them
+  // makes a real directory that only contains e.g. `node_modules` or `target`
+  // appear as the misleading `Empty` state.
+  const entries = state.entries;
   if (entries.length === 0) {
     return (
       <div className="px-3 py-2 text-[var(--taomni-code-muted)]">

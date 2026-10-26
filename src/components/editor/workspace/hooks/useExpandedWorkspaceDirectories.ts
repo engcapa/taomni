@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import type { CodeWorkspaceRootInfo } from "../../../../types";
-import { rootDirKey, shouldHideEntry, type CompactChainState, type DirectoryState, type TreeViewMode } from "../codeWorkspaceModel";
+import { rootDirKey, type CompactChainState, type DirectoryState, type TreeViewMode } from "../codeWorkspaceModel";
 
 interface ExpandedDirectoryOptions {
   roots: readonly CodeWorkspaceRootInfo[];
@@ -33,7 +33,10 @@ export function useExpandedWorkspaceDirectories({
         const listing = directories[key];
         if (!listing?.loaded || listing.error) continue;
         for (const entry of listing.entries) {
-          if (entry.fileType !== "dir" || shouldHideEntry(entry)) continue;
+          // Explicitly persisted expansions are user intent. Heavy folders
+          // stay out of recursive indexes, but their direct listing should be
+          // restored just like any other file-explorer directory.
+          if (entry.fileType !== "dir") continue;
           const childPath = treeViewMode === "compact"
             ? compactChains[rootDirKey(root.id, entry.path)]?.path ?? entry.path
             : entry.path;
