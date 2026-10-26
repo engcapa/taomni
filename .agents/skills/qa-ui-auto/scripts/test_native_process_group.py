@@ -53,6 +53,26 @@ class NativePortReleaseTest(unittest.TestCase):
         with patch("native_process_group.socket.create_connection", side_effect=connect):
             wait_for_driver_ports("127.0.0.1", (4444, 4445))
 
+    def test_reset_during_adapter_shutdown_still_requires_a_refused_connection(self):
+        with patch("native_process_group.platform.system", return_value="Linux"), \
+                patch("native_process_group.socket.create_connection",
+                      side_effect=[ConnectionResetError("adapter closing"), ConnectionRefusedError()]) as connect, \
+                patch("native_process_group.time.sleep"):
+            wait_for_driver_ports("127.0.0.1", (4444,))
+        self.assertEqual(connect.call_count, 2)
+
+    def test_resets_alone_cannot_establish_that_an_adapter_port_is_free(self):
+        with patch("native_process_group.platform.system", return_value="Linux"), \
+                patch("native_process_group.socket.create_connection", side_effect=ConnectionResetError()):
+            with self.assertRaisesRegex(RuntimeError, "4444.*reset"):
+                wait_for_driver_ports("127.0.0.1", (4444,), timeout=0)
+
+    def test_unrelated_socket_errors_still_fail(self):
+        with patch("native_process_group.platform.system", return_value="Linux"), \
+                patch("native_process_group.socket.create_connection", side_effect=PermissionError("denied")):
+            with self.assertRaisesRegex(PermissionError, "denied"):
+                wait_for_driver_ports("127.0.0.1", (4444,))
+
     def test_restart_waits_for_a_late_adapter_socket_close(self):
         listener = socket.socket()
         listener.bind(("127.0.0.1", 0))

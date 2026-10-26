@@ -340,33 +340,8 @@ class TauriDriverProcess:
         raise WebDriverError(f"native driver did not listen on {self.url}")
 
     def ensure_running(self) -> None:
-        """Ensure the per-run driver endpoint is ready for a new session.
-
-        The macOS bridge lives inside the QA application. Windows releases
-        the owned driver/app tree on session close to unlock its profile.
-        Wait for the old endpoint to go away before starting the next one.
-        """
-        if platform.system() not in ("Darwin", "Windows"):
-            return
-
-        # A new case must never attach to the previous session's listener
-        # while the asynchronous app/driver exit is still in flight.
-        if self._restart_required:
-            self.stop()
-            self._restart_required = False
-
-        if self.proc is not None and self.proc.poll() is None and _tcp_ok(self.host, self.port):
-            return
-
-        if self.proc is not None and self.proc.poll() is None:
-            self.stop()
-
-        deadline = time.time() + self.startup_timeout
-        while _tcp_ok(self.host, self.port) and time.time() < deadline:
-            time.sleep(0.1)
-        if _tcp_ok(self.host, self.port):
-            raise WebDriverError(f"native driver port {self.port} did not become available")
-        self.start()
+        from native_driver_lifecycle import ensure_owned_driver_running
+        ensure_owned_driver_running(self, system=platform.system(), tcp_probe=_tcp_ok)
 
     def mark_session_closed(self) -> None:
         """Release owned Windows children before the next fixture reset."""

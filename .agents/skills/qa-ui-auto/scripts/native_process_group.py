@@ -51,6 +51,10 @@ def wait_for_driver_ports(host: str, ports: tuple[int, ...], timeout: float = 5)
                 last_probe = "connection opened"
             except ConnectionRefusedError:
                 break
+            except ConnectionResetError:
+                # A closing adapter can reset the probe during its TCP
+                # handshake. Only a later refusal proves the port is free.
+                last_probe = "connection reset while the adapter was closing"
             except TimeoutError:
                 last_probe = "connection timed out without a refusal"
             if time.monotonic() >= deadline:

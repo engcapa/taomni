@@ -7,6 +7,16 @@
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
 
+## 驱动端口释放续验（2026-10-26）
+
+合并提交 `f1297db1` 的相关集 [40260631956](https://github.com/engcapa/taomni/actions/runs/40260631956) 已完成三平台 browser 794/794 和 macOS native 144/144；Linux native 为 173/175。`TC-WS-030` 第二次关闭后的应用及三个 WebKit 相关进程已退出，失败阶段是 `wait-for-old-ports`：旧适配器关闭期间的 TCP reset 被端口探针直接抛出。随后 `TC-WS-037` 遇到已停止的驱动，Linux 的旧入口假定每个用例间驱动一直运行，因此 setup 连接被拒绝。Windows 结果继续收集；该运行不计作相关集通过。
+
+端口检查现在对关闭中的 reset 继续观察，必须得到后续连接拒绝才确认释放；持续 reset、超时、活跃监听和其他 socket 错误仍失败。将驱动可用性恢复职责从大型 facade 提取到带类型的 `native_driver_lifecycle.py`，保留 Windows/macOS 的原有状态与端口语义；Linux 仅在自有驱动已停止时等待两个旧端口释放并启动新 owner，不重放不确定的 UI 动作。契约测试先在修复前复现 reset 失败，并覆盖持续 reset 不能证明空闲、无关错误继续失败及下一个用例的驱动恢复。
+
+本机 150 项工具测试通过，1 项平台预设跳过；当前 runner 的 native `workspace-native/run-20261026-113147-849761893` 为 `TC-WS-030/037` 2/2 passed、`identity_stable=true`。两次正常关闭、冷启动、profile 恢复和磁盘冲突断言均保留。没有产品构建输入变化，QA v15 仍通过复用检查。以下 56 ID 本机证据是 `f1297db1` 时的记录；本轮工具边界使用上述新回执，最终当前 runner 的完整覆盖由下一轮 GitHub 相关集及全量建立。
+
+这次仅修改自动化工具内部生命周期，未改变产品用户流程；保留的可执行回归为 `TC-WS-030` 与 `TC-WS-037`，新增工具契约纳入全量 workflow。`pnpm check:refactor` 同时检查提取边界。
+
 ## main 合并与全量续验（2026-10-26）
 
 `f1587254` 的三平台相关集 [40246136402](https://github.com/engcapa/taomni/actions/runs/40246136402) 已完成：374 个 ID、1,227 次执行全部 passed，0 failed / skipped / infrastructure errors。Linux browser/native 为 259/167，Windows 为 259/148，macOS 为 258/136。原始回执、源码/runner/用例及 native 构建身份已独立核验，记录在 `_local/workspace-final-hosted-evidence.json`。
