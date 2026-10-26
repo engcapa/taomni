@@ -8967,6 +8967,8 @@ controls:
     optional: true       # root context menu
   - id: search-everywhere
     selector: '[data-testid="code-workspace-search-everywhere"]'
+    aliases:
+      - 'xpath=//*[@data-testid="code-workspace-search-everywhere"]//button[@data-selected="true" and .//span[normalize-space(.)="Search Structurally…"]]'
     kind: display
     optional: true       # Ctrl+Shift+N palette popup
   - id: find-panel

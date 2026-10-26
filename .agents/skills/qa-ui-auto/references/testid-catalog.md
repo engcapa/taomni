@@ -418,6 +418,7 @@
 - `[data-testid="code-workspace-tree-new-directory"]` — interactive [optional] — F25.5.tree-new-directory
 - `[data-testid="code-workspace-tree-remove-root"]` — interactive [optional] — F25.5.tree-remove-root
 - `[data-testid="code-workspace-search-everywhere"]` — display [optional] — F25.5.search-everywhere
+  ↳ `xpath=//*[@data-testid="code-workspace-search-everywhere"]//button[@data-selected="true" and .//span[normalize-space(.)="Search Structurally…"]]` — alias
 - `[data-testid="code-workspace-find-in-files-panel"]` — display [optional] — F25.5.find-panel
 - `[aria-label="Search query"]` — interactive [optional] — F25.5.find-query-input
 - `[aria-label="Include globs"]` — interactive [optional] — F25.5.find-include-globs
