@@ -83,6 +83,7 @@ export type MockPanelSize = { asPercentage: number; inPixels: number; };
 
 const panelResizeMock = vi.hoisted(() => ({
   handlers: new Map<string, (size: MockPanelSize, id: string | undefined, prev: MockPanelSize | undefined) => void>(),
+  commands: [] as Array<{ id: string | undefined; size: string | null; }>,
 }));
 
 vi.mock("react-resizable-panels", () => {
@@ -97,8 +98,8 @@ vi.mock("react-resizable-panels", () => {
   }>(({ children, panelRef, id, onResize }, ref) => {
     if (id && onResize) panelResizeMock.handlers.set(id, onResize);
     const handle = {
-      collapse: vi.fn(),
-      resize: vi.fn(),
+      collapse: vi.fn(() => panelResizeMock.commands.push({ id, size: null })),
+      resize: vi.fn((size: string) => panelResizeMock.commands.push({ id, size })),
     };
     useImperativeHandle(ref, () => handle);
     useImperativeHandle(panelRef, () => handle);

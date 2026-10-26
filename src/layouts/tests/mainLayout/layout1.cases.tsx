@@ -88,6 +88,27 @@ export function registerMainLayoutLayout1Cases() {
       expect(useAppStore.getState().sidebarCollapsed).toBe(true);
     });
 
+    it("applies navigator geometry before the next frame can receive a tab click", () => {
+      // Returning from Home must not expose the old canvas position while a
+      // later RAF moves the title bar underneath an in-progress native click.
+      const frame = vi.spyOn(window, "requestAnimationFrame").mockReturnValue(1);
+      panelResizeMock.commands = [];
+      try {
+        useAppStore.setState({ activeTabId: "ssh-tab", mergeToolWindowRail: false });
+        render(<MainLayout />);
+        expect(panelResizeMock.commands.at(-1)).toEqual({ id: "sidebar", size: "260px" });
+        const onResize = panelResizeMock.handlers.get("sidebar");
+        act(() => onResize?.({ asPercentage: 27, inPixels: 270 }, "sidebar", undefined));
+        act(() => useAppStore.getState().setActiveSideTab("home"));
+        expect(panelResizeMock.commands.at(-1)).toEqual({ id: "sidebar", size: null });
+        act(() => useAppStore.getState().setActiveSideTab("sessions"));
+        expect(panelResizeMock.commands.at(-1)).toEqual({ id: "sidebar", size: "27%" });
+        expect(useAppStore.getState().sidebarCollapsedByGroup.terminal).toBe(true);
+      } finally {
+        frame.mockRestore();
+      }
+    });
+
     it("remembers a manual expand for terminal tabs only", async () => {
       render(<MainLayout />);
       act(() => useAppStore.getState().setActiveTab("ssh-tab"));
@@ -100,11 +121,11 @@ export function registerMainLayoutLayout1Cases() {
       expect(useAppStore.getState().sidebarCollapsedByGroup["code-workspace"]).toBe(true);
     });
 
-    it("moves the terminal's SFTP and Chat toggles into the collapsed rail", async () => {
+    it("moves SFTP into the collapsed rail and leaves Chat to the shared bottom button", async () => {
       render(<MainLayout />);
       act(() => useAppStore.getState().setActiveTab("ssh-tab"));
       await waitFor(() => expect(host.querySelector('[data-testid="attached-sftp-toggle"]')).not.toBeNull());
-      expect(host.querySelector('[data-testid="tab-chat-toggle"]')).not.toBeNull();
+      expect(host.querySelector('[data-testid="tab-chat-toggle"]')).toBeNull();
       const active = terminalPanelMock.props.filter((props) => props.tabId === "ssh-tab").at(-1);
       expect(active?.sftpToggle).toBeUndefined();
       expect(active?.chatToggle).toBeUndefined();

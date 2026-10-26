@@ -1,7 +1,8 @@
 id: TC-WS-039
 title: Shared panel lifecycle survives hidden nested editors, resizing and reload
 description: Use real resizable panels and nested editor splits through public controls, retain a dirty draft while terminal/mode switches hide the editor,
-  then collapse, resize and reload. Explicit runtime assertions protect component upgrades even if the UI recovers.
+  then collapse, resize and reload. Immediately activate and close utility tabs after Home/Sessions navigation to detect delayed navigator geometry.
+  Explicit runtime assertions protect component upgrades even if the UI recovers.
 modes:
 - browser
 - native
@@ -133,6 +134,32 @@ steps:
       steps: 8
 - assert_no_runtime_errors: null
 - screenshot: workspace-shared-panels-stable.png
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="mfa-tab"]'
+- vault_first_run: qa-ws-shared-panels
+- wait_for: '[data-testid="mfa-empty"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="mfa"]'
+- assert_attribute:
+    selector: '[data-testid="tab-item"][data-tab-type="mfa"]'
+    name: data-active
+    equals: 'true'
+- assert_visible: '[data-testid="mfa-tab"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="settings"] [data-testid="tab-close"]'
+- wait_for:
+    selector: '[data-testid="tab-item"][data-tab-type="settings"]'
+    state: detached
+- assert_attribute:
+    selector: '[data-testid="tab-item"][data-tab-type="mfa"]'
+    name: data-active
+    equals: 'true'
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -300,6 +327,46 @@ verification:
     - 75
     - 77
     - 79
+  - id: R2
+    requirement: Home/Sessions mode switches apply navigator geometry before immediate utility-tab activation and closing; native press and release reach the same target
+      without added sleeps or click retries.
+    actions:
+    - 81
+    - 82
+    - 84
+    - 86
+    - 88
+    - 89
+    - 90
+    - 93
+    - 94
+    - 95
+    checkpoints:
+    - step: 83
+      expectation: '{"wait_for": "[data-testid=\"mfa-tab\"]"}'
+    - step: 85
+      expectation: '{"wait_for": "[data-testid=\"mfa-empty\"]"}'
+    - step: 87
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 91
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"mfa\"]", "name": "data-active", "equals": "true"}}'
+    - step: 92
+      expectation: '{"assert_visible": "[data-testid=\"mfa-tab\"]"}'
+    - step: 96
+      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"settings\"]", "state": "detached"}}'
+    - step: 97
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"mfa\"]", "name": "data-active", "equals": "true"}}'
+    - step: 98
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 83
+    - 85
+    - 87
+    - 91
+    - 92
+    - 96
+    - 97
+    - 98
   native:
   - check: Consecutive hidden-panel lifecycle and resizing in the packaged WebView.
     method: automated
