@@ -48,6 +48,25 @@ function workspace() {
   return useWorkspacePlatformStore.getState().workspaces.find((entry) => entry.id === DEFAULT_WORKSPACE_ID)!;
 }
 
+function mockHorizontalOverflow(
+  element: HTMLElement,
+  sizes: { clientWidth: number; scrollWidth: number; scrollLeft?: number },
+) {
+  let scrollLeft = sizes.scrollLeft ?? 0;
+  Object.defineProperty(element, "clientWidth", { configurable: true, get: () => sizes.clientWidth });
+  Object.defineProperty(element, "scrollWidth", { configurable: true, get: () => sizes.scrollWidth });
+  Object.defineProperty(element, "scrollLeft", {
+    configurable: true,
+    get: () => scrollLeft,
+    set: (value: number) => { scrollLeft = value; },
+  });
+  Object.defineProperty(element, "scrollTo", {
+    configurable: true,
+    value: vi.fn((options?: ScrollToOptions) => { scrollLeft = Number(options?.left ?? 0); }),
+  });
+  return { get scrollLeft() { return scrollLeft; } };
+}
+
 beforeEach(() => {
   window.localStorage.clear();
   useWorkspacePlatformStore.getState().reloadFromStorage();
@@ -151,5 +170,28 @@ describe("Workspace isolated sessions (TASK-07)", () => {
     expect(screen.getByTestId("workspace-session-pane").dataset.kind).toBe("terminal");
     expect(screen.getByTestId("terminal-panel-mock").dataset.tabId).toBe(sshTab.id);
     expect(screen.getByTestId("workspace-session-pane").dataset.sessionId).toBe("sess-ssh");
+  });
+
+  it("UT-WS-07-06 provides overflow navigation and a full-width workspace drag target", async () => {
+    for (let index = 0; index < 12; index += 1) {
+      useWorkspacePlatformStore.getState().openLocalTerminalInWorkspace(DEFAULT_WORKSPACE_ID);
+    }
+    render(<WorkspaceTabStrip />);
+
+    const scrollArea = screen.getByTestId("workspace-tab-scroll-area");
+    const scroll = mockHorizontalOverflow(scrollArea, { clientWidth: 300, scrollWidth: 1200 });
+    fireEvent.scroll(scrollArea);
+
+    const left = await screen.findByTestId("workspace-tab-scroll-left");
+    const right = screen.getByTestId("workspace-tab-scroll-right");
+    expect(left).toBeDisabled();
+    expect(right).not.toBeDisabled();
+    expect(screen.getByTestId("workspace-tab-drag-region")).toBeInTheDocument();
+
+    fireEvent.click(right);
+    await waitFor(() => expect(scroll.scrollLeft).toBeGreaterThan(0));
+    expect(screen.getByTestId("workspace-tab-scroll-left")).not.toBeDisabled();
+    fireEvent.click(left);
+    await waitFor(() => expect(scroll.scrollLeft).toBe(0));
   });
 });

@@ -57,6 +57,26 @@ class WindowContextTests(unittest.TestCase):
             native_switch(SimpleNamespace(session=session), {'selector': '#main', 'close_with': '#reattach'})
         session.request.assert_called_once()
 
+    def test_webkit_evaluation_timeout_recovers_only_after_observed_window_closure(self):
+        for closes in [True, False]:
+            with self.subTest(closes=closes):
+                session = Mock()
+                session.endpoint.side_effect = lambda path: '/session/owned' + path
+                session.request.side_effect = ['detached', ['main'] if closes else ['detached', 'main'], None]
+                session.click.side_effect = WebDriverError('WebView JavaScript evaluation timed out')
+                session.execute.return_value = True
+                with patch('qa_ui_auto.window_context.time.monotonic', side_effect=[0, 0, 2]), \
+                        patch('qa_ui_auto.window_context.time.sleep'):
+                    ctx = SimpleNamespace(session=session)
+                    args = {'selector': '#main', 'close_with': '#reattach', 'timeout_sec': 1}
+                    if closes:
+                        self.assertIn('main', native_switch(ctx, args))
+                    else:
+                        with self.assertRaisesRegex(RuntimeError, 'source window did not close'):
+                            native_switch(ctx, args)
+                        session.execute.assert_not_called()
+                session.click.assert_called_once()
+
     def test_browser_reattach_selects_the_surviving_page_after_observed_closure(self):
         source, main = Mock(), Mock()
         source.context.pages = [source, main]

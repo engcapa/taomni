@@ -603,7 +603,7 @@ export function TabBar({
         />
       )}
 
-      <div className="flex items-end" data-testid="new-tab-split">
+      <div className="flex shrink-0 items-end" data-testid="new-tab-split">
         <button
           data-testid="new-local-terminal"
           className="taomni-tab"

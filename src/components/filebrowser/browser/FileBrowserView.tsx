@@ -279,31 +279,6 @@ export function FileBrowserView(inputs: FileBrowserViewProps) {
           )}
         </div>
       )}
-      {banner && (
-        <div
-          className="text-[11px] px-2 py-1 border-b shrink-0"
-          style={{
-            borderColor: "var(--taomni-divider)",
-            background: session?.error ? "#fde7e2" : "var(--taomni-quick-bg)",
-            color: session?.error ? "#7a1f0a" : "var(--taomni-text)",
-          }}
-        >
-          {banner}
-          {session?.error && (
-            <button
-              type="button"
-              className="ml-2 underline"
-              onClick={() => {
-                void connection.reconnect(props.sessionId).catch((err) =>
-                  setStatus(t("fileBrowser.statusReconnectFailed", { error: String(err) }))
-                );
-              }}
-            >
-              {t("fileBrowser.bannerRetry")}
-            </button>
-          )}
-        </div>
-      )}
       <div className="flex-1 min-h-0">
         <PanelGroup
           // Re-mount the panel group when orientation flips so
@@ -435,6 +410,32 @@ export function FileBrowserView(inputs: FileBrowserViewProps) {
           </Panel>
         </PanelGroup>
       </div>
+      {/* Connection changes must not move the navigation controls during input. */}
+      {banner && (
+        <div
+          className="text-[11px] px-2 py-1 border-b shrink-0"
+          style={{
+            borderColor: "var(--taomni-divider)",
+            background: session?.error ? "#fde7e2" : "var(--taomni-quick-bg)",
+            color: session?.error ? "#7a1f0a" : "var(--taomni-text)",
+          }}
+        >
+          {banner}
+          {session?.error && (
+            <button
+              type="button"
+              className="ml-2 underline"
+              onClick={() => {
+                void connection.reconnect(props.sessionId).catch((err) =>
+                  setStatus(t("fileBrowser.statusReconnectFailed", { error: String(err) }))
+                );
+              }}
+            >
+              {t("fileBrowser.bannerRetry")}
+            </button>
+          )}
+        </div>
+      )}
       <FileTransferQueue
         sessionId={props.sessionId}
         showCrossHostBanner

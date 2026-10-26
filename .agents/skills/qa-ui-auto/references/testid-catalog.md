@@ -1820,6 +1820,11 @@
 - `[data-testid="workspace-sessions-panel"]` — display [optional] — F-WS-2.workspace-sessions-panel
 - `[data-testid="workspace-tab"]` — interactive — F-WS-2.workspace-tab
 - `[data-testid="workspace-tab-strip"]` — display — F-WS-2.workspace-tab-strip
+- `[data-testid="workspace-tab-scroll-left"]` — interactive [optional] — F-WS-2.workspace-tab-scroll-left
+- `[data-testid="workspace-tab-scroll-right"]` — interactive [optional] — F-WS-2.workspace-tab-scroll-right
+- `[data-testid="workspace-tab-top-drag-region"]` — display — F-WS-2.workspace-tab-top-drag-region
+- `[data-testid="workspace-tab-scroll-area"]` — display — F-WS-2.workspace-tab-scroll-area
+- `[data-testid="workspace-tab-drag-region"]` — display [optional] — F-WS-2.workspace-tab-drag-region
 - `[data-testid="workspace-tree-add-root"]` — interactive — F-WS-2.workspace-tree-add-root
 - `[data-testid="workspace-tree-copy-path"]` — interactive — F-WS-2.workspace-tree-copy-path
 - `[data-testid="workspace-tree-delete"]` — interactive — F-WS-2.workspace-tree-delete
@@ -2842,6 +2847,7 @@
 - `[data-testid="terminal-theme-select-menu"]` — display [optional] — F5.2.theme-select-menu
 - `[data-testid="terminal-context-set-local-default-theme"]` — interactive [optional] — F5.2.local-default-theme
 - `[data-testid^="terminal-context-theme-option-"]` — interactive [optional] — F5.2.context-theme-options
+- `[data-testid="terminal-context-theme-list"]` — display [optional] — F5.2.context-theme-list
 - `[data-testid="terminal-preview"]` — display — F5.2.preview
 - `[data-testid="terminal-preview-cursor"]` — display — F5.2.preview-cursor
 - `input[aria-label="Terminal font size"]` — interactive — F5.2.font-size

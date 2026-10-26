@@ -1,11 +1,25 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 此前完整相关集 [40344676416](https://github.com/engcapa/taomni/actions/runs/40344676416) 已通过 **1,301/1,301**，随后同步远程 main（`a5743792`，Already up to date）。后续全量尚未通过：共四条 native 失败，macOS 分片另有 runner 容量取消。修复后本机 browser **12/12**、native **13/13** 已通过；下一轮托管相关集扩大为 402 个精确 ID。下述历史通过不代表当前全量或性能结论。
+> 当前验收尚未完成。最近托管运行 [40405967669](https://github.com/engcapa/taomni/actions/runs/40405967669) 的 job 为 success，但聚合回执仍有 **15 次 native 失败**，不能视为通过。此前相关集 `40344676416` 的 1,301/1,301 为历史结果；后续源码须重新验证。功能全量通过后再进行正式性能对照，目前没有“性能无退化”的结论。外部 `clickhousecrud` 项目用例继续按用户认可的现有 policy 单独报告缺口。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
+
+## 标签导航、窗口拖动及托管失败复验（2026-10-27，进行中）
+
+Sessions 的本地终端加号与下拉组成固定宽度的紧凑按钮组。Workspace 标签条新增双向溢出箭头、滚轮横向滚动、活动标签可见性及 Home/End/方向键导航；末尾保留可拖动空白，顶部 4px 边框也可拖动窗口。新增双模式 `TC-WS-048`，既有 `TC-MAIN-RAIL-03` 增加真实系统窗口位移断言，混合标签恢复用例保留文件/协议/草稿断言并补充导航检查。浏览器已通过新标签导航及恢复场景，本机 native 已验证两处实际拖动；当前修复批次的最终回执仍在收集。
+
+`40405967669` 的三平台 browser 共 1,309 passed；Linux native 5 failed、Windows native 3 failed、macOS native 7 failed。独立检查聚合及原始失败记录后，已确认 Replace Preview 的层级遮住全局确认框，以及原生覆盖式滚动条遮住 Run 配置保存按钮。修正层级和滚动区域后，使用真实打包 WebView 复验。另补齐 macOS QA 合成鼠标的默认控件焦点行为；窗口重新附着仅在确认原 WebView 消失后恢复超时，不重放点击。右键重开菜单时清理上次子菜单，主题刷新仍保留当前子菜单。
+
+`TC-SESSION-NET-002` 以真实 reload 代替 native 无操作的第二次 open，验证持久化后再进入 Sessions。`TC-WS-030` 等待实际外部文件变更提示，保留冲突磁盘哈希及未保存缓冲区，并在重启前关闭该模态提示。SCP 路径编辑和分屏恢复的点击失败继续依据实际事件及遮挡诊断处理，不以 job 绿色、跳过或删除原断言替代验收。
+
+最终本机 browser `workspace-controls-browser-final/run-20261027-074041-244615695` 为 **8/8 passed**，native `workspace-native/run-20261027-074420-637737452` 为 **12/12 passed**，独立真实 SCP 批次 `run-20261027-075051-140038032` 为 **1/1 passed**。三个批次均 `identity_stable=true`；签名回执、source/runner/case/native build 身份已独立核验，见 `_local/workspace-controls-local-evidence.json`。本机使用 CI 固定版本、校验 SHA256 的独立 Java 扩展目录，没有修改用户编辑器扩展。此前 Java Test 提供器加载失败、首次分屏点击及冲突用例失败均保留。
+
+SCP 连接状态提示移到文件区下方，避免连接完成时路径工具栏突然上移；原用例在输入路径前增加焦点断言，保留真实协议、断点下载及上传/下载哈希、删除断言。分屏恢复点击可见的末行后通过键盘移到文首，避免点中首行诊断浮层，编辑、撤销/重做和草稿恢复断言不变。保存时的哈希冲突继续由原有状态栏反馈并拒绝写盘，用例不要求重复弹窗。
+
+54 项相关前端单测、8 项窗口切换工具契约、QA 原生构建（含 TypeScript 与 `pnpm check:refactor`）、Rust 格式和 634 ID 的静态 QA 门禁通过。本地最多两个测试 worker，native 顺序运行；当前磁盘使用率 93%。三平台托管相关范围包含 633 个适用 ID，唯一外部项目缺口按既有 policy 单独记录。托管结果和随后全量、main 同步、性能对照仍待完成。
 
 ## 全量原生点击和焦点回归（2026-10-27，验证进行中）
 

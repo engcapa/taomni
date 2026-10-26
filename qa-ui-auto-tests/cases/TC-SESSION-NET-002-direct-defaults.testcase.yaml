@@ -167,7 +167,7 @@ steps:
     equals: app
 - click: '[data-testid="session-save"]'
 - assert_not_visible: '[data-testid="session-editor"]'
-- open: ${cfg.app.base_url}
+- reload_window: null
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
 - click: '[data-testid="session-tree-item"][data-session-name="qa-saved-app-route"]'

@@ -5,6 +5,27 @@ import { ContextMenu, useContextMenu, type MenuItem } from "./ContextMenu";
 afterEach(cleanup);
 
 describe("ContextMenu", () => {
+  it("starts a reopened menu with no stale flyout while refreshing preserves it", () => {
+    const items: MenuItem[] = [{ label: "Appearance", children: [{ label: "Dark" }] }];
+    function Harness() {
+      const menu = useContextMenu();
+      return <>
+        <button onClick={() => menu.showAt(10, 10, items)}>Open menu</button>
+        <button onClick={() => menu.refreshItems([...items])}>Refresh menu</button>
+        {menu.render}
+      </>;
+    }
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
+    fireEvent.mouseEnter(screen.getByTestId("context-menu-item-appearance").parentElement!);
+    expect(screen.getByTestId("context-menu-item-dark")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Refresh menu" }));
+    expect(screen.getByTestId("context-menu-item-dark")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open menu" }));
+    expect(screen.queryByTestId("context-menu-item-dark")).not.toBeInTheDocument();
+    expect(screen.getByTestId("context-menu")).toHaveFocus();
+  });
+
   it("keeps the hook controller stable across unrelated rerenders", () => {
     const controllers: Array<ReturnType<typeof useContextMenu>> = [];
 

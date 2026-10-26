@@ -28,7 +28,11 @@ def native_switch(ctx, args):
             # permits recovery; never replay an uncertain action.
             ctx.session.click(args["close_with"])
         except WebDriverError as exc:
-            if "no such window" not in str(exc):
+            # WKWebView can disappear before its evaluation callback replies.
+            # A timeout is uncertain input, so never replay it; require the
+            # same observed source-window closure as a no-such-window reply.
+            if not any(message in str(exc) for message in (
+                    "no such window", "WebView JavaScript evaluation timed out")):
                 raise
     while time.monotonic() < end:
         handles = ctx.session.request("GET", ctx.session.endpoint("/window/handles"))

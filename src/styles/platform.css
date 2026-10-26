@@ -124,8 +124,13 @@ html[data-app-theme="dark"] .taomni-main-window {
   border-top: none;
   padding: 0;
 }
-.taomni-workspace-tab-strip { scrollbar-width: none; }
-.taomni-workspace-tab-strip::-webkit-scrollbar { display: none; }
+.taomni-workspace-tab-scroll { scrollbar-width: none; }
+.taomni-workspace-tab-scroll::-webkit-scrollbar { display: none; }
+.taomni-workspace-tab-drag-region {
+  cursor: grab;
+  user-select: none;
+}
+.taomni-workspace-tab-drag-region:active { cursor: grabbing; }
 .taomni-workspace-tab {
   position: relative;
   height: 28px;
@@ -165,6 +170,15 @@ html[data-app-theme="dark"] .taomni-main-window {
   border-color: var(--taomni-chrome-border);
   box-shadow: inset 0 2px var(--taomni-accent);
   max-width: 220px;
+}
+.taomni-main-window .taomni-control-bar [data-testid="new-tab-split"] .taomni-tab {
+  min-width: 0;
+  width: 26px;
+  justify-content: center;
+  padding: 0;
+}
+.taomni-main-window .taomni-control-bar [data-testid="new-tab-split"] [data-testid="new-tab-launch-menu"] {
+  width: 18px;
 }
 .taomni-main-window .taomni-control-bar .taomni-tab:focus-visible {
   outline: 1px solid var(--taomni-accent);

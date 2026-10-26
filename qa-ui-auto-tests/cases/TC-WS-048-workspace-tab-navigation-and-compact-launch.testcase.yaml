@@ -1,0 +1,267 @@
+id: TC-WS-048
+title: Compact local launcher and workspace overflow navigation retain active tabs and window drag space
+description: Creates twelve UI-owned workspace local terminal tabs. Verifies compact Sessions launch controls, reachable plus/menu, bidirectional overflow, Home/End
+  activation and active visibility without closing tabs. Physical window movement is covered by TC-MAIN-RAIL-03.
+modes:
+- browser
+- native
+covers:
+- F-WS-1
+- F-WS-2
+- F-WS-3
+- F1.5
+tags:
+- p0
+- workspace-redesign
+- regression
+fixtures:
+- reset_db
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-tabs
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"n'+'ew-tab-split"]').getBoundingClientRect().width < 60 && document.querySelector('[data-testid'+String.fromCharCode(61)+'"n'+'ew-tab-launch-menu"]').getBoundingClientRect().left
+      - document.querySelector('[data-testid'+String.fromCharCode(61)+'"n'+'ew-local-terminal"]').getBoundingClientRect().right < 2
+    expect_truthy: true
+- click: '[data-testid="new-tab-launch-menu"]'
+- wait_for: '[data-testid="launch-menu-new-session"]'
+- press: Escape
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- assert_count:
+    selector: '[data-testid="workspace-tab"]'
+    equal: 12
+- assert_visible: '[data-testid="workspace-tab-scroll-left"]'
+- assert_visible: '[data-testid="workspace-tab-scroll-right"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').scrollLeft > 0
+    expect_truthy: true
+- click: '[data-testid="workspace-tab-scroll-left"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').scrollLeft < document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').scrollWidth
+      - document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').clientWidth - 10
+    expect_truthy: true
+- click: '[data-testid="workspace-tab-scroll-right"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').scrollLeft > 0
+    expect_truthy: true
+- press:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    key: Home
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').scrollLeft < 5 && document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab"]').getAttribute("aria-selected")
+      === "true"
+    expect_truthy: true
+- assert_disabled: '[data-testid="workspace-tab-scroll-left"]'
+- press:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    key: End
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').scrollLeft > document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').scrollWidth
+      - document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').clientWidth - 10
+    expect_truthy: true
+- assert_disabled: '[data-testid="workspace-tab-scroll-right"]'
+- assert_visible: '[data-testid="workspace-tab-drag-region"]'
+- assert_visible: '[data-testid="workspace-tab-top-drag-region"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-drag-region"]').getBoundingClientRect().width >= 39 && document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').getBoundingClientRect().width
+      > document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-strip"]').getBoundingClientRect().width * 0.5
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="workspace-tab"]'
+    equal: 12
+- assert_no_runtime_errors: null
+- screenshot: workspace-tab-overflow-and-drag.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Sessions plus and shell dropdown stay adjacent and functional; workspace many-tab scrolling, keyboard activation, visible active tabs, creation menu
+      and both drag regions remain usable without losing terminals.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 7
+    - 9
+    - 10
+    - 11
+    - 12
+    - 14
+    - 15
+    - 17
+    - 18
+    - 20
+    - 21
+    - 23
+    - 24
+    - 26
+    - 27
+    - 29
+    - 30
+    - 32
+    - 33
+    - 35
+    - 36
+    - 38
+    - 39
+    - 41
+    - 42
+    - 44
+    - 45
+    - 51
+    - 53
+    - 55
+    - 58
+    results:
+    - 5
+    - 6
+    - 8
+    - 13
+    - 16
+    - 19
+    - 22
+    - 25
+    - 28
+    - 31
+    - 34
+    - 37
+    - 40
+    - 43
+    - 46
+    - 47
+    - 48
+    - 49
+    - 50
+    - 52
+    - 54
+    - 56
+    - 57
+    - 59
+    - 60
+    - 61
+    - 62
+    - 63
+    - 64
+    - 65
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 6
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"n''+''ew-tab-split\"]'').getBoundingClientRect().width
+        < 60 && document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"n''+''ew-tab-launch-menu\"]'').getBoundingClientRect().left - document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"n''+''ew-local-terminal\"]'').getBoundingClientRect().right
+        < 2", "expect_truthy": true}}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"launch-menu-new-session\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 37
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 40
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 43
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 46
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 47
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 12}}'
+    - step: 48
+      expectation: '{"assert_visible": "[data-testid=\"workspace-tab-scroll-left\"]"}'
+    - step: 49
+      expectation: '{"assert_visible": "[data-testid=\"workspace-tab-scroll-right\"]"}'
+    - step: 50
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').scrollLeft
+        > 0", "expect_truthy": true}}'
+    - step: 52
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').scrollLeft
+        < document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').scrollWidth - document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').clientWidth
+        - 10", "expect_truthy": true}}'
+    - step: 54
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').scrollLeft
+        > 0", "expect_truthy": true}}'
+    - step: 56
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').scrollLeft
+        < 5 && document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab\"]'').getAttribute(\"aria-selected\") === \"true\"", "expect_truthy":
+        true}}'
+    - step: 57
+      expectation: '{"assert_disabled": "[data-testid=\"workspace-tab-scroll-left\"]"}'
+    - step: 59
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').scrollLeft
+        > document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').scrollWidth - document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').clientWidth
+        - 10", "expect_truthy": true}}'
+    - step: 60
+      expectation: '{"assert_disabled": "[data-testid=\"workspace-tab-scroll-right\"]"}'
+    - step: 61
+      expectation: '{"assert_visible": "[data-testid=\"workspace-tab-drag-region\"]"}'
+    - step: 62
+      expectation: '{"assert_visible": "[data-testid=\"workspace-tab-top-drag-region\"]"}'
+    - step: 63
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-drag-region\"]'').getBoundingClientRect().width
+        >= 39 && document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').getBoundingClientRect().width > document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-strip\"]'').getBoundingClientRect().width
+        * 0.5", "expect_truthy": true}}'
+    - step: 64
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 12}}'
+    - step: 65
+      expectation: '{"assert_no_runtime_errors": null}'
+  visual:
+  - check: Review arrow visibility, compact launch split and useful title-bar drag space.
+    method: manual
+    reason: Functional geometry is automated; retained screenshots support visual review.
+  native:
+  - check: Twelve independent terminal tabs remain operable in the native WebView; real PTY readiness and OS window movement are separately tested by TC-MAIN-RAIL-03 and TC-WS-015.
+    method: automated
+    reason: Browser uses stubs; native case uses actual PTYs.

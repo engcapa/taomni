@@ -173,6 +173,17 @@ describe("ControlBar settings button", () => {
     expect(windowMocks.startDragging).toHaveBeenCalledTimes(1);
   });
 
+  it("moves and maximizes from workspace title-bar regions without consuming tab actions", () => {
+    useAppStore.setState({ activeSideTab: "workspaces" });
+    renderControlBar(vi.fn());
+    fireEvent.mouseDown(screen.getByTestId("workspace-tab-drag-region"), { button: 0, detail: 1 });
+    fireEvent.mouseDown(screen.getByTestId("workspace-tab-top-drag-region"), { button: 0, detail: 2 });
+    expect(windowMocks.startDragging).toHaveBeenCalledTimes(1);
+    expect(windowMocks.toggleMaximize).toHaveBeenCalledTimes(1);
+    fireEvent.mouseDown(screen.getByTestId("workspace-open-session-plus"), { button: 0, detail: 1 });
+    expect(windowMocks.startDragging).toHaveBeenCalledTimes(1);
+  });
+
   it("forwards the active detach action into the More menu", () => {
     const onDetach = vi.fn();
     renderControlBar(vi.fn(), {}, onDetach);

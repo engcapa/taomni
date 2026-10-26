@@ -191,6 +191,14 @@ steps:
 - assert_text:
     selector: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
     contains: QA_RESTORED_UNSAVED_DRAFT
+- assert_visible: '[data-testid="workspace-tab-scroll-left"]'
+- assert_visible: '[data-testid="workspace-tab-scroll-right"]'
+- click: '[data-testid="workspace-tab-scroll-right"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').scrollLeft > 0
+    expect_truthy: true
+- click: '[data-testid="workspace-tab-scroll-left"]'
+- assert_visible: '[data-testid="workspace-tab-drag-region"]'
 - screenshot: workspace-mixed-tabs-restored.png
 verification:
   review: reviewed
@@ -392,6 +400,25 @@ verification:
     - 106
     - 107
     - 109
+  - id: R2
+    requirement: Workspace tab overflow is reachable with explicit left/right controls, and the remaining title-bar area remains a native window drag target.
+    actions:
+    - 110
+    - 112
+    - 114
+    results:
+    - 111
+    - 113
+    - 115
+    checkpoints:
+    - step: 110
+      expectation: '{"assert_visible": "[data-testid=\"workspace-tab-scroll-left\"]"}'
+    - step: 111
+      expectation: '{"assert_visible": "[data-testid=\"workspace-tab-scroll-right\"]"}'
+    - step: 113
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\\\"workspace-tab-scroll-area\\\"]'').scrollLeft > 0", "expect_truthy": true}}'
+    - step: 115
+      expectation: '{"assert_visible": "[data-testid=\"workspace-tab-drag-region\"]"}'
   native:
   - check: Real IPC/disk/SSH/SFTP and process restart are covered by TC-WS-030.
     method: external

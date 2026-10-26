@@ -65,7 +65,19 @@ async function dispatchQaActions(sources, emitKey, modifiers, resolveOrigin, tar
         const event = new PointerEvent("pointerdown", init);
         target.dispatchEvent(event);
         state.suppressMouse = event.defaultPrevented;
-        if (!state.suppressMouse) target.dispatchEvent(new MouseEvent("mousedown", init));
+        if (!state.suppressMouse) {
+          const mouse = new MouseEvent("mousedown", init);
+          target.dispatchEvent(mouse);
+          // Synthetic mousedown has no browser default focus action. Preserve
+          // cancellation by editors, then focus the actual control (including
+          // buttons reached through an SVG) before click/blur handlers run.
+          if (!mouse.defaultPrevented) {
+            const control = target.closest("button,input,select,textarea,a[href],[tabindex],[contenteditable='true']");
+            if (control && !control.matches(":disabled") && !control.closest("[inert]")) {
+              control.focus({ preventScroll: true });
+            }
+          }
+        }
       } else {
         target.dispatchEvent(new PointerEvent("pointerup", init));
         if (!state.suppressMouse) target.dispatchEvent(new MouseEvent("mouseup", init));

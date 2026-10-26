@@ -116,6 +116,7 @@ steps:
 - right_click:
     selector: '[data-testid="terminal-pane"]'
 - wait_for: '[data-testid="context-menu"]'
+- assert_not_visible: '[data-testid="terminal-context-theme-list"]'
 - click: '[data-testid="terminal-context-set-local-default-theme"]'
 - assert_text:
     selector: '[data-testid="status-bar"]'
@@ -141,8 +142,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A connected SSH terminal opens current appearance settings, applies a live font/theme change, exposes both default actions with their status
-      or confirmation feedback, and remains ready for subsequent command input.
+    requirement: A connected SSH terminal opens current appearance settings, applies a live font/theme change, exposes both default actions with their status or confirmation
+      feedback, and remains ready for subsequent command input.
     actions:
     - 1
     - 2
@@ -170,10 +171,10 @@ verification:
     - 42
     - 44
     - 46
-    - 48
-    - 50
-    - 52
-    - 55
+    - 49
+    - 51
+    - 53
+    - 56
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
@@ -188,8 +189,7 @@ verification:
     - step: 17
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
     - step: 20
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
-        60}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
     - step: 22
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa-ssh-current-settings\\r?$", "timeout_sec": 60}}'
     - step: 24
@@ -213,24 +213,24 @@ verification:
     - step: 40
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 43
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
-        20}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 20}}'
     - step: 45
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa-ssh-after-current-settings\\r?$", "timeout_sec":
-        60}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa-ssh-after-current-settings\\r?$", "timeout_sec": 60}}'
     - step: 47
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
-    - step: 49
+    - step: 48
+      expectation: '{"assert_not_visible": "[data-testid=\"terminal-context-theme-list\"]"}'
+    - step: 50
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "Default appearance for new terminals updated"}}'
-    - step: 51
+    - step: 52
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
-    - step: 53
-      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
     - step: 54
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 55
       expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog-message\"]", "contains": "Save this terminal''s appearance"}}'
-    - step: 56
-      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "state": "detached"}}'
     - step: 57
+      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "state": "detached"}}'
+    - step: 58
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "data-terminal-ready", "equals": "true"}}'
     results:
     - 3
@@ -254,12 +254,13 @@ verification:
     - 43
     - 45
     - 47
-    - 49
-    - 51
-    - 53
+    - 48
+    - 50
+    - 52
     - 54
-    - 56
+    - 55
     - 57
+    - 58
   visual:
   - check: Inspect the SSH terminal settings and live terminal screenshot for dialog layout, status feedback, and no overlap.
     method: manual

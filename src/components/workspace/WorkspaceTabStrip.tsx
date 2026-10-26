@@ -1,4 +1,4 @@
-import { FilePlus2, FolderPlus, MonitorSmartphone, Plus, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, FilePlus2, FolderPlus, MonitorSmartphone, Plus, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { WorkspaceTabContextMenu } from "./WorkspaceTabContextMenu";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
@@ -11,6 +11,9 @@ import {
   type WorkspaceIsolatedTab,
   type WorkspaceTabKind,
 } from "../../stores/workspacePlatformStore";
+import { maxScrollLeft } from "../tabbar/tabs/scroll";
+import { IconBtn } from "../tabbar/tabs/TabItem";
+import { useWorkspaceTabScroll } from "./useWorkspaceTabScroll";
 
 const KIND_LABEL: Record<WorkspaceTabKind, string> = {
   file: "FILE",
@@ -57,6 +60,8 @@ export function WorkspaceTabStrip() {
   const openSessionPicker = useWorkspaceUiStore((s) => s.openSessionPicker);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [tabMenu, setTabMenu] = useState<{ tabId: string; x: number; y: number } | null>(null);
+  const tabScroll = useWorkspaceTabScroll(workspace?.id, workspace?.openTabs, workspace?.activeTabId);
+
   useEffect(() => { setMenu(null); setTabMenu(null); }, [workspace?.id]);
 
   if (!workspace) return null;
@@ -117,8 +122,9 @@ export function WorkspaceTabStrip() {
   const tabButton = (tab: WorkspaceIsolatedTab) => (
     <div
       key={tab.id}
+      ref={(element) => tabScroll.setTabElement(tab.id, element)}
       role="tab"
-      tabIndex={0}
+      tabIndex={tab.id === workspace.activeTabId ? 0 : -1}
       aria-selected={tab.id === workspace.activeTabId}
       data-testid="workspace-tab"
       data-tab-title={tab.title}
@@ -135,7 +141,20 @@ export function WorkspaceTabStrip() {
         setTabMenu({ tabId: tab.id, x: event.clientX, y: event.clientY });
       }}
       onKeyDown={(event) => {
-        if (event.key === "Enter") setActiveTab(workspace.id, tab.id);
+        if (event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) return;
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          setActiveTab(workspace.id, tab.id);
+        } else if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+          event.preventDefault();
+          const tabs = workspace.openTabs;
+          const index = tabs.findIndex((entry) => entry.id === tab.id);
+          const target = event.key === "Home" ? tabs[0] : event.key === "End" ? tabs.at(-1) : tabs[(index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length];
+          if (target) {
+            setActiveTab(workspace.id, target.id);
+            tabScroll.tabElements.current.get(target.id)?.focus({ preventScroll: true });
+          }
+        }
       }}
       onAuxClick={(event) => {
         if (event.button === 1 && tab.closable) closeTab(workspace.id, tab.id);
@@ -163,8 +182,41 @@ export function WorkspaceTabStrip() {
   );
 
   return (
-    <div data-testid="workspace-tab-strip" className="taomni-workspace-tab-strip flex h-full min-w-0 flex-1 items-end gap-0.5 overflow-x-auto">
-      {workspace.openTabs.map(tabButton)}
+    <div data-testid="workspace-tab-strip" className="taomni-workspace-tab-strip relative flex h-full min-w-0 flex-1 items-end gap-0.5 overflow-hidden">
+      {tabScroll.scrollState.overflow && (
+        <IconBtn
+          testId="workspace-tab-scroll-left"
+          title={t("tabs.scrollLeft")}
+          icon={<ChevronLeft className="h-3.5 w-3.5" />}
+          onClick={() => tabScroll.scrollBy("left")}
+          disabled={tabScroll.scrollState.atStart}
+        />
+      )}
+      <div
+        ref={tabScroll.scrollRef}
+        data-testid="workspace-tab-scroll-area"
+        role="tablist"
+        aria-label={t("tabs.openTabs")}
+        className="taomni-workspace-tab-scroll flex min-w-0 shrink items-end gap-0.5 overflow-x-auto overflow-y-hidden"
+        onWheel={(event) => {
+          const element = event.currentTarget;
+          if (maxScrollLeft(element) > 0 && Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+            element.scrollLeft += event.deltaY;
+          }
+        }}
+        onScroll={tabScroll.updateScrollState}
+      >
+        {workspace.openTabs.map(tabButton)}
+      </div>
+      {tabScroll.scrollState.overflow && (
+        <IconBtn
+          testId="workspace-tab-scroll-right"
+          title={t("tabs.scrollRight")}
+          icon={<ChevronRight className="h-3.5 w-3.5" />}
+          onClick={() => tabScroll.scrollBy("right")}
+          disabled={tabScroll.scrollState.atEnd}
+        />
+      )}
       {tabMenu && workspace.openTabs.find((tab) => tab.id === tabMenu.tabId) && <WorkspaceTabContextMenu
         key={`${workspace.id}:${tabMenu.tabId}`}
         workspace={workspace}
@@ -188,6 +240,20 @@ export function WorkspaceTabStrip() {
       >
         <Plus className="h-3.5 w-3.5" />
       </button>
+      <div
+        data-testid="workspace-tab-drag-region"
+        data-window-drag
+        title={t("window.drag")}
+        aria-label={t("window.drag")}
+        className="taomni-workspace-tab-drag-region h-full min-w-[40px] flex-1"
+      />
+      <div
+        data-testid="workspace-tab-top-drag-region"
+        data-window-drag
+        title={t("window.drag")}
+        aria-label={t("window.drag")}
+        className="taomni-workspace-tab-drag-region absolute inset-x-0 top-0 h-[4px]"
+      />
       {menu && (
         <ContextMenu
           testId="workspace-open-session-menu"
