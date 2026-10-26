@@ -87,6 +87,10 @@ steps:
 - wait_for: '[data-testid="tab-overview"]'
 - press: Escape
 - assert_not_visible: '[data-testid="tab-overview"]'
+- press: Mod+Shift+E
+- wait_for: '[data-testid="tab-overview"]'
+- press: Escape
+- assert_not_visible: '[data-testid="tab-overview"]'
 - click: '[data-testid="workspace-toolbar-bottom-dock"]'
 - assert_visible: '[data-testid="workspace-bottom-dock"]'
 - click: '[data-testid="workspace-toolbar-bottom-dock"]'
@@ -114,7 +118,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 工作区分屏和大预览使用实际文件与未保存缓冲区；点击卡片切换到正确工作区与标签，布局切换保留内容，底栏可独立开关。
+    requirement: 工作区分屏和大预览使用实际文件与未保存缓冲区；点击卡片切换到正确工作区与标签，布局切换保留内容，底栏可独立开关。 连续两次快捷键打开/关闭大预览，每次按键只切换一次。
     actions:
     - 1
     - 2
@@ -139,8 +143,10 @@ verification:
     - 38
     - 40
     - 42
-    - 43
+    - 44
     - 46
+    - 47
+    - 50
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -176,19 +182,23 @@ verification:
     - step: 37
       expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
     - step: 39
-      expectation: '{"assert_visible": "[data-testid=\"workspace-bottom-dock\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"tab-overview\"]"}'
     - step: 41
-      expectation: '{"assert_not_visible": "[data-testid=\"workspace-bottom-dock\"]"}'
-    - step: 44
-      expectation: '{"wait_for": "[data-testid=\"tab-overview\"][data-scope=\"all\"]"}'
+      expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
+    - step: 43
+      expectation: '{"assert_visible": "[data-testid=\"workspace-bottom-dock\"]"}'
     - step: 45
-      expectation: '{"assert_text": {"selector": "[data-testid=\"tab-overview\"]", "contains": "previewUnsaved"}}'
+      expectation: '{"assert_not_visible": "[data-testid=\"workspace-bottom-dock\"]"}'
     - step: 48
+      expectation: '{"wait_for": "[data-testid=\"tab-overview\"][data-scope=\"all\"]"}'
+    - step: 49
+      expectation: '{"assert_text": {"selector": "[data-testid=\"tab-overview\"]", "contains": "previewUnsaved"}}'
+    - step: 52
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"src/index.ts\"]", "name": "data-dirty", "equals":
         "true"}}'
-    - step: 49
+    - step: 53
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"src/index.ts\"] .cm-content", "contains": "previewUnsaved"}}'
-    - step: 50
+    - step: 54
       expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]", "equal": 0}}'
     results:
     - 3
@@ -209,11 +219,13 @@ verification:
     - 37
     - 39
     - 41
-    - 44
+    - 43
     - 45
     - 48
     - 49
-    - 50
+    - 52
+    - 53
+    - 54
   visual:
   - check: 工具栏顺序、大预览卡片与画布无重叠或裁切，匹配原型。
     method: manual

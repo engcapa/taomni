@@ -24,6 +24,14 @@ function isTypingTarget(target: EventTarget | null): boolean {
  */
 export function usePlatformShortcuts(): void {
   useEffect(() => {
+    // GTK IME forwarding can mark the first delivered keydown as a repeat.
+    // Track the physical press instead; long holds and duplicate forwards must
+    // still toggle only once, and a missed keyup must not strand the shortcut.
+    let overviewPressed = false;
+    const releaseOverview = (event: KeyboardEvent) => {
+      if (event.code === "KeyE" || event.key.toLowerCase() === "e") overviewPressed = false;
+    };
+    const resetOverview = () => { overviewPressed = false; };
     const onKeyDown = (event: KeyboardEvent) => {
       const mod = IS_MAC ? event.metaKey : event.ctrlKey;
       const key = event.key.toLowerCase();
@@ -34,7 +42,8 @@ export function usePlatformShortcuts(): void {
       if (mod && event.shiftKey && !event.altKey && key === "e") {
         event.preventDefault();
         event.stopImmediatePropagation();
-        if (!event.repeat) useTabOverviewStore.getState().toggle();
+        if (!overviewPressed) useTabOverviewStore.getState().toggle();
+        overviewPressed = true;
         return;
       }
       if (mod && !event.shiftKey && !event.altKey && key === "b") {
@@ -67,6 +76,12 @@ export function usePlatformShortcuts(): void {
       // Ctrl+Shift+H: tab details overlay is owned by the tab bar; do nothing.
     };
     window.addEventListener("keydown", onKeyDown, true);
-    return () => window.removeEventListener("keydown", onKeyDown, true);
+    window.addEventListener("keyup", releaseOverview, true);
+    window.addEventListener("blur", resetOverview);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("keyup", releaseOverview, true);
+      window.removeEventListener("blur", resetOverview);
+    };
   }, []);
 }

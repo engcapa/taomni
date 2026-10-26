@@ -1,0 +1,106 @@
+id: TC-WS-046
+title: Sessions overview shortcuts reopen after real GTK IME composition
+description: Linux GTK/fcitx forwarding can label the first delivered shortcut keydown as repeat. Commit real CJK text into a PTY, then open, select, close and reopen the overview with native keys. Browser cases cannot establish this IME boundary.
+modes:
+- native
+native_platforms:
+- Linux
+covers:
+- F1.5
+- F-WS-1
+- F-WS-3
+tags:
+- p0
+- workspace-redesign
+- terminal
+- ime
+fixtures:
+- reset_db
+- linux_x11_required
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-046
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: printf 'qa-overview-ime-<%s>\n' '
+    submit: false
+- native_ime_keys:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    expected_engine: wbpy
+    keys: [n, i, h, a, o, Space]
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: "'"
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^qa-overview-ime-<[\u4e00-\u9fff]{2}>\r?$
+    timeout_sec: 20
+- click: '[data-testid="tab-overview-trigger"]'
+- wait_for: '[data-testid="tab-overview"][data-scope="sessions"]'
+- assert_text:
+    selector: '[data-testid="tab-overview"]'
+    contains: qa-overview-ime-
+- click: '[data-testid="tab-overview-card"]'
+- press:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    key: Mod+Shift+E
+- wait_for: '[data-testid="tab-overview"]'
+- press: Escape
+- assert_not_visible: '[data-testid="tab-overview"]'
+- press:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    key: Mod+Shift+E
+- wait_for: '[data-testid="tab-overview"]'
+- press: Escape
+- assert_not_visible: '[data-testid="tab-overview"]'
+- assert_count:
+    selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+    equal: 1
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^qa-overview-ime-<[\u4e00-\u9fff]{2}>\r?$
+- screenshot: ws-046-ime-overview-shortcuts.png
+verification:
+  review: reviewed
+  visual:
+  - check: The restored terminal output remains readable after closing the overview.
+    method: manual
+    reason: Inspect the retained screenshot separately from functional assertions.
+  requirements:
+  - id: R1
+    requirement: Real fcitx composition reaches the PTY once; overview shortcuts work after selecting its card and after reopening, without destroying the terminal.
+    actions: [1, 2, 4, 5, 7, 8, 9, 11, 14, 15, 17, 19, 21]
+    results: [3, 6, 10, 12, 13, 16, 18, 20, 22, 23, 24]
+    checkpoints:
+    - step: 3
+      expectation: Home is ready after the isolated vault setup.
+    - step: 6
+      expectation: The actual local PTY is active and ready for input.
+    - step: 10
+      expectation: The real printf output contains two committed CJK characters.
+    - step: 12
+      expectation: The Sessions overview opens.
+    - step: 13
+      expectation: The overview reads the existing PTY output.
+    - step: 16
+      expectation: The shortcut opens the overview after card selection.
+    - step: 18
+      expectation: Escape closes the overview.
+    - step: 20
+      expectation: A fresh shortcut press opens the overview again.
+    - step: 22
+      expectation: Escape closes the second overview.
+    - step: 23
+      expectation: Exactly one ready PTY remains.
+    - step: 24
+      expectation: The original committed output remains in the active PTY.
+  native:
+  - check: GTK/fcitx native key forwarding and real PTY state.
+    method: automated
+    reason: Linux native only; this does not establish Windows/macOS IME behavior.

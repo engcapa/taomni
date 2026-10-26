@@ -1,6 +1,6 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 上一轮 `9f3ada0f` 已在合并 main 后通过三平台 browser/native 相关集 **1,276/1,276** 与全量 **2,036/2,036**。本轮追加空工作区共享文件区、列表/排序/包平铺及 LSP 非阻塞验收，并修复手测发现的 Home 恢复子目录 Empty 问题。托管相关集又发现空编辑器入口和侧栏几何延后应用的问题；随后修复 Windows 备份任务原子记录替换失败。本机完整单测 **5,768 passed / 1 既有 skipped**；新托管相关集发现 Linux 原生大预览快捷键一次未打开，正在通过原始输入诊断定位。以下历史结果不代表当前托管全量或性能结论。
+> 上一轮 `9f3ada0f` 已在合并 main 后通过三平台 browser/native 相关集 **1,276/1,276** 与全量 **2,036/2,036**。本轮追加空工作区共享文件区、列表/排序/包平铺及 LSP 非阻塞验收，并修复手测发现的 Home 恢复子目录 Empty 问题。托管相关集又发现空编辑器入口和侧栏几何延后应用的问题；随后修复 Windows 备份任务原子记录替换失败。本机完整单测曾为 **5,768 passed / 1 既有 skipped**；最新相关集为 **1,299 passed / 1 failed**，唯一失败已复现为 GTK 输入法首次快捷键被标成 repeat 后遭忽略，修复及新增回归正在本机验证。以下历史结果不代表当前托管全量或性能结论。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
@@ -49,9 +49,17 @@ Native `workspace-native/run-20261026-181135-743400216` 为 **14/14 passed**，�
 
 ## 原生大预览快捷键输入诊断（2026-10-26）
 
-相关集 [40322687656](https://github.com/engcapa/taomni/actions/runs/40322687656) 在 Linux native 的 `TC-WS-019` 第 28 步未等到大预览：此前两份真实 PTY 输出、大预览尺寸、卡片激活和侧栏状态均通过，第 27 步 Ctrl+Shift+E 后预览没有出现，进程存活且控制台无异常。原始焦点记录最终为活动终端 textarea，但旧诊断没有键盘事件，不能据此断定按键是否到达，也不将其归为已修复或已知抖动。
+相关集 [40322687656](https://github.com/engcapa/taomni/actions/runs/40322687656) 最终为 **1,299 passed / 1 failed**，唯一失败是 Linux native 的 `TC-WS-019` 第 28 步未等到大预览：此前两份真实 PTY 输出、大预览尺寸、卡片激活和侧栏状态均通过，第 27 步 Ctrl+Shift+E 后预览没有出现，进程存活且控制台无异常。Windows 五份真实备份归档与结果任务状态均通过，四项真实文件句柄契约也通过。
 
-保留原快捷键断言，不增加延时、重试或替换成按钮。补充原生诊断的有界修饰键/物理键码和焦点记录，排除普通输入字符与控件值，便于区分按键投递、修饰键、焦点与产品路由。当前源码本机原生 `workspace-native/run-20261026-211153-051258694` 为 **1/1 passed**，签名回执和 source/runner/case/build 身份已独立核验，见 `_local/workspace-shortcut-local-evidence.json`。独立观察探针分别检查预览返回、终端焦点及按键期间焦点切换，未复现失败；这些探针不是托管通过证据。Windows 备份的四项真实文件句柄契约已在该托管构建通过，其余平台用例继续监控。
+保留原快捷键断言，不增加延时、重试或替换成按钮。补充原生诊断的有界修饰键/物理键码和焦点记录，排除普通输入字符与控件值。普通本机原生 `workspace-native/run-20261026-211153-051258694` 为 **1/1 passed**，回执身份已核验，见 `_local/workspace-shortcut-local-evidence.json`；该结果只说明普通环境没有复现，不能覆盖后续发现。
+
+随后复用 CI 的私有 fcitx/GTK 准备流程在本机重现：`_local/workspace-shortcut-ime-repro/result.json` 的第二次实际按键为可信 Ctrl+Shift+E，首个 E keydown 却带 `repeat=true`，此前对应的 E keyup 已送达。产品确实收到并阻止了事件，但 `if (!event.repeat)` 忽略了打开操作。修复前两项新单测分别在“首次 repeat”和“重复初始事件”上失败，日志为 `_local/workspace-shortcut-unit-red.log`。
+
+快捷键现在按下时只切换一次，E 松开或窗口失焦后释放按下状态，不依赖首次事件的 repeat 标记。修复后快捷键/预览 **8/8** 单测通过，保留编辑器 Recent Locations 的原有按键归属。`TC-WS-018/019` 增加连续两次打开/关闭，新增 Linux-only `TC-WS-046` 先通过真实 fcitx 将中文提交到 PTY，再在终端输入区获得焦点后验证卡片选择、快捷键重复打开和终端保留。
+
+最终本机 browser `workspace-browser/run-20261026-213342-869085699` 为 **2/2 passed**，native `workspace-native/run-20261026-215156-402186892` 为 **4/4 passed**。原生批次复用 CI 的 fcitx/GTK 准备流程，`TC-WS-046` 的真实中文 printf 输出及两轮快捷键全部通过；截图已复核。两批 `identity_stable=true`，签名回执及 source/runner/case/build 身份已独立核验，见 `_local/workspace-shortcut-fixed-local-evidence.json`。632 ID 静态门禁、重构契约、TypeScript/QA 构建均通过，96 项测试工具契约通过。QA 二进制 SHA-256 为 `dc78b8624f55baa43cf13e9f427b19b1e4d1fab48c7489c05405428f21570319`，产品源码指纹为 `993a1c795fa6ab217bfd63a891a664840778f7ca3737fb6172d51e18a70f4dda`。
+
+保留本机隔离桌面的环境失败记录：私有输入法服务退出后原窗口管理器不再映射新窗口，后续预检失败或原生驱动超时，没有计为通过。仅重启 QA 所属 `:186` 窗口管理器并禁用该管理器自身的输入法依赖；产品仍使用真实 fcitx/GTK。上述最终两批在环境恢复后执行；未改动个人 `:0` 桌面或用户 profile。输入诊断的旧源码定向运行不作为修复版本证据。新增用例后完整相关范围为 396 个 ID，当前全量单测亦重新执行。
 
 ## 空工作区文件浏览器追加实现（2026-10-26）
 

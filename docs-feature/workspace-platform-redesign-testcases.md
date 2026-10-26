@@ -200,3 +200,6 @@
 - **代码兼容方案（零 YAML 修改即可通过 + 新增 `TC-WS-004` 覆盖悬浮窗）**：
   - **保留**：`context-menu-item-mfa` 与 `sidebar-tool-mfa` 继续打开全屏 `[data-testid="mfa-tab"]`（或在悬浮窗点击 `[data-testid="mfa-floating-expand-tab"]` 也打开 `[data-testid="mfa-tab"]`），使 `TC-MFA-001` ~ `TC-MFA-108` **零修改 100% 通过**；
   - **新增**：左侧主导航条底部 `[data-testid="rail-mfa-button"]` 触发左下角悬浮窗 `[data-testid="mfa-floating-window"]`，由新增用例 **`TC-WS-004`** 与 **`TC-WS-012`** 全面覆盖测试。
+# GTK 输入法与大预览快捷键追加回归
+
+`TC-WS-046`（Linux native）：在隔离 QA 应用和 CI 相同的 fcitx/GTK 环境中启动真实 PTY，使用 wbpy 输入并提交两个中文字符，独立检查 printf 的完整输出行。通过大预览卡片返回会话后，连续两次按 Ctrl+Shift+E 打开、Esc 关闭，检查同一个终端和原输出保留。此场景保护输入法将首次 keydown 标记为 repeat 时的实际路由；browser 不替代原生输入法证据。`TC-WS-018/019` 同时保留工作区/browser 与 Sessions/native 的连续开关回归；单测确定性覆盖首次 repeat、长按/重复事件、keyup/窗口失焦释放及编辑器快捷键让行。

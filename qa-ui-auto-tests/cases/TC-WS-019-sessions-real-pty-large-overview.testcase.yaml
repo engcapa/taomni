@@ -1,7 +1,7 @@
 id: TC-WS-019
 title: Sessions large overview reads real PTY output and activates existing sessions
-description: 'Native boundary: echo markers travel through real local shells, PTYs and terminal buffers into overview cards. Opening, closing and choosing cards preserves
-  both running sessions; Sessions never shows Welcome.'
+description: 'Native boundary: echo markers travel through real local shells, PTYs and terminal buffers into overview cards. Opening, closing and choosing
+  cards preserves both running sessions; Sessions never shows Welcome.'
 modes:
 - native
 covers:
@@ -76,6 +76,10 @@ steps:
 - assert_count:
     selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
     equal: 2
+- press: Mod+Shift+E
+- wait_for: '[data-testid="tab-overview"]'
+- press: Escape
+- assert_not_visible: '[data-testid="tab-overview"]'
 - screenshot: ws-019-real-pty-overview.png
 - click: '[data-testid="toggle-left-sidebar"]'
 - assert_visible: '[data-testid="collapsed-sidebar-rail"]'
@@ -94,7 +98,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Sessions 大预览展示两个真实终端的输出，按钮/快捷键均可打开并可点击切换，关闭预览不销毁会话。 大预览选择会话保持侧栏原有展开或收缩状态。
+    requirement: Sessions 大预览展示两个真实终端的输出，按钮/快捷键均可打开并可点击切换，关闭预览不销毁会话。 大预览选择会话保持侧栏原有展开或收缩状态。 连续两次快捷键打开/关闭大预览，每次按键只切换一次。
     actions:
     - 1
     - 2
@@ -108,9 +112,11 @@ verification:
     - 24
     - 27
     - 29
-    - 33
-    - 35
-    - 36
+    - 32
+    - 34
+    - 37
+    - 39
+    - 40
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -148,17 +154,21 @@ verification:
       expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
     - step: 31
       expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "equal": 2}}'
-    - step: 34
-      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 37
+    - step: 33
+      expectation: '{"wait_for": "[data-testid=\"tab-overview\"]"}'
+    - step: 35
       expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
     - step: 38
       expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 39
-      expectation: '{"assert_not_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
-    - step: 40
-      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "contains": "TAOMNI_OVERVIEW_SECOND"}}'
     - step: 41
+      expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
+    - step: 42
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 43
+      expectation: '{"assert_not_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 44
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "contains": "TAOMNI_OVERVIEW_SECOND"}}'
+    - step: 45
       expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "equal": 2}}'
     results:
     - 3
@@ -179,12 +189,14 @@ verification:
     - 28
     - 30
     - 31
-    - 34
-    - 37
+    - 33
+    - 35
     - 38
-    - 39
-    - 40
     - 41
+    - 42
+    - 43
+    - 44
+    - 45
   visual:
   - check: 工具栏顺序、大预览卡片与画布无重叠或裁切，匹配原型。
     method: manual
