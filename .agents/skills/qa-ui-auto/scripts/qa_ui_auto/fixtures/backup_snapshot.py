@@ -140,7 +140,8 @@ def setup(ctx: Any, root: Path, config: dict) -> None:
                                     raise AssertionError("Local backup did not publish a valid archive")
                             event("local_completed:valid_archive=true")
         except Exception as error:
-            event("ORACLE_ERROR:" + str(error))
+            event(f"ORACLE_ERROR:{type(error).__name__}:{error} "
+                  f"[errno={getattr(error, 'errno', None)},winerror={getattr(error, 'winerror', None)}]")
         finally:
             if lock_file is not None:
                 lock_file.close()

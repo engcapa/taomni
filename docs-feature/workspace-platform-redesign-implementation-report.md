@@ -1,6 +1,6 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 上一轮 `9f3ada0f` 已在合并 main 后通过三平台 browser/native 相关集 **1,276/1,276** 与全量 **2,036/2,036**。本轮追加空工作区共享文件区、列表/排序/包平铺及 LSP 非阻塞验收，并修复手测发现的 Home 恢复子目录 Empty 问题。托管相关集又发现空编辑器入口和侧栏几何延后应用的问题；随后修复 Windows 备份任务原子记录替换失败。本机完整单测曾为 **5,768 passed / 1 既有 skipped**；最新相关集为 **1,299 passed / 1 failed**，唯一失败已复现为 GTK 输入法首次快捷键被标成 repeat 后遭忽略，修复及新增回归正在本机验证。以下历史结果不代表当前托管全量或性能结论。
+> 上一轮 `9f3ada0f` 已在合并 main 后通过三平台 browser/native 相关集 **1,276/1,276** 与全量 **2,036/2,036**。本轮追加空工作区共享文件区、列表/排序/包平铺及 LSP 非阻塞验收，并修复 Home 恢复子目录 Empty、空编辑器入口、侧栏几何及 Windows 备份原子记录替换问题。GTK 输入法快捷键修复后的本机完整单测为 **5,770 passed / 1 既有 skipped**；最新相关集 **1,300 passed / 1 failed**，全部快捷键回归通过，唯一失败是 Windows 独立归档观察器未识别 CRT 的 errno=13。观察器修复后的本机两条备份原生回归已通过，下一轮托管验证继续执行。以下历史结果不代表当前托管全量或性能结论。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
@@ -60,6 +60,16 @@ Native `workspace-native/run-20261026-181135-743400216` 为 **14/14 passed**，�
 最终本机 browser `workspace-browser/run-20261026-213342-869085699` 为 **2/2 passed**，native `workspace-native/run-20261026-215156-402186892` 为 **4/4 passed**。原生批次复用 CI 的 fcitx/GTK 准备流程，`TC-WS-046` 的真实中文 printf 输出及两轮快捷键全部通过；截图已复核。两批 `identity_stable=true`，签名回执及 source/runner/case/build 身份已独立核验，见 `_local/workspace-shortcut-fixed-local-evidence.json`。632 ID 静态门禁、重构契约、TypeScript/QA 构建均通过，96 项测试工具契约通过。QA 二进制 SHA-256 为 `dc78b8624f55baa43cf13e9f427b19b1e4d1fab48c7489c05405428f21570319`，产品源码指纹为 `993a1c795fa6ab217bfd63a891a664840778f7ca3737fb6172d51e18a70f4dda`。
 
 保留本机隔离桌面的环境失败记录：私有输入法服务退出后原窗口管理器不再映射新窗口，后续预检失败或原生驱动超时，没有计为通过。仅重启 QA 所属 `:186` 窗口管理器并禁用该管理器自身的输入法依赖；产品仍使用真实 fcitx/GTK。上述最终两批在环境恢复后执行；未改动个人 `:0` 桌面或用户 profile。输入诊断的旧源码定向运行不作为修复版本证据。新增用例后完整相关范围为 396 个 ID，当前全量单测亦重新执行。
+
+本机完整复验已结束：Node 22、1 worker、**587 files passed / 5,770 tests passed / 1 既有 skipped，EXITCODE=0**，日志为 `_local/workspace-shortcut-complete-unit.log`。相关集 [40335429931](https://github.com/engcapa/taomni/actions/runs/40335429931) 为 **1,300 passed / 1 failed / 0 skipped**，Linux native 181/181、macOS native 149/149、三平台 browser 809/809；真实输入法分片中的 `TC-WS-019/046` 均通过。截图已复核真实中文输出和大预览内容。
+
+## Windows 独立归档观察器的 CRT 错误修复（2026-10-26）
+
+`40335429931` 唯一失败为 Windows `TC-BACKUP-MAIL-001` 第 37 步。前三份归档已通过独立 ZIP/SQLite 校验；第四份完成时观察线程收到 `[Errno 13] Permission denied` 并退出。失败截图和 DOM 显示四份 local 任务均为 completed，原事件文件完整保留。既有 reader 仅重试带 winerror=5/32/33 的错误，遗漏 Python `Path.read_text` 经 Windows CRT 返回 errno=13、winerror 缺失的形式。
+
+观察器补充该 Windows CRT 形式，继续使用原两秒期限；永久拒绝仍报 ORACLE_ERROR，损坏 JSON、错误结构和其他错误不重试。错误诊断保留 errno/winerror。两条确定性测试在修复前分别失败和报错，修复后通过；Windows 构建增加真实独占文件句柄契约，验证实际 CRT 异常、释放后读到完整记录，以及持续锁到期仍拒绝观察。Linux 上不把两条 Windows 专属契约计为通过。
+
+本机 native `workspace-native/run-20261026-225057-483631656` 为 **2/2 passed**，包含 `TC-BACKUP-MAIL-001` 的全部五份归档内容及字节校验，以及 `TC-BACKUP-CANCEL-002` 的真实 OS 锁、取消与恢复。`identity_stable=true`，当前 source/runner/case/native build 与签名回执已独立核验，见 `_local/workspace-journal-crt-local-evidence.json`。观察器与 CI 选择、聚合、构建和导出契约 **51 passed / 2 Windows 专属 skipped**；`pnpm check:refactor` 通过。产品源码和 QA 二进制保持上一节身份；本次仅修改观察器、工具契约和 workflow，原两条执行用例及其断言完整保留，不需要为工具修复另建产品用例。396 ID 完整相关集将使用新的 runner 身份重新执行，全部通过后再同步 main、启动全量。
 
 ## 空工作区文件浏览器追加实现（2026-10-26）
 

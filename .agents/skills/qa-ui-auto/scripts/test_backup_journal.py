@@ -1,3 +1,4 @@
+import errno
 import json
 from pathlib import Path
 from unittest import TestCase
@@ -13,6 +14,27 @@ def locked(code: int = 5) -> OSError:
 
 
 class BackupJournalTest(TestCase):
+    def test_windows_crt_access_denial_without_winerror_retries_current_job(self):
+        error = PermissionError(errno.EACCES, "Permission denied", "job.json")
+        self.assertIsNone(getattr(error, "winerror", None))
+        with patch.object(backup_journal.os, "name", "nt"), \
+                patch.object(backup_journal.time, "sleep"):
+            path = Mock()
+            path.read_text.side_effect = [error, '{"phase":"completed"}']
+            self.assertEqual(backup_journal.read_journal(path)["phase"], "completed")
+            self.assertEqual(path.read_text.call_count, 2)
+
+    def test_windows_crt_permanent_denial_still_expires(self):
+        error = PermissionError(errno.EACCES, "Permission denied", "job.json")
+        with patch.object(backup_journal.os, "name", "nt"), \
+                patch.object(backup_journal.time, "monotonic", side_effect=[10, 10.5, 12]), \
+                patch.object(backup_journal.time, "sleep"):
+            path = Mock()
+            path.read_text.side_effect = error
+            with self.assertRaises(PermissionError):
+                backup_journal.read_journal(path)
+            self.assertEqual(path.read_text.call_count, 2)
+
     def test_windows_atomic_replacement_denial_retries_and_reads_current_job(self):
         for code in (5, 32, 33):
             with self.subTest(code=code), patch.object(backup_journal.os, "name", "nt"), \
@@ -32,7 +54,11 @@ class BackupJournalTest(TestCase):
             self.assertEqual(path.read_text.call_count, 2)
 
     def test_other_errors_and_posix_denials_fail_immediately(self):
-        for system, error in (("posix", locked()), ("nt", locked(123)), ("nt", FileNotFoundError("missing"))):
+        crt = PermissionError(errno.EACCES, "Permission denied", "job.json")
+        unknown = PermissionError(errno.EACCES, "Unexpected native error", "job.json")
+        unknown.winerror = 123
+        for system, error in (("posix", locked()), ("posix", crt), ("nt", locked(123)),
+                              ("nt", unknown), ("nt", FileNotFoundError("missing"))):
             with self.subTest(system=system, error=error), patch.object(backup_journal.os, "name", system):
                 path = Mock(); path.read_text.side_effect = error
                 with self.assertRaises(type(error)):
