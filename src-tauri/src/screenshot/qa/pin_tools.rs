@@ -358,6 +358,18 @@ pub async fn screenshot_qa_pin_tools(app: AppHandle) -> Result<String, String> {
       Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(input,'QA pin note');
       input.dispatchEvent(new Event('input',{bubbles:true}));
       input.dispatchEvent(new Event('change',{bubbles:true})); await new Promise(r=>setTimeout(r,100));
+      const zoomText=()=>q('screenshot-pin-zoom')?.textContent||'';
+      const initialPercent=Number(zoomText().replace('%',''));
+      const nextZoom=`${initialPercent+10}%`;
+      q('screenshot-pin-zoom-in').click();
+      for(let i=0;i<100&&zoomText()!==nextZoom;i++) await new Promise(r=>setTimeout(r,50));
+      if(zoomText()!==nextZoom || input.value!=='QA pin note')
+        throw new Error('Source zoom update overwrote the unsaved pin note: '+JSON.stringify({value:input.value,defaultValue:input.defaultValue,connected:input.isConnected,initialPercent,nextZoom,zoom:zoomText(),pendingZoom:q('screenshot-pin-zoom')?.dataset.pendingZoom,alert:document.querySelector('[role="alert"]')?.textContent}));
+      q('screenshot-pin-zoom-out').click();
+      const restoredZoom=`${initialPercent}%`;
+      for(let i=0;i<100&&zoomText()!==restoredZoom;i++) await new Promise(r=>setTimeout(r,50));
+      if(zoomText()!==restoredZoom || input.value!=='QA pin note')
+        throw new Error('Repeated source view update overwrote the unsaved pin note: '+JSON.stringify({value:input.value,defaultValue:input.defaultValue,connected:input.isConnected,restoredZoom,zoom:zoomText(),pendingZoom:q('screenshot-pin-zoom')?.dataset.pendingZoom,alert:document.querySelector('[role="alert"]')?.textContent}));
       q('screenshot-pin-note-save').click(); return true;
     "#, Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
     let favorite_note = run_js(&pin, "for(let i=0;i<100 && document.querySelector('[data-testid=\"screenshot-pin-note\"]')?.textContent!=='QA pin note';i++) await new Promise(r=>setTimeout(r,50)); return document.querySelector('[data-testid=\"screenshot-pin-note\"]')?.textContent;", Duration::from_secs(10)).await.map_err(|e| e.to_string())?;

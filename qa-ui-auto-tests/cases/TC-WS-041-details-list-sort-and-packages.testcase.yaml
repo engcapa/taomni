@@ -31,6 +31,7 @@ steps:
 - click: '[data-testid="code-workspace-tree-view-selector"]'
 - click: '[data-testid="code-workspace-tree-view-list"]'
 - wait_for: '[data-testid="code-workspace-list-columns"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src"]'
 - assert_count:
     selector: '[data-tree-kind][data-path]'
     equal: 6
@@ -125,6 +126,7 @@ steps:
 - reload_window: null
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="code-workspace-list-columns"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src"]'
 - assert_count:
     selector: '[data-tree-kind][data-path]'
     equal: 6
@@ -178,7 +180,8 @@ verification:
   requirements:
   - id: R1
     requirement: Natural names, size, type, modified settings, ascending/descending and folders-first are retained across reload; packages preserve source-set
-      identity and open the original file.
+      identity and open the original file. The list header may render before the asynchronous root read; wait for an actual entry before checking the exact
+      six rows and their order.
     actions:
     - 3
     - 4
@@ -187,150 +190,150 @@ verification:
     - 7
     - 9
     - 10
-    - 15
-    - 19
-    - 23
-    - 27
-    - 31
+    - 16
+    - 20
+    - 24
+    - 28
     - 32
     - 33
     - 34
     - 35
     - 36
-    - 40
+    - 37
     - 41
     - 42
-    - 47
+    - 43
     - 48
-    - 54
-    - 55
-    - 61
-    - 64
-    - 65
-    - 68
-    - 69
+    - 49
+    - 56
+    - 57
+    - 63
+    - 66
+    - 67
     - 70
+    - 71
     - 72
-    - 73
     - 74
+    - 75
+    - 76
     results:
-    - 12
     - 13
     - 14
-    - 16
+    - 15
     - 17
     - 18
-    - 20
+    - 19
     - 21
     - 22
-    - 24
+    - 23
     - 25
     - 26
-    - 28
+    - 27
     - 29
     - 30
-    - 37
+    - 31
     - 38
     - 39
-    - 43
+    - 40
     - 44
     - 45
     - 46
-    - 50
-    - 51
+    - 47
     - 52
-    - 57
-    - 58
+    - 53
+    - 54
     - 59
     - 60
-    - 63
-    - 67
-    - 76
+    - 61
+    - 62
+    - 65
+    - 69
+    - 78
     checkpoints:
-    - step: 12
-      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
     - step: 13
+      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
+    - step: 14
       expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
         === \"Documents|Pictures|src\"", "expect_truthy": true}}'
-    - step: 14
+    - step: 15
       expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
         === \"Draft2.txt|Draft10.txt|README.md\"", "expect_truthy": true}}'
-    - step: 16
-      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
     - step: 17
+      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
+    - step: 18
       expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
         === \"Documents|Pictures|src\"", "expect_truthy": true}}'
-    - step: 18
+    - step: 19
       expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
         === \"Draft10.txt|Draft2.txt|README.md\"", "expect_truthy": true}}'
-    - step: 20
-      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
     - step: 21
+      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
+    - step: 22
       expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
         === \"src|Pictures|Documents\"", "expect_truthy": true}}'
-    - step: 22
+    - step: 23
       expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
         === \"README.md|Draft2.txt|Draft10.txt\"", "expect_truthy": true}}'
-    - step: 24
-      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
     - step: 25
+      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
+    - step: 26
       expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
         === \"Documents|Pictures|src\"", "expect_truthy": true}}'
-    - step: 26
+    - step: 27
       expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
         === \"README.md|Draft2.txt|Draft10.txt\"", "expect_truthy": true}}'
-    - step: 28
+    - step: 29
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-list-name\"]'').getBoundingClientRect().left
         >= document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree\"]'').getBoundingClientRect().left", "expect_truthy":
         true}}'
-    - step: 29
+    - step: 30
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-list-name\"]'').getBoundingClientRect().right
         <= document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree\"]'').getBoundingClientRect().right", "expect_truthy":
         true}}'
-    - step: 30
+    - step: 31
       expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(\"taomni.codeWorkspace.explorerSort.v1\")).field === ''modified''",
         "expect_truthy": true}}'
-    - step: 37
-      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
     - step: 38
+      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
+    - step: 39
       expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
         === \"src|Pictures|Documents\"", "expect_truthy": true}}'
-    - step: 39
+    - step: 40
       expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
         === \"README.md|Draft10.txt|Draft2.txt\"", "expect_truthy": true}}'
-    - step: 43
-      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
     - step: 44
+      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
+    - step: 45
       expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
         === \"src|README.md|Pictures\"", "expect_truthy": true}}'
-    - step: 45
+    - step: 46
       expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
         === \"Draft10.txt|Draft2.txt|Documents\"", "expect_truthy": true}}'
-    - step: 46
+    - step: 47
       expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(\"taomni.codeWorkspace.explorerSort.v1\")).descending && !JSON.parse(localStorage.getItem(\"taomni.codeWorkspace.explorerSort.v1\")).foldersFirst",
         "expect_truthy": true}}'
-    - step: 50
+    - step: 52
       expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
-    - step: 51
+    - step: 53
       expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
         === \"src|README.md|Pictures\"", "expect_truthy": true}}'
-    - step: 52
+    - step: 54
       expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
         === \"Draft10.txt|Draft2.txt|Documents\"", "expect_truthy": true}}'
-    - step: 57
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree\"]", "contains": "src/main/java · com.example"}}'
-    - step: 58
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree\"]", "contains": "src/main/java · com.example.util"}}'
     - step: 59
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree\"]", "contains": "src/test/java · com.example"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree\"]", "contains": "src/main/java · com.example"}}'
     - step: 60
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree\"]", "contains": "src/main/java · com.example.util"}}'
+    - step: 61
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree\"]", "contains": "src/test/java · com.example"}}'
+    - step: 62
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-flat-file\"][data-path=\"src/main/java/com/example/util/Helper.java\"]",
         "regex": "^Helper[.]java$"}}'
-    - step: 63
+    - step: 65
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"]", "contains": "package com.example.util;"}}'
-    - step: 67
+    - step: 69
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-package-group\"]", "equal": 0}}'
-    - step: 76
+    - step: 78
       expectation: '{"assert_no_runtime_errors": null}'
   visual:
   - check: Review file area, row metadata, selection, toolbar and package layout in the retained screenshot.

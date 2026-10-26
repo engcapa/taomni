@@ -181,6 +181,37 @@ describe("useWorkspaceTreeData", () => {
     expect(result.current.directories["root-1:src"]).toMatchObject({ loading: false, entries: [updated] });
   });
 
+  it("rejects a late empty response from an older request in the same generation", async () => {
+    const pending: Array<(value: WorkspaceTreeLoadResult<unknown>) => void> = [];
+    workspaceMocks.workspaceListDir.mockImplementation(() => new Promise((resolve) => pending.push(resolve)));
+    const onError = vi.fn();
+    const { result } = renderHook(() => useWorkspaceTreeData({
+      roots, expandedRootIds: noExpandedRoots, treeViewMode: "tree", onError,
+    }));
+
+    let older!: Promise<void>;
+    let newer!: Promise<void>;
+    act(() => {
+      older = result.current.loadDir(root.id, "Documents");
+      newer = result.current.loadDir(root.id, "Documents");
+    });
+    await waitFor(() => expect(pending).toHaveLength(2));
+
+    const document = { ...ENTRY, name: "notes.md", path: "Documents/notes.md" };
+    await act(async () => {
+      pending[1](ready([document]));
+      await newer;
+    });
+    expect(result.current.directories["root-1:Documents"]?.entries).toEqual([document]);
+
+    await act(async () => {
+      pending[0](ready([]));
+      await older;
+    });
+    expect(result.current.directories["root-1:Documents"]?.entries).toEqual([document]);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
   it("keeps the compact endpoint mounted until its refreshed chain is ready", async () => {
     const onError = vi.fn();
     const directory = { ...ENTRY, name: "src", path: "src", fileType: "dir" };

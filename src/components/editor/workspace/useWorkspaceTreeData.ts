@@ -62,6 +62,11 @@ export function useWorkspaceTreeData({
   const compactChainsRef = useRef(compactChains);
   const flatFilesRef = useRef(flatFiles);
   const generationRef = useRef(0);
+  // A directory can be requested more than once in one refresh generation
+  // (restored expansion, watcher refresh, and a user retry may overlap). Keep
+  // only the newest response for each key so a late empty/error result cannot
+  // replace a newer, populated listing.
+  const directoryRequestsRef = useRef<Record<string, number>>({});
   const compactGenerationsRef = useRef<Record<string, number>>({});
   const flatGenerationsRef = useRef<Record<string, number>>({});
   const [reloadVersion, setReloadVersion] = useState(0);
@@ -88,6 +93,8 @@ export function useWorkspaceTreeData({
     if (!root) return;
     const generation = generationRef.current;
     const key = rootDirKey(rootId, path);
+    const request = (directoryRequestsRef.current[key] ?? 0) + 1;
+    directoryRequestsRef.current[key] = request;
     setDirectories((current) => ({
       ...current,
       [key]: {
@@ -101,6 +108,7 @@ export function useWorkspaceTreeData({
     // entries into DirectoryState.
     const result = await workspaceListDir(root.path, path);
     if (generation !== generationRef.current) return;
+    if (directoryRequestsRef.current[key] !== request) return;
     if (!findRoot(rootId)) return; // root removed / workspace switched mid-flight
     if (result.state === "ready") {
       setDirectories((current) => ({
@@ -225,6 +233,7 @@ export function useWorkspaceTreeData({
 
   const reset = useCallback((options?: { retainListings?: boolean }) => {
     generationRef.current += 1;
+    directoryRequestsRef.current = {};
     compactGenerationsRef.current = {};
     flatGenerationsRef.current = {};
     compactChainsRef.current = {};
@@ -243,11 +252,15 @@ export function useWorkspaceTreeData({
   }, []);
 
   const removeRoot = useCallback((rootId: string) => {
+    const prefix = `${rootId}:`;
+    for (const key of Object.keys(directoryRequestsRef.current)) {
+      if (key.startsWith(prefix)) delete directoryRequestsRef.current[key];
+    }
     setDirectories((current) => Object.fromEntries(
-      Object.entries(current).filter(([key]) => !key.startsWith(`${rootId}:`)),
+      Object.entries(current).filter(([key]) => !key.startsWith(prefix)),
     ));
     setCompactChains((current) => Object.fromEntries(
-      Object.entries(current).filter(([key]) => !key.startsWith(`${rootId}:`)),
+      Object.entries(current).filter(([key]) => !key.startsWith(prefix)),
     ));
     setFlatFiles((current) => {
       const next = { ...current };

@@ -29,7 +29,7 @@ verification:
     requirement: The real pin remains above other windows and moves with OS drag. Zoom changes actual dimensions, opacity reveals desktop
       pixels, 64px collapse restores geometry and opacity, public Copy/Save retain original pixels. A note written through the pin menu
       is stored on the persistent favorite, and reopening the favorite after temporary artifacts are deleted shows the same note.
-      Options use an independent window. The editor is resizable. Done replacement updates only the original pin and preserves its note;
+      A draft typed as options appear must survive consecutive source zoom updates before saving. Options use an independent window. The editor is resizable. Done replacement updates only the original pin and preserves its note;
       new pin retains the original and creates annotated pixels; copy only retains the original pin. Every branch writes the same annotated pixels to the OS clipboard.
       Close the old options before opening the editor so a late opening reply cannot close reopened options. Read scripts before clicking controls that close their window, and wait for enabled Edit controls across consecutive edit sessions.
       Before opacity readback, park the real OS pointer outside the pin to dismiss hover help. Sample the native image interior using actual output pixels, including XWayland windows whose buffer scale differs from the output scale.

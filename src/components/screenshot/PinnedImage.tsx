@@ -30,8 +30,13 @@ export function PinnedImage() {
   const sizeBusy = useRef(false);
   const expandedSize = useRef<LogicalSize | null>(null);
   const toolsLabel = useRef<string | null>(null);
+  const viewRevision = useRef(0);
   const viewSnapshot = (): PinView => ({ zoom, opacity, note, busy, error, notice });
-  const publishView = () => { if (toolsLabel.current) void emitTo(toolsLabel.current, PIN_VIEW_EVENT, viewSnapshot()).catch(() => undefined); };
+  const publishView = () => {
+    if (!toolsLabel.current) return;
+    const snapshot = { ...viewSnapshot(), revision: ++viewRevision.current };
+    void emitTo(toolsLabel.current, PIN_VIEW_EVENT, snapshot).catch(() => undefined);
+  };
   const hideTools = () => { setMenuOpen(false); void closePinTools().catch((e) => setError(formatUnknownError(e))); };
 
   useEffect(() => {
