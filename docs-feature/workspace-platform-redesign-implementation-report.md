@@ -1,11 +1,23 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 上一轮 `9f3ada0f` 已在合并 main 后通过三平台 browser/native 相关集 **1,276/1,276** 与全量 **2,036/2,036**。本轮追加空工作区共享文件区、列表/排序/包平铺及 LSP 非阻塞验收，本机 browser **9/9**、native **9/9** 已通过；GitHub 三平台复验待执行，以下历史通过结果不代表本轮托管结果。性能对照将在新增功能全量通过后完成。
+> 上一轮 `9f3ada0f` 已在合并 main 后通过三平台 browser/native 相关集 **1,276/1,276** 与全量 **2,036/2,036**。本轮追加空工作区共享文件区、列表/排序/包平铺及 LSP 非阻塞验收，并修复手测发现的 Home 恢复子目录 Empty 问题。本机当前源码的 **10 个 browser ID、12 个 native ID** 最新适用结果全部通过；GitHub 三平台复验待执行，以下历史通过结果不代表本轮托管结果。性能对照将在新增功能全量通过后完成。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
+
+## Home 恢复目录内容修复（2026-10-26）
+
+用户手工测试在 Home 进入 Workspaces、选择 Workspace1 后，已展开的 `.idea`、`.settings`、`src` 等目录显示 `Empty`。本机只读检查确认目录有真实文件；新增 `TC-WS-044` 在修复前 browser `workspace-browser/run-20261026-170337-346038659` 第 29 步复现同样状态。布局持久化保存了子目录展开 key，但挂载时仅重新读取根目录，缺失的子目录缓存又被误显示为空。
+
+新增独立的 `useExpandedWorkspaceDirectories`，在根目录及父目录列表就绪后逐层读取可见的已展开子目录，支持 Project、Compact 与 Detailed List。折叠分支、筛选/平铺视图不触发此恢复遍历；已有缓存和正在进行的读取继续复用，错误保留原显式重试语义。未加载的目录明确显示 Loading，只有成功读取的空目录显示 Empty。
+
+`TC-WS-044` 用 UI 创建 Workspace1、展开文档及嵌套源码目录，切到默认工作区，从 Home 重载并选择 Workspace1；检查子目录、展开状态及打开的文档，再对 Detailed List 重复验收。原生 `TC-WS-030` 在两次真实进程冷启动后增加已展开 `src` 的文件及展开状态断言。33 项相关单元测试已通过；修复前的单元失败日志、browser trace 与截图均保留。
+
+当前源码本机 native `workspace-native/run-20261026-171519-113425853` 为 **12/12 passed**，包含全部新增文件区用例、冷启动和原有 Code Workspace 的原生树键盘导航及焦点转移。Browser 主批次 `workspace-browser/run-20261026-170915-852827221` 为 9 passed / 1 页面意外重载失败，原断言不变的 `TC-WS-036` 在 `run-20261026-171519-039833829` 通过；10 个 browser ID 的最新适用结果全部 passed。三个批次均 `identity_stable=true`，签名回执及所有身份由 `load_observations` 核验，记录在 `_local/workspace-restored-tree-local-evidence.json`；没有删除首次失败。
+
+QA 原生构建、`pnpm check:refactor`、Rust 格式及 630 个目录 ID 的静态 QA 门禁通过。当前 `com.taomni.app.qa` 二进制为 `src-tauri/target/qa-ui-auto/debug/taomni`，SHA-256 `c0b34cad944fa390d7f30c09d878a481e5bc2f94ac3a5b23ffb62e0365765f3b`，产品源码指纹 `48f19b2cf00af8679ab43f6e21ebc0ab31f87e774d3a1a96a079b9d733666bdf`。新一轮三平台相关集使用 394 个精确 ID，全部通过后再执行整体。
 
 ## 空工作区文件浏览器追加实现（2026-10-26）
 
@@ -21,7 +33,7 @@ Browser 曾实际复现首次添加目录的 `Maximum update depth exceeded`：�
 
 最终本机 browser `workspace-browser/run-20261026-164121-553892673` 为 **9/9 passed**（2 workers），native `workspace-native/run-20261026-163507-030400079` 为 **9/9 passed**（顺序执行）。两批均 `identity_stable=true`，签名回执、源码/runner/用例及原生构建身份由 `load_observations` 独立核验；记录在 `_local/workspace-explorer-local-evidence.json`。Browser 首批保留的两个页面重载失败随后在单独批次和完整 9 条批次中均通过，没有修改断言。Native 覆盖真实系统目录选择、磁盘读写、JDTLS 补全、冷启动、面板恢复和真实 stdio 服务初始化等待。
 
-112 项相关 frontend 测试、14 项源码过滤测试、74 项 Rust workspace 测试及慢 LSP fixture 契约通过；`pnpm build --mode qa`（含 `pnpm check:refactor`）、Rust 格式和 QA 静态覆盖门禁通过。当前 QA 二进制 `src-tauri/target/qa-ui-auto/debug/taomni` 的 SHA-256 为 `cc32aa46218aef608e6398e03004f5512e9aae13fd64fc4520fb8acecf210ae7`，产品源码指纹为 `c047370f9e53dc1084dd418366813fa6eac1dbf0253212d08986470e774cce58`。下一轮使用 393 个精确相关 ID，三平台全绿后再跑整体。
+112 项相关 frontend 测试、14 项源码过滤测试、74 项 Rust workspace 测试及慢 LSP fixture 契约通过；`pnpm build --mode qa`（含 `pnpm check:refactor`）、Rust 格式和 QA 静态覆盖门禁通过。该批 QA 二进制的 SHA-256 为 `cc32aa46218aef608e6398e03004f5512e9aae13fd64fc4520fb8acecf210ae7`，产品源码指纹为 `c047370f9e53dc1084dd418366813fa6eac1dbf0253212d08986470e774cce58`，随后启动 393 个精确相关 ID 的托管执行；Home 恢复追加修复和当前验证范围见上节。
 
 ## 上一轮功能验收（2026-10-26，9f3ada0f）
 

@@ -47,6 +47,7 @@ export function useWorkspaceTreeModel(context: UseWorkspaceTreeModelContext) {
   const treeData = useWorkspaceTreeData({
     roots,
     expandedRootIds: expandedRoots,
+    expandedDirKeys: expandedDirs,
     treeViewMode: workspaceUi.treeViewMode,
     treeFilter: workspaceUi.treeFilter,
     onError: setStatusMessage,

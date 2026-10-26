@@ -5,6 +5,7 @@ import {
   workspaceListFilesRecursive,
 } from "../../../lib/editor/workspace";
 import type { CodeWorkspaceRootInfo } from "../../../types";
+import { useExpandedWorkspaceDirectories } from "./hooks/useExpandedWorkspaceDirectories";
 import {
   DEFAULT_DIR_STATE,
   DEFAULT_FLAT_FILES_STATE,
@@ -22,11 +23,14 @@ import {
 interface UseWorkspaceTreeDataOptions {
   roots: CodeWorkspaceRootInfo[];
   expandedRootIds: ReadonlySet<string>;
+  expandedDirKeys?: ReadonlySet<string>;
   treeViewMode: TreeViewMode;
   /** When non-empty, recursive file indexes load so tree filter can match nested files. */
   treeFilter?: string;
   onError: (message: string) => void;
 }
+
+const NO_EXPANDED_DIRS: ReadonlySet<string> = new Set();
 
 export interface WorkspaceTreeDataController {
   directories: Record<string, DirectoryState>;
@@ -46,6 +50,7 @@ export interface WorkspaceTreeDataController {
 export function useWorkspaceTreeData({
   roots,
   expandedRootIds,
+  expandedDirKeys = NO_EXPANDED_DIRS,
   treeViewMode,
   treeFilter = "",
   onError,
@@ -256,6 +261,11 @@ export function useWorkspaceTreeData({
       if (expandedRootIds.has(root.id)) void loadDir(root.id, "");
     });
   }, [expandedRootIds, loadDir, roots]);
+
+  useExpandedWorkspaceDirectories({
+    roots, expandedRootIds, expandedDirKeys, directories, compactChains,
+    treeViewMode, treeFilter, loadDir,
+  });
 
   useEffect(() => {
     if (treeViewMode !== "compact") return;

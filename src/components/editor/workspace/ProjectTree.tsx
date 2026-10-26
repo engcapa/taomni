@@ -62,7 +62,7 @@ function renderEntries(
   if (filter) {
     return renderMatchingFlatFiles(root, props, { groupBySource: false });
   }
-  if (state.loading && !state.loaded) {
+  if (!state.loaded) {
     return (
       <div className="h-[var(--taomni-code-tree-row-height)] flex items-center gap-2 px-2 text-[var(--taomni-code-muted)]">
         <Loader2 className="w-3.5 h-3.5 animate-spin" />

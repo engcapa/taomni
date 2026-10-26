@@ -34,4 +34,3 @@ export interface ProjectTreeProps {
   showDetails?: boolean;
   sort?: ExplorerSort;
 }
-
