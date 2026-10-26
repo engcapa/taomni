@@ -10934,163 +10934,198 @@ controls:
 id: F-BACKUP-2
 status: partial
 area: settings/backup
-components: [RemoteBackupPanel]
+components:
+- RemoteBackupPanel
 files:
-  - src/components/settings/RemoteBackupPanel.tsx
-  - src/lib/remoteBackup.ts
-  - src-tauri/src/backup/commands.rs
-  - src-tauri/src/backup/control.rs
-  - src-tauri/src/backup/credentials.rs
-  - src-tauri/src/backup/feishu/auth.rs
-  - src/components/settings/backup/BackupDestination.tsx
-  - src/components/settings/backup/BackupAuthorizationBanner.tsx
-  - src/components/settings/backup/BackupCloudActivity.tsx
-  - src/stores/backupControlStore.ts
-  - src-tauri/src/backup/feishu/auth_session.rs
-  - src-tauri/src/backup/feishu/auth_service.rs
-  - src-tauri/src/backup/feishu/auth_connect.rs
+- src/components/settings/RemoteBackupPanel.tsx
+- src/lib/remoteBackup.ts
+- src-tauri/src/backup/commands.rs
+- src-tauri/src/backup/control.rs
+- src-tauri/src/backup/credentials.rs
+- src-tauri/src/backup/feishu/auth.rs
+- src/components/settings/backup/BackupDestination.tsx
+- src/components/settings/backup/BackupAuthorizationBanner.tsx
+- src/components/settings/backup/BackupCloudActivity.tsx
+- src/stores/backupControlStore.ts
+- src-tauri/src/backup/feishu/auth_session.rs
+- src-tauri/src/backup/feishu/auth_service.rs
+- src-tauri/src/backup/feishu/auth_connect.rs
+- src-tauri/src/backup/jobs.rs
+- src-tauri/src/backup/job_lifecycle.rs
+- src-tauri/src/backup/model.rs
+- src-tauri/src/backup/source.rs
 controls:
-  - id: backup-cloud-include-mail
-    selector: '[data-testid="backup-cloud-include-mail"]'
-    kind: interactive
-    aliases:
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-include-mail"]'
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-include-mail"]'
-  - id: cloud-panel
-    selector: '[data-testid="backup-cloud-panel"]'
-    kind: display
-  - id: feishu-add
-    selector: '[data-testid="backup-feishu-add"]'
-    kind: interactive
-  - id: cloud-target
-    selector: '[data-testid="backup-cloud-target"]'
-    kind: interactive
-  - id: cloud-name
-    selector: '[data-testid="backup-cloud-name"]'
-    kind: interactive
-    aliases:
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-name"]'
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-name"]'
-  - id: cloud-proxy
-    selector: '[data-testid="backup-cloud-proxy"]'
-    kind: interactive
-    aliases:
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-proxy"]'
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-proxy"]'
-  - id: cloud-save
-    selector: '[data-testid="backup-cloud-save"]'
-    kind: interactive
-    aliases:
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-save"]'
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-save"]'
-  - id: feishu-folder
-    selector: '[data-testid="backup-feishu-folder"]'
-    kind: interactive
-    aliases:
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-feishu-folder"]'
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-feishu-folder"]'
-  - id: device-name
-    selector: '[data-testid="backup-device-name"]'
-    kind: interactive
-  - id: source-device
-    selector: '[data-testid="backup-source-device"]'
-    kind: interactive
-  - id: cloud-row
-    selector: '[data-testid="backup-cloud-row"]'
-    kind: display
-  - id: feishu-app-id-legacy
-    selector: '[data-testid="backup-feishu-app-id"]'
-    kind: display
-  - id: feishu-authorize
-    selector: '[data-testid="backup-feishu-authorize"]'
-    kind: interactive
-    aliases:
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-feishu-authorize"]'
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-feishu-authorize"]'
-  - id: recovery
-    selector: '[data-testid="backup-connection-recovery"]'
-    kind: display
-  - id: restart-confirm
-    selector: '[data-testid="backup-restart-confirm"]'
-    kind: interactive
-  - id: restart-application
-    selector: '[data-testid="backup-restart-application"]'
-    kind: interactive
-  - id: cache
-    selector: '[data-testid="backup-cache"]'
-    kind: display
-  - id: cache-clean
-    selector: '[data-testid="backup-cache-clean"]'
-    kind: interactive
-  - id: job-cancel
-    selector: '[data-testid="backup-job-cancel"]'
-    kind: interactive
-  - id: job-retry
-    selector: '[data-testid="backup-job-retry"]'
-    kind: interactive
-  - id: job-discard
-    selector: '[data-testid="backup-job-discard"]'
-    kind: interactive
-  - id: discard-confirm
-    selector: '[data-testid="backup-discard-confirm"]'
-    kind: interactive
-  - id: retry-notice
-    selector: '[data-testid="backup-retry-notice"]'
-    kind: display
-  - id: job
-    selector: '[data-testid="backup-cloud-job"]'
-    kind: display
-  - id: cloud-refresh
-    selector: '[data-testid="backup-cloud-refresh"]'
-    kind: interactive
-  - id: destination-expand
-    selector: '[data-testid="backup-cloud-destination"] > summary'
-    kind: interactive
-    aliases:
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) > summary'
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) > summary'
-  - id: cloud-range-mode
-    selector: '[data-testid="backup-cloud-range-mode"]'
-    kind: interactive
-    aliases:
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-range-mode"]'
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-range-mode"]'
-  - id: cloud-scope
-    selector: '[data-testid="backup-cloud-scope"]'
-    kind: interactive
-    aliases:
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-scope"]'
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-scope"]'
-  - id: cloud-password
-    selector: '[data-testid="backup-cloud-password"]'
-    kind: interactive
-    aliases:
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-password"]'
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-password"]'
-  - id: cloud-enabled
-    selector: '[data-testid="backup-cloud-enabled"]'
-    kind: interactive
-    aliases:
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-enabled"]'
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-enabled"]'
-  - id: authorization-banner
-    selector: '[data-testid="backup-authorization-banner"]'
-    kind: display
-  - id: authorization-session
-    selector: '[data-testid="backup-feishu-session"]'
-    kind: display
-  - id: authorization-cancel
-    selector: '[data-testid="backup-authorization-cancel"]'
-    kind: interactive
-  - id: authorization-forget
-    selector: '[data-testid="backup-authorization-forget"]'
-    kind: interactive
-  - id: device-settings
-    selector: '[data-testid="backup-device-settings"] > summary'
-    kind: interactive
-  - id: destination
-    selector: '[data-testid="backup-cloud-destination"]'
-    kind: display
+- id: backup-cloud-include-mail
+  selector: '[data-testid="backup-cloud-include-mail"]'
+  kind: interactive
+  aliases:
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-include-mail"]'
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-include-mail"]'
+- id: cloud-panel
+  selector: '[data-testid="backup-cloud-panel"]'
+  kind: display
+- id: feishu-add
+  selector: '[data-testid="backup-feishu-add"]'
+  kind: interactive
+- id: cloud-target
+  selector: '[data-testid="backup-cloud-target"]'
+  kind: interactive
+- id: cloud-name
+  selector: '[data-testid="backup-cloud-name"]'
+  kind: interactive
+  aliases:
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-name"]'
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-name"]'
+- id: cloud-proxy
+  selector: '[data-testid="backup-cloud-proxy"]'
+  kind: interactive
+  aliases:
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-proxy"]'
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-proxy"]'
+- id: cloud-save
+  selector: '[data-testid="backup-cloud-save"]'
+  kind: interactive
+  aliases:
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-save"]'
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-save"]'
+- id: feishu-folder
+  selector: '[data-testid="backup-feishu-folder"]'
+  kind: interactive
+  aliases:
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-feishu-folder"]'
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-feishu-folder"]'
+- id: device-name
+  selector: '[data-testid="backup-device-name"]'
+  kind: interactive
+- id: source-device
+  selector: '[data-testid="backup-source-device"]'
+  kind: interactive
+- id: cloud-row
+  selector: '[data-testid="backup-cloud-row"]'
+  kind: display
+- id: feishu-app-id-legacy
+  selector: '[data-testid="backup-feishu-app-id"]'
+  kind: display
+- id: feishu-authorize
+  selector: '[data-testid="backup-feishu-authorize"]'
+  kind: interactive
+  aliases:
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-feishu-authorize"]'
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-feishu-authorize"]'
+- id: recovery
+  selector: '[data-testid="backup-connection-recovery"]'
+  kind: display
+- id: restart-confirm
+  selector: '[data-testid="backup-restart-confirm"]'
+  kind: interactive
+- id: restart-application
+  selector: '[data-testid="backup-restart-application"]'
+  kind: interactive
+- id: cache
+  selector: '[data-testid="backup-cache"]'
+  kind: display
+- id: cache-clean
+  selector: '[data-testid="backup-cache-clean"]'
+  kind: interactive
+- id: job-cancel
+  selector: '[data-testid="backup-job-cancel"]'
+  kind: interactive
+- id: job-retry
+  selector: '[data-testid="backup-job-retry"]'
+  kind: interactive
+- id: job-discard
+  selector: '[data-testid="backup-job-discard"]'
+  kind: interactive
+- id: discard-confirm
+  selector: '[data-testid="backup-discard-confirm"]'
+  kind: interactive
+- id: retry-notice
+  selector: '[data-testid="backup-retry-notice"]'
+  kind: display
+- id: job
+  selector: '[data-testid="backup-cloud-job"]'
+  kind: display
+- id: cloud-refresh
+  selector: '[data-testid="backup-cloud-refresh"]'
+  kind: interactive
+- id: destination-expand
+  selector: '[data-testid="backup-cloud-destination"] > summary'
+  kind: interactive
+  aliases:
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(1) > summary'
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(2) > summary'
+- id: cloud-range-mode
+  selector: '[data-testid="backup-cloud-range-mode"]'
+  kind: interactive
+  aliases:
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-range-mode"]'
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-range-mode"]'
+- id: cloud-password
+  selector: '[data-testid="backup-cloud-password"]'
+  kind: interactive
+  aliases:
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-password"]'
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-password"]'
+- id: cloud-enabled
+  selector: '[data-testid="backup-cloud-enabled"]'
+  kind: interactive
+  aliases:
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-enabled"]'
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(2) [data-testid="backup-cloud-enabled"]'
+- id: authorization-banner
+  selector: '[data-testid="backup-authorization-banner"]'
+  kind: display
+- id: authorization-session
+  selector: '[data-testid="backup-feishu-session"]'
+  kind: display
+- id: authorization-cancel
+  selector: '[data-testid="backup-authorization-cancel"]'
+  kind: interactive
+- id: authorization-forget
+  selector: '[data-testid="backup-authorization-forget"]'
+  kind: interactive
+- id: device-settings
+  selector: '[data-testid="backup-device-settings"] > summary'
+  kind: interactive
+- id: destination
+  selector: '[data-testid="backup-cloud-destination"]'
+  kind: display
+- id: backup-cloud-categories
+  selector: '[data-testid="backup-cloud-categories"]'
+  kind: display
+- id: backup-cloud-includeSessions
+  selector: '[data-testid="backup-cloud-includeSessions"]'
+  kind: interactive
+- id: backup-cloud-includeNotes
+  selector: '[data-testid="backup-cloud-includeNotes"]'
+  kind: interactive
+- id: backup-cloud-includeVault
+  selector: '[data-testid="backup-cloud-includeVault"]'
+  kind: interactive
+- id: backup-cloud-includeMfa
+  selector: '[data-testid="backup-cloud-includeMfa"]'
+  kind: interactive
+- id: backup-cloud-includeConfigs
+  selector: '[data-testid="backup-cloud-includeConfigs"]'
+  kind: interactive
+- id: backup-cloud-includeServerCertificates
+  selector: '[data-testid="backup-cloud-includeServerCertificates"]'
+  kind: interactive
+- id: backup-cloud-includeLanchat
+  selector: '[data-testid="backup-cloud-includeLanchat"]'
+  kind: interactive
+- id: backup-cloud-includeLocalHistory
+  selector: '[data-testid="backup-cloud-includeLocalHistory"]'
+  kind: interactive
+- id: backup-cloud-includeMail
+  selector: '[data-testid="backup-cloud-includeMail"]'
+  kind: interactive
+- id: backup-cloud-includeMailOriginals
+  selector: '[data-testid="backup-cloud-includeMailOriginals"]'
+  kind: interactive
+- id: backup-cloud-includeMailAttachments
+  selector: '[data-testid="backup-cloud-includeMailAttachments"]'
+  kind: interactive
 -->
 
 - 飞书使用原生应用复用/浏览器注册和设备授权，目标可保存独立代理；不需要手工应用密钥或回调设置。
@@ -11103,98 +11138,170 @@ controls:
 id: F-BACKUP-1
 status: done
 area: settings/backup
-components: [BackupSettingsPanel]
+components:
+- BackupSettingsPanel
 files:
-  - src-tauri/src/backup/scheduler.rs
-  - src-tauri/src/backup/coordination.rs
-  - src-tauri/src/backup/mod.rs
-  - src-tauri/src/backup/policy.rs
-  - src-tauri/src/backup/engine.rs
-  - src/stores/backupStore.ts
-  - src/components/settings/BackupSettingsPanel.tsx
-  - src/components/settings/backup/BackupSettingsView.tsx
-  - src/components/settings/backup/BackupSections.tsx
-  - src/components/settings/backup/BackupRangeEditor.tsx
-  - src/components/settings/backup/BackupLocalHistory.tsx
-  - src/components/settings/backup/BackupRestoreDialog.tsx
-  - src/components/settings/backup/BackupError.tsx
-  - src/components/settings/backup/BackupSettingsTypes.ts
-  - src/stores/backupSettingsStore.ts
-  - src/lib/backupSettings.ts
-  - src/stubs/remoteBackupStub.ts
-  - src-tauri/src/backup/settings.rs
-  - src-tauri/src/backup/settings_model.rs
-  - src-tauri/src/backup/range.rs
+- src-tauri/src/backup/scheduler.rs
+- src-tauri/src/backup/coordination.rs
+- src-tauri/src/backup/mod.rs
+- src-tauri/src/backup/policy.rs
+- src-tauri/src/backup/engine.rs
+- src/stores/backupStore.ts
+- src/components/settings/BackupSettingsPanel.tsx
+- src/components/settings/backup/BackupSettingsView.tsx
+- src/components/settings/backup/BackupSections.tsx
+- src/components/settings/backup/BackupRangeEditor.tsx
+- src/components/settings/backup/BackupLocalHistory.tsx
+- src/components/settings/backup/BackupRestoreDialog.tsx
+- src/components/settings/backup/BackupError.tsx
+- src/components/settings/backup/BackupSettingsTypes.ts
+- src/stores/backupSettingsStore.ts
+- src/lib/backupSettings.ts
+- src/stubs/remoteBackupStub.ts
+- src-tauri/src/backup/settings.rs
+- src-tauri/src/backup/settings_model.rs
+- src-tauri/src/backup/range.rs
+- src-tauri/src/backup/archive_writer.rs
+- src-tauri/src/backup/mail_snapshot.rs
+- src-tauri/src/backup/snapshot_context.rs
+- src-tauri/src/backup/local_jobs.rs
+- src/lib/backup.ts
 controls:
-  - id: backup-global-scope
-    selector: '[data-testid="backup-global-scope"]'
-    kind: interactive
-  - id: backup-global-include-mail
-    selector: '[data-testid="backup-global-include-mail"]'
-    kind: interactive
-  - id: auto-toggle
-    selector: '[data-testid="backup-auto-enabled"]'
-    kind: interactive
-  - id: frequency
-    selector: '[data-testid="backup-auto-frequency"]'
-    kind: interactive
-  - id: retained-copies
-    selector: '[data-testid="backup-auto-retention"]'
-    kind: interactive
-  - id: last-success
-    selector: '[data-testid="backup-last-success"]'
-    kind: display
-  - id: history-refresh
-    selector: '[data-testid="backup-history-refresh"]'
-    kind: interactive
-  - id: global-defaults
-    selector: '[data-testid="backup-global-defaults"]'
-    kind: display
-  - id: save-status
-    selector: '[data-testid="backup-settings-save-status"]'
-    kind: display
-  - id: local-expand
-    selector: '[data-testid="backup-local-destination"] > summary'
-    kind: interactive
-  - id: local-range
-    selector: '[data-testid="backup-local-range-mode"]'
-    kind: interactive
-  - id: local-scope
-    selector: '[data-testid="backup-local-scope"]'
-    kind: interactive
-  - id: local-select
-    selector: '[data-testid="backup-local-select"]'
-    kind: interactive
-  - id: global-history
-    selector: '[data-testid="backup-global-includeLocalHistory"]'
-    kind: interactive
-  - id: global-vault
-    selector: '[data-testid="backup-global-includeVault"]'
-    kind: interactive
-  - id: global-mfa
-    selector: '[data-testid="backup-global-includeMfa"]'
-    kind: interactive
-  - id: manual
-    selector: '[data-testid="backup-manual"]'
-    kind: display
-  - id: restore-password
-    selector: '[data-testid="backup-restore-password"]'
-    kind: interactive
-  - id: restore-unlock
-    selector: '[data-testid="backup-restore-unlock"]'
-    kind: interactive
-  - id: restore-dialog
-    selector: '[data-testid="backup-restore-dialog"]'
-    kind: display
-  - id: range-summary
-    selector: '[data-testid="backup-range-summary"]'
-    kind: display
-    aliases:
-    - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-range-summary"]'
-    - '[data-testid="backup-manual"] [data-testid="backup-range-summary"]'
-  - id: save-retry
-    selector: '[data-testid="backup-settings-retry"]'
-    kind: interactive
+- id: backup-global-include-mail
+  selector: '[data-testid="backup-global-include-mail"]'
+  kind: interactive
+- id: auto-toggle
+  selector: '[data-testid="backup-auto-enabled"]'
+  kind: interactive
+- id: frequency
+  selector: '[data-testid="backup-auto-frequency"]'
+  kind: interactive
+- id: retained-copies
+  selector: '[data-testid="backup-auto-retention"]'
+  kind: interactive
+- id: last-success
+  selector: '[data-testid="backup-last-success"]'
+  kind: display
+- id: history-refresh
+  selector: '[data-testid="backup-history-refresh"]'
+  kind: interactive
+- id: global-defaults
+  selector: '[data-testid="backup-global-defaults"]'
+  kind: display
+- id: save-status
+  selector: '[data-testid="backup-settings-save-status"]'
+  kind: display
+- id: local-expand
+  selector: '[data-testid="backup-local-destination"] > summary'
+  kind: interactive
+- id: local-range
+  selector: '[data-testid="backup-local-range-mode"]'
+  kind: interactive
+- id: local-select
+  selector: '[data-testid="backup-local-select"]'
+  kind: interactive
+- id: global-history
+  selector: '[data-testid="backup-global-includeLocalHistory"]'
+  kind: interactive
+- id: global-vault
+  selector: '[data-testid="backup-global-includeVault"]'
+  kind: interactive
+- id: manual
+  selector: '[data-testid="backup-manual"]'
+  kind: display
+- id: restore-password
+  selector: '[data-testid="backup-restore-password"]'
+  kind: interactive
+- id: restore-unlock
+  selector: '[data-testid="backup-restore-unlock"]'
+  kind: interactive
+- id: restore-dialog
+  selector: '[data-testid="backup-restore-dialog"]'
+  kind: display
+- id: range-summary
+  selector: '[data-testid="backup-range-summary"]'
+  kind: display
+  aliases:
+  - '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-range-summary"]'
+  - '[data-testid="backup-manual"] [data-testid="backup-range-summary"]'
+- id: save-retry
+  selector: '[data-testid="backup-settings-retry"]'
+  kind: interactive
+- id: backup-global-categories
+  selector: '[data-testid="backup-global-categories"]'
+  kind: display
+- id: backup-global-includeSessions
+  selector: '[data-testid="backup-global-includeSessions"]'
+  kind: interactive
+- id: backup-global-includeNotes
+  selector: '[data-testid="backup-global-includeNotes"]'
+  kind: interactive
+- id: backup-global-includeMfa
+  selector: '[data-testid="backup-global-includeMfa"]'
+  kind: interactive
+- id: backup-global-includeConfigs
+  selector: '[data-testid="backup-global-includeConfigs"]'
+  kind: interactive
+- id: backup-global-includeServerCertificates
+  selector: '[data-testid="backup-global-includeServerCertificates"]'
+  kind: interactive
+- id: backup-global-includeLanchat
+  selector: '[data-testid="backup-global-includeLanchat"]'
+  kind: interactive
+- id: backup-global-includeMail
+  selector: '[data-testid="backup-global-includeMail"]'
+  kind: interactive
+- id: backup-global-includeMailOriginals
+  selector: '[data-testid="backup-global-includeMailOriginals"]'
+  kind: interactive
+- id: backup-global-includeMailAttachments
+  selector: '[data-testid="backup-global-includeMailAttachments"]'
+  kind: interactive
+- id: backup-local-categories
+  selector: '[data-testid="backup-local-categories"]'
+  kind: display
+- id: backup-local-include-mail
+  selector: '[data-testid="backup-local-include-mail"]'
+  kind: interactive
+- id: backup-local-includeSessions
+  selector: '[data-testid="backup-local-includeSessions"]'
+  kind: interactive
+- id: backup-local-includeNotes
+  selector: '[data-testid="backup-local-includeNotes"]'
+  kind: interactive
+- id: backup-local-includeVault
+  selector: '[data-testid="backup-local-includeVault"]'
+  kind: interactive
+- id: backup-local-includeMfa
+  selector: '[data-testid="backup-local-includeMfa"]'
+  kind: interactive
+- id: backup-local-includeConfigs
+  selector: '[data-testid="backup-local-includeConfigs"]'
+  kind: interactive
+- id: backup-local-includeServerCertificates
+  selector: '[data-testid="backup-local-includeServerCertificates"]'
+  kind: interactive
+- id: backup-local-includeLanchat
+  selector: '[data-testid="backup-local-includeLanchat"]'
+  kind: interactive
+- id: backup-local-includeLocalHistory
+  selector: '[data-testid="backup-local-includeLocalHistory"]'
+  kind: interactive
+- id: backup-local-includeMail
+  selector: '[data-testid="backup-local-includeMail"]'
+  kind: interactive
+- id: backup-local-includeMailOriginals
+  selector: '[data-testid="backup-local-includeMailOriginals"]'
+  kind: interactive
+- id: backup-local-includeMailAttachments
+  selector: '[data-testid="backup-local-includeMailAttachments"]'
+  kind: interactive
+- id: local-completed-restore
+  selector: '[data-testid="backup-local-restore"]'
+  kind: interactive
+- id: destination-select
+  selector: '[data-testid="backup-destination-select"]'
+  kind: interactive
 -->
 
 - 原生后台在启动时及运行中每分钟检查到期备份；daily/weekly 距上次成功备份满 24 小时/7 天触发，休眠恢复后补做一次当前快照，失败后下次检查重试。`on_exit` 在正常退出前完成备份。

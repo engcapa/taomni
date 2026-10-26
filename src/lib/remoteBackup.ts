@@ -58,6 +58,8 @@ export interface RemoteBackup {
   modifiedAt: string;
 }
 export interface BackupJob {
+  cancelRequested?: boolean;
+  localPath?: string | null;
   id: string;
   revision: number;
   targetId: string;

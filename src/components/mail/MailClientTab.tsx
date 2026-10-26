@@ -39,6 +39,7 @@ import { useMailCacheLoading } from "./client/useMailCacheLoading";
 import { useMailCacheState } from "./client/useMailCacheState";
 import { useMailCalendar } from "./client/useMailCalendar";
 import { useMailComposer } from "./client/useMailComposer";
+import { useMailFeedback } from "./client/useMailFeedback";
 import { useMailMessageTabs } from "./client/useMailMessageTabs";
 import { useMailReading } from "./client/useMailReading";
 import { useMailSearch } from "./client/useMailSearch";
@@ -51,8 +52,7 @@ import { useRemoteContentPermissions } from "./client/useRemoteContentPermission
 export function MailClientTab({ tabId, info, visible, onEditSession }: MailClientTabProps) {
   const rowActionsRef = useRef<MailRowActions | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  const [status, setStatus] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const { status, setStatus, setLoadingStatus, error, setError } = useMailFeedback();
   const [downloadingAttachmentIndex, setDownloadingAttachmentIndex] = useState<number | null>(null);
   const cacheOwner = useMailCacheState({
     visible,
@@ -202,7 +202,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     setError,
     info,
     pageSize,
-    setStatus,
+    setStatus: setLoadingStatus,
     searchOwner,
     selectionOwner,
   });
@@ -218,6 +218,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     pageSize,
     setMessages: cacheOwner.setMessages,
     setStatus,
+    setLoadingStatus,
     reloadVisibleFromCache: cacheLoadingOwner.reloadVisibleFromCache,
     incomingFiltersRef,
     setError,

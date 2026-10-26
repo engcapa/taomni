@@ -6,9 +6,10 @@ import { BackupAuthorizationBanner } from "./backup/BackupAuthorizationBanner";
 import { BackupCloudActivity } from "./backup/BackupCloudActivity";
 import { useBackupSettingsStore as settings } from "../../stores/backupSettingsStore";
 import { observeBackupControl, useBackupControlStore as control } from "../../stores/backupControlStore";
-import { backupHarness } from "../../test/backupHarness";
+import { backupHarness, deferred } from "../../test/backupHarness";
 import { setLocale } from "../../lib/i18n";
 import type { AuthorizationSession } from "../../lib/remoteBackup";
+import type { BackupJob } from "../../lib/remoteBackup";
 const mocks = vi.hoisted(() => ({ invoke: vi.fn(), listen: vi.fn(), open: vi.fn(), events: new Map<string, (event: { payload: any }) => void>() }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: mocks.invoke }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: mocks.listen }));
@@ -27,6 +28,53 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); setLocale("en"); });
 const publish = async (session: AuthorizationSession) => { h.sessions = [session]; await act(async () => mocks.events.get("backup-authorization")!({ payload: session })); };
+
+const activeJob = (operation = "upload"): BackupJob => ({ id: "job", revision: 1, targetId: "target", operation, phase: "snapshotting", bytes: 64, total: null, error: null, artifact: null, remote: null, createdAt: Date.now() });
+
+it("cancels a preparing task while another request is busy and restores cancelling after remount", async () => {
+  const held = deferred<void>();
+  const listing = deferred<unknown[]>();
+  h.jobs = [activeJob()]; h.disk.remote.statuses[0].connected = true; h.reset();
+  mocks.invoke.mockImplementation(async (cmd, args) => {
+    if (cmd === "backup_remote_list") return listing.promise;
+    if (cmd === "backup_remote_cancel") {
+      await held.promise;
+      h.jobs = [{ ...h.jobs[0], phase: "cancelling", cancelRequested: true, revision: 2 }];
+      return;
+    }
+    return h.invoke(cmd, args);
+  });
+  const view = render(<Panel />);
+  fireEvent.click(screen.getByTestId("backup-cloud-refresh"));
+  expect(screen.getByTestId("backup-cloud-refresh")).toBeDisabled();
+  fireEvent.click(screen.getByTestId("backup-job-cancel"));
+  expect(screen.getByTestId("backup-job-cancel")).toBeDisabled();
+  expect(screen.getByTestId("backup-job-cancel")).toHaveTextContent("Cancelling");
+  await act(async () => { held.resolve(); listing.resolve([]); });
+  await waitFor(() => expect(screen.getByTestId("backup-cloud-job")).toHaveAttribute("data-phase", "cancelling"));
+  view.unmount(); render(<Panel />);
+  expect(screen.getByTestId("backup-job-cancel")).toBeDisabled();
+  h.jobs = [{ ...h.jobs[0], phase: "cancelled", revision: 3 }];
+  await act(async () => { await control.getState().refresh(); });
+  expect(screen.queryByTestId("backup-job-cancel")).toBeNull();
+  expect(screen.getByTestId("backup-job-retry")).toBeEnabled();
+});
+
+it("allows retrying a failed cancellation request and exposes completed local backups", async () => {
+  h.jobs = [activeJob("local")]; h.reset();
+  mocks.invoke.mockImplementation((cmd, args) => cmd === "backup_remote_cancel" ? Promise.reject(new Error("journal unavailable")) : h.invoke(cmd, args));
+  render(<Panel />);
+  fireEvent.click(screen.getByTestId("backup-job-cancel"));
+  await screen.findByText(/journal unavailable/);
+  expect(screen.getByTestId("backup-job-cancel")).toBeEnabled();
+  h.jobs = [{ ...h.jobs[0], phase: "cancelled", revision: 2 }];
+  await act(async () => { await control.getState().refresh(); });
+  expect(screen.queryByTestId("backup-job-retry")).toBeNull();
+  expect(screen.getByTestId("backup-job-discard")).toBeEnabled();
+  h.jobs = [{ ...h.jobs[0], phase: "completed", localPath: "/backups/local.taobak", revision: 3 }];
+  await act(async () => { await control.getState().refresh(); });
+  expect(screen.getByTestId("backup-local-restore")).toBeEnabled();
+});
 
 it("keeps A's cancellation visible while adding B and waits for cleanup before reconnecting (#714)", async () => {
   const session = waiting(); h.sessions = [session]; h.reset(); render(<Panel />);
@@ -81,11 +129,13 @@ it("persists a channel proxy and inherits the global scope without exposing appl
 it("keeps legacy custom scope until inheritance is explicitly selected", async () => {
   delete h.disk.remote.config.targets[0].rangeMode; h.disk.policy.defaultScope = "full"; h.reset(); render(<Panel />);
   expect(screen.getByTestId("backup-cloud-range-mode")).toHaveValue("custom");
-  expect(screen.getByTestId("backup-cloud-scope")).toHaveValue("core");
+  expect(screen.getByTestId("backup-cloud-categories")).toBeDefined();
+  expect(screen.getByTestId("backup-cloud-include-mail")).not.toBeChecked();
+  expect(screen.getByTestId("backup-cloud-includeServerCertificates")).toBeChecked();
   fireEvent.change(screen.getByTestId("backup-cloud-range-mode"), { target: { value: "inherit" } });
   await settings.getState().flush();
   expect(h.disk.remote.config.targets[0].rangeMode).toBe("inherit");
-  expect(screen.queryByTestId("backup-cloud-scope")).toBeNull();
+  expect(screen.queryByTestId("backup-cloud-categories")).toBeNull();
 });
 it("opens only requested official links, ignores stale events, and never auto opens on remount", async () => {
   const view = render(<Panel />);

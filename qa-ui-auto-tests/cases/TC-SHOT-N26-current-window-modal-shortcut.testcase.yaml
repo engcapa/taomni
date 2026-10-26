@@ -14,7 +14,7 @@ verification:
   review: reviewed
   requirements:
   - id: manual-selection
-    requirement: The menu and real Alt+A with a session-modal text field focused preserve the main window, start without a region or toolbar, and accept a manually drawn 300 by 220 CSS pixel region.
+    requirement: The menu and real Alt+A with a session-modal text field focused preserve the main window, start without a region or toolbar, and accept a manually drawn 300 by 220 CSS pixel region. The modal is opened through the Sessions mode navigation.
     actions: [1, 3]
     checkpoints:
     - {step: 3, expectation: Both entries start in select phase without selection; DOM drag yields the exact requested rectangle; native main window stays visible; modal remains mounted; captured window pixels differ from the pre-shortcut reference by at most 3 intensity levels on average; real Escape resets then closes the overlay.}

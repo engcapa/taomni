@@ -1,4 +1,3 @@
-use super::engine;
 use super::policy::{BackupPolicy, load_policy};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -51,21 +50,8 @@ pub fn start(app: &AppHandle) {
 }
 
 async fn run_backup(app: AppHandle, trigger: BackupTrigger) {
-    let result = tauri::async_runtime::spawn_blocking(move || {
-        engine::create_scheduled_backup(&app, trigger)
-    })
-    .await;
-    match result {
-        Ok(Ok(Some(result))) => {
-            tracing::info!(target: "backup", ?trigger, path = %result.file_path, "Automatic backup completed");
-        }
-        Ok(Ok(None)) => {}
-        Ok(Err(error)) => {
-            tracing::error!(target: "backup", ?trigger, %error, "Automatic backup failed");
-        }
-        Err(error) => {
-            tracing::error!(target: "backup", ?trigger, %error, "Automatic backup task failed");
-        }
+    if let Err(error) = super::local_jobs::scheduled(&app, trigger).await {
+        tracing::error!(target: "backup", ?trigger, %error, "Automatic backup failed");
     }
 }
 

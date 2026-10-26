@@ -136,6 +136,8 @@ export interface AppState {
   tabs: Tab[];
   activeTabId: string | null;
   sidebarCollapsed: boolean;
+  /** Workspaces remembers its navigator independently of the active Sessions tab. */
+  workspaceSidebarCollapsed: boolean;
   /**
    * ED-PARITY-027: merge the active tab's tool window bar into the sidebar
    * rail and remember the sidebar state per tab group (default on).

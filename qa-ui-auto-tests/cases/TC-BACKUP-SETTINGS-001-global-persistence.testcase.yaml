@@ -1,7 +1,7 @@
 id: TC-BACKUP-SETTINGS-001
-title: Global scope persists; legacy and inherited channels remain distinct
-description: Renderer model verifies persisted global choices, custom channel semantics, manual summary and live translations. Native disk and range execution
-  have separate cases.
+title: Category trees preserve legacy exclusions and independent destination overrides
+description: Exercises legacy full with mail excluded, mixed mail children, all global categories, independent destination
+  overrides, persistence and translations.
 covers:
 - F-BACKUP-1
 - F-BACKUP-2
@@ -21,201 +21,358 @@ steps:
     selector: '[data-testid="welcome-panel"]'
     timeout_sec: 60
 - click: '[data-testid="ribbon-settings"]'
-- wait_for: '[data-testid="settings-panel"]'
-- click: '[data-testid="settings-group-toggle-backup"]'
-- wait_for: '[data-testid="backup-global-scope"]'
-- wait_for: '[data-testid="backup-cloud-panel"]'
-- select_option:
-    selector: '[data-testid="backup-global-scope"]'
-    value: full
-- eval_readonly:
-    expression: document.getElementById("backup-global-include-mail").checked
-    expect_truthy: true
-- assert_text:
-    selector: '[data-testid="backup-settings-save-status"]'
-    contains: Saved
+- wait_for:
+    selector: '[data-testid="settings-panel"]'
     timeout_sec: 30
-- click: '[data-testid="backup-cloud-destination"]:nth-of-type(1) > summary'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- wait_for:
+    selector: '[data-testid="backup-global-categories"]'
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="backup-global-defaults"] select option:is([value="core"],[value="full"])'
+    equal: 0
 - assert_attribute:
-    selector: '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-range-mode"]'
+    selector: '[data-testid="backup-global-include-mail"]'
+    name: aria-checked
+    equals: 'false'
+- assert_attribute:
+    selector: '[data-testid="backup-global-includeLanchat"]'
+    name: aria-checked
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="backup-global-includeServerCertificates"]'
+    name: aria-checked
+    equals: 'true'
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem("taomni.backup.policy")).defaultScope === "full" && JSON.parse(localStorage.getItem("taomni.backup.policy")).includeMail
+      === false
+    expect_truthy: true
+- click: '[data-testid="backup-cloud-destination"] > summary'
+- assert_attribute:
+    selector: '[data-testid="backup-cloud-range-mode"]'
     name: value
     equals: custom
 - assert_attribute:
-    selector: '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-scope"]'
-    name: value
-    equals: core
+    selector: '[data-testid="backup-cloud-includeLanchat"]'
+    name: aria-checked
+    equals: 'false'
+- set_check:
+    selector: '[data-testid="backup-cloud-includeMailOriginals"]'
+    checked: true
+- assert_attribute:
+    selector: '[data-testid="backup-cloud-include-mail"]'
+    name: aria-checked
+    equals: mixed
+- assert_attribute:
+    selector: '[data-testid="backup-cloud-includeMail"]'
+    name: aria-checked
+    equals: 'true'
+- assert_visible: '[data-testid="backup-cloud-categories"]'
+- set_check:
+    selector: '[data-testid="backup-cloud-includeSessions"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-cloud-includeNotes"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-cloud-includeMfa"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-cloud-includeVault"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-cloud-includeConfigs"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-cloud-includeServerCertificates"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="backup-cloud-includeLanchat"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="backup-cloud-includeLocalHistory"]'
+    checked: true
 - set_check:
     selector: '[data-testid="backup-cloud-include-mail"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-cloud-includeMail"]'
     checked: true
-- assert_text:
-    selector: '[data-testid="backup-settings-save-status"]'
-    contains: Saved
-    timeout_sec: 30
+- set_check:
+    selector: '[data-testid="backup-cloud-includeMailOriginals"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="backup-cloud-includeMailAttachments"]'
+    checked: true
+- assert_attribute:
+    selector: '[data-testid="backup-cloud-include-mail"]'
+    name: aria-checked
+    equals: 'true'
 - select_option:
-    selector: '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-range-mode"]'
+    selector: '[data-testid="backup-cloud-range-mode"]'
     value: inherit
 - assert_text:
-    selector: '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-range-summary"]'
+    selector: '[data-testid="backup-cloud-destination"] [data-testid="backup-range-summary"]'
     contains: LAN chat
-- assert_not_visible: '[data-testid="backup-manual"] select'
-- assert_text:
-    selector: '[data-testid="backup-manual"] [data-testid="backup-range-summary"]'
-    contains: Mail
 - set_check:
     selector: '[data-testid="backup-global-include-mail"]'
-    checked: false
-- assert_text:
-    selector: '[data-testid="backup-settings-save-status"]'
-    contains: Saved
-    timeout_sec: 30
-- click: '[data-testid="settings-group-toggle-backup"]'
-- click: '[data-testid="settings-group-toggle-backup"]'
-- assert_attribute:
-    selector: '[data-testid="backup-global-scope"]'
-    name: value
-    equals: full
-- eval_readonly:
-    expression: '!document.getElementById("backup-global-include-mail").checked'
-    expect_truthy: true
-- click: '[data-testid="backup-cloud-destination"]:nth-of-type(1) > summary'
-- assert_attribute:
-    selector: '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-range-mode"]'
-    name: value
-    equals: inherit
-- click: '[data-testid="backup-local-destination"] > summary'
-- select_option:
-    selector: '[data-testid="backup-local-range-mode"]'
-    value: custom
-- select_option:
-    selector: '[data-testid="backup-local-scope"]'
-    value: core
-- select_option:
-    selector: '[data-testid="backup-global-scope"]'
-    value: custom
+    checked: true
 - set_check:
-    selector: '[data-testid="backup-global-includeLocalHistory"]'
+    selector: '[data-testid="backup-global-includeMailOriginals"]'
+    checked: false
+- assert_attribute:
+    selector: '[data-testid="backup-global-include-mail"]'
+    name: aria-checked
+    equals: mixed
+- set_check:
+    selector: '[data-testid="backup-global-includeMailAttachments"]'
+    checked: false
+- assert_attribute:
+    selector: '[data-testid="backup-global-includeMail"]'
+    name: aria-checked
+    equals: 'true'
+- set_check:
+    selector: '[data-testid="backup-global-includeMail"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-global-includeMailOriginals"]'
+    checked: true
+- assert_attribute:
+    selector: '[data-testid="backup-global-includeMail"]'
+    name: disabled
+    equals: ''
+- set_check:
+    selector: '[data-testid="backup-global-includeMailAttachments"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="backup-global-includeSessions"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-global-includeSessions"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="backup-global-includeNotes"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-global-includeNotes"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="backup-global-includeConfigs"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-global-includeConfigs"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="backup-global-includeServerCertificates"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-global-includeServerCertificates"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="backup-global-includeLanchat"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-global-includeLanchat"]'
     checked: true
 - set_check:
     selector: '[data-testid="backup-global-includeMfa"]'
     checked: false
-- assert_enabled: '[data-testid="backup-global-includeVault"]'
 - set_check:
     selector: '[data-testid="backup-global-includeVault"]'
     checked: false
-- eval_readonly:
-    expression: '!document.querySelector(''[data-testid''+String.fromCharCode(61)+''"backup-global-includeVault"]'').checked'
-    expect_truthy: true
-- set_check:
-    selector: '[data-testid="backup-global-includeVault"]'
-    checked: true
 - set_check:
     selector: '[data-testid="backup-global-includeMfa"]'
     checked: true
-- eval_readonly:
-    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"backup-global-includeVault"]').checked
-    expect_truthy: true
 - assert_attribute:
     selector: '[data-testid="backup-global-includeVault"]'
     name: disabled
     equals: ''
+- click: '[data-testid="backup-local-destination"] > summary'
+- select_option:
+    selector: '[data-testid="backup-local-range-mode"]'
+    value: custom
+- assert_visible: '[data-testid="backup-local-categories"]'
+- set_check:
+    selector: '[data-testid="backup-local-includeSessions"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-local-includeMfa"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-local-includeVault"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-local-includeConfigs"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-local-includeServerCertificates"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-local-includeLanchat"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-local-include-mail"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-local-includeMail"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="backup-local-includeMailOriginals"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="backup-local-includeMailAttachments"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="backup-local-includeNotes"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-local-include-mail"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="backup-local-includeLocalHistory"]'
+    checked: true
+- assert_attribute:
+    selector: '[data-testid="backup-local-include-mail"]'
+    name: aria-checked
+    equals: 'false'
+- assert_attribute:
+    selector: '[data-testid="backup-global-include-mail"]'
+    name: aria-checked
+    equals: 'true'
+- set_check:
+    selector: '[data-testid="backup-global-includeLocalHistory"]'
+    checked: true
+- assert_text:
+    selector: '[data-testid="backup-settings-save-status"]'
+    contains: Saved
+    timeout_sec: 30
+- click: '[data-testid="settings-group-toggle-backup"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- assert_attribute:
+    selector: '[data-testid="backup-global-includeMailOriginals"]'
+    name: aria-checked
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="backup-global-includeMailAttachments"]'
+    name: aria-checked
+    equals: 'true'
+- assert_not_visible: '[data-testid="backup-manual"] select'
+- click: '[data-testid="backup-local-destination"] > summary'
+- assert_attribute:
+    selector: '[data-testid="backup-local-includeNotes"]'
+    name: aria-checked
+    equals: 'false'
+- assert_attribute:
+    selector: '[data-testid="backup-global-includeNotes"]'
+    name: aria-checked
+    equals: 'true'
 - click: '[data-testid="language-switcher"]'
 - click: '[data-testid="language-option-zh-CN"]'
 - assert_text:
-    selector: '[data-testid="backup-global-defaults"]'
-    contains: 全局默认配置
-- assert_attribute:
-    selector: '[data-testid="backup-global-scope"]'
-    name: value
-    equals: custom
-- screenshot: backup-global-zh.png
-- click: '[data-testid="backup-cloud-job"][data-job-id="${fixture.backup_failed_id}"] [data-testid="backup-job-retry"]'
-- wait_for: '[data-testid="backup-cloud-job"][data-job-id="${fixture.backup_failed_id}"][data-phase="completed"]'
+    selector: '[data-testid="backup-global-categories"]'
+    contains: 完整邮件原件
+- screenshot: backup-categories-zh.png
 verification:
   review: reviewed
   native:
   - check: Renderer behavior only
     method: not-applicable
-    reason: Native boundaries are covered separately by TC-BACKUP-SETTINGS-002, TC-BACKUP-AUTH-715 and TC-BACKUP-COMPAT-001.
-  visual:
-  - check: Backup layout and translated controls
-    method: manual
-    reason: Review retained workflow screenshots.
+    reason: Native cancellation and archive contents have dedicated cases.
   requirements:
   - id: R1
-    requirement: Full preset persists atomically and explicit mail exclusion survives reopening
+    requirement: Legacy full/core configurations expand without rewriting or enabling excluded mail
     actions:
-    - 8
-    - 20
-    - 23
+    - 12
     checkpoints:
+    - step: 7
+      expectation: No core/full selector
+    - step: 8
+      expectation: Mail remains excluded
     - step: 9
-      expectation: '{"eval_readonly": {"expression": "document.getElementById(\"backup-global-include-mail\").checked", "expect_truthy": true}}'
+      expectation: LAN chat retained
     - step: 10
-      expectation: saved
-    - step: 24
-      expectation: fullPersisted
-    - step: 25
-      expectation: '{"eval_readonly": {"expression": "!document.getElementById(\"backup-global-include-mail\").checked", "expect_truthy": true}}'
+      expectation: Certificates retained
+    - step: 11
+      expectation: Opening leaves legacy persisted policy intact
+    - step: 13
+      expectation: Old target stays custom
+    - step: 14
+      expectation: Old target core excludes LAN chat
     results:
+    - 7
+    - 8
     - 9
     - 10
-    - 24
-    - 25
-  - id: R2
-    requirement: Legacy override is retained until explicit inheritance and manual uses the global summary
-    actions:
-    - 16
-    - 23
-    checkpoints:
-    - step: 12
-      expectation: legacyCustom
-    - step: 13
-      expectation: legacyCore
-    - step: 17
-      expectation: effectiveFull
-    - step: 18
-      expectation: manualNoScope
-    - step: 19
-      expectation: manualMail
-    - step: 27
-      expectation: inheritPersisted
-    results:
-    - 12
+    - 11
     - 13
-    - 17
-    - 18
-    - 19
-    - 27
-  - id: R3
-    requirement: Local override, custom history and MFA/vault controls survive live language changes
+    - 14
+  - id: R2
+    requirement: Mail children support mixed state and enforce cache/vault dependencies
     actions:
-    - 29
-    - 31
-    - 32
-    - 33
-    - 35
-    - 37
-    - 38
-    - 42
-    checkpoints:
-    - step: 34
-      expectation: '{"assert_enabled": "[data-testid=\"backup-global-includeVault\"]"}'
-    - step: 36
-      expectation: '{"eval_readonly": {"expression": "!document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"backup-global-includeVault\"]'').checked",
-        "expect_truthy": true}}'
-    - step: 39
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"backup-global-includeVault\"]'').checked",
-        "expect_truthy": true}}'
-    - step: 40
-      expectation: mfaVault
-    - step: 43
-      expectation: translated
-    - step: 44
-      expectation: customRetained
-    results:
+    - 15
     - 34
+    - 35
+    checkpoints:
+    - step: 16
+      expectation: Target mixed state
+    - step: 17
+      expectation: Originals include cache
+    - step: 36
+      expectation: Global mixed state
+    - step: 38
+      expectation: Cache alone stays selected
+    - step: 41
+      expectation: Cache cannot be removed while originals need it
+    - step: 56
+      expectation: MFA retains vault
+    results:
+    - 16
+    - 17
     - 36
-    - 39
-    - 40
-    - 43
-    - 44
+    - 38
+    - 41
+    - 56
+  - id: R3
+    requirement: Destination overrides remain independent and category edits persist through remount and translations
+    actions:
+    - 32
+    - 58
+    - 75
+    - 78
+    - 86
+    checkpoints:
+    - step: 33
+      expectation: Inherited category summary
+    - step: 73
+      expectation: Local excludes mail
+    - step: 74
+      expectation: Global retains all mail
+    - step: 76
+      expectation: Save acknowledged
+    - step: 79
+      expectation: Originals restored
+    - step: 80
+      expectation: Attachments restored
+    - step: 83
+      expectation: Local notes exclusion restored
+    - step: 84
+      expectation: Global notes retained
+    - step: 81
+      expectation: Manual action uses global categories
+    - step: 87
+      expectation: Translated child label
+    results:
+    - 33
+    - 73
+    - 74
+    - 76
+    - 79
+    - 80
+    - 83
+    - 84
+    - 81
+    - 87
+  visual:
+  - check: Category and task controls remain readable in retained screenshots
+    method: manual
+    reason: Review screenshots from the hosted workflow; filesystem assertions establish native effects.

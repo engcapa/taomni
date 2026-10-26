@@ -3,7 +3,8 @@ title: Permanent Sessions, Tools and Settings share tool window icons and names 
 description: Browser and packaged native acceptance for the title-bar grip and permanent buttons. Native explicitly covers the requested WebView layout
   and interactions. Names toggle in both directions from both the permanent and workspace menus; preferences survive reload and permanent entries stay available
   across tabs/panels. Settings follows the names toggle and opens by keyboard; local terminals and Code Workspace do not add a separate Git action to the
-  main sidebar.
+  main sidebar. Returning to Workspaces restores its own collapsed navigator preference; explicitly expand and collapse it before checking merged tools
+  and footer actions.
 covers:
 - F1.2
 - F1.3
@@ -157,6 +158,9 @@ steps:
 - wait_for: '[data-testid="session-tree"]'
 - assert_not_visible: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
 - click: '[data-testid="nav-mode-workspaces"]'
+- assert_visible: '[data-testid="collapsed-sidebar-rail"]'
+- click: '[data-testid="toggle-left-sidebar"]'
+- wait_for: '[data-testid="expanded-sidebar-panel"]'
 - click: '[data-testid="toggle-left-sidebar"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for: '[data-testid="collapsed-sidebar-rail"]'
@@ -205,6 +209,9 @@ steps:
     equals: Settings
 - screenshot: main-rail-terminal-footer.png
 - click: '[data-testid="nav-mode-workspaces"]'
+- assert_visible: '[data-testid="collapsed-sidebar-rail"]'
+- click: '[data-testid="toggle-left-sidebar"]'
+- wait_for: '[data-testid="expanded-sidebar-panel"]'
 - click: '[data-testid="toggle-left-sidebar"]'
 - assert_count:
     selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="ribbon-git"]'
@@ -308,7 +315,7 @@ verification:
     - 38
     - 41
   - id: R3
-    requirement: 工作区与常驻按钮宽度一致且至少 32px；Project 可点击，两个菜单共享名称设置，侧栏/标签切换保留常驻入口。
+    requirement: 工作区与常驻按钮宽度一致且至少 32px；Project 可点击，两个菜单共享名称设置，侧栏/标签切换保留常驻入口。 返回 Workspace 恢复独立折叠偏好，再展开、收起仍正常。
     actions:
     - 42
     - 43
@@ -320,10 +327,11 @@ verification:
     - 62
     - 64
     - 67
-    - 68
     - 69
-    - 70
+    - 71
     - 72
+    - 73
+    - 75
     checkpoints:
     - step: 44
       expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
@@ -357,13 +365,17 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
     - step: 66
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
-    - step: 71
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
-    - step: 73
-      expectation: '{"assert_visible": "[data-testid=\"side-tab-sessions\"]"}'
+    - step: 68
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 70
+      expectation: '{"wait_for": "[data-testid=\"expanded-sidebar-panel\"]"}'
     - step: 74
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
+    - step: 76
+      expectation: '{"assert_visible": "[data-testid=\"side-tab-sessions\"]"}'
+    - step: 77
       expectation: '{"assert_visible": "[data-testid=\"side-tab-tools\"]"}'
-    - step: 75
+    - step: 78
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''.taomni-control-bar .taomni-window-drag-handle'').getBoundingClientRect().height
         <= 32 && getComputedStyle(document.querySelector(''.taomni-main-window'')).paddingLeft === ''0px''", "expect_truthy": true}}'
     results:
@@ -381,55 +393,64 @@ verification:
     - 63
     - 65
     - 66
-    - 71
-    - 73
+    - 68
+    - 70
     - 74
-    - 75
+    - 76
+    - 77
+    - 78
   - id: R4
     requirement: Settings 与其他 action 一起显示/隐藏名称，仍可用键盘打开设置；终端和 Code Workspace 的左下角不再出现独立 Git panel action。
     actions:
-    - 77
-    - 78
     - 80
     - 81
     - 83
-    - 85
-    - 86
-    - 91
-    - 92
-    - 94
-    - 95
-    - 98
-    - 99
-    checkpoints:
-    - step: 79
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"ribbon-settings\"]", "equals": ""}}'
-    - step: 82
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"ribbon-settings\"]", "equals": "Settings"}}'
-    - step: 84
-      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
-    - step: 88
-      expectation: '{"assert_count": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"ribbon-git\"]", "equal": 0}}'
-    - step: 89
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"ribbon-settings\"]", "equals": "Settings"}}'
-    - step: 93
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"ribbon-settings\"]", "equals": ""}}'
-    - step: 96
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"ribbon-settings\"]", "equals": "Settings"}}'
-    - step: 100
-      expectation: '{"assert_count": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"ribbon-git\"]", "equal": 0}}'
-    - step: 101
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"ribbon-settings\"]", "equals": "Settings"}}'
-    results:
-    - 79
-    - 82
     - 84
+    - 86
     - 88
     - 89
-    - 93
-    - 96
-    - 100
+    - 94
+    - 95
+    - 97
+    - 98
     - 101
+    - 103
+    - 105
+    checkpoints:
+    - step: 82
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"ribbon-settings\"]", "equals": ""}}'
+    - step: 85
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"ribbon-settings\"]", "equals": "Settings"}}'
+    - step: 87
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 91
+      expectation: '{"assert_count": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"ribbon-git\"]", "equal": 0}}'
+    - step: 92
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"ribbon-settings\"]", "equals": "Settings"}}'
+    - step: 96
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"ribbon-settings\"]", "equals": ""}}'
+    - step: 99
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"ribbon-settings\"]", "equals": "Settings"}}'
+    - step: 102
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 104
+      expectation: '{"wait_for": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 106
+      expectation: '{"assert_count": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"ribbon-git\"]", "equal": 0}}'
+    - step: 107
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"ribbon-settings\"]", "equals": "Settings"}}'
+    results:
+    - 82
+    - 85
+    - 87
+    - 91
+    - 92
+    - 96
+    - 99
+    - 102
+    - 104
+    - 106
+    - 107
   visual:
   - check: 检查对应截图的图标、名称、选中态、标题栏抓手以及点击区域无缩小、遮挡或截断。
     method: manual

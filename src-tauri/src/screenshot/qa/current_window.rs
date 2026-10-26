@@ -16,6 +16,9 @@ pub async fn screenshot_qa_current_window(app: AppHandle) -> Result<String, Stri
             if modal {
                 r#"
             const q=id=>document.querySelector('[data-testid="'+id+'"]');
+            q('side-tab-sessions').click();
+            for(let i=0;i<100&&!q('session-new');i++) await new Promise(r=>setTimeout(r,50));
+            if(!q('session-new')) throw new Error('Sessions new-session control missing');
             q('session-new').click();
             for(let i=0;i<100&&!q('session-host');i++) await new Promise(r=>setTimeout(r,50));
             const input=q('session-host');

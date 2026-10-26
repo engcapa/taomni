@@ -9,27 +9,45 @@ TARGET_GEOMETRY = r"""
 const el = arguments[0];
 if (!el?.isConnected) throw new Error('stale element reference');
 const r = el.getBoundingClientRect();
-const left = Math.max(0, r.left), right = Math.min(innerWidth, r.right);
-const top = Math.max(0, r.top), bottom = Math.min(innerHeight, r.bottom);
-const x = Math.floor((left + right) / 2), y = Math.floor((top + bottom) / 2);
-const points = [[x, y]];
-if (arguments[1] && right > left && bottom > top) {
-  // A context menu may intentionally stay open while applying terminal
-  // appearance settings. Right-click another visible part of that same
-  // container to reopen it; never click through a covering sibling/portal.
-  const inset = Math.min(8, (right - left) / 4, (bottom - top) / 4);
-  const l = Math.ceil(left + inset), rr = Math.floor(right - inset);
-  const t = Math.ceil(top + inset), b = Math.floor(bottom - inset);
-  points.push([l,y], [rr,y], [x,t], [x,b], [l,t], [rr,t], [l,b], [rr,b]);
-}
-for (const [px, py] of points) {
-  const hit = document.elementFromPoint(px, py);
-  if (right > left && bottom > top && !!hit && el.contains(hit)) {
-    return {x: px, y: py, width: r.width, height: r.height, ready: true};
+const allowAlternate = arguments[1];
+const probe = r => {
+  const left = Math.max(0, r.left), right = Math.min(innerWidth, r.right);
+  const top = Math.max(0, r.top), bottom = Math.min(innerHeight, r.bottom);
+  const x = Math.floor((left + right) / 2), y = Math.floor((top + bottom) / 2);
+  const points = [[x, y]];
+  if (allowAlternate && right > left && bottom > top) {
+    // A context menu may intentionally stay open while applying terminal
+    // appearance settings. Right-click another visible part of that same
+    // container to reopen it; never click through a covering sibling/portal.
+    const inset = Math.min(8, (right - left) / 4, (bottom - top) / 4);
+    const l = Math.ceil(left + inset), rr = Math.floor(right - inset);
+    const t = Math.ceil(top + inset), b = Math.floor(bottom - inset);
+    points.push([l,y], [rr,y], [x,t], [x,b], [l,t], [rr,t], [l,b], [rr,b]);
   }
+  for (const [px, py] of points) {
+    const hit = document.elementFromPoint(px, py);
+    if (right > left && bottom > top && !!hit && el.contains(hit)) {
+      return {x: px, y: py, width: r.width, height: r.height, ready: true};
+    }
+  }
+  return {x, y, width: r.width, height: r.height, ready: false,
+    outside: right <= left || bottom <= top};
+};
+const original = probe(r);
+if (original.ready || !el.closest('dialog:modal')) return original;
+// WKWebView can report a top-layer dialog's rect divided by an ancestor's
+// CSS zoom, while elementFromPoint uses viewport coordinates. Correct only
+// that geometry and still require the original element to pass the hit test.
+let zoom = 1;
+for (let node = el; node; node = node.parentElement) {
+  zoom *= Number.parseFloat(getComputedStyle(node).zoom) || 1;
 }
-return {x, y, width: r.width, height: r.height, ready: false,
-  outside: right <= left || bottom <= top};
+if (zoom !== 1 && Number.isFinite(zoom) && zoom > 0) {
+  const corrected = probe({left:r.left*zoom, right:r.right*zoom,
+    top:r.top*zoom, bottom:r.bottom*zoom, width:r.width*zoom, height:r.height*zoom});
+  if (corrected.ready) return corrected;
+}
+return original;
 """
 
 

@@ -31,7 +31,7 @@ steps:
     equals: en
 - click: '[data-testid="settings-group-toggle-general"]'
 - click: '[data-testid="settings-group-toggle-backup"]'
-- wait_for: '[data-testid="backup-global-scope"]'
+- wait_for: '[data-testid="backup-global-categories"]'
 - click: '[data-testid="backup-feishu-add"]'
 - fill:
     selector: '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-name"]'

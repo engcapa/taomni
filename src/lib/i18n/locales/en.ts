@@ -8,6 +8,11 @@ type Dict = {
 
 const dict = {
   backupUnified: {
+    "categories": "Backup categories",
+    "mailCache": "Mail lists, settings and cache",
+    "includeMailOriginals": "Complete original messages",
+    "includeMailAttachments": "Downloaded attachments",
+    "includeServerCertificates": "Server certificates and keys",
     "unsavedTitle": "Backup settings are not saved",
     "unsavedExit": "Taomni stayed open because your backup settings could not be saved. Retry saving, or cancel exit to review them.",
     "introduction": "Manage a shared backup scope, automatic destinations, and manual backup in one place.",
@@ -20,7 +25,7 @@ const dict = {
     "core": "Core data",
     "full": "Full data",
     "custom": "Custom selection",
-    "includeSessions": "Sessions and server keys",
+    "includeSessions": "Sessions",
     "includeNotes": "Notes",
     "includeVault": "Credential vault",
     "includeMfa": "MFA accounts",
@@ -29,7 +34,7 @@ const dict = {
     "includeMail": "Mail",
     "includeLocalHistory": "Local file history",
     "emptyRange": "No data selected",
-    "rangeHint": "Full data adds LAN chat and mail to core data. Local file history requires a custom selection. MFA accounts also require the credential vault.",
+    "rangeHint": "Original messages include their embedded attachments. Downloaded attachments are separately cached files. Both require mail lists and cache. MFA accounts require the credential vault.",
     "loading": "Loading settings…",
     "saving": "Saving…",
     "saved": "Saved",
@@ -3771,6 +3776,10 @@ const dict = {
     "historyNotice": "Restore a version on the Feishu page, then return here and download again. Uploads on this device are paused. For another device’s backup, also pause uploads on the source device to prevent overwriting.",
     "errorDetails": "Technical details",
     "phases": {
+      "cancelling": "Cancelling",
+      "encrypting": "Encrypting backup",
+      "packing": "Packing backup",
+      "snapshotting": "Copying data",
       "retrying": "Retrying after a temporary service error",
       "retry_wait": "Waiting for automatic retry",
       "discarded": "Local task discarded",

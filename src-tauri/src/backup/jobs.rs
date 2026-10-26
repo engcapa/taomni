@@ -16,8 +16,10 @@ use tokio_util::sync::CancellationToken;
 
 #[derive(Default)]
 pub struct BackupJobs {
+    pub root: std::sync::OnceLock<std::path::PathBuf>,
     pub running: Mutex<HashMap<String, CancellationToken>>,
     pub gate: Mutex<()>,
+    pub active: Mutex<HashMap<String, Arc<Mutex<BackupJob>>>>,
     pub worker: super::worker::CloudWorker,
 }
 
@@ -57,7 +59,7 @@ pub fn list(app: &tauri::AppHandle) -> Result<Vec<BackupJob>, String> {
     jobs.sort_by_key(|job| std::cmp::Reverse(job.created_at));
     Ok(jobs)
 }
-fn save(app: &tauri::AppHandle, job: &BackupJob) -> Result<(), String> {
+pub(crate) fn save(app: &tauri::AppHandle, job: &BackupJob) -> Result<(), String> {
     validate_id(&job.id)?;
     control::write_json(
         &control::root(app)?
@@ -108,7 +110,7 @@ pub fn discard(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
         super::cache::remove_artifacts(&control::root(app)?, id)
     })
 }
-fn context(
+pub(crate) fn context(
     app: &tauri::AppHandle,
     job: Arc<Mutex<BackupJob>>,
     cancel: CancellationToken,
@@ -119,7 +121,11 @@ fn context(
         report: Arc::new(move |phase, bytes, total| {
             if let Ok(mut job) = job.lock() {
                 job.revision += 1;
+                if job.cancel_requested {
+                    return;
+                }
                 job.phase = phase.into();
+                job.updated_at = now_ms();
                 job.bytes = bytes;
                 job.total = total;
                 // Persist phase changes and every progress update so reopened views are authoritative.
@@ -131,23 +137,45 @@ fn context(
     }
 }
 
+fn cancel_active(app: &tauri::AppHandle, service: &BackupJobs, id: &str) -> Result<bool, String> {
+    let active = service
+        .active
+        .lock()
+        .map_err(|e| e.to_string())?
+        .get(id)
+        .cloned();
+    if let Some(active) = active {
+        // Stop blocking I/O before touching journal/configuration locks.
+        if let Some(token) = service.running.lock().map_err(|e| e.to_string())?.get(id) {
+            token.cancel();
+        }
+        let mut job = active.lock().map_err(|e| e.to_string())?;
+        if super::job_lifecycle::request_cancel(&mut job, true) {
+            save(app, &job)?;
+        }
+        return Ok(true);
+    }
+    Ok(false)
+}
+
 pub fn cancel(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
-    let _owner = claim(app)?;
     let service = app.state::<BackupJobs>();
-    let _gate = service.gate.lock().map_err(|e| e.to_string())?;
-    if let Some(token) = service.running.lock().map_err(|e| e.to_string())?.get(id) {
-        token.cancel();
+    if cancel_active(app, &service, id)? {
         return Ok(());
     }
-    if let Some(mut job) = list(app)?
-        .into_iter()
-        .find(|j| j.id == id && j.phase == "retry_wait")
-    {
-        job.phase = "cancelled".into();
-        job.next_retry_at = None;
-        job.updated_at = now_ms();
-        job.revision += 1;
-        save(app, &job)?;
+    let _owner = claim(app)?;
+    let _gate = service.gate.lock().map_err(|e| e.to_string())?;
+    // A start can register the task while cancellation is acquiring the gate.
+    if cancel_active(app, &service, id)? {
+        return Ok(());
+    }
+    if let Some(mut job) = list(app)?.into_iter().find(|j| {
+        j.id == id
+            && ["retry_wait", "interrupted", "queued", "preparing"].contains(&j.phase.as_str())
+    }) {
+        if super::job_lifecycle::request_cancel(&mut job, false) {
+            save(app, &job)?;
+        }
     }
     Ok(())
 }
@@ -293,12 +321,15 @@ fn start_inner(
             attempts: 0,
             next_retry_at: None,
             failure_kind: None,
+            cancel_requested: false,
+            local_path: None,
             execution_source: Some(match source {
                 Some(source) => source,
                 None => super::range::scheduled(&super::policy::load_policy_result(app)?, &target),
             }),
         }
     };
+    job.cancel_requested = false;
     job.phase = "queued".into();
     job.attempts = job.attempts.saturating_add(1);
     job.updated_at = now_ms();
@@ -306,10 +337,27 @@ fn start_inner(
     job.failure_kind = None;
     job.error = None;
     job.revision += 1;
+    launch(app, job, owner, Some(target), None)
+}
+
+pub(crate) fn launch(
+    app: &tauri::AppHandle,
+    job: BackupJob,
+    owner: Arc<std::fs::File>,
+    target: Option<BackupTarget>,
+    local: Option<super::local_jobs::LocalRequest>,
+) -> Result<String, String> {
+    let service = app.state::<BackupJobs>();
     save(app, &job)?;
     let id = job.id.clone();
     let returned_id = id.clone();
     let cancel = CancellationToken::new();
+    let job = Arc::new(Mutex::new(job));
+    service
+        .active
+        .lock()
+        .map_err(|e| e.to_string())?
+        .insert(id.clone(), job.clone());
     service
         .running
         .lock()
@@ -318,40 +366,20 @@ fn start_inner(
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let _owner = owner;
-        let job = Arc::new(Mutex::new(job));
         let ctx = context(&app, job.clone(), cancel.clone());
-        let result = execute(&app, &target, job.clone(), &ctx).await;
+        let result = if let Some(request) = local {
+            super::local_jobs::execute(&app, job.clone(), &ctx, request).await
+        } else {
+            execute(&app, &target.expect("Remote target"), job.clone(), &ctx).await
+        };
         if let Ok(mut state) = job.lock() {
-            state.revision += 1;
-            state.updated_at = now_ms();
-            match result {
-                Ok(()) => {
-                    state.phase = "completed".into();
-                    state.error = None;
-                }
-                Err(error) => {
-                    state.phase = if cancel.is_cancelled() {
-                        "cancelled"
-                    } else {
-                        "failed"
-                    }
-                    .into();
-                    state.error = Some(error);
-                    if !cancel.is_cancelled() {
-                        let kind =
-                            super::failure::classify(state.error.as_deref().unwrap_or_default());
-                        state.failure_kind = Some(kind);
-                        state.next_retry_at =
-                            super::failure::next_retry(kind, state.attempts, now_ms());
-                        if state.next_retry_at.is_some() {
-                            state.phase = "retry_wait".into();
-                        }
-                    }
-                }
-            }
+            super::job_lifecycle::finish(&mut state, result, cancel.is_cancelled());
             if let Err(error) = save(&app, &state) {
                 tracing::error!(target:"backup",%error,"Failed to persist transfer result");
             }
+        }
+        if let Ok(mut active) = app.state::<BackupJobs>().active.lock() {
+            active.remove(&id);
         }
         if let Ok(mut running) = app.state::<BackupJobs>().running.lock() {
             running.remove(&id);
@@ -384,8 +412,15 @@ async fn execute(
                 .execution_source
                 .unwrap_or_else(|| target.source.clone());
             let path = path.clone();
+            let snapshot_context = super::snapshot_context::SnapshotContext::new(Some(ctx.clone()));
             let artifact = tauri::async_runtime::spawn_blocking(move || {
-                TaomniSource.snapshot(&snapshot_app, &source, &path, &secrets.archive_password)
+                TaomniSource.snapshot(
+                    &snapshot_app,
+                    &source,
+                    &path,
+                    &secrets.archive_password,
+                    &snapshot_context,
+                )
             })
             .await
             .map_err(|_| "Backup snapshot task failed")??;
@@ -416,7 +451,9 @@ async fn execute(
             path: path.to_string_lossy().into_owned(),
             snapshot_id: String::new(),
             size: std::fs::metadata(&path).map_err(|e| e.to_string())?.len(),
-            sha256: super::manifest::file_sha256(&path).map_err(|e| e.to_string())?,
+            sha256: super::snapshot_context::SnapshotContext::new(Some(ctx.clone()))
+                .hash(&path)
+                .map_err(|e| e.to_string())?,
             source_kind: remote.source_kind,
         };
         job.lock().map_err(|e| e.to_string())?.artifact = Some(artifact);
@@ -426,6 +463,9 @@ async fn execute(
 
 pub fn initialize(app: &tauri::AppHandle) {
     app.manage(BackupJobs::default());
+    if let Ok(root) = control::root(app) {
+        let _ = app.state::<BackupJobs>().root.set(root);
+    }
     feishu::auth::initialize(app);
     let Ok(_owner) = claim(app) else {
         return;
@@ -449,19 +489,7 @@ fn recover_interrupted(app: &tauri::AppHandle) {
     match list(app) {
         Ok(jobs) => {
             for mut job in jobs {
-                if ![
-                    "completed",
-                    "failed",
-                    "cancelled",
-                    "interrupted",
-                    "retry_wait",
-                    "discarded",
-                ]
-                .contains(&job.phase.as_str())
-                {
-                    job.phase = "interrupted".into();
-                    job.revision += 1;
-                    job.error = Some("Application stopped; retry to continue this transfer".into());
+                if super::job_lifecycle::recover(&mut job) {
                     let _ = save(app, &job);
                 }
             }

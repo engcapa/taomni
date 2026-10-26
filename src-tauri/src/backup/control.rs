@@ -18,6 +18,11 @@ fn process_lock(root: &Path) -> Result<std::fs::File, String> {
 
 pub fn root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     use tauri::Manager;
+    if let Some(jobs) = app.try_state::<super::jobs::BackupJobs>() {
+        if let Some(root) = jobs.root.get() {
+            return Ok(root.clone());
+        }
+    }
     let state = app.state::<crate::state::AppState>();
     let db = state.db.lock().map_err(|e| e.to_string())?;
     let path = db

@@ -61,6 +61,21 @@ pub fn snapshot_objects(
     account: &str,
     target_root: &Path,
 ) -> Result<Vec<(PathBuf, PathBuf)>, String> {
+    snapshot_objects_with(db, account, target_root, &|| Ok(()), &|source, target| {
+        fs::copy(source, target)
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    })
+}
+
+pub fn snapshot_objects_with(
+    db: &Connection,
+    account: &str,
+    target_root: &Path,
+    check: &dyn Fn() -> Result<(), String>,
+    copy: &dyn Fn(&Path, &Path) -> Result<(), String>,
+) -> Result<Vec<(PathBuf, PathBuf)>, String> {
+    check()?;
     let hashes: Vec<String> = db
         .prepare("SELECT DISTINCT sha256 FROM mail_full_messages WHERE account_id=?1")
         .map_err(|e| e.to_string())?
@@ -71,11 +86,12 @@ pub fn snapshot_objects(
     let source_root = account_root(db, account)?;
     let mut files = Vec::new();
     for hash in hashes {
+        check()?;
         let source = object_path(&source_root, &hash)?;
         let target = object_path(target_root, &hash)?;
         fs::create_dir_all(target.parent().unwrap()).map_err(|e| e.to_string())?;
         if fs::hard_link(&source, &target).is_err() {
-            fs::copy(&source, &target).map_err(|e| format!("Snapshot saved email: {e}"))?;
+            copy(&source, &target)?;
         }
         files.push((
             target.strip_prefix(target_root).unwrap().to_path_buf(),

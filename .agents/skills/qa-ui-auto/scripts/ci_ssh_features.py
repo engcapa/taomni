@@ -34,6 +34,25 @@ def transfer_paths(remote_dir: PurePath, remote_posix: str, local_dir: PurePath)
     }
 
 
+def prepare_cygwin_home(root: Path, user: str) -> Path:
+    """Create the owned SSH user's home before sshd runs its X11 cookie setup."""
+    from ci_services import command
+    records = command([root / "bin" / "mkpasswd.exe", "-c"])
+    entries = [line.split(":") for line in records.splitlines()]
+    entry = next((fields for fields in entries
+                  if len(fields) == 7 and fields[0].casefold() == user.casefold()), None)
+    if entry is None or not entry[5].startswith("/"):
+        raise RuntimeError("Cannot resolve the Cygwin SSH user's home directory")
+    home = Path(command([root / "bin" / "cygpath.exe", "-w", entry[5]])).resolve()
+    owned_root = root.resolve()
+    if home == owned_root or not home.is_relative_to(owned_root):
+        raise RuntimeError("Cygwin SSH home must stay inside the job-owned installation")
+    # A login shell creates this too late: sshd invokes xauth before the shell.
+    # Keep existing home contents when another service already initialized it.
+    home.mkdir(parents=True, exist_ok=True)
+    return home
+
+
 def install():
     from ci_services import command
     system = platform.system()
@@ -82,6 +101,7 @@ def start(services):
         def path(value): return command([binary / "cygpath.exe", "-u", str(value)])
         suffix = ".exe"
         user = command([binary / "id.exe", "-un"])
+        prepare_cygwin_home(cygwin, user)
         ssh = binary / "ssh.exe"
         sshd = sbin / "sshd.exe"
         krb_bin, krb_sbin = binary, sbin

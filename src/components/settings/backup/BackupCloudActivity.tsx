@@ -19,6 +19,7 @@ export function BackupCloudActivity({ onRestore }: { onRestore: (path: string) =
   const [error, setError] = useState("");
   const [message, setMessage] = useState<{ key: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [cancelling, setCancelling] = useState<Set<string>>(() => new Set());
   const [discardId, setDiscardId] = useState<string | null>(null);
   const generation = useRef(0);
   const target = data?.config.targets.find((t) => t.id === targetId) ?? data?.config.targets[0];
@@ -33,6 +34,13 @@ export function BackupCloudActivity({ onRestore }: { onRestore: (path: string) =
     const version = ++generation.current;
     const result = await remoteBackup.list(id);
     if (version === generation.current) setFiles(result);
+  };
+  const cancelJob = async (jobId: string) => {
+    setCancelling((ids) => new Set(ids).add(jobId));
+    setError("");
+    try { await remoteBackup.cancel(jobId); await refreshJobs(); }
+    catch (e) { setError(String(e)); }
+    finally { setCancelling((ids) => { const next = new Set(ids); next.delete(jobId); return next; }); }
   };
   const visible = files.filter((f) => !filter || f.deviceId === filter);
   return <section className="space-y-3 rounded-lg border border-theme-border bg-theme-surface p-4" data-testid="backup-cloud-activity">
@@ -55,16 +63,17 @@ export function BackupCloudActivity({ onRestore }: { onRestore: (path: string) =
     {error && <BackupError error={error} t={t} />}
     {data?.cache && <div data-testid="backup-cache" className="space-y-2 text-xs text-theme-muted"><p>{t("remoteBackup.cacheUsage", { used: bytes(data.cache.usedBytes), limit: bytes(data.cache.limitBytes), days: data.cache.retentionDays })}</p><button data-testid="backup-cache-clean" className={button} disabled={busy} onClick={() => void action(async () => { await remoteBackup.cleanCache(); await refreshConfig(); setMessage({ key: "cacheCleaned" }); })}>{t("remoteBackup.cleanCache")}</button></div>}
     {jobs.length > 0 && <div className="space-y-2 border-t border-theme-border pt-3"><h5 className="text-xs font-medium text-theme-text">{t("remoteBackup.jobs")}</h5>{jobs.slice(0, 20).map((job) => <div key={job.id} data-testid="backup-cloud-job" data-job-id={job.id} data-phase={job.phase} data-operation={job.operation} className="space-y-2 rounded border border-theme-border p-2 text-xs text-theme-muted">
-      <p>{t(job.operation === "upload" ? "remoteBackup.upload" : "remoteBackup.download")} · {t(`remoteBackup.phases.${job.phase}`)} · {new Date(job.createdAt).toLocaleString(getLocale())}</p>
+      <p>{t(job.operation === "local" ? "remoteBackup.localDestination" : job.operation === "upload" ? "remoteBackup.upload" : "remoteBackup.download")} · {t(`remoteBackup.phases.${job.phase}`)} · {new Date(job.createdAt).toLocaleString(getLocale())}</p>
       <p>{bytes(job.bytes)}{job.total != null && ` / ${bytes(job.total)} (${job.total ? Math.min(100, Math.round(job.bytes / job.total * 100)) : 0}%)`}</p>
       {!finished.has(job.phase) && <progress className="w-full" max={job.total ?? undefined} value={job.total != null ? job.bytes : undefined} />}
       {job.error && <BackupError error={job.error} t={t} />}
       {job.nextRetryAt && job.phase === "retry_wait" && <p data-testid="backup-retry-notice">{t("remoteBackup.retryAt", { time: new Date(job.nextRetryAt).toLocaleString(getLocale()), attempts: job.attempts ?? 0 })}</p>}
       {job.phase === "failed" && <p>{t("remoteBackup.actionRequired")}</p>}
-      {(!finished.has(job.phase) || job.phase === "retry_wait") && <button data-testid="backup-job-cancel" className={button} onClick={() => void action(() => remoteBackup.cancel(job.id))}>{t("common.cancel")}</button>}
-      {["failed", "cancelled", "interrupted", "retry_wait"].includes(job.phase) && <><button data-testid="backup-job-retry" className={button} disabled={busy} onClick={() => void action(() => remoteBackup.retry(job.id))}>{t("remoteBackup.retry")}</button><button data-testid="backup-job-discard" className={button} disabled={busy} onClick={() => setDiscardId(job.id)}>{t("remoteBackup.discard")}</button></>}
+      {(!finished.has(job.phase) || job.phase === "retry_wait") && <button data-testid="backup-job-cancel" className={button} disabled={cancelling.has(job.id) || job.cancelRequested || job.phase === "cancelling"} onClick={() => void cancelJob(job.id)}>{t(cancelling.has(job.id) || job.cancelRequested || job.phase === "cancelling" ? "remoteBackup.phases.cancelling" : "common.cancel")}</button>}
+      {["failed", "cancelled", "interrupted", "retry_wait"].includes(job.phase) && <>{job.operation !== "local" && <button data-testid="backup-job-retry" className={button} disabled={busy} onClick={() => void action(() => remoteBackup.retry(job.id))}>{t("remoteBackup.retry")}</button>}<button data-testid="backup-job-discard" className={button} disabled={busy} onClick={() => setDiscardId(job.id)}>{t("remoteBackup.discard")}</button></>}
       {discardId === job.id && <div role="alertdialog"><p>{t("remoteBackup.discardWarning")}</p><button data-testid="backup-discard-confirm" className={button} disabled={busy} onClick={() => void action(async () => { await remoteBackup.discard(job.id); setDiscardId(null); await refreshConfig(); })}>{t("remoteBackup.discardConfirm")}</button><button className={button} onClick={() => setDiscardId(null)}>{t("common.cancel")}</button></div>}
       {job.phase === "completed" && job.operation === "download" && job.artifact && <button data-testid="backup-cloud-restore" className={button} onClick={() => onRestore(job.artifact!.path)}>{t("remoteBackup.restore")}</button>}
+      {job.phase === "completed" && job.operation === "local" && job.localPath && <><p className="break-all">{job.localPath}</p><button data-testid="backup-local-restore" className={button} onClick={() => onRestore(job.localPath!)}>{t("remoteBackup.restore")}</button></>}
     </div>)}</div>}
   </section>;
 }

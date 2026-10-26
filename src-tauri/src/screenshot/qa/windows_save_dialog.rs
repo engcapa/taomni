@@ -86,8 +86,8 @@ pub(super) async fn wait_ready() -> anyhow::Result<Value> {
 }
 
 /// Use actual OS input, then read the whole field back before confirming.
-/// Sending a long Unicode batch followed immediately by Return can instead
-/// accept a Shell autocomplete suggestion halfway through that batch.
+/// Shell autocomplete can consume even paced Unicode events while a directory
+/// component resolves. A single OS paste retains the complete destination.
 pub(super) fn choose_destination(
     input: &mut enigo::Enigo,
     destination: &std::path::Path,
@@ -100,6 +100,12 @@ pub(super) fn choose_destination(
         filename_ready(&before, None),
         "Save field lost focus: {before}"
     );
+    let mut pasteboard = super::path_pasteboard::PathPasteboard::new(path)?;
+    let staged = snapshot();
+    anyhow::ensure!(
+        staged == before,
+        "Save dialog changed while staging path: {staged}"
+    );
     input.key(Key::Control, Direction::Press)?;
     std::thread::sleep(Duration::from_millis(30));
     let selected = input.key(Key::Unicode('a'), Direction::Click);
@@ -107,10 +113,12 @@ pub(super) fn choose_destination(
     selected?;
     released?;
     std::thread::sleep(Duration::from_millis(50));
-    for character in path.chars() {
-        input.text(&character.to_string())?;
-        std::thread::sleep(Duration::from_millis(15));
-    }
+    input.key(Key::Control, Direction::Press)?;
+    std::thread::sleep(Duration::from_millis(30));
+    let pasted = input.key(Key::Unicode('v'), Direction::Click);
+    let released = input.key(Key::Control, Direction::Release);
+    pasted?;
+    released?;
     let started = Instant::now();
     let mut stable = StableObservation::default();
     let entered = loop {
@@ -128,6 +136,7 @@ pub(super) fn choose_destination(
         );
         std::thread::sleep(Duration::from_millis(50));
     };
+    pasteboard.restore()?;
     let center = &entered["saveButton"]["center"];
     let target = (
         center[0].as_i64().context("Save button x")? as i32,
@@ -146,7 +155,7 @@ pub(super) fn choose_destination(
     );
     input.button(Button::Left, Direction::Click)?;
     Ok(
-        json!({"input":"paced OS keyboard","destinationEntered":entered,
+        json!({"input":"OS clipboard and Control+V","copiedPinImageRestored":true,"destinationEntered":entered,
         "confirmation":"OS mouse click on the enabled Save button"}),
     )
 }

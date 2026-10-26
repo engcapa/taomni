@@ -209,6 +209,10 @@ pub struct BackupJob {
     /// The concrete source is frozen at enqueue, never added to the archive.
     #[serde(default)]
     pub execution_source: Option<SourceSpec>,
+    #[serde(default)]
+    pub cancel_requested: bool,
+    #[serde(default)]
+    pub local_path: Option<String>,
 }
 
 fn default_range_mode() -> String {

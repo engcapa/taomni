@@ -1,6 +1,6 @@
 id: TC-SHOT-N1
 title: Native full-display capture and real OCR/redaction output
-description: Decode captured and intermediate PNG images before canvas export so the first OCR input retains the captured pixels in WebKit as well as subsequent redaction.
+description: Decode captured and intermediate PNG images before canvas export so the first OCR input retains the captured pixels in WebKit as well as subsequent redaction. Park the OS pointer outside the OCR fixture before either capture so CoreGraphics cannot include its glyph over the email text.
 covers: [F27.1]
 tags: [screenshot, native, p1]
 modes: [native]

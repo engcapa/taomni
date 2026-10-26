@@ -145,6 +145,18 @@ Release executables can also be found under:
 src-tauri/target/release/
 ```
 
+Windows MSVC builds use the dynamic CRT by default. If linking fails with
+`LNK2038` (`MD_DynamicRelease` versus `MT_StaticRelease`) after changing CRT or
+CMake flags, remove those temporary overrides from the shell. Whisper's build
+script does not track all forwarded `CMAKE_*` environment variables, so Cargo
+can reuse native objects compiled with earlier runtime settings. Clear its
+Release cache before retrying:
+
+```powershell
+cargo clean --manifest-path src-tauri/Cargo.toml -p whisper-rs-sys --release
+pnpm tauri build --no-bundle
+```
+
 ## Versioning and Releases
 
 The application version is maintained in the root `package.json` `version` field. `src-tauri/tauri.conf.json` reads the same version from `../package.json`, so the frontend package and Tauri bundle stay aligned.

@@ -266,10 +266,10 @@ pub(super) async fn open_fixture(
     let _ = window.set_focus();
     // Let the window manager map and raise it.
     tokio::time::sleep(Duration::from_millis(1200)).await;
-    if route == "anim" {
-        // A previous scroll scenario leaves the OS cursor over the fixture.
-        // CoreGraphics snapshots include it even when a different WebView has
-        // focus, so park it outside the source for every recording scenario.
+    if route == "anim" || route == "ocr" {
+        // Previous scenarios can leave the OS cursor over source pixels.
+        // CoreGraphics includes it in snapshots, corrupting OCR glyphs as
+        // well as recording pixels. Keep it outside both fixture regions.
         park_pointer(input_point((display.x + 16, display.y + 16), s)).await?;
         tokio::time::sleep(Duration::from_millis(350)).await;
     }

@@ -1,9 +1,56 @@
+import json
+import subprocess
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
-from native_pointer import prepare_pointer_target
+from native_pointer import TARGET_GEOMETRY, prepare_pointer_target
 from native_webdriver_transport import WebDriverError
 from qa_ui_auto.deadline import CaseTimeout, Deadline
+
+
+class PointerGeometryTest(TestCase):
+    def geometry(self, *, zoom=1, modal=False, scaled=False, covered=False):
+        harness = r"""
+const fs = require('node:fs');
+const data = JSON.parse(fs.readFileSync(0, 'utf8'));
+const rect = {left:24, top:232, right:36, bottom:244, width:12, height:12};
+const ancestor = {parentElement:null, zoom:data.zoom};
+const el = {isConnected:true, parentElement:ancestor, zoom:1,
+  getBoundingClientRect:()=>rect, contains:hit=>hit===el,
+  closest:()=>data.modal ? ancestor : null};
+const scale = data.scaled ? data.zoom : 1;
+global.innerWidth=1024; global.innerHeight=768;
+global.getComputedStyle=node=>({zoom:String(node.zoom)});
+global.document={elementFromPoint:(x,y)=>!data.covered &&
+  x>=rect.left*scale && x<rect.right*scale &&
+  y>=rect.top*scale && y<rect.bottom*scale ? el : ancestor};
+process.stdout.write(JSON.stringify(new Function(data.script)(el, false)));
+"""
+        result = subprocess.run(["node", "-e", harness], input=json.dumps({
+            "script": TARGET_GEOMETRY, "zoom": zoom, "modal": modal,
+            "scaled": scaled, "covered": covered,
+        }), capture_output=True, text=True, check=True)
+        return json.loads(result.stdout)
+
+    def test_normal_geometry_keeps_its_viewport_point(self):
+        self.assertEqual(self.geometry()["x"], 30)
+        self.assertTrue(self.geometry()["ready"])
+
+    def test_webkit_modal_geometry_accounts_for_inherited_zoom(self):
+        result = self.geometry(zoom=19 / 14, modal=True, scaled=True)
+        self.assertTrue(result["ready"], result)
+        self.assertEqual((result["x"], result["y"]), (40, 323))
+
+    def test_zoomed_modal_with_correct_viewport_geometry_is_not_scaled_twice(self):
+        result = self.geometry(zoom=19 / 14, modal=True)
+        self.assertTrue(result["ready"], result)
+        self.assertEqual((result["x"], result["y"]), (30, 238))
+
+    def test_modal_zoom_does_not_bypass_a_covering_element(self):
+        self.assertFalse(self.geometry(zoom=19 / 14, modal=True, scaled=True, covered=True)["ready"])
+
+    def test_nonmodal_geometry_never_uses_the_webkit_dialog_correction(self):
+        self.assertFalse(self.geometry(zoom=19 / 14, scaled=True)["ready"])
 
 
 class NativePointerReadinessTest(TestCase):

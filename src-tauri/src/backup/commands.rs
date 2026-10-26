@@ -196,6 +196,9 @@ pub fn backup_remote_retry(app: AppHandle, job_id: String) -> Result<String, Str
         .into_iter()
         .find(|j| j.id == job_id)
         .ok_or("Backup job not found")?;
+    if job.operation == "local" {
+        return Err("Start a new local backup to choose its destination and password".into());
+    }
     jobs::start(&app, &job.target_id, job.remote, Some(&job_id))
 }
 #[tauri::command]

@@ -9,6 +9,9 @@ export interface BackupCustomOptions {
   includeLanchat?: boolean;
   includeConfigs?: boolean;
   includeMail?: boolean;
+  includeMailOriginals?: boolean;
+  includeMailAttachments?: boolean;
+  includeServerCertificates?: boolean;
   includeLocalHistory?: boolean;
   /** MFA accounts (mfa.db); the backend also includes vault.db, which holds their key. */
   includeMfa?: boolean;

@@ -34,7 +34,9 @@ pub use reading::export;
 #[cfg(test)]
 pub use reading::read_entry;
 
-pub use cleanup::{as_sql_error, collect_garbage, remove_entries, snapshot_objects};
+pub use cleanup::{
+    as_sql_error, collect_garbage, remove_entries, snapshot_objects, snapshot_objects_with,
+};
 
 pub use relocation::{configured_directory, save_mail_session};
 

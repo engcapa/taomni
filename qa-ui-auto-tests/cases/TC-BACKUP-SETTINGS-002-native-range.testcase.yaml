@@ -1,7 +1,7 @@
 id: TC-BACKUP-SETTINGS-002
-title: Native global scope is durable and manual cloud jobs freeze it
-description: Real policy/config disk reads plus a loopback upload prove manual range planning. Fixed legacy restore
-  samples and scheduled local behavior are covered by dedicated cases.
+title: Native category selections persist and manual cloud jobs freeze the global plan
+description: Real policy/config disk writes and a loopback upload verify category planning while preserving a legacy
+  core destination override.
 covers:
 - F-BACKUP-1
 - F-BACKUP-2
@@ -21,110 +21,137 @@ steps:
     selector: '[data-testid="welcome-panel"]'
     timeout_sec: 60
 - click: '[data-testid="ribbon-settings"]'
-- wait_for: '[data-testid="settings-panel"]'
+- wait_for:
+    selector: '[data-testid="settings-panel"]'
+    timeout_sec: 30
 - click: '[data-testid="settings-group-toggle-backup"]'
-- wait_for: '[data-testid="backup-global-scope"]'
-- select_option:
-    selector: '[data-testid="backup-global-scope"]'
-    value: full
+- wait_for:
+    selector: '[data-testid="backup-global-categories"]'
+    timeout_sec: 30
+- set_check:
+    selector: '[data-testid="backup-global-include-mail"]'
+    checked: true
+- set_check:
+    selector: '[data-testid="backup-global-includeLanchat"]'
+    checked: true
+- assert_text:
+    selector: '[data-testid="backup-settings-save-status"]'
+    contains: Saved
+    timeout_sec: 30
 - assert_file_contains:
     path: ${fixture.backup_policy_path}
-    contains: '"defaultScope": "full"'
+    contains: '"defaultScope": "custom"'
+    timeout_sec: 30
 - assert_file_contains:
     path: ${fixture.backup_policy_path}
-    contains: '"includeMail": true'
-- click: '[data-testid="backup-cloud-destination"]:nth-of-type(1) > summary'
+    contains: '"includeMailOriginals": true'
+    timeout_sec: 30
+- click: '[data-testid="backup-cloud-destination"] > summary'
 - assert_attribute:
-    selector: '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-range-mode"]'
+    selector: '[data-testid="backup-cloud-range-mode"]'
     name: value
     equals: custom
 - assert_attribute:
-    selector: '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-scope"]'
-    name: value
-    equals: core
-- wait_for: '[data-testid="backup-selected-start"]:not([disabled])'
+    selector: '[data-testid="backup-cloud-include-mail"]'
+    name: aria-checked
+    equals: 'false'
+- wait_for:
+    selector: '[data-testid="backup-selected-start"]:not([disabled])'
+    timeout_sec: 30
 - click: '[data-testid="backup-selected-start"]'
 - wait_for:
     selector: '[data-testid="backup-cloud-job"][data-operation="upload"][data-phase="completed"]'
     timeout_sec: 120
 - assert_file_contains:
     path: ${fixture.backup_service_events}
-    contains: execution_scope=full
+    contains: execution_scope=custom
+    timeout_sec: 30
 - set_check:
     selector: '[data-testid="backup-global-include-mail"]'
     checked: false
 - assert_file_contains:
     path: ${fixture.backup_policy_path}
     contains: '"includeMail": false'
+    timeout_sec: 30
+- assert_file_contains:
+    path: ${fixture.backup_policy_path}
+    contains: '"includeMailOriginals": false'
+    timeout_sec: 30
 - select_option:
-    selector: '[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-cloud-range-mode"]'
+    selector: '[data-testid="backup-cloud-range-mode"]'
     value: inherit
 - assert_file_contains:
     path: ${fixture.backup_control_path}
     contains: '"rangeMode": "inherit"'
+    timeout_sec: 30
 - click: '[data-testid="settings-group-toggle-backup"]'
 - click: '[data-testid="settings-group-toggle-backup"]'
 - assert_attribute:
-    selector: '[data-testid="backup-global-scope"]'
-    name: value
-    equals: full
-- eval_readonly:
-    expression: '!document.getElementById("backup-global-include-mail").checked'
-    expect_truthy: true
-- screenshot: backup-native-global-range.png
+    selector: '[data-testid="backup-global-include-mail"]'
+    name: aria-checked
+    equals: 'false'
+- assert_attribute:
+    selector: '[data-testid="backup-global-includeLanchat"]'
+    name: aria-checked
+    equals: 'true'
+- screenshot: backup-native-category-range.png
 verification:
   review: reviewed
   native:
-  - check: Disk persistence and native task cleanup
+  - check: Real isolated IPC, OS lock, journal and archive effects
     method: automated
-    reason: Production IPC and isolated profile; loopback Feishu is synthetic, not live service evidence.
-  visual:
-  - check: Backup layout and translated controls
-    method: manual
-    reason: Review retained workflow screenshots.
+    reason: Hosted native runs use disposable profiles and independent filesystem observations.
   requirements:
   - id: R1
-    requirement: Saved global full scope drives manual execution despite a destination core override
+    requirement: Category choices are durable and manual work uses the global plan despite a legacy target override
     actions:
     - 7
-    - 14
-    checkpoints:
-    - step: 8
-      expectation: fullDisk
-    - step: 9
-      expectation: mailDisk
-    - step: 11
-      expectation: legacy
-    - step: 12
-      expectation: core
-    - step: 15
-      expectation: completed
-    - step: 16
-      expectation: frozenFull
-    results:
     - 8
-    - 9
-    - 11
-    - 12
-    - 15
     - 16
-  - id: R2
-    requirement: Explicit mail exclusion and inheritance persist through real disk writes and remount
-    actions:
+    checkpoints:
+    - step: 10
+      expectation: Explicit custom flags persisted
+    - step: 11
+      expectation: Mail child flags saved
+    - step: 13
+      expectation: Legacy target remains independent
+    - step: 14
+      expectation: Legacy core target still excludes mail
+    - step: 17
+      expectation: Real upload completed
+    - step: 18
+      expectation: Job uses frozen category plan
+    results:
+    - 10
+    - 11
+    - 13
+    - 14
     - 17
+    - 18
+  - id: R2
+    requirement: Mail exclusion and explicit inheritance survive native disk writes and remount
+    actions:
     - 19
     - 22
+    - 25
     checkpoints:
-    - step: 18
-      expectation: excludeDisk
     - step: 20
-      expectation: inheritDisk
+      expectation: Mail excluded on disk
+    - step: 21
+      expectation: Originals excluded on disk
     - step: 23
-      expectation: persisted
-    - step: 24
-      expectation: persistedMail
+      expectation: Inheritance saved
+    - step: 26
+      expectation: Excluded after remount
+    - step: 27
+      expectation: Other selected category retained
     results:
-    - 18
     - 20
+    - 21
     - 23
-    - 24
+    - 26
+    - 27
+  visual:
+  - check: Category and task controls remain readable in retained screenshots
+    method: manual
+    reason: Review screenshots from the hosted workflow; filesystem assertions establish native effects.

@@ -2,7 +2,7 @@ import { type StateCreator } from "zustand";
 import { t as tr } from "../../lib/i18n";
 import { readMergeToolWindowRail, readSidebarCollapsedByGroup, sidebarRailGroup, writeMergeToolWindowRail } from "../sidebarRailPolicy";
 import { type AppState, type FloatingMfaWindowState } from "./types";
-import { readSidebarCollapsed } from "./preferences";
+import { readSidebarCollapsed, readWorkspaceSidebarCollapsed, writeWorkspaceSidebarCollapsed } from "./preferences";
 import { rememberSidebarForActiveGroup } from "./policies";
 
 /** Default bottom-left placement of the floating MFA window (design DEC-03). */
@@ -37,8 +37,18 @@ export function createInitialFloatingMfaState(): FloatingMfaWindowState {
   };
 }
 
-export const createLayoutSlice: StateCreator<AppState, [], [], Pick<AppState, "sidebarCollapsed" | "mergeToolWindowRail" | "sidebarCollapsedByGroup" | "activeSideTab" | "rightSidebarCollapsed" | "floatingMfa" | "statusMessage" | "toggleSidebar" | "setSidebarCollapsed" | "setActiveSideTab" | "toggleRightSidebar" | "setRightSidebarCollapsed" | "toggleFloatingMfa" | "openFloatingMfa" | "closeFloatingMfa" | "setFloatingMfaPosition" | "setFloatingMfaPinned" | "setFloatingMfaSearch" | "setMergeToolWindowRail" | "applySidebarForActiveTab" | "setStatusMessage">> = (set, get) => ({
+function rememberSidebarChange(s: AppState, collapsed: boolean): Partial<AppState> {
+  if (s.activeSideTab === "home") return {};
+  if (s.activeSideTab === "workspaces") {
+    writeWorkspaceSidebarCollapsed(collapsed);
+    return { workspaceSidebarCollapsed: collapsed };
+  }
+  return rememberSidebarForActiveGroup(s, collapsed);
+}
+
+export const createLayoutSlice: StateCreator<AppState, [], [], Pick<AppState, "sidebarCollapsed" | "workspaceSidebarCollapsed" | "mergeToolWindowRail" | "sidebarCollapsedByGroup" | "activeSideTab" | "rightSidebarCollapsed" | "floatingMfa" | "statusMessage" | "toggleSidebar" | "setSidebarCollapsed" | "setActiveSideTab" | "toggleRightSidebar" | "setRightSidebarCollapsed" | "toggleFloatingMfa" | "openFloatingMfa" | "closeFloatingMfa" | "setFloatingMfaPosition" | "setFloatingMfaPinned" | "setFloatingMfaSearch" | "setMergeToolWindowRail" | "applySidebarForActiveTab" | "setStatusMessage">> = (set, get) => ({
   sidebarCollapsed: readSidebarCollapsed(),
+  workspaceSidebarCollapsed: readWorkspaceSidebarCollapsed(),
   mergeToolWindowRail: readMergeToolWindowRail(),
   sidebarCollapsedByGroup: readSidebarCollapsedByGroup(readSidebarCollapsed()),
   activeSideTab: "home",
@@ -49,10 +59,10 @@ export const createLayoutSlice: StateCreator<AppState, [], [], Pick<AppState, "s
   toggleSidebar: () =>
     set((s) => {
       const sidebarCollapsed = !s.sidebarCollapsed;
-      return { sidebarCollapsed, ...(s.activeSideTab === "home" ? {} : rememberSidebarForActiveGroup(s, sidebarCollapsed)) };
+      return { sidebarCollapsed, ...rememberSidebarChange(s, sidebarCollapsed) };
     }),
   setSidebarCollapsed: (collapsed) => {
-    set((s) => ({ sidebarCollapsed: collapsed, ...(s.activeSideTab === "home" ? {} : rememberSidebarForActiveGroup(s, collapsed)) }));
+    set((s) => ({ sidebarCollapsed: collapsed, ...rememberSidebarChange(s, collapsed) }));
   },
   setActiveSideTab: (tab) => {
     set((s) => ({
@@ -60,8 +70,9 @@ export const createLayoutSlice: StateCreator<AppState, [], [], Pick<AppState, "s
       ...(tab === "sessions" && s.tabs.find((candidate) => candidate.id === s.activeTabId)?.type === "welcome"
         ? { activeTabId: [...s.tabs].reverse().find((candidate) => candidate.type !== "welcome")?.id ?? s.activeTabId }
         : {}),
-      sidebarCollapsed: tab === "home",
-      ...(tab === "home" || s.activeSideTab === "home" ? {} : rememberSidebarForActiveGroup(s, false)),
+      sidebarCollapsed: tab === "home" || (tab === "workspaces" && s.workspaceSidebarCollapsed),
+      ...(tab === "home" || tab === "workspaces" || s.activeSideTab === "home" || s.activeSideTab === "workspaces"
+        ? {} : rememberSidebarForActiveGroup(s, false)),
     }));
   },
   toggleRightSidebar: () => set((s) => ({ rightSidebarCollapsed: !s.rightSidebarCollapsed })),
@@ -79,7 +90,7 @@ export const createLayoutSlice: StateCreator<AppState, [], [], Pick<AppState, "s
   },
   applySidebarForActiveTab: () => {
     const s = get();
-    if (!s.mergeToolWindowRail || s.activeSideTab === "home") return;
+    if (!s.mergeToolWindowRail || s.activeSideTab === "home" || s.activeSideTab === "workspaces") return;
     const active = s.tabs.find((tab) => tab.id === s.activeTabId);
     const collapsed = s.sidebarCollapsedByGroup[sidebarRailGroup(active?.type)];
     if (collapsed === s.sidebarCollapsed) return;

@@ -71,9 +71,17 @@ steps:
 - click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="workspace-session-pane"]'
+- assert_visible: '[data-testid="expanded-sidebar-panel"]'
 - assert_count:
     selector: '[data-testid="code-workspace-tab"]'
     equal: 1
+- click: '[data-testid="code-workspace-tool-rail-project"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-session-pane"]'
+- assert_visible: '[data-testid="collapsed-sidebar-rail"]'
 - click: '[data-testid="workspace-tab"][data-tab-title="README.md"]'
 - assert_text:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
@@ -84,7 +92,8 @@ verification:
   requirements:
   - id: R1
     requirement: A terminal-selected workspace with a hidden editor can be restored from Home without crashing. Its active terminal, collapsed sidebar and
-      dirty draft survive; Project and Documentation still toggle and repeated mode switches keep one editor runtime.
+      dirty draft survive; expanded and collapsed navigator choices survive repeated mode switches, Project and Documentation still toggle, and only one
+      editor runtime is mounted.
     actions:
     - 1
     - 2
@@ -110,7 +119,11 @@ verification:
     - 38
     - 39
     - 40
-    - 43
+    - 44
+    - 46
+    - 47
+    - 48
+    - 51
     checkpoints:
     - step: 7
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
@@ -148,8 +161,16 @@ verification:
     - step: 41
       expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
     - step: 42
+      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 43
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
-    - step: 44
+    - step: 45
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 49
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 50
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 52
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_HIDDEN_EDITOR_DRAFT"}}'
     results:
     - 7
@@ -170,7 +191,11 @@ verification:
     - 36
     - 41
     - 42
-    - 44
+    - 43
+    - 45
+    - 49
+    - 50
+    - 52
   native:
   - check: Restore the hidden editor behind the active terminal in the packaged WebView.
     method: automated

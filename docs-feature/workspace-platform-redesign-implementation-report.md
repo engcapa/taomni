@@ -7,6 +7,24 @@
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
 
+## main 合并与全量续验（2026-10-26）
+
+`f1587254` 的三平台相关集 [40246136402](https://github.com/engcapa/taomni/actions/runs/40246136402) 已完成：374 个 ID、1,227 次执行全部 passed，0 failed / skipped / infrastructure errors。Linux browser/native 为 259/167，Windows 为 259/148，macOS 为 258/136。原始回执、源码/runner/用例及 native 构建身份已独立核验，记录在 `_local/workspace-final-hosted-evidence.json`。
+
+随后全量 [40249257719](https://github.com/engcapa/taomni/actions/runs/40249257719) 执行 621 个目录 ID 中的 620 个适用 ID，2,018/2,021 次执行通过，3 failed、0 infrastructure errors。虽然 workflow job 为 success，严格用例聚合为未通过。失败分别为 Windows `TC-SHOT-N17` 保存路径逐字符输入漏字、Windows `TC-SHOT-N26` 仍使用 Home 中的旧会话创建入口，以及 macOS release `TC-WS-038` 的折叠侧栏恢复。没有重现原 `Panel constraints not found for index 2` 崩溃。
+
+相关集通过后，依照用户要求 fetch 并合并远程 main `a5743792`。整合保留 main 的备份取消、分类树、邮件存储和异步反馈能力，以及本分支的独立 Workspace、导航和原生重启工具修复；六处文本冲突已解决。邮件用例改走 Sessions 后继续执行 main 的全部原断言，同步更新步骤编号和验证映射。合并后目录为 624 个精确 ID，QA 静态审计与覆盖率门禁通过。
+
+全量反馈的修复：Workspace 折叠偏好独立持久化在 `taomni.workspaceSidebarCollapsed`，进入分区时直接恢复，隐藏的 Sessions 标签组策略不再覆盖 Workspace 侧栏；Home 的自动收起仍是瞬时状态。`TC-WS-038` 增加展开、折叠两种状态下反复切换分区的断言。Windows 截图保存辅助工具改用真实系统剪贴板及 Ctrl+V 输入完整路径，保留原生字段稳定回读、窗口所有权和保存按钮鼠标操作的严格检查，并恢复原截图剪贴板。共用的 `PathPasteboard` 从 macOS 保存辅助工具提取，保留异常清理语义。`TC-SHOT-N26` 先进入 Sessions 后创建原有会话弹窗，不改变截图、像素和快捷键断言。
+
+合并后的本机验证：177 个相关 frontend 单元测试、43 个 QA 工具契约及 Rust 库测试 1,906 passed / 0 failed / 25 预设 ignored；`pnpm build`（包含 `pnpm check:refactor`）和 Rust 格式检查通过。Browser 批次 `workspace-browser/run-20261026-093209-602919200` 为 10/10 passed、`identity_stable=true`，增强后的 `TC-WS-038` 单独批次 `run-20261026-092921-858965310` 也通过。共享导航追加批次 `run-20261026-101950-441892612` 为 30/31 passed；第一次 MAIN-RAIL-01 失败前发生整页刷新，保留原始 trace。更新到 main 0.5.3 的本地 Vite 后返回 Sessions 正常，继续执行暴露旧用例默认 Workspace 总是展开的预期。该用例现明确验证恢复折叠偏好，再展开和收起，完整 browser `run-20261026-103508-734354208` 及 native `run-20261026-103508-866126129` 均通过；更新服务后的 `TC-WS-038` 也通过。未删除合并工具窗口、Settings、键盘操作或重复 Git 的原断言。
+
+QA v15 二进制构建完成，源码指纹为 `0f145a26430319575478de9cdc84fc63f667bc7b8be21373a7a3e4fa982bce94`。Native 的 19 个不同 ID 最新适用结果全部通过，含备份分类/取消、邮件完整归档、真实 SSH/X11、两次冷启动和隐藏编辑器恢复。批次 `workspace-native/run-20261026-094509-637109761` 首次为 13 passed / 5 failed；3 项受私有密钥服务未准备影响，另 2 项为本机缺少 OCR 引擎和私有桌面透明合成。补齐独立密钥服务（真实凭据存、取、清理检查）、校验哈希的中英文 OCR 数据和 xcompmgr 后，`run-20261026-100941-450276495` 完整重跑 5/5 passed；`run-20261026-101333-658089772` 的真实 X11 用例通过。未修改产品或断言来规避这些环境失败。更早的代理误转发本地 WebDriver 连接的 setup 失败保留原日志，随后为 localhost 设置直连。临时密钥服务、profile、SSH 凭据和 X11 会话均隔离，不清理用户手工测试数据。
+
+共享导航原生追加批次 `workspace-native/run-20261026-103841-674155167` 的 15/15 通过。最终本机选中范围为 56 个不同 ID，40 个 browser 与 35 个 native 执行结果；保留所有首次失败及后续完整重跑证据。当前源码、runner、用例与 QA 构建身份的严格核验记录在 `_local/workspace-merged-local-evidence.json`。新一轮 388 个相关 ID 的三平台 browser/native 严格聚合全绿后，再执行全量。
+
+外部 clickhousecrud 用例 `TC-IDE-C6-06-java-definition-realproject-native` 继续按用户确认的现有策略单列，不计作通过。
+
 ## 追加反馈与跨平台回归（2026-10-25）
 
 2026-10-26 手工反馈的 Workspaces 点击崩溃已定位：`WorkspaceShellView` 将 Project 的开关状态传给编辑器面板的 `defaultSize`。编辑器在终端标签后隐藏时，修改该初始参数会重新注册面板；所有隐藏面板的尺寸均为零，注册顺序变为 Documentation → Editor，而 DOM 仍为 Editor → Documentation，分隔条计算抛出 `Panel constraints not found for index 2`。编辑器初始尺寸改为在挂载时固定，后续尺寸继续由已有面板 ref 与工具窗口状态管理，不重挂载工作区或清除保存数据。

@@ -10,6 +10,8 @@ export const SQL_ECHO_KEY = "taomni.sqlEcho";
 
 export const SIDEBAR_COLLAPSED_KEY = "taomni.sidebarCollapsed";
 
+export const WORKSPACE_SIDEBAR_COLLAPSED_KEY = "taomni.workspaceSidebarCollapsed";
+
 export const WELCOME_RECENT_SESSION_LIMIT_KEY = "taomni.welcomeRecentSessionLimit";
 
 export const VAULT_UNLOCK_MODE_KEY = "taomni.vaultUnlockMode";
@@ -139,6 +141,22 @@ export function writeSidebarCollapsed(collapsed: boolean) {
     window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, collapsed ? "true" : "false");
   } catch {
     // Ignore storage failures; the current session still reflects the change.
+  }
+}
+
+export function readWorkspaceSidebarCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(WORKSPACE_SIDEBAR_COLLAPSED_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+export function writeWorkspaceSidebarCollapsed(collapsed: boolean): void {
+  try {
+    window.localStorage.setItem(WORKSPACE_SIDEBAR_COLLAPSED_KEY, String(collapsed));
+  } catch {
+    // The store still retains the preference for this run.
   }
 }
 

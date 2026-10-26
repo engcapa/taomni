@@ -1,7 +1,9 @@
 id: TC-MAIL-STORAGE-07
 title: Search, filter and bulk clean local archive across pages with native indexed storage and shared originals
-description: Whole-archive search, combined filters, sorting, retained cross-page selection, keyboard shortcuts and frozen cleanup preview. Real Tauri SQLite/FTS5, MIME files and
-  hashes verify storage deletion, shared-object retention and skip markers; browser stubs cannot prove these.
+description: Whole-archive search, combined filters, sorting, retained cross-page selection, keyboard shortcuts and frozen
+  cleanup preview. Real Tauri SQLite/FTS5, MIME files and hashes verify storage deletion, shared-object retention and
+  skip markers; browser stubs cannot prove these. Native checkbox input must hit the archive dialog at the fixture's
+  enlarged mail font, including WKWebView top-layer zoom geometry.
 covers:
 - F-MAIL-23
 tags:
@@ -500,10 +502,12 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Whole-archive search, combined filters, sorting, retained cross-page selection, keyboard shortcuts and frozen cleanup preview. Real Tauri SQLite/FTS5, MIME files
-      and hashes verify storage deletion, shared-object retention and skip markers; browser stubs cannot prove these.
+    requirement: Whole-archive search, combined filters, sorting, retained cross-page selection, keyboard shortcuts and
+      frozen cleanup preview. Real Tauri SQLite/FTS5, MIME files and hashes verify storage deletion, shared-object retention
+      and skip markers; browser stubs cannot prove these.
     actions:
     - 1
+    - 2
     - 3
     - 5
     - 6
@@ -591,122 +595,165 @@ verification:
     - 164
     checkpoints:
     - step: 23
-      expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}", "full": {"INBOX": 210, "Archive": 2}, "headers": {"INBOX": 210,
-        "Archive": 2}, "timeout_sec": 90}}'
+      expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}",
+        "full": {"INBOX": 210, "Archive": 2}, "headers": {"INBOX": 210, "Archive": 2}, "timeout_sec": 90}}'
     - step: 28
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages",
+        "timeout_sec": 60}}'
     - step: 29
       expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 200}}'
     - step: 32
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 1 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 1 messages",
+        "timeout_sec": 60}}'
     - step: 33
       expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 1}}'
     - step: 35
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages",
+        "timeout_sec": 60}}'
     - step: 38
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "201–210 of 210", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "201–210 of 210",
+        "timeout_sec": 60}}'
     - step: 39
       expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 10}}'
     - step: 41
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains": "2 selected", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains": "2 selected",
+        "timeout_sec": 60}}'
     - step: 43
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "1–200 of 210", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "1–200 of 210",
+        "timeout_sec": 60}}'
     - step: 44
       expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"] input:checked", "equal": 1}}'
     - step: 46
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-confirm\"]", "contains": "Remove 2 local originals?", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-confirm\"]", "contains": "Remove 2 local
+        originals?", "timeout_sec": 60}}'
     - step: 47
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-cleanup-estimate\"]", "contains": "reclaimable", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-cleanup-estimate\"]", "contains": "reclaimable",
+        "timeout_sec": 60}}'
     - step: 49
       expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-confirm\"]"}'
     - step: 50
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains": "2 selected", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains": "2 selected",
+        "timeout_sec": 60}}'
     - step: 52
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains": "0 selected", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains": "0 selected",
+        "timeout_sec": 60}}'
     - step: 55
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages",
+        "timeout_sec": 60}}'
     - step: 58
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages",
+        "timeout_sec": 60}}'
     - step: 61
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages",
+        "timeout_sec": 60}}'
     - step: 63
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 0 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 0 messages",
+        "timeout_sec": 60}}'
     - step: 65
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages",
+        "timeout_sec": 60}}'
     - step: 73
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages",
+        "timeout_sec": 60}}'
     - step: 75
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-dialog\"]", "contains": "Enter a valid size range", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-dialog\"]", "contains": "Enter a valid
+        size range", "timeout_sec": 60}}'
     - step: 76
       expectation: '{"assert_disabled": "[data-testid=\"mail-archive-select-all\"]"}'
     - step: 81
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 0 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 0 messages",
+        "timeout_sec": 60}}'
     - step: 84
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages",
+        "timeout_sec": 60}}'
     - step: 87
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 0 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 0 messages",
+        "timeout_sec": 60}}'
     - step: 89
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages",
+        "timeout_sec": 60}}'
     - step: 92
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages",
+        "timeout_sec": 60}}'
     - step: 95
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages",
+        "timeout_sec": 60}}'
     - step: 98
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages",
+        "timeout_sec": 60}}'
     - step: 101
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages",
+        "timeout_sec": 60}}'
     - step: 104
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages",
+        "timeout_sec": 60}}'
     - step: 107
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages",
+        "timeout_sec": 60}}'
     - step: 109
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains": "200 selected", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains": "200 selected",
+        "timeout_sec": 60}}'
     - step: 111
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains": "0 selected", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains": "0 selected",
+        "timeout_sec": 60}}'
     - step: 113
-      expectation: '{"eval_readonly": {"expression": "document.activeElement.dataset.testid === \"mail-archive-search\"", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement.dataset.testid === \"mail-archive-search\"",
+        "expect_truthy": true}}'
     - step: 115
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains": "200 selected", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains": "200 selected",
+        "timeout_sec": 60}}'
     - step: 118
       expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-confirm\"]"}'
     - step: 120
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-confirm\"]", "contains": "Remove 200 local originals?", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-confirm\"]", "contains": "Remove 200 local
+        originals?", "timeout_sec": 60}}'
     - step: 122
       expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-confirm\"]"}'
     - step: 125
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains": "0 selected", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains": "0 selected",
+        "timeout_sec": 60}}'
     - step: 128
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 210 messages",
+        "timeout_sec": 60}}'
     - step: 132
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains": "210 selected across all pages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains": "210 selected
+        across all pages", "timeout_sec": 60}}'
     - step: 134
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains": "209 selected across all pages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-selection-count\"]", "contains": "209 selected
+        across all pages", "timeout_sec": 60}}'
     - step: 136
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-confirm\"]", "contains": "Remove 209 local originals?", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-confirm\"]", "contains": "Remove 209 local
+        originals?", "timeout_sec": 60}}'
     - step: 139
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-notice\"]", "contains": "Removed 209 local originals. Server messages kept.", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-notice\"]", "contains": "Removed 209 local
+        originals. Server messages kept.", "timeout_sec": 60}}'
     - step: 140
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 1 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 1 messages",
+        "timeout_sec": 60}}'
     - step: 141
       expectation: '{"assert_count": {"selector": "[data-testid=\"mail-archive-row\"]", "equal": 1}}'
     - step: 142
-      expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}", "full": {"INBOX": 1, "Archive": 2}, "headers": {"INBOX": 210,
-        "Archive": 2}, "timeout_sec": 90}}'
+      expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}",
+        "full": {"INBOX": 1, "Archive": 2}, "headers": {"INBOX": 210, "Archive": 2}, "timeout_sec": 90}}'
     - step: 147
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 1 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 1 messages",
+        "timeout_sec": 60}}'
     - step: 149
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-preview\"]", "contains": "invoice.bin", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-preview\"]", "contains": "invoice.bin",
+        "timeout_sec": 60}}'
     - step: 151
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-preview\"]", "contains": "Invoice body 0000", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-preview\"]", "contains": "Invoice body
+        0000", "timeout_sec": 60}}'
     - step: 154
       expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
     - step: 155
       expectation: '{"mail_server_assert_folder_count": {"folder": "INBOX", "min": 210}}'
     - step: 158
-      expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}", "full": {"INBOX": 1, "Archive": 2}, "headers": {"INBOX": 210,
-        "Archive": 2}, "timeout_sec": 90}}'
+      expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}",
+        "full": {"INBOX": 1, "Archive": 2}, "headers": {"INBOX": 210, "Archive": 2}, "timeout_sec": 90}}'
     - step: 163
-      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 1 messages", "timeout_sec": 60}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"mail-archive-results\"]", "contains": "of 1 messages",
+        "timeout_sec": 60}}'
     - step: 165
       expectation: '{"assert_not_visible": "[data-testid=\"mail-archive-dialog\"]"}'
     results:

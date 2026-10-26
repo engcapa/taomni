@@ -1,0 +1,103 @@
+id: TC-BACKUP-CANCEL-001
+title: Cancellation stays actionable during preparation and survives panel reopening
+description: A delayed browser task model checks immediate acknowledgement, duplicate suppression, remount state and
+  local/remote recovery controls.
+covers:
+- F-BACKUP-1
+- F-BACKUP-2
+tags:
+- backup
+- settings
+- p1
+modes:
+- browser
+fixtures:
+- reset_db
+- backup_cloud
+timeout_sec: 100
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- click: '[data-testid="ribbon-settings"]'
+- wait_for:
+    selector: '[data-testid="settings-panel"]'
+    timeout_sec: 30
+- click: '[data-testid="settings-group-toggle-backup"]'
+- wait_for:
+    selector: '[data-testid="backup-global-categories"]'
+    timeout_sec: 30
+- click: '[data-testid="backup-cloud-job"][data-job-id="${fixture.backup_waiting_id}"] [data-testid="backup-job-cancel"]'
+- wait_for:
+    selector: '[data-testid="backup-cloud-job"][data-job-id="${fixture.backup_waiting_id}"][data-phase="cancelling"]'
+    timeout_sec: 30
+- assert_attribute:
+    selector: '[data-testid="backup-cloud-job"][data-job-id="${fixture.backup_waiting_id}"] [data-testid="backup-job-cancel"]'
+    name: disabled
+    equals: ''
+- click: '[data-testid="settings-group-toggle-backup"]'
+- click: '[data-testid="settings-group-toggle-backup"]'
+- assert_attribute:
+    selector: '[data-testid="backup-cloud-job"][data-job-id="${fixture.backup_waiting_id}"] [data-testid="backup-job-cancel"]'
+    name: disabled
+    equals: ''
+- wait_for:
+    selector: '[data-testid="backup-cloud-job"][data-job-id="${fixture.backup_waiting_id}"][data-phase="cancelled"]'
+    timeout_sec: 30
+- assert_visible: '[data-testid="backup-cloud-job"][data-job-id="${fixture.backup_waiting_id}"] [data-testid="backup-job-retry"]'
+- click: '[data-testid="backup-cloud-job"][data-job-id="${fixture.backup_failed_id}"] [data-testid="backup-job-cancel"]'
+- wait_for:
+    selector: '[data-testid="backup-cloud-job"][data-job-id="${fixture.backup_failed_id}"][data-phase="cancelled"]'
+    timeout_sec: 30
+- assert_not_visible: '[data-testid="backup-cloud-job"][data-job-id="${fixture.backup_failed_id}"] [data-testid="backup-job-retry"]'
+- assert_visible: '[data-testid="backup-cloud-job"][data-job-id="${fixture.backup_failed_id}"] [data-testid="backup-job-discard"]'
+- screenshot: backup-cancelled-tasks.png
+verification:
+  review: reviewed
+  native:
+  - check: Renderer behavior only
+    method: not-applicable
+    reason: Native cancellation and archive contents have dedicated cases.
+  requirements:
+  - id: R1
+    requirement: Cancel is acknowledged immediately and restored while backend cleanup continues
+    actions:
+    - 7
+    - 11
+    checkpoints:
+    - step: 8
+      expectation: Cancelling task visible
+    - step: 9
+      expectation: Duplicate cancellation disabled
+    - step: 12
+      expectation: Reopened panel restores cancellation
+    - step: 13
+      expectation: Task reaches cancelled
+    - step: 14
+      expectation: Remote retry remains available
+    results:
+    - 8
+    - 9
+    - 12
+    - 13
+    - 14
+  - id: R2
+    requirement: Local tasks expose cancellation and use a fresh backup instead of a cloud retry
+    actions:
+    - 15
+    checkpoints:
+    - step: 16
+      expectation: Local task cancelled
+    - step: 17
+      expectation: No invalid cloud retry
+    - step: 18
+      expectation: Stopped job can be discarded
+    results:
+    - 16
+    - 17
+    - 18
+  visual:
+  - check: Category and task controls remain readable in retained screenshots
+    method: manual
+    reason: Review screenshots from the hosted workflow; filesystem assertions establish native effects.

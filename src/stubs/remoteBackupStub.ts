@@ -56,9 +56,9 @@ export async function remoteBackupStub(cmd: string, args: Record<string, any> = 
       if (request.expectedPolicyRevision !== snapshot().revisions.policy || request.expectedControlRevision !== snapshot().revisions.control) throw new Error("BACKUP_CONFIG_CONFLICT");
       const ids: string[] = request.destination.kind === "file" ? ["local"] : config.selectedTargetIds;
       result = ids.map((targetId) => {
-        const jobId = targetId === "local" ? null : crypto.randomUUID();
-        if (jobId) state.jobs.push({ id: jobId, targetId, revision: 1, operation: "upload", phase: "completed", bytes: 128, total: 128, error: null, artifact: null, remote: null, createdAt: Date.now() });
-        return { targetId, jobId, localPath: jobId ? null : request.destination.path ?? "/preview/backups/manual.taobak", error: null };
+        const jobId = crypto.randomUUID();
+        state.jobs.push({ id: jobId, targetId, revision: 1, operation: targetId === "local" ? "local" : "upload", phase: "completed", bytes: 128, total: 128, error: null, artifact: null, remote: null, localPath: targetId === "local" ? request.destination.path ?? "/preview/backups/manual.taobak" : null, createdAt: Date.now() });
+        return { targetId, jobId, localPath: null, error: null };
       });
       localStorage.setItem("taomni.qa.backup.lastManual", JSON.stringify({ range: globalRange(policy), destinationIds: ids }));
       break;
@@ -83,7 +83,16 @@ export async function remoteBackupStub(cmd: string, args: Record<string, any> = 
       state.sessions = [session]; result = session; break;
     }
     case "backup_feishu_authorization_cancel": state.sessions = state.sessions.map(s => s.id === args.sessionId ? { ...s, phase: "cancelled", cleanupComplete: true, cancelRequested: true, verificationUrl: null, userCode: null, revision: s.revision + 1 } : s); break;
-    case "backup_remote_cancel": state.jobs = state.jobs.map(j => j.id === args.jobId ? { ...j, phase: "cancelled", nextRetryAt: null, revision: j.revision + 1 } : j); break;
+    case "backup_remote_cancel": {
+      const delay = Number(localStorage.getItem("taomni.qa.backup.cancelDelayMs") || 0);
+      state.jobs = state.jobs.map(j => j.id === args.jobId ? { ...j, phase: delay ? "cancelling" : "cancelled", cancelRequested: true, nextRetryAt: null, revision: j.revision + 1 } : j);
+      if (delay) setTimeout(() => {
+        const current = load();
+        current.jobs = current.jobs.map(j => j.id === args.jobId && j.phase === "cancelling" ? { ...j, phase: "cancelled", revision: j.revision + 1 } : j);
+        localStorage.setItem(key, JSON.stringify(current));
+      }, delay);
+      break;
+    }
     case "backup_remote_retry": state.jobs = state.jobs.map(j => j.id === args.jobId ? { ...j, phase: "completed", error: null, nextRetryAt: null, revision: j.revision + 1 } : j); result = args.jobId; break;
     case "backup_remote_discard": state.jobs = state.jobs.map(j => j.id === args.jobId ? { ...j, phase: "discarded", nextRetryAt: null, artifact: null, revision: j.revision + 1 } : j); break;
     case "backup_remote_clean_cache": state.jobs = state.jobs.map(j => j.phase === "completed" ? { ...j, artifact: null, revision: j.revision + 1 } : j); state.config.cache = { usedBytes: 128, limitBytes: 2147483648, retentionDays: 7 }; break;

@@ -107,7 +107,7 @@ async fn choose_save_destination(destination: std::path::PathBuf) -> anyhow::Res
             let filename_entered = super::macos_save_dialog::wait_value(&filename)?;
             chord(&mut input, &[Key::Meta, Key::Shift], Key::Other(5))?;
             let folder_field = super::macos_save_dialog::wait_folder_field(&filename)?;
-            let mut pasteboard = super::macos_save_dialog::PathPasteboard::new(&directory)?;
+            let mut pasteboard = super::path_pasteboard::PathPasteboard::new(&directory)?;
             chord(&mut input, &[Key::Meta], Key::Other(0))?;
             // ANSI V: a single real paste avoids Go to Folder's handling of
             // separate Unicode chunks. AX only reads the resulting field.
