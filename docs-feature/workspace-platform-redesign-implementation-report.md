@@ -7,6 +7,14 @@
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
 
+## Windows 备份独立校验竞态（2026-10-26）
+
+相关集 [40264966563](https://github.com/engcapa/taomni/actions/runs/40264966563) 最终为 1,269/1,270 passed、1 failed、0 infrastructure errors：三平台 browser 794/794、Linux native 175/175、macOS native 144/144、Windows native 156/157。唯一失败 `TC-BACKUP-MAIL-001` 的前四份归档已由 ZIP/SQLite oracle 核验，第五份在 UI 显示 completed，但独立观察线程读取 Windows 正在被原子替换的 job journal 时收到 `Permission denied`，写入 `ORACLE_ERROR` 后退出。原始 `snapshot-oracle/events.txt` 和失败截图保留，不把 job 完成视作归档校验通过。
+
+读取 journal 的共享工具仅对 Windows 的 access/sharing/lock 错误码 5/32/33 做最多 2 秒重读；永久拒绝、其他错误、无效 JSON 或非对象内容继续明确失败。不改变用例时限、归档内容、原文字节、附件、索引或成功条件。该工具同时用于快照 oracle 与云端服务的 journal 观察。9 项工具契约通过，其中覆盖短暂拒绝后继续读取、永久拒绝超时、POSIX 拒绝及损坏数据不被忽略。包含崩溃补充的 [40268425464](https://github.com/engcapa/taomni/actions/runs/40268425464) 已主动取消，后续使用包含这项修复的同一 runner 重新执行完整相关集；不拼接不同 runner 的回执作为全绿结果。
+
+当前本机 native `workspace-native/run-20261026-122433-182786478` 为 4/4 passed（MAIL-001、CANCEL-002、WS-038/039），browser `workspace-browser/run-20261026-122400-614861793` 为 WS-038/039 2/2 passed。两批均匹配当前 source/runner 指纹且 `identity_stable=true`；`pnpm check:refactor` 通过。Windows 锁语义的真实复验由下一轮托管 native 执行完成，此处 Linux 本机通过不替代 Windows 结果。
+
 ## 崩溃与组件升级防回归补充（2026-10-26）
 
 保留 `TC-WS-038` 对用户原始 `Panel constraints not found for index 2` 崩溃的真实操作复现，并在重载前与每次恢复后增加显式运行时断言。新增 `TC-WS-039` 在真实 `react-resizable-panels` 上连续进行嵌套分栏、Documentation、侧栏指针拖动/键盘调整、终端隐藏、模式切换、大预览、合并分栏及重载，检查草稿、活动会话与单一编辑器所有权。两个用例均要求 browser/native；这保护组件及 WebView 升级后的真实集成，面板组件没有替换成 mock。

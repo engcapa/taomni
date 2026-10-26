@@ -18,6 +18,7 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any
 
+from .backup_journal import read_journal
 
 def seed_mail(data: Path) -> tuple[bytes, bytes]:
     account = "qa-backup-categories"
@@ -122,7 +123,7 @@ def setup(ctx: Any, root: Path, config: dict) -> None:
                     lock_file = None
                     event(control + "=released")
                 for journal in (root / "jobs").glob("*.json"):
-                    job = json.loads(journal.read_text(encoding="utf-8"))
+                    job = read_journal(journal)
                     if job.get("phase") == "cancelled" and job["id"] not in stopped:
                         stopped.add(job["id"])
                         artifact = root / "artifacts" / job["id"] / "archive.taobak"
