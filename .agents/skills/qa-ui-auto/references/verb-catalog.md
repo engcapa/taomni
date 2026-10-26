@@ -77,6 +77,7 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | Verb | Args | Notes |
 |------|------|-------|
 | `assert_visible` | selector | Browser/native. Waits for a nonzero layout box and visible CSS visibility; attachment alone is insufficient. |
+| `assert_no_runtime_errors` | `null` | Browser/native, all platforms. Fails on uncaught exceptions, unhandled promise rejections, the production React root error diagnostic or `[data-testid="app-crash"]`. Ordinary console warnings and handled service errors remain diagnostic. Browser observations span the case including reloads; native observes the current document, so place a checkpoint before and after reload/navigation. Missing monitoring fails. Saves raw observations in `runtime-errors.jsonl` before asserting, including failures. Does not establish OS process survival by itself; retain functional postconditions and native lifecycle assertions. |
 | `assert_not_visible` | selector | Browser/native. Waits until hidden or absent, including mounted nodes with `display:none` or `visibility:hidden`. Use `wait_for` with `state: detached` when DOM removal is required. |
 | `assert_text` | `{selector, contains, timeout_sec?}` | Polls `text_content` and `data-terminal-text` (xterm canvas fallback). |
 | `assert_text_equals` | `{selector, equals, timeout_sec?}` | Browser/native: requires exactly one DOM match and exact `textContent`, preserving whitespace. No substring or terminal-buffer fallback. |

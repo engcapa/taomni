@@ -51,6 +51,8 @@ from .native_assertions import assert_count, assert_menu_items
 from .linux_ime import current_fcitx_engine
 from . import save_race
 from . import wayland
+from .runtime_errors import native_assert as assert_no_runtime_errors
+from .native_drag import native_drag
 
 
 class NativeStepContext:
@@ -1426,6 +1428,8 @@ def _append_clipboard_observation(ctx: NativeStepContext, entry: dict[str, Any])
 
 VERBS: dict[str, Callable[[NativeStepContext], str]] = {}
 VERBS.update(assert_count=assert_count, assert_menu_items=assert_menu_items)
+VERBS["assert_no_runtime_errors"] = assert_no_runtime_errors
+VERBS["drag_to"] = native_drag
 VERBS["terminal_drag_selection"] = _terminal_drag_selection
 
 

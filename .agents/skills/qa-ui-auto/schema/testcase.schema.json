@@ -549,6 +549,10 @@
         "assert_visible": {
           "$ref": "#/$defs/selector"
         },
+        "assert_no_runtime_errors": {
+          "type": "null",
+          "description": "Fail on uncaught errors, unhandled rejections, the React root error boundary or app crash UI. Native checks cover the current document; assert before and after reload. Raw observations are saved even on failure."
+        },
         "assert_not_visible": {
           "$ref": "#/$defs/selector"
         },

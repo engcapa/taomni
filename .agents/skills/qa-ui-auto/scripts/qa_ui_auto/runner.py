@@ -214,6 +214,7 @@ def _run_browser_case_inner(payload: dict) -> dict:
         ctx = StepContext(
             page=BudgetedPage(page, deadline), case_id=case_dict["id"], case_dir=case_dir,
             cfg=cfg, env=env, dry_run=False,
+            case_state={"runtime_console": captured_console},
         )
 
         try:

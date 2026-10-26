@@ -7,6 +7,16 @@
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
 
+## 崩溃与组件升级防回归补充（2026-10-26）
+
+保留 `TC-WS-038` 对用户原始 `Panel constraints not found for index 2` 崩溃的真实操作复现，并在重载前与每次恢复后增加显式运行时断言。新增 `TC-WS-039` 在真实 `react-resizable-panels` 上连续进行嵌套分栏、Documentation、侧栏指针拖动/键盘调整、终端隐藏、模式切换、大预览、合并分栏及重载，检查草稿、活动会话与单一编辑器所有权。两个用例均要求 browser/native；这保护组件及 WebView 升级后的真实集成，面板组件没有替换成 mock。
+
+新增 `assert_no_runtime_errors`：未捕获异常、未处理 Promise、生产 React 根错误诊断或 `app-crash` 页面均失败，即使后续界面恢复也不清除已有错误；普通警告与已处理服务错误保留为诊断。Native 当前文档在重载前后分别检查，缺失监控或传输失败不能变成空列表通过，原始观察写入 `runtime-errors.jsonl`。原生文档监听提取到独立 `native_console.py`，保持焦点、输入、控制台观察及文档销毁语义。新增原生拖动以单个 W3C action 请求完成，失败时释放指针，兼容 macOS 桥接不跨请求保留指针状态的限制。
+
+本机 `workspace-native/run-20261026-121406-571111343` 与 browser `run-20261026-121546-454194723` 各两条用例通过，两批均匹配当前 source/runner 指纹、`identity_stable=true`，各有 13 个运行时检查点。114 项运行时、拖动、传输、几何及驱动生命周期工具契约通过。独立 Chromium 页面对两个观察通道执行 10 项正负检查，包含真实异步异常和未处理 Promise，均得到预期结果：`_local/workspace-runtime-negative-controls/summary.json`。此项仅证明自动化异常检测，native 产品行为由上述真实桌面用例证明。
+
+625 个目录 ID 的静态审计与覆盖率门禁、`pnpm check:refactor` 通过。产品源码和构建输入未变，匹配 Node 22 与原构建环境后 QA v15 复用检查通过。新增/修改用例已经注册 policy/dependencies；下一轮三平台相关集使用 389 个精确 ID，全绿后才启动全量。性能 review 按用户顺序留在功能全量通过后执行。
+
 ## 驱动端口释放续验（2026-10-26）
 
 合并提交 `f1297db1` 的相关集 [40260631956](https://github.com/engcapa/taomni/actions/runs/40260631956) 已完成三平台 browser 794/794 和 macOS native 144/144；Linux native 为 173/175。`TC-WS-030` 第二次关闭后的应用及三个 WebKit 相关进程已退出，失败阶段是 `wait-for-old-ports`：旧适配器关闭期间的 TCP reset 被端口探针直接抛出。随后 `TC-WS-037` 遇到已停止的驱动，Linux 的旧入口假定每个用例间驱动一直运行，因此 setup 连接被拒绝。Windows 结果继续收集；该运行不计作相关集通过。
