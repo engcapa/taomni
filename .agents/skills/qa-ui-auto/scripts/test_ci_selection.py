@@ -121,6 +121,10 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(len(x11), 2)
         self.assertEqual(len(wayland), 2)
         self.assertEqual(sum('dual-display' in e['capabilities'] for e in wayland), 1)
+        # The dual-display dependency walk must not overwrite the impacted
+        # planner's changed-path list with its loop-control boolean. The
+        # workflow summary iterates this field after planning.
+        self.assertIsInstance(plan['changed_paths'], list)
         # The user's external project remains unavailable on both desktops.
         self.assertEqual([(g['case'], g['linux_profile']) for g in plan['gaps']], [
             ('TC-IDE-C6-06-java-definition-realproject-native', 'ubuntu-24.04-xvfb'),
