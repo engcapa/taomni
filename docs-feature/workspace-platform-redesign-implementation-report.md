@@ -1,6 +1,6 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 上一轮 `9f3ada0f` 已在合并 main 后通过三平台 browser/native 相关集 **1,276/1,276** 与全量 **2,036/2,036**。本轮追加空工作区共享文件区、列表/排序/包平铺及 LSP 非阻塞验收，并修复手测发现的 Home 恢复子目录 Empty 问题。托管相关集又发现空编辑器入口和侧栏几何延后应用的问题；随后修复 Windows 备份任务原子记录替换失败；当前版本追加本机 **2/2 browser、7/7 native** 通过并核验签名回执，整体单测及新完整相关集继续执行。以下历史结果不代表当前托管全量或性能结论。
+> 上一轮 `9f3ada0f` 已在合并 main 后通过三平台 browser/native 相关集 **1,276/1,276** 与全量 **2,036/2,036**。本轮追加空工作区共享文件区、列表/排序/包平铺及 LSP 非阻塞验收，并修复手测发现的 Home 恢复子目录 Empty 问题。托管相关集又发现空编辑器入口和侧栏几何延后应用的问题；随后修复 Windows 备份任务原子记录替换失败。本机完整单测 **5,768 passed / 1 既有 skipped**；新托管相关集发现 Linux 原生大预览快捷键一次未打开，正在通过原始输入诊断定位。以下历史结果不代表当前托管全量或性能结论。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
@@ -45,7 +45,13 @@ Native `workspace-native/run-20261026-181135-743400216` 为 **14/14 passed**，�
 
 当前 QA 二进制路径为 `src-tauri/target/qa-ui-auto/debug/taomni`，SHA-256 `fcc6b5cf34fe5b8d254f48f48e157b078c5d6bcb906544f602b7c091068c2e98`，产品源码指纹 `6c511e6a29cf36d9e1342809a6ea88099d1fe0fd054849b81ef06986b2f0319e`。新 395 ID 三平台相关集继续执行，全部通过后再同步 main 和执行整体。
 
-整体 Node 22 单测初次为 5,766 passed / 2 failed / 1 既有 skip。两个失败均是既有 Code Workspace 测试仍使用重构前的操作：默认名称排序下的树选择顺序，以及 editor 焦点占用共享 Undo 时的独立 action。迁移为正确的名称顺序与已有工作区 Undo 快捷键，保留“不读取仅选择目标”“整笔事务撤销及排除文件不变”的断言；两条定向复验通过。整体复验为 5,767 passed / 1 failed / 1 既有 skip；新失败的 Extract Method 重试测试没有先等待 provider 拒绝后再操作重开的输入框，补齐 provider 调用和错误状态检查后定向 1/1 通过。仍保留整体失败日志，下一轮整体复验将包含此同步修正。
+整体 Node 22 单测初次为 5,766 passed / 2 failed / 1 既有 skip。两个失败均是既有 Code Workspace 测试仍使用重构前的操作：默认名称排序下的树选择顺序，以及 editor 焦点占用共享 Undo 时的独立 action。迁移为正确的名称顺序与已有工作区 Undo 快捷键，保留“不读取仅选择目标”“整笔事务撤销及排除文件不变”的断言；两条定向复验通过。整体复验为 5,767 passed / 1 failed / 1 既有 skip；新失败的 Extract Method 重试测试没有先等待 provider 拒绝后再操作重开的输入框，补齐 provider 调用和错误状态检查后定向 1/1 通过。随后以 Node 22、最多两个 worker 完整执行 **587 个文件全部通过，5,768 passed / 1 既有 skipped，EXITCODE=0**，日志为 `_local/workspace-final-unit-complete.log`；此前失败日志继续保留。
+
+## 原生大预览快捷键输入诊断（2026-10-26）
+
+相关集 [40322687656](https://github.com/engcapa/taomni/actions/runs/40322687656) 在 Linux native 的 `TC-WS-019` 第 28 步未等到大预览：此前两份真实 PTY 输出、大预览尺寸、卡片激活和侧栏状态均通过，第 27 步 Ctrl+Shift+E 后预览没有出现，进程存活且控制台无异常。原始焦点记录最终为活动终端 textarea，但旧诊断没有键盘事件，不能据此断定按键是否到达，也不将其归为已修复或已知抖动。
+
+保留原快捷键断言，不增加延时、重试或替换成按钮。补充原生诊断的有界修饰键/物理键码和焦点记录，排除普通输入字符与控件值，便于区分按键投递、修饰键、焦点与产品路由。当前源码本机原生 `workspace-native/run-20261026-211153-051258694` 为 **1/1 passed**，签名回执和 source/runner/case/build 身份已独立核验，见 `_local/workspace-shortcut-local-evidence.json`。独立观察探针分别检查预览返回、终端焦点及按键期间焦点切换，未复现失败；这些探针不是托管通过证据。Windows 备份的四项真实文件句柄契约已在该托管构建通过，其余平台用例继续监控。
 
 ## 空工作区文件浏览器追加实现（2026-10-26）
 

@@ -28,6 +28,26 @@ if (!window.__QA_UI_AUTO_CONSOLE__) {
       if (window.__QA_UI_AUTO_FOCUS__.length > 64) window.__QA_UI_AUTO_FOCUS__.shift();
     }, true);
   }
+  // Observe shortcut delivery at the window before surface input handlers.
+  // Keep physical codes and modifier state, never ordinary typed characters
+  // or control values. Consumed chords may stop before this listener, while
+  // their modifier transitions still distinguish lost native input/focus.
+  for (const type of ['keydown', 'keyup']) {
+    window.addEventListener(type, event => {
+      const modifier = /^(Control|Shift|Alt|Meta)$/.test(event.key);
+      if (!modifier && !event.ctrlKey && !event.metaKey && !event.altKey) return;
+      window.__QA_UI_AUTO_FOCUS__.push({
+        type, time: performance.now(), trusted: event.isTrusted,
+        code: event.code, ctrl: event.ctrlKey, shift: event.shiftKey,
+        alt: event.altKey, meta: event.metaKey, repeat: event.repeat,
+        composing: event.isComposing, prevented: event.defaultPrevented,
+        target: describeFocus(event.target),
+        active: describeFocus(document.activeElement),
+        document_has_focus: document.hasFocus()
+      });
+      if (window.__QA_UI_AUTO_FOCUS__.length > 64) window.__QA_UI_AUTO_FOCUS__.shift();
+    }, true);
+  }
   // Bounded editor-only input history distinguishes driver ordering
   // from caret changes during async editor updates. Never inspect form
   // controls (in particular password fields), or modify input/selection.
