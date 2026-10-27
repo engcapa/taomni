@@ -3,7 +3,6 @@ import { selectUploadFile } from "../../lib/ipc";
 import {
   mailExportMbox,
   mailImportMessages,
-  mailSetFolderSubscription,
   mailUnsubscribeOneClick,
   type MailCertificateInfo,
   type MailFolder,
@@ -11,7 +10,7 @@ import {
 } from "../../lib/mail";
 import { type MailAddressBookEntry } from "../../lib/mailContacts";
 import { type MailFilter } from "../../lib/mailFilters";
-import { folderLabel, loadSubscribedOnly, saveSubscribedOnly, visibleFolders } from "../../lib/mailFolders";
+import { folderLabel, visibleFolders } from "../../lib/mailFolders";
 import { mailHtmlHasRemoteImages } from "../../lib/mailHtml";
 import { MailMutationSession } from "../../lib/mailMutations";
 import { useChatStore } from "../../stores/chatStore";
@@ -46,6 +45,7 @@ import { useMailSearch } from "./client/useMailSearch";
 import { useMailSelection } from "./client/useMailSelection";
 import { useMailShortcuts } from "./client/useMailShortcuts";
 import { useMailSynchronization } from "./client/useMailSynchronization";
+import { useMailSubscriptions } from "./client/useMailSubscriptions";
 import { useReadReceipts } from "./client/useReadReceipts";
 import { useRemoteContentPermissions } from "./client/useRemoteContentPermissions";
 
@@ -56,6 +56,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const [downloadingAttachmentIndex, setDownloadingAttachmentIndex] = useState<number | null>(null);
   const cacheOwner = useMailCacheState({
     visible,
+    accountId: info.sessionId,
   });
   const attachmentMenu = useContextMenu();
   const mailMenu = useContextMenu();
@@ -73,14 +74,12 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   const sendMessageToAi = useChatStore((s) => s.sendMessage);
 
   const displayFolders = cacheOwner.folders.length > 0 ? cacheOwner.folders : [{ ...DEFAULT_FOLDER, accountId: info.sessionId }];
-  // TASK-10: "show only subscribed folders" (per account, this browser).
-  const [subscribedOnly, setSubscribedOnlyState] = useState(
-    () => loadSubscribedOnly(info.sessionId, info.sync.subscribedOnly ?? false),
-  );
-  const subscribedOnlyRef = useRef(subscribedOnly);
-  subscribedOnlyRef.current = subscribedOnly;
+  const { subscribedOnly, subscribedOnlyRef, setSubscribedOnly, subscriptionsOpen,
+    setSubscriptionsOpen, subscriptionBusy, toggleSubscription } = useMailSubscriptions({
+    info, foldersRef: cacheOwner.foldersRef, setFolders: cacheOwner.setFolders,
+    folderSnapshots: cacheOwner.folderSnapshots, setError,
+  });
   const treeFolders = useMemo(() => visibleFolders(displayFolders, subscribedOnly), [displayFolders, subscribedOnly]);
-  const [subscriptionsOpen, setSubscriptionsOpen] = useState(false);
   const draggedMessagesRef = useRef<MailMessageHeader[]>([]);
   const [dropFolder, setDropFolder] = useState<string | null>(null);
   const [unsubscribeArmed, setUnsubscribeArmed] = useState<string | null>(null);
@@ -100,7 +99,6 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     error?: string;
   } | null>(null);
   const retryAfterTrustRef = useRef(false);
-  const [subscriptionBusy, setSubscriptionBusy] = useState<string | null>(null);
   const oauthReauthRequired = isOAuthReauthRequired(error);
   const pageSize = useMemo(() => messagePageSize(info), [info.sync.maxFetchPerSync]);
   const appearanceOwner = useMailAppearance({
@@ -174,29 +172,6 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     setStatus,
   });
 
-  const setSubscribedOnly = useCallback((value: boolean) => {
-    setSubscribedOnlyState(value);
-    saveSubscribedOnly(info.sessionId, value);
-  }, [info.sessionId]);
-
-  const toggleSubscription = useCallback(async (folder: MailFolder, subscribed: boolean) => {
-    setSubscriptionBusy(folder.name);
-    setError(null);
-    try {
-      const listed = await mailSetFolderSubscription(info, folder.name, subscribed);
-      // Only the attributes change; keep cached counts and watermarks.
-      const merged = cacheOwner.foldersRef.current.map((entry) => {
-        const remote = listed.find((candidate) => candidate.name === entry.name);
-        return remote ? { ...entry, flags: remote.flags } : entry;
-      });
-      cacheOwner.foldersRef.current = merged;
-      cacheOwner.setFolders(merged);
-    } catch (e) {
-      setError(mailClientErrorMessage(e));
-    } finally {
-      setSubscriptionBusy(null);
-    }
-  }, [info]);
   const cacheLoadingOwner = useMailCacheLoading({
     cacheOwner,
     setError,
@@ -208,6 +183,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
   });
   const syncOwner = useMailSynchronization({
     info,
+    folderSnapshots: cacheOwner.folderSnapshots,
     foldersRef: cacheOwner.foldersRef,
     tabId,
     visibleRef: cacheOwner.visibleRef,
@@ -330,6 +306,7 @@ export function MailClientTab({ tabId, info, visible, onEditSession }: MailClien
     loadCachedMessages: cacheLoadingOwner.loadCachedMessages,
     foldersRef: cacheOwner.foldersRef,
     syncInFlightRef: syncOwner.syncInFlightRef,
+    folderSnapshots: cacheOwner.folderSnapshots,
     applySyncedFolder: syncOwner.applySyncedFolder,
     setStatus,
   }), [

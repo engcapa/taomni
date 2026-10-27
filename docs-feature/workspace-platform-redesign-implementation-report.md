@@ -1,11 +1,17 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前验收尚未完成。Breadcrumbs 修复后的 GitHub 定向复验 40495133881 为 51/51 通过；随后 fetch 并检查合并 main `a5743792`，当前分支已包含它，无冲突或新增改动。全量 40500343529 发现 Windows browser TC-145 丢失命令首字节，正在诊断，其余分片继续收集。按用户最新指示，browser/native 用例直接在 GitHub 执行，本机仅运行单测、编译与静态检查。功能完成后再做正式性能对照，目前没有“性能无退化”的结论。原始证据保留于 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
+> 当前验收尚未完成。Breadcrumbs 修复后的 GitHub 定向复验 40495133881 为 51/51 通过；随后 fetch 并检查合并 main `a5743792`，当前分支已包含它，无冲突或新增改动。全量 40500343529 发现 Windows browser TC-145 丢失命令首字节、Linux native TC-MAIL-FOLDER-01 订阅状态回退，原始失败保留，分别诊断和修复中。按用户最新指示，browser/native 用例直接在 GitHub 执行，本机仅运行单测、编译与静态检查。功能完成后再做正式性能对照，目前没有“性能无退化”的结论。原始证据保留于 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
+
+## 邮件订阅与后台同步竞争（2026-10-27，待托管复验）
+
+全量 40500343529 的 Linux native TC-MAIL-FOLDER-01 可信点击已送达 Archive checkbox，但取消订阅后仍显示 subscribed=true。现有远端 LIST、缓存读取及全量/单目录同步可在订阅写入后返回旧快照，覆盖服务器刚确认的状态。新增两条真实挂载组件回归，分别延迟旧 LIST 和旧 full sync；改前均出现 false 被覆盖为 true，改后完整组件组 75/75 通过。
+
+提取每账户订阅 owner 与快照顺序 guard，读取开始时捕获版本；只有比读取更新的服务器确认订阅位受到保护，计数和其他 flags 继续更新。后续新读取仍可接受其他客户端做出的订阅变更。订阅失败不发布乐观状态，关闭/换账户后的迟到响应无效，不修改公共 IPC 或持久化格式。快照/同步/目录单测 34/34、订阅错误重试和生命周期单测 2/2、TypeScript 与重构边界检查通过。TC-MAIL-FOLDER-01 保留原断言，补全完整同步后仍取消订阅及再次订阅/取消的真实往返，browser/native 结果尚待 GitHub 验证，单测不能替代原生证据。
 
 ## Windows SSH 首字节诊断（2026-10-27，进行中）
 

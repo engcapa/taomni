@@ -3,9 +3,11 @@ import { mailGetMessageBody, mailPrefetchMessageBody, mailListCachedFolders, mai
 import { folderHasMoreToLoad, mergeSyncedMessages } from "../../../lib/mailSync";
 import { type OpenMailMessageTab, type BodyWarmState } from "./types";
 import { messageKey, sortMessages, mailClientErrorMessage, bodyMatchesMessage, mergeMessagePages, delay } from "./messages";
+import type { MailSubscriptionSnapshots } from "./subscriptionSnapshots";
 
 
 export interface LoadCachedFoldersContext {
+  folderSnapshots: MailSubscriptionSnapshots;
   visibleRef: import("react").RefObject<boolean>;
   pendingCacheRefreshRef: import("react").RefObject<boolean>;
   setLoadingFolders: import("react").Dispatch<SetStateAction<boolean>>;
@@ -25,8 +27,10 @@ export function createLoadCachedFolders(controllerContext: LoadCachedFoldersCont
     }
     controllerContext.setLoadingFolders(true);
     controllerContext.setError(null);
+    const readRevision = controllerContext.folderSnapshots.capture();
     try {
-      const cached = await mailListCachedFolders(controllerContext.info.sessionId);
+      const listed = await mailListCachedFolders(controllerContext.info.sessionId);
+      const cached = controllerContext.folderSnapshots.merge(listed, readRevision);
       if (!controllerContext.visibleRef.current) {
         controllerContext.pendingCacheRefreshRef.current = true;
         return;
@@ -358,6 +362,7 @@ export function createLoadBody(controllerContext: LoadBodyContext): (message: Ma
 
 
 export interface LoadMoreMessagesContext {
+  folderSnapshots: MailSubscriptionSnapshots;
   query: string;
   loadingMessages: boolean;
   loadingMoreMessages: boolean;
@@ -375,7 +380,7 @@ export interface LoadMoreMessagesContext {
   loadCachedMessages: (folder: string, offset?: number, append?: boolean, quiet?: boolean, limitOverride?: number) => Promise<{ page: MailMessageHeader[]; hasMore: boolean; }>;
   foldersRef: import("react").RefObject<MailFolder[]>;
   syncInFlightRef: import("react").RefObject<boolean>;
-  applySyncedFolder: (folder: MailFolder) => void;
+  applySyncedFolder: (folder: MailFolder, readRevision: number) => void;
   setStatus: import("react").Dispatch<SetStateAction<string | null>>;
 }
 
@@ -412,9 +417,10 @@ export function createLoadMoreMessages(controllerContext: LoadMoreMessagesContex
     }
     controllerContext.syncInFlightRef.current = true;
     controllerContext.setLoadingMoreMessages(true);
+    const readRevision = controllerContext.folderSnapshots.capture();
     try {
       const result = await mailSyncFolder(controllerContext.info, folder, { mode: "backfill", limit: controllerContext.pageSize });
-      controllerContext.applySyncedFolder(result.folder);
+      controllerContext.applySyncedFolder(result.folder, readRevision);
       await controllerContext.loadCachedMessages(folder, loaded, true);
       if (!result.more && result.fetched === 0) controllerContext.setStatus("No more messages");
     } catch (e) {

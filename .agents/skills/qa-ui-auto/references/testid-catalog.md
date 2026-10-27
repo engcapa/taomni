@@ -1332,6 +1332,7 @@
 
 - `[data-testid="mail-subscriptions-open"]` — interactive — F-MAIL-11.subscriptions-open
 - `[data-testid="mail-subscriptions-dialog"]` — display — F-MAIL-11.subscriptions-dialog
+- `[role="dialog"][aria-label="Folder subscriptions"] [aria-label="Close dialog"]` — interactive — F-MAIL-11.subscriptions-close
 - `[data-testid="mail-subscription-row"]` — display — F-MAIL-11.subscription-row
 - `[data-testid="mail-subscription-toggle"]` — interactive — F-MAIL-11.subscription-toggle
 - `[data-testid="mail-subscribed-only"]` — interactive — F-MAIL-11.subscribed-only

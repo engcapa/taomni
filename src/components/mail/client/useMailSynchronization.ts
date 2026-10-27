@@ -6,6 +6,7 @@ import { mergeFolderMeta } from "../../../lib/mailSync";
 import { useTaoAlertStore } from "../../../stores/taoAlertStore";
 import { NEW_MAIL_EXCLUDED_KINDS, folderMatchesSpecial } from "./folders";
 import { catchupStepSize, refreshBatchSize } from "./messages";
+import type { MailSubscriptionSnapshots } from "./subscriptionSnapshots";
 import {
   createQueueFolderCatchups,
   createQuietPollSelectedAndInbox,
@@ -17,6 +18,7 @@ import {
 } from "./synchronization";
 
 export interface UseMailSynchronizationContext {
+  folderSnapshots: MailSubscriptionSnapshots;
   info: import("../../../types").MailTabInfo;
   foldersRef: import("react").RefObject<MailFolder[]>;
   tabId: string;
@@ -43,6 +45,7 @@ export interface UseMailSynchronizationContext {
 export function useMailSynchronization(context: UseMailSynchronizationContext) {
   const {
     info,
+    folderSnapshots,
     foldersRef,
     tabId,
     visibleRef,
@@ -109,29 +112,30 @@ export function useMailSynchronization(context: UseMailSynchronizationContext) {
     }
   }, [info.displayName, info.emailAddress, info.sessionId, info.sync.desktopNotify, pushMailNew, tabId]);
 
-  const applySyncedFolder = useCallback((folder: MailFolder) => {
-    const next = mergeFolderMeta(foldersRef.current, folder);
+  const applySyncedFolder = useCallback((folder: MailFolder, readRevision: number) => {
+    const next = folderSnapshots.merge(mergeFolderMeta(foldersRef.current, folder), readRevision);
     foldersRef.current = next;
     if (visibleRef.current) setFolders(next);
-  }, []);
+  }, [folderSnapshots]);
 
   /** Remote LIST on open so a new account shows every folder at once. */
   const refreshFolderTree = useCallback(async () => {
+    const readRevision = folderSnapshots.capture();
     try {
       const listed = await mailListFolders(info);
       if (listed.length === 0) return;
       // Keep counts/watermarks a concurrent sync may have just updated.
       const byName = new Map(foldersRef.current.map((entry) => [entry.name, entry]));
-      const next = listed.map((entry) => {
+      const next = folderSnapshots.merge(listed.map((entry) => {
         const known = byName.get(entry.name);
         return known ? { ...entry, ...known, flags: entry.flags } : entry;
-      });
+      }), readRevision);
       foldersRef.current = next;
       if (visibleRef.current) setFolders(next);
     } catch (e) {
       console.debug("mail folder LIST failed", e);
     }
-  }, [info]);
+  }, [folderSnapshots, info]);
 
   /**
    * Run gap-free sync steps for one folder until the backend reports no more
@@ -140,6 +144,7 @@ export function useMailSynchronization(context: UseMailSynchronizationContext) {
    * changes from other clients show up too.
    */
   const runFolderSync = useCallback(createRunFolderSync({
+    folderSnapshots,
     syncGenerationRef,
     info,
     catchupBatchSize,
@@ -177,6 +182,7 @@ export function useMailSynchronization(context: UseMailSynchronizationContext) {
    * tab hide or unmount; the next open resumes from the stored watermark.
    */
   const startBackfill = useCallback(createStartBackfill({
+    folderSnapshots,
     foldersRef,
     info,
     backfillSeqRef,
@@ -234,6 +240,7 @@ export function useMailSynchronization(context: UseMailSynchronizationContext) {
   }), [info.cache.enabled, isNewMailExcludedName, notifyNewMail, runFolderSync]);
 
   const syncAllFolders = useCallback(createSyncAllFolders({
+    folderSnapshots,
     batchSize,
     selectedFolderRef,
     manualSyncPendingRef,

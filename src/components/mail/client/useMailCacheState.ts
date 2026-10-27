@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
+import { useCallback, useMemo, useRef, useState, type SetStateAction } from "react";
 import { type MailFolder, type MailMessageBody, type MailMessageHeader } from "../../../lib/mail";
 import { type BodyWarmState } from "./types";
+import { MailSubscriptionSnapshots } from "./subscriptionSnapshots";
 
 export interface UseMailCacheStateContext {
   visible: boolean;
+  accountId: string;
 }
 
 export function useMailCacheState(context: UseMailCacheStateContext) {
-  const { visible } = context;
-  const [folders, setFolders] = useState<MailFolder[]>([]);
+  const { visible, accountId } = context;
+  const [folders, setFoldersState] = useState<MailFolder[]>([]);
+  const folderSnapshots = useMemo(() => new MailSubscriptionSnapshots(), [accountId]);
   const [selectedFolder, setSelectedFolder] = useState("INBOX");
   const [messages, setMessagesState] = useState<MailMessageHeader[]>([]);
   const [body, setBody] = useState<MailMessageBody | null>(null);
@@ -40,9 +43,11 @@ export function useMailCacheState(context: UseMailCacheStateContext) {
     setMessagesState(value);
   }, []);
 
-  useEffect(() => {
-    foldersRef.current = folders;
-  }, [folders]);
+  const setFolders = useCallback((next: SetStateAction<MailFolder[]>) => {
+    const value = typeof next === "function" ? next(foldersRef.current) : next;
+    foldersRef.current = value;
+    setFoldersState(value);
+  }, []);
 
   /** Keep selectedFolderRef in sync immediately (folder switches can race quiet poll awaits). */
   const updateSelectedFolder = useCallback((next: string | ((prev: string) => string)) => {
@@ -50,5 +55,5 @@ export function useMailCacheState(context: UseMailCacheStateContext) {
     selectedFolderRef.current = value;
     setSelectedFolder(value);
   }, []);
-  return { folders, selectedFolder, selectedFolderRef, messages, visibleRef, bodyWarmSeqRef, bodyLoadSeqRef, setLoadingFolders, setLoadingMessages, setLoadingMoreMessages, setBodyLoadingKey, setBodyWarming, bodyCache, body, pendingCacheRefreshRef, foldersRef, setFolders, updateSelectedFolder, setHasMoreMessages, cacheRemovalVersionsRef, cacheRequestSeqRef, messagesRef, setMessages, bodyCacheRef, setBodyCache, setBody, bodyRequestsRef, loadingMessages, loadingMoreMessages, hasMoreMessages, bodyLoadingKey, bodyWarming, loadingFolders };
+  return { folders, folderSnapshots, selectedFolder, selectedFolderRef, messages, visibleRef, bodyWarmSeqRef, bodyLoadSeqRef, setLoadingFolders, setLoadingMessages, setLoadingMoreMessages, setBodyLoadingKey, setBodyWarming, bodyCache, body, pendingCacheRefreshRef, foldersRef, setFolders, updateSelectedFolder, setHasMoreMessages, cacheRemovalVersionsRef, cacheRequestSeqRef, messagesRef, setMessages, bodyCacheRef, setBodyCache, setBody, bodyRequestsRef, loadingMessages, loadingMoreMessages, hasMoreMessages, bodyLoadingKey, bodyWarming, loadingFolders };
 }

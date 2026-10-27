@@ -6426,6 +6426,9 @@ area: mail/folders
 components: [MailClientTab, SessionEditor]
 files:
   - src/components/mail/MailClientTab.tsx
+  - src/components/mail/client/subscriptionSnapshots.ts
+  - src/components/mail/client/useMailSubscriptions.ts
+  - src/components/mail/client/useMailCacheState.ts
   - src/lib/mailFolders.ts
   - src/components/session/SessionEditor.tsx
   - src-tauri/src/mail/folders.rs
@@ -6436,6 +6439,9 @@ controls:
   - id: subscriptions-dialog
     selector: '[data-testid="mail-subscriptions-dialog"]'
     kind: display
+  - id: subscriptions-close
+    selector: '[role="dialog"][aria-label="Folder subscriptions"] [aria-label="Close dialog"]'
+    kind: interactive
   - id: subscription-row
     selector: '[data-testid="mail-subscription-row"]'
     kind: display
