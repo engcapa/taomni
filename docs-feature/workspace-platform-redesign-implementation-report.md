@@ -1,6 +1,6 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前验收尚未完成。Breadcrumbs 修复后的 GitHub 定向复验 40495133881 为 51/51 通过；随后 fetch 并检查合并 main `a5743792`，当前分支已包含它，无冲突或新增改动。全量 40500343529 发现 Windows browser TC-145 丢失命令首字节、Linux native TC-MAIL-FOLDER-01 订阅状态回退，原始失败保留，分别诊断和修复中。按用户最新指示，browser/native 用例直接在 GitHub 执行，本机仅运行单测、编译与静态检查。功能完成后再做正式性能对照，目前没有“性能无退化”的结论。原始证据保留于 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
+> 当前验收尚未完成。全量 [40500343529](https://github.com/engcapa/taomni/actions/runs/40500343529) 已收齐 25/25 分片：641 个适用 ID、2,103 次执行，2,100 passed / 3 failed。失败分别为 Windows browser TC-145 丢失命令首字节、Linux native TC-MAIL-FOLDER-01 订阅状态回退、macOS native TC-RDPS-PERF-03-photo-content 帧率比 0.845 < 0.85；原始失败全部保留。邮件已修复并在托管复验，SSH 正在定位远端 shell 的输入丢失，RDP 定向复验见下文。最近一次 main 同步为 `a5743792`，后续仍需再次同步并全量验收。按用户最新指示，browser/native 用例直接在 GitHub 执行，本机仅运行单测、编译与静态检查。功能完成后再做正式性能对照，目前没有“性能无退化”的结论。原始证据保留于 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
@@ -11,7 +11,15 @@
 
 全量 40500343529 的 Linux native TC-MAIL-FOLDER-01 可信点击已送达 Archive checkbox，但取消订阅后仍显示 subscribed=true。现有远端 LIST、缓存读取及全量/单目录同步可在订阅写入后返回旧快照，覆盖服务器刚确认的状态。新增两条真实挂载组件回归，分别延迟旧 LIST 和旧 full sync；改前均出现 false 被覆盖为 true，改后完整组件组 75/75 通过。
 
-提取每账户订阅 owner 与快照顺序 guard，读取开始时捕获版本；只有比读取更新的服务器确认订阅位受到保护，计数和其他 flags 继续更新。后续新读取仍可接受其他客户端做出的订阅变更。订阅失败不发布乐观状态，关闭/换账户后的迟到响应无效，不修改公共 IPC 或持久化格式。快照/同步/目录单测 34/34、订阅错误重试和生命周期单测 2/2、TypeScript 与重构边界检查通过。TC-MAIL-FOLDER-01 保留原断言，补全完整同步后仍取消订阅及再次订阅/取消的真实往返，browser/native 结果尚待 GitHub 验证，单测不能替代原生证据。
+提取每账户订阅 owner 与快照顺序 guard，读取开始时捕获版本；只有比读取更新的服务器确认订阅位受到保护，计数和其他 flags 继续更新。后续新读取仍可接受其他客户端做出的订阅变更。订阅失败不发布乐观状态，组件卸载/换账户后的迟到响应无效，不修改公共 IPC 或持久化格式。快照/同步/目录单测 34/34、订阅错误重试和生命周期单测 2/2、TypeScript 与重构边界检查通过。TC-MAIL-FOLDER-01 保留原断言，补全完整同步后仍取消订阅及再次订阅/取消的真实往返，browser/native 结果尚待 GitHub 验证，单测不能替代原生证据。
+
+本机 QA release 已重新编译供手工测试：`src-tauri/target/qa-ui-auto/release/taomni`，独立 ID `com.taomni.app.qa`，product source SHA `a34f0739513f8e4ef3d2d2a2d1079ffc0c9c294dc994ab292aa247b2589231b5`，binary SHA `4ae0c7d5ecc10d8b0cd9ef279ba06f1b300939683e3be74b915a81ad2697ab9f`。使用 Node 22、`CARGO_BUILD_JOBS=2` 检查 inputs match；构建后未在本机运行 browser/native。
+
+## RDP 照片帧率诊断（2026-10-27，原因未确认）
+
+全量 macOS 的 baseline/adaptive 实际 marker 为 18.458/15.597 fps，比值 0.845009661；零 bulk 解码错误、每帧带宽比 1.019295685 不能抵消帧率失败。源动画在一秒区间内明显波动，draw max 达 118/130ms。RDP server、vendor encoder 与 rdp-probe 对当前已合并 main 无源码差异，但这不构成 UI 性能无退化的证据。
+
+定向 [40509410996](https://github.com/engcapa/taomni/actions/runs/40509410996) 保持相同阈值和采样方式，macOS browser/native 的适用完整崩溃专项与照片场景共 15/15 通过，原始 receipt、源码/runner/case 和构建身份已独立核验。照片 baseline/adaptive 为 29.364/27.896 fps，比值 0.950036238、每帧带宽比 0.985016801。没有修改 RDP 产品或阈值，也未丢弃原全量慢样本；单次复验尚不能证明失败原因或性能修复，最终全量仍须覆盖。
 
 ## Windows SSH 首字节诊断（2026-10-27，进行中）
 
@@ -22,6 +30,10 @@ Breadcrumbs 修复后的定向 [40495133881](https://github.com/engcapa/taomni/a
 新增测试侧被动 WebSocket 帧观察，仅对声明 SSH fixture 的 browser 用例启用；只监听实际发送/接收事件，排除 connect/认证消息，不替换 WebSocket、DOM 或产品回调。每条数据记录字节长度、SHA256 及有界头尾，最多 128 条帧；通过和失败均保留 `terminal-transport.json`，以区分输入派发、bridge 发送和远端输出。控制台监听生命周期从大型 runner shell 一并提取到独立证据模块，不增加新的产品行为。工具契约保护消息顺序/内容、现有监听器、敏感握手排除、有界记录和清理；产品既有 TC-012/145 仍是验收用例，不能以工具单测代替实际执行。原全量监控改从同 SHA 的独立 worktree 核验，以免后续诊断工具变化污染旧回执身份。
 
 首次诊断 40504722143 的 Windows browser 8/8 通过，尚未复现。成功帧显示 UCRT64 开启焦点报告，SFTP 开关触发 171↔104 列缩放，完整命令写入后收到正确输出；该 trace 没有 cwd setup probe，不能再把 setup 路径认定为唯一原因。增加独立 Windows SSH 协议诊断，对比焦点报告、缩放和 0/10/50ms 间隔，在每个新 PTY 只发送一次命令，失败不重放。保留所有输入/输出帧和原始屏幕，不含认证消息；临时服务由现有 Services 负责清理。五条工具契约通过，覆盖首字节丢失不重试、echo 不冒充实际输出、分帧 cursor query 和连接关闭。该脚本/专用 workflow 仅采集根因证据，不提供产品覆盖或替代 TC-012/145，无新增产品工作流所以不另加 YAML 用例。
+
+后续直接 Paramiko/Win32 OpenSSH 探针在没有 Taomni、浏览器或 WebSocket bridge 的条件下复现完整 `echo` 被远端执行为 `cho`，Git Bash 2.56/MSYS 3.6.10。0–500ms 的等待、焦点报告、Win32 键盘编码与 bracketed paste 均不能避免；paste 的起始 ESC 也会丢失，因此不在产品加入等待、额外按键或输入重放。此前从 Git Bash 嵌套另一 MSYS2 运行时的对照没有启动到提示符，不算有效对照。新探针改为服务建立时显式配置 MSYS2 DefaultShell，避免跨运行时启动；保留 shell 退出状态，正常托管服务仍使用 Git Bash。
+
+TC-145 保留原步骤，进一步在两轮 SFTP 的每次打开与关闭后验证各自独立的精确命令输出，所有命令仅尝试一次。新增工具契约与共享 Services 回归 28/28、`pnpm check:refactor` 通过；增强用例仍需当前分支托管验收。
 
 ## 全量 ResizeObserver 诊断（2026-10-27，进行中）
 

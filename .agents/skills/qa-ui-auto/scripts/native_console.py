@@ -38,7 +38,7 @@ if (!window.__QA_UI_AUTO_CONSOLE__) {
     window.addEventListener(type, event => {
       const modifier = /^(Control|Shift|Alt|Meta)$/.test(event.key);
       if (!modifier && !event.ctrlKey && !event.metaKey && !event.altKey) return;
-      window.__QA_UI_AUTO_FOCUS__.push({
+      const observation = {
         type, time: performance.now(), trusted: event.isTrusted,
         code: event.code, ctrl: event.ctrlKey, shift: event.shiftKey,
         alt: event.altKey, meta: event.metaKey, repeat: event.repeat,
@@ -46,7 +46,25 @@ if (!window.__QA_UI_AUTO_CONSOLE__) {
         target: describeFocus(event.target),
         active: describeFocus(document.activeElement),
         document_has_focus: document.hasFocus()
-      });
+      };
+      window.__QA_UI_AUTO_FOCUS__.push(observation);
+      // Observe the completed shortcut, including handlers that stop event
+      // propagation. Never change selection or inspect form control values.
+      if (event.target?.closest?.('.cm-content') && (event.ctrlKey || event.metaKey)) {
+        queueMicrotask(() => {
+          const selection = document.getSelection();
+          const editor = event.target.closest('.cm-content');
+          observation.after = {
+            prevented: event.defaultPrevented,
+            editorFocused: document.activeElement === editor,
+            selectedChars: selection?.toString().length ?? 0,
+            collapsed: selection?.isCollapsed ?? null,
+            anchorOffset: selection?.anchorOffset ?? null,
+            focusOffset: selection?.focusOffset ?? null,
+            documentChars: editor?.textContent?.length ?? null
+          };
+        });
+      }
       if (window.__QA_UI_AUTO_FOCUS__.length > 64) window.__QA_UI_AUTO_FOCUS__.shift();
     }, true);
   }
