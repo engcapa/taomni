@@ -1,11 +1,19 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前验收尚未完成。GitHub 定向复验 51/51 通过；随后 fetch 并检查合并 main `a5743792`，当前分支已包含它，无冲突或新增改动。全量 40484591524 发现 macOS release 保存后的 ResizeObserver 循环错误，正在定位。按用户最新指示，browser/native 用例直接在 GitHub 执行，本机仅运行单测、编译与静态检查。功能完成后再做正式性能对照，目前没有“性能无退化”的结论。原始证据保留于 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
+> 当前验收尚未完成。Breadcrumbs 修复后的 GitHub 定向复验 40495133881 为 51/51 通过；随后 fetch 并检查合并 main `a5743792`，当前分支已包含它，无冲突或新增改动。全量 40500343529 发现 Windows browser TC-145 丢失命令首字节，正在诊断，其余分片继续收集。按用户最新指示，browser/native 用例直接在 GitHub 执行，本机仅运行单测、编译与静态检查。功能完成后再做正式性能对照，目前没有“性能无退化”的结论。原始证据保留于 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
+
+## Windows SSH 首字节诊断（2026-10-27，进行中）
+
+Breadcrumbs 修复后的定向 [40495133881](https://github.com/engcapa/taomni/actions/runs/40495133881) 覆盖 14 个 ID、51/51 次通过，无 failed/skipped；三平台 browser/native 的完整崩溃专项及 TC-WS-054 扩充布局/保存检查通过，原始 receipt、源码/runner/case/原生构建身份独立核验。随后 fetch/merge main `a5743792`，无新增源码变化，启动全量 [40500343529](https://github.com/engcapa/taomni/actions/runs/40500343529)。
+
+全量的 Windows browser TC-145 在 SFTP 打开后的首次命令失败：原始 Playwright trace 表明焦点正确、完整 `echo qa-ssh-with-sftp-open` InputEvent 与单独 Enter 均已派发，shell 却回显并执行 `cho ...`。仓库历史 39891148602 记录过相同症状，但此前 MSYS 环境识别修复没有证明其唯一原因。本次保留单次输入和原正则/deadline，不重放命令来掩盖缺失。
+
+新增测试侧被动 WebSocket 帧观察，仅对声明 SSH fixture 的 browser 用例启用；只监听实际发送/接收事件，排除 connect/认证消息，不替换 WebSocket、DOM 或产品回调。每条数据记录字节长度、SHA256 及有界头尾，最多 128 条帧；通过和失败均保留 `terminal-transport.json`，以区分输入派发、bridge 发送和远端输出。控制台监听生命周期从大型 runner shell 一并提取到独立证据模块，不增加新的产品行为。工具契约保护消息顺序/内容、现有监听器、敏感握手排除、有界记录和清理；产品既有 TC-012/145 仍是验收用例，不能以工具单测代替实际执行。原全量监控改从同 SHA 的独立 worktree 核验，以免后续诊断工具变化污染旧回执身份。
 
 ## 全量 ResizeObserver 诊断（2026-10-27，进行中）
 

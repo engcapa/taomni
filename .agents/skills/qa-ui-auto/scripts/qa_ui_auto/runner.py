@@ -40,6 +40,7 @@ from .service_fixtures import LocalServiceFixtures, ServiceFixtureError
 from .steps import REGISTRY as STEP_REGISTRY, StepContext, StepError
 from .deadline import BudgetedPage, Deadline, using_deadline
 from .provenance import input_digest, execution_identity, conditions_identity
+from .browser_evidence import BrowserEvidence
 
 _browser = None
 _playwright = None
@@ -190,12 +191,8 @@ def _run_browser_case_inner(payload: dict) -> dict:
     result["timings"]["context_setup_sec"] = time.monotonic() - context_started
     if browser_ctx:
         page = browser_ctx.pages[0] if browser_ctx.pages else browser_ctx.new_page()
-        page.on("console", lambda msg: captured_console.append(  # noqa: SLF001
-            {"level": msg.type, "text": msg.text}
-        ))
-        page.on("pageerror", lambda exc: captured_console.append(
-            {"level": "error", "text": f"pageerror: {exc}"}
-        ))
+        browser_evidence = BrowserEvidence(page, captured_console, case_dir,
+            trace_terminal="ssh_required" in case_dict.get("fixtures", []))
 
         # Tracing: record everything; only persist on failure.
         try:
@@ -262,6 +259,7 @@ def _run_browser_case_inner(payload: dict) -> dict:
             result["failure"] = failure
         finally:
             cleanup_started = time.monotonic()
+            browser_evidence.close()
             try:
                 trace_path = case_dir / "trace.zip"
                 browser_ctx.tracing.stop(**({"path": str(trace_path)} if failure is not None else {}))
