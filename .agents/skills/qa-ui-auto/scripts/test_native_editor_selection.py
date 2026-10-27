@@ -10,8 +10,19 @@ HARNESS = r"""
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const source = require('node:fs').readFileSync(0, 'utf8');
+const focusNode = {nodeType: 3, nodeName: '#text', isConnected: true, parentNode: {nodeName: 'SPAN'}};
+const domSelection = {anchorNode: focusNode, focusNode, anchorOffset: 0, focusOffset: 23,
+  isCollapsed: false, toString: () => 'QA_RELEASE_CANVAS_SAVED'};
+let mutationCallback;
+let disconnected = 0;
 const sandbox = {
-  localStorage: {getItem: () => '1'}, performance: {now: () => 17}
+  localStorage: {getItem: () => '1'}, performance: {now: () => 17},
+  document: {getSelection: () => domSelection},
+  MutationObserver: class {
+    constructor(callback) {mutationCallback = callback;}
+    observe() {}
+    disconnect() {disconnected++;}
+  }
 };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
@@ -31,7 +42,7 @@ const view = {state, update: function(actual, marker) {
   if (failure) throw failure;
   state.selection = collapsed;
   return 42;
-}};
+}, destroy: () => 'destroyed'};
 const editor = {cmTile: {root: {view}}};
 const observation = {followingInput: []};
 install(editor, observation);
@@ -42,6 +53,12 @@ assert.equal(sample.before.head, 23);
 assert.equal(sample.after.head, 0);
 assert.deepEqual(Array.from(sample.transactions[0].userEvents), ['select']);
 assert.match(sample.stack, /Editor selection transaction/);
+assert.equal(sample.domBefore.selectedChars, 23);
+assert.equal(sample.domAfter.focus.id, sample.domBefore.focus.id);
+mutationCallback([{type: 'childList', target: focusNode.parentNode,
+  addedNodes: [focusNode], removedNodes: []}]);
+assert.equal(observation.domChanges.length, 1);
+assert.equal(observation.domChanges[0].records[0].added[0].id, sample.domBefore.focus.id);
 state.selection = {main: {anchor: 3, head: 3}};
 assert.equal(sample.after.head, 0, 'samples never alias live selection');
 const wrapper = view.update;
@@ -63,6 +80,8 @@ next.transactions = {get length() {throw Error('diagnostic failed');}};
 const previous = calls;
 assert.equal(view.update(transactions, 'marker'), 42);
 assert.equal(calls, previous + 1);
+assert.equal(view.destroy(), 'destroyed');
+assert.equal(disconnected, 1);
 vm.runInContext(source, sandbox);
 assert.equal(sandbox.__QA_UI_AUTO_WATCH_SELECTION__, install);
 const disabled = {localStorage: {getItem: () => null}};
