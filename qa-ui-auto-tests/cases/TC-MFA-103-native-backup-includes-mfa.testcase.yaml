@@ -1,9 +1,10 @@
 id: TC-MFA-103
 title: A native backup archive contains mfa.db together with the vault that holds its key
 description: V-21 (AC-15). Isolated native profile. After an MFA account exists, Settings → Backup & Restore → Backup Now
-  creates a core backup in the profile's backup directory. Inspecting it from the history list (the real archive reader) lists
-  databases/mfa.db and databases/vault.db; the restore is cancelled so nothing is staged. Wait for the manual local task to
-  complete and refresh history before selecting its first row; an earlier startup backup may predate the MFA account.
+  creates a core backup in the profile's backup directory. Follow the job ID returned by this manual invocation, wait for
+  that exact task to complete, and verify its archive appears first in refreshed history. Inspecting that archive through
+  the real archive reader lists databases/mfa.db and databases/vault.db; cancelling the restore stages nothing.
+  An earlier startup backup may predate the MFA account and must not satisfy either task or archive assertion.
 covers:
 - F-MFA-3
 tags:
@@ -53,13 +54,16 @@ steps:
 - wait_for:
     selector: '[data-testid="backup-action-success"]'
     timeout_sec: 90
-- wait_for:
-    selector: '[data-testid="backup-cloud-job"][data-operation="local"][data-phase="completed"]'
+- wait_for: '[data-testid="backup-manual-result"][data-target-id="local"][data-job-id]'
+- eval_readonly:
+    expression: >-
+      !!document.querySelector('[data-job-id'+String.fromCharCode(61)+'"'+document.querySelector('[data-testid'+String.fromCharCode(61)+'"backup-manual-result"][data-target-id'+String.fromCharCode(61)+'"local"]').getAttribute('data-job-id')+'"][data-phase'+String.fromCharCode(61)+'"completed"]')
+    expect_truthy: true
     timeout_sec: 90
 - click: '[data-testid="backup-history-refresh"]'
 - eval_readonly:
     expression: >-
-      document.querySelector('[data-operation'+String.fromCharCode(61)+'"local"][data-phase'+String.fromCharCode(61)+'"completed"]').textContent.includes(document.querySelector('[data-testid'+String.fromCharCode(61)+'"backup-history-row"]:first-child').getAttribute('data-file-name'))
+      document.querySelector('[data-job-id'+String.fromCharCode(61)+'"'+document.querySelector('[data-testid'+String.fromCharCode(61)+'"backup-manual-result"][data-target-id'+String.fromCharCode(61)+'"local"]').getAttribute('data-job-id')+'"][data-phase]').textContent.includes(document.querySelector('[data-testid'+String.fromCharCode(61)+'"backup-history-row"]').getAttribute('data-file-name'))
     expect_truthy: true
     timeout_sec: 30
 - click: '[data-testid="backup-history-row"]:first-child [data-testid="backup-history-restore"]'
@@ -93,8 +97,8 @@ verification:
     - 17
     - 19
     - 21
-    - 24
-    - 26
+    - 25
+    - 27
     checkpoints:
     - step: 16
       expectation: MFA account stored
@@ -103,33 +107,34 @@ verification:
     - step: 22
       expectation: Manual backup accepted; actual completion is checked next.
     - step: 23
+      expectation: The manual invocation exposes the local job ID, so an earlier startup task cannot satisfy completion.
+    - step: 24
       expectation: The manual local task completed before refreshing and selecting the newest archive.
-    - step: 25
+    - step: 26
       expectation: The first history row names the completed manual job's actual local archive.
-    - step: 27
-      expectation: archive inspected
     - step: 28
-      expectation: databases/mfa.db included
+      expectation: archive inspected
     - step: 29
+      expectation: databases/mfa.db included
+    - step: 30
       expectation: databases/vault.db included
     results:
-    - 28
     - 29
+    - 30
   - id: R2
     requirement: Cancelling the restore closes the confirmation without staging (AC-15).
     actions:
-    - 30
+    - 31
     checkpoints:
-    - step: 31
+    - step: 32
       expectation: restore confirmation closed
     results:
-    - 31
+    - 32
   visual:
   - check: Backup history and restore confirmation are legible.
     method: manual
     reason: Screenshot needs human review.
   native:
-  - check: Applying a restore and restarting into the restored mfa.db is covered by Rust backup tests (V-06/V-07), not by
-      this UI case.
+  - check: Applying a restore and restarting into the restored mfa.db is covered by Rust backup tests (V-06/V-07), not by this UI case.
     method: external
     reason: Applying a restore and restarting into the restored MFA database is outside this archive-inspection case.

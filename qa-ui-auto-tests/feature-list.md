@@ -10940,6 +10940,9 @@ controls:
   - id: create-now
     selector: '[data-testid="backup-selected-start"]'
     kind: interactive
+  - id: manual-result
+    selector: '[data-testid="backup-manual-result"]'
+    kind: display
   - id: action-success
     selector: '[data-testid="backup-action-success"]'
     kind: display

@@ -78,7 +78,7 @@ export function BackupManual(props: BackupSettingsViewProps) {
       <button data-testid="backup-selected-start" className={backupButton} disabled={props.creating || status === "error" || blocked && selected.some((id) => id !== "local") || !selected.length || invalid || props.usePassword && !props.password.trim()} onClick={props.handleBackupNow}>{t(props.creating ? "backupSettings.creating" : "remoteBackup.startSelected")}</button>
       <button data-testid="backup-export" className={backupButton} disabled={props.creating || status === "error" || props.usePassword && !props.password.trim()} onClick={props.handleExportBackup}>{t("backupSettings.exportTo")}</button>
     </div>
-    {props.manualResults.map((result) => <div key={result.targetId} role="status" className="space-y-1 text-xs text-theme-muted">
+    {props.manualResults.map((result) => <div key={result.targetId} role="status" data-testid="backup-manual-result" data-target-id={result.targetId} data-job-id={result.jobId} className="space-y-1 text-xs text-theme-muted">
       <p>{result.targetId === "local" ? t("remoteBackup.localDestination") : config.targets.find((target) => target.id === result.targetId)?.name}: {t(result.error ? "remoteBackup.phases.failed" : result.jobId ? "remoteBackup.taskCreated" : "remoteBackup.completed")}</p>
       {result.error && <BackupError error={result.error} t={t} />}
     </div>)}

@@ -2709,6 +2709,7 @@
 
 - `[data-testid="settings-group-toggle-backup"]` — interactive — F-MFA-3.group-toggle-backup
 - `[data-testid="backup-selected-start"]` — interactive — F-MFA-3.create-now
+- `[data-testid="backup-manual-result"]` — display — F-MFA-3.manual-result
 - `[data-testid="backup-action-success"]` — display — F-MFA-3.action-success
 - `[data-testid="backup-history-row"]` — display — F-MFA-3.history-row
 - `[data-testid="backup-history-restore"]` — interactive — F-MFA-3.history-restore
