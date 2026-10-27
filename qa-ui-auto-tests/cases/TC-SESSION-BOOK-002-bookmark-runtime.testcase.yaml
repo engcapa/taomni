@@ -16,6 +16,7 @@ fixtures:
 timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
@@ -63,8 +64,7 @@ steps:
     equal: 1
 - wait_for: '[data-testid="session-terminal-background"]'
 - eval_readonly:
-    expression: document.querySelector('[data-terminal-active] img')?.naturalWidth
-      === 4
+    expression: document.querySelector('[data-terminal-active] img')?.naturalWidth === 4
     expect_truthy: true
     timeout_sec: 15
 - assert_visible: '[data-testid="session-terminal-background"]'
@@ -84,12 +84,12 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: An explicit bookmark shortcut opens exactly one terminal, reload
-      auto-connects once, editable fields do not trigger the shortcut, and native
-      background loading decodes the fixture image from disk.
+    requirement: An explicit bookmark shortcut opens exactly one terminal, reload auto-connects once, editable fields do not trigger the shortcut, and native background
+      loading decodes the fixture image from disk.
     actions:
-    - 3
-    - 5
+    - 1
+    - 2
+    - 4
     - 6
     - 7
     - 8
@@ -100,51 +100,65 @@ verification:
     - 13
     - 14
     - 15
-    - 18
+    - 16
     - 19
-    - 22
+    - 20
+    - 23
     - 29
-    - 31
+    - 30
     - 32
-    - 34
-    - 28
-    checkpoints:
-    - step: 17
-      expectation: The saved value, rendered state or connection count matches the
-        explicit assertion.
-    - step: 21
-      expectation: The saved value, rendered state or connection count matches the
-        explicit assertion.
-    - step: 24
-      expectation: The saved value, rendered state or connection count matches the
-        explicit assertion.
-    - step: 26
-      expectation: The saved value, rendered state or connection count matches the
-        explicit assertion.
-    - step: 27
-      expectation: The saved value, rendered state or connection count matches the
-        explicit assertion.
-    - step: 33
-      expectation: The saved value, rendered state or connection count matches the
-        explicit assertion.
-    - step: 35
-      expectation: The saved value, rendered state or connection count matches the
-        explicit assertion.
-    results:
-    - 17
-    - 21
-    - 24
-    - 26
-    - 27
     - 33
     - 35
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-bookmark-runtime\"]"}'
+    - step: 18
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-bookmark-runtime\"]", "contains": "★"}}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 22
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"]", "equal": 1}}'
+    - step: 24
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 60}}'
+    - step: 25
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"]", "equal": 1}}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"session-terminal-background\"]"}'
+    - step: 27
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-terminal-active] img'')?.naturalWidth === 4", "expect_truthy": true, "timeout_sec":
+        15}}'
+    - step: 28
+      expectation: '{"assert_visible": "[data-testid=\"session-terminal-background\"]"}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 34
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"]", "equal": 1}}'
+    - step: 36
+      expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
+    results:
+    - 3
+    - 5
+    - 17
+    - 18
+    - 21
+    - 22
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 31
+    - 34
+    - 36
   visual:
   - check: Bookmark controls and terminal background
     method: automated
-    reason: Assertions verify values, visibility and decoded image dimensions where
-      applicable.
+    reason: Assertions verify values, visibility and decoded image dimensions where applicable.
   native:
   - check: Persistence and terminal lifecycle
     method: automated
-    reason: Native cases exercise SQLite, real local PTY and file IPC. Browser-only
-      TC-128 verifies the dialog workflow.
+    reason: Native cases exercise SQLite, real local PTY and file IPC. Browser-only TC-128 verifies the dialog workflow.

@@ -21,6 +21,7 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 |------|------|-------|
 | `open` | string URL **or** `{url}` | Navigates and waits for `domcontentloaded`. Auto-runs at step 0 if first step isn't `open`/`goto`. |
 | `goto` | same as `open` | Alias. |
+| `native_restart_app` | `null` | Native only. Uses the production window close control, waits for the browsing context to close, then restarts the run-owned QA application with the same isolated profile. Does not reset fixtures or reseed storage. Unexpected exit confirmation fails explicitly; handle prompts in the case. Requires a new WebDriver session id and records the shutdown path and both ids in `native-application-restarts.jsonl`; the original case deadline remains active. |
 | `wait` | seconds (number or `"3s"`) | Hard sleep; use sparingly. |
 | `switch_window` | `{selector, timeout_sec?, close_with?}` | Browser/native. Enumerates real app-created pages/WebViews and selects the one containing the CSS selector. Optional `close_with` clicks a control once in the source window and requires that window to disappear before selecting the target; a native `no such window` response is accepted only with this observed closure. Never creates a synthetic window or replays an uncertain click. |
 | `wait_for` | selector string **or** `{selector, timeout_sec?, state?}` | `state` ∈ `attached/detached/visible/hidden`, default `visible`. |
@@ -76,6 +77,7 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | Verb | Args | Notes |
 |------|------|-------|
 | `assert_visible` | selector | Browser/native. Waits for a nonzero layout box and visible CSS visibility; attachment alone is insufficient. |
+| `assert_no_runtime_errors` | `null` | Browser/native, all platforms. Fails on uncaught exceptions, unhandled promise rejections, the production React root error diagnostic or `[data-testid="app-crash"]`. Ordinary console warnings and handled service errors remain diagnostic. Browser observations span the case including reloads; native observes the current document, so place a checkpoint before and after reload/navigation. Missing monitoring fails. Saves raw observations in `runtime-errors.jsonl` before asserting, including failures. Does not establish OS process survival by itself; retain functional postconditions and native lifecycle assertions. |
 | `assert_not_visible` | selector | Browser/native. Waits until hidden or absent, including mounted nodes with `display:none` or `visibility:hidden`. Use `wait_for` with `state: detached` when DOM removal is required. |
 | `assert_text` | `{selector, contains, timeout_sec?}` | Polls `text_content` and `data-terminal-text` (xterm canvas fallback). |
 | `assert_text_equals` | `{selector, equals, timeout_sec?}` | Browser/native: requires exactly one DOM match and exact `textContent`, preserving whitespace. No substring or terminal-buffer fallback. |
@@ -89,6 +91,13 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 | `assert_menu_items` | `[label, label, ...]` | Browser/native. After `right_click`; checks each label visible inside `[data-testid="context-menu"]` using substring matching. |
 
 ## App-specific helpers (use these instead of inlining selector chains)
+
+`native_folder_dialog: {action: choose|cancel, path?}` operates an already opened
+system folder chooser in native mode. `choose` requires an existing directory
+inside the current QA report. It verifies that the chooser belongs to the QA
+executable and uses OS input/accessibility on Linux X11, Windows and macOS;
+records ownership, action and failures in `native-folder-dialogs.jsonl`.
+The testcase must separately assert the returned path and mounted directory.
 
 | Verb | Args | Notes |
 |------|------|-------|

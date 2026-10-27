@@ -75,6 +75,17 @@ on:
     paths:
       - 'src/**'
       - 'src-tauri/src/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'vite.config.ts'
+      - 'src-tauri/Cargo.toml'
+      - 'src-tauri/Cargo.lock'
+      - 'src-tauri/tauri.conf.json'
+      - 'src-tauri/capabilities/**'
+      - 'src-tauri/resources/**'
+      - 'public/**'
+      - 'index.html'
+      - 'tsconfig*.json'
       - 'vite-plugins/**'
       - 'qa-ui-auto-tests/**'
       - '.agents/skills/qa-ui-auto/**'
@@ -133,15 +144,18 @@ jobs:
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1 numpy==2.4.4 Pillow==12.1.1
       - name: Validate QA tools
         if: inputs.scope != 'selected'
-        run: python -m unittest test_session_config test_credential_store test_credential_store_readiness test_ci_sharding test_ci_build_pipeline test_ci_native_artifact test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_navigation test_ci_provenance test_ci_services test_ci_tcp_throttle test_ci_mysql test_ci_clickhouse test_ci_maven_warmup test_vnc_required test_dev_contract test_rdp_encoder_tools test_mstsc_process test_native_fixture_cleanup test_native_webdriver_transport test_tauri_webdriver.NativeSessionTransportTest test_tauri_webdriver.NativeSessionFillTest test_tauri_webdriver.MacosDebuggerProcessTest test_host_clipboard test_verification_workflow test_native_isolation.NativeIsolationTest test_native_reset_boundaries test_native_window_focus test_window_context test_updater_fixture test_mouse_steps test_native_assertions test_window_drag test_element_geometry test_screenshot_scenarios test_color_input test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
+        run: python -m unittest test_native_application_restart test_native_application_shutdown test_native_process_group test_native_driver_lifecycle test_session_config test_credential_store test_credential_store_readiness test_ci_sharding test_ci_build_pipeline test_ci_native_artifact test_ci_selection test_ci_report test_ci_execute test_ci_desktop test_navigation test_ci_provenance test_ci_services test_ci_tcp_throttle test_ci_mysql test_ci_clickhouse test_ci_maven_warmup test_vnc_required test_dev_contract test_rdp_encoder_tools test_mstsc_process test_native_fixture_cleanup test_native_webdriver_transport test_tauri_webdriver.NativeSessionTransportTest test_tauri_webdriver.NativeSessionFillTest test_tauri_webdriver.MacosDebuggerProcessTest test_host_clipboard test_folder_dialog test_folder_dialog_macos test_verification_workflow test_native_isolation.NativeIsolationTest test_native_reset_boundaries test_native_window_focus test_window_context test_updater_fixture test_mouse_steps test_native_assertions test_window_drag test_element_geometry test_screenshot_scenarios test_color_input test_drag_path test_screenshot_mask test_stage_screenshot_artifacts test_setup_screenshot_ocr
       - name: Native pointer and SSH desktop fixture contracts
         if: inputs.scope != 'selected'
-        run: python -m unittest test_native_pointer test_ci_x11_session test_ci_ssh_features
+        run: python -m unittest test_native_pointer test_ci_x11_session test_ci_ssh_features test_runtime_errors test_native_resize_observer test_native_console test_ci_windows_ssh_shell test_ci_windows_posix_ssh test_native_drag test_backup_cloud test_backup_journal test_browser_evidence test_keyboard_steps
       - name: Linux package setup contracts
         run: python -m unittest test_ci_linux_setup test_ci_setup_protoc
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: macOS folder chooser automation contracts
+        if: inputs.scope != 'selected'
+        run: python -m unittest test_folder_dialog_macos
       - name: Updater packaging unit contracts
         if: inputs.scope != 'selected'
         run: node --test scripts/compose-updater-manifest.test.mjs .agents/skills/qa-ui-auto/scripts/test_ci_macos_consent.cjs
@@ -150,7 +164,6 @@ jobs:
         run: python -m unittest test_wayland_tools test_multi_display test_ci_wayland_startup
 
   plan:
-    if: github.event_name != 'pull_request' || inputs.scope != ''
     runs-on: ubuntu-24.04
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
@@ -186,12 +199,16 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1 numpy==2.4.4 Pillow==12.1.1
+      - name: Mandatory crash regression selection and result contracts
+        run: python -m unittest test_crash_regressions
+      - name: Cold-start fixture filesystem contracts
+        run: python -m unittest test_workspace_ignored_ancestor
       - name: Catalog contract gate
         run: python -m qa_ui_auto.audit --gate
       - name: Plan exact cases and dependencies
         id: plan
         env:
-          QA_SCOPE: ${{ github.event_name == 'schedule' && 'all' || inputs.scope || 'smoke' }}
+          QA_SCOPE: ${{ inputs.scope || github.event_name == 'pull_request' && 'selected' || github.event_name == 'schedule' && 'all' || 'smoke' }}
           QA_BASE: ${{ inputs.base }}
           QA_PLATFORMS: ${{ inputs.platforms }}
           QA_MODES: ${{ inputs.modes }}
@@ -201,7 +218,9 @@ jobs:
           QA_BROWSER_WORKERS: ${{ inputs.browser_workers }}
           QA_CASE_IDS: ${{ inputs.case_ids }}
           QA_FEATURES: ${{ inputs.features }}
-          QA_TAGS: ${{ inputs.tags }}
+          # New feature PRs always run the packaged crash suite. Focused manual
+          # selections also retain it, even when their feature selectors differ.
+          QA_TAGS: ${{ inputs.scope == '' && github.event_name == 'pull_request' && 'crash-regression' || (inputs.scope == 'selected' || inputs.scope == 'impacted') && format('{0},crash-regression', inputs.tags) || inputs.tags }}
         run: python -m qa_ui_auto.ci plan
       - uses: actions/upload-artifact@v4
         with:
@@ -275,6 +294,8 @@ jobs:
     if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-macos.result == 'success' && needs.plan.outputs.has_macos_native == 'true' }}
     uses: ./.github/workflows/qa-ui-auto-entry.yml
     with:
+      # Bound the burst on hosted ARM runners; retain every planned shard.
+      max_parallel: 2
       matrix: ${{ needs.plan.outputs.macos_native_matrix }}
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
@@ -343,8 +364,8 @@ jobs:
                   stream.write(text)
           sys.exit(bool(failures))
           PYTHON
-      - name: Require selected cases to pass
-        if: needs.plan.result == 'success' && inputs.scope == 'selected'
+      - name: Require all planned cases to pass
+        if: needs.plan.result == 'success'
         run: python -c "import json, sys; result = json.load(open('qa-ui-auto-report/ci-summary.json')); sys.exit(0 if result['passed'] else 1)"
       - uses: actions/upload-artifact@v4
         if: always()

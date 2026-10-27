@@ -10,12 +10,13 @@ fixtures:
 - reset_db
 timeout_sec: 90
 id: TC-VOICE-009
-title: Optional cleanup preserves an accessible original and undo in the titlebar
-  draft
+title: Optional cleanup preserves an accessible original and undo in the Chat draft
 steps:
 - open: ${cfg.app.base_url}/?voiceFixture=1
-- wait_for: '[data-testid="ptt-button"]'
-- click: '[data-testid="ptt-button"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="chat-voice-button"]'
+- click: '[data-testid="chat-voice-button"]'
 - wait_for: '[data-testid="asr-settings"]'
 - select_option:
     selector: '[data-testid="asr-realtime-provider"]'
@@ -27,51 +28,48 @@ steps:
     key: taomni.ai.config.v1
     contains: '"cleanup":"full"'
 - click: '[data-testid="voice-settings-close"]'
-- click: '[data-testid="ptt-button"]'
-- wait_for: '[data-testid="ptt-button"][data-state="recording"]'
-- click: '[data-testid="ptt-button"]'
+- click: '[data-testid="chat-voice-button"]'
+- wait_for: '[data-testid="chat-voice-button"][data-state="recording"]'
+- click: '[data-testid="chat-voice-button"]'
 - wait_for: '[data-testid="chat-composer-textarea"]'
 - eval_readonly:
-    expression: document.querySelector("#chat-composer-textarea").value === "Cleaned
-      stream fixture."
+    expression: document.querySelector("#chat-composer-textarea").value === "Cleaned stream fixture."
     timeout_sec: 5
-- click: '[data-testid="composer-voice-original"] summary'
+- click: '[data-testid="chat-voice-button-original"] summary'
 - assert_text:
-    selector: '[data-testid="composer-voice-original"]'
+    selector: '[data-testid="chat-voice-button-original"]'
     contains: Final stream fixture.
-- click: '[data-testid="composer-voice-original"] button'
+- click: '[data-testid="chat-voice-button-original"] button'
 - eval_readonly:
-    expression: document.querySelector("#chat-composer-textarea").value === "Final
-      stream fixture."
+    expression: document.querySelector("#chat-composer-textarea").value === "Final stream fixture."
 - screenshot: cleanup-original.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Optional cleanup preserves an accessible original and undo in the
-      titlebar draft
+    requirement: Optional cleanup preserves an accessible original and undo in the Chat draft
     actions:
-    - 5
-    - 6
-    - 8
-    - 9
-    - 11
-    - 14
-    - 16
-    checkpoints:
-    - step: 7
-      expectation: Cleanup requires explicit opt-in.
-    - step: 13
-      expectation: Cleaned final is staged once.
-    - step: 15
-      expectation: Raw original remains available.
-    - step: 17
-      expectation: Undo restores raw text without sending.
-    results:
     - 7
+    - 8
+    - 10
+    - 11
     - 13
+    - 16
+    - 18
+    checkpoints:
+    - step: 9
+      expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"cleanup\":\"full\""}}'
+    - step: 15
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"#chat-composer-textarea\").value === \"Cleaned stream fixture.\"", "timeout_sec": 5}}'
+    - step: 17
+      expectation: '{"assert_text": {"selector": "[data-testid=\"chat-voice-button-original\"]", "contains": "Final stream fixture."}}'
+    - step: 19
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(\"#chat-composer-textarea\").value === \"Final stream fixture.\""}}'
+    results:
+    - 9
     - 15
     - 17
+    - 19
   visual:
   - check: Settings and original transcript remain readable
     method: manual
@@ -79,5 +77,4 @@ verification:
   native:
   - check: Provider transport, credentials and LLM protection
     method: external
-    reason: Native socket/config/cleanup tests establish backend behavior; browser
-      fixtures do not validate vendor service availability.
+    reason: Native socket/config/cleanup tests establish backend behavior; browser fixtures do not validate vendor service availability.

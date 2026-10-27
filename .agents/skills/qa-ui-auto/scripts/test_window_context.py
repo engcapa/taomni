@@ -57,6 +57,63 @@ class WindowContextTests(unittest.TestCase):
             native_switch(SimpleNamespace(session=session), {'selector': '#main', 'close_with': '#reattach'})
         session.request.assert_called_once()
 
+    def test_webkit_evaluation_timeout_recovers_only_after_observed_window_closure(self):
+        for closes in [True, False]:
+            with self.subTest(closes=closes):
+                session = Mock()
+                session.endpoint.side_effect = lambda path: '/session/owned' + path
+                session.request.side_effect = ['detached', ['main'] if closes else ['detached', 'main'], None]
+                session.click.side_effect = WebDriverError('WebView JavaScript evaluation timed out')
+                session.execute.return_value = True
+                with patch('qa_ui_auto.window_context.time.monotonic', side_effect=[0, 0, 2]), \
+                        patch('qa_ui_auto.window_context.time.sleep'):
+                    ctx = SimpleNamespace(session=session)
+                    args = {'selector': '#main', 'close_with': '#reattach', 'timeout_sec': 1}
+                    if closes:
+                        self.assertIn('main', native_switch(ctx, args))
+                    else:
+                        with self.assertRaisesRegex(RuntimeError, 'source window did not close'):
+                            native_switch(ctx, args)
+                        session.execute.assert_not_called()
+                session.click.assert_called_once()
+
+    def test_lost_close_ack_observes_window_state_after_dispatch_consumes_poll_budget(self):
+        for closes in [True, False]:
+            with self.subTest(closes=closes):
+                session = Mock()
+                session.endpoint.side_effect = lambda path: '/session/owned' + path
+                session.request.side_effect = ['detached', ['main'] if closes else ['detached', 'main'], None]
+                session.click.side_effect = WebDriverError('WebView JavaScript evaluation timed out')
+                session.execute.return_value = True
+                with patch('qa_ui_auto.window_context.time.monotonic', side_effect=[0, 60, 61]), \
+                        patch('qa_ui_auto.window_context.time.sleep'):
+                    args = {'selector': '#main', 'close_with': '#reattach', 'timeout_sec': 45}
+                    if closes:
+                        self.assertIn('main', native_switch(SimpleNamespace(session=session), args))
+                    else:
+                        with self.assertRaisesRegex(RuntimeError, 'source window did not close'):
+                            native_switch(SimpleNamespace(session=session), args)
+                        session.execute.assert_not_called()
+                session.click.assert_called_once_with('#reattach')
+                session.request.assert_any_call('GET', '/session/owned/window/handles')
+
+    def test_real_window_observations_record_source_closure_and_selected_context(self):
+        import json
+        session = Mock()
+        session.endpoint.side_effect = lambda path: '/session/owned' + path
+        session.request.side_effect = ['detached', ['main'], None]
+        session.execute.return_value = True
+        with tempfile.TemporaryDirectory() as directory:
+            ctx = SimpleNamespace(session=session, case_dir=Path(directory))
+            native_switch(ctx, {'selector': '#main', 'close_with': '#reattach'})
+            entries = [json.loads(line) for line in
+                       (ctx.case_dir / 'native-window-context.jsonl').read_text().splitlines()]
+        self.assertEqual([entry['phase'] for entry in entries], ['close', 'windows', 'selected'])
+        self.assertEqual(entries[1]['handles'], ['main'])
+        self.assertTrue(entries[1]['source_closed'])
+        self.assertEqual(entries[2]['handle'], 'main')
+        session.click.assert_called_once_with('#reattach')
+
     def test_browser_reattach_selects_the_surviving_page_after_observed_closure(self):
         source, main = Mock(), Mock()
         source.context.pages = [source, main]

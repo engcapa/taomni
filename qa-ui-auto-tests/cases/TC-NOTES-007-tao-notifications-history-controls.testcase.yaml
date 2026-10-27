@@ -25,8 +25,8 @@ timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="status-bar"]'
-- wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
-- click: '[data-testid="ai-chat-drawer-ribbon"]'
+- wait_for: '[data-testid="rail-chat-button"]'
+- click: '[data-testid="rail-chat-button"]'
 - wait_for: '[data-testid="ai-chat-drawer"]'
 - click: '[data-testid="tao-hub-tab-notifications"]'
 - wait_for: '[data-testid="tao-alert-inbox"]'
@@ -69,7 +69,7 @@ verification:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
     - step: 3
-      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-ribbon\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"rail-chat-button\"]"}'
     - step: 5
       expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
     - step: 7
@@ -89,11 +89,9 @@ verification:
     - step: 15
       expectation: '{"assert_text": {"selector": "[data-testid=\"tao-alert-inbox\"]", "contains": "No matching history"}}'
     - step: 17
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tao-alert-history-limit-30\"]", "name": "aria-pressed",
-        "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tao-alert-history-limit-30\"]", "name": "aria-pressed", "equals": "true"}}'
     - step: 19
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tao-alert-history-limit-300\"]", "name": "aria-pressed",
-        "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tao-alert-history-limit-300\"]", "name": "aria-pressed", "equals": "true"}}'
     results:
     - 19
   visual:

@@ -13,14 +13,23 @@ import { useWorkspaceSurfaceComposition } from "./workspace/hooks/useWorkspaceSu
 import { useWorkspaceSurfaceState } from "./workspace/hooks/useWorkspaceSurfaceState";
 import { createWorkspaceShellProps } from "./workspace/views/createWorkspaceShellProps";
 import { WorkspaceShellView } from "./workspace/views/WorkspaceShellView";
+import { WorkspaceHostContext } from "./workspace/workspaceHostIntegration";
+import { useWorkspaceHostFiles } from "./workspace/hooks/useWorkspaceHostFiles";
 
-export function CodeWorkspaceTab({
+export function CodeWorkspaceTab(props: CodeWorkspaceTabProps) {
+  return <WorkspaceHostContext.Provider value={props.hostIntegration ?? null}>
+    <CodeWorkspaceRuntime {...props} />
+  </WorkspaceHostContext.Provider>;
+}
+
+function CodeWorkspaceRuntime({
   tabId,
   workspace,
   visible = true,
   onOpenGitManager,
   onSyncGitManager,
   onCommandsChange,
+  hostIntegration,
 }: CodeWorkspaceTabProps) {
   const session = useWorkspaceSession({
     workspace,
@@ -104,6 +113,7 @@ export function CodeWorkspaceTab({
     editorFeatures,
     commands,
   });
+  useWorkspaceHostFiles({ host: hostIntegration, session, project, files, editing });
   const executionRuntime = useWorkspaceExecutionRuntime({
     editing,
     session,

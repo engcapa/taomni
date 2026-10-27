@@ -102,6 +102,30 @@ function mockHorizontalOverflow(
 }
 
 describe("TabBar overflow navigation", () => {
+  it("keeps focus in the tab strip during keyboard navigation and clears that intent on pointer input", () => {
+    renderTabBar();
+    const first = screen.getAllByTestId("tab-item")[0];
+    fireEvent.keyDown(first, { key: "Home" });
+    expect(useAppStore.getState().activeTabId).toBe("tab-0");
+    expect(first).toHaveFocus();
+    expect(screen.getByTestId("tab-scroll-area")).toHaveAttribute("data-keyboard-navigation", "true");
+    fireEvent.keyDown(first, { key: "End" });
+    expect(useAppStore.getState().activeTabId).toBe("tab-11");
+    expect(screen.getAllByTestId("tab-item")[11]).toHaveFocus();
+    fireEvent.pointerDown(first);
+    expect(screen.getByTestId("tab-scroll-area")).not.toHaveAttribute("data-keyboard-navigation");
+  });
+
+  it("selects individual broadcast targets inside the tab without activating or dragging it", () => {
+    useAppStore.setState({ multiExecActive: true });
+    renderTabBar();
+    const checkbox = screen.getAllByTestId("tab-multiexec-checkbox")[1];
+    fireEvent.pointerDown(checkbox, { button: 0 });
+    fireEvent.click(checkbox);
+    expect(useAppStore.getState().multiExecSelectedTabIds.has("tab-1")).toBe(true);
+    expect(useAppStore.getState().activeTabId).toBe("tab-0");
+    expect(checkbox).toBeChecked();
+  });
   beforeEach(() => {
     useSessionStore.setState({ sessions: [] });
     useAppStore.setState({

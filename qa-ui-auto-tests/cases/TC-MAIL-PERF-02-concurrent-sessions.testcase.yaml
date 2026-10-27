@@ -1,10 +1,8 @@
 id: TC-MAIL-PERF-02
 title: Native 33,913-mail concurrency with 313 large bodies and other-session responsiveness
-description: Two independent mail accounts run real IMAP header/body/full-original
-  workers against 33,913 messages, including 313 larger bodies, while a local PTY
-  remains open. Five cold/warm mixed samples each for reading, sending and idle/loaded
-  terminal echo; protocol receipts prove multi-connection overlap. Absolute p95 guardrails
-  include automation overhead. No baseline revision speedup is claimed.
+description: Two independent mail accounts run real IMAP header/body/full-original workers against 33,913 messages, including 313 larger bodies, while a local PTY remains open.
+  Five cold/warm mixed samples each for reading, sending and idle/loaded terminal echo; protocol receipts prove multi-connection overlap. Absolute p95 guardrails include automation
+  overhead. No baseline revision speedup is claimed.
 covers:
 - F-MAIL-23
 - F-MAIL-3
@@ -28,8 +26,9 @@ steps:
 - seed_storage:
     key: taomni.quickConnectVisible
     value: 'true'
-- reload_window: null
+- reload_window:
 - wait_for: '[data-testid="qc-input"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="new-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
 - mail_performance_probe:
@@ -89,44 +88,37 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Mail details and sending remain responsive while two sessions process
-      many messages; native additionally proves continued PTY output and overlapping
-      worker requests.
+    requirement: Mail details and sending remain responsive while two sessions process many messages; native additionally proves continued PTY output and overlapping worker
+      requests.
     actions:
     - 1
     - 3
-    - 5
-    - 8
+    - 6
     - 9
-    - 12
+    - 10
     - 13
-    - 17
+    - 14
+    - 18
     checkpoints:
-    - step: 7
-      expectation: Measured samples meet the fixed latency budget; all raw samples
-        are retained.
-    - step: 11
-      expectation: Measured samples meet the fixed latency budget; all raw samples
-        are retained.
-    - step: 15
-      expectation: Measured samples meet the fixed latency budget; all raw samples
-        are retained.
+    - step: 8
+      expectation: '{"mail_performance_probe": {"kind": "terminal", "label": "idle-terminal", "samples": 5, "max_p95_ms": 1500, "require_background": false}}'
+    - step: 12
+      expectation: '{"mail_performance_probe": {"kind": "read", "label": "first-mail", "samples": 5, "max_p95_ms": 2500, "require_background": true}}'
     - step: 16
-      expectation: Measured samples meet the fixed latency budget; all raw samples
-        are retained.
-    - step: 19
-      expectation: Measured samples meet the fixed latency budget; all raw samples
-        are retained.
+      expectation: '{"mail_performance_probe": {"kind": "read", "label": "second-mail", "samples": 5, "max_p95_ms": 2500, "require_background": true}}'
+    - step: 17
+      expectation: '{"mail_performance_probe": {"kind": "send", "label": "loaded-send", "samples": 5, "max_p95_ms": 3000, "require_background": true}}'
     - step: 20
-      expectation: Measured samples meet the fixed latency budget; all raw samples
-        are retained.
+      expectation: '{"mail_performance_probe": {"kind": "terminal", "label": "loaded-terminal", "samples": 5, "max_p95_ms": 1500, "require_background": true}}'
+    - step: 21
+      expectation: '{"mail_performance_probe": {"kind": "concurrency", "label": "protocol-overlap", "samples": 5, "max_p95_ms": 2000, "require_background": false}}'
     results:
-    - 7
-    - 11
-    - 15
+    - 8
+    - 12
     - 16
-    - 19
+    - 17
     - 20
+    - 21
   visual:
   - check: Two mail tabs and the active view remain readable.
     method: manual
@@ -134,8 +126,7 @@ verification:
   native:
   - check: Real concurrent IMAP workers, SMTP acceptance and PTY response.
     method: automated
-    reason: Native server receipts and real PTY output are required; browser only
-      verifies renderer behavior.
+    reason: Native server receipts and real PTY output are required; browser only verifies renderer behavior.
 native_platforms:
 - Linux
 - Windows

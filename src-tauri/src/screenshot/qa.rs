@@ -46,6 +46,8 @@ pub mod current_window;
 pub mod displays;
 #[cfg(target_os = "macos")]
 mod macos_save_dialog;
+#[cfg(any(target_os = "macos", target_os = "windows"))]
+mod path_pasteboard;
 pub mod pin_arrangement;
 pub mod pin_tools;
 #[cfg(any(target_os = "windows", test))]

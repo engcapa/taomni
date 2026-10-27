@@ -110,35 +110,35 @@ status: done
 area: main
 components: [MainLayout, MenuBar, Ribbon, QuickConnect, Sidebar, TabBar, StatusBar]
 files:
-  - src/layouts/MainLayout.tsx
+- src/layouts/MainLayout.tsx
 controls:
   # MainLayout owns layout-level chrome only; menu/ribbon/sidebar/quick-connect testids belong to their own features.
   # Ribbon and QuickConnect are hidden by default and can be enabled from View.
-  - id: collapsed-sidebar-rail
-    selector: '[data-testid="collapsed-sidebar-rail"]'
-    kind: interactive
-    optional: true       # only when sidebar collapsed
-  - id: expanded-sidebar-panel
-    selector: '[data-testid="expanded-sidebar-panel"]'
-    kind: display
-    optional: true
-  - id: sidebar-tool-window-rail      # ED-PARITY-027: the active tab's tool window bar inside the collapsed rail
-    selector: '[data-testid="sidebar-tool-window-rail"]'
-    kind: display
-    optional: true
-    aliases:
-      - '[data-testid="sidebar-rail"]'
-  - id: sidebar-resize-handle
-    selector: '[data-testid="main-sidebar-resize-handle"]'
-    kind: display    # drag handle — meaningless to click; existence is the assertion
-  - id: sidebar-rail-menu-show-names
-    selector: '[data-testid="sidebar-rail-menu-show-names"]'
-    kind: interactive
-    optional: true
-  - id: sidebar-rail-resize
-    selector: '[data-testid="sidebar-rail-resize"]'
-    kind: interactive
-    optional: true       # visible while tool window names are shown
+- id: collapsed-sidebar-rail
+  selector: '[data-testid="collapsed-sidebar-rail"]'
+  kind: interactive
+  optional: true         # only when sidebar collapsed
+- id: expanded-sidebar-panel
+  selector: '[data-testid="expanded-sidebar-panel"]'
+  kind: display
+  optional: true
+- id: sidebar-tool-window-rail        # ED-PARITY-027: the active tab's tool window bar inside the collapsed rail
+  selector: '[data-testid="sidebar-tool-window-rail"]'
+  kind: display
+  optional: true
+  aliases:
+  - '[data-testid="sidebar-rail"]'
+- id: sidebar-resize-handle
+  selector: '[data-testid="main-sidebar-resize-handle"]'
+  kind: display      # drag handle — meaningless to click; existence is the assertion
+- id: sidebar-rail-menu-show-names
+  selector: '[data-testid="sidebar-rail-menu-show-names"]'
+  kind: interactive
+  optional: true
+- id: sidebar-rail-resize
+  selector: '[data-testid="sidebar-rail-resize"]'
+  kind: interactive
+  optional: true         # visible while tool window names are shown
 -->
 
 - 顶部菜单栏 `MenuBar`（File/Edit/View/Sessions/Tools/Help）
@@ -160,6 +160,7 @@ components: [AppTitleBar, WindowControls, WindowResizeHandles, TitleBarTrayContr
 files:
   - src/components/tabbar/ControlBar.tsx
   - src/components/window/WindowDragHandle.tsx
+  - src/components/window/WindowResizeHandles.tsx
   - src/lib/windowDrag.ts
   - src/components/window/AppTitleBar.tsx
   - src/components/window/WindowControls.tsx
@@ -169,7 +170,7 @@ controls:
     selector: '[data-testid="app-titlebar"]'
     kind: display
   - id: tray
-    selector: '[data-testid="titlebar-tray"]'
+    selector: '[data-testid="control-bar"] [data-testid="platform-toolbar-actions"]'
     kind: display
   - id: control-bar
     selector: '[data-testid="control-bar"]'
@@ -178,6 +179,9 @@ controls:
     selector: '[data-testid="tab-action-slot"]'
     kind: display
     optional: true
+  - id: main-window-top-drag-region
+    selector: '[data-testid="main-window-top-drag-region"]'
+    kind: display    # shared frame move target; native checks actual displacement
   - id: window-drag-handle
     selector: '[data-testid="window-drag-handle"]'
     kind: display    # title-bar grip before Welcome; Linux native verifies actual OS displacement
@@ -215,7 +219,7 @@ controls:
 
 - 取消原生 decorations，前端自绘 `AppTitleBar` + `WindowControls`（最小化 / 最大化 / 关闭）
 - 标题栏左侧固定 `WindowDragHandle`（48px）作为可识别的窗口移动锚点；Tab 数量不会挤掉该区域
-- 标题栏托盘 `TitleBarTrayControls`：常规宽度分组排列 — Voice (PTT) | View (主题循环) | Terminal (Split + MultiExec) | Language (locale 切换)；窄窗口收进 `More window actions`
+- 标题栏操作区 `PlatformToolbarActions` 按 Home / Sessions / Workspaces / Tools 排列导航、布局、搜索、大预览和更多操作；语音 (PTT) 保留在 `More window actions`，主题与语言入口移至主导航条。
 - `WindowResizeHandles` 在无 decorations 模式下提供 8 向窗口缩放（North/South/East/West/四个角）
 - 主菜单 / Sessions / View / Tunneling / Settings / Help / Exit 入口接入
 
@@ -238,98 +242,140 @@ controls: []
 id: F1.5
 status: done
 area: main/tabs
-components: [TabBar, ControlBar, OpenTabsMenu, TabDetailsOverlay]
+components: [TabBar, ControlBar, OpenTabsMenu, TabDetailsOverlay, TabOverview, PlatformToolbarActions, TabActionMenuItems, TitleBarTrayControls]
 files:
-  - src/components/tabbar/TabBar.tsx
-  - src/components/tabbar/ControlBar.tsx
-  - src/components/tabbar/OpenTabsMenu.tsx
-  - src/components/tabbar/TabDetailsOverlay.tsx
-  - src/lib/customDnD.ts
-  - src/lib/tabDetails.ts
-  - src/lib/terminalActivity.ts
-  - src/lib/terminalCwd.ts
-  - src/stores/appStore.ts
+- src/components/tabbar/TabBar.tsx
+- src/components/tabbar/ControlBar.tsx
+- src/components/tabbar/OpenTabsMenu.tsx
+- src/components/tabbar/TabDetailsOverlay.tsx
+- src/components/tabbar/TabOverview.tsx
+- src/components/tabbar/PlatformToolbarActions.tsx
+- src/stores/tabOverviewStore.ts
+- src/lib/customDnD.ts
+- src/lib/tabDetails.ts
+- src/lib/terminalActivity.ts
+- src/lib/terminalCwd.ts
+- src/stores/appStore.ts
+- src/components/tabbar/TabActionMenuItems.tsx
+- src/components/tabbar/TabActionSlot.tsx
+- src/components/tabbar/useToolbarPopover.ts
+- src/components/window/TitleBarTrayControls.tsx
 controls:
-  - id: tab-bar
-    selector: '[data-testid="tab-bar"]'
-    kind: display
-  - id: tab-item               # individual tab; pair with [data-tab-type=...] / [data-tab-title=...] when targeting
-    selector: '[data-testid="tab-item"]'
-    kind: interactive
-  - id: tab-title              # the title span inside a tab; double-click to rename
-    selector: '[data-testid="tab-title"]'
-    kind: interactive
-  - id: tab-title-input        # inline rename input; only present while editing
-    selector: '[data-testid="tab-title-input"]'
-    kind: interactive
-    optional: true
-  - id: new-local-terminal     # the "+" plus tab button
-    selector: '[data-testid="new-local-terminal"]'
-    kind: interactive
-  - id: new-tab-split          # the "+ ▾" split-button container (Windows Terminal style)
-    selector: '[data-testid="new-tab-split"]'
-    kind: display
-  - id: new-tab-launch-menu    # the "▾" chevron that opens the quick-launch context menu
-    selector: '[data-testid="new-tab-launch-menu"]'
-    kind: interactive
-  - id: launch-menu-new-session  # "New session…" leaf in the quick-launch menu
-    selector: '[data-testid="launch-menu-new-session"]'
-    kind: interactive
-    optional: true       # only after opening the launch menu
-  - id: tabs-more
-    selector: '[data-testid="tab-more"]'
-    kind: interactive
-  - id: tab-details-hover
-    selector: '[data-testid="tab-details-hover"]'
-    kind: interactive
-  - id: tab-details-overlay
-    selector: '[data-testid="tab-details-overlay"]'
-    kind: display
-    optional: true
-  - id: tab-details-card
-    selector: '[data-testid^="tab-details-card-"]'
-    kind: display
-    optional: true
-  - id: tab-details-program
-    selector: '[data-testid^="tab-details-program-"]'
-    kind: display
-    optional: true
-  - id: open-tabs-menu
-    selector: '[data-testid="open-tabs-menu"]'
-    kind: display
-    optional: true
-  - id: open-tabs-detach-active
-    selector: '[data-testid="open-tabs-detach-active"]'
-    kind: interactive
-    optional: true
-  - id: tab-menu-move-first
-    selector: '[data-testid="context-menu-item-move-to-first"]'
-    kind: interactive
-    optional: true       # only visible in a tab context menu
-  - id: tab-menu-move-left
-    selector: '[data-testid="context-menu-item-move-left"]'
-    kind: interactive
-    optional: true
-  - id: tab-menu-move-right
-    selector: '[data-testid="context-menu-item-move-right"]'
-    kind: interactive
-    optional: true
-  - id: tab-menu-move-last
-    selector: '[data-testid="context-menu-item-move-to-last"]'
-    kind: interactive
-    optional: true
-  - id: tab-new-output-dot
-    selector: 'span[aria-label="New output"]'
-    kind: display
-    optional: true
-  - id: context-menu-item-tools
-    selector: '[data-testid="context-menu-item-tools"]'
-    kind: interactive
-    optional: true
-  - id: context-menu-item-tunneling
-    selector: '[data-testid="context-menu-item-tunneling"]'
-    kind: interactive
-    optional: true
+- id: tab-bar
+  selector: '[data-testid="tab-bar"]'
+  kind: display
+- id: tab-item                 # individual tab; pair with [data-tab-type=...] / [data-tab-title=...] when targeting
+  selector: '[data-testid="tab-item"]'
+  kind: interactive
+- id: tab-title                # the title span inside a tab; double-click to rename
+  selector: '[data-testid="tab-title"]'
+  kind: interactive
+- id: tab-title-input          # inline rename input; only present while editing
+  selector: '[data-testid="tab-title-input"]'
+  kind: interactive
+  optional: true
+- id: new-local-terminal       # the "+" plus tab button
+  selector: '[data-testid="new-local-terminal"]'
+  kind: interactive
+- id: new-tab-split            # the "+ ▾" split-button container (Windows Terminal style)
+  selector: '[data-testid="new-tab-split"]'
+  kind: display
+- id: new-tab-launch-menu      # the "▾" chevron that opens the quick-launch context menu
+  selector: '[data-testid="new-tab-launch-menu"]'
+  kind: interactive
+- id: launch-menu-new-session    # "New session…" leaf in the quick-launch menu
+  selector: '[data-testid="launch-menu-new-session"]'
+  kind: interactive
+  optional: true         # only after opening the launch menu
+- id: tabs-more
+  selector: '[data-testid="tab-more"]'
+  kind: interactive
+- id: tab-overview-trigger
+  selector: '[data-testid="tab-overview-trigger"]'
+  kind: interactive
+- id: tab-overview
+  selector: '[data-testid="tab-overview"]'
+  kind: display
+- id: tab-overview-card
+  selector: '[data-testid="tab-overview-card"]'
+  kind: interactive
+- id: tab-overview-summary
+  selector: '[data-testid="tab-overview-summary"]'
+  kind: display
+- id: tab-overview-close
+  selector: '[data-testid="tab-overview-close"]'
+  kind: interactive
+- id: tab-overview-current
+  selector: '[data-testid="tab-overview-current"]'
+  kind: interactive
+- id: tab-overview-all
+  selector: '[data-testid="tab-overview-all"]'
+  kind: interactive
+- id: tab-overview-empty
+  selector: '[data-testid="tab-overview-empty"]'
+  kind: display
+- id: tab-details-overlay
+  selector: '[data-testid="tab-details-overlay"]'
+  kind: display
+  optional: true
+- id: tab-details-card
+  selector: '[data-testid^="tab-details-card-"]'
+  kind: display
+  optional: true
+- id: tab-details-program
+  selector: '[data-testid^="tab-details-program-"]'
+  kind: display
+  optional: true
+- id: open-tabs-menu
+  selector: '[data-testid="open-tabs-menu"]'
+  kind: display
+  optional: true
+- id: tab-menu-move-first
+  selector: '[data-testid="context-menu-item-move-to-first"]'
+  kind: interactive
+  optional: true         # only visible in a tab context menu
+- id: tab-menu-move-left
+  selector: '[data-testid="context-menu-item-move-left"]'
+  kind: interactive
+  optional: true
+- id: tab-menu-move-right
+  selector: '[data-testid="context-menu-item-move-right"]'
+  kind: interactive
+  optional: true
+- id: tab-menu-move-last
+  selector: '[data-testid="context-menu-item-move-to-last"]'
+  kind: interactive
+  optional: true
+- id: tab-new-output-dot
+  selector: 'span[aria-label="New output"]'
+  kind: display
+  optional: true
+- id: context-menu-item-tools
+  selector: '[data-testid="context-menu-item-tools"]'
+  kind: interactive
+  optional: true
+- id: context-menu-item-tunneling
+  selector: '[data-testid="context-menu-item-tunneling"]'
+  kind: interactive
+  optional: true
+- id: tab-details-hover
+  selector: '[data-testid="tab-details-hover"]'
+  kind: display
+  optional: true   # removed UI; only negative regression assertions remain
+- id: ai-chat-drawer-ribbon
+  selector: '[data-testid="ai-chat-drawer-ribbon"]'
+  kind: display
+  optional: true   # removed UI; only negative regression assertions remain
+- id: titlebar-actions-menu
+  selector: '[data-testid="titlebar-actions-menu"]'
+  kind: display
+- id: toolbar-close-all-terminals
+  selector: '[data-testid="toolbar-close-all-terminals"]'
+  kind: interactive
+- id: open-tabs-detach-active
+  selector: '[data-testid="open-tabs-detach-active"]'
+  kind: interactive
+  optional: true
 -->
 
 - 多标签：本地终端 / SSH 终端 / SFTP / VNC / 设置 / 隧道管理 / Welcome / 占位标签
@@ -374,7 +420,7 @@ controls:
     optional: true       # only rendered when selected shell canElevate
   - id: new-session-card
     selector: 'text="New session…"'
-    kind: interactive
+    kind: display # card heading; the action is welcome-new-session below
   - id: new-session-card-testid
     selector: '[data-testid="welcome-new-session"]'
     kind: interactive
@@ -765,7 +811,7 @@ controls:
 - ResizeObserver + debounce 自动 fit
 - 终端第一列保留 8px 左侧留白；留白位于 xterm 内部，支持从留白处正向/反向拖选与矩形选区，FitAddon 按留白后的宽度计算列数。TC-154（browser）和 TC-155（native）验证首字符、复制内容、搜索/选区高亮及缩放/全屏后的布局，TC-110 覆盖分屏布局。
 - 容器卸载时正确 dispose 终端实例与监听器
-- 浮动工具栏包含当前 tab 绑定 Chat 入口（`tab-chat-toggle` / Ctrl+Shift+L）；全局 Chat 入口已移除
+- Sessions 复用主导航条底部 `rail-chat-button` 与 Ctrl+Shift+L，打开当前 tab 绑定 Chat；标签工具栏和临时终端 rail 不重复显示 Chat。
 - 命令历史持久化：每条 host 维度记录到 SQLite (`command_history` 表)，支持 `history_append / history_match_prefix / history_list_recent / history_clear`
 - Inline ghost-text 自动补全：基于 host 命令历史的前缀匹配，按右箭头 / End / Tab 接受建议（PowerShell 本地终端关闭以避免与 PSReadLine 冲突）
 - Common commands 调色板（`CommonCommandsPalette`）：合并历史 + 用户自定义 + 平台预置命令（Windows / Unix），在本地终端中可调出
@@ -1297,6 +1343,10 @@ controls:
   - id: context-theme-options
     selector: '[data-testid^="terminal-context-theme-option-"]'
     kind: interactive
+    optional: true
+  - id: context-theme-list
+    selector: '[data-testid="terminal-context-theme-list"]'
+    kind: display
     optional: true
   - id: preview
     selector: '[data-testid="terminal-preview"]'
@@ -3720,7 +3770,7 @@ controls:
 
 - `AiMasterSwitch`：一键关闭所有 AI 入口（Drawer 按钮、PTT、命令重写等），内存占用与网络调用全部归零
 - `PrivacyToggle`：保持 AI 启用，但强制把请求路由到 loopback / 本地 provider
-- 状态由 `aiStore.config.fully_disabled` 持久化；勾选后标题栏 `ptt-button` 与 Chat Tao ribbon / drawer 入口立即从 DOM 中移除
+- 状态由 `aiStore.config.fully_disabled` 持久化；勾选后Chat 听写与共享 Chat 入口立即从 DOM 中移除
 
 ### 14.2 终端补全与命令重写 ✅
 
@@ -3763,178 +3813,180 @@ controls:
 id: F-AI-2.3
 status: done
 area: ai/voice
-components: [PttButton, DictationButton, VoiceSettingsDialog, AsrPanel, TitleBarTrayControls]
+components:
+- DictationButton
+- VoiceSettingsDialog
+- AsrPanel
 files:
-  - src/components/window/PttButton.tsx
-  - src/components/voice/
-  - src/components/settings/AsrPanel.tsx
-  - src-tauri/src/voice/
-  - src-tauri/src/asr/
+- src/components/voice/
+- src/components/settings/AsrPanel.tsx
+- src-tauri/src/voice/
+- src-tauri/src/asr/
 controls:
-  - id: ptt-button
-    selector: '[data-testid="ptt-button"]'
-    kind: interactive
-    optional: true
-  - id: chat-voice-button
-    selector: '[data-testid="chat-voice-button"]'
-    kind: interactive
-  - id: chat-voice-cancel
-    selector: '[data-testid="chat-voice-button-cancel"]'
-    kind: interactive
-  - id: voice-settings-close
-    selector: '[data-testid="voice-settings-close"]'
-    kind: interactive
-  - id: voice-settings-dialog
-    selector: '[data-testid="voice-settings-dialog"]'
-    kind: display
-  - id: asr-installation-progress
-    selector: '[data-testid="asr-installation-progress"]'
-    kind: display
-  - id: asr-cancel-download
-    selector: '[data-testid="asr-cancel-download"]'
-    kind: interactive
-  - id: asr-download-url-base
-    selector: '[data-testid="asr-download-url-whisper-base"]'
-    kind: interactive
-  - id: asr-copy-url-base
-    selector: '[data-testid="asr-copy-url-whisper-base"]'
-    kind: interactive
-  - id: asr-open-url-base
-    selector: '[data-testid="asr-open-url-whisper-base"]'
-    kind: interactive
-  - id: asr-download-proxy-mode
-    selector: '[data-testid="asr-download-proxy-mode"]'
-    kind: interactive
-  - id: asr-download-proxy-save
-    selector: '[data-testid="asr-download-proxy-save"]'
-    kind: interactive
-  - id: asr-check-models
-    selector: '[data-testid="asr-check-models"]'
-    kind: interactive
-  - id: asr-language
-    selector: '[data-testid="asr-language"]'
-    kind: interactive
-  - id: asr-realtime-provider
-    selector: '[data-testid="asr-realtime-provider"]'
-    kind: interactive
-  - id: asr-sherpa-installation-progress
-    selector: '[data-testid="asr-sherpa-installation-progress"]'
-    kind: display
-  - id: asr-cancel-sherpa-download
-    selector: '[data-testid="asr-cancel-sherpa-download"]'
-    kind: interactive
-  - id: asr-download-sherpa
-    selector: '[data-testid="asr-download-sherpa-zipformer-zh-en"]'
-    kind: interactive
-  - id: asr-select-sherpa
-    selector: '[data-testid="asr-select-sherpa-zipformer-zh-en"]'
-    kind: interactive
-  - id: asr-copy-url-sherpa
-    selector: '[data-testid="asr-copy-url-sherpa-zipformer-zh-en"]'
-    kind: interactive
-  - id: asr-open-url-sherpa
-    selector: '[data-testid="asr-open-url-sherpa-zipformer-zh-en"]'
-    kind: interactive
-  - id: asr-download-url-sherpa
-    selector: '[data-testid="asr-download-url-sherpa-zipformer-zh-en"]'
-    kind: interactive
-  - id: asr-download-base
-    selector: '[data-testid="asr-download-whisper-base"]'
-    kind: interactive
-  - id: asr-download-small
-    selector: '[data-testid="asr-download-whisper-small"]'
-    kind: interactive
-  - id: asr-select-base
-    selector: '[data-testid="asr-select-whisper-base"]'
-    kind: interactive
-  - id: asr-select-small
-    selector: '[data-testid="asr-select-whisper-small"]'
-    kind: interactive
-  - id: asr-settings
-    selector: '[data-testid="asr-settings"]'
-    kind: display
-  - id: asr-download-proxy
-    selector: '[data-testid="asr-download-proxy"]'
-    kind: display
-  - id: asr-proxy-port
-    selector: '[data-testid="asr-download-proxy"] input[placeholder="Port"]'
-    kind: interactive
-  - id: asr-proxy-host
-    selector: '[data-testid="asr-download-proxy"] input[placeholder="Proxy host"]'
-    kind: interactive
-  - id: asr-provider-model
-    selector: '[data-testid="asr-realtime-settings"] label:has-text("Model") input'
-    kind: interactive
-  - id: asr-provider-key
-    selector: '[data-testid="asr-realtime-settings"] input[type="password"]'
-    kind: interactive
-  - id: asr-provider-proxy
-    selector: '[data-testid="asr-realtime-settings"] label:has-text("Proxy") select'
-    kind: interactive
-  - id: asr-provider-proxy-url
-    selector: '[data-testid="asr-realtime-settings"] label:has-text("Proxy URL") input'
-    kind: interactive
-  - id: asr-provider-save
-    selector: '[data-testid="asr-realtime-settings"] button:has-text("Save provider")'
-    kind: interactive
-  - id: voice-composer-draft
-    selector: '[data-testid="chat-composer-textarea"]'
-    kind: display
-  - id: voice-composer-original
-    selector: '[data-testid="composer-voice-original"]'
-    kind: display
-  - id: voice-composer-original-open
-    selector: '[data-testid="composer-voice-original"] summary'
-    kind: interactive
-  - id: voice-composer-original-undo
-    selector: '[data-testid="composer-voice-original"] button'
-    kind: interactive
-  - id: asr-download-recommended
-    selector: '[data-testid="asr-download-recommended"]'
-    kind: interactive
-  - id: asr-replace-whisper-small
-    selector: '[data-testid="asr-replace-whisper-small"]'
-    kind: interactive
-  - id: asr-hotwords
-    selector: '[data-testid="asr-hotwords"]'
-    kind: interactive
-  - id: asr-hotwords-save
-    selector: '[data-testid="asr-hotwords-save"]'
-    kind: interactive
-  - id: asr-experimental
-    selector: '[data-testid="asr-experimental"]'
-    kind: interactive
-  - id: asr-cleanup
-    selector: '[data-testid="asr-cleanup"]'
-    kind: interactive
-  - id: asr-provider-endpoint
-    selector: '[data-testid="asr-provider-endpoint"]'
-    kind: interactive
-  - id: asr-model-sensevoice-small
-    selector: '[data-testid="asr-model-sensevoice-small"]'
-    kind: display
-  - id: asr-model-sherpa-zipformer-zh-en
-    selector: '[data-testid="asr-model-sherpa-zipformer-zh-en"]'
-    kind: display
-  - id: asr-model-whisper-base
-    selector: '[data-testid="asr-model-whisper-base"]'
-    kind: display
-  - id: asr-model-whisper-small
-    selector: '[data-testid="asr-model-whisper-small"]'
-    kind: display
-  - id: asr-model-whisper-small-q8
-    selector: '[data-testid="asr-model-whisper-small-q8"]'
-    kind: display
-  - id: ptt-button-interim
-    selector: '[data-testid="ptt-button-interim"]'
-    kind: display
-  - id: asr-gemini-option
-    selector: '[data-testid="asr-realtime-provider"] option[value="gemini"]'
-    kind: display
+- id: chat-voice-button
+  selector: '[data-testid="chat-voice-button"]'
+  kind: interactive
+- id: chat-voice-cancel
+  selector: '[data-testid="chat-voice-button-cancel"]'
+  kind: interactive
+- id: voice-settings-close
+  selector: '[data-testid="voice-settings-close"]'
+  kind: interactive
+- id: voice-settings-dialog
+  selector: '[data-testid="voice-settings-dialog"]'
+  kind: display
+- id: asr-installation-progress
+  selector: '[data-testid="asr-installation-progress"]'
+  kind: display
+- id: asr-cancel-download
+  selector: '[data-testid="asr-cancel-download"]'
+  kind: interactive
+- id: asr-download-url-base
+  selector: '[data-testid="asr-download-url-whisper-base"]'
+  kind: interactive
+- id: asr-copy-url-base
+  selector: '[data-testid="asr-copy-url-whisper-base"]'
+  kind: interactive
+- id: asr-open-url-base
+  selector: '[data-testid="asr-open-url-whisper-base"]'
+  kind: interactive
+- id: asr-download-proxy-mode
+  selector: '[data-testid="asr-download-proxy-mode"]'
+  kind: interactive
+- id: asr-download-proxy-save
+  selector: '[data-testid="asr-download-proxy-save"]'
+  kind: interactive
+- id: asr-check-models
+  selector: '[data-testid="asr-check-models"]'
+  kind: interactive
+- id: asr-language
+  selector: '[data-testid="asr-language"]'
+  kind: interactive
+- id: asr-realtime-provider
+  selector: '[data-testid="asr-realtime-provider"]'
+  kind: interactive
+- id: asr-sherpa-installation-progress
+  selector: '[data-testid="asr-sherpa-installation-progress"]'
+  kind: display
+- id: asr-cancel-sherpa-download
+  selector: '[data-testid="asr-cancel-sherpa-download"]'
+  kind: interactive
+- id: asr-download-sherpa
+  selector: '[data-testid="asr-download-sherpa-zipformer-zh-en"]'
+  kind: interactive
+- id: asr-select-sherpa
+  selector: '[data-testid="asr-select-sherpa-zipformer-zh-en"]'
+  kind: interactive
+- id: asr-copy-url-sherpa
+  selector: '[data-testid="asr-copy-url-sherpa-zipformer-zh-en"]'
+  kind: interactive
+- id: asr-open-url-sherpa
+  selector: '[data-testid="asr-open-url-sherpa-zipformer-zh-en"]'
+  kind: interactive
+- id: asr-download-url-sherpa
+  selector: '[data-testid="asr-download-url-sherpa-zipformer-zh-en"]'
+  kind: interactive
+- id: asr-download-base
+  selector: '[data-testid="asr-download-whisper-base"]'
+  kind: interactive
+- id: asr-download-small
+  selector: '[data-testid="asr-download-whisper-small"]'
+  kind: interactive
+- id: asr-select-base
+  selector: '[data-testid="asr-select-whisper-base"]'
+  kind: interactive
+- id: asr-select-small
+  selector: '[data-testid="asr-select-whisper-small"]'
+  kind: interactive
+- id: asr-settings
+  selector: '[data-testid="asr-settings"]'
+  kind: display
+- id: asr-download-proxy
+  selector: '[data-testid="asr-download-proxy"]'
+  kind: display
+- id: asr-proxy-port
+  selector: '[data-testid="asr-download-proxy"] input[placeholder="Port"]'
+  kind: interactive
+- id: asr-proxy-host
+  selector: '[data-testid="asr-download-proxy"] input[placeholder="Proxy host"]'
+  kind: interactive
+- id: asr-provider-model
+  selector: '[data-testid="asr-realtime-settings"] label:has-text("Model") input'
+  kind: interactive
+- id: asr-provider-key
+  selector: '[data-testid="asr-realtime-settings"] input[type="password"]'
+  kind: interactive
+- id: asr-provider-proxy
+  selector: '[data-testid="asr-realtime-settings"] label:has-text("Proxy") select'
+  kind: interactive
+- id: asr-provider-proxy-url
+  selector: '[data-testid="asr-realtime-settings"] label:has-text("Proxy URL") input'
+  kind: interactive
+- id: asr-provider-save
+  selector: '[data-testid="asr-realtime-settings"] button:has-text("Save provider")'
+  kind: interactive
+- id: voice-composer-draft
+  selector: '[data-testid="chat-composer-textarea"]'
+  kind: display
+- id: voice-composer-original
+  selector: '[data-testid="chat-voice-button-original"]'
+  kind: display
+- id: voice-composer-original-open
+  selector: '[data-testid="chat-voice-button-original"] summary'
+  kind: interactive
+- id: voice-composer-original-undo
+  selector: '[data-testid="chat-voice-button-original"] button'
+  kind: interactive
+- id: asr-download-recommended
+  selector: '[data-testid="asr-download-recommended"]'
+  kind: interactive
+- id: asr-replace-whisper-small
+  selector: '[data-testid="asr-replace-whisper-small"]'
+  kind: interactive
+- id: asr-hotwords
+  selector: '[data-testid="asr-hotwords"]'
+  kind: interactive
+- id: asr-hotwords-save
+  selector: '[data-testid="asr-hotwords-save"]'
+  kind: interactive
+- id: asr-experimental
+  selector: '[data-testid="asr-experimental"]'
+  kind: interactive
+- id: asr-cleanup
+  selector: '[data-testid="asr-cleanup"]'
+  kind: interactive
+- id: asr-provider-endpoint
+  selector: '[data-testid="asr-provider-endpoint"]'
+  kind: interactive
+- id: asr-model-sensevoice-small
+  selector: '[data-testid="asr-model-sensevoice-small"]'
+  kind: display
+- id: asr-model-sherpa-zipformer-zh-en
+  selector: '[data-testid="asr-model-sherpa-zipformer-zh-en"]'
+  kind: display
+- id: asr-model-whisper-base
+  selector: '[data-testid="asr-model-whisper-base"]'
+  kind: display
+- id: asr-model-whisper-small
+  selector: '[data-testid="asr-model-whisper-small"]'
+  kind: display
+- id: asr-model-whisper-small-q8
+  selector: '[data-testid="asr-model-whisper-small-q8"]'
+  kind: display
+- id: chat-voice-button-interim
+  selector: '[data-testid="chat-voice-button-interim"]'
+  kind: display
+- id: asr-gemini-option
+  selector: '[data-testid="asr-realtime-provider"] option[value="gemini"]'
+  kind: display
+- id: retired-titlebar-voice
+  selector: '[data-testid="ptt-button"]'
+  kind: display
+  optional: true
 -->
 
 - 单击开始，再次单击停止识别；Esc、取消、切换上下文或窗口失焦会取消。最长 120 秒。
-- 模型设置提供完整下载地址、复制与浏览器打开；后端进度支持关闭重开恢复，取消保留断点，再次下载按 Range 续传。宽窄窗口自适应，标题栏入口卸载不关闭设置。
+- 模型设置提供完整下载地址、复制与浏览器打开；后端进度支持关闭重开恢复，取消保留断点，再次下载按 Range 续传。宽窄窗口自适应，Chat 入口卸载不关闭设置；标题栏不再提供语音入口。
 - 默认本地 SenseVoice + Small q8 组合，按语种路由；Turbo q5 可选。旧 f16 显式一键替换，校验成功后删除旧权重。模型按需下载或离线导入，版本目录按哈希隔离。
 - 在线阿里／火山／Deepgram／Soniox，共享代理和 vault；Gemini 默认隐藏为实验项。清理默认关，可选轻／全并保留原文和撤销。
 - 标题栏和 Chat、LAN 聊天、终端 AI 改写说明共用听写组件，只填入可编辑文本，不自动发送或执行。
@@ -4031,10 +4083,6 @@ controls:
     selector: '[data-testid="ai-chat-drawer-hide"]'
     kind: interactive
     optional: true
-  - id: ai-chat-drawer-ribbon
-    selector: '[data-testid="ai-chat-drawer-ribbon"]'
-    kind: interactive
-    optional: true       # shown when a chat-capable active tab has drawer hidden
   - id: ai-chat-drawer-position
     selector: '[data-testid="ai-chat-drawer-position"]'
     kind: interactive
@@ -4094,7 +4142,7 @@ controls:
 -->
 
 - 全局唯一抽屉（每窗口一个），由 `chatStore.drawerOpen` + `drawerScope/tabId` + `drawerPosition` 控制状态机；线程始终绑定到 tab
-- **打开方式**：Welcome 的 `Chat Tao` 卡片、当前 tab 的 `tab-chat-toggle` / `Ctrl+Shift+L`、或隐藏态 `ai-chat-drawer-ribbon` 打开 tab-bound drawer
+- **打开方式**：Welcome 的 `Chat Tao` 卡片、当前 tab 的 `tab-chat-toggle` / `Ctrl+Shift+L`、或主导航条 `rail-chat-button` 打开 tab-bound drawer
 - **抽屉头部**：位置切换 / 固定切换 / 顶部或底部悬浮透明度 / 复制全部对话 / 新对话 / 历史对话 / 隐藏到 ribbon
 - **Thread badge 区**：显示 thread 绑定的 tab (`Link2` 图标 + tab 标题)；Provider 选择器在配置了多 provider 时显示；output format 选择器在 thread 仍空时可改、有消息后锁定
 - **Composer**：`Ctrl+Enter` 发送、附件按钮（paperclip）/ 拖拽文件到输入区 / 粘贴剪贴板图片添加本地附件，最多 10 个文件且总计最多 100 MiB；`@terminal:last-N` / `@file:./X` / `@session:Q` 解析为 `attachment-chip`，其中 `@file` 在发送前转为结构化文件附件
@@ -5693,7 +5741,7 @@ controls:
 id: F-TAO-1
 status: done
 area: notes
-components: [TaoRibbon, NotesPanel, NotesList, NoteEditor, NoteFilters, NoteThemeSettings, FloatingNotesPanel, TaoAlertInbox, TaoAlertPoller]
+components: [NotesPanel, NotesList, NoteEditor, NoteFilters, NoteThemeSettings, FloatingNotesPanel, TaoAlertInbox, TaoAlertPoller]
 files:
   - src-tauri/src/notes/db.rs
   - src-tauri/src/notes/commands.rs
@@ -5711,7 +5759,6 @@ files:
   - src/components/notes/NoteFilters.tsx
   - src/components/notes/NoteThemeSettings.tsx
   - src/components/notes/FloatingNotesPanel.tsx
-  - src/components/tao/TaoRibbon.tsx
   - src/components/tao/TaoAlertInbox.tsx
   - src/components/tao/TaoAlertPoller.tsx
 controls:
@@ -5831,13 +5878,9 @@ controls:
     selector: '[data-testid="floating-notes-dock"]'
     kind: interactive
     optional: true
-  - id: tao-ribbon-badge
-    selector: '[data-testid="tao-ribbon-badge"]'
-    kind: display
-    optional: true
 -->
 
-- 统一 `TaoRibbon` 四边任意位置悬浮入口，拖动落点决定 edge + offsetRatio（`localStorage: taomni.chatDrawer.layout.v1`），带节制的临期/过期/AI 完成 badge 与跳动提示
+- 主导航条 `rail-chat-button` 统一打开 Tao Hub；按照工作区原型移除贴边悬浮条，Chat / 便签 / 通知与抽屉布局功能保留。
 - `Tao Hub`：单一抽屉三个主 tab（`Chat` / `便签` / `通知`），记住上次非通知 tab（`localStorage: taomni.taoHub.lastTab.v1`）
 - `便签`：独立 `notes.db` + 统一便签模型（完成 / 置顶 / 归档 / 颜色 / 优先级 / due / reminder / 步骤 / 标签）；默认「最近未完成」视图；搜索、过滤视图；主题 taomni/system/light/dark/paper/compact
 - 单例 `FloatingNotesPanel`：hub ↔ floating 模式切换，可拖拽 / 调整大小，Taomni 内部置顶（层级低于 vault / 认证弹窗）
@@ -6383,6 +6426,9 @@ area: mail/folders
 components: [MailClientTab, SessionEditor]
 files:
   - src/components/mail/MailClientTab.tsx
+  - src/components/mail/client/subscriptionSnapshots.ts
+  - src/components/mail/client/useMailSubscriptions.ts
+  - src/components/mail/client/useMailCacheState.ts
   - src/lib/mailFolders.ts
   - src/components/session/SessionEditor.tsx
   - src-tauri/src/mail/folders.rs
@@ -6393,6 +6439,9 @@ controls:
   - id: subscriptions-dialog
     selector: '[data-testid="mail-subscriptions-dialog"]'
     kind: display
+  - id: subscriptions-close
+    selector: '[role="dialog"][aria-label="Folder subscriptions"] [aria-label="Close dialog"]'
+    kind: interactive
   - id: subscription-row
     selector: '[data-testid="mail-subscription-row"]'
     kind: display
@@ -7297,7 +7346,7 @@ controls:
 - IMAP 全部/仅选中/排除文件夹均保留其它文件夹的摘要。后台暂停保留可续传片段，普通删除/远端消失保留归档，主动清理才物理删除最后引用。
 - 本地归档独立于实时邮件列表，可以读取/导出服务器已消失的邮件。POP3 原始本地库保持兼容并保留压缩归档。
 - 文件夹候选只来自当前账号的本地同步缓存，离线仍可用；首次连接前为空并显示提示。复选框显示解码名称，保存完整的服务器原始键；切换账号丢弃旧候选和迟到回复。
-- `TC-MAIL-STORAGE-01` 为 browser；`TC-MAIL-STORAGE-02` 为 Linux/Windows/macOS native，分别验证 UI 和独立磁盘/备份字节。`TC-MAIL-PERF-01/02` 覆盖大量邮件、多个会话和终端并发；`TC-MAIL-PERF-03` 用两个真实 QA 进程共享邮箱目录，检查下载互斥、暂停、迁移和清理。用户已授权 Linux 本机执行，Windows/macOS 本轮只编写；具体运行证据及未验证边界见 `docs-feature/mail-complete-storage-design.md`。
+- `TC-MAIL-STORAGE-01` 为 browser；`TC-MAIL-STORAGE-02` 为 Linux/Windows/macOS native，分别验证 UI 和独立磁盘/备份字节。`TC-MAIL-PERF-01/02` 覆盖大量邮件、多个会话和终端并发；`TC-MAIL-PERF-03` 用两个真实 QA 进程共享邮箱目录，检查下载互斥、暂停、迁移和清理。 Pause/Resume 在轮询切换时使用独立控件身份，避免按下与释放之间改变动作；对应组件回归检查与原生下载场景共同保护。用户已授权 Linux 本机执行，Windows/macOS 本轮只编写；具体运行证据及未验证边界见 `docs-feature/mail-complete-storage-design.md`。
 
 
 ## 14. SocksCap 网络流量路由
@@ -7543,7 +7592,8 @@ controls:
   - id: git-panel-toggle
     selector: '[data-testid="code-workspace-git-panel-toggle"]'
     kind: interactive
-    optional: true       # only enabled for a workspace with a detected Git root
+    optional: true
+    aliases: ['[data-testid="code-workspace-tool-rail-git"]']       # only enabled for a workspace with a detected Git root
   - id: tree-container
     selector: '[data-testid="code-workspace-tree"]'
     kind: display
@@ -8937,8 +8987,14 @@ controls:
     selector: '[data-testid="code-workspace-tree-new-directory"]'
     kind: interactive
     optional: true       # enabled when a workspace root/directory is selected
+  - id: tree-remove-root
+    selector: '[data-testid="code-workspace-tree-remove-root"]'
+    kind: interactive
+    optional: true       # root context menu
   - id: search-everywhere
     selector: '[data-testid="code-workspace-search-everywhere"]'
+    aliases:
+      - 'xpath=//*[@data-testid="code-workspace-search-everywhere"]//button[@data-selected="true" and .//span[normalize-space(.)="Search Structurally…"]]'
     kind: display
     optional: true       # Ctrl+Shift+N palette popup
   - id: find-panel
@@ -9260,6 +9316,7 @@ controls:
       - '[data-testid="code-workspace-tool-rail-structure"]'
       - '[data-testid="code-workspace-tool-rail-commit"]'
       - '[data-testid="code-workspace-tool-rail-documentation"]'
+      - '[data-testid="code-workspace-tool-rail-sessions"]'
   - id: tool-rail-resize              # ED-PARITY-024 stripe width handle (names shown)
     selector: '[data-testid="code-workspace-tool-rail-left-resize"]'
     kind: interactive
@@ -9282,6 +9339,10 @@ controls:
     aliases:
       - '[data-testid="code-workspace-tool-window-structure"]'
       - '[data-testid="code-workspace-left-tool-area"] [data-testid="code-workspace-tool-window-structure"]'
+      - '[data-testid="code-workspace-tool-window-terminal"]'
+      - '[data-testid="code-workspace-tool-window-search"]'
+      - '[data-testid="code-workspace-tool-window-todos"]'
+      - '[data-testid="code-workspace-tool-window-coverage"]'
   - id: tool-window-options-menu      # ED-PARITY-024 ⋮ Options: View Mode / Move to / Resize / Remove
     selector: '[data-testid="code-workspace-tool-window-options-problems"]'
     kind: interactive
@@ -9329,6 +9390,11 @@ controls:
     selector: '[data-testid="code-workspace-bottom-tab-overflow-problems"]'
     kind: interactive
     optional: true
+    aliases:
+      - '[data-testid="code-workspace-bottom-tab-overflow-search"]'
+      - '[data-testid="code-workspace-bottom-tab-overflow-todos"]'
+      - '[data-testid="code-workspace-bottom-tab-overflow-coverage"]'
+      - '[data-testid="code-workspace-bottom-tab-overflow-structure"]'
   - id: terminal-dock-panel
     selector: '[data-testid="code-workspace-terminal-dock"]'
     kind: display
@@ -9571,6 +9637,7 @@ controls:
     selector: '[data-testid="code-workspace-editor-banners"]'
     kind: display
     optional: true       # rendered only when a file/workspace condition is active
+    aliases: ['[data-testid^="code-workspace-banner-lsp-error:"]']
   - id: editor-banner-open-settings
     selector: '[data-testid="banner-action-open-settings"]'
     kind: interactive
@@ -10879,6 +10946,9 @@ controls:
   - id: create-now
     selector: '[data-testid="backup-selected-start"]'
     kind: interactive
+  - id: manual-result
+    selector: '[data-testid="backup-manual-result"]'
+    kind: display
   - id: action-success
     selector: '[data-testid="backup-action-success"]'
     kind: display
@@ -12098,3 +12168,1010 @@ controls:
 > - SFTP 底部的 "Cross-host transfer (remote ↔ remote)" 按钮（disabled 占位）
 
 - TC-MAIL-SYNC-03: native sparse UID command limits, FETCH reconnect, gap-free catch-up and full remote deletion/flag reconciliation (F-MAIL-5/F-MAIL-3).
+
+---
+
+## 12. Workspace-First 平台重构（v6.1）
+
+> 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents / Crew 开发中入口与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-049`。`TC-WS-049` 覆盖 Home、Tools、Sessions、空/多标签 Workspaces 的共享标题栏拖动事件、窄窗口真实命中、双击最大化，以及按钮、标签、弹出输入框和右键的排除；`TC-MAIN-RAIL-03` 验证同一顶部边框及 Home/Tools 标题的真实系统位移。`TC-WS-029/030` 还覆盖工作区标签过多时的左右滚动控制，以及顶部空白区保留原生窗口拖动目标。`TC-WS-044` 在 browser/native 中覆盖从 Home 选择已保存工作区后，树形/详细列表的已展开子目录自动重新加载，保留文档与目录展开状态。`TC-WS-045` 覆盖 Tools / Home 显式进入空编辑器时展示文件区，以及收缩、Project 和 Sessions 工具切换后的恢复。`TC-WS-047` 覆盖普通层级文件树显示依赖/构建目录，避免将父目录误判为 Empty。`TC-WS-018/019` 保留连续快捷键开关回归，`TC-WS-046` 追加 Linux 原生 GTK/fcitx 真实输入及大预览重复打开边界。
+
+### 12.1 Workspace-first 主壳层：单行工具栏、主导航条 5 大模式与右栏收纳
+
+<!-- feature
+id: F-WS-1
+status: done
+area: main/workspace-platform
+components:
+- ControlBar
+- Sidebar
+- PrimaryNavigationRail
+- WorkspaceSidebar
+- WorkspaceMainPanel
+- MfaFloatingWindow
+- AgentsPlatformView
+- GlobalCommandModal
+files:
+- src/components/tabbar/ControlBar.tsx
+- src/components/sidebar/PrimaryNavigationRail.tsx
+- src/components/sidebar/Sidebar.tsx
+- src/components/workspace/WorkspaceSidebar.tsx
+- src/components/workspace/WorkspaceMainPanel.tsx
+- src/components/workspace/WorkspaceGitPanel.tsx
+- src/components/workspace/WorkspaceSessionPickerModal.tsx
+- src/components/workspace/WorkspaceSessionPane.tsx
+- src/components/mfa/MfaFloatingWindow.tsx
+- src/components/agents/AgentsPlatformView.tsx
+- src/components/search/GlobalCommandModal.tsx
+- src/stores/workspacePlatformStore.ts
+- src/stores/agentsStore.ts
+- src/stores/workspaceEditorStore.ts
+- src/stores/workspaceUiStore.ts
+- src/layouts/main/MainLayoutView.tsx
+- src/styles/platform.css
+- src/styles/platform-home.css
+- src/components/workspace/RightContextPanel.tsx
+- src/components/workspace/useContextPanelWidth.ts
+- src/components/welcome/PlatformLaunchCards.tsx
+controls:
+- id: global-search-trigger
+  selector: '[data-testid="global-search-trigger"]'
+  kind: interactive
+- id: home-sidebar-panel
+  selector: '[data-testid="home-sidebar-panel"]'
+  kind: display
+- id: nav-mode-home
+  selector: '[data-testid="nav-mode-home"]'
+  kind: interactive
+- id: nav-mode-workspaces
+  selector: '[data-testid="nav-mode-workspaces"]'
+  kind: interactive
+- id: right-sidebar
+  selector: '[data-testid="right-sidebar"]'
+  kind: display
+- id: sidebar-rail
+  selector: '[data-testid="sidebar-rail"]'
+  kind: interactive
+- id: toggle-left-sidebar
+  selector: '[data-testid="toggle-left-sidebar"]'
+  kind: interactive
+- id: toggle-right-sidebar
+  selector: '[data-testid="toggle-right-sidebar"]'
+  kind: interactive
+- id: main-canvas-frame
+  selector: '[data-testid="main-canvas-frame"]'
+  kind: display
+- id: platform-mode-title
+  selector: '[data-testid="platform-mode-title"]'
+  kind: display
+- id: global-session-surface
+  selector: '[data-testid="global-session-surface"]'
+  kind: display
+- id: right-sidebar-resize-handle
+  selector: '[data-testid="right-sidebar-resize-handle"]'
+  kind: interactive
+- id: right-sidebar-close
+  selector: '[data-testid="right-sidebar-close"]'
+  kind: interactive
+- id: right-sidebar-ai-tab
+  selector: '[data-testid="right-sidebar-ai-tab"]'
+  kind: interactive
+- id: right-sidebar-structure-tab
+  selector: '[data-testid="right-sidebar-structure-tab"]'
+  kind: interactive
+- id: right-sidebar-content
+  selector: '[data-testid="right-sidebar-content"]'
+  kind: display
+- id: right-sidebar-open-chat
+  selector: '[data-testid="right-sidebar-open-chat"]'
+  kind: interactive
+- id: rail-app-menu-host
+  selector: '[data-testid="rail-app-menu-host"]'
+  kind: display
+- id: home-import-sessions
+  selector: '[data-testid="home-import-sessions"]'
+  kind: interactive
+- id: home-import-json
+  selector: '[data-testid="home-import-json"]'
+  kind: interactive
+- id: home-import-mobaxterm
+  selector: '[data-testid="home-import-mobaxterm"]'
+  kind: interactive
+- id: home-import-csv
+  selector: '[data-testid="home-import-csv"]'
+  kind: interactive
+- id: home-import-openssh
+  selector: '[data-testid="home-import-openssh"]'
+  kind: interactive
+- id: home-download-csv-template
+  selector: '[data-testid="home-download-csv-template"]'
+  kind: interactive
+- id: home-open-workspace
+  selector: '[data-testid="home-open-workspace"]'
+  kind: interactive
+- id: home-open-git
+  selector: '[data-testid="home-open-git"]'
+  kind: interactive
+- id: home-open-agents
+  selector: '[data-testid="home-open-agents"]'
+  kind: interactive
+- id: home-open-mail
+  selector: '[data-testid="home-open-mail"]'
+  kind: interactive
+- id: home-open-network-tools
+  selector: '[data-testid="home-open-network-tools"]'
+  kind: interactive
+- id: home-open-mfa
+  selector: '[data-testid="home-open-mfa"]'
+  kind: interactive
+- id: welcome-open-lanchat
+  selector: '[data-testid="welcome-open-lanchat"]'
+  kind: interactive
+- id: lanchat-roster-panel
+  selector: '[data-testid="lanchat-roster-panel"]'
+  kind: display
+- id: platform-toolbar-actions
+  selector: '[data-testid="platform-toolbar-actions"]'
+  kind: display
+- id: home-toolbar-workspaces
+  selector: '[data-testid="home-toolbar-workspaces"]'
+  kind: interactive
+- id: home-toolbar-sessions
+  selector: '[data-testid="home-toolbar-sessions"]'
+  kind: interactive
+- id: tools-toolbar-workspaces
+  selector: '[data-testid="tools-toolbar-workspaces"]'
+  kind: interactive
+- id: platform-layout-single
+  selector: '[data-testid="platform-layout-single"]'
+  kind: interactive
+- id: platform-layout-grid
+  selector: '[data-testid="platform-layout-grid"]'
+  kind: interactive
+- id: sessions-empty-state
+  selector: '[data-testid="sessions-empty-state"]'
+  kind: display
+- id: sessions-empty-new-session
+  selector: '[data-testid="sessions-empty-new-session"]'
+  kind: interactive
+- id: tools-empty-state
+  selector: '[data-testid="tools-empty-state"]'
+  kind: display
+
+# The removed upper Agents button is retained only as a negative regression selector.
+- id: removed-nav-mode-agents
+  selector: '[data-testid="nav-mode-agents"]'
+  kind: display
+  optional: true
+- id: tab-filter-chip
+  selector: '[data-testid="tab-filter-chip"]'
+  kind: interactive
+  optional: true
+- id: tab-filter-empty
+  selector: '[data-testid="tab-filter-empty"]'
+  kind: display
+  optional: true
+- id: tab-scroll-left
+  selector: '[data-testid="tab-scroll-left"]'
+  kind: interactive
+  optional: true
+- id: tab-scroll-right
+  selector: '[data-testid="tab-scroll-right"]'
+  kind: interactive
+  optional: true
+- id: workspace-code-tab
+  selector: '[data-testid="workspace-code-tab"]'
+  kind: display
+  optional: true
+- id: workspace-create-button
+  selector: '[data-testid="workspace-create-button"]'
+  kind: interactive
+  optional: true
+- id: open-tabs-search-result
+  selector: '[data-testid^="open-tabs-tab-"]:not([data-testid^="open-tabs-tab-checkbox-"])'
+  kind: interactive
+  optional: true
+- id: workspace-custom-switcher-option
+  selector: '[data-testid^="workspace-switcher-option-"]:not([data-testid="workspace-switcher-option-default-workspace"])'
+  kind: interactive
+  optional: true
+-->
+
+主窗口只有单行 33px 共享 ControlBar；左侧主导航条提供 Home / Workspaces / Sessions / Agents / Tools 五大一级模式，支持左右侧栏收缩与 Ctrl/Cmd+K 全局搜索。
+
+### 12.2 Workspaces 工作区左栏：切换器、多根文件树、标签条与新建入口
+
+<!-- feature
+id: F-WS-2
+status: done
+area: main/workspace-platform
+components:
+- ControlBar
+- Sidebar
+- PrimaryNavigationRail
+- WorkspaceSidebar
+- WorkspaceMainPanel
+- MfaFloatingWindow
+- AgentsPlatformView
+- GlobalCommandModal
+- WorkspaceTabsFilter
+files:
+- src/components/tabbar/ControlBar.tsx
+- src/components/sidebar/PrimaryNavigationRail.tsx
+- src/components/sidebar/Sidebar.tsx
+- src/components/workspace/WorkspaceSidebar.tsx
+- src/components/workspace/WorkspaceMainPanel.tsx
+- src/components/workspace/WorkspaceGitPanel.tsx
+- src/components/workspace/WorkspaceSessionPickerModal.tsx
+- src/components/workspace/WorkspaceSessionPane.tsx
+- src/components/mfa/MfaFloatingWindow.tsx
+- src/components/agents/AgentsPlatformView.tsx
+- src/components/search/GlobalCommandModal.tsx
+- src/stores/workspacePlatformStore.ts
+- src/stores/agentsStore.ts
+- src/stores/workspaceEditorStore.ts
+- src/stores/workspaceUiStore.ts
+- src/components/editor/workspace/explorerPreferences.ts
+- src/components/editor/workspace/ExplorerSortControls.tsx
+- src/components/editor/workspace/ProjectTreeFlat.tsx
+- src/components/editor/workspace/ProjectTreeEntryDetails.tsx
+- src/components/editor/workspace/ProjectTree.tsx
+- src/components/editor/workspace/FileTreePane.tsx
+- src/components/editor/workspace/hooks/useWorkspaceHostFiles.ts
+- src/lib/ipc/files.ts
+- src/components/workspace/WorkspaceTabsFilter.tsx
+- src/lib/workspaceTabFilter.ts
+controls:
+- id: code-workspace-tree-view-all-files
+  selector: '[data-testid="code-workspace-tree-view-all-files"]'
+  kind: interactive
+- id: code-workspace-tree-search
+  selector: '[data-testid="code-workspace-tree-search"]'
+  kind: interactive
+- id: code-workspace-tree-open-default
+  selector: '[data-testid="code-workspace-tree-open-default"]'
+  kind: interactive
+- id: code-workspace-tree-copy
+  selector: '[data-testid="code-workspace-tree-copy"]'
+  kind: interactive
+- id: code-workspace-tree-paste
+  selector: '[data-testid="code-workspace-tree-paste"]'
+  kind: interactive
+- id: workspace-plus-add-folder
+  selector: '[data-testid="workspace-plus-add-folder"]'
+  kind: interactive
+- id: ui-font-family-select
+  selector: '[data-testid="ui-font-family-select"]'
+  kind: interactive
+- id: ui-font-size-slider
+  selector: '#ui-font-size-slider'
+  kind: interactive
+- id: code-theme-select
+  selector: '[data-testid="code-theme-select"]'
+  kind: interactive
+- id: code-theme-kanagawa-lotus
+  selector: '[data-testid="code-theme-option-terminal-kanagawa-lotus"]'
+  kind: interactive
+- id: global-code-font
+  selector: button[aria-label="Code font"]
+  kind: interactive
+- id: global-code-font-size
+  selector: input[aria-label="Code font size"]
+  kind: interactive
+- id: font-picker-search
+  selector: input[aria-label="Search fonts..."]
+  kind: interactive
+- id: font-picker-outfit
+  selector: '[role="option"]:has-text("Outfit")'
+  kind: interactive
+- id: font-picker-consolas
+  selector: '[role="option"] >> text="Consolas"'
+  kind: interactive
+- id: workspace-add-folder
+  selector: '[data-testid="workspace-add-folder"]'
+  kind: interactive
+- id: workspace-default-badge
+  selector: '[data-testid="workspace-default-badge"]'
+  kind: display
+- id: workspace-file-editor
+  selector: '[data-testid="workspace-file-editor"]'
+  kind: display
+- id: workspace-file-tree
+  selector: '[data-testid="workspace-file-tree"]'
+  kind: display
+- id: workspace-fs-modal
+  selector: '[data-testid="workspace-fs-modal"]'
+  kind: display
+- id: workspace-fs-modal-confirm
+  selector: '[data-testid="workspace-fs-modal-confirm"]'
+  kind: interactive
+- id: workspace-tab-context-menu
+  selector: '[data-testid="workspace-tab-context-menu"]'
+  kind: display
+  optional: true
+- id: workspace-tab-context-close
+  selector: '[data-testid="workspace-tab-context-close"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-context-close-others
+  selector: '[data-testid="workspace-tab-context-close-others"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-context-close-all
+  selector: '[data-testid="workspace-tab-context-close-all"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-context-rename
+  selector: '[data-testid="workspace-tab-context-rename"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-context-duplicate
+  selector: '[data-testid="workspace-tab-context-duplicate"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-context-copy-info
+  selector: '[data-testid="workspace-tab-context-copy-info"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-context-move-first
+  selector: '[data-testid="workspace-tab-context-move-first"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-context-move-left
+  selector: '[data-testid="workspace-tab-context-move-left"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-context-move-right
+  selector: '[data-testid="workspace-tab-context-move-right"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-context-move-last
+  selector: '[data-testid="workspace-tab-context-move-last"]'
+  kind: interactive
+  optional: true
+- id: workspace-session-unavailable
+  selector: '[data-testid="workspace-session-unavailable"]'
+  kind: display
+  optional: true
+- id: workspace-session-retry
+  selector: '[data-testid="workspace-session-retry"]'
+  kind: interactive
+  optional: true
+- id: workspace-session-access
+  selector: '[data-testid="workspace-session-access"]'
+  kind: display
+  optional: true
+- id: workspace-session-connect
+  selector: '[data-testid="workspace-session-connect"]'
+  kind: interactive
+  optional: true
+- id: workspace-editor-recovery-error
+  selector: '[data-testid="workspace-editor-recovery-error"]'
+  kind: display
+  optional: true
+- id: workspace-open-browser
+  selector: '[data-testid="workspace-open-browser"]'
+  kind: interactive
+  optional: true
+- id: tab-multiexec-checkbox
+  selector: '[data-testid="tab-multiexec-checkbox"]'
+  kind: interactive
+  optional: true
+- id: multiexec-targets
+  selector: '[data-testid="multiexec-targets"]'
+  kind: interactive
+  optional: true
+- id: multiexec-target-menu
+  selector: '[data-testid="multiexec-target-menu"]'
+  kind: display
+  optional: true
+- id: multiexec-target-search
+  selector: '[data-testid="multiexec-target-search"]'
+  kind: interactive
+  optional: true
+- id: multiexec-target-checkbox
+  selector: '[data-testid="multiexec-target-checkbox"]'
+  kind: interactive
+  optional: true
+- id: multiexec-target-empty
+  selector: '[data-testid="multiexec-target-empty"]'
+  kind: display
+  optional: true
+- id: session-tab-categories
+  selector: '[data-testid="session-tab-categories"]'
+  kind: display
+  optional: true
+- id: session-tab-filter-all
+  selector: '[data-testid="session-tab-filter-all"]'
+  kind: interactive
+  optional: true
+- id: session-tab-filter-ssh
+  selector: '[data-testid="session-tab-filter-ssh"]'
+  kind: interactive
+  optional: true
+- id: session-tab-filter-database
+  selector: '[data-testid="session-tab-filter-database"]'
+  kind: interactive
+  optional: true
+- id: session-tab-filter-sftp
+  selector: '[data-testid="session-tab-filter-sftp"]'
+  kind: interactive
+  optional: true
+- id: session-tab-filter-remote
+  selector: '[data-testid="session-tab-filter-remote"]'
+  kind: interactive
+  optional: true
+- id: session-tab-filter-local
+  selector: '[data-testid="session-tab-filter-local"]'
+  kind: interactive
+  optional: true
+- id: session-tab-filter-other
+  selector: '[data-testid="session-tab-filter-other"]'
+  kind: interactive
+  optional: true
+- id: open-tabs-empty
+  selector: '[data-testid="open-tabs-empty"]'
+  kind: display
+  optional: true
+- id: workspace-dock-tab-terminal
+  selector: '[data-testid="workspace-dock-tab-terminal"]'
+  kind: interactive
+  optional: true
+- id: workspace-dock-tab-problems
+  selector: '[data-testid="workspace-dock-tab-problems"]'
+  kind: interactive
+  optional: true
+- id: workspace-dock-tab-run
+  selector: '[data-testid="workspace-dock-tab-run"]'
+  kind: interactive
+  optional: true
+- id: workspace-dock-tab-find
+  selector: '[data-testid="workspace-dock-tab-find"]'
+  kind: interactive
+  optional: true
+- id: workspace-dock-tab-bookmarks
+  selector: '[data-testid="workspace-dock-tab-bookmarks"]'
+  kind: interactive
+  optional: true
+- id: workspace-dock-tab-todo
+  selector: '[data-testid="workspace-dock-tab-todo"]'
+  kind: interactive
+  optional: true
+- id: workspace-dock-tab-services
+  selector: '[data-testid="workspace-dock-tab-services"]'
+  kind: interactive
+  optional: true
+- id: workspace-dock-tab-database
+  selector: '[data-testid="workspace-dock-tab-database"]'
+  kind: interactive
+  optional: true
+- id: workspace-fs-modal-browse
+  selector: '[data-testid="workspace-fs-modal-browse"]'
+  kind: interactive
+- id: workspace-fs-modal-cancel
+  selector: '[data-testid="workspace-fs-modal-cancel"]'
+  kind: interactive
+- id: workspace-fs-modal-error
+  selector: '[data-testid="workspace-fs-modal-error"]'
+  kind: display
+  optional: true
+- id: workspace-fs-modal-input
+  selector: '[data-testid="workspace-fs-modal-input"]'
+  kind: display
+- id: workspace-git-panel
+  selector: '[data-testid="workspace-git-panel"]'
+  kind: display
+- id: workspace-main-panel
+  selector: '[data-testid="workspace-main-panel"]'
+  kind: display
+- id: workspace-open-session-menu
+  selector: '[data-testid="workspace-open-session-menu"]'
+  kind: display
+- id: workspace-open-session-plus
+  selector: '[data-testid="workspace-open-session-plus"]'
+  kind: interactive
+- id: workspace-plus-local-terminal
+  selector: '[data-testid="workspace-plus-local-terminal"]'
+  kind: interactive
+- id: workspace-plus-open-session
+  selector: '[data-testid="workspace-plus-open-session"]'
+  kind: interactive
+- id: workspace-repo-selector
+  selector: '[data-testid="workspace-repo-selector"]'
+  kind: interactive
+- id: workspace-session-pane
+  selector: '[data-testid="workspace-session-pane"]'
+  kind: display
+- id: workspace-session-picker-filter-db
+  selector: '[data-testid="workspace-session-picker-filter-db"]'
+  kind: interactive
+- id: workspace-session-picker-filter-desktop
+  selector: '[data-testid="workspace-session-picker-filter-desktop"]'
+  kind: interactive
+- id: workspace-session-picker-filter-sftp
+  selector: '[data-testid="workspace-session-picker-filter-sftp"]'
+  kind: interactive
+- id: workspace-session-picker-filter-ssh
+  selector: '[data-testid="workspace-session-picker-filter-ssh"]'
+  kind: interactive
+- id: workspace-session-picker-modal
+  selector: '[data-testid="workspace-session-picker-modal"]'
+  kind: display
+- id: workspace-session-picker-pin
+  selector: '[data-testid="workspace-session-picker-pin"]'
+  kind: interactive
+- id: workspace-session-picker-row
+  selector: '[data-testid="workspace-session-picker-row"]'
+  kind: display
+- id: workspace-session-picker-search
+  selector: '[data-testid="workspace-session-picker-search"]'
+  kind: interactive
+- id: workspace-sidebar-git-bar
+  selector: '[data-testid="workspace-sidebar-git-bar"]'
+  kind: display
+- id: workspace-sidebar-panel
+  selector: '[data-testid="workspace-sidebar-panel"]'
+  kind: display
+- id: workspace-switcher
+  selector: '[data-testid="workspace-switcher"]'
+  kind: display
+- id: workspace-switcher-button
+  selector: '[data-testid="workspace-switcher-button"]'
+  kind: interactive
+- id: workspace-switcher-menu
+  selector: '[data-testid="workspace-switcher-menu"]'
+  kind: display
+- id: workspace-switcher-add-folder
+  selector: '[data-testid="workspace-switcher-add-folder"]'
+  kind: interactive
+- id: workspace-switcher-removed-duplicate-add-folder
+  selector: '[data-testid="workspace-switcher-menu-add-folder"]'
+  kind: display
+  optional: true  # negative regression probe: no duplicate folder menu
+- id: workspace-sessions-panel
+  selector: '[data-testid="workspace-sessions-panel"]'
+  kind: display
+  optional: true
+- id: workspace-tab
+  selector: '[data-testid="workspace-tab"]'
+  kind: interactive
+- id: workspace-plus-new-file
+  selector: '[data-testid="workspace-plus-new-file"]'
+  kind: interactive
+- id: workspace-tab-strip
+  selector: '[data-testid="workspace-tab-strip"]'
+  kind: display
+- id: workspace-tab-scroll-left
+  selector: '[data-testid="workspace-tab-scroll-left"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-scroll-right
+  selector: '[data-testid="workspace-tab-scroll-right"]'
+  kind: interactive
+  optional: true
+- id: workspace-tab-scroll-area
+  selector: '[data-testid="workspace-tab-scroll-area"]'
+  kind: display
+- id: workspace-tab-drag-region
+  selector: '[data-testid="workspace-tab-drag-region"]'
+  kind: display
+  optional: true
+- id: workspace-tree-add-root
+  selector: '[data-testid="workspace-tree-add-root"]'
+  kind: interactive
+- id: workspace-tree-copy-path
+  selector: '[data-testid="workspace-tree-copy-path"]'
+  kind: interactive
+- id: workspace-tree-delete
+  selector: '[data-testid="workspace-tree-delete"]'
+  kind: interactive
+- id: workspace-tree-file
+  selector: '[data-testid="workspace-tree-file"]'
+  kind: interactive
+- id: workspace-tree-folder
+  selector: '[data-testid="workspace-tree-folder"]'
+  kind: interactive
+- id: workspace-tree-new-file
+  selector: '[data-testid="workspace-tree-new-file"]'
+  kind: interactive
+- id: workspace-tree-new-folder
+  selector: '[data-testid="workspace-tree-new-folder"]'
+  kind: interactive
+- id: workspace-tree-remove-root
+  selector: '[data-testid="workspace-tree-remove-root"]'
+  kind: interactive
+- id: workspace-tree-rename
+  selector: '[data-testid="workspace-tree-rename"]'
+  kind: interactive
+- id: workspace-tree-root
+  selector: '[data-testid="workspace-tree-root"]'
+  kind: display
+- id: workspace-session-picker-filter-all
+  selector: '[data-testid="workspace-session-picker-filter-all"]'
+  kind: interactive
+- id: workspace-file-filter
+  selector: '[data-testid="workspace-file-filter"]'
+  kind: interactive
+- id: workspace-linked-sessions
+  selector: '[data-testid="workspace-linked-sessions"]'
+  kind: display
+- id: workspace-linked-sessions-toggle
+  selector: '[data-testid="workspace-linked-sessions-toggle"]'
+  kind: interactive
+- id: workspace-link-session
+  selector: '[data-testid="workspace-link-session"]'
+  kind: interactive
+- id: workspace-linked-session
+  selector: '[data-testid="workspace-linked-session"]'
+  kind: interactive
+- id: workspace-editor-save
+  selector: '[data-testid="workspace-editor-save"]'
+  kind: interactive
+- id: workspace-switcher-option-default-workspace
+  selector: '[data-testid="workspace-switcher-option-default-workspace"]'
+  kind: interactive
+- id: workspace-switcher-option-second-workspace
+  selector: '[data-testid="workspace-switcher-option-second-workspace"]'
+  kind: interactive
+- id: workspace-layout-split
+  selector: '[data-testid="workspace-layout-split"]'
+  kind: interactive
+- id: workspace-toolbar-bottom-dock
+  selector: '[data-testid="workspace-toolbar-bottom-dock"]'
+  kind: interactive
+- id: workspace-canvas-panes
+  selector: '[data-testid="workspace-canvas-panes"]'
+  kind: display
+- id: workspace-canvas-pane
+  selector: '[data-testid="workspace-canvas-pane"]'
+  kind: display
+- id: workspace-bottom-dock
+  selector: '[data-testid="workspace-bottom-dock"]'
+  kind: display
+
+- id: code-workspace-tree-view-list
+  selector: '[data-testid="code-workspace-tree-view-list"]'
+  kind: interactive
+- id: code-workspace-tree-view-packages
+  selector: '[data-testid="code-workspace-tree-view-packages"]'
+  kind: interactive
+- id: code-workspace-tree-menu-flatten-packages
+  selector: '[data-testid="code-workspace-tree-menu-flatten-packages"]'
+  kind: interactive
+- id: code-workspace-list-columns
+  selector: '[data-testid="code-workspace-list-columns"]'
+  kind: display
+- id: code-workspace-list-name
+  selector: '[data-testid="code-workspace-list-name"]'
+  kind: display
+- id: code-workspace-file-list-order
+  selector: '[data-tree-kind][data-path]'
+  kind: display
+  optional: true  # visible row sequence shared by tree and detailed list
+- id: code-workspace-list-metadata
+  selector: '[data-testid="code-workspace-list-metadata"]'
+  kind: display
+- id: code-workspace-list-size
+  selector: '[data-testid="code-workspace-list-size"]'
+  kind: display
+- id: code-workspace-list-type
+  selector: '[data-testid="code-workspace-list-type"]'
+  kind: display
+- id: code-workspace-list-modified
+  selector: '[data-testid="code-workspace-list-modified"]'
+  kind: display
+- id: code-workspace-package-group
+  selector: '[data-testid="code-workspace-package-group"]'
+  kind: display
+- id: code-workspace-tree-sort
+  selector: '[data-testid="code-workspace-tree-sort"]'
+  kind: interactive
+- id: code-workspace-list-sort-name
+  selector: '[data-testid="code-workspace-list-sort-name"]'
+  kind: interactive
+- id: code-workspace-list-sort-size
+  selector: '[data-testid="code-workspace-list-sort-size"]'
+  kind: interactive
+- id: code-workspace-list-sort-type
+  selector: '[data-testid="code-workspace-list-sort-type"]'
+  kind: interactive
+- id: code-workspace-list-sort-modified
+  selector: '[data-testid="code-workspace-list-sort-modified"]'
+  kind: interactive
+- id: code-workspace-tree-sort-name
+  selector: '[data-testid="code-workspace-tree-sort-name"]'
+  kind: interactive
+- id: code-workspace-tree-sort-size
+  selector: '[data-testid="code-workspace-tree-sort-size"]'
+  kind: interactive
+- id: code-workspace-tree-sort-type
+  selector: '[data-testid="code-workspace-tree-sort-type"]'
+  kind: interactive
+- id: code-workspace-tree-sort-modified
+  selector: '[data-testid="code-workspace-tree-sort-modified"]'
+  kind: interactive
+- id: code-workspace-tree-sort-ascending
+  selector: '[data-testid="code-workspace-tree-sort-ascending"]'
+  kind: interactive
+- id: code-workspace-tree-sort-descending
+  selector: '[data-testid="code-workspace-tree-sort-descending"]'
+  kind: interactive
+- id: code-workspace-tree-sort-folders-first
+  selector: '[data-testid="code-workspace-tree-sort-folders-first"]'
+  kind: interactive
+- id: workspace-tabs-filter-trigger
+  selector: '[data-testid="workspace-tabs-filter-trigger"]'
+  kind: interactive
+- id: workspace-tabs-filter-menu
+  selector: '[data-testid="workspace-tabs-filter-menu"]'
+  kind: display
+- id: workspace-tabs-filter-search
+  selector: '[data-testid="workspace-tabs-filter-search"]'
+  kind: interactive
+- id: workspace-tabs-filter-clear
+  selector: '[data-testid="workspace-tabs-filter-clear"]'
+  kind: interactive
+- id: workspace-tabs-filter-row
+  selector: '[data-testid="workspace-tabs-filter-row"]'
+  kind: interactive
+- id: workspace-tabs-filter-empty
+  selector: '[data-testid="workspace-tabs-filter-empty"]'
+  kind: display
+- id: workspace-tab-filter-chip
+  selector: '[data-testid="workspace-tab-filter-chip"]'
+  kind: interactive
+- id: workspace-tab-filter-all
+  selector: '[data-testid="workspace-tab-filter-all"]'
+  kind: interactive
+- id: workspace-tab-filter-files
+  selector: '[data-testid="workspace-tab-filter-files"]'
+  kind: interactive
+- id: workspace-tab-filter-ssh
+  selector: '[data-testid="workspace-tab-filter-ssh"]'
+  kind: interactive
+- id: workspace-tab-filter-database
+  selector: '[data-testid="workspace-tab-filter-database"]'
+  kind: interactive
+- id: workspace-tab-filter-sftp
+  selector: '[data-testid="workspace-tab-filter-sftp"]'
+  kind: interactive
+- id: workspace-tab-filter-remote
+  selector: '[data-testid="workspace-tab-filter-remote"]'
+  kind: interactive
+- id: workspace-tab-filter-local
+  selector: '[data-testid="workspace-tab-filter-local"]'
+  kind: interactive
+- id: workspace-tab-filter-other
+  selector: '[data-testid="workspace-tab-filter-other"]'
+  kind: interactive
+- id: workspace-tab-categories
+  selector: '[data-testid="workspace-tab-categories"]'
+  kind: display
+-->
+
+Workspaces 模式左栏提供工作区切换器（默认工作区不可删除）、多根文件树（新建文件/目录、添加/移除根目录）、工作区标签条与打开任意会话入口；画布内含编辑器、Git 面板与隔离会话。
+
+### 12.3 左侧主导航条底部工具与左下角 MFA 悬浮窗
+
+<!-- feature
+id: F-WS-3
+status: done
+area: main/workspace-platform
+components: [ControlBar, Sidebar, PrimaryNavigationRail, WorkspaceSidebar, WorkspaceMainPanel, MfaFloatingWindow, AgentsPlatformView, GlobalCommandModal]
+files:
+  - src/components/tabbar/ControlBar.tsx
+  - src/components/sidebar/PrimaryNavigationRail.tsx
+  - src/components/sidebar/Sidebar.tsx
+  - src/components/workspace/WorkspaceSidebar.tsx
+  - src/components/workspace/WorkspaceMainPanel.tsx
+  - src/components/workspace/WorkspaceGitPanel.tsx
+  - src/components/workspace/WorkspaceSessionPickerModal.tsx
+  - src/components/workspace/WorkspaceSessionPane.tsx
+  - src/components/mfa/MfaFloatingWindow.tsx
+  - src/components/agents/AgentsPlatformView.tsx
+  - src/components/search/GlobalCommandModal.tsx
+  - src/stores/workspacePlatformStore.ts
+  - src/stores/agentsStore.ts
+  - src/stores/workspaceEditorStore.ts
+  - src/stores/workspaceUiStore.ts
+controls:
+  - id: mfa-floating-account
+    selector: '[data-testid="mfa-floating-account"]'
+    kind: interactive
+  - id: mfa-floating-close
+    selector: '[data-testid="mfa-floating-close"]'
+    kind: interactive
+  - id: mfa-floating-drag-handle
+    selector: '[data-testid="mfa-floating-drag-handle"]'
+    kind: interactive
+  - id: mfa-floating-expand-tab
+    selector: '[data-testid="mfa-floating-expand-tab"]'
+    kind: interactive
+  - id: mfa-floating-locked
+    selector: '[data-testid="mfa-floating-locked"]'
+    kind: display
+  - id: mfa-floating-pin
+    selector: '[data-testid="mfa-floating-pin"]'
+    kind: interactive
+  - id: mfa-floating-search
+    selector: '[data-testid="mfa-floating-search"]'
+    kind: interactive
+  - id: mfa-floating-window
+    selector: '[data-testid="mfa-floating-window"]'
+    kind: display
+  - id: rail-bottom-tools
+    selector: '[data-testid="rail-bottom-tools"]'
+    kind: display
+  - id: rail-chat-button
+    selector: '[data-testid="rail-chat-button"]'
+    kind: interactive
+  - id: rail-mfa-button
+    selector: '[data-testid="rail-mfa-button"]'
+    kind: interactive
+-->
+
+左侧主导航条底部依次为 MFA → 截图 → 聊天 → 主题 → 语言 → 设置；点击 MFA 在左下角弹出可拖拽悬浮验证器，支持搜索、复制、置顶、Esc 关闭与展开全屏 MFA 页。
+
+### 12.4 工作区内置 Git 面板与四路跳转
+
+<!-- feature
+id: F-WS-4
+status: done
+area: main/workspace-platform
+components: [ControlBar, Sidebar, PrimaryNavigationRail, WorkspaceSidebar, WorkspaceMainPanel, MfaFloatingWindow, AgentsPlatformView, GlobalCommandModal]
+files:
+  - src/components/tabbar/ControlBar.tsx
+  - src/components/sidebar/PrimaryNavigationRail.tsx
+  - src/components/sidebar/Sidebar.tsx
+  - src/components/workspace/WorkspaceSidebar.tsx
+  - src/components/workspace/WorkspaceMainPanel.tsx
+  - src/components/workspace/WorkspaceGitPanel.tsx
+  - src/components/workspace/WorkspaceSessionPickerModal.tsx
+  - src/components/workspace/WorkspaceSessionPane.tsx
+  - src/components/mfa/MfaFloatingWindow.tsx
+  - src/components/agents/AgentsPlatformView.tsx
+  - src/components/search/GlobalCommandModal.tsx
+  - src/stores/workspacePlatformStore.ts
+  - src/stores/agentsStore.ts
+  - src/stores/workspaceEditorStore.ts
+  - src/stores/workspaceUiStore.ts
+controls:
+  - id: editor-open-git-diff
+    selector: '[data-testid="editor-open-git-diff"]'
+    kind: interactive
+  - id: git-branches-tab
+    selector: '[data-testid="git-branches-tab"]'
+    kind: interactive
+  - id: git-changes-tab
+    selector: '[data-testid="git-changes-tab"]'
+    kind: interactive
+  - id: git-changes-tree-toggle
+    selector: '[data-testid="git-changes-tree-toggle"]'
+    kind: interactive
+  - id: git-commit-amend
+    selector: '[data-testid="git-commit-amend"]'
+    kind: interactive
+  - id: git-commit-and-push
+    selector: '[data-testid="git-commit-and-push"]'
+    kind: interactive
+  - id: git-commit-button
+    selector: '[data-testid="git-commit-button"]'
+    kind: interactive
+  - id: git-commit-message
+    selector: '[data-testid="git-commit-message"]'
+    kind: interactive
+  - id: git-settings-tab
+    selector: '[data-testid="git-settings-tab"]'
+    kind: interactive
+  - id: git-stash-tab
+    selector: '[data-testid="git-stash-tab"]'
+    kind: interactive
+  - id: git-tags-tab
+    selector: '[data-testid="git-tags-tab"]'
+    kind: interactive
+  - id: git-branches-view
+    selector: '[data-testid="git-branches-view"]'
+    kind: display
+  - id: git-tags-view
+    selector: '[data-testid="git-tags-view"]'
+    kind: display
+-->
+
+工作区内置专用 Git 面板可通过主左栏 Git 按钮、左栏 Git 状态条、编辑器“在 Git 面板对比”与工作区 GIT 标签进入，保留 main 的 6 大子面板、Tree/Flat、Amend 与并排/统一 Diff。
+
+### 12.5 工作区打开全局任意会话与会话选择器
+
+<!-- feature
+id: F-WS-5
+status: done
+area: main/workspace-platform
+components: [ControlBar, Sidebar, PrimaryNavigationRail, WorkspaceSidebar, WorkspaceMainPanel, MfaFloatingWindow, AgentsPlatformView, GlobalCommandModal]
+files:
+  - src/components/tabbar/ControlBar.tsx
+  - src/components/sidebar/PrimaryNavigationRail.tsx
+  - src/components/sidebar/Sidebar.tsx
+  - src/components/workspace/WorkspaceSidebar.tsx
+  - src/components/workspace/WorkspaceMainPanel.tsx
+  - src/components/workspace/WorkspaceGitPanel.tsx
+  - src/components/workspace/WorkspaceSessionPickerModal.tsx
+  - src/components/workspace/WorkspaceSessionPane.tsx
+  - src/components/mfa/MfaFloatingWindow.tsx
+  - src/components/agents/AgentsPlatformView.tsx
+  - src/components/search/GlobalCommandModal.tsx
+  - src/stores/workspacePlatformStore.ts
+  - src/stores/agentsStore.ts
+  - src/stores/workspaceEditorStore.ts
+  - src/stores/workspaceUiStore.ts
+controls:
+  - id: session-favorite
+    selector: '[data-testid="session-favorite"]'
+    kind: interactive
+  - id: session-refresh
+    selector: '[data-testid="session-refresh"]'
+    kind: interactive
+  - id: sessions-sidebar-panel
+    selector: '[data-testid="sessions-sidebar-panel"]'
+    kind: display
+-->
+
+工作区可通过 + 菜单、Ctrl/Cmd+Alt+O 选择器与左栏 Sessions 工具窗口打开任意全局会话，运行实例与 Sessions 模式完全隔离。
+
+### 12.6 Agents / Crew 开发中入口与全局 Ctrl+K 命令面板
+
+<!-- feature
+id: F-WS-6
+status: done
+area: main/workspace-platform
+components:
+- ControlBar
+- Sidebar
+- PrimaryNavigationRail
+- WorkspaceSidebar
+- WorkspaceMainPanel
+- MfaFloatingWindow
+- AgentsPlatformView
+- GlobalCommandModal
+files:
+- src/components/tabbar/ControlBar.tsx
+- src/components/sidebar/PrimaryNavigationRail.tsx
+- src/components/sidebar/Sidebar.tsx
+- src/components/workspace/WorkspaceSidebar.tsx
+- src/components/workspace/WorkspaceMainPanel.tsx
+- src/components/workspace/WorkspaceGitPanel.tsx
+- src/components/workspace/WorkspaceSessionPickerModal.tsx
+- src/components/workspace/WorkspaceSessionPane.tsx
+- src/components/mfa/MfaFloatingWindow.tsx
+- src/components/agents/AgentsPlatformView.tsx
+- src/components/search/GlobalCommandModal.tsx
+- src/stores/workspacePlatformStore.ts
+- src/stores/agentsStore.ts
+- src/stores/workspaceEditorStore.ts
+- src/stores/workspaceUiStore.ts
+- src/components/agents/comingSoon.ts
+controls:
+- id: global-search-input
+  selector: '[data-testid="global-search-input"]'
+  kind: interactive
+- id: global-search-modal
+  selector: '[data-testid="global-search-modal"]'
+  kind: display
+- id: global-search-result
+  selector: '[data-testid="global-search-result"]'
+  kind: display
+- id: menu-export-sessions
+  selector: '[data-testid="menu-export-sessions"]'
+  kind: display
+- id: open-tabs-filter
+  selector: '[data-testid="open-tabs-filter"]'
+  kind: interactive
+-->
+
+按当前产品范围，Agents / Crew 各入口显示“开发中”提示并保留当前画布；任务编排暂缓。全局 Ctrl/Cmd+K 命令面板仍可检索工作区、会话与工具动作并执行跳转。
+
+
+工作区普通目录复用完整编辑器、LSP 与全局外观设置：`TC-WS-034`（browser），`TC-WS-035`（native、真实 Java LSP 与磁盘）。
+
+普通文件 workspace 浏览与编辑：`TC-WS-036`（browser），`TC-WS-037`（native 复制与磁盘保存）；保留递归搜索、源码视图和完整编辑器，顶部仅保留当前文件 Git 差异入口。
+
+隐藏编辑器布局恢复：`TC-WS-038`（browser/native），通过用户入口隐藏 Project、切换到终端、从 Home 重载并恢复，保留草稿、活动标签及工具窗口；覆盖零尺寸面板注册顺序导致的崩溃。
+
+共享面板组件升级回归：`TC-WS-039`（browser/native），真实嵌套分栏、Documentation、侧栏拖动、终端隐藏、大预览和重载连续操作后保留草稿与编辑器所有权；与 `TC-WS-038` 一起显式断言未捕获异常、未处理 Promise、React 根错误与崩溃页，防止界面恢复后漏报组件异常。

@@ -29,11 +29,13 @@ interface ContextMenuProps extends ContextMenuAppearance {
   x: number;
   y: number;
   onClose: (reason?: ContextMenuCloseReason) => void;
+  /** Root test id override (popovers that are not a bare context menu). */
+  testId?: string;
 }
 
 const MENU_MARGIN = 6;
 
-export function ContextMenu({ items, x, y, onClose, appearance }: ContextMenuProps) {
+export function ContextMenu({ items, x, y, onClose, appearance, testId }: ContextMenuProps) {
   // ED-PARITY-021 A3 / DEC-ALIGN-11: closing (Esc, outside click, an action
   // that moves no focus) gives focus back to the element that opened the menu.
   useFocusReturn(true);
@@ -74,7 +76,7 @@ export function ContextMenu({ items, x, y, onClose, appearance }: ContextMenuPro
     zIndex: 9999,
   };
 
-  return <MenuSurface ref={ref} appearance={appearance} items={items} onClose={onClose} style={style} />;
+  return <MenuSurface ref={ref} appearance={appearance} items={items} onClose={onClose} style={style} testId={testId} />;
 }
 
 export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
@@ -83,7 +85,8 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
   style?: CSSProperties;
   isSubmenu?: boolean;
   onBack?: () => void;
-}>(({ items, onClose, style, isSubmenu, onBack, appearance }, forwardedRef) => {
+  testId?: string;
+}>(({ items, onClose, style, isSubmenu, onBack, appearance, testId }, forwardedRef) => {
   const innerRef = useRef<HTMLDivElement | null>(null);
 
   const selectableIndices = useMemo(() => {
@@ -188,7 +191,7 @@ export const MenuSurface = forwardRef<HTMLDivElement, ContextMenuAppearance & {
     <div
       ref={setRef}
       tabIndex={-1}
-      data-testid="context-menu"
+      data-testid={testId ?? "context-menu"}
       data-taomni-context-menu=""
       data-appearance={appearance}
       className={`min-w-[220px] ${appearance === "code-candidates" ? "py-0" : "py-1"} rounded shadow-lg border text-[12px] outline-none`}
@@ -448,7 +451,8 @@ export interface UseContextMenuOptions {
 }
 
 export function useContextMenu(options?: UseContextMenuOptions) {
-  const [menu, setMenu] = useState<ContextMenuAppearance & { x: number; y: number; items: MenuItem[] } | null>(null);
+  const [menu, setMenu] = useState<ContextMenuAppearance & { id: number; x: number; y: number; items: MenuItem[] } | null>(null);
+  const nextMenuId = useRef(0);
   const onCloseRef = useRef(options?.onClose);
   onCloseRef.current = options?.onClose;
   const pendingCloseRef = useRef<ContextMenuCloseReason | null>(null);
@@ -464,10 +468,11 @@ export function useContextMenu(options?: UseContextMenuOptions) {
   const show = useCallback((e: React.MouseEvent, items: MenuItem[]) => {
     e.preventDefault();
     e.stopPropagation();
-    setMenu({ x: e.clientX, y: e.clientY, items });
+    setMenu({ id: ++nextMenuId.current, x: e.clientX, y: e.clientY, items });
   }, []);
   const showAt = useCallback((x: number, y: number, items: MenuItem[], menuOptions?: ContextMenuAppearance) => {
-    flushSync(() => setMenu({ x, y, items, ...menuOptions }));
+    const id = ++nextMenuId.current;
+    flushSync(() => setMenu({ id, x, y, items, ...menuOptions }));
   }, []);
   const refreshItems = useCallback((items: MenuItem[]) => {
     setMenu((current) => current ? { ...current, items } : current);
@@ -484,7 +489,7 @@ export function useContextMenu(options?: UseContextMenuOptions) {
     refreshItems,
     close,
     render: menu ? (
-      <ContextMenu appearance={menu.appearance} items={menu.items} x={menu.x} y={menu.y} onClose={close} />
+      <ContextMenu key={menu.id} appearance={menu.appearance} items={menu.items} x={menu.x} y={menu.y} onClose={close} />
     ) : null,
     isOpen: menu !== null,
   }), [close, menu, refreshItems, show, showAt]);

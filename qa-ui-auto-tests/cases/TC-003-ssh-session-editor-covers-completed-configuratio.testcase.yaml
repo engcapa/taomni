@@ -17,6 +17,7 @@ fixtures:
 - ssh_required
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - assert_visible: '[data-testid="session-proto-ssh"]'
@@ -175,125 +176,125 @@ verification:
     requirement: SSH session editor covers completed configuration sections：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
-    - 2
-    - 8
+    - 3
     - 9
     - 10
-    - 12
-    - 15
+    - 11
+    - 13
     - 16
-    - 20
-    - 23
+    - 17
+    - 21
     - 24
     - 25
     - 26
     - 27
     - 28
-    - 30
-    - 32
+    - 29
+    - 31
     - 33
     - 34
     - 35
-    - 38
+    - 36
     - 39
-    - 44
-    - 47
-    - 53
+    - 40
+    - 45
+    - 48
     - 54
-    - 58
-    - 61
+    - 55
+    - 59
     - 62
-    - 64
-    - 69
+    - 63
+    - 65
+    - 70
     checkpoints:
-    - step: 3
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 4
-      expectation: '{"assert_visible": "[data-testid=\"session-proto-ssh\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 5
-      expectation: '{"assert_visible": "[data-testid=\"session-proto-sftp\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"session-proto-ssh\"]"}'
     - step: 6
-      expectation: '{"assert_visible": "[data-testid=\"session-proto-rdp\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"session-proto-sftp\"]"}'
     - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"session-proto-rdp\"]"}'
+    - step: 8
       expectation: '{"assert_visible": "[data-testid=\"session-proto-vnc\"]"}'
-    - step: 13
-      expectation: '{"assert_visible": "[data-testid=\"advanced-ssh-settings\"]"}'
     - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 15
       expectation: '{"assert_visible": "[data-testid=\"session-editor\"] >> text=\"SSH-browser type\""}'
-    - step: 17
-      expectation: '{"assert_visible": "[data-testid=\"terminal-settings\"]"}'
     - step: 18
-      expectation: '{"assert_visible": "[data-testid=\"terminal-appearance-settings\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"terminal-settings\"]"}'
     - step: 19
+      expectation: '{"assert_visible": "[data-testid=\"terminal-appearance-settings\"]"}'
+    - step: 20
       expectation: '{"assert_visible": "[data-testid=\"terminal-preview\"]"}'
-    - step: 21
-      expectation: '{"assert_visible": "[data-testid=\"network-settings\"]"}'
     - step: 22
+      expectation: '{"assert_visible": "[data-testid=\"network-settings\"]"}'
+    - step: 23
       expectation: '{"assert_visible": "[data-testid=\"session-editor\"] >> text=\"Keep-alive\""}'
-    - step: 29
+    - step: 30
       expectation: '{"assert_visible": "[data-testid=\"session-editor\"] input[aria-label=\"Forward local address\"]"}'
-    - step: 31
+    - step: 32
       expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 37
+    - step: 38
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-settings\"]"}'
-    - step: 40
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 41
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "${cfg.ssh.host}"}}'
-    - step: 42
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "${cfg.ssh.port}"}}'
-    - step: 43
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "${cfg.ssh.user}"}}'
-    - step: 46
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "echo qa-ui-auto-session"}}'
-    - step: 49
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy host\"]", "name": "value", "equals": "proxy.example.test"}}'
-    - step: 50
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19090"}}'
-    - step: 51
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "127.0.0.1:22"}}'
-    - step: 52
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": "qa-ui-auto-forward"}}'
-    - step: 55
-      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 56
-      expectation: '{"assert_attribute": {"selector": "textarea[aria-label=\"Description notes\"]", "name": "value", "equals": "Created by qa-ui-auto"}}'
-    - step: 57
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Tags\"]", "name": "value", "equals": "qa, e2e, ssh"}}'
-    - step: 60
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-settings\"]"}'
-    - step: 63
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 66
+    - step: 42
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "${cfg.ssh.host}"}}'
+    - step: 43
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "${cfg.ssh.port}"}}'
+    - step: 44
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "${cfg.ssh.user}"}}'
+    - step: 47
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "echo qa-ui-auto-session"}}'
+    - step: 50
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Proxy host\"]", "name": "value", "equals": "proxy.example.test"}}'
+    - step: 51
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19090"}}'
-    - step: 67
+    - step: 52
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "127.0.0.1:22"}}'
-    - step: 68
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": "qa-ui-auto-forward-edited"}}'
-    - step: 70
+    - step: 53
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": "qa-ui-auto-forward"}}'
+    - step: 56
       expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 71
+    - step: 57
       expectation: '{"assert_attribute": {"selector": "textarea[aria-label=\"Description notes\"]", "name": "value", "equals": "Created by qa-ui-auto"}}'
+    - step: 58
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Tags\"]", "name": "value", "equals": "qa, e2e, ssh"}}'
+    - step: 61
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-settings\"]"}'
+    - step: 64
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 67
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19090"}}'
+    - step: 68
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "127.0.0.1:22"}}'
+    - step: 69
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": "qa-ui-auto-forward-edited"}}'
+    - step: 71
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
     - step: 72
+      expectation: '{"assert_attribute": {"selector": "textarea[aria-label=\"Description notes\"]", "name": "value", "equals": "Created by qa-ui-auto"}}'
+    - step: 73
       expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Tags\"]", "name": "value", "equals": "qa, e2e, ssh"}}'
     results:
-    - 37
-    - 41
+    - 38
     - 42
     - 43
-    - 46
-    - 49
+    - 44
+    - 47
     - 50
     - 51
     - 52
-    - 56
+    - 53
     - 57
-    - 60
-    - 66
+    - 58
+    - 61
     - 67
     - 68
-    - 71
+    - 69
     - 72
+    - 73
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

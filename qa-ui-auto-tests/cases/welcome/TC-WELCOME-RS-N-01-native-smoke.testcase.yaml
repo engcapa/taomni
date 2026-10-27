@@ -38,7 +38,7 @@ steps:
 - wait_for:
     selector: '[data-testid="terminal-pane"]'
     timeout_sec: 30
-- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- click: '[data-testid="nav-mode-home"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="welcome-history-tab-directories"]'
 - wait_for: '[data-testid="welcome-local-directories"]'
@@ -63,11 +63,9 @@ verification:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 4
-      expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-restore-status\"][data-state=\"empty\"]",
-        "timeout_sec": 30}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-restore-status\"][data-state=\"empty\"]", "timeout_sec": 30}}'
     - step: 5
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-last-session\"]", "name":
-        "disabled", "equals": ""}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-restore-last-session\"]", "name": "disabled", "equals": ""}}'
     - step: 7
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 30}}'
     - step: 9

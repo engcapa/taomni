@@ -28,6 +28,8 @@ import { createWorkspaceDockContents } from "./createWorkspaceDockContents";
 import { createWorkspaceLayoutRenderer } from "./createWorkspaceLayoutRenderer";
 import { createWorkspaceSideContents } from "./createWorkspaceSideContents";
 import { createRenderEditorGroup } from "./editorGroupView";
+import { useWorkspaceHost } from "../workspaceHostIntegration";
+import { useEffect, useRef } from "react";
 
 
 export interface WorkspaceShellViewProps {
@@ -77,6 +79,20 @@ export interface WorkspaceShellViewProps {
 }
 
 export function WorkspaceShellView(props: WorkspaceShellViewProps) {
+  const host = useWorkspaceHost();
+  // defaultSize is a mount-time input. Changing it re-registers the panel;
+  // when a terminal hides this group, every panel has zero geometry and the
+  // library can put the re-registered editor after Documentation. Its separator
+  // then targets a nonexistent panel. Live tool visibility uses panel refs.
+  const initialEditorPanelSize = useRef(props.languagePanelOpen ? "56%" : "80%").current;
+  const previousLeftOpen = useRef<boolean | null>(null);
+  useEffect(() => {
+    const open = props.toolWindowRouting.leftToolAreaOpen;
+    if (host?.active && previousLeftOpen.current !== null && previousLeftOpen.current !== open) {
+      host.onLeftToolAreaChange(open);
+    }
+    previousLeftOpen.current = open;
+  }, [host, props.toolWindowRouting.leftToolAreaOpen]);
   const {
     clipboard,
     rootRef,
@@ -101,7 +117,6 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
     initialProjectPanelSize,
     toolWindowActions,
     renderToolWindowSideArea,
-    languagePanelOpen,
     workspaceUi,
     editorLayout,
     renderEditorGroup,
@@ -149,6 +164,11 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
         className="relative h-full w-full min-h-0 flex flex-col overflow-hidden bg-[var(--taomni-code-bg)] text-[var(--taomni-code-text)]"
       >
         <WorkspaceOperationObservations {...workspaceOperationObservationsProps} /><WorkspaceToolbar {...workspaceToolbarProps} />
+        {host?.leftToolAreaHost && createPortal(
+          <div data-testid="code-workspace-left-tool-area" className="h-full min-h-0" style={toolWindowRouting.leftToolAreaOpen ? undefined : { display: "none" }}>
+            {renderToolWindowSideArea("left")}
+          </div>, host.leftToolAreaHost,
+        )}
 
         {recoveryState.resourceCleanupRecoveries.length > 0 && (
           <div
@@ -187,7 +207,7 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
 
         <div className="flex-1 min-h-0 flex">
           {(() => {
-            const merged = visible && mainRailMergeActive && !!mainRailHost;
+            const merged = (host ? host.active : visible) && mainRailMergeActive && !!mainRailHost;
             const leftStripe = (
               <ToolWindowRail
                 side="left"
@@ -218,7 +238,7 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
                   }
                 }}
               >
-                <Panel
+                {!host && <Panel
                   panelRef={projectPanelRef}
                   id="project"
                   defaultSize={initialProjectPanelSize}
@@ -238,18 +258,18 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
                   >
                     {renderToolWindowSideArea("left")}
                   </div>
-                </Panel>
-                <PanelResizeHandle
+                </Panel>}
+                {!host && <PanelResizeHandle
                   id="code-workspace-project-resize-handle"
                   data-testid="code-workspace-project-resize-handle"
                   disabled={!toolWindowRouting.leftToolAreaOpen}
                   className={toolWindowRouting.leftToolAreaOpen
                     ? "w-[3px] bg-[var(--taomni-code-border)] hover:bg-[var(--taomni-accent)] active:bg-[var(--taomni-accent)] transition-colors cursor-col-resize shrink-0 relative after:absolute after:inset-y-0 after:-left-1.5 after:-right-1.5 after:z-20"
                     : "hidden"}
-                />
+                />}
                 <Panel
                   id="editor"
-                  defaultSize={languagePanelOpen ? "56%" : "80%"}
+                  defaultSize={initialEditorPanelSize}
                   minSize="37px"
                   className="min-w-0"
                 >

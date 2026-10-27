@@ -247,14 +247,14 @@ def make_plan(args) -> dict:
                 if profile and mode == "native" and "dual-display" in capabilities(eligible, mode):
                     dual_ids = {c.id for c in eligible if "dual_display_required" in c.fixtures}
                     # Keep prerequisites with the variant that needs them.
-                    changed = True
-                    while changed:
-                        changed = False
+                    expanded_dependencies = True
+                    while expanded_dependencies:
+                        expanded_dependencies = False
                         for cid in tuple(dual_ids):
                             for previous in dependencies.get(cid, []):
                                 if previous in {c.id for c in eligible} and previous not in dual_ids:
                                     dual_ids.add(previous)
-                                    changed = True
+                                    expanded_dependencies = True
                     if dual_ids and dual_ids != {c.id for c in eligible}:
                         variants = [("", [c for c in eligible if c.id not in dual_ids]),
                                     ("dual-display", [c for c in eligible if c.id in dual_ids])]

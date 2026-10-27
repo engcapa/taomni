@@ -25,6 +25,7 @@ import { useWorkspaceActionsController } from "../useWorkspaceActionsController"
 import { useWorkspaceLspClientEvents } from "../useWorkspaceLspClientEvents";
 import { useWorkspaceNavigation } from "../useWorkspaceNavigation";
 import { useWorkspaceSemanticIndex } from "../useWorkspaceSemanticIndex";
+import { useWorkspaceHost } from "../workspaceHostIntegration";
 
 
 export interface WorkspaceNavigationPopupsProps {
@@ -74,6 +75,7 @@ export interface WorkspaceNavigationPopupsProps {
 }
 
 export function WorkspaceNavigationPopups(props: WorkspaceNavigationPopupsProps) {
+  const host = useWorkspaceHost();
   const {
     keyboard,
     searchEverywhereOpen,
@@ -236,7 +238,7 @@ export function WorkspaceNavigationPopups(props: WorkspaceNavigationPopupsProps)
         void librarySources.openLspLocation(location);
       }}
     />
-    {treeInteractions.treeContextMenu}
+    {host ? createPortal(treeInteractions.treeContextMenu, document.body) : treeInteractions.treeContextMenu}
     {treeInteractions.editorContextMenu}
     {visible ? <StructuralSearchDialog session={structuralSearch} /> : null}
     <UsagesScopeDialog
@@ -256,3 +258,4 @@ export function WorkspaceNavigationPopups(props: WorkspaceNavigationPopupsProps)
     )}
   </>);
 }
+import { createPortal } from "react-dom";

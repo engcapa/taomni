@@ -16,7 +16,9 @@ fixtures:
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - assert_visible: '[data-testid="session-help"]'
@@ -191,17 +193,16 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH advanced settings retain remote environment, authentication and toggle behavior;
-      the SSH browser displays only SFTP without a protocol selector, including after save/reopen where
-      present.
+    requirement: SSH advanced settings retain remote environment, authentication and toggle behavior; the SSH browser displays only SFTP without a protocol
+      selector, including after save/reopen where present.
     actions:
     - 1
-    - 3
-    - 12
-    - 13
-    - 18
+    - 2
+    - 5
+    - 14
+    - 15
     - 20
-    - 23
+    - 22
     - 25
     - 27
     - 29
@@ -209,136 +210,130 @@ verification:
     - 33
     - 35
     - 37
-    - 41
+    - 39
     - 43
     - 45
     - 47
     - 49
-    - 52
-    - 55
-    - 58
-    - 61
-    - 62
+    - 51
+    - 54
+    - 57
+    - 60
+    - 63
     - 64
-    - 67
+    - 66
     - 68
-    - 71
+    - 69
+    - 70
+    - 72
+    - 73
     checkpoints:
-    - step: 5
-      expectation: '{"assert_visible": "[data-testid=\"session-help\"]"}'
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 6
-      expectation: '{"assert_visible": "[data-testid=\"session-close\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 7
-      expectation: '{"assert_visible": "[data-testid=\"session-host-lookup\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"session-help\"]"}'
     - step: 8
-      expectation: '{"assert_visible": "[data-testid=\"session-proto-ssh\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"session-close\"]"}'
     - step: 9
-      expectation: '{"assert_visible": "[data-testid=\"session-section-advanced\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"session-host-lookup\"]"}'
     - step: 10
-      expectation: '{"assert_visible": "[data-testid=\"session-section-network\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"session-proto-ssh\"]"}'
     - step: 11
+      expectation: '{"assert_visible": "[data-testid=\"session-section-advanced\"]"}'
+    - step: 12
+      expectation: '{"assert_visible": "[data-testid=\"session-section-network\"]"}'
+    - step: 13
       expectation: '{"assert_visible": "[data-testid=\"session-section-bookmark\"]"}'
-    - step: 14
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value",
-        "equals": "127.0.0.1"}}'
-    - step: 15
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value",
-        "equals": "2222"}}'
     - step: 16
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value",
-        "equals": "qauser"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "127.0.0.1"}}'
     - step: 17
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-specify-username\"]", "name":
-        "data-checked", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "2222"}}'
+    - step: 18
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "qauser"}}'
     - step: 19
-      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains":
-        "Fill required fields, then OK to save this session."}}'
-    - step: 22
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
-        "name": "value", "equals": "shell"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-specify-username\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 21
+      expectation: '{"assert_text": {"selector": "[data-testid=\"session-test-result-summary\"]", "contains": "Fill required fields, then OK to save this
+        session."}}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
     - step: 24
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
-        "name": "value", "equals": "lxde"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "shell"}}'
     - step: 26
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
-        "name": "value", "equals": "xfce"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "lxde"}}'
     - step: 28
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
-        "name": "value", "equals": "gnome"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "xfce"}}'
     - step: 30
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
-        "name": "value", "equals": "kde"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "gnome"}}'
     - step: 32
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
-        "name": "value", "equals": "awesome"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "kde"}}'
     - step: 34
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
-        "name": "value", "equals": "custom"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "awesome"}}'
     - step: 36
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name":
-        "value", "equals": "printf ''qa-advanced-control\\n''"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "custom"}}'
     - step: 38
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name":
-        "data-checked", "equals": "false"}}'
-    - step: 39
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"session-ssh-browser-type\"]",
-        "equals": "SFTP protocol (recommended)"}}'
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf ''qa-advanced-control\\n''"}}'
     - step: 40
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-ssh-browser-type\"]:is(select)",
-        "equal": 0}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 41
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "equals": "SFTP protocol (recommended)"}}'
     - step: 42
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-agent\"]:checked", "equal":
-        1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-ssh-browser-type\"]:is(select)", "equal": 0}}'
     - step: 44
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-gssapi\"]:checked", "equal":
-        1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-agent\"]:checked", "equal": 1}}'
     - step: 46
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-password\"]:checked", "equal":
-        1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-gssapi\"]:checked", "equal": 1}}'
     - step: 48
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"SSH password\"]", "name": "type",
-        "equals": "password"}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-password\"]:checked", "equal": 1}}'
     - step: 50
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-privatekey\"]:checked",
-        "equal": 1}}'
-    - step: 51
-      expectation: '{"assert_enabled": "[data-testid=\"session-private-key-toggle\"]"}'
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"SSH password\"]", "name": "type", "equals": "password"}}'
+    - step: 52
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-privatekey\"]:checked", "equal": 1}}'
     - step: 53
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-private-key-toggle\"]",
-        "name": "data-checked", "equals": "false"}}'
-    - step: 54
-      expectation: '{"assert_disabled": "input[aria-label=\"Private key path\"]"}'
+      expectation: '{"assert_enabled": "[data-testid=\"session-private-key-toggle\"]"}'
+    - step: 55
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-private-key-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 56
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-private-key-toggle\"]",
-        "name": "data-checked", "equals": "true"}}'
-    - step: 57
+      expectation: '{"assert_disabled": "input[aria-label=\"Private key path\"]"}'
+    - step: 58
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-private-key-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 59
       expectation: '{"assert_enabled": "input[aria-label=\"Private key path\"]"}'
-    - step: 60
+    - step: 61
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 62
       expectation: '{"assert_visible": "[data-testid=\"text-input-dialog-input\"]"}'
-    - step: 63
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Private key path\"]", "name":
-        "value", "equals": "/home/qauser/.ssh/id_ed25519"}}'
     - step: 65
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Private key path\"]", "name": "value", "equals": "/home/qauser/.ssh/id_ed25519"}}'
+    - step: 67
       expectation: '{"assert_visible": "[data-testid=\"session-key-generator\"]"}'
-    - step: 69
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ssh-cipher\"]", "name":
-        "value", "equals": "aes256-gcm@openssh.com"}}'
+    - step: 71
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-ssh-cipher\"]", "name": "value", "equals": "aes256-gcm@openssh.com"}}'
     - step: 74
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    - step: 76
       expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
     results:
-    - 5
+    - 3
+    - 4
     - 6
     - 7
     - 8
     - 9
     - 10
     - 11
-    - 14
-    - 15
+    - 12
+    - 13
     - 16
     - 17
+    - 18
     - 19
-    - 22
+    - 21
+    - 23
     - 24
     - 26
     - 28
@@ -347,28 +342,30 @@ verification:
     - 34
     - 36
     - 38
-    - 39
     - 40
+    - 41
     - 42
     - 44
     - 46
     - 48
     - 50
-    - 51
+    - 52
     - 53
-    - 54
+    - 55
     - 56
-    - 57
-    - 60
-    - 63
+    - 58
+    - 59
+    - 61
+    - 62
     - 65
-    - 69
+    - 67
+    - 71
     - 74
+    - 76
   visual:
   - check: Configuration and workflow state
     method: automated
-    reason: Exact SFTP text and absence of a select are asserted alongside the retained control assertions.
-      Layout fidelity is not claimed.
+    reason: Exact SFTP text and absence of a select are asserted alongside the retained control assertions. Layout fidelity is not claimed.
   native:
   - check: Native boundary
     method: external

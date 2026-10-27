@@ -18,6 +18,7 @@ from contextlib import closing
 from pathlib import Path
 from typing import Any
 
+from .backup_journal import read_journal
 
 def seed_mail(data: Path) -> tuple[bytes, bytes]:
     account = "qa-backup-categories"
@@ -122,7 +123,7 @@ def setup(ctx: Any, root: Path, config: dict) -> None:
                     lock_file = None
                     event(control + "=released")
                 for journal in (root / "jobs").glob("*.json"):
-                    job = json.loads(journal.read_text(encoding="utf-8"))
+                    job = read_journal(journal)
                     if job.get("phase") == "cancelled" and job["id"] not in stopped:
                         stopped.add(job["id"])
                         artifact = root / "artifacts" / job["id"] / "archive.taobak"
@@ -139,7 +140,8 @@ def setup(ctx: Any, root: Path, config: dict) -> None:
                                     raise AssertionError("Local backup did not publish a valid archive")
                             event("local_completed:valid_archive=true")
         except Exception as error:
-            event("ORACLE_ERROR:" + str(error))
+            event(f"ORACLE_ERROR:{type(error).__name__}:{error} "
+                  f"[errno={getattr(error, 'errno', None)},winerror={getattr(error, 'winerror', None)}]")
         finally:
             if lock_file is not None:
                 lock_file.close()

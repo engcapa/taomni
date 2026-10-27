@@ -1,0 +1,200 @@
+id: TC-WS-003
+title: Workspaces use one real IDEA tool rail even before a folder is added
+description: The shared editor owns the contextual rail in an empty workspace; its actual tool overflow and stripe context menu retain main tool and layout
+  operations. Sessions hides workspace controls.
+modes:
+- browser
+- native
+covers:
+- F-WS-2
+- F25.1
+- F25.3
+tags:
+- p0
+- workspace-redesign
+- file-explorer
+- regression
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-003
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="sidebar-tool-window-rail"]'
+- assert_visible: '[data-testid="code-workspace-tool-rail-project"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-tool-rail-project"]'
+    equal: 1
+- assert_visible: '[data-testid="code-workspace-tool-rail-sessions"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-tool-rail-sessions"]'
+    equal: 1
+- assert_visible: '[data-testid="code-workspace-tool-rail-git"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-tool-rail-git"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"] [data-testid="code-workspace-tool-rail-left"]'
+    equal: 0
+- click: '[data-testid="sidebar-rail"] [data-testid="code-workspace-bottom-tab-overflow"]'
+- wait_for: '[data-testid="code-workspace-bottom-tab-overflow-menu"]'
+- assert_visible: '[data-testid="code-workspace-bottom-tab-overflow-terminal"]'
+- assert_visible: '[data-testid="code-workspace-bottom-tab-overflow-problems"]'
+- assert_visible: '[data-testid="code-workspace-bottom-tab-overflow-run"]'
+- assert_visible: '[data-testid="code-workspace-bottom-tab-overflow-debug"]'
+- assert_visible: '[data-testid="code-workspace-bottom-tab-overflow-search"]'
+- assert_visible: '[data-testid="code-workspace-bottom-tab-overflow-todos"]'
+- assert_visible: '[data-testid="code-workspace-bottom-tab-overflow-build"]'
+- assert_visible: '[data-testid="code-workspace-bottom-tab-overflow-tests"]'
+- assert_visible: '[data-testid="code-workspace-bottom-tab-overflow-coverage"]'
+- assert_visible: '[data-testid="code-workspace-bottom-tab-overflow-structure"]'
+- press: Escape
+- click: '[data-testid="sidebar-rail"] [data-testid="code-workspace-bottom-tab-overflow"]'
+- click: '[data-testid="code-workspace-bottom-tab-overflow-terminal"]'
+- wait_for: '[data-testid="code-workspace-tool-window-terminal"]'
+- assert_visible: '[data-testid="code-workspace-tool-window-terminal"]'
+- click: '[data-testid="sidebar-rail"] [data-testid="code-workspace-bottom-tab-overflow"]'
+- click: '[data-testid="code-workspace-bottom-tab-overflow-search"]'
+- wait_for: '[data-testid="code-workspace-tool-window-search"]'
+- assert_visible: '[data-testid="code-workspace-tool-window-search"]'
+- click: '[data-testid="sidebar-rail"] [data-testid="code-workspace-bottom-tab-overflow"]'
+- click: '[data-testid="code-workspace-bottom-tab-overflow-todos"]'
+- wait_for: '[data-testid="code-workspace-tool-window-todos"]'
+- assert_visible: '[data-testid="code-workspace-tool-window-todos"]'
+- click: '[data-testid="sidebar-rail"] [data-testid="code-workspace-bottom-tab-overflow"]'
+- click: '[data-testid="code-workspace-bottom-tab-overflow-coverage"]'
+- wait_for: '[data-testid="code-workspace-tool-window-coverage"]'
+- assert_visible: '[data-testid="code-workspace-tool-window-coverage"]'
+- click: '[data-testid="sidebar-rail"] [data-testid="code-workspace-bottom-tab-overflow"]'
+- click: '[data-testid="code-workspace-bottom-tab-overflow-structure"]'
+- wait_for: '[data-testid="code-workspace-tool-window-structure"]'
+- assert_visible: '[data-testid="code-workspace-tool-window-structure"]'
+- click: '[data-testid="code-workspace-tool-rail-sessions"]'
+- wait_for: '[data-testid="workspace-sessions-panel"]'
+- click: '[data-testid="code-workspace-tool-rail-project"]'
+- wait_for: '[data-testid="code-workspace-tree-empty"]'
+- right_click: '[data-testid="code-workspace-tool-rail-project"]'
+- assert_visible: '[data-testid="code-workspace-tool-rail-menu-show-names"]'
+- assert_visible: '[data-testid="code-workspace-tool-rail-menu-move"]'
+- press: Escape
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- assert_count:
+    selector: '[data-testid="sidebar-rail"] [data-testid="code-workspace-tool-rail-project"]'
+    equal: 0
+- assert_no_runtime_errors: null
+- screenshot: ws-003-real-merged-rail.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: One shared rail supplies Project/Sessions/Git, the main editor tools and Show Names/Move operations, without rendering a second stripe
+      in the canvas.
+    actions:
+    - 3
+    - 12
+    - 24
+    - 25
+    - 26
+    - 29
+    - 30
+    - 33
+    - 34
+    - 37
+    - 38
+    - 41
+    - 42
+    - 45
+    - 47
+    - 49
+    - 52
+    - 53
+    results:
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 28
+    - 32
+    - 36
+    - 40
+    - 44
+    - 50
+    - 51
+    - 55
+    - 56
+    checkpoints:
+    - step: 5
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-project\"]"}'
+    - step: 6
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "equal": 1}}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-sessions\"]"}'
+    - step: 8
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tool-rail-sessions\"]", "equal": 1}}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-git\"]"}'
+    - step: 10
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tool-rail-git\"]", "equal": 1}}'
+    - step: 11
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 0}}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-bottom-tab-overflow-terminal\"]"}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-bottom-tab-overflow-problems\"]"}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-bottom-tab-overflow-run\"]"}'
+    - step: 17
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-bottom-tab-overflow-debug\"]"}'
+    - step: 18
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-bottom-tab-overflow-search\"]"}'
+    - step: 19
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-bottom-tab-overflow-todos\"]"}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-bottom-tab-overflow-build\"]"}'
+    - step: 21
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-bottom-tab-overflow-tests\"]"}'
+    - step: 22
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-bottom-tab-overflow-coverage\"]"}'
+    - step: 23
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-bottom-tab-overflow-structure\"]"}'
+    - step: 28
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-window-terminal\"]"}'
+    - step: 32
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-window-search\"]"}'
+    - step: 36
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-window-todos\"]"}'
+    - step: 40
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-window-coverage\"]"}'
+    - step: 44
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-window-structure\"]"}'
+    - step: 50
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-menu-show-names\"]"}'
+    - step: 51
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-menu-move\"]"}'
+    - step: 55
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]", "equal": 0}}'
+    - step: 56
+      expectation: '{"assert_no_runtime_errors": null}'
+  visual:
+  - check: Review file area, row metadata, selection, toolbar and package layout in the retained screenshot.
+    method: manual
+    reason: Functional assertions do not establish visual fidelity; review the case screenshot separately.
+  native:
+  - check: Shared-rail mounting and tool menu behavior in the packaged WebView.
+    method: automated
+    reason: Real Tauri IPC, native filesystem or process effects cannot be established by browser stubs.

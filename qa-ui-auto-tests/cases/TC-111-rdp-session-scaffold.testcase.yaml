@@ -36,7 +36,9 @@ fixtures:
 timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-rdp"]'
@@ -69,11 +71,15 @@ steps:
     selector: '[data-testid="rdp-canvas"]'
     state: attached
     timeout_sec: 5
+- click: '[data-testid="titlebar-actions-more"]'
 - assert_visible: '[data-testid="rdp-status"]'
 - click: '[data-testid="rdp-scale-toggle"]'
+- click: '[data-testid="titlebar-actions-more"]'
 - assert_visible: '[data-testid="rdp-view-cycle"]'
 - click: '[data-testid="rdp-view-cycle"]'
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="rdp-reconnect"]'
+- click: '[data-testid="titlebar-actions-more"]'
 - assert_visible: '[data-testid="rdp-detach"]'
 - click: '[data-testid="rdp-detach"]'
 - wait: 1
@@ -85,45 +91,62 @@ verification:
     requirement: Saved RDP session opens the RDP panel and toolbar：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
-    - 3
+    - 2
     - 5
-    - 6
     - 7
     - 8
+    - 9
     - 10
-    - 11
+    - 12
     - 13
     - 15
-    - 16
-    - 21
-    - 23
+    - 17
+    - 18
+    - 22
     - 24
+    - 25
+    - 27
+    - 28
+    - 29
+    - 30
     checkpoints:
-    - step: 2
+    - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
     - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
+    - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 9
+    - step: 11
       expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 12
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-rdp\"]"}'
     - step: 14
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-rdp\"]"}'
+    - step: 16
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
-    - step: 17
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-panel\"]", "timeout_sec": 10}}'
-    - step: 18
-      expectation: '{"assert_visible": "[data-testid=\"rdp-panel\"]"}'
     - step: 19
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-canvas\"]", "state": "attached", "timeout_sec":
-        5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-panel\"]", "timeout_sec": 10}}'
     - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"rdp-panel\"]"}'
+    - step: 21
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-canvas\"]", "state": "attached", "timeout_sec": 5}}'
+    - step: 23
       expectation: '{"assert_visible": "[data-testid=\"rdp-status\"]"}'
-    - step: 22
+    - step: 26
       expectation: '{"assert_visible": "[data-testid=\"rdp-view-cycle\"]"}'
-    - step: 25
+    - step: 31
       expectation: '{"assert_visible": "[data-testid=\"rdp-detach\"]"}'
     results:
-    - 25
+    - 3
+    - 4
+    - 6
+    - 11
+    - 14
+    - 16
+    - 19
+    - 20
+    - 21
+    - 23
+    - 26
+    - 31
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

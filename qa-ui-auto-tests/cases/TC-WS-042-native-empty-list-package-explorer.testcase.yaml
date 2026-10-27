@@ -1,0 +1,208 @@
+id: TC-WS-042
+title: Native empty folder picker, list rename/save and package reopen use one editor
+description: Operate the real empty-workspace directory chooser, cancel then choose. List metadata and sort use native disk entries; F2 rename/save are
+  verified on disk. Package navigation and the open file survive reload.
+modes:
+- native
+covers:
+- F-WS-2
+- F25.1
+- F25.3
+tags:
+- p0
+- workspace-redesign
+- file-explorer
+- regression
+fixtures:
+- reset_db
+- workspace_explorer
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-native-explorer
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree-empty"]'
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- native_folder_dialog:
+    action: cancel
+- assert_count:
+    selector: '[data-testid="code-workspace-tree-root"]'
+    equal: 0
+- click: '[data-testid="code-workspace-tree-add-folder"]'
+- native_folder_dialog:
+    action: choose
+    path: ${fixture.platform_workspace_root}
+- wait_for: '[data-testid="code-workspace-tree-root"]'
+- click: '[data-testid="code-workspace-tree-view-selector"]'
+- click: '[data-testid="code-workspace-tree-view-list"]'
+- wait_for: '[data-testid="code-workspace-list-columns"]'
+- click: '[data-testid="code-workspace-list-sort-size"]'
+- assert_count:
+    selector: '[data-tree-kind][data-path]'
+    equal: 6
+- eval_readonly:
+    expression: '[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
+      === "Documents|Pictures|src"'
+    expect_truthy: true
+- eval_readonly:
+    expression: '[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
+      === "Draft10.txt|Draft2.txt|README.md"'
+    expect_truthy: true
+- click: '[data-testid="code-workspace-list-sort-modified"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-list-name"]').getBoundingClientRect().left >= document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-tree"]').getBoundingClientRect().left
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-list-name"]').getBoundingClientRect().right <= document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-tree"]').getBoundingClientRect().right
+    expect_truthy: true
+- click: '[data-testid="code-workspace-tree-file"][data-path="Draft10.txt"]'
+- press:
+    selector: '[data-testid="code-workspace-tree-pane"]'
+    key: F2
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: Renamed.txt
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="Renamed.txt"]'
+- assert_file_contains:
+    path: ${fixture.platform_workspace_root}/Renamed.txt
+    contains: Tenth.
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Renamed.txt"]'
+- wait_for: '[data-testid="workspace-file-editor"]'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"]'
+    contains: Tenth.
+- press:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    key: Mod+End
+- type:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    text: SAVED
+- wait_for: '[data-testid="workspace-file-editor"][data-dirty="true"]'
+- click: '[data-testid="workspace-editor-save"]'
+- assert_file_contains:
+    path: ${fixture.platform_workspace_root}/Renamed.txt
+    contains: SAVED
+- screenshot: workspace-native-explorer-detailed-list.png
+- click: '[data-testid="code-workspace-tree-view-selector"]'
+- click: '[data-testid="code-workspace-tree-view-packages"]'
+- wait_for: '[data-testid="code-workspace-package-group"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-tree"]'
+    contains: src/main/java · com.example
+- assert_text:
+    selector: '[data-testid="code-workspace-tree"]'
+    contains: src/main/java · com.example.util
+- assert_text:
+    selector: '[data-testid="code-workspace-tree"]'
+    contains: src/test/java · com.example
+- assert_pattern:
+    selector: '[data-testid="code-workspace-flat-file"][data-path="src/main/java/com/example/util/Helper.java"]'
+    regex: ^Helper[.]java$
+- dblclick: '[data-testid="code-workspace-flat-file"][data-path="src/main/java/com/example/util/Helper.java"]'
+- wait_for: '[data-testid="workspace-file-editor"]'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"]'
+    contains: package com.example.util;
+- reload_window: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-package-group"]'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"]'
+    contains: package com.example.util;
+- assert_no_runtime_errors: null
+- screenshot: workspace-native-detailed-explorer.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The rootless workspace chooses an actual folder, lists and sorts disk metadata, renames/saves a file and restores package view plus its
+      selected editor.
+    actions:
+    - 3
+    - 5
+    - 6
+    - 8
+    - 9
+    - 11
+    - 12
+    - 14
+    - 18
+    - 21
+    - 22
+    - 24
+    - 25
+    - 28
+    - 31
+    - 34
+    - 37
+    - 38
+    - 44
+    - 47
+    - 48
+    results:
+    - 7
+    - 15
+    - 16
+    - 17
+    - 19
+    - 20
+    - 27
+    - 30
+    - 35
+    - 40
+    - 41
+    - 42
+    - 43
+    - 46
+    - 50
+    - 51
+    checkpoints:
+    - step: 7
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree-root\"]", "equal": 0}}'
+    - step: 15
+      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
+    - step: 16
+      expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
+        === \"Documents|Pictures|src\"", "expect_truthy": true}}'
+    - step: 17
+      expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
+        === \"Draft10.txt|Draft2.txt|README.md\"", "expect_truthy": true}}'
+    - step: 19
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-list-name\"]'').getBoundingClientRect().left
+        >= document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree\"]'').getBoundingClientRect().left", "expect_truthy":
+        true}}'
+    - step: 20
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-list-name\"]'').getBoundingClientRect().right
+        <= document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree\"]'').getBoundingClientRect().right", "expect_truthy":
+        true}}'
+    - step: 27
+      expectation: '{"assert_file_contains": {"path": "${fixture.platform_workspace_root}/Renamed.txt", "contains": "Tenth."}}'
+    - step: 30
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"]", "contains": "Tenth."}}'
+    - step: 35
+      expectation: '{"assert_file_contains": {"path": "${fixture.platform_workspace_root}/Renamed.txt", "contains": "SAVED"}}'
+    - step: 40
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree\"]", "contains": "src/main/java · com.example"}}'
+    - step: 41
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree\"]", "contains": "src/main/java · com.example.util"}}'
+    - step: 42
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree\"]", "contains": "src/test/java · com.example"}}'
+    - step: 43
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-flat-file\"][data-path=\"src/main/java/com/example/util/Helper.java\"]",
+        "regex": "^Helper[.]java$"}}'
+    - step: 46
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"]", "contains": "package com.example.util;"}}'
+    - step: 50
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"]", "contains": "package com.example.util;"}}'
+    - step: 51
+      expectation: '{"assert_no_runtime_errors": null}'
+  visual:
+  - check: Review file area, row metadata, selection, toolbar and package layout in the retained screenshot.
+    method: manual
+    reason: Functional assertions do not establish visual fidelity; review the case screenshot separately.
+  native:
+  - check: OS folder chooser, real filesystem rename/save and reload of package files.
+    method: automated
+    reason: Real Tauri IPC, native filesystem or process effects cannot be established by browser stubs.

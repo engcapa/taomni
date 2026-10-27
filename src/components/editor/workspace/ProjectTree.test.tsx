@@ -31,7 +31,51 @@ function TreeHarness({ mode }: { mode: ProjectTreeProps["treeViewMode"] }) {
 
 describe("ProjectTree navigation across views", () => {
   afterEach(cleanup);
-  it.each(["tree", "compact", "flat"] as const)("keeps selection and visible ancestry in %s view, including loose files", (mode) => {
+
+  it("keeps heavy directories visible in the hierarchical file explorer", () => {
+    render(
+      <ProjectTree
+        roots={[{ id: "root", name: "fixture", path: "/fixture", kind: "folder" }]}
+        looseFiles={[]}
+        directories={{
+          [rootDirKey("root", "")]: {
+            entries: [{ name: "packages", path: "packages", fileType: "dir", size: 0, mtime: 1, isHidden: false }],
+            loading: false,
+            loaded: true,
+            error: null,
+          },
+          [rootDirKey("root", "packages")]: {
+            entries: [{ name: "node_modules", path: "packages/node_modules", fileType: "dir", size: 0, mtime: 1, isHidden: false }],
+            loading: false,
+            loaded: true,
+            error: null,
+          },
+        }}
+        compactChains={{}}
+        flatFiles={{}}
+        treeViewMode="tree"
+        treeFilter=""
+        expandedRoots={new Set(["root"])}
+        expandedDirs={new Set([rootDirKey("root", "packages")])}
+        selected={null}
+        activeKey={null}
+        openFiles={{}}
+        gitChangeByRootPath={new Map()}
+        onToggleRoot={vi.fn()}
+        onToggleDir={vi.fn()}
+        onSelect={vi.fn()}
+        onOpenFile={open}
+        onContextMenu={() => {}}
+      />,
+    );
+
+    const directories = screen.getAllByTestId("code-workspace-tree-dir");
+    expect(directories.some((node) => node.getAttribute("data-path") === "packages")).toBe(true);
+    expect(directories.some((node) => node.getAttribute("data-path") === "packages/node_modules")).toBe(true);
+    expect(screen.queryByText("Empty")).not.toBeInTheDocument();
+  });
+
+  it.each(["tree", "compact", "flat", "list", "packages"] as const)("keeps selection and visible ancestry in %s view, including loose files", (mode) => {
     open.mockClear();
     render(<TreeHarness mode={mode} />);
     const tree = screen.getByRole("tree");
@@ -39,12 +83,12 @@ describe("ProjectTree navigation across views", () => {
     press("Home");
     expect(screen.getByTestId("code-workspace-tree-root")).toHaveAttribute("aria-selected", "true");
     press("ArrowRight");
-    if (mode !== "flat") press("ArrowRight");
-    const file = screen.getByTestId(mode === "flat" ? "code-workspace-flat-file" : "code-workspace-tree-file");
+    if (mode !== "flat" && mode !== "packages") press("ArrowRight");
+    const file = screen.getByTestId((mode === "flat" || mode === "packages") ? "code-workspace-flat-file" : "code-workspace-tree-file");
     expect(file).toHaveFocus();
     expect(file).toHaveAttribute("aria-selected", "true");
     press("ArrowLeft");
-    expect(screen.getByTestId(mode === "flat" ? "code-workspace-tree-root" : "code-workspace-tree-dir")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId((mode === "flat" || mode === "packages") ? "code-workspace-tree-root" : "code-workspace-tree-dir")).toHaveAttribute("aria-selected", "true");
     press("End");
     const loose = screen.getByTestId("code-workspace-tree-loose-file");
     expect(loose).toHaveFocus();

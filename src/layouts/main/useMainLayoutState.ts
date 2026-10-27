@@ -1,3 +1,5 @@
+import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
+import { activeWorkspaceRuntimeTabId } from "../../lib/workspaceRuntimeIdentity";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type PanelImperativeHandle } from "react-resizable-panels";
 import { useToolWindowStripeStore } from "../../components/editor/workspace/toolWindowStripeStore";
@@ -72,6 +74,12 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
   } = useAppStore();
   const { loadSessions, markConnected, sessions, updateSession, setSelectedSession, setSearchQuery } = useSessionStore();
   const activeTab = tabs.find((t) => t.id === activeTabId);
+  const primaryMode = useAppStore((state) => state.activeSideTab);
+  const platformTabClosable = useWorkspacePlatformStore((state) => {
+    const workspace = state.workspaces.find((item) => item.id === state.activeWorkspaceId);
+    return !!workspace?.openTabs.find((tab) => tab.id === workspace.activeTabId)?.closable;
+  });
+  const activeTabClosable = primaryMode === "workspaces" ? platformTabClosable : !!activeTab?.closable;
   // ED-PARITY-027 A: every tab group restores its own sidebar state (tool
   // window tabs start collapsed to the rail).
   const activeRailGroup = sidebarRailGroup(activeTab?.type);
@@ -103,7 +111,7 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
   const executeControlToolRef = useRef<ControlToolExecutor | null>(null);
   const seenControlToolCallsRef = useRef<Set<string>>(new Set());
   const sidebarPanelRef = useRef<PanelImperativeHandle>(null);
-  const lastSidebarSizeRef = useRef(22);
+  const lastSidebarSizeRef = useRef(0);
   const [showSessionEditor, setShowSessionEditor] = useState(false);
   const [editingSession, setEditingSession] = useState<SessionConfig | undefined>();
   const [newSessionGroupPath, setNewSessionGroupPath] = useState<string | null>(null);
@@ -138,9 +146,9 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
       return next;
     });
   }, []);
-  const activeWorkspaceCommandRegistration = activeTabId
-    ? workspaceCommandRegistrations[activeTabId] ?? null
-    : null;
+  const platformActiveTabId = useWorkspacePlatformStore((state) => activeWorkspaceRuntimeTabId(state.getWorkspace()));
+  const commandTabId = primaryMode === "workspaces" ? platformActiveTabId : primaryMode === "sessions" ? activeTabId : undefined;
+  const activeWorkspaceCommandRegistration = commandTabId ? workspaceCommandRegistrations[commandTabId] ?? null : null;
   // On macOS we render a native global menu bar instead of the in-app app menu.
   // The native menu lives at the top of the screen, matching standard macOS
   // apps; the in-bar menu button is hidden there.
@@ -254,6 +262,7 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
     refreshXServer,
     activeTabId,
     activeTab,
+    activeTabClosable,
     syncTabChatWithActiveTab,
     sidebarPanelRef,
     sidebarCollapsed,

@@ -72,6 +72,38 @@ it("starts an account-owned task and leaves it running when the tab unmounts", a
   expect(ipc.invoke.mock.calls.filter(([cmd]) => cmd === "mail_archive_pause")).toHaveLength(0);
 });
 
+it.each([
+  ["completed", "shared", "resume", "pause", "mail_archive_pause"],
+  ["shared", "completed", "pause", "resume", "mail_archive_start"],
+])("does not change a pressed %s control into the opposite action after polling", async (initial, next, from, to, command) => {
+  vi.useFakeTimers();
+  let phase = initial;
+  const previous = ipc.invoke.getMockImplementation()!;
+  ipc.invoke.mockImplementation((cmd: string, args: unknown) => cmd === "mail_archive_status"
+    ? Promise.resolve({ phase, saved: 1, total: 1 }) : previous(cmd, args));
+  try {
+    render(<MailArchivePanel info={info} />);
+    await act(async () => {});
+    const pressed = screen.getByTestId(`mail-storage-${from}`);
+    fireEvent.pointerDown(pressed, { button: 0 });
+    phase = next;
+    await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+    const replacement = screen.getByTestId(`mail-storage-${to}`);
+    ipc.invoke.mockClear();
+    // A physical release belongs to the pressed control. A poll must not
+    // repurpose that same DOM node into Pause/Resume before the release.
+    await act(async () => {
+      fireEvent.pointerUp(pressed, { button: 0 });
+      fireEvent.click(pressed);
+    });
+    expect(ipc.invoke.mock.calls.filter(([cmd]) => cmd === command)).toHaveLength(0);
+    await act(async () => { fireEvent.click(replacement); });
+    expect(ipc.invoke.mock.calls.filter(([cmd]) => cmd === command)).toHaveLength(1);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
 it("reads retained originals, exports attachments, and cleans up only after confirmation", async () => {
   render(<MailArchivePanel info={info} />);
   fireEvent.click(screen.getByTestId("mail-archive-open"));

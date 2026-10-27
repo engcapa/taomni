@@ -1,6 +1,67 @@
 [data-testid="code-workspace-tree"] [role="treeitem"] {
-  border-radius: 4px;
+  border-radius: 5px;
   outline-offset: -2px;
+}
+
+.taomni-file-explorer [data-testid="code-workspace-tree"] {
+  padding: 5px 5px 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--taomni-code-border) transparent;
+}
+
+.taomni-file-explorer [data-testid="code-workspace-tree-root"] {
+  margin-top: 3px;
+  letter-spacing: 0.01em;
+}
+
+.taomni-file-explorer [data-testid="code-workspace-tree-file-details"] {
+  margin-left: auto;
+  padding-left: 10px;
+  font-size: var(--taomni-code-tree-small-font-size);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.8;
+}
+
+.taomni-explorer-file-icon { color: var(--taomni-code-muted); }
+.taomni-explorer-list-metadata {
+  display: grid;
+  grid-template-columns: 64px 72px 146px;
+  gap: 10px;
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--taomni-code-muted);
+  font-size: var(--taomni-code-tree-small-font-size);
+  font-variant-numeric: tabular-nums;
+}
+.taomni-explorer-list-name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  width: var(--taomni-explorer-name-width);
+  flex: 0 0 var(--taomni-explorer-name-width);
+  background: var(--taomni-code-gutter-bg);
+}
+.taomni-explorer-list-name > .truncate { flex: 1; min-width: 0; }
+[data-view-mode="list"] [role="treeitem"]:hover .taomni-explorer-list-name,
+[data-view-mode="list"] [data-selected="true"] .taomni-explorer-list-name {
+  background: var(--taomni-code-active-line-bg);
+}
+[data-view-mode="list"] [data-active="true"] .taomni-explorer-list-name {
+  background: var(--taomni-code-selection-match-bg);
+}
+[data-view-mode="list"]:focus-within [data-selected="true"] .taomni-explorer-list-name,
+[data-testid="code-workspace-tree-pane"]:focus-within [data-view-mode="list"] [data-selected="true"] .taomni-explorer-list-name {
+  background: var(--taomni-code-selection-bg);
+}
+.taomni-explorer-file-icon[data-file-type="folder"] { color: var(--taomni-accent); }
+.taomni-explorer-file-icon:is([data-file-type="code"], [data-file-type="script"]) {
+  color: var(--taomni-code-syntax-function, var(--taomni-accent));
+}
+.taomni-explorer-file-icon:is([data-file-type="image"], [data-file-type="video"], [data-file-type="audio"]) {
+  color: var(--taomni-code-syntax-string, var(--taomni-accent));
+}
+.taomni-explorer-file-icon:is([data-file-type="config"], [data-file-type="archive"], [data-file-type="database"], [data-file-type="spreadsheet"]) {
+  color: var(--taomni-code-syntax-number, var(--taomni-accent));
 }
 
 /* Selection remains visible while focus is in the editor or a menu. */

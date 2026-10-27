@@ -103,6 +103,8 @@ def run(ctx, args):
             peer.act("fill", {"selector": '[data-testid="vault-unlock-pw"]', "value": "qa-mail-storage-password"})
             peer.act("click", '[data-testid="vault-unlock-confirm"]')
             peer.act("wait_for", {"selector": '[data-testid="vault-unlock-dialog"]', "state": "detached", "timeout_sec": 30})
+            peer.act("click", '[data-testid="side-tab-sessions"]')
+            peer.act("wait_for", '[data-testid="session-tree"]')
             peer.act("dblclick", session_name)
             peer.until(text(progress) + '.includes("completed")', 30)
             # Keep a chunk in flight long enough to distinguish the two owners.

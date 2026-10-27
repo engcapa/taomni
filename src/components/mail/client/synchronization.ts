@@ -4,14 +4,16 @@ import { folderLabel } from "../../../lib/mailFolders";
 import { countNewMail, folderHasMoreToLoad, mergeSyncedMessages, runFolderSyncLoop } from "../../../lib/mailSync";
 import { type SyncIndicator, type SyncFolderOptions } from "./types";
 import { sortMessages, mailClientErrorMessage, delay } from "./messages";
+import type { MailSubscriptionSnapshots } from "./subscriptionSnapshots";
 
 
 
 export interface RunFolderSyncContext {
+  folderSnapshots: MailSubscriptionSnapshots;
   syncGenerationRef: import("react").RefObject<number>;
   info: import("../../../types").MailTabInfo;
   catchupBatchSize: number;
-  applySyncedFolder: (folder: MailFolder) => void;
+  applySyncedFolder: (folder: MailFolder, readRevision: number) => void;
   visibleRef: import("react").RefObject<boolean>;
   pendingCacheRefreshRef: import("react").RefObject<boolean>;
   selectedFolderRef: import("react").RefObject<string>;
@@ -33,14 +35,18 @@ export function createRunFolderSync(controllerContext: RunFolderSyncContext): (f
   } = {}) => {
     const generation = controllerContext.syncGenerationRef.current;
     const indicator = options.indicator ?? "none";
+    let readRevision = controllerContext.folderSnapshots.capture();
     try {
       const loop = await runFolderSyncLoop({
         mode: options.mode ?? "auto",
         maxSteps: options.maxSteps ?? 40,
         isCancelled: () => controllerContext.syncGenerationRef.current !== generation,
-        step: (mode) => mailSyncFolder(controllerContext.info, folder, { mode, limit: controllerContext.catchupBatchSize, includeBodies: false }),
+        step: (mode) => {
+          readRevision = controllerContext.folderSnapshots.capture();
+          return mailSyncFolder(controllerContext.info, folder, { mode, limit: controllerContext.catchupBatchSize, includeBodies: false });
+        },
         onStep: (result, progress) => {
-          controllerContext.applySyncedFolder(result.folder);
+          controllerContext.applySyncedFolder(result.folder, readRevision);
           if (!controllerContext.visibleRef.current) {
             controllerContext.pendingCacheRefreshRef.current = true;
             return;
@@ -143,6 +149,7 @@ export function createQueueFolderCatchups(controllerContext: QueueFolderCatchups
 
 
 export interface StartBackfillContext {
+  folderSnapshots: MailSubscriptionSnapshots;
   foldersRef: import("react").RefObject<MailFolder[]>;
   info: import("../../../types").MailTabInfo;
   backfillSeqRef: import("react").RefObject<number>;
@@ -151,7 +158,7 @@ export interface StartBackfillContext {
   syncInFlightRef: import("react").RefObject<boolean>;
   manualSyncPendingRef: import("react").RefObject<boolean>;
   catchupBatchSize: number;
-  applySyncedFolder: (folder: MailFolder) => void;
+  applySyncedFolder: (folder: MailFolder, readRevision: number) => void;
   setBackfillProgress: import("react").Dispatch<SetStateAction<{ folder: string; cached: number; total: number; } | null>>;
   setHasMoreMessages: import("react").Dispatch<SetStateAction<boolean>>;
   messagesRef: import("react").RefObject<MailMessageHeader[]>;
@@ -175,13 +182,14 @@ export function createStartBackfill(controllerContext: StartBackfillContext): (f
             continue;
           }
           controllerContext.syncInFlightRef.current = true;
+          const readRevision = controllerContext.folderSnapshots.capture();
           let result: MailFolderSyncResult;
           try {
             result = await mailSyncFolder(controllerContext.info, folder, { mode: "backfill", limit: controllerContext.catchupBatchSize });
           } finally {
             controllerContext.syncInFlightRef.current = false;
           }
-          controllerContext.applySyncedFolder(result.folder);
+          controllerContext.applySyncedFolder(result.folder, readRevision);
           if (!active()) return;
           const cached = result.folder.cachedCount ?? 0;
           const total = result.folder.total ?? cached;
@@ -349,6 +357,7 @@ export function createQuietPollSelectedAndInbox(controllerContext: QuietPollSele
 
 
 export interface SyncAllFoldersContext {
+  folderSnapshots: MailSubscriptionSnapshots;
   batchSize: number;
   selectedFolderRef: import("react").RefObject<string>;
   manualSyncPendingRef: import("react").RefObject<boolean>;
@@ -420,13 +429,14 @@ export function createSyncAllFolders(controllerContext: SyncAllFoldersContext): 
     }
     if (indicator !== "none") controllerContext.setError(null);
 
+    const readRevision = controllerContext.folderSnapshots.capture();
     try {
       // Manual sync reconciles every cached message; periodic scans only the newest window.
       const result = await mailSyncAllFolders(
         { ...controllerContext.info, sync: { ...controllerContext.info.sync, subscribedOnly: controllerContext.subscribedOnlyRef.current } },
         { limit, includeBodies, fullReconcile: !quiet },
       );
-      controllerContext.foldersRef.current = result.folders;
+      controllerContext.foldersRef.current = controllerContext.folderSnapshots.merge(result.folders, readRevision);
       const newMessages = countNewMail(result.newUnseenByFolder, result.folders, controllerContext.isNewMailExcludedFolder);
       const pending = (result.pendingFolders ?? [])
         .slice()

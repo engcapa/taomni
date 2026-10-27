@@ -75,7 +75,9 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual({e['linux_profile'] for e in native}, set(LINUX_PROFILES))
         self.assertEqual(len({e['id'] for e in native}), 4)
         self.assertEqual({e['runner'] for e in native}, {'ubuntu-22.04', 'ubuntu-24.04', 'ubuntu-26.04'})
-        self.assertTrue(all(e['selected_ids'] == ['TC-NATIVE-CORE-001'] for e in native))
+        expected = {'TC-NATIVE-CORE-001', 'TC-WS-038', 'TC-WS-039', 'TC-WS-045', 'TC-WS-051',
+                    'TC-WS-052', 'TC-WS-053', 'TC-WS-054', 'TC-WS-056'}
+        self.assertTrue(all(set(e['selected_ids']) == expected for e in native))
 
     def test_only_selected_profile_runs_without_implicit_default(self):
         plan = make_plan(args(platforms='linux', modes='native', linux_profiles='ubuntu-22.04-vnc'))
@@ -121,6 +123,10 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(len(x11), 2)
         self.assertEqual(len(wayland), 2)
         self.assertEqual(sum('dual-display' in e['capabilities'] for e in wayland), 1)
+        # The dual-display dependency walk must not overwrite the impacted
+        # planner's changed-path list with its loop-control boolean. The
+        # workflow summary iterates this field after planning.
+        self.assertIsInstance(plan['changed_paths'], list)
         # The user's external project remains unavailable on both desktops.
         self.assertEqual([(g['case'], g['linux_profile']) for g in plan['gaps']], [
             ('TC-IDE-C6-06-java-definition-realproject-native', 'ubuntu-24.04-xvfb'),

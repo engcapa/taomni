@@ -2,6 +2,19 @@ export type CloseRequestedEvent = {
   preventDefault: () => void;
 };
 
+type WindowAction = "startDragging" | "toggleMaximize";
+const windowActions: WindowAction[] = [];
+declare global {
+  interface Window { readonly __taomniWindowActions: readonly WindowAction[] }
+}
+// Browser-preview observations only: the desktop build imports Tauri instead.
+// Return a copy so tests can inspect real gesture dispatch without changing it.
+Object.defineProperty(window, "__taomniWindowActions", { configurable: true, get: () => [...windowActions] });
+function recordWindowAction(action: WindowAction) {
+  windowActions.push(action);
+  if (windowActions.length > 128) windowActions.shift();
+}
+
 class MockWindow {
   get label(): string { return location.hash.startsWith("#screenshot-pin") ? "screenshot-pin-1" : "main"; }
   async innerSize(): Promise<{ width: number; height: number }> {
@@ -14,7 +27,7 @@ class MockWindow {
   }
 
   async startDragging(): Promise<void> {
-    return undefined;
+    recordWindowAction("startDragging");
   }
 
   async startResizeDragging(_direction: string): Promise<void> {
@@ -26,7 +39,7 @@ class MockWindow {
   }
 
   async toggleMaximize(): Promise<void> {
-    return undefined;
+    recordWindowAction("toggleMaximize");
   }
 
   async close(): Promise<void> {

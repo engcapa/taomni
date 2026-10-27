@@ -24,6 +24,7 @@ export function useMailCacheLoading(context: UseMailCacheLoadingContext) {
     setError,
     info,
     foldersRef: cacheOwner.foldersRef,
+    folderSnapshots: cacheOwner.folderSnapshots,
     setFolders: cacheOwner.setFolders,
     updateSelectedFolder: cacheOwner.updateSelectedFolder,
   }), [info.sessionId, cacheOwner.updateSelectedFolder]);

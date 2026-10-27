@@ -17,7 +17,9 @@ fixtures:
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -35,25 +37,25 @@ steps:
 - click: '[data-testid="session-section-advanced"]'
 - wait_for: '[data-testid="advanced-ssh-settings"]'
 - fill:
-    selector: 'input[aria-label="SSH password"]'
+    selector: input[aria-label="SSH password"]
     value: ${env.QA_SSH_PASSWORD}
 - click: '[data-testid="session-section-network"]'
 - wait_for: '[data-testid="network-settings"]'
 - select_option:
     selector: '[data-testid="session-proxy-kind"]'
     value: ssh-tunnel
-- wait_for: 'input[aria-label="Jump host"]'
-- assert_visible: 'input[aria-label="Jump port"]'
-- assert_visible: 'input[aria-label="Jump user"]'
+- wait_for: input[aria-label="Jump host"]
+- assert_visible: input[aria-label="Jump port"]
+- assert_visible: input[aria-label="Jump user"]
 - assert_visible: '[data-testid="session-jump-password"]'
 - fill:
-    selector: 'input[aria-label="Jump host"]'
+    selector: input[aria-label="Jump host"]
     value: ${cfg.ssh.host}
 - fill:
-    selector: 'input[aria-label="Jump port"]'
+    selector: input[aria-label="Jump port"]
     value: ${cfg.ssh.port}
 - fill:
-    selector: 'input[aria-label="Jump user"]'
+    selector: input[aria-label="Jump user"]
     value: ${cfg.ssh.user}
 - fill:
     selector: '[data-testid="session-jump-password"]'
@@ -81,43 +83,65 @@ verification:
     requirement: The native SSH connection test uses the configured SSH jump host and succeeds with the target and jump credentials.
     actions:
     - 1
-    - 3
+    - 2
     - 5
-    - 6
     - 7
     - 8
     - 9
+    - 10
     - 11
-    - 12
+    - 13
     - 14
-    - 19
-    - 20
+    - 16
     - 21
     - 22
     - 23
+    - 24
+    - 25
+    - 29
     checkpoints:
-    - step: 2
+    - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
     - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
+    - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 10
+    - step: 12
       expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
-    - step: 13
-      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
     - step: 15
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 17
       expectation: '{"wait_for": "input[aria-label=\"Jump host\"]"}'
-    - step: 24
-      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
-    - step: 25
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"alert-dialog\"]", "name": "data-tone", "equals": "success"}}'
+    - step: 18
+      expectation: '{"assert_visible": "input[aria-label=\"Jump port\"]"}'
+    - step: 19
+      expectation: '{"assert_visible": "input[aria-label=\"Jump user\"]"}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"session-jump-password\"]"}'
     - step: 26
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"alert-dialog-message\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated to .+ as .+)$", "timeout_sec": 60}}'
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
+    - step: 27
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"alert-dialog\"]", "name": "data-tone", "equals": "success"}}'
     - step: 28
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"session-test-result-summary\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated to .+ as .+)$", "timeout_sec": 60}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"alert-dialog-message\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated
+        to .+ as .+)$", "timeout_sec": 60}}'
+    - step: 30
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"session-test-result-summary\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated
+        to .+ as .+)$", "timeout_sec": 60}}'
     results:
-    - 25
+    - 3
+    - 4
+    - 6
+    - 12
+    - 15
+    - 17
+    - 18
+    - 19
+    - 20
     - 26
+    - 27
     - 28
+    - 30
   visual:
   - check: Jump host fields, test status, and successful result remain readable in the native session editor.
     method: manual

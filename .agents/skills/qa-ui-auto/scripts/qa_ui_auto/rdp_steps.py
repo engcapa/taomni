@@ -851,15 +851,9 @@ def _do_rdp_canvas_click(ctx: NativeStepContext, args: Any) -> str:
     sy = float(geometry["height"]) / float(geometry["desktopHeight"] or geometry["height"])
     vx = int(geometry["left"] + float(args["x"]) * sx)
     vy = int(geometry["top"] + float(args["y"]) * sy)
-    ctx.session.request("POST", ctx.session.endpoint("/actions"), {"actions": [{
-        "type": "pointer", "id": "rdp-canvas-pointer", "parameters": {"pointerType": "mouse"},
-        "actions": [
-            {"type": "pointerMove", "duration": 50, "x": vx, "y": vy, "origin": "viewport"},
-            {"type": "pointerDown", "button": 0},
-            {"type": "pause", "duration": 60},
-            {"type": "pointerUp", "button": 0},
-        ]}]})
-    ctx.session.request("DELETE", ctx.session.endpoint("/actions"))
+    from native_pointer import click_viewport_point
+
+    click_viewport_point(ctx.session, vx, vy, move_ms=50, hold_ms=60)
     return f"clicked desktop ({args['x']},{args['y']}) at viewport ({vx},{vy}) scale {sx:.3f}x{sy:.3f}"
 
 

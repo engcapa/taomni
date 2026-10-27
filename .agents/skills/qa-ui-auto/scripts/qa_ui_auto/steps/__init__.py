@@ -86,3 +86,6 @@ from . import mfa          # noqa: E402,F401
 
 from ..window_context import browser_switch
 verb("switch_window")(browser_switch)
+
+from ..runtime_errors import browser_assert
+verb("assert_no_runtime_errors")(browser_assert)

@@ -33,22 +33,22 @@ steps:
     expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-tree-toolbar-actions"] > button:nth-of-type(1)')?.getAttribute('data-testid') === 'code-workspace-tree-view-selector'
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-tree-toolbar-actions"] > button:nth-of-type(2)')?.getAttribute('title') === 'New…'
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-tree-toolbar-actions"] > button:nth-of-type(3)')?.getAttribute('title') === 'New…'
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-tree-toolbar-actions"] > button:nth-of-type(3)')?.getAttribute('data-testid') === 'code-workspace-tree-select-opened'
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-tree-toolbar-actions"] > button:nth-of-type(4)')?.getAttribute('data-testid') === 'code-workspace-tree-select-opened'
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-tree-toolbar-actions"] > button:nth-of-type(4)')?.getAttribute('data-testid') === 'code-workspace-tree-expand-all'
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-tree-toolbar-actions"] > button:nth-of-type(5)')?.getAttribute('data-testid') === 'code-workspace-tree-expand-all'
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-tree-toolbar-actions"] > button:nth-of-type(5)')?.getAttribute('data-testid') === 'code-workspace-tree-collapse-all'
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-tree-toolbar-actions"] > button:nth-of-type(6)')?.getAttribute('data-testid') === 'code-workspace-tree-collapse-all'
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-tree-toolbar-actions"] > button:nth-of-type(6)')?.getAttribute('data-testid') === 'code-workspace-tree-toolbar-more'
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-tree-toolbar-actions"] > button:nth-of-type(7)')?.getAttribute('data-testid') === 'code-workspace-tree-toolbar-more'
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-tree-toolbar-actions"] > button:nth-of-type(7)')?.getAttribute('data-testid') === 'code-workspace-tree-collapse'
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-tree-toolbar-actions"] > button:nth-of-type(8)')?.getAttribute('data-testid') === 'code-workspace-tree-collapse'
     expect_truthy: true
 - assert_not_visible: '[data-testid="code-workspace-tree-filter"]'
 - assert_visible: '[data-testid="code-workspace-tree-root-path"]'
@@ -172,17 +172,17 @@ verification:
     - step: 14
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"] > button:nth-of-type(1)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-view-selector''", "expect_truthy": true}}'
     - step: 15
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"] > button:nth-of-type(2)'')?.getAttribute(''title'') === ''New…''", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"] > button:nth-of-type(3)'')?.getAttribute(''title'') === ''New…''", "expect_truthy": true}}'
     - step: 16
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"] > button:nth-of-type(3)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-select-opened''", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"] > button:nth-of-type(4)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-select-opened''", "expect_truthy": true}}'
     - step: 17
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"] > button:nth-of-type(4)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-expand-all''", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"] > button:nth-of-type(5)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-expand-all''", "expect_truthy": true}}'
     - step: 18
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"] > button:nth-of-type(5)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-collapse-all''", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"] > button:nth-of-type(6)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-collapse-all''", "expect_truthy": true}}'
     - step: 19
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"] > button:nth-of-type(6)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-toolbar-more''", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"] > button:nth-of-type(7)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-toolbar-more''", "expect_truthy": true}}'
     - step: 20
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"] > button:nth-of-type(7)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-collapse''", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"] > button:nth-of-type(8)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-collapse''", "expect_truthy": true}}'
     - step: 21
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree-filter\"]"}'
     - step: 22

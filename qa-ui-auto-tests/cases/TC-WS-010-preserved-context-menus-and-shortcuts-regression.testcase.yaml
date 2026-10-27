@@ -1,0 +1,297 @@
+id: TC-WS-010
+title: Context menus and import/export stay complete across the redesigned shell
+description: v6.1 AC-10 regression. The app main menu keeps its entries (new local terminal, new remote session, new SFTP, Sessions import/export submenus, View,
+  Tools, Settings, Help, Exit); the primary rail keeps Show Tool Window Names; the session tree, tab strip and workspace file tree keep their full context menus
+  (connect/edit/duplicate/move/delete, close variants, copy path, new file/directory, add/remove root).
+modes:
+- browser
+- native
+covers:
+- F1.2
+- F1.4
+- F1.8
+- F25.5
+tags:
+- p0
+- workspace-redesign
+- right-menu
+- regression
+fixtures:
+- reset_db
+- platform_workspace_root
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-010
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: 127.0.0.1
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: prod-api-01
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="prod-api-01"]'
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace (默认工作区)","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"qa-root","path":"${fixture.platform_workspace_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
+- reload_window: null
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="app-main-menu"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_visible: '[data-testid="context-menu-item-new-local-terminal"]'
+- assert_visible: '[data-testid="context-menu-item-new-remote-session"]'
+- assert_visible: '[data-testid="context-menu-item-new-sftp"]'
+- assert_visible: '[data-testid="context-menu-item-sessions"]'
+- assert_visible: '[data-testid="context-menu-item-view"]'
+- assert_visible: '[data-testid="context-menu-item-tools"]'
+- assert_visible: '[data-testid="context-menu-item-settings"]'
+- assert_visible: '[data-testid="context-menu-item-help"]'
+- assert_visible: '[data-testid="context-menu-item-exit"]'
+- hover: '[data-testid="context-menu-item-sessions"]'
+- assert_visible: '[data-testid="menu-import-sessions"]'
+- assert_visible: '[data-testid="menu-export-sessions"]'
+- press: Escape
+- right_click: '[data-testid="sidebar-rail"]'
+- wait_for: '[data-testid="sidebar-rail-menu-show-names"]'
+- click: '[data-testid="sidebar-rail-menu-show-names"]'
+- assert_localstorage:
+    key: taomni.codeWorkspace.toolWindowStripes.v1
+    contains: '"showNames":true'
+- right_click: '[data-testid="sidebar-rail"]'
+- click: '[data-testid="sidebar-rail-menu-show-names"]'
+- assert_localstorage:
+    key: taomni.codeWorkspace.toolWindowStripes.v1
+    contains: '"showNames":false'
+- right_click: '[data-testid="session-tree-item"][data-session-name="prod-api-01"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Connect
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Edit
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Duplicate
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Move to folder
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Delete
+- press: Escape
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- right_click: '[data-testid="tab-bar"] [data-testid="tab-item"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Close others
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Close all
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Duplicate tab
+- press: Escape
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree"]'
+- click: '[data-testid="code-workspace-tree-root"]'
+- wait_for: '[data-testid="code-workspace-tree-file"]'
+- right_click: '[data-testid="code-workspace-tree-root"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_menu_items:
+  - New File...
+- assert_menu_items:
+  - New Directory...
+- assert_menu_items:
+  - Open in Terminal
+- assert_menu_items:
+  - Rename Root...
+- assert_menu_items:
+  - Remove from Workspace
+- assert_menu_items:
+  - Copy Path
+- assert_menu_items:
+  - Remove from Workspace
+- press: Escape
+- assert_not_visible: '[data-testid="context-menu"]'
+- screenshot: ws-010-preserved-context-menus.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 主菜单及导入导出保留；图标栏名称可显示、隐藏并持久化。
+    actions:
+    - 1
+    - 2
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 13
+    - 16
+    - 27
+    - 30
+    - 31
+    - 33
+    - 35
+    - 36
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"prod-api-01\"]"}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 18
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-new-local-terminal\"]"}'
+    - step: 19
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-new-remote-session\"]"}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-new-sftp\"]"}'
+    - step: 21
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-sessions\"]"}'
+    - step: 22
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-view\"]"}'
+    - step: 23
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-tools\"]"}'
+    - step: 24
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-settings\"]"}'
+    - step: 25
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-help\"]"}'
+    - step: 26
+      expectation: '{"assert_visible": "[data-testid=\"context-menu-item-exit\"]"}'
+    - step: 28
+      expectation: '{"assert_visible": "[data-testid=\"menu-import-sessions\"]"}'
+    - step: 29
+      expectation: '{"assert_visible": "[data-testid=\"menu-export-sessions\"]"}'
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"sidebar-rail-menu-show-names\"]"}'
+    - step: 34
+      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"showNames\":true"}}'
+    - step: 37
+      expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.toolWindowStripes.v1", "contains": "\"showNames\":false"}}'
+    results:
+    - 3
+    - 6
+    - 11
+    - 15
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 28
+    - 29
+    - 32
+    - 34
+    - 37
+  - id: R2
+    requirement: 会话树、终端标签、工作区文件树右键菜单保留全部操作。
+    actions:
+    - 38
+    - 45
+    - 46
+    - 48
+    - 53
+    - 54
+    - 56
+    - 58
+    - 67
+    checkpoints:
+    - step: 39
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 40
+      expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Connect"}}'
+    - step: 41
+      expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Edit"}}'
+    - step: 42
+      expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Duplicate"}}'
+    - step: 43
+      expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Move to folder"}}'
+    - step: 44
+      expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Delete"}}'
+    - step: 47
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
+    - step: 49
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 50
+      expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Close others"}}'
+    - step: 51
+      expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Close all"}}'
+    - step: 52
+      expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Duplicate tab"}}'
+    - step: 55
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
+    - step: 57
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+    - step: 59
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 60
+      expectation: '{"assert_menu_items": ["New File..."]}'
+    - step: 61
+      expectation: '{"assert_menu_items": ["New Directory..."]}'
+    - step: 62
+      expectation: '{"assert_menu_items": ["Open in Terminal"]}'
+    - step: 63
+      expectation: '{"assert_menu_items": ["Rename Root..."]}'
+    - step: 64
+      expectation: '{"assert_menu_items": ["Remove from Workspace"]}'
+    - step: 65
+      expectation: '{"assert_menu_items": ["Copy Path"]}'
+    - step: 66
+      expectation: '{"assert_menu_items": ["Remove from Workspace"]}'
+    - step: 68
+      expectation: '{"assert_not_visible": "[data-testid=\"context-menu\"]"}'
+    results:
+    - 39
+    - 40
+    - 41
+    - 42
+    - 43
+    - 44
+    - 47
+    - 49
+    - 50
+    - 51
+    - 52
+    - 55
+    - 57
+    - 59
+    - 60
+    - 61
+    - 62
+    - 63
+    - 64
+    - 65
+    - 66
+    - 68
+  visual:
+  - check: 与 HTML 原型比较圆角框架、紧凑尺寸、无溢出和可用操作入口。
+    method: manual
+    reason: 保留运行截图供视觉对比，自动断言验证具体布局和状态。
+  native:
+  - check: 在真实桌面 WebView 验证布局与持久化；终端用例额外验证真实 PTY，编辑器用例验证真实磁盘写入。
+    method: automated
+    reason: 浏览器存根不能证明 WebKit/WebView2 渲染与原生磁盘、进程行为。
+native_platforms:
+- Linux
+- Windows

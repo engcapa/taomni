@@ -1,0 +1,233 @@
+id: TC-WS-038
+title: Restore a workspace with a terminal selected and its editor hidden
+description: Create the saved layout through the UI, reload on Home, then return to a workspace whose file editor is mounted behind a terminal. Retain the
+  draft, terminal, navigator and tool controls.
+modes:
+- browser
+- native
+covers:
+- F-WS-1
+- F-WS-2
+- F-WS-5
+- F25.3
+tags:
+- p0
+- workspace-redesign
+- regression
+- crash-regression
+fixtures:
+- reset_db
+- platform_workspace_root
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-hidden-editor
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.platform_workspace_root}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree"]'
+- click: '[data-testid="code-workspace-tree-root"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- wait_for: '[data-testid="workspace-file-editor"] .cm-content'
+- press:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    key: Mod+End
+- type:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    text: QA_HIDDEN_EDITOR_DRAFT
+- wait_for: '[data-testid="workspace-file-editor"][data-dirty="true"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="workspace-session-pane"]'
+- click: '[data-testid="code-workspace-tool-rail-project"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_no_runtime_errors: null
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-session-pane"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-tab-title
+    equals: Local Terminal
+- assert_visible: '[data-testid="collapsed-sidebar-rail"]'
+- assert_no_runtime_errors: null
+- click: '[data-testid="workspace-tab"][data-tab-title="README.md"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-dirty="true"] .cm-content'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    contains: QA_HIDDEN_EDITOR_DRAFT
+- click: '[data-testid="code-workspace-tool-rail-project"]'
+- wait_for: '[data-testid="code-workspace-tree"]'
+- assert_visible: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- click: '[data-testid="code-workspace-tool-rail-documentation"]'
+- assert_visible: '[data-testid="code-workspace-right-pane"]'
+- click: '[data-testid="code-workspace-tool-rail-documentation"]'
+- assert_not_visible: '[data-testid="code-workspace-right-pane"]'
+- assert_no_runtime_errors: null
+- click: '[data-testid="workspace-tab"][data-tab-title="Local Terminal"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-session-pane"]'
+- assert_visible: '[data-testid="expanded-sidebar-panel"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 1
+- assert_no_runtime_errors: null
+- click: '[data-testid="code-workspace-tool-rail-project"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-session-pane"]'
+- assert_visible: '[data-testid="collapsed-sidebar-rail"]'
+- assert_no_runtime_errors: null
+- click: '[data-testid="workspace-tab"][data-tab-title="README.md"]'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    contains: QA_HIDDEN_EDITOR_DRAFT
+- assert_no_runtime_errors: null
+- screenshot: workspace-hidden-editor-restored.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A terminal-selected workspace with a hidden editor can be restored from Home without crashing. Its active terminal, collapsed sidebar and
+      dirty draft survive; expanded and collapsed navigator choices survive repeated mode switches, Project and Documentation still toggle, and only one
+      editor runtime is mounted. No uncaught exception, unhandled rejection, React boundary error or crash page is permitted before reload or after restoration.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 7
+    - 9
+    - 10
+    - 12
+    - 13
+    - 15
+    - 16
+    - 18
+    - 20
+    - 23
+    - 25
+    - 30
+    - 33
+    - 36
+    - 38
+    - 41
+    - 42
+    - 43
+    - 44
+    - 49
+    - 51
+    - 52
+    - 53
+    - 57
+    checkpoints:
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-dirty=\"true\"]"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 22
+      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 27
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "Local
+        Terminal"}}'
+    - step: 28
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 29
+      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-dirty=\"true\"] .cm-content"}'
+    - step: 32
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_HIDDEN_EDITOR_DRAFT"}}'
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
+    - step: 35
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
+    - step: 37
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
+    - step: 39
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
+    - step: 40
+      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
+    - step: 45
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 46
+      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 47
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
+    - step: 48
+      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
+    - step: 50
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 54
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 55
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 56
+      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
+    - step: 58
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_HIDDEN_EDITOR_DRAFT"}}'
+    - step: 59
+      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
+    results:
+    - 8
+    - 11
+    - 14
+    - 17
+    - 19
+    - 21
+    - 22
+    - 24
+    - 26
+    - 27
+    - 28
+    - 29
+    - 31
+    - 32
+    - 34
+    - 35
+    - 37
+    - 39
+    - 40
+    - 45
+    - 46
+    - 47
+    - 48
+    - 50
+    - 54
+    - 55
+    - 56
+    - 58
+    - 59
+  native:
+  - check: Restore the hidden editor behind the active terminal in the packaged WebView.
+    method: automated
+    reason: The reported desktop crash depends on mounting and resizing invisible panels. Browser geometry cannot certify packaged WebView behavior; real
+      PTY commands remain covered by TC-WS-015 and TC-WS-024.
+  visual:
+  - check: Restored file, terminal and compact navigator remain usable.
+    method: manual
+    reason: Retain the screenshot; assertions establish restoration and control behavior.

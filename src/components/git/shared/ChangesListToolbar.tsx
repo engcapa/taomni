@@ -229,6 +229,18 @@ export function ChangesListToolbar({
         />
       ) : null}
 
+      <button
+        type="button"
+        data-testid="git-changes-tree-toggle"
+        data-tree-mode={treeMode ? "tree" : "flat"}
+        aria-pressed={treeMode}
+        aria-label={viewLabel}
+        title={viewLabel}
+        className="taomni-btn h-7 w-8 p-0 inline-flex items-center justify-center"
+        onClick={onToggleTreeMode}
+      >
+        {treeMode ? <List className="w-3.5 h-3.5" /> : <ListTree className="w-3.5 h-3.5" />}
+      </button>
       <div ref={moreMenuRef} className="relative shrink-0">
         <button
           type="button"

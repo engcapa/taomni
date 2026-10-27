@@ -85,7 +85,28 @@ pub fn write_json<T: serde::Serialize>(path: &Path, value: &T) -> Result<(), Str
     use std::io::Write;
     tmp.write_all(&bytes).map_err(|e| e.to_string())?;
     tmp.as_file().sync_all().map_err(|e| e.to_string())?;
-    tmp.persist(path).map_err(|e| e.error.to_string())?;
+    let mut pending = Some(tmp);
+    super::atomic_replace::retry(|| {
+        match pending
+            .take()
+            .expect("pending backup control file")
+            .persist(path)
+        {
+            Ok(file) => Ok(file),
+            Err(error) => {
+                // PersistError returns ownership: retry the same synced file,
+                // without truncating or removing the last complete journal.
+                pending = Some(error.file);
+                Err(error.error)
+            }
+        }
+    })
+    .map_err(|error| {
+        format!(
+            "Cannot replace backup control file {}: {error}",
+            path.display()
+        )
+    })?;
     Ok(())
 }
 fn read_at(root: &Path) -> Result<ControlConfig, String> {

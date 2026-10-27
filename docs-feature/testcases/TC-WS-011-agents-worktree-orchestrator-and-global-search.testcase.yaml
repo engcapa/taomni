@@ -1,0 +1,60 @@
+id: TC-WS-011
+title: Agents mode displays Git Worktree tasks and links to Workspace Git Diff while
+  Ctrl+K opens global search
+description: 'Verifies TASK-09 / V-11: clicking Agents in the left rail renders the
+  Git Worktree agent orchestrator with Diff review link to Workspace Git Panel, and
+  clicking global search opens the command modal.'
+covers:
+- F1.2
+tags:
+- p1
+- agents
+- workspace-redesign
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 60
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar-rail"]'
+- click: '[data-testid="nav-mode-agents"]'
+- wait_for: '[data-testid="agents-platform-view"]'
+- assert_visible: '[data-testid="agent-review-git-diff"]'
+- click: '[data-testid="global-search-trigger"]'
+- wait_for: '[data-testid="global-search-modal"]'
+- press: Escape
+- assert_not_visible: '[data-testid="global-search-modal"]'
+- screenshot: ws-011-agents-and-global-search.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 切换到 Agents 模式展示 Worktree 任务编排视图与 Git Diff 审阅入口，点击顶栏搜索按钮打开并可按 Esc
+      关闭全局搜索弹窗。
+    actions:
+    - 1
+    - 3
+    - 6
+    - 8
+    checkpoints:
+    - step: 4
+      expectation: Agents 平台视图挂载
+    - step: 5
+      expectation: 在工作区 Git 面板审阅 Diff 按钮可见
+    - step: 7
+      expectation: 全局搜索弹窗打开
+    - step: 9
+      expectation: 按 Esc 关闭全局搜索弹窗
+    results:
+    - 5
+    - 7
+    - 9
+  visual:
+  - check: Agents 视图与全局搜索模态框居中清晰。
+    method: manual
+    reason: 结合截图确认。
+  native:
+  - check: 本用例为 Browser 模式验证前端状态与模态框路由。
+    method: external
+    reason: 仅在声明的 browser 模式执行。

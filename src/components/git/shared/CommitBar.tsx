@@ -59,6 +59,7 @@ export function CommitBar({
         </label>
       ) : null}
       <textarea
+        data-testid="git-commit-message"
         className="taomni-input w-full min-h-20 resize-none"
         value={message}
         placeholder="Commit message"
@@ -67,7 +68,7 @@ export function CommitBar({
       <div className="flex items-center gap-2">
         {amend ? (
           <label className="flex items-center gap-1 text-[12px] select-none">
-            <input type="checkbox" checked={amend.checked} onChange={(event) => amend.onChange(event.target.checked)} />
+            <input data-testid="git-commit-amend" type="checkbox" checked={amend.checked} onChange={(event) => amend.onChange(event.target.checked)} />
             Amend
           </label>
         ) : null}
@@ -79,6 +80,7 @@ export function CommitBar({
           <div className="flex-1" />
         )}
         <button
+          data-testid="git-commit-button"
           className="taomni-btn h-7 px-2 inline-flex items-center gap-1"
           type="button"
           disabled={!canCommit}
@@ -88,6 +90,7 @@ export function CommitBar({
           <span>{commitLabel}</span>
         </button>
         <button
+          data-testid="git-commit-and-push"
           className="taomni-btn h-7 px-2 inline-flex items-center gap-1"
           type="button"
           disabled={!canCommitAndPush}

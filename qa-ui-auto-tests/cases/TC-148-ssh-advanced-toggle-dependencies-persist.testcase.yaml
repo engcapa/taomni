@@ -18,7 +18,9 @@ fixtures:
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-ssh"]'
@@ -166,127 +168,130 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH advanced settings retain remote environment, authentication and toggle behavior;
-      the SSH browser displays only SFTP without a protocol selector, including after save/reopen where
-      present.
+    requirement: SSH advanced settings retain remote environment, authentication and toggle behavior; the SSH browser displays only SFTP without a protocol
+      selector, including after save/reopen where present.
     actions:
     - 1
-    - 3
+    - 2
     - 5
-    - 6
     - 7
     - 8
     - 9
     - 10
-    - 15
-    - 18
+    - 11
+    - 12
+    - 17
     - 20
     - 22
     - 24
     - 26
-    - 27
-    - 31
-    - 34
-    - 35
-    - 38
+    - 28
+    - 29
+    - 33
+    - 36
+    - 37
     - 40
-    - 41
+    - 42
     - 43
-    - 44
+    - 45
     - 46
-    - 57
+    - 48
+    - 59
     checkpoints:
-    - step: 12
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]",
-        "name": "data-checked", "equals": "true"}}'
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 13
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]",
-        "name": "data-checked", "equals": "true"}}'
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
     - step: 14
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]",
-        "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 15
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "true"}}'
     - step: 16
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]",
-        "name": "data-checked", "equals": "false"}}'
-    - step: 17
-      expectation: '{"assert_disabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 18
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 19
-      expectation: '{"assert_enabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
+      expectation: '{"assert_disabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
     - step: 21
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]",
-        "name": "data-checked", "equals": "false"}}'
+      expectation: '{"assert_enabled": "[data-testid=\"session-x11-trusted-toggle\"]"}'
     - step: 23
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]",
-        "name": "data-checked", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 25
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
-        "name": "value", "equals": "custom"}}'
-    - step: 28
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name":
-        "data-checked", "equals": "false"}}'
-    - step: 29
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"session-ssh-browser-type\"]",
-        "equals": "SFTP protocol (recommended)"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 27
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "custom"}}'
     - step: 30
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-ssh-browser-type\"]:is(select)",
-        "equal": 0}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 31
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "equals": "SFTP protocol (recommended)"}}'
     - step: 32
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-private-key-toggle\"]",
-        "name": "data-checked", "equals": "true"}}'
-    - step: 33
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-ssh-browser-type\"]:is(select)", "equal": 0}}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-private-key-toggle\"]", "name": "data-checked", "equals": "true"}}'
+    - step: 35
       expectation: '{"assert_enabled": "input[aria-label=\"Private key path\"]"}'
-    - step: 36
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-password\"]:checked", "equal":
-        1}}'
-    - step: 37
+    - step: 38
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-password\"]:checked", "equal": 1}}'
+    - step: 39
       expectation: '{"assert_disabled": "input[aria-label=\"Private key path\"]"}'
-    - step: 48
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]",
-        "name": "data-checked", "equals": "true"}}'
+    - step: 41
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 44
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-advanced-dependencies\"]"}'
+    - step: 47
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 49
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]",
-        "name": "data-checked", "equals": "false"}}'
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
     - step: 50
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]",
-        "name": "data-checked", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-forwarding-toggle\"]", "name": "data-checked", "equals": "true"}}'
     - step: 51
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
-        "name": "value", "equals": "custom"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-x11-trusted-toggle\"]", "name": "data-checked", "equals": "false"}}'
     - step: 52
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name":
-        "value", "equals": "printf qa-ssh-advanced-toggle"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-compression-toggle\"]", "name": "data-checked", "equals": "true"}}'
     - step: 53
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name":
-        "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "custom"}}'
     - step: 54
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"session-ssh-browser-type\"]",
-        "equals": "SFTP protocol (recommended)"}}'
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf qa-ssh-advanced-toggle"}}'
     - step: 55
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-ssh-browser-type\"]:is(select)",
-        "equal": 0}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
     - step: 56
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-password\"]:checked", "equal":
-        1}}'
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "equals": "SFTP protocol (recommended)"}}'
+    - step: 57
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-ssh-browser-type\"]:is(select)", "equal": 0}}'
+    - step: 58
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-password\"]:checked", "equal": 1}}'
     - step: 60
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    - step: 62
       expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
     results:
-    - 12
+    - 3
+    - 4
+    - 6
     - 13
     - 14
+    - 15
     - 16
-    - 17
+    - 18
     - 19
     - 21
     - 23
     - 25
-    - 28
-    - 29
+    - 27
     - 30
+    - 31
     - 32
-    - 33
-    - 36
-    - 37
-    - 48
+    - 34
+    - 35
+    - 38
+    - 39
+    - 41
+    - 44
+    - 47
     - 49
     - 50
     - 51
@@ -295,12 +300,14 @@ verification:
     - 54
     - 55
     - 56
+    - 57
+    - 58
     - 60
+    - 62
   visual:
   - check: Configuration and workflow state
     method: automated
-    reason: Exact SFTP text and absence of a select are asserted alongside the retained control assertions.
-      Layout fidelity is not claimed.
+    reason: Exact SFTP text and absence of a select are asserted alongside the retained control assertions. Layout fidelity is not claimed.
   native:
   - check: Native boundary
     method: automated

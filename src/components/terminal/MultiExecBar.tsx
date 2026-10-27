@@ -3,6 +3,7 @@ import {
   Users, X, Send, ChevronUp, ChevronDown, Maximize2, Clock, CornerDownLeft,
 } from "lucide-react";
 import { useT } from "../../lib/i18n";
+import { MultiExecTargets } from "./MultiExecTargets";
 
 // Module-level history shared between compact bar and expanded panel
 const _history: string[] = [];
@@ -477,9 +478,7 @@ export function MultiExecBar({
             <Send className="w-3 h-3 mr-1" />
             {lineCount > 1 ? t("multiExec.sendLines", { lines: lineCount }) : t("multiExec.send")}
           </button>
-          <span className="taomni-pill flex-shrink-0" style={{ fontSize: 11 }}>
-            {selectedCount} / {totalTerminalCount}
-          </span>
+          <MultiExecTargets selectedCount={selectedCount} totalCount={totalTerminalCount} />
           <button
             className="text-[11px] px-1.5 py-0.5 rounded hover:bg-[var(--taomni-hover)] flex-shrink-0"
             style={{ color: "var(--taomni-text-muted)" }}

@@ -3,6 +3,15 @@ schema: qa-ui-auto.ci-policy.v1
 smoke:
 - TC-001
 - TC-NATIVE-CORE-001
+- TC-WS-038
+- TC-WS-039
+- TC-WS-045
+- TC-WS-051
+- TC-WS-052
+- TC-WS-053
+- TC-WS-054
+- TC-WS-055
+- TC-WS-056
 unavailable:
   # This read-only regression targets the user's external clickhousecrud
   # checkout, not an in-repository sample. Hosted VMs have neither that source
@@ -12,6 +21,62 @@ unavailable:
     windows/native: External clickhousecrud project (QA_JAVA_PROJECT_ROOT) is not distributed with the repository; run locally with the original project.
     macos/native: External clickhousecrud project (QA_JAVA_PROJECT_ROOT) is not distributed with the repository; run locally with the original project.
 cases:
+- TC-WS-056
+- TC-WS-055
+- TC-WS-052
+- TC-WS-053
+- TC-WS-054
+- TC-WS-050
+- TC-WS-051
+- TC-WS-049
+- TC-WS-048
+- TC-WS-047
+- TC-WS-040
+- TC-WS-041
+- TC-WS-042
+- TC-WS-043
+- TC-WS-044
+- TC-WS-045
+- TC-WS-046
+- TC-WS-039
+- TC-WS-038
+- TC-WS-036
+- TC-WS-037
+- TC-WS-034
+- TC-WS-035
+- TC-WS-032
+- TC-WS-033
+- TC-WS-029
+- TC-WS-030
+- TC-WS-031
+- TC-WS-023
+- TC-WS-024
+- TC-WS-025
+- TC-WS-026
+- TC-WS-027
+- TC-WS-028
+- TC-WS-021
+- TC-WS-022
+- TC-WS-020
+- TC-WS-018
+- TC-WS-019
+- TC-WS-016
+- TC-WS-017
+- TC-WS-015
+- TC-WS-014
+- TC-WS-013
+- TC-WS-012
+- TC-WS-011
+- TC-WS-010
+- TC-WS-009
+- TC-WS-008
+- TC-WS-007
+- TC-WS-006
+- TC-WS-005
+- TC-WS-004
+- TC-WS-003
+- TC-WS-002
+- TC-WS-001
 - TC-SESSION-NET-002
 - TC-SESSION-SFTP-001
 - TC-SESSION-GSS-002

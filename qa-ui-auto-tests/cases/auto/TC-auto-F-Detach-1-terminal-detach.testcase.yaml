@@ -41,6 +41,7 @@ steps:
 - wait_for:
     selector: '[data-testid="terminal-pane"]'
     timeout_sec: 15
+- click: '[data-testid="titlebar-actions-more"]'
 - wait_for:
     selector: '[data-testid="terminal-detach"]'
     timeout_sec: 5
@@ -56,19 +57,20 @@ verification:
     actions:
     - 1
     - 3
+    - 5
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 4
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 15}}'
-    - step: 5
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-detach\"]", "timeout_sec": 5}}'
     - step: 6
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-detach\"]", "timeout_sec": 5}}'
+    - step: 7
       expectation: '{"assert_visible": "[data-testid=\"terminal-detach\"]"}'
     results:
     - 4
-    - 5
     - 6
+    - 7
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

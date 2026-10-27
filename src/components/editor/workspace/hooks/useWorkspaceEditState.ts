@@ -5,6 +5,7 @@ import { createRestoreEchoSuppressor } from "../refactorRecoveryController";
 import { WorkspaceDocumentTransactionOwner } from "../workspaceDocumentTransactionOwner";
 import { WorkspaceEditHistory, type WorkspaceEditPathSnapshot } from "../workspaceEditHistory";
 import { WorkspaceObservationBridge } from "../workspaceObservationBridge";
+import { useWorkspaceDocumentLifetime } from "./useWorkspaceDocumentLifetime";
 
 
 export interface UseWorkspaceEditStateContext {
@@ -77,6 +78,7 @@ export function useWorkspaceEditState(context: UseWorkspaceEditStateContext) {
       publishWorkspaceObservation((bridge) => bridge.observeLeaseDelta(delta));
     },
   }));
+  useWorkspaceDocumentLifetime(workspaceInstanceId, documentTransactionOwnerRef.current);
 
   useEffect(() => {
     workspaceEditHistory.clear();

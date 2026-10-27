@@ -1,4 +1,5 @@
 import { sshBrowserMode } from "../../../lib/sshSessionOptions";
+import { useAppStore } from "../../../stores/appStore";
 import { parseSessionOptions } from "../../../lib/terminalProfile";
 import { Lock, Unlock } from "lucide-react";
 import { Fragment } from "react";
@@ -73,6 +74,7 @@ export interface TerminalTabContentsProps {
 }
 
 export function TerminalTabContents(inputs: TerminalTabContentsProps) {
+  const isSessionsMode = useAppStore((state) => state.activeSideTab === "sessions");
   const {
     terminalSplitVisible,
     terminalSplitLayout,
@@ -222,7 +224,7 @@ export function TerminalTabContents(inputs: TerminalTabContentsProps) {
               detachToggle={!terminalSplitVisible ? {
                 onDetach: () => openDetachedTerminal(tab.id, tab, tab.title),
               } : undefined}
-              chatToggle={!aiFullyDisabled && !(terminalRailMerged && isActive) ? {
+              chatToggle={!aiFullyDisabled && !isSessionsMode && !(terminalRailMerged && isActive) ? {
                 open: chatDrawerOpen && activeTabId === tab.id,
                 onToggle: () => void toggleTabChat(chatBindingIdForTab(tab) ?? tab.id),
               } : undefined}

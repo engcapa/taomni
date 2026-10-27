@@ -24,6 +24,7 @@ const sidebarMock = vi.hoisted(() => ({
   props: [] as Array<{
     onConnectSession?: (session: SessionConfig) => void;
     onOpenSettings?: () => void;
+    panelOnly?: boolean;
   }>,
 }));
 
@@ -82,6 +83,7 @@ export type MockPanelSize = { asPercentage: number; inPixels: number; };
 
 const panelResizeMock = vi.hoisted(() => ({
   handlers: new Map<string, (size: MockPanelSize, id: string | undefined, prev: MockPanelSize | undefined) => void>(),
+  commands: [] as Array<{ id: string | undefined; size: string | null; }>,
 }));
 
 vi.mock("react-resizable-panels", () => {
@@ -96,15 +98,15 @@ vi.mock("react-resizable-panels", () => {
   }>(({ children, panelRef, id, onResize }, ref) => {
     if (id && onResize) panelResizeMock.handlers.set(id, onResize);
     const handle = {
-      collapse: vi.fn(),
-      resize: vi.fn(),
+      collapse: vi.fn(() => panelResizeMock.commands.push({ id, size: null })),
+      resize: vi.fn((size: string) => panelResizeMock.commands.push({ id, size })),
     };
     useImperativeHandle(ref, () => handle);
     useImperativeHandle(panelRef, () => handle);
     return <div data-testid="panel">{children}</div>;
   });
-  const Separator = ({ className, "data-testid": testId }: React.HTMLAttributes<HTMLDivElement> & { "data-testid"?: string; }) => (
-    <div className={className} data-testid={testId ?? "panel-resize-handle"} />
+  const Separator = ({ className, style, "data-testid": testId }: React.HTMLAttributes<HTMLDivElement> & { "data-testid"?: string; }) => (
+    <div className={className} style={style} data-testid={testId ?? "panel-resize-handle"} />
   );
   return {
     Group,
@@ -163,13 +165,14 @@ vi.mock("../../../components/sidebar/Sidebar", () => ({
   Sidebar: (props: {
     onConnectSession?: (session: SessionConfig) => void;
     onOpenSettings?: () => void;
+    panelOnly?: boolean;
   }) => {
     sidebarMock.props.push(props);
     return (
       <div data-testid="sidebar">
-        <button type="button" data-testid="ribbon-settings" onClick={props.onOpenSettings}>
+        {!props.panelOnly && <button type="button" data-testid="ribbon-settings" onClick={props.onOpenSettings}>
           Settings
-        </button>
+        </button>}
       </div>
     );
   },

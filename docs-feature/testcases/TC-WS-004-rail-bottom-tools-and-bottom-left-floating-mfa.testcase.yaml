@@ -1,0 +1,90 @@
+id: TC-WS-004
+title: Left rail bottom stacks MFA, Screenshot, Chat, Theme, Language, Settings and
+  opens floating MFA at bottom-left
+description: 'Verifies DEC-03 / AC-04: bottom of left rail orders MFA -> Screenshot
+  -> Chat -> Theme -> Language -> Settings, and clicking MFA opens the draggable floating
+  authenticator window at the bottom-left (left: 50px, bottom: 30px).'
+covers:
+- F5.5
+- F27.1
+- F-MFA-1
+- F-I18n-1
+tags:
+- p0
+- mfa
+- screenshot
+- i18n
+- workspace-redesign
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar-rail"]'
+- assert_visible: '[data-testid="rail-mfa-button"]'
+- assert_visible: '[data-testid="system-screenshot"]'
+- assert_visible: '[data-testid="rail-chat-button"]'
+- assert_visible: '[data-testid="theme-cycle"]'
+- assert_visible: '[data-testid="language-switcher"]'
+- assert_visible: '[data-testid="ribbon-settings"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) +
+      '"theme-cycle"]').getBoundingClientRect().top < document.querySelector('[data-testid'
+      + String.fromCharCode(61) + '"language-switcher"]').getBoundingClientRect().top
+    expect_truthy: true
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="mfa-floating-window"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) +
+      '"mfa-floating-window"]').getBoundingClientRect().left >= 40 && (window.innerHeight
+      - document.querySelector('[data-testid' + String.fromCharCode(61) + '"mfa-floating-window"]').getBoundingClientRect().bottom)
+      <= 80
+    expect_truthy: true
+- click: '[data-testid="mfa-floating-close"]'
+- assert_not_visible: '[data-testid="mfa-floating-window"]'
+- screenshot: ws-004-rail-bottom-and-floating-mfa.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 左侧栏底部自上而下依次为 MFA、截图、聊天、主题切换、语言切换、设置，点击 MFA 在左下角打开悬浮验证器窗口并可正常关闭。
+    actions:
+    - 1
+    - 10
+    - 13
+    checkpoints:
+    - step: 3
+      expectation: MFA 按钮可见
+    - step: 4
+      expectation: 截图按钮可见
+    - step: 5
+      expectation: 聊天按钮可见
+    - step: 6
+      expectation: 主题切换按钮可见
+    - step: 7
+      expectation: 语言切换按钮可见
+    - step: 8
+      expectation: 设置按钮可见
+    - step: 9
+      expectation: 6 个按钮严格按自上而下顺序排列
+    - step: 11
+      expectation: 点击 MFA 打开悬浮窗口
+    - step: 12
+      expectation: MFA 悬浮窗口默认位于窗口左下角区域
+    - step: 14
+      expectation: 点击关闭按钮隐藏 MFA 悬浮窗口
+    results:
+    - 9
+    - 12
+    - 14
+  visual:
+  - check: 左下角 MFA 悬浮窗紧贴左侧主导航条右侧与底部状态栏上方，无遮挡左侧图标。
+    method: manual
+    reason: 悬浮窗位置与阴影层次需视觉确认。
+  native:
+  - check: 在桌面 WebView 中验证悬浮窗定位与交互。
+    method: automated
+    reason: 按实际执行模式验证。

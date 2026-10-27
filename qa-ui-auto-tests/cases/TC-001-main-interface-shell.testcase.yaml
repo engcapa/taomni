@@ -1,22 +1,7 @@
 id: TC-001
 title: Main interface shell renders all primary surfaces
-description: 'Smoke test for the chrome of the app in standard (non-compact) mode. Loads
-
-  the welcome screen and verifies every top-level layout surface is mounted:
-
-  menu bar, sidebar sidetab strip, session tree, tab bar, status bar,
-
-  welcome panel, and the optional ribbon / quick-connect toolbars once enabled
-
-  from View. Asserts the remaining welcome actions (Start local terminal,
-
-  New session) and the Tips section. Status bar segments are spot-checked.
-
-  (The former right-hand activity column and compact mode were removed from
-
-  the product.)
-
-  '
+description: 'Home launches independently of Sessions. The shared toolbar, global utilities, status and Home actions render; Sessions has its own tree, tab strip and empty state without
+  a Welcome tab. Quick connect remains reachable through View.'
 covers:
 - F1.2
 - F1.6
@@ -35,25 +20,14 @@ steps:
 - wait_for:
     selector: '[data-testid="control-bar"]'
     timeout_sec: 55
-- assert_not_visible: '[data-testid="quick-connect"]'
-- click: '[data-testid="app-main-menu"]'
-- hover: '[data-testid="context-menu-item-view"]'
-- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
-- wait_for: '[data-testid="quick-connect"]'
-- assert_visible: '[data-testid="quick-connect"]'
-- assert_visible: '[data-testid="qc-input"]'
-- assert_visible: '[data-testid="qc-submit"]'
-- assert_visible: '[data-testid="sidebar"]'
-- assert_visible: '[data-testid="main-sidebar-resize-handle"]'
-- assert_visible: '[data-testid="session-tree"]'
-- assert_visible: '[data-testid="session-search"]'
-- assert_visible: '[data-testid="session-new"]'
-- assert_visible: '[data-testid="tab-bar"]'
-- assert_visible: '[data-testid="new-local-terminal"]'
-- assert_visible: '[data-testid="status-bar"]'
-- assert_visible: '[data-testid="app-titlebar"]'
-- assert_visible: '[data-testid="titlebar-tray"]'
-- assert_visible: '[data-testid="theme-cycle"]'
+- assert_visible: '[data-testid="welcome-panel"]'
+- assert_visible: '[data-testid="home-toolbar-workspaces"]'
+- assert_visible: '[data-testid="home-toolbar-sessions"]'
+- assert_visible: '[data-testid="global-search-trigger"]'
+- assert_visible: '[data-testid="tab-overview-trigger"]'
+- assert_count:
+    selector: '[data-testid="ai-chat-drawer-ribbon"]'
+    equal: 0
 - assert_visible: '[data-testid="welcome-panel"]'
 - assert_text:
     selector: '[data-testid="welcome-panel"]'
@@ -74,6 +48,29 @@ steps:
 - assert_text:
     selector: '[data-testid="welcome-panel"]'
     contains: Quick connect
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="sessions-empty-state"]'
+- assert_not_visible: '[data-testid="welcome-panel"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="welcome"]'
+    equal: 0
+- assert_not_visible: '[data-testid="quick-connect"]'
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu-item-view"]'
+- click: '[data-testid="context-menu-item-toggle-quick-connect"]'
+- assert_visible: '[data-testid="quick-connect"]'
+- assert_visible: '[data-testid="qc-input"]'
+- assert_visible: '[data-testid="qc-submit"]'
+- assert_visible: '[data-testid="sidebar"]'
+- assert_visible: '[data-testid="main-sidebar-resize-handle"]'
+- assert_visible: '[data-testid="session-tree"]'
+- assert_visible: '[data-testid="session-search"]'
+- assert_visible: '[data-testid="session-new"]'
+- assert_visible: '[data-testid="tab-bar"]'
+- assert_visible: '[data-testid="new-local-terminal"]'
+- assert_visible: '[data-testid="status-bar"]'
+- assert_visible: '[data-testid="app-titlebar"]'
+- assert_visible: '[data-testid="theme-cycle"]'
 - assert_text:
     selector: '[data-testid="status-bar"]'
     contains: sessions
@@ -89,83 +86,106 @@ steps:
 - assert_text:
     selector: '[data-testid="status-bar"]'
     contains: 0.2.0 MVP
+- assert_visible: '[data-testid="titlebar-actions-more"]'
 - screenshot: 001-main-interface.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 初始主界面各主要表面可见；快捷连接从隐藏切换为输入框和提交按钮可用。
+    requirement: Home 保留完整启动与历史入口；Sessions 独立显示会话树、空画布和标签栏，无 Welcome 标签；快速连接与状态栏可用。
     actions:
     - 1
-    - 4
-    - 5
-    - 6
+    - 19
+    - 24
+    - 25
+    - 26
     checkpoints:
     - step: 2
       expectation: '{"wait_for": {"selector": "[data-testid=\"control-bar\"]", "timeout_sec": 55}}'
     - step: 3
-      expectation: '{"assert_not_visible": "[data-testid=\"quick-connect\"]"}'
-    - step: 7
-      expectation: '{"wait_for": "[data-testid=\"quick-connect\"]"}'
-    - step: 8
-      expectation: '{"assert_visible": "[data-testid=\"quick-connect\"]"}'
-    - step: 9
-      expectation: '{"assert_visible": "[data-testid=\"qc-input\"]"}'
-    - step: 10
-      expectation: '{"assert_visible": "[data-testid=\"qc-submit\"]"}'
-    - step: 11
-      expectation: '{"assert_visible": "[data-testid=\"sidebar\"]"}'
-    - step: 12
-      expectation: '{"assert_visible": "[data-testid=\"main-sidebar-resize-handle\"]"}'
-    - step: 13
-      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
-    - step: 14
-      expectation: '{"assert_visible": "[data-testid=\"session-search\"]"}'
-    - step: 15
-      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
-    - step: 16
-      expectation: '{"assert_visible": "[data-testid=\"tab-bar\"]"}'
-    - step: 17
-      expectation: '{"assert_visible": "[data-testid=\"new-local-terminal\"]"}'
-    - step: 18
-      expectation: '{"assert_visible": "[data-testid=\"status-bar\"]"}'
-    - step: 19
-      expectation: '{"assert_visible": "[data-testid=\"app-titlebar\"]"}'
-    - step: 20
-      expectation: '{"assert_visible": "[data-testid=\"titlebar-tray\"]"}'
-    - step: 21
-      expectation: '{"assert_visible": "[data-testid=\"theme-cycle\"]"}'
-    - step: 22
       expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
-    - step: 23
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"home-toolbar-workspaces\"]"}'
+    - step: 5
+      expectation: '{"assert_visible": "[data-testid=\"home-toolbar-sessions\"]"}'
+    - step: 6
+      expectation: '{"assert_visible": "[data-testid=\"global-search-trigger\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"tab-overview-trigger\"]"}'
+    - step: 8
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]", "equal": 0}}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 10
       expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Welcome to Taomni"}}'
-    - step: 24
+    - step: 11
       expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Start local terminal"}}'
-    - step: 25
+    - step: 12
       expectation: '{"assert_visible": "[data-testid=\"welcome-open-local-terminal\"]"}'
-    - step: 26
+    - step: 13
       expectation: '{"assert_enabled": "[data-testid=\"welcome-open-local-terminal\"]"}'
-    - step: 27
+    - step: 14
       expectation: '{"assert_visible": "[data-testid=\"welcome-version\"]"}'
-    - step: 28
+    - step: 15
       expectation: '{"assert_visible": "[data-testid=\"welcome-version-footer\"]"}'
-    - step: 29
+    - step: 16
       expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "New session"}}'
-    - step: 30
+    - step: 17
       expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Tips"}}'
-    - step: 31
+    - step: 18
       expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Quick connect"}}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"sessions-empty-state\"]"}'
+    - step: 21
+      expectation: '{"assert_not_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 22
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"welcome\"]", "equal": 0}}'
+    - step: 23
+      expectation: '{"assert_not_visible": "[data-testid=\"quick-connect\"]"}'
+    - step: 27
+      expectation: '{"assert_visible": "[data-testid=\"quick-connect\"]"}'
+    - step: 28
+      expectation: '{"assert_visible": "[data-testid=\"qc-input\"]"}'
+    - step: 29
+      expectation: '{"assert_visible": "[data-testid=\"qc-submit\"]"}'
+    - step: 30
+      expectation: '{"assert_visible": "[data-testid=\"sidebar\"]"}'
+    - step: 31
+      expectation: '{"assert_visible": "[data-testid=\"main-sidebar-resize-handle\"]"}'
     - step: 32
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "sessions"}}'
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
     - step: 33
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "Network"}}'
+      expectation: '{"assert_visible": "[data-testid=\"session-search\"]"}'
     - step: 34
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "Theme"}}'
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
     - step: 35
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "terminals"}}'
+      expectation: '{"assert_visible": "[data-testid=\"tab-bar\"]"}'
     - step: 36
+      expectation: '{"assert_visible": "[data-testid=\"new-local-terminal\"]"}'
+    - step: 37
+      expectation: '{"assert_visible": "[data-testid=\"status-bar\"]"}'
+    - step: 38
+      expectation: '{"assert_visible": "[data-testid=\"app-titlebar\"]"}'
+    - step: 39
+      expectation: '{"assert_visible": "[data-testid=\"theme-cycle\"]"}'
+    - step: 40
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "sessions"}}'
+    - step: 41
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "Network"}}'
+    - step: 42
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "Theme"}}'
+    - step: 43
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "terminals"}}'
+    - step: 44
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "0.2.0 MVP"}}'
+    - step: 45
+      expectation: '{"assert_visible": "[data-testid=\"titlebar-actions-more\"]"}'
     results:
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
     - 7
     - 8
     - 9
@@ -178,14 +198,10 @@ verification:
     - 16
     - 17
     - 18
-    - 19
     - 20
     - 21
     - 22
     - 23
-    - 24
-    - 25
-    - 26
     - 27
     - 28
     - 29
@@ -196,6 +212,15 @@ verification:
     - 34
     - 35
     - 36
+    - 37
+    - 38
+    - 39
+    - 40
+    - 41
+    - 42
+    - 43
+    - 44
+    - 45
   visual:
   - check: 主界面标题栏、侧栏和欢迎页无重叠、裁切；窄窗口另需布局检查。
     method: manual

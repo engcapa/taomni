@@ -24,7 +24,8 @@ from typing import Any
 
 from native_build import QA_APP_ID, verify_identity
 from native_webdriver_transport import WebDriverError, WebDriverTransport
-from native_pointer import prepare_pointer_target
+from native_console import CONSOLE_HOOK_SCRIPT
+from native_pointer import MOUSE_SOURCE, prepare_pointer_target
 from native_window_focus import NativeWindowFocus
 
 
@@ -317,7 +318,8 @@ class TauriDriverProcess:
                 # canonical 'wayland': GNOME portal rejects backend lists.
                 env["GDK_BACKEND"] = "wayland,x11"
             with out.open("a", encoding="utf-8") as stdout, err.open("a", encoding="utf-8") as stderr:
-                self.proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=stdout, stderr=stderr, text=True)
+                self.proc = subprocess.Popen(cmd, cwd=ROOT, env=env, stdout=stdout, stderr=stderr,
+                                             text=True, start_new_session=platform.system() == "Linux")
         deadline = time.time() + self.startup_timeout
         while time.time() < deadline:
             if self.proc.poll() is not None:
@@ -339,33 +341,8 @@ class TauriDriverProcess:
         raise WebDriverError(f"native driver did not listen on {self.url}")
 
     def ensure_running(self) -> None:
-        """Ensure the per-run driver endpoint is ready for a new session.
-
-        The macOS bridge lives inside the QA application. Windows releases
-        the owned driver/app tree on session close to unlock its profile.
-        Wait for the old endpoint to go away before starting the next one.
-        """
-        if platform.system() not in ("Darwin", "Windows"):
-            return
-
-        # A new case must never attach to the previous session's listener
-        # while the asynchronous app/driver exit is still in flight.
-        if self._restart_required:
-            self.stop()
-            self._restart_required = False
-
-        if self.proc is not None and self.proc.poll() is None and _tcp_ok(self.host, self.port):
-            return
-
-        if self.proc is not None and self.proc.poll() is None:
-            self.stop()
-
-        deadline = time.time() + self.startup_timeout
-        while _tcp_ok(self.host, self.port) and time.time() < deadline:
-            time.sleep(0.1)
-        if _tcp_ok(self.host, self.port):
-            raise WebDriverError(f"native driver port {self.port} did not become available")
-        self.start()
+        from native_driver_lifecycle import ensure_owned_driver_running
+        ensure_owned_driver_running(self, system=platform.system(), tcp_probe=_tcp_ok)
 
     def mark_session_closed(self) -> None:
         """Release owned Windows children before the next fixture reset."""
@@ -379,6 +356,11 @@ class TauriDriverProcess:
 
     def stop(self) -> None:
         if not self.proc:
+            return
+        if platform.system() == "Linux":
+            from native_process_group import stop_owned_process_group
+            stop_owned_process_group(self.proc)
+            self.proc = None
             return
         if platform.system() == "Windows" and self.proc.poll() is None:
             result = subprocess.run(
@@ -532,28 +514,10 @@ class NativeSession(WebDriverTransport):
         return self.endpoint(f"/element/{element_id}{suffix}")
 
     def click(self, selector: str) -> str:
-        for attempt in range(3):
-            try:
-                element = self.find(selector, interactive=True)
-                self.request("POST", self.element_path(element, "/click"), {})
-                return f"clicked {selector}"
-            except WebDriverError as exc:
-                if _is_stale_element_error(exc) and attempt < 2:
-                    time.sleep(0.3)
-                    continue
-                if ("element not interactable" in str(exc) or "element click intercepted" in str(exc)) and attempt < 2:
-                    # A synthetic click() does not move focus the way a real
-                    # pointer press does, so focus editable/focusable targets
-                    # (e.g. a CodeMirror `.cm-content` whose center sits under
-                    # a sticky gutter) explicitly.
-                    with suppress(Exception):
-                        self.execute(
-                            f"const el = document.querySelector({json.dumps(selector)});"
-                            "if (el) { el.scrollIntoView({block:'center', inline:'center'}); el.click();"
-                            " if (el.isContentEditable || el.tabIndex >= 0) el.focus(); }"
-                        )
-                        return f"clicked {selector}"
-                raise
+        # WebKit's element /click can use pre-scroll coordinates and activate
+        # a neighbouring settings row. Reuse stable, hit-tested W3C input;
+        # do not turn an intercepted pointer action into a synthetic click.
+        self.pointer_button_click(selector, 0)
         return f"clicked {selector}"
 
     def count(self, selector: str) -> int:
@@ -605,7 +569,7 @@ class NativeSession(WebDriverTransport):
                         + [{"type": "pause", "duration": 0} for _ in pointer_core]
                         + [{"type": "keyUp", "value": value} for value in reversed(modifier_values)]})
                 actions.append({
-                    "type": "pointer", "id": "mouse",
+                    "type": "pointer", "id": MOUSE_SOURCE,
                     "parameters": {"pointerType": "mouse"},
                     "actions": [{"type": "pause", "duration": 0} for _ in modifier_values]
                         + pointer_core + [{"type": "pause", "duration": 0} for _ in modifier_values],
@@ -1222,98 +1186,8 @@ class NativeSession(WebDriverTransport):
         )
 
     def install_console_hook(self) -> None:
-        script = r"""
-        if (!window.__QA_UI_AUTO_CONSOLE__) {
-          window.__QA_UI_AUTO_CONSOLE__ = [];
-          // Keep focus transitions without recording typed text or values.
-          window.__QA_UI_AUTO_FOCUS__ = [];
-          const describeFocus = el => ({
-            tag: el?.tagName ?? null,
-            testid: el?.getAttribute?.('data-testid') ?? null,
-            role: el?.getAttribute?.('role') ?? null
-          });
-          for (const type of ['focusin', 'focusout', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'contextmenu']) {
-            document.addEventListener(type, event => {
-              window.__QA_UI_AUTO_FOCUS__.push({
-                type, time: performance.now(), trusted: event.isTrusted,
-                button: event.button ?? null,
-                x: event.clientX ?? null, y: event.clientY ?? null,
-                target: describeFocus(event.target),
-                related: describeFocus(event.relatedTarget),
-                active: describeFocus(document.activeElement),
-                document_has_focus: document.hasFocus()
-              });
-              if (window.__QA_UI_AUTO_FOCUS__.length > 64) window.__QA_UI_AUTO_FOCUS__.shift();
-            }, true);
-          }
-          // Bounded editor-only input history distinguishes driver ordering
-          // from caret changes during async editor updates. Never inspect form
-          // controls (in particular password fields), or modify input/selection.
-          window.__QA_UI_AUTO_EDITOR_INPUT__ = [];
-          for (const type of ['keydown', 'keyup', 'beforeinput', 'input', 'selectionchange']) {
-            document.addEventListener(type, event => {
-              const editor = document.activeElement?.closest?.('.cm-content');
-              if (!editor || (type !== 'selectionchange' && !editor.contains(event.target))) return;
-              const selection = document.getSelection();
-              const describeEndpoint = (node, offset) => {
-                if (!node || !editor.contains(node)) return null;
-                const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-                return {
-                  offset, nodeText: node.textContent?.slice(0, 200) ?? null,
-                  lineText: element?.closest?.('.cm-line')?.textContent?.slice(0, 200) ?? null
-                };
-              };
-              const events = window.__QA_UI_AUTO_EDITOR_INPUT__;
-              events.push({
-                type, time: performance.now(), trusted: event.isTrusted,
-                key: event.key ?? null, data: event.data ?? null,
-                inputType: event.inputType ?? null,
-                anchor: describeEndpoint(selection?.anchorNode, selection?.anchorOffset),
-                focus: describeEndpoint(selection?.focusNode, selection?.focusOffset)
-              });
-              if (events.length > 128) events.shift();
-            }, true);
-          }
-          for (const level of ['log', 'info', 'warn', 'error', 'debug']) {
-            const original = console[level] ? console[level].bind(console) : console.log.bind(console);
-            console[level] = (...args) => {
-              try {
-                window.__QA_UI_AUTO_CONSOLE__.push({
-                  level,
-                  time: new Date().toISOString(),
-                  args: args.map((arg) => {
-                    try {
-                      if (arg instanceof Error) return arg.stack || arg.message;
-                      if (typeof arg === 'string') return arg;
-                      return JSON.stringify(arg);
-                    } catch (_) {
-                      return String(arg);
-                    }
-                  })
-                });
-              } catch (_) {}
-              return original(...args);
-            };
-          }
-          window.addEventListener('error', (event) => {
-            window.__QA_UI_AUTO_CONSOLE__.push({
-              level: 'error',
-              time: new Date().toISOString(),
-              args: [event.message, event.filename, event.lineno, event.colno]
-            });
-          });
-          window.addEventListener('unhandledrejection', (event) => {
-            window.__QA_UI_AUTO_CONSOLE__.push({
-              level: 'error',
-              time: new Date().toISOString(),
-              args: ['unhandledrejection', String(event.reason)]
-            });
-          });
-        }
-        return true;
-        """
         try:
-            self.execute(script)
+            self.execute(CONSOLE_HOOK_SCRIPT)
         except WebDriverError:
             pass
 
@@ -1385,6 +1259,8 @@ class NativeHarness:
                 encoding="utf-8",
             )
         session = NativeSession(self.driver.url, self.application, self.driver.mark_session_closed)
+        from native_application_restart import restart_owned_application
+        session.application_restarter = lambda: restart_owned_application(self.driver, session)
         session.deadline = getattr(self, "deadline", None)
         try:
             session.start()

@@ -16,7 +16,9 @@ fixtures:
 timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-ssh"]'
@@ -140,106 +142,116 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH advanced settings retain remote environment, authentication and toggle behavior;
-      the SSH browser displays only SFTP without a protocol selector, including after save/reopen where
-      present.
+    requirement: SSH advanced settings retain remote environment, authentication and toggle behavior; the SSH browser displays only SFTP without a protocol
+      selector, including after save/reopen where present.
     actions:
     - 1
-    - 3
+    - 2
     - 5
-    - 6
     - 7
     - 8
     - 9
     - 10
+    - 11
     - 12
-    - 13
     - 14
     - 15
     - 16
     - 17
     - 18
-    - 22
-    - 23
+    - 19
+    - 20
+    - 24
     - 25
     - 27
-    - 28
+    - 29
     - 30
     - 32
     - 34
-    - 35
     - 36
     - 37
+    - 38
     - 39
-    - 40
+    - 41
     - 42
-    - 43
+    - 44
     - 45
+    - 47
     checkpoints:
-    - step: 19
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
-        "name": "value", "equals": "custom"}}'
-    - step: 20
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"session-ssh-browser-type\"]",
-        "equals": "SFTP protocol (recommended)"}}'
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
     - step: 21
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-ssh-browser-type\"]:is(select)",
-        "equal": 0}}'
-    - step: 24
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name":
-        "data-checked", "equals": "false"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "custom"}}'
+    - step: 22
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "equals": "SFTP protocol (recommended)"}}'
+    - step: 23
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-ssh-browser-type\"]:is(select)", "equal": 0}}'
     - step: 26
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 28
       expectation: '{"assert_enabled": "input[aria-label=\"Private key path\"]"}'
-    - step: 29
-      expectation: '{"assert_disabled": "input[aria-label=\"Private key path\"]"}'
     - step: 31
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-gssapi\"]:checked", "equal":
-        1}}'
+      expectation: '{"assert_disabled": "input[aria-label=\"Private key path\"]"}'
     - step: 33
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"SSH password\"]", "name": "type",
-        "equals": "password"}}'
-    - step: 47
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]",
-        "name": "value", "equals": "custom"}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-gssapi\"]:checked", "equal": 1}}'
+    - step: 35
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"SSH password\"]", "name": "type", "equals": "password"}}'
+    - step: 40
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 43
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-advanced-matrix\"]"}'
+    - step: 46
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 48
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"session-ssh-browser-type\"]",
-        "equals": "SFTP protocol (recommended)"}}'
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
     - step: 49
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-ssh-browser-type\"]:is(select)",
-        "equal": 0}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-remote-environment\"]", "name": "value", "equals": "custom"}}'
     - step: 50
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name":
-        "value", "equals": "printf ''qa-advanced-command\\n''"}}'
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"session-ssh-browser-type\"]", "equals": "SFTP protocol (recommended)"}}'
     - step: 51
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name":
-        "data-checked", "equals": "false"}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-ssh-browser-type\"]:is(select)", "equal": 0}}'
     - step: 52
-      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-privatekey\"]:checked",
-        "equal": 1}}'
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf ''qa-advanced-command\\n''"}}'
     - step: 53
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Private key path\"]", "name":
-        "value", "equals": "/home/qauser/.ssh/id_ed25519"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-do-not-exit\"]", "name": "data-checked", "equals": "false"}}'
+    - step: 54
+      expectation: '{"assert_count": {"selector": "[data-testid=\"session-auth-privatekey\"]:checked", "equal": 1}}'
+    - step: 55
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Private key path\"]", "name": "value", "equals": "/home/qauser/.ssh/id_ed25519"}}'
     results:
-    - 19
-    - 20
+    - 3
+    - 4
+    - 6
+    - 13
     - 21
-    - 24
+    - 22
+    - 23
     - 26
-    - 29
+    - 28
     - 31
     - 33
-    - 47
+    - 35
+    - 40
+    - 43
+    - 46
     - 48
     - 49
     - 50
     - 51
     - 52
     - 53
+    - 54
+    - 55
   visual:
   - check: Configuration and workflow state
     method: automated
-    reason: Exact SFTP text and absence of a select are asserted alongside the retained control assertions.
-      Layout fidelity is not claimed.
+    reason: Exact SFTP text and absence of a select are asserted alongside the retained control assertions. Layout fidelity is not claimed.
   native:
   - check: Native boundary
     method: automated

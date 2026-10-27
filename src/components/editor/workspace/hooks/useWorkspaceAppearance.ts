@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { loadCodeViewProfile } from "../../../../lib/codeViewProfile";
+import { loadCodeViewProfile, subscribeCodeViewProfile } from "../../../../lib/codeViewProfile";
 import { type EditorGroupId } from "../../../../stores/codeWorkspaceStore";
+import { useAppStore } from "../../../../stores/appStore";
 import { clampCodeWorkspaceFontSize, clampCodeWorkspaceTreeFontSize, readCodeWorkspaceTreeFontSize, writeCodeWorkspaceTreeFontSize } from "../codeWorkspaceModel";
 import {
   matchesSoftWrapPath,
@@ -40,13 +41,15 @@ export function useWorkspaceAppearance(context: UseWorkspaceAppearanceContext) {
   const [editorAppearanceSettingsOpen, setEditorAppearanceSettingsOpen] = useState(false);
   const [columnSelectionMode, setColumnSelectionMode] = useState(false);
   const [treeFontSize, setTreeFontSizeState] = useState(() => readCodeWorkspaceTreeFontSize());
+  const uiFontSize = useAppStore((state) => state.uiFontSize);
+  const effectiveTreeFontSize = Math.max(10, treeFontSize + uiFontSize - 12);
   const editorAppearanceProfileRef = useRef(editorAppearanceProfile);
   const treeFontSizeRef = useRef(treeFontSize);
   const treePaneStyle = useMemo(() => ({
-    "--taomni-code-tree-font-size": `${treeFontSize}px`,
-    "--taomni-code-tree-small-font-size": `${Math.max(10, treeFontSize - 1)}px`,
-    "--taomni-code-tree-row-height": `${Math.max(24, treeFontSize + 15)}px`,
-  }) as CSSProperties, [treeFontSize]);
+    "--taomni-code-tree-font-size": `${effectiveTreeFontSize}px`,
+    "--taomni-code-tree-small-font-size": `${Math.max(10, effectiveTreeFontSize - 1)}px`,
+    "--taomni-code-tree-row-height": `${Math.max(24, effectiveTreeFontSize + 15)}px`,
+  }) as CSSProperties, [effectiveTreeFontSize]);
   const editorPaneStyle = useMemo(() => ({
     "--taomni-code-editor-ui-font-size": `${editorAppearanceProfile.fontSizePx}px`,
     "--taomni-code-editor-ui-small-font-size": `${Math.max(10, editorAppearanceProfile.fontSizePx - 2)}px`,
@@ -97,6 +100,17 @@ export function useWorkspaceAppearance(context: UseWorkspaceAppearanceContext) {
     if (next.zoomScope === "all-editors") setActiveEditorFontSizes({});
     if (statusMessage) setStatusMessage(statusMessage(next));
   }, [setStatusMessage, workspaceInstanceId]);
+
+  useEffect(() => subscribeCodeViewProfile((profile) => {
+    updateEditorAppearanceProfile((current) => ({
+      ...current,
+      fontFamily: profile.fontFamily,
+      fontSizePx: profile.fontSize,
+      ligatures: profile.fontLigatures,
+      // Global code colours are already resolved to inherited CSS variables.
+      colorSchemeId: "app",
+    }));
+  }), [updateEditorAppearanceProfile]);
 
   const effectiveEditorFontSize = useCallback((groupId: EditorGroupId) => (
     editorAppearanceProfileRef.current.zoomScope === "active-editor"
@@ -179,5 +193,5 @@ export function useWorkspaceAppearance(context: UseWorkspaceAppearanceContext) {
     },
     [setTreeFontSize],
   );
-  return { stepTreeFontSize, setTreeFontSize, stepCodeViewFontSize, setCodeViewFontSize, currentEditorFontSize, setEditorAppearanceSettingsOpen, activeFileSoftWrap, toggleSoftWrap, columnSelectionMode, toggleColumnSelectionMode, editorAppearanceProfile, activeEditorFontSizes, editorPaneStyle, treePaneStyle, treeFontSize, editorAppearanceSettingsOpen, updateEditorAppearanceProfile };
+  return { stepTreeFontSize, setTreeFontSize, stepCodeViewFontSize, setCodeViewFontSize, currentEditorFontSize, setEditorAppearanceSettingsOpen, activeFileSoftWrap, toggleSoftWrap, columnSelectionMode, toggleColumnSelectionMode, editorAppearanceProfile, activeEditorFontSizes, editorPaneStyle, treePaneStyle, treeFontSize: effectiveTreeFontSize, editorAppearanceSettingsOpen, updateEditorAppearanceProfile };
 }

@@ -1,5 +1,5 @@
 import { useBookmarkWindows } from "./useBookmarkWindows";
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useLayoutEffect } from "react";
 import { t as tr } from "../../lib/i18n";
 import { setActiveQueryTab } from "../../lib/queryRegistry";
 import { setActiveTerminalTab } from "../../lib/terminal/terminalRegistry";
@@ -125,19 +125,17 @@ export function useMainWindowLifecycle(context: UseMainWindowLifecycleContext) {
     layout.tabsRef.current = layout.tabs;
   }, [layout.tabs]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const panel = layout.sidebarPanelRef.current;
     if (!panel) return;
 
-    const frame = requestAnimationFrame(() => {
-      if (layout.sidebarCollapsed) {
-        panel.collapse();
-      } else {
-        panel.resize(`${layout.lastSidebarSizeRef.current}%`);
-      }
-    });
-
-    return () => cancelAnimationFrame(frame);
+    // The title bar belongs to the content panel. Apply its new position
+    // before paint so an immediate tab click cannot straddle two layouts.
+    if (layout.sidebarCollapsed) {
+      panel.collapse();
+    } else {
+      panel.resize(layout.lastSidebarSizeRef.current > 0 ? `${layout.lastSidebarSizeRef.current}%` : "260px");
+    }
   }, [layout.sidebarCollapsed]);
 
   useEffect(() => {

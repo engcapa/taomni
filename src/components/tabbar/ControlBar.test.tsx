@@ -1,5 +1,7 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useAppStore } from "../../stores/appStore";
+import { useTabOverviewStore } from "../../stores/tabOverviewStore";
 import { ControlBar } from "./ControlBar";
 import type { AppCommand } from "../menubar/commands";
 
@@ -40,10 +42,6 @@ vi.mock("../window/WindowControls", () => ({
   WindowControls: () => <div data-testid="window-controls" />,
 }));
 
-vi.mock("../window/TitleBarTrayControls", () => ({
-  TitleBarTrayControls: () => <div data-testid="titlebar-tray" />,
-}));
-
 vi.mock("../menubar/useSessionImportExport", () => ({
   useSessionImportExport: () => ({
     hasSessions: false,
@@ -73,6 +71,7 @@ function renderControlBar(
   workspace: {
     commands?: Parameters<typeof ControlBar>[0]["workspaceCommands"];
     onCommand?: (commandId: string) => void;
+    onToggleSidebar?: () => void;
   } = {},
   onDetachActiveTab?: () => void,
 ) {
@@ -85,7 +84,7 @@ function renderControlBar(
       workspaceCommands={workspace.commands}
       onCommand={onCommand}
       onWorkspaceCommand={workspace.onCommand}
-      onToggleSidebar={vi.fn()}
+      onToggleSidebar={workspace.onToggleSidebar ?? vi.fn()}
       onStartLocalTerminal={vi.fn()}
       onConnectSession={vi.fn()}
       onOpenSessionEditor={vi.fn()}
@@ -97,20 +96,14 @@ function renderControlBar(
 }
 
 describe("ControlBar settings button", () => {
-  it("hides windows by default and offers an explicit current-window capture", () => {
+  beforeEach(() => { useAppStore.setState({ activeSideTab: "sessions" }); useTabOverviewStore.getState().close(); });
+  it("moves the screenshot entry out of the shared toolbar (rail owns it now)", () => {
     renderControlBar(vi.fn());
-    fireEvent.click(screen.getByTestId("system-screenshot"));
-    expect(captureMocks.open).toHaveBeenCalledWith(undefined, false);
-  });
-
-  it("closes capture options and includes the current window when requested", () => {
-    renderControlBar(vi.fn());
-    fireEvent.click(screen.getByTestId("system-screenshot-delay-toggle"));
-    expect(screen.getByTestId("system-screenshot-current-window")).toHaveTextContent("Alt+A");
-    fireEvent.click(screen.getByTestId("system-screenshot-current-window"));
-    expect(captureMocks.open).toHaveBeenCalledWith(undefined, true);
-    expect(screen.queryByTestId("system-screenshot-delay-menu")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("capture-indicators")).not.toBeInTheDocument();
+    // v6.1 AC-04: the ScreenshotMenuButton lives in the primary rail's bottom
+    // tools group; the 33px toolbar must not grow a second entry.
+    expect(screen.queryByTestId("system-screenshot")).not.toBeInTheDocument();
+    expect(screen.getByTestId("global-search-trigger")).toBeInTheDocument();
+    expect(screen.getByTestId("toggle-right-sidebar")).toBeInTheDocument();
   });
   afterEach(() => {
     cleanup();
@@ -119,17 +112,20 @@ describe("ControlBar settings button", () => {
     openTabsMocks.props.length = 0;
   });
 
-  it("keeps only the app menu in the left button group", () => {
+  it("keeps the left collapse toggle and the app menu in the left button group", () => {
     const onCommand = vi.fn();
-    renderControlBar(onCommand);
+    const onToggleSidebar = vi.fn();
+    renderControlBar(onCommand, { onToggleSidebar });
 
     const mainMenu = screen.getByTestId("app-main-menu");
     const leftGroup = mainMenu.parentElement;
     expect(leftGroup).toBeTruthy();
     expect(within(leftGroup!).getAllByRole("button").map((button) => button.getAttribute("data-testid"))).toEqual([
+      "toggle-left-sidebar",
       "app-main-menu",
     ]);
-    expect(screen.queryByTestId("sidebar-toggle")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("toggle-left-sidebar"));
+    expect(onToggleSidebar).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId("ribbon-settings")).not.toBeInTheDocument();
     expect(onCommand).not.toHaveBeenCalled();
   });
@@ -150,15 +146,13 @@ describe("ControlBar settings button", () => {
     expect(onWorkspaceCommand).toHaveBeenCalledWith("workspace.findInFiles");
   });
 
-  it("uses the button before More to reveal tab details on hover", () => {
+  it("opens the large overview and removes the small hover-preview button", () => {
     renderControlBar(vi.fn());
-    const button = screen.getByTestId("tab-details-hover");
-
-    expect(tabBarMocks.props.at(-1)?.detailsRevealExternal).toBe(false);
-    fireEvent.mouseEnter(button);
-    expect(tabBarMocks.props.at(-1)?.detailsRevealExternal).toBe(true);
-    fireEvent.mouseLeave(button);
-    expect(tabBarMocks.props.at(-1)?.detailsRevealExternal).toBe(false);
+    expect(screen.queryByTestId("tab-details-hover")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("tab-overview-trigger"));
+    expect(useTabOverviewStore.getState().open).toBe(true);
+    fireEvent.click(screen.getByTestId("tab-overview-trigger"));
+    expect(useTabOverviewStore.getState().open).toBe(false);
   });
 
   it("preserves dragging and maximize gestures in the tab strip filler", () => {
@@ -172,6 +166,39 @@ describe("ControlBar settings button", () => {
     expect(windowMocks.toggleMaximize).toHaveBeenCalledTimes(1);
 
     fireEvent.mouseDown(screen.getByTestId("app-main-menu"), { button: 0, detail: 1 });
+    expect(windowMocks.startDragging).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(["home", "tools", "agents"] as const)("moves from the %s title and empty title-bar space", (mode) => {
+    useAppStore.setState({ activeSideTab: mode });
+    renderControlBar(vi.fn());
+    const title = screen.getByTestId("platform-mode-title");
+    fireEvent.mouseDown(title, { button: 0, detail: 1 });
+    fireEvent.mouseDown(screen.getByTestId("control-bar"), { button: 0, detail: 1 });
+    fireEvent.mouseDown(title, { button: 0, detail: 2 });
+    expect(windowMocks.startDragging).toHaveBeenCalledTimes(2);
+    expect(windowMocks.toggleMaximize).toHaveBeenCalledTimes(1);
+  });
+
+  it("moves from workspace strip padding but leaves nested buttons alone", () => {
+    useAppStore.setState({ activeSideTab: "workspaces" });
+    renderControlBar(vi.fn());
+    fireEvent.mouseDown(screen.getByTestId("workspace-tab-strip"), { button: 0, detail: 1 });
+    expect(windowMocks.startDragging).toHaveBeenCalledTimes(1);
+    fireEvent.mouseDown(screen.getByTestId("workspace-open-session-plus").querySelector("svg")!, { button: 0, detail: 1 });
+    fireEvent.mouseDown(screen.getByTestId("global-search-trigger"), { button: 0, detail: 2 });
+    expect(windowMocks.startDragging).toHaveBeenCalledTimes(1);
+    expect(windowMocks.toggleMaximize).not.toHaveBeenCalled();
+  });
+
+  it("moves and maximizes from workspace title-bar regions without consuming tab actions", () => {
+    useAppStore.setState({ activeSideTab: "workspaces" });
+    renderControlBar(vi.fn());
+    fireEvent.mouseDown(screen.getByTestId("workspace-tab-drag-region"), { button: 0, detail: 1 });
+    fireEvent.mouseDown(screen.getByTestId("control-bar"), { button: 0, detail: 2 });
+    expect(windowMocks.startDragging).toHaveBeenCalledTimes(1);
+    expect(windowMocks.toggleMaximize).toHaveBeenCalledTimes(1);
+    fireEvent.mouseDown(screen.getByTestId("workspace-open-session-plus"), { button: 0, detail: 1 });
     expect(windowMocks.startDragging).toHaveBeenCalledTimes(1);
   });
 

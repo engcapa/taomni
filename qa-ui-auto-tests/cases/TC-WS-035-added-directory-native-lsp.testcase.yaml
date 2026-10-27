@@ -1,0 +1,128 @@
+id: TC-WS-035
+title: An ordinary added workspace directory starts the full native Java LSP and saves real files
+description: Uses Add Folder, not a Code Workspace/recents entry; traverses the unified Project tree, opens Java, waits for actual semantic readiness, edits
+  and verifies host disk bytes and live provider across mode switches.
+modes:
+- native
+covers:
+- F-WS-2
+- F25.1
+- F25.3
+- F25.5
+tags:
+- p0
+- workspace-redesign
+- native-gate
+- regression
+fixtures:
+- reset_db
+- java_sample_projects
+- jdtls_required
+timeout_sec: 420
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-35
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.maven_single_root}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree"]'
+- click: '[data-testid="code-workspace-tree-root"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src/main"] [data-testid="code-workspace-tree-dir-arrow"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java"] [data-testid="code-workspace-tree-dir-arrow"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com"] [data-testid="code-workspace-tree-dir-arrow"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com/example"] [data-testid="code-workspace-tree-dir-arrow"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com/example/single"] [data-testid="code-workspace-tree-dir-arrow"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="src/main/java/com/example/single/App.java"]'
+- wait_for: '[data-testid="workspace-file-editor"] .cm-content[data-language="java"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
+    timeout_sec: 120
+- assert_count:
+    selector: '[data-testid="code-workspace-tab"]'
+    equal: 1
+- press:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    key: Mod+End
+- type:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    text: '
+
+      // QA_SHARED_NATIVE_LSP'
+- wait_for: '[data-testid="workspace-file-editor"][data-dirty="true"]'
+- click: '[data-testid="workspace-editor-save"]'
+- assert_file_contains:
+    path: ${fixture.maven_single_root}/src/main/java/com/example/single/App.java
+    contains: // QA_SHARED_NATIVE_LSP
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    contains: // QA_SHARED_NATIVE_LSP
+- wait_for:
+    selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
+    timeout_sec: 90
+- screenshot: workspace-added-root-native-lsp.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Add Folder uses the complete native editor, real Java provider, disk save and retained provider across navigation.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 5
+    - 6
+    - 7
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 20
+    - 21
+    - 23
+    - 25
+    - 26
+    checkpoints:
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content[data-language=\"java\"]"}'
+    - step: 18
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"][data-semantic-ready=\"true\"]", "timeout_sec": 120}}'
+    - step: 19
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-dirty=\"true\"]"}'
+    - step: 24
+      expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/App.java", "contains": "// QA_SHARED_NATIVE_LSP"}}'
+    - step: 27
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "// QA_SHARED_NATIVE_LSP"}}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"][data-semantic-ready=\"true\"]", "timeout_sec": 90}}'
+    results:
+    - 8
+    - 17
+    - 18
+    - 19
+    - 22
+    - 24
+    - 27
+    - 28
+  visual:
+  - check: Review compact shared editor chrome, tree, tabs and chosen appearance in the retained screenshot.
+    method: manual
+    reason: DOM assertions establish functionality and computed sizes; visual fidelity is inspected separately.
+  native:
+  - check: An added ordinary directory launches the existing editor and real JDT LS, and saves to actual host bytes.
+    method: automated
+    reason: Browser stubs cannot establish provider processes or host disk effects.

@@ -1,0 +1,67 @@
+id: TC-WS-008
+title: Workspace file tree creates new files, new folders, and mounts multiple root
+  directories
+description: 'Verifies DEC-04 / AC-08: Workspace file tree toolbar and context menu
+  allow creating new files, creating new folders, and adding external directories
+  (Multi-Root) into the workspace.'
+covers:
+- F25.1
+tags:
+- p1
+- code-workspace
+- workspace-redesign
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 60
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="sidebar-rail"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-new-file"]'
+- assert_visible: '[data-testid="workspace-new-folder"]'
+- assert_visible: '[data-testid="workspace-add-folder"]'
+- click: '[data-testid="workspace-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: hello-workspace.ts
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-pane"] >> text="hello-workspace.ts"'
+- screenshot: ws-008-workspace-new-file-folder.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 工作区左栏提供新建文件、新建目录、添加外部目录按钮，新建文件后立即出现在工作区文件树中。
+    actions:
+    - 1
+    - 3
+    - 7
+    - 9
+    - 10
+    checkpoints:
+    - step: 4
+      expectation: 新建文件按钮可见
+    - step: 5
+      expectation: 新建目录按钮可见
+    - step: 6
+      expectation: 添加文件夹到工作区按钮可见
+    - step: 8
+      expectation: 弹出文件名输入对话框
+    - step: 11
+      expectation: 新文件 hello-workspace.ts 出现在工作区文件树中
+    results:
+    - 5
+    - 6
+    - 11
+  visual:
+  - check: 文件树工具栏图标紧凑清晰，新建节点缩进正确。
+    method: manual
+    reason: 截图人工复核。
+  native:
+  - check: 在桌面端验证工作区新建文件与目录树更新。
+    method: automated
+    reason: 按实际执行模式验证。

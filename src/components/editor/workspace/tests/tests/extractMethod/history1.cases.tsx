@@ -298,6 +298,10 @@ export function registerextractMethodHistory1Cases(caseContext: registerextractM
       fireEvent.keyDown(input, { key: "Enter" });
       // The provider rejects the name; the prompt reopens with the user's input
       // and the committed extraction is never repeated.
+      await waitFor(() => expect(caseContext.workspaceTestHarness.lspMocks.lspRename)
+        .toHaveBeenCalledWith(expect.anything(), expect.anything(), "1bad"));
+      await waitFor(() => expect(useAppStore.getState().statusMessage)
+        .toContain("'1bad' is not a valid identifier"));
       const retry = await screen.findByTestId("text-input-dialog-input", {}, { timeout: 5_000 });
       expect(retry).toHaveValue("1bad");
       expect(fixture.text()).toBe(caseContext.B1);

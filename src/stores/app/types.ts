@@ -3,7 +3,26 @@ import { type XServerStatus } from "../../lib/ipc";
 import type { TabFilter } from "../../lib/tabFilter";
 import { type SidebarCollapsedByGroup } from "../sidebarRailPolicy";
 
-export type SideTab = "sessions" | "tools";
+/**
+ * Primary navigation modes of the workspace-first shell (v6.1).
+ *
+ * `sessions`/`tools` keep their historical names and behaviour so existing
+ * automation and stored preferences stay valid; `home`, `workspaces` and
+ * `agents` extend the same rail.
+ */
+export type PrimaryNavMode = "home" | "workspaces" | "sessions" | "agents" | "tools";
+
+/** Backwards-compatible alias for the former two-value sidebar tab type. */
+export type SideTab = PrimaryNavMode;
+
+/** Bottom-left floating MFA authenticator window (position is viewport-fixed). */
+export interface FloatingMfaWindowState {
+  open: boolean;
+  pinned: boolean;
+  /** Default placement: `{ left: 50, bottom: 30 }`. */
+  position: { left: number; bottom: number };
+  searchQuery: string;
+}
 
 export type TerminalSplitLayout = "horizontal" | "vertical" | "grid";
 
@@ -117,6 +136,8 @@ export interface AppState {
   tabs: Tab[];
   activeTabId: string | null;
   sidebarCollapsed: boolean;
+  /** Workspaces remembers its navigator independently of the active Sessions tab. */
+  workspaceSidebarCollapsed: boolean;
   /**
    * ED-PARITY-027: merge the active tab's tool window bar into the sidebar
    * rail and remember the sidebar state per tab group (default on).
@@ -125,6 +146,10 @@ export interface AppState {
   /** Sidebar collapsed state remembered per tab group (see sidebarRailPolicy). */
   sidebarCollapsedByGroup: SidebarCollapsedByGroup;
   activeSideTab: SideTab;
+  /** Right context sidebar (`◨`, AI / session assist) collapsed state. */
+  rightSidebarCollapsed: boolean;
+  /** Bottom-left floating MFA authenticator window (v6.1 AC-04). */
+  floatingMfa: FloatingMfaWindowState;
   /**
    * Whether a usable local X server is reachable (Xorg / XQuartz / VcXsrv /
    * WSLg). This is now backed by real backend detection via
@@ -225,6 +250,16 @@ export interface AppState {
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
   setActiveSideTab: (tab: SideTab) => void;
+  toggleRightSidebar: () => void;
+  setRightSidebarCollapsed: (collapsed: boolean) => void;
+  /** Toggle the bottom-left floating MFA window. */
+  toggleFloatingMfa: () => void;
+  openFloatingMfa: () => void;
+  closeFloatingMfa: () => void;
+  /** Move the floating MFA window; coordinates are clamped to the viewport. */
+  setFloatingMfaPosition: (left: number, bottom: number) => void;
+  setFloatingMfaPinned: (pinned: boolean) => void;
+  setFloatingMfaSearch: (query: string) => void;
   setMergeToolWindowRail: (value: boolean) => void;
   /** Apply the remembered sidebar state of the active tab's group (ED-PARITY-027). */
   applySidebarForActiveTab: () => void;

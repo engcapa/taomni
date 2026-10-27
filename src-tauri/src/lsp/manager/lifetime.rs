@@ -230,6 +230,10 @@ impl LspManager {
 
     pub(in crate::lsp) async fn stop_workspace(&self, workspace_id: &str) -> usize {
         self.stop_workspace_watcher(workspace_id).await;
+        self.stop_workspace_servers(workspace_id).await
+    }
+
+    pub(in crate::lsp) async fn stop_workspace_servers(&self, workspace_id: &str) -> usize {
         if let Some((_, cancellation)) = self
             .workspace_symbol_queries
             .lock()

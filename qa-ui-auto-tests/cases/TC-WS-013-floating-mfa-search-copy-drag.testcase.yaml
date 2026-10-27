@@ -1,0 +1,146 @@
+id: TC-WS-013
+title: Floating MFA window search, copy, drag and expand to the full MFA tab
+description: v6.1 AC-04 browser half. With seeded authenticator accounts the bottom-left floating window filters by search, copies the current code to the clipboard,
+  clamps a pointer drag inside the viewport and expands into the full MFA tab while closing itself.
+modes:
+- browser
+covers:
+- F-MFA-1
+- F-WS-3
+tags:
+- p1
+- workspace-redesign
+- mfa
+- clipboard
+fixtures:
+- reset_db
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-ws-013
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-ws-013
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="mfa-empty"]'
+    timeout_sec: 30
+- seed_storage:
+    key: taomni.stub.mfa.v1
+    value: '{"accounts":[{"id":"mfa-qa-hotp","issuer":"QA Clip","accountName":"qa@example.com","group":"","note":"","kind":"hotp","algorithm":"SHA1","digits":6,"period":30,"counter":0,"pinned":false,"sortOrder":1,"useCount":0,"lastUsedAt":null,"createdAt":1,"updatedAt":1,"secret":"GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ","fingerprint":"qa-hotp-1"},{"id":"mfa-qa-totp","issuer":"GitHub","accountName":"dev@example.com","group":"","note":"","kind":"totp","algorithm":"SHA1","digits":6,"period":30,"counter":0,"pinned":false,"sortOrder":2,"useCount":0,"lastUsedAt":null,"createdAt":1,"updatedAt":1,"secret":"JBSWY3DPEHPK3PXP","fingerprint":"qa-totp-1"}],"prefs":{"sortMode":"custom","groupFilter":""}}'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="mfa-floating-window"]'
+- wait_for: '[data-testid="mfa-floating-account"]'
+- assert_count:
+    selector: '[data-testid="mfa-floating-account"]'
+    equal: 2
+- fill:
+    selector: '[data-testid="mfa-floating-search"]'
+    value: QA Clip
+- wait_for: '[data-testid="mfa-floating-account"][data-account-id="mfa-qa-hotp"]'
+- assert_count:
+    selector: '[data-testid="mfa-floating-account"]'
+    equal: 1
+- fill:
+    selector: '[data-testid="mfa-floating-search"]'
+    value: ''
+- wait_for: '[data-testid="mfa-floating-account"][data-account-id="mfa-qa-totp"]'
+- click: '[data-testid="mfa-floating-account"][data-account-id="mfa-qa-hotp"]'
+- wait_for: '[data-testid="mfa-floating-account"][data-account-id="mfa-qa-hotp"][data-copied="true"]'
+- eval_readonly:
+    expression: navigator.clipboard.readText()
+    contains: '755224'
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"mfa-floating-window"]').getBoundingClientRect().left >= 40 && document.querySelector('[data-testid'
+      + String.fromCharCode(61) + '"mfa-floating-window"]').getBoundingClientRect().left <= 80
+    expect_truthy: true
+- drag_to:
+    from: '[data-testid="mfa-floating-drag-handle"]'
+    by:
+      dx: 70
+      dy: -30
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"mfa-floating-window"]').getBoundingClientRect().left >= 100
+    expect_truthy: true
+- press: Escape
+- assert_not_visible: '[data-testid="mfa-floating-window"]'
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="mfa-floating-window"]'
+- click: '[data-testid="mfa-floating-expand-tab"]'
+- wait_for: '[data-testid="mfa-tab"]'
+- assert_not_visible: '[data-testid="mfa-floating-window"]'
+- screenshot: ws-013-floating-mfa-search-copy-drag.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 初始化密码库并载入验证器账户后，悬浮窗显示 6 位验证码与倒计时，并按搜索关键字过滤账户。
+    actions:
+    - 14
+    - 18
+    - 21
+    checkpoints:
+    - step: 15
+      expectation: 步骤 15 的可观察断言通过
+    - step: 16
+      expectation: 步骤 16 的可观察断言通过
+    - step: 17
+      expectation: 步骤 17 的可观察断言通过
+    - step: 19
+      expectation: 步骤 19 的可观察断言通过
+    - step: 20
+      expectation: 步骤 20 的可观察断言通过
+    - step: 22
+      expectation: 步骤 22 的可观察断言通过
+    results:
+    - 22
+  - id: R2
+    requirement: 单击账户把当前 6 位验证码写入剪贴板并显示已复制状态。
+    actions:
+    - 23
+    checkpoints:
+    - step: 24
+      expectation: 步骤 24 的可观察断言通过
+    - step: 25
+      expectation: 步骤 25 的可观察断言通过
+    results:
+    - 25
+  - id: R3
+    requirement: 悬浮窗可拖拽并夹紧在视口内；Esc 关闭浮窗；展开后打开全屏 MFA 标签并关闭浮窗。
+    actions:
+    - 27
+    - 29
+    - 31
+    - 33
+    checkpoints:
+    - step: 26
+      expectation: 步骤 26 的可观察断言通过
+    - step: 28
+      expectation: 步骤 28 的可观察断言通过
+    - step: 30
+      expectation: 步骤 30 的可观察断言通过
+    - step: 32
+      expectation: 步骤 32 的可观察断言通过
+    - step: 34
+      expectation: 步骤 34 的可观察断言通过
+    results:
+    - 34
+  visual:
+  - check: 浮窗搜索、账户卡片、验证码与倒计时环在左下角紧凑对齐。
+    method: manual
+    reason: 浮窗视觉与拖拽边界需要截图评审。
+  native:
+  - check: 原生桌面剪贴板与浮层层级由 TC-WS-012 / TC-WS-014 覆盖。
+    method: automated
+    reason: 本用例只声明 browser 模式，不替代操作系统的剪贴板证据。

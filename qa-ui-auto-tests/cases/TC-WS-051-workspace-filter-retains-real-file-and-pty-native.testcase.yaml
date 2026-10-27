@@ -1,0 +1,210 @@
+id: TC-WS-051
+title: Workspace filters and overflow layouts preserve unsaved editor buffers, exact saved bytes and the same live local PTY
+description: 'Native-only boundary: real files are opened and saved via Tauri; independent host disk reread verifies the save. Shell output before and after filtering must
+  be separate anchored output lines and the terminal count stays one.'
+modes:
+- native
+covers:
+- F-WS-1
+- F-WS-2
+- F-WS-3
+- F1.5
+tags:
+- p0
+- workspace-redesign
+- regression
+- filter
+- crash-regression
+fixtures:
+- reset_db
+- platform_workspace_root
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-filter
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: '{"version": 1, "activeWorkspaceId": "default-workspace", "createdNodes": [], "workspaces": [{"id": "default-workspace", "name": "Default Workspace", "description":
+      "", "isDefault": true, "rootFolders": [{"id": "root-1", "name": "qa-root", "path": "${fixture.platform_workspace_root}", "addedAt": 1}], "pinnedSessionIds": [], "activeLeftToolWindow":
+      "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId": ""}, {"id": "second-workspace", "name": "Second Workspace",
+      "description": "", "isDefault": false, "rootFolders": [], "pinnedSessionIds": [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal",
+      "heightPx": 220}, "openTabs": [], "activeTabId": ""}]}'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="code-workspace-tree-root"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- wait_for: '[data-testid="workspace-file-editor"]'
+- press:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    key: Mod+a
+- type:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    text: QA_FILTER_UNSAVED_DRAFT
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+- assert_count:
+    selector: '[data-testid="workspace-tab"]'
+    equal: 2
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo QA_FILTER_PTY_BEFORE
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^QA_FILTER_PTY_BEFORE\s*$
+- click: '[data-testid="workspace-tabs-filter-trigger"]'
+- click: '[data-testid="workspace-tab-filter-files"]'
+- assert_count:
+    selector: '[data-testid="workspace-tab"]'
+    equal: 1
+- press: Escape
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    equals: QA_FILTER_UNSAVED_DRAFT
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="workspace-layout-split"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-canvas-panes"]'
+    name: data-layout
+    equals: split
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="platform-layout-single"]'
+- click: '[data-testid="workspace-tabs-filter-trigger"]'
+- fill:
+    selector: '[data-testid="workspace-tabs-filter-search"]'
+    value: missing
+- assert_count:
+    selector: '[data-testid="workspace-tab"]'
+    equal: 0
+- assert_visible: '[data-testid="workspace-tabs-filter-empty"]'
+- click: '[data-testid="workspace-tabs-filter-clear"]'
+- click: '[data-testid="workspace-tab-filter-local"]'
+- press: Escape
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^QA_FILTER_PTY_BEFORE\s*$
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo QA_FILTER_PTY_AFTER
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^QA_FILTER_PTY_AFTER\s*$
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 1
+- click: '[data-testid="workspace-tabs-filter-trigger"]'
+- click: '[data-testid="workspace-tabs-filter-clear"]'
+- click: '[data-testid="workspace-tab-filter-files"]'
+- press: Escape
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    equals: QA_FILTER_UNSAVED_DRAFT
+- press: Mod+s
+- assert_file_sha256:
+    path: ${fixture.platform_workspace_root}/README.md
+    equals: 6f9d78d9f3af64d8bc4f9b392c6ce5606b48a0140d2d8f82a0fd1975febac0ae
+- assert_count:
+    selector: '[data-testid="workspace-tab"]'
+    equal: 1
+- click: '[data-testid="workspace-tab-filter-chip"]'
+- assert_count:
+    selector: '[data-testid="workspace-tab"]'
+    equal: 2
+- assert_no_runtime_errors: null
+- screenshot: workspace-filter-real-file-and-pty.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Workspace filters and overflow layouts preserve unsaved editor buffers, exact saved bytes and the same live local PTY
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 6
+    - 7
+    - 8
+    - 10
+    - 11
+    - 12
+    - 13
+    - 16
+    - 18
+    - 19
+    - 21
+    - 23
+    - 24
+    - 26
+    - 27
+    - 28
+    - 29
+    - 32
+    - 33
+    - 34
+    - 36
+    - 39
+    - 40
+    - 41
+    - 42
+    - 44
+    - 47
+    checkpoints:
+    - step: 15
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 2}}'
+    - step: 17
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_FILTER_PTY_BEFORE\\s*$"}}'
+    - step: 20
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 1}}'
+    - step: 22
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "QA_FILTER_UNSAVED_DRAFT"}}'
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
+    - step: 30
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 0}}'
+    - step: 31
+      expectation: '{"assert_visible": "[data-testid=\"workspace-tabs-filter-empty\"]"}'
+    - step: 35
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_FILTER_PTY_BEFORE\\s*$"}}'
+    - step: 37
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_FILTER_PTY_AFTER\\s*$"}}'
+    - step: 38
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"]", "equal": 1}}'
+    - step: 43
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "QA_FILTER_UNSAVED_DRAFT"}}'
+    - step: 45
+      expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/README.md", "equals": "6f9d78d9f3af64d8bc4f9b392c6ce5606b48a0140d2d8f82a0fd1975febac0ae"}}'
+    - step: 46
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 1}}'
+    - step: 48
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 2}}'
+    - step: 49
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 15
+    - 17
+    - 20
+    - 22
+    - 25
+    - 30
+    - 31
+    - 35
+    - 37
+    - 38
+    - 43
+    - 45
+    - 46
+    - 48
+    - 49
+  visual:
+  - check: Compact funnel/overflow controls and bounded popovers
+    method: automated
+    reason: The case checks exact button order, geometry and focus; retained screenshots support appearance inspection.
+  native:
+  - check: Real editor buffers, file writes and live PTY ownership survive filtering
+    method: automated
+    reason: 'Native-only boundary: real files are opened and saved via Tauri; independent host disk reread verifies the save. Shell output before and after filtering must be
+      separate anchored output lines and the terminal count stays one.'

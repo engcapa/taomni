@@ -71,13 +71,19 @@ function normalize(path: unknown): string {
   return typeof path === "string" ? path.replace(/\\/g, "/").replace(/\/+$/, "") : "";
 }
 
+function repositoryForPath(path: unknown): string | null {
+  const normalized = normalize(path);
+  return Object.keys(REPOS).find((repo) => normalized === repo || normalized.startsWith(`${repo}/`)) ?? null;
+}
+
 /** True when this invoke belongs to the isolated fixture. */
 export function parity008Handles(cmd: string, args: Record<string, unknown> | undefined): boolean {
   if (!enabled()) return false;
   if (cmd === "workspace_detect_git_roots") {
     const roots = Array.isArray(args?.roots) ? args.roots as Array<{ path?: unknown }> : [];
-    return roots.some((root) => normalize(root.path) === parity008Root);
+    return roots.some((root) => normalize(root.path) === parity008Root || repositoryForPath(root.path));
   }
+  if (cmd === "git_probe_path") return normalize(args?.path) === parity008Root || repositoryForPath(args?.path) !== null;
   if (!cmd.startsWith("git_")) return false;
   return normalize(args?.repoRoot) in REPOS;
 }
@@ -132,14 +138,16 @@ async function blobPair(repoRoot: string, path: string): Promise<GitBlobPair> {
 
 export async function parity008Invoke(cmd: string, args: Record<string, unknown> | undefined): Promise<unknown> {
   if (cmd === "workspace_detect_git_roots") {
-    const root = (args?.roots as Array<{ id: string; path: string }>).find((item) => normalize(item.path) === parity008Root)!;
-    return Object.entries(REPOS).map(([repoRoot, repo]) => ({
-      id: repo.name,
-      name: repo.name,
-      path: parity008Root,
-      repoRoot,
-      rootIds: [root.id],
-    }));
+    const roots = args?.roots as Array<{ id: string; path: string }>;
+    return Object.entries(REPOS).flatMap(([repoRoot, repo]) => {
+      const matching = roots.filter((root) => normalize(root.path) === parity008Root || repositoryForPath(root.path) === repoRoot);
+      return matching.length ? [{ id: repo.name, name: repo.name, path: matching[0].path,
+        repoRoot, rootIds: matching.map((root) => root.id) }] : [];
+    });
+  }
+  if (cmd === "git_probe_path") {
+    const repoRoot = repositoryForPath(args?.path);
+    return { path: normalize(args?.path), gitAvailable: true, isRepo: !!repoRoot, repoRoot, error: null };
   }
   const repoRoot = normalize(args?.repoRoot);
   const path = typeof args?.path === "string" ? args.path : null;

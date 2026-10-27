@@ -34,7 +34,7 @@ export function LocalTerminalCard({
 
   return (
     <div
-      className="text-left p-4 min-h-[170px] h-full rounded-md border taomni-card-hover flex flex-col"
+      className="taomni-home-launch-card text-left h-full border taomni-card-hover flex flex-col"
       style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
     >
       <div className="flex items-center gap-2 mb-1">
@@ -57,7 +57,7 @@ export function LocalTerminalCard({
         {selectedShell ? t("welcome.openShell", { shell: selectedShell.name }) : t("welcome.openLocalShell")}
       </div>
 
-      <div className="mt-3 space-y-3">
+      <div className="taomni-home-shell-actions">
         {hasChoices ? (
           <select
             className="taomni-input h-8 w-full"
@@ -81,8 +81,8 @@ export function LocalTerminalCard({
             {selectedShell?.name ?? (shellStatus === "loading" ? t("welcome.detectingShellsShort") : t("welcome.defaultShell"))}
           </div>
         )}
-        <div className="flex items-center justify-end gap-2 flex-wrap">
-          <button data-testid="welcome-open-local-terminal" className="taomni-btn h-8 px-3" onClick={onStart} type="button">
+        <div className="taomni-home-shell-buttons flex items-center gap-2 flex-wrap">
+          <button data-testid="welcome-open-local-terminal" className="taomni-btn taomni-btn-primary h-8 px-3" onClick={onStart} type="button">
             {t("welcome.open")}
           </button>
           {canElevate && (
@@ -140,7 +140,7 @@ export function WslCard({
   return (
     <div
       data-testid="welcome-wsl-card"
-      className="text-left p-4 min-h-[170px] h-full rounded-md border taomni-card-hover flex flex-col"
+      className="taomni-home-launch-card text-left h-full border taomni-card-hover flex flex-col"
       style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
     >
       <div className="flex items-center gap-2 mb-1">
@@ -151,7 +151,7 @@ export function WslCard({
       </div>
       <div className="text-[12px] text-[var(--taomni-text-muted)]">{detail}</div>
 
-      <div className="mt-3 space-y-3">
+      <div className="taomni-home-shell-actions">
         <select
           data-testid="welcome-wsl-distro"
           className="taomni-input h-8 w-full"
@@ -165,7 +165,7 @@ export function WslCard({
             </option>
           ))}
         </select>
-        <div className="flex items-center justify-end gap-2 flex-wrap">
+        <div className="taomni-home-shell-buttons flex items-center gap-2 flex-wrap">
           <button
             data-testid="welcome-wsl-open"
             className="taomni-btn h-8 px-3"
@@ -193,7 +193,7 @@ export function MailSessionsCard({
   return (
     <div
       data-testid="welcome-mail-card"
-      className="text-left p-4 min-h-[138px] h-full rounded-md border taomni-card-hover flex flex-col"
+      className="taomni-home-launch-card text-left h-full border taomni-card-hover flex flex-col"
       style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
     >
       <div className="flex items-center gap-2 mb-1">
@@ -251,7 +251,7 @@ export function ActionCard({
   return (
     <button
       data-testid={testId}
-      className="text-left p-4 min-h-[138px] h-full rounded-md border taomni-card-hover flex flex-col"
+      className="taomni-home-launch-card text-left h-full border taomni-card-hover flex flex-col"
       style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
       onClick={onClick}
       type="button"

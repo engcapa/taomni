@@ -12,53 +12,54 @@ modes: [browser]
 fixtures: [reset_db, parity008_git]
 timeout_sec: 180
 steps:
-  - open: ${cfg.app.base_url}
-  - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity008_root}"]'
-  - wait_for: '[data-testid="code-workspace-git-panel-toggle"]:not([disabled])'
-  - click: '[data-testid="code-workspace-git-panel-toggle"]'
-  - wait_for: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-b"][data-path="same.txt"]'
-  - click: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-b"][data-path="same.txt"]'
-  - wait_for: '[data-testid="git-diff-viewer"][data-repo-root="${fixture.parity008_root}/repo-b"]'
-  - parity008_hold: ${fixture.parity008_root}/repo-a
-  - click: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-a"][data-path="same.txt"]'
-  - parity008_trace: {pending_min: 1}
-  - assert_text_equals:
-      selector: '[data-testid="workspace-diff-title"]'
-      equals: repo-a / same.txt
-  - assert_count:
-      selector: '[data-testid="git-diff-viewer"]'
-      equal: 0
-  - parity008_hold: null
-  - click: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-b"][data-path="same.txt"]'
-  - wait_for: '[data-testid="git-diff-viewer"][data-repo-root="${fixture.parity008_root}/repo-b"]'
-  - parity008_release: null
-  - parity008_trace: {pending: 0, writes: 0}
-  - assert_text_equals:
-      selector: '[data-testid="workspace-diff-title"]'
-      equals: repo-b / same.txt
-  - assert_attribute:
-      selector: '[data-testid="git-diff-viewer"]'
-      name: data-repo-root
-      equals: ${fixture.parity008_root}/repo-b
-  - assert_pattern:
-      selector: '[data-testid="git-diff-viewer"]'
-      regex: '(?s)^(?!.*repo-a).*repo-b HEAD.*repo-b WORKTREE'
-  - assert_text_equals:
-      selector: '[data-testid="workspace-diff-file-position"]'
-      equals: 3/3 files
-  - screenshot: tc-ide-parity-008-02-late-a-dropped.png
-  - click: '[data-testid="git-diff-discard"]'
-  - wait_for: '[data-testid="confirm-dialog"]'
-  - click: '[data-testid="confirm-dialog-cancel"]'
-  - assert_not_visible: '[data-testid="confirm-dialog"]'
-  - parity008_trace: {writes: 0, pending: 0}
-  - click: '[data-testid="tab-item"][data-tab-type="git"] [data-testid="tab-close"]'
-  - assert_count:
-      selector: '[data-testid="workspace-git-manager"]'
-      equal: 0
-  - parity008_trace: {writes: 0, pending: 0}
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity008_root}"]'
+- wait_for: '[data-testid="code-workspace-tool-rail-git"]:not([disabled])'
+- click: '[data-testid="code-workspace-tool-rail-git"]'
+- wait_for: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-b"][data-path="same.txt"]'
+- click: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-b"][data-path="same.txt"]'
+- wait_for: '[data-testid="git-diff-viewer"][data-repo-root="${fixture.parity008_root}/repo-b"]'
+- parity008_hold: ${fixture.parity008_root}/repo-a
+- click: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-a"][data-path="same.txt"]'
+- parity008_trace: {pending_min: 1}
+- assert_text_equals:
+    selector: '[data-testid="workspace-diff-title"]'
+    equals: repo-a / same.txt
+- assert_count:
+    selector: '[data-testid="git-diff-viewer"]'
+    equal: 0
+- parity008_hold:
+- click: '[data-testid="workspace-change-row"][data-repo-root="${fixture.parity008_root}/repo-b"][data-path="same.txt"]'
+- wait_for: '[data-testid="git-diff-viewer"][data-repo-root="${fixture.parity008_root}/repo-b"]'
+- parity008_release:
+- parity008_trace: {pending: 0, writes: 0}
+- assert_text_equals:
+    selector: '[data-testid="workspace-diff-title"]'
+    equals: repo-b / same.txt
+- assert_attribute:
+    selector: '[data-testid="git-diff-viewer"]'
+    name: data-repo-root
+    equals: ${fixture.parity008_root}/repo-b
+- assert_pattern:
+    selector: '[data-testid="git-diff-viewer"]'
+    regex: '(?s)^(?!.*repo-a).*repo-b HEAD.*repo-b WORKTREE'
+- assert_text_equals:
+    selector: '[data-testid="workspace-diff-file-position"]'
+    equals: 3/3 files
+- screenshot: tc-ide-parity-008-02-late-a-dropped.png
+- click: '[data-testid="git-diff-discard"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_not_visible: '[data-testid="confirm-dialog"]'
+- parity008_trace: {writes: 0, pending: 0}
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="workspace-tab"][data-tab-kind="git"] [data-testid="workspace-tab-close"]'
+- assert_count:
+    selector: '[data-testid="workspace-git-manager"]'
+    equal: 0
+- parity008_trace: {writes: 0, pending: 0}
 verification:
   review: reviewed
   requirements:
@@ -73,23 +74,23 @@ verification:
     - 18
     checkpoints:
     - step: 12
-      expectation: '{parity008_trace: {pending_min: 1}}'
+      expectation: '{"parity008_trace": {"pending_min": 1}}'
     - step: 13
-      expectation: '{assert_text_equals: {equals: repo-a / same.txt, selector: ''[data-testid="workspace-diff-title"]''}}'
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-diff-title\"]", "equals": "repo-a / same.txt"}}'
     - step: 14
-      expectation: '{assert_count: {equal: 0, selector: ''[data-testid="git-diff-viewer"]''}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"git-diff-viewer\"]", "equal": 0}}'
     - step: 17
-      expectation: '{wait_for: ''[data-testid="git-diff-viewer"][data-repo-root="${fixture.parity008_root}/repo-b"]''}'
+      expectation: '{"wait_for": "[data-testid=\"git-diff-viewer\"][data-repo-root=\"${fixture.parity008_root}/repo-b\"]"}'
     - step: 19
-      expectation: '{parity008_trace: {pending: 0, writes: 0}}'
+      expectation: '{"parity008_trace": {"pending": 0, "writes": 0}}'
     - step: 20
-      expectation: '{assert_text_equals: {equals: repo-b / same.txt, selector: ''[data-testid="workspace-diff-title"]''}}'
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-diff-title\"]", "equals": "repo-b / same.txt"}}'
     - step: 21
-      expectation: '{assert_attribute: {equals: ''${fixture.parity008_root}/repo-b'', name: data-repo-root, selector: ''[data-testid="git-diff-viewer"]''}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"git-diff-viewer\"]", "name": "data-repo-root", "equals": "${fixture.parity008_root}/repo-b"}}'
     - step: 22
-      expectation: '{assert_pattern: {regex: ''(?s)^(?!.*repo-a).*repo-b HEAD.*repo-b WORKTREE'', selector: ''[data-testid="git-diff-viewer"]''}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"git-diff-viewer\"]", "regex": "(?s)^(?!.*repo-a).*repo-b HEAD.*repo-b WORKTREE"}}'
     - step: 23
-      expectation: '{assert_text_equals: {equals: 3/3 files, selector: ''[data-testid="workspace-diff-file-position"]''}}'
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-diff-file-position\"]", "equals": "3/3 files"}}'
     results:
     - 19
     - 20
@@ -101,19 +102,19 @@ verification:
     actions:
     - 25
     - 27
-    - 30
+    - 31
     checkpoints:
     - step: 28
-      expectation: '{assert_not_visible: ''[data-testid="confirm-dialog"]''}'
+      expectation: '{"assert_not_visible": "[data-testid=\"confirm-dialog\"]"}'
     - step: 29
-      expectation: '{parity008_trace: {pending: 0, writes: 0}}'
-    - step: 31
-      expectation: '{assert_count: {equal: 0, selector: ''[data-testid="workspace-git-manager"]''}}'
+      expectation: '{"parity008_trace": {"writes": 0, "pending": 0}}'
     - step: 32
-      expectation: '{parity008_trace: {pending: 0, writes: 0}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-git-manager\"]", "equal": 0}}'
+    - step: 33
+      expectation: '{"parity008_trace": {"writes": 0, "pending": 0}}'
     results:
-    - 31
     - 32
+    - 33
   visual:
   - check: 截图中标题、n/N 导航、两侧标签/结果树与高亮无截断遮挡；与 IDEA 参照的视觉差异单独记录于 comparison record。
     method: manual

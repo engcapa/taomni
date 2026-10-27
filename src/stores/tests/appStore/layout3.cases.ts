@@ -213,6 +213,7 @@ export function registerappStoreLayout3Cases() {
 
   describe("appStore.sidebar", () => {
     beforeEach(() => {
+      useAppStore.setState({ activeSideTab: "sessions" });
       window.localStorage.clear();
       useAppStore.setState({
         tabs: [tab("welcome", { type: "welcome", closable: false })],
@@ -240,6 +241,7 @@ export function registerappStoreLayout3Cases() {
 
   describe("appStore.sidebar per tab group (ED-PARITY-027)", () => {
     beforeEach(() => {
+      useAppStore.setState({ activeSideTab: "sessions" });
       window.localStorage.clear();
       useAppStore.setState({
         tabs: [tab("welcome", { type: "welcome", closable: false }), tab("t1"), tab("cw", { type: "code-workspace" })],
@@ -282,6 +284,22 @@ export function registerappStoreLayout3Cases() {
       useAppStore.getState().toggleSidebar();
       expect(useAppStore.getState().sidebarCollapsedByGroup.other).toBe(true);
       expect(window.localStorage.getItem("taomni.sidebarCollapsed")).toBe("true");
+    });
+
+    it("keeps Home collapse transient and restores the same session group's preference", () => {
+      useAppStore.setState({ activeTabId: "cw", sidebarCollapsed: false,
+        sidebarCollapsedByGroup: { "code-workspace": true, terminal: false, other: false } });
+      const before = useAppStore.getState().sidebarCollapsedByGroup;
+      useAppStore.getState().setActiveSideTab("home");
+      useAppStore.getState().setSidebarCollapsed(true);
+      useAppStore.getState().toggleSidebar();
+      expect(useAppStore.getState().sidebarCollapsedByGroup).toBe(before);
+      expect(localStorage.getItem("taomni.sidebarCollapsed")).toBeNull();
+      expect(localStorage.getItem("taomni.sidebarCollapsedByGroup.v1")).toBeNull();
+      useAppStore.getState().setActiveSideTab("sessions");
+      useAppStore.getState().setActiveTab("cw");
+      expect(useAppStore.getState().sidebarCollapsed).toBe(true);
+      expect(useAppStore.getState().sidebarCollapsedByGroup).toBe(before);
     });
 
     it("keeps the single global state when the bar is not merged", () => {

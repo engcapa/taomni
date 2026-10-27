@@ -167,7 +167,8 @@ def setup(ctx: Any) -> None:
                     if parts["file_name"] == b"current.taobak":
                         self.event("upload_sha256=" + hashlib.sha256(data).hexdigest())
                         for journal in (root / "jobs").glob("*.json"):
-                            job = json.loads(journal.read_text(encoding="utf-8"))
+                            from .backup_journal import read_journal
+                            job = read_journal(journal)
                             if job.get("operation") == "upload" and job.get("phase") not in {"completed", "discarded"}:
                                 source = job.get("executionSource") or {}
                                 self.event("execution_scope=" + source.get("scope", "legacy"))

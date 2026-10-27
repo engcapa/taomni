@@ -23,12 +23,15 @@ import {
   X,
 } from "lucide-react";
 import { useContextMenu, type MenuItem } from "../../ContextMenu";
+import { useT } from "../../../lib/i18n";
 import {
   treeToolbarDensity,
   treeToolbarVisibility,
   treeViewTitle,
   type FileTreeViewMode,
 } from "./treeToolbarChrome";
+import { DEFAULT_EXPLORER_SORT, type ExplorerSort } from "./explorerPreferences";
+import { ExplorerListColumns, explorerSortMenu } from "./ExplorerSortControls";
 
 export type { FileTreeViewMode };
 
@@ -66,6 +69,8 @@ interface FileTreePaneProps {
   /** IDEA Appearance › Details: modification time and size after file names. */
   showDetails?: boolean;
   onShowDetailsChange?: (value: boolean) => void;
+  sort?: ExplorerSort;
+  onSortChange?: (value: ExplorerSort) => void;
   children: ReactNode;
 }
 
@@ -132,7 +137,10 @@ export function FileTreePane({
   toolWindowOptions,
   showDetails = false,
   onShowDetailsChange,
+  sort = DEFAULT_EXPLORER_SORT,
+  onSortChange,
 }: FileTreePaneProps) {
+  const t = useT();
   const toolbarMenu = useContextMenu();
   const [toolbarWidth, setToolbarWidth] = useState(TREE_DEFAULT_WIDTH_ASSUMPTION);
   const density = treeToolbarDensity(toolbarWidth);
@@ -205,8 +213,26 @@ export function FileTreePane({
       {
         label: "Project",
         testId: "code-workspace-tree-view-project",
-        checked: viewMode !== "flat",
-        onClick: () => { if (viewMode === "flat") onViewModeChange("tree"); },
+        checked: viewMode === "tree" || viewMode === "compact",
+        onClick: () => { if (viewMode !== "compact") onViewModeChange("tree"); },
+      },
+      {
+        label: t("platform.allFiles"),
+        testId: "code-workspace-tree-view-all-files",
+        checked: viewMode === "files",
+        onClick: () => onViewModeChange("files"),
+      },
+      {
+        label: t("platform.explorerList"),
+        testId: "code-workspace-tree-view-list",
+        checked: viewMode === "list",
+        onClick: () => onViewModeChange("list"),
+      },
+      {
+        label: t("platform.explorerPackages"),
+        testId: "code-workspace-tree-view-packages",
+        checked: viewMode === "packages",
+        onClick: () => onViewModeChange("packages"),
       },
       {
         label: "Project Files",
@@ -233,6 +259,7 @@ export function FileTreePane({
   const openToolbarOverflow = (event: MouseEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const items: MenuItem[] = [];
+    if (onSortChange) items.push(explorerSortMenu(sort, onSortChange, t));
     if (onExpandAll && !visibility.showExpandAll) {
       items.push({ label: "Expand All", testId: "code-workspace-tree-menu-expand-all", onClick: onExpandAll }, { separator: true, label: "" });
     }
@@ -250,8 +277,14 @@ export function FileTreePane({
           label: "Compact Directories",
           testId: "code-workspace-tree-menu-compact",
           checked: viewMode === "compact",
-          disabled: viewMode === "flat",
+          disabled: viewMode === "flat" || viewMode === "files" || viewMode === "packages",
           onClick: () => onViewModeChange(viewMode === "compact" ? "tree" : "compact"),
+        },
+        {
+          label: t("platform.explorerFlattenPackages"),
+          testId: "code-workspace-tree-menu-flatten-packages",
+          checked: viewMode === "packages",
+          onClick: () => onViewModeChange(viewMode === "packages" ? "tree" : "packages"),
         },
         { separator: true, label: "" },
         {
@@ -290,7 +323,7 @@ export function FileTreePane({
       tabIndex={0}
       data-testid="code-workspace-tree-pane"
       data-tree-toolbar-density={density}
-      className="h-full min-h-0 flex flex-col bg-[var(--taomni-code-gutter-bg)] outline-none focus-visible:ring-1 focus-visible:ring-[var(--taomni-accent)]"
+      className="taomni-file-explorer h-full min-h-0 flex flex-col bg-[var(--taomni-code-gutter-bg)] outline-none focus-visible:ring-1 focus-visible:ring-[var(--taomni-accent)]"
       style={style}
       onKeyDown={handlePaneKeyDown}
     >
@@ -319,6 +352,13 @@ export function FileTreePane({
             <ChevronDown className="w-3 h-3 shrink-0 text-[var(--taomni-code-muted)]" />
           </button>
           <div className="flex-1 min-w-0" />
+          <TreeIconButton
+            label={t("platform.filterFiles")}
+            testId="code-workspace-tree-search"
+            icon={<Search className="w-3.5 h-3.5" />}
+            active={speedSearchVisible}
+            onClick={() => openSpeedSearch()}
+          />
           <TreeIconButton
             label="New…"
             testId="code-workspace-tree-new"
@@ -403,12 +443,19 @@ export function FileTreePane({
       )}
       <div
         data-testid="code-workspace-tree"
+        data-view-mode={viewMode}
         role="tree"
         aria-label="Project files"
         className="group/tree flex-1 min-h-0 overflow-auto py-1"
-        style={{ fontSize: "var(--taomni-code-tree-font-size)" }}
+        style={{ fontSize: "var(--taomni-code-tree-font-size)",
+          "--taomni-explorer-name-width": `${Math.max(112, Math.min(260, toolbarWidth / 2))}px`,
+          scrollPaddingInlineStart: "var(--taomni-explorer-name-width)",
+        } as CSSProperties}
       >
-        {children}
+        <div style={viewMode === "list" ? { minWidth: "calc(var(--taomni-explorer-name-width) + 328px)" } : undefined}>
+          {viewMode === "list" && <ExplorerListColumns sort={sort} onChange={onSortChange} />}
+          {children}
+        </div>
       </div>
       {toolbarMenu.render}
     </aside>

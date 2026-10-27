@@ -7,7 +7,7 @@ afterEach(cleanup);
 describe("FileEncodingDialog", () => {
   it("commits a BOM selected through the native pointer path", () => {
     const onConvert = vi.fn();
-    render(
+    const { container } = render(
       <FileEncodingDialog
         path="src/main.txt"
         currentEncoding="UTF-8"
@@ -22,6 +22,10 @@ describe("FileEncodingDialog", () => {
     const bom = screen.getByRole("checkbox", {
       name: "Write byte-order marker (BOM)",
     }) as HTMLInputElement;
+    // A panel's document-level resize listener must see the modal as an
+    // overlay outside its group, even when a checkbox covers the divider.
+    expect(container).not.toContainElement(bom);
+    expect(document.body).toContainElement(bom);
     fireEvent.click(bom);
     expect(bom).toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "Convert on Save" }));

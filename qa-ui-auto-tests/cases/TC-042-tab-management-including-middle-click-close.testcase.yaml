@@ -16,7 +16,7 @@ steps:
 - click: '[data-testid="welcome-open-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"]'
 - click: '[data-testid="new-local-terminal"]'
-- wait_for: '[data-testid="tab-item"] >> nth=2'
+- wait_for: '[data-testid="tab-item"] >> nth=1'
 - assert_count:
     selector: '[data-testid="tab-item"]'
     min: 2
@@ -43,14 +43,13 @@ verification:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
     - step: 5
-      expectation: '{"wait_for": "[data-testid=\"tab-item\"] >> nth=2"}'
+      expectation: '{"wait_for": "[data-testid=\"tab-item\"] >> nth=1"}'
     - step: 6
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "min": 2}}'
     - step: 9
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "1 terminals"}}'
     - step: 10
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"terminal\"]", "equal":
-        1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"terminal\"]", "equal": 1}}'
     results:
     - 9
     - 10

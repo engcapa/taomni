@@ -1,0 +1,155 @@
+id: TC-WS-024
+title: Native workspace duplicate starts an independent terminal and context copy reaches the OS
+description: Checks real PTY readiness, two distinct tab instances, system clipboard metadata and surviving duplicate after source close. No synthetic terminal
+  text is needed on macOS.
+modes:
+- native
+covers:
+- F-WS-2
+- F-WS-3
+tags:
+- p0
+- workspace-redesign
+- regression
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-024
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- wait_for: '[data-testid="workspace-open-session-menu"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="workspace-session-pane"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+- right_click: '[data-testid="workspace-tab"][title="Local Terminal"]'
+- click: '[data-testid="workspace-tab-context-rename"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: QA native source
+- click: '[data-testid="text-input-dialog-confirm"]'
+- right_click: '[data-testid="workspace-tab"][title="QA native source"]'
+- click: '[data-testid="workspace-tab-context-copy-info"]'
+- host_clipboard:
+    action: assert
+    kind: text
+    contains: 'Title: QA native source'
+- right_click: '[data-testid="workspace-tab"][title="QA native source"]'
+- click: '[data-testid="workspace-tab-context-duplicate"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+- assert_count:
+    selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+    equal: 2
+- assert_items:
+    selector: '[data-testid="workspace-tab"]'
+    attribute: title
+    equals:
+    - QA native source
+    - QA native source-1
+- right_click: '[data-testid="workspace-tab"][title="QA native source-1"]'
+- click: '[data-testid="workspace-tab-context-copy-info"]'
+- host_clipboard:
+    action: assert
+    kind: text
+    contains: 'Title: QA native source-1'
+- host_clipboard:
+    action: assert
+    kind: text
+    contains: 'Backend session:'
+- right_click: '[data-testid="workspace-tab"][title="QA native source"]'
+- click: '[data-testid="workspace-tab-context-close"]'
+- assert_items:
+    selector: '[data-testid="workspace-tab"]'
+    attribute: title
+    equals:
+    - QA native source-1
+- assert_count:
+    selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+    equal: 1
+- click: '[data-testid="side-tab-sessions"]'
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    equal: 0
+- click: '[data-testid="nav-mode-workspaces"]'
+- assert_visible: '[data-testid="workspace-session-pane"]'
+- right_click: '[data-testid="workspace-tab"][title="QA native source-1"]'
+- click: '[data-testid="workspace-tab-context-close-all"]'
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 0
+- screenshot: workspace-native-tab-context-menu.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Duplicate starts a second real PTY; metadata reaches the system clipboard; source close leaves the duplicate alive; Sessions remains isolated
+      and Close all disposes both terminal surfaces.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 9
+    - 10
+    - 12
+    - 13
+    - 14
+    - 15
+    - 17
+    - 18
+    - 22
+    - 23
+    - 26
+    - 27
+    - 30
+    - 32
+    - 34
+    - 35
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"workspace-open-session-menu\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 8
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]"}'
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]"}'
+    - step: 20
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "equal": 2}}'
+    - step: 21
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "title", "equals": ["QA native source", "QA native source-1"]}}'
+    - step: 28
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "title", "equals": ["QA native source-1"]}}'
+    - step: 29
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "equal": 1}}'
+    - step: 31
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 0}}'
+    - step: 33
+      expectation: '{"assert_visible": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 36
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"]", "equal": 0}}'
+    results:
+    - 5
+    - 7
+    - 8
+    - 11
+    - 19
+    - 20
+    - 21
+    - 28
+    - 29
+    - 31
+    - 33
+    - 36
+  visual:
+  - check: Compact controls retain readable icons and active states without toolbar overlap.
+    method: manual
+    reason: Inspect the retained screenshots; functional assertions do not establish visual matching.
+  native:
+  - check: Duplicate starts a second real PTY; metadata reaches the system clipboard; source close leaves the duplicate alive; Sessions remains isolated
+      and Close all disposes both terminal surfaces.
+    method: automated
+    reason: Runs the isolated packaged application and explicitly asserts real native effects.

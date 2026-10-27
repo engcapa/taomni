@@ -4,14 +4,15 @@ import { buildAppMenuSpec, installAppMenu, type MenuActionId } from "../../lib/n
 import type { WorkspaceCommandRegistration } from "../../components/editor/workspace/workspaceCommands";
 import { resolveShellShortcutRoute } from "../../components/editor/workspace/shellShortcutRouter";
 import { shellKeyClaimed } from "../../lib/shellKeyClaims";
-import type { Tab } from "../../types";
+import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { useAppStore } from "../../stores/appStore";
 import { macCommandDigitIndex } from "./sessionPolicy";
+import { activeWorkspaceRuntimeTabId, workspaceEditorRuntimeId } from "../../lib/workspaceRuntimeIdentity";
 
 export interface UseMainMenuBridgeContext {
   dispatchMenuAction: (action: MenuActionId) => void;
   nativeMenu: boolean;
-  activeTab: Tab | undefined;
+  activeTabClosable: boolean;
   importExport: import("../../components/menubar/useSessionImportExport").UseSessionImportExport;
   quickConnectVisible: boolean;
   activeWorkspaceCommandRegistration: WorkspaceCommandRegistration | null;
@@ -25,7 +26,7 @@ export function useMainMenuBridge(context: UseMainMenuBridgeContext) {
   const {
     dispatchMenuAction,
     nativeMenu,
-    activeTab,
+    activeTabClosable,
     importExport,
     quickConnectVisible,
     activeWorkspaceCommandRegistration,
@@ -47,7 +48,7 @@ export function useMainMenuBridge(context: UseMainMenuBridgeContext) {
     if (!nativeMenu) return;
     let cancelled = false;
     const spec = buildAppMenuSpec({
-      activeTabClosable: !!activeTab?.closable,
+      activeTabClosable,
       hasSessions: importExport.hasSessions,
       quickConnectVisible,
       workspaceCommands: activeWorkspaceCommandRegistration?.items ?? [],
@@ -61,7 +62,7 @@ export function useMainMenuBridge(context: UseMainMenuBridgeContext) {
     };
   }, [
     nativeMenu,
-    activeTab?.closable,
+    activeTabClosable,
     importExport.hasSessions,
     quickConnectVisible,
     activeWorkspaceCommandRegistration?.items,
@@ -78,7 +79,15 @@ export function useMainMenuBridge(context: UseMainMenuBridgeContext) {
         event.stopPropagation();
 
         const state = useAppStore.getState();
-        const target = tabIndex === -1 ? state.tabs.at(-1) : state.tabs[tabIndex];
+        if (state.activeSideTab === "workspaces") {
+          const platform = useWorkspacePlatformStore.getState();
+          const workspace = platform.getWorkspace();
+          const target = tabIndex === -1 ? workspace?.openTabs.at(-1) : workspace?.openTabs[tabIndex];
+          if (workspace && target) platform.setActiveWorkspaceTab(workspace.id, target.id);
+          return;
+        }
+        const sessionTabs = state.tabs.filter((tab) => tab.type !== "welcome");
+        const target = tabIndex === -1 ? sessionTabs.at(-1) : sessionTabs[tabIndex];
         if (target && target.id !== state.activeTabId) {
           setActiveTab(target.id);
         }
@@ -97,7 +106,10 @@ export function useMainMenuBridge(context: UseMainMenuBridgeContext) {
         // Read the registration map synchronously because the workspace can
         // publish a newly available claim during the same interaction in
         // which the user closes the last editor tab.
-        const currentActiveTabId = useAppStore.getState().activeTabId;
+        const appState = useAppStore.getState();
+        const currentActiveTabId = appState.activeSideTab === "workspaces"
+          ? activeWorkspaceRuntimeTabId(useWorkspacePlatformStore.getState().getWorkspace())
+          : appState.activeSideTab === "sessions" ? appState.activeTabId : undefined;
         const registration = currentActiveTabId
           ? workspaceCommandRegistrationsRef.current[currentActiveTabId] ?? null
           : null;
@@ -120,8 +132,22 @@ export function useMainMenuBridge(context: UseMainMenuBridgeContext) {
       }
 
       const state = useAppStore.getState();
+      const platform = useWorkspacePlatformStore.getState();
+      const workspace = platform.getWorkspace();
+      const codeTab = workspace?.openTabs.find((tab) => tab.kind === "code");
+      const editorTab = workspace?.openTabs.find((tab) => tab.id === workspace.activeTabId && (tab.kind === "file" || tab.kind === "code"));
+      if (state.activeSideTab === "workspaces" && editorTab) return;
       const current = state.tabs.find((tab) => tab.id === state.activeTabId);
       if (current?.type === "welcome") {
+        const fileTab = workspace?.openTabs.find((tab) => tab.kind === "file");
+        if (workspace && (fileTab || codeTab)) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          platform.setActiveWorkspaceTab(workspace.id, (fileTab ?? codeTab)!.id);
+          state.setActiveSideTab("workspaces");
+          void workspaceCommandRegistrationsRef.current[workspaceEditorRuntimeId(workspace)]?.executeAction("workspace.goToFile");
+          return;
+        }
         // If a code-workspace tab exists, switch to it and let its Go to File
         // handler execute Ctrl+Shift+N instead of creating a new session.
         const workspaceTab = state.tabs.find((tab) => tab.type === "code-workspace");

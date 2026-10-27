@@ -40,6 +40,7 @@ from .service_fixtures import LocalServiceFixtures, ServiceFixtureError
 from .steps import REGISTRY as STEP_REGISTRY, StepContext, StepError
 from .deadline import BudgetedPage, Deadline, using_deadline
 from .provenance import input_digest, execution_identity, conditions_identity
+from .browser_evidence import BrowserEvidence
 
 _browser = None
 _playwright = None
@@ -94,16 +95,8 @@ def _timed_step(result: dict, index: int, verb: str, action, deadline=None) -> N
 
 
 def _run_browser_case(payload: dict) -> dict:
-    started = time.monotonic()
-    try:
-        return _run_browser_case_inner(payload)
-    except Exception as exc:
-        case = payload["case"]
-        return {"id": case["id"], "title": case["title"], "tags": case["tags"],
-                "covers": case["covers"], "modes": case["modes"], "status": "failed",
-                "duration_sec": time.monotonic() - started, "step_count": len(case["steps"]),
-                "failure": {"step_index": 0, "verb": "<setup>", "message": str(exc), "artifacts": {}}}
-
+    from .browser_case import run_browser_case
+    return run_browser_case(payload, _run_browser_case_inner)
 
 # ─── per-case worker (browser) ──────────────────────────────────────────────
 
@@ -198,12 +191,8 @@ def _run_browser_case_inner(payload: dict) -> dict:
     result["timings"]["context_setup_sec"] = time.monotonic() - context_started
     if browser_ctx:
         page = browser_ctx.pages[0] if browser_ctx.pages else browser_ctx.new_page()
-        page.on("console", lambda msg: captured_console.append(  # noqa: SLF001
-            {"level": msg.type, "text": msg.text}
-        ))
-        page.on("pageerror", lambda exc: captured_console.append(
-            {"level": "error", "text": f"pageerror: {exc}"}
-        ))
+        browser_evidence = BrowserEvidence(page, captured_console, case_dir,
+            trace_terminal="ssh_required" in case_dict.get("fixtures", []))
 
         # Tracing: record everything; only persist on failure.
         try:
@@ -214,6 +203,7 @@ def _run_browser_case_inner(payload: dict) -> dict:
         ctx = StepContext(
             page=BudgetedPage(page, deadline), case_id=case_dict["id"], case_dir=case_dir,
             cfg=cfg, env=env, dry_run=False,
+            case_state={"runtime_console": captured_console},
         )
 
         try:
@@ -269,6 +259,7 @@ def _run_browser_case_inner(payload: dict) -> dict:
             result["failure"] = failure
         finally:
             cleanup_started = time.monotonic()
+            browser_evidence.close()
             try:
                 trace_path = case_dir / "trace.zip"
                 browser_ctx.tracing.stop(**({"path": str(trace_path)} if failure is not None else {}))
@@ -485,12 +476,10 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                     r["timings"]["session_setup_sec"] = time.monotonic() - session_started
                     nctx: NativeStepContext | None = None
                     try:
-                        if platform.system() == "Darwin" and "reset_db" in c.fixtures:
-                            from .fixtures.reset_db import reset_native_renderer
-
-                            renderer_reset_started = time.monotonic()
-                            reset_native_renderer(ctx_ns, session)
-                            r["timings"]["renderer_reset_sec"] = time.monotonic() - renderer_reset_started
+                        from .fixtures.reset_db import reset_case_renderer
+                        renderer_reset_sec = reset_case_renderer(ctx_ns, session, c.fixtures, java25_home or cfg.get("app", {}).get("tooling_java_home"))
+                        if renderer_reset_sec is not None:
+                            r["timings"]["renderer_reset_sec"] = renderer_reset_sec
                         nctx = NativeStepContext(session, case_dir, cfg)
                         last_step, last_verb, last_args = 0, "<setup>", None
                         for i, step in enumerate(c.steps, start=1):

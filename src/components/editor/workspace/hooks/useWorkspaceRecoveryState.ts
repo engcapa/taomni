@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type ResourceCleanupRecoveryView } from "../controller/model";
 import { SaveTransactionRegistry } from "../saveCommit";
 import { type SaveObservationRecord } from "../saveObservationContract";
-import { listDiskEffectLedgerEntries, readWorkspaceRecoveryEntries, reconcileWorkspaceRecoveryEntries, type WorkspaceRecoveryEntry } from "../workspaceRecovery";
+import { listDiskEffectLedgerEntries, readWorkspaceRecoveryEntries, reconcileWorkspaceRecoveryEntries, writeWorkspaceRecoveryEntries, type WorkspaceRecoveryEntry } from "../workspaceRecovery";
 import { WorkspaceResourceRecoveryCoordinator, type ResourceCleanupHandlers, type ResourceCleanupOutcome } from "../workspaceResourceRecoveryCoordinator";
 
 
@@ -53,6 +53,29 @@ export function useWorkspaceRecoveryState(context: UseWorkspaceRecoveryStateCont
       resourceRecoveryCoordinatorRef.current.dispose();
     };
   }, [workspaceInstanceId]);
+
+  const previousFilesRef = useRef(openFiles);
+  useEffect(() => {
+    const previous = previousFilesRef.current;
+    previousFilesRef.current = openFiles;
+    const entries = readWorkspaceRecoveryEntries(workspaceInstanceId);
+    const remaining = entries.filter((entry) => {
+      const file = openFiles[entry.key];
+      if (!file || file.loading || file.error || file.dirty) return true;
+      // A completed save supersedes the old draft immediately. Waiting for
+      // the debounce could offer that already saved draft after a fast reload.
+      const saved = previous[entry.key]?.dirty && file.text === file.savedText;
+      if (!saved && file.savedText !== entry.text) return true;
+      pendingWorkspaceRecoveryKeysRef.current.delete(entry.key);
+      return false;
+    });
+    if (remaining.length === entries.length) return;
+    writeWorkspaceRecoveryEntries(workspaceInstanceId, remaining);
+    setWorkspaceRecoveryEntries(remaining);
+    if (!remaining.length && !listDiskEffectLedgerEntries(workspaceInstanceId).length) {
+      setWorkspaceRecoveryOpen(false);
+    }
+  }, [openFiles, workspaceInstanceId]);
 
   const observeResourceCleanupOutcome = useCallback((
     outcome: ResourceCleanupOutcome,

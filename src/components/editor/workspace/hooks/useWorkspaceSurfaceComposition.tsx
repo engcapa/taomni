@@ -20,6 +20,7 @@ import type { useWorkspaceProjectRuntime } from "./useWorkspaceProjectRuntime";
 import type { useWorkspaceSemanticFeatures } from "./useWorkspaceSemanticFeatures";
 import type { useWorkspaceSession } from "./useWorkspaceSession";
 import type { useWorkspaceSurfaceState } from "./useWorkspaceSurfaceState";
+import { useWorkspaceHost } from "../workspaceHostIntegration";
 
 
 export interface UseWorkspaceSurfaceCompositionContext {
@@ -38,6 +39,7 @@ export interface UseWorkspaceSurfaceCompositionContext {
 }
 
 export function useWorkspaceSurfaceComposition(context: UseWorkspaceSurfaceCompositionContext) {
+  const host = useWorkspaceHost();
   const { executionRuntime, visible, session, editing, project, editorFeatures, semantics, commands, surfaceState, files, insight, ports } = context;
 
   // §8.19.6: move-tab menu entries only make sense with another split target.
@@ -278,6 +280,8 @@ export function useWorkspaceSurfaceComposition(context: UseWorkspaceSurfaceCompo
     get toolWindowOptionsItems() { return toolWindowOptionsItems; },
     treeShowDetails: project.projectTree.treeShowDetails,
     setTreeShowDetails: project.projectTree.setTreeShowDetails,
+    treeSort: project.projectTree.treeSort,
+    setTreeSort: project.projectTree.setTreeSort,
     roots: project.projectTree.roots,
     looseFiles: project.projectTree.looseFiles,
     treeData: project.projectTree.treeData,
@@ -308,6 +312,7 @@ export function useWorkspaceSurfaceComposition(context: UseWorkspaceSurfaceCompo
     renderToolWindowPane,
     rightStripeTop,
   } = createToolWindowChrome({
+    host,
     toolWindowContents: sideContents.toolWindowContents,
     toolWindowLayout: project.toolWindowRouting.toolWindowLayout,
     currentBottomDockHeight: editorFeatures.toolWindowActions.currentBottomDockHeight,

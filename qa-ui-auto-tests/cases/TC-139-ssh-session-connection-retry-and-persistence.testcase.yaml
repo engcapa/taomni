@@ -20,9 +20,11 @@ fixtures:
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for:
     selector: '[data-testid="sidebar"]'
     timeout_sec: 45
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-ssh"]'
@@ -47,7 +49,7 @@ steps:
 - click: '[data-testid="session-section-advanced"]'
 - wait_for: '[data-testid="advanced-ssh-settings"]'
 - fill:
-    selector: 'input[aria-label="SSH password"]'
+    selector: input[aria-label="SSH password"]
     value: qa-ui-auto-wrong-password
 - click: '[data-testid="session-test-connection"]'
 - wait_for: '[data-testid="alert-dialog"]'
@@ -57,7 +59,7 @@ steps:
     equals: error
 - click: '[data-testid="alert-dialog-ok"]'
 - fill:
-    selector: 'input[aria-label="SSH password"]'
+    selector: input[aria-label="SSH password"]
     value: ${env.QA_SSH_PASSWORD}
 - click: '[data-testid="session-test-connection"]'
 - wait_for: '[data-testid="alert-dialog"]'
@@ -87,15 +89,15 @@ steps:
 - assert_attribute:
     selector: '[data-testid="session-host"]'
     name: value
-    equals: "${cfg.ssh.host}"
+    equals: ${cfg.ssh.host}
 - assert_attribute:
     selector: '[data-testid="session-port"]'
     name: value
-    equals: "${cfg.ssh.port}"
+    equals: ${cfg.ssh.port}
 - assert_attribute:
     selector: '[data-testid="session-user"]'
     name: value
-    equals: "${cfg.ssh.user}"
+    equals: ${cfg.ssh.user}
 - click: '[data-testid="session-cancel"]'
 - wait_for:
     selector: '[data-testid="session-editor"]'
@@ -105,82 +107,177 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: SSH connection testing reports a missing password, rejects a wrong password, then reports a successful authenticated connection and exposes the same result in the editor summary.
+    requirement: SSH connection testing reports a missing password, rejects a wrong password, then reports a successful authenticated connection and exposes
+      the same result in the editor summary.
     actions:
-    - 6
+    - 1
+    - 2
+    - 5
     - 7
     - 8
     - 9
     - 10
     - 11
-    - 14
+    - 12
     - 15
     - 16
-    - 17
     - 18
-    - 21
+    - 19
     - 22
     - 23
     - 24
-    - 25
-    - 26
-    checkpoints:
-    - step: 11
-      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
-    - step: 12
-      expectation: '{"assert_text": {"selector": "[data-testid=\"alert-dialog-message\"]", "contains": "Enter password above to test"}}'
-    - step: 18
-      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
-    - step: 19
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"alert-dialog\"]", "name": "data-tone", "equals": "error"}}'
-    - step: 23
-      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
-    - step: 24
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"alert-dialog\"]", "name": "data-tone", "equals": "success"}}'
-    - step: 25
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"alert-dialog-message\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated to .+ as .+)$", "timeout_sec": 60}}'
-    - step: 27
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"session-test-result-summary\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated to .+ as .+)$", "timeout_sec": 60}}'
-    results:
-    - 12
-    - 19
-    - 24
-    - 25
-    - 27
-  - id: R2
-    requirement: The endpoint that passed the connection test is saved and reopens with the configured host, port, and username.
-    actions:
-    - 29
+    - 28
     - 30
-    - 31
     - 32
     - 33
-    - 34
     - 35
     - 36
+    - 41
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
+    - step: 14
+      expectation: '{"assert_text": {"selector": "[data-testid=\"alert-dialog-message\"]", "contains": "Enter password above to test"}}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
+    - step: 21
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"alert-dialog\"]", "name": "data-tone", "equals": "error"}}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
+    - step: 26
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"alert-dialog\"]", "name": "data-tone", "equals": "success"}}'
+    - step: 27
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"alert-dialog-message\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated
+        to .+ as .+)$", "timeout_sec": 60}}'
+    - step: 29
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"session-test-result-summary\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated
+        to .+ as .+)$", "timeout_sec": 60}}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-connection-retry\"]"}'
+    - step: 37
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 38
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "${cfg.ssh.host}"}}'
+    - step: 39
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "${cfg.ssh.port}"}}'
+    - step: 40
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "${cfg.ssh.user}"}}'
+    - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    results:
+    - 3
+    - 4
+    - 6
+    - 13
+    - 14
+    - 17
+    - 20
+    - 21
+    - 25
+    - 26
+    - 27
+    - 29
+    - 31
+    - 34
     - 37
     - 38
     - 39
-    checkpoints:
-    - step: 32
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-connection-retry\"]"}'
-    - step: 35
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 36
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "${cfg.ssh.host}"}}'
-    - step: 37
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "${cfg.ssh.port}"}}'
-    - step: 38
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "${cfg.ssh.user}"}}'
-    - step: 40
-      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
-    results:
+    - 40
+    - 42
+  - id: R2
+    requirement: The endpoint that passed the connection test is saved and reopens with the configured host, port, and username.
+    actions:
+    - 1
+    - 2
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 15
+    - 16
+    - 18
+    - 19
+    - 22
+    - 23
+    - 24
+    - 28
+    - 30
     - 32
+    - 33
     - 35
     - 36
+    - 41
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
+    - step: 14
+      expectation: '{"assert_text": {"selector": "[data-testid=\"alert-dialog-message\"]", "contains": "Enter password above to test"}}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
+    - step: 21
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"alert-dialog\"]", "name": "data-tone", "equals": "error"}}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog\"]"}'
+    - step: 26
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"alert-dialog\"]", "name": "data-tone", "equals": "success"}}'
+    - step: 27
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"alert-dialog-message\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated
+        to .+ as .+)$", "timeout_sec": 60}}'
+    - step: 29
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"session-test-result-summary\"]", "regex": "^(?:Connection successful(?: \\(\\d+ms\\))?|Authenticated
+        to .+ as .+)$", "timeout_sec": 60}}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-connection-retry\"]"}'
+    - step: 37
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 38
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-host\"]", "name": "value", "equals": "${cfg.ssh.host}"}}'
+    - step: 39
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-port\"]", "name": "value", "equals": "${cfg.ssh.port}"}}'
+    - step: 40
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"session-user\"]", "name": "value", "equals": "${cfg.ssh.user}"}}'
+    - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"session-editor\"]", "state": "detached"}}'
+    results:
+    - 3
+    - 6
+    - 13
+    - 14
+    - 17
+    - 20
+    - 21
+    - 25
+    - 26
+    - 27
+    - 29
+    - 31
+    - 34
     - 37
     - 38
+    - 39
     - 40
+    - 42
   visual:
   - check: Authentication feedback and the saved endpoint remain readable without clipping.
     method: manual

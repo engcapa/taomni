@@ -155,6 +155,9 @@ export function TabItem(props: TabItemProps) {
   return (
     <div
       ref={ref}
+      role="tab"
+      aria-selected={active}
+      tabIndex={active ? 0 : -1}
       data-testid="tab-item"
       data-tab-id={tab.id}
       data-tab-title={tab.title}
@@ -165,6 +168,7 @@ export function TabItem(props: TabItemProps) {
       className="taomni-tab relative"
       data-active={active}
       onClick={() => onActivate(tab)}
+      onKeyDown={(event) => { if (!editing && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onActivate(tab); } }}
       onMouseDown={(e) => {
         if (editing) return;
         onMouseDown(e, tab);
@@ -178,24 +182,19 @@ export function TabItem(props: TabItemProps) {
       onContextMenu={(e) => onContextMenu(e, tab)}
     >
       {multiExecActive && tab.type === "terminal" && (
-        <button
-          type="button"
+        <input
+          type="checkbox"
+          data-testid="tab-multiexec-checkbox"
+          checked={multiExecSelected}
+          aria-label={`${t("multiExec.title")}: ${tab.title}`}
           title={multiExecSelected ? t("tabs.multiExecRemove") : t("tabs.multiExecAdd")}
-          className="absolute -top-0.5 -left-0.5 w-3 h-3 rounded-full border flex items-center justify-center z-10 flex-shrink-0"
-          style={{
-            background: multiExecSelected ? "var(--taomni-accent)" : "var(--taomni-chrome-bg)",
-            borderColor: multiExecSelected ? "var(--taomni-accent)" : "var(--taomni-divider)",
-            fontSize: 7,
-            color: multiExecSelected ? "#fff" : "var(--taomni-text-muted)",
-          }}
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleMultiExecTab(tab.id);
-          }}
+          className="taomni-checkbox h-3.5 w-3.5 shrink-0"
+          onChange={() => onToggleMultiExecTab(tab.id)}
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
-        >
-          {multiExecSelected ? "✓" : ""}
-        </button>
+          onKeyDown={(e) => e.stopPropagation()}
+        />
       )}
       <div className="relative flex-shrink-0">
         <TabIcon tab={tab} />

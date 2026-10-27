@@ -10,6 +10,7 @@ import { chatState, eventMocks, filterMocks, folder, info, mailMocks, message, m
 import { registerMailClientTabHistory3Cases } from "./tests/mailClientTab/history3.cases";
 import { registerMailClientTabHistory4Cases } from "./tests/mailClientTab/history4.cases";
 import { registerMailCacheSynchronizationCases } from "./tests/mailClientTab/cacheSynchronization.cases";
+import { registerMailSubscriptionSnapshotCases } from "./tests/mailClientTab/subscriptionSnapshots.cases";
 
 describe("MailClientTab", () => {
   beforeEach(() => {
@@ -128,4 +129,5 @@ describe("MailClientTab", () => {
   });
   registerMailClientTabHistory4Cases();
   registerMailCacheSynchronizationCases();
+  registerMailSubscriptionSnapshotCases();
 });

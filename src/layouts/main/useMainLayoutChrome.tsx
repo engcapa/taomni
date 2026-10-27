@@ -1,6 +1,6 @@
 import { sshBrowserMode } from "../../lib/sshSessionOptions";
 import { parseSessionOptions } from "../../lib/terminalProfile";
-import { Bot, FolderOpen } from "lucide-react";
+import { FolderOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { type ToolWindowRailItem } from "../../components/editor/workspace/panels/ToolWindowRail";
 import { useViewportSize } from "../../hooks/useViewportSize";
@@ -8,7 +8,6 @@ import { resolveChatDock } from "../../lib/chat/chatDock";
 import { getSessionNetworkSettings, toNetworkSettingsPayload } from "../../lib/networkSettings";
 import { getAppPlatform } from "../../lib/runtime";
 import type { Tab } from "../../types";
-import { chatBindingIdForTab } from "./sessionPolicy";
 import { useMainLayoutState } from "./useMainLayoutState";
 import { useMainTerminalIntegration } from "./useMainTerminalIntegration";
 import { useMainWindowLifecycle } from "./useMainWindowLifecycle";
@@ -77,16 +76,6 @@ export function useMainLayoutChrome(context: UseMainLayoutChromeContext) {
         active: !!layout.attachedSidebars[railTab.id],
         testId: "attached-sftp-toggle",
         onSelect: () => toggleTerminalSftp(railTab),
-      });
-    }
-    if (!layout.aiFullyDisabled) {
-      terminalRailItems.push({
-        id: "chat",
-        label: layout.t("terminal.chatFloatingButtonLabel"),
-        icon: <Bot />,
-        active: layout.chatDrawerOpen && layout.activeTabId === railTab.id,
-        testId: "tab-chat-toggle",
-        onSelect: () => void layout.toggleTabChat(chatBindingIdForTab(railTab) ?? railTab.id),
       });
     }
   }

@@ -2,7 +2,7 @@
  * Project tree body: roots, hierarchical/flat entries, and loose files.
  * Presentation + expand/open callbacks only — load/mutate logic stays in the shell.
  */
-import { Fragment, memo, type MouseEvent, type ReactNode } from "react";
+import { Fragment, memo, useMemo, type ReactNode } from "react";
 import "./ProjectTree.css";
 import {
   ChevronDown,
@@ -11,233 +11,26 @@ import {
   Folder,
   Loader2,
 } from "lucide-react";
-import { gitChangeLabel, type GitChange } from "../../../lib/git";
 import type {
   CodeWorkspaceFileRef,
-  CodeWorkspaceLooseFileInfo,
   CodeWorkspaceRootInfo,
 } from "../../../types";
-import type { WorkspaceEntry } from "../../../lib/editor/workspace";
 import {
   compactEntryName,
   DEFAULT_DIR_STATE,
-  DEFAULT_FLAT_FILES_STATE,
   fileKey,
   fileRefEquals,
-  flatSourceGroup,
-  flatSourceRelativePath,
-  FLAT_VIEW_MAX_FILES,
   formatBytes,
   gitChangeForPath,
   gitDirectoryChangeCount,
-  isFlatViewSourceFile,
   isRootRef,
-  matchesTreeFilter,
   rootDirKey,
-  shouldHideEntry,
-  type CompactChainState,
-  type DirectoryState,
-  type FlatFilesState,
-  type TreeSelection,
-  type TreeViewMode,
 } from "./codeWorkspaceModel";
-import { treeFileDetails } from "./treeToolbarChrome";
-import { getLocale } from "../../../lib/i18n";
-
-export interface ProjectTreeOpenFileHint {
-  dirty?: boolean;
-}
-
-export interface ProjectTreeProps {
-  roots: CodeWorkspaceRootInfo[];
-  looseFiles: CodeWorkspaceLooseFileInfo[];
-  directories: Record<string, DirectoryState>;
-  compactChains: Record<string, CompactChainState>;
-  flatFiles: Record<string, FlatFilesState>;
-  treeViewMode: TreeViewMode;
-  treeFilter: string;
-  expandedRoots: ReadonlySet<string>;
-  expandedDirs: ReadonlySet<string>;
-  selected: TreeSelection | null;
-  activeKey: string | null;
-  openFiles: Record<string, ProjectTreeOpenFileHint | undefined>;
-  gitChangeByRootPath: ReadonlyMap<string, GitChange>;
-  onToggleRoot: (rootId: string) => void;
-  onToggleDir: (rootId: string, path: string) => void;
-  onSelect: (selection: TreeSelection) => void;
-  onOpenFile: (ref: CodeWorkspaceFileRef, options?: { preview?: boolean }) => void;
-  onContextMenu: (event: MouseEvent, selection: TreeSelection) => void;
-  /** Empty workspace entry points (the header keeps them under New +). */
-  onAddFolder?: () => void;
-  onOpenLooseFile?: () => void;
-  /** IDEA Appearance › Details: modification time and size after file names. */
-  showDetails?: boolean;
-}
-
-function GitStatusBadge({ change }: { change: GitChange | undefined }): ReactNode {
-  if (!change) return null;
-  const label = change.conflict
-    ? "C"
-    : change.status === "untracked"
-      ? "U"
-      : change.status === "renamed"
-        ? "R"
-        : change.status[0]?.toUpperCase() ?? "?";
-  const color = change.conflict
-    ? "border-red-500/30 bg-red-500/10 text-red-500"
-    : change.status === "untracked"
-      ? "border-amber-500/30 bg-amber-500/10 text-amber-500"
-      : change.staged
-        ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-500"
-        : "border-blue-500/30 bg-blue-500/10 text-blue-500";
-  return (
-    <span
-      data-testid="code-workspace-git-status"
-      className={`inline-flex h-4 min-w-4 items-center justify-center rounded border px-1 text-[10px] font-semibold ${color}`}
-      title={gitChangeLabel(change)}
-    >
-      {label}
-    </span>
-  );
-}
-
-function renderMatchingFlatFiles(
-  root: CodeWorkspaceRootInfo,
-  props: ProjectTreeProps,
-  options: { groupBySource: boolean },
-): ReactNode {
-  const {
-    flatFiles,
-    treeFilter,
-    activeKey,
-    selected,
-    openFiles,
-    gitChangeByRootPath,
-    onSelect,
-    onOpenFile,
-    onContextMenu,
-  } = props;
-  const state = flatFiles[root.id] ?? DEFAULT_FLAT_FILES_STATE;
-  if (state.loading && !state.loaded) {
-    return (
-      <div className="h-[var(--taomni-code-tree-row-height)] flex items-center gap-2 px-4 text-[var(--taomni-code-muted)]">
-        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-        <span>Loading files</span>
-      </div>
-    );
-  }
-  if (state.error) {
-    return (
-      <div className="m-2 rounded border border-red-500/30 bg-red-500/10 p-2 text-[12px] text-red-500">
-        {state.error}
-      </div>
-    );
-  }
-  const entries = state.entries.filter((entry) => {
-    if (shouldHideEntry(entry)) return false;
-    // Flat view only lists language sources under recognized src/lib/app roots.
-    // Filter search keeps the broader recursive index so nested names still match.
-    if (options.groupBySource && !isFlatViewSourceFile(entry.path)) return false;
-    return matchesTreeFilter(entry.name, entry.path, treeFilter);
-  });
-  if (entries.length === 0) {
-    return (
-      <div className="px-3 py-2 text-[var(--taomni-code-muted)]">
-        {state.loaded ? (options.groupBySource ? "No language source files" : "No files") : "Not loaded"}
-      </div>
-    );
-  }
-  const groups = new Map<string, WorkspaceEntry[]>();
-  if (options.groupBySource) {
-    for (const entry of entries) {
-      const group = flatSourceGroup(entry.path);
-      const list = groups.get(group) ?? [];
-      list.push(entry);
-      groups.set(group, list);
-    }
-  } else {
-    groups.set("__matches__", entries);
-  }
-  return (
-    <>
-      {state.truncated && (
-        <div className="px-3 py-1 text-[11px] text-[var(--taomni-code-muted)]">
-          Showing first {FLAT_VIEW_MAX_FILES} files
-        </div>
-      )}
-      {[...groups.entries()].sort(([a], [b]) => a.localeCompare(b)).map(([group, groupEntries]) => (
-        <Fragment key={`${root.id}:flat:${group}`}>
-          {options.groupBySource && (
-            <div
-              className="h-6 flex items-center gap-1.5 px-4 font-semibold text-[var(--taomni-code-muted)]"
-              style={{ fontSize: "var(--taomni-code-tree-small-font-size)" }}
-              data-testid="code-workspace-flat-group"
-            >
-              <Folder className="w-3.5 h-3.5 text-[var(--taomni-code-muted)]" />
-              <span>{group}</span>
-              <span className="ml-auto text-[10px] font-normal">{groupEntries.length}</span>
-            </div>
-          )}
-          {groupEntries.map((entry) => {
-            const ref: CodeWorkspaceFileRef = { kind: "root", rootId: root.id, path: entry.path };
-            const key = fileKey(ref);
-            const active = activeKey === key;
-            const isSelected = selected?.kind === "file" && isRootRef(selected.ref, root.id, entry.path);
-            const open = openFiles[key];
-            const change = gitChangeForPath(gitChangeByRootPath, root.id, entry.path);
-            const label = options.groupBySource ? flatSourceRelativePath(entry.path) : entry.path;
-            return (
-              <button
-                key={`${root.id}:flat:${entry.path}`}
-                type="button"
-                data-testid="code-workspace-flat-file"
-                data-root-id={root.id}
-                data-path={entry.path}
-                data-tree-kind="file"
-                data-active={active || undefined}
-                data-selected={isSelected || undefined}
-                role="treeitem"
-                aria-level={2}
-                aria-selected={isSelected}
-                className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pl-6 pr-2 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
-                title={`${root.name} / ${entry.path}${entry.size ? ` - ${formatBytes(entry.size)}` : ""}`}
-                onClick={() => {
-                  onSelect({ kind: "file", ref });
-                }}
-                onDoubleClick={() => {
-                  onSelect({ kind: "file", ref });
-                  onOpenFile(ref, { preview: false });
-                }}
-                onContextMenu={(event) => onContextMenu(event, { kind: "file", ref })}
-              >
-                <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-                <span className="truncate">{label}</span>
-                {props.showDetails && (
-                  <span data-testid="code-workspace-tree-file-details" className="min-w-0 truncate text-[var(--taomni-code-muted)]">
-                    {treeFileDetails(entry.size, entry.mtime, getLocale())}
-                  </span>
-                )}
-                {(change || open?.dirty) && (
-                  <span className="ml-auto flex shrink-0 items-center gap-1">
-                    <GitStatusBadge change={change} />
-                    {open?.dirty && <span className="text-[var(--taomni-accent)]">*</span>}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </Fragment>
-      ))}
-    </>
-  );
-}
-
-function renderFlatEntries(
-  root: CodeWorkspaceRootInfo,
-  props: ProjectTreeProps,
-): ReactNode {
-  return renderMatchingFlatFiles(root, props, { groupBySource: true });
-}
+import { WorkspaceFileIcon } from "./WorkspaceFileIcon";
+import type { ProjectTreeProps } from "./projectTreeTypes";
+import { renderMatchingFlatFiles } from "./ProjectTreeFlat";
+import { GitStatusBadge, ProjectTreeEntryDetails, ProjectTreeEntryName } from "./ProjectTreeEntryDetails";
+import { DEFAULT_EXPLORER_SORT, sortExplorerEntries } from "./explorerPreferences";
 
 function renderEntries(
   root: CodeWorkspaceRootInfo,
@@ -268,7 +61,7 @@ function renderEntries(
   if (filter) {
     return renderMatchingFlatFiles(root, props, { groupBySource: false });
   }
-  if (state.loading && !state.loaded) {
+  if (!state.loaded) {
     return (
       <div className="h-[var(--taomni-code-tree-row-height)] flex items-center gap-2 px-2 text-[var(--taomni-code-muted)]">
         <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -283,7 +76,12 @@ function renderEntries(
       </div>
     );
   }
-  const entries = state.entries.filter((entry) => !shouldHideEntry(entry));
+  // The hierarchical Project view is also the general file explorer. Heavy
+  // directories are excluded from recursive indexes (flat/packages/search)
+  // to keep scans bounded, but they must remain visible here: hiding them
+  // makes a real directory that only contains e.g. `node_modules` or `target`
+  // appear as the misleading `Empty` state.
+  const entries = state.entries;
   if (entries.length === 0) {
     return (
       <div className="px-3 py-2 text-[var(--taomni-code-muted)]">
@@ -300,7 +98,7 @@ function renderEntries(
     const displayName = isDir ? compactEntryName(entry, chain) : entry.name;
     const dirKey = rootDirKey(root.id, displayPath);
     const isExpanded = expandedDirs.has(dirKey);
-    const rowStyle = { paddingLeft: `${10 + depth * 14}px` };
+    const rowStyle = treeViewMode === "list" ? undefined : { paddingLeft: `${10 + depth * 14}px` };
     if (isDir) {
       const childState = directories[dirKey];
       const isSelected = selected?.kind === "dir" && selected.rootId === root.id && selected.path === displayPath;
@@ -330,36 +128,39 @@ function renderEntries(
             }}
             onContextMenu={(event) => onContextMenu(event, { kind: "dir", rootId: root.id, path: displayPath })}
           >
-            <span
-              role="button"
-              tabIndex={-1}
-              aria-label={isExpanded ? "Collapse directory" : "Expand directory"}
-              data-testid="code-workspace-tree-dir-arrow"
-              className="inline-flex items-center justify-center p-0.5 -m-0.5 rounded hover:bg-[var(--taomni-code-active-line-bg)]"
-              onClick={(event) => {
-                event.stopPropagation();
-                onSelect({ kind: "dir", rootId: root.id, path: displayPath });
-                onToggleDir(root.id, displayPath);
-              }}
-            >
-              {isExpanded ? (
-                <ChevronDown className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-              ) : (
-                <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-              )}
-            </span>
-            <Folder className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-            <span className="truncate">{displayName}</span>
-            {(changeCount > 0 || childState?.loading || chain?.loading) && (
-              <span className="ml-auto flex shrink-0 items-center gap-1">
-                {changeCount > 0 && (
-                  <span className="rounded border border-[var(--taomni-code-border)] px-1 text-[10px] text-[var(--taomni-code-muted)]">
-                    {changeCount}
-                  </span>
+            <ProjectTreeEntryName depth={depth} list={treeViewMode === "list"}>
+              <span
+                role="button"
+                tabIndex={-1}
+                aria-label={isExpanded ? "Collapse directory" : "Expand directory"}
+                data-testid="code-workspace-tree-dir-arrow"
+                className="inline-flex items-center justify-center p-0.5 -m-0.5 rounded hover:bg-[var(--taomni-code-active-line-bg)]"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSelect({ kind: "dir", rootId: root.id, path: displayPath });
+                  onToggleDir(root.id, displayPath);
+                }}
+              >
+                {isExpanded ? (
+                  <ChevronDown className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+                ) : (
+                  <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
                 )}
-                {(childState?.loading || chain?.loading) && <Loader2 className="w-3 h-3 animate-spin" />}
               </span>
-            )}
+              <WorkspaceFileIcon path={displayPath} folder expanded={isExpanded} />
+              <span className="truncate">{displayName}</span>
+              {(changeCount > 0 || childState?.loading || chain?.loading) && (
+                <span className="ml-auto flex shrink-0 items-center gap-1">
+                  {changeCount > 0 && (
+                    <span className="rounded border border-[var(--taomni-code-border)] px-1 text-[10px] text-[var(--taomni-code-muted)]">
+                      {changeCount}
+                    </span>
+                  )}
+                  {(childState?.loading || chain?.loading) && <Loader2 className="w-3 h-3 animate-spin" />}
+                </span>
+              )}
+            </ProjectTreeEntryName>
+            {treeViewMode === "list" && <ProjectTreeEntryDetails entry={entry} list />}
           </button>
           {isExpanded && renderEntries(root, displayPath, depth + 1, props)}
         </Fragment>
@@ -396,20 +197,18 @@ function renderEntries(
         }}
         onContextMenu={(event) => onContextMenu(event, { kind: "file", ref })}
       >
-        <span className="w-3.5 shrink-0" />
-        <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-        <span className="truncate">{entry.name}</span>
-        {props.showDetails && (
-          <span data-testid="code-workspace-tree-file-details" className="min-w-0 truncate text-[var(--taomni-code-muted)]">
-            {treeFileDetails(entry.size, entry.mtime, getLocale())}
-          </span>
-        )}
-        {(change || open?.dirty) && (
-          <span className="ml-auto flex shrink-0 items-center gap-1">
-            <GitStatusBadge change={change} />
-            {open?.dirty && <span className="text-[var(--taomni-accent)]">*</span>}
-          </span>
-        )}
+        <ProjectTreeEntryName depth={depth} list={treeViewMode === "list"}>
+          <span className="w-3.5 shrink-0" />
+          <WorkspaceFileIcon path={entry.path} />
+          <span className="truncate">{entry.name}</span>
+          {(change || open?.dirty) && (
+            <span className="ml-auto flex shrink-0 items-center gap-1">
+              <GitStatusBadge change={change} />
+              {open?.dirty && <span className="text-[var(--taomni-accent)]">*</span>}
+            </span>
+          )}
+        </ProjectTreeEntryName>
+        <ProjectTreeEntryDetails entry={entry} list={treeViewMode === "list"} visible={props.showDetails} />
       </button>
     );
   });
@@ -419,7 +218,16 @@ function renderEntries(
  * Memoized: the workspace shell re-renders per caret move; with stable
  * handlers (useLatestHandlers) the tree only re-renders when its data changes.
  */
-export const ProjectTree = memo(function ProjectTree(props: ProjectTreeProps) {
+export const ProjectTree = memo(function ProjectTree(inputProps: ProjectTreeProps) {
+  const props = useMemo(() => {
+    const sort = inputProps.sort ?? DEFAULT_EXPLORER_SORT;
+    return { ...inputProps,
+      directories: Object.fromEntries(Object.entries(inputProps.directories).map(([key, value]) =>
+        [key, { ...value, entries: sortExplorerEntries(value.entries, sort) }])),
+      flatFiles: Object.fromEntries(Object.entries(inputProps.flatFiles).map(([key, value]) =>
+        [key, { ...value, entries: sortExplorerEntries(value.entries, sort) }])),
+    };
+  }, [inputProps]);
   const {
     roots,
     looseFiles,
@@ -478,6 +286,7 @@ export const ProjectTree = memo(function ProjectTree(props: ProjectTreeProps) {
               type="button"
               data-testid="code-workspace-tree-root"
               data-root-id={root.id}
+              data-root-path={root.path}
               data-tree-kind="root"
               data-selected={selectedRoot || undefined}
               role="treeitem"
@@ -511,7 +320,7 @@ export const ProjectTree = memo(function ProjectTree(props: ProjectTreeProps) {
                   <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
                 )}
               </span>
-              <Folder className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+              <WorkspaceFileIcon path={root.path} folder expanded={expanded} />
               <span className="shrink-0 max-w-[60%] truncate">{root.name}</span>
               {/* IDEA shows the project root's location after its name. */}
               <span data-testid="code-workspace-tree-root-path" className="min-w-0 truncate font-normal text-[var(--taomni-code-muted)]">
@@ -526,9 +335,9 @@ export const ProjectTree = memo(function ProjectTree(props: ProjectTreeProps) {
               )}
             </button>
             {expanded && (
-              treeViewMode === "flat"
-                ? renderFlatEntries(root, props)
-                : treeFilter.trim()
+              (treeViewMode === "flat" || treeViewMode === "packages")
+                ? renderMatchingFlatFiles(root, props, { groupBySource: true })
+                : treeViewMode === "files" || treeFilter.trim()
                   ? renderMatchingFlatFiles(root, props, { groupBySource: false })
                   : renderEntries(root, "", 1, props)
             )}
@@ -574,7 +383,7 @@ export const ProjectTree = memo(function ProjectTree(props: ProjectTreeProps) {
                 }}
                 onContextMenu={(event) => onContextMenu(event, { kind: "file", ref })}
               >
-                <File className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
+                <WorkspaceFileIcon path={file.path} />
                 <span className="truncate">{file.name}</span>
                 {open?.dirty && <span className="ml-auto text-[var(--taomni-accent)]">*</span>}
               </button>
@@ -585,3 +394,5 @@ export const ProjectTree = memo(function ProjectTree(props: ProjectTreeProps) {
     </>
   );
 });
+
+export type { ProjectTreeProps } from "./projectTreeTypes";

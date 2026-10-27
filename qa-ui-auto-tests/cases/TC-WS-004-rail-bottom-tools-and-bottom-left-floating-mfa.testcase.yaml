@@ -1,0 +1,178 @@
+id: TC-WS-004
+title: Rail bottom tools order and the bottom-left floating MFA window
+description: v6.1 AC-04 / DEC-03. The primary rail's bottom group renders MFA → Screenshot → Chat → Theme → Language → Settings top-to-bottom. Clicking MFA opens
+  the floating authenticator at the bottom-left (left 50px / bottom 30px equivalents) which can be pinned, expanded to the full MFA tab and closed without touching
+  the active terminal.
+modes:
+- browser
+- native
+covers:
+- F5.5
+- F27.1
+- F-MFA-1
+- F-I18n-1
+- F-WS-3
+tags:
+- smoke
+- p0
+- workspace-redesign
+- mfa
+fixtures:
+- reset_db
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 60
+- assert_visible: '[data-testid="rail-mfa-button"]'
+- assert_visible: '[data-testid="system-screenshot"]'
+- assert_visible: '[data-testid="rail-chat-button"]'
+- assert_visible: '[data-testid="theme-cycle"]'
+- assert_visible: '[data-testid="language-switcher"]'
+- assert_visible: '[data-testid="ribbon-settings"]'
+- assert_items:
+    selector: '[data-testid="rail-bottom-tools"] [data-testid]'
+    attribute: data-testid
+    equals:
+    - rail-mfa-button
+    - system-screenshot
+    - system-screenshot-delay-toggle
+    - rail-chat-button
+    - theme-cycle
+    - language-switcher
+    - ribbon-settings
+- assert_count:
+    selector: '[data-testid="control-bar"] [data-testid="system-screenshot"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="control-bar"] [data-testid="language-switcher"]'
+    equal: 0
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="rail-chat-button"][aria-pressed="true"]'
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="mfa-floating-window"]'
+- assert_visible: '[data-testid="mfa-floating-locked"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"mfa-floating-window"]').getBoundingClientRect().left >= 40 && (window.innerHeight
+      - document.querySelector('[data-testid' + String.fromCharCode(61) + '"mfa-floating-window"]').getBoundingClientRect().bottom) <= 80
+    expect_truthy: true
+- click: '[data-testid="mfa-floating-expand-tab"]'
+- wait_for: '[data-testid="mfa-tab"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-ws-004
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-ws-004
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="mfa-empty"]'
+    timeout_sec: 30
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="mfa-floating-window"]'
+- assert_visible: '[data-testid="mfa-floating-search"]'
+- assert_visible: '[data-testid="mfa-floating-pin"]'
+- assert_visible: '[data-testid="mfa-floating-drag-handle"]'
+- click: '[data-testid="mfa-floating-pin"]'
+- assert_attribute:
+    selector: '[data-testid="mfa-floating-pin"]'
+    name: aria-pressed
+    equals: 'true'
+- click: '[data-testid="mfa-floating-expand-tab"]'
+- wait_for: '[data-testid="mfa-tab"]'
+- assert_not_visible: '[data-testid="mfa-floating-window"]'
+- click: '[data-testid="rail-mfa-button"]'
+- wait_for: '[data-testid="mfa-floating-window"]'
+- press: Escape
+- assert_not_visible: '[data-testid="mfa-floating-window"]'
+- screenshot: ws-004-rail-bottom-and-floating-mfa.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 左栏底部严格按 MFA → 截图（含延时菜单）→ 聊天 → 主题 → 语言 → 设置自上而下排列，标题栏不再保留截图与语言按钮。
+    actions:
+    - 3
+    checkpoints:
+    - step: 3
+      expectation: 步骤 3 的可观察断言通过
+    - step: 4
+      expectation: 步骤 4 的可观察断言通过
+    - step: 5
+      expectation: 步骤 5 的可观察断言通过
+    - step: 6
+      expectation: 步骤 6 的可观察断言通过
+    - step: 7
+      expectation: 步骤 7 的可观察断言通过
+    - step: 8
+      expectation: 步骤 8 的可观察断言通过
+    - step: 9
+      expectation: 步骤 9 的可观察断言通过
+    - step: 10
+      expectation: 步骤 10 的可观察断言通过
+    - step: 11
+      expectation: 步骤 11 的可观察断言通过
+    results:
+    - 11
+  - id: R2
+    requirement: 点击 MFA 在左下角弹出浮窗；未解锁时展示紧凑解锁入口，展开后在 MFA 标签页完成主密码初始化。
+    actions:
+    - 14
+    - 18
+    - 21
+    - 22
+    - 23
+    checkpoints:
+    - step: 15
+      expectation: 步骤 13 的可观察断言通过
+    - step: 16
+      expectation: 步骤 14 的可观察断言通过
+    - step: 17
+      expectation: 步骤 15 的可观察断言通过
+    - step: 19
+      expectation: 步骤 17 的可观察断言通过
+    - step: 20
+      expectation: 步骤 18 的可观察断言通过
+    - step: 24
+      expectation: 步骤 22 的可观察断言通过
+    results:
+    - 24
+  - id: R3
+    requirement: 初始化后浮窗提供搜索、置顶、拖拽栏与展开；展开切换到全屏 MFA 标签页并关闭浮窗，Esc 可关闭浮窗。
+    actions:
+    - 25
+    - 30
+    - 32
+    - 35
+    - 37
+    checkpoints:
+    - step: 26
+      expectation: 步骤 24 的可观察断言通过
+    - step: 27
+      expectation: 步骤 25 的可观察断言通过
+    - step: 28
+      expectation: 步骤 26 的可观察断言通过
+    - step: 29
+      expectation: 步骤 27 的可观察断言通过
+    - step: 31
+      expectation: 步骤 29 的可观察断言通过
+    - step: 33
+      expectation: 步骤 31 的可观察断言通过
+    - step: 34
+      expectation: 步骤 32 的可观察断言通过
+    - step: 36
+      expectation: 步骤 34 的可观察断言通过
+    - step: 38
+      expectation: 步骤 36 的可观察断言通过
+    results:
+    - 38
+  visual:
+  - check: 底部工具排列紧凑、图标清晰，浮窗位于左下角且不遮挡终端主体。
+    method: manual
+    reason: 绝对定位与视觉层级需要截图评审。
+  native:
+  - check: 真实 WebView 中浮窗定位、拖拽与置顶层级正确；剪贴板复制由 TC-WS-012/TC-WS-014 覆盖。
+    method: automated
+    reason: 用例声明 browser 与 native 两种模式。

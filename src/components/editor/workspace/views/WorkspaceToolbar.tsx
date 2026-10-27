@@ -13,6 +13,8 @@ import { type WorkspaceCommandContext } from "../workspaceCommands";
 import type { CodeWorkspaceLooseFileInfo, CodeWorkspaceRootInfo } from "../../../../types";
 import { type OpenFileState, CODE_WORKSPACE_MAX_FONT_SIZE, CODE_WORKSPACE_MIN_FONT_SIZE } from "../codeWorkspaceModel";
 import { type CodeWorkspaceGitManagerPayload } from "../controller/model";
+import { useWorkspaceHost } from "../workspaceHostIntegration";
+import { useT } from "../../../../lib/i18n";
 
 
 export interface WorkspaceToolbarProps {
@@ -74,8 +76,20 @@ export interface WorkspaceToolbarProps {
 }
 
 export function WorkspaceToolbar(viewProps: WorkspaceToolbarProps) {
+  const host = useWorkspaceHost();
+  const t = useT();
   const { absolutePathForOpenFile, activeCapabilities, activeDebugConfiguration, activeFile, activeFileDebuggable, activeFileRunnable, activeFileSoftWrap, activeGitRoot, activeInlayHintsEnabled, activeLanguageId, activeRunConfiguration, activeRunConfigurations, buildActiveProject, closeSplit, columnSelectionMode, currentEditorFontSize, debugRuntimeAvailable, debugSessionActive, dirtyCount, executeWorkspaceCommand, gitRoots, gitRootsLoading, intelligencePreferences, javaRunBusy, looseFiles, navCan, onOpenGitManager, openTabPolicySettings, projectBuildBusy, projectDescriptorDiscovery, projectFacts, projectFactsRoot, refreshProjectFacts, rightPaneOpen, rightPaneTab, roots, runActiveTarget, setCodeViewFontSize, setStatusMessage, setSyncSplitScroll, setToolbarMoreOpen, splitEditor, splitOrientation, startDebugActiveTarget, stepCodeViewFontSize, syncSplitScroll, title, toggleColumnSelectionMode, toggleInlayHintsForActiveLanguage, toggleInlineBlame, toggleSoftWrap, toolbarMoreOpen, visible, workspaceInstanceId, workspaceWidgetHost } = viewProps;
- return (<header className="h-10 shrink-0 flex items-center gap-2 overflow-x-auto px-3 border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]">
+ return (<header className={`${host ? "h-8 gap-1 px-2" : "h-10 gap-2 px-3"} shrink-0 flex items-center overflow-x-auto border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]`}>
+        {host ? <>
+          <span data-testid="workspace-editor-title" className="min-w-0 truncate font-medium" title={activeFile?.path ?? title}>
+            {activeFile?.path ?? title}{activeFile?.dirty ? " ●" : ""}
+          </span>
+          <IconButton label={t("platform.saveFile")} testId="workspace-editor-save" icon={<Save className="h-3.5 w-3.5" />}
+            disabled={!activeFile?.dirty || activeFile.loading || !!activeFile.error}
+            onClick={() => executeWorkspaceCommand("workspace.save", { focus: "editor" })} />
+          <IconButton label={t("platform.openInGit")} testId="editor-open-git-diff" icon={<GitBranch className="h-3.5 w-3.5" />}
+            onClick={() => host.onOpenGitDiff(activeFile?.ref.kind === "root" ? activeFile.ref.path : "")} />
+        </> : <>
         <Braces className="w-4 h-4 text-[var(--taomni-accent)]" />
         <div className="min-w-0">
           <div className="font-semibold leading-4 truncate">Code · {title}</div>
@@ -89,6 +103,7 @@ export function WorkspaceToolbar(viewProps: WorkspaceToolbarProps) {
             {dirtyCount} unsaved
           </span>
         )}
+        </>}
         {/* ED-PARITY-010 DEC-010-05: SDK / project-facts widgets live in the
             status bar (portal) like IDEA's status widgets. */}
         {visible && workspaceWidgetHost
@@ -124,13 +139,13 @@ export function WorkspaceToolbar(viewProps: WorkspaceToolbarProps) {
             )}
             </>
           )}
-        <IconButton
+        {!host && <IconButton
           label="Open Git tab"
           testId="code-workspace-git-panel-toggle"
           icon={gitRootsLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <GitBranch className="w-3.5 h-3.5" />}
           disabled={gitRootsLoading || !onOpenGitManager || gitRoots.length === 0}
           onClick={() => executeWorkspaceCommand("workspace.openGit")}
-        />
+        />}
         <div className="flex-1" />
         <IconButton
           label="Build project (Ctrl+F9)"

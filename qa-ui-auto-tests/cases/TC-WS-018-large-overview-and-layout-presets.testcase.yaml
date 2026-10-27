@@ -1,0 +1,244 @@
+id: TC-WS-018
+title: Workspace layout presets and large live/global overview preserve unsaved files
+description: Operates the prototype toolbar, split/grid/single, bottom dock and large overview. File previews read the current unsaved document. Global Home cards
+  activate their owning workspace. Native verifies real file loading and retained editor state in the packaged WebView.
+modes:
+- browser
+- native
+covers:
+- F1.5
+- F-WS-1
+- F-WS-2
+- F-WS-5
+tags:
+- p0
+- workspace-redesign
+- regression
+fixtures:
+- reset_db
+- platform_workspace_root
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-018
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: '{"version": 1, "activeWorkspaceId": "default-workspace", "createdNodes": [], "workspaces": [{"id": "default-workspace", "name": "Default Workspace", "description":
+      "", "isDefault": true, "rootFolders": [{"id": "root-1", "name": "qa-root", "path": "${fixture.platform_workspace_root}", "addedAt": 1}], "pinnedSessionIds": [], "activeLeftToolWindow":
+      "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId": ""}, {"id": "second-workspace", "name": "Second Workspace",
+      "description": "", "isDefault": false, "rootFolders": [], "pinnedSessionIds": [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal",
+      "heightPx": 220}, "openTabs": [], "activeTabId": ""}]}'
+- reload_window:
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="code-workspace-tree-root"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- wait_for: '[data-testid="workspace-file-editor"] .cm-content'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="src/index.ts"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="src/index.ts"] .cm-content'
+- press:
+    selector: '[data-testid="workspace-file-editor"][data-path="src/index.ts"] .cm-content'
+    key: Mod+a
+- type:
+    selector: '[data-testid="workspace-file-editor"][data-path="src/index.ts"] .cm-content'
+    text: export const previewUnsaved = "live draft";
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="workspace-layout-split"]'
+- assert_count:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
+    equal: 2
+- assert_attribute:
+    selector: '[data-testid="workspace-canvas-panes"]'
+    name: data-layout
+    equals: split
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="platform-layout-grid"]'
+- assert_count:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
+    equal: 2
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="platform-layout-single"]'
+- assert_count:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
+    equal: 1
+- click: '[data-testid="tab-overview-trigger"]'
+- wait_for: '[data-testid="tab-overview"][data-scope="workspaces"]'
+- assert_count:
+    selector: '[data-testid="tab-overview-card"]'
+    equal: 2
+- click: '[data-testid="tab-overview-all"]'
+- assert_attribute:
+    selector: '[data-testid="tab-overview"]'
+    name: data-scope
+    equals: all
+- click: '[data-testid="tab-overview-current"]'
+- assert_attribute:
+    selector: '[data-testid="tab-overview"]'
+    name: data-scope
+    equals: workspaces
+- assert_text:
+    selector: '[data-testid="tab-overview"]'
+    contains: previewUnsaved
+- screenshot: ws-018-workspace-large-overview.png
+- click: '[data-testid="tab-overview-card"]:nth-child(1)'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+    contains: platform workspace root
+- press: Mod+Shift+E
+- wait_for: '[data-testid="tab-overview"]'
+- press: Escape
+- assert_not_visible: '[data-testid="tab-overview"]'
+- press: Mod+Shift+E
+- wait_for: '[data-testid="tab-overview"]'
+- press: Escape
+- assert_not_visible: '[data-testid="tab-overview"]'
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="workspace-toolbar-bottom-dock"]'
+- assert_visible: '[data-testid="workspace-bottom-dock"]'
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="workspace-toolbar-bottom-dock"]'
+- assert_not_visible: '[data-testid="workspace-bottom-dock"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tab-overview-trigger"]'
+- wait_for: '[data-testid="tab-overview"][data-scope="all"]'
+- assert_text:
+    selector: '[data-testid="tab-overview"]'
+    contains: previewUnsaved
+- click: '[data-testid="tab-overview-card"]:nth-child(2)'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="src/index.ts"][data-dirty="true"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-file-editor"][data-path="src/index.ts"]'
+    name: data-dirty
+    equals: 'true'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"][data-path="src/index.ts"] .cm-content'
+    contains: previewUnsaved
+- assert_count:
+    selector: '[data-testid="ai-chat-drawer-ribbon"]'
+    equal: 0
+- screenshot: ws-018-workspace-layout-overview.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 工作区分屏和大预览使用实际文件与未保存缓冲区；点击卡片切换到正确工作区与标签，布局切换保留内容，底栏可独立开关。 连续两次快捷键打开/关闭大预览，每次按键只切换一次。
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 14
+    - 15
+    - 16
+    - 17
+    - 20
+    - 21
+    - 23
+    - 24
+    - 26
+    - 29
+    - 31
+    - 35
+    - 37
+    - 39
+    - 41
+    - 43
+    - 45
+    - 46
+    - 48
+    - 49
+    - 51
+    - 52
+    - 55
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-path=\"src/index.ts\"] .cm-content"}'
+    - step: 18
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
+    - step: 22
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
+    - step: 25
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"tab-overview\"][data-scope=\"workspaces\"]"}'
+    - step: 28
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-overview-card\"]", "equal": 2}}'
+    - step: 30
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-overview\"]", "name": "data-scope", "equals": "all"}}'
+    - step: 32
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-overview\"]", "name": "data-scope", "equals": "workspaces"}}'
+    - step: 33
+      expectation: '{"assert_text": {"selector": "[data-testid=\"tab-overview\"]", "contains": "previewUnsaved"}}'
+    - step: 36
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"] .cm-content", "contains": "platform workspace root"}}'
+    - step: 38
+      expectation: '{"wait_for": "[data-testid=\"tab-overview\"]"}'
+    - step: 40
+      expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
+    - step: 42
+      expectation: '{"wait_for": "[data-testid=\"tab-overview\"]"}'
+    - step: 44
+      expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
+    - step: 47
+      expectation: '{"assert_visible": "[data-testid=\"workspace-bottom-dock\"]"}'
+    - step: 50
+      expectation: '{"assert_not_visible": "[data-testid=\"workspace-bottom-dock\"]"}'
+    - step: 53
+      expectation: '{"wait_for": "[data-testid=\"tab-overview\"][data-scope=\"all\"]"}'
+    - step: 54
+      expectation: '{"assert_text": {"selector": "[data-testid=\"tab-overview\"]", "contains": "previewUnsaved"}}'
+    - step: 57
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"src/index.ts\"]", "name": "data-dirty", "equals": "true"}}'
+    - step: 58
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"src/index.ts\"] .cm-content", "contains": "previewUnsaved"}}'
+    - step: 59
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]", "equal": 0}}'
+    results:
+    - 3
+    - 6
+    - 10
+    - 13
+    - 18
+    - 19
+    - 22
+    - 25
+    - 27
+    - 28
+    - 30
+    - 32
+    - 33
+    - 36
+    - 38
+    - 40
+    - 42
+    - 44
+    - 47
+    - 50
+    - 53
+    - 54
+    - 57
+    - 58
+    - 59
+  visual:
+  - check: 工具栏顺序、大预览卡片与画布无重叠或裁切，匹配原型。
+    method: manual
+    reason: 截图需要人工评审，功能断言不代替视觉结论。
+  native:
+  - check: 实际文件从磁盘加载，布局和模式切换保留未保存编辑缓冲区。
+    method: automated
+    reason: Native 模式直接运行隔离 QA 应用，browser 不替代原生边界证据。

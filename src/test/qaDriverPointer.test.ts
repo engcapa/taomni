@@ -159,6 +159,48 @@ describe("macOS QA WebView pointer actions", () => {
     expect(events.filter((event) => event.type === "dblclick")).toHaveLength(1);
   });
 
+  it("focuses clicked controls so the previous input commits on blur", async () => {
+    const input = document.createElement("input");
+    const radio = document.createElement("input");
+    radio.type = "radio";
+    document.body.append(input, radio);
+    input.value = "50001";
+    input.addEventListener("blur", () => { input.value = "50000"; });
+    input.focus();
+    await dispatch([{ type: "pointer", actions: [
+      { type: "pointerMove", x: 20, y: 10 },
+      { type: "pointerDown", button: 0 }, { type: "pointerUp", button: 0 },
+    ] }], () => {}, { Control: false, Shift: false, Alt: false, Meta: false },
+    (_origin, x, y) => [x, y], () => radio);
+    expect(document.activeElement).toBe(radio);
+    expect(input.value).toBe("50000");
+    expect(radio.checked).toBe(true);
+  });
+
+  it("honors prevented mousedown instead of taking focus from the editor", async () => {
+    const editor = document.createElement("textarea");
+    const button = document.createElement("button");
+    const icon = document.createElement("span");
+    button.append(icon);
+    document.body.append(editor, button);
+    editor.focus();
+    button.addEventListener("mousedown", (event) => event.preventDefault());
+    const click = () => dispatch([{ type: "pointer", actions: [
+      { type: "pointerMove", x: 20, y: 10 },
+      { type: "pointerDown", button: 0 }, { type: "pointerUp", button: 0 },
+    ] }], () => {}, { Control: false, Shift: false, Alt: false, Meta: false },
+    (_origin, x, y) => [x, y], () => icon);
+    await click();
+    expect(document.activeElement).toBe(editor);
+    const replacement = button.cloneNode(true) as HTMLButtonElement;
+    button.replaceWith(replacement);
+    await dispatch([{ type: "pointer", actions: [
+      { type: "pointerMove", x: 20, y: 10 }, { type: "pointerDown", button: 0 },
+    ] }], () => {}, { Control: false, Shift: false, Alt: false, Meta: false },
+    (_origin, x, y) => [x, y], () => replacement.firstElementChild as HTMLElement);
+    expect(document.activeElement).toBe(replacement);
+  });
+
   it("uses the right-button mask and opens the context menu", async () => {
     const { events, run } = fixture([{ type: "pointer", actions: [
       { type: "pointerMove", x: 20, y: 10 },

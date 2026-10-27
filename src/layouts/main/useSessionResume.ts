@@ -45,11 +45,11 @@ export function useSessionResume(context: UseSessionResumeContext) {
     awaitingManualAuthRef,
     continueConnectQueueRef,
     setActiveTab,
-    activeTab,
     terminalCwds,
     activeTabId,
     setStatusMessage,
   } = context;
+  const homeActive = useAppStore((state) => state.activeSideTab === "home");
 
   /// Welcome restore orchestration (design §4.2.3): per-entry waiters keyed by
   /// request id, plus tabId bindings and readiness timers.
@@ -226,7 +226,7 @@ export function useSessionResume(context: UseSessionResumeContext) {
   };
 
   const welcomeRestore = useWelcomeSessionResume(
-    activeTab?.type === "welcome" || !activeTab,
+    homeActive,
     restoreCallbacksRef.current,
   );
   const welcomeRestoreViewRef = useRef(welcomeRestore.view);

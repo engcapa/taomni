@@ -30,6 +30,7 @@ steps:
 - click: '[data-testid="auth-submit"]'
 - wait_for: '[data-testid="terminal-pane"]'
 - wait: 2
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-browser"]'
 - assert_visible: '[data-testid="sftp-detach"]'
@@ -51,6 +52,7 @@ verification:
     - 9
     - 10
     - 13
+    - 14
     checkpoints:
     - step: 5
       expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
@@ -58,13 +60,13 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
     - step: 11
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
-    - step: 14
-      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
     - step: 15
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 16
       expectation: '{"assert_visible": "[data-testid=\"sftp-detach\"]"}'
     results:
-    - 14
     - 15
+    - 16
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

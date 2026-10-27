@@ -102,7 +102,7 @@ export function useMainMenuActions(context: UseMainMenuActionsContext) {
   useMainMenuBridge({
     dispatchMenuAction,
     nativeMenu: layout.nativeMenu,
-    activeTab: layout.activeTab,
+    activeTabClosable: layout.activeTabClosable,
     importExport: layout.importExport,
     quickConnectVisible: layout.quickConnectVisible,
     activeWorkspaceCommandRegistration: layout.activeWorkspaceCommandRegistration,

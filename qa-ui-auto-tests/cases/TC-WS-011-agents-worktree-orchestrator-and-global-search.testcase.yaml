@@ -1,0 +1,144 @@
+id: TC-WS-011
+title: Crew placeholder from Home and command palette; global search remains usable
+description: Agents / Crew is deferred by product scope. Each supported entry shows the development notice without changing the active canvas or creating
+  tasks. Global search still finds workspaces and tools, and executes selected entries.
+modes:
+- browser
+- native
+covers:
+- F-WS-6
+tags:
+- p0
+- workspace-redesign
+- regression
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-011
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_not_visible: '[data-testid="nav-mode-agents"]'
+- click: '[data-testid="home-open-agents"]'
+- wait_for: '[data-testid="alert-dialog-message"]'
+- assert_text:
+    selector: '[data-testid="alert-dialog-message"]'
+    contains: under development
+- click: '[data-testid="alert-dialog-ok"]'
+- assert_visible: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="home-open-agents"]'
+- wait_for: '[data-testid="alert-dialog-message"]'
+- click: '[data-testid="alert-dialog-ok"]'
+- assert_visible: '[data-testid="welcome-panel"]'
+- click: '[data-testid="global-search-trigger"]'
+- wait_for: '[data-testid="global-search-modal"]'
+- fill:
+    selector: '[data-testid="global-search-input"]'
+    value: agents
+- click: '[data-testid="global-search-result"][data-result-id="mode-agents"]'
+- wait_for: '[data-testid="alert-dialog-message"]'
+- click: '[data-testid="alert-dialog-ok"]'
+- assert_not_visible: '[data-testid="alert-dialog-message"]'
+- press: Mod+k
+- wait_for: '[data-testid="global-search-modal"]'
+- fill:
+    selector: '[data-testid="global-search-input"]'
+    value: mfa
+- wait_for: '[data-testid="global-search-result"][data-result-id="floating-mfa"]'
+- fill:
+    selector: '[data-testid="global-search-input"]'
+    value: Default Workspace
+- wait_for: '[data-testid="global-search-result"][data-kind="workspace"]'
+- press: Enter
+- wait_for: '[data-testid="workspace-switcher"]'
+- assert_not_visible: '[data-testid="global-search-modal"]'
+- press: Mod+k
+- wait_for: '[data-testid="global-search-modal"]'
+- press: Escape
+- assert_not_visible: '[data-testid="global-search-modal"]'
+- screenshot: ws-011-agents-placeholder-and-global-search.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Home Crew and command-palette Agents display the development notice and preserve the canvas; global search can still activate workspaces
+      and tools.
+    actions:
+    - 5
+    - 8
+    - 10
+    - 11
+    - 13
+    - 15
+    - 17
+    - 18
+    - 20
+    - 22
+    - 24
+    - 26
+    - 28
+    - 31
+    - 33
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"assert_not_visible": "[data-testid=\"nav-mode-agents\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog-message\"]"}'
+    - step: 7
+      expectation: '{"assert_text": {"selector": "[data-testid=\"alert-dialog-message\"]", "contains": "under development"}}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog-message\"]"}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog-message\"]"}'
+    - step: 21
+      expectation: '{"assert_not_visible": "[data-testid=\"alert-dialog-message\"]"}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"global-search-result\"][data-result-id=\"floating-mfa\"]"}'
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"global-search-result\"][data-kind=\"workspace\"]"}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"workspace-switcher\"]"}'
+    - step: 30
+      expectation: '{"assert_not_visible": "[data-testid=\"global-search-modal\"]"}'
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
+    - step: 34
+      expectation: '{"assert_not_visible": "[data-testid=\"global-search-modal\"]"}'
+    results:
+    - 3
+    - 4
+    - 6
+    - 7
+    - 9
+    - 12
+    - 14
+    - 16
+    - 19
+    - 21
+    - 23
+    - 25
+    - 27
+    - 29
+    - 30
+    - 32
+    - 34
+  visual:
+  - check: Compact controls retain readable icons and active states without toolbar overlap.
+    method: manual
+    reason: Inspect the retained screenshots; functional assertions do not establish visual matching.
+  native:
+  - check: Home Crew and command-palette Agents display the development notice and preserve the canvas; global search can still activate workspaces and
+      tools.
+    method: automated
+    reason: Runs the isolated packaged application and explicitly asserts real native effects.

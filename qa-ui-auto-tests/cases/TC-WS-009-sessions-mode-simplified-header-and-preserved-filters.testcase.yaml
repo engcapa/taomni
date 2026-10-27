@@ -1,0 +1,175 @@
+id: TC-WS-009
+title: Sessions mode keeps the single-line header, SessionTree toolbar and open-tabs filters
+description: 'v6.1 AC-09 / DEC-05. Sessions mode shows no quick-connect chip row and no secondary terminal breadcrumb: the main panel shares the single 33px toolbar. The left panel keeps
+  the seven SessionTree toolbar actions, search, the folder tree and its context menus, while the header keeps the large live overview and the ⋯ OpenTabsMenu with directory grouping
+  and fuzzy search.'
+modes:
+- browser
+- native
+covers:
+- F1.4
+- F1.5
+- F-Sidebar-1
+tags:
+- smoke
+- p0
+- workspace-redesign
+- session
+fixtures:
+- reset_db
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-009
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: 127.0.0.1
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: prod-api-01
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="prod-api-01"]'
+- assert_count:
+    selector: '[data-testid="quick-connect"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="control-bar"]'
+    equal: 1
+- assert_visible: '[data-testid="session-new"]'
+- assert_visible: '[data-testid="session-edit"]'
+- assert_visible: '[data-testid="session-duplicate"]'
+- assert_visible: '[data-testid="session-delete"]'
+- assert_visible: '[data-testid="session-refresh"]'
+- assert_visible: '[data-testid="session-favorite"]'
+- assert_visible: '[data-testid="session-search"]'
+- assert_items:
+    selector: '[data-testid="sessions-sidebar-panel"] > div:first-child > button'
+    attribute: data-testid
+    equals:
+    - session-new
+    - session-edit
+    - session-duplicate
+    - session-delete
+    - session-refresh
+    - session-favorite
+- assert_visible: '[data-testid="session-tree"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="prod-api-01"]'
+- fill:
+    selector: '[data-testid="session-search"]'
+    value: prod
+- wait_for: '[data-testid="session-tree-item"][data-session-name="prod-api-01"]'
+- fill:
+    selector: '[data-testid="session-search"]'
+    value: zzz-no-session
+- assert_not_visible: '[data-testid="session-tree-item"][data-session-name="prod-api-01"]'
+- fill:
+    selector: '[data-testid="session-search"]'
+    value: ''
+- wait_for: '[data-testid="session-tree-item"][data-session-name="prod-api-01"]'
+- click: '[data-testid="session-tree-item"][data-session-name="prod-api-01"]'
+- right_click: '[data-testid="session-tree-item"][data-session-name="prod-api-01"]'
+- wait_for: '[data-testid="context-menu"]'
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Connect
+- assert_text:
+    selector: '[data-testid="context-menu"]'
+    contains: Move to folder
+- press: Escape
+- click: '[data-testid="session-tree-item"][data-session-name="prod-api-01"]'
+- click: '[data-testid="session-refresh"]'
+- click: '[data-testid="session-tree-item"][data-session-name="prod-api-01"]'
+- click: '[data-testid="session-favorite"]'
+- assert_visible: '[data-testid="tab-overview-trigger"]'
+- click: '[data-testid="tab-more"]'
+- wait_for: '[data-testid="open-tabs-menu"]'
+- assert_visible: '[data-testid="open-tabs-filter"]'
+- fill:
+    selector: '[data-testid="open-tabs-filter"]'
+    value: zzz-no-match
+- assert_count:
+    selector: '[data-testid="tab-bar"] [data-testid="tab-item"]'
+    equal: 0
+- press: Escape
+- assert_not_visible: '[data-testid="open-tabs-menu"]'
+- screenshot: ws-009-sessions-compact-header-and-filters.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Sessions 模式不显示快速连接芯片行，主面板共享单行 33px 工具栏。
+    actions:
+    - 11
+    checkpoints:
+    - step: 11
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"prod-api-01\"]"}'
+    - step: 12
+      expectation: '{"assert_count": {"selector": "[data-testid=\"quick-connect\"]", "equal": 0}}'
+    results:
+    - 12
+  - id: R2
+    requirement: 左栏完整保留 7 个会话工具按钮、搜索过滤、目录树与右键菜单。
+    actions:
+    - 24
+    - 26
+    - 28
+    checkpoints:
+    - step: 13
+      expectation: '{"assert_count": {"selector": "[data-testid=\"control-bar\"]", "equal": 1}}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"session-edit\"]"}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"session-duplicate\"]"}'
+    - step: 17
+      expectation: '{"assert_visible": "[data-testid=\"session-delete\"]"}'
+    - step: 18
+      expectation: '{"assert_visible": "[data-testid=\"session-refresh\"]"}'
+    - step: 19
+      expectation: '{"assert_visible": "[data-testid=\"session-favorite\"]"}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"session-search\"]"}'
+    - step: 21
+      expectation: '{"assert_items": {"selector": "[data-testid=\"sessions-sidebar-panel\"] > div:first-child > button", "attribute": "data-testid", "equals": ["session-new", "session-edit",
+        "session-duplicate", "session-delete", "session-refresh", "session-favorite"]}}'
+    - step: 22
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"prod-api-01\"]"}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"prod-api-01\"]"}'
+    - step: 27
+      expectation: '{"assert_not_visible": "[data-testid=\"session-tree-item\"][data-session-name=\"prod-api-01\"]"}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"prod-api-01\"]"}'
+    results:
+    - 29
+  - id: R3
+    requirement: 顶栏 大预览与 ⋯ OpenTabsMenu（目录分组 + 模糊搜索）保持可用。
+    actions:
+    - 32
+    - 36
+    - 38
+    checkpoints:
+    - step: 33
+      expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Connect"}}'
+    - step: 34
+      expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Move to folder"}}'
+    - step: 40
+      expectation: '{"assert_visible": "[data-testid=\"tab-overview-trigger\"]"}'
+    results:
+    - 40
+  visual:
+  - check: Sessions 模式垂直空间完全留给画布，左栏工具与过滤器密度一致。
+    method: manual
+    reason: 单行头部与左栏布局需要截图评审。
+  native:
+  - check: 真实 WebView 中工具栏、右键菜单与标签过滤一致。
+    method: automated
+    reason: 用例声明 browser 与 native 两种模式。

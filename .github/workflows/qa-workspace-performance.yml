@@ -1,0 +1,113 @@
+name: Workspace native performance comparison
+
+on:
+  # A new workflow cannot be dispatched until it exists on the default branch.
+  # Push this exact, functionally verified SHA to qa/workspace-performance/<run-id>
+  # to run the comparison before merge, without creating a different source commit.
+  push:
+    branches: ['qa/workspace-performance/*']
+  workflow_dispatch:
+    inputs:
+      functional_run:
+        description: Successful qa-ui-auto-platforms full-suite run for this exact commit
+        type: string
+        required: true
+      baseline:
+        description: Immutable main commit merged before the full suite
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  PYTHONPATH: .agents/skills/qa-ui-auto/scripts
+  PYTHONUNBUFFERED: '1'
+  PYTHONUTF8: '1'
+  CARGO_BUILD_JOBS: '2'
+
+jobs:
+  comparison:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve the immutable functional run and merged main baseline
+        env:
+          QA_DISPATCH_RUN: ${{ inputs.functional_run }}
+          QA_DISPATCH_BASELINE: ${{ inputs.baseline }}
+        run: |
+          functional_run="$QA_DISPATCH_RUN"
+          baseline="$QA_DISPATCH_BASELINE"
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            functional_run="${GITHUB_REF_NAME##*/}"
+            baseline="$(git merge-base HEAD origin/main)"
+          fi
+          [[ "$functional_run" =~ ^[0-9]+$ ]]
+          [[ "$baseline" =~ ^[0-9a-f]{40}$ ]]
+          echo "QA_FUNCTIONAL_RUN=$functional_run" >> "$GITHUB_ENV"
+          echo "QA_BASELINE=$baseline" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/qa-runtime
+        with:
+          mode: native
+      - name: Measurement and functional gate contracts
+        run: python -m unittest test_workspace_performance
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/taomni-qa/pipewire
+          key: qa-pipewire-1.0.9-Linux-X64-ubuntu-22.04-${{ hashFiles('.agents/skills/qa-ui-auto/scripts/ci_linux_setup.sh') }}
+      - name: Linux desktop and build dependencies
+        env:
+          QA_OPERATION: run
+          QA_LINUX_PROFILE: ubuntu-22.04-x11
+        run: bash .agents/skills/qa-ui-auto/scripts/ci_linux_setup.sh
+      - name: Fixed protoc
+        run: python .agents/skills/qa-ui-auto/scripts/ci_setup_protoc.py
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target/qa-ui-auto
+          shared-key: qa-platforms-ubuntu-22.04-x11
+          cache-targets: false
+      - uses: actions/cache/restore@v4
+        with:
+          path: src-tauri/target/qa-ui-auto
+          key: workspace-perf-release-${{ github.sha }}
+          restore-keys: |
+            qa-native-v1-ubuntu-22.04-x11-Linux-X64-release-
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/taomni-qa/adapter
+          key: qa-tauri-driver-2.0.4-Linux-X64-ubuntu-22.04
+      - name: Native adapter
+        run: |
+          adapter="$HOME/.cache/taomni-qa/adapter"
+          if ! "$adapter/bin/tauri-driver" --help; then
+            cargo install tauri-driver --version 2.0.4 --locked --root "$adapter"
+          fi
+          echo "$adapter/bin" >> "$GITHUB_PATH"
+      - name: Verify successful full suite and preserve original matched runtimes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python -m workspace_perf.hosted prepare
+          --functional-run "$QA_FUNCTIONAL_RUN" --baseline "$QA_BASELINE"
+          --out qa-ui-auto-report/workspace-performance
+      - name: Alternate main and candidate on one isolated native desktop
+        run: >-
+          dbus-run-session -- xvfb-run -a
+          -s '-screen 0 1440x900x24 -nolisten tcp -noreset'
+          python -m workspace_perf.hosted measure
+          --out qa-ui-auto-report/workspace-performance
+      - name: Retain every sample, failure, original build identity and screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-performance-${{ github.run_id }}
+          path: qa-ui-auto-report/workspace-performance/
+          if-no-files-found: error
+          retention-days: 14

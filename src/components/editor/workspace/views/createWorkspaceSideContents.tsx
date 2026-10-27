@@ -25,6 +25,7 @@ import { useWorkspaceFileActions } from "../useWorkspaceFileActions";
 import { useWorkspaceTreeData } from "../useWorkspaceTreeData";
 import { type WorkspaceCommandContext } from "../workspaceCommands";
 import { createWorkspaceDockContents } from "./createWorkspaceDockContents";
+import type { ExplorerSort } from "../explorerPreferences";
 
 
 export interface CreateWorkspaceSideContentsContext {
@@ -44,6 +45,8 @@ export interface CreateWorkspaceSideContentsContext {
   toolWindowOptionsItems: (id: string) => import("../../../ContextMenu").MenuItem[];
   treeShowDetails: boolean;
   setTreeShowDetails: (value: boolean) => void;
+  treeSort: ExplorerSort;
+  setTreeSort: (value: ExplorerSort) => void;
   roots: CodeWorkspaceRootInfo[];
   looseFiles: CodeWorkspaceLooseFileInfo[];
   treeData: ReturnType<typeof useWorkspaceTreeData>;
@@ -139,8 +142,13 @@ export function createWorkspaceSideContents(context: CreateWorkspaceSideContents
           toolWindowOptions={() => context.toolWindowOptionsItems("project")}
           showDetails={treeShowDetails}
           onShowDetailsChange={setTreeShowDetails}
+          sort={context.treeSort}
+          onSortChange={context.setTreeSort}
         >
           <ProjectTree
+            sort={context.treeSort}
+            onAddFolder={() => executeWorkspaceCommand("workspace.tree.addFolder", { focus: "tree" })}
+            onOpenLooseFile={() => executeWorkspaceCommand("workspace.tree.openLooseFile", { focus: "tree" })}
             showDetails={treeShowDetails}
             roots={roots}
             looseFiles={looseFiles}

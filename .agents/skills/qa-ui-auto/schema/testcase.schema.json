@@ -82,6 +82,12 @@
           "linux_desktop_required",
           "dual_display_required",
           "workspace_root",
+          "platform_workspace_root",
+          "workspace_ignored_ancestor_root",
+          "workspace_explorer",
+          "workspace_hidden_entries",
+          "workspace_slow_lsp",
+          "workspace_restore_sessions",
           "java_sample_projects",
           "java25_projects",
           "git_diff_repo",
@@ -546,6 +552,10 @@
         "assert_visible": {
           "$ref": "#/$defs/selector"
         },
+        "assert_no_runtime_errors": {
+          "type": "null",
+          "description": "Fail on uncaught errors, unhandled rejections, the React root error boundary or app crash UI. Native checks cover the current document; assert before and after reload. Raw observations are saved even on failure."
+        },
         "assert_not_visible": {
           "$ref": "#/$defs/selector"
         },
@@ -662,6 +672,15 @@
             "icon_size": {"type": "number", "minimum": 1},
             "viewport_margin": {"type": "number", "minimum": 0},
             "tolerance": {"type": "number", "minimum": 0, "maximum": 2}
+          }
+        },
+        "native_folder_dialog": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["action"],
+          "properties": {
+            "action": {"enum": ["choose", "cancel"]},
+            "path": {"type": "string", "minLength": 1}
           }
         },
         "native_window_drag": {
@@ -837,6 +856,10 @@
           "type": "object", "additionalProperties": false, "required": ["selector"],
           "properties": {"selector": {"type": "string", "minLength": 1}, "timeout_sec": {"type": "number", "minimum": 1}, "close_with": {"type": "string", "minLength": 1}},
           "description": "Switch to a real app-created browser page/native WebView with the matching CSS selector."
+        },
+        "native_restart_app": {
+          "type": "null",
+          "description": "Restart the owned isolated native QA process without resetting its profile, sessions, vault or files."
         },
         "reload_window": {
           "oneOf": [

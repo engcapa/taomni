@@ -55,6 +55,8 @@ Frontend tests use Vitest, jsdom, and Testing Library. Colocate `*.test.ts` or `
 
 Cover changed behavior and regressions; Vitest has no configured numeric coverage threshold. UI cases use `TC-XXX-<slug>.testcase.yaml`; follow `qa-ui-auto-tests/README.md` for browser/native runs. Verify native behavior in the desktop app because browser tests use stubs. Live SSH tests require environment credentials and explicit opt-in; see `src-tauri/tests/README.md`.
 
+Every new feature, UI refactor and component upgrade must also run the complete `crash-regression` tagged browser/native suite before review, using a matching QA release binary for native. Run affected feature cases in addition to this suite. Keep a regression for every user-reported crash, reproduce it before the fix where possible, and assert actual pane/content/lifecycle results as well as `assert_no_runtime_errors`. See `qa-ui-auto-tests/ci/crash-regressions.md`. The platforms workflow automatically includes this suite on product PRs and focused hosted runs; failed or missing crash evidence blocks completion.
+
 ## Commit & Pull Request Guidelines
 
 Follow the history's Conventional Commit pattern: `fix(screenshot): repair capture controls`, `feat(filebrowser): add folder suggestions`, or `test(rdp): verify viewport`. Keep commits focused.

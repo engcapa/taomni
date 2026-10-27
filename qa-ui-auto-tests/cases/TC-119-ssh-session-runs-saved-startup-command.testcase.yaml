@@ -18,7 +18,9 @@ fixtures:
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -87,64 +89,142 @@ verification:
   - id: R1
     requirement: The SSH Execute command survives saving and reopening the session editor.
     actions:
-    - 3
+    - 1
+    - 2
     - 5
-    - 6
     - 7
     - 8
     - 9
+    - 10
     - 11
     - 13
+    - 14
     - 15
-    - 16
+    - 17
     - 18
-    - 19
+    - 20
     - 21
+    - 23
+    - 26
+    - 28
+    - 30
+    - 31
+    - 34
     checkpoints:
-    - step: 2
+    - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
     - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
+    - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 10
+    - step: 12
       expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
-    - step: 14
+    - step: 16
       expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 17
+    - step: 19
       expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-startup-command\"]"}'
-    - step: 20
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 22
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 24
       expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
-    - step: 23
-      expectation: >-
-        {"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf 'qa-ssh-startup-command-ran\\n'"}}
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf ''qa-ssh-startup-command-ran\\n''"}}'
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-startup-command\"]"}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 32
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        40}}'
+    - step: 33
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-command\\-ran\\r?$", "timeout_sec":
+        60}}'
+    - step: 35
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-interactive\\-ready\\r?$", "timeout_sec":
+        60}}'
     results:
-    - 17
-    - 23
+    - 3
+    - 4
+    - 6
+    - 12
+    - 16
+    - 19
+    - 22
+    - 24
+    - 25
+    - 27
+    - 29
+    - 32
+    - 33
+    - 35
   - id: R2
     requirement: The saved startup command runs after authentication and leaves the remote shell available for interactive commands.
     actions:
-    - 12
-    - 24
+    - 1
+    - 2
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 13
+    - 14
+    - 15
+    - 17
+    - 18
+    - 20
+    - 21
+    - 23
     - 26
     - 28
+    - 30
+    - 31
+    - 34
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-startup-command\"]"}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"advanced-ssh-settings\"]"}'
+    - step: 25
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Execute command\"]", "name": "value", "equals": "printf ''qa-ssh-startup-command-ran\\n''"}}'
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-startup-command\"]"}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 32
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        40}}'
+    - step: 33
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-command\\-ran\\r?$", "timeout_sec":
+        60}}'
+    - step: 35
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-interactive\\-ready\\r?$", "timeout_sec":
+        60}}'
+    results:
+    - 3
+    - 6
+    - 12
+    - 16
+    - 19
+    - 22
+    - 24
+    - 25
+    - 27
     - 29
     - 32
-    checkpoints:
-    - step: 25
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-startup-command\"]"}'
-    - step: 27
-      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
-    - step: 30
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 40}}'
-    - step: 31
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-command\\-ran\\r?$", "timeout_sec": 60}}'
-    - step: 33
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-startup\\-interactive\\-ready\\r?$", "timeout_sec": 60}}'
-    results:
-    - 25
-    - 31
     - 33
+    - 35
   visual:
   - check: The startup command output and the following interactive command output are visible as separate readable terminal lines.
     method: manual

@@ -477,7 +477,7 @@ export function FindInFilesView(props: FindInFilesViewProps) {
         })}
       </div>
       {replacePreview && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 p-4">
+        <div className="fixed inset-0 z-[940] flex items-center justify-center bg-black/40 p-4">
           <ReplacePreviewDialog
             edit={replacePreview.edit}
             replacement={replacePreview.replacement}

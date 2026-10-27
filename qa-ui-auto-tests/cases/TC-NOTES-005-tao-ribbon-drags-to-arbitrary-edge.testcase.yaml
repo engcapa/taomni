@@ -1,16 +1,6 @@
 id: TC-NOTES-005
-title: Tao Ribbon drags to an arbitrary edge and persists
-description: 'Verifies the unified Tao Ribbon placement (F-TAO-1, plan §7.1): dragging the
-
-  edge-docked ribbon toward the bottom of the window re-docks it to the bottom
-
-  edge and persists the placement (edge + offsetRatio) to localStorage so it
-
-  survives reload. The offset math + clamping are unit-tested in
-
-  src/lib/tao/ribbonPlacement.test.ts; this case exercises the live drag.
-
-  '
+title: Tao opens from the primary rail without an edge-docked ribbon
+description: 'The removed edge ribbon stays absent before and after reload. Chat and Notes remain reachable through the primary rail, including reopening after hiding the drawer.'
 covers:
 - F-TAO-1
 tags:
@@ -26,54 +16,67 @@ timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="status-bar"]'
-- wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
-- drag_to:
-    from: '[data-testid="ai-chat-drawer-ribbon"]'
-    to: '[data-testid="status-bar"]'
-- wait: 0.5
-- assert_attribute:
+- assert_count:
     selector: '[data-testid="ai-chat-drawer-ribbon"]'
-    name: data-position
-    equals: bottom
-- assert_localstorage:
-    key: taomni.chatDrawer.layout.v1
-    contains: bottom
-- hover: '[data-testid="welcome-panel"]'
-- reload: null
-- wait_for: '[data-testid="ai-chat-drawer-ribbon"]'
-- assert_attribute:
+    equal: 0
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="ai-chat-drawer"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- wait_for: '[data-testid="notes-panel"]'
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- assert_not_visible: '[data-testid="ai-chat-drawer"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="notes-panel"]'
+- reload:
+- wait_for: '[data-testid="status-bar"]'
+- assert_count:
     selector: '[data-testid="ai-chat-drawer-ribbon"]'
-    name: data-position
-    equals: bottom
-- screenshot: notes-005-ribbon-drag.png
+    equal: 0
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="notes-panel"]'
+- screenshot: notes-005-rail-entry-no-ribbon.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Tao Ribbon drags to an arbitrary edge and persists：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: Tao 悬浮条已移除；左栏入口打开 Chat/Notes，隐藏后可重新打开，重载后仍无悬浮条。
     actions:
     - 1
     - 4
+    - 6
     - 8
-    - 9
+    - 10
+    - 12
+    - 15
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
     - step: 3
-      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-ribbon\"]"}'
-    - step: 6
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]", "name": "data-position",
-        "equals": "bottom"}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]", "equal": 0}}'
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
     - step: 7
-      expectation: '{"assert_localstorage": {"key": "taomni.chatDrawer.layout.v1", "contains": "bottom"}}'
-    - step: 10
-      expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer-ribbon\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"notes-panel\"]"}'
+    - step: 9
+      expectation: '{"assert_not_visible": "[data-testid=\"ai-chat-drawer\"]"}'
     - step: 11
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]", "name": "data-position",
-        "equals": "bottom"}}'
+      expectation: '{"wait_for": "[data-testid=\"notes-panel\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 14
+      expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]", "equal": 0}}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"notes-panel\"]"}'
     results:
-    - 10
+    - 2
+    - 3
+    - 5
+    - 7
+    - 9
     - 11
+    - 13
+    - 14
+    - 16
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

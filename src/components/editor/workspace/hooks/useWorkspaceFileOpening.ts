@@ -18,6 +18,7 @@ import { useWorkspaceSurfaceState } from "./useWorkspaceSurfaceState";
 import { useWorkspaceTreeInteractions } from "./useWorkspaceTreeInteractions";
 import { useWorkspaceTreeOpening } from "./useWorkspaceTreeOpening";
 import { useWorkspaceZoom } from "./useWorkspaceZoom";
+import { useWorkspaceHost } from "../workspaceHostIntegration";
 
 
 export interface UseWorkspaceFileOpeningContext {
@@ -32,6 +33,7 @@ export interface UseWorkspaceFileOpeningContext {
 
 export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext) {
   const { project, session, visible, surfaceState, ports, workspace } = context;
+  const host = useWorkspaceHost();
 
   const persistWorkspaceLayoutNowRef = useRef<((targetInstanceId?: string) => void) | null>(null);
 
@@ -74,7 +76,7 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
   >(null);
   const pendingClosedFilesRef = useRef(new Map<string, PendingClosedFile>());
 
-  const openFile = useCallback(
+  const openFileInternal = useCallback(
     createOpenFile({
       flushPendingEditorText: project.buffers.flushPendingEditorText,
       pendingClosedFilesRef,
@@ -107,6 +109,11 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
       session.workspaceInstanceId,
     ],
   );
+  const openFile = useCallback<typeof openFileInternal>(async (ref, options) => {
+    const result = await openFileInternal(ref, options);
+    if (result && options?.activate !== false && !options?.restoring) host?.onActivateFile(ref);
+    return result;
+  }, [openFileInternal, host?.onActivateFile]);
   const treeOpening = useWorkspaceTreeOpening({
     treeFocus: session.treeFocus,
     workspaceInstanceId: session.workspaceInstanceId,
@@ -208,7 +215,7 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
     project.toolWindowRouting.setBottomDockOpen(true);
     ports.terminalDockRef.current?.openAt(cwd, relativeDirectory ? basename(relativeDirectory) : root.name);
   }, [project.projectTree.findRoot]);
-  const { navigationHistoryFacade } = useWorkspaceLayoutPersistence({
+  const { navigationHistoryFacade, restoreReady } = useWorkspaceLayoutPersistence({
     rootsRef: project.projectTree.rootsRef,
     workspaceLocationControllerRef: project.workspaceLocationControllerRef,
     removeNavigationLocations: navigation.removeNavigationLocations,
@@ -320,5 +327,6 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
     handleViewStateChange,
     recoveryActions,
     navigationHistoryFacade,
+    restoreReady,
   };
 }

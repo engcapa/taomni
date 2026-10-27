@@ -52,6 +52,24 @@ steps:
 - wait_for:
     selector: '[data-testid="mail-subscription-row"][data-folder-name="Archive"][data-subscribed="false"]'
     timeout_sec: 30
+- click: '[role="dialog"][aria-label="Folder subscriptions"] [aria-label="Close dialog"]'
+- click: '[data-testid="mail-sync-button"]'
+- assert_text:
+    selector: '[data-testid="mail-client-tab"]'
+    contains: new headers across
+    timeout_sec: 30
+- click: '[data-testid="mail-subscriptions-open"]'
+- wait_for:
+    selector: '[data-testid="mail-subscription-row"][data-folder-name="Archive"][data-subscribed="false"]'
+    timeout_sec: 30
+- click: '[data-testid="mail-subscription-row"][data-folder-name="Archive"] [data-testid="mail-subscription-toggle"]'
+- wait_for:
+    selector: '[data-testid="mail-subscription-row"][data-folder-name="Archive"][data-subscribed="true"]'
+    timeout_sec: 30
+- click: '[data-testid="mail-subscription-row"][data-folder-name="Archive"] [data-testid="mail-subscription-toggle"]'
+- wait_for:
+    selector: '[data-testid="mail-subscription-row"][data-folder-name="Archive"][data-subscribed="false"]'
+    timeout_sec: 30
 - click: '[data-testid="mail-subscribed-only"]'
 - wait_for:
     selector: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
@@ -59,6 +77,7 @@ steps:
     timeout_sec: 10
 - assert_visible: '[data-testid="mail-folder-row"][data-folder-name="Sent"]'
 - screenshot: mail-folder-01-subscriptions.png
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="tab-item"][data-tab-type="mail"] [data-testid="tab-close"]'
 - wait_for:
     selector: '[data-testid="mail-client-tab"]'
@@ -82,7 +101,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 在订阅对话框取消订阅 Archive 后，服务器返回的订阅状态为未订阅；开启“只显示已订阅文件夹”后 Archive 离开文件夹树，INBOX/Sent 仍在（AC-32）。
+    requirement: 在订阅对话框取消订阅 Archive 后，服务器返回的订阅状态为未订阅；开启“只显示已订阅文件夹”后 Archive 离开文件夹树，INBOX/Sent 仍在（AC-32）。 完整服务器同步后重新打开对话框，Archive 仍未订阅，再验证过滤与关闭重开。 同一对话框中重新订阅再取消，两个实际服务器状态都必须返回。
     actions:
     - 1
     - 2
@@ -92,41 +111,59 @@ verification:
     - 9
     - 11
     - 13
+    - 14
+    - 16
+    - 18
+    - 20
+    - 22
     checkpoints:
     - step: 8
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Archive\"]", "timeout_sec": 60}}'
     - step: 10
       expectation: '{"wait_for": "[data-testid=\"mail-subscriptions-dialog\"]"}'
     - step: 12
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-subscription-row\"][data-folder-name=\"Archive\"][data-subscribed=\"false\"]", "timeout_sec": 30}}'
-    - step: 14
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Archive\"]", "state": "detached", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-subscription-row\"][data-folder-name=\"Archive\"][data-subscribed=\"false\"]", "timeout_sec":
+        30}}'
     - step: 15
-      expectation: '{"assert_visible": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Sent\"]"}'
-    results:
-    - 12
-    - 14
-    - 15
-  - id: R2
-    requirement: 重开账户后偏好与服务器订阅保持，Archive 仍然隐藏。
-    actions:
-    - 17
-    - 19
-    - 20
-    checkpoints:
-    - step: 18
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-client-tab\"]", "state": "detached"}}'
+      expectation: A full server synchronization completes before subscription state is rechecked.
+    - step: 17
+      expectation: The server-confirmed Archive unsubscribe remains after synchronization and dialog reopen.
+    - step: 19
+      expectation: Resubscribe Archive returns the actual subscribed server state.
     - step: 21
-      expectation: '{"wait_for": "[data-testid=\"mail-client-tab\"]"}'
-    - step: 22
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Sent\"]", "timeout_sec": 60}}'
+      expectation: A second unsubscribe returns the actual unsubscribed server state before filtering.
     - step: 23
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Archive\"]", "state": "detached", "timeout_sec": 10}}'
     - step: 24
-      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Archive\"]", "equal": 0}}'
+      expectation: '{"assert_visible": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Sent\"]"}'
     results:
+    - 12
+    - 15
+    - 17
+    - 19
+    - 21
     - 23
     - 24
+  - id: R2
+    requirement: 重开账户后偏好与服务器订阅保持，Archive 仍然隐藏。
+    actions:
+    - 27
+    - 29
+    - 30
+    checkpoints:
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-client-tab\"]", "state": "detached"}}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"mail-client-tab\"]"}'
+    - step: 32
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Sent\"]", "timeout_sec": 60}}'
+    - step: 33
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Archive\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 34
+      expectation: '{"assert_count": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Archive\"]", "equal": 0}}'
+    results:
+    - 33
+    - 34
   visual:
   - check: 截图中订阅对话框的 Archive 未勾选、“只显示已订阅”已勾选，文件夹树不含 Archive。
     method: manual

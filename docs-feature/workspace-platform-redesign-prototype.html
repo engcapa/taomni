@@ -1,0 +1,3329 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Taomni — UI & Interaction Redesign Prototype v5 (Zero Extra Top Bar, Home #1 in Rail, Ultra-Clean Workspace & Session Tabs)</title>
+  <style>
+    /* ============================================================================
+       1. TAOMNI THEME TOKENS (from src/styles/theme.css)
+       ============================================================================ */
+    :root {
+      --taomni-bg: #f8fafc;
+      --taomni-panel-bg: #f1f5f9;
+      --taomni-chrome-bg: #e8eef5;
+      --taomni-chrome-border: #cbd5e1;
+      --taomni-card-bg: #ffffff;
+      --taomni-card-border: #e2e8f0;
+      --taomni-accent: #1e40af;
+      --taomni-accent-soft: #3b82f6;
+      --taomni-selected: #dbeafe;
+      --taomni-selected-border: #93c5fd;
+      --taomni-hover: rgba(15, 23, 42, 0.06);
+      --taomni-hover-strong: rgba(15, 23, 42, 0.11);
+      --taomni-text: #0f172a;
+      --taomni-text-muted: #64748b;
+      --taomni-text-subtle: #94a3b8;
+      --taomni-term-bg: #0f172a;
+      --taomni-term-fg: #e2e8f0;
+      --taomni-code-bg: #ffffff;
+      --taomni-code-gutter: #f8fafc;
+      --taomni-code-active-line: #eff6ff;
+      --taomni-success: #10b981;
+      --taomni-warning: #f59e0b;
+      --taomni-danger: #ef4444;
+      --taomni-purple: #7c3aed;
+      --taomni-shadow-lg: 0 16px 40px -8px rgba(15, 23, 42, 0.22), 0 4px 12px -2px rgba(15, 23, 42, 0.1);
+      --taomni-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+
+    html.dark {
+      --taomni-bg: #1e1f22;
+      --taomni-panel-bg: #23252a;
+      --taomni-chrome-bg: #16171a;
+      --taomni-chrome-border: #2e3138;
+      --taomni-card-bg: #26282e;
+      --taomni-card-border: #35383f;
+      --taomni-accent: #6aa6f8;
+      --taomni-accent-soft: #8bbcff;
+      --taomni-selected: #25354d;
+      --taomni-selected-border: #4d7ec4;
+      --taomni-hover: rgba(255, 255, 255, 0.06);
+      --taomni-hover-strong: rgba(255, 255, 255, 0.12);
+      --taomni-text: #e6eaf0;
+      --taomni-text-muted: #9ca3ad;
+      --taomni-text-subtle: #6e7582;
+      --taomni-term-bg: #141518;
+      --taomni-term-fg: #e5e9f0;
+      --taomni-code-bg: #1e1f22;
+      --taomni-code-gutter: #212328;
+      --taomni-code-active-line: #262930;
+      --taomni-success: #34d399;
+      --taomni-warning: #fbbf24;
+      --taomni-danger: #f87171;
+      --taomni-purple: #a78bfa;
+      --taomni-shadow-lg: 0 20px 48px -10px rgba(0, 0, 0, 0.7), 0 4px 16px -2px rgba(0, 0, 0, 0.5);
+      --taomni-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body {
+      font-family: var(--font-sans);
+      font-size: 12.5px;
+      line-height: 1.4;
+      color: var(--taomni-text);
+      background: var(--taomni-chrome-bg);
+      height: 100vh;
+      width: 100vw;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+    button, input, select, textarea {
+      font-family: inherit;
+      font-size: inherit;
+      color: inherit;
+      background: none;
+      border: none;
+      outline: none;
+    }
+    button { cursor: pointer; white-space: nowrap; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.25); border-radius: 999px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.45); }
+
+    /* ============================================================================
+       2. WORKBENCH SHELL (NO Extra Top Titlebar Row! Full-Height Rail + Shared Main Toolbar)
+       ============================================================================ */
+    .workbench {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      padding: 4px 6px 4px 0;
+      background: var(--taomni-chrome-bg);
+      position: relative;
+    }
+
+    .icon-btn {
+      width: 26px;
+      height: 26px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--taomni-text-muted);
+      transition: background 0.12s, color 0.12s;
+      flex-shrink: 0;
+    }
+    .icon-btn:hover { background: var(--taomni-hover); color: var(--taomni-text); }
+    .icon-btn.active {
+      background: var(--taomni-selected);
+      color: var(--taomni-accent);
+      border: 1px solid var(--taomni-selected-border);
+    }
+    .icon-btn svg { width: 14px; height: 14px; stroke-width: 1.9; }
+
+    .kbd-badge {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: var(--taomni-chrome-bg);
+      border: 1px solid var(--taomni-chrome-border);
+      color: var(--taomni-text-muted);
+    }
+
+    .badge-count {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 700;
+      padding: 0 5px;
+      height: 15px;
+      line-height: 15px;
+      border-radius: 99px;
+      background: var(--taomni-selected);
+      color: var(--taomni-accent);
+    }
+
+    /* Left Primary Rail (42px): Menu at top, then 1. Home, 2. Workspaces, 3. Sessions, 4. Agents, 5. Tools */
+    .primary-rail {
+      width: 42px;
+      min-width: 42px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 2px 0 4px 0;
+      background: var(--taomni-chrome-bg);
+      z-index: 20;
+    }
+    .rail-group { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; }
+    .rail-divider { width: 20px; height: 1px; background: var(--taomni-chrome-border); margin: 2px 0; }
+    .rail-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--taomni-text-muted);
+      position: relative;
+      transition: background 0.12s, color 0.12s;
+    }
+    .rail-btn:hover { background: var(--taomni-hover); color: var(--taomni-text); }
+    .rail-btn.active { background: var(--taomni-selected); color: var(--taomni-accent); }
+    .rail-btn.active::before {
+      content: "";
+      position: absolute;
+      left: -5px;
+      top: 6px;
+      bottom: 6px;
+      width: 3px;
+      border-radius: 0 3px 3px 0;
+      background: var(--taomni-accent);
+    }
+    .rail-btn svg { width: 16px; height: 16px; stroke-width: 1.85; }
+    .rail-badge {
+      position: absolute;
+      top: 1px;
+      right: 1px;
+      min-width: 13px;
+      height: 13px;
+      padding: 0 3px;
+      border-radius: 99px;
+      font-size: 9px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--taomni-accent);
+      color: #fff;
+    }
+    html.dark .rail-badge { color: #0f172a; }
+
+    /* Resizable Left Navigator Panel */
+    .tw-stripe { width: 30px; min-width: 30px; display: flex; flex-direction: column; justify-content: space-between; align-items: center; padding: 4px 0; background: var(--taomni-chrome-bg); border-right: 1px solid var(--taomni-chrome-border); }
+    .tw-group { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .tw-btn { width: 24px; height: 26px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--taomni-text-muted); position: relative; }
+    .tw-btn:hover { background: var(--taomni-hover); color: var(--taomni-text); }
+    .tw-btn.active { background: var(--taomni-selected); color: var(--taomni-accent); }
+    .tw-btn .tw-dot { position: absolute; top: 1px; right: 0; min-width: 11px; height: 11px; border-radius: 99px; font-size: 8px; font-weight: 700; background: var(--taomni-accent); color: #fff; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); }
+    .nav-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .mfa-float { position: fixed; left: 50px; bottom: 30px; width: 280px; z-index: 150; background: var(--taomni-panel-bg); border: 1px solid var(--taomni-selected-border); border-radius: 10px; box-shadow: var(--taomni-shadow-lg); display: none; flex-direction: column; overflow: hidden; }
+    .mfa-float.open { display: flex; }
+    .mfa-head { height: 30px; padding: 0 8px; display: flex; align-items: center; justify-content: space-between; background: var(--taomni-chrome-bg); border-bottom: 1px solid var(--taomni-chrome-border); cursor: move; font-weight: 700; font-size: 12px; }
+    .navigator-panel {
+      flex-direction: row !important;
+      width: 260px;
+      min-width: 185px;
+      max-width: 500px;
+      background: var(--taomni-panel-bg);
+      border: 1px solid var(--taomni-chrome-border);
+      border-radius: 9px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .navigator-panel.collapsed {
+      width: 0 !important;
+      min-width: 0 !important;
+      border-width: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .resize-handle-x {
+      width: 6px;
+      flex-shrink: 0;
+      cursor: ew-resize;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 25;
+    }
+    .resize-handle-x::after {
+      content: "";
+      width: 2px;
+      height: 30px;
+      border-radius: 2px;
+      background: var(--taomni-chrome-border);
+      transition: background 0.12s, height 0.12s;
+    }
+    .resize-handle-x:hover::after,
+    .resize-handle-x.dragging::after {
+      height: 100%;
+      background: var(--taomni-accent);
+    }
+    .resize-handle-x.hidden { display: none; }
+
+    .resize-handle-y {
+      height: 5px;
+      flex-shrink: 0;
+      cursor: ns-resize;
+      background: var(--taomni-panel-bg);
+      border-top: 1px solid var(--taomni-chrome-border);
+    }
+    .resize-handle-y:hover { background: var(--taomni-accent); }
+
+    /* ============================================================================
+       3. LEFT SIDEBAR: CLEAN WORKSPACE SWITCHER (Row 1 Deleted!) & SESSION TREE
+       ============================================================================ */
+    .ws-sidebar-switcher {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--taomni-chrome-border);
+      background: var(--taomni-card-bg);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .ws-selector-btn {
+      width: 100%;
+      height: 27px;
+      padding: 0 8px;
+      border-radius: 6px;
+      background: var(--taomni-panel-bg);
+      border: 1px solid var(--taomni-card-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 600;
+      font-size: 12px;
+    }
+    .ws-selector-btn:hover { border-color: var(--taomni-selected-border); }
+
+    .nav-action-toolbar {
+      height: 28px;
+      min-height: 28px;
+      padding: 0 6px;
+      display: flex;
+      align-items: center;
+      gap: 2px;
+      border-bottom: 1px solid var(--taomni-chrome-border);
+    }
+    .toolbar-v-divider {
+      width: 1px;
+      height: 14px;
+      background: var(--taomni-chrome-border);
+      margin: 0 3px;
+      flex-shrink: 0;
+    }
+    .nav-inline-search {
+      flex: 1;
+      min-width: 60px;
+      height: 21px;
+      padding: 0 6px;
+      border-radius: 4px;
+      background: var(--taomni-card-bg);
+      border: 1px solid var(--taomni-card-border);
+      display: flex;
+      align-items: center;
+    }
+    .nav-inline-search input { width: 100%; font-size: 11.5px; color: var(--taomni-text); }
+
+    .nav-filter-pills {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      padding: 4px 6px;
+      border-bottom: 1px solid var(--taomni-chrome-border);
+      overflow-x: auto;
+      flex-shrink: 0;
+    }
+    .nav-filter-pills.hidden { display: none; }
+    .filter-chip {
+      font-size: 11px;
+      padding: 1.5px 6px;
+      border-radius: 5px;
+      color: var(--taomni-text-muted);
+      border: 1px solid transparent;
+    }
+    .filter-chip:hover { background: var(--taomni-hover); color: var(--taomni-text); }
+    .filter-chip.active {
+      background: var(--taomni-selected);
+      color: var(--taomni-accent);
+      border-color: var(--taomni-selected-border);
+      font-weight: 600;
+    }
+
+    .nav-tree-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 4px 4px 10px 4px;
+    }
+
+    .tree-row {
+      height: 24px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-right: 6px;
+      cursor: pointer;
+      color: var(--taomni-text);
+      font-size: 12px;
+      margin-top: 1px;
+    }
+    .tree-row:hover { background: var(--taomni-hover); }
+    .tree-row.selected {
+      background: var(--taomni-selected);
+      color: var(--taomni-accent);
+      font-weight: 500;
+    }
+    .tree-row-left {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      min-width: 0;
+      flex: 1;
+    }
+    .tree-chevron {
+      width: 14px;
+      height: 14px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--taomni-text-muted);
+      font-size: 10px;
+      flex-shrink: 0;
+    }
+    .tree-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tree-meta { font-family: var(--font-mono); font-size: 10px; color: var(--taomni-text-muted); flex-shrink: 0; }
+    .tree-hover-btns { display: none; align-items: center; gap: 2px; }
+    .tree-row:hover .tree-hover-btns { display: inline-flex; }
+    .tree-row:hover .tree-meta { display: none; }
+
+    .proto-badge {
+      font-family: var(--font-mono);
+      font-size: 9.5px;
+      font-weight: 700;
+      padding: 0 4px;
+      border-radius: 3px;
+      text-transform: uppercase;
+      flex-shrink: 0;
+    }
+    .proto-ssh { background: rgba(16, 185, 129, 0.15); color: var(--taomni-success); }
+    .proto-sftp { background: rgba(59, 130, 246, 0.15); color: var(--taomni-accent-soft); }
+    .proto-db { background: rgba(245, 158, 11, 0.15); color: var(--taomni-warning); }
+    .proto-code { background: rgba(139, 92, 246, 0.16); color: var(--taomni-purple); }
+    .proto-git { background: rgba(249, 115, 22, 0.16); color: #fb923c; }
+    .proto-rdp { background: rgba(236, 72, 153, 0.15); color: #f472b6; }
+    .proto-mail { background: rgba(99, 102, 241, 0.16); color: #818cf8; }
+
+    /* ============================================================================
+       4. CENTER MAIN PANEL: SHARED 33PX TOOLBAR (Hosts Left/Right Collapse + Tabs + Actions)
+       ============================================================================ */
+    .center-stage { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+    .main-canvas-frame {
+      flex: 1;
+      min-height: 0;
+      background: var(--taomni-bg);
+      border: 1px solid var(--taomni-chrome-border);
+      border-radius: 9px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: var(--taomni-shadow-sm);
+    }
+
+    /* The ONE and ONLY top bar in the main panel (33px, matching main's 32px ControlBar!) */
+    .canvas-header-bar {
+      height: 33px;
+      min-height: 33px;
+      background: var(--taomni-panel-bg);
+      border-bottom: 1px solid var(--taomni-chrome-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 5px;
+      gap: 4px;
+      overflow: hidden;
+    }
+
+    .tabs-scroll-strip {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      align-items: flex-end;
+      height: 100%;
+      gap: 2px;
+      overflow-x: auto;
+      padding-top: 4px;
+    }
+    .tabs-scroll-strip::-webkit-scrollbar { height: 0; }
+
+    .ws-tab {
+      height: 28px;
+      max-width: 185px;
+      min-width: 92px;
+      padding: 0 8px;
+      border-radius: 6px 6px 0 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 5px;
+      font-size: 12px;
+      color: var(--taomni-text-muted);
+      border: 1px solid transparent;
+      border-bottom: none;
+      cursor: pointer;
+      position: relative;
+      flex-shrink: 0;
+    }
+    .ws-tab:hover { background: var(--taomni-hover); color: var(--taomni-text); }
+    .ws-tab.active {
+      background: var(--taomni-bg);
+      color: var(--taomni-text);
+      font-weight: 600;
+      border-color: var(--taomni-chrome-border);
+      margin-bottom: -1px;
+      padding-bottom: 1px;
+    }
+    .ws-tab.active::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 6px;
+      right: 6px;
+      height: 2px;
+      border-radius: 2px;
+      background: var(--taomni-accent);
+    }
+
+    .canvas-right-controls {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      flex-shrink: 0;
+      padding-left: 5px;
+      border-left: 1px solid var(--taomni-chrome-border);
+    }
+
+    .split-preset-group {
+      display: inline-flex;
+      align-items: center;
+      background: var(--taomni-card-bg);
+      border: 1px solid var(--taomni-card-border);
+      border-radius: 5px;
+      padding: 1px;
+      gap: 1px;
+    }
+    .split-btn {
+      height: 21px;
+      padding: 0 5px;
+      border-radius: 4px;
+      font-size: 11px;
+      color: var(--taomni-text-muted);
+    }
+    .split-btn:hover { color: var(--taomni-text); background: var(--taomni-hover); }
+    .split-btn.active {
+      background: var(--taomni-selected);
+      color: var(--taomni-accent);
+      font-weight: 600;
+    }
+
+    .surface-viewport {
+      flex: 1;
+      min-height: 0;
+      display: grid;
+      gap: 1px;
+      background: var(--taomni-chrome-border);
+      overflow: hidden;
+    }
+    .surface-viewport.layout-single { grid-template-columns: 1fr; grid-template-rows: 1fr; }
+    .surface-viewport.layout-split-right { grid-template-columns: 1.15fr 0.85fr; grid-template-rows: 1fr; }
+    .surface-viewport.layout-grid-2x2 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+
+    .pane-cell {
+      background: var(--taomni-bg);
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .ws-bottom-dock {
+      height: 165px;
+      min-height: 80px;
+      max-height: 400px;
+      background: var(--taomni-panel-bg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .ws-bottom-header {
+      height: 27px;
+      min-height: 27px;
+      padding: 0 8px;
+      border-bottom: 1px solid var(--taomni-chrome-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 4px;
+    }
+    .dock-tool-btn {
+      height: 21px;
+      padding: 0 7px;
+      border-radius: 4px;
+      font-size: 11px;
+      color: var(--taomni-text-muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .dock-tool-btn:hover { background: var(--taomni-hover); color: var(--taomni-text); }
+    .dock-tool-btn.active {
+      background: var(--taomni-selected);
+      color: var(--taomni-accent);
+      font-weight: 600;
+    }
+
+    .right-context-dock {
+      width: 300px;
+      min-width: 220px;
+      max-width: 480px;
+      background: var(--taomni-panel-bg);
+      border: 1px solid var(--taomni-chrome-border);
+      border-radius: 9px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+    .right-context-dock.collapsed {
+      width: 0 !important;
+      min-width: 0 !important;
+      border-width: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .home-launch-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(225px, 1fr));
+      gap: 11px;
+    }
+    .home-card {
+      background: var(--taomni-card-bg);
+      border: 1px solid var(--taomni-card-border);
+      border-radius: 9px;
+      padding: 11px 13px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 8px;
+      transition: border-color 0.12s;
+    }
+    .home-card:hover { border-color: var(--taomni-selected-border); }
+
+    /* Context Menu, OpenTabsMenu Popup, Overview & Modals */
+    .context-menu-popup {
+      position: fixed;
+      z-index: 200;
+      min-width: 240px;
+      background: var(--taomni-panel-bg);
+      border: 1px solid var(--taomni-chrome-border);
+      border-radius: 8px;
+      padding: 4px;
+      box-shadow: var(--taomni-shadow-lg);
+      display: none;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .context-menu-popup.open { display: flex; }
+    .ctx-item {
+      height: 26px;
+      padding: 0 9px;
+      border-radius: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--taomni-text);
+      cursor: pointer;
+    }
+    .ctx-item:hover { background: var(--taomni-selected); color: var(--taomni-accent); }
+    .ctx-item.danger { color: var(--taomni-danger); }
+    .ctx-sep { height: 1px; background: var(--taomni-chrome-border); margin: 3px 4px; }
+
+    .tab-overview-backdrop {
+      position: fixed;
+      inset: 4px 0 24px 42px;
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(10px);
+      z-index: 80;
+      display: none;
+      flex-direction: column;
+      padding: 18px 24px;
+      overflow-y: auto;
+    }
+    .tab-overview-backdrop.open { display: flex; }
+    .overview-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 12px;
+    }
+    .preview-card {
+      background: var(--taomni-card-bg);
+      border: 1px solid var(--taomni-card-border);
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      cursor: pointer;
+    }
+    .preview-card:hover { border-color: var(--taomni-accent); }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      backdrop-filter: blur(4px);
+      z-index: 120;
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding-top: 56px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-card {
+      width: 600px;
+      max-width: 92vw;
+      background: var(--taomni-panel-bg);
+      border: 1px solid var(--taomni-chrome-border);
+      border-radius: 11px;
+      box-shadow: var(--taomni-shadow-lg);
+      overflow: hidden;
+    }
+
+    .statusbar {
+      height: 23px;
+      min-height: 23px;
+      background: var(--taomni-chrome-bg);
+      border-top: 1px solid var(--taomni-chrome-border);
+      padding: 0 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--taomni-text-muted);
+    }
+
+    .mono { font-family: var(--font-mono); }
+    .muted { color: var(--taomni-text-muted); }
+    .pill-btn {
+      height: 22px;
+      padding: 0 7px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      background: var(--taomni-card-bg);
+      border: 1px solid var(--taomni-card-border);
+      color: var(--taomni-text);
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .pill-btn:hover { border-color: var(--taomni-selected-border); background: var(--taomni-hover); }
+    .pill-btn.primary { background: var(--taomni-accent); border-color: var(--taomni-accent); color: #fff; }
+    html.dark .pill-btn.primary { color: #0f172a; }
+  </style>
+</head>
+<body>
+
+  <!-- ==========================================================================
+       MAIN WORKBENCH (NO Extra Top Titlebar Row! Starts directly at top of window!)
+       ========================================================================== -->
+  <div class="workbench">
+    <!-- 1. Left Primary Rail (Menu + 1. Home, 2. Workspaces, 3. Sessions, 4. Agents, 5. Tools) -->
+    <nav class="primary-rail">
+      <div class="rail-group">
+        <!-- Application Main Menu (Aligned with ControlBar Menu button) -->
+        <button class="rail-btn" id="btn-app-menu" title="应用主菜单 (新建终端 / 会话 / 导入导出 / 视图 / 工具 / 设置)" onclick="showAppMenu(event)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+        </button>
+
+        <div class="rail-divider"></div>
+
+        <!-- #1: HOME (Moved from top bar to be #1 alongside Workspaces per feedback!) -->
+        <button class="rail-btn" data-mode="home" onclick="switchMode('home')" title="Home 主页 (本地终端 / WSL / 恢复上次会话 / 最近工作区与会话)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </button>
+
+        <!-- #2: WORKSPACES -->
+        <button class="rail-btn active" data-mode="workspace" onclick="switchMode('workspace')" title="工作区 (Workspaces — 文件管理 / 内置 Git 面板 / 独立关联会话)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        </button>
+
+        <!-- #3: SESSIONS -->
+        <button class="rail-btn" data-mode="sessions" onclick="switchMode('sessions')" title="全部会话总览 (All Sessions — 完整目录树、过滤与单栏会话标签)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          <span class="rail-badge">5</span>
+        </button>
+
+        <!-- #4: CODING AGENTS -->
+        <button class="rail-btn" data-mode="agents" onclick="switchMode('agents')" title="Coding Agents 调度中心 (Claude Code / Codex / OpenCode)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>
+          <span class="rail-badge">2</span>
+        </button>
+
+        <!-- #5: GLOBAL TOOLS -->
+        <button class="rail-btn" data-mode="tools" onclick="switchMode('tools')" title="全局独立工具箱 (截图 / MFA / 网络诊断 / 端口转发 / SocksCap / 本地服务)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+        </button>
+
+        <!-- Workspace tool windows merged into the main rail (visible only in Workspaces mode) -->
+        <div id="rail-ctx" class="rail-group"></div>
+      </div>
+
+      <div class="rail-group">
+        <button class="rail-btn" onclick="openMfaFloat()" title="MFA 验证器 (悬浮窗口)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        </button>
+        <button class="rail-btn" onclick="openScreenshotMenu(event)" title="截图与标注 (Ctrl+Alt+A)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </button>
+        <button class="rail-btn" onclick="openRightInspectorTab('tao')" title="Tao 助手 (AI 对话 / 随手笔记 / 通知中心)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span class="rail-badge" style="background:var(--taomni-purple);color:#fff;">3</span>
+        </button>
+        <button class="rail-btn" onclick="toggleTheme()" title="切换深色 / 浅色主题">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+        </button>
+        <button class="rail-btn" onclick="openLanguageMenu(event)" title="切换语言 (简体中文 / English)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z"/></svg>
+        </button>
+        <button class="rail-btn" onclick="openSettingsModal()" title="全局设置 (外观 / 终端 / 代理 / 快捷键 / AI 引擎)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M1 12h4M19 12h4M4.2 4.2l2.8 2.8M17 17l2.8 2.8M4.2 19.8L7 17M17 7l2.8-2.8"/></svg>
+        </button>
+      </div>
+    </nav>
+
+    <!-- 2. Resizable Left Navigator Sidebar -->
+    <aside class="navigator-panel" id="left-navigator">
+      <div class="nav-main">
+      <div id="nav-top-dynamic"></div>
+      <div class="nav-action-toolbar" id="nav-action-toolbar"></div>
+      <div class="nav-filter-pills hidden" id="nav-filter-pills"></div>
+      <div class="nav-tree-container" id="nav-tree"></div>
+      <div id="nav-footer" style="padding:5px 8px;border-top:1px solid var(--taomni-chrome-border);display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--taomni-text-muted);background:var(--taomni-card-bg);"></div>
+      </div>
+    </aside>
+
+    <!-- Draggable Horizontal Splitter (Left Sidebar <-> Center Stage) -->
+    <div class="resize-handle-x" id="left-resizer" title="拖拽调整左侧栏宽度 (双击恢复 260px)"></div>
+
+    <!-- 3. Center Stage (Its single 33px top bar hosts Left/Right Sidebar Collapse + Tabs + Actions!) -->
+    <main class="center-stage">
+      <div class="main-canvas-frame" id="center-canvas"></div>
+    </main>
+
+    <!-- Draggable Horizontal Splitter (Center Stage <-> Right Dock) -->
+    <div class="resize-handle-x" id="right-resizer" title="拖拽调整右侧边栏宽度 (双击恢复 300px)"></div>
+
+    <!-- 4. Right Context Dock -->
+    <aside class="right-context-dock" id="right-dock"></aside>
+  </div>
+
+  <!-- ==========================================================================
+       OVERALL MULTI-TAB VISUAL PREVIEW OVERLAY (Ctrl+Shift+E)
+       ========================================================================== -->
+  <div class="tab-overview-backdrop" id="tab-overview">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div>
+        <div style="font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;">
+          <span>已打开 Tab 实时大预览 (Tab Visual Overview)</span>
+          <span class="kbd-badge">Ctrl+Shift+E</span>
+        </div>
+        <div class="muted" style="font-size:12px;margin-top:2px;">
+          直接查看当前模式各打开标签的实时内容摘要，点击任意卡片即可立即切换。
+        </div>
+      </div>
+      <button class="pill-btn" onclick="toggleTabOverview()">✕ 关闭预览 (Esc)</button>
+    </div>
+    <div class="overview-grid" id="overview-grid"></div>
+  </div>
+
+  <!-- ==========================================================================
+       RIGHT-CLICK CONTEXT MENU & OPEN-TABS FILTER POPUP
+       ========================================================================== -->
+  <div class="context-menu-popup" id="ctx-menu"></div>
+
+  <!-- ==========================================================================
+       COMMAND PALETTE / MODAL OVERLAY
+       ========================================================================== -->
+  <div class="modal-backdrop" id="modal-backdrop" onclick="if(event.target===this)closeModal()">
+    <div class="modal-card" id="modal-content"></div>
+  </div>
+
+  <!-- ==========================================================================
+       BOTTOM STATUS BAR
+       ========================================================================== -->
+  <div class="mfa-float" id="mfa-float"></div>
+
+  <footer class="statusbar">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span id="status-left-context" style="display:flex;align-items:center;gap:5px;color:var(--taomni-accent);font-weight:600;"></span>
+      <span class="mono" id="status-git-branch" style="cursor:pointer;" onclick="openWorkspaceGitSurface()" title="点击打开工作区内置 Git 面板">🌿 feat/workspace-platform* (3 变更 · ↑1)</span>
+      <span>代理: <strong>跟随应用设置 (10.1.0.80:3228)</strong></span>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span class="mono" id="status-sidebar-width">左边栏: 260px (可拖拽)</span>
+      <span class="mono">UTF-8 · LF · Rust 1.94 / TS 5.8</span>
+      <span style="color:var(--taomni-success);">● SFTP 续传就绪</span>
+    </div>
+  </footer>
+
+  <!-- ==========================================================================
+       INTERACTIVE PROTOTYPE ENGINE (v5)
+       ========================================================================== -->
+  <script>
+    const STATE = {
+      mode: 'workspace', // 'home' | 'workspace' | 'sessions' | 'agents' | 'tools'
+      activeWorkspaceId: 'ws-taomni',
+      onlyDefaultWorkspaceMode: false,
+      wsLinkedSessionsExpanded: true,
+      wsLens: 'project', // 'project' | 'sessions' (IDEA tool-window stripe)
+      wsSessionQuery: '',
+      lang: 'zh',
+      mfaTick: 0,
+      nodeSeq: 100,
+      leftNavCollapsed: false,
+      leftNavWidth: 260,
+      rightDockCollapsed: true, // Default collapsed for maximum simplicity & screen space!
+      rightDockWidth: 300,
+      rightDockTab: 'companion', // 'companion' | 'agent' | 'structure' | 'tao'
+      layoutPreset: 'single', // 'single' | 'split-right' | 'grid-2x2'
+      wsBottomDockOpen: false, // Clean by default, 1-click to open!
+      wsBottomDockTab: 'terminal',
+      codeViewMode: 'code',
+
+      // Home View State (Aligned with WelcomePanel.tsx)
+      homeShell: 'zsh',
+      homeWslDistro: 'Ubuntu-24.04',
+      homeRestoreBannerVisible: true,
+      homeHistoryTab: 'workspaces',
+      homeHistorySearch: '',
+
+      // In-Workspace Dedicated Git Panel State (Aligned 100% with GitPanelView.tsx + Enhancements)
+      gitState: {
+        selectedRepo: 'taomni',
+        activeTab: 'changes', // 'changes' | 'log' | 'branches' | 'tags' | 'stash' | 'settings'
+        viewMode: 'tree',
+        diffStyle: 'side-by-side',
+        selectedFile: 'src/components/workspace/WorkspaceShell.tsx',
+        remote: 'origin',
+        targetBranch: 'feat/workspace-platform',
+        amendChecked: false,
+        commitMessage: 'feat(workspace): unify shared main toolbar, left-rail Home, and clean in-workspace Git panel',
+        showConflictBanner: false,
+        stashIncludeUntracked: true,
+        changes: [
+          { path: 'src/components/workspace/WorkspaceShell.tsx', repo: 'taomni', status: 'M', staged: true, checked: true, additions: 58, deletions: 14 },
+          { path: 'src/components/git/panel/GitPanelView.tsx', repo: 'taomni', status: 'M', staged: true, checked: true, additions: 34, deletions: 8 },
+          { path: 'src/components/sidebar/SessionTree.tsx', repo: 'taomni', status: 'M', staged: false, checked: true, additions: 19, deletions: 4 },
+          { path: 'docs-feature/workspace-platform-redesign-design.md', repo: 'taomni', status: 'A', staged: false, checked: true, additions: 420, deletions: 0 }
+        ],
+        commits: [
+          { sha: '8aa7450b', graph: '●─', msg: 'docs(feature): add workspace platform redesign prototype and spec', author: 'zhyhang', time: '25m ago', branch: 'HEAD -> feat/workspace-platform', repo: 'taomni' },
+          { sha: 'c91d04e2', graph: '│ ●', msg: 'feat(sftp): add HTTP Range validation for resumable transfers [Agent: Claude Code]', author: 'Claude Code', time: '42m ago', branch: 'agent/cc-sftp-resume', repo: 'wt-cc-sftp' },
+          { sha: 'e41f92a0', graph: '├─╯', msg: 'fix(ssh): keep background keepalive channel active on tab switch', author: 'zhyhang', time: '3h ago', branch: 'origin/main', repo: 'taomni' },
+          { sha: '7b019c41', graph: '●', msg: 'feat(db): align PostgreSQL table DDL inspector with DBeaver', author: 'zhyhang', time: 'Yesterday', branch: '', repo: 'taomni' }
+        ],
+        branches: [
+          { name: 'feat/workspace-platform', current: true, upstream: 'origin/feat/workspace-platform', ahead: 1, behind: 0, worktree: '主工作树 (~/code/taomni)' },
+          { name: 'main', current: false, upstream: 'origin/main', ahead: 0, behind: 0, worktree: '' },
+          { name: 'agent/cc-sftp-resume', current: false, upstream: 'origin/agent/cc-sftp-resume', ahead: 2, behind: 0, worktree: '.worktrees/cc-sftp-resume (Claude Code)' },
+          { name: 'agent/codex-pg-pool', current: false, upstream: '', ahead: 1, behind: 0, worktree: '.worktrees/codex-pg-pool (Codex)' },
+          { name: 'feat/rdp-smart-sizing', current: false, upstream: 'origin/feat/rdp-smart-sizing', ahead: 0, behind: 2, worktree: '' }
+        ],
+        tags: [
+          { name: 'v0.9.4', sha: 'e41f92a0', date: '2026-10-20', message: 'Release v0.9.4: SFTP & RDP stability improvements' },
+          { name: 'v0.9.3', sha: '7b019c41', date: '2026-10-12', message: 'Release v0.9.3: DBeaver SQL result grid parity' },
+          { name: 'v0.9.2', sha: '4a18c902', date: '2026-10-01', message: 'Release v0.9.2: Multi-session broadcast bar' }
+        ],
+        stashes: [
+          { id: 'stash@{0}', branch: 'feat/workspace-platform', message: 'WIP: experiment with compact tab strip height', time: '1h ago', files: 3 },
+          { id: 'stash@{1}', branch: 'main', message: 'backup local cargo config overrides', time: '2d ago', files: 1 }
+        ]
+      },
+
+      // Session Tree State (Preserves 100% of src/components/sidebar/SessionTree.tsx)
+      sessionFilterProto: 'all', // 'all' | 'favorites' | 'ssh' | 'sftp' | 'db' | 'rdp' | 'other'
+      sessionSearchQuery: '',
+      selectedSessionNodeId: 'sess-gw-01',
+
+      // Sessions Overview Mode: INDEPENDENT opened session tabs + main's OpenTabsMenu group/query filtering!
+      sessionWorkbench: {
+        activeTabId: 'sess-gw-01',
+        typeFilter: 'all', // 'all' | 'ssh' | 'db' | 'sftp' | 'rdp'
+        groupFilter: 'all', // 'all' | '生产环境集群 / 北京可用区' | '生产环境集群 / 上海灾备区' | '核心数据库与缓存'
+        tabSearchQuery: '',
+        detailsHoverActive: false, // Matches main's TabDetailsHover (Ctrl+Shift+H)
+        broadcastEnabled: false,
+        openTabs: [
+          { id: 'sess-gw-01', title: 'prod-gateway-01', proto: 'ssh', group: '生产环境集群 / 北京可用区', host: '10.24.1.10:22', user: 'ubuntu', latency: '8ms', companionSftp: true },
+          { id: 'sess-k8s-master', title: 'prod-k8s-master', proto: 'ssh', group: '生产环境集群 / 北京可用区', host: '10.24.1.11:22', user: 'root', latency: '9ms', companionSftp: true },
+          { id: 'sess-pg-main', title: 'orders-pg-primary', proto: 'db', group: '核心数据库与缓存', host: 'pg.internal:5432', user: 'postgres', latency: '4ms', companionSftp: false },
+          { id: 'sess-sftp-cdn', title: 'cdn-Edge-SFTP', proto: 'sftp', group: '生产环境集群 / 北京可用区', host: '10.24.8.50:22', user: 'deploy', latency: '11ms', companionSftp: false },
+          { id: 'sess-win-jump', title: 'win-bastion-rdp', proto: 'rdp', group: '生产环境集群 / 上海灾备区', host: '10.24.2.99:3389', user: 'Administrator', latency: '15ms', companionSftp: false }
+        ]
+      },
+
+      // Workspaces Data Model (Always includes Default Workspace + User Custom Workspaces)
+      workspaces: {
+        'ws-default': {
+          id: 'ws-default',
+          name: 'Default Workspace (默认工作区)',
+          isDefault: true,
+          badge: 'DEFAULT',
+          rootPath: '~/TaomniWorkspace',
+          gitBranch: 'main',
+          gitStatus: 'clean',
+          activeTabId: 'tab-def-readme',
+          foldersExpanded: { 'df-files': true },
+          fileTree: [
+            {
+              id: 'df-files', name: '默认工作区目录 (~/TaomniWorkspace)', type: 'folder',
+              children: [
+                { id: 'f-def-readme', name: 'WORKSPACE_NOTES.md', type: 'file', tabId: 'tab-def-readme', git: '' },
+                { id: 'f-def-script', name: 'quick-check.sh', type: 'file', tabId: 'tab-def-script', git: 'M' },
+                { id: 'f-def-hosts', name: 'hosts-inventory.yaml', type: 'file', tabId: 'tab-def-readme', git: '' }
+              ]
+            }
+          ],
+          linkedSessionIds: ['sess-gw-01', 'sess-pg-main'],
+          openTabs: [
+            { id: 'tab-def-readme', title: 'WORKSPACE_NOTES.md', proto: 'code', path: '~/TaomniWorkspace/WORKSPACE_NOTES.md', summary: '# Default Workspace\n未创建自定义工作区时，所有临时文件与笔记自动归属在此默认工作区。' },
+            { id: 'tab-def-script', title: 'quick-check.sh', proto: 'code', path: '~/TaomniWorkspace/quick-check.sh', summary: '#!/usr/bin/env bash\ncurl -s http://127.0.0.1:8080/healthz | jq .' },
+            { id: 'tab-ws-git', title: 'Git (main)', proto: 'git', summary: '工作区内置 Git 面板 (Changes / Log / Branches / Tags / Stash / Settings)' }
+          ]
+        },
+        'ws-taomni': {
+          id: 'ws-taomni',
+          name: 'Taomni Core & Prod',
+          isDefault: false,
+          badge: 'RUST + TS',
+          rootPath: '~/code/taomni',
+          gitBranch: 'feat/workspace-platform*',
+          gitStatus: '3 modified · ↑1',
+          activeTabId: 'tab-code-shell',
+          foldersExpanded: { 'wf-root': true, 'wf-src': true, 'wf-tauri': true, 'wf-docs': true },
+          fileTree: [
+            {
+              id: 'wf-root', name: 'taomni (~/code/taomni)', type: 'folder',
+              children: [
+                {
+                  id: 'wf-src', name: 'src/components', type: 'folder',
+                  children: [
+                    { id: 'f-shell', name: 'WorkspaceShell.tsx', type: 'file', tabId: 'tab-code-shell', git: 'M' },
+                    { id: 'f-gitview', name: 'GitPanelView.tsx', type: 'file', tabId: 'tab-code-shell', git: 'M' },
+                    { id: 'f-sesstree', name: 'SessionTree.tsx', type: 'file', tabId: 'tab-code-shell', git: 'M' }
+                  ]
+                },
+                {
+                  id: 'wf-tauri', name: 'src-tauri/src', type: 'folder',
+                  children: [
+                    { id: 'f-sftp-rs', name: 'sftp_transfer.rs', type: 'file', tabId: 'tab-code-sftp', git: 'M' }
+                  ]
+                },
+                {
+                  id: 'wf-docs', name: 'docs-feature', type: 'folder',
+                  children: [
+                    { id: 'f-design-md', name: 'workspace-platform-redesign-design.md', type: 'file', tabId: 'tab-note-arch', git: 'A' }
+                  ]
+                }
+              ]
+            }
+          ],
+          linkedSessionIds: ['sess-gw-01', 'sess-pg-main', 'sess-sftp-cdn'],
+          openTabs: [
+            { id: 'tab-code-shell', title: 'WorkspaceShell.tsx', proto: 'code', dirty: true, path: 'src/components/workspace/WorkspaceShell.tsx', summary: 'export function WorkspaceShell({ workspaceId }: Props) {\n  // File Explorer + In-Workspace Dedicated Git Panel\n}' },
+            { id: 'tab-ws-git', title: 'Git (feat/workspace-platform*)', proto: 'git', summary: '工作区专用 Git 面板: Changes (4) | Log | Branches | Tags | Stash | Settings' },
+            { id: 'tab-code-sftp', title: 'sftp_transfer.rs', proto: 'code', dirty: false, path: 'src-tauri/src/sftp_transfer.rs', summary: 'pub async fn resume_range_download(task_id: Uuid, offset: u64) -> Result<()> {\n  // Validate HTTP 206 Partial Content\n}' },
+            { id: 'tab-ws-ssh-gw', title: 'prod-gateway-01 (工作区终端)', proto: 'ssh', host: '10.24.1.10:22', summary: 'ubuntu@prod-gateway-01:~$ systemctl status taomni-edge\n● active (running) — 工作区独立会话实例' },
+            { id: 'tab-note-arch', title: 'workspace-platform-redesign-design.md', proto: 'code', path: 'docs-feature/workspace-platform-redesign-design.md', summary: '# Taomni Workspace-First Design v5\n- Zero Extra Top Bar\n- Home #1 on Rail' }
+          ]
+        },
+        'ws-payment': {
+          id: 'ws-payment',
+          name: 'Payment Cloud Ops',
+          isDefault: false,
+          badge: 'DEVOPS',
+          rootPath: '~/ops/payment-k8s',
+          gitBranch: 'release/2026.10',
+          gitStatus: 'clean',
+          activeTabId: 'tab-pay-helm',
+          foldersExpanded: { 'pf-helm': true },
+          fileTree: [
+            {
+              id: 'pf-helm', name: 'payment-k8s (~/ops/payment-k8s)', type: 'folder',
+              children: [
+                { id: 'f-pay-values', name: 'values-prod.yaml', type: 'file', tabId: 'tab-pay-helm', git: 'M' },
+                { id: 'f-pay-ingress', name: 'ingress-gateway.yaml', type: 'file', tabId: 'tab-pay-helm', git: '' }
+              ]
+            }
+          ],
+          linkedSessionIds: ['sess-k8s-master', 'sess-pg-main'],
+          openTabs: [
+            { id: 'tab-pay-helm', title: 'values-prod.yaml', proto: 'code', path: '~/ops/payment-k8s/values-prod.yaml', summary: 'replicaCount: 6\nimage:\n  repository: registry.internal/payment-core\n  tag: "v2.14.0"' },
+            { id: 'tab-ws-git', title: 'Git (release/2026.10)', proto: 'git', summary: '工作区专用 Git 面板' }
+          ]
+        }
+      },
+
+      // Full Hierarchical Session Directory Tree (100% aligned with SessionTree.tsx)
+      sessionTreeFoldersExpanded: {
+        'fld-prod': true,
+        'fld-prod-bj': true,
+        'fld-prod-sh': true,
+        'fld-db': true,
+        'fld-office': true
+      },
+      sessionTree: [
+        {
+          id: 'fld-prod', name: '生产环境集群 (Production)', type: 'folder', count: 5,
+          children: [
+            {
+              id: 'fld-prod-bj', name: '北京可用区 (BJ-AZ1)', type: 'folder', count: 3,
+              children: [
+                { id: 'sess-gw-01', name: 'prod-gateway-01', type: 'session', proto: 'ssh', group: '生产环境集群 / 北京可用区', host: '10.24.1.10:22', user: 'ubuntu', favorite: true },
+                { id: 'sess-k8s-master', name: 'prod-k8s-master', type: 'session', proto: 'ssh', group: '生产环境集群 / 北京可用区', host: '10.24.1.11:22', user: 'root', favorite: true },
+                { id: 'sess-sftp-cdn', name: 'cdn-Edge-SFTP', type: 'session', proto: 'sftp', group: '生产环境集群 / 北京可用区', host: '10.24.8.50:22', user: 'deploy', favorite: false }
+              ]
+            },
+            {
+              id: 'fld-prod-sh', name: '上海灾备区 (SH-DR)', type: 'folder', count: 2,
+              children: [
+                { id: 'sess-sh-app', name: 'sh-dr-worker-01', type: 'session', proto: 'ssh', group: '生产环境集群 / 上海灾备区', host: '10.28.1.20:22', user: 'ubuntu', favorite: false },
+                { id: 'sess-win-jump', name: 'win-bastion-rdp', type: 'session', proto: 'rdp', group: '生产环境集群 / 上海灾备区', host: '10.24.2.99:3389', user: 'Administrator', favorite: true }
+              ]
+            }
+          ]
+        },
+        {
+          id: 'fld-db', name: '核心数据库与缓存 (Databases)', type: 'folder', count: 2,
+          children: [
+            { id: 'sess-pg-main', name: 'orders-pg-primary', type: 'session', proto: 'db', group: '核心数据库与缓存', host: 'pg.internal:5432', user: 'postgres', favorite: true },
+            { id: 'sess-ch-bi', name: 'bi-clickhouse-cluster', type: 'session', proto: 'db', group: '核心数据库与缓存', host: 'ch.internal:8123', user: 'analyst', favorite: false }
+          ]
+        },
+        {
+          id: 'fld-office', name: '本地终端与开发邮件 (Local & Mail)', type: 'folder', count: 2,
+          children: [
+            { id: 'sess-local-zsh', name: 'Local Terminal (zsh)', type: 'session', proto: 'ssh', group: '本地终端与开发邮件', host: 'localhost', user: 'zhyhang', favorite: false },
+            { id: 'sess-mail-ops', name: 'devops-alerts@taomni.dev', type: 'session', proto: 'mail', group: '本地终端与开发邮件', host: 'imap.taomni.dev', user: 'devops', favorite: false }
+          ]
+        }
+      ],
+
+      agents: [
+        {
+          id: 'ag-1', name: 'Claude Code', model: 'claude-sonnet-4-5', status: 'needs_approval', statusText: '等待命令审批',
+          task: '重构 SFTP 断点续传校验逻辑并补充 HTTP 206 测试',
+          workspace: 'Taomni Core & Prod', worktree: '.worktrees/cc-sftp-resume', branch: 'agent/cc-sftp-resume',
+          progress: 78, filesChanged: 4, additions: 142, deletions: 29,
+          pendingCmd: 'cargo test --manifest-path src-tauri/Cargo.toml sftp_transfer::tests'
+        },
+        {
+          id: 'ag-2', name: 'OpenAI Codex', model: 'codex-mini-latest', status: 'running', statusText: '正在编写单测 (62%)',
+          task: '为 PostgreSQL 连接池增加空闲超时自动重连与指标上报',
+          workspace: 'Taomni Core & Prod', worktree: '.worktrees/codex-pg-pool', branch: 'agent/codex-pg-pool',
+          progress: 62, filesChanged: 3, additions: 88, deletions: 12,
+          pendingCmd: null
+        },
+        {
+          id: 'ag-3', name: 'OpenCode Local', model: 'qwen-2.5-coder-32b', status: 'completed', statusText: '已完成 · 可合并',
+          task: '检查 Helm values-prod.yaml 限流注解并生成变更摘要',
+          workspace: 'Payment Cloud Ops', worktree: '.worktrees/opencode-helm', branch: 'agent/opencode-helm',
+          progress: 100, filesChanged: 2, additions: 24, deletions: 6,
+          pendingCmd: null
+        }
+      ],
+      selectedAgentId: 'ag-1',
+
+      globalTools: [
+        { id: 'screenshot', name: '截图与标注 (Screenshot)', badge: 'Ctrl+Alt+A', desc: '区域截图、窗口吸附、序号/箭头/马赛克标注、贴图钉在桌面与 OCR 提取' },
+        { id: 'mfa', name: 'MFA 验证器 (Authenticator)', badge: '6 枚令牌', desc: 'TOTP 动态验证码管理，支持二维码导入与 SSH 登录自动填充' },
+        { id: 'nettools', name: '网络诊断箱 (Ping / MTR / PortScan / Whois)', badge: 'NetTools', desc: '多节点 Ping、路由追踪、TCP/UDP 端口扫描、DNS Dig 与 SSL 证书检查' },
+        { id: 'tunnels', name: 'SSH 隧道与端口转发管理器', badge: '3 活跃', desc: '集中监控 Local / Remote / Dynamic SOCKS5 隧道状态与流量统计' },
+        { id: 'sockscap', name: 'SocksCap 应用级代理沙箱', badge: 'Proxy', desc: '强制指定本地进程通过 SSH 动态隧道或指定 SOCKS5/HTTP 代理访问内网' },
+        { id: 'localservers', name: '本地服务启停面板 (HTTP / TFTP / Syslog)', badge: 'Servers', desc: '一键启动本地静态文件 HTTP 共享、固件升级 TFTP 或 Syslog 接收器' },
+        { id: 'lanchat', name: '局域网闪电传书 (LAN Chat)', badge: 'P2P', desc: '零配置局域网加密消息与大文件点对点直传' }
+      ],
+      selectedToolId: 'nettools'
+    };
+
+    function getActiveWorkspace() {
+      if (STATE.onlyDefaultWorkspaceMode) return STATE.workspaces['ws-default'];
+      return STATE.workspaces[STATE.activeWorkspaceId] || STATE.workspaces['ws-default'];
+    }
+
+    function findSessionById(id, nodes = STATE.sessionTree) {
+      for (const n of nodes) {
+        if (n.id === id) return n;
+        if (n.children) {
+          const found = findSessionById(id, n.children);
+          if (found) return found;
+        }
+      }
+      return null;
+    }
+
+    function getActiveTab() {
+      if (STATE.mode === 'sessions') {
+        const sw = STATE.sessionWorkbench;
+        return sw.openTabs.find(t => t.id === sw.activeTabId) || sw.openTabs[0];
+      }
+      const ws = getActiveWorkspace();
+      return ws.openTabs.find(t => t.id === ws.activeTabId) || ws.openTabs[0];
+    }
+
+    function protoBadgeHtml(proto) {
+      const map = {
+        ssh: ['SSH', 'proto-ssh'],
+        sftp: ['SFTP', 'proto-sftp'],
+        db: ['DB', 'proto-db'],
+        code: ['FILE', 'proto-code'],
+        git: ['GIT', 'proto-git'],
+        rdp: ['RDP', 'proto-rdp'],
+        mail: ['MAIL', 'proto-mail']
+      };
+      const [label, cls] = map[proto] || ['TAB', 'proto-code'];
+      return `<span class="proto-badge ${cls}">${label}</span>`;
+    }
+
+    // Shared Main-Panel Toolbar Helpers: Left & Right Collapse Buttons + Global Quick Actions
+    function renderSharedLeftCollapseBtn() {
+      if (STATE.mode === 'home') return '';
+      return `
+        <button class="icon-btn ${!STATE.leftNavCollapsed ? 'active' : ''}" onclick="toggleLeftNav()" title="展开/收起左侧边栏 (Ctrl+B)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+        </button>
+      `;
+    }
+
+    function renderSharedRightToolbarUtilities() {
+      return `
+        <button class="icon-btn" onclick="openCommandPalette()" title="全局搜索与命令面板 (Ctrl+K)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        </button>
+        <button class="icon-btn" onclick="toggleTabOverview()" title="已打开标签实时大预览网格 (Ctrl+Shift+E)">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+        </button>
+        ${STATE.mode !== 'home' ? `
+          <button class="icon-btn ${!STATE.rightDockCollapsed ? 'active' : ''}" onclick="toggleRightDock()" title="展开/收起右侧伴侣边栏 (伴随 SFTP / Agent / Structure / Tao)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+          </button>
+        ` : ''}
+      `;
+    }
+
+    // Open or Jump to the In-Workspace Dedicated Git Panel Tab!
+    function openWorkspaceGitSurface(subTab) {
+      if (STATE.mode !== 'workspace') {
+        STATE.mode = 'workspace';
+      }
+      if (subTab) {
+        STATE.gitState.activeTab = subTab;
+      }
+      const ws = getActiveWorkspace();
+      let gitTab = ws.openTabs.find(t => t.proto === 'git');
+      if (!gitTab) {
+        gitTab = {
+          id: 'tab-ws-git',
+          title: `Git (${ws.gitBranch})`,
+          proto: 'git',
+          summary: '工作区专用 Git 面板 (Changes / Log / Branches / Tags / Stash / Settings)'
+        };
+        ws.openTabs.splice(1, 0, gitTab);
+      }
+      ws.activeTabId = gitTab.id;
+      renderAll();
+    }
+    // ============================================================================
+    // RENDER ORCHESTRATOR & LEFT SIDEBAR (Row 1 Deleted in Workspace Mode!)
+    // ============================================================================
+    function renderAll() {
+      // Primary rail active state (1. Home, 2. Workspaces, 3. Sessions, 4. Agents, 5. Tools)
+      document.querySelectorAll('.rail-btn[data-mode]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === STATE.mode);
+      });
+
+      // Left navigator & resizer visibility
+      const navEl = document.getElementById('left-navigator');
+      const leftResizer = document.getElementById('left-resizer');
+      const hideLeftForHome = STATE.mode === 'home';
+      navEl.classList.toggle('collapsed', STATE.leftNavCollapsed || hideLeftForHome);
+      leftResizer.classList.toggle('hidden', STATE.leftNavCollapsed || hideLeftForHome);
+      if (!STATE.leftNavCollapsed && !hideLeftForHome) {
+        navEl.style.width = `${STATE.leftNavWidth}px`;
+      }
+
+      // Right dock & resizer visibility
+      const rightEl = document.getElementById('right-dock');
+      const rightResizer = document.getElementById('right-resizer');
+      const hideRightForHome = STATE.mode === 'home';
+      rightEl.classList.toggle('collapsed', STATE.rightDockCollapsed || hideRightForHome);
+      rightResizer.classList.toggle('hidden', STATE.rightDockCollapsed || hideRightForHome);
+      if (!STATE.rightDockCollapsed && !hideRightForHome) {
+        rightEl.style.width = `${STATE.rightDockWidth}px`;
+      }
+
+      // Status bar
+      const ws = getActiveWorkspace();
+      document.getElementById('status-left-context').innerHTML =
+        STATE.mode === 'home'
+          ? `<span>🏠 Home 主页</span>`
+          : STATE.mode === 'sessions'
+          ? `<span>🖥️ 会话总览 (独立打开 ${STATE.sessionWorkbench.openTabs.length} 个会话)</span>`
+          : `<span>🟣 ${ws.name}</span>`;
+      document.getElementById('status-git-branch').textContent = `🌿 ${ws.gitBranch} (${ws.gitStatus})`;
+      document.getElementById('status-sidebar-width').textContent = `左边栏: ${STATE.leftNavWidth}px (可拖拽)`;
+
+      renderToolStripe();
+      if (!hideLeftForHome) renderLeftNavigator();
+      renderCenterCanvas();
+      if (!hideRightForHome) renderRightDock();
+      renderTabOverviewModal();
+    }
+
+    function renderLeftNavigator() {
+      const topDynamicEl = document.getElementById('nav-top-dynamic');
+      const toolbarEl = document.getElementById('nav-action-toolbar');
+      const filterEl = document.getElementById('nav-filter-pills');
+      const treeEl = document.getElementById('nav-tree');
+      const footerEl = document.getElementById('nav-footer');
+
+      // ----------------------------------------------------------------------
+      // MODE A: WORKSPACE (Clean Workspace Switcher at Top; Row 1 Deleted!)
+      // ----------------------------------------------------------------------
+      if (STATE.mode === 'workspace') {
+        const ws = getActiveWorkspace();
+        const changeCount = STATE.gitState.changes.length;
+
+        // Clean Workspace Switcher inside Left Sidebar (Row 1 [文件管理 | Git 面板] is completely removed!)
+        topDynamicEl.innerHTML = `
+          <div class="ws-sidebar-switcher">
+            <div style="display:flex;align-items:center;justify-content:space-between;font-size:10.5px;color:var(--taomni-text-muted);font-weight:700;">
+              <span>当前工作区 (WORKSPACE)</span>
+              <div style="display:flex;align-items:center;gap:4px;">
+                <button class="filter-chip ${STATE.onlyDefaultWorkspaceMode ? 'active' : ''}" style="font-size:10px;padding:1px 5px;" onclick="toggleDefaultWorkspaceDemo()" title="演示未创建自定义工作区时的默认工作区状态">
+                  ${STATE.onlyDefaultWorkspaceMode ? '✓ 仅默认工作区' : '默认工作区演示'}
+                </button>
+                <button class="filter-chip" style="font-size:10px;padding:1px 5px;color:var(--taomni-accent);" onclick="openCreateWorkspaceModal()" title="新建工作区">+ 新建</button>
+              </div>
+            </div>
+            <button class="ws-selector-btn" onclick="openWorkspaceSwitcherMenu(event)" title="点击切换工作区">
+              <span style="display:flex;align-items:center;gap:6px;min-width:0;">
+                <span style="width:8px;height:8px;border-radius:50%;background:${ws.isDefault ? 'var(--taomni-success)' : 'var(--taomni-purple)'};flex-shrink:0;"></span>
+                <span class="tree-label">${ws.name}</span>
+              </span>
+              <span style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+                <span class="kbd-badge" style="font-size:9.5px;">${ws.badge}</span>
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+              </span>
+            </button>
+          </div>
+        `;
+        filterEl.classList.add('hidden');
+
+        if (STATE.wsLens === 'sessions') { renderWsSessionsLens(ws, toolbarEl, treeEl, footerEl); return; }
+
+        // Project (file management) toolbar: easy add file / folder / extra root dir
+        toolbarEl.innerHTML = `
+          <button class="icon-btn" style="width:22px;height:22px;" title="新建文件 (Alt+Insert)" onclick="openAddNodeModal('file')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          </button>
+          <button class="icon-btn" style="width:22px;height:22px;" title="新建目录" onclick="openAddNodeModal('folder')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+          </button>
+          <button class="icon-btn" style="width:22px;height:22px;" title="添加目录到工作区 (多根目录)" onclick="openAddNodeModal('root')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2z"/><line x1="12" y1="10" x2="12" y2="16"/><line x1="9" y1="13" x2="15" y2="13"/></svg>
+          </button>
+          <button class="icon-btn" style="width:22px;height:22px;" title="全部折叠" onclick="collapseWsFolders()">⇳</button>
+          <div class="toolbar-v-divider"></div>
+          <div class="nav-inline-search">
+            <input type="text" placeholder="过滤文件..." oninput="showToast('按关键字过滤文件: ' + this.value)" />
+          </div>
+        `;
+
+        const renderFileNodes = (nodes, depth = 0) => nodes.map(node => {
+          const padLeft = 6 + depth * 13;
+          if (node.type === 'folder') {
+            const expanded = ws.foldersExpanded[node.id] !== false;
+            return `
+              <div>
+                <div class="tree-row" style="padding-left:${padLeft}px;" onclick="toggleWsFolder('${node.id}')" oncontextmenu="openFileContextMenu(event, '${node.name}', true, '${node.id}')">
+                  <div class="tree-row-left">
+                    <span class="tree-chevron">${expanded ? '▾' : '▸'}</span>
+                    <span style="color:var(--taomni-accent-soft);">📁</span>
+                    <span class="tree-label" style="font-weight:600;">${node.name}</span>
+                  </div>
+                </div>
+                ${expanded && node.children ? renderFileNodes(node.children, depth + 1) : ''}
+              </div>
+            `;
+          }
+          const active = ws.activeTabId === node.tabId;
+          const gitColor = node.git === 'M' ? 'var(--taomni-warning)' : node.git === 'A' ? 'var(--taomni-success)' : '';
+          return `
+            <div class="tree-row ${active ? 'selected' : ''}" style="padding-left:${padLeft}px;" onclick="activateTab('${node.tabId}')" oncontextmenu="openFileContextMenu(event, '${node.name}', false)">
+              <div class="tree-row-left">
+                <span class="tree-chevron"></span>
+                <span>📄</span>
+                <span class="tree-label">${node.name}</span>
+              </div>
+              ${node.git ? `<span class="tree-meta" style="color:${gitColor};font-weight:700;">${node.git}</span>` : ''}
+            </div>
+          `;
+        }).join('');
+
+        const linkedSessionsHtml = ws.linkedSessionIds.map(sid => {
+          const s = findSessionById(sid);
+          if (!s) return '';
+          const wsTabId = 'ws-inst-' + s.id;
+          const isOpenInWs = ws.openTabs.some(t => t.id === wsTabId);
+          return `
+            <div class="tree-row ${ws.activeTabId === wsTabId ? 'selected' : ''}" style="padding-left:18px;" onclick="openLinkedSessionInWorkspace('${s.id}')" oncontextmenu="openSessionContextMenu(event, '${s.id}', false)">
+              <div class="tree-row-left">
+                ${protoBadgeHtml(s.proto)}
+                <span class="tree-label">${s.name}</span>
+              </div>
+              <span class="tree-meta" style="color:${isOpenInWs ? 'var(--taomni-success)' : 'var(--taomni-text-muted)'};">${isOpenInWs ? '● 工作区已连' : s.host}</span>
+            </div>
+          `;
+        }).join('');
+
+        treeEl.innerHTML = `
+          <div style="padding:3px 6px 4px 6px;font-size:10.5px;font-weight:700;color:var(--taomni-text-muted);display:flex;align-items:center;justify-content:space-between;">
+            <span>文件管理 (${ws.rootPath})</span>
+            <span class="mono">右键菜单</span>
+          </div>
+          ${renderFileNodes(ws.fileTree, 0)}
+
+          <!-- Collapsible Workspace Linked Sessions (Independent runtime instances!) -->
+          <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--taomni-chrome-border);">
+            <div class="tree-row" style="padding-left:4px;" onclick="STATE.wsLinkedSessionsExpanded=!STATE.wsLinkedSessionsExpanded;renderLeftNavigator();">
+              <div class="tree-row-left">
+                <span class="tree-chevron">${STATE.wsLinkedSessionsExpanded ? '▾' : '▸'}</span>
+                <span style="font-size:11px;font-weight:700;color:var(--taomni-text-muted);">工作区关联会话 (${ws.linkedSessionIds.length})</span>
+              </div>
+              <button class="filter-chip" style="font-size:10px;padding:0 5px;" onclick="event.stopPropagation();openLinkSessionModal();">+ 关联</button>
+            </div>
+            ${STATE.wsLinkedSessionsExpanded ? `
+              <div style="padding:2px 6px 4px 18px;font-size:10.5px;color:var(--taomni-text-muted);">
+                独立实例：与「会话总览」各自打开，互不干扰
+              </div>
+              ${linkedSessionsHtml}
+            ` : ''}
+          </div>
+        `;
+
+        // Entry #2 kept at bottom of Workspace Left Sidebar!
+        footerEl.innerHTML = `
+          <span class="mono">🌿 ${ws.gitBranch} (${changeCount})</span>
+          <span style="color:var(--taomni-accent);cursor:pointer;font-weight:600;" onclick="openWorkspaceGitSurface()">打开 Git 面板 →</span>
+        `;
+        return;
+      }
+
+      // ----------------------------------------------------------------------
+      // MODE B: SESSIONS OVERVIEW (100% Preserved SessionTree.tsx + 7 Toolbar Buttons + Filter Pills + Context Menus)
+      // ----------------------------------------------------------------------
+      if (STATE.mode === 'sessions') {
+        topDynamicEl.innerHTML = '';
+
+        // 7-Button Toolbar matching src/components/sidebar/Sidebar.tsx
+        toolbarEl.innerHTML = `
+          <button class="icon-btn" style="width:22px;height:22px;" title="新建会话 (New Session)" onclick="openNewSessionModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <button class="icon-btn" style="width:22px;height:22px;" title="新建目录 (New Folder)" onclick="showToast('已在当前节点下新建会话目录')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+          </button>
+          <div class="toolbar-v-divider"></div>
+          <button class="icon-btn" style="width:22px;height:22px;" title="导入会话 (Taomni JSON / SSH Config / Xshell / SecureCRT / MobaXterm / DBeaver)" onclick="openImportMenu(event)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </button>
+          <button class="icon-btn" style="width:22px;height:22px;" title="导出会话 (Export Sessions)" onclick="openExportMenu(event)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          </button>
+          <div class="toolbar-v-divider"></div>
+          <button class="icon-btn" style="width:22px;height:22px;" title="全部展开 / 全部折叠" onclick="toggleAllSessionFolders()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="7 15 12 20 17 15"/><polyline points="7 9 12 4 17 9"/></svg>
+          </button>
+          <button class="icon-btn ${STATE.sessionFilterProto === 'favorites' ? 'active' : ''}" style="width:22px;height:22px;" title="仅显示收藏会话 (Favorites)" onclick="setSessionProtoFilter(STATE.sessionFilterProto === 'favorites' ? 'all' : 'favorites')">
+            <svg viewBox="0 0 24 24" fill="${STATE.sessionFilterProto === 'favorites' ? 'currentColor' : 'none'}" stroke="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          </button>
+          <div class="nav-inline-search">
+            <input type="text" placeholder="搜索主机/IP..." value="${STATE.sessionSearchQuery}" oninput="updateSessionSearch(this.value)" />
+          </div>
+        `;
+
+        filterEl.classList.remove('hidden');
+        const filters = [
+          ['all', '全部'],
+          ['ssh', 'SSH'],
+          ['sftp', 'SFTP'],
+          ['db', 'DB'],
+          ['rdp', 'RDP/VNC'],
+          ['other', '其他']
+        ];
+        filterEl.innerHTML = filters.map(([key, label]) => `
+          <button class="filter-chip ${STATE.sessionFilterProto === key ? 'active' : ''}" onclick="setSessionProtoFilter('${key}')">${label}</button>
+        `).join('');
+
+        treeEl.innerHTML = renderSessionDirectoryTree(STATE.sessionTree, 0);
+        footerEl.innerHTML = `
+          <span>共 9 个会话配置</span>
+          <span class="mono">右键目录/节点菜单</span>
+        `;
+        return;
+      }
+
+      // ----------------------------------------------------------------------
+      // MODE C: AGENTS
+      // ----------------------------------------------------------------------
+      if (STATE.mode === 'agents') {
+        topDynamicEl.innerHTML = `
+          <div style="padding:6px 8px;border-bottom:1px solid var(--taomni-chrome-border);display:flex;align-items:center;justify-content:space-between;background:var(--taomni-card-bg);">
+            <span style="font-size:11px;font-weight:700;color:var(--taomni-text-muted);">ONE-SYSTEM CODING AGENTS</span>
+            <button class="filter-chip active" onclick="openDispatchAgentModal()">+ 派发任务</button>
+          </div>
+        `;
+        toolbarEl.innerHTML = `<span class="muted" style="font-size:11px;padding-left:4px;">基于独立 Git Worktree 沙箱并行执行</span>`;
+        filterEl.classList.add('hidden');
+        treeEl.innerHTML = STATE.agents.map(ag => `
+          <div class="tree-row ${STATE.selectedAgentId === ag.id ? 'selected' : ''}" style="height:auto;padding:7px 8px;flex-direction:column;align-items:stretch;gap:3px;" onclick="STATE.selectedAgentId='${ag.id}';renderAll();">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-weight:600;">🤖 ${ag.name}</span>
+              <span class="kbd-badge">${ag.statusText}</span>
+            </div>
+            <div class="muted" style="font-size:11px;white-space:normal;">${ag.task}</div>
+            <div class="mono muted" style="font-size:10px;">🌿 ${ag.branch} (+${ag.additions}/-${ag.deletions})</div>
+          </div>
+        `).join('');
+        footerEl.innerHTML = `<span>3 个 Agent Worktree</span><span>隔离沙箱运行</span>`;
+        return;
+      }
+
+      // ----------------------------------------------------------------------
+      // MODE D: GLOBAL TOOLS
+      // ----------------------------------------------------------------------
+      topDynamicEl.innerHTML = `
+        <div style="padding:6px 8px;border-bottom:1px solid var(--taomni-chrome-border);background:var(--taomni-card-bg);font-size:11px;font-weight:700;color:var(--taomni-text-muted);">
+          全局独立工具箱 (不隶属单一工作区)
+        </div>
+      `;
+      toolbarEl.innerHTML = `<span class="muted" style="font-size:11px;padding-left:4px;">可在任意工作区或会话中随时呼出</span>`;
+      filterEl.classList.add('hidden');
+      treeEl.innerHTML = STATE.globalTools.map(tool => `
+        <div class="tree-row ${STATE.selectedToolId === tool.id ? 'selected' : ''}" style="padding-left:8px;" onclick="STATE.selectedToolId='${tool.id}';renderAll();">
+          <div class="tree-row-left"><span>🛠️</span><span class="tree-label">${tool.name}</span></div>
+          <span class="tree-meta">${tool.badge}</span>
+        </div>
+      `).join('');
+      footerEl.innerHTML = `<span>7 项系统级工具</span><span>全局快捷键支持</span>`;
+    }
+
+    function sessionMatchesFilter(node) {
+      if (node.type === 'folder') {
+        return (node.children || []).some(c => sessionMatchesFilter(c));
+      }
+      const f = STATE.sessionFilterProto;
+      if (f === 'favorites' && !node.favorite) return false;
+      if (f === 'ssh' && node.proto !== 'ssh') return false;
+      if (f === 'sftp' && node.proto !== 'sftp') return false;
+      if (f === 'db' && node.proto !== 'db') return false;
+      if (f === 'rdp' && node.proto !== 'rdp') return false;
+      if (f === 'other' && ['ssh', 'sftp', 'db', 'rdp'].includes(node.proto)) return false;
+      if (STATE.sessionSearchQuery) {
+        const q = STATE.sessionSearchQuery.toLowerCase();
+        if (!node.name.toLowerCase().includes(q) && !(node.host || '').toLowerCase().includes(q)) return false;
+      }
+      return true;
+    }
+
+    function renderSessionDirectoryTree(nodes, depth) {
+      return nodes.filter(sessionMatchesFilter).map(node => {
+        const padLeft = 6 + depth * 13;
+        if (node.type === 'folder') {
+          const expanded = STATE.sessionTreeFoldersExpanded[node.id] !== false;
+          return `
+            <div>
+              <div class="tree-row" style="padding-left:${padLeft}px;"
+                   onclick="STATE.sessionTreeFoldersExpanded['${node.id}']=!${expanded};renderLeftNavigator();"
+                   oncontextmenu="openSessionContextMenu(event, '${node.id}', true)">
+                <div class="tree-row-left">
+                  <span class="tree-chevron">${expanded ? '▾' : '▸'}</span>
+                  <span style="color:var(--taomni-warning);">📁</span>
+                  <span class="tree-label" style="font-weight:600;">${node.name}</span>
+                </div>
+                <span class="tree-meta">${node.count || ''}</span>
+              </div>
+              ${expanded && node.children ? renderSessionDirectoryTree(node.children, depth + 1) : ''}
+            </div>
+          `;
+        }
+        const selected = STATE.selectedSessionNodeId === node.id;
+        return `
+          <div class="tree-row ${selected ? 'selected' : ''}" style="padding-left:${padLeft}px;"
+               onclick="openSessionInSessionsWorkbench('${node.id}')"
+               oncontextmenu="openSessionContextMenu(event, '${node.id}', false)">
+            <div class="tree-row-left">
+              <span class="tree-chevron">${node.favorite ? '★' : ''}</span>
+              ${protoBadgeHtml(node.proto)}
+              <span class="tree-label">${node.name}</span>
+            </div>
+            <span class="tree-meta">${node.host}</span>
+            <div class="tree-hover-btns">
+              <button class="icon-btn" style="width:18px;height:18px;" title="在新分屏打开" onclick="event.stopPropagation();openSessionInSessionsWorkbench('${node.id}');setLayoutPreset('split-right');">◫</button>
+              <button class="icon-btn" style="width:18px;height:18px;" title="右键菜单" onclick="event.stopPropagation();openSessionContextMenu(event, '${node.id}', false)">⋯</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    // ============================================================================
+    // CENTER CANVAS: SHARED 33PX TOOLBAR (Hosts Left/Right Collapse + Tabs + Actions)
+    // ============================================================================
+    function renderCenterCanvas() {
+      const canvas = document.getElementById('center-canvas');
+
+      // 1. HOME MODE (#1 on Left Rail!)
+      if (STATE.mode === 'home') {
+        canvas.innerHTML = renderHomeView();
+        return;
+      }
+
+      // 2. AGENTS MODE
+      if (STATE.mode === 'agents') {
+        const ag = STATE.agents.find(a => a.id === STATE.selectedAgentId) || STATE.agents[0];
+        canvas.innerHTML = `
+          <div class="canvas-header-bar">
+            <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+              ${renderSharedLeftCollapseBtn()}
+              <span style="font-weight:700;">🤖 One-System Coding Agent 调度台</span>
+              <span class="kbd-badge">${ag.worktree}</span>
+              <span class="kbd-badge" style="color:var(--taomni-accent);">🌿 ${ag.branch}</span>
+            </div>
+            <div class="canvas-right-controls">
+              <button class="pill-btn" onclick="openWorkspaceGitSurface('changes')">🌿 在工作区 Git 审查变更</button>
+              <button class="pill-btn primary" onclick="openDispatchAgentModal()">+ 派发新 Agent</button>
+              <div class="toolbar-v-divider"></div>
+              ${renderSharedRightToolbarUtilities()}
+            </div>
+          </div>
+          <div style="flex:1;display:grid;grid-template-columns:1.1fr 0.9fr;gap:1px;background:var(--taomni-chrome-border);min-height:0;">
+            <div style="background:var(--taomni-bg);padding:14px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
+              <div style="padding:12px;border-radius:8px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);">
+                <div style="font-weight:700;">任务目标: ${ag.task}</div>
+                <div class="muted" style="font-size:11.5px;margin-top:4px;">所属工作区: <strong>${ag.workspace}</strong> · 隔离目录: <span class="mono">${ag.worktree}</span></div>
+              </div>
+              ${ag.pendingCmd ? `
+                <div style="padding:12px;border-radius:8px;background:rgba(245,158,11,0.1);border:1px solid var(--taomni-warning);">
+                  <div style="font-weight:700;color:var(--taomni-warning);">⚠️ 等待终端命令执行授权</div>
+                  <div class="mono" style="margin:6px 0;padding:7px;background:var(--taomni-term-bg);color:var(--taomni-term-fg);border-radius:5px;font-size:11.5px;">$ ${ag.pendingCmd}</div>
+                  <div style="display:flex;gap:8px;">
+                    <button class="pill-btn primary" onclick="approveAgentCmd('${ag.id}')">✓ 允许并继续执行</button>
+                    <button class="pill-btn" onclick="showToast('已拒绝该命令')">✕ 拒绝</button>
+                  </div>
+                </div>
+              ` : `
+                <div style="padding:12px;border-radius:8px;background:rgba(16,185,129,0.1);border:1px solid var(--taomni-success);color:var(--taomni-success);font-weight:600;">
+                  ✓ 命令已批准，单元测试全部通过，可随时合入工作区主分支。
+                </div>
+              `}
+              <div style="flex:1;padding:12px;border-radius:8px;background:var(--taomni-term-bg);color:var(--taomni-term-fg);font-family:var(--font-mono);font-size:11.5px;line-height:1.6;">
+                <div style="color:#94a3b8;">[Agent Trace — ${ag.name} (${ag.model})]</div>
+                <div>✓ Read src-tauri/src/sftp_transfer.rs (lines 1..280)</div>
+                <div>✓ Added HTTP 206 Content-Range verification before file seek</div>
+                <div>✓ Updated progress restoration state in src/stores/downloadStore.ts</div>
+              </div>
+            </div>
+            <div style="background:var(--taomni-bg);padding:14px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
+              <div style="display:flex;align-items:center;justify-content:space-between;">
+                <span style="font-weight:700;">Worktree 变更审查 (${ag.filesChanged} 文件 · +${ag.additions}/-${ag.deletions})</span>
+                <button class="pill-btn primary" onclick="showToast('已将 ' + '${ag.branch}' + ' 合并入工作区当前分支')">一键合并入工作区</button>
+              </div>
+              <div class="mono" style="font-size:11.5px;background:var(--taomni-code-bg);border:1px solid var(--taomni-card-border);border-radius:8px;padding:10px;line-height:1.6;">
+                <div style="color:var(--taomni-text-muted);">diff --git a/src-tauri/src/sftp_transfer.rs b/src-tauri/src/sftp_transfer.rs</div>
+                <div style="background:rgba(239,68,68,0.14);color:var(--taomni-danger);padding:0 4px;">- let mut file = OpenOptions::new().append(true).open(&part_path)?;</div>
+                <div style="background:rgba(16,185,129,0.14);color:var(--taomni-success);padding:0 4px;">+ let mut file = verify_range_and_seek(&response, &part_path, resume_offset)?;</div>
+              </div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // 3. GLOBAL TOOLS MODE
+      if (STATE.mode === 'tools') {
+        const tool = STATE.globalTools.find(t => t.id === STATE.selectedToolId) || STATE.globalTools[0];
+        canvas.innerHTML = `
+          <div class="canvas-header-bar">
+            <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+              ${renderSharedLeftCollapseBtn()}
+              <span style="font-weight:700;">🛠️ 全局独立工具箱 · ${tool.name}</span>
+              <span class="kbd-badge">${tool.badge}</span>
+            </div>
+            <div class="canvas-right-controls">
+              <button class="pill-btn" onclick="switchMode('workspace')">返回工作区</button>
+              <div class="toolbar-v-divider"></div>
+              ${renderSharedRightToolbarUtilities()}
+            </div>
+          </div>
+          <div style="flex:1;padding:18px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;">
+            <div style="padding:14px;border-radius:10px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);display:flex;align-items:center;justify-content:space-between;">
+              <div>
+                <div style="font-size:14px;font-weight:700;">${tool.name}</div>
+                <div class="muted" style="margin-top:3px;">${tool.desc}</div>
+              </div>
+              <button class="pill-btn primary" onclick="showToast('已执行 ' + '${tool.name}')">▶ 立即运行诊断</button>
+            </div>
+            <div class="mono" style="flex:1;padding:14px;border-radius:10px;background:var(--taomni-term-bg);color:var(--taomni-term-fg);font-size:12px;line-height:1.65;">
+              <div style="color:#6aa6f8;font-weight:700;">$ taomni-netdiag --target 10.24.1.10 --mtr --ports 22,80,443,5432,6379</div>
+              <div>HOST: prod-gateway-01 (10.24.1.10)   Loss%   Snt   Last   Avg  Best  Wrst</div>
+              <div>  1.|-- 10.1.0.1                      0.0%    10    0.8   0.9   0.7   1.2</div>
+              <div>  2.|-- 10.24.0.254                   0.0%    10    3.4   3.6   3.1   4.5</div>
+              <div style="color:#34d399;">  3.|-- 10.24.1.10 (OPEN: 22, 443)    0.0%    10    7.9   8.1   7.6   8.9</div>
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      // 4. SESSIONS OVERVIEW MODE (Single 33px Shared Toolbar: Left Collapse + Type/Group Filter + Tabs + OpenTabsMenu ⋯ + Right Collapse!)
+      if (STATE.mode === 'sessions') {
+        const sw = STATE.sessionWorkbench;
+        const visibleTabs = sw.openTabs.filter(t => {
+          if (sw.typeFilter !== 'all' && t.proto !== sw.typeFilter) return false;
+          if (sw.groupFilter !== 'all' && t.group !== sw.groupFilter) return false;
+          if (sw.tabSearchQuery && !t.title.toLowerCase().includes(sw.tabSearchQuery.toLowerCase()) && !(t.host || '').toLowerCase().includes(sw.tabSearchQuery.toLowerCase())) return false;
+          return true;
+        });
+        const activeTab = visibleTabs.find(t => t.id === sw.activeTabId) || visibleTabs[0] || sw.openTabs[0];
+
+        const panesToRender = STATE.layoutPreset === 'single'
+          ? [activeTab]
+          : STATE.layoutPreset === 'split-right'
+          ? visibleTabs.slice(0, 2)
+          : visibleTabs.slice(0, 4);
+
+        canvas.innerHTML = `
+          <div class="canvas-header-bar">
+            <!-- Left Sidebar Collapse Toggle + Quick Protocol Filters -->
+            <div style="display:flex;align-items:center;gap:2px;flex-shrink:0;">
+              ${renderSharedLeftCollapseBtn()}
+              <div class="toolbar-v-divider"></div>
+              ${[['all', '全部'], ['ssh', 'SSH'], ['db', 'DB'], ['sftp', 'SFTP'], ['rdp', 'RDP']].map(([k, lbl]) => `
+                <button class="filter-chip ${sw.typeFilter === k ? 'active' : ''}" style="padding:1px 5px;font-size:10.5px;" onclick="STATE.sessionWorkbench.typeFilter='${k}';renderCenterCanvas();">${lbl}</button>
+              `).join('')}
+              ${sw.groupFilter !== 'all' ? `
+                <span class="filter-chip active" style="font-size:10px;padding:1px 5px;" onclick="STATE.sessionWorkbench.groupFilter='all';renderCenterCanvas();" title="点击清除目录组过滤">📁 ${sw.groupFilter.split('/').pop().trim()} ✕</span>
+              ` : ''}
+            </div>
+            <div class="toolbar-v-divider"></div>
+
+            <!-- Opened Session Tabs Strip -->
+            <div class="tabs-scroll-strip">
+              ${visibleTabs.map(tab => `
+                <div class="ws-tab ${tab.id === activeTab.id ? 'active' : ''}" style="${sw.detailsHoverActive ? 'max-width:260px;' : ''}" onclick="activateSessionWorkbenchTab('${tab.id}')" oncontextmenu="openTabContextMenu(event, '${tab.id}', true)">
+                  <div style="display:flex;align-items:center;gap:5px;min-width:0;">
+                    ${protoBadgeHtml(tab.proto)}
+                    <span class="tree-label">${tab.title}</span>
+                    ${sw.detailsHoverActive ? `<span class="mono muted" style="font-size:10px;">(${tab.host})</span>` : ''}
+                  </div>
+                  <span style="font-size:11px;opacity:0.6;" onclick="event.stopPropagation();closeSessionWorkbenchTab('${tab.id}')">✕</span>
+                </div>
+              `).join('')}
+              <button class="icon-btn" style="width:23px;height:23px;margin-bottom:2px;" title="快速新建会话标签" onclick="openNewSessionModal()">+</button>
+            </div>
+
+            <!-- Right Controls: Session Actions + main's TabDetailsHover & OpenTabsMenu (⋯) + Shared Utilities + Right Collapse -->
+            <div class="canvas-right-controls">
+              ${activeTab && activeTab.proto === 'ssh' ? `
+                <button class="pill-btn" style="height:21px;font-size:10.5px;" onclick="openRightInspectorTab('companion')" title="同步打开当前 SSH 目录的伴随 SFTP">📂 SFTP</button>
+              ` : ''}
+              <button class="pill-btn ${sw.broadcastEnabled ? 'primary' : ''}" style="height:21px;font-size:10.5px;" onclick="toggleBroadcastBar()" title="多终端广播输入 (Multi-Exec)">📡 广播</button>
+              <div class="split-preset-group">
+                <button class="split-btn ${STATE.layoutPreset === 'single' ? 'active' : ''}" onclick="setLayoutPreset('single')" title="单视图">▢</button>
+                <button class="split-btn ${STATE.layoutPreset === 'split-right' ? 'active' : ''}" onclick="setLayoutPreset('split-right')" title="左右双分屏">◫</button>
+                <button class="split-btn ${STATE.layoutPreset === 'grid-2x2' ? 'active' : ''}" onclick="setLayoutPreset('grid-2x2')" title="2x2 矩阵">⊞</button>
+              </div>
+              <!-- main's TabDetailsHover (Ctrl+Shift+H) & OpenTabsMenu (⋯) for directory/fuzzy tab filtering! -->
+              <button class="icon-btn ${sw.detailsHoverActive ? 'active' : ''}" onclick="STATE.sessionWorkbench.detailsHoverActive=!STATE.sessionWorkbench.detailsHoverActive;renderCenterCanvas();" title="显示/隐藏标签详情摘要 (对齐 main 的 Ctrl+Shift+H)">ℹ️</button>
+              <button class="icon-btn ${sw.groupFilter !== 'all' || sw.tabSearchQuery ? 'active' : ''}" onclick="openSessionTabsFilterMenu(event)" title="按目录分组或关键字过滤已打开会话标签 (对齐 main 的 OpenTabsMenu ⋯)">⋯</button>
+              <div class="toolbar-v-divider"></div>
+              ${renderSharedRightToolbarUtilities()}
+            </div>
+          </div>
+
+          ${sw.broadcastEnabled ? `
+            <div style="height:27px;padding:0 10px;background:rgba(245,158,11,0.14);border-bottom:1px solid var(--taomni-warning);display:flex;align-items:center;justify-content:space-between;font-size:11.5px;">
+              <span style="color:var(--taomni-warning);font-weight:600;">📡 多终端广播输入 (MultiExecBar)：输入命令将同步发送至所选 SSH 终端</span>
+              <input type="text" placeholder="输入广播命令回车发送 (如: uptime && df -h)..." style="width:310px;height:19px;padding:0 8px;border-radius:4px;background:var(--taomni-card-bg);border:1px solid var(--taomni-warning);" onkeydown="if(event.key==='Enter'){showToast('已广播执行: '+this.value);this.value='';}" />
+            </div>
+          ` : ''}
+
+          <div class="surface-viewport layout-${STATE.layoutPreset}">
+            ${panesToRender.map((tab, idx) => renderPaneSurface(tab, idx)).join('')}
+          </div>
+        `;
+        return;
+      }
+
+      // 5. WORKSPACE MODE (Single 33px Shared Toolbar: Left Collapse + Tabs + Split/BottomDock + Right Collapse! Button #3 Deleted!)
+      const ws = getActiveWorkspace();
+      const activeTab = getActiveTab();
+
+      const panesToRender = STATE.layoutPreset === 'single'
+        ? [activeTab]
+        : STATE.layoutPreset === 'split-right'
+        ? ws.openTabs.slice(0, 2)
+        : ws.openTabs.slice(0, 4);
+
+      canvas.innerHTML = `
+        <!-- Single 33px Shared Workspace Toolbar (Left Collapse on Left, Right Collapse on Right, Button #3 Deleted!) -->
+        <div class="canvas-header-bar">
+          ${renderSharedLeftCollapseBtn()}
+          <div class="toolbar-v-divider"></div>
+          <div class="tabs-scroll-strip">
+            ${ws.openTabs.map(tab => `
+              <div class="ws-tab ${tab.id === activeTab.id ? 'active' : ''}" onclick="activateTab('${tab.id}')" oncontextmenu="openTabContextMenu(event, '${tab.id}', false)">
+                <div style="display:flex;align-items:center;gap:5px;min-width:0;">
+                  ${protoBadgeHtml(tab.proto)}
+                  <span class="tree-label">${tab.title}</span>
+                  ${tab.dirty ? '<span style="color:var(--taomni-warning);font-weight:700;">●</span>' : ''}
+                </div>
+                <span style="font-size:11px;opacity:0.6;" onclick="event.stopPropagation();closeTab('${tab.id}')">✕</span>
+              </div>
+            `).join('')}
+          </div>
+
+          <button class="icon-btn" style="width:23px;height:23px;" onclick="openWsNewMenu(event)" title="新建文件 / 打开任意会话 / 本地终端 / 添加目录">＋</button>
+          <div class="canvas-right-controls">
+            <div class="split-preset-group">
+              <button class="split-btn ${STATE.layoutPreset === 'single' ? 'active' : ''}" onclick="setLayoutPreset('single')" title="单视图">▢</button>
+              <button class="split-btn ${STATE.layoutPreset === 'split-right' ? 'active' : ''}" onclick="setLayoutPreset('split-right')" title="左右分屏">◫</button>
+              <button class="split-btn ${STATE.layoutPreset === 'grid-2x2' ? 'active' : ''}" onclick="setLayoutPreset('grid-2x2')" title="2x2 网格">⊞</button>
+            </div>
+            <button class="split-btn ${STATE.wsBottomDockOpen ? 'active' : ''}" style="border:1px solid var(--taomni-card-border);border-radius:5px;" onclick="toggleWsBottomDock()" title="显示/隐藏工作区底部工具栏 (Alt+F12)">⬓ 底栏</button>
+            <div class="toolbar-v-divider"></div>
+            ${renderSharedRightToolbarUtilities()}
+          </div>
+        </div>
+
+        <!-- Main Workspace Viewport -->
+        <div class="surface-viewport layout-${STATE.layoutPreset}">
+          ${panesToRender.map((tab, idx) => renderPaneSurface(tab, idx)).join('')}
+        </div>
+
+        <!-- Workspace Bottom Dock -->
+        ${STATE.wsBottomDockOpen ? `
+          <div class="resize-handle-y" title="拖拽调整底部面板高度"></div>
+          <div class="ws-bottom-dock">
+            <div class="ws-bottom-header">
+              <div style="display:flex;align-items:center;gap:3px;">
+                <button class="dock-tool-btn ${STATE.wsBottomDockTab === 'terminal' ? 'active' : ''}" onclick="setWsBottomTab('terminal')">⌨️ 终端 (Alt+F12)</button>
+                <button class="dock-tool-btn ${STATE.wsBottomDockTab === 'problems' ? 'active' : ''}" onclick="setWsBottomTab('problems')">⚠️ 问题 (Problems 2)</button>
+                <button class="dock-tool-btn ${STATE.wsBottomDockTab === 'run' ? 'active' : ''}" onclick="setWsBottomTab('run')">▶️ 运行与调试</button>
+                <button class="dock-tool-btn ${STATE.wsBottomDockTab === 'git-log' ? 'active' : ''}" onclick="setWsBottomTab('git-log')">🌿 Git 摘要 (Alt+9)</button>
+                <button class="dock-tool-btn ${STATE.wsBottomDockTab === 'search' ? 'active' : ''}" onclick="setWsBottomTab('search')">🔍 全局搜索</button>
+                <button class="dock-tool-btn ${STATE.wsBottomDockTab === 'ports' ? 'active' : ''}" onclick="setWsBottomTab('ports')">🔌 端口与进程</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:4px;">
+                <button class="pill-btn" style="height:20px;font-size:10px;" onclick="openWorkspaceGitSurface()">在主视图打开 Git 面板 ↗</button>
+                <button class="icon-btn" style="width:20px;height:20px;" onclick="toggleWsBottomDock()" title="收起底部面板">✕</button>
+              </div>
+            </div>
+            <div style="flex:1;overflow-y:auto;padding:8px 12px;font-family:var(--font-mono);font-size:11.5px;background:var(--taomni-term-bg);color:var(--taomni-term-fg);">
+              ${renderWsBottomDockContent(ws)}
+            </div>
+          </div>
+        ` : ''}
+      `;
+    }
+
+    // ============================================================================
+    // HOME VIEW (#1 on Left Rail; 100% WelcomePanel.tsx features + Modern UI)
+    // ============================================================================
+    function renderHomeView() {
+      const historyItems = STATE.homeHistoryTab === 'workspaces'
+        ? [
+            { title: 'Taomni Core & Prod', path: '~/code/taomni', meta: '🌿 feat/workspace-platform* · 3 文件变更 · 2 Agents 运行中', action: () => { STATE.activeWorkspaceId='ws-taomni'; switchMode('workspace'); } },
+            { title: 'Payment Cloud Ops', path: '~/ops/payment-k8s', meta: '🌿 release/2026.10 · K8s Helm & 2 关联会话', action: () => { STATE.activeWorkspaceId='ws-payment'; switchMode('workspace'); } },
+            { title: 'Default Workspace (默认工作区)', path: '~/TaomniWorkspace', meta: '🌿 main · 系统默认工作区', action: () => { STATE.activeWorkspaceId='ws-default'; switchMode('workspace'); } }
+          ]
+        : STATE.homeHistoryTab === 'sessions'
+        ? [
+            { title: 'prod-gateway-01 (SSH)', path: 'ubuntu@10.24.1.10:22', meta: '生产环境集群 / 北京可用区 · 8ms · 最近连接 5 分钟前', action: () => { switchMode('sessions'); openSessionInSessionsWorkbench('sess-gw-01'); } },
+            { title: 'orders-pg-primary (PostgreSQL)', path: 'postgres@pg.internal:5432', meta: '核心数据库与缓存 · PostgreSQL 16 · 最近连接 18 分钟前', action: () => { switchMode('sessions'); openSessionInSessionsWorkbench('sess-pg-main'); } },
+            { title: 'cdn-Edge-SFTP (SFTP)', path: 'deploy@10.24.8.50:22', meta: '生产环境集群 · 支持 HTTP/SFTP 断点续传', action: () => { switchMode('sessions'); openSessionInSessionsWorkbench('sess-sftp-cdn'); } },
+            { title: 'win-bastion-rdp (RDP)', path: 'Administrator@10.24.2.99:3389', meta: '上海灾备区 · Smart Sizing 已启用', action: () => { switchMode('sessions'); openSessionInSessionsWorkbench('sess-win-jump'); } }
+          ]
+        : [
+            { title: '~/code/taomni', path: '/data-raw-ssd/code-src/person/taomni', meta: 'Rust + TypeScript + Tauri 2 · 最近打开 Today', action: () => { STATE.activeWorkspaceId='ws-taomni'; switchMode('workspace'); } },
+            { title: '~/ops/payment-k8s', path: '/home/zhyhang/ops/payment-k8s', meta: 'Helm Charts & Terraform · 最近打开 Yesterday', action: () => { STATE.activeWorkspaceId='ws-payment'; switchMode('workspace'); } },
+            { title: '~/TaomniWorkspace', path: '/home/zhyhang/TaomniWorkspace', meta: '默认工作区根目录', action: () => { STATE.activeWorkspaceId='ws-default'; switchMode('workspace'); } }
+          ];
+
+      const filteredItems = historyItems.filter(it =>
+        !STATE.homeHistorySearch ||
+        it.title.toLowerCase().includes(STATE.homeHistorySearch.toLowerCase()) ||
+        it.path.toLowerCase().includes(STATE.homeHistorySearch.toLowerCase())
+      );
+
+      return `
+        <div class="canvas-header-bar">
+          <div style="display:flex;align-items:center;gap:8px;padding-left:6px;font-weight:700;">
+            <span>🏠 Home 主页</span>
+            <span class="kbd-badge">左侧主导航第 1 项 · 零额外顶栏高度</span>
+          </div>
+          <div class="canvas-right-controls">
+            <button class="pill-btn" onclick="switchMode('workspace')">进入工作区 →</button>
+            <button class="pill-btn primary" onclick="switchMode('sessions')">进入会话总览 →</button>
+            <div class="toolbar-v-divider"></div>
+            ${renderSharedRightToolbarUtilities()}
+          </div>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:18px 24px;display:flex;flex-direction:column;gap:14px;background:var(--taomni-bg);">
+          <!-- RestoreLastSessionRow Banner (from WelcomePanel.tsx) -->
+          ${STATE.homeRestoreBannerVisible ? `
+            <div style="padding:9px 14px;border-radius:8px;background:var(--taomni-selected);border:1px solid var(--taomni-selected-border);display:flex;align-items:center;justify-content:space-between;">
+              <div style="display:flex;align-items:center;gap:8px;font-size:12px;">
+                <span>🕒 <strong>恢复上次会话 (Restore Last Session)</strong>：检测到上次退出时打开了 <strong>Taomni Core & Prod</strong> 工作区及 <strong>4 个远程终端会话</strong></span>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <button class="pill-btn primary" onclick="showToast('已恢复上次打开的工作区与全部会话标签');switchMode('workspace');">一键恢复 (Restore)</button>
+                <button class="pill-btn" onclick="STATE.homeRestoreBannerVisible=false;renderCenterCanvas();">忽略</button>
+              </div>
+            </div>
+          ` : ''}
+
+          <!-- 5 Quick Launch Cards (100% WelcomePanel.tsx Parity) -->
+          <div class="home-launch-grid">
+            <div class="home-card">
+              <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <span style="font-weight:700;font-size:13px;">⌨️ 本地终端 (Local Terminal)</span>
+                  <span class="kbd-badge">Ctrl+Shift+T</span>
+                </div>
+                <div class="muted" style="font-size:11.5px;margin-top:3px;">选择默认 Shell 启动本地终端、提权运行或打开主目录</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <select style="flex:1;height:24px;padding:0 6px;border-radius:5px;background:var(--taomni-panel-bg);border:1px solid var(--taomni-chrome-border);font-size:11.5px;" onchange="STATE.homeShell=this.value">
+                  <option value="zsh" ${STATE.homeShell==='zsh'?'selected':''}>Shell: /bin/zsh (Default)</option>
+                  <option value="bash" ${STATE.homeShell==='bash'?'selected':''}>Shell: /bin/bash</option>
+                  <option value="fish" ${STATE.homeShell==='fish'?'selected':''}>Shell: /usr/bin/fish</option>
+                  <option value="pwsh" ${STATE.homeShell==='pwsh'?'selected':''}>Shell: pwsh (PowerShell)</option>
+                </select>
+                <button class="pill-btn primary" onclick="showToast('已启动本地终端 ('+STATE.homeShell+')');switchMode('sessions');">▶ 启动</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;padding-top:4px;border-top:1px solid var(--taomni-chrome-border);">
+                <button class="filter-chip" onclick="showToast('已请求管理员权限启动本地终端')">🛡️ 管理员运行</button>
+                <button class="filter-chip" onclick="showToast('已在文件管理器打开主目录 (~)')">📂 打开 ~ 目录</button>
+              </div>
+            </div>
+
+            <div class="home-card">
+              <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <span style="font-weight:700;font-size:13px;">🐧 WSL 发行版终端</span>
+                  <span class="kbd-badge">WSL 2</span>
+                </div>
+                <div class="muted" style="font-size:11.5px;margin-top:3px;">直接连接本机 WSL Linux 子系统并挂载工作目录</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <select style="flex:1;height:24px;padding:0 6px;border-radius:5px;background:var(--taomni-panel-bg);border:1px solid var(--taomni-chrome-border);font-size:11.5px;" onchange="STATE.homeWslDistro=this.value">
+                  <option value="Ubuntu-24.04">Ubuntu-24.04 (Running)</option>
+                  <option value="Debian-12">Debian-12 (Stopped)</option>
+                  <option value="Arch">Arch Linux</option>
+                </select>
+                <button class="pill-btn primary" onclick="showToast('已启动 WSL: '+STATE.homeWslDistro);switchMode('sessions');">▶ 连接</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;padding-top:4px;border-top:1px solid var(--taomni-chrome-border);">
+                <button class="filter-chip" onclick="showToast('已打开 WSL 文件树')">📁 浏览 WSL 文件</button>
+              </div>
+            </div>
+
+            <div class="home-card">
+              <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <span style="font-weight:700;font-size:13px;">🖥️ 新建/导入远程会话</span>
+                  <span class="kbd-badge">Ctrl+Shift+N</span>
+                </div>
+                <div class="muted" style="font-size:11.5px;margin-top:3px;">支持 SSH / SFTP / DB / RDP / VNC / Telnet / Serial</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <button class="pill-btn primary" style="flex:1;justify-content:center;" onclick="openNewSessionModal()">+ 新建会话配置</button>
+                <button class="pill-btn" onclick="openImportMenu(event)">📥 导入</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;padding-top:4px;border-top:1px solid var(--taomni-chrome-border);">
+                <button class="filter-chip" onclick="switchMode('sessions')">🌳 打开完整会话目录树 (9)</button>
+              </div>
+            </div>
+
+            <div class="home-card">
+              <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <span style="font-weight:700;font-size:13px;">🟣 工作区与 Coding Agents</span>
+                  <span class="kbd-badge">2 运行中</span>
+                </div>
+                <div class="muted" style="font-size:11.5px;margin-top:3px;">打开本地项目工作区、内置 Git 面板或多 Agent 并行开发</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <button class="pill-btn primary" style="flex:1;justify-content:center;" onclick="openCreateWorkspaceModal()">+ 新建/打开工作区</button>
+                <button class="pill-btn" onclick="openWorkspaceGitSurface()">🌿 Git</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;padding-top:4px;border-top:1px solid var(--taomni-chrome-border);">
+                <button class="filter-chip" onclick="switchMode('agents')">🤖 查看 2 个并行 Coding Agents</button>
+              </div>
+            </div>
+
+            <div class="home-card">
+              <div>
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <span style="font-weight:700;font-size:13px;">💬 协作与全局工具</span>
+                  <span class="kbd-badge">LAN / Mail</span>
+                </div>
+                <div class="muted" style="font-size:11.5px;margin-top:3px;">局域网加密传书、邮件客户端、网络诊断箱与 MFA</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;">
+                <button class="pill-btn" style="flex:1;justify-content:center;" onclick="openGlobalTool('lanchat')">💬 局域网传书</button>
+                <button class="pill-btn" style="flex:1;justify-content:center;" onclick="switchMode('sessions');openSessionInSessionsWorkbench('sess-mail-ops');">✉️ 邮件客户端</button>
+              </div>
+              <div style="display:flex;align-items:center;gap:6px;padding-top:4px;border-top:1px solid var(--taomni-chrome-border);">
+                <button class="filter-chip" onclick="openGlobalTool('nettools')">🛠️ 网络诊断箱</button>
+                <button class="filter-chip" onclick="openGlobalTool('mfa')">🔐 MFA 验证器</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- WelcomeHistoryPanel -->
+          <div style="flex:1;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);border-radius:9px;display:flex;flex-direction:column;overflow:hidden;min-height:200px;">
+            <div style="height:34px;padding:0 12px;border-bottom:1px solid var(--taomni-chrome-border);display:flex;align-items:center;justify-content:space-between;background:var(--taomni-panel-bg);">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <button class="filter-chip ${STATE.homeHistoryTab === 'workspaces' ? 'active' : ''}" onclick="STATE.homeHistoryTab='workspaces';renderCenterCanvas();">🟣 最近工作区 (3)</button>
+                <button class="filter-chip ${STATE.homeHistoryTab === 'sessions' ? 'active' : ''}" onclick="STATE.homeHistoryTab='sessions';renderCenterCanvas();">🖥️ 最近连接会话 (4)</button>
+                <button class="filter-chip ${STATE.homeHistoryTab === 'directories' ? 'active' : ''}" onclick="STATE.homeHistoryTab='directories';renderCenterCanvas();">📁 本地常用目录 (3)</button>
+              </div>
+              <input type="text" placeholder="搜索历史记录..." value="${STATE.homeHistorySearch}" oninput="STATE.homeHistorySearch=this.value;renderCenterCanvas();" style="width:190px;height:23px;padding:0 8px;border-radius:5px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);font-size:11.5px;" />
+            </div>
+            <div style="flex:1;overflow-y:auto;padding:8px 12px;display:flex;flex-direction:column;gap:6px;">
+              ${filteredItems.map(it => `
+                <div style="padding:7px 10px;border-radius:7px;background:var(--taomni-panel-bg);border:1px solid var(--taomni-chrome-border);display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="(${it.action.toString()})()">
+                  <div>
+                    <div style="font-weight:600;font-size:12px;">${it.title} <span class="mono muted" style="font-size:11px;font-weight:400;margin-left:6px;">${it.path}</span></div>
+                    <div class="muted" style="font-size:11px;margin-top:1px;">${it.meta}</div>
+                  </div>
+                  <button class="pill-btn">打开 →</button>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ============================================================================
+    // DEDICATED IN-WORKSPACE GIT PANEL (100% GitPanelView.tsx + Enhancements!)
+    // ============================================================================
+    function renderWorkspaceGitPanel() {
+      const ws = getActiveWorkspace();
+      const g = STATE.gitState;
+      const selectedChange = g.changes.find(c => c.path === g.selectedFile) || g.changes[0];
+
+      return `
+        <div class="pane-cell" style="display:flex;flex-direction:column;flex:1;min-height:0;">
+          <div style="height:32px;min-height:32px;padding:0 10px;background:var(--taomni-card-bg);border-bottom:1px solid var(--taomni-chrome-border);display:flex;align-items:center;justify-content:space-between;gap:8px;">
+            <div style="display:flex;align-items:center;gap:6px;min-width:0;">
+              <span style="font-weight:700;color:var(--taomni-accent);">🌿 工作区 Git</span>
+              <select style="height:22px;padding:0 6px;border-radius:5px;background:var(--taomni-panel-bg);border:1px solid var(--taomni-chrome-border);font-size:11.5px;font-weight:600;" onchange="STATE.gitState.selectedRepo=this.value;renderCenterCanvas();">
+                <option value="all" ${g.selectedRepo==='all'?'selected':''}>全部仓库 (All Repositories · 2)</option>
+                <option value="taomni" ${g.selectedRepo==='taomni'?'selected':''}>仓库: taomni (主工作树)</option>
+                <option value="infra-deploy" ${g.selectedRepo==='infra-deploy'?'selected':''}>仓库: infra-deploy (子模块)</option>
+                <option value="wt-cc-sftp" ${g.selectedRepo==='wt-cc-sftp'?'selected':''}>Worktree: .worktrees/cc-sftp-resume (Claude Code)</option>
+              </select>
+              <button class="pill-btn" style="height:22px;" onclick="STATE.gitState.activeTab='branches';renderCenterCanvas();">
+                <span class="mono">🌿 ${ws.gitBranch}</span>
+                <span class="kbd-badge">↑1 ↓0</span>
+              </button>
+              <span class="kbd-badge">${g.changes.length} 变更</span>
+            </div>
+
+            <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+              <select style="height:22px;padding:0 6px;border-radius:5px;background:var(--taomni-panel-bg);border:1px solid var(--taomni-chrome-border);font-size:11px;" onchange="STATE.gitState.remote=this.value">
+                <option value="origin">Remote: origin</option>
+                <option value="upstream">Remote: upstream</option>
+              </select>
+              <button class="pill-btn" onclick="showToast('已执行 git fetch')">↓ Fetch</button>
+              <button class="pill-btn" onclick="showToast('已执行 git pull --rebase')">⇊ Pull</button>
+              <button class="pill-btn primary" onclick="showToast('已推送至 ' + STATE.gitState.remote)">↑ Push (1)</button>
+              <button class="pill-btn" onclick="openGitMoreActionsMenu(event)">⋯ 更多</button>
+              <button class="icon-btn" style="width:22px;height:22px;" title="刷新 Git 状态" onclick="showToast('Git 状态已刷新')">↻</button>
+            </div>
+          </div>
+
+          <div style="height:28px;min-height:28px;padding:0 10px;background:var(--taomni-panel-bg);border-bottom:1px solid var(--taomni-chrome-border);display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:4px;">
+              ${[
+                ['changes', `Changes (${g.changes.length})`],
+                ['log', `Log (${g.commits.length})`],
+                ['branches', `Branches (${g.branches.length})`],
+                ['tags', `Tags (${g.tags.length})`],
+                ['stash', `Stash (${g.stashes.length})`],
+                ['settings', `Settings`]
+              ].map(([id, label]) => `
+                <button class="filter-chip ${g.activeTab === id ? 'active' : ''}" onclick="STATE.gitState.activeTab='${id}';renderCenterCanvas();">${label}</button>
+              `).join('')}
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <button class="filter-chip ${g.showConflictBanner ? 'active' : ''}" onclick="STATE.gitState.showConflictBanner=!STATE.gitState.showConflictBanner;renderCenterCanvas();">
+                ${g.showConflictBanner ? '⚠️ 隐藏冲突条' : '🧪 演示 Rebase/冲突处理条'}
+              </button>
+            </div>
+          </div>
+
+          ${g.showConflictBanner ? `
+            <div style="padding:6px 12px;background:rgba(245,158,11,0.14);border-bottom:1px solid var(--taomni-warning);display:flex;align-items:center;justify-content:space-between;font-size:11.5px;">
+              <span style="color:var(--taomni-warning);font-weight:600;">⚠️ Rebase in progress (feat/workspace-platform onto origin/main · 1 冲突)</span>
+              <div style="display:flex;align-items:center;gap:5px;">
+                <button class="pill-btn" onclick="showToast('已采用 Ours')">采用 Ours</button>
+                <button class="pill-btn" onclick="showToast('已采用 Theirs')">采用 Theirs</button>
+                <button class="pill-btn primary" onclick="STATE.gitState.showConflictBanner=false;showToast('已继续变基');renderCenterCanvas();">▶ Continue</button>
+                <button class="pill-btn" onclick="showToast('Skip')">Skip</button>
+                <button class="pill-btn" style="color:var(--taomni-danger);" onclick="STATE.gitState.showConflictBanner=false;showToast('已中止变基');renderCenterCanvas();">Abort</button>
+              </div>
+            </div>
+          ` : ''}
+
+          <div style="flex:1;min-height:0;display:flex;overflow:hidden;">
+            ${renderGitSubViewContent(g, selectedChange)}
+          </div>
+        </div>
+      `;
+    }
+    function renderGitSubViewContent(g, selectedChange) {
+      if (g.activeTab === 'changes') {
+        const stagedList = g.changes.filter(c => c.staged);
+        const unstagedList = g.changes.filter(c => !c.staged);
+        return `
+          <div style="flex:1;display:grid;grid-template-columns:320px 1fr;gap:1px;background:var(--taomni-chrome-border);min-height:0;">
+            <div style="background:var(--taomni-panel-bg);display:flex;flex-direction:column;min-height:0;">
+              <div style="height:27px;padding:0 8px;border-bottom:1px solid var(--taomni-chrome-border);display:flex;align-items:center;justify-content:space-between;font-size:11px;">
+                <div style="display:flex;align-items:center;gap:3px;">
+                  <button class="filter-chip ${g.viewMode === 'tree' ? 'active' : ''}" style="padding:1px 5px;" onclick="STATE.gitState.viewMode='tree';renderCenterCanvas();">🌳 Tree</button>
+                  <button class="filter-chip ${g.viewMode === 'flat' ? 'active' : ''}" style="padding:1px 5px;" onclick="STATE.gitState.viewMode='flat';renderCenterCanvas();">☰ Flat</button>
+                </div>
+                <div style="display:flex;align-items:center;gap:4px;">
+                  <button class="filter-chip" style="padding:1px 5px;" onclick="gStageAll(true)">+ 全暂存</button>
+                  <button class="filter-chip" style="padding:1px 5px;" onclick="gStageAll(false)">- 全取消</button>
+                  <button class="filter-chip" style="padding:1px 5px;color:var(--taomni-danger);" onclick="showToast('已丢弃未暂存更改')">🗑️ 丢弃</button>
+                </div>
+              </div>
+
+              <div style="flex:1;overflow-y:auto;padding:6px;">
+                <div style="font-size:10.5px;font-weight:700;color:var(--taomni-text-muted);padding:2px 4px;">已暂存更改 (Staged · ${stagedList.length})</div>
+                ${stagedList.map(c => `
+                  <div class="tree-row ${g.selectedFile === c.path ? 'selected' : ''}" style="padding-left:6px;" onclick="selectGitFile('${c.path}')" oncontextmenu="openGitChangeContextMenu(event, '${c.path}')">
+                    <div class="tree-row-left">
+                      <input type="checkbox" ${c.checked ? 'checked' : ''} onclick="event.stopPropagation();toggleGitFileChecked('${c.path}')" />
+                      <span class="mono" style="color:var(--taomni-warning);font-weight:700;">${c.status}</span>
+                      <span class="tree-label">${g.viewMode === 'tree' ? c.path.split('/').pop() : c.path}</span>
+                    </div>
+                    <div class="tree-hover-btns">
+                      <button class="filter-chip" style="font-size:9.5px;padding:0 4px;" onclick="event.stopPropagation();toggleGitFileStaged('${c.path}')">Unstage</button>
+                    </div>
+                    <span class="tree-meta">+${c.additions} -${c.deletions}</span>
+                  </div>
+                `).join('')}
+
+                <div style="font-size:10.5px;font-weight:700;color:var(--taomni-text-muted);padding:8px 4px 2px 4px;">未暂存更改 (Changes · ${unstagedList.length})</div>
+                ${unstagedList.map(c => `
+                  <div class="tree-row ${g.selectedFile === c.path ? 'selected' : ''}" style="padding-left:6px;" onclick="selectGitFile('${c.path}')" oncontextmenu="openGitChangeContextMenu(event, '${c.path}')">
+                    <div class="tree-row-left">
+                      <input type="checkbox" ${c.checked ? 'checked' : ''} onclick="event.stopPropagation();toggleGitFileChecked('${c.path}')" />
+                      <span class="mono" style="color:${c.status==='A'?'var(--taomni-success)':'var(--taomni-warning)'};font-weight:700;">${c.status}</span>
+                      <span class="tree-label">${g.viewMode === 'tree' ? c.path.split('/').pop() : c.path}</span>
+                    </div>
+                    <div class="tree-hover-btns">
+                      <button class="filter-chip" style="font-size:9.5px;padding:0 4px;" onclick="event.stopPropagation();toggleGitFileStaged('${c.path}')">Stage</button>
+                    </div>
+                    <span class="tree-meta">+${c.additions} -${c.deletions}</span>
+                  </div>
+                `).join('')}
+              </div>
+
+              <div style="padding:8px;border-top:1px solid var(--taomni-chrome-border);background:var(--taomni-card-bg);display:flex;flex-direction:column;gap:6px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;">
+                  <label style="display:flex;align-items:center;gap:4px;cursor:pointer;">
+                    <input type="checkbox" ${g.amendChecked ? 'checked' : ''} onchange="STATE.gitState.amendChecked=this.checked" />
+                    <span>Amend (修正上次提交)</span>
+                  </label>
+                  <button class="filter-chip active" style="font-size:10px;padding:1px 6px;" onclick="generateAiCommitMessage()">✨ AI 生成提交信息</button>
+                </div>
+                <textarea rows="3" style="width:100%;padding:6px 8px;border-radius:6px;background:var(--taomni-panel-bg);border:1px solid var(--taomni-chrome-border);font-family:var(--font-mono);font-size:11px;resize:none;" oninput="STATE.gitState.commitMessage=this.value">${g.commitMessage}</textarea>
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <button class="pill-btn primary" style="flex:1;justify-content:center;" onclick="showToast('已提交选中变更')">✓ Commit (${g.changes.filter(c=>c.checked).length})</button>
+                  <button class="pill-btn" style="flex:1;justify-content:center;" onclick="showToast('已提交并推送')">↑ Commit & Push</button>
+                </div>
+              </div>
+            </div>
+
+            <div style="background:var(--taomni-code-bg);display:flex;flex-direction:column;min-height:0;">
+              <div style="height:27px;padding:0 10px;background:var(--taomni-panel-bg);border-bottom:1px solid var(--taomni-chrome-border);display:flex;align-items:center;justify-content:space-between;font-size:11.5px;">
+                <span class="mono" style="font-weight:600;">DiffViewer · ${selectedChange ? selectedChange.path : ''}</span>
+                <div style="display:flex;align-items:center;gap:5px;">
+                  <button class="filter-chip ${g.diffStyle === 'side-by-side' ? 'active' : ''}" onclick="STATE.gitState.diffStyle='side-by-side';renderCenterCanvas();">◫ 并排对比</button>
+                  <button class="filter-chip ${g.diffStyle === 'unified' ? 'active' : ''}" onclick="STATE.gitState.diffStyle='unified';renderCenterCanvas();">☰ 统一视图</button>
+                  <button class="pill-btn" style="height:20px;font-size:10px;" onclick="activateTab('tab-code-shell')">F4 跳转到源文件</button>
+                </div>
+              </div>
+              <div class="mono" style="flex:1;overflow-y:auto;padding:12px;font-size:12px;line-height:1.65;">
+                ${g.diffStyle === 'side-by-side' ? `
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <div style="border:1px solid var(--taomni-chrome-border);border-radius:6px;padding:8px;">
+                      <div class="muted" style="margin-bottom:4px;">HEAD (${selectedChange ? selectedChange.path : ''})</div>
+                      <div style="background:rgba(239,68,68,0.14);color:var(--taomni-danger);padding:0 4px;">18 - &lt;ExtraTopTitleBar /&gt;</div>
+                      <div>19   &lt;WorkspaceLayout /&gt;</div>
+                    </div>
+                    <div style="border:1px solid var(--taomni-chrome-border);border-radius:6px;padding:8px;">
+                      <div class="muted" style="margin-bottom:4px;">Working Tree (Modified)</div>
+                      <div style="background:rgba(16,185,129,0.14);color:var(--taomni-success);padding:0 4px;">18 + &lt;SharedSingleMainToolbar /&gt;</div>
+                      <div>19   &lt;WorkspaceLayout /&gt;</div>
+                    </div>
+                  </div>
+                ` : `
+                  <div style="color:var(--taomni-text-muted);">@@ -16,6 +16,6 @@ export function WorkspaceShell() {</div>
+                  <div style="background:rgba(239,68,68,0.14);color:var(--taomni-danger);padding:0 6px;">-  &lt;ExtraTopTitleBar /&gt;</div>
+                  <div style="background:rgba(16,185,129,0.14);color:var(--taomni-success);padding:0 6px;">+  &lt;SharedSingleMainToolbar /&gt;</div>
+                `}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      if (g.activeTab === 'log') {
+        return `
+          <div style="flex:1;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-weight:700;">📜 提交历史图谱 (右键提交支持 Cherry-pick / Revert / Reset / Create Tag)</span>
+              <input type="text" placeholder="按提交信息、哈希或作者过滤..." style="width:240px;height:24px;padding:0 8px;border-radius:5px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);font-size:11.5px;" />
+            </div>
+            ${g.commits.map(c => `
+              <div style="padding:8px 10px;border-radius:7px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);display:flex;align-items:center;justify-content:space-between;cursor:pointer;" oncontextmenu="openGitCommitContextMenu(event, '${c.sha}')">
+                <div style="display:flex;align-items:center;gap:10px;">
+                  <span class="mono" style="color:var(--taomni-accent);font-weight:700;">${c.graph}</span>
+                  <span class="kbd-badge">${c.sha}</span>
+                  ${c.branch ? `<span class="proto-badge proto-git">${c.branch}</span>` : ''}
+                  <span style="font-weight:600;">${c.msg}</span>
+                </div>
+                <span class="mono muted" style="font-size:11px;">${c.author} · ${c.time}</span>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      if (g.activeTab === 'branches') {
+        return `
+          <div style="flex:1;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-weight:700;">🌿 分支与 Worktrees 管理</span>
+              <button class="pill-btn primary" onclick="showToast('已创建新分支')">+ 新建分支</button>
+            </div>
+            ${g.branches.map(b => `
+              <div style="padding:9px 12px;border-radius:7px;background:var(--taomni-card-bg);border:1px solid ${b.current ? 'var(--taomni-selected-border)' : 'var(--taomni-card-border)'};display:flex;align-items:center;justify-content:space-between;">
+                <div style="display:flex;align-items:center;gap:6px;font-weight:600;">
+                  <span class="mono">${b.current ? '● ' : ''}${b.name}</span>
+                  ${b.upstream ? `<span class="kbd-badge">→ ${b.upstream} (↑${b.ahead} ↓${b.behind})</span>` : ''}
+                  ${b.worktree ? `<span class="proto-badge proto-code">${b.worktree}</span>` : ''}
+                </div>
+                <div style="display:flex;gap:6px;">
+                  ${!b.current ? `<button class="pill-btn" onclick="showToast('已检出 ' + '${b.name}')">Checkout</button>` : ''}
+                  <button class="pill-btn" onclick="showToast('已合并 ' + '${b.name}')">Merge</button>
+                  <button class="pill-btn" onclick="showToast('已变基到 ' + '${b.name}')">Rebase onto</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      if (g.activeTab === 'tags') {
+        return `
+          <div style="flex:1;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-weight:700;">🏷️ Git 标签管理 (Tags)</span>
+              <button class="pill-btn primary" onclick="showToast('已创建标签 v0.9.5')">+ 新建标签</button>
+            </div>
+            ${g.tags.map(t => `
+              <div style="padding:8px 12px;border-radius:7px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);display:flex;align-items:center;justify-content:space-between;">
+                <div>
+                  <span class="mono" style="font-weight:700;color:var(--taomni-accent);">🏷️ ${t.name}</span>
+                  <span class="kbd-badge" style="margin-left:6px;">${t.sha}</span>
+                  <span style="margin-left:8px;">${t.message}</span>
+                </div>
+                <div style="display:flex;gap:6px;">
+                  <button class="pill-btn" onclick="showToast('已推送标签 ' + '${t.name}')">↑ Push Tag</button>
+                  <button class="pill-btn" style="color:var(--taomni-danger);" onclick="showToast('已删除标签')">删除</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      if (g.activeTab === 'stash') {
+        return `
+          <div style="flex:1;padding:12px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;">
+              <span style="font-weight:700;">📦 Git 贮藏箱 (Stash)</span>
+              <button class="pill-btn primary" onclick="showToast('已保存到 Stash')">+ Save Stash</button>
+            </div>
+            ${g.stashes.map(s => `
+              <div style="padding:9px 12px;border-radius:7px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);display:flex;align-items:center;justify-content:space-between;">
+                <div>
+                  <span class="mono" style="font-weight:700;">${s.id}</span>
+                  <span class="kbd-badge" style="margin-left:6px;">${s.branch}</span>
+                  <span style="margin-left:8px;font-weight:600;">${s.message}</span>
+                </div>
+                <div style="display:flex;gap:6px;">
+                  <button class="pill-btn primary" onclick="showToast('Pop ' + '${s.id}')">Pop</button>
+                  <button class="pill-btn" onclick="showToast('Apply ' + '${s.id}')">Apply</button>
+                  <button class="pill-btn" style="color:var(--taomni-danger);" onclick="showToast('Drop ' + '${s.id}')">Drop</button>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      return `
+        <div style="flex:1;padding:14px;overflow-y:auto;display:flex;flex-direction:column;gap:10px;">
+          <div style="font-weight:700;">⚙️ 仓库级 Git 与网络代理配置</div>
+          <div style="display:grid;grid-template-columns:160px 1fr;gap:8px;align-items:center;max-width:560px;background:var(--taomni-card-bg);padding:12px;border-radius:8px;border:1px solid var(--taomni-card-border);">
+            <span class="muted">user.name</span><input type="text" value="zhyhang" style="padding:4px 8px;border-radius:4px;background:var(--taomni-panel-bg);border:1px solid var(--taomni-chrome-border);" />
+            <span class="muted">user.email</span><input type="text" value="zhyhang@taomni.dev" style="padding:4px 8px;border-radius:4px;background:var(--taomni-panel-bg);border:1px solid var(--taomni-chrome-border);" />
+            <span class="muted">Git 网络代理模式</span>
+            <select style="padding:4px 8px;border-radius:4px;background:var(--taomni-panel-bg);border:1px solid var(--taomni-chrome-border);">
+              <option>跟随全局应用设置 (http://10.1.0.80:3228)</option>
+              <option>使用此仓库独立代理</option>
+              <option>不使用代理 (直连并绕过系统环境变量)</option>
+            </select>
+          </div>
+        </div>
+      `;
+    }
+
+    // ============================================================================
+    // PANE SURFACE RENDERER (Entry #4 kept in Editor Toolbar; Single-Bar Terminal!)
+    // ============================================================================
+    function renderPaneSurface(tab, idx) {
+      if (!tab) return `<div class="pane-cell"></div>`;
+
+      if (tab.proto === 'git') {
+        return renderWorkspaceGitPanel();
+      }
+
+      if (tab.proto === 'ssh') {
+        return `
+          <div class="pane-cell">
+            ${STATE.layoutPreset !== 'single' ? `
+              <div style="height:22px;padding:0 8px;background:var(--taomni-panel-bg);border-bottom:1px solid var(--taomni-chrome-border);display:flex;align-items:center;justify-content:space-between;font-size:11px;">
+                <span class="mono">${protoBadgeHtml('ssh')} ${tab.title} (${tab.host || '10.24.1.10:22'})</span>
+                <span style="color:var(--taomni-success);">● ${tab.latency || '8ms'}</span>
+              </div>
+            ` : ''}
+            <div style="flex:1;padding:12px 14px;background:var(--taomni-term-bg);color:var(--taomni-term-fg);font-family:var(--font-mono);font-size:12px;line-height:1.6;overflow-y:auto;">
+              <div style="color:#64748b;">Connected to ${tab.title} (${tab.host || '10.24.1.10:22'}) · SSH-2.0-OpenSSH_9.6p1 · RTT ${tab.latency || '8ms'}</div>
+              <div style="margin-top:4px;"><span style="color:#34d399;font-weight:700;">${tab.user || 'ubuntu'}@${tab.title}</span>:<span style="color:#6aa6f8;">/srv/taomni</span>$ docker ps --format "table {{.Names}}\\t{{.Status}}\\t{{.Ports}}"</div>
+              <div style="color:#cbd5e1;margin-top:2px;">NAMES                  STATUS                   PORTS</div>
+              <div style="color:#cbd5e1;">taomni-api-gateway     Up 9 days (healthy)      0.0.0.0:443-&gt;8443/tcp</div>
+              <div style="color:#cbd5e1;">taomni-worker-node     Up 9 days (healthy)      127.0.0.1:9090-&gt;9090/tcp</div>
+              <div style="margin-top:8px;"><span style="color:#34d399;font-weight:700;">${tab.user || 'ubuntu'}@${tab.title}</span>:<span style="color:#6aa6f8;">/srv/taomni</span>$ <span style="display:inline-block;width:7px;height:14px;background:#6aa6f8;vertical-align:middle;"></span></div>
+            </div>
+          </div>
+        `;
+      }
+
+      if (tab.proto === 'db') {
+        return `
+          <div class="pane-cell">
+            <div style="height:26px;padding:0 10px;background:var(--taomni-panel-bg);border-bottom:1px solid var(--taomni-chrome-border);display:flex;align-items:center;justify-content:space-between;font-size:11px;">
+              <span class="mono">PostgreSQL 16 · ${tab.host || 'pg.internal:5432'} / prod_orders</span>
+              <div style="display:flex;gap:5px;">
+                <button class="pill-btn primary" style="height:20px;font-size:10px;" onclick="showToast('已执行 SQL 查询 (3.8ms)')">▶ 执行 (Ctrl+Enter)</button>
+                <button class="pill-btn" style="height:20px;font-size:10px;" onclick="showToast('EXPLAIN ANALYZE')">EXPLAIN</button>
+              </div>
+            </div>
+            <div class="mono" style="padding:10px 14px;background:var(--taomni-code-bg);border-bottom:1px solid var(--taomni-chrome-border);font-size:12px;">
+              <span style="color:var(--taomni-purple);font-weight:700;">SELECT</span> order_id, tenant_id, status, amount_cents <span style="color:var(--taomni-purple);font-weight:700;">FROM</span> orders <span style="color:var(--taomni-purple);font-weight:700;">ORDER BY</span> updated_at <span style="color:var(--taomni-purple);font-weight:700;">DESC LIMIT</span> 10;
+            </div>
+            <div style="flex:1;padding:10px 14px;overflow:auto;">
+              <table style="width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:11.5px;">
+                <thead>
+                  <tr style="border-bottom:1px solid var(--taomni-chrome-border);text-align:left;color:var(--taomni-text-muted);">
+                    <th style="padding:5px;">order_id</th><th style="padding:5px;">tenant_id</th><th style="padding:5px;">status</th><th style="padding:5px;">amount_cents</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style="border-bottom:1px solid var(--taomni-chrome-border);"><td style="padding:5px;">ord_99281a</td><td style="padding:5px;">t_enterprise</td><td style="padding:5px;color:var(--taomni-success);">SETTLED</td><td style="padding:5px;">129000</td></tr>
+                  <tr style="border-bottom:1px solid var(--taomni-chrome-border);"><td style="padding:5px;">ord_99280f</td><td style="padding:5px;">t_cloud_ops</td><td style="padding:5px;color:var(--taomni-success);">SETTLED</td><td style="padding:5px;">45000</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `;
+      }
+
+      if (tab.proto === 'sftp' || tab.proto === 'rdp') {
+        return `
+          <div class="pane-cell" style="padding:14px;display:flex;flex-direction:column;gap:10px;">
+            <div style="font-weight:700;">${protoBadgeHtml(tab.proto)} ${tab.title} (${tab.host || ''})</div>
+            <div class="muted">${tab.proto === 'sftp' ? '双栏/单栏远程文件管理，支持断点续传、HTTP Range 校验与后台传输队列。' : '远程桌面连接 (Smart Sizing 自适应缩放、剪贴板同步与凭据保险箱)。'}</div>
+          </div>
+        `;
+      }
+
+      // Default: Workspace File / Code Editor Surface (Entry #4 kept!)
+      return `
+        <div class="pane-cell">
+          <div style="height:26px;padding:0 10px;background:var(--taomni-panel-bg);border-bottom:1px solid var(--taomni-chrome-border);display:flex;align-items:center;justify-content:space-between;font-size:11px;">
+            <div class="mono muted" style="display:flex;align-items:center;gap:6px;">
+              <span>${tab.path || ('src/' + tab.title)}</span>
+              <span>›</span>
+              <span style="color:var(--taomni-accent);font-weight:600;">WorkspaceShell</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:4px;">
+              <button class="filter-chip ${STATE.codeViewMode === 'code' ? 'active' : ''}" style="padding:0 5px;font-size:10px;" onclick="STATE.codeViewMode='code';renderCenterCanvas();">Code</button>
+              <button class="filter-chip ${STATE.codeViewMode === 'diff' ? 'active' : ''}" style="padding:0 5px;font-size:10px;" onclick="STATE.codeViewMode='diff';renderCenterCanvas();">Inline Diff</button>
+              <button class="filter-chip" style="padding:0 5px;font-size:10px;color:var(--taomni-accent);" onclick="openWorkspaceGitSurface('changes')">🌿 在 Git 面板对比</button>
+              <button class="filter-chip" style="padding:0 5px;font-size:10px;" onclick="openRightInspectorTab('structure')">Structure</button>
+            </div>
+          </div>
+          <div style="flex:1;overflow-y:auto;padding:10px 0;background:var(--taomni-code-bg);font-family:var(--font-mono);font-size:12px;line-height:1.65;">
+            <div style="display:grid;grid-template-columns:42px 1fr;padding:0 12px;"><span class="muted">1</span><span><span style="color:var(--taomni-purple);">import</span> { useWorkspaceStore } <span style="color:var(--taomni-purple);">from</span> <span style="color:var(--taomni-success);">"@/stores/workspaceStore"</span>;</span></div>
+            <div style="display:grid;grid-template-columns:42px 1fr;padding:0 12px;"><span class="muted">2</span><span><span style="color:var(--taomni-purple);">import</span> { GitPanel } <span style="color:var(--taomni-purple);">from</span> <span style="color:var(--taomni-success);">"@/components/git/GitPanel"</span>;</span></div>
+            <div style="display:grid;grid-template-columns:42px 1fr;padding:0 12px;background:rgba(16,185,129,0.12);"><span class="muted">3</span><span><span style="color:var(--taomni-muted);">// 极简共享主工具栏 (包含左右边栏收缩按钮) + 左侧导航 #1 Home + 工作区内置 Git 面板</span></span></div>
+            <div style="display:grid;grid-template-columns:42px 1fr;padding:0 12px;"><span class="muted">4</span><span><span style="color:var(--taomni-purple);">export function</span> <span style="color:var(--taomni-accent);">WorkspaceShell</span>() {</span></div>
+            <div style="display:grid;grid-template-columns:42px 1fr;padding:0 12px;background:var(--taomni-code-active-line);"><span class="muted">5</span><span>  <span style="color:var(--taomni-purple);">const</span> { activeWorkspace, openTabs } = useWorkspaceStore();</span></div>
+            <div style="display:grid;grid-template-columns:42px 1fr;padding:0 12px;"><span class="muted">6</span><span>  <span style="color:var(--taomni-purple);">return</span> &lt;SharedSingleToolbarLayout workspace={activeWorkspace} tabs={openTabs} /&gt;;</span></div>
+            <div style="display:grid;grid-template-columns:42px 1fr;padding:0 12px;"><span class="muted">7</span><span>}</span></div>
+          </div>
+        </div>
+      `;
+    }
+
+    function renderWsBottomDockContent(ws) {
+      if (STATE.wsBottomDockTab === 'problems') {
+        return `<div style="color:#34d399;">✓ [cargo check & tsc] 0 errors, 0 warnings</div>`;
+      }
+      if (STATE.wsBottomDockTab === 'git-log') {
+        return `
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+            <span style="color:#6aa6f8;font-weight:700;">🌿 工作区 Git 快速摘要 (${ws.gitBranch})</span>
+            <button class="pill-btn primary" style="height:20px;font-size:10px;" onclick="openWorkspaceGitSurface('changes')">在主视图打开 Git 面板 ↗</button>
+          </div>
+          <div>● 8aa7450b (HEAD -> ${ws.gitBranch}) docs(feature): add workspace platform redesign prototype and spec</div>
+        `;
+      }
+      return `
+        <div style="color:#34d399;">zhyhang@taomni-workstation:${ws.rootPath}$ <span style="color:#e2e8f0;">pnpm check:refactor && cargo test --lib</span></div>
+        <div style="color:#94a3b8;">✓ All source files within 800-line boundary · 142 passed (1.18s)</div>
+      `;
+    }
+
+    function renderRightDock() {
+      const dock = document.getElementById('right-dock');
+      const tabs = [
+        ['companion', '📂 伴随 SFTP'],
+        ['agent', '🤖 Agent'],
+        ['structure', '🧭 结构'],
+        ['tao', '💬 Tao']
+      ];
+      let bodyHtml = '';
+      if (STATE.rightDockTab === 'companion') {
+        bodyHtml = `
+          <div style="padding:10px;display:flex;flex-direction:column;gap:8px;">
+            <div style="padding:8px;border-radius:6px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);">
+              <div style="font-weight:700;font-size:11.5px;">🔗 SSH 终端跟随式 SFTP</div>
+              <div class="mono muted" style="font-size:10.5px;margin-top:2px;">自动同步: prod-gateway-01:/srv/taomni</div>
+            </div>
+            <div class="tree-row"><div class="tree-row-left"><span>📁</span><span class="mono">conf.d/</span></div><span class="tree-meta">4 KB</span></div>
+            <div class="tree-row"><div class="tree-row-left"><span>📄</span><span class="mono">docker-compose.yml</span></div><span class="tree-meta">3.8 KB</span></div>
+          </div>
+        `;
+      } else if (STATE.rightDockTab === 'agent') {
+        bodyHtml = `
+          <div style="padding:10px;display:flex;flex-direction:column;gap:8px;">
+            <div style="font-weight:700;">🤖 当前工作区 Coding Agents (2)</div>
+            ${STATE.agents.slice(0, 2).map(ag => `
+              <div style="padding:8px;border-radius:7px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);">
+                <div style="display:flex;justify-content:space-between;font-weight:600;"><span>${ag.name}</span><span class="kbd-badge">${ag.statusText}</span></div>
+                <div class="muted" style="font-size:11px;margin:4px 0;">${ag.task}</div>
+                <button class="pill-btn" style="width:100%;justify-content:center;" onclick="switchMode('agents')">查看详情 →</button>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      } else if (STATE.rightDockTab === 'structure') {
+        bodyHtml = `
+          <div style="padding:10px;display:flex;flex-direction:column;gap:4px;">
+            <div style="font-weight:700;margin-bottom:4px;">🧭 代码结构大纲 (Structure)</div>
+            <div class="tree-row"><div class="tree-row-left"><span style="color:var(--taomni-purple);">ƒ</span><span class="mono">WorkspaceShell()</span></div><span class="tree-meta">:14</span></div>
+            <div class="tree-row"><div class="tree-row-left"><span style="color:var(--taomni-accent);">ƒ</span><span class="mono">openWorkspaceGitSurface()</span></div><span class="tree-meta">:42</span></div>
+          </div>
+        `;
+      } else {
+        bodyHtml = `
+          <div style="padding:10px;display:flex;flex-direction:column;gap:8px;">
+            <div style="font-weight:700;">💬 Tao 助手 (AI 对话 / 随手笔记 / 通知)</div>
+            <div style="padding:8px;border-radius:6px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);font-size:11.5px;">
+              <strong>📝 工作区随手笔记：</strong><br/>- 网关节点：10.24.1.10<br/>- 外部访问代理：http://10.1.0.80:3228
+            </div>
+          </div>
+        `;
+      }
+
+      dock.innerHTML = `
+        <div style="height:33px;min-height:33px;padding:0 6px;border-bottom:1px solid var(--taomni-chrome-border);display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:2px;">
+            ${tabs.map(([id, label]) => `
+              <button class="filter-chip ${STATE.rightDockTab === id ? 'active' : ''}" style="font-size:11px;padding:2px 6px;" onclick="STATE.rightDockTab='${id}';renderRightDock();">${label}</button>
+            `).join('')}
+          </div>
+          <button class="icon-btn" style="width:20px;height:20px;" onclick="toggleRightDock()" title="收起右侧边栏">✕</button>
+        </div>
+        <div style="flex:1;overflow-y:auto;">${bodyHtml}</div>
+      `;
+    }
+
+    // ============================================================================
+    // INTERACTIONS, OPEN-TABS FILTER MENU (main parity), CONTEXT MENUS & RESIZERS
+    // ============================================================================
+    function switchMode(mode) {
+      STATE.mode = mode;
+      renderAll();
+    }
+
+    function activateTab(tabId) {
+      const ws = getActiveWorkspace();
+      ws.activeTabId = tabId;
+      renderAll();
+    }
+
+    function closeTab(tabId) {
+      const ws = getActiveWorkspace();
+      if (ws.openTabs.length <= 1) return;
+      ws.openTabs = ws.openTabs.filter(t => t.id !== tabId);
+      if (ws.activeTabId === tabId) ws.activeTabId = ws.openTabs[0].id;
+      renderAll();
+    }
+
+    function openLinkedSessionInWorkspace(sessionId) {
+      const s = findSessionById(sessionId);
+      if (!s) return;
+      const ws = getActiveWorkspace();
+      const wsTabId = 'ws-inst-' + s.id;
+      let tab = ws.openTabs.find(t => t.id === wsTabId);
+      if (!tab) {
+        tab = { id: wsTabId, title: `${s.name} (工作区实例)`, proto: s.proto, host: s.host, user: s.user, latency: '8ms', summary: `工作区独立会话实例: ${s.name}` };
+        ws.openTabs.push(tab);
+      }
+      ws.activeTabId = wsTabId;
+      renderAll();
+    }
+
+    function openSessionInSessionsWorkbench(sessionId) {
+      STATE.selectedSessionNodeId = sessionId;
+      const s = findSessionById(sessionId);
+      if (!s || s.type === 'folder') return;
+      const sw = STATE.sessionWorkbench;
+      let tab = sw.openTabs.find(t => t.id === s.id);
+      if (!tab) {
+        tab = { id: s.id, title: s.name, proto: s.proto, group: s.group || '未分组', host: s.host, user: s.user, latency: '9ms', companionSftp: s.proto === 'ssh' };
+        sw.openTabs.push(tab);
+      }
+      sw.activeTabId = tab.id;
+      renderAll();
+    }
+
+    function activateSessionWorkbenchTab(tabId) {
+      STATE.sessionWorkbench.activeTabId = tabId;
+      STATE.selectedSessionNodeId = tabId;
+      renderAll();
+    }
+
+    function closeSessionWorkbenchTab(tabId) {
+      const sw = STATE.sessionWorkbench;
+      if (sw.openTabs.length <= 1) return;
+      sw.openTabs = sw.openTabs.filter(t => t.id !== tabId);
+      if (sw.activeTabId === tabId) sw.activeTabId = sw.openTabs[0].id;
+      renderAll();
+    }
+
+    // OpenTabsMenu (⋯) in Sessions mode — 100% aligned with src/components/tabbar/OpenTabsMenu.tsx!
+    function openSessionTabsFilterMenu(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      const rect = e.currentTarget.getBoundingClientRect();
+      const sw = STATE.sessionWorkbench;
+      const groups = [...new Set(sw.openTabs.map(t => t.group || '默认组'))];
+      showContextMenuAt(rect.right - 260, rect.bottom + 4, `
+        <div style="padding:5px 8px;font-size:10.5px;font-weight:700;color:var(--taomni-text-muted);display:flex;justify-content:space-between;">
+          <span>按会话目录组过滤标签 (OpenTabsMenu)</span>
+          ${sw.groupFilter !== 'all' ? `<span style="color:var(--taomni-accent);cursor:pointer;" onclick="STATE.sessionWorkbench.groupFilter='all';renderCenterCanvas();">重置</span>` : ''}
+        </div>
+        <div style="padding:3px 6px;" onclick="event.stopPropagation()">
+          <input type="text" placeholder="搜索已打开标签名称/IP..." value="${sw.tabSearchQuery}" oninput="STATE.sessionWorkbench.tabSearchQuery=this.value;renderCenterCanvas();" style="width:100%;height:24px;padding:0 7px;border-radius:4px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);font-size:11.5px;" />
+        </div>
+        <div class="ctx-sep"></div>
+        <div class="ctx-item" onclick="STATE.sessionWorkbench.groupFilter='all';renderCenterCanvas();">
+          <span>${sw.groupFilter === 'all' ? '✓ ' : ''}显示全部已打开会话标签</span>
+          <span class="kbd-badge">${sw.openTabs.length}</span>
+        </div>
+        ${groups.map(g => {
+          const count = sw.openTabs.filter(t => (t.group || '默认组') === g).length;
+          return `
+            <div class="ctx-item" onclick="STATE.sessionWorkbench.groupFilter='${g}';renderCenterCanvas();">
+              <span>${sw.groupFilter === g ? '✓ ' : ''}📁 ${g}</span>
+              <span class="kbd-badge">${count}</span>
+            </div>
+          `;
+        }).join('')}
+        <div class="ctx-sep"></div>
+        <div class="ctx-item" onclick="STATE.sessionWorkbench.detailsHoverActive=!STATE.sessionWorkbench.detailsHoverActive;renderCenterCanvas();">
+          <span>ℹ️ 切换标签栏内联详情 (Ctrl+Shift+H)</span>
+        </div>
+        <div class="ctx-item" onclick="showToast('已将当前会话标签弹出为独立窗口 (Detach Tab)')">
+          <span>↗ 将当前会话弹出为独立窗口</span>
+        </div>
+      `);
+    }
+
+    function toggleWsFolder(folderId) {
+      const ws = getActiveWorkspace();
+      ws.foldersExpanded[folderId] = ws.foldersExpanded[folderId] === false ? true : false;
+      renderLeftNavigator();
+    }
+
+    function setSessionProtoFilter(proto) {
+      STATE.sessionFilterProto = proto;
+      renderLeftNavigator();
+    }
+
+    function updateSessionSearch(val) {
+      STATE.sessionSearchQuery = val;
+      renderLeftNavigator();
+    }
+
+    function toggleAllSessionFolders() {
+      const keys = Object.keys(STATE.sessionTreeFoldersExpanded);
+      const anyOpen = keys.some(k => STATE.sessionTreeFoldersExpanded[k]);
+      keys.forEach(k => { STATE.sessionTreeFoldersExpanded[k] = !anyOpen; });
+      renderLeftNavigator();
+    }
+
+    function toggleDefaultWorkspaceDemo() {
+      STATE.onlyDefaultWorkspaceMode = !STATE.onlyDefaultWorkspaceMode;
+      STATE.activeWorkspaceId = STATE.onlyDefaultWorkspaceMode ? 'ws-default' : 'ws-taomni';
+      renderAll();
+    }
+
+    function selectGitFile(path) {
+      STATE.gitState.selectedFile = path;
+      STATE.gitState.activeTab = 'changes';
+      renderAll();
+    }
+
+    function toggleGitFileChecked(path) {
+      const item = STATE.gitState.changes.find(c => c.path === path);
+      if (item) item.checked = !item.checked;
+      renderAll();
+    }
+
+    function toggleGitFileStaged(path) {
+      const item = STATE.gitState.changes.find(c => c.path === path);
+      if (item) item.staged = !item.staged;
+      renderAll();
+    }
+
+    function gStageAll(stage) {
+      STATE.gitState.changes.forEach(c => { c.staged = stage; c.checked = true; });
+      renderAll();
+    }
+
+    function generateAiCommitMessage() {
+      STATE.gitState.commitMessage = 'feat(workspace): unify shared main toolbar, left-rail Home, and clean in-workspace Git panel';
+      renderCenterCanvas();
+      showToast('✨ 已根据当前 Staged Diff 生成 Commit Message');
+    }
+
+    function setLayoutPreset(preset) {
+      STATE.layoutPreset = preset;
+      renderCenterCanvas();
+    }
+
+    function toggleWsBottomDock() {
+      STATE.wsBottomDockOpen = !STATE.wsBottomDockOpen;
+      renderCenterCanvas();
+    }
+
+    function setWsBottomTab(tab) {
+      STATE.wsBottomDockTab = tab;
+      STATE.wsBottomDockOpen = true;
+      renderCenterCanvas();
+    }
+
+    function toggleBroadcastBar() {
+      STATE.sessionWorkbench.broadcastEnabled = !STATE.sessionWorkbench.broadcastEnabled;
+      renderCenterCanvas();
+    }
+
+    function toggleLeftNav() {
+      STATE.leftNavCollapsed = !STATE.leftNavCollapsed;
+      renderAll();
+    }
+
+    function toggleRightDock() {
+      STATE.rightDockCollapsed = !STATE.rightDockCollapsed;
+      renderAll();
+    }
+
+    function openRightInspectorTab(tab) {
+      STATE.rightDockCollapsed = false;
+      STATE.rightDockTab = tab;
+      renderAll();
+    }
+
+    function openGlobalTool(toolId) {
+      if (toolId === 'mfa') { openMfaFloat(); return; }
+      if (toolId === 'screenshot') { showToast('📷 已启动区域截图 (Ctrl+Alt+A)'); return; }
+      STATE.mode = 'tools';
+      STATE.selectedToolId = toolId;
+      renderAll();
+    }
+
+    function approveAgentCmd(agId) {
+      const ag = STATE.agents.find(a => a.id === agId);
+      if (ag) {
+        ag.pendingCmd = null;
+        ag.status = 'completed';
+        ag.statusText = '已完成 · 可合并';
+      }
+      renderAll();
+      showToast('已授权 Agent 执行 cargo test');
+    }
+
+    function toggleTheme() {
+      document.documentElement.classList.toggle('dark');
+    }
+
+    function showContextMenuAt(x, y, itemsHtml) {
+      const menu = document.getElementById('ctx-menu');
+      menu.innerHTML = itemsHtml;
+      menu.classList.add('open');
+      menu.style.left = Math.min(Math.max(8, x), window.innerWidth - 260) + 'px';
+      menu.style.top = Math.min(Math.max(8, y), window.innerHeight - 290) + 'px';
+    }
+
+    function closeContextMenu() {
+      document.getElementById('ctx-menu').classList.remove('open');
+    }
+    window.addEventListener('click', closeContextMenu);
+
+    function openWorkspaceSwitcherMenu(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      const rect = e.currentTarget.getBoundingClientRect();
+      const wsList = STATE.onlyDefaultWorkspaceMode
+        ? [STATE.workspaces['ws-default']]
+        : Object.values(STATE.workspaces);
+      showContextMenuAt(rect.left, rect.bottom + 4, `
+        <div style="padding:4px 8px;font-size:10.5px;font-weight:700;color:var(--taomni-text-muted);">切换工作区</div>
+        ${wsList.map(w => `
+          <div class="ctx-item" onclick="STATE.activeWorkspaceId='${w.id}';renderAll();">
+            <span>${w.id === getActiveWorkspace().id ? '✓ ' : ''}${w.name}</span>
+            <span class="kbd-badge">${w.badge}</span>
+          </div>
+        `).join('')}
+        <div class="ctx-sep"></div>
+        <div class="ctx-item" onclick="openCreateWorkspaceModal()"><span>+ 新建自定义工作区...</span></div>
+        <div class="ctx-item" onclick="showToast('选择本地文件夹打开为工作区')"><span>📂 打开本地文件夹作为工作区...</span></div>
+      `);
+    }
+
+    function openSessionContextMenu(e, nodeId, isFolder) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isFolder) {
+        showContextMenuAt(e.clientX, e.clientY, `
+          <div class="ctx-item" onclick="openNewSessionModal()"><span>+ 在此目录下新建会话 (New Session)</span></div>
+          <div class="ctx-item" onclick="showToast('新建子目录')"><span>📁 新建子目录 (New Subfolder)</span></div>
+          <div class="ctx-item" onclick="showToast('批量打开目录下全部会话')"><span>⚡ 批量打开目录下全部会话</span></div>
+          <div class="ctx-sep"></div>
+          <div class="ctx-item" onclick="showToast('重命名目录')"><span>✏️ 重命名目录 (Rename)</span><span class="kbd-badge">F2</span></div>
+          <div class="ctx-item" onclick="showToast('导出该目录会话 JSON')"><span>📤 导出此目录会话</span></div>
+          <div class="ctx-item danger" onclick="showToast('删除目录')"><span>🗑️ 删除目录 (Delete)</span></div>
+        `);
+      } else {
+        showContextMenuAt(e.clientX, e.clientY, `
+          <div class="ctx-item" onclick="openSessionInSessionsWorkbench('${nodeId}')"><span>🔌 连接 / 在新标签打开</span><span class="kbd-badge">Enter</span></div>
+          <div class="ctx-item" onclick="openSessionInSessionsWorkbench('${nodeId}');setLayoutPreset('split-right');"><span>◫ 在右侧分屏中打开</span></div>
+          <div class="ctx-item" onclick="openRightInspectorTab('companion')"><span>📂 打开伴随 SFTP 面板</span></div>
+          <div class="ctx-item" onclick="showToast('已将该会话关联到当前工作区')"><span>🟣 关联到工作区 (Link to Workspace)</span></div>
+          <div class="ctx-sep"></div>
+          <div class="ctx-item" onclick="showToast('已克隆会话配置')"><span>📋 克隆会话 (Duplicate)</span></div>
+          <div class="ctx-item" onclick="showToast('编辑会话属性')"><span>⚙️ 编辑连接配置 (Edit)</span></div>
+          <div class="ctx-item danger" onclick="showToast('已删除会话')"><span>🗑️ 删除会话 (Delete)</span></div>
+        `);
+      }
+    }
+
+    function openFileContextMenu(e, name, isFolder, nodeId) {
+      e.preventDefault();
+      e.stopPropagation();
+      showContextMenuAt(e.clientX, e.clientY, `
+        ${isFolder ? `
+          <div class="ctx-item" onclick="openAddNodeModal('file','${nodeId}')"><span>📄 在此新建文件...</span><span class="kbd-badge">Alt+Insert</span></div>
+          <div class="ctx-item" onclick="openAddNodeModal('folder','${nodeId}')"><span>📁 在此新建目录...</span></div>
+          <div class="ctx-sep"></div>
+        ` : `<div class="ctx-item" onclick="showToast('已打开 ' + '${name}')"><span>📄 打开文件</span></div>`}
+        <div class="ctx-item" onclick="setLayoutPreset('split-right')"><span>◫ 在右侧分屏打开</span></div>
+        <div class="ctx-item" onclick="openWorkspaceGitSurface('changes')"><span>🌿 在工作区 Git 面板对比</span></div>
+        <div class="ctx-sep"></div>
+        <div class="ctx-item" onclick="showToast('已复制相对路径')"><span>📋 复制相对路径 (Copy Path)</span></div>
+        <div class="ctx-item" onclick="showToast('重命名 ' + '${name}')"><span>✏️ 重命名 (Rename)</span><span class="kbd-badge">F2</span></div>
+        <div class="ctx-item danger" onclick="showToast('删除 ' + '${name}')"><span>🗑️ 删除 (Delete)</span></div>
+      `);
+    }
+
+    function openGitChangeContextMenu(e, path) {
+      e.preventDefault();
+      e.stopPropagation();
+      showContextMenuAt(e.clientX, e.clientY, `
+        <div class="ctx-item" onclick="selectGitFile('${path}')"><span>🔍 查看并排 Diff (View Diff)</span></div>
+        <div class="ctx-item" onclick="toggleGitFileStaged('${path}')"><span>➕ 暂存 / 取消暂存 (Stage / Unstage)</span></div>
+        <div class="ctx-item" onclick="activateTab('tab-code-shell')"><span>📄 跳转到源文件编辑器</span><span class="kbd-badge">F4</span></div>
+        <div class="ctx-sep"></div>
+        <div class="ctx-item danger" onclick="showToast('已放弃修改: ' + '${path}')"><span>↩️ 放弃更改 (Discard Changes)</span></div>
+      `);
+    }
+
+    function openGitCommitContextMenu(e, sha) {
+      e.preventDefault();
+      e.stopPropagation();
+      showContextMenuAt(e.clientX, e.clientY, `
+        <div class="ctx-item" onclick="showToast('git cherry-pick ' + '${sha}')"><span>🍒 Cherry-pick 提交 (${sha})</span></div>
+        <div class="ctx-item" onclick="showToast('git revert ' + '${sha}')"><span>↩️ Revert 反向还原此提交</span></div>
+        <div class="ctx-item" onclick="showToast('已在此提交处创建新分支')"><span>🌿 从此提交创建分支...</span></div>
+        <div class="ctx-item" onclick="showToast('已在此提交处创建标签')"><span>🏷️ 从此提交创建标签...</span></div>
+        <div class="ctx-sep"></div>
+        <div class="ctx-item" onclick="showToast('Reset 当前分支到 ' + '${sha}')"><span>⏪ Reset 当前分支到此提交...</span></div>
+      `);
+    }
+
+    function openGitMoreActionsMenu(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      const rect = e.currentTarget.getBoundingClientRect();
+      showContextMenuAt(rect.left - 80, rect.bottom + 4, `
+        <div class="ctx-item" onclick="showToast('Sync Current Branch')"><span>🔄 同步当前分支 (Sync Current Branch)</span></div>
+        <div class="ctx-item" onclick="STATE.gitState.activeTab='branches';renderCenterCanvas();"><span>🌿 切换分支 (Checkout Branch...)</span></div>
+        <div class="ctx-item" onclick="showToast('Create Branch from HEAD')"><span>➕ 从 HEAD 创建新分支...</span></div>
+        <div class="ctx-sep"></div>
+        <div class="ctx-item" onclick="STATE.gitState.showConflictBanner=!STATE.gitState.showConflictBanner;renderCenterCanvas();"><span>⚠️ 切换演示 Rebase / Merge 冲突解决横幅</span></div>
+        <div class="ctx-item" onclick="showToast('git push --force-with-lease')"><span>⚡ 强制推送 (Force Push with Lease)</span></div>
+      `);
+    }
+
+    function openTabContextMenu(e, tabId, isSessionsMode) {
+      e.preventDefault();
+      e.stopPropagation();
+      showContextMenuAt(e.clientX, e.clientY, `
+        <div class="ctx-item" onclick="setLayoutPreset('split-right')"><span>◫ 向右分屏并排显示 (Split Right)</span></div>
+        <div class="ctx-item" onclick="setLayoutPreset('grid-2x2')"><span>⊞ 2x2 网格视图</span></div>
+        <div class="ctx-sep"></div>
+        <div class="ctx-item" onclick="${isSessionsMode ? `closeSessionWorkbenchTab('${tabId}')` : `closeTab('${tabId}')`}"><span>✕ 关闭当前标签 (Close)</span><span class="kbd-badge">Ctrl+W</span></div>
+        <div class="ctx-item" onclick="showToast('已关闭其他标签')"><span>关闭其他标签 (Close Others)</span></div>
+      `);
+    }
+
+    function openImportMenu(e) {
+      e.stopPropagation();
+      const rect = e.currentTarget.getBoundingClientRect();
+      showContextMenuAt(rect.left, rect.bottom + 4, `
+        <div class="ctx-item" onclick="showToast('从 Taomni JSON 导入会话')"><span>📥 导入 Taomni 会话文件 (.json)</span></div>
+        <div class="ctx-item" onclick="showToast('已解析 ~/.ssh/config')"><span>🔑 从本机 ~/.ssh/config 导入</span></div>
+        <div class="ctx-item" onclick="showToast('导入 Xshell / SecureCRT / MobaXterm 会话目录')"><span>📦 从 Xshell / SecureCRT / MobaXterm 导入</span></div>
+        <div class="ctx-item" onclick="showToast('从 DBeaver 导入数据源配置')"><span>🗄️ 从 DBeaver 导入数据库连接</span></div>
+      `);
+    }
+
+    function openExportMenu(e) {
+      e.stopPropagation();
+      const rect = e.currentTarget.getBoundingClientRect();
+      showContextMenuAt(rect.left, rect.bottom + 4, `
+        <div class="ctx-item" onclick="showToast('已导出加密备份 (.taomni-enc)')"><span>🔐 导出全量会话 (含加密凭据)</span></div>
+        <div class="ctx-item" onclick="showToast('已导出脱敏会话配置 (.json)')"><span>📄 导出会话配置 (不含密码)</span></div>
+      `);
+    }
+
+    function showAppMenu(e) {
+      e.stopPropagation();
+      const rect = e.currentTarget.getBoundingClientRect();
+      showContextMenuAt(rect.right + 4, rect.top, `
+        <div class="ctx-item" onclick="switchMode('home')"><span>🏠 打开 Home 主页</span></div>
+        <div class="ctx-item" onclick="openCreateWorkspaceModal()"><span>🟣 新建/打开工作区...</span></div>
+        <div class="ctx-item" onclick="openNewSessionModal()"><span>🖥️ 新建远程会话...</span><span class="kbd-badge">Ctrl+Shift+N</span></div>
+        <div class="ctx-item" onclick="openWorkspaceGitSurface()"><span>🌿 打开工作区 Git 面板</span><span class="kbd-badge">Ctrl+Shift+G</span></div>
+        <div class="ctx-sep"></div>
+        <div class="ctx-item" onclick="openSettingsModal()"><span>⚙️ 全局设置 (Settings)</span><span class="kbd-badge">Ctrl+,</span></div>
+      `);
+    }
+
+    function toggleTabOverview() {
+      const el = document.getElementById('tab-overview');
+      el.classList.toggle('open');
+      renderTabOverviewModal();
+    }
+
+    function renderTabOverviewModal() {
+      const grid = document.getElementById('overview-grid');
+      if (!grid) return;
+      const tabs = STATE.mode === 'sessions' ? STATE.sessionWorkbench.openTabs : getActiveWorkspace().openTabs;
+      grid.innerHTML = tabs.map(t => `
+        <div class="preview-card" onclick="document.getElementById('tab-overview').classList.remove('open');${STATE.mode === 'sessions' ? `activateSessionWorkbenchTab('${t.id}')` : `activateTab('${t.id}')`}">
+          <div style="height:32px;padding:0 10px;background:var(--taomni-panel-bg);border-bottom:1px solid var(--taomni-chrome-border);display:flex;align-items:center;justify-content:space-between;">
+            <span style="font-weight:600;display:flex;align-items:center;gap:6px;">${protoBadgeHtml(t.proto)} ${t.title}</span>
+            <span class="kbd-badge">${t.host || t.path || 'Workspace'}</span>
+          </div>
+          <div class="mono" style="padding:10px;height:110px;background:var(--taomni-term-bg);color:var(--taomni-term-fg);font-size:11px;overflow:hidden;">
+            ${(t.summary || `Connected to ${t.title} (${t.host || ''})\n● Session ready`).replace(/\n/g, '<br/>')}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function openCommandPalette() {
+      const m = document.getElementById('modal-backdrop');
+      const c = document.getElementById('modal-content');
+      c.innerHTML = `
+        <div style="padding:12px 14px;border-bottom:1px solid var(--taomni-chrome-border);display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-weight:700;">🔍 统一命令与跳转中心 (Command Palette · Ctrl+K)</span>
+          <button class="icon-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div style="padding:10px;">
+          <div class="ctx-item" onclick="closeModal();switchMode('home');"><span>🏠 跳转到 Home 主页</span><span class="kbd-badge">Rail #1</span></div>
+          <div class="ctx-item" onclick="closeModal();openWorkspaceGitSurface('changes');"><span>🌿 打开当前工作区专用 Git 面板</span><span class="kbd-badge">Ctrl+Shift+G</span></div>
+          <div class="ctx-item" onclick="closeModal();switchMode('sessions');"><span>🖥️ 切换到全部会话总览 (All Sessions)</span><span class="kbd-badge">Rail #3</span></div>
+          <div class="ctx-item" onclick="closeModal();switchMode('agents');"><span>🤖 打开 Coding Agents 调度中心</span><span class="kbd-badge">Rail #4</span></div>
+        </div>
+      `;
+      m.classList.add('open');
+    }
+
+    function openCreateWorkspaceModal() {
+      const m = document.getElementById('modal-backdrop');
+      const c = document.getElementById('modal-content');
+      c.innerHTML = `
+        <div style="padding:12px 14px;border-bottom:1px solid var(--taomni-chrome-border);display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-weight:700;">🟣 新建工作区 (Create Workspace)</span>
+          <button class="icon-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:10px;">
+          <input type="text" placeholder="工作区名称 (例如: E-Commerce Core)" style="height:30px;padding:0 10px;border-radius:6px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);" />
+          <input type="text" placeholder="本地目录路径 (例如: ~/code/ecommerce)" style="height:30px;padding:0 10px;border-radius:6px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);" />
+          <div style="display:flex;justify-content:flex-end;gap:8px;">
+            <button class="pill-btn" onclick="closeModal()">取消</button>
+            <button class="pill-btn primary" onclick="closeModal();showToast('已创建新工作区')">创建并打开</button>
+          </div>
+        </div>
+      `;
+      m.classList.add('open');
+    }
+
+    function openNewSessionModal() {
+      const m = document.getElementById('modal-backdrop');
+      const c = document.getElementById('modal-content');
+      c.innerHTML = `
+        <div style="padding:12px 14px;border-bottom:1px solid var(--taomni-chrome-border);display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-weight:700;">🖥️ 新建会话配置 (SSH / SFTP / DB / RDP / VNC / Telnet / Serial)</span>
+          <button class="icon-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:10px;">
+          <input type="text" placeholder="会话名称 (如: prod-redis-01)" style="height:30px;padding:0 10px;border-radius:6px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);" />
+          <input type="text" placeholder="主机地址与端口 (如: 10.24.1.55:22)" style="height:30px;padding:0 10px;border-radius:6px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);" />
+          <div style="display:flex;justify-content:flex-end;gap:8px;">
+            <button class="pill-btn" onclick="closeModal()">取消</button>
+            <button class="pill-btn primary" onclick="closeModal();showToast('已保存会话到目录树')">保存并连接</button>
+          </div>
+        </div>
+      `;
+      m.classList.add('open');
+    }
+
+    function openLinkSessionModal() { openNewSessionModal(); }
+
+    function openDispatchAgentModal() {
+      const m = document.getElementById('modal-backdrop');
+      const c = document.getElementById('modal-content');
+      c.innerHTML = `
+        <div style="padding:12px 14px;border-bottom:1px solid var(--taomni-chrome-border);display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-weight:700;">🤖 派发新 Coding Agent 任务 (自动创建独立 Git Worktree)</span>
+          <button class="icon-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:10px;">
+          <select style="height:30px;padding:0 10px;border-radius:6px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);">
+            <option>Claude Code (claude-sonnet-4-5)</option>
+            <option>OpenAI Codex CLI</option>
+            <option>OpenCode Local</option>
+          </select>
+          <textarea rows="3" placeholder="描述开发或排障任务..." style="padding:8px;border-radius:6px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);"></textarea>
+          <div style="display:flex;justify-content:flex-end;gap:8px;">
+            <button class="pill-btn" onclick="closeModal()">取消</button>
+            <button class="pill-btn primary" onclick="closeModal();switchMode('agents');showToast('已创建隔离 Git Worktree 并启动 Agent');">立即派发</button>
+          </div>
+        </div>
+      `;
+      m.classList.add('open');
+    }
+
+    function openSettingsModal() {
+      const m = document.getElementById('modal-backdrop');
+      const c = document.getElementById('modal-content');
+      c.innerHTML = `
+        <div style="padding:12px 14px;border-bottom:1px solid var(--taomni-chrome-border);display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-weight:700;">⚙️ 全局设置与三级网络代理</span>
+          <button class="icon-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:10px;">
+          <div><strong>外部网络访问三级代理策略 (符合 AGENTS.md 规范)：</strong></div>
+          <div class="muted">1. 默认跟随应用全局代理 (<span class="mono">http://10.1.0.80:3228</span>)<br/>2. 功能独立持久化代理<br/>3. 强制直连 (No Proxy，绕过系统环境变量且失败时显式报错)</div>
+          <div style="display:flex;justify-content:flex-end;"><button class="pill-btn primary" onclick="closeModal()">确定</button></div>
+        </div>
+      `;
+      m.classList.add('open');
+    }
+
+    function closeModal() {
+      document.getElementById('modal-backdrop').classList.remove('open');
+    }
+
+    function showToast(msg) {
+      let t = document.getElementById('toast-banner');
+      if (!t) {
+        t = document.createElement('div');
+        t.id = 'toast-banner';
+        t.style.cssText = 'position:fixed;bottom:32px;right:18px;z-index:300;padding:8px 14px;border-radius:8px;background:var(--taomni-accent);color:#fff;font-weight:600;box-shadow:var(--taomni-shadow-lg);transition:opacity 0.2s;';
+        document.body.appendChild(t);
+      }
+      t.textContent = msg;
+      t.style.opacity = '1';
+      clearTimeout(window.__toastTimer);
+      window.__toastTimer = setTimeout(() => { t.style.opacity = '0'; }, 2400);
+    }
+
+
+    // ============================================================================
+    // v6: IDEA-style tool window stripe, any-session opening, add file/dir, floating MFA, language
+    // ============================================================================
+    function renderToolStripe() {
+      const el = document.getElementById('rail-ctx');
+      if (STATE.mode !== 'workspace') { el.innerHTML = ''; return; }
+      const at = getActiveTab();
+      const gitActive = at && at.proto === 'git';
+      const btn = (icon, title, on, active, badge) => `<button class="rail-btn ${active ? 'active' : ''}" style="font-size:15px;" title="${title}" onclick="${on}">${icon}${badge ? `<span class="rail-badge">${badge}</span>` : ''}</button>`;
+      el.innerHTML = `
+        <div class="rail-divider"></div>
+        ${btn('📁', 'Project 文件管理 (Alt+1)', "setWsLens('project')", STATE.wsLens === 'project' && !STATE.leftNavCollapsed)}
+        ${btn('🖥️', 'Sessions 打开任意会话 (Alt+2)', "setWsLens('sessions')", STATE.wsLens === 'sessions' && !STATE.leftNavCollapsed)}
+        ${btn('🌿', 'Git 面板 (Alt+9 / Ctrl+Shift+G)', "openWorkspaceGitSurface()", gitActive, STATE.gitState.changes.length)}
+        ${btn('🧭', 'Structure 结构大纲 (Alt+7)', "openRightInspectorTab('structure')", !STATE.rightDockCollapsed && STATE.rightDockTab === 'structure')}
+        ${btn('⋯', '更多工具窗口 (Terminal / Problems / Run / Find / Bookmarks / TODO / Services ...)', "openMoreToolWindowsMenu(event)", STATE.wsBottomDockOpen)}`;
+    }
+
+    function setWsLens(lens) {
+      if (STATE.leftNavCollapsed) STATE.leftNavCollapsed = false;
+      else if (STATE.wsLens === lens && lens === 'project') { /* IDEA: re-click hides */ STATE.leftNavCollapsed = true; }
+      STATE.wsLens = lens;
+      renderAll();
+    }
+
+    function openMoreToolWindowsMenu(e) {
+      e.stopPropagation();
+      const r = e.currentTarget.getBoundingClientRect();
+      showContextMenuAt(r.right + 4, Math.max(8, r.top - 220), `
+        <div style="padding:4px 8px;font-size:10.5px;font-weight:700;color:var(--taomni-text-muted);">底部工具窗口 (同底栏页签)</div>
+        <div class="ctx-item" onclick="setWsBottomTab('terminal')"><span>⌨️ Terminal</span><span class="kbd-badge">Alt+F12</span></div>
+        <div class="ctx-item" onclick="setWsBottomTab('problems')"><span>⚠️ Problems</span><span class="kbd-badge">Alt+6</span></div>
+        <div class="ctx-item" onclick="setWsBottomTab('run')"><span>▶️ Run / Debug</span><span class="kbd-badge">Alt+4</span></div>
+        <div class="ctx-item" onclick="setWsBottomTab('search')"><span>🔍 Find / 全局搜索</span><span class="kbd-badge">Alt+3</span></div>
+        <div class="ctx-sep"></div>
+        <div style="padding:4px 8px;font-size:10.5px;font-weight:700;color:var(--taomni-text-muted);">更多 (沿用原 Code Workspace)</div>
+        <div class="ctx-item" onclick="showToast('Bookmarks 已打开 (Alt+2)')"><span>🔖 Bookmarks</span></div>
+        <div class="ctx-item" onclick="showToast('TODO 已打开 (Alt+6)')"><span>☑️ TODO</span></div>
+        <div class="ctx-item" onclick="showToast('Services / Ports 已打开')"><span>🔌 Services / Ports</span></div>
+        <div class="ctx-item" onclick="showToast('Database 工具窗口已打开')"><span>🗄️ Database</span></div>
+        <div class="ctx-item" onclick="setWsBottomTab('git-log')"><span>📜 Git Log (Alt+9)</span></div>
+        <div class="ctx-sep"></div>
+        <div class="ctx-item" onclick="showToast('已切换显示工具窗口名称')"><span>Aa 显示工具窗口名称</span></div>
+        <div class="ctx-item" onclick="showToast('已打开 Move to 子菜单 (Left Top / Bottom Left / Right Top ...)')"><span>↔ 移动工具窗口到...</span></div>
+      `);
+    }
+
+    function flatSessions(nodes = STATE.sessionTree, out = []) {
+      nodes.forEach(n => { if (n.type === 'session') out.push(n); else flatSessions(n.children || [], out); });
+      return out;
+    }
+
+    function toggleLinkSession(id) {
+      const ws = getActiveWorkspace();
+      const i = ws.linkedSessionIds.indexOf(id);
+      if (i >= 0) ws.linkedSessionIds.splice(i, 1); else ws.linkedSessionIds.push(id);
+      renderAll();
+      showToast(i >= 0 ? '已取消关联 (仅取消快捷入口，不影响会话配置)' : '已关联到当前工作区');
+    }
+
+    function renderWsSessionsLens(ws, toolbarEl, treeEl, footerEl) {
+      const q = STATE.wsSessionQuery.toLowerCase();
+      toolbarEl.innerHTML = `
+        <button class="icon-btn" style="width:22px;height:22px;" title="新建会话配置" onclick="openNewSessionModal()">+</button>
+        <button class="icon-btn" style="width:22px;height:22px;" title="在工作区打开本地终端" onclick="openWsLocalTerminal()">⌨️</button>
+        <div class="toolbar-v-divider"></div>
+        <div class="nav-inline-search"><input type="text" id="ws-sess-q" placeholder="搜索全部会话 / 主机..." value="${STATE.wsSessionQuery}" oninput="STATE.wsSessionQuery=this.value;renderLeftNavigator();document.getElementById('ws-sess-q').focus();" /></div>`;
+      const match = s => !q || s.name.toLowerCase().includes(q) || (s.host || '').toLowerCase().includes(q);
+      const row = (s, pad) => {
+        const linked = ws.linkedSessionIds.includes(s.id);
+        const open = ws.openTabs.some(t => t.id === 'ws-inst-' + s.id);
+        return `<div class="tree-row ${ws.activeTabId === 'ws-inst-' + s.id ? 'selected' : ''}" style="padding-left:${pad}px;" onclick="openLinkedSessionInWorkspace('${s.id}')" oncontextmenu="openWsSessionContextMenu(event,'${s.id}')">
+          <div class="tree-row-left">${protoBadgeHtml(s.proto)}<span class="tree-label">${s.name}</span></div>
+          <span class="tree-meta" style="${open ? 'color:var(--taomni-success);' : ''}">${open ? '● 已连' : s.host}</span>
+          <div class="tree-hover-btns"><button class="icon-btn" style="width:18px;height:18px;" title="${linked ? '取消关联' : '关联到工作区'}" onclick="event.stopPropagation();toggleLinkSession('${s.id}')">${linked ? '★' : '☆'}</button></div>
+        </div>`;
+      };
+      const tree = (nodes, d) => nodes.map(n => {
+        if (n.type === 'session') return match(n) ? row(n, 6 + d * 13) : '';
+        const inner = tree(n.children || [], d + 1);
+        if (!inner) return '';
+        return `<div><div class="tree-row" style="padding-left:${6 + d * 13}px;cursor:default;"><div class="tree-row-left"><span class="tree-chevron">▾</span><span style="color:var(--taomni-warning);">📁</span><span class="tree-label" style="font-weight:600;">${n.name}</span></div></div>${inner}</div>`;
+      }).join('');
+      const linked = ws.linkedSessionIds.map(id => findSessionById(id)).filter(Boolean).filter(match);
+      treeEl.innerHTML = `
+        <div style="padding:3px 6px;font-size:10.5px;font-weight:700;color:var(--taomni-text-muted);">★ 本工作区常用 (${linked.length})</div>
+        ${linked.map(s => row(s, 10)).join('') || '<div class="muted" style="padding:2px 14px;font-size:11px;">暂无，悬停会话点 ☆ 即可关联</div>'}
+        <div style="margin-top:8px;padding:6px 6px 3px;border-top:1px solid var(--taomni-chrome-border);font-size:10.5px;font-weight:700;color:var(--taomni-text-muted);">全部会话 (点击即在本工作区打开独立实例)</div>
+        ${tree(STATE.sessionTree, 0)}`;
+      footerEl.innerHTML = `<span>共 ${flatSessions().length} 个会话</span><span class="mono">右键: 关联 / 连接</span>`;
+    }
+
+    function openWsSessionContextMenu(e, id) {
+      e.preventDefault(); e.stopPropagation();
+      const ws = getActiveWorkspace();
+      const linked = ws.linkedSessionIds.includes(id);
+      showContextMenuAt(e.clientX, e.clientY, `
+        <div class="ctx-item" onclick="openLinkedSessionInWorkspace('${id}')"><span>🔌 在本工作区打开</span></div>
+        <div class="ctx-item" onclick="openLinkedSessionInWorkspace('${id}');setLayoutPreset('split-right');"><span>◫ 在右侧分屏打开</span></div>
+        <div class="ctx-item" onclick="toggleLinkSession('${id}')"><span>${linked ? '☆ 取消关联' : '★ 关联到本工作区'}</span></div>
+        <div class="ctx-sep"></div>
+        <div class="ctx-item" onclick="showToast('编辑会话属性')"><span>⚙️ 编辑连接配置</span></div>
+        <div class="ctx-item" onclick="showToast('已克隆会话')"><span>📋 克隆会话</span></div>`);
+    }
+
+    function openWsLocalTerminal() {
+      const ws = getActiveWorkspace();
+      const id = 'ws-local-' + (++STATE.nodeSeq);
+      ws.openTabs.push({ id, title: 'Local (zsh)', proto: 'ssh', host: 'localhost', user: 'zhyhang', latency: '0ms', summary: 'zhyhang@localhost:' + ws.rootPath + '$' });
+      ws.activeTabId = id; renderAll();
+    }
+
+    function openWsNewMenu(e) {
+      e.stopPropagation();
+      const r = e.currentTarget.getBoundingClientRect();
+      const fav = flatSessions().filter(s => s.favorite).slice(0, 4);
+      showContextMenuAt(r.left, r.bottom + 4, `
+        <div class="ctx-item" onclick="openAddNodeModal('file')"><span>📄 新建文件...</span><span class="kbd-badge">Alt+Insert</span></div>
+        <div class="ctx-item" onclick="openAddNodeModal('folder')"><span>📁 新建目录...</span></div>
+        <div class="ctx-item" onclick="openAddNodeModal('root')"><span>📂 添加目录到工作区...</span></div>
+        <div class="ctx-sep"></div>
+        <div class="ctx-item" onclick="openWsLocalTerminal()"><span>⌨️ 本地终端</span><span class="kbd-badge">Ctrl+Shift+T</span></div>
+        <div style="padding:4px 8px;font-size:10.5px;font-weight:700;color:var(--taomni-text-muted);">打开会话 (任意会话，不限关联)</div>
+        ${fav.map(s => `<div class="ctx-item" onclick="openLinkedSessionInWorkspace('${s.id}')"><span>${s.proto.toUpperCase()} · ${s.name}</span></div>`).join('')}
+        <div class="ctx-item" onclick="openSessionPicker()"><span>🔎 浏览 / 搜索全部会话...</span><span class="kbd-badge">Ctrl+Alt+O</span></div>
+        <div class="ctx-item" onclick="openNewSessionModal()"><span>+ 新建会话配置...</span></div>`);
+    }
+
+    function openSessionPicker(q = '') {
+      const list = flatSessions().filter(s => !q || s.name.toLowerCase().includes(q.toLowerCase()) || (s.host || '').includes(q));
+      document.getElementById('modal-content').innerHTML = `
+        <div style="padding:10px 12px;border-bottom:1px solid var(--taomni-chrome-border);display:flex;gap:8px;align-items:center;">
+          <input id="sp-q" autofocus placeholder="搜索会话名称 / 主机 / 协议 (SSH / DB / SFTP / RDP / Mail)..." value="${q}" oninput="openSessionPicker(this.value)" style="flex:1;height:28px;padding:0 10px;border-radius:6px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);" />
+          <button class="icon-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div style="max-height:360px;overflow-y:auto;padding:6px;">
+          ${list.map(s => `<div class="ctx-item" style="height:30px;" onclick="closeModal();openLinkedSessionInWorkspace('${s.id}')"><span style="display:flex;gap:8px;align-items:center;">${protoBadgeHtml(s.proto)}<strong>${s.name}</strong><span class="muted mono" style="font-size:10.5px;">${s.host}</span></span><span class="muted" style="font-size:10.5px;">${(s.group || '').split('/').pop()}</span></div>`).join('') || '<div class="muted" style="padding:12px;">无匹配会话</div>'}
+        </div>
+        <div class="muted" style="padding:6px 12px;border-top:1px solid var(--taomni-chrome-border);font-size:11px;">点击即在当前工作区打开独立会话实例 · 在左侧 Sessions 面板可 ★ 关联为常用</div>`;
+      document.getElementById('modal-backdrop').classList.add('open');
+      setTimeout(() => { const i = document.getElementById('sp-q'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 0);
+    }
+
+    function findNodeById(id, nodes) {
+      for (const n of nodes) { if (n.id === id) return n; if (n.children) { const f = findNodeById(id, n.children); if (f) return f; } }
+      return null;
+    }
+
+    function openAddNodeModal(kind, parentId) {
+      const ws = getActiveWorkspace();
+      const parent = parentId ? findNodeById(parentId, ws.fileTree) : ws.fileTree[0];
+      const titles = { file: '📄 新建文件', folder: '📁 新建目录', root: '📂 添加目录到工作区' };
+      document.getElementById('modal-content').innerHTML = `
+        <div style="padding:12px 14px;border-bottom:1px solid var(--taomni-chrome-border);display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-weight:700;">${titles[kind]}</span><button class="icon-btn" onclick="closeModal()">✕</button>
+        </div>
+        <div style="padding:14px;display:flex;flex-direction:column;gap:10px;">
+          ${kind !== 'root' ? `<div class="muted">位置: <span class="mono">${parent ? parent.name : ws.rootPath}</span></div>` : '<div class="muted">将已有本地目录作为额外根目录加入当前工作区 (多根工作区)；也可直接拖拽目录到左侧文件树。</div>'}
+          <input id="node-name" placeholder="${kind === 'file' ? '文件名，如 utils.ts' : kind === 'folder' ? '目录名，如 components' : '本地目录路径，如 ~/code/infra-deploy'}" style="height:30px;padding:0 10px;border-radius:6px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);" onkeydown="if(event.key==='Enter')addFileNode('${kind}','${parent ? parent.id : ''}')" />
+          <div style="display:flex;justify-content:flex-end;gap:8px;"><button class="pill-btn" onclick="closeModal()">取消</button><button class="pill-btn primary" onclick="addFileNode('${kind}','${parent ? parent.id : ''}')">${kind === 'root' ? '添加' : '创建'}</button></div>
+        </div>`;
+      document.getElementById('modal-backdrop').classList.add('open');
+      setTimeout(() => document.getElementById('node-name').focus(), 0);
+    }
+
+    function addFileNode(kind, parentId) {
+      const ws = getActiveWorkspace();
+      const name = (document.getElementById('node-name').value || '').trim();
+      if (!name) { showToast('请输入名称'); return; }
+      const id = 'n-' + (++STATE.nodeSeq);
+      if (kind === 'root') {
+        ws.fileTree.push({ id, name, type: 'folder', children: [] });
+        ws.foldersExpanded[id] = true;
+      } else {
+        const parent = findNodeById(parentId, ws.fileTree) || ws.fileTree[0];
+        parent.children = parent.children || [];
+        ws.foldersExpanded[parent.id] = true;
+        if (kind === 'folder') {
+          parent.children.push({ id, name, type: 'folder', children: [] });
+          ws.foldersExpanded[id] = true;
+        } else {
+          const tabId = 'tab-' + id;
+          parent.children.push({ id, name, type: 'file', tabId, git: 'A' });
+          ws.openTabs.push({ id: tabId, title: name, proto: 'code', dirty: true, path: parent.name + '/' + name, summary: '// ' + name });
+          ws.activeTabId = tabId;
+        }
+      }
+      STATE.wsLens = 'project';
+      closeModal(); renderAll();
+      showToast(kind === 'root' ? '已添加目录到工作区' : '已创建 ' + name);
+    }
+
+    function collapseWsFolders() {
+      const ws = getActiveWorkspace();
+      Object.keys(ws.foldersExpanded).forEach(k => ws.foldersExpanded[k] = false);
+      renderLeftNavigator();
+    }
+
+    function openScreenshotMenu(e) {
+      e.stopPropagation();
+      const r = e.currentTarget.getBoundingClientRect();
+      showContextMenuAt(r.right + 4, r.top - 40, `
+        <div class="ctx-item" onclick="showToast('📷 区域截图已启动')"><span>▭ 区域截图</span><span class="kbd-badge">Ctrl+Alt+A</span></div>
+        <div class="ctx-item" onclick="showToast('📷 窗口截图')"><span>🪟 窗口截图</span></div>
+        <div class="ctx-item" onclick="showToast('📷 全屏截图')"><span>🖥️ 全屏截图</span></div>
+        <div class="ctx-item" onclick="showToast('⏱ 3 秒后截图')"><span>⏱ 延时截图 (3s / 5s)</span></div>
+        <div class="ctx-item" onclick="showToast('已打开 Pin Board')"><span>📌 贴图板</span></div>`);
+    }
+
+    function openLanguageMenu(e) {
+      e.stopPropagation();
+      const r = e.currentTarget.getBoundingClientRect();
+      showContextMenuAt(r.right + 4, r.top - 30, `
+        <div class="ctx-item" onclick="STATE.lang='zh';showToast('界面语言: 简体中文')"><span>${STATE.lang === 'zh' ? '✓ ' : ''}简体中文</span></div>
+        <div class="ctx-item" onclick="STATE.lang='en';showToast('UI language: English')"><span>${STATE.lang === 'en' ? '✓ ' : ''}English</span></div>`);
+    }
+
+    function openMfaFloat() {
+      const el = document.getElementById('mfa-float');
+      if (el.classList.contains('open')) { el.classList.remove('open'); return; }
+      el.classList.add('open');
+      renderMfaFloat();
+      if (!window.__mfaTimer) window.__mfaTimer = setInterval(() => { if (el.classList.contains('open')) renderMfaFloat(); }, 1000);
+    }
+
+    function renderMfaFloat() {
+      const el = document.getElementById('mfa-float');
+      const sec = 30 - (Math.floor(Date.now() / 1000) % 30);
+      const code = n => String((Math.floor(Date.now() / 30000) * 7919 + n * 104729) % 1000000).padStart(6, '0');
+      const accts = [['GitHub', 'zhyhang'], ['prod-gateway-01', 'ubuntu'], ['AWS Console', 'ops@taomni']];
+      el.innerHTML = `
+        <div class="mfa-head"><span>🔐 MFA 验证器</span><button class="icon-btn" style="width:20px;height:20px;" onclick="openMfaFloat()">✕</button></div>
+        <div style="padding:8px;display:flex;flex-direction:column;gap:6px;">
+          ${accts.map((a, i) => `<div style="padding:7px 9px;border-radius:7px;background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);display:flex;align-items:center;justify-content:space-between;cursor:pointer;" onclick="showToast('已复制验证码 ${code(i + 1)}')">
+            <div><div style="font-weight:600;font-size:11.5px;">${a[0]}</div><div class="muted" style="font-size:10.5px;">${a[1]}</div></div>
+            <div style="text-align:right;"><div class="mono" style="font-size:16px;font-weight:700;letter-spacing:1px;color:var(--taomni-accent);">${code(i + 1).slice(0, 3)} ${code(i + 1).slice(3)}</div><div class="muted mono" style="font-size:10px;">${sec}s</div></div></div>`).join('')}
+          <div class="muted" style="font-size:10.5px;">点击卡片复制 · 窗口可拖动，不占用主界面</div>
+        </div>`;
+      const head = el.querySelector('.mfa-head'); let d = null;
+      head.onmousedown = ev => { d = { x: ev.clientX - el.offsetLeft, y: ev.clientY - el.offsetTop }; window.__mfaDrag = d; };
+    }
+    window.addEventListener('mousemove', ev => { const el = document.getElementById('mfa-float'); const d = window.__mfaDrag; if (d) { el.style.left = (ev.clientX - d.x) + 'px'; el.style.top = (ev.clientY - d.y) + 'px'; el.style.right = 'auto'; el.style.bottom = 'auto'; } });
+    window.addEventListener('mouseup', () => { window.__mfaDrag = null; });
+
+    // Draggable Left & Right Sidebar Resizers
+    (function initResizers() {
+      const leftResizer = document.getElementById('left-resizer');
+      const rightResizer = document.getElementById('right-resizer');
+      let dragging = null;
+
+      leftResizer.addEventListener('mousedown', () => { dragging = 'left'; leftResizer.classList.add('dragging'); });
+      leftResizer.addEventListener('dblclick', () => { STATE.leftNavWidth = 260; renderAll(); });
+
+      rightResizer.addEventListener('mousedown', () => { dragging = 'right'; rightResizer.classList.add('dragging'); });
+      rightResizer.addEventListener('dblclick', () => { STATE.rightDockWidth = 300; renderAll(); });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!dragging) return;
+        if (dragging === 'left') {
+          STATE.leftNavWidth = Math.max(185, Math.min(500, e.clientX - 42));
+          renderAll();
+        } else if (dragging === 'right') {
+          STATE.rightDockWidth = Math.max(220, Math.min(480, window.innerWidth - e.clientX - 6));
+          renderAll();
+        }
+      });
+
+      window.addEventListener('mouseup', () => {
+        if (dragging) {
+          leftResizer.classList.remove('dragging');
+          rightResizer.classList.remove('dragging');
+          dragging = null;
+        }
+      });
+
+      window.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openCommandPalette(); }
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'e') { e.preventDefault(); toggleTabOverview(); }
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'g') { e.preventDefault(); openWorkspaceGitSurface(); }
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'h') {
+          e.preventDefault();
+          STATE.sessionWorkbench.detailsHoverActive = !STATE.sessionWorkbench.detailsHoverActive;
+          renderCenterCanvas();
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') { e.preventDefault(); toggleLeftNav(); }
+        if (e.key === 'Escape') { closeModal(); document.getElementById('tab-overview').classList.remove('open'); }
+      });
+    })();
+
+    renderAll();
+  </script>
+</body>
+</html>

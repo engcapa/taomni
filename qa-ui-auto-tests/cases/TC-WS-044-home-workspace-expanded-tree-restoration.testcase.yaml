@@ -1,0 +1,151 @@
+id: TC-WS-044
+title: Home to saved Workspace restores expanded tree and list descendants
+description: Create Workspace1 through the UI, expand document and nested source directories, choose another workspace, reload from Home and select Workspace1.
+  Expanded descendants and the open document must restore without collapsing or re-expanding nodes. Repeat in Detailed List.
+modes:
+- browser
+- native
+covers:
+- F-WS-1
+- F-WS-2
+- F25.1
+- F25.3
+tags:
+- p0
+- workspace-redesign
+- file-explorer
+- regression
+- persistence
+fixtures:
+- reset_db
+- workspace_explorer
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-restored-tree
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="workspace-create-button"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: Workspace1
+- click: '[data-testid="text-input-dialog-confirm"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.platform_workspace_root}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-path="Documents"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="Documents"] [data-testid="code-workspace-tree-dir-arrow"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="Documents/notes.txt"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src/main"] [data-testid="code-workspace-tree-dir-arrow"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/notes.txt"]'
+- wait_for: '[data-testid="workspace-file-editor"] .cm-content'
+- click: '[data-testid="workspace-switcher-button"]'
+- click: '[data-testid="workspace-switcher-option-default-workspace"]'
+- wait_for: '[data-testid="code-workspace-tree-empty"]'
+- click: '[data-testid="nav-mode-home"]'
+- reload_window: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-switcher-button"]'
+- click: '[data-testid="workspace-switcher-button"]'
+- click: '[data-testid="workspace-switcher-menu"] >> text=Workspace1'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="Documents/notes.txt"]'
+- assert_visible: '[data-testid="code-workspace-tree-file"][data-path="src/index.ts"]'
+- assert_visible: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-dir"][data-path="src/main"]'
+    name: aria-expanded
+    equals: 'true'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"]'
+    contains: Weekly notes
+- assert_no_runtime_errors: null
+- click: '[data-testid="code-workspace-tree-view-selector"]'
+- click: '[data-testid="code-workspace-tree-view-list"]'
+- reload_window: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="Documents/notes.txt"]'
+- assert_visible: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree"]'
+    name: data-view-mode
+    equals: list
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="src/index.ts"]'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"]'
+    contains: export const platform = "workspace"
+- assert_no_runtime_errors: null
+- screenshot: workspace-restored-expanded-tree.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Restored expanded document and nested source directories load their real entries when selected from Home; tree and list preserve expansion
+      and the selected file.
+    actions:
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 14
+    - 16
+    - 18
+    - 20
+    - 21
+    - 23
+    - 24
+    - 25
+    - 27
+    - 28
+    - 35
+    - 36
+    - 37
+    - 38
+    - 42
+    results:
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 40
+    - 41
+    - 43
+    - 44
+    checkpoints:
+    - step: 30
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-file\"][data-path=\"src/index.ts\"]"}'
+    - step: 31
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main/java\"]"}'
+    - step: 32
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main\"]", "name": "aria-expanded", "equals":
+        "true"}}'
+    - step: 33
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"]", "contains": "Weekly notes"}}'
+    - step: 34
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 40
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main/java\"]"}'
+    - step: 41
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree\"]", "name": "data-view-mode", "equals": "list"}}'
+    - step: 43
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"]", "contains": "export const platform = \"workspace\""}}'
+    - step: 44
+      expectation: '{"assert_no_runtime_errors": null}'
+  visual:
+  - check: Restored expanded rows show their children in the retained tree/list screenshot.
+    method: manual
+    reason: Functional assertions do not establish visual fidelity.
+  native:
+  - check: Restored directory contents are read from native disk in the packaged WebView.
+    method: automated
+    reason: Browser VFS cannot verify native filesystem reads after a real WebView reload; cold process restoration is also retained in TC-WS-030.

@@ -1,6 +1,6 @@
 use super::*;
-#[test]
-fn returns_compact_chain_endpoint() {
+#[tokio::test]
+async fn returns_compact_chain_endpoint() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().to_string_lossy().to_string();
     fs::create_dir_all(dir.path().join("src/main/java/com/example/service")).unwrap();
@@ -11,7 +11,9 @@ fn returns_compact_chain_endpoint() {
     )
     .unwrap();
 
-    let chain = workspace_compact_chain(root, "src".into(), Some(16)).unwrap();
+    let chain = workspace_compact_chain(root, "src".into(), Some(16))
+        .await
+        .unwrap();
 
     assert_eq!(chain.path, "src/main/java/com/example/service");
     assert_eq!(chain.entries.len(), 1);
@@ -21,8 +23,8 @@ fn returns_compact_chain_endpoint() {
     );
 }
 
-#[test]
-fn recursively_lists_files_with_limits_and_skips_git() {
+#[tokio::test]
+async fn recursively_lists_files_with_limits_and_skips_git() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().to_string_lossy().to_string();
     fs::create_dir_all(dir.path().join("src/a")).unwrap();
@@ -31,16 +33,20 @@ fn recursively_lists_files_with_limits_and_skips_git() {
     fs::write(dir.path().join("src/two.ts"), "two").unwrap();
     fs::write(dir.path().join(".git/config"), "hidden").unwrap();
 
-    let files = workspace_list_files_recursive(root.clone(), None, Some(10), Some(10)).unwrap();
+    let files = workspace_list_files_recursive(root.clone(), None, Some(10), Some(10))
+        .await
+        .unwrap();
     let paths: Vec<_> = files.iter().map(|entry| entry.path.as_str()).collect();
     assert_eq!(paths, vec!["src/a/one.ts", "src/two.ts"]);
 
-    let limited = workspace_list_files_recursive(root, None, Some(10), Some(1)).unwrap();
+    let limited = workspace_list_files_recursive(root, None, Some(10), Some(1))
+        .await
+        .unwrap();
     assert_eq!(limited.len(), 1);
 }
 
-#[test]
-fn recursive_listing_skips_dependency_and_build_dirs() {
+#[tokio::test]
+async fn recursive_listing_skips_dependency_and_build_dirs() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().to_string_lossy().to_string();
     fs::create_dir_all(dir.path().join("src")).unwrap();
@@ -54,13 +60,15 @@ fn recursive_listing_skips_dependency_and_build_dirs() {
     .unwrap();
     fs::write(dir.path().join("target/debug/app"), "bin").unwrap();
 
-    let files = workspace_list_files_recursive(root, None, Some(10), Some(100)).unwrap();
+    let files = workspace_list_files_recursive(root, None, Some(10), Some(100))
+        .await
+        .unwrap();
     let paths: Vec<_> = files.iter().map(|entry| entry.path.as_str()).collect();
     assert_eq!(paths, vec!["src/main.rs"]);
 }
 
-#[test]
-fn detects_git_roots_and_deduplicates_nested_roots() {
+#[tokio::test]
+async fn detects_git_roots_and_deduplicates_nested_roots() {
     let dir = tempfile::tempdir().unwrap();
     let repo = dir.path().join("repo");
     let nested = repo.join("packages/app");
@@ -86,6 +94,7 @@ fn detects_git_roots_and_deduplicates_nested_roots() {
             path: plain.to_string_lossy().to_string(),
         },
     ])
+    .await
     .unwrap();
 
     let repo_root = path_to_string(&fs::canonicalize(&repo).unwrap_or(repo.clone()));
@@ -97,8 +106,8 @@ fn detects_git_roots_and_deduplicates_nested_roots() {
     assert!(detected.root_ids.contains(&"app".to_string()));
 }
 
-#[test]
-fn detects_child_git_roots_under_plain_workspace_root() {
+#[tokio::test]
+async fn detects_child_git_roots_under_plain_workspace_root() {
     let dir = tempfile::tempdir().unwrap();
     let workspace = dir.path().join("workspace");
     let app = workspace.join("app");
@@ -112,6 +121,7 @@ fn detects_child_git_roots_under_plain_workspace_root() {
         name: "workspace".into(),
         path: workspace.to_string_lossy().to_string(),
     }])
+    .await
     .unwrap();
 
     let app_canon = fs::canonicalize(&app).unwrap_or(app.clone());
@@ -143,8 +153,8 @@ fn detects_child_git_roots_under_plain_workspace_root() {
     );
 }
 
-#[test]
-fn marks_git_file_roots_as_submodules() {
+#[tokio::test]
+async fn marks_git_file_roots_as_submodules() {
     let dir = tempfile::tempdir().unwrap();
     let workspace = dir.path().join("workspace");
     let submodule = workspace.join("vendor/lib");
@@ -160,6 +170,7 @@ fn marks_git_file_roots_as_submodules() {
         name: "workspace".into(),
         path: workspace.to_string_lossy().to_string(),
     }])
+    .await
     .unwrap();
 
     let submodule_canon = fs::canonicalize(&submodule).unwrap_or(submodule.clone());

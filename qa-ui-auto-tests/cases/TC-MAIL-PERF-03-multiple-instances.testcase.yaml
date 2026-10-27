@@ -1,12 +1,10 @@
 id: TC-MAIL-PERF-03
 title: 'Two native instances sharing one mailbox: ownership, pause, relocation and cleanup'
-description: Two QA binaries use separate disposable profiles and one shared account directory. Actual
-  UI actions prove one archive owner, peer pause and byte-exact resume, five PTY response samples after
-  a real resumed chunk becomes active, migration with an already-open connection in another process, and
-  physical cleanup without redownload. No personal profile is accessed. Native concurrency is intentional
-  for this case; both drivers and profiles remain run-owned. Auto-started scans are observed as active
-  instead of clicking a Resume button that has already become Pause; ownership and byte-exact continuation
-  assertions remain mandatory.
+description: Two QA binaries use separate disposable profiles and one shared account directory. Actual UI actions prove one archive owner, peer pause and byte-exact resume, five
+  PTY response samples after a real resumed chunk becomes active, migration with an already-open connection in another process, and physical cleanup without redownload. No personal
+  profile is accessed. Native concurrency is intentional for this case; both drivers and profiles remain run-owned. Auto-started scans are observed as active instead of clicking a
+  Resume button that has already become Pause; ownership and byte-exact continuation assertions remain mandatory.
+  Polling must not turn a pressed Resume control into Pause; separate action identities are also covered by the mounted control regression tests.
 covers:
 - F-MAIL-23
 - F2.1
@@ -29,6 +27,7 @@ fixtures:
 timeout_sec: 420
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-mail"]'
@@ -107,11 +106,9 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Multiple app instances can safely share one mailbox without duplicate downloads, stale
-      writes or resurrection after cleanup. Peer terminal remains responsive.
+    requirement: Multiple app instances can safely share one mailbox without duplicate downloads, stale writes or resurrection after cleanup. Peer terminal remains responsive.
     actions:
     - 1
-    - 2
     - 3
     - 4
     - 5
@@ -124,7 +121,7 @@ verification:
     - 12
     - 13
     - 14
-    - 16
+    - 15
     - 17
     - 18
     - 19
@@ -139,17 +136,15 @@ verification:
     - 28
     - 29
     - 30
-    checkpoints:
-    - step: 30
-      expectation: Initial full MIME and attachments match independent hashes.
-    - step: 31
-      expectation: Both native processes pass shared-directory ownership, peer pause/resume, migration
-        and cleanup assertions; all five PTY samples meet the fixed p95 budget. A resumed chunk is active
-        before sampling, and a matching chunk overlaps a measured PTY sample and completes within the
-        measurement window; monotonic sample and protocol timestamps are retained.
-    results:
-    - 30
     - 31
+    checkpoints:
+    - step: 31
+      expectation: '{"mail_storage_assert": {"root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}", "full": {"INBOX": 2}, "headers": {"INBOX": 2, "Archive": 2}}}'
+    - step: 32
+      expectation: '{"mail_multi_instance_probe": {"data_root": "${fixture.mail_qa_data}", "storage_root": "${fixture.mail_storage_a}", "expected": "${fixture.mail_expected}"}}'
+    results:
+    - 31
+    - 32
   visual:
   - check: The primary mail view remains usable after peer migration and cleanup.
     method: manual
@@ -157,5 +152,4 @@ verification:
   native:
   - check: Real processes coordinate the same SQLite and compressed MIME files.
     method: automated
-    reason: Browser stubs cannot prove OS locks or live connection relocation; the probe records both
-      QA identities and real chunk receipts.
+    reason: Browser stubs cannot prove OS locks or live connection relocation; the probe records both QA identities and real chunk receipts.

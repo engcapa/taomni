@@ -20,7 +20,9 @@ fixtures:
 timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -77,7 +79,7 @@ steps:
 - assert_attribute:
     selector: '[data-testid="terminal-pane"]'
     name: data-terminal-text
-    matches: '(?s)(?!.*qa-ssh-read-only-blocked).*'
+    matches: (?s)(?!.*qa-ssh-read-only-blocked).*
 - right_click:
     selector: '[data-testid="terminal-pane"]'
 - wait_for: '[data-testid="context-menu"]'
@@ -108,7 +110,7 @@ steps:
 - assert_attribute:
     selector: '[data-testid="terminal-pane"]'
     name: class
-    matches: '.*terminal-hide-scrollbar.*'
+    matches: .*terminal-hide-scrollbar.*
 - right_click:
     selector: '[data-testid="terminal-pane"]'
 - wait_for: '[data-testid="context-menu"]'
@@ -117,7 +119,7 @@ steps:
 - assert_attribute:
     selector: '[data-testid="terminal-pane"]'
     name: class
-    matches: '(?!.*terminal-hide-scrollbar).*'
+    matches: (?!.*terminal-hide-scrollbar).*
 - right_click:
     selector: '[data-testid="terminal-pane"]'
 - wait_for: '[data-testid="context-menu"]'
@@ -126,7 +128,7 @@ steps:
 - assert_attribute:
     selector: '[data-testid="terminal-pane"]'
     name: class
-    matches: '.*fixed.*inset-0.*'
+    matches: .*fixed.*inset-0.*
 - right_click:
     selector: '[data-testid="terminal-pane"]'
 - wait_for: '[data-testid="context-menu"]'
@@ -135,7 +137,7 @@ steps:
 - assert_attribute:
     selector: '[data-testid="terminal-pane"]'
     name: class
-    matches: '(?!.*fixed.*inset-0).*'
+    matches: (?!.*fixed.*inset-0).*
 - right_click:
     selector: '[data-testid="terminal-pane"]'
 - wait_for: '[data-testid="context-menu"]'
@@ -156,104 +158,136 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 'SSH terminal display actions produce observable state changes: read-only blocks input and can be reversed, scrollbar and fullscreen classes toggle in both directions, and the event log exposes connection/auth records and closes.'
+    requirement: 'SSH terminal display actions produce observable state changes: read-only blocks input and can be reversed, scrollbar and fullscreen classes
+      toggle in both directions, and the event log exposes connection/auth records and closes.'
     actions:
     - 1
-    - 3
+    - 2
     - 5
-    - 6
     - 7
     - 8
     - 9
+    - 10
     - 11
-    - 12
+    - 13
     - 14
     - 16
-    - 17
+    - 18
     - 19
+    - 21
     - 22
     - 24
-    - 25
+    - 26
     - 27
-    - 28
+    - 29
+    - 30
     - 31
     - 33
-    - 34
+    - 35
     - 36
+    - 38
     - 39
     - 41
-    - 42
+    - 43
     - 44
     - 46
-    - 47
+    - 48
     - 49
     - 51
-    - 52
+    - 53
     - 54
     - 56
-    - 57
+    - 58
     - 59
     - 61
-    - 65
+    - 63
+    - 67
     checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
     - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
+    - step: 6
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 10
+    - step: 12
       expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 13
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-display-actions\"]"}'
     - step: 15
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ssh-display-actions\"]"}'
+    - step: 17
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
-    - step: 18
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
-    - step: 21
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-display\\-before\\r?$", "timeout_sec": 60}}'
+    - step: 20
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        60}}'
     - step: 23
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-display\\-before\\r?$", "timeout_sec":
+        60}}'
+    - step: 25
       expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
-    - step: 26
+    - step: 28
       expectation: '{"wait_for": "[data-testid=\"terminal-read-only\"]"}'
-    - step: 30
+    - step: 32
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "data-terminal-text", "matches": "(?s)(?!.*qa-ssh-read-only-blocked).*"}}'
-    - step: 35
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 37
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-read-only\"]", "state": "detached"}}'
-    - step: 38
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-display\\-after\\-read\\-only\\r?$", "timeout_sec": 60}}'
-    - step: 43
+    - step: 40
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-display\\-after\\-read\\-only\\r?$", "timeout_sec":
+        60}}'
+    - step: 42
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 45
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "class", "matches": ".*terminal-hide-scrollbar.*"}}'
-    - step: 48
+    - step: 47
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 50
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "class", "matches": "(?!.*terminal-hide-scrollbar).*"}}'
-    - step: 53
+    - step: 52
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 55
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "class", "matches": ".*fixed.*inset-0.*"}}'
-    - step: 58
+    - step: 57
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
+    - step: 60
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-pane\"]", "name": "class", "matches": "(?!.*fixed.*inset-0).*"}}'
     - step: 62
-      expectation: '{"wait_for": "[data-testid=\"terminal-event-log\"]"}'
-    - step: 63
-      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-event-log\"]", "contains": "connection"}}'
+      expectation: '{"wait_for": "[data-testid=\"context-menu\"]"}'
     - step: 64
-      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-event-log\"]", "contains": "auth"}}'
+      expectation: '{"wait_for": "[data-testid=\"terminal-event-log\"]"}'
+    - step: 65
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-event-log\"]", "contains": "connection"}}'
     - step: 66
+      expectation: '{"assert_text": {"selector": "[data-testid=\"terminal-event-log\"]", "contains": "auth"}}'
+    - step: 68
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-event-log\"]", "state": "detached"}}'
     results:
+    - 3
     - 4
-    - 10
-    - 13
+    - 6
+    - 12
     - 15
-    - 18
-    - 21
+    - 17
+    - 20
     - 23
-    - 26
-    - 30
-    - 35
-    - 38
-    - 43
-    - 48
-    - 53
-    - 58
+    - 25
+    - 28
+    - 32
+    - 34
+    - 37
+    - 40
+    - 42
+    - 45
+    - 47
+    - 50
+    - 52
+    - 55
+    - 57
+    - 60
     - 62
-    - 63
     - 64
+    - 65
     - 66
+    - 68
   visual:
   - check: SSH terminal display menu, badges, fullscreen state, and event-log contents remain readable without clipping.
     method: manual

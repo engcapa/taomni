@@ -1,7 +1,8 @@
 import "./tests/mainLayout/harness";
+import { MainLayout } from "./MainLayout";
 import { invoke as tauriInvoke } from "@tauri-apps/api/core";
-import { cleanup } from "@testing-library/react";
-import { afterEach, beforeEach, describe, vi } from "vitest";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { exitApp, listSessions, markSessionConnected } from "../lib/ipc";
 import { useAppStore } from "../stores/appStore";
 import { useMainRailHostStore } from "../stores/mainRailHostStore";
@@ -68,6 +69,7 @@ describe("MainLayout attached SFTP sidebar", () => {
         },
       ],
       activeTabId: "ssh-tab",
+      activeSideTab: "sessions",
       sidebarCollapsed: false,
       // These cases cover the legacy layout; ED-PARITY-027 has its own block.
       mergeToolWindowRail: false,
@@ -85,6 +87,19 @@ describe("MainLayout attached SFTP sidebar", () => {
   afterEach(() => {
     cleanup();
   });
+  it("keeps global terminal ownership and selected tab across workspace and Home navigation", async () => {
+    render(<MainLayout />);
+    await waitFor(() => expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1));
+    const mounts = terminalLifecycle.mounted.mock.calls.length;
+    for (const mode of ["workspaces", "home", "sessions"] as const) {
+      act(() => useAppStore.getState().setActiveSideTab(mode));
+      expect(useAppStore.getState().activeTabId).toBe("ssh-tab");
+      expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
+    }
+    expect(terminalLifecycle.mounted.mock.calls.length).toBe(mounts);
+    expect(screen.getByTestId("global-session-surface")).toBeVisible();
+  });
+
   registerMainLayoutLifecycle2Cases();
   registerMainLayoutLifecycle3Cases();
   registerMainLayoutLifecycle4Cases();

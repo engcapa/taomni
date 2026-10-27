@@ -1,4 +1,5 @@
-import { useCallback,useEffect,useMemo } from "react";
+import { useCallback,useEffect,useMemo,useState } from "react";
+import { useWorkspaceHost } from "../workspaceHostIntegration";
 import { type BottomDockTabId,type CodeWorkspaceEditorGroupState,type EditorGroupId,type EditorSplitOrientation,type RightPaneTabId } from "../../../../stores/codeWorkspaceStore";
 import { type WorkspaceTabPolicyV3 } from "../workspaceTabPolicy";
 import { isPathContainedInRoot,NavigationHistoryFacade,workspacePathComparisonKey,type BackForwardHistoryBridge,type WorkspaceLocationController } from "../navigationHistoryModel";
@@ -46,6 +47,8 @@ export interface UseWorkspaceLayoutPersistenceContext {
 }
 
 export function useWorkspaceLayoutPersistence(context: UseWorkspaceLayoutPersistenceContext) {
+  const host = useWorkspaceHost();
+  const [restoreReady, setRestoreReady] = useState(false);
   const {
     rootsRef,
     workspaceLocationControllerRef,
@@ -216,13 +219,20 @@ export function useWorkspaceLayoutPersistence(context: UseWorkspaceLayoutPersist
             });
           }).finally(() => {
             layoutRestoredOpenFilesRef.current=false;
+            setRestoreReady(true);
           });
           return;
         }
       }
     }
+    setRestoreReady(true);
+    if (host && !host.showEditorTabs) return;
     const ref=initialFileRef(workspace,roots,looseFiles);
     if(!ref) return;
+    // Root-file requests belong to the host. Its active-file publications are
+    // recent-workspace metadata, not another open command during transactions.
+    // Loose files still use the editor's initial target once per lifetime.
+    if (host && (ref.kind === "root" || initialOpenedKeyRef.current !== null)) return;
     const key=fileKey(ref);
     if(initialOpenedKeyRef.current===key) return;
     initialOpenedKeyRef.current=key;
@@ -301,5 +311,5 @@ export function useWorkspaceLayoutPersistence(context: UseWorkspaceLayoutPersist
       persistWorkspaceLayoutNowRef.current?.(workspaceInstanceId);
     };
   },[workspaceInstanceId]);
-  return { navigationHistoryFacade };
+  return { navigationHistoryFacade, restoreReady };
 }

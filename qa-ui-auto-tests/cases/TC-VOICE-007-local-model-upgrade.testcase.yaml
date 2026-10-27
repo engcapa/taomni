@@ -13,8 +13,10 @@ fixtures:
 timeout_sec: 75
 steps:
 - open: ${cfg.app.base_url}/?voiceFixture=1
-- wait_for: '[data-testid="ptt-button"]'
-- click: '[data-testid="ptt-button"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="chat-voice-button"]'
+- click: '[data-testid="chat-voice-button"]'
 - wait_for: '[data-testid="asr-settings"]'
 - assert_text:
     selector: '[data-testid="asr-model-sensevoice-small"]'
@@ -46,34 +48,33 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Recommended downloads expose license and preserve Cantonese preference;
-      f16 replacement is explicit.
+    requirement: Recommended downloads expose license and preserve Cantonese preference; f16 replacement is explicit.
     actions:
-    - 6
-    - 9
-    - 11
-    - 12
-    - 13
-    checkpoints:
-    - step: 5
-      expectation: SenseVoice license is visible.
-    - step: 7
-      expectation: Small q8 is installed.
-    - step: 8
-      expectation: SenseVoice is installed.
-    - step: 10
-      expectation: Cantonese remains the automatic route prior.
-    - step: 14
-      expectation: Explicit replacement activates q8.
-    - step: 15
-      expectation: Old model is removed only after replacement.
-    results:
-    - 5
-    - 7
     - 8
-    - 10
+    - 11
+    - 13
     - 14
     - 15
+    checkpoints:
+    - step: 7
+      expectation: '{"assert_text": {"selector": "[data-testid=\"asr-model-sensevoice-small\"]", "contains": "FunASR Model License"}}'
+    - step: 9
+      expectation: '{"assert_text": {"selector": "[data-testid=\"asr-model-whisper-small-q8\"]", "contains": "Downloaded"}}'
+    - step: 10
+      expectation: '{"assert_text": {"selector": "[data-testid=\"asr-model-sensevoice-small\"]", "contains": "Downloaded"}}'
+    - step: 12
+      expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"language_prior\":\"yue\""}}'
+    - step: 16
+      expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"active\":\"whisper-small-q8\""}}'
+    - step: 17
+      expectation: '{"assert_text": {"selector": "[data-testid=\"asr-model-whisper-small\"]", "contains": "Not downloaded"}}'
+    results:
+    - 7
+    - 9
+    - 10
+    - 12
+    - 16
+    - 17
   visual:
   - check: Model license, size and upgrade action remain readable
     method: manual
@@ -81,5 +82,4 @@ verification:
   native:
   - check: Checksum-gated retirement and real local model decode
     method: external
-    reason: Rust tests and native benchmark receipts provide the disk/decoder evidence;
-      browser stubs do not.
+    reason: Rust tests and native benchmark receipts provide the disk/decoder evidence; browser stubs do not.

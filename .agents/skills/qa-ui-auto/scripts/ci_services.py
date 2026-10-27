@@ -48,6 +48,19 @@ def powershell(script):
                     "$ErrorActionPreference='Stop'; " + script])
 
 
+def configure_windows_ssh_shell(shell):
+    shell = Path(shell)
+    if not shell.is_file():
+        raise RuntimeError(f"Required Windows SSH shell is missing: {shell}")
+    # Keep paths out of PowerShell code, including spaces and apostrophes.
+    os.environ["QA_SSH_DEFAULT_SHELL"] = str(shell)
+    powershell("New-Item -Path HKLM:\\SOFTWARE\\OpenSSH -Force | Out-Null; "
+               "New-ItemProperty -Path HKLM:\\SOFTWARE\\OpenSSH -Name DefaultShell "
+               "-Value $env:QA_SSH_DEFAULT_SHELL -PropertyType String -Force | Out-Null; "
+               "New-ItemProperty -Path HKLM:\\SOFTWARE\\OpenSSH -Name DefaultShellCommandOption "
+               "-Value '-c' -PropertyType String -Force | Out-Null")
+
+
 def secret(name, value=None):
     value = value or "Qa1_" + secrets.token_hex(16)
     os.environ[name] = value
@@ -231,10 +244,17 @@ def install(capabilities):
 
 
 class Services:
-    def __init__(self, root, capabilities, config):
+    def __init__(self, root, capabilities, config, *, ssh_windows_shell=None, ssh_windows_sshd=None,
+                 ssh_windows_runtime="win32"):
+        if ssh_windows_runtime not in {"win32", "cygwin"}:
+            raise ValueError("Unknown Windows SSH runtime")
         self.root = Path(root).resolve()
         self.capabilities = set(capabilities)
         self.config = config
+        # Diagnostic opt-in; normal hosted cases retain their Git Bash shell.
+        self.ssh_windows_shell = ssh_windows_shell
+        self.ssh_windows_sshd = ssh_windows_sshd
+        self.ssh_windows_runtime = ssh_windows_runtime
         self.stack = ExitStack()
         self.namespace = "qa" + secrets.token_hex(5)
         self.resources = []
@@ -296,6 +316,9 @@ class Services:
 
     def local_ssh(self, password):
         system = platform.system()
+        if system == "Windows" and self.ssh_windows_runtime == "cygwin":
+            from ci_windows_posix_ssh import start
+            return start(self, password)
         user, port = self.namespace, free_port()
         private = self.private
         host_key = private / "host_key"
@@ -343,15 +366,14 @@ class Services:
                        f"icacls '{remote_dir}' /grant '{user}:(OI)(CI)F' | Out-Null")
             self.stack.callback(lambda: shutil.rmtree(remote_dir, ignore_errors=True))
             # Git Bash supports the POSIX shell commands in the portable SSH cases.
-            powershell("New-Item -Path HKLM:\\SOFTWARE\\OpenSSH -Force | Out-Null; "
-                       "New-ItemProperty -Path HKLM:\\SOFTWARE\\OpenSSH -Name DefaultShell "
-                       "-Value 'C:\\Program Files\\Git\\bin\\bash.exe' -PropertyType String -Force | Out-Null; "
-                       "New-ItemProperty -Path HKLM:\\SOFTWARE\\OpenSSH -Name DefaultShellCommandOption "
-                       "-Value '-c' -PropertyType String -Force | Out-Null")
+            configure_windows_ssh_shell(self.ssh_windows_shell or "C:/Program Files/Git/bin/bash.exe")
             cfg = private / "sshd_config"
             cfg.write_text("\n".join(lines) + "\n", encoding="utf-8")
             # sshd must run as LocalSystem for password logon/PTY impersonation.
-            executable = Path(os.environ["WINDIR"]) / "System32/OpenSSH/sshd.exe"
+            executable = (Path(self.ssh_windows_sshd) if self.ssh_windows_sshd
+                          else Path(os.environ["WINDIR"]) / "System32/OpenSSH/sshd.exe")
+            if not executable.is_file():
+                raise RuntimeError(f"Required Windows SSH server is missing: {executable}")
             # The service runs as SYSTEM; use the standard machine host-key
             # location instead of a runner user's temporary directory.
             command([ssh_keygen, "-A"])
@@ -477,14 +499,15 @@ class Services:
         finally:
             sftp.close()
         cfg = {"host": "127.0.0.1", "port": port, "user": user, "password": "${env.QA_SSH_PASSWORD}"}
-        shell_dir = "/c/" + remote_dir[3:] if system == "Windows" else remote_dir
-        sftp_shell_dir = "/" + remote_dir if system == "Windows" else remote_dir
+        win32 = system == "Windows" and self.ssh_windows_runtime == "win32"
+        shell_dir = "/c/" + remote_dir[3:] if win32 else remote_dir
+        sftp_shell_dir = "/" + remote_dir if win32 else remote_dir
         jump_target_host, jump_target_port = jump_target_endpoint(system, port)
         cfg.update(jump_target_host=jump_target_host, jump_target_port=jump_target_port)
         self.config.update(ssh=cfg.copy(), sftp={**cfg, "remote_test_dir": remote_dir,
                                              "remote_shell_test_dir": shell_dir,
                                              "remote_sftp_shell_test_dir": sftp_shell_dir,
-                                             "chmod_readback_mode": "644" if system == "Windows" else "600"})
+                                             "chmod_readback_mode": "644" if win32 else "600"})
         return {"authentication": True, "pty_exec": True, "sftp_roundtrip": True, "port": port}
 
     def mysql(self):

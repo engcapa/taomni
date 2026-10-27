@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle, type PanelSize } from "react-resizable-panels";
 import { AboutDialog } from "../../components/AboutDialog";
@@ -14,14 +15,24 @@ import { AuthPrompt } from "../../components/session/AuthPrompt";
 import { SessionEditor } from "../../components/session/SessionEditor";
 import { Sidebar } from "../../components/sidebar/Sidebar";
 import { StatusBar } from "../../components/statusbar/StatusBar";
+import { AgentsPlatformView } from "../../components/agents/AgentsPlatformView";
+import { MfaFloatingWindow } from "../../components/mfa/MfaFloatingWindow";
+import { GlobalCommandModal } from "../../components/search/GlobalCommandModal";
+import { RightContextPanel } from "../../components/workspace/RightContextPanel";
+import { WorkspaceMainPanel } from "../../components/workspace/WorkspaceMainPanel";
+import { useAppStore } from "../../stores/appStore";
+import { useWorkspaceUiStore } from "../../stores/workspaceUiStore";
+import { useWorkspaceRailStore } from "../../stores/workspaceRailStore";
+import type { AppCommand } from "../../components/menubar/commands";
 import { ControlBar } from "../../components/tabbar/ControlBar";
 import { TabActionSlotProvider } from "../../components/tabbar/TabActionSlot";
 import { TaoAlertPoller } from "../../components/tao/TaoAlertPoller";
-import { TaoRibbon } from "../../components/tao/TaoRibbon";
+import { TabOverview } from "../../components/tabbar/TabOverview";
 import { MultiExecBar } from "../../components/terminal/MultiExecBar";
 import { UpdateDialog } from "../../components/UpdateDialog";
 import { VaultUnlockDialog } from "../../components/vault/VaultUnlockDialog";
 import { WindowResizeHandles } from "../../components/window/WindowResizeHandles";
+import { startWindowDrag } from "../../lib/windowDrag";
 import { t as tr } from "../../lib/i18n";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
 import { TabContentRouter } from "./TabContentRouter";
@@ -34,6 +45,7 @@ import { useMainTerminalIntegration } from "./useMainTerminalIntegration";
 import { useMainUtilityTabs } from "./useMainUtilityTabs";
 import { useMainWindowLifecycle } from "./useMainWindowLifecycle";
 import { useMainWorkspaceOpening } from "./useMainWorkspaceOpening";
+import { usePlatformShortcuts } from "./usePlatformShortcuts";
 
 
 export interface MainLayoutViewProps {
@@ -51,16 +63,148 @@ export interface MainLayoutViewProps {
 export function MainLayoutView(props: MainLayoutViewProps) {
   const { layout, chrome, menuActions, sessionActions, connections, terminals, windowLifecycle, workspaceOpening, utilityTabs } = props;
   const { pendingAuth } = layout;
+  const activeSideTab = useAppStore((s) => s.activeSideTab);
+  const sidebarCollapsed = useAppStore((s) => s.sidebarCollapsed);
+  const setForceRailMerge = useWorkspaceRailStore((s) => s.setForceMerge);
+  const openGlobalSearch = useWorkspaceUiStore((s) => s.openGlobalSearch);
+  usePlatformShortcuts();
+
+  // Tools and the main menu share the context-free editor entry point.
+  const handleSidebarCommand = menuActions.handleCommand;
+
+  // The command palette is mounted outside the menu-action tree; it asks the
+  // shell to run a command through this event.
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const command = (event as CustomEvent<string>).detail;
+      if (command) menuActions.handleCommand(command as AppCommand);
+    };
+    window.addEventListener("taomni:command", handler);
+    return () => window.removeEventListener("taomni:command", handler);
+  }, [menuActions]);
+
+  // Workspaces mode merges the legacy Code Workspace rail into the primary
+  // rail; other modes restore the ED-PARITY-027 behaviour.
+  useEffect(() => {
+    setForceRailMerge(activeSideTab === "workspaces");
+    return () => setForceRailMerge(false);
+  }, [activeSideTab, setForceRailMerge]);
+
+  // Home opens as the wide launch surface from the prototype. The toolbar
+  // toggles can still reveal either companion panel on demand.
+  useEffect(() => {
+    if (activeSideTab !== "home") return;
+    useAppStore.getState().setSidebarCollapsed(true);
+    useAppStore.getState().setRightSidebarCollapsed(true);
+  }, [activeSideTab]);
+
   return ((
     <TabActionSlotProvider slot={layout.tabActionSlot}>
       <div
         className="taomni-main-window relative w-full h-full flex flex-col"
         style={{ background: "var(--taomni-chrome-bg)" }}
       >
-        {!chrome.isMac && <WindowResizeHandles />}
+        {!chrome.isMac && <WindowResizeHandles topEdgeSize={2} />}
+        {/* Keep the outermost 2px and corners resizable. The remaining top
+            frame is a common move target in every platform view. */}
+        <div
+          data-testid="main-window-top-drag-region"
+          data-window-drag
+          aria-hidden="true"
+          className="fixed inset-x-[14px] top-[2px] h-[4px] z-[9999] cursor-grab active:cursor-grabbing"
+          onMouseDown={startWindowDrag}
+        />
+        {chrome.chatDrawerTopPinned && <ChatDrawer />}
+
+        <div data-testid="platform-workbench" className="taomni-platform-workbench flex-1 flex min-h-0">
+          {chrome.terminalRailMerged && layout.mainRailHost && chrome.terminalRailItems.length > 0 && createPortal(
+            <ToolWindowRail
+              side="left"
+              embedded
+              top={chrome.terminalRailItems}
+              width={effectiveStripeWidth(layout.stripeSettings, "left")}
+              showNames={layout.stripeSettings.showNames}
+              onToggleShowNames={layout.toggleStripeNames}
+              onHide={(id) => chrome.terminalRailItems.find((item) => item.id === id)?.onSelect()}
+            />,
+            layout.mainRailHost,
+          )}
+          <div data-testid={layout.sidebarCollapsed ? "collapsed-sidebar-rail" : undefined} className="h-full shrink-0">
+            <Sidebar
+              railOnly
+              compact={layout.sidebarCollapsed}
+              onOpenSettings={() => menuActions.handleCommand("settings")}
+            />
+          </div>
+          <PanelGroup
+            orientation="horizontal"
+            id="main-layout"
+            defaultLayout={loadResizableLayout("main-layout", ["sidebar", "content"])}
+            onLayoutChanged={saveResizableLayout("main-layout")}
+            className="flex-1 min-w-0"
+            // Size the resize hit target to match the 6px visible divider.
+            // Sizing the hit target to the divider width keeps it from bleeding onto content/terminal.
+            resizeTargetMinimumSize={{ coarse: 6, fine: 6 }}
+          >
+            <Panel
+              panelRef={layout.sidebarPanelRef}
+              id="sidebar"
+              defaultSize="260px"
+              minSize="180px"
+              maxSize="520px"
+              collapsible
+              collapsedSize={0}
+              // The panel's default scroll container can pan the fixed rail when
+              // a focused/selected session is scrolled into view. Its children
+              // own their scrolling; this frame must keep the rail in place.
+              style={{ overflow: "clip" }}
+              onResize={(size: PanelSize, _id, prevSize?: PanelSize) => {
+                const percentage = size.asPercentage;
+                if (percentage > 2) {
+                  layout.lastSidebarSizeRef.current = percentage;
+                }
+                // The first report is the restored layout, which may carry another
+                // tab group's collapsed sidebar (ED-PARITY-027); the store's state
+                // wins and the sync effect resizes the panel to it.
+                if (!prevSize) return;
+                const collapsed = percentage <= 2;
+                // A resize that applies the store's current state is not a
+                // manual preference change (for example returning from Home).
+                if (collapsed !== useAppStore.getState().sidebarCollapsed) {
+                  layout.setSidebarCollapsed(collapsed);
+                }
+              }}
+            >
+              <div data-testid="expanded-sidebar-panel" className="taomni-navigator-frame h-full overflow-clip" style={layout.sidebarCollapsed ? { display: "none" } : undefined}>
+                <Sidebar
+                  panelOnly
+                  onNewSession={sessionActions.handleNewSession}
+                  onNewSftpSession={sessionActions.handleNewSftpSession}
+                  onEditSession={sessionActions.handleEditSession}
+                  onConnectSession={connections.handleConnectSession}
+                  onOpenSettings={() => menuActions.handleCommand("settings")}
+                  onCommand={handleSidebarCommand}
+                  onStartLocalTerminal={() => sessionActions.openLocalTab(tr("tabs.localTerminal"))}
+                />
+              </div>
+            </Panel>
+
+            <PanelResizeHandle
+              id="main-sidebar-resize-handle"
+              data-testid="main-sidebar-resize-handle"
+              className="taomni-platform-resizer"
+              // Keep the separator in layout so the panel library retains its
+              // adjacent-panel mapping when Home collapses the navigator.
+              style={layout.sidebarCollapsed ? { width: 0, visibility: "hidden", pointerEvents: "none" } : undefined}
+            />
+
+            <Panel id="content">
+              <div className="h-full flex min-w-0">
+                {chrome.chatDrawerInline && layout.chatDrawerPosition === "left" && <ChatDrawer />}
+                <div data-testid="main-canvas-frame" className="taomni-main-canvas-frame h-full flex flex-col min-w-0 flex-1">
         <div data-testid="app-titlebar" className="min-w-0">
           <ControlBar
-            activeTabClosable={!!layout.activeTab?.closable}
+            activeTabClosable={layout.activeTabClosable}
             nativeMenu={layout.nativeMenu}
             xServerEnabled={layout.xServerEnabled}
             quickConnectVisible={layout.quickConnectVisible}
@@ -86,6 +230,8 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                 : undefined
             }
             onCloseWindow={sessionActions.requestAppExit}
+            leftSidebarCollapsed={sidebarCollapsed}
+            onOpenGlobalSearch={openGlobalSearch}
             slotRef={layout.setTabActionSlot}
           />
         </div>
@@ -97,90 +243,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
           />
         )}
 
-        {chrome.chatDrawerTopPinned && <ChatDrawer />}
 
-        <div className="flex-1 flex min-h-0">
-          {chrome.terminalRailMerged && layout.mainRailHost && chrome.terminalRailItems.length > 0 && createPortal(
-            <ToolWindowRail
-              side="left"
-              embedded
-              top={chrome.terminalRailItems}
-              width={effectiveStripeWidth(layout.stripeSettings, "left")}
-              showNames={layout.stripeSettings.showNames}
-              onToggleShowNames={layout.toggleStripeNames}
-              onHide={(id) => chrome.terminalRailItems.find((item) => item.id === id)?.onSelect()}
-            />,
-            layout.mainRailHost,
-          )}
-          {layout.sidebarCollapsed && (
-            <div data-testid="collapsed-sidebar-rail" className="h-full shrink-0 overflow-visible">
-              <Sidebar
-                compact
-                onNewSession={sessionActions.handleNewSession}
-                onNewSftpSession={sessionActions.handleNewSftpSession}
-                onEditSession={sessionActions.handleEditSession}
-                onConnectSession={connections.handleConnectSession}
-                onOpenSettings={() => menuActions.handleCommand("settings")}
-                onCommand={menuActions.handleCommand}
-              />
-            </div>
-          )}
-          <PanelGroup
-            orientation="horizontal"
-            id="main-layout"
-            defaultLayout={loadResizableLayout("main-layout", ["sidebar", "content"])}
-            onLayoutChanged={saveResizableLayout("main-layout")}
-            className="flex-1 min-w-0"
-            // Size the resize hit target to match the 6px visible divider.
-            // Sizing the hit target to the divider width keeps it from bleeding onto content/terminal.
-            resizeTargetMinimumSize={{ coarse: 6, fine: 6 }}
-          >
-            <Panel
-              panelRef={layout.sidebarPanelRef}
-              id="sidebar"
-              defaultSize="22%"
-              minSize="15%"
-              maxSize="40%"
-              collapsible
-              collapsedSize={0}
-              // The panel's default scroll container can pan the fixed rail when
-              // a focused/selected session is scrolled into view. Its children
-              // own their scrolling; this frame must keep the rail in place.
-              style={{ overflow: "clip" }}
-              onResize={(size: PanelSize, _id, prevSize?: PanelSize) => {
-                const percentage = size.asPercentage;
-                if (percentage > 2) {
-                  layout.lastSidebarSizeRef.current = percentage;
-                }
-                // The first report is the restored layout, which may carry another
-                // tab group's collapsed sidebar (ED-PARITY-027); the store's state
-                // wins and the sync effect resizes the panel to it.
-                if (!prevSize) return;
-                layout.setSidebarCollapsed(percentage <= 2);
-              }}
-            >
-              <div data-testid="expanded-sidebar-panel" className="h-full overflow-clip" style={layout.sidebarCollapsed ? { display: "none" } : undefined}>
-                <Sidebar
-                  onNewSession={sessionActions.handleNewSession}
-                  onNewSftpSession={sessionActions.handleNewSftpSession}
-                  onEditSession={sessionActions.handleEditSession}
-                  onConnectSession={connections.handleConnectSession}
-                  onOpenSettings={() => menuActions.handleCommand("settings")}
-                  onCommand={menuActions.handleCommand}
-                />
-              </div>
-            </Panel>
-
-            <PanelResizeHandle
-              id="main-sidebar-resize-handle"
-              data-testid="main-sidebar-resize-handle"
-              className={layout.sidebarCollapsed ? "hidden" : "w-[6px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] transition-colors cursor-col-resize"}
-            />
-
-            <Panel id="content">
-              <div className="h-full flex min-w-0">
-                {chrome.chatDrawerInline && layout.chatDrawerPosition === "left" && <ChatDrawer />}
-                <div className="h-full flex flex-col min-w-0 flex-1">
                   {layout.multiExecActive && (
                     <MultiExecBar
                       selectedCount={chrome.effectiveMultiExecSelectedCount}
@@ -191,8 +254,15 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                       onClose={layout.toggleMultiExec}
                     />
                   )}
+                  <div className="flex min-h-0 flex-1 flex-col" style={{ display: activeSideTab === "workspaces" ? "flex" : "none" }}>
+                    <WorkspaceMainPanel onEditSession={sessionActions.handleEditSessionById} visible={activeSideTab === "workspaces"} onCommandsChange={layout.handleWorkspaceCommandsChange} />
+                  </div>
+                  {activeSideTab === "agents" && <AgentsPlatformView />}
+                  <div data-testid="global-session-surface" className="flex min-h-0 flex-1 flex-col" style={{ display: activeSideTab === "workspaces" || activeSideTab === "agents" ? "none" : "flex" }}>
                   <TabContentRouter
-                    activeTab={layout.activeTab}
+                    activeTab={activeSideTab === "home" ? undefined : layout.activeTab}
+                    showHome={activeSideTab === "home"}
+                    toolsView={activeSideTab === "tools"}
                     welcomeRestore={workspaceOpening.welcomeRestore}
                     openLocalTab={sessionActions.openLocalTab}
                     handleNewSession={sessionActions.handleNewSession}
@@ -211,7 +281,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                     revealRecentCodeWorkspace={workspaceOpening.revealRecentCodeWorkspace}
                     openNewCodeWorkspaceFromWelcome={workspaceOpening.openNewCodeWorkspaceFromWelcome}
                     openSettingsTab={utilityTabs.openSettingsTab}
-                    terminalSplitVisible={chrome.terminalSplitVisible}
+                    terminalSplitVisible={activeSideTab !== "home" && activeSideTab !== "workspaces" && activeSideTab !== "agents" && chrome.terminalSplitVisible}
                     terminalSplitLayout={layout.terminalSplitLayout}
                     terminalSplitInputLockedTabIds={layout.terminalSplitInputLockedTabIds}
                     setTerminalSplitLayout={layout.setTerminalSplitLayout}
@@ -222,7 +292,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                     splitGridColumnTemplate={chrome.splitGridColumnTemplate}
                     splitGridRowTemplate={chrome.splitGridRowTemplate}
                     terminalTabs={chrome.terminalTabs}
-                    activeTabId={layout.activeTabId}
+                    activeTabId={activeSideTab === "home" || activeSideTab === "workspaces" || activeSideTab === "agents" ? null : layout.activeTabId}
                     attachedSidebars={layout.attachedSidebars}
                     terminalProfileOverrides={layout.terminalProfileOverrides}
                     terminalProfilesBySessionId={layout.terminalProfilesBySessionId}
@@ -293,13 +363,15 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                     setStatusMessage={layout.setStatusMessage}
                     removeTab={layout.removeTab}
                   />
+                  </div>
                 </div>
                 {chrome.chatDrawerInline && layout.chatDrawerPosition === "right" && <ChatDrawer />}
               </div>
             </Panel>
           </PanelGroup>
           {chrome.chatDrawerFloating && <ChatDrawer />}
-          {!layout.aiFullyDisabled && <TaoRibbon />}
+          <TabOverview />
+          <RightContextPanel />
           <FloatingNotesPanel />
           <TaoAlertPoller />
         </div>
@@ -307,6 +379,14 @@ export function MainLayoutView(props: MainLayoutViewProps) {
         {chrome.chatDrawerBottomPinned && <ChatDrawer />}
 
         <StatusBar />
+
+        <MfaFloatingWindow
+          onExpand={() => {
+            useAppStore.getState().setActiveSideTab("sessions");
+            menuActions.handleCommand("mfa");
+          }}
+        />
+        <GlobalCommandModal />
 
         <CcAgentBridge />
 

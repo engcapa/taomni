@@ -220,7 +220,7 @@ export function TabBar({
       setTabScrollLeft(container, tabRight - container.clientWidth + TAB_SCROLL_PADDING);
     }
     updateTabScrollState();
-  }, [activeTabId, tabs, updateTabScrollState]);
+  }, [activeTabId, tabs, tabFilter, updateTabScrollState]);
 
   const mergedShells = useMemo<LocalShellOption[]>(() => {
     if (wslDistros.length === 0) return localShells;
@@ -247,9 +247,10 @@ export function TabBar({
   // Tabs actually rendered in the strip. The focus filter (issue #121) hides
   // non-matching tabs here without closing them; the `…` menu still lists all.
   const visibleTabs = useMemo(
-    () => filterVisibleTabs(tabs, sessions, tabFilter),
+    () => filterVisibleTabs(tabs.filter((tab) => tab.type !== "welcome"), sessions, tabFilter),
     [tabs, sessions, tabFilter],
   );
+  const [keyboardNavigation, setKeyboardNavigation] = useState(false);
 
   useEffect(() => {
     if (editingTabId && !tabs.some((t) => t.id === editingTabId)) {
@@ -378,9 +379,14 @@ export function TabBar({
   );
 
   const handleTabContext = (e: React.MouseEvent, tab: Tab) => {
-    const idx = tabs.findIndex((t) => t.id === tab.id);
+    const sessionTabs = tabs.filter((item) => item.type !== "welcome");
+    const idx = sessionTabs.findIndex((item) => item.id === tab.id);
     const isFirst = idx === 0;
-    const isLast = idx === tabs.length - 1;
+    const isLast = idx === sessionTabs.length - 1;
+    const moveToSessionIndex = (index: number) => {
+      const target = sessionTabs[index];
+      if (target) moveTabToIndex(tab.id, tabs.findIndex((item) => item.id === target.id));
+    };
     ctx.show(e, [
       { label: t("tabs.close"), icon: <X className="w-3 h-3" />, onClick: () => removeTab(tab.id), disabled: !tab.closable },
       { label: t("tabs.closeOthersShort"), icon: <Trash2 className="w-3 h-3" />, onClick: () => removeTabs(tabs.filter((t) => t.id !== tab.id && t.closable).map((t) => t.id)) },
@@ -399,10 +405,10 @@ export function TabBar({
         onClick: () => copyTabSessionInfo(tab),
       },
       { label: "", separator: true, onClick: () => { } },
-      { label: t("tabs.moveToFirst"), icon: <ChevronFirst className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, 0), disabled: isFirst },
-      { label: t("tabs.moveLeft"), icon: <ChevronLeft className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, idx - 1), disabled: isFirst },
-      { label: t("tabs.moveRight"), icon: <ChevronRight className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, idx + 1), disabled: isLast },
-      { label: t("tabs.moveToLast"), icon: <ChevronLast className="w-3 h-3" />, onClick: () => moveTabToIndex(tab.id, tabs.length - 1), disabled: isLast },
+      { label: t("tabs.moveToFirst"), icon: <ChevronFirst className="w-3 h-3" />, onClick: () => moveToSessionIndex(0), disabled: isFirst },
+      { label: t("tabs.moveLeft"), icon: <ChevronLeft className="w-3 h-3" />, onClick: () => moveToSessionIndex(idx - 1), disabled: isFirst },
+      { label: t("tabs.moveRight"), icon: <ChevronRight className="w-3 h-3" />, onClick: () => moveToSessionIndex(idx + 1), disabled: isLast },
+      { label: t("tabs.moveToLast"), icon: <ChevronLast className="w-3 h-3" />, onClick: () => moveToSessionIndex(sessionTabs.length - 1), disabled: isLast },
     ]);
   };
 
@@ -458,9 +464,9 @@ export function TabBar({
         <button
           type="button"
           data-testid="tab-filter-chip"
-          onClick={() => setTabFilter(null)}
+          onClick={() => setTabFilter(tabFilter.kind !== "protocol" && tabFilter.protocol && tabFilter.protocol !== "all" ? { kind: "protocol", protocol: tabFilter.protocol } : null)}
           title={t("tabs.filterClear")}
-          className="flex items-center gap-1 mb-0.5 mr-1 px-2 h-6 rounded text-[11px] max-w-[180px] shrink-0"
+          className="flex items-center gap-1 mb-0.5 mr-1 px-2 h-6 rounded text-[11px] max-w-[112px] shrink-0"
           style={{ background: "var(--taomni-hover)", color: "var(--taomni-text)" }}
         >
           {tabFilter.kind === "group" || tabFilter.kind === "multi" ? (
@@ -469,7 +475,9 @@ export function TabBar({
             <Search className="w-3 h-3 shrink-0" />
           )}
           <span className="truncate">
-            {tabFilter.kind === "query"
+            {tabFilter.kind === "protocol"
+              ? t(`tabs.category.${tabFilter.protocol ?? "all"}`)
+              : tabFilter.kind === "query"
               ? tabFilter.text
               : tabFilter.kind === "multi"
                 ? getFilterChipText(tabFilter, sessions, tabs, t)
@@ -492,7 +500,28 @@ export function TabBar({
       <div
         ref={tabScrollRef}
         data-testid="tab-scroll-area"
+        role="tablist"
+        data-keyboard-navigation={keyboardNavigation ? "true" : undefined}
+        aria-label={t("tabs.openTabs")}
         className="taomni-tab-scroll flex items-end min-w-0 overflow-x-auto overflow-y-hidden"
+        onPointerDownCapture={() => setKeyboardNavigation(false)}
+        onWheel={(event) => {
+          const el = event.currentTarget;
+          if (maxScrollLeft(el) > 0 && Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
+            el.scrollLeft += event.deltaY;
+          }
+        }}
+        onKeyDown={(event) => {
+          if (editingTabId || event.altKey || event.ctrlKey || event.metaKey || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+          const index = visibleTabs.findIndex((tab) => tab.id === activeTabId);
+          const target = event.key === "Home" ? visibleTabs[0] : event.key === "End" ? visibleTabs.at(-1) : visibleTabs[(index + (event.key === "ArrowRight" ? 1 : -1) + visibleTabs.length) % visibleTabs.length];
+          if (target) {
+            event.preventDefault();
+            setKeyboardNavigation(true);
+            setActiveTab(target.id);
+            tabElementRefs.current.get(target.id)?.focus();
+          }
+        }}
         onScroll={updateTabScrollState}
       >
         {tabFilter && visibleTabs.length === 0 && (
@@ -574,7 +603,7 @@ export function TabBar({
         />
       )}
 
-      <div className="flex items-end" data-testid="new-tab-split">
+      <div className="flex shrink-0 items-end" data-testid="new-tab-split">
         <button
           data-testid="new-local-terminal"
           className="taomni-tab"

@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useLayoutEffect, useState } from "react";
 import { PinToolsWindow } from "./PinToolsWindow";
 
 const api = vi.hoisted(() => ({ invoke: vi.fn(), emitTo: vi.fn(), close: vi.fn(), listPins: vi.fn(), listeners: new Map<string, (event: { payload: unknown }) => void>() }));
@@ -90,5 +91,51 @@ describe("separate pin options", () => {
     fireEvent.click(screen.getByTestId("screenshot-pin-note-save"));
     expect(api.emitTo).toHaveBeenCalledWith("screenshot-pin-9", "screenshot://pin-tool", { action: "note", value: "Draft" });
     view.unmount(); expect(api.listeners.size).toBe(0);
+  });
+
+  it("keeps typing that begins when initialized controls first become available", async () => {
+    let initialize!: (value: unknown) => void;
+    let controlsReady!: () => void;
+    api.invoke.mockReturnValueOnce(new Promise((resolve) => { initialize = resolve; }));
+    function TypeOnReady() {
+      const [ready, setReady] = useState(false);
+      controlsReady = () => setReady(true);
+      useLayoutEffect(() => {
+        if (ready) fireEvent.change(screen.getByTestId("screenshot-pin-note-input"), { target: { value: "Immediate draft" } });
+      }, [ready]);
+      return <PinToolsWindow />;
+    }
+    render(<TypeOnReady />);
+    await waitFor(() => expect(api.invoke).toHaveBeenCalled());
+    await act(async () => {
+      initialize({ label: "screenshot-pin-9", view: { zoom: 1, opacity: 1, note: "Original", busy: false, error: null, notice: null } });
+      await Promise.resolve();
+      controlsReady();
+    });
+    expect(screen.getByTestId("screenshot-pin-note-input")).toHaveValue("Immediate draft");
+    act(() => api.listeners.get("screenshot://pin-view")?.({ payload: { zoom: 1.5, opacity: 0.5, note: "Original", busy: false, error: null, notice: null } }));
+    expect(screen.getByTestId("screenshot-pin-note-input")).toHaveValue("Immediate draft");
+    fireEvent.click(screen.getByTestId("screenshot-pin-note-save"));
+    expect(api.emitTo).toHaveBeenCalledWith("screenshot-pin-9", "screenshot://pin-tool", { action: "note", value: "Immediate draft" });
+  });
+
+  it("applies a changed source note and preserves later typing through repeated source replies", async () => {
+    render(<PinToolsWindow />);
+    await waitFor(() => expect(screen.getByTestId("screenshot-pin-note-input")).toHaveValue("Original"));
+    const source = { zoom: 1, opacity: 1, note: "Updated at source", busy: false, error: null, notice: null };
+    act(() => api.listeners.get("screenshot://pin-view")?.({ payload: source }));
+    expect(screen.getByTestId("screenshot-pin-note-input")).toHaveValue("Updated at source");
+    fireEvent.change(screen.getByTestId("screenshot-pin-note-input"), { target: { value: "Next draft" } });
+    act(() => api.listeners.get("screenshot://pin-view")?.({ payload: { ...source, zoom: 2 } }));
+    expect(screen.getByTestId("screenshot-pin-note-input")).toHaveValue("Next draft");
+  });
+
+  it("ignores an out-of-order source view revision", async () => {
+    render(<PinToolsWindow />);
+    await waitFor(() => expect(screen.getByTestId("screenshot-pin-note-input")).toHaveValue("Original"));
+    const source = { opacity: 1, note: "Original", busy: false, error: null, notice: null };
+    act(() => api.listeners.get("screenshot://pin-view")?.({ payload: { ...source, zoom: 1.2, revision: 2 } }));
+    act(() => api.listeners.get("screenshot://pin-view")?.({ payload: { ...source, zoom: 1.1, revision: 1 } }));
+    expect(screen.getByTestId("screenshot-pin-zoom")).toHaveTextContent("120%");
   });
 });

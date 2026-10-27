@@ -346,15 +346,15 @@ export function registerfilesClipboard2Cases(caseContext: registerfilesClipboard
       : [caseContext.workspaceTestHarness.entry("src", "src", "dir"), caseContext.workspaceTestHarness.entry("README.md", "README.md"), caseContext.workspaceTestHarness.entry("notes.txt", "notes.txt")]);
     caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => caseContext.workspaceTestHarness.file(path, `Keep ${path}`));
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    const readme = (await screen.findAllByTestId("code-workspace-tree-file")).find((row) => row.dataset.path === "README.md")!;
-    fireEvent.doubleClick(readme);
-    await screen.findByTitle("app / README.md");
+    const notes = (await screen.findAllByTestId("code-workspace-tree-file")).find((row) => row.dataset.path === "notes.txt")!;
+    fireEvent.doubleClick(notes);
+    await screen.findByTitle("app / notes.txt");
     const before = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-nav");
     const pane = screen.getByTestId("code-workspace-tree-pane");
     fireEvent.keyDown(pane, { key: "ArrowDown" });
     expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-nav").treeSelection)
-      .toEqual({ kind: "file", ref: { kind: "root", rootId: "app", path: "notes.txt" } });
-    expect(caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile).not.toHaveBeenCalledWith("/repo/app", "notes.txt");
+      .toEqual({ kind: "file", ref: { kind: "root", rootId: "app", path: "README.md" } });
+    expect(caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile).not.toHaveBeenCalledWith("/repo/app", "README.md");
     fireEvent.keyDown(pane, { key: "ArrowUp" });
     fireEvent.keyDown(pane, { key: "ArrowUp" });
     expect(screen.queryByTitle("app / src/example.txt")).toBeNull();

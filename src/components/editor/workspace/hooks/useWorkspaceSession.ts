@@ -6,6 +6,7 @@ import { useAppStore } from "../../../../stores/appStore";
 import { useChatStore } from "../../../../stores/chatStore";
 import { selectCodeWorkspaceUi, useCodeWorkspaceStore } from "../../../../stores/codeWorkspaceStore";
 import { useMainRailHostStore } from "../../../../stores/mainRailHostStore";
+import { useWorkspaceRailStore } from "../../../../stores/workspaceRailStore";
 import { type EditorSelectionRange } from "../CodeMirrorHost";
 import { useWorkspacePreferences } from "../controller/useWorkspacePreferences";
 import { readWorkspaceBookmarks } from "../todoBookmarks";
@@ -35,7 +36,11 @@ export function useWorkspaceSession(context: UseWorkspaceSessionContext) {
   // ED-PARITY-027 B: while the main sidebar is collapsed to its rail, the
   // active workspace renders its left tool window bar into that rail.
   const mainRailHost = useMainRailHostStore((s) => s.host);
-  const mainRailMergeActive = useAppStore((s) => s.mergeToolWindowRail && s.sidebarCollapsed);
+  const globalMergeActive = useAppStore((s) => s.mergeToolWindowRail && s.sidebarCollapsed);
+  // Workspaces mode (v6.1) always merges the workspace tool windows into the
+  // window's primary rail, so the canvas can never grow a second stripe.
+  const forceWorkspaceMerge = useWorkspaceRailStore((s) => s.forceMerge);
+  const mainRailMergeActive = forceWorkspaceMerge || globalMergeActive;
   const sendPromptToTabChat = useChatStore((s) => s.sendPromptToTabChat);
   const t = useT();
   const workspaceInstanceId = useMemo(

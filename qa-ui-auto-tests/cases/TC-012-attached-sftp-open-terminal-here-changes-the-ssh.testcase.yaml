@@ -22,7 +22,7 @@ steps:
 - seed_storage:
     key: taomni.quickConnectVisible
     value: 'true'
-- reload_window: null
+- reload_window:
 - wait_for: '[data-testid="qc-input"]'
 - fill:
     selector: '[data-testid="qc-input"]'
@@ -39,6 +39,7 @@ steps:
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
     timeout_sec: 60
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-browser"]'
 - wait_for:
@@ -49,6 +50,9 @@ steps:
 - fill:
     selector: '[data-testid="sftp-remote-path"]'
     value: ${cfg.sftp.remote_test_dir}
+# A late terminal measurement must leave the adjacent path editor focused.
+- wait: 1
+- assert_visible: 'input[data-testid="sftp-remote-path"]:focus'
 - press: Enter
 - wait: 1
 - click: '[data-testid="sftp-remote-path-edit"]'
@@ -87,14 +91,15 @@ verification:
     - 8
     - 9
     - 12
-    - 15
-    - 17
+    - 13
+    - 16
     - 18
-    - 20
+    - 21
     - 23
-    - 24
-    - 25
+    - 26
     - 27
+    - 28
+    - 30
     checkpoints:
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
@@ -103,23 +108,24 @@ verification:
     - step: 10
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
     - step: 11
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]",
-        "timeout_sec": 60}}'
-    - step: 13
-      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
     - step: 14
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 15
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"] tbody tr", "timeout_sec": 30}}'
-    - step: 16
+    - step: 17
       expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
-    - step: 21
+    - step: 20
+      expectation: '{"assert_visible": "input[data-testid=\"sftp-remote-path\"]:focus"}'
+    - step: 24
       expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
-    - step: 22
+    - step: 25
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${fixture.sftp_sync_test_dir}"}}'
-    - step: 29
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_CWD=${cfg.sftp.remote_test_dir}\\r?$",
-        "timeout_sec": 60}}'
+    - step: 32
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_CWD=${cfg.sftp.remote_test_dir}\\r?$", "timeout_sec": 60}}'
     results:
-    - 29
+    - 20
+    - 32
   visual:
   - check: SFTP 路径与关联终端输出可同时辨认。
     method: manual

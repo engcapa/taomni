@@ -1,0 +1,335 @@
+id: TC-WS-023
+title: Workspace terminal tab menu preserves ordering, rename, duplication and isolation
+description: Runs every context menu action through the workspace strip. Cancellation preserves titles; closing affects only this workspace.
+modes:
+- browser
+covers:
+- F-WS-2
+- F-WS-3
+tags:
+- p0
+- workspace-redesign
+- regression
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-023
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- wait_for: '[data-testid="workspace-open-session-menu"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="workspace-session-pane"]:visible'
+- right_click: '[data-testid="workspace-tab"][title="Local Terminal"]'
+- click: '[data-testid="workspace-tab-context-rename"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: QA alpha
+- click: '[data-testid="text-input-dialog-confirm"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- wait_for: '[data-testid="workspace-open-session-menu"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="workspace-session-pane"]:visible'
+- right_click: '[data-testid="workspace-tab"][title="Local Terminal"]'
+- click: '[data-testid="workspace-tab-context-rename"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: QA beta
+- click: '[data-testid="text-input-dialog-confirm"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- wait_for: '[data-testid="workspace-open-session-menu"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="workspace-session-pane"]:visible'
+- right_click: '[data-testid="workspace-tab"][title="Local Terminal"]'
+- click: '[data-testid="workspace-tab-context-rename"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: QA gamma
+- click: '[data-testid="text-input-dialog-confirm"]'
+- right_click: '[data-testid="workspace-tab"][title="QA alpha"]'
+- assert_items:
+    selector: '[data-testid="workspace-tab-context-menu"] button'
+    attribute: data-testid
+    equals:
+    - workspace-tab-context-close
+    - workspace-tab-context-close-others
+    - workspace-tab-context-close-all
+    - workspace-tab-context-rename
+    - workspace-tab-context-duplicate
+    - workspace-tab-context-copy-info
+    - workspace-tab-context-move-first
+    - workspace-tab-context-move-left
+    - workspace-tab-context-move-right
+    - workspace-tab-context-move-last
+- press: Escape
+- right_click: '[data-testid="workspace-tab"][title="QA alpha"]'
+- click: '[data-testid="workspace-tab-context-rename"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: discarded
+- click: '[data-testid="text-input-dialog-cancel"]'
+- assert_items:
+    selector: '[data-testid="workspace-tab"]'
+    attribute: title
+    equals:
+    - QA alpha
+    - QA beta
+    - QA gamma
+- right_click: '[data-testid="workspace-tab"][title="QA alpha"]'
+- click: '[data-testid="workspace-tab-context-duplicate"]'
+- assert_items:
+    selector: '[data-testid="workspace-tab"]'
+    attribute: title
+    equals:
+    - QA alpha
+    - QA alpha-1
+    - QA beta
+    - QA gamma
+- right_click: '[data-testid="workspace-tab"][title="QA alpha"]'
+- click: '[data-testid="workspace-tab-context-move-last"]'
+- assert_items:
+    selector: '[data-testid="workspace-tab"]'
+    attribute: title
+    equals:
+    - QA alpha-1
+    - QA beta
+    - QA gamma
+    - QA alpha
+- right_click: '[data-testid="workspace-tab"][title="QA alpha"]'
+- click: '[data-testid="workspace-tab-context-move-first"]'
+- assert_items:
+    selector: '[data-testid="workspace-tab"]'
+    attribute: title
+    equals:
+    - QA alpha
+    - QA alpha-1
+    - QA beta
+    - QA gamma
+- right_click: '[data-testid="workspace-tab"][title="QA alpha"]'
+- click: '[data-testid="workspace-tab-context-move-right"]'
+- assert_items:
+    selector: '[data-testid="workspace-tab"]'
+    attribute: title
+    equals:
+    - QA alpha-1
+    - QA alpha
+    - QA beta
+    - QA gamma
+- right_click: '[data-testid="workspace-tab"][title="QA alpha"]'
+- click: '[data-testid="workspace-tab-context-move-left"]'
+- assert_items:
+    selector: '[data-testid="workspace-tab"]'
+    attribute: title
+    equals:
+    - QA alpha
+    - QA alpha-1
+    - QA beta
+    - QA gamma
+- right_click: '[data-testid="workspace-tab"][title="QA alpha"]'
+- click: '[data-testid="workspace-tab-context-copy-info"]'
+- assert_text:
+    selector: '[data-testid="status-bar"]'
+    contains: copied
+- right_click: '[data-testid="workspace-tab"][title="QA alpha-1"]'
+- click: '[data-testid="workspace-tab-context-close"]'
+- assert_items:
+    selector: '[data-testid="workspace-tab"]'
+    attribute: title
+    equals:
+    - QA alpha
+    - QA beta
+    - QA gamma
+- click: '[data-testid="workspace-create-button"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: QA other
+- click: '[data-testid="text-input-dialog-confirm"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- wait_for: '[data-testid="workspace-open-session-menu"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="workspace-session-pane"]:visible'
+- right_click: '[data-testid="workspace-tab"][title="Local Terminal"]'
+- click: '[data-testid="workspace-tab-context-rename"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: Other retained
+- click: '[data-testid="text-input-dialog-confirm"]'
+- click: '[data-testid="workspace-switcher-button"]'
+- click: '[data-testid="workspace-switcher-option-default-workspace"]'
+- right_click: '[data-testid="workspace-tab"][title="QA beta"]'
+- click: '[data-testid="workspace-tab-context-close-others"]'
+- assert_items:
+    selector: '[data-testid="workspace-tab"]'
+    attribute: title
+    equals:
+    - QA beta
+- right_click: '[data-testid="workspace-tab"][title="QA beta"]'
+- click: '[data-testid="workspace-tab-context-close-all"]'
+- assert_count:
+    selector: '[data-testid="workspace-tab"]'
+    equal: 0
+- click: '[data-testid="workspace-switcher-button"]'
+- click: '[data-testid^="workspace-switcher-option-"]:not([data-testid="workspace-switcher-option-default-workspace"])'
+- assert_items:
+    selector: '[data-testid="workspace-tab"]'
+    attribute: title
+    equals:
+    - Other retained
+- screenshot: workspace-tab-menu-isolation.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: All ten terminal context actions work; duplicate owns a new tab, all four moves preserve titles, cancelled rename is inert and bulk close
+      preserves another workspace.
+    actions:
+    - 3
+    - 4
+    - 6
+    - 8
+    - 9
+    - 11
+    - 12
+    - 13
+    - 15
+    - 17
+    - 18
+    - 20
+    - 21
+    - 22
+    - 24
+    - 26
+    - 27
+    - 29
+    - 30
+    - 31
+    - 33
+    - 34
+    - 35
+    - 36
+    - 37
+    - 39
+    - 40
+    - 42
+    - 43
+    - 45
+    - 46
+    - 48
+    - 49
+    - 51
+    - 52
+    - 54
+    - 55
+    - 57
+    - 58
+    - 60
+    - 61
+    - 62
+    - 63
+    - 65
+    - 67
+    - 68
+    - 70
+    - 71
+    - 72
+    - 73
+    - 74
+    - 75
+    - 77
+    - 78
+    - 80
+    - 81
+    checkpoints:
+    - step: 5
+      expectation: '{"wait_for": "[data-testid=\"workspace-open-session-menu\"]"}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]:visible"}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"workspace-open-session-menu\"]"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]:visible"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"workspace-open-session-menu\"]"}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]:visible"}'
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 32
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab-context-menu\"] button", "attribute": "data-testid", "equals": ["workspace-tab-context-close",
+        "workspace-tab-context-close-others", "workspace-tab-context-close-all", "workspace-tab-context-rename", "workspace-tab-context-duplicate", "workspace-tab-context-copy-info",
+        "workspace-tab-context-move-first", "workspace-tab-context-move-left", "workspace-tab-context-move-right", "workspace-tab-context-move-last"]}}'
+    - step: 38
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "title", "equals": ["QA alpha", "QA beta", "QA gamma"]}}'
+    - step: 41
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "title", "equals": ["QA alpha", "QA alpha-1", "QA beta",
+        "QA gamma"]}}'
+    - step: 44
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "title", "equals": ["QA alpha-1", "QA beta", "QA gamma",
+        "QA alpha"]}}'
+    - step: 47
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "title", "equals": ["QA alpha", "QA alpha-1", "QA beta",
+        "QA gamma"]}}'
+    - step: 50
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "title", "equals": ["QA alpha-1", "QA alpha", "QA beta",
+        "QA gamma"]}}'
+    - step: 53
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "title", "equals": ["QA alpha", "QA alpha-1", "QA beta",
+        "QA gamma"]}}'
+    - step: 56
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "copied"}}'
+    - step: 59
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "title", "equals": ["QA alpha", "QA beta", "QA gamma"]}}'
+    - step: 64
+      expectation: '{"wait_for": "[data-testid=\"workspace-open-session-menu\"]"}'
+    - step: 66
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]:visible"}'
+    - step: 69
+      expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
+    - step: 76
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "title", "equals": ["QA beta"]}}'
+    - step: 79
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 0}}'
+    - step: 82
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "title", "equals": ["Other retained"]}}'
+    results:
+    - 5
+    - 7
+    - 10
+    - 14
+    - 16
+    - 19
+    - 23
+    - 25
+    - 28
+    - 32
+    - 38
+    - 41
+    - 44
+    - 47
+    - 50
+    - 53
+    - 56
+    - 59
+    - 64
+    - 66
+    - 69
+    - 76
+    - 79
+    - 82
+  visual:
+  - check: Compact controls retain readable icons and active states without toolbar overlap.
+    method: manual
+    reason: Inspect the retained screenshots; functional assertions do not establish visual matching.
+  native:
+  - check: Renderer workflow; real OS boundaries are verified by the corresponding native workspace cases.
+    method: external
+    reason: Browser preview uses platform stubs and does not claim native process, disk, picker or clipboard evidence.

@@ -5,6 +5,7 @@ import {
   lspDeclaration,
   lspDefinition,
   lspDetectServers,
+  lspStopWorkspace,
   nextLspRequestSequence,
   type LspDocumentDescriptor,
   type LspLocationsResult,
@@ -16,6 +17,22 @@ const coreMocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@tauri-apps/api/core", () => coreMocks);
+
+describe("workspace provider and explorer lifetime boundary", () => {
+  beforeEach(() => coreMocks.invoke.mockReset().mockResolvedValue(1));
+
+  it("keeps the existing full-disposal IPC payload for callers without options", async () => {
+    expect(await lspStopWorkspace("workspace")).toBe(1);
+    expect(coreMocks.invoke).toHaveBeenCalledWith("lsp_stop_workspace", { workspaceId: "workspace" });
+  });
+
+  it("preserves explorer file monitoring during a provider restart", async () => {
+    expect(await lspStopWorkspace("workspace", true)).toBe(1);
+    expect(coreMocks.invoke).toHaveBeenCalledWith("lsp_stop_workspace", {
+      workspaceId: "workspace", preserveFileWatcher: true,
+    });
+  });
+});
 
 const mockStatus: LspServerStatus = {
   presetId: "jdtls",

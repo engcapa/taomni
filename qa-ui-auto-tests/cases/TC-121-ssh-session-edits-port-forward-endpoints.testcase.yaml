@@ -16,7 +16,9 @@ fixtures:
 timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
+- assert_visible: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'
 - fill:
@@ -111,79 +113,93 @@ verification:
   - id: R1
     requirement: A saved SSH session can edit both port-forward endpoints, persist the changes, and restore them when reopened.
     actions:
-    - 3
+    - 1
+    - 2
     - 5
-    - 6
     - 7
     - 8
     - 9
+    - 10
     - 11
-    - 12
     - 13
     - 14
-    - 18
+    - 15
+    - 16
     - 20
-    - 21
+    - 22
     - 23
-    - 24
+    - 25
     - 26
     - 28
-    - 29
     - 30
-    - 34
-    - 36
-    - 37
-    - 39
-    checkpoints:
-    - step: 2
-      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
-    - step: 4
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 10
-      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
-    - step: 15
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"] input[aria-label=\"Forward local address\"]"}'
-    - step: 16
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19090"}}'
-    - step: 17
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "service.internal:80"}}'
-    - step: 19
-      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 22
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-forward-edit\"]"}'
-    - step: 25
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 27
-      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
-    - step: 31
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19091"}}'
-    - step: 32
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "service.internal:8080"}}'
-    - step: 33
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": "qa-forward-edited"}}'
-    - step: 35
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-forward-edit\"]"}'
-    - step: 38
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 40
-      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
-    - step: 41
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19091"}}'
-    - step: 42
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "service.internal:8080"}}'
-    - step: 43
-      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": "qa-forward-edited"}}'
-    results:
-    - 16
-    - 17
-    - 22
     - 31
     - 32
-    - 33
-    - 35
+    - 36
+    - 38
+    - 39
     - 41
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 4
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"] input[aria-label=\"Forward local address\"]"}'
+    - step: 18
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19090"}}'
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "service.internal:80"}}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-forward-edit\"]"}'
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19091"}}'
+    - step: 34
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "service.internal:8080"}}'
+    - step: 35
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": "qa-forward-edited"}}'
+    - step: 37
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-forward-edit\"]"}'
+    - step: 40
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 42
+      expectation: '{"wait_for": "[data-testid=\"network-settings\"]"}'
+    - step: 43
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward local address\"]", "name": "value", "equals": "127.0.0.1:19091"}}'
+    - step: 44
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward remote address\"]", "name": "value", "equals": "service.internal:8080"}}'
+    - step: 45
+      expectation: '{"assert_attribute": {"selector": "input[aria-label=\"Forward description\"]", "name": "value", "equals": "qa-forward-edited"}}'
+    results:
+    - 3
+    - 4
+    - 6
+    - 12
+    - 17
+    - 18
+    - 19
+    - 21
+    - 24
+    - 27
+    - 29
+    - 33
+    - 34
+    - 35
+    - 37
+    - 40
     - 42
     - 43
+    - 44
+    - 45
   visual:
   - check: The saved forward rows and updated endpoints remain readable without clipping in the editor.
     method: manual

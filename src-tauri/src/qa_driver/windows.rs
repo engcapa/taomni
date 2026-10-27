@@ -54,6 +54,12 @@ pub(super) async fn switch<R: Runtime>(
     if let Err(message) = window.set_focus() {
         return error(message.to_string());
     }
+    // AppKit window activation does not make its WKWebView the first
+    // responder. W3C context switching must also give that view input focus.
+    let webview: &tauri::Webview<R> = window.as_ref();
+    if let Err(message) = webview.set_focus() {
+        return error(message.to_string());
+    }
     match state.window.write() {
         Ok(mut active) => *active = window,
         Err(_) => return error("QA window lock poisoned"),

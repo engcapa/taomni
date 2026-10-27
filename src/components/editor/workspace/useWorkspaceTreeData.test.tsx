@@ -72,6 +72,64 @@ describe("useWorkspaceTreeData", () => {
     expect(workspaceMocks.workspaceListFilesRecursive).not.toHaveBeenCalled();
   });
 
+  it("rehydrates visible expanded descendants without scanning collapsed branches", async () => {
+    const dir = (path: string) => ({ ...ENTRY, path, name: path.split("/").at(-1) ?? path, fileType: "dir" });
+    const listings: Record<string, typeof ENTRY[]> = {
+      "": [dir("src"), dir("Documents"), dir("closed")],
+      src: [dir("src/main"), dir("src/collapsed"), ENTRY],
+      "src/main": [{ ...ENTRY, path: "src/main/a.ts" }],
+      Documents: [{ ...ENTRY, path: "Documents/notes.txt" }],
+    };
+    workspaceMocks.workspaceListDir.mockImplementation(async (_root: string, path: string) => ready(listings[path] ?? []));
+    const onError = vi.fn();
+    const { result } = renderHook(() => useWorkspaceTreeData({
+      roots, expandedRootIds: expandedRoots,
+      expandedDirKeys: new Set(["root-1:src", "root-1:src/main", "root-1:Documents", "root-1:closed/hidden"]),
+      treeViewMode: "tree", onError,
+    }));
+    await waitFor(() => expect(result.current.directories["root-1:src/main"]?.entries).toEqual([
+      { ...ENTRY, path: "src/main/a.ts" },
+    ]));
+    expect(result.current.directories["root-1:Documents"]?.loaded).toBe(true);
+    expect(workspaceMocks.workspaceListDir.mock.calls.map(([, path]) => path).sort())
+      .toEqual(["", "Documents", "src", "src/main"]);
+    expect(workspaceMocks.workspaceListFilesRecursive).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it("loads restored descendants when a saved workspace definition arrives after mount", async () => {
+    workspaceMocks.workspaceListDir.mockImplementation(async (_root: string, path: string) => ready(
+      path ? [{ ...ENTRY, path: "src/a.ts" }] : [{ ...ENTRY, name: "src", path: "src", fileType: "dir" }],
+    ));
+    const onError = vi.fn();
+    const { result, rerender } = renderHook(({ currentRoots }) => useWorkspaceTreeData({
+      roots: currentRoots, expandedRootIds: expandedRoots, expandedDirKeys: new Set(["root-1:src"]),
+      treeViewMode: "list", onError,
+    }), { initialProps: { currentRoots: [] as CodeWorkspaceRootInfo[] } });
+    expect(workspaceMocks.workspaceListDir).not.toHaveBeenCalled();
+    rerender({ currentRoots: roots });
+    await waitFor(() => expect(result.current.directories["root-1:src"]?.loaded).toBe(true));
+    expect(result.current.directories["root-1:src"].entries).toEqual([{ ...ENTRY, path: "src/a.ts" }]);
+    expect(workspaceMocks.workspaceListDir).toHaveBeenCalledTimes(2);
+  });
+
+  it("preserves a restored directory error until an explicit retry", async () => {
+    workspaceMocks.workspaceListDir.mockImplementation(async (_root: string, path: string) => path
+      ? { state: "failed", message: "Permission denied" }
+      : ready([{ ...ENTRY, name: "src", path: "src", fileType: "dir" }]));
+    const onError = vi.fn();
+    const { result, rerender } = renderHook(() => useWorkspaceTreeData({
+      roots, expandedRootIds: expandedRoots, expandedDirKeys: new Set(["root-1:src"]), treeViewMode: "tree", onError,
+    }));
+    await waitFor(() => expect(result.current.directories["root-1:src"]?.error).toBe("Permission denied"));
+    rerender();
+    expect(workspaceMocks.workspaceListDir).toHaveBeenCalledTimes(2);
+    expect(onError).toHaveBeenCalledTimes(1);
+    workspaceMocks.workspaceListDir.mockResolvedValueOnce(ready([ENTRY]));
+    await act(async () => result.current.loadDir(root.id, "src"));
+    expect(result.current.directories["root-1:src"]).toMatchObject({ loaded: true, error: null, entries: [ENTRY] });
+  });
+
   it("discards in-flight results after reset and removes one root cache", async () => {
     let resolveListing!: (result: WorkspaceTreeLoadResult<unknown>) => void;
     workspaceMocks.workspaceListDir.mockImplementation(() => new Promise<WorkspaceTreeLoadResult<unknown>>((resolve) => {
@@ -123,6 +181,37 @@ describe("useWorkspaceTreeData", () => {
     expect(result.current.directories["root-1:src"]).toMatchObject({ loading: false, entries: [updated] });
   });
 
+  it("rejects a late empty response from an older request in the same generation", async () => {
+    const pending: Array<(value: WorkspaceTreeLoadResult<unknown>) => void> = [];
+    workspaceMocks.workspaceListDir.mockImplementation(() => new Promise((resolve) => pending.push(resolve)));
+    const onError = vi.fn();
+    const { result } = renderHook(() => useWorkspaceTreeData({
+      roots, expandedRootIds: noExpandedRoots, treeViewMode: "tree", onError,
+    }));
+
+    let older!: Promise<void>;
+    let newer!: Promise<void>;
+    act(() => {
+      older = result.current.loadDir(root.id, "Documents");
+      newer = result.current.loadDir(root.id, "Documents");
+    });
+    await waitFor(() => expect(pending).toHaveLength(2));
+
+    const document = { ...ENTRY, name: "notes.md", path: "Documents/notes.md" };
+    await act(async () => {
+      pending[1](ready([document]));
+      await newer;
+    });
+    expect(result.current.directories["root-1:Documents"]?.entries).toEqual([document]);
+
+    await act(async () => {
+      pending[0](ready([]));
+      await older;
+    });
+    expect(result.current.directories["root-1:Documents"]?.entries).toEqual([document]);
+    expect(onError).not.toHaveBeenCalled();
+  });
+
   it("keeps the compact endpoint mounted until its refreshed chain is ready", async () => {
     const onError = vi.fn();
     const directory = { ...ENTRY, name: "src", path: "src", fileType: "dir" };
@@ -141,7 +230,7 @@ describe("useWorkspaceTreeData", () => {
     expect(result.current.compactChains["root-1:src"]).toMatchObject({ path: "src/changed", loading: false });
   });
 
-  it.each(["flat", "tree"] as const)("refreshes a retained recursive index in %s view", async (mode) => {
+  it.each(["flat", "files", "tree", "packages"] as const)("refreshes a retained recursive index in %s view", async (mode) => {
     const onError = vi.fn();
     workspaceMocks.workspaceListFilesRecursive.mockResolvedValue(ready([ENTRY]));
     const { result } = renderHook(() => useWorkspaceTreeData({

@@ -217,6 +217,8 @@ export const PIN_VIEW_EVENT = "screenshot://pin-view";
 export interface PinView {
   zoom: number; opacity: number; note: string; busy: boolean;
   error: string | null; notice: string | null;
+  /** Monotonic source-render revision; absent for legacy/browser stubs. */
+  revision?: number;
 }
 export const openPinTools = (view: PinView) => invoke<string>("screenshot_open_pin_tools", { view });
 export const closePinTools = () => invoke<void>("screenshot_close_pin_tools");

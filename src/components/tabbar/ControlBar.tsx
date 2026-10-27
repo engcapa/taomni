@@ -7,12 +7,11 @@ import {
   MessageSquare,
   Inbox,
   Monitor,
-  MoreHorizontal,
+  Filter,
   Network,
-  PanelsTopLeft,
-  Info,
   KeyRound,
   PanelLeft,
+  PanelRight,
   Plus,
   Power,
   RefreshCw,
@@ -29,15 +28,19 @@ import {
   GitBranch,
   Braces,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useMainRailHostStore } from "../../stores/mainRailHostStore";
+import { useEffect, useRef, useState } from "react";
 import { TabBar } from "./TabBar";
 import { OpenTabsMenu } from "./OpenTabsMenu";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { WindowControls } from "../window/WindowControls";
 import { WindowDragHandle } from "../window/WindowDragHandle";
 import { startWindowDrag } from "../../lib/windowDrag";
-import { TitleBarTrayControls } from "../window/TitleBarTrayControls";
-import { ScreenshotMenuButton } from "../screenshot/ScreenshotMenuButton";
+import { PlatformToolbarActions } from "./PlatformToolbarActions";
+import { WorkspaceTabStrip } from "../workspace/WorkspaceTabStrip";
+import { WorkspaceTabsFilter } from "../workspace/WorkspaceTabsFilter";
+import { useAppStore } from "../../stores/appStore";
 import { useSessionImportExport } from "../menubar/useSessionImportExport";
 import type { AppCommand } from "../menubar/commands";
 import { getAppPlatform } from "../../lib/runtime";
@@ -70,6 +73,10 @@ interface ControlBarProps {
   onDuplicateTab?: (id: string) => void;
   onDetachActiveTab?: () => void;
   onCloseWindow?: () => void;
+  /** Left sidebar collapsed state, for the `◧` toggle's aria-pressed. */
+  leftSidebarCollapsed?: boolean;
+  /** Opens the `Ctrl+K` global command palette. */
+  onOpenGlobalSearch?: () => void;
   /** Receives the DOM node that hosts the active tab's contextual actions. */
   slotRef: (el: HTMLDivElement | null) => void;
 }
@@ -88,11 +95,14 @@ export function ControlBar({
   onDuplicateTab,
   onDetachActiveTab,
   onCloseWindow,
+  leftSidebarCollapsed = false,
+  onOpenGlobalSearch,
   slotRef,
 }: ControlBarProps) {
   const ctx = useContextMenu();
+  const menuHost = useMainRailHostStore((s) => s.menuHost);
+  const activeSideTab = useAppStore((state) => state.activeSideTab);
   const t = useT();
-  const [detailsRevealHovered, setDetailsRevealHovered] = useState(false);
   const {
     hasSessions,
     importJson,
@@ -207,6 +217,7 @@ export function ControlBar({
   return (
     <div
       data-testid="control-bar"
+      data-window-drag
       className="taomni-control-bar h-8 flex items-center min-w-0"
       onMouseDown={startWindowDrag}
     >
@@ -216,69 +227,75 @@ export function ControlBar({
         <div className="shrink-0 self-stretch" style={{ width: MAC_TRAFFIC_LIGHT_INSET }} data-window-drag />
       )}
       <div className="flex items-center gap-1 px-1.5 shrink-0">
+        {activeSideTab !== "home" && <BarButton
+          testId="toggle-left-sidebar"
+          title={`${t("platform.toggleLeftSidebar")} (${IS_MAC ? "Cmd+B" : "Ctrl+B"})`}
+          icon={leftSidebarCollapsed ? <PanelRight className="w-4 h-4" /> : <PanelLeft className="w-4 h-4" />}
+          active={!leftSidebarCollapsed}
+          onClick={onToggleSidebar}
+        />}
         {!nativeMenu && (
-          <BarButton testId="app-main-menu" title={t("compactTitleBar.mainMenu")} icon={<Menu className="w-4 h-4" />} onClick={openMainMenu} />
+          menuHost ? createPortal(
+            <BarButton testId="app-main-menu" title={t("compactTitleBar.mainMenu")} icon={<Menu className="w-4 h-4" />} onClick={openMainMenu} />,
+            menuHost,
+          ) : <BarButton testId="app-main-menu" title={t("compactTitleBar.mainMenu")} icon={<Menu className="w-4 h-4" />} onClick={openMainMenu} />
         )}
       </div>
       <WindowDragHandle />
       <div className="min-w-0 flex-1 self-stretch">
-        <TabBar
-          onStartLocalTerminal={onStartLocalTerminal}
-          onConnectSession={onConnectSession}
-          onOpenSessionEditor={onOpenSessionEditor}
-          onDuplicateTab={onDuplicateTab}
-          detailsRevealExternal={detailsRevealHovered}
-        />
+        {activeSideTab === "workspaces" ? (
+          <div className="flex h-full min-w-0 items-center gap-1">
+            <WorkspaceTabStrip />
+          </div>
+        ) : activeSideTab === "home" || activeSideTab === "agents" || activeSideTab === "tools" ? (
+          <div className="flex h-full items-center gap-2 px-2 text-[12px] font-semibold" data-testid="platform-mode-title">
+            {t(activeSideTab === "home" ? "platform.homeTitle" : activeSideTab === "tools" ? "platform.tools" : "platform.agentsTitle")}
+          </div>
+        ) : (
+          <TabBar
+            onStartLocalTerminal={onStartLocalTerminal}
+            onConnectSession={onConnectSession}
+            onOpenSessionEditor={onOpenSessionEditor}
+            onDuplicateTab={onDuplicateTab}
+          />
+        )}
       </div>
       {/* Update hint sits just left of the tab-action group (centre-right of the
           bar). It only appears once a new version is staged. */}
       <UpdateHint />
-      {/* Per-tab contextual actions portal in here (SFTP / Chat / detach …). */}
-      <div ref={slotRef} data-testid="tab-action-slot" className="flex items-center gap-0.5 self-stretch shrink-0 pr-1" />
-      <button
-        type="button"
-        data-testid="tab-details-hover"
-        aria-label={t("tabs.detailsShortcutHint", { shortcut: IS_MAC ? "Cmd+Shift+H" : "Ctrl+Shift+H" })}
-        title={t("tabs.detailsShortcutHint", { shortcut: IS_MAC ? "Cmd+Shift+H" : "Ctrl+Shift+H" })}
-        data-active={detailsRevealHovered || undefined}
-        className="taomni-tab-details-button relative h-6 w-7 shrink-0 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)] data-[active=true]:bg-[var(--taomni-selected)]"
-        onMouseEnter={() => setDetailsRevealHovered(true)}
-        onMouseLeave={() => setDetailsRevealHovered(false)}
-        onFocus={() => setDetailsRevealHovered(true)}
-        onBlur={() => setDetailsRevealHovered(false)}
-      >
-        <PanelsTopLeft className="w-4 h-4" />
-        <Info className="absolute right-0.5 bottom-0.5 w-2.5 h-2.5 rounded-full" style={{ background: "var(--taomni-chrome-bg)" }} />
-      </button>
-      {/* Open-tabs `⋯` overflow — also hosts the Screenshot actions. Sits at the
-          right end of the tab-action group. */}
-      <TabMore onDetachActiveTab={onDetachActiveTab} />
-      <div className={IS_MAC ? "w-2 self-stretch shrink-0" : "w-3 self-stretch shrink-0"} />
-      {/* Divider between the tab-related buttons and the main-window controls. */}
-      <div aria-hidden="true" className="taomni-control-divider self-stretch shrink-0" />
-      {/* System screenshot: independent of any tab — global window chrome.
-          Click captures immediately; the chevron offers timed (delayed) capture
-          Flameshot-style. Clicking during a countdown cancels it. */}
-      <ScreenshotMenuButton />
-      <TitleBarTrayControls />
+      <PlatformToolbarActions onOpenSearch={onOpenGlobalSearch} slotRef={slotRef} onDetachActiveTab={onDetachActiveTab}>
+        {activeSideTab === "sessions" && <TabMore onDetachActiveTab={onDetachActiveTab} />}
+        {activeSideTab === "workspaces" && <WorkspaceTabsFilter />}
+      </PlatformToolbarActions>
       {!IS_MAC && <WindowControls onClose={onCloseWindow} />}
     </div>
   );
 }
 
-/** The open-tabs overflow dropdown at the right of the tab-action group. */
+/** Sessions filter and search share one compact entry. */
 function TabMore({ onDetachActiveTab }: { onDetachActiveTab?: () => void }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  const filter = useAppStore((s) => s.tabFilter);
   const wrapRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      const primary = IS_MAC ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+      if (!event.isComposing && primary && event.shiftKey && !event.altKey && event.key.toLowerCase() === "a") {
+        event.preventDefault(); event.stopPropagation(); setOpen(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   return (
     <div ref={wrapRef} className="relative shrink-0 pr-1">
       <BarButton
         testId="tab-more"
-        title={t("tabs.moreWithDetailsShortcut", {
-          shortcut: IS_MAC ? "Cmd+Shift+H" : "Ctrl+Shift+H",
-        })}
-        icon={<MoreHorizontal className="w-4 h-4" />}
+        title={t("tabs.filterOpenTabs")}
+        icon={<Filter className="w-4 h-4" />}
+        active={Boolean(filter)}
+        expanded={open}
         onClick={() => setOpen((v) => !v)}
       />
       <OpenTabsMenu
@@ -286,6 +303,7 @@ function TabMore({ onDetachActiveTab }: { onDetachActiveTab?: () => void }) {
         onClose={() => setOpen(false)}
         anchorRef={wrapRef}
         onDetachActiveTab={onDetachActiveTab}
+        showActions={false}
       />
     </div>
   );
@@ -324,11 +342,15 @@ function BarButton({
   title,
   onClick,
   testId,
+  active,
+  expanded,
 }: {
   icon: React.ReactNode;
   title: string;
   onClick?: (event: React.MouseEvent) => void;
   testId?: string;
+  active?: boolean;
+  expanded?: boolean;
 }) {
   return (
     <button
@@ -336,7 +358,11 @@ function BarButton({
       type="button"
       title={title}
       aria-label={title}
-      className="h-6 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
+      aria-pressed={active}
+      aria-haspopup={expanded === undefined ? undefined : "dialog"}
+      aria-expanded={expanded}
+      data-active={active || undefined}
+      className="taomni-platform-toolbar-button w-7"
       onClick={onClick}
     >
       {icon}

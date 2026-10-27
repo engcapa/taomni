@@ -1,0 +1,127 @@
+id: TC-WS-002
+title: Four primary modes and one bottom chat entry
+description: The primary rail is Home, Workspaces, Sessions and Tools; Home launch actions remain available. Crew is retained on Home and in global search.
+modes:
+- browser
+- native
+covers:
+- F1.2
+- F1.6
+- F-WS-1
+tags:
+- p0
+- workspace-redesign
+- regression
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-002
+- wait_for: '[data-testid="welcome-panel"]'
+- wait_for: '[data-testid="sidebar-rail"]'
+- assert_visible: '[data-testid="sidebar-rail"] [data-testid="nav-mode-home"]'
+- assert_visible: '[data-testid="sidebar-rail"] [data-testid="nav-mode-workspaces"]'
+- assert_visible: '[data-testid="sidebar-rail"] [data-testid="side-tab-sessions"]'
+- assert_not_visible: '[data-testid="nav-mode-agents"]'
+- assert_visible: '[data-testid="sidebar-rail"] [data-testid="side-tab-tools"]'
+- assert_items:
+    selector: '[data-testid="sidebar-rail"] [data-testid="rail-mode-group"] button'
+    attribute: data-testid
+    equals:
+    - nav-mode-home
+    - nav-mode-workspaces
+    - side-tab-sessions
+    - side-tab-tools
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- assert_visible: '[data-testid="welcome-panel"]'
+- assert_visible: '[data-testid="welcome-open-local-terminal"]'
+- assert_text:
+    selector: '[data-testid="welcome-panel"]'
+    contains: Start local terminal
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-switcher"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- assert_not_visible: '[data-testid="nav-mode-agents"]'
+- assert_count:
+    selector: '[data-testid="rail-chat-button"]'
+    equal: 1
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- screenshot: ws-002-primary-rail-modes.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Four primary modes have the requested order, the duplicate top robot is absent, one bottom chat entry remains and Home, Workspaces, Sessions
+      and Tools navigation works.
+    actions:
+    - 11
+    - 16
+    - 18
+    - 22
+    checkpoints:
+    - step: 3
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"sidebar-rail\"]"}'
+    - step: 5
+      expectation: '{"assert_visible": "[data-testid=\"sidebar-rail\"] [data-testid=\"nav-mode-home\"]"}'
+    - step: 6
+      expectation: '{"assert_visible": "[data-testid=\"sidebar-rail\"] [data-testid=\"nav-mode-workspaces\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"sidebar-rail\"] [data-testid=\"side-tab-sessions\"]"}'
+    - step: 8
+      expectation: '{"assert_not_visible": "[data-testid=\"nav-mode-agents\"]"}'
+    - step: 9
+      expectation: '{"assert_visible": "[data-testid=\"sidebar-rail\"] [data-testid=\"side-tab-tools\"]"}'
+    - step: 10
+      expectation: '{"assert_items": {"selector": "[data-testid=\"sidebar-rail\"] [data-testid=\"rail-mode-group\"] button", "attribute": "data-testid",
+        "equals": ["nav-mode-home", "nav-mode-workspaces", "side-tab-sessions", "side-tab-tools"]}}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"welcome-open-local-terminal\"]"}'
+    - step: 15
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Start local terminal"}}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"workspace-switcher\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 20
+      expectation: '{"assert_not_visible": "[data-testid=\"nav-mode-agents\"]"}'
+    - step: 21
+      expectation: '{"assert_count": {"selector": "[data-testid=\"rail-chat-button\"]", "equal": 1}}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tools-panel\"]"}'
+    results:
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 13
+    - 14
+    - 15
+    - 17
+    - 19
+    - 20
+    - 21
+    - 23
+  visual:
+  - check: Compact controls retain readable icons and active states without toolbar overlap.
+    method: manual
+    reason: Inspect the retained screenshots; functional assertions do not establish visual matching.
+  native:
+  - check: Four primary modes have the requested order, the duplicate top robot is absent, one bottom chat entry remains and Home, Workspaces, Sessions
+      and Tools navigation works.
+    method: automated
+    reason: Runs the isolated packaged application and explicitly asserts real native effects.

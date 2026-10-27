@@ -1,0 +1,73 @@
+id: TC-WS-001
+title: Single 33px shared main toolbar hosts left/right sidebar collapse buttons without
+  extra top bar
+description: 'Verifies DEC-01 / AC-01: main window renders only a single 32-33px ControlBar,
+  removes fake 3 colored dots, and provides left/right sidebar collapse buttons (Ctrl+B)
+  and Ctrl+K search trigger.'
+covers:
+- F1.2
+- F1.3
+tags:
+- smoke
+- p0
+- main
+- workspace-redesign
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 60
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="control-bar"]'
+    timeout_sec: 30
+- assert_visible: '[data-testid="toggle-left-sidebar"]'
+- assert_visible: '[data-testid="global-search-trigger"]'
+- assert_visible: '[data-testid="toggle-right-sidebar"]'
+- eval_readonly:
+    expression: document.querySelector('.taomni-control-bar').getBoundingClientRect().height
+      <= 34
+    expect_truthy: true
+- click: '[data-testid="toggle-left-sidebar"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- click: '[data-testid="toggle-left-sidebar"]'
+- wait_for: '[data-testid="expanded-sidebar-panel"]'
+- screenshot: ws-001-single-shared-toolbar.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: 顶栏仅保留单行 <=34px 的共享 ControlBar，且左右侧栏收缩按钮与全局搜索按钮可见，点击左栏收缩按钮可折叠与恢复主侧栏。
+    actions:
+    - 1
+    - 7
+    - 9
+    checkpoints:
+    - step: 2
+      expectation: 共享主工具栏挂载完成
+    - step: 3
+      expectation: 左栏收缩按钮可见
+    - step: 4
+      expectation: 全局搜索按钮可见
+    - step: 5
+      expectation: 右栏收缩按钮可见
+    - step: 6
+      expectation: 单行顶栏高度不超过 34px
+    - step: 8
+      expectation: 点击左栏收缩按钮后主侧栏折叠
+    - step: 10
+      expectation: 再次点击左栏收缩按钮后主侧栏恢复展开
+    results:
+    - 6
+    - 8
+    - 10
+  visual:
+  - check: 顶栏为单行紧凑布局，无第二行多余标题栏，右上角无 3 色装饰圆点。
+    method: manual
+    reason: 视觉对齐与装饰元素清理需结合截图复核。
+  native:
+  - check: 在真实桌面 WebView 中验证单行顶栏布局与按钮点击响应。
+    method: automated
+    reason: 按实际执行模式采集 browser 与 native 证据。

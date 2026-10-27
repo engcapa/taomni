@@ -484,10 +484,19 @@ pub async fn lsp_close_document(
 pub async fn lsp_stop_workspace(
     state: State<'_, AppState>,
     workspace_id: String,
+    preserve_file_watcher: Option<bool>,
 ) -> Result<usize, String> {
     let workspace_id = workspace_id.trim();
     if workspace_id.is_empty() {
         return Err("workspaceId is required".into());
     }
-    Ok(state.workspace.lsp.stop_workspace(workspace_id).await)
+    Ok(if preserve_file_watcher.unwrap_or(false) {
+        state
+            .workspace
+            .lsp
+            .stop_workspace_servers(workspace_id)
+            .await
+    } else {
+        state.workspace.lsp.stop_workspace(workspace_id).await
+    })
 }

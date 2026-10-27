@@ -89,7 +89,7 @@ verification:
     - step: 7
       expectation: '{"wait_for": "[data-testid=\"mail-client-tab\"]"}'
     - step: 9
-      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60, "unread": true}}'
     - step: 11
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-client-tab\"]", "state": "detached"}}'
     - step: 16

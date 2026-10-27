@@ -1,0 +1,345 @@
+id: TC-WS-041
+title: Detailed file list sorts and persists; source packages flatten independently
+description: Use all column headers and sort options, verify real row ordering and persistence, then open a nested package file. Return to Project and toggle
+  Flatten Packages in Appearance.
+modes:
+- browser
+covers:
+- F-WS-2
+- F25.1
+- F25.3
+tags:
+- p0
+- workspace-redesign
+- file-explorer
+- regression
+fixtures:
+- reset_db
+- workspace_explorer
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-list-packages
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.platform_workspace_root}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-root"]'
+- click: '[data-testid="code-workspace-tree-view-selector"]'
+- click: '[data-testid="code-workspace-tree-view-list"]'
+- wait_for: '[data-testid="code-workspace-list-columns"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src"]'
+- assert_count:
+    selector: '[data-tree-kind][data-path]'
+    equal: 6
+- eval_readonly:
+    expression: '[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
+      === "Documents|Pictures|src"'
+    expect_truthy: true
+- eval_readonly:
+    expression: '[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
+      === "Draft2.txt|Draft10.txt|README.md"'
+    expect_truthy: true
+- click: '[data-testid="code-workspace-list-sort-size"]'
+- assert_count:
+    selector: '[data-tree-kind][data-path]'
+    equal: 6
+- eval_readonly:
+    expression: '[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
+      === "Documents|Pictures|src"'
+    expect_truthy: true
+- eval_readonly:
+    expression: '[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
+      === "Draft10.txt|Draft2.txt|README.md"'
+    expect_truthy: true
+- click: '[data-testid="code-workspace-list-sort-size"]'
+- assert_count:
+    selector: '[data-tree-kind][data-path]'
+    equal: 6
+- eval_readonly:
+    expression: '[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
+      === "src|Pictures|Documents"'
+    expect_truthy: true
+- eval_readonly:
+    expression: '[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
+      === "README.md|Draft2.txt|Draft10.txt"'
+    expect_truthy: true
+- click: '[data-testid="code-workspace-list-sort-type"]'
+- assert_count:
+    selector: '[data-tree-kind][data-path]'
+    equal: 6
+- eval_readonly:
+    expression: '[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
+      === "Documents|Pictures|src"'
+    expect_truthy: true
+- eval_readonly:
+    expression: '[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
+      === "README.md|Draft2.txt|Draft10.txt"'
+    expect_truthy: true
+- click: '[data-testid="code-workspace-list-sort-modified"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-list-name"]').getBoundingClientRect().left >= document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-tree"]').getBoundingClientRect().left
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-list-name"]').getBoundingClientRect().right <= document.querySelector('[data-testid'+String.fromCharCode(61)+'"code-workspace-tree"]').getBoundingClientRect().right
+    expect_truthy: true
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem("taomni.codeWorkspace.explorerSort.v1")).field === 'modified'
+    expect_truthy: true
+- click: '[data-testid="code-workspace-tree-toolbar-more"]'
+- click: '[data-testid="code-workspace-tree-sort"]'
+- click: '[data-testid="code-workspace-tree-sort-name"]'
+- click: '[data-testid="code-workspace-tree-toolbar-more"]'
+- click: '[data-testid="code-workspace-tree-sort"]'
+- click: '[data-testid="code-workspace-tree-sort-descending"]'
+- assert_count:
+    selector: '[data-tree-kind][data-path]'
+    equal: 6
+- eval_readonly:
+    expression: '[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
+      === "src|Pictures|Documents"'
+    expect_truthy: true
+- eval_readonly:
+    expression: '[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
+      === "README.md|Draft10.txt|Draft2.txt"'
+    expect_truthy: true
+- click: '[data-testid="code-workspace-tree-toolbar-more"]'
+- click: '[data-testid="code-workspace-tree-sort"]'
+- click: '[data-testid="code-workspace-tree-sort-folders-first"]'
+- assert_count:
+    selector: '[data-tree-kind][data-path]'
+    equal: 6
+- eval_readonly:
+    expression: '[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
+      === "src|README.md|Pictures"'
+    expect_truthy: true
+- eval_readonly:
+    expression: '[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
+      === "Draft10.txt|Draft2.txt|Documents"'
+    expect_truthy: true
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem("taomni.codeWorkspace.explorerSort.v1")).descending && !JSON.parse(localStorage.getItem("taomni.codeWorkspace.explorerSort.v1")).foldersFirst
+    expect_truthy: true
+- reload_window: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-list-columns"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src"]'
+- assert_count:
+    selector: '[data-tree-kind][data-path]'
+    equal: 6
+- eval_readonly:
+    expression: '[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
+      === "src|README.md|Pictures"'
+    expect_truthy: true
+- eval_readonly:
+    expression: '[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
+      === "Draft10.txt|Draft2.txt|Documents"'
+    expect_truthy: true
+- screenshot: workspace-explorer-detailed-list.png
+- click: '[data-testid="code-workspace-tree-view-selector"]'
+- click: '[data-testid="code-workspace-tree-view-packages"]'
+- wait_for: '[data-testid="code-workspace-package-group"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-tree"]'
+    contains: src/main/java · com.example
+- assert_text:
+    selector: '[data-testid="code-workspace-tree"]'
+    contains: src/main/java · com.example.util
+- assert_text:
+    selector: '[data-testid="code-workspace-tree"]'
+    contains: src/test/java · com.example
+- assert_pattern:
+    selector: '[data-testid="code-workspace-flat-file"][data-path="src/main/java/com/example/util/Helper.java"]'
+    regex: ^Helper[.]java$
+- dblclick: '[data-testid="code-workspace-flat-file"][data-path="src/main/java/com/example/util/Helper.java"]'
+- wait_for: '[data-testid="workspace-file-editor"]'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"]'
+    contains: package com.example.util;
+- click: '[data-testid="code-workspace-tree-view-selector"]'
+- click: '[data-testid="code-workspace-tree-view-project"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-package-group"]'
+    equal: 0
+- click: '[data-testid="code-workspace-tree-toolbar-more"]'
+- click: '[data-testid="code-workspace-tree-menu-appearance"]'
+- click: '[data-testid="code-workspace-tree-menu-flatten-packages"]'
+- wait_for: '[data-testid="code-workspace-package-group"]'
+- click: '[data-testid="code-workspace-tree-toolbar-more"]'
+- click: '[data-testid="code-workspace-tree-menu-appearance"]'
+- click: '[data-testid="code-workspace-tree-menu-flatten-packages"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"]'
+- assert_no_runtime_errors: null
+- screenshot: workspace-explorer-packages.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Natural names, size, type, modified settings, ascending/descending and folders-first are retained across reload; packages preserve source-set
+      identity and open the original file. The list header may render before the asynchronous root read; wait for an actual entry before checking the exact
+      six rows and their order.
+    actions:
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 9
+    - 10
+    - 16
+    - 20
+    - 24
+    - 28
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 37
+    - 41
+    - 42
+    - 43
+    - 48
+    - 49
+    - 56
+    - 57
+    - 63
+    - 66
+    - 67
+    - 70
+    - 71
+    - 72
+    - 74
+    - 75
+    - 76
+    results:
+    - 13
+    - 14
+    - 15
+    - 17
+    - 18
+    - 19
+    - 21
+    - 22
+    - 23
+    - 25
+    - 26
+    - 27
+    - 29
+    - 30
+    - 31
+    - 38
+    - 39
+    - 40
+    - 44
+    - 45
+    - 46
+    - 47
+    - 52
+    - 53
+    - 54
+    - 59
+    - 60
+    - 61
+    - 62
+    - 65
+    - 69
+    - 78
+    checkpoints:
+    - step: 13
+      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
+    - step: 14
+      expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
+        === \"Documents|Pictures|src\"", "expect_truthy": true}}'
+    - step: 15
+      expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
+        === \"Draft2.txt|Draft10.txt|README.md\"", "expect_truthy": true}}'
+    - step: 17
+      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
+    - step: 18
+      expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
+        === \"Documents|Pictures|src\"", "expect_truthy": true}}'
+    - step: 19
+      expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
+        === \"Draft10.txt|Draft2.txt|README.md\"", "expect_truthy": true}}'
+    - step: 21
+      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
+    - step: 22
+      expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
+        === \"src|Pictures|Documents\"", "expect_truthy": true}}'
+    - step: 23
+      expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
+        === \"README.md|Draft2.txt|Draft10.txt\"", "expect_truthy": true}}'
+    - step: 25
+      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
+    - step: 26
+      expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
+        === \"Documents|Pictures|src\"", "expect_truthy": true}}'
+    - step: 27
+      expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
+        === \"README.md|Draft2.txt|Draft10.txt\"", "expect_truthy": true}}'
+    - step: 29
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-list-name\"]'').getBoundingClientRect().left
+        >= document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree\"]'').getBoundingClientRect().left", "expect_truthy":
+        true}}'
+    - step: 30
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-list-name\"]'').getBoundingClientRect().right
+        <= document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree\"]'').getBoundingClientRect().right", "expect_truthy":
+        true}}'
+    - step: 31
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(\"taomni.codeWorkspace.explorerSort.v1\")).field === ''modified''",
+        "expect_truthy": true}}'
+    - step: 38
+      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
+    - step: 39
+      expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
+        === \"src|Pictures|Documents\"", "expect_truthy": true}}'
+    - step: 40
+      expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
+        === \"README.md|Draft10.txt|Draft2.txt\"", "expect_truthy": true}}'
+    - step: 44
+      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
+    - step: 45
+      expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
+        === \"src|README.md|Pictures\"", "expect_truthy": true}}'
+    - step: 46
+      expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
+        === \"Draft10.txt|Draft2.txt|Documents\"", "expect_truthy": true}}'
+    - step: 47
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(\"taomni.codeWorkspace.explorerSort.v1\")).descending && !JSON.parse(localStorage.getItem(\"taomni.codeWorkspace.explorerSort.v1\")).foldersFirst",
+        "expect_truthy": true}}'
+    - step: 52
+      expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
+    - step: 53
+      expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
+        === \"src|README.md|Pictures\"", "expect_truthy": true}}'
+    - step: 54
+      expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
+        === \"Draft10.txt|Draft2.txt|Documents\"", "expect_truthy": true}}'
+    - step: 59
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree\"]", "contains": "src/main/java · com.example"}}'
+    - step: 60
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree\"]", "contains": "src/main/java · com.example.util"}}'
+    - step: 61
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree\"]", "contains": "src/test/java · com.example"}}'
+    - step: 62
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-flat-file\"][data-path=\"src/main/java/com/example/util/Helper.java\"]",
+        "regex": "^Helper[.]java$"}}'
+    - step: 65
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"]", "contains": "package com.example.util;"}}'
+    - step: 69
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-package-group\"]", "equal": 0}}'
+    - step: 78
+      expectation: '{"assert_no_runtime_errors": null}'
+  visual:
+  - check: Review file area, row metadata, selection, toolbar and package layout in the retained screenshot.
+    method: manual
+    reason: Functional assertions do not establish visual fidelity; review the case screenshot separately.
+  native:
+  - check: Native filesystem and provider effects are verified by TC-WS-042/043.
+    method: manual
+    reason: This browser case establishes renderer behavior only; dedicated native cases cover the OS boundary.

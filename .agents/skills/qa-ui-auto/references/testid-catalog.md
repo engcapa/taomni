@@ -62,7 +62,6 @@
 - `button[title="History"]` — interactive [optional] — F-AI-2.4.ai-chat-history
 - `button[aria-label="Copy entire conversation"]` — interactive [optional] — F-AI-2.4.ai-chat-copy-all
 - `[data-testid="ai-chat-drawer-hide"]` — interactive [optional] — F-AI-2.4.ai-chat-close
-- `[data-testid="ai-chat-drawer-ribbon"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-ribbon
 - `[data-testid="ai-chat-drawer-position"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-position
 - `[data-testid="ai-chat-drawer-pin"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-pin
 - `[data-testid="ai-chat-drawer-opacity"]` — interactive [optional] — F-AI-2.4.ai-chat-drawer-opacity
@@ -154,7 +153,6 @@
 
 ## ai/voice (F-AI-2.3)
 
-- `[data-testid="ptt-button"]` — interactive [optional] — F-AI-2.3.ptt-button
 - `[data-testid="chat-voice-button"]` — interactive — F-AI-2.3.chat-voice-button
 - `[data-testid="chat-voice-button-cancel"]` — interactive — F-AI-2.3.chat-voice-cancel
 - `[data-testid="voice-settings-close"]` — interactive — F-AI-2.3.voice-settings-close
@@ -190,9 +188,9 @@
 - `[data-testid="asr-realtime-settings"] label:has-text("Proxy URL") input` — interactive — F-AI-2.3.asr-provider-proxy-url
 - `[data-testid="asr-realtime-settings"] button:has-text("Save provider")` — interactive — F-AI-2.3.asr-provider-save
 - `[data-testid="chat-composer-textarea"]` — display — F-AI-2.3.voice-composer-draft
-- `[data-testid="composer-voice-original"]` — display — F-AI-2.3.voice-composer-original
-- `[data-testid="composer-voice-original"] summary` — interactive — F-AI-2.3.voice-composer-original-open
-- `[data-testid="composer-voice-original"] button` — interactive — F-AI-2.3.voice-composer-original-undo
+- `[data-testid="chat-voice-button-original"]` — display — F-AI-2.3.voice-composer-original
+- `[data-testid="chat-voice-button-original"] summary` — interactive — F-AI-2.3.voice-composer-original-open
+- `[data-testid="chat-voice-button-original"] button` — interactive — F-AI-2.3.voice-composer-original-undo
 - `[data-testid="asr-download-recommended"]` — interactive — F-AI-2.3.asr-download-recommended
 - `[data-testid="asr-replace-whisper-small"]` — interactive — F-AI-2.3.asr-replace-whisper-small
 - `[data-testid="asr-hotwords"]` — interactive — F-AI-2.3.asr-hotwords
@@ -205,8 +203,9 @@
 - `[data-testid="asr-model-whisper-base"]` — display — F-AI-2.3.asr-model-whisper-base
 - `[data-testid="asr-model-whisper-small"]` — display — F-AI-2.3.asr-model-whisper-small
 - `[data-testid="asr-model-whisper-small-q8"]` — display — F-AI-2.3.asr-model-whisper-small-q8
-- `[data-testid="ptt-button-interim"]` — display — F-AI-2.3.ptt-button-interim
+- `[data-testid="chat-voice-button-interim"]` — display — F-AI-2.3.chat-voice-button-interim
 - `[data-testid="asr-realtime-provider"] option[value="gemini"]` — display — F-AI-2.3.asr-gemini-option
+- `[data-testid="ptt-button"]` — display [optional] — F-AI-2.3.retired-titlebar-voice
 
 ## application/update (F-Update-1)
 
@@ -417,7 +416,9 @@
 - `[data-testid="project-facts-failed-icon"]` — display [optional] — F25.5.project-facts-failed-icon
 - `[data-testid="code-workspace-tree-new-file"]` — interactive [optional] — F25.5.tree-new-file
 - `[data-testid="code-workspace-tree-new-directory"]` — interactive [optional] — F25.5.tree-new-directory
+- `[data-testid="code-workspace-tree-remove-root"]` — interactive [optional] — F25.5.tree-remove-root
 - `[data-testid="code-workspace-search-everywhere"]` — display [optional] — F25.5.search-everywhere
+  ↳ `xpath=//*[@data-testid="code-workspace-search-everywhere"]//button[@data-selected="true" and .//span[normalize-space(.)="Search Structurally…"]]` — alias
 - `[data-testid="code-workspace-find-in-files-panel"]` — display [optional] — F25.5.find-panel
 - `[aria-label="Search query"]` — interactive [optional] — F25.5.find-query-input
 - `[aria-label="Include globs"]` — interactive [optional] — F25.5.find-include-globs
@@ -499,6 +500,7 @@
   ↳ `[data-testid="code-workspace-tool-rail-structure"]` — alias
   ↳ `[data-testid="code-workspace-tool-rail-commit"]` — alias
   ↳ `[data-testid="code-workspace-tool-rail-documentation"]` — alias
+  ↳ `[data-testid="code-workspace-tool-rail-sessions"]` — alias
 - `[data-testid="code-workspace-tool-rail-left-resize"]` — interactive [optional] — F25.5.tool-rail-resize
   ↳ `[data-testid="code-workspace-tool-rail-right-resize"]` — alias
 - `[data-testid="code-workspace-tool-rail-menu-move"]` — interactive [optional] — F25.5.tool-rail-menu
@@ -509,6 +511,10 @@
 - `[data-testid="code-workspace-tool-window-problems"]` — display [optional] — F25.5.tool-window-pane
   ↳ `[data-testid="code-workspace-tool-window-structure"]` — alias
   ↳ `[data-testid="code-workspace-left-tool-area"] [data-testid="code-workspace-tool-window-structure"]` — alias
+  ↳ `[data-testid="code-workspace-tool-window-terminal"]` — alias
+  ↳ `[data-testid="code-workspace-tool-window-search"]` — alias
+  ↳ `[data-testid="code-workspace-tool-window-todos"]` — alias
+  ↳ `[data-testid="code-workspace-tool-window-coverage"]` — alias
 - `[data-testid="code-workspace-tool-window-options-problems"]` — interactive [optional] — F25.5.tool-window-options-menu
   ↳ `[data-testid="code-workspace-tool-window-options-terminal"]` — alias
   ↳ `[data-testid="code-workspace-tool-window-move"]` — alias
@@ -526,6 +532,10 @@
 - `[data-testid="code-workspace-tool-window-hide"]` — interactive [optional] — F25.5.tool-window-hide
 - `[data-testid="code-workspace-tool-window-options"]` — interactive [optional] — F25.5.tool-window-options
 - `[data-testid="code-workspace-bottom-tab-overflow-problems"]` — interactive [optional] — F25.5.bottom-tool-overflow-item
+  ↳ `[data-testid="code-workspace-bottom-tab-overflow-search"]` — alias
+  ↳ `[data-testid="code-workspace-bottom-tab-overflow-todos"]` — alias
+  ↳ `[data-testid="code-workspace-bottom-tab-overflow-coverage"]` — alias
+  ↳ `[data-testid="code-workspace-bottom-tab-overflow-structure"]` — alias
 - `[data-testid="code-workspace-terminal-dock"]` — display [optional] — F25.5.terminal-dock-panel
   ↳ `[data-testid="code-workspace-terminal-dock"] [data-terminal-ready="true"]` — alias
   ↳ `[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]` — alias
@@ -591,6 +601,7 @@
 - `[data-testid="code-workspace-hover-doc-pin"]` — interactive [optional] — F25.5.hover-doc-pin
 - `[data-testid="code-workspace-documentation-pane"]` — display [optional] — F25.5.documentation-pane
 - `[data-testid="code-workspace-editor-banners"]` — display [optional] — F25.5.editor-banners
+  ↳ `[data-testid^="code-workspace-banner-lsp-error:"]` — alias
 - `[data-testid="banner-action-open-settings"]` — interactive [optional] — F25.5.editor-banner-open-settings
 - `[data-testid="banner-action-error-open-settings"]` — display [optional] — F25.5.editor-banner-action-error
 - `[data-testid^="banner-dismiss-"]` — interactive [optional] — F25.5.editor-banner-dismiss
@@ -661,6 +672,7 @@
 - `[data-testid="sidebar-tool-code-workspace"]` — interactive — F25.1.sidebar-entry
 - `[data-testid="code-workspace-tab"]` — display — F25.1.workspace
 - `[data-testid="code-workspace-git-panel-toggle"]` — interactive [optional] — F25.1.git-panel-toggle
+  ↳ `[data-testid="code-workspace-tool-rail-git"]` — alias
 - `[data-testid="code-workspace-tree"]` — display [optional] — F25.1.tree-container
 - `[data-testid="debug-subtab-breakpoints"]` — interactive [optional] — F25.1.debug-subtab-breakpoints
 - `[data-testid="code-workspace-split-equalize"]` — interactive [optional] — F25.1.split-equalize
@@ -1320,6 +1332,7 @@
 
 - `[data-testid="mail-subscriptions-open"]` — interactive — F-MAIL-11.subscriptions-open
 - `[data-testid="mail-subscriptions-dialog"]` — display — F-MAIL-11.subscriptions-dialog
+- `[role="dialog"][aria-label="Folder subscriptions"] [aria-label="Close dialog"]` — interactive — F-MAIL-11.subscriptions-close
 - `[data-testid="mail-subscription-row"]` — display — F-MAIL-11.subscription-row
 - `[data-testid="mail-subscription-toggle"]` — interactive — F-MAIL-11.subscription-toggle
 - `[data-testid="mail-subscribed-only"]` — interactive — F-MAIL-11.subscribed-only
@@ -1568,12 +1581,18 @@
 - `[data-testid="new-tab-launch-menu"]` — interactive — F1.5.new-tab-launch-menu
 - `[data-testid="launch-menu-new-session"]` — interactive [optional] — F1.5.launch-menu-new-session
 - `[data-testid="tab-more"]` — interactive — F1.5.tabs-more
-- `[data-testid="tab-details-hover"]` — interactive — F1.5.tab-details-hover
+- `[data-testid="tab-overview-trigger"]` — interactive — F1.5.tab-overview-trigger
+- `[data-testid="tab-overview"]` — display — F1.5.tab-overview
+- `[data-testid="tab-overview-card"]` — interactive — F1.5.tab-overview-card
+- `[data-testid="tab-overview-summary"]` — display — F1.5.tab-overview-summary
+- `[data-testid="tab-overview-close"]` — interactive — F1.5.tab-overview-close
+- `[data-testid="tab-overview-current"]` — interactive — F1.5.tab-overview-current
+- `[data-testid="tab-overview-all"]` — interactive — F1.5.tab-overview-all
+- `[data-testid="tab-overview-empty"]` — display — F1.5.tab-overview-empty
 - `[data-testid="tab-details-overlay"]` — display [optional] — F1.5.tab-details-overlay
 - `[data-testid^="tab-details-card-"]` — display [optional] — F1.5.tab-details-card
 - `[data-testid^="tab-details-program-"]` — display [optional] — F1.5.tab-details-program
 - `[data-testid="open-tabs-menu"]` — display [optional] — F1.5.open-tabs-menu
-- `[data-testid="open-tabs-detach-active"]` — interactive [optional] — F1.5.open-tabs-detach-active
 - `[data-testid="context-menu-item-move-to-first"]` — interactive [optional] — F1.5.tab-menu-move-first
 - `[data-testid="context-menu-item-move-left"]` — interactive [optional] — F1.5.tab-menu-move-left
 - `[data-testid="context-menu-item-move-right"]` — interactive [optional] — F1.5.tab-menu-move-right
@@ -1581,6 +1600,11 @@
 - `span[aria-label="New output"]` — display [optional] — F1.5.tab-new-output-dot
 - `[data-testid="context-menu-item-tools"]` — interactive [optional] — F1.5.context-menu-item-tools
 - `[data-testid="context-menu-item-tunneling"]` — interactive [optional] — F1.5.context-menu-item-tunneling
+- `[data-testid="tab-details-hover"]` — display [optional] — F1.5.tab-details-hover
+- `[data-testid="ai-chat-drawer-ribbon"]` — display [optional] — F1.5.ai-chat-drawer-ribbon
+- `[data-testid="titlebar-actions-menu"]` — display — F1.5.titlebar-actions-menu
+- `[data-testid="toolbar-close-all-terminals"]` — interactive — F1.5.toolbar-close-all-terminals
+- `[data-testid="open-tabs-detach-active"]` — interactive [optional] — F1.5.open-tabs-detach-active
 
 ## main/theme (F5.5)
 
@@ -1599,7 +1623,7 @@
 - `select[aria-label="Terminal shell"]` — interactive [optional] — F1.6.shell-select
 - `[data-testid="welcome-open-home-folder"]` — interactive [optional] — F1.6.open-home-folder
 - `button[aria-label="Open as administrator"]` — interactive [optional] — F1.6.open-as-administrator
-- `text="New session…"` — interactive — F1.6.new-session-card
+- `text="New session…"` — display — F1.6.new-session-card
 - `[data-testid="welcome-new-session"]` — interactive — F1.6.new-session-card-testid
 - `[data-testid="welcome-recent-sessions"]` — display — F1.6.recent-sessions-panel
 - `[data-testid="welcome-recent-filter"]` — interactive — F1.6.recent-filter
@@ -1640,9 +1664,10 @@
 ## main/window (F1.3)
 
 - `[data-testid="app-titlebar"]` — display — F1.3.titlebar
-- `[data-testid="titlebar-tray"]` — display — F1.3.tray
+- `[data-testid="control-bar"] [data-testid="platform-toolbar-actions"]` — display — F1.3.tray
 - `[data-testid="control-bar"]` — display — F1.3.control-bar
 - `[data-testid="tab-action-slot"]` — display [optional] — F1.3.tab-action-slot
+- `[data-testid="main-window-top-drag-region"]` — display — F1.3.main-window-top-drag-region
 - `[data-testid="window-drag-handle"]` — display — F1.3.window-drag-handle
 - `[data-testid="titlebar-actions-more"]` — interactive [optional] — F1.3.titlebar-actions-more
 - `[data-testid="theme-cycle"]` — interactive — F1.3.theme-cycle
@@ -1652,6 +1677,265 @@
 - `[data-testid="window-min"]` — display — F1.3.window-min
 - `[data-testid="window-max"]` — display — F1.3.window-max
 - `[data-testid="window-close"]` — display — F1.3.window-close
+
+## main/workspace-platform (F-WS-1)
+
+- `[data-testid="global-search-trigger"]` — interactive — F-WS-1.global-search-trigger
+- `[data-testid="home-sidebar-panel"]` — display — F-WS-1.home-sidebar-panel
+- `[data-testid="nav-mode-home"]` — interactive — F-WS-1.nav-mode-home
+- `[data-testid="nav-mode-workspaces"]` — interactive — F-WS-1.nav-mode-workspaces
+- `[data-testid="right-sidebar"]` — display — F-WS-1.right-sidebar
+- `[data-testid="sidebar-rail"]` — interactive — F-WS-1.sidebar-rail
+- `[data-testid="toggle-left-sidebar"]` — interactive — F-WS-1.toggle-left-sidebar
+- `[data-testid="toggle-right-sidebar"]` — interactive — F-WS-1.toggle-right-sidebar
+- `[data-testid="main-canvas-frame"]` — display — F-WS-1.main-canvas-frame
+- `[data-testid="platform-mode-title"]` — display — F-WS-1.platform-mode-title
+- `[data-testid="global-session-surface"]` — display — F-WS-1.global-session-surface
+- `[data-testid="right-sidebar-resize-handle"]` — interactive — F-WS-1.right-sidebar-resize-handle
+- `[data-testid="right-sidebar-close"]` — interactive — F-WS-1.right-sidebar-close
+- `[data-testid="right-sidebar-ai-tab"]` — interactive — F-WS-1.right-sidebar-ai-tab
+- `[data-testid="right-sidebar-structure-tab"]` — interactive — F-WS-1.right-sidebar-structure-tab
+- `[data-testid="right-sidebar-content"]` — display — F-WS-1.right-sidebar-content
+- `[data-testid="right-sidebar-open-chat"]` — interactive — F-WS-1.right-sidebar-open-chat
+- `[data-testid="rail-app-menu-host"]` — display — F-WS-1.rail-app-menu-host
+- `[data-testid="home-import-sessions"]` — interactive — F-WS-1.home-import-sessions
+- `[data-testid="home-import-json"]` — interactive — F-WS-1.home-import-json
+- `[data-testid="home-import-mobaxterm"]` — interactive — F-WS-1.home-import-mobaxterm
+- `[data-testid="home-import-csv"]` — interactive — F-WS-1.home-import-csv
+- `[data-testid="home-import-openssh"]` — interactive — F-WS-1.home-import-openssh
+- `[data-testid="home-download-csv-template"]` — interactive — F-WS-1.home-download-csv-template
+- `[data-testid="home-open-workspace"]` — interactive — F-WS-1.home-open-workspace
+- `[data-testid="home-open-git"]` — interactive — F-WS-1.home-open-git
+- `[data-testid="home-open-agents"]` — interactive — F-WS-1.home-open-agents
+- `[data-testid="home-open-mail"]` — interactive — F-WS-1.home-open-mail
+- `[data-testid="home-open-network-tools"]` — interactive — F-WS-1.home-open-network-tools
+- `[data-testid="home-open-mfa"]` — interactive — F-WS-1.home-open-mfa
+- `[data-testid="welcome-open-lanchat"]` — interactive — F-WS-1.welcome-open-lanchat
+- `[data-testid="lanchat-roster-panel"]` — display — F-WS-1.lanchat-roster-panel
+- `[data-testid="platform-toolbar-actions"]` — display — F-WS-1.platform-toolbar-actions
+- `[data-testid="home-toolbar-workspaces"]` — interactive — F-WS-1.home-toolbar-workspaces
+- `[data-testid="home-toolbar-sessions"]` — interactive — F-WS-1.home-toolbar-sessions
+- `[data-testid="tools-toolbar-workspaces"]` — interactive — F-WS-1.tools-toolbar-workspaces
+- `[data-testid="platform-layout-single"]` — interactive — F-WS-1.platform-layout-single
+- `[data-testid="platform-layout-grid"]` — interactive — F-WS-1.platform-layout-grid
+- `[data-testid="sessions-empty-state"]` — display — F-WS-1.sessions-empty-state
+- `[data-testid="sessions-empty-new-session"]` — interactive — F-WS-1.sessions-empty-new-session
+- `[data-testid="tools-empty-state"]` — display — F-WS-1.tools-empty-state
+- `[data-testid="nav-mode-agents"]` — display [optional] — F-WS-1.removed-nav-mode-agents
+- `[data-testid="tab-filter-chip"]` — interactive [optional] — F-WS-1.tab-filter-chip
+- `[data-testid="tab-filter-empty"]` — display [optional] — F-WS-1.tab-filter-empty
+- `[data-testid="tab-scroll-left"]` — interactive [optional] — F-WS-1.tab-scroll-left
+- `[data-testid="tab-scroll-right"]` — interactive [optional] — F-WS-1.tab-scroll-right
+- `[data-testid="workspace-code-tab"]` — display [optional] — F-WS-1.workspace-code-tab
+- `[data-testid="workspace-create-button"]` — interactive [optional] — F-WS-1.workspace-create-button
+- `[data-testid^="open-tabs-tab-"]:not([data-testid^="open-tabs-tab-checkbox-"])` — interactive [optional] — F-WS-1.open-tabs-search-result
+- `[data-testid^="workspace-switcher-option-"]:not([data-testid="workspace-switcher-option-default-workspace"])` — interactive [optional] — F-WS-1.workspace-custom-switcher-option
+
+## main/workspace-platform (F-WS-2)
+
+- `[data-testid="code-workspace-tree-view-all-files"]` — interactive — F-WS-2.code-workspace-tree-view-all-files
+- `[data-testid="code-workspace-tree-search"]` — interactive — F-WS-2.code-workspace-tree-search
+- `[data-testid="code-workspace-tree-open-default"]` — interactive — F-WS-2.code-workspace-tree-open-default
+- `[data-testid="code-workspace-tree-copy"]` — interactive — F-WS-2.code-workspace-tree-copy
+- `[data-testid="code-workspace-tree-paste"]` — interactive — F-WS-2.code-workspace-tree-paste
+- `[data-testid="workspace-plus-add-folder"]` — interactive — F-WS-2.workspace-plus-add-folder
+- `[data-testid="ui-font-family-select"]` — interactive — F-WS-2.ui-font-family-select
+- `#ui-font-size-slider` — interactive — F-WS-2.ui-font-size-slider
+- `[data-testid="code-theme-select"]` — interactive — F-WS-2.code-theme-select
+- `[data-testid="code-theme-option-terminal-kanagawa-lotus"]` — interactive — F-WS-2.code-theme-kanagawa-lotus
+- `button[aria-label="Code font"]` — interactive — F-WS-2.global-code-font
+- `input[aria-label="Code font size"]` — interactive — F-WS-2.global-code-font-size
+- `input[aria-label="Search fonts..."]` — interactive — F-WS-2.font-picker-search
+- `[role="option"]:has-text("Outfit")` — interactive — F-WS-2.font-picker-outfit
+- `[role="option"] >> text="Consolas"` — interactive — F-WS-2.font-picker-consolas
+- `[data-testid="workspace-add-folder"]` — interactive — F-WS-2.workspace-add-folder
+- `[data-testid="workspace-default-badge"]` — display — F-WS-2.workspace-default-badge
+- `[data-testid="workspace-file-editor"]` — display — F-WS-2.workspace-file-editor
+- `[data-testid="workspace-file-tree"]` — display — F-WS-2.workspace-file-tree
+- `[data-testid="workspace-fs-modal"]` — display — F-WS-2.workspace-fs-modal
+- `[data-testid="workspace-fs-modal-confirm"]` — interactive — F-WS-2.workspace-fs-modal-confirm
+- `[data-testid="workspace-tab-context-menu"]` — display [optional] — F-WS-2.workspace-tab-context-menu
+- `[data-testid="workspace-tab-context-close"]` — interactive [optional] — F-WS-2.workspace-tab-context-close
+- `[data-testid="workspace-tab-context-close-others"]` — interactive [optional] — F-WS-2.workspace-tab-context-close-others
+- `[data-testid="workspace-tab-context-close-all"]` — interactive [optional] — F-WS-2.workspace-tab-context-close-all
+- `[data-testid="workspace-tab-context-rename"]` — interactive [optional] — F-WS-2.workspace-tab-context-rename
+- `[data-testid="workspace-tab-context-duplicate"]` — interactive [optional] — F-WS-2.workspace-tab-context-duplicate
+- `[data-testid="workspace-tab-context-copy-info"]` — interactive [optional] — F-WS-2.workspace-tab-context-copy-info
+- `[data-testid="workspace-tab-context-move-first"]` — interactive [optional] — F-WS-2.workspace-tab-context-move-first
+- `[data-testid="workspace-tab-context-move-left"]` — interactive [optional] — F-WS-2.workspace-tab-context-move-left
+- `[data-testid="workspace-tab-context-move-right"]` — interactive [optional] — F-WS-2.workspace-tab-context-move-right
+- `[data-testid="workspace-tab-context-move-last"]` — interactive [optional] — F-WS-2.workspace-tab-context-move-last
+- `[data-testid="workspace-session-unavailable"]` — display [optional] — F-WS-2.workspace-session-unavailable
+- `[data-testid="workspace-session-retry"]` — interactive [optional] — F-WS-2.workspace-session-retry
+- `[data-testid="workspace-session-access"]` — display [optional] — F-WS-2.workspace-session-access
+- `[data-testid="workspace-session-connect"]` — interactive [optional] — F-WS-2.workspace-session-connect
+- `[data-testid="workspace-editor-recovery-error"]` — display [optional] — F-WS-2.workspace-editor-recovery-error
+- `[data-testid="workspace-open-browser"]` — interactive [optional] — F-WS-2.workspace-open-browser
+- `[data-testid="tab-multiexec-checkbox"]` — interactive [optional] — F-WS-2.tab-multiexec-checkbox
+- `[data-testid="multiexec-targets"]` — interactive [optional] — F-WS-2.multiexec-targets
+- `[data-testid="multiexec-target-menu"]` — display [optional] — F-WS-2.multiexec-target-menu
+- `[data-testid="multiexec-target-search"]` — interactive [optional] — F-WS-2.multiexec-target-search
+- `[data-testid="multiexec-target-checkbox"]` — interactive [optional] — F-WS-2.multiexec-target-checkbox
+- `[data-testid="multiexec-target-empty"]` — display [optional] — F-WS-2.multiexec-target-empty
+- `[data-testid="session-tab-categories"]` — display [optional] — F-WS-2.session-tab-categories
+- `[data-testid="session-tab-filter-all"]` — interactive [optional] — F-WS-2.session-tab-filter-all
+- `[data-testid="session-tab-filter-ssh"]` — interactive [optional] — F-WS-2.session-tab-filter-ssh
+- `[data-testid="session-tab-filter-database"]` — interactive [optional] — F-WS-2.session-tab-filter-database
+- `[data-testid="session-tab-filter-sftp"]` — interactive [optional] — F-WS-2.session-tab-filter-sftp
+- `[data-testid="session-tab-filter-remote"]` — interactive [optional] — F-WS-2.session-tab-filter-remote
+- `[data-testid="session-tab-filter-local"]` — interactive [optional] — F-WS-2.session-tab-filter-local
+- `[data-testid="session-tab-filter-other"]` — interactive [optional] — F-WS-2.session-tab-filter-other
+- `[data-testid="open-tabs-empty"]` — display [optional] — F-WS-2.open-tabs-empty
+- `[data-testid="workspace-dock-tab-terminal"]` — interactive [optional] — F-WS-2.workspace-dock-tab-terminal
+- `[data-testid="workspace-dock-tab-problems"]` — interactive [optional] — F-WS-2.workspace-dock-tab-problems
+- `[data-testid="workspace-dock-tab-run"]` — interactive [optional] — F-WS-2.workspace-dock-tab-run
+- `[data-testid="workspace-dock-tab-find"]` — interactive [optional] — F-WS-2.workspace-dock-tab-find
+- `[data-testid="workspace-dock-tab-bookmarks"]` — interactive [optional] — F-WS-2.workspace-dock-tab-bookmarks
+- `[data-testid="workspace-dock-tab-todo"]` — interactive [optional] — F-WS-2.workspace-dock-tab-todo
+- `[data-testid="workspace-dock-tab-services"]` — interactive [optional] — F-WS-2.workspace-dock-tab-services
+- `[data-testid="workspace-dock-tab-database"]` — interactive [optional] — F-WS-2.workspace-dock-tab-database
+- `[data-testid="workspace-fs-modal-browse"]` — interactive — F-WS-2.workspace-fs-modal-browse
+- `[data-testid="workspace-fs-modal-cancel"]` — interactive — F-WS-2.workspace-fs-modal-cancel
+- `[data-testid="workspace-fs-modal-error"]` — display [optional] — F-WS-2.workspace-fs-modal-error
+- `[data-testid="workspace-fs-modal-input"]` — display — F-WS-2.workspace-fs-modal-input
+- `[data-testid="workspace-git-panel"]` — display — F-WS-2.workspace-git-panel
+- `[data-testid="workspace-main-panel"]` — display — F-WS-2.workspace-main-panel
+- `[data-testid="workspace-open-session-menu"]` — display — F-WS-2.workspace-open-session-menu
+- `[data-testid="workspace-open-session-plus"]` — interactive — F-WS-2.workspace-open-session-plus
+- `[data-testid="workspace-plus-local-terminal"]` — interactive — F-WS-2.workspace-plus-local-terminal
+- `[data-testid="workspace-plus-open-session"]` — interactive — F-WS-2.workspace-plus-open-session
+- `[data-testid="workspace-repo-selector"]` — interactive — F-WS-2.workspace-repo-selector
+- `[data-testid="workspace-session-pane"]` — display — F-WS-2.workspace-session-pane
+- `[data-testid="workspace-session-picker-filter-db"]` — interactive — F-WS-2.workspace-session-picker-filter-db
+- `[data-testid="workspace-session-picker-filter-desktop"]` — interactive — F-WS-2.workspace-session-picker-filter-desktop
+- `[data-testid="workspace-session-picker-filter-sftp"]` — interactive — F-WS-2.workspace-session-picker-filter-sftp
+- `[data-testid="workspace-session-picker-filter-ssh"]` — interactive — F-WS-2.workspace-session-picker-filter-ssh
+- `[data-testid="workspace-session-picker-modal"]` — display — F-WS-2.workspace-session-picker-modal
+- `[data-testid="workspace-session-picker-pin"]` — interactive — F-WS-2.workspace-session-picker-pin
+- `[data-testid="workspace-session-picker-row"]` — display — F-WS-2.workspace-session-picker-row
+- `[data-testid="workspace-session-picker-search"]` — interactive — F-WS-2.workspace-session-picker-search
+- `[data-testid="workspace-sidebar-git-bar"]` — display — F-WS-2.workspace-sidebar-git-bar
+- `[data-testid="workspace-sidebar-panel"]` — display — F-WS-2.workspace-sidebar-panel
+- `[data-testid="workspace-switcher"]` — display — F-WS-2.workspace-switcher
+- `[data-testid="workspace-switcher-button"]` — interactive — F-WS-2.workspace-switcher-button
+- `[data-testid="workspace-switcher-menu"]` — display — F-WS-2.workspace-switcher-menu
+- `[data-testid="workspace-switcher-add-folder"]` — interactive — F-WS-2.workspace-switcher-add-folder
+- `[data-testid="workspace-switcher-menu-add-folder"]` — display [optional] — F-WS-2.workspace-switcher-removed-duplicate-add-folder
+- `[data-testid="workspace-sessions-panel"]` — display [optional] — F-WS-2.workspace-sessions-panel
+- `[data-testid="workspace-tab"]` — interactive — F-WS-2.workspace-tab
+- `[data-testid="workspace-plus-new-file"]` — interactive — F-WS-2.workspace-plus-new-file
+- `[data-testid="workspace-tab-strip"]` — display — F-WS-2.workspace-tab-strip
+- `[data-testid="workspace-tab-scroll-left"]` — interactive [optional] — F-WS-2.workspace-tab-scroll-left
+- `[data-testid="workspace-tab-scroll-right"]` — interactive [optional] — F-WS-2.workspace-tab-scroll-right
+- `[data-testid="workspace-tab-scroll-area"]` — display — F-WS-2.workspace-tab-scroll-area
+- `[data-testid="workspace-tab-drag-region"]` — display [optional] — F-WS-2.workspace-tab-drag-region
+- `[data-testid="workspace-tree-add-root"]` — interactive — F-WS-2.workspace-tree-add-root
+- `[data-testid="workspace-tree-copy-path"]` — interactive — F-WS-2.workspace-tree-copy-path
+- `[data-testid="workspace-tree-delete"]` — interactive — F-WS-2.workspace-tree-delete
+- `[data-testid="workspace-tree-file"]` — interactive — F-WS-2.workspace-tree-file
+- `[data-testid="workspace-tree-folder"]` — interactive — F-WS-2.workspace-tree-folder
+- `[data-testid="workspace-tree-new-file"]` — interactive — F-WS-2.workspace-tree-new-file
+- `[data-testid="workspace-tree-new-folder"]` — interactive — F-WS-2.workspace-tree-new-folder
+- `[data-testid="workspace-tree-remove-root"]` — interactive — F-WS-2.workspace-tree-remove-root
+- `[data-testid="workspace-tree-rename"]` — interactive — F-WS-2.workspace-tree-rename
+- `[data-testid="workspace-tree-root"]` — display — F-WS-2.workspace-tree-root
+- `[data-testid="workspace-session-picker-filter-all"]` — interactive — F-WS-2.workspace-session-picker-filter-all
+- `[data-testid="workspace-file-filter"]` — interactive — F-WS-2.workspace-file-filter
+- `[data-testid="workspace-linked-sessions"]` — display — F-WS-2.workspace-linked-sessions
+- `[data-testid="workspace-linked-sessions-toggle"]` — interactive — F-WS-2.workspace-linked-sessions-toggle
+- `[data-testid="workspace-link-session"]` — interactive — F-WS-2.workspace-link-session
+- `[data-testid="workspace-linked-session"]` — interactive — F-WS-2.workspace-linked-session
+- `[data-testid="workspace-editor-save"]` — interactive — F-WS-2.workspace-editor-save
+- `[data-testid="workspace-switcher-option-default-workspace"]` — interactive — F-WS-2.workspace-switcher-option-default-workspace
+- `[data-testid="workspace-switcher-option-second-workspace"]` — interactive — F-WS-2.workspace-switcher-option-second-workspace
+- `[data-testid="workspace-layout-split"]` — interactive — F-WS-2.workspace-layout-split
+- `[data-testid="workspace-toolbar-bottom-dock"]` — interactive — F-WS-2.workspace-toolbar-bottom-dock
+- `[data-testid="workspace-canvas-panes"]` — display — F-WS-2.workspace-canvas-panes
+- `[data-testid="workspace-canvas-pane"]` — display — F-WS-2.workspace-canvas-pane
+- `[data-testid="workspace-bottom-dock"]` — display — F-WS-2.workspace-bottom-dock
+- `[data-testid="code-workspace-tree-view-list"]` — interactive — F-WS-2.code-workspace-tree-view-list
+- `[data-testid="code-workspace-tree-view-packages"]` — interactive — F-WS-2.code-workspace-tree-view-packages
+- `[data-testid="code-workspace-tree-menu-flatten-packages"]` — interactive — F-WS-2.code-workspace-tree-menu-flatten-packages
+- `[data-testid="code-workspace-list-columns"]` — display — F-WS-2.code-workspace-list-columns
+- `[data-testid="code-workspace-list-name"]` — display — F-WS-2.code-workspace-list-name
+- `[data-tree-kind][data-path]` — display [optional] — F-WS-2.code-workspace-file-list-order
+- `[data-testid="code-workspace-list-metadata"]` — display — F-WS-2.code-workspace-list-metadata
+- `[data-testid="code-workspace-list-size"]` — display — F-WS-2.code-workspace-list-size
+- `[data-testid="code-workspace-list-type"]` — display — F-WS-2.code-workspace-list-type
+- `[data-testid="code-workspace-list-modified"]` — display — F-WS-2.code-workspace-list-modified
+- `[data-testid="code-workspace-package-group"]` — display — F-WS-2.code-workspace-package-group
+- `[data-testid="code-workspace-tree-sort"]` — interactive — F-WS-2.code-workspace-tree-sort
+- `[data-testid="code-workspace-list-sort-name"]` — interactive — F-WS-2.code-workspace-list-sort-name
+- `[data-testid="code-workspace-list-sort-size"]` — interactive — F-WS-2.code-workspace-list-sort-size
+- `[data-testid="code-workspace-list-sort-type"]` — interactive — F-WS-2.code-workspace-list-sort-type
+- `[data-testid="code-workspace-list-sort-modified"]` — interactive — F-WS-2.code-workspace-list-sort-modified
+- `[data-testid="code-workspace-tree-sort-name"]` — interactive — F-WS-2.code-workspace-tree-sort-name
+- `[data-testid="code-workspace-tree-sort-size"]` — interactive — F-WS-2.code-workspace-tree-sort-size
+- `[data-testid="code-workspace-tree-sort-type"]` — interactive — F-WS-2.code-workspace-tree-sort-type
+- `[data-testid="code-workspace-tree-sort-modified"]` — interactive — F-WS-2.code-workspace-tree-sort-modified
+- `[data-testid="code-workspace-tree-sort-ascending"]` — interactive — F-WS-2.code-workspace-tree-sort-ascending
+- `[data-testid="code-workspace-tree-sort-descending"]` — interactive — F-WS-2.code-workspace-tree-sort-descending
+- `[data-testid="code-workspace-tree-sort-folders-first"]` — interactive — F-WS-2.code-workspace-tree-sort-folders-first
+- `[data-testid="workspace-tabs-filter-trigger"]` — interactive — F-WS-2.workspace-tabs-filter-trigger
+- `[data-testid="workspace-tabs-filter-menu"]` — display — F-WS-2.workspace-tabs-filter-menu
+- `[data-testid="workspace-tabs-filter-search"]` — interactive — F-WS-2.workspace-tabs-filter-search
+- `[data-testid="workspace-tabs-filter-clear"]` — interactive — F-WS-2.workspace-tabs-filter-clear
+- `[data-testid="workspace-tabs-filter-row"]` — interactive — F-WS-2.workspace-tabs-filter-row
+- `[data-testid="workspace-tabs-filter-empty"]` — display — F-WS-2.workspace-tabs-filter-empty
+- `[data-testid="workspace-tab-filter-chip"]` — interactive — F-WS-2.workspace-tab-filter-chip
+- `[data-testid="workspace-tab-filter-all"]` — interactive — F-WS-2.workspace-tab-filter-all
+- `[data-testid="workspace-tab-filter-files"]` — interactive — F-WS-2.workspace-tab-filter-files
+- `[data-testid="workspace-tab-filter-ssh"]` — interactive — F-WS-2.workspace-tab-filter-ssh
+- `[data-testid="workspace-tab-filter-database"]` — interactive — F-WS-2.workspace-tab-filter-database
+- `[data-testid="workspace-tab-filter-sftp"]` — interactive — F-WS-2.workspace-tab-filter-sftp
+- `[data-testid="workspace-tab-filter-remote"]` — interactive — F-WS-2.workspace-tab-filter-remote
+- `[data-testid="workspace-tab-filter-local"]` — interactive — F-WS-2.workspace-tab-filter-local
+- `[data-testid="workspace-tab-filter-other"]` — interactive — F-WS-2.workspace-tab-filter-other
+- `[data-testid="workspace-tab-categories"]` — display — F-WS-2.workspace-tab-categories
+
+## main/workspace-platform (F-WS-3)
+
+- `[data-testid="mfa-floating-account"]` — interactive — F-WS-3.mfa-floating-account
+- `[data-testid="mfa-floating-close"]` — interactive — F-WS-3.mfa-floating-close
+- `[data-testid="mfa-floating-drag-handle"]` — interactive — F-WS-3.mfa-floating-drag-handle
+- `[data-testid="mfa-floating-expand-tab"]` — interactive — F-WS-3.mfa-floating-expand-tab
+- `[data-testid="mfa-floating-locked"]` — display — F-WS-3.mfa-floating-locked
+- `[data-testid="mfa-floating-pin"]` — interactive — F-WS-3.mfa-floating-pin
+- `[data-testid="mfa-floating-search"]` — interactive — F-WS-3.mfa-floating-search
+- `[data-testid="mfa-floating-window"]` — display — F-WS-3.mfa-floating-window
+- `[data-testid="rail-bottom-tools"]` — display — F-WS-3.rail-bottom-tools
+- `[data-testid="rail-chat-button"]` — interactive — F-WS-3.rail-chat-button
+- `[data-testid="rail-mfa-button"]` — interactive — F-WS-3.rail-mfa-button
+
+## main/workspace-platform (F-WS-4)
+
+- `[data-testid="editor-open-git-diff"]` — interactive — F-WS-4.editor-open-git-diff
+- `[data-testid="git-branches-tab"]` — interactive — F-WS-4.git-branches-tab
+- `[data-testid="git-changes-tab"]` — interactive — F-WS-4.git-changes-tab
+- `[data-testid="git-changes-tree-toggle"]` — interactive — F-WS-4.git-changes-tree-toggle
+- `[data-testid="git-commit-amend"]` — interactive — F-WS-4.git-commit-amend
+- `[data-testid="git-commit-and-push"]` — interactive — F-WS-4.git-commit-and-push
+- `[data-testid="git-commit-button"]` — interactive — F-WS-4.git-commit-button
+- `[data-testid="git-commit-message"]` — interactive — F-WS-4.git-commit-message
+- `[data-testid="git-settings-tab"]` — interactive — F-WS-4.git-settings-tab
+- `[data-testid="git-stash-tab"]` — interactive — F-WS-4.git-stash-tab
+- `[data-testid="git-tags-tab"]` — interactive — F-WS-4.git-tags-tab
+- `[data-testid="git-branches-view"]` — display — F-WS-4.git-branches-view
+- `[data-testid="git-tags-view"]` — display — F-WS-4.git-tags-view
+
+## main/workspace-platform (F-WS-5)
+
+- `[data-testid="session-favorite"]` — interactive — F-WS-5.session-favorite
+- `[data-testid="session-refresh"]` — interactive — F-WS-5.session-refresh
+- `[data-testid="sessions-sidebar-panel"]` — display — F-WS-5.sessions-sidebar-panel
+
+## main/workspace-platform (F-WS-6)
+
+- `[data-testid="global-search-input"]` — interactive — F-WS-6.global-search-input
+- `[data-testid="global-search-modal"]` — display — F-WS-6.global-search-modal
+- `[data-testid="global-search-result"]` — display — F-WS-6.global-search-result
+- `[data-testid="menu-export-sessions"]` — display — F-WS-6.menu-export-sessions
+- `[data-testid="open-tabs-filter"]` — interactive — F-WS-6.open-tabs-filter
 
 ## network/sockscap (F-Sockscap-1)
 
@@ -1736,7 +2020,6 @@
 - `[data-testid="notes-floating-toggle"]` — interactive [optional] — F-TAO-1.notes-floating-toggle
 - `[data-testid="floating-notes-panel"]` — display [optional] — F-TAO-1.floating-notes-panel
 - `[data-testid="floating-notes-dock"]` — interactive [optional] — F-TAO-1.floating-notes-dock
-- `[data-testid="tao-ribbon-badge"]` — display [optional] — F-TAO-1.tao-ribbon-badge
 
 ## rdp (F9.7)
 
@@ -2427,6 +2710,7 @@
 
 - `[data-testid="settings-group-toggle-backup"]` — interactive — F-MFA-3.group-toggle-backup
 - `[data-testid="backup-selected-start"]` — interactive — F-MFA-3.create-now
+- `[data-testid="backup-manual-result"]` — display — F-MFA-3.manual-result
 - `[data-testid="backup-action-success"]` — display — F-MFA-3.action-success
 - `[data-testid="backup-history-row"]` — display — F-MFA-3.history-row
 - `[data-testid="backup-history-restore"]` — interactive — F-MFA-3.history-restore
@@ -2584,6 +2868,7 @@
 - `[data-testid="terminal-theme-select-menu"]` — display [optional] — F5.2.theme-select-menu
 - `[data-testid="terminal-context-set-local-default-theme"]` — interactive [optional] — F5.2.local-default-theme
 - `[data-testid^="terminal-context-theme-option-"]` — interactive [optional] — F5.2.context-theme-options
+- `[data-testid="terminal-context-theme-list"]` — display [optional] — F5.2.context-theme-list
 - `[data-testid="terminal-preview"]` — display — F5.2.preview
 - `[data-testid="terminal-preview-cursor"]` — display — F5.2.preview-cursor
 - `input[aria-label="Terminal font size"]` — interactive — F5.2.font-size

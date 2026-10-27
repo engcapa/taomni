@@ -1,11 +1,16 @@
 id: TC-DB-EXEC-001-execution-log-browser
 title: Execution log records a failed statement and the statements that did not run
-description: |
-  DB-EXEC-001 V4. Opens the offline MySQL session scaffold (browser preview has
+description: 'DB-EXEC-001 V4. Opens the offline MySQL session scaffold (browser preview has
+
   no database, so every statement fails), runs two statements with the Run
+
   toolbar button, answers Stop in the DB-EXEC-002 error prompt, and verifies the
+
   Log tab becomes active with one FAILED and one NOT RUN entry plus a summary. Success paths are covered by the native case
+
   TC-DB-EXEC-001-execution-log-native.
+
+  '
 covers:
 - F-DB-1
 tags:
@@ -20,7 +25,9 @@ fixtures:
 timeout_sec: 90
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
+- assert_visible: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-new"]'
 - click: '[data-testid="session-new"]'
 - wait_for: '[data-testid="session-editor"]'

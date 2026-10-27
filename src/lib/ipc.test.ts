@@ -56,6 +56,14 @@ describe("ipc dialog path selectors", () => {
     expect(mocks.invoke).not.toHaveBeenCalledWith("select_folder_path", expect.anything());
   });
 
+  it("starts an empty folder chooser at the native home and preserves cancellation", async () => {
+    mocks.invoke.mockResolvedValueOnce("/home/user");
+    mocks.open.mockResolvedValueOnce(null);
+    await expect(selectFolderPath()).resolves.toBeNull();
+    expect(mocks.invoke).toHaveBeenCalledWith("get_home_dir", {});
+    expect(mocks.open).toHaveBeenCalledWith(expect.objectContaining({ directory: true, defaultPath: "/home/user" }));
+  });
+
   it("selects files through the Tauri dialog plugin", async () => {
     mocks.open.mockResolvedValueOnce("/home/user/.ssh/config");
 

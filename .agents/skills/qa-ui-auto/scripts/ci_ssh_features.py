@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePath
 import platform
 import re
 import shlex
@@ -20,6 +20,18 @@ import sys
 import threading
 import time
 import urllib.request
+import shutil
+
+
+def transfer_paths(remote_dir: PurePath, remote_posix: str, local_dir: PurePath) -> dict[str, str]:
+    """Keep SSH paths separate from native paths used to verify actual bytes."""
+    return {
+        "remote_dir": remote_posix,
+        "source": remote_posix + "/scp-source.txt",
+        "local_dir": local_dir.as_posix(),
+        "downloaded": (local_dir / "scp-source.txt").as_posix(),
+        "uploaded": (remote_dir / "scp-upload.txt").as_posix(),
+    }
 
 
 def prepare_cygwin_home(root: Path, user: str) -> Path:
@@ -246,8 +258,23 @@ LogLevel DEBUG3
         if result.returncode or result.stdout != "QA_GSSAPI_OK":
             raise RuntimeError("GSSAPI command roundtrip failed; see ssh-gssapi-probe.log")
     retry(authenticated)
-    remote_dir = private / "remote"
-    remote_dir.mkdir()
+    if cygwin:
+        # Native Windows paths under RUNNER_TEMP are exposed through a
+        # /cygdrive prefix that the Cygwin SFTP subsystem accepts, but the
+        # product's Windows SSH client may normalize differently. Keep the
+        # protocol fixture in Cygwin's canonical /tmp mount and pass that
+        # exact POSIX path to the app.
+        # Keep the fixture below the account home. Windows' Cygwin sshd and
+        # the native SFTP client agree on this namespace; /tmp can resolve to
+        # different mounts for the Cygwin shell and internal-sftp subsystem.
+        remote_posix = f"/home/{user}/taomni-qa-{private.name}"
+        remote_dir = Path(command([binary / "cygpath.exe", "-w", remote_posix]))
+        command([binary / "mkdir.exe", "-p", remote_posix])
+    else:
+        remote_posix = path(private / "remote")
+        remote_dir = private / "remote"
+        remote_dir.mkdir()
+    services.cleanup_action("ssh-features-remote", lambda: shutil.rmtree(remote_dir, ignore_errors=True))
     (remote_dir / "scp-source.txt").write_text("qa-scp-roundtrip\n", encoding="utf-8", newline="\n")
     local_dir = private / "local"
     local_dir.mkdir()
@@ -256,9 +283,7 @@ LogLevel DEBUG3
         "ticket_cache": ccache.as_posix(),
         "key_path": str(client_key).replace("\\", "/"), "generated_key": str(generated).replace("\\", "/"),
         "encrypted_key": encrypted.as_posix(), "encrypted_public_key": encrypted.as_posix() + ".pub",
-        "remote_dir": path(remote_dir), "source": path(remote_dir / "scp-source.txt"),
-        "local_dir": local_dir.as_posix(), "downloaded": (local_dir / "scp-source.txt").as_posix(),
-        "uploaded": (remote_dir / "scp-upload.txt").as_posix(),
+        **transfer_paths(remote_dir, remote_posix, local_dir),
         "native_public_key": str(generated).replace("\\", "/") + ".pub"}
     # Pace the encrypted SSH stream, including the Python SCP resume source.
     # Only the lifecycle case selects this port; other SSH tests stay direct.
@@ -270,7 +295,7 @@ LogLevel DEBUG3
     large = remote_dir / "scp-large.bin"
     payload = b"taomni-scp-cancel-resume\n" * (1024 * 192)
     large.write_bytes(payload)
-    services.config["ssh_features"].update({"large_source": path(large),
+    services.config["ssh_features"].update({"large_source": remote_posix + "/" + large.name,
         "large_downloaded": (local_dir / large.name).as_posix(),
         "large_sha256": hashlib.sha256(payload).hexdigest()})
     return {"gssapi_command": True, "realm": realm, "port": port, "kdc_port": kdc_port,

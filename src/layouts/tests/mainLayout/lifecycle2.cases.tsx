@@ -6,6 +6,7 @@ import { exitApp, type SessionConfig } from "../../../lib/ipc";
 import { DEFAULT_TERMINAL_PROFILE } from "../../../lib/terminalProfile";
 import { recentWorkspaceIdFromParts, useAppStore } from "../../../stores/appStore";
 import { useSessionStore } from "../../../stores/sessionStore";
+import { useWorkspacePlatformStore } from "../../../stores/workspacePlatformStore";
 import { MainLayout } from "../../MainLayout";
 import { controlBarMock, setNavigatorPlatform, sftpSidebarMock, terminalLifecycle, terminalPanelMock } from "./harness";
 
@@ -15,7 +16,7 @@ export function registerMainLayoutLifecycle2Cases() {
     render(<MainLayout />);
 
     expect(screen.getByTestId("terminal-panel")).toBeInTheDocument();
-    expect(screen.getByTestId("ai-chat-drawer-ribbon")).toBeInTheDocument();
+    expect(screen.queryByTestId("ai-chat-drawer-ribbon")).not.toBeInTheDocument();
     expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
     expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
 
@@ -149,6 +150,7 @@ export function registerMainLayoutLifecycle2Cases() {
         { id: "ssh-tab", type: "terminal", title: "SSH", closable: true },
       ],
       activeTabId: "welcome",
+      activeSideTab: "home",
     });
 
     render(<MainLayout />);
@@ -205,10 +207,12 @@ export function registerMainLayoutLifecycle2Cases() {
     fireEvent.click(screen.getByTestId("welcome-recent-workspace-row"));
 
     await waitFor(() => {
-      const tab = useAppStore.getState().tabs.find((entry) => entry.type === "code-workspace");
-      expect(tab?.codeWorkspace?.workspaceInstanceId).toBeTruthy();
+      const workspace = useWorkspacePlatformStore.getState().getWorkspace();
+      expect(workspace?.codeWorkspace?.workspaceInstanceId).toBeTruthy();
     });
-    const tab = useAppStore.getState().tabs.find((entry) => entry.type === "code-workspace")!;
+    const tab = useWorkspacePlatformStore.getState().getWorkspace()!;
+    expect(useAppStore.getState().activeSideTab).toBe("workspaces");
+    expect(useAppStore.getState().tabs.some((entry) => entry.type === "code-workspace")).toBe(false);
     expect(tab.codeWorkspace?.workspaceInstanceId).not.toMatch(/^workspace-instance-/);
     expect(tab.codeWorkspace?.workspaceInstanceId).toBe(
       recentWorkspaceIdFromParts(tab.codeWorkspace?.roots ?? [], tab.codeWorkspace?.looseFiles ?? []),
@@ -369,7 +373,7 @@ export function registerMainLayoutLifecycle2Cases() {
     try {
       render(<MainLayout />);
 
-      for (const [index, tab] of shortcutTabs.entries()) {
+      for (const [index, tab] of shortcutTabs.filter((tab) => tab.type !== "welcome").entries()) {
         const digit = String(index + 1);
         fireEvent.keyDown(window, { key: digit, code: `Digit${digit}`, metaKey: true });
         await waitFor(() => {

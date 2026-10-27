@@ -22,7 +22,7 @@ steps:
 - wait_for:
     selector: '[data-testid="terminal-pane"]'
     timeout_sec: 30
-- click: '[data-testid="tab-chat-toggle"]'
+- click: '[data-testid="rail-chat-button"]'
 - wait_for: '[data-testid="ai-chat-drawer"]'
 - select_option:
     selector: '[data-testid="ai-chat-provider-select"]'
@@ -44,7 +44,7 @@ steps:
 - wait_for:
     selector: '[data-testid="terminal-pane"]'
     timeout_sec: 30
-- click: '[data-testid="tab-chat-toggle"]'
+- click: '[data-testid="rail-chat-button"]'
 - wait_for: '[data-testid="go-thread-model-select"]'
 - assert_attribute:
     selector: '[data-testid="go-thread-model-select"]'

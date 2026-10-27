@@ -155,14 +155,14 @@ export function useEditorGroupTabs(context: UseEditorGroupTabsContext) {
     updateTabScrollState();
   }, [activeKey, openOrder, updateTabScrollState]);
 
-  const showTabMenu = (event: React.MouseEvent, key: string) => {
+  const getTabMenuItems = (key: string): import("../../../ContextMenu").MenuItem[] => {
     const pinned = pinnedSet.has(key);
     const index = openOrder.indexOf(key);
     const hasOthers = openOrder.length > 1;
     const hasRight = index >= 0 && index < openOrder.length - 1;
     // ED-PARITY-021 DEC-021-02: IDEA tab menu order — close group, copy path,
     // splits, pin, Open In ›, Local History; availability follows the tab set.
-    tabMenu.show(event, [
+    return [
       { label: "Close", shortcut: "Ctrl+F4", onClick: () => onClose(key) },
       { label: "Close Other Tabs", disabled: !hasOthers, onClick: () => onCloseOthers(key) },
       { label: "Close All Tabs", onClick: onCloseAll },
@@ -194,12 +194,14 @@ export function useEditorGroupTabs(context: UseEditorGroupTabsContext) {
       ...(onLocalHistory ? [
         { label: "Local History…", onClick: () => onLocalHistory(key) },
       ] : []),
-    ]);
+    ];
   };
+  const showTabMenu = (event: React.MouseEvent, key: string) => tabMenu.show(event, getTabMenuItems(key));
   return {
     isSeparatePinnedRow,
     separatePinnedKeys,
     showTabMenu,
+    getTabMenuItems,
     tabScrollState,
     scrollTabsBy,
     tabScrollRef,

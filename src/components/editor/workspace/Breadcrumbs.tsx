@@ -73,6 +73,8 @@ export function Breadcrumbs({
   }, [activeNavigationBar, visibleItems.length]);
 
   useLayoutEffect(() => {
+    let frame: number | null = null;
+    let disposed = false;
     const updateCollapsedState = () => {
       const availableWidth = navRef.current?.clientWidth ?? 0;
       const fullPathWidth = fullPathMeasureRef.current?.getBoundingClientRect().width ?? 0;
@@ -83,9 +85,23 @@ export function Breadcrumbs({
 
     updateCollapsedState();
     if (typeof ResizeObserver === "undefined" || !navRef.current) return;
-    const observer = new ResizeObserver(updateCollapsedState);
+    // The status message/cursor widgets change this flex item's width during
+    // edits and saves. Measuring and changing its children in RO delivery can
+    // invalidate an already-delivered ancestor in WebKit's same layout pass.
+    // Read the latest width once next frame, outside observer delivery.
+    const observer = new ResizeObserver(() => {
+      if (disposed || frame !== null) return;
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        if (!disposed) updateCollapsedState();
+      });
+    });
     observer.observe(navRef.current);
-    return () => observer.disconnect();
+    return () => {
+      disposed = true;
+      observer.disconnect();
+      if (frame !== null) cancelAnimationFrame(frame);
+    };
   }, [fullItems]);
 
   // Close popup when the active trail changes (file switch / cursor jump).

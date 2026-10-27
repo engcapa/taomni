@@ -56,12 +56,16 @@ from dataclasses import dataclass
 from typing import Callable, Protocol
 
 from . import ard_required, editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_rename_deleted_fixtures, java_sample_projects, java_test_bundle, jdtls_required, linux_desktop_required, linux_x11_required, mysql_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, vnc_required, welcome_recents, workspace_root
+from . import platform_workspace_root
+from . import workspace_restore_sessions
 from . import bookmark_assets
 from . import clickhouse_required
 from . import ssh_features_required
 from . import session_config
 from . import x11_session_required
 from . import project_tree
+from . import workspace_explorer, workspace_hidden_entries, workspace_slow_lsp
+from . import workspace_ignored_ancestor_root
 from . import parity005_completion
 from . import parity006_replace
 from . import parity008_git
@@ -124,6 +128,12 @@ REGISTRY: dict[str, Fixture] = {
     "linux_x11_required": Fixture("linux_x11_required", linux_x11_required.setup),
     "linux_desktop_required": Fixture("linux_desktop_required", linux_desktop_required.setup),
     "workspace_root": Fixture("workspace_root", workspace_root.setup, workspace_root.teardown),
+    "workspace_explorer": Fixture("workspace_explorer", workspace_explorer.setup),
+    "workspace_hidden_entries": Fixture("workspace_hidden_entries", workspace_hidden_entries.setup),
+    "workspace_slow_lsp": Fixture("workspace_slow_lsp", workspace_slow_lsp.setup),
+    "platform_workspace_root": Fixture("platform_workspace_root", platform_workspace_root.setup, platform_workspace_root.teardown),
+    "workspace_ignored_ancestor_root": Fixture("workspace_ignored_ancestor_root", workspace_ignored_ancestor_root.setup),
+    "workspace_restore_sessions": Fixture("workspace_restore_sessions", workspace_restore_sessions.setup, workspace_restore_sessions.teardown),
     "java_sample_projects": Fixture("java_sample_projects", java_sample_projects.setup),
     "java25_projects": Fixture("java25_projects", java25_projects.setup),
     "git_diff_repo": Fixture("git_diff_repo", git_diff_repo.setup, git_diff_repo.teardown),

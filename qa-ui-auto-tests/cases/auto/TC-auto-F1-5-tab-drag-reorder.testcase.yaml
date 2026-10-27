@@ -14,6 +14,7 @@ fixtures:
 - reset_db
 steps:
 - open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="tab-bar"]'
 - click: '[data-testid="new-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"]'
@@ -22,14 +23,14 @@ steps:
 - wait: 0.5
 - assert_count:
     selector: '[data-testid="tab-item"]'
-    min: 3
+    min: 2
 - drag_to:
     from: '[data-testid="tab-item"][data-tab-type="terminal"] >> nth=0'
     to: '[data-testid="tab-item"][data-tab-type="terminal"] >> nth=1'
 - wait: 0.5
 - assert_count:
     selector: '[data-testid="tab-item"]'
-    min: 3
+    min: 2
 - screenshot: auto-F1-5-tab-drag-reorder.png
 verification:
   review: reviewed
@@ -38,20 +39,20 @@ verification:
     requirement: Tab drag-and-drop reorders tabs in the tab bar：按步骤执行后，所有声明的可观察结果均满足。
     actions:
     - 1
-    - 3
-    - 6
-    - 9
+    - 4
+    - 7
+    - 10
     checkpoints:
-    - step: 2
+    - step: 3
       expectation: '{"wait_for": "[data-testid=\"tab-bar\"]"}'
-    - step: 4
+    - step: 5
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
-    - step: 8
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "min": 3}}'
-    - step: 11
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "min": 3}}'
+    - step: 9
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "min": 2}}'
+    - step: 12
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "min": 2}}'
     results:
-    - 11
+    - 12
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

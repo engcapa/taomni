@@ -1,5 +1,6 @@
 import { createContext, useContext, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { TabActionMenuItems } from "./TabActionMenuItems";
 
 /**
  * Per-tab action toolbar plumbing.
@@ -40,5 +41,5 @@ export function TabActions({
 }) {
   const slot = useTabActionSlot();
   if (!active || !slot) return null;
-  return createPortal(children, slot);
+  return createPortal(slot.dataset.presentation === "menu" ? <TabActionMenuItems>{children}</TabActionMenuItems> : children, slot);
 }

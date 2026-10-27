@@ -1,0 +1,51 @@
+name: Windows SSH input protocol diagnostic
+
+on:
+  push:
+    branches: ['qa/ssh-input-probe/*']
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .agents/skills/qa-ui-auto/scripts
+  PYTHONUNBUFFERED: '1'
+  PYTHONUTF8: '1'
+  QA_CAPABILITIES: '["ssh"]'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  protocol:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shell: [console, cygwin-sshd]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install PyYAML==6.0.2 jsonschema==4.25.1 paramiko==3.5.1 pyte==0.8.2
+      - run: python -m unittest test_ci_ssh_input_probe test_ci_windows_ssh_shell test_ci_windows_posix_ssh
+      - run: python .agents/skills/qa-ui-auto/scripts/ci_services.py install
+      - name: Install the existing owned Cygwin SSH runtime for a PTY control
+        if: matrix.shell == 'cygwin-sshd'
+        run: python -c "from ci_ssh_features import install; install()"
+      - if: matrix.shell == 'console'
+        run: python .agents/skills/qa-ui-auto/scripts/ci_ssh_input_probe.py --shell ${{ matrix.shell }} --out qa-ui-auto-report/ssh-input-probe
+      - if: matrix.shell == 'cygwin-sshd'
+        run: python .agents/skills/qa-ui-auto/scripts/ci_ssh_input_probe.py --server-runtime cygwin --out qa-ui-auto-report/ssh-input-probe
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ssh-input-probe-${{ matrix.shell }}-${{ github.run_id }}
+          path: qa-ui-auto-report/ssh-input-probe/
+          if-no-files-found: error
+          retention-days: 14

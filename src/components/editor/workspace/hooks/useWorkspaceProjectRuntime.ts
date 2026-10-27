@@ -4,6 +4,7 @@ import { useProjectFacts } from "../../../../hooks/useProjectFacts";
 import { fsPathComparisonKey } from "../codeWorkspaceModel";
 import { createWorkspaceLocationController, type WorkspaceLocationController } from "../navigationHistoryModel";
 import { useWorkspaceGitSnapshots } from "../useWorkspaceGitSnapshots";
+import { useWorkspaceHost } from "../workspaceHostIntegration";
 import { useWorkspaceLspSession } from "../useWorkspaceLspSession";
 import { useWorkspaceProjectAnalysis } from "../useWorkspaceProjectAnalysis";
 import { useWorkspaceActionPorts } from "./useWorkspaceActionPorts";
@@ -35,6 +36,7 @@ export interface UseWorkspaceProjectRuntimeContext {
 
 export function useWorkspaceProjectRuntime(context: UseWorkspaceProjectRuntimeContext) {
   const { session, surfaceState, workspace, visible, ports } = context;
+  const workspaceVisible = useWorkspaceHost()?.active ?? visible;
   const editState = useWorkspaceEditState({
     publishWorkspaceObservation: session.publishWorkspaceObservation,
     workspaceInstanceId: session.workspaceInstanceId,
@@ -118,7 +120,7 @@ export function useWorkspaceProjectRuntime(context: UseWorkspaceProjectRuntimeCo
   const gitSnapshotOwner = useWorkspaceGitSnapshots({
     roots: projectTree.roots,
     onError: session.setStatusMessage,
-    visible,
+    visible: workspaceVisible,
   });
   const telemetry = useWorkspaceEditorTelemetry({
     activeKey: session.workspaceUi.activeKey,
