@@ -104,6 +104,7 @@ def main():
     parser.add_argument("--shell", choices=["console", "msys-script", "msys-console"], default="console")
     parser.add_argument("--shell-executable", type=Path)
     parser.add_argument("--sshd-executable", type=Path)
+    parser.add_argument("--server-runtime", choices=["win32", "cygwin"], default="win32")
     args = parser.parse_args()
     delays = [float(value) for value in args.delays.split(",")]
     if not delays or any(value < 0 or value > 2 for value in delays):
@@ -114,7 +115,7 @@ def main():
     server_version = None
     shell = args.shell_executable or (Path("C:/msys64/usr/bin/bash.exe") if args.shell.startswith("msys-") else None)
     with Services(args.out / "services", {"ssh"}, config, ssh_windows_shell=shell,
-                  ssh_windows_sshd=args.sshd_executable):
+                  ssh_windows_sshd=args.sshd_executable, ssh_windows_runtime=args.server_runtime):
         connection = config["ssh"]
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -144,7 +145,7 @@ def main():
             (args.out / "input-probe.json").write_text(json.dumps({
                 "observation": "Direct SSH protocol diagnostic; no app/browser/native case coverage",
                 "sha": os.environ.get("GITHUB_SHA"), "results": results,
-                "server_version": server_version,
+                "server_version": server_version, "server_runtime": args.server_runtime,
             }, indent=2) + "\n", encoding="utf-8")
     if len(results) != len(delays) * 4 or not all(result["passed"] for result in results):
         raise SystemExit("SSH input probe failed; original frames retained")

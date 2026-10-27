@@ -244,13 +244,17 @@ def install(capabilities):
 
 
 class Services:
-    def __init__(self, root, capabilities, config, *, ssh_windows_shell=None, ssh_windows_sshd=None):
+    def __init__(self, root, capabilities, config, *, ssh_windows_shell=None, ssh_windows_sshd=None,
+                 ssh_windows_runtime="win32"):
+        if ssh_windows_runtime not in {"win32", "cygwin"}:
+            raise ValueError("Unknown Windows SSH runtime")
         self.root = Path(root).resolve()
         self.capabilities = set(capabilities)
         self.config = config
         # Diagnostic opt-in; normal hosted cases retain their Git Bash shell.
         self.ssh_windows_shell = ssh_windows_shell
         self.ssh_windows_sshd = ssh_windows_sshd
+        self.ssh_windows_runtime = ssh_windows_runtime
         self.stack = ExitStack()
         self.namespace = "qa" + secrets.token_hex(5)
         self.resources = []
@@ -312,6 +316,9 @@ class Services:
 
     def local_ssh(self, password):
         system = platform.system()
+        if system == "Windows" and self.ssh_windows_runtime == "cygwin":
+            from ci_windows_posix_ssh import start
+            return start(self, password)
         user, port = self.namespace, free_port()
         private = self.private
         host_key = private / "host_key"
@@ -492,14 +499,15 @@ class Services:
         finally:
             sftp.close()
         cfg = {"host": "127.0.0.1", "port": port, "user": user, "password": "${env.QA_SSH_PASSWORD}"}
-        shell_dir = "/c/" + remote_dir[3:] if system == "Windows" else remote_dir
-        sftp_shell_dir = "/" + remote_dir if system == "Windows" else remote_dir
+        win32 = system == "Windows" and self.ssh_windows_runtime == "win32"
+        shell_dir = "/c/" + remote_dir[3:] if win32 else remote_dir
+        sftp_shell_dir = "/" + remote_dir if win32 else remote_dir
         jump_target_host, jump_target_port = jump_target_endpoint(system, port)
         cfg.update(jump_target_host=jump_target_host, jump_target_port=jump_target_port)
         self.config.update(ssh=cfg.copy(), sftp={**cfg, "remote_test_dir": remote_dir,
                                              "remote_shell_test_dir": shell_dir,
                                              "remote_sftp_shell_test_dir": sftp_shell_dir,
-                                             "chmod_readback_mode": "644" if system == "Windows" else "600"})
+                                             "chmod_readback_mode": "644" if win32 else "600"})
         return {"authentication": True, "pty_exec": True, "sftp_roundtrip": True, "port": port}
 
     def mysql(self):

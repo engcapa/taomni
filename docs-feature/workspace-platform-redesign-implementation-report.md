@@ -1,17 +1,25 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前验收尚未完成。全量 [40500343529](https://github.com/engcapa/taomni/actions/runs/40500343529) 已收齐 25/25 分片：641 个适用 ID、2,103 次执行，2,100 passed / 3 failed。失败分别为 Windows browser TC-145 丢失命令首字节、Linux native TC-MAIL-FOLDER-01 订阅状态回退、macOS native TC-RDPS-PERF-03-photo-content 帧率比 0.845 < 0.85；原始失败全部保留。邮件已修复并在托管复验，SSH 正在定位远端 shell 的输入丢失，RDP 定向复验见下文。最近一次 main 同步为 `a5743792`，后续仍需再次同步并全量验收。按用户最新指示，browser/native 用例直接在 GitHub 执行，本机仅运行单测、编译与静态检查。功能完成后再做正式性能对照，目前没有“性能无退化”的结论。原始证据保留于 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
+> 当前验收尚未完成。全量 [40500343529](https://github.com/engcapa/taomni/actions/runs/40500343529) 已收齐 25/25 分片：641 个适用 ID、2,103 次执行，2,100 passed / 3 failed。失败分别为 Windows browser TC-145 丢失命令首字节、Linux native TC-MAIL-FOLDER-01 订阅状态回退、macOS native TC-RDPS-PERF-03-photo-content 帧率比 0.845 < 0.85；原始失败全部保留。邮件修复已在三平台 browser/native 全部通过，SSH 远端输入和编辑器偶发选区异常仍在定位，RDP 定向复验见下文。最近一次 main 同步为 `a5743792`，后续仍需再次同步并全量验收。按用户最新指示，browser/native 用例直接在 GitHub 执行，本机仅运行单测、编译与静态检查。功能完成后再做正式性能对照，目前没有“性能无退化”的结论。原始证据保留于 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
 
-## 邮件订阅与后台同步竞争（2026-10-27，待托管复验）
+## 邮件订阅与后台同步竞争（2026-10-27，定向托管复验通过）
 
 全量 40500343529 的 Linux native TC-MAIL-FOLDER-01 可信点击已送达 Archive checkbox，但取消订阅后仍显示 subscribed=true。现有远端 LIST、缓存读取及全量/单目录同步可在订阅写入后返回旧快照，覆盖服务器刚确认的状态。新增两条真实挂载组件回归，分别延迟旧 LIST 和旧 full sync；改前均出现 false 被覆盖为 true，改后完整组件组 75/75 通过。
 
-提取每账户订阅 owner 与快照顺序 guard，读取开始时捕获版本；只有比读取更新的服务器确认订阅位受到保护，计数和其他 flags 继续更新。后续新读取仍可接受其他客户端做出的订阅变更。订阅失败不发布乐观状态，组件卸载/换账户后的迟到响应无效，不修改公共 IPC 或持久化格式。快照/同步/目录单测 34/34、订阅错误重试和生命周期单测 2/2、TypeScript 与重构边界检查通过。TC-MAIL-FOLDER-01 保留原断言，补全完整同步后仍取消订阅及再次订阅/取消的真实往返，browser/native 结果尚待 GitHub 验证，单测不能替代原生证据。
+提取每账户订阅 owner 与快照顺序 guard，读取开始时捕获版本；只有比读取更新的服务器确认订阅位受到保护，计数和其他 flags 继续更新。后续新读取仍可接受其他客户端做出的订阅变更。订阅失败不发布乐观状态，组件卸载/换账户后的迟到响应无效，不修改公共 IPC 或持久化格式。快照/同步/目录单测 34/34、订阅错误重试和生命周期单测 2/2、TypeScript 与重构边界检查通过。TC-MAIL-FOLDER-01 保留原断言，补全完整同步后仍取消订阅及再次订阅/取消的真实往返。
+
+托管相关集 [40507904066](https://github.com/engcapa/taomni/actions/runs/40507904066) 已收齐 18/18 分片，110 passed / 1 failed，原始回执、身份及聚合已独立核验。邮件目录的 34 个步骤在三平台 browser/native 六个执行单元均通过，相关邮件同步用例也通过；整轮唯一失败是 Windows native TC-WS-054 的选区替换，因此不能将整轮标记为通过。
+
+## Windows 编辑器选区诊断（2026-10-27，原因未确认）
+
+40507904066 的 TC-WS-054 在第二轮 Documentation/侧栏宽度切换后，Ctrl+A 和随后输入没有替换旧的短文本，而是将长文本插在旧文本前；精确文本断言失败。原始可信事件显示 Ctrl+A 到达已聚焦编辑器，尚不能判断选区何时改变。新增被动快捷键后 microtask 观察，记录默认行为是否被消费、选区长度/端点、焦点和文档长度，不读取表单值、不写 DOM、不变更选区、不重放输入。35 项相关工具契约通过。
+
+定向 [40516121016](https://github.com/engcapa/taomni/actions/runs/40516121016) 的 Windows browser/native 完整适用崩溃专项及 TC-012/145 共 18/18 通过，回执和原生构建身份独立核验。选区异常没有复现，不能据此宣称已修复；保留原失败与诊断，继续纳入后续相关和全量运行。
 
 本机 QA release 已重新编译供手工测试：`src-tauri/target/qa-ui-auto/release/taomni`，独立 ID `com.taomni.app.qa`，product source SHA `a34f0739513f8e4ef3d2d2a2d1079ffc0c9c294dc994ab292aa247b2589231b5`，binary SHA `4ae0c7d5ecc10d8b0cd9ef279ba06f1b300939683e3be74b915a81ad2697ab9f`。使用 Node 22、`CARGO_BUILD_JOBS=2` 检查 inputs match；构建后未在本机运行 browser/native。
 
@@ -34,6 +42,8 @@ Breadcrumbs 修复后的定向 [40495133881](https://github.com/engcapa/taomni/a
 后续直接 Paramiko/Win32 OpenSSH 探针在没有 Taomni、浏览器或 WebSocket bridge 的条件下复现完整 `echo` 被远端执行为 `cho`，Git Bash 2.56/MSYS 3.6.10。0–500ms 的等待、焦点报告、Win32 键盘编码与 bracketed paste 均不能避免；paste 的起始 ESC 也会丢失，因此不在产品加入等待、额外按键或输入重放。此前从 Git Bash 嵌套另一 MSYS2 运行时的对照没有启动到提示符，不算有效对照。新探针改为服务建立时显式配置 MSYS2 DefaultShell，避免跨运行时启动；保留 shell 退出状态，正常托管服务仍使用 Git Bash。
 
 TC-145 保留原步骤，进一步在两轮 SFTP 的每次打开与关闭后验证各自独立的精确命令输出，所有命令仅尝试一次。新增工具契约与共享 Services 回归 28/28、`pnpm check:refactor` 通过；增强用例仍需当前分支托管验收。
+
+直接协议对照进一步显示：固定旧 Git 2.50.1 为 23/24；真正启动到 POSIX script 提示符的嵌套 PTY 为 15/24；[40518918877](https://github.com/engcapa/taomni/actions/runs/40518918877) 的 Win32 OpenSSH 9.5 为 19/24、10.4 为 18/24。所有失败均保留原始帧，升级服务端与降低 shell 版本都不是有效修复。现增加 Cygwin OpenSSH 真实 POSIX PTY 的独立对照，使用已有的、校验安装器哈希的运行时以及独立临时账户，不改 runner 账户密码、不替换正常托管 fixture；本机 44 项服务/诊断契约和重构检查通过。该对照尚待 GitHub 实测，不提供产品通过证据。
 
 ## 全量 ResizeObserver 诊断（2026-10-27，进行中）
 
