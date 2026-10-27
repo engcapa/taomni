@@ -1,8 +1,8 @@
 id: TC-151
 title: VNC session reaches the hosted RFB fixture, relays input and follows a remote resize
-description: 'Real RFB session for F9.6 against the scriptable VNC fixture (vnc_required): the per-attempt unencrypted-connection warning, then VNCAuth through the session''s own authentication
-  form (asked only because the server requires a password, DEC-VNC-21), first frame at the framebuffer size, pointer/key/Ctrl+Alt+Del arrival in the fixture''s event log, and a server
-  DesktopSize change. Native mode exercises the Rust RFB client and relay; browser mode exercises the same panel through the dev-server VNC bridge.
+description: 'Real RFB session for F9.6 against the scriptable VNC fixture (vnc_required): the per-attempt unencrypted-connection warning, then VNCAuth through the session''s
+  own authentication form (asked only because the server requires a password, DEC-VNC-21), first frame at the framebuffer size, pointer/key/Ctrl+Alt+Del arrival in the fixture''s
+  event log, and a server DesktopSize change. Native mode exercises the Rust RFB client and relay; browser mode exercises the same panel through the dev-server VNC bridge.
 
   '
 covers:
@@ -59,6 +59,7 @@ steps:
 - press:
     key: a
     selector: '[data-testid="vnc-canvas"]'
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="vnc-send-cad"]'
 - assert_file_contains:
     path: ${fixture.vnc_events}
@@ -83,8 +84,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A saved VNC session without a stored password connects first, stops for the per-attempt unencrypted-connection confirmation, asks for the password only because the
-      fixture requires VNCAuth, and then paints the remote desktop at its framebuffer size without warning again.
+    requirement: A saved VNC session without a stored password connects first, stops for the per-attempt unencrypted-connection confirmation, asks for the password only
+      because the fixture requires VNCAuth, and then paints the remote desktop at its framebuffer size without warning again.
     actions:
     - 1
     - 3
@@ -122,35 +123,36 @@ verification:
     - 21
     - 22
     - 23
+    - 24
     checkpoints:
-    - step: 24
-      expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"type\": \"pointer\", \"mask\": 1"}}'
     - step: 25
-      expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"keysym\": 97, \"keysym_hex\": \"0x61\""}}'
+      expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"type\": \"pointer\", \"mask\": 1"}}'
     - step: 26
+      expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"keysym\": 97, \"keysym_hex\": \"0x61\""}}'
+    - step: 27
       expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"keysym\": 65535, \"keysym_hex\": \"0xffff\""}}'
     results:
-    - 24
     - 25
     - 26
+    - 27
   - id: R3
     requirement: A server DesktopSize change resizes the canvas to the new framebuffer.
     actions:
-    - 27
+    - 28
     checkpoints:
-    - step: 28
-      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1024\"][height=\"768\"]", "timeout_sec": 15}}'
     - step: 29
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1024\"][height=\"768\"]", "timeout_sec": 15}}'
+    - step: 30
       expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"type\": \"desktop_size\", \"width\": 1024, \"height\": 768"}}'
     results:
-    - 28
     - 29
+    - 30
   visual:
   - check: The connected session shows the fixture's gradient desktop without overlays, letterboxing or clipped tab actions.
     method: manual
     reason: DOM and event-log assertions do not judge the rendered pixels.
   native:
-  - check: Native mode drives the Rust RFB client and WebSocket relay; browser mode drives the dev-server VNC bridge (None/VNCAuth, Raw, DesktopSize) and proves only the shared
-      panel workflow.
+  - check: Native mode drives the Rust RFB client and WebSocket relay; browser mode drives the dev-server VNC bridge (None/VNCAuth, Raw, DesktopSize) and proves only the
+      shared panel workflow.
     method: automated
     reason: The fixture is synthetic; OS input, the system clipboard, encodings and real VNC servers stay covered by the VNC skill's native scenarios.

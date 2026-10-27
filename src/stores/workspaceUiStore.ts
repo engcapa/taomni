@@ -5,6 +5,7 @@
  * tab strip and the sidebar can open the same dialog without prop drilling.
  */
 import { create } from "zustand";
+import type { WorkspaceTabFilter } from "../lib/workspaceTabFilter";
 
 export type WorkspaceCanvasLayout = "single" | "split" | "grid";
 
@@ -19,6 +20,8 @@ export interface WorkspaceFsModalRequest {
 }
 
 export interface WorkspaceUiState {
+  tabFilters: Record<string, WorkspaceTabFilter>;
+  setTabFilter: (workspaceId: string, filter: WorkspaceTabFilter) => void;
   canvasLayouts: Record<string, WorkspaceCanvasLayout>;
   setCanvasLayout: (workspaceId: string, layout: WorkspaceCanvasLayout) => void;
   sessionPickerOpen: boolean;
@@ -38,6 +41,8 @@ export interface WorkspaceUiState {
 }
 
 export const useWorkspaceUiStore = create<WorkspaceUiState>((set) => ({
+  tabFilters: {},
+  setTabFilter: (workspaceId, filter) => set((state) => ({ tabFilters: { ...state.tabFilters, [workspaceId]: filter } })),
   canvasLayouts: {},
   setCanvasLayout: (workspaceId, layout) => set((state) => ({ canvasLayouts: { ...state.canvasLayouts, [workspaceId]: layout } })),
   sessionPickerOpen: false,

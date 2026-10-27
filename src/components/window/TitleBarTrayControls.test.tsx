@@ -1,6 +1,8 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TitleBarTrayControls } from "./TitleBarTrayControls";
+import { useState } from "react";
+import { TabActions, TabActionSlotProvider } from "../tabbar/TabActionSlot";
 
 const mocks = vi.hoisted(() => ({
   theme: {
@@ -31,10 +33,6 @@ vi.mock("../../stores/aiStore", () => ({
 
 vi.mock("../../lib/i18n/labels", () => ({
   useAppThemeI18nLabel: () => (mode: string) => mode,
-}));
-
-vi.mock("./PttButton", () => ({
-  PttButton: () => <button type="button" data-testid="ptt-button" />,
 }));
 
 vi.mock("./LanguageSwitcher", () => ({
@@ -81,7 +79,7 @@ describe("TitleBarTrayControls responsive layout", () => {
 
     fireEvent.click(screen.getByTestId("tab-split-view"));
     expect(mocks.app.toggleTerminalSplit).toHaveBeenCalledTimes(1);
-    expect(screen.queryByTestId("titlebar-actions-menu")).not.toBeInTheDocument();
+    expect(screen.getByTestId("titlebar-actions-menu")).not.toBeVisible();
   });
 
   it("switches layout when the window crosses the breakpoint", async () => {
@@ -95,5 +93,33 @@ describe("TitleBarTrayControls responsive layout", () => {
       expect(screen.getByTestId("titlebar-actions-more")).toBeInTheDocument();
     });
     expect(screen.queryByTestId("titlebar-tray")).not.toBeInTheDocument();
+  });
+
+  it("keeps contextual controls mounted across close/reopen and never offers title-bar voice", () => {
+    const detach = vi.fn();
+    function Shell() {
+      const [slot, setSlot] = useState<HTMLDivElement | null>(null);
+      return <>
+        <TitleBarTrayControls compact layoutActions={false} slotRef={setSlot} />
+        <TabActionSlotProvider slot={slot}><TabActions active>
+          <button type="button" title="Detach terminal" data-testid="terminal-detach" onClick={detach}><svg /></button>
+        </TabActions></TabActionSlotProvider>
+      </>;
+    }
+    render(<Shell />);
+    const action = screen.getByTestId("terminal-detach");
+    expect(action).not.toBeVisible();
+    fireEvent.click(screen.getByTestId("titlebar-actions-more"));
+    expect(action).toBeVisible();
+    expect(action).toHaveTextContent("Detach terminal");
+    expect(screen.queryByTestId("ptt-button")).not.toBeInTheDocument();
+    fireEvent.click(action);
+    expect(detach).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("terminal-detach")).toBe(action);
+    expect(action).not.toBeVisible();
+    fireEvent.click(screen.getByTestId("titlebar-actions-more"));
+    fireEvent.keyDown(action, { key: "Escape" });
+    expect(screen.getByTestId("titlebar-actions-more")).toHaveFocus();
+    expect(action).not.toBeVisible();
   });
 });

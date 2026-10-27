@@ -13,9 +13,10 @@ id: TC-VOICE-008
 title: Volcengine and Soniox selection, neutral hotwords and experimental Gemini
 steps:
 - open: ${cfg.app.base_url}/?voiceFixture=1
-- click: '[data-testid="titlebar-actions-more"]'
-- wait_for: '[data-testid="ptt-button"]'
-- click: '[data-testid="ptt-button"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="chat-voice-button"]'
+- click: '[data-testid="chat-voice-button"]'
 - wait_for: '[data-testid="asr-settings"]'
 - select_option:
     selector: '[data-testid="asr-realtime-provider"]'
@@ -64,39 +65,39 @@ verification:
   - id: R1
     requirement: Volcengine and Soniox selection, neutral hotwords and experimental Gemini
     actions:
-    - 6
-    - 8
-    - 9
-    - 11
-    - 14
-    - 15
-    checkpoints:
-    - step: 7
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"asr-provider-endpoint\"]", "name": "value", "equals": "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"}}'
-    - step: 10
-      expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"hotwords\":[\"Taomni\",\"src/main.rs\"]"}}'
-    - step: 12
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"asr-realtime-settings\"] label:has-text(\"Model\") input", "name": "value", "equals": "stt-rt-v5"}}'
-    - step: 13
-      expectation: '{"assert_not_visible": "[data-testid=\"asr-realtime-provider\"] option[value=\"gemini\"]"}'
-    - step: 16
-      expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"active\":\"gemini\""}}'
-    results:
     - 7
+    - 9
     - 10
     - 12
-    - 13
+    - 15
     - 16
+    checkpoints:
+    - step: 8
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"asr-provider-endpoint\"]", "name": "value", "equals": "wss://openspeech.bytedance.com/api/v3/sauc/bigmodel_async"}}'
+    - step: 11
+      expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"hotwords\":[\"Taomni\",\"src/main.rs\"]"}}'
+    - step: 13
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"asr-realtime-settings\"] label:has-text(\"Model\") input", "name": "value", "equals": "stt-rt-v5"}}'
+    - step: 14
+      expectation: '{"assert_not_visible": "[data-testid=\"asr-realtime-provider\"] option[value=\"gemini\"]"}'
+    - step: 17
+      expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"active\":\"gemini\""}}'
+    results:
+    - 8
+    - 11
+    - 13
+    - 14
+    - 17
   - id: R2
     requirement: Custom endpoints persist only after explicitly saving the provider.
     actions:
-    - 18
     - 19
+    - 20
     checkpoints:
-    - step: 20
+    - step: 21
       expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "wss://example.invalid/experimental"}}'
     results:
-    - 20
+    - 21
   visual:
   - method: manual
     reason: Inspect retained screenshots.

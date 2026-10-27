@@ -1,7 +1,7 @@
 id: TC-WS-026
 title: Home and Sessions editor entries belong to Workspaces (native)
-description: Home new and recent preserve the full editor and saved text, IDE tools have a separate group; context-free Tools entry opens the default workspace.
-  Native uses an actual OS directory chooser and disk reread.
+description: Home new and recent preserve the full editor and saved text, IDE tools have a separate group; context-free Tools entry opens the default workspace. Native
+  uses an actual OS directory chooser and disk reread.
 modes:
 - native
 covers:
@@ -55,12 +55,12 @@ steps:
     path: ${fixture.platform_workspace_root}/README.md
     contains: QA_HOME_ROUTE_SAVE
 - eval_readonly:
-    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]').title.length > 0 && parseFloat(getComputedStyle(document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]')).borderTopWidth)
-      >= 1
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]').title.length > 0 &&
+      parseFloat(getComputedStyle(document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]')).borderTopWidth) >= 1
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]').getBoundingClientRect().top - document.querySelector('[data-testid'+String.fromCharCode(61)+'"rail-mode-group"]').getBoundingClientRect().bottom
-      >= 12
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]').getBoundingClientRect().top -
+      document.querySelector('[data-testid'+String.fromCharCode(61)+'"rail-mode-group"]').getBoundingClientRect().bottom >= 12
     expect_truthy: true
 - screenshot: home-workspace-ide-group.png
 - click: '[data-testid="nav-mode-home"]'
@@ -94,15 +94,19 @@ steps:
     selector: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
     equal: 0
 - screenshot: sessions-code-entry-default-workspace.png
+- click: '[data-testid="titlebar-actions-more"]'
 - assert_text_equals:
     selector: '[data-testid="workspace-toolbar-bottom-dock"]'
-    equals: ''
+    equals: Show/hide workspace bottom dock
+- assert_count:
+    selector: '[data-testid="platform-toolbar-actions"] [data-testid="workspace-toolbar-bottom-dock"]'
+    equal: 0
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Home new/recent opens the same full editor inside Workspaces, save survives re-entry, Sessions contains no code tabs, and context-free Code
-      Editor routes to the default workspace. IDE tools are separated by at least 12px with a divider and tooltip.
+    requirement: Home new/recent opens the same full editor inside Workspaces, save survives re-entry, Sessions contains no code tabs, and context-free Code Editor routes
+      to the default workspace. IDE tools are separated by at least 12px with a divider and tooltip.
     actions:
     - 3
     - 4
@@ -116,6 +120,7 @@ verification:
     - 27
     - 32
     - 33
+    - 41
     checkpoints:
     - step: 5
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
@@ -134,9 +139,9 @@ verification:
     - step: 17
       expectation: '{"assert_file_contains": {"path": "${fixture.platform_workspace_root}/README.md", "contains": "QA_HOME_ROUTE_SAVE"}}'
     - step: 18
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'').title.length
-        > 0 && parseFloat(getComputedStyle(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'')).borderTopWidth)
-        >= 1", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'').title.length > 0 &&
+        parseFloat(getComputedStyle(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'')).borderTopWidth) >= 1", "expect_truthy":
+        true}}'
     - step: 19
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'').getBoundingClientRect().top
         - document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"rail-mode-group\"]'').getBoundingClientRect().bottom >= 12", "expect_truthy": true}}'
@@ -166,8 +171,8 @@ verification:
       expectation: '{"assert_visible": "[data-testid=\"workspace-default-badge\"]"}'
     - step: 39
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"code-workspace\"]", "equal": 0}}'
-    - step: 41
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-toolbar-bottom-dock\"]", "equals": ""}}'
+    - step: 43
+      expectation: '{"assert_count": {"selector": "[data-testid=\"platform-toolbar-actions\"] [data-testid=\"workspace-toolbar-bottom-dock\"]", "equal": 0}}'
     results:
     - 5
     - 6
@@ -192,13 +197,13 @@ verification:
     - 37
     - 38
     - 39
-    - 41
+    - 43
   visual:
   - check: Compact controls retain readable icons and active states without toolbar overlap.
     method: manual
     reason: Inspect the retained screenshots; functional assertions do not establish visual matching.
   native:
-  - check: Home new/recent opens the same full editor inside Workspaces, save survives re-entry, Sessions contains no code tabs, and context-free Code Editor
-      routes to the default workspace. IDE tools are separated by at least 12px with an IDE label.
+  - check: Home new/recent opens the same full editor inside Workspaces, save survives re-entry, Sessions contains no code tabs, and context-free Code Editor routes to
+      the default workspace. IDE tools are separated by at least 12px with an IDE label.
     method: automated
     reason: Runs the isolated packaged application and explicitly asserts real native effects.

@@ -1,7 +1,7 @@
 id: TC-WS-025
 title: Home and Sessions editor entries belong to Workspaces
-description: Home new and recent preserve the full editor and saved text, IDE tools have a separate group; context-free Tools entry opens the default workspace.
-  Native uses an actual OS directory chooser and disk reread.
+description: Home new and recent preserve the full editor and saved text, IDE tools have a separate group; context-free Tools entry opens the default workspace. Native
+  uses an actual OS directory chooser and disk reread.
 modes:
 - browser
 covers:
@@ -54,12 +54,12 @@ steps:
     selector: '[data-testid="code-workspace-editor"]'
     contains: QA_HOME_ROUTE_SAVE
 - eval_readonly:
-    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]').title.length > 0 && parseFloat(getComputedStyle(document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]')).borderTopWidth)
-      >= 1
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]').title.length > 0 &&
+      parseFloat(getComputedStyle(document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]')).borderTopWidth) >= 1
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]').getBoundingClientRect().top - document.querySelector('[data-testid'+String.fromCharCode(61)+'"rail-mode-group"]').getBoundingClientRect().bottom
-      >= 12
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]').getBoundingClientRect().top -
+      document.querySelector('[data-testid'+String.fromCharCode(61)+'"rail-mode-group"]').getBoundingClientRect().bottom >= 12
     expect_truthy: true
 - screenshot: home-workspace-ide-group.png
 - click: '[data-testid="nav-mode-home"]'
@@ -93,15 +93,19 @@ steps:
     selector: '[data-testid="tab-item"][data-tab-type="code-workspace"]'
     equal: 0
 - screenshot: sessions-code-entry-default-workspace.png
+- click: '[data-testid="titlebar-actions-more"]'
 - assert_text_equals:
     selector: '[data-testid="workspace-toolbar-bottom-dock"]'
-    equals: ''
+    equals: Show/hide workspace bottom dock
+- assert_count:
+    selector: '[data-testid="platform-toolbar-actions"] [data-testid="workspace-toolbar-bottom-dock"]'
+    equal: 0
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Home new/recent opens the same full editor inside Workspaces, save survives re-entry, Sessions contains no code tabs, and context-free Code
-      Editor routes to the default workspace. IDE tools are separated by at least 12px with a divider and tooltip.
+    requirement: Home new/recent opens the same full editor inside Workspaces, save survives re-entry, Sessions contains no code tabs, and context-free Code Editor routes
+      to the default workspace. IDE tools are separated by at least 12px with a divider and tooltip.
     actions:
     - 3
     - 5
@@ -116,6 +120,7 @@ verification:
     - 28
     - 33
     - 34
+    - 42
     checkpoints:
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
@@ -134,9 +139,9 @@ verification:
     - step: 18
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "QA_HOME_ROUTE_SAVE"}}'
     - step: 19
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'').title.length
-        > 0 && parseFloat(getComputedStyle(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'')).borderTopWidth)
-        >= 1", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'').title.length > 0 &&
+        parseFloat(getComputedStyle(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'')).borderTopWidth) >= 1", "expect_truthy":
+        true}}'
     - step: 20
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'').getBoundingClientRect().top
         - document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"rail-mode-group\"]'').getBoundingClientRect().bottom >= 12", "expect_truthy": true}}'
@@ -166,8 +171,8 @@ verification:
       expectation: '{"assert_visible": "[data-testid=\"workspace-default-badge\"]"}'
     - step: 40
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"code-workspace\"]", "equal": 0}}'
-    - step: 42
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-toolbar-bottom-dock\"]", "equals": ""}}'
+    - step: 44
+      expectation: '{"assert_count": {"selector": "[data-testid=\"platform-toolbar-actions\"] [data-testid=\"workspace-toolbar-bottom-dock\"]", "equal": 0}}'
     results:
     - 4
     - 7
@@ -192,7 +197,7 @@ verification:
     - 38
     - 39
     - 40
-    - 42
+    - 44
   visual:
   - check: Compact controls retain readable icons and active states without toolbar overlap.
     method: manual

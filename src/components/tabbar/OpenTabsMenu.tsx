@@ -30,6 +30,7 @@ interface OpenTabsMenuProps {
   /** The trigger element the menu anchors to (used for positioning + hit-test). */
   anchorRef: RefObject<HTMLElement | null>;
   onDetachActiveTab?: () => void;
+  showActions?: boolean;
 }
 
 interface TabGroup {
@@ -45,7 +46,7 @@ interface TabGroup {
  * filter hides non-matching tabs from the strip without closing them. Search
  * narrows this list too; clearing it reveals every group again. See issue #121.
  */
-export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab }: OpenTabsMenuProps) {
+export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab, showActions = true }: OpenTabsMenuProps) {
   const t = useT();
   const allTabs = useAppStore((s) => s.tabs);
   const tabs = useMemo(() => allTabs.filter((tab) => tab.type !== "welcome"), [allTabs]);
@@ -255,7 +256,9 @@ export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab }: Op
     <div
       ref={menuRef}
       data-testid="open-tabs-menu"
-      className="fixed z-[9999] w-72 max-h-[70vh] flex flex-col rounded shadow-lg border text-[12px]"
+      role="dialog"
+      aria-label={t("tabs.filterOpenTabs")}
+      className="taomni-tab-filter-menu fixed z-[9999] w-72 max-h-[70vh] flex flex-col rounded shadow-lg border"
       style={{
         top: pos.top,
         right: pos.right,
@@ -264,7 +267,7 @@ export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab }: Op
         color: "var(--taomni-text)",
       }}
     >
-      <div className="py-1">
+      {showActions && <div className="py-1">
         {onDetachActiveTab && (
           <button
             type="button"
@@ -287,7 +290,7 @@ export function OpenTabsMenu({ open, onClose, anchorRef, onDetachActiveTab }: Op
           </span>
           <span className="flex-1 truncate">{t("tabs.closeAllTerminals")}</span>
         </button>
-      </div>
+      </div>}
 
       <div className="px-3 pb-1.5 flex items-center justify-between gap-2 text-[10px] text-[var(--taomni-text-muted)]">
         <span>{t("tabs.detailsVisibleCount", { visible: stripVisibleCount, total: tabs.length })}</span>

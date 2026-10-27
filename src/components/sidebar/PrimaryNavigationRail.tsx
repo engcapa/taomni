@@ -18,6 +18,7 @@ import { useAppTheme } from "../../lib/appTheme";
 import { useT } from "../../lib/i18n";
 import { useAppStore, type PrimaryNavMode } from "../../stores/appStore";
 import { isChatCapableTabType, useChatStore } from "../../stores/chatStore";
+import { useAiStore } from "../../stores/aiStore";
 import { LanguageSwitcher } from "../window/LanguageSwitcher";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
 
@@ -61,6 +62,7 @@ export function PrimaryNavigationRail({
   const floatingMfaOpen = useAppStore((s) => s.floatingMfa.open);
   const toggleDrawer = useChatStore((s) => s.toggleDrawer);
   const chatDrawerOpen = useChatStore((s) => s.drawerOpen);
+  const aiDisabled = useAiStore((s) => s.config?.fully_disabled === true);
   const activeTab = useAppStore((s) => s.tabs.find((tab) => tab.id === s.activeTabId));
   const stripeSettings = useToolWindowStripeStore((s) => s.settings);
   const setStripeWidth = useToolWindowStripeStore((s) => s.setWidth);
@@ -153,7 +155,7 @@ export function PrimaryNavigationRail({
           <div className="flex w-full flex-col items-stretch">
             <ScreenshotMenuButton variant="rail" />
           </div>
-          <RailIconButton
+          {!aiDisabled && <RailIconButton
             testId="rail-chat-button"
             label={t("platform.chat")}
             active={chatDrawerOpen}
@@ -165,7 +167,7 @@ export function PrimaryNavigationRail({
             }}
           >
             <MessageSquare className="w-[16px] h-[16px]" />
-          </RailIconButton>
+          </RailIconButton>}
           <RailIconButton
             testId="theme-cycle"
             label={themeLabel(themeMode)}

@@ -9,10 +9,6 @@ vi.mock("../../window/WindowControls", () => ({
   WindowControls: () => <div data-testid="window-controls" />,
 }));
 
-vi.mock("../../window/TitleBarTrayControls", () => ({
-  TitleBarTrayControls: () => <div data-testid="titlebar-tray" />,
-}));
-
 vi.mock("../OpenTabsMenu", () => ({
   OpenTabsMenu: ({ open }: { open: boolean }) => (open ? <div data-testid="open-tabs-menu">menu</div> : null),
 }));

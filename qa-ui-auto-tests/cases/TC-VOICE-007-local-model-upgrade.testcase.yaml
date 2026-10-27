@@ -13,9 +13,10 @@ fixtures:
 timeout_sec: 75
 steps:
 - open: ${cfg.app.base_url}/?voiceFixture=1
-- click: '[data-testid="titlebar-actions-more"]'
-- wait_for: '[data-testid="ptt-button"]'
-- click: '[data-testid="ptt-button"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="chat-voice-button"]'
+- click: '[data-testid="chat-voice-button"]'
 - wait_for: '[data-testid="asr-settings"]'
 - assert_text:
     selector: '[data-testid="asr-model-sensevoice-small"]'
@@ -49,31 +50,31 @@ verification:
   - id: R1
     requirement: Recommended downloads expose license and preserve Cantonese preference; f16 replacement is explicit.
     actions:
-    - 7
-    - 10
-    - 12
+    - 8
+    - 11
     - 13
     - 14
+    - 15
     checkpoints:
-    - step: 6
+    - step: 7
       expectation: '{"assert_text": {"selector": "[data-testid=\"asr-model-sensevoice-small\"]", "contains": "FunASR Model License"}}'
-    - step: 8
-      expectation: '{"assert_text": {"selector": "[data-testid=\"asr-model-whisper-small-q8\"]", "contains": "Downloaded"}}'
     - step: 9
+      expectation: '{"assert_text": {"selector": "[data-testid=\"asr-model-whisper-small-q8\"]", "contains": "Downloaded"}}'
+    - step: 10
       expectation: '{"assert_text": {"selector": "[data-testid=\"asr-model-sensevoice-small\"]", "contains": "Downloaded"}}'
-    - step: 11
+    - step: 12
       expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"language_prior\":\"yue\""}}'
-    - step: 15
-      expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"active\":\"whisper-small-q8\""}}'
     - step: 16
+      expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"active\":\"whisper-small-q8\""}}'
+    - step: 17
       expectation: '{"assert_text": {"selector": "[data-testid=\"asr-model-whisper-small\"]", "contains": "Not downloaded"}}'
     results:
-    - 6
-    - 8
+    - 7
     - 9
-    - 11
-    - 15
+    - 10
+    - 12
     - 16
+    - 17
   visual:
   - check: Model license, size and upgrade action remain readable
     method: manual

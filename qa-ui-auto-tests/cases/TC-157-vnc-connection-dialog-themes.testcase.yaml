@@ -1,7 +1,7 @@
 id: TC-157
 title: VNC connection dialogs are readable in light and dark themes
-description: Inspect the unencrypted warning, username/password form and authentication error in both themes. Preserve password autofocus, masking, disabled empty-password
-  submission and Enter-to-submit. Screenshots require visual review; the successful fixture handshake proves corrected credentials still connect.
+description: Inspect the unencrypted warning, username/password form and authentication error in both themes. Preserve password autofocus, masking, disabled
+  empty-password submission and Enter-to-submit. Screenshots require visual review; the successful fixture handshake proves corrected credentials still connect.
 covers:
 - F9.6
 tags:
@@ -111,6 +111,7 @@ steps:
     text: 'drop
 
       '
+- click: '[data-testid="titlebar-actions-more"]'
 - wait_for:
     selector: '[data-testid="vnc-reconnect"]'
     timeout_sec: 15
@@ -203,24 +204,25 @@ verification:
     requirement: A remote disconnect exposes a readable reconnect action; reconnect confirms the unencrypted connection and paints a new framebuffer.
     actions:
     - 48
-    - 51
-    - 53
-    checkpoints:
-    - step: 49
-      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-reconnect\"]", "timeout_sec": 15}}'
-    - step: 52
-      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-unencrypted-continue\"]", "timeout_sec": 20}}'
-    - step: 54
-      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1280\"][height=\"720\"]", "timeout_sec": 20}}'
-    - step: 55
-      expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('.vnc-container canvas').getContext('2d').getImageData(16, 16, 1, 1).data[3] === 255\", \"timeout_sec\"\
-        : 10}}"
-    results:
+    - 49
+    - 52
     - 54
+    checkpoints:
+    - step: 50
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-reconnect\"]", "timeout_sec": 15}}'
+    - step: 53
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-unencrypted-continue\"]", "timeout_sec": 20}}'
+    - step: 55
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1280\"][height=\"720\"]", "timeout_sec": 20}}'
+    - step: 56
+      expectation: "{\"eval_readonly\": {\"expression\": \"document.querySelector('.vnc-container canvas').getContext('2d').getImageData(16, 16, 1, 1).data[3] === 255\", \"\
+        timeout_sec\": 10}}"
+    results:
     - 55
+    - 56
   visual:
-  - check: 'Review dialog screenshots: opaque theme-appropriate cards; readable titles, descriptions, field labels, entered username, buttons and error text; visible focus and no clipping.
-      Check the disconnected card and reconnect button too.'
+  - check: 'Review dialog screenshots: opaque theme-appropriate cards; readable titles, descriptions, field labels, entered username, buttons and error text; visible focus
+      and no clipping. Check the disconnected card and reconnect button too.'
     method: manual
     reason: Theme attributes and successful input do not prove contrast or visual quality.
   native:

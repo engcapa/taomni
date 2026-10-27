@@ -61,10 +61,13 @@ def step_auth(ctx: StepContext, args: Any) -> None:
 
 @verb("attach_sftp")
 def step_attach_sftp(ctx: StepContext, args: Any) -> None:
-    """Click the attached-SFTP toggle in the active SSH terminal."""
+    """Open the active terminal's actions, then toggle its attached SFTP."""
     if ctx.dry_run:
         return
     page = ctx.page
+    more = page.locator('[data-testid="titlebar-actions-more"][aria-expanded="false"]')  # type: ignore[attr-defined]
+    if more.count():
+        more.first.click()
     page.locator('[data-testid="attached-sftp-toggle"]').first.click()  # type: ignore[attr-defined]
     page.wait_for_selector('[data-testid="sftp-browser"]', timeout=15_000)  # type: ignore[attr-defined]
 

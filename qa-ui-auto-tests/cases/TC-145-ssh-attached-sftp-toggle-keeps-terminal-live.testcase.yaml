@@ -56,6 +56,7 @@ steps:
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
     timeout_sec: 60
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-browser"]'
 - wait_for:
@@ -80,6 +81,7 @@ steps:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^qa\-ssh\-with\-sftp\-open\r?$
     timeout_sec: 10
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for:
     selector: '[data-testid="sftp-browser"]'
@@ -101,6 +103,7 @@ steps:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^qa\-ssh\-after\-sftp\-close\r?$
     timeout_sec: 60
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-browser"]'
 - wait_for:
@@ -109,6 +112,7 @@ steps:
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
     timeout_sec: 30
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for:
     selector: '[data-testid="sftp-browser"]'
@@ -119,9 +123,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: An authenticated SSH terminal opens its attached SFTP browser, exposes both panes and the transfer queue, accepts a command while the browser
-      is open, closes the browser without disconnecting, accepts a command while closed, and reopens and closes the browser again with the terminal still
-      ready.
+    requirement: An authenticated SSH terminal opens its attached SFTP browser, exposes both panes and the transfer queue, accepts a command while the browser is open,
+      closes the browser without disconnecting, accepts a command while closed, and reopens and closes the browser again with the terminal still ready.
     actions:
     - 1
     - 2
@@ -137,12 +140,16 @@ verification:
     - 18
     - 19
     - 21
-    - 28
-    - 30
-    - 33
-    - 34
+    - 22
+    - 29
+    - 31
+    - 32
+    - 35
     - 36
-    - 40
+    - 38
+    - 39
+    - 43
+    - 44
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
@@ -157,42 +164,36 @@ verification:
     - step: 17
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
     - step: 20
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
-        60}}'
-    - step: 22
-      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
     - step: 23
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"] tbody tr", "timeout_sec": 30}}'
-    - step: 24
-      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"]"}'
-    - step: 25
-      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"]"}'
-    - step: 26
-      expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"]"}'
-    - step: 27
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
-        10}}'
-    - step: 29
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-with\\-sftp\\-open\\r?$", "timeout_sec":
-        10}}'
-    - step: 31
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached"}}'
-    - step: 32
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
-        30}}'
-    - step: 35
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-after\\-sftp\\-close\\r?$", "timeout_sec":
-        60}}'
-    - step: 37
       expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
-    - step: 38
+    - step: 24
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"] tbody tr", "timeout_sec": 30}}'
-    - step: 39
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
-        30}}'
-    - step: 41
+    - step: 25
+      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"]"}'
+    - step: 26
+      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"]"}'
+    - step: 27
+      expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"]"}'
+    - step: 28
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 10}}'
+    - step: 30
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-with\\-sftp\\-open\\r?$", "timeout_sec": 10}}'
+    - step: 33
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached"}}'
+    - step: 34
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 30}}'
+    - step: 37
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-after\\-sftp\\-close\\r?$", "timeout_sec": 60}}'
+    - step: 40
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 41
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"] tbody tr", "timeout_sec": 30}}'
     - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 30}}'
+    - step: 45
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached"}}'
+    - step: 46
       expectation: '{"assert_not_visible": "[data-testid=\"sftp-browser\"]"}'
     results:
     - 3
@@ -202,21 +203,21 @@ verification:
     - 15
     - 17
     - 20
-    - 22
     - 23
     - 24
     - 25
     - 26
     - 27
-    - 29
-    - 31
-    - 32
-    - 35
+    - 28
+    - 30
+    - 33
+    - 34
     - 37
-    - 38
-    - 39
+    - 40
     - 41
     - 42
+    - 45
+    - 46
   visual:
   - check: Attached SFTP panes, transfer queue, and terminal remain readable across open/close transitions.
     method: manual

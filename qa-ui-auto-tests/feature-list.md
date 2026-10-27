@@ -110,35 +110,35 @@ status: done
 area: main
 components: [MainLayout, MenuBar, Ribbon, QuickConnect, Sidebar, TabBar, StatusBar]
 files:
-  - src/layouts/MainLayout.tsx
+- src/layouts/MainLayout.tsx
 controls:
   # MainLayout owns layout-level chrome only; menu/ribbon/sidebar/quick-connect testids belong to their own features.
   # Ribbon and QuickConnect are hidden by default and can be enabled from View.
-  - id: collapsed-sidebar-rail
-    selector: '[data-testid="collapsed-sidebar-rail"]'
-    kind: interactive
-    optional: true       # only when sidebar collapsed
-  - id: expanded-sidebar-panel
-    selector: '[data-testid="expanded-sidebar-panel"]'
-    kind: display
-    optional: true
-  - id: sidebar-tool-window-rail      # ED-PARITY-027: the active tab's tool window bar inside the collapsed rail
-    selector: '[data-testid="sidebar-tool-window-rail"]'
-    kind: display
-    optional: true
-    aliases:
-      - '[data-testid="sidebar-rail"]'
-  - id: sidebar-resize-handle
-    selector: '[data-testid="main-sidebar-resize-handle"]'
-    kind: display    # drag handle — meaningless to click; existence is the assertion
-  - id: sidebar-rail-menu-show-names
-    selector: '[data-testid="sidebar-rail-menu-show-names"]'
-    kind: interactive
-    optional: true
-  - id: sidebar-rail-resize
-    selector: '[data-testid="sidebar-rail-resize"]'
-    kind: interactive
-    optional: true       # visible while tool window names are shown
+- id: collapsed-sidebar-rail
+  selector: '[data-testid="collapsed-sidebar-rail"]'
+  kind: interactive
+  optional: true         # only when sidebar collapsed
+- id: expanded-sidebar-panel
+  selector: '[data-testid="expanded-sidebar-panel"]'
+  kind: display
+  optional: true
+- id: sidebar-tool-window-rail        # ED-PARITY-027: the active tab's tool window bar inside the collapsed rail
+  selector: '[data-testid="sidebar-tool-window-rail"]'
+  kind: display
+  optional: true
+  aliases:
+  - '[data-testid="sidebar-rail"]'
+- id: sidebar-resize-handle
+  selector: '[data-testid="main-sidebar-resize-handle"]'
+  kind: display      # drag handle — meaningless to click; existence is the assertion
+- id: sidebar-rail-menu-show-names
+  selector: '[data-testid="sidebar-rail-menu-show-names"]'
+  kind: interactive
+  optional: true
+- id: sidebar-rail-resize
+  selector: '[data-testid="sidebar-rail-resize"]'
+  kind: interactive
+  optional: true         # visible while tool window names are shown
 -->
 
 - 顶部菜单栏 `MenuBar`（File/Edit/View/Sessions/Tools/Help）
@@ -242,130 +242,140 @@ controls: []
 id: F1.5
 status: done
 area: main/tabs
-components: [TabBar, ControlBar, OpenTabsMenu, TabDetailsOverlay, TabOverview, PlatformToolbarActions]
+components: [TabBar, ControlBar, OpenTabsMenu, TabDetailsOverlay, TabOverview, PlatformToolbarActions, TabActionMenuItems, TitleBarTrayControls]
 files:
-  - src/components/tabbar/TabBar.tsx
-  - src/components/tabbar/ControlBar.tsx
-  - src/components/tabbar/OpenTabsMenu.tsx
-  - src/components/tabbar/TabDetailsOverlay.tsx
-  - src/components/tabbar/TabOverview.tsx
-  - src/components/tabbar/PlatformToolbarActions.tsx
-  - src/stores/tabOverviewStore.ts
-  - src/lib/customDnD.ts
-  - src/lib/tabDetails.ts
-  - src/lib/terminalActivity.ts
-  - src/lib/terminalCwd.ts
-  - src/stores/appStore.ts
+- src/components/tabbar/TabBar.tsx
+- src/components/tabbar/ControlBar.tsx
+- src/components/tabbar/OpenTabsMenu.tsx
+- src/components/tabbar/TabDetailsOverlay.tsx
+- src/components/tabbar/TabOverview.tsx
+- src/components/tabbar/PlatformToolbarActions.tsx
+- src/stores/tabOverviewStore.ts
+- src/lib/customDnD.ts
+- src/lib/tabDetails.ts
+- src/lib/terminalActivity.ts
+- src/lib/terminalCwd.ts
+- src/stores/appStore.ts
+- src/components/tabbar/TabActionMenuItems.tsx
+- src/components/tabbar/TabActionSlot.tsx
+- src/components/tabbar/useToolbarPopover.ts
+- src/components/window/TitleBarTrayControls.tsx
 controls:
-  - id: tab-bar
-    selector: '[data-testid="tab-bar"]'
-    kind: display
-  - id: tab-item               # individual tab; pair with [data-tab-type=...] / [data-tab-title=...] when targeting
-    selector: '[data-testid="tab-item"]'
-    kind: interactive
-  - id: tab-title              # the title span inside a tab; double-click to rename
-    selector: '[data-testid="tab-title"]'
-    kind: interactive
-  - id: tab-title-input        # inline rename input; only present while editing
-    selector: '[data-testid="tab-title-input"]'
-    kind: interactive
-    optional: true
-  - id: new-local-terminal     # the "+" plus tab button
-    selector: '[data-testid="new-local-terminal"]'
-    kind: interactive
-  - id: new-tab-split          # the "+ ▾" split-button container (Windows Terminal style)
-    selector: '[data-testid="new-tab-split"]'
-    kind: display
-  - id: new-tab-launch-menu    # the "▾" chevron that opens the quick-launch context menu
-    selector: '[data-testid="new-tab-launch-menu"]'
-    kind: interactive
-  - id: launch-menu-new-session  # "New session…" leaf in the quick-launch menu
-    selector: '[data-testid="launch-menu-new-session"]'
-    kind: interactive
-    optional: true       # only after opening the launch menu
-  - id: tabs-more
-    selector: '[data-testid="tab-more"]'
-    kind: interactive
-  - id: tab-overview-trigger
-    selector: '[data-testid="tab-overview-trigger"]'
-    kind: interactive
-  - id: tab-overview
-    selector: '[data-testid="tab-overview"]'
-    kind: display
-  - id: tab-overview-card
-    selector: '[data-testid="tab-overview-card"]'
-    kind: interactive
-  - id: tab-overview-summary
-    selector: '[data-testid="tab-overview-summary"]'
-    kind: display
-  - id: tab-overview-close
-    selector: '[data-testid="tab-overview-close"]'
-    kind: interactive
-  - id: tab-overview-current
-    selector: '[data-testid="tab-overview-current"]'
-    kind: interactive
-  - id: tab-overview-all
-    selector: '[data-testid="tab-overview-all"]'
-    kind: interactive
-  - id: tab-overview-empty
-    selector: '[data-testid="tab-overview-empty"]'
-    kind: display
-  - id: tab-details-overlay
-    selector: '[data-testid="tab-details-overlay"]'
-    kind: display
-    optional: true
-  - id: tab-details-card
-    selector: '[data-testid^="tab-details-card-"]'
-    kind: display
-    optional: true
-  - id: tab-details-program
-    selector: '[data-testid^="tab-details-program-"]'
-    kind: display
-    optional: true
-  - id: open-tabs-menu
-    selector: '[data-testid="open-tabs-menu"]'
-    kind: display
-    optional: true
-  - id: open-tabs-detach-active
-    selector: '[data-testid="open-tabs-detach-active"]'
-    kind: interactive
-    optional: true
-  - id: tab-menu-move-first
-    selector: '[data-testid="context-menu-item-move-to-first"]'
-    kind: interactive
-    optional: true       # only visible in a tab context menu
-  - id: tab-menu-move-left
-    selector: '[data-testid="context-menu-item-move-left"]'
-    kind: interactive
-    optional: true
-  - id: tab-menu-move-right
-    selector: '[data-testid="context-menu-item-move-right"]'
-    kind: interactive
-    optional: true
-  - id: tab-menu-move-last
-    selector: '[data-testid="context-menu-item-move-to-last"]'
-    kind: interactive
-    optional: true
-  - id: tab-new-output-dot
-    selector: 'span[aria-label="New output"]'
-    kind: display
-    optional: true
-  - id: context-menu-item-tools
-    selector: '[data-testid="context-menu-item-tools"]'
-    kind: interactive
-    optional: true
-  - id: context-menu-item-tunneling
-    selector: '[data-testid="context-menu-item-tunneling"]'
-    kind: interactive
-    optional: true
-  - id: tab-details-hover
-    selector: '[data-testid="tab-details-hover"]'
-    kind: display
-    optional: true # removed UI; only negative regression assertions remain
-  - id: ai-chat-drawer-ribbon
-    selector: '[data-testid="ai-chat-drawer-ribbon"]'
-    kind: display
-    optional: true # removed UI; only negative regression assertions remain
+- id: tab-bar
+  selector: '[data-testid="tab-bar"]'
+  kind: display
+- id: tab-item                 # individual tab; pair with [data-tab-type=...] / [data-tab-title=...] when targeting
+  selector: '[data-testid="tab-item"]'
+  kind: interactive
+- id: tab-title                # the title span inside a tab; double-click to rename
+  selector: '[data-testid="tab-title"]'
+  kind: interactive
+- id: tab-title-input          # inline rename input; only present while editing
+  selector: '[data-testid="tab-title-input"]'
+  kind: interactive
+  optional: true
+- id: new-local-terminal       # the "+" plus tab button
+  selector: '[data-testid="new-local-terminal"]'
+  kind: interactive
+- id: new-tab-split            # the "+ ▾" split-button container (Windows Terminal style)
+  selector: '[data-testid="new-tab-split"]'
+  kind: display
+- id: new-tab-launch-menu      # the "▾" chevron that opens the quick-launch context menu
+  selector: '[data-testid="new-tab-launch-menu"]'
+  kind: interactive
+- id: launch-menu-new-session    # "New session…" leaf in the quick-launch menu
+  selector: '[data-testid="launch-menu-new-session"]'
+  kind: interactive
+  optional: true         # only after opening the launch menu
+- id: tabs-more
+  selector: '[data-testid="tab-more"]'
+  kind: interactive
+- id: tab-overview-trigger
+  selector: '[data-testid="tab-overview-trigger"]'
+  kind: interactive
+- id: tab-overview
+  selector: '[data-testid="tab-overview"]'
+  kind: display
+- id: tab-overview-card
+  selector: '[data-testid="tab-overview-card"]'
+  kind: interactive
+- id: tab-overview-summary
+  selector: '[data-testid="tab-overview-summary"]'
+  kind: display
+- id: tab-overview-close
+  selector: '[data-testid="tab-overview-close"]'
+  kind: interactive
+- id: tab-overview-current
+  selector: '[data-testid="tab-overview-current"]'
+  kind: interactive
+- id: tab-overview-all
+  selector: '[data-testid="tab-overview-all"]'
+  kind: interactive
+- id: tab-overview-empty
+  selector: '[data-testid="tab-overview-empty"]'
+  kind: display
+- id: tab-details-overlay
+  selector: '[data-testid="tab-details-overlay"]'
+  kind: display
+  optional: true
+- id: tab-details-card
+  selector: '[data-testid^="tab-details-card-"]'
+  kind: display
+  optional: true
+- id: tab-details-program
+  selector: '[data-testid^="tab-details-program-"]'
+  kind: display
+  optional: true
+- id: open-tabs-menu
+  selector: '[data-testid="open-tabs-menu"]'
+  kind: display
+  optional: true
+- id: tab-menu-move-first
+  selector: '[data-testid="context-menu-item-move-to-first"]'
+  kind: interactive
+  optional: true         # only visible in a tab context menu
+- id: tab-menu-move-left
+  selector: '[data-testid="context-menu-item-move-left"]'
+  kind: interactive
+  optional: true
+- id: tab-menu-move-right
+  selector: '[data-testid="context-menu-item-move-right"]'
+  kind: interactive
+  optional: true
+- id: tab-menu-move-last
+  selector: '[data-testid="context-menu-item-move-to-last"]'
+  kind: interactive
+  optional: true
+- id: tab-new-output-dot
+  selector: 'span[aria-label="New output"]'
+  kind: display
+  optional: true
+- id: context-menu-item-tools
+  selector: '[data-testid="context-menu-item-tools"]'
+  kind: interactive
+  optional: true
+- id: context-menu-item-tunneling
+  selector: '[data-testid="context-menu-item-tunneling"]'
+  kind: interactive
+  optional: true
+- id: tab-details-hover
+  selector: '[data-testid="tab-details-hover"]'
+  kind: display
+  optional: true   # removed UI; only negative regression assertions remain
+- id: ai-chat-drawer-ribbon
+  selector: '[data-testid="ai-chat-drawer-ribbon"]'
+  kind: display
+  optional: true   # removed UI; only negative regression assertions remain
+- id: titlebar-actions-menu
+  selector: '[data-testid="titlebar-actions-menu"]'
+  kind: display
+- id: toolbar-close-all-terminals
+  selector: '[data-testid="toolbar-close-all-terminals"]'
+  kind: interactive
+- id: open-tabs-detach-active
+  selector: '[data-testid="open-tabs-detach-active"]'
+  kind: interactive
+  optional: true
 -->
 
 - 多标签：本地终端 / SSH 终端 / SFTP / VNC / 设置 / 隧道管理 / Welcome / 占位标签
@@ -3760,7 +3770,7 @@ controls:
 
 - `AiMasterSwitch`：一键关闭所有 AI 入口（Drawer 按钮、PTT、命令重写等），内存占用与网络调用全部归零
 - `PrivacyToggle`：保持 AI 启用，但强制把请求路由到 loopback / 本地 provider
-- 状态由 `aiStore.config.fully_disabled` 持久化；勾选后标题栏 `ptt-button` 与 Chat Tao ribbon / drawer 入口立即从 DOM 中移除
+- 状态由 `aiStore.config.fully_disabled` 持久化；勾选后Chat 听写与共享 Chat 入口立即从 DOM 中移除
 
 ### 14.2 终端补全与命令重写 ✅
 
@@ -3803,178 +3813,180 @@ controls:
 id: F-AI-2.3
 status: done
 area: ai/voice
-components: [PttButton, DictationButton, VoiceSettingsDialog, AsrPanel, TitleBarTrayControls]
+components:
+- DictationButton
+- VoiceSettingsDialog
+- AsrPanel
 files:
-  - src/components/window/PttButton.tsx
-  - src/components/voice/
-  - src/components/settings/AsrPanel.tsx
-  - src-tauri/src/voice/
-  - src-tauri/src/asr/
+- src/components/voice/
+- src/components/settings/AsrPanel.tsx
+- src-tauri/src/voice/
+- src-tauri/src/asr/
 controls:
-  - id: ptt-button
-    selector: '[data-testid="ptt-button"]'
-    kind: interactive
-    optional: true
-  - id: chat-voice-button
-    selector: '[data-testid="chat-voice-button"]'
-    kind: interactive
-  - id: chat-voice-cancel
-    selector: '[data-testid="chat-voice-button-cancel"]'
-    kind: interactive
-  - id: voice-settings-close
-    selector: '[data-testid="voice-settings-close"]'
-    kind: interactive
-  - id: voice-settings-dialog
-    selector: '[data-testid="voice-settings-dialog"]'
-    kind: display
-  - id: asr-installation-progress
-    selector: '[data-testid="asr-installation-progress"]'
-    kind: display
-  - id: asr-cancel-download
-    selector: '[data-testid="asr-cancel-download"]'
-    kind: interactive
-  - id: asr-download-url-base
-    selector: '[data-testid="asr-download-url-whisper-base"]'
-    kind: interactive
-  - id: asr-copy-url-base
-    selector: '[data-testid="asr-copy-url-whisper-base"]'
-    kind: interactive
-  - id: asr-open-url-base
-    selector: '[data-testid="asr-open-url-whisper-base"]'
-    kind: interactive
-  - id: asr-download-proxy-mode
-    selector: '[data-testid="asr-download-proxy-mode"]'
-    kind: interactive
-  - id: asr-download-proxy-save
-    selector: '[data-testid="asr-download-proxy-save"]'
-    kind: interactive
-  - id: asr-check-models
-    selector: '[data-testid="asr-check-models"]'
-    kind: interactive
-  - id: asr-language
-    selector: '[data-testid="asr-language"]'
-    kind: interactive
-  - id: asr-realtime-provider
-    selector: '[data-testid="asr-realtime-provider"]'
-    kind: interactive
-  - id: asr-sherpa-installation-progress
-    selector: '[data-testid="asr-sherpa-installation-progress"]'
-    kind: display
-  - id: asr-cancel-sherpa-download
-    selector: '[data-testid="asr-cancel-sherpa-download"]'
-    kind: interactive
-  - id: asr-download-sherpa
-    selector: '[data-testid="asr-download-sherpa-zipformer-zh-en"]'
-    kind: interactive
-  - id: asr-select-sherpa
-    selector: '[data-testid="asr-select-sherpa-zipformer-zh-en"]'
-    kind: interactive
-  - id: asr-copy-url-sherpa
-    selector: '[data-testid="asr-copy-url-sherpa-zipformer-zh-en"]'
-    kind: interactive
-  - id: asr-open-url-sherpa
-    selector: '[data-testid="asr-open-url-sherpa-zipformer-zh-en"]'
-    kind: interactive
-  - id: asr-download-url-sherpa
-    selector: '[data-testid="asr-download-url-sherpa-zipformer-zh-en"]'
-    kind: interactive
-  - id: asr-download-base
-    selector: '[data-testid="asr-download-whisper-base"]'
-    kind: interactive
-  - id: asr-download-small
-    selector: '[data-testid="asr-download-whisper-small"]'
-    kind: interactive
-  - id: asr-select-base
-    selector: '[data-testid="asr-select-whisper-base"]'
-    kind: interactive
-  - id: asr-select-small
-    selector: '[data-testid="asr-select-whisper-small"]'
-    kind: interactive
-  - id: asr-settings
-    selector: '[data-testid="asr-settings"]'
-    kind: display
-  - id: asr-download-proxy
-    selector: '[data-testid="asr-download-proxy"]'
-    kind: display
-  - id: asr-proxy-port
-    selector: '[data-testid="asr-download-proxy"] input[placeholder="Port"]'
-    kind: interactive
-  - id: asr-proxy-host
-    selector: '[data-testid="asr-download-proxy"] input[placeholder="Proxy host"]'
-    kind: interactive
-  - id: asr-provider-model
-    selector: '[data-testid="asr-realtime-settings"] label:has-text("Model") input'
-    kind: interactive
-  - id: asr-provider-key
-    selector: '[data-testid="asr-realtime-settings"] input[type="password"]'
-    kind: interactive
-  - id: asr-provider-proxy
-    selector: '[data-testid="asr-realtime-settings"] label:has-text("Proxy") select'
-    kind: interactive
-  - id: asr-provider-proxy-url
-    selector: '[data-testid="asr-realtime-settings"] label:has-text("Proxy URL") input'
-    kind: interactive
-  - id: asr-provider-save
-    selector: '[data-testid="asr-realtime-settings"] button:has-text("Save provider")'
-    kind: interactive
-  - id: voice-composer-draft
-    selector: '[data-testid="chat-composer-textarea"]'
-    kind: display
-  - id: voice-composer-original
-    selector: '[data-testid="composer-voice-original"]'
-    kind: display
-  - id: voice-composer-original-open
-    selector: '[data-testid="composer-voice-original"] summary'
-    kind: interactive
-  - id: voice-composer-original-undo
-    selector: '[data-testid="composer-voice-original"] button'
-    kind: interactive
-  - id: asr-download-recommended
-    selector: '[data-testid="asr-download-recommended"]'
-    kind: interactive
-  - id: asr-replace-whisper-small
-    selector: '[data-testid="asr-replace-whisper-small"]'
-    kind: interactive
-  - id: asr-hotwords
-    selector: '[data-testid="asr-hotwords"]'
-    kind: interactive
-  - id: asr-hotwords-save
-    selector: '[data-testid="asr-hotwords-save"]'
-    kind: interactive
-  - id: asr-experimental
-    selector: '[data-testid="asr-experimental"]'
-    kind: interactive
-  - id: asr-cleanup
-    selector: '[data-testid="asr-cleanup"]'
-    kind: interactive
-  - id: asr-provider-endpoint
-    selector: '[data-testid="asr-provider-endpoint"]'
-    kind: interactive
-  - id: asr-model-sensevoice-small
-    selector: '[data-testid="asr-model-sensevoice-small"]'
-    kind: display
-  - id: asr-model-sherpa-zipformer-zh-en
-    selector: '[data-testid="asr-model-sherpa-zipformer-zh-en"]'
-    kind: display
-  - id: asr-model-whisper-base
-    selector: '[data-testid="asr-model-whisper-base"]'
-    kind: display
-  - id: asr-model-whisper-small
-    selector: '[data-testid="asr-model-whisper-small"]'
-    kind: display
-  - id: asr-model-whisper-small-q8
-    selector: '[data-testid="asr-model-whisper-small-q8"]'
-    kind: display
-  - id: ptt-button-interim
-    selector: '[data-testid="ptt-button-interim"]'
-    kind: display
-  - id: asr-gemini-option
-    selector: '[data-testid="asr-realtime-provider"] option[value="gemini"]'
-    kind: display
+- id: chat-voice-button
+  selector: '[data-testid="chat-voice-button"]'
+  kind: interactive
+- id: chat-voice-cancel
+  selector: '[data-testid="chat-voice-button-cancel"]'
+  kind: interactive
+- id: voice-settings-close
+  selector: '[data-testid="voice-settings-close"]'
+  kind: interactive
+- id: voice-settings-dialog
+  selector: '[data-testid="voice-settings-dialog"]'
+  kind: display
+- id: asr-installation-progress
+  selector: '[data-testid="asr-installation-progress"]'
+  kind: display
+- id: asr-cancel-download
+  selector: '[data-testid="asr-cancel-download"]'
+  kind: interactive
+- id: asr-download-url-base
+  selector: '[data-testid="asr-download-url-whisper-base"]'
+  kind: interactive
+- id: asr-copy-url-base
+  selector: '[data-testid="asr-copy-url-whisper-base"]'
+  kind: interactive
+- id: asr-open-url-base
+  selector: '[data-testid="asr-open-url-whisper-base"]'
+  kind: interactive
+- id: asr-download-proxy-mode
+  selector: '[data-testid="asr-download-proxy-mode"]'
+  kind: interactive
+- id: asr-download-proxy-save
+  selector: '[data-testid="asr-download-proxy-save"]'
+  kind: interactive
+- id: asr-check-models
+  selector: '[data-testid="asr-check-models"]'
+  kind: interactive
+- id: asr-language
+  selector: '[data-testid="asr-language"]'
+  kind: interactive
+- id: asr-realtime-provider
+  selector: '[data-testid="asr-realtime-provider"]'
+  kind: interactive
+- id: asr-sherpa-installation-progress
+  selector: '[data-testid="asr-sherpa-installation-progress"]'
+  kind: display
+- id: asr-cancel-sherpa-download
+  selector: '[data-testid="asr-cancel-sherpa-download"]'
+  kind: interactive
+- id: asr-download-sherpa
+  selector: '[data-testid="asr-download-sherpa-zipformer-zh-en"]'
+  kind: interactive
+- id: asr-select-sherpa
+  selector: '[data-testid="asr-select-sherpa-zipformer-zh-en"]'
+  kind: interactive
+- id: asr-copy-url-sherpa
+  selector: '[data-testid="asr-copy-url-sherpa-zipformer-zh-en"]'
+  kind: interactive
+- id: asr-open-url-sherpa
+  selector: '[data-testid="asr-open-url-sherpa-zipformer-zh-en"]'
+  kind: interactive
+- id: asr-download-url-sherpa
+  selector: '[data-testid="asr-download-url-sherpa-zipformer-zh-en"]'
+  kind: interactive
+- id: asr-download-base
+  selector: '[data-testid="asr-download-whisper-base"]'
+  kind: interactive
+- id: asr-download-small
+  selector: '[data-testid="asr-download-whisper-small"]'
+  kind: interactive
+- id: asr-select-base
+  selector: '[data-testid="asr-select-whisper-base"]'
+  kind: interactive
+- id: asr-select-small
+  selector: '[data-testid="asr-select-whisper-small"]'
+  kind: interactive
+- id: asr-settings
+  selector: '[data-testid="asr-settings"]'
+  kind: display
+- id: asr-download-proxy
+  selector: '[data-testid="asr-download-proxy"]'
+  kind: display
+- id: asr-proxy-port
+  selector: '[data-testid="asr-download-proxy"] input[placeholder="Port"]'
+  kind: interactive
+- id: asr-proxy-host
+  selector: '[data-testid="asr-download-proxy"] input[placeholder="Proxy host"]'
+  kind: interactive
+- id: asr-provider-model
+  selector: '[data-testid="asr-realtime-settings"] label:has-text("Model") input'
+  kind: interactive
+- id: asr-provider-key
+  selector: '[data-testid="asr-realtime-settings"] input[type="password"]'
+  kind: interactive
+- id: asr-provider-proxy
+  selector: '[data-testid="asr-realtime-settings"] label:has-text("Proxy") select'
+  kind: interactive
+- id: asr-provider-proxy-url
+  selector: '[data-testid="asr-realtime-settings"] label:has-text("Proxy URL") input'
+  kind: interactive
+- id: asr-provider-save
+  selector: '[data-testid="asr-realtime-settings"] button:has-text("Save provider")'
+  kind: interactive
+- id: voice-composer-draft
+  selector: '[data-testid="chat-composer-textarea"]'
+  kind: display
+- id: voice-composer-original
+  selector: '[data-testid="chat-voice-button-original"]'
+  kind: display
+- id: voice-composer-original-open
+  selector: '[data-testid="chat-voice-button-original"] summary'
+  kind: interactive
+- id: voice-composer-original-undo
+  selector: '[data-testid="chat-voice-button-original"] button'
+  kind: interactive
+- id: asr-download-recommended
+  selector: '[data-testid="asr-download-recommended"]'
+  kind: interactive
+- id: asr-replace-whisper-small
+  selector: '[data-testid="asr-replace-whisper-small"]'
+  kind: interactive
+- id: asr-hotwords
+  selector: '[data-testid="asr-hotwords"]'
+  kind: interactive
+- id: asr-hotwords-save
+  selector: '[data-testid="asr-hotwords-save"]'
+  kind: interactive
+- id: asr-experimental
+  selector: '[data-testid="asr-experimental"]'
+  kind: interactive
+- id: asr-cleanup
+  selector: '[data-testid="asr-cleanup"]'
+  kind: interactive
+- id: asr-provider-endpoint
+  selector: '[data-testid="asr-provider-endpoint"]'
+  kind: interactive
+- id: asr-model-sensevoice-small
+  selector: '[data-testid="asr-model-sensevoice-small"]'
+  kind: display
+- id: asr-model-sherpa-zipformer-zh-en
+  selector: '[data-testid="asr-model-sherpa-zipformer-zh-en"]'
+  kind: display
+- id: asr-model-whisper-base
+  selector: '[data-testid="asr-model-whisper-base"]'
+  kind: display
+- id: asr-model-whisper-small
+  selector: '[data-testid="asr-model-whisper-small"]'
+  kind: display
+- id: asr-model-whisper-small-q8
+  selector: '[data-testid="asr-model-whisper-small-q8"]'
+  kind: display
+- id: chat-voice-button-interim
+  selector: '[data-testid="chat-voice-button-interim"]'
+  kind: display
+- id: asr-gemini-option
+  selector: '[data-testid="asr-realtime-provider"] option[value="gemini"]'
+  kind: display
+- id: retired-titlebar-voice
+  selector: '[data-testid="ptt-button"]'
+  kind: display
+  optional: true
 -->
 
 - 单击开始，再次单击停止识别；Esc、取消、切换上下文或窗口失焦会取消。最长 120 秒。
-- 模型设置提供完整下载地址、复制与浏览器打开；后端进度支持关闭重开恢复，取消保留断点，再次下载按 Range 续传。宽窄窗口自适应，标题栏入口卸载不关闭设置。
+- 模型设置提供完整下载地址、复制与浏览器打开；后端进度支持关闭重开恢复，取消保留断点，再次下载按 Range 续传。宽窄窗口自适应，Chat 入口卸载不关闭设置；标题栏不再提供语音入口。
 - 默认本地 SenseVoice + Small q8 组合，按语种路由；Turbo q5 可选。旧 f16 显式一键替换，校验成功后删除旧权重。模型按需下载或离线导入，版本目录按哈希隔离。
 - 在线阿里／火山／Deepgram／Soniox，共享代理和 vault；Gemini 默认隐藏为实验项。清理默认关，可选轻／全并保留原文和撤销。
 - 标题栏和 Chat、LAN 聊天、终端 AI 改写说明共用听写组件，只填入可编辑文本，不自动发送或执行。
@@ -12372,6 +12384,7 @@ components:
 - MfaFloatingWindow
 - AgentsPlatformView
 - GlobalCommandModal
+- WorkspaceTabsFilter
 files:
 - src/components/tabbar/ControlBar.tsx
 - src/components/sidebar/PrimaryNavigationRail.tsx
@@ -12396,6 +12409,8 @@ files:
 - src/components/editor/workspace/FileTreePane.tsx
 - src/components/editor/workspace/hooks/useWorkspaceHostFiles.ts
 - src/lib/ipc/files.ts
+- src/components/workspace/WorkspaceTabsFilter.tsx
+- src/lib/workspaceTabFilter.ts
 controls:
 - id: code-workspace-tree-view-all-files
   selector: '[data-testid="code-workspace-tree-view-all-files"]'
@@ -12874,6 +12889,54 @@ controls:
 - id: code-workspace-tree-sort-folders-first
   selector: '[data-testid="code-workspace-tree-sort-folders-first"]'
   kind: interactive
+- id: workspace-tabs-filter-trigger
+  selector: '[data-testid="workspace-tabs-filter-trigger"]'
+  kind: interactive
+- id: workspace-tabs-filter-menu
+  selector: '[data-testid="workspace-tabs-filter-menu"]'
+  kind: display
+- id: workspace-tabs-filter-search
+  selector: '[data-testid="workspace-tabs-filter-search"]'
+  kind: interactive
+- id: workspace-tabs-filter-clear
+  selector: '[data-testid="workspace-tabs-filter-clear"]'
+  kind: interactive
+- id: workspace-tabs-filter-row
+  selector: '[data-testid="workspace-tabs-filter-row"]'
+  kind: interactive
+- id: workspace-tabs-filter-empty
+  selector: '[data-testid="workspace-tabs-filter-empty"]'
+  kind: display
+- id: workspace-tab-filter-chip
+  selector: '[data-testid="workspace-tab-filter-chip"]'
+  kind: interactive
+- id: workspace-tab-filter-all
+  selector: '[data-testid="workspace-tab-filter-all"]'
+  kind: interactive
+- id: workspace-tab-filter-files
+  selector: '[data-testid="workspace-tab-filter-files"]'
+  kind: interactive
+- id: workspace-tab-filter-ssh
+  selector: '[data-testid="workspace-tab-filter-ssh"]'
+  kind: interactive
+- id: workspace-tab-filter-database
+  selector: '[data-testid="workspace-tab-filter-database"]'
+  kind: interactive
+- id: workspace-tab-filter-sftp
+  selector: '[data-testid="workspace-tab-filter-sftp"]'
+  kind: interactive
+- id: workspace-tab-filter-remote
+  selector: '[data-testid="workspace-tab-filter-remote"]'
+  kind: interactive
+- id: workspace-tab-filter-local
+  selector: '[data-testid="workspace-tab-filter-local"]'
+  kind: interactive
+- id: workspace-tab-filter-other
+  selector: '[data-testid="workspace-tab-filter-other"]'
+  kind: interactive
+- id: workspace-tab-categories
+  selector: '[data-testid="workspace-tab-categories"]'
+  kind: display
 -->
 
 Workspaces 模式左栏提供工作区切换器（默认工作区不可删除）、多根文件树（新建文件/目录、添加/移除根目录）、工作区标签条与打开任意会话入口；画布内含编辑器、Git 面板与隔离会话。

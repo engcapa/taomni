@@ -1,7 +1,7 @@
 id: TC-auto-F1-5-tab-details-overlay
 title: Tab hover details, large Sessions overview and active detach menu
-description: 'Per-tab hover and Ctrl+Shift+H keep compact details. Ctrl+Shift+E and the toolbar open the large live overview; clicking a card activates that session. No Welcome or toolbar
-  hover-preview button remains.'
+description: 'Per-tab hover and Ctrl+Shift+H keep compact details. Ctrl+Shift+E and the toolbar open the large live overview; clicking a card activates that session. No Welcome
+  or toolbar hover-preview button remains.'
 covers:
 - F1.5
 tags:
@@ -58,11 +58,11 @@ steps:
     selector: '[data-testid="tab-item"] >> nth=0'
     name: data-active
     equals: 'true'
-- click: '[data-testid="tab-more"]'
-- wait_for: '[data-testid="open-tabs-menu"]'
-- assert_visible: '[data-testid="open-tabs-detach-active"]'
+- click: '[data-testid="titlebar-actions-more"]'
+- wait_for: '[data-testid="titlebar-actions-menu"]'
+- assert_visible: '[data-testid="terminal-detach"]'
 - screenshot: f1-5-tab-details-overlay.png
-- click: '[data-testid="open-tabs-detach-active"]'
+- click: '[data-testid="terminal-detach"]'
 - assert_count:
     selector: '[data-testid="tab-item"]'
     equal: 1
@@ -116,9 +116,9 @@ verification:
     - step: 26
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"] >> nth=0", "name": "data-active", "equals": "true"}}'
     - step: 28
-      expectation: '{"wait_for": "[data-testid=\"open-tabs-menu\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"titlebar-actions-menu\"]"}'
     - step: 29
-      expectation: '{"assert_visible": "[data-testid=\"open-tabs-detach-active\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"terminal-detach\"]"}'
     - step: 32
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 1}}'
     results:

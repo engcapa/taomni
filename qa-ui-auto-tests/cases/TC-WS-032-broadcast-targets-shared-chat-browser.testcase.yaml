@@ -1,7 +1,7 @@
 id: TC-WS-032
 title: Sessions broadcast subset, filtered target picker and shared Chat entry (browser)
-description: Selects individual sessions through inline checkboxes and the searchable broadcast picker while protocol filters hide their tabs. Keeps active tab,
-  selection and live instances; the shared bottom Chat button reopens the current session thread.
+description: Selects individual sessions through inline checkboxes and the searchable broadcast picker while protocol filters hide their tabs. Keeps active tab, selection
+  and live instances; the shared bottom Chat button reopens the current session thread.
 modes:
 - browser
 covers:
@@ -42,6 +42,7 @@ steps:
     selector: '[data-testid="tab-title-input"]'
     value: QA Broadcast Gamma
 - press: Enter
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="tab-multiexec-toggle"]'
 - wait_for: '[data-testid="multiexec-bar"]'
 - assert_count:
@@ -110,12 +111,19 @@ steps:
 - click: '[data-testid="rail-chat-button"]'
 - wait_for: '[data-testid="ai-chat-drawer"]'
 - screenshot: workspace-broadcast-targets-32.png
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="toolbar-close-all-terminals"]'
+- assert_count:
+    selector: '[data-testid="tab-item"]'
+    equal: 0
+- assert_visible: '[data-testid="sessions-empty-state"]'
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Broadcast checkboxes remain reachable in the tab body. The target picker searches all live terminals including filtered tabs, selects a subset
-      without switching focus, and Escape dismisses only the picker. The bottom Chat control preserves session chat access without duplicate toolbar/rail controls.
+    requirement: Broadcast checkboxes remain reachable in the tab body. The target picker searches all live terminals including filtered tabs, selects a subset without
+      switching focus, and Escape dismisses only the picker. The bottom Chat control preserves session chat access without duplicate toolbar/rail controls.
     actions:
     - 1
     - 2
@@ -133,22 +141,26 @@ verification:
     - 17
     - 18
     - 19
-    - 22
-    - 25
-    - 27
+    - 20
+    - 23
+    - 26
     - 28
     - 29
-    - 31
+    - 30
     - 32
-    - 34
-    - 36
+    - 33
+    - 35
     - 37
     - 38
-    - 40
-    - 43
-    - 47
-    - 49
-    - 51
+    - 39
+    - 41
+    - 44
+    - 48
+    - 50
+    - 52
+    - 55
+    - 56
+    - 57
     checkpoints:
     - step: 5
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
@@ -156,63 +168,69 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
     - step: 15
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
-    - step: 20
-      expectation: '{"wait_for": "[data-testid=\"multiexec-bar\"]"}'
     - step: 21
+      expectation: '{"wait_for": "[data-testid=\"multiexec-bar\"]"}'
+    - step: 22
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-multiexec-checkbox\"]", "equal": 3}}'
-    - step: 23
-      expectation: '{"assert_text": {"selector": "[data-testid=\"multiexec-targets\"]", "contains": "1 / 3"}}'
     - step: 24
+      expectation: '{"assert_text": {"selector": "[data-testid=\"multiexec-targets\"]", "contains": "1 / 3"}}'
+    - step: 25
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "QA Broadcast Gamma"}}'
-    - step: 26
+    - step: 27
       expectation: '{"assert_text": {"selector": "[data-testid=\"multiexec-targets\"]", "contains": "0 / 3"}}'
-    - step: 30
+    - step: 31
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 0}}'
-    - step: 33
+    - step: 34
       expectation: '{"assert_visible": "[data-testid=\"multiexec-target-empty\"]"}'
-    - step: 35
+    - step: 36
       expectation: '{"assert_count": {"selector": "[data-testid=\"multiexec-target-checkbox\"]", "equal": 1}}'
-    - step: 39
+    - step: 40
       expectation: '{"assert_text": {"selector": "[data-testid=\"multiexec-targets\"]", "contains": "2 / 3"}}'
-    - step: 41
-      expectation: '{"assert_not_visible": "[data-testid=\"multiexec-target-menu\"]"}'
     - step: 42
+      expectation: '{"assert_not_visible": "[data-testid=\"multiexec-target-menu\"]"}'
+    - step: 43
       expectation: '{"assert_visible": "[data-testid=\"multiexec-bar\"]"}'
-    - step: 44
-      expectation: '{"assert_items": {"selector": "[data-testid=\"tab-item\"][data-multiexec-selected=\"true\"]", "attribute": "data-tab-title", "equals": ["QA
-        Broadcast Alpha", "QA Broadcast Gamma"]}}'
     - step: 45
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "QA Broadcast Gamma"}}'
+      expectation: '{"assert_items": {"selector": "[data-testid=\"tab-item\"][data-multiexec-selected=\"true\"]", "attribute": "data-tab-title", "equals": ["QA Broadcast Alpha",
+        "QA Broadcast Gamma"]}}'
     - step: 46
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "QA Broadcast Gamma"}}'
+    - step: 47
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"tab-chat-toggle\"]'') === null", "expect_truthy":
         true}}'
-    - step: 48
+    - step: 49
       expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
-    - step: 50
+    - step: 51
       expectation: '{"assert_not_visible": "[data-testid=\"ai-chat-drawer\"]"}'
-    - step: 52
+    - step: 53
       expectation: '{"wait_for": "[data-testid=\"ai-chat-drawer\"]"}'
+    - step: 58
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"]", "equal": 0}}'
+    - step: 59
+      expectation: '{"assert_visible": "[data-testid=\"sessions-empty-state\"]"}'
     results:
     - 5
     - 10
     - 15
-    - 20
     - 21
-    - 23
+    - 22
     - 24
-    - 26
-    - 30
-    - 33
-    - 35
-    - 39
-    - 41
+    - 25
+    - 27
+    - 31
+    - 34
+    - 36
+    - 40
     - 42
-    - 44
+    - 43
     - 45
     - 46
-    - 48
-    - 50
-    - 52
+    - 47
+    - 49
+    - 51
+    - 53
+    - 58
+    - 59
   visual:
   - check: Review readable target checkboxes and compact unified controls.
     method: manual

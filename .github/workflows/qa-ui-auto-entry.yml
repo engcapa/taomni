@@ -43,6 +43,9 @@ jobs:
       - uses: ./.github/actions/qa-runtime
         with:
           mode: ${{ matrix.mode }}
+      - name: Shared VNC fixture ownership contracts
+        if: matrix.mode == 'browser' && contains(matrix.capabilities, 'vnc') && inputs.operation == 'run'
+        run: python -m unittest -v test_browser_case
       - name: Updater unit contracts
         if: (contains(matrix.capabilities, 'updater')) && inputs.operation == 'run'
         run: pnpm test src/lib/updateService.test.ts src/stores/updateStore.test.ts src/components/UpdateDialog.test.tsx

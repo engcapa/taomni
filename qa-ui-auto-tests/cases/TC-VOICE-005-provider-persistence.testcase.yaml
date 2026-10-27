@@ -14,9 +14,10 @@ fixtures:
 timeout_sec: 75
 steps:
 - open: ${cfg.app.base_url}/?voiceFixture=1
-- click: '[data-testid="titlebar-actions-more"]'
-- wait_for: '[data-testid="ptt-button"]'
-- click: '[data-testid="ptt-button"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="chat-voice-button"]'
+- click: '[data-testid="chat-voice-button"]'
 - wait_for: '[data-testid="asr-settings"]'
 - select_option:
     selector: '[data-testid="asr-realtime-provider"]'
@@ -44,8 +45,7 @@ steps:
     key: taomni.ai.config.v1
     contains: socks5://127.0.0.1:1080
 - reload: {}
-- click: '[data-testid="titlebar-actions-more"]'
-- wait_for: '[data-testid="ptt-button"]'
+- wait_for: '[data-testid="ribbon-settings"]'
 - click: '[data-testid="ribbon-settings"]'
 - click: '[data-testid="settings-group-toggle-ai"]'
 - wait_for: '[data-testid="asr-settings"]'
@@ -80,27 +80,27 @@ verification:
   - id: R1
     requirement: Saving a configured provider keeps the selected model and feature proxy and replaces the test API key with a vault reference.
     actions:
-    - 6
     - 7
     - 8
     - 9
     - 10
     - 11
+    - 12
     checkpoints:
-    - step: 12
-      expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "vault:stub-asr_api_key:deepgram"}}'
     - step: 13
-      expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "nova-3-persistence-fixture"}}'
+      expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "vault:stub-asr_api_key:deepgram"}}'
     - step: 14
+      expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "nova-3-persistence-fixture"}}'
+    - step: 15
       expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "socks5://127.0.0.1:1080"}}'
     results:
-    - 12
     - 13
     - 14
+    - 15
   - id: R2
     requirement: Reloading settings and saving another preference retains the provider settings.
     actions:
-    - 15
+    - 16
     - 18
     - 19
     - 25
@@ -110,7 +110,8 @@ verification:
     - step: 22
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"asr-realtime-settings\"] label:has-text(\"Model\") input", "name": "value", "equals": "nova-3-persistence-fixture"}}'
     - step: 23
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"asr-realtime-settings\"] input[type=\"password\"]", "name": "placeholder", "equals": "Stored in credential vault"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"asr-realtime-settings\"] input[type=\"password\"]", "name": "placeholder", "equals": "Stored in credential
+        vault"}}'
     - step: 24
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"asr-realtime-settings\"] label:has-text(\"Proxy URL\") input", "name": "value", "equals": "socks5://127.0.0.1:1080"}}'
     - step: 26

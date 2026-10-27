@@ -7,9 +7,10 @@ fixtures: [reset_db]
 timeout_sec: 90
 steps:
 - open: '${cfg.app.base_url}/?voiceFixture=1'
-- click: '[data-testid="titlebar-actions-more"]'
-- wait_for: '[data-testid="ptt-button"]'
-- click: '[data-testid="ptt-button"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="chat-voice-button"]'
+- click: '[data-testid="chat-voice-button"]'
 - wait_for: '[data-testid="asr-download-proxy-mode"]'
 - select_option: {selector: '[data-testid="asr-download-proxy-mode"]', value: custom}
 - fill: {selector: '[data-testid="asr-download-proxy"] input[placeholder="Proxy host"]', value: '127.0.0.1'}
@@ -19,8 +20,7 @@ steps:
 - assert_localstorage: {key: taomni.ai.config.v1, contains: '"host":"127.0.0.1"'}
 - screenshot: custom-download-proxy.png
 - click: '[data-testid="voice-settings-close"]'
-- click: '[data-testid="titlebar-actions-more"]'
-- click: '[data-testid="ptt-button"]'
+- click: '[data-testid="chat-voice-button"]'
 - assert_attribute: {selector: '[data-testid="asr-download-proxy"] input[placeholder="Proxy host"]', name: value, equals: '127.0.0.1'}
 - select_option: {selector: '[data-testid="asr-download-proxy-mode"]', value: none}
 - click: '[data-testid="asr-download-proxy-save"]'
@@ -36,11 +36,11 @@ verification:
   - id: R1
     requirement: Custom proxy uses the shared Settings editor and persists across opening the voice setup; no-proxy and app modes save independently.
     actions:
-    - 6
     - 7
     - 8
-    - 10
-    - 13
+    - 9
+    - 11
+    - 14
     - 15
     - 17
     - 18
@@ -48,15 +48,15 @@ verification:
     - 21
     - 23
     checkpoints:
-    - {step: 9, expectation: '{"assert_text": {"selector": "[data-testid=\"asr-download-proxy\"]", "contains": "Save proxy changes before downloading."}}'}
-    - {step: 11, expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"host\":\"127.0.0.1\""}}'}
+    - {step: 10, expectation: '{"assert_text": {"selector": "[data-testid=\"asr-download-proxy\"]", "contains": "Save proxy changes before downloading."}}'}
+    - {step: 12, expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"host\":\"127.0.0.1\""}}'}
     - {step: 16, expectation: '{"assert_attribute": {"selector": "[data-testid=\"asr-download-proxy\"] input[placeholder=\"Proxy host\"]", "name": "value", "equals": "127.0.0.1"}}'}
     - {step: 19, expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"mode\":\"none\",\"custom\""}}'}
     - {step: 22, expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"mode\":\"app\",\"custom\""}}'}
     - {step: 24, expectation: '{"assert_text": {"selector": "[data-testid=\"asr-model-whisper-base\"]", "contains": "Downloaded"}}'}
     results:
-    - 9
-    - 11
+    - 10
+    - 12
     - 16
     - 19
     - 22
@@ -64,4 +64,5 @@ verification:
   visual:
   - {check: Shared proxy editor in voice modal, method: manual, reason: Inspect screenshot for clipping and scroll access.}
   native:
-  - {check: HTTP routing and direct environment bypass, method: external, reason: Rust local-server tests validate the real downloader client; browser download is a fixture.}
+  - {check: HTTP routing and direct environment bypass, method: external, reason: Rust local-server tests validate the real downloader client; browser download is a
+      fixture.}

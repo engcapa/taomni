@@ -132,6 +132,7 @@ steps:
     selector: '[data-testid="confirm-dialog"]'
     timeout_sec: 60
 - click: '[data-testid="confirm-dialog-confirm"]'
+- click: '[data-testid="titlebar-actions-more"]'
 - assert_text:
     selector: '[data-testid="rdp-status"]'
     contains: Connected
@@ -213,15 +214,16 @@ verification:
     - 40
     - 41
     - 43
-    - 45
+    - 44
     - 46
     - 47
     - 48
     - 49
     - 50
     - 51
-    - 53
-    - 57
+    - 52
+    - 54
+    - 58
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
@@ -247,19 +249,18 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
     - step: 42
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
-    - step: 44
+    - step: 45
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Connected", "timeout_sec": 60}}'
-    - step: 52
+    - step: 53
       expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 30}}'
-    - step: 54
-      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "this computer -> client: text (28 chars)", "timeout_sec":
-        15}}'
     - step: 55
+      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "this computer -> client: text (28 chars)", "timeout_sec": 15}}'
+    - step: 56
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"server-log\"]", "regex": "^(?!(?:[\\s\\S]*?this computer -> client: text \\(28 chars\\)){3})[\\s\\S]*?this
         computer -> client: text \\(28 chars\\)", "timeout_sec": 5}}'
-    - step: 56
+    - step: 57
       expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "disconnected after", "timeout_sec": 30}}'
-    - step: 58
+    - step: 59
       expectation: '{"wait_for": {"selector": "[data-testid=\"server-row-rdp\"][data-status=\"stopped\"]", "timeout_sec": 30}}'
     results:
     - 3
@@ -274,12 +275,12 @@ verification:
     - 37
     - 39
     - 42
-    - 44
-    - 52
-    - 54
+    - 45
+    - 53
     - 55
     - 56
-    - 58
+    - 57
+    - 59
   - id: R2
     requirement: A host copy reaches the shared clipboard once and does not bounce between client and server.
     actions:
@@ -314,15 +315,16 @@ verification:
     - 40
     - 41
     - 43
-    - 45
+    - 44
     - 46
     - 47
     - 48
     - 49
     - 50
     - 51
-    - 53
-    - 57
+    - 52
+    - 54
+    - 58
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
@@ -346,19 +348,18 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
     - step: 42
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
-    - step: 44
+    - step: 45
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Connected", "timeout_sec": 60}}'
-    - step: 52
+    - step: 53
       expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 30}}'
-    - step: 54
-      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "this computer -> client: text (28 chars)", "timeout_sec":
-        15}}'
     - step: 55
+      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "this computer -> client: text (28 chars)", "timeout_sec": 15}}'
+    - step: 56
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"server-log\"]", "regex": "^(?!(?:[\\s\\S]*?this computer -> client: text \\(28 chars\\)){3})[\\s\\S]*?this
         computer -> client: text \\(28 chars\\)", "timeout_sec": 5}}'
-    - step: 56
+    - step: 57
       expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "disconnected after", "timeout_sec": 30}}'
-    - step: 58
+    - step: 59
       expectation: '{"wait_for": {"selector": "[data-testid=\"server-row-rdp\"][data-status=\"stopped\"]", "timeout_sec": 30}}'
     results:
     - 3
@@ -372,12 +373,12 @@ verification:
     - 37
     - 39
     - 42
-    - 44
-    - 52
-    - 54
+    - 45
+    - 53
     - 55
     - 56
-    - 58
+    - 57
+    - 59
   - id: R3
     requirement: The server announced the copied text to the client a bounded number of times and noticed the client leave.
     actions:
@@ -412,15 +413,16 @@ verification:
     - 40
     - 41
     - 43
-    - 45
+    - 44
     - 46
     - 47
     - 48
     - 49
     - 50
     - 51
-    - 53
-    - 57
+    - 52
+    - 54
+    - 58
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
@@ -444,19 +446,18 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
     - step: 42
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
-    - step: 44
+    - step: 45
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Connected", "timeout_sec": 60}}'
-    - step: 52
+    - step: 53
       expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 30}}'
-    - step: 54
-      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "this computer -> client: text (28 chars)", "timeout_sec":
-        15}}'
     - step: 55
+      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "this computer -> client: text (28 chars)", "timeout_sec": 15}}'
+    - step: 56
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"server-log\"]", "regex": "^(?!(?:[\\s\\S]*?this computer -> client: text \\(28 chars\\)){3})[\\s\\S]*?this
         computer -> client: text \\(28 chars\\)", "timeout_sec": 5}}'
-    - step: 56
+    - step: 57
       expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "disconnected after", "timeout_sec": 30}}'
-    - step: 58
+    - step: 59
       expectation: '{"wait_for": {"selector": "[data-testid=\"server-row-rdp\"][data-status=\"stopped\"]", "timeout_sec": 30}}'
     results:
     - 3
@@ -470,12 +471,12 @@ verification:
     - 37
     - 39
     - 42
-    - 44
-    - 52
-    - 54
+    - 45
+    - 53
     - 55
     - 56
-    - 58
+    - 57
+    - 59
   native:
   - check: Real OS clipboard shared by the product RDP client and server in one QA build, observed with platform tools and the OS change counters.
     method: automated

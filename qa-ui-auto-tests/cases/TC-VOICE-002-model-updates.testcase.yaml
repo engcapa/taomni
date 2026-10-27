@@ -8,9 +8,9 @@ fixtures: [reset_db]
 timeout_sec: 75
 steps:
 - open: '${cfg.app.base_url}/?voiceFixture=1&voiceOldBase=1'
-- click: '[data-testid="titlebar-actions-more"]'
-- wait_for: '[data-testid="ptt-button"]'
-- click: '[data-testid="ptt-button"]'
+- click: '[data-testid="ribbon-settings"]'
+- click: '[data-testid="settings-group-toggle-ai"]'
+- wait_for: '[data-testid="asr-settings"]'
 - wait_for: '[data-testid="asr-settings"]'
 - assert_text: {selector: '[data-testid="asr-model-whisper-base"]', contains: 'Model data update available'}
 - assert_text: {selector: '[data-testid="asr-model-whisper-base"]', contains: 'fixture-v1'}

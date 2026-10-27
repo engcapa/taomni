@@ -713,6 +713,8 @@ const dict = {
     enterWorkspaces: "Enter workspace →",
     enterSessions: "Enter sessions →",
     returnToWorkspace: "Return to workspace",
+    filterWorkspaceTabs: "Filter workspace tabs",
+    canvasLayout: "View layout",
     singleView: "Single view",
     splitView: "Split right",
     gridView: "Grid view",
@@ -1041,6 +1043,7 @@ const dict = {
   tabs: {
     category: {
       all: "All",
+      files: "Files",
       ssh: "SSH",
       database: "DB",
       sftp: "SFTP",
@@ -1049,6 +1052,7 @@ const dict = {
       other: "Other",
     },
     categoryFilter: "Filter open tabs by connection type",
+    filterOpenTabs: "Filter open session tabs",
     openTabs: "Open session tabs",
     closeTab: "Close tab",
     closeOthers: "Close other tabs",

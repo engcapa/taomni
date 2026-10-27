@@ -29,6 +29,7 @@ steps:
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
     timeout_sec: 60
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for:
     selector: '[data-testid="sftp-browser"]'
@@ -85,26 +86,27 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Previously saved SCP sessions continue to exercise the original Real scp directory listing, upload, download and deletion workflow; new session configuration
-      offers only SFTP.
+    requirement: Previously saved SCP sessions continue to exercise the original Real scp directory listing, upload, download and deletion workflow; new session
+      configuration offers only SFTP.
     actions:
     - 1
     - 2
     - 6
     - 8
-    - 10
-    - 12
+    - 9
+    - 11
     - 13
-    - 15
-    - 17
+    - 14
+    - 16
     - 18
-    - 20
+    - 19
     - 21
-    - 24
+    - 22
     - 25
-    - 28
+    - 26
     - 29
-    - 31
+    - 30
+    - 32
     checkpoints:
     - step: 3
       expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
@@ -114,48 +116,48 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"startup-vault-check\"]", "state": "hidden", "timeout_sec": 45}}'
     - step: 7
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
-    - step: 9
+    - step: 10
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "timeout_sec": 45}}'
-    - step: 11
+    - step: 12
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.tagName === ''INPUT'' && document.activeElement?.getAttribute(''data-testid'') === ''sftp-remote-path''",
         "expect_truthy": true}}'
-    - step: 14
+    - step: 15
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "scp-source.txt", "timeout_sec": 45}}'
-    - step: 16
+    - step: 17
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.tagName === ''INPUT'' && document.activeElement?.getAttribute(''data-testid'') === ''sftp-local-path''",
         "expect_truthy": true}}'
-    - step: 19
+    - step: 20
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "scp-upload.txt", "timeout_sec": 45}}'
-    - step: 22
-      expectation: '{"assert_file_sha256": {"path": "${cfg.ssh_features.downloaded}", "equals": "054e942b10569af4c2006f997e3e2c40a9a14fc1464329401bf1e44f7560c4d7",
-        "timeout_sec": 45}}'
     - step: 23
+      expectation: '{"assert_file_sha256": {"path": "${cfg.ssh_features.downloaded}", "equals": "054e942b10569af4c2006f997e3e2c40a9a14fc1464329401bf1e44f7560c4d7", "timeout_sec":
+        45}}'
+    - step: 24
       expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"done\"][data-resume-bytes=\"7\"][data-transfer-restarted=\"false\"]"}'
-    - step: 26
-      expectation: '{"assert_file_sha256": {"path": "${cfg.ssh_features.uploaded}", "equals": "7ebc6ab39279cf17a71009ebaba8d2c5fe8ac9beca8eeb3167662b8e47db956a",
-        "timeout_sec": 45}}'
     - step: 27
+      expectation: '{"assert_file_sha256": {"path": "${cfg.ssh_features.uploaded}", "equals": "7ebc6ab39279cf17a71009ebaba8d2c5fe8ac9beca8eeb3167662b8e47db956a", "timeout_sec":
+        45}}'
+    - step: 28
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "scp-upload.txt", "timeout_sec": 45}}'
-    - step: 30
+    - step: 31
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 45}}'
-    - step: 32
+    - step: 33
       expectation: '{"assert_not_visible": "[data-testid=\"sftp-remote-list\"] tr[title$=\"/scp-upload.txt\"]"}'
     results:
     - 3
     - 4
     - 5
     - 7
-    - 9
-    - 11
-    - 14
-    - 16
-    - 19
-    - 22
+    - 10
+    - 12
+    - 15
+    - 17
+    - 20
     - 23
-    - 26
+    - 24
     - 27
-    - 30
-    - 32
+    - 28
+    - 31
+    - 33
   visual:
   - check: Configuration and workflow state
     method: automated

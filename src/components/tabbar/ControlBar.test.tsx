@@ -42,10 +42,6 @@ vi.mock("../window/WindowControls", () => ({
   WindowControls: () => <div data-testid="window-controls" />,
 }));
 
-vi.mock("../window/TitleBarTrayControls", () => ({
-  TitleBarTrayControls: () => <div data-testid="titlebar-tray" />,
-}));
-
 vi.mock("../menubar/useSessionImportExport", () => ({
   useSessionImportExport: () => ({
     hasSessions: false,

@@ -1,6 +1,7 @@
 id: TC-SESSION-GSS-001
 title: GSSAPI ticket authentication, real terminal command and SFTP subsystem
-description: Navigate both attached and detached SFTP panes, including an address entered while the detached connection is initializing. Initial-directory restoration must not override the submitted path.
+description: Navigate both attached and detached SFTP panes, including an address entered while the detached connection is initializing. Initial-directory restoration
+  must not override the submitted path.
 covers:
 - F6.3
 - F2.2
@@ -64,6 +65,7 @@ steps:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^QA_GSSAPI_TERMINAL_OK\s*$
     timeout_sec: 45
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for:
     selector: '[data-testid="sftp-browser"]'
@@ -131,14 +133,15 @@ verification:
     - 19
     - 21
     - 23
-    - 25
-    - 27
-    - 29
-    - 31
+    - 24
+    - 26
+    - 28
+    - 30
     - 32
-    - 34
-    - 36
-    - 38
+    - 33
+    - 35
+    - 37
+    - 39
     checkpoints:
     - step: 3
       expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
@@ -152,21 +155,21 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
     - step: 22
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_GSSAPI_TERMINAL_OK\\s*$", "timeout_sec": 45}}'
-    - step: 24
+    - step: 25
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "timeout_sec": 45}}'
-    - step: 26
+    - step: 27
       expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
-    - step: 28
+    - step: 29
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${cfg.ssh_features.remote_dir}"}}'
-    - step: 30
+    - step: 31
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "scp-source.txt", "timeout_sec": 45}}'
-    - step: 33
+    - step: 34
       expectation: '{"eval_readonly": {"expression": "document.hasFocus()", "expect_truthy": true, "timeout_sec": 10}}'
-    - step: 35
+    - step: 36
       expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
-    - step: 37
+    - step: 38
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${cfg.ssh_features.remote_dir}"}}'
-    - step: 39
+    - step: 40
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "scp-source.txt", "timeout_sec": 45}}'
     results:
     - 3
@@ -175,14 +178,14 @@ verification:
     - 18
     - 20
     - 22
-    - 24
-    - 26
-    - 28
-    - 30
-    - 33
-    - 35
-    - 37
-    - 39
+    - 25
+    - 27
+    - 29
+    - 31
+    - 34
+    - 36
+    - 38
+    - 40
   - id: R2
     requirement: Detaching creates a real independent SFTP window that can navigate and list remote files with the Kerberos ticket.
     actions:
@@ -203,14 +206,15 @@ verification:
     - 19
     - 21
     - 23
-    - 25
-    - 27
-    - 29
-    - 31
+    - 24
+    - 26
+    - 28
+    - 30
     - 32
-    - 34
-    - 36
-    - 38
+    - 33
+    - 35
+    - 37
+    - 39
     checkpoints:
     - step: 3
       expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
@@ -224,21 +228,21 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
     - step: 22
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_GSSAPI_TERMINAL_OK\\s*$", "timeout_sec": 45}}'
-    - step: 24
+    - step: 25
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "timeout_sec": 45}}'
-    - step: 26
+    - step: 27
       expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
-    - step: 28
+    - step: 29
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${cfg.ssh_features.remote_dir}"}}'
-    - step: 30
+    - step: 31
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "scp-source.txt", "timeout_sec": 45}}'
-    - step: 33
+    - step: 34
       expectation: '{"eval_readonly": {"expression": "document.hasFocus()", "expect_truthy": true, "timeout_sec": 10}}'
-    - step: 35
+    - step: 36
       expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
-    - step: 37
+    - step: 38
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${cfg.ssh_features.remote_dir}"}}'
-    - step: 39
+    - step: 40
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "scp-source.txt", "timeout_sec": 45}}'
     results:
     - 3
@@ -247,14 +251,14 @@ verification:
     - 18
     - 20
     - 22
-    - 24
-    - 26
-    - 28
-    - 30
-    - 33
-    - 35
-    - 37
-    - 39
+    - 25
+    - 27
+    - 29
+    - 31
+    - 34
+    - 36
+    - 38
+    - 40
   native:
   - check: Real SSH server, MIT Kerberos KDC and native filesystem
     method: automated

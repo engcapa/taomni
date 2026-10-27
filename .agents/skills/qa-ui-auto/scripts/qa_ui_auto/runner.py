@@ -94,16 +94,8 @@ def _timed_step(result: dict, index: int, verb: str, action, deadline=None) -> N
 
 
 def _run_browser_case(payload: dict) -> dict:
-    started = time.monotonic()
-    try:
-        return _run_browser_case_inner(payload)
-    except Exception as exc:
-        case = payload["case"]
-        return {"id": case["id"], "title": case["title"], "tags": case["tags"],
-                "covers": case["covers"], "modes": case["modes"], "status": "failed",
-                "duration_sec": time.monotonic() - started, "step_count": len(case["steps"]),
-                "failure": {"step_index": 0, "verb": "<setup>", "message": str(exc), "artifacts": {}}}
-
+    from .browser_case import run_browser_case
+    return run_browser_case(payload, _run_browser_case_inner)
 
 # ─── per-case worker (browser) ──────────────────────────────────────────────
 

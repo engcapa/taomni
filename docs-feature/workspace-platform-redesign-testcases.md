@@ -1,3 +1,5 @@
+> 2026-10-27 工具栏验收更新：Sessions 的 `tab-more` 为漏斗过滤入口，保留分类、目录与搜索；Workspaces 新增 `workspace-tabs-filter-trigger`，支持分类与搜索组合。广播、布局、底栏和会话上下文操作集中在最右侧 `titlebar-actions-more`，Home/Tools 不显示空操作菜单。全部主视图移除标题栏语音，Chat 听写及 Settings 语音配置保留。新 browser `TC-WS-050` 验证过滤、草稿、工作区隔离、键盘/窄窗口和菜单入口；native `TC-WS-051` 以真实 PTY 输出、未保存缓冲区和磁盘 SHA-256 验证运行实例及文件保存。既有 SFTP、RDP、VNC、广播、语音等用例迁移导航后保留其业务断言。以下早期表格的 `⋯` 过滤图标以此更新为准。
+
 > 2026-10-25 补充验收：全局/Sessions 实时大预览（Ctrl/Cmd+Shift+E）、移除 Sessions Welcome 与右上角小预览、移除 Tao 贴边悬浮条、按模式对齐右上角工具栏。TC-WS-018 覆盖文件缓冲区预览与工作区分屏，TC-WS-019 通过原生 PTY 输出验证 Sessions 大预览；TC-NOTES-005 改验主导航入口和无悬浮条，原 Chat/Notes/通知用例保留。旧会话用例显式进入 Sessions，历史启动/恢复用例回到 Home；不由 runner 隐式更改模式。本机测试 worker 总数不超过 2。
 
 # Taomni Workspace-First & One-System 平台级 UI/交互重构全量测试规范（Unit / Browser / Native & 既有回归适配专册）
@@ -78,7 +80,7 @@
   2. **`UT-WS-03-02`（左右栏收缩按钮与 `Ctrl+B` 联动）**：点击 `[data-testid="toggle-left-sidebar"]`（`◧`）切换左栏折叠状态；点击 `[data-testid="toggle-right-sidebar"]`（`◨`）切换右栏折叠状态。
   3. **`UT-WS-03-03`（按模式切换共享工具栏中间的 Tab 条）**：在 `Workspaces` 模式下展示当前工作区的 `openTabs`；在 `Sessions` 模式下展示全局会话 `TabBar`。
   4. **`UT-WS-03-04`（100% 保留 `app-main-menu` 所有主菜单项）**：点击 `[data-testid="app-main-menu"]`，断言 `New local terminal`、`New remote session`、`New SFTP`、`Sessions`（含导入导出子菜单）、`View`、`Tools`、`Settings`、`Help`、`Exit` 全部存在。
-  5. **`UT-WS-03-05`（100% 保留 `tab-details-hover` 与 `OpenTabsMenu` 过滤）**：断言 `[data-testid="tab-details-hover"]`（`ℹ️`）与 `[data-testid="tab-more"]`（`⋯`）存在；点击 `tab-more` 打开 `[data-testid="open-tabs-menu"]`，验证目录分组芯片过滤与搜索框过滤已打开标签。
+  5. **`UT-WS-03-05`（大预览与统一过滤）**：断言原小预览 `tab-details-hover` 已移除，`tab-overview-trigger` 打开大预览；`tab-more`（漏斗）打开 `open-tabs-menu`，保留分类、目录分组与搜索过滤已打开标签。
   6. **`UT-WS-03-06`（保留左栏拖拽分隔条 `main-sidebar-resize-handle`）**：断言左栏展开时 `[data-testid="main-sidebar-resize-handle"]` 可见且拖拽更新左栏宽度。
 
 ---
@@ -121,7 +123,7 @@
 | **`TC-WS-006`** | `TC-WS-006-workspace-in-panel-git-navigation-and-full-parity.testcase.yaml` | `browser`, `native` | `F25.1`, `F-WS-4` | **工作区内置专用 Git Panel 4 路跳转与 `main` 全功能对齐**：验证工作区左栏已移除 `[文件管理\|Git]` 按钮行（标识 1）、右上角已移除 `Git` 按钮（标识 3）；验证从主左侧栏 `🌿 Git`、左栏底部 Git 状态栏、编辑器 `🌿 在 Git 面板对比`、工作区 `GIT` Tab 跳转到内置 Git Panel，并验证 6 大子标签页、Repo/Branch/Remote、Tree/Flat、Amend、Side-by-Side Diff。 |
 | **`TC-WS-007`** | `TC-WS-007-workspace-open-any-session-and-instance-isolation.testcase.yaml` | `browser`, `native` | `F1.5`, `F2.4`, `F-WS-5` | **工作区打开全局任意会话与运行实例隔离**：验证在工作区内通过 `+` 菜单、`Ctrl+Alt+O` 会话选择器弹窗、主左侧栏 `Sessions` 工具窗口打开未关联的全局会话；验证同一会话在 `Workspaces` 与 `Sessions` 模式下各自打开时运行实例完全独立，关闭一方不影响另一方。 |
 | **`TC-WS-008`** | `TC-WS-008-workspace-multi-root-and-new-file-folder.testcase.yaml` | `browser`, `native` | `F25.1`, `F-WS-2` | **工作区多根目录（Multi-Root）与新建文件/目录**：验证通过工作区左栏工具栏与文件夹右键菜单执行 `新建文件 (Alt+Insert)`、`新建目录`、`添加外部文件夹到工作区`，并在编辑器中打开新建文件。 |
-| **`TC-WS-009`** | `TC-WS-009-sessions-mode-simplified-header-and-preserved-filters.testcase.yaml` | `browser`, `native` | `F1.4`, `F1.5`, `F-Sidebar-1` | **Sessions 模式单行头部极简化与全量过滤保留**：验证 `Sessions` 模式无冗余快速连接芯片行与次级终端栏；验证左栏 `SessionTree` 7 个工具按钮、协议过滤、搜索与顶栏 `ℹ️`（`Ctrl+Shift+H`）、`⋯`（`OpenTabsMenu` 目录分组过滤）100% 可用。 |
+| **`TC-WS-009`** | `TC-WS-009-sessions-mode-simplified-header-and-preserved-filters.testcase.yaml` | `browser`, `native` | `F1.4`, `F1.5`, `F-Sidebar-1` | **Sessions 模式单行头部极简化与全量过滤保留**：验证 `Sessions` 模式无冗余快速连接芯片行与次级终端栏；验证左栏 `SessionTree` 7 个工具按钮、协议过滤、搜索与顶栏大预览（`Ctrl/Cmd+Shift+E`）与漏斗（`OpenTabsMenu` 分类、目录分组及搜索过滤）可用。 |
 | **`TC-WS-010`** | `TC-WS-010-preserved-context-menus-and-shortcuts-regression.testcase.yaml` | `browser`, `native` | `F1.2`, `F1.4`, `F1.8`, `F25.5` | **全量右键上下文菜单与导入导出 100% 保留专项回归**：逐一验证 `app-main-menu`（含 JSON/CSV/MobaXterm/OpenSSH 导入导出）、左侧主导航条右键 `Show Tool Window Names`、`SessionTree` 文件夹与会话右键菜单、`TabBar` 标签右键菜单、`Workspace` 文件树右键菜单无任何缺失。 |
 | **`TC-WS-011`** | `TC-WS-011-agents-worktree-orchestrator-and-global-search.testcase.yaml` | `browser` | `F-WS-6` | **Agents 模式 Git Worktree 编排与 `Ctrl+K` 全局命令面板**：验证切换到 `🤖 Agents` 模式查看并行 Worktree 任务、点击跳转工作区 Git 面板审阅 Diff；验证 `Ctrl+K` 搜索工作区、文件与全局会话。 |
 | **`TC-WS-012`** | `TC-WS-012-native-desktop-window-drag-mfa-clipboard-and-pty.testcase.yaml` | `native` | `F1.3`, `F2.4`, `F-MFA-1`, `F-WS-3` | **Native 桌面端综合验证（Linux / Windows / macOS）**：在真实桌面 WebView 中验证单行 33px 顶栏原生窗口拖拽、左下角 MFA 悬浮窗复制验证码写入操作系统剪贴板、以及工作区内独立打开真实本地 PTY 终端收发命令。 |

@@ -6,6 +6,8 @@ import { useWorkspacePlatformStore } from "../../../stores/workspacePlatformStor
 import { useToolWindowStripeStore } from "../../editor/workspace/toolWindowStripeStore";
 import { defaultStripeSettings } from "../../editor/workspace/toolWindowLayout";
 import { useChatStore } from "../../../stores/chatStore";
+import { useAiStore } from "../../../stores/aiStore";
+import { DEFAULT_CONFIG } from "../../../stores/ai/defaults";
 
 const MODE_ORDER = [
   "nav-mode-home",
@@ -25,6 +27,7 @@ const BOTTOM_ORDER = [
 
 beforeEach(() => {
   window.localStorage.clear();
+  useAiStore.setState({ config: null });
   useAppStore.setState({
     activeSideTab: "sessions",
     sidebarCollapsed: false,
@@ -41,6 +44,14 @@ afterEach(() => {
 });
 
 describe("PrimaryNavigationRail (TASK-02)", () => {
+  it("removes the shared Chat entry when AI is disabled and restores it when enabled", () => {
+    render(<PrimaryNavigationRail />);
+    expect(screen.getByTestId("rail-chat-button")).toBeVisible();
+    act(() => useAiStore.setState({ config: { ...DEFAULT_CONFIG, fully_disabled: true } }));
+    expect(screen.queryByTestId("rail-chat-button")).not.toBeInTheDocument();
+    act(() => useAiStore.setState({ config: { ...DEFAULT_CONFIG, fully_disabled: false } }));
+    expect(screen.getByTestId("rail-chat-button")).toBeVisible();
+  });
   it("reuses the bottom Chat button for the active session's remembered chat identity", async () => {
     const toggle = vi.spyOn(useChatStore.getState(), "toggleTabChat").mockResolvedValue();
     useAppStore.setState({ activeTabId: "session-a", tabs: [

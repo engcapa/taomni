@@ -1,11 +1,23 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前验收尚未完成。托管相关集 [40422801868](https://github.com/engcapa/taomni/actions/runs/40422801868) 已结束，共 **2,068 passed / 5 failed / 0 skipped**；三平台 browser 的 **1,312 次全部通过**，native 的四个场景仍需修复复验。该运行基于顶部统一拖动修复之前的提交，不能当作当前源码的通过证据。功能全量通过后再进行正式性能对照，目前没有“性能无退化”的结论。外部 `clickhousecrud` 项目用例继续按用户认可的现有 policy 单独报告缺口。
+> 当前验收尚未完成。最新工具栏实现已在本机观察到 51 条 browser 与 26 条适用 native 全部通过；机器重启后，本地 `qa-ui-auto-report` 目录下旧报告和临时工具已不在，尚未完成独立回执核验，因此这些结果不能作为现行可复核证据。正在重建隔离环境并补跑验收。旧提交的托管相关集 [40432446710](https://github.com/engcapa/taomni/actions/runs/40432446710) 为 2,076 次执行全部通过，但不包含最新工具栏调整。本轮相关集全部通过后仍须拉取合并 main、复测并执行整体用例；功能完成后再做正式性能对照，目前没有“性能无退化”的结论。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
+
+## 分类过滤与紧凑操作菜单（2026-10-27，验证中）
+
+Sessions 的既有分类、目录与搜索过滤统一从漏斗按钮打开。Workspaces 新增同样的漏斗入口，分类包括文件/代码、SSH、数据库、SFTP、远程桌面、本地终端及其他，并与标题、路径、主机及用户搜索组合。过滤只改变标签导航，不关闭编辑器或连接；每个工作区独立记住当前过滤，新打开或从大预览激活的标签会正常显现。无匹配时保留当前运行内容并提供清除入口。编辑器原有 Find Action 快捷键继续保留。
+
+广播、单屏/分屏/网格、底栏及活动会话的 SFTP、分离、RDP/VNC 控制统一放入最右侧操作菜单。上下文 action slot 关闭时保持挂载，避免改变活跃运行实例的生命周期。全局搜索、大预览和右侧栏控制保持直接可达。所有主视图移除标题栏语音；Chat 听写与 Settings 配置继续保留，既有语音安装、下载恢复、提供商、草稿、取消和原文撤销用例迁移到这些真实入口。共享 Chat 按钮同时遵循关闭 AI 的设置。
+
+新增 browser `TC-WS-050` 覆盖分类/搜索组合、空结果、过滤清除、工作区隔离、鼠标/键盘选择、窄窗口及未保存草稿；新增 native `TC-WS-051` 检查真实文件读取、同一 PTY 在过滤前后的独立输出、分屏恢复及保存后的磁盘 SHA-256。58 条既有用例迁移菜单导航并同步其验证步骤编号，保留原有业务断言。54 项前端单测、3 项测试服务隔离契约和静态覆盖门禁通过；最终 E2E 回执仍在收集。
+
+本机两个 browser worker 同时使用共享 VNC 测试服务时，后一个用例的 reset 会断开前一个用例，原始 RFB 日志已确认该原因。测试调度现在只对同一 VNC 服务加跨进程互斥，等待发生在用例计时前，并在整个用例和清理结束后释放；其他用例维持原有并发。进程崩溃由系统释放锁，失败结果及原有 deadline 保留。三平台 browser 的 VNC 分片同时执行该隔离契约，Windows/macOS 结果待本轮 hosted 运行确认。
+
+已按 ZIP 成员大小与 CRC 完整核对解压副本，清理 581 个重复旧下载包，回收约 2.37 GiB；解压的成功、失败及签名回执全部保留，当前仍运行的托管任务目录未清理。
 
 ## 所有主视图统一顶部拖动（2026-10-27）
 

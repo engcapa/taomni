@@ -7,7 +7,7 @@ import {
   MessageSquare,
   Inbox,
   Monitor,
-  MoreHorizontal,
+  Filter,
   Network,
   KeyRound,
   PanelLeft,
@@ -39,6 +39,7 @@ import { WindowDragHandle } from "../window/WindowDragHandle";
 import { startWindowDrag } from "../../lib/windowDrag";
 import { PlatformToolbarActions } from "./PlatformToolbarActions";
 import { WorkspaceTabStrip } from "../workspace/WorkspaceTabStrip";
+import { WorkspaceTabsFilter } from "../workspace/WorkspaceTabsFilter";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionImportExport } from "../menubar/useSessionImportExport";
 import type { AppCommand } from "../menubar/commands";
@@ -262,20 +263,20 @@ export function ControlBar({
       {/* Update hint sits just left of the tab-action group (centre-right of the
           bar). It only appears once a new version is staged. */}
       <UpdateHint />
-      {/* Per-tab contextual actions portal in here (SFTP / Chat / detach …). */}
-      <div ref={slotRef} data-testid="tab-action-slot" className="flex items-center gap-0.5 self-stretch shrink-0 pr-1" style={{ display: activeSideTab === "home" ? "none" : undefined }} />
-      <PlatformToolbarActions onOpenSearch={onOpenGlobalSearch}>
+      <PlatformToolbarActions onOpenSearch={onOpenGlobalSearch} slotRef={slotRef} onDetachActiveTab={onDetachActiveTab}>
         {activeSideTab === "sessions" && <TabMore onDetachActiveTab={onDetachActiveTab} />}
+        {activeSideTab === "workspaces" && <WorkspaceTabsFilter />}
       </PlatformToolbarActions>
       {!IS_MAC && <WindowControls onClose={onCloseWindow} />}
     </div>
   );
 }
 
-/** The open-tabs overflow dropdown at the right of the tab-action group. */
+/** Sessions filter and search share one compact entry. */
 function TabMore({ onDetachActiveTab }: { onDetachActiveTab?: () => void }) {
   const t = useT();
   const [open, setOpen] = useState(false);
+  const filter = useAppStore((s) => s.tabFilter);
   const wrapRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -291,10 +292,10 @@ function TabMore({ onDetachActiveTab }: { onDetachActiveTab?: () => void }) {
     <div ref={wrapRef} className="relative shrink-0 pr-1">
       <BarButton
         testId="tab-more"
-        title={t("tabs.moreWithDetailsShortcut", {
-          shortcut: IS_MAC ? "Cmd+Shift+H" : "Ctrl+Shift+H",
-        })}
-        icon={<MoreHorizontal className="w-4 h-4" />}
+        title={t("tabs.filterOpenTabs")}
+        icon={<Filter className="w-4 h-4" />}
+        active={Boolean(filter)}
+        expanded={open}
         onClick={() => setOpen((v) => !v)}
       />
       <OpenTabsMenu
@@ -302,6 +303,7 @@ function TabMore({ onDetachActiveTab }: { onDetachActiveTab?: () => void }) {
         onClose={() => setOpen(false)}
         anchorRef={wrapRef}
         onDetachActiveTab={onDetachActiveTab}
+        showActions={false}
       />
     </div>
   );
@@ -341,12 +343,14 @@ function BarButton({
   onClick,
   testId,
   active,
+  expanded,
 }: {
   icon: React.ReactNode;
   title: string;
   onClick?: (event: React.MouseEvent) => void;
   testId?: string;
   active?: boolean;
+  expanded?: boolean;
 }) {
   return (
     <button
@@ -355,7 +359,10 @@ function BarButton({
       title={title}
       aria-label={title}
       aria-pressed={active}
-      className="h-6 w-7 inline-flex items-center justify-center rounded hover:bg-[var(--taomni-hover)]"
+      aria-haspopup={expanded === undefined ? undefined : "dialog"}
+      aria-expanded={expanded}
+      data-active={active || undefined}
+      className="taomni-platform-toolbar-button w-7"
       onClick={onClick}
     >
       {icon}

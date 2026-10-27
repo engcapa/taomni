@@ -712,6 +712,8 @@ export const zhCN: DeepPartial<typeof en> = {
     enterWorkspaces: "进入工作区 →",
     enterSessions: "进入会话总览 →",
     returnToWorkspace: "返回工作区",
+    filterWorkspaceTabs: "筛选工作区标签",
+    canvasLayout: "视图布局",
     singleView: "单视图",
     splitView: "左右分屏",
     gridView: "网格视图",
@@ -1040,6 +1042,7 @@ export const zhCN: DeepPartial<typeof en> = {
   tabs: {
     category: {
       all: "全部",
+      files: "文件",
       ssh: "SSH",
       database: "数据库",
       sftp: "SFTP",
@@ -1048,6 +1051,7 @@ export const zhCN: DeepPartial<typeof en> = {
       other: "其它",
     },
     categoryFilter: "按连接类型筛选已打开的标签",
+    filterOpenTabs: "筛选已打开的会话标签",
     openTabs: "已打开的会话标签",
     closeTab: "关闭标签页",
     closeOthers: "关闭其他标签页",

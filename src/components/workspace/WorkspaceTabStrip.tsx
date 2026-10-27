@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, FilePlus2, FolderPlus, MonitorSmartphone, Plus, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { WorkspaceTabContextMenu } from "./WorkspaceTabContextMenu";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
 import { useT } from "../../lib/i18n";
@@ -14,6 +14,7 @@ import {
 import { maxScrollLeft } from "../tabbar/tabs/scroll";
 import { IconBtn } from "../tabbar/tabs/TabItem";
 import { useWorkspaceTabScroll } from "./useWorkspaceTabScroll";
+import { EMPTY_WORKSPACE_TAB_FILTER, filterWorkspaceTabs, hasWorkspaceTabFilter } from "../../lib/workspaceTabFilter";
 
 const KIND_LABEL: Record<WorkspaceTabKind, string> = {
   file: "FILE",
@@ -58,11 +59,25 @@ export function WorkspaceTabStrip() {
   const setSidebarCollapsed = useAppStore((s) => s.setSidebarCollapsed);
   const openFsModal = useWorkspaceUiStore((s) => s.openFsModal);
   const openSessionPicker = useWorkspaceUiStore((s) => s.openSessionPicker);
+  const filters = useWorkspaceUiStore((s) => s.tabFilters);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [tabMenu, setTabMenu] = useState<{ tabId: string; x: number; y: number } | null>(null);
-  const tabScroll = useWorkspaceTabScroll(workspace?.id, workspace?.openTabs, workspace?.activeTabId);
+  const filter = filters[workspace?.id ?? ""] ?? EMPTY_WORKSPACE_TAB_FILTER;
+  const visibleTabs = useMemo(() => filterWorkspaceTabs(workspace?.openTabs ?? [], filter), [workspace?.openTabs, filter]);
+  const tabScroll = useWorkspaceTabScroll(workspace?.id, visibleTabs, workspace?.activeTabId);
+  const previousActive = useRef({ workspaceId: workspace?.id, tabId: workspace?.activeTabId });
 
   useEffect(() => { setMenu(null); setTabMenu(null); }, [workspace?.id]);
+  useEffect(() => {
+    const previous = previousActive.current;
+    previousActive.current = { workspaceId: workspace?.id, tabId: workspace?.activeTabId };
+    // Opening a new tab or choosing one from the large overview must reveal it.
+    // An empty search result keeps its filter while the current runtime lives on.
+    if (workspace && previous.workspaceId === workspace.id && previous.tabId !== workspace.activeTabId
+      && hasWorkspaceTabFilter(filter) && !visibleTabs.some((tab) => tab.id === workspace.activeTabId)) {
+      useWorkspaceUiStore.getState().setTabFilter(workspace.id, EMPTY_WORKSPACE_TAB_FILTER);
+    }
+  }, [workspace, filter, visibleTabs]);
 
   if (!workspace) return null;
 
@@ -147,7 +162,7 @@ export function WorkspaceTabStrip() {
           setActiveTab(workspace.id, tab.id);
         } else if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
           event.preventDefault();
-          const tabs = workspace.openTabs;
+          const tabs = visibleTabs;
           const index = tabs.findIndex((entry) => entry.id === tab.id);
           const target = event.key === "Home" ? tabs[0] : event.key === "End" ? tabs.at(-1) : tabs[(index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length];
           if (target) {
@@ -206,8 +221,15 @@ export function WorkspaceTabStrip() {
         }}
         onScroll={tabScroll.updateScrollState}
       >
-        {workspace.openTabs.map(tabButton)}
+        {visibleTabs.map(tabButton)}
       </div>
+      {hasWorkspaceTabFilter(filter) && <button type="button" data-testid="workspace-tab-filter-chip"
+        className="taomni-toolbar-pill shrink-0 max-w-32" title={t("tabs.filterClear")}
+        onClick={() => useWorkspaceUiStore.getState().setTabFilter(workspace.id, EMPTY_WORKSPACE_TAB_FILTER)}>
+        <span className="truncate">{filter.query.trim() || t(`tabs.category.${filter.category}`)}</span><span aria-hidden="true"> ×</span>
+      </button>}
+      {!visibleTabs.length && workspace.openTabs.length > 0 && <span data-testid="workspace-tab-filter-empty"
+        className="truncate px-2 text-[11px] text-[var(--taomni-text-muted)]">{t("tabs.filterNoMatch")}</span>}
       {tabScroll.scrollState.overflow && (
         <IconBtn
           testId="workspace-tab-scroll-right"

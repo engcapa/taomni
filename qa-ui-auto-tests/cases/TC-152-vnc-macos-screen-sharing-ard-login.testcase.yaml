@@ -1,10 +1,10 @@
 id: TC-152
 title: VNC session logs in to macOS Screen Sharing with ARD and reports it in Session Information
-description: 'Native macOS check for F9.2 against the real Screen Sharing server of the runner (ard_required): a saved VNC session with the macOS account name uses Apple Remote Desktop
-  authentication (RFB security type 30), passes the per-attempt unencrypted-connection warning, asks for the password in the session only because ARD needs one (DEC-VNC-21), connects,
-  and Session Information reports ARD and the desktop size the Mac announced. The ARD login of a second account makes macOS switch the console to that account, so the app''s own (now
-  background) session stops painting frames; frame pixels are covered by TC-151. The backgrounded app also answers the WebDriver bridge slowly: on the hosted runner the wait for the
-  connected toolbar plus the next click took 26-50 s and once more than 45 s for the wait alone, so the waits after the login allow 120 s.
+description: 'Native macOS check for F9.2 against the real Screen Sharing server of the runner (ard_required): a saved VNC session with the macOS account name uses Apple Remote
+  Desktop authentication (RFB security type 30), passes the per-attempt unencrypted-connection warning, asks for the password in the session only because ARD needs one (DEC-VNC-21),
+  connects, and Session Information reports ARD and the desktop size the Mac announced. The ARD login of a second account makes macOS switch the console to that account, so
+  the app''s own (now background) session stops painting frames; frame pixels are covered by TC-151. The backgrounded app also answers the WebDriver bridge slowly: on the hosted
+  runner the wait for the connected toolbar plus the next click took 26-50 s and once more than 45 s for the wait alone, so the waits after the login allow 120 s.
 
   '
 covers:
@@ -60,6 +60,7 @@ steps:
     selector: '[data-testid="vnc-auth-password"]'
     value: ${env.QA_ARD_PASSWORD}
 - click: '[data-testid="vnc-auth-ok"]'
+- click: '[data-testid="titlebar-actions-more"]'
 - wait_for:
     selector: '[data-testid="vnc-session-menu"]'
     timeout_sec: 120
@@ -79,8 +80,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A VNC session with the macOS account name and no stored password reaches Screen Sharing, stops for the unencrypted-connection confirmation, asks for the password
-      in the session because ARD needs one, and logs in with ARD.
+    requirement: A VNC session with the macOS account name and no stored password reaches Screen Sharing, stops for the unencrypted-connection confirmation, asks for the
+      password in the session because ARD needs one, and logs in with ARD.
     actions:
     - 1
     - 3
@@ -96,6 +97,7 @@ verification:
     - 17
     - 19
     - 20
+    - 21
     checkpoints:
     - step: 4
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
@@ -107,28 +109,28 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-unencrypted-continue\"]", "timeout_sec": 30}}'
     - step: 18
       expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-auth-password\"]", "timeout_sec": 30}}'
-    - step: 21
+    - step: 22
       expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-session-menu\"]", "timeout_sec": 120}}'
     results:
     - 16
     - 18
-    - 21
+    - 22
   - id: R2
     requirement: Session Information names the ARD security method and the desktop size from the Mac's ServerInit.
     actions:
-    - 22
     - 23
+    - 24
     checkpoints:
-    - step: 24
-      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-session-info\"]", "timeout_sec": 120}}'
     - step: 25
-      expectation: '{"assert_text": {"selector": "[data-testid=\"vnc-session-info\"]", "contains": "ARD (Apple Remote Desktop)"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-session-info\"]", "timeout_sec": 120}}'
     - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"vnc-session-info\"]", "contains": "ARD (Apple Remote Desktop)"}}'
+    - step: 27
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"vnc-session-info\"]", "regex": "[1-9][0-9]* x [1-9][0-9]*"}}'
     results:
-    - 24
     - 25
     - 26
+    - 27
   visual:
   - check: The Session Information dialog is readable over the session without clipping.
     method: manual

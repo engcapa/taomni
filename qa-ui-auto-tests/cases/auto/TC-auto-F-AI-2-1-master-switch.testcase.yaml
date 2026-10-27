@@ -1,14 +1,6 @@
 id: TC-auto-F-AI-2-1
 title: AI master switch + privacy toggle render in Settings
-description: 'F-AI-2.1 closes the gap by exercising the two top-level AI privacy controls.
-
-  The "Disable AI completely" row is interactive (clickable container that
-
-  toggles `aiStore.config.fully_disabled`); the "Full local mode" row only
-
-  renders when AI is enabled, so we assert it as soft-optional.
-
-  '
+description: 'Settings AI privacy controls retain persistence and immediately hide or restore the shared Chat entry.'
 covers:
 - F-AI-2.1
 tags:
@@ -32,13 +24,12 @@ steps:
 - assert_visible: '[data-testid="ai-master-switch"]'
 - click: '[data-testid="ai-master-switch"]'
 - wait_for:
-    selector: '[data-testid="ptt-button"]'
+    selector: '[data-testid="rail-chat-button"]'
     state: detached
     timeout_sec: 10
 - click: '[data-testid="ai-master-switch"]'
-- click: '[data-testid="titlebar-actions-more"]'
 - wait_for:
-    selector: '[data-testid="ptt-button"]'
+    selector: '[data-testid="rail-chat-button"]'
     timeout_sec: 10
 - screenshot: ai-2-1-master-switch.png
 verification:
@@ -62,11 +53,11 @@ verification:
     - step: 7
       expectation: '{"assert_visible": "[data-testid=\"ai-master-switch\"]"}'
     - step: 9
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ptt-button\"]", "state": "detached", "timeout_sec": 10}}'
-    - step: 12
-      expectation: '{"wait_for": {"selector": "[data-testid=\"ptt-button\"]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rail-chat-button\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rail-chat-button\"]", "timeout_sec": 10}}'
     results:
-    - 12
+    - 11
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

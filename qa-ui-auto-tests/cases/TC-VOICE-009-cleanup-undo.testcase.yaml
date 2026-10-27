@@ -10,12 +10,13 @@ fixtures:
 - reset_db
 timeout_sec: 90
 id: TC-VOICE-009
-title: Optional cleanup preserves an accessible original and undo in the titlebar draft
+title: Optional cleanup preserves an accessible original and undo in the Chat draft
 steps:
 - open: ${cfg.app.base_url}/?voiceFixture=1
-- click: '[data-testid="titlebar-actions-more"]'
-- wait_for: '[data-testid="ptt-button"]'
-- click: '[data-testid="ptt-button"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="chat-voice-button"]'
+- click: '[data-testid="chat-voice-button"]'
 - wait_for: '[data-testid="asr-settings"]'
 - select_option:
     selector: '[data-testid="asr-realtime-provider"]'
@@ -27,19 +28,18 @@ steps:
     key: taomni.ai.config.v1
     contains: '"cleanup":"full"'
 - click: '[data-testid="voice-settings-close"]'
-- click: '[data-testid="titlebar-actions-more"]'
-- click: '[data-testid="ptt-button"]'
-- wait_for: '[data-testid="ptt-button"][data-state="recording"]'
-- click: '[data-testid="ptt-button"]'
+- click: '[data-testid="chat-voice-button"]'
+- wait_for: '[data-testid="chat-voice-button"][data-state="recording"]'
+- click: '[data-testid="chat-voice-button"]'
 - wait_for: '[data-testid="chat-composer-textarea"]'
 - eval_readonly:
     expression: document.querySelector("#chat-composer-textarea").value === "Cleaned stream fixture."
     timeout_sec: 5
-- click: '[data-testid="composer-voice-original"] summary'
+- click: '[data-testid="chat-voice-button-original"] summary'
 - assert_text:
-    selector: '[data-testid="composer-voice-original"]'
+    selector: '[data-testid="chat-voice-button-original"]'
     contains: Final stream fixture.
-- click: '[data-testid="composer-voice-original"] button'
+- click: '[data-testid="chat-voice-button-original"] button'
 - eval_readonly:
     expression: document.querySelector("#chat-composer-textarea").value === "Final stream fixture."
 - screenshot: cleanup-original.png
@@ -47,26 +47,26 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Optional cleanup preserves an accessible original and undo in the titlebar draft
+    requirement: Optional cleanup preserves an accessible original and undo in the Chat draft
     actions:
-    - 6
     - 7
-    - 9
+    - 8
+    - 10
     - 11
     - 13
     - 16
     - 18
     checkpoints:
-    - step: 8
+    - step: 9
       expectation: '{"assert_localstorage": {"key": "taomni.ai.config.v1", "contains": "\"cleanup\":\"full\""}}'
     - step: 15
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\"#chat-composer-textarea\").value === \"Cleaned stream fixture.\"", "timeout_sec": 5}}'
     - step: 17
-      expectation: '{"assert_text": {"selector": "[data-testid=\"composer-voice-original\"]", "contains": "Final stream fixture."}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"chat-voice-button-original\"]", "contains": "Final stream fixture."}}'
     - step: 19
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\"#chat-composer-textarea\").value === \"Final stream fixture.\""}}'
     results:
-    - 8
+    - 9
     - 15
     - 17
     - 19

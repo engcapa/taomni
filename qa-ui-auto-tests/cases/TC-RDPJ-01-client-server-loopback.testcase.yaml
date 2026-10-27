@@ -145,6 +145,7 @@ steps:
     selector: '[data-testid="confirm-dialog"]'
     timeout_sec: 60
 - click: '[data-testid="confirm-dialog-confirm"]'
+- click: '[data-testid="titlebar-actions-more"]'
 - assert_text:
     selector: '[data-testid="rdp-status"]'
     contains: Connected
@@ -158,6 +159,7 @@ steps:
     expect:
       flips:
         min: 1
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="rdp-view-cycle"]'
 - wait_for:
     selector: '[data-testid="rdp-connection-bar"][data-visible="true"]'
@@ -174,6 +176,7 @@ steps:
     selector: '[data-testid="rdp-connection-bar"]'
     state: detached
     timeout_sec: 15
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="rdp-view-cycle"]'
 - hover: '[data-testid="rdp-bar-hotzone"]'
 - wait_for:
@@ -184,6 +187,7 @@ steps:
     selector: '[data-testid="rdp-connection-bar"]'
     state: detached
     timeout_sec: 15
+- click: '[data-testid="titlebar-actions-more"]'
 - assert_text:
     selector: '[data-testid="rdp-status"]'
     contains: Disconnected
@@ -233,13 +237,17 @@ verification:
     - 40
     - 41
     - 43
-    - 45
-    - 47
-    - 50
+    - 44
+    - 46
+    - 48
+    - 49
     - 52
     - 54
-    - 55
+    - 56
     - 57
+    - 58
+    - 60
+    - 62
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
@@ -265,23 +273,23 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
     - step: 42
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
-    - step: 44
+    - step: 45
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Connected", "timeout_sec": 60}}'
-    - step: 46
+    - step: 47
       expectation: '{"assert_json_file": {"path": "target-state.json", "timeout_sec": 20, "expect": {"flips": {"min": 1}}}}'
-    - step: 48
+    - step: 50
       expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
-    - step: 49
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-bar-quality\"]:not([data-level=\"0\"])", "timeout_sec": 45}}'
     - step: 51
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-bar-quality\"]:not([data-level=\"0\"])", "timeout_sec": 45}}'
     - step: 53
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
-    - step: 56
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
-    - step: 58
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 10}}'
+    - step: 55
       expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
     - step: 59
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
+    - step: 61
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
+    - step: 63
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Disconnected", "timeout_sec": 20}}'
     results:
     - 3
@@ -296,15 +304,15 @@ verification:
     - 37
     - 39
     - 42
-    - 44
-    - 46
-    - 48
-    - 49
+    - 45
+    - 47
+    - 50
     - 51
     - 53
-    - 56
-    - 58
+    - 55
     - 59
+    - 61
+    - 63
   - id: R2
     requirement: A click on the client canvas reaches the host desktop through the server.
     actions:
@@ -339,13 +347,17 @@ verification:
     - 40
     - 41
     - 43
-    - 45
-    - 47
-    - 50
+    - 44
+    - 46
+    - 48
+    - 49
     - 52
     - 54
-    - 55
+    - 56
     - 57
+    - 58
+    - 60
+    - 62
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
@@ -369,23 +381,23 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
     - step: 42
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
-    - step: 44
+    - step: 45
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Connected", "timeout_sec": 60}}'
-    - step: 46
+    - step: 47
       expectation: '{"assert_json_file": {"path": "target-state.json", "timeout_sec": 20, "expect": {"flips": {"min": 1}}}}'
-    - step: 48
+    - step: 50
       expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
-    - step: 49
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-bar-quality\"]:not([data-level=\"0\"])", "timeout_sec": 45}}'
     - step: 51
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-bar-quality\"]:not([data-level=\"0\"])", "timeout_sec": 45}}'
     - step: 53
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
-    - step: 56
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
-    - step: 58
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 10}}'
+    - step: 55
       expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
     - step: 59
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
+    - step: 61
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
+    - step: 63
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Disconnected", "timeout_sec": 20}}'
     results:
     - 3
@@ -399,18 +411,18 @@ verification:
     - 37
     - 39
     - 42
-    - 44
-    - 46
-    - 48
-    - 49
+    - 45
+    - 47
+    - 50
     - 51
     - 53
-    - 56
-    - 58
+    - 55
     - 59
+    - 61
+    - 63
   - id: R3
-    requirement: In OS full screen the connection bar shows the server-measured connection quality, comes back from the top edge, restores the window and
-      disconnects the session.
+    requirement: In OS full screen the connection bar shows the server-measured connection quality, comes back from the top edge, restores the window and disconnects the
+      session.
     actions:
     - 1
     - 2
@@ -443,13 +455,17 @@ verification:
     - 40
     - 41
     - 43
-    - 45
-    - 47
-    - 50
+    - 44
+    - 46
+    - 48
+    - 49
     - 52
     - 54
-    - 55
+    - 56
     - 57
+    - 58
+    - 60
+    - 62
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
@@ -473,23 +489,23 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
     - step: 42
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
-    - step: 44
+    - step: 45
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Connected", "timeout_sec": 60}}'
-    - step: 46
+    - step: 47
       expectation: '{"assert_json_file": {"path": "target-state.json", "timeout_sec": 20, "expect": {"flips": {"min": 1}}}}'
-    - step: 48
+    - step: 50
       expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
-    - step: 49
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-bar-quality\"]:not([data-level=\"0\"])", "timeout_sec": 45}}'
     - step: 51
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 10}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-bar-quality\"]:not([data-level=\"0\"])", "timeout_sec": 45}}'
     - step: 53
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
-    - step: 56
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
-    - step: 58
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 10}}'
+    - step: 55
       expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
     - step: 59
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
+    - step: 61
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
+    - step: 63
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Disconnected", "timeout_sec": 20}}'
     results:
     - 3
@@ -503,15 +519,15 @@ verification:
     - 37
     - 39
     - 42
-    - 44
-    - 46
-    - 48
-    - 49
+    - 45
+    - 47
+    - 50
     - 51
     - 53
-    - 56
-    - 58
+    - 55
     - 59
+    - 61
+    - 63
   native:
   - check: Real desktop session on the runner with the product RDP client and server in one QA build, OS-level input injection and OS full screen.
     method: automated

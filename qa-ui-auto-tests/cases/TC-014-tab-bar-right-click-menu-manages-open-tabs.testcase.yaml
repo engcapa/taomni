@@ -25,9 +25,11 @@ steps:
 - assert_visible: '[data-testid="context-menu"] >> text="Close all"'
 - assert_visible: '[data-testid="context-menu"] >> text="Duplicate tab"'
 - press: Escape
+- click: '[data-testid="titlebar-actions-more"]'
 - assert_visible: '[data-testid="tab-split-view"]'
 - assert_enabled: '[data-testid="tab-split-view"]'
 - click: '[data-testid="tab-multiexec-toggle"]'
+- click: '[data-testid="titlebar-actions-more"]'
 - assert_visible: '[data-testid="tab-multiexec-toggle"][data-active="true"]'
 - wait: 0.5
 - click: '[data-testid="tab-multiexec-toggle"]'
@@ -47,9 +49,11 @@ verification:
     - 4
     - 6
     - 12
-    - 15
-    - 18
-    - 21
+    - 13
+    - 16
+    - 17
+    - 20
+    - 23
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"tab-bar\"]"}'
@@ -65,21 +69,21 @@ verification:
       expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Close all\""}'
     - step: 11
       expectation: '{"assert_visible": "[data-testid=\"context-menu\"] >> text=\"Duplicate tab\""}'
-    - step: 13
-      expectation: '{"assert_visible": "[data-testid=\"tab-split-view\"]"}'
     - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"tab-split-view\"]"}'
+    - step: 15
       expectation: '{"assert_enabled": "[data-testid=\"tab-split-view\"]"}'
-    - step: 16
+    - step: 18
       expectation: '{"assert_visible": "[data-testid=\"tab-multiexec-toggle\"][data-active=\"true\"]"}'
-    - step: 19
+    - step: 21
       expectation: '{"assert_not_visible": "[data-testid=\"tab-multiexec-toggle\"][data-active=\"true\"]"}'
-    - step: 22
+    - step: 24
       expectation: '{"wait_for": "[data-testid=\"open-tabs-menu\"]"}'
-    - step: 23
+    - step: 25
       expectation: '{"assert_visible": "[data-testid=\"open-tabs-menu\"]"}'
     results:
-    - 22
-    - 23
+    - 24
+    - 25
   visual:
   - check: 右键菜单和更多列表无截断，激活状态可区分。
     method: manual

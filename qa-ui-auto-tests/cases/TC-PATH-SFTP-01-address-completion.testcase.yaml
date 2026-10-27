@@ -1,8 +1,8 @@
 id: TC-PATH-SFTP-01
 title: SFTP remote and local address completion stays isolated and preserves navigation
-description: Create a disposable remote directory tree through the real SSH terminal, then drive the attached SFTP address bars. The remote namespace is POSIX even when hosted
-  OpenSSH runs on Windows. Browser uses the real SSH/SFTP dev bridge and local VFS; native exercises packaged russh-sftp and real local filesystem IPC. Verify remote/local
-  independence, exact candidates, excluded files, common-prefix, nested and mouse completion, selected Enter, cancellation, empty matches and history.
+description: Create a disposable remote directory tree through the real SSH terminal, then drive the attached SFTP address bars. The remote namespace is POSIX even when
+  hosted OpenSSH runs on Windows. Browser uses the real SSH/SFTP dev bridge and local VFS; native exercises packaged russh-sftp and real local filesystem IPC. Verify
+  remote/local independence, exact candidates, excluded files, common-prefix, nested and mouse completion, selected Enter, cancellation, empty matches and history.
 covers:
 - F7.2
 - F7.5
@@ -58,13 +58,14 @@ steps:
     text: mkdir -p '${fixture.sftp_shell_test_dir}/qa-path-completion/project-alpha' '${fixture.sftp_shell_test_dir}/qa-path-completion/project-beta'
       '${fixture.sftp_shell_test_dir}/qa-path-completion/only space/child' '${fixture.sftp_shell_test_dir}/qa-path-completion/.hidden' && printf 'nested directory\n' >
       '${fixture.sftp_shell_test_dir}/qa-path-completion/only space/child/child-marker.txt' && printf 'beta directory\n' >
-      '${fixture.sftp_shell_test_dir}/qa-path-completion/project-beta/beta-marker.txt' && printf 'regular file\n' > '${fixture.sftp_shell_test_dir}/qa-path-completion/project.txt'
-      && printf '\nQA_PATH_COMPLETION_READY\n'
+      '${fixture.sftp_shell_test_dir}/qa-path-completion/project-beta/beta-marker.txt' && printf 'regular file\n' >
+      '${fixture.sftp_shell_test_dir}/qa-path-completion/project.txt' && printf '\nQA_PATH_COMPLETION_READY\n'
     submit: true
 - assert_pattern:
     selector: '[data-testid="terminal-pane"]'
     regex: (?m)^QA_PATH_COMPLETION_READY\r?$
     timeout_sec: 60
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-remote-path-edit"]'
 - click: '[data-testid="sftp-remote-path-edit"]'
@@ -329,42 +330,43 @@ verification:
     - 18
     - 20
     - 22
-    - 24
-    - 27
+    - 23
+    - 25
     - 28
-    - 30
-    - 33
-    - 36
-    - 39
+    - 29
+    - 31
+    - 34
+    - 37
     - 40
     - 41
-    - 43
-    - 45
-    - 48
-    - 50
-    - 53
-    - 56
-    - 58
-    - 60
-    - 62
-    - 65
-    - 67
-    - 70
-    - 72
-    - 75
-    - 77
-    - 79
-    - 82
-    - 85
-    - 87
-    - 90
-    - 92
+    - 42
+    - 44
+    - 46
+    - 49
+    - 51
+    - 54
+    - 57
+    - 59
+    - 61
+    - 63
+    - 66
+    - 68
+    - 71
+    - 73
+    - 76
+    - 78
+    - 80
+    - 83
+    - 86
+    - 88
+    - 91
     - 93
     - 94
-    - 97
-    - 100
-    - 102
-    - 104
+    - 95
+    - 98
+    - 101
+    - 103
+    - 105
     checkpoints:
     - step: 3
       expectation: '{"wait_for": {"selector": "[data-testid=\"session-new\"]", "timeout_sec": 60}}'
@@ -378,114 +380,116 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
     - step: 21
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^QA_PATH_COMPLETION_READY\\r?$", "timeout_sec": 60}}'
-    - step: 23
+    - step: 24
       expectation: '{"wait_for": "[data-testid=\"sftp-remote-path-edit\"]"}'
-    - step: 25
-      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 26
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.dataset.testid === \"sftp-remote-path\"", "expect_truthy": true, "timeout_sec": 5}}'
-    - step: 29
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "project-alpha"}}'
-    - step: 31
       expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
-    - step: 32
+    - step: 27
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.dataset.testid === \"sftp-remote-path\"", "expect_truthy": true, "timeout_sec": 5}}'
-    - step: 34
+    - step: 30
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "project-alpha"}}'
+    - step: 32
+      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 33
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.dataset.testid === \"sftp-remote-path\"", "expect_truthy": true, "timeout_sec": 5}}'
+    - step: 35
       expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-remote-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.sftp_sync_test_dir}/qa-path-completion/project-alpha/",
         "${fixture.sftp_sync_test_dir}/qa-path-completion/project-beta/"]}}'
-    - step: 37
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${fixture.sftp_sync_test_dir}/qa-path-completion/project-"}}'
     - step: 38
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${fixture.sftp_sync_test_dir}/qa-path-completion/project-"}}'
+    - step: 39
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") === \"sftp-remote-path\"", "expect_truthy": true}}'
-    - step: 42
+    - step: 43
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${fixture.sftp_sync_test_dir}/qa-path-completion/project-beta/"}}'
-    - step: 44
+    - step: 45
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "project-alpha"}}'
-    - step: 46
-      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 47
+      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 48
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.dataset.testid === \"sftp-remote-path\"", "expect_truthy": true, "timeout_sec": 5}}'
-    - step: 49
+    - step: 50
       expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-remote-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.sftp_sync_test_dir}/qa-path-completion/only
         space/"]}}'
-    - step: 51
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${fixture.sftp_sync_test_dir}/qa-path-completion/only space/"}}'
     - step: 52
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${fixture.sftp_sync_test_dir}/qa-path-completion/only
+        space/"}}'
+    - step: 53
       expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-remote-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.sftp_sync_test_dir}/qa-path-completion/only
         space/child/"]}}'
-    - step: 54
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${fixture.sftp_sync_test_dir}/qa-path-completion/only space/child/"}}'
     - step: 55
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${fixture.sftp_sync_test_dir}/qa-path-completion/only
+        space/child/"}}'
+    - step: 56
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") === \"sftp-remote-path\"", "expect_truthy": true}}'
-    - step: 57
+    - step: 58
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "child-marker.txt"}}'
-    - step: 59
+    - step: 60
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "project-alpha"}}'
-    - step: 61
+    - step: 62
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "child-marker.txt"}}'
-    - step: 63
-      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 64
+      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 65
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.dataset.testid === \"sftp-remote-path\"", "expect_truthy": true, "timeout_sec": 5}}'
-    - step: 66
+    - step: 67
       expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-remote-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.sftp_sync_test_dir}/qa-path-completion/project-alpha/",
         "${fixture.sftp_sync_test_dir}/qa-path-completion/project-beta/"]}}'
-    - step: 68
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${fixture.sftp_sync_test_dir}/qa-path-completion/project-beta/"}}'
     - step: 69
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-remote-path\"]", "name": "value", "equals": "${fixture.sftp_sync_test_dir}/qa-path-completion/project-beta/"}}'
+    - step: 70
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") === \"sftp-remote-path\"", "expect_truthy": true}}'
-    - step: 71
+    - step: 72
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "beta-marker.txt"}}'
-    - step: 73
-      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
     - step: 74
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.dataset.testid === \"sftp-remote-path\"", "expect_truthy": true, "timeout_sec": 5}}'
-    - step: 76
-      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-remote-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.sftp_sync_test_dir}/qa-path-completion/.hidden/"]}}'
-    - step: 78
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "beta-marker.txt"}}'
-    - step: 80
       expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
-    - step: 81
+    - step: 75
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.dataset.testid === \"sftp-remote-path\"", "expect_truthy": true, "timeout_sec": 5}}'
-    - step: 83
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-path-suggestions\"]", "contains": "No matching folders"}}'
-    - step: 84
-      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-remote-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": []}}'
-    - step: 86
+    - step: 77
+      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-remote-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.sftp_sync_test_dir}/qa-path-completion/.hidden/"]}}'
+    - step: 79
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "beta-marker.txt"}}'
-    - step: 88
-      expectation: '{"wait_for": "input[data-testid=\"sftp-local-path\"]"}'
+    - step: 81
+      expectation: '{"wait_for": "input[data-testid=\"sftp-remote-path\"]"}'
+    - step: 82
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.dataset.testid === \"sftp-remote-path\"", "expect_truthy": true, "timeout_sec": 5}}'
+    - step: 84
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-path-suggestions\"]", "contains": "No matching folders"}}'
+    - step: 85
+      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-remote-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": []}}'
+    - step: 87
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "beta-marker.txt"}}'
     - step: 89
+      expectation: '{"wait_for": "input[data-testid=\"sftp-local-path\"]"}'
+    - step: 90
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.dataset.testid === \"sftp-local-path\"", "expect_truthy": true, "timeout_sec": 5}}'
-    - step: 91
+    - step: 92
       expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-local-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.path_completion_root}/project-alpha/",
         "${fixture.path_completion_root}/project-beta/"]}}'
-    - step: 95
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "beta-marker.txt"}}'
     - step: 96
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "beta-marker.txt"}}'
+    - step: 97
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "beta-marker.txt"}}'
-    - step: 98
-      expectation: '{"wait_for": "input[data-testid=\"sftp-local-path\"]"}'
     - step: 99
+      expectation: '{"wait_for": "input[data-testid=\"sftp-local-path\"]"}'
+    - step: 100
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.dataset.testid === \"sftp-local-path\"", "expect_truthy": true, "timeout_sec": 5}}'
-    - step: 101
+    - step: 102
       expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-local-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.path_completion_root}/only
         space/"]}}'
-    - step: 103
+    - step: 104
       expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-local-path\"]", "name": "value", "equals": "${fixture.path_completion_root}/only space/"}}'
-    - step: 105
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "beta-marker.txt"}}'
     - step: 106
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "beta-marker.txt"}}'
+    - step: 107
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "beta-marker.txt"}}'
     results:
-    - 106
+    - 107
   visual:
   - check: Inspect the matching-folder popup, input, selection and pane for clipping or overlap; folder names must remain distinguishable with long parent paths.
     method: manual
     reason: Screenshots supplement exact path, focus and navigation assertions.
   native:
-  - check: The packaged app obtains remote candidates through russh-sftp from the runner-local SSH server and local candidates through native filesystem IPC, then lists the
-      independent marker files after navigation.
+  - check: The packaged app obtains remote candidates through russh-sftp from the runner-local SSH server and local candidates through native filesystem IPC, then lists
+      the independent marker files after navigation.
     method: external
     reason: Browser VFS/service-bridge results do not establish packaged Tauri IPC or host filesystem access.

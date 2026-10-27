@@ -1,7 +1,7 @@
 id: TC-WS-020
 title: Mode toolbar actions follow the prototype and Sessions onboarding has no Welcome
-description: Checks exact ordered toolbar control lists for Home, Sessions, Workspaces and Tools. Operates both Home routes, empty Sessions creation/cancel, empty overview/close,
-  the rail menu and Tools return route.
+description: Checks exact ordered toolbar control lists for Home, Sessions, Workspaces and Tools. Operates both Home routes, empty Sessions creation/cancel, empty
+  overview/close, the rail menu and Tools return route.
 modes:
 - browser
 covers:
@@ -27,7 +27,7 @@ steps:
     - home-toolbar-sessions
     - global-search-trigger
     - tab-overview-trigger
-    - titlebar-actions-more
+- assert_not_visible: '[data-testid="ptt-button"]'
 - assert_not_visible: '[data-testid="toggle-left-sidebar"]'
 - assert_not_visible: '[data-testid="toggle-right-sidebar"]'
 - click: '[data-testid="home-toolbar-sessions"]'
@@ -36,15 +36,29 @@ steps:
     selector: '[data-testid="platform-toolbar-actions"] button'
     attribute: data-testid
     equals:
-    - tab-multiexec-toggle
-    - platform-layout-single
-    - tab-split-view
-    - platform-layout-grid
     - tab-more
     - global-search-trigger
     - tab-overview-trigger
     - toggle-right-sidebar
     - titlebar-actions-more
+- assert_not_visible: '[data-testid="ptt-button"]'
+- click: '[data-testid="titlebar-actions-more"]'
+- assert_items:
+    selector: '[data-testid="titlebar-actions-menu"] button'
+    attribute: data-testid
+    equals:
+    - tab-multiexec-toggle
+    - platform-layout-single
+    - tab-split-view
+    - platform-layout-grid
+    - toolbar-close-all-terminals
+- assert_disabled: '[data-testid="toolbar-close-all-terminals"]'
+- assert_not_visible: '[data-testid="ptt-button"]'
+- press: Escape
+- assert_attribute:
+    selector: '[data-testid="tab-more"]'
+    name: aria-haspopup
+    equals: dialog
 - click: '[data-testid="sessions-empty-new-session"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-cancel"]'
@@ -64,14 +78,12 @@ steps:
     selector: '[data-testid="platform-toolbar-actions"] button'
     attribute: data-testid
     equals:
-    - platform-layout-single
-    - workspace-layout-split
-    - platform-layout-grid
-    - workspace-toolbar-bottom-dock
+    - workspace-tabs-filter-trigger
     - global-search-trigger
     - tab-overview-trigger
     - toggle-right-sidebar
     - titlebar-actions-more
+- assert_not_visible: '[data-testid="ptt-button"]'
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="tools-empty-state"]'
 - assert_items:
@@ -82,7 +94,7 @@ steps:
     - global-search-trigger
     - tab-overview-trigger
     - toggle-right-sidebar
-    - titlebar-actions-more
+- assert_not_visible: '[data-testid="ptt-button"]'
 - click: '[data-testid="tools-toolbar-workspaces"]'
 - assert_attribute:
     selector: '[data-testid="platform-toolbar-actions"]'
@@ -98,77 +110,104 @@ verification:
     actions:
     - 1
     - 2
-    - 7
-    - 10
+    - 8
     - 12
-    - 14
     - 16
     - 18
     - 20
     - 22
-    - 23
+    - 24
     - 26
-    - 29
+    - 28
+    - 30
+    - 31
+    - 35
+    - 39
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 4
       expectation: '{"assert_items": {"selector": "[data-testid=\"platform-toolbar-actions\"] button", "attribute": "data-testid", "equals": ["home-toolbar-workspaces", "home-toolbar-sessions",
-        "global-search-trigger", "tab-overview-trigger", "titlebar-actions-more"]}}'
-    - step: 5
-      expectation: '{"assert_not_visible": "[data-testid=\"toggle-left-sidebar\"]"}'
+        "global-search-trigger", "tab-overview-trigger"]}}'
     - step: 6
+      expectation: '{"assert_not_visible": "[data-testid=\"toggle-left-sidebar\"]"}'
+    - step: 7
       expectation: '{"assert_not_visible": "[data-testid=\"toggle-right-sidebar\"]"}'
-    - step: 8
-      expectation: '{"wait_for": "[data-testid=\"sessions-empty-state\"]"}'
     - step: 9
-      expectation: '{"assert_items": {"selector": "[data-testid=\"platform-toolbar-actions\"] button", "attribute": "data-testid", "equals": ["tab-multiexec-toggle", "platform-layout-single",
-        "tab-split-view", "platform-layout-grid", "tab-more", "global-search-trigger", "tab-overview-trigger", "toggle-right-sidebar", "titlebar-actions-more"]}}'
-    - step: 11
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 13
-      expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
-    - step: 15
-      expectation: '{"wait_for": "[data-testid=\"tab-overview-empty\"]"}'
-    - step: 17
-      expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
-    - step: 19
-      expectation: '{"wait_for": "[data-testid=\"sidebar-rail-menu-show-names\"]"}'
-    - step: 21
-      expectation: '{"assert_not_visible": "[data-testid=\"context-menu\"]"}'
-    - step: 24
-      expectation: '{"wait_for": "[data-testid=\"workspace-main-panel\"]"}'
-    - step: 25
-      expectation: '{"assert_items": {"selector": "[data-testid=\"platform-toolbar-actions\"] button", "attribute": "data-testid", "equals": ["platform-layout-single", "workspace-layout-split",
-        "platform-layout-grid", "workspace-toolbar-bottom-dock", "global-search-trigger", "tab-overview-trigger", "toggle-right-sidebar", "titlebar-actions-more"]}}'
-    - step: 27
-      expectation: '{"wait_for": "[data-testid=\"tools-empty-state\"]"}'
-    - step: 28
-      expectation: '{"assert_items": {"selector": "[data-testid=\"platform-toolbar-actions\"] button", "attribute": "data-testid", "equals": ["tools-toolbar-workspaces", "global-search-trigger",
+      expectation: '{"wait_for": "[data-testid=\"sessions-empty-state\"]"}'
+    - step: 10
+      expectation: '{"assert_items": {"selector": "[data-testid=\"platform-toolbar-actions\"] button", "attribute": "data-testid", "equals": ["tab-more", "global-search-trigger",
         "tab-overview-trigger", "toggle-right-sidebar", "titlebar-actions-more"]}}'
-    - step: 30
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 21
+      expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"tab-overview-empty\"]"}'
+    - step: 25
+      expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"sidebar-rail-menu-show-names\"]"}'
+    - step: 29
+      expectation: '{"assert_not_visible": "[data-testid=\"context-menu\"]"}'
+    - step: 32
+      expectation: '{"wait_for": "[data-testid=\"workspace-main-panel\"]"}'
+    - step: 33
+      expectation: '{"assert_items": {"selector": "[data-testid=\"platform-toolbar-actions\"] button", "attribute": "data-testid", "equals": ["workspace-tabs-filter-trigger",
+        "global-search-trigger", "tab-overview-trigger", "toggle-right-sidebar", "titlebar-actions-more"]}}'
+    - step: 36
+      expectation: '{"wait_for": "[data-testid=\"tools-empty-state\"]"}'
+    - step: 37
+      expectation: '{"assert_items": {"selector": "[data-testid=\"platform-toolbar-actions\"] button", "attribute": "data-testid", "equals": ["tools-toolbar-workspaces", "global-search-trigger",
+        "tab-overview-trigger", "toggle-right-sidebar"]}}'
+    - step: 40
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"platform-toolbar-actions\"]", "name": "data-mode", "equals": "workspaces"}}'
-    - step: 31
+    - step: 41
       expectation: '{"assert_visible": "[data-testid=\"workspace-main-panel\"]"}'
+    - step: 5
+      expectation: '{"assert_not_visible": "[data-testid=\"ptt-button\"]"}'
+    - step: 11
+      expectation: '{"assert_not_visible": "[data-testid=\"ptt-button\"]"}'
+    - step: 13
+      expectation: '{"assert_items": {"selector": "[data-testid=\"titlebar-actions-menu\"] button", "attribute": "data-testid", "equals": ["tab-multiexec-toggle", "platform-layout-single",
+        "tab-split-view", "platform-layout-grid", "toolbar-close-all-terminals"]}}'
+    - step: 14
+      expectation: '{"assert_disabled": "[data-testid=\"toolbar-close-all-terminals\"]"}'
+    - step: 15
+      expectation: '{"assert_not_visible": "[data-testid=\"ptt-button\"]"}'
+    - step: 17
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-more\"]", "name": "aria-haspopup", "equals": "dialog"}}'
+    - step: 34
+      expectation: '{"assert_not_visible": "[data-testid=\"ptt-button\"]"}'
+    - step: 38
+      expectation: '{"assert_not_visible": "[data-testid=\"ptt-button\"]"}'
     results:
     - 3
     - 4
-    - 5
     - 6
-    - 8
+    - 7
     - 9
-    - 11
-    - 13
-    - 15
-    - 17
+    - 10
     - 19
     - 21
-    - 24
+    - 23
     - 25
     - 27
-    - 28
-    - 30
-    - 31
+    - 29
+    - 32
+    - 33
+    - 36
+    - 37
+    - 40
+    - 41
+    - 5
+    - 11
+    - 13
+    - 14
+    - 15
+    - 17
+    - 34
+    - 38
   visual:
   - check: 各视图右上角图标、布局按钮及模式操作符合 HTML 原型。
     method: manual

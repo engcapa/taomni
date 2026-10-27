@@ -29,6 +29,7 @@ steps:
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
     timeout_sec: 60
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for:
     selector: '[data-testid="sftp-browser"]'
@@ -56,7 +57,9 @@ steps:
 - wait_for: '[data-testid="sftp-transfer-queue"] [data-transfer-state="running"] button[title="Pause"]'
 - click: '[data-testid="sftp-transfer-queue"] button[title="Pause"]'
 - wait_for: '[data-testid="sftp-transfer-queue"] [data-transfer-state="paused"]'
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="attached-sftp-toggle"]'
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-transfer-queue"] [data-transfer-state="paused"]'
 - click: '[data-testid="sftp-transfer-queue"] button[title="Resume"]'
@@ -83,20 +86,23 @@ verification:
     - 2
     - 6
     - 8
-    - 10
+    - 9
     - 11
     - 12
-    - 14
+    - 13
     - 15
     - 16
-    - 18
+    - 17
     - 19
-    - 21
-    - 23
+    - 20
+    - 22
     - 24
+    - 25
     - 26
+    - 27
     - 29
-    - 31
+    - 32
+    - 34
     checkpoints:
     - step: 3
       expectation: '{"wait_for": {"selector": "[data-testid=\"sidebar\"]", "timeout_sec": 45}}'
@@ -106,46 +112,46 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"startup-vault-check\"]", "state": "hidden", "timeout_sec": 45}}'
     - step: 7
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
-    - step: 9
+    - step: 10
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "timeout_sec": 45}}'
-    - step: 13
+    - step: 14
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "scp-source.txt", "timeout_sec": 45}}'
-    - step: 17
+    - step: 18
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "scp-upload.txt", "timeout_sec": 45}}'
-    - step: 20
+    - step: 21
       expectation: '{"wait_for": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"running\"] button[title=\"Pause\"]"}'
-    - step: 22
+    - step: 23
       expectation: '{"wait_for": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"paused\"]"}'
-    - step: 25
-      expectation: '{"wait_for": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"paused\"]"}'
-    - step: 27
-      expectation: '{"wait_for": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"running\"]"}'
     - step: 28
+      expectation: '{"wait_for": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"paused\"]"}'
+    - step: 30
+      expectation: '{"wait_for": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"running\"]"}'
+    - step: 31
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"running\"][data-transfer-bytes]:not([data-transfer-bytes=\"0\"])",
         "timeout_sec": 45}}'
-    - step: 30
-      expectation: '{"wait_for": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"cancelled\"]"}'
-    - step: 32
-      expectation: '{"assert_file_sha256": {"path": "${cfg.ssh_features.large_downloaded}", "equals": "6b4be392164b2c21ce9cd339a9846f9de7afb4407b46becb7ddf98081e3c6cac",
-        "timeout_sec": 90}}'
     - step: 33
+      expectation: '{"wait_for": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"cancelled\"]"}'
+    - step: 35
+      expectation: '{"assert_file_sha256": {"path": "${cfg.ssh_features.large_downloaded}", "equals": "6b4be392164b2c21ce9cd339a9846f9de7afb4407b46becb7ddf98081e3c6cac", "timeout_sec":
+        90}}'
+    - step: 36
       expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"] [data-transfer-state=\"done\"][data-resume-bytes]:not([data-resume-bytes=\"0\"])"}'
     results:
     - 3
     - 4
     - 5
     - 7
-    - 9
-    - 13
-    - 17
-    - 20
-    - 22
-    - 25
-    - 27
+    - 10
+    - 14
+    - 18
+    - 21
+    - 23
     - 28
     - 30
-    - 32
+    - 31
     - 33
+    - 35
+    - 36
   visual:
   - check: Configuration and workflow state
     method: automated

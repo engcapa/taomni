@@ -33,8 +33,8 @@ timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="status-bar"]'
-- click: '[data-testid="titlebar-actions-more"]'
-- assert_visible: '[data-testid="ptt-button"]'
+- assert_not_visible: '[data-testid="titlebar-actions-more"]'
+- assert_not_visible: '[data-testid="ptt-button"]'
 - click: '[data-testid="welcome-open-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"]'
 - click: '[data-testid="rail-chat-button"]'
@@ -88,7 +88,7 @@ verification:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
     - step: 4
-      expectation: '{"assert_visible": "[data-testid=\"ptt-button\"]"}'
+      expectation: '{"assert_not_visible": "[data-testid=\"ptt-button\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
     - step: 8
@@ -114,8 +114,8 @@ verification:
     - step: 22
       expectation: '{"assert_visible": "[data-testid=\"ai-chat-composer-resize\"]"}'
     - step: 23
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer\"] textarea", "name": "placeholder", "equals": "Type a message... (Ctrl+Enter to send · supports
-        @terminal:last-50 / @file:./error.log)"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"ai-chat-drawer\"] textarea", "name": "placeholder", "equals": "Type a message... (Ctrl+Enter to send ·
+        supports @terminal:last-50 / @file:./error.log)"}}'
     - step: 25
       expectation: '{"wait_for": "[data-testid=\"attachment-chip\"]"}'
     - step: 26

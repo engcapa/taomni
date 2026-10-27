@@ -196,6 +196,12 @@ html[data-app-theme="dark"] .taomni-main-window {
 .taomni-platform-toolbar-button svg { width: 14px; height: 14px; }
 .taomni-platform-toolbar-button:hover { background: var(--taomni-hover); color: var(--taomni-text); }
 .taomni-platform-toolbar-button[data-active="true"] { background: var(--taomni-selected); color: var(--taomni-accent); }
+.taomni-titlebar-actions-menu, .taomni-tab-filter-menu { font-size: var(--taomni-ui-font-size); font-family: var(--taomni-ui-font-family, inherit); }
+.taomni-tab-action-menu-item:hover { background: var(--taomni-hover) !important; }
+.taomni-tab-action-menu-slot:empty { display: none; }
+.taomni-tab-action-menu-slot:not(:empty) { border-top: 1px solid var(--taomni-divider); margin-top: 4px; padding-top: 4px; }
+.taomni-tab-action-menu-slot [data-testid="rdp-status"] { color: var(--taomni-text-muted) !important; }
+.taomni-tab-action-menu-slot > [aria-hidden="true"] { display: none !important; }
 .taomni-layout-presets { display: flex; align-items: center; border: 1px solid var(--taomni-card-border); border-radius: 5px; padding: 1px; gap: 1px; }
 .taomni-layout-presets .taomni-platform-toolbar-button { height: 20px; min-width: 21px; }
 .taomni-toolbar-divider { width: 1px; height: 18px; margin: 0 2px; background: var(--taomni-chrome-border); }

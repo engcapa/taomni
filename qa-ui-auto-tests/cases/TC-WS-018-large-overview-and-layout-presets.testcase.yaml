@@ -1,7 +1,7 @@
 id: TC-WS-018
 title: Workspace layout presets and large live/global overview preserve unsaved files
-description: Operates the prototype toolbar, split/grid/single, bottom dock and large overview. File previews read the current unsaved document. Global
-  Home cards activate their owning workspace. Native verifies real file loading and retained editor state in the packaged WebView.
+description: Operates the prototype toolbar, split/grid/single, bottom dock and large overview. File previews read the current unsaved document. Global Home cards
+  activate their owning workspace. Native verifies real file loading and retained editor state in the packaged WebView.
 modes:
 - browser
 - native
@@ -24,12 +24,12 @@ steps:
 - wait_for: '[data-testid="welcome-panel"]'
 - seed_storage:
     key: taomni.platformWorkspaces.v1
-    value: '{"version": 1, "activeWorkspaceId": "default-workspace", "createdNodes": [], "workspaces": [{"id": "default-workspace", "name": "Default Workspace",
-      "description": "", "isDefault": true, "rootFolders": [{"id": "root-1", "name": "qa-root", "path": "${fixture.platform_workspace_root}", "addedAt":
-      1}], "pinnedSessionIds": [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs":
-      [], "activeTabId": ""}, {"id": "second-workspace", "name": "Second Workspace", "description": "", "isDefault": false, "rootFolders": [], "pinnedSessionIds":
-      [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId": ""}]}'
-- reload_window: null
+    value: '{"version": 1, "activeWorkspaceId": "default-workspace", "createdNodes": [], "workspaces": [{"id": "default-workspace", "name": "Default Workspace", "description":
+      "", "isDefault": true, "rootFolders": [{"id": "root-1", "name": "qa-root", "path": "${fixture.platform_workspace_root}", "addedAt": 1}], "pinnedSessionIds": [], "activeLeftToolWindow":
+      "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId": ""}, {"id": "second-workspace", "name": "Second Workspace",
+      "description": "", "isDefault": false, "rootFolders": [], "pinnedSessionIds": [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal",
+      "heightPx": 220}, "openTabs": [], "activeTabId": ""}]}'
+- reload_window:
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="nav-mode-workspaces"]'
 - click: '[data-testid="code-workspace-tree-root"]'
@@ -44,6 +44,7 @@ steps:
 - type:
     selector: '[data-testid="workspace-file-editor"][data-path="src/index.ts"] .cm-content'
     text: export const previewUnsaved = "live draft";
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="workspace-layout-split"]'
 - assert_count:
     selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
@@ -52,10 +53,12 @@ steps:
     selector: '[data-testid="workspace-canvas-panes"]'
     name: data-layout
     equals: split
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="platform-layout-grid"]'
 - assert_count:
     selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
     equal: 2
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="platform-layout-single"]'
 - assert_count:
     selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
@@ -91,8 +94,10 @@ steps:
 - wait_for: '[data-testid="tab-overview"]'
 - press: Escape
 - assert_not_visible: '[data-testid="tab-overview"]'
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="workspace-toolbar-bottom-dock"]'
 - assert_visible: '[data-testid="workspace-bottom-dock"]'
+- click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="workspace-toolbar-bottom-dock"]'
 - assert_not_visible: '[data-testid="workspace-bottom-dock"]'
 - click: '[data-testid="nav-mode-home"]'
@@ -132,21 +137,26 @@ verification:
     - 14
     - 15
     - 16
-    - 19
+    - 17
+    - 20
     - 21
     - 23
+    - 24
     - 26
-    - 28
-    - 32
-    - 34
-    - 36
-    - 38
-    - 40
-    - 42
-    - 44
+    - 29
+    - 31
+    - 35
+    - 37
+    - 39
+    - 41
+    - 43
+    - 45
     - 46
-    - 47
-    - 50
+    - 48
+    - 49
+    - 51
+    - 52
+    - 55
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -156,76 +166,74 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
     - step: 13
       expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-path=\"src/index.ts\"] .cm-content"}'
-    - step: 17
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
     - step: 18
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
-    - step: 20
       expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
     - step: 22
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
-    - step: 24
-      expectation: '{"wait_for": "[data-testid=\"tab-overview\"][data-scope=\"workspaces\"]"}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
     - step: 25
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-overview-card\"]", "equal": 2}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
     - step: 27
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-overview\"]", "name": "data-scope", "equals": "all"}}'
-    - step: 29
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-overview\"]", "name": "data-scope", "equals": "workspaces"}}'
+      expectation: '{"wait_for": "[data-testid=\"tab-overview\"][data-scope=\"workspaces\"]"}'
+    - step: 28
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-overview-card\"]", "equal": 2}}'
     - step: 30
-      expectation: '{"assert_text": {"selector": "[data-testid=\"tab-overview\"]", "contains": "previewUnsaved"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-overview\"]", "name": "data-scope", "equals": "all"}}'
+    - step: 32
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-overview\"]", "name": "data-scope", "equals": "workspaces"}}'
     - step: 33
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"] .cm-content", "contains": "platform workspace
-        root"}}'
-    - step: 35
-      expectation: '{"wait_for": "[data-testid=\"tab-overview\"]"}'
-    - step: 37
-      expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
-    - step: 39
-      expectation: '{"wait_for": "[data-testid=\"tab-overview\"]"}'
-    - step: 41
-      expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
-    - step: 43
-      expectation: '{"assert_visible": "[data-testid=\"workspace-bottom-dock\"]"}'
-    - step: 45
-      expectation: '{"assert_not_visible": "[data-testid=\"workspace-bottom-dock\"]"}'
-    - step: 48
-      expectation: '{"wait_for": "[data-testid=\"tab-overview\"][data-scope=\"all\"]"}'
-    - step: 49
       expectation: '{"assert_text": {"selector": "[data-testid=\"tab-overview\"]", "contains": "previewUnsaved"}}'
-    - step: 52
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"src/index.ts\"]", "name": "data-dirty", "equals":
-        "true"}}'
+    - step: 36
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"] .cm-content", "contains": "platform workspace root"}}'
+    - step: 38
+      expectation: '{"wait_for": "[data-testid=\"tab-overview\"]"}'
+    - step: 40
+      expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
+    - step: 42
+      expectation: '{"wait_for": "[data-testid=\"tab-overview\"]"}'
+    - step: 44
+      expectation: '{"assert_not_visible": "[data-testid=\"tab-overview\"]"}'
+    - step: 47
+      expectation: '{"assert_visible": "[data-testid=\"workspace-bottom-dock\"]"}'
+    - step: 50
+      expectation: '{"assert_not_visible": "[data-testid=\"workspace-bottom-dock\"]"}'
     - step: 53
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"src/index.ts\"] .cm-content", "contains": "previewUnsaved"}}'
+      expectation: '{"wait_for": "[data-testid=\"tab-overview\"][data-scope=\"all\"]"}'
     - step: 54
+      expectation: '{"assert_text": {"selector": "[data-testid=\"tab-overview\"]", "contains": "previewUnsaved"}}'
+    - step: 57
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"src/index.ts\"]", "name": "data-dirty", "equals": "true"}}'
+    - step: 58
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"src/index.ts\"] .cm-content", "contains": "previewUnsaved"}}'
+    - step: 59
       expectation: '{"assert_count": {"selector": "[data-testid=\"ai-chat-drawer-ribbon\"]", "equal": 0}}'
     results:
     - 3
     - 6
     - 10
     - 13
-    - 17
     - 18
-    - 20
+    - 19
     - 22
-    - 24
     - 25
     - 27
-    - 29
+    - 28
     - 30
+    - 32
     - 33
-    - 35
-    - 37
-    - 39
-    - 41
-    - 43
-    - 45
-    - 48
-    - 49
-    - 52
+    - 36
+    - 38
+    - 40
+    - 42
+    - 44
+    - 47
+    - 50
     - 53
     - 54
+    - 57
+    - 58
+    - 59
   visual:
   - check: 工具栏顺序、大预览卡片与画布无重叠或裁切，匹配原型。
     method: manual

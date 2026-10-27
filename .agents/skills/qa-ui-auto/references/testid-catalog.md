@@ -153,7 +153,6 @@
 
 ## ai/voice (F-AI-2.3)
 
-- `[data-testid="ptt-button"]` — interactive [optional] — F-AI-2.3.ptt-button
 - `[data-testid="chat-voice-button"]` — interactive — F-AI-2.3.chat-voice-button
 - `[data-testid="chat-voice-button-cancel"]` — interactive — F-AI-2.3.chat-voice-cancel
 - `[data-testid="voice-settings-close"]` — interactive — F-AI-2.3.voice-settings-close
@@ -189,9 +188,9 @@
 - `[data-testid="asr-realtime-settings"] label:has-text("Proxy URL") input` — interactive — F-AI-2.3.asr-provider-proxy-url
 - `[data-testid="asr-realtime-settings"] button:has-text("Save provider")` — interactive — F-AI-2.3.asr-provider-save
 - `[data-testid="chat-composer-textarea"]` — display — F-AI-2.3.voice-composer-draft
-- `[data-testid="composer-voice-original"]` — display — F-AI-2.3.voice-composer-original
-- `[data-testid="composer-voice-original"] summary` — interactive — F-AI-2.3.voice-composer-original-open
-- `[data-testid="composer-voice-original"] button` — interactive — F-AI-2.3.voice-composer-original-undo
+- `[data-testid="chat-voice-button-original"]` — display — F-AI-2.3.voice-composer-original
+- `[data-testid="chat-voice-button-original"] summary` — interactive — F-AI-2.3.voice-composer-original-open
+- `[data-testid="chat-voice-button-original"] button` — interactive — F-AI-2.3.voice-composer-original-undo
 - `[data-testid="asr-download-recommended"]` — interactive — F-AI-2.3.asr-download-recommended
 - `[data-testid="asr-replace-whisper-small"]` — interactive — F-AI-2.3.asr-replace-whisper-small
 - `[data-testid="asr-hotwords"]` — interactive — F-AI-2.3.asr-hotwords
@@ -204,8 +203,9 @@
 - `[data-testid="asr-model-whisper-base"]` — display — F-AI-2.3.asr-model-whisper-base
 - `[data-testid="asr-model-whisper-small"]` — display — F-AI-2.3.asr-model-whisper-small
 - `[data-testid="asr-model-whisper-small-q8"]` — display — F-AI-2.3.asr-model-whisper-small-q8
-- `[data-testid="ptt-button-interim"]` — display — F-AI-2.3.ptt-button-interim
+- `[data-testid="chat-voice-button-interim"]` — display — F-AI-2.3.chat-voice-button-interim
 - `[data-testid="asr-realtime-provider"] option[value="gemini"]` — display — F-AI-2.3.asr-gemini-option
+- `[data-testid="ptt-button"]` — display [optional] — F-AI-2.3.retired-titlebar-voice
 
 ## application/update (F-Update-1)
 
@@ -1592,7 +1592,6 @@
 - `[data-testid^="tab-details-card-"]` — display [optional] — F1.5.tab-details-card
 - `[data-testid^="tab-details-program-"]` — display [optional] — F1.5.tab-details-program
 - `[data-testid="open-tabs-menu"]` — display [optional] — F1.5.open-tabs-menu
-- `[data-testid="open-tabs-detach-active"]` — interactive [optional] — F1.5.open-tabs-detach-active
 - `[data-testid="context-menu-item-move-to-first"]` — interactive [optional] — F1.5.tab-menu-move-first
 - `[data-testid="context-menu-item-move-left"]` — interactive [optional] — F1.5.tab-menu-move-left
 - `[data-testid="context-menu-item-move-right"]` — interactive [optional] — F1.5.tab-menu-move-right
@@ -1602,6 +1601,9 @@
 - `[data-testid="context-menu-item-tunneling"]` — interactive [optional] — F1.5.context-menu-item-tunneling
 - `[data-testid="tab-details-hover"]` — display [optional] — F1.5.tab-details-hover
 - `[data-testid="ai-chat-drawer-ribbon"]` — display [optional] — F1.5.ai-chat-drawer-ribbon
+- `[data-testid="titlebar-actions-menu"]` — display — F1.5.titlebar-actions-menu
+- `[data-testid="toolbar-close-all-terminals"]` — interactive — F1.5.toolbar-close-all-terminals
+- `[data-testid="open-tabs-detach-active"]` — interactive [optional] — F1.5.open-tabs-detach-active
 
 ## main/theme (F5.5)
 
@@ -1873,6 +1875,22 @@
 - `[data-testid="code-workspace-tree-sort-ascending"]` — interactive — F-WS-2.code-workspace-tree-sort-ascending
 - `[data-testid="code-workspace-tree-sort-descending"]` — interactive — F-WS-2.code-workspace-tree-sort-descending
 - `[data-testid="code-workspace-tree-sort-folders-first"]` — interactive — F-WS-2.code-workspace-tree-sort-folders-first
+- `[data-testid="workspace-tabs-filter-trigger"]` — interactive — F-WS-2.workspace-tabs-filter-trigger
+- `[data-testid="workspace-tabs-filter-menu"]` — display — F-WS-2.workspace-tabs-filter-menu
+- `[data-testid="workspace-tabs-filter-search"]` — interactive — F-WS-2.workspace-tabs-filter-search
+- `[data-testid="workspace-tabs-filter-clear"]` — interactive — F-WS-2.workspace-tabs-filter-clear
+- `[data-testid="workspace-tabs-filter-row"]` — interactive — F-WS-2.workspace-tabs-filter-row
+- `[data-testid="workspace-tabs-filter-empty"]` — display — F-WS-2.workspace-tabs-filter-empty
+- `[data-testid="workspace-tab-filter-chip"]` — interactive — F-WS-2.workspace-tab-filter-chip
+- `[data-testid="workspace-tab-filter-all"]` — interactive — F-WS-2.workspace-tab-filter-all
+- `[data-testid="workspace-tab-filter-files"]` — interactive — F-WS-2.workspace-tab-filter-files
+- `[data-testid="workspace-tab-filter-ssh"]` — interactive — F-WS-2.workspace-tab-filter-ssh
+- `[data-testid="workspace-tab-filter-database"]` — interactive — F-WS-2.workspace-tab-filter-database
+- `[data-testid="workspace-tab-filter-sftp"]` — interactive — F-WS-2.workspace-tab-filter-sftp
+- `[data-testid="workspace-tab-filter-remote"]` — interactive — F-WS-2.workspace-tab-filter-remote
+- `[data-testid="workspace-tab-filter-local"]` — interactive — F-WS-2.workspace-tab-filter-local
+- `[data-testid="workspace-tab-filter-other"]` — interactive — F-WS-2.workspace-tab-filter-other
+- `[data-testid="workspace-tab-categories"]` — display — F-WS-2.workspace-tab-categories
 
 ## main/workspace-platform (F-WS-3)
 
