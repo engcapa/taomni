@@ -21,6 +21,10 @@
 
 ## Release 文件监听生命周期复验（2026-10-27，验证中）
 
+GitHub 当前相关集 `40466625564` 已收到 23/25 个分片，三平台 browser 1,327/1,327 通过。失败材料保留，不能按分片 job 软成功计为通过：TC-WS-030 三平台的 `.cache/workspace` 父目录未由 fixture 创建，尚未进入产品步骤；新增隔离 fixture 预建完整目录及种子文件。Linux TC-MFA-103 在手动备份仅受理时读取到启动前归档，现等待实际 local job completed，并按任务输出路径核对第一条历史归档，再保留原 MFA/Vault 数据库断言。
+
+Windows TC-RDPC-REF-01-termservice 在远端画布切回本地工具栏期间，参考目标收到额外一次 ButtonPress，最终 flip-state 为两次点击/黑色；可信 DOM 事件只记录一次画布 pointerdown。原 canvas 点击与 locator 点击使用两个 W3C mouse source，现统一使用共享鼠标源，失败时仍释放输入且不重放。用例追加菜单打开、全屏、恢复后三个远端精确计数断言，原白色像素、质量和断开检查完整保留；目标记录事件坐标便于继续诊断。17 项工具契约通过，实际修复效果仍需 GitHub 原生复验，不据单测宣称已解决。
+
 第一轮当前源码 browser 为 59/59 passed，native 主批为 25/27 passed。新增四文件与数量边界用例、真实 PTY 混合布局均通过。TC-WS-054 的最初用例误以为 `vault_first_run` 总会设置主密码；实际上没有保存凭据时它是 no-op，重启应直接进入 Home。修正为等待真实 Home 后，`canvas-rerun-native/run-20261027-142045-383382934` 的该用例通过，四文件布局、实际磁盘 SHA 和冷启动后的重新布局断言保留。原失败与一次步骤编号契约错误均保留，不计为通过。
 
 同一 release 的 TC-WS-030 在两轮均未出现外部文件冲突提示。语言服务因 SDK/偏好变化重启时调用 `lsp_stop_workspace`，而该接口也停止独立的目录文件监听；根目录未变，TreeModel 不会重新启动监听。现在原 IPC 增加可选 `preserveFileWatcher`，省略时保持完整清理，provider restart 显式保留 watcher；底层拆分 provider stop 与 workspace dispose。前端 IPC、SDK 重启及画布测试 42/42 通过，新增真实 OS watcher 的 Rust 生命周期契约和原生磁盘冲突回归继续执行。

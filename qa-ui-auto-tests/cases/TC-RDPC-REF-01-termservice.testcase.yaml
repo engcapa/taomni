@@ -1,7 +1,7 @@
 id: TC-RDPC-REF-01-termservice
 title: Taomni RDP client renders and controls a real termservice reference desktop
-description: 'AC-E07/E08: connect the product client to a disposable reference account, confirm its certificate, assert decoded magenta/cyan pixels and click to flip the target.
-  Exercise full screen, quality evidence, restore and disconnect. DEC-07 authorizes sudo xrdp provisioning only on the hosted Linux runner.'
+description: 'AC-E07/E08: connect the product client to a disposable reference account, confirm its certificate, assert decoded magenta/cyan pixels and click to flip
+  the target. Exercise full screen, quality evidence, restore and disconnect. DEC-07 authorizes sudo xrdp provisioning only on the hosted Linux runner.'
 covers:
 - F9.7
 tags:
@@ -114,11 +114,31 @@ steps:
       - 255
       - 255
 - click: '[data-testid="titlebar-actions-more"]'
+- host_copy_file:
+    from_env_dir: QA_RDP_BASELINE_DIR
+    name: flip-state.json
+    to: reference-menu-input.json
+    timeout_sec: 10
+    expect:
+      flips:
+        min: 1
+        max: 1
+      color: '#ffffff'
 - click: '[data-testid="rdp-view-cycle"]'
 - wait_for:
     selector: '[data-testid="rdp-connection-bar"][data-visible="true"]'
     timeout_sec: 15
 - wait_for: '[data-testid="rdp-bar-quality"]'
+- host_copy_file:
+    from_env_dir: QA_RDP_BASELINE_DIR
+    name: flip-state.json
+    to: reference-fullscreen-input.json
+    timeout_sec: 10
+    expect:
+      flips:
+        min: 1
+        max: 1
+      color: '#ffffff'
 - rdp_canvas_assert:
     artifact: reference-fullscreen
     points:
@@ -139,6 +159,16 @@ steps:
     selector: '[data-testid="rdp-connection-bar"]'
     state: detached
     timeout_sec: 15
+- host_copy_file:
+    from_env_dir: QA_RDP_BASELINE_DIR
+    name: flip-state.json
+    to: reference-restored-input.json
+    timeout_sec: 10
+    expect:
+      flips:
+        min: 1
+        max: 1
+      color: '#ffffff'
 - click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="rdp-view-cycle"]'
 - hover: '[data-testid="rdp-bar-hotzone"]'
@@ -182,14 +212,14 @@ verification:
     - 31
     - 32
     - 33
-    - 34
-    - 37
+    - 35
     - 39
     - 41
-    - 42
-    - 43
+    - 44
     - 45
     - 46
+    - 48
+    - 49
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
@@ -207,17 +237,17 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
     - step: 27
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Connected", "timeout_sec": 60}}'
-    - step: 35
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
     - step: 36
-      expectation: '{"wait_for": "[data-testid=\"rdp-bar-quality\"]"}'
-    - step: 38
-      expectation: '{"assert_json_file": {"path": "reference-fullscreen.json", "expect": {"quality_level": {"min": 0, "max": 4}}}}'
-    - step: 40
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
-    - step: 44
       expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
+    - step: 37
+      expectation: '{"wait_for": "[data-testid=\"rdp-bar-quality\"]"}'
+    - step: 40
+      expectation: '{"assert_json_file": {"path": "reference-fullscreen.json", "expect": {"quality_level": {"min": 0, "max": 4}}}}'
+    - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
     - step: 47
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
+    - step: 50
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Disconnected", "timeout_sec": 20}}'
     results:
     - 3
@@ -228,12 +258,12 @@ verification:
     - 21
     - 24
     - 27
-    - 35
     - 36
-    - 38
+    - 37
     - 40
-    - 44
+    - 42
     - 47
+    - 50
   - id: R2
     requirement: Input reaches the reference session and the changed pixels return to the product client.
     actions:
@@ -262,14 +292,14 @@ verification:
     - 31
     - 32
     - 33
-    - 34
-    - 37
+    - 35
     - 39
     - 41
-    - 42
-    - 43
+    - 44
     - 45
     - 46
+    - 48
+    - 49
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
@@ -285,17 +315,17 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
     - step: 27
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Connected", "timeout_sec": 60}}'
-    - step: 35
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
     - step: 36
-      expectation: '{"wait_for": "[data-testid=\"rdp-bar-quality\"]"}'
-    - step: 38
-      expectation: '{"assert_json_file": {"path": "reference-fullscreen.json", "expect": {"quality_level": {"min": 0, "max": 4}}}}'
-    - step: 40
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
-    - step: 44
       expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
+    - step: 37
+      expectation: '{"wait_for": "[data-testid=\"rdp-bar-quality\"]"}'
+    - step: 40
+      expectation: '{"assert_json_file": {"path": "reference-fullscreen.json", "expect": {"quality_level": {"min": 0, "max": 4}}}}'
+    - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
     - step: 47
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
+    - step: 50
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Disconnected", "timeout_sec": 20}}'
     results:
     - 3
@@ -305,12 +335,12 @@ verification:
     - 21
     - 24
     - 27
-    - 35
     - 36
-    - 38
+    - 37
     - 40
-    - 44
+    - 42
     - 47
+    - 50
   - id: R3
     requirement: Full screen, quality indicator, restore and disconnect work with the reference server.
     actions:
@@ -339,14 +369,14 @@ verification:
     - 31
     - 32
     - 33
-    - 34
-    - 37
+    - 35
     - 39
     - 41
-    - 42
-    - 43
+    - 44
     - 45
     - 46
+    - 48
+    - 49
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
@@ -362,17 +392,17 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
     - step: 27
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Connected", "timeout_sec": 60}}'
-    - step: 35
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
     - step: 36
-      expectation: '{"wait_for": "[data-testid=\"rdp-bar-quality\"]"}'
-    - step: 38
-      expectation: '{"assert_json_file": {"path": "reference-fullscreen.json", "expect": {"quality_level": {"min": 0, "max": 4}}}}'
-    - step: 40
-      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
-    - step: 44
       expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
+    - step: 37
+      expectation: '{"wait_for": "[data-testid=\"rdp-bar-quality\"]"}'
+    - step: 40
+      expectation: '{"assert_json_file": {"path": "reference-fullscreen.json", "expect": {"quality_level": {"min": 0, "max": 4}}}}'
+    - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"]", "state": "detached", "timeout_sec": 15}}'
     - step: 47
+      expectation: '{"wait_for": {"selector": "[data-testid=\"rdp-connection-bar\"][data-visible=\"true\"]", "timeout_sec": 15}}'
+    - step: 50
       expectation: '{"assert_text": {"selector": "[data-testid=\"rdp-status\"]", "contains": "Disconnected", "timeout_sec": 20}}'
     results:
     - 3
@@ -382,12 +412,33 @@ verification:
     - 21
     - 24
     - 27
-    - 35
     - 36
-    - 38
+    - 37
     - 40
-    - 44
+    - 42
     - 47
+    - 50
+  - id: R4
+    requirement: Opening local actions, entering fullscreen and restoring do not send an extra click or key to the reference desktop.
+    actions:
+    - 30
+    - 33
+    - 35
+    - 41
+    checkpoints:
+    - step: 34
+      expectation: '{"host_copy_file": {"from_env_dir": "QA_RDP_BASELINE_DIR", "name": "flip-state.json", "to": "reference-menu-input.json", "timeout_sec": 10, "expect":
+        {"flips": {"min": 1, "max": 1}, "color": "#ffffff"}}}'
+    - step: 38
+      expectation: '{"host_copy_file": {"from_env_dir": "QA_RDP_BASELINE_DIR", "name": "flip-state.json", "to": "reference-fullscreen-input.json", "timeout_sec":
+        10, "expect": {"flips": {"min": 1, "max": 1}, "color": "#ffffff"}}}'
+    - step: 43
+      expectation: '{"host_copy_file": {"from_env_dir": "QA_RDP_BASELINE_DIR", "name": "flip-state.json", "to": "reference-restored-input.json", "timeout_sec": 10,
+        "expect": {"flips": {"min": 1, "max": 1}, "color": "#ffffff"}}}'
+    results:
+    - 34
+    - 38
+    - 43
   native:
   - check: Real termservice service and desktop on Windows; product client framebuffer and remote input.
     method: automated

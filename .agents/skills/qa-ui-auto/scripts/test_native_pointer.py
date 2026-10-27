@@ -3,9 +3,36 @@ import subprocess
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
-from native_pointer import TARGET_GEOMETRY, prepare_pointer_target
+from native_pointer import MOUSE_SOURCE, TARGET_GEOMETRY, click_viewport_point, prepare_pointer_target
 from native_webdriver_transport import WebDriverError
 from qa_ui_auto.deadline import CaseTimeout, Deadline
+
+
+class NativePointerActionsTest(TestCase):
+    def setUp(self):
+        self.session = Mock()
+        self.session.endpoint.side_effect = lambda suffix: '/session/qa' + suffix
+
+    def test_canvas_and_locator_clicks_use_the_same_mouse(self):
+        from tauri_webdriver import NativeSession
+
+        click_viewport_point(self.session, 589, 278, move_ms=50, hold_ms=60)
+        canvas = self.session.request.call_args_list[0].args[2]['actions'][0]
+        self.assertEqual(canvas['id'], MOUSE_SOURCE)
+        self.assertEqual([a['type'] for a in canvas['actions']],
+                         ['pointerMove', 'pointerDown', 'pause', 'pointerUp'])
+        self.session.request.reset_mock()
+        self.session.find.return_value = 'toolbar'
+        with patch('tauri_webdriver.prepare_pointer_target', return_value={'x': 913, 'y': 21}):
+            NativeSession.pointer_button_click(self.session, '[data-testid=toolbar]', 0)
+        posts = [c.args[2] for c in self.session.request.call_args_list if c.args[1].endswith('/actions') and c.args[0] == 'POST']
+        self.assertEqual(posts[0]['actions'][0]['id'], canvas['id'])
+
+    def test_failed_input_is_released_without_replay_or_masking_the_original_error(self):
+        self.session.request.side_effect = [WebDriverError('input failed'), WebDriverError('release failed')]
+        with self.assertRaisesRegex(WebDriverError, 'input failed'):
+            click_viewport_point(self.session, 280, 240)
+        self.assertEqual([c.args[0] for c in self.session.request.call_args_list], ['POST', 'DELETE'])
 
 
 class PointerGeometryTest(TestCase):

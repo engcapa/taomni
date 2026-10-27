@@ -25,7 +25,7 @@ from typing import Any
 from native_build import QA_APP_ID, verify_identity
 from native_webdriver_transport import WebDriverError, WebDriverTransport
 from native_console import CONSOLE_HOOK_SCRIPT
-from native_pointer import prepare_pointer_target
+from native_pointer import MOUSE_SOURCE, prepare_pointer_target
 from native_window_focus import NativeWindowFocus
 
 
@@ -569,7 +569,7 @@ class NativeSession(WebDriverTransport):
                         + [{"type": "pause", "duration": 0} for _ in pointer_core]
                         + [{"type": "keyUp", "value": value} for value in reversed(modifier_values)]})
                 actions.append({
-                    "type": "pointer", "id": "mouse",
+                    "type": "pointer", "id": MOUSE_SOURCE,
                     "parameters": {"pointerType": "mouse"},
                     "actions": [{"type": "pause", "duration": 0} for _ in modifier_values]
                         + pointer_core + [{"type": "pause", "duration": 0} for _ in modifier_values],

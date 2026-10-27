@@ -154,6 +154,8 @@ def _run_target(args: argparse.Namespace, activity: str) -> int:
             # Do not retain typed text or character values.
             "event_type": getattr(getattr(event, "type", None), "name", None),
             "button": getattr(event, "num", None),
+            "x": getattr(event, "x", None),
+            "y": getattr(event, "y", None),
             "keycode": getattr(event, "keycode", None),
             "modifiers": getattr(event, "state", None),
         })

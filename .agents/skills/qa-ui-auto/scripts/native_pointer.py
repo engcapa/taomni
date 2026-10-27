@@ -1,8 +1,35 @@
 """Resolve a stable, hit-testable viewport point before native pointer input."""
 import math
 import time
+from contextlib import suppress
 
 from native_webdriver_transport import WebDriverError
+
+MOUSE_SOURCE = "mouse"
+
+
+def click_viewport_point(session, x: int, y: int, *, move_ms: int = 0,
+                         hold_ms: int = 0) -> None:
+    """Use the same physical mouse source as locator clicks, and always release.
+
+    A separate source for a remote canvas leaves two W3C mouse positions when
+    the next action operates the local toolbar. Keep one source across that
+    boundary; never replay an ambiguous input failure.
+    """
+    actions = [{"type": "pointerMove", "duration": move_ms,
+                "x": x, "y": y, "origin": "viewport"},
+               {"type": "pointerDown", "button": 0}]
+    if hold_ms:
+        actions.append({"type": "pause", "duration": hold_ms})
+    actions.append({"type": "pointerUp", "button": 0})
+    try:
+        session.request("POST", session.endpoint("/actions"), {"actions": [{
+            "type": "pointer", "id": MOUSE_SOURCE,
+            "parameters": {"pointerType": "mouse"}, "actions": actions,
+        }]})
+    finally:
+        with suppress(WebDriverError):
+            session.request("DELETE", session.endpoint("/actions"))
 
 
 TARGET_GEOMETRY = r"""
