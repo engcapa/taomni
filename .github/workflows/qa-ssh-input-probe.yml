@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shell: [console, script]
+        shell: [console, msys-script]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,6 +35,8 @@ jobs:
       - run: python -m pip install PyYAML==6.0.2 jsonschema==4.25.1 paramiko==3.5.1 pyte==0.8.2
       - run: python -m unittest test_ci_ssh_input_probe
       - run: python .agents/skills/qa-ui-auto/scripts/ci_services.py install
+      - if: matrix.shell == 'msys-script'
+        run: C:/msys64/usr/bin/bash.exe -lc 'pacman -Sy --needed --noconfirm util-linux'
       - run: python .agents/skills/qa-ui-auto/scripts/ci_ssh_input_probe.py --shell ${{ matrix.shell }} --out qa-ui-auto-report/ssh-input-probe
       - uses: actions/upload-artifact@v4
         if: always()

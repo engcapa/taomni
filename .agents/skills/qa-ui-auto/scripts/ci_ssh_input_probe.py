@@ -90,7 +90,7 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--delays", default="0,0.01,0.05,0.1,0.25,0.5")
     parser.add_argument("--protocol", choices=["vt", "win32", "paste"], default="vt")
-    parser.add_argument("--shell", choices=["console", "script"], default="console")
+    parser.add_argument("--shell", choices=["console", "script", "msys-script"], default="console")
     args = parser.parse_args()
     delays = [float(value) for value in args.delays.split(",")]
     if not delays or any(value < 0 or value > 2 for value in delays):
@@ -109,10 +109,12 @@ def main():
             (args.out / "shell-versions.txt").write_text(facts.read().decode(errors="replace"), encoding="utf-8")
             for delay in delays:
                 for resize, focus in ((False, False), (False, True), (True, False), (True, True)):
-                    if args.shell == "script":
+                    if args.shell in {"script", "msys-script"}:
                         channel = client.get_transport().open_session()
                         channel.get_pty(term="xterm-256color", width=171, height=32)
-                        channel.exec_command("exec script -q -c '/bin/bash --noprofile --norc -i' /dev/null")
+                        script = ("MSYS2_ARG_CONV_EXCL='*' /c/msys64/usr/bin/script.exe"
+                                  if args.shell == "msys-script" else "script")
+                        channel.exec_command(f"exec {script} -q -c '/usr/bin/bash --noprofile --norc -i' /dev/null")
                     else:
                         channel = client.invoke_shell(term="xterm-256color", width=171, height=32)
                     try:
