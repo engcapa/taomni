@@ -244,12 +244,13 @@ def install(capabilities):
 
 
 class Services:
-    def __init__(self, root, capabilities, config, *, ssh_windows_shell=None):
+    def __init__(self, root, capabilities, config, *, ssh_windows_shell=None, ssh_windows_sshd=None):
         self.root = Path(root).resolve()
         self.capabilities = set(capabilities)
         self.config = config
         # Diagnostic opt-in; normal hosted cases retain their Git Bash shell.
         self.ssh_windows_shell = ssh_windows_shell
+        self.ssh_windows_sshd = ssh_windows_sshd
         self.stack = ExitStack()
         self.namespace = "qa" + secrets.token_hex(5)
         self.resources = []
@@ -362,7 +363,10 @@ class Services:
             cfg = private / "sshd_config"
             cfg.write_text("\n".join(lines) + "\n", encoding="utf-8")
             # sshd must run as LocalSystem for password logon/PTY impersonation.
-            executable = Path(os.environ["WINDIR"]) / "System32/OpenSSH/sshd.exe"
+            executable = (Path(self.ssh_windows_sshd) if self.ssh_windows_sshd
+                          else Path(os.environ["WINDIR"]) / "System32/OpenSSH/sshd.exe")
+            if not executable.is_file():
+                raise RuntimeError(f"Required Windows SSH server is missing: {executable}")
             # The service runs as SYSTEM; use the standard machine host-key
             # location instead of a runner user's temporary directory.
             command([ssh_keygen, "-A"])

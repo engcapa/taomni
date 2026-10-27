@@ -28,7 +28,11 @@ class WindowsSshShellTest(TestCase):
 
     def test_diagnostic_override_is_explicit_and_does_not_change_normal_services(self):
         with tempfile.TemporaryDirectory() as directory:
-            self.assertIsNone(Services(Path(directory), {"ssh"}, {}).ssh_windows_shell)
+            normal = Services(Path(directory), {"ssh"}, {})
+            self.assertIsNone(normal.ssh_windows_shell)
+            self.assertIsNone(normal.ssh_windows_sshd)
             shell = Path(directory) / "bash.exe"
-            diagnostic = Services(Path(directory), {"ssh"}, {}, ssh_windows_shell=shell)
+            server = Path(directory) / "sshd.exe"
+            diagnostic = Services(Path(directory), {"ssh"}, {}, ssh_windows_shell=shell, ssh_windows_sshd=server)
             self.assertEqual(diagnostic.ssh_windows_shell, shell)
+            self.assertEqual(diagnostic.ssh_windows_sshd, server)
