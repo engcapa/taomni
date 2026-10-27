@@ -4,7 +4,7 @@ description: 'Native macOS check for F9.2 against the real Screen Sharing server
   Desktop authentication (RFB security type 30), passes the per-attempt unencrypted-connection warning, asks for the password in the session only because ARD needs one (DEC-VNC-21),
   connects, and Session Information reports ARD and the desktop size the Mac announced. The ARD login of a second account makes macOS switch the console to that account, so
   the app''s own (now background) session stops painting frames; frame pixels are covered by TC-151. The backgrounded app also answers the WebDriver bridge slowly: on the hosted
-  runner the wait for the connected toolbar plus the next click took 26-50 s and once more than 45 s for the wait alone, so the waits after the login allow 120 s.
+  runner the wait for the connected toolbar plus the next click took 26-50 s and once more than 45 s for the wait alone, so the waits after the login allow 120 s. The opt-in isolated QA WebView disables inactive scheduling so its bridge can still inspect this real background login session; production launches keep their default policy.
 
   '
 covers:

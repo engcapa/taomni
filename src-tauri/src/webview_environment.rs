@@ -21,6 +21,19 @@ pub(crate) fn configure<'a>(
                 builder = builder.additional_browser_args(&arguments);
             }
         }
+        #[cfg(target_os = "macos")]
+        if std::env::var("TAOMNI_QA_WEBDRIVER_PORT")
+            .ok()
+            .and_then(|value| value.parse::<u16>().ok())
+            .is_some_and(|port| port != 0)
+        {
+            // The real ARD fixture switches the console to its disposable
+            // account. Keep this opt-in QA view's JS bridge responsive while
+            // it is in the runner's background login session. Production and
+            // manual QA launches retain the default scheduling policy.
+            builder = builder
+                .background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled);
+        }
     }
     builder
 }
