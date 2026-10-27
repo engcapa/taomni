@@ -65,8 +65,9 @@ class WindowsPosixSshTest(TestCase):
                             QA_SSH_PASSWORD="disposable-secret"), \
                     patch("ci_services.command", side_effect=self.commands(services, events)), \
                     patch("ci_services.powershell", side_effect=powershell):
+                original_path = os.environ["PATH"]
                 user, port, remote = start(services, "disposable-secret")
-                self.assertTrue(os.environ["PATH"].startswith(str(root / "bin") + os.pathsep))
+                self.assertEqual(Path(os.environ["PATH"].split(os.pathsep)[0]).resolve(), (root / "bin").resolve())
                 self.assertEqual(user, services.namespace)
                 self.assertGreater(port, 0)
                 self.assertEqual(remote, f"/home/{user}/qa-temp")
@@ -77,6 +78,7 @@ class WindowsPosixSshTest(TestCase):
                 self.assertNotIn("disposable-secret", text)
                 self.assertIn(f"/home/{user}:/bin/bash", passwd.read_text())
                 services.stack.close()
+                self.assertEqual(os.environ["PATH"], original_path)
             self.assertEqual(passwd.read_bytes(), original)
             self.assertFalse((root / "home" / user).exists())
             self.assertEqual(events, ["process-stop", "account-remove"])
