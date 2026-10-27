@@ -32,15 +32,27 @@ class SshInputProbeTest(TestCase):
         client.invoke_shell.assert_called_once_with(term="xterm-256color", width=171, height=32)
         client.get_transport.assert_not_called()
 
-    def test_posix_wrapper_gets_a_pty_inside_the_default_shell_runtime(self):
+    def test_posix_wrapper_starts_from_the_real_interactive_shell(self):
         client = Mock()
-        channel = client.get_transport.return_value.open_session.return_value
-        self.assertIs(open_shell(client, "msys-script"), channel)
-        channel.get_pty.assert_called_once_with(term="xterm-256color", width=171, height=32)
-        command = channel.exec_command.call_args.args[0]
-        self.assertTrue(command.startswith("exec /usr/bin/script "))
-        self.assertIn("-c '/usr/bin/bash --noprofile --norc -i' /dev/null", command)
-        client.invoke_shell.assert_not_called()
+        self.assertIs(open_shell(client, "msys-script"), client.invoke_shell.return_value)
+        client.invoke_shell.assert_called_once_with(term="xterm-256color", width=171, height=32)
+        client.get_transport.assert_not_called()
+
+    def test_posix_wrapper_is_ready_before_resizing_or_sending_the_one_probe(self):
+        channel = Channel([b"$ ", b"\r\nqa-posix-pty$ ", b"\r\nqa-marker\r\n"])
+        result = TerminalProbe(channel).run("qa-marker", resize=True, focus=False, delay=0, shell="msys-script")
+        self.assertTrue(result["passed"])
+        self.assertTrue(channel.sent[0].startswith(b"exec /usr/bin/script "))
+        self.assertEqual(channel.sent[1:], [b"echo qa-marker", b"\r"])
+        directions = [f["direction"] for f in result["frames"]]
+        self.assertEqual(directions[:4], ["received", "sent", "received", "resize"])
+
+    def test_posix_wrapper_failure_does_not_resize_or_send_the_probe(self):
+        channel = Channel([b"$ ", b"script: failed\r\n$ "])
+        result = TerminalProbe(channel).run("qa-marker", resize=True, focus=True, delay=0, shell="msys-script")
+        self.assertFalse(result["ready"])
+        self.assertEqual(len(channel.sent), 1)
+        self.assertEqual(channel.resizes, [])
 
     def test_msys_console_uses_default_shell_without_nesting_runtimes(self):
         client = Mock()

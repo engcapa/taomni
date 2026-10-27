@@ -16,15 +16,7 @@ from ci_services import Services
 
 
 def open_shell(client, shell):
-    if shell in {"console", "msys-console"}:
-        return client.invoke_shell(term="xterm-256color", width=171, height=32)
-    channel = client.get_transport().open_session()
-    channel.set_combine_stderr(True)
-    channel.get_pty(term="xterm-256color", width=171, height=32)
-    # Run script inside the same MSYS runtime as DefaultShell. Nesting MSYS2
-    # underneath Git Bash can exit before a shell is started.
-    channel.exec_command("exec /usr/bin/script -q -c '/usr/bin/bash --noprofile --norc -i' /dev/null")
-    return channel
+    return client.invoke_shell(term="xterm-256color", width=171, height=32)
 
 
 class TerminalProbe:
@@ -66,9 +58,16 @@ class TerminalProbe:
                 return True
         return False
 
-    def run(self, marker, *, resize, focus, delay, protocol="vt"):
+    def run(self, marker, *, resize, focus, delay, protocol="vt", shell="console"):
         self.channel.settimeout(0.1)
         ready = self.wait(lambda lines: any(line.rstrip().endswith("$") for line in lines), 30)
+        if ready and shell == "msys-script":
+            # Initialize the POSIX PTY through the real interactive shell.
+            # Win32 sshd's exec command line can lose the command-string
+            # quoting for Bash -c ("-c exec ..." exits without running script).
+            # Bootstrap happens before resize/focus and is never replayed.
+            self.send(b'exec /usr/bin/script -q -c "env PS1=\'qa-posix-pty$ \' /usr/bin/bash --noprofile --norc -i" /dev/null\r')
+            ready = self.wait(lambda lines: any(line.strip() == "qa-posix-pty$" for line in lines), 30)
         if not ready:
             return {"ready": False, "passed": False, "frames": self.frames, "screen": self.screen.display}
         if focus:
@@ -102,7 +101,7 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--delays", default="0,0.01,0.05,0.1,0.25,0.5")
     parser.add_argument("--protocol", choices=["vt", "win32", "paste"], default="vt")
-    parser.add_argument("--shell", choices=["console", "script", "msys-script", "msys-console"], default="console")
+    parser.add_argument("--shell", choices=["console", "msys-script", "msys-console"], default="console")
     args = parser.parse_args()
     delays = [float(value) for value in args.delays.split(",")]
     if not delays or any(value < 0 or value > 2 for value in delays):
@@ -127,7 +126,7 @@ def main():
                     try:
                         result = TerminalProbe(channel).run(
                             f"qa-ssh-protocol-{len(results) + 1}", resize=resize, focus=focus, delay=delay,
-                            protocol=args.protocol)
+                            protocol=args.protocol, shell=args.shell)
                         result.update(resize=resize, focus=focus, delay=delay, protocol=args.protocol, shell=args.shell)
                         result.update(channel_closed=channel.closed,
                                       exit_status=channel.recv_exit_status() if channel.exit_status_ready() else None)
