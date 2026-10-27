@@ -1,11 +1,19 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前验收尚未完成。用户新报告的 QA release 工具栏布局崩溃已在修复前以真实 store、browser、匹配旧源码的 native release 三层复现；此前 **53/53 browser、26/26 native** 的通过未覆盖四文件 Grid，不能作为本次修复的完成依据。按用户最新指示，后续 browser/native 用例直接在 GitHub 执行，本机仅运行单测、编译与静态检查。接下来重新执行 GitHub 相关范围、拉取合并 main、复测及全量；功能完成后再做正式性能对照，目前没有“性能无退化”的结论。原始证据保留于 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
+> 当前验收尚未完成。GitHub 定向复验 51/51 通过；随后 fetch 并检查合并 main `a5743792`，当前分支已包含它，无冲突或新增改动。全量 40484591524 发现 macOS release 保存后的 ResizeObserver 循环错误，正在定位。按用户最新指示，browser/native 用例直接在 GitHub 执行，本机仅运行单测、编译与静态检查。功能完成后再做正式性能对照，目前没有“性能无退化”的结论。原始证据保留于 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
+
+## 全量 ResizeObserver 诊断（2026-10-27，进行中）
+
+定向 [40478838714](https://github.com/engcapa/taomni/actions/runs/40478838714) 的 14 个 ID、51 次执行全部通过，三平台 browser/native 原始 receipt、源码与二进制身份独立核验通过。包含九个崩溃专项、文件 watcher、MFA 备份、RDP 参考和真实 macOS ARD。随后同步远程 main，`git merge origin/main` 返回 Already up to date。
+
+全量 [40484591524](https://github.com/engcapa/taomni/actions/runs/40484591524) 为 641 个适用 ID、2,103 次执行、25 分片。TC-WS-054 在 macOS release 中完成四文件 Grid/Split/Single，实际保存 SHA 也正确，但紧接着的运行时断言捕获 `ResizeObserver loop completed with undelivered notifications`。这是失败，不能用先前定向通过替代。
+
+该用例新增仅 QA runner 的可选观察器溯源：记录创建栈、原有 contentRect 与元素标签，最多 64 条、不持有 DOM 引用；不额外测量布局、不改调度、不写 DOM、不吞原回调异常。原生 error 证据附上该环形记录；其他用例默认关闭。工具契约验证回调参数/this/返回值/异常与 observe/unobserve/disconnect、禁用及有界行为。先在 GitHub 保留原失败断言复现，再依据来源修复，不能将全局错误过滤作为修复。
 
 ## QA release 布局崩溃与专项回归（2026-10-27，验证中）
 

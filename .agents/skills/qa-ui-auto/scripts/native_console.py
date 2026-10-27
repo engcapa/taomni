@@ -4,7 +4,9 @@ Installed idempotently after navigation; the document owns listeners and release
 them on reload. Keep diagnostics independent from product code and UI state.
 """
 
-CONSOLE_HOOK_SCRIPT = r"""
+from native_resize_observer import RESIZE_OBSERVER_HOOK_SCRIPT
+
+CONSOLE_HOOK_SCRIPT = RESIZE_OBSERVER_HOOK_SCRIPT + r"""
 if (!window.__QA_UI_AUTO_CONSOLE__) {
   window.__QA_UI_AUTO_CONSOLE__ = [];
   // Keep focus transitions without recording typed text or values.
@@ -102,7 +104,13 @@ if (!window.__QA_UI_AUTO_CONSOLE__) {
       kind: 'uncaught-error',
       level: 'error',
       time: new Date().toISOString(),
-      args: [event.message, event.filename, event.lineno, event.colno]
+      args: [event.message, event.filename, event.lineno, event.colno],
+      ...(/ResizeObserver/.test(event.message) && window.__QA_UI_AUTO_RESIZE_TRACE__ ? {
+        resizeObservers: {
+          created: window.__QA_UI_AUTO_RESIZE_TRACE__.created,
+          samples: window.__QA_UI_AUTO_RESIZE_TRACE__.samples.slice()
+        }
+      } : {})
     });
   });
   window.addEventListener('unhandledrejection', (event) => {

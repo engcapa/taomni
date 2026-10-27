@@ -31,6 +31,9 @@ steps:
       1}], "pinnedSessionIds": [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs":
       [], "activeTabId": ""}, {"id": "second-workspace", "name": "Second Workspace", "description": "", "isDefault": false, "rootFolders": [], "pinnedSessionIds":
       [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId": ""}]}'
+- seed_storage:
+    key: qa.ui.resizeTrace.v1
+    value: '1'
 - reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="nav-mode-workspaces"]'
@@ -169,123 +172,123 @@ verification:
   - id: R1
     requirement: Release toolbar Grid/Split/Single works on four real files and saving writes the exact draft bytes.
     actions:
-    - 17
     - 18
-    - 23
+    - 19
     - 24
-    - 29
+    - 25
     - 30
-    - 34
+    - 31
     - 35
     - 36
     - 37
+    - 38
     checkpoints:
-    - step: 19
-      expectation: '{"assert_no_runtime_errors": null}'
     - step: 20
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "grid"}}'
+      expectation: '{"assert_no_runtime_errors": null}'
     - step: 21
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 4}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "grid"}}'
     - step: 22
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 4}}'
+    - step: 23
       expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"] [data-editor-tab-key][data-active=\"true\"]",
         "attribute": "data-editor-tab-key", "equals": ["root:root-1:src/index.ts", "root:root-1:Draft2.txt", "root:root-1:README.md", "root:root-1:Draft10.txt"]}}'
-    - step: 25
-      expectation: '{"assert_no_runtime_errors": null}'
     - step: 26
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
+      expectation: '{"assert_no_runtime_errors": null}'
     - step: 27
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
     - step: 28
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
+    - step: 29
       expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"] [data-editor-tab-key][data-active=\"true\"]",
         "attribute": "data-editor-tab-key", "equals": ["root:root-1:src/index.ts", "root:root-1:README.md"]}}'
-    - step: 31
-      expectation: '{"assert_no_runtime_errors": null}'
     - step: 32
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "single"}}'
+      expectation: '{"assert_no_runtime_errors": null}'
     - step: 33
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "single"}}'
+    - step: 34
       expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
-    - step: 38
-      expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/README.md", "equals": "2686497ac79d66b9c2d8932067753d7452c411ff5faff19c8ffd85479471966b"}}'
     - step: 39
+      expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/README.md", "equals": "2686497ac79d66b9c2d8932067753d7452c411ff5faff19c8ffd85479471966b"}}'
+    - step: 40
       expectation: '{"assert_no_runtime_errors": null}'
     results:
-    - 19
     - 20
     - 21
     - 22
-    - 25
+    - 23
     - 26
     - 27
     - 28
-    - 31
+    - 29
     - 32
     - 33
-    - 38
+    - 34
     - 39
+    - 40
   - id: R2
     requirement: Cold restart restores all file tabs and reapplying Grid/Split keeps the saved content and disk checksum.
     actions:
-    - 40
-    - 42
-    - 46
+    - 41
+    - 43
     - 47
-    - 52
+    - 48
     - 53
-    - 58
+    - 54
     - 59
-    - 63
+    - 60
+    - 64
     checkpoints:
-    - step: 44
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 4}}'
     - step: 45
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 48
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 4}}'
+    - step: 46
       expectation: '{"assert_no_runtime_errors": null}'
     - step: 49
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "grid"}}'
+      expectation: '{"assert_no_runtime_errors": null}'
     - step: 50
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 4}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "grid"}}'
     - step: 51
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 4}}'
+    - step: 52
       expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"] [data-editor-tab-key][data-active=\"true\"]",
         "attribute": "data-editor-tab-key", "equals": ["root:root-1:README.md", "root:root-1:Draft10.txt", "root:root-1:Draft2.txt", "root:root-1:src/index.ts"]}}'
-    - step: 54
-      expectation: '{"assert_no_runtime_errors": null}'
     - step: 55
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
+      expectation: '{"assert_no_runtime_errors": null}'
     - step: 56
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
     - step: 57
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
+    - step: 58
       expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"] [data-editor-tab-key][data-active=\"true\"]",
         "attribute": "data-editor-tab-key", "equals": ["root:root-1:README.md", "root:root-1:Draft2.txt"]}}'
-    - step: 60
-      expectation: '{"assert_no_runtime_errors": null}'
     - step: 61
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "single"}}'
-    - step: 62
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
-    - step: 64
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "QA_RELEASE_CANVAS_SAVED"}}'
-    - step: 65
       expectation: '{"assert_no_runtime_errors": null}'
+    - step: 62
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "single"}}'
+    - step: 63
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
+    - step: 65
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "QA_RELEASE_CANVAS_SAVED"}}'
     - step: 66
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 67
       expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/README.md", "equals": "2686497ac79d66b9c2d8932067753d7452c411ff5faff19c8ffd85479471966b"}}'
     results:
-    - 44
     - 45
-    - 48
+    - 46
     - 49
     - 50
     - 51
-    - 54
+    - 52
     - 55
     - 56
     - 57
-    - 60
+    - 58
     - 61
     - 62
-    - 64
+    - 63
     - 65
     - 66
+    - 67
   visual:
   - check: Pane topology, selected files and preserved editor content
     method: automated
