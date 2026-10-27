@@ -27,7 +27,7 @@ TC-WS-054 再增至四轮连续宽/窄拖动及长/短替换，逐轮保留原�
 
 相关集 40525718246 已收齐 18/18 分片，108 passed / 3 failed：Linux TC-WS-038 与 macOS TC-WS-054 的 observer 错误，以及 Windows TC-WS-054 第一轮宽文本替换失败。Windows Ctrl+A 的 keyup 快照确认 DOM 已选择原 23 字符，但后续真实输入仍留下全部旧文本，原因尚未证明。进一步校正测试诊断：可信原生事件可在 capture 与 target listener 之间执行 microtask，旧 `after.prevented=false` 不能证明 CM 没有消费按键。改用零延迟只读任务记录最终事件状态，并同时读取当前固定 CM6 的 DOM 链接所指向的内部选区；不调用 focus/dispatch/flush，不修改选区或输入。每次 Ctrl+A 后保留至多 12 条初始输入选区快照，避免原始 128 条输入环形记录覆盖首字符证据。缺少 CM 链接明确记录 null；8 项诊断契约通过。当前产品面包屑修正的三平台相关集为 [40530554568](https://github.com/engcapa/taomni/actions/runs/40530554568)，尚在执行。
 
-## Windows 原生选区诊断（2026-10-28，未解决）
+## Windows 原生选区诊断（2026-10-28，修复待托管复验）
 
 最新 [40541426840](https://github.com/engcapa/taomni/actions/runs/40541426840) 最终 13 passed / 1 failed，2/2 回执与聚合独立核验一致。7871ms 全选事务与 7889ms DOM selectionchange 均为 0..23；7917ms Ctrl 释放清除超链接、7932ms LSP overlay 刷新均为 effects-only，7945ms CodeMirror measure → observer.forceFlush → applyDOMChange 首次发布 0..0 选区，7992ms 首字符进入前旧文档仍有 23 字符。已将 bundle 栈对应到 `lspHyperlink.clearMod`、`useEditorDecorations` 的 overlay 和 error-stripe 更新；尚无证据区分 DOM 重绘与后续 OS/驱动事件。
 
@@ -36,6 +36,18 @@ TC-WS-054 再增至四轮连续宽/窄拖动及长/短替换，逐轮保留原�
 挂载基线进一步覆盖真实鼠标悬停建立的超链接、原生选区绘制扩展，以及引用高亮原先存在/不存在两个状态；将 jsdom navigator 固定为 Chromium/Windows，以进入 CM 对应的 DOM 分支。3/3 通过，与已有 hyperlink 单测合计 9/9；该环境不模拟 WebView2 的原生事件调度，不提供原生修复结论。
 
 Linux [40547602802](https://github.com/engcapa/taomni/actions/runs/40547602802) 的完整适用崩溃组为 browser 6/6、native 8/8，2/2 回执及最终聚合独立核验通过。TC-WS-039 的既有失败没有复现；进一步将同一用例扩充为三次连续隐藏/恢复双栏与 Documentation，并在两个方向拖动侧栏，每轮保留双编辑器、草稿、侧栏状态和运行时断言。没有过滤错误或放宽断言，扩充部分仍待 GitHub 执行。
+
+扩充后的 Linux [40550921670](https://github.com/engcapa/taomni/actions/runs/40550921670) 已完成，browser 6/6、native 8/8；全部九个 ID 的适用执行单元、2/2 回执、源码/runner/case/原生构建身份及最终汇总独立核验通过。三次隐藏/恢复各保留两个编辑器、Documentation、草稿和原有侧栏状态，未复现此前错误。该结果证明本轮扩充流程通过，不将历史偶发失败改记为通过或据此认定原因已修复。
+
+main `65d6d907` 已包含重构的大部分内容；正式性能对照将显式指定重构前已合并的 main `a57437927b62d6036a6d473eddccc053a4b4c0e8` 为 baseline，而不是性能分支默认推导出的近期 merge-base。仍由成功的精确 SHA 全量功能 gate 约束候选，并在同一 runner 交替测量原始 QA release 二进制，保留全部尾部样本和既定预算。
+
+Windows 定向 [40550014363](https://github.com/engcapa/taomni/actions/runs/40550014363) 最终为 13 passed / 1 failed，2/2 回执、原生构建身份及最终失败汇总独立核验一致。8049.2ms 全选成功，8071.7ms selectionchange 仍选中全部 23 字符；8080.5ms 的 `updateLspOverlayChrome` effects-only 事务保持 CM 内部 0..23，却在事务结束时将 DOM 选区折叠到行 DIV。独立 MutationObserver 证明同一个仍 connected 的 `#text` 节点从行 DIV 被移动到新 `SPAN.cm-lsp-usage`；8084.2ms measure/observer 才把 CM 选区同步为 0..0。清除超链接的事务到 8106.8ms 才运行，因此不是此次折叠的起点。
+
+新增六个真实 CM 装饰 diff/DOM 重挂载场景，只在浏览器边界模拟 Chromium 重绘后短暂返回旧选区端点。改前全选、反向全选、局部范围和 caret 四项稳定失败；anchor-only/focus-only 两项与原三条保留基线通过。对 `@codemirror/view@6.43.11` 的 ESM/CJS 同步添加 pnpm patch：重绘 tracker 同时跟踪 anchor/focus，插入节点前检测移动的节点或其子树包含任一端点，通过原有 `forceSelection` 和焦点 guard 完成同步，不新增 focus、延迟、重试、输入重放或事务。只在实际 DOM 重挂载且尚未标记变更时检查 contains，不增加布局读取。升级该依赖时必须保留本组回归并重新核对上游修复。
+
+改后六场景、原基线及跨编辑器焦点/undo/redo 均通过，连同 LSP、hyperlink、CodeMirror 编辑/IME guard/共享事务 owner 共 117/117 单测通过。TC-WS-054 保留原 128 步及 300 秒预算，再加 8 步检查首轮宽文本保存后的 undo/redo、精确文本、dirty 状态和未改变的磁盘哈希。patch 与 pnpm workspace 配置纳入 QA 源码身份（新增/修改/删除契约先失败后通过），组件 patch 修改触发 PR 的完整崩溃回归。没有运行本机 browser/native；原生修复结论等待 GitHub 三平台相关集。
+
+历史 main 的性能构建仍执行该 checkout 原有 builder、配置及产品源码，仅预加载当前测量 runner 的 provenance 模块，使新增 workspace/patch 输入边界在构建和测量时一致；不改写二进制身份或历史 checkout。子进程契约以旧 fingerprint 模块和真实临时 Git checkout 验证同一输入规则及未改动的 builder。11 项构建/崩溃门禁契约、TypeScript、静态覆盖 audit 和 refactor 检查通过；性能实测仍等待全量功能 gate。
 
 [40532648901](https://github.com/engcapa/taomni/actions/runs/40532648901) 的 2/2 回执与最终汇总已独立验证：17 passed / 1 failed，唯一失败为 TC-WS-054。Ctrl+A keydown 7698.2ms 后，事件已被编辑器消费，DOM 与 CodeMirror 内部选区均为 0..23；keyup 7752.4ms 后两者已经折叠为 0，首字符 keydown 7814.9ms 前旧文档仍为 23 字符。因此全选已生效，但在输入前丢失；目前不能据此认定是焦点、保存或字符投递问题。
 

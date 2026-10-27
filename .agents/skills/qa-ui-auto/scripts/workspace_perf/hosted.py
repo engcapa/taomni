@@ -160,10 +160,11 @@ def prepare(args):
     subprocess.run(
         [
             sys.executable,
-            ".agents/skills/qa-ui-auto/scripts/native_build.py",
-            "--release",
+            str(Path(__file__).with_name("build_baseline.py")),
+            "--checkout", str(baseline),
         ],
         cwd=baseline,
+        env=dict(os.environ, PYTHONPATH=str(repo / ".agents/skills/qa-ui-auto/scripts")),
         check=True,
     )
     # Keep the original baseline binary and identity before restoring the

@@ -2,13 +2,18 @@
 
 from copy import deepcopy
 import hashlib
+import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 from unittest import TestCase
 
 from workspace_perf.common import stats
 from workspace_perf.explorer import dataset
 from workspace_perf.hosted import linux_release_entry, validate_gate
+from qa_ui_auto.provenance import source_identity
 
 
 class FunctionalGateTest(TestCase):
@@ -88,6 +93,35 @@ class FunctionalGateTest(TestCase):
 
 
 class WorkloadTest(TestCase):
+    def test_historical_builder_uses_probe_identity_without_changing_the_checkout(self):
+        scripts = Path(__file__).resolve().parent
+        with tempfile.TemporaryDirectory() as directory:
+            checkout = Path(directory)
+            subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+            old_scripts = checkout / ".agents/skills/qa-ui-auto/scripts"
+            old_package = old_scripts / "qa_ui_auto"
+            old_package.mkdir(parents=True)
+            (old_package / "__init__.py").write_text("")
+            (old_package / "provenance.py").write_text("def source_identity(root): return 'old-boundary'\n")
+            (checkout / "pnpm-workspace.yaml").write_text("packages: [.]\n")
+            builder = old_scripts / "native_build.py"
+            # A disposable builder records its imported identity; no UI or build.
+            builder.write_text(
+                "from pathlib import Path\n"
+                "import json,sys\n"
+                "from qa_ui_auto.provenance import source_identity\n"
+                "Path('result.json').write_text(json.dumps([source_identity(Path.cwd()),sys.argv[1:]]))\n"
+            )
+            original = builder.read_bytes()
+            expected = source_identity(checkout)
+            subprocess.run([
+                sys.executable, str(scripts / "workspace_perf/build_baseline.py"),
+                "--checkout", str(checkout),
+            ], cwd=checkout, env=dict(os.environ, PYTHONPATH=str(scripts)), check=True)
+            self.assertEqual(json.loads((checkout / "result.json").read_text()), [expected, ["--release"]])
+            self.assertEqual(builder.read_bytes(), original)
+            self.assertEqual(source_identity(checkout), expected)
+
     def test_release_runtime_is_selected_by_producer_not_consumer_desktop(self):
         entry = {
             "platform_key": "linux", "mode": "native", "runner": "ubuntu-24.04",

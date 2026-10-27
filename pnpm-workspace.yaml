@@ -11,3 +11,6 @@ onlyBuiltDependencies:
   - esbuild
 
 minimumReleaseAge: 0
+
+patchedDependencies:
+  '@codemirror/view@6.43.11': patches/@codemirror__view@6.43.11.patch

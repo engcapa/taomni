@@ -77,6 +77,8 @@ on:
       - 'src-tauri/src/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'patches/**'
       - 'vite.config.ts'
       - 'src-tauri/Cargo.toml'
       - 'src-tauri/Cargo.lock'

@@ -52,7 +52,7 @@ class CrashRegressionTests(unittest.TestCase):
         self.assertIn("format('{0},crash-regression', inputs.tags)", env["QA_TAGS"])
         triggers = workflow.get("on", workflow.get(True))
         paths = triggers["pull_request"]["paths"]
-        for path in ["src/**", "src-tauri/src/**", "pnpm-lock.yaml", "src-tauri/Cargo.lock"]:
+        for path in ["src/**", "src-tauri/src/**", "pnpm-lock.yaml", "pnpm-workspace.yaml", "patches/**", "src-tauri/Cargo.lock"]:
             self.assertIn(path, paths)
 
     def test_failed_or_missing_case_summary_fails_all_scopes(self):

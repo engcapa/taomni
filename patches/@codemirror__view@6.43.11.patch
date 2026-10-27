@@ -1,0 +1,94 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index d50b20ac11b4a88cce7c1de94618f85abadb7eef..d9dd3f8c4d1c97069066b2d8d1b7c496de5d8f46 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -1829,7 +1829,7 @@ class CompositeTile extends Tile {
+             return;
+         super.sync(track);
+         let parent = this.dom, prev = null, next;
+-        let tracking = (track === null || track === void 0 ? void 0 : track.node) == parent ? track : null;
++        let tracking = track && (track.node == parent || track.anchor == parent) ? track : null;
+         let length = 0;
+         for (let child of this.children) {
+             child.sync(track);
+@@ -1842,6 +1842,11 @@ class CompositeTile extends Tile {
+                     next = rm$1(next);
+             }
+             else {
++                // Reparenting a selected node (or its ancestor) can invalidate
++                // Chrome's DOM selection while getSelection still reports the
++                // old endpoints. Force the normal selection sync for either end.
++                if (track && !track.written && (child.dom.contains(track.node) || child.dom.contains(track.anchor)))
++                    track.written = true;
+                 parent.insertBefore(child.dom, next);
+             }
+             prev = child.dom;
+@@ -2065,7 +2070,7 @@ class TextTile extends Tile {
+             return;
+         super.sync(track);
+         if (this.dom.nodeValue != this.text) {
+-            if (track && track.node == this.dom)
++            if (track && (track.node == this.dom || track.anchor == this.dom))
+                 track.written = true;
+             this.dom.nodeValue = this.text;
+         }
+@@ -3011,9 +3016,10 @@ class DocView {
+             // around the selection, get confused and report a different
+             // selection from the one it displays (issue #218). This tries
+             // to detect that situation.
+-            let track = browser.chrome || browser.ios ? { node: observer.selectionRange.focusNode, written: false } : undefined;
++            let track = browser.chrome || browser.ios ? { node: observer.selectionRange.focusNode, anchor: observer.selectionRange.anchorNode, written: false } : undefined;
+             this.tile.sync(track);
+-            if (track && (track.written || observer.selectionRange.focusNode != track.node || !this.tile.dom.contains(track.node)))
++            if (track && (track.written || observer.selectionRange.focusNode != track.node || observer.selectionRange.anchorNode != track.anchor ||
++                !this.tile.dom.contains(track.node) || !this.tile.dom.contains(track.anchor)))
+                 this.forceSelection = true;
+             this.tile.dom.style.height = "";
+         });
+diff --git a/dist/index.js b/dist/index.js
+index 1021312cb249ef4c52559c82500ce061e9d66b17..30ce08fb708095d1e541f8ca13fabef9aa2f1607 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1825,7 +1825,7 @@ class CompositeTile extends Tile {
+             return;
+         super.sync(track);
+         let parent = this.dom, prev = null, next;
+-        let tracking = (track === null || track === void 0 ? void 0 : track.node) == parent ? track : null;
++        let tracking = track && (track.node == parent || track.anchor == parent) ? track : null;
+         let length = 0;
+         for (let child of this.children) {
+             child.sync(track);
+@@ -1838,6 +1838,11 @@ class CompositeTile extends Tile {
+                     next = rm$1(next);
+             }
+             else {
++                // Reparenting a selected node (or its ancestor) can invalidate
++                // Chrome's DOM selection while getSelection still reports the
++                // old endpoints. Force the normal selection sync for either end.
++                if (track && !track.written && (child.dom.contains(track.node) || child.dom.contains(track.anchor)))
++                    track.written = true;
+                 parent.insertBefore(child.dom, next);
+             }
+             prev = child.dom;
+@@ -2061,7 +2066,7 @@ class TextTile extends Tile {
+             return;
+         super.sync(track);
+         if (this.dom.nodeValue != this.text) {
+-            if (track && track.node == this.dom)
++            if (track && (track.node == this.dom || track.anchor == this.dom))
+                 track.written = true;
+             this.dom.nodeValue = this.text;
+         }
+@@ -3007,9 +3012,10 @@ class DocView {
+             // around the selection, get confused and report a different
+             // selection from the one it displays (issue #218). This tries
+             // to detect that situation.
+-            let track = browser.chrome || browser.ios ? { node: observer.selectionRange.focusNode, written: false } : undefined;
++            let track = browser.chrome || browser.ios ? { node: observer.selectionRange.focusNode, anchor: observer.selectionRange.anchorNode, written: false } : undefined;
+             this.tile.sync(track);
+-            if (track && (track.written || observer.selectionRange.focusNode != track.node || !this.tile.dom.contains(track.node)))
++            if (track && (track.written || observer.selectionRange.focusNode != track.node || observer.selectionRange.anchorNode != track.anchor ||
++                !this.tile.dom.contains(track.node) || !this.tile.dom.contains(track.anchor)))
+                 this.forceSelection = true;
+             this.tile.dom.style.height = "";
+         });
