@@ -68,6 +68,7 @@
           "credential_store",
           "path_completion",
           "ssh_required",
+          "ssh_posix_required",
           "sftp_required",
           "mysql_required",
           "clickhouse_required",

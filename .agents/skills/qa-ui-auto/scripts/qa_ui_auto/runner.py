@@ -40,7 +40,7 @@ from .service_fixtures import LocalServiceFixtures, ServiceFixtureError
 from .steps import REGISTRY as STEP_REGISTRY, StepContext, StepError
 from .deadline import BudgetedPage, Deadline, using_deadline
 from .provenance import input_digest, execution_identity, conditions_identity
-from .browser_evidence import BrowserEvidence
+from .browser_evidence import BrowserEvidence, traces_ssh_terminal
 
 _browser = None
 _playwright = None
@@ -192,7 +192,7 @@ def _run_browser_case_inner(payload: dict) -> dict:
     if browser_ctx:
         page = browser_ctx.pages[0] if browser_ctx.pages else browser_ctx.new_page()
         browser_evidence = BrowserEvidence(page, captured_console, case_dir,
-            trace_terminal="ssh_required" in case_dict.get("fixtures", []))
+            trace_terminal=traces_ssh_terminal(case_dict.get("fixtures", [])))
 
         # Tracing: record everything; only persist on failure.
         try:

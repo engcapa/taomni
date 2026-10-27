@@ -1,12 +1,14 @@
-"""Diagnostic Windows SSH service with a real POSIX PTY, without ConPTY.
+"""Owned Windows SSH service with a real POSIX PTY, without ConPTY.
 
-Only the disposable GitHub VM/account/installation are changed. Normal hosted
-services keep using Win32 OpenSSH until the diagnostic proves this alternative.
+Only the disposable GitHub VM/account/installation are changed. The independent
+Win32 service remains available to Windows path and permission scenarios.
 """
 from __future__ import annotations
 
 import os
+import json
 from pathlib import Path
+import platform
 import shutil
 
 
@@ -35,9 +37,10 @@ def start(services, password):
     # Start sshd as the same temporary account that authenticates to it. This
     # keeps the POSIX process unprivileged and avoids changing runner credentials.
     os.environ["QA_POSIX_SSH_USER"] = user
+    os.environ["QA_POSIX_SSH_PASSWORD"] = password
     services.cleanup_action("posix-ssh-user", lambda: powershell(
         "Remove-LocalUser -Name $env:QA_POSIX_SSH_USER"))
-    powershell("$pw=ConvertTo-SecureString $env:QA_SSH_PASSWORD -AsPlainText -Force; "
+    powershell("$pw=ConvertTo-SecureString $env:QA_POSIX_SSH_PASSWORD -AsPlainText -Force; "
                "New-LocalUser -Name $env:QA_POSIX_SSH_USER -Password $pw -PasswordNeverExpires | Out-Null; "
                "$cred=[PSCredential]::new($env:QA_POSIX_SSH_USER,$pw); "
                "Start-Process $env:WINDIR\\System32\\cmd.exe -Credential $cred -LoadUserProfile "
@@ -84,7 +87,7 @@ LogLevel DEBUG3
                       QA_POSIX_SSH_LOG=str(services.root / "posix-sshd.log"),
                       QA_POSIX_SSH_DLL_PATH=str(binary))
     result = powershell(
-        "$pw=ConvertTo-SecureString $env:QA_SSH_PASSWORD -AsPlainText -Force; "
+        "$pw=ConvertTo-SecureString $env:QA_POSIX_SSH_PASSWORD -AsPlainText -Force; "
         "$cred=[PSCredential]::new($env:QA_POSIX_SSH_USER,$pw); "
         "$env:PATH=$env:QA_POSIX_SSH_DLL_PATH+';'+$env:PATH; "
         "$p=Start-Process -FilePath $env:QA_POSIX_SSH_BIN -Credential $cred -LoadUserProfile "
@@ -95,3 +98,25 @@ LogLevel DEBUG3
         ["taskkill", "/PID", str(pid), "/T", "/F"]))
     services.resources.append(f"cygwin-sshd:{user}:{port}")
     return user, port, f"/home/{user}/qa-temp"
+
+
+def prepare(services, shared_facts=None):
+    """Expose a POSIX endpoint without overwriting the Win32 fixture's login."""
+    from ci_services import Services, secret
+
+    if platform.system() != "Windows" and shared_facts is not None:
+        # Linux/macOS already own a real POSIX PTY; keep the same server lease.
+        config = services.config["ssh"].copy()
+        secret("QA_POSIX_SSH_PASSWORD", os.environ["QA_SSH_PASSWORD"])
+        config["password"] = "${env.QA_POSIX_SSH_PASSWORD}"
+        facts = {**shared_facts, "shared_with": "ssh"}
+    else:
+        config = {}
+        child = Services(services.root / "posix-ssh", {"ssh"}, config,
+                         ssh_windows_runtime="cygwin" if platform.system() == "Windows" else "win32",
+                         ssh_password_env="QA_POSIX_SSH_PASSWORD")
+        services.stack.enter_context(child)
+        facts = json.loads((child.root / "lease.json").read_text(encoding="utf-8"))["ssh"]
+        config = config["ssh"].copy()
+    services.config["ssh_posix"] = config
+    return facts

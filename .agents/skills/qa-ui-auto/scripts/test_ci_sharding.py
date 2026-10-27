@@ -55,11 +55,11 @@ class ShardingTests(unittest.TestCase):
             validate_partition(groups, shards)
 
     def test_browser_shared_cases_do_not_serialize_independent_cases(self):
-        ids = ['A', 'B', 'C', 'D']
-        shards, _, builds = schedule([entry(ids, 'browser')], cases(ids, {'A':['ssh_required'], 'B':['vnc_required']}), {}, scope='selected', costs={})
+        ids = ['A', 'B', 'C', 'D', 'E']
+        shards, _, builds = schedule([entry(ids, 'browser')], cases(ids, {'A':['ssh_required'], 'B':['vnc_required'], 'C':['ssh_posix_required']}), {}, scope='selected', costs={})
         self.assertEqual(len(shards), 2)
         self.assertFalse(builds)
-        self.assertEqual({tuple(s['selected_ids']): s['workers'] for s in shards}, {('A','B'): 1, ('C','D'): 2})
+        self.assertEqual({tuple(s['selected_ids']): s['workers'] for s in shards}, {('A','B','C'): 1, ('D','E'): 2})
 
     def test_single_case_keeps_one_runner_and_dependency_only_selection_keeps_order(self):
         for ids, deps in [(['A'], {}), (['A','B'], {'B':['A']})]:

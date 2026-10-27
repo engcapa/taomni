@@ -8,7 +8,7 @@ import math
 from pathlib import Path
 
 COSTS = Path('qa-ui-auto-tests/ci/durations.json')
-SHARED = {'ssh', 'vnc', 'ard'}
+SHARED = {'ssh', 'ssh_posix', 'vnc', 'ard'}
 
 
 def components(ids, dependencies):

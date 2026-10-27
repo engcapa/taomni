@@ -18,6 +18,17 @@ def args(**overrides):
 
 
 class SelectionTests(unittest.TestCase):
+    def test_portable_sftp_lifecycle_uses_posix_without_changing_win32_path_cases(self):
+        plan = make_plan(args(scope="selected", case_ids="TC-145"))
+        self.assertEqual(len(plan["entries"]), 6)
+        for entry in plan["entries"]:
+            self.assertIn("ssh_posix", entry["capabilities"])
+            self.assertNotIn("ssh", entry["capabilities"])
+        retained = make_plan(args(scope="selected", case_ids="TC-010,TC-012"))
+        for entry in retained["entries"]:
+            self.assertIn("ssh", entry["capabilities"])
+            self.assertNotIn("ssh_posix", entry["capabilities"])
+
     def test_cloud_settings_provision_secret_service_without_protocol_fixture(self):
         plan = make_plan(args(scope="selected", case_ids="TC-BACKUP-CLOUD-001",
                               platforms="linux", modes="native"))

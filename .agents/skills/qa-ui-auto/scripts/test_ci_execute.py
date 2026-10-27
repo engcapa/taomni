@@ -50,12 +50,13 @@ class ExecuteRuntimeTests(unittest.TestCase):
                 self.assertEqual(events, ["desktop-start", "x11-start", "x11-stop", "desktop-stop"])
 
     def test_browser_services_do_not_start_a_native_desktop(self):
-        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack, \
-                patch("ci_desktop.Desktop") as desktop, patch("ci_services.Services") as services:
-            self.assertIsNone(_prepare_runtime(stack, {"mode": "browser", "capabilities": ["ssh"]},
-                                               Path(directory), {}))
-            desktop.assert_not_called()
-            services.return_value.__enter__.assert_called_once()
+        for capability in ("ssh", "ssh_posix"):
+            with self.subTest(capability=capability), tempfile.TemporaryDirectory() as directory, ExitStack() as stack, \
+                    patch("ci_desktop.Desktop") as desktop, patch("ci_services.Services") as services:
+                self.assertIsNone(_prepare_runtime(stack, {"mode": "browser", "capabilities": [capability]},
+                                                   Path(directory), {}))
+                desktop.assert_not_called()
+                services.return_value.__enter__.assert_called_once()
 
 
 class ExecuteOutcomeTests(unittest.TestCase):

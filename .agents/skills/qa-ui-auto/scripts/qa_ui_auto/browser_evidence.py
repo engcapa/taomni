@@ -12,6 +12,10 @@ from typing import Any
 from urllib.parse import urlparse
 
 
+def traces_ssh_terminal(fixtures: list[str]) -> bool:
+    return bool({"ssh_required", "ssh_posix_required"}.intersection(fixtures))
+
+
 class BrowserEvidence:
     """Own console listeners and bounded SSH bridge frame evidence for one case.
 

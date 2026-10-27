@@ -318,6 +318,19 @@ OpenSSH fixture acknowledges `chmod 600` without applying POSIX bits; `TC-010`
 requires an explicit unsupported-mode warning and unchanged `644` readback
 there, while Linux/macOS require the actual `600` readback.
 
+`TC-145` tests the portable attached-SFTP open/close lifecycle against an
+explicit `ssh_posix_required` endpoint (`ssh_posix` config section,
+`QA_POSIX_SSH_PASSWORD`). It never falls back to the `ssh` endpoint. On Windows
+CI owns a second Cygwin OpenSSH server and temporary account; Win32 OpenSSH/Git
+Bash remains selected by TC-010/012 for its path/permission contracts. Independent
+Paramiko controls reproduced command first-byte loss on the Win32 combination
+without Taomni, while the Cygwin control passed all 24 resize/focus/timing cells
+in run 40526074910. No product input delay, extra key, or replay is added. Both
+services retain authenticated exec/PTY/SFTP readiness, server banner and cleanup
+evidence in their leases. Linux/macOS reuse their existing POSIX lease if present;
+otherwise the supervisor creates one. Shared SSH cases stay serial and both
+passwords are redacted from reports and traces.
+
 Java downloads are pinned by version and SHA256 in `toolchains.yaml`. JDTLS
 performs real LSP initialize and checks debug/test command registration when
 bundles are selected. Java Test 0.43.1 matches the ASM 9.8 family in JDTLS 1.50;

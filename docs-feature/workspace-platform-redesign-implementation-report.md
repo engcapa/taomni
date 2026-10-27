@@ -49,6 +49,12 @@ TC-145 保留原步骤，进一步在两轮 SFTP 的每次打开与关闭后验�
 
 首次 Cygwin 对照 40524300692 停在 sshd Windows loader 错误 `3221225781`，未执行协议试验；已在执行配置检查之前将 job 所有的 Cygwin bin 目录加入 PATH，并在退出时恢复。另保存初始诊断身份文件，确保 setup 失败也有可下载材料；该修正尚待重跑，不能把 setup 失败计为有效对照。
 
+修正后的直接协议对照 [40526074910](https://github.com/engcapa/taomni/actions/runs/40526074910) 中，Cygwin 3.6.12 / Bash 5.2.21 / OpenSSH 10.6 的 24 个缩放、焦点和 0–500ms 时序组合全部通过，原始 JSON 和 SHA 已核验；Win32 对照仍丢首字节，所以该诊断 workflow 整体保留失败状态。它证明 fixture 差异，不能作为 Taomni 产品通过证据。
+
+TC-145 改为显式 `ssh_posix_required`、`ssh_posix` 配置和独立 `QA_POSIX_SSH_PASSWORD`，不自动退回 Win32 服务。Windows supervisor 同时拥有可独立清理的 Cygwin 服务及临时账户；Linux/macOS 在已存在普通 SSH lease 时复用真实 POSIX 服务，否则单独创建。保留每次开关后单次输入、精确输出、既有全部断言和 120 秒预算。TC-010/012 保持 Win32 的权限及路径转换契约，产品没有等待、额外按键或重放修改。两种 SSH fixture 均保留被动 browser 帧证据，密码一并脱敏。用例仍待新提交的托管 browser/native 验收。
+
+相关集 [40525718246](https://github.com/engcapa/taomni/actions/runs/40525718246) 在 macOS release TC-WS-054 第 63 步重新捕获 ResizeObserver 错误；此前精确文本及磁盘 SHA 断言通过。错误快照中最后一条为重新创建的面包屑 observer 97，宽度 187.453125px；完整原始材料保留，不能将此前面包屑延期测量的定向通过视为问题已经解决。正在进一步检查内容更新与 observer 生命周期。
+
 ## 全量 ResizeObserver 诊断（2026-10-27，进行中）
 
 定向 [40478838714](https://github.com/engcapa/taomni/actions/runs/40478838714) 的 14 个 ID、51 次执行全部通过，三平台 browser/native 原始 receipt、源码与二进制身份独立核验通过。包含九个崩溃专项、文件 watcher、MFA 备份、RDP 参考和真实 macOS ARD。随后同步远程 main，`git merge origin/main` 返回 Already up to date。
