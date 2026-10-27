@@ -1,11 +1,25 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前功能全量与性能验收尚未完成。当前源码 `7dbd1e88` 的三平台相关集 [40569868761](https://github.com/engcapa/taomni/actions/runs/40569868761) 已全部通过：48 个精确 ID、178/178 次适用执行、18/18 分片，0 failed / skipped / infrastructure errors，全部原始回执、源码/runner/case/原生构建身份及最终汇总已独立核验。包含整组九项崩溃回归、Windows 选区修复、分屏面包屑与保留行为。此前三平台崩溃组 42/42 和 Linux 面包屑专项 14/14 也已核验。接下来同步并合并最新 main，再执行完整目录；不能把相关集当作全量通过。旧相关集与旧全量的失败、慢样本全部保留。browser/native 只在 GitHub 执行，本机仅运行单测、编译与静态检查；功能全量通过后再做正式性能对照，目前没有“性能无退化”的结论。证据目录为 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 用例按用户认可的现有 policy 单独报告缺口。
+> 当前功能全量与性能验收尚未完成。修复提交 `7dbd1e88` 的三平台相关集 [40569868761](https://github.com/engcapa/taomni/actions/runs/40569868761) 已全部通过：48 个精确 ID、178/178 次适用执行、18/18 分片，0 failed / skipped / infrastructure errors，全部原始回执、源码/runner/case/原生构建身份及最终汇总已独立核验。包含整组九项崩溃回归、Windows 选区修复、分屏面包屑与保留行为。此前三平台崩溃组 42/42 和 Linux 面包屑专项 14/14 也已核验。已重新 fetch 并无冲突合并 main `65d6d907`，合并提交 `efd6c4ed` 的三平台全量 [40577348054](https://github.com/engcapa/taomni/actions/runs/40577348054) 已结束并独立核验：2,102 passed / 1 failed，唯一失败为 macOS native RDP 照片帧率比 0.75228（要求 ≥0.85）；尚未全量通过。旧相关集与旧全量的失败、慢样本全部保留。browser/native 只在 GitHub 执行，本机仅运行单测、编译与静态检查；功能全量通过后再做正式性能对照，目前没有“性能无退化”的结论。证据目录为 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 用例按用户认可的现有 policy 单独报告缺口。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
+
+## main 合并与全量结果（2026-10-28，尚有一项失败）
+
+相关集 40569868761 的 178/178 通过且完成独立核验后，重新 `git fetch origin main`，远程 main 为 `65d6d907efdf291478e660dc1ada96a12a41b8ad`；无冲突合并并推送 `efd6c4edec2c2309cf545fa9ff1feda99bdc6ab1`。main 只增加已包含父提交的合并节点，合并前后工作树文件内容无差异，产品 source SHA 仍为 `1acd6425c4211b04f72f5c08865ebbf1e97f5c9e7e2b26e3537e35078f713171`，现有本机 QA release 与该内容匹配。没有用源码无变化代替用户要求的复测。
+
+已对合并提交启动独立三平台 browser/native `scope=all`：[40577348054](https://github.com/engcapa/taomni/actions/runs/40577348054)。精确选集为 641 个适用 ID、2,103 次执行、25 个分片。使用各模式完整适用目录、browser workers 2、原生 release、整组九项崩溃回归及原有 CI 契约；持续下载每个原始分片并在相同 frozen checkout 独立核验源码/用例/runner/构建身份与最终汇总。唯一允许的外部源码缺口仍为 clickhousecrud 用例，不能计为通过。正式性能对照等待此精确 SHA 的全量成功，不提前宣称无性能退化。
+
+全量最终收齐 25/25 分片、641 个适用 ID、2,103 次执行：**2,102 passed / 1 failed**，0 skipped / infrastructure errors。全部原始回执、源码/runner/case/原生构建身份与失败聚合已独立核验，保存在 `github-40577348054/verified-final-failed.json`。唯一失败 `TC-RDPS-PERF-03-photo-content` 的 macOS native observed FPS 为 baseline 21.6663、adaptive 16.2992，比例 0.7522807473，低于原有 0.85 下限；每个实际交付帧的带宽比例 0.998791618，两次连接都使用 RemoteFX、bulk 解码错误为 0。Linux/Windows 同用例通过，之前的邮件订阅与 Windows browser TC-145 本轮也通过。
+
+失败 DOM 保留的服务端日志显示两次捕获均约 57fps，但五秒窗口转交帧数由 baseline 178 降至 adaptive 104；捕获 p95 约 3ms、帧龄 p95 约 16ms。源动画自身约 32.34/30.72fps 且 draw 最大约 100ms，不能仅凭源波动解释全部差距。正在拆分编码选择、编码与发送成本；不降低门槛、不丢弃慢样本、不把重跑偶然通过当作根因修复。正式 UI 性能对照仍等待全量功能成功。
+
+本机仅执行 CPU release 单测作成本拆分：16 个确定性照片帧，32 个预热帧后交替 512 次配对，Rayon/build jobs 均为 2；640×360 的 baseline/adaptive 编码为 10.707/10.712ms，保留父 stride 的 704×384 为 11.446/11.414ms，逐轮输出字节完全一致。该 Linux CPU 结果不能替代 macOS 原生证据，也没有复现 25% 帧率差距。
+
+为区分真实排队与编码停顿，增加可选、常量空间的累计 count/total/max 纳秒计时，覆盖 diff、blocking queue、codec、blocking roundtrip、selection、RemoteFX 和 fragmentation，并记录 raw sample/materialized planar candidate 数量。采样不改选择、压缩历史、调度或失败语义，保留全部慢样本的总量和最大值。将选择/估计器 owner 提取到 `encoder/adaptive.rs`，计数 owner 到 `stats.rs`，既有 inline bulk 测试整体移到独立模块；剩余约千行 facade 的后续边界记录在 encoder experiment README。混合 UI/photo 的真实分片测试比较计时启用/禁用时每个线上字节和跨帧 bulk history，连同保留组为 22/22 通过（另有已单独执行的 ignored profiling）；QA 工具 40/40、format、refactor 检查通过。PERF-03 保持全部原断言与 600 秒预算，新增第一轮 server-log 快照及真实 stage counter 断言，待 GitHub 执行。此提交属于诊断，尚未宣称 RDP 根因已修复。
 
 ## 分屏面包屑与原生撤销专项（2026-10-28，托管复验进行中）
 

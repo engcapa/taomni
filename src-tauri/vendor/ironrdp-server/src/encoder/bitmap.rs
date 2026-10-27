@@ -615,9 +615,10 @@ mod tests {
                         };
                         assert_eq!(sample, expected, "{width}x{height} {format:?}");
                         assert_eq!(
-                            super::super::estimate_bulk_sample(&mut estimator, length, &sample)
+                            super::super::adaptive::estimate_bulk_sample(&mut estimator, length, &sample)
                                 .unwrap(),
-                            super::super::estimate_bulk_size(&mut estimator, &output).unwrap(),
+                            super::super::adaptive::estimate_bulk_size(&mut estimator, &output)
+                                .unwrap(),
                         );
                     }
                 }
