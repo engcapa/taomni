@@ -1,7 +1,8 @@
 id: TC-WS-038
 title: Restore a workspace with a terminal selected and its editor hidden
-description: Create the saved layout through the UI, reload on Home, then return to a workspace whose file editor is mounted behind a terminal. Retain the draft,
-  terminal, navigator and tool controls.
+description: Create the saved layout through the UI, reload on Home, then return to a workspace whose file editor is mounted behind a terminal. Retain the
+  draft, terminal, navigator and tool controls. A closed Documentation panel must have no visible layout box after the hidden editor is restored or Documentation
+  is toggled closed.
 modes:
 - browser
 - native
@@ -67,6 +68,7 @@ steps:
 - assert_text:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
     contains: QA_HIDDEN_EDITOR_DRAFT
+- assert_not_visible: '[data-testid="workspace-file-editor"] [data-panel][id="documentation"]'
 - click: '[data-testid="code-workspace-tool-rail-project"]'
 - wait_for: '[data-testid="code-workspace-tree"]'
 - assert_visible: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
@@ -74,6 +76,7 @@ steps:
 - assert_visible: '[data-testid="code-workspace-right-pane"]'
 - click: '[data-testid="code-workspace-tool-rail-documentation"]'
 - assert_not_visible: '[data-testid="code-workspace-right-pane"]'
+- assert_not_visible: '[data-testid="workspace-file-editor"] [data-panel][id="documentation"]'
 - assert_no_runtime_errors: null
 - click: '[data-testid="workspace-tab"][data-tab-title="Local Terminal"]'
 - click: '[data-testid="nav-mode-home"]'
@@ -103,9 +106,9 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A terminal-selected workspace with a hidden editor can be restored from Home without crashing. Its active terminal, collapsed sidebar and dirty draft
-      survive; expanded and collapsed navigator choices survive repeated mode switches, Project and Documentation still toggle, and only one editor runtime is mounted.
-      No uncaught exception, unhandled rejection, React boundary error or crash page is permitted before reload or after restoration.
+    requirement: A terminal-selected workspace with a hidden editor can be restored from Home without crashing. Its active terminal, collapsed sidebar and
+      dirty draft survive; expanded and collapsed navigator choices survive repeated mode switches, Project and Documentation still toggle, and only one
+      editor runtime is mounted. No uncaught exception, unhandled rejection, React boundary error or crash page is permitted before reload or after restoration.
     actions:
     - 1
     - 2
@@ -124,18 +127,18 @@ verification:
     - 25
     - 27
     - 32
-    - 35
-    - 38
-    - 40
-    - 43
-    - 44
+    - 36
+    - 39
+    - 41
     - 45
     - 46
-    - 51
+    - 47
+    - 48
     - 53
-    - 54
     - 55
-    - 59
+    - 56
+    - 57
+    - 61
     checkpoints:
     - step: 10
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
@@ -156,7 +159,8 @@ verification:
     - step: 28
       expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
     - step: 29
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "Local Terminal"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "Local
+        Terminal"}}'
     - step: 30
       expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
     - step: 31
@@ -165,35 +169,39 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-dirty=\"true\"] .cm-content"}'
     - step: 34
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_HIDDEN_EDITOR_DRAFT"}}'
-    - step: 36
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
+    - step: 35
+      expectation: The closed Documentation panel itself has no visible layout box; a hidden child must not leave an empty strip.
     - step: 37
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
+    - step: 38
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
-    - step: 39
+    - step: 40
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
-    - step: 41
-      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
     - step: 42
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
+    - step: 43
+      expectation: The closed Documentation panel itself has no visible layout box; a hidden child must not leave an empty strip.
+    - step: 44
       expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
-    - step: 47
-      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
-    - step: 48
-      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
     - step: 49
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
-    - step: 50
-      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
-    - step: 52
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 56
       expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
-    - step: 57
-      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 58
+    - step: 50
+      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 51
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
+    - step: 52
       expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
+    - step: 54
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 58
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 59
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
     - step: 60
+      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
+    - step: 62
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_HIDDEN_EDITOR_DRAFT"}}'
-    - step: 61
+    - step: 63
       expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
     results:
     - 10
@@ -210,26 +218,28 @@ verification:
     - 31
     - 33
     - 34
-    - 36
+    - 35
     - 37
-    - 39
-    - 41
+    - 38
+    - 40
     - 42
-    - 47
-    - 48
+    - 43
+    - 44
     - 49
     - 50
+    - 51
     - 52
-    - 56
-    - 57
+    - 54
     - 58
+    - 59
     - 60
-    - 61
+    - 62
+    - 63
   native:
   - check: Restore the hidden editor behind the active terminal in the packaged WebView.
     method: automated
-    reason: The reported desktop crash depends on mounting and resizing invisible panels. Browser geometry cannot certify packaged WebView behavior; real PTY commands
-      remain covered by TC-WS-015 and TC-WS-024.
+    reason: The reported desktop crash depends on mounting and resizing invisible panels. Browser geometry cannot certify packaged WebView behavior; real
+      PTY commands remain covered by TC-WS-015 and TC-WS-024.
   visual:
   - check: Restored file, terminal and compact navigator remain usable.
     method: manual

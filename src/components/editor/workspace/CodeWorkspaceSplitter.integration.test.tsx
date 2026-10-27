@@ -529,4 +529,19 @@ describe("CodeWorkspace project splitter integration (real react-resizable-panel
         .shellChromeState?.projectWidthPx,
     ).toBe(452);
   });
+
+  it("keeps a closed Documentation panel collapsed when a zero-size workspace becomes visible", async () => {
+    const view = render(
+      <CodeWorkspaceTab tabId="tab-splitter-integration" workspace={workspace} visible={false} />,
+    );
+    await screen.findByTestId("code-workspace-tree-pane");
+    const { documentation } = splitterElements(view.container);
+    // Mount behind another tab. Collapse runs while the library has no
+    // measurable geometry; its deferred first layout must preserve closure.
+    await waitFor(() => expect(styleFlexGrow(documentation)).toBe(0));
+    view.rerender(<CodeWorkspaceTab tabId="tab-splitter-integration" workspace={workspace} visible />);
+    act(() => applyGeometry(view.container, 452));
+    expect(styleFlexGrow(documentation)).toBe(0);
+    expect(screen.getByTestId("code-workspace-right-pane")).not.toBeVisible();
+  });
 });
