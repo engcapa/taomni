@@ -1,6 +1,6 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前验收尚未完成。全量 [40500343529](https://github.com/engcapa/taomni/actions/runs/40500343529) 已收齐 25/25 分片：641 个适用 ID、2,103 次执行，2,100 passed / 3 failed。失败分别为 Windows browser TC-145 丢失命令首字节、Linux native TC-MAIL-FOLDER-01 订阅状态回退、macOS native TC-RDPS-PERF-03-photo-content 帧率比 0.845 < 0.85；原始失败全部保留。邮件修复已在三平台 browser/native 全部通过，SSH 远端输入和编辑器偶发选区异常仍在定位，RDP 定向复验见下文。最近一次 main 同步为 `a5743792`，后续仍需再次同步并全量验收。按用户最新指示，browser/native 用例直接在 GitHub 执行，本机仅运行单测、编译与静态检查。功能完成后再做正式性能对照，目前没有“性能无退化”的结论。原始证据保留于 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
+> 当前验收尚未完成。最近三平台相关集 [40539076925](https://github.com/engcapa/taomni/actions/runs/40539076925) 为 112 passed / 2 failed，失败为 Linux native TC-WS-039 的偶发 ResizeObserver 错误和 Windows native TC-WS-054 的选区丢失。SSH POSIX fixture 及邮件修复已通过相关验证；Linux 随后专项为 14/14，但未复现不能证明偶发错误已修复。原全量 [40500343529](https://github.com/engcapa/taomni/actions/runs/40500343529) 的 2,100 passed / 3 failed 与全部慢样本保留，仍须新一轮全量。已 fetch main `65d6d907`（合并 PR #748），待相关修复通过后合并到当前分支。browser/native 只在 GitHub 执行，本机仅运行单测、编译与静态检查；功能全量通过后再做正式性能对照，目前没有“性能无退化”的结论。证据目录为 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 用例按用户认可的现有 policy 单独报告缺口。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
@@ -28,6 +28,12 @@ TC-WS-054 再增至四轮连续宽/窄拖动及长/短替换，逐轮保留原�
 相关集 40525718246 已收齐 18/18 分片，108 passed / 3 failed：Linux TC-WS-038 与 macOS TC-WS-054 的 observer 错误，以及 Windows TC-WS-054 第一轮宽文本替换失败。Windows Ctrl+A 的 keyup 快照确认 DOM 已选择原 23 字符，但后续真实输入仍留下全部旧文本，原因尚未证明。进一步校正测试诊断：可信原生事件可在 capture 与 target listener 之间执行 microtask，旧 `after.prevented=false` 不能证明 CM 没有消费按键。改用零延迟只读任务记录最终事件状态，并同时读取当前固定 CM6 的 DOM 链接所指向的内部选区；不调用 focus/dispatch/flush，不修改选区或输入。每次 Ctrl+A 后保留至多 12 条初始输入选区快照，避免原始 128 条输入环形记录覆盖首字符证据。缺少 CM 链接明确记录 null；8 项诊断契约通过。当前产品面包屑修正的三平台相关集为 [40530554568](https://github.com/engcapa/taomni/actions/runs/40530554568)，尚在执行。
 
 ## Windows 原生选区诊断（2026-10-28，未解决）
+
+最新 [40541426840](https://github.com/engcapa/taomni/actions/runs/40541426840) 最终 13 passed / 1 failed，2/2 回执与聚合独立核验一致。7871ms 全选事务与 7889ms DOM selectionchange 均为 0..23；7917ms Ctrl 释放清除超链接、7932ms LSP overlay 刷新均为 effects-only，7945ms CodeMirror measure → observer.forceFlush → applyDOMChange 首次发布 0..0 选区，7992ms 首字符进入前旧文档仍有 23 字符。已将 bundle 栈对应到 `lspHyperlink.clearMod`、`useEditorDecorations` 的 overlay 和 error-stripe 更新；尚无证据区分 DOM 重绘与后续 OS/驱动事件。
+
+新增两条真实 CodeMirror 挂载单测，验证全文选区跨异步引用高亮出现/消失与 Ctrl 释放仍保留，2/2 通过；它们是保留行为基线，没有复现 Windows 缺陷。仅 QA 诊断再增有界 DOM 前后端点/节点身份快照及独立 MutationObserver，不消费编辑器 observer、不读取布局、不改变 DOM/选区/调度；destroy 时断开，7 项相关工具契约通过。Windows 定向 [40550014363](https://github.com/engcapa/taomni/actions/runs/40550014363) 正在采集实际失败边界。
+
+Linux [40547602802](https://github.com/engcapa/taomni/actions/runs/40547602802) 的完整适用崩溃组为 browser 6/6、native 8/8，2/2 回执及最终聚合独立核验通过。TC-WS-039 的既有失败没有复现；进一步将同一用例扩充为三次连续隐藏/恢复双栏与 Documentation，并在两个方向拖动侧栏，每轮保留双编辑器、草稿、侧栏状态和运行时断言。没有过滤错误或放宽断言，扩充部分仍待 GitHub 执行。
 
 [40532648901](https://github.com/engcapa/taomni/actions/runs/40532648901) 的 2/2 回执与最终汇总已独立验证：17 passed / 1 failed，唯一失败为 TC-WS-054。Ctrl+A keydown 7698.2ms 后，事件已被编辑器消费，DOM 与 CodeMirror 内部选区均为 0..23；keyup 7752.4ms 后两者已经折叠为 0，首字符 keydown 7814.9ms 前旧文档仍为 23 字符。因此全选已生效，但在输入前丢失；目前不能据此认定是焦点、保存或字符投递问题。
 
