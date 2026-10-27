@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shell: [console, msys-console, msys-script]
+        shell: [console, portable-console]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,9 +35,21 @@ jobs:
       - run: python -m pip install PyYAML==6.0.2 jsonschema==4.25.1 paramiko==3.5.1 pyte==0.8.2
       - run: python -m unittest test_ci_ssh_input_probe test_ci_windows_ssh_shell
       - run: python .agents/skills/qa-ui-auto/scripts/ci_services.py install
-      - if: matrix.shell == 'msys-script'
-        run: C:/msys64/usr/bin/bash.exe -lc 'pacman -Sy --needed --noconfirm util-linux'
-      - run: python .agents/skills/qa-ui-auto/scripts/ci_ssh_input_probe.py --shell ${{ matrix.shell }} --out qa-ui-auto-report/ssh-input-probe
+      - name: Prepare a fixed older Git runtime as a diagnostic control
+        if: matrix.shell == 'portable-console'
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'PortableGit-2.50.1-64-bit.7z.exe'
+          $destination = Join-Path $env:RUNNER_TEMP 'ssh-probe-git-2.50.1'
+          Invoke-WebRequest 'https://github.com/git-for-windows/git/releases/download/v2.50.1.windows.1/PortableGit-2.50.1-64-bit.7z.exe' -OutFile $archive
+          if ((Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant() -ne 'c45a7dfa2bde34059f6dbd85f49a95d73d5aea29305f51b79595e56e4f323a3d') { throw 'PortableGit SHA256 mismatch' }
+          & 7z x -y "-o$destination" $archive
+          if ($LASTEXITCODE -ne 0) { throw 'PortableGit extraction failed' }
+          "QA_SSH_PROBE_SHELL=$destination/bin/bash.exe" >> $env:GITHUB_ENV
+      - if: matrix.shell != 'portable-console'
+        run: python .agents/skills/qa-ui-auto/scripts/ci_ssh_input_probe.py --shell ${{ matrix.shell }} --out qa-ui-auto-report/ssh-input-probe
+      - if: matrix.shell == 'portable-console'
+        run: python .agents/skills/qa-ui-auto/scripts/ci_ssh_input_probe.py --shell-executable "$QA_SSH_PROBE_SHELL" --out qa-ui-auto-report/ssh-input-probe
       - uses: actions/upload-artifact@v4
         if: always()
         with:

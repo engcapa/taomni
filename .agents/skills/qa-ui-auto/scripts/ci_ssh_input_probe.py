@@ -102,6 +102,7 @@ def main():
     parser.add_argument("--delays", default="0,0.01,0.05,0.1,0.25,0.5")
     parser.add_argument("--protocol", choices=["vt", "win32", "paste"], default="vt")
     parser.add_argument("--shell", choices=["console", "msys-script", "msys-console"], default="console")
+    parser.add_argument("--shell-executable", type=Path)
     args = parser.parse_args()
     delays = [float(value) for value in args.delays.split(",")]
     if not delays or any(value < 0 or value > 2 for value in delays):
@@ -109,7 +110,7 @@ def main():
     args.out.mkdir(parents=True, exist_ok=True)
     config = {}
     results = []
-    shell = Path("C:/msys64/usr/bin/bash.exe") if args.shell.startswith("msys-") else None
+    shell = args.shell_executable or (Path("C:/msys64/usr/bin/bash.exe") if args.shell.startswith("msys-") else None)
     with Services(args.out / "services", {"ssh"}, config, ssh_windows_shell=shell):
         connection = config["ssh"]
         client = paramiko.SSHClient()
@@ -117,7 +118,7 @@ def main():
         try:
             client.connect(connection["host"], connection["port"], connection["user"],
                            os.environ["QA_SSH_PASSWORD"], allow_agent=False, look_for_keys=False)
-            _, facts, errors = client.exec_command("git --version; bash --version; uname -a; command -v script; command -v winpty; ls -l /c/msys64/usr/bin/script.exe")
+            _, facts, errors = client.exec_command("printf 'BASH_VERSION=%s\\n' \"$BASH_VERSION\"; /usr/bin/uname -a; git --version; command -v script; command -v winpty")
             (args.out / "shell-versions.txt").write_text(
                 facts.read().decode(errors="replace") + errors.read().decode(errors="replace"), encoding="utf-8")
             for delay in delays:
