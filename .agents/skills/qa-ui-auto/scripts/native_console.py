@@ -16,6 +16,17 @@ if (!window.__QA_UI_AUTO_CONSOLE__) {
     testid: el?.getAttribute?.('data-testid') ?? null,
     role: el?.getAttribute?.('role') ?? null
   });
+  // Match EditorView.findFromDOM for the pinned CM6 runtime. Read only; a
+  // missing/changed private DOM link is explicit, never a simulated selection.
+  const editorSelection = editor => {
+    const view = editor?.cmTile?.root?.view;
+    const main = view?.state?.selection?.main;
+    return main ? {
+      anchor: main.anchor, head: main.head, documentChars: view.state.doc.length,
+      focused: view.hasFocus, composing: view.composing
+    } : null;
+  };
+  let selectionProbe = null;
   for (const type of ['focusin', 'focusout', 'pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'contextmenu']) {
     document.addEventListener(type, event => {
       window.__QA_UI_AUTO_FOCUS__.push({
@@ -48,10 +59,17 @@ if (!window.__QA_UI_AUTO_CONSOLE__) {
         document_has_focus: document.hasFocus()
       };
       window.__QA_UI_AUTO_FOCUS__.push(observation);
+      if (type === 'keydown' && event.code === 'KeyA' && (event.ctrlKey || event.metaKey)
+          && event.target?.closest?.('.cm-content')) {
+        observation.followingInput = [];
+        selectionProbe = {editor: event.target.closest('.cm-content'), observation};
+      }
       // Observe the completed shortcut, including handlers that stop event
-      // propagation. Never change selection or inspect form control values.
+      // propagation. Trusted events can checkpoint microtasks between capture
+      // and target listeners, so a microtask is too early. Do not wait/replay
+      // input: a zero-delay observation runs after the native event dispatch.
       if (event.target?.closest?.('.cm-content') && (event.ctrlKey || event.metaKey)) {
-        queueMicrotask(() => {
+        setTimeout(() => {
           const selection = document.getSelection();
           const editor = event.target.closest('.cm-content');
           observation.after = {
@@ -61,9 +79,10 @@ if (!window.__QA_UI_AUTO_CONSOLE__) {
             collapsed: selection?.isCollapsed ?? null,
             anchorOffset: selection?.anchorOffset ?? null,
             focusOffset: selection?.focusOffset ?? null,
-            documentChars: editor?.textContent?.length ?? null
+            documentChars: editor?.textContent?.length ?? null,
+            codeMirror: editorSelection(editor)
           };
-        });
+        }, 0);
       }
       if (window.__QA_UI_AUTO_FOCUS__.length > 64) window.__QA_UI_AUTO_FOCUS__.shift();
     }, true);
@@ -76,6 +95,14 @@ if (!window.__QA_UI_AUTO_CONSOLE__) {
     document.addEventListener(type, event => {
       const editor = document.activeElement?.closest?.('.cm-content');
       if (!editor || (type !== 'selectionchange' && !editor.contains(event.target))) return;
+      if (selectionProbe?.editor === editor && selectionProbe.observation.followingInput.length < 12
+          && (type === 'beforeinput' || type === 'input'
+              || (type === 'keydown' && !event.ctrlKey && !event.metaKey && event.key?.length === 1))) {
+        selectionProbe.observation.followingInput.push({
+          type, time: performance.now(), inputType: event.inputType ?? null,
+          codeMirror: editorSelection(editor)
+        });
+      }
       const selection = document.getSelection();
       const describeEndpoint = (node, offset) => {
         if (!node || !editor.contains(node)) return null;

@@ -25,6 +25,8 @@ TC-WS-054 再增至四轮连续宽/窄拖动及长/短替换，逐轮保留原�
 
 本机 QA release 已重新编译供手工测试：`src-tauri/target/qa-ui-auto/release/taomni`，独立 ID `com.taomni.app.qa`，product source SHA `a34f0739513f8e4ef3d2d2a2d1079ffc0c9c294dc994ab292aa247b2589231b5`，binary SHA `4ae0c7d5ecc10d8b0cd9ef279ba06f1b300939683e3be74b915a81ad2697ab9f`。使用 Node 22、`CARGO_BUILD_JOBS=2` 检查 inputs match；构建后未在本机运行 browser/native。
 
+相关集 40525718246 已收齐 18/18 分片，108 passed / 3 failed：Linux TC-WS-038 与 macOS TC-WS-054 的 observer 错误，以及 Windows TC-WS-054 第一轮宽文本替换失败。Windows Ctrl+A 的 keyup 快照确认 DOM 已选择原 23 字符，但后续真实输入仍留下全部旧文本，原因尚未证明。进一步校正测试诊断：可信原生事件可在 capture 与 target listener 之间执行 microtask，旧 `after.prevented=false` 不能证明 CM 没有消费按键。改用零延迟只读任务记录最终事件状态，并同时读取当前固定 CM6 的 DOM 链接所指向的内部选区；不调用 focus/dispatch/flush，不修改选区或输入。每次 Ctrl+A 后保留至多 12 条初始输入选区快照，避免原始 128 条输入环形记录覆盖首字符证据。缺少 CM 链接明确记录 null；8 项诊断契约通过。当前产品面包屑修正的三平台相关集为 [40530554568](https://github.com/engcapa/taomni/actions/runs/40530554568)，尚在执行。
+
 ## RDP 照片帧率诊断（2026-10-27，原因未确认）
 
 全量 macOS 的 baseline/adaptive 实际 marker 为 18.458/15.597 fps，比值 0.845009661；零 bulk 解码错误、每帧带宽比 1.019295685 不能抵消帧率失败。源动画在一秒区间内明显波动，draw max 达 118/130ms。RDP server、vendor encoder 与 rdp-probe 对当前已合并 main 无源码差异，但这不构成 UI 性能无退化的证据。
