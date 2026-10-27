@@ -1,10 +1,10 @@
 id: TC-WS-039
 title: Shared panel lifecycle survives hidden nested editors, resizing and reload
-description: Use real resizable panels and nested editor splits through public controls, retain a dirty draft while terminal/mode switches hide
-  the editor, then collapse, resize and reload. Immediately activate and close utility tabs after Home/Sessions navigation to detect delayed navigator
-  geometry. Explicit runtime assertions protect component upgrades even if the UI recovers. Retains opt-in, read-only ResizeObserver provenance
-  from initial workspace creation through hidden split restoration. Repeat the hidden split restoration three times, resizing both directions,
-  to expose observer loops during consecutive returns.
+description: Use real resizable panels and nested editor splits through public controls, retain a dirty draft while terminal/mode switches hide the editor,
+  then collapse, resize and reload. Immediately activate and close utility tabs after Home/Sessions navigation to detect delayed navigator geometry. Explicit
+  runtime assertions protect component upgrades even if the UI recovers. Retains opt-in, read-only ResizeObserver provenance from initial workspace creation
+  through hidden split restoration. Repeat the hidden split restoration three times, resizing both directions, to expose observer loops during consecutive
+  returns.
 modes:
 - browser
 - native
@@ -55,6 +55,12 @@ steps:
 - assert_count:
     selector: '[data-testid="code-workspace-editor-pane"]'
     equal: 2
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-pane"] [data-testid="code-workspace-breadcrumbs"][data-variant="statusbar"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-pane"] [data-testid="code-workspace-breadcrumbs"][data-variant="bar"]'
+    equal: 1
 - click: '[data-testid="code-workspace-tool-rail-documentation"]'
 - assert_visible: '[data-testid="code-workspace-right-pane"]'
 - drag_to:
@@ -84,6 +90,12 @@ steps:
 - assert_count:
     selector: '[data-testid="code-workspace-editor-pane"]'
     equal: 2
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-pane"] [data-testid="code-workspace-breadcrumbs"][data-variant="statusbar"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-pane"] [data-testid="code-workspace-breadcrumbs"][data-variant="bar"]'
+    equal: 1
 - assert_visible: '[data-testid="code-workspace-right-pane"]'
 - assert_text:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
@@ -112,6 +124,12 @@ steps:
 - assert_count:
     selector: '[data-testid="code-workspace-editor-pane"]'
     equal: 2
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-pane"] [data-testid="code-workspace-breadcrumbs"][data-variant="statusbar"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-pane"] [data-testid="code-workspace-breadcrumbs"][data-variant="bar"]'
+    equal: 1
 - assert_visible: '[data-testid="code-workspace-right-pane"]'
 - assert_text:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
@@ -140,6 +158,12 @@ steps:
 - assert_count:
     selector: '[data-testid="code-workspace-editor-pane"]'
     equal: 2
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-pane"] [data-testid="code-workspace-breadcrumbs"][data-variant="statusbar"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="code-workspace-editor-pane"] [data-testid="code-workspace-breadcrumbs"][data-variant="bar"]'
+    equal: 1
 - assert_visible: '[data-testid="code-workspace-right-pane"]'
 - assert_text:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
@@ -229,9 +253,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Real nested editor panels, Documentation, sidebar resizing, terminal hiding and overview remain usable across consecutive operations
-      and reload; one shared editor owner and the dirty draft survive with no uncaught errors, unhandled rejections, React boundary errors or
-      crash UI.
+    requirement: Real nested editor panels, Documentation, sidebar resizing, terminal hiding and overview remain usable across consecutive operations and
+      reload; one shared editor owner and the dirty draft survive with no uncaught errors, unhandled rejections, React boundary errors or crash UI.
     actions:
     - 1
     - 2
@@ -245,34 +268,34 @@ verification:
     - 15
     - 17
     - 18
-    - 21
     - 23
-    - 24
+    - 25
     - 26
-    - 27
+    - 28
     - 29
     - 31
     - 33
-    - 34
-    - 38
-    - 82
-    - 84
-    - 85
-    - 87
-    - 89
+    - 35
+    - 36
+    - 40
     - 90
     - 92
     - 93
     - 95
     - 97
+    - 98
+    - 100
     - 101
     - 103
-    - 106
-    - 108
+    - 105
+    - 109
     - 111
     - 114
-    - 118
-    - 120
+    - 116
+    - 119
+    - 122
+    - 126
+    - 128
     checkpoints:
     - step: 10
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
@@ -284,75 +307,75 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-split\"]"}'
     - step: 20
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
-    - step: 22
+    - step: 24
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
-    - step: 25
+    - step: 27
       expectation: '{"assert_no_runtime_errors": null}'
-    - step: 28
-      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
     - step: 30
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
     - step: 32
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 35
-      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
-    - step: 36
-      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 37
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 39
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-split\"]"}'
-    - step: 40
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
-    - step: 41
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
-    - step: 42
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_SHARED_PANEL_DRAFT"}}'
-    - step: 43
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 83
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
-    - step: 86
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
-    - step: 88
-      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
-    - step: 91
-      expectation: '{"assert_visible": "[data-testid=\"workspace-bottom-dock\"]"}'
-    - step: 94
-      expectation: '{"assert_not_visible": "[data-testid=\"workspace-bottom-dock\"]"}'
-    - step: 96
-      expectation: '{"wait_for": "[data-testid=\"tab-overview\"]"}'
-    - step: 98
-      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"]"}'
-    - step: 99
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_SHARED_PANEL_DRAFT"}}'
-    - step: 100
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 102
-      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
-    - step: 104
       expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 105
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 107
+    - step: 34
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 109
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 110
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 112
+    - step: 37
       expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
-    - step: 113
+    - step: 38
       expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 115
-      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"]"}'
-    - step: 116
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
-    - step: 117
+    - step: 39
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 41
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-split\"]"}'
+    - step: 42
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
+    - step: 45
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
+    - step: 46
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_SHARED_PANEL_DRAFT"}}'
-    - step: 119
+    - step: 47
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 91
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
+    - step: 94
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
+    - step: 96
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
+    - step: 99
+      expectation: '{"assert_visible": "[data-testid=\"workspace-bottom-dock\"]"}'
+    - step: 102
+      expectation: '{"assert_not_visible": "[data-testid=\"workspace-bottom-dock\"]"}'
+    - step: 104
+      expectation: '{"wait_for": "[data-testid=\"tab-overview\"]"}'
+    - step: 106
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"]"}'
+    - step: 107
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_SHARED_PANEL_DRAFT"}}'
+    - step: 108
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 110
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 112
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 113
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 115
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 117
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 118
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 120
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
     - step: 121
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 123
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"]"}'
+    - step: 124
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
+    - step: 125
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_SHARED_PANEL_DRAFT"}}'
+    - step: 127
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
+    - step: 129
       expectation: '{"assert_no_runtime_errors": null}'
     results:
     - 10
@@ -360,174 +383,216 @@ verification:
     - 16
     - 19
     - 20
-    - 22
-    - 25
-    - 28
+    - 24
+    - 27
     - 30
     - 32
-    - 35
-    - 36
+    - 34
     - 37
+    - 38
     - 39
-    - 40
     - 41
     - 42
-    - 43
-    - 83
-    - 86
-    - 88
+    - 45
+    - 46
+    - 47
     - 91
     - 94
     - 96
-    - 98
     - 99
-    - 100
     - 102
     - 104
-    - 105
+    - 106
     - 107
-    - 109
+    - 108
     - 110
     - 112
     - 113
     - 115
-    - 116
     - 117
-    - 119
+    - 118
+    - 120
     - 121
-  - id: R2
-    requirement: Home/Sessions mode switches apply navigator geometry before immediate utility-tab activation and closing; native press and release
-      reach the same target without added sleeps or click retries.
-    actions:
     - 123
     - 124
-    - 126
-    - 128
-    - 130
-    - 131
-    - 132
-    - 135
-    - 136
-    - 137
-    checkpoints:
-    - step: 125
-      expectation: '{"wait_for": "[data-testid=\"mfa-tab\"]"}'
-    - step: 127
-      expectation: '{"wait_for": "[data-testid=\"mfa-empty\"]"}'
-    - step: 129
-      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
-    - step: 133
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"mfa\"]", "name": "data-active", "equals": "true"}}'
-    - step: 134
-      expectation: '{"assert_visible": "[data-testid=\"mfa-tab\"]"}'
-    - step: 138
-      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"settings\"]", "state": "detached"}}'
-    - step: 139
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"mfa\"]", "name": "data-active", "equals": "true"}}'
-    - step: 140
-      expectation: '{"assert_no_runtime_errors": null}'
-    results:
     - 125
     - 127
     - 129
-    - 133
+  - id: R2
+    requirement: Home/Sessions mode switches apply navigator geometry before immediate utility-tab activation and closing; native press and release reach
+      the same target without added sleeps or click retries.
+    actions:
+    - 131
+    - 132
     - 134
+    - 136
     - 138
     - 139
     - 140
-  - id: R3
-    requirement: Three consecutive expanded/collapsed sidebar and nested Documentation/split restoration cycles preserve both editors and the
-      dirty draft without any runtime errors; each return from Home/Sessions uses the existing terminal and file tabs.
-    actions:
-    - 44
-    - 46
-    - 47
-    - 49
-    - 51
-    - 53
-    - 54
-    - 57
-    - 63
-    - 65
-    - 66
-    - 68
-    - 70
-    - 72
-    - 73
-    - 76
+    - 143
+    - 144
+    - 145
     checkpoints:
-    - step: 45
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
-    - step: 48
-      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
-    - step: 50
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 52
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 55
-      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
-    - step: 56
-      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 58
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-split\"]"}'
-    - step: 59
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
-    - step: 60
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
-    - step: 61
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_SHARED_PANEL_DRAFT"}}'
-    - step: 62
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 64
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
-    - step: 67
-      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
-    - step: 69
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 71
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 74
-      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
-    - step: 75
-      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 77
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-split\"]"}'
-    - step: 78
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
-    - step: 79
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
-    - step: 80
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_SHARED_PANEL_DRAFT"}}'
-    - step: 81
+    - step: 133
+      expectation: '{"wait_for": "[data-testid=\"mfa-tab\"]"}'
+    - step: 135
+      expectation: '{"wait_for": "[data-testid=\"mfa-empty\"]"}'
+    - step: 137
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 141
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"mfa\"]", "name": "data-active", "equals": "true"}}'
+    - step: 142
+      expectation: '{"assert_visible": "[data-testid=\"mfa-tab\"]"}'
+    - step: 146
+      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"settings\"]", "state": "detached"}}'
+    - step: 147
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"mfa\"]", "name": "data-active", "equals": "true"}}'
+    - step: 148
       expectation: '{"assert_no_runtime_errors": null}'
     results:
-    - 45
+    - 133
+    - 135
+    - 137
+    - 141
+    - 142
+    - 146
+    - 147
+    - 148
+  - id: R3
+    requirement: Three consecutive expanded/collapsed sidebar and nested Documentation/split restoration cycles preserve both editors and the dirty draft
+      without any runtime errors; each return from Home/Sessions uses the existing terminal and file tabs.
+    actions:
     - 48
     - 50
-    - 52
+    - 51
+    - 53
     - 55
-    - 56
+    - 57
     - 58
-    - 59
-    - 60
     - 61
-    - 62
-    - 64
-    - 67
     - 69
     - 71
+    - 72
     - 74
-    - 75
-    - 77
+    - 76
     - 78
     - 79
+    - 82
+    checkpoints:
+    - step: 49
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
+    - step: 52
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 54
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 56
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 59
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 60
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 62
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-split\"]"}'
+    - step: 63
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
+    - step: 66
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
+    - step: 67
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_SHARED_PANEL_DRAFT"}}'
+    - step: 68
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 70
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
+    - step: 73
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 75
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 77
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 80
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 81
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 83
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-split\"]"}'
+    - step: 84
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
+    - step: 87
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
+    - step: 88
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_SHARED_PANEL_DRAFT"}}'
+    - step: 89
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 49
+    - 52
+    - 54
+    - 56
+    - 59
+    - 60
+    - 62
+    - 63
+    - 66
+    - 67
+    - 68
+    - 70
+    - 73
+    - 75
+    - 77
     - 80
     - 81
+    - 83
+    - 84
+    - 87
+    - 88
+    - 89
+  - id: R4
+    requirement: Only the active group portals a statusbar navigation trail. Each inactive split uses one fixed-height local breadcrumb bar before and after
+      hidden restoration, so it cannot expand to fill the editor.
+    actions:
+    - 18
+    - 40
+    - 61
+    - 82
+    checkpoints:
+    - step: 21
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"] [data-testid=\"code-workspace-breadcrumbs\"][data-variant=\"statusbar\"]",
+        "equal": 0}}'
+    - step: 22
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"] [data-testid=\"code-workspace-breadcrumbs\"][data-variant=\"bar\"]",
+        "equal": 1}}'
+    - step: 43
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"] [data-testid=\"code-workspace-breadcrumbs\"][data-variant=\"statusbar\"]",
+        "equal": 0}}'
+    - step: 44
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"] [data-testid=\"code-workspace-breadcrumbs\"][data-variant=\"bar\"]",
+        "equal": 1}}'
+    - step: 64
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"] [data-testid=\"code-workspace-breadcrumbs\"][data-variant=\"statusbar\"]",
+        "equal": 0}}'
+    - step: 65
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"] [data-testid=\"code-workspace-breadcrumbs\"][data-variant=\"bar\"]",
+        "equal": 1}}'
+    - step: 85
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"] [data-testid=\"code-workspace-breadcrumbs\"][data-variant=\"statusbar\"]",
+        "equal": 0}}'
+    - step: 86
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"] [data-testid=\"code-workspace-breadcrumbs\"][data-variant=\"bar\"]",
+        "equal": 1}}'
+    results:
+    - 21
+    - 22
+    - 43
+    - 44
+    - 64
+    - 65
+    - 85
+    - 86
   native:
   - check: Consecutive hidden-panel lifecycle and resizing in the packaged WebView.
     method: automated
-    reason: Zero-size nested panel registration and pointer geometry depend on WKWebView/WebKitGTK/WebView2. Browser tests cannot certify those
-      component and WebView interactions; real PTY and process restart effects remain covered by TC-WS-024 and TC-WS-030.
+    reason: Zero-size nested panel registration and pointer geometry depend on WKWebView/WebKitGTK/WebView2. Browser tests cannot certify those component
+      and WebView interactions; real PTY and process restart effects remain covered by TC-WS-024 and TC-WS-030.
   visual:
   - check: Editor, Documentation and compact navigator recover usable geometry.
     method: manual

@@ -106,7 +106,6 @@ export interface RenderEditorGroupContext {
   navigateDiagnostic: (direction: 1 | -1) => void;
   editorPaneRef: import("react").RefObject<HTMLElement | null>;
   inactiveEditorPaneRef: import("react").RefObject<HTMLElement | null>;
-  statusNavigationHost: HTMLElement | null;
   breadcrumbSymbolsByGroup: Record<string, LspDocumentSymbol[]>;
   cursorPositions: Record<string, LspPosition>;
   loadBreadcrumbPathChildren: (segment: BreadcrumbPathSegment, file: OpenFileState, trail: BreadcrumbPathSegment[]) => Promise<BreadcrumbPathChild[]>;
@@ -444,9 +443,9 @@ export function createRenderEditorGroup(controllerContext: RenderEditorGroupCont
             }}
           />
         ) : null}
-        breadcrumbs={showGroupBreadcrumbs && groupFile ? (
+        breadcrumbs={showGroupBreadcrumbs && groupFile ? (variant) => (
           <Breadcrumbs
-            variant={controllerContext.editorAppearanceProfile.breadcrumbs.placement === "status-bar" && controllerContext.statusNavigationHost ? "statusbar" : "bar"}
+            variant={variant}
             pathSegments={groupBreadcrumbSegments}
             symbols={controllerContext.breadcrumbSymbolsByGroup[groupId] ?? []}
             position={controllerContext.cursorPositions[groupId] ?? { line: 0, character: 0 }}

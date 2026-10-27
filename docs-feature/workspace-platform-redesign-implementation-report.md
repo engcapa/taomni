@@ -1,11 +1,23 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前验收尚未完成。最近三平台相关集 [40539076925](https://github.com/engcapa/taomni/actions/runs/40539076925) 为 112 passed / 2 failed，失败为 Linux native TC-WS-039 的偶发 ResizeObserver 错误和 Windows native TC-WS-054 的选区丢失。SSH POSIX fixture 及邮件修复已通过相关验证；Linux 随后专项为 14/14，但未复现不能证明偶发错误已修复。原全量 [40500343529](https://github.com/engcapa/taomni/actions/runs/40500343529) 的 2,100 passed / 3 failed 与全部慢样本保留，仍须新一轮全量。已 fetch main `65d6d907`（合并 PR #748），待相关修复通过后合并到当前分支。browser/native 只在 GitHub 执行，本机仅运行单测、编译与静态检查；功能全量通过后再做正式性能对照，目前没有“性能无退化”的结论。证据目录为 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 用例按用户认可的现有 policy 单独报告缺口。
+> 当前验收尚未完成。三平台相关集 [40560013232](https://github.com/engcapa/taomni/actions/runs/40560013232) 的 browser 93/93 已通过，native 仍在执行并已暴露隐藏面板 ResizeObserver 错误及新增撤销步骤的测试分组假设问题。Windows 选区丢失已根据真实 DOM 重挂载证据修复，修正版 TC-WS-054 与完整九项崩溃回归正在 [40565635547](https://github.com/engcapa/taomni/actions/runs/40565635547) 三平台复验；不能将执行中或定向结果记为全部通过。原全量 [40500343529](https://github.com/engcapa/taomni/actions/runs/40500343529) 的 2,100 passed / 3 failed 与全部慢样本保留，仍须新一轮全量。已 fetch main `65d6d907`（合并 PR #748），待相关修复通过后合并到当前分支。browser/native 只在 GitHub 执行，本机仅运行单测、编译与静态检查；功能全量通过后再做正式性能对照，目前没有“性能无退化”的结论。证据目录为 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 用例按用户认可的现有 policy 单独报告缺口。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
+
+## 分屏面包屑与原生撤销专项（2026-10-28，托管复验进行中）
+
+40560013232 的 Linux native TC-WS-039 失败截图确定了另一项布局缺陷：非活动编辑器的导航留在 pane 内部，却按全局 status host 是否存在选择 `statusbar`，与实际 portal 的 active/visible 条件不同，`h-full flex-1` 将导航撑高至 341px。提取 `useEditorGroupBreadcrumbs`，由同一个实际目标同时决定导航 variant、portal 和 owner 生命周期；非活动、隐藏或没有 host 的组使用固定 `h-7 shrink-0` 本地栏。删除 shell 对 navigationHost 的多余订阅，保留 ReactNode 调用兼容。该确定缺陷的修复不能自动证明单栏 TC-WS-038 的 ResizeObserver 错误也已解决。
+
+新 hook 的两项真实 Breadcrumbs 挂载测试保护 active group 切换、隐藏、host 消失及卸载清理，连同 EditorGroup、Breadcrumbs/resize 为 31/31 通过；真实面板库集成、选区、编辑器生命周期及 StatusBar 为 32/32 通过。TypeScript 和 `pnpm check:refactor` 通过。TC-WS-039 保留原 140 步、三次隐藏/恢复、草稿和运行时检查，另增 8 个检查点，每次双栏恢复都禁止 pane 内 `statusbar` 并要求恰好一个本地 `bar`，总计 148 步，仍为 240 秒预算。最终 browser/native 结果待托管验证。
+
+初版 TC-WS-054 的新增撤销检查错误地假定原生逐字符长输入总是一个 history group；Linux/macOS 实际只撤销最后一个字符，不能据此判断选区修复失败。现保留全部原 128 步，在宽文本保存后使用非相邻的 Mod+Home + 单字符 `!` 操作，再验证 undo/redo/undo 的精确文本、dirty 状态与不变的磁盘 SHA。共 144 步、原 300 秒预算不变，三平台 [40565635547](https://github.com/engcapa/taomni/actions/runs/40565635547) 执行完整适用九项崩溃回归。
+
+Linux 真实 IME 专项 [40562614105](https://github.com/engcapa/taomni/actions/runs/40562614105) 的 2/2 原始回执与最终失败汇总已独立核验：13 passed / 2 failed，其中 TC-IDE-IMPROVE-008-ime-lifecycle-native 通过，失败为 TC-WS-038 的 observer 错误和 TC-WS-054 初版新增撤销假设，整轮仍保留 failure。另一诊断 [40564815021](https://github.com/engcapa/taomni/actions/runs/40564815021) 在现有被动 RO 记录中增加每个真实 callback 的同步 DOM 写入，不读布局、不写 DOM、不改变调度或吞错，等待区分具体几何变化 owner。
+
+本机仅重新编译供手工验证的 QA release：`src-tauri/target/qa-ui-auto/release/taomni`，独立 ID `com.taomni.app.qa`，source SHA `aa2151fdcbb86a35246c54e26bc003af4828c51cceedb2791e52dcbcf4f513ff`，binary SHA `bcad15b8cfbe9b71c9500669f887b01c9280d6e888b172c95fa30c46cf18f618`，耗时 1135.78 秒、build jobs 为 2。包含 CodeMirror 选区 patch；不包含本节新面包屑修复，后续源码稳定再编译。没有启动本机 browser/native 用例。
 
 ## 邮件订阅与后台同步竞争（2026-10-27，定向托管复验通过）
 
@@ -45,7 +57,7 @@ Windows 定向 [40550014363](https://github.com/engcapa/taomni/actions/runs/4055
 
 新增六个真实 CM 装饰 diff/DOM 重挂载场景，只在浏览器边界模拟 Chromium 重绘后短暂返回旧选区端点。改前全选、反向全选、局部范围和 caret 四项稳定失败；anchor-only/focus-only 两项与原三条保留基线通过。对 `@codemirror/view@6.43.11` 的 ESM/CJS 同步添加 pnpm patch：重绘 tracker 同时跟踪 anchor/focus，插入节点前检测移动的节点或其子树包含任一端点，通过原有 `forceSelection` 和焦点 guard 完成同步，不新增 focus、延迟、重试、输入重放或事务。只在实际 DOM 重挂载且尚未标记变更时检查 contains，不增加布局读取。升级该依赖时必须保留本组回归并重新核对上游修复。
 
-改后六场景、原基线及跨编辑器焦点/undo/redo 均通过，连同 LSP、hyperlink、CodeMirror 编辑/IME guard/共享事务 owner 共 117/117 单测通过。TC-WS-054 保留原 128 步及 300 秒预算，再加 8 步检查首轮宽文本保存后的 undo/redo、精确文本、dirty 状态和未改变的磁盘哈希。patch 与 pnpm workspace 配置纳入 QA 源码身份（新增/修改/删除契约先失败后通过），组件 patch 修改触发 PR 的完整崩溃回归。没有运行本机 browser/native；原生修复结论等待 GitHub 三平台相关集。
+改后六场景、原基线及跨编辑器焦点/undo/redo 均通过，连同 LSP、hyperlink、CodeMirror 编辑/IME guard/共享事务 owner 共 117/117 单测通过。TC-WS-054 保留原 128 步及 300 秒预算，新增保存后的 undo/redo、精确文本、dirty 状态和未改变的磁盘哈希；原生逐字符 history 分组的断言按本报告最新章节修正。patch 与 pnpm workspace 配置纳入 QA 源码身份（新增/修改/删除契约先失败后通过），组件 patch 修改触发 PR 的完整崩溃回归。没有运行本机 browser/native；原生修复结论等待 GitHub 三平台相关集。
 
 历史 main 的性能构建仍执行该 checkout 原有 builder、配置及产品源码，仅预加载当前测量 runner 的 provenance 模块，使新增 workspace/patch 输入边界在构建和测量时一致；不改写二进制身份或历史 checkout。子进程契约以旧 fingerprint 模块和真实临时 Git checkout 验证同一输入规则及未改动的 builder。11 项构建/崩溃门禁契约、TypeScript、静态覆盖 audit 和 refactor 检查通过；性能实测仍等待全量功能 gate。
 

@@ -116,7 +116,6 @@ export function useWorkspaceSurfaceComposition(context: UseWorkspaceSurfaceCompo
     navigateDiagnostic: editorFeatures.navigateDiagnostic,
     editorPaneRef: surfaceState.editorPaneRef,
     inactiveEditorPaneRef: surfaceState.inactiveEditorPaneRef,
-    statusNavigationHost: commands.statusNavigationHost,
     breadcrumbSymbolsByGroup: project.telemetry.breadcrumbSymbolsByGroup,
     cursorPositions: project.telemetry.cursorPositions,
     loadBreadcrumbPathChildren: files.treeInteractions.loadBreadcrumbPathChildren,
