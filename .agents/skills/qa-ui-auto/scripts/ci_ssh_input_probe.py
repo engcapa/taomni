@@ -112,7 +112,7 @@ def main():
                     if args.shell in {"script", "msys-script"}:
                         channel = client.get_transport().open_session()
                         channel.get_pty(term="xterm-256color", width=171, height=32)
-                        script = ("MSYS2_ARG_CONV_EXCL='*' /c/msys64/usr/bin/script.exe"
+                        script = ("env MSYS2_ARG_CONV_EXCL='*' /c/msys64/usr/bin/script.exe"
                                   if args.shell == "msys-script" else "script")
                         channel.exec_command(f"exec {script} -q -c '/usr/bin/bash --noprofile --norc -i' /dev/null")
                     else:
