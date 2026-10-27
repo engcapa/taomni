@@ -1,6 +1,6 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前验收尚未完成。最新工具栏实现 `97c37487` 在本机重建隔离环境后，**51/51 browser、26/26 native 通过**，原始回执及 source/runner/case/native build 身份已独立核验。用户确认重启前后手工清理了 repo 的 `qa-ui-auto-report`，新证据存于 repo 外的 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/verified-local.json`，原环境失败保留。旧提交的托管相关集 [40432446710](https://github.com/engcapa/taomni/actions/runs/40432446710) 为 2,076 次执行全部通过，但不包含最新工具栏调整。本轮相关集全部通过后仍须重新拉取合并 main、复测并执行整体用例；功能完成后再做正式性能对照，目前没有“性能无退化”的结论。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
+> 当前验收尚未完成。最新工具栏实现 `97c37487` 在本机重建隔离环境后，**53/53 browser、26/26 native 通过**，原始回执及 source/runner/case/native build 身份已独立核验。用户确认重启前后手工清理了 repo 的 `qa-ui-auto-report`，新证据存于 repo 外的 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/verified-local.json`，原环境失败保留。旧提交的托管相关集 [40432446710](https://github.com/engcapa/taomni/actions/runs/40432446710) 为 2,076 次执行全部通过，但不包含最新工具栏调整。本轮相关集全部通过后仍须重新拉取合并 main、复测并执行整体用例；功能完成后再做正式性能对照，目前没有“性能无退化”的结论。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
@@ -18,6 +18,14 @@ Sessions 的既有分类、目录与搜索过滤统一从漏斗按钮打开。Wo
 本机两个 browser worker 同时使用共享 VNC 测试服务时，后一个用例的 reset 会断开前一个用例，原始 RFB 日志已确认该原因。测试调度现在只对同一 VNC 服务加跨进程互斥，等待发生在用例计时前，并在整个用例和清理结束后释放；其他用例维持原有并发。进程崩溃由系统释放锁，失败结果及原有 deadline 保留。三平台 browser 的 VNC 分片同时执行该隔离契约，Windows/macOS 结果待本轮 hosted 运行确认。
 
 已按 ZIP 成员大小与 CRC 完整核对解压副本，清理 581 个重复旧下载包，回收约 2.37 GiB；解压的成功、失败及签名回执全部保留，当前仍运行的托管任务目录未清理。
+
+## Home 工具栏既有用例迁移补齐（2026-10-27）
+
+本轮相关集 [40449231276](https://github.com/engcapa/taomni/actions/runs/40449231276) 的 Linux browser `TC-100/101` 等待 Home 的 `titlebar-actions-more` 超时。原始截图、DOM 与实际代码一致：Home 不显示没有可用操作的空菜单，主应用菜单仍位于导航条顶部。这是用例遗漏，未修改产品或增加空按钮。
+
+`TC-100` 保留 Home 的窗口控件、抓手、工具栏及主题持久化断言，明确 Home 没有空操作菜单，再进入 Sessions 打开真实菜单、检查单屏入口、用 Escape 关闭并返回 Home。`TC-101` 以真实 ControlBar 为就绪条件，继续验证应用主菜单条目、Escape 关闭及重载后的相同入口，补充 Home 不显示空菜单。原失败证据保留。
+
+本机补跑 `browser/run-20261027-124222-272180511/` 的两条用例通过；最新 `verified-local.json` 独立核验 **53/53 browser、26/26 native**，source/runner 身份保持上一节所列值，逐用例摘要均匹配当前文件。637 ID 静态门禁及 `pnpm check:refactor` 通过。该批只有 YAML 和文档变化，不要求重新编译产品；复用同源码的 QA 二进制。旧托管运行继续收集其余分片，修正后的托管结果另行记录。
 
 ## 重启后本机复验（2026-10-27）
 
