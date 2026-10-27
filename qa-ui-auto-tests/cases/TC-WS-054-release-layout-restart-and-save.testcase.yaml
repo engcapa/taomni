@@ -1,8 +1,8 @@
 id: TC-WS-054
 title: 'Crash regression: release WebView multi-file layouts, cold restart and exact disk save'
 description: Runs toolbar layouts through production controls and real editor/store owners in the matching QA release WebView. Verifies four real files,
-  exact saved bytes, a process cold restart with the initially empty vault, and layouts after restoration. No layout or resizable-panel mocks. Repeats narrow/wide
-  editor geometry with Documentation and sidebar resizing, then saves long and short content before cold restart.
+  exact saved bytes, a process cold restart with the initially empty vault, and layouts after restoration. No layout or resizable-panel mocks. Repeats four
+  consecutive narrow/wide editor geometry cycles with Documentation and sidebar resizing, then saves long and short content before cold restart.
 modes:
 - native
 covers:
@@ -93,6 +93,96 @@ steps:
     selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
     equal: 1
 - click: '[data-testid="workspace-tab"][data-tab-title="README.md"]'
+- press:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    key: Mod+a
+- type:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    text: QA_RELEASE_CANVAS_SAVED
+- press:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    key: Mod+s
+- assert_file_sha256:
+    path: ${fixture.platform_workspace_root}/README.md
+    equals: 2686497ac79d66b9c2d8932067753d7452c411ff5faff19c8ffd85479471966b
+- assert_no_runtime_errors: null
+- click: '[data-testid="code-workspace-tool-rail-documentation"]'
+- drag_to:
+    from: '[data-testid="main-sidebar-resize-handle"]'
+    by:
+      dx: 120
+      dy: 0
+      steps: 8
+- press:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    key: Mod+a
+- type:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    text: Workspace resize and save 1 - wide document content wide document content wide document content wide document content wide document content wide
+      document content wide document content wide document content
+- press:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    key: Mod+s
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    equals: Workspace resize and save 1 - wide document content wide document content wide document content wide document content wide document content
+      wide document content wide document content wide document content
+- assert_file_sha256:
+    path: ${fixture.platform_workspace_root}/README.md
+    equals: c136116a215b155a15dd56886f7f44953b2fdaeef0bb56fc2242b39df5330bb9
+- assert_no_runtime_errors: null
+- click: '[data-testid="code-workspace-tool-rail-documentation"]'
+- drag_to:
+    from: '[data-testid="main-sidebar-resize-handle"]'
+    by:
+      dx: -120
+      dy: 0
+      steps: 8
+- press:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    key: Mod+a
+- type:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    text: QA_RELEASE_CANVAS_SAVED
+- press:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    key: Mod+s
+- assert_file_sha256:
+    path: ${fixture.platform_workspace_root}/README.md
+    equals: 2686497ac79d66b9c2d8932067753d7452c411ff5faff19c8ffd85479471966b
+- assert_no_runtime_errors: null
+- click: '[data-testid="code-workspace-tool-rail-documentation"]'
+- drag_to:
+    from: '[data-testid="main-sidebar-resize-handle"]'
+    by:
+      dx: 120
+      dy: 0
+      steps: 8
+- press:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    key: Mod+a
+- type:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    text: Workspace resize and save 2 - wide document content wide document content wide document content wide document content wide document content wide
+      document content wide document content wide document content
+- press:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    key: Mod+s
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    equals: Workspace resize and save 2 - wide document content wide document content wide document content wide document content wide document content
+      wide document content wide document content wide document content
+- assert_file_sha256:
+    path: ${fixture.platform_workspace_root}/README.md
+    equals: cd1ce269962d4c655e3dbc2dcf3e7feaf5d887cddc8ba31d18915a7096d8f1d1
+- assert_no_runtime_errors: null
+- click: '[data-testid="code-workspace-tool-rail-documentation"]'
+- drag_to:
+    from: '[data-testid="main-sidebar-resize-handle"]'
+    by:
+      dx: -120
+      dy: 0
+      steps: 8
 - press:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
     key: Mod+a
@@ -317,8 +407,8 @@ verification:
     - 39
     - 40
   - id: R3
-    requirement: Repeated sidebar and Documentation width changes while replacing and saving text preserve exact editor/disk bytes without ResizeObserver
-      or other runtime errors.
+    requirement: Four consecutive narrow/wide cycles of sidebar and Documentation width changes while replacing and saving text preserve exact editor/disk
+      bytes without ResizeObserver or other runtime errors.
     actions:
     - 41
     - 42
@@ -340,6 +430,26 @@ verification:
     - 66
     - 67
     - 68
+    - 71
+    - 72
+    - 73
+    - 74
+    - 75
+    - 79
+    - 80
+    - 81
+    - 82
+    - 83
+    - 86
+    - 87
+    - 88
+    - 89
+    - 90
+    - 94
+    - 95
+    - 96
+    - 97
+    - 98
     checkpoints:
     - step: 46
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "Workspace resize and save 1 -
@@ -365,6 +475,30 @@ verification:
       expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/README.md", "equals": "2686497ac79d66b9c2d8932067753d7452c411ff5faff19c8ffd85479471966b"}}'
     - step: 70
       expectation: '{"assert_no_runtime_errors": null}'
+    - step: 76
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "Workspace resize and save 1 -
+        wide document content wide document content wide document content wide document content wide document content wide document content wide document
+        content wide document content"}}'
+    - step: 77
+      expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/README.md", "equals": "c136116a215b155a15dd56886f7f44953b2fdaeef0bb56fc2242b39df5330bb9"}}'
+    - step: 78
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 84
+      expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/README.md", "equals": "2686497ac79d66b9c2d8932067753d7452c411ff5faff19c8ffd85479471966b"}}'
+    - step: 85
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 91
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "Workspace resize and save 2 -
+        wide document content wide document content wide document content wide document content wide document content wide document content wide document
+        content wide document content"}}'
+    - step: 92
+      expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/README.md", "equals": "cd1ce269962d4c655e3dbc2dcf3e7feaf5d887cddc8ba31d18915a7096d8f1d1"}}'
+    - step: 93
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 99
+      expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/README.md", "equals": "2686497ac79d66b9c2d8932067753d7452c411ff5faff19c8ffd85479471966b"}}'
+    - step: 100
+      expectation: '{"assert_no_runtime_errors": null}'
     results:
     - 46
     - 47
@@ -376,70 +510,80 @@ verification:
     - 63
     - 69
     - 70
-  - id: R2
-    requirement: Cold restart restores all file tabs and reapplying Grid/Split keeps the saved content and disk checksum.
-    actions:
-    - 71
-    - 73
+    - 76
     - 77
     - 78
-    - 83
     - 84
-    - 89
-    - 90
-    - 94
-    checkpoints:
-    - step: 75
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 4}}'
-    - step: 76
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 79
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 80
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "grid"}}'
-    - step: 81
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 4}}'
-    - step: 82
-      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"] [data-editor-tab-key][data-active=\"true\"]",
-        "attribute": "data-editor-tab-key", "equals": ["root:root-1:README.md", "root:root-1:Draft10.txt", "root:root-1:Draft2.txt", "root:root-1:src/index.ts"]}}'
-    - step: 85
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 86
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
-    - step: 87
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
-    - step: 88
-      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"] [data-editor-tab-key][data-active=\"true\"]",
-        "attribute": "data-editor-tab-key", "equals": ["root:root-1:README.md", "root:root-1:Draft2.txt"]}}'
-    - step: 91
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 92
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "single"}}'
-    - step: 93
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
-    - step: 95
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "QA_RELEASE_CANVAS_SAVED"}}'
-    - step: 96
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 97
-      expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/README.md", "equals": "2686497ac79d66b9c2d8932067753d7452c411ff5faff19c8ffd85479471966b"}}'
-    results:
-    - 75
-    - 76
-    - 79
-    - 80
-    - 81
-    - 82
     - 85
-    - 86
-    - 87
-    - 88
     - 91
     - 92
     - 93
-    - 95
-    - 96
-    - 97
+    - 99
+    - 100
+  - id: R2
+    requirement: Cold restart restores all file tabs and reapplying Grid/Split keeps the saved content and disk checksum.
+    actions:
+    - 101
+    - 103
+    - 107
+    - 108
+    - 113
+    - 114
+    - 119
+    - 120
+    - 124
+    checkpoints:
+    - step: 105
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 4}}'
+    - step: 106
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 109
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 110
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "grid"}}'
+    - step: 111
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 4}}'
+    - step: 112
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"] [data-editor-tab-key][data-active=\"true\"]",
+        "attribute": "data-editor-tab-key", "equals": ["root:root-1:README.md", "root:root-1:Draft10.txt", "root:root-1:Draft2.txt", "root:root-1:src/index.ts"]}}'
+    - step: 115
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 116
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
+    - step: 117
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
+    - step: 118
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"] [data-editor-tab-key][data-active=\"true\"]",
+        "attribute": "data-editor-tab-key", "equals": ["root:root-1:README.md", "root:root-1:Draft2.txt"]}}'
+    - step: 121
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 122
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "single"}}'
+    - step: 123
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
+    - step: 125
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "QA_RELEASE_CANVAS_SAVED"}}'
+    - step: 126
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 127
+      expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/README.md", "equals": "2686497ac79d66b9c2d8932067753d7452c411ff5faff19c8ffd85479471966b"}}'
+    results:
+    - 105
+    - 106
+    - 109
+    - 110
+    - 111
+    - 112
+    - 115
+    - 116
+    - 117
+    - 118
+    - 121
+    - 122
+    - 123
+    - 125
+    - 126
+    - 127
   visual:
   - check: Pane topology, selected files and preserved editor content
     method: automated

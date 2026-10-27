@@ -21,6 +21,8 @@
 
 定向 [40516121016](https://github.com/engcapa/taomni/actions/runs/40516121016) 的 Windows browser/native 完整适用崩溃专项及 TC-012/145 共 18/18 通过，回执和原生构建身份独立核验。选区异常没有复现，不能据此宣称已修复；保留原失败与诊断，继续纳入后续相关和全量运行。
 
+TC-WS-054 再增至四轮连续宽/窄拖动及长/短替换，逐轮保留原有精确文本、磁盘 SHA 与运行时断言，仍使用原 300 秒预算。现有运行时检查点一并保存最近 64 条被动快捷键/焦点观察，使冷启动前的成功选区状态也保留；不增加快捷键与输入之间的 WebDriver 往返或等待。23 项服务及观察器契约通过，新增轮次尚待托管执行。
+
 本机 QA release 已重新编译供手工测试：`src-tauri/target/qa-ui-auto/release/taomni`，独立 ID `com.taomni.app.qa`，product source SHA `a34f0739513f8e4ef3d2d2a2d1079ffc0c9c294dc994ab292aa247b2589231b5`，binary SHA `4ae0c7d5ecc10d8b0cd9ef279ba06f1b300939683e3be74b915a81ad2697ab9f`。使用 Node 22、`CARGO_BUILD_JOBS=2` 检查 inputs match；构建后未在本机运行 browser/native。
 
 ## RDP 照片帧率诊断（2026-10-27，原因未确认）
@@ -44,6 +46,8 @@ Breadcrumbs 修复后的定向 [40495133881](https://github.com/engcapa/taomni/a
 TC-145 保留原步骤，进一步在两轮 SFTP 的每次打开与关闭后验证各自独立的精确命令输出，所有命令仅尝试一次。新增工具契约与共享 Services 回归 28/28、`pnpm check:refactor` 通过；增强用例仍需当前分支托管验收。
 
 直接协议对照进一步显示：固定旧 Git 2.50.1 为 23/24；真正启动到 POSIX script 提示符的嵌套 PTY 为 15/24；[40518918877](https://github.com/engcapa/taomni/actions/runs/40518918877) 的 Win32 OpenSSH 9.5 为 19/24、10.4 为 18/24。所有失败均保留原始帧，升级服务端与降低 shell 版本都不是有效修复。现增加 Cygwin OpenSSH 真实 POSIX PTY 的独立对照，使用已有的、校验安装器哈希的运行时以及独立临时账户，不改 runner 账户密码、不替换正常托管 fixture；本机 44 项服务/诊断契约和重构检查通过。该对照尚待 GitHub 实测，不提供产品通过证据。
+
+首次 Cygwin 对照 40524300692 停在 sshd Windows loader 错误 `3221225781`，未执行协议试验；已在执行配置检查之前将 job 所有的 Cygwin bin 目录加入 PATH，并在退出时恢复。另保存初始诊断身份文件，确保 setup 失败也有可下载材料；该修正尚待重跑，不能把 setup 失败计为有效对照。
 
 ## 全量 ResizeObserver 诊断（2026-10-27，进行中）
 

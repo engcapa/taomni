@@ -4,12 +4,13 @@ import subprocess
 from unittest import TestCase
 
 from native_console import CONSOLE_HOOK_SCRIPT
+from qa_ui_auto.runtime_errors import NATIVE_SNAPSHOT
 
 
 HARNESS = r"""
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
-const source = require('node:fs').readFileSync(0, 'utf8');
+const {source, snapshot} = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
 const handlers = {};
 const pending = [];
 let selectionReads = 0;
@@ -21,6 +22,7 @@ const sandbox = {
   queueMicrotask: callback => pending.push(callback),
   document: {
     addEventListener: () => {}, activeElement: editor, hasFocus: () => true,
+    querySelector: () => null,
     getSelection: () => {
       selectionReads++;
       return {toString: () => 'original', isCollapsed: false, anchorOffset: 0, focusOffset: 8};
@@ -45,6 +47,10 @@ assert.deepEqual(JSON.parse(JSON.stringify(result.after)), {
   prevented: true, editorFocused: true, selectedChars: 8, collapsed: false,
   anchorOffset: 0, focusOffset: 8, documentChars: 8
 });
+const checkpoint = vm.runInContext(snapshot, sandbox);
+assert.equal(checkpoint.focusHistory.length, 1);
+assert.equal(checkpoint.focusHistory[0].after.selectedChars, 8);
+assert.notEqual(checkpoint.focusHistory, sandbox.__QA_UI_AUTO_FOCUS__);
 const field = {tagName: 'INPUT', getAttribute: () => 'password', closest: () => null,
   get value() {throw Error('must not read control values');}};
 handlers.keydown[0]({...key, target: field});
@@ -62,6 +68,8 @@ process.stdout.write(JSON.stringify({passed: true}));
 
 class NativeConsoleTest(TestCase):
     def test_shortcut_probe_is_passive_bounded_and_excludes_form_values(self):
-        result = subprocess.run(["node", "-e", HARNESS], input=CONSOLE_HOOK_SCRIPT,
+        result = subprocess.run(["node", "-e", HARNESS], input=json.dumps({
+            "source": CONSOLE_HOOK_SCRIPT, "snapshot": NATIVE_SNAPSHOT,
+        }),
                                 text=True, capture_output=True, check=True, timeout=20)
         self.assertTrue(json.loads(result.stdout)["passed"])

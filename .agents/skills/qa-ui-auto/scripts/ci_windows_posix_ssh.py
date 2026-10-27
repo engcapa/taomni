@@ -20,6 +20,11 @@ def start(services, password):
     sshd = root / "usr/sbin/sshd.exe"
     if not sshd.is_file():
         raise RuntimeError("The diagnostic requires the owned Cygwin OpenSSH installation")
+    # sshd lives in usr/sbin; the Windows loader needs bin for cygwin1.dll
+    # before any executable test or launch, not only inside its login shell.
+    previous_path = os.environ.get("PATH", "")
+    services.cleanup_action("posix-ssh-path", lambda: os.environ.__setitem__("PATH", previous_path))
+    os.environ["PATH"] = str(binary) + os.pathsep + previous_path
     user, port = services.namespace, free_port()
     private = services.private / "posix-ssh"
     private.mkdir()
@@ -30,13 +35,13 @@ def start(services, password):
     # Start sshd as the same temporary account that authenticates to it. This
     # keeps the POSIX process unprivileged and avoids changing runner credentials.
     os.environ["QA_POSIX_SSH_USER"] = user
+    services.cleanup_action("posix-ssh-user", lambda: powershell(
+        "Remove-LocalUser -Name $env:QA_POSIX_SSH_USER"))
     powershell("$pw=ConvertTo-SecureString $env:QA_SSH_PASSWORD -AsPlainText -Force; "
                "New-LocalUser -Name $env:QA_POSIX_SSH_USER -Password $pw -PasswordNeverExpires | Out-Null; "
                "$cred=[PSCredential]::new($env:QA_POSIX_SSH_USER,$pw); "
                "Start-Process $env:WINDIR\\System32\\cmd.exe -Credential $cred -LoadUserProfile "
                "-ArgumentList '/c exit 0' -Wait")
-    services.cleanup_action("posix-ssh-user", lambda: powershell(
-        "Remove-LocalUser -Name $env:QA_POSIX_SSH_USER"))
     records = command([binary / "mkpasswd.exe", "-l", "-u", user])
     fields = next((line.split(":") for line in records.splitlines()
                    if line.split(":")[0].casefold() == user.casefold()), None)

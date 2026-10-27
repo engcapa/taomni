@@ -66,6 +66,7 @@ class WindowsPosixSshTest(TestCase):
                     patch("ci_services.command", side_effect=self.commands(services, events)), \
                     patch("ci_services.powershell", side_effect=powershell):
                 user, port, remote = start(services, "disposable-secret")
+                self.assertTrue(os.environ["PATH"].startswith(str(root / "bin") + os.pathsep))
                 self.assertEqual(user, services.namespace)
                 self.assertGreater(port, 0)
                 self.assertEqual(remote, f"/home/{user}/qa-temp")
