@@ -21,6 +21,8 @@ Breadcrumbs 修复后的定向 [40495133881](https://github.com/engcapa/taomni/a
 
 新增测试侧被动 WebSocket 帧观察，仅对声明 SSH fixture 的 browser 用例启用；只监听实际发送/接收事件，排除 connect/认证消息，不替换 WebSocket、DOM 或产品回调。每条数据记录字节长度、SHA256 及有界头尾，最多 128 条帧；通过和失败均保留 `terminal-transport.json`，以区分输入派发、bridge 发送和远端输出。控制台监听生命周期从大型 runner shell 一并提取到独立证据模块，不增加新的产品行为。工具契约保护消息顺序/内容、现有监听器、敏感握手排除、有界记录和清理；产品既有 TC-012/145 仍是验收用例，不能以工具单测代替实际执行。原全量监控改从同 SHA 的独立 worktree 核验，以免后续诊断工具变化污染旧回执身份。
 
+首次诊断 40504722143 的 Windows browser 8/8 通过，尚未复现。成功帧显示 UCRT64 开启焦点报告，SFTP 开关触发 171↔104 列缩放，完整命令写入后收到正确输出；该 trace 没有 cwd setup probe，不能再把 setup 路径认定为唯一原因。增加独立 Windows SSH 协议诊断，对比焦点报告、缩放和 0/10/50ms 间隔，在每个新 PTY 只发送一次命令，失败不重放。保留所有输入/输出帧和原始屏幕，不含认证消息；临时服务由现有 Services 负责清理。五条工具契约通过，覆盖首字节丢失不重试、echo 不冒充实际输出、分帧 cursor query 和连接关闭。该脚本/专用 workflow 仅采集根因证据，不提供产品覆盖或替代 TC-012/145，无新增产品工作流所以不另加 YAML 用例。
+
 ## 全量 ResizeObserver 诊断（2026-10-27，进行中）
 
 定向 [40478838714](https://github.com/engcapa/taomni/actions/runs/40478838714) 的 14 个 ID、51 次执行全部通过，三平台 browser/native 原始 receipt、源码与二进制身份独立核验通过。包含九个崩溃专项、文件 watcher、MFA 备份、RDP 参考和真实 macOS ARD。随后同步远程 main，`git merge origin/main` 返回 Already up to date。
