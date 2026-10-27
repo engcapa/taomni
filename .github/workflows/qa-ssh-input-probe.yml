@@ -33,7 +33,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: python -m pip install PyYAML==6.0.2 jsonschema==4.25.1 paramiko==3.5.1 pyte==0.8.2
-      - run: python -m unittest test_ci_ssh_input_probe
+      - run: python -m unittest test_ci_ssh_input_probe test_ci_windows_ssh_shell
       - run: python .agents/skills/qa-ui-auto/scripts/ci_services.py install
       - if: matrix.shell == 'msys-script'
         run: C:/msys64/usr/bin/bash.exe -lc 'pacman -Sy --needed --noconfirm util-linux'

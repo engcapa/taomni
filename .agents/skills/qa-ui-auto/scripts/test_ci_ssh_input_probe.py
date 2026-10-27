@@ -32,24 +32,21 @@ class SshInputProbeTest(TestCase):
         client.invoke_shell.assert_called_once_with(term="xterm-256color", width=171, height=32)
         client.get_transport.assert_not_called()
 
-    def test_posix_wrapper_gets_a_pty_and_passes_conversion_option_through_env(self):
+    def test_posix_wrapper_gets_a_pty_inside_the_default_shell_runtime(self):
         client = Mock()
         channel = client.get_transport.return_value.open_session.return_value
         self.assertIs(open_shell(client, "msys-script"), channel)
         channel.get_pty.assert_called_once_with(term="xterm-256color", width=171, height=32)
         command = channel.exec_command.call_args.args[0]
-        self.assertTrue(command.startswith("exec env MSYS2_ARG_CONV_EXCL='*' /c/msys64/usr/bin/script.exe "))
+        self.assertTrue(command.startswith("exec /usr/bin/script "))
         self.assertIn("-c '/usr/bin/bash --noprofile --norc -i' /dev/null", command)
         client.invoke_shell.assert_not_called()
 
-    def test_msys_console_uses_the_same_requested_geometry_without_a_script_wrapper(self):
+    def test_msys_console_uses_default_shell_without_nesting_runtimes(self):
         client = Mock()
-        channel = client.get_transport.return_value.open_session.return_value
-        self.assertIs(open_shell(client, "msys-console"), channel)
-        channel.get_pty.assert_called_once_with(term="xterm-256color", width=171, height=32)
-        channel.exec_command.assert_called_once_with(
-            "exec env MSYS2_ARG_CONV_EXCL='*' /c/msys64/usr/bin/bash.exe --noprofile --norc -i")
-        channel.set_combine_stderr.assert_called_once_with(True)
+        self.assertIs(open_shell(client, "msys-console"), client.invoke_shell.return_value)
+        client.invoke_shell.assert_called_once_with(term="xterm-256color", width=171, height=32)
+        client.get_transport.assert_not_called()
 
     def test_win32_protocol_has_one_key_down_and_key_up_for_each_character(self):
         channel = Channel([b"$ ", b"\r\nqa-marker\r\n"])

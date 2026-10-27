@@ -16,17 +16,14 @@ from ci_services import Services
 
 
 def open_shell(client, shell):
-    if shell == "console":
+    if shell in {"console", "msys-console"}:
         return client.invoke_shell(term="xterm-256color", width=171, height=32)
     channel = client.get_transport().open_session()
     channel.set_combine_stderr(True)
     channel.get_pty(term="xterm-256color", width=171, height=32)
-    if shell == "msys-console":
-        channel.exec_command("exec env MSYS2_ARG_CONV_EXCL='*' /c/msys64/usr/bin/bash.exe --noprofile --norc -i")
-        return channel
-    script = ("env MSYS2_ARG_CONV_EXCL='*' /c/msys64/usr/bin/script.exe"
-              if shell == "msys-script" else "script")
-    channel.exec_command(f"exec {script} -q -c '/usr/bin/bash --noprofile --norc -i' /dev/null")
+    # Run script inside the same MSYS runtime as DefaultShell. Nesting MSYS2
+    # underneath Git Bash can exit before a shell is started.
+    channel.exec_command("exec /usr/bin/script -q -c '/usr/bin/bash --noprofile --norc -i' /dev/null")
     return channel
 
 
@@ -113,7 +110,8 @@ def main():
     args.out.mkdir(parents=True, exist_ok=True)
     config = {}
     results = []
-    with Services(args.out / "services", {"ssh"}, config):
+    shell = Path("C:/msys64/usr/bin/bash.exe") if args.shell.startswith("msys-") else None
+    with Services(args.out / "services", {"ssh"}, config, ssh_windows_shell=shell):
         connection = config["ssh"]
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -131,6 +129,8 @@ def main():
                             f"qa-ssh-protocol-{len(results) + 1}", resize=resize, focus=focus, delay=delay,
                             protocol=args.protocol)
                         result.update(resize=resize, focus=focus, delay=delay, protocol=args.protocol, shell=args.shell)
+                        result.update(channel_closed=channel.closed,
+                                      exit_status=channel.recv_exit_status() if channel.exit_status_ready() else None)
                         results.append(result)
                         print(json.dumps({k: v for k, v in result.items() if k not in {"frames", "screen"}}), flush=True)
                     finally:

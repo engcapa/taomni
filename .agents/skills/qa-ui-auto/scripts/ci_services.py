@@ -48,6 +48,19 @@ def powershell(script):
                     "$ErrorActionPreference='Stop'; " + script])
 
 
+def configure_windows_ssh_shell(shell):
+    shell = Path(shell)
+    if not shell.is_file():
+        raise RuntimeError(f"Required Windows SSH shell is missing: {shell}")
+    # Keep paths out of PowerShell code, including spaces and apostrophes.
+    os.environ["QA_SSH_DEFAULT_SHELL"] = str(shell)
+    powershell("New-Item -Path HKLM:\\SOFTWARE\\OpenSSH -Force | Out-Null; "
+               "New-ItemProperty -Path HKLM:\\SOFTWARE\\OpenSSH -Name DefaultShell "
+               "-Value $env:QA_SSH_DEFAULT_SHELL -PropertyType String -Force | Out-Null; "
+               "New-ItemProperty -Path HKLM:\\SOFTWARE\\OpenSSH -Name DefaultShellCommandOption "
+               "-Value '-c' -PropertyType String -Force | Out-Null")
+
+
 def secret(name, value=None):
     value = value or "Qa1_" + secrets.token_hex(16)
     os.environ[name] = value
@@ -231,10 +244,12 @@ def install(capabilities):
 
 
 class Services:
-    def __init__(self, root, capabilities, config):
+    def __init__(self, root, capabilities, config, *, ssh_windows_shell=None):
         self.root = Path(root).resolve()
         self.capabilities = set(capabilities)
         self.config = config
+        # Diagnostic opt-in; normal hosted cases retain their Git Bash shell.
+        self.ssh_windows_shell = ssh_windows_shell
         self.stack = ExitStack()
         self.namespace = "qa" + secrets.token_hex(5)
         self.resources = []
@@ -343,11 +358,7 @@ class Services:
                        f"icacls '{remote_dir}' /grant '{user}:(OI)(CI)F' | Out-Null")
             self.stack.callback(lambda: shutil.rmtree(remote_dir, ignore_errors=True))
             # Git Bash supports the POSIX shell commands in the portable SSH cases.
-            powershell("New-Item -Path HKLM:\\SOFTWARE\\OpenSSH -Force | Out-Null; "
-                       "New-ItemProperty -Path HKLM:\\SOFTWARE\\OpenSSH -Name DefaultShell "
-                       "-Value 'C:\\Program Files\\Git\\bin\\bash.exe' -PropertyType String -Force | Out-Null; "
-                       "New-ItemProperty -Path HKLM:\\SOFTWARE\\OpenSSH -Name DefaultShellCommandOption "
-                       "-Value '-c' -PropertyType String -Force | Out-Null")
+            configure_windows_ssh_shell(self.ssh_windows_shell or "C:/Program Files/Git/bin/bash.exe")
             cfg = private / "sshd_config"
             cfg.write_text("\n".join(lines) + "\n", encoding="utf-8")
             # sshd must run as LocalSystem for password logon/PTY impersonation.
