@@ -26,6 +26,19 @@ class Channel:
 
 
 class SshInputProbeTest(TestCase):
+    def test_win32_protocol_has_one_key_down_and_key_up_for_each_character(self):
+        channel = Channel([b"$ ", b"\r\nqa-marker\r\n"])
+        result = TerminalProbe(channel).run("qa-marker", resize=True, focus=False, delay=0, protocol="win32")
+        self.assertTrue(result["passed"])
+        self.assertEqual(channel.sent[:2], [b"\x1b[0;0;101;1;0;1_", b"\x1b[0;0;101;0;0;1_"])
+        self.assertEqual(len(channel.sent), len("echo qa-marker\r") * 2)
+
+    def test_paste_protocol_preserves_enabled_bracketed_paste_boundaries(self):
+        channel = Channel([b"$ ", b"\r\nqa-marker\r\n"])
+        result = TerminalProbe(channel).run("qa-marker", resize=True, focus=False, delay=0, protocol="paste")
+        self.assertTrue(result["passed"])
+        self.assertEqual(channel.sent, [b"\x1b[200~echo qa-marker\x1b[201~", b"\r"])
+
     def test_success_records_one_command_focus_and_resize_in_original_order(self):
         channel = Channel([b"UCRT64 ~\r\n$ ", b"\r\nqa-marker\r\n$ "])
         with patch("ci_ssh_input_probe.time.sleep") as pause:

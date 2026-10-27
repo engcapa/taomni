@@ -54,7 +54,7 @@ class TerminalProbe:
                 return True
         return False
 
-    def run(self, marker, *, resize, focus, delay):
+    def run(self, marker, *, resize, focus, delay, protocol="vt"):
         self.channel.settimeout(0.1)
         ready = self.wait(lambda lines: any(line.rstrip().endswith("$") for line in lines), 30)
         if not ready:
@@ -71,8 +71,16 @@ class TerminalProbe:
         if delay:
             time.sleep(delay)
         # Exactly one echo and one Enter. A failed input stays failed.
-        self.send(f"echo {marker}".encode())
-        self.send(b"\r")
+        if protocol == "win32":
+            for character in f"echo {marker}\r":
+                for down in (1, 0):
+                    self.send(f"\x1b[0;0;{ord(character)};{down};0;1_".encode())
+        elif protocol == "paste":
+            self.send(f"\x1b[200~echo {marker}\x1b[201~".encode())
+            self.send(b"\r")
+        else:
+            self.send(f"echo {marker}".encode())
+            self.send(b"\r")
         passed = self.wait(lambda lines: marker in [line.strip() for line in lines], 5)
         return {"ready": True, "passed": passed, "frames": self.frames, "screen": self.screen.display}
 
@@ -81,6 +89,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--delays", default="0,0.01,0.05,0.1,0.25,0.5")
+    parser.add_argument("--protocol", choices=["vt", "win32", "paste"], default="vt")
     args = parser.parse_args()
     delays = [float(value) for value in args.delays.split(",")]
     if not delays or any(value < 0 or value > 2 for value in delays):
@@ -100,8 +109,9 @@ def main():
                     channel = client.invoke_shell(term="xterm-256color", width=171, height=32)
                     try:
                         result = TerminalProbe(channel).run(
-                            f"qa-ssh-protocol-{len(results) + 1}", resize=resize, focus=focus, delay=delay)
-                        result.update(resize=resize, focus=focus, delay=delay)
+                            f"qa-ssh-protocol-{len(results) + 1}", resize=resize, focus=focus, delay=delay,
+                            protocol=args.protocol)
+                        result.update(resize=resize, focus=focus, delay=delay, protocol=args.protocol)
                         results.append(result)
                         print(json.dumps({k: v for k, v in result.items() if k not in {"frames", "screen"}}), flush=True)
                     finally:

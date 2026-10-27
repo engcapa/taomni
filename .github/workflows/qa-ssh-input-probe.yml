@@ -21,6 +21,10 @@ jobs:
   protocol:
     runs-on: windows-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        protocol: [win32, paste]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -31,11 +35,11 @@ jobs:
       - run: python -m pip install PyYAML==6.0.2 jsonschema==4.25.1 paramiko==3.5.1 pyte==0.8.2
       - run: python -m unittest test_ci_ssh_input_probe
       - run: python .agents/skills/qa-ui-auto/scripts/ci_services.py install
-      - run: python .agents/skills/qa-ui-auto/scripts/ci_ssh_input_probe.py --out qa-ui-auto-report/ssh-input-probe
+      - run: python .agents/skills/qa-ui-auto/scripts/ci_ssh_input_probe.py --protocol ${{ matrix.protocol }} --out qa-ui-auto-report/ssh-input-probe
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ssh-input-probe-${{ github.run_id }}
+          name: ssh-input-probe-${{ matrix.protocol }}-${{ github.run_id }}
           path: qa-ui-auto-report/ssh-input-probe/
           if-no-files-found: error
           retention-days: 14
