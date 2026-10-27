@@ -83,6 +83,7 @@
           "dual_display_required",
           "workspace_root",
           "platform_workspace_root",
+          "workspace_ignored_ancestor_root",
           "workspace_explorer",
           "workspace_hidden_entries",
           "workspace_slow_lsp",

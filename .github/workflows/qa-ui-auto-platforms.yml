@@ -201,6 +201,8 @@ jobs:
       - run: python -m pip install pyyaml==6.0.2 jsonschema==4.25.1 numpy==2.4.4 Pillow==12.1.1
       - name: Mandatory crash regression selection and result contracts
         run: python -m unittest test_crash_regressions
+      - name: Cold-start fixture filesystem contracts
+        run: python -m unittest test_workspace_ignored_ancestor
       - name: Catalog contract gate
         run: python -m qa_ui_auto.audit --gate
       - name: Plan exact cases and dependencies

@@ -1,8 +1,9 @@
 id: TC-MFA-103
 title: A native backup archive contains mfa.db together with the vault that holds its key
-description: V-21 (AC-15). Isolated native profile. After an MFA account exists, Settings → Backup & Restore → Backup
-  Now creates a core backup in the profile's backup directory. Inspecting it from the history list (the real archive
-  reader) lists databases/mfa.db and databases/vault.db; the restore is cancelled so nothing is staged.
+description: V-21 (AC-15). Isolated native profile. After an MFA account exists, Settings → Backup & Restore → Backup Now
+  creates a core backup in the profile's backup directory. Inspecting it from the history list (the real archive reader) lists
+  databases/mfa.db and databases/vault.db; the restore is cancelled so nothing is staged. Wait for the manual local task to
+  complete and refresh history before selecting its first row; an earlier startup backup may predate the MFA account.
 covers:
 - F-MFA-3
 tags:
@@ -53,9 +54,15 @@ steps:
     selector: '[data-testid="backup-action-success"]'
     timeout_sec: 90
 - wait_for:
-    selector: '[data-testid="backup-history-row"]'
+    selector: '[data-testid="backup-cloud-job"][data-operation="local"][data-phase="completed"]'
+    timeout_sec: 90
+- click: '[data-testid="backup-history-refresh"]'
+- eval_readonly:
+    expression: >-
+      document.querySelector('[data-operation'+String.fromCharCode(61)+'"local"][data-phase'+String.fromCharCode(61)+'"completed"]').textContent.includes(document.querySelector('[data-testid'+String.fromCharCode(61)+'"backup-history-row"]:first-child').getAttribute('data-file-name'))
+    expect_truthy: true
     timeout_sec: 30
-- click: '[data-testid="backup-history-restore"]'
+- click: '[data-testid="backup-history-row"]:first-child [data-testid="backup-history-restore"]'
 - wait_for:
     selector: '[data-testid="backup-restore-files"]'
     timeout_sec: 60
@@ -87,39 +94,42 @@ verification:
     - 19
     - 21
     - 24
+    - 26
     checkpoints:
     - step: 16
       expectation: MFA account stored
     - step: 20
       expectation: backup panel open
     - step: 22
-      expectation: backup created
+      expectation: Manual backup accepted; actual completion is checked next.
     - step: 23
-      expectation: archive listed in history
+      expectation: The manual local task completed before refreshing and selecting the newest archive.
     - step: 25
-      expectation: archive inspected
-    - step: 26
-      expectation: databases/mfa.db included
+      expectation: The first history row names the completed manual job's actual local archive.
     - step: 27
+      expectation: archive inspected
+    - step: 28
+      expectation: databases/mfa.db included
+    - step: 29
       expectation: databases/vault.db included
     results:
-    - 26
-    - 27
+    - 28
+    - 29
   - id: R2
     requirement: Cancelling the restore closes the confirmation without staging (AC-15).
     actions:
-    - 28
+    - 30
     checkpoints:
-    - step: 29
+    - step: 31
       expectation: restore confirmation closed
     results:
-    - 29
+    - 31
   visual:
   - check: Backup history and restore confirmation are legible.
     method: manual
     reason: Screenshot needs human review.
   native:
-  - check: Applying a restore and restarting into the restored mfa.db is covered by Rust backup tests (V-06/V-07),
-      not by this UI case.
+  - check: Applying a restore and restarting into the restored mfa.db is covered by Rust backup tests (V-06/V-07), not by
+      this UI case.
     method: external
-    reason: A real restore restarts the app, which the WebDriver session cannot follow.
+    reason: Applying a restore and restarting into the restored MFA database is outside this archive-inspection case.
