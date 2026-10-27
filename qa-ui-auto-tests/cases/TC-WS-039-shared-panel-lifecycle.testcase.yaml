@@ -17,6 +17,7 @@ tags:
 - workspace-redesign
 - regression
 - component-upgrade
+- crash-regression
 fixtures:
 - reset_db
 - platform_workspace_root

@@ -14,6 +14,7 @@ tags:
 - workspace-redesign
 - regression
 - filter
+- crash-regression
 fixtures:
 - reset_db
 - platform_workspace_root

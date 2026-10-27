@@ -2,6 +2,10 @@
 
 End-to-end UI test artifacts for Taomni, consumed by the `qa-ui-auto` skill.
 
+Every new feature, UI refactor and component upgrade must run the complete
+[browser/native crash regression suite](ci/crash-regressions.md) as well as its
+affected functional cases. Product PRs and focused hosted runs include it automatically.
+
 ## Layout
 
 ```

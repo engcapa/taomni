@@ -162,7 +162,9 @@ export function useWorkspaceLspSession({
         syncedText: null,
       }]),
     ));
-    void lspStopWorkspace(workspaceInstanceId)
+    // SDK and language settings restart providers while the explorer still
+    // owns its file watcher. Only workspace disposal should stop both.
+    void lspStopWorkspace(workspaceInstanceId, true)
       .catch(() => undefined)
       .finally(() => {
         if (mountedRef.current) void refreshServerStatuses(true);

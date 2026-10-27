@@ -26,6 +26,7 @@ export function registeruseWorkspaceLspSessionHistory2Cases() {
 
     await waitFor(() => expect(lspMocks.lspStopWorkspace).toHaveBeenCalledWith(
       "workspace-sdk-change",
+      true,
     ));
     expect(updateLspFiles).toHaveBeenCalled();
     expect(onRestart).toHaveBeenCalledOnce();

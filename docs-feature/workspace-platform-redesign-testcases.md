@@ -1,3 +1,5 @@
+> 2026-10-27 崩溃专项：新增 TC-WS-052/053/054/055/056，与 TC-WS-038/039/045/051 共同标记 `crash-regression`，每次新功能、重构、组件升级必跑整组 browser/native。四文件直接 Grid 和 Split→Grid、0/1/2/3 文件边界、关闭面板、内外分屏交替、Sessions 从四会话关闭至空再重开、混合终端及跨视图返回、QA release 冷启动与实际磁盘保存均有独立结果断言；全程检查运行时错误。具体断言、复盘、自动执行与证据要求见 [崩溃专项](../qa-ui-auto-tests/ci/crash-regressions.md)。已有少文件 happy path 的通过不能代替这些状态转换。
+
 > 2026-10-27 工具栏验收更新：Sessions 的 `tab-more` 为漏斗过滤入口，保留分类、目录与搜索；Workspaces 新增 `workspace-tabs-filter-trigger`，支持分类与搜索组合。广播、布局、底栏和会话上下文操作集中在最右侧 `titlebar-actions-more`，Home/Tools 不显示空操作菜单。全部主视图移除标题栏语音，Chat 听写及 Settings 语音配置保留。新 browser `TC-WS-050` 验证过滤、草稿、工作区隔离、键盘/窄窗口和菜单入口；native `TC-WS-051` 以真实 PTY 输出、未保存缓冲区和磁盘 SHA-256 验证运行实例及文件保存。既有 SFTP、RDP、VNC、广播、语音等用例迁移导航后保留其业务断言。以下早期表格的 `⋯` 过滤图标以此更新为准。
 
 > 2026-10-25 补充验收：全局/Sessions 实时大预览（Ctrl/Cmd+Shift+E）、移除 Sessions Welcome 与右上角小预览、移除 Tao 贴边悬浮条、按模式对齐右上角工具栏。TC-WS-018 覆盖文件缓冲区预览与工作区分屏，TC-WS-019 通过原生 PTY 输出验证 Sessions 大预览；TC-NOTES-005 改验主导航入口和无悬浮条，原 Chat/Notes/通知用例保留。旧会话用例显式进入 Sessions，历史启动/恢复用例回到 Home；不由 runner 隐式更改模式。本机测试 worker 总数不超过 2。

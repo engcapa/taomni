@@ -1,11 +1,37 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前验收尚未完成。最新工具栏实现 `97c37487` 在本机重建隔离环境后，**53/53 browser、26/26 native 通过**，原始回执及 source/runner/case/native build 身份已独立核验。用户确认重启前后手工清理了 repo 的 `qa-ui-auto-report`，新证据存于 repo 外的 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/verified-local.json`，原环境失败保留。旧提交的托管相关集 [40432446710](https://github.com/engcapa/taomni/actions/runs/40432446710) 为 2,076 次执行全部通过，但不包含最新工具栏调整。本轮相关集全部通过后仍须重新拉取合并 main、复测并执行整体用例；功能完成后再做正式性能对照，目前没有“性能无退化”的结论。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
+> 当前验收尚未完成。用户新报告的 QA release 工具栏布局崩溃已在修复前以真实 store、browser、匹配旧源码的 native release 三层复现；此前 **53/53 browser、26/26 native** 的通过未覆盖四文件 Grid，不能作为本次修复的完成依据。按用户最新指示，后续 browser/native 用例直接在 GitHub 执行，本机仅运行单测、编译与静态检查。接下来重新执行 GitHub 相关范围、拉取合并 main、复测及全量；功能完成后再做正式性能对照，目前没有“性能无退化”的结论。原始证据保留于 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
+
+## QA release 布局崩溃与专项回归（2026-10-27，验证中）
+
+`useWorkspaceHostCanvas` 保存了 Zustand 的旧状态快照，Unsplit/Split 后仍从旧树读取 leaf。直接四文件 Grid 访问不存在的 `pair[1].id`，与用户 `App-DRawYxY8.js` 的错误和组件堆栈一致；从已有 Split 切换还会使用已删除的 leaf ID，四文件只显示 3 个面板。现在每个依赖前一次操作结果的读取都从当前 store 取状态，再恢复实际活动文件对应的 group。
+
+遗漏原因及执行约束记录在 [崩溃专项复盘](../qa-ui-auto-tests/ci/crash-regressions.md)。旧 TC-WS-039 走内部分屏，TC-WS-018 只有两文件，TC-WS-051 是一文件／一终端，均未进入四文件分支；运行时监控未执行到该分支，因而没有发现异常。新增四文件、数量边界、内外分屏组合、Sessions／混合终端、冷启动和实际保存专项；既检查错误，也检查 pane 数量、选中文件、dirty 内容及真实副作用。
+
+修复前真实 store 回归为 4 failed / 5 passed，日志 `/tmp/taomni-workspace-canvas-before-fix.log`；browser `canvas-before-browser/run-20261027-131926-554012791` 与 native release `canvas-before-release/run-20261027-131951-435897178` 均捕获相同崩溃。原生改前使用独立 `crash-baseline-b213` worktree 和原始 QA identity，未伪造构建身份或放宽源码检查。先从 Split 进入的 browser 另保留 3-pane 错误布局证据。
+
+修复后 hook 9/9、布局相关单测合计 45/45；新增 TC-WS-052/053 的 browser `canvas-after-browser/run-20261027-132307-351639992` 为 2/2 passed。QA release 重新构建及完整专项／受影响回归继续执行，最终 receipt 和当前输入身份另行核验。旧 GitHub 相关运行 40452611575 已取消；main／全量自动推进保持停止，等待本次修复相关集通过。
+
+`crash-regression` tag 包含 TC-WS-038/039/045/051/052/053/054/055/056。TC-WS-055 只检查 browser 的布局及终端不可用状态，TC-WS-056 使用真实 PTY 就绪和独立输出证明 native；不混淆两个边界。AGENTS.md 规定每次新功能、重构和组件升级均执行整组 browser/native；产品 PR 自动执行，手动 selected/impacted 合并该组，smoke 也包含整组。workflow 在所有 scope 都按真实 case 结果失败，避免全量 job 绿而 case 失败。工具契约检查实际选集、三平台 release、PR 路径和失败／缺失报告的退出码。
+
+## Release 文件监听生命周期复验（2026-10-27，验证中）
+
+第一轮当前源码 browser 为 59/59 passed，native 主批为 25/27 passed。新增四文件与数量边界用例、真实 PTY 混合布局均通过。TC-WS-054 的最初用例误以为 `vault_first_run` 总会设置主密码；实际上没有保存凭据时它是 no-op，重启应直接进入 Home。修正为等待真实 Home 后，`canvas-rerun-native/run-20261027-142045-383382934` 的该用例通过，四文件布局、实际磁盘 SHA 和冷启动后的重新布局断言保留。原失败与一次步骤编号契约错误均保留，不计为通过。
+
+同一 release 的 TC-WS-030 在两轮均未出现外部文件冲突提示。语言服务因 SDK/偏好变化重启时调用 `lsp_stop_workspace`，而该接口也停止独立的目录文件监听；根目录未变，TreeModel 不会重新启动监听。现在原 IPC 增加可选 `preserveFileWatcher`，省略时保持完整清理，provider restart 显式保留 watcher；底层拆分 provider stop 与 workspace dispose。前端 IPC、SDK 重启及画布测试 42/42 通过，新增真实 OS watcher 的 Rust 生命周期契约和原生磁盘冲突回归继续执行。
+
+VNC 首批因本机输入法准备失败而未执行。重建独立桌面、跳过这两条用例不依赖的输入法准备后，两条原生 VNC 用例通过；未改产品、未修改业务断言。当前完整专项增加原始 TC-WS-038，共 9 个 ID、三平台 42 个适用执行项。用例断言映射 9/9、静态 QA 门禁及 5 项 workflow 契约已通过；新的匹配 release 构建及完整 60 条 browser／30 条 native 回归正在进行，此前 source/runner 身份的通过只保留为历史。
+
+本机增量 release 完成（源码 `8d6bc418c9a082ed3f1c68d8fe609ea7e1bec2123aa6f840b633b78b20744d0b`、binary `480090b43c00889a138b74e53e08164be0aac22366fcbb554ac25974fde2734f`）。该轮 browser 60/60、native 主批 27/28、VNC 2/2；TC-WS-030 仍失败，不能将这轮称为全部通过。真实 OS watcher 的 provider restart/dispose 单测通过。
+
+进一步确认 TC-WS-030 的事件被 `should_skip_workspace_entry_path` 对绝对路径的过滤丢弃：本机 report 置于 `.cache`，普通文件继承该祖先即被忽略。过滤改为相对每个显式选择的根目录进行；仍排除根内生成目录和原子写临时文件，显式选择的嵌套根／单文件可正常监听。新增 Rust 契约覆盖忽略祖先、忽略子目录、路径边界、重叠根、单文件及临时文件，加入 hosted 原生 Rust 契约。TC-WS-030 在三平台均显式建立 `.cache/workspace`，保留两次冷启动、真实 SSH/SFTP/PTY、dirty 草稿、磁盘冲突和 hash 断言。
+
+用户随后明确取消本机 browser/native 自动化，后续这两类验证全部交给 GitHub `qa-ui-auto-platforms`；不再等待本机这两类用例全通过才推送。当前 binary 早于相对路径过滤追加修复，不能作为该追加修复的证据；本机只保留必要单测、编译与静态检查。
 
 ## 分类过滤与紧凑操作菜单（2026-10-27，验证中）
 

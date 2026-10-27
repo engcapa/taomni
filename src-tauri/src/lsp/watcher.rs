@@ -211,13 +211,26 @@ pub(super) fn normalized_watch_path_is_under(root: &str, path: &str) -> bool {
 }
 
 pub(super) fn workspace_watch_target_matches(targets: &[WorkspaceWatchTarget], path: &str) -> bool {
+    if crate::workspace::is_workspace_write_temp_path(path) {
+        return false;
+    }
     targets.iter().any(|target| {
         let filter = normalized_file_operation_path(&target.filter_path);
-        if target.recursive {
-            normalized_watch_path_is_under(&filter, path)
-        } else {
-            normalized_watch_path_equals(filter.trim_end_matches('/'), path.trim_end_matches('/'))
+        if !target.recursive {
+            // An explicitly opened loose file remains observable even when
+            // its parent is normally excluded from recursive project scans.
+            return normalized_watch_path_equals(
+                filter.trim_end_matches('/'),
+                path.trim_end_matches('/'),
+            );
         }
+        if !normalized_watch_path_is_under(&filter, path) {
+            return false;
+        }
+        // Ignore generated descendants, not ancestors of the root the user
+        // chose. A project under ~/.cache or build/ is still a workspace.
+        let relative = &path[filter.trim_end_matches('/').len()..];
+        !crate::workspace::should_skip_workspace_entry_path(relative.trim_start_matches('/'))
     })
 }
 

@@ -1,8 +1,9 @@
 # Hosted QA UI automation
 
 `.github/workflows/qa-ui-auto-platforms.yml` is independent of the existing E2E,
-native and release workflows. Its failures remain visible; it does not add a PR
-or release dependency. Default runners are Ubuntu 24.04 x64, Windows 2025 x64
+native and release workflows. Product PRs now automatically execute the mandatory
+[crash regression suite](crash-regressions.md). Focused manual runs include it,
+and every scope fails when actual cases fail. Default runners are Ubuntu 24.04 x64, Windows 2025 x64
 and macOS 15 ARM64. Each can run browser and native cases. Linux native supports
 the optional desktop profiles below; release builds and packaging are unchanged.
 

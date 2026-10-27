@@ -16,6 +16,7 @@ tags:
 - file-explorer
 - regression
 - sidebar
+- crash-regression
 fixtures:
 - reset_db
 timeout_sec: 180

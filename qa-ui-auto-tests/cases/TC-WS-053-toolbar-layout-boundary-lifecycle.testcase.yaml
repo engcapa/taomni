@@ -1,0 +1,464 @@
+id: TC-WS-053
+title: 'Crash regression: empty, one-, two-, three-file layouts and editor split transitions'
+description: Reproduce the toolbar layout crash through production controls and real editor/store owners. Native mode verifies the shipped WebView; browser mode
+  uses the same renderer workflow. No layout or resizable-panel mocks.
+modes:
+- browser
+- native
+covers:
+- F-WS-1
+- F-WS-2
+- F-WS-5
+- F25.3
+- F25.5
+tags:
+- p0
+- workspace-redesign
+- regression
+- crash-regression
+- component-upgrade
+fixtures:
+- reset_db
+- workspace_explorer
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-canvas-crash
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: '{"version": 1, "activeWorkspaceId": "default-workspace", "createdNodes": [], "workspaces": [{"id": "default-workspace", "name": "Default Workspace",
+      "description": "", "isDefault": true, "rootFolders": [{"id": "root-1", "name": "qa-root", "path": "${fixture.platform_workspace_root}", "addedAt": 1}],
+      "pinnedSessionIds": [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId":
+      ""}, {"id": "second-workspace", "name": "Second Workspace", "description": "", "isDefault": false, "rootFolders": [], "pinnedSessionIds": [], "activeLeftToolWindow":
+      "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId": ""}]}'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="workspace-layout-split"]'
+- assert_no_runtime_errors: null
+- assert_attribute:
+    selector: '[data-testid="workspace-canvas-panes"]'
+    name: data-layout
+    equals: split
+- assert_count:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
+    equal: 0
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="platform-layout-grid"]'
+- assert_no_runtime_errors: null
+- assert_attribute:
+    selector: '[data-testid="workspace-canvas-panes"]'
+    name: data-layout
+    equals: grid
+- assert_count:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
+    equal: 0
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="platform-layout-single"]'
+- assert_no_runtime_errors: null
+- assert_attribute:
+    selector: '[data-testid="workspace-canvas-panes"]'
+    name: data-layout
+    equals: single
+- assert_count:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
+    equal: 0
+- click: '[data-testid="code-workspace-tree-root"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+- press:
+    selector: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+    key: Mod+a
+- type:
+    selector: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+    text: QA_BOUNDARY_DRAFT
+- wait_for: '[data-testid="workspace-file-editor"][data-dirty="true"]'
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+    equals: QA_BOUNDARY_DRAFT
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="workspace-layout-split"]'
+- assert_no_runtime_errors: null
+- assert_attribute:
+    selector: '[data-testid="workspace-canvas-panes"]'
+    name: data-layout
+    equals: split
+- assert_count:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
+    equal: 1
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="platform-layout-grid"]'
+- assert_no_runtime_errors: null
+- assert_attribute:
+    selector: '[data-testid="workspace-canvas-panes"]'
+    name: data-layout
+    equals: grid
+- assert_count:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
+    equal: 1
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="platform-layout-single"]'
+- assert_no_runtime_errors: null
+- assert_attribute:
+    selector: '[data-testid="workspace-canvas-panes"]'
+    name: data-layout
+    equals: single
+- assert_count:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
+    equal: 1
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Draft2.txt"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="Draft2.txt"] .cm-content'
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="workspace-layout-split"]'
+- assert_no_runtime_errors: null
+- assert_attribute:
+    selector: '[data-testid="workspace-canvas-panes"]'
+    name: data-layout
+    equals: split
+- assert_count:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
+    equal: 2
+- assert_items:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"] [data-editor-tab-key][data-active="true"]'
+    attribute: data-editor-tab-key
+    equals:
+    - root:root-1:Draft2.txt
+    - root:root-1:README.md
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="platform-layout-grid"]'
+- assert_no_runtime_errors: null
+- assert_attribute:
+    selector: '[data-testid="workspace-canvas-panes"]'
+    name: data-layout
+    equals: grid
+- assert_count:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
+    equal: 2
+- assert_items:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"] [data-editor-tab-key][data-active="true"]'
+    attribute: data-editor-tab-key
+    equals:
+    - root:root-1:Draft2.txt
+    - root:root-1:README.md
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="platform-layout-single"]'
+- assert_no_runtime_errors: null
+- assert_attribute:
+    selector: '[data-testid="workspace-canvas-panes"]'
+    name: data-layout
+    equals: single
+- assert_count:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
+    equal: 1
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Draft10.txt"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="Draft10.txt"] .cm-content'
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="platform-layout-grid"]'
+- assert_no_runtime_errors: null
+- assert_attribute:
+    selector: '[data-testid="workspace-canvas-panes"]'
+    name: data-layout
+    equals: grid
+- assert_count:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
+    equal: 3
+- assert_items:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"] [data-editor-tab-key][data-active="true"]'
+    attribute: data-editor-tab-key
+    equals:
+    - root:root-1:Draft10.txt
+    - root:root-1:Draft2.txt
+    - root:root-1:README.md
+- click: '[data-testid="workspace-tab"][data-tab-title="Draft10.txt"] [data-testid="workspace-tab-close"]'
+- assert_no_runtime_errors: null
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="workspace-layout-split"]'
+- assert_no_runtime_errors: null
+- assert_attribute:
+    selector: '[data-testid="workspace-canvas-panes"]'
+    name: data-layout
+    equals: split
+- assert_count:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
+    equal: 2
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="platform-layout-single"]'
+- assert_no_runtime_errors: null
+- assert_attribute:
+    selector: '[data-testid="workspace-canvas-panes"]'
+    name: data-layout
+    equals: single
+- assert_count:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
+    equal: 1
+- click: '[data-testid="workspace-tab"][data-tab-title="README.md"]'
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    equals: QA_BOUNDARY_DRAFT
+- assert_no_runtime_errors: null
+- click: '[data-testid="code-workspace-toolbar-more"]'
+- click: '[data-testid="code-workspace-split-right"]'
+- assert_count:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
+    equal: 2
+- assert_no_runtime_errors: null
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="platform-layout-grid"]'
+- assert_no_runtime_errors: null
+- assert_attribute:
+    selector: '[data-testid="workspace-canvas-panes"]'
+    name: data-layout
+    equals: grid
+- assert_count:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
+    equal: 2
+- assert_items:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"] [data-editor-tab-key][data-active="true"]'
+    attribute: data-editor-tab-key
+    equals:
+    - root:root-1:README.md
+    - root:root-1:Draft2.txt
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="platform-layout-single"]'
+- assert_no_runtime_errors: null
+- assert_attribute:
+    selector: '[data-testid="workspace-canvas-panes"]'
+    name: data-layout
+    equals: single
+- assert_count:
+    selector: '[data-testid="workspace-file-editor"] [data-testid="code-workspace-editor-pane"]'
+    equal: 1
+- click: '[data-testid="workspace-tab"][data-tab-title="README.md"]'
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    equals: QA_BOUNDARY_DRAFT
+- assert_no_runtime_errors: null
+- screenshot: workspace-canvas-boundaries.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Empty and one-file layouts create no phantom file panes; two/three-file grids show the requested distinct files.
+    actions:
+    - 7
+    - 8
+    - 12
+    - 13
+    - 17
+    - 18
+    - 22
+    - 23
+    - 25
+    - 26
+    - 29
+    - 30
+    - 34
+    - 35
+    - 39
+    - 40
+    - 44
+    - 46
+    - 47
+    - 52
+    - 53
+    - 58
+    - 59
+    - 63
+    - 65
+    - 66
+    checkpoints:
+    - step: 9
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 10
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
+    - step: 11
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 0}}'
+    - step: 14
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 15
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "grid"}}'
+    - step: 16
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 0}}'
+    - step: 19
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 20
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "single"}}'
+    - step: 21
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 0}}'
+    - step: 28
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"] .cm-content", "equals": "QA_BOUNDARY_DRAFT"}}'
+    - step: 31
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 32
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
+    - step: 33
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
+    - step: 36
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 37
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "grid"}}'
+    - step: 38
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
+    - step: 41
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 42
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "single"}}'
+    - step: 43
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
+    - step: 48
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 49
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
+    - step: 50
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
+    - step: 51
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"] [data-editor-tab-key][data-active=\"true\"]",
+        "attribute": "data-editor-tab-key", "equals": ["root:root-1:Draft2.txt", "root:root-1:README.md"]}}'
+    - step: 54
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 55
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "grid"}}'
+    - step: 56
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
+    - step: 57
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"] [data-editor-tab-key][data-active=\"true\"]",
+        "attribute": "data-editor-tab-key", "equals": ["root:root-1:Draft2.txt", "root:root-1:README.md"]}}'
+    - step: 60
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 61
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "single"}}'
+    - step: 62
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
+    - step: 67
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 68
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "grid"}}'
+    - step: 69
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 3}}'
+    - step: 70
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"] [data-editor-tab-key][data-active=\"true\"]",
+        "attribute": "data-editor-tab-key", "equals": ["root:root-1:Draft10.txt", "root:root-1:Draft2.txt", "root:root-1:README.md"]}}'
+    results:
+    - 9
+    - 10
+    - 11
+    - 14
+    - 15
+    - 16
+    - 19
+    - 20
+    - 21
+    - 28
+    - 31
+    - 32
+    - 33
+    - 36
+    - 37
+    - 38
+    - 41
+    - 42
+    - 43
+    - 48
+    - 49
+    - 50
+    - 51
+    - 54
+    - 55
+    - 56
+    - 57
+    - 60
+    - 61
+    - 62
+    - 67
+    - 68
+    - 69
+    - 70
+  - id: R2
+    requirement: Closing a file in grid and combining inner/outer split controls preserves the remaining draft and a healthy editor.
+    actions:
+    - 71
+    - 73
+    - 74
+    - 78
+    - 79
+    - 83
+    - 86
+    - 87
+    - 90
+    - 91
+    - 96
+    - 97
+    - 101
+    checkpoints:
+    - step: 72
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 75
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 76
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
+    - step: 77
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
+    - step: 80
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 81
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "single"}}'
+    - step: 82
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
+    - step: 84
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "QA_BOUNDARY_DRAFT"}}'
+    - step: 85
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 88
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
+    - step: 89
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 92
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 93
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "grid"}}'
+    - step: 94
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
+    - step: 95
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"] [data-editor-tab-key][data-active=\"true\"]",
+        "attribute": "data-editor-tab-key", "equals": ["root:root-1:README.md", "root:root-1:Draft2.txt"]}}'
+    - step: 98
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 99
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "single"}}'
+    - step: 100
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
+    - step: 102
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "QA_BOUNDARY_DRAFT"}}'
+    - step: 103
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 72
+    - 75
+    - 76
+    - 77
+    - 80
+    - 81
+    - 82
+    - 84
+    - 85
+    - 88
+    - 89
+    - 92
+    - 93
+    - 94
+    - 95
+    - 98
+    - 99
+    - 100
+    - 102
+    - 103
+  visual:
+  - check: Pane topology, selected files and preserved editor content
+    method: automated
+    reason: Assert actual mounted editor panes and active tab file keys after public toolbar actions.
+  native:
+  - check: Packaged WebView crash and shared panel lifecycle
+    method: automated
+    reason: The reported error occurred in the release desktop WebView; native repeats the actual toolbar path. Host disk hashing and process restart are required
+      in the native-only companion.
