@@ -62,6 +62,7 @@ export function WorkspaceTabStrip() {
   const filters = useWorkspaceUiStore((s) => s.tabFilters);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [tabMenu, setTabMenu] = useState<{ tabId: string; x: number; y: number } | null>(null);
+  const [keyboardNavigation, setKeyboardNavigation] = useState(false);
   const filter = filters[workspace?.id ?? ""] ?? EMPTY_WORKSPACE_TAB_FILTER;
   const visibleTabs = useMemo(() => filterWorkspaceTabs(workspace?.openTabs ?? [], filter), [workspace?.openTabs, filter]);
   const tabScroll = useWorkspaceTabScroll(workspace?.id, visibleTabs, workspace?.activeTabId);
@@ -159,6 +160,7 @@ export function WorkspaceTabStrip() {
         if (event.target !== event.currentTarget || event.altKey || event.ctrlKey || event.metaKey) return;
         if (event.key === "Enter" || event.key === " ") {
           event.preventDefault();
+          setKeyboardNavigation(true);
           setActiveTab(workspace.id, tab.id);
         } else if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
           event.preventDefault();
@@ -166,6 +168,7 @@ export function WorkspaceTabStrip() {
           const index = tabs.findIndex((entry) => entry.id === tab.id);
           const target = event.key === "Home" ? tabs[0] : event.key === "End" ? tabs.at(-1) : tabs[(index + (event.key === "ArrowRight" ? 1 : -1) + tabs.length) % tabs.length];
           if (target) {
+            setKeyboardNavigation(true);
             setActiveTab(workspace.id, target.id);
             tabScroll.tabElements.current.get(target.id)?.focus({ preventScroll: true });
           }
@@ -211,8 +214,10 @@ export function WorkspaceTabStrip() {
         ref={tabScroll.scrollRef}
         data-testid="workspace-tab-scroll-area"
         role="tablist"
+        data-keyboard-navigation={keyboardNavigation ? "true" : undefined}
         aria-label={t("tabs.openTabs")}
         className="taomni-workspace-tab-scroll flex min-w-0 shrink items-end gap-0.5 overflow-x-auto overflow-y-hidden"
+        onPointerDownCapture={() => setKeyboardNavigation(false)}
         onWheel={(event) => {
           const element = event.currentTarget;
           if (maxScrollLeft(element) > 0 && Math.abs(event.deltaY) > Math.abs(event.deltaX)) {

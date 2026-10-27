@@ -7,6 +7,16 @@
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
 
+## Workspace 标签栏与延迟终端焦点（2026-10-28，修复待托管复验）
+
+分屏库补丁提交 `75d87ad9` 的三平台相关集 [40601604851](https://github.com/engcapa/taomni/actions/runs/40601604851) 包含 38 个 ID、140 次适用执行、18 分片。目前 Linux native TC-WS-038/039 与八个新增尺寸检查通过，但 macOS browser TC-WS-048 在 End 后等待末端按钮禁用失败；原 trace 显示 Home 正常切到第一标签，紧接着 End 派发时 xterm 已重新获得焦点，活动标签仍为第一项。原始失败保留，不将此前相关集通过作为当前成功证据。
+
+`useTerminalViewport` 已为 Sessions 保留 `[role=tablist][data-keyboard-navigation=true]` 的焦点保护，而 Workspace strip 未接入此意图。切到另一终端后，50ms + RAF 的正常终端激活会覆盖刚建立的键盘标签焦点；这是产品回归，不能用等待或输入重放解决。两个新挂载测试组合真实 Workspace strip、store 与 terminal viewport hook，仅替代 xterm DOM 边界，在改前 2/2 失败。现为键盘导航/激活设置相同意图，pointer capture 清除，保留真实鼠标激活后自动聚焦终端。新增/保留焦点、过滤、滚动与 Sessions 组共 33/33 通过；TypeScript、refactor、更新用例 schema 与行为契约通过。
+
+TC-WS-048 保留全部原步骤、精确滚动和 300 秒预算，新增第一/最后标签的真实焦点与选择断言，以及 Home/Sessions 隐藏恢复后的再次 Home/End，共 92 步；仍需新提交的三平台 browser/native 复验。补丁前的用例修正版 [40598905018](https://github.com/engcapa/taomni/actions/runs/40598905018) 已独立核验 **25 ID、89/89 passed**、15/15 回执；这不能覆盖本节新源码。
+
+本机已完成分屏库补丁阶段的 QA release：`src-tauri/target/qa-ui-auto/release/taomni`，`com.taomni.app.qa`，source SHA `954e17ba386813697e3eb3ddad32b2e6b782acbcb901a46e9790183c5a0b2f1b`、binary SHA `71e8329f326b7c88396d300f513dcfb25e0ffe6cc7a779bec80b6ddeb7b9d894`，编译 1060.94 秒、jobs 2，输入核验匹配。该阶段 binary 尚未包含本节的焦点修复；源码稳定后再更新手测版本。没有在本机运行 browser/native 用例。
+
 ## 真实分屏库的观察器边界（2026-10-28，修复待托管复验）
 
 标签栏修复后的 [40596454168](https://github.com/engcapa/taomni/actions/runs/40596454168) 最终 **82 passed / 7 failed**、15/15 分片，原始回执/身份与失败汇总已独立核验，0 infrastructure errors。再次捕获 Linux native TC-WS-039 的 `ResizeObserver loop completed with undelivered notifications`。该轮标签栏 callback 已无同步测量；根分屏恢复后 editor/documentation 的宽度由 953.16/233.84px 继续变化至 1002.20/184.80px，嵌套分屏 callback 约耗时 13ms。不能把此前某轮没有复现当作修复完成。另六项 TC-WS-048 旧断言失败均保留；修正选择器及帧就绪的 [40598905018](https://github.com/engcapa/taomni/actions/runs/40598905018) 仍在执行。一次 browser-only 规划 40598145429 因完整 crash-regression 含 native-only 用例而正确拒绝，未执行用例；未关闭该门禁，后续均使用 browser/native。
