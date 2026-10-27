@@ -17,6 +17,10 @@
 
 首次仅选 native 的诊断 40489873988 在规划阶段因 browser 专用 TC-WS-055 不适用而失败，未执行产品用例；改为 macOS browser/native 后，[40490473216](https://github.com/engcapa/taomni/actions/runs/40490473216) 的 14/14 通过，未复现。没有据此宣称修复。TC-WS-054 进一步在原保存断言和冷启动之间加入两轮侧栏拖动、Documentation 开关、长/短文本替换及真实磁盘 SHA 验证，并在每个运行时检查保存可选的观察器环形记录，保留此前全部断言。
 
+扩充后的 [40492647357](https://github.com/engcapa/taomni/actions/runs/40492647357) 也是 14/14 通过，原错误没有稳定复现。完整原生记录显示：原保存区间只有状态栏 Breadcrumbs 反复响应宽度变化（104.67 → 190.77 → 187.45 → 145.17px），其回调同步测宽并切换折叠子节点。将该路径改为下一动画帧合并测量，避免观察器交付期间改变被观测的 flex 布局；保持首次布局同步测量，内容变化/卸载时取消旧任务，晚到通知无效。没有全局替换产品 ResizeObserver 或过滤错误。该证据缩小了原因范围，但不能声称已稳定复现原生错误；仍需修复后完整专项及全量验收。
+
+新增 Breadcrumbs.resize 单测在改前 2/2 失败（同步测量/没有可取消帧），改后连同原 Breadcrumbs、真实 host canvas、编辑器生命周期和状态栏为 42/42 通过，`pnpm check:refactor` 通过。本次修复不改变用户工作流，用前一提交已扩充的 TC-WS-054 及完整 crash-regression 保护原生边界，不另造重复入口用例。
+
 ## QA release 布局崩溃与专项回归（2026-10-27，验证中）
 
 `useWorkspaceHostCanvas` 保存了 Zustand 的旧状态快照，Unsplit/Split 后仍从旧树读取 leaf。直接四文件 Grid 访问不存在的 `pair[1].id`，与用户 `App-DRawYxY8.js` 的错误和组件堆栈一致；从已有 Split 切换还会使用已删除的 leaf ID，四文件只显示 3 个面板。现在每个依赖前一次操作结果的读取都从当前 store 取状态，再恢复实际活动文件对应的 group。
