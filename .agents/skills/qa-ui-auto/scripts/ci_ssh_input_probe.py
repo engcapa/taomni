@@ -90,6 +90,7 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--delays", default="0,0.01,0.05,0.1,0.25,0.5")
     parser.add_argument("--protocol", choices=["vt", "win32", "paste"], default="vt")
+    parser.add_argument("--shell", choices=["console", "script"], default="console")
     args = parser.parse_args()
     delays = [float(value) for value in args.delays.split(",")]
     if not delays or any(value < 0 or value > 2 for value in delays):
@@ -104,14 +105,21 @@ def main():
         try:
             client.connect(connection["host"], connection["port"], connection["user"],
                            os.environ["QA_SSH_PASSWORD"], allow_agent=False, look_for_keys=False)
+            _, facts, _ = client.exec_command("git --version; bash --version; uname -a; command -v script; command -v winpty")
+            (args.out / "shell-versions.txt").write_text(facts.read().decode(errors="replace"), encoding="utf-8")
             for delay in delays:
                 for resize, focus in ((False, False), (False, True), (True, False), (True, True)):
-                    channel = client.invoke_shell(term="xterm-256color", width=171, height=32)
+                    if args.shell == "script":
+                        channel = client.get_transport().open_session()
+                        channel.get_pty(term="xterm-256color", width=171, height=32)
+                        channel.exec_command("exec script -q -c '/bin/bash --noprofile --norc -i' /dev/null")
+                    else:
+                        channel = client.invoke_shell(term="xterm-256color", width=171, height=32)
                     try:
                         result = TerminalProbe(channel).run(
                             f"qa-ssh-protocol-{len(results) + 1}", resize=resize, focus=focus, delay=delay,
                             protocol=args.protocol)
-                        result.update(resize=resize, focus=focus, delay=delay, protocol=args.protocol)
+                        result.update(resize=resize, focus=focus, delay=delay, protocol=args.protocol, shell=args.shell)
                         results.append(result)
                         print(json.dumps({k: v for k, v in result.items() if k not in {"frames", "screen"}}), flush=True)
                     finally:
