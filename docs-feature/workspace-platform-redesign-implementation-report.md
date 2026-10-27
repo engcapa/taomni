@@ -21,6 +21,12 @@
 
 ## Release 文件监听生命周期复验（2026-10-27，验证中）
 
+定向复验 [40474385918](https://github.com/engcapa/taomni/actions/runs/40474385918) 已收齐 15/15 个分片，50 次执行中 47 passed、3 failed。九个崩溃专项、三平台 TC-WS-030 和两条原生 RDP 参考用例均通过；失败均为 TC-MFA-103。该备份用例在任务列表取到了第一个 completed 的启动备份，而非本次手动备份，错误地用该任务路径核对最新归档。现为手动操作结果添加只读 job ID 观察，按该 ID 等待完成再核对归档，原 mfa.db/vault.db 内容断言不变。
+
+上一轮全相关范围中的 macOS TC-152 在 ARD 登录导致控制台切换到临时用户后，后台 WebView 的 JS bridge 未及时响应。仅对独立 QA ID、隔离数据目录、有效 WebDriver 端口的 QA WebView 禁用后台调度限制，生产与手工启动保留默认策略。真实 ARD 身份认证及连接信息断言保留，需在 GitHub 使用新的匹配 QA release 复验。
+
+正式性能比较工具现已准备：功能全量通过后，在同一 GitHub Ubuntu/WebKitGTK 桌面交替执行 main/candidate 两轮，使用相同 24 个真实 PTY、2MiB 输出、3,097 文件、24 个文件标签与 1MiB 编辑器工作负载，保留原始样本、尾部、原始构建身份和进程资源记录。该工具变化不改变产品流程，由测试工具单测保护，不新增产品 YAML case。尚未执行正式比较，不能据此声称无性能退化。
+
 GitHub 当前相关集 `40466625564` 已收到 23/25 个分片，三平台 browser 1,327/1,327 通过。失败材料保留，不能按分片 job 软成功计为通过：TC-WS-030 三平台的 `.cache/workspace` 父目录未由 fixture 创建，尚未进入产品步骤；新增隔离 fixture 预建完整目录及种子文件。Linux TC-MFA-103 在手动备份仅受理时读取到启动前归档，现等待实际 local job completed，并按任务输出路径核对第一条历史归档，再保留原 MFA/Vault 数据库断言。
 
 Windows TC-RDPC-REF-01-termservice 在远端画布切回本地工具栏期间，参考目标收到额外一次 ButtonPress，最终 flip-state 为两次点击/黑色；可信 DOM 事件只记录一次画布 pointerdown。原 canvas 点击与 locator 点击使用两个 W3C mouse source，现统一使用共享鼠标源，失败时仍释放输入且不重放。用例追加菜单打开、全屏、恢复后三个远端精确计数断言，原白色像素、质量和断开检查完整保留；目标记录事件坐标便于继续诊断。17 项工具契约通过，实际修复效果仍需 GitHub 原生复验，不据单测宣称已解决。
