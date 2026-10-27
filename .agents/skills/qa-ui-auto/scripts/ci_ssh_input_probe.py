@@ -15,6 +15,21 @@ import pyte
 from ci_services import Services
 
 
+def open_shell(client, shell):
+    if shell == "console":
+        return client.invoke_shell(term="xterm-256color", width=171, height=32)
+    channel = client.get_transport().open_session()
+    channel.set_combine_stderr(True)
+    channel.get_pty(term="xterm-256color", width=171, height=32)
+    if shell == "msys-console":
+        channel.exec_command("exec env MSYS2_ARG_CONV_EXCL='*' /c/msys64/usr/bin/bash.exe --noprofile --norc -i")
+        return channel
+    script = ("env MSYS2_ARG_CONV_EXCL='*' /c/msys64/usr/bin/script.exe"
+              if shell == "msys-script" else "script")
+    channel.exec_command(f"exec {script} -q -c '/usr/bin/bash --noprofile --norc -i' /dev/null")
+    return channel
+
+
 class TerminalProbe:
     def __init__(self, channel):
         self.channel = channel
@@ -90,7 +105,7 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--delays", default="0,0.01,0.05,0.1,0.25,0.5")
     parser.add_argument("--protocol", choices=["vt", "win32", "paste"], default="vt")
-    parser.add_argument("--shell", choices=["console", "script", "msys-script"], default="console")
+    parser.add_argument("--shell", choices=["console", "script", "msys-script", "msys-console"], default="console")
     args = parser.parse_args()
     delays = [float(value) for value in args.delays.split(",")]
     if not delays or any(value < 0 or value > 2 for value in delays):
@@ -105,18 +120,12 @@ def main():
         try:
             client.connect(connection["host"], connection["port"], connection["user"],
                            os.environ["QA_SSH_PASSWORD"], allow_agent=False, look_for_keys=False)
-            _, facts, _ = client.exec_command("git --version; bash --version; uname -a; command -v script; command -v winpty")
-            (args.out / "shell-versions.txt").write_text(facts.read().decode(errors="replace"), encoding="utf-8")
+            _, facts, errors = client.exec_command("git --version; bash --version; uname -a; command -v script; command -v winpty; ls -l /c/msys64/usr/bin/script.exe")
+            (args.out / "shell-versions.txt").write_text(
+                facts.read().decode(errors="replace") + errors.read().decode(errors="replace"), encoding="utf-8")
             for delay in delays:
                 for resize, focus in ((False, False), (False, True), (True, False), (True, True)):
-                    if args.shell in {"script", "msys-script"}:
-                        channel = client.get_transport().open_session()
-                        channel.get_pty(term="xterm-256color", width=171, height=32)
-                        script = ("env MSYS2_ARG_CONV_EXCL='*' /c/msys64/usr/bin/script.exe"
-                                  if args.shell == "msys-script" else "script")
-                        channel.exec_command(f"exec {script} -q -c '/usr/bin/bash --noprofile --norc -i' /dev/null")
-                    else:
-                        channel = client.invoke_shell(term="xterm-256color", width=171, height=32)
+                    channel = open_shell(client, args.shell)
                     try:
                         result = TerminalProbe(channel).run(
                             f"qa-ssh-protocol-{len(results) + 1}", resize=resize, focus=focus, delay=delay,

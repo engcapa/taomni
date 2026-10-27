@@ -1,9 +1,9 @@
 import base64
 import socket
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
-from ci_ssh_input_probe import TerminalProbe
+from ci_ssh_input_probe import TerminalProbe, open_shell
 
 
 class Channel:
@@ -26,6 +26,31 @@ class Channel:
 
 
 class SshInputProbeTest(TestCase):
+    def test_console_opens_an_unmodified_interactive_shell(self):
+        client = Mock()
+        self.assertIs(open_shell(client, "console"), client.invoke_shell.return_value)
+        client.invoke_shell.assert_called_once_with(term="xterm-256color", width=171, height=32)
+        client.get_transport.assert_not_called()
+
+    def test_posix_wrapper_gets_a_pty_and_passes_conversion_option_through_env(self):
+        client = Mock()
+        channel = client.get_transport.return_value.open_session.return_value
+        self.assertIs(open_shell(client, "msys-script"), channel)
+        channel.get_pty.assert_called_once_with(term="xterm-256color", width=171, height=32)
+        command = channel.exec_command.call_args.args[0]
+        self.assertTrue(command.startswith("exec env MSYS2_ARG_CONV_EXCL='*' /c/msys64/usr/bin/script.exe "))
+        self.assertIn("-c '/usr/bin/bash --noprofile --norc -i' /dev/null", command)
+        client.invoke_shell.assert_not_called()
+
+    def test_msys_console_uses_the_same_requested_geometry_without_a_script_wrapper(self):
+        client = Mock()
+        channel = client.get_transport.return_value.open_session.return_value
+        self.assertIs(open_shell(client, "msys-console"), channel)
+        channel.get_pty.assert_called_once_with(term="xterm-256color", width=171, height=32)
+        channel.exec_command.assert_called_once_with(
+            "exec env MSYS2_ARG_CONV_EXCL='*' /c/msys64/usr/bin/bash.exe --noprofile --norc -i")
+        channel.set_combine_stderr.assert_called_once_with(True)
+
     def test_win32_protocol_has_one_key_down_and_key_up_for_each_character(self):
         channel = Channel([b"$ ", b"\r\nqa-marker\r\n"])
         result = TerminalProbe(channel).run("qa-marker", resize=True, focus=False, delay=0, protocol="win32")

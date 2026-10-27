@@ -24,7 +24,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shell: [console, msys-script]
+        shell: [console, msys-console, msys-script]
     steps:
       - uses: actions/checkout@v4
         with:
