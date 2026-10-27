@@ -1,6 +1,6 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前验收尚未完成。托管相关集 [40422801868](https://github.com/engcapa/taomni/actions/runs/40422801868) 的三平台 browser 共 **1,312 次通过**，native 尚有失败和未完成分片。该运行基于顶部统一拖动修复之前的提交，不能当作当前源码的通过证据。功能全量通过后再进行正式性能对照，目前没有“性能无退化”的结论。外部 `clickhousecrud` 项目用例继续按用户认可的现有 policy 单独报告缺口。
+> 当前验收尚未完成。托管相关集 [40422801868](https://github.com/engcapa/taomni/actions/runs/40422801868) 已结束，共 **2,068 passed / 5 failed / 0 skipped**；三平台 browser 的 **1,312 次全部通过**，native 的四个场景仍需修复复验。该运行基于顶部统一拖动修复之前的提交，不能当作当前源码的通过证据。功能全量通过后再进行正式性能对照，目前没有“性能无退化”的结论。外部 `clickhousecrud` 项目用例继续按用户认可的现有 policy 单独报告缺口。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
@@ -13,9 +13,17 @@ Home、Tools 的标题及空白原先没有拖动标记，Workspace 独立的窄
 
 新增 browser `TC-WS-049`，107 步覆盖四视图、空/多标签工作区、800px 溢出布局、顶部实际命中、拖动 API 调用、双击最大化和控件正常操作。浏览器窗口 adapter 只提供有界只读观察，不向 native 注入模拟窗口行为。扩展 `TC-MAIN-RAIL-03`，由真实 X11 输入与独立系统几何读数检查 12 次拖动，每次实际位移 24×18px，宽高均不变；保留三处抓手、折叠、工具按钮与真实 PTY 检查。`TC-WS-048` 同步公共顶部选择器。
 
-本机新用例 `workspace-titlebar-browser/run-20261027-084207-654713663` **1/1 passed**；受影响 browser `workspace-browser/run-20261027-083429-409298911` 为 5 passed / 1 意外页面刷新失败，WS-048 原断言在 `workspace-browser/run-20261027-084538-838679269` 复验通过。原失败 trace 与控制台继续保留，刷新原因尚未确定，不计作已修复。最终 native `workspace-native/run-20261027-084330-810003645` **7/7 passed**，包含统一拖动、标签导航、共享面板、隐藏编辑器、工作区冷启动及文件编辑保存。27 项拖动/工具栏/缩放单测、QA 构建（含 TypeScript 与重构边界）通过；无新增 apt/sudo 依赖。本机 UI worker 总数不超过 2，native 位于隔离桌面。
+本机新用例 `workspace-titlebar-browser/run-20261027-084207-654713663` **1/1 passed**；受影响 browser `workspace-browser/run-20261027-083429-409298911` 为 5 passed / 1 意外页面刷新失败，WS-048 原断言在 `workspace-browser/run-20261027-084538-838679269` 复验通过。原失败 trace 与控制台继续保留。随后独立 Vite WebSocket 探针确认：原样重写 `feature-list.md` 后 14ms 收到 `full-reload`，与失败时的写入/导航时间相符。Vite 现在忽略 QA 目录及设计文档的文件监控；同一探针对目录和设计文档的两次原样写入未触发整页刷新，见 `_local/workspace-vite-catalog-refresh-fixed-probe.jsonl`。最终 native `workspace-native/run-20261027-084330-810003645` **7/7 passed**，包含统一拖动、标签导航、共享面板、隐藏编辑器、工作区冷启动及文件编辑保存。27 项拖动/工具栏/缩放单测、QA 构建（含 TypeScript 与重构边界）通过；无新增 apt/sudo 依赖。本机 UI worker 总数不超过 2，native 位于隔离桌面。
 
-托管旧源码出现的 Linux 保存按钮点击、邮件共享归档状态和 macOS 分屏恢复点击失败保留原证据，继续分别定位；不将本机单次通过当作托管失败已解决。当前挂载点占用 94%，尚未触发超过 95% 时清理 repo 临时产物的条件。
+托管旧源码出现的 Linux 保存按钮点击、邮件共享归档状态、Windows/macOS 分屏恢复点击，以及 macOS 分离窗口重新附着失败均保留原证据；不将本机单次通过当作托管失败已解决。当前挂载点占用 94%，尚未触发超过 95% 时清理 repo 临时产物的条件。
+
+邮件面板的轮询可以在按下 Resume 后、松开前把同一 DOM 按钮换成 Pause 并替换事件处理器。两个确定性挂载测试先失败，分别执行了相反操作。现在 Resume/Pause 使用独立 React key，旧按钮被替换后松开不会触发新操作；9 项邮件单测通过。邮件存储用例保留真实共享所有权、断点字节与 PTY 检查，并明确恢复后的控件状态。分屏恢复用例点击可见的编辑器滚动区后使用原有定位快捷键，保留编辑、撤销/重做、草稿恢复和磁盘哈希断言，避免目标文本被诊断浮层覆盖。WS-017 保存入口明确等待按钮可用；旧托管事件只有 pointerdown/up 而无 click，与原生 disabled 按钮一致，但其具体瞬态尚未在本机重现，需由托管复验确认。
+
+macOS `TC-SESSION-BOOK-003` 的重新附着输入耗时约 60 秒，超过窗口切换自身的 45 秒预算，旧驱动随后没有进行任何窗口列表查询就报告 `no matching window`。按相同时间条件新增契约测试，原实现对真实关闭和仍存活两种状态均失败。现在关闭输入只派发一次，即使其回执耗尽等待预算，也在整体 case 截止时间内至少读取一次真实窗口状态；原窗口仍在时必须失败，只有原窗口消失并匹配主窗口 DOM 才可返回。原始窗口状态写入 `native-window-context.jsonl`。不增加等待预算、不重放输入。保留 `TC-SESSION-BOOK-003` 的真实 PTY 输出、重新附着后相同输出和单实例断言；这是测试驱动修复，不新增产品能力。30 项窗口、输入、传输及生命周期工具契约通过，确定性时间条件由红转绿；macOS 当前修复仍须托管执行。
+
+邮件/Vite 修复后的本机 browser `workspace-browser/run-20261027-090842-550443983` 为 **4/4 passed**，native `workspace-native/run-20261027-090920-739571660` 为 **6/6 passed**，签名回执及 source/runner/case/native build 已独立核验，见 `_local/workspace-titlebar-mail-local-evidence.json`。真实邮件双实例证据包含所有权排他、262,144 字节暂停前缀、断点 FETCH、迁移前后对象数量和清理结果；窗口证据包含 12 次系统几何位移。
+
+驱动最后调整后的相同范围已完整复跑：browser `workspace-browser/run-20261027-091652-415482339` **4/4 passed**，native `workspace-native/run-20261027-091654-524529874` **6/6 passed**。两批 `identity_stable=true`，签名回执、当前 source/runner/case/native build 独立核验通过，见 `_local/workspace-titlebar-current-local-evidence.json`。分离窗口的原始列表确认源窗口消失后选中主窗口，再保留同一 PTY 输出。36 项相关前端单测、30 项工具契约、635 ID 的静态门禁、开发用例契约与 `pnpm check:refactor` 通过。QA 原生构建检查确认输入匹配、复用已有二进制，SHA-256 为 `e696780e3ad63301b9a6abcbe36316fe39f7848f147de3466f62214b5ec547fb`。三平台托管相关范围新增 WS-049 后为 634 个适用 ID；下一步执行该范围并核验真实回执，之后再同步 main、执行全量和正式性能对照。
 
 ## 标签导航、窗口拖动及托管失败复验（2026-10-27，进行中）
 

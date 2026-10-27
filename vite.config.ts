@@ -104,7 +104,12 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     watch: {
       ignored: [
         "**/qa-ui-auto-report/**",
-        "**/qa-ui-auto-tests/cases/**",
+        "**/qa-ui-auto-tests/**",
+        // Catalog and design writes also invalidate the entry module through
+        // dev plugins. They are not renderer inputs and must not interrupt QA.
+        "**/.agents/skills/qa-ui-auto/references/**",
+        "**/docs-feature/**",
+        "**/docs-issue/**",
         // Replit keeps a large Cargo registry under the workspace's .local
         // tree. It is not frontend source and can exhaust Linux inotify
         // watchers during Vite startup.
