@@ -12,6 +12,10 @@ CRASH_SNAPSHOT = """({
 NATIVE_SNAPSHOT = """({
   installed: Array.isArray(window.__QA_UI_AUTO_CONSOLE__),
   entries: window.__QA_UI_AUTO_CONSOLE__ ?? [],
+  resizeObservers: window.__QA_UI_AUTO_RESIZE_TRACE__ ? {
+    created: window.__QA_UI_AUTO_RESIZE_TRACE__.created,
+    samples: window.__QA_UI_AUTO_RESIZE_TRACE__.samples.slice()
+  } : null,
   crash: document.querySelector('[data-testid="app-crash"]')?.textContent ?? null
 })"""
 

@@ -11,9 +11,11 @@
 
 定向 [40478838714](https://github.com/engcapa/taomni/actions/runs/40478838714) 的 14 个 ID、51 次执行全部通过，三平台 browser/native 原始 receipt、源码与二进制身份独立核验通过。包含九个崩溃专项、文件 watcher、MFA 备份、RDP 参考和真实 macOS ARD。随后同步远程 main，`git merge origin/main` 返回 Already up to date。
 
-全量 [40484591524](https://github.com/engcapa/taomni/actions/runs/40484591524) 为 641 个适用 ID、2,103 次执行、25 分片。TC-WS-054 在 macOS release 中完成四文件 Grid/Split/Single，实际保存 SHA 也正确，但紧接着的运行时断言捕获 `ResizeObserver loop completed with undelivered notifications`。这是失败，不能用先前定向通过替代。
+全量 [40484591524](https://github.com/engcapa/taomni/actions/runs/40484591524) 已收齐 25/25 分片，641 个适用 ID、2,103 次执行中 2,102 passed / 1 failed，无 skipped 或基础设施错误。TC-WS-054 在 macOS release 中完成四文件 Grid/Split/Single，实际保存 SHA 也正确，但紧接着的运行时断言捕获 `ResizeObserver loop completed with undelivered notifications`。这是失败，不能用先前定向通过替代。
 
 该用例新增仅 QA runner 的可选观察器溯源：记录创建栈、原有 contentRect 与元素标签，最多 64 条、不持有 DOM 引用；不额外测量布局、不改调度、不写 DOM、不吞原回调异常。原生 error 证据附上该环形记录；其他用例默认关闭。工具契约验证回调参数/this/返回值/异常与 observe/unobserve/disconnect、禁用及有界行为。先在 GitHub 保留原失败断言复现，再依据来源修复，不能将全局错误过滤作为修复。
+
+首次仅选 native 的诊断 40489873988 在规划阶段因 browser 专用 TC-WS-055 不适用而失败，未执行产品用例；改为 macOS browser/native 后，[40490473216](https://github.com/engcapa/taomni/actions/runs/40490473216) 的 14/14 通过，未复现。没有据此宣称修复。TC-WS-054 进一步在原保存断言和冷启动之间加入两轮侧栏拖动、Documentation 开关、长/短文本替换及真实磁盘 SHA 验证，并在每个运行时检查保存可选的观察器环形记录，保留此前全部断言。
 
 ## QA release 布局崩溃与专项回归（2026-10-27，验证中）
 
