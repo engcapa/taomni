@@ -80,7 +80,11 @@ class TerminalProbe:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--out", type=Path, required=True)
+    parser.add_argument("--delays", default="0,0.01,0.05,0.1,0.25,0.5")
     args = parser.parse_args()
+    delays = [float(value) for value in args.delays.split(",")]
+    if not delays or any(value < 0 or value > 2 for value in delays):
+        parser.error("delays must be between 0 and 2 seconds")
     args.out.mkdir(parents=True, exist_ok=True)
     config = {}
     results = []
@@ -91,7 +95,7 @@ def main():
         try:
             client.connect(connection["host"], connection["port"], connection["user"],
                            os.environ["QA_SSH_PASSWORD"], allow_agent=False, look_for_keys=False)
-            for delay in (0, 0.01, 0.05):
+            for delay in delays:
                 for resize, focus in ((False, False), (False, True), (True, False), (True, True)):
                     channel = client.invoke_shell(term="xterm-256color", width=171, height=32)
                     try:
@@ -108,7 +112,7 @@ def main():
                 "observation": "Direct SSH protocol diagnostic; no app/browser/native case coverage",
                 "sha": os.environ.get("GITHUB_SHA"), "results": results,
             }, indent=2) + "\n", encoding="utf-8")
-    if len(results) != 12 or not all(result["passed"] for result in results):
+    if len(results) != len(delays) * 4 or not all(result["passed"] for result in results):
         raise SystemExit("SSH input probe failed; original frames retained")
 
 
