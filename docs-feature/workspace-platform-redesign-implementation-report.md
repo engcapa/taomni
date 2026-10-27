@@ -33,13 +33,19 @@ TC-WS-054 再增至四轮连续宽/窄拖动及长/短替换，逐轮保留原�
 
 增加仅在该用例已启用诊断时工作的有界事务观察：透传实际 EditorView.update 的原始参数、返回值和异常，记录全选至首字符间的选区变化与调用栈，同时保留 selectionchange 快照。不派发事务、不 flush、不 focus、不重放或延迟输入；三个诊断契约测试及 refactor 检查通过。现有精确内容、磁盘哈希和完整崩溃组继续执行，诊断本身不计为修复或新的产品用例。
 
-## 隐藏布局与邮件分页的确定性回归（2026-10-28，托管复验进行中）
+## 隐藏布局与邮件分页的确定性回归（2026-10-28，Linux 复验通过）
 
-三平台相关集 40530554568 的 Linux native 回执新增两项失败：TC-WS-038 恢复隐藏编辑器后的 ResizeObserver 错误，以及 TC-MAIL-SYNC-01 在服务器已有 480 封时停在 400 封并隐藏加载入口。保留原始回执和失败画面；当前整轮尚未结束，不能将已通过的分片当作最终结果。
+三平台相关集 40530554568 最终为 105 passed / 3 failed，另有 Windows 基础设施失败导致 6 条未执行。Linux native 的两项失败为 TC-WS-038 恢复隐藏编辑器后的 ResizeObserver 错误，以及 TC-MAIL-SYNC-01 在服务器已有 480 封时停在 400 封并隐藏加载入口；第三项为 Windows TC-WS-054。原始回执、汇总和失败画面全部保留并独立验证。
 
-TC-WS-038 被动记录显示，恢复文件后原本为 0 的 Documentation 面板重新占用 313.16px。使用真实 react-resizable-panels 的挂载回归先失败：隐藏时完成 collapse，但首次获得非零尺寸时库重新应用固定的 20% 默认值，实际 flex-grow 17.581，面板内容仍隐藏。现在关闭侧栏的初始默认尺寸为 0，保持该 mount-time 值稳定；现有 ref 继续负责后续显式开关。TC-WS-038 增加对面板本身无可见布局框的双模式断言，保留全部草稿、终端、侧栏和运行时检查。它证明并修复隐藏布局缺陷，ResizeObserver 错误是否完全消除仍需托管原生证据。
+TC-WS-038 被动记录显示，恢复文件后原本为 0 的 Documentation 面板重新占用 313.16px。使用真实 react-resizable-panels 的挂载回归先失败：隐藏时完成 collapse，但首次获得非零尺寸时库重新应用固定的 20% 默认值，实际 flex-grow 17.581，面板内容仍隐藏。现在关闭侧栏的初始默认尺寸为 0，保持该 mount-time 值稳定；现有 ref 继续负责后续显式开关。TC-WS-038 增加对面板本身无可见布局框的双模式断言，保留全部草稿、终端、侧栏和运行时检查。
 
-邮件挂载回归也先失败：加载旧页尚未返回时，前台同步已经发布新缓存快照，旧页被 sequence guard 丢弃后却返回普通空页；Load more 调用方据此把新快照的 hasMore 清为 false。缓存结果现在显式返回 applied，未采纳或失败的读取不再触发清空分页或补取旧目录。新测试继续点击至全部 120 封并要求最后正确结束分页；TC-MAIL-SYNC-01 仍要求原有 480 封服务器/界面完全相等。83 项相关前端测试、TypeScript 与 refactor 检查通过，本机未运行 browser/native。GitHub 完整崩溃组及相关复验尚待执行。
+邮件挂载回归也先失败：加载旧页尚未返回时，前台同步已经发布新缓存快照，旧页被 sequence guard 丢弃后却返回普通空页；Load more 调用方据此把新快照的 hasMore 清为 false。缓存结果现在显式返回 applied，未采纳或失败的读取不再触发清空分页或补取旧目录。新测试继续点击至全部 120 封并要求最后正确结束分页；TC-MAIL-SYNC-01 仍要求原有 480 封服务器/界面完全相等。83 项相关前端测试、TypeScript 与 refactor 检查通过，本机未运行 browser/native。
+
+Linux 定向 [40537559185](https://github.com/engcapa/taomni/actions/runs/40537559185) 已完成，browser 7/7、native 9/9，包含完整适用崩溃组、隐藏面板断言和 480 封分页。2/2 原始回执、源码/runner/case/native 构建身份及最终汇总独立核验一致，没有跳过或基础设施缺口。三平台相关集与 Windows 选区专项仍在执行，此 Linux 结果不能替代当前全部平台验收。
+
+本机 QA release 已重新编译并通过 `native_build.py --release --check`，耗时 1170.54 秒，QA ID 为 `com.taomni.app.qa`，二进制位于 `src-tauri/target/qa-ui-auto/release/taomni`。源码指纹 `07ceec45bbf225a475f1a33390541a3e287cd119e1211b8c2948887e73f81ef1`，二进制 SHA-256 为 `68e8ab144a6b71a743ca79dd58e6a451f7d9766deaa7406c89bc923db856a177`；仅供本轮手工验证，未启动本地 browser/native 用例。
+
+随后三平台相关集 [40539076925](https://github.com/engcapa/taomni/actions/runs/40539076925) 已收齐 18/18 回执并独立核验最终汇总：114 次执行，112 passed / 2 failed，没有基础设施错误或未执行分片。Linux native TC-WS-039 在恢复双栏编辑器后的第 41 步捕获另一次 ResizeObserver 错误；此前专项通过不能掩盖本次失败。该用例原来没有启用观察器来源记录，现补充诊断开关并在建立工作区前重载，使现有被动 observer 包装覆盖新建、分屏及隐藏/恢复全过程，原有运行时和草稿断言全部保留。Windows 同轮 TC-WS-054 仍失败；TC-145 在三平台 native 已实际通过，包括此前未执行的 Windows POSIX-only 分片。新的 Linux 来源采集及 Windows 事务定位结果尚待返回。
 
 同轮 Windows native 第 3 分片在启动服务前失败，6 条用例没有执行。实际分片只有 `ssh_posix`，而 reusable workflow 的 service-install 条件漏掉它；browser 同批还包含普通 `ssh`，所以此前 browser 通过不能证明该独立分片已准备好环境。新增契约执行 workflow 的原始条件，在 POSIX-only 情况先失败；现在所有 run 入口将完整 capabilities 交给已有安装器，由它决定实际依赖，不再复制第二份能力清单。30 项服务/所有权契约及 refactor 检查通过。该改动只修正 CI 编排，没有新增产品能力，沿用 TC-145 的真实 POSIX PTY 与开关 SFTP 断言；仍需托管独立分片复验。
 
