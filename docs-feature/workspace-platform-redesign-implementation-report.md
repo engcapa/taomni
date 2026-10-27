@@ -15,6 +15,8 @@ RDP 诊断提交 `84205ceb` 的 macOS 独立照片专项 [40588926870](https://g
 
 将这些测量的帧、observer、最新回调、实际 DOM owner 和清理统一到 `useElementResizeFrame`。工作区和编辑器标签栏的内容/激活/resize 测量在下一动画帧合并执行，隐藏的零宽容器保留既有滚动状态；同一 DOM 的活动项变化不重建 observer。Sessions 标签栏复用相同 resize 边界。没有全局替换 ResizeObserver、吞掉错误或改变阈值；该修复消除已确认的交付期同步测量机制，原生错误是否全部解决仍以新托管结果为准。新增回归、现有标签栏、EditorGroup、真实面板库及面包屑共 43/43 单测通过。TC-WS-048 保留原 65 步断言，补充 Home/Sessions 隐藏恢复后十二标签保留、活动项完整可见、左右滚动和运行时健康，仍为 300 秒预算。
 
+相关集 [40596454168](https://github.com/engcapa/taomni/actions/runs/40596454168) 的 browser 回执暴露 TC-WS-048 两项用例问题：Linux 第 71 步用通用会话面板选择器匹配十二个保留实例，等待了第一个隐藏面板；macOS 第 59 步在 End 激活后的测量帧前读取滚动位置，失败截图中活动末尾标签已恢复显示。现在等待真正活动的 terminal pane，并在 Home/End 后等待相应已渲染的 disabled 滚动端点控件，再执行全部原有精确位置断言；不加固定 sleep、不重试点击、不改变滚动/运行时预期。共 82 步，原 300 秒预算不变。产品源码不变，原失败保留，新用例需再次托管执行。
+
 ## main 合并与全量结果（2026-10-28，尚有一项失败）
 
 相关集 40569868761 的 178/178 通过且完成独立核验后，重新 `git fetch origin main`，远程 main 为 `65d6d907efdf291478e660dc1ada96a12a41b8ad`；无冲突合并并推送 `efd6c4edec2c2309cf545fa9ff1feda99bdc6ab1`。main 只增加已包含父提交的合并节点，合并前后工作树文件内容无差异，产品 source SHA 仍为 `1acd6425c4211b04f72f5c08865ebbf1e97f5c9e7e2b26e3537e35078f713171`，现有本机 QA release 与该内容匹配。没有用源码无变化代替用户要求的复测。
