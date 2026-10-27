@@ -22,7 +22,7 @@ class OriginalObserver {
   disconnect() { this.targets.clear(); }
   emit(entries) { return this.callback.call(this, entries, this); }
 }
-function environment(enabled) {
+function environment(enabled, extra = {}) {
   const sandbox = {
     ResizeObserver: OriginalObserver,
     localStorage: { getItem: key => {
@@ -30,6 +30,7 @@ function environment(enabled) {
       return enabled ? '1' : null;
     } },
     performance: { now: () => 17 },
+    ...extra,
   };
   sandbox.window = sandbox;
   vm.createContext(sandbox);
@@ -82,6 +83,27 @@ const badEntries = [{target: null, get contentRect() { throw Error('probe failed
 let recovered = false;
 new wrapper(() => { recovered = true; }).emit(badEntries);
 assert.equal(recovered, true);
+const queues = [];
+const traced = environment(true, {
+  document: {documentElement: {}},
+  MutationObserver: class {
+    constructor(callback) { this.records = []; queues.push(this); }
+    observe() {}
+    takeRecords() { const records = this.records; this.records = []; return records; }
+  },
+});
+const withWrites = new traced.ResizeObserver(() => {
+  queues[0].records.push({target, type: 'attributes', attributeName: 'style', oldValue: 'width: 10px'});
+  return 123;
+});
+assert.equal(withWrites.emit(entries), 123);
+const written = traced.__QA_UI_AUTO_RESIZE_TRACE__.samples.at(-1);
+assert.equal(written.writeCount, 1);
+assert.equal(written.writes[0].before, 'width: 10px');
+assert.equal(written.writes[0].target[0].testid, 'editor');
+assert.doesNotThrow(() => JSON.stringify(written));
+new traced.ResizeObserver(() => {}).emit(entries);
+assert.equal(traced.__QA_UI_AUTO_RESIZE_TRACE__.samples.at(-1).writeCount, 0);
 process.stdout.write(JSON.stringify({passed: true}));
 """
 
