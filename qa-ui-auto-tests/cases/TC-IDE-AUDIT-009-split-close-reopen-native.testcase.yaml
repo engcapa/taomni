@@ -214,7 +214,7 @@ steps:
     path: ${fixture.workspace_root}/notes.txt
     equals: def2bdd6fe376421f97ec0d11cd08e6c81f5e6ee299586561ee09c9310ac8858
     timeout_sec: 30
-- click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content .cm-line:last-child'
+- click: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-scroller'
 - press:
     key: Mod+Home
     selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'

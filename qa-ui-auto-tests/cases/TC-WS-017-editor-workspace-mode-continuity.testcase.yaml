@@ -77,7 +77,7 @@ steps:
 - assert_text:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
     contains: X
-- click: '[data-testid="workspace-editor-save"]'
+- click: '[data-testid="workspace-editor-save"]:enabled'
 - wait_for:
     selector: '[data-testid="workspace-file-editor"][data-dirty]'
     state: detached

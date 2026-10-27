@@ -4,6 +4,14 @@ from .deadline import budget_time as time
 from native_webdriver_transport import WebDriverError
 
 
+def _record_native_context(ctx, phase, **details):
+    directory = getattr(ctx, "case_dir", None)
+    if directory is not None:
+        with (directory / "native-window-context.jsonl").open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps({"at_unix_ms": int(time.time() * 1000),
+                                     "phase": phase, **details}) + "\n")
+
+
 def arguments(args):
     from .steps import StepError
     if not isinstance(args, dict) or not isinstance(args.get("selector"), str) or not args["selector"]:
@@ -22,6 +30,7 @@ def native_switch(ctx, args):
     source = None
     if args.get("close_with"):
         source = ctx.session.request("GET", ctx.session.endpoint("/window"))
+        _record_native_context(ctx, "close", source=source, control=args["close_with"])
         try:
             # Dispatch once: reattach can destroy this WebView before WebKit
             # acknowledges the element click. Only its observed disappearance
@@ -34,8 +43,19 @@ def native_switch(ctx, args):
             if not any(message in str(exc) for message in (
                     "no such window", "WebView JavaScript evaluation timed out")):
                 raise
-    while time.monotonic() < end:
+            _record_native_context(ctx, "close_acknowledgement_lost", error=str(exc))
+    # A destroyed WKWebView can consume its callback timeouts before the close
+    # request returns. Still observe the real outcome once; never infer closure
+    # from that error or replay the input. The case deadline bounds transport.
+    observe_close_once = source is not None
+    previous_handles = None
+    while time.monotonic() < end or observe_close_once:
+        observe_close_once = False
         handles = ctx.session.request("GET", ctx.session.endpoint("/window/handles"))
+        if handles != previous_handles:
+            _record_native_context(ctx, "windows", handles=handles, source=source,
+                                   source_closed=source is not None and source not in handles)
+            previous_handles = handles
         if source is not None and source in handles:
             error = "source window did not close"
             time.sleep(.1)
@@ -45,6 +65,7 @@ def native_switch(ctx, args):
                 ctx.session.request("POST", ctx.session.endpoint("/window"), {"handle": handle})
                 if ctx.session.execute(f"return !!document.querySelector({json.dumps(selector)});"):
                     ctx.session.install_console_hook()
+                    _record_native_context(ctx, "selected", handle=handle, selector=selector)
                     return f"selected real WebView window {handle} with {selector}"
             except Exception as exc:
                 error = str(exc)
