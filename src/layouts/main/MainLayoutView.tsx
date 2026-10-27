@@ -32,6 +32,7 @@ import { MultiExecBar } from "../../components/terminal/MultiExecBar";
 import { UpdateDialog } from "../../components/UpdateDialog";
 import { VaultUnlockDialog } from "../../components/vault/VaultUnlockDialog";
 import { WindowResizeHandles } from "../../components/window/WindowResizeHandles";
+import { startWindowDrag } from "../../lib/windowDrag";
 import { t as tr } from "../../lib/i18n";
 import { loadResizableLayout, saveResizableLayout } from "../../lib/resizableLayout";
 import { TabContentRouter } from "./TabContentRouter";
@@ -103,7 +104,16 @@ export function MainLayoutView(props: MainLayoutViewProps) {
         className="taomni-main-window relative w-full h-full flex flex-col"
         style={{ background: "var(--taomni-chrome-bg)" }}
       >
-        {!chrome.isMac && <WindowResizeHandles />}
+        {!chrome.isMac && <WindowResizeHandles topEdgeSize={2} />}
+        {/* Keep the outermost 2px and corners resizable. The remaining top
+            frame is a common move target in every platform view. */}
+        <div
+          data-testid="main-window-top-drag-region"
+          data-window-drag
+          aria-hidden="true"
+          className="fixed inset-x-[14px] top-[2px] h-[4px] z-[9999] cursor-grab active:cursor-grabbing"
+          onMouseDown={startWindowDrag}
+        />
         {chrome.chatDrawerTopPinned && <ChatDrawer />}
 
         <div data-testid="platform-workbench" className="taomni-platform-workbench flex-1 flex min-h-0">

@@ -216,6 +216,7 @@ export function ControlBar({
   return (
     <div
       data-testid="control-bar"
+      data-window-drag
       className="taomni-control-bar h-8 flex items-center min-w-0"
       onMouseDown={startWindowDrag}
     >

@@ -173,11 +173,33 @@ describe("ControlBar settings button", () => {
     expect(windowMocks.startDragging).toHaveBeenCalledTimes(1);
   });
 
+  it.each(["home", "tools", "agents"] as const)("moves from the %s title and empty title-bar space", (mode) => {
+    useAppStore.setState({ activeSideTab: mode });
+    renderControlBar(vi.fn());
+    const title = screen.getByTestId("platform-mode-title");
+    fireEvent.mouseDown(title, { button: 0, detail: 1 });
+    fireEvent.mouseDown(screen.getByTestId("control-bar"), { button: 0, detail: 1 });
+    fireEvent.mouseDown(title, { button: 0, detail: 2 });
+    expect(windowMocks.startDragging).toHaveBeenCalledTimes(2);
+    expect(windowMocks.toggleMaximize).toHaveBeenCalledTimes(1);
+  });
+
+  it("moves from workspace strip padding but leaves nested buttons alone", () => {
+    useAppStore.setState({ activeSideTab: "workspaces" });
+    renderControlBar(vi.fn());
+    fireEvent.mouseDown(screen.getByTestId("workspace-tab-strip"), { button: 0, detail: 1 });
+    expect(windowMocks.startDragging).toHaveBeenCalledTimes(1);
+    fireEvent.mouseDown(screen.getByTestId("workspace-open-session-plus").querySelector("svg")!, { button: 0, detail: 1 });
+    fireEvent.mouseDown(screen.getByTestId("global-search-trigger"), { button: 0, detail: 2 });
+    expect(windowMocks.startDragging).toHaveBeenCalledTimes(1);
+    expect(windowMocks.toggleMaximize).not.toHaveBeenCalled();
+  });
+
   it("moves and maximizes from workspace title-bar regions without consuming tab actions", () => {
     useAppStore.setState({ activeSideTab: "workspaces" });
     renderControlBar(vi.fn());
     fireEvent.mouseDown(screen.getByTestId("workspace-tab-drag-region"), { button: 0, detail: 1 });
-    fireEvent.mouseDown(screen.getByTestId("workspace-tab-top-drag-region"), { button: 0, detail: 2 });
+    fireEvent.mouseDown(screen.getByTestId("control-bar"), { button: 0, detail: 2 });
     expect(windowMocks.startDragging).toHaveBeenCalledTimes(1);
     expect(windowMocks.toggleMaximize).toHaveBeenCalledTimes(1);
     fireEvent.mouseDown(screen.getByTestId("workspace-open-session-plus"), { button: 0, detail: 1 });

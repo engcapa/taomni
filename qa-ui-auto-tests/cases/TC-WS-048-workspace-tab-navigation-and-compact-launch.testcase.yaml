@@ -101,7 +101,7 @@ steps:
     expect_truthy: true
 - assert_disabled: '[data-testid="workspace-tab-scroll-right"]'
 - assert_visible: '[data-testid="workspace-tab-drag-region"]'
-- assert_visible: '[data-testid="workspace-tab-top-drag-region"]'
+- assert_visible: '[data-testid="main-window-top-drag-region"]'
 - eval_readonly:
     expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-drag-region"]').getBoundingClientRect().width >= 39 && document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').getBoundingClientRect().width
       > document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-strip"]').getBoundingClientRect().width * 0.5
@@ -248,7 +248,7 @@ verification:
     - step: 61
       expectation: '{"assert_visible": "[data-testid=\"workspace-tab-drag-region\"]"}'
     - step: 62
-      expectation: '{"assert_visible": "[data-testid=\"workspace-tab-top-drag-region\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"main-window-top-drag-region\"]"}'
     - step: 63
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-drag-region\"]'').getBoundingClientRect().width
         >= 39 && document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').getBoundingClientRect().width > document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-strip\"]'').getBoundingClientRect().width

@@ -1,11 +1,21 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前验收尚未完成。最近托管运行 [40405967669](https://github.com/engcapa/taomni/actions/runs/40405967669) 的 job 为 success，但聚合回执仍有 **15 次 native 失败**，不能视为通过。此前相关集 `40344676416` 的 1,301/1,301 为历史结果；后续源码须重新验证。功能全量通过后再进行正式性能对照，目前没有“性能无退化”的结论。外部 `clickhousecrud` 项目用例继续按用户认可的现有 policy 单独报告缺口。
+> 当前验收尚未完成。托管相关集 [40422801868](https://github.com/engcapa/taomni/actions/runs/40422801868) 的三平台 browser 共 **1,312 次通过**，native 尚有失败和未完成分片。该运行基于顶部统一拖动修复之前的提交，不能当作当前源码的通过证据。功能全量通过后再进行正式性能对照，目前没有“性能无退化”的结论。外部 `clickhousecrud` 项目用例继续按用户认可的现有 policy 单独报告缺口。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
+
+## 所有主视图统一顶部拖动（2026-10-27）
+
+Home、Tools 的标题及空白原先没有拖动标记，Workspace 独立的窄拖动区又被主窗口顶部 6px 缩放层覆盖。现在共享 ControlBar 的非交互背景统一处理单击拖动、双击最大化；主窗口提供跨 Home、Sessions、Workspaces、Tools 的顶部 4px 拖动区，外侧 2px 与原有角落继续缩放。移除 Workspace 的重复覆盖层。按钮、SVG 图标所在按钮、链接、输入框、菜单、标签、可编辑文本、拖放目标和 React portal 不触发窗口拖动。
+
+新增 browser `TC-WS-049`，107 步覆盖四视图、空/多标签工作区、800px 溢出布局、顶部实际命中、拖动 API 调用、双击最大化和控件正常操作。浏览器窗口 adapter 只提供有界只读观察，不向 native 注入模拟窗口行为。扩展 `TC-MAIN-RAIL-03`，由真实 X11 输入与独立系统几何读数检查 12 次拖动，每次实际位移 24×18px，宽高均不变；保留三处抓手、折叠、工具按钮与真实 PTY 检查。`TC-WS-048` 同步公共顶部选择器。
+
+本机新用例 `workspace-titlebar-browser/run-20261027-084207-654713663` **1/1 passed**；受影响 browser `workspace-browser/run-20261027-083429-409298911` 为 5 passed / 1 意外页面刷新失败，WS-048 原断言在 `workspace-browser/run-20261027-084538-838679269` 复验通过。原失败 trace 与控制台继续保留，刷新原因尚未确定，不计作已修复。最终 native `workspace-native/run-20261027-084330-810003645` **7/7 passed**，包含统一拖动、标签导航、共享面板、隐藏编辑器、工作区冷启动及文件编辑保存。27 项拖动/工具栏/缩放单测、QA 构建（含 TypeScript 与重构边界）通过；无新增 apt/sudo 依赖。本机 UI worker 总数不超过 2，native 位于隔离桌面。
+
+托管旧源码出现的 Linux 保存按钮点击、邮件共享归档状态和 macOS 分屏恢复点击失败保留原证据，继续分别定位；不将本机单次通过当作托管失败已解决。当前挂载点占用 94%，尚未触发超过 95% 时清理 repo 临时产物的条件。
 
 ## 标签导航、窗口拖动及托管失败复验（2026-10-27，进行中）
 

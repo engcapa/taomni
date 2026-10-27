@@ -160,6 +160,7 @@ components: [AppTitleBar, WindowControls, WindowResizeHandles, TitleBarTrayContr
 files:
   - src/components/tabbar/ControlBar.tsx
   - src/components/window/WindowDragHandle.tsx
+  - src/components/window/WindowResizeHandles.tsx
   - src/lib/windowDrag.ts
   - src/components/window/AppTitleBar.tsx
   - src/components/window/WindowControls.tsx
@@ -178,6 +179,9 @@ controls:
     selector: '[data-testid="tab-action-slot"]'
     kind: display
     optional: true
+  - id: main-window-top-drag-region
+    selector: '[data-testid="main-window-top-drag-region"]'
+    kind: display    # shared frame move target; native checks actual displacement
   - id: window-drag-handle
     selector: '[data-testid="window-drag-handle"]'
     kind: display    # title-bar grip before Welcome; Linux native verifies actual OS displacement
@@ -12148,7 +12152,7 @@ controls:
 
 ## 12. Workspace-First 平台重构（v6.1）
 
-> 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents / Crew 开发中入口与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-048`。`TC-WS-029/030` 还覆盖工作区标签过多时的左右滚动控制，以及顶部空白区保留原生窗口拖动目标。`TC-WS-044` 在 browser/native 中覆盖从 Home 选择已保存工作区后，树形/详细列表的已展开子目录自动重新加载，保留文档与目录展开状态。`TC-WS-045` 覆盖 Tools / Home 显式进入空编辑器时展示文件区，以及收缩、Project 和 Sessions 工具切换后的恢复。`TC-WS-047` 覆盖普通层级文件树显示依赖/构建目录，避免将父目录误判为 Empty。`TC-WS-018/019` 保留连续快捷键开关回归，`TC-WS-046` 追加 Linux 原生 GTK/fcitx 真实输入及大预览重复打开边界。
+> 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents / Crew 开发中入口与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-049`。`TC-WS-049` 覆盖 Home、Tools、Sessions、空/多标签 Workspaces 的共享标题栏拖动事件、窄窗口真实命中、双击最大化，以及按钮、标签、弹出输入框和右键的排除；`TC-MAIN-RAIL-03` 验证同一顶部边框及 Home/Tools 标题的真实系统位移。`TC-WS-029/030` 还覆盖工作区标签过多时的左右滚动控制，以及顶部空白区保留原生窗口拖动目标。`TC-WS-044` 在 browser/native 中覆盖从 Home 选择已保存工作区后，树形/详细列表的已展开子目录自动重新加载，保留文档与目录展开状态。`TC-WS-045` 覆盖 Tools / Home 显式进入空编辑器时展示文件区，以及收缩、Project 和 Sessions 工具切换后的恢复。`TC-WS-047` 覆盖普通层级文件树显示依赖/构建目录，避免将父目录误判为 Empty。`TC-WS-018/019` 保留连续快捷键开关回归，`TC-WS-046` 追加 Linux 原生 GTK/fcitx 真实输入及大预览重复打开边界。
 
 ### 12.1 Workspace-first 主壳层：单行工具栏、主导航条 5 大模式与右栏收纳
 
@@ -12706,6 +12710,9 @@ controls:
 - id: workspace-tab
   selector: '[data-testid="workspace-tab"]'
   kind: interactive
+- id: workspace-plus-new-file
+  selector: '[data-testid="workspace-plus-new-file"]'
+  kind: interactive
 - id: workspace-tab-strip
   selector: '[data-testid="workspace-tab-strip"]'
   kind: display
@@ -12717,9 +12724,6 @@ controls:
   selector: '[data-testid="workspace-tab-scroll-right"]'
   kind: interactive
   optional: true
-- id: workspace-tab-top-drag-region
-  selector: '[data-testid="workspace-tab-top-drag-region"]'
-  kind: display
 - id: workspace-tab-scroll-area
   selector: '[data-testid="workspace-tab-scroll-area"]'
   kind: display

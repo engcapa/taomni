@@ -1664,6 +1664,7 @@
 - `[data-testid="control-bar"] [data-testid="platform-toolbar-actions"]` — display — F1.3.tray
 - `[data-testid="control-bar"]` — display — F1.3.control-bar
 - `[data-testid="tab-action-slot"]` — display [optional] — F1.3.tab-action-slot
+- `[data-testid="main-window-top-drag-region"]` — display — F1.3.main-window-top-drag-region
 - `[data-testid="window-drag-handle"]` — display — F1.3.window-drag-handle
 - `[data-testid="titlebar-actions-more"]` — interactive [optional] — F1.3.titlebar-actions-more
 - `[data-testid="theme-cycle"]` — interactive — F1.3.theme-cycle
@@ -1819,10 +1820,10 @@
 - `[data-testid="workspace-switcher-menu-add-folder"]` — display [optional] — F-WS-2.workspace-switcher-removed-duplicate-add-folder
 - `[data-testid="workspace-sessions-panel"]` — display [optional] — F-WS-2.workspace-sessions-panel
 - `[data-testid="workspace-tab"]` — interactive — F-WS-2.workspace-tab
+- `[data-testid="workspace-plus-new-file"]` — interactive — F-WS-2.workspace-plus-new-file
 - `[data-testid="workspace-tab-strip"]` — display — F-WS-2.workspace-tab-strip
 - `[data-testid="workspace-tab-scroll-left"]` — interactive [optional] — F-WS-2.workspace-tab-scroll-left
 - `[data-testid="workspace-tab-scroll-right"]` — interactive [optional] — F-WS-2.workspace-tab-scroll-right
-- `[data-testid="workspace-tab-top-drag-region"]` — display — F-WS-2.workspace-tab-top-drag-region
 - `[data-testid="workspace-tab-scroll-area"]` — display — F-WS-2.workspace-tab-scroll-area
 - `[data-testid="workspace-tab-drag-region"]` — display [optional] — F-WS-2.workspace-tab-drag-region
 - `[data-testid="workspace-tree-add-root"]` — interactive — F-WS-2.workspace-tree-add-root

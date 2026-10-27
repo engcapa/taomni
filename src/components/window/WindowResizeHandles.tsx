@@ -24,6 +24,7 @@ const CORNER_SIZE = 14;
 interface WindowResizeHandlesProps {
   className?: string;
   edgeSize?: number;
+  topEdgeSize?: number;
   cornerSize?: number;
 }
 
@@ -73,6 +74,7 @@ const HANDLES: ResizeHandle[] = [
 export function WindowResizeHandles({
   className = "fixed inset-0 z-[10000]",
   edgeSize = EDGE_SIZE,
+  topEdgeSize = edgeSize,
   cornerSize = CORNER_SIZE,
 }: WindowResizeHandlesProps = {}) {
   const tauri = isTauriRuntime();
@@ -118,7 +120,7 @@ export function WindowResizeHandles({
         const isCorner = handle.direction.length > 5;
         const style: CSSProperties = {
           cursor: handle.cursor,
-          height: isCorner ? cornerSize : edgeSize,
+          height: isCorner ? cornerSize : handle.direction === "North" ? topEdgeSize : edgeSize,
           width: isCorner ? cornerSize : edgeSize,
           pointerEvents: "auto",
         };

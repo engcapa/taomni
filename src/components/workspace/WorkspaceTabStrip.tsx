@@ -247,13 +247,6 @@ export function WorkspaceTabStrip() {
         aria-label={t("window.drag")}
         className="taomni-workspace-tab-drag-region h-full min-w-[40px] flex-1"
       />
-      <div
-        data-testid="workspace-tab-top-drag-region"
-        data-window-drag
-        title={t("window.drag")}
-        aria-label={t("window.drag")}
-        className="taomni-workspace-tab-drag-region absolute inset-x-0 top-0 h-[4px]"
-      />
       {menu && (
         <ContextMenu
           testId="workspace-open-session-menu"

@@ -55,4 +55,14 @@ describe("WindowResizeHandles", () => {
     await act(async () => {});
     expect(container.querySelectorAll("div.absolute")).toHaveLength(0);
   });
+
+  it("reserves the main window top frame for moving while retaining edge and corner resize targets", async () => {
+    const { container } = render(<WindowResizeHandles topEdgeSize={2} />);
+    await act(async () => {});
+    const handles = [...container.querySelectorAll<HTMLElement>("div.absolute")];
+    expect(handles[0]).toHaveStyle({ height: "2px" });
+    expect(handles[1]).toHaveStyle({ height: "6px" });
+    expect(handles[2]).toHaveStyle({ width: "6px" });
+    for (const corner of handles.slice(4)) expect(corner).toHaveStyle({ width: "14px", height: "14px" });
+  });
 });
