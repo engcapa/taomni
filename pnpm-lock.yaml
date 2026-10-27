@@ -8,6 +8,9 @@ patchedDependencies:
   '@codemirror/view@6.43.11':
     hash: 53e41a9caff1f19d2227bc1eebfb8c8af923e62a4986cc5d5b58c737721d6fb7
     path: patches/@codemirror__view@6.43.11.patch
+  react-resizable-panels@4.12.4:
+    hash: 1690e00cd96512b054089d38fa959f394c849f78c708638c5a886a2f4d0d108f
+    path: patches/react-resizable-panels@4.12.4.patch
 
 importers:
 
@@ -156,7 +159,7 @@ importers:
         version: 19.2.7(@types/react@19.3.0)(konva@10.5.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react-resizable-panels:
         specifier: ^4.12.4
-        version: 4.12.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 4.12.4(patch_hash=1690e00cd96512b054089d38fa959f394c849f78c708638c5a886a2f4d0d108f)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       sql-formatter:
         specifier: ^15.8.2
         version: 15.8.2
@@ -3583,7 +3586,7 @@ snapshots:
       react: 19.3.0
       scheduler: 0.27.0
 
-  react-resizable-panels@4.12.4(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+  react-resizable-panels@4.12.4(patch_hash=1690e00cd96512b054089d38fa959f394c849f78c708638c5a886a2f4d0d108f)(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
     dependencies:
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)

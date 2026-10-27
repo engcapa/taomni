@@ -7,6 +7,16 @@
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
 
+## 真实分屏库的观察器边界（2026-10-28，修复待托管复验）
+
+标签栏修复后的 [40596454168](https://github.com/engcapa/taomni/actions/runs/40596454168) 最终 **82 passed / 7 failed**、15/15 分片，原始回执/身份与失败汇总已独立核验，0 infrastructure errors。再次捕获 Linux native TC-WS-039 的 `ResizeObserver loop completed with undelivered notifications`。该轮标签栏 callback 已无同步测量；根分屏恢复后 editor/documentation 的宽度由 953.16/233.84px 继续变化至 1002.20/184.80px，嵌套分屏 callback 约耗时 13ms。不能把此前某轮没有复现当作修复完成。另六项 TC-WS-048 旧断言失败均保留；修正选择器及帧就绪的 [40598905018](https://github.com/engcapa/taomni/actions/runs/40598905018) 仍在执行。一次 browser-only 规划 40598145429 因完整 crash-regression 含 native-only 用例而正确拒绝，未执行用例；未关闭该门禁，后续均使用 browser/native。
+
+真实 `react-resizable-panels@4.12.4` 在自己的 observer callback 中读取尺寸、发布外部布局状态并同步调用 panel `onResize`。新增挂载回归在改前 5/5 失败，暴露交付期发布与回调机制；这证明了该机制，尚不等价于稳定复现原生完整错误。局部 pnpm patch 对该库的每个 group 合并通知，下一动画帧读取最新几何，卸载取消帧、移除 owner 并忽略迟到回调。未替换全局 observer、过滤运行时错误或改变布局约束。
+
+相邻真实拖动回归发现仅延期会使 release 时缓存的 panel 宽度滞后一帧，现于真实 pointer 开始/结束和键盘 resize 前刷新待处理通知，保留连续拖动和仅 release 保存最终 519px 的原断言。补丁同时覆盖 ESM/CJS，十二项真实依赖生命周期测试保护隐藏恢复、像素宽度、嵌套比例、通知合并、imperative collapse/expand/resize、立即键盘操作与清理；连同真实 CodeWorkspace/Git splitter、标签栏为 26/26，通过且无未处理异常。
+
+TC-WS-039 保留全部 148 步和 240 秒预算，新增八个真实矩形检查，要求初次打开与三次隐藏恢复后 Documentation 和两栏编辑器均有可用尺寸，共 156 步。它继续保护实际入口、dirty 草稿、三种 WebView、面板升级与完整运行时错误；其余八项 crash-regression 仍为强制回归。共享依赖消费者包括主导航、终端/SFTP、数据库、邮件、Git、文件浏览器和编辑器，托管相关集将包含这些实际入口，之后再跑精确 HEAD 全量与正式性能对照。额外四组主界面/数据库/邮件 owner 单测 96/96、TypeScript、refactor 与 QA audit gate 通过。现有本机 QA release 对应补丁前 source `309777cf…`，binary SHA `de3085ce708991753c03821b29a822f7cd4bc4afad40f9585ab3f05976ba608c`、编译 942.56 秒，不能用作本次补丁的验证证据；稳定提交后另编译匹配版本供手测。
+
 ## 标签栏观察器交付与隐藏恢复（2026-10-28，修复待托管复验）
 
 RDP 诊断提交 `84205ceb` 的 macOS 独立照片专项 [40588926870](https://github.com/engcapa/taomni/actions/runs/40588926870) 为 15/15，先运行客户端/服务端联通再运行照片的顺序专项 [40593176426](https://github.com/engcapa/taomni/actions/runs/40593176426) 为 16/16，均包含全部适用崩溃组并独立核验原始回执、构建身份和最终汇总。照片 FPS 比分别为 0.98925、1.05542；两轮未复现旧帧率差距，诊断提交没有修改编码算法，不能据此宣称旧 RDP 根因已修复。
