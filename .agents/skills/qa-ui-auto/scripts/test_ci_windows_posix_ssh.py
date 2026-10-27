@@ -3,9 +3,11 @@ import os
 from pathlib import Path
 import tempfile
 import json
+import re
 from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
+import yaml
 
 from ci_services import Services, install
 from ci_windows_posix_ssh import start
@@ -141,6 +143,22 @@ class PosixSshFixtureTest(TestCase):
 
 
 class PosixServiceOwnershipTest(TestCase):
+    def test_workflow_provisions_an_isolated_posix_only_shard(self):
+        root = Path(__file__).resolve().parents[4]
+        workflow = yaml.safe_load((root / ".github/workflows/qa-ui-auto-entry.yml").read_text())
+        step = next(step for job in workflow["jobs"].values() for step in job.get("steps", [])
+                    if step.get("name") == "Prepare local service packages")
+        self.assertEqual(step["env"]["QA_CAPABILITIES"], "${{ toJSON(matrix.capabilities) }}")
+        self.assertIn("ci_services.py install", step["run"])
+        for capabilities in ({"ssh_posix"}, {"ssh", "ssh_posix"}, {"release", "display"}):
+            for operation in ("run", "build"):
+                with self.subTest(capabilities=capabilities, operation=operation):
+                    condition = re.sub(r"contains\(matrix.capabilities, '([^']+)'\)",
+                                       lambda match: str(match[1] in capabilities), step["if"])
+                    condition = condition.replace("inputs.operation", repr(operation))
+                    condition = condition.replace("&&", " and ").replace("||", " or ")
+                    self.assertEqual(eval(condition, {"__builtins__": {}}), operation == "run")
+
     def test_install_shares_cygwin_package_setup_but_keeps_normal_windows_ssh(self):
         for capabilities in ({"ssh_posix"}, {"ssh", "ssh_posix", "ssh_features"}):
             with self.subTest(capabilities=capabilities), patch.dict(os.environ, GITHUB_ACTIONS="true"), \

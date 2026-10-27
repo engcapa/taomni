@@ -212,7 +212,9 @@ jobs:
         with:
           gradle-version: '9.1.0'
       - name: Prepare local service packages
-        if: (contains(matrix.capabilities, 'ssh') || contains(matrix.capabilities, 'mysql') || contains(matrix.capabilities, 'clickhouse') || contains(matrix.capabilities, 'ssh_features') || contains(matrix.capabilities, 'vnc') || contains(matrix.capabilities, 'xrdp')) && inputs.operation == 'run'
+        # The installer owns capability selection, including a POSIX-only SSH
+        # shard. Keep this entry free of a second, drifting service allowlist.
+        if: inputs.operation == 'run'
         env:
           QA_CAPABILITIES: ${{ toJSON(matrix.capabilities) }}
         run: python .agents/skills/qa-ui-auto/scripts/ci_services.py install

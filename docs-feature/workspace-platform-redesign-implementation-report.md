@@ -35,6 +35,8 @@ TC-WS-038 被动记录显示，恢复文件后原本为 0 的 Documentation 面�
 
 邮件挂载回归也先失败：加载旧页尚未返回时，前台同步已经发布新缓存快照，旧页被 sequence guard 丢弃后却返回普通空页；Load more 调用方据此把新快照的 hasMore 清为 false。缓存结果现在显式返回 applied，未采纳或失败的读取不再触发清空分页或补取旧目录。新测试继续点击至全部 120 封并要求最后正确结束分页；TC-MAIL-SYNC-01 仍要求原有 480 封服务器/界面完全相等。83 项相关前端测试、TypeScript 与 refactor 检查通过，本机未运行 browser/native。GitHub 完整崩溃组及相关复验尚待执行。
 
+同轮 Windows native 第 3 分片在启动服务前失败，6 条用例没有执行。实际分片只有 `ssh_posix`，而 reusable workflow 的 service-install 条件漏掉它；browser 同批还包含普通 `ssh`，所以此前 browser 通过不能证明该独立分片已准备好环境。新增契约执行 workflow 的原始条件，在 POSIX-only 情况先失败；现在所有 run 入口将完整 capabilities 交给已有安装器，由它决定实际依赖，不再复制第二份能力清单。30 项服务/所有权契约及 refactor 检查通过。该改动只修正 CI 编排，没有新增产品能力，沿用 TC-145 的真实 POSIX PTY 与开关 SFTP 断言；仍需托管独立分片复验。
+
 ## RDP 照片帧率诊断（2026-10-27，原因未确认）
 
 全量 macOS 的 baseline/adaptive 实际 marker 为 18.458/15.597 fps，比值 0.845009661；零 bulk 解码错误、每帧带宽比 1.019295685 不能抵消帧率失败。源动画在一秒区间内明显波动，draw max 达 118/130ms。RDP server、vendor encoder 与 rdp-probe 对当前已合并 main 无源码差异，但这不构成 UI 性能无退化的证据。
