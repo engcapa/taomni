@@ -1,6 +1,6 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前验收尚未完成。三平台相关集 [40560013232](https://github.com/engcapa/taomni/actions/runs/40560013232) 的 browser 93/93 已通过，native 仍在执行并已暴露隐藏面板 ResizeObserver 错误及新增撤销步骤的测试分组假设问题。Windows 选区丢失已根据真实 DOM 重挂载证据修复，修正版 TC-WS-054 与完整九项崩溃回归正在 [40565635547](https://github.com/engcapa/taomni/actions/runs/40565635547) 三平台复验；不能将执行中或定向结果记为全部通过。原全量 [40500343529](https://github.com/engcapa/taomni/actions/runs/40500343529) 的 2,100 passed / 3 failed 与全部慢样本保留，仍须新一轮全量。已 fetch main `65d6d907`（合并 PR #748），待相关修复通过后合并到当前分支。browser/native 只在 GitHub 执行，本机仅运行单测、编译与静态检查；功能全量通过后再做正式性能对照，目前没有“性能无退化”的结论。证据目录为 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 用例按用户认可的现有 policy 单独报告缺口。
+> 当前功能全量与性能验收尚未完成。当前源码 `7dbd1e88` 的三平台相关集 [40569868761](https://github.com/engcapa/taomni/actions/runs/40569868761) 已全部通过：48 个精确 ID、178/178 次适用执行、18/18 分片，0 failed / skipped / infrastructure errors，全部原始回执、源码/runner/case/原生构建身份及最终汇总已独立核验。包含整组九项崩溃回归、Windows 选区修复、分屏面包屑与保留行为。此前三平台崩溃组 42/42 和 Linux 面包屑专项 14/14 也已核验。接下来同步并合并最新 main，再执行完整目录；不能把相关集当作全量通过。旧相关集与旧全量的失败、慢样本全部保留。browser/native 只在 GitHub 执行，本机仅运行单测、编译与静态检查；功能全量通过后再做正式性能对照，目前没有“性能无退化”的结论。证据目录为 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 用例按用户认可的现有 policy 单独报告缺口。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
@@ -18,6 +18,14 @@
 Linux 真实 IME 专项 [40562614105](https://github.com/engcapa/taomni/actions/runs/40562614105) 的 2/2 原始回执与最终失败汇总已独立核验：13 passed / 2 failed，其中 TC-IDE-IMPROVE-008-ime-lifecycle-native 通过，失败为 TC-WS-038 的 observer 错误和 TC-WS-054 初版新增撤销假设，整轮仍保留 failure。另一诊断 [40564815021](https://github.com/engcapa/taomni/actions/runs/40564815021) 在现有被动 RO 记录中增加每个真实 callback 的同步 DOM 写入，不读布局、不写 DOM、不改变调度或吞错，等待区分具体几何变化 owner。
 
 本机仅重新编译供手工验证的 QA release：`src-tauri/target/qa-ui-auto/release/taomni`，独立 ID `com.taomni.app.qa`，source SHA `aa2151fdcbb86a35246c54e26bc003af4828c51cceedb2791e52dcbcf4f513ff`，binary SHA `bcad15b8cfbe9b71c9500669f887b01c9280d6e888b172c95fa30c46cf18f618`，耗时 1135.78 秒、build jobs 为 2。包含 CodeMirror 选区 patch；不包含本节新面包屑修复，后续源码稳定再编译。没有启动本机 browser/native 用例。
+
+三平台相关集 [40560013232](https://github.com/engcapa/taomni/actions/runs/40560013232) 最终收齐 18/18 分片并独立核验：173 passed / 5 failed，无 infrastructure errors；browser 93/93 全部通过，native 的失败为 Linux TC-WS-038/039 的 ResizeObserver 错误及三平台 TC-WS-054 初版撤销假设。不是全绿，旧回执和截图全部保留。诊断 [40564815021](https://github.com/engcapa/taomni/actions/runs/40564815021) 最终 13 passed / 1 failed，仅剩旧撤销断言；未复现 observer 错误，样本中各 callback 的同步 DOM 写入记录为 0，不能根据该轮无复现证明旧错误的唯一根因。
+
+修正版 TC-WS-054 和整组九项崩溃回归 [40565635547](https://github.com/engcapa/taomni/actions/runs/40565635547)，三平台 browser 各 6/6、native 各 8/8，总计 **42/42 passed**，6/6 分片、全部身份/原始回执与最终汇总已独立核验。Windows 四轮宽窄调整、长短文本替换、真实保存、独立单字符 undo/redo/undo 和冷启动完整通过；原生选区修复得到对应平台当前证据。
+
+面包屑修复提交 `7dbd1e88` 的 Linux [40566936305](https://github.com/engcapa/taomni/actions/runs/40566936305) 为 **browser 6/6、native 8/8**，2/2 回执及最终聚合独立核验，source SHA `1acd6425c4211b04f72f5c08865ebbf1e97f5c9e7e2b26e3537e35078f713171`。TC-WS-039 的全部原流程及新增八个分屏 variant 检查均通过；TC-WS-038 与 TC-WS-054 同轮也通过。三平台相关集 [40569868761](https://github.com/engcapa/taomni/actions/runs/40569868761) 最终为 **48 个精确 ID、178/178 passed**，18/18 分片，0 failed / skipped / infrastructure errors。Linux browser/native 为 31/31、31/31，Windows 为 31/31、27/27，macOS 为 31/31、27/27；全部原始回执、身份及最终聚合独立核验。九个崩溃专项、TC-WS-039 新增 variant 检查、TC-WS-054 四轮替换/保存/undo/redo/冷启动和所有选定保留行为均通过。旧偶发失败原件保留，未删除或过滤错误；当前相关验收完成，接下来同步 main 与全量验证。
+
+最新本机 QA release 对应 `7dbd1e88`，包含本节面包屑与 CodeMirror 选区修复：`src-tauri/target/qa-ui-auto/release/taomni`，ID `com.taomni.app.qa`，source SHA `1acd6425c4211b04f72f5c08865ebbf1e97f5c9e7e2b26e3537e35078f713171`，binary SHA `807af95b227a7e37b803ab6e9f5d174e3892a7cdf96b42d52193a61890bcb42f`。使用 Node 22、build jobs 2 编译，耗时 1111.15 秒；构建及 `native_build.py --release --check` 均为 exit 0、inputs match。仅供用户手工测试，未在本机启动 browser/native 用例。
 
 ## 邮件订阅与后台同步竞争（2026-10-27，定向托管复验通过）
 
