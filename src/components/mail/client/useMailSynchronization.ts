@@ -38,7 +38,7 @@ export interface UseMailSynchronizationContext {
   setHasMoreMessages: import("react").Dispatch<SetStateAction<boolean>>;
   subscribedOnlyRef: import("react").RefObject<boolean>;
   updateSelectedFolder: (next: string | ((prev: string) => string)) => void;
-  loadCachedMessages: (folder: string, offset?: number, append?: boolean, quiet?: boolean, limitOverride?: number) => Promise<{ page: MailMessageHeader[]; hasMore: boolean; }>;
+  loadCachedMessages: (folder: string, offset?: number, append?: boolean, quiet?: boolean, limitOverride?: number) => Promise<import("./types").MailCachePageResult>;
   warmRecentBodies: (foldersToWarm: MailFolder[], preferredFolder: string) => Promise<void>;
 }
 

@@ -99,4 +99,31 @@ export function registerMailCacheSynchronizationCases() {
     expect(screen.getByTestId("mail-message-count")).toHaveAttribute("data-count", "1");
     expect(screen.getByTestId("mail-message-row")).toHaveTextContent(message.subject);
   });
+
+  it("keeps Load older available when a superseded page finishes after a foreground refresh", async () => {
+    const headers = Array.from({ length: 120 }, (_, index) => ({ ...message, uid: 120 - index }));
+    const complete = { ...folder, total: 120, cachedCount: 120, syncComplete: true };
+    let finishOldPage!: (value: MailMessageHeader[]) => void;
+    mailMocks.mailListCachedFolders.mockResolvedValue([complete]);
+    mailMocks.mailListCachedMessages.mockImplementation(async (_account, _folder, limit, offset) => headers.slice(offset, offset + limit));
+    mailMocks.mailSyncAllFolders.mockResolvedValue({
+      accountId: info.sessionId, folders: [complete], fetchedMessages: 0,
+      newMessages: 0, cachedBodies: 0, syncedAt: 0,
+    });
+    renderMailbox();
+    await waitFor(() => expect(screen.getByTestId("mail-message-count")).toHaveAttribute("data-count", "50"));
+    mailMocks.mailListCachedMessages.mockImplementationOnce(() => new Promise((resolve) => { finishOldPage = resolve; }));
+    fireEvent.click(screen.getByTestId("mail-load-more"));
+    await waitFor(() => expect(finishOldPage).toBeDefined());
+    fireEvent.click(screen.getByTestId("mail-sync-button"));
+    await waitFor(() => expect(screen.getByTestId("mail-sync-button")).toBeEnabled());
+    await waitFor(() => expect(screen.getByTestId("mail-message-count")).toHaveAttribute("data-has-more", "true"));
+    await act(async () => finishOldPage(headers.slice(50, 101)));
+    expect(screen.getByTestId("mail-message-count")).toHaveAttribute("data-has-more", "true");
+    fireEvent.click(screen.getByTestId("mail-load-more"));
+    await waitFor(() => expect(screen.getByTestId("mail-message-count")).toHaveAttribute("data-count", "100"));
+    fireEvent.click(screen.getByTestId("mail-load-more"));
+    await waitFor(() => expect(screen.getByTestId("mail-message-count")).toHaveAttribute("data-count", "120"));
+    expect(screen.getByTestId("mail-message-count")).toHaveAttribute("data-has-more", "false");
+  });
 }

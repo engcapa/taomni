@@ -54,6 +54,13 @@ export interface BodyWarmState {
   folder?: string | null;
 }
 
+export interface MailCachePageResult {
+  page: MailMessageHeader[];
+  hasMore: boolean;
+  /** False when stale, hidden, removed or failed work did not own the list. */
+  applied: boolean;
+}
+
 
 export interface MailDraggableDialogProps {
   title: string;

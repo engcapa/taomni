@@ -89,7 +89,7 @@ export interface HandleMarkFolderReadContext {
   markMessagesReadLocally: (folder: string, uids: number[] | null, markedCount: number) => void;
   loadCachedFolders: () => Promise<void>;
   selectedFolderRef: import("react").RefObject<string>;
-  loadCachedMessages: (folder: string, offset?: number, append?: boolean, quiet?: boolean, limitOverride?: number) => Promise<{ page: MailMessageHeader[]; hasMore: boolean; }>;
+  loadCachedMessages: (folder: string, offset?: number, append?: boolean, quiet?: boolean, limitOverride?: number) => Promise<import("./types").MailCachePageResult>;
   messagesRef: import("react").RefObject<MailMessageHeader[]>;
   setStatus: import("react").Dispatch<SetStateAction<string | null>>;
 }

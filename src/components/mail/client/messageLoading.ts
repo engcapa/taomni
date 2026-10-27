@@ -71,7 +71,7 @@ export interface LoadCachedMessagesContext {
 }
 
 
-export function createLoadCachedMessages(controllerContext: LoadCachedMessagesContext): (folder: string, offset?: number, append?: boolean, quiet?: boolean, limitOverride?: number) => Promise<{ page: MailMessageHeader[]; hasMore: boolean; }> {
+export function createLoadCachedMessages(controllerContext: LoadCachedMessagesContext): (folder: string, offset?: number, append?: boolean, quiet?: boolean, limitOverride?: number) => Promise<import("./types").MailCachePageResult> {
   return async (
     folder: string,
     offset = 0,
@@ -81,7 +81,7 @@ export function createLoadCachedMessages(controllerContext: LoadCachedMessagesCo
   ) => {
     if (!controllerContext.visibleRef.current) {
       controllerContext.pendingCacheRefreshRef.current = true;
-      return { page: [] as MailMessageHeader[], hasMore: false };
+      return { page: [], hasMore: false, applied: false };
     }
     const sequence = ++controllerContext.cacheRequestSeqRef.current;
     const current = () => controllerContext.cacheRequestSeqRef.current === sequence;
@@ -98,13 +98,13 @@ export function createLoadCachedMessages(controllerContext: LoadCachedMessagesCo
       const cached = await mailListCachedMessages(controllerContext.info.sessionId, folder, limit + 1, offset);
       if (!controllerContext.visibleRef.current) {
         controllerContext.pendingCacheRefreshRef.current = true;
-        return { page: [] as MailMessageHeader[], hasMore: false };
+        return { page: [], hasMore: false, applied: false };
       }
       if (!current() || controllerContext.selectedFolderRef.current !== folder
         || (controllerContext.cacheRemovalVersionsRef.current.get(folder) ?? 0) !== removalVersion) {
         // A snapshot started before a successful move/delete can still contain
         // removed rows. Keep the current list until the next fresh query.
-        return { page: [] as MailMessageHeader[], hasMore: false };
+        return { page: [], hasMore: false, applied: false };
       }
       const page = cached.slice(0, limit);
       const loadedCount = offset + page.length;
@@ -124,10 +124,10 @@ export function createLoadCachedMessages(controllerContext: LoadCachedMessagesCo
             : page.length > 0 ? `Loaded ${page.length} cached messages` : "No cached messages",
         );
       }
-      return { page, hasMore };
+      return { page, hasMore, applied: true };
     } catch (e) {
       if (current()) controllerContext.setError(mailClientErrorMessage(e));
-      return { page: [] as MailMessageHeader[], hasMore: false };
+      return { page: [], hasMore: false, applied: false };
     } finally {
       // A newer snapshot owns the list and both loading indicators. A late
       // initial page must not replace post-sync rows or clear its loading state.
@@ -377,7 +377,7 @@ export interface LoadMoreMessagesContext {
   setMessages: (next: SetStateAction<MailMessageHeader[]>) => void;
   setHasMoreMessages: import("react").Dispatch<SetStateAction<boolean>>;
   setError: import("react").Dispatch<SetStateAction<string | null>>;
-  loadCachedMessages: (folder: string, offset?: number, append?: boolean, quiet?: boolean, limitOverride?: number) => Promise<{ page: MailMessageHeader[]; hasMore: boolean; }>;
+  loadCachedMessages: (folder: string, offset?: number, append?: boolean, quiet?: boolean, limitOverride?: number) => Promise<import("./types").MailCachePageResult>;
   foldersRef: import("react").RefObject<MailFolder[]>;
   syncInFlightRef: import("react").RefObject<boolean>;
   applySyncedFolder: (folder: MailFolder, readRevision: number) => void;
@@ -408,8 +408,10 @@ export function createLoadMoreMessages(controllerContext: LoadMoreMessagesContex
       return;
     }
     // Cache first; only when the cache is exhausted backfill older history.
-    const { page } = await controllerContext.loadCachedMessages(folder, loaded, true);
-    if (page.length > 0) return;
+    const { page, applied } = await controllerContext.loadCachedMessages(folder, loaded, true);
+    // A superseded page is not an empty current cache. Its caller must not
+    // clear a newer refresh's pagination or start backfill for an old folder.
+    if (!applied || page.length > 0) return;
     const meta = controllerContext.foldersRef.current.find((entry) => entry.name === folder);
     if (!meta || meta.syncComplete || controllerContext.syncInFlightRef.current) {
       if (meta?.syncComplete) controllerContext.setHasMoreMessages(false);

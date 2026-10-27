@@ -22,6 +22,10 @@ description: 'Regression for the "mail missing after the session was closed" iss
 
   server started by the mail_server fixture.
 
+
+  Paging during foreground catch-up must retain Load older after a newer cache refresh supersedes an in-flight page; an ignored page is not proof that the
+  cache is exhausted. The exact server/list equality remains mandatory.
+
   '
 covers:
 - F-MAIL-5

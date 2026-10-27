@@ -23,9 +23,17 @@
 
 TC-WS-054 再增至四轮连续宽/窄拖动及长/短替换，逐轮保留原有精确文本、磁盘 SHA 与运行时断言，仍使用原 300 秒预算。现有运行时检查点一并保存最近 64 条被动快捷键/焦点观察，使冷启动前的成功选区状态也保留；不增加快捷键与输入之间的 WebDriver 往返或等待。23 项服务及观察器契约通过，新增轮次尚待托管执行。
 
-本机 QA release 已重新编译供手工测试：`src-tauri/target/qa-ui-auto/release/taomni`，独立 ID `com.taomni.app.qa`，product source SHA `a34f0739513f8e4ef3d2d2a2d1079ffc0c9c294dc994ab292aa247b2589231b5`，binary SHA `4ae0c7d5ecc10d8b0cd9ef279ba06f1b300939683e3be74b915a81ad2697ab9f`。使用 Node 22、`CARGO_BUILD_JOBS=2` 检查 inputs match；构建后未在本机运行 browser/native。
+本机 QA release 已重新编译供手工测试：`src-tauri/target/qa-ui-auto/release/taomni`，独立 ID `com.taomni.app.qa`，product source SHA `8292ee82f5b0363b257a32379bbec731e867778bf25751b7fe211960d11efbee`，binary SHA `beda64eb25de7cea3f0c7ee5a85bbc7141a7363e1a1367aebe2954a07b4bec91`，包含面包屑 observer 生命周期修复。使用 Node 22、`CARGO_BUILD_JOBS=2` 编译，耗时 980.87 秒；完成后 `native_build.py --release --check` 确认 inputs match。构建后未在本机运行 browser/native。
 
 相关集 40525718246 已收齐 18/18 分片，108 passed / 3 failed：Linux TC-WS-038 与 macOS TC-WS-054 的 observer 错误，以及 Windows TC-WS-054 第一轮宽文本替换失败。Windows Ctrl+A 的 keyup 快照确认 DOM 已选择原 23 字符，但后续真实输入仍留下全部旧文本，原因尚未证明。进一步校正测试诊断：可信原生事件可在 capture 与 target listener 之间执行 microtask，旧 `after.prevented=false` 不能证明 CM 没有消费按键。改用零延迟只读任务记录最终事件状态，并同时读取当前固定 CM6 的 DOM 链接所指向的内部选区；不调用 focus/dispatch/flush，不修改选区或输入。每次 Ctrl+A 后保留至多 12 条初始输入选区快照，避免原始 128 条输入环形记录覆盖首字符证据。缺少 CM 链接明确记录 null；8 项诊断契约通过。当前产品面包屑修正的三平台相关集为 [40530554568](https://github.com/engcapa/taomni/actions/runs/40530554568)，尚在执行。
+
+## 隐藏布局与邮件分页的确定性回归（2026-10-28，托管复验待执行）
+
+三平台相关集 40530554568 的 Linux native 回执新增两项失败：TC-WS-038 恢复隐藏编辑器后的 ResizeObserver 错误，以及 TC-MAIL-SYNC-01 在服务器已有 480 封时停在 400 封并隐藏加载入口。保留原始回执和失败画面；当前整轮尚未结束，不能将已通过的分片当作最终结果。
+
+TC-WS-038 被动记录显示，恢复文件后原本为 0 的 Documentation 面板重新占用 313.16px。使用真实 react-resizable-panels 的挂载回归先失败：隐藏时完成 collapse，但首次获得非零尺寸时库重新应用固定的 20% 默认值，实际 flex-grow 17.581，面板内容仍隐藏。现在关闭侧栏的初始默认尺寸为 0，保持该 mount-time 值稳定；现有 ref 继续负责后续显式开关。TC-WS-038 增加对面板本身无可见布局框的双模式断言，保留全部草稿、终端、侧栏和运行时检查。它证明并修复隐藏布局缺陷，ResizeObserver 错误是否完全消除仍需托管原生证据。
+
+邮件挂载回归也先失败：加载旧页尚未返回时，前台同步已经发布新缓存快照，旧页被 sequence guard 丢弃后却返回普通空页；Load more 调用方据此把新快照的 hasMore 清为 false。缓存结果现在显式返回 applied，未采纳或失败的读取不再触发清空分页或补取旧目录。新测试继续点击至全部 120 封并要求最后正确结束分页；TC-MAIL-SYNC-01 仍要求原有 480 封服务器/界面完全相等。83 项相关前端测试、TypeScript 与 refactor 检查通过，本机未运行 browser/native。GitHub 完整崩溃组及相关复验尚待执行。
 
 ## RDP 照片帧率诊断（2026-10-27，原因未确认）
 
