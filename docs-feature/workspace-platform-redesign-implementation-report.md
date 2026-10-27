@@ -33,6 +33,8 @@ TC-WS-054 再增至四轮连续宽/窄拖动及长/短替换，逐轮保留原�
 
 新增两条真实 CodeMirror 挂载单测，验证全文选区跨异步引用高亮出现/消失与 Ctrl 释放仍保留，2/2 通过；它们是保留行为基线，没有复现 Windows 缺陷。仅 QA 诊断再增有界 DOM 前后端点/节点身份快照及独立 MutationObserver，不消费编辑器 observer、不读取布局、不改变 DOM/选区/调度；destroy 时断开，7 项相关工具契约通过。Windows 定向 [40550014363](https://github.com/engcapa/taomni/actions/runs/40550014363) 正在采集实际失败边界。
 
+挂载基线进一步覆盖真实鼠标悬停建立的超链接、原生选区绘制扩展，以及引用高亮原先存在/不存在两个状态；将 jsdom navigator 固定为 Chromium/Windows，以进入 CM 对应的 DOM 分支。3/3 通过，与已有 hyperlink 单测合计 9/9；该环境不模拟 WebView2 的原生事件调度，不提供原生修复结论。
+
 Linux [40547602802](https://github.com/engcapa/taomni/actions/runs/40547602802) 的完整适用崩溃组为 browser 6/6、native 8/8，2/2 回执及最终聚合独立核验通过。TC-WS-039 的既有失败没有复现；进一步将同一用例扩充为三次连续隐藏/恢复双栏与 Documentation，并在两个方向拖动侧栏，每轮保留双编辑器、草稿、侧栏状态和运行时断言。没有过滤错误或放宽断言，扩充部分仍待 GitHub 执行。
 
 [40532648901](https://github.com/engcapa/taomni/actions/runs/40532648901) 的 2/2 回执与最终汇总已独立验证：17 passed / 1 failed，唯一失败为 TC-WS-054。Ctrl+A keydown 7698.2ms 后，事件已被编辑器消费，DOM 与 CodeMirror 内部选区均为 0..23；keyup 7752.4ms 后两者已经折叠为 0，首字符 keydown 7814.9ms 前旧文档仍为 23 字符。因此全选已生效，但在输入前丢失；目前不能据此认定是焦点、保存或字符投递问题。
