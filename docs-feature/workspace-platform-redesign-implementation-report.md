@@ -55,6 +55,8 @@ TC-145 改为显式 `ssh_posix_required`、`ssh_posix` 配置和独立 `QA_POSIX
 
 相关集 [40525718246](https://github.com/engcapa/taomni/actions/runs/40525718246) 在 macOS release TC-WS-054 第 63 步重新捕获 ResizeObserver 错误；此前精确文本及磁盘 SHA 断言通过。错误快照中最后一条为重新创建的面包屑 observer 97，宽度 187.453125px；完整原始材料保留，不能将此前面包屑延期测量的定向通过视为问题已经解决。正在进一步检查内容更新与 observer 生命周期。
 
+进一步发现先前修复只延后了 resize 回调：`fullItems` 在编辑/保存后变化时，layout effect 仍同步测量并销毁、重建 observer。新增挂载回归在改前 2/2 失败：8 次编辑产生 9 个 observer，resize 同期内容变化仍触发同步测量。现将测量状态、单个 observer、合并帧及清理提取到 `useBreadcrumbCollapse`，首次/内容/resize 测量均在下一帧读取最新 DOM；不在 observer 交付中改变子节点，不吞掉运行时错误。面包屑、EditorGroup 和状态栏 38/38 通过；SSH fixture、选择、分片、执行、清理和证据工具共 88/88 通过。TC-WS-038 在 Linux native 也捕获同类错误，现打开其被动 observer 溯源，保留全部工作流及运行时断言。两例与完整崩溃组仍需新提交的托管验收，不能仅据单测宣称原生问题已修复。
+
 ## 全量 ResizeObserver 诊断（2026-10-27，进行中）
 
 定向 [40478838714](https://github.com/engcapa/taomni/actions/runs/40478838714) 的 14 个 ID、51 次执行全部通过，三平台 browser/native 原始 receipt、源码与二进制身份独立核验通过。包含九个崩溃专项、文件 watcher、MFA 备份、RDP 参考和真实 macOS ARD。随后同步远程 main，`git merge origin/main` 返回 Already up to date。

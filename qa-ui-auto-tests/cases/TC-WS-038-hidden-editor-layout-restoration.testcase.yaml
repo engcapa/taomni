@@ -1,7 +1,7 @@
 id: TC-WS-038
 title: Restore a workspace with a terminal selected and its editor hidden
-description: Create the saved layout through the UI, reload on Home, then return to a workspace whose file editor is mounted behind a terminal. Retain the
-  draft, terminal, navigator and tool controls.
+description: Create the saved layout through the UI, reload on Home, then return to a workspace whose file editor is mounted behind a terminal. Retain the draft,
+  terminal, navigator and tool controls.
 modes:
 - browser
 - native
@@ -22,6 +22,10 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-ws-hidden-editor
+- seed_storage:
+    key: taomni.qa.resizeTrace.v1
+    value: '1'
+- reload_window: null
 - click: '[data-testid="nav-mode-workspaces"]'
 - click: '[data-testid="workspace-open-session-plus"]'
 - click: '[data-testid="workspace-plus-add-folder"]'
@@ -99,134 +103,133 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A terminal-selected workspace with a hidden editor can be restored from Home without crashing. Its active terminal, collapsed sidebar and
-      dirty draft survive; expanded and collapsed navigator choices survive repeated mode switches, Project and Documentation still toggle, and only one
-      editor runtime is mounted. No uncaught exception, unhandled rejection, React boundary error or crash page is permitted before reload or after restoration.
+    requirement: A terminal-selected workspace with a hidden editor can be restored from Home without crashing. Its active terminal, collapsed sidebar and dirty draft
+      survive; expanded and collapsed navigator choices survive repeated mode switches, Project and Documentation still toggle, and only one editor runtime is mounted.
+      No uncaught exception, unhandled rejection, React boundary error or crash page is permitted before reload or after restoration.
     actions:
     - 1
     - 2
-    - 3
     - 5
-    - 6
     - 7
+    - 8
     - 9
-    - 10
+    - 11
     - 12
-    - 13
+    - 14
     - 15
-    - 16
+    - 17
     - 18
     - 20
-    - 23
+    - 22
     - 25
-    - 30
-    - 33
-    - 36
+    - 27
+    - 32
+    - 35
     - 38
-    - 41
-    - 42
+    - 40
     - 43
     - 44
-    - 49
-    - 51
-    - 52
-    - 53
-    - 57
-    checkpoints:
-    - step: 8
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
-    - step: 11
-      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
-    - step: 14
-      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-dirty=\"true\"]"}'
-    - step: 17
-      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
-    - step: 19
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 21
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 22
-      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
-    - step: 24
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 26
-      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
-    - step: 27
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "Local
-        Terminal"}}'
-    - step: 28
-      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 29
-      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
-    - step: 31
-      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-dirty=\"true\"] .cm-content"}'
-    - step: 32
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_HIDDEN_EDITOR_DRAFT"}}'
-    - step: 34
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
-    - step: 35
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
-    - step: 37
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
-    - step: 39
-      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
-    - step: 40
-      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
-    - step: 45
-      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
-    - step: 46
-      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
-    - step: 47
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
-    - step: 48
-      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
-    - step: 50
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 54
-      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
-    - step: 55
-      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 56
-      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
-    - step: 58
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_HIDDEN_EDITOR_DRAFT"}}'
-    - step: 59
-      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
-    results:
-    - 8
-    - 11
-    - 14
-    - 17
-    - 19
-    - 21
-    - 22
-    - 24
-    - 26
-    - 27
-    - 28
-    - 29
-    - 31
-    - 32
-    - 34
-    - 35
-    - 37
-    - 39
-    - 40
     - 45
     - 46
-    - 47
-    - 48
-    - 50
+    - 51
+    - 53
     - 54
     - 55
-    - 56
-    - 58
     - 59
+    checkpoints:
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
+    - step: 13
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
+    - step: 16
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-dirty=\"true\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 24
+      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 29
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "Local Terminal"}}'
+    - step: 30
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 31
+      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
+    - step: 33
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-dirty=\"true\"] .cm-content"}'
+    - step: 34
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_HIDDEN_EDITOR_DRAFT"}}'
+    - step: 36
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
+    - step: 37
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
+    - step: 39
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
+    - step: 41
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
+    - step: 42
+      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
+    - step: 47
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 48
+      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 49
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
+    - step: 50
+      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
+    - step: 52
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 56
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 57
+      expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 58
+      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
+    - step: 60
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_HIDDEN_EDITOR_DRAFT"}}'
+    - step: 61
+      expectation: No uncaught errors, unhandled rejections, React root error or app crash screen.
+    results:
+    - 10
+    - 13
+    - 16
+    - 19
+    - 21
+    - 23
+    - 24
+    - 26
+    - 28
+    - 29
+    - 30
+    - 31
+    - 33
+    - 34
+    - 36
+    - 37
+    - 39
+    - 41
+    - 42
+    - 47
+    - 48
+    - 49
+    - 50
+    - 52
+    - 56
+    - 57
+    - 58
+    - 60
+    - 61
   native:
   - check: Restore the hidden editor behind the active terminal in the packaged WebView.
     method: automated
-    reason: The reported desktop crash depends on mounting and resizing invisible panels. Browser geometry cannot certify packaged WebView behavior; real
-      PTY commands remain covered by TC-WS-015 and TC-WS-024.
+    reason: The reported desktop crash depends on mounting and resizing invisible panels. Browser geometry cannot certify packaged WebView behavior; real PTY commands
+      remain covered by TC-WS-015 and TC-WS-024.
   visual:
   - check: Restored file, terminal and compact navigator remain usable.
     method: manual
