@@ -5,8 +5,9 @@ them on reload. Keep diagnostics independent from product code and UI state.
 """
 
 from native_resize_observer import RESIZE_OBSERVER_HOOK_SCRIPT
+from native_editor_selection import EDITOR_SELECTION_HOOK_SCRIPT
 
-CONSOLE_HOOK_SCRIPT = RESIZE_OBSERVER_HOOK_SCRIPT + r"""
+CONSOLE_HOOK_SCRIPT = RESIZE_OBSERVER_HOOK_SCRIPT + EDITOR_SELECTION_HOOK_SCRIPT + r"""
 if (!window.__QA_UI_AUTO_CONSOLE__) {
   window.__QA_UI_AUTO_CONSOLE__ = [];
   // Keep focus transitions without recording typed text or values.
@@ -62,7 +63,9 @@ if (!window.__QA_UI_AUTO_CONSOLE__) {
       if (type === 'keydown' && event.code === 'KeyA' && (event.ctrlKey || event.metaKey)
           && event.target?.closest?.('.cm-content')) {
         observation.followingInput = [];
+        observation.selectionChanges = [];
         selectionProbe = {editor: event.target.closest('.cm-content'), observation};
+        window.__QA_UI_AUTO_WATCH_SELECTION__?.(selectionProbe.editor, observation);
       }
       // Observe the completed shortcut, including handlers that stop event
       // propagation. Trusted events can checkpoint microtasks between capture
@@ -104,6 +107,14 @@ if (!window.__QA_UI_AUTO_CONSOLE__) {
         });
       }
       const selection = document.getSelection();
+      if (type === 'selectionchange' && selectionProbe?.editor === editor
+          && selectionProbe.observation.selectionChanges.length < 12) {
+        selectionProbe.observation.selectionChanges.push({
+          time: performance.now(), collapsed: selection?.isCollapsed ?? null,
+          anchorOffset: selection?.anchorOffset ?? null, focusOffset: selection?.focusOffset ?? null,
+          codeMirror: editorSelection(editor)
+        });
+      }
       const describeEndpoint = (node, offset) => {
         if (!node || !editor.contains(node)) return null;
         const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;

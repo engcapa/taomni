@@ -27,7 +27,13 @@ TC-WS-054 再增至四轮连续宽/窄拖动及长/短替换，逐轮保留原�
 
 相关集 40525718246 已收齐 18/18 分片，108 passed / 3 failed：Linux TC-WS-038 与 macOS TC-WS-054 的 observer 错误，以及 Windows TC-WS-054 第一轮宽文本替换失败。Windows Ctrl+A 的 keyup 快照确认 DOM 已选择原 23 字符，但后续真实输入仍留下全部旧文本，原因尚未证明。进一步校正测试诊断：可信原生事件可在 capture 与 target listener 之间执行 microtask，旧 `after.prevented=false` 不能证明 CM 没有消费按键。改用零延迟只读任务记录最终事件状态，并同时读取当前固定 CM6 的 DOM 链接所指向的内部选区；不调用 focus/dispatch/flush，不修改选区或输入。每次 Ctrl+A 后保留至多 12 条初始输入选区快照，避免原始 128 条输入环形记录覆盖首字符证据。缺少 CM 链接明确记录 null；8 项诊断契约通过。当前产品面包屑修正的三平台相关集为 [40530554568](https://github.com/engcapa/taomni/actions/runs/40530554568)，尚在执行。
 
-## 隐藏布局与邮件分页的确定性回归（2026-10-28，托管复验待执行）
+## Windows 原生选区诊断（2026-10-28，未解决）
+
+[40532648901](https://github.com/engcapa/taomni/actions/runs/40532648901) 的 2/2 回执与最终汇总已独立验证：17 passed / 1 failed，唯一失败为 TC-WS-054。Ctrl+A keydown 7698.2ms 后，事件已被编辑器消费，DOM 与 CodeMirror 内部选区均为 0..23；keyup 7752.4ms 后两者已经折叠为 0，首字符 keydown 7814.9ms 前旧文档仍为 23 字符。因此全选已生效，但在输入前丢失；目前不能据此认定是焦点、保存或字符投递问题。
+
+增加仅在该用例已启用诊断时工作的有界事务观察：透传实际 EditorView.update 的原始参数、返回值和异常，记录全选至首字符间的选区变化与调用栈，同时保留 selectionchange 快照。不派发事务、不 flush、不 focus、不重放或延迟输入；三个诊断契约测试及 refactor 检查通过。现有精确内容、磁盘哈希和完整崩溃组继续执行，诊断本身不计为修复或新的产品用例。
+
+## 隐藏布局与邮件分页的确定性回归（2026-10-28，托管复验进行中）
 
 三平台相关集 40530554568 的 Linux native 回执新增两项失败：TC-WS-038 恢复隐藏编辑器后的 ResizeObserver 错误，以及 TC-MAIL-SYNC-01 在服务器已有 480 封时停在 400 封并隐藏加载入口。保留原始回执和失败画面；当前整轮尚未结束，不能将已通过的分片当作最终结果。
 
