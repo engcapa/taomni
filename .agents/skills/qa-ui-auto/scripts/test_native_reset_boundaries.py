@@ -32,6 +32,7 @@ class NativeResetBoundariesTest(unittest.TestCase):
             "taomni.codeWorkspace.lspJavaSettings.v1": "previous language settings",
             "taomni.recentWorkspaces.v1": "previous project",
             "taomni.newFeature.preference": "previous unknown preference",
+            "taomni.qa.resizeTrace.v1": "1",
             "unrelated.website.preference": "preserved",
         }
         retained = {key: value for key, value in previous_case.items()

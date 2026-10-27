@@ -33,7 +33,7 @@ steps:
       [], "activeTabId": ""}, {"id": "second-workspace", "name": "Second Workspace", "description": "", "isDefault": false, "rootFolders": [], "pinnedSessionIds":
       [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId": ""}]}'
 - seed_storage:
-    key: qa.ui.resizeTrace.v1
+    key: taomni.qa.resizeTrace.v1
     value: '1'
 - reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'

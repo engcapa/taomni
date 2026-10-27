@@ -7,7 +7,7 @@ The document owns the wrapper and bounded, DOM-reference-free observations.
 RESIZE_OBSERVER_HOOK_SCRIPT = r"""
 (() => {
   let enabled = false;
-  try { enabled = localStorage.getItem('qa.ui.resizeTrace.v1') === '1'; } catch (_) {}
+  try { enabled = localStorage.getItem('taomni.qa.resizeTrace.v1') === '1'; } catch (_) {}
   if (!enabled || window.__QA_UI_AUTO_RESIZE_TRACE__ || typeof ResizeObserver !== 'function') return;
   const NativeObserver = window.ResizeObserver;
   const trace = { created: 0, samples: [] };

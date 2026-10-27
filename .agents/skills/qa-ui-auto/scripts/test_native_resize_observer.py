@@ -25,7 +25,10 @@ class OriginalObserver {
 function environment(enabled) {
   const sandbox = {
     ResizeObserver: OriginalObserver,
-    localStorage: { getItem: () => enabled ? '1' : null },
+    localStorage: { getItem: key => {
+      assert.equal(key, 'taomni.qa.resizeTrace.v1');
+      return enabled ? '1' : null;
+    } },
     performance: { now: () => 17 },
   };
   sandbox.window = sandbox;

@@ -21,6 +21,8 @@
 
 新增 Breadcrumbs.resize 单测在改前 2/2 失败（同步测量/没有可取消帧），改后连同原 Breadcrumbs、真实 host canvas、编辑器生命周期和状态栏为 42/42 通过，`pnpm check:refactor` 通过。本次修复不改变用户工作流，用前一提交已扩充的 TC-WS-054 及完整 crash-regression 保护原生边界，不另造重复入口用例。
 
+复核诊断隔离时发现开关原键未进入 `taomni.*` 自动清理范围，改为 `taomni.qa.resizeTrace.v1`，并用实际 renderer reset 契约确认下一用例会删除它。40494718371 在规划后、用例尚未执行时取消，按修正后的工具重新回归；该取消不能计为通过。产品源码不变，本机 QA release 编译继续进行，未运行本机 UI 用例。
+
 ## QA release 布局崩溃与专项回归（2026-10-27，验证中）
 
 `useWorkspaceHostCanvas` 保存了 Zustand 的旧状态快照，Unsplit/Split 后仍从旧树读取 leaf。直接四文件 Grid 访问不存在的 `pair[1].id`，与用户 `App-DRawYxY8.js` 的错误和组件堆栈一致；从已有 Split 切换还会使用已删除的 leaf ID，四文件只显示 3 个面板。现在每个依赖前一次操作结果的读取都从当前 store 取状态，再恢复实际活动文件对应的 group。
