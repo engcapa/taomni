@@ -53,8 +53,10 @@ export function MailArchivePanel({ info }: { info: MailTabInfo }) {
   return <div className="flex flex-wrap items-center gap-2 px-2 py-1 text-xs border-b border-[var(--taomni-divider)]">
     <button data-testid="mail-archive-open" className="taomni-btn" onClick={() => setOpen(true)}>Local archive</button>
     {progress}
-    {running ? <button data-testid="mail-storage-pause" className="taomni-btn" disabled={busy || status?.phase === "pausing"} onClick={() => void action(async () => { await mailArchivePause(info.sessionId); await refresh(); })}>Pause</button>
-      : <button data-testid="mail-storage-resume" className="taomni-btn" disabled={busy} onClick={() => void action(async () => { await mailArchiveStart(info, true); await refresh(); })}>{status?.phase === "failed" ? "Retry" : "Resume / scan"}</button>}
+    {/* A poll can switch actions during a press; keep their DOM identities
+        separate so releasing Resume cannot invoke the new Pause handler. */}
+    {running ? <button key="pause" data-testid="mail-storage-pause" className="taomni-btn" disabled={busy || status?.phase === "pausing"} onClick={() => void action(async () => { await mailArchivePause(info.sessionId); await refresh(); })}>Pause</button>
+      : <button key="resume" data-testid="mail-storage-resume" className="taomni-btn" disabled={busy} onClick={() => void action(async () => { await mailArchiveStart(info, true); await refresh(); })}>{status?.phase === "failed" ? "Retry" : "Resume / scan"}</button>}
     {status?.error && <span role="alert">{status.error}</span>}
     {!open && error && <span role="alert">{error}</span>}
     {open && <MailArchiveDialog key={info.sessionId} accountId={info.sessionId} onClose={() => setOpen(false)} onChanged={refresh} />}

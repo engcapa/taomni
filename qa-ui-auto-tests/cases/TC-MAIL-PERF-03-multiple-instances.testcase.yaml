@@ -4,6 +4,7 @@ description: Two QA binaries use separate disposable profiles and one shared acc
   PTY response samples after a real resumed chunk becomes active, migration with an already-open connection in another process, and physical cleanup without redownload. No personal
   profile is accessed. Native concurrency is intentional for this case; both drivers and profiles remain run-owned. Auto-started scans are observed as active instead of clicking a
   Resume button that has already become Pause; ownership and byte-exact continuation assertions remain mandatory.
+  Polling must not turn a pressed Resume control into Pause; separate action identities are also covered by the mounted control regression tests.
 covers:
 - F-MAIL-23
 - F2.1

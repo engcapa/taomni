@@ -7328,7 +7328,7 @@ controls:
 - IMAP 全部/仅选中/排除文件夹均保留其它文件夹的摘要。后台暂停保留可续传片段，普通删除/远端消失保留归档，主动清理才物理删除最后引用。
 - 本地归档独立于实时邮件列表，可以读取/导出服务器已消失的邮件。POP3 原始本地库保持兼容并保留压缩归档。
 - 文件夹候选只来自当前账号的本地同步缓存，离线仍可用；首次连接前为空并显示提示。复选框显示解码名称，保存完整的服务器原始键；切换账号丢弃旧候选和迟到回复。
-- `TC-MAIL-STORAGE-01` 为 browser；`TC-MAIL-STORAGE-02` 为 Linux/Windows/macOS native，分别验证 UI 和独立磁盘/备份字节。`TC-MAIL-PERF-01/02` 覆盖大量邮件、多个会话和终端并发；`TC-MAIL-PERF-03` 用两个真实 QA 进程共享邮箱目录，检查下载互斥、暂停、迁移和清理。用户已授权 Linux 本机执行，Windows/macOS 本轮只编写；具体运行证据及未验证边界见 `docs-feature/mail-complete-storage-design.md`。
+- `TC-MAIL-STORAGE-01` 为 browser；`TC-MAIL-STORAGE-02` 为 Linux/Windows/macOS native，分别验证 UI 和独立磁盘/备份字节。`TC-MAIL-PERF-01/02` 覆盖大量邮件、多个会话和终端并发；`TC-MAIL-PERF-03` 用两个真实 QA 进程共享邮箱目录，检查下载互斥、暂停、迁移和清理。 Pause/Resume 在轮询切换时使用独立控件身份，避免按下与释放之间改变动作；对应组件回归检查与原生下载场景共同保护。用户已授权 Linux 本机执行，Windows/macOS 本轮只编写；具体运行证据及未验证边界见 `docs-feature/mail-complete-storage-design.md`。
 
 
 ## 14. SocksCap 网络流量路由

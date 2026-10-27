@@ -286,6 +286,10 @@ steps:
 - screenshot: mail-storage-decoded-folders.png
 - click: '[data-testid="session-cancel"]'
 - assert_not_visible: '[data-testid="session-editor"]'
+- assert_visible: '[data-testid="mail-storage-resume"]'
+- assert_count:
+    selector: '[data-testid="mail-storage-pause"]'
+    equal: 0
 verification:
   review: reviewed
   requirements:
@@ -488,6 +492,18 @@ verification:
     - 121
     - 123
     - 128
+  - id: R5
+    requirement: Returning from settings retains Resume for the completed archive; polling during a press is also covered by mounted tests.
+    actions:
+    - 127
+    results:
+    - 129
+    - 130
+    checkpoints:
+    - step: 129
+      expectation: The completed archive has a usable Resume action.
+    - step: 130
+      expectation: The opposite Pause action is absent.
   visual:
   - check: Storage settings, progress and archive list remain readable without clipping.
     method: manual
