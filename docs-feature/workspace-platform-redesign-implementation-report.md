@@ -1,6 +1,6 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前验收尚未完成。最新工具栏实现已在本机观察到 51 条 browser 与 26 条适用 native 全部通过；机器重启后，本地 `qa-ui-auto-report` 目录下旧报告和临时工具已不在，尚未完成独立回执核验，因此这些结果不能作为现行可复核证据。正在重建隔离环境并补跑验收。旧提交的托管相关集 [40432446710](https://github.com/engcapa/taomni/actions/runs/40432446710) 为 2,076 次执行全部通过，但不包含最新工具栏调整。本轮相关集全部通过后仍须拉取合并 main、复测并执行整体用例；功能完成后再做正式性能对照，目前没有“性能无退化”的结论。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
+> 当前验收尚未完成。最新工具栏实现 `97c37487` 在本机重建隔离环境后，**51/51 browser、26/26 native 通过**，原始回执及 source/runner/case/native build 身份已独立核验。用户确认重启前后手工清理了 repo 的 `qa-ui-auto-report`，新证据存于 repo 外的 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/verified-local.json`，原环境失败保留。旧提交的托管相关集 [40432446710](https://github.com/engcapa/taomni/actions/runs/40432446710) 为 2,076 次执行全部通过，但不包含最新工具栏调整。本轮相关集全部通过后仍须重新拉取合并 main、复测并执行整体用例；功能完成后再做正式性能对照，目前没有“性能无退化”的结论。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
@@ -13,11 +13,21 @@ Sessions 的既有分类、目录与搜索过滤统一从漏斗按钮打开。Wo
 
 广播、单屏/分屏/网格、底栏及活动会话的 SFTP、分离、RDP/VNC 控制统一放入最右侧操作菜单。上下文 action slot 关闭时保持挂载，避免改变活跃运行实例的生命周期。全局搜索、大预览和右侧栏控制保持直接可达。所有主视图移除标题栏语音；Chat 听写与 Settings 配置继续保留，既有语音安装、下载恢复、提供商、草稿、取消和原文撤销用例迁移到这些真实入口。共享 Chat 按钮同时遵循关闭 AI 的设置。
 
-新增 browser `TC-WS-050` 覆盖分类/搜索组合、空结果、过滤清除、工作区隔离、鼠标/键盘选择、窄窗口及未保存草稿；新增 native `TC-WS-051` 检查真实文件读取、同一 PTY 在过滤前后的独立输出、分屏恢复及保存后的磁盘 SHA-256。58 条既有用例迁移菜单导航并同步其验证步骤编号，保留原有业务断言。54 项前端单测、3 项测试服务隔离契约和静态覆盖门禁通过；最终 E2E 回执仍在收集。
+新增 browser `TC-WS-050` 覆盖分类/搜索组合、空结果、过滤清除、工作区隔离、鼠标/键盘选择、窄窗口及未保存草稿；新增 native `TC-WS-051` 检查真实文件读取、同一 PTY 在过滤前后的独立输出、分屏恢复及保存后的磁盘 SHA-256。58 条既有用例迁移菜单导航并同步其验证步骤编号，保留原有业务断言。54 项前端单测、3 项测试服务隔离契约和静态覆盖门禁通过。本机 E2E 回执已独立核验；三平台结果待本轮 hosted 运行确认。
 
 本机两个 browser worker 同时使用共享 VNC 测试服务时，后一个用例的 reset 会断开前一个用例，原始 RFB 日志已确认该原因。测试调度现在只对同一 VNC 服务加跨进程互斥，等待发生在用例计时前，并在整个用例和清理结束后释放；其他用例维持原有并发。进程崩溃由系统释放锁，失败结果及原有 deadline 保留。三平台 browser 的 VNC 分片同时执行该隔离契约，Windows/macOS 结果待本轮 hosted 运行确认。
 
 已按 ZIP 成员大小与 CRC 完整核对解压副本，清理 581 个重复旧下载包，回收约 2.37 GiB；解压的成功、失败及签名回执全部保留，当前仍运行的托管任务目录未清理。
+
+## 重启后本机复验（2026-10-27）
+
+用户手工清理 repo 的临时报告后，测试服务和本地依赖重新建立在 repo 外，未使用个人 app profile。无需 sudo/apt 安装，缺少的工具通过 `apt-get download` 与私有目录解包恢复。当前挂载点占用 78%，可用约 55 GiB。本机 UI worker 总数始终不超过 2，native 顺序执行。
+
+当前源码指纹 `6ba51f1f9c576adf00148bf3a99036233a5409e4074adcb6f63e929f60161548`，runner 指纹 `e001df07a04a12f4399fbb8fb115bda1bf878f597ea9c70904907d9761562dc2`。最新 QA 二进制为 `src-tauri/target/qa-ui-auto/debug/taomni`，在产品提交后重新构建，TypeScript 与重构边界检查通过；54 项相关前端单测再次通过。
+
+新证据根目录 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`：browser **51/51 passed**；native 的 VNC **2/2**、主批 **19/20**、真实 SSH/Kerberos/SCP **4/4**，最后单独复跑 `TC-RDPJ-02` **1/1**，合计最新适用 native **26/26 passed**。主批唯一失败是缺少 `xclip`，原失败保留；恢复该工具后使用同一源码和断言复跑通过，未修改汇总掩盖失败。初始私有 Secret Service 尚未就绪的环境诊断也保留。
+
+`verified-local.json` 读取每份原始 summary 与签名 receipt，检查当前 source/runner、逐 case 摘要、native QA ID/构建身份以及最新结果优先。报告和配置均在 repo 外，核验时明确传入每份报告记录的原始配置，不关闭身份校验。全部 51 个 browser 和 26 个 native ID 均有 current passing evidence，无 rejected receipts。随后启动三平台完整相关范围（636 个适用 ID），不将旧提交托管通过视为本轮通过。
 
 ## 所有主视图统一顶部拖动（2026-10-27）
 
@@ -173,7 +183,7 @@ Browser 曾实际复现首次添加目录的 `Maximum update depth exceeded`：�
 
 ## 性能审查与实测
 
-在全量回执独立核验通过后进行。main 与候选版本在独立桌面、相同工具链和构建输入下交错采样；原始结果位于 `qa-ui-auto-report/workspace-performance/`，方法、构建条件及失败诊断保留于 `_local/workspace-perf-plan.json`、`workspace-perf-conditions.json`。最终对照结果将在本节补全。
+正式性能验收在本轮全量功能回执独立核验通过后进行。main 与候选版本须在独立桌面、相同工具链、数据集和构建条件下交错采样。此前临时诊断材料随用户清理 repo 的临时目录删除，且从未形成有效的性能对照结论；不能据此宣称无退化。新测量及原始样本将保存到 repo 外的证据目录，本节届时补全。
 
 ## 历史实现与修复记录
 
