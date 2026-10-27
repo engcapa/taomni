@@ -1,7 +1,8 @@
 id: TC-WS-048
 title: Compact local launcher and workspace overflow navigation retain active tabs and window drag space
-description: Creates twelve UI-owned workspace local terminal tabs. Verifies compact Sessions launch controls, reachable plus/menu, bidirectional overflow, Home/End
-  activation and active visibility without closing tabs. Physical window movement is covered by TC-MAIN-RAIL-03.
+description: Creates twelve UI-owned workspace local terminal tabs. Verifies compact Sessions launch controls, reachable plus/menu, bidirectional overflow,
+  Home/End activation and active visibility without closing tabs. Physical window movement is covered by TC-MAIN-RAIL-03. Return through Home and Sessions
+  with all twelve tabs open; the restored active tab stays visible and both scroll controls still work without runtime errors.
 modes:
 - browser
 - native
@@ -110,13 +111,38 @@ steps:
     selector: '[data-testid="workspace-tab"]'
     equal: 12
 - assert_no_runtime_errors: null
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-session-pane"]'
+- assert_disabled: '[data-testid="workspace-tab-scroll-right"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab"][data-active'+String.fromCharCode(61)+'"true"]').getBoundingClientRect().left
+      >= document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').getBoundingClientRect().left - 1
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab"][data-active'+String.fromCharCode(61)+'"true"]').getBoundingClientRect().right
+      <= document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').getBoundingClientRect().right + 1
+    expect_truthy: true
+- click: '[data-testid="workspace-tab-scroll-left"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').scrollLeft < document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').scrollWidth
+      - document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').clientWidth - 10
+    expect_truthy: true
+- click: '[data-testid="workspace-tab-scroll-right"]'
+- assert_count:
+    selector: '[data-testid="workspace-tab"]'
+    equal: 12
+- assert_no_runtime_errors: null
 - screenshot: workspace-tab-overflow-and-drag.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Sessions plus and shell dropdown stay adjacent and functional; workspace many-tab scrolling, keyboard activation, visible active tabs, creation menu
-      and both drag regions remain usable without losing terminals.
+    requirement: Sessions plus and shell dropdown stay adjacent and functional; workspace many-tab scrolling, keyboard activation, visible active tabs,
+      creation menu and both drag regions remain usable without losing terminals.
     actions:
     - 1
     - 2
@@ -257,11 +283,56 @@ verification:
       expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 12}}'
     - step: 65
       expectation: '{"assert_no_runtime_errors": null}'
+  - id: R2
+    requirement: A many-tab strip recovers from hidden Home/Sessions navigation with the active tab fully visible, all twelve terminals retained and working
+      bidirectional overflow controls, without observer or other runtime errors.
+    actions:
+    - 66
+    - 68
+    - 70
+    - 75
+    - 77
+    checkpoints:
+    - step: 67
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 69
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 71
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 72
+      expectation: '{"assert_disabled": "[data-testid=\"workspace-tab-scroll-right\"]"}'
+    - step: 73
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab\"][data-active''+String.fromCharCode(61)+''\"true\"]'').getBoundingClientRect().left
+        >= document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').getBoundingClientRect().left - 1", "expect_truthy":
+        true}}'
+    - step: 74
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab\"][data-active''+String.fromCharCode(61)+''\"true\"]'').getBoundingClientRect().right
+        <= document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').getBoundingClientRect().right + 1", "expect_truthy":
+        true}}'
+    - step: 76
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').scrollLeft
+        < document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').scrollWidth - document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').clientWidth
+        - 10", "expect_truthy": true}}'
+    - step: 78
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 12}}'
+    - step: 79
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 67
+    - 69
+    - 71
+    - 72
+    - 73
+    - 74
+    - 76
+    - 78
+    - 79
   visual:
   - check: Review arrow visibility, compact launch split and useful title-bar drag space.
     method: manual
     reason: Functional geometry is automated; retained screenshots support visual review.
   native:
-  - check: Twelve independent terminal tabs remain operable in the native WebView; real PTY readiness and OS window movement are separately tested by TC-MAIN-RAIL-03 and TC-WS-015.
+  - check: Twelve independent terminal tabs remain operable in the native WebView; real PTY readiness and OS window movement are separately tested by TC-MAIN-RAIL-03
+      and TC-WS-015.
     method: automated
     reason: Browser uses stubs; native case uses actual PTYs.

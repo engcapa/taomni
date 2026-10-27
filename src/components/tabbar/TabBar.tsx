@@ -18,6 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useElementResizeFrame } from "../../hooks/useElementResizeFrame";
 import { writeText } from "../../lib/clipboard";
 import { startCustomDrag } from "../../lib/customDnD";
 import { useT } from "../../lib/i18n";
@@ -185,22 +186,7 @@ export function TabBar({
     };
   }, []);
 
-  useEffect(() => {
-    const el = tabScrollRef.current;
-    if (!el) return;
-    updateTabScrollState();
-
-    const resizeObserver =
-      typeof ResizeObserver === "undefined"
-        ? null
-        : new ResizeObserver(() => updateTabScrollState());
-    resizeObserver?.observe(el);
-    window.addEventListener("resize", updateTabScrollState);
-    return () => {
-      resizeObserver?.disconnect();
-      window.removeEventListener("resize", updateTabScrollState);
-    };
-  }, [updateTabScrollState]);
+  useElementResizeFrame(tabScrollRef, updateTabScrollState);
 
   useEffect(() => {
     const container = tabScrollRef.current;

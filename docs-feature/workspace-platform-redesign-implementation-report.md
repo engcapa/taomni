@@ -7,6 +7,14 @@
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
 
+## 标签栏观察器交付与隐藏恢复（2026-10-28，修复待托管复验）
+
+RDP 诊断提交 `84205ceb` 的 macOS 独立照片专项 [40588926870](https://github.com/engcapa/taomni/actions/runs/40588926870) 为 15/15，先运行客户端/服务端联通再运行照片的顺序专项 [40593176426](https://github.com/engcapa/taomni/actions/runs/40593176426) 为 16/16，均包含全部适用崩溃组并独立核验原始回执、构建身份和最终汇总。照片 FPS 比分别为 0.98925、1.05542；两轮未复现旧帧率差距，诊断提交没有修改编码算法，不能据此宣称旧 RDP 根因已修复。
+
+同 SHA 的 Linux/Windows 相关集 [40590358570](https://github.com/engcapa/taomni/actions/runs/40590358570) 最终 35 passed / 2 failed、10/10 分片，原始回执和最终失败聚合已独立核验，无基础设施错误；再次捕获 Linux native TC-WS-038/039 的 ResizeObserver 错误，保留为失败。被动记录中同步 DOM 写入为 0，但编辑器标签栏在 observer 交付中同步读取布局，单个 callback 曾耗时约 24ms，同一轮嵌套面板宽度继续变化。Workspace 标签栏还在活动标签变更时重建 observer，并在交付中测量及滚动。新增两类标签栏的六项挂载回归在改前 6/6 失败，覆盖交付时无测量/滚动、合并连续通知、隐藏后显示活动标签、使用最新宽度/活动项，以及卸载取消和晚到通知。
+
+将这些测量的帧、observer、最新回调、实际 DOM owner 和清理统一到 `useElementResizeFrame`。工作区和编辑器标签栏的内容/激活/resize 测量在下一动画帧合并执行，隐藏的零宽容器保留既有滚动状态；同一 DOM 的活动项变化不重建 observer。Sessions 标签栏复用相同 resize 边界。没有全局替换 ResizeObserver、吞掉错误或改变阈值；该修复消除已确认的交付期同步测量机制，原生错误是否全部解决仍以新托管结果为准。新增回归、现有标签栏、EditorGroup、真实面板库及面包屑共 43/43 单测通过。TC-WS-048 保留原 65 步断言，补充 Home/Sessions 隐藏恢复后十二标签保留、活动项完整可见、左右滚动和运行时健康，仍为 300 秒预算。
+
 ## main 合并与全量结果（2026-10-28，尚有一项失败）
 
 相关集 40569868761 的 178/178 通过且完成独立核验后，重新 `git fetch origin main`，远程 main 为 `65d6d907efdf291478e660dc1ada96a12a41b8ad`；无冲突合并并推送 `efd6c4edec2c2309cf545fa9ff1feda99bdc6ab1`。main 只增加已包含父提交的合并节点，合并前后工作树文件内容无差异，产品 source SHA 仍为 `1acd6425c4211b04f72f5c08865ebbf1e97f5c9e7e2b26e3537e35078f713171`，现有本机 QA release 与该内容匹配。没有用源码无变化代替用户要求的复测。
