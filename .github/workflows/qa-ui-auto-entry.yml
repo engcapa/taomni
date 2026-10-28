@@ -331,7 +331,7 @@ jobs:
           python -m unittest -v test_backup_journal test_backup_journal_windows 2>&1 | tee qa-build-output/backup-reader-contracts.log
       - name: Windows file observation contracts
         if: runner.os == 'Windows' && inputs.operation == 'build'
-        run: python -m unittest -v test_host_file_observation 2>&1 | tee qa-build-output/file-observation-contracts.log
+        run: python -m unittest -v test_host_file_observation test_save_lock_probe 2>&1 | tee qa-build-output/file-observation-contracts.log
       - name: Windows capture helper contracts
         if: runner.os == 'Windows' && inputs.operation == 'build'
         env:

@@ -54,6 +54,7 @@ from . import wayland
 from .runtime_errors import native_assert as assert_no_runtime_errors
 from .native_drag import native_drag
 from .host_file_observation import assert_file_sha256 as _assert_file_sha256
+from .save_lock_probe import run as save_reader_lock
 
 
 class NativeStepContext:
@@ -1863,6 +1864,11 @@ def _do_assert_file_receipt(ctx: NativeStepContext, args: Any) -> str:
 @_verb("assert_file_sha256")
 def _do_assert_file_sha256(ctx: NativeStepContext, args: Any) -> str:
     return _assert_file_sha256(ctx, args)
+
+
+@_verb("native_save_reader_lock")
+def _do_native_save_reader_lock(ctx: NativeStepContext, args: Any) -> str:
+    return save_reader_lock(ctx, args)
 
 
 @_verb("native_set_writable")

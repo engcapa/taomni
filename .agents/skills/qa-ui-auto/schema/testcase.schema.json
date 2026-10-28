@@ -526,6 +526,9 @@
         "native_pointer_drag": {
           "$ref": "#/$defs/native_pointer_drag_arg"
         },
+        "native_save_reader_lock": {
+          "$ref": "#/$defs/native_save_reader_lock_arg"
+        },
         "native_set_writable": {
           "$ref": "#/$defs/native_set_writable_arg"
         },
@@ -2240,6 +2243,17 @@
           "type": "number",
           "exclusiveMinimum": 0
         }
+      }
+    },
+    "native_save_reader_lock_arg": {
+      "type": "object",
+      "required": ["path", "selector", "equals", "max_ui_ms"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "selector": {"type": "string", "minLength": 1},
+        "equals": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "max_ui_ms": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 2000}
       }
     },
     "native_set_writable_arg": {

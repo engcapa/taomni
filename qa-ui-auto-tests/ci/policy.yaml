@@ -319,6 +319,7 @@ cases:
 - TC-IDE-C0-01
 - TC-IDE-C0-02
 - TC-IDE-C0-03
+- TC-IDE-C0-04
 - TC-IDE-C1-01
 - TC-IDE-C2-01
 - TC-IDE-C2-02-completion-scope-fallback-browser

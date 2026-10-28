@@ -17,6 +17,8 @@ Windows native `TC-IDE-C0-03` 的 424 个输入字符完整到达编辑器，编
 
 本机 release 配置的 `workspace::tests::atomic_writes` **16/16 passed**，共享替换 helper 的 Linux 契约 **3/3 passed**；性能工具与 host observer 共 20 项单测为 **19 passed / 1 Windows 专属 skip**，该 Win32 项明确待托管执行。`cargo fmt --check`、`pnpm check:refactor`、`audit --gate` 均通过，没有在本机运行 browser/native 用例。
 
+补充性能边界复核：现有四个保存 IPC 为同步处理，加入锁重试后可能占用 UI 线程最长 2 秒。新增 Windows-only `TC-IDE-C0-04`，使用报告目录内真实的不共享 DELETE 的 reader 持锁，实际 Ctrl+S 后观察待发布临时文件，在锁仍持有时要求 Home/Workspaces 导航低于 1,500ms，再释放锁并核对精确磁盘 SHA-256、完整旧文件和临时文件清理。先在保持同步保存的源码上采集原生区分证据，随后由异步阻塞任务承接写入并保留保存串行顺序。该用例不属于 RDP/VNC 性能例外；既有九条崩溃专项数量不变。探针的路径隔离、平台限制和异常释放单测通过，实际原生结果待 GitHub 执行。
+
 另一失败为 macOS native `TC-RDPS-PERF-03-photo-content`：baseline/adaptive observed FPS 为 **28.1567 / 21.0972**，比值 **0.7492768147280562**，原阈值为 ≥0.85，bulk 解码错误为 0。按用户 2026-10-28 的明确授权，RDP/VNC server/client 性能 case 失败可暂忽略；本项原始失败与慢样本保留，未修改 RDP 算法或阈值、未算作通过。正式 UI 性能 workflow 默认仍要求全绿；只有显式给出的现有 remote performance case ID 可以作为验收例外，保存/崩溃/skip/infra/缺失回执均不适用。plan 同时记录真实 full-suite passed 状态和已接受失败。
 
 以下为修复前已完成的历史全绿及测量准备，最新修复仍须先跑相关集、再跑完整 GitHub 全量，随后完成四轮原生性能对照。

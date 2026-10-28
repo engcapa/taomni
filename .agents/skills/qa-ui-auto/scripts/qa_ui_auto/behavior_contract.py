@@ -16,7 +16,7 @@ import yaml
 
 def is_check(step: dict) -> bool:
     verb, args = next(iter(step.items()))
-    if verb.startswith("assert_") or verb in {"wait_for", "native_editor_performance", "parity005_wait_pending"}:
+    if verb.startswith("assert_") or verb in {"wait_for", "native_editor_performance", "native_save_reader_lock", "parity005_wait_pending"}:
         return True
     if verb == "eval_readonly":
         return args.get("expect_truthy", True) or "contains" in args
