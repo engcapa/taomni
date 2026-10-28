@@ -17,6 +17,16 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 
 ## Navigation & timing
 
+`measure_workspace_file_open: {selector, expected, event: click|dblclick, label}`
+drives one real browser/WebDriver activation and passively records exact canonical
+document publication, visible syntax highlighting and every animation-frame gap.
+Content and highlighting each retain a 1500ms budget; every frame gap must stay
+within 150ms through one second after highlighting. It never sets document text,
+dispatches synthetic input, retries activation or discards initial slow frames.
+`file-open-<label>.json` retains all frames and separate driver action time on
+success and failure. Browser proves renderer/VFS behavior; native additionally
+exercises the packaged WebView and real filesystem.
+
 | Verb | Args | Notes |
 |------|------|-------|
 | `open` | string URL **or** `{url}` | Navigates and waits for `domcontentloaded`. Auto-runs at step 0 if first step isn't `open`/`goto`. |

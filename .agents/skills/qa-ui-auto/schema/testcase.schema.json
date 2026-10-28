@@ -633,6 +633,17 @@
             }
           }
         },
+        "measure_workspace_file_open": {
+          "type": "object",
+          "required": ["selector", "expected", "event", "label"],
+          "additionalProperties": false,
+          "properties": {
+            "selector": {"type": "string", "minLength": 1},
+            "expected": {"type": "string", "minLength": 1},
+            "event": {"enum": ["click", "dblclick"]},
+            "label": {"type": "string", "pattern": "^[a-z0-9-]+$"}
+          }
+        },
         "native_sdk_startup_probe": {
           "type": "object",
           "required": [

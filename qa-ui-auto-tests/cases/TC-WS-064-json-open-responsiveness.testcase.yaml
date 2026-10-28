@@ -1,0 +1,173 @@
+id: TC-WS-064
+title: 704-line JSON opens and restores without blocking the workspace
+description: Activate a public 704-line JSON fixture through the real file tree, switch to notes and return, then restore from Home. Require the exact canonical
+  document and visible syntax highlighting within 1500ms, every frame gap at most 150ms through one second after highlighting, and zero automatic SDK/LSP
+  requests. Retain every frame and real driver action time; do not inject document contents.
+modes:
+- browser
+- native
+covers:
+- F-WS-2
+- F25.1
+- F25.3
+- F11.2
+tags:
+- p0
+- workspace-redesign
+- file-explorer
+- regression
+- performance
+fixtures:
+- reset_db
+- workspace_language_files
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-plain-files
+- observe_language_startup: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree-empty"]'
+- assert_language_startup:
+    commands:
+      sdk_get_registry:
+        equal: 0
+      sdk_analyze_workspace:
+        equal: 0
+      sdk_resolve_workspace:
+        equal: 0
+      lsp_detect_servers:
+        equal: 0
+      lsp_discover_java_bundles:
+        equal: 0
+      lsp_open_document:
+        equal: 0
+      lsp_document_status:
+        equal: 0
+    quiet_ms: 500
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.platform_workspace_root}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-root"]'
+- assert_language_startup:
+    commands:
+      sdk_get_registry:
+        equal: 0
+      sdk_analyze_workspace:
+        equal: 0
+      sdk_resolve_workspace:
+        equal: 0
+      lsp_detect_servers:
+        equal: 0
+      lsp_discover_java_bundles:
+        equal: 0
+      lsp_open_document:
+        equal: 0
+      lsp_document_status:
+        equal: 0
+    quiet_ms: 500
+- click: '[data-testid="code-workspace-tree-dir"][data-path="Documents"] [data-testid="code-workspace-tree-dir-arrow"]'
+- measure_workspace_file_open:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="Documents/records.json"]'
+    expected: ${fixture.workspace_json_text}
+    event: dblclick
+    label: cold-json
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/notes.txt"]'
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-line:first-child'
+    equals: Weekly notes
+- measure_workspace_file_open:
+    selector: '[data-testid="workspace-tab"][data-tab-title="records.json"]'
+    expected: ${fixture.workspace_json_text}
+    event: click
+    label: warm-json
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- measure_workspace_file_open:
+    selector: '[data-testid="nav-mode-workspaces"]'
+    expected: ${fixture.workspace_json_text}
+    event: click
+    label: restore-json
+- assert_language_startup:
+    commands:
+      sdk_get_registry:
+        equal: 0
+      sdk_analyze_workspace:
+        equal: 0
+      sdk_resolve_workspace:
+        equal: 0
+      lsp_detect_servers:
+        equal: 0
+      lsp_discover_java_bundles:
+        equal: 0
+      lsp_open_document:
+        equal: 0
+      lsp_document_status:
+        equal: 0
+    quiet_ms: 500
+- assert_no_runtime_errors: null
+- screenshot: workspace-json-responsive.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Activate a public 704-line JSON fixture through the real file tree, switch to notes and return, then restore from Home. Require the exact
+      canonical document and visible syntax highlighting within 1500ms, every frame gap at most 150ms through one second after highlighting, and zero automatic
+      SDK/LSP requests. Retain every frame and real driver action time; do not inject document contents.
+    actions:
+    - 4
+    - 7
+    - 8
+    - 9
+    - 10
+    - 13
+    - 14
+    - 15
+    - 17
+    - 18
+    - 20
+    results:
+    - 6
+    - 12
+    - 14
+    - 16
+    - 17
+    - 20
+    - 21
+    - 22
+    checkpoints:
+    - step: 6
+      expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"equal": 0}, "sdk_analyze_workspace": {"equal": 0}, "sdk_resolve_workspace":
+        {"equal": 0}, "lsp_detect_servers": {"equal": 0}, "lsp_discover_java_bundles": {"equal": 0}, "lsp_open_document": {"equal": 0}, "lsp_document_status":
+        {"equal": 0}}, "quiet_ms": 500}}'
+    - step: 12
+      expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"equal": 0}, "sdk_analyze_workspace": {"equal": 0}, "sdk_resolve_workspace":
+        {"equal": 0}, "lsp_detect_servers": {"equal": 0}, "lsp_discover_java_bundles": {"equal": 0}, "lsp_open_document": {"equal": 0}, "lsp_document_status":
+        {"equal": 0}}, "quiet_ms": 500}}'
+    - step: 14
+      expectation: '{"measure_workspace_file_open": {"selector": "[data-testid=\"code-workspace-tree-file\"][data-path=\"Documents/records.json\"]", "expected":
+        "${fixture.workspace_json_text}", "event": "dblclick", "label": "cold-json"}}'
+    - step: 16
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "Weekly notes"}}'
+    - step: 17
+      expectation: '{"measure_workspace_file_open": {"selector": "[data-testid=\"workspace-tab\"][data-tab-title=\"records.json\"]", "expected": "${fixture.workspace_json_text}",
+        "event": "click", "label": "warm-json"}}'
+    - step: 20
+      expectation: '{"measure_workspace_file_open": {"selector": "[data-testid=\"nav-mode-workspaces\"]", "expected": "${fixture.workspace_json_text}",
+        "event": "click", "label": "restore-json"}}'
+    - step: 21
+      expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"equal": 0}, "sdk_analyze_workspace": {"equal": 0}, "sdk_resolve_workspace":
+        {"equal": 0}, "lsp_detect_servers": {"equal": 0}, "lsp_discover_java_bundles": {"equal": 0}, "lsp_open_document": {"equal": 0}, "lsp_document_status":
+        {"equal": 0}}, "quiet_ms": 500}}'
+    - step: 22
+      expectation: '{"assert_no_runtime_errors": null}'
+  visual:
+  - check: JSON content and highlighting remain readable.
+    method: manual
+    reason: Screenshots retained; renderer frames separately verify responsiveness.
+  native:
+  - check: Packaged WebView, real native file read.
+    method: automated
+    reason: Browser VFS cannot establish real disk or native WebView latency.
