@@ -1,4 +1,3 @@
-import copy
 import json
 from pathlib import Path
 import tempfile
@@ -9,6 +8,7 @@ from unittest.mock import Mock
 from qa_ui_auto.file_open_probe import review, run, validate
 from qa_ui_auto.steps import StepError
 from qa_ui_auto.fixtures.workspace_language_files import JSON_DOCUMENT
+from qa_ui_auto.file_open_profile import capture
 
 
 def observation():
@@ -83,6 +83,32 @@ class FileOpenReviewTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             run(SimpleNamespace(page=page, case_dir=Path(folder)), {**CONFIG, "event": "click"})
         page.locator(CONFIG["selector"]).click.assert_called_once_with()
+
+    def test_cpu_samples_are_retained_after_the_original_action_failure(self):
+        page = Mock()
+        page.context.browser.browser_type.name = "chromium"
+        session = page.context.new_cdp_session.return_value
+        session.send.return_value = {"profile": {"nodes": [], "samples": [1, 2]}}
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "profile.json"
+            with self.assertRaisesRegex(RuntimeError, "action failed"):
+                with capture(page, target):
+                    raise RuntimeError("action failed")
+            report = json.loads(target.read_text())
+        self.assertTrue(report["available"])
+        self.assertEqual(report["profile"]["samples"], [1, 2])
+        session.detach.assert_called_once_with()
+
+    def test_unavailable_cpu_sampling_is_explicit_and_does_not_replace_ui_assertions(self):
+        page = Mock()
+        page.context.browser.browser_type.name = "webkit"
+        with tempfile.TemporaryDirectory() as folder:
+            target = Path(folder) / "profile.json"
+            with capture(page, target):
+                pass
+            report = json.loads(target.read_text())
+        self.assertFalse(report["available"])
+        page.context.new_cdp_session.assert_not_called()
 
 
 if __name__ == "__main__":

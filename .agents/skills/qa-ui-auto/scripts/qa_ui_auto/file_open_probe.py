@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import json
 import math
+from contextlib import nullcontext
 from pathlib import Path
 import re
 from typing import Any
 
 from .deadline import budget_time as time
 from .steps import StepError
+from .file_open_profile import capture as capture_profile
 
 SCRIPT = Path(__file__).with_suffix(".js").read_text(encoding="utf-8")
 OPEN_BUDGET_MS = 1500
@@ -43,6 +45,14 @@ def review(state: Any) -> None:
 
 
 def run(ctx: Any, args: Any) -> str:
+    config = validate(args)
+    profile = (nullcontext() if hasattr(ctx, "session") else capture_profile(
+        ctx.page, ctx.case_dir / ("file-open-" + config["label"] + "-cpu-profile.json")))
+    with profile:
+        return measure(ctx, config)
+
+
+def measure(ctx: Any, args: Any) -> str:
     config = validate(args)
     native = hasattr(ctx, "session")
     execute = ctx.session.execute if native else lambda source: ctx.page.evaluate("() => {" + source + "}")

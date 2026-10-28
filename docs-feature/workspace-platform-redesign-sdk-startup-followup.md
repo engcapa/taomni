@@ -66,6 +66,12 @@ RDP 修复定向 run `40767562150` 已完成 21/21 passed（macOS browser 7、na
 
 ## 剩余 macOS 响应时间诊断
 
+新增 JSON 改前 run `40782708587` 已捕获冷打开的真实慢帧：Linux browser
+214.6ms、macOS browser 157.8ms、macOS native 267ms。内容与高亮在 1500ms 内
+出现，但不能据此忽略用户可感知的卡顿。为定位渲染/布局开销，Chromium 另保留
+固定 1000µs 间隔的 CPU 采样，失败后也保存；采样不可用明确记录，不取代精确
+文档、每帧预算、原生 I/O 和保存断言。改前/改后对照须使用相同观察工具。
+
 用户另报告本机 QA release 首次打开约 600 多行 JSON 时有 2–3 秒阻塞。
 新增 `TC-WS-064/065` 使用完全公开、无凭据的 704 行 JSON：64 在 browser/native
 中保留冷打开、切回标签、Home 返回的精确文档与语法高亮首帧（1500ms），并对开始
