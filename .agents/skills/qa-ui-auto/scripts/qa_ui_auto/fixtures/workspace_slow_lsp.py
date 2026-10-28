@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import sys
 
-from . import workspace_explorer
+from . import workspace_explorer, workspace_lsp_diagnostic
 
 
 def setup(ctx):
@@ -25,3 +25,8 @@ def setup(ctx):
             "args": " ".join(json.dumps(arg) for arg in [script.as_posix(), events.as_posix(), gate.as_posix()]),
         }}),
     )
+    workspace_lsp_diagnostic.setup(ctx, events)
+
+
+def teardown(ctx):
+    workspace_lsp_diagnostic.teardown(ctx)

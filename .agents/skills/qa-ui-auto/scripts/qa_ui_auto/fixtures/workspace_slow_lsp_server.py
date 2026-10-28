@@ -1,11 +1,15 @@
 """Minimal real LSP peer; stdout contains only framed JSON-RPC messages."""
 import json
+import os
 from pathlib import Path
 import sys
 import time
 
 
 def serve(events: Path, gate: Path):
+    events.with_suffix(".process.json").write_text(json.dumps({
+        "pid": os.getpid(), "parent": os.getppid(), "startedAt": time.time(),
+    }) + "\n")
     def log(message):
         with events.open("a", encoding="utf-8") as stream:
             stream.write(message + "\n")

@@ -135,7 +135,7 @@ REGISTRY: dict[str, Fixture] = {
     "workspace_explorer": Fixture("workspace_explorer", workspace_explorer.setup),
     "workspace_compact_tree": Fixture("workspace_compact_tree", workspace_compact_tree.setup),
     "workspace_hidden_entries": Fixture("workspace_hidden_entries", workspace_hidden_entries.setup),
-    "workspace_slow_lsp": Fixture("workspace_slow_lsp", workspace_slow_lsp.setup),
+    "workspace_slow_lsp": Fixture("workspace_slow_lsp", workspace_slow_lsp.setup, workspace_slow_lsp.teardown),
     "platform_workspace_root": Fixture("platform_workspace_root", platform_workspace_root.setup, platform_workspace_root.teardown),
     "workspace_ignored_ancestor_root": Fixture("workspace_ignored_ancestor_root", workspace_ignored_ancestor_root.setup),
     "workspace_restore_sessions": Fixture("workspace_restore_sessions", workspace_restore_sessions.setup, workspace_restore_sessions.teardown),
