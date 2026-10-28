@@ -1,7 +1,7 @@
 id: TC-WS-061
 title: Real held SDK discovery leaves source editing and workspace navigation responsive
 description: Concurrent same-root callers must share exactly one real SDK child. The real SDK java -version executable waits on a host gate with live child heartbeats. Open/edit a source, visit Home, restore Workspace and
-  open an ordinary file before the unchanged five-second SDK timeout. Each UI action must complete within 1500ms while the same child and real IPC are still
+  open an ordinary file before the unchanged five-second SDK timeout. Opening, clearing and navigation retain 1500ms; every paced real key retains 1500ms per request and a stricter 150ms key-to-frame limit, with all characters, raw samples and total typing wall time retained. The same child and real IPC must remain
   pending. Release in finally, observe actual stdio LSP dirty-buffer messages, preserve active notes.txt, then save/reopen and independently hash disk bytes.
   No LSP initialize delay or renderer SDK promise substitution is used.
 modes:

@@ -13,6 +13,7 @@ from typing import Any, Callable
 
 from .deadline import budget_time as time
 from .language_startup_observer import validate_observation
+from .sdk_editor_input import measure as measure_editor_input
 from .steps import StepError
 
 ACTION_BUDGET_MS = 1500
@@ -132,7 +133,11 @@ def run(ctx: Any, args: Any) -> str:
         if child_pid is None:
             raise StepError("Opening a real source never reached the held SDK process")
         report["sourceOpenWhileSdkPending"] = require_pending()
-        action("edit-source", lambda: session.fill(editor, edited_source), content_is(edited_source))
+        # A long paced string is many user key actions, not one latency
+        # sample. Retain all characters and wall time; budget every real key
+        # and its rendered frame independently while the same SDK stays held.
+        action("prepare-edit-source", lambda: session.fill(editor, ""), content_is(""))
+        report["typing"] = measure_editor_input(session, editor, edited_source, ctx.case_dir, require_pending)
         action("home", lambda: session.click(selector("nav-mode-home")),
                "!!document.querySelector('[data-testid=\"welcome-panel\"]')")
         action("restore-workspace", lambda: session.click(selector("nav-mode-workspaces")), content_is(edited_source))

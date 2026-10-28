@@ -278,8 +278,14 @@ Relative paths resolve from the repository root.
 `native_sdk_startup_probe: {events, gate, language?: typescript|java}` requires
 `workspace_slow_sdk` and the forwarding observer below. The native input driver
 opens and edits `src/index.ts` (default) or `src/Main.java`,
-visits Home, restores the workspace and opens `Documents/notes.txt`. Every action
-keeps a fixed 1500ms dispatch-to-result budget. The same independently compiled
+visits Home, restores the workspace and opens `Documents/notes.txt`. File opening,
+selection/clearing and navigation keep a fixed 1500ms dispatch-to-result budget.
+Typing retains every character and the driver's original 20ms pacing, measures
+each key request against 1500ms and every keydown-to-frame against 150ms, and
+checks the canonical document/caret after each key plus exact final DOM/text.
+Full typing wall time and all raw key/input/frame samples are retained separately
+in `sdk-typing-responsiveness.json`; whole-string typing time is not UI latency.
+The same independently compiled
 SDK child must emit fresh waiting heartbeats and the real SDK/LSP IPC must remain
 pending after each action, before the unchanged five-second production timeout.
 The verb releases its case-owned gate in `finally`, retaining all action timings,
