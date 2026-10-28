@@ -231,6 +231,27 @@ jobs:
           path: qa-ui-auto-report/${{ matrix.id }}/mstsc-startup/
           if-no-files-found: error
           retention-days: 14
+      - name: Windows native session cleanup contracts
+        if: runner.os == 'Windows' && inputs.operation == 'build'
+        run: |
+          mkdir -p qa-build-output
+          python -m unittest test_native_webdriver_transport test_native_fixture_cleanup 2>&1 | tee qa-build-output/session-cleanup-contracts.log
+      - name: Windows atomic file replacement contracts
+        if: runner.os == 'Windows' && inputs.operation == 'build'
+        run: |
+          mkdir -p qa-build-output
+          rustc --edition=2024 --test src-tauri/src/atomic_replace.rs -o qa-build-output/backup-atomic-tests.exe
+          qa-build-output/backup-atomic-tests.exe --test-threads=1 2>&1 | tee qa-build-output/backup-atomic-contracts.log
+      - name: Windows backup journal reader contracts
+        if: runner.os == 'Windows' && inputs.operation == 'build' && contains(matrix.capabilities, 'secret-service')
+        run: |
+          mkdir -p qa-build-output
+          python -m unittest -v test_backup_journal test_backup_journal_windows 2>&1 | tee qa-build-output/backup-reader-contracts.log
+      - name: Windows file observation contracts
+        if: runner.os == 'Windows' && inputs.operation == 'build'
+        run: |
+          mkdir -p qa-build-output
+          python -m unittest -v test_host_file_observation test_save_lock_probe 2>&1 | tee qa-build-output/file-observation-contracts.log
       - name: Native QA build input identity
         id: native-cache-key
         if: (matrix.mode == 'native') && inputs.operation != 'run'
@@ -306,11 +327,6 @@ jobs:
           path: qa-contract-output/
           if-no-files-found: warn
           retention-days: 14
-      - name: Windows native session cleanup contracts
-        if: runner.os == 'Windows' && inputs.operation == 'build'
-        run: |
-          mkdir -p qa-build-output
-          python -m unittest test_native_webdriver_transport test_native_fixture_cleanup 2>&1 | tee qa-build-output/session-cleanup-contracts.log
       - name: Build and export the verified native runtime
         if: inputs.operation == 'build'
         env:
@@ -320,18 +336,6 @@ jobs:
           python .agents/skills/qa-ui-auto/scripts/ci_native_artifact.py \
             --selection qa-ui-auto-report/selection.json --build "$QA_BUILD_ID" \
             --archive qa-build-output/runtime.tar.gz 2>&1 | tee qa-build-output/build.log
-      - name: Windows atomic file replacement contracts
-        if: runner.os == 'Windows' && inputs.operation == 'build'
-        run: |
-          rustc --edition=2024 --test src-tauri/src/atomic_replace.rs -o qa-build-output/backup-atomic-tests.exe
-          qa-build-output/backup-atomic-tests.exe --test-threads=1 2>&1 | tee qa-build-output/backup-atomic-contracts.log
-      - name: Windows backup journal reader contracts
-        if: runner.os == 'Windows' && inputs.operation == 'build' && contains(matrix.capabilities, 'secret-service')
-        run: |
-          python -m unittest -v test_backup_journal test_backup_journal_windows 2>&1 | tee qa-build-output/backup-reader-contracts.log
-      - name: Windows file observation contracts
-        if: runner.os == 'Windows' && inputs.operation == 'build'
-        run: python -m unittest -v test_host_file_observation test_save_lock_probe 2>&1 | tee qa-build-output/file-observation-contracts.log
       - name: Windows capture helper contracts
         if: runner.os == 'Windows' && inputs.operation == 'build'
         env:
