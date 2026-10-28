@@ -78,6 +78,13 @@ class SdkStartupProbeTest(unittest.TestCase):
                 run(ctx, {"events": str(case / "events"), "gate": str(gate)})
             ctx.session.dblclick.assert_not_called()
 
+    def test_source_language_and_unknown_arguments_fail_closed(self):
+        for args in [{"events": "events", "gate": "gate", "language": "python"},
+                     {"events": "events", "gate": "gate", "language": []},
+                     {"events": "events", "gate": "gate", "source": "arbitrary-file"}]:
+            with self.subTest(args=args), self.assertRaises(StepError):
+                run(None, args)
+
     def test_both_observers_are_registered_but_real_process_probe_is_native_only(self):
         self.assertTrue(callable(get("observe_language_startup")))
         self.assertTrue(callable(get("assert_language_startup")))

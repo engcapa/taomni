@@ -647,6 +647,10 @@
             "gate": {
               "type": "string",
               "minLength": 1
+            },
+            "language": {
+              "enum": ["typescript", "java"],
+              "default": "typescript"
             }
           },
           "description": "Native-only: source open/edit, Home/Workspace restoration and ordinary-file open while one real SDK child and actual Tauri requests remain pending. Each action keeps the fixed 1500ms budget; finally releases the fixture and retains all results."

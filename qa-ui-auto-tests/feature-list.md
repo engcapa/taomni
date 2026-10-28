@@ -12175,7 +12175,7 @@ controls:
 
 ---
 
-TC-WS-059/060 cover ordinary-document discovery suppression and every explicit folder reveal; TC-WS-061/062 retain real held-SDK success/error, live native responsiveness, late LSP buffer delivery and byte-exact disk save. These follow-up cases remain unexecuted until their hosted runs are reviewed.
+TC-WS-059/060 cover ordinary-document discovery suppression and every explicit folder reveal; TC-WS-061/062 retain real held-SDK success/error, live native responsiveness, late LSP buffer delivery and byte-exact disk save. TC-WS-063 applies the same pending-process and retained-content contract to a Java source. These follow-up cases remain unverified until their hosted runs are reviewed.
 
 ## 12. Workspace-First 平台重构（v6.1）
 
