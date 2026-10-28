@@ -115,6 +115,7 @@
           "macos_updater",
           "rdp_server_required",
           "system_rdp_running",
+          "rdp_clipboard_diagnostic",
           "release_build_required",
           "rdp_baseline_required",
           "rdp_audio_required",

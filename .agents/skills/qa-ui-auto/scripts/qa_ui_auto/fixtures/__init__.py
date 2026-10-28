@@ -90,6 +90,7 @@ from . import backup_cloud
 from . import credential_store
 from . import path_completion
 from . import dual_display_required
+from . import rdp_clipboard_diagnostic
 
 
 class FixtureContext(Protocol):
@@ -162,6 +163,7 @@ REGISTRY: dict[str, Fixture] = {
     "macos_updater": Fixture("macos_updater", macos_updater.setup, macos_updater.teardown),
     "rdp_server_required": Fixture("rdp_server_required", rdp_server_required.setup),
     "system_rdp_running": Fixture("system_rdp_running", system_rdp_running.setup),
+    "rdp_clipboard_diagnostic": Fixture("rdp_clipboard_diagnostic", rdp_clipboard_diagnostic.setup, rdp_clipboard_diagnostic.teardown),
     "release_build_required": Fixture("release_build_required", release_build_required.setup),
     "rdp_baseline_required": Fixture("rdp_baseline_required", rdp_baseline_required.setup, rdp_baseline_required.teardown),
     "rdp_audio_required": Fixture("rdp_audio_required", rdp_audio_required.setup, rdp_audio_required.teardown),
