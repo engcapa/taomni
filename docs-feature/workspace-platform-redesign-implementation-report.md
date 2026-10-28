@@ -1,6 +1,6 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前交付源码的三平台全量 [40641466776](https://github.com/engcapa/taomni/actions/runs/40641466776) 已独立核验：**642 个适用 ID、2,104/2,104 passed、25/25 分片，0 failed/skipped/infrastructure errors**；完整九条崩溃专项 **42/42 passed**，相关集 **86/86 passed**。本轮 RDP/VNC 性能例外未使用。main `65d6d907` 已合并。正式四轮原生性能对照 `40647814102` 在旧 main-1 输入阶段因工具请求超时失败，尚未测到 candidate，不能作完整无退化结论；修复测量工具后将重新完成精确 HEAD 的全量及四轮对照。browser/native 均只在 GitHub 运行，本机仅做单测、静态检查和供手测的 release 编译。唯一外部 clickhousecrud 缺口按用户确认单列，不计为通过。以下历史章节以本节最新状态为准。
+> 当前交付源码及修正后的测量工具已完成三平台全量 [40652692956](https://github.com/engcapa/taomni/actions/runs/40652692956)：**642 个适用 ID、2,104/2,104 passed、25/25 分片，0 failed/skipped/infrastructure errors**，原始回执及最终汇总已独立核验；完整九条崩溃专项 **42/42 passed**，先前同产品相关集 **86/86 passed**。本轮 RDP/VNC 性能例外未使用。main `65d6d907` 已合并。正式四轮原生性能对照 [40659856210](https://github.com/engcapa/taomni/actions/runs/40659856210) 在 candidate-1 的 2MiB 终端输出阶段失败，正在补充原生输出诊断，尚无完整性能结论；先前 `40647814102` 的 main-1 工具超时失败及全部慢样本保留。browser/native 均只在 GitHub 运行，本机仅做单测、静态检查和供手测的 release 编译。唯一外部 clickhousecrud 缺口按用户确认单列，不计为通过。以下历史章节以本节最新状态为准。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
@@ -9,7 +9,7 @@
 
 ## 当前功能验收与性能复核（2026-10-28）
 
-最终功能门禁在 `d6cbfcd18daf8d21fd5efe1c9fb0ed803573fc27` 执行。产品 source SHA `6a2f1c52e15f19505e3e8dcfac1ad75acdf8a46c77be7d6d6ffb3d43c31e853d`，runner SHA `7d87df09fdce3353e11c87ee7be01fd72e51977b8b16bcf49a7910bf7fb09ede`。全部原始 receipt、case digest、source/runner/native build 身份与托管最终汇总已逐分片独立核验，证据保存在仓库外 `github-40641466776/verified-final.json`。以下测量工具修复不改变产品 source SHA，但会改变 runner SHA；保留本轮证据，并重新执行新 HEAD 全量，不复用旧 runner 的门禁。
+最终功能门禁在 `23b6120cb110ad54fbc8fdcde8abb5276599c864` 执行。产品 source SHA `6a2f1c52e15f19505e3e8dcfac1ad75acdf8a46c77be7d6d6ffb3d43c31e853d`，runner SHA `bf665b084f3bbecaf7e44d7660863a9c11d161700251fd5c6d31b49947309640`。全部原始 receipt、case digest、source/runner/native build 身份与托管最终汇总已逐分片独立核验，证据保存在仓库外 `github-40652692956/verified-final.json`；九条崩溃 42 项原始执行另核对为 `crash-cells-reviewed.json`。工具修正未改变产品 source SHA；上一轮 `d6cbfcd1` 的 2,104/2,104 及其 runner 身份仍保留，新性能流程使用本轮精确 HEAD 门禁。
 
 | 平台 / 模式 | 适用执行 | Passed | Failed / Skipped / Infra |
 | --- | ---: | ---: | --- |
@@ -23,9 +23,13 @@
 
 九条崩溃专项 `TC-WS-038/039/045/051/052/053/054/055/056` 在相关集及全量均为 **42/42 passed**，每次产品功能修改后继续作为强制回归。新增 Windows 文件锁场景 `TC-IDE-C0-04` 为另一条真实磁盘/导航回归，不计入九条数量。唯一外部 `TC-IDE-C6-06-java-definition-realproject-native` 缺少 clickhousecrud 源码，在三个原生平台各有一项明确 policy gap；总计一个未执行 ID，不计通过。
 
+最新正式性能运行 [40659856210](https://github.com/engcapa/taomni/actions/runs/40659856210) 使用同一提交的工具、当前原始 release 构建与真正改前 main `a57437927b62d6036a6d473eddccc053a4b4c0e8`，main-1 全部完成。原始输入 warmup / group1 / group2 的 p95 为 **35 / 29 / 33ms**、max 为 **45 / 794 / 1,409ms**，下一帧 p95 为 **899 / 1,047 / 1,019ms**；全部 424 个键与样本保留。candidate-1 在 24 个真实 PTY 下的 2MiB 输出等待结束行超过原有 180 秒：producer receipt 为完整 **2,097,152 bytes / 161.838736ms**，失败截图可见大量 P，但没有结束行与后续 shell prompt。main-2 / candidate-2 尚未执行；单次失败不能区分 IPC、xterm 处理或观测问题，也不能构成四轮退化结论。原始证据保留于仓库外 `github-40659856210/workspace-performance/`。
+
+补充 `TC-TERM-BURST-001`（native Linux/macOS，release）：24 个真实 PTY、正反 48 次标签切换、三轮各 2MiB 输出；每轮要求连续唯一的原始 Tauri IPC 序号、完整 payload SHA-256、界面结束行和随后十条命令，最后关闭全部标签并清空注册表。只旁路观察现存 callback，原样交付消息及异常，不重放、不减工作量；失败保留通道字节、序号缺口、console、buffer tail 与独立 producer receipt。Windows ConPTY 是屏幕更新流，精确 POSIX 字节 oracle 不适用，明确不外推。新增工具契约验证真实 producer 字节、丢包/重复/错字节拒绝、乱序交付、原始异常和 callback 恢复；GitHub 实际执行待完成。它是额外终端回归，九条强制 crash-regression 及其计数不变。
+
 正式性能运行 [40647814102](https://github.com/engcapa/taomni/actions/runs/40647814102) 已保留失败。真正改前 main `a57437927b62d6036a6d473eddccc053a4b4c0e8` 的 main-1 完成 24 个真实 PTY、echo/2MiB 输出/关闭、3,097 文件冷暖展开和滚动、24 个 64KiB 文件打开及 48 次切换；1MiB 编辑器的 24 键 warmup 原始 p95 **639ms**、max **1,082ms**、下一帧 p95 **1,301ms**。随后 200 键单次 W3C `/actions` 请求超过工具固定 120 秒；清理 DELETE 的 `RemoteDisconnected` 又遮盖了原 `TimeoutError`。candidate 未执行，部分慢数据不能建立当前版本退化结论。
 
-测量工具改为每批 8 键，仍调用原生 WebDriver 的原有 20ms paced input；不重试投递状态不确定的请求，正式输入总量仍为 400，warmup 另保留 24 键。逐组校验完整 keydown 顺序、DOM/下一帧样本、pending=0、原始尾值与 p95/max 一致。仅完整写盘后的精确预算失败允许继续采集；慢 baseline 的 `passed=false` 保留，candidate 任一组超过原有 **150ms** 正式预算（warmup 1,000ms）仍导致最终门禁失败，相对 15%+噪声门槛不变。清理失败单独记录；已有原错时保留原错，无原错时清理仍失败。工具契约 **26/26 passed**，包含历史构建脚本实际启动、超时不重试、坏样本拒绝、慢 baseline 及 candidate 仍须达到绝对预算等断言；新模块采用 `native_input.py` 避免遮蔽标准库 `typing`。这次仅修性能采集工具，无产品用户流程变化，不新增产品 YAML；既有 `TC-IDE-C0-03`、`TC-IDE-C0-04` 及九条崩溃专项继续保留。新 HEAD 全量通过后再次按 main-1 / candidate-1 / main-2 / candidate-2 对照，全部原始失败保留。
+测量工具改为每批 8 键，仍调用原生 WebDriver 的原有 20ms paced input；不重试投递状态不确定的请求，正式输入总量仍为 400，warmup 另保留 24 键。逐组校验完整 keydown 顺序、DOM/下一帧样本、pending=0、原始尾值与 p95/max 一致。仅完整写盘后的精确预算失败允许继续采集；慢 baseline 的 `passed=false` 保留，candidate 任一组超过原有 **150ms** 正式预算（warmup 1,000ms）仍导致最终门禁失败，相对 15%+噪声门槛不变。清理失败单独记录；已有原错时保留原错，无原错时清理仍失败。工具契约 **26/26 passed**，包含历史构建脚本实际启动、超时不重试、坏样本拒绝、慢 baseline 及 candidate 仍须达到绝对预算等断言；新模块采用 `native_input.py` 避免遮蔽标准库 `typing`。这次仅修性能采集工具，无产品用户流程变化，不新增产品 YAML；既有 `TC-IDE-C0-03`、`TC-IDE-C0-04` 及九条崩溃专项继续保留。修正工具的新 HEAD 全量已核验 2,104/2,104，`40659856210` 的 main-1 已完整采集，但 candidate-1 的终端输出失败，完整对照待诊断修复后再执行；全部原始失败保留。
 
 SVG 点击工具修复提交 `11f57e40d440d5558adc316aa75387dda90eaf52` 的全量 [40619625516](https://github.com/engcapa/taomni/actions/runs/40619625516) 已收齐全部原始回执并独立核验：**2,101 passed / 2 failed，25/25 分片**，没有跳过或基础设施错误。完整九条崩溃专项 **42/42 passed**，失败不能被 job 本身的绿色状态掩盖。
 

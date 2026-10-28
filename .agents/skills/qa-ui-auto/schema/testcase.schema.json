@@ -505,6 +505,9 @@
         "terminal_input": {
           "$ref": "#/$defs/terminal_input_arg"
         },
+        "native_terminal_burst": {
+          "$ref": "#/$defs/native_terminal_burst_arg"
+        },
         "compose_text": {
           "$ref": "#/$defs/compose_text_arg"
         },
@@ -1916,6 +1919,16 @@
           "type": "string",
           "minLength": 1
         }
+      }
+    },
+    "native_terminal_burst_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sessions", "repeats", "timeout_sec"],
+      "properties": {
+        "sessions": {"const": 24},
+        "repeats": {"const": 3},
+        "timeout_sec": {"const": 180}
       }
     },
     "terminal_input_arg": {
