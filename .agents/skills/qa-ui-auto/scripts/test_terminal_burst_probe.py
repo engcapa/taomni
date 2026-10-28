@@ -2,7 +2,9 @@
 from copy import deepcopy
 import hashlib
 import json
+import os
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -25,6 +27,18 @@ def trace():
 
 
 class ProducerTest(TestCase):
+    def test_relative_report_and_spaces_work_from_an_unrelated_shell_directory(self):
+        with tempfile.TemporaryDirectory(prefix="burst with space ") as directory:
+            folder = Path(directory).resolve()
+            relative = Path(os.path.relpath(folder, Path.cwd()))
+            receipt, command = probe.prepare_producer(relative, 0, BEGIN, END)
+            self.assertTrue(receipt.is_absolute())
+            with tempfile.TemporaryDirectory() as unrelated:
+                result = subprocess.run(shlex.split(command), cwd=unrelated, capture_output=True,
+                                        timeout=20, check=True)
+            self.assertEqual(result.stdout, (BEGIN + "\n" + PAYLOAD + END + "\n").encode())
+            self.assertEqual(json.loads(receipt.read_text())["bytes"], 2097152)
+
     def test_independent_process_really_writes_the_complete_workload_and_receipt(self):
         with tempfile.TemporaryDirectory() as directory:
             receipt = Path(directory) / "receipt.json"

@@ -101,6 +101,16 @@ def producer_source(receipt: Path, begin: str, end: str) -> str:
     )
 
 
+def prepare_producer(case_dir: Path, index: int, begin: str, end: str) -> tuple[Path, str]:
+    # Runner report paths can be relative; a new local shell starts at HOME.
+    # Resolve both the script and its receipt before crossing the PTY boundary.
+    folder = case_dir.resolve()
+    receipt = folder / f'producer-{index}.json'
+    producer = folder / f'producer-{index}.py'
+    producer.write_text(producer_source(receipt, begin, end))
+    return receipt, shlex.quote(sys.executable) + ' ' + shlex.quote(str(producer))
+
+
 def channel_summary(trace: dict) -> dict:
     result = {}
     for channel_id, rows in trace['channels'].items():
@@ -205,15 +215,13 @@ def run(ctx: Any, args: Any, send_input: Callable) -> str:
         echo('many')
         for index in range(3):
             begin, end = f'qa-burst-begin-{index}', f'qa-burst-done-{index}'
-            receipt = Path(ctx.case_dir) / f'producer-{index}.json'
-            producer = Path(ctx.case_dir) / f'producer-{index}.py'
-            producer.write_text(producer_source(receipt, begin, end))
+            receipt, command = prepare_producer(Path(ctx.case_dir), index, begin, end)
             session.execute(TRACE_INSTALL)
             installed = True
             started = time.monotonic()
             repetition: dict = {'index': index, 'passed': False}
             record['repeats'].append(repetition)
-            send(shlex.quote(sys.executable) + ' ' + shlex.quote(str(producer)))
+            send(command)
             try:
                 until(session, line_present(end), 180)
                 repetition['outputObservedMs'] = (time.monotonic()-started)*1000
