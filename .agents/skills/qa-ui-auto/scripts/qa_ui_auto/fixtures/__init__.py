@@ -91,6 +91,7 @@ from . import credential_store
 from . import path_completion
 from . import dual_display_required
 from . import rdp_clipboard_diagnostic
+from . import rdp_deferred_clipboard
 
 
 class FixtureContext(Protocol):
@@ -164,6 +165,7 @@ REGISTRY: dict[str, Fixture] = {
     "rdp_server_required": Fixture("rdp_server_required", rdp_server_required.setup),
     "system_rdp_running": Fixture("system_rdp_running", system_rdp_running.setup),
     "rdp_clipboard_diagnostic": Fixture("rdp_clipboard_diagnostic", rdp_clipboard_diagnostic.setup, rdp_clipboard_diagnostic.teardown),
+    "rdp_deferred_clipboard": Fixture("rdp_deferred_clipboard", rdp_deferred_clipboard.setup, rdp_deferred_clipboard.teardown),
     "release_build_required": Fixture("release_build_required", release_build_required.setup),
     "rdp_baseline_required": Fixture("rdp_baseline_required", rdp_baseline_required.setup, rdp_baseline_required.teardown),
     "rdp_audio_required": Fixture("rdp_audio_required", rdp_audio_required.setup, rdp_audio_required.teardown),

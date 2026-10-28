@@ -29,6 +29,12 @@ description: 'V-19 (docs-feature/rdp-server-parity-design.md §4.2, AC-19, DEC-1
 
   the runner''s system Remote Desktop.
 
+  Diagnostic variant: on macOS, AppKit declares the actual text type 1.2
+  seconds before publishing data. The fixture records real change counts
+  and rejects publication if the token changes. Original protocol, text,
+  quiet-period and announcement assertions remain required. No background
+  clipboard reader or thread sampling runs alongside this variant.
+
   '
 covers:
 - F-RdpServer-1
@@ -46,7 +52,7 @@ fixtures:
 - reset_db
 - rdp_server_required
 - system_rdp_running
-- rdp_clipboard_diagnostic
+- rdp_deferred_clipboard
 timeout_sec: 420
 steps:
 - open: ${cfg.app.base_url}
