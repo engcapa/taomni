@@ -1,6 +1,6 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 已验证提交 `f6f8d276` 的三平台全量 [40677271635](https://github.com/engcapa/taomni/actions/runs/40677271635) 为 **643 个适用 ID、2,106/2,106 passed、25/25 分片，0 failed/skipped/infrastructure errors**，全部原始回执与最终汇总已独立核验；九条崩溃专项 **42/42 passed**，额外 Ubuntu 22.04 相关集共 **53/53 passed**。19,552 份已保留的签名报告文件也已重算大小及 SHA-256。main `65d6d907` 已合并。正式四轮原生性能对照 [40703223277](https://github.com/engcapa/taomni/actions/runs/40703223277) 已完整采集并独立复算，**7 项延迟和 3 项 CPU 指标超过既定门槛，性能验收未通过，正在诊断修复**。本轮 RDP/VNC 性能例外未使用；本次性能退化不属于该例外。browser/native 均只在 GitHub 运行，本机仅做单测、静态检查和供手测的 release 编译。唯一外部 clickhousecrud 缺口按用户确认单列，不计为通过。以下历史章节以本节最新状态为准。
+> 当前已合并 main `c793f30b`，四角绘制与 Compact 目录加载修复后的全量 [40743957940](https://github.com/engcapa/taomni/actions/runs/40743957940) 为 **645 个适用 ID、2,115 passed / 3 failed、25/25 分片**，原始回执和最终汇总已独立核验。macOS 慢 LSP 与 RDP 剪贴板是功能失败，继续诊断；RDP 延迟 p95 90.153292ms 超过 65ms，按用户授权单列保留，不计通过。正式四轮性能对照尚未通过，旧源码的通过记录不能替代当前验收。新增文件打开、SDK 后台初始化及每次添加目录展开的实现已完成本机单测，见[SDK 跟进记录](./workspace-platform-redesign-sdk-startup-followup.md)，待当前组合源码的托管相关集、完整 10 ID 崩溃专项和全量验证。browser/native 继续只在 GitHub 执行；本机仅单测、静态检查与 QA release 编译。唯一外部 clickhousecrud 缺口按用户确认单列。以下历史章节以本节最新状态为准。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
