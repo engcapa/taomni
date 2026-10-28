@@ -6,11 +6,12 @@
 
 - 类型：新功能（新增移动控制面 + 实例端移动服务）
 - 文档位置：`docs-feature/mobile-remote-p0-design.md`
-- 设计状态：**部分可实施**（DEC-01～DEC-04、DEC-08～DEC-12 已定或可由 agent 自决，P0 核心任务可开始；剩余待决只影响 IM 的微信落地方式与 diff 数据源细节，不阻塞 P0 核心，见 §10；修订记录见 §1 末。另有一次 Review 修订，见紧随其后的“Review 修订记录”，原有 DEC/AC/TASK/V 编号全部保留、未新增、未重编号）
+- 设计状态：**部分可实施**（DEC-01～DEC-04、DEC-08～DEC-12 已定或可由 agent 自决，P0 核心任务可开始；剩余待决只影响 IM 的微信落地方式与 diff 数据源细节，不阻塞 P0 核心，见 §10；修订记录见 §1 末。另有 Review 修订与新基线修订，见紧随其后的两条修订记录，原有 DEC/AC/TASK/V 编号全部保留、未新增、未重编号）
 - 来源：用户需求（2026-10-25 讨论）：移动端开发，主要连接远程 PC 上运行的 taomni 实例并管理多个远程实例；也要能连部署在云上的 taomni；重点是远程执行情况的方便交互（正在执行的终端如何回显到手机并同步操作，但不要重到屏幕共享的程度）；App 还是 Mobile Web 待定；远程一般无公网 IP，是否借助飞书、微信，参考 ZCode（https://github.com/zai-org/ZCode.git）。同日用户在讨论中点选“按这条路线写一份 P0 移动端设计文档”，即接受 §4 的推荐路线（模型 B + Mobile Web 先行 + PTY 共享 + 隧道/组网到达 + IM 只做侧通道）。同日用户随后给出 5 条决策（见修订记录），本设计按这 5 条修订，原 DEC-02、DEC-05、DEC-06、DEC-07 的结论以修订版为准，ID 保留不变。
 - 修订记录（2026-10-25，用户 5 条决策）：① 手机主场景定为输入命令、发提示词、看结果、做审批，一般不改代码，但要能看文件、看 diff，交互要方便（快捷键、文本输入）且实时；② 中继与外网访问由用户自行解决，设计中不考虑、不选型、不写厂商步骤；③ 飞书/微信定位为通知与审批入口、可直接发命令、非实时看部分结果与文件；④ 现阶段不考虑上架 App，只做 Mobile Web；⑤ PC 端或云上实例可以开着桌面，也可以 headless 运行。修订影响：P0 新增只读文件查看与 diff 查看；IM 从“仅通知卡片”升级为第二客户端面（P1 适配器，见 DEC-07 与 TASK-07）；headless 从 P1 延期改为与桌面模式同契约的双运行模式（见 DEC-06）；原生壳与上架从 P2 计划改为暂不考虑，不列入本设计后续阶段。同日用户确认分期：IM 放 P1、headless 证明放 P0，此划分已定。
 - Review 修订记录（用户 5 点 Review 意见，本次修订）：① 修复 DEC-09 与 AC-02/AC-10 的 CORS 悖论：多实例切换本质是跨域，`/api/v1/*` 须按 §4.4 的两级 CORS 策略放行（配对端点预检回显、业务端点仅放行已配对 Origin），原“实例自身托管即同源、无跨域”的说法作废；② 修复 §4.4 WS 路由矛盾：`task_status` 与 `file_changed` 从终端 WS 迁到新增的实例级事件流 `WS /api/v1/events`，终端 WS 只留 PTY 相关消息，见 AC-15 与 TASK-01/02/03/04 的修订；③ 补充 TASK-01 Linux Headless 无 GUI 约束：`--headless` 须绕过 `tauri::Builder` 直接跑 Tokio Runtime，核心模块的 `AppHandle` 事件发送须解耦为可替换 Sink，见 DEC-06 与 TASK-01 的修订；④ 收紧 PTY resize 与 Ring Buffer：只读态禁止 resize，resize 仅持有写权时可用且释放/抢回时恢复桌面尺寸，Ring Buffer 在 1000 行之外加总字节上限、单行上限、`\r` 覆盖与 UTF-8 跨 chunk 保护，见 DEC-04/DEC-10 与 TASK-02 的修订；⑤ 修正飞书接入：优先用飞书官方 WebSocket 长连接（实例主动出站），入站 webhook 仅为已有公网 endpoint 时的 fallback，见 DEC-07 与 TASK-07 的修订。本次修订未新增、未重编号任何 DEC/AC/TASK/V；本次修订版推送到 PR #743 后，PR 版与本地版一致。
-- 调研基线：taomni main `1e8acfa6`（2026-10-25 本地检出，`git status` 仅有 5 个未跟踪的 UI 设计文件，与本文无关）；工作区无已跟踪未提交变更。本设计不提交、不推送，只落盘为未跟踪文档。
+- 新基线修订记录（2026-10-28，用户要求拉取 main 远程后按 UI 布局大重构更新）：本地 main 已按用户指示快进 `1e8acfa6 → 65d6d907`（PR #748 合并的 workspace-first 平台壳 v6.1，含 `docs/workspace-platform-redesign` 分支的全部工作区重构），本文 §2/§4/§5 按新树重钉，编号全部保留。核心结论：Rust 终端/会话/Agent 锚点未变，移动服务仍为全新 Rust 服务层；变化集中在桌面 UI 壳层：① 桌面新增 workspace-first 平台壳（主导航条、Workspaces 模式、多根目录工作区、隔离 tab），移动会话视图必须区分“后端运行终端 id”“已保存会话 id”“桌面展示 tab id”三类身份，不得用工作区 tab id 当 PTY attach id；② 同一已保存会话在 Sessions 模式与 Workspaces 模式下是独立运行实例，移动列表须以后端运行终端 id 为键，不得按已保存会话 id 合并；③ 平台工作区状态只存在桌面前端 localStorage（`taomni.platformWorkspaces.v1`），Rust 移动服务读不到，P0 文件校验仍以后端已知的会话/任务工作目录根为准，多根目录校验留给 TASK-04 盘点，不假装已打通；④ 桌面设置入口改为左侧主导航条底部的 Settings 按钮，配对与设备列表是实例级全局入口，不随工作区变化、不出现在单个工作区侧栏里。本次修订经用户 review 确认按建议处理（2026-10-28）：① 会话键规则按本修订的硬约束执行；② P0 文件校验以会话/任务工作目录根为准，多根目录校验留 TASK-04 盘点；③ 设置入口按主导航条 Settings 按钮的实例级全局入口执行。本次确认版推送到 PR #743（PR 分支基分支仍为旧 main `73e1f6cf`，见附录）。
+- 调研基线：taomni main `65d6d907`（2026-10-28 拉取后本地检出；原基线 `1e8acfa6` 的 §2 锚点已按新树重钉，见 §2 新增行与 §4/§5 修订）；工作区无已跟踪未提交变更，仅有 6 个未跟踪设计文件（含本文）。本设计不提交、不推送，只落盘为未跟踪文档，待用户 review。
 - 平台与运行方式：实例端（server）是 Windows、macOS、Linux 三端可运行的服务，server 代码必须兼容三端构建与运行；它有两种运行模式（DEC-06）：桌面模式（随 Tauri 桌面进程运行）与 headless 模式（不建窗口，只跑核心 + 移动服务），两种模式对外是同一 v1 契约。手机端只做 Mobile Web（PWA），在 Android Chrome / iOS Safari 浏览器里运行；现阶段不考虑上架 App，也不做原生壳（DEC-02 修订版）。
 - 本轮真机执行端：Linux（当前环境）；Windows/macOS 实例端与 Android/iOS 手机端均保留真机计划（§9），本轮完成 Linux 实例端验证即可满足本轮真机交付条件，其他端未执行不单独阻塞交付，但不得声称三端均已通过；headless 模式的真机验证与桌面模式分开记录。
 - 推荐方案：给每个 taomni 实例加一个**移动服务**（新增的 HTTP + WebSocket 服务，见 §4.1），手机是一个**瘦控制面**：实例列表、会话列表、Agent 任务卡片、终端 attach 视图、只读文件查看与 diff 查看。执行、PTY、Agent 状态全部留在实例端；手机只展示和发指令。实例之间、PC 与云之间不分两套协议，区别只在手机用哪个 endpoint URL 到达它。飞书/微信是第二客户端面（P1 的 IM 适配器，见 DEC-07）：它调同一 v1 API，只做通知、审批、直接发命令与非实时快照查看，不承载实时终端流。
@@ -23,7 +24,7 @@
 
 不做（明确排除）：原生 App 壳与应用商店上架（现阶段不考虑，未来如需另行决策）；手机上改代码、保存文件、解决冲突；手机上新建 SSH 连接、SFTP、数据库、RDP/VNC；云实例的开通/计费/多租户；屏幕共享；IM 承载实时终端流。
 
-兼容约束：桌面终端、聊天、会话的现有行为不得改变（AC-12）；移动服务默认关闭，关闭时不监听、不产生新端口、不影响桌面启动；移动服务开启也不改变桌面 UI，除设置页新增“移动服务”入口与已配对设备列表外；headless 模式不依赖任何窗口/WebView 状态。
+兼容约束：桌面终端、聊天、会话的现有行为不得改变（AC-12）；移动服务默认关闭，关闭时不监听、不产生新端口、不影响桌面启动；移动服务开启也不改变桌面 UI，除主导航条底部 Settings 按钮打开的设置入口中新增“移动服务”入口与已配对设备列表外（该入口是实例级全局入口，不随当前工作区变化，不在单个工作区侧栏里重复出现）；headless 模式不依赖任何窗口/WebView 状态；移动 PWA 不复用桌面 workspace-first 壳层的布局状态（`layoutSlice`、`workspaceUiStore`、`workspaceRailStore` 等只属于桌面 WebView，手机布局独立，见 §4.2）。
 
 ## 2. 当前实现与功能缺口
 
@@ -33,12 +34,14 @@
 | `src-tauri/src/terminal/output.rs` `TerminalOutputSubscribers` / `attach_terminal_output` / `send_terminal_output` | 终端输出通过 Tauri channel 发给桌面 WebView 订阅者；`read_loop_local` 读到数据即 `send_terminal_output`，退出时发 `terminal-exit-{session_id}` | 订阅模型可复用，但传输必须新增：Tauri channel 只到本机 WebView，到不了手机。新增 WS broker 时，输出扇出点应与现有 `send_terminal_output` 同源，避免桌面与手机看到两份不同输出 | 源码实查（事实） |
 | `src-tauri/src/terminal/pty.rs` / `pty/lifetime.rs` | `create_pty`、`create_command_pty`、`resize_pty` 等本地 PTY 能力 | P0 不新增 PTY 创建路径（只 attach 已有会话）；移动端“新建终端”如需进入 P1，届时再复用此处 | 源码实查（事实） |
 | `src-tauri/src/session/mod.rs` `list_sessions`、`src-tauri/src/session/models.rs` `SessionConfig` / `SessionType` | 会话配置持久化与按组列出 | 移动会话列表的“已保存会话”部分由此派生；“正在运行的终端”部分来自运行中终端注册表，两者是不同来源，视图层要合并而非混淆 | 源码实查（事实） |
-| `src-tauri/src/session/resume.rs` run snapshot | Welcome 页的上一轮运行快照：可恢复的会话 tab 集合，含白名单本地终端，不含整个工作区 | 只能证明“桌面重启后恢复 tab”已有快照概念，**不能**直接当作手机断线重连的回放，也不覆盖 Agent 轮次。手机重连回放由新增的 PTY ring buffer 负责（§4.3），不复用该快照表 | 源码实查（事实） |
+| `src-tauri/src/session/resume.rs` run snapshot（门面；记录在 `session/resume/model.rs`） | Home 页（原 WelcomePanel 升级）的上一轮运行快照：可恢复的会话 tab 集合，含白名单本地终端，不含整个工作区 | 只能证明“桌面重启后恢复 tab”已有快照概念，**不能**直接当作手机断线重连的回放，也不覆盖 Agent 轮次。手机重连回放由新增的 PTY ring buffer 负责（§4.3），不复用该快照表 | 源码实查（事实，新基线 `65d6d907` 重钉） |
 | `src-tauri/src/chat/run.rs` `ChatRunRegistry` / `ChatRunHandle::stop` | 在途聊天轮次的注册表；`DirectLlm` 用取消令牌，桥接进程用 `stop()` | 手机“停止当前轮次”映射到此处；这是 P0 唯一有把握的 Agent 干预动作。通用“审批”没有对应的统一注册表，见 AC-06 的条件性处理 | 源码实查（事实） |
 | `src-tauri/src/agent/`、`src/components/agent/`、`src/components/chat/` | Agent 桥接、工具卡片、确认卡片（如 `WebSearchConfirmCard`、`ActionCard`）散落在各桥接与 UI 处 | TASK-03 必须先盘点桌面已有的确认点，再决定手机能透传哪几个；不得在盘点前承诺“所有审批都能在手机上点” | 源码实查（事实，盘点结果待 TASK-03） |
 | `src-tauri/src/lib.rs`、`src-tauri/src/main.rs` | 无对外 HTTP / WebSocket 服务注册 | 移动服务是全新服务层，不是“把 Tauri IPC 暴露出去”。Tauri IPC 保留给桌面 WebView，手机走独立的 HTTP + WS 契约（§4.4） | 源码检索实查（事实） |
 | `src-tauri/src/servers/http.rs`、`src-tauri/src/servers/ssh.rs` | 前者是面向用户配置的静态文件 HTTP 服务（可配 CORS、目录浏览、根目录回退）；后者是内置 SSH/SFTP 服务 | **两者都不复用为移动入口**：静态服务的设计目标不是鉴权 API，SSH 服务面向局域网受信场景。移动服务独立成模块、自带鉴权与默认回环绑定（§4.5） | 源码实查（事实） |
 | `src/components/terminal/TerminalPanel.tsx`、`src/components/chat/ChatDrawer.tsx`、`src/stores/` | 桌面 SPA：xterm.js 终端、聊天抽屉、Zustand stores，全部依赖 Tauri IPC | 桌面前端不能原样当作手机前端。P0 手机 Web 是独立小应用，只借鉴 xterm 接线方式与任务卡片的信息结构，不直接复用桌面组件与 stores | 源码实查（事实） |
+| workspace-first 平台壳 v6.1（新基线新增）：`src/components/sidebar/PrimaryNavigationRail.tsx`（主导航条，`PrimaryNavMode = home \| workspaces \| sessions \| agents \| tools`，底部 Settings 按钮）、`src/layouts/main/MainLayoutView.tsx`（`WorkspaceMainPanel` 仅在 `workspaces` 模式可见）、`src/components/workspace/WorkspaceMainPanel.tsx` / `WorkspaceSwitcher.tsx` / `WorkspaceSidebar.tsx` / `WorkspaceTabStrip.tsx` / `WorkspaceSessionsPanel.tsx`、`src/stores/workspacePlatformStore.ts`（`PlatformWorkspace`、`WorkspaceIsolatedTab`）、`src/stores/app/layoutSlice.ts`（`workspaceSidebarCollapsed`、`rightSidebarCollapsed`、浮动 MFA，默认 `activeSideTab = home`） | 平台工作区是顶层项目容器：多根目录（`rootFolders`）、“★ 本工作区常用”已保存会话 id 快捷入口（`pinnedSessionIds`，仅快捷方式）、自有隔离 tab 列表；工作区 tab 从不触碰 `appStore.tabs`，同一已保存会话在 Workspaces 模式与 Sessions 模式下可同时运行且运行实例独立；平台工作区状态只持久化在桌面前端 localStorage（`taomni.platformWorkspaces.v1`），Rust 后端无对应表 | 移动设计必须区分三类身份，缺一不可：① 后端运行终端 id（PTY attach 的唯一目标）；② 已保存会话 id（`list_sessions` 的 `SessionConfig` id）；③ 桌面展示 tab id（Sessions 模式的 `appStore` Tab，仍无 `workspaceId` 字段；Workspaces 模式的 `WorkspaceIsolatedTab`，id 形如 `ws:<workspaceId>:<kind>:<uuid>`，含 `workspaceId` 与 `sessionId` 快捷引用）。移动会话列表须以后端运行终端 id 为键，不得按已保存会话 id 合并两个模式下的独立实例，也不得用工作区 tab id 去 attach PTY；工作区名称在手机上只作展示上下文（经 v1 API 暴露后才可用），不作校验依据（见 §4.3/§4.4 与 TASK-02/04 的盘点项） | 源码实查（事实，新基线 `65d6d907`，PR #748） |
+| 桌面设置入口（新基线）：`PrimaryNavigationRail` 底部 Settings 按钮 → `MainLayoutView` 的 `handleCommand("settings")` | 设置入口由主导航条触发，不属于某个工作区侧栏，也不在 Sessions/Workspaces 模式间各有一份 | 移动服务的配对码生成与已配对设备列表挂在这个实例级设置入口下，与当前工作区、当前模式无关；不得把配对入口做成“每个工作区一个” | 源码实查（事实，新基线 `65d6d907`） |
 | `vite.config.ts`、`package.json`（`pnpm dev` 浏览器预览） | 浏览器预览用 Tauri stubs，端口见配置 | 预览模式证明“React 前端可在浏览器跑”，但 stubs 不能证明手机能连真实实例。P0 手机 Web 的开发联调必须连真实移动服务（V-04），不能只用 stubs 交差 | 源码实查（事实） |
 | ZCode 官方文档（外部事实，2026-10-25 查阅） | 远程开发是桌面连 SSH/WSL/Docker，桌面负责账号与任务入口；Mobile Remote Control 不能新建连接，只能对桌面窗口已注册且断开的工作区触发重连，实际连接仍由桌面完成 | 本设计**不照抄 ZCode 字面模型**：ZCode 的手机是桌面遥控器，本设计的手机是多实例控制面（DEC-01）。抄前者会丢掉“多实例 + 云”这个用户核心诉求 | 文档实查（事实） |
 | OpenCode Mobile 文档（外部事实，2026-10-25 查阅） | “OpenCode 跑活，Mobile 只是控制面”；连接方式含局域网地址、扫码配对、Tailscale、Cloudflare Tunnel、反向代理，连接档案可切换 | 本设计的模型 B 与 endpoint 抽象与之同构，但协议、配对与鉴权按 taomni 现状重写，不照搬其 API | 文档实查（事实） |
@@ -108,7 +111,7 @@ flowchart LR
 
 ### 4.2 用户流程与交互
 
-入口：桌面模式在设置页新增“移动服务”：开关、监听方式、配对码生成、已配对设备列表与吊销；headless 模式的配对码由命令行/日志输出（TASK-01 定确切方式，不依赖设置页）。手机首次打开 Mobile Web：实例列表为空 → “添加实例” → 扫码或手动输入 endpoint + 配对码 → 成功后进入该实例的会话列表。P1 的 IM 入口不在 Mobile Web 内：用户先在实例端绑定 IM 身份（白名单用户），再在飞书/微信里与机器人对话。
+入口：桌面模式在主导航条底部 Settings 按钮打开的设置入口中新增“移动服务”：开关、监听方式、配对码生成、已配对设备列表与吊销（新基线：该入口是实例级全局入口，不随当前工作区/模式变化；不得在工作区侧栏里为每个工作区重复放一份配对入口）；headless 模式的配对码由命令行/日志输出（TASK-01 定确切方式，不依赖设置页）。手机首次打开 Mobile Web：实例列表为空 → “添加实例” → 扫码或手动输入 endpoint + 配对码 → 成功后进入该实例的会话列表。P1 的 IM 入口不在 Mobile Web 内：用户先在实例端绑定 IM 身份（白名单用户），再在飞书/微信里与机器人对话。
 
 主流程状态表：
 
@@ -139,9 +142,9 @@ PTY broker（拟新增，见 §5）：每个运行中终端一个 ring buffer，
 
 resize 权限（DEC-10 的一部分，与写权同一把锁）：手机只读态（未持有写权）下，resize 请求一律被服务端拒绝（回 `not_holder`），不得转发给 `resize_terminal`，否则手机在小屏上的一次 resize 会把桌面终端列宽挤窄，违反 AC-12 的桌面回归。持有写权时 resize 才生效，且受钳制（cols 20～300、rows 10～100，超出钳制，尺寸不变时不转发以免抖动）。服务端另行记录桌面最后一次尺寸：桌面经现有 `resize_terminal` 改尺寸时更新该值；手机释放写权或被桌面抢回时，服务端把 PTY 尺寸恢复为桌面尺寸（恢复失败时记日志、不阻塞写权释放）。SSH 终端同理，走 `resize_terminal` 的 SSH 分支（`window_change`），不另开通道。
 
-会话视图派生规则（P0 不新开持久化表）：运行中终端来自终端注册表；已保存会话来自 `list_sessions`；Agent 任务状态来自线程记录 + `ChatRunRegistry`（在途才有“运行中”，其余按线程最后状态展示）。若 TASK-02/03 盘点发现某字段无法派生（如线程最后状态字段缺失），允许在该任务内补一个只读派生字段，但不得为手机单独复制一份会话 DB。
+会话视图派生规则（P0 不新开持久化表；新基线修订）：运行中终端来自终端注册表；已保存会话来自 `list_sessions`；Agent 任务状态来自线程记录 + `ChatRunRegistry`（在途才有“运行中”，其余按线程最后状态展示）。若 TASK-02/03 盘点发现某字段无法派生（如线程最后状态字段缺失），允许在该任务内补一个只读派生字段，但不得为手机单独复制一份会话 DB。workspace-first 平台壳（新基线）带来的三类身份区分是硬约束：移动会话列表的键必须是后端运行终端 id，同一已保存会话在 Sessions 模式与 Workspaces 模式下是两个独立运行实例，不得按已保存会话 id 合并为一条；桌面展示 tab id（`appStore` Tab 或 `WorkspaceIsolatedTab` 的 `ws:` id）只是桌面 UI 的展示身份，不得用作 PTY attach 的目标 id，attach 一律以 `sessions` 接口返回的后端运行终端 id 为准；工作区内“★ 常用”只是已保存会话的快捷入口，不是运行实例，点开它是在该工作区新建一个独立运行实例。手机视图上可展示工作区名称作为上下文（经 v1 API 暴露后），但不得把桌面 `workspacePlatformStore`、`workspaceUiStore`、`layoutSlice` 的状态直接当作移动会话列表的数据源——那些状态只存在桌面 WebView，手机经 v1 API 拿到的才是实例端权威状态。
 
-文件/diff 视图（P0 只读）：改动列表来自任务的工具调用摘要与工作区变更（数据源以 TASK-04 盘点为准，git diff 优先、工具改动摘要为 fallback）；文件全文来自实例磁盘，但只允许已注册工作区根目录内的路径：先规范化（含符号链接解析），再校验仍在根内，越界一律拒绝，不只做字符串前缀判断（这是对既有 SFTP 沙箱仅 lexical 边界的显式收紧，移动文件 API 不得复用其宽松实现）。文件内容不落手机端缓存以外的持久化，大文件截断；diff 按 hunk 折叠，超长截断。文件改动事件经实例级事件流 `WS /api/v1/events` 推送 `file_changed { task_id, path, change_kind }`（不是终端 WS），手机收到后拉取列表与 diff，不轮询；任务状态 `task_status` 与会话变化亦同理走事件流，见 §4.4。
+文件/diff 视图（P0 只读；新基线修订）：改动列表来自任务的工具调用摘要与工作区变更（数据源以 TASK-04 盘点为准，git diff 优先、工具改动摘要为 fallback）；文件全文来自实例磁盘，但只允许后端已知的根目录内的路径：先规范化（含符号链接解析），再校验仍在根内，越界一律拒绝，不只做字符串前缀判断（这是对既有 SFTP 沙箱仅 lexical 边界的显式收紧，移动文件 API 不得复用其宽松实现）。“根”在 P0 的定义保持收敛：以会话/任务的工作目录根（后端已知）为准，不以平台工作区的多根目录（`rootFolders`）为准——因为平台工作区状态只存在桌面前端 localStorage，Rust 移动服务读不到，若 P0 假装能按多根目录校验，等于在设计里虚构了一个不存在的同步通道。多根目录校验若要做，须由 TASK-04 先盘点并定下同步方式（例如桌面端在移动服务开启/工作区变更时把工作区定义显式同步给移动服务，再由 v1 API 暴露），盘点前不承诺、不实现；盘点结论回填 AC-15 备注。文件内容不落手机端缓存以外的持久化，大文件截断；diff 按 hunk 折叠，超长截断。文件改动事件经实例级事件流 `WS /api/v1/events` 推送 `file_changed { task_id, path, change_kind }`（不是终端 WS），手机收到后拉取列表与 diff，不轮询；任务状态 `task_status` 与会话变化亦同理走事件流，见 §4.4。手机文件视图不得复用桌面 `WorkspaceFileTree` / `WorkspaceGitPanel` 组件（那是桌面多根目录与 in-workspace Git 的展示层），只经 v1 API 读只读数据。
 
 生命周期与资源：WS 连接断开即释放该连接的订阅与写权；ring buffer 随终端退出释放；配对设备吊销即吊销 token，后续 WS 握手失败；移动服务关闭时先断开全部手机 WS 再停止监听，桌面终端不受影响。
 
@@ -159,13 +162,13 @@ resize 权限（DEC-10 的一部分，与写权同一把锁）：手机只读态
 |---|---|---|---|---|
 | `GET /api/v1/health` | 手机 → 移动服务 | 无（可不鉴权，仅返回服务版本与是否需配对） | `{ service: "taomni-mobile", version: "1", pairing_required: bool }` | 只读，不泄露实例名与会话 |
 | `POST /api/v1/pair` | 手机 → 移动服务 | `{ endpoint_label, pairing_code }`（HTTPS 下传输） | 成功 `{ device_id, token }`（token 仅此次返回）；失败 `{ error: "invalid_or_expired_code" \| "rate_limited" }` | 一次性码单次有效、5 分钟过期；限流并记失败 |
-| `GET /api/v1/sessions` | 手机 → 移动服务 | Bearer token | `{ sessions: [{ id, kind: "terminal" \| "agent", title, status, last_activity_at, summary }] }` | 派生视图，字段只增不改语义；v1 内不删除字段 |
+| `GET /api/v1/sessions` | 手机 → 移动服务 | Bearer token | `{ sessions: [{ id, kind: "terminal" \| "agent", title, status, last_activity_at, summary, workspace_context? }] }`，其中 `id` 必须是后端运行终端/线程 id（新基线硬约束：不得返回桌面展示 tab id，更不得返回 `ws:` 工作区 tab id；同一已保存会话的两个模式实例是两条记录，`workspace_context` 仅作展示，来自 v1 API 暴露后的工作区信息，缺失时为空） | 派生视图，字段只增不改语义；v1 内不删除字段 |
 | `GET /api/v1/sessions/{id}` | 手机 → 移动服务 | Bearer token | 会话详情：终端为 cwd/类型/状态；Agent 为线程、当前步骤摘要、工具调用摘要（工具名 + 目标路径 + 状态，不含文件全文） | 同上 |
 | `POST /api/v1/sessions/{id}/stop` | 手机 → 移动服务 | Bearer token | 终端：按 `send_terminal_signal` 语义处理（TASK-02 定信号，默认不直接杀进程）；Agent 轮次：`ChatRunRegistry` 停止 | 幂等：已停止再调返回已停止，不报错为失败 |
 | `POST /api/v1/sessions/{id}/message` | 手机 → 移动服务 | `{ text }` | 作为该线程的新一轮发出 | 不篡改历史轮次 |
 | `POST /api/v1/tasks/{id}/confirmations/{cid}` | 手机 → 移动服务 | `{ decision: "approve" \| "reject" }` | 仅 TASK-03 确认可透传的确认点可用 | 不可透传时返回 `not_supported_on_mobile`，手机按 AC-06 展示 |
 | `GET /api/v1/tasks/{id}/changes` | 手机 → 移动服务 | Bearer token | `{ changes: [{ path, change_kind, diff_available }] }`，只含路径与状态，不含全文 | 路径须在工作区根内；越界返回拒绝 |
-| `GET /api/v1/files?path=...` | 手机 → 移动服务 | Bearer token + 规范化路径（查询串只传路径，不传 token） | 只读全文（截断标记 `{ truncated: bool }`）；大文件只返回前 N 行并提示 | 越界、符号链接逃逸、二进制文件均拒绝或转摘要，TASK-04 定确切规则 |
+| `GET /api/v1/files?path=...` | 手机 → 移动服务 | Bearer token + 规范化路径（查询串只传路径，不传 token） | 只读全文（截断标记 `{ truncated: bool }`）；大文件只返回前 N 行并提示 | 越界、符号链接逃逸、二进制文件均拒绝或转摘要，TASK-04 定确切规则；P0 的“根”以会话/任务工作目录根为准，不以平台工作区多根目录为准（新基线：平台工作区只在桌面前端 localStorage，移动服务读不到，多根目录校验留给 TASK-04 盘点，见 §4.3） |
 | `GET /api/v1/tasks/{id}/changes/{path}/diff` | 手机 → 移动服务 | Bearer token | 统一 diff（分 hunk，超长截断） | 数据源以 TASK-04 盘点为准；无 diff 时返回 `diff_unavailable` 而非空 diff |
 | `WS /api/v1/terminals/{id}/stream` | 手机 ↔ 移动服务 | 握手票据 + Origin 校验（见上跨域策略）；客户端消息见下 | 服务端消息见下；错误 `{ type: "error", code }` 后关闭 | 序列号单调递增，断线可续接；本连接只承载 PTY 相关消息，不承载任务/改动事件 |
 | `WS /api/v1/events`（拟新增，实例级事件流） | 手机 ↔ 移动服务 | 握手票据 + Origin 校验；客户端消息见下 | 服务端消息见下；错误 `{ type: "error", code }` 后关闭 | 每实例一连接，事件序列号单调递增；断线可按事件序列号续接，超出缓冲时回 `resync` |
@@ -186,7 +189,7 @@ WS 消息（JSON，输出数据用 base64，避免控制字符破坏帧解析）
 
 ### 4.5 三端兼容与相关存储、故障边界
 
-- 实例端三端：移动服务只用 Tokio + 标准网络与同步原语，不引入平台专属依赖；配对、token 哈希、ring buffer、WS 均与平台无关。Windows/macOS/Linux 的差异只在桌面设置页入口，不在协议层；中继与外网访问由用户自备，不在本设计内。
+- 实例端三端：移动服务只用 Tokio + 标准网络与同步原语，不引入平台专属依赖；配对、token 哈希、ring buffer、WS 均与平台无关。Windows/macOS/Linux 的差异只在桌面设置入口（主导航条 Settings 按钮）上，不在协议层；中继与外网访问由用户自备，不在本设计内。新基线补充：桌面 workspace-first 壳层（主导航条、Workspaces 模式、浮动 MFA、右侧上下文栏）是桌面 WebView 的展示层，不进入 v1 协议；移动 PWA 不得照搬该壳层的布局与状态机。
 - 实例端双模式：桌面模式与 headless 模式共享核心与 v1 契约，区别只在启动方式（建窗口 vs 不建窗口）与配对码输出方式（设置页 vs 命令行/日志）。TASK-01 必须证明核心不依赖窗口/WebView 状态，否则 headless 模式不得宣布完成。Linux 无 GUI 约束（Review 修订，DEC-06 的一部分）：`--headless` 模式不得调用 `tauri::Builder`（现有 `lib.rs` 的 `run()` 在 Linux 下走 Builder → `gtk::init()`，无 Display 的云主机上会 panic，headless 若复用该路径即是假 headless）；须在 `main.rs` 的命令行分发处（已有 `--screenshot-scroll-input` 等绕过 `run()` 的先例）在进 `taomni_lib::run()` 之前拦截 `--headless`，直接构建 Tokio Runtime、只初始化核心（DB、会话/终端注册表、移动服务）与事件 Sink，不初始化 GTK、WebView、窗口与桌面插件。核心模块现有的 `AppHandle` 事件发送（桌面终端退出 `terminal-exit-*`、SSH 认证提示、聊天流事件等）在移动服务路径上须解耦为可替换的 `EventSink` trait：桌面模式用 `AppHandle` 适配器（行为不变），headless 模式用转发到移动事件流 `/api/v1/events` / 日志的适配器；TASK-01 须先盘点 `AppHandle` 使用点并分类（移动路径必需 → 改 Sink，桌面专属 → headless 路径不得调用），不得用静默丢弃关键事件的空实现冒充解耦。
 - 手机端：只做 Mobile Web，不做原生壳与上架；P0 只要求现代移动浏览器（Android Chrome、iOS Safari），不要求原生能力；iOS PWA 的推送与后台限制是已知短板，P0 不承诺后台推送，系统级推送改由 P1 的 IM 通知覆盖（IM 本身不依赖 PWA 推送）。
 - 存储：实例端新增的持久化只有已配对设备清单（device_id、token 哈希、创建时间、最后使用时间）与已配对 Origin 清单（device_id、Origin，吊销时同步删除），与现有 vault/会话 DB 分离存放，删除该文件即等价于吊销全部设备；手机端实例注册信息存于浏览器存储，P0 明示其安全性低于原生 Keychain/Keystore。
@@ -219,12 +222,12 @@ WS 消息（JSON，输出数据用 base64，避免控制字符破坏帧解析）
 | `src-tauri/src/mobile/auth.rs`、`pairing.rs`（拟新增） | 一次性码生成/过期/单次核销、限流、token 签发与哈希存储、设备列表与吊销、WS 票据签发；配对时记录已配对 Origin 清单，吊销时同步删除；headless 模式配对码输出方式（命令行/日志，不依赖设置页） | AC-01/AC-02/AC-10/AC-16 | TASK-01 |
 | `src-tauri/src/mobile/events.rs`（拟新增） | 实例级事件总线：`WS /api/v1/events`，任务/改动/会话事件的发布、事件序列号、最近 200 条缓冲、`resync`；与终端 WS 的出队与序列号分离 | AC-08/AC-15 | TASK-01（骨架）+ TASK-02/03/04（事件发布与消费） |
 | `src-tauri/src/mobile/pty_broker.rs`（拟新增） | 每终端 ring buffer（1000 行 + 512 KiB 总字节 + 16 KiB 单行 + `\r` 覆盖 + 增量 UTF-8 解码）、扇出、序列号、背压断开、写权锁（含 resize 权限与桌面尺寸恢复）、桌面写抢回事件；复用 `io_commands.rs` 的写/改尺寸/信号 | AC-03/AC-04/AC-08/AC-11 | TASK-02 |
-| `src-tauri/src/mobile/session_view.rs`（拟新增） | 会话列表与详情的派生视图：运行中终端 + `list_sessions` + 线程状态合并；不新开会话 DB 表 | AC-02/AC-05 | TASK-02 |
+| `src-tauri/src/mobile/session_view.rs`（拟新增） | 会话列表与详情的派生视图：运行中终端 + `list_sessions` + 线程状态合并；不新开会话 DB 表；新基线硬约束：列表键为后端运行终端 id，不得按已保存会话 id 合并 Sessions/Workspaces 两个模式的独立实例，不得返回桌面展示 tab id（尤其不得返回 `ws:` 工作区 tab id） | AC-02/AC-05 | TASK-02 |
 | `src-tauri/src/mobile/agent_view.rs`（拟新增） | 任务状态、停止映射（`ChatRunRegistry`）、后续指令入口、确认点透传（以 TASK-03 盘点为准） | AC-05/AC-06 | TASK-03 |
-| `src-tauri/src/mobile/file_view.rs`（拟新增） | 只读文件/diff 视图：工作区根目录校验（含符号链接解析）、改动列表、文件全文截断、diff 分 hunk；数据源以 TASK-04 盘点为准 | AC-15 | TASK-04 |
+| `src-tauri/src/mobile/file_view.rs`（拟新增） | 只读文件/diff 视图：工作区根目录校验（含符号链接解析）、改动列表、文件全文截断、diff 分 hunk；数据源以 TASK-04 盘点为准；P0 的根以会话/任务工作目录根为准，平台工作区多根目录校验留给 TASK-04 盘点（新基线：平台工作区只在桌面前端 localStorage） | AC-15 | TASK-04 |
 | `src-tauri/src/mobile/im_adapter.rs`（拟新增，P1） | 飞书/微信 IM 适配器：飞书优先 WebSocket 长连接（实例主动出站，同一连接收事件与回消息，含重连退避与事件去重），入站 webhook 仅为已有公网 endpoint 时的 fallback；平台签名校验、白名单身份绑定、通知卡片、审批回传、直接发命令、快照查询；内部调同一 v1 API，不另建协议 | AC-17 | TASK-07 |
 | `src-tauri/src/lib.rs`、`src-tauri/src/state.rs`、`src-tauri/src/main.rs`（修改） | 仅在移动服务开启时把终端/任务注册表句柄交给 mobile 模块；不改现有命令签名与桌面事件名；headless 启动路径：`main.rs` 拦截 `--headless` 后绕过 `tauri::Builder` 直接跑 Tokio Runtime，只初始化核心 + 移动服务，不初始化 GTK/WebView/窗口；核心 `AppHandle` 事件发送解耦为可替换 `EventSink`（桌面用 AppHandle 适配器，headless 转发到移动事件流/日志） | AC-12/AC-16 | TASK-01 |
-| `src/components/settings/`（修改，桌面设置页） | 新增“移动服务”入口：开关、监听方式、配对码、已配对设备与吊销；其余设置页不动；headless 模式无此入口 | AC-01/AC-02 | TASK-01 |
+| `src/components/settings/`（修改，桌面设置入口；新基线：入口由 `PrimaryNavigationRail` 底部 Settings 按钮触发） | 新增“移动服务”入口：开关、监听方式、配对码、已配对设备与吊销；其余设置页不动；该入口为实例级全局入口，不随工作区变化；headless 模式无此入口 | AC-01/AC-02 | TASK-01 |
 | `mobile-web/`（拟新增，独立小应用） | Vite + React + xterm.js：实例列表、会话列表、任务卡片、终端 attach、文件查看、diff 查看、配对页、PWA manifest 与 Service Worker 外壳缓存；不依赖 Tauri IPC，只调 HTTP/WS；终端通道与 Agent 通道分开（键条 vs 多行提示词编辑器） | AC-02/AC-03/AC-05/AC-13/AC-15 | TASK-04 |
 | `src-tauri/resources/mobile-web/`（拟新增，构建产物） | 手机 Web 构建产物拷入处，由移动服务在 `/` 提供；构建脚本负责同步，不手工粘贴产物 | AC-13 | TASK-04 |
 | `src-tauri/Cargo.toml`（修改，待 TASK-01 核实） | 按需引入 WS/HTTP 依赖；不得引入桌面已有 RDP/VNC 等重依赖进移动服务；依赖选择以 TASK-01 核实后的 `Cargo.toml` 为准，本文不硬编 crate 名与版本 | AC-10 | TASK-01 |
@@ -233,10 +236,10 @@ WS 消息（JSON，输出数据用 base64，避免控制字符破坏帧解析）
 
 ### TASK-01 移动服务骨架、配对与鉴权、双运行模式
 
-- 职责与文件范围：`src-tauri/src/mobile/mod.rs`、`server.rs`、`auth.rs`、`pairing.rs`、`events.rs`（事件总线骨架）；`lib.rs`/`state.rs`/`main.rs` 的最小接线；桌面设置页“移动服务”入口；headless 启动路径。
+- 职责与文件范围：`src-tauri/src/mobile/mod.rs`、`server.rs`、`auth.rs`、`pairing.rs`、`events.rs`（事件总线骨架）；`lib.rs`/`state.rs`/`main.rs` 的最小接线；桌面设置入口“移动服务”（新基线：主导航条 Settings 按钮触发的实例级入口）；headless 启动路径。
 - 输入与必读：本设计 §4.1、§4.4、§4.5；仓库 `AGENTS.md` 网络规范（代理显形失败、不静默直连）与文件体积规则（新文件不超 800 行，超限即拆）。
 - 依赖：无前置 TASK；DEC-05、DEC-06 已定（只实现 endpoint 抽象，不实现中继逻辑；双模式同契约）。
-- 实施内容：默认回环监听 + 显式局域网选项；`/health`（含 `run_mode`）、`/pair`、静态 PWA 托管；一次性码（5 分钟、单次、限流）、token 签发与哈希存储、设备列表与吊销、WS 票据（单次、60 秒）；CORS 两级策略与 WS Origin 校验（§4.4：配对端点预检回显、业务端点仅放行已配对 Origin、Authorization 头放行、恒不设 `Allow-Credentials: true`、不设 `*`、配对时记录 Origin 清单、吊销时同步删除）；实例级事件总线骨架（`WS /api/v1/events`、事件序列号、200 条缓冲、`resync`，事件发布点由 TASK-02/03/04 接入）；服务启停与桌面进程解耦（服务失败不拖垮桌面）；核心与窗口解耦证明：headless 启动不建窗口、不依赖 WebView 状态，仍能提供会话、终端、任务视图；headless 配对码输出方式（命令行/日志）与桌面设置页配对并列；构建时同步手机 Web 占位页（真实页面由 TASK-04 补齐）。
+- 实施内容：默认回环监听 + 显式局域网选项；`/health`（含 `run_mode`）、`/pair`、静态 PWA 托管；一次性码（5 分钟、单次、限流）、token 签发与哈希存储、设备列表与吊销、WS 票据（单次、60 秒）；CORS 两级策略与 WS Origin 校验（§4.4：配对端点预检回显、业务端点仅放行已配对 Origin、Authorization 头放行、恒不设 `Allow-Credentials: true`、不设 `*`、配对时记录 Origin 清单、吊销时同步删除）；实例级事件总线骨架（`WS /api/v1/events`、事件序列号、200 条缓冲、`resync`，事件发布点由 TASK-02/03/04 接入）；服务启停与桌面进程解耦（服务失败不拖垮桌面）；核心与窗口解耦证明：headless 启动不建窗口、不依赖 WebView 状态，仍能提供会话、终端、任务视图；headless 配对码输出方式（命令行/日志）与桌面设置入口配对并列；构建时同步手机 Web 占位页（真实页面由 TASK-04 补齐）。
 - Linux Headless 无 GUI 约束（Review 修订，TASK-01 的硬性子项，不得以“桌面会话里跑通 headless”代替）：① `main.rs` 在进 `taomni_lib::run()` 之前拦截 `--headless`（已有 `--screenshot-scroll-input` 等绕过 `run()` 的先例），该分支不得调用 `tauri::Builder::default()`、`.build()`、`.run()`，不得初始化 GTK、WebView、窗口与桌面插件，直接构建 Tokio Runtime 并只初始化核心（DB、会话/终端注册表、移动服务）；② 盘点核心模块的 `AppHandle` 使用点（至少覆盖 `terminal/` 的终端退出/SSH 认证提示与 `chat/` 流事件），分类为移动路径必需与桌面专属：移动路径必需的改走可替换 `EventSink` trait（桌面模式用 AppHandle 适配器、行为不变；headless 模式转发到 `/api/v1/events` 或日志），桌面专属的在 headless 路径不得被调用（编译期或启动期守卫，不得静默丢弃）；③ 证明标准：无 Display 环境（清除 `DISPLAY`，不得用 Xvfb 冒充无 GUI）下 `--headless` 启动不 panic、移动服务正常响应，见 V-07；证明失败时 headless 部分回流，不谎称双模式完成。
 - 对应验收：AC-01、AC-02（配对与吊销部分）、AC-07（endpoint 抽象）、AC-09、AC-10、AC-16。
 - 验证与完成条件：V-01、V-06；产物为可独立启停的移动服务、设置页入口与 headless 启动路径。
@@ -247,7 +250,7 @@ WS 消息（JSON，输出数据用 base64，避免控制字符破坏帧解析）
 - 职责与文件范围：`src-tauri/src/mobile/pty_broker.rs`、`session_view.rs`；复用 `terminal/io_commands.rs`、`terminal/output.rs` 的输出同源点。
 - 输入与必读：本设计 §4.3、§4.4；`terminal/active.rs` 的 Local/SSH 分支；`session/mod.rs` 的 `list_sessions`。
 - 依赖：TASK-01 的服务骨架与鉴权；DEC-03、DEC-04、DEC-10 已定。
-- 实施内容：每终端 ring buffer（1000 行 + 512 KiB 总字节 + 16 KiB 单行 + `\r` 覆盖 + 增量 UTF-8 解码，见 §4.3）、attach 时行尾回放 + 序列号实时流、扇出、背压断开、心跳与重连续接、写权锁与桌面抢回事件；resize 与输入共用写权锁（只读态 resize 回 `not_holder` 不转发，持有写权时钳制 cols 20～300、rows 10～100，释放/抢回时恢复桌面尺寸，桌面经 `resize_terminal` 的改尺寸须更新桌面尺寸记录）；终端 WS 不再发布 `task_status`/`file_changed`（改由事件流，TASK-01 的事件总线骨架）；会话列表派生（运行中终端 + 已保存会话）；终端退出事件与 buffer 释放；`stop` 的终端语义（TASK 内定信号，默认不直接杀进程，并在 AC 文档中回填）。
+- 实施内容：每终端 ring buffer（1000 行 + 512 KiB 总字节 + 16 KiB 单行 + `\r` 覆盖 + 增量 UTF-8 解码，见 §4.3）、attach 时行尾回放 + 序列号实时流、扇出、背压断开、心跳与重连续接、写权锁与桌面抢回事件；resize 与输入共用写权锁（只读态 resize 回 `not_holder` 不转发，持有写权时钳制 cols 20～300、rows 10～100，释放/抢回时恢复桌面尺寸，桌面经 `resize_terminal` 的改尺寸须更新桌面尺寸记录）；终端 WS 不再发布 `task_status`/`file_changed`（改由事件流，TASK-01 的事件总线骨架）；会话列表派生（运行中终端 + 已保存会话，新基线硬约束：列表键为后端运行终端 id，不得按已保存会话 id 合并 Sessions/Workspaces 两个模式的独立实例，不得返回桌面展示 tab id）；终端退出事件与 buffer 释放；`stop` 的终端语义（TASK 内定信号，默认不直接杀进程，并在 AC 文档中回填）。
 - 对应验收：AC-03、AC-04、AC-08、AC-11。
 - 验证与完成条件：V-02、V-03；产物为两个 WS 客户端同 attach 一终端的集成证据（见 V-03）。
 - 并行与集成：与 TASK-03 并行；共享 `session_view` 的会话 id 命名（终端会话 id 与线程 id 不得混用同一命名空间，前缀区分）。
@@ -267,7 +270,7 @@ WS 消息（JSON，输出数据用 base64，避免控制字符破坏帧解析）
 - 职责与文件范围：`mobile-web/` 独立应用；`src-tauri/src/mobile/file_view.rs`；`src-tauri/resources/mobile-web/` 构建产物同步；PWA manifest 与 Service Worker。
 - 输入与必读：本设计 §4.2、§4.4；桌面 `TerminalPanel.tsx` 的 xterm 接线方式（仅借鉴，不直接复用组件）。
 - 依赖：TASK-01 的 API 与配对、TASK-02 的 WS 协议、TASK-03 的任务 API；DEC-02、DEC-09、DEC-11、DEC-12 已定。
-- 实施内容：先盘点 diff 数据源（git diff 优先、工具改动摘要为 fallback，盘点结论回填 AC-15 备注）；再实现实例列表（注册/切换/离线提示/吊销提示）、会话列表、任务卡片（状态/步骤摘要/停止/后续指令/确认按钮仅当后端支持时出现）、终端 attach（xterm.js、行尾回放区 + 实时区、常用键条、接管/释放、重连提示）、文件查看（只读、行号、截断提示）、diff 查看（改动列表实时更新、分 hunk 折叠、截断提示）、配对页（扫码与手动输入）、PWA 外壳缓存与离线提示、每块数据标上次更新时间；终端通道与 Agent 通道分开：终端键条只写 PTY，任务编辑器（多行、历史、常用指令模板）只发提示词；多实例切换须走跨域：外壳 Origin 与目标实例不同时，API 请求带 Authorization 头并依赖 §4.4 两级 CORS（客户端不得因 CORS 失败而降级为同源假设或把 token 放进 URL/静态资源请求）；任务卡片与改动列表订阅事件流 `/api/v1/events`（不依赖终端 WS），只读态 resize 按钮置灰（服务端仍以 `not_holder` 为准，UI 置灰只是提示，不替代服务端校验）。
+- 实施内容：先盘点 diff 数据源（git diff 优先、工具改动摘要为 fallback，盘点结论回填 AC-15 备注）与工作区根校验方式（新基线盘点项：平台工作区多根目录只在桌面前端 localStorage，P0 文件校验以会话/任务工作目录根为准，多根目录校验须先定同步方式再实现，盘点前不承诺）；再实现实例列表（注册/切换/离线提示/吊销提示）、会话列表（新基线：同一已保存会话的两个模式实例分开展示，以后端运行终端 id 为键，工作区名称只作展示上下文）、任务卡片（状态/步骤摘要/停止/后续指令/确认按钮仅当后端支持时出现）、终端 attach（xterm.js、行尾回放区 + 实时区、常用键条、接管/释放、重连提示）、文件查看（只读、行号、截断提示）、diff 查看（改动列表实时更新、分 hunk 折叠、截断提示）、配对页（扫码与手动输入）、PWA 外壳缓存与离线提示、每块数据标上次更新时间；终端通道与 Agent 通道分开：终端键条只写 PTY，任务编辑器（多行、历史、常用指令模板）只发提示词；多实例切换须走跨域：外壳 Origin 与目标实例不同时，API 请求带 Authorization 头并依赖 §4.4 两级 CORS（客户端不得因 CORS 失败而降级为同源假设或把 token 放进 URL/静态资源请求）；任务卡片与改动列表订阅事件流 `/api/v1/events`（不依赖终端 WS），只读态 resize 按钮置灰（服务端仍以 `not_holder` 为准，UI 置灰只是提示，不替代服务端校验）；手机 PWA 不得复用桌面 `WorkspaceFileTree` / `WorkspaceGitPanel` / `PrimaryNavigationRail` 等工作区壳层组件，只经 v1 API 读数据。
 - 对应验收：AC-02、AC-03、AC-05、AC-13、AC-14、AC-15。
 - 验证与完成条件：V-04、V-05；产物为可在手机浏览器打开的 PWA（先连本地实例，再连用户自备的第二个 endpoint）。
 - 并行与集成：UI 文案与状态名须与 §4.2 状态表一致；新增的移动端字符串不混入桌面 i18n 体系（P0 独立）。
@@ -307,7 +310,7 @@ WS 消息（JSON，输出数据用 base64，避免控制字符破坏帧解析）
 | V ID | AC / 用途 | 层级与文件 / case（标注拟新增） | 前置数据与操作 | 核心断言 | 命令、工作目录与前置依赖 | 改前依据 / 改后结果 |
 |---|---|---|---|---|---|---|
 | V-01 | AC-01/AC-10 / 配对与鉴权 | Rust unit（拟新增 `src-tauri/src/mobile/auth.rs`、`pairing.rs` 内联测试） | 生成一次性码、过期码、复用码、错误 token | 过期/复用/错误 token 均失败；成功 token 仅返回一次且实例端只存哈希；限流触发后后续请求被拒 | `src-tauri/`：`cargo test --lib mobile` | 待执行 |
-| V-02 | AC-02/AC-05 / 会话与任务视图 | Rust unit + 集成（拟新增 mobile session/agent 测试） | 构造运行中终端、已保存会话、在途与已结束线程 | 列表合并无 id 冲突；停止映射到取消/进程停止；已停止再调幂等 | `src-tauri/`：`cargo test --lib mobile`，集成按 `src-tauri/tests/README.md` | 待执行 |
+| V-02 | AC-02/AC-05 / 会话与任务视图 | Rust unit + 集成（拟新增 mobile session/agent 测试） | 构造运行中终端、已保存会话、在途与已结束线程；新基线：同一已保存会话在 Sessions/Workspaces 模式下的两个独立运行实例 | 列表合并无 id 冲突；两个模式实例以不同后端运行终端 id 分开展示，不按已保存会话 id 合并，不返回桌面 tab id；停止映射到取消/进程停止；已停止再调幂等 | `src-tauri/`：`cargo test --lib mobile`，集成按 `src-tauri/tests/README.md` | 待执行 |
 | V-03 | AC-03/AC-04/AC-08/AC-11 / PTY broker | Rust 集成 + WS 客户端脚本（拟新增） | 同一终端挂两个 WS 客户端、高速输出、断线重连、只读态 resize、进度条 `\r` 输出、拆在 UTF-8 多字节字符中间的 chunk、超长行与超 ring 总量输出 | 两客户端输出一致且为同一 PTY；写权单持有、桌面写抢回；只读态 resize 回 `not_holder` 且桌面尺寸不变，释放/抢回后恢复桌面尺寸；进度条不产生新行、不淹没 ring buffer；UTF-8 拆 chunk 后字符完整无替换字符；超 1000 行/512 KiB/16 KiB 单行时按边界淘汰/截断；重连按 `after_seq` 续接不重复；慢消费者被有界断开 | `src-tauri/`：`cargo test --test integration mobile`（以实际集成套件为准，TASK-02 回填确切过滤条件） | 待执行 |
 | V-04 | AC-03/AC-05/AC-13/AC-14/AC-15 / 手机 Web | Vitest（拟新增 `mobile-web/` 测试）+ 浏览器联调（连真实移动服务，不只 stubs） | 实例/会话/任务/文件/diff fixture、事件流回放与 `file_changed`/`task_status` fixture、不打开终端的任务卡片/改动页 | 实例切换不串数据；任务卡片状态与后端一致；不打开终端时任务状态与改动仍经事件流到达；PTY 高速输出不拖垮事件流时效；文件/diff 只读、越界拒绝、大文件截断；P0 边界入口（编辑/保存）不存在；离线显示上次更新时间而非假装最新 | 仓库根目录：`pnpm test <mobile-web 相关测试文件>`（实现后回填确切文件）；`pnpm dev` 仅作开发联调，不作通过证据 | 待执行 |
 | V-05 | AC-07/AC-16 / 到达方式与双模式 | 手工 + 脚本（拟新增联调记录） | 同一实例的两个用户自备 endpoint；桌面模式与 headless 模式各一次 | 两 endpoint 下配对、会话、终端均通，客户端无厂商分支；两种模式能力一致 | 以 §9 真机步骤为准 | 待执行 |
@@ -329,7 +332,7 @@ WS 消息（JSON，输出数据用 base64，避免控制字符破坏帧解析）
 
 - 对应验收：AC-01～AC-05、AC-07～AC-10、AC-12、AC-15、AC-16。
 - 执行前状态：实例已开启移动服务；手机未配对；实例上有一个正在输出的终端与一个在途 Agent 轮次。
-- 操作与逐步预期：生成配对码（桌面设置页或 headless 命令行/日志）→ 手机扫码配对成功，设备列表出现该设备 → 会话列表看到终端与任务 → 打开终端，先见行尾回放后见实时输出，与桌面一致 → 手机接管输入并输入一条无害命令（如 `echo mobile-takeover`），桌面可见该输出 → 桌面敲键盘，手机回只读并提示 → 任务卡片点停止，轮次停止 → 任务改动列表出现测试文件，点开看只读全文与 diff → 在任务卡片编辑器发一条后续提示词，作为新一轮发出（不经过 PTY）→ 切到第二实例，会话列表随之切换 → 关 Wi-Fi 再恢复，终端按序列号续接 → 同一实例改以另一运行模式（桌面 ↔ headless）重跑主流程，能力一致。
+- 操作与逐步预期：生成配对码（桌面设置入口：主导航条 Settings 按钮，或 headless 命令行/日志）→ 手机扫码配对成功，设备列表出现该设备 → 会话列表看到终端与任务 → 打开终端，先见行尾回放后见实时输出，与桌面一致 → 手机接管输入并输入一条无害命令（如 `echo mobile-takeover`），桌面可见该输出 → 桌面敲键盘，手机回只读并提示 → 任务卡片点停止，轮次停止 → 任务改动列表出现测试文件，点开看只读全文与 diff → 在任务卡片编辑器发一条后续提示词，作为新一轮发出（不经过 PTY）→ 切到第二实例，会话列表随之切换 → 关 Wi-Fi 再恢复，终端按序列号续接 → 同一实例改以另一运行模式（桌面 ↔ headless）重跑主流程，能力一致。
 - 故障与恢复：配对码过期重生成；token 吊销后手机显示吊销态；endpoint 断开后手机显示离线与上次在线时间；移动服务关闭后桌面终端与聊天仍正常；文件越界请求被拒。
 - 证据：配对与切换的录屏或截图、终端一致性的对照截图（桌面与手机同一时刻）、文件/diff 查看截图、WS 重连日志摘要、测试实例 endpoint 类型（局域网/用户自备隧道/云）与运行模式、设备型号/OS/浏览器版本。
 - 清理：吊销测试设备、删除测试实例注册、关闭移动服务、清理测试终端与测试线程、还原测试文件改动。
@@ -340,7 +343,7 @@ WS 消息（JSON，输出数据用 base64，避免控制字符破坏帧解析）
 | AC | 方案位置 | 开发任务 | 验证项与平台 | 所需证据 / 实际证据链接 | 当前缺口 |
 |---|---|---|---|---|---|
 | AC-01 | §4.4、DEC-08 | TASK-01 | V-01、真机 | 配对成功/过期/复用记录 | 未实现、待执行 |
-| AC-02 | §4.1、§4.4（CORS 两级策略） | TASK-01、TASK-04 | V-02、V-04、V-06、真机 | 双实例切换与吊销记录，含已配对/未配对 Origin 的 CORS 预检记录 | 未实现、待执行 |
+| AC-02 | §4.1、§4.4（CORS 两级策略）、§2 新基线工作区身份区分 | TASK-01、TASK-02、TASK-04 | V-02、V-04、V-06、真机 | 双实例切换与吊销记录，含已配对/未配对 Origin 的 CORS 预检记录，含同一已保存会话两个模式实例分开展示的记录 | 未实现、待执行 |
 | AC-03 | §4.3 | TASK-02、TASK-04 | V-03、V-04、真机 | 桌面与手机输出对照 | 未实现、待执行 |
 | AC-04 | §4.3、DEC-10 | TASK-02 | V-03、真机 | 接管与桌面抢回记录，含只读态 resize 拒绝与桌面尺寸恢复记录 | 未实现、待执行 |
 | AC-05 | §4.4 | TASK-03 | V-02、真机 | 停止与后续指令记录 | 未实现、待执行 |
@@ -353,7 +356,7 @@ WS 消息（JSON，输出数据用 base64，避免控制字符破坏帧解析）
 | AC-12 | §4.5 | TASK-05 | V-07、真机 | 桌面回归记录 | 未实现、待执行 |
 | AC-13 | §4.2、§4.4 | TASK-04 | V-04、真机 | PWA 安装与离线外壳记录 | 未实现、待执行 |
 | AC-14 | §1、§4.2 | TASK-04 | V-04 | P0 边界入口缺失检查（编辑/保存不存在） | 未实现、待执行 |
-| AC-15 | §4.3、§4.4、DEC-11（事件流） | TASK-01、TASK-04 | V-04、真机 | 文件/diff 只读与实时更新记录，含不开终端时事件流到达记录 | 未实现、待执行；diff 数据源待 TASK-04 盘点 |
+| AC-15 | §4.3、§4.4、DEC-11（事件流） | TASK-01、TASK-04 | V-04、真机 | 文件/diff 只读与实时更新记录，含不开终端时事件流到达记录 | 未实现、待执行；diff 数据源与工作区多根目录校验方式待 TASK-04 盘点（新基线） |
 | AC-16 | §4.1、§4.5、DEC-06（Linux 无 GUI 约束） | TASK-01 | V-05、V-07、真机 | 桌面与 headless 双模式记录，含无 Display 下 `--headless` 启动记录 | 未实现、待执行 |
 | AC-17 | §4.4、DEC-07（飞书 WS 长连接优先） | TASK-07（P1） | V-08 | 飞书端到端记录（含无入站端口下的 WS 长连接记录）；微信单独记录 | 未实现、待执行（P1，不阻塞 P0） |
 
@@ -369,6 +372,7 @@ WS 消息（JSON，输出数据用 base64，避免控制字符破坏帧解析）
 | 上架 App 已定（2026-10-25 第 4 条）：现阶段不考虑 | 若 P0 预设商店包名、签名或原生壳依赖，会白做工作 | 只做 Mobile Web，不预设商店信息；未来如需上架另行决策，不在本设计内留 P2 壳计划 | 不阻塞任何 TASK | 无（已定；未来另行决策） |
 | 双运行模式已定（2026-10-25 第 5 条，DEC-06）：桌面开着或 headless 均可 | 核心若仍依赖窗口/WebView 状态，headless 会是假 headless；云上无 GUI 时桌面模式不可用；Linux 下 `tauri::Builder` 会触发 `gtk::init()`，无 Display 时 panic | TASK-01 必须划清核心与 UI 边界并证明 headless 可跑全部 P0 能力；`--headless` 须绕过 Builder 直接跑 Tokio Runtime，`AppHandle` 事件发送解耦为可替换 Sink；证明须在真正无 Display 环境下做，在有 Display 的桌面会话里跑通不算通过；证明失败时 headless 部分回流，不谎称双模式完成 | TASK-01 的 headless 证明；不阻塞桌面模式先行 | TASK-01 的 headless 证明记录 |
 | 多实例 CORS 配错（Review 修订，DEC-09/AC-02/AC-10） | 若业务端点误设 `*` 或 `Allow-Credentials: true`，或误以为同源托管即无跨域，切换实例时会被浏览器拦住或放宽到不安全；若 Origin 清单与设备清单不同步，吊销后仍可跨域读接口 | 按 §4.4 两级策略实现与复查（TASK-01 实现、TASK-05 复查、V-06 逐项断言）；吊销即删 Origin，清单与设备清单同一持久化来源 | TASK-01、TASK-05；不阻塞 P0 核心先行，但 CORS 未通过不得宣布 AC-02/AC-10 完成 | V-06 的 CORS 断言全部通过 |
+| 工作区身份混淆（新基线，PR #748） | 同一已保存会话在 Sessions/Workspaces 模式下是独立运行实例，工作区 tab id（`ws:`）不是后端运行终端 id；平台工作区又只在桌面前端 localStorage，移动服务读不到多根目录定义 | 移动列表键一律用后端运行终端 id，attach 一律用该 id，不得用 tab id；P0 文件校验以会话/任务工作目录根为准，多根目录校验留给 TASK-04 盘点并定同步方式，盘点前不承诺 | TASK-02（会话键）、TASK-04（文件根盘点）；不阻塞 P0 核心，但会话键错误即属 AC-02/AC-03 未通过 | TASK-02/04 的盘点与 V-02/V-04 记录 |
 | PWA token 存储安全性（AC-10 已明示） | 浏览器存储弱于 Keychain/Keystore，设备丢失或 XSS 面扩大时 token 风险高于原生 | 现阶段不做原生壳，故在 UI 与文档中明示该短板；token 设有效期与吊销入口；未来如需原生壳再重审生命周期 | 不阻塞 P0；影响未来安全设计 | 未来原生壳决策时重审 |
 | endpoint 的 TLS 与域名信任（用户自备中继的前提） | 互联网到达时若 endpoint 无 TLS，token 与终端输出明文传输；本设计不替用户配 TLS | 配对页明示：互联网到达须用用户自备的带 TLS endpoint，局域网直连仅限受信局域网；TASK-05 复查文案与默认绑定 | TASK-01（配对页文案）、TASK-05（复查） | TASK-05 复查时复核 |
 | Agent 确认点盘点可能收缩 AC-06 | 若桌面确认点多为进程内回调而无统一钩子，手机审批面会小于预期 | TASK-03 先盘点后实现，不可透传的一律提示而非假按钮 | TASK-03 的确认接口部分 | TASK-03 盘点表交付 |
@@ -381,7 +385,7 @@ WS 消息（JSON，输出数据用 base64，避免控制字符破坏帧解析）
 
 本附录只为把背景说清楚，供接手实施的其他 agent 直接使用；本设计本身不包含任何实现代码，设计作者不实施。
 
-- 基线与位置：仓库为 engcapa/taomni，设计时本地基线为 main `1e8acfa6`（2026-10-25）；本文档位于 `docs-feature/mobile-remote-p0-design.md`。PR #743 的分支为 `docs/mobile-remote-p0-design`（首提交 `363bbf9d`，基分支为 PR 时的 origin/main `73e1f6cf`），本次 Review 修订版推送到同一 PR 后，PR 版与本地版一致；实施前仍须以远端分支最新提交为准，不得按旧提交硬套。实施前请先核对当前 main 是否已前进：若已前进，须把 §2 的代码锚点（终端、会话、Agent、服务模块）在新基线上重钉一遍，锚点变了以新基线为准，不得按旧行号硬套。
+- 基线与位置：仓库为 engcapa/taomni，设计时本地基线已更新为 main `65d6d907`（2026-10-28，用户指示拉取后快进，PR #748 workspace-first 平台壳 v6.1）；本文档位于 `docs-feature/mobile-remote-p0-design.md`。PR #743 的分支为 `docs/mobile-remote-p0-design`（首提交 `363bbf9d`、Review 修订提交 `581b0d1b`，基分支为 PR 时的 origin/main `73e1f6cf`，PR 仍 open、未合并），本次新基线修订经用户 review 确认后以新提交推送到同一分支，PR 的文件 diff 仍只有本文档 1 个文件（因为基分支未变）。实施前请先核对当前 main 是否已前进：若已前进，须把 §2 的代码锚点在新基线上重钉一遍，锚点变了以新基线为准，不得按旧行号硬套；workspace-first 壳层的桌面组件与状态一律不得当作移动服务的后端数据源。
 - 分支与提交规则：main 受 ruleset 分支保护，管理员也不能直推，所有改动须走分支 + PR（零审批 PR 可由用户合并）。实施 agent 不得尝试向 main 直推，不得以“本地编不过靠 CI 验证”为由跳过本地编译与测试（见仓库与工作区 AGENTS.md 的推送前检查：TS `tsc`、Rust `cargo check`、相关单测，缺系统依赖先装依赖）。
 - 必须先读的规则：仓库 `AGENTS.md`（文件体积：新文件不超 800 行；网络规范：代理失败显形、不静默直连；测试与提交规范）与本设计 §4 的 DEC 表。DEC/AC/TASK/V 的 ID 全程稳定：修订保留原 ID 并写清变更原因，不得重编号、不得把待决写成已定、不得把盘点未做写成已盘点。
 - 已定的背景（实施不得推翻，除非用户另行指示）：模型 B 多实例控制面；只做 Mobile Web，不上架、不做原生壳；PTY 共享而非屏幕共享；手机不改代码，只读文件/diff；中继与外网访问由用户自行解决，设计内不选型；IM 为 P1 第二客户端面（飞书先行，微信待决），不承载实时终端流；桌面与 headless 双模式同契约，均为 P0，IM 放 P1、headless 证明放 P0 的分期已由用户确认。
