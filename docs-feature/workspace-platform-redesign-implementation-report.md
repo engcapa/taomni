@@ -1,21 +1,61 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前功能全量与性能验收尚未完成。修复提交 `7dbd1e88` 的三平台相关集 [40569868761](https://github.com/engcapa/taomni/actions/runs/40569868761) 已全部通过：48 个精确 ID、178/178 次适用执行、18/18 分片，0 failed / skipped / infrastructure errors，全部原始回执、源码/runner/case/原生构建身份及最终汇总已独立核验。包含整组九项崩溃回归、Windows 选区修复、分屏面包屑与保留行为。此前三平台崩溃组 42/42 和 Linux 面包屑专项 14/14 也已核验。已重新 fetch 并无冲突合并 main `65d6d907`，合并提交 `efd6c4ed` 的三平台全量 [40577348054](https://github.com/engcapa/taomni/actions/runs/40577348054) 已结束并独立核验：2,102 passed / 1 failed，唯一失败为 macOS native RDP 照片帧率比 0.75228（要求 ≥0.85）；尚未全量通过。旧相关集与旧全量的失败、慢样本全部保留。browser/native 只在 GitHub 执行，本机仅运行单测、编译与静态检查；功能全量通过后再做正式性能对照，目前没有“性能无退化”的结论。证据目录为 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 用例按用户认可的现有 policy 单独报告缺口。
+> 产品提交 `0535305b` 已完成三平台 browser/native 全量功能验收：641 个适用 ID、2,103/2,103 次执行、25/25 分片，0 failed / skipped / infrastructure errors；全部原始回执、源码/runner/case/原生构建身份及最终汇总已独立核验。此前相关集为 38 ID、140/140 passed。main `65d6d907` 已合并。首轮正式 Linux/WebKitGTK 性能流程因测量工具的 SVG 点击错误失败，尚未测量候选版本，不能得出性能结论；工具修复后重新执行精确 HEAD 门禁。后续 browser/native 均只在 GitHub 执行，本机仅做单测、静态检查和供手测的 release 编译。唯一外部 clickhousecrud 项目缺口按用户确认单独列出。以下历史章节中的“待复验”仅代表当时状态，以本节当前验收为准。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
 
-## Workspace 标签栏与延迟终端焦点（2026-10-28，修复待托管复验）
+## 当前功能验收与性能复核（2026-10-28）
 
-分屏库补丁提交 `75d87ad9` 的三平台相关集 [40601604851](https://github.com/engcapa/taomni/actions/runs/40601604851) 包含 38 个 ID、140 次适用执行、18 分片。目前 Linux native TC-WS-038/039 与八个新增尺寸检查通过，但 macOS browser TC-WS-048 在 End 后等待末端按钮禁用失败；原 trace 显示 Home 正常切到第一标签，紧接着 End 派发时 xterm 已重新获得焦点，活动标签仍为第一项。原始失败保留，不将此前相关集通过作为当前成功证据。
+相关集 [40604739146](https://github.com/engcapa/taomni/actions/runs/40604739146) 已核验 **38 ID、140/140 passed**，18/18 分片。随后在相同产品提交 `0535305b3fd0b9d0bc8425e7ee8a023b5433c0c2` 执行 `scope=all`：[40609887227](https://github.com/engcapa/taomni/actions/runs/40609887227)，最终 **641 个适用 ID、2,103/2,103 passed**，25/25 分片，0 failed / skipped / infrastructure errors。以下数量均来自原始回执核验，未将未分配、未执行或不适用项计为通过。
 
-`useTerminalViewport` 已为 Sessions 保留 `[role=tablist][data-keyboard-navigation=true]` 的焦点保护，而 Workspace strip 未接入此意图。切到另一终端后，50ms + RAF 的正常终端激活会覆盖刚建立的键盘标签焦点；这是产品回归，不能用等待或输入重放解决。两个新挂载测试组合真实 Workspace strip、store 与 terminal viewport hook，仅替代 xterm DOM 边界，在改前 2/2 失败。现为键盘导航/激活设置相同意图，pointer capture 清除，保留真实鼠标激活后自动聚焦终端。新增/保留焦点、过滤、滚动与 Sessions 组共 33/33 通过；TypeScript、refactor、更新用例 schema 与行为契约通过。
+| 平台 / 模式 | 适用执行 | Passed |
+| --- | ---: | ---: |
+| Linux browser | 443 | 443 |
+| Linux native | 275 | 275 |
+| Linux native 双显示器 | 1 | 1 |
+| Windows browser | 443 | 443 |
+| Windows native | 257 | 257 |
+| macOS browser | 441 | 441 |
+| macOS native | 243 | 243 |
 
-TC-WS-048 保留全部原步骤、精确滚动和 300 秒预算，新增第一/最后标签的真实焦点与选择断言，以及 Home/Sessions 隐藏恢复后的再次 Home/End，共 92 步；仍需新提交的三平台 browser/native 复验。补丁前的用例修正版 [40598905018](https://github.com/engcapa/taomni/actions/runs/40598905018) 已独立核验 **25 ID、89/89 passed**、15/15 回执；这不能覆盖本节新源码。
+完整九条 `crash-regression`（TC-WS-038/039/045/051/052/053/054/055/056）在相关集及全量中均执行并通过，三平台适用执行为 **42/42**。已纳入产品 PR，以及手动 selected / impacted / smoke / all 路径；遗漏原因、数量边界和后续执行约束见 [崩溃专项复盘](../qa-ui-auto-tests/ci/crash-regressions.md)。专项不代替本次功能及其他消费者回归。
 
-本机已完成分屏库补丁阶段的 QA release：`src-tauri/target/qa-ui-auto/release/taomni`，`com.taomni.app.qa`，source SHA `954e17ba386813697e3eb3ddad32b2e6b782acbcb901a46e9790183c5a0b2f1b`、binary SHA `71e8329f326b7c88396d300f513dcfb25e0ffe6cc7a779bec80b6ddeb7b9d894`，编译 1060.94 秒、jobs 2，输入核验匹配。该阶段 binary 尚未包含本节的焦点修复；源码稳定后再更新手测版本。没有在本机运行 browser/native 用例。
+最终产品 source SHA 为 `6ed9ab49dc80b47167a550c02fec0bc8df2970471351199ed58d4ca37bd32809`，runner SHA 为 `960aea3b48d469095626d51b22fb66cb31a38e6840e3e0a2911b129180bc7c01`。独立核验结果保存在 repo 外证据目录的 `github-40604739146/verified-final.json` 和 `github-40609887227/verified-final.json`，与托管汇总完全一致；每份原始 receipt 和原生 build-source 身份均已检查。文档后续更新不改变该产品源码指纹。
+
+本轮全量的 RDP 照片 observed FPS 比为 Linux **1.00598**、Windows **1.00646**、macOS **1.05282**，均达到原有 ≥0.85 要求，三平台 bulk 解码错误均为 0。macOS baseline / adaptive 为 17.8528 / 18.7958fps。原全量 40577348054 的 0.75228 失败及慢样本保留；诊断没有改变编码算法，本轮通过不代表已证明该旧失败的唯一根因。
+
+main 同步按用户要求在相关集通过后执行：远程 `65d6d907efdf291478e660dc1ada96a12a41b8ad` 已合并为 `efd6c4ed`，本轮全量包含该合并。外部 `TC-IDE-C6-06-java-definition-realproject-native` 依赖未随仓库提供的 clickhousecrud，在 Linux/Windows/macOS native 各有一项 policy gap，按用户确认单独记录，**不计为通过**。
+
+首轮正式性能 workflow [40616686958](https://github.com/engcapa/taomni/actions/runs/40616686958) 已保留失败：main-1 完成 24 个真实 PTY 的建立、切换、echo 与 2MiB 输出后，在第一下关闭标签时调用 SVGElement 不支持的 `.click()`，未进入候选版本或比较阶段。原始部分数据、截图、traceback 和二进制身份全部保留，不混入新的完整四轮结果。
+
+测量工具改用同一套兼容 SVG/HTML 的 bubbling、cancelable MouseEvent；两版采用一致操作，React 原有关闭处理和 stopPropagation 语义保留，缺少控件会显式失败。其余 DOM 点击共用这一实现，关闭全部 24 个标签及进程/资源观察不删减。新增真实 jsdom SVG/HTML 与 React 事件委托单测，确认旧 SVG 调用失败、最后一个标签只关闭一次且不激活父标签、HTML 事件语义与缺失控件失败；完整性能工具契约 **13/13** 通过。此修改只涉及测量工具，不改变产品源码；runner 身份改变，因此保留现有功能证据并重新执行新 HEAD 的 GitHub 全量门禁，不绕过精确身份要求。
+
+正式对照基线仍为重构前 main `a57437927b62d6036a6d473eddccc053a4b4c0e8`；同一 Ubuntu/WebKitGTK release 环境依次运行 main-1 / candidate-1 / main-2 / candidate-2，覆盖 24 个真实 PTY、2MiB 输出、3,097 文件、24 个 64KiB 文件标签、1MiB 编辑器与每轮 400 次真实输入，并检查保存 / undo / redo 的内容 hash。全部尾部样本、身份和资源记录保留，使用既定 15% 相对预算和基线噪声，结果待收齐。
+
+功能全量完成后进行了以下代码性能审查，检查结果本身不替代实测：
+
+| 路径 | 审查结论 |
+| --- | --- |
+| Sessions / Workspaces 运行实例 | 工作区首次访问才创建 canvas；一个工作区共享一个完整编辑器，稳定 tab key 保留原协议实例。关闭标签移出渲染树；没有按文件重复创建编辑器 |
+| Terminal / 大预览 | 相同 cols/rows 不重复发 resize IPC，隐藏零尺寸不 fit。全局 registry 持有实时 ref；大预览仅打开时创建 1 秒刷新 timer，关闭即清理，每次只取八行近期输出。terminal owner 清理 observer、订阅、timer、IME、registry 和其拥有的 PTY，分离/接管语义保留 |
+| 文件浏览器 | 异步目录列表与语言服务识别分开，generation 与每目录请求序号阻止迟到结果覆盖。递归索引按需加载并保留既有深度/文件数量上限；WeakMap 按不可变列表及有限排序选项复用排序结果。没有宣称文件树已虚拟化 |
+| 布局 / resize | 真实 DOM 或 panel group 各自合并一帧通知；替换/卸载取消帧并断开观察，忽略迟到 callback。pointer/keyboard 开始及 release 前刷新待处理布局，保留真实最终宽度 |
+| 草稿恢复 / 编辑输入 | 镜像前比较 buffer 字段，不变的文件 tab 集合返回原 state。草稿保留同步末次按键恢复；大文件序列化成本由完整输入延迟、资源与内容断言判断，不能通过简单 debounce 牺牲立即关闭后的恢复 |
+
+测量边界：QA 构建开启全缓冲文本镜像；WebDriver / DOM / 下一帧时间不是物理按键到显示器延迟；Linux/WebKitGTK/Xvfb 对照不建立 Windows/macOS/GPU 性能结论。四份原始结果及比较将在 workflow 完成后补充。
+
+## Workspace 标签栏与延迟终端焦点（2026-10-28，托管复验通过）
+
+分屏库补丁提交 `75d87ad9` 的相关集 [40601604851](https://github.com/engcapa/taomni/actions/runs/40601604851) 最终 **139 passed / 1 failed**，18/18 分片；74 次 native 全部通过，唯一失败为 macOS browser TC-WS-048。原 trace 显示 Home 正常切到第一标签，紧接着 End 派发时 xterm 已重新获得焦点，活动标签仍为第一项。该失败及全部原件保留。
+
+`useTerminalViewport` 已为 Sessions 保留 `[role=tablist][data-keyboard-navigation=true]` 的焦点保护，而 Workspace strip 未接入此意图。切到另一终端后，50ms + RAF 的正常终端激活会覆盖刚建立的键盘标签焦点。两个新挂载测试组合真实 Workspace strip、store 与 terminal viewport hook，仅替代 xterm DOM 边界，在改前 2/2 失败。现为键盘导航/激活设置相同意图，pointer capture 清除，保留真实鼠标激活后自动聚焦终端。新增/保留焦点、过滤、滚动与 Sessions 组共 33/33 通过；TypeScript、refactor、更新用例 schema 与行为契约通过。
+
+TC-WS-048 保留全部原步骤、精确滚动和 300 秒预算，新增第一/最后标签的真实焦点与选择断言，以及 Home/Sessions 隐藏恢复后的再次 Home/End，共 92 步。修复提交 `0535305b` 的三平台 browser/native 相关集 140/140 与全量 2,103/2,103 均已独立核验通过。补丁前的用例修正版 [40598905018](https://github.com/engcapa/taomni/actions/runs/40598905018) 的 25 ID、89/89 passed 仅作为历史保留。
+
+本机 QA release 已包含分屏库补丁和焦点修复：`src-tauri/target/qa-ui-auto/release/taomni`，`com.taomni.app.qa`，source SHA `6ed9ab49dc80b47167a550c02fec0bc8df2970471351199ed58d4ca37bd32809`、binary SHA `027c1f0b0563a0d2a3ef26ef05e57670d0b320c157e52f5c410b5df2294986e9`，编译 1094.55 秒、jobs 2，构建与输入核验均通过。未在本机运行后续 browser/native 用例。
 
 ## 真实分屏库的观察器边界（2026-10-28，修复待托管复验）
 

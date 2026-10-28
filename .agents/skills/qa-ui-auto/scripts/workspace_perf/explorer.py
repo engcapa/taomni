@@ -51,10 +51,7 @@ def run(*, binary, cfg, root, NativeHarness, NativeStepContext, VERBS, common, e
     def save():
         common.retain(folder / "metrics.json", metrics)
 
-    def click(s, selector):
-        return s.execute(
-            "document.querySelector(" + q(selector) + ").click();return true;"
-        )
+    click = common.click
 
     def file_selector(name):
         return '[data-testid="code-workspace-tree-file"][data-path=' + q(name) + "]"
@@ -102,7 +99,7 @@ def run(*, binary, cfg, root, NativeHarness, NativeStepContext, VERBS, common, e
                 )
                 metrics["coldWorkspaceOpen"] = timed(
                     s,
-                    "document.querySelector(" + q(row) + ").click()",
+                    common.click_action(row),
                     "(document.querySelector('[data-testid=\"code-workspace-editor\"]')?.textContent||'').includes('WORKSPACE_PERF_TAB_00')",
                     90,
                 )
@@ -144,7 +141,7 @@ def run(*, binary, cfg, root, NativeHarness, NativeStepContext, VERBS, common, e
                     cold.append(
                         timed(
                             s,
-                            "document.querySelector(" + q(arrow) + ").click()",
+                            common.click_action(arrow),
                             "!!document.querySelector(" + q(child) + ")",
                             45,
                         )
@@ -154,7 +151,7 @@ def run(*, binary, cfg, root, NativeHarness, NativeStepContext, VERBS, common, e
                     warm.append(
                         timed(
                             s,
-                            "document.querySelector(" + q(arrow) + ").click()",
+                            common.click_action(arrow),
                             "!!document.querySelector(" + q(child) + ")",
                             45,
                         )
@@ -261,7 +258,7 @@ def run(*, binary, cfg, root, NativeHarness, NativeStepContext, VERBS, common, e
                     switches.append(
                         timed(
                             s,
-                            "document.querySelector(" + q(selector) + ").click()",
+                            common.click_action(selector),
                             "(document.querySelector('[data-testid=\"code-workspace-editor\"]')?.textContent||'').includes("
                             + q(f"WORKSPACE_PERF_TAB_{i:02}")
                             + ")",

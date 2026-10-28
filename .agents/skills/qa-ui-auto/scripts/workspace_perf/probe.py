@@ -81,10 +81,6 @@ def event(text):
     print(label, text, flush=True)
 
 
-def click(s, selector):
-    return s.execute("document.querySelector(" + q(selector) + ").click();return true;")
-
-
 def ctx_for(s, folder):
     return NativeStepContext(s, folder, cfg)
 
@@ -131,9 +127,7 @@ def sessions():
             ctx = ctx_for(s, folder)
             try:
                 VERBS["vault_first_run"](ctx, "qa-isolated-workspace-performance")
-                s.execute(
-                    "document.querySelector('[data-testid=\"side-tab-sessions\"]')?.click();return true;"
-                )
+                common.click(s, '[data-testid="side-tab-sessions"]')
                 until(
                     s,
                     "!!document.querySelector('[data-testid=\"new-local-terminal\"]')",
@@ -142,7 +136,7 @@ def sessions():
                 for i in range(24):
                     sample = timed(
                         s,
-                        "document.querySelector('[data-testid=\"new-local-terminal\"]').click()",
+                        common.click_action('[data-testid="new-local-terminal"]'),
                         f'document.querySelectorAll(\'[data-testid="terminal-pane"]\').length==={i+1} && !!document.querySelector(\'[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]\')',
                         45,
                     )
@@ -166,7 +160,7 @@ def sessions():
                     switches.append(
                         timed(
                             s,
-                            "document.querySelector(" + q(selector) + ").click()",
+                            common.click_action(selector),
                             "document.querySelector("
                             + q(selector)
                             + ")?.getAttribute('data-active')==='true' && !!document.querySelector('[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]')",
@@ -211,8 +205,10 @@ def sessions():
                 save()
                 screenshots(s, "sessions24")
                 for count in range(24, 0, -1):
-                    s.execute(
-                        '[...document.querySelectorAll(\'[data-testid="tab-item"][data-tab-type="terminal"] [data-testid="tab-close"]\')].at(-1).click();return true;'
+                    common.click(
+                        s,
+                        '[data-testid="tab-item"][data-tab-type="terminal"] [data-testid="tab-close"]',
+                        last=True,
                     )
                     until(
                         s,

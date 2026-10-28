@@ -8,6 +8,26 @@ def q(value):
     return json.dumps(value)
 
 
+def click_action(selector, *, last=False):
+    # SVGElement has no HTMLElement.click() in WebKit. Use the same bubbling
+    # DOM event for both revisions and both element types; this remains a
+    # renderer timing probe, not trusted OS pointer input.
+    target = (
+        "[...document.querySelectorAll(" + q(selector) + ")].at(-1)"
+        if last else "document.querySelector(" + q(selector) + ")"
+    )
+    return (
+        "(()=>{const target=" + target + ";"
+        "if(!target)throw new Error(" + q("Missing performance control: " + selector) + ");"
+        "target.dispatchEvent(new MouseEvent('click',"
+        "{bubbles:true,cancelable:true,composed:true,view:window,detail:1,button:0}));})()"
+    )
+
+
+def click(session, selector, *, last=False):
+    return session.execute(click_action(selector, last=last) + ";return true;")
+
+
 def until(session, expression, timeout=30):
     deadline = time.monotonic() + timeout
     last = None

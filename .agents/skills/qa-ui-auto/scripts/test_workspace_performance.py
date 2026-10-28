@@ -10,6 +10,7 @@ import sys
 import tempfile
 from unittest import TestCase
 
+from workspace_perf import common
 from workspace_perf.common import stats
 from workspace_perf.explorer import dataset
 from workspace_perf.hosted import linux_release_entry, validate_gate
@@ -162,3 +163,88 @@ class WorkloadTest(TestCase):
         result = stats(values)
         self.assertEqual(values[-1], 500)
         self.assertEqual(result, {"n": 20, "p50": 1, "p95": 1, "max": 500})
+
+
+class ClickDispatchTest(TestCase):
+    """Exercise real SVG/HTML DOM and React delegation without launching a UI."""
+
+    HARNESS = r"""
+const fs = require('node:fs');
+const {JSDOM} = require('jsdom');
+const {window} = new JSDOM('<div id="root"></div>', {runScripts:'outside-only'});
+global.window = window;
+global.document = window.document;
+const React = require('react');
+const {createRoot} = require('react-dom/client');
+const {flushSync} = require('react-dom');
+const input = JSON.parse(fs.readFileSync(0, 'utf8'));
+const events = [];
+let activations = 0;
+function Tabs() {
+  const [ids, setIds] = React.useState(['first', 'last']);
+  return React.createElement('div', {onClick:()=>{activations++;}},
+    ids.map(id=>React.createElement('div', {key:id, 'data-tab-id':id},
+      React.createElement('svg', {'data-testid':'tab-close', onClick:event=>{
+        event.stopPropagation();
+        events.push({id, tag:event.target.tagName, bubbles:event.bubbles,
+          cancelable:event.cancelable, detail:event.detail, button:event.button});
+        setIds(ids=>ids.filter(value=>value!==id));
+      }}))),
+    React.createElement('button', {'data-testid':'html-button', onClick:event=>{
+      event.preventDefault();
+      events.push({tag:event.target.tagName, bubbles:event.bubbles,
+        cancelable:event.cancelable, detail:event.detail, button:event.button});
+    }}, 'Open'));
+}
+const root = createRoot(document.getElementById('root'));
+flushSync(()=>root.render(React.createElement(Tabs)));
+let error = null;
+try { flushSync(()=>window.eval(input.script)); }
+catch (value) { error = String(value); }
+const result = {error, events, activations,
+  tabs:[...document.querySelectorAll('[data-tab-id]')].map(el=>el.dataset.tabId)};
+flushSync(()=>root.unmount());
+window.close();
+process.stdout.write(JSON.stringify(result));
+"""
+
+    def dispatch(self, script):
+        result = subprocess.run(
+            ["node", "-e", self.HARNESS],
+            input=json.dumps({"script": script}),
+            text=True, capture_output=True, check=True,
+            cwd=Path(__file__).resolve().parents[4],
+        )
+        return json.loads(result.stdout)
+
+    def test_historical_svg_does_not_have_an_html_click_method(self):
+        result = self.dispatch("document.querySelector('svg').click()")
+        self.assertIn("click is not a function", result["error"])
+        self.assertEqual(result["tabs"], ["first", "last"])
+        self.assertEqual(result["events"], [])
+
+    def test_last_svg_closes_once_through_react_without_activating_its_tab(self):
+        result = self.dispatch(common.click_action('[data-testid="tab-close"]', last=True))
+        self.assertIsNone(result["error"])
+        self.assertEqual(result["tabs"], ["first"])
+        self.assertEqual(result["activations"], 0)
+        self.assertEqual(result["events"], [{
+            "id": "last", "tag": "svg", "bubbles": True, "cancelable": True,
+            "detail": 1, "button": 0,
+        }])
+
+    def test_html_control_uses_the_same_bubbling_cancelable_mouse_event(self):
+        result = self.dispatch(common.click_action('[data-testid="html-button"]'))
+        self.assertIsNone(result["error"])
+        self.assertEqual(result["tabs"], ["first", "last"])
+        self.assertEqual(result["activations"], 1)
+        self.assertEqual(result["events"], [{
+            "tag": "BUTTON", "bubbles": True, "cancelable": True,
+            "detail": 1, "button": 0,
+        }])
+
+    def test_missing_control_fails_instead_of_silently_skipping_the_action(self):
+        result = self.dispatch(common.click_action('[data-testid="missing"]', last=True))
+        self.assertIn('Missing performance control: [data-testid="missing"]', result["error"])
+        self.assertEqual(result["events"], [])
+        self.assertEqual(result["tabs"], ["first", "last"])
