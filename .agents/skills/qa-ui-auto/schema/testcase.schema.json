@@ -86,6 +86,7 @@
           "platform_workspace_root",
           "workspace_ignored_ancestor_root",
           "workspace_explorer",
+          "workspace_compact_tree",
           "workspace_hidden_entries",
           "workspace_slow_lsp",
           "workspace_restore_sessions",

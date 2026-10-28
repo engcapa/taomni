@@ -15,6 +15,7 @@
 | TC-WS-054 | QA release WebView 四真实文件布局；保存后的独立磁盘 SHA-256；冷启动及重新分屏 | native/release |
 | TC-WS-055 | Sessions 空／单／四面板，关闭至空再新建；工作区混合布局及 dirty 保留；browser 本地终端不可用的错误状态也可正常操作布局 | browser |
 | TC-WS-056 | 与 TC-WS-055 对应的真实 PTY：就绪后执行命令，布局后逐个检查独立输出再关闭，清空后新建执行；返回工作区原输出保留且可继续执行 | native |
+| TC-WS-057 | Default Workspace 恢复 Compact 模式；Home 形状目录中浏览压缩路径与真实文件，AppData 保持折叠，导航／reload／切换视图后内容和展开状态保留；hook 回归另断言扫描范围、并发、重试及迟到响应 | browser/native |
 
 本地使用隔离的 QA 配置和测试桌面，不清理个人配置。保持 native 串行、全部本地测试 worker 总数不超过 2。下列命令应通过 `background_job.py` 启动，native 使用匹配当前源码的 QA release 二进制：
 
