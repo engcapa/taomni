@@ -27,6 +27,7 @@ class HostObservationTest(TestCase):
                     "path": str(path), "equals": "0" * 64, "timeout_sec": 1,
                 })
 
+    @skipUnless(os.name != "nt", "POSIX open-file replacement semantics")
     def test_replacement_while_observing_retains_old_snapshot_and_reads_new_next_time(self):
         with tempfile.TemporaryDirectory() as directory:
             path, pending = Path(directory) / "document.txt", Path(directory) / "pending.txt"
@@ -50,16 +51,18 @@ class HostObservationTest(TestCase):
             path.unlink()
 
     @skipUnless(os.name == "nt", "real Win32 sharing contract runs on GitHub Windows")
-    def test_old_python_reader_reproduces_denial_but_the_observer_allows_atomic_replace(self):
+    def test_windows_observer_retains_both_complete_files_until_reader_release(self):
         with tempfile.TemporaryDirectory() as directory:
             path, pending = Path(directory) / "document.txt", Path(directory) / "pending.txt"
-            path.write_bytes(b"old")
-            pending.write_bytes(b"new")
-            with path.open("rb"):
+            path.write_bytes(b"old complete document")
+            pending.write_bytes(b"new complete document")
+            with observation.open_observation(path) as reader:
                 with self.assertRaises(PermissionError):
                     os.replace(pending, path)
-                self.assertEqual(path.read_bytes(), b"old")
-            with observation.open_observation(path) as reader:
-                os.replace(pending, path)
-                self.assertEqual(reader.read(), b"old")
-            self.assertEqual(path.read_bytes(), b"new")
+                self.assertEqual(reader.read(), b"old complete document")
+                self.assertEqual(path.read_bytes(), b"old complete document")
+                self.assertEqual(pending.read_bytes(), b"new complete document")
+            self.assertTrue(reader.closed)
+            os.replace(pending, path)
+            self.assertFalse(pending.exists())
+            self.assertEqual(path.read_bytes(), b"new complete document")

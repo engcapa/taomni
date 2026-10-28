@@ -13,7 +13,7 @@ SVG 点击工具修复提交 `11f57e40d440d5558adc316aa75387dda90eaf52` 的全�
 
 Windows native `TC-IDE-C0-03` 的 424 个输入字符完整到达编辑器，编辑器内容 SHA-256 正确，但磁盘仍为编辑前 1MiB 内容。失败画面显示 `rename temp file: Access is denied. (os error 5)`。原哈希观察使用 Python 普通文件读取，在 Windows 不共享 DELETE，可与 Ctrl+S 后的原子替换竞争；真实扫描器也可短时持有此锁。现在将既有备份原子替换重试提取为共享 `atomic_replace`，工作区保存复用：只对 Windows 5/32/33 错误每 20ms 重试，最长 2 秒，其他错误立即返回，保留原有写入、sync、hash 比较和失败反馈，不先删除或截断旧文件。
 
-独立的 host 文件哈希观察改为 Windows READ/WRITE/DELETE 共享打开，完整流式计算原始字节 SHA-256，保持原有期望值、超时和轮询频率。当前打开的句柄读完整旧快照，下一轮观察新发布文件。新增真实文件替换、错误哈希拒绝、异常句柄释放，以及 Windows 普通 reader 确定性复现拒绝/新 observer 允许替换的契约；共享 Rust 契约继续覆盖真实短时锁、永久锁保留完整文件和其他错误立即失败。Windows 构建统一执行并保存这些契约日志。`TC-IDE-C0-03` 保留全部输入/延迟/磁盘 hash/history 断言，并补充末尾运行时错误断言；相关保存、编码、草稿恢复和备份用例保护共享边界。提取没有新增产品工作流，未增加重复 case ID。
+独立的 host 文件哈希观察提取为单独 owner，完整流式计算原始字节 SHA-256，保持原有期望值、超时和轮询频率。首次 Windows 构建 [40630051144](https://github.com/engcapa/taomni/actions/runs/40630051144) 的真实契约否定了“DELETE sharing 可保证覆盖已打开目标”的假设：共享标志为 READ/WRITE/DELETE 时 `os.replace` 仍返回 WinError 5，两个新契约失败，Windows native 因此未执行；失败不计为产品验证通过。现撤回该标志假设与自定义句柄转换，按原生平台语义测试：Windows 持读句柄期间保留完整旧文件和 pending，释放后可替换；POSIX 另测打开旧快照时可发布新文件。哈希观察及时关闭每次完整读取，由产品的有限重试处理真实短时锁。异常释放、错误哈希拒绝、Windows 真实锁及 POSIX 快照契约继续保留。`TC-IDE-C0-03` 保留全部输入/延迟/磁盘 hash/history 断言，并补充末尾运行时错误断言；相关保存、编码、草稿恢复和备份用例保护共享边界。
 
 本机 release 配置的 `workspace::tests::atomic_writes` **16/16 passed**，共享替换 helper 的 Linux 契约 **3/3 passed**；性能工具与 host observer 共 20 项单测为 **19 passed / 1 Windows 专属 skip**，该 Win32 项明确待托管执行。`cargo fmt --check`、`pnpm check:refactor`、`audit --gate` 均通过，没有在本机运行 browser/native 用例。
 
