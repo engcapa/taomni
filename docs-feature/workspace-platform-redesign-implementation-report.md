@@ -32,7 +32,7 @@
 
 第二轮 [40717069614](https://github.com/engcapa/taomni/actions/runs/40717069614) 的 21 阶段成功完成，原 runtime 所有文件 SHA、producer identity、源码、每段 CPU/PSS 与布局均已独立复核：仅去阴影 **1.295 核** 与原样 **1.295 核** 相同，仅方角保留阴影降至 **0.099 核**，随后原样 **1.364 核**；保留圆角的 `clip-path` 为 **0.135 核**、随后原样 **1.343 核**。共享壳层的进一步调用方检查发现，终端当前设置及多个编辑器对话框仍是画布内的 viewport-fixed 元素，整层几何裁剪会把它们一起裁掉，因此不能直接作为产品修复。
 
-修复候选保持 9px 圆角、1px 边框和原阴影，将整层圆角裁剪改为四个 9px 角部的装饰绘制；装饰层 `pointer-events:none`，普通内容和 viewport 对话框保留各自的层级。第三轮诊断 [40719117532](https://github.com/engcapa/taomni/actions/runs/40719117532) 已完成且独立复核了 23 个阶段、原始 runtime、采样与布局；四角绘制 **0.090 核**，恢复原样 **1.008 核**。新增 `TC-WS-058`（browser/native）验证宽侧栏下对话框超出画布的真实命中、字体提交、模式返回、重复开关及原 PTY 输出；它是保留行为回归，不属于崩溃专项。编号为远程已新增的 Compact/HOME `TC-WS-057` 留出。产品候选、此新用例及新的完整性能对照尚待托管验证，不能复用旧源码的全量通过声明。
+修复候选保持 9px 圆角、1px 边框和原阴影，将整层圆角裁剪改为四个 9px 角部的装饰绘制；装饰层 `pointer-events:none`，普通内容和 viewport 对话框保留各自的层级。第三轮诊断 [40719117532](https://github.com/engcapa/taomni/actions/runs/40719117532) 已完成且独立复核了 23 个阶段、原始 runtime、采样与布局；四角绘制 **0.090 核**，恢复原样 **1.008 核**。新增 `TC-WS-058`（browser/native，使用既有真实 SSH 服务）验证宽侧栏下对话框超出画布的真实命中、字体提交、模式返回、重复开关及原 PTY 输出；它是保留行为回归，不属于崩溃专项。编号为远程已新增的 Compact/HOME `TC-WS-057` 留出。产品候选、此新用例及新的完整性能对照尚待托管验证，不能复用旧源码的全量通过声明。
 
 用户要求的本机 QA 存储清理已完成：仅删除 `/home/zhyhang/.local/share/com.taomni.app.qa`，包括其 `vault.db`；删除前确认无 QA 文件占用。生产 `/home/zhyhang/.local/share/com.taomni.app`、共享 `~/.config/taomni` 和 `~/.cache/taomni` 均保留，没有启动本机 browser/native。
 

@@ -1,10 +1,7 @@
 id: TC-WS-058
 title: Rounded canvas decoration preserves viewport dialogs and the same live terminal
-description: >-
-  Retains the prototype canvas corners while a wide navigator puts the terminal
-  settings dialog partly outside the canvas. Check actual hit testing outside
-  the frame, change appearance, return through Home, reopen and close by Escape,
-  and verify a command still runs in the original terminal. This protects against
+description: Retains the prototype canvas corners while a wide navigator puts the terminal settings dialog partly outside the canvas. Check actual hit testing outside
+  the frame, change appearance, return through Home, reopen and close by Escape, and verify a command still runs in the original SSH terminal. This protects against
   replacing rounded overflow with a clip-path that also clips fixed dialogs.
 modes:
 - browser
@@ -14,6 +11,8 @@ covers:
 - F1.2
 - F2.2
 - F5.2
+- F3.1
+- F4.2
 tags:
 - p0
 - regression
@@ -21,6 +20,7 @@ tags:
 - appearance
 fixtures:
 - reset_db
+- ssh_required
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
@@ -31,10 +31,38 @@ steps:
 - seed_storage:
     key: taomni.sidebarCollapsedByGroup.v1
     value: '{"terminal":false}'
-- reload_window:
+- reload_window: null
 - click: '[data-testid="side-tab-sessions"]'
-- click: '[data-testid="new-local-terminal"]'
-- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.ssh.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.ssh.port}
+- set_check:
+    checked: true
+    selector: '[data-testid="session-specify-username"]'
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${cfg.ssh.user}
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-canvas-dialog
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-canvas-dialog"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-canvas-dialog"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
 - assert_visible: '[data-testid="expanded-sidebar-panel"]'
 - press:
     selector: '[data-testid="main-sidebar-resize-handle"]'
@@ -52,15 +80,11 @@ steps:
     min_height: 200
     viewport_margin: 16
 - eval_readonly:
-    expression: >-
-      document.querySelector('[data-testid'+String.fromCharCode(61)+'"terminal-current-settings-dialog"]').getBoundingClientRect().left + 12
-      < document.querySelector('[data-testid'+String.fromCharCode(61)+'"main-canvas-frame"]').getBoundingClientRect().left
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"terminal-current-settings-dialog"]').getBoundingClientRect().left + 12 < document.querySelector('[data-testid'+String.fromCharCode(61)+'"main-canvas-frame"]').getBoundingClientRect().left
     expect_truthy: true
 - eval_readonly:
-    expression: >-
-      document.querySelectorAll('[aria-modal]').length === 1 && document.querySelector('[aria-modal]').contains(document.elementFromPoint(
-      document.querySelector('[aria-modal]').getBoundingClientRect().left + 12,
-      document.querySelector('[aria-modal]').getBoundingClientRect().top + 20))
+    expression: document.querySelectorAll('[aria-modal]').length === 1 && document.querySelector('[aria-modal]').contains(document.elementFromPoint( document.querySelector('[aria-modal]').getBoundingClientRect().left
+      + 12, document.querySelector('[aria-modal]').getBoundingClientRect().top + 20))
     expect_truthy: true
 - fill:
     selector: '[data-testid="terminal-current-settings-dialog"] input[aria-label="Terminal font size"]'
@@ -82,10 +106,8 @@ steps:
 - click: '[data-testid="terminal-context-change-settings"]'
 - wait_for: '[data-testid="terminal-current-settings-dialog"] input[aria-label="Terminal font size"][value="19"]'
 - eval_readonly:
-    expression: >-
-      document.querySelectorAll('[aria-modal]').length === 1 && document.querySelector('[aria-modal]').contains(document.elementFromPoint(
-      document.querySelector('[aria-modal]').getBoundingClientRect().left + 12,
-      document.querySelector('[aria-modal]').getBoundingClientRect().top + 20))
+    expression: document.querySelectorAll('[aria-modal]').length === 1 && document.querySelector('[aria-modal]').contains(document.elementFromPoint( document.querySelector('[aria-modal]').getBoundingClientRect().left
+      + 12, document.querySelector('[aria-modal]').getBoundingClientRect().top + 20))
     expect_truthy: true
 - click: '[data-testid="terminal-current-settings-dialog"] input[aria-label="Terminal font size"]'
 - press: Escape
@@ -98,59 +120,107 @@ steps:
     submit: true
     verify:
       selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
-      regex: '(?m)^qa-canvas-dialog-ok\r?$'
+      regex: (?m)^qa-canvas-dialog-ok\r?$
       timeout_sec: 20
       attempts: 2
 - assert_pattern:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
-    regex: '(?m)^qa-canvas-dialog-ok\r?$'
+    regex: (?m)^qa-canvas-dialog-ok\r?$
     timeout_sec: 20
-- assert_no_runtime_errors:
+- assert_no_runtime_errors: null
 - screenshot: ws-058-live-terminal-after-dialog.png
 verification:
   review: reviewed
   requirements:
   - id: R1
     requirement: A viewport dialog extends beyond the wide navigator's canvas boundary and remains visible and hit-testable there.
-    actions: [1, 2, 3, 4, 5, 6, 7, 10, 11, 12, 13]
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 24
+    - 25
+    - 26
+    - 27
     checkpoints:
-    - step: 8
+    - step: 22
       expectation: The original terminal is active and ready before opening settings.
-    - step: 9
+    - step: 23
       expectation: The navigator is expanded and its resize handle can be operated.
-    - step: 15
+    - step: 29
       expectation: The full dialog fits inside the viewport with a 16px margin.
-    - step: 16
+    - step: 30
       expectation: The sampled dialog point lies strictly left of the main canvas.
-    - step: 17
+    - step: 31
       expectation: Hit testing that point reaches the dialog rather than the navigator behind it.
-    results: [8, 9, 15, 16, 17]
+    results:
+    - 22
+    - 23
+    - 29
+    - 30
+    - 31
   - id: R2
     requirement: Appearance persists through mode changes and repeated dialog use, while the original terminal still executes commands.
-    actions: [18, 19, 22, 24, 25, 27, 28, 31, 32, 34]
+    actions:
+    - 32
+    - 33
+    - 36
+    - 38
+    - 39
+    - 41
+    - 42
+    - 45
+    - 46
+    - 48
     checkpoints:
-    - step: 20
+    - step: 34
       expectation: Font size 19 commits through the normal settings input.
-    - step: 23
+    - step: 37
       expectation: The footer closes the dialog.
-    - step: 26
+    - step: 40
       expectation: Returning through Home leaves exactly one global terminal mounted.
-    - step: 29
+    - step: 43
       expectation: Reopened settings retain font size 19.
-    - step: 30
+    - step: 44
       expectation: The reopened dialog remains hit-testable beyond the canvas boundary.
-    - step: 33
+    - step: 47
       expectation: Escape from the settings field dismisses the dialog.
-    - step: 35
+    - step: 49
       expectation: The original shell produces the anchored command output after all dialog and mode transitions.
-    - step: 36
+    - step: 50
       expectation: No runtime errors occurred.
-    results: [20, 23, 26, 29, 30, 33, 35, 36]
+    results:
+    - 34
+    - 37
+    - 40
+    - 43
+    - 44
+    - 47
+    - 49
+    - 50
   visual:
   - check: Rounded canvas corners and complete dialog with an expanded navigator
     method: manual
     reason: Retain screenshots; actual dimensions and hit testing are automated, while corner appearance is reviewed from the images.
   native:
-  - check: Actual WebKitGTK, WKWebView and WebView2 stacking and the same live local PTY after settings changes
+  - check: Actual WebKitGTK, WKWebView and WebView2 stacking and the same live SSH connection after settings changes
     method: automated
-    reason: Chromium stubs cannot establish the affected WebKit clipping behavior or real shell execution.
+    reason: Browser mode checks Chromium through the real SSH service bridge; native checks the packaged WebView and native SSH connection lifecycle.
