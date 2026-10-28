@@ -34,6 +34,8 @@
 
 修复候选保持 9px 圆角、1px 边框和原阴影，将整层圆角裁剪改为四个 9px 角部的装饰绘制；装饰层 `pointer-events:none`，普通内容和 viewport 对话框保留各自的层级。第三轮诊断 [40719117532](https://github.com/engcapa/taomni/actions/runs/40719117532) 已完成且独立复核了 23 个阶段、原始 runtime、采样与布局；四角绘制 **0.090 核**，恢复原样 **1.008 核**。新增 `TC-WS-058`（browser/native）验证宽侧栏下对话框超出画布的真实命中、字体提交、模式返回、重复开关及原 PTY 输出；它是保留行为回归，不属于崩溃专项。编号为远程已新增的 Compact/HOME `TC-WS-057` 留出。产品候选、此新用例及新的完整性能对照尚待托管验证，不能复用旧源码的全量通过声明。
 
+已合入远程 `b091c772` 的 Compact/HOME 按可见层级加载修复及 `TC-WS-057`，目录扫描最多 4 个并发，刷新和迟到响应保持同一预算。崩溃专项现为 10 个 ID。合并后相关 hook 单测 21/21 通过；它不代替托管 browser/native 证据。`eceb802f` 保留原画布裁剪作为新弹窗回归的改前基线，随后独立提交四角绘制修复；两者均用 GitHub 执行实际用例。
+
 用户要求的本机 QA 存储清理已完成：仅删除 `/home/zhyhang/.local/share/com.taomni.app.qa`，包括其 `vault.db`；删除前确认无 QA 文件占用。生产 `/home/zhyhang/.local/share/com.taomni.app`、共享 `~/.config/taomni` 和 `~/.cache/taomni` 均保留，没有启动本机 browser/native。
 
 ## 终端突发输出专项与工具验收（2026-10-28）
