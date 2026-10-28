@@ -8,6 +8,7 @@ from unittest.mock import Mock
 from qa_ui_auto.file_open_probe import review, run, validate
 from qa_ui_auto.steps import StepError
 from qa_ui_auto.fixtures.workspace_language_files import JSON_DOCUMENT
+from qa_ui_auto.fixtures.workspace_json_documents import LONG_JSON_DOCUMENT
 from qa_ui_auto.file_open_profile import capture
 
 
@@ -43,6 +44,15 @@ class FileOpenReviewTests(unittest.TestCase):
         self.assertEqual(len(data["records"]), 100)
         self.assertEqual(data["records"][-1]["name"], "Public fixture 099")
         self.assertEqual(set(data["records"][0]), {"id", "name", "enabled", "description", "category"})
+
+    def test_long_line_fixture_retains_the_reported_workload_dimensions(self):
+        document = json.loads(LONG_JSON_DOCUMENT)
+        self.assertEqual(len(LONG_JSON_DOCUMENT.splitlines()), 693)
+        self.assertGreaterEqual(len(LONG_JSON_DOCUMENT.encode("utf-8")), 190_000)
+        self.assertLessEqual(len(LONG_JSON_DOCUMENT.encode("utf-8")), 210_000)
+        self.assertGreaterEqual(max(map(len, LONG_JSON_DOCUMENT.splitlines())), 5125)
+        self.assertEqual(len(document["records"]), 40)
+        self.assertTrue(all(record["label"].startswith("Public synthetic") for record in document["records"]))
 
     def test_native_action_and_cleanup_have_no_document_writes(self):
         session = Mock()
