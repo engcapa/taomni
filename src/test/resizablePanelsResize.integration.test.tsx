@@ -13,7 +13,7 @@ const esmPanels: typeof panels = await import(esmEntry);
 
 describe.each([{ entry: "CJS", components: panels }, { entry: "ESM", components: esmPanels }])(
   "real resizable panels observer ownership ($entry)", ({ components }) => {
-    const mountFixture = (nested = false) => mountPanelResizeFixture(nested, components);
+    const mountFixture = (nested = false, syncVisibility = false) => mountPanelResizeFixture(nested, components, syncVisibility);
     let clock: ReturnType<typeof installPanelResizeHarness>;
     beforeEach(() => { clock = installPanelResizeHarness(); });
     afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -86,6 +86,24 @@ describe.each([{ entry: "CJS", components: panels }, { entry: "ESM", components:
       expect(fixture.docsRef.current!.isCollapsed()).toBe(false);
       act(() => fixture.docsRef.current!.resize(250));
       expect(fixture.groupRef.current!.getLayout().docs * 12).toBeCloseTo(250, 1);
+    });
+
+    it("commits visible tool geometry before paint without waiting for an observer frame", () => {
+      const fixture = mountFixture(true, true);
+      fixture.setWidth(1000);
+      fixture.deliver();
+      fixture.deliver("resize-nested");
+      clock.flushFrame();
+      const split = fixture.nestedRef.current!.getLayout();
+      const content = fixture.container.querySelector('[id="docs"]');
+      for (let cycle = 0; cycle < 3; cycle++) {
+        fixture.setOpen(false);
+        expect(fixture.docsRef.current!.isCollapsed()).toBe(true);
+        fixture.setOpen(true);
+        expect(fixture.groupRef.current!.getLayout().docs).toBeCloseTo(20, 1);
+        expect(fixture.nestedRef.current!.getLayout()).toEqual(split);
+        expect(fixture.container.querySelector('[id="docs"]')).toBe(content);
+      }
     });
 
     it("applies pending visible geometry before the first keyboard resize", () => {
