@@ -40,6 +40,7 @@ import type { WorkspaceActionHost } from "../workspaceActionHost";
 import type { WorkspaceDocumentTransactionOwner } from "../workspaceDocumentTransactionOwner";
 import type { PersistedEditorViewState } from "../workspaceLayoutPersistence";
 import { type WorkspaceTabPolicyV3 } from "../workspaceTabPolicy";
+import type { EditorGroupBreadcrumbs } from "./useEditorGroupBreadcrumbs";
 
 export type MarkdownViewMode = "edit" | "preview" | "split";
 
@@ -122,7 +123,7 @@ export interface EditorGroupProps {
   activeLspSyncing: boolean;
   lspStatusPill: ReactNode;
   highlightingWidget?: ReactNode;
-  breadcrumbs: ReactNode;
+  breadcrumbs: EditorGroupBreadcrumbs;
   breadcrumbsPlacement?: "top" | "bottom" | "status-bar";
   editorBanners?: EditorBannerItem[];
   /** ED-PARITY-012 DEC-012-06: host-rendered Go to Line dialog. */

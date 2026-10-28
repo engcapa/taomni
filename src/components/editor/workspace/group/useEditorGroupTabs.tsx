@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useContextMenu } from "../../../ContextMenu";
+import { useElementResizeFrame } from "../../../../hooks/useElementResizeFrame";
 import { computeEditorTabScrollState, editorTabScrollStep, ensureChildVisibleScrollLeft, setScrollLeft, type EditorTabScrollState } from "../editorTabScroll";
 import { DEFAULT_WORKSPACE_TAB_POLICY_V3, orderTabsForDisplay, type TabEvictionMeta } from "../workspaceTabPolicy";
 
@@ -99,7 +100,7 @@ export function useEditorGroupTabs(context: UseEditorGroupTabsContext) {
 
   const updateTabScrollState = useCallback(() => {
     const el = tabScrollRef.current;
-    if (!el) return;
+    if (!el || el.clientWidth <= 0) return;
     const next = computeEditorTabScrollState(el);
     setTabScrollState((prev) =>
       prev.overflow === next.overflow &&
@@ -121,39 +122,23 @@ export function useEditorGroupTabs(context: UseEditorGroupTabsContext) {
     [updateTabScrollState],
   );
 
-  useEffect(() => {
-    updateTabScrollState();
-  }, [openOrder, orderedKeys.length, updateTabScrollState]);
-
-  useEffect(() => {
-    const el = tabScrollRef.current;
-    if (!el) return;
-    const ro =
-      typeof ResizeObserver === "undefined"
-        ? null
-        : new ResizeObserver(() => updateTabScrollState());
-    ro?.observe(el);
-    window.addEventListener("resize", updateTabScrollState);
-    return () => {
-      ro?.disconnect();
-      window.removeEventListener("resize", updateTabScrollState);
-    };
-  }, [openOrder.length, updateTabScrollState]);
-
-  useEffect(() => {
+  const measureTabs = useCallback(() => {
     const container = tabScrollRef.current;
-    if (!container || !activeKey) return;
+    if (!container || container.clientWidth <= 0) return;
     const child = Array.from(container.children).find(
       (node): node is HTMLElement =>
         node instanceof HTMLElement && node.dataset.editorTabKey === activeKey,
     );
-    if (!child) return;
-    const nextLeft = ensureChildVisibleScrollLeft(container, child);
-    if (nextLeft !== container.scrollLeft) {
-      setScrollLeft(container, nextLeft);
+    if (child) {
+      const nextLeft = ensureChildVisibleScrollLeft(container, child);
+      if (nextLeft !== container.scrollLeft) setScrollLeft(container, nextLeft);
     }
     updateTabScrollState();
-  }, [activeKey, openOrder, updateTabScrollState]);
+  }, [activeKey, updateTabScrollState]);
+  const scheduleMeasurement = useElementResizeFrame(tabScrollRef, measureTabs);
+  useEffect(() => {
+    scheduleMeasurement();
+  }, [activeKey, openOrder, orderedKeys.length, scheduleMeasurement]);
 
   const getTabMenuItems = (key: string): import("../../../ContextMenu").MenuItem[] => {
     const pinned = pinnedSet.has(key);

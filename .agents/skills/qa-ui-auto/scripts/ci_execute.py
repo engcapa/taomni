@@ -35,7 +35,7 @@ def _prepare_runtime(stack: ExitStack, entry: dict, report: Path, config: dict) 
         from qa_ui_auto.linux_profiles import DEFAULT_LINUX_PROFILE
         desktop = stack.enter_context(Desktop(report / "desktop", entry["capabilities"],
                                               entry.get("linux_profile") or DEFAULT_LINUX_PROFILE))
-    if set(entry["capabilities"]) & {"ssh", "ssh_features", "clickhouse", "mysql", "vnc", "ard"}:
+    if set(entry["capabilities"]) & {"ssh", "ssh_posix", "ssh_features", "clickhouse", "mysql", "vnc", "ard"}:
         from ci_services import Services
         stack.enter_context(Services(report / "services", entry["capabilities"], config))
     return desktop
@@ -137,7 +137,7 @@ def main():
                                  stdout=log, stderr=subprocess.STDOUT)
             # The SSH account, the VNC fixture's per-case event log and the
             # macOS console session behind Screen Sharing are shared.
-            serial = set(entry["capabilities"]) & {"ssh", "ssh_features", "clickhouse", "vnc", "ard"}
+            serial = set(entry["capabilities"]) & {"ssh", "ssh_posix", "ssh_features", "clickhouse", "vnc", "ard"}
             config = {"app": {"base_url": "http://127.0.0.1:5000", "mode": entry["mode"]},
                       "worker": {"parallel": 1 if serial else entry.get("workers", 2)},
                       "report": {"dir": str(args.report), "keep_runs": 0}}

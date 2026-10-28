@@ -2,7 +2,6 @@ import { ChevronRight, File, Folder, Hash, MoreHorizontal } from "lucide-react";
 import {
   useCallback,
   useEffect,
-  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -13,6 +12,7 @@ import type { LspDocumentSymbol } from "../../../lib/editor/lsp";
 import { type BreadcrumbItem, type BreadcrumbPathSegment, type BreadcrumbsProps, type OpenPopup } from "./breadcrumbs/model";
 import { collapsedBreadcrumbItems, sortPathChildren, symbolChainAtPosition, symbolSiblingsAt } from "./breadcrumbs/paths";
 import { SegmentPopup } from "./breadcrumbs/SegmentPopup";
+import { useBreadcrumbCollapse } from "./breadcrumbs/useBreadcrumbCollapse";
 import { navigateSegments } from "./navigationBarModel";
 
 export function Breadcrumbs({
@@ -44,9 +44,6 @@ export function Breadcrumbs({
     symbolChainRef.current = computedSymbolChain;
   }
   const symbolChain = symbolChainRef.current;
-  const navRef = useRef<HTMLElement | null>(null);
-  const fullPathMeasureRef = useRef<HTMLDivElement | null>(null);
-  const [collapsed, setCollapsed] = useState(false);
   const [popup, setPopup] = useState<OpenPopup | null>(null);
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -57,6 +54,7 @@ export function Breadcrumbs({
     ...pathSegments.map((value) => ({ type: "path" as const, value })),
     ...symbolChain.map((value) => ({ type: "symbol" as const, value })),
   ], [pathSegments, symbolChain]);
+  const { navRef, fullPathMeasureRef, collapsed } = useBreadcrumbCollapse(fullItems);
   const compactItems = useMemo(
     () => collapsedBreadcrumbItems(pathSegments, symbolChain),
     [pathSegments, symbolChain],
@@ -71,38 +69,6 @@ export function Breadcrumbs({
       setNavBarFocusedIndex(null);
     }
   }, [activeNavigationBar, visibleItems.length]);
-
-  useLayoutEffect(() => {
-    let frame: number | null = null;
-    let disposed = false;
-    const updateCollapsedState = () => {
-      const availableWidth = navRef.current?.clientWidth ?? 0;
-      const fullPathWidth = fullPathMeasureRef.current?.getBoundingClientRect().width ?? 0;
-      if (availableWidth > 0 && fullPathWidth > 0) {
-        setCollapsed(fullPathWidth > availableWidth);
-      }
-    };
-
-    updateCollapsedState();
-    if (typeof ResizeObserver === "undefined" || !navRef.current) return;
-    // The status message/cursor widgets change this flex item's width during
-    // edits and saves. Measuring and changing its children in RO delivery can
-    // invalidate an already-delivered ancestor in WebKit's same layout pass.
-    // Read the latest width once next frame, outside observer delivery.
-    const observer = new ResizeObserver(() => {
-      if (disposed || frame !== null) return;
-      frame = requestAnimationFrame(() => {
-        frame = null;
-        if (!disposed) updateCollapsedState();
-      });
-    });
-    observer.observe(navRef.current);
-    return () => {
-      disposed = true;
-      observer.disconnect();
-      if (frame !== null) cancelAnimationFrame(frame);
-    };
-  }, [fullItems]);
 
   // Close popup when the active trail changes (file switch / cursor jump).
   useEffect(() => {

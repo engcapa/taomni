@@ -30,6 +30,14 @@ ssh:
   # private_key_path: ~/.ssh/id_ed25519
   # private_key_passphrase: ${env.QA_SSH_KEY_PASSPHRASE}
 
+# TC-145 requires an explicitly configured real POSIX SSH PTY. GitHub provisions
+# it separately on Windows; it may share the normal endpoint on Linux/macOS.
+ssh_posix:
+  host: 127.0.0.1
+  port: 2222
+  user: testuser
+  password: ${env.QA_POSIX_SSH_PASSWORD}
+
 sftp:
   host: 127.0.0.1
   port: 2222

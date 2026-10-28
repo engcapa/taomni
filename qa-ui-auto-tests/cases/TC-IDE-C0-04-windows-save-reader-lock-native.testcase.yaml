@@ -1,0 +1,99 @@
+id: TC-IDE-C0-04
+title: Windows atomic save retries a real reader lock without blocking navigation
+description: Real Windows DELETE-sharing denial distinguishes UI-thread blocking from an asynchronous native save. The lock remains held during Home/Workspaces
+  navigation; release must publish the exact complete bytes without leftover temp files. Browser stubs cannot establish this kernel/IPC boundary.
+covers:
+- F25.1
+- F1.7
+- F-WS-2
+tags:
+- p0
+- regression
+- save
+- native-gate
+- file-lock
+modes:
+- native
+native_platforms:
+- Windows
+fixtures:
+- reset_db
+- platform_workspace_root
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-reader-lock
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: '{"version": 1, "activeWorkspaceId": "default-workspace", "createdNodes": [], "workspaces": [{"id": "default-workspace", "name": "Default Workspace",
+      "description": "", "isDefault": true, "rootFolders": [{"id": "root-1", "name": "qa-root", "path": "${fixture.platform_workspace_root}", "addedAt":
+      1}], "pinnedSessionIds": [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs":
+      [], "activeTabId": ""}, {"id": "second-workspace", "name": "Second Workspace", "description": "", "isDefault": false, "rootFolders": [], "pinnedSessionIds":
+      [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId": ""}]}'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="code-workspace-tree-root"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- wait_for: '[data-testid="workspace-file-editor"]'
+- press:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    key: Mod+a
+- type:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    text: QA_FILE_LOCK_RETRY
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    equals: QA_FILE_LOCK_RETRY
+- native_save_reader_lock:
+    path: ${fixture.platform_workspace_root}/README.md
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    equals: dc68b0d091ba8eda480ac28809650f582a20fb6907f729de69bb347889480ed5
+    max_ui_ms: 1500
+- assert_file_sha256:
+    path: ${fixture.platform_workspace_root}/README.md
+    equals: dc68b0d091ba8eda480ac28809650f582a20fb6907f729de69bb347889480ed5
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    equals: QA_FILE_LOCK_RETRY
+- assert_no_runtime_errors: null
+- screenshot: native-save-reader-lock.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Native lock denial preserves the old complete file while save is pending, UI stays interactive, and releasing the lock completes the same
+      save with exact disk bytes.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 6
+    - 7
+    - 8
+    - 10
+    - 11
+    - 13
+    checkpoints:
+    - step: 13
+      expectation: Real kernel lock, pending atomic write and UI navigation under 1500ms; lock release publishes exact SHA-256 with no pending temp.
+    - step: 14
+      expectation: Independent host SHA-256 equals the intended complete file.
+    - step: 15
+      expectation: Editor retains the intended text after mode transitions.
+    - step: 16
+      expectation: No runtime errors.
+    results:
+    - 13
+    - 14
+    - 15
+    - 16
+  native:
+  - check: Actual Win32 reader lock and native IPC scheduling
+    method: automated
+    reason: A browser stub cannot create DELETE-sharing denial or prove that native retries release the WebView/UI thread.
+  visual:
+  - check: Home and the existing editor are visible after the corresponding real navigation clicks
+    method: automated
+    reason: The locked-save probe reads nonzero rendered bounds after each navigation and retains the final screenshot.

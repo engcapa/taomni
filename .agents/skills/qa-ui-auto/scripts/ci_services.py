@@ -206,7 +206,11 @@ def install(capabilities):
         raise RuntimeError("package/account installation is restricted to GitHub hosted jobs")
     if "vnc" in capabilities:
         command([sys.executable, "-m", "pip", "install", *VNC_FIXTURE_PACKAGES])
-    if "ssh_features" in capabilities:
+    capabilities = set(capabilities)
+    posix_windows = "ssh_posix" in capabilities and platform.system() == "Windows"
+    if "ssh_posix" in capabilities:
+        capabilities.add("ssh")
+    if "ssh_features" in capabilities or posix_windows:
         from ci_ssh_features import install as install_ssh_features
         install_ssh_features()
     if "x11_session" in capabilities:
@@ -245,7 +249,7 @@ def install(capabilities):
 
 class Services:
     def __init__(self, root, capabilities, config, *, ssh_windows_shell=None, ssh_windows_sshd=None,
-                 ssh_windows_runtime="win32"):
+                 ssh_windows_runtime="win32", ssh_password_env="QA_SSH_PASSWORD"):
         if ssh_windows_runtime not in {"win32", "cygwin"}:
             raise ValueError("Unknown Windows SSH runtime")
         self.root = Path(root).resolve()
@@ -255,6 +259,7 @@ class Services:
         self.ssh_windows_shell = ssh_windows_shell
         self.ssh_windows_sshd = ssh_windows_sshd
         self.ssh_windows_runtime = ssh_windows_runtime
+        self.ssh_password_env = ssh_password_env
         self.stack = ExitStack()
         self.namespace = "qa" + secrets.token_hex(5)
         self.resources = []
@@ -416,7 +421,7 @@ class Services:
         return user, port, remote_dir
 
     def ssh(self):
-        password = secret("QA_SSH_PASSWORD")
+        password = secret(self.ssh_password_env)
         system = platform.system()
         if system == "Linux":
             user, remote_dir = "testuser", "/tmp/qa-ui-auto-temp"
@@ -498,7 +503,8 @@ class Services:
                     stream.write(payload)
         finally:
             sftp.close()
-        cfg = {"host": "127.0.0.1", "port": port, "user": user, "password": "${env.QA_SSH_PASSWORD}"}
+        cfg = {"host": "127.0.0.1", "port": port, "user": user,
+               "password": "${env." + self.ssh_password_env + "}"}
         win32 = system == "Windows" and self.ssh_windows_runtime == "win32"
         shell_dir = "/c/" + remote_dir[3:] if win32 else remote_dir
         sftp_shell_dir = "/" + remote_dir if win32 else remote_dir
@@ -508,7 +514,9 @@ class Services:
                                              "remote_shell_test_dir": shell_dir,
                                              "remote_sftp_shell_test_dir": sftp_shell_dir,
                                              "chmod_readback_mode": "644" if win32 else "600"})
-        return {"authentication": True, "pty_exec": True, "sftp_roundtrip": True, "port": port}
+        return {"authentication": True, "pty_exec": True, "sftp_roundtrip": True, "port": port,
+                "server_version": client.get_transport().remote_version,
+                "runtime": self.ssh_windows_runtime if system == "Windows" else "host"}
 
     def mysql(self):
         import pymysql
@@ -655,7 +663,7 @@ class Services:
         (self.root / "screensharing-diagnostics.txt").write_text("\n".join(report), encoding="utf-8")
 
     def __enter__(self):
-        accounts = self.capabilities & {"ssh", "mysql", "ard"}
+        accounts = self.capabilities & {"ssh", "ssh_posix", "mysql", "ard"}
         if accounts and platform.system() != "Linux" and os.environ.get("GITHUB_ACTIONS") != "true":
             raise RuntimeError("native service account setup is restricted to hosted CI")
         self.root.mkdir(parents=True, exist_ok=True)
@@ -665,6 +673,9 @@ class Services:
                      "images": self.images if platform.system() == "Linux" else None}
             if "ssh" in self.capabilities:
                 facts["ssh"] = self.ssh()
+            if "ssh_posix" in self.capabilities:
+                from ci_windows_posix_ssh import prepare
+                facts["ssh_posix"] = prepare(self, facts.get("ssh"))
             if "mysql" in self.capabilities:
                 facts["mysql"] = self.mysql()
             if "ssh_features" in self.capabilities:

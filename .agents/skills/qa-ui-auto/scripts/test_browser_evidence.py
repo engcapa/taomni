@@ -6,7 +6,7 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest import TestCase
 
-from qa_ui_auto.browser_evidence import BrowserEvidence
+from qa_ui_auto.browser_evidence import BrowserEvidence, traces_ssh_terminal
 
 
 class Emitter:
@@ -26,6 +26,12 @@ class Emitter:
 
 
 class BrowserEvidenceTest(TestCase):
+    def test_both_ssh_fixtures_keep_passive_transport_evidence(self):
+        for fixture in ("ssh_required", "ssh_posix_required"):
+            self.assertTrue(traces_ssh_terminal(["reset_db", fixture]))
+        self.assertFalse(traces_ssh_terminal(["reset_db", "sftp_required"]))
+        self.assertFalse(traces_ssh_terminal([]))
+
     def test_console_and_errors_retain_original_content_and_detach(self):
         with TemporaryDirectory() as directory:
             page = Emitter()

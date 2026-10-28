@@ -245,6 +245,7 @@ steps:
     equals: ${fixture.editor_perf_Small_after_sha256}
     timeout_sec: 30
 - screenshot: tc-ide-c0-03-typing-latency.png
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -371,8 +372,11 @@ verification:
     - step: 58
       expectation: '{"assert_file_sha256": {"path": "${fixture.editor_perf_root}/Small.txt", "equals": "${fixture.editor_perf_Small_after_sha256}",
         "timeout_sec": 30}}'
+    - step: 60
+      expectation: All editor input, saves, history and file switches finish without runtime errors.
     results:
     - 58
+    - 60
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

@@ -1,5 +1,6 @@
 import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { WorkspaceIsolatedTab } from "../../stores/workspacePlatformStore";
+import { useElementResizeFrame } from "../../hooks/useElementResizeFrame";
 import { maxScrollLeft, setTabScrollLeft, TAB_SCROLL_EDGE_TOLERANCE, TAB_SCROLL_PADDING, TAB_SCROLL_STEP_MIN } from "../tabbar/tabs/scroll";
 
 /** Owns overflow observation and active-tab visibility for one workspace strip. */
@@ -14,7 +15,7 @@ export function useWorkspaceTabScroll(workspaceId: string | undefined, tabs: rea
 
   const updateScrollState = useCallback(() => {
     const element = scrollRef.current;
-    if (!element) return;
+    if (!element || element.clientWidth <= 0) return;
     const maxLeft = maxScrollLeft(element);
     const next = {
       overflow: maxLeft > TAB_SCROLL_EDGE_TOLERANCE,
@@ -31,39 +32,25 @@ export function useWorkspaceTabScroll(workspaceId: string | undefined, tabs: rea
   const revealActiveTab = useCallback(() => {
     const element = scrollRef.current;
     const active = activeTabId ? tabElements.current.get(activeTabId) : null;
-    if (!element || !active || element.clientWidth <= 0) return;
-    const viewport = element.getBoundingClientRect();
-    const rect = active.getBoundingClientRect();
-    const left = rect.left - viewport.left + element.scrollLeft;
-    const right = rect.right - viewport.left + element.scrollLeft;
-    if (rect.width > element.clientWidth || left < element.scrollLeft + TAB_SCROLL_PADDING) {
-      setTabScrollLeft(element, left - TAB_SCROLL_PADDING);
-    } else if (right > element.scrollLeft + element.clientWidth - TAB_SCROLL_PADDING) {
-      setTabScrollLeft(element, right - element.clientWidth + TAB_SCROLL_PADDING);
+    if (!element || element.clientWidth <= 0) return;
+    if (active) {
+      const viewport = element.getBoundingClientRect();
+      const rect = active.getBoundingClientRect();
+      const left = rect.left - viewport.left + element.scrollLeft;
+      const right = rect.right - viewport.left + element.scrollLeft;
+      if (rect.width > element.clientWidth || left < element.scrollLeft + TAB_SCROLL_PADDING) {
+        setTabScrollLeft(element, left - TAB_SCROLL_PADDING);
+      } else if (right > element.scrollLeft + element.clientWidth - TAB_SCROLL_PADDING) {
+        setTabScrollLeft(element, right - element.clientWidth + TAB_SCROLL_PADDING);
+      }
     }
     updateScrollState();
   }, [activeTabId, updateScrollState]);
 
+  const scheduleMeasurement = useElementResizeFrame(scrollRef, revealActiveTab);
   useLayoutEffect(() => {
-    revealActiveTab();
-    updateScrollState();
-  }, [workspaceId, tabs, revealActiveTab, updateScrollState]);
-
-  useLayoutEffect(() => {
-    const element = scrollRef.current;
-    if (!element) return;
-    const onResize = () => {
-      revealActiveTab();
-      updateScrollState();
-    };
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(onResize);
-    observer?.observe(element);
-    window.addEventListener("resize", onResize);
-    return () => {
-      observer?.disconnect();
-      window.removeEventListener("resize", onResize);
-    };
-  }, [workspaceId, revealActiveTab, updateScrollState]);
+    scheduleMeasurement();
+  }, [workspaceId, tabs, revealActiveTab, scheduleMeasurement]);
 
   const scrollBy = useCallback((direction: "left" | "right") => {
     const element = scrollRef.current;

@@ -23,6 +23,8 @@ from workspace_perf import common
 from tauri_webdriver import NativeHarness
 from native_build import verify_identity
 from qa_ui_auto.native_steps import NativeStepContext, VERBS
+from qa_ui_auto import terminal_burst_probe
+from qa_ui_auto.terminal_burst_probe import observe_output
 
 binary = checkout / "src-tauri/target/qa-ui-auto/release/taomni"
 identity = verify_identity(binary)
@@ -53,6 +55,7 @@ result = {
     "metrics": {},
     "events": [],
     "sourceStable": False,
+    "outputObserverSha256": hashlib.sha256(Path(terminal_burst_probe.__file__).read_bytes()).hexdigest(),
     "harnessSha256": {
         Path(f).name: hashlib.sha256(Path(f).read_bytes()).hexdigest()
         for f in Path(__file__).resolve().parent.glob("*.py")
@@ -79,10 +82,6 @@ def event(text):
     result["events"].append({"at": time.monotonic(), "message": text})
     save()
     print(label, text, flush=True)
-
-
-def click(s, selector):
-    return s.execute("document.querySelector(" + q(selector) + ").click();return true;")
 
 
 def ctx_for(s, folder):
@@ -131,9 +130,7 @@ def sessions():
             ctx = ctx_for(s, folder)
             try:
                 VERBS["vault_first_run"](ctx, "qa-isolated-workspace-performance")
-                s.execute(
-                    "document.querySelector('[data-testid=\"side-tab-sessions\"]')?.click();return true;"
-                )
+                common.click(s, '[data-testid="side-tab-sessions"]')
                 until(
                     s,
                     "!!document.querySelector('[data-testid=\"new-local-terminal\"]')",
@@ -142,7 +139,7 @@ def sessions():
                 for i in range(24):
                     sample = timed(
                         s,
-                        "document.querySelector('[data-testid=\"new-local-terminal\"]').click()",
+                        common.click_action('[data-testid="new-local-terminal"]'),
                         f'document.querySelectorAll(\'[data-testid="terminal-pane"]\').length==={i+1} && !!document.querySelector(\'[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]\')',
                         45,
                     )
@@ -166,7 +163,7 @@ def sessions():
                     switches.append(
                         timed(
                             s,
-                            "document.querySelector(" + q(selector) + ").click()",
+                            common.click_action(selector),
                             "document.querySelector("
                             + q(selector)
                             + ")?.getAttribute('data-active')==='true' && !!document.querySelector('[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]')",
@@ -185,34 +182,39 @@ def sessions():
                     + marker
                     + "\\r\\n')\n"
                 )
-                started = time.monotonic()
-                VERBS["terminal_input"](
-                    ctx,
-                    {
-                        "selector": '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea',
-                        "text": "python3 " + shlex.quote(str(producer)),
-                        "submit": True,
-                    },
-                )
-                until(
-                    s,
-                    "(document.querySelector('[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]')?.getAttribute('data-terminal-text')||'').split(/\\r?\\n/).some(line=>line.trim()==="
-                    + q(marker)
-                    + ")",
-                    180,
-                )
+                diagnostics = result["metrics"]["outputDiagnostics"] = {}
+                with observe_output(s, folder / "terminal-output-raw.json", diagnostics):
+                    started = time.monotonic()
+                    VERBS["terminal_input"](
+                        ctx,
+                        {
+                            "selector": '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea',
+                            "text": "python3 " + shlex.quote(str(producer)),
+                            "submit": True,
+                        },
+                    )
+                    until(
+                        s,
+                        "(document.querySelector('[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]')?.getAttribute('data-terminal-text')||'').split(/\\r?\\n/).some(line=>line.trim()==="
+                        + q(marker)
+                        + ")",
+                        180,
+                    )
+                    output_observed_ms = (time.monotonic() - started) * 1000
                 result["metrics"]["output2MiB"] = {
-                    "observedElapsedMs": (time.monotonic() - started) * 1000,
+                    "observedElapsedMs": output_observed_ms,
                     "producer": json.loads(receipt.read_text()),
-                    "limit": "QA full-history mirror is included; not production mirror=false throughput",
+                    "limit": "QA full-history mirror and passive IPC byte observation are included; not production mirror=false throughput",
                 }
                 known = common.owned_processes(binary)
                 result["metrics"]["beforeCloseProcesses"] = known
                 save()
                 screenshots(s, "sessions24")
                 for count in range(24, 0, -1):
-                    s.execute(
-                        '[...document.querySelectorAll(\'[data-testid="tab-item"][data-tab-type="terminal"] [data-testid="tab-close"]\')].at(-1).click();return true;'
+                    common.click(
+                        s,
+                        '[data-testid="tab-item"][data-tab-type="terminal"] [data-testid="tab-close"]',
+                        last=True,
                     )
                     until(
                         s,
@@ -235,7 +237,7 @@ def sessions():
                         for p in known + common.owned_processes(binary)
                     }.values()
                 )
-                s.close()
+                common.close_session(s, result["metrics"])
         time.sleep(1)
         table = common.process_table()
         result["metrics"]["afterSessionExitProcesses"] = [
@@ -262,7 +264,8 @@ try:
         common=common,
         event=event,
     )
-    result["passed"] = True
+    result["workloadCompleted"] = True
+    result["passed"] = result["metrics"]["explorer"]["inputBudgetPassed"]
 except BaseException as exc:
     result["passed"] = False
     result["error"] = str(exc)

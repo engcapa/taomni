@@ -12,6 +12,7 @@ CRASH_SNAPSHOT = """({
 NATIVE_SNAPSHOT = """({
   installed: Array.isArray(window.__QA_UI_AUTO_CONSOLE__),
   entries: window.__QA_UI_AUTO_CONSOLE__ ?? [],
+  focusHistory: window.__QA_UI_AUTO_FOCUS__?.slice(-64) ?? [],
   resizeObservers: window.__QA_UI_AUTO_RESIZE_TRACE__ ? {
     created: window.__QA_UI_AUTO_RESIZE_TRACE__.created,
     samples: window.__QA_UI_AUTO_RESIZE_TRACE__.samples.slice()

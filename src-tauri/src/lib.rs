@@ -3,6 +3,7 @@ pub mod ai;
 mod app_exit;
 mod appearance;
 mod asr;
+mod atomic_replace;
 pub mod backup;
 mod chat;
 mod commands;

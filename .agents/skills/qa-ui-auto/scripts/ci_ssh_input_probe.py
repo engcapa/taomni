@@ -110,6 +110,11 @@ def main():
     if not delays or any(value < 0 or value > 2 for value in delays):
         parser.error("delays must be between 0 and 2 seconds")
     args.out.mkdir(parents=True, exist_ok=True)
+    (args.out / "probe-identity.json").write_text(json.dumps({
+        "sha": os.environ.get("GITHUB_SHA"), "server_runtime": args.server_runtime,
+        "shell": args.shell, "protocol": args.protocol,
+        "observation": "Diagnostic only; a setup failure has no protocol or app coverage",
+    }, indent=2) + "\n", encoding="utf-8")
     config = {}
     results = []
     server_version = None

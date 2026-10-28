@@ -85,6 +85,10 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
   // library can put the re-registered editor after Documentation. Its separator
   // then targets a nonexistent panel. Live tool visibility uses panel refs.
   const initialEditorPanelSize = useRef(props.languagePanelOpen ? "56%" : "80%").current;
+  // A group mounted behind a terminal first measures zero. The library
+  // reapplies these defaults when it becomes measurable, so an already closed
+  // side must also start collapsed rather than claim hidden editor space.
+  const initialRightPanelSize = useRef(props.toolWindowRouting.rightToolAreaOpen ? "20%" : "0%").current;
   const previousLeftOpen = useRef<boolean | null>(null);
   useEffect(() => {
     const open = props.toolWindowRouting.leftToolAreaOpen;
@@ -287,7 +291,7 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
                 <Panel
                   panelRef={toolWindowRouting.rightPanelRef}
                   id="documentation"
-                  defaultSize="20%"
+                  defaultSize={initialRightPanelSize}
                   groupResizeBehavior="preserve-pixel-size"
                   minSize="12%"
                   maxSize="40%"

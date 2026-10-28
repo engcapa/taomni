@@ -1,7 +1,10 @@
 id: TC-WS-048
 title: Compact local launcher and workspace overflow navigation retain active tabs and window drag space
-description: Creates twelve UI-owned workspace local terminal tabs. Verifies compact Sessions launch controls, reachable plus/menu, bidirectional overflow, Home/End
-  activation and active visibility without closing tabs. Physical window movement is covered by TC-MAIN-RAIL-03.
+description: Creates twelve UI-owned workspace local terminal tabs. Verifies compact Sessions launch controls, reachable plus/menu, bidirectional overflow,
+  Home/End activation and active visibility without closing tabs. Physical window movement is covered by TC-MAIN-RAIL-03. Return through Home and Sessions
+  with all twelve tabs open; the restored active tab stays visible and both scroll controls still work without runtime errors. Wait for the rendered disabled-edge
+  control before inspecting scroll geometry; hidden terminal panes must not be used as the restored active-pane readiness target. Home/End must keep the
+  active endpoint tab focused through delayed terminal activation; repeat after hidden-mode restoration while retaining pointer scrolling.
 modes:
 - browser
 - native
@@ -87,19 +90,35 @@ steps:
 - press:
     selector: '[data-testid="workspace-tab"][data-active="true"]'
     key: Home
+- wait_for: '[data-testid="workspace-tab-scroll-left"][disabled]'
 - eval_readonly:
     expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').scrollLeft < 5 && document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab"]').getAttribute("aria-selected")
       === "true"
     expect_truthy: true
 - assert_disabled: '[data-testid="workspace-tab-scroll-left"]'
+- eval_readonly:
+    expression: document.activeElement?.matches('[role'+String.fromCharCode(61)+'"tab"]:first-child[aria-selected'+String.fromCharCode(61)+'"true"]')
+    expect_truthy: true
+- assert_attribute:
+    selector: '[data-testid="workspace-tab-scroll-area"]'
+    name: data-keyboard-navigation
+    equals: 'true'
 - press:
     selector: '[data-testid="workspace-tab"][data-active="true"]'
     key: End
+- wait_for: '[data-testid="workspace-tab-scroll-right"][disabled]'
 - eval_readonly:
     expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').scrollLeft > document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').scrollWidth
       - document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').clientWidth - 10
     expect_truthy: true
 - assert_disabled: '[data-testid="workspace-tab-scroll-right"]'
+- eval_readonly:
+    expression: document.activeElement?.matches('[role'+String.fromCharCode(61)+'"tab"]:last-child[aria-selected'+String.fromCharCode(61)+'"true"]')
+    expect_truthy: true
+- assert_attribute:
+    selector: '[data-testid="workspace-tab-scroll-area"]'
+    name: data-keyboard-navigation
+    equals: 'true'
 - assert_visible: '[data-testid="workspace-tab-drag-region"]'
 - assert_visible: '[data-testid="main-window-top-drag-region"]'
 - eval_readonly:
@@ -110,13 +129,52 @@ steps:
     selector: '[data-testid="workspace-tab"]'
     equal: 12
 - assert_no_runtime_errors: null
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-session-pane"] [data-testid="terminal-pane"][data-terminal-active="true"]'
+- assert_disabled: '[data-testid="workspace-tab-scroll-right"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab"][data-active'+String.fromCharCode(61)+'"true"]').getBoundingClientRect().left
+      >= document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').getBoundingClientRect().left - 1
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab"][data-active'+String.fromCharCode(61)+'"true"]').getBoundingClientRect().right
+      <= document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').getBoundingClientRect().right + 1
+    expect_truthy: true
+- click: '[data-testid="workspace-tab-scroll-left"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').scrollLeft < document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').scrollWidth
+      - document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').clientWidth - 10
+    expect_truthy: true
+- click: '[data-testid="workspace-tab-scroll-right"]'
+- assert_count:
+    selector: '[data-testid="workspace-tab"]'
+    equal: 12
+- press:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    key: Home
+- wait_for: '[data-testid="workspace-tab-scroll-left"][disabled]'
+- eval_readonly:
+    expression: document.activeElement?.matches('[role'+String.fromCharCode(61)+'"tab"]:first-child[aria-selected'+String.fromCharCode(61)+'"true"]')
+    expect_truthy: true
+- press:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    key: End
+- wait_for: '[data-testid="workspace-tab-scroll-right"][disabled]'
+- eval_readonly:
+    expression: document.activeElement?.matches('[role'+String.fromCharCode(61)+'"tab"]:last-child[aria-selected'+String.fromCharCode(61)+'"true"]')
+    expect_truthy: true
+- assert_no_runtime_errors: null
 - screenshot: workspace-tab-overflow-and-drag.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Sessions plus and shell dropdown stay adjacent and functional; workspace many-tab scrolling, keyboard activation, visible active tabs, creation menu
-      and both drag regions remain usable without losing terminals.
+    requirement: Sessions plus and shell dropdown stay adjacent and functional; workspace many-tab scrolling, keyboard activation, visible active tabs,
+      creation menu and both drag regions remain usable without losing terminals.
     actions:
     - 1
     - 2
@@ -152,7 +210,7 @@ verification:
     - 51
     - 53
     - 55
-    - 58
+    - 61
     results:
     - 5
     - 6
@@ -177,13 +235,15 @@ verification:
     - 54
     - 56
     - 57
-    - 59
-    - 60
-    - 61
+    - 58
     - 62
     - 63
     - 64
-    - 65
+    - 67
+    - 68
+    - 69
+    - 70
+    - 71
     checkpoints:
     - step: 5
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
@@ -234,34 +294,121 @@ verification:
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').scrollLeft
         > 0", "expect_truthy": true}}'
     - step: 56
+      expectation: '{"wait_for": "[data-testid=\"workspace-tab-scroll-left\"][disabled]"}'
+    - step: 57
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').scrollLeft
         < 5 && document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab\"]'').getAttribute(\"aria-selected\") === \"true\"", "expect_truthy":
         true}}'
-    - step: 57
+    - step: 58
       expectation: '{"assert_disabled": "[data-testid=\"workspace-tab-scroll-left\"]"}'
-    - step: 59
+    - step: 62
+      expectation: '{"wait_for": "[data-testid=\"workspace-tab-scroll-right\"][disabled]"}'
+    - step: 63
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').scrollLeft
         > document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').scrollWidth - document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').clientWidth
         - 10", "expect_truthy": true}}'
-    - step: 60
+    - step: 64
       expectation: '{"assert_disabled": "[data-testid=\"workspace-tab-scroll-right\"]"}'
-    - step: 61
+    - step: 67
       expectation: '{"assert_visible": "[data-testid=\"workspace-tab-drag-region\"]"}'
-    - step: 62
+    - step: 68
       expectation: '{"assert_visible": "[data-testid=\"main-window-top-drag-region\"]"}'
-    - step: 63
+    - step: 69
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-drag-region\"]'').getBoundingClientRect().width
         >= 39 && document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').getBoundingClientRect().width > document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-strip\"]'').getBoundingClientRect().width
         * 0.5", "expect_truthy": true}}'
-    - step: 64
+    - step: 70
       expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 12}}'
-    - step: 65
+    - step: 71
       expectation: '{"assert_no_runtime_errors": null}'
+  - id: R2
+    requirement: A many-tab strip recovers from hidden Home/Sessions navigation with the active tab fully visible, all twelve terminals retained and working
+      bidirectional overflow controls, without observer or other runtime errors.
+    actions:
+    - 72
+    - 74
+    - 76
+    - 81
+    - 83
+    checkpoints:
+    - step: 73
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 75
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 77
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"] [data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 78
+      expectation: '{"assert_disabled": "[data-testid=\"workspace-tab-scroll-right\"]"}'
+    - step: 79
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab\"][data-active''+String.fromCharCode(61)+''\"true\"]'').getBoundingClientRect().left
+        >= document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').getBoundingClientRect().left - 1", "expect_truthy":
+        true}}'
+    - step: 80
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab\"][data-active''+String.fromCharCode(61)+''\"true\"]'').getBoundingClientRect().right
+        <= document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').getBoundingClientRect().right + 1", "expect_truthy":
+        true}}'
+    - step: 82
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').scrollLeft
+        < document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').scrollWidth - document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').clientWidth
+        - 10", "expect_truthy": true}}'
+    - step: 84
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 12}}'
+    - step: 91
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 73
+    - 75
+    - 77
+    - 78
+    - 79
+    - 80
+    - 82
+    - 84
+    - 91
+  - id: R5
+    requirement: Keyboard Home/End keeps focus and selection on the first/last workspace tab despite delayed terminal activation, before and after Home/Sessions
+      restoration; pointer overflow controls remain functional.
+    actions:
+    - 55
+    - 61
+    - 85
+    - 88
+    checkpoints:
+    - step: 59
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.matches(''[role''+String.fromCharCode(61)+''\"tab\"]:first-child[aria-selected''+String.fromCharCode(61)+''\"true\"]'')",
+        "expect_truthy": true}}'
+    - step: 60
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab-scroll-area\"]", "name": "data-keyboard-navigation", "equals": "true"}}'
+    - step: 65
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.matches(''[role''+String.fromCharCode(61)+''\"tab\"]:last-child[aria-selected''+String.fromCharCode(61)+''\"true\"]'')",
+        "expect_truthy": true}}'
+    - step: 66
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab-scroll-area\"]", "name": "data-keyboard-navigation", "equals": "true"}}'
+    - step: 86
+      expectation: '{"wait_for": "[data-testid=\"workspace-tab-scroll-left\"][disabled]"}'
+    - step: 87
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.matches(''[role''+String.fromCharCode(61)+''\"tab\"]:first-child[aria-selected''+String.fromCharCode(61)+''\"true\"]'')",
+        "expect_truthy": true}}'
+    - step: 89
+      expectation: '{"wait_for": "[data-testid=\"workspace-tab-scroll-right\"][disabled]"}'
+    - step: 90
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.matches(''[role''+String.fromCharCode(61)+''\"tab\"]:last-child[aria-selected''+String.fromCharCode(61)+''\"true\"]'')",
+        "expect_truthy": true}}'
+    results:
+    - 59
+    - 60
+    - 65
+    - 66
+    - 86
+    - 87
+    - 89
+    - 90
   visual:
   - check: Review arrow visibility, compact launch split and useful title-bar drag space.
     method: manual
     reason: Functional geometry is automated; retained screenshots support visual review.
   native:
-  - check: Twelve independent terminal tabs remain operable in the native WebView; real PTY readiness and OS window movement are separately tested by TC-MAIN-RAIL-03 and TC-WS-015.
+  - check: Twelve independent terminal tabs remain operable in the native WebView; real PTY readiness and OS window movement are separately tested by TC-MAIN-RAIL-03
+      and TC-WS-015.
     method: automated
     reason: Browser uses stubs; native case uses actual PTYs.

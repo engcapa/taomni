@@ -4,6 +4,7 @@ Fixtures are referenced from a testcase's `fixtures: [...]` list. Builtin set:
 
 * reset_db        - clears Taomni persistent state for this worker before the case
 * ssh_required    - probe the configured ssh.host:port over TCP; skip case otherwise
+* ssh_posix_required - explicitly configured POSIX SSH endpoint, without Win32 fallback
 * sftp_required   - probe the configured sftp.host:port over TCP; skip case otherwise
 * vnc_required    - reset the scriptable VNC fixture and expose a per-case event
                     log and command file as ${fixture.vnc_events} / ${fixture.vnc_control}
@@ -61,6 +62,7 @@ from . import workspace_restore_sessions
 from . import bookmark_assets
 from . import clickhouse_required
 from . import ssh_features_required
+from . import ssh_posix_required
 from . import session_config
 from . import x11_session_required
 from . import project_tree
@@ -115,6 +117,7 @@ REGISTRY: dict[str, Fixture] = {
     "project_tree": Fixture("project_tree", project_tree.setup),
     "reset_db":     Fixture("reset_db",     reset_db.setup,     reset_db.teardown),
     "ssh_required": Fixture("ssh_required", ssh_required.setup),
+    "ssh_posix_required": Fixture("ssh_posix_required", ssh_posix_required.setup),
     "sftp_required": Fixture("sftp_required", sftp_required.setup),
     "ssh_features_required": Fixture("ssh_features_required", ssh_features_required.setup),
     "unreachable_app_proxy": Fixture("unreachable_app_proxy", session_config.setup_unreachable_proxy, session_config.teardown_unreachable_proxy),

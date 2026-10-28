@@ -292,7 +292,29 @@ fn format_encoding_stats(stats: &ironrdp::server::EncoderStats) -> String {
     } else {
         after.saturating_mul(100) / before
     };
-    format!(" encode=planar:{planar}/rfx:{rfx} bulk={ratio}%")
+    let mut result = format!(" encode=planar:{planar}/rfx:{rfx} bulk={ratio}%");
+    // Counts/totals retain every sample, including stalls. Nanoseconds also
+    // preserve sub-microsecond work; consumers can subtract snapshots between
+    // connections instead of comparing a changing rolling average.
+    if stats.codec_time.snapshot().0 > 0 {
+        result.push_str(" encode-timing-ns=count/total/max");
+        for (name, timing) in [
+            ("diff", &stats.diff_time),
+            ("queue", &stats.queue_time),
+            ("codec", &stats.codec_time),
+            ("blocking-roundtrip", &stats.blocking_roundtrip_time),
+            ("selection", &stats.selection_time),
+            ("rfx", &stats.rfx_time),
+            ("fragment", &stats.fragment_time),
+        ] {
+            let (count, total, max) = timing.snapshot();
+            result.push_str(&format!(" {name}:{count}/{total}/{max}"));
+        }
+        let raw = stats.raw_planar_samples.load(Ordering::Relaxed);
+        let planar = stats.materialized_planar_candidates.load(Ordering::Relaxed);
+        result.push_str(&format!(" candidates=raw:{raw}/planar:{planar}"));
+    }
+    result
 }
 
 #[cfg(test)]

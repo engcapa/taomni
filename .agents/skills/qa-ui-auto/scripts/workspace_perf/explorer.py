@@ -3,6 +3,8 @@
 from pathlib import Path
 import hashlib, json, time
 
+from . import native_input
+
 
 def dataset(root):
     root.mkdir()
@@ -51,10 +53,7 @@ def run(*, binary, cfg, root, NativeHarness, NativeStepContext, VERBS, common, e
     def save():
         common.retain(folder / "metrics.json", metrics)
 
-    def click(s, selector):
-        return s.execute(
-            "document.querySelector(" + q(selector) + ").click();return true;"
-        )
+    click = common.click
 
     def file_selector(name):
         return '[data-testid="code-workspace-tree-file"][data-path=' + q(name) + "]"
@@ -102,7 +101,7 @@ def run(*, binary, cfg, root, NativeHarness, NativeStepContext, VERBS, common, e
                 )
                 metrics["coldWorkspaceOpen"] = timed(
                     s,
-                    "document.querySelector(" + q(row) + ").click()",
+                    common.click_action(row),
                     "(document.querySelector('[data-testid=\"code-workspace-editor\"]')?.textContent||'').includes('WORKSPACE_PERF_TAB_00')",
                     90,
                 )
@@ -144,7 +143,7 @@ def run(*, binary, cfg, root, NativeHarness, NativeStepContext, VERBS, common, e
                     cold.append(
                         timed(
                             s,
-                            "document.querySelector(" + q(arrow) + ").click()",
+                            common.click_action(arrow),
                             "!!document.querySelector(" + q(child) + ")",
                             45,
                         )
@@ -154,7 +153,7 @@ def run(*, binary, cfg, root, NativeHarness, NativeStepContext, VERBS, common, e
                     warm.append(
                         timed(
                             s,
-                            "document.querySelector(" + q(arrow) + ").click()",
+                            common.click_action(arrow),
                             "!!document.querySelector(" + q(child) + ")",
                             45,
                         )
@@ -261,7 +260,7 @@ def run(*, binary, cfg, root, NativeHarness, NativeStepContext, VERBS, common, e
                     switches.append(
                         timed(
                             s,
-                            "document.querySelector(" + q(selector) + ").click()",
+                            common.click_action(selector),
                             "(document.querySelector('[data-testid=\"code-workspace-editor\"]')?.textContent||'').includes("
                             + q(f"WORKSPACE_PERF_TAB_{i:02}")
                             + ")",
@@ -288,21 +287,20 @@ def run(*, binary, cfg, root, NativeHarness, NativeStepContext, VERBS, common, e
                     ctx,
                     {"selector": editor, "transport": "webdriver", "keys": ["Mod+End"]},
                 )
+                input_budgets = []
                 for label, keys in [
                     ("typing-warmup", "w" * 24),
                     ("typing-group1", "a" * 200),
                     ("typing-group2", "b" * 200),
                 ]:
-                    VERBS["native_editor_performance"](
-                        ctx,
-                        {
-                            "selector": editor,
-                            "keys": keys,
-                            "capture_text": False,
-                            "max_p95_ms": 150 if label != "typing-warmup" else 1000,
-                            "label": label,
-                        },
-                    )
+                    input_budgets.append(native_input.measure(
+                        ctx, VERBS["native_editor_performance"], selector=editor,
+                        keys=keys, label=label,
+                        limit=150 if label != "typing-warmup" else 1000,
+                    ))
+                    metrics["inputBudgets"] = input_budgets
+                    save()
+                metrics["inputBudgetPassed"] = all(g["budgetPassed"] for g in input_budgets)
                 VERBS["press"](ctx, "Control+s")
                 expected = hashlib.sha256(
                     (project / "Large1MiB.txt").read_bytes()
@@ -372,7 +370,7 @@ def run(*, binary, cfg, root, NativeHarness, NativeStepContext, VERBS, common, e
                 raise
             finally:
                 known = common.owned_processes(binary)
-                s.close()
+                common.close_session(s, metrics)
         time.sleep(1)
         table = common.process_table()
         metrics["afterExitProcesses"] = [
@@ -380,7 +378,8 @@ def run(*, binary, cfg, root, NativeHarness, NativeStepContext, VERBS, common, e
             for p in known
             if p["pid"] in table and table[p["pid"]]["startTicks"] == p["startTicks"]
         ]
-        metrics["passed"] = True
+        metrics["workloadCompleted"] = True
+        metrics["passed"] = metrics["inputBudgetPassed"]
         save()
         return metrics
     except BaseException as exc:

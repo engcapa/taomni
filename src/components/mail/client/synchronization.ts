@@ -379,7 +379,7 @@ export interface SyncAllFoldersContext {
   setFolders: import("react").Dispatch<SetStateAction<MailFolder[]>>;
   updateSelectedFolder: (next: string | ((prev: string) => string)) => void;
   messagesRef: import("react").RefObject<MailMessageHeader[]>;
-  loadCachedMessages: (folder: string, offset?: number, append?: boolean, quiet?: boolean, limitOverride?: number) => Promise<{ page: MailMessageHeader[]; hasMore: boolean; }>;
+  loadCachedMessages: (folder: string, offset?: number, append?: boolean, quiet?: boolean, limitOverride?: number) => Promise<import("./types").MailCachePageResult>;
   pageSize: number;
   warmRecentBodies: (foldersToWarm: MailFolder[], preferredFolder: string) => Promise<void>;
   startBackfill: (folder: string) => void;

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ComponentProps } from "react";
 import { EditorGroup } from "./EditorGroup";
@@ -291,7 +291,7 @@ describe("EditorGroup tabs", () => {
     expect(screen.getByTestId("code-workspace-editor-tab-scroll-left")).not.toBeDisabled();
   });
 
-  it("scrolls the active tab into the visible track using rect geometry (sidebar-safe)", () => {
+  it("scrolls the active tab into the visible track using rect geometry (sidebar-safe)", async () => {
     const many = Array.from({ length: 6 }, (_, i) => `f${i}`);
     const openFiles = Object.fromEntries(many.map((key) => [key, file(key)]));
     const { rerender } = render(<EditorGroup {...props({
@@ -359,7 +359,7 @@ describe("EditorGroup tabs", () => {
 
     // f5 content left=750, width=150, viewport=200 → scrollLeft 708.
     // offsetLeft-based math would wrongly use 300+750 and not land here.
-    expect(scrollLeft).toBe(750 + 150 - 200 + 8);
+    await waitFor(() => expect(scrollLeft).toBe(750 + 150 - 200 + 8));
     expect(scrollLeft).not.toBe((paneLeft + 750) + 150 - 200 + 8);
   });
 

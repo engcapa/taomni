@@ -200,7 +200,6 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
     visible,
   });
   const workspaceWidgetHost = useCodeWorkspaceStatusStore((s) => s.widgetHost);
-  const statusNavigationHost = useCodeWorkspaceStatusStore((s) => s.navigationHost);
 
   // Stable handler identities let the memoized project tree skip the
   // per-caret-move workspace re-render.
@@ -389,7 +388,6 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
     actionsController,
     emptyEditorHints,
     filesWithErrors,
-    statusNavigationHost,
     executeWorkspaceCommand,
     projectTreeHandlers,
     leftToolRailItems,

@@ -36,6 +36,24 @@ class CheckoutIdentityTest(unittest.TestCase):
             (root / "src/new.ts").write_text("export const changed = true;\n")
             self.assertNotEqual(before, source_identity(root))
 
+    def test_dependency_patch_and_workspace_configuration_invalidate_identity(self):
+        for name in ("patches/@codemirror__view@6.43.11.patch", "pnpm-workspace.yaml"):
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                subprocess.run(["git", "init", "-q", str(root)], check=True)
+                before = source_identity(root)
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("original\n")
+                added = source_identity(root)
+                self.assertNotEqual(before, added)
+                subprocess.run(["git", "add", name], cwd=root, check=True)
+                path.write_text("modified\n")
+                modified = source_identity(root)
+                self.assertNotEqual(added, modified)
+                path.unlink()
+                self.assertNotEqual(modified, source_identity(root))
+
 
 if __name__ == "__main__":
     unittest.main()

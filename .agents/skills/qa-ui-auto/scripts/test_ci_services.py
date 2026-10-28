@@ -94,15 +94,18 @@ class HostedServicesTest(unittest.TestCase):
     def test_credentials_are_redacted_before_receipts_including_browser_trace(self):
         import zipfile
         from qa_ui_auto.report_secrets import redact_report
-        with tempfile.TemporaryDirectory() as directory, patch.dict('os.environ', {'QA_SSH_PASSWORD': 'secret-value'}):
+        with tempfile.TemporaryDirectory() as directory, patch.dict('os.environ', {'QA_SSH_PASSWORD': 'secret-value',
+                                                                                 'QA_POSIX_SSH_PASSWORD': 'posix-secret'}):
             root = Path(directory)
-            (root / 'summary.json').write_text('{"failure":"secret-value"}')
+            (root / 'summary.json').write_text('{"failure":"secret-value posix-secret"}')
             with zipfile.ZipFile(root / 'trace.zip', 'w') as trace:
-                trace.writestr('trace.trace', '{"fill":"secret-value"}')
+                trace.writestr('trace.trace', '{"fill":"secret-value posix-secret"}')
             redact_report(root)
             self.assertNotIn('secret-value', (root / 'summary.json').read_text())
+            self.assertNotIn('posix-secret', (root / 'summary.json').read_text())
             with zipfile.ZipFile(root / 'trace.zip') as trace:
                 self.assertNotIn(b'secret-value', trace.read('trace.trace'))
+                self.assertNotIn(b'posix-secret', trace.read('trace.trace'))
 
     def test_vnc_fixture_is_provisioned_without_account_setup(self):
         with tempfile.TemporaryDirectory() as directory, \

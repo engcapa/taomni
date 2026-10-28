@@ -46,9 +46,9 @@ def input_digest(path: Path) -> str:
 
 
 def source_input(name: str) -> bool:
-    return (name.startswith(("src/", "src-tauri/", "vite-plugins/", "scripts/", "public/", ".cargo/"))
+    return (name.startswith(("src/", "src-tauri/", "vite-plugins/", "scripts/", "public/", ".cargo/", "patches/"))
             and not name.startswith(("src-tauri/target/", "src-tauri/tests/"))) or (
-        name in {"package.json", "pnpm-lock.yaml", "vite.config.ts", "index.html", "rust-toolchain.toml", "rust-toolchain"}
+        name in {"package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "vite.config.ts", "index.html", "rust-toolchain.toml", "rust-toolchain"}
         or name.startswith("tsconfig")
     )
 

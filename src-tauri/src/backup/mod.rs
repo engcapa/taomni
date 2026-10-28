@@ -1,5 +1,4 @@
 mod archive_writer;
-mod atomic_replace;
 pub mod batch;
 pub mod cache;
 pub mod commands;
@@ -37,7 +36,7 @@ mod snapshot_tests;
 #[cfg(test)]
 mod tests;
 
-use crate::state::AppState;
+use crate::{atomic_replace, state::AppState};
 pub use engine::{BackupCustomOptions, BackupEntryInfo, BackupResult};
 pub use manifest::BackupManifest;
 pub use policy::BackupPolicy;

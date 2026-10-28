@@ -2,13 +2,19 @@
 
 from copy import deepcopy
 import hashlib
+import json
+import os
 from pathlib import Path
+import subprocess
+import sys
 import tempfile
 from unittest import TestCase
 
+from workspace_perf import common
 from workspace_perf.common import stats
 from workspace_perf.explorer import dataset
 from workspace_perf.hosted import linux_release_entry, validate_gate
+from qa_ui_auto.provenance import source_identity
 
 
 class FunctionalGateTest(TestCase):
@@ -86,8 +92,77 @@ class FunctionalGateTest(TestCase):
         with self.assertRaises(ValueError):
             self.check()
 
+    def remote_failure(self, case="TC-RDPS-PERF-03-photo-content"):
+        self.run["conclusion"] = "failure"
+        self.summary["passed"] = False
+        self.summary["groups"][0]["counts"] = {"passed": 2, "failed": 1}
+        self.summary["failures"] = [{
+            "entry": "linux-browser-shard-1", "group_id": "linux-browser", "case": case,
+        }]
+
+    def test_explicit_remote_performance_exception_preserves_the_failed_result(self):
+        self.remote_failure()
+        original = deepcopy(self.summary)
+        with self.assertRaises(ValueError):
+            self.check()
+        validate_gate(self.run, self.selection, self.summary, self.head, self.identity,
+                      ["TC-RDPS-PERF-03-photo-content"])
+        self.assertEqual(self.summary, original)
+        self.assertFalse(self.summary["passed"])
+
+    def test_exception_cannot_accept_a_save_failure_or_crash(self):
+        for case in ["TC-IDE-C0-03", "TC-WS-054"]:
+            with self.subTest(case=case):
+                self.remote_failure(case)
+                with self.assertRaises(ValueError):
+                    validate_gate(self.run, self.selection, self.summary, self.head,
+                                  self.identity, [case])
+
+    def test_exception_cannot_conceal_skips_missing_results_or_infrastructure_failure(self):
+        self.remote_failure()
+        original = deepcopy(self.summary)
+        for patch in [
+            {"infrastructure_errors": ["driver unavailable"]},
+            {"job_results": {"plan": "success", "execute": "failure"}},
+            {"report_ok": False},
+            {"groups": [{**original["groups"][0], "counts": {"passed": 1, "failed": 1, "skipped": 1}}, *original["groups"][1:]]},
+            {"failures": original["failures"] * 2},
+        ]:
+            with self.subTest(patch=patch), self.assertRaises(ValueError):
+                validate_gate(self.run, self.selection, {**original, **patch}, self.head,
+                              self.identity, ["TC-RDPS-PERF-03-photo-content"])
+
 
 class WorkloadTest(TestCase):
+    def test_historical_builder_uses_probe_identity_without_changing_the_checkout(self):
+        scripts = Path(__file__).resolve().parent
+        with tempfile.TemporaryDirectory() as directory:
+            checkout = Path(directory)
+            subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+            old_scripts = checkout / ".agents/skills/qa-ui-auto/scripts"
+            old_package = old_scripts / "qa_ui_auto"
+            old_package.mkdir(parents=True)
+            (old_package / "__init__.py").write_text("")
+            (old_package / "provenance.py").write_text("def source_identity(root): return 'old-boundary'\n")
+            (checkout / "pnpm-workspace.yaml").write_text("packages: [.]\n")
+            builder = old_scripts / "native_build.py"
+            # A disposable builder records its imported identity; no UI or build.
+            builder.write_text(
+                "from pathlib import Path\n"
+                "import json,sys\n"
+                "from qa_ui_auto.provenance import source_identity\n"
+                "Path('result.json').write_text(json.dumps([source_identity(Path.cwd()),sys.argv[1:]]))\n"
+            )
+            original = builder.read_bytes()
+            expected = source_identity(checkout)
+            subprocess.run([
+                sys.executable, str(scripts / "workspace_perf/build_baseline.py"),
+                "--checkout", str(checkout),
+            ], cwd=checkout, env=dict(os.environ, PYTHONPATH=str(scripts)), check=True)
+            self.assertEqual(json.loads((checkout / "result.json").read_text()), [expected, ["--release"]])
+            self.assertEqual(builder.read_bytes(), original)
+            self.assertEqual(source_identity(checkout), expected)
+
     def test_release_runtime_is_selected_by_producer_not_consumer_desktop(self):
         entry = {
             "platform_key": "linux", "mode": "native", "runner": "ubuntu-24.04",
@@ -128,3 +203,88 @@ class WorkloadTest(TestCase):
         result = stats(values)
         self.assertEqual(values[-1], 500)
         self.assertEqual(result, {"n": 20, "p50": 1, "p95": 1, "max": 500})
+
+
+class ClickDispatchTest(TestCase):
+    """Exercise real SVG/HTML DOM and React delegation without launching a UI."""
+
+    HARNESS = r"""
+const fs = require('node:fs');
+const {JSDOM} = require('jsdom');
+const {window} = new JSDOM('<div id="root"></div>', {runScripts:'outside-only'});
+global.window = window;
+global.document = window.document;
+const React = require('react');
+const {createRoot} = require('react-dom/client');
+const {flushSync} = require('react-dom');
+const input = JSON.parse(fs.readFileSync(0, 'utf8'));
+const events = [];
+let activations = 0;
+function Tabs() {
+  const [ids, setIds] = React.useState(['first', 'last']);
+  return React.createElement('div', {onClick:()=>{activations++;}},
+    ids.map(id=>React.createElement('div', {key:id, 'data-tab-id':id},
+      React.createElement('svg', {'data-testid':'tab-close', onClick:event=>{
+        event.stopPropagation();
+        events.push({id, tag:event.target.tagName, bubbles:event.bubbles,
+          cancelable:event.cancelable, detail:event.detail, button:event.button});
+        setIds(ids=>ids.filter(value=>value!==id));
+      }}))),
+    React.createElement('button', {'data-testid':'html-button', onClick:event=>{
+      event.preventDefault();
+      events.push({tag:event.target.tagName, bubbles:event.bubbles,
+        cancelable:event.cancelable, detail:event.detail, button:event.button});
+    }}, 'Open'));
+}
+const root = createRoot(document.getElementById('root'));
+flushSync(()=>root.render(React.createElement(Tabs)));
+let error = null;
+try { flushSync(()=>window.eval(input.script)); }
+catch (value) { error = String(value); }
+const result = {error, events, activations,
+  tabs:[...document.querySelectorAll('[data-tab-id]')].map(el=>el.dataset.tabId)};
+flushSync(()=>root.unmount());
+window.close();
+process.stdout.write(JSON.stringify(result));
+"""
+
+    def dispatch(self, script):
+        result = subprocess.run(
+            ["node", "-e", self.HARNESS],
+            input=json.dumps({"script": script}),
+            text=True, capture_output=True, check=True,
+            cwd=Path(__file__).resolve().parents[4],
+        )
+        return json.loads(result.stdout)
+
+    def test_historical_svg_does_not_have_an_html_click_method(self):
+        result = self.dispatch("document.querySelector('svg').click()")
+        self.assertIn("click is not a function", result["error"])
+        self.assertEqual(result["tabs"], ["first", "last"])
+        self.assertEqual(result["events"], [])
+
+    def test_last_svg_closes_once_through_react_without_activating_its_tab(self):
+        result = self.dispatch(common.click_action('[data-testid="tab-close"]', last=True))
+        self.assertIsNone(result["error"])
+        self.assertEqual(result["tabs"], ["first"])
+        self.assertEqual(result["activations"], 0)
+        self.assertEqual(result["events"], [{
+            "id": "last", "tag": "svg", "bubbles": True, "cancelable": True,
+            "detail": 1, "button": 0,
+        }])
+
+    def test_html_control_uses_the_same_bubbling_cancelable_mouse_event(self):
+        result = self.dispatch(common.click_action('[data-testid="html-button"]'))
+        self.assertIsNone(result["error"])
+        self.assertEqual(result["tabs"], ["first", "last"])
+        self.assertEqual(result["activations"], 1)
+        self.assertEqual(result["events"], [{
+            "tag": "BUTTON", "bubbles": True, "cancelable": True,
+            "detail": 1, "button": 0,
+        }])
+
+    def test_missing_control_fails_instead_of_silently_skipping_the_action(self):
+        result = self.dispatch(common.click_action('[data-testid="missing"]', last=True))
+        self.assertIn('Missing performance control: [data-testid="missing"]', result["error"])
+        self.assertEqual(result["events"], [])
+        self.assertEqual(result["tabs"], ["first", "last"])

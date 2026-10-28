@@ -1,11 +1,157 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前验收尚未完成。全量 [40500343529](https://github.com/engcapa/taomni/actions/runs/40500343529) 已收齐 25/25 分片：641 个适用 ID、2,103 次执行，2,100 passed / 3 failed。失败分别为 Windows browser TC-145 丢失命令首字节、Linux native TC-MAIL-FOLDER-01 订阅状态回退、macOS native TC-RDPS-PERF-03-photo-content 帧率比 0.845 < 0.85；原始失败全部保留。邮件修复已在三平台 browser/native 全部通过，SSH 远端输入和编辑器偶发选区异常仍在定位，RDP 定向复验见下文。最近一次 main 同步为 `a5743792`，后续仍需再次同步并全量验收。按用户最新指示，browser/native 用例直接在 GitHub 执行，本机仅运行单测、编译与静态检查。功能完成后再做正式性能对照，目前没有“性能无退化”的结论。原始证据保留于 `/home/zhyhang/.cache/taomni-workspace-redesign-20261027/`。外部 `clickhousecrud` 项目用例按用户认可的现有 policy 单独报告缺口。
+> 当前交付源码及修正后的测量工具已完成三平台全量 [40652692956](https://github.com/engcapa/taomni/actions/runs/40652692956)：**642 个适用 ID、2,104/2,104 passed、25/25 分片，0 failed/skipped/infrastructure errors**，原始回执及最终汇总已独立核验；完整九条崩溃专项 **42/42 passed**，先前同产品相关集 **86/86 passed**。本轮 RDP/VNC 性能例外未使用。main `65d6d907` 已合并。正式四轮原生性能对照 [40659856210](https://github.com/engcapa/taomni/actions/runs/40659856210) 在 candidate-1 的 2MiB 终端输出阶段失败，正在补充原生输出诊断，尚无完整性能结论；先前 `40647814102` 的 main-1 工具超时失败及全部慢样本保留。browser/native 均只在 GitHub 运行，本机仅做单测、静态检查和供手测的 release 编译。唯一外部 clickhousecrud 缺口按用户确认单列，不计为通过。以下历史章节以本节最新状态为准。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
+
+## 当前功能验收与性能复核（2026-10-28）
+
+最终功能门禁在 `23b6120cb110ad54fbc8fdcde8abb5276599c864` 执行。产品 source SHA `6a2f1c52e15f19505e3e8dcfac1ad75acdf8a46c77be7d6d6ffb3d43c31e853d`，runner SHA `bf665b084f3bbecaf7e44d7660863a9c11d161700251fd5c6d31b49947309640`。全部原始 receipt、case digest、source/runner/native build 身份与托管最终汇总已逐分片独立核验，证据保存在仓库外 `github-40652692956/verified-final.json`；九条崩溃 42 项原始执行另核对为 `crash-cells-reviewed.json`。工具修正未改变产品 source SHA；上一轮 `d6cbfcd1` 的 2,104/2,104 及其 runner 身份仍保留，新性能流程使用本轮精确 HEAD 门禁。
+
+| 平台 / 模式 | 适用执行 | Passed | Failed / Skipped / Infra |
+| --- | ---: | ---: | --- |
+| Linux browser | 443 | 443 | 0 / 0 / 0 |
+| Linux native | 275 | 275 | 0 / 0 / 0 |
+| Linux native 双显示器 | 1 | 1 | 0 / 0 / 0 |
+| Windows browser | 443 | 443 | 0 / 0 / 0 |
+| Windows native | 258 | 258 | 0 / 0 / 0 |
+| macOS browser | 441 | 441 | 0 / 0 / 0 |
+| macOS native | 243 | 243 | 0 / 0 / 0 |
+
+九条崩溃专项 `TC-WS-038/039/045/051/052/053/054/055/056` 在相关集及全量均为 **42/42 passed**，每次产品功能修改后继续作为强制回归。新增 Windows 文件锁场景 `TC-IDE-C0-04` 为另一条真实磁盘/导航回归，不计入九条数量。唯一外部 `TC-IDE-C6-06-java-definition-realproject-native` 缺少 clickhousecrud 源码，在三个原生平台各有一项明确 policy gap；总计一个未执行 ID，不计通过。
+
+最新正式性能运行 [40659856210](https://github.com/engcapa/taomni/actions/runs/40659856210) 使用同一提交的工具、当前原始 release 构建与真正改前 main `a57437927b62d6036a6d473eddccc053a4b4c0e8`，main-1 全部完成。原始输入 warmup / group1 / group2 的 p95 为 **35 / 29 / 33ms**、max 为 **45 / 794 / 1,409ms**，下一帧 p95 为 **899 / 1,047 / 1,019ms**；全部 424 个键与样本保留。candidate-1 在 24 个真实 PTY 下的 2MiB 输出等待结束行超过原有 180 秒：producer receipt 为完整 **2,097,152 bytes / 161.838736ms**，失败截图可见大量 P，但没有结束行与后续 shell prompt。main-2 / candidate-2 尚未执行；单次失败不能区分 IPC、xterm 处理或观测问题，也不能构成四轮退化结论。原始证据保留于仓库外 `github-40659856210/workspace-performance/`。
+
+补充 `TC-TERM-BURST-001`（native Linux/macOS，release）：24 个真实 PTY、正反 48 次标签切换、三轮各 2MiB 输出；每轮要求连续唯一的原始 Tauri IPC 序号、完整 payload SHA-256、界面结束行和随后十条命令，最后关闭全部标签并清空注册表。只旁路观察现存 callback，原样交付消息及异常，不重放、不减工作量；失败保留通道字节、序号缺口、console、buffer tail 与独立 producer receipt。Windows ConPTY 是屏幕更新流，精确 POSIX 字节 oracle 不适用，明确不外推。新增工具契约验证真实 producer 字节、丢包/重复/错字节拒绝、乱序交付、原始异常和 callback 恢复。33 项相关工具单测通过，包含失败路径的完整原始数据保存、采集失败不能遮盖原错；本机未运行 browser/native。GitHub 定向 [40667935598](https://github.com/engcapa/taomni/actions/runs/40667935598)（Ubuntu 24.04）及 [40668754349](https://github.com/engcapa/taomni/actions/runs/40668754349)（匹配性能环境的 Ubuntu 22.04）各覆盖此用例与完整九条崩溃专项，原生结果待收齐。正式四轮工具也增加同一旁路观察，main/candidate 都保持完整工作负载和既定阈值；输出延迟在收集原始数据前截取，观察器源码 SHA-256 单列，异常时同样保留通道、console 与注册表尾部。观察开销属于两版相同测量条件，不能外推为未插桩的生产吞吐。它是额外终端回归，九条强制 crash-regression 及其计数不变。
+
+正式性能运行 [40647814102](https://github.com/engcapa/taomni/actions/runs/40647814102) 已保留失败。真正改前 main `a57437927b62d6036a6d473eddccc053a4b4c0e8` 的 main-1 完成 24 个真实 PTY、echo/2MiB 输出/关闭、3,097 文件冷暖展开和滚动、24 个 64KiB 文件打开及 48 次切换；1MiB 编辑器的 24 键 warmup 原始 p95 **639ms**、max **1,082ms**、下一帧 p95 **1,301ms**。随后 200 键单次 W3C `/actions` 请求超过工具固定 120 秒；清理 DELETE 的 `RemoteDisconnected` 又遮盖了原 `TimeoutError`。candidate 未执行，部分慢数据不能建立当前版本退化结论。
+
+测量工具改为每批 8 键，仍调用原生 WebDriver 的原有 20ms paced input；不重试投递状态不确定的请求，正式输入总量仍为 400，warmup 另保留 24 键。逐组校验完整 keydown 顺序、DOM/下一帧样本、pending=0、原始尾值与 p95/max 一致。仅完整写盘后的精确预算失败允许继续采集；慢 baseline 的 `passed=false` 保留，candidate 任一组超过原有 **150ms** 正式预算（warmup 1,000ms）仍导致最终门禁失败，相对 15%+噪声门槛不变。清理失败单独记录；已有原错时保留原错，无原错时清理仍失败。工具契约 **26/26 passed**，包含历史构建脚本实际启动、超时不重试、坏样本拒绝、慢 baseline 及 candidate 仍须达到绝对预算等断言；新模块采用 `native_input.py` 避免遮蔽标准库 `typing`。这次仅修性能采集工具，无产品用户流程变化，不新增产品 YAML；既有 `TC-IDE-C0-03`、`TC-IDE-C0-04` 及九条崩溃专项继续保留。修正工具的新 HEAD 全量已核验 2,104/2,104，`40659856210` 的 main-1 已完整采集，但 candidate-1 的终端输出失败，完整对照待诊断修复后再执行；全部原始失败保留。
+
+SVG 点击工具修复提交 `11f57e40d440d5558adc316aa75387dda90eaf52` 的全量 [40619625516](https://github.com/engcapa/taomni/actions/runs/40619625516) 已收齐全部原始回执并独立核验：**2,101 passed / 2 failed，25/25 分片**，没有跳过或基础设施错误。完整九条崩溃专项 **42/42 passed**，失败不能被 job 本身的绿色状态掩盖。
+
+Windows native `TC-IDE-C0-03` 的 424 个输入字符完整到达编辑器，编辑器内容 SHA-256 正确，但磁盘仍为编辑前 1MiB 内容。失败画面显示 `rename temp file: Access is denied. (os error 5)`。原哈希观察使用 Python 普通文件读取，在 Windows 不共享 DELETE，可与 Ctrl+S 后的原子替换竞争；真实扫描器也可短时持有此锁。现在将既有备份原子替换重试提取为共享 `atomic_replace`，工作区保存复用：只对 Windows 5/32/33 错误每 20ms 重试，最长 2 秒，其他错误立即返回，保留原有写入、sync、hash 比较和失败反馈，不先删除或截断旧文件。
+
+独立的 host 文件哈希观察提取为单独 owner，完整流式计算原始字节 SHA-256，保持原有期望值、超时和轮询频率。首次 Windows 构建 [40630051144](https://github.com/engcapa/taomni/actions/runs/40630051144) 的真实契约否定了“DELETE sharing 可保证覆盖已打开目标”的假设：共享标志为 READ/WRITE/DELETE 时 `os.replace` 仍返回 WinError 5，两个新契约失败，Windows native 因此未执行；失败不计为产品验证通过。现撤回该标志假设与自定义句柄转换，按原生平台语义测试：Windows 持读句柄期间保留完整旧文件和 pending，释放后可替换；POSIX 另测打开旧快照时可发布新文件。哈希观察及时关闭每次完整读取，由产品的有限重试处理真实短时锁。异常释放、错误哈希拒绝、Windows 真实锁及 POSIX 快照契约继续保留。`TC-IDE-C0-03` 保留全部输入/延迟/磁盘 hash/history 断言，并补充末尾运行时错误断言；相关保存、编码、草稿恢复和备份用例保护共享边界。
+
+本机 release 配置的 `workspace::tests::atomic_writes` **16/16 passed**，共享替换 helper 的 Linux 契约 **3/3 passed**；性能工具与 host observer 共 20 项单测为 **19 passed / 1 Windows 专属 skip**，该 Win32 项明确待托管执行。`cargo fmt --check`、`pnpm check:refactor`、`audit --gate` 均通过，没有在本机运行 browser/native 用例。
+
+补充性能边界复核：现有四个保存 IPC 为同步处理，加入锁重试后可能占用 UI 线程最长 2 秒。新增 Windows-only `TC-IDE-C0-04`，使用报告目录内真实的不共享 DELETE 的 reader 持锁，实际 Ctrl+S 后观察待发布临时文件，在锁仍持有时要求 Home/Workspaces 导航低于 1,500ms，再释放锁并核对精确磁盘 SHA-256、完整旧文件和临时文件清理。先在保持同步保存的源码上采集原生区分证据，随后由异步阻塞任务承接写入并保留保存串行顺序。该用例不属于 RDP/VNC 性能例外；既有九条崩溃专项数量不变。探针的路径隔离、平台限制和异常释放单测通过，实际原生结果待 GitHub 执行。
+
+四个保存 IPC 现通过独立 `commands/workspace_writes.rs` owner 使用异步队列与 `spawn_blocking`：队列异步等待，真实写入交给阻塞 worker，任务持有队列 guard 至实际写入结束，提供跨保存调用的串行排他。原同步 Rust API、IPC 名/参数/回执和编码、hash 前置条件保留；worker 异常标记 disk effect unknown，不能伪称未写入。单线程异步 runtime 的阻塞写入/队列及异常释放契约 **2/2 passed**，相同测试二进制的原子写入 **16/16 passed**；768 个 native command、328 个 facade exports、39 个 literal events 的兼容检查通过。完整锁场景在同步源码上的区分采集为 [40633593507](https://github.com/engcapa/taomni/actions/runs/40633593507)，真实文件观察契约通过，但工具的 reader tracking 单测以 Windows 8.3 临时目录别名比较规范化后的长路径，未记录 reader 而失败；**原生 UI 用例没有执行**，不能作阻塞复现结论。`d6cbfcd1` 将临时 root 规范化，保留至少两个 reader、全部关闭、原文件与原错误等断言，并把 Windows 低成本文件/工具契约提前到 app 编译前。修正工具后旧同步实现的独立对照为 [40636760493](https://github.com/engcapa/taomni/actions/runs/40636760493)，异步实现相关集为 [40636705527](https://github.com/engcapa/taomni/actions/runs/40636705527)。两轮均已独立核验：旧同步版本 **15/15 passed**、异步版本 **86/86 passed**，后文记录测量及其边界；先前 [40632227021](https://github.com/engcapa/taomni/actions/runs/40632227021) 同样受错误的观察器契约阻断，不作原生 UI 结论。异步版本随后须完成相关集、完整全量及正式性能对照。
+
+修正工具后的异步版本相关集 [40636705527](https://github.com/engcapa/taomni/actions/runs/40636705527) 已完成并独立核验：精确产品/runner/用例/原生构建身份匹配，24 ID、**86/86 passed**，15/15 分片、0 failed/skipped/infrastructure errors。九条崩溃专项 **42/42 passed**。Windows `TC-IDE-C0-03` 的全部 424 字符输入和磁盘保存通过；新增 `TC-IDE-C0-04` 在真实 reader 持锁期间的 Ctrl+S 为 **94ms**、Home→Workspaces 导航为 **360ms**，完整旧文件与 pending 保持，释放后精确磁盘 SHA-256 正确、临时文件清理。旧同步版本的同一锁场景亦通过：Ctrl+S **63ms**、导航 **266ms**；该反例没有复现此前推测的 UI 阻塞，不能宣称此用例证明异步改造必要性或带来性能收益。它验证的是实际 WebView 导航、完整文件保留及释放后的发布预算，不能单靠 DOM 导航证明原生宿主事件循环的全部响应性。`spawn_blocking` 为耗时 I/O 提供显式执行边界；两组单次值不是匹配多轮性能结论，正式完整对照仍待执行。随后同一 HEAD `d6cbfcd1` 的三平台全量 [40641466776](https://github.com/engcapa/taomni/actions/runs/40641466776) 已核验 2,104/2,104 passed，详见本节矩阵。
+
+当前供手工测试的本机 QA release 已包含异步保存修复：`src-tauri/target/qa-ui-auto/release/taomni`，独立 ID `com.taomni.app.qa`，source SHA `6a2f1c52e15f19505e3e8dcfac1ad75acdf8a46c77be7d6d6ffb3d43c31e853d`，binary SHA `c0734ad52de4fe43b487019d2679c9607e2296d36fd6b142668e3d6313c0edf9`。Node 22、build jobs 2，耗时 624.82 秒；`CARGO_BUILD_JOBS=2 native_build.py --release --check` 确认 inputs match。后续 `d6cbfcd1` 仅修改测试工具与 workflow，不改变产品 source SHA，无需重复编译。未在本机执行 browser/native 用例。
+
+另一失败为 macOS native `TC-RDPS-PERF-03-photo-content`：baseline/adaptive observed FPS 为 **28.1567 / 21.0972**，比值 **0.7492768147280562**，原阈值为 ≥0.85，bulk 解码错误为 0。按用户 2026-10-28 的明确授权，RDP/VNC server/client 性能 case 失败可暂忽略；本项原始失败与慢样本保留，未修改 RDP 算法或阈值、未算作通过。正式 UI 性能 workflow 默认仍要求全绿；只有显式给出的现有 remote performance case ID 可以作为验收例外，保存/崩溃/skip/infra/缺失回执均不适用。plan 同时记录真实 full-suite passed 状态和已接受失败。
+
+以下为修复前已完成的历史全绿及测量准备，最新修复仍须先跑相关集、再跑完整 GitHub 全量，随后完成四轮原生性能对照。
+
+相关集 [40604739146](https://github.com/engcapa/taomni/actions/runs/40604739146) 已核验 **38 ID、140/140 passed**，18/18 分片。随后在相同产品提交 `0535305b3fd0b9d0bc8425e7ee8a023b5433c0c2` 执行 `scope=all`：[40609887227](https://github.com/engcapa/taomni/actions/runs/40609887227)，最终 **641 个适用 ID、2,103/2,103 passed**，25/25 分片，0 failed / skipped / infrastructure errors。以下数量均来自原始回执核验，未将未分配、未执行或不适用项计为通过。
+
+| 平台 / 模式 | 适用执行 | Passed |
+| --- | ---: | ---: |
+| Linux browser | 443 | 443 |
+| Linux native | 275 | 275 |
+| Linux native 双显示器 | 1 | 1 |
+| Windows browser | 443 | 443 |
+| Windows native | 257 | 257 |
+| macOS browser | 441 | 441 |
+| macOS native | 243 | 243 |
+
+完整九条 `crash-regression`（TC-WS-038/039/045/051/052/053/054/055/056）在相关集及全量中均执行并通过，三平台适用执行为 **42/42**。已纳入产品 PR，以及手动 selected / impacted / smoke / all 路径；遗漏原因、数量边界和后续执行约束见 [崩溃专项复盘](../qa-ui-auto-tests/ci/crash-regressions.md)。专项不代替本次功能及其他消费者回归。
+
+该历史产品 source SHA 为 `6ed9ab49dc80b47167a550c02fec0bc8df2970471351199ed58d4ca37bd32809`，runner SHA 为 `960aea3b48d469095626d51b22fb66cb31a38e6840e3e0a2911b129180bc7c01`。独立核验结果保存在 repo 外证据目录的 `github-40604739146/verified-final.json` 和 `github-40609887227/verified-final.json`，与托管汇总完全一致；每份原始 receipt 和原生 build-source 身份均已检查。文档后续更新不改变该产品源码指纹。
+
+本轮全量的 RDP 照片 observed FPS 比为 Linux **1.00598**、Windows **1.00646**、macOS **1.05282**，均达到原有 ≥0.85 要求，三平台 bulk 解码错误均为 0。macOS baseline / adaptive 为 17.8528 / 18.7958fps。原全量 40577348054 的 0.75228 失败及慢样本保留；诊断没有改变编码算法，本轮通过不代表已证明该旧失败的唯一根因。
+
+main 同步按用户要求在相关集通过后执行：远程 `65d6d907efdf291478e660dc1ada96a12a41b8ad` 已合并为 `efd6c4ed`，本轮全量包含该合并。外部 `TC-IDE-C6-06-java-definition-realproject-native` 依赖未随仓库提供的 clickhousecrud，在 Linux/Windows/macOS native 各有一项 policy gap，按用户确认单独记录，**不计为通过**。
+
+首轮正式性能 workflow [40616686958](https://github.com/engcapa/taomni/actions/runs/40616686958) 已保留失败：main-1 完成 24 个真实 PTY 的建立、切换、echo 与 2MiB 输出后，在第一下关闭标签时调用 SVGElement 不支持的 `.click()`，未进入候选版本或比较阶段。原始部分数据、截图、traceback 和二进制身份全部保留，不混入新的完整四轮结果。
+
+测量工具改用同一套兼容 SVG/HTML 的 bubbling、cancelable MouseEvent；两版采用一致操作，React 原有关闭处理和 stopPropagation 语义保留，缺少控件会显式失败。其余 DOM 点击共用这一实现，关闭全部 24 个标签及进程/资源观察不删减。新增真实 jsdom SVG/HTML 与 React 事件委托单测，确认旧 SVG 调用失败、最后一个标签只关闭一次且不激活父标签、HTML 事件语义与缺失控件失败；完整性能工具契约 **13/13** 通过。此修改只涉及测量工具，不改变产品源码；runner 身份改变，因此保留现有功能证据并重新执行新 HEAD 的 GitHub 全量门禁，不绕过精确身份要求。
+
+正式对照基线仍为重构前 main `a57437927b62d6036a6d473eddccc053a4b4c0e8`；同一 Ubuntu/WebKitGTK release 环境依次运行 main-1 / candidate-1 / main-2 / candidate-2，覆盖 24 个真实 PTY、2MiB 输出、3,097 文件、24 个 64KiB 文件标签、1MiB 编辑器与每轮 400 次真实输入，并检查保存 / undo / redo 的内容 hash。全部尾部样本、身份和资源记录保留，使用既定 15% 相对预算和基线噪声，结果待收齐。
+
+功能全量完成后进行了以下代码性能审查，检查结果本身不替代实测：
+
+| 路径 | 审查结论 |
+| --- | --- |
+| Sessions / Workspaces 运行实例 | 工作区首次访问才创建 canvas；一个工作区共享一个完整编辑器，稳定 tab key 保留原协议实例。关闭标签移出渲染树；没有按文件重复创建编辑器 |
+| Terminal / 大预览 | 相同 cols/rows 不重复发 resize IPC，隐藏零尺寸不 fit。全局 registry 持有实时 ref；大预览仅打开时创建 1 秒刷新 timer，关闭即清理，每次只取八行近期输出。terminal owner 清理 observer、订阅、timer、IME、registry 和其拥有的 PTY，分离/接管语义保留 |
+| 文件浏览器 | 异步目录列表与语言服务识别分开，generation 与每目录请求序号阻止迟到结果覆盖。递归索引按需加载并保留既有深度/文件数量上限；WeakMap 按不可变列表及有限排序选项复用排序结果。没有宣称文件树已虚拟化 |
+| 布局 / resize | 真实 DOM 或 panel group 各自合并一帧通知；替换/卸载取消帧并断开观察，忽略迟到 callback。pointer/keyboard 开始及 release 前刷新待处理布局，保留真实最终宽度 |
+| 草稿恢复 / 编辑输入 | 镜像前比较 buffer 字段，不变的文件 tab 集合返回原 state。草稿保留同步末次按键恢复；大文件序列化成本由完整输入延迟、资源与内容断言判断，不能通过简单 debounce 牺牲立即关闭后的恢复 |
+
+测量边界：QA 构建开启全缓冲文本镜像；WebDriver / DOM / 下一帧时间不是物理按键到显示器延迟；Linux/WebKitGTK/Xvfb 对照不建立 Windows/macOS/GPU 性能结论。四份原始结果及比较将在 workflow 完成后补充。
+
+## Workspace 标签栏与延迟终端焦点（2026-10-28，托管复验通过）
+
+分屏库补丁提交 `75d87ad9` 的相关集 [40601604851](https://github.com/engcapa/taomni/actions/runs/40601604851) 最终 **139 passed / 1 failed**，18/18 分片；74 次 native 全部通过，唯一失败为 macOS browser TC-WS-048。原 trace 显示 Home 正常切到第一标签，紧接着 End 派发时 xterm 已重新获得焦点，活动标签仍为第一项。该失败及全部原件保留。
+
+`useTerminalViewport` 已为 Sessions 保留 `[role=tablist][data-keyboard-navigation=true]` 的焦点保护，而 Workspace strip 未接入此意图。切到另一终端后，50ms + RAF 的正常终端激活会覆盖刚建立的键盘标签焦点。两个新挂载测试组合真实 Workspace strip、store 与 terminal viewport hook，仅替代 xterm DOM 边界，在改前 2/2 失败。现为键盘导航/激活设置相同意图，pointer capture 清除，保留真实鼠标激活后自动聚焦终端。新增/保留焦点、过滤、滚动与 Sessions 组共 33/33 通过；TypeScript、refactor、更新用例 schema 与行为契约通过。
+
+TC-WS-048 保留全部原步骤、精确滚动和 300 秒预算，新增第一/最后标签的真实焦点与选择断言，以及 Home/Sessions 隐藏恢复后的再次 Home/End，共 92 步。修复提交 `0535305b` 的三平台 browser/native 相关集 140/140 与全量 2,103/2,103 均已独立核验通过。补丁前的用例修正版 [40598905018](https://github.com/engcapa/taomni/actions/runs/40598905018) 的 25 ID、89/89 passed 仅作为历史保留。
+
+本机 QA release 已包含分屏库补丁和焦点修复：`src-tauri/target/qa-ui-auto/release/taomni`，`com.taomni.app.qa`，source SHA `6ed9ab49dc80b47167a550c02fec0bc8df2970471351199ed58d4ca37bd32809`、binary SHA `027c1f0b0563a0d2a3ef26ef05e57670d0b320c157e52f5c410b5df2294986e9`，编译 1094.55 秒、jobs 2，构建与输入核验均通过。未在本机运行后续 browser/native 用例。
+
+## 真实分屏库的观察器边界（2026-10-28，修复待托管复验）
+
+标签栏修复后的 [40596454168](https://github.com/engcapa/taomni/actions/runs/40596454168) 最终 **82 passed / 7 failed**、15/15 分片，原始回执/身份与失败汇总已独立核验，0 infrastructure errors。再次捕获 Linux native TC-WS-039 的 `ResizeObserver loop completed with undelivered notifications`。该轮标签栏 callback 已无同步测量；根分屏恢复后 editor/documentation 的宽度由 953.16/233.84px 继续变化至 1002.20/184.80px，嵌套分屏 callback 约耗时 13ms。不能把此前某轮没有复现当作修复完成。另六项 TC-WS-048 旧断言失败均保留；修正选择器及帧就绪的 [40598905018](https://github.com/engcapa/taomni/actions/runs/40598905018) 仍在执行。一次 browser-only 规划 40598145429 因完整 crash-regression 含 native-only 用例而正确拒绝，未执行用例；未关闭该门禁，后续均使用 browser/native。
+
+真实 `react-resizable-panels@4.12.4` 在自己的 observer callback 中读取尺寸、发布外部布局状态并同步调用 panel `onResize`。新增挂载回归在改前 5/5 失败，暴露交付期发布与回调机制；这证明了该机制，尚不等价于稳定复现原生完整错误。局部 pnpm patch 对该库的每个 group 合并通知，下一动画帧读取最新几何，卸载取消帧、移除 owner 并忽略迟到回调。未替换全局 observer、过滤运行时错误或改变布局约束。
+
+相邻真实拖动回归发现仅延期会使 release 时缓存的 panel 宽度滞后一帧，现于真实 pointer 开始/结束和键盘 resize 前刷新待处理通知，保留连续拖动和仅 release 保存最终 519px 的原断言。补丁同时覆盖 ESM/CJS，十二项真实依赖生命周期测试保护隐藏恢复、像素宽度、嵌套比例、通知合并、imperative collapse/expand/resize、立即键盘操作与清理；连同真实 CodeWorkspace/Git splitter、标签栏为 26/26，通过且无未处理异常。
+
+TC-WS-039 保留全部 148 步和 240 秒预算，新增八个真实矩形检查，要求初次打开与三次隐藏恢复后 Documentation 和两栏编辑器均有可用尺寸，共 156 步。它继续保护实际入口、dirty 草稿、三种 WebView、面板升级与完整运行时错误；其余八项 crash-regression 仍为强制回归。共享依赖消费者包括主导航、终端/SFTP、数据库、邮件、Git、文件浏览器和编辑器，托管相关集将包含这些实际入口，之后再跑精确 HEAD 全量与正式性能对照。额外四组主界面/数据库/邮件 owner 单测 96/96、TypeScript、refactor 与 QA audit gate 通过。现有本机 QA release 对应补丁前 source `309777cf…`，binary SHA `de3085ce708991753c03821b29a822f7cd4bc4afad40f9585ab3f05976ba608c`、编译 942.56 秒，不能用作本次补丁的验证证据；稳定提交后另编译匹配版本供手测。
+
+## 标签栏观察器交付与隐藏恢复（2026-10-28，修复待托管复验）
+
+RDP 诊断提交 `84205ceb` 的 macOS 独立照片专项 [40588926870](https://github.com/engcapa/taomni/actions/runs/40588926870) 为 15/15，先运行客户端/服务端联通再运行照片的顺序专项 [40593176426](https://github.com/engcapa/taomni/actions/runs/40593176426) 为 16/16，均包含全部适用崩溃组并独立核验原始回执、构建身份和最终汇总。照片 FPS 比分别为 0.98925、1.05542；两轮未复现旧帧率差距，诊断提交没有修改编码算法，不能据此宣称旧 RDP 根因已修复。
+
+同 SHA 的 Linux/Windows 相关集 [40590358570](https://github.com/engcapa/taomni/actions/runs/40590358570) 最终 35 passed / 2 failed、10/10 分片，原始回执和最终失败聚合已独立核验，无基础设施错误；再次捕获 Linux native TC-WS-038/039 的 ResizeObserver 错误，保留为失败。被动记录中同步 DOM 写入为 0，但编辑器标签栏在 observer 交付中同步读取布局，单个 callback 曾耗时约 24ms，同一轮嵌套面板宽度继续变化。Workspace 标签栏还在活动标签变更时重建 observer，并在交付中测量及滚动。新增两类标签栏的六项挂载回归在改前 6/6 失败，覆盖交付时无测量/滚动、合并连续通知、隐藏后显示活动标签、使用最新宽度/活动项，以及卸载取消和晚到通知。
+
+将这些测量的帧、observer、最新回调、实际 DOM owner 和清理统一到 `useElementResizeFrame`。工作区和编辑器标签栏的内容/激活/resize 测量在下一动画帧合并执行，隐藏的零宽容器保留既有滚动状态；同一 DOM 的活动项变化不重建 observer。Sessions 标签栏复用相同 resize 边界。没有全局替换 ResizeObserver、吞掉错误或改变阈值；该修复消除已确认的交付期同步测量机制，原生错误是否全部解决仍以新托管结果为准。新增回归、现有标签栏、EditorGroup、真实面板库及面包屑共 43/43 单测通过。TC-WS-048 保留原 65 步断言，补充 Home/Sessions 隐藏恢复后十二标签保留、活动项完整可见、左右滚动和运行时健康，仍为 300 秒预算。
+
+相关集 [40596454168](https://github.com/engcapa/taomni/actions/runs/40596454168) 的 browser 回执暴露 TC-WS-048 两项用例问题：Linux 第 71 步用通用会话面板选择器匹配十二个保留实例，等待了第一个隐藏面板；macOS 第 59 步在 End 激活后的测量帧前读取滚动位置，失败截图中活动末尾标签已恢复显示。现在等待真正活动的 terminal pane，并在 Home/End 后等待相应已渲染的 disabled 滚动端点控件，再执行全部原有精确位置断言；不加固定 sleep、不重试点击、不改变滚动/运行时预期。共 82 步，原 300 秒预算不变。产品源码不变，原失败保留，新用例需再次托管执行。
+
+## main 合并与全量结果（2026-10-28，尚有一项失败）
+
+相关集 40569868761 的 178/178 通过且完成独立核验后，重新 `git fetch origin main`，远程 main 为 `65d6d907efdf291478e660dc1ada96a12a41b8ad`；无冲突合并并推送 `efd6c4edec2c2309cf545fa9ff1feda99bdc6ab1`。main 只增加已包含父提交的合并节点，合并前后工作树文件内容无差异，产品 source SHA 仍为 `1acd6425c4211b04f72f5c08865ebbf1e97f5c9e7e2b26e3537e35078f713171`，现有本机 QA release 与该内容匹配。没有用源码无变化代替用户要求的复测。
+
+已对合并提交启动独立三平台 browser/native `scope=all`：[40577348054](https://github.com/engcapa/taomni/actions/runs/40577348054)。精确选集为 641 个适用 ID、2,103 次执行、25 个分片。使用各模式完整适用目录、browser workers 2、原生 release、整组九项崩溃回归及原有 CI 契约；持续下载每个原始分片并在相同 frozen checkout 独立核验源码/用例/runner/构建身份与最终汇总。唯一允许的外部源码缺口仍为 clickhousecrud 用例，不能计为通过。正式性能对照等待此精确 SHA 的全量成功，不提前宣称无性能退化。
+
+全量最终收齐 25/25 分片、641 个适用 ID、2,103 次执行：**2,102 passed / 1 failed**，0 skipped / infrastructure errors。全部原始回执、源码/runner/case/原生构建身份与失败聚合已独立核验，保存在 `github-40577348054/verified-final-failed.json`。唯一失败 `TC-RDPS-PERF-03-photo-content` 的 macOS native observed FPS 为 baseline 21.6663、adaptive 16.2992，比例 0.7522807473，低于原有 0.85 下限；每个实际交付帧的带宽比例 0.998791618，两次连接都使用 RemoteFX、bulk 解码错误为 0。Linux/Windows 同用例通过，之前的邮件订阅与 Windows browser TC-145 本轮也通过。
+
+失败 DOM 保留的服务端日志显示两次捕获均约 57fps，但五秒窗口转交帧数由 baseline 178 降至 adaptive 104；捕获 p95 约 3ms、帧龄 p95 约 16ms。源动画自身约 32.34/30.72fps 且 draw 最大约 100ms，不能仅凭源波动解释全部差距。正在拆分编码选择、编码与发送成本；不降低门槛、不丢弃慢样本、不把重跑偶然通过当作根因修复。正式 UI 性能对照仍等待全量功能成功。
+
+本机仅执行 CPU release 单测作成本拆分：16 个确定性照片帧，32 个预热帧后交替 512 次配对，Rayon/build jobs 均为 2；640×360 的 baseline/adaptive 编码为 10.707/10.712ms，保留父 stride 的 704×384 为 11.446/11.414ms，逐轮输出字节完全一致。该 Linux CPU 结果不能替代 macOS 原生证据，也没有复现 25% 帧率差距。
+
+为区分真实排队与编码停顿，增加可选、常量空间的累计 count/total/max 纳秒计时，覆盖 diff、blocking queue、codec、blocking roundtrip、selection、RemoteFX 和 fragmentation，并记录 raw sample/materialized planar candidate 数量。采样不改选择、压缩历史、调度或失败语义，保留全部慢样本的总量和最大值。将选择/估计器 owner 提取到 `encoder/adaptive.rs`，计数 owner 到 `stats.rs`，既有 inline bulk 测试整体移到独立模块；剩余约千行 facade 的后续边界记录在 encoder experiment README。混合 UI/photo 的真实分片测试比较计时启用/禁用时每个线上字节和跨帧 bulk history，连同保留组为 22/22 通过（另有已单独执行的 ignored profiling）；QA 工具 40/40、format、refactor 检查通过。PERF-03 保持全部原断言与 600 秒预算，新增第一轮 server-log 快照及真实 stage counter 断言，待 GitHub 执行。此提交属于诊断，尚未宣称 RDP 根因已修复。
+
+## 分屏面包屑与原生撤销专项（2026-10-28，托管复验进行中）
+
+40560013232 的 Linux native TC-WS-039 失败截图确定了另一项布局缺陷：非活动编辑器的导航留在 pane 内部，却按全局 status host 是否存在选择 `statusbar`，与实际 portal 的 active/visible 条件不同，`h-full flex-1` 将导航撑高至 341px。提取 `useEditorGroupBreadcrumbs`，由同一个实际目标同时决定导航 variant、portal 和 owner 生命周期；非活动、隐藏或没有 host 的组使用固定 `h-7 shrink-0` 本地栏。删除 shell 对 navigationHost 的多余订阅，保留 ReactNode 调用兼容。该确定缺陷的修复不能自动证明单栏 TC-WS-038 的 ResizeObserver 错误也已解决。
+
+新 hook 的两项真实 Breadcrumbs 挂载测试保护 active group 切换、隐藏、host 消失及卸载清理，连同 EditorGroup、Breadcrumbs/resize 为 31/31 通过；真实面板库集成、选区、编辑器生命周期及 StatusBar 为 32/32 通过。TypeScript 和 `pnpm check:refactor` 通过。TC-WS-039 保留原 140 步、三次隐藏/恢复、草稿和运行时检查，另增 8 个检查点，每次双栏恢复都禁止 pane 内 `statusbar` 并要求恰好一个本地 `bar`，总计 148 步，仍为 240 秒预算。最终 browser/native 结果待托管验证。
+
+初版 TC-WS-054 的新增撤销检查错误地假定原生逐字符长输入总是一个 history group；Linux/macOS 实际只撤销最后一个字符，不能据此判断选区修复失败。现保留全部原 128 步，在宽文本保存后使用非相邻的 Mod+Home + 单字符 `!` 操作，再验证 undo/redo/undo 的精确文本、dirty 状态与不变的磁盘 SHA。共 144 步、原 300 秒预算不变，三平台 [40565635547](https://github.com/engcapa/taomni/actions/runs/40565635547) 执行完整适用九项崩溃回归。
+
+Linux 真实 IME 专项 [40562614105](https://github.com/engcapa/taomni/actions/runs/40562614105) 的 2/2 原始回执与最终失败汇总已独立核验：13 passed / 2 failed，其中 TC-IDE-IMPROVE-008-ime-lifecycle-native 通过，失败为 TC-WS-038 的 observer 错误和 TC-WS-054 初版新增撤销假设，整轮仍保留 failure。另一诊断 [40564815021](https://github.com/engcapa/taomni/actions/runs/40564815021) 在现有被动 RO 记录中增加每个真实 callback 的同步 DOM 写入，不读布局、不写 DOM、不改变调度或吞错，等待区分具体几何变化 owner。
+
+本机仅重新编译供手工验证的 QA release：`src-tauri/target/qa-ui-auto/release/taomni`，独立 ID `com.taomni.app.qa`，source SHA `aa2151fdcbb86a35246c54e26bc003af4828c51cceedb2791e52dcbcf4f513ff`，binary SHA `bcad15b8cfbe9b71c9500669f887b01c9280d6e888b172c95fa30c46cf18f618`，耗时 1135.78 秒、build jobs 为 2。包含 CodeMirror 选区 patch；不包含本节新面包屑修复，后续源码稳定再编译。没有启动本机 browser/native 用例。
+
+三平台相关集 [40560013232](https://github.com/engcapa/taomni/actions/runs/40560013232) 最终收齐 18/18 分片并独立核验：173 passed / 5 failed，无 infrastructure errors；browser 93/93 全部通过，native 的失败为 Linux TC-WS-038/039 的 ResizeObserver 错误及三平台 TC-WS-054 初版撤销假设。不是全绿，旧回执和截图全部保留。诊断 [40564815021](https://github.com/engcapa/taomni/actions/runs/40564815021) 最终 13 passed / 1 failed，仅剩旧撤销断言；未复现 observer 错误，样本中各 callback 的同步 DOM 写入记录为 0，不能根据该轮无复现证明旧错误的唯一根因。
+
+修正版 TC-WS-054 和整组九项崩溃回归 [40565635547](https://github.com/engcapa/taomni/actions/runs/40565635547)，三平台 browser 各 6/6、native 各 8/8，总计 **42/42 passed**，6/6 分片、全部身份/原始回执与最终汇总已独立核验。Windows 四轮宽窄调整、长短文本替换、真实保存、独立单字符 undo/redo/undo 和冷启动完整通过；原生选区修复得到对应平台当前证据。
+
+面包屑修复提交 `7dbd1e88` 的 Linux [40566936305](https://github.com/engcapa/taomni/actions/runs/40566936305) 为 **browser 6/6、native 8/8**，2/2 回执及最终聚合独立核验，source SHA `1acd6425c4211b04f72f5c08865ebbf1e97f5c9e7e2b26e3537e35078f713171`。TC-WS-039 的全部原流程及新增八个分屏 variant 检查均通过；TC-WS-038 与 TC-WS-054 同轮也通过。三平台相关集 [40569868761](https://github.com/engcapa/taomni/actions/runs/40569868761) 最终为 **48 个精确 ID、178/178 passed**，18/18 分片，0 failed / skipped / infrastructure errors。Linux browser/native 为 31/31、31/31，Windows 为 31/31、27/27，macOS 为 31/31、27/27；全部原始回执、身份及最终聚合独立核验。九个崩溃专项、TC-WS-039 新增 variant 检查、TC-WS-054 四轮替换/保存/undo/redo/冷启动和所有选定保留行为均通过。旧偶发失败原件保留，未删除或过滤错误；当前相关验收完成，接下来同步 main 与全量验证。
+
+最新本机 QA release 对应 `7dbd1e88`，包含本节面包屑与 CodeMirror 选区修复：`src-tauri/target/qa-ui-auto/release/taomni`，ID `com.taomni.app.qa`，source SHA `1acd6425c4211b04f72f5c08865ebbf1e97f5c9e7e2b26e3537e35078f713171`，binary SHA `807af95b227a7e37b803ab6e9f5d174e3892a7cdf96b42d52193a61890bcb42f`。使用 Node 22、build jobs 2 编译，耗时 1111.15 秒；构建及 `native_build.py --release --check` 均为 exit 0、inputs match。仅供用户手工测试，未在本机启动 browser/native 用例。
 
 ## 邮件订阅与后台同步竞争（2026-10-27，定向托管复验通过）
 
@@ -21,7 +167,53 @@
 
 定向 [40516121016](https://github.com/engcapa/taomni/actions/runs/40516121016) 的 Windows browser/native 完整适用崩溃专项及 TC-012/145 共 18/18 通过，回执和原生构建身份独立核验。选区异常没有复现，不能据此宣称已修复；保留原失败与诊断，继续纳入后续相关和全量运行。
 
-本机 QA release 已重新编译供手工测试：`src-tauri/target/qa-ui-auto/release/taomni`，独立 ID `com.taomni.app.qa`，product source SHA `a34f0739513f8e4ef3d2d2a2d1079ffc0c9c294dc994ab292aa247b2589231b5`，binary SHA `4ae0c7d5ecc10d8b0cd9ef279ba06f1b300939683e3be74b915a81ad2697ab9f`。使用 Node 22、`CARGO_BUILD_JOBS=2` 检查 inputs match；构建后未在本机运行 browser/native。
+TC-WS-054 再增至四轮连续宽/窄拖动及长/短替换，逐轮保留原有精确文本、磁盘 SHA 与运行时断言，仍使用原 300 秒预算。现有运行时检查点一并保存最近 64 条被动快捷键/焦点观察，使冷启动前的成功选区状态也保留；不增加快捷键与输入之间的 WebDriver 往返或等待。23 项服务及观察器契约通过，新增轮次尚待托管执行。
+
+本机 QA release 已重新编译供手工测试：`src-tauri/target/qa-ui-auto/release/taomni`，独立 ID `com.taomni.app.qa`，product source SHA `8292ee82f5b0363b257a32379bbec731e867778bf25751b7fe211960d11efbee`，binary SHA `beda64eb25de7cea3f0c7ee5a85bbc7141a7363e1a1367aebe2954a07b4bec91`，包含面包屑 observer 生命周期修复。使用 Node 22、`CARGO_BUILD_JOBS=2` 编译，耗时 980.87 秒；完成后 `native_build.py --release --check` 确认 inputs match。构建后未在本机运行 browser/native。
+
+相关集 40525718246 已收齐 18/18 分片，108 passed / 3 failed：Linux TC-WS-038 与 macOS TC-WS-054 的 observer 错误，以及 Windows TC-WS-054 第一轮宽文本替换失败。Windows Ctrl+A 的 keyup 快照确认 DOM 已选择原 23 字符，但后续真实输入仍留下全部旧文本，原因尚未证明。进一步校正测试诊断：可信原生事件可在 capture 与 target listener 之间执行 microtask，旧 `after.prevented=false` 不能证明 CM 没有消费按键。改用零延迟只读任务记录最终事件状态，并同时读取当前固定 CM6 的 DOM 链接所指向的内部选区；不调用 focus/dispatch/flush，不修改选区或输入。每次 Ctrl+A 后保留至多 12 条初始输入选区快照，避免原始 128 条输入环形记录覆盖首字符证据。缺少 CM 链接明确记录 null；8 项诊断契约通过。当前产品面包屑修正的三平台相关集为 [40530554568](https://github.com/engcapa/taomni/actions/runs/40530554568)，尚在执行。
+
+## Windows 原生选区诊断（2026-10-28，修复待托管复验）
+
+最新 [40541426840](https://github.com/engcapa/taomni/actions/runs/40541426840) 最终 13 passed / 1 failed，2/2 回执与聚合独立核验一致。7871ms 全选事务与 7889ms DOM selectionchange 均为 0..23；7917ms Ctrl 释放清除超链接、7932ms LSP overlay 刷新均为 effects-only，7945ms CodeMirror measure → observer.forceFlush → applyDOMChange 首次发布 0..0 选区，7992ms 首字符进入前旧文档仍有 23 字符。已将 bundle 栈对应到 `lspHyperlink.clearMod`、`useEditorDecorations` 的 overlay 和 error-stripe 更新；尚无证据区分 DOM 重绘与后续 OS/驱动事件。
+
+新增两条真实 CodeMirror 挂载单测，验证全文选区跨异步引用高亮出现/消失与 Ctrl 释放仍保留，2/2 通过；它们是保留行为基线，没有复现 Windows 缺陷。仅 QA 诊断再增有界 DOM 前后端点/节点身份快照及独立 MutationObserver，不消费编辑器 observer、不读取布局、不改变 DOM/选区/调度；destroy 时断开，7 项相关工具契约通过。Windows 定向 [40550014363](https://github.com/engcapa/taomni/actions/runs/40550014363) 正在采集实际失败边界。
+
+挂载基线进一步覆盖真实鼠标悬停建立的超链接、原生选区绘制扩展，以及引用高亮原先存在/不存在两个状态；将 jsdom navigator 固定为 Chromium/Windows，以进入 CM 对应的 DOM 分支。3/3 通过，与已有 hyperlink 单测合计 9/9；该环境不模拟 WebView2 的原生事件调度，不提供原生修复结论。
+
+Linux [40547602802](https://github.com/engcapa/taomni/actions/runs/40547602802) 的完整适用崩溃组为 browser 6/6、native 8/8，2/2 回执及最终聚合独立核验通过。TC-WS-039 的既有失败没有复现；进一步将同一用例扩充为三次连续隐藏/恢复双栏与 Documentation，并在两个方向拖动侧栏，每轮保留双编辑器、草稿、侧栏状态和运行时断言。没有过滤错误或放宽断言，扩充部分仍待 GitHub 执行。
+
+扩充后的 Linux [40550921670](https://github.com/engcapa/taomni/actions/runs/40550921670) 已完成，browser 6/6、native 8/8；全部九个 ID 的适用执行单元、2/2 回执、源码/runner/case/原生构建身份及最终汇总独立核验通过。三次隐藏/恢复各保留两个编辑器、Documentation、草稿和原有侧栏状态，未复现此前错误。该结果证明本轮扩充流程通过，不将历史偶发失败改记为通过或据此认定原因已修复。
+
+main `65d6d907` 已包含重构的大部分内容；正式性能对照将显式指定重构前已合并的 main `a57437927b62d6036a6d473eddccc053a4b4c0e8` 为 baseline，而不是性能分支默认推导出的近期 merge-base。仍由成功的精确 SHA 全量功能 gate 约束候选，并在同一 runner 交替测量原始 QA release 二进制，保留全部尾部样本和既定预算。
+
+Windows 定向 [40550014363](https://github.com/engcapa/taomni/actions/runs/40550014363) 最终为 13 passed / 1 failed，2/2 回执、原生构建身份及最终失败汇总独立核验一致。8049.2ms 全选成功，8071.7ms selectionchange 仍选中全部 23 字符；8080.5ms 的 `updateLspOverlayChrome` effects-only 事务保持 CM 内部 0..23，却在事务结束时将 DOM 选区折叠到行 DIV。独立 MutationObserver 证明同一个仍 connected 的 `#text` 节点从行 DIV 被移动到新 `SPAN.cm-lsp-usage`；8084.2ms measure/observer 才把 CM 选区同步为 0..0。清除超链接的事务到 8106.8ms 才运行，因此不是此次折叠的起点。
+
+新增六个真实 CM 装饰 diff/DOM 重挂载场景，只在浏览器边界模拟 Chromium 重绘后短暂返回旧选区端点。改前全选、反向全选、局部范围和 caret 四项稳定失败；anchor-only/focus-only 两项与原三条保留基线通过。对 `@codemirror/view@6.43.11` 的 ESM/CJS 同步添加 pnpm patch：重绘 tracker 同时跟踪 anchor/focus，插入节点前检测移动的节点或其子树包含任一端点，通过原有 `forceSelection` 和焦点 guard 完成同步，不新增 focus、延迟、重试、输入重放或事务。只在实际 DOM 重挂载且尚未标记变更时检查 contains，不增加布局读取。升级该依赖时必须保留本组回归并重新核对上游修复。
+
+改后六场景、原基线及跨编辑器焦点/undo/redo 均通过，连同 LSP、hyperlink、CodeMirror 编辑/IME guard/共享事务 owner 共 117/117 单测通过。TC-WS-054 保留原 128 步及 300 秒预算，新增保存后的 undo/redo、精确文本、dirty 状态和未改变的磁盘哈希；原生逐字符 history 分组的断言按本报告最新章节修正。patch 与 pnpm workspace 配置纳入 QA 源码身份（新增/修改/删除契约先失败后通过），组件 patch 修改触发 PR 的完整崩溃回归。没有运行本机 browser/native；原生修复结论等待 GitHub 三平台相关集。
+
+历史 main 的性能构建仍执行该 checkout 原有 builder、配置及产品源码，仅预加载当前测量 runner 的 provenance 模块，使新增 workspace/patch 输入边界在构建和测量时一致；不改写二进制身份或历史 checkout。子进程契约以旧 fingerprint 模块和真实临时 Git checkout 验证同一输入规则及未改动的 builder。11 项构建/崩溃门禁契约、TypeScript、静态覆盖 audit 和 refactor 检查通过；性能实测仍等待全量功能 gate。
+
+[40532648901](https://github.com/engcapa/taomni/actions/runs/40532648901) 的 2/2 回执与最终汇总已独立验证：17 passed / 1 failed，唯一失败为 TC-WS-054。Ctrl+A keydown 7698.2ms 后，事件已被编辑器消费，DOM 与 CodeMirror 内部选区均为 0..23；keyup 7752.4ms 后两者已经折叠为 0，首字符 keydown 7814.9ms 前旧文档仍为 23 字符。因此全选已生效，但在输入前丢失；目前不能据此认定是焦点、保存或字符投递问题。
+
+增加仅在该用例已启用诊断时工作的有界事务观察：透传实际 EditorView.update 的原始参数、返回值和异常，记录全选至首字符间的选区变化与调用栈，同时保留 selectionchange 快照。不派发事务、不 flush、不 focus、不重放或延迟输入；三个诊断契约测试及 refactor 检查通过。现有精确内容、磁盘哈希和完整崩溃组继续执行，诊断本身不计为修复或新的产品用例。
+
+## 隐藏布局与邮件分页的确定性回归（2026-10-28，Linux 复验通过）
+
+三平台相关集 40530554568 最终为 105 passed / 3 failed，另有 Windows 基础设施失败导致 6 条未执行。Linux native 的两项失败为 TC-WS-038 恢复隐藏编辑器后的 ResizeObserver 错误，以及 TC-MAIL-SYNC-01 在服务器已有 480 封时停在 400 封并隐藏加载入口；第三项为 Windows TC-WS-054。原始回执、汇总和失败画面全部保留并独立验证。
+
+TC-WS-038 被动记录显示，恢复文件后原本为 0 的 Documentation 面板重新占用 313.16px。使用真实 react-resizable-panels 的挂载回归先失败：隐藏时完成 collapse，但首次获得非零尺寸时库重新应用固定的 20% 默认值，实际 flex-grow 17.581，面板内容仍隐藏。现在关闭侧栏的初始默认尺寸为 0，保持该 mount-time 值稳定；现有 ref 继续负责后续显式开关。TC-WS-038 增加对面板本身无可见布局框的双模式断言，保留全部草稿、终端、侧栏和运行时检查。
+
+邮件挂载回归也先失败：加载旧页尚未返回时，前台同步已经发布新缓存快照，旧页被 sequence guard 丢弃后却返回普通空页；Load more 调用方据此把新快照的 hasMore 清为 false。缓存结果现在显式返回 applied，未采纳或失败的读取不再触发清空分页或补取旧目录。新测试继续点击至全部 120 封并要求最后正确结束分页；TC-MAIL-SYNC-01 仍要求原有 480 封服务器/界面完全相等。83 项相关前端测试、TypeScript 与 refactor 检查通过，本机未运行 browser/native。
+
+Linux 定向 [40537559185](https://github.com/engcapa/taomni/actions/runs/40537559185) 已完成，browser 7/7、native 9/9，包含完整适用崩溃组、隐藏面板断言和 480 封分页。2/2 原始回执、源码/runner/case/native 构建身份及最终汇总独立核验一致，没有跳过或基础设施缺口。三平台相关集与 Windows 选区专项仍在执行，此 Linux 结果不能替代当前全部平台验收。
+
+本机 QA release 已重新编译并通过 `native_build.py --release --check`，耗时 1170.54 秒，QA ID 为 `com.taomni.app.qa`，二进制位于 `src-tauri/target/qa-ui-auto/release/taomni`。源码指纹 `07ceec45bbf225a475f1a33390541a3e287cd119e1211b8c2948887e73f81ef1`，二进制 SHA-256 为 `68e8ab144a6b71a743ca79dd58e6a451f7d9766deaa7406c89bc923db856a177`；仅供本轮手工验证，未启动本地 browser/native 用例。
+
+随后三平台相关集 [40539076925](https://github.com/engcapa/taomni/actions/runs/40539076925) 已收齐 18/18 回执并独立核验最终汇总：114 次执行，112 passed / 2 failed，没有基础设施错误或未执行分片。Linux native TC-WS-039 在恢复双栏编辑器后的第 41 步捕获另一次 ResizeObserver 错误；此前专项通过不能掩盖本次失败。该用例原来没有启用观察器来源记录，现补充诊断开关并在建立工作区前重载，使现有被动 observer 包装覆盖新建、分屏及隐藏/恢复全过程，原有运行时和草稿断言全部保留。Windows 同轮 TC-WS-054 仍失败；TC-145 在三平台 native 已实际通过，包括此前未执行的 Windows POSIX-only 分片。新的 Linux 来源采集及 Windows 事务定位结果尚待返回。
+
+同轮 Windows native 第 3 分片在启动服务前失败，6 条用例没有执行。实际分片只有 `ssh_posix`，而 reusable workflow 的 service-install 条件漏掉它；browser 同批还包含普通 `ssh`，所以此前 browser 通过不能证明该独立分片已准备好环境。新增契约执行 workflow 的原始条件，在 POSIX-only 情况先失败；现在所有 run 入口将完整 capabilities 交给已有安装器，由它决定实际依赖，不再复制第二份能力清单。30 项服务/所有权契约及 refactor 检查通过。该改动只修正 CI 编排，没有新增产品能力，沿用 TC-145 的真实 POSIX PTY 与开关 SFTP 断言；仍需托管独立分片复验。
 
 ## RDP 照片帧率诊断（2026-10-27，原因未确认）
 
@@ -44,6 +236,16 @@ Breadcrumbs 修复后的定向 [40495133881](https://github.com/engcapa/taomni/a
 TC-145 保留原步骤，进一步在两轮 SFTP 的每次打开与关闭后验证各自独立的精确命令输出，所有命令仅尝试一次。新增工具契约与共享 Services 回归 28/28、`pnpm check:refactor` 通过；增强用例仍需当前分支托管验收。
 
 直接协议对照进一步显示：固定旧 Git 2.50.1 为 23/24；真正启动到 POSIX script 提示符的嵌套 PTY 为 15/24；[40518918877](https://github.com/engcapa/taomni/actions/runs/40518918877) 的 Win32 OpenSSH 9.5 为 19/24、10.4 为 18/24。所有失败均保留原始帧，升级服务端与降低 shell 版本都不是有效修复。现增加 Cygwin OpenSSH 真实 POSIX PTY 的独立对照，使用已有的、校验安装器哈希的运行时以及独立临时账户，不改 runner 账户密码、不替换正常托管 fixture；本机 44 项服务/诊断契约和重构检查通过。该对照尚待 GitHub 实测，不提供产品通过证据。
+
+首次 Cygwin 对照 40524300692 停在 sshd Windows loader 错误 `3221225781`，未执行协议试验；已在执行配置检查之前将 job 所有的 Cygwin bin 目录加入 PATH，并在退出时恢复。另保存初始诊断身份文件，确保 setup 失败也有可下载材料；该修正尚待重跑，不能把 setup 失败计为有效对照。
+
+修正后的直接协议对照 [40526074910](https://github.com/engcapa/taomni/actions/runs/40526074910) 中，Cygwin 3.6.12 / Bash 5.2.21 / OpenSSH 10.6 的 24 个缩放、焦点和 0–500ms 时序组合全部通过，原始 JSON 和 SHA 已核验；Win32 对照仍丢首字节，所以该诊断 workflow 整体保留失败状态。它证明 fixture 差异，不能作为 Taomni 产品通过证据。
+
+TC-145 改为显式 `ssh_posix_required`、`ssh_posix` 配置和独立 `QA_POSIX_SSH_PASSWORD`，不自动退回 Win32 服务。Windows supervisor 同时拥有可独立清理的 Cygwin 服务及临时账户；Linux/macOS 在已存在普通 SSH lease 时复用真实 POSIX 服务，否则单独创建。保留每次开关后单次输入、精确输出、既有全部断言和 120 秒预算。TC-010/012 保持 Win32 的权限及路径转换契约，产品没有等待、额外按键或重放修改。两种 SSH fixture 均保留被动 browser 帧证据，密码一并脱敏。用例仍待新提交的托管 browser/native 验收。
+
+相关集 [40525718246](https://github.com/engcapa/taomni/actions/runs/40525718246) 在 macOS release TC-WS-054 第 63 步重新捕获 ResizeObserver 错误；此前精确文本及磁盘 SHA 断言通过。错误快照中最后一条为重新创建的面包屑 observer 97，宽度 187.453125px；完整原始材料保留，不能将此前面包屑延期测量的定向通过视为问题已经解决。正在进一步检查内容更新与 observer 生命周期。
+
+进一步发现先前修复只延后了 resize 回调：`fullItems` 在编辑/保存后变化时，layout effect 仍同步测量并销毁、重建 observer。新增挂载回归在改前 2/2 失败：8 次编辑产生 9 个 observer，resize 同期内容变化仍触发同步测量。现将测量状态、单个 observer、合并帧及清理提取到 `useBreadcrumbCollapse`，首次/内容/resize 测量均在下一帧读取最新 DOM；不在 observer 交付中改变子节点，不吞掉运行时错误。面包屑、EditorGroup 和状态栏 38/38 通过；SSH fixture、选择、分片、执行、清理和证据工具共 88/88 通过。TC-WS-038 在 Linux native 也捕获同类错误，现打开其被动 observer 溯源，保留全部工作流及运行时断言。两例与完整崩溃组仍需新提交的托管验收，不能仅据单测宣称原生问题已修复。
 
 ## 全量 ResizeObserver 诊断（2026-10-27，进行中）
 

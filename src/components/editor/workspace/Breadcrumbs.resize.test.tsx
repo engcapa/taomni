@@ -38,7 +38,7 @@ function harness() {
     frames.clear();
     scheduled.forEach((callback) => callback(0));
   };
-  return { ...view, frames, request, disconnect, available, measure, resize, flush, setWidth: (next: number) => { width = next; } };
+  return { ...view, deliveries, frames, request, disconnect, available, measure, resize, flush, setWidth: (next: number) => { width = next; } };
 }
 
 afterEach(() => {
@@ -78,5 +78,37 @@ describe("breadcrumb resize delivery", () => {
     act(() => { h.resize(); h.flush(); });
     expect(h.measure).not.toHaveBeenCalled();
     expect(h.frames.size).toBe(0);
+  });
+
+  it("keeps one observer and defers content measurements across edit/save updates", () => {
+    const h = harness();
+    for (let character = 1; character <= 8; character++) {
+      h.rerender(<Breadcrumbs pathSegments={[...pathSegments]} symbols={[]} position={{ line: 0, character }} />);
+    }
+    expect(h.deliveries).toHaveLength(1);
+    expect(h.disconnect).not.toHaveBeenCalled();
+    expect(h.measure).not.toHaveBeenCalled();
+    expect(h.frames.size).toBe(1);
+    act(h.flush);
+    expect(h.measure).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("code-workspace-breadcrumb-path-file")).toHaveTextContent("README.md");
+  });
+
+  it("measures the newest trail next frame when content changes during resize delivery", () => {
+    const h = harness();
+    h.setWidth(100);
+    act(() => {
+      h.resize();
+      h.rerender(<Breadcrumbs pathSegments={pathSegments.map((segment) => segment.kind === "file"
+        ? { ...segment, label: "changed.md", path: "source/nested/changed.md" }
+        : segment)} symbols={[]} position={{ line: 1, character: 0 }} />);
+    });
+    expect(h.measure).not.toHaveBeenCalled();
+    expect(h.frames.size).toBe(1);
+    expect(h.deliveries).toHaveLength(1);
+    act(h.flush);
+    expect(h.measure).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("code-workspace-breadcrumb-path-file")).toHaveTextContent("changed.md");
+    expect(screen.getByTestId("code-workspace-breadcrumb-collapsed")).toBeInTheDocument();
   });
 });

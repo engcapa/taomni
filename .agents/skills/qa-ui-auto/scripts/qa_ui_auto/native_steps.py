@@ -53,6 +53,9 @@ from . import save_race
 from . import wayland
 from .runtime_errors import native_assert as assert_no_runtime_errors
 from .native_drag import native_drag
+from .host_file_observation import assert_file_sha256 as _assert_file_sha256
+from .save_lock_probe import run as save_reader_lock
+from .terminal_burst_probe import run as terminal_burst
 
 
 class NativeStepContext:
@@ -677,27 +680,6 @@ def _assert_file_exists(ctx: NativeStepContext, args: Any) -> str:
             return f"exists {path}"
         time.sleep(0.25)
     raise StepError(f"assert_file_exists failed: {path} not created within {timeout}s")
-
-
-def _assert_file_sha256(ctx: NativeStepContext, args: Any) -> str:
-    if not isinstance(args, dict) or not {"path", "equals"} <= set(args):
-        raise StepError("assert_file_sha256: expected {path, equals, timeout_sec?}")
-    path = Path(str(args["path"])).expanduser()
-    expected = str(args["equals"]).lower()
-    if not re.fullmatch(r"[a-f0-9]{64}", expected):
-        raise StepError("assert_file_sha256: equals must be a lowercase SHA-256 hex digest")
-    timeout = float(args.get("timeout_sec", 10))
-    deadline = time.time() + timeout
-    actual = "missing"
-    while time.time() < deadline:
-        if path.exists():
-            actual = hashlib.sha256(path.read_bytes()).hexdigest()
-            if actual == expected:
-                return f"host byte SHA-256 verified: {actual}"
-        time.sleep(0.25)
-    raise StepError(
-        f"assert_file_sha256: {path} hash {actual!r} != {expected!r} after {timeout}s"
-    )
 
 
 def _native_set_writable(ctx: NativeStepContext, args: Any) -> str:
@@ -1431,6 +1413,7 @@ VERBS.update(assert_count=assert_count, assert_menu_items=assert_menu_items)
 VERBS["assert_no_runtime_errors"] = assert_no_runtime_errors
 VERBS["drag_to"] = native_drag
 VERBS["terminal_drag_selection"] = _terminal_drag_selection
+VERBS["native_terminal_burst"] = lambda ctx, args: terminal_burst(ctx, args, VERBS["terminal_input"])
 
 
 from .window_context import native_switch
@@ -1883,6 +1866,11 @@ def _do_assert_file_receipt(ctx: NativeStepContext, args: Any) -> str:
 @_verb("assert_file_sha256")
 def _do_assert_file_sha256(ctx: NativeStepContext, args: Any) -> str:
     return _assert_file_sha256(ctx, args)
+
+
+@_verb("native_save_reader_lock")
+def _do_native_save_reader_lock(ctx: NativeStepContext, args: Any) -> str:
+    return save_reader_lock(ctx, args)
 
 
 @_verb("native_set_writable")

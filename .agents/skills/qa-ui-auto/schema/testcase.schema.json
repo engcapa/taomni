@@ -68,6 +68,7 @@
           "credential_store",
           "path_completion",
           "ssh_required",
+          "ssh_posix_required",
           "sftp_required",
           "mysql_required",
           "clickhouse_required",
@@ -504,6 +505,9 @@
         "terminal_input": {
           "$ref": "#/$defs/terminal_input_arg"
         },
+        "native_terminal_burst": {
+          "$ref": "#/$defs/native_terminal_burst_arg"
+        },
         "compose_text": {
           "$ref": "#/$defs/compose_text_arg"
         },
@@ -524,6 +528,9 @@
         },
         "native_pointer_drag": {
           "$ref": "#/$defs/native_pointer_drag_arg"
+        },
+        "native_save_reader_lock": {
+          "$ref": "#/$defs/native_save_reader_lock_arg"
         },
         "native_set_writable": {
           "$ref": "#/$defs/native_set_writable_arg"
@@ -1914,6 +1921,16 @@
         }
       }
     },
+    "native_terminal_burst_arg": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sessions", "repeats", "timeout_sec"],
+      "properties": {
+        "sessions": {"const": 24},
+        "repeats": {"const": 3},
+        "timeout_sec": {"const": 180}
+      }
+    },
     "terminal_input_arg": {
       "type": "object",
       "additionalProperties": false,
@@ -2239,6 +2256,17 @@
           "type": "number",
           "exclusiveMinimum": 0
         }
+      }
+    },
+    "native_save_reader_lock_arg": {
+      "type": "object",
+      "required": ["path", "selector", "equals", "max_ui_ms"],
+      "additionalProperties": false,
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "selector": {"type": "string", "minLength": 1},
+        "equals": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "max_ui_ms": {"type": "number", "exclusiveMinimum": 0, "exclusiveMaximum": 2000}
       }
     },
     "native_set_writable_arg": {

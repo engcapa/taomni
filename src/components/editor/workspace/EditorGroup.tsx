@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { writeText } from "../../../lib/clipboard";
 import type { LspRange } from "../../../lib/editor/lsp";
-import { useCodeWorkspaceStatusStore } from "../../../stores/codeWorkspaceStatusStore";
 import { CodeMirrorHost, type EditorCommandPort, type EditorCommandPortRegistration } from "./CodeMirrorHost";
 import { EditorBanner } from "./EditorBanner";
 import { GitDiffPeek } from "./GitDiffPeek";
@@ -14,6 +13,7 @@ import { EditorGroupTabs } from "./group/EditorGroupTabs";
 import { ModeButton } from "./group/ModeButton";
 import { type EditorGroupProps } from "./group/types";
 import { useEditorGroupTabs } from "./group/useEditorGroupTabs";
+import { useEditorGroupBreadcrumbs } from "./group/useEditorGroupBreadcrumbs";
 import { mergeCompletionTriggers } from "./lspCompletion";
 import { computeStickyLines, StickyLinesOverlay } from "./stickyLines";
 import type { RegionFoldingProvenance } from "./workspaceEditorCommands";
@@ -70,7 +70,7 @@ export function EditorGroup({
   activeLspSyncing,
   lspStatusPill,
   highlightingWidget,
-  breadcrumbs,
+  breadcrumbs: breadcrumbContent,
   breadcrumbsPlacement = "top",
   editorBanners = [],
   filesWithErrors,
@@ -160,17 +160,10 @@ export function EditorGroup({
   // file-level conditions (read-only, encoding) keep the inline editor bar.
   const floatingBanners = visibleBanners.length > 0
     && visibleBanners.every((banner) => banner.category === "indexing-degraded" || banner.category === "sdk-import");
-  const navigationHost = useCodeWorkspaceStatusStore((state) => state.navigationHost);
-  const setNavigationPortalOwner = useCodeWorkspaceStatusStore((state) => state.setNavigationPortalOwner);
-  const statusBarNavigation = breadcrumbsPlacement === "status-bar" && isActiveGroup && visible
-    ? navigationHost
-    : null;
-  const navigationOwnerId = `${workspaceInstanceId}:${groupId}`;
-  useEffect(() => {
-    if (!statusBarNavigation || !breadcrumbs) return undefined;
-    setNavigationPortalOwner(navigationOwnerId);
-    return () => setNavigationPortalOwner(null, navigationOwnerId);
-  }, [breadcrumbs ? 1 : 0, navigationOwnerId, setNavigationPortalOwner, statusBarNavigation]);
+  const { breadcrumbs, statusBarNavigation } = useEditorGroupBreadcrumbs({
+    content: breadcrumbContent, placement: breadcrumbsPlacement, visible, active: isActiveGroup,
+    ownerId: `${workspaceInstanceId}:${groupId}`,
+  });
   const tabs = useEditorGroupTabs({
     openOrder,
     openFiles,

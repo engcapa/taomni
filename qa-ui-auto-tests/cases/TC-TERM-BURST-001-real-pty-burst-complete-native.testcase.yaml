@@ -1,0 +1,50 @@
+id: TC-TERM-BURST-001
+title: Native release keeps exact burst output and subsequent input across 24 real PTYs
+description: >-
+  Protects real terminal output after repeated session switching. Three complete
+  2MiB bursts must retain exact bytes through native IPC and reach the rendered
+  buffer; subsequent commands and closing all tabs must work. A passive callback
+  observer preserves channel ordering and errors for failure diagnosis. Browser
+  stubs cannot establish this PTY/IPC boundary. POSIX byte identity applies to
+  Linux/macOS; Windows ConPTY screen updates need a separate semantic oracle.
+covers: [F1.6, F2.1, F2.2]
+tags: [p0, terminal, native-boundary, workspace-redesign, regression]
+modes: [native]
+native_platforms: [Linux, macOS]
+fixtures: [reset_db, release_build_required]
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-native-burst-password
+- native_terminal_burst:
+    sessions: 24
+    repeats: 3
+    timeout_sec: 180
+- assert_no_runtime_errors: null
+- screenshot: real-pty-bursts-complete.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: >-
+      Twenty-four real PTYs survive 48 tab switches and three exact 2MiB output
+      bursts without missing/duplicated IPC data, stalled output, lost subsequent
+      commands or runtime errors; closing all tabs clears the terminal registry.
+    actions: [1, 2, 3]
+    checkpoints:
+    - step: 3
+      expectation: >-
+        Native producer receipts and raw channel payload SHA-256 match all
+        2,097,152 bytes per burst; IPC indices are continuous and unique, all
+        anchored echo/end lines arrive and all 24 terminal tabs close.
+    - step: 4
+      expectation: No React, WebView or unhandled runtime errors occurred.
+    results: [3, 4]
+  visual:
+  - check: No pixel-level design comparison is claimed by this output regression.
+    method: not-applicable
+    reason: Exact output and runtime assertions own this case; screenshot is diagnostic.
+  native:
+  - check: Real POSIX PTY output traverses Tauri IPC into the packaged terminal.
+    method: automated
+    reason: Independent producer receipts, complete raw stream and rendered end lines prove this native boundary; browser stubs cannot.

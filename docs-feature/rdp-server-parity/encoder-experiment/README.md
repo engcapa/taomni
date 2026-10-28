@@ -30,3 +30,22 @@ cargo test --release -p ironrdp-server --lib profile_photo_encoder_costs -- --ig
 It runs 16 identical generated photo frames through each path, reports encoder
 and fragmentation/compression time separately, and requires RemoteFX selection.
 Use GitHub `qa-ui-auto-platforms.yml` PERF-01/03 for native acceptance.
+
+The optional `EncoderStats` handle also reports constant-space cumulative
+`count/total/max` nanosecond counters for dirty-rectangle diffing, blocking-pool
+queueing, codec work, the entire blocking round trip, adaptive selection,
+RemoteFX work and fragmentation. Raw-sample/materialized-candidate counts
+distinguish the two planar estimate paths. The normal five-second server log
+contains these counters; no pixels or individual-frame traces are retained.
+PERF-03 saves a baseline log before the second connection so deltas remain
+available even when its original FPS or bandwidth assertion fails. Counters do
+not alter codec selection, bulk history, pacing or the 15% acceptance budget.
+
+Selection/estimator ownership now lives in `encoder/adaptive.rs`, telemetry in
+`encoder/stats.rs`, and the pre-existing bulk tests in `encoder/bulk_tests.rs`.
+The encoder facade remains existing size debt (about 1,000 lines); its remaining
+protocol handlers can be extracted separately by codec ownership. This change
+does not add another protocol/state responsibility to that facade. Retained
+pixel/layout, first-header, resize/history and compressor-failure tests protect
+the split, and a mixed UI/photo transmission test requires identical wire bytes
+with the optional counters enabled and disabled.

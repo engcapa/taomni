@@ -6,7 +6,7 @@ import { messageKey } from "./messages";
 
 
 export interface UseMailboxLifecycleContext {
-  loadCachedMessages: (folder: string, offset?: number, append?: boolean, quiet?: boolean, limitOverride?: number) => Promise<{ page: MailMessageHeader[]; hasMore: boolean; }>;
+  loadCachedMessages: (folder: string, offset?: number, append?: boolean, quiet?: boolean, limitOverride?: number) => Promise<import("./types").MailCachePageResult>;
   initialSyncDoneRef: import("react").RefObject<boolean>;
   foldersRef: import("react").RefObject<MailFolder[]>;
   bodyWarmSeqRef: import("react").RefObject<number>;

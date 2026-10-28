@@ -2,7 +2,7 @@ id: TC-RDPS-PERF-03-photo-content
 title: Adaptive RDP encoding keeps photo bandwidth and frame rate at the RemoteFX baseline
 description: 'AC-E02/V-E12: measure the same deterministic noisy photo animation with compression disabled and RDP6.1
   enabled on one release server, restarting each target at the same initial photo frame. Preserve both decoded
-  snapshots, source telemetry including macOS process activity and draw timings, bulk statistics and frame rate ratios. Animated macOS targets hold a process-local user-initiated activity to keep their timers eligible throughout both measurements. Bandwidth
+  snapshots, source telemetry including macOS process activity and draw timings, bulk statistics and frame rate ratios. Retain baseline server counters before the second connection, and cumulative diff, blocking queue, codec, selection, RemoteFX and fragmentation timings, including maxima, to locate slow delivery without changing decisions. Animated macOS targets hold a process-local user-initiated activity to keep their timers eligible throughout both measurements. Bandwidth
   cannot improve by dropping delivered frames. Retains the same four-strip planar selection after the small-damage
   sampling optimization and reuse of independent estimator scratch buffers; relative performance regressions up to 15% are accepted (FPS >= 85% and bandwidth per delivered frame <= 115% of baseline).'
 covers:
@@ -83,6 +83,9 @@ steps:
       kbps:
         min: 1
       negotiated.compression: none
+- save_text:
+    selector: '[data-testid="server-log"]'
+    path: photo-baseline-server-log.txt
 - host_helper:
     action: stop
     name: photo-baseline
@@ -122,6 +125,10 @@ steps:
     selector: '[data-testid="server-log"]'
     regex: encode=planar:[0-9]+/rfx:[1-9][0-9]*
     timeout_sec: 15
+- assert_pattern:
+    selector: '[data-testid="server-log"]'
+    regex: encode-timing-ns=count/total/max.*selection:[1-9][0-9]*/[0-9]+/[0-9]+.*candidates=raw:[0-9]+/planar:[0-9]+
+    timeout_sec: 15
 - click: '[data-testid="server-row-rdp-stop"]'
 - wait_for:
     selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
@@ -135,16 +142,19 @@ verification:
     actions:
     - 17
     - 18
-    - 19
     - 20
-    checkpoints:
-    - step: 21
-      expectation: The independently decoded measurement meets both ratios with zero bulk errors.
-    - step: 24
-      expectation: The server actually selected RemoteFX for photo rectangles.
-    results:
     - 21
-    - 24
+    checkpoints:
+    - step: 22
+      expectation: The independently decoded measurement meets both ratios with zero bulk errors.
+    - step: 25
+      expectation: The server actually selected RemoteFX for photo rectangles.
+    - step: 26
+      expectation: Real encoder stage counters and slow-sample maxima remain available alongside the source telemetry.
+    results:
+    - 22
+    - 25
+    - 26
   native:
   - check: Release encoder/capture and two sequential native probe connections with matching initial photo frames.
     method: automated
