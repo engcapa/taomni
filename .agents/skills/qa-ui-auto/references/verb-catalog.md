@@ -273,6 +273,32 @@ Relative paths resolve from the repository root.
 
 ## Last-resort escape hatch
 
+### SDK and language startup observation
+
+`native_sdk_startup_probe: {events, gate}` requires `workspace_slow_sdk` and the
+forwarding observer below. The native input driver opens and edits `src/index.ts`,
+visits Home, restores the workspace and opens `Documents/notes.txt`. Every action
+keeps a fixed 1500ms dispatch-to-result budget. The same independently compiled
+SDK child must emit fresh waiting heartbeats and the real SDK/LSP IPC must remain
+pending after each action, before the unchanged five-second production timeout.
+The verb releases its case-owned gate in `finally`, retaining all action timings,
+heartbeat events and invoke observations in `sdk-startup-responsiveness.json` on
+both success and failure. A timed-out child cannot establish responsiveness.
+
+`observe_language_startup: null` installs a forwarding-only invoke observer in
+browser/native mode. It calls the original owner with its original receiver,
+arguments and options, preserves results/errors, and records only command timing,
+workspace/root/file identities and pending/fulfilled/rejected state. It does not
+delay or replace SDK/LSP providers, and excludes source text and result bodies.
+
+`assert_language_startup: {commands: {sdk_resolve_workspace: {equal: 0}}, quiet_ms: 500}`
+checks per-command `min`, `max`, `equal`, `pending`, `fulfilled`, or `rejected`
+counts. `quiet_ms` (0..2000) requires a stable interval before accepting a count,
+so zero calls cannot pass from one premature read. Each assertion retains an
+independent `language-startup-observation-NN.json`, including on failure. Browser
+observes the existing stub registry; native forwards real Tauri IPC and therefore
+establishes which SDK/process requests the packaged app actually made.
+
 | Verb | Args | Notes |
 |------|------|-------|
 | `eval_readonly` | `{expression, expect_truthy?, contains?, timeout_sec?}` | Evaluates a read-only JS expression once by default; optional `timeout_sec` polls the same condition until it passes or the bounded timeout expires. Browser/native share the assertion and polling rules. Schema **rejects** assignments, function declarations, `await`, `new`, `.click(`, `.setAttribute(`, `.dispatchEvent(`, `.innerHTML=`, `document.write`. Use for things like reading `localStorage` to verify persistence. Max 400 chars. |
