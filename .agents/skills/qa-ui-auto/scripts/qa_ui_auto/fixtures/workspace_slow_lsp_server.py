@@ -5,7 +5,7 @@ import sys
 import time
 
 
-def serve(events: Path, gate: Path):
+def serve(events: Path, gate: Path, documents: Path | None = None):
     def log(message):
         with events.open("a", encoding="utf-8") as stream:
             stream.write(message + "\n")
@@ -27,6 +27,13 @@ def serve(events: Path, gate: Path):
             headers[name.lower()] = value.strip()
         message = json.loads(sys.stdin.buffer.read(int(headers["content-length"])))
         method = message.get("method")
+        if documents is not None and method in {
+            "textDocument/didOpen", "textDocument/didChange", "textDocument/didClose",
+        }:
+            # Synthetic fixture buffers only. This independent peer is never
+            # connected to a personal project/profile.
+            with documents.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(message) + "\n")
         if method == "exit":
             return
         if method == "initialize":
@@ -48,4 +55,4 @@ def serve(events: Path, gate: Path):
 
 
 if __name__ == "__main__":
-    serve(Path(sys.argv[1]), Path(sys.argv[2]))
+    serve(Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3]) if len(sys.argv) > 3 else None)

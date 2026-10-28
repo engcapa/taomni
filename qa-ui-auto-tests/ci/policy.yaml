@@ -12,6 +12,7 @@ smoke:
 - TC-WS-054
 - TC-WS-055
 - TC-WS-056
+- TC-WS-057
 unavailable:
   # This read-only regression targets the user's external clickhousecrud
   # checkout, not an in-repository sample. Hosted VMs have neither that source
@@ -21,6 +22,15 @@ unavailable:
     windows/native: External clickhousecrud project (QA_JAVA_PROJECT_ROOT) is not distributed with the repository; run locally with the original project.
     macos/native: External clickhousecrud project (QA_JAVA_PROJECT_ROOT) is not distributed with the repository; run locally with the original project.
 cases:
+- TC-WS-064
+- TC-WS-065
+- TC-WS-063
+- TC-WS-061
+- TC-WS-062
+- TC-WS-059
+- TC-WS-060
+- TC-WS-058
+- TC-WS-057
 - TC-TERM-BURST-001
 - TC-WS-056
 - TC-WS-055
@@ -635,6 +645,7 @@ cases:
 - TC-RDPS-UI-03-rdp-media-clipboard-settings
 - TC-RDPJ-01-client-server-loopback
 - TC-RDPJ-02-joint-clipboard-no-echo
+- TC-RDPJ-03-deferred-clipboard-publication
 - TC-MFA-001
 - TC-MFA-002
 - TC-MFA-003

@@ -5081,6 +5081,7 @@ controls:
 - 本地服务器窗口 RDP 行：通用字段（端口/绑定地址/自动停止/随应用启动）+ RDP 字段（用户名/密码（vault）/域/仅查看/本机确认控制/公网绑定/显示器）；行 `data-status` 反映 stopped/starting/running/error
 - Native 用例经 `open_route: '?servers=main'` 在主窗口打开同一组件树，通过 `rdp-probe`（QA 专用探针客户端，随 QA 构建产出）做协议级判定与性能测量，`rdp_target.py`（Tk）提供宿主可见目标，`host_clipboard` 用系统工具判定宿主剪贴板
 - 剪贴板按方向分级（off/text/rich/all，默认 all）：文本、CF_HTML、CF_DIB/CF_DIBV5 图片、文件（FileGroupDescriptorW + FileContents，暂存目录 + 上限 MB）；两方向都 off 时不提供 CLIPRDR 通道
+- `TC-RDPJ-02-joint-clipboard-no-echo` 保留联合客户端/服务端 Unicode 文本与无回环校验；`TC-RDPJ-03-deferred-clipboard-publication` 在 macOS 真实 AppKit 中分离类型声明与数据发布（间隔至少 1.2 秒、同一 changeCount），校验迟到文本不会丢失，公告不超过两次、六秒无回环并正常停止。空快照每秒复核一次；非空稳定快照保持廉价变更标记检查。
 - CI：`rdp_server_required` → capability `rdp`；`system_rdp_running`（Windows 系统远程桌面运行中）→ `rdp`；`release_build_required`（性能用例）→ `release`（该条目改用 release QA 构建）；音频/TermService 基线/xrdp 参考服务器分别为 `audio`/`rdp-baseline`/`xrdp`
 - Windows：NAT-01/PERF-01 三端运行，Windows 上经 `platform_choice` 在系统远程桌面提示中选 Taomni；系统远程桌面分支由 TC-RDPS-NAT-06 覆盖，TermService 基线由 TC-RDPS-PERF-02 测量
 - 声音（RDPSND 播放）：服务器回采本机默认输出（Windows WASAPI loopback、Linux PipeWire sink monitor），按客户端格式重采样为 PCM 下发；macOS 13+ 用 ScreenCaptureKit 系统音频（排除 Taomni 自身声音）；TC-RDPS-NAT-04 在宿主播放单音、由探针经 RDPSND 接收并判定频率。CI `audio`：Linux 为 PipeWire null sink，Windows 为 VB-CABLE，macOS 为 BlackHole 虚拟设备
@@ -8416,6 +8417,8 @@ controls:
 - 当前为部分完成：Rust/Go/Python/Node/Swift 已接入首批 Run/Debug，CMake/.NET/JVM provider 仍有 artifact、BSP/DAP 和跨平台 native smoke 待补；仓库 shared configuration、嵌套 compound Run/Debug、多 DAP 子会话选择、组级 Stop/Restart 与 `parallel`/`stopOnFailure` 已形成代码闭环。标准 source/function/data/exception breakpoints 已覆盖 adapter scope、条件、Mute/Remove All、configurationDone 前同步和绑定状态；exception filters 同时兼容 `filters` 与 capability-gated `filterOptions`，支持 `exceptionOptions` 的 adapter 还可管理持久化异常树路径、排除段及 caught/uncaught break mode。Maven Surefire/Failsafe 与 Gradle JUnit XML 已形成结构化结果、失败详情/定位/重跑闭环；IDEA 专有断点属性、coverage 和完整 adapter 矩阵仍未完成。
 
 ### 25.5 编辑器工作台壳层（tree / split / switcher / keymap surface）🟡
+
+Compact 目录只预加载可见行，并限制刷新期间的原生并发；`TC-WS-057` 保护 Home 形状目录中的压缩路径浏览、展开恢复与视图切换。
 
 <!-- feature
 id: F25.5
@@ -12173,11 +12176,15 @@ controls:
 
 ---
 
+TC-WS-059/060 cover ordinary-document discovery suppression and every explicit folder reveal; TC-WS-061/062 retain real held-SDK success/error, live native responsiveness, late LSP buffer delivery and byte-exact disk save. TC-WS-063 applies the same pending-process and retained-content contract to a Java source. TC-WS-064 measures exact 704-line JSON publication, syntax highlighting and every frame gap on cold open, tab return and Home restoration in browser/native. TC-WS-065 adds real native keyboard latency and byte-exact save/reopen. These follow-up cases remain unverified until their hosted runs are reviewed.
+
 ## 12. Workspace-First 平台重构（v6.1）
 
 > 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents / Crew 开发中入口与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-049`。`TC-WS-049` 覆盖 Home、Tools、Sessions、空/多标签 Workspaces 的共享标题栏拖动事件、窄窗口真实命中、双击最大化，以及按钮、标签、弹出输入框和右键的排除；`TC-MAIN-RAIL-03` 验证同一顶部边框及 Home/Tools 标题的真实系统位移。`TC-WS-029/030` 还覆盖工作区标签过多时的左右滚动控制，以及顶部空白区保留原生窗口拖动目标。`TC-WS-044` 在 browser/native 中覆盖从 Home 选择已保存工作区后，树形/详细列表的已展开子目录自动重新加载，保留文档与目录展开状态。`TC-WS-045` 覆盖 Tools / Home 显式进入空编辑器时展示文件区，以及收缩、Project 和 Sessions 工具切换后的恢复。`TC-WS-047` 覆盖普通层级文件树显示依赖/构建目录，避免将父目录误判为 Empty。`TC-WS-018/019` 保留连续快捷键开关回归，`TC-WS-046` 追加 Linux 原生 GTK/fcitx 真实输入及大预览重复打开边界。
 
 ### 12.1 Workspace-first 主壳层：单行工具栏、主导航条 5 大模式与右栏收纳
+
+`TC-WS-058` 在 browser/native 中保留宽导航栏下 viewport 对话框超出画布仍可操作的行为：读取真实命中、设置字体、跨 Home 返回、重复打开并 Escape 关闭，最后验证原有 SSH 终端输出。圆角装饰不能通过整层裁剪破坏此边界；正式性能对照另验证 24 PTY、文件树和编辑器的原始延迟与资源预算。
 
 <!-- feature
 id: F-WS-1

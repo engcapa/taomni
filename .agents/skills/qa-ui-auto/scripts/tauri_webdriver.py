@@ -804,31 +804,8 @@ class NativeSession(WebDriverTransport):
             "return !!el?.isContentEditable;"
         )
         if contenteditable is True:
-            # WebKit accepts element /value for contenteditable nodes without
-            # dispatching the beforeinput/input events CodeMirror owns. Drive
-            # real key actions so the editor creates a normal transaction.
-            for _ in range(3):
-                self.request("POST", self.element_path(element, "/click"), {})
-                focused = self.execute(
-                    f"const el = document.querySelector({json.dumps(selector)});"
-                    "return !!el && document.activeElement === el;"
-                )
-                if focused is True:
-                    break
-                time.sleep(0.1)
-            else:
-                raise WebDriverError(f"contenteditable did not receive focus: {selector}")
-            self.press_combo("Control+a")
-            if not text:
-                self.press_combo("Backspace")
-                return f"filled contenteditable {selector}"
-            lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-            for index, line in enumerate(lines):
-                if index:
-                    self.press_combo("Enter")
-                if line:
-                    self.type_text(line)
-            return f"filled contenteditable {selector}"
+            from native_contenteditable import fill_contenteditable
+            return fill_contenteditable(self, element, selector, text, WebDriverError)
         if platform.system() == "Darwin":
             # The WKWebView bridge's value endpoint replaces the value using
             # the native DOM setter and React input events without blurring.

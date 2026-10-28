@@ -99,6 +99,38 @@ describe("useWorkspaceFileActions", () => {
     gitMocks.gitIgnorePath.mockReset();
   });
 
+  it.each(["/new-folder", "/repo"])("reveals and expands a successful folder selection: %s", async (path) => {
+    ipcMocks.selectFolderPath.mockResolvedValue(path);
+    const onRootAdded = vi.fn();
+    const props = options({ onRootAdded });
+    const { result, unmount } = renderHook(() => useWorkspaceFileActions(props));
+    await act(async () => result.current.addRoot());
+    const root = onRootAdded.mock.calls[0][0] as CodeWorkspaceRootInfo;
+    expect(root.path).toBe(path);
+    expect(onRootAdded).toHaveBeenCalledTimes(1);
+    expect(props.setExpandedRoots.mock.calls[0][0](new Set())).toEqual(new Set([root.id]));
+    expect(props.setExpandedDirs.mock.calls[0][0](new Set())).toEqual(new Set([`${root.id}:`]));
+    expect(props.loadDir).toHaveBeenCalledWith(root.id, "");
+    if (path === "/repo") {
+      expect(root.id).toBe("root-1");
+      expect(props.setRoots).not.toHaveBeenCalled();
+    } else expect(props.setRoots).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it("preserves tree visibility and roots when folder selection is cancelled", async () => {
+    ipcMocks.selectFolderPath.mockResolvedValue(null);
+    const onRootAdded = vi.fn();
+    const props = options({ onRootAdded });
+    const { result, unmount } = renderHook(() => useWorkspaceFileActions(props));
+    await act(async () => result.current.addRoot());
+    expect(onRootAdded).not.toHaveBeenCalled();
+    expect(props.setRoots).not.toHaveBeenCalled();
+    expect(props.setExpandedRoots).not.toHaveBeenCalled();
+    expect(props.loadDir).not.toHaveBeenCalled();
+    unmount();
+  });
+
   it("derives the selected directory and owns file creation", async () => {
     dialogMocks.promptAppDialog.mockResolvedValue("main.ts");
     workspaceMocks.workspaceCreateFile.mockResolvedValue({

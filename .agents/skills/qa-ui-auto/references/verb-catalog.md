@@ -17,6 +17,16 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 
 ## Navigation & timing
 
+`measure_workspace_file_open: {selector, expected, event: click|dblclick, label}`
+drives one real browser/WebDriver activation and passively records exact canonical
+document publication, visible syntax highlighting and every animation-frame gap.
+Content and highlighting each retain a 1500ms budget; every frame gap must stay
+within 150ms through one second after highlighting. It never sets document text,
+dispatches synthetic input, retries activation or discards initial slow frames.
+`file-open-<label>.json` retains all frames and separate driver action time on
+success and failure. Browser proves renderer/VFS behavior; native additionally
+exercises the packaged WebView and real filesystem.
+
 | Verb | Args | Notes |
 |------|------|-------|
 | `open` | string URL **or** `{url}` | Navigates and waits for `domcontentloaded`. Auto-runs at step 0 if first step isn't `open`/`goto`. |
@@ -272,6 +282,51 @@ Relative paths resolve from the repository root.
 | `native_show_image_window` | `{path, x?, y?}` or `{action: close}` | Native Linux/X11 and Windows. Shows a topmost Tk window with the PNG so a real screen capture contains the QR; records geometry in `native-image-window.json`; closed automatically after the case. |
 
 ## Last-resort escape hatch
+
+### SDK and language startup observation
+
+`native_sdk_startup_probe: {events, gate, language?: typescript|java}` requires
+`workspace_slow_sdk` and the forwarding observer below. The native input driver
+opens and edits `src/index.ts` (default) or `src/Main.java`,
+visits Home, restores the workspace and opens `Documents/notes.txt`. File opening,
+selection/clearing and navigation keep a fixed 1500ms dispatch-to-result budget.
+Typing retains every character and the driver's original 20ms pacing, measures
+each batch of at most eight keys against 1500ms and every keydown-to-frame
+against 150ms. Frames check the canonical document/caret against every key
+observed by that frame, plus exact final DOM/text; no keys or slow frames are
+discarded when several keys share a frame. IPC/heartbeat reads occur after each
+batch to avoid spending the held SDK's lifetime on observation round trips.
+Full typing wall time and all raw key/input/frame samples are retained separately
+in `sdk-typing-responsiveness.json`; whole-string typing time is not UI latency.
+The same independently compiled
+SDK child must emit fresh waiting heartbeats and the real SDK/LSP IPC must remain
+pending after each action, before the unchanged five-second production timeout.
+The verb releases its case-owned gate in `finally`, retaining all action timings,
+heartbeat events and invoke observations in `sdk-startup-responsiveness.json` on
+both success and failure. A timed-out child cannot establish responsiveness.
+`sdk-action-trace.json` separately retains original WebDriver request timings,
+actual pointer-event times, next frames and canonical/DOM publication. It never
+logs request payloads or replays input. Native language observations also retain
+file-read callback times in `fileReads`, separate from SDK/LSP invocation counts;
+file contents are excluded. These passive diagnostics do not change any budget.
+
+`observe_language_startup: null` installs a forwarding-only observer. Browser
+observation wraps the stub registry's invoke method. Native observation keeps
+Tauri's read-only invoke unchanged, forwards the original custom-protocol fetch
+with its receiver/arguments/options, and observes actual callback Map completion.
+It first verifies a real `plugin:app|name` control response. Missing observation,
+read-only fetch or protocol fallback fails explicitly; zero counts then cannot
+pass. Only command timing/state is recorded natively; browser also records
+workspace/root/file identities. Request bodies, headers/invoke keys, source text
+and result bodies are excluded. SDK/LSP responses and errors are never replaced.
+
+`assert_language_startup: {commands: {sdk_resolve_workspace: {equal: 0}}, quiet_ms: 500}`
+checks per-command `min`, `max`, `equal`, `pending`, `fulfilled`, or `rejected`
+counts. `quiet_ms` (0..2000) requires a stable interval before accepting a count,
+so zero calls cannot pass from one premature read. Each assertion retains an
+independent `language-startup-observation-NN.json`, including on failure. Browser
+observes the existing stub registry; native forwards real Tauri IPC and therefore
+establishes which SDK/process requests the packaged app actually made.
 
 | Verb | Args | Notes |
 |------|------|-------|

@@ -7,6 +7,7 @@ import { useWorkspacePlatformStore, type PlatformWorkspace } from "../../stores/
 import type { CodeWorkspaceTabInfo } from "../../types";
 import { useWorkspaceGitContextStore } from "../../stores/workspaceGitContextStore";
 import { useWorkspaceCodeHost } from "./useWorkspaceCodeHost";
+import { workspaceEditorInstanceId } from "../../lib/workspaceRuntimeIdentity";
 
 export interface WorkspaceCodeEditorProps {
   workspace: PlatformWorkspace;
@@ -42,7 +43,7 @@ export function WorkspaceCodeEditor({ workspace, tabId, visible, onCommandsChang
     ...workspace.codeWorkspace,
     repoRoot: workspace.rootFolders[0]?.path ?? "",
     workspaceId: workspace.codeWorkspace?.workspaceId ?? workspace.id,
-    workspaceInstanceId: workspace.codeWorkspace?.workspaceInstanceId ?? `platform:${workspace.id}`,
+    workspaceInstanceId: workspaceEditorInstanceId(workspace),
     name: workspace.name,
     roots: workspace.rootFolders.map((root) => ({
       id: root.id, name: root.name, path: root.path,

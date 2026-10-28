@@ -32,8 +32,27 @@ html[data-app-theme="dark"] .taomni-main-window {
   overflow: hidden;
 }
 .taomni-main-canvas-frame {
+  position: relative;
+  overflow: visible;
   background: var(--taomni-bg);
   box-shadow: 0 1px 3px rgb(0 0 0 / 6%);
+}
+/* A rounded overflow clip makes WebKit repaint the whole live canvas on cursor
+   updates. Cover only the four 9px corners, leaving viewport-fixed dialogs and
+   menus free to extend beyond the canvas. This layer never intercepts input. */
+.taomni-main-canvas-frame::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: 40;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at bottom right, transparent 8px, var(--taomni-chrome-border) 8px 9px, var(--taomni-chrome-bg) 9px) top left,
+    radial-gradient(circle at bottom left, transparent 8px, var(--taomni-chrome-border) 8px 9px, var(--taomni-chrome-bg) 9px) top right,
+    radial-gradient(circle at top right, transparent 8px, var(--taomni-chrome-border) 8px 9px, var(--taomni-chrome-bg) 9px) bottom left,
+    radial-gradient(circle at top left, transparent 8px, var(--taomni-chrome-border) 8px 9px, var(--taomni-chrome-bg) 9px) bottom right;
+  background-size: 9px 9px;
+  background-repeat: no-repeat;
 }
 .taomni-main-window .taomni-control-bar {
   height: 33px;

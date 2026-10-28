@@ -31,6 +31,7 @@ interface UseWorkspaceTreeDataOptions {
 }
 
 const NO_EXPANDED_DIRS: ReadonlySet<string> = new Set();
+const MAX_COMPACT_REQUESTS = 4;
 
 export interface WorkspaceTreeDataController {
   directories: Record<string, DirectoryState>;
@@ -69,15 +70,32 @@ export function useWorkspaceTreeData({
   const directoryRequestsRef = useRef<Record<string, number>>({});
   const compactGenerationsRef = useRef<Record<string, number>>({});
   const flatGenerationsRef = useRef<Record<string, number>>({});
+  const activeCompactRequestsRef = useRef(new Set<symbol>());
+  const mountedRef = useRef(false);
+  const [compactWorkVersion, setCompactWorkVersion] = useState(0);
   const [reloadVersion, setReloadVersion] = useState(0);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      generationRef.current += 1;
+    };
+  }, []);
 
   useEffect(() => {
     rootsRef.current = roots;
   }, [roots]);
 
-  useEffect(() => {
-    compactChainsRef.current = compactChains;
-  }, [compactChains]);
+  // Publish the request state synchronously, before another visible row can
+  // schedule the same key. React may batch the corresponding state updates.
+  const updateCompactChains = useCallback((
+    update: (current: Record<string, CompactChainState>) => Record<string, CompactChainState>,
+  ) => {
+    const next = update(compactChainsRef.current);
+    compactChainsRef.current = next;
+    setCompactChains(next);
+  }, []);
 
   useEffect(() => {
     flatFilesRef.current = flatFiles;
@@ -133,51 +151,60 @@ export function useWorkspaceTreeData({
 
   const loadCompactChain = useCallback(async (rootId: string, path: string) => {
     const root = findRoot(rootId);
-    if (!root) return;
+    if (!root || !mountedRef.current) return;
     const key = rootDirKey(rootId, path);
     const cached = compactChainsRef.current[key];
     const generation = generationRef.current;
+    // One attempt per refresh, including errors. A denied directory must not
+    // retry whenever a sibling's listing changes.
     if (compactGenerationsRef.current[key] === generation
-      && (cached?.loading || (cached && !cached.error))) return;
+      || activeCompactRequestsRef.current.size >= MAX_COMPACT_REQUESTS) return;
     compactGenerationsRef.current[key] = generation;
-    setCompactChains((current) => ({
+    const request = Symbol(key);
+    activeCompactRequestsRef.current.add(request);
+    updateCompactChains((current) => ({
       ...current,
       [key]: { path: cached?.path ?? path, entries: cached?.entries ?? [], loading: true, error: null },
     }));
-    const result = await workspaceCompactChain(root.path, path, 16);
-    if (generation !== generationRef.current) return;
-    if (!findRoot(rootId)) return;
-    if (result.state === "ready") {
-      const entries = [...result.entries];
-      // The native walk can descend through single-dir chains; the walked
-      // endpoint is recoverable from the entries themselves (their common
-      // parent) and is what the tree displays for the chain. The endpoint's
-      // listing lands under the WALKED key — the requested directory keeps
-      // its own entries.
-      const walkedPath = entries.length > 0 ? parentPath(entries[0].path) : path;
-      setCompactChains((current) => ({
+    try {
+      const result = await workspaceCompactChain(root.path, path, 16);
+      if (!mountedRef.current || generation !== generationRef.current
+        || compactGenerationsRef.current[key] !== generation
+        || findRoot(rootId)?.path !== root.path) return;
+      if (result.state === "ready") {
+        const entries = [...result.entries];
+        // Cache the compact endpoint, but only expanded endpoints may schedule
+        // its children. Merely caching this listing must never start a walk.
+        const walkedPath = entries.length > 0 ? parentPath(entries[0].path) : path;
+        updateCompactChains((current) => ({
+          ...current,
+          [key]: { path: walkedPath, entries, loading: false, error: null },
+        }));
+        setDirectories((current) => ({
+          ...current,
+          [rootDirKey(rootId, walkedPath)]: {
+            ...(current[rootDirKey(rootId, walkedPath)] ?? DEFAULT_DIR_STATE),
+            entries,
+            loaded: true,
+            loading: false,
+            error: null,
+          },
+        }));
+        return;
+      }
+      const message = result.state === "cancelled" ? null
+        : result.state === "unavailable" ? result.reason : result.message;
+      updateCompactChains((current) => ({
         ...current,
-        [key]: { path: walkedPath, entries, loading: false, error: null },
+        [key]: { path: cached?.path ?? path, entries: cached?.entries ?? [], loading: false, error: message },
       }));
-      setDirectories((current) => ({
-        ...current,
-        [rootDirKey(rootId, walkedPath)]: {
-          ...(current[rootDirKey(rootId, walkedPath)] ?? DEFAULT_DIR_STATE),
-          entries,
-          loaded: true,
-          loading: false,
-          error: null,
-        },
-      }));
-      return;
+    } finally {
+      // Old-generation requests still occupy native workers until they finish.
+      // Refreshing must not reset this budget and multiply in-flight work.
+      activeCompactRequestsRef.current.delete(request);
+      if (mountedRef.current) setCompactWorkVersion((version) => version + 1);
     }
-    if (result.state === "cancelled") return;
-    const message = result.state === "unavailable" ? result.reason : result.message;
-    setCompactChains((current) => ({
-      ...current,
-      [key]: { path, entries: [], loading: false, error: message },
-    }));
-  }, [findRoot]);
+  }, [findRoot, updateCompactChains]);
 
   const loadFlatFiles = useCallback(async (rootId: string, force = false) => {
     const root = findRoot(rootId);
@@ -236,7 +263,6 @@ export function useWorkspaceTreeData({
     directoryRequestsRef.current = {};
     compactGenerationsRef.current = {};
     flatGenerationsRef.current = {};
-    compactChainsRef.current = {};
     flatFilesRef.current = {};
     // A watcher refresh invalidates old requests without unmounting the rows
     // beneath a pending pointer event or the user's keyboard focus. Each new
@@ -246,20 +272,23 @@ export function useWorkspaceTreeData({
         ? Object.fromEntries(Object.entries(current).map(([key, state]) => [key, { ...state, loading: false }]))
         : {};
     setDirectories(retain);
-    setCompactChains(retain);
+    updateCompactChains(retain);
     setFlatFiles(retain);
     setReloadVersion((version) => version + 1);
-  }, []);
+  }, [updateCompactChains]);
 
   const removeRoot = useCallback((rootId: string) => {
     const prefix = `${rootId}:`;
     for (const key of Object.keys(directoryRequestsRef.current)) {
       if (key.startsWith(prefix)) delete directoryRequestsRef.current[key];
     }
+    for (const key of Object.keys(compactGenerationsRef.current)) {
+      if (key.startsWith(prefix)) delete compactGenerationsRef.current[key];
+    }
     setDirectories((current) => Object.fromEntries(
       Object.entries(current).filter(([key]) => !key.startsWith(prefix)),
     ));
-    setCompactChains((current) => Object.fromEntries(
+    updateCompactChains((current) => Object.fromEntries(
       Object.entries(current).filter(([key]) => !key.startsWith(prefix)),
     ));
     setFlatFiles((current) => {
@@ -267,7 +296,7 @@ export function useWorkspaceTreeData({
       delete next[rootId];
       return next;
     });
-  }, []);
+  }, [updateCompactChains]);
 
   useEffect(() => {
     roots.forEach((root) => {
@@ -281,17 +310,29 @@ export function useWorkspaceTreeData({
   });
 
   useEffect(() => {
-    if (treeViewMode !== "compact") return;
-    for (const [key, state] of Object.entries(directories)) {
-      if (!state.loaded || state.error) continue;
-      const [rootId] = key.split(":", 1);
-      for (const entry of state.entries) {
-        if (entry.fileType === "dir" && !shouldHideEntry(entry)) {
-          void loadCompactChain(rootId, entry.path);
+    if (treeViewMode !== "compact" || treeFilter.trim()) return;
+    // Mirror the rendered tree: each expanded listing needs compact names for
+    // its immediate directory rows. Cached descendants below a collapsed row
+    // are not visible and must not recursively schedule their own children.
+    for (const root of roots) {
+      if (!expandedRootIds.has(root.id)) continue;
+      const pending = [""];
+      const visited = new Set<string>();
+      while (pending.length) {
+        const path = pending.pop()!;
+        if (visited.has(path)) continue;
+        visited.add(path);
+        const state = directories[rootDirKey(root.id, path)];
+        if (!state?.loaded || state.error) continue;
+        for (const entry of state.entries) {
+          if (entry.fileType !== "dir") continue;
+          if (!shouldHideEntry(entry)) void loadCompactChain(root.id, entry.path);
+          const childPath = compactChainsRef.current[rootDirKey(root.id, entry.path)]?.path ?? entry.path;
+          if (expandedDirKeys.has(rootDirKey(root.id, childPath))) pending.push(childPath);
         }
       }
     }
-  }, [directories, loadCompactChain, treeViewMode]);
+  }, [roots, expandedRootIds, expandedDirKeys, directories, compactChains, compactWorkVersion, loadCompactChain, treeViewMode, treeFilter]);
 
   useEffect(() => {
     // Flat view always indexes; tree/compact only index when the filter needs

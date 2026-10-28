@@ -34,6 +34,8 @@ mod host_content;
 
 mod change_token;
 
+mod host_poll;
+
 mod files;
 
 mod shared;

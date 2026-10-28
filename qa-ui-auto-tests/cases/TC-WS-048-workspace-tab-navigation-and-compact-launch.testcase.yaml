@@ -4,7 +4,9 @@ description: Creates twelve UI-owned workspace local terminal tabs. Verifies com
   Home/End activation and active visibility without closing tabs. Physical window movement is covered by TC-MAIN-RAIL-03. Return through Home and Sessions
   with all twelve tabs open; the restored active tab stays visible and both scroll controls still work without runtime errors. Wait for the rendered disabled-edge
   control before inspecting scroll geometry; hidden terminal panes must not be used as the restored active-pane readiness target. Home/End must keep the
-  active endpoint tab focused through delayed terminal activation; repeat after hidden-mode restoration while retaining pointer scrolling.
+  active endpoint tab focused through delayed terminal activation; repeat after hidden-mode restoration while retaining pointer scrolling. After Home/Sessions
+  restoration, await the unchanged 1px active-tab containment condition for at most 1.5s and retain both initial and settled rectangles; a disabled arrow
+  can still carry the previous hidden layout before ResizeObserver has measured the restored strip.
 modes:
 - browser
 - native
@@ -136,14 +138,26 @@ steps:
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="workspace-session-pane"] [data-testid="terminal-pane"][data-terminal-active="true"]'
 - assert_disabled: '[data-testid="workspace-tab-scroll-right"]'
+- assert_element_geometry:
+    selector: '[data-testid="workspace-tab-scroll-area"], [data-testid="workspace-tab"][data-active="true"]'
+    min_count: 2
+    min_width: 50
+    min_height: 20
 - eval_readonly:
     expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab"][data-active'+String.fromCharCode(61)+'"true"]').getBoundingClientRect().left
       >= document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').getBoundingClientRect().left - 1
     expect_truthy: true
+    timeout_sec: 1.5
 - eval_readonly:
     expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab"][data-active'+String.fromCharCode(61)+'"true"]').getBoundingClientRect().right
       <= document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').getBoundingClientRect().right + 1
     expect_truthy: true
+    timeout_sec: 1.5
+- assert_element_geometry:
+    selector: '[data-testid="workspace-tab-scroll-area"], [data-testid="workspace-tab"][data-active="true"]'
+    min_count: 2
+    min_width: 50
+    min_height: 20
 - click: '[data-testid="workspace-tab-scroll-left"]'
 - eval_readonly:
     expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').scrollLeft < document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-tab-scroll-area"]').scrollWidth
@@ -328,8 +342,8 @@ verification:
     - 72
     - 74
     - 76
-    - 81
     - 83
+    - 85
     checkpoints:
     - step: 73
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -340,20 +354,26 @@ verification:
     - step: 78
       expectation: '{"assert_disabled": "[data-testid=\"workspace-tab-scroll-right\"]"}'
     - step: 79
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"workspace-tab-scroll-area\"], [data-testid=\"workspace-tab\"][data-active=\"true\"]",
+        "min_count": 2, "min_width": 50, "min_height": 20}}'
+    - step: 80
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab\"][data-active''+String.fromCharCode(61)+''\"true\"]'').getBoundingClientRect().left
         >= document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').getBoundingClientRect().left - 1", "expect_truthy":
-        true}}'
-    - step: 80
+        true, "timeout_sec": 1.5}}'
+    - step: 81
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab\"][data-active''+String.fromCharCode(61)+''\"true\"]'').getBoundingClientRect().right
         <= document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').getBoundingClientRect().right + 1", "expect_truthy":
-        true}}'
+        true, "timeout_sec": 1.5}}'
     - step: 82
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"workspace-tab-scroll-area\"], [data-testid=\"workspace-tab\"][data-active=\"true\"]",
+        "min_count": 2, "min_width": 50, "min_height": 20}}'
+    - step: 84
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').scrollLeft
         < document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').scrollWidth - document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-scroll-area\"]'').clientWidth
         - 10", "expect_truthy": true}}'
-    - step: 84
+    - step: 86
       expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 12}}'
-    - step: 91
+    - step: 93
       expectation: '{"assert_no_runtime_errors": null}'
     results:
     - 73
@@ -362,17 +382,19 @@ verification:
     - 78
     - 79
     - 80
+    - 81
     - 82
     - 84
-    - 91
+    - 86
+    - 93
   - id: R5
     requirement: Keyboard Home/End keeps focus and selection on the first/last workspace tab despite delayed terminal activation, before and after Home/Sessions
       restoration; pointer overflow controls remain functional.
     actions:
     - 55
     - 61
-    - 85
-    - 88
+    - 87
+    - 90
     checkpoints:
     - step: 59
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.matches(''[role''+String.fromCharCode(61)+''\"tab\"]:first-child[aria-selected''+String.fromCharCode(61)+''\"true\"]'')",
@@ -384,14 +406,14 @@ verification:
         "expect_truthy": true}}'
     - step: 66
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab-scroll-area\"]", "name": "data-keyboard-navigation", "equals": "true"}}'
-    - step: 86
+    - step: 88
       expectation: '{"wait_for": "[data-testid=\"workspace-tab-scroll-left\"][disabled]"}'
-    - step: 87
+    - step: 89
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.matches(''[role''+String.fromCharCode(61)+''\"tab\"]:first-child[aria-selected''+String.fromCharCode(61)+''\"true\"]'')",
         "expect_truthy": true}}'
-    - step: 89
+    - step: 91
       expectation: '{"wait_for": "[data-testid=\"workspace-tab-scroll-right\"][disabled]"}'
-    - step: 90
+    - step: 92
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.matches(''[role''+String.fromCharCode(61)+''\"tab\"]:last-child[aria-selected''+String.fromCharCode(61)+''\"true\"]'')",
         "expect_truthy": true}}'
     results:
@@ -399,10 +421,10 @@ verification:
     - 60
     - 65
     - 66
-    - 86
-    - 87
+    - 88
     - 89
-    - 90
+    - 91
+    - 92
   visual:
   - check: Review arrow visibility, compact launch split and useful title-bar drag space.
     method: manual

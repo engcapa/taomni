@@ -129,8 +129,14 @@ export function createOpenFile(controllerContext: OpenFileContext) {
         if (!isCurrent()) return null;
         const latest = controllerContext.openFilesRef.current[key];
         if (pendingClosedFile.didCloseCompleted && latest && !latest.loading) {
-          await controllerContext.syncLspDocument(latest, "open");
-          if (!isCurrent()) return null;
+          // Cleanup (including didClose) has finished. Resume the provider in
+          // its existing ordered queue without making the visible reopen wait
+          // for SDK discovery or initialize; edits keep feeding that queue.
+          void controllerContext.syncLspDocument(latest, "open").catch((error) => {
+            if (isCurrent() && controllerContext.openFilesRef.current[key]) {
+              controllerContext.setStatusMessage(errorMessage(error));
+            }
+          });
         }
       }
       if (controllerContext.openFilesRef.current[key] && !controllerContext.openFilesRef.current[key].loading) {

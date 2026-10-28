@@ -503,7 +503,7 @@ class NativeSessionFillTest(TestCase):
             "return !!el && document.activeElement === el;"
         )
         session.press_combo.assert_has_calls([
-            call("Control+a"),
+            call("Mod+a"),
             call("Enter"),
             call("Enter"),
         ])
@@ -606,7 +606,7 @@ class NativeSessionFillTest(TestCase):
     def test_empty_contenteditable_fill_deletes_the_selection(self) -> None:
         session = self.session(True)
         session.fill('.cm-content', '')
-        session.press_combo.assert_has_calls([call("Control+a"), call("Backspace")])
+        session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
         session.type_text.assert_not_called()
 
     def test_wayland_fill_retries_select_all_before_deleting_old_prefix(self) -> None:

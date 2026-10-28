@@ -48,6 +48,7 @@ mod webview_recovery;
 mod windowing;
 mod workspace;
 mod workspace_execution;
+mod workspace_reads;
 mod workspace_search;
 mod workspace_tooling;
 mod workspace_writes;

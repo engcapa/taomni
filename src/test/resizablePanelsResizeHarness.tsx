@@ -1,8 +1,15 @@
 import { act, render } from "@testing-library/react";
-import { createRef } from "react";
+import { createRef, useRef, type RefObject } from "react";
 import * as Panels from "react-resizable-panels";
 import type { GroupImperativeHandle, OnPanelResize, PanelImperativeHandle } from "react-resizable-panels";
 import { vi } from "vitest";
+import { useToolWindowPanelVisibility } from "../components/editor/workspace/hooks/useToolWindowPanelVisibility";
+
+function PanelVisibility({ panelRef, open }: { panelRef: RefObject<PanelImperativeHandle | null>; open: boolean }) {
+  const size = useRef(20);
+  useToolWindowPanelVisibility(panelRef, open, size, "%");
+  return null;
+}
 
 // jsdom supplies no geometry or ResizeObserver delivery loop. Only those browser
 // boundaries are controlled here; Group/Panel registration and layout are real.
@@ -58,7 +65,7 @@ export function installPanelResizeHarness() {
   };
 }
 
-export function mountPanelResizeFixture(nested = false, components = Panels) {
+export function mountPanelResizeFixture(nested = false, components = Panels, syncVisibility = false) {
   const { Group, Panel, Separator } = components;
   const groupRef = createRef<GroupImperativeHandle>();
   const nestedRef = createRef<GroupImperativeHandle>();
@@ -70,7 +77,7 @@ export function mountPanelResizeFixture(nested = false, components = Panels) {
   const onResize = vi.fn<NonNullable<OnPanelResize>>(() => {
     if (PanelResizeObserver.delivering) throw new Error("Panel onResize ran during observer delivery");
   });
-  const view = render(
+  const Fixture = ({ open = true }: { open?: boolean }) => <>
     <Group id="resize-root" groupRef={groupRef} defaultLayout={{ editor: 80, docs: 20 }}
       onLayoutChange={onLayoutChange} onLayoutChanged={onLayoutChanged}>
       <Panel id="editor" minSize={200} onResize={onResize}>
@@ -83,8 +90,10 @@ export function mountPanelResizeFixture(nested = false, components = Panels) {
       <Separator />
       <Panel id="docs" panelRef={docsRef} defaultSize={235} minSize={185} collapsible
         groupResizeBehavior="preserve-pixel-size" onResize={onResize}>Documentation</Panel>
-    </Group>,
-  );
+    </Group>
+    {syncVisibility && <PanelVisibility panelRef={docsRef} open={open} />}
+  </>;
+  const view = render(<Fixture />);
   let width = 0;
   const reads = vi.fn();
   const element = (id: string) => view.container.querySelector<HTMLElement>(`[id="${id}"]`)!;
@@ -117,5 +126,6 @@ export function mountPanelResizeFixture(nested = false, components = Panels) {
     act(() => owner.deliver(entries));
   };
   return { ...view, groupRef, nestedRef, docsRef, onLayoutChange, onLayoutChanged, onResize, reads, observer,
-    setWidth(value: number) { width = value; }, deliver };
+    setWidth(value: number) { width = value; }, deliver,
+    setOpen(open: boolean) { view.rerender(<Fixture open={open} />); } };
 }

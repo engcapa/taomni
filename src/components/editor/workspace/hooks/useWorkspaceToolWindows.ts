@@ -2,6 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { type PanelImperativeHandle, type PanelSize } from "react-resizable-panels";
 import { selectCodeWorkspaceUi, useCodeWorkspaceStore, type BottomDockTabId, type RightPaneTabId } from "../../../../stores/codeWorkspaceStore";
 import { BOTTOM_DOCK_MIN_HEIGHT, BOTTOM_DOCK_MAX_HEIGHT } from "../panels/BottomDock";
+import { useToolWindowPanelVisibility } from "./useToolWindowPanelVisibility";
 
 export interface UseWorkspaceToolWindowsContext {
   setLanguagePanelOpen: (open: boolean | ((prev: boolean) => boolean)) => void;
@@ -66,18 +67,7 @@ export function useWorkspaceToolWindows(context: UseWorkspaceToolWindowsContext)
 
   // Keep the resizable project panel in sync with the persisted open flag.
   // Drag-to-min collapses via onResize; toolbar / Alt+1 toggles go through this effect.
-  useEffect(() => {
-    const panel = projectPanelRef.current;
-    if (!panel) return;
-    const frame = requestAnimationFrame(() => {
-      if (!leftToolAreaOpen) {
-        panel.collapse();
-      } else {
-        panel.resize(`${lastProjectPanelSizeRef.current}px`);
-      }
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [leftToolAreaOpen]);
+  useToolWindowPanelVisibility(projectPanelRef, leftToolAreaOpen, lastProjectPanelSizeRef, "px");
 
   const handleProjectPanelResize = useCallback((size: PanelSize) => {
     const pixels = size.inPixels > 0 ? Math.round(size.inPixels) : 0;
@@ -298,18 +288,7 @@ export function useWorkspaceToolWindows(context: UseWorkspaceToolWindowsContext)
 
   // Keep the resizable right pane panel in sync with the persisted open flag.
   // Follows the same collapse/expand pattern as the project tree panel.
-  useEffect(() => {
-    const panel = rightPanelRef.current;
-    if (!panel) return;
-    const frame = requestAnimationFrame(() => {
-      if (!rightToolAreaOpen) {
-        panel.collapse();
-      } else {
-        panel.resize(`${lastRightPanelSizeRef.current}%`);
-      }
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [rightToolAreaOpen]);
+  useToolWindowPanelVisibility(rightPanelRef, rightToolAreaOpen, lastRightPanelSizeRef, "%");
 
   const handleRightPanelResize = useCallback((size: PanelSize) => {
     const percentage = size.asPercentage;

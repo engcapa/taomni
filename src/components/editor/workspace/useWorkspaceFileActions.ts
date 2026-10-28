@@ -80,6 +80,7 @@ interface UseWorkspaceFileActionsOptions {
   ) => Promise<void>;
   notifyWorkspacePathGitChanged: (rootId: string, path: string) => void;
   onStatus: (message: string) => void;
+  onRootAdded?: (root: CodeWorkspaceRootInfo) => void;
 }
 
 export interface WorkspaceFileActionsController {
@@ -139,6 +140,7 @@ export function useWorkspaceFileActions({
   applyResourceOperation,
   notifyWorkspacePathGitChanged,
   onStatus,
+  onRootAdded,
 }: UseWorkspaceFileActionsOptions): WorkspaceFileActionsController {
   const treeClipboardRef = useRef<{
     mode: "copy" | "cut";
@@ -184,17 +186,16 @@ export function useWorkspaceFileActions({
   const addRoot = useCallback(async () => {
     const path = await selectFolderPath();
     if (!path) return;
-    const root = makeRoot(path, "folder");
-    if (rootsRef.current?.some((item) => item.path === root.path)) {
-      onStatus(`Folder already in workspace: ${root.path}`);
-      return;
-    }
-    setRoots((current) => [...current, root]);
+    const selectedRoot = makeRoot(path, "folder");
+    const existing = rootsRef.current?.find((item) => normalizeFsPath(item.path) === normalizeFsPath(selectedRoot.path));
+    const root = existing ?? selectedRoot;
+    if (!existing) setRoots((current) => [...current, root]);
     setExpandedRoots((current) => new Set(current).add(root.id));
     setExpandedDirs((current) => new Set(current).add(rootDirKey(root.id, "")));
-    onStatus(`Added folder ${root.path}`);
+    onRootAdded?.(root);
+    onStatus(existing ? `Folder already in workspace: ${root.path}` : `Added folder ${root.path}`);
     void loadDir(root.id, "");
-  }, [loadDir, onStatus, rootsRef, setExpandedDirs, setExpandedRoots, setRoots]);
+  }, [loadDir, onRootAdded, onStatus, rootsRef, setExpandedDirs, setExpandedRoots, setRoots]);
 
   const addLooseFilePath = useCallback(async (path: string) => {
     if (!path) return;

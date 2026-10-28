@@ -86,8 +86,11 @@
           "platform_workspace_root",
           "workspace_ignored_ancestor_root",
           "workspace_explorer",
+          "workspace_compact_tree",
           "workspace_hidden_entries",
           "workspace_slow_lsp",
+          "workspace_language_files",
+          "workspace_slow_sdk",
           "workspace_restore_sessions",
           "java_sample_projects",
           "java25_projects",
@@ -113,6 +116,7 @@
           "mail_stress",
           "macos_updater",
           "rdp_server_required",
+          "rdp_deferred_clipboard",
           "system_rdp_running",
           "release_build_required",
           "rdp_baseline_required",
@@ -313,6 +317,37 @@
     }
   },
   "$defs": {
+    "language_startup_counts": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "min": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "equal": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pending": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "fulfilled": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "rejected": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
     "selector": {
       "type": "string",
       "minLength": 1,
@@ -558,6 +593,79 @@
         },
         "assert_visible": {
           "$ref": "#/$defs/selector"
+        },
+        "observe_language_startup": {
+          "type": "null",
+          "description": "Install forwarding-only SDK/LSP invoke observation; never hold or replace a provider."
+        },
+        "assert_language_startup": {
+          "type": "object",
+          "required": [
+            "commands"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "quiet_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2000
+            },
+            "commands": {
+              "type": "object",
+              "minProperties": 1,
+              "propertyNames": {
+                "enum": [
+                  "sdk_get_registry",
+                  "sdk_analyze_workspace",
+                  "sdk_resolve_workspace",
+                  "lsp_detect_servers",
+                  "lsp_discover_java_bundles",
+                  "lsp_open_document",
+                  "lsp_document_status",
+                  "lsp_change_document",
+                  "lsp_save_document",
+                  "lsp_close_document"
+                ]
+              },
+              "additionalProperties": {
+                "$ref": "#/$defs/language_startup_counts"
+              }
+            }
+          }
+        },
+        "measure_workspace_file_open": {
+          "type": "object",
+          "required": ["selector", "expected", "event", "label"],
+          "additionalProperties": false,
+          "properties": {
+            "selector": {"type": "string", "minLength": 1},
+            "expected": {"type": "string", "minLength": 1},
+            "event": {"enum": ["click", "dblclick"]},
+            "label": {"type": "string", "pattern": "^[a-z0-9-]+$"}
+          }
+        },
+        "native_sdk_startup_probe": {
+          "type": "object",
+          "required": [
+            "events",
+            "gate"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "events": {
+              "type": "string",
+              "minLength": 1
+            },
+            "gate": {
+              "type": "string",
+              "minLength": 1
+            },
+            "language": {
+              "enum": ["typescript", "java"],
+              "default": "typescript"
+            }
+          },
+          "description": "Native-only: source open/edit, Home/Workspace restoration and ordinary-file open while one real SDK child and actual Tauri requests remain pending. Each action keeps the fixed 1500ms budget; finally releases the fixture and retains all results."
         },
         "assert_no_runtime_errors": {
           "type": "null",

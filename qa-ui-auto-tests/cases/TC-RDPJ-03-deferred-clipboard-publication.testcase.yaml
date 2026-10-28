@@ -1,0 +1,280 @@
+id: TC-RDPJ-03-deferred-clipboard-publication
+title: Delayed macOS host text publication is forwarded once without an echo loop
+description: Real AppKit declares the text type 1.2 seconds before publishing the Unicode payload, without changing its token again. The fixture records
+  actual token values and rejects invalid publication. Use the normal product RDP client/server on one computer; retain the complete original announcement,
+  clipboard contents, six-second quiet period and shutdown assertions. No clipboard polling observer or protocol results are mocked.
+covers:
+- F-RdpServer-1
+- F9.7
+tags:
+- rdp
+- rdp-server
+- rdp-client
+- joint
+- clipboard
+- p1
+- regression
+- deferred-publication
+modes:
+- native
+fixtures:
+- reset_db
+- rdp_server_required
+- system_rdp_running
+- rdp_deferred_clipboard
+timeout_sec: 420
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="sidebar"]'
+- assert_visible: '[data-testid="session-new"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-rdp"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: 127.0.0.1
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${env.QA_RDP_PORT}
+- click: '[data-testid="session-specify-username"]'
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${env.QA_RDP_USER}
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-rdp-joint-clipboard
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-rdp-joint-clipboard"]'
+- open_route: ?servers=main
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- fill:
+    selector: '[data-testid="server-field-port"]'
+    value: ${env.QA_RDP_PORT}
+- fill:
+    selector: '[data-testid="server-field-bind-address"]'
+    value: 127.0.0.1
+- set_check:
+    selector: '[data-testid="server-field-auto-stop"]'
+    checked: false
+- fill:
+    selector: '[data-testid="rdp-field-username"]'
+    value: ${env.QA_RDP_USER}
+- fill:
+    selector: '[data-testid="rdp-field-password"]'
+    value: ${env.QA_RDP_PASSWORD}
+- set_check:
+    selector: '[data-testid="rdp-field-control-approval"]'
+    checked: false
+- click: '[data-testid="server-row-rdp-start"]'
+- platform_choice:
+    platforms:
+    - Windows
+    dialog: '[data-testid="choice-dialog"]'
+    click: '[data-testid="choice-dialog-secondary"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-dialog"]'
+    timeout_sec: 30
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: ${env.QA_VAULT_PASSWORD}
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="running"]'
+    timeout_sec: 90
+- host_clipboard:
+    action: clear
+- open_route: /
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- wait_for:
+    selector: '[data-testid="sidebar"]'
+    timeout_sec: 30
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-rdp-joint-clipboard"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_RDP_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="confirm-dialog"]'
+    timeout_sec: 60
+- click: '[data-testid="confirm-dialog-confirm"]'
+- click: '[data-testid="titlebar-actions-more"]'
+- assert_text:
+    selector: '[data-testid="rdp-status"]'
+    contains: Connected
+    timeout_sec: 60
+- wait: 2
+- host_clipboard:
+    action: set
+    kind: text
+    text: joint-clipboard 联合 ✓ no-echo
+- host_clipboard:
+    action: assert
+    kind: text
+    equals: joint-clipboard 联合 ✓ no-echo
+    timeout_sec: 10
+- wait: 3
+- host_clipboard:
+    action: quiet
+    seconds: 6
+    max_changes: 0
+- host_clipboard:
+    action: assert
+    kind: text
+    equals: joint-clipboard 联合 ✓ no-echo
+- open_route: ?servers=main
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp"]'
+- assert_text:
+    selector: '[data-testid="server-log"]'
+    contains: 'this computer -> client: text (28 chars)'
+    timeout_sec: 15
+- assert_pattern:
+    selector: '[data-testid="server-log"]'
+    regex: '^(?!(?:[\s\S]*?this computer -> client: text \(28 chars\)){3})[\s\S]*?this computer -> client: text \(28 chars\)'
+    timeout_sec: 5
+- assert_text:
+    selector: '[data-testid="server-log"]'
+    contains: disconnected after
+    timeout_sec: 30
+- click: '[data-testid="server-row-rdp-stop"]'
+- wait_for:
+    selector: '[data-testid="server-row-rdp"][data-status="stopped"]'
+    timeout_sec: 30
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: After a real delayed same-token pasteboard write, the Unicode text is announced at least once and at most twice, remains correct, produces
+      no six-second echo loop, and the server stops normally.
+    actions:
+    - 1
+    - 2
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 14
+    - 15
+    - 17
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 29
+    - 30
+    - 31
+    - 33
+    - 34
+    - 35
+    - 38
+    - 40
+    - 41
+    - 43
+    - 44
+    - 46
+    - 47
+    - 49
+    - 52
+    - 54
+    - 58
+    results:
+    - 3
+    - 4
+    - 6
+    - 13
+    - 16
+    - 18
+    - 28
+    - 32
+    - 36
+    - 37
+    - 39
+    - 42
+    - 45
+    - 48
+    - 50
+    - 51
+    - 53
+    - 55
+    - 56
+    - 57
+    - 59
+    - 60
+    checkpoints:
+    - step: 3
+      expectation: 'wait_for: ''[data-testid="sidebar"]'''
+    - step: 4
+      expectation: 'assert_visible: ''[data-testid="session-new"]'''
+    - step: 6
+      expectation: 'wait_for: ''[data-testid="session-editor"]'''
+    - step: 13
+      expectation: 'wait_for: ''[data-testid="bookmark-settings"]'''
+    - step: 16
+      expectation: 'wait_for: ''[data-testid="session-tree-item"][data-session-name="qa-rdp-joint-clipboard"]'''
+    - step: 18
+      expectation: "wait_for:\n  selector: '[data-testid=\"servers-dialog\"]'\n  timeout_sec: 30"
+    - step: 28
+      expectation: "wait_for:\n  selector: '[data-testid=\"vault-setup-dialog\"]'\n  timeout_sec: 30"
+    - step: 32
+      expectation: "wait_for:\n  selector: '[data-testid=\"server-row-rdp\"][data-status=\"running\"]'\n  timeout_sec: 90"
+    - step: 36
+      expectation: 'wait_for: ''[data-testid="session-tree"]'''
+    - step: 37
+      expectation: "wait_for:\n  selector: '[data-testid=\"sidebar\"]'\n  timeout_sec: 30"
+    - step: 39
+      expectation: 'wait_for: ''[data-testid="auth-prompt"]'''
+    - step: 42
+      expectation: "wait_for:\n  selector: '[data-testid=\"confirm-dialog\"]'\n  timeout_sec: 60"
+    - step: 45
+      expectation: "assert_text:\n  contains: Connected\n  selector: '[data-testid=\"rdp-status\"]'\n  timeout_sec: 60"
+    - step: 48
+      expectation: "host_clipboard:\n  action: assert\n  equals: joint-clipboard 联合 ✓ no-echo\n  kind: text\n  timeout_sec: 10"
+    - step: 50
+      expectation: "host_clipboard:\n  action: quiet\n  max_changes: 0\n  seconds: 6"
+    - step: 51
+      expectation: "host_clipboard:\n  action: assert\n  equals: joint-clipboard 联合 ✓ no-echo\n  kind: text"
+    - step: 53
+      expectation: "wait_for:\n  selector: '[data-testid=\"servers-dialog\"]'\n  timeout_sec: 30"
+    - step: 55
+      expectation: "assert_text:\n  contains: 'this computer -> client: text (28 chars)'\n  selector: '[data-testid=\"server-log\"]'\n  timeout_sec: 15"
+    - step: 56
+      expectation: "assert_pattern:\n  regex: '^(?!(?:[\\s\\S]*?this computer -> client: text \\(28 chars\\)){3})[\\s\\S]*?this\n    computer -> client:\
+        \ text \\(28 chars\\)'\n  selector: '[data-testid=\"server-log\"]'\n  timeout_sec: 5"
+    - step: 57
+      expectation: "assert_text:\n  contains: disconnected after\n  selector: '[data-testid=\"server-log\"]'\n  timeout_sec: 30"
+    - step: 59
+      expectation: "wait_for:\n  selector: '[data-testid=\"server-row-rdp\"][data-status=\"stopped\"]'\n  timeout_sec: 30"
+    - step: 60
+      expectation: 'assert_no_runtime_errors: null'
+  visual:
+  - check: Layout and visual styling
+    method: not-applicable
+    reason: This regression changes clipboard scheduling without changing the UI. The case asserts the visible connection state and server output.
+  native:
+  - check: Real AppKit type declaration and delayed data publication with unchanged changeCount, followed by actual RDP client/server transfer.
+    method: automated
+    reason: Requires macOS NSPasteboard and native RDP; browser stubs cannot establish this producer race.
+native_platforms:
+- macOS

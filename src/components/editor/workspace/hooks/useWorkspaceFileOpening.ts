@@ -261,7 +261,13 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
     return apply(operation);
   }, []);
 
+  const onRootAdded = useCallback((root: import("../../../../types").CodeWorkspaceRootInfo) => {
+    project.toolWindowRouting.toolWindowLayoutRef.current.show("project");
+    host?.onFolderOpened?.(root.id);
+  }, [host?.onFolderOpened, project.toolWindowRouting.toolWindowLayoutRef]);
+
   const fileActions = useWorkspaceFileActions({
+    onRootAdded,
     workspaceId: session.workspaceInstanceId,
     locationController: project.workspaceLocationControllerRef.current,
     roots: project.projectTree.roots,

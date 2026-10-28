@@ -1,0 +1,133 @@
+id: TC-WS-061
+title: Real held SDK discovery leaves source editing and workspace navigation responsive
+description: Concurrent same-root callers must share exactly one real SDK child. The real SDK java -version executable waits on a host gate with live child heartbeats. Open/edit a source, visit Home, restore Workspace and
+  open an ordinary file before the unchanged five-second SDK timeout. Opening, clearing and navigation retain 1500ms; every batch of at most eight real paced keys retains 1500ms per request and every key retains a stricter 150ms key-to-frame limit, with all characters, raw samples and total typing wall time retained. Each frame must contain the canonical prefix and caret for every key observed by that frame. Passive request, pointer/frame and file-read timings are retained without changing the budgets. The same child and real IPC must remain
+  pending. Release in finally, observe actual stdio LSP dirty-buffer messages, preserve active notes.txt, then save/reopen and independently hash disk bytes.
+  No LSP initialize delay or renderer SDK promise substitution is used.
+modes:
+- native
+covers:
+- F-WS-2
+- F25.1
+- F25.3
+- F11.2
+tags:
+- p0
+- workspace-redesign
+- file-explorer
+- regression
+- sdk
+fixtures:
+- reset_db
+- workspace_slow_sdk
+- release_build_required
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-held-sdk-normal
+- seed_storage:
+    key: taomni.codeWorkspace.lspCommandPrefs.v1
+    value: ${fixture.slow_lsp_prefs}
+- seed_storage:
+    key: taomni.codeWorkspace.lspCustomCommands.v1
+    value: ${fixture.slow_lsp_command}
+- reload_window: null
+- observe_language_startup: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.platform_workspace_root}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-root"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="Documents"] [data-testid="code-workspace-tree-dir-arrow"]'
+- host_write_file:
+    path: ${fixture.slow_sdk_mode}
+    text: normal
+- native_sdk_startup_probe:
+    events: ${fixture.slow_sdk_events}
+    gate: ${fixture.slow_sdk_gate}
+- assert_file_contains:
+    path: ${fixture.slow_sdk_response_report}
+    contains: '"passed": true'
+- assert_file_contains:
+    path: ${fixture.slow_sdk_lsp_documents}
+    contains: export const edited = 7;
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-tab-title
+    equals: notes.txt
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-line:first-child'
+    equals: Weekly notes
+- click: '[data-testid="workspace-tab"][data-tab-title="index.ts"]'
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    equals: export const edited = 7;
+- click: '[data-testid="workspace-editor-save"]:enabled'
+- assert_file_sha256:
+    path: ${fixture.platform_workspace_root}/src/index.ts
+    equals: aed6c50cc73cdff4a62bf3caf77e7a9d4c9fe880966c6ab35814c202b63ef85b
+- click: '[data-testid="workspace-tab"][data-tab-title="index.ts"] [data-testid="workspace-tab-close"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="src/index.ts"]'
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    equals: export const edited = 7;
+- assert_no_runtime_errors: null
+- screenshot: workspace-held-sdk-normal.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Real held SDK discovery leaves source editing and workspace navigation responsive; late SDK/LSP results preserve the latest dirty buffer,
+      active file and byte-exact saved document.
+    actions:
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 13
+    - 14
+    - 15
+    - 16
+    - 21
+    - 23
+    - 25
+    - 26
+    results:
+    - 17
+    - 18
+    - 19
+    - 20
+    - 22
+    - 24
+    - 27
+    - 28
+    checkpoints:
+    - step: 17
+      expectation: '{"assert_file_contains": {"path": "${fixture.slow_sdk_response_report}", "contains": "\"passed\": true"}}'
+    - step: 18
+      expectation: '{"assert_file_contains": {"path": "${fixture.slow_sdk_lsp_documents}", "contains": "export const edited = 7;"}}'
+    - step: 19
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "notes.txt"}}'
+    - step: 20
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "Weekly notes"}}'
+    - step: 22
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "export const edited = 7;"}}'
+    - step: 24
+      expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/src/index.ts", "equals": "aed6c50cc73cdff4a62bf3caf77e7a9d4c9fe880966c6ab35814c202b63ef85b"}}'
+    - step: 27
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "export const edited = 7;"}}'
+    - step: 28
+      expectation: '{"assert_no_runtime_errors": null}'
+  visual:
+  - check: Current document and SDK status remain readable.
+    method: manual
+    reason: Screenshot is retained; timings, peer protocol and disk hash establish behavior separately.
+  native:
+  - check: Real SDK executable, unchanged native probe timeout, real Tauri requests, real stdio LSP and independently reread disk hash.
+    method: automated
+    reason: Browser stubs cannot establish process liveness or host responsiveness while native SDK discovery is pending.

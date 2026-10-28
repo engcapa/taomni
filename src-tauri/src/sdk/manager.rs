@@ -16,20 +16,15 @@ use super::registry_policy::normalize_scope_path;
 use super::registry_policy::paths_equal;
 use super::registry_policy::require_installation;
 use super::registry_policy::sort_registry;
-use crate::sdk::detect;
+use super::resolution_cache::CachedWorkspaceResolution;
 use crate::sdk::probe;
-use crate::sdk::resolve;
-use crate::sdk::runtime;
-use crate::sdk::runtime::WorkspaceSdkEnvironment;
 use chrono::Utc;
 use std::collections::HashMap;
 use std::io::Write;
-use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Weak;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
-use std::time::Duration;
-use std::time::Instant;
 use tokio::sync::Mutex;
 use tokio::sync::RwLock;
 
@@ -38,15 +33,8 @@ pub struct SdkManager {
     pub(super) registry: RwLock<SdkRegistry>,
     pub(super) revision: AtomicU64,
     pub(super) resolution_cache: Mutex<HashMap<String, CachedWorkspaceResolution>>,
+    pub(super) resolution_guards: Mutex<HashMap<String, Weak<Mutex<()>>>>,
 }
-
-pub(super) struct CachedWorkspaceResolution {
-    pub(super) revision: u64,
-    pub(super) resolved_at: Instant,
-    pub(super) resolution: resolve::WorkspaceSdkResolution,
-}
-
-pub(super) const WORKSPACE_RESOLUTION_CACHE_TTL: Duration = Duration::from_secs(5);
 
 impl SdkManager {
     pub fn load(path: PathBuf) -> Self {
@@ -59,58 +47,12 @@ impl SdkManager {
             registry: RwLock::new(registry),
             revision: AtomicU64::new(1),
             resolution_cache: Mutex::new(HashMap::new()),
+            resolution_guards: Mutex::new(HashMap::new()),
         }
     }
 
     pub async fn snapshot(&self) -> SdkRegistry {
         self.registry.read().await.clone()
-    }
-
-    pub async fn resolve_workspace(
-        &self,
-        workspace_root: &str,
-    ) -> Result<resolve::WorkspaceSdkResolution, String> {
-        let root = normalize_scope_path(workspace_root)?;
-        let revision = self.revision.load(Ordering::SeqCst);
-        if let Some(cached) = self.resolution_cache.lock().await.get(&root)
-            && cached.revision == revision
-            && cached.resolved_at.elapsed() <= WORKSPACE_RESOLUTION_CACHE_TTL
-        {
-            return Ok(cached.resolution.clone());
-        }
-
-        let analysis_root = root.clone();
-        let analysis =
-            tokio::task::spawn_blocking(move || detect::analyze_workspace(&analysis_root))
-                .await
-                .map_err(|error| format!("SDK workspace analysis task failed: {error}"))??;
-        let registry = self.snapshot().await;
-        let resolution = resolve::resolve_workspace(analysis, &registry).await;
-        self.resolution_cache.lock().await.insert(
-            root,
-            CachedWorkspaceResolution {
-                revision,
-                resolved_at: Instant::now(),
-                resolution: resolution.clone(),
-            },
-        );
-        Ok(resolution)
-    }
-
-    pub async fn resolve_environment(
-        &self,
-        workspace_root: &Path,
-        scope_path: &Path,
-    ) -> Result<WorkspaceSdkEnvironment, String> {
-        let resolution = self
-            .resolve_workspace(&workspace_root.to_string_lossy())
-            .await?;
-        let registry = self.snapshot().await;
-        Ok(runtime::build_workspace_environment(
-            &resolution,
-            &registry,
-            scope_path,
-        ))
     }
 
     pub(super) fn registry_changed(&self) {

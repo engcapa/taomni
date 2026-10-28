@@ -69,7 +69,8 @@ class BuildPipelineTests(unittest.TestCase):
                     continue
                 root_tests = [c for c in commands if '--lib' in c and '-p' not in c]
                 self.assertEqual(len(root_tests), 1)
-                expected = ['lsp::tests::workspace_watch_lifetime'] + (['rdp::'] if rdp else []) + (['capture::', 'screenshot::surfaces::',
+                expected = ['lsp::tests::workspace_watch_lifetime', 'commands::workspace_reads::tests',
+                    'workspace::tests::text_and_encoding', 'workspace::tests::encoding_matrix'] + (['rdp::'] if rdp else []) + (['capture::', 'screenshot::surfaces::',
                     'screenshot::qa::save_dialog_observation::'] if dual else [])
                 self.assertEqual(root_tests[0], ['test', '--locked', '--release', '--lib', '--', *expected])
                 self.assertEqual(any('rdp-probe' in c for c in commands), rdp)

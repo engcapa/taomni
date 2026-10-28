@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -10,11 +10,8 @@ import {
   X,
 } from "lucide-react";
 import {
-  sdkGetRegistry,
   sdkRemoveWorkspaceBinding,
-  sdkResolveWorkspace,
   sdkSaveWorkspaceBinding,
-  subscribeSdkRegistryChanged,
   type ProjectSdkProfile,
   type ResolvedSdk,
   type ResolvedSdkSource,
@@ -24,27 +21,15 @@ import {
   type SdkRegistry,
   type SdkRole,
   type WorkspaceSdkBinding,
-  type WorkspaceSdkResolution,
 } from "../../../lib/editor/sdk";
 import { useT, type TranslateFn } from "../../../lib/i18n";
 import { openSettingsSection } from "../../../lib/settingsNavigation";
 import type { CodeWorkspaceRootInfo } from "../../../types";
-
-const EMPTY_REGISTRY: SdkRegistry = {
-  schemaVersion: 1,
-  installations: [],
-  defaults: [],
-  bindings: [],
-};
-
-interface RootSdkState {
-  root: CodeWorkspaceRootInfo;
-  resolution: WorkspaceSdkResolution | null;
-  error: string | null;
-}
+import { useWorkspaceSdkResolution } from "./useWorkspaceSdkResolution";
 
 interface WorkspaceSdkStatusProps {
   roots: CodeWorkspaceRootInfo[];
+  autoResolve?: boolean;
 }
 
 function normalizedPath(path: string): string {
@@ -231,6 +216,11 @@ function BindingRow({ registry, resolved, rootId, busyKey, onBindingChange, t }:
         <div className="min-w-0 text-[9px] leading-4 text-[var(--taomni-code-muted)]">
           <span className="font-medium text-[var(--taomni-code-text)]">{sourceLabel(resolved.source, t)}</span>
           {` · ${resolved.reason}`}
+          {resolved.installation?.lastError && resolved.installation.lastError !== resolved.reason && (
+            <div className="mt-1 whitespace-pre-wrap break-words text-red-400">
+              {resolved.installation.lastError}
+            </div>
+          )}
           {binding && normalizedPath(binding.scopePath) !== normalizedPath(resolved.scopePath) && (
             <div className="truncate" title={binding.scopePath}>
               {t("settings.workspaceSdkInherited", { scope: binding.scopePath })}
@@ -355,50 +345,13 @@ function KotlinProfileDetails({ profile, t }: { profile: ProjectSdkProfile; t: T
   );
 }
 
-export function WorkspaceSdkStatus({ roots }: WorkspaceSdkStatusProps) {
+export function WorkspaceSdkStatus({ roots, autoResolve = true }: WorkspaceSdkStatusProps) {
   const t = useT();
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [registry, setRegistry] = useState<SdkRegistry>(EMPTY_REGISTRY);
-  const [rootStates, setRootStates] = useState<RootSdkState[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
-  const requestRef = useRef(0);
-
-  const load = useCallback(async () => {
-    const request = requestRef.current + 1;
-    requestRef.current = request;
-    setLoading(true);
-    try {
-      const nextRegistry = await sdkGetRegistry();
-      const nextRootStates = await Promise.all(roots.map(async (root): Promise<RootSdkState> => {
-        try {
-          return { root, resolution: await sdkResolveWorkspace(root.path), error: null };
-        } catch (reason) {
-          return {
-            root,
-            resolution: null,
-            error: reason instanceof Error ? reason.message : String(reason),
-          };
-        }
-      }));
-      if (requestRef.current !== request) return;
-      setRegistry(nextRegistry);
-      setRootStates(nextRootStates);
-      setError(null);
-    } catch (reason) {
-      if (requestRef.current !== request) return;
-      setError(reason instanceof Error ? reason.message : String(reason));
-      setRootStates(roots.map((root) => ({ root, resolution: null, error: null })));
-    } finally {
-      if (requestRef.current === request) setLoading(false);
-    }
-  }, [roots]);
-
-  useEffect(() => {
-    void load();
-    return subscribeSdkRegistryChanged(() => { void load(); });
-  }, [load]);
+  const { loading, loaded, registry, rootStates, error, setError, load } = useWorkspaceSdkResolution(
+    roots, autoResolve || open,
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -446,7 +399,7 @@ export function WorkspaceSdkStatus({ roots }: WorkspaceSdkStatusProps) {
     }
   }, [load, registry]);
 
-  const buttonText = loading
+  const buttonText = loading || !loaded
     ? t("settings.workspaceSdkButton")
     : issueCount > 0
       ? t("settings.workspaceSdkIssues", { count: issueCount })
@@ -470,7 +423,9 @@ export function WorkspaceSdkStatus({ roots }: WorkspaceSdkStatusProps) {
           ? <Loader2 className="h-3 w-3 animate-spin" />
           : issueCount > 0
             ? <AlertTriangle className="h-3 w-3" />
-            : <CheckCircle2 className="h-3 w-3 text-emerald-500" />}
+            : loaded
+              ? <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+              : <Wrench className="h-3 w-3" />}
         {buttonText}
       </button>
 

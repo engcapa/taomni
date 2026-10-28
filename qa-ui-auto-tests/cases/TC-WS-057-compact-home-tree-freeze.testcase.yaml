@@ -1,0 +1,207 @@
+id: TC-WS-057
+title: 'Crash regression: Default Workspace with Compact Home directories remains usable'
+description: Enable Compact through Appearance on a disposable Home-shaped tree, then restore Default Workspace in that saved mode. Browse a real compressed
+  source chain and a document while the branching AppData directory stays collapsed. Reload and toggle Compact through Appearance; expansion and file contents
+  must survive.
+modes:
+- browser
+- native
+covers:
+- F-WS-1
+- F-WS-2
+- F25.3
+- F25.5
+tags:
+- p0
+- workspace-redesign
+- file-explorer
+- regression
+- crash-regression
+- persistence
+fixtures:
+- reset_db
+- workspace_compact_tree
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-compact-home
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace","description":"","isDefault":true,"rootFolders":[{"id":"root-home","name":"HOME","path":"${fixture.platform_workspace_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-path="AppData"]'
+- click: '[data-testid="code-workspace-tree-toolbar-more"]'
+- hover: '[data-testid="code-workspace-tree-menu-appearance"]'
+- click: '[data-testid="code-workspace-tree-menu-compact"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com/example"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree"]'
+    name: data-view-mode
+    equals: compact
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-dir"][data-path="AppData"]'
+    name: aria-expanded
+    equals: 'false'
+- assert_count:
+    selector: '[data-testid="code-workspace-tree-dir"][data-path="AppData/Local"]'
+    equal: 0
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src/main/java/com/example"] [data-testid="code-workspace-tree-dir-arrow"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="src/main/java/com/example/App.java"]'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"]'
+    contains: package com.example; class App {}
+- click: '[data-testid="code-workspace-tree-dir"][data-path="Documents"] [data-testid="code-workspace-tree-dir-arrow"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/notes.txt"]'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"]'
+    contains: Compact directory browsing stays responsive.
+- assert_no_runtime_errors: null
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- assert_visible: '[data-testid="code-workspace-tree-file"][data-path="src/main/java/com/example/App.java"]'
+- assert_visible: '[data-testid="code-workspace-tree-file"][data-path="Documents/notes.txt"]'
+- assert_no_runtime_errors: null
+- reload_window: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="src/main/java/com/example/App.java"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-dir"][data-path="Documents"]'
+    name: aria-expanded
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-dir"][data-path="AppData"]'
+    name: aria-expanded
+    equals: 'false'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"]'
+    contains: Compact directory browsing stays responsive.
+- assert_no_runtime_errors: null
+- click: '[data-testid="code-workspace-tree-toolbar-more"]'
+- hover: '[data-testid="code-workspace-tree-menu-appearance"]'
+- click: '[data-testid="code-workspace-tree-menu-compact"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree"]'
+    name: data-view-mode
+    equals: tree
+- assert_visible: '[data-testid="code-workspace-tree-dir"][data-path="src"]'
+- click: '[data-testid="code-workspace-tree-toolbar-more"]'
+- hover: '[data-testid="code-workspace-tree-menu-appearance"]'
+- click: '[data-testid="code-workspace-tree-menu-compact"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree"]'
+    name: data-view-mode
+    equals: compact
+- assert_visible: '[data-testid="code-workspace-tree-file"][data-path="src/main/java/com/example/App.java"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="src/main/java/com/example/Helper.java"]'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"]'
+    contains: package com.example; class Helper {}
+- assert_no_runtime_errors: null
+- screenshot: compact-home-responsive.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Default Workspace restores Compact mode, renders the compressed source chain and opens both source and document contents while AppData
+      stays collapsed.
+    actions:
+    - 3
+    - 6
+    - 8
+    - 9
+    - 10
+    - 15
+    - 16
+    - 18
+    - 19
+    results:
+    - 12
+    - 13
+    - 14
+    - 17
+    - 20
+    - 21
+    checkpoints:
+    - step: 12
+      expectation: The restored directory view is Compact.
+    - step: 13
+      expectation: AppData remains collapsed.
+    - step: 14
+      expectation: Collapsed AppData does not render child rows.
+    - step: 17
+      expectation: The compact source endpoint opens the actual App.java contents.
+    - step: 20
+      expectation: The document opens with the fixture text.
+    - step: 21
+      expectation: No runtime errors occurred during navigation or file opening.
+  - id: R2
+    requirement: Home navigation and reload preserve expanded Compact endpoints and document contents without expanding AppData.
+    actions:
+    - 22
+    - 23
+    - 27
+    - 28
+    results:
+    - 24
+    - 25
+    - 26
+    - 30
+    - 31
+    - 32
+    - 33
+    checkpoints:
+    - step: 24
+      expectation: The expanded source endpoint is still visible after mode navigation.
+    - step: 25
+      expectation: The document row is still visible after mode navigation.
+    - step: 26
+      expectation: Mode navigation caused no runtime errors.
+    - step: 30
+      expectation: The document directory remains expanded after reload.
+    - step: 31
+      expectation: AppData remains collapsed after reload.
+    - step: 32
+      expectation: The document content is restored after reload.
+    - step: 33
+      expectation: Reload and restoration caused no runtime errors.
+  - id: R3
+    requirement: Appearance can disable and enable Compact and the restored source endpoint remains usable.
+    actions:
+    - 34
+    - 35
+    - 36
+    - 39
+    - 40
+    - 41
+    - 44
+    results:
+    - 37
+    - 38
+    - 42
+    - 43
+    - 45
+    - 46
+    checkpoints:
+    - step: 37
+      expectation: Disabling Compact selects Tree mode.
+    - step: 38
+      expectation: Tree mode displays the uncompressed src row.
+    - step: 42
+      expectation: Enabling Compact selects Compact mode.
+    - step: 43
+      expectation: The expanded compact endpoint is visible again.
+    - step: 45
+      expectation: The sibling source file opens with its actual contents.
+    - step: 46
+      expectation: Repeated Compact transitions caused no runtime errors.
+  visual:
+  - check: Inspect compressed directory labels and file rows in compact-home-responsive.png.
+    method: manual
+    reason: Content assertions do not establish pixel appearance.
+  native:
+  - check: Compact endpoint discovery and file contents use real disk IPC in the packaged WebView.
+    method: automated
+    reason: Browser VFS cannot establish native filesystem behavior. Request scope and concurrency have deterministic hook regressions; the real HOME diagnostic
+      supplies the original large-directory repro.

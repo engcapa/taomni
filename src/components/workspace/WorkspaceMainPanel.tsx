@@ -16,6 +16,7 @@ import { WorkspaceFsModals } from "./WorkspaceFsModals";
 import { WorkspaceGitPanel } from "./WorkspaceGitPanel";
 import { WorkspaceSessionPane } from "./WorkspaceSessionPane";
 import { WorkspaceSessionPickerModal } from "./WorkspaceSessionPickerModal";
+import { revealWorkspaceFolder } from "./workspaceFolderReveal";
 
 const DOCK_TOOLS: WorkspaceBottomTool[] = [
   "terminal",
@@ -92,7 +93,9 @@ function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange, onEdi
       : undefined) ?? workspace.rootFolders[0];
     try {
       if (fsModal?.kind === "root") {
-        useWorkspacePlatformStore.getState().addRootFolder(workspace.id, { path: value });
+        const added = useWorkspacePlatformStore.getState().addRootFolder(workspace.id, { path: value });
+        if (!added) return;
+        revealWorkspaceFolder(workspace.id, added.id);
         setStatusMessage(`${value} added to ${workspace.name}`);
       } else {
         if (!root) return;
