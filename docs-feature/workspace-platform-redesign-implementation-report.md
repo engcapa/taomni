@@ -1,13 +1,65 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前交付源码及修正后的测量工具已完成三平台全量 [40652692956](https://github.com/engcapa/taomni/actions/runs/40652692956)：**642 个适用 ID、2,104/2,104 passed、25/25 分片，0 failed/skipped/infrastructure errors**，原始回执及最终汇总已独立核验；完整九条崩溃专项 **42/42 passed**，先前同产品相关集 **86/86 passed**。本轮 RDP/VNC 性能例外未使用。main `65d6d907` 已合并。正式四轮原生性能对照 [40659856210](https://github.com/engcapa/taomni/actions/runs/40659856210) 在 candidate-1 的 2MiB 终端输出阶段失败，正在补充原生输出诊断，尚无完整性能结论；先前 `40647814102` 的 main-1 工具超时失败及全部慢样本保留。browser/native 均只在 GitHub 运行，本机仅做单测、静态检查和供手测的 release 编译。唯一外部 clickhousecrud 缺口按用户确认单列，不计为通过。以下历史章节以本节最新状态为准。
+> 已验证提交 `f6f8d276` 的三平台全量 [40677271635](https://github.com/engcapa/taomni/actions/runs/40677271635) 为 **643 个适用 ID、2,106/2,106 passed、25/25 分片，0 failed/skipped/infrastructure errors**，全部原始回执与最终汇总已独立核验；九条崩溃专项 **42/42 passed**，额外 Ubuntu 22.04 相关集共 **53/53 passed**。19,552 份已保留的签名报告文件也已重算大小及 SHA-256。main `65d6d907` 已合并。正式四轮原生性能对照 [40703223277](https://github.com/engcapa/taomni/actions/runs/40703223277) 已完整采集并独立复算，**7 项延迟和 3 项 CPU 指标超过既定门槛，性能验收未通过，正在诊断修复**。本轮 RDP/VNC 性能例外未使用；本次性能退化不属于该例外。browser/native 均只在 GitHub 运行，本机仅做单测、静态检查和供手测的 release 编译。唯一外部 clickhousecrud 缺口按用户确认单列，不计为通过。以下历史章节以本节最新状态为准。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
 > 关联用例规范：[workspace-platform-redesign-testcases.md](./workspace-platform-redesign-testcases.md)
 > 分支：`docs/workspace-platform-redesign`
 
-## 当前功能验收与性能复核（2026-10-28）
+## 正式性能回归诊断（2026-10-28）
+
+`40703223277` 的 main-1 / candidate-1 / main-2 / candidate-2 全部完成。原始 runtime 中逐文件 SHA、原 producer identity、source、四轮工具/观察器身份、完整 2MiB 通道序号与 payload、3,097 文件、全部 424 输入键/样本、实际保存/undo/redo SHA 以及进程清理均已独立核验。两版 Rust/Cargo/release 及编译/链接参数一致；原始 Node 构建补丁版本、构建宿主内核和 Cargo 并行数差异另保留，不宣称完整构建环境逐字相同。实际运行均为同一个 Ubuntu 22.04/WebKitGTK/Xvfb 桌面。CPU 比较从原采集量重算；PSS 另外重算进程总和。
+
+| 超限路径 | 改前 | 候选 | 既定上限 |
+| --- | ---: | ---: | ---: |
+| 后续终端创建 p95 / ms | 230 | 778 | 284.50 |
+| 会话切换 p95 / ms | 54 | 402 | 82.10 |
+| 2MiB producer p95 / ms | 50.13 | 81.64 | 77.65 |
+| 冷打开工作区 p95 / ms | 951 | 1,540 | 1,392.65 |
+| 目录冷展开 p95 / ms | 152 | 367 | 194.80 |
+| 目录暖展开 p95 / ms | 108 | 321 | 144.20 |
+| 文件树滚动 p95 / ms | 46 | 266 | 72.90 |
+| 24 终端空闲 CPU / 核 | 0.331 | 2.139 | 0.468 |
+| 24 文件空闲 CPU / 核 | 2.149 | 3.373 | 2.522 |
+| 1MiB 编辑器空闲 CPU / 核 | 1.206 | 2.843 | 1.455 |
+
+其余 9 项延迟和 5 项资源指标未超过原门槛，候选两轮正式输入均达到原有 150ms p95 预算；这不能抵销以上退化。所有慢样本、原始 JSON 与 `independent-review.json` 保留于仓库外 `github-40703223277/workspace-performance/`，独立复核以预算失败明确退出 1。
+
+新增托管空闲渲染诊断，复用 `40677271635` 的原始已通过 QA release 及其原始 checkout/installer，不改写 identity、不重编产品。24 个真实 PTY 下，将原始样式与可逆 CSS 干预交错观察，保留每个阶段前后 `/proc` 计数、rAF 来源/耗时、DOM mutation、RO 记录与截图，定位高 CPU 和慢帧的来源。此诊断不计为性能验收，不减少正式四轮负载或放宽任何阈值。
+
+首轮诊断 [40714841152](https://github.com/engcapa/taomni/actions/runs/40714841152) 已通过并下载原始记录。全部 13 阶段保持 24 个真实终端、1 个活动终端，源码稳定且正常关闭；每个干预后立即恢复原样作对照。方角去阴影为 **0.134 核**、取消外层 overflow 裁剪为 **0.120 核**，随后原样分别恢复到 **1.311 / 1.464 核**；`contain:layout paint` 和强制合成仍约 **0.991 / 0.999 核**，`overflow:clip` 为 **1.473 核**。禁用动画后的 **1.431 核** 与其后原样 **1.440 核** 接近，初始 **2.503 核** 的暖机尾值保留。rAF 每阶段 16–18 次、回调总耗时约 3–8ms，DOM 更新相近，不能将持续高 CPU 归因于这些 JS 回调。下一轮单独分离圆角/阴影，并验证保留 9px 圆角的几何裁剪方式；尚未修改产品样式，性能验收继续保持未通过。
+
+第二轮 [40717069614](https://github.com/engcapa/taomni/actions/runs/40717069614) 的 21 阶段成功完成：仅去阴影 **1.295 核** 与原样 **1.295 核** 相同，仅方角保留阴影降至 **0.099 核**，随后原样 **1.364 核**；保留圆角的 `clip-path` 为 **0.135 核**、随后原样 **1.343 核**。共享壳层的进一步调用方检查发现，终端当前设置及多个编辑器对话框仍是画布内的 viewport-fixed 元素，整层几何裁剪会把它们一起裁掉，因此不能直接作为产品修复。下一轮验证只覆盖四个圆角的绘制方式，取消整层裁剪，并补充宽侧栏下弹窗超出画布仍能操作的保留行为回归。
+
+用户要求的本机 QA 存储清理已完成：仅删除 `/home/zhyhang/.local/share/com.taomni.app.qa`，包括其 `vault.db`；删除前确认无 QA 文件占用。生产 `/home/zhyhang/.local/share/com.taomni.app`、共享 `~/.config/taomni` 和 `~/.cache/taomni` 均保留，没有启动本机 browser/native。
+
+## 终端突发输出专项与工具验收（2026-10-28）
+
+当前测试提交 `f6f8d27681e5dae552b03c6d784a074844ee52ad` 未改变产品源码，source SHA 仍为 `6a2f1c52e15f19505e3e8dcfac1ad75acdf8a46c77be7d6d6ffb3d43c31e853d`，runner SHA 为 `43222b0557c5cfae557f349b3160e1beef735ec629d4719fcad48e864c4af568`。三平台相关集 [40670548735](https://github.com/engcapa/taomni/actions/runs/40670548735) **53/53 passed、7/7 分片、0 failed/skipped/infra**，原始回执独立核验；其中九条崩溃在三平台及额外 Ubuntu 22.04 的执行共 **50/50 passed**。九条用例没有增减。
+
+新增 `TC-TERM-BURST-001` 在 Ubuntu 24.04、Ubuntu 22.04 及 macOS native release 全部通过。三份报告的九轮原始流已重新按 channel index 排序计算，每轮完整 **2,097,152 bytes**、SHA-256 `e1a3a1f0cc47ca6f1cbff51a387b05edba3e3ab8e98af8e587b0a091933889fb`，序号连续无重复、callback 无异常，结束行/后续十条命令及所有标签关闭通过。这是原生功能与诊断证据，不能代替匹配的正式性能比较。三轮观测耗时：Ubuntu 22.04 **73,972.87 / 107,407.22 / 115,004.05ms**，Ubuntu 24.04 **170,720.25 / 111,852.11 / 87,769.13ms**，macOS **94,413.33 / 158,796.31 / 140,622.97ms**。QA 全缓冲文本镜像和旁路字节观察纳入这些数值；单轮成功没有解释先前超时，所有慢样本保留。
+
+精确当前提交的三平台全量 [40677271635](https://github.com/engcapa/taomni/actions/runs/40677271635) 已完成 **2,106/2,106 passed、643 个适用 ID、25/25 分片**，原始 receipt、源码/runner/case/native build 身份、全部选集与托管最终汇总独立核验；九条崩溃专项 **42/42 passed**。另对签名清单中的 19,552 份已保留报告文件逐一重算大小及 SHA-256，全部一致；62 份 updater 真实 app/bundle 夹具按现有 workflow 的明确上传排除规则保留为夹具排除，不是用例跳过。重启造成一份本机已下载缓存为零字节，保留损坏副本后从同一 GitHub artifact 重新下载，未重跑或篡改用例。正式 [40703223277](https://github.com/engcapa/taomni/actions/runs/40703223277) 已在完整核验后启动 main-1 / candidate-1 / main-2 / candidate-2。真正改前 baseline 仍为 `a57437927b62d6036a6d473eddccc053a4b4c0e8`，24 个 PTY、2MiB 输出、3,097 文件、24×64KiB 文件与 1MiB 编辑器 400 正式输入键全部保留。两版使用同一旁路观察，原始失败不丢弃，150ms 输入预算与相对 15%+噪声门槛不变。
+
+本机仅执行 34 项相关工具单测、refactor/static 检查及 QA release 的 `--check`；未执行 browser/native 用例。当前供手测进制继续 inputs match，路径与 binary SHA 见后文。全目录 behavior contract 检查另显示既有 31 项语义待评审/缺失文档契约；新终端用例本身已通过 schema 与 reviewed contract，未把全目录文档契约称为通过，也未以其代替运行时结果。
+
+当前精确提交的全量执行分布如下；各组均无 failed、skipped 或 infrastructure errors：
+
+| 平台与模式 | 实际通过 / 选择 |
+| --- | --- |
+| Linux browser | 443 / 443 |
+| Linux native | 276 / 276 |
+| Linux native 双屏 | 1 / 1 |
+| Windows browser | 443 / 443 |
+| Windows native | 258 / 258 |
+| macOS browser | 441 / 441 |
+| macOS native | 244 / 244 |
+| 合计 | 2,106 / 2,106 |
+
+唯一适用性缺口 `TC-IDE-C6-06-java-definition-realproject-native` 依赖未随仓库提供的 clickhousecrud 项目，在三个 native 平台单列为外部缺口。用户已确认按现有策略执行其余适用用例；它不计入 643 个适用 ID、2,106 次执行或通过数。崩溃专项始终为 9 个 ID；`TC-TERM-BURST-001` 是额外终端回归，不计入这 9 个 ID。
+
+## 历史功能门禁与性能诊断（2026-10-28）
 
 最终功能门禁在 `23b6120cb110ad54fbc8fdcde8abb5276599c864` 执行。产品 source SHA `6a2f1c52e15f19505e3e8dcfac1ad75acdf8a46c77be7d6d6ffb3d43c31e853d`，runner SHA `bf665b084f3bbecaf7e44d7660863a9c11d161700251fd5c6d31b49947309640`。全部原始 receipt、case digest、source/runner/native build 身份与托管最终汇总已逐分片独立核验，证据保存在仓库外 `github-40652692956/verified-final.json`；九条崩溃 42 项原始执行另核对为 `crash-cells-reviewed.json`。工具修正未改变产品 source SHA；上一轮 `d6cbfcd1` 的 2,104/2,104 及其 runner 身份仍保留，新性能流程使用本轮精确 HEAD 门禁。
 
