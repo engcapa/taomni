@@ -1,6 +1,5 @@
 use super::*;
 
-#[tauri::command]
 pub fn workspace_read_file(
     repo_root: String,
     path: String,
@@ -24,7 +23,6 @@ pub fn workspace_read_file(
     file_from_bytes(&root, &target, bytes, meta)
 }
 
-#[tauri::command]
 pub fn workspace_read_loose_file(
     path: String,
     max_bytes: Option<u64>,
@@ -48,7 +46,6 @@ pub fn workspace_read_loose_file(
 
 /// Re-decode an existing file using an explicit user-selected encoding. The
 /// default read commands remain auto-detecting for backwards compatibility.
-#[tauri::command]
 pub fn workspace_read_file_with_encoding(
     repo_root: String,
     path: String,
@@ -73,7 +70,6 @@ pub fn workspace_read_file_with_encoding(
     file_from_bytes_with_encoding(&root, &target, bytes, meta, Some(&encoding))
 }
 
-#[tauri::command]
 pub fn workspace_read_loose_file_with_encoding(
     path: String,
     max_bytes: Option<u64>,

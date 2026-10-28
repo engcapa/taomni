@@ -14,7 +14,8 @@ if [[ "${QA_RELEASE:-false}" == true ]]; then
   export CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS=true
   export CARGO_PROFILE_RELEASE_INCREMENTAL=true
 fi
-filters=(lsp::tests::workspace_watch_lifetime)
+filters=(lsp::tests::workspace_watch_lifetime commands::workspace_reads::tests
+  workspace::tests::text_and_encoding workspace::tests::encoding_matrix)
 if [[ "${QA_RDP_CONTRACTS:-false}" == true ]]; then
   cargo test --locked "${profile[@]}" -p ironrdp-acceptor -p ironrdp-bulk -p ironrdp-server -p ironrdp-session --lib
   cargo test --locked "${profile[@]}" -p ironrdp-server --lib profile_photo_encoder_costs -- --ignored --nocapture
