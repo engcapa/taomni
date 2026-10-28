@@ -1,6 +1,6 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 最新精确 HEAD `11f57e40` 的三平台全量为 2,101 passed / 2 failed，25/25 分片，0 skipped / infrastructure errors；九条崩溃专项仍为 42/42 passed。Windows 大文件编辑后的原子保存遇到共享锁，正在修复并等待托管复验；另一项 macOS RDP 照片性能失败按用户最新授权单列，保留失败结果、不计为通过。此前产品提交 `0535305b` 的 2,103/2,103 全绿作为历史证据保留，不能覆盖最新失败。main `65d6d907` 已合并。正式 UI 性能对照仍待完成，不作无退化结论。browser/native 均只在 GitHub 执行，本机仅做单测、静态检查和手测用 release 编译。唯一外部 clickhousecrud 缺口按用户确认单列。以下历史章节以本节最新状态为准。
+> 当前交付源码的三平台全量 [40641466776](https://github.com/engcapa/taomni/actions/runs/40641466776) 已独立核验：**642 个适用 ID、2,104/2,104 passed、25/25 分片，0 failed/skipped/infrastructure errors**；完整九条崩溃专项 **42/42 passed**，相关集 **86/86 passed**。本轮 RDP/VNC 性能例外未使用。main `65d6d907` 已合并。正式四轮原生性能对照 `40647814102` 在旧 main-1 输入阶段因工具请求超时失败，尚未测到 candidate，不能作完整无退化结论；修复测量工具后将重新完成精确 HEAD 的全量及四轮对照。browser/native 均只在 GitHub 运行，本机仅做单测、静态检查和供手测的 release 编译。唯一外部 clickhousecrud 缺口按用户确认单列，不计为通过。以下历史章节以本节最新状态为准。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
@@ -8,6 +8,24 @@
 > 分支：`docs/workspace-platform-redesign`
 
 ## 当前功能验收与性能复核（2026-10-28）
+
+最终功能门禁在 `d6cbfcd18daf8d21fd5efe1c9fb0ed803573fc27` 执行。产品 source SHA `6a2f1c52e15f19505e3e8dcfac1ad75acdf8a46c77be7d6d6ffb3d43c31e853d`，runner SHA `7d87df09fdce3353e11c87ee7be01fd72e51977b8b16bcf49a7910bf7fb09ede`。全部原始 receipt、case digest、source/runner/native build 身份与托管最终汇总已逐分片独立核验，证据保存在仓库外 `github-40641466776/verified-final.json`。以下测量工具修复不改变产品 source SHA，但会改变 runner SHA；保留本轮证据，并重新执行新 HEAD 全量，不复用旧 runner 的门禁。
+
+| 平台 / 模式 | 适用执行 | Passed | Failed / Skipped / Infra |
+| --- | ---: | ---: | --- |
+| Linux browser | 443 | 443 | 0 / 0 / 0 |
+| Linux native | 275 | 275 | 0 / 0 / 0 |
+| Linux native 双显示器 | 1 | 1 | 0 / 0 / 0 |
+| Windows browser | 443 | 443 | 0 / 0 / 0 |
+| Windows native | 258 | 258 | 0 / 0 / 0 |
+| macOS browser | 441 | 441 | 0 / 0 / 0 |
+| macOS native | 243 | 243 | 0 / 0 / 0 |
+
+九条崩溃专项 `TC-WS-038/039/045/051/052/053/054/055/056` 在相关集及全量均为 **42/42 passed**，每次产品功能修改后继续作为强制回归。新增 Windows 文件锁场景 `TC-IDE-C0-04` 为另一条真实磁盘/导航回归，不计入九条数量。唯一外部 `TC-IDE-C6-06-java-definition-realproject-native` 缺少 clickhousecrud 源码，在三个原生平台各有一项明确 policy gap；总计一个未执行 ID，不计通过。
+
+正式性能运行 [40647814102](https://github.com/engcapa/taomni/actions/runs/40647814102) 已保留失败。真正改前 main `a57437927b62d6036a6d473eddccc053a4b4c0e8` 的 main-1 完成 24 个真实 PTY、echo/2MiB 输出/关闭、3,097 文件冷暖展开和滚动、24 个 64KiB 文件打开及 48 次切换；1MiB 编辑器的 24 键 warmup 原始 p95 **639ms**、max **1,082ms**、下一帧 p95 **1,301ms**。随后 200 键单次 W3C `/actions` 请求超过工具固定 120 秒；清理 DELETE 的 `RemoteDisconnected` 又遮盖了原 `TimeoutError`。candidate 未执行，部分慢数据不能建立当前版本退化结论。
+
+测量工具改为每批 8 键，仍调用原生 WebDriver 的原有 20ms paced input；不重试投递状态不确定的请求，正式输入总量仍为 400，warmup 另保留 24 键。逐组校验完整 keydown 顺序、DOM/下一帧样本、pending=0、原始尾值与 p95/max 一致。仅完整写盘后的精确预算失败允许继续采集；慢 baseline 的 `passed=false` 保留，candidate 任一组超过原有 **150ms** 正式预算（warmup 1,000ms）仍导致最终门禁失败，相对 15%+噪声门槛不变。清理失败单独记录；已有原错时保留原错，无原错时清理仍失败。工具契约 **26/26 passed**，包含历史构建脚本实际启动、超时不重试、坏样本拒绝、慢 baseline 及 candidate 仍须达到绝对预算等断言；新模块采用 `native_input.py` 避免遮蔽标准库 `typing`。这次仅修性能采集工具，无产品用户流程变化，不新增产品 YAML；既有 `TC-IDE-C0-03`、`TC-IDE-C0-04` 及九条崩溃专项继续保留。新 HEAD 全量通过后再次按 main-1 / candidate-1 / main-2 / candidate-2 对照，全部原始失败保留。
 
 SVG 点击工具修复提交 `11f57e40d440d5558adc316aa75387dda90eaf52` 的全量 [40619625516](https://github.com/engcapa/taomni/actions/runs/40619625516) 已收齐全部原始回执并独立核验：**2,101 passed / 2 failed，25/25 分片**，没有跳过或基础设施错误。完整九条崩溃专项 **42/42 passed**，失败不能被 job 本身的绿色状态掩盖。
 
@@ -19,7 +37,11 @@ Windows native `TC-IDE-C0-03` 的 424 个输入字符完整到达编辑器，编
 
 补充性能边界复核：现有四个保存 IPC 为同步处理，加入锁重试后可能占用 UI 线程最长 2 秒。新增 Windows-only `TC-IDE-C0-04`，使用报告目录内真实的不共享 DELETE 的 reader 持锁，实际 Ctrl+S 后观察待发布临时文件，在锁仍持有时要求 Home/Workspaces 导航低于 1,500ms，再释放锁并核对精确磁盘 SHA-256、完整旧文件和临时文件清理。先在保持同步保存的源码上采集原生区分证据，随后由异步阻塞任务承接写入并保留保存串行顺序。该用例不属于 RDP/VNC 性能例外；既有九条崩溃专项数量不变。探针的路径隔离、平台限制和异常释放单测通过，实际原生结果待 GitHub 执行。
 
-四个保存 IPC 现通过独立 `commands/workspace_writes.rs` owner 使用异步队列与 `spawn_blocking`：队列等待和真实写入均不占用 UI 或异步执行线程，任务持有队列 guard 至实际写入结束，保留原来跨保存调用的串行排他。原同步 Rust API、IPC 名/参数/回执和编码、hash 前置条件保留；worker 异常标记 disk effect unknown，不能伪称未写入。单线程异步 runtime 的阻塞写入/队列及异常释放契约 **2/2 passed**，相同测试二进制的原子写入 **16/16 passed**；768 个 native command、328 个 facade exports、39 个 literal events 的兼容检查通过。完整锁场景在同步源码上的区分采集为 [40633593507](https://github.com/engcapa/taomni/actions/runs/40633593507)，结果仍待托管回执；先前 [40632227021](https://github.com/engcapa/taomni/actions/runs/40632227021) 同样受错误的观察器契约阻断，不作原生 UI 结论。异步版本随后须完成相关集、完整全量及正式性能对照。
+四个保存 IPC 现通过独立 `commands/workspace_writes.rs` owner 使用异步队列与 `spawn_blocking`：队列异步等待，真实写入交给阻塞 worker，任务持有队列 guard 至实际写入结束，提供跨保存调用的串行排他。原同步 Rust API、IPC 名/参数/回执和编码、hash 前置条件保留；worker 异常标记 disk effect unknown，不能伪称未写入。单线程异步 runtime 的阻塞写入/队列及异常释放契约 **2/2 passed**，相同测试二进制的原子写入 **16/16 passed**；768 个 native command、328 个 facade exports、39 个 literal events 的兼容检查通过。完整锁场景在同步源码上的区分采集为 [40633593507](https://github.com/engcapa/taomni/actions/runs/40633593507)，真实文件观察契约通过，但工具的 reader tracking 单测以 Windows 8.3 临时目录别名比较规范化后的长路径，未记录 reader 而失败；**原生 UI 用例没有执行**，不能作阻塞复现结论。`d6cbfcd1` 将临时 root 规范化，保留至少两个 reader、全部关闭、原文件与原错误等断言，并把 Windows 低成本文件/工具契约提前到 app 编译前。修正工具后旧同步实现的独立对照为 [40636760493](https://github.com/engcapa/taomni/actions/runs/40636760493)，异步实现相关集为 [40636705527](https://github.com/engcapa/taomni/actions/runs/40636705527)。两轮均已独立核验：旧同步版本 **15/15 passed**、异步版本 **86/86 passed**，后文记录测量及其边界；先前 [40632227021](https://github.com/engcapa/taomni/actions/runs/40632227021) 同样受错误的观察器契约阻断，不作原生 UI 结论。异步版本随后须完成相关集、完整全量及正式性能对照。
+
+修正工具后的异步版本相关集 [40636705527](https://github.com/engcapa/taomni/actions/runs/40636705527) 已完成并独立核验：精确产品/runner/用例/原生构建身份匹配，24 ID、**86/86 passed**，15/15 分片、0 failed/skipped/infrastructure errors。九条崩溃专项 **42/42 passed**。Windows `TC-IDE-C0-03` 的全部 424 字符输入和磁盘保存通过；新增 `TC-IDE-C0-04` 在真实 reader 持锁期间的 Ctrl+S 为 **94ms**、Home→Workspaces 导航为 **360ms**，完整旧文件与 pending 保持，释放后精确磁盘 SHA-256 正确、临时文件清理。旧同步版本的同一锁场景亦通过：Ctrl+S **63ms**、导航 **266ms**；该反例没有复现此前推测的 UI 阻塞，不能宣称此用例证明异步改造必要性或带来性能收益。它验证的是实际 WebView 导航、完整文件保留及释放后的发布预算，不能单靠 DOM 导航证明原生宿主事件循环的全部响应性。`spawn_blocking` 为耗时 I/O 提供显式执行边界；两组单次值不是匹配多轮性能结论，正式完整对照仍待执行。随后同一 HEAD `d6cbfcd1` 的三平台全量 [40641466776](https://github.com/engcapa/taomni/actions/runs/40641466776) 已核验 2,104/2,104 passed，详见本节矩阵。
+
+当前供手工测试的本机 QA release 已包含异步保存修复：`src-tauri/target/qa-ui-auto/release/taomni`，独立 ID `com.taomni.app.qa`，source SHA `6a2f1c52e15f19505e3e8dcfac1ad75acdf8a46c77be7d6d6ffb3d43c31e853d`，binary SHA `c0734ad52de4fe43b487019d2679c9607e2296d36fd6b142668e3d6313c0edf9`。Node 22、build jobs 2，耗时 624.82 秒；`CARGO_BUILD_JOBS=2 native_build.py --release --check` 确认 inputs match。后续 `d6cbfcd1` 仅修改测试工具与 workflow，不改变产品 source SHA，无需重复编译。未在本机执行 browser/native 用例。
 
 另一失败为 macOS native `TC-RDPS-PERF-03-photo-content`：baseline/adaptive observed FPS 为 **28.1567 / 21.0972**，比值 **0.7492768147280562**，原阈值为 ≥0.85，bulk 解码错误为 0。按用户 2026-10-28 的明确授权，RDP/VNC server/client 性能 case 失败可暂忽略；本项原始失败与慢样本保留，未修改 RDP 算法或阈值、未算作通过。正式 UI 性能 workflow 默认仍要求全绿；只有显式给出的现有 remote performance case ID 可以作为验收例外，保存/崩溃/skip/infra/缺失回执均不适用。plan 同时记录真实 full-suite passed 状态和已接受失败。
 
@@ -39,7 +61,7 @@ Windows native `TC-IDE-C0-03` 的 424 个输入字符完整到达编辑器，编
 
 完整九条 `crash-regression`（TC-WS-038/039/045/051/052/053/054/055/056）在相关集及全量中均执行并通过，三平台适用执行为 **42/42**。已纳入产品 PR，以及手动 selected / impacted / smoke / all 路径；遗漏原因、数量边界和后续执行约束见 [崩溃专项复盘](../qa-ui-auto-tests/ci/crash-regressions.md)。专项不代替本次功能及其他消费者回归。
 
-最终产品 source SHA 为 `6ed9ab49dc80b47167a550c02fec0bc8df2970471351199ed58d4ca37bd32809`，runner SHA 为 `960aea3b48d469095626d51b22fb66cb31a38e6840e3e0a2911b129180bc7c01`。独立核验结果保存在 repo 外证据目录的 `github-40604739146/verified-final.json` 和 `github-40609887227/verified-final.json`，与托管汇总完全一致；每份原始 receipt 和原生 build-source 身份均已检查。文档后续更新不改变该产品源码指纹。
+该历史产品 source SHA 为 `6ed9ab49dc80b47167a550c02fec0bc8df2970471351199ed58d4ca37bd32809`，runner SHA 为 `960aea3b48d469095626d51b22fb66cb31a38e6840e3e0a2911b129180bc7c01`。独立核验结果保存在 repo 外证据目录的 `github-40604739146/verified-final.json` 和 `github-40609887227/verified-final.json`，与托管汇总完全一致；每份原始 receipt 和原生 build-source 身份均已检查。文档后续更新不改变该产品源码指纹。
 
 本轮全量的 RDP 照片 observed FPS 比为 Linux **1.00598**、Windows **1.00646**、macOS **1.05282**，均达到原有 ≥0.85 要求，三平台 bulk 解码错误均为 0。macOS baseline / adaptive 为 17.8528 / 18.7958fps。原全量 40577348054 的 0.75228 失败及慢样本保留；诊断没有改变编码算法，本轮通过不代表已证明该旧失败的唯一根因。
 

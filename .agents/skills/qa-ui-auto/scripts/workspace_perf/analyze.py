@@ -4,6 +4,7 @@ from pathlib import Path
 import json, math, sys
 import argparse
 from workspace_perf import common
+from workspace_perf.native_input import review_comparison
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--out", type=Path, required=True)
@@ -15,7 +16,8 @@ records = {
     label: json.loads((root / label / "result.json").read_text()) for label in labels
 }
 for label, r in records.items():
-    assert r["passed"] and r["sourceStable"], (label, r.get("error"))
+    assert r.get("workloadCompleted") and r["sourceStable"], (label, r.get("error"))
+    assert r["metrics"]["explorer"].get("workloadCompleted"), label
     expected_head = plan["baseline"] if label.startswith("main") else plan["candidate"]
     assert r["head"] == expected_head, "Unexpected comparison revision"
 
@@ -119,6 +121,9 @@ for key in keys:
             "instrumentationBound": key in ["outputObserved", "echoAt1", "echoAt24"],
         }
     )
+input_review = review_comparison(root, records)
+input_budgets = input_review["rounds"]
+candidate_input_passed = input_review["candidatePassed"]
 resources = []
 for metric, location in [
     ("idle24", "sessions"),
@@ -167,7 +172,8 @@ result = {
     "plan": json.loads((root / "plan.json").read_text()),
     "latency": rows,
     "resources": resources,
-    "allWithinAllowance": not any(r["regression"] for r in rows + resources),
+    "absoluteInputBudgets": input_budgets,
+    "allWithinAllowance": candidate_input_passed and not any(r["regression"] for r in rows + resources),
     "warmup": "All typing warmup raw artifacts retained separately; no measured sample removed.",
     "lifecycle": {
         label: {
@@ -186,6 +192,7 @@ print(
             "withinAllowance": result["allWithinAllowance"],
             "latencyRegressions": [r["metric"] for r in rows if r["regression"]],
             "resourceRegressions": [r["metric"] for r in resources if r["regression"]],
+            "candidateInputBudgetPassed": candidate_input_passed,
         },
         indent=2,
     )

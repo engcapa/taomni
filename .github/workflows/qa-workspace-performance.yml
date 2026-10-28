@@ -59,7 +59,7 @@ jobs:
         with:
           mode: native
       - name: Measurement and functional gate contracts
-        run: python -m unittest test_workspace_performance
+        run: python -m unittest test_workspace_performance test_workspace_performance_typing
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/cache@v4
         with:

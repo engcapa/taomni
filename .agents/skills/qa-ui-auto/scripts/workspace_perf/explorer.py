@@ -3,6 +3,8 @@
 from pathlib import Path
 import hashlib, json, time
 
+from . import native_input
+
 
 def dataset(root):
     root.mkdir()
@@ -285,21 +287,20 @@ def run(*, binary, cfg, root, NativeHarness, NativeStepContext, VERBS, common, e
                     ctx,
                     {"selector": editor, "transport": "webdriver", "keys": ["Mod+End"]},
                 )
+                input_budgets = []
                 for label, keys in [
                     ("typing-warmup", "w" * 24),
                     ("typing-group1", "a" * 200),
                     ("typing-group2", "b" * 200),
                 ]:
-                    VERBS["native_editor_performance"](
-                        ctx,
-                        {
-                            "selector": editor,
-                            "keys": keys,
-                            "capture_text": False,
-                            "max_p95_ms": 150 if label != "typing-warmup" else 1000,
-                            "label": label,
-                        },
-                    )
+                    input_budgets.append(native_input.measure(
+                        ctx, VERBS["native_editor_performance"], selector=editor,
+                        keys=keys, label=label,
+                        limit=150 if label != "typing-warmup" else 1000,
+                    ))
+                    metrics["inputBudgets"] = input_budgets
+                    save()
+                metrics["inputBudgetPassed"] = all(g["budgetPassed"] for g in input_budgets)
                 VERBS["press"](ctx, "Control+s")
                 expected = hashlib.sha256(
                     (project / "Large1MiB.txt").read_bytes()
@@ -369,7 +370,7 @@ def run(*, binary, cfg, root, NativeHarness, NativeStepContext, VERBS, common, e
                 raise
             finally:
                 known = common.owned_processes(binary)
-                s.close()
+                common.close_session(s, metrics)
         time.sleep(1)
         table = common.process_table()
         metrics["afterExitProcesses"] = [
@@ -377,7 +378,8 @@ def run(*, binary, cfg, root, NativeHarness, NativeStepContext, VERBS, common, e
             for p in known
             if p["pid"] in table and table[p["pid"]]["startTicks"] == p["startTicks"]
         ]
-        metrics["passed"] = True
+        metrics["workloadCompleted"] = True
+        metrics["passed"] = metrics["inputBudgetPassed"]
         save()
         return metrics
     except BaseException as exc:

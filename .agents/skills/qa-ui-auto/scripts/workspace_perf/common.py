@@ -1,7 +1,20 @@
 """Shared, passive timing and owned-process observations for the redesign comparison."""
 
 from pathlib import Path
-import json, math, os, signal, time
+import json, math, os, signal, sys, time
+
+
+def close_session(session, diagnostics):
+    original = sys.exception()
+    try:
+        session.close()
+    except BaseException as cleanup:
+        diagnostics["sessionCleanupError"] = {
+            "type": type(cleanup).__name__, "message": str(cleanup),
+            "originalError": str(original) if original is not None else None,
+        }
+        if original is None:
+            raise
 
 
 def q(value):

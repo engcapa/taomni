@@ -231,7 +231,7 @@ def sessions():
                         for p in known + common.owned_processes(binary)
                     }.values()
                 )
-                s.close()
+                common.close_session(s, result["metrics"])
         time.sleep(1)
         table = common.process_table()
         result["metrics"]["afterSessionExitProcesses"] = [
@@ -258,7 +258,8 @@ try:
         common=common,
         event=event,
     )
-    result["passed"] = True
+    result["workloadCompleted"] = True
+    result["passed"] = result["metrics"]["explorer"]["inputBudgetPassed"]
 except BaseException as exc:
     result["passed"] = False
     result["error"] = str(exc)
