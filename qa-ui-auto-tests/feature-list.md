@@ -8417,6 +8417,8 @@ controls:
 
 ### 25.5 编辑器工作台壳层（tree / split / switcher / keymap surface）🟡
 
+Compact 目录只预加载可见行，并限制刷新期间的原生并发；`TC-WS-057` 保护 Home 形状目录中的压缩路径浏览、展开恢复与视图切换。
+
 <!-- feature
 id: F25.5
 status: partial
