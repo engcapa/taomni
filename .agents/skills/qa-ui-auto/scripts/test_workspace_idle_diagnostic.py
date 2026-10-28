@@ -8,7 +8,7 @@ class IdleDiagnosticTest(TestCase):
     def test_every_intervention_has_an_original_control_immediately_after_it(self):
         sequence = list(phases())
         self.assertEqual(sequence[0], ('original-0', ''))
-        self.assertEqual(len(sequence), 13)
+        self.assertEqual(len(sequence), 21)
         for index in range(1, len(sequence), 2):
             self.assertTrue(sequence[index][1])
             self.assertEqual(sequence[index + 1][1], '')

@@ -28,6 +28,10 @@ VARIANTS = [
     ('contained-frame', FRAME + '{contain:layout paint!important}'),
     ('composited-frame', FRAME + '{transform:translateZ(0)!important;isolation:isolate!important}'),
     ('clip-frame-overflow', FRAME + '{overflow:clip!important}'),
+    ('no-frame-shadow', FRAME + '{box-shadow:none!important}'),
+    ('square-frame-with-shadow', FRAME + '{border-radius:0!important}'),
+    ('rounded-clip-path', FRAME + '{overflow:visible!important;clip-path:inset(0 round 9px)!important}'),
+    ('rounded-clip-path-layer', FRAME + '{overflow:visible!important;clip-path:inset(0 round 9px)!important;transform:translateZ(0)!important}'),
 ]
 
 

@@ -28,6 +28,8 @@
 
 新增托管空闲渲染诊断，复用 `40677271635` 的原始已通过 QA release 及其原始 checkout/installer，不改写 identity、不重编产品。24 个真实 PTY 下，将原始样式与可逆 CSS 干预交错观察，保留每个阶段前后 `/proc` 计数、rAF 来源/耗时、DOM mutation、RO 记录与截图，定位高 CPU 和慢帧的来源。此诊断不计为性能验收，不减少正式四轮负载或放宽任何阈值。
 
+首轮诊断 [40714841152](https://github.com/engcapa/taomni/actions/runs/40714841152) 已通过并下载原始记录。全部 13 阶段保持 24 个真实终端、1 个活动终端，源码稳定且正常关闭；每个干预后立即恢复原样作对照。方角去阴影为 **0.134 核**、取消外层 overflow 裁剪为 **0.120 核**，随后原样分别恢复到 **1.311 / 1.464 核**；`contain:layout paint` 和强制合成仍约 **0.991 / 0.999 核**，`overflow:clip` 为 **1.473 核**。禁用动画后的 **1.431 核** 与其后原样 **1.440 核** 接近，初始 **2.503 核** 的暖机尾值保留。rAF 每阶段 16–18 次、回调总耗时约 3–8ms，DOM 更新相近，不能将持续高 CPU 归因于这些 JS 回调。下一轮单独分离圆角/阴影，并验证保留 9px 圆角的几何裁剪方式；尚未修改产品样式，性能验收继续保持未通过。
+
 用户要求的本机 QA 存储清理已完成：仅删除 `/home/zhyhang/.local/share/com.taomni.app.qa`，包括其 `vault.db`；删除前确认无 QA 文件占用。生产 `/home/zhyhang/.local/share/com.taomni.app`、共享 `~/.config/taomni` 和 `~/.cache/taomni` 均保留，没有启动本机 browser/native。
 
 ## 终端突发输出专项与工具验收（2026-10-28）
