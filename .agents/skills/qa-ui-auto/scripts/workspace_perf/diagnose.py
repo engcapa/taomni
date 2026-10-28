@@ -21,6 +21,16 @@ from qa_ui_auto.provenance import source_identity
 
 
 FRAME = '.taomni-main-canvas-frame'
+PAINT_CORNERS = (
+    FRAME + '{overflow:visible!important;position:relative!important}'
+    + FRAME + '::after{content:"";position:absolute;inset:-1px;z-index:40;pointer-events:none;'
+    'background:'
+    'radial-gradient(circle at bottom right,transparent 8px,var(--taomni-chrome-border) 8px 9px,var(--taomni-chrome-bg) 9px) top left,'
+    'radial-gradient(circle at bottom left,transparent 8px,var(--taomni-chrome-border) 8px 9px,var(--taomni-chrome-bg) 9px) top right,'
+    'radial-gradient(circle at top right,transparent 8px,var(--taomni-chrome-border) 8px 9px,var(--taomni-chrome-bg) 9px) bottom left,'
+    'radial-gradient(circle at top left,transparent 8px,var(--taomni-chrome-border) 8px 9px,var(--taomni-chrome-bg) 9px) bottom right;'
+    'background-size:9px 9px;background-repeat:no-repeat;}'
+)
 VARIANTS = [
     ('no-css-animation', '*{animation:none!important;transition:none!important}'),
     ('square-frame', FRAME + '{border-radius:0!important;box-shadow:none!important}'),
@@ -32,6 +42,7 @@ VARIANTS = [
     ('square-frame-with-shadow', FRAME + '{border-radius:0!important}'),
     ('rounded-clip-path', FRAME + '{overflow:visible!important;clip-path:inset(0 round 9px)!important}'),
     ('rounded-clip-path-layer', FRAME + '{overflow:visible!important;clip-path:inset(0 round 9px)!important;transform:translateZ(0)!important}'),
+    ('paint-corners', PAINT_CORNERS),
 ]
 
 
