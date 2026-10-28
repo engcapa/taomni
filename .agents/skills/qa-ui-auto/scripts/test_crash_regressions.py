@@ -14,7 +14,10 @@ from qa_ui_auto.ci import make_plan
 from qa_ui_auto.testcase import discover
 
 ROOT = Path(__file__).resolve().parents[4]
-EXPECTED = {"TC-WS-038", "TC-WS-039", "TC-WS-045", "TC-WS-051", "TC-WS-052", "TC-WS-053", "TC-WS-054", "TC-WS-055", "TC-WS-056"}
+EXPECTED = {
+    "TC-WS-038", "TC-WS-039", "TC-WS-045", "TC-WS-051", "TC-WS-052",
+    "TC-WS-053", "TC-WS-054", "TC-WS-055", "TC-WS-056", "TC-WS-057",
+}
 
 
 class CrashRegressionTests(unittest.TestCase):
