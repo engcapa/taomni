@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .deadline import budget_time as time
+from .language_startup_observer import validate_observation
 from .steps import StepError
 
 ACTION_BUDGET_MS = 1500
@@ -57,9 +58,7 @@ def run(ctx: Any, args: Any) -> str:
 
     def observation() -> dict:
         state = read("window.__taomniQaLanguageStartup?.observe() ?? null")
-        if not isinstance(state, dict) or not isinstance(state.get("events"), list):
-            raise StepError("Real language invoke forwarding observer is missing")
-        return state
+        return validate_observation(state)
 
     def events() -> list[dict]:
         # Each child appends one short JSON line per heartbeat; ignore only an
@@ -69,11 +68,11 @@ def run(ctx: Any, args: Any) -> str:
 
     child_pid: int | None = None
 
-    def require_pending() -> dict:
+    def require_pending(state: dict | None = None) -> dict:
         if gate.exists():
             raise StepError("SDK was released before the UI actions finished")
         child = pending_child(events(), time.time() * 1000, child_pid)
-        state = observation()
+        state = observation() if state is None else state
         pending = [event for event in state["events"] if event["status"] == "pending"
                    and event["command"] in {"sdk_resolve_workspace", "lsp_open_document", "lsp_document_status"}]
         if not pending:
@@ -108,13 +107,15 @@ def run(ctx: Any, args: Any) -> str:
         return f"document.querySelector({json.dumps(editor)})?.textContent === {json.dumps(text)}"
 
     try:
+        observation()
         # File read/publication must complete without awaiting SDK discovery.
         action("open-source", lambda: session.dblclick(source_row),
                "document.querySelector(" + json.dumps(editor) + ")?.textContent.includes('export const platform')", pending=False)
         started = time.monotonic()
         while time.monotonic() - started < 1.5:
+            state = observation()
             try:
-                child_pid = require_pending()["child"]["pid"]
+                child_pid = require_pending(state)["child"]["pid"]
                 break
             except StepError:
                 time.sleep(.01)

@@ -34,7 +34,11 @@ class SdkStartupProbeTest(unittest.TestCase):
             ctx = SimpleNamespace(case_dir=root, session=Mock())
             original = RuntimeError("real input failed")
             ctx.session.dblclick.side_effect = original
-            ctx.session.execute.side_effect = RuntimeError("renderer disconnected")
+            ctx.session.execute.side_effect = [
+                {"valid": True, "transport": "tauri-fetch-callbacks", "events": [],
+                 "transportProbe": {"observed": True, "status": "fulfilled"}},
+                RuntimeError("renderer disconnected"),
+            ]
             with self.assertRaises(RuntimeError) as result:
                 run(ctx, {"events": str(events), "gate": str(gate)})
             self.assertIs(result.exception, original)
@@ -44,6 +48,21 @@ class SdkStartupProbeTest(unittest.TestCase):
             self.assertEqual(report["actions"][0]["label"], "open-source")
             self.assertFalse(report["actions"][0]["passed"])
             self.assertIn("disconnected", report["captureError"])
+
+    def test_invalid_transport_fails_before_input_and_still_releases_sdk_child(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            events, gate = root / "events.jsonl", root / "release"
+            events.write_text("")
+            ctx = SimpleNamespace(case_dir=root, session=Mock())
+            ctx.session.execute.return_value = {"events": [], "valid": False}
+            with self.assertRaisesRegex(StepError, "zero counts are not evidence"):
+                run(ctx, {"events": str(events), "gate": str(gate)})
+            ctx.session.dblclick.assert_not_called()
+            self.assertTrue(gate.is_file())
+            report = json.loads((root / "sdk-startup-responsiveness.json").read_text())
+            self.assertFalse(report["passed"])
+            self.assertEqual(report["actions"], [])
 
     def test_paths_outside_case_and_already_released_gate_fail_closed(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -4,19 +4,23 @@ from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from qa_ui_auto import language_startup_observer as observer
 from qa_ui_auto.steps import StepError
 
 
 class LanguageStartupObservationTest(unittest.TestCase):
+    @staticmethod
+    def state(events):
+        return {"valid": True, "transport": "browser-invoke", "events": events}
+
     def test_pending_fulfilled_and_rejected_calls_are_distinguished(self):
-        state = {"events": [
+        state = self.state([
             {"command": "sdk_resolve_workspace", "status": "pending"},
             {"command": "sdk_resolve_workspace", "status": "fulfilled"},
             {"command": "lsp_open_document", "status": "rejected"},
-        ]}
+        ])
         self.assertEqual(observer.mismatches(state, {
             "sdk_resolve_workspace": {"equal": 2, "pending": 1, "fulfilled": 1, "rejected": 0},
             "lsp_open_document": {"min": 1, "max": 1, "rejected": 1},
@@ -35,13 +39,63 @@ class LanguageStartupObservationTest(unittest.TestCase):
             with self.subTest(args=args), self.assertRaises(StepError):
                 observer.validate_expectations(args)
 
+    def test_zero_counts_require_verified_transport_and_control_callback(self):
+        valid = {"valid": True, "transport": "tauri-fetch-callbacks", "events": [],
+                 "transportProbe": {"observed": True, "status": "fulfilled"}}
+        expected = {"sdk_get_registry": {"equal": 0}}
+        self.assertEqual(observer.mismatches(valid, expected), [])
+        for state in [{"events": []}, {**valid, "valid": False},
+                      {**valid, "observationError": "custom-protocol-failed"},
+                      {**valid, "transport": "unverified"},
+                      {**valid, "transportProbe": {"observed": False, "status": "fulfilled"}},
+                      {**valid, "transportProbe": {"observed": True, "status": "pending"}}]:
+            with self.subTest(state=state), self.assertRaises(StepError):
+                observer.mismatches(state, expected)
+
+    def test_native_install_waits_for_observed_real_control_callback_and_retains_it(self):
+        ready = {"valid": True, "transport": "tauri-fetch-callbacks", "events": [],
+                 "observationError": None, "transportProbe": {"observed": True, "status": "fulfilled"}}
+        pending = {**ready, "valid": False, "transportProbe": {"observed": True, "status": "pending"}}
+        with tempfile.TemporaryDirectory() as directory:
+            ctx = SimpleNamespace(case_dir=Path(directory), session=Mock())
+            ctx.session.execute.side_effect = [{"installed": True, "forwarding": True}, pending, ready]
+            with patch.object(observer.time, "sleep") as sleep:
+                observer.install_native(ctx)
+            sleep.assert_called_once()
+            self.assertEqual(json.loads((ctx.case_dir / "language-startup-transport.json").read_text()), ready)
+
+    def test_native_install_cannot_accept_an_unobserved_control_response(self):
+        elapsed = [0.0]
+
+        def sleep(seconds):
+            elapsed[0] += seconds
+
+        invalid = {"valid": False, "transport": "tauri-fetch-callbacks", "events": [],
+                   "transportProbe": {"observed": False, "status": "pending"}}
+        for state in [invalid, {**invalid, "observationError": "control-request-bypassed-observer"}]:
+            with self.subTest(state=state), tempfile.TemporaryDirectory() as directory:
+                elapsed[0] = 0
+                ctx = SimpleNamespace(case_dir=Path(directory), session=Mock())
+                count = [0]
+
+                def execute(script):
+                    count[0] += 1
+                    return {"installed": True, "forwarding": True} if count[0] == 1 else state
+
+                ctx.session.execute.side_effect = execute
+                with patch.object(observer.time, "monotonic", side_effect=lambda: elapsed[0]), \
+                        patch.object(observer.time, "sleep", side_effect=sleep):
+                    with self.assertRaises(StepError):
+                        observer.install_native(ctx)
+                self.assertEqual(json.loads((ctx.case_dir / "language-startup-transport.json").read_text()), state)
+
     def test_zero_count_requires_the_whole_quiet_interval_and_retains_independent_json(self):
         elapsed = [0.0]
         reads = []
 
         def read():
             reads.append(elapsed[0])
-            return {"events": []}
+            return self.state([])
 
         def sleep(seconds):
             elapsed[0] += seconds
@@ -62,7 +116,7 @@ class LanguageStartupObservationTest(unittest.TestCase):
         def sleep(seconds):
             elapsed[0] += seconds
 
-        state = {"events": [{"command": "sdk_get_registry", "status": "fulfilled"}]}
+        state = self.state([{"command": "sdk_get_registry", "status": "fulfilled"}])
         with tempfile.TemporaryDirectory() as directory:
             ctx = SimpleNamespace(case_dir=Path(directory))
             with patch.object(observer.time, "monotonic", side_effect=lambda: elapsed[0]), \

@@ -73,3 +73,13 @@ test("restore respects ownership and a duplicate install fails instead of stacki
   assert.equal(h.target.invoke, original);
   assert.equal(h.window.__taomniQaLanguageStartup, undefined);
 });
+
+test("a readonly Tauri invoke cannot silently install an ineffective observer", () => {
+  const h = harness(() => Promise.resolve(null));
+  h.observer.restore();
+  const original = h.target.invoke;
+  Object.defineProperty(h.target, "invoke", { value: original, writable: false, configurable: false });
+  assert.throws(() => h.install(h.target), /not writable/);
+  assert.equal(h.target.invoke, original);
+  assert.equal(h.window.__taomniQaLanguageStartup, undefined);
+});

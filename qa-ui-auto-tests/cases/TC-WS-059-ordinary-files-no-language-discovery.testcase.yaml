@@ -55,6 +55,7 @@ steps:
     quiet_ms: 500
 - click: '[data-testid="code-workspace-tree-dir"][data-path="Documents"] [data-testid="code-workspace-tree-dir-arrow"]'
 - dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/notes.txt"]'
+- wait_for: '[data-testid="workspace-tab"][data-active="true"][data-tab-title="notes.txt"]'
 - assert_attribute:
     selector: '[data-testid="workspace-tab"][data-active="true"]'
     name: data-tab-title
@@ -63,6 +64,7 @@ steps:
     selector: '[data-testid="workspace-file-editor"] .cm-line:first-child'
     equals: Weekly notes
 - dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/budget.csv"]'
+- wait_for: '[data-testid="workspace-tab"][data-active="true"][data-tab-title="budget.csv"]'
 - assert_attribute:
     selector: '[data-testid="workspace-tab"][data-active="true"]'
     name: data-tab-title
@@ -71,6 +73,7 @@ steps:
     selector: '[data-testid="workspace-file-editor"] .cm-line:first-child'
     equals: item,amount
 - dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/preferences.json"]'
+- wait_for: '[data-testid="workspace-tab"][data-active="true"][data-tab-title="preferences.json"]'
 - assert_attribute:
     selector: '[data-testid="workspace-tab"][data-active="true"]'
     name: data-tab-title
@@ -79,6 +82,7 @@ steps:
     selector: '[data-testid="workspace-file-editor"] .cm-line:first-child'
     equals: '{"language":"auto","plainDocument":true}'
 - dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/service.log"]'
+- wait_for: '[data-testid="workspace-tab"][data-active="true"][data-tab-title="service.log"]'
 - assert_attribute:
     selector: '[data-testid="workspace-tab"][data-active="true"]'
     name: data-tab-title
@@ -87,6 +91,7 @@ steps:
     selector: '[data-testid="workspace-file-editor"] .cm-line:first-child'
     equals: 2026-10-29 INFO ready
 - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- wait_for: '[data-testid="workspace-tab"][data-active="true"][data-tab-title="README.md"]'
 - assert_attribute:
     selector: '[data-testid="workspace-tab"][data-active="true"]'
     name: data-tab-title
@@ -105,6 +110,7 @@ steps:
 - assert_visible: '[data-testid="workspace-editor-save"]:disabled'
 - click: '[data-testid="workspace-tab"][data-tab-title="notes.txt"] [data-testid="workspace-tab-close"]'
 - dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/notes.txt"]'
+- wait_for: '[data-testid="workspace-tab"][data-active="true"][data-tab-title="notes.txt"]'
 - assert_text_equals:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
     equals: Ordinary document saved without SDK
@@ -160,42 +166,42 @@ verification:
     - 10
     - 13
     - 14
-    - 17
-    - 20
-    - 23
+    - 18
+    - 22
     - 26
     - 30
-    - 31
-    - 32
-    - 34
     - 35
+    - 36
     - 37
-    - 38
-    - 41
-    - 45
+    - 39
+    - 40
+    - 43
+    - 44
     - 47
+    - 51
+    - 53
     results:
     - 6
     - 12
-    - 15
     - 16
-    - 18
-    - 19
+    - 17
+    - 20
     - 21
-    - 22
     - 24
     - 25
-    - 27
     - 28
     - 29
+    - 32
     - 33
-    - 36
-    - 39
-    - 40
-    - 44
+    - 34
+    - 38
+    - 42
+    - 45
     - 46
-    - 48
-    - 49
+    - 50
+    - 52
+    - 54
+    - 55
     checkpoints:
     - step: 6
       expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"equal": 0}, "sdk_analyze_workspace": {"equal": 0}, "sdk_resolve_workspace":
@@ -205,53 +211,53 @@ verification:
       expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"equal": 0}, "sdk_analyze_workspace": {"equal": 0}, "sdk_resolve_workspace":
         {"equal": 0}, "lsp_detect_servers": {"equal": 0}, "lsp_discover_java_bundles": {"equal": 0}, "lsp_open_document": {"equal": 0}, "lsp_document_status":
         {"equal": 0}}, "quiet_ms": 500}}'
-    - step: 15
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "notes.txt"}}'
     - step: 16
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "notes.txt"}}'
+    - step: 17
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "Weekly notes"}}'
-    - step: 18
+    - step: 20
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "budget.csv"}}'
-    - step: 19
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "item,amount"}}'
     - step: 21
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "preferences.json"}}'
-    - step: 22
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "{\"language\":\"auto\",\"plainDocument\":true}"}}'
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "item,amount"}}'
     - step: 24
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "service.log"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "preferences.json"}}'
     - step: 25
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "2026-10-29 INFO ready"}}'
-    - step: 27
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "README.md"}}'
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "{\"language\":\"auto\",\"plainDocument\":true}"}}'
     - step: 28
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "service.log"}}'
+    - step: 29
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "2026-10-29 INFO ready"}}'
+    - step: 32
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "README.md"}}'
+    - step: 33
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "# platform workspace
         root"}}'
-    - step: 29
+    - step: 34
       expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"equal": 0}, "sdk_analyze_workspace": {"equal": 0}, "sdk_resolve_workspace":
         {"equal": 0}, "lsp_detect_servers": {"equal": 0}, "lsp_discover_java_bundles": {"equal": 0}, "lsp_open_document": {"equal": 0}, "lsp_document_status":
         {"equal": 0}}, "quiet_ms": 500}}'
-    - step: 33
+    - step: 38
       expectation: '{"assert_visible": "[data-testid=\"workspace-editor-save\"]:disabled"}'
-    - step: 36
+    - step: 42
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "Ordinary document saved without
         SDK"}}'
-    - step: 39
+    - step: 45
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "Ordinary document saved without
         SDK"}}'
-    - step: 40
+    - step: 46
       expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"equal": 0}, "sdk_analyze_workspace": {"equal": 0}, "sdk_resolve_workspace":
         {"equal": 0}, "lsp_detect_servers": {"equal": 0}, "lsp_discover_java_bundles": {"equal": 0}, "lsp_open_document": {"equal": 0}, "lsp_document_status":
         {"equal": 0}}, "quiet_ms": 500}}'
-    - step: 44
+    - step: 50
       expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"min": 1, "pending": 0}, "sdk_resolve_workspace": {"min": 1, "pending":
         0}, "lsp_open_document": {"equal": 0}}}}'
-    - step: 46
+    - step: 52
       expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"min": 2, "pending": 0}, "sdk_resolve_workspace": {"min": 2, "pending":
         0}, "lsp_open_document": {"equal": 0}}}}'
-    - step: 48
+    - step: 54
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "Ordinary document saved without
         SDK"}}'
-    - step: 49
+    - step: 55
       expectation: '{"assert_no_runtime_errors": null}'
   visual:
   - check: Readable file rows, editor and SDK dialog.

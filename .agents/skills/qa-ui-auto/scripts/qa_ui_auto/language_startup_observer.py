@@ -13,6 +13,7 @@ from .deadline import budget_time as time
 from .steps import StepError
 
 SCRIPT = Path(__file__).with_suffix('.js').read_text(encoding='utf-8')
+NATIVE_SCRIPT = Path(__file__).with_name('native_language_startup_observer.js').read_text(encoding='utf-8')
 COMMANDS = {
     'sdk_get_registry', 'sdk_analyze_workspace', 'sdk_resolve_workspace',
     'lsp_detect_servers', 'lsp_discover_java_bundles', 'lsp_open_document',
@@ -30,10 +31,38 @@ def install_browser(ctx: Any) -> None:
 
 
 def install_native(ctx: Any) -> str:
-    result = ctx.session.execute('return (' + SCRIPT + ')(window.__TAURI_INTERNALS__);')
+    result = ctx.session.execute('return (' + NATIVE_SCRIPT + ')();')
     if result != {'installed': True, 'forwarding': True}:
         raise StepError(f'Language startup observer did not install: {result!r}')
-    return 'Installed forwarding-only native language startup observer'
+    deadline = time.monotonic() + 5
+    state = None
+    try:
+        while time.monotonic() < deadline:
+            state = ctx.session.execute('return window.__taomniQaLanguageStartup?.observe() ?? null;')
+            if not isinstance(state, dict) or state.get('observationError'):
+                raise StepError(f'Native language observation transport failed: {state!r}')
+            if state.get('valid') is True:
+                validate_observation(state)
+                return 'Verified forwarding-only native observer through a real Tauri control request'
+            time.sleep(.05)
+        raise StepError('Native language observation control request was not observed and completed')
+    finally:
+        (ctx.case_dir / 'language-startup-transport.json').write_text(
+            json.dumps(state, indent=2) + '\n', encoding='utf-8')
+
+
+def validate_observation(state: Any) -> dict:
+    if not isinstance(state, dict) or not isinstance(state.get('events'), list):
+        raise StepError('Language startup forwarding observer is unavailable')
+    if state.get('valid') is not True or state.get('observationError'):
+        raise StepError('Language startup forwarding observer is invalid; zero counts are not evidence')
+    if state.get('transport') == 'tauri-fetch-callbacks':
+        probe = state.get('transportProbe') or {}
+        if probe.get('observed') is not True or probe.get('status') != 'fulfilled':
+            raise StepError('Native language observation control request is unverified')
+    elif state.get('transport') != 'browser-invoke':
+        raise StepError('Language startup observation transport is unknown')
+    return state
 
 
 def validate_expectations(args: Any) -> tuple[dict, float]:
@@ -54,8 +83,7 @@ def validate_expectations(args: Any) -> tuple[dict, float]:
 
 
 def mismatches(state: Any, expected: dict) -> list[str]:
-    if not isinstance(state, dict) or not isinstance(state.get('events'), list):
-        raise StepError('Language startup forwarding observer is unavailable')
+    validate_observation(state)
     errors = []
     for command, bounds in expected.items():
         events = [event for event in state['events'] if event['command'] == command]
