@@ -18,7 +18,9 @@ class SaveLockProbeTest(TestCase):
 
     def test_fault_releases_the_reader_and_retains_the_original_failure(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            # Windows temp paths may use an 8.3 alias. Match the probe's
+            # canonical target when tracking the actual reader lifetimes.
+            root = Path(directory).resolve()
             case = root / "runs" / "run-1" / "case"
             case.mkdir(parents=True)
             path = root / "document.txt"
@@ -54,7 +56,7 @@ class SaveLockProbeTest(TestCase):
 
     def test_external_path_and_indistinguishable_budget_are_rejected(self):
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
+            root = Path(directory).resolve()
             case = root / "reports" / "runs" / "run-1" / "case"
             case.mkdir(parents=True)
             outside = root / "personal-file.txt"
