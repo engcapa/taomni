@@ -98,3 +98,22 @@ SHA 计算会在调用线程执行。现在由独立 async 适配器交给 block
 调用 executor 与另一读取继续推进、UTF-16/BOM、错误与 worker panic。
 CI 的 root Rust contract 同时执行这组测试。原生三平台与完整崩溃组仍须用包含
 本次产品改动的 QA release 验证；不能据此认定渲染慢帧已解决。
+
+## JSON 冷打开的渲染开销
+
+同一改前源码的 Linux 定向 `40784926015` 为 16 passed / 2 failed，原始回执与
+附件 SHA 已核验。JSON browser 的首帧为 197.8ms，内容首次出现前另有 251.3ms
+慢帧；原生首帧为 191ms。CPU 原样采样显示同步 React 渲染/提交占用约 665.6ms，
+其中 Lucide 的 `createElement` 调用约 114.6ms。采样与帧报告保留，不能将这些
+数值外推为未插桩的生产耗时。
+
+工作区常驻的树、面包屑、工具栏、编辑器和 dock 改用共享的 memo 图标组件：
+buffer/selection 更新时复用 props 未变化的 SVG 子树，图标 props、主题 context
+和 ref 仍按 React 语义更新。这不改变操作、可达性或工具内容挂载生命周期。
+`TC-WS-064/065` 与完整崩溃组继续验证最终组合，正式性能比较仍待执行。
+
+改前 JSON run `40782708587` 已收齐，49 passed / 8 failed，1,180 附件 SHA
+核验一致；七项为真实慢帧，Windows 原生 65 的另一项发生于已完成输入、磁盘
+SHA 和重开末尾文本之后：Mod+End 使首行离开 CodeMirror 虚拟视口，新用例却
+要求首行 DOM 存在。现在只读实际文档首行，仍要求精确 `{`；不改变滚动、输入、
+文件内容、预算或磁盘校验。所有原始失败继续保留。

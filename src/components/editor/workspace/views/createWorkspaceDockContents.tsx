@@ -14,7 +14,7 @@ import {
   Search,
   ShieldCheck,
   TerminalSquare,
-} from "lucide-react";
+} from "../icons";
 import { lspJavaModules, type LspWorkspaceEdit } from "../../../../lib/editor/lsp";
 import type { StructuralMatch } from "../../../../lib/editor/structuralSearch";
 import { type WorkspaceToolConfig } from "../../../../lib/editor/workspace";

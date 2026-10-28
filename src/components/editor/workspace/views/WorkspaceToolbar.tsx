@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { ArrowLeft, ArrowRight, Braces, GitBranch, GitCommitHorizontal, Loader2, RefreshCw, RotateCcw, Save, PanelRight, Columns2, Rows2, Play, Hammer, Bug, Search, X, ZoomIn, ZoomOut, WrapText, Columns3, Link2, AlignHorizontalJustifyCenter, Maximize2, Square, SlidersHorizontal, MoreVertical, Settings as SettingsIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, Braces, GitBranch, GitCommitHorizontal, Loader2, RefreshCw, RotateCcw, Save, PanelRight, Columns2, Rows2, Play, Hammer, Bug, Search, X, ZoomIn, ZoomOut, WrapText, Columns3, Link2, AlignHorizontalJustifyCenter, Maximize2, Square, SlidersHorizontal, MoreVertical, Settings as SettingsIcon } from "../icons";
 import { type ExecutionRunConfiguration, type ExecutionDebugConfiguration } from "../../../../lib/editor/workspace";
 import { type EditorSplitOrientation, type RightPaneTabId } from "../../../../stores/codeWorkspaceStore";
 import { openSettingsSection } from "../../../../lib/settingsNavigation";

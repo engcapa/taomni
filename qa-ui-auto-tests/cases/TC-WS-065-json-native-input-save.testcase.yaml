@@ -100,9 +100,11 @@ steps:
 - assert_text:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
     contains: qajsonabcdefghijklmnopqrstuvwxyz
-- assert_text_equals:
-    selector: '[data-testid="workspace-file-editor"] .cm-line:first-child'
-    equals: '{'
+# The viewport is at EOF after Mod+End; CodeMirror virtualizes the first line.
+# Check the live document without scrolling or replacing the native input.
+- eval_readonly:
+    expression: document.querySelectorAll('.cm-content').length === 1 && document.querySelector('.cm-content').cmTile.root.view.state.doc.line(1).text === '{'
+    expect_truthy: true
 - assert_file_sha256:
     path: ${fixture.platform_workspace_root}/Documents/records.json
     equals: f04739e7c9e9fc056bf01a0b4c877f442d59ebd9bfe43f2320dbf428218c9392
@@ -178,7 +180,7 @@ verification:
     - step: 24
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "qajsonabcdefghijklmnopqrstuvwxyz"}}'
     - step: 25
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "{"}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''.cm-content'').length === 1 && document.querySelector(''.cm-content'').cmTile.root.view.state.doc.line(1).text === ''{''", "expect_truthy": true}}'
     - step: 26
       expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/Documents/records.json", "equals": "f04739e7c9e9fc056bf01a0b4c877f442d59ebd9bfe43f2320dbf428218c9392"}}'
     - step: 27

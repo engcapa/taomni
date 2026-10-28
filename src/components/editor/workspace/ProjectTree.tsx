@@ -10,7 +10,7 @@ import {
   File,
   Folder,
   Loader2,
-} from "lucide-react";
+} from "./icons";
 import type {
   CodeWorkspaceFileRef,
   CodeWorkspaceRootInfo,

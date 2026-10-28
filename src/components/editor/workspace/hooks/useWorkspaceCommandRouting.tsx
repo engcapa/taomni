@@ -1,4 +1,4 @@
-import { BookOpen, FolderTree, GitCommitHorizontal, ListTree } from "lucide-react";
+import { BookOpen, FolderTree, GitCommitHorizontal, ListTree } from "../icons";
 import { useCallback, useEffect, useLayoutEffect, useMemo } from "react";
 import { useCodeWorkspaceStatusStore } from "../../../../stores/codeWorkspaceStatusStore";
 import type { CodeWorkspaceFileRef } from "../../../../types";

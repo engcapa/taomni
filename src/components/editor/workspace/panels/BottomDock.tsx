@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown, ChevronUp, Minus, MoreHorizontal, MoreVertical } from "lucide-react";
+import { ChevronDown, ChevronUp, Minus, MoreHorizontal, MoreVertical } from "../icons";
 import { toolWindowRailButtonClass } from "./ToolWindowRail";
 import { useToolWindowStripeStore } from "../toolWindowStripeStore";
 
