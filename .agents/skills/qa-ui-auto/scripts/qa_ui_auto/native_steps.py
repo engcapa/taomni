@@ -49,7 +49,7 @@ from typing import Any, Callable
 from .steps import StepError
 from .native_assertions import assert_count, assert_menu_items
 from .linux_ime import current_fcitx_engine
-from . import save_race
+from .native_editor_probes import register as register_editor_probes
 from . import wayland
 from .runtime_errors import native_assert as assert_no_runtime_errors
 from .native_drag import native_drag
@@ -2704,32 +2704,7 @@ def _do_reload_window(ctx: NativeStepContext, args: Any) -> str:
     return "reloaded; welcome-panel visible"
 
 
-# ED-PARITY-002 save-race time-point collector: QA-build-only verbs driving the
-# in-page gate installed by src/components/editor/workspace/saveRaceProbe.ts.
-# A production binary without the gate fails these steps explicitly.
-@_verb("save_race_arm")
-def _do_save_race_arm(ctx: NativeStepContext, args: Any) -> str:
-    return save_race.arm(ctx, args)
-
-
-@_verb("save_race_wait_entered")
-def _do_save_race_wait_entered(ctx: NativeStepContext, args: Any) -> str:
-    return save_race.wait_entered(ctx, args)
-
-
-@_verb("save_race_release")
-def _do_save_race_release(ctx: NativeStepContext, args: Any) -> str:
-    return save_race.release(ctx, args)
-
-
-@_verb("save_race_trace")
-def _do_save_race_trace(ctx: NativeStepContext, args: Any) -> str:
-    return save_race.trace(ctx, args)
-
-
-@_verb("save_race_note")
-def _do_save_race_note(ctx: NativeStepContext, args: Any) -> str:
-    return save_race.note(ctx, args)
+register_editor_probes(_verb)
 
 
 @_verb("parity005_native_fault")

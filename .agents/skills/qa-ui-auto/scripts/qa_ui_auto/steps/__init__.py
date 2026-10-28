@@ -83,6 +83,7 @@ from . import parity0089   # noqa: E402,F401
 from . import parity007    # noqa: E402,F401
 from . import mail         # noqa: E402,F401
 from . import mfa          # noqa: E402,F401
+from . import language_startup  # noqa: E402,F401
 
 from ..window_context import browser_switch
 verb("switch_window")(browser_switch)

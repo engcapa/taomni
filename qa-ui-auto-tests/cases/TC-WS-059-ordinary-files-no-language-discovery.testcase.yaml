@@ -1,0 +1,263 @@
+id: TC-WS-059
+title: Ordinary files open and save without automatic SDK or language-server discovery
+description: Observe and forward real browser/native invoke calls. Empty workspace, adding a mixed folder, and opening txt/csv/json/log/markdown documents
+  must not start SDK/LSP discovery. Save and reopen an ordinary file through the real shared editor; explicit SDK dialog and Refresh remain available.
+modes:
+- browser
+- native
+covers:
+- F-WS-2
+- F25.1
+- F25.3
+- F11.2
+tags:
+- p0
+- workspace-redesign
+- file-explorer
+- regression
+- sdk
+fixtures:
+- reset_db
+- workspace_language_files
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-plain-files
+- observe_language_startup: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree-empty"]'
+- assert_language_startup:
+    commands: &id001
+      sdk_get_registry:
+        equal: 0
+      sdk_analyze_workspace:
+        equal: 0
+      sdk_resolve_workspace:
+        equal: 0
+      lsp_detect_servers:
+        equal: 0
+      lsp_discover_java_bundles:
+        equal: 0
+      lsp_open_document:
+        equal: 0
+      lsp_document_status:
+        equal: 0
+    quiet_ms: 500
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.platform_workspace_root}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-root"]'
+- assert_language_startup:
+    commands: *id001
+    quiet_ms: 500
+- click: '[data-testid="code-workspace-tree-dir"][data-path="Documents"] [data-testid="code-workspace-tree-dir-arrow"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/notes.txt"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-tab-title
+    equals: notes.txt
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-line:first-child'
+    equals: Weekly notes
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/budget.csv"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-tab-title
+    equals: budget.csv
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-line:first-child'
+    equals: item,amount
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/preferences.json"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-tab-title
+    equals: preferences.json
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-line:first-child'
+    equals: '{"language":"auto","plainDocument":true}'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/service.log"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-tab-title
+    equals: service.log
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-line:first-child'
+    equals: 2026-10-29 INFO ready
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-tab-title
+    equals: README.md
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-line:first-child'
+    equals: '# platform workspace root'
+- assert_language_startup:
+    commands: *id001
+    quiet_ms: 500
+- click: '[data-testid="workspace-tab"][data-tab-title="notes.txt"]'
+- fill:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    value: Ordinary document saved without SDK
+- click: '[data-testid="workspace-editor-save"]:enabled'
+- assert_visible: '[data-testid="workspace-editor-save"]:disabled'
+- click: '[data-testid="workspace-tab"][data-tab-title="notes.txt"] [data-testid="workspace-tab-close"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/notes.txt"]'
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    equals: Ordinary document saved without SDK
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    equals: Ordinary document saved without SDK
+- assert_language_startup:
+    commands: *id001
+    quiet_ms: 500
+- click: '[data-testid="code-workspace-sdk-status"]'
+- wait_for: '[data-testid="workspace-sdk-dialog"]'
+- wait_for: '[data-testid^="workspace-sdk-root-"]'
+- assert_language_startup:
+    commands:
+      sdk_get_registry:
+        min: 1
+        pending: 0
+      sdk_resolve_workspace:
+        min: 1
+        pending: 0
+      lsp_open_document:
+        equal: 0
+- click: '[data-testid="workspace-sdk-refresh"]'
+- assert_language_startup:
+    commands:
+      sdk_get_registry:
+        min: 2
+        pending: 0
+      sdk_resolve_workspace:
+        min: 2
+        pending: 0
+      lsp_open_document:
+        equal: 0
+- click: '[data-testid="workspace-sdk-close"]'
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    equals: Ordinary document saved without SDK
+- assert_no_runtime_errors: null
+- screenshot: workspace-ordinary-files-no-language-discovery.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Ordinary documents are usable and persist saved content without automatic SDK/LSP discovery; the explicit SDK dialog and Refresh still
+      resolve the real root.
+    actions:
+    - 4
+    - 7
+    - 8
+    - 9
+    - 10
+    - 13
+    - 14
+    - 17
+    - 20
+    - 23
+    - 26
+    - 30
+    - 31
+    - 32
+    - 34
+    - 35
+    - 37
+    - 38
+    - 41
+    - 45
+    - 47
+    results:
+    - 6
+    - 12
+    - 15
+    - 16
+    - 18
+    - 19
+    - 21
+    - 22
+    - 24
+    - 25
+    - 27
+    - 28
+    - 29
+    - 33
+    - 36
+    - 39
+    - 40
+    - 44
+    - 46
+    - 48
+    - 49
+    checkpoints:
+    - step: 6
+      expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"equal": 0}, "sdk_analyze_workspace": {"equal": 0}, "sdk_resolve_workspace":
+        {"equal": 0}, "lsp_detect_servers": {"equal": 0}, "lsp_discover_java_bundles": {"equal": 0}, "lsp_open_document": {"equal": 0}, "lsp_document_status":
+        {"equal": 0}}, "quiet_ms": 500}}'
+    - step: 12
+      expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"equal": 0}, "sdk_analyze_workspace": {"equal": 0}, "sdk_resolve_workspace":
+        {"equal": 0}, "lsp_detect_servers": {"equal": 0}, "lsp_discover_java_bundles": {"equal": 0}, "lsp_open_document": {"equal": 0}, "lsp_document_status":
+        {"equal": 0}}, "quiet_ms": 500}}'
+    - step: 15
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "notes.txt"}}'
+    - step: 16
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "Weekly notes"}}'
+    - step: 18
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "budget.csv"}}'
+    - step: 19
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "item,amount"}}'
+    - step: 21
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "preferences.json"}}'
+    - step: 22
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "{\"language\":\"auto\",\"plainDocument\":true}"}}'
+    - step: 24
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "service.log"}}'
+    - step: 25
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "2026-10-29 INFO ready"}}'
+    - step: 27
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "README.md"}}'
+    - step: 28
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "# platform workspace
+        root"}}'
+    - step: 29
+      expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"equal": 0}, "sdk_analyze_workspace": {"equal": 0}, "sdk_resolve_workspace":
+        {"equal": 0}, "lsp_detect_servers": {"equal": 0}, "lsp_discover_java_bundles": {"equal": 0}, "lsp_open_document": {"equal": 0}, "lsp_document_status":
+        {"equal": 0}}, "quiet_ms": 500}}'
+    - step: 33
+      expectation: '{"assert_visible": "[data-testid=\"workspace-editor-save\"]:disabled"}'
+    - step: 36
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "Ordinary document saved without
+        SDK"}}'
+    - step: 39
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "Ordinary document saved without
+        SDK"}}'
+    - step: 40
+      expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"equal": 0}, "sdk_analyze_workspace": {"equal": 0}, "sdk_resolve_workspace":
+        {"equal": 0}, "lsp_detect_servers": {"equal": 0}, "lsp_discover_java_bundles": {"equal": 0}, "lsp_open_document": {"equal": 0}, "lsp_document_status":
+        {"equal": 0}}, "quiet_ms": 500}}'
+    - step: 44
+      expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"min": 1, "pending": 0}, "sdk_resolve_workspace": {"min": 1, "pending":
+        0}, "lsp_open_document": {"equal": 0}}}}'
+    - step: 46
+      expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"min": 2, "pending": 0}, "sdk_resolve_workspace": {"min": 2, "pending":
+        0}, "lsp_open_document": {"equal": 0}}}}'
+    - step: 48
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "Ordinary document saved without
+        SDK"}}'
+    - step: 49
+      expectation: '{"assert_no_runtime_errors": null}'
+  visual:
+  - check: Readable file rows, editor and SDK dialog.
+    method: manual
+    reason: Retained screenshot is an artifact; invocation and content checks establish behavior separately.
+  native:
+  - check: Real Tauri invoke forwarding and saved-file close/reopen through the host filesystem.
+    method: automated
+    reason: Browser VFS cannot establish native SDK calls or real disk reload.

@@ -17,8 +17,9 @@ class SlowLspPeerTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="slow-lsp-test-") as directory:
             root = Path(directory)
             events, gate = root / "events.txt", root / "release.txt"
+            documents = root / "documents.jsonl"
             with subprocess.Popen(
-                [sys.executable, workspace_slow_lsp_server.__file__, str(events), str(gate)],
+                [sys.executable, workspace_slow_lsp_server.__file__, str(events), str(gate), str(documents)],
                 stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             ) as process:
                 replies = queue.Queue()
@@ -63,13 +64,25 @@ class SlowLspPeerTest(unittest.TestCase):
                     self.assertEqual(reply["id"], 1)
                     self.assertTrue(reply["result"]["capabilities"]["textDocumentSync"]["openClose"])
                     reader.join(timeout=5)
-                    send({"method": "textDocument/didOpen", "params": {"textDocument": {"uri": "file:///fixture/src/index.ts"}}})
+                    send({"method": "textDocument/didOpen", "params": {"textDocument": {
+                        "uri": "file:///fixture/src/index.ts", "text": "export const seed = 1;", "version": 1,
+                    }}})
                     log_contains("didOpen:file:///fixture/src/index.ts")
+                    send({"method": "textDocument/didChange", "params": {
+                        "textDocument": {"uri": "file:///fixture/src/index.ts", "version": 2},
+                        "contentChanges": [{"text": "export const edited = 7;"}],
+                    }})
                     send({"method": "textDocument/didClose", "params": {"textDocument": {"uri": "file:///fixture/src/index.ts"}}})
                     log_contains("didClose:file:///fixture/src/index.ts")
                     send({"method": "exit"})
                     process.wait(timeout=5)
                     self.assertEqual(process.returncode, 0, process.stderr.read().decode())
+                    messages = [json.loads(line) for line in documents.read_text().splitlines()]
+                    self.assertEqual([message["method"] for message in messages], [
+                        "textDocument/didOpen", "textDocument/didChange", "textDocument/didClose",
+                    ])
+                    self.assertEqual(messages[0]["params"]["textDocument"]["text"], "export const seed = 1;")
+                    self.assertEqual(messages[1]["params"]["contentChanges"], [{"text": "export const edited = 7;"}])
                 finally:
                     if process.poll() is None:
                         process.kill()
