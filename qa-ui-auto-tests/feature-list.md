@@ -5081,6 +5081,7 @@ controls:
 - 本地服务器窗口 RDP 行：通用字段（端口/绑定地址/自动停止/随应用启动）+ RDP 字段（用户名/密码（vault）/域/仅查看/本机确认控制/公网绑定/显示器）；行 `data-status` 反映 stopped/starting/running/error
 - Native 用例经 `open_route: '?servers=main'` 在主窗口打开同一组件树，通过 `rdp-probe`（QA 专用探针客户端，随 QA 构建产出）做协议级判定与性能测量，`rdp_target.py`（Tk）提供宿主可见目标，`host_clipboard` 用系统工具判定宿主剪贴板
 - 剪贴板按方向分级（off/text/rich/all，默认 all）：文本、CF_HTML、CF_DIB/CF_DIBV5 图片、文件（FileGroupDescriptorW + FileContents，暂存目录 + 上限 MB）；两方向都 off 时不提供 CLIPRDR 通道
+- `TC-RDPJ-02-joint-clipboard-no-echo` 保留联合客户端/服务端 Unicode 文本与无回环校验；`TC-RDPJ-03-deferred-clipboard-publication` 在 macOS 真实 AppKit 中分离类型声明与数据发布（间隔至少 1.2 秒、同一 changeCount），校验迟到文本不会丢失，公告不超过两次、六秒无回环并正常停止。空快照每秒复核一次；非空稳定快照保持廉价变更标记检查。
 - CI：`rdp_server_required` → capability `rdp`；`system_rdp_running`（Windows 系统远程桌面运行中）→ `rdp`；`release_build_required`（性能用例）→ `release`（该条目改用 release QA 构建）；音频/TermService 基线/xrdp 参考服务器分别为 `audio`/`rdp-baseline`/`xrdp`
 - Windows：NAT-01/PERF-01 三端运行，Windows 上经 `platform_choice` 在系统远程桌面提示中选 Taomni；系统远程桌面分支由 TC-RDPS-NAT-06 覆盖，TermService 基线由 TC-RDPS-PERF-02 测量
 - 声音（RDPSND 播放）：服务器回采本机默认输出（Windows WASAPI loopback、Linux PipeWire sink monitor），按客户端格式重采样为 PCM 下发；macOS 13+ 用 ScreenCaptureKit 系统音频（排除 Taomni 自身声音）；TC-RDPS-NAT-04 在宿主播放单音、由探针经 RDPSND 接收并判定频率。CI `audio`：Linux 为 PipeWire null sink，Windows 为 VB-CABLE，macOS 为 BlackHole 虚拟设备

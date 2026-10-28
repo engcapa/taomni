@@ -4,6 +4,7 @@ use super::files::cleanup_stale_staging;
 use super::host_content::HostBusy;
 use super::host_content::read_host;
 use super::host_content::write_host;
+use super::host_poll::HostPoll;
 use super::limits::CONTENT_POLL;
 use super::limits::TOKEN_POLL;
 use super::policy::ClipboardPolicy;
@@ -24,6 +25,7 @@ use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc::Receiver;
 use std::sync::mpsc::RecvTimeoutError;
+use std::time::Instant;
 
 /// The host worker: owns arboard, watches for changes, performs writes.
 pub(super) fn run_worker(shared: Arc<Shared>, commands: Receiver<Command>) {
@@ -38,8 +40,9 @@ pub(super) fn run_worker(shared: Arc<Shared>, commands: Receiver<Command>) {
     };
     let level = shared.policy.server_to_client;
     let mut token = ChangeToken::new();
-    let mut last_token = token.current();
-    let poll = if last_token.is_some() {
+    let initial_token = token.current();
+    let mut host_poll = HostPoll::new(initial_token, Instant::now());
+    let poll = if initial_token.is_some() {
         TOKEN_POLL
     } else {
         CONTENT_POLL
@@ -53,7 +56,7 @@ pub(super) fn run_worker(shared: Arc<Shared>, commands: Receiver<Command>) {
                 let now = token.current();
                 match read_host(&mut clipboard, level) {
                     Ok(content) if !content.is_empty() => {
-                        last_token = now;
+                        host_poll.observed(now, false, Instant::now());
                         known = Some(content.identity());
                         // The client can request a format as soon as its list
                         // is queued. Publish the payload first, as on the
@@ -62,11 +65,11 @@ pub(super) fn run_worker(shared: Arc<Shared>, commands: Receiver<Command>) {
                         shared.set_snapshot(content.clone());
                         shared.advertise(&content);
                     }
-                    // Busy, or nothing readable yet (another process may be
-                    // mid-write): leave the change token alone so the next
-                    // tick reads the host again instead of treating this
-                    // state as already announced.
+                    // A format declaration can precede its data without a
+                    // second token change. Empty snapshots keep a rate-limited
+                    // content check; busy reads leave the token unconsumed.
                     Ok(content) => {
+                        host_poll.observed(now, true, Instant::now());
                         shared
                             .log
                             .line("clipboard: nothing to offer on this computer's clipboard yet");
@@ -89,9 +92,10 @@ pub(super) fn run_worker(shared: Arc<Shared>, commands: Receiver<Command>) {
                     content.describe()
                 ));
                 // The write is the new baseline and must not bounce back.
-                last_token = token.current();
+                let now = token.current();
                 known = Some(content.identity());
                 let current = read_host(&mut clipboard, level).unwrap_or(content);
+                host_poll.observed(now, current.is_empty(), Instant::now());
                 shared.set_snapshot(current);
                 continue;
             }
@@ -102,14 +106,14 @@ pub(super) fn run_worker(shared: Arc<Shared>, commands: Receiver<Command>) {
             continue;
         }
         let now = token.current();
-        if now.is_some() && now == last_token {
+        if !host_poll.should_read(now, Instant::now()) {
             continue;
         }
         // Busy: keep the old token so the next tick reads again.
         let Ok(content) = read_host(&mut clipboard, level) else {
             continue;
         };
-        last_token = now;
+        host_poll.observed(now, content.is_empty(), Instant::now());
         let identity = content.identity();
         if known == Some(identity) {
             shared.set_snapshot(content);

@@ -643,6 +643,7 @@ cases:
 - TC-RDPS-UI-03-rdp-media-clipboard-settings
 - TC-RDPJ-01-client-server-loopback
 - TC-RDPJ-02-joint-clipboard-no-echo
+- TC-RDPJ-03-deferred-clipboard-publication
 - TC-MFA-001
 - TC-MFA-002
 - TC-MFA-003

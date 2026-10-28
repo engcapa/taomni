@@ -116,6 +116,7 @@
           "mail_stress",
           "macos_updater",
           "rdp_server_required",
+          "rdp_deferred_clipboard",
           "system_rdp_running",
           "release_build_required",
           "rdp_baseline_required",

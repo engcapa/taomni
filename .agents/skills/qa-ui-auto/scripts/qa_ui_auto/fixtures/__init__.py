@@ -91,6 +91,7 @@ from . import backup_cloud
 from . import credential_store
 from . import path_completion
 from . import dual_display_required
+from . import rdp_deferred_clipboard
 
 
 class FixtureContext(Protocol):
@@ -164,6 +165,7 @@ REGISTRY: dict[str, Fixture] = {
     "mail_server": Fixture("mail_server", mail_server.setup, mail_server.teardown),
     "macos_updater": Fixture("macos_updater", macos_updater.setup, macos_updater.teardown),
     "rdp_server_required": Fixture("rdp_server_required", rdp_server_required.setup),
+    "rdp_deferred_clipboard": Fixture("rdp_deferred_clipboard", rdp_deferred_clipboard.setup, rdp_deferred_clipboard.teardown),
     "system_rdp_running": Fixture("system_rdp_running", system_rdp_running.setup),
     "release_build_required": Fixture("release_build_required", release_build_required.setup),
     "rdp_baseline_required": Fixture("rdp_baseline_required", rdp_baseline_required.setup, rdp_baseline_required.teardown),
