@@ -1,6 +1,7 @@
 """Real PTY burst output and passive Tauri channel ordering evidence."""
 from __future__ import annotations
 
+from contextlib import contextmanager
 import hashlib
 import json
 from pathlib import Path
@@ -111,6 +112,27 @@ def channel_summary(trace: dict) -> dict:
             'missing': sorted(set(range(indices[0], indices[-1] + 1)) - set(indices)),
         }
     return result
+
+
+@contextmanager
+def observe_output(session: Any, raw_path: Path, summary: dict):
+    """Keep passive raw evidence even when the original output observation fails."""
+    session.execute(TRACE_INSTALL)
+    captured: dict = {}
+    try:
+        yield captured
+    finally:
+        original = sys.exception()
+        try:
+            trace = session.execute(TRACE_COLLECT)
+            raw_path.write_text(json.dumps(trace) + '\n')
+            captured['trace'] = trace
+            summary.update(channels=channel_summary(trace), callbackErrors=trace['errors'],
+                           console=trace['console'], terminals=trace['terminals'])
+        except BaseException as diagnostic:
+            summary['observationError'] = str(diagnostic)
+            if original is None:
+                raise
 
 
 def review_trace(trace: dict, begin: str, end: str) -> dict:

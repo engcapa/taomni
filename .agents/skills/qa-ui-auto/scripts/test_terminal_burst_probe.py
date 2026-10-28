@@ -37,6 +37,44 @@ class ProducerTest(TestCase):
             self.assertGreaterEqual(record["elapsedMs"], 0)
 
 
+class ObservationTest(TestCase):
+    def test_failure_still_retains_raw_bytes_and_preserves_the_original_error(self):
+        failure = TimeoutError("output end line was not rendered")
+        raw = {**trace(), "console": [{"message": "native fetch failed"}], "terminals": []}
+        class Session:
+            def execute(self, script):
+                return raw if script == probe.TRACE_COLLECT else 2
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "raw.json"
+            summary = {}
+            with self.assertRaises(TimeoutError) as caught:
+                with probe.observe_output(Session(), path, summary):
+                    raise failure
+            self.assertIs(caught.exception, failure)
+            self.assertEqual(json.loads(path.read_text()), raw)
+            self.assertEqual(summary["console"], raw["console"])
+            self.assertGreater(summary["channels"]["7"]["bytes"], 2097152)
+
+    def test_collection_failure_never_hides_original_but_fails_successful_workload(self):
+        failure = TimeoutError("original output timeout")
+        class Session:
+            def execute(self, script):
+                if script == probe.TRACE_COLLECT:
+                    raise ConnectionError("diagnostic WebView disconnected")
+                return 2
+        with tempfile.TemporaryDirectory() as directory:
+            summary = {}
+            path = Path(directory) / "raw.json"
+            with self.assertRaises(TimeoutError) as caught:
+                with probe.observe_output(Session(), path, summary):
+                    raise failure
+            self.assertIs(caught.exception, failure)
+            self.assertIn("disconnected", summary["observationError"])
+            with self.assertRaises(ConnectionError):
+                with probe.observe_output(Session(), path, {}):
+                    pass
+
+
 class OracleTest(TestCase):
     def test_tauri_out_of_order_arrival_retains_exact_ordered_bytes(self):
         raw = trace()

@@ -23,6 +23,8 @@ from workspace_perf import common
 from tauri_webdriver import NativeHarness
 from native_build import verify_identity
 from qa_ui_auto.native_steps import NativeStepContext, VERBS
+from qa_ui_auto import terminal_burst_probe
+from qa_ui_auto.terminal_burst_probe import observe_output
 
 binary = checkout / "src-tauri/target/qa-ui-auto/release/taomni"
 identity = verify_identity(binary)
@@ -53,6 +55,7 @@ result = {
     "metrics": {},
     "events": [],
     "sourceStable": False,
+    "outputObserverSha256": hashlib.sha256(Path(terminal_burst_probe.__file__).read_bytes()).hexdigest(),
     "harnessSha256": {
         Path(f).name: hashlib.sha256(Path(f).read_bytes()).hexdigest()
         for f in Path(__file__).resolve().parent.glob("*.py")
@@ -179,26 +182,29 @@ def sessions():
                     + marker
                     + "\\r\\n')\n"
                 )
-                started = time.monotonic()
-                VERBS["terminal_input"](
-                    ctx,
-                    {
-                        "selector": '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea',
-                        "text": "python3 " + shlex.quote(str(producer)),
-                        "submit": True,
-                    },
-                )
-                until(
-                    s,
-                    "(document.querySelector('[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]')?.getAttribute('data-terminal-text')||'').split(/\\r?\\n/).some(line=>line.trim()==="
-                    + q(marker)
-                    + ")",
-                    180,
-                )
+                diagnostics = result["metrics"]["outputDiagnostics"] = {}
+                with observe_output(s, folder / "terminal-output-raw.json", diagnostics):
+                    started = time.monotonic()
+                    VERBS["terminal_input"](
+                        ctx,
+                        {
+                            "selector": '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea',
+                            "text": "python3 " + shlex.quote(str(producer)),
+                            "submit": True,
+                        },
+                    )
+                    until(
+                        s,
+                        "(document.querySelector('[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]')?.getAttribute('data-terminal-text')||'').split(/\\r?\\n/).some(line=>line.trim()==="
+                        + q(marker)
+                        + ")",
+                        180,
+                    )
+                    output_observed_ms = (time.monotonic() - started) * 1000
                 result["metrics"]["output2MiB"] = {
-                    "observedElapsedMs": (time.monotonic() - started) * 1000,
+                    "observedElapsedMs": output_observed_ms,
                     "producer": json.loads(receipt.read_text()),
-                    "limit": "QA full-history mirror is included; not production mirror=false throughput",
+                    "limit": "QA full-history mirror and passive IPC byte observation are included; not production mirror=false throughput",
                 }
                 known = common.owned_processes(binary)
                 result["metrics"]["beforeCloseProcesses"] = known
