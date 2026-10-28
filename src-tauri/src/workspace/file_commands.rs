@@ -96,7 +96,6 @@ pub fn workspace_read_loose_file_with_encoding(
     loose_file_from_bytes_with_encoding(&target, bytes, meta, Some(&encoding))
 }
 
-#[tauri::command]
 pub fn workspace_write_file(
     repo_root: String,
     path: String,
@@ -157,7 +156,6 @@ pub fn workspace_write_file(
     workspace_read_file(repo_root, path, None)
 }
 
-#[tauri::command]
 pub fn workspace_write_loose_file(
     path: String,
     contents: String,
@@ -219,7 +217,6 @@ pub fn workspace_write_loose_file(
 /// Write text using the selected editor encoding while retaining the existing
 /// hash-precondition and atomic replacement guarantees. Returns a typed ack
 /// carrying the exact written byte identity (§8.18.1 native contract).
-#[tauri::command]
 pub fn workspace_write_file_encoded(
     repo_root: String,
     path: String,
@@ -262,7 +259,6 @@ pub fn workspace_write_file_encoded(
     })
 }
 
-#[tauri::command]
 pub fn workspace_write_loose_file_encoded(
     path: String,
     contents: String,

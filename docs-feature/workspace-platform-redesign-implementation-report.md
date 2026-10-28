@@ -19,6 +19,8 @@ Windows native `TC-IDE-C0-03` 的 424 个输入字符完整到达编辑器，编
 
 补充性能边界复核：现有四个保存 IPC 为同步处理，加入锁重试后可能占用 UI 线程最长 2 秒。新增 Windows-only `TC-IDE-C0-04`，使用报告目录内真实的不共享 DELETE 的 reader 持锁，实际 Ctrl+S 后观察待发布临时文件，在锁仍持有时要求 Home/Workspaces 导航低于 1,500ms，再释放锁并核对精确磁盘 SHA-256、完整旧文件和临时文件清理。先在保持同步保存的源码上采集原生区分证据，随后由异步阻塞任务承接写入并保留保存串行顺序。该用例不属于 RDP/VNC 性能例外；既有九条崩溃专项数量不变。探针的路径隔离、平台限制和异常释放单测通过，实际原生结果待 GitHub 执行。
 
+四个保存 IPC 现通过独立 `commands/workspace_writes.rs` owner 使用异步队列与 `spawn_blocking`：队列等待和真实写入均不占用 UI 或异步执行线程，任务持有队列 guard 至实际写入结束，保留原来跨保存调用的串行排他。原同步 Rust API、IPC 名/参数/回执和编码、hash 前置条件保留；worker 异常标记 disk effect unknown，不能伪称未写入。单线程异步 runtime 的阻塞写入/队列及异常释放契约 **2/2 passed**，相同测试二进制的原子写入 **16/16 passed**；768 个 native command、328 个 facade exports、39 个 literal events 的兼容检查通过。完整锁场景在同步源码上的区分采集为 [40633593507](https://github.com/engcapa/taomni/actions/runs/40633593507)，结果仍待托管回执；先前 [40632227021](https://github.com/engcapa/taomni/actions/runs/40632227021) 同样受错误的观察器契约阻断，不作原生 UI 结论。异步版本随后须完成相关集、完整全量及正式性能对照。
+
 另一失败为 macOS native `TC-RDPS-PERF-03-photo-content`：baseline/adaptive observed FPS 为 **28.1567 / 21.0972**，比值 **0.7492768147280562**，原阈值为 ≥0.85，bulk 解码错误为 0。按用户 2026-10-28 的明确授权，RDP/VNC server/client 性能 case 失败可暂忽略；本项原始失败与慢样本保留，未修改 RDP 算法或阈值、未算作通过。正式 UI 性能 workflow 默认仍要求全绿；只有显式给出的现有 remote performance case ID 可以作为验收例外，保存/崩溃/skip/infra/缺失回执均不适用。plan 同时记录真实 full-suite passed 状态和已接受失败。
 
 以下为修复前已完成的历史全绿及测量准备，最新修复仍须先跑相关集、再跑完整 GitHub 全量，随后完成四轮原生性能对照。

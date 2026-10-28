@@ -7580,6 +7580,8 @@ files:
   - src/lib/terminal/commandInput.ts
   - src-tauri/src/lsp.rs
   - src-tauri/src/workspace_execution.rs
+  - src-tauri/src/workspace/file_commands.rs
+  - src-tauri/src/commands/workspace_writes.rs
   - src-tauri/src/test_results.rs
   - src-tauri/src/dap.rs
 controls:

@@ -50,6 +50,7 @@ mod workspace;
 mod workspace_execution;
 mod workspace_search;
 mod workspace_tooling;
+mod workspace_writes;
 mod wsl;
 
 pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
