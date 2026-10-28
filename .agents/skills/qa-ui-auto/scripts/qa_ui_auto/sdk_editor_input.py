@@ -1,6 +1,6 @@
 """Measure real paced keys separately from the time spent typing a whole file.
 
-Every key retains the 1.5s action budget and has a stricter 150ms frame budget.
+Every input batch retains the 1.5s action budget; each key has a 150ms frame budget.
 The full wall time, all characters and native event/frame observations remain in
 the report. No JS document writes, input dispatch or faster driver pacing.
 """
@@ -16,6 +16,7 @@ from .steps import StepError
 
 KEY_FRAME_BUDGET_MS = 150
 KEY_ACTION_BUDGET_MS = 1500
+INPUT_BATCH_SIZE = 8
 
 
 def install_script(selector: str) -> str:
@@ -32,7 +33,7 @@ const keydown=event=>{
     sample.frameMs=performance.now()-sample.started;
     state.frames.push({key:sample.key,frameMs:sample.frameMs,
       document:view.state.doc.toString(),dom:el.textContent,
-      caret:view.state.selection.main.head});
+      caret:view.state.selection.main.head,keyCount:state.keys.length});
   });
 };
 const input=event=>state.inputs.push({type:event.type,data:event.data,
@@ -59,12 +60,19 @@ def review(state: Any, text: str, *, exact: bool = True) -> None:
     keys, frames = state.get("keys", []), state.get("frames", [])
     if [item.get("key") for item in keys] != list(text) or [item.get("key") for item in frames] != list(text):
         raise StepError("SDK typing keys/frames were lost, duplicated or reordered")
+    previous_count = 0
     for index, frame in enumerate(frames):
         latency = frame.get("frameMs")
         if type(latency) not in {int, float} or not math.isfinite(latency) or not 0 <= latency <= KEY_FRAME_BUDGET_MS:
             raise StepError(f"SDK typing key {index + 1} exceeded the {KEY_FRAME_BUDGET_MS}ms frame budget: {latency}")
-        if not frame.get("document", "").startswith(text[:index + 1]) or frame.get("caret") != index + 1:
+        # More than one real key may be delivered before the next frame. Check
+        # that frame against every key observed by then, not just its first key.
+        count = frame.get("keyCount")
+        if (type(count) is not int or not max(index + 1, previous_count) <= count <= len(text)
+                or not frame.get("document", "").startswith(text[:count])
+                or frame.get("caret") != count):
             raise StepError(f"SDK typing key {index + 1} did not reach the canonical editor document/caret")
+        previous_count = count
     # Automatic closing brackets are valid intermediate suffixes. The final
     # review requires exact text, with no normalization or bracket repair.
     if exact and (not frames or frames[-1].get("document") != text or frames[-1].get("dom") != text):
@@ -74,31 +82,38 @@ def review(state: Any, text: str, *, exact: bool = True) -> None:
 def measure(session: Any, selector: str, text: str, case_dir: Path,
             require_pending: Callable[[], Any]) -> dict:
     report = {"passed": False, "text": text, "keyActionBudgetMs": KEY_ACTION_BUDGET_MS,
-              "keyFrameBudgetMs": KEY_FRAME_BUDGET_MS, "requests": []}
+              "keyFrameBudgetMs": KEY_FRAME_BUDGET_MS, "batchSize": INPUT_BATCH_SIZE,
+              "requests": []}
     started = time.monotonic()
     installed = False
     try:
         if session.execute(install_script(selector)) is not True:
             raise StepError("SDK typing observer could not bind the focused real editor")
         installed = True
-        for index, character in enumerate(text):
+        for offset in range(0, len(text), INPUT_BATCH_SIZE):
+            batch = text[offset:offset + INPUT_BATCH_SIZE]
+            end = offset + len(batch)
             began = time.monotonic()
-            request = {"key": character, "passed": False}
+            request = {"text": batch, "firstKey": offset + 1, "lastKey": end, "passed": False}
             report["requests"].append(request)
             try:
-                session.type_text(character)
+                # Preserve the driver's real keyboard events and its original
+                # 20ms per-key pacing. Reading IPC/heartbeats after every key
+                # otherwise adds ~100 WebDriver round trips to this short text,
+                # consuming the real SDK's unchanged five-second lifetime.
+                session.type_text(batch)
                 deadline = began + KEY_ACTION_BUDGET_MS / 1000
                 while True:
                     state = session.execute(READ_SCRIPT)
-                    if isinstance(state, dict) and len(state.get("frames", [])) >= index + 1:
+                    if isinstance(state, dict) and len(state.get("frames", [])) >= end:
                         break
                     if time.monotonic() >= deadline:
                         raise StepError("SDK typing frame did not appear within 1500ms")
                     time.sleep(.01)
-                review(state, text[:index + 1], exact=index == len(text) - 1)
+                review(state, text[:end], exact=end == len(text))
                 request["sdkPending"] = require_pending()
                 if (time.monotonic() - began) * 1000 > KEY_ACTION_BUDGET_MS:
-                    raise StepError("SDK typing key request exceeded the unchanged 1500ms action budget")
+                    raise StepError("SDK typing batch request exceeded the unchanged 1500ms action budget")
                 request["passed"] = True
             finally:
                 request["durationMs"] = (time.monotonic() - began) * 1000

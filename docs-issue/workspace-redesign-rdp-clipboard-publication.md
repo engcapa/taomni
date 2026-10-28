@@ -22,6 +22,6 @@
 - 保留 `TC-RDPJ-02-joint-clipboard-no-echo`、`TC-RDPS-NAT-02-clipboard-rich`、`TC-RDPS-NAT-03-clipboard-files`、`TC-RDPS-NAT-09-clipboard-policy`。产品变更还需完整 crash-regression browser/native。
 - 本机 release Rust clipboard 单测：23 passed，包括 6 条新调度边界测试；fixture 工具单测 5 passed。未在本机运行 browser/native。
 - YAML/schema、行为契约、catalog audit、`pnpm check:refactor` 通过。
-- 修复后的真实原生结果待 GitHub 执行，本文件不将单测或改前诊断通过记为当前产品通过。
+- 修复定向 [40767562150](https://github.com/engcapa/taomni/actions/runs/40767562150) 已完成 21/21 passed（macOS browser 7、native 14）。原始回执和 382 个发布附件 SHA 已独立核验，包含原 02、新 03、rich/files/policy 及完整适用崩溃组。最终组合源码仍需三平台相关集及全量，不以该定向提交替代。
 
 本机原始证据根：`/home/zhyhang/.cache/taomni-workspace-redesign-20261027/github-40761729585/`。CI 链接：<https://github.com/engcapa/taomni/actions/runs/40761729585>。

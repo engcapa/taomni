@@ -134,8 +134,8 @@ def run(ctx: Any, args: Any) -> str:
             raise StepError("Opening a real source never reached the held SDK process")
         report["sourceOpenWhileSdkPending"] = require_pending()
         # A long paced string is many user key actions, not one latency
-        # sample. Retain all characters and wall time; budget every real key
-        # and its rendered frame independently while the same SDK stays held.
+        # sample. Retain all characters and wall time; budget every real key's
+        # rendered frame and each paced batch while the same SDK stays held.
         action("prepare-edit-source", lambda: session.fill(editor, ""), content_is(""))
         report["typing"] = measure_editor_input(session, editor, edited_source, ctx.case_dir, require_pending)
         action("home", lambda: session.click(selector("nav-mode-home")),

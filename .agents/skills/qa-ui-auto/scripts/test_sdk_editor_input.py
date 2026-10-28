@@ -13,7 +13,7 @@ from qa_ui_auto.steps import StepError
 def sample(text):
     return {"keys": [{"key": key} for key in text], "frames": [
         {"key": key, "frameMs": 12, "document": text[:index + 1],
-         "dom": text[:index + 1], "caret": index + 1}
+         "dom": text[:index + 1], "caret": index + 1, "keyCount": index + 1}
         for index, key in enumerate(text)], "inputs": []}
 
 
@@ -28,7 +28,8 @@ class SdkEditorInputTest(unittest.TestCase):
                 review({**valid, field: replacement}, "abc")
         for field, value in [("frameMs", 150.01), ("frameMs", float("nan")),
                               ("frameMs", None), ("document", "abc}"),
-                              ("dom", "abc}"), ("caret", 2)]:
+                              ("dom", "abc}"), ("caret", 2),
+                              ("keyCount", None), ("keyCount", 4), ("keyCount", True)]:
             changed = copy.deepcopy(valid)
             changed["frames"][-1][field] = value
             with self.subTest(field=field, value=value), self.assertRaises(StepError):
@@ -43,23 +44,52 @@ class SdkEditorInputTest(unittest.TestCase):
         with self.assertRaises(StepError):
             review(state, "{")
 
-    def test_each_character_and_raw_sample_is_retained_with_same_pending_sdk(self):
+    def test_frames_with_multiple_paced_keys_require_the_complete_observed_prefix(self):
+        state = sample("abc")
+        for frame in state["frames"][:2]:
+            frame.update(document="ab", dom="ab", caret=2, keyCount=2)
+        review(state, "abc")
+        state["frames"][0]["document"] = "a"
+        with self.assertRaisesRegex(StepError, "canonical editor"):
+            review(state, "abc")
+        state["frames"][0].update(document="abc", caret=3, keyCount=3)
+        with self.assertRaisesRegex(StepError, "canonical editor"):
+            review(state, "abc")
+
+    def test_each_character_and_raw_sample_is_retained_in_original_paced_batches(self):
         typed = []
+        text = "public class Main { int value = 7; }"
         session = Mock()
         session.type_text.side_effect = typed.append
         session.execute.side_effect = lambda script: sample("".join(typed)) if script in {READ_SCRIPT, CLEANUP_SCRIPT} else True
         pending = Mock(return_value={"pid": 77, "pending": True})
         with tempfile.TemporaryDirectory() as directory:
-            report = measure(session, ".cm-content", "abc", Path(directory), pending)
+            report = measure(session, ".cm-content", text, Path(directory), pending)
             retained = json.loads((Path(directory) / "sdk-typing-responsiveness.json").read_text())
             self.assertEqual(retained, report)
         self.assertTrue(report["passed"])
-        self.assertEqual(typed, list("abc"))
-        self.assertEqual(pending.call_count, 3)
+        self.assertEqual(typed, [text[offset:offset + 8] for offset in range(0, len(text), 8)])
+        self.assertEqual("".join(typed), text)
+        self.assertEqual(pending.call_count, 5)
         self.assertEqual(report["keyActionBudgetMs"], 1500)
         self.assertEqual(report["keyFrameBudgetMs"], 150)
+        self.assertEqual(report["batchSize"], 8)
+        self.assertEqual(report["observation"], sample(text))
+        self.assertEqual("".join(request["text"] for request in report["requests"]), text)
+        self.assertEqual([(r["firstKey"], r["lastKey"]) for r in report["requests"]],
+                         [(1, 8), (9, 16), (17, 24), (25, 32), (33, 36)])
+
+    def test_a_completed_sdk_cannot_pass_from_fast_complete_typing_samples(self):
+        session = Mock()
+        session.execute.side_effect = [True, sample("abc"), sample("abc")]
+        pending = Mock(side_effect=StepError("SDK child is no longer alive and waiting"))
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(StepError, "no longer alive"):
+                measure(session, ".cm-content", "abc", Path(directory), pending)
+            report = json.loads((Path(directory) / "sdk-typing-responsiveness.json").read_text())
+        self.assertFalse(report["passed"])
+        self.assertFalse(report["requests"][0]["passed"])
         self.assertEqual(report["observation"], sample("abc"))
-        self.assertEqual([request["key"] for request in report["requests"]], list("abc"))
 
     def test_input_failure_stays_original_and_observer_cleanup_is_attempted(self):
         session = Mock()

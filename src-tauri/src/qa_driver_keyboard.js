@@ -1,5 +1,19 @@
 // Embedded by the opt-in macOS QA bridge. Untrusted key events do not run
 // browser editing or implicit form submission, so mirror those defaults here.
+function normalizeQaWebDriverKey(value) {
+  return ({
+    '\uE003':'Backspace',
+    '\uE004':'Tab','\uE007':'Enter','\uE008':'Shift','\uE009':'Control',
+    '\uE00A':'Alt','\uE00B':'Pause','\uE00C':'Escape','\uE00D':' ',
+    '\uE00E':'PageUp','\uE00F':'PageDown','\uE010':'End','\uE011':'Home',
+    '\uE012':'ArrowLeft','\uE013':'ArrowUp','\uE014':'ArrowRight','\uE015':'ArrowDown',
+    '\uE016':'Insert','\uE017':'Delete',
+    '\uE031':'F1','\uE032':'F2','\uE033':'F3','\uE034':'F4','\uE035':'F5','\uE036':'F6',
+    '\uE037':'F7','\uE038':'F8','\uE039':'F9','\uE03A':'F10','\uE03B':'F11','\uE03C':'F12',
+    '\uE03D':'Meta'
+  })[value] || value;
+}
+
 function dispatchQaKeyDefault(el, key, event, modifiers) {
   if (event.defaultPrevented || modifiers.Control || modifiers.Meta || modifiers.Alt ||
       ["Control", "Shift", "Alt", "Meta"].includes(key)) return;

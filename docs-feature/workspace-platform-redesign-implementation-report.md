@@ -1,6 +1,8 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 当前已合并 main `c793f30b`，四角绘制与 Compact 目录加载修复后的全量 [40743957940](https://github.com/engcapa/taomni/actions/runs/40743957940) 为 **645 个适用 ID、2,115 passed / 3 failed、25/25 分片**，原始回执和最终汇总已独立核验。macOS 慢 LSP 与 RDP 剪贴板是功能失败，继续诊断；RDP 延迟 p95 90.153292ms 超过 65ms，按用户授权单列保留，不计通过。正式四轮性能对照尚未通过，旧源码的通过记录不能替代当前验收。新增文件打开、SDK 后台初始化及每次添加目录展开的实现已完成本机单测，见[SDK 跟进记录](./workspace-platform-redesign-sdk-startup-followup.md)，待当前组合源码的托管相关集、完整 10 ID 崩溃专项和全量验证。browser/native 继续只在 GitHub 执行；本机仅单测、静态检查与 QA release 编译。唯一外部 clickhousecrud 缺口按用户确认单列。以下历史章节以本节最新状态为准。
+> 当前已合并 main `c793f30b`。文件先显示并可编辑、SDK/LSP 后台初始化、普通文件跳过自动探测及每次成功添加目录展开 Project 的实现已完成，见[SDK 跟进记录](./workspace-platform-redesign-sdk-startup-followup.md)。候选 `3190f31e` 的三平台 browser 相关集 **51/51 passed**，原生阶段发现并正在修正逐字观察往返耗尽 SDK 超时及 macOS QA 桥漏译 Backspace 两项工具问题；保留全部原失败，修正后重跑三平台相关集和完整 10 ID 崩溃专项。RDP 剪贴板功能修复定向 [40767562150](https://github.com/engcapa/taomni/actions/runs/40767562150) 已独立核验 **21/21 passed**。
+
+> 正式四轮性能对照尚未通过，当前组合源码的全量尚待执行。旧全量 [40743957940](https://github.com/engcapa/taomni/actions/runs/40743957940) 的 **645 个适用 ID、2,115 passed / 3 failed、25/25 分片**仍原样保留，20,307 个发布附件 SHA 已独立核验，62 个明确上传排除的大夹具单列。RDP 性能失败按用户授权单列，不计通过；clickhousecrud 外部缺口按用户确认保留。browser/native 只在 GitHub 执行，本机仅单测、静态检查与 QA release 编译。以下历史章节以本节最新状态为准。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)

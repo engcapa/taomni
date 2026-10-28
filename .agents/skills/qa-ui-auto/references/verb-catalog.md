@@ -281,8 +281,11 @@ opens and edits `src/index.ts` (default) or `src/Main.java`,
 visits Home, restores the workspace and opens `Documents/notes.txt`. File opening,
 selection/clearing and navigation keep a fixed 1500ms dispatch-to-result budget.
 Typing retains every character and the driver's original 20ms pacing, measures
-each key request against 1500ms and every keydown-to-frame against 150ms, and
-checks the canonical document/caret after each key plus exact final DOM/text.
+each batch of at most eight keys against 1500ms and every keydown-to-frame
+against 150ms. Frames check the canonical document/caret against every key
+observed by that frame, plus exact final DOM/text; no keys or slow frames are
+discarded when several keys share a frame. IPC/heartbeat reads occur after each
+batch to avoid spending the held SDK's lifetime on observation round trips.
 Full typing wall time and all raw key/input/frame samples are retained separately
 in `sdk-typing-responsiveness.json`; whole-string typing time is not UI latency.
 The same independently compiled

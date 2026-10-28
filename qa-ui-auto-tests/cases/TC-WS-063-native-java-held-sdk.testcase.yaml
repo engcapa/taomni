@@ -1,7 +1,7 @@
 id: TC-WS-063
 title: Java source editing stays responsive during real SDK discovery
 description: The real SDK java -version executable waits on a host gate with live child heartbeats. Open/edit a real Main.java source, visit Home, restore
-  Workspace and open an ordinary file before the unchanged five-second SDK timeout. Opening, clearing and navigation retain 1500ms; every paced real key retains 1500ms per request and a stricter 150ms key-to-frame limit, with all characters, raw samples and total typing wall time retained. The same child and
+  Workspace and open an ordinary file before the unchanged five-second SDK timeout. Opening, clearing and navigation retain 1500ms; every batch of at most eight real paced keys retains 1500ms per request and every key retains a stricter 150ms key-to-frame limit, with all characters, raw samples and total typing wall time retained. Each frame must contain the canonical prefix and caret for every key observed by that frame. The same child and
   real IPC are still pending. Concurrent same-root callers must share exactly one real SDK child. Release in finally, observe actual stdio LSP dirty-buffer messages, preserve active notes.txt, then save/reopen and independently
   hash disk bytes. No LSP initialize delay or renderer SDK promise substitution is used.
 modes:
