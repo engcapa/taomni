@@ -2,7 +2,7 @@ import { beforeEach, expect, it } from "vitest";
 import { useAppStore } from "../../../stores/appStore";
 import { useCodeWorkspaceStore } from "../../../stores/codeWorkspaceStore";
 import { DEFAULT_WORKSPACE_ID, useWorkspacePlatformStore } from "../../../stores/workspacePlatformStore";
-import { workspaceEditorRuntimeId } from "../../../lib/workspaceRuntimeIdentity";
+import { workspaceEditorInstanceId } from "../../../lib/workspaceRuntimeIdentity";
 import { revealWorkspaceFolder } from "../workspaceFolderReveal";
 
 beforeEach(() => {
@@ -14,7 +14,7 @@ beforeEach(() => {
 
 it("reveals the selected root without dropping other tree expansion", () => {
   const editor = useCodeWorkspaceStore.getState();
-  const id = workspaceEditorRuntimeId({ id: DEFAULT_WORKSPACE_ID });
+  const id = workspaceEditorInstanceId(useWorkspacePlatformStore.getState().getWorkspace()!);
   editor.updateExpandedRootIds(id, ["old-root"]);
   editor.updateExpandedDirKeys(id, ["old-root:src"]);
   editor.patchInstance(id, { languagePanelOpen: false });

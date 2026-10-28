@@ -4,6 +4,10 @@ import type { PlatformWorkspace } from "../stores/workspacePlatformStore";
 export const workspaceEditorRuntimeId = (workspace: Pick<PlatformWorkspace, "id">) =>
   `ws:${workspace.id}:editor`;
 
+/** Persisted UI/layout owner; imported workspaces retain their original ID. */
+export const workspaceEditorInstanceId = (workspace: Pick<PlatformWorkspace, "id" | "codeWorkspace">) =>
+  workspace.codeWorkspace?.workspaceInstanceId ?? `platform:${workspace.id}`;
+
 export function activeWorkspaceRuntimeTabId(workspace: PlatformWorkspace | undefined): string | undefined {
   const tab = workspace?.openTabs.find((item) => item.id === workspace.activeTabId);
   return workspace && (tab?.kind === "file" || tab?.kind === "code")

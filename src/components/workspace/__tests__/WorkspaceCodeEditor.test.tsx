@@ -6,6 +6,8 @@ import { useAppStore } from "../../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../../stores/workspacePlatformStore";
 import { useWorkspaceGitContextStore } from "../../../stores/workspaceGitContextStore";
 import type { CodeWorkspaceContext } from "../../../stores/app/types";
+import { useCodeWorkspaceStore } from "../../../stores/codeWorkspaceStore";
+import { revealWorkspaceFolder } from "../workspaceFolderReveal";
 
 const editor = vi.hoisted(() => ({ props: null as CodeWorkspaceTabProps | null }));
 vi.mock("../../editor/CodeWorkspaceTab", () => ({
@@ -38,6 +40,26 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("platform editor ownership", () => {
+  it.each(["default", "imported"])("reveals the actual %s editor instance after another folder is added", (kind) => {
+    if (kind === "default") {
+      workspaceId = useWorkspacePlatformStore.getState().createWorkspace({ name: "Default" }).id;
+      useWorkspacePlatformStore.getState().addRootFolder(workspaceId, { path: "/first" });
+    }
+    useWorkspacePlatformStore.getState().setActiveWorkspace(workspaceId);
+    useAppStore.setState({ activeSideTab: "workspaces", sidebarCollapsed: true });
+    render(<Harness />);
+    const instanceId = editor.props!.workspace.workspaceInstanceId!;
+    act(() => useCodeWorkspaceStore.getState().patchInstance(instanceId, { languagePanelOpen: false }));
+    const added = useWorkspacePlatformStore.getState().addRootFolder(workspaceId, { path: "/second" })!;
+    act(() => revealWorkspaceFolder(workspaceId, added.id));
+    const live = useCodeWorkspaceStore.getState().byInstanceId[instanceId];
+    expect(live.languagePanelOpen).toBe(true);
+    expect(live.expandedRootIds).toContain(added.id);
+    expect(live.expandedDirKeys).toContain(`${added.id}:`);
+    expect(useAppStore.getState().sidebarCollapsed).toBe(false);
+    expect(current().activeLeftToolWindow).toBe("project");
+  });
+
   it("retains the requested initial file until the editor publishes it, and then records a closed last file", async () => {
     render(<Harness />);
     act(() => useAppStore.getState().setTabCodeWorkspaceContext(tabId, context()));
