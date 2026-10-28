@@ -1,8 +1,9 @@
-"""Prepare matched release runtimes only after a successful hosted full suite."""
+"""Prepare matched runtimes after a full suite with no unaccepted failures."""
 
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import json
 import os
 from pathlib import Path
@@ -15,20 +16,38 @@ from qa_ui_auto.ci import selection_entry
 from qa_ui_auto.provenance import execution_identity
 
 EXTERNAL_CASE = "TC-IDE-C6-06-java-definition-realproject-native"
+# Explicit opt-in for the user's remote desktop performance exception. A
+# functional failure, missing case, crash or infrastructure error is never
+# eligible, and the failed receipt/summary remains failed.
+REMOTE_PERFORMANCE_CASES = {
+    "TC-RDPS-PERF-01-performance-budget",
+    "TC-RDPS-PERF-02-windows-termservice-baseline",
+    "TC-RDPS-PERF-03-photo-content",
+}
 
 
 def gh(*args):
     return subprocess.check_output(["gh", *args], text=True)
 
 
-def validate_gate(run, selection, summary, head, identity):
+def validate_gate(run, selection, summary, head, identity, accepted_failures=()):
+    accepted = set(accepted_failures)
+    if not accepted <= REMOTE_PERFORMANCE_CASES:
+        raise ValueError("Only explicitly accepted remote desktop performance IDs are eligible")
+    failures = summary.get("failures", [])
+    if any(failure.get("case") not in accepted for failure in failures):
+        raise ValueError("Unaccepted functional failure")
+    failed_cells = {(failure.get("entry"), failure.get("case")) for failure in failures}
+    if len(failed_cells) != len(failures):
+        raise ValueError("Duplicate failed execution cells")
+    expected_conclusion = "failure" if failures else "success"
     if (
         run.get("head_sha") != head
-        or run.get("conclusion") != "success"
+        or run.get("conclusion") != expected_conclusion
         or run.get("path") != ".github/workflows/qa-ui-auto-platforms.yml"
     ):
         raise ValueError(
-            "A successful qa-ui-auto-platforms run for this commit is required"
+            "A matching full qa-ui-auto-platforms run with no unaccepted failures is required"
         )
     if (
         selection.get("scope") != "all"
@@ -40,9 +59,8 @@ def validate_gate(run, selection, summary, head, identity):
     ):
         raise ValueError("Full-suite source, runner and invocation must match")
     if (
-        summary.get("passed") is not True
+        summary.get("passed") is not (not failures)
         or summary.get("report_ok") is not True
-        or summary.get("failures")
         or summary.get("infrastructure_errors")
         or not summary.get("job_results")
         or any(
@@ -50,7 +68,7 @@ def validate_gate(run, selection, summary, head, identity):
             for value in summary["job_results"].values()
         )
     ):
-        raise ValueError("Functional cases and supporting jobs must all pass")
+        raise ValueError("Unaccepted failures, missing results or failed supporting jobs")
     groups = summary.get("groups", [])
     required = {
         f"{platform}-{mode}"
@@ -59,11 +77,18 @@ def validate_gate(run, selection, summary, head, identity):
     }
     if not required <= {group["id"] for group in groups}:
         raise ValueError("All three browser/native platform groups are required")
+    failed_groups = Counter(failure.get("group_id") for failure in failures)
+    if not set(failed_groups) <= {group["id"] for group in groups}:
+        raise ValueError("Failed execution group missing from the summary")
     for group in groups:
+        count = failed_groups[group["id"]]
+        expected_counts = {"passed": group.get("selected", 0) - count}
+        if count:
+            expected_counts["failed"] = count
         if (
             group.get("errors")
             or not group.get("selected")
-            or group.get("counts") != {"passed": group["selected"]}
+            or group.get("counts") != expected_counts
         ):
             raise ValueError("Missing or nonpassing functional execution cells")
     for gap in selection.get("gaps", []):
@@ -140,7 +165,11 @@ def prepare(args):
     selection_path = out / "selection/selection.json"
     selection = json.loads(selection_path.read_text())
     summary = json.loads((out / "summary/ci-summary.json").read_text())
-    validate_gate(run, selection, summary, head, execution_identity(repo))
+    accepted_failures = [
+        item.strip() for item in args.accepted_performance_failures.split(",")
+        if item.strip()
+    ]
+    validate_gate(run, selection, summary, head, execution_identity(repo), accepted_failures)
     entry = linux_release_entry(selection)
     # This also binds every selected YAML digest, using the existing CI contract.
     selection_entry(selection_path, entry["id"])
@@ -191,6 +220,11 @@ def prepare(args):
         "baseline": args.baseline,
         "candidate": head,
         "functionalRun": args.functional_run,
+        "functionalAllCasesPassed": summary["passed"],
+        "acceptedPerformanceFailures": [
+            failure for failure in summary.get("failures", [])
+            if failure["case"] in accepted_failures
+        ],
         "order": ["main-1", "candidate-1", "main-2", "candidate-2"],
         "build": "Original release QA identities, source digests and binary bytes checked before every launch",
         "limits": [
@@ -252,6 +286,7 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--functional-run", type=int)
     parser.add_argument("--baseline")
+    parser.add_argument("--accepted-performance-failures", default="")
     args = parser.parse_args()
     if args.operation == "prepare":
         if not args.functional_run or not args.baseline:

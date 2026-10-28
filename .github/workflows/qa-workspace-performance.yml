@@ -9,13 +9,17 @@ on:
   workflow_dispatch:
     inputs:
       functional_run:
-        description: Successful qa-ui-auto-platforms full-suite run for this exact commit
+        description: qa-ui-auto-platforms full-suite run for this exact commit
         type: string
         required: true
       baseline:
         description: Immutable main commit merged before the full suite
         type: string
         required: true
+      accepted_performance_failures:
+        description: Explicitly accepted remote desktop performance case IDs (CSV); failed receipts stay failed
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -90,12 +94,14 @@ jobs:
             cargo install tauri-driver --version 2.0.4 --locked --root "$adapter"
           fi
           echo "$adapter/bin" >> "$GITHUB_PATH"
-      - name: Verify successful full suite and preserve original matched runtimes
+      - name: Verify full functional results and preserve original matched runtimes
         env:
           GH_TOKEN: ${{ github.token }}
+          QA_ACCEPTED_PERFORMANCE_FAILURES: ${{ inputs.accepted_performance_failures }}
         run: >-
           python -m workspace_perf.hosted prepare
           --functional-run "$QA_FUNCTIONAL_RUN" --baseline "$QA_BASELINE"
+          --accepted-performance-failures "$QA_ACCEPTED_PERFORMANCE_FAILURES"
           --out qa-ui-auto-report/workspace-performance
       - name: Alternate main and candidate on one isolated native desktop
         run: >-

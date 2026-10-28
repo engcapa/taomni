@@ -1,6 +1,6 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 产品提交 `0535305b` 已完成三平台 browser/native 全量功能验收：641 个适用 ID、2,103/2,103 次执行、25/25 分片，0 failed / skipped / infrastructure errors；全部原始回执、源码/runner/case/原生构建身份及最终汇总已独立核验。此前相关集为 38 ID、140/140 passed。main `65d6d907` 已合并。首轮正式 Linux/WebKitGTK 性能流程因测量工具的 SVG 点击错误失败，尚未测量候选版本，不能得出性能结论；工具修复后重新执行精确 HEAD 门禁。后续 browser/native 均只在 GitHub 执行，本机仅做单测、静态检查和供手测的 release 编译。唯一外部 clickhousecrud 项目缺口按用户确认单独列出。以下历史章节中的“待复验”仅代表当时状态，以本节当前验收为准。
+> 最新精确 HEAD `11f57e40` 的三平台全量为 2,101 passed / 2 failed，25/25 分片，0 skipped / infrastructure errors；九条崩溃专项仍为 42/42 passed。Windows 大文件编辑后的原子保存遇到共享锁，正在修复并等待托管复验；另一项 macOS RDP 照片性能失败按用户最新授权单列，保留失败结果、不计为通过。此前产品提交 `0535305b` 的 2,103/2,103 全绿作为历史证据保留，不能覆盖最新失败。main `65d6d907` 已合并。正式 UI 性能对照仍待完成，不作无退化结论。browser/native 均只在 GitHub 执行，本机仅做单测、静态检查和手测用 release 编译。唯一外部 clickhousecrud 缺口按用户确认单列。以下历史章节以本节最新状态为准。
 
 > 关联设计：[workspace-platform-redesign-design.md](./workspace-platform-redesign-design.md)
 > 关联原型：[workspace-platform-redesign-prototype.html](./workspace-platform-redesign-prototype.html)
@@ -8,6 +8,18 @@
 > 分支：`docs/workspace-platform-redesign`
 
 ## 当前功能验收与性能复核（2026-10-28）
+
+SVG 点击工具修复提交 `11f57e40d440d5558adc316aa75387dda90eaf52` 的全量 [40619625516](https://github.com/engcapa/taomni/actions/runs/40619625516) 已收齐全部原始回执并独立核验：**2,101 passed / 2 failed，25/25 分片**，没有跳过或基础设施错误。完整九条崩溃专项 **42/42 passed**，失败不能被 job 本身的绿色状态掩盖。
+
+Windows native `TC-IDE-C0-03` 的 424 个输入字符完整到达编辑器，编辑器内容 SHA-256 正确，但磁盘仍为编辑前 1MiB 内容。失败画面显示 `rename temp file: Access is denied. (os error 5)`。原哈希观察使用 Python 普通文件读取，在 Windows 不共享 DELETE，可与 Ctrl+S 后的原子替换竞争；真实扫描器也可短时持有此锁。现在将既有备份原子替换重试提取为共享 `atomic_replace`，工作区保存复用：只对 Windows 5/32/33 错误每 20ms 重试，最长 2 秒，其他错误立即返回，保留原有写入、sync、hash 比较和失败反馈，不先删除或截断旧文件。
+
+独立的 host 文件哈希观察改为 Windows READ/WRITE/DELETE 共享打开，完整流式计算原始字节 SHA-256，保持原有期望值、超时和轮询频率。当前打开的句柄读完整旧快照，下一轮观察新发布文件。新增真实文件替换、错误哈希拒绝、异常句柄释放，以及 Windows 普通 reader 确定性复现拒绝/新 observer 允许替换的契约；共享 Rust 契约继续覆盖真实短时锁、永久锁保留完整文件和其他错误立即失败。Windows 构建统一执行并保存这些契约日志。`TC-IDE-C0-03` 保留全部输入/延迟/磁盘 hash/history 断言，并补充末尾运行时错误断言；相关保存、编码、草稿恢复和备份用例保护共享边界。提取没有新增产品工作流，未增加重复 case ID。
+
+本机 release 配置的 `workspace::tests::atomic_writes` **16/16 passed**，共享替换 helper 的 Linux 契约 **3/3 passed**；性能工具与 host observer 共 20 项单测为 **19 passed / 1 Windows 专属 skip**，该 Win32 项明确待托管执行。`cargo fmt --check`、`pnpm check:refactor`、`audit --gate` 均通过，没有在本机运行 browser/native 用例。
+
+另一失败为 macOS native `TC-RDPS-PERF-03-photo-content`：baseline/adaptive observed FPS 为 **28.1567 / 21.0972**，比值 **0.7492768147280562**，原阈值为 ≥0.85，bulk 解码错误为 0。按用户 2026-10-28 的明确授权，RDP/VNC server/client 性能 case 失败可暂忽略；本项原始失败与慢样本保留，未修改 RDP 算法或阈值、未算作通过。正式 UI 性能 workflow 默认仍要求全绿；只有显式给出的现有 remote performance case ID 可以作为验收例外，保存/崩溃/skip/infra/缺失回执均不适用。plan 同时记录真实 full-suite passed 状态和已接受失败。
+
+以下为修复前已完成的历史全绿及测量准备，最新修复仍须先跑相关集、再跑完整 GitHub 全量，随后完成四轮原生性能对照。
 
 相关集 [40604739146](https://github.com/engcapa/taomni/actions/runs/40604739146) 已核验 **38 ID、140/140 passed**，18/18 分片。随后在相同产品提交 `0535305b3fd0b9d0bc8425e7ee8a023b5433c0c2` 执行 `scope=all`：[40609887227](https://github.com/engcapa/taomni/actions/runs/40609887227)，最终 **641 个适用 ID、2,103/2,103 passed**，25/25 分片，0 failed / skipped / infrastructure errors。以下数量均来自原始回执核验，未将未分配、未执行或不适用项计为通过。
 

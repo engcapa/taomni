@@ -320,15 +320,18 @@ jobs:
           python .agents/skills/qa-ui-auto/scripts/ci_native_artifact.py \
             --selection qa-ui-auto-report/selection.json --build "$QA_BUILD_ID" \
             --archive qa-build-output/runtime.tar.gz 2>&1 | tee qa-build-output/build.log
-      - name: Windows backup journal replacement contracts
-        if: runner.os == 'Windows' && inputs.operation == 'build' && contains(matrix.capabilities, 'secret-service')
+      - name: Windows atomic file replacement contracts
+        if: runner.os == 'Windows' && inputs.operation == 'build'
         run: |
-          rustc --edition=2024 --test src-tauri/src/backup/atomic_replace.rs -o qa-build-output/backup-atomic-tests.exe
+          rustc --edition=2024 --test src-tauri/src/atomic_replace.rs -o qa-build-output/backup-atomic-tests.exe
           qa-build-output/backup-atomic-tests.exe --test-threads=1 2>&1 | tee qa-build-output/backup-atomic-contracts.log
       - name: Windows backup journal reader contracts
         if: runner.os == 'Windows' && inputs.operation == 'build' && contains(matrix.capabilities, 'secret-service')
         run: |
           python -m unittest -v test_backup_journal test_backup_journal_windows 2>&1 | tee qa-build-output/backup-reader-contracts.log
+      - name: Windows file observation contracts
+        if: runner.os == 'Windows' && inputs.operation == 'build'
+        run: python -m unittest -v test_host_file_observation 2>&1 | tee qa-build-output/file-observation-contracts.log
       - name: Windows capture helper contracts
         if: runner.os == 'Windows' && inputs.operation == 'build'
         env:
@@ -365,6 +368,7 @@ jobs:
             qa-build-output/session-cleanup-contracts.log
             qa-build-output/backup-atomic-contracts.log
             qa-build-output/backup-reader-contracts.log
+            qa-build-output/file-observation-contracts.log
             qa-ui-auto-report/${{ matrix.id }}/
           retention-days: 14
       - name: Download this invocation's verified native runtime

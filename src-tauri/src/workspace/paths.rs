@@ -130,7 +130,7 @@ pub(super) fn ensure_inside(root: &Path, target: &Path) -> Result<(), String> {
 /// the workspace without its old contents. Never delete the target first — the
 /// old delete-then-rename sequence lost the only copy when the rename failed.
 pub(super) fn replace_file(tmp: &Path, target: &Path) -> std::io::Result<()> {
-    fs::rename(tmp, target)
+    crate::atomic_replace::retry(|| fs::rename(tmp, target))
 }
 
 pub(super) fn reject_workspace_root_target(

@@ -92,6 +92,46 @@ class FunctionalGateTest(TestCase):
         with self.assertRaises(ValueError):
             self.check()
 
+    def remote_failure(self, case="TC-RDPS-PERF-03-photo-content"):
+        self.run["conclusion"] = "failure"
+        self.summary["passed"] = False
+        self.summary["groups"][0]["counts"] = {"passed": 2, "failed": 1}
+        self.summary["failures"] = [{
+            "entry": "linux-browser-shard-1", "group_id": "linux-browser", "case": case,
+        }]
+
+    def test_explicit_remote_performance_exception_preserves_the_failed_result(self):
+        self.remote_failure()
+        original = deepcopy(self.summary)
+        with self.assertRaises(ValueError):
+            self.check()
+        validate_gate(self.run, self.selection, self.summary, self.head, self.identity,
+                      ["TC-RDPS-PERF-03-photo-content"])
+        self.assertEqual(self.summary, original)
+        self.assertFalse(self.summary["passed"])
+
+    def test_exception_cannot_accept_a_save_failure_or_crash(self):
+        for case in ["TC-IDE-C0-03", "TC-WS-054"]:
+            with self.subTest(case=case):
+                self.remote_failure(case)
+                with self.assertRaises(ValueError):
+                    validate_gate(self.run, self.selection, self.summary, self.head,
+                                  self.identity, [case])
+
+    def test_exception_cannot_conceal_skips_missing_results_or_infrastructure_failure(self):
+        self.remote_failure()
+        original = deepcopy(self.summary)
+        for patch in [
+            {"infrastructure_errors": ["driver unavailable"]},
+            {"job_results": {"plan": "success", "execute": "failure"}},
+            {"report_ok": False},
+            {"groups": [{**original["groups"][0], "counts": {"passed": 1, "failed": 1, "skipped": 1}}, *original["groups"][1:]]},
+            {"failures": original["failures"] * 2},
+        ]:
+            with self.subTest(patch=patch), self.assertRaises(ValueError):
+                validate_gate(self.run, self.selection, {**original, **patch}, self.head,
+                              self.identity, ["TC-RDPS-PERF-03-photo-content"])
+
 
 class WorkloadTest(TestCase):
     def test_historical_builder_uses_probe_identity_without_changing_the_checkout(self):
