@@ -1,7 +1,7 @@
 id: TC-WS-060
 title: Every successful Add Folder reveals Project and expands the selected root
-description: Add first, second and third real/VFS roots while Project is collapsed or Sessions is selected. Cancellation and passive mode switching
-  preserve collapse; explicitly reopening an existing root reveals it without duplicates.
+description: Add first, second and third real/VFS roots while Project is collapsed or Sessions is selected. Cancellation and passive mode switching preserve
+  collapse; explicitly reopening an existing root reveals it without duplicates.
 modes:
 - browser
 - native
@@ -56,6 +56,11 @@ steps:
 - assert_count:
     selector: '[data-testid="code-workspace-tree-root"]'
     equal: 3
+- click: '[data-testid="code-workspace-tree-root"][data-root-path="${fixture.platform_workspace_root}/Documents"] [data-testid="code-workspace-tree-root-arrow"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-root"][data-root-path="${fixture.platform_workspace_root}/Documents"]'
+    name: aria-expanded
+    equals: 'false'
 - click: '[data-testid="code-workspace-tool-rail-project"]'
 - assert_not_visible: '[data-testid="code-workspace-tree"]'
 - click: '[data-testid="workspace-open-session-plus"]'
@@ -71,6 +76,7 @@ steps:
     selector: '[data-testid="workspace-fs-modal-input"]'
     value: ${fixture.platform_workspace_root}/Documents
 - click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-root"][data-root-path="${fixture.platform_workspace_root}/Documents"][aria-expanded="true"]'
 - wait_for: '[data-testid="code-workspace-tree-file"][data-path="notes.txt"]'
 - assert_count:
     selector: '[data-testid="code-workspace-tree-root"]'
@@ -84,8 +90,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Every explicit successful Add Folder, including an existing root, reveals the active workspace Project tree with the new root
-      expanded. Cancellation and passive Home/Workspaces navigation preserve the prior collapse, no root or editor runtime is duplicated.
+    requirement: Every explicit successful Add Folder, including an existing root, reveals the active workspace Project tree with the new root expanded.
+      Cancellation and passive Home/Workspaces navigation preserve the prior collapse, no root or editor runtime is duplicated.
     actions:
     - 3
     - 4
@@ -104,14 +110,15 @@ verification:
     - 24
     - 28
     - 30
-    - 31
     - 32
+    - 33
     - 34
-    - 35
+    - 36
     - 37
-    - 38
     - 39
     - 40
+    - 41
+    - 42
     results:
     - 9
     - 11
@@ -121,11 +128,12 @@ verification:
     - 26
     - 27
     - 29
-    - 33
-    - 36
-    - 42
-    - 43
-    - 44
+    - 31
+    - 35
+    - 38
+    - 45
+    - 46
+    - 47
     checkpoints:
     - step: 9
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"Documents\"]"}'
@@ -142,16 +150,19 @@ verification:
     - step: 27
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree-root\"]", "equal": 3}}'
     - step: 29
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree-root\"][data-root-path=\"${fixture.platform_workspace_root}/Documents\"]",
+        "name": "aria-expanded", "equals": "false"}}'
+    - step: 31
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree\"]"}'
-    - step: 33
+    - step: 35
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree\"]"}'
-    - step: 36
+    - step: 38
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree\"]"}'
-    - step: 42
+    - step: 45
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree-root\"]", "equal": 3}}'
-    - step: 43
+    - step: 46
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
-    - step: 44
+    - step: 47
       expectation: '{"assert_no_runtime_errors": null}'
   visual:
   - check: Project tree appears with the selected root and readable file rows.
@@ -160,5 +171,4 @@ verification:
   native:
   - check: Added native directories are enumerated by the shared production explorer in the packaged WebView.
     method: automated
-    reason: Browser VFS cannot prove native directory enumeration or native pane layout. Existing TC-WS-042 retains the actual system chooser
-      boundary.
+    reason: Browser VFS cannot prove native directory enumeration or native pane layout. Existing TC-WS-042 retains the actual system chooser boundary.

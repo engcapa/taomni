@@ -34,12 +34,21 @@
       throw error;
     }
   }
-  target.invoke = invoke;
+  if (!Reflect.set(target, "invoke", invoke) || target.invoke !== invoke) {
+    throw new Error("Language startup observer: invoke is not writable");
+  }
   window.__taomniQaLanguageStartup = {
-    observe: () => ({ events: events.map((event) => ({ ...event })), nowMs: performance.now() }),
+    observe: () => ({
+      valid: target.invoke === invoke,
+      transport: "browser-invoke",
+      events: events.map((event) => ({ ...event })),
+      nowMs: performance.now(),
+    }),
     restore: () => {
       if (target.invoke !== invoke) throw new Error("Language startup invoke owner changed");
-      target.invoke = original;
+      if (!Reflect.set(target, "invoke", original) || target.invoke !== original) {
+        throw new Error("Language startup invoke could not be restored");
+      }
       delete window.__taomniQaLanguageStartup;
     },
   };
