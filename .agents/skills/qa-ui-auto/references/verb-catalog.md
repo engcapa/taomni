@@ -294,6 +294,11 @@ pending after each action, before the unchanged five-second production timeout.
 The verb releases its case-owned gate in `finally`, retaining all action timings,
 heartbeat events and invoke observations in `sdk-startup-responsiveness.json` on
 both success and failure. A timed-out child cannot establish responsiveness.
+`sdk-action-trace.json` separately retains original WebDriver request timings,
+actual pointer-event times, next frames and canonical/DOM publication. It never
+logs request payloads or replays input. Native language observations also retain
+file-read callback times in `fileReads`, separate from SDK/LSP invocation counts;
+file contents are excluded. These passive diagnostics do not change any budget.
 
 `observe_language_startup: null` installs a forwarding-only observer. Browser
 observation wraps the stub registry's invoke method. Native observation keeps

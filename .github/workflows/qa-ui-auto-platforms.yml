@@ -152,7 +152,7 @@ jobs:
         run: python -m unittest test_native_pointer test_ci_x11_session test_ci_ssh_features test_runtime_errors test_native_resize_observer test_native_console test_terminal_burst_probe test_ci_windows_ssh_shell test_ci_windows_posix_ssh test_native_drag test_backup_cloud test_backup_journal test_browser_evidence test_keyboard_steps
       - name: Language startup process and observation contracts
         if: inputs.scope != 'selected'
-        run: python -m unittest test_language_startup_observer test_sdk_startup_probe test_workspace_slow_sdk test_sdk_editor_input test_native_contenteditable test_rdp_deferred_clipboard
+        run: python -m unittest test_language_startup_observer test_sdk_startup_probe test_workspace_slow_sdk test_sdk_editor_input test_sdk_action_trace test_native_contenteditable test_rdp_deferred_clipboard
       - name: Linux package setup contracts
         run: python -m unittest test_ci_linux_setup test_ci_setup_protoc
       - uses: actions/setup-node@v4
@@ -166,7 +166,7 @@ jobs:
         run: node --test scripts/compose-updater-manifest.test.mjs .agents/skills/qa-ui-auto/scripts/test_ci_macos_consent.cjs
       - name: Browser and native language startup observer contracts
         if: inputs.scope != 'selected'
-        run: node --test .agents/skills/qa-ui-auto/scripts/test_language_startup_observer.mjs .agents/skills/qa-ui-auto/scripts/test_native_language_startup_observer.mjs
+        run: node --test .agents/skills/qa-ui-auto/scripts/test_language_startup_observer.mjs .agents/skills/qa-ui-auto/scripts/test_native_language_startup_observer.mjs .agents/skills/qa-ui-auto/scripts/test_sdk_action_trace.mjs
       - name: Wayland automation contracts
         if: inputs.scope != 'selected'
         run: python -m unittest test_wayland_tools test_multi_display test_ci_wayland_startup

@@ -15,6 +15,8 @@
   const callbacks = target.callbacks;
   const wrappedCallbacks = new Map();
   const events = [];
+  const fileReads = [];
+  const fileCommands = new Set(["workspace_read_file", "workspace_read_loose_file"]);
   const probe = { command: "plugin:app|name", observed: false, status: "pending" };
   const watched = new Set([
     "sdk_get_registry", "sdk_analyze_workspace", "sdk_resolve_workspace",
@@ -42,6 +44,7 @@
     function callback(...args) {
       event.status = status;
       event.finishedMs = performance.now();
+      if (event.startedEpochMs !== undefined) event.finishedEpochMs = Date.now();
       // Preserve Tauri's once/unregister and original return/throw semantics.
       return Reflect.apply(original, this, args);
     }
@@ -51,12 +54,16 @@
   }
   function fetch(resource, options, ...rest) {
     const command = commandFor(resource);
-    if (command !== null && (watched.has(command) || command === probe.command)) {
+    if (command !== null && (watched.has(command) || fileCommands.has(command) || command === probe.command)) {
+      const output = fileCommands.has(command) ? fileReads : events;
       const event = command === probe.command ? probe : {
-        index: events.length, command, startedMs: performance.now(), status: "pending",
+        index: output.length, command, startedMs: performance.now(), status: "pending",
       };
       if (event === probe) probe.observed = true;
-      else events.push(event);
+      else {
+        if (output === fileReads) event.startedEpochMs = Date.now();
+        output.push(event);
+      }
       try {
         const headers = new Headers(options?.headers ?? resource.headers);
         for (const [name, status] of [["Tauri-Callback", "fulfilled"], ["Tauri-Error", "rejected"]]) {
@@ -92,6 +99,7 @@
       transportProbe: { ...probe },
       observationError,
       events: events.map((event) => ({ ...event })),
+      fileReads: fileReads.map((event) => ({ ...event })),
       nowMs: performance.now(),
     }),
     restore: () => {

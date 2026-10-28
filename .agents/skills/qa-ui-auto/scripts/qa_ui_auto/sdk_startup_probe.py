@@ -14,6 +14,7 @@ from typing import Any, Callable
 from .deadline import budget_time as time
 from .language_startup_observer import validate_observation
 from .sdk_editor_input import measure as measure_editor_input
+from .sdk_action_trace import capture as capture_action_trace
 from .steps import StepError
 
 ACTION_BUDGET_MS = 1500
@@ -100,11 +101,15 @@ def run(ctx: Any, args: Any) -> str:
 
     def action(label: str, invoke: Callable[[], Any], expression: str, *, pending: bool = True) -> None:
         started = time.monotonic()
-        record = {"label": label, "started": started, "passed": False}
+        record = {"label": label, "started": started,
+                  "startedEpochMs": time.time() * 1000, "passed": False}
         report["actions"].append(record)
         try:
             invoke()
+            record["invokeDurationMs"] = (time.monotonic() - started) * 1000
+            record["invokeCompletedEpochMs"] = time.time() * 1000
             until(expression, started + ACTION_BUDGET_MS / 1000)
+            record["resultObservedEpochMs"] = time.time() * 1000
             if pending:
                 record["sdkPending"] = require_pending()
             record["durationMs"] = (time.monotonic() - started) * 1000
@@ -118,35 +123,44 @@ def run(ctx: Any, args: Any) -> str:
         return f"document.querySelector({json.dumps(editor)})?.textContent === {json.dumps(text)}"
 
     try:
-        observation()
-        # File read/publication must complete without awaiting SDK discovery.
-        action("open-source", lambda: session.dblclick(source_row),
-               "document.querySelector(" + json.dumps(editor) + ")?.textContent.includes(" + json.dumps(initial_source) + ")", pending=False)
-        started = time.monotonic()
-        while time.monotonic() - started < 1.5:
-            state = observation()
-            try:
-                child_pid = require_pending(state)["child"]["pid"]
-                break
-            except StepError:
-                time.sleep(.01)
-        if child_pid is None:
-            raise StepError("Opening a real source never reached the held SDK process")
-        report["sourceOpenWhileSdkPending"] = require_pending()
-        # A long paced string is many user key actions, not one latency
-        # sample. Retain all characters and wall time; budget every real key's
-        # rendered frame and each paced batch while the same SDK stays held.
-        action("prepare-edit-source", lambda: session.fill(editor, ""), content_is(""))
-        report["typing"] = measure_editor_input(session, editor, edited_source, ctx.case_dir, require_pending)
-        action("home", lambda: session.click(selector("nav-mode-home")),
-               "!!document.querySelector('[data-testid=\"welcome-panel\"]')")
-        action("restore-workspace", lambda: session.click(selector("nav-mode-workspaces")), content_is(edited_source))
-        action("open-ordinary-file", lambda: session.dblclick(notes_row),
-               "document.querySelector(" + json.dumps(editor) + ")?.textContent.includes('Weekly notes')")
-        report["finalPending"] = require_pending()
-        report["sdkProbeStarts"] = len({event["pid"] for event in events() if event["phase"] == "started"})
-        report["passed"] = True
-        return "Source editing, Home/Workspace restoration and ordinary-file opening completed during real SDK discovery"
+        with capture_action_trace(session, ctx.case_dir):
+            observation()
+            # File read/publication must complete without awaiting SDK discovery.
+            action("open-source", lambda: session.dblclick(source_row),
+                   "document.querySelector(" + json.dumps(editor) + ")?.textContent.includes(" + json.dumps(initial_source) + ")", pending=False)
+            started = time.monotonic()
+            source_pending = None
+            while time.monotonic() - started < 1.5:
+                state = observation()
+                try:
+                    source_pending = require_pending(state)
+                    child_pid = source_pending["child"]["pid"]
+                    break
+                except StepError:
+                    time.sleep(.01)
+            if child_pid is None:
+                raise StepError("Opening a real source never reached the held SDK process")
+            report["sourceOpenWhileSdkPending"] = source_pending
+            # A long paced string is many user key actions, not one latency
+            # sample. Retain all characters and wall time; budget every real key's
+            # rendered frame and each paced batch while the same SDK stays held.
+            action("prepare-edit-source", lambda: session.fill(editor, ""), content_is(""))
+            report["typing"] = measure_editor_input(session, editor, edited_source, ctx.case_dir, require_pending)
+            action("home", lambda: session.click(selector("nav-mode-home")),
+                   "!!document.querySelector('[data-testid=\"welcome-panel\"]')")
+            action("restore-workspace", lambda: session.click(selector("nav-mode-workspaces")), content_is(edited_source))
+            action("open-ordinary-file", lambda: session.dblclick(notes_row),
+                   "document.querySelector(" + json.dumps(editor) + ")?.textContent.includes('Weekly notes')")
+            # The last action already checked the real child and actual pending
+            # IPC after its result. With no intervening user action, a second
+            # WebDriver round trip would only spend the SDK's remaining life.
+            report["finalPending"] = report["actions"][-1]["sdkPending"]
+            report["sdkProbeStarts"] = len({event["pid"] for event in events() if event["phase"] == "started"})
+            report["passed"] = True
+            return "Source editing, Home/Workspace restoration and ordinary-file opening completed during real SDK discovery"
+    except BaseException:
+        report["passed"] = False
+        raise
     finally:
         try:
             try:

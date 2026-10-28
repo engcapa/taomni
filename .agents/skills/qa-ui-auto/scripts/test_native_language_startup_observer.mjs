@@ -90,6 +90,12 @@ test("unrelated fetch and ordinary commands retain their promise and never enter
   await h.complete(h.requests.at(-1), "real-file-response");
   assert.equal(await invocation, "real-file-response");
   assert.equal(h.observer().observe().events.length, 0);
+  const reads = h.observer().observe().fileReads;
+  assert.equal(reads.length, 1);
+  assert.equal(reads[0].command, "workspace_read_file");
+  assert.equal(reads[0].status, "fulfilled");
+  assert.ok(reads[0].finishedEpochMs >= reads[0].startedEpochMs);
+  assert.equal(JSON.stringify(reads).includes("SECRET"), false);
 });
 
 test("restore returns pending callbacks to Tauri and refuses another owner's changes", async () => {

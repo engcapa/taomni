@@ -1,6 +1,6 @@
 # 工作区文件打开与 SDK 后台初始化
 
-当前状态：SDK 产品修复和本机单测完成。GitHub `40768691984` 三平台 browser 为 51/51 通过；原生阶段已发现 Java 逐字观察往返耗尽 SDK 超时、macOS QA 桥漏译 Backspace 两项测试工具问题，正在修正并重新验证。原始失败保留，不将部分执行记为全部通过。正式性能对照仍未通过，不把单测或测量修正称为性能验收。关联[重构实现报告](./workspace-platform-redesign-implementation-report.md)。
+当前状态：候选 `2ff025f4` 相关集 [40773829621](https://github.com/engcapa/taomni/actions/runs/40773829621) 已完成，123 passed / 2 failed，18/18 执行分片已收齐。三平台 browser 51/51、Linux native 25/25、Windows native 24/24 通过；macOS Java 完整编辑也通过。macOS TypeScript 错误 SDK 场景打开普通文件为 1579.30ms，超出原有 1500ms，另一个正常 SDK 场景在所有交互及其 pending 检查通过后的重复观察越过五秒，仍保留原失败。已独立核验原始回执、汇总和 2044 个发布附件 SHA。正在补只读诊断并重跑，不能称全量或正式性能对照已通过。关联[重构实现报告](./workspace-platform-redesign-implementation-report.md)。
 
 ## 目标与保留行为
 
@@ -63,3 +63,9 @@ macOS 慢 LSP 诊断 run `40758688130` 已完成 17 passed / 0 failed，330 个�
 RDP 修复定向 run `40767562150` 已完成 21/21 passed（macOS browser 7、native 14），原始回执和 382 个发布附件 SHA 已独立核验，包含原 `TC-RDPJ-02`、新增同标记迟到发布、rich/files/policy 及完整适用崩溃组。该修复提交的证据不替代最终组合源码的三平台相关集和全量。
 
 本轮工具合同 33/33 通过，TypeScript、Rust formatting、`pnpm check:refactor` 和 `audit --gate` 通过；本机没有运行 browser/native UI。新工具及 QA 桥组合仍需匹配源码的托管相关集、完整崩溃组、全量与正式性能对照。
+
+## 剩余 macOS 响应时间诊断
+
+run `40773829621` 的 macOS `TC-WS-062` 已正确清空并输入完整源码；返回工作区为 1458.41ms，接着打开普通文件为 1579.30ms，失败截图已含正确 notes.txt。现有记录无法区分原生 WebDriver 准备/往返、真实文件读取与绘制，不将其归咎于产品或以重跑通过解释。补充 `sdk-action-trace.json`：原始 HTTP 方法/路径/耗时（不含 payload）、真实 pointer/click 时间、下一帧及 canonical/DOM 内容发表。原生转发观察器在独立 `fileReads` 中记录真实读文件 callback 时间，不改变 SDK/LSP counts、不读取源码响应。观察器退出时恢复原请求 owner、取消全部帧和监听器；既有动作、完整字符、1500/150ms 和五秒生产超时不变。
+
+同 run 的 macOS `TC-WS-061` 五个动作及其真实 pending 检查均通过（打开普通文件 1339.67ms），失败发生于无新用户动作之间的第二次最终观察。现在直接保留最后动作结束后已验证的 pending 快照；启动握手成功后也复用同一快照，减少两个重复的 WebDriver 观察请求。没有删除任何交互后的校验；原始 5 秒失败仍保留。正式性能仍须匹配四轮实测。
