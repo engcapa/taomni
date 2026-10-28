@@ -1,0 +1,80 @@
+name: Workspace native idle rendering diagnosis
+
+on:
+  push:
+    branches: ['qa/workspace-idle-diagnostic/*']
+  workflow_dispatch:
+    inputs:
+      functional_run:
+        description: Passing full functional run whose original QA runtime will be observed
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  PYTHONPATH: .agents/skills/qa-ui-auto/scripts
+  PYTHONUNBUFFERED: '1'
+  PYTHONUTF8: '1'
+  CARGO_BUILD_JOBS: '2'
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/qa-runtime
+        with:
+          mode: native
+      - name: Diagnostic resource and phase contracts
+        run: python -m unittest test_workspace_idle_diagnostic
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/taomni-qa/pipewire
+          key: qa-pipewire-1.0.9-Linux-X64-ubuntu-22.04-${{ hashFiles('.agents/skills/qa-ui-auto/scripts/ci_linux_setup.sh') }}
+      - name: Linux desktop dependencies
+        env:
+          QA_OPERATION: run
+          QA_LINUX_PROFILE: ubuntu-22.04-x11
+        run: bash .agents/skills/qa-ui-auto/scripts/ci_linux_setup.sh
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/taomni-qa/adapter
+          key: qa-tauri-driver-2.0.4-Linux-X64-ubuntu-22.04
+      - name: Native adapter
+        run: |
+          adapter="$HOME/.cache/taomni-qa/adapter"
+          if ! "$adapter/bin/tauri-driver" --help; then
+            cargo install tauri-driver --version 2.0.4 --locked --root "$adapter"
+          fi
+          echo "$adapter/bin" >> "$GITHUB_PATH"
+      - name: Verify and install the original passing QA runtime
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QA_INPUT_RUN: ${{ inputs.functional_run }}
+        run: |
+          functional_run="$QA_INPUT_RUN"
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            functional_run="${GITHUB_REF_NAME##*/}"
+          fi
+          python -m workspace_perf.diagnose prepare --functional-run "$functional_run" --out qa-ui-auto-report/workspace-idle-diagnostic
+      - name: Original rendering interleaved with reversible CSS interventions
+        run: >-
+          dbus-run-session -- xvfb-run -a
+          -s '-screen 0 1440x900x24 -nolisten tcp -noreset'
+          python -m workspace_perf.diagnose measure
+          --out qa-ui-auto-report/workspace-idle-diagnostic
+      - name: Preserve original identity and all diagnostic measurements
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace-idle-diagnostic-${{ github.run_id }}
+          path: qa-ui-auto-report/workspace-idle-diagnostic/
+          if-no-files-found: error
+          retention-days: 14
