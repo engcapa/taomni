@@ -53,6 +53,7 @@ def setup(ctx: Any) -> None:
     case_dir = Path(ctx.case_dir).resolve()
     manifest = build_probe(case_dir / "held-sdk")
     project = Path(ctx.values["platform_workspace_root"])
+    (project / "src" / "Main.java").write_text("public class Main { int value = 1; }\n", encoding="utf-8")
     (project / "build.gradle.kts").write_text('plugins { java }\n', encoding="utf-8")
     (project / "gradle.properties").write_text(
         "org.gradle.java.home=" + manifest["home"] + "\n", encoding="utf-8",
@@ -71,18 +72,19 @@ def setup(ctx: Any) -> None:
     lsp_documents.write_text("", encoding="utf-8")
     lsp_gate.write_text("release\n", encoding="utf-8")
     script = Path(workspace_slow_lsp.__file__).with_name("workspace_slow_lsp_server.py").resolve()
-    preset = "typescript-javascript"
+    presets = ["typescript-javascript", "java"]
+    command = {
+        "command": sys.executable,
+        "args": " ".join(json.dumps(arg) for arg in [
+            script.as_posix(), lsp_events.as_posix(), lsp_gate.as_posix(), lsp_documents.as_posix(),
+        ]),
+    }
     ctx.values.update(
         slow_lsp_events=lsp_events.as_posix(), slow_lsp_gate=lsp_gate.as_posix(),
         slow_sdk_lsp_documents=lsp_documents.as_posix(),
         slow_sdk_response_report=(case_dir / "sdk-startup-responsiveness.json").as_posix(),
-        slow_lsp_prefs=json.dumps({preset: "__custom__"}),
-        slow_lsp_command=json.dumps({preset: {
-            "command": sys.executable,
-            "args": " ".join(json.dumps(arg) for arg in [
-                script.as_posix(), lsp_events.as_posix(), lsp_gate.as_posix(), lsp_documents.as_posix(),
-            ]),
-        }}),
+        slow_lsp_prefs=json.dumps({preset: "__custom__" for preset in presets}),
+        slow_lsp_command=json.dumps({preset: command for preset in presets}),
     )
 
 

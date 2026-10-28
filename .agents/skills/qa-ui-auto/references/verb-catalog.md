@@ -275,8 +275,9 @@ Relative paths resolve from the repository root.
 
 ### SDK and language startup observation
 
-`native_sdk_startup_probe: {events, gate}` requires `workspace_slow_sdk` and the
-forwarding observer below. The native input driver opens and edits `src/index.ts`,
+`native_sdk_startup_probe: {events, gate, language?: typescript|java}` requires
+`workspace_slow_sdk` and the forwarding observer below. The native input driver
+opens and edits `src/index.ts` (default) or `src/Main.java`,
 visits Home, restores the workspace and opens `Documents/notes.txt`. Every action
 keeps a fixed 1500ms dispatch-to-result budget. The same independently compiled
 SDK child must emit fresh waiting heartbeats and the real SDK/LSP IPC must remain
@@ -285,11 +286,15 @@ The verb releases its case-owned gate in `finally`, retaining all action timings
 heartbeat events and invoke observations in `sdk-startup-responsiveness.json` on
 both success and failure. A timed-out child cannot establish responsiveness.
 
-`observe_language_startup: null` installs a forwarding-only invoke observer in
-browser/native mode. It calls the original owner with its original receiver,
-arguments and options, preserves results/errors, and records only command timing,
-workspace/root/file identities and pending/fulfilled/rejected state. It does not
-delay or replace SDK/LSP providers, and excludes source text and result bodies.
+`observe_language_startup: null` installs a forwarding-only observer. Browser
+observation wraps the stub registry's invoke method. Native observation keeps
+Tauri's read-only invoke unchanged, forwards the original custom-protocol fetch
+with its receiver/arguments/options, and observes actual callback Map completion.
+It first verifies a real `plugin:app|name` control response. Missing observation,
+read-only fetch or protocol fallback fails explicitly; zero counts then cannot
+pass. Only command timing/state is recorded natively; browser also records
+workspace/root/file identities. Request bodies, headers/invoke keys, source text
+and result bodies are excluded. SDK/LSP responses and errors are never replaced.
 
 `assert_language_startup: {commands: {sdk_resolve_workspace: {equal: 0}}, quiet_ms: 500}`
 checks per-command `min`, `max`, `equal`, `pending`, `fulfilled`, or `rejected`

@@ -18,6 +18,10 @@ from .steps import StepError
 ACTION_BUDGET_MS = 1500
 SDK_PROBE_TIMEOUT_MS = 5000
 EDITED_SOURCE = "export const edited = 7;"
+SOURCE_SCENARIOS = {
+    "typescript": ("src/index.ts", "export const platform", EDITED_SOURCE),
+    "java": ("src/Main.java", "public class Main", "public class Main { int value = 7; }"),
+}
 
 
 def selector(testid: str) -> str:
@@ -40,16 +44,20 @@ def pending_child(events: list[dict], now_ms: float, pid: int | None = None) -> 
 
 
 def run(ctx: Any, args: Any) -> str:
-    if not isinstance(args, dict) or set(args) != {"events", "gate"}:
-        raise StepError("native_sdk_startup_probe expects {events, gate}")
+    if not isinstance(args, dict) or not {"events", "gate"} <= set(args) or set(args) - {"events", "gate", "language"}:
+        raise StepError("native_sdk_startup_probe expects {events, gate, language?}")
+    language = args.get("language", "typescript")
+    if not isinstance(language, str) or language not in SOURCE_SCENARIOS:
+        raise StepError("native_sdk_startup_probe language must be typescript or java")
+    source_path, initial_source, edited_source = SOURCE_SCENARIOS[language]
     events_path, gate = (Path(str(args[key])).resolve() for key in ("events", "gate"))
     if not all(path.is_relative_to(ctx.case_dir.resolve()) for path in (events_path, gate)):
         raise StepError("SDK probe files must belong to this retained QA case")
     if gate.exists():
         raise StepError("SDK release gate already exists before the responsiveness check")
-    report: dict = {"passed": False, "actionBudgetMs": ACTION_BUDGET_MS, "actions": []}
+    report: dict = {"passed": False, "sourcePath": source_path, "actionBudgetMs": ACTION_BUDGET_MS, "actions": []}
     session = ctx.session
-    source_row = selector("code-workspace-tree-file") + '[data-path="src/index.ts"]'
+    source_row = selector("code-workspace-tree-file") + f'[data-path="{source_path}"]'
     notes_row = selector("code-workspace-tree-file") + '[data-path="Documents/notes.txt"]'
     editor = selector("workspace-file-editor") + " .cm-content"
 
@@ -110,7 +118,7 @@ def run(ctx: Any, args: Any) -> str:
         observation()
         # File read/publication must complete without awaiting SDK discovery.
         action("open-source", lambda: session.dblclick(source_row),
-               "document.querySelector(" + json.dumps(editor) + ")?.textContent.includes('export const platform')", pending=False)
+               "document.querySelector(" + json.dumps(editor) + ")?.textContent.includes(" + json.dumps(initial_source) + ")", pending=False)
         started = time.monotonic()
         while time.monotonic() - started < 1.5:
             state = observation()
@@ -122,10 +130,10 @@ def run(ctx: Any, args: Any) -> str:
         if child_pid is None:
             raise StepError("Opening a real source never reached the held SDK process")
         report["sourceOpenWhileSdkPending"] = require_pending()
-        action("edit-source", lambda: session.fill(editor, EDITED_SOURCE), content_is(EDITED_SOURCE))
+        action("edit-source", lambda: session.fill(editor, edited_source), content_is(edited_source))
         action("home", lambda: session.click(selector("nav-mode-home")),
                "!!document.querySelector('[data-testid=\"welcome-panel\"]')")
-        action("restore-workspace", lambda: session.click(selector("nav-mode-workspaces")), content_is(EDITED_SOURCE))
+        action("restore-workspace", lambda: session.click(selector("nav-mode-workspaces")), content_is(edited_source))
         action("open-ordinary-file", lambda: session.dblclick(notes_row),
                "document.querySelector(" + json.dumps(editor) + ")?.textContent.includes('Weekly notes')")
         report["finalPending"] = require_pending()
