@@ -23,6 +23,7 @@ export interface WorkspaceToolbarProps {
   looseFiles: CodeWorkspaceLooseFileInfo[];
   dirtyCount: number;
   visible: boolean;
+  hasSourceBuffers: boolean;
   workspaceWidgetHost: HTMLElement | null;
   projectFactsRoot: string;
   projectFacts: { refresh: (customOptions?: Partial<import("../../../../stores/projectFactsStore").FetchProjectFactsOptions>) => Promise<import("../../../../stores/projectFactsStore").WorkspaceProjectFactsEntry>; invalidate: (reason?: string) => void; workspaceRoot: string; generation: number; status: import("../../../../stores/projectFactsStore").ProjectFactsStatus; reason: string | null; fingerprint: string | null; structure: import("../projectStructureModel").ProjectStructureSnapshotV2 | null; provenance: import("../../../../lib/editor/workspaceTooling").MavenToolingProvenance | import("../../../../lib/editor/workspaceTooling").GradleToolingProvenance | null; isStale: boolean; abortController?: AbortController | null; };
@@ -108,7 +109,7 @@ export function WorkspaceToolbar(viewProps: WorkspaceToolbarProps) {
             status bar (portal) like IDEA's status widgets. */}
         {visible && workspaceWidgetHost
           ? createPortal(<>
-        <WorkspaceSdkStatus roots={roots} />
+        <WorkspaceSdkStatus roots={roots} autoResolve={visible && viewProps.hasSourceBuffers} />
             {projectFactsRoot && (
               <ProjectFactsStatusBadge
                 status={projectFacts.status}
@@ -124,7 +125,7 @@ export function WorkspaceToolbar(viewProps: WorkspaceToolbarProps) {
           </>, workspaceWidgetHost)
           : (
             <>
-        <WorkspaceSdkStatus roots={roots} />
+        <WorkspaceSdkStatus roots={roots} autoResolve={visible && viewProps.hasSourceBuffers} />
             {projectFactsRoot && (
               <ProjectFactsStatusBadge
                 status={projectFacts.status}

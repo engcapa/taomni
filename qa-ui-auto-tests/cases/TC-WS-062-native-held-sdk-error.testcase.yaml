@@ -1,6 +1,6 @@
 id: TC-WS-062
 title: A failed real SDK probe preserves responsive editing and exposes its error
-description: The real SDK java -version executable waits on a host gate with live child heartbeats. Open/edit a source, visit Home, restore Workspace and
+description: Concurrent same-root callers must share exactly one real SDK child. The real SDK java -version executable waits on a host gate with live child heartbeats. Open/edit a source, visit Home, restore Workspace and
   open an ordinary file before the unchanged five-second SDK timeout. Each UI action must complete within 1500ms while the same child and real IPC are still
   pending. Release in finally, observe actual stdio LSP dirty-buffer messages, preserve active notes.txt, then save/reopen and independently hash disk bytes.
   The child exits with a real nonzero error and the SDK dialog must expose it.

@@ -30,6 +30,8 @@ def selector(testid: str) -> str:
 
 def pending_child(events: list[dict], now_ms: float, pid: int | None = None) -> dict:
     started = {event["pid"]: event["epochMs"] for event in events if event["phase"] == "started"}
+    if len(started) > 1:
+        raise StepError(f"Concurrent callers launched {len(started)} SDK probes for the same root; expected one shared probe")
     ended = {event["pid"] for event in events if event["phase"] in {
         "released", "rejected", "fixture-timeout",
     }}
@@ -137,6 +139,7 @@ def run(ctx: Any, args: Any) -> str:
         action("open-ordinary-file", lambda: session.dblclick(notes_row),
                "document.querySelector(" + json.dumps(editor) + ")?.textContent.includes('Weekly notes')")
         report["finalPending"] = require_pending()
+        report["sdkProbeStarts"] = len({event["pid"] for event in events() if event["phase"] == "started"})
         report["passed"] = True
         return "Source editing, Home/Workspace restoration and ordinary-file opening completed during real SDK discovery"
     finally:

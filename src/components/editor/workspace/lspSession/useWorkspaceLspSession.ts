@@ -3,18 +3,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   lspChangeDocument,
   lspCloseDocument,
-  lspDetectServers,
   lspGetDiagnostics,
   lspOpenDocument,
   lspSaveDocument,
-  lspSetJavaBundles,
-  lspSetJavaHome,
-  lspSetJavaSettings,
-  lspSetJavaVmargs,
   lspStopWorkspace,
   type LspDocumentDescriptor,
   type LspDocumentStatus,
-  type LspServerStatus,
 } from "../../../../lib/editor/lsp";
 import { subscribeSdkRegistryChanged } from "../../../../lib/editor/sdk";
 import {
@@ -26,8 +20,6 @@ import {
   readLspCommandPrefs,
   readLspCustomCommands,
   readLspJavaHome,
-  readLspJavaSettings,
-  readLspJavaVmargs,
   subscribeLspServerPrefs,
   writeLspCommandPrefs,
   writeLspCustomCommands,
@@ -36,7 +28,7 @@ import {
 } from "../codeWorkspaceModel";
 import { isDiagnosticScopeCurrent, type DiagnosticScope } from "../diagnosticScopeModel";
 import { buildIncrementalContentChange } from "../lspTextEdits";
-import { resolveJavaBundles } from "./java";
+import { useWorkspaceServerDiscovery } from "./useWorkspaceServerDiscovery";
 import { type DocumentSyncQueue, type PendingDocumentSync, type UseWorkspaceLspSessionOptions, type WorkspaceLspSessionController } from "./model";
 import {
   LSP_DIAGNOSTICS_IDLE_DELAY_MS,
@@ -56,8 +48,11 @@ export function useWorkspaceLspSession({
   onError,
   onRestart,
   visible = true,
+  autoDiscover = true,
 }: UseWorkspaceLspSessionOptions): WorkspaceLspSessionController {
-  const [serverStatuses, setServerStatuses] = useState<LspServerStatus[]>([]);
+  const { serverStatuses, refreshServerStatuses, refreshAutomaticServerStatuses } = useWorkspaceServerDiscovery({
+    visible, autoDiscover, onError,
+  });
   const [commandPrefs, setCommandPrefs] = useState<Record<string, string>>(() => readLspCommandPrefs());
   const [customCommands, setCustomCommands] = useState<Record<string, LspCustomCommandConfig>>(
     () => readLspCustomCommands(),
@@ -74,10 +69,6 @@ export function useWorkspaceLspSession({
   const diagnosticsRequestSequenceRef = useRef<Record<string, number>>({});
   const syncQueuesRef = useRef<Record<string, DocumentSyncQueue>>({});
   const mountedRef = useRef(true);
-  const visibleRef = useRef(visible);
-  const serverRefreshSequenceRef = useRef(0);
-  const previousVisibleRef = useRef(visible);
-  visibleRef.current = visible;
 
   useEffect(() => {
     rootsRef.current = roots;
@@ -98,51 +89,9 @@ export function useWorkspaceLspSession({
     };
   }, []);
 
-  useEffect(() => {
-    serverRefreshSequenceRef.current += 1;
-  }, [visible]);
-
   useEffect(() => () => {
     void lspStopWorkspace(workspaceInstanceId);
   }, [workspaceInstanceId]);
-
-  const refreshServerStatuses = useCallback(async (forceRefresh = false) => {
-    const requestSequence = ++serverRefreshSequenceRef.current;
-    const isCurrentRequest = () => (
-      mountedRef.current
-      && visibleRef.current
-      && serverRefreshSequenceRef.current === requestSequence
-    );
-    if (!isCurrentRequest()) return;
-    try {
-      const home = readLspJavaHome().trim();
-      if (!isCurrentRequest()) return;
-      await lspSetJavaHome(home || null);
-      if (!isCurrentRequest()) return;
-      await lspSetJavaVmargs(readLspJavaVmargs());
-      if (!isCurrentRequest()) return;
-      await lspSetJavaSettings(readLspJavaSettings());
-      if (!isCurrentRequest()) return;
-      const javaBundles = await resolveJavaBundles();
-      if (!isCurrentRequest()) return;
-      await lspSetJavaBundles(javaBundles);
-      if (!isCurrentRequest()) return;
-      const statuses = await lspDetectServers({ javaHome: home || null, forceRefresh });
-      // A provider that resolves null (or a non-array) must degrade to "no
-      // servers", not crash the workspace tab render (serverStatuses.find
-      // assumes an array).
-      if (isCurrentRequest()) setServerStatuses(Array.isArray(statuses) ? statuses : []);
-    } catch (error) {
-      if (isCurrentRequest()) onError(errorMessage(error));
-    }
-  }, [onError]);
-
-  useEffect(() => {
-    const becameVisible = !previousVisibleRef.current;
-    previousVisibleRef.current = visible;
-    if (!visible) return;
-    void refreshServerStatuses(becameVisible);
-  }, [refreshServerStatuses, visible]);
 
   const restartWorkspaceServers = useCallback(() => {
     if (!mountedRef.current) return;
@@ -167,9 +116,9 @@ export function useWorkspaceLspSession({
     void lspStopWorkspace(workspaceInstanceId, true)
       .catch(() => undefined)
       .finally(() => {
-        if (mountedRef.current) void refreshServerStatuses(true);
+        if (mountedRef.current) void refreshAutomaticServerStatuses(true);
       });
-  }, [onRestart, refreshServerStatuses, updateLspFiles, workspaceInstanceId]);
+  }, [onRestart, refreshAutomaticServerStatuses, updateLspFiles, workspaceInstanceId]);
 
   // Settings is the primary editor for LSP preferences. Keep open workspaces
   // in sync without remounting and restart servers so command/runtime changes
@@ -302,7 +251,7 @@ export function useWorkspaceLspSession({
 
   const refreshDiagnostics = useCallback(async (file: OpenFileState) => {
     // Library sources are never opened on the server, so they publish no diagnostics.
-    if (file.library) return;
+    if (file.library || !lspPresetIdForPath(file.languagePath)) return;
     const descriptor = descriptorForFile(file);
     if (!descriptor) return;
     const requestRevision = file.documentRevision ?? openFilesRef.current[file.key]?.documentRevision ?? 0;
@@ -615,7 +564,7 @@ export function useWorkspaceLspSession({
   }, []);
 
   const saveDocument = useCallback(async (file: OpenFileState, text: string) => {
-    if (file.library) return;
+    if (file.library || !lspPresetIdForPath(file.languagePath)) return;
     const descriptor = descriptorForFile(file);
     if (!descriptor) return;
     // Eclipse JDT LS drops into a degraded completion state after
@@ -738,7 +687,7 @@ export function useWorkspaceLspSession({
       queue.waiters.splice(0).forEach((resolve) => resolve());
     }
     // Never opened by us (library source) → nothing to close on the server.
-    const descriptor = file.library ? null : descriptorForFile(file);
+    const descriptor = file.library || !lspPresetIdForPath(file.languagePath) ? null : descriptorForFile(file);
     if (descriptor) await lspCloseDocument(descriptor);
     forgetDocument(file.key);
   }, [descriptorForFile, forgetDocument]);

@@ -25,6 +25,7 @@ export interface WorkspaceHostIntegration {
   leftToolAreaHost: HTMLElement | null;
   onActivateFile: (ref: CodeWorkspaceFileRef) => void;
   onOpenGitDiff: (path: string) => void;
+  onFolderOpened?: (rootId: string) => void;
   onActivateToolWindow: (toolId: string, side: "left" | "right" | "bottom") => void;
   onLeftToolAreaChange: (open: boolean) => void;
   registerFileMenu: (groupId: string, menu: WorkspaceFileMenu | null) => void;

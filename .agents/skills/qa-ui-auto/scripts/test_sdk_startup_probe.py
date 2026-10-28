@@ -26,6 +26,13 @@ class SdkStartupProbeTest(unittest.TestCase):
             with self.subTest(events=events, now=now, pid=pid), self.assertRaises(StepError):
                 pending_child(events, now, pid)
 
+    def test_concurrent_real_sdk_children_cannot_pass_as_one_background_probe(self):
+        events = [{"pid": 123, "phase": "started", "epochMs": 900},
+                  {"pid": 124, "phase": "started", "epochMs": 901},
+                  {"pid": 123, "phase": "waiting", "epochMs": 1000}]
+        with self.assertRaisesRegex(StepError, "launched 2 SDK probes"):
+            pending_child(events, 1100, 123)
+
     def test_input_failure_retains_original_failure_and_releases_gate_despite_observer_disconnect(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

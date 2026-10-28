@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useProjectDescriptorDiscovery } from "../../../../hooks/useProjectDescriptorDiscovery";
 import { useProjectFacts } from "../../../../hooks/useProjectFacts";
-import { fsPathComparisonKey } from "../codeWorkspaceModel";
+import { fsPathComparisonKey, lspPresetIdForPath } from "../codeWorkspaceModel";
 import { createWorkspaceLocationController, type WorkspaceLocationController } from "../navigationHistoryModel";
 import { useWorkspaceGitSnapshots } from "../useWorkspaceGitSnapshots";
 import { useWorkspaceHost } from "../workspaceHostIntegration";
@@ -36,6 +36,11 @@ export interface UseWorkspaceProjectRuntimeContext {
 
 export function useWorkspaceProjectRuntime(context: UseWorkspaceProjectRuntimeContext) {
   const { session, surfaceState, workspace, visible, ports } = context;
+  const sourcePresets = Object.values(session.workspaceUi.openFiles).map((file) => (
+    lspPresetIdForPath(file.library?.originFilePath ?? file.languagePath)
+  ));
+  const hasSourceBuffers = sourcePresets.some(Boolean);
+  const hasJavaBuffers = sourcePresets.includes("java");
   const workspaceVisible = useWorkspaceHost()?.active ?? visible;
   const editState = useWorkspaceEditState({
     publishWorkspaceObservation: session.publishWorkspaceObservation,
@@ -190,6 +195,7 @@ export function useWorkspaceProjectRuntime(context: UseWorkspaceProjectRuntimeCo
     onError: session.setStatusMessage,
     onRestart: invalidateSemanticAfterLspRestart,
     visible,
+    autoDiscover: hasSourceBuffers,
   });
   // §8.20.3 W2: provider-owned Project Analysis snapshot (phase/progress/
   // modules/classpath fingerprint). The generation resync rides the statuses
@@ -222,6 +228,7 @@ export function useWorkspaceProjectRuntime(context: UseWorkspaceProjectRuntimeCo
     progresses: session.lspClientEvents.progresses,
     sessionGeneration: projectAnalysisGeneration,
     descriptorForRoot: projectAnalysisDescriptorForRoot,
+    autoResolveSdk: visible && hasJavaBuffers,
   });
 
   const semanticRootsFingerprint = useMemo(
@@ -244,6 +251,7 @@ export function useWorkspaceProjectRuntime(context: UseWorkspaceProjectRuntimeCo
     lspDescriptorForFile: lsp.descriptorForFile,
   });
   return {
+    hasSourceBuffers,
     semanticQueries,
     appearance,
     buffers,

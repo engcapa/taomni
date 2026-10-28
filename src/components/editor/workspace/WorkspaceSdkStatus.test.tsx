@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
@@ -216,6 +216,51 @@ describe("WorkspaceSdkStatus", () => {
     await userEvent.click(screen.getByTestId("code-workspace-sdk-status"));
     return screen.getByTestId("workspace-sdk-dialog");
   }
+
+  it("keeps ordinary folder browsing idle and resolves only when the SDK dialog is opened", async () => {
+    const { rerender } = render(<WorkspaceSdkStatus roots={[root]} autoResolve={false} />);
+    rerender(<WorkspaceSdkStatus roots={[root, { ...root, id: "docs", path: "/docs" }]} autoResolve={false} />);
+    expect(sdkMocks.getRegistry).not.toHaveBeenCalled();
+    expect(sdkMocks.resolveWorkspace).not.toHaveBeenCalled();
+    expect(screen.queryByText("SDKs ready")).not.toBeInTheDocument();
+    expect(screen.getByTestId("code-workspace-sdk-status").querySelector(".animate-spin")).toBeNull();
+    await userEvent.click(screen.getByTestId("code-workspace-sdk-status"));
+    await waitFor(() => expect(sdkMocks.resolveWorkspace).toHaveBeenCalledTimes(2));
+    expect(sdkMocks.resolveWorkspace).toHaveBeenCalledWith("/docs");
+  });
+
+  it("resolves source demand once for equivalent root definitions", async () => {
+    const { rerender } = render(<WorkspaceSdkStatus roots={[root]} autoResolve={false} />);
+    rerender(<WorkspaceSdkStatus roots={[{ ...root }]} autoResolve />);
+    await waitFor(() => expect(screen.getByText("SDKs ready")).toBeInTheDocument());
+    expect(sdkMocks.resolveWorkspace).toHaveBeenCalledTimes(1);
+    rerender(<WorkspaceSdkStatus roots={[{ ...root }]} autoResolve />);
+    await act(async () => {});
+    expect(sdkMocks.resolveWorkspace).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not start per-root probes after an abandoned registry request completes", async () => {
+    let finish!: (value: SdkRegistry) => void;
+    sdkMocks.getRegistry.mockImplementation(() => new Promise((resolve) => { finish = resolve; }));
+    const { rerender } = render(<WorkspaceSdkStatus roots={[root]} autoResolve />);
+    rerender(<WorkspaceSdkStatus roots={[root]} autoResolve={false} />);
+    await act(async () => { finish(registry); });
+    expect(sdkMocks.resolveWorkspace).not.toHaveBeenCalled();
+    expect(screen.queryByText("SDKs ready")).not.toBeInTheDocument();
+  });
+
+  it("shows the actual SDK executable failure while keeping the dialog usable", async () => {
+    const failed = structuredClone(resolution);
+    failed.resolved[0] = { ...failed.resolved[0], status: "invalid", reason: "The configured JDK is invalid",
+      installation: { ...jdk17, status: "invalid", lastError: "java -version exited with status 1: SDK fixture failure" } };
+    sdkMocks.resolveWorkspace.mockResolvedValue(failed);
+    render(<WorkspaceSdkStatus roots={[root]} autoResolve={false} />);
+    await userEvent.click(screen.getByTestId("code-workspace-sdk-status"));
+    expect(await screen.findByText("java -version exited with status 1: SDK fixture failure")).toBeInTheDocument();
+    expect(screen.getByTestId("workspace-sdk-refresh")).toBeEnabled();
+    await userEvent.click(screen.getByTestId("workspace-sdk-close"));
+    expect(screen.queryByTestId("workspace-sdk-dialog")).not.toBeInTheDocument();
+  });
 
   it("shows Kotlin compiler and JVM configuration without requiring a standalone compiler", async () => {
     const dialog = await openDialog();

@@ -2,7 +2,7 @@ id: TC-WS-063
 title: Java source editing stays responsive during real SDK discovery
 description: The real SDK java -version executable waits on a host gate with live child heartbeats. Open/edit a real Main.java source, visit Home, restore
   Workspace and open an ordinary file before the unchanged five-second SDK timeout. Each UI action must complete within 1500ms while the same child and
-  real IPC are still pending. Release in finally, observe actual stdio LSP dirty-buffer messages, preserve active notes.txt, then save/reopen and independently
+  real IPC are still pending. Concurrent same-root callers must share exactly one real SDK child. Release in finally, observe actual stdio LSP dirty-buffer messages, preserve active notes.txt, then save/reopen and independently
   hash disk bytes. No LSP initialize delay or renderer SDK promise substitution is used.
 modes:
 - native

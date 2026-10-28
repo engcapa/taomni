@@ -1,10 +1,13 @@
 import "./tests/useWorkspaceLspSession/harness";
-import { beforeEach, describe } from "vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach, beforeEach, describe } from "vitest";
 import { lspMocks, status } from "./tests/useWorkspaceLspSession/harness";
 import { registeruseWorkspaceLspSessionHistory2Cases } from "./tests/useWorkspaceLspSession/history2.cases";
 import { registeruseWorkspaceLspSessionLifecycle1Cases } from "./tests/useWorkspaceLspSession/lifecycle1.cases";
+import { registerWorkspaceLspDemandCases } from "./tests/useWorkspaceLspSession/demand.cases";
 
 describe("useWorkspaceLspSession", () => {
+  afterEach(cleanup);
   beforeEach(() => {
     window.localStorage.clear();
     lspMocks.lspDetectServers.mockReset().mockResolvedValue([]);
@@ -22,4 +25,5 @@ describe("useWorkspaceLspSession", () => {
   });
   registeruseWorkspaceLspSessionLifecycle1Cases();
   registeruseWorkspaceLspSessionHistory2Cases();
+  registerWorkspaceLspDemandCases();
 });

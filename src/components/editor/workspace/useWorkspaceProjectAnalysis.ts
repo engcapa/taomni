@@ -42,6 +42,7 @@ export interface UseWorkspaceProjectAnalysisOptions {
   sessionGeneration: number;
   /** Descriptor builder used to address the java session over IPC. */
   descriptorForRoot: (root: string) => LspDocumentDescriptor;
+  autoResolveSdk?: boolean;
 }
 
 export interface WorkspaceProjectAnalysisController {
@@ -97,6 +98,7 @@ export function useWorkspaceProjectAnalysis({
   progresses,
   sessionGeneration,
   descriptorForRoot,
+  autoResolveSdk = provider.active,
 }: UseWorkspaceProjectAnalysisOptions): WorkspaceProjectAnalysisController {
   const [modelResult, setModelResult] = useState<LspJavaProjectModelResult | null>(null);
   const [probing, setProbing] = useState(false);
@@ -115,7 +117,7 @@ export function useWorkspaceProjectAnalysis({
   // JDK identity per root set (best effort; absence keeps sdk=null honest).
   useEffect(() => {
     let cancelled = false;
-    if (!trimmedRoots.length) {
+    if (!autoResolveSdk || !trimmedRoots.length) {
       setSdkIdentity(null);
       return;
     }
@@ -125,7 +127,7 @@ export function useWorkspaceProjectAnalysis({
     return () => {
       cancelled = true;
     };
-  }, [key, trimmedRoots]);
+  }, [autoResolveSdk, key, trimmedRoots]);
 
   const runProbe = useCallback(() => {
     if (inflightRef.current || !trimmedRoots.length || !provider.active) return;

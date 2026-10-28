@@ -194,6 +194,7 @@ export function createWorkspaceShellProps(context: CreateWorkspaceShellPropsCont
       lspClientEvents: session.lspClientEvents,
     },
     workspaceToolbarProps: {
+      hasSourceBuffers: project.hasSourceBuffers,
       title: semantics.title,
       roots: project.projectTree.roots,
       looseFiles: project.projectTree.looseFiles,

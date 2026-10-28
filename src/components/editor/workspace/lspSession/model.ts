@@ -16,6 +16,8 @@ export interface UseWorkspaceLspSessionOptions {
   onError: (message: string) => void;
   onRestart?: () => void;
   visible?: boolean;
+  /** Source buffers request discovery; explicit refresh remains available. */
+  autoDiscover?: boolean;
 }
 
 export interface PendingDocumentSync {

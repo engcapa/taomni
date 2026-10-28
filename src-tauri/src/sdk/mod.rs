@@ -34,6 +34,8 @@ mod model;
 
 mod manager;
 
+mod resolution_cache;
+
 mod persistence;
 
 mod commands;
@@ -42,6 +44,9 @@ mod registry_policy;
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(all(test, unix))]
+mod resolution_cache_tests;
 
 pub use model::{
     SaveSdkInstallationRequest, SaveWorkspaceSdkBindingRequest, SdkBindingMode, SdkDefault,
@@ -52,8 +57,6 @@ pub use model::{
 use model::SDK_REGISTRY_SCHEMA_VERSION;
 
 pub use manager::SdkManager;
-
-use manager::{CachedWorkspaceResolution, WORKSPACE_RESOLUTION_CACHE_TTL};
 
 pub use persistence::default_sdk_registry_path;
 

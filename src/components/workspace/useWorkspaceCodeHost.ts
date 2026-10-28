@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import { fileKey } from "../editor/workspace/codeWorkspaceModel";
 import type { WorkspaceFileMenu, WorkspaceHostIntegration, WorkspaceHostSnapshot } from "../editor/workspace/workspaceHostIntegration";
 import { useWorkspaceEditorHostStore } from "../../stores/workspaceEditorHostStore";
@@ -10,6 +10,7 @@ import { useT } from "../../lib/i18n";
 import { GitBranch, MonitorSmartphone } from "lucide-react";
 import { createElement } from "react";
 import { useWorkspaceUiStore } from "../../stores/workspaceUiStore";
+import { revealWorkspaceFolder } from "./workspaceFolderReveal";
 
 export { workspaceEditorRuntimeId } from "../../lib/workspaceRuntimeIdentity";
 
@@ -20,15 +21,6 @@ export function useWorkspaceCodeHost(workspace: PlatformWorkspace, visible: bool
   const workspaceMode = useAppStore((state) => state.activeSideTab === "workspaces");
   const selectedWorkspace = useWorkspacePlatformStore((state) => state.activeWorkspaceId === workspace.id);
   const active = workspaceMode && selectedWorkspace;
-  const previousRootCount = useRef(workspace.rootFolders.length);
-  useEffect(() => {
-    const firstFolderAdded = previousRootCount.current === 0 && workspace.rootFolders.length > 0;
-    previousRootCount.current = workspace.rootFolders.length;
-    if (firstFolderAdded && active) {
-      useWorkspacePlatformStore.getState().setActiveLeftToolWindow(workspace.id, "project");
-      useAppStore.getState().setSidebarCollapsed(false);
-    }
-  }, [workspace.id, workspace.rootFolders.length, active]);
   const sidebarExpanded = useAppStore((state) => !state.sidebarCollapsed);
   const leftToolAreaVisible = active && sidebarExpanded && workspace.activeLeftToolWindow !== "sessions";
   const canvasLayout = useWorkspaceUiStore((state) => state.canvasLayouts[workspace.id] ?? "single");
@@ -63,6 +55,9 @@ export function useWorkspaceCodeHost(workspace: PlatformWorkspace, visible: bool
   }, []);
   const onOpenGitDiff = useCallback((path: string) => {
     useWorkspacePlatformStore.getState().openGitTab(latest.current.workspace.id, path || undefined);
+  }, []);
+  const onFolderOpened = useCallback((rootId: string) => {
+    revealWorkspaceFolder(latest.current.workspace.id, rootId);
   }, []);
   const onActivateToolWindow = useCallback((_toolId: string, side: "left" | "right" | "bottom") => {
     const current = latest.current.workspace;
@@ -135,7 +130,7 @@ export function useWorkspaceCodeHost(workspace: PlatformWorkspace, visible: bool
     useWorkspacePlatformStore.getState().syncWorkspaceFiles(current.id, entries, reveal);
   }, []);
   return useMemo(() => enabled ? { active, editorVisible: visible, leftToolAreaVisible, showEditorTabs, navigationItems, files, activeFile, canvasLayout, paneFiles, leftToolAreaHost, recoverDraft, onSnapshot,
-    onActivateFile, onOpenGitDiff, onActivateToolWindow, onLeftToolAreaChange, registerFileMenu } : undefined,
+    onActivateFile, onOpenGitDiff, onFolderOpened, onActivateToolWindow, onLeftToolAreaChange, registerFileMenu } : undefined,
     [enabled, active, visible, leftToolAreaVisible, showEditorTabs, navigationItems, files, activeFile, canvasLayout, paneFiles, leftToolAreaHost, recoverDraft, onSnapshot,
-      onActivateFile, onOpenGitDiff, onActivateToolWindow, onLeftToolAreaChange, registerFileMenu]);
+      onActivateFile, onOpenGitDiff, onFolderOpened, onActivateToolWindow, onLeftToolAreaChange, registerFileMenu]);
 }
