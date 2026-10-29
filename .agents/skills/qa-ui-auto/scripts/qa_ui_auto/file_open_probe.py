@@ -18,18 +18,21 @@ FRAME_BUDGET_MS = 150
 
 
 def validate(args: Any) -> dict:
-    if (not isinstance(args, dict) or set(args) != {"selector", "expected", "event", "label"}
-            or not all(isinstance(value, str) and value for value in args.values())
+    required = {"selector", "expected", "event", "label"}
+    if (not isinstance(args, dict) or not required <= set(args)
+            or set(args) - required - {"require_highlight"}
+            or not all(isinstance(args[key], str) and args[key] for key in required)
+            or type(args.get("require_highlight", True)) is not bool
             or args["event"] not in {"click", "dblclick"}
             or not re.fullmatch(r"[a-z0-9-]+", args["label"])):
-        raise StepError("measure_workspace_file_open expects {selector, expected, event: click|dblclick, label}")
+        raise StepError("measure_workspace_file_open expects {selector, expected, event: click|dblclick, label, require_highlight?: boolean}")
     return args
 
 
-def review(state: Any) -> None:
+def review(state: Any, *, require_highlight: bool = True) -> None:
     if not isinstance(state, dict) or state.get("started") is None or not state.get("finished"):
         raise StepError("File activation did not produce the exact visible document and syntax-highlighted frame")
-    for key in ["firstContentMs", "firstHighlightMs"]:
+    for key in ["firstContentMs", *(["firstHighlightMs"] if require_highlight else [])]:
         value = state.get(key)
         if type(value) not in {int, float} or not math.isfinite(value) or not 0 <= value <= OPEN_BUDGET_MS:
             raise StepError(f"File {key} exceeded {OPEN_BUDGET_MS}ms: {value}")
@@ -40,7 +43,7 @@ def review(state: Any) -> None:
         value = frame.get("gapMs")
         if type(value) not in {int, float} or not math.isfinite(value) or not 0 <= value <= FRAME_BUDGET_MS:
             raise StepError(f"File activation frame {index + 1} blocked beyond {FRAME_BUDGET_MS}ms: {value}")
-    if not frames[-1].get("matches") or not frames[-1].get("highlighted"):
+    if not frames[-1].get("matches") or (require_highlight and not frames[-1].get("highlighted")):
         raise StepError("File activation lost its document or highlighting after the first frame")
 
 
@@ -57,7 +60,8 @@ def measure(ctx: Any, args: Any) -> str:
     native = hasattr(ctx, "session")
     execute = ctx.session.execute if native else lambda source: ctx.page.evaluate("() => {" + source + "}")
     report = {"passed": False, "label": config["label"], "mode": "native" if native else "browser",
-              "openBudgetMs": OPEN_BUDGET_MS, "frameBudgetMs": FRAME_BUDGET_MS}
+              "openBudgetMs": OPEN_BUDGET_MS, "frameBudgetMs": FRAME_BUDGET_MS,
+              "requireHighlight": config.get("require_highlight", True)}
     installed = False
     state = None
     failed = False
@@ -80,9 +84,9 @@ def measure(ctx: Any, args: Any) -> str:
             if time.monotonic() >= deadline:
                 raise StepError("File-open frame observer did not finish")
             time.sleep(.025)
-        review(state)
+        review(state, require_highlight=config.get("require_highlight", True))
         report["passed"] = True
-        return "Exact JSON document, syntax highlighting and continuous responsive frames observed after real activation"
+        return "Exact visible document and continuous responsive frames observed after real activation"
     except BaseException:
         failed = True
         raise

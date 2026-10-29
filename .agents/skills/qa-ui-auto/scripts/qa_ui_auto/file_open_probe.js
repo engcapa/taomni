@@ -1,5 +1,6 @@
 (config) => {
   if (window.__QA_FILE_OPEN_PROBE__) throw new Error("File-open probe already installed");
+  const requireHighlight = config.require_highlight !== false;
   const state = { event: config.event, started: null, firstContentMs: null,
     firstHighlightMs: null, frames: [], finished: false };
   let handle = null;
@@ -19,7 +20,8 @@
     lastFrame = now;
     if (matches && state.firstContentMs === null) state.firstContentMs = elapsedMs;
     if (highlighted && state.firstHighlightMs === null) state.firstHighlightMs = elapsedMs;
-    if (state.firstHighlightMs !== null && elapsedMs - state.firstHighlightMs >= 1000) {
+    const readyMs = requireHighlight ? state.firstHighlightMs : state.firstContentMs;
+    if (readyMs !== null && elapsedMs - readyMs >= 1000) {
       state.finished = true;
     } else {
       handle = requestAnimationFrame(frame);

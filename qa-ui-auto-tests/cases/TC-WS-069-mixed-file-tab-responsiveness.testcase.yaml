@@ -1,0 +1,260 @@
+id: TC-WS-069
+title: Mixed file tabs switch responsively and preserve an unsaved draft
+description: Open five txt/log/csv/JSON tabs including the public 193KiB long-line document. Edit a plain-text draft, switch through every other tab and
+  back twice, retaining every activation frame with a 150ms gap budget and 1500ms exact-content budget. JSON still requires syntax highlighting. Save, close
+  and reopen the exact draft and require zero automatic SDK/LSP discovery.
+modes:
+- browser
+- native
+covers:
+- F-WS-2
+- F25.1
+- F25.3
+- F11.2
+tags:
+- p0
+- workspace-redesign
+- file-explorer
+- regression
+- performance
+fixtures:
+- reset_db
+- workspace_language_files
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-plain-files
+- observe_language_startup: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree-empty"]'
+- assert_language_startup:
+    commands:
+      sdk_get_registry: &id001
+        equal: 0
+      sdk_analyze_workspace: &id002
+        equal: 0
+      sdk_resolve_workspace: &id003
+        equal: 0
+      lsp_detect_servers: &id004
+        equal: 0
+      lsp_discover_java_bundles: &id005
+        equal: 0
+      lsp_open_document: &id006
+        equal: 0
+      lsp_document_status: &id007
+        equal: 0
+    quiet_ms: 500
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.platform_workspace_root}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-root"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="Documents"] [data-testid="code-workspace-tree-dir-arrow"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/notes.txt"]'
+- wait_for: '[data-testid="workspace-tab"][data-active="true"][data-tab-title="notes.txt"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/service.log"]'
+- wait_for: '[data-testid="workspace-tab"][data-active="true"][data-tab-title="service.log"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/budget.csv"]'
+- wait_for: '[data-testid="workspace-tab"][data-active="true"][data-tab-title="budget.csv"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/records.json"]'
+- wait_for: '[data-testid="workspace-tab"][data-active="true"][data-tab-title="records.json"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/long-records.json"]'
+- wait_for: '[data-testid="workspace-tab"][data-active="true"][data-tab-title="long-records.json"]'
+- click: '[data-testid="workspace-tab"][data-tab-title="notes.txt"]'
+- fill:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    value: Draft retained across ten file tab changes
+- assert_visible: '[data-testid="workspace-editor-save"]:enabled'
+- measure_workspace_file_open:
+    selector: '[data-testid="workspace-tab"][data-tab-title="service.log"]'
+    expected: ${fixture.workspace_log_text}
+    event: click
+    label: switch-1-service-log
+    require_highlight: false
+- measure_workspace_file_open:
+    selector: '[data-testid="workspace-tab"][data-tab-title="budget.csv"]'
+    expected: ${fixture.workspace_csv_text}
+    event: click
+    label: switch-1-budget-csv
+    require_highlight: false
+- measure_workspace_file_open:
+    selector: '[data-testid="workspace-tab"][data-tab-title="records.json"]'
+    expected: ${fixture.workspace_json_text}
+    event: click
+    label: switch-1-records-json
+- measure_workspace_file_open:
+    selector: '[data-testid="workspace-tab"][data-tab-title="long-records.json"]'
+    expected: ${fixture.workspace_long_json_text}
+    event: click
+    label: switch-1-long-records-json
+- measure_workspace_file_open:
+    selector: '[data-testid="workspace-tab"][data-tab-title="notes.txt"]'
+    expected: Draft retained across ten file tab changes
+    event: click
+    label: switch-1-notes-txt
+    require_highlight: false
+- measure_workspace_file_open:
+    selector: '[data-testid="workspace-tab"][data-tab-title="service.log"]'
+    expected: ${fixture.workspace_log_text}
+    event: click
+    label: switch-2-service-log
+    require_highlight: false
+- measure_workspace_file_open:
+    selector: '[data-testid="workspace-tab"][data-tab-title="budget.csv"]'
+    expected: ${fixture.workspace_csv_text}
+    event: click
+    label: switch-2-budget-csv
+    require_highlight: false
+- measure_workspace_file_open:
+    selector: '[data-testid="workspace-tab"][data-tab-title="records.json"]'
+    expected: ${fixture.workspace_json_text}
+    event: click
+    label: switch-2-records-json
+- measure_workspace_file_open:
+    selector: '[data-testid="workspace-tab"][data-tab-title="long-records.json"]'
+    expected: ${fixture.workspace_long_json_text}
+    event: click
+    label: switch-2-long-records-json
+- measure_workspace_file_open:
+    selector: '[data-testid="workspace-tab"][data-tab-title="notes.txt"]'
+    expected: Draft retained across ten file tab changes
+    event: click
+    label: switch-2-notes-txt
+    require_highlight: false
+- assert_visible: '[data-testid="workspace-editor-save"]:enabled'
+- click: '[data-testid="workspace-editor-save"]:enabled'
+- assert_visible: '[data-testid="workspace-editor-save"]:disabled'
+- click: '[data-testid="workspace-tab"][data-tab-title="notes.txt"] [data-testid="workspace-tab-close"]'
+- measure_workspace_file_open:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="Documents/notes.txt"]'
+    expected: Draft retained across ten file tab changes
+    event: dblclick
+    label: reopen-saved-draft
+    require_highlight: false
+- assert_language_startup:
+    commands:
+      sdk_get_registry: *id001
+      sdk_analyze_workspace: *id002
+      sdk_resolve_workspace: *id003
+      lsp_detect_servers: *id004
+      lsp_discover_java_bundles: *id005
+      lsp_open_document: *id006
+      lsp_document_status: *id007
+    quiet_ms: 500
+- assert_no_runtime_errors: null
+- screenshot: workspace-mixed-file-tab-responsiveness.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Ten consecutive real tab activations retain exact content, JSON highlighting, responsive frames and the dirty draft.
+    actions:
+    - 4
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 13
+    - 15
+    - 17
+    - 19
+    - 21
+    - 23
+    - 24
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    results:
+    - 6
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    checkpoints:
+    - step: 6
+      expectation: "assert_language_startup:\n  commands:\n    sdk_get_registry:\n      equal: 0\n    sdk_analyze_workspace:\n      equal: 0\n    sdk_resolve_workspace:\n\
+        \      equal: 0\n    lsp_detect_servers:\n      equal: 0\n    lsp_discover_java_bundles:\n      equal: 0\n    lsp_open_document:\n      equal: 0\n\
+        \    lsp_document_status:\n      equal: 0\n  quiet_ms: 500"
+    - step: 25
+      expectation: 'assert_visible: ''[data-testid="workspace-editor-save"]:enabled'''
+    - step: 26
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"service.log\"]'\n  expected: ${fixture.workspace_log_text}\n\
+        \  event: click\n  label: switch-1-service-log\n  require_highlight: false"
+    - step: 27
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"budget.csv\"]'\n  expected: ${fixture.workspace_csv_text}\n\
+        \  event: click\n  label: switch-1-budget-csv\n  require_highlight: false"
+    - step: 28
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"records.json\"]'\n  expected: ${fixture.workspace_json_text}\n\
+        \  event: click\n  label: switch-1-records-json"
+    - step: 29
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"long-records.json\"]'\n  expected: ${fixture.workspace_long_json_text}\n\
+        \  event: click\n  label: switch-1-long-records-json"
+    - step: 30
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"notes.txt\"]'\n  expected: Draft retained\
+        \ across ten file tab changes\n  event: click\n  label: switch-1-notes-txt\n  require_highlight: false"
+    - step: 31
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"service.log\"]'\n  expected: ${fixture.workspace_log_text}\n\
+        \  event: click\n  label: switch-2-service-log\n  require_highlight: false"
+    - step: 32
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"budget.csv\"]'\n  expected: ${fixture.workspace_csv_text}\n\
+        \  event: click\n  label: switch-2-budget-csv\n  require_highlight: false"
+    - step: 33
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"records.json\"]'\n  expected: ${fixture.workspace_json_text}\n\
+        \  event: click\n  label: switch-2-records-json"
+    - step: 34
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"long-records.json\"]'\n  expected: ${fixture.workspace_long_json_text}\n\
+        \  event: click\n  label: switch-2-long-records-json"
+    - step: 35
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"notes.txt\"]'\n  expected: Draft retained\
+        \ across ten file tab changes\n  event: click\n  label: switch-2-notes-txt\n  require_highlight: false"
+    - step: 36
+      expectation: 'assert_visible: ''[data-testid="workspace-editor-save"]:enabled'''
+  - id: R2
+    requirement: Saving, closing and reopening retain the exact edited text; ordinary documents never start SDK/LSP discovery.
+    actions:
+    - 37
+    - 39
+    - 40
+    results:
+    - 38
+    - 40
+    - 41
+    - 42
+    checkpoints:
+    - step: 38
+      expectation: 'assert_visible: ''[data-testid="workspace-editor-save"]:disabled'''
+    - step: 40
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"code-workspace-tree-file\"][data-path=\"Documents/notes.txt\"]'\n  expected:\
+        \ Draft retained across ten file tab changes\n  event: dblclick\n  label: reopen-saved-draft\n  require_highlight: false"
+    - step: 41
+      expectation: "assert_language_startup:\n  commands:\n    sdk_get_registry:\n      equal: 0\n    sdk_analyze_workspace:\n      equal: 0\n    sdk_resolve_workspace:\n\
+        \      equal: 0\n    lsp_detect_servers:\n      equal: 0\n    lsp_discover_java_bundles:\n      equal: 0\n    lsp_open_document:\n      equal: 0\n\
+        \    lsp_document_status:\n      equal: 0\n  quiet_ms: 500"
+    - step: 42
+      expectation: 'assert_no_runtime_errors: null'
+  visual:
+  - check: Active documents remain readable.
+    method: manual
+    reason: Screenshots are retained; exact canonical contents and frame responsiveness are automated.
+  native:
+  - check: Packaged WebView frame latency, real file reading, and save/reopen where exercised.
+    method: automated
+    reason: Browser VFS cannot establish real disk effects or packaged WebView responsiveness.

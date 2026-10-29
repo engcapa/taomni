@@ -143,3 +143,12 @@ SDK/LSP 自动探测必须保持为零。当前新增用例未完成托管执行
 5 文件 / 288 tests passed（最多 2 workers）；TypeScript 与 refactor 合同通过。
 这是待托管测量的产品优化，尚不能据单测声称减少慢帧。保留 `TC-WS-064` 至
 `067` 和完整崩溃组，并将补充普通 txt/log/csv 冷开及连续标签切换的响应回归。
+
+新增 `TC-WS-068/069`：68 从真实树冷开 txt/log/csv/未知扩展名的普通文本；69
+在五个 txt/log/csv/JSON 标签之间连续切换十次，其中包含 193KiB 长行 JSON，
+并保留未保存草稿，最后保存、关闭和重开精确内容。两者均覆盖 browser/native。
+普通文本没有语法 token，显式使用 `require_highlight: false`；仍检查完整可见
+canonical 文档、1500ms 内容预算和从真实操作至内容出现后 1 秒的每帧 150ms
+预算。原 JSON 默认高亮断言完全保留。工具 13 项 Python 和 4 项 JS 合同通过，
+覆盖纯文本未高亮、错误内容、慢帧、超时、清理与原始失败保留；目录 audit gate
+及托管选择计划通过。新用例执行结果仍待 GitHub，不能作为通过证据。

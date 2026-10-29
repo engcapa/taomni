@@ -24,6 +24,18 @@ class FileOpenReviewTests(unittest.TestCase):
     def test_complete_sample(self):
         review(observation())
 
+    def test_plain_document_requires_exact_content_and_keeps_every_frame_budget(self):
+        plain = {**observation(), "firstHighlightMs": None,
+                 "frames": [{"gapMs": 20, "matches": True, "highlighted": False}]}
+        review(plain, require_highlight=False)
+        with self.assertRaises(StepError):
+            review(plain)
+        for patch in [{"firstContentMs": 1501},
+                      {"frames": [{"gapMs": 151, "matches": True, "highlighted": False}]},
+                      {"frames": [{"gapMs": 20, "matches": False, "highlighted": False}]}]:
+            with self.subTest(patch=patch), self.assertRaises(StepError):
+                review({**plain, **patch}, require_highlight=False)
+
     def test_rejects_missing_or_late_results_and_slow_frames(self):
         for patch in [{"started": None}, {"finished": False}, {"firstContentMs": 1501},
                       {"firstHighlightMs": 1501}, {"firstContentMs": float("nan")},
@@ -34,7 +46,9 @@ class FileOpenReviewTests(unittest.TestCase):
 
     def test_validates_args_and_artifact_path(self):
         self.assertEqual(validate(CONFIG), CONFIG)
-        for patch in [{"label": "../other"}, {"event": "input"}, {"expected": ""}, {"selector": None}, {"budget": 9999}]:
+        self.assertFalse(validate({**CONFIG, "require_highlight": False})["require_highlight"])
+        for patch in [{"label": "../other"}, {"event": "input"}, {"expected": ""}, {"selector": None},
+                      {"budget": 9999}, {"require_highlight": 0}, {"require_highlight": "false"}]:
             with self.subTest(patch=patch), self.assertRaises(StepError):
                 validate({**CONFIG, **patch})
 
@@ -93,6 +107,20 @@ class FileOpenReviewTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             run(SimpleNamespace(page=page, case_dir=Path(folder)), {**CONFIG, "event": "click"})
         page.locator(CONFIG["selector"]).click.assert_called_once_with()
+
+    def test_native_plaintext_does_not_fabricate_highlighting(self):
+        session = Mock()
+        plain = {**observation(), "firstHighlightMs": None,
+                 "frames": [{"gapMs": 20, "matches": True, "highlighted": False}]}
+        session.execute.side_effect = [True, plain, plain]
+        with tempfile.TemporaryDirectory() as folder:
+            run(SimpleNamespace(session=session, case_dir=Path(folder)),
+                {**CONFIG, "expected": "Plain document\n", "require_highlight": False})
+            report = json.loads((Path(folder) / "file-open-cold-json.json").read_text())
+        self.assertTrue(report["passed"])
+        self.assertFalse(report["requireHighlight"])
+        self.assertIsNone(report["observation"]["firstHighlightMs"])
+        session.dblclick.assert_called_once_with(CONFIG["selector"])
 
     def test_cpu_samples_are_retained_after_the_original_action_failure(self):
         page = Mock()

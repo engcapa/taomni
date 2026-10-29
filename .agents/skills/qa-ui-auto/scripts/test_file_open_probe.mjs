@@ -4,7 +4,7 @@ import test from "node:test";
 import vm from "node:vm";
 
 const script = readFileSync(new URL("./qa_ui_auto/file_open_probe.js", import.meta.url), "utf8");
-function fixture() {
+function fixture(config = {}) {
   let now = 0;
   let text = "previous document";
   let highlighted = false;
@@ -24,7 +24,7 @@ function fixture() {
     document: { querySelector: () => content, addEventListener: (event, fn) => listeners.set(event, fn),
       removeEventListener: (event) => listeners.delete(event) } });
   const install = vm.runInContext("(" + script + ")", context);
-  install({ selector: "file", event: "dblclick", expected: "{\n  \"value\": 1\n}\n" });
+  install({ selector: "file", event: "dblclick", expected: "{\n  \"value\": 1\n}\n", ...config });
   return { context, frames, listeners,
     input: () => listeners.get("dblclick")({ target: new Element(), isTrusted: true }),
     publish: () => { text = "{\n  \"value\": 1\n}\n"; },
@@ -67,6 +67,23 @@ test("does not restart measurement on repeated activation and cancels unfinished
   assert.equal(state.started, 0);
   assert.equal(state.frames.length, 2);
   assert.equal(state.finished, false);
+  assert.equal(f.frames.size, 0);
+  assert.equal(f.listeners.size, 0);
+});
+
+test("plain documents settle for one second after exact content without inventing syntax tokens", () => {
+  const f = fixture({ require_highlight: false });
+  f.input(); f.tick(16); f.publish(); f.tick(16);
+  const probe = f.context.window.__QA_FILE_OPEN_PROBE__;
+  assert.equal(probe.state.firstContentMs, 32);
+  for (let i = 0; i < 62; i++) f.tick(16);
+  assert.equal(probe.state.finished, false);
+  f.tick(16);
+  const state = probe.finish();
+  assert.equal(state.finished, true);
+  assert.equal(state.firstHighlightMs, null);
+  assert.equal(state.frames.at(-1).highlighted, false);
+  assert.equal(state.frames.at(-1).matches, true);
   assert.equal(f.frames.size, 0);
   assert.equal(f.listeners.size, 0);
 });
