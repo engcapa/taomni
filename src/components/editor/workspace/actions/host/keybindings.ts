@@ -115,20 +115,20 @@ export class ActionKeybindings {
    * override is how `displaceStroke` revokes a reassigned chord from its
    * previous holder without letting the base default return (DEC-04).
    */
-  effectiveShortcuts(actionId: string): { shortcuts: readonly Shortcut[]; source: ResolvedBindingSource; } {
+  effectiveShortcuts(actionId: string, platform: KeymapPlatform = detectKeymapPlatform()): { shortcuts: readonly Shortcut[]; source: ResolvedBindingSource; } {
     const scheme = this.keymapScheme;
     const userBindings = scheme?.bindings[actionId];
     if (userBindings) {
       return { shortcuts: userBindings, source: "user" };
     }
-    return { shortcuts: this.baseDefinitionShortcuts(actionId), source: "base" };
+    return { shortcuts: this.baseDefinitionShortcuts(actionId, platform), source: "base" };
   }
 
   /** Built-in definition defaults for one action, ignoring the active scheme. */
-  baseDefinitionShortcuts(actionId: string): readonly Shortcut[] {
+  baseDefinitionShortcuts(actionId: string, platform: KeymapPlatform = detectKeymapPlatform()): readonly Shortcut[] {
     const action = this.host.getAction(actionId);
     if (!action) return [];
-    return parseDefinitionKeybindings(action);
+    return parseDefinitionKeybindings(action, platform);
   }
 
   isActionUserDisabled(actionId: string): boolean {
@@ -262,7 +262,7 @@ export class ActionKeybindings {
       else if (!bucket.some((existing) => existing.actionId === entry.actionId)) bucket.push(entry);
     };
     for (const actionId of this.host.actionIds()) {
-      const { shortcuts, source } = this.effectiveShortcuts(actionId);
+      const { shortcuts, source } = this.effectiveShortcuts(actionId, platform);
       for (const shortcut of shortcuts) {
         if (shortcut.kind !== "keyboard") continue;
         const [first, second] = shortcut.strokes;
@@ -453,11 +453,13 @@ export class ActionKeybindings {
    * Display strings for an action's effective shortcuts (user scheme first),
    * through the one shared formatter (ED-PARITY-013 DEC-013-02).
    */
-  effectiveKeybindingDisplay(actionId: string): string[] {
+  effectiveKeybindingDisplay(
+    actionId: string,
+    platform: KeymapPlatform = detectKeymapPlatform(),
+    locale: string = getLocale(),
+  ): string[] {
     // Rails, menus and tooltips ask for these labels on every render; cache
     // them until the bindings, platform or UI locale change.
-    const platform = detectKeymapPlatform();
-    const locale = getLocale();
     let cache = this.displayCache;
     if (
       !cache
@@ -471,7 +473,7 @@ export class ActionKeybindings {
     }
     const cached = cache.labels.get(actionId);
     if (cached) return [...cached];
-    const labels = this.effectiveShortcuts(actionId).shortcuts
+    const labels = this.effectiveShortcuts(actionId, platform).shortcuts
       .map((shortcut) => formatShortcutLabel(shortcut, platform, locale))
       .filter(Boolean);
     cache.labels.set(actionId, labels);
