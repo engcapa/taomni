@@ -11,6 +11,7 @@
 import { create } from "zustand";
 import type { SessionConfig } from "../lib/ipc/session";
 import { createWorkspaceTabActions } from "./workspacePlatformTabActions";
+import { createWorkspaceCodeActions } from "./workspacePlatformCodeActions";
 import type { CodeWorkspaceTabInfo } from "../types";
 
 export const PLATFORM_WORKSPACES_STORAGE_KEY = "taomni.platformWorkspaces.v1";
@@ -568,22 +569,7 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
     return tab;
   },
 
-  updateCodeWorkspace: (workspaceId, info) => {
-    set((state) => {
-      const current = state.workspaces.find((workspace) => workspace.id === workspaceId);
-      if (!current || JSON.stringify(current.codeWorkspace) === JSON.stringify(info)) return state;
-      const workspaces = updateWorkspace(state.workspaces, workspaceId, (workspace) => ({
-        ...workspace,
-        codeWorkspace: info,
-        rootFolders: (info.roots ?? []).map((root) => ({
-          ...root,
-          addedAt: workspace.rootFolders.find((folder) => folder.id === root.id)?.addedAt ?? Date.now(),
-        })),
-      }));
-      persist({ ...state, workspaces });
-      return { workspaces };
-    });
-  },
+  ...createWorkspaceCodeActions(set, persist),
 
   openLocalTerminalInWorkspace: (workspaceId) => {
     const tab: WorkspaceIsolatedTab = {

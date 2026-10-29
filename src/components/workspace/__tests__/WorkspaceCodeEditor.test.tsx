@@ -21,9 +21,9 @@ const context = (patch: Partial<CodeWorkspaceContext> = {}): CodeWorkspaceContex
   openPaths: [], dirtyPaths: [], activeFile: null, openFiles: [], dirtyFiles: [], ...patch,
 });
 const current = () => useWorkspacePlatformStore.getState().getWorkspace(workspaceId)!;
-function Harness() {
+function Harness({ sharedFiles = false }: { sharedFiles?: boolean }) {
   const workspace = useWorkspacePlatformStore((state) => state.workspaces.find((item) => item.id === workspaceId)!);
-  return <WorkspaceCodeEditor workspace={workspace} tabId={tabId} visible />;
+  return <WorkspaceCodeEditor workspace={workspace} tabId={tabId} visible sharedFiles={sharedFiles} />;
 }
 beforeEach(() => {
   localStorage.clear();
@@ -40,6 +40,42 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("platform editor ownership", () => {
+  it("persists an active-file publication without feeding it back as a new shared-editor definition", () => {
+    render(<Harness sharedFiles />);
+    act(() => useAppStore.getState().setTabCodeWorkspaceContext(tabId, context({
+      activeFile: { kind: "root", rootId: root.id, path: "notes.txt" },
+    })));
+    const input = editor.props!.workspace;
+    const host = editor.props!.hostIntegration;
+    const folders = current().rootFolders;
+    act(() => useAppStore.getState().setTabCodeWorkspaceContext(tabId, context({
+      activeFile: { kind: "root", rootId: root.id, path: "second.json" },
+    })));
+    expect(current().codeWorkspace?.initialFile).toMatchObject({ path: "second.json" });
+    expect(useAppStore.getState().recentWorkspaces[0]?.lastActiveFile).toMatchObject({ path: "second.json" });
+    expect(current().rootFolders).toBe(folders);
+    expect(editor.props!.workspace).toBe(input);
+    expect(editor.props!.hostIntegration).toBe(host);
+    useWorkspacePlatformStore.getState().reloadFromStorage();
+    expect(current().codeWorkspace?.initialFile).toMatchObject({ path: "second.json" });
+  });
+
+  it("still forwards external file targets and project changes to the shared editor", () => {
+    render(<Harness sharedFiles />);
+    act(() => useAppStore.getState().setTabCodeWorkspaceContext(tabId, context({
+      activeFile: { kind: "root", rootId: root.id, path: "notes.txt" },
+    })));
+    act(() => useWorkspacePlatformStore.getState().updateCodeWorkspace(workspaceId, {
+      ...current().codeWorkspace!, initialFile: { kind: "loose", id: "loose", path: "/other/readme.txt" },
+      looseFiles: [{ id: "loose", name: "readme.txt", path: "/other/readme.txt" }],
+    }));
+    expect(editor.props!.workspace.initialFile).toMatchObject({ path: "/other/readme.txt" });
+    expect(editor.props!.workspace.looseFiles).toHaveLength(1);
+    act(() => useWorkspacePlatformStore.getState().addRootFolder(workspaceId, { path: "/second" }));
+    expect(editor.props!.workspace.roots?.map((item) => item.path)).toEqual(["/project", "/second"]);
+    expect(current().codeWorkspace?.looseFiles).toHaveLength(1);
+  });
+
   it.each(["default", "imported"])("reveals the actual %s editor instance after another folder is added", (kind) => {
     if (kind === "default") {
       workspaceId = useWorkspacePlatformStore.getState().createWorkspace({ name: "Default" }).id;

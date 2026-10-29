@@ -1,6 +1,6 @@
 # 工作区文件打开与 SDK 后台初始化
 
-当前状态：文件打开及标签切换卡顿仍未通过验收。产品 `f0c1ae4e` 的相关集 [40787137504](https://github.com/engcapa/taomni/actions/runs/40787137504) 正在执行；三平台 browser 的 JSON 首帧仍有约 195–207ms 停顿，Linux native 有 206–315ms 慢帧，超过保留的 150ms 预算。相同产品的长行公开夹具基线 [40790432602](https://github.com/engcapa/taomni/actions/runs/40790432602) 已在 browser 捕获 410ms 慢帧。后台文件读取和图标复用不足以证明问题解决，继续分析原始 CPU 与原生帧证据。当前组合源码的全量与正式四轮性能仍待执行。以下记录保留历史失败，关联[重构实现报告](./workspace-platform-redesign-implementation-report.md)。
+当前状态：文件打开及标签切换卡顿仍未通过验收。命令/最近记录隔离版本 `4d1c27bf` 的 Linux browser/native 相关集 [40798438419](https://github.com/engcapa/taomni/actions/runs/40798438419) 已结束：26 passed / 10 failed，失败均为文件打开/切换帧超限，747 个附件 SHA、源码、用例及回执已独立核验。用户使用该版本 QA release 手测 HTML/text 仍卡顿。继续修正公共编辑器更新回路，不能据单测、局部优化或旧源码通过声称解决。当前组合源码的全量与正式四轮性能仍待执行。以下保留历史失败，关联[重构实现报告](./workspace-platform-redesign-implementation-report.md)。
 
 ## 目标与保留行为
 
@@ -195,3 +195,29 @@ macOS 原生菜单直接订阅注册表，隐藏实例发表不重装当前菜�
 用户流程；保留 `TC-WS-064` 至 `069`、Home 路由 `TC-WS-025/026`、
 `TC-IDE-C4-02-split-and-structured-reopen` 与完整崩溃组作为托管行为门禁。
 新的帧测量及三平台结果尚未收齐，当前仍未验收。
+
+## 文件激活的协调与定义更新
+
+新增回归在修改前复现三种多余渲染：同目录的 active-file 发布仍重建
+`rootFolders`；文件请求完成标记使编辑器额外 render 1→2；仅更新历史 caret、
+前进/后退可用性未变仍 render 4→5。文件协调的单测还发现读取旧 React
+snapshot 会将已激活的 b.html 发布为 a.txt。
+
+`useWorkspaceCodeDefinition` 拥有平台输入与编辑器输出的适配、最近记录和
+持久化；通过发布对象的精确身份识别自身反射，不把保存的 active file 再当成
+一次新输入。外部打开请求、新 root、loose files 和恢复身份继续传给编辑器。
+平台定义动作提取到 `workspacePlatformCodeActions`，未改变根目录时复用原
+列表，仍即时保存当前文件和原有存储格式。没有暂停或延迟用户选择。
+
+`useWorkspaceHostFiles` 用 ref 记录内部协调状态，队列完成后直接从同一
+buffer owner 的最新状态发布结果并协调 canvas，不额外刷新整个编辑器。
+保留串行队列、迟到请求取消、pending-close、dirty 恢复和 provider 同步；
+canvas 仍在真实文件就绪后执行，并保留独立 editor split。导航历史仅在按钮
+可用性改变时刷新 React，caret/history 本身仍同步更新。
+
+本机 8 文件 / 56 tests passed，包含真实 CodeMirror 的 dirty/save/undo、
+split/grid/single、关闭后重开、外部定义和快速 supersede。新增
+`TC-WS-070` 覆盖五行 HTML、704 行文本、小文本的三次冷开和六次标签激活；
+HTML 保留高亮、正文精确相等、零自动 SDK/LSP、1500ms 内容和每帧150ms
+断言。064–069、025/026、C4-02 与完整 10 ID 崩溃组继续保留。此处只记录
+实现和单测结果，托管帧验证及原生 release 仍待新一轮执行。

@@ -10,6 +10,8 @@ FILES = {
     "Documents/preferences.json": '{"language":"auto","plainDocument":true}\n',
     "Documents/service.log": "2026-10-29 INFO ready\n2026-10-29 INFO ordinary log\n",
     "Documents/receipt.data": "Public unclassified document\nHandled as plain text\n",
+    "Documents/page.html": '<!doctype html>\n<html lang="en">\n<head><title>Public page</title></head>\n<body><h1>Ordinary HTML document</h1></body>\n</html>\n',
+    "Documents/report.txt": "".join(f"Public text row {index:04}: ordinary document without a language server.\n" for index in range(704)),
 }
 JSON_DOCUMENT = json.dumps({"records": [
     {"id": index, "name": f"Public fixture {index:03}", "enabled": index % 2 == 0,
@@ -27,7 +29,8 @@ def setup(ctx: Any) -> None:
     ctx.values["workspace_json_text"] = JSON_DOCUMENT
     ctx.values["workspace_long_json_text"] = LONG_JSON_DOCUMENT
     for label, path in {"notes": "Documents/notes.txt", "csv": "Documents/budget.csv",
-                        "log": "Documents/service.log", "unclassified": "Documents/receipt.data"}.items():
+                        "log": "Documents/service.log", "unclassified": "Documents/receipt.data",
+                        "html": "Documents/page.html", "report": "Documents/report.txt"}.items():
         ctx.values[f"workspace_{label}_text"] = FILES.get(path, workspace_explorer.FILES.get(path))
     if (ctx.cfg.get("app") or {}).get("mode") == "native":
         for name, text in FILES.items():

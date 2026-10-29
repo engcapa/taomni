@@ -120,7 +120,13 @@ export function useWorkspaceNavigation({
   setRecentFilesOpen,
 }: UseWorkspaceNavigationOptions): WorkspaceNavigationController {
   const splitLayoutLeaf = useCodeWorkspaceStore((state) => state.splitLayoutLeaf);
-  const [navCan, setNavCan] = useState({ back: false, forward: false });
+  const [navCan, setNavCanState] = useState({ back: false, forward: false });
+  const navCanRef = useRef(navCan);
+  const setNavCan = useCallback((next: typeof navCan) => {
+    if (next.back === navCanRef.current.back && next.forward === navCanRef.current.forward) return;
+    navCanRef.current = next;
+    setNavCanState(next);
+  }, []);
   const [recentChangedOnly, setRecentChangedOnly] = useState(false);
   const navHistoryRef = useRef<{
     stack: WorkspaceNavLocation[];
