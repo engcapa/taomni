@@ -60,8 +60,21 @@ export function useWorkspaceTabScroll(workspaceId: string | undefined, tabs: rea
     const element = scrollRef.current;
     if (!element) return;
     userScrolled.current = true;
-    const delta = Math.max(TAB_SCROLL_STEP_MIN, Math.floor(element.clientWidth * 0.8));
-    setTabScrollLeft(element, element.scrollLeft + (direction === "right" ? delta : -delta));
+    const step = Math.max(TAB_SCROLL_STEP_MIN, Math.floor(element.clientWidth * 0.8));
+    const left = element.getBoundingClientRect().left;
+    const right = left + element.clientWidth;
+    // Reveal the next clipped tab before paging further. A fixed page jump
+    // can clip its opposite edge, making the two arrows oscillate forever.
+    const clipped = [...tabElements.current.values()]
+      .map((tab) => tab.getBoundingClientRect())
+      .filter((rect) => rect.width <= element.clientWidth && (direction === "right"
+        ? rect.left < right && rect.right > right + TAB_SCROLL_EDGE_TOLERANCE
+        : rect.right > left && rect.left < left - TAB_SCROLL_EDGE_TOLERANCE))
+      .sort((a, b) => direction === "right" ? a.right - b.right : b.left - a.left)[0];
+    const delta = direction === "right"
+      ? Math.min(step, clipped ? Math.ceil(clipped.right - right + TAB_SCROLL_PADDING) : step)
+      : Math.max(-step, clipped ? Math.floor(clipped.left - left - TAB_SCROLL_PADDING) : -step);
+    setTabScrollLeft(element, element.scrollLeft + delta);
     updateScrollState();
   }, [updateScrollState]);
 
