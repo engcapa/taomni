@@ -86,6 +86,15 @@ function describePanel(panel) {
 const panel = waitFor(findPanel, "No unique folder chooser owned by the QA executable", 20000);
 log("owned NSOpenPanel found");
 process.frontmost = true;
+const screenshot = readEnv("QA_PICKER_SCREENSHOT");
+if (screenshot) {
+  const capture = $.NSTask.alloc.init;
+  capture.launchPath = "/usr/sbin/screencapture";
+  capture.arguments = ["-x", screenshot];
+  capture.launch;
+  capture.waitUntilExit;
+  if (Number(capture.terminationStatus) !== 0) throw new Error("Could not capture the owned folder chooser");
+}
 try {
   if (readEnv("QA_PICKER_ACTION") === "cancel") {
     buttons(panel, "Cancel", true)[0].click();

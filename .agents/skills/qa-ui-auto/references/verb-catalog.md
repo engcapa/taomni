@@ -115,8 +115,12 @@ activation is still sent exactly once and all original frame budgets apply.
 
 ## App-specific helpers (use these instead of inlining selector chains)
 
-`native_folder_dialog: {action: choose|cancel, path?}` operates an already opened
-system folder chooser in native mode. `choose` requires an existing directory
+`native_folder_dialog: {action: choose|cancel, path?, trigger?}` operates a
+system folder chooser in native mode. `trigger` clicks that selector through the
+real driver while the OS helper waits for and operates the owned dialog, then
+joins the click response before returning. This also supports modal dialogs that
+hold the WebView response until they close. Without it, the chooser must already
+be open. `choose` requires an existing directory
 inside the current QA report. It verifies that the chooser belongs to the QA
 executable and uses OS input/accessibility on Linux X11, Windows and macOS;
 records ownership, action and failures in `native-folder-dialogs.jsonl`.

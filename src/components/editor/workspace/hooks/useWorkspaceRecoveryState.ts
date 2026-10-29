@@ -17,6 +17,8 @@ export interface UseWorkspaceRecoveryStateContext {
 export function useWorkspaceRecoveryState(context: UseWorkspaceRecoveryStateContext) {
   const { workspaceInstanceId, setTabPolicyReceipt, setStatusMessage, openFilesRef, openFiles } = context;
   const [workspaceRecoveryEntries, setWorkspaceRecoveryEntries] = useState<WorkspaceRecoveryEntry[]>([]);
+  const recoveryEntriesRef = useRef(workspaceRecoveryEntries);
+  recoveryEntriesRef.current = workspaceRecoveryEntries;
   const [workspaceRecoveryOpen, setWorkspaceRecoveryOpen] = useState(false);
   /** §8.19.1 disk-effect ledger view state; bumped whenever rows are recorded/resolved. */
   const [diskEffectLedgerRevision, setDiskEffectLedgerRevision] = useState(0);
@@ -147,6 +149,9 @@ export function useWorkspaceRecoveryState(context: UseWorkspaceRecoveryStateCont
         openFilesRef.current,
         pendingWorkspaceRecoveryKeysRef.current,
       );
+      // Persistence reconciliation still runs. A clean document has no new
+      // recovery UI to publish, so keep it out of the editor's paint path.
+      if (!entries.length && !recoveryEntriesRef.current.length) return;
       setWorkspaceRecoveryEntries(entries);
     }, 400);
     return () => window.clearTimeout(timer);

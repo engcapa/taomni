@@ -61,13 +61,17 @@ export function useEditorSemanticDecorations(context: UseEditorSemanticDecoratio
     // ED-PARITY-022 DEC-022-04: Java usages are semantic; while the provider
     // cannot answer, show none rather than a same-text imitation.
     const semanticOnly = /\.java$/i.test(file.ref.path);
+    const publishHighlights = (highlights: LspDocumentHighlight[]) => {
+      setHighlightsByGroup((current) => (
+        !highlights.length && !(current[groupId] ?? []).length
+          ? current
+          : { ...current, [groupId]: highlights }
+      ));
+    };
     if (!activeCapabilities?.documentHighlight || !descriptor) {
       const timer = window.setTimeout(() => {
         if (!cancelled && canApply()) {
-          setHighlightsByGroup((current) => ({
-            ...current,
-            [groupId]: semanticOnly ? [] : fallbackWordHighlights(file.text, position),
-          }));
+          publishHighlights(semanticOnly ? [] : fallbackWordHighlights(file.text, position));
         }
       }, LSP_HIGHLIGHT_IDLE_DELAY_MS);
       return () => {
@@ -88,14 +92,11 @@ export function useEditorSemanticDecorations(context: UseEditorSemanticDecoratio
         .then((result) => {
           if (cancelled || !canApply() || !isCurrentLspDocumentRequest(file, epoch)) return;
           updateLspStatusForFile(file, result.status);
-          setHighlightsByGroup((current) => ({ ...current, [groupId]: result.highlights }));
+          publishHighlights(result.highlights);
         })
         .catch(() => {
           if (cancelled || !canApply() || !isCurrentLspDocumentRequest(file, epoch)) return;
-          setHighlightsByGroup((current) => ({
-            ...current,
-            [groupId]: semanticOnly ? [] : fallbackWordHighlights(file.text, position),
-          }));
+          publishHighlights(semanticOnly ? [] : fallbackWordHighlights(file.text, position));
         });
     }, LSP_HIGHLIGHT_IDLE_DELAY_MS);
     return () => {

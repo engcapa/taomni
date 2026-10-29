@@ -511,7 +511,8 @@ class NativeSessionFillTest(TestCase):
         self.assertFalse(any(args[1].endswith("/value") for args, _ in session.request.call_args_list))
 
     def test_contenteditable_fill_retries_real_click_until_focused(self) -> None:
-        session = self.session(True, [False, True])
+        # Initial focus observation, then two real-click focus results.
+        session = self.session(True, [False, False, True])
 
         session.fill(".cm-content", "text")
 

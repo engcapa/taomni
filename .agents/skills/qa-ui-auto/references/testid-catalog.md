@@ -594,6 +594,7 @@
 - `[data-workspace-focus="terminal"]` — interactive [optional] — F25.5.workspace-terminal-dock
 - `[data-testid="keymap-migration-notice"]` — display [optional] — F25.5.keymap-migration-notice
 - `[data-testid="search-everywhere-shortcut-workspace.format"]` — display [optional] — F25.5.search-everywhere-action-shortcut
+- `[data-testid="search-everywhere-shortcut-editor.pageDown"]` — display [optional] — F25.5.search-everywhere-page-down-shortcut
 - `[data-testid="search-everywhere-assign-shortcut-hint"]` — display [optional] — F25.5.search-everywhere-assign-shortcut-hint
 - `[data-testid="code-workspace-parameter-info"]` — display [optional] — F25.5.parameter-info-tooltip
 - `[data-testid="code-workspace-quick-doc"]` — display [optional] — F25.5.quick-doc-popup

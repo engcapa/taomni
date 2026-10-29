@@ -47,6 +47,7 @@ import { desiredVisualColumnField, virtualOverflowRestoreField, virtualSpaceClic
 import { useEditorHostRefs } from "./useEditorHostRefs";
 import { createEditorViewStateLifecycle, type EditorViewStateLifecycle } from "./editorViewStateLifecycle";
 import { EditorStateCache, reconfigureCachedEditorState } from "./editorStateCache";
+import { editorActionGeometry } from "./editorActionGeometry";
 
 export interface UseEditorViewLifetimeContext {
   editor: ReturnType<typeof useEditorHostRefs>;
@@ -306,6 +307,7 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
       return compartment.of(extension);
     };
     const extensions = [
+        editorActionGeometry,
         lineNumbers(),
         foldGutter(),
         // Language-aware region grammar; unknown languages never fold.

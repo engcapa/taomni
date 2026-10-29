@@ -5,7 +5,7 @@ import { cancelLspSnippetSession } from "../lspCompletion";
 import { lspPositionFromOffset } from "../lspPositions";
 import { escapeEditorSelections } from "../workspaceEditorCommands";
 import { buildEditorHostActions } from "../workspaceCodeMirrorKeymap";
-import { isEditorGeometryReady } from "../workspaceVirtualSpace";
+import { measuredEditorActionGeometryReady } from "./editorActionGeometry";
 import { applySharedTransactionToView } from "./documentSync";
 
 
@@ -93,7 +93,7 @@ export function createMountedEditorActions(context: CreateMountedEditorActionsCo
       cancelLspSnippetSession(view)
       || escapeEditorSelections(view)
       || (onParameterEscapeRef.current?.() ?? false),
-    isEditorGeometryReady: () => isEditorGeometryReady(view),
+    isEditorGeometryReady: () => measuredEditorActionGeometryReady(view),
     runEditorCommand: (command) => command(view),
     undo: () => {
       // ED-AUDIT-008: the workspace-edit journal is the newest

@@ -35,6 +35,7 @@ export function useWorkspaceGitRootDiscovery({ roots, activeFile, visible, onErr
   inputsRef.current = { roots, activeRoot, activeFile, onError };
   const [baseResult, setBaseResult] = useState({ key: "", roots: EMPTY_ROOTS });
   const [activeResult, setActiveResult] = useState({ key: "", roots: EMPTY_ROOTS });
+  const publishedActiveRootsRef = useRef(EMPTY_ROOTS);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -61,6 +62,15 @@ export function useWorkspaceGitRootDiscovery({ roots, activeFile, visible, onErr
     const { activeRoot: root, activeFile: file } = inputsRef.current;
     if (!visible || !root || !file) return;
     let cancelled = false;
+    const publish = (detected: WorkspaceGitRoot[]) => {
+      const next = Array.isArray(detected) && detected.length ? detected : EMPTY_ROOTS;
+      // An empty lookup has no visible ownership to change. Avoid enqueueing
+      // a React update for every ordinary HOME document. Nonempty results
+      // still carry the request key, so old responses cannot leak a repo.
+      if (!next.length && !publishedActiveRootsRef.current.length) return;
+      publishedActiveRootsRef.current = next;
+      setActiveResult({ key: activeKey, roots: next });
+    };
     // The document gets its first rendering turn before this optional Git lookup.
     const frame = window.requestAnimationFrame(() => {
       void workspaceDetectGitRoots([{
@@ -68,10 +78,10 @@ export function useWorkspaceGitRootDiscovery({ roots, activeFile, visible, onErr
         activeFilePath: file.path, ancestorsOnly: true,
       }]).then((detected) => {
         if (cancelled) return;
-        startTransition(() => setActiveResult({ key: activeKey, roots: Array.isArray(detected) && detected.length ? detected : EMPTY_ROOTS }));
+        startTransition(() => publish(detected));
       }).catch((error) => {
         if (cancelled) return;
-        setActiveResult({ key: activeKey, roots: EMPTY_ROOTS });
+        publish(EMPTY_ROOTS);
         inputsRef.current.onError(errorMessage(error));
       });
     });
