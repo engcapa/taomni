@@ -1508,6 +1508,8 @@
 - `[data-testid="context-menu-item-servers"]` — interactive [optional] — F1.9.command-servers
 - `[data-testid="context-menu-item-exit"]` — interactive [optional] — F1.9.command-exit
 - `[data-testid="context-menu-item-close-active-tab"]` — interactive [optional] — F1.9.command-close-active
+- `[data-testid="context-menu-workspace-actions"]` — interactive [optional] — F1.9.workspace-command-submenu
+- `[data-testid="context-menu-workspace-command-workspace.save"]` — interactive [optional] — F1.9.workspace-command-save
 
 ## main/detach (F-Detach-1)
 

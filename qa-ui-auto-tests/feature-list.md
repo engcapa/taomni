@@ -731,6 +731,14 @@ controls:
     selector: '[data-testid="context-menu-item-close-active-tab"]'
     kind: interactive
     optional: true
+  - id: workspace-command-submenu
+    selector: '[data-testid="context-menu-workspace-actions"]'
+    kind: interactive
+    optional: true
+  - id: workspace-command-save
+    selector: '[data-testid="context-menu-workspace-command-workspace.save"]'
+    kind: interactive
+    optional: true
 -->
 
 - 控制栏统一菜单承接原 Ribbon 大图标核心命令分发：Session / SFTP / Settings / Help / Servers / Exit。
@@ -12440,7 +12448,8 @@ files:
 - src/components/editor/workspace/ProjectTreeFlat.tsx
 - src/components/editor/workspace/ProjectTreeEntryDetails.tsx
 - src/components/editor/workspace/ProjectTree.tsx
-- src/components/editor/workspace/ProjectTreeRows.tsx
+- src/components/editor/workspace/projectTreeRendering.tsx
+- src/components/editor/workspace/ProjectTreeEntryRows.tsx
 - src/components/editor/workspace/ProjectTreeViewport.tsx
 - src/components/editor/workspace/projectTreeRows.ts
 - src/components/editor/workspace/projectTreeNavigationModel.ts
