@@ -14,6 +14,7 @@ import { useWorkspaceClipboard } from "../hooks/useWorkspaceClipboard";
 import { useWorkspaceCodeStyle } from "../hooks/useWorkspaceCodeStyle";
 import { useWorkspaceEditorCommands } from "../hooks/useWorkspaceEditorCommands";
 import { useWorkspaceKeymap } from "../hooks/useWorkspaceKeymap";
+import { useWorkspaceActionProjection } from "../hooks/useWorkspaceActionProjection";
 import { useWorkspaceStatusBridge } from "../hooks/useWorkspaceStatusBridge";
 import { useWorkspaceUiActions } from "../hooks/useWorkspaceUiActions";
 import { useWorkspaceActionsController } from "../useWorkspaceActionsController";
@@ -43,6 +44,7 @@ export interface WorkspaceEditingPopupsProps {
 }
 
 export function WorkspaceEditingPopups(props: WorkspaceEditingPopupsProps) {
+  const { snapshot } = useWorkspaceActionProjection(props.actionsController.projection);
   const {
     uiActions,
     editorCommands,
@@ -115,11 +117,11 @@ export function WorkspaceEditingPopups(props: WorkspaceEditingPopupsProps) {
     {keymapCheatSheetOpen && (
       <KeymapCheatSheetDialog
         open={true}
-        actionSnapshots={actionsController.snapshot}
+        actionSnapshots={snapshot}
         onClose={() => setKeymapCheatSheetOpen(false)}
         onExecuteCommand={(cmdId) => {
           // §8.17.3: cheatsheet runs the rendered frozen evaluation.
-          const entry = actionsController.snapshot.find((item) => item.id === cmdId);
+          const entry = snapshot.find((item) => item.id === cmdId);
           if (!entry) return;
           void actionsController.host.executePrepared(entry.evaluation);
         }}
@@ -165,7 +167,7 @@ export function WorkspaceEditingPopups(props: WorkspaceEditingPopupsProps) {
     {keymap.keymapSettingsOpen && (
       <KeymapSettingsDialog
         open={true}
-        snapshot={actionsController.snapshot}
+        snapshot={snapshot}
         schemes={keymap.keymapSchemes}
         activeSchemeId={keymap.activeKeymapSchemeId}
         defaultSchemeName="IDEA defaults"

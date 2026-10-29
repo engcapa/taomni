@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type WorkspaceActionContext,
   type ActionState,
@@ -19,6 +19,7 @@ import {
   type KeyDispatchResult,
   WorkspaceActionHost,
 } from "./workspaceActionHost";
+import { createWorkspaceActionProjection, type WorkspaceActionProjection } from "./workspaceActionProjection";
 
 export interface UseWorkspaceActionsControllerOptions {
   workspaceId?: string;
@@ -29,6 +30,8 @@ export interface UseWorkspaceActionsControllerOptions {
   contextData?: Partial<WorkspaceActionContext>;
   /** Read live owners for dispatch while their secondary UI render is pending. */
   getContextData?: () => Partial<WorkspaceActionContext>;
+  /** Deferred display notifications from live editor ports and selections. */
+  subscribeContextChanges?: (listener: () => void) => () => void;
   onCommandExecuted?: (commandId: string, result?: ActionResult) => void;
   /** ED-PARITY-004 DEC-05: observable rejection for ambiguous strokes. */
   onBindingConflict?: (notice: BindingConflictNotice) => void;
@@ -49,6 +52,7 @@ export interface WorkspaceActionsController {
   /** Instance-scoped snapshot: the single runtime truth for all surfaces. */
   snapshot: ActionSnapshotItem[];
   commandRegistration: WorkspaceCommandRegistration;
+  projection: WorkspaceActionProjection;
 }
 
 /**
@@ -63,6 +67,7 @@ export function useWorkspaceActionsController({
   getDefaultFocus,
   contextData,
   getContextData,
+  subscribeContextChanges,
   onCommandExecuted,
   onBindingConflict,
 }: UseWorkspaceActionsControllerOptions): WorkspaceActionsController {
@@ -88,8 +93,6 @@ export function useWorkspaceActionsController({
 
   const onBindingConflictRef = useRef(onBindingConflict);
   onBindingConflictRef.current = onBindingConflict;
-
-  const [revision, setRevision] = useState(0);
 
   // §8.16.3 Gate-R1 lifecycle: the host lives in lazily-created state (never
   // useMemo, which React may drop). Real unmount disposes the host; StrictMode's
@@ -136,16 +139,6 @@ export function useWorkspaceActionsController({
     };
   }, [ensureLiveHost, host]);
 
-  // Synchronize registered commands with the host
-  useEffect(() => {
-    if (host.isDisposed()) return;
-    const unregister = host.registerCommands(commands);
-    // Registration is immediate. Its menu projection must yield to the new
-    // document instead of forcing another complete workspace render pre-paint.
-    startTransition(() => setRevision((r) => r + 1));
-    return unregister;
-  }, [host, commands]);
-
   const executeAction = useCallback(
     async (commandId: string, payload?: unknown, signal?: AbortSignal): Promise<ActionResult> => {
       return ensureLiveHost().execute(commandId, payload, signal);
@@ -190,34 +183,25 @@ export function useWorkspaceActionsController({
     [ensureLiveHost],
   );
 
-  // Build one immutable snapshot first. Every display projection below is derived
-  // from this same prepared context/evaluation set.
-  const snapshot = useMemo<ActionSnapshotItem[]>(() => {
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-    revision;
-    activeFocus;
-    contextData;
-    return host.getSnapshot();
-  }, [host, revision, activeFocus, contextData, getContextData]);
+  const contextKey = useMemo(() => ({}), [host, activeFocus, contextData, getContextData]);
+  const contextKeyRef = useRef(contextKey);
+  contextKeyRef.current = contextKey;
+  const executionRef = useRef({ executeAction, executeCommand });
+  executionRef.current = { executeAction, executeCommand };
+  const [projection] = useState(() => createWorkspaceActionProjection(
+    () => ({ host: hostRef.current, contextKey: contextKeyRef.current }),
+    (...args) => executionRef.current.executeAction(...args),
+    (...args) => executionRef.current.executeCommand(...args),
+  ));
 
-  const menuItems = useMemo<WorkspaceCommandMenuItem[]>(() => snapshot.map((entry) => ({
-    id: entry.id,
-    title: entry.title,
-    category: entry.category,
-    keybinding: entry.keybinding,
-    enabled: entry.state.availability === "available",
-    provenance: entry.state.source,
-  })), [snapshot]);
-
-  const commandRegistration = useMemo<WorkspaceCommandRegistration>(
-    () => ({
-      items: menuItems,
-      snapshot,
-      executeAction,
-      execute: (commandId, payload) => executeCommand(commandId, payload),
-    }),
-    [executeAction, executeCommand, menuItems, snapshot],
-  );
+  useEffect(() => {
+    if (host.isDisposed()) return;
+    const unregister = host.registerCommands(commands);
+    projection.publish();
+    return unregister;
+  }, [host, commands, projection]);
+  useEffect(() => projection.publish(), [projection, contextKey]);
+  useEffect(() => subscribeContextChanges?.(projection.publish), [projection, subscribeContextChanges]);
 
   return {
     host,
@@ -226,8 +210,9 @@ export function useWorkspaceActionsController({
     dispatchKeydown,
     dispatchKeydownV2,
     getActionState,
-    menuItems,
-    snapshot,
-    commandRegistration,
+    get menuItems() { return projection.getSnapshot().menuItems; },
+    get snapshot() { return projection.getSnapshot().snapshot; },
+    get commandRegistration() { return projection.getSnapshot().commandRegistration; },
+    projection,
   };
 }

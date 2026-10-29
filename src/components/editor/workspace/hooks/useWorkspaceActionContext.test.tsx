@@ -54,7 +54,7 @@ function renderOwner(onRender = () => {}) {
   return { result, run };
 }
 
-it("keeps the new command owner live while yielding its menu render to the editor paint", async () => {
+it("updates live command menus after paint without recomposing the editor owner", async () => {
   vi.useFakeTimers();
   const frames = new Map<number, FrameRequestCallback>();
   let frameId = 0;
@@ -71,9 +71,13 @@ it("keeps the new command owner live while yielding its menu render to the edito
   try {
     const renders = vi.fn();
     const { result, run } = renderOwner(renders);
+    expect(result.current.controller.snapshot[0].state.availability).toBe("disabled");
+    const changed = vi.fn();
+    const unsubscribe = result.current.controller.projection.subscribe(changed);
+    let flags = state();
     renders.mockClear();
     act(() => {
-      result.current.editorCommands.registerEditorCommandPort("primary", { fileKey: "a", token: {}, port: port(() => state()) });
+      result.current.editorCommands.registerEditorCommandPort("primary", { fileKey: "a", token: {}, port: port(() => flags) });
       result.current.editorCommands.setEditorCommandContextRevision((revision) => revision + 1);
       expect(result.current.controller.executeCommand("editor.selectionProbe")).toBe(true);
     });
@@ -84,8 +88,18 @@ it("keeps the new command owner live while yielding its menu render to the edito
     expect(renders).not.toHaveBeenCalled();
     paint();
     act(() => vi.advanceTimersByTime(0));
-    expect(renders).toHaveBeenCalledOnce();
+    expect(renders).not.toHaveBeenCalled();
+    expect(changed).toHaveBeenCalledOnce();
     expect(result.current.controller.snapshot[0].state.availability).toBe("available");
+    flags = state({ readOnly: true });
+    act(() => result.current.editorCommands.setEditorCommandContextRevision((revision) => revision + 1));
+    paint();
+    paint();
+    act(() => vi.advanceTimersByTime(0));
+    expect(renders).not.toHaveBeenCalled();
+    expect(result.current.controller.snapshot[0].state.availability).toBe("disabled");
+    expect(changed).toHaveBeenCalledTimes(2);
+    unsubscribe();
   } finally {
     cleanup();
     request.mockRestore();

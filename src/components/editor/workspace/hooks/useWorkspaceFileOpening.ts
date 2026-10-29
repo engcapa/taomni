@@ -56,7 +56,7 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
       [groupId]: { ...(leaf ?? {}), [fileKey]: state },
     };
     if (session.mountedRef.current) {
-      session.layoutHydration.setViewStateRevision((revision) => revision + 1);
+      session.layoutHydration.viewStateChanges.notify();
     } else {
       persistWorkspaceLayoutNowRef.current?.(session.workspaceInstanceId);
     }
@@ -244,7 +244,7 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
     setStatusMessage: session.setStatusMessage,
     persistWorkspaceLayoutNowRef,
     tabPolicyRevision: session.tabPolicyOwner.tabPolicyRevision,
-    viewStateRevision: session.layoutHydration.viewStateRevision,
+    viewStateChanges: session.layoutHydration.viewStateChanges,
     workspaceInstanceIdRef: project.semanticQueries.workspaceInstanceIdRef,
   });
 

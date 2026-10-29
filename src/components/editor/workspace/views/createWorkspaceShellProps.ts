@@ -257,6 +257,7 @@ export function createWorkspaceShellProps(context: CreateWorkspaceShellPropsCont
       uiActions: project.uiActions,
       clipboard: session.clipboard,
     },
+    commandPublication: commands.commandPublication,
     clipboard: session.clipboard,
     rootRef: surfaceState.rootRef,
     observationBridge: session.observationBridge,

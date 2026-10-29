@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createEditorGroup, selectCodeWorkspaceUi, useCodeWorkspaceStore } from "../../../../stores/codeWorkspaceStore";
 import { DEFAULT_WORKSPACE_TAB_POLICY_V3, type WorkspaceTabPolicyV3 } from "../workspaceTabPolicy";
 import { createSingleLeafLayout } from "../recursiveLayoutTree";
@@ -11,6 +11,7 @@ import {
   type WorkspaceViewStates,
 } from "../workspaceLayoutPersistence";
 import { initialRoots, rootDirKey } from "../codeWorkspaceModel";
+import { createWorkspaceViewStateChanges } from "../workspaceViewStateChanges";
 
 
 export interface UseWorkspaceLayoutHydrationContext {
@@ -36,12 +37,7 @@ export function useWorkspaceLayoutHydration(context: UseWorkspaceLayoutHydration
     readWorkspaceLayoutSnapshot(workspaceInstanceId)?.viewStates ?? {}
   ));
   const viewStatesRef = useRef<WorkspaceViewStates>(hydratedViewStates);
-  const [viewStateRevision, setRevision] = useState(0);
-  // Caret/fold/scroll snapshots are already captured in viewStatesRef. Only
-  // their debounced persistence notification needs a React update.
-  const setViewStateRevision = useCallback<typeof setRevision>((update) => {
-    startTransition(() => setRevision(update));
-  }, []);
+  const [viewStateChanges] = useState(createWorkspaceViewStateChanges);
   useEffect(() => {
     if (layoutHydratedRef.current === workspaceInstanceId) return;
     layoutHydratedRef.current = workspaceInstanceId;
@@ -118,5 +114,5 @@ export function useWorkspaceLayoutHydration(context: UseWorkspaceLayoutHydration
       seedRoots.map((root) => rootDirKey(root.id, "")),
     );
   }, [patchWorkspaceUi, seedTreeExpandIfEmpty, workspace, workspaceInstanceId]);
-  return { viewStatesRef, setViewStateRevision, layoutRestoredOpenFilesRef, viewStateRevision };
+  return { viewStatesRef, viewStateChanges, layoutRestoredOpenFilesRef };
 }

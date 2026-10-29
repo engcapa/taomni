@@ -9,14 +9,14 @@ interface Dependencies {
   activeEditorGroupId: string;
   activeFilePath?: string;
   modalOpen: boolean;
-  editorCommands: Pick<ReturnType<typeof useWorkspaceEditorCommands>, "activeEditorCommandState" | "editorCommandContextRevision">;
+  editorCommands: Pick<ReturnType<typeof useWorkspaceEditorCommands>, "activeEditorCommandState" | "subscribeEditorCommandContext">;
 }
 
 /** Dispatch reads the live editor; immutable menu snapshots update separately. */
 export function useWorkspaceActionContext({
   workspaceInstanceId, activeKey, activeEditorGroupId, activeFilePath, modalOpen, editorCommands,
 }: Dependencies) {
-  const { activeEditorCommandState, editorCommandContextRevision } = editorCommands;
+  const { activeEditorCommandState, subscribeEditorCommandContext } = editorCommands;
   const getContextData = useCallback((): Partial<WorkspaceActionContext> => {
     const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
     const editorState = activeEditorCommandState();
@@ -34,7 +34,7 @@ export function useWorkspaceActionContext({
     };
   }, [workspaceInstanceId, activeEditorCommandState, modalOpen]);
   const contextData = useMemo(() => getContextData(), [
-    getContextData, editorCommandContextRevision, activeKey, activeEditorGroupId, activeFilePath,
+    getContextData, activeKey, activeEditorGroupId, activeFilePath,
   ]);
-  return { contextData, getContextData };
+  return { contextData, getContextData, subscribeContextChanges: subscribeEditorCommandContext };
 }

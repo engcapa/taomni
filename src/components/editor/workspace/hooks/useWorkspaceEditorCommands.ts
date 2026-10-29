@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from "react";
 import { type LspPosition } from "../../../../lib/editor/lsp";
 import { selectCodeWorkspaceUi, useCodeWorkspaceStore, type EditorGroupId } from "../../../../stores/codeWorkspaceStore";
 import {
@@ -32,13 +32,28 @@ export function useWorkspaceEditorCommands(dependencies: UseWorkspaceEditorComma
     port: EditorCommandPort;
   }>());
 
-  const [editorCommandContextRevision, setContextRevision] = useState(0);
+  const contextChanges = useRef({ revision: 0, pending: false, listeners: new Set<() => void>() });
   const projectAfterPaint = useWorkspacePaintQueue();
-  // Port ownership changes immediately below. Menu/selection flags are a
-  // secondary projection and must not block the first document paint.
-  const setEditorCommandContextRevision = useCallback<typeof setContextRevision>((update) => {
-    projectAfterPaint(() => setContextRevision(update));
+  const subscribeEditorCommandContext = useCallback((listener: () => void) => {
+    contextChanges.current.listeners.add(listener);
+    return () => { contextChanges.current.listeners.delete(listener); };
+  }, []);
+  // Dispatch reads live ports. Only menu consumers need the combined selection
+  // notification after paint; the editor's runtime owner needs no render.
+  const setEditorCommandContextRevision = useCallback<Dispatch<SetStateAction<number>>>((update) => {
+    const changes = contextChanges.current;
+    changes.revision = typeof update === "function" ? update(changes.revision) : update;
+    if (changes.pending) return;
+    changes.pending = true;
+    projectAfterPaint(() => {
+      changes.pending = false;
+      for (const listener of changes.listeners) listener();
+    });
   }, [projectAfterPaint]);
+  useEffect(() => () => {
+    contextChanges.current.pending = false;
+    contextChanges.current.listeners.clear();
+  }, []);
   /** Selection-derived action-context flags last published (see onSelectionChange). */
   const editorCommandSignatureRef = useRef<string | null>(null);
   const registerEditorCommandPort = useCallback((
@@ -171,5 +186,11 @@ export function useWorkspaceEditorCommands(dependencies: UseWorkspaceEditorComma
     const file = openFilesRef.current[ui.activeKey ?? ""] ?? null;
     return { file, position: dependencies.editorSelectionRef.current.end };
   }, [workspaceInstanceId]);
-  return { editorCommandOwnerFor, handleReturnToEditor, resolveEditorTarget, executeActiveEditorCommand, executeEditorCommand, editorCommandStateFor, activeEditorCommandState, isActiveEditorReady, editorCommandContextRevision, activeEditorCommandOwner, executeEditorCommandFor, editorCommandSignatureRef, setEditorCommandContextRevision, registerEditorCommandPort };
+  return {
+    editorCommandOwnerFor, handleReturnToEditor, resolveEditorTarget, executeActiveEditorCommand,
+    executeEditorCommand, editorCommandStateFor, activeEditorCommandState, isActiveEditorReady,
+    get editorCommandContextRevision() { return contextChanges.current.revision; },
+    subscribeEditorCommandContext, activeEditorCommandOwner, executeEditorCommandFor,
+    editorCommandSignatureRef, setEditorCommandContextRevision, registerEditorCommandPort,
+  };
 }
