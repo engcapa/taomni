@@ -2,7 +2,8 @@
   if (window.__QA_FILE_OPEN_PROBE__) throw new Error("File-open probe already installed");
   const requireHighlight = config.require_highlight !== false;
   const state = { event: config.event, started: null, firstContentMs: null,
-    firstHighlightMs: null, frames: [], finished: false };
+    firstHighlightMs: null, frames: [], finished: false, editorReused: null };
+  let initialView = null;
   let handle = null;
   let lastFrame = null;
   function frame() {
@@ -10,6 +11,7 @@
     const now = performance.now();
     const el = document.querySelector('[data-testid="workspace-file-editor"] .cm-content');
     const view = el?.cmTile?.root?.view;
+    if (!view || view !== initialView) state.editorReused = false;
     const text = view?.state.doc.toString();
     const visible = !!el && el.getBoundingClientRect().width > 0 && el.getBoundingClientRect().height > 0;
     const matches = visible && text === config.expected;
@@ -31,6 +33,8 @@
     const target = event.target instanceof Element ? event.target.closest(config.selector) : null;
     if (!target || state.started !== null) return;
     state.started = performance.now();
+    initialView = document.querySelector('[data-testid="workspace-file-editor"] .cm-content')?.cmTile?.root?.view ?? null;
+    state.editorReused = initialView !== null;
     state.eventTrusted = event.isTrusted;
     lastFrame = state.started;
     handle = requestAnimationFrame(frame);

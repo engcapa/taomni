@@ -66,6 +66,8 @@ export interface CodeMirrorHostProps {
   path: string;
   /** Stable buffer identity used by the workspace editor command owner. */
   fileKey?: string;
+  /** Buffers still open in this pane; closed buffers must leave its state cache. */
+  retainedFileKeys?: readonly string[];
   /** Editor view or group identifier (§8.26 / ED-MULTIVIEW-002). */
   viewId?: string;
   /** Shared document transaction owner (§8.26 / ED-MULTIVIEW-002). */

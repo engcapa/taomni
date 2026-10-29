@@ -21,16 +21,17 @@ FRAME_BUDGET_MS = 150
 def validate(args: Any) -> dict:
     required = {"selector", "expected", "event", "label"}
     if (not isinstance(args, dict) or not required <= set(args)
-            or set(args) - required - {"require_highlight"}
+            or set(args) - required - {"require_highlight", "require_editor_reuse"}
             or not all(isinstance(args[key], str) and args[key] for key in required)
             or type(args.get("require_highlight", True)) is not bool
+            or type(args.get("require_editor_reuse", False)) is not bool
             or args["event"] not in {"click", "dblclick"}
             or not re.fullmatch(r"[a-z0-9-]+", args["label"])):
-        raise StepError("measure_workspace_file_open expects {selector, expected, event: click|dblclick, label, require_highlight?: boolean}")
+        raise StepError("measure_workspace_file_open expects {selector, expected, event: click|dblclick, label, require_highlight?: boolean, require_editor_reuse?: boolean}")
     return args
 
 
-def review(state: Any, *, require_highlight: bool = True) -> None:
+def review(state: Any, *, require_highlight: bool = True, require_editor_reuse: bool = False) -> None:
     if not isinstance(state, dict) or state.get("started") is None or not state.get("finished"):
         raise StepError("File activation did not produce the exact visible document and syntax-highlighted frame")
     for key in ["firstContentMs", *(["firstHighlightMs"] if require_highlight else [])]:
@@ -46,6 +47,8 @@ def review(state: Any, *, require_highlight: bool = True) -> None:
             raise StepError(f"File activation frame {index + 1} blocked beyond {FRAME_BUDGET_MS}ms: {value}")
     if not frames[-1].get("matches") or (require_highlight and not frames[-1].get("highlighted")):
         raise StepError("File activation lost its document or highlighting after the first frame")
+    if require_editor_reuse and state.get("editorReused") is not True:
+        raise StepError("File activation replaced or unmounted the existing editor instead of reusing it")
 
 
 def run(ctx: Any, args: Any) -> str:
@@ -65,7 +68,8 @@ def measure(ctx: Any, args: Any, *, preparation: list[dict] | None = None) -> st
     execute = ctx.session.execute if native else lambda source: ctx.page.evaluate("() => {" + source + "}")
     report = {"passed": False, "label": config["label"], "mode": "native" if native else "browser",
               "openBudgetMs": OPEN_BUDGET_MS, "frameBudgetMs": FRAME_BUDGET_MS,
-              "requireHighlight": config.get("require_highlight", True)}
+              "requireHighlight": config.get("require_highlight", True),
+              "requireEditorReuse": config.get("require_editor_reuse", False)}
     report["tabPreparation"] = preparation
     if not native:
         report["browserTrace"] = getattr(ctx, "case_state", {}).get("browser_trace")
@@ -91,7 +95,8 @@ def measure(ctx: Any, args: Any, *, preparation: list[dict] | None = None) -> st
             if time.monotonic() >= deadline:
                 raise StepError("File-open frame observer did not finish")
             time.sleep(.025)
-        review(state, require_highlight=config.get("require_highlight", True))
+        review(state, require_highlight=config.get("require_highlight", True),
+               require_editor_reuse=config.get("require_editor_reuse", False))
         report["passed"] = True
         return "Exact visible document and continuous responsive frames observed after real activation"
     except BaseException:

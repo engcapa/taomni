@@ -5,7 +5,7 @@ import { search } from "@codemirror/search";
 import { EditorState, Text, Transaction } from "@codemirror/state";
 import type { KeyBinding } from "@codemirror/view";
 import { crosshairCursor, drawSelection, EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, rectangularSelection } from "@codemirror/view";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { codeViewExtensions } from "../../../../lib/codeViewTheme";
 import { createCoverageEditorChrome } from "../coverageEditorChrome";
 import { type DebugBreakpointMarker } from "../debugEditorChrome";
@@ -45,6 +45,7 @@ import {
 import { treeRevisionField } from "../workspaceSyntaxFacts";
 import { desiredVisualColumnField, virtualOverflowRestoreField, virtualSpaceClickHandler, virtualSpaceOverflowField, virtualSpaceTypingHandler } from "../workspaceVirtualSpace";
 import { useEditorHostRefs } from "./useEditorHostRefs";
+import { EditorStateCache, reconfigureCachedEditorState } from "./editorStateCache";
 
 export interface UseEditorViewLifetimeContext {
   editor: ReturnType<typeof useEditorHostRefs>;
@@ -99,6 +100,7 @@ export interface UseEditorViewLifetimeContext {
   clipboardWorkspaceId: string | undefined;
   viewId: string | undefined;
   fileKey: string;
+  retainedFileKeys?: readonly string[];
 }
 
 export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
@@ -140,17 +142,38 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
     viewId,
     fileKey,
   } = context;
+  const stateCache = useRef(new EditorStateCache());
+  const ownerAtRender = editor.transactionOwnerRef.current;
+  const cacheOwner = useRef({ owner: ownerAtRender, workspaceId: clipboardWorkspaceId });
+  const stateCallback = useRef({ fileKey, callback: editor.onViewStateChangeRef.current });
+  if (stateCallback.current.fileKey === fileKey) stateCallback.current.callback = editor.onViewStateChangeRef.current;
 
-  useEffect(function mountEditorHost() {
+  useEffect(function activateEditorDocument() {
     if (!editor.hostRef.current) return;
+    let disposed = false;
     const owner = editor.transactionOwnerRef.current;
     const sharedFileKey = editor.fileKeyRef.current;
     const sharedViewId = editor.viewIdRef.current;
+    const documentPath = editor.pathRef.current;
+    if (cacheOwner.current.owner !== owner || cacheOwner.current.workspaceId !== clipboardWorkspaceId) {
+      stateCache.current.clear();
+    }
+    cacheOwner.current = { owner, workspaceId: clipboardWorkspaceId };
+    const cached = stateCache.current.take(sharedFileKey, documentPath);
+    const initialLanguage = cached ? context.languageCompartment.current.get(cached.state) : undefined;
+    const callback = { fileKey, callback: editor.onViewStateChangeRef.current };
+    stateCallback.current = callback;
+    editor.lastSelectionRef.current = null;
+    editor.lastEmittedViewStateRef.current = null;
+    editor.pendingDeferredScrollRef.current = null;
+    editor.userInteractedSinceMountRef.current = false;
     const initialDocumentText = owner && sharedFileKey
       ? owner.acquireView(sharedFileKey, sharedViewId, doc, documentRevision)
       : doc;
     context.lastDocumentTextRef.current = initialDocumentText;
-    const initialDoc = Text.of(initialDocumentText.split("\n"));
+    const initialDoc = cached?.state.doc.toString() === initialDocumentText
+      ? cached.state.doc
+      : Text.of(initialDocumentText.split("\n"));
     // §8.19.4 resolve gate banner: anchored to the caret at presentation time.
     // The gate request's own closures re-verify identity/doc before acting, so
     // a stale banner is inert — this only decides where it shows.
@@ -280,19 +303,17 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
       };
       void handler(selection).then((ranges) => {
         const current = editor.viewRef.current;
-        if (!current || current !== view) return;
+        if (disposed || !current || current !== view) return;
         if (!ranges || !expandSelectionFromLspRanges(current, ranges)) {
           expandSyntaxSelection(current);
         }
       }).catch(() => {
         const current = editor.viewRef.current;
-        if (current === view) expandSyntaxSelection(current);
+        if (!disposed && current === view) expandSyntaxSelection(current);
       });
       return true;
     };
-    const state = EditorState.create({
-      doc: initialDoc,
-      extensions: [
+    const extensions = [
         lineNumbers(),
         foldGutter(),
         // Language-aware region grammar; unknown languages never fold.
@@ -403,7 +424,7 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
           EditorState.tabSize.of(codeStyle?.tabSize ?? 2),
           indentUnit.of(codeStyle?.insertSpaces ? " ".repeat(codeStyle?.indentSize || codeStyle?.tabSize || 2) : "\t"),
         ]),
-        context.languageCompartment.current.of([]),
+        context.languageCompartment.current.of(initialLanguage ?? []),
         context.diagnosticsCompartment.current.of(createDiagnosticChrome(
           diagnostics,
           (line) => editor.onLightbulbRef.current?.(line),
@@ -522,9 +543,12 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
         ]),
         createEditorDomHandlers({ pointerClickCountRef: editor.pointerClickCountRef, shiftExtendKeyRef: editor.shiftExtendKeyRef, onContextMenuRef: editor.onContextMenuRef }),
         createDocumentUpdateListener({ applyingExternalDocRef: context.applyingExternalDocRef, lastDocumentTextRef: context.lastDocumentTextRef, transactionOwnerRef: editor.transactionOwnerRef, fileKeyRef: editor.fileKeyRef, viewIdRef: editor.viewIdRef, currentCompositionSessionRef: editor.currentCompositionSessionRef, compositionActiveRef: editor.compositionActiveRef, viewRef: editor.viewRef, rememberLocalDocumentEcho: context.rememberLocalDocumentEcho, onChangeRef: editor.onChangeRef, signatureTriggersRef: editor.signatureTriggersRef, emitParameterTrigger, onParameterInvalidateRef: editor.onParameterInvalidateRef, scheduleSelectionEmit, scheduleViewportEmit, viewportEmitTimerRef: editor.viewportEmitTimerRef, restoringInitialViewStateRef: editor.restoringInitialViewStateRef, userInteractedSinceMountRef: editor.userInteractedSinceMountRef, pendingDeferredScrollRef: editor.pendingDeferredScrollRef, scheduleViewStateEmit }),
-      ],
-    });
-    const view = new EditorView({ state, parent: editor.hostRef.current });
+      ];
+    const state = cached
+      ? reconfigureCachedEditorState(cached.state, initialDocumentText, extensions)
+      : EditorState.create({ doc: initialDoc, extensions });
+    const view = editor.viewRef.current ?? new EditorView({ state, parent: editor.hostRef.current });
+    if (editor.viewRef.current) view.setState(state);
     editorLanguageByView.set(view, liveTemplateLanguageForPath(editor.pathRef.current));
     editor.viewRef.current = view;
     // ED-PARITY-011 DEC-011-07: remember whether the latest key in this view
@@ -543,9 +567,11 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
     const importFold = importFoldRange(editor.pathRef.current, view.state.doc.toString());
     if (importFold && importFold.to <= view.state.doc.length) {
       importFoldPathByView.set(view, editor.pathRef.current);
-      if (editor.initialViewStateRef.current?.importsExpanded !== true) {
+      if (!cached && editor.initialViewStateRef.current?.importsExpanded !== true) {
         view.dispatch({ effects: foldEffect.of(importFold) });
       }
+    } else {
+      importFoldPathByView.delete(view);
     }
     const providerRowForEvent = (event: MouseEvent): { row: HTMLLIElement; index: number; } | null => {
       if (!editor.pathRef.current.toLowerCase().endsWith(".java") || editor.viewRef.current !== view) return null;
@@ -577,7 +603,12 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
     // ED-IMPROVE-007: one-shot restore of this leaf/file's own caret,
     // selection, scroll and folds. Applied before any user input and never
     // re-applied on prop changes, so late updates cannot overwrite typing.
-    const initialViewState = editor.initialViewStateRef.current;
+    view.scrollDOM.scrollTop = cached?.scrollTop ?? 0;
+    view.scrollDOM.scrollLeft = cached?.scrollLeft ?? 0;
+    if (cached && (cached.scrollTop > 0 || cached.scrollLeft > 0)) {
+      editor.pendingDeferredScrollRef.current = { scrollTop: cached.scrollTop, scrollLeft: cached.scrollLeft };
+    }
+    const initialViewState = cached ? null : editor.initialViewStateRef.current;
     if (initialViewState) {
       editor.restoringInitialViewStateRef.current = true;
       try {
@@ -646,6 +677,8 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
     }
 
     return () => {
+      disposed = true;
+      bumpClipboardOwnerGeneration(view);
       document.removeEventListener("mousedown", selectProviderRow, true);
       document.removeEventListener("dblclick", acceptProviderRow, true);
       legacyBridgeRegistration?.dispose();
@@ -658,13 +691,13 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
         editor.viewStateEmitTimerRef.current = null;
       }
       // ED-REPAIR-009: Tail capture on unmount / teardown
-      if (editor.viewRef.current === view && editor.onViewStateChangeRef.current) {
+      if (editor.viewRef.current === view && callback.callback) {
         try {
           const captured = captureEditorViewState(view);
           const serialized = JSON.stringify(captured);
           if (serialized !== editor.lastEmittedViewStateRef.current) {
             editor.lastEmittedViewStateRef.current = serialized;
-            editor.onViewStateChangeRef.current(captured);
+            callback.callback(captured);
           }
         } catch {
           // view may be in teardown
@@ -683,12 +716,25 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
       view.contentDOM.removeEventListener("focusout", clipboardFocusOutGuard, true);
       editor.pendingCompletionAcceptanceRef.current?.();
       editor.pendingCompletionAcceptanceRef.current = null;
+      // Completion proposals and snippet tabstops are request-scoped UI. Keep
+      // document history/folds, but never revive these requests on a later tab.
+      editor.basicCompletionReopenRef.current = true;
+      if (completionStatus(view.state) !== null) closeCompletion(view);
+      cancelLspSnippetSession(view);
+      editor.basicCompletionReopenRef.current = false;
       editor.selectionKeyTrackerCleanupRef.current?.();
       editor.selectionKeyTrackerCleanupRef.current = null;
-      view.destroy();
-      editor.viewRef.current = null;
+      stateCache.current.save(sharedFileKey, {
+        state: view.state, path: documentPath, scrollTop: view.scrollDOM.scrollTop, scrollLeft: view.scrollDOM.scrollLeft,
+      });
       if (owner && sharedFileKey) owner.releaseView(sharedFileKey, sharedViewId);
     };
+  }, [fileKey, viewId, ownerAtRender, workspaceActionHost, clipboardWorkspaceId]);
+  useEffect(() => stateCache.current.retain(context.retainedFileKeys), [context.retainedFileKeys, fileKey]);
+  useEffect(() => () => {
+    editor.viewRef.current?.destroy();
+    editor.viewRef.current = null;
+    stateCache.current.clear();
   }, []);
   return {};
 }

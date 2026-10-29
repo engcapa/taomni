@@ -35,6 +35,7 @@ import { EditorHostSurface } from "./host/EditorHostSurface";
 export const CodeMirrorHost = memo(function CodeMirrorHost({
   path,
   fileKey = path,
+  retainedFileKeys,
   viewId,
   transactionOwner = null,
   onWorkspaceHistoryClaim,
@@ -350,6 +351,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     clipboardWorkspaceId,
     viewId,
     fileKey,
+    retainedFileKeys,
   });
 
   // ED-REPAIR-009: Flush view-state on window unload
@@ -445,6 +447,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   }, [fileKey]);
 
   const { languageCompartment, signatureCompartment, hoverCompartment, requestParameterInfoRef, activeHoverResizeSessionRef } = useEditorIntelligence({
+    fileKey,
     path,
     viewRef: editor.viewRef,
     showHoverDocumentation,

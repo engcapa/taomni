@@ -9,15 +9,21 @@ vi.mock("./CodeMirrorHost", () => ({
     onFoldProvenanceChange,
     renderedDocEnabled,
     renderedDocLanguageId,
+    readOnly,
+    doc,
   }: {
     onFoldProvenanceChange?: (p: string | null) => void;
     renderedDocEnabled?: boolean;
     renderedDocLanguageId?: string | null;
+    readOnly?: boolean;
+    doc?: string;
   }) => (
     <div
       data-testid="mock-code-mirror"
       data-rendered-doc-enabled={renderedDocEnabled || undefined}
       data-rendered-doc-language={renderedDocLanguageId || undefined}
+      data-read-only={readOnly || undefined}
+      data-document={doc}
     >
       <button
         type="button"
@@ -124,6 +130,30 @@ function props(overrides: Partial<ComponentProps<typeof EditorGroup>> = {}): Com
 }
 
 describe("EditorGroup tabs", () => {
+  it("keeps the same editor host mounted when activating another ready file", () => {
+    const a = file("a");
+    const b = file("b");
+    const initial = props({ activeKey: a.key, activeFile: a });
+    const view = render(<EditorGroup {...initial} />);
+    const host = screen.getByTestId("mock-code-mirror");
+    view.rerender(<EditorGroup {...initial} activeKey={b.key} activeFile={b} />);
+    expect(screen.getByTestId("mock-code-mirror")).toBe(host);
+  });
+  it("retains the editor during a slow read, blocks editing and reveals the ready content", () => {
+    const initial = props();
+    const rendered = render(<EditorGroup {...initial} />);
+    const host = screen.getByTestId("mock-code-mirror");
+    const loading = { ...file("slow"), text: "", loading: true };
+    rendered.rerender(<EditorGroup {...initial} activeKey={loading.key} activeFile={loading} />);
+    expect(screen.getByTestId("mock-code-mirror")).toBe(host);
+    expect(host).toHaveAttribute("data-read-only", "true");
+    expect(screen.getByRole("status", { name: "Loading file" })).toBeInTheDocument();
+    rendered.rerender(<EditorGroup {...initial} activeKey={loading.key} activeFile={{ ...loading, loading: false, text: "loaded from disk" }} />);
+    expect(screen.getByTestId("mock-code-mirror")).toBe(host);
+    expect(host).not.toHaveAttribute("data-read-only");
+    expect(host).toHaveAttribute("data-document", "loaded from disk");
+    expect(screen.queryByRole("status", { name: "Loading file" })).not.toBeInTheDocument();
+  });
   it("ED-PARITY-011: the floating inspection widget keeps file details in its tooltip", () => {
     const activeFile = {
       ...file("BackupManager"),

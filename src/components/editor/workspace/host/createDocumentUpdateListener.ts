@@ -116,12 +116,16 @@ export function createDocumentUpdateListener(context: CreateDocumentUpdateListen
             if (!sharedTransaction) {
               const rejectedView = update.view;
               const rejectedText = nextDoc;
+              const rejectedOwner = transactionOwnerRef.current;
+              const rejectedFileKey = fileKeyRef.current;
               queueMicrotask(() => {
                 const currentView = viewRef.current;
                 const currentOwner = transactionOwnerRef.current;
                 const currentFileKey = fileKeyRef.current;
                 if (
                   currentView !== rejectedView
+                  || currentOwner !== rejectedOwner
+                  || currentFileKey !== rejectedFileKey
                   || !currentOwner
                   || !currentFileKey
                   || currentView.state.doc.toString() !== rejectedText

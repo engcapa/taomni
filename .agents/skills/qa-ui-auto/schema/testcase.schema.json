@@ -648,7 +648,8 @@
             "expected": {"type": "string", "minLength": 1},
             "event": {"enum": ["click", "dblclick"]},
             "label": {"type": "string", "pattern": "^[a-z0-9-]+$"},
-            "require_highlight": {"type": "boolean", "default": true}
+            "require_highlight": {"type": "boolean", "default": true},
+            "require_editor_reuse": {"type": "boolean", "default": false}
           }
         },
         "native_sdk_startup_probe": {

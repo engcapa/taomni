@@ -10,6 +10,7 @@ import { WorkspaceResourceRecoveryCoordinator, type ResourceCleanupHandlers, typ
 import type { CodeWorkspaceFileRef, CodeWorkspaceLooseFileInfo, CodeWorkspaceRootInfo } from "../../../../types";
 import { type LibraryBufferInfo, type LspFileState, type MarkdownViewMode, type OpenFileState, errorMessage, fileKey, fileMeta, makeLibraryFile, makeLoadingFile, normalizeEditorText } from "../codeWorkspaceModel";
 import { type PendingClosedFile, type PendingExternalFileEvent } from "./model";
+import { readAheadForDisplay } from "./fileReadAhead";
 
 
 export interface OpenFileContext {
@@ -34,7 +35,16 @@ export interface OpenFileContext {
 }
 
 
+export interface OpenFileResult {
+  canonicalFileKey: string;
+  groupId: EditorGroupId;
+  error: string | null;
+  /** A later user selection owns activation while this read still opens in the background. */
+  activated?: false;
+}
+
 export function createOpenFile(controllerContext: OpenFileContext) {
+  const activationRequests = new Map<EditorGroupId, object>();
   return async (
       ref: CodeWorkspaceFileRef,
       options: {
@@ -44,7 +54,7 @@ export function createOpenFile(controllerContext: OpenFileContext) {
         restoring?: boolean;
         isCurrent?: () => boolean;
       } = {},
-    ) => {
+    ): Promise<OpenFileResult | null> => {
       const isCurrent = options.isCurrent ?? (() => true);
       if (!isCurrent()) {
         return null;
@@ -60,64 +70,81 @@ export function createOpenFile(controllerContext: OpenFileContext) {
       const currentUi = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), controllerContext.workspaceInstanceId);
       const groupId = options.groupId ?? currentUi.activeEditorGroupId;
       const shouldActivate = options.activate !== false;
-      controllerContext.updateEditorGroup(groupId, (group) => {
-        const alreadyOpen = group.openOrder.includes(key);
-        let nextOrder = group.openOrder;
-        let previewKey = group.previewKey;
-        const effectivePreview = options.preview && controllerContext.tabPolicyRef.current.previewMode;
-        if (!alreadyOpen) {
-          if (effectivePreview && controllerContext.tabPolicyRef.current.reusePreview && previewKey && previewKey !== key && !group.pinnedKeys.includes(previewKey)) {
-            nextOrder = nextOrder.filter((entry) => entry !== previewKey);
-          }
-          if (controllerContext.tabPolicyRef.current.openPosition === "after-active") {
-            const activeIdx = nextOrder.indexOf(group.activeKey ?? "");
-            if (activeIdx >= 0) {
-              nextOrder = [
-                ...nextOrder.slice(0, activeIdx + 1),
-                key,
-                ...nextOrder.slice(activeIdx + 1),
-              ];
+      const activationRequest = {};
+      if (shouldActivate) activationRequests.set(groupId, activationRequest);
+      let published = false;
+      let activated = false;
+      const result = (canonicalFileKey: string, error: string | null): OpenFileResult => ({
+        canonicalFileKey, groupId, error,
+        ...(shouldActivate && (!activated || activationRequests.get(groupId) !== activationRequest
+          || selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), controllerContext.workspaceInstanceId)
+            .editorGroups[groupId]?.activeKey !== canonicalFileKey) ? { activated: false } : {}),
+      });
+      const publishGroup = (key: string) => {
+        if (published) return;
+        published = true;
+        const latestUi = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), controllerContext.workspaceInstanceId);
+        activated = shouldActivate && activationRequests.get(groupId) === activationRequest
+          && latestUi.editorGroups[groupId]?.activeKey === currentUi.editorGroups[groupId]?.activeKey;
+        controllerContext.updateEditorGroup(groupId, (group) => {
+          const alreadyOpen = group.openOrder.includes(key);
+          let nextOrder = group.openOrder;
+          let previewKey = group.previewKey;
+          const effectivePreview = options.preview && controllerContext.tabPolicyRef.current.previewMode;
+          if (!alreadyOpen) {
+            if (effectivePreview && controllerContext.tabPolicyRef.current.reusePreview && previewKey && previewKey !== key && !group.pinnedKeys.includes(previewKey)) {
+              nextOrder = nextOrder.filter((entry) => entry !== previewKey);
+            }
+            if (controllerContext.tabPolicyRef.current.openPosition === "after-active") {
+              const activeIdx = nextOrder.indexOf(group.activeKey ?? "");
+              if (activeIdx >= 0) {
+                nextOrder = [
+                  ...nextOrder.slice(0, activeIdx + 1),
+                  key,
+                  ...nextOrder.slice(activeIdx + 1),
+                ];
+              } else {
+                nextOrder = [...nextOrder, key];
+              }
             } else {
               nextOrder = [...nextOrder, key];
             }
-          } else {
-            nextOrder = [...nextOrder, key];
           }
-        }
-        if (effectivePreview) {
-          previewKey = group.pinnedKeys.includes(key) ? null : key;
-        } else if (previewKey === key) {
-          previewKey = null;
-        }
-        return { ...group, openOrder: nextOrder, activeKey: shouldActivate ? key : group.activeKey, previewKey };
-      });
-      if (shouldActivate && groupId !== currentUi.activeEditorGroupId) controllerContext.activateEditorGroup(groupId);
-      // §8.18.5 tab limit enforcement: opening beyond the leaf's limit evicts
-      // clean preview/least-recent candidates; dirty/pinned tabs are never
-      // silently closed (over-limit surfaces a reason instead).
-      if (!options.restoring) {
-        const groupAfter = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), controllerContext.workspaceInstanceId).editorGroups[groupId];
-        if (groupAfter) {
-          const meta = new Map(groupAfter.openOrder.map((entryKey) => [
-            entryKey,
-            {
-              key: entryKey,
-              dirty: !!controllerContext.openFilesRef.current[entryKey]?.dirty,
-              pinned: groupAfter.pinnedKeys.includes(entryKey),
-              preview: groupAfter.previewKey === entryKey,
-              lastUsedAt: 1_000_000 - controllerContext.mruFileKeysRef.current.indexOf(entryKey),
-            },
-          ]));
-          const eviction = enforceTabPolicy(groupAfter.openOrder, meta, controllerContext.tabPolicyRef.current);
-          if (eviction.kind === "evicted") {
-            for (const evictedKey of eviction.evictedKeys) {
-              if (evictedKey !== key) void controllerContext.closeFileRef.current?.(evictedKey, groupId, { discard: true });
+          if (effectivePreview) {
+            previewKey = group.pinnedKeys.includes(key) ? null : key;
+          } else if (previewKey === key) {
+            previewKey = null;
+          }
+          return { ...group, openOrder: nextOrder, activeKey: activated ? key : group.activeKey, previewKey };
+        });
+        if (activated && groupId !== latestUi.activeEditorGroupId) controllerContext.activateEditorGroup(groupId);
+        // §8.18.5 tab limit enforcement: opening beyond the leaf's limit evicts
+        // clean preview/least-recent candidates; dirty/pinned tabs are never
+        // silently closed (over-limit surfaces a reason instead).
+        if (!options.restoring) {
+          const groupAfter = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), controllerContext.workspaceInstanceId).editorGroups[groupId];
+          if (groupAfter) {
+            const meta = new Map(groupAfter.openOrder.map((entryKey) => [
+              entryKey,
+              {
+                key: entryKey,
+                dirty: !!controllerContext.openFilesRef.current[entryKey]?.dirty,
+                pinned: groupAfter.pinnedKeys.includes(entryKey),
+                preview: groupAfter.previewKey === entryKey,
+                lastUsedAt: 1_000_000 - controllerContext.mruFileKeysRef.current.indexOf(entryKey),
+              },
+            ]));
+            const eviction = enforceTabPolicy(groupAfter.openOrder, meta, controllerContext.tabPolicyRef.current);
+            if (eviction.kind === "evicted") {
+              for (const evictedKey of eviction.evictedKeys) {
+                if (evictedKey !== key) void controllerContext.closeFileRef.current?.(evictedKey, groupId, { discard: true });
+              }
+            } else if (eviction.kind === "over-limit-protected") {
+              controllerContext.setStatusMessage(eviction.reason);
             }
-          } else if (eviction.kind === "over-limit-protected") {
-            controllerContext.setStatusMessage(eviction.reason);
           }
         }
-      }
+      };
       if (!isCurrent()) {
         return null;
       }
@@ -125,6 +152,9 @@ export function createOpenFile(controllerContext: OpenFileContext) {
       // finishes. Reopening the entry must wait for that cleanup so a late
       // buffer teardown cannot erase the newly visible editor.
       if (pendingClosedFile?.cleanup) {
+        // Claim the tab immediately: the remaining cleanup stages check this
+        // layout claim before releasing its canonical buffer and watcher.
+        publishGroup(key);
         await pendingClosedFile.cleanup;
         if (!isCurrent()) return null;
         const latest = controllerContext.openFilesRef.current[key];
@@ -141,7 +171,8 @@ export function createOpenFile(controllerContext: OpenFileContext) {
       }
       if (controllerContext.openFilesRef.current[key] && !controllerContext.openFilesRef.current[key].loading) {
         const existing = controllerContext.openFilesRef.current[key];
-        return { canonicalFileKey: existing?.key ?? key, groupId, error: existing?.error ?? null };
+        publishGroup(key);
+        return result(existing?.key ?? key, existing?.error ?? null);
       }
       // Library sources (JDK / dependency classes) have no file to read: ask the
       // language server again so history and Recent Files can reopen them.
@@ -151,6 +182,7 @@ export function createOpenFile(controllerContext: OpenFileContext) {
           ...current,
           [key]: current[key] ?? { ...makeLibraryFile(library, ""), loading: true },
         }));
+        publishGroup(key);
         try {
           const contents = await lspReadUriContents(
             controllerContext.lspDescriptorForPath(library.originRootPath, library.originFilePath),
@@ -167,7 +199,7 @@ export function createOpenFile(controllerContext: OpenFileContext) {
           controllerContext.libraryBuffersRef.current[key] = info;
           controllerContext.setOpenFiles((current) => ({ ...current, [key]: makeLibraryFile(info, contents.text) }));
           if (!options.restoring) controllerContext.setStatusMessage(`Opened ${info.title}`);
-          return { canonicalFileKey: key, groupId, error: null };
+          return result(key, null);
         } catch (err) {
           const message = errorMessage(err);
           controllerContext.setOpenFiles((current) => ({
@@ -179,17 +211,24 @@ export function createOpenFile(controllerContext: OpenFileContext) {
             },
           }));
           controllerContext.setStatusMessage(message);
-          return { canonicalFileKey: key, groupId, error: message };
+          return result(key, message);
         }
       }
-      controllerContext.setOpenFiles((current) => ({
-        ...current,
-        [key]: current[key] ?? makeLoadingFile(ref, controllerContext.rootsRef.current, controllerContext.looseFilesRef.current),
-      }));
       try {
-        const file = ref.kind === "root"
-          ? await workspaceReadFile(controllerContext.findRoot(ref.rootId)?.path ?? "", ref.path)
-          : await workspaceReadLooseFile(ref.path);
+        const read = await readAheadForDisplay(ref.kind === "root"
+          ? workspaceReadFile(controllerContext.findRoot(ref.rootId)?.path ?? "", ref.path)
+          : workspaceReadLooseFile(ref.path));
+        if (!isCurrent()) return null;
+        if (!read.ready) {
+          controllerContext.setOpenFiles((current) => ({
+            ...current,
+            [key]: current[key] ?? makeLoadingFile(ref, controllerContext.rootsRef.current, controllerContext.looseFilesRef.current),
+          }));
+          publishGroup(key);
+        }
+        const outcome = read.ready ?? await read.pending;
+        if (!outcome.ok) throw outcome.error;
+        const file = outcome.value;
         if (!isCurrent()) {
           return null;
         }
@@ -224,8 +263,9 @@ export function createOpenFile(controllerContext: OpenFileContext) {
           };
           return next;
         });
+        publishGroup(fileKey(nextRef));
         controllerContext.restoreBookmarksForFileKey(fileKey(nextRef), meta.subtitle);
-        controllerContext.updateEditorGroup(groupId, (group) => ({
+        if (fileKey(nextRef) !== key) controllerContext.updateEditorGroup(groupId, (group) => ({
           ...group,
           openOrder: group.openOrder.map((item) => (item === key ? fileKey(nextRef) : item)),
           activeKey: group.activeKey === key ? fileKey(nextRef) : group.activeKey,
@@ -233,7 +273,7 @@ export function createOpenFile(controllerContext: OpenFileContext) {
           pinnedKeys: group.pinnedKeys.map((item) => (item === key ? fileKey(nextRef) : item)),
         }));
         if (!options.restoring) controllerContext.setStatusMessage(`Opened ${meta.subtitle}`);
-        return { canonicalFileKey: fileKey(nextRef), groupId, error: null };
+        return result(fileKey(nextRef), null);
       } catch (err) {
         if (!isCurrent()) {
           return null;
@@ -248,8 +288,9 @@ export function createOpenFile(controllerContext: OpenFileContext) {
             error: message,
           },
         }));
+        publishGroup(key);
         controllerContext.setStatusMessage(message);
-        return { canonicalFileKey: key, groupId, error: message };
+        return result(key, message);
       }
     };
 }

@@ -68,6 +68,7 @@ steps:
     event: dblclick
     label: cold-text-704
     require_highlight: false
+    require_editor_reuse: true
 - assert_attribute:
     selector: '[data-testid="workspace-tab"][data-active="true"]'
     name: data-tab-title
@@ -78,6 +79,7 @@ steps:
     event: dblclick
     label: cold-text-tiny
     require_highlight: false
+    require_editor_reuse: true
 - assert_attribute:
     selector: '[data-testid="workspace-tab"][data-active="true"]'
     name: data-tab-title
@@ -87,6 +89,7 @@ steps:
     expected: ${fixture.workspace_html_text}
     event: click
     label: return-1-html
+    require_editor_reuse: true
 - assert_attribute:
     selector: '[data-testid="workspace-tab"][data-active="true"]'
     name: data-tab-title
@@ -97,6 +100,7 @@ steps:
     event: click
     label: return-1-text-704
     require_highlight: false
+    require_editor_reuse: true
 - assert_attribute:
     selector: '[data-testid="workspace-tab"][data-active="true"]'
     name: data-tab-title
@@ -107,6 +111,7 @@ steps:
     event: click
     label: return-1-text-tiny
     require_highlight: false
+    require_editor_reuse: true
 - assert_attribute:
     selector: '[data-testid="workspace-tab"][data-active="true"]'
     name: data-tab-title
@@ -116,6 +121,7 @@ steps:
     expected: ${fixture.workspace_html_text}
     event: click
     label: return-2-html
+    require_editor_reuse: true
 - assert_attribute:
     selector: '[data-testid="workspace-tab"][data-active="true"]'
     name: data-tab-title
@@ -126,6 +132,7 @@ steps:
     event: click
     label: return-2-text-704
     require_highlight: false
+    require_editor_reuse: true
 - assert_attribute:
     selector: '[data-testid="workspace-tab"][data-active="true"]'
     name: data-tab-title
@@ -136,6 +143,7 @@ steps:
     event: click
     label: return-2-text-tiny
     require_highlight: false
+    require_editor_reuse: true
 - assert_attribute:
     selector: '[data-testid="workspace-tab"][data-active="true"]'
     name: data-tab-title
@@ -146,12 +154,14 @@ steps:
     event: click
     label: same-active-text-tab
     require_highlight: false
+    require_editor_reuse: true
 - measure_workspace_file_open:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     expected: ${fixture.workspace_notes_text}
     event: click
     label: focus-active-text-editor
     require_highlight: false
+    require_editor_reuse: true
 - assert_attribute:
     selector: '[data-testid="workspace-tab"][data-active="true"]'
     name: data-tab-title
@@ -183,7 +193,8 @@ verification:
       Cold-open each through the real tree, then activate all three tabs twice. Retain exact canonical content, HTML syntax highlighting, every
       frame and zero automatic SDK/LSP discovery. Native uses real file reads in the QA release WebView. Keep 1500ms exact-content/highlight and
       150ms all-frame limits; no retries or synthetic activation. Clicking the already active text tab and focusing its editor must preserve content
-      without redundant activation work.
+      without redundant activation work. After the first open, cold-opening another small file and switching tabs must retain the same actual
+      editor without a loading/unmount cycle.
     actions:
     - 4
     - 7
@@ -215,58 +226,60 @@ verification:
         \ page.html"
     - step: 15
       expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"code-workspace-tree-file\"][data-path=\"Documents/report.txt\"]'\n\
-        \  expected: ${fixture.workspace_report_text}\n  event: dblclick\n  label: cold-text-704\n  require_highlight: false"
+        \  expected: ${fixture.workspace_report_text}\n  event: dblclick\n  label: cold-text-704\n  require_highlight: false\n  require_editor_reuse:\
+        \ true"
     - step: 16
       expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
         \ report.txt"
     - step: 17
       expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"code-workspace-tree-file\"][data-path=\"Documents/notes.txt\"]'\n\
-        \  expected: ${fixture.workspace_notes_text}\n  event: dblclick\n  label: cold-text-tiny\n  require_highlight: false"
+        \  expected: ${fixture.workspace_notes_text}\n  event: dblclick\n  label: cold-text-tiny\n  require_highlight: false\n  require_editor_reuse:\
+        \ true"
     - step: 18
       expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
         \ notes.txt"
     - step: 19
       expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"page.html\"]'\n  expected: ${fixture.workspace_html_text}\n\
-        \  event: click\n  label: return-1-html"
+        \  event: click\n  label: return-1-html\n  require_editor_reuse: true"
     - step: 20
       expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
         \ page.html"
     - step: 21
       expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"report.txt\"]'\n  expected: ${fixture.workspace_report_text}\n\
-        \  event: click\n  label: return-1-text-704\n  require_highlight: false"
+        \  event: click\n  label: return-1-text-704\n  require_highlight: false\n  require_editor_reuse: true"
     - step: 22
       expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
         \ report.txt"
     - step: 23
       expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"notes.txt\"]'\n  expected: ${fixture.workspace_notes_text}\n\
-        \  event: click\n  label: return-1-text-tiny\n  require_highlight: false"
+        \  event: click\n  label: return-1-text-tiny\n  require_highlight: false\n  require_editor_reuse: true"
     - step: 24
       expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
         \ notes.txt"
     - step: 25
       expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"page.html\"]'\n  expected: ${fixture.workspace_html_text}\n\
-        \  event: click\n  label: return-2-html"
+        \  event: click\n  label: return-2-html\n  require_editor_reuse: true"
     - step: 26
       expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
         \ page.html"
     - step: 27
       expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"report.txt\"]'\n  expected: ${fixture.workspace_report_text}\n\
-        \  event: click\n  label: return-2-text-704\n  require_highlight: false"
+        \  event: click\n  label: return-2-text-704\n  require_highlight: false\n  require_editor_reuse: true"
     - step: 28
       expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
         \ report.txt"
     - step: 29
       expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"notes.txt\"]'\n  expected: ${fixture.workspace_notes_text}\n\
-        \  event: click\n  label: return-2-text-tiny\n  require_highlight: false"
+        \  event: click\n  label: return-2-text-tiny\n  require_highlight: false\n  require_editor_reuse: true"
     - step: 30
       expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
         \ notes.txt"
     - step: 31
       expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"notes.txt\"]'\n  expected: ${fixture.workspace_notes_text}\n\
-        \  event: click\n  label: same-active-text-tab\n  require_highlight: false"
+        \  event: click\n  label: same-active-text-tab\n  require_highlight: false\n  require_editor_reuse: true"
     - step: 32
       expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"code-workspace-editor\"] .cm-content'\n  expected: ${fixture.workspace_notes_text}\n\
-        \  event: click\n  label: focus-active-text-editor\n  require_highlight: false"
+        \  event: click\n  label: focus-active-text-editor\n  require_highlight: false\n  require_editor_reuse: true"
     - step: 33
       expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
         \ notes.txt"

@@ -1,6 +1,6 @@
 # 工作区文件打开与 SDK 后台初始化
 
-当前状态：文件打开及标签切换卡顿仍未通过验收。命令/最近记录隔离版本 `4d1c27bf` 的 Linux browser/native 相关集 [40798438419](https://github.com/engcapa/taomni/actions/runs/40798438419) 已结束：26 passed / 10 failed，失败均为文件打开/切换帧超限，747 个附件 SHA、源码、用例及回执已独立核验。用户使用该版本 QA release 手测 HTML/text 仍卡顿。继续修正公共编辑器更新回路，不能据单测、局部优化或旧源码通过声称解决。当前组合源码的全量与正式四轮性能仍待执行。以下保留历史失败，关联[重构实现报告](./workspace-platform-redesign-implementation-report.md)。
+当前状态：文件打开及标签切换卡顿仍未通过验收。Home 监听版本 `8b60a5d7` 的 Linux browser/native 相关集 [40811827670](https://github.com/engcapa/taomni/actions/runs/40811827670) 已结束：26 passed / 9 failed，失败均为文件打开/切换帧超限，完整崩溃组通过。参考 [Home 文件打开分析](../docs-issue/workspace-home-file-open-latency-design.md) 继续实施编辑器常驻、状态缓存和快速读取合并。不能据单测、局部优化或旧源码通过声称解决；当前组合源码的全量与正式四轮性能仍待执行。以下保留历史失败，关联[重构实现报告](./workspace-platform-redesign-implementation-report.md)。
 
 ## 目标与保留行为
 
@@ -277,3 +277,38 @@ OS watcher 注册移入 blocking worker，Home 根只监听直接子项，已展
 064–070 的真实打开帧预算继续独立保留，完整崩溃组仍是门禁。
 本机不执行 browser/native 用例；执行 focused Vitest、真实 notify Rust 测试、
 工具单测、TypeScript 与 refactor 合同。EditorView 复用及最终性能验收尚未完成。
+
+## 常驻编辑器、文件状态缓存与读取就绪提交
+
+Home 监听版本 [40811827670](https://github.com/engcapa/taomni/actions/runs/40811827670)
+实际执行 35 次，26 passed / 9 failed；无基础设施错误，完整崩溃组通过，真实
+Home 外部文件增删改与增量树刷新 `TC-WS-071` 通过。browser 的冷开长行 JSON
+仍有 347ms 慢帧；native 首次打开 JSON、HTML、普通文本仍有 163–216ms 慢帧。
+保留原始报告，这说明仅修监听没有解决文件打开的固有开销。
+
+按分析 P1 移除普通文件的动态 host key，每个 pane 复用同一 EditorView。
+新增独立 `editorStateCache`，最多缓存 24 个文件及 800 万字符；关闭文件、改变
+文档路径、切换 workspace/transaction owner、卸载 pane 时释放对应状态。
+回切保留选区、折叠、滚动与独立撤销，canonical 文档和共享 history 的所有权
+保持不变；用当前只读、换行、字体、诊断、调试等配置重新绑定扩展。相同正文
+复用已有 CodeMirror Text，避免回切重新构造全文树。
+
+文档激活结束会释放原 view lease、监听、composition、clipboard generation、
+补全和 snippet 请求；旧语义选区 promise、被拒事务 microtask、参数提示清理
+均不能修改新文件。最终卸载才销毁实际 EditorView。慢读取显示只读加载遮罩，
+保留编辑器实例；读取就绪解除只读并显示正文。
+
+读取请求直接开始，80ms 内返回则先发布 ready buffer 再激活标签，避免
+loading→卸载→重建的中间态。超过 80ms 才发布加载状态。较早请求的迟到
+结果可以补齐后台标签，但不能夺走后续用户选择。关闭后立即重开仍即时认领
+标签，再等待旧清理结束，以免 cleanup 删除已经恢复的 canonical buffer；
+LSP 重开继续在后台进行。现有 workspace 测试捕获该竞态后已修复。
+
+本机执行主 workspace 全部 254 条、真实 CodeMirror/IME、快速/慢速读取、
+关闭重开、缓存边界与当前设置等 focused 单测；新增实际 View 身份和跨文件
+状态回归（6 条），工具 Python 14 条、JS probe 5 条通过。TypeScript、refactor
+合同和 catalog gate 通过；本机不跑 browser/native。`TC-WS-070` 在首次打开
+之后的十次操作额外断言真实 EditorView 未被替换，正文、高亮、零自动 SDK/LSP、
+1500ms 内容及每帧 150ms 门槛均未放宽。保留 `TC-WS-025/026`、064–071，
+增加 split/history、跨 pane clipboard、原生 view-state 恢复及关闭重开既有
+用例，与完整崩溃组共同在 GitHub 执行；托管性能结果尚待新版本验证。
