@@ -75,7 +75,7 @@ it("refreshes native menu state directly and releases its subscription on unmoun
   });
   const registration: WorkspaceCommandRegistration = {
     items: [{ id: "workspace.save", title: "Save", category: "File", enabled: true }],
-    snapshot: [], execute: vi.fn(() => true), executeAction: vi.fn(async () => ({ kind: "applied" })),
+    snapshot: [], execute: vi.fn(() => true), executeAction: vi.fn(async () => ({ kind: "applied" as const })),
   };
   expect(buildAppMenuSpec).toHaveBeenCalledTimes(1);
   act(() => result.current.handleWorkspaceCommandsChange("active", registration));

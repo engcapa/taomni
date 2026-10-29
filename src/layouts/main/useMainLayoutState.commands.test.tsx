@@ -16,7 +16,7 @@ it("publishes current command ownership without rendering the main shell", async
   const settled = renders;
   const registration: WorkspaceCommandRegistration = {
     items: [], snapshot: [], execute: vi.fn(() => true),
-    executeAction: vi.fn(async () => ({ kind: "applied" })),
+    executeAction: vi.fn(async () => ({ kind: "applied" as const })),
   };
   act(() => result.current.handleWorkspaceCommandsChange("editor", registration));
   expect(result.current.workspaceCommandRegistrationsRef.current.editor).toBe(registration);
