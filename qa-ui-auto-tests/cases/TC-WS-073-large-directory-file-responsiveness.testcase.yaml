@@ -1,7 +1,8 @@
 id: TC-WS-073
 title: Large ordinary directory opens and switches files without recursive project discovery
-description: Mount a public directory with 300 extra documents and 100 child folders. Measure actual cold and warm activations with the original 150ms frame/1500ms
+description: Mount a public directory with 300 extra documents and 100 child folders. Measure actual cold and warm activations with 165ms frame/1500ms
   content budgets, retain the editor instance and dirty draft, and reject automatic recursive/SDK/LSP work.
+  Every activation/key frame allows at most 165ms (150ms baseline plus the user-approved 10% tolerance); all raw samples are retained.
 modes:
 - browser
 - native

@@ -1,8 +1,9 @@
 id: TC-WS-066
 title: 693-line 193KiB long-line JSON opens without blocking the workspace
 description: Activate public synthetic 693-line 193KiB JSON with strings up to 5125 characters through the real file tree, return from another tab and from
-  Home. Require exact canonical content and syntax highlighting within 1500ms, every frame gap at most 150ms through one second after highlighting, and
+  Home. Require exact canonical content and syntax highlighting within 1500ms, every frame gap at most 165ms through one second after highlighting, and
   zero automatic SDK/LSP requests. No user document contents are used.
+  Every activation/key frame allows at most 165ms (150ms baseline plus the user-approved 10% tolerance); all raw samples are retained.
 modes:
 - browser
 - native
@@ -114,7 +115,7 @@ verification:
   requirements:
   - id: R1
     requirement: Activate public synthetic 693-line 193KiB JSON with strings up to 5125 characters through the real file tree, return from another tab and
-      from Home. Require exact canonical content and syntax highlighting within 1500ms, every frame gap at most 150ms through one second after highlighting,
+      from Home. Require exact canonical content and syntax highlighting within 1500ms, every frame gap at most 165ms through one second after highlighting,
       and zero automatic SDK/LSP requests. No user document contents are used.
     actions:
     - 4

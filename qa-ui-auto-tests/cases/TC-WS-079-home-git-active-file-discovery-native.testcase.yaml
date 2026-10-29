@@ -3,6 +3,7 @@ title: HOME Git discovery follows active files and preserves real modified statu
 description: HOME starts without nested Git snapshots. Opening public tracked documents finds only their nearest real repository, preserves modified
   badges and reuses the bounded snapshot cache across file switches. The shared owned HOME fixture includes at least 2900 mixed files, 400 directories,
   64 nested project manifests, a 320-file directory and seven-level paths; its measured filesystem dimensions are retained in home-fixture-layout.json.
+  Every activation/key frame allows at most 165ms (150ms baseline plus the user-approved 10% tolerance); all raw samples are retained.
 modes:
 - native
 covers:
@@ -79,7 +80,7 @@ verification:
   requirements:
   - id: R1
     requirement: Before opening a file HOME starts zero snapshots; opening and switching ordinary documents finds their nearest repository once,
-      keeps its real M badge and respects unchanged 150/1500ms budgets.
+      keeps its real M badge and respects 150ms frame baseline + 10% tolerance (165ms limit) and unchanged 1500ms content budget.
     actions:
     - 4
     - 6

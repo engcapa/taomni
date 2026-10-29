@@ -13,10 +13,10 @@ from .steps import StepError
 from .file_open_profile import capture as capture_profile
 from .workspace_tab_reveal import reveal as reveal_tab
 from .project_tree_reveal import reveal as reveal_tree
+from .workspace_frame_budget import FRAME_BUDGET_MS, FRAME_LIMIT_MS, FRAME_TOLERANCE_PERCENT
 
 SCRIPT = Path(__file__).with_suffix(".js").read_text(encoding="utf-8")
 OPEN_BUDGET_MS = 1500
-FRAME_BUDGET_MS = 150
 
 
 def validate(args: Any) -> dict:
@@ -44,8 +44,9 @@ def review(state: Any, *, require_highlight: bool = True, require_editor_reuse: 
         raise StepError("File activation has no real frame observations")
     for index, frame in enumerate(frames):
         value = frame.get("gapMs")
-        if type(value) not in {int, float} or not math.isfinite(value) or not 0 <= value <= FRAME_BUDGET_MS:
-            raise StepError(f"File activation frame {index + 1} blocked beyond {FRAME_BUDGET_MS}ms: {value}")
+        if type(value) not in {int, float} or not math.isfinite(value) or not 0 <= value <= FRAME_LIMIT_MS:
+            raise StepError(f"File activation frame {index + 1} blocked beyond {FRAME_LIMIT_MS:g}ms "
+                            f"({FRAME_BUDGET_MS}ms + {FRAME_TOLERANCE_PERCENT}% tolerance): {value}")
     if not frames[-1].get("matches") or (require_highlight and not frames[-1].get("highlighted")):
         raise StepError("File activation lost its document or highlighting after the first frame")
     if require_editor_reuse and state.get("editorReused") is not True:
@@ -70,6 +71,7 @@ def measure(ctx: Any, args: Any, *, preparation: list[dict] | None = None, tree_
     execute = ctx.session.execute if native else lambda source: ctx.page.evaluate("() => {" + source + "}")
     report = {"passed": False, "label": config["label"], "mode": "native" if native else "browser",
               "openBudgetMs": OPEN_BUDGET_MS, "frameBudgetMs": FRAME_BUDGET_MS,
+              "frameTolerancePercent": FRAME_TOLERANCE_PERCENT, "frameLimitMs": FRAME_LIMIT_MS,
               "requireHighlight": config.get("require_highlight", True),
               "requireEditorReuse": config.get("require_editor_reuse", False)}
     report["tabPreparation"] = preparation

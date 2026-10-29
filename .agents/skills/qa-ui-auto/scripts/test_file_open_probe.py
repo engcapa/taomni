@@ -29,6 +29,17 @@ class FileOpenReviewTests(unittest.TestCase):
     def test_complete_sample(self):
         review(observation())
 
+    def test_approved_frame_tolerance_keeps_every_raw_frame_and_exact_boundary(self):
+        state = observation()
+        for gap in [150, 150.0000000000009, 153.3, 165]:
+            state["frames"].append({"gapMs": gap, "matches": True, "highlighted": True})
+        original = json.dumps(state)
+        review(state)
+        self.assertEqual(json.dumps(state), original)
+        for gap in [165.000001, float("inf"), float("nan"), -1, True]:
+            with self.subTest(gap=gap), self.assertRaisesRegex(StepError, "165ms"):
+                review({**state, "frames": [*state["frames"], {"gapMs": gap}]})
+
     def test_reuse_requires_the_actual_existing_editor_throughout_activation(self):
         review({**observation(), "editorReused": True}, require_editor_reuse=True)
         for value in [None, False, 1]:
@@ -44,7 +55,7 @@ class FileOpenReviewTests(unittest.TestCase):
         with self.assertRaises(StepError):
             review(plain)
         for patch in [{"firstContentMs": 1501},
-                      {"frames": [{"gapMs": 151, "matches": True, "highlighted": False}]},
+                      {"frames": [{"gapMs": 165.01, "matches": True, "highlighted": False}]},
                       {"frames": [{"gapMs": 20, "matches": False, "highlighted": False}]}]:
             with self.subTest(patch=patch), self.assertRaises(StepError):
                 review({**plain, **patch}, require_highlight=False)
@@ -52,7 +63,7 @@ class FileOpenReviewTests(unittest.TestCase):
     def test_rejects_missing_or_late_results_and_slow_frames(self):
         for patch in [{"started": None}, {"finished": False}, {"firstContentMs": 1501},
                       {"firstHighlightMs": 1501}, {"firstContentMs": float("nan")},
-                      {"frames": []}, {"frames": [{"gapMs": 151, "matches": True, "highlighted": True}]},
+                      {"frames": []}, {"frames": [{"gapMs": 165.01, "matches": True, "highlighted": True}]},
                       {"frames": [{"gapMs": 20, "matches": False, "highlighted": True}]}]:
             with self.subTest(patch=patch), self.assertRaises(StepError):
                 review({**observation(), **patch})
@@ -89,6 +100,10 @@ class FileOpenReviewTests(unittest.TestCase):
             run(ctx, CONFIG)
             report = json.loads((Path(folder) / "file-open-cold-json.json").read_text())
         self.assertTrue(report["passed"])
+        self.assertEqual(report["openBudgetMs"], 1500)
+        self.assertEqual(report["frameBudgetMs"], 150)
+        self.assertEqual(report["frameTolerancePercent"], 10)
+        self.assertEqual(report["frameLimitMs"], 165)
         session.dblclick.assert_called_once_with(CONFIG["selector"])
         self.assertIn(".finish()", session.execute.call_args.args[0])
         session.type_text.assert_not_called()

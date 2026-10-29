@@ -3,6 +3,7 @@ title: Long-line 193KiB JSON retains real input and byte-exact native saving
 description: Open public synthetic 693-line 193KiB JSON through real native file reading, require exact content and continuous responsive frames, measure
   32 paced keys with a 150ms p95 input guardrail, save, close and reopen, and independently hash complete disk bytes. Ordinary JSON must never start automatic
   SDK/LSP discovery.
+  Every activation/key frame allows at most 165ms (150ms baseline plus the user-approved 10% tolerance); all raw samples are retained.
 modes:
 - native
 covers:

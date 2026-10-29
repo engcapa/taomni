@@ -2,7 +2,8 @@ id: TC-WS-074
 title: Real home workspace opens and switches public HTML/text/JSON responsively
 description: Mount the runner real current HOME as the workspace root. The owned public child contains at least 2900 mixed files, 400 directories,
   64 project manifests, a 320-file wide directory and seven-level paths. Open and switch ordinary documents and the deep long-line JSON through
-  the real tree, retain dirty text and every frame under the unchanged 150/1500ms budgets. No HOME replacement or private-file inventory is used.
+  the real tree, retain dirty text and every frame under 165ms frame and 1500ms content budgets. No HOME replacement or private-file inventory is used.
+  Every activation/key frame allows at most 165ms (150ms baseline plus the user-approved 10% tolerance); all raw samples are retained.
 modes:
 - native
 covers:

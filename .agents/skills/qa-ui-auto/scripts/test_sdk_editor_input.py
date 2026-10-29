@@ -26,13 +26,26 @@ class SdkEditorInputTest(unittest.TestCase):
                                     ("frames", valid["frames"] * 2)]:
             with self.subTest(field=field), self.assertRaises(StepError):
                 review({**valid, field: replacement}, "abc")
-        for field, value in [("frameMs", 150.01), ("frameMs", float("nan")),
+        for field, value in [("frameMs", 165.01), ("frameMs", float("nan")),
                               ("frameMs", None), ("document", "abc}"),
                               ("dom", "abc}"), ("caret", 2),
                               ("keyCount", None), ("keyCount", 4), ("keyCount", True)]:
             changed = copy.deepcopy(valid)
             changed["frames"][-1][field] = value
             with self.subTest(field=field, value=value), self.assertRaises(StepError):
+                review(changed, "abc")
+
+    def test_approved_tolerance_preserves_samples_and_rejects_any_slower_key(self):
+        state = sample("abc")
+        for frame, latency in zip(state["frames"], [150.0000000000009, 153.3, 165]):
+            frame["frameMs"] = latency
+        original = copy.deepcopy(state)
+        review(state, "abc")
+        self.assertEqual(state, original)
+        for index in range(3):
+            changed = copy.deepcopy(state)
+            changed["frames"][index]["frameMs"] = 165.000001
+            with self.subTest(index=index), self.assertRaisesRegex(StepError, "165ms"):
                 review(changed, "abc")
 
     def test_intermediate_autoclosing_bracket_is_retained_but_final_requires_exact_text(self):
@@ -73,6 +86,8 @@ class SdkEditorInputTest(unittest.TestCase):
         self.assertEqual(pending.call_count, 5)
         self.assertEqual(report["keyActionBudgetMs"], 1500)
         self.assertEqual(report["keyFrameBudgetMs"], 150)
+        self.assertEqual(report["keyFrameTolerancePercent"], 10)
+        self.assertEqual(report["keyFrameLimitMs"], 165)
         self.assertEqual(report["batchSize"], 8)
         self.assertEqual(report["observation"], sample(text))
         self.assertEqual("".join(request["text"] for request in report["requests"]), text)

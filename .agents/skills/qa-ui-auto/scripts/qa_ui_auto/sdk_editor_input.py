@@ -1,6 +1,7 @@
 """Measure real paced keys separately from the time spent typing a whole file.
 
-Every input batch retains the 1.5s action budget; each key has a 150ms frame budget.
+Every input batch retains the 1.5s action budget; each key has a 150ms frame
+baseline with the approved 10% tolerance.
 The full wall time, all characters and native event/frame observations remain in
 the report. No JS document writes, input dispatch or faster driver pacing.
 """
@@ -13,8 +14,9 @@ from typing import Any, Callable
 
 from .deadline import budget_time as time
 from .steps import StepError
+from .workspace_frame_budget import FRAME_BUDGET_MS, FRAME_LIMIT_MS, FRAME_TOLERANCE_PERCENT
 
-KEY_FRAME_BUDGET_MS = 150
+KEY_FRAME_BUDGET_MS = FRAME_BUDGET_MS
 KEY_ACTION_BUDGET_MS = 1500
 INPUT_BATCH_SIZE = 8
 
@@ -63,8 +65,9 @@ def review(state: Any, text: str, *, exact: bool = True) -> None:
     previous_count = 0
     for index, frame in enumerate(frames):
         latency = frame.get("frameMs")
-        if type(latency) not in {int, float} or not math.isfinite(latency) or not 0 <= latency <= KEY_FRAME_BUDGET_MS:
-            raise StepError(f"SDK typing key {index + 1} exceeded the {KEY_FRAME_BUDGET_MS}ms frame budget: {latency}")
+        if type(latency) not in {int, float} or not math.isfinite(latency) or not 0 <= latency <= FRAME_LIMIT_MS:
+            raise StepError(f"SDK typing key {index + 1} exceeded the {FRAME_LIMIT_MS:g}ms frame limit "
+                            f"({KEY_FRAME_BUDGET_MS}ms + {FRAME_TOLERANCE_PERCENT}% tolerance): {latency}")
         # More than one real key may be delivered before the next frame. Check
         # that frame against every key observed by then, not just its first key.
         count = frame.get("keyCount")
@@ -83,6 +86,7 @@ def measure(session: Any, selector: str, text: str, case_dir: Path,
             require_pending: Callable[[], Any]) -> dict:
     report = {"passed": False, "text": text, "keyActionBudgetMs": KEY_ACTION_BUDGET_MS,
               "keyFrameBudgetMs": KEY_FRAME_BUDGET_MS, "batchSize": INPUT_BATCH_SIZE,
+              "keyFrameTolerancePercent": FRAME_TOLERANCE_PERCENT, "keyFrameLimitMs": FRAME_LIMIT_MS,
               "requests": []}
     started = time.monotonic()
     installed = False

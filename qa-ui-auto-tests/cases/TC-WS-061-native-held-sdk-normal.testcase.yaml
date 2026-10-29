@@ -1,9 +1,10 @@
 id: TC-WS-061
 title: Real held SDK discovery leaves source editing and workspace navigation responsive
 description: Concurrent same-root callers must share exactly one real SDK child. The real SDK java -version executable waits on a host gate with live child heartbeats. Open/edit a source, visit Home, restore Workspace and
-  open an ordinary file before the unchanged five-second SDK timeout. Opening, clearing and navigation retain 1500ms; every batch of at most eight real paced keys retains 1500ms per request and every key retains a stricter 150ms key-to-frame limit, with all characters, raw samples and total typing wall time retained. Each frame must contain the canonical prefix and caret for every key observed by that frame. Passive request, pointer/frame and file-read timings are retained without changing the budgets. The same child and real IPC must remain
+  open an ordinary file before the unchanged five-second SDK timeout. Opening, clearing and navigation retain 1500ms; every batch of at most eight real paced keys retains 1500ms per request and every key retains a 165ms key-to-frame limit, with all characters, raw samples and total typing wall time retained. Each frame must contain the canonical prefix and caret for every key observed by that frame. Passive request, pointer/frame and file-read timings are retained without changing the budgets. The same child and real IPC must remain
   pending. Release in finally, observe actual stdio LSP dirty-buffer messages, preserve active notes.txt, then save/reopen and independently hash disk bytes.
   No LSP initialize delay or renderer SDK promise substitution is used.
+  Every activation/key frame allows at most 165ms (150ms baseline plus the user-approved 10% tolerance); all raw samples are retained.
 modes:
 - native
 covers:
