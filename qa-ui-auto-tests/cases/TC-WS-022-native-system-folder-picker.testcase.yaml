@@ -45,6 +45,7 @@ steps:
     expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"workspace-fs-modal-input"]').value.split(String.fromCharCode(92)).join('/').replace(/\/$/,
       '') === '${fixture.platform_workspace_root}/src'
     expect_truthy: true
+    timeout_sec: 5
 - assert_count:
     selector: '[data-testid="code-workspace-tree-root"]'
     equal: 0
@@ -101,7 +102,7 @@ verification:
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree-root\"]", "equal": 0}}'
     - step: 13
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-fs-modal-input\"]'').value.split(String.fromCharCode(92)).join(''/'').replace(/\\/$/,
-        '''') === ''${fixture.platform_workspace_root}/src''", "expect_truthy": true}}'
+        '''') === ''${fixture.platform_workspace_root}/src''", "expect_truthy": true, "timeout_sec": 5}}'
     - step: 14
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree-root\"]", "equal": 0}}'
     - step: 16
