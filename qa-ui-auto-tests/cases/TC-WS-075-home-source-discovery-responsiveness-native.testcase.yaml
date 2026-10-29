@@ -1,0 +1,125 @@
+id: TC-WS-075
+title: Home source discovery keeps the desktop responsive and never delays ordinary tabs
+description: Exercise real automatic execution-model discovery for a public Python source below Home. Retain every activation frame and verify source-to-document
+  switches, exact contents and the existing editor.
+modes:
+- native
+covers:
+- F-WS-2
+- F25.1
+- F25.3
+- F11.2
+tags:
+- p0
+- workspace-redesign
+- file-explorer
+- regression
+- performance
+fixtures:
+- reset_db
+- workspace_home_documents
+- release_build_required
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-directory-performance
+- observe_language_startup: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree-empty"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.workspace_host_home}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-root"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="${fixture.workspace_home_fixture_name}"] [data-testid="code-workspace-tree-dir-arrow"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="${fixture.workspace_home_documents_path}"] [data-testid="code-workspace-tree-dir-arrow"]'
+- measure_workspace_file_open:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="${fixture.workspace_home_documents_path}/qa-public-source.py"]'
+    expected: "def public_value():\n    return 42\n"
+    event: dblclick
+    label: cold-source
+    require_highlight: true
+    require_editor_reuse: false
+- measure_workspace_file_open:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="${fixture.workspace_home_documents_path}/notes.txt"]'
+    expected: ${fixture.workspace_notes_text}
+    event: dblclick
+    label: cold-notes
+    require_highlight: false
+    require_editor_reuse: true
+- measure_workspace_file_open:
+    selector: '[data-testid="workspace-tab"][data-tab-title="qa-public-source.py"]'
+    expected: "def public_value():\n    return 42\n"
+    event: click
+    label: return-source
+    require_highlight: true
+    require_editor_reuse: true
+- measure_workspace_file_open:
+    selector: '[data-testid="workspace-tab"][data-tab-title="notes.txt"]'
+    expected: ${fixture.workspace_notes_text}
+    event: click
+    label: return-notes
+    require_highlight: false
+    require_editor_reuse: true
+- assert_language_startup:
+    commands:
+      workspace_execution_model:
+        min: 1
+    quiet_ms: 1000
+- assert_no_runtime_errors: null
+- screenshot: workspace-tc-ws-075-source-and-documents.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A real execution-model command is exercised while public source and ordinary documents meet unchanged 150ms frame and 1500ms content/highlight
+      budgets. Warm activations reuse the editor and retain exact contents.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    results:
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    checkpoints:
+    - step: 13
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"code-workspace-tree-file\"][data-path=\"${fixture.workspace_home_documents_path}/qa-public-source.py\"\
+        ]'\n  expected: \"def public_value():\\n    return 42\\n\"\n  event: dblclick\n  label: cold-source\n  require_highlight: true\n  require_editor_reuse:\
+        \ false"
+    - step: 14
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"code-workspace-tree-file\"][data-path=\"${fixture.workspace_home_documents_path}/notes.txt\"\
+        ]'\n  expected: ${fixture.workspace_notes_text}\n  event: dblclick\n  label: cold-notes\n  require_highlight: false\n  require_editor_reuse: true"
+    - step: 15
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"qa-public-source.py\"]'\n  expected: \"\
+        def public_value():\\n    return 42\\n\"\n  event: click\n  label: return-source\n  require_highlight: true\n  require_editor_reuse: true"
+    - step: 16
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"notes.txt\"]'\n  expected: ${fixture.workspace_notes_text}\n\
+        \  event: click\n  label: return-notes\n  require_highlight: false\n  require_editor_reuse: true"
+    - step: 17
+      expectation: "assert_language_startup:\n  commands:\n    workspace_execution_model:\n      min: 1\n  quiet_ms: 1000"
+    - step: 18
+      expectation: 'assert_no_runtime_errors: null'
+  native:
+  - check: Native command scheduling, real home scans and packaged WebView frames.
+    method: automated
+    reason: Browser stubs cannot prove whether a native execution scan blocks the desktop event loop.
+  visual:
+  - check: The active public document remains visible.
+    method: manual
+    reason: Screenshots supplement exact content, editor identity and measured frames.

@@ -91,6 +91,9 @@
           "workspace_slow_lsp",
           "workspace_language_files",
           "workspace_watch",
+          "workspace_large_directory",
+          "workspace_home_documents",
+          "workspace_execution_documents",
           "workspace_slow_sdk",
           "workspace_restore_sessions",
           "java_sample_projects",
@@ -629,6 +632,7 @@
                   "workspace_list_dir",
                   "workspace_compact_chain",
                   "workspace_list_files_recursive",
+                  "workspace_execution_model",
                   "lsp_start_workspace_watcher",
                   "lsp_stop_workspace_watcher"
                 ]

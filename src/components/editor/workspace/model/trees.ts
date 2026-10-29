@@ -220,3 +220,24 @@ export function gitDirectoryChangeCount(
   }
   return count;
 }
+
+/** Build once per immutable Git snapshot, keeping directory-row lookup O(1). */
+export function createGitDirectoryChangeCounts(
+  changes: ReadonlyMap<string, GitChange>,
+  rootIds: readonly string[],
+): ReadonlyMap<string, number> {
+  const counts = new Map<string, number>();
+  for (const rootId of rootIds) {
+    const prefix = `${rootId}:`;
+    for (const key of changes.keys()) {
+      if (!key.startsWith(prefix)) continue;
+      counts.set(prefix, (counts.get(prefix) ?? 0) + 1);
+      const path = key.slice(prefix.length);
+      for (let slash = path.lastIndexOf("/"); slash > 0; slash = path.lastIndexOf("/", slash - 1)) {
+        const parent = `${prefix}${path.slice(0, slash)}`;
+        counts.set(parent, (counts.get(parent) ?? 0) + 1);
+      }
+    }
+  }
+  return counts;
+}

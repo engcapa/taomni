@@ -1,10 +1,11 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceEntry, WorkspaceFile, WorkspaceTreeLoadResult } from "../lib/editor/workspace";
-import { workspaceListFilesRecursive, workspaceReadFile } from "../lib/editor/workspace";
+import { workspaceListDir, workspaceListFilesRecursive, workspaceReadFile } from "../lib/editor/workspace";
 import { useProjectDescriptorDiscovery } from "./useProjectDescriptorDiscovery";
 
 vi.mock("../lib/editor/workspace", () => ({
+  workspaceListDir: vi.fn(),
   workspaceListFilesRecursive: vi.fn(),
   workspaceReadFile: vi.fn(),
 }));
@@ -42,11 +43,48 @@ afterEach(() => {
 });
 
 beforeEach(() => {
+  vi.mocked(workspaceListDir).mockResolvedValue(ready([]));
   listFilesMock.mockResolvedValue(ready([]));
   readFileMock.mockResolvedValue(file("", ""));
 });
 
 describe("useProjectDescriptorDiscovery", () => {
+  it("inspects ordinary folder descriptors without a recursive scan and retains full manual refresh", async () => {
+    vi.mocked(workspaceListDir).mockResolvedValue(ready([
+      entry("package.json", "package.json"), entry("notes.txt", "notes.txt"),
+    ]));
+    readFileMock.mockImplementation(async (_root, path) => file(path, '{"name":"public-folder"}'));
+    const { result } = renderHook(() => useProjectDescriptorDiscovery("/home/public", {
+      autoRefresh: true, autoScope: "root",
+    }));
+    await waitFor(() => expect(result.current.status).toBe("descriptor-only"));
+    expect(workspaceListDir).toHaveBeenCalledExactlyOnceWith("/home/public", "");
+    expect(listFilesMock).not.toHaveBeenCalled();
+    expect(readFileMock).toHaveBeenCalledExactlyOnceWith("/home/public", "package.json", 256 * 1024);
+    listFilesMock.mockResolvedValue(ready([entry("pom.xml", "nested/pom.xml")]));
+    readFileMock.mockResolvedValue(file("nested/pom.xml", "<project><artifactId>nested</artifactId></project>"));
+    await act(() => result.current.refresh());
+    expect(listFilesMock).toHaveBeenCalledExactlyOnceWith("/home/public", "", 16, 2000);
+    expect(result.current.discovery?.descriptors[0]?.root).toBe("/home/public/nested");
+  });
+
+  it("promotes source discovery without accepting a late shallow result", async () => {
+    let finish!: (value: WorkspaceTreeLoadResult<WorkspaceEntry>) => void;
+    vi.mocked(workspaceListDir).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    listFilesMock.mockResolvedValue(ready([entry("pom.xml", "nested/pom.xml")]));
+    readFileMock.mockResolvedValue(file("nested/pom.xml", "<project><artifactId>nested</artifactId></project>"));
+    const { result, rerender } = renderHook(({ scope }: { scope: "root" | "recursive" }) => (
+      useProjectDescriptorDiscovery("/home/public", { autoRefresh: true, autoScope: scope })
+    ), { initialProps: { scope: "root" } });
+    expect(workspaceListDir).toHaveBeenCalledExactlyOnceWith("/home/public", "");
+    expect(listFilesMock).not.toHaveBeenCalled();
+    rerender({ scope: "recursive" });
+    await waitFor(() => expect(result.current.status).toBe("descriptor-only"));
+    await act(async () => { finish(ready([])); });
+    expect(result.current.discovery?.descriptors[0]?.root).toBe("/home/public/nested");
+    expect(readFileMock).toHaveBeenCalledOnce();
+  });
+
   it("discovers descriptors through the bounded workspace IPC without producing ready facts", async () => {
     listFilesMock.mockResolvedValue(ready([
       entry("pom.xml", "pom.xml"),

@@ -22,7 +22,6 @@ import {
   fileRefEquals,
   formatBytes,
   gitChangeForPath,
-  gitDirectoryChangeCount,
   isRootRef,
   rootDirKey,
 } from "./codeWorkspaceModel";
@@ -31,12 +30,17 @@ import type { ProjectTreeProps } from "./projectTreeTypes";
 import { renderMatchingFlatFiles } from "./ProjectTreeFlat";
 import { GitStatusBadge, ProjectTreeEntryDetails, ProjectTreeEntryName } from "./ProjectTreeEntryDetails";
 import { DEFAULT_EXPLORER_SORT, sortExplorerEntries } from "./explorerPreferences";
+import { createGitDirectoryChangeCounts } from "./model/trees";
+
+interface ProjectTreeRenderProps extends ProjectTreeProps {
+  gitDirectoryCounts: ReadonlyMap<string, number>;
+}
 
 function renderEntries(
   root: CodeWorkspaceRootInfo,
   path: string,
   depth: number,
-  props: ProjectTreeProps,
+  props: ProjectTreeRenderProps,
 ): ReactNode {
   const {
     directories,
@@ -102,7 +106,7 @@ function renderEntries(
     if (isDir) {
       const childState = directories[dirKey];
       const isSelected = selected?.kind === "dir" && selected.rootId === root.id && selected.path === displayPath;
-      const changeCount = gitDirectoryChangeCount(gitChangeByRootPath, root.id, displayPath);
+      const changeCount = props.gitDirectoryCounts.get(rootDirKey(root.id, displayPath)) ?? 0;
       return (
         <Fragment key={`${root.id}:${entry.path}`}>
           <button
@@ -230,7 +234,10 @@ export const ProjectTree = memo(function ProjectTree(inputProps: ProjectTreeProp
         [key, { ...value, entries: sortExplorerEntries(value.entries, sort) }])),
     };
   }, [inputProps.directories, inputProps.flatFiles, sort]);
-  const props = { ...inputProps, ...sortedEntries };
+  const gitDirectoryCounts = useMemo(() => createGitDirectoryChangeCounts(
+    inputProps.gitChangeByRootPath, inputProps.roots.map((root) => root.id),
+  ), [inputProps.gitChangeByRootPath, inputProps.roots]);
+  const props = { ...inputProps, ...sortedEntries, gitDirectoryCounts };
   const {
     roots,
     looseFiles,
@@ -240,7 +247,6 @@ export const ProjectTree = memo(function ProjectTree(inputProps: ProjectTreeProp
     selected,
     activeKey,
     openFiles,
-    gitChangeByRootPath,
     onToggleRoot,
     onSelect,
     onOpenFile,
@@ -282,7 +288,7 @@ export const ProjectTree = memo(function ProjectTree(inputProps: ProjectTreeProp
       {roots.map((root) => {
         const expanded = expandedRoots.has(root.id);
         const selectedRoot = selected?.kind === "root" && selected.rootId === root.id;
-        const rootChangeCount = gitDirectoryChangeCount(gitChangeByRootPath, root.id, "");
+        const rootChangeCount = gitDirectoryCounts.get(rootDirKey(root.id, "")) ?? 0;
         return (
           <Fragment key={root.id}>
             <button

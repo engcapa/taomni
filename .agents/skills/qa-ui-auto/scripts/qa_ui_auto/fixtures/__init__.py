@@ -69,6 +69,8 @@ from . import project_tree
 from . import workspace_explorer, workspace_hidden_entries, workspace_slow_lsp
 from . import workspace_language_files, workspace_slow_sdk
 from . import workspace_watch
+from . import workspace_large_directory, workspace_home_documents
+from . import workspace_execution_documents
 from . import workspace_compact_tree
 from . import workspace_ignored_ancestor_root
 from . import parity005_completion
@@ -141,6 +143,9 @@ REGISTRY: dict[str, Fixture] = {
     "workspace_slow_lsp": Fixture("workspace_slow_lsp", workspace_slow_lsp.setup),
     "workspace_language_files": Fixture("workspace_language_files", workspace_language_files.setup),
     "workspace_watch": Fixture("workspace_watch", workspace_watch.setup),
+    "workspace_large_directory": Fixture("workspace_large_directory", workspace_large_directory.setup),
+    "workspace_home_documents": Fixture("workspace_home_documents", workspace_home_documents.setup, workspace_home_documents.teardown),
+    "workspace_execution_documents": Fixture("workspace_execution_documents", workspace_execution_documents.setup, platform_workspace_root.teardown),
     "workspace_slow_sdk": Fixture("workspace_slow_sdk", workspace_slow_sdk.setup, workspace_slow_sdk.teardown),
     "platform_workspace_root": Fixture("platform_workspace_root", platform_workspace_root.setup, platform_workspace_root.teardown),
     "workspace_ignored_ancestor_root": Fixture("workspace_ignored_ancestor_root", workspace_ignored_ancestor_root.setup),

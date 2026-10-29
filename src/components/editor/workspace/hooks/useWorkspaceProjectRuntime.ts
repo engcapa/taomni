@@ -110,11 +110,15 @@ export function useWorkspaceProjectRuntime(context: UseWorkspaceProjectRuntimeCo
     storeActions: session.storeActions,
   });
   const projectFactsRoot = projectTree.roots[0]?.path ?? "";
-  const projectFacts = useProjectFacts(projectFactsRoot, {
-    autoFetch: visible,
-  });
   const projectDescriptorDiscovery = useProjectDescriptorDiscovery(projectFactsRoot, {
     autoRefresh: visible,
+    autoScope: hasSourceBuffers ? "recursive" : "root",
+  });
+  const hasBuildTooling = projectDescriptorDiscovery.discovery?.descriptors.some((descriptor) => (
+    descriptor.buildSystem === "maven" || descriptor.buildSystem === "gradle"
+  )) ?? false;
+  const projectFacts = useProjectFacts(projectFactsRoot, {
+    autoFetch: visible && (hasJavaBuffers || hasBuildTooling),
   });
   const refreshProjectFacts = useCallback(() => {
     void Promise.allSettled([

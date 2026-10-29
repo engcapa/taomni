@@ -51,7 +51,7 @@ export function registerinteractionLifecycle1Cases(caseContext: registerinteract
     );
     expect(caseContext.workspaceTestHarness.descriptorDiscoveryMock.useProjectDescriptorDiscovery).toHaveBeenCalledWith(
       "/repo/app",
-      { autoRefresh: true },
+      { autoRefresh: true, autoScope: "root" },
     );
 
     fireEvent.click(screen.getByTestId("project-facts-refresh-btn"));

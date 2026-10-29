@@ -1,6 +1,6 @@
 # 工作区文件打开与 SDK 后台初始化
 
-当前状态：文件打开及标签切换卡顿仍未通过验收。Home 监听版本 `8b60a5d7` 的 Linux browser/native 相关集 [40811827670](https://github.com/engcapa/taomni/actions/runs/40811827670) 已结束：26 passed / 9 failed，失败均为文件打开/切换帧超限，完整崩溃组通过。参考 [Home 文件打开分析](../docs-issue/workspace-home-file-open-latency-design.md) 继续实施编辑器常驻、状态缓存和快速读取合并。不能据单测、局部优化或旧源码通过声称解决；当前组合源码的全量与正式四轮性能仍待执行。以下保留历史失败，关联[重构实现报告](./workspace-platform-redesign-implementation-report.md)。
+当前状态：文件打开及标签切换卡顿仍未通过验收。最新托管相关集 [40826483271](https://github.com/engcapa/taomni/actions/runs/40826483271)（`dd477f6c`）共57次执行，50 passed / 7 failed、无跳过；适用的完整崩溃组通过。用户随后授权本机隔离 QA release 性能复现，已捕获真实 HOME 场景的原生窗口线程同步执行 `workspace_execution_model`，造成4–6秒长帧。后台执行与普通文件按需发现修复正在验证，未据单测声称问题解决。参考 [Home 文件打开分析](../docs-issue/workspace-home-file-open-latency-design.md)，全量与正式四轮性能对照仍待执行。以下保留历史失败，关联[重构实现报告](./workspace-platform-redesign-implementation-report.md)。
 
 ## 目标与保留行为
 
@@ -435,3 +435,86 @@ reload及末次dirty正文恢复；不增加持久化等待或写入store/storag
 现有029/030混合恢复、034全局外观、054 release冷启动等继续保护保留行为。
 本机8文件58 tests passed、TypeScript及refactor通过，最多2 workers；
 不在本机执行browser/native。托管新SHA性能及生命周期验证待执行。
+
+## HOME 本机原生根因与专项回归（2026-10-29）
+
+用户授权本机专项性能复现，其余 browser/native 回归继续在 GitHub 执行。
+使用隔离 QA release、独立 data/config/cache，在真实 HOME 下创建公开临时
+文档目录；不读取用户提供的 credentials.json 正文，不修改生产配置或进程。
+三次基线 notes.txt（30字符、3行）分别记录5970、4335、5042ms最长帧。
+4335ms样本中七次 storage.setItem 均为0ms，不能把这次秒级停顿归因于存储。
+
+保留的原生栈 `qa-ui-auto-report/_local/workspace-profiler-baseline/`
+`combined-native-stack-02.txt` 及04/06/08显示，Tauri窗口线程从
+`Webview::on_message` 同步进入 `workspace_execution_model`、
+`detect_execution_model`、`ignore::Walk`，递归读取HOME里的gitignore等元数据。
+同期WebProcess主线程空闲、帧回调暂停；JSC样本中的较短布局开销不能解释
+整个5秒停顿。临时CSS containment试验也没有消除此停顿，未进入产品。
+
+修复把整个执行模型发现（含root规范化）放到 `spawn_blocking`，保留命令名、
+输入输出、provider、失败传播。普通文件夹中的txt/html/json/md不自动递归
+发现Build/Run；源码、构建描述符和已识别项目里的文档保留自动发现，显式
+Build/Run入口保持完整能力。项目识别按活动文件所属descriptor限定，跨root
+不误启；切文件取消后拒绝迟到结果，Java fallback保持。
+
+同时隔离文件树工具栏的无关渲染，文件激活同一调用栈通知平台host；普通文件
+只做root级项目描述符发现，源码或显式刷新才递归。Git快照全局并发最多2、
+失败释放队列，并复用目录变更计数索引。尚未实现树虚拟化及按活动文件祖先
+发现HOME Git根，不把它们写成已完成。
+
+新增TC-WS-073（browser/native）保护300文档/100目录的cold/warm/dirty路径；
+074（native/release）使用真实HOME和公开文档；075（native/release）打开公开
+Python源码，断言真实execution-model请求仍发生、切回文档和warm tab仍响应。
+073/074额外断言零自动execution-model/递归描述符/SDK/LSP探测；075保留真实
+异步模型成功或错误结果，不通过stub制造性能证据。所有路径继续执行精确
+正文、高亮、EditorView复用及1500ms正文/150ms全观察期帧预算。
+
+测量起点从dblclick前移到最早pointerdown/mousedown，保留triggerEvent、
+每个原始帧及临时存储写入耗时（只记录key/长度，不保存value），结束恢复
+原有方法和监听。原生观察器转发并计数execution-model请求，单测验证真实
+结果/错误和callback生命周期，同时不记录HOME路径、参数及模型内容。
+
+本机支持性验证：执行目标/编辑器/Build/Run 5文件292 tests passed；
+Python probe与HOME fixture安全合同17 passed，Node原生观察器/probe合同
+13 passed。TypeScript、Rust formatting、refactor gate、catalog gate通过。
+073/074/075的dry-run准确选择三条，仅证明语法，尚不算实际通过。
+TC-WS-030只对旧同步metadata落盘假设增加有界1秒poll；072立即reload仍无
+新增等待。匹配修复源码的QA release性能实测与托管相关集结果待补。
+
+### 本机候选的剩余长帧
+
+首次候选实测 `run-20261029-152439-224934258` 为0 passed / 3 failed。
+窗口无系统焦点，RAF稳定约1秒；075还因host_write_file正确拒绝report范围外
+写入而失败。075公开源码改由HOME fixture创建，保留其严格所有权清理规则；
+未放宽host_write_file权限。下载并在repo临时目录解包xdotool/Xvfb，无需sudo。
+随后使用独立Xvfb显示与隔离窗口管理器，不影响生产桌面。
+
+`run-20261029-153134-606587301` 精确执行三条，仍0 passed / 3 failed，
+无skip：073普通大目录最长帧309ms，074真实HOME为229ms，075源码为247ms。
+原始秒级阻塞在这些冷打开样本中未出现，但未执行到的warm/dirty路径不算通过。
+不能据此宣称已达到响应预算，也不通过重跑筛掉失败。
+
+原生JSC采样及转发DOM操作计时，把额外开销定位到首次EditorView插入后
+`scrollDOM.scrollTop = 0` 强制的同步布局（89ms），另有焦点同步布局16ms。
+临时size-containment对照无改善，没有进入产品。新建scroller原生位置就是0，
+现跳过这次冗余写入；复用view时仍重置/恢复每个文件的横纵滚动，持久化
+光标、折叠、慢读取恢复和用户输入取消恢复逻辑保留。
+
+新增mounted测试先复现冷创建多余scroll写入，再验证同一EditorView切到新文档
+归零、返回缓存文档恢复240/32位置。改前1 failed / 7 passed；修后连同真实
+编辑器、慢读取恢复与缓存4文件89 passed，TypeScript通过。新release正在
+编译，真实性能收益尚待测量；所有诊断注入报告只作定位证据，不作验收。
+
+`run-20261029-155826-869721899`（去掉冷创建scroll写入后的matching release）
+为1 passed / 3 failed、无skip：076真实Node项目从notes.txt自动发现并实际执行
+脚本通过；073/074/075仍分别有298/277/240ms长帧。冗余scroll修复没有消除
+整体冷打开布局成本，不能称作验收通过。额外诊断继续执行全部观察点并在
+末尾强制保留失败判定，显示074的warm切换127–150ms，HTML冷开219ms，
+JSON冷开245ms；最长帧152/197ms仍失败。上述仅用于定位，正式用例继续
+在首次预算失败时失败，没有删除原始样本或放宽预算。
+
+新增TC-WS-076以公开、无依赖Node项目保护普通文档下的真实Run入口、
+自动模型成功响应与独立终端输出；同时选取原Maven Run/Build/Tests原生
+用例及多语言工具配置browser用例，保留功能回归边界。076的fixture、catalog、
+policy、schema和依赖同步登记。正在推进新SHA托管相关集与完整崩溃组；
+冷打开长帧仍在修复中，相关集通过前不合并main。

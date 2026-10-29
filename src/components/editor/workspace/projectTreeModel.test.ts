@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GitChange } from "../../../lib/git";
 import type { WorkspaceEntry } from "../../../lib/editor/workspace";
+import { createGitDirectoryChangeCounts } from "./model/trees";
 import {
   applyEditorEol,
   compactEntryName,
@@ -138,6 +139,18 @@ describe("project tree model helpers", () => {
     expect(gitDirectoryChangeCount(map, "root1", "src")).toBe(1);
     expect(gitDirectoryChangeCount(map, "root1", "")).toBe(1);
     expect(gitDirectoryChangeCount(map, "other", "")).toBe(0);
+    map.set("root1:src/deep/b.ts", change);
+    map.set("root1:src-other/c.ts", change);
+    map.set("root1:README.md", change);
+    map.set("root2:src/d.ts", change);
+    const counts = createGitDirectoryChangeCounts(map, ["root1", "root2"]);
+    expect(counts.get("root1:")).toBe(4);
+    expect(counts.get("root1:src")).toBe(2);
+    expect(counts.get("root1:src/deep")).toBe(1);
+    expect(counts.get("root1:src-other")).toBe(1);
+    expect(counts.get("root2:")).toBe(1);
+    expect(counts.has("root1:src/deep/b.ts")).toBe(false);
+    expect(counts.has("other:")).toBe(false);
   });
 
   it("makeLibraryFile builds a clean read-only buffer keyed by class URI", () => {

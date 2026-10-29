@@ -32,6 +32,8 @@ export interface OpenFileContext {
   looseFilesRef: import("react").RefObject<CodeWorkspaceLooseFileInfo[]>;
   findRoot: (rootId: string) => CodeWorkspaceRootInfo | null;
   restoreBookmarksForFileKey: (fileKeyValue: string, pathLabel?: string) => void;
+  /** Publish containing workbench selection in the same turn as the buffer. */
+  onActivateFile?: (ref: CodeWorkspaceFileRef) => void;
 }
 
 
@@ -74,12 +76,20 @@ export function createOpenFile(controllerContext: OpenFileContext) {
       if (shouldActivate) activationRequests.set(groupId, activationRequest);
       let published = false;
       let activated = false;
-      const result = (canonicalFileKey: string, error: string | null): OpenFileResult => ({
-        canonicalFileKey, groupId, error,
-        ...(shouldActivate && (!activated || activationRequests.get(groupId) !== activationRequest
-          || selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), controllerContext.workspaceInstanceId)
-            .editorGroups[groupId]?.activeKey !== canonicalFileKey) ? { activated: false } : {}),
-      });
+      const result = (canonicalFileKey: string, error: string | null): OpenFileResult => {
+        const outcome: OpenFileResult = {
+          canonicalFileKey, groupId, error,
+          ...(shouldActivate && (!activated || activationRequests.get(groupId) !== activationRequest
+            || selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), controllerContext.workspaceInstanceId)
+              .editorGroups[groupId]?.activeKey !== canonicalFileKey) ? { activated: false } : {}),
+        };
+        // Awaiting the open in a wrapper lets the external-store render run
+        // before its outer tab updates, repainting the whole workspace twice.
+        if (shouldActivate && outcome.activated !== false && !options.restoring) {
+          controllerContext.onActivateFile?.(ref);
+        }
+        return outcome;
+      };
       const publishGroup = (key: string) => {
         if (published) return;
         published = true;
