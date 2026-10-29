@@ -1,6 +1,5 @@
 import { WORKSPACE_TOOL_ICONS } from "../workspaceToolIcons";
 import { useCallback, useEffect, useMemo } from "react";
-import { useCodeWorkspaceStatusStore } from "../../../../stores/codeWorkspaceStatusStore";
 import type { CodeWorkspaceFileRef } from "../../../../types";
 import { isPathContainedInRoot } from "../navigationHistoryModel";
 import { type ToolWindowRailItem } from "../panels/ToolWindowRail";
@@ -183,7 +182,6 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
     rootRef: surfaceState.rootRef,
     visible,
   });
-  const workspaceWidgetHost = useCodeWorkspaceStatusStore((s) => s.widgetHost);
 
   // Stable handler identities let the memoized project tree skip the
   // per-caret-move workspace re-render.
@@ -359,7 +357,6 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
     rightToolRailItems,
     keymap,
     runSearchEverywhereCommand,
-    workspaceWidgetHost,
     commandPublication,
   };
 }
