@@ -167,3 +167,11 @@ context 和状态仍由原 owner 发表，原消费者继续收到更新，广�
 更新；没有调整持久化、快捷键或编辑器挂载生命周期。托管帧验证尚未完成。
 状态条消费者与 session import/export 另有 55 tests passed，TypeScript 和
 `pnpm check:refactor` 通过；本机只执行这些单测和静态检查。
+
+同一公共路径还存在 `useWorkspaceTabs` 对完整平台工作区数组的订阅，尽管
+关联 Git 清理只使用“仍打开的 code 编辑器实例 ID”。现在使用浅比较选择这些
+ID，文件选择、目录和 buffer 信息变化由原消费者交付，编辑器关闭或导入实例
+ID 变化仍立即清理失去 owner 的 Git 标签。新增隔离测试改前由一次 render
+增至四次，改后与两条 Git 清理回归、真实 Git 集成及主布局回归共 67 tests
+passed。本轮 `8d4fc91b` 托管验证仍捕获 browser 慢帧（JSON 152–163ms、普通
+文件/标签 188–228ms）；订阅调整尚不能作为卡顿通过证据。

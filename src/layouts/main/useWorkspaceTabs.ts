@@ -1,4 +1,5 @@
 import { useEffect, useCallback } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { type CodeWorkspaceGitManagerPayload } from "../../components/editor/CodeWorkspaceTab";
 import { decideWorkspaceGitSync } from "../../lib/workspaceGitManagerSync";
 import type { Tab, CodeWorkspaceRootInfo, CodeWorkspaceTabInfo, RecentWorkspace } from "../../types";
@@ -26,7 +27,11 @@ export function useWorkspaceTabs(context: UseWorkspaceTabsContext) {
   const { tabsRef, setActiveTab, addTab, updateGitTabInfo, removeTab, tabs, setStatusMessage } = context;
   const activeTabId = useAppStore((state) => state.activeTabId);
   const activeMode = useAppStore((state) => state.activeSideTab);
-  const platformWorkspaces = useWorkspacePlatformStore((state) => state.workspaces);
+  // Only editor owner identities affect linked Git cleanup. File selection,
+  // drafts and folder metadata must not refresh the entire main window.
+  const platformWorkspaceInstanceIds = useWorkspacePlatformStore(useShallow((state) => state.workspaces
+    .filter((workspace) => workspace.openTabs.some((tab) => tab.kind === "code"))
+    .map((workspace) => workspace.codeWorkspace?.workspaceInstanceId ?? `platform:${workspace.id}`)));
 
   const openGitTab = useCallback((repoRoot: string) => {
     const normalized = repoRoot.trim();
@@ -137,17 +142,14 @@ export function useWorkspaceTabs(context: UseWorkspaceTabsContext) {
           return ws.workspaceInstanceId ?? ws.workspaceId ?? ws.repoRoot?.trim() ?? tab.id;
         }),
     );
-    for (const workspace of platformWorkspaces) {
-      if (!workspace.openTabs.some((tab) => tab.kind === "code")) continue;
-      openWorkspaceInstanceIds.add(workspace.codeWorkspace?.workspaceInstanceId ?? `platform:${workspace.id}`);
-    }
+    for (const instanceId of platformWorkspaceInstanceIds) openWorkspaceInstanceIds.add(instanceId);
     for (const tab of tabs) {
       if (tab.type !== "git" || !tab.git?.sourceWorkspaceInstanceId) continue;
       if (!tab.git.workspaceRoots?.length) continue;
       if (openWorkspaceInstanceIds.has(tab.git.sourceWorkspaceInstanceId)) continue;
       removeTab(tab.id);
     }
-  }, [removeTab, tabs, platformWorkspaces]);
+  }, [removeTab, tabs, platformWorkspaceInstanceIds]);
 
   const openCodeWorkspaceInfo = useCallback((workspace: CodeWorkspaceTabInfo) => {
     openPlatformCodeWorkspace(workspace);
