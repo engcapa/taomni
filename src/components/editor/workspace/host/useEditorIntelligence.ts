@@ -45,27 +45,27 @@ export function useEditorIntelligence(context: UseEditorIntelligenceContext) {
 
   useEffect(() => {
     let cancelled = false;
-    void languageForPath(path)
-      .then((language: Extension | null) => {
-        const view = viewRef.current;
-        if (cancelled || !view) return;
-        const current = languageCompartment.current.get(view.state);
-        if (current === language || (!language && Array.isArray(current) && current.length === 0)) return;
+    let frame: number | null = null;
+    const install = (language: Extension | null) => {
+      const view = viewRef.current;
+      if (cancelled || !view) return;
+      const current = languageCompartment.current.get(view.state);
+      if (current === language || (!language && Array.isArray(current) && current.length === 0)) return;
+      // A resolved import runs in a microtask, alongside the first EditorView
+      // commit. Let the view measure its document before rebuilding language
+      // plugins. Input keeps working and the current document owns the update.
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        if (cancelled || viewRef.current !== view) return;
         view.dispatch({
           effects: languageCompartment.current.reconfigure(language ?? []),
         });
-      })
-      .catch(() => {
-        const view = viewRef.current;
-        if (cancelled || !view) return;
-        const current = languageCompartment.current.get(view.state);
-        if (Array.isArray(current) && current.length === 0) return;
-        view.dispatch({
-          effects: languageCompartment.current.reconfigure([]),
-        });
       });
+    };
+    void languageForPath(path).then(install, () => install(null));
     return () => {
       cancelled = true;
+      if (frame !== null) window.cancelAnimationFrame(frame);
     };
   }, [path, context.fileKey]);
 

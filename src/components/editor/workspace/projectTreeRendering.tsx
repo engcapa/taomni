@@ -13,7 +13,6 @@ import {
   DEFAULT_DIR_STATE,
   fileKey,
   fileRefEquals,
-  formatBytes,
   gitChangeForPath,
   isRootRef,
   rootDirKey,
@@ -22,7 +21,7 @@ import { WorkspaceFileIcon } from "./WorkspaceFileIcon";
 import type { ProjectTreeProps } from "./projectTreeTypes";
 import { matchingFlatFileRows } from "./ProjectTreeFlat";
 import type { ProjectTreeRow } from "./projectTreeRows";
-import { GitStatusBadge, ProjectTreeEntryDetails, ProjectTreeEntryName } from "./ProjectTreeEntryDetails";
+import { ProjectTreeDirectoryRow, ProjectTreeFileRow } from "./ProjectTreeEntryRows";
 
 export interface ProjectTreeRenderProps extends ProjectTreeProps {
   gitDirectoryCounts: ReadonlyMap<string, number>;
@@ -94,7 +93,6 @@ function renderEntries(
     const displayName = isDir ? compactEntryName(entry, chain) : entry.name;
     const dirKey = rootDirKey(root.id, displayPath);
     const isExpanded = expandedDirs.has(dirKey);
-    const rowStyle = treeViewMode === "list" ? undefined : { paddingLeft: `${10 + depth * 14}px` };
     if (isDir) {
       const childState = directories[dirKey];
       const isSelected = selected?.kind === "dir" && selected.rootId === root.id && selected.path === displayPath;
@@ -104,63 +102,12 @@ function renderEntries(
         selection: { kind: "dir", rootId: root.id, path: displayPath },
         level: depth + 1, expanded: isExpanded,
         render: () => (
-          <button
-            type="button"
-            data-testid="code-workspace-tree-dir"
-            data-root-id={root.id}
-            data-path={displayPath}
-            data-tree-kind="dir"
-            data-selected={isSelected || undefined}
-            role="treeitem"
-            aria-level={depth + 1}
-            aria-expanded={isExpanded}
-            aria-selected={isSelected}
-            className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pr-2 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
-            style={rowStyle}
-            title={`${root.name} / ${displayPath}`}
-            onClick={() => {
-              onSelect({ kind: "dir", rootId: root.id, path: displayPath });
-            }}
-            onDoubleClick={() => {
-              onSelect({ kind: "dir", rootId: root.id, path: displayPath });
-              onToggleDir(root.id, displayPath);
-            }}
-            onContextMenu={(event) => onContextMenu(event, { kind: "dir", rootId: root.id, path: displayPath })}
-          >
-            <ProjectTreeEntryName depth={depth} list={treeViewMode === "list"}>
-              <span
-                role="button"
-                tabIndex={-1}
-                aria-label={isExpanded ? "Collapse directory" : "Expand directory"}
-                data-testid="code-workspace-tree-dir-arrow"
-                className="inline-flex items-center justify-center p-0.5 -m-0.5 rounded hover:bg-[var(--taomni-code-active-line-bg)]"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onSelect({ kind: "dir", rootId: root.id, path: displayPath });
-                  onToggleDir(root.id, displayPath);
-                }}
-              >
-                {isExpanded ? (
-                  <ChevronDown className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-                ) : (
-                  <ChevronRight className="w-3.5 h-3.5 shrink-0 text-[var(--taomni-code-muted)]" />
-                )}
-              </span>
-              <WorkspaceFileIcon path={displayPath} folder expanded={isExpanded} />
-              <span className="truncate">{displayName}</span>
-              {(changeCount > 0 || childState?.loading || chain?.loading) && (
-                <span className="ml-auto flex shrink-0 items-center gap-1">
-                  {changeCount > 0 && (
-                    <span className="rounded border border-[var(--taomni-code-border)] px-1 text-[10px] text-[var(--taomni-code-muted)]">
-                      {changeCount}
-                    </span>
-                  )}
-                  {(childState?.loading || chain?.loading) && <Loader2 className="w-3 h-3 animate-spin" />}
-                </span>
-              )}
-            </ProjectTreeEntryName>
-            {treeViewMode === "list" && <ProjectTreeEntryDetails entry={entry} list />}
-          </button>
+          <ProjectTreeDirectoryRow
+            entry={entry} rootId={root.id} rootName={root.name} depth={depth} list={treeViewMode === "list"}
+            selected={isSelected} displayPath={displayPath} displayName={displayName} expanded={isExpanded}
+            changeCount={changeCount} loading={!!(childState?.loading || chain?.loading)}
+            onSelect={onSelect} onToggleDir={onToggleDir} onContextMenu={onContextMenu}
+          />
         ),
       }, ...(isExpanded ? renderEntries(root, displayPath, depth + 1, props) : [])];
     }
@@ -174,43 +121,11 @@ function renderEntries(
       key: `file:${root.id}:${entry.path}`,
       selection: { kind: "file", ref }, level: depth + 1,
       render: () => (
-      <button
-        key={`${root.id}:${entry.path}`}
-        type="button"
-        data-testid="code-workspace-tree-file"
-        data-root-id={root.id}
-        data-path={entry.path}
-        data-tree-kind="file"
-        data-active={active || undefined}
-        data-selected={isSelected || undefined}
-        role="treeitem"
-        aria-level={depth + 1}
-        aria-selected={isSelected}
-        className="h-[var(--taomni-code-tree-row-height)] w-full min-w-0 flex items-center gap-1.5 pr-2 text-left hover:bg-[var(--taomni-code-active-line-bg)] data-[active=true]:bg-[var(--taomni-code-selection-match-bg)] data-[selected=true]:bg-[var(--taomni-code-active-line-bg)]"
-        style={rowStyle}
-        title={`${root.name} / ${entry.path}${entry.size ? ` - ${formatBytes(entry.size)}` : ""}`}
-        onClick={() => {
-          onSelect({ kind: "file", ref });
-        }}
-        onDoubleClick={() => {
-          onSelect({ kind: "file", ref });
-          onOpenFile(ref, { preview: false });
-        }}
-        onContextMenu={(event) => onContextMenu(event, { kind: "file", ref })}
-      >
-        <ProjectTreeEntryName depth={depth} list={treeViewMode === "list"}>
-          <span className="w-3.5 shrink-0" />
-          <WorkspaceFileIcon path={entry.path} />
-          <span className="truncate">{entry.name}</span>
-          {(change || open?.dirty) && (
-            <span className="ml-auto flex shrink-0 items-center gap-1">
-              <GitStatusBadge change={change} />
-              {open?.dirty && <span className="text-[var(--taomni-accent)]">*</span>}
-            </span>
-          )}
-        </ProjectTreeEntryName>
-        <ProjectTreeEntryDetails entry={entry} list={treeViewMode === "list"} visible={props.showDetails} />
-      </button>
+        <ProjectTreeFileRow
+          entry={entry} rootId={root.id} rootName={root.name} depth={depth} list={treeViewMode === "list"}
+          active={active} selected={isSelected} dirty={!!open?.dirty} change={change} showDetails={props.showDetails}
+          onSelect={onSelect} onOpenFile={onOpenFile} onContextMenu={onContextMenu}
+        />
       ),
     }];
   });

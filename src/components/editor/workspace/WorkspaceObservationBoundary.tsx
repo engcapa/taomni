@@ -1,12 +1,24 @@
-import { useEffect, useState, type ComponentPropsWithRef } from "react";
+import { useEffect, useState, useSyncExternalStore, type ComponentPropsWithRef } from "react";
 import { WorkspaceObservationBridge } from "./workspaceObservationBridge";
+import type { WorkspaceClipboardHandle } from "./workspaceClipboardSession";
+
+const noClipboardSnapshot = () => null;
+const noClipboardSubscribe = () => () => {};
 
 /** Keep per-transaction dev telemetry updates out of the workspace render tree. */
 export function WorkspaceObservationBoundary({
   bridge,
+  clipboardHandle,
   children,
   ...props
-}: ComponentPropsWithRef<"div"> & { bridge: WorkspaceObservationBridge }) {
+}: ComponentPropsWithRef<"div"> & { bridge: WorkspaceObservationBridge; clipboardHandle?: WorkspaceClipboardHandle }) {
+  // Clipboard consumer registration happens while an editor mounts. Subscribe
+  // here so publishing its metadata cannot synchronously redraw that editor.
+  const clipboard = useSyncExternalStore(
+    clipboardHandle?.subscribe ?? noClipboardSubscribe,
+    clipboardHandle?.getSnapshot ?? noClipboardSnapshot,
+    clipboardHandle?.getSnapshot ?? noClipboardSnapshot,
+  );
   const [, setRevision] = useState(0);
   useEffect(() => {
     const unsubscribe = bridge.subscribe(() => setRevision((revision) => revision + 1));
@@ -17,6 +29,9 @@ export function WorkspaceObservationBoundary({
   return (
     <div
       {...props}
+      data-clipboard-revision={clipboard?.revision}
+      data-clipboard-history-revision={clipboard?.historyRevision}
+      data-clipboard-consumer-count={clipboard?.consumerCount}
       data-observation-status={workspaceObservation.observationStatus}
       data-observation-revision={workspaceObservation.observationRevision}
       data-observation-fresh={String(workspaceObservation.isFresh)}

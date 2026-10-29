@@ -75,12 +75,9 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
   } = useAppStore(useShallow(selectMainLayoutAppState));
   const { loadSessions, markConnected, sessions, updateSession, setSelectedSession, setSearchQuery } = useSessionStore();
   const activeTab = tabs.find((t) => t.id === activeTabId);
-  const primaryMode = useAppStore((state) => state.activeSideTab);
-  const platformTabClosable = useWorkspacePlatformStore((state) => {
-    const workspace = state.workspaces.find((item) => item.id === state.activeWorkspaceId);
-    return !!workspace?.openTabs.find((tab) => tab.id === workspace.activeTabId)?.closable;
-  });
-  const activeTabClosable = primaryMode === "workspaces" ? platformTabClosable : !!activeTab?.closable;
+  // Platform menu state belongs to the menu consumers. Opening the first file
+  // must not synchronously redraw the entire window just to enable Close.
+  const activeTabClosable = !!activeTab?.closable;
   // ED-PARITY-027 A: every tab group restores its own sidebar state (tool
   // window tabs start collapsed to the rail).
   const activeRailGroup = sidebarRailGroup(activeTab?.type);
@@ -127,11 +124,13 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
   // portals into this slot, which lives inside the ControlBar.
   const [tabActionSlot, setTabActionSlot] = useState<HTMLDivElement | null>(null);
   const { workspaceCommandRegistrationsRef, handleWorkspaceCommandsChange, subscribeWorkspaceCommands } = useWorkspaceCommandRegistry();
-  const platformActiveTabId = useWorkspacePlatformStore((state) => activeWorkspaceRuntimeTabId(state.getWorkspace()));
-  const commandTabId = primaryMode === "workspaces" ? platformActiveTabId : primaryMode === "sessions" ? activeTabId : undefined;
-  const getActiveWorkspaceCommands = useCallback(() => commandTabId
-    ? workspaceCommandRegistrationsRef.current[commandTabId] ?? null : null,
-  [commandTabId, workspaceCommandRegistrationsRef]);
+  const getActiveWorkspaceCommands = useCallback(() => {
+    const app = useAppStore.getState();
+    const commandTabId = app.activeSideTab === "workspaces"
+      ? activeWorkspaceRuntimeTabId(useWorkspacePlatformStore.getState().getWorkspace())
+      : app.activeSideTab === "sessions" ? app.activeTabId : undefined;
+    return commandTabId ? workspaceCommandRegistrationsRef.current[commandTabId] ?? null : null;
+  }, [workspaceCommandRegistrationsRef]);
   // On macOS we render a native global menu bar instead of the in-app app menu.
   // The native menu lives at the top of the screen, matching standard macOS
   // apps; the in-bar menu button is hidden there.

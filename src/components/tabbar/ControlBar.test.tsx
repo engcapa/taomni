@@ -1,10 +1,11 @@
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAppStore } from "../../stores/appStore";
 import { useTabOverviewStore } from "../../stores/tabOverviewStore";
 import { ControlBar } from "./ControlBar";
 import type { AppCommand } from "../menubar/commands";
 import type { WorkspaceCommandRegistration } from "../editor/workspace/workspaceCommands";
+import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 
 const windowMocks = vi.hoisted(() => ({
   startDragging: vi.fn(async () => undefined),
@@ -177,6 +178,28 @@ describe("ControlBar settings button", () => {
     fireEvent.click(screen.getByTestId("app-main-menu"));
     fireEvent.mouseEnter(screen.getByTestId("context-menu-item-tools"));
     expect(screen.queryByTestId("context-menu-workspace-actions")).not.toBeInTheDocument();
+  });
+
+  it("reads platform close availability when the menu opens without a parent update", () => {
+    localStorage.clear();
+    useWorkspacePlatformStore.getState().reloadFromStorage();
+    const platform = useWorkspacePlatformStore.getState();
+    const workspace = platform.createWorkspace({ name: "Files", rootPath: "/public" });
+    useAppStore.setState({ activeSideTab: "workspaces" });
+    renderControlBar(vi.fn());
+    const openMenu = () => fireEvent.click(screen.getByTestId("app-main-menu"));
+    const closeItem = () => screen.getByTestId("context-menu-item-close-active-tab");
+    openMenu();
+    expect(closeItem()).toBeDisabled();
+    fireEvent.keyDown(document, { key: "Escape" });
+    let fileId = "";
+    act(() => { fileId = platform.openFileInWorkspace(workspace.id, { rootId: workspace.rootFolders[0]!.id, path: "notes.txt" }).id; });
+    openMenu();
+    expect(closeItem()).not.toBeDisabled();
+    fireEvent.keyDown(document, { key: "Escape" });
+    act(() => platform.closeWorkspaceTab(workspace.id, fileId));
+    openMenu();
+    expect(closeItem()).toBeDisabled();
   });
 
   it("preserves dragging and maximize gestures in the tab strip filler", () => {

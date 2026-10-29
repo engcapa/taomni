@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type { WorkspaceEntry } from "../../../lib/editor/workspace";
 import { gitChangeLabel, type GitChange } from "../../../lib/git";
-import { getLocale } from "../../../lib/i18n";
+import { useLocale } from "../../../lib/i18n";
 import { treeFileDetails, formatTreeBytes, treeModifiedDate } from "./treeToolbarChrome";
 import { explorerEntryType } from "./explorerPreferences";
 
@@ -38,12 +38,13 @@ export function GitStatusBadge({ change }: { change: GitChange | undefined }): R
 }
 
 export function ProjectTreeEntryDetails({ entry, list, visible }: { entry: WorkspaceEntry; list: boolean; visible?: boolean }) {
+  const { locale } = useLocale();
   if (list) return <span data-testid="code-workspace-list-metadata" className="taomni-explorer-list-metadata">
     <span data-testid="code-workspace-list-size">{entry.fileType === "dir" ? "—" : formatTreeBytes(entry.size)}</span>
     <span data-testid="code-workspace-list-type" className="truncate">{explorerEntryType(entry)}</span>
-    <span data-testid="code-workspace-list-modified">{treeModifiedDate(entry.mtime, getLocale()) || "—"}</span>
+    <span data-testid="code-workspace-list-modified">{treeModifiedDate(entry.mtime, locale) || "—"}</span>
   </span>;
   return visible ? <span data-testid="code-workspace-tree-file-details" className="min-w-0 truncate text-[var(--taomni-code-muted)]">
-    {treeFileDetails(entry.size, entry.mtime, getLocale())}
+    {treeFileDetails(entry.size, entry.mtime, locale)}
   </span> : null;
 }

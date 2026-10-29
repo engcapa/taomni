@@ -13215,3 +13215,5 @@ controls:
 TC-WS-075 adds native Home source-to-document activation coverage for the real `workspace_execution_model` command. It retains the 150ms frame and 1500ms content/highlight budgets, exact public contents and editor reuse; TC-WS-073/074 also reject automatic execution-model scans for ordinary folders.
 
 TC-WS-077 protects virtual explorer rows in browser/native: bounded DOM rows, Home/End and offscreen ArrowUp selection without activation, actual file opening, search/reset, list view and reverse name sorting. Cold/warm frame budgets remain unchanged in TC-WS-073/074.
+
+TC-WS-078 protects application menu ownership after ordinary-file activation: Close availability before/after the first and last file, a contributed Save with saved-content reopen, and release of the closed editor menu. Browser covers the renderer entry; native menu state and store-subscription cleanup have mounted contracts, with current-source hosted activation performance still gated by TC-WS-064/073.

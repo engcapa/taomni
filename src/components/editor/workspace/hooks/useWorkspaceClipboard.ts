@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useSyncExternalStore } from "react";
-import { acquireClipboardStore, createDefaultClipboardPermissionAdapter } from "../workspaceClipboardSession";
+import { useEffect, useMemo } from "react";
+import { acquireClipboardStore, createDefaultClipboardPermissionAdapter, type WorkspaceClipboardSnapshot } from "../workspaceClipboardSession";
 import { WorkspaceObservationBridge } from "../workspaceObservationBridge";
 
 
@@ -13,13 +13,8 @@ export function useWorkspaceClipboard(context: UseWorkspaceClipboardContext) {
 
   // §8.26.2 AA1: Root workspace clipboard session handle with permission adapter (§8.27.2 BB1 / ED-CLIP-002)
   const clipboardHandle = useMemo(() => acquireClipboardStore(workspaceInstanceId), [workspaceInstanceId]);
-  const clipboardSnapshot = useSyncExternalStore(
-    clipboardHandle.subscribe,
-    clipboardHandle.getSnapshot,
-    clipboardHandle.getSnapshot,
-  );
   useEffect(() => {
-    const observeClipboard = (snapshot: typeof clipboardSnapshot) => {
+    const observeClipboard = (snapshot: WorkspaceClipboardSnapshot) => {
       publishWorkspaceObservation((bridge) => {
         bridge.observeClipboardSession(snapshot.payloadRevision, snapshot.consumerCount);
       });
@@ -35,5 +30,5 @@ export function useWorkspaceClipboard(context: UseWorkspaceClipboardContext) {
       clipboardHandle.release();
     };
   }, [clipboardHandle]);
-  return { clipboardHandle, clipboardSnapshot };
+  return { clipboardHandle };
 }

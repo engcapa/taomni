@@ -5,6 +5,23 @@ import type { WorkspaceCommand } from "./workspaceCommands";
 import type { WorkspaceActionContext } from "./workspaceActionRegistry";
 
 describe("useWorkspaceActionsController", () => {
+  it("projects an owner context change once with the current availability", () => {
+    const commands: WorkspaceCommand[] = [{
+      id: "editor.liveFile", title: "File", category: "Edit",
+      when: (context) => context.hasActiveFile === true, run: () => {},
+    }];
+    const renders = vi.fn();
+    const { result, rerender } = renderHook(({ hasActiveFile }) => {
+      renders();
+      return useWorkspaceActionsController({ commands, contextData: { hasActiveFile } });
+    }, { initialProps: { hasActiveFile: false } });
+    expect(result.current.snapshot[0]?.state.availability).toBe("disabled");
+    renders.mockClear();
+    rerender({ hasActiveFile: true });
+    expect(result.current.snapshot[0]?.state.availability).toBe("available");
+    expect(renders).toHaveBeenCalledTimes(1);
+  });
+
   it("uses the current editor owner for an action before its display snapshot rerenders", () => {
     let context: Partial<WorkspaceActionContext> = { activeFileKey: "a", hasActiveFile: false, hasSelection: false };
     const run = vi.fn();
