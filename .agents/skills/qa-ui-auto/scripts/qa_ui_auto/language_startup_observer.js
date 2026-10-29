@@ -12,6 +12,7 @@
     "lsp_document_status", "lsp_change_document", "lsp_save_document", "lsp_close_document",
     "workspace_list_dir", "workspace_compact_chain", "workspace_list_files_recursive",
     "workspace_execution_model",
+    "workspace_detect_git_roots", "git_snapshot",
     "lsp_start_workspace_watcher", "lsp_stop_workspace_watcher",
   ]);
   const events = [];

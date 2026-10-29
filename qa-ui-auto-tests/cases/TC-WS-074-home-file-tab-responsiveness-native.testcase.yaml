@@ -1,7 +1,8 @@
 id: TC-WS-074
 title: Real home workspace opens and switches public HTML/text/JSON responsively
-description: Mount the real home as the only workspace root and open only public files in a disposable QA-owned child. Measure cold activation
-  and warm tabs, preserve a dirty draft, and retain every frame.
+description: Mount the runner real current HOME as the workspace root. The owned public child contains at least 2900 mixed files, 400 directories,
+  64 project manifests, a 320-file wide directory and seven-level paths. Open and switch ordinary documents and the deep long-line JSON through
+  the real tree, retain dirty text and every frame under the unchanged 150/1500ms budgets. No HOME replacement or private-file inventory is used.
 modes:
 - native
 covers:
@@ -90,6 +91,38 @@ steps:
     require_highlight: false
     require_editor_reuse: true
 - assert_visible: '[data-testid="workspace-editor-save"]:enabled'
+- reveal_project_tree_row: '[data-testid="code-workspace-tree-dir"][data-path="${fixture.workspace_home_nested_path}"] [data-testid="code-workspace-tree-dir-arrow"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="${fixture.workspace_home_nested_path}"] [data-testid="code-workspace-tree-dir-arrow"]'
+- reveal_project_tree_row: '[data-testid="code-workspace-tree-dir"][data-path="${fixture.workspace_home_level_1}"] [data-testid="code-workspace-tree-dir-arrow"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="${fixture.workspace_home_level_1}"] [data-testid="code-workspace-tree-dir-arrow"]'
+- reveal_project_tree_row: '[data-testid="code-workspace-tree-dir"][data-path="${fixture.workspace_home_level_2}"] [data-testid="code-workspace-tree-dir-arrow"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="${fixture.workspace_home_level_2}"] [data-testid="code-workspace-tree-dir-arrow"]'
+- reveal_project_tree_row: '[data-testid="code-workspace-tree-dir"][data-path="${fixture.workspace_home_level_3}"] [data-testid="code-workspace-tree-dir-arrow"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="${fixture.workspace_home_level_3}"] [data-testid="code-workspace-tree-dir-arrow"]'
+- reveal_project_tree_row: '[data-testid="code-workspace-tree-dir"][data-path="${fixture.workspace_home_level_4}"] [data-testid="code-workspace-tree-dir-arrow"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="${fixture.workspace_home_level_4}"] [data-testid="code-workspace-tree-dir-arrow"]'
+- reveal_project_tree_row: '[data-testid="code-workspace-tree-dir"][data-path="${fixture.workspace_home_level_5}"] [data-testid="code-workspace-tree-dir-arrow"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="${fixture.workspace_home_level_5}"] [data-testid="code-workspace-tree-dir-arrow"]'
+- measure_workspace_file_open:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="${fixture.workspace_home_deep_document}"]'
+    expected: ${fixture.workspace_long_json_text}
+    event: dblclick
+    label: deep-long-json
+    require_highlight: true
+    require_editor_reuse: true
+- measure_workspace_file_open:
+    selector: '[data-testid="workspace-tab"][data-tab-title="notes.txt"]'
+    expected: Public draft retained in the home workspace
+    event: click
+    label: deep-return-draft
+    require_highlight: false
+    require_editor_reuse: true
+- assert_file_contains:
+    path: ${fixture.workspace_home_layout_report}
+    contains: '"wideDocumentCount": 320'
+- assert_file_contains:
+    path: ${fixture.workspace_home_layout_report}
+    contains: '"projectCount": 64'
 - assert_language_startup:
     commands:
       workspace_list_files_recursive:
@@ -133,8 +166,8 @@ verification:
     - 21
     - 22
     - 23
-    - 24
-    - 25
+    - 40
+    - 41
     checkpoints:
     - step: 15
       expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"code-workspace-tree-file\"][data-path=\"${fixture.workspace_home_documents_path}/notes.txt\"\
@@ -162,12 +195,46 @@ verification:
         \ draft retained in the home workspace\n  event: click\n  label: switch-draft\n  require_highlight: false\n  require_editor_reuse: true"
     - step: 23
       expectation: 'assert_visible: ''[data-testid="workspace-editor-save"]:enabled'''
-    - step: 24
+    - step: 40
       expectation: "assert_language_startup:\n  commands:\n    workspace_list_files_recursive:\n      equal: 0\n    sdk_get_registry:\n      equal:\
         \ 0\n    sdk_analyze_workspace:\n      equal: 0\n    sdk_resolve_workspace:\n      equal: 0\n    lsp_detect_servers:\n      equal: 0\n\
         \    lsp_open_document:\n      equal: 0\n    workspace_execution_model:\n      equal: 0\n  quiet_ms: 1000"
-    - step: 25
+    - step: 41
       expectation: 'assert_no_runtime_errors: null'
+  - id: R2
+    requirement: A deterministic broad and deep mixed HOME workload is created in the current native HOME. Navigate every intermediate directory,
+      open the exact deep long-line JSON under the original frame/content/highlight budgets and return to the unchanged dirty draft.
+    actions:
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    results:
+    - 36
+    - 37
+    - 38
+    - 39
+    checkpoints:
+    - step: 36
+      expectation: '{"measure_workspace_file_open": {"selector": "[data-testid=\"code-workspace-tree-file\"][data-path=\"${fixture.workspace_home_deep_document}\"]",
+        "expected": "${fixture.workspace_long_json_text}", "event": "dblclick", "label": "deep-long-json", "require_highlight": true, "require_editor_reuse":
+        true}}'
+    - step: 37
+      expectation: '{"measure_workspace_file_open": {"selector": "[data-testid=\"workspace-tab\"][data-tab-title=\"notes.txt\"]", "expected":
+        "Public draft retained in the home workspace", "event": "click", "label": "deep-return-draft", "require_highlight": false, "require_editor_reuse":
+        true}}'
+    - step: 38
+      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_home_layout_report}", "contains": "\"wideDocumentCount\": 320"}}'
+    - step: 39
+      expectation: '{"assert_file_contains": {"path": "${fixture.workspace_home_layout_report}", "contains": "\"projectCount\": 64"}}'
   native:
   - check: Real home/disk reads and the packaged WebView frame timings.
     method: automated

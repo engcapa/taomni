@@ -80,16 +80,22 @@ async fn detects_git_roots_and_deduplicates_nested_roots() {
     let repos = workspace_detect_git_roots(vec![
         WorkspaceGitRootCandidate {
             id: "repo".into(),
+            active_file_path: None,
+            ancestors_only: false,
             name: "repo".into(),
             path: repo.to_string_lossy().to_string(),
         },
         WorkspaceGitRootCandidate {
             id: "app".into(),
+            active_file_path: None,
+            ancestors_only: false,
             name: "app".into(),
             path: nested.to_string_lossy().to_string(),
         },
         WorkspaceGitRootCandidate {
             id: "plain".into(),
+            active_file_path: None,
+            ancestors_only: false,
             name: "plain".into(),
             path: plain.to_string_lossy().to_string(),
         },
@@ -118,6 +124,8 @@ async fn detects_child_git_roots_under_plain_workspace_root() {
 
     let repos = workspace_detect_git_roots(vec![WorkspaceGitRootCandidate {
         id: "workspace".into(),
+        active_file_path: None,
+        ancestors_only: false,
         name: "workspace".into(),
         path: workspace.to_string_lossy().to_string(),
     }])
@@ -167,6 +175,8 @@ async fn marks_git_file_roots_as_submodules() {
 
     let repos = workspace_detect_git_roots(vec![WorkspaceGitRootCandidate {
         id: "workspace".into(),
+        active_file_path: None,
+        ancestors_only: false,
         name: "workspace".into(),
         path: workspace.to_string_lossy().to_string(),
     }])

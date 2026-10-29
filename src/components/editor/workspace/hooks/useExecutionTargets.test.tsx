@@ -57,6 +57,26 @@ it("retains automatic discovery for sources and build descriptors", async () => 
   await waitFor(() => expect(ipc.workspaceExecutionModel).toHaveBeenCalledWith(root.path, `${root.path}/Cargo.toml`, undefined));
 });
 
+it("lets the first source paint before starting automatic Run discovery and cancels abandoned demand", async () => {
+  vi.useFakeTimers();
+  const h = harness();
+  const { rerender, unmount } = renderHook(useExecutionTargets, { initialProps: h.select(h.files[4]!) });
+  try {
+    expect(ipc.workspaceExecutionModel).not.toHaveBeenCalled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(16); });
+    expect(ipc.workspaceExecutionModel).not.toHaveBeenCalled();
+    rerender(h.select(h.files[0]!));
+    await act(async () => { await vi.advanceTimersByTimeAsync(80); });
+    expect(ipc.workspaceExecutionModel).not.toHaveBeenCalled();
+    rerender(h.select(h.files[5]!));
+    await act(async () => { await vi.advanceTimersByTimeAsync(80); });
+    expect(ipc.workspaceExecutionModel).toHaveBeenCalledExactlyOnceWith(root.path, `${root.path}/Cargo.toml`, undefined);
+  } finally {
+    unmount();
+    vi.useRealTimers();
+  }
+});
+
 it("retains project-level discovery when the active file is project documentation", async () => {
   const h = harness();
   h.context.projectDetected = true;
@@ -70,7 +90,7 @@ it("rejects a late source model after selecting an ordinary document", async () 
   ipc.workspaceExecutionModel.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
   const h = harness();
   const { result, rerender } = renderHook(useExecutionTargets, { initialProps: h.select(h.files[4]!) });
-  expect(ipc.workspaceExecutionModel).toHaveBeenCalledOnce();
+  await waitFor(() => expect(ipc.workspaceExecutionModel).toHaveBeenCalledOnce());
   rerender(h.select(h.files[0]!));
   await act(async () => { finish(emptyModel); });
   expect(result.current.activeExecutionModel).toBeNull();

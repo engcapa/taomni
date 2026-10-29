@@ -1,7 +1,8 @@
 id: TC-WS-075
 title: Home source discovery keeps the desktop responsive and never delays ordinary tabs
 description: Exercise real automatic execution-model discovery for a public Python source below Home. Retain every activation frame and verify
-  source-to-document switches, exact contents and the existing editor.
+  source-to-document switches, exact contents and the existing editor. The shared owned HOME fixture includes at least 2900 mixed files, 400 directories,
+  64 nested project manifests, a 320-file directory and seven-level paths; its measured filesystem dimensions are retained in home-fixture-layout.json.
 modes:
 - native
 covers:
@@ -69,6 +70,8 @@ steps:
     commands:
       workspace_execution_model:
         min: 1
+      workspace_list_files_recursive:
+        equal: 0
     quiet_ms: 1000
 - assert_no_runtime_errors: null
 - screenshot: workspace-tc-ws-075-source-and-documents.png
@@ -116,7 +119,8 @@ verification:
       expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"notes.txt\"]'\n  expected: ${fixture.workspace_notes_text}\n\
         \  event: click\n  label: return-notes\n  require_highlight: false\n  require_editor_reuse: true"
     - step: 19
-      expectation: "assert_language_startup:\n  commands:\n    workspace_execution_model:\n      min: 1\n  quiet_ms: 1000"
+      expectation: "assert_language_startup:\n  commands:\n    workspace_execution_model:\n      min: 1\n    workspace_list_files_recursive:\n\
+        \      equal: 0\n  quiet_ms: 1000"
     - step: 20
       expectation: 'assert_no_runtime_errors: null'
   native:

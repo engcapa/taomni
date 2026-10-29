@@ -20,8 +20,15 @@ export interface UseWorkspaceTreeOpeningContext {
 export function useWorkspaceTreeOpening(context: UseWorkspaceTreeOpeningContext) {
   const { treeFocus, workspaceInstanceId, editorCommands, buffers, splitLayoutLeaf, openFile } = context;
   const pendingFocusFrame = useRef<{ id: number; requestId: number; key: string } | null>(null);
+  const readScopeRef = useRef<object | null>(null);
+
+  useEffect(() => {
+    readScopeRef.current = {};
+    return () => { readScopeRef.current = null; };
+  }, [workspaceInstanceId]);
 
   const grantTreeFocus = useCallback((intent: TreeOpenIntent, canonicalKey: string): boolean => {
+    if (intent.canonicalFileKey !== canonicalKey) return false;
     if (treeFocus.pendingTreeOpenIntentRef.current?.requestId !== intent.requestId) {
       return false;
     }
@@ -56,6 +63,9 @@ export function useWorkspaceTreeOpening(context: UseWorkspaceTreeOpeningContext)
   }, [workspaceInstanceId]);
 
   const tryGrantTreeFocus = useCallback((intent: TreeOpenIntent, canonicalKey: string): boolean => {
+    // A loading editor can register a port before its disk read completes.
+    // Only the completed open establishes the canonical document to focus.
+    if (intent.canonicalFileKey !== canonicalKey) return false;
     if (treeFocus.pendingTreeOpenIntentRef.current?.requestId !== intent.requestId) return false;
     const pending = pendingFocusFrame.current;
     if (pending?.requestId === intent.requestId && pending.key === canonicalKey) return false;
@@ -91,6 +101,7 @@ export function useWorkspaceTreeOpening(context: UseWorkspaceTreeOpeningContext)
     treeFocus.treeInteractionEpochRef.current += 1;
     const epoch = treeFocus.treeInteractionEpochRef.current;
     const requestId = ++treeFocus.treeOpenRequestIdRef.current;
+    const readScope = readScopeRef.current;
 
     const currentUi = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
     let targetGroupId = options.targetGroupId ?? currentUi.activeEditorGroupId;
@@ -116,7 +127,10 @@ export function useWorkspaceTreeOpening(context: UseWorkspaceTreeOpeningContext)
     const result = await openFile(ref, {
       groupId: targetGroupId,
       preview: options.preview ?? false,
-      isCurrent: () => treeFocus.pendingTreeOpenIntentRef.current?.requestId === requestId,
+      // Relinquishing focus (for example, to a search input) must not discard
+      // a successful read and strand its published loading buffer.
+      isCurrent: () => readScope !== null && readScopeRef.current === readScope
+        && treeFocus.treeOpenRequestIdRef.current === requestId,
     });
 
     if (treeFocus.pendingTreeOpenIntentRef.current?.requestId !== requestId) {

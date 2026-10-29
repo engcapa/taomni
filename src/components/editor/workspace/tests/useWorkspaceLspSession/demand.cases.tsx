@@ -5,6 +5,27 @@ import { useWorkspaceLspSession } from "../../useWorkspaceLspSession";
 import { file, lspMocks, roots, status } from "./harness";
 
 export function registerWorkspaceLspDemandCases() {
+  it("yields the document's first paint before automatic provider setup while explicit refresh stays immediate", async () => {
+    vi.useFakeTimers();
+    const { result, unmount } = renderHook(() => useWorkspaceLspSession({
+      workspaceInstanceId: "first-paint-discovery", roots,
+      openFilesRef: { current: { [file.key]: file } },
+      updateLspFiles: vi.fn(), onError: vi.fn(), autoDiscover: true,
+    }));
+    try {
+      expect(lspMocks.lspSetJavaHome).not.toHaveBeenCalled();
+      await act(async () => { await vi.advanceTimersByTimeAsync(16); });
+      expect(lspMocks.lspSetJavaHome).not.toHaveBeenCalled();
+      await act(async () => { await vi.advanceTimersByTimeAsync(80); });
+      expect(lspMocks.lspDetectServers).toHaveBeenCalledOnce();
+      await act(async () => { await result.current.refreshServerStatuses(true); });
+      expect(lspMocks.lspDetectServers).toHaveBeenCalledTimes(2);
+    } finally {
+      unmount();
+      vi.useRealTimers();
+    }
+  });
+
   it.each(["notes.txt", "events.log", "data.csv", "settings.json", "diagram.svg"])(
     "does not contact a provider while opening, saving or closing %s", async (path) => {
       const ordinary = { ...file, languagePath: path, path };

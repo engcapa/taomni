@@ -3,6 +3,7 @@ import { workspaceJavaRunTarget, workspaceExecutionModel, type WorkspaceExecutio
 import { applyRunOverrideToDebugConfiguration, javaRunTargetToExecutionRunConfiguration, materializeRunConfigurations, readActiveRunConfigurationSelection, readRunConfigurationOverrides, RUN_CONFIGURATION_CHANGED_EVENT } from "../runConfigurationPersistence";
 import type { CodeWorkspaceRootInfo } from "../../../../types";
 import { type OpenFileState, errorMessage, fsPathEquals, lspPresetIdForPath, normalizeFsPath, relativePathWithinRoot } from "../codeWorkspaceModel";
+import { scheduleAfterEditorPaint } from "../scheduleAfterEditorPaint";
 
 const EXECUTION_MANIFEST = /(?:^|[/\\])(?:Cargo\.toml|go\.mod|package\.json|pyproject\.toml|CMakeLists\.txt|pom\.xml|build\.gradle(?:\.kts)?|build\.sbt|Package\.swift|[^/\\]+\.csproj|\.taomni[/\\]run-configurations\.json)$/i;
 
@@ -20,6 +21,7 @@ export interface UseExecutionTargetsContext {
   roots: CodeWorkspaceRootInfo[];
   /** Keep project-level run configurations available while reading its docs. */
   projectDetected?: boolean;
+  isEditorReady?: () => boolean;
 }
 
 export function useExecutionTargets(context: UseExecutionTargetsContext) {
@@ -36,6 +38,7 @@ export function useExecutionTargets(context: UseExecutionTargetsContext) {
     activeFile,
     roots,
     projectDetected = false,
+    isEditorReady,
   } = context;
 
   const [activeExecutionModel, setActiveExecutionModel] = useState<WorkspaceExecutionModel | null>(null);
@@ -61,7 +64,7 @@ export function useExecutionTargets(context: UseExecutionTargetsContext) {
     // Ordinary documents in a general folder need no recursive Build/Run scan.
     // Sources, manifests, and known projects retain their automatic targets;
     // opening Build/Run explicitly still discovers the whole workspace.
-    if (!file || file.ref.kind !== "root" || file.library || !discoverAutomatically) {
+    if (!file || file.loading || file.ref.kind !== "root" || file.library || !discoverAutomatically) {
       setActiveExecutionModel(null);
       setJavaFallbackConfiguration(null);
       return;
@@ -76,27 +79,30 @@ export function useExecutionTargets(context: UseExecutionTargetsContext) {
     let cancelled = false;
     setActiveExecutionModel(null);
     setJavaFallbackConfiguration(null);
-    void workspaceExecutionModel(root.path, absolute, toolConfigRef.current)
-      .then((model) => {
-        if (cancelled) return;
-        setActiveExecutionModel(model);
-        if (activeFileIsJava) {
-          void workspaceJavaRunTarget(root.path, file.ref.path, toolConfigRef.current)
-            .then((target) => {
-              if (!cancelled) setJavaFallbackConfiguration(javaRunTargetToExecutionRunConfiguration(target));
-            })
-            .catch(() => {
-              if (!cancelled) setJavaFallbackConfiguration(null);
-            });
-        }
-      })
-      .catch((error) => {
-        if (!cancelled) setStatusMessage(`Run target discovery failed: ${errorMessage(error)}`);
-      });
+    const cancel = scheduleAfterEditorPaint(() => {
+      void workspaceExecutionModel(root.path, absolute, toolConfigRef.current)
+        .then((model) => {
+          if (cancelled) return;
+          setActiveExecutionModel(model);
+          if (activeFileIsJava) {
+            void workspaceJavaRunTarget(root.path, file.ref.path, toolConfigRef.current)
+              .then((target) => {
+                if (!cancelled) setJavaFallbackConfiguration(javaRunTargetToExecutionRunConfiguration(target));
+              })
+              .catch(() => {
+                if (!cancelled) setJavaFallbackConfiguration(null);
+              });
+          }
+        })
+        .catch((error) => {
+          if (!cancelled) setStatusMessage(`Run target discovery failed: ${errorMessage(error)}`);
+        });
+    }, isEditorReady);
     return () => {
       cancelled = true;
+      cancel();
     };
-  }, [absolutePathForOpenFile, activeFileIsJava, activeKey, discoverAutomatically, findRoot, setStatusMessage, toolConfig]);
+  }, [absolutePathForOpenFile, activeFileIsJava, activeFile?.loading, activeKey, discoverAutomatically, findRoot, setStatusMessage, toolConfig, isEditorReady]);
 
   const activeRunConfigurations = useMemo<ExecutionRunConfiguration[]>(() => {
     if (!activeExecutionModel || !activeFile || activeFile.ref.kind !== "root") return [];

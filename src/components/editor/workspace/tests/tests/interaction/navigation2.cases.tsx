@@ -252,6 +252,11 @@ export function registerinteractionNavigation2Cases(caseContext: registerinterac
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
     await findEditorByTitle("app / src/main.ts");
+    // Symbol navigation retains its file-search fallback until the provider
+    // advertises symbols. The editor now paints before that automatic probe.
+    await waitFor(() => expect(selectCodeWorkspaceUi(
+      useCodeWorkspaceStore.getState(), "instance-symbol-resolve",
+    ).lspFiles["root:app:src/main.ts"]?.status?.capabilities?.workspaceSymbol).toBe(true));
     await waitFor(() => {
       expect(registrationRef.current?.items.find((item) => item.id === "workspace.goToSymbol")?.enabled)
         .toBe(true);

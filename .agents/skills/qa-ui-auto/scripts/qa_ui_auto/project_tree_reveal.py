@@ -67,7 +67,17 @@ def reveal(ctx, selector):
             if time.monotonic() >= deadline or value["height"] <= 0:
                 break
             if value["found"]:
-                execute("document.querySelector(" + json.dumps(selector) + ")?.scrollIntoView({block:'nearest',inline:'nearest'}); return true;")
+                edges = [value.get(key) for key in ("targetTop", "targetBottom", "viewportTop", "viewportBottom")]
+                if all(type(edge) in {int, float} and math.isfinite(edge) for edge in edges):
+                    top, bottom, viewport_top, viewport_bottom = edges
+                    # Some WebViews round nearest scrollIntoView to a whole
+                    # pixel while leaving a fractional edge clipped. Perform
+                    # the real extra scroll; visibility remains exact.
+                    delta = math.floor(top - viewport_top) if top < viewport_top else math.ceil(bottom - viewport_bottom)
+                    offset = max(0, value["offset"] + delta)
+                    execute("document.querySelector('[data-testid=\"code-workspace-tree\"]').scrollTo(" + json.dumps({"top": offset, "behavior": "instant"}) + "); return true;")
+                else:
+                    execute("document.querySelector(" + json.dumps(selector) + ")?.scrollIntoView({block:'nearest',inline:'nearest'}); return true;")
             else:
                 offset = 0 if not restarted else min(value["total"] - value["height"], value["offset"] + value["height"] * .7)
                 if restarted and len(samples) > 2 and all(abs(sample["offset"] - offset) < 1 for sample in samples[-2:]):

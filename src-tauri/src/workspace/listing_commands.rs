@@ -87,36 +87,7 @@ pub async fn workspace_detect_git_roots(
     roots: Vec<WorkspaceGitRootCandidate>,
 ) -> Result<Vec<WorkspaceGitRoot>, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let mut repos: Vec<WorkspaceGitRoot> = Vec::new();
-        for root in roots {
-            let Ok(path) = fs::canonicalize(&root.path) else {
-                continue;
-            };
-            let Ok(meta) = fs::metadata(&path) else {
-                continue;
-            };
-            if !meta.is_dir() {
-                continue;
-            }
-            let mut found = Vec::new();
-            if let Some(repo_root) = find_git_repo_root(&path) {
-                found.push(repo_root);
-            }
-            let mut remaining_dirs = GIT_ROOT_SCAN_MAX_DIRS;
-            collect_nested_git_roots(
-                &path,
-                0,
-                GIT_ROOT_SCAN_MAX_DEPTH,
-                &mut remaining_dirs,
-                &mut found,
-            )?;
-
-            for repo_root in found {
-                upsert_workspace_git_root(&mut repos, &root, &path, &repo_root);
-            }
-        }
-        repos.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        Ok(repos)
+        detect_workspace_git_roots(roots, dirs::home_dir().as_deref())
     })
     .await
     .map_err(|error| format!("workspace_detect_git_roots: {error}"))?

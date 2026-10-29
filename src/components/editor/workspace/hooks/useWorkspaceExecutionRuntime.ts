@@ -48,6 +48,7 @@ export function useWorkspaceExecutionRuntime(context: UseWorkspaceExecutionRunti
   const [javaRunBusy, setJavaRunBusy] = useState(false);
   const [projectBuildBusy, setProjectBuildBusy] = useState(false);
   const execution = useExecutionTargets({
+    isEditorReady: session.editorCommands.isActiveEditorReady,
     workspaceInstanceId: session.workspaceInstanceId,
     openFilesRef: session.bufferState.openFilesRef,
     activeKey: session.workspaceUi.activeKey,

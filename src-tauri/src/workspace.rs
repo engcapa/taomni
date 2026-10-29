@@ -223,6 +223,10 @@ pub struct WorkspaceGitRootCandidate {
     pub id: String,
     pub name: String,
     pub path: String,
+    #[serde(default)]
+    pub active_file_path: Option<String>,
+    #[serde(default)]
+    pub ancestors_only: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

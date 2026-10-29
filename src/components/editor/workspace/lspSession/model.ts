@@ -18,6 +18,7 @@ export interface UseWorkspaceLspSessionOptions {
   visible?: boolean;
   /** Source buffers request discovery; explicit refresh remains available. */
   autoDiscover?: boolean;
+  isEditorReady?: () => boolean;
 }
 
 export interface PendingDocumentSync {

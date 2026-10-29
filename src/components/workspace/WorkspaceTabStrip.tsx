@@ -217,9 +217,10 @@ export function WorkspaceTabStrip() {
         data-keyboard-navigation={keyboardNavigation ? "true" : undefined}
         aria-label={t("tabs.openTabs")}
         className="taomni-workspace-tab-scroll flex min-w-0 shrink items-end gap-0.5 overflow-x-auto overflow-y-hidden"
-        onPointerDownCapture={() => setKeyboardNavigation(false)}
+        onPointerDownCapture={() => { setKeyboardNavigation(false); tabScroll.markUserScroll(); }}
         onWheel={(event) => {
           const element = event.currentTarget;
+          if (event.deltaX || event.deltaY) tabScroll.markUserScroll();
           if (maxScrollLeft(element) > 0 && Math.abs(event.deltaY) > Math.abs(event.deltaX)) {
             element.scrollLeft += event.deltaY;
           }

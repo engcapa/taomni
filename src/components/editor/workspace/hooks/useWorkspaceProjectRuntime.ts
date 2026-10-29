@@ -23,6 +23,7 @@ import { useWorkspaceSurfaceState } from "./useWorkspaceSurfaceState";
 import { useWorkspaceToolWindowRouting } from "./useWorkspaceToolWindowRouting";
 import { useWorkspaceTreeModel } from "./useWorkspaceTreeModel";
 import { useWorkspaceUiActions } from "./useWorkspaceUiActions";
+import { useWorkspaceDiscoveryScope } from "./useWorkspaceDiscoveryScope";
 import { useWorkspaceUsagesState } from "./useWorkspaceUsagesState";
 
 
@@ -110,9 +111,10 @@ export function useWorkspaceProjectRuntime(context: UseWorkspaceProjectRuntimeCo
     storeActions: session.storeActions,
   });
   const projectFactsRoot = projectTree.roots[0]?.path ?? "";
+  const automaticDiscoveryScope = useWorkspaceDiscoveryScope(projectFactsRoot, hasSourceBuffers);
   const projectDescriptorDiscovery = useProjectDescriptorDiscovery(projectFactsRoot, {
     autoRefresh: visible,
-    autoScope: hasSourceBuffers ? "recursive" : "root",
+    autoScope: automaticDiscoveryScope,
   });
   const hasBuildTooling = projectDescriptorDiscovery.discovery?.descriptors.some((descriptor) => (
     descriptor.buildSystem === "maven" || descriptor.buildSystem === "gradle"
@@ -130,6 +132,7 @@ export function useWorkspaceProjectRuntime(context: UseWorkspaceProjectRuntimeCo
     roots: projectTree.roots,
     onError: session.setStatusMessage,
     visible: workspaceVisible,
+    activeFile: session.workspaceUi.openFiles[session.workspaceUi.activeKey ?? ""]?.ref,
   });
   const telemetry = useWorkspaceEditorTelemetry({
     activeKey: session.workspaceUi.activeKey,
@@ -200,6 +203,7 @@ export function useWorkspaceProjectRuntime(context: UseWorkspaceProjectRuntimeCo
     onRestart: invalidateSemanticAfterLspRestart,
     visible,
     autoDiscover: hasSourceBuffers,
+    isEditorReady: session.editorCommands.isActiveEditorReady,
   });
   // §8.20.3 W2: provider-owned Project Analysis snapshot (phase/progress/
   // modules/classpath fingerprint). The generation resync rides the statuses

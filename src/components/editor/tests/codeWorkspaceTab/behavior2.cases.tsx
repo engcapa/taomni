@@ -89,7 +89,7 @@ export function registerCodeWorkspaceTabBehavior2Cases() {
         debugConfigurations: [],
         tools: [],
       });
-      workspaceMocks.workspaceJavaRunTarget.mockReset();
+      workspaceMocks.workspaceJavaRunTarget.mockReset().mockRejectedValue(new Error("No runnable Java main class"));
       workspaceMocks.workspaceTaskTree.mockReset().mockResolvedValue([]);
       workspaceMocks.workspaceTestResults.mockReset().mockResolvedValue({
         schema: "taomni.codeWorkspace.testResults",

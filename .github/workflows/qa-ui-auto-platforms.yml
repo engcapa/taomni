@@ -210,7 +210,7 @@ jobs:
       - name: Mandatory crash regression selection and result contracts
         run: python -m unittest test_crash_regressions
       - name: Cold-start fixture filesystem contracts
-        run: python -m unittest test_workspace_ignored_ancestor
+        run: python -m unittest test_workspace_ignored_ancestor test_workspace_home_documents
       - name: Catalog contract gate
         run: python -m qa_ui_auto.audit --gate
       - name: Plan exact cases and dependencies

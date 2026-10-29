@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  workspaceDetectGitRoots,
-  type WorkspaceGitRoot,
-} from "../../../lib/editor/workspace";
+import { type WorkspaceGitRoot } from "../../../lib/editor/workspace";
 import { clearGitSnapshotCache, fetchGitSnapshotDeduplicated, normalizedRepoRoot } from "../../../lib/workspaceGitSnapshotRequests";
 import { notifyGitRepoChanged, subscribeGitRepoRefresh } from "../../../lib/gitRefresh";
-import type { CodeWorkspaceRootInfo } from "../../../types";
+import type { CodeWorkspaceFileRef, CodeWorkspaceRootInfo } from "../../../types";
+import { useWorkspaceGitRootDiscovery } from "./useWorkspaceGitRootDiscovery";
 import {
   errorMessage,
   gitRootForWorkspacePath,
@@ -16,6 +14,7 @@ interface UseWorkspaceGitSnapshotsOptions {
   roots: CodeWorkspaceRootInfo[];
   onError: (message: string) => void;
   visible?: boolean;
+  activeFile?: CodeWorkspaceFileRef | null;
 }
 
 export interface WorkspaceGitSnapshotsController {
@@ -65,9 +64,9 @@ export function useWorkspaceGitSnapshots({
   roots,
   onError,
   visible = true,
+  activeFile,
 }: UseWorkspaceGitSnapshotsOptions): WorkspaceGitSnapshotsController {
-  const [gitRoots, setGitRoots] = useState<WorkspaceGitRoot[]>([]);
-  const [gitRootsLoading, setGitRootsLoading] = useState(false);
+  const { gitRoots, gitRootsLoading } = useWorkspaceGitRootDiscovery({ roots, activeFile, visible, onError });
   const [gitSnapshots, setGitSnapshots] = useState<Record<string, WorkspaceGitSnapshotState>>({});
   const rootsRef = useRef(roots);
   const gitRootsRef = useRef(gitRoots);
@@ -83,13 +82,16 @@ export function useWorkspaceGitSnapshots({
 
   useEffect(() => {
     gitRootsRef.current = gitRoots;
+    setGitSnapshots((current) => {
+      const retained = Object.entries(current).filter(([repoRoot]) => gitRoots.some((root) => root.repoRoot === repoRoot));
+      return retained.length === Object.keys(current).length ? current : Object.fromEntries(retained);
+    });
   }, [gitRoots]);
 
   useEffect(() => {
     visibilityGenerationRef.current += 1;
     if (visible) forceRefreshOnShowRef.current = true;
     if (!visible) setGitSnapshots(clearLoadingSnapshots);
-    if (!visible) setGitRootsLoading(false);
   }, [visible]);
 
   const refreshSnapshots = useCallback(async (
@@ -106,6 +108,7 @@ export function useWorkspaceGitSnapshots({
         visibleRef.current
         && visibilityGenerationRef.current === visibilityGeneration
         && refreshSequenceRef.current.get(repoRoot) === requestSequence
+        && gitRootsRef.current.some((candidate) => normalizedRepoRoot(candidate.repoRoot) === repoRoot)
       );
       if (!isCurrentRequest()) return;
       setGitSnapshots((current) => {
@@ -160,57 +163,6 @@ export function useWorkspaceGitSnapshots({
       }
     }));
   }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (roots.length === 0) {
-      gitRootsRef.current = [];
-      setGitRoots([]);
-      setGitRootsLoading(false);
-      setGitSnapshots({});
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    if (!visible) {
-      setGitRootsLoading(false);
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    setGitRootsLoading(true);
-    void workspaceDetectGitRoots(roots.map((root) => ({
-      id: root.id,
-      name: root.name,
-      path: root.path,
-    }))).then((detected) => {
-      if (cancelled || !visibleRef.current) return;
-      // A provider that resolves null (or a non-array) must degrade to "no
-      // git roots", not crash the workspace tab render (gitRoots[0] and the
-      // snapshot filter both assume an array).
-      const detectedRoots = Array.isArray(detected) ? detected : [];
-      gitRootsRef.current = detectedRoots;
-      setGitRoots(detectedRoots);
-      setGitSnapshots((current) => Object.fromEntries(
-        Object.entries(current).filter(([repoRoot]) => (
-          detectedRoots.some((root) => root.repoRoot === repoRoot)
-        )),
-      ));
-    }).catch((error) => {
-      if (cancelled || !visibleRef.current) return;
-      gitRootsRef.current = [];
-      setGitRoots([]);
-      onError(errorMessage(error));
-    }).finally(() => {
-      if (!cancelled && visibleRef.current) setGitRootsLoading(false);
-    });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [onError, roots, visible]);
 
   useEffect(() => {
     if (gitRoots.length === 0) return;

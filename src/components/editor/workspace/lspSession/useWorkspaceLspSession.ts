@@ -49,9 +49,10 @@ export function useWorkspaceLspSession({
   onRestart,
   visible = true,
   autoDiscover = true,
+  isEditorReady,
 }: UseWorkspaceLspSessionOptions): WorkspaceLspSessionController {
   const { serverStatuses, refreshServerStatuses, refreshAutomaticServerStatuses } = useWorkspaceServerDiscovery({
-    visible, autoDiscover, onError,
+    visible, autoDiscover, onError, isEditorReady,
   });
   const [commandPrefs, setCommandPrefs] = useState<Record<string, string>>(() => readLspCommandPrefs());
   const [customCommands, setCustomCommands] = useState<Record<string, LspCustomCommandConfig>>(

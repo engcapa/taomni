@@ -14,12 +14,14 @@ import {
   readLspJavaVmargs,
 } from "../codeWorkspaceModel";
 import { resolveJavaBundles } from "./java";
+import { scheduleAfterEditorPaint } from "../scheduleAfterEditorPaint";
 
 /** Background capability discovery has no ownership of document sync queues. */
-export function useWorkspaceServerDiscovery({ visible, autoDiscover, onError }: {
+export function useWorkspaceServerDiscovery({ visible, autoDiscover, onError, isEditorReady }: {
   visible: boolean;
   autoDiscover: boolean;
   onError: (message: string) => void;
+  isEditorReady?: () => boolean;
 }) {
   const [serverStatuses, setServerStatuses] = useState<LspServerStatus[]>([]);
   const mountedRef = useRef(true);
@@ -69,9 +71,11 @@ export function useWorkspaceServerDiscovery({ visible, autoDiscover, onError }: 
     const becameVisible = !previousVisibleRef.current;
     previousVisibleRef.current = visible;
     sequenceRef.current += 1;
-    if (visible && autoDiscover) void refreshServerStatuses(becameVisible);
-    return () => { sequenceRef.current += 1; };
-  }, [autoDiscover, refreshServerStatuses, visible]);
+    const cancel = visible && autoDiscover
+      ? scheduleAfterEditorPaint(() => { void refreshServerStatuses(becameVisible); }, isEditorReady)
+      : undefined;
+    return () => { cancel?.(); sequenceRef.current += 1; };
+  }, [autoDiscover, refreshServerStatuses, visible, isEditorReady]);
 
   return { serverStatuses, refreshServerStatuses, refreshAutomaticServerStatuses };
 }

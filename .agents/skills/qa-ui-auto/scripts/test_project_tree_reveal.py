@@ -48,6 +48,16 @@ class ProjectTreeRevealTests(unittest.TestCase):
         self.assertEqual(len(reveal(self.ctx, SELECTOR)), 2)
         self.assertIn("scrollIntoView", self.actions[0])
 
+    def test_fractional_clipping_scrolls_a_whole_pixel_and_keeps_the_strict_visibility_check(self):
+        clipped = position(13, found=True, virtual=False)
+        clipped.update(targetTop=684.25, targetBottom=697.75, viewportTop=88.5, viewportBottom=697.5)
+        self.pending = [clipped, position(14, found=True, visible=True, virtual=False)]
+        samples = reveal(self.ctx, SELECTOR)
+        self.assertEqual(samples[0]["visible"], False)
+        self.assertEqual(samples[1]["offset"], 14)
+        self.assertIn('"top": 14', self.actions[0])
+        self.assertIn("scrollTo", self.actions[0])
+
     def test_a_visible_row_requires_no_scroll(self):
         self.pending = [position(found=True, visible=True)]
         run(self.ctx, SELECTOR)

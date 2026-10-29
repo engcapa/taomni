@@ -38,14 +38,16 @@ export function registerinteractionEditing5Cases(caseContext: registerinteractio
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
     await findEditorByTitle("app / src/main/java/com/acme/App.java");
-    fireEvent.click(screen.getByTestId("code-workspace-run-target"));
+    const runButton = screen.getByTestId("code-workspace-run-target");
+    await waitFor(() => expect(runButton).not.toBeDisabled());
+    fireEvent.click(runButton);
 
     await waitFor(() => expect(caseContext.workspaceTestHarness.workspaceMocks.workspaceJavaRunTarget).toHaveBeenCalledWith(
       "/repo/app",
       "src/main/java/com/acme/App.java",
       undefined,
     ));
-    expect(screen.getByRole("tab", { name: /Terminal/, selected: true })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: /Terminal/, selected: true })).toBeInTheDocument();
     expect(await screen.findByTestId("mock-workspace-terminal")).toHaveAttribute(
       "data-initial-cwd",
       "/repo/app",

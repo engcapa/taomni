@@ -1,0 +1,136 @@
+id: TC-WS-079
+title: HOME Git discovery follows active files and preserves real modified status
+description: HOME starts without nested Git snapshots. Opening public tracked documents finds only their nearest real repository, preserves modified
+  badges and reuses the bounded snapshot cache across file switches. The shared owned HOME fixture includes at least 2900 mixed files, 400 directories,
+  64 nested project manifests, a 320-file directory and seven-level paths; its measured filesystem dimensions are retained in home-fixture-layout.json.
+modes:
+- native
+covers:
+- F-WS-2
+- F25.1
+- F25.3
+- F11.2
+tags:
+- p0
+- workspace-redesign
+- file-explorer
+- regression
+- performance
+fixtures:
+- reset_db
+- workspace_home_git_documents
+- release_build_required
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-directory-performance
+- observe_language_startup: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree-empty"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.workspace_host_home}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-root"]'
+- assert_language_startup:
+    commands:
+      git_snapshot:
+        equal: 0
+    quiet_ms: 500
+- reveal_project_tree_row: '[data-testid="code-workspace-tree-dir"][data-path="${fixture.workspace_home_fixture_name}"] [data-testid="code-workspace-tree-dir-arrow"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="${fixture.workspace_home_fixture_name}"] [data-testid="code-workspace-tree-dir-arrow"]'
+- reveal_project_tree_row: '[data-testid="code-workspace-tree-dir"][data-path="${fixture.workspace_home_documents_path}"] [data-testid="code-workspace-tree-dir-arrow"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="${fixture.workspace_home_documents_path}"] [data-testid="code-workspace-tree-dir-arrow"]'
+- measure_workspace_file_open:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="${fixture.workspace_home_documents_path}/notes.txt"]'
+    expected: ${fixture.workspace_notes_text}
+    event: dblclick
+    label: cold-notes
+    require_highlight: false
+    require_editor_reuse: false
+- measure_workspace_file_open:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="${fixture.workspace_home_documents_path}/page.html"]'
+    expected: ${fixture.workspace_html_text}
+    event: dblclick
+    label: cold-html
+    require_highlight: true
+    require_editor_reuse: true
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="${fixture.workspace_home_documents_path}/notes.txt"] [data-testid="code-workspace-git-status"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="${fixture.workspace_home_documents_path}/notes.txt"] [data-testid="code-workspace-git-status"]'
+    contains: M
+- assert_language_startup:
+    commands:
+      workspace_detect_git_roots:
+        min: 3
+      git_snapshot:
+        equal: 1
+      sdk_resolve_workspace:
+        equal: 0
+      lsp_detect_servers:
+        equal: 0
+    quiet_ms: 1000
+- assert_no_runtime_errors: null
+- screenshot: workspace-tc-ws-079-home-git-demand.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Before opening a file HOME starts zero snapshots; opening and switching ordinary documents finds their nearest repository once,
+      keeps its real M badge and respects unchanged 150/1500ms budgets.
+    actions:
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 13
+    - 15
+    - 16
+    - 17
+    results:
+    - 5
+    - 10
+    - 11
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    checkpoints:
+    - step: 5
+      expectation: 'wait_for: ''[data-testid="code-workspace-tree-empty"]'''
+    - step: 10
+      expectation: 'wait_for: ''[data-testid="code-workspace-tree-root"]'''
+    - step: 11
+      expectation: "assert_language_startup:\n  commands:\n    git_snapshot:\n      equal: 0\n  quiet_ms: 500"
+    - step: 16
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"code-workspace-tree-file\"][data-path=\"${fixture.workspace_home_documents_path}/notes.txt\"\
+        ]'\n  expected: ${fixture.workspace_notes_text}\n  event: dblclick\n  label: cold-notes\n  require_highlight: false\n  require_editor_reuse:\
+        \ false"
+    - step: 17
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"code-workspace-tree-file\"][data-path=\"${fixture.workspace_home_documents_path}/page.html\"\
+        ]'\n  expected: ${fixture.workspace_html_text}\n  event: dblclick\n  label: cold-html\n  require_highlight: true\n  require_editor_reuse:\
+        \ true"
+    - step: 18
+      expectation: "wait_for: '[data-testid=\"code-workspace-tree-file\"][data-path=\"${fixture.workspace_home_documents_path}/notes.txt\"]\n\
+        \  [data-testid=\"code-workspace-git-status\"]'"
+    - step: 19
+      expectation: "assert_text:\n  selector: '[data-testid=\"code-workspace-tree-file\"][data-path=\"${fixture.workspace_home_documents_path}/notes.txt\"\
+        ]\n    [data-testid=\"code-workspace-git-status\"]'\n  contains: M"
+    - step: 20
+      expectation: "assert_language_startup:\n  commands:\n    workspace_detect_git_roots:\n      min: 3\n    git_snapshot:\n      equal: 1\n\
+        \    sdk_resolve_workspace:\n      equal: 0\n    lsp_detect_servers:\n      equal: 0\n  quiet_ms: 1000"
+    - step: 21
+      expectation: 'assert_no_runtime_errors: null'
+  native:
+  - check: Real HOME ancestor lookup, Git snapshot process and modified file state.
+    method: automated
+    reason: Browser stubs cannot establish bounded filesystem discovery or real native Git results.
+  visual:
+  - check: Active document and ordinary file tree stay readable.
+    method: manual
+    reason: Retain screenshots; exact text, editor identity and every measured frame are asserted automatically.

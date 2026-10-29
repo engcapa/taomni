@@ -93,6 +93,7 @@
           "workspace_watch",
           "workspace_large_directory",
           "workspace_home_documents",
+          "workspace_home_git_documents",
           "workspace_execution_documents",
           "workspace_slow_sdk",
           "workspace_restore_sessions",
@@ -633,6 +634,8 @@
                   "workspace_compact_chain",
                   "workspace_list_files_recursive",
                   "workspace_execution_model",
+                  "workspace_detect_git_roots",
+                  "git_snapshot",
                   "lsp_start_workspace_watcher",
                   "lsp_stop_workspace_watcher"
                 ]

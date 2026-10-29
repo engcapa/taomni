@@ -2,6 +2,7 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useCodeWorkspaceStore } from "../../../../stores/codeWorkspaceStore";
 import type { EditorCommandPort } from "../host/types";
+import { makeLoadingFile } from "../codeWorkspaceModel";
 import { useWorkspaceEditorCommands, type UseWorkspaceEditorCommandsContext } from "./useWorkspaceEditorCommands";
 
 const workspaceInstanceId = "command-routing-contract";
@@ -36,6 +37,23 @@ beforeEach(() => {
 afterEach(() => { cleanup(); useCodeWorkspaceStore.getState().disposeInstance(workspaceInstanceId); });
 
 describe("editor command ownership", () => {
+  it("reports ready only for a loaded buffer owned by the active editor", () => {
+    const { result, dependencies } = setup();
+    const file = { ...makeLoadingFile({ kind: "loose", id: "a", path: "/public/a.py" }, [], []), key: "a" };
+    dependencies.openFilesRef.current.a = file;
+    expect(result.current.isActiveEditorReady()).toBe(false);
+    const token = {};
+    act(() => result.current.registerEditorCommandPort("primary", { fileKey: "a", token, port: port() }));
+    expect(result.current.isActiveEditorReady()).toBe(false);
+    dependencies.openFilesRef.current.a = { ...file, loading: false };
+    expect(result.current.isActiveEditorReady()).toBe(true);
+    act(() => useCodeWorkspaceStore.getState().setActiveEditorGroup(workspaceInstanceId, "secondary"));
+    expect(result.current.isActiveEditorReady()).toBe(false);
+    act(() => useCodeWorkspaceStore.getState().setActiveEditorGroup(workspaceInstanceId, "primary"));
+    act(() => result.current.registerEditorCommandPort("primary", { fileKey: "a", token, port: null }));
+    expect(result.current.isActiveEditorReady()).toBe(false);
+  });
+
   it("keeps a context-menu target pinned while keyboard commands follow the active leaf", () => {
     const { result } = setup();
     const a = port(), b = port();
