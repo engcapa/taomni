@@ -111,7 +111,7 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
   );
   const openFile = useCallback<typeof openFileInternal>(async (ref, options) => {
     const result = await openFileInternal(ref, options);
-    if (result && options?.activate !== false && !options?.restoring) host?.onActivateFile(ref);
+    if (result && result.activated !== false && options?.activate !== false && !options?.restoring) host?.onActivateFile(ref);
     return result;
   }, [openFileInternal, host?.onActivateFile]);
   const treeOpening = useWorkspaceTreeOpening({

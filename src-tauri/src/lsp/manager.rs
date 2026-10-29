@@ -1,5 +1,6 @@
 mod lifetime;
 
+pub(super) mod watcher_registration;
 mod watchers;
 
 mod status;

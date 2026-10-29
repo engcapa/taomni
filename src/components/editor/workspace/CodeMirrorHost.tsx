@@ -21,7 +21,6 @@ import { useEditorDecorations } from "./host/useEditorDecorations";
 import { useEditorIntelligence } from "./host/useEditorIntelligence";
 import { useEditorPresentation } from "./host/useEditorPresentation";
 import { useProviderCompletion } from "./host/useProviderCompletion";
-import { captureEditorViewState } from "./host/viewState";
 import { lspPositionFromOffset, offsetFromLspPosition } from "./lspPositions";
 import { useWorkspaceClipboardSession } from "./workspaceClipboardSession";
 import { detectLineFoldProvenance } from "./workspaceEditorCommands";
@@ -35,12 +34,14 @@ import { EditorHostSurface } from "./host/EditorHostSurface";
 export const CodeMirrorHost = memo(function CodeMirrorHost({
   path,
   fileKey = path,
+  retainedFileKeys,
   viewId,
   transactionOwner = null,
   onWorkspaceHistoryClaim,
   historyReplay = false,
   documentRevision = 0,
   doc,
+  documentReady = true,
   visible,
   active = true,
   diagnostics = EMPTY_DIAGNOSTICS,
@@ -300,6 +301,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   useEditorViewLifetime({
     editor,
     doc,
+    documentReady,
     documentRevision,
     get lastDocumentTextRef() { return lastDocumentTextRef; },
     emitSelection,
@@ -350,19 +352,14 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     clipboardWorkspaceId,
     viewId,
     fileKey,
+    retainedFileKeys,
   });
 
   // ED-REPAIR-009: Flush view-state on window unload
   useEffect(() => {
     const handleBeforeUnload = () => {
       const view = editor.viewRef.current;
-      if (!view || !editor.onViewStateChangeRef.current) return;
-      try {
-        const captured = captureEditorViewState(view);
-        editor.onViewStateChangeRef.current(captured);
-      } catch {
-        // ignore
-      }
+      if (view) editor.viewStateLifecycleRef.current?.flush();
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => {
@@ -445,6 +442,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
   }, [fileKey]);
 
   const { languageCompartment, signatureCompartment, hoverCompartment, requestParameterInfoRef, activeHoverResizeSessionRef } = useEditorIntelligence({
+    fileKey,
     path,
     viewRef: editor.viewRef,
     showHoverDocumentation,
@@ -540,6 +538,12 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     viewIdRef: editor.viewIdRef,
     historyReplayRef: editor.historyReplayRef,
   });
+
+  // Reconciliation above must replace the loading placeholder before a saved
+  // caret/fold snapshot can be consumed. This keeps the same EditorView alive.
+  useEffect(() => {
+    editor.viewStateLifecycleRef.current?.restoreWhenReady(documentReady);
+  }, [documentReady, fileKey, doc]);
 
   useEffect(() => {
     if (!visible) return;

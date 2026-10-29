@@ -7,6 +7,7 @@ import { lspHoverExtension, cancelActiveHoverResize, signatureTooltipDom } from 
 
 
 export interface UseEditorIntelligenceContext {
+  fileKey: string;
   path: string;
   viewRef: import("react").RefObject<EditorView | null>;
   showHoverDocumentation: boolean;
@@ -60,7 +61,7 @@ export function useEditorIntelligence(context: UseEditorIntelligenceContext) {
     return () => {
       cancelled = true;
     };
-  }, [path]);
+  }, [path, context.fileKey]);
 
   useLayoutEffect(() => {
     const view = viewRef.current;
@@ -99,13 +100,14 @@ export function useEditorIntelligence(context: UseEditorIntelligenceContext) {
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
+    let cancelled = false;
     if (!parameterPopup || parameterPopup.signatures.length === 0) {
       window.queueMicrotask(() => {
         const current = viewRef.current;
-        if (!current || current !== view) return;
+        if (cancelled || !current || current !== view) return;
         current.dispatch({ effects: signatureCompartment.current.reconfigure([]) });
       });
-      return;
+      return () => { cancelled = true; };
     }
     const pos = Math.min(Math.max(0, parameterPopup.anchorOffset), view.state.doc.length);
     view.dispatch({
@@ -119,6 +121,6 @@ export function useEditorIntelligence(context: UseEditorIntelligenceContext) {
         }),
       ),
     });
-  }, [parameterPopup]);
+  }, [parameterPopup, context.fileKey]);
   return { languageCompartment, signatureCompartment, hoverCompartment, lastParameterInfoNonceRef, requestParameterInfoRef, activeHoverResizeSessionRef, renderedHoverRef };
 }

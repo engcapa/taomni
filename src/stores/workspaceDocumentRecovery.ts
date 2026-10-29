@@ -2,6 +2,18 @@ import type { WorkspaceDocumentState } from "./workspaceEditorStore";
 
 export const WORKSPACE_DOCUMENT_RECOVERY_KEY = "taomni.workspaceDocuments.recovery.v1";
 
+/** Only fields consumed during recovery need a synchronous journal write. */
+export function workspaceDocumentRecoveryChanged(
+  previous: WorkspaceDocumentState | undefined,
+  next: WorkspaceDocumentState | undefined,
+): boolean {
+  if (!previous?.dirty && !next?.dirty) return false;
+  if (!previous?.dirty || !next?.dirty) return true;
+  return previous.path !== next.path || previous.text !== next.text
+    || previous.savedText !== next.savedText || previous.savedHash !== next.savedHash
+    || previous.language !== next.language;
+}
+
 export function readWorkspaceDocumentRecovery(): Record<string, WorkspaceDocumentState> {
   try {
     const data: unknown = JSON.parse(window.localStorage.getItem(WORKSPACE_DOCUMENT_RECOVERY_KEY) ?? "{}");

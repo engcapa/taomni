@@ -1,4 +1,4 @@
-import { BookOpen, FolderTree, GitCommitHorizontal, ListTree } from "../icons";
+import { WORKSPACE_TOOL_ICONS } from "../workspaceToolIcons";
 import { useCallback, useEffect, useLayoutEffect, useMemo } from "react";
 import { useCodeWorkspaceStatusStore } from "../../../../stores/codeWorkspaceStatusStore";
 import type { CodeWorkspaceFileRef } from "../../../../types";
@@ -7,6 +7,7 @@ import { type ToolWindowRailItem } from "../panels/ToolWindowRail";
 import type { ShellShortcutClaim } from "../shellShortcutRouter";
 import { useLatestHandlers } from "../useLatestHandlers";
 import { useWorkspaceActionsController } from "../useWorkspaceActionsController";
+import { useWorkspaceActionContext } from "./useWorkspaceActionContext";
 import { type WorkspaceCommandContext } from "../workspaceCommands";
 import { useSemanticNavigation } from "./useSemanticNavigation";
 import { useWorkspaceActionPorts } from "./useWorkspaceActionPorts";
@@ -130,40 +131,21 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
     editorPaneRef: surfaceState.editorPaneRef,
   });
 
-  // Stable identity unless the active file actually changes, so the action
-  // snapshot stays fresh on file switch without re-render feedback loops.
-  const actionContextData = useMemo(() => {
-    // Port state is intentionally sampled while constructing the immutable host
-    // snapshot; registration and selection events bump the revision dependency.
-    void session.editorCommands.editorCommandContextRevision;
-    const editorState = session.editorCommands.activeEditorCommandState();
-    return {
-      activeFileKey: session.workspaceUi.activeKey ?? undefined,
-      activeFilePath: editing.documentLanguage.activeFile?.path,
-      editorViewId: editorState ? session.workspaceUi.activeEditorGroupId : undefined,
-      hasActiveFile: !!editorState,
-      hasSelection: editorState?.hasSelection ?? false,
-      readOnly: editorState?.readOnly ?? false,
-      editorComposing: editorState?.composing ?? false,
-      editorCaretCount: editorState?.caretCount ?? 0,
-      editorOccurrenceSessionActive: editorState?.occurrenceSessionActive ?? false,
-      ...(surfaceState.keymapCheatSheetOpen ? { modalOpen: true } : {}),
-    };
-  }, [
-    session.editorCommands.activeEditorCommandState,
-    session.workspaceUi.activeEditorGroupId,
-    editing.documentLanguage.activeFile?.path,
-    session.workspaceUi.activeKey,
-    session.editorCommands.editorCommandContextRevision,
-    surfaceState.keymapCheatSheetOpen,
-  ]);
+  const actionContext = useWorkspaceActionContext({
+    workspaceInstanceId: session.workspaceInstanceId,
+    activeKey: session.workspaceUi.activeKey,
+    activeEditorGroupId: session.workspaceUi.activeEditorGroupId,
+    activeFilePath: editing.documentLanguage.activeFile?.path,
+    modalOpen: surfaceState.keymapCheatSheetOpen,
+    editorCommands: session.editorCommands,
+  });
 
   const actionsController = useWorkspaceActionsController({
     workspaceId: session.workspaceInstanceId,
     commands: commandCatalog.workspaceCommands,
     resolveFocus: commandFocus.commandFocusForTarget,
     getDefaultFocus: () => session.editorCommands.activeEditorCommandOwner() ? "editor" : "workspace",
-    contextData: actionContextData,
+    ...actionContext,
     // §8.16.3 typed-result visibility: surfaced outcomes instead of silent no-ops.
     onCommandExecuted: (commandId, result) => {
       if (!result) return;
@@ -220,7 +202,7 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
     {
       id: "project",
       label: "Project",
-      icon: <FolderTree className="h-3.5 w-3.5" />,
+      icon: WORKSPACE_TOOL_ICONS["project"],
       active: session.workspaceUi.languagePanelOpen,
       shortcut: railShortcut("workspace.toggleProjectTree"),
       onSelect: editorFeatures.toolWindowActions.toggleProjectTree,
@@ -228,7 +210,7 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
     {
       id: "commit",
       label: "Commit",
-      icon: <GitCommitHorizontal className="h-3.5 w-3.5" />,
+      icon: WORKSPACE_TOOL_ICONS["commit"],
       active: session.workspaceUi.bottomDockOpen && session.workspaceUi.bottomDockTab === "git",
       shortcut: railShortcut("workspace.commitToolWindow"),
       disabled: project.gitSnapshotOwner.gitRoots.length === 0,
@@ -254,7 +236,7 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
     {
       id: "structure",
       label: "Structure",
-      icon: <ListTree className="h-3.5 w-3.5" />,
+      icon: WORKSPACE_TOOL_ICONS["structure"],
       active: project.toolWindowRouting.rightPaneOpen && session.workspaceUi.rightPaneTab === "outline",
       shortcut: railShortcut("workspace.toggleDocumentationPane"),
       onSelect: editorFeatures.toolWindowActions.toggleOutlinePane,
@@ -262,7 +244,7 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
     {
       id: "documentation",
       label: "Docs",
-      icon: <BookOpen className="h-3.5 w-3.5" />,
+      icon: WORKSPACE_TOOL_ICONS["documentation"],
       active: project.toolWindowRouting.rightPaneOpen && session.workspaceUi.rightPaneTab === "documentation",
       onSelect: () => {
         if (project.toolWindowRouting.rightPaneOpen && session.workspaceUi.rightPaneTab === "documentation") {

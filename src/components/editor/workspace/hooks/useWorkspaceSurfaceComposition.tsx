@@ -21,6 +21,7 @@ import type { useWorkspaceSemanticFeatures } from "./useWorkspaceSemanticFeature
 import type { useWorkspaceSession } from "./useWorkspaceSession";
 import type { useWorkspaceSurfaceState } from "./useWorkspaceSurfaceState";
 import { useWorkspaceHost } from "../workspaceHostIntegration";
+import { useProjectTreeOpenFileHints } from "./useProjectTreeOpenFileHints";
 
 
 export interface UseWorkspaceSurfaceCompositionContext {
@@ -41,6 +42,7 @@ export interface UseWorkspaceSurfaceCompositionContext {
 export function useWorkspaceSurfaceComposition(context: UseWorkspaceSurfaceCompositionContext) {
   const host = useWorkspaceHost();
   const { executionRuntime, visible, session, editing, project, editorFeatures, semantics, commands, surfaceState, files, insight, ports } = context;
+  const treeOpenFileHints = useProjectTreeOpenFileHints(session.workspaceUi.openFiles);
 
   // §8.19.6: move-tab menu entries only make sense with another split target.
   const leafCountForMenu = getAllLeafNodes(session.workspaceUi.layoutTreeV2).length;
@@ -263,6 +265,7 @@ export function useWorkspaceSurfaceComposition(context: UseWorkspaceSurfaceCompo
     absolutePathForOpenFile: editing.absolutePathForOpenFile,
   });
   const sideContents = createWorkspaceSideContents({
+    treeOpenFileHints,
     treeFocus: session.treeFocus,
     appearance: project.appearance,
     treeInteractions: files.treeInteractions,
@@ -286,7 +289,6 @@ export function useWorkspaceSurfaceComposition(context: UseWorkspaceSurfaceCompo
     treeData: project.projectTree.treeData,
     expandedRoots: project.projectTree.expandedRoots,
     expandedDirs: project.projectTree.expandedDirs,
-    openFiles: session.workspaceUi.openFiles,
     gitDecorations: semantics.gitDecorations,
     projectTreeHandlers: commands.projectTreeHandlers,
     telemetry: project.telemetry,

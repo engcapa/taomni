@@ -10,6 +10,8 @@
     "sdk_get_registry", "sdk_analyze_workspace", "sdk_resolve_workspace",
     "lsp_detect_servers", "lsp_discover_java_bundles", "lsp_open_document",
     "lsp_document_status", "lsp_change_document", "lsp_save_document", "lsp_close_document",
+    "workspace_list_dir", "workspace_compact_chain", "workspace_list_files_recursive",
+    "lsp_start_workspace_watcher", "lsp_stop_workspace_watcher",
   ]);
   const events = [];
   const finish = (event, status) => {

@@ -109,7 +109,7 @@ export interface TerminalSessionLifetime {
   unlistenAuthPrompt: import("@tauri-apps/api/event").UnlistenFn | null;
   detachImeGuard: (() => void) | null;
   cleanupImePositionLock: (() => void) | null;
-  resizeTimer: ReturnType<typeof setTimeout> | undefined;
+  resizeFrame: number | undefined;
   activityPromptTimer: ReturnType<typeof setTimeout> | undefined;
   sshLaunchTimer: ReturnType<typeof setTimeout> | undefined;
   sockscapLaunchTimer: ReturnType<typeof setTimeout> | undefined;

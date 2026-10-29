@@ -223,6 +223,10 @@ export function registerCodeMirrorHostClipboard5Cases() {
 
     it("finalizes session on fileKey switch and does not pollute new file (ED-REPAIR-007-A2)", async () => {
       const owner = new WorkspaceDocumentTransactionOwner();
+      // The production buffer owner retains open documents independently of
+      // the pane's active-view lease.
+      owner.retainDocument("fileA.ts");
+      owner.retainDocument("fileB.ts");
       const rendered = renderEditor("", vi.fn(), {
         transactionOwner: owner,
         viewId: "primary",
@@ -251,6 +255,7 @@ export function registerCodeMirrorHostClipboard5Cases() {
       });
 
       expect(owner.getDocument("fileA.ts")).toBe("typedA");
+      expect(owner.getDocument("fileB.ts")).toBe("");
     });
   });
 

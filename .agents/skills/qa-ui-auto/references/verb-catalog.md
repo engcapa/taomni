@@ -17,7 +17,7 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 
 ## Navigation & timing
 
-`measure_workspace_file_open: {selector, expected, event: click|dblclick, label, require_highlight?: boolean}`
+`measure_workspace_file_open: {selector, expected, event: click|dblclick, label, require_highlight?: boolean, require_editor_reuse?: boolean}`
 drives one real browser/WebDriver activation and passively records exact canonical
 document publication, visible syntax highlighting and every animation-frame gap.
 Content and highlighting each retain a 1500ms budget; every frame gap must stay

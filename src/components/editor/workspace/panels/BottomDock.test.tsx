@@ -70,6 +70,23 @@ describe("BottomDock", () => {
     expect(screen.getByText("Search results state")).not.toBeVisible();
   });
 
+  it("constructs hidden panel props only on mount and catches up without losing its input", () => {
+    const construct = vi.fn((revision: number) => <div>
+      <input aria-label="Search query" defaultValue="retained query" /><span>Revision {revision}</span>
+    </div>);
+    const props = { open: false, activeTab: "search", onOpenChange: vi.fn(), onActiveTabChange: vi.fn() };
+    const makeTabs = (revision: number) => [{ id: "search", label: "Search", icon: <ListTree />,
+      renderContent: () => construct(revision) }];
+    const { rerender } = render(<BottomDock {...props} tabs={makeTabs(1)} />);
+    expect(construct).toHaveBeenCalledTimes(1);
+    fireEvent.change(screen.getByLabelText("Search query"), { target: { value: "edited query" } });
+    rerender(<BottomDock {...props} tabs={makeTabs(2)} />);
+    expect(construct).toHaveBeenCalledTimes(1);
+    rerender(<BottomDock {...props} open tabs={makeTabs(3)} />);
+    expect(screen.getByText("Revision 3")).toBeVisible();
+    expect(screen.getByLabelText("Search query")).toHaveValue("edited query");
+  });
+
   it("activates and expands a closed tab", () => {
     const onOpenChange = vi.fn();
     const onActiveTabChange = vi.fn();

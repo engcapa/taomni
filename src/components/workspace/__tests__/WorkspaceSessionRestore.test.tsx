@@ -51,6 +51,7 @@ it("preserves configured LocalShell executable and arguments across storage boot
   const shell = { ...saved, session_type: "LocalShell", options_json: '{"localShellPath":"/bin/qa-shell","localShellArgs":["--login"]}' };
   useSessionStore.setState({ loaded: true, sessions: [shell] });
   const props = open(shell);
+  window.dispatchEvent(new Event("pagehide"));
   useWorkspacePlatformStore.getState().reloadFromStorage();
   expect(useWorkspacePlatformStore.getState().workspaces[0].openTabs[0].kind).toBe("terminal");
   render(<WorkspaceSessionPane {...props} />);
@@ -79,6 +80,7 @@ it("cancels missing-password authentication without losing the tab and can retry
   fireEvent.change(screen.getByTestId("auth-password"), { target: { value: "one-shot-qa" } });
   fireEvent.submit(screen.getByTestId("auth-prompt"));
   expect(surfaces.terminal).toHaveBeenLastCalledWith(expect.objectContaining({ ssh: expect.objectContaining({ authData: "one-shot-qa" }) }));
+  window.dispatchEvent(new Event("pagehide"));
   expect(localStorage.getItem("taomni.platformWorkspaces.v1")).not.toContain("one-shot-qa");
 });
 

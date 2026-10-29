@@ -447,11 +447,16 @@ export function EditorGroup({
                     />
                   );
                 })()}
-                {activeFile.loading ? (
-                  <div className="h-full flex items-center justify-center text-[12px] text-[var(--taomni-code-muted)]">
+                {activeFile.loading && (
+                  <div
+                    role="status"
+                    aria-label="Loading file"
+                    className="absolute inset-0 z-20 flex items-center justify-center bg-[var(--taomni-code-bg)]/80 text-[var(--taomni-code-muted)]"
+                  >
                     <Loader2 className="w-4 h-4 animate-spin" />
                   </div>
-                ) : isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "preview" ? (
+                )}
+                {isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "preview" ? (
                   renderMarkdownPreview(activeFile, onOpenMarkdownHref)
                 ) : isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "split" ? (
                   <div className="h-full min-h-0 grid grid-cols-2 relative">
@@ -461,8 +466,8 @@ export function EditorGroup({
                     />
                     <div className="min-w-0 min-h-0 border-r border-[var(--taomni-code-border)]">
                       <CodeMirrorHost
-                        key={`${activeFile.key}:edit`}
                         fileKey={activeFile.key}
+                        retainedFileKeys={openOrder}
                         viewId={groupId}
                         initialViewState={initialViewState}
                         onViewStateChange={onViewStateChange
@@ -478,6 +483,7 @@ export function EditorGroup({
                         workspaceActionHost={workspaceActionHost}
                         path={activeFile.languagePath}
                         doc={activeFile.text}
+                        documentReady={!activeFile.loading}
                         visible={visible}
                         active={isActiveGroup}
                         diagnostics={activeDiagnostics}
@@ -492,7 +498,7 @@ export function EditorGroup({
                         coverageEnabled={coverageEnabled}
                         reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
                         // Library sources (JDK / dependency classes) cannot be written back.
-                        readOnly={readOnly || !!activeFile.library}
+                        readOnly={readOnly || activeFile.loading || !!activeFile.library}
                         onChange={(doc, caret, caretOffset) => {
                           if (previewKey === activeFile.key) onPromotePreview(activeFile.key);
                           onChangeText(activeFile.key, doc, caret, caretOffset);
@@ -546,8 +552,8 @@ export function EditorGroup({
                       onSelectLine={(line) => onRevealTargetLine?.(line + 1)}
                     />
                     <CodeMirrorHost
-                      key={activeFile.key}
                       fileKey={activeFile.key}
+                      retainedFileKeys={openOrder}
                       viewId={groupId}
                       initialViewState={initialViewState}
                       onViewStateChange={onViewStateChange
@@ -563,6 +569,7 @@ export function EditorGroup({
                       workspaceActionHost={workspaceActionHost}
                       path={activeFile.languagePath}
                       doc={activeFile.text}
+                      documentReady={!activeFile.loading}
                       visible={visible}
                       active={isActiveGroup}
                       diagnostics={activeDiagnostics}
@@ -586,7 +593,7 @@ export function EditorGroup({
                       onEditBreakpoint={onEditBreakpoint}
                       breakpointGutterActions={breakpointGutterActions}
                       reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
-                      readOnly={readOnly || !!activeFile.library}
+                      readOnly={readOnly || activeFile.loading || !!activeFile.library}
                       onChange={(doc, caret, caretOffset) => {
                         if (previewKey === activeFile.key) onPromotePreview(activeFile.key);
                         onChangeText(activeFile.key, doc, caret, caretOffset);

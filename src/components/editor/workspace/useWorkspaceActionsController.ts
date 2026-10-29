@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   type WorkspaceActionContext,
   type ActionState,
@@ -27,6 +27,8 @@ export interface UseWorkspaceActionsControllerOptions {
   resolveFocus?: (target: EventTarget | null) => WorkspaceFocus;
   getDefaultFocus?: () => WorkspaceFocus;
   contextData?: Partial<WorkspaceActionContext>;
+  /** Read live owners for dispatch while their secondary UI render is pending. */
+  getContextData?: () => Partial<WorkspaceActionContext>;
   onCommandExecuted?: (commandId: string, result?: ActionResult) => void;
   /** ED-PARITY-004 DEC-05: observable rejection for ambiguous strokes. */
   onBindingConflict?: (notice: BindingConflictNotice) => void;
@@ -60,6 +62,7 @@ export function useWorkspaceActionsController({
   resolveFocus,
   getDefaultFocus,
   contextData,
+  getContextData,
   onCommandExecuted,
   onBindingConflict,
 }: UseWorkspaceActionsControllerOptions): WorkspaceActionsController {
@@ -77,6 +80,8 @@ export function useWorkspaceActionsController({
 
   const contextDataRef = useRef(contextData);
   contextDataRef.current = contextData;
+  const getContextDataRef = useRef(getContextData);
+  getContextDataRef.current = getContextData;
 
   const onCommandExecutedRef = useRef(onCommandExecuted);
   onCommandExecutedRef.current = onCommandExecuted;
@@ -93,7 +98,7 @@ export function useWorkspaceActionsController({
   // answer typed failed results and never re-register stale commands.
   const createHost = useCallback(() => new WorkspaceActionHost({
     workspaceId,
-    getDefaultContext: () => ({ ...contextDataRef.current }),
+    getDefaultContext: () => ({ ...contextDataRef.current, ...getContextDataRef.current?.() }),
     resolveFocus: (target) =>
       resolveFocusRef.current ? resolveFocusRef.current(target) : (activeFocusRef.current ?? "workspace"),
     getDefaultFocus: () =>
@@ -135,7 +140,9 @@ export function useWorkspaceActionsController({
   useEffect(() => {
     if (host.isDisposed()) return;
     const unregister = host.registerCommands(commands);
-    setRevision((r) => r + 1);
+    // Registration is immediate. Its menu projection must yield to the new
+    // document instead of forcing another complete workspace render pre-paint.
+    startTransition(() => setRevision((r) => r + 1));
     return unregister;
   }, [host, commands]);
 
@@ -185,13 +192,14 @@ export function useWorkspaceActionsController({
 
   // Build one immutable snapshot first. Every display projection below is derived
   // from this same prepared context/evaluation set.
+  const displayContext = useDeferredValue(contextData);
   const snapshot = useMemo<ActionSnapshotItem[]>(() => {
     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     revision;
     activeFocus;
-    contextData;
+    displayContext;
     return host.getSnapshot();
-  }, [host, revision, activeFocus, contextData]);
+  }, [host, revision, activeFocus, displayContext, getContextData]);
 
   const menuItems = useMemo<WorkspaceCommandMenuItem[]>(() => snapshot.map((entry) => ({
     id: entry.id,

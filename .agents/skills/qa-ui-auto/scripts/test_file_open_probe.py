@@ -29,6 +29,14 @@ class FileOpenReviewTests(unittest.TestCase):
     def test_complete_sample(self):
         review(observation())
 
+    def test_reuse_requires_the_actual_existing_editor_throughout_activation(self):
+        review({**observation(), "editorReused": True}, require_editor_reuse=True)
+        for value in [None, False, 1]:
+            with self.subTest(value=value), self.assertRaisesRegex(StepError, "existing editor"):
+                review({**observation(), "editorReused": value}, require_editor_reuse=True)
+        with self.assertRaises(StepError):
+            validate({**CONFIG, "require_editor_reuse": "true"})
+
     def test_plain_document_requires_exact_content_and_keeps_every_frame_budget(self):
         plain = {**observation(), "firstHighlightMs": None,
                  "frames": [{"gapMs": 20, "matches": True, "highlighted": False}]}

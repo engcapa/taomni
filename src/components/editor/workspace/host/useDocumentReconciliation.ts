@@ -52,6 +52,18 @@ export function useDocumentReconciliation(context: UseDocumentReconciliationCont
     }
   };
 
+  // Echo revisions and controlled snapshots belong to one document, even
+  // when its pane reuses the same EditorView for the next tab.
+  const previousFileKeyRef = useRef(fileKey);
+  useEffect(() => {
+    if (previousFileKeyRef.current === fileKey) return;
+    previousFileKeyRef.current = fileKey;
+    pendingLocalDocumentEchoesRef.current = [];
+    lastLocalDocumentRevisionRef.current = documentRevision;
+    lastPropDocumentTextRef.current = doc;
+    lastDocumentTextRef.current = viewRef.current?.state.doc.toString() ?? doc;
+  }, [fileKey]);
+
 
   useEffect(() => {
     const owner = transactionOwner;
@@ -167,6 +179,6 @@ export function useDocumentReconciliation(context: UseDocumentReconciliationCont
     } finally {
       applyingExternalDocRef.current = false;
     }
-  }, [doc, documentRevision]);
+  }, [doc, documentRevision, fileKey]);
   return { applyingExternalDocRef, lastDocumentTextRef, rememberLocalDocumentEcho };
 }

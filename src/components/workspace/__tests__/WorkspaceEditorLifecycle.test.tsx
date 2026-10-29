@@ -11,6 +11,7 @@ import { readWorkspaceDocumentRecovery } from "../../../stores/workspaceDocument
 import { useAppStore } from "../../../stores/appStore";
 import type { WorkspaceCommandRegistration } from "../../editor/workspace/workspaceCommands";
 import { useCodeWorkspaceStore } from "../../../stores/codeWorkspaceStore";
+import { workspaceEditorRuntimeId } from "../../../lib/workspaceRuntimeIdentity";
 
 vi.mock("../workspaceFs", () => ({
   readWorkspaceText: vi.fn(async () => ({ text: "const original = 1;\n", hash: "h1" })),
@@ -41,14 +42,20 @@ vi.mock("../WorkspaceSessionPane", () => ({ WorkspaceSessionPane: ({ tab }: { ta
 } }));
 vi.mock("../../terminal/TerminalPanel", () => ({ TerminalPanel: () => null }));
 
-let commands: WorkspaceCommandRegistration | null = null;
-const publishCommands = (_id: string, value: WorkspaceCommandRegistration | null) => { commands = value; };
+// Match the main window's per-runtime registry: a hidden workspace may publish
+// after the visible one, without taking over the visible editor's commands.
+const commandPublications = new Map<string, WorkspaceCommandRegistration>();
+const publishCommands = (id: string, value: WorkspaceCommandRegistration | null) => {
+  if (value) commandPublications.set(id, value);
+  else commandPublications.delete(id);
+};
+const activeCommands = () => commandPublications.get(workspaceEditorRuntimeId(useWorkspacePlatformStore.getState().getWorkspace()!))!;
 function Panel({ visible = true }: { visible?: boolean }) {
   return <WorkspaceMainPanel visible={visible} onCommandsChange={publishCommands} />;
 }
 
 beforeEach(() => {
-  commands = null;
+  commandPublications.clear();
   localStorage.clear();
   useWorkspaceUiStore.setState({ canvasLayouts: {} });
   useCodeWorkspaceStore.setState({ byInstanceId: {} });
@@ -117,6 +124,7 @@ it("preserves the selected file when a cold workspace also restores a terminal b
   first.unmount();
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
   useCodeWorkspaceStore.setState({ byInstanceId: {} });
+  window.dispatchEvent(new Event("pagehide"));
   platform.reloadFromStorage();
   expect(platform.getWorkspace()!.activeTabId).toBe(file.id);
   const { rerender } = render(<Panel visible={false} />);
@@ -174,7 +182,10 @@ it("loads under StrictMode and retains the same editor, unsaved text and undo ac
   expect(await editor()).toBe(view);
   expect(view.state.doc.toString()).toContain("// unsaved");
   const reads = vi.mocked(readWorkspaceText).mock.calls.length;
-  await act(async () => { expect((await commands!.executeAction("workspace.undo")).kind).toBe("applied"); });
+  await act(async () => {
+    const outcome = await activeCommands().executeAction("workspace.undo");
+    expect(outcome.kind, JSON.stringify(outcome)).toBe("applied");
+  });
   await waitFor(() => expect(view.state.doc.toString()).toBe("const original = 1;\n"));
   await waitFor(() => expect(screen.getByTestId("workspace-file-editor")).not.toHaveAttribute("data-dirty"));
   expect(vi.mocked(readWorkspaceText)).toHaveBeenCalledTimes(reads);
@@ -220,7 +231,7 @@ it("retains both editors and undo while changing split/grid/single layouts", asy
   await waitFor(() => expect(document.querySelector(".cm-content")?.textContent).toContain("// unsaved split"));
   const returned = await editor();
   act(() => returned.focus());
-  await act(async () => { expect((await commands!.executeAction("workspace.undo")).kind).toBe("applied"); });
+  await act(async () => { expect((await activeCommands().executeAction("workspace.undo")).kind).toBe("applied"); });
   await waitFor(() => expect(returned.state.doc.toString()).toBe("const original = 1;\n"));
   expect(vi.mocked(readWorkspaceText).mock.calls.filter(([, path]) => path.endsWith(".ts"))).toHaveLength(2);
 });
@@ -230,7 +241,7 @@ it("retains the source editor and all open files when the IDE splits the active 
   const initial = await editor();
   act(() => useWorkspacePlatformStore.getState().openCodeWorkspaceTab(DEFAULT_WORKSPACE_ID));
   act(() => initial.focus());
-  await act(async () => { await commands!.executeAction("workspace.splitRight"); });
+  await act(async () => { await activeCommands().executeAction("workspace.splitRight"); });
   await waitFor(() => expect(document.querySelectorAll(".cm-content")).toHaveLength(2));
   const ui = useCodeWorkspaceStore.getState().getInstance("platform:default-workspace");
   expect(Object.values(ui.editorGroups).filter((group) => group.openOrder.length)).toHaveLength(2);
@@ -253,7 +264,7 @@ it("does not reopen a closed editor from active-file metadata published during a
   await editor();
   const platform = useWorkspacePlatformStore.getState();
   act(() => platform.openCodeWorkspaceTab(DEFAULT_WORKSPACE_ID));
-  await act(async () => { await commands!.executeAction("workspace.closeActiveEditorTab"); });
+  await act(async () => { await activeCommands().executeAction("workspace.closeActiveEditorTab"); });
   await waitFor(() => expect(platform.getWorkspace()!.openTabs.filter((tab) => tab.kind === "file")).toHaveLength(0));
   const current = platform.getWorkspace()!;
   act(() => platform.updateCodeWorkspace(current.id, {

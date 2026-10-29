@@ -26,6 +26,7 @@ function fixture(config = {}) {
   const install = vm.runInContext("(" + script + ")", context);
   install({ selector: "file", event: "dblclick", expected: "{\n  \"value\": 1\n}\n", ...config });
   return { context, frames, listeners,
+    replaceView: () => { content.cmTile.root.view = { ...content.cmTile.root.view }; },
     input: () => listeners.get("dblclick")({ target: new Element(), isTrusted: true }),
     publish: () => { text = "{\n  \"value\": 1\n}\n"; },
     highlight: () => { highlighted = true; },
@@ -49,6 +50,16 @@ test("waits for actual activation, exact canonical text, highlighting and settle
   assert.equal(f.frames.size, 0);
   assert.equal(f.listeners.size, 0);
   assert.equal(f.context.window.__QA_FILE_OPEN_PROBE__, undefined);
+});
+
+test("observes real view replacement even when the new view has identical visible content", () => {
+  const f = fixture({ require_highlight: false, require_editor_reuse: true });
+  f.input(); f.publish(); f.tick(16);
+  assert.equal(f.context.window.__QA_FILE_OPEN_PROBE__.state.editorReused, true);
+  f.replaceView(); f.tick(16);
+  const state = f.context.window.__QA_FILE_OPEN_PROBE__.finish();
+  assert.equal(state.editorReused, false);
+  assert.equal(state.frames.at(-1).matches, true);
 });
 
 test("retains an initial main-thread freeze instead of discarding the slow sample", () => {

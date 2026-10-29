@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SessionConfig } from "../../lib/ipc";
 import {
   DEFAULT_WORKSPACE_ID,
@@ -44,6 +44,25 @@ beforeEach(() => {
 });
 
 describe("workspacePlatformStore (TASK-01)", () => {
+  it("keeps repeated focus on the active canvas tab free of persistence and store notifications", () => {
+    const store = useWorkspacePlatformStore.getState();
+    const tab = store.openLocalTerminalInWorkspace(DEFAULT_WORKSPACE_ID);
+    const write = vi.spyOn(Storage.prototype, "setItem");
+    const notified = vi.fn();
+    const unsubscribe = useWorkspacePlatformStore.subscribe(notified);
+    try {
+      store.setActiveWorkspaceTab(DEFAULT_WORKSPACE_ID, tab.id);
+      store.setActiveWorkspaceTab(DEFAULT_WORKSPACE_ID, tab.id);
+      store.setActiveWorkspaceTab(DEFAULT_WORKSPACE_ID, "missing");
+      expect(write).not.toHaveBeenCalled();
+      expect(notified).not.toHaveBeenCalled();
+      expect(store.getWorkspace()!.activeTabId).toBe(tab.id);
+    } finally {
+      unsubscribe();
+      write.mockRestore();
+    }
+  });
+
   it("UT-WS-01-01 initializes the undeletable default workspace from empty storage", () => {
     const state = useWorkspacePlatformStore.getState();
     expect(state.workspaces.length).toBeGreaterThanOrEqual(1);
@@ -185,6 +204,7 @@ describe("workspacePlatformStore (TASK-01)", () => {
     store.addRootFolder(custom.id, { path: "/repo/extra" });
     store.pinSession(custom.id, "ssh-a");
 
+    window.dispatchEvent(new Event("pagehide"));
     const stored = window.localStorage.getItem(PLATFORM_WORKSPACES_STORAGE_KEY);
     expect(stored).toContain("persisted");
 
@@ -215,6 +235,7 @@ describe("workspacePlatformStore (TASK-01)", () => {
     store.closeWorkspaceTab(workspace.id, tabs[2].id);
     store.setActiveWorkspaceTab(workspace.id, file.id);
     const expected = useWorkspacePlatformStore.getState().getWorkspace(workspace.id)!;
+    window.dispatchEvent(new Event("beforeunload"));
     store.reloadFromStorage();
     expect(useWorkspacePlatformStore.getState().getWorkspace(workspace.id)).toEqual(expected);
     expect(expected.openTabs.map((tab) => tab.protocol).filter(Boolean)).not.toContain("MySQL");

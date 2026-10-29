@@ -1,5 +1,6 @@
 import { ArrowUpDown, Search, X, Server, Play, CheckSquare, Square, Settings, ListTree } from "lucide-react";
 import { useMemo } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { type SessionConfig } from "../../lib/ipc";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
@@ -74,8 +75,15 @@ export function RecentSessionsPanel({
     moveSessionsToGroup,
     removeSessions,
     updateSessionsTerminalAppearance,
-  } = useSessionStore();
-  const { setStatusMessage } = useAppStore();
+  } = useSessionStore(useShallow((state) => ({
+    sessions: state.sessions,
+    groups: state.groups,
+    duplicateSessions: state.duplicateSessions,
+    moveSessionsToGroup: state.moveSessionsToGroup,
+    removeSessions: state.removeSessions,
+    updateSessionsTerminalAppearance: state.updateSessionsTerminalAppearance,
+  })));
+  const setStatusMessage = useAppStore((state) => state.setStatusMessage);
   const folderPaths = useMemo(
     () => collectFolderPaths(allSessions, groups),
     [allSessions, groups],

@@ -318,6 +318,7 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
                 id={entry.id}
                 label={entry.label}
                 active={toolWindowRouting.toolWindowLayout.isVisible(entry.id)}
+                renderContent={entry.renderContent}
                 // The terminal keeps Esc for the shell and the tree handles its own.
                 onEscape={entry.id === "terminal" || entry.id === "project" ? undefined : editorCommands.handleReturnToEditor}
               >

@@ -109,8 +109,10 @@ export function createWorkspaceTabActions(
 
   setActiveWorkspaceTab: (workspaceId, tabId) => {
     set((state) => {
+      const current = state.workspaces.find((workspace) => workspace.id === workspaceId);
+      if (!current || current.activeTabId === tabId || !current.openTabs.some((tab) => tab.id === tabId)) return state;
       const workspaces = updateWorkspace(state.workspaces, workspaceId, (workspace) => (
-        workspace.openTabs.some((tab) => tab.id === tabId) ? { ...workspace, activeTabId: tabId } : workspace
+        { ...workspace, activeTabId: tabId }
       ));
       const next = { workspaces };
       persist({ ...state, ...next });

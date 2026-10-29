@@ -216,6 +216,18 @@ pub(super) fn workspace_watch_target_matches(targets: &[WorkspaceWatchTarget], p
     }
     targets.iter().any(|target| {
         let filter = normalized_file_operation_path(&target.filter_path);
+        if target.direct_children {
+            let parent = path
+                .trim_end_matches('/')
+                .rsplit_once('/')
+                .map(|(parent, _)| parent)
+                .unwrap_or("");
+            return normalized_watch_path_equals(filter.trim_end_matches('/'), parent)
+                || normalized_watch_path_equals(
+                    filter.trim_end_matches('/'),
+                    path.trim_end_matches('/'),
+                );
+        }
         if !target.recursive {
             // An explicitly opened loose file remains observable even when
             // its parent is normally excluded from recursive project scans.

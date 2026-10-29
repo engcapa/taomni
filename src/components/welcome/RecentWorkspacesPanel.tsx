@@ -36,7 +36,7 @@ export function RecentWorkspacesPanel({
   const hasFilter = query.trim().length > 0;
   const ctx = useContextMenu();
   const clearConfirm = useConfirmDialog();
-  const { setStatusMessage } = useAppStore();
+  const setStatusMessage = useAppStore((state) => state.setStatusMessage);
 
   const copyWorkspacePath = (workspace: RecentWorkspace) => {
     const path = recentWorkspacePrimaryPath(workspace);

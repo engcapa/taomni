@@ -96,6 +96,15 @@ steps:
     contains: Z
     timeout_sec: 10
 - screenshot: tc-ide-improve007-secondary-restored.png
+- click: '[data-editor-group-id="primary"] [data-testid="code-workspace-editor-tab-strip"]'
+- assert_text:
+    selector: '[data-testid="status-bar-workspace-cursor"]'
+    contains: '41:1'
+    timeout_sec: 30
+- eval_readonly:
+    expression: document.querySelectorAll(".cm-editor")[0].querySelectorAll(".cm-foldPlaceholder").length >= 1
+    expect_truthy: true
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -144,6 +153,21 @@ verification:
         10}}'
     results:
     - 23
+  - id: R2
+    requirement: 正文异步恢复后，每个分屏保留各自的视图；另一分屏编辑共享正文后返回主分屏，光标仍在41行且折叠保留，不被加载占位状态覆盖。
+    actions:
+    - 25
+    checkpoints:
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "41:1", "timeout_sec": 30}}'
+    - step: 27
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-editor\")[0].querySelectorAll(\".cm-foldPlaceholder\").length >= 1", "expect_truthy": true}}'
+    - step: 28
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 26
+    - 27
+    - 28
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

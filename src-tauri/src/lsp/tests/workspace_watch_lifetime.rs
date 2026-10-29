@@ -6,6 +6,7 @@ fn watcher_filters_descendants_relative_to_explicit_roots() {
         let root = format!("/users/qa/{ancestor}/project");
         let targets = [WorkspaceWatchTarget {
             recursive: true,
+            direct_children: false,
             filter_path: PathBuf::from(&root),
         }];
         assert!(watcher::workspace_watch_target_matches(
@@ -40,14 +41,17 @@ fn explicitly_opened_nested_root_and_loose_file_remain_observable() {
     let targets = [
         WorkspaceWatchTarget {
             recursive: true,
+            direct_children: false,
             filter_path: PathBuf::from("/repo"),
         },
         WorkspaceWatchTarget {
             recursive: true,
+            direct_children: false,
             filter_path: PathBuf::from("/repo/build/project"),
         },
         WorkspaceWatchTarget {
             recursive: false,
+            direct_children: false,
             filter_path: PathBuf::from("/notes/.cache/draft.txt"),
         },
     ];

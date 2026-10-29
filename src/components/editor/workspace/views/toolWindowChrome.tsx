@@ -7,10 +7,11 @@ import { MoreToolWindowsButton, type ToolWindowRailItem } from "../panels/ToolWi
 import { ToolWindowPane, ToolWindowSlot, ToolWindowSplitArea } from "../panels/ToolWindowHost";
 import { TOOL_WINDOW_ANCHORS, TOOL_WINDOW_ANCHOR_LABELS, anchorSide, type ToolWindowAnchor } from "../toolWindowLayout";
 import type { WorkspaceHostIntegration } from "../workspaceHostIntegration";
+import type { ToolWindowContent } from "../panels/toolWindowContent";
 
 export interface CreateToolWindowChromeContext {
   host?: WorkspaceHostIntegration | null;
-  toolWindowContents: { id: string; label: string; content: ReactNode; }[];
+  toolWindowContents: ToolWindowContent[];
   toolWindowLayout: import("../useToolWindowLayout").ToolWindowLayoutController;
   currentBottomDockHeight: number;
   handleBottomDockHeightChange: (height: number) => void;

@@ -1,6 +1,6 @@
 # 工作区文件打开与 SDK 后台初始化
 
-当前状态：文件打开及标签切换卡顿仍未通过验收。产品 `f0c1ae4e` 的相关集 [40787137504](https://github.com/engcapa/taomni/actions/runs/40787137504) 正在执行；三平台 browser 的 JSON 首帧仍有约 195–207ms 停顿，Linux native 有 206–315ms 慢帧，超过保留的 150ms 预算。相同产品的长行公开夹具基线 [40790432602](https://github.com/engcapa/taomni/actions/runs/40790432602) 已在 browser 捕获 410ms 慢帧。后台文件读取和图标复用不足以证明问题解决，继续分析原始 CPU 与原生帧证据。当前组合源码的全量与正式四轮性能仍待执行。以下记录保留历史失败，关联[重构实现报告](./workspace-platform-redesign-implementation-report.md)。
+当前状态：文件打开及标签切换卡顿仍未通过验收。Home 监听版本 `8b60a5d7` 的 Linux browser/native 相关集 [40811827670](https://github.com/engcapa/taomni/actions/runs/40811827670) 已结束：26 passed / 9 failed，失败均为文件打开/切换帧超限，完整崩溃组通过。参考 [Home 文件打开分析](../docs-issue/workspace-home-file-open-latency-design.md) 继续实施编辑器常驻、状态缓存和快速读取合并。不能据单测、局部优化或旧源码通过声称解决；当前组合源码的全量与正式四轮性能仍待执行。以下保留历史失败，关联[重构实现报告](./workspace-platform-redesign-implementation-report.md)。
 
 ## 目标与保留行为
 
@@ -195,3 +195,243 @@ macOS 原生菜单直接订阅注册表，隐藏实例发表不重装当前菜�
 用户流程；保留 `TC-WS-064` 至 `069`、Home 路由 `TC-WS-025/026`、
 `TC-IDE-C4-02-split-and-structured-reopen` 与完整崩溃组作为托管行为门禁。
 新的帧测量及三平台结果尚未收齐，当前仍未验收。
+
+## 文件激活的协调与定义更新
+
+新增回归在修改前复现三种多余渲染：同目录的 active-file 发布仍重建
+`rootFolders`；文件请求完成标记使编辑器额外 render 1→2；仅更新历史 caret、
+前进/后退可用性未变仍 render 4→5。文件协调的单测还发现读取旧 React
+snapshot 会将已激活的 b.html 发布为 a.txt。
+
+`useWorkspaceCodeDefinition` 拥有平台输入与编辑器输出的适配、最近记录和
+持久化；通过发布对象的精确身份识别自身反射，不把保存的 active file 再当成
+一次新输入。外部打开请求、新 root、loose files 和恢复身份继续传给编辑器。
+平台定义动作提取到 `workspacePlatformCodeActions`，未改变根目录时复用原
+列表，仍即时保存当前文件和原有存储格式。没有暂停或延迟用户选择。
+
+`useWorkspaceHostFiles` 用 ref 记录内部协调状态，队列完成后直接从同一
+buffer owner 的最新状态发布结果并协调 canvas，不额外刷新整个编辑器。
+保留串行队列、迟到请求取消、pending-close、dirty 恢复和 provider 同步；
+canvas 仍在真实文件就绪后执行，并保留独立 editor split。导航历史仅在按钮
+可用性改变时刷新 React，caret/history 本身仍同步更新。
+
+本机 8 文件 / 56 tests passed，包含真实 CodeMirror 的 dirty/save/undo、
+split/grid/single、关闭后重开、外部定义和快速 supersede。新增
+`TC-WS-070` 覆盖五行 HTML、704 行文本、小文本的三次冷开和六次标签激活；
+HTML 保留高亮、正文精确相等、零自动 SDK/LSP、1500ms 内容和每帧150ms
+断言。064–069、025/026、C4-02 与完整 10 ID 崩溃组继续保留。此处只记录
+实现和单测结果，托管帧验证及原生 release 仍待新一轮执行。
+
+## 激活时的同步持久化与辅助更新
+
+`33313e03` 的 Linux 托管运行
+[40802285035](https://github.com/engcapa/taomni/actions/runs/40802285035)
+已完成并独立核验：25 个适用 ID、38 次执行，28 passed / 10 failed；801 个
+附件 SHA 与 aggregate 一致，无基础设施错误。完整 10 ID 崩溃专项在 browser
+和 native 均通过，但文件激活的性能尚未通过。browser HTML 正文 401.1ms、
+最大帧 241.5ms；native HTML 最大帧 178ms。native 普通文本四种冷开和连续
+十二次标签激活通过，不代表其他文件或用户本机已经达标。保留全部失败证据。
+
+继续去掉公共激活路径中的重复工作：干净文件的加载、关闭和重复 publication
+不重写 dirty 恢复日志；真实编辑、保存、关闭 dirty 文件仍同步更新恢复内容，
+写入失败仍在下次 publication 重试。同一树节点重复 click/double-click、同一
+canvas 重复聚焦不再写 store 或平台持久化。
+
+编辑器 command port 的 owner 注册和命令执行仍即时完成，菜单 projection、
+selection revision 和已捕获 caret/fold/scroll 的持久化通知使用 transition。
+命令 dispatch 从实时 store 和 port 读取上下文，避免辅助 UI 尚未 render 时
+使用旧文件、选区、只读或 composition 标志。布局退出保存仍直接读取原 ref。
+新增改前失败的去重、恢复写入和实时 owner 回归；连同真实 CodeMirror 的
+dirty/save/undo、split/grid/single、StrictMode、恢复和 pending save，共
+8 文件 / 126 tests passed（本机最多 2 workers）。
+
+生命周期测试的命令发布改为按 runtime ID 保存，匹配生产主窗口；此前隐藏
+空 workspace 的晚发布会覆盖测试单个全局变量，现按真实活动 workspace
+选择命令，保留所有实际编辑、撤销与保存断言。`TC-WS-070` 保留三次冷开、
+六次切换，增加重复点击当前标签和正文聚焦，共 11 次激活测量。正文、HTML
+高亮、零自动 SDK/LSP、1500ms 内容和每帧 150ms 预算未放宽。当前实现的
+GitHub 性能与完整崩溃回归仍待执行，不能据单测宣称速度达标。
+
+
+## Home 文件监听与增量目录刷新
+
+`7724ce43` 的 Linux 托管运行
+[40805896015](https://github.com/engcapa/taomni/actions/runs/40805896015)
+已结束：38 次执行中 31 passed / 7 failed，无基础设施错误；完整崩溃组通过。
+失败仍是文件打开/激活长帧（154–199ms），不是性能验收通过证据。
+
+参考 `docs-issue/workspace-home-file-open-latency-design.md`，先处理 P0 监听边界：
+OS watcher 注册移入 blocking worker，Home 根只监听直接子项，已展开目录和
+已打开文件补充按需监听。普通项目保留递归语义，显式打开的缓存目录/文件仍
+可操作。应用自身存储路径在进入异步队列前过滤，显式打开一个内部文件不会
+放开其它内部写入。取消 token 和任务身份保护启动/停止重叠时的归属。
+
+外部事件按 200ms 批次刷新已加载的受影响父目录，不 reset 全树；保留其它
+目录的列表与行。平铺索引仅在当前显示/过滤需要时更新，迟到响应不能覆盖
+新一轮列表。Project 树只接收 dirty 提示，正文和加载变化不重建该输入。
+移除初始文档构造中多余的空扩展 EditorState 初始化。
+
+新增 native `TC-WS-071` 将真实 runner Home 与公开的报告目录同时加入，
+用真实 host 新建、修改、删除及重建文件，核验树、buffer 与未受影响目录，
+通过转发观察器断言没有递归扫描或全树重刷。这个用例负责磁盘/监听契约；
+064–070 的真实打开帧预算继续独立保留，完整崩溃组仍是门禁。
+本机不执行 browser/native 用例；执行 focused Vitest、真实 notify Rust 测试、
+工具单测、TypeScript 与 refactor 合同。EditorView 复用及最终性能验收尚未完成。
+
+## 常驻编辑器、文件状态缓存与读取就绪提交
+
+Home 监听版本 [40811827670](https://github.com/engcapa/taomni/actions/runs/40811827670)
+实际执行 35 次，26 passed / 9 failed；无基础设施错误，完整崩溃组通过，真实
+Home 外部文件增删改与增量树刷新 `TC-WS-071` 通过。browser 的冷开长行 JSON
+仍有 347ms 慢帧；native 首次打开 JSON、HTML、普通文本仍有 163–216ms 慢帧。
+保留原始报告，这说明仅修监听没有解决文件打开的固有开销。
+
+按分析 P1 移除普通文件的动态 host key，每个 pane 复用同一 EditorView。
+新增独立 `editorStateCache`，最多缓存 24 个文件及 800 万字符；关闭文件、改变
+文档路径、切换 workspace/transaction owner、卸载 pane 时释放对应状态。
+回切保留选区、折叠、滚动与独立撤销，canonical 文档和共享 history 的所有权
+保持不变；用当前只读、换行、字体、诊断、调试等配置重新绑定扩展。相同正文
+复用已有 CodeMirror Text，避免回切重新构造全文树。
+
+文档激活结束会释放原 view lease、监听、composition、clipboard generation、
+补全和 snippet 请求；旧语义选区 promise、被拒事务 microtask、参数提示清理
+均不能修改新文件。最终卸载才销毁实际 EditorView。慢读取显示只读加载遮罩，
+保留编辑器实例；读取就绪解除只读并显示正文。
+
+读取请求直接开始，80ms 内返回则先发布 ready buffer 再激活标签，避免
+loading→卸载→重建的中间态。超过 80ms 才发布加载状态。较早请求的迟到
+结果可以补齐后台标签，但不能夺走后续用户选择。关闭后立即重开仍即时认领
+标签，再等待旧清理结束，以免 cleanup 删除已经恢复的 canonical buffer；
+LSP 重开继续在后台进行。现有 workspace 测试捕获该竞态后已修复。
+
+本机执行主 workspace 全部 254 条、真实 CodeMirror/IME、快速/慢速读取、
+关闭重开、缓存边界与当前设置等 focused 单测；新增实际 View 身份和跨文件
+状态回归（6 条），工具 Python 14 条、JS probe 5 条通过。TypeScript、refactor
+合同和 catalog gate 通过；本机不跑 browser/native。`TC-WS-070` 在首次打开
+之后的十次操作额外断言真实 EditorView 未被替换，正文、高亮、零自动 SDK/LSP、
+1500ms 内容及每帧 150ms 门槛均未放宽。保留 `TC-WS-025/026`、064–071，
+增加 split/history、跨 pane clipboard、原生 view-state 恢复及关闭重开既有
+用例，与完整崩溃组共同在 GitHub 执行；托管性能结果尚待新版本验证。
+
+复查补充：CodeMirror 的 root reconfigure 会保留已有 compartment overrides，
+单靠重新传入扩展不能保证缓存文件收到新字体、只读、换行等配置。另一个边界
+是旧只读 filter 会拒绝外部 canonical 正文更新。新增两条单测在修前分别捕获
+tabSize 仍为 4（期望 8）与正文仍为旧磁盘快照；现在同时重配各 compartment，
+并沿用已有 remote transaction 标记同步 canonical 内容。7 条真实 View 回归
+包含在另一文件中修改全局外观后回切；CodeMirror/IME/cache 4 文件 88 tests
+passed。前一提交用 Node.js 22、2 workers 执行的相关 10 文件 375 tests passed。
+`TC-WS-034` 增加先切至普通文本再修改 Settings、回切 README 的字体/主题及
+独立撤销断言，覆盖缓存文件的全局外观同步。
+
+## 隐藏工具窗口的构造边界与 Home 历史更新
+
+常驻 View 首轮 [40815182933](https://github.com/engcapa/taomni/actions/runs/40815182933)
+执行 39 次，28 passed / 11 failed；完整崩溃组、原生视图状态、拆屏关闭重开和
+Home 真实监听通过。native 连续回切与保存重开正文为 57–92ms，但首次打开仍
+有 151–231ms 慢帧。设置缓存补修轮
+[40816522359](https://github.com/engcapa/taomni/actions/runs/40816522359)
+执行 40 次，29 passed / 11 failed。browser 使用单 worker 后首次打开仍有
+289–318ms 慢帧，native 为 182–229ms；native 连续切换 48–75ms。两轮均保留
+原始失败，不能据此宣称性能达标。后者另有 `TC-WS-034` fixture 选错目录：
+该浏览器路径实际有 README.txt，没有 Documents，现改用真实存在的文本文件，
+保留字体、主题、dirty 与单字符 undo 断言。
+
+CPU 采样仍显示隐藏工具的 JSX 构造、portal 包装和隐藏 Home 最近记录参与
+文件激活。原 KeepAlive 已冻结面板组件，但其父 factory 仍预先构造全部工具
+内容。现在将内容构造传入 KeepAlive 内部；隐藏 portal 同样跳过父更新，显示
+时使用最新回调和配置。所有工具仍在初始挂载时创建，保留后台 Run/Terminal
+句柄、订阅和任务生命周期。工具图标使用固定元素，减少 stripe 的 SVG 重建。
+Home 隐藏时冻结 props 并暂停最近 workspace 订阅，返回时同步当前记录，
+搜索、所选历史分区和滚动仍由原组件保存。
+
+新增 mounted 回归核验后台句柄、draft、移动 portal、实际卸载、重新显示的
+最新回调与 Home 搜索/历史；连同完整 workspace 单测共 7 文件 305 tests
+passed（Node 22、最多 2 workers）。`TC-WS-025` 增加隐藏 Home 后保留搜索与
+历史分区再进入 workspace 的实际流程。保留并选择 064–071 性能、034 外观、
+010/024 工具条、弹层、终端移动原生回归与完整 crash-regression；正文、高亮、
+每帧 150ms、1500ms 就绪预算及真实 View 身份不变。本机未运行 browser/native，
+本轮托管结果待收集；最终 main 对比和全量门禁仍未完成。
+
+## 面包屑、关闭弹窗与最近记录的订阅边界
+
+`1d63c01b` 的托管运行
+[40819080806](https://github.com/engcapa/taomni/actions/runs/40819080806)
+browser 实际执行 22 次，17 passed / 5 failed。034 外观、069 连续切换与崩溃
+browser 组通过；064/066/068/070 首次打开仍有 251–291ms 长帧。025 在往返
+默认和自定义工作区后有两个常驻编辑器，其新增步骤选中了隐藏实例；现在只在
+该等待中增加 `:visible`，不改变任何正文、路由、状态保持或错误断言。
+native 实际执行 25 次，19 passed / 6 failed；合计 47 次，36 passed / 11 failed。
+064 JSON、068 普通文件、069 连续切换通过，但 065/067/066/070 仍有
+152–232ms 长帧。另外 007 分屏光标恢复和 024-03 终端移动存在功能失败，
+需修复后重新验证，本轮不能宣称性能验收完成。
+
+新的采样显示，隐藏 Home 的子面板直接订阅整个 App store，可以绕过父组件的
+memo。最近会话同时订阅整个 Session store。新增 mounted 回归在改前捕获了
+一次无关状态发布导致 21 次翻译调用；现在分别选择所需 action 与 session/group
+数据，无关文件/状态更新不再重绘历史面板，分组变化仍正常更新。
+
+面包屑路径/图标提取为 memoized `BreadcrumbTrail`，事件通过现有 latest handler
+机制读取当前回调；弹窗的 actions getter、请求 generation、清理和键盘导航仍由
+原 Breadcrumbs 管理。关闭的导航弹窗保留 owner，但跳过无关正文/光标发布；
+每次打开和关闭都渲染，保证异步取消、当前数据、回调以及焦点返回。工具条按钮
+同样按实际显示字段 memo，点击、双击及右键都使用当前 handler 和 item。
+
+此轮是保持交互的内部渲染优化，沿用真实耗时用例 064–071，不新增同义 YAML；
+回归增加选择 `TC-IDE-NAV-01`、`TC-IDE-PARITY-014-01` 以覆盖面包屑导航、
+Structure/Search Everywhere/Recent Files 的关闭再打开，并保留工具条 010/024、
+Home 025/026、全局外观034和完整 crash-regression。单测新增旧/新回调、弹窗
+焦点、状态订阅与当前按钮数据显示断言；本机只运行单测和静态检查，不运行
+browser/native。持久化、后台发现和大型树的剩余方案仍需按实际证据推进，
+不得用单测或较小文件行数替代最终同条件 native 性能对比。
+
+本机最终组合回归：14 文件 357 tests passed（Node.js 22、最多 2 workers）；
+TypeScript、`pnpm check:refactor`、catalog gate、selected CI plan 全部通过。
+新增用例的改前失败和全部修后日志保存在 `qa-ui-auto-report/_local/`，不作为
+browser/native 的执行证据；新 SHA 的托管运行仍待执行。
+
+## 慢读取视图恢复与终端移动的竞态回归
+
+托管运行 40819080806 中，007 恢复两个活动文件共耗时 665ms，超过读取占位的
+80ms 阈值。常驻编辑器在空占位文档上提前消费了光标/折叠快照，真实正文到达
+后仅同步内容，没有重新恢复光标。新增真实 mounted 回归在改前复现光标落在
+offset 0，以及 beforeunload 把空文档快照写回的问题。
+
+现在由独立的 `editorViewStateLifecycle` 管理每次文件激活的恢复、延时捕获、
+退出捕获与清理；`documentReady` 显式标识正文是否可用。待正文 reconciliation
+完成后才消费一次快照，占位文档不能写回持久化或进入 EditorState 缓存。
+分屏各自恢复、已有用户操作取消恢复、内容身份不符拒绝恢复、关闭重开、撤销
+和延迟滚动语义保持。007 原生用例额外断言在另一分屏编辑后返回主分屏，41行
+光标与折叠仍保留，并检查运行时错误。
+
+024-03 的失败证据显示终端已经移回底部、命令有回显，但独立结果行缺失；
+移动后 100ms 才执行的尺寸同步会与新输入竞争。将 ResizeObserver 的延时防抖
+改为下一帧同步最新几何，连续通知每帧合并一次，销毁取消待处理帧。mounted
+回归改前无法在下一帧得到正确 PTY 尺寸，修后通过；真实输出是否修复仍以
+托管 024-03 原有的三次独立输出断言为准，不添加输出重试、不删除或放宽断言。
+该调度属于内部生命周期修复，复用 024-03、051/056 及现有终端 retained cases。
+
+本机：编辑器/工作区 14 文件 404 tests passed；终端及工具窗口 6 文件 116
+passed / 1 既有编译模式条件 skip（生产模式与 QA 镜像分支互斥），最多 2 workers。
+本机未执行 browser/native。1500ms 正文/高亮及全观察期每帧150ms预算保持。
+下一轮托管覆盖 064–071、007/024-03 等功能与完整 crash-regression，结果待收集。
+
+## 后台元数据持久化与外观读取缓存
+
+托管运行 40823139637（`db4dff9e`）共执行49次：browser 20通过/4失败，
+native 19通过/6失败，无跳过。007分屏恢复与024-03三次独立终端输出均通过，
+本轮适用的完整崩溃回归通过。失败全部为首次打开的全观察期150ms帧预算：
+browser 153.8–173.3ms，native 191–231ms；仍未达验收，不刷绿、不放宽预算。
+
+CPU采样与源码继续发现激活调用栈上的同步存储，以及外观初始值在每次渲染
+重复读取/规范化。真实store单测复现一组文件操作5次同步写入；mounted外观
+单测复现3次切换6次存储读取。元数据现合并为最多300ms一次后台序列化写入，
+beforeunload/pagehide立即保存最新tab、目录和活动项。显式reload取消旧队列；
+落盘前检查上次读取后的外部替换，避免退出旧窗口时覆盖较新的导入/窗口数据。
+未保存正文的恢复日志继续同步，错误/重试行为保持。外观初始读取按workspace
+身份缓存，全局设置订阅及跨工作区读取仍生效。
+
+新增TC-WS-072 browser/native用例覆盖混合文件/终端、关闭移除、激活后立即
+reload及末次dirty正文恢复；不增加持久化等待或写入store/storage来制造结果。
+现有029/030混合恢复、034全局外观、054 release冷启动等继续保护保留行为。
+本机8文件58 tests passed、TypeScript及refactor通过，最多2 workers；
+不在本机执行browser/native。托管新SHA性能及生命周期验证待执行。

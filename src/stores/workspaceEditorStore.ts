@@ -6,7 +6,7 @@
  * session identities stay in the platform store.
  */
 import { create } from "zustand";
-import { persistWorkspaceDocumentRecovery, readWorkspaceDocumentRecovery } from "./workspaceDocumentRecovery";
+import { persistWorkspaceDocumentRecovery, readWorkspaceDocumentRecovery, workspaceDocumentRecoveryChanged } from "./workspaceDocumentRecovery";
 
 export interface WorkspaceDocumentState {
   tabId: string;
@@ -53,19 +53,27 @@ export const useWorkspaceEditorStore = create<WorkspaceEditorState>((set) => ({
   recoveryError: null,
 
   setDocument: (tabId, patch) => set((state) => {
-    const current = state.documents[tabId] ?? { ...EMPTY_DOCUMENT, tabId };
-    const documents = { ...state.documents, [tabId]: { ...current, ...patch, tabId } };
-    return { documents, recoveryError: persistWorkspaceDocumentRecovery(documents) };
+    const previous = state.documents[tabId];
+    if (previous && !state.recoveryError && Object.entries(patch).every(([key, value]) => (
+      previous[key as keyof WorkspaceDocumentState] === value
+    ))) return state;
+    const document = { ...(previous ?? EMPTY_DOCUMENT), ...patch, tabId };
+    const documents = { ...state.documents, [tabId]: document };
+    const recoveryError = state.recoveryError || workspaceDocumentRecoveryChanged(previous, document)
+      ? persistWorkspaceDocumentRecovery(documents) : null;
+    return { documents, recoveryError };
   }),
 
   removeDocument: (tabId) => set((state) => {
     if (!state.documents[tabId]) return state;
     const documents = { ...state.documents };
     delete documents[tabId];
-    return { documents, activeTabId: state.activeTabId === tabId ? null : state.activeTabId, recoveryError: persistWorkspaceDocumentRecovery(documents) };
+    const recoveryError = state.recoveryError || state.documents[tabId].dirty
+      ? persistWorkspaceDocumentRecovery(documents) : null;
+    return { documents, activeTabId: state.activeTabId === tabId ? null : state.activeTabId, recoveryError };
   }),
 
-  setActiveTab: (tabId) => set({ activeTabId: tabId }),
+  setActiveTab: (tabId) => set((state) => state.activeTabId === tabId ? state : { activeTabId: tabId }),
 }));
 
 export function languageFromPath(path: string): string {

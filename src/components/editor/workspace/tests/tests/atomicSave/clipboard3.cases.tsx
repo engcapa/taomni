@@ -99,8 +99,8 @@ export function registeratomicSaveClipboard3Cases(caseContext: registeratomicSav
       looseFiles: [],
       initialFile: { kind: "root", rootId: "app", path: "src/main.ts" },
     };
-    caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile.mockImplementation(async (path: string) => {
-      if (path === "/repo/app/src/main.ts") return caseContext.workspaceTestHarness.file("src/main.ts", "content-in-main\n");
+    caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => {
+      if (path === "src/main.ts") return caseContext.workspaceTestHarness.file("src/main.ts", "content-in-main\n");
       return caseContext.workspaceTestHarness.file("src/util.ts", "content-in-util\n");
     });
 

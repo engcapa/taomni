@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { selectCodeWorkspaceUi, useCodeWorkspaceStore } from "../../../../stores/codeWorkspaceStore";
 import type { WorkspaceHostIntegration } from "../workspaceHostIntegration";
 import { fileKey, type OpenFileState } from "../codeWorkspaceModel";
@@ -8,12 +8,31 @@ import type { useWorkspaceFileOpening } from "./useWorkspaceFileOpening";
 import type { useWorkspaceDocumentEditing } from "./useWorkspaceDocumentEditing";
 import { useWorkspaceHostCanvas } from "./useWorkspaceHostCanvas";
 
+type Session = ReturnType<typeof useWorkspaceSession>;
+type Project = ReturnType<typeof useWorkspaceProjectRuntime>;
+
 interface Dependencies {
   host?: WorkspaceHostIntegration;
-  session: ReturnType<typeof useWorkspaceSession>;
-  project: ReturnType<typeof useWorkspaceProjectRuntime>;
-  files: ReturnType<typeof useWorkspaceFileOpening>;
-  editing: ReturnType<typeof useWorkspaceDocumentEditing>;
+  session: Pick<Session, "workspaceInstanceId" | "mountedRef" | "workspaceUi" | "setStatusMessage"> & {
+    bufferState: Pick<Session["bufferState"], "openFilesRef" | "lspFilesRef">;
+  };
+  project: {
+    projectTree: Pick<Project["projectTree"], "roots">;
+    buffers: Pick<Project["buffers"], "setOpenFiles" | "flushPendingEditorText">;
+    recoveryState: Pick<Project["recoveryState"], "workspaceRecoveryEntries" | "pendingWorkspaceRecoveryKeysRef" | "setWorkspaceRecoveryEntries" | "diskEffectLedgerEntries" | "setWorkspaceRecoveryOpen">;
+    lsp: Pick<Project["lsp"], "syncDocument">;
+  };
+  files: Pick<ReturnType<typeof useWorkspaceFileOpening>, "openFile" | "restoreReady">;
+  editing: { fileLifecycle: Pick<ReturnType<typeof useWorkspaceDocumentEditing>["fileLifecycle"], "closeFile"> };
+}
+
+function publishSnapshot(host: WorkspaceHostIntegration, workspaceInstanceId: string) {
+  const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
+  const keys = [...new Set(Object.values(ui.editorGroups).flatMap((group) => group.openOrder))];
+  const files = keys.map((key) => ui.openFiles[key])
+    .filter((file): file is OpenFileState => !!file && !file.library && file.ref.kind === "root");
+  if (files.some((file) => file.loading)) return;
+  host.onSnapshot({ files, activeFile: ui.openFiles[ui.activeKey ?? ""]?.ref ?? null });
 }
 
 /** Host requests share the editor's normal buffer, close, recovery and LSP owners. */
@@ -22,7 +41,7 @@ export function useWorkspaceHostFiles(dependencies: Dependencies) {
   const live = useRef(dependencies);
   live.current = dependencies;
   const applying = useRef(false);
-  const [settledRequest, setSettledRequest] = useState<string | null>(null);
+  const settledRequest = useRef<string | null>(null);
   const request = host ? JSON.stringify({ files: host.files, active: host.activeFile }) : null;
   const requestRef = useRef(request);
   requestRef.current = request;
@@ -30,7 +49,8 @@ export function useWorkspaceHostFiles(dependencies: Dependencies) {
   const previousWanted = useRef<Set<string> | null>(null);
   const queue = useRef(Promise.resolve());
   const rootIds = project.projectTree.roots.map((root) => root.id).join("\n");
-  useWorkspaceHostCanvas(host, session.workspaceInstanceId, !applying.current && settledRequest === request && files.restoreReady);
+  const reconcileCanvas = useWorkspaceHostCanvas(host, session.workspaceInstanceId,
+    !applying.current && settledRequest.current === request && files.restoreReady);
 
   useEffect(() => {
     if (!host || request === null || !files.restoreReady) return;
@@ -110,25 +130,24 @@ export function useWorkspaceHostFiles(dependencies: Dependencies) {
       if (isCurrent()) {
         current.project.buffers.flushPendingEditorText();
         applying.current = false;
-        setSettledRequest(request);
+        settledRequest.current = request;
+        reconcileCanvas(requested);
+        publishSnapshot(requested, current.session.workspaceInstanceId);
       }
     }).catch((error) => {
       if (isCurrent()) {
         applying.current = false;
         live.current.session.setStatusMessage(String(error));
-        setSettledRequest(request);
+        settledRequest.current = request;
+        reconcileCanvas(requested);
+        publishSnapshot(requested, live.current.session.workspaceInstanceId);
       }
     });
     return () => { cancelled = true; };
-  }, [request, rootIds, files.restoreReady]);
+  }, [request, rootIds, files.restoreReady, reconcileCanvas]);
 
   useEffect(() => {
-    if (!host || applying.current || settledRequest !== request) return;
-    const keys = [...new Set(Object.values(session.workspaceUi.editorGroups).flatMap((group) => group.openOrder))];
-    const openFiles = keys.map((key) => session.workspaceUi.openFiles[key])
-      .filter((file): file is OpenFileState => !!file && !file.library && file.ref.kind === "root");
-    if (openFiles.some((file) => file.loading)) return;
-    const active = session.workspaceUi.openFiles[session.workspaceUi.activeKey ?? ""];
-    host.onSnapshot({ files: openFiles, activeFile: active?.ref ?? null });
-  }, [host, request, settledRequest, session.workspaceUi.openFiles, session.workspaceUi.editorGroups, session.workspaceUi.activeKey]);
+    if (!host || applying.current || settledRequest.current !== request) return;
+    publishSnapshot(host, session.workspaceInstanceId);
+  }, [host, request, session.workspaceInstanceId, session.workspaceUi.openFiles, session.workspaceUi.editorGroups, session.workspaceUi.activeKey]);
 }

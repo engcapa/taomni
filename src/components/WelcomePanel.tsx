@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { memo, useRef, useState } from "react";
 import { useT } from "../lib/i18n";
 import { openLocalShellAsAdministrator, type LocalDirectoryShortcut, type SessionConfig } from "../lib/ipc";
 import { sftpLocalHome } from "../lib/sftp";
@@ -17,7 +17,7 @@ import { WelcomeHistoryPanel } from "./welcome/WelcomeHistoryPanel";
 
 const EMPTY_RECENT_SESSIONS: SessionConfig[] = [];
 
-export function WelcomePanel({
+export const WelcomePanel = memo(function WelcomePanel({
   restore,
   onStartLocalTerminal,
   onNewSession,
@@ -42,7 +42,12 @@ export function WelcomePanel({
   const [pendingDirectoryIds, setPendingDirectoryIds] = useState<string[]>([]);
   const [historyTab, setHistoryTab] = useState<WelcomeHistoryTab>("sessions");
   const setStatusMessage = useAppStore((state) => state.setStatusMessage);
-  const recentWorkspaces = useAppStore((state) => providedRecentWorkspaces ?? state.recentWorkspaces);
+  // Opening a file publishes its recent workspace. Keep the hidden Home's
+  // history and controls intact without rendering them on the activation path.
+  const recentWorkspacesRef = useRef(providedRecentWorkspaces ?? useAppStore.getState().recentWorkspaces);
+  const visibleRecentWorkspaces = useAppStore((state) => active ? providedRecentWorkspaces ?? state.recentWorkspaces : null);
+  if (visibleRecentWorkspaces) recentWorkspacesRef.current = visibleRecentWorkspaces;
+  const recentWorkspaces = recentWorkspacesRef.current;
   const t = useT();
   const {
     selectedShell,
@@ -268,6 +273,6 @@ export function WelcomePanel({
       </div>
     </div>
   );
-}
+}, (previous, next) => previous.active === false && next.active === false);
 
 export { type WelcomeRestoreProp } from "./welcome/types";

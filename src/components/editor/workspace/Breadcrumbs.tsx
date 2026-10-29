@@ -1,4 +1,3 @@
-import { ChevronRight, File, Folder, Hash, MoreHorizontal } from "./icons";
 import {
   useCallback,
   useEffect,
@@ -14,6 +13,8 @@ import { collapsedBreadcrumbItems, sortPathChildren, symbolChainAtPosition, symb
 import { SegmentPopup } from "./breadcrumbs/SegmentPopup";
 import { useBreadcrumbCollapse } from "./breadcrumbs/useBreadcrumbCollapse";
 import { navigateSegments } from "./navigationBarModel";
+import { BreadcrumbTrail } from "./breadcrumbs/BreadcrumbTrail";
+import { useLatestHandlers } from "./useLatestHandlers";
 
 export function Breadcrumbs({
   pathSegments,
@@ -218,98 +219,11 @@ export function Breadcrumbs({
     }
   }, [activeNavigationBar, navBarFocusedIndex, onCloseNavigationBar, openPathPopup, openSymbolPopup, popup, visibleItems]);
 
-  const renderItems = (items: BreadcrumbItem[], compact: boolean, interactive: boolean) => items.map((item, index) => {
-    const path = item.type === "path" ? item.value : null;
-    const symbol = item.type === "symbol" ? item.value : null;
-    const label = path?.label ?? symbol?.name ?? "";
-    // IDEA's navigation bar keeps the file name whole and truncates the
-    // surrounding directories/members first; a narrow status bar otherwise
-    // squeezed the file segment to zero width (ED-PARITY-011 DEC-011-02).
-    const flexible = compact && path?.kind !== "file";
-    const isFocused = navBarFocusedIndex === index;
-    const icon = path?.kind === "root" || path?.kind === "directory" ? (
-      <Folder className="h-3 w-3 shrink-0 text-[#d59d32]" />
-    ) : path?.kind === "file" ? (
-      <File className="h-3 w-3 shrink-0" />
-    ) : item.type === "collapsed" ? (
-      <MoreHorizontal className="h-3 w-3" />
-    ) : (
-      <Hash className="h-3 w-3 shrink-0 text-[var(--taomni-accent)]" />
-    );
-
-    if (item.type === "collapsed") {
-      return (
-        <span key={`collapsed:${index}`} className="inline-flex shrink-0 items-center">
-          {index > 0 && <ChevronRight className="mx-0.5 h-3 w-3" />}
-          {interactive ? (
-            <button
-              type="button"
-              className={`inline-flex h-5 items-center rounded px-1 hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)] ${isFocused ? "ring-1 ring-[var(--taomni-accent)] bg-[var(--taomni-code-active-line-bg)]" : ""
-                }`}
-              aria-label="Hidden breadcrumb segments"
-              id={`code-workspace-breadcrumb-segment-${index}`}
-              tabIndex={activeNavigationBar ? -1 : 0}
-              data-testid="code-workspace-breadcrumb-collapsed"
-              data-nav-index={index}
-              onClick={(event) => {
-                if (item.hiddenPaths.length > 0) {
-                  openCollapsedPopup(item.hiddenPaths, event.currentTarget);
-                }
-              }}
-            >
-              {icon}
-            </button>
-          ) : (
-            <span className="inline-flex h-5 items-center rounded px-1">{icon}</span>
-          )}
-        </span>
-      );
-    }
-
-    const content = (
-      <>
-        {icon}
-        <span className={flexible ? "truncate" : undefined}>{label}</span>
-      </>
-    );
-
-    return (
-      <span
-        key={`${item.type}:${label}:${index}`}
-        className={`inline-flex min-w-0 items-center ${flexible ? "flex-1" : "shrink-0"}`}
-      >
-        {index > 0 && <ChevronRight className="mx-0.5 h-3 w-3 shrink-0" />}
-        {interactive ? (
-          <button
-            type="button"
-            className={`inline-flex h-5 min-w-0 items-center gap-1 rounded px-1 hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)] ${flexible ? "flex-1" : ""
-              } ${isFocused ? "ring-1 ring-[var(--taomni-accent)] bg-[var(--taomni-code-active-line-bg)]" : ""}`}
-            aria-haspopup="listbox"
-            aria-current={index === items.length - 1 ? (path?.kind === "file" ? "page" : symbol ? "location" : undefined) : undefined}
-            id={`code-workspace-breadcrumb-segment-${index}`}
-            tabIndex={activeNavigationBar ? -1 : 0}
-            data-nav-index={index}
-            data-focused={isFocused ? "true" : undefined}
-            data-testid={path
-              ? `code-workspace-breadcrumb-path-${path.kind}`
-              : "code-workspace-breadcrumb-symbol"}
-            onClick={(event) => {
-              if (path) void openPathPopup(path, event.currentTarget);
-              if (symbol) openSymbolPopup(symbol, event.currentTarget);
-            }}
-            onContextMenu={(event) => {
-              if (path) handlePathContextMenu(event, path);
-            }}
-          >
-            {content}
-          </button>
-        ) : (
-          <span className={`inline-flex h-5 min-w-0 items-center gap-1 rounded px-1 ${flexible ? "flex-1" : ""}`}>
-            {content}
-          </span>
-        )}
-      </span>
-    );
+  const trailHandlers = useLatestHandlers({
+    onOpenPath: (path: BreadcrumbPathSegment, anchor: HTMLElement) => { void openPathPopup(path, anchor); },
+    onOpenSymbol: openSymbolPopup,
+    onOpenCollapsed: openCollapsedPopup,
+    onPathContextMenu: handlePathContextMenu,
   });
 
   return (
@@ -327,16 +241,15 @@ export function Breadcrumbs({
         ? "relative flex h-full min-w-0 flex-1 items-center overflow-hidden text-[11px] text-[var(--taomni-status-text)] outline-none"
         : "relative flex h-7 shrink-0 items-center overflow-hidden border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)] px-2 text-[11px] text-[var(--taomni-code-muted)] outline-none"}
     >
-      <div
-        ref={fullPathMeasureRef}
-        aria-hidden="true"
-        className="pointer-events-none absolute invisible w-max whitespace-nowrap"
-      >
-        {renderItems(fullItems, false, false)}
-      </div>
-      <div className="flex min-w-0 flex-1 items-center overflow-hidden">
-        {renderItems(visibleItems, collapsed, true)}
-      </div>
+      <BreadcrumbTrail
+        fullItems={fullItems}
+        visibleItems={visibleItems}
+        collapsed={collapsed}
+        activeNavigationBar={activeNavigationBar}
+        focusedIndex={navBarFocusedIndex}
+        measureRef={fullPathMeasureRef}
+        {...trailHandlers}
+      />
       {popup && (
         <SegmentPopup
           open={popup}

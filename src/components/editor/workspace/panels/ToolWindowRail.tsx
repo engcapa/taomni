@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from "react";
+import { memo, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent, type ReactNode, type Ref } from "react";
 import { createPortal } from "react-dom";
 import { MoreHorizontal } from "../icons";
 import { ContextMenu, type MenuItem } from "../../../ContextMenu";
+import { useLatestHandlers } from "../useLatestHandlers";
 import {
   STRIPE_MAX_WIDTH,
   STRIPE_MIN_WIDTH,
@@ -268,6 +269,24 @@ export function ToolWindowRailButton({
   onContextMenu?: (event: ReactMouseEvent, item: ToolWindowRailItem) => void;
   onDoubleClick?: (event: ReactMouseEvent<HTMLButtonElement>) => void;
 }) {
+  const handlers = useLatestHandlers({
+    onClick: onClick ?? item.onSelect,
+    onDoubleClick,
+    onContextMenu: onContextMenu ? (event: ReactMouseEvent) => onContextMenu(event, item) : undefined,
+  });
+  const { onSelect: _onSelect, ...appearance } = item;
+  return <ToolWindowRailButtonView {...appearance} showNames={showNames} {...handlers} />;
+}
+
+/** Stable visual inputs keep all unaffected stripe buttons out of file activation. */
+const ToolWindowRailButtonView = memo(function ToolWindowRailButtonView({
+  showNames, onClick, onDoubleClick, onContextMenu, ...item
+}: Omit<ToolWindowRailItem, "onSelect"> & {
+  showNames: boolean;
+  onClick: (event: ReactMouseEvent<HTMLButtonElement>) => void;
+  onDoubleClick?: (event: ReactMouseEvent<HTMLButtonElement>) => void;
+  onContextMenu?: (event: ReactMouseEvent) => void;
+}) {
   const title = [item.label, item.shortcut].filter(Boolean).join(" ")
     + (item.disabled && item.disabledReason ? ` — ${item.disabledReason}` : "");
   const showBadge = typeof item.badge === "number" ? item.badge > 0 : !!item.badge;
@@ -285,9 +304,9 @@ export function ToolWindowRailButton({
       disabled={item.disabled}
       title={title}
       className={toolWindowRailButtonClass}
-      onClick={onClick ?? item.onSelect}
+      onClick={onClick}
       onDoubleClick={onDoubleClick}
-      onContextMenu={onContextMenu ? (event) => onContextMenu(event, item) : undefined}
+      onContextMenu={onContextMenu}
     >
       <span aria-hidden="true" className="flex h-[20px] w-[20px] items-center justify-center [&>svg]:h-[16px] [&>svg]:w-[16px]">{item.icon}</span>
       {showNames && (
@@ -300,7 +319,7 @@ export function ToolWindowRailButton({
       )}
     </button>
   );
-}
+});
 
 export const toolWindowRailButtonClass = "relative flex min-h-[32px] w-full shrink-0 flex-col items-center justify-center gap-0.5 rounded-md px-0 py-1 text-[var(--taomni-code-muted)] hover:bg-[var(--taomni-code-active-line-bg)] hover:text-[var(--taomni-code-text)] focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--taomni-accent)] disabled:opacity-40 data-[active=true]:bg-[var(--taomni-accent)] data-[active=true]:text-white";
 

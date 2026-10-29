@@ -1,0 +1,103 @@
+id: TC-WS-072
+title: Pending workspace metadata survives immediate window reload with dirty text intact
+description: Open two files and a local terminal, close one file, then change the active tab and immediately reload. Preserve the folder, surviving file and terminal identities, selected tab and unsaved text without waiting for the background metadata timer.
+modes: [browser, native]
+covers: [F-WS-1, F-WS-2, F25.1, F25.3]
+tags: [p0, workspace-redesign, file-explorer, regression]
+fixtures: [reset_db, workspace_language_files]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-pending-metadata
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree-empty"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.platform_workspace_root}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-root"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="Documents"] [data-testid="code-workspace-tree-dir-arrow"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/notes.txt"]'
+- wait_for: '[data-testid="workspace-file-editor"] .cm-content'
+- press:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    key: Mod+End
+- type:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    text: QA_PENDING_METADATA_DRAFT
+- wait_for: '[data-testid="workspace-file-editor"][data-dirty="true"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/records.json"]'
+- wait_for: '[data-testid="workspace-tab"][data-tab-title="records.json"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="workspace-tab"][data-tab-kind="terminal"]'
+- click: '[data-testid="workspace-tab"][data-tab-title="records.json"] [data-testid="workspace-tab-close"]'
+- assert_no_runtime_errors: null
+- click: '[data-testid="workspace-tab"][data-tab-title="notes.txt"]'
+- reload_window: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-dirty="true"] .cm-content'
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-tab-title
+    equals: notes.txt
+- assert_count:
+    selector: '[data-testid="workspace-tab"][data-tab-kind="file"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="workspace-tab"][data-tab-kind="terminal"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="workspace-tab"][data-tab-title="records.json"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="code-workspace-tree-root"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    contains: QA_PENDING_METADATA_DRAFT
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    contains: Weekly notes
+- assert_no_runtime_errors: null
+- screenshot: workspace-pending-metadata-restored.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Immediate document reload preserves workspace folders, surviving mixed tabs, closed-file removal, active selection and dirty recovery without an explicit persistence wait.
+    actions: [3, 5, 6, 7, 8, 10, 11, 13, 14, 16, 18, 19, 21, 23, 24, 25]
+    results: [15, 22, 26, 27, 28, 29, 30, 31, 32, 33, 34]
+    checkpoints:
+    - step: 15
+      expectation: The editor marks the unsaved text dirty before switching away.
+    - step: 22
+      expectation: No runtime errors occur before reload.
+    - step: 26
+      expectation: The restored editor is present and still marks the recovered text dirty.
+    - step: 27
+      expectation: The restored active tab is notes.txt.
+    - step: 28
+      expectation: Exactly one file tab survives.
+    - step: 29
+      expectation: The local terminal tab is restored.
+    - step: 30
+      expectation: The closed records.json tab stays closed.
+    - step: 31
+      expectation: The original folder is restored.
+    - step: 32
+      expectation: The final unsaved input survives reload.
+    - step: 33
+      expectation: The original document contents also survive.
+    - step: 34
+      expectation: No uncaught renderer errors or crash fallback.
+  visual:
+  - check: Restored workspace is readable.
+    method: manual
+    reason: Screenshot is retained; actual tab, text and lifecycle outcomes are automated.
+  native:
+  - check: Packaged WebView persistence, real folder reading and local-terminal lifecycle.
+    method: automated
+    reason: Browser storage and virtual filesystem alone cannot establish desktop persistence.

@@ -141,10 +141,12 @@ export function sameEditorAppearance(
 export function areCodeMirrorHostPropsEqual(prev: CodeMirrorHostProps, next: CodeMirrorHostProps): boolean {
   if (prev.path !== next.path) return false;
   if (prev.fileKey !== next.fileKey) return false;
+  if (!sameOptionalArray(prev.retainedFileKeys, next.retainedFileKeys)) return false;
   if (prev.viewId !== next.viewId) return false;
   if (prev.transactionOwner !== next.transactionOwner) return false;
   if (prev.documentRevision !== next.documentRevision) return false;
   if (prev.doc !== next.doc) return false;
+  if (prev.documentReady !== next.documentReady) return false;
   if (prev.visible !== next.visible) return false;
   if (prev.active !== next.active) return false;
   if (prev.readOnly !== next.readOnly) return false;

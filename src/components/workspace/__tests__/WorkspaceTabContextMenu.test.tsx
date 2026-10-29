@@ -62,6 +62,7 @@ describe("Workspace terminal tab context menu", () => {
     fireEvent.change(await screen.findByTestId("text-input-dialog-input"), { target: { value: "  retained  " } });
     fireEvent.click(screen.getByTestId("text-input-dialog-confirm"));
     await waitFor(() => expect(workspace().openTabs[0].title).toBe("retained"));
+    window.dispatchEvent(new Event("pagehide"));
     useWorkspacePlatformStore.getState().reloadFromStorage();
     expect(workspace().openTabs[0]).toMatchObject({ id: first.id, title: "retained" });
   });
@@ -92,6 +93,7 @@ describe("Workspace terminal tab context menu", () => {
       expect(workspace().openTabs.map((tab) => tab.id)).toEqual(order);
       expect(workspace().activeTabId).toBe(active);
     }
+    window.dispatchEvent(new Event("pagehide"));
     useWorkspacePlatformStore.getState().reloadFromStorage();
     expect(workspace().openTabs.map((tab) => tab.id)).toEqual([first.id, second.id]);
   });

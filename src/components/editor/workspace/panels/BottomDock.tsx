@@ -13,13 +13,11 @@ import { createPortal } from "react-dom";
 import { ChevronDown, ChevronUp, Minus, MoreHorizontal, MoreVertical } from "../icons";
 import { toolWindowRailButtonClass } from "./ToolWindowRail";
 import { useToolWindowStripeStore } from "../toolWindowStripeStore";
+import type { ToolWindowContent } from "./toolWindowContent";
 
-export interface BottomDockTab {
-  id: string;
-  label: string;
+export interface BottomDockTab extends ToolWindowContent {
   icon: ReactNode;
   badge?: ReactNode;
-  content: ReactNode;
 }
 
 interface BottomDockProps {
@@ -58,8 +56,8 @@ interface BottomDockProps {
  * hidden panel catches up with the latest props when it is shown again.
  */
 export const KeepAliveToolPanel = memo(
-  function KeepAliveToolPanel({ children }: { active: boolean; children: ReactNode }) {
-    return <>{children}</>;
+  function KeepAliveToolPanel({ children, renderContent }: { active: boolean; children?: ReactNode; renderContent?: () => ReactNode }) {
+    return <>{renderContent ? renderContent() : children}</>;
   },
   (previous, next) => !previous.active && !next.active,
 );
@@ -672,7 +670,7 @@ export function BottomDock({
               hidden={tab.id !== active?.id}
               className="h-full min-h-0"
             >
-              <KeepAliveToolPanel active={panelActive}>{tab.content}</KeepAliveToolPanel>
+              <KeepAliveToolPanel active={panelActive} renderContent={tab.renderContent}>{tab.content}</KeepAliveToolPanel>
             </div>
           );
         })}

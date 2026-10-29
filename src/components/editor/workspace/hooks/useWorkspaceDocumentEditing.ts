@@ -189,7 +189,7 @@ export function useWorkspaceDocumentEditing(context: UseWorkspaceDocumentEditing
     setExternalFileConflicts: surfaceState.setExternalFileConflicts,
     workspaceStyleControllerRef: project.codeStyle.workspaceStyleControllerRef,
     semanticIndex: session.semanticIndex,
-    refreshTree: files.fileActions.refreshTree,
+    refreshTree: project.projectTree.treeData.refreshPath,
     restoreEchoSuppressorRef: project.editState.restoreEchoSuppressorRef,
     setStatusMessage: session.setStatusMessage,
     setOpenFiles: project.buffers.setOpenFiles,

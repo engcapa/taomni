@@ -2,10 +2,10 @@ import { acceptCompletion, closeBrackets, closeCompletion, completionStatus, set
 import { history } from "@codemirror/commands";
 import { bracketMatching, foldEffect, foldGutter, indentOnInput, indentUnit } from "@codemirror/language";
 import { search } from "@codemirror/search";
-import { EditorState, Transaction } from "@codemirror/state";
+import { EditorState, Text, Transaction, type Compartment, type Extension, type StateEffect } from "@codemirror/state";
 import type { KeyBinding } from "@codemirror/view";
 import { crosshairCursor, drawSelection, EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, rectangularSelection } from "@codemirror/view";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { codeViewExtensions } from "../../../../lib/codeViewTheme";
 import { createCoverageEditorChrome } from "../coverageEditorChrome";
 import { type DebugBreakpointMarker } from "../debugEditorChrome";
@@ -23,7 +23,7 @@ import { createMountedEditorActions } from "./createMountedEditorActions";
 import { createTemplateKeybindings } from "./createTemplateKeybindings";
 import { cancelActiveHoverResize, foldHoverProvenanceTooltip, lspHoverExtension, lspNavigationExtensions } from "./intelligence";
 import { type EditorSelectionRange } from "./types";
-import { applyPersistedEditorViewState, captureEditorViewState, importFoldPathByView } from "./viewState";
+import { importFoldPathByView } from "./viewState";
 import { importFoldRange } from "../importFold";
 import { liveTemplateLanguageForPath } from "../liveTemplates";
 import { cancelLspSnippetSession, lspSnippetSessionInvalidator, resetBasicCompletionSession, type CompletionResolveGateRequest } from "../lspCompletion";
@@ -45,10 +45,13 @@ import {
 import { treeRevisionField } from "../workspaceSyntaxFacts";
 import { desiredVisualColumnField, virtualOverflowRestoreField, virtualSpaceClickHandler, virtualSpaceOverflowField, virtualSpaceTypingHandler } from "../workspaceVirtualSpace";
 import { useEditorHostRefs } from "./useEditorHostRefs";
+import { createEditorViewStateLifecycle, type EditorViewStateLifecycle } from "./editorViewStateLifecycle";
+import { EditorStateCache, reconfigureCachedEditorState } from "./editorStateCache";
 
 export interface UseEditorViewLifetimeContext {
   editor: ReturnType<typeof useEditorHostRefs>;
   doc: string;
+  documentReady: boolean;
   documentRevision: number;
   lastDocumentTextRef: import("react").RefObject<string>;
   emitSelection: (view: EditorView) => void;
@@ -99,12 +102,14 @@ export interface UseEditorViewLifetimeContext {
   clipboardWorkspaceId: string | undefined;
   viewId: string | undefined;
   fileKey: string;
+  retainedFileKeys?: readonly string[];
 }
 
 export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
   const {
     editor,
     doc,
+    documentReady,
     documentRevision,
     emitSelection,
     emitViewport,
@@ -140,17 +145,38 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
     viewId,
     fileKey,
   } = context;
+  const stateCache = useRef(new EditorStateCache());
+  const ownerAtRender = editor.transactionOwnerRef.current;
+  const cacheOwner = useRef({ owner: ownerAtRender, workspaceId: clipboardWorkspaceId });
+  const stateCallback = useRef({ fileKey, callback: editor.onViewStateChangeRef.current });
+  if (stateCallback.current.fileKey === fileKey) stateCallback.current.callback = editor.onViewStateChangeRef.current;
 
-  useEffect(function mountEditorHost() {
+  useEffect(function activateEditorDocument() {
     if (!editor.hostRef.current) return;
+    let disposed = false;
     const owner = editor.transactionOwnerRef.current;
     const sharedFileKey = editor.fileKeyRef.current;
     const sharedViewId = editor.viewIdRef.current;
+    const documentPath = editor.pathRef.current;
+    if (cacheOwner.current.owner !== owner || cacheOwner.current.workspaceId !== clipboardWorkspaceId) {
+      stateCache.current.clear();
+    }
+    cacheOwner.current = { owner, workspaceId: clipboardWorkspaceId };
+    const cached = stateCache.current.take(sharedFileKey, documentPath);
+    const initialLanguage = cached ? context.languageCompartment.current.get(cached.state) : undefined;
+    const callback = { fileKey, callback: editor.onViewStateChangeRef.current };
+    stateCallback.current = callback;
+    editor.lastSelectionRef.current = null;
+    editor.lastEmittedViewStateRef.current = null;
+    editor.pendingDeferredScrollRef.current = null;
+    editor.userInteractedSinceMountRef.current = false;
     const initialDocumentText = owner && sharedFileKey
       ? owner.acquireView(sharedFileKey, sharedViewId, doc, documentRevision)
       : doc;
     context.lastDocumentTextRef.current = initialDocumentText;
-    const initialDoc = EditorState.create({ doc: initialDocumentText }).doc;
+    const initialDoc = cached?.state.doc.toString() === initialDocumentText
+      ? cached.state.doc
+      : Text.of(initialDocumentText.split("\n"));
     // §8.19.4 resolve gate banner: anchored to the caret at presentation time.
     // The gate request's own closures re-verify identity/doc before acting, so
     // a stale banner is inert — this only decides where it shows.
@@ -218,26 +244,8 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
         if (editor.viewRef.current === view) emitViewport(view);
       }, 125);
     };
-    // ED-IMPROVE-007: capture is cheap and stays in memory; identical
-    // snapshots are dropped so a scroll or caret move does not schedule a
-    // persistence write per event.
-    const scheduleViewStateEmit = (view: EditorView, delay = 150) => {
-      if (!editor.onViewStateChangeRef.current) return;
-      if (editor.viewStateEmitTimerRef.current !== null) {
-        window.clearTimeout(editor.viewStateEmitTimerRef.current);
-      }
-      editor.viewStateEmitTimerRef.current = window.setTimeout(() => {
-        editor.viewStateEmitTimerRef.current = null;
-        if (editor.viewRef.current !== view) return;
-        const handler = editor.onViewStateChangeRef.current;
-        if (!handler) return;
-        const captured = captureEditorViewState(view);
-        const serialized = JSON.stringify(captured);
-        if (serialized === editor.lastEmittedViewStateRef.current) return;
-        editor.lastEmittedViewStateRef.current = serialized;
-        handler(captured);
-      }, delay);
-    };
+    let viewState: EditorViewStateLifecycle | null = null;
+    const scheduleViewStateEmit = (view: EditorView, delay?: number) => viewState?.schedule(view, delay);
     const saveHandler = () => {
       editor.onSaveRef.current();
       return true;
@@ -280,19 +288,24 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
       };
       void handler(selection).then((ranges) => {
         const current = editor.viewRef.current;
-        if (!current || current !== view) return;
+        if (disposed || !current || current !== view) return;
         if (!ranges || !expandSelectionFromLspRanges(current, ranges)) {
           expandSyntaxSelection(current);
         }
       }).catch(() => {
         const current = editor.viewRef.current;
-        if (current === view) expandSyntaxSelection(current);
+        if (!disposed && current === view) expandSyntaxSelection(current);
       });
       return true;
     };
-    const state = EditorState.create({
-      doc: initialDoc,
-      extensions: [
+    // Root reconfiguration preserves explicit compartment overrides. Replace
+    // them as well, so a cached tab receives the latest settings and chrome.
+    const compartmentEffects: StateEffect<unknown>[] = [];
+    const configure = (compartment: Compartment, extension: Extension): Extension => {
+      compartmentEffects.push(compartment.reconfigure(extension));
+      return compartment.of(extension);
+    };
+    const extensions = [
         lineNumbers(),
         foldGutter(),
         // Language-aware region grammar; unknown languages never fold.
@@ -325,7 +338,7 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
         bracketMatching(),
         closeBrackets(),
         indentOnInput(),
-        editor.completionCompartment.current.of(buildAutocompletionExtension()),
+        configure(editor.completionCompartment.current, buildAutocompletionExtension()),
         // IDEA: typing `.` / `:` (or server trigger chars) opens the popup
         // immediately instead of waiting for activateOnTypingDelay.
         EditorView.updateListener.of((update) => {
@@ -399,21 +412,21 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
         occurrenceSessionField,
         // Drop pending LSP snippet tabstop sessions on any unrelated edit.
         lspSnippetSessionInvalidator(),
-        context.codeStyleCompartment.current.of([
+        configure(context.codeStyleCompartment.current, [
           EditorState.tabSize.of(codeStyle?.tabSize ?? 2),
           indentUnit.of(codeStyle?.insertSpaces ? " ".repeat(codeStyle?.indentSize || codeStyle?.tabSize || 2) : "\t"),
         ]),
-        context.languageCompartment.current.of([]),
-        context.diagnosticsCompartment.current.of(createDiagnosticChrome(
+        configure(context.languageCompartment.current, initialLanguage ?? []),
+        configure(context.diagnosticsCompartment.current, createDiagnosticChrome(
           diagnostics,
           (line) => editor.onLightbulbRef.current?.(line),
         )),
-        editor.overlayCompartment.current.of(createLspOverlayChrome(
+        configure(editor.overlayCompartment.current, createLspOverlayChrome(
           initialDoc,
           highlights,
           inlayHints,
         )),
-        editor.semanticTokensCompartment.current.of(createLspSemanticTokenChrome(
+        configure(editor.semanticTokensCompartment.current, createLspSemanticTokenChrome(
           initialDoc,
           semanticTokens,
         )),
@@ -424,36 +437,36 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
           targets: runGutterTargets,
           onClick: (target, anchor) => editor.onRunGutterClickRef.current?.(target, anchor),
         }),
-        editor.gitCompartment.current.of(createGitEditorChrome(
+        configure(editor.gitCompartment.current, createGitEditorChrome(
           gitChanges,
           gitBlame,
           (change) => editor.onGitChangeClickRef.current?.(change),
         )),
-        context.coverageCompartment.current.of(createCoverageEditorChrome(
+        configure(context.coverageCompartment.current, createCoverageEditorChrome(
           fileCoverage ?? null,
           coverageEnabled,
         )),
-        context.debugCompartment.current.of(buildDebugChrome(
+        configure(context.debugCompartment.current, buildDebugChrome(
           debugBreakpoints,
           debugCurrentLine,
           debugInlineValues,
           !!debugEvaluate,
         )),
-        context.signatureCompartment.current.of([]),
-        context.hoverCompartment.current.of(lspHoverExtension(
+        configure(context.signatureCompartment.current, []),
+        configure(context.hoverCompartment.current, lspHoverExtension(
           editor.onHoverRef,
           editor.onPinHoverDocRef,
           context.activeHoverResizeSessionRef,
           showHoverDocumentation,
           hoverDocumentationDelayMs,
         )),
-        context.readOnlyCompartment.current.of(readOnlyExtension(readOnly)),
-        context.wrappingCompartment.current.of(softWrap ? EditorView.lineWrapping : []),
-        context.appearanceCompartment.current.of(
+        configure(context.readOnlyCompartment.current, readOnlyExtension(readOnly)),
+        configure(context.wrappingCompartment.current, softWrap ? EditorView.lineWrapping : []),
+        configure(context.appearanceCompartment.current,
           appearance ? editorAppearanceExtension(appearance) : [],
         ),
         renderedDocDecorationField,
-        context.renderedDocCompartment.current.of(renderedDocDecorationConfig.of({
+        configure(context.renderedDocCompartment.current, renderedDocDecorationConfig.of({
           languageId: renderedDocLanguageId ?? liveTemplateLanguageForPath(editor.pathRef.current),
           enabled: renderedDocEnabled,
           onToggleRaw: () => {
@@ -522,11 +535,21 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
         ]),
         createEditorDomHandlers({ pointerClickCountRef: editor.pointerClickCountRef, shiftExtendKeyRef: editor.shiftExtendKeyRef, onContextMenuRef: editor.onContextMenuRef }),
         createDocumentUpdateListener({ applyingExternalDocRef: context.applyingExternalDocRef, lastDocumentTextRef: context.lastDocumentTextRef, transactionOwnerRef: editor.transactionOwnerRef, fileKeyRef: editor.fileKeyRef, viewIdRef: editor.viewIdRef, currentCompositionSessionRef: editor.currentCompositionSessionRef, compositionActiveRef: editor.compositionActiveRef, viewRef: editor.viewRef, rememberLocalDocumentEcho: context.rememberLocalDocumentEcho, onChangeRef: editor.onChangeRef, signatureTriggersRef: editor.signatureTriggersRef, emitParameterTrigger, onParameterInvalidateRef: editor.onParameterInvalidateRef, scheduleSelectionEmit, scheduleViewportEmit, viewportEmitTimerRef: editor.viewportEmitTimerRef, restoringInitialViewStateRef: editor.restoringInitialViewStateRef, userInteractedSinceMountRef: editor.userInteractedSinceMountRef, pendingDeferredScrollRef: editor.pendingDeferredScrollRef, scheduleViewStateEmit }),
-      ],
-    });
-    const view = new EditorView({ state, parent: editor.hostRef.current });
+      ];
+    const state = cached
+      ? reconfigureCachedEditorState(cached.state, initialDocumentText, extensions, compartmentEffects)
+      : EditorState.create({ doc: initialDoc, extensions });
+    const view = editor.viewRef.current ?? new EditorView({ state, parent: editor.hostRef.current });
+    if (editor.viewRef.current) view.setState(state);
     editorLanguageByView.set(view, liveTemplateLanguageForPath(editor.pathRef.current));
     editor.viewRef.current = view;
+    viewState = createEditorViewStateLifecycle({
+      view, refs: editor, documentReady,
+      initialState: cached ? null : editor.initialViewStateRef.current,
+      callback,
+      onRestored: (restored) => { emitSelection(restored); emitViewport(restored); },
+    });
+    editor.viewStateLifecycleRef.current = viewState;
     // ED-PARITY-011 DEC-011-07: remember whether the latest key in this view
     // was a Shift+navigation extend. Window capture sees it even when the
     // workspace dispatcher consumes the key before CodeMirror.
@@ -543,9 +566,11 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
     const importFold = importFoldRange(editor.pathRef.current, view.state.doc.toString());
     if (importFold && importFold.to <= view.state.doc.length) {
       importFoldPathByView.set(view, editor.pathRef.current);
-      if (editor.initialViewStateRef.current?.importsExpanded !== true) {
+      if (!cached && editor.initialViewStateRef.current?.importsExpanded !== true) {
         view.dispatch({ effects: foldEffect.of(importFold) });
       }
+    } else {
+      importFoldPathByView.delete(view);
     }
     const providerRowForEvent = (event: MouseEvent): { row: HTMLLIElement; index: number; } | null => {
       if (!editor.pathRef.current.toLowerCase().endsWith(".java") || editor.viewRef.current !== view) return null;
@@ -577,23 +602,12 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
     // ED-IMPROVE-007: one-shot restore of this leaf/file's own caret,
     // selection, scroll and folds. Applied before any user input and never
     // re-applied on prop changes, so late updates cannot overwrite typing.
-    const initialViewState = editor.initialViewStateRef.current;
-    if (initialViewState) {
-      editor.restoringInitialViewStateRef.current = true;
-      try {
-        const restoreResult = applyPersistedEditorViewState(view, initialViewState);
-        editor.pendingDeferredScrollRef.current = restoreResult.deferredScroll;
-      } finally {
-        editor.restoringInitialViewStateRef.current = false;
-      }
-      view.requestMeasure();
+    view.scrollDOM.scrollTop = cached?.scrollTop ?? 0;
+    view.scrollDOM.scrollLeft = cached?.scrollLeft ?? 0;
+    if (cached && (cached.scrollTop > 0 || cached.scrollLeft > 0)) {
+      editor.pendingDeferredScrollRef.current = { scrollTop: cached.scrollTop, scrollLeft: cached.scrollLeft };
     }
-    const cancelDeferredScroll = () => {
-      editor.userInteractedSinceMountRef.current = true;
-      editor.pendingDeferredScrollRef.current = null;
-    };
-    view.scrollDOM?.addEventListener("wheel", cancelDeferredScroll, { passive: true });
-    view.scrollDOM?.addEventListener("pointerdown", cancelDeferredScroll, { passive: true });
+    viewState.restoreWhenReady(documentReady);
     const disposeComposition = createCompositionLifecycle({
       view,
       compositionActiveRef: editor.compositionActiveRef,
@@ -646,6 +660,8 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
     }
 
     return () => {
+      disposed = true;
+      bumpClipboardOwnerGeneration(view);
       document.removeEventListener("mousedown", selectProviderRow, true);
       document.removeEventListener("dblclick", acceptProviderRow, true);
       legacyBridgeRegistration?.dispose();
@@ -653,25 +669,9 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
       unregisterEditorActions?.();
       clearPendingSelectionEmit();
       clearPendingViewportEmit();
-      if (editor.viewStateEmitTimerRef.current !== null) {
-        window.clearTimeout(editor.viewStateEmitTimerRef.current);
-        editor.viewStateEmitTimerRef.current = null;
-      }
-      // ED-REPAIR-009: Tail capture on unmount / teardown
-      if (editor.viewRef.current === view && editor.onViewStateChangeRef.current) {
-        try {
-          const captured = captureEditorViewState(view);
-          const serialized = JSON.stringify(captured);
-          if (serialized !== editor.lastEmittedViewStateRef.current) {
-            editor.lastEmittedViewStateRef.current = serialized;
-            editor.onViewStateChangeRef.current(captured);
-          }
-        } catch {
-          // view may be in teardown
-        }
-      }
-      view.scrollDOM?.removeEventListener("wheel", cancelDeferredScroll);
-      view.scrollDOM?.removeEventListener("pointerdown", cancelDeferredScroll);
+      const cacheReadyState = viewState?.canCapture() === true;
+      viewState?.dispose();
+      if (editor.viewStateLifecycleRef.current === viewState) editor.viewStateLifecycleRef.current = null;
       context.requestParameterInfoRef.current = null;
       cancelActiveHoverResize(context.activeHoverResizeSessionRef);
       clipboardContextByView.delete(view);
@@ -683,12 +683,27 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
       view.contentDOM.removeEventListener("focusout", clipboardFocusOutGuard, true);
       editor.pendingCompletionAcceptanceRef.current?.();
       editor.pendingCompletionAcceptanceRef.current = null;
+      // Completion proposals and snippet tabstops are request-scoped UI. Keep
+      // document history/folds, but never revive these requests on a later tab.
+      editor.basicCompletionReopenRef.current = true;
+      if (completionStatus(view.state) !== null) closeCompletion(view);
+      cancelLspSnippetSession(view);
+      editor.basicCompletionReopenRef.current = false;
       editor.selectionKeyTrackerCleanupRef.current?.();
       editor.selectionKeyTrackerCleanupRef.current = null;
-      view.destroy();
-      editor.viewRef.current = null;
+      if (cacheReadyState) {
+        stateCache.current.save(sharedFileKey, {
+          state: view.state, path: documentPath, scrollTop: view.scrollDOM.scrollTop, scrollLeft: view.scrollDOM.scrollLeft,
+        });
+      }
       if (owner && sharedFileKey) owner.releaseView(sharedFileKey, sharedViewId);
     };
+  }, [fileKey, viewId, ownerAtRender, workspaceActionHost, clipboardWorkspaceId]);
+  useEffect(() => stateCache.current.retain(context.retainedFileKeys), [context.retainedFileKeys, fileKey]);
+  useEffect(() => () => {
+    editor.viewRef.current?.destroy();
+    editor.viewRef.current = null;
+    stateCache.current.clear();
   }, []);
   return {};
 }

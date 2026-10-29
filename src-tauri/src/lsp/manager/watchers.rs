@@ -1,7 +1,7 @@
+use super::watcher_registration;
 use crate::lsp::LocalWatchedEvent;
 use crate::lsp::LspExternalFileChangeEvent;
 use crate::lsp::LspManager;
-use crate::lsp::WorkspaceWatchTarget;
 use crate::lsp::WorkspaceWatcherHandle;
 use crate::lsp::edit_types::LspWatchedFileChange;
 use crate::lsp::watcher;
@@ -10,28 +10,20 @@ use crate::lsp::watcher::local_watched_snapshot;
 use crate::lsp::watcher::normalized_file_operation_path;
 use crate::lsp::watcher::notify_event_changes;
 use crate::lsp::watcher::notify_watched_file_sessions;
-use crate::lsp::watcher::workspace_watch_target_matches;
-use notify::Config as NotifyConfig;
-use notify::RecommendedWatcher;
-use notify::RecursiveMode;
-use notify::Watcher;
 use std::collections::HashMap;
 use std::path::Path;
-use std::path::PathBuf;
 use std::time::Duration;
 use std::time::Instant;
-use tokio::sync::mpsc;
 use tokio::sync::oneshot;
+use tokio_util::sync::CancellationToken;
 
 impl LspManager {
     pub(in crate::lsp) async fn stop_workspace_watcher(&self, workspace_id: &str) {
         let handle = self.workspace_watchers.lock().await.remove(workspace_id);
-        let Some(mut handle) = handle else {
+        let Some(handle) = handle else {
             return;
         };
-        if let Some(stop) = handle.stop.take() {
-            let _ = stop.send(());
-        }
+        handle.cancelled.cancel();
         handle.task.abort();
     }
 
@@ -40,6 +32,16 @@ impl LspManager {
         workspace_id: &str,
         roots: Vec<String>,
     ) -> Result<(), String> {
+        self.start_workspace_watcher_with_directories(workspace_id, roots, Vec::new())
+            .await
+    }
+
+    pub(in crate::lsp) async fn start_workspace_watcher_with_directories(
+        &self,
+        workspace_id: &str,
+        roots: Vec<String>,
+        directories: Vec<String>,
+    ) -> Result<(), String> {
         let mut roots = roots
             .into_iter()
             .map(|root| root.trim().to_string())
@@ -47,96 +49,61 @@ impl LspManager {
             .collect::<Vec<_>>();
         roots.sort();
         roots.dedup();
-        for root in &roots {
+        for root in roots.iter().chain(directories.iter()) {
             if !Path::new(root).is_absolute() {
                 return Err(format!(
                     "workspace watcher requires an absolute root path: {root}"
                 ));
             }
         }
-        self.stop_workspace_watcher(workspace_id).await;
-        if roots.is_empty() {
+        let ignored_paths = watcher_registration::application_paths(self.client_bridge.app.get());
+        // Publish ownership before waiting on OS setup. Stop/restart cancels the
+        // same token while a blocking registration is still in flight.
+        let mut watchers = self.workspace_watchers.lock().await;
+        if let Some(previous) = watchers.remove(workspace_id) {
+            previous.cancelled.cancel();
+            previous.task.abort();
+        }
+        if roots.is_empty() && directories.is_empty() {
             return Ok(());
         }
-
-        let (event_sender, mut event_receiver) = mpsc::unbounded_channel();
-        let mut watcher = RecommendedWatcher::new(
-            move |event| {
-                let _ = event_sender.send(event);
-            },
-            NotifyConfig::default(),
-        )
-        .map_err(|error| format!("cannot initialize workspace file watcher: {error}"))?;
-        let mut watched_roots = 0;
-        let mut root_errors = Vec::new();
-        let mut watch_targets = Vec::new();
-        let mut watch_registrations: HashMap<String, (PathBuf, bool, Vec<String>)> = HashMap::new();
-        for root in &roots {
-            let requested = PathBuf::from(root);
-            let (watch_path, recursive, filter_path) = if requested.is_dir() {
-                (requested.clone(), true, requested)
-            } else if requested.exists() {
-                // notify accepts files on all supported backends, but recursive
-                // mode is rejected by some platform watchers for a file path.
-                (requested.clone(), false, requested)
-            } else if let Some(parent) = requested.parent().filter(|parent| parent.is_dir()) {
-                // A loose file can be deleted before the workspace opens it. Keep
-                // watching its parent so a later recreate is observable, while
-                // filtering sibling events below.
-                (parent.to_path_buf(), false, requested)
-            } else {
-                root_errors.push(format!("{root}: parent directory does not exist"));
-                continue;
-            };
-            let mut registration_key = normalized_file_operation_path(&watch_path);
-            if cfg!(windows) {
-                registration_key.make_ascii_lowercase();
-            }
-            let registration = watch_registrations
-                .entry(registration_key)
-                .or_insert_with(|| (watch_path, false, Vec::new()));
-            registration.1 |= recursive;
-            registration.2.push(root.clone());
-            watch_targets.push(WorkspaceWatchTarget {
-                recursive,
-                filter_path,
-            });
-        }
-        let mut watch_registrations = watch_registrations.into_values().collect::<Vec<_>>();
-        watch_registrations.sort_by(|left, right| {
-            normalized_file_operation_path(&left.0).cmp(&normalized_file_operation_path(&right.0))
-        });
-        for (watch_path, recursive, requested_roots) in watch_registrations {
-            let mode = if recursive {
-                RecursiveMode::Recursive
-            } else {
-                RecursiveMode::NonRecursive
-            };
-            match watcher.watch(&watch_path, mode) {
-                Ok(()) => watched_roots += 1,
-                Err(error) => root_errors.push(format!("{}: {error}", requested_roots.join(", "))),
-            }
-        }
-        if watched_roots == 0 {
-            return Err(format!(
-                "cannot watch workspace roots: {}",
-                root_errors.join("; ")
-            ));
-        }
-
-        let (stop_sender, mut stop_receiver) = oneshot::channel();
+        let cancelled = CancellationToken::new();
+        let task_cancelled = cancelled.clone();
+        let (initialized_sender, initialized_receiver) = oneshot::channel();
         let workspace_id = workspace_id.to_string();
         let watcher_workspace_id = workspace_id.clone();
         let sessions = self.sessions.clone();
         let client_bridge = self.client_bridge.clone();
         let local_events = self.local_watched_events.clone();
         let task = tokio::spawn(async move {
-            // Keep the watcher alive for the lifetime of this task.
-            let _watcher = watcher;
+            let registration_cancelled = task_cancelled.clone();
+            let registration = tokio::task::spawn_blocking(move || {
+                watcher_registration::register(
+                    roots,
+                    directories,
+                    ignored_paths,
+                    registration_cancelled,
+                )
+            })
+            .await
+            .map_err(|error| format!("workspace watcher worker failed: {error}"))
+            .and_then(|result| result);
+            let registered = match registration {
+                Ok(registered) => registered,
+                Err(error) => {
+                    let _ = initialized_sender.send(Err(error));
+                    return;
+                }
+            };
+            let _watcher = registered.watcher;
+            let mut event_receiver = registered.events;
+            let watch_targets = registered.targets;
+            let ignored_paths = registered.ignored_paths;
+            let _ = initialized_sender.send(Ok(()));
             let mut recent_external: HashMap<(String, u8), Instant> = HashMap::new();
             loop {
                 tokio::select! {
-                    _ = &mut stop_receiver => break,
+                    _ = task_cancelled.cancelled() => break,
                     event = event_receiver.recv() => {
                         let Some(event) = event else { break; };
                         let Ok(event) = event else {
@@ -150,7 +117,7 @@ impl LspManager {
                         let changes = changes
                             .into_iter()
                             .filter(|change| {
-                                workspace_watch_target_matches(&watch_targets, &change.path)
+                                watcher_registration::event_path_allowed(&watch_targets, &ignored_paths, &change.path)
                             })
                             .collect::<Vec<_>>();
                         if changes.is_empty() {
@@ -189,20 +156,28 @@ impl LspManager {
                 }
             }
         });
-        self.workspace_watchers.lock().await.insert(
-            workspace_id,
-            WorkspaceWatcherHandle {
-                stop: Some(stop_sender),
-                task,
-            },
+        let task_id = task.id();
+        watchers.insert(
+            workspace_id.clone(),
+            WorkspaceWatcherHandle { cancelled, task },
         );
-        if !root_errors.is_empty() {
-            log::warn!(
-                "workspace watcher started with unavailable roots: {}",
-                root_errors.join("; ")
-            );
+        drop(watchers);
+        let result = initialized_receiver
+            .await
+            .unwrap_or_else(|_| Err("workspace watcher initialization cancelled".into()));
+        if result.is_err() {
+            let mut watchers = self.workspace_watchers.lock().await;
+            if watchers
+                .get(&workspace_id)
+                .is_some_and(|handle| handle.task.id() == task_id)
+            {
+                if let Some(handle) = watchers.remove(&workspace_id) {
+                    handle.cancelled.cancel();
+                    handle.task.abort();
+                }
+            }
         }
-        Ok(())
+        result
     }
 
     pub(in crate::lsp) fn mark_local_watched_events(

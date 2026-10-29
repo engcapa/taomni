@@ -27,6 +27,8 @@ export function createCompositionLifecycle(context: CreateCompositionLifecycleCo
     viewIdRef,
     clipboardWorkspaceId,
   } = context;
+  const mountedOwner = transactionOwnerRef.current;
+  const mountedFileKey = fileKeyRef.current;
   const compositionNavigationGuard = (event: KeyboardEvent) => {
     if (
       (!view.composing && event.isComposing !== true && !compositionActiveRef.current)
@@ -111,8 +113,8 @@ export function createCompositionLifecycle(context: CreateCompositionLifecycleCo
     clearPendingCompositionFinalize();
     if (currentCompositionSessionRef.current) {
       finalizeSession(currentCompositionSessionRef.current);
-    } else if (transactionOwnerRef.current && fileKeyRef.current) {
-      transactionOwnerRef.current.finalizeComposition(fileKeyRef.current);
+    } else if (mountedOwner && mountedFileKey) {
+      mountedOwner.finalizeComposition(mountedFileKey);
     }
     view.contentDOM.removeEventListener("keydown", compositionNavigationGuard, true);
     view.contentDOM.removeEventListener("compositionstart", compositionStartGuard, true);

@@ -1643,6 +1643,7 @@
 - `[data-testid="welcome-recent-empty"]` — display [optional] — F1.6.recent-empty
 - `[data-testid="welcome-recent-no-matches"]` — display [optional] — F1.6.recent-no-matches
 - `[data-testid="welcome-recent-workspace-row"]` — interactive [optional] — F1.6.recent-workspace-row
+- `[data-testid="welcome-recent-workspace-filter"]` — interactive [optional] — F1.6.recent-workspace-filter
 - `[data-testid="welcome-history-tab-workspaces"]` — interactive [optional] — F1.6.history-tab-workspaces
 - `[data-testid="welcome-history-tab-sessions"]` — interactive — F1.6.history-tab-sessions
 - `[data-testid="welcome-history-tab-directories"]` — interactive — F1.6.history-tab-directories

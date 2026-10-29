@@ -114,13 +114,17 @@ describe("useWorkspaceNavigation", () => {
       setRecentEntries,
       setRecentFilesOpen,
     };
+    let renders = 0;
     const { result, rerender } = renderHook(
-      ({ activeKey }) => useWorkspaceNavigation({ ...props, activeKey }),
+      ({ activeKey }) => { renders++; return useWorkspaceNavigation({ ...props, activeKey }); },
       { initialProps: { activeKey: "root:root-1:src/first.ts" as string | null } },
     );
     act(() => result.current.noteCaretPosition("root:root-1:src/first.ts", { line: 10, character: 4 }));
     rerender({ activeKey: "root:root-1:src/second.ts" });
     await waitFor(() => expect(result.current.navCan.back).toBe(true));
+    const beforeRefinement = renders;
+    act(() => result.current.recordNavigationLocation(second, { line: 20, character: 2 }));
+    expect(renders).toBe(beforeRefinement);
 
     act(() => result.current.navigateHistory(-1));
     expect(openFile).toHaveBeenCalledWith(first);

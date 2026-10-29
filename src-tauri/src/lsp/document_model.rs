@@ -4,10 +4,9 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::path::PathBuf;
 use std::time::Instant;
-use tokio::sync::oneshot;
 
 pub(super) struct WorkspaceWatcherHandle {
-    pub(super) stop: Option<oneshot::Sender<()>>,
+    pub(super) cancelled: tokio_util::sync::CancellationToken,
     pub(super) task: tokio::task::JoinHandle<()>,
 }
 
@@ -15,6 +14,9 @@ pub(super) struct WorkspaceWatcherHandle {
 pub(super) struct WorkspaceWatchTarget {
     /// Whether notify should recurse below the requested directory.
     pub(super) recursive: bool,
+    /// A broad home root or explicitly loaded directory watches its immediate
+    /// children without recursively registering the entire home filesystem.
+    pub(super) direct_children: bool,
     /// Logical path used to discard events outside the requested workspace root
     /// or loose file. For a missing loose file this is the file itself, not its
     /// parent directory.

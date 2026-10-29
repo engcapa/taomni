@@ -2,8 +2,32 @@ import { renderHook, act } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { useWorkspaceActionsController } from "./useWorkspaceActionsController";
 import type { WorkspaceCommand } from "./workspaceCommands";
+import type { WorkspaceActionContext } from "./workspaceActionRegistry";
 
 describe("useWorkspaceActionsController", () => {
+  it("uses the current editor owner for an action before its display snapshot rerenders", () => {
+    let context: Partial<WorkspaceActionContext> = { activeFileKey: "a", hasActiveFile: false, hasSelection: false };
+    const run = vi.fn();
+    const commands: WorkspaceCommand[] = [{
+      id: "editor.liveSelection", title: "Selection", category: "Edit",
+      when: (value) => !!value.hasActiveFile && !!value.hasSelection,
+      run,
+    }];
+    const { result } = renderHook(() => useWorkspaceActionsController({
+      commands, activeFocus: "editor", contextData: context,
+      getContextData: () => context,
+    }));
+    expect(result.current.getActionState("editor.liveSelection").availability).toBe("disabled");
+    // Port registration and selection update synchronously; their secondary
+    // menu/status render may still be pending when the next shortcut arrives.
+    context = { activeFileKey: "b", hasActiveFile: true, hasSelection: true };
+    act(() => expect(result.current.executeCommand("editor.liveSelection")).toBe(true));
+    expect(run).toHaveBeenCalledWith(expect.objectContaining({ activeFileKey: "b", hasSelection: true }));
+    context = { activeFileKey: "b", hasActiveFile: false, hasSelection: false };
+    expect(result.current.executeCommand("editor.liveSelection")).toBe(false);
+    expect(run).toHaveBeenCalledTimes(1);
+  });
+
   it("registers commands and executes them by id", () => {
     const runMock = vi.fn();
     const commands: WorkspaceCommand[] = [

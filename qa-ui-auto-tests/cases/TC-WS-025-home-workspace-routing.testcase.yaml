@@ -54,12 +54,12 @@ steps:
     selector: '[data-testid="code-workspace-editor"]'
     contains: QA_HOME_ROUTE_SAVE
 - eval_readonly:
-    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]').title.length > 0 &&
-      parseFloat(getComputedStyle(document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]')).borderTopWidth) >= 1
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]').title.length > 0 && parseFloat(getComputedStyle(document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]')).borderTopWidth)
+      >= 1
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]').getBoundingClientRect().top -
-      document.querySelector('[data-testid'+String.fromCharCode(61)+'"rail-mode-group"]').getBoundingClientRect().bottom >= 12
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"sidebar-tool-window-rail"]').getBoundingClientRect().top - document.querySelector('[data-testid'+String.fromCharCode(61)+'"rail-mode-group"]').getBoundingClientRect().bottom
+      >= 12
     expect_truthy: true
 - screenshot: home-workspace-ide-group.png
 - click: '[data-testid="nav-mode-home"]'
@@ -100,12 +100,28 @@ steps:
 - assert_count:
     selector: '[data-testid="platform-toolbar-actions"] [data-testid="workspace-toolbar-bottom-dock"]'
     equal: 0
+- press: Escape
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- fill:
+    selector: '[data-testid="welcome-recent-workspace-filter"]'
+    value: ${fixture.platform_workspace_root}
+- assert_visible: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
+- wait_for: '[data-testid="code-workspace-tab"]:visible'
+- click: '[data-testid="nav-mode-home"]'
+- assert_attribute:
+    selector: '[data-testid="welcome-recent-workspace-filter"]'
+    name: value
+    equals: ${fixture.platform_workspace_root}
+- assert_visible: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Home new/recent opens the same full editor inside Workspaces, save survives re-entry, Sessions contains no code tabs, and context-free Code Editor routes
-      to the default workspace. IDE tools are separated by at least 12px with a divider and tooltip.
+    requirement: Home new/recent opens the same full editor inside Workspaces, save survives re-entry, Sessions contains no code tabs, and context-free Code Editor
+      routes to the default workspace. IDE tools are separated by at least 12px with a divider and tooltip.
     actions:
     - 3
     - 5
@@ -139,9 +155,9 @@ verification:
     - step: 18
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "QA_HOME_ROUTE_SAVE"}}'
     - step: 19
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'').title.length > 0 &&
-        parseFloat(getComputedStyle(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'')).borderTopWidth) >= 1", "expect_truthy":
-        true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'').title.length
+        > 0 && parseFloat(getComputedStyle(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'')).borderTopWidth) >=
+        1", "expect_truthy": true}}'
     - step: 20
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'').getBoundingClientRect().top
         - document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"rail-mode-group\"]'').getBoundingClientRect().bottom >= 12", "expect_truthy": true}}'
@@ -198,6 +214,33 @@ verification:
     - 39
     - 40
     - 44
+  - id: R2
+    requirement: Hidden Home retains the selected history section and search text while workspace recent-file publications update; returning shows the current matching
+      workspace and keeps its routing action usable.
+    actions:
+    - 45
+    - 46
+    - 47
+    - 48
+    - 50
+    - 52
+    checkpoints:
+    - step: 49
+      expectation: '{"assert_visible": "[data-testid=\"welcome-recent-workspace-row\"][data-workspace-path=\"${fixture.platform_workspace_root}\"]"}'
+    - step: 51
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]:visible"}'
+    - step: 53
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-recent-workspace-filter\"]", "name": "value", "equals": "${fixture.platform_workspace_root}"}}'
+    - step: 54
+      expectation: '{"assert_visible": "[data-testid=\"welcome-recent-workspace-row\"][data-workspace-path=\"${fixture.platform_workspace_root}\"]"}'
+    - step: 55
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 49
+    - 51
+    - 53
+    - 54
+    - 55
   visual:
   - check: Compact controls retain readable icons and active states without toolbar overlap.
     method: manual
