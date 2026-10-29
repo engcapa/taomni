@@ -13,8 +13,9 @@ import type { SessionConfig } from "../lib/ipc/session";
 import { createWorkspaceTabActions } from "./workspacePlatformTabActions";
 import { createWorkspaceCodeActions } from "./workspacePlatformCodeActions";
 import type { CodeWorkspaceTabInfo } from "../types";
+import { cancelWorkspacePlatformPersistence, observeWorkspacePlatformStorage, persistWorkspacePlatformMetadata as persist, PLATFORM_WORKSPACES_STORAGE_KEY } from "./workspacePlatformPersistence";
 
-export const PLATFORM_WORKSPACES_STORAGE_KEY = "taomni.platformWorkspaces.v1";
+export { PLATFORM_WORKSPACES_STORAGE_KEY };
 export const DEFAULT_WORKSPACE_ID = "default-workspace";
 export const DEFAULT_WORKSPACE_NAME = "Default Workspace (默认工作区)";
 
@@ -262,6 +263,7 @@ export function readPersistedPlatformState(): Pick<PersistedPlatformState, "work
   if (typeof window === "undefined") return fallback;
   try {
     const raw = window.localStorage.getItem(PLATFORM_WORKSPACES_STORAGE_KEY);
+    observeWorkspacePlatformStorage(raw);
     if (!raw) return fallback;
     const parsed = JSON.parse(raw) as Partial<PersistedPlatformState>;
     const workspaces = Array.isArray(parsed.workspaces) ? parsed.workspaces.filter(isPlatformWorkspace) : [];
@@ -275,21 +277,6 @@ export function readPersistedPlatformState(): Pick<PersistedPlatformState, "work
     return { workspaces: ensured, activeWorkspaceId, createdNodes };
   } catch {
     return fallback;
-  }
-}
-
-function persist(state: Pick<WorkspacePlatformState, "workspaces" | "activeWorkspaceId" | "createdNodes">): void {
-  if (typeof window === "undefined") return;
-  try {
-    const payload: PersistedPlatformState = {
-      version: 1,
-      workspaces: state.workspaces,
-      activeWorkspaceId: state.activeWorkspaceId,
-      createdNodes: state.createdNodes,
-    };
-    window.localStorage.setItem(PLATFORM_WORKSPACES_STORAGE_KEY, JSON.stringify(payload));
-  } catch {
-    // Storage unavailable: the session keeps the in-memory state.
   }
 }
 
@@ -325,6 +312,7 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
   createdNodes: initial.createdNodes,
 
   reloadFromStorage: () => {
+    cancelWorkspacePlatformPersistence();
     const next = readPersistedPlatformState();
     set({ ...next });
   },

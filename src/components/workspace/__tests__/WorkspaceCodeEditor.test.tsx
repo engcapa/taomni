@@ -56,6 +56,7 @@ describe("platform editor ownership", () => {
     expect(current().rootFolders).toBe(folders);
     expect(editor.props!.workspace).toBe(input);
     expect(editor.props!.hostIntegration).toBe(host);
+    window.dispatchEvent(new Event("pagehide"));
     useWorkspacePlatformStore.getState().reloadFromStorage();
     expect(current().codeWorkspace?.initialFile).toMatchObject({ path: "second.json" });
   });

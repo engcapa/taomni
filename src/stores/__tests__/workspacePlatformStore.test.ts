@@ -204,6 +204,7 @@ describe("workspacePlatformStore (TASK-01)", () => {
     store.addRootFolder(custom.id, { path: "/repo/extra" });
     store.pinSession(custom.id, "ssh-a");
 
+    window.dispatchEvent(new Event("pagehide"));
     const stored = window.localStorage.getItem(PLATFORM_WORKSPACES_STORAGE_KEY);
     expect(stored).toContain("persisted");
 
@@ -234,6 +235,7 @@ describe("workspacePlatformStore (TASK-01)", () => {
     store.closeWorkspaceTab(workspace.id, tabs[2].id);
     store.setActiveWorkspaceTab(workspace.id, file.id);
     const expected = useWorkspacePlatformStore.getState().getWorkspace(workspace.id)!;
+    window.dispatchEvent(new Event("beforeunload"));
     store.reloadFromStorage();
     expect(useWorkspacePlatformStore.getState().getWorkspace(workspace.id)).toEqual(expected);
     expect(expected.openTabs.map((tab) => tab.protocol).filter(Boolean)).not.toContain("MySQL");

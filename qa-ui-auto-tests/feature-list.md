@@ -12188,6 +12188,8 @@ TC-WS-068 measures cold tree activation of txt/log/csv and an unclassified text 
 
 TC-WS-070 reproduces the all-types report with a five-line HTML file, 704-line text and tiny text: three cold tree opens followed by six tab activations. Exact canonical contents, HTML syntax highlighting, all frame samples and zero automatic SDK/LSP commands remain required in browser/native. The native run reads real files in the matching QA release. Current-source hosted evidence remains pending.
 
+TC-WS-072 covers the coalesced workspace metadata writer through immediate browser/native window reload. Two file tabs and a terminal are opened, one file is closed, and the surviving file is activated immediately before reload. The folder, mixed tabs, selected file and final dirty text must restore, while the closed file stays closed. No persistence wait or direct store/storage injection is used.
+
 ## 12. Workspace-First 平台重构（v6.1）
 
 > 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents / Crew 开发中入口与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-049`。`TC-WS-049` 覆盖 Home、Tools、Sessions、空/多标签 Workspaces 的共享标题栏拖动事件、窄窗口真实命中、双击最大化，以及按钮、标签、弹出输入框和右键的排除；`TC-MAIN-RAIL-03` 验证同一顶部边框及 Home/Tools 标题的真实系统位移。`TC-WS-029/030` 还覆盖工作区标签过多时的左右滚动控制，以及顶部空白区保留原生窗口拖动目标。`TC-WS-044` 在 browser/native 中覆盖从 Home 选择已保存工作区后，树形/详细列表的已展开子目录自动重新加载，保留文档与目录展开状态。`TC-WS-045` 覆盖 Tools / Home 显式进入空编辑器时展示文件区，以及收缩、Project 和 Sessions 工具切换后的恢复。`TC-WS-047` 覆盖普通层级文件树显示依赖/构建目录，避免将父目录误判为 Empty。`TC-WS-018/019` 保留连续快捷键开关回归，`TC-WS-046` 追加 Linux 原生 GTK/fcitx 真实输入及大预览重复打开边界。

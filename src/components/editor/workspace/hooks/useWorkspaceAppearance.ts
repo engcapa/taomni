@@ -25,10 +25,10 @@ export interface UseWorkspaceAppearanceContext {
 export function useWorkspaceAppearance(context: UseWorkspaceAppearanceContext) {
   const { activeEditorGroupIdRef, workspaceInstanceId, clipboardHandle, setStatusMessage, activeEditorGroupId, activeKey, openFilesRef } = context;
 
-  const initialEditorAppearance = readEditorAppearanceProfileWithDiagnostics(
+  const initialEditorAppearance = useMemo(() => readEditorAppearanceProfileWithDiagnostics(
     workspaceInstanceId,
     loadCodeViewProfile(),
-  );
+  ), [workspaceInstanceId]);
   const [editorAppearanceProfile, setEditorAppearanceProfileState] = useState<EditorAppearanceProfile>(
     () => {
       if (initialEditorAppearance.source === "migrated") {

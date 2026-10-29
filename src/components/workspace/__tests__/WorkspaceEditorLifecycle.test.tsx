@@ -124,6 +124,7 @@ it("preserves the selected file when a cold workspace also restores a terminal b
   first.unmount();
   await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
   useCodeWorkspaceStore.setState({ byInstanceId: {} });
+  window.dispatchEvent(new Event("pagehide"));
   platform.reloadFromStorage();
   expect(platform.getWorkspace()!.activeTabId).toBe(file.id);
   const { rerender } = render(<Panel visible={false} />);
