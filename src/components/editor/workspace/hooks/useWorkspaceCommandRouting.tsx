@@ -1,4 +1,4 @@
-import { BookOpen, FolderTree, GitCommitHorizontal, ListTree } from "../icons";
+import { WORKSPACE_TOOL_ICONS } from "../workspaceToolIcons";
 import { useCallback, useEffect, useLayoutEffect, useMemo } from "react";
 import { useCodeWorkspaceStatusStore } from "../../../../stores/codeWorkspaceStatusStore";
 import type { CodeWorkspaceFileRef } from "../../../../types";
@@ -202,7 +202,7 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
     {
       id: "project",
       label: "Project",
-      icon: <FolderTree className="h-3.5 w-3.5" />,
+      icon: WORKSPACE_TOOL_ICONS["project"],
       active: session.workspaceUi.languagePanelOpen,
       shortcut: railShortcut("workspace.toggleProjectTree"),
       onSelect: editorFeatures.toolWindowActions.toggleProjectTree,
@@ -210,7 +210,7 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
     {
       id: "commit",
       label: "Commit",
-      icon: <GitCommitHorizontal className="h-3.5 w-3.5" />,
+      icon: WORKSPACE_TOOL_ICONS["commit"],
       active: session.workspaceUi.bottomDockOpen && session.workspaceUi.bottomDockTab === "git",
       shortcut: railShortcut("workspace.commitToolWindow"),
       disabled: project.gitSnapshotOwner.gitRoots.length === 0,
@@ -236,7 +236,7 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
     {
       id: "structure",
       label: "Structure",
-      icon: <ListTree className="h-3.5 w-3.5" />,
+      icon: WORKSPACE_TOOL_ICONS["structure"],
       active: project.toolWindowRouting.rightPaneOpen && session.workspaceUi.rightPaneTab === "outline",
       shortcut: railShortcut("workspace.toggleDocumentationPane"),
       onSelect: editorFeatures.toolWindowActions.toggleOutlinePane,
@@ -244,7 +244,7 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
     {
       id: "documentation",
       label: "Docs",
-      icon: <BookOpen className="h-3.5 w-3.5" />,
+      icon: WORKSPACE_TOOL_ICONS["documentation"],
       active: project.toolWindowRouting.rightPaneOpen && session.workspaceUi.rightPaneTab === "documentation",
       onSelect: () => {
         if (project.toolWindowRouting.rightPaneOpen && session.workspaceUi.rightPaneTab === "documentation") {

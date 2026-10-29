@@ -1,4 +1,4 @@
-import { type ReactNode } from "react";
+import type { ToolWindowContent } from "../panels/toolWindowContent";
 import type { CodeWorkspaceLooseFileInfo, CodeWorkspaceRootInfo } from "../../../../types";
 import { FileTreePane } from "../FileTreePane";
 import { OutlinePane } from "../OutlinePane";
@@ -107,11 +107,11 @@ export function createWorkspaceSideContents(context: CreateWorkspaceSideContents
 
   // ED-PARITY-024: every tool window renders once into a re-parentable host;
   // the area showing it adopts the host node (state survives moves).
-  const toolWindowContents: { id: string; label: string; content: ReactNode; }[] = [
+  const toolWindowContents: ToolWindowContent[] = [
     {
       id: "project",
       label: "Project",
-      content: (
+      renderContent: () => (
         <FileTreePane
           paneRef={treeFocus.treePaneRef}
           style={appearance.treePaneStyle}
@@ -170,7 +170,7 @@ export function createWorkspaceSideContents(context: CreateWorkspaceSideContents
     {
       id: "structure",
       label: "Structure",
-      content: (
+      renderContent: () => (
         <OutlinePane
           symbols={telemetry.breadcrumbSymbolsByGroup[activeEditorGroupId] ?? []}
           position={telemetry.cursorPositions[activeEditorGroupId] ?? { line: 0, character: 0 }}
@@ -187,7 +187,7 @@ export function createWorkspaceSideContents(context: CreateWorkspaceSideContents
     {
       id: "documentation",
       label: "Documentation",
-      content: (
+      renderContent: () => (
         <DocumentationPane
           content={pinnedDoc}
           locked={pinnedDocLocked}
@@ -204,7 +204,7 @@ export function createWorkspaceSideContents(context: CreateWorkspaceSideContents
         />
       ),
     },
-    ...dockContents.bottomDockTabs.map((tab) => ({ id: tab.id, label: tab.label, content: tab.content })),
+    ...dockContents.bottomDockTabs,
   ];
   return { toolWindowContents };
 }

@@ -322,3 +322,32 @@ tabSize 仍为 4（期望 8）与正文仍为旧磁盘快照；现在同时重�
 passed。前一提交用 Node.js 22、2 workers 执行的相关 10 文件 375 tests passed。
 `TC-WS-034` 增加先切至普通文本再修改 Settings、回切 README 的字体/主题及
 独立撤销断言，覆盖缓存文件的全局外观同步。
+
+## 隐藏工具窗口的构造边界与 Home 历史更新
+
+常驻 View 首轮 [40815182933](https://github.com/engcapa/taomni/actions/runs/40815182933)
+执行 39 次，28 passed / 11 failed；完整崩溃组、原生视图状态、拆屏关闭重开和
+Home 真实监听通过。native 连续回切与保存重开正文为 57–92ms，但首次打开仍
+有 151–231ms 慢帧。设置缓存补修轮
+[40816522359](https://github.com/engcapa/taomni/actions/runs/40816522359)
+执行 40 次，29 passed / 11 failed。browser 使用单 worker 后首次打开仍有
+289–318ms 慢帧，native 为 182–229ms；native 连续切换 48–75ms。两轮均保留
+原始失败，不能据此宣称性能达标。后者另有 `TC-WS-034` fixture 选错目录：
+该浏览器路径实际有 README.txt，没有 Documents，现改用真实存在的文本文件，
+保留字体、主题、dirty 与单字符 undo 断言。
+
+CPU 采样仍显示隐藏工具的 JSX 构造、portal 包装和隐藏 Home 最近记录参与
+文件激活。原 KeepAlive 已冻结面板组件，但其父 factory 仍预先构造全部工具
+内容。现在将内容构造传入 KeepAlive 内部；隐藏 portal 同样跳过父更新，显示
+时使用最新回调和配置。所有工具仍在初始挂载时创建，保留后台 Run/Terminal
+句柄、订阅和任务生命周期。工具图标使用固定元素，减少 stripe 的 SVG 重建。
+Home 隐藏时冻结 props 并暂停最近 workspace 订阅，返回时同步当前记录，
+搜索、所选历史分区和滚动仍由原组件保存。
+
+新增 mounted 回归核验后台句柄、draft、移动 portal、实际卸载、重新显示的
+最新回调与 Home 搜索/历史；连同完整 workspace 单测共 7 文件 305 tests
+passed（Node 22、最多 2 workers）。`TC-WS-025` 增加隐藏 Home 后保留搜索与
+历史分区再进入 workspace 的实际流程。保留并选择 064–071 性能、034 外观、
+010/024 工具条、弹层、终端移动原生回归与完整 crash-regression；正文、高亮、
+每帧 150ms、1500ms 就绪预算及真实 View 身份不变。本机未运行 browser/native，
+本轮托管结果待收集；最终 main 对比和全量门禁仍未完成。

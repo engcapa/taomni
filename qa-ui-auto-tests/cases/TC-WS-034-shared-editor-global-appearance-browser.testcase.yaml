@@ -1,7 +1,7 @@
 id: TC-WS-034
 title: Added workspace folders share the full editor and follow live Settings appearance
-description: Adds an ordinary folder, edits README, then switches to a text file before applying global font/theme settings. Returning to the cached README
-  retains the new appearance and a one-character undo.
+description: Adds an ordinary folder, edits README, then switches to a text file before applying global font/theme settings. Returning to the cached README retains
+  the new appearance and a one-character undo.
 modes:
 - browser
 covers:
@@ -52,11 +52,10 @@ steps:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
     text: X
 - wait_for: '[data-testid="workspace-file-editor"][data-dirty="true"]'
-- click: '[data-testid="code-workspace-tree-dir"][data-path="Documents"] [data-testid="code-workspace-tree-dir-arrow"]'
-- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/notes.txt"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.txt"]'
 - assert_text:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
-    contains: Weekly notes
+    contains: Browser preview uses an in-memory virtual local filesystem.
 - click: '[data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - click: '[data-testid="settings-group-toggle-general"]'
@@ -129,7 +128,6 @@ verification:
     - 16
     - 17
     - 19
-    - 20
     checkpoints:
     - step: 8
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
@@ -142,13 +140,13 @@ verification:
     - step: 14
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"]", "equal": 0}}'
     - step: 15
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid''+String.fromCharCode(61)+''\"workspace-editor-title\"]'').length
-        === 1 && !document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tab\"]'').textContent.includes(''Code ·'')", "expect_truthy":
-        true}}'
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid''+String.fromCharCode(61)+''\"workspace-editor-title\"]'').length ===
+        1 && !document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tab\"]'').textContent.includes(''Code ·'')", "expect_truthy": true}}'
     - step: 18
       expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-dirty=\"true\"]"}'
-    - step: 21
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "Weekly notes"}}'
+    - step: 20
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "Browser preview uses an in-memory virtual local
+        filesystem."}}'
     results:
     - 8
     - 9
@@ -157,11 +155,12 @@ verification:
     - 14
     - 15
     - 18
-    - 21
+    - 20
   - id: R2
     requirement: Settings fonts, size and colour theme update the mounted workspace and a cached document when switched back; its undo survives.
     actions:
-    - 22
+    - 21
+    - 23
     - 24
     - 25
     - 26
@@ -174,44 +173,43 @@ verification:
     - 33
     - 34
     - 35
-    - 36
-    - 38
-    - 45
+    - 37
+    - 44
     checkpoints:
-    - step: 23
+    - step: 22
       expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
-    - step: 37
+    - step: 36
       expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
-    - step: 39
+    - step: 38
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab-strip\"]'')).fontFamily.includes(\"Outfit\")",
         "expect_truthy": true, "timeout_sec": 10}}'
-    - step: 40
+    - step: 39
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-tab\"]'')).fontSize
         === \"18px\"", "expect_truthy": true, "timeout_sec": 10}}'
-    - step: 41
+    - step: 40
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-file-editor\"]
         .cm-editor'')).fontSize === \"18px\"", "expect_truthy": true, "timeout_sec": 10}}'
-    - step: 42
+    - step: 41
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"workspace-file-editor\"]
         .cm-scroller'')).fontFamily.includes(\"Consolas\")", "expect_truthy": true, "timeout_sec": 10}}'
-    - step: 43
+    - step: 42
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tab\"]'')).backgroundColor
-        === getComputedStyle(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-view-preview\"]'')).backgroundColor", "expect_truthy":
-        true, "timeout_sec": 10}}'
-    - step: 44
+        === getComputedStyle(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-view-preview\"]'')).backgroundColor", "expect_truthy": true,
+        "timeout_sec": 10}}'
+    - step: 43
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "X"}}'
-    - step: 46
+    - step: 45
       expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-file-editor\"][data-dirty]", "state": "detached"}}'
     results:
-    - 23
-    - 37
+    - 22
+    - 36
+    - 38
     - 39
     - 40
     - 41
     - 42
     - 43
-    - 44
-    - 46
+    - 45
   visual:
   - check: Review compact shared editor chrome, tree, tabs and chosen appearance in the retained screenshot.
     method: manual

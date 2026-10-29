@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
+import { memo, useCallback, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Minus, MoreVertical } from "../icons";
 import { ContextMenu, type MenuItem } from "../../../ContextMenu";
@@ -52,13 +52,14 @@ export function useToolWindowNodes(): ToolWindowNodes {
 }
 
 /** Renders one tool window's content into its host node. */
-export function ToolWindowPortal({
+export const ToolWindowPortal = memo(function ToolWindowPortal({
   nodes,
   id,
   label,
   active,
   onEscape,
   children,
+  renderContent,
 }: {
   nodes: ToolWindowNodes;
   id: string;
@@ -70,7 +71,8 @@ export function ToolWindowPortal({
    * dock's own handler never sees it), so each window handles it here.
    */
   onEscape?: () => void;
-  children: ReactNode;
+  children?: ReactNode;
+  renderContent?: () => ReactNode;
 }) {
   return createPortal(
     <div
@@ -80,12 +82,13 @@ export function ToolWindowPortal({
         onEscape();
       } : undefined}
     >
-      <KeepAliveToolPanel active={active}>{children}</KeepAliveToolPanel>
+      <KeepAliveToolPanel active={active} renderContent={renderContent}>{children}</KeepAliveToolPanel>
     </div>,
     nodes.node(id, label),
     `tool-window-${id}`,
   );
-}
+}, (previous, next) => !previous.active && !next.active
+  && previous.nodes === next.nodes && previous.id === next.id && previous.label === next.label);
 
 /** A visible area slot: adopts the tool window's host node while mounted. */
 export function ToolWindowSlot({

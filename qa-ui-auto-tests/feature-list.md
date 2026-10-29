@@ -486,6 +486,10 @@ controls:
     selector: '[data-testid="welcome-recent-workspace-row"]'
     kind: interactive
     optional: true       # rendered only when recent workspaces exist (native gate C0 enters here)
+  - id: recent-workspace-filter
+    selector: '[data-testid="welcome-recent-workspace-filter"]'
+    kind: interactive
+    optional: true       # available in the workspace history section
   - id: history-tab-workspaces
     selector: '[data-testid="welcome-history-tab-workspaces"]'
     kind: interactive

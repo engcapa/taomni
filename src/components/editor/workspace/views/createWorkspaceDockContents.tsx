@@ -1,20 +1,4 @@
-import {
-  Activity,
-  AlertTriangle,
-  Braces,
-  Bug,
-  FlaskConical,
-  GitBranch,
-  GitFork,
-  Hammer,
-  ListTodo,
-  ListTree,
-  Network,
-  Play,
-  Search,
-  ShieldCheck,
-  TerminalSquare,
-} from "../icons";
+import { WORKSPACE_TOOL_ICONS } from "../workspaceToolIcons";
 import { lspJavaModules, type LspWorkspaceEdit } from "../../../../lib/editor/lsp";
 import type { StructuralMatch } from "../../../../lib/editor/structuralSearch";
 import { type WorkspaceToolConfig } from "../../../../lib/editor/workspace";
@@ -205,14 +189,14 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
     {
       id: "problems",
       label: "Problems",
-      icon: <AlertTriangle className="h-3.5 w-3.5" />,
+      icon: WORKSPACE_TOOL_ICONS["problems"],
       badge: problems.activeProblemCounts.errors > 0 || problems.activeProblemCounts.warnings > 0 ? (
         <span className="inline-flex items-center gap-1">
           {problems.activeProblemCounts.errors > 0 && <span className="text-red-500">{problems.activeProblemCounts.errors}</span>}
           {problems.activeProblemCounts.warnings > 0 && <span className="text-amber-500">{problems.activeProblemCounts.warnings}</span>}
         </span>
       ) : undefined,
-      content: (
+      renderContent: () => (
         <ProblemsPanel
           files={problemsScopeFiles}
           onOpenProblem={problems.openProblem}
@@ -240,9 +224,9 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
     {
       id: "analysis",
       label: "Analysis",
-      icon: <Activity className="h-3.5 w-3.5" />,
+      icon: WORKSPACE_TOOL_ICONS["analysis"],
       badge: problems.activeProblemCounts.errors + problems.activeProblemCounts.warnings || undefined,
-      content: (
+      renderContent: () => (
         <AnalysisPanel
           files={analysisFiles}
           status={activeLspState?.status ?? null}
@@ -267,8 +251,8 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
     {
       id: "search",
       label: "Search",
-      icon: <Search className="h-3.5 w-3.5" />,
-      content: (
+      icon: WORKSPACE_TOOL_ICONS["search"],
+      renderContent: () => (
         <FindInFilesPanel
           roots={roots}
           workspaceInstanceId={workspaceInstanceId}
@@ -285,18 +269,18 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
     {
       id: "structural",
       label: "Structural Search",
-      icon: <Braces className="h-3.5 w-3.5" />,
+      icon: WORKSPACE_TOOL_ICONS["structural"],
       badge: structuralSearch.result?.matches.length || undefined,
-      content: (
+      renderContent: () => (
         <StructuralSearchPanel session={structuralSearch} onOpenMatch={openStructuralMatch} />
       ),
     },
     {
       id: "references",
       label: "References",
-      icon: <ListTree className="h-3.5 w-3.5" />,
+      icon: WORKSPACE_TOOL_ICONS["references"],
       badge: usages.referencesResult.locations.length,
-      content: (
+      renderContent: () => (
         <ReferencesPanel
           result={usages.referencesResult}
           roots={roots}
@@ -315,8 +299,8 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
     {
       id: "call-hierarchy",
       label: "Call Hierarchy",
-      icon: <GitFork className="h-3.5 w-3.5" />,
-      content: (
+      icon: WORKSPACE_TOOL_ICONS["call-hierarchy"],
+      renderContent: () => (
         <HierarchyPanel
           {...hierarchy.hierarchyPanelProps("call")}
           active={bottomDockOpen && bottomDockTab === "call-hierarchy"}
@@ -327,8 +311,8 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
     {
       id: "type-hierarchy",
       label: "Type Hierarchy",
-      icon: <Network className="h-3.5 w-3.5" />,
-      content: (
+      icon: WORKSPACE_TOOL_ICONS["type-hierarchy"],
+      renderContent: () => (
         <HierarchyPanel
           {...hierarchy.hierarchyPanelProps("type")}
           active={bottomDockOpen && bottomDockTab === "type-hierarchy"}
@@ -339,9 +323,9 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
     {
       id: "todos",
       label: "TODOs",
-      icon: <ListTodo className="h-3.5 w-3.5" />,
+      icon: WORKSPACE_TOOL_ICONS["todos"],
       badge: (openFileTodos.length + preferences.bookmarks.length) > 0 ? (openFileTodos.length + preferences.bookmarks.length) : undefined,
-      content: (
+      renderContent: () => (
         <TodosBookmarksPanel
           todos={openFileTodos}
           bookmarks={preferences.bookmarks}
@@ -355,9 +339,9 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
     {
       id: "terminal",
       label: "Terminal",
-      icon: <TerminalSquare className="h-3.5 w-3.5" />,
+      icon: WORKSPACE_TOOL_ICONS["terminal"],
       badge: undefined,
-      content: (
+      renderContent: () => (
         <TerminalDockPanel
           ref={terminalDockRef}
           workspaceInstanceId={workspaceInstanceId}
@@ -370,8 +354,8 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
     {
       id: "run",
       label: "Run",
-      icon: <Play className="h-3.5 w-3.5" />,
-      content: (
+      icon: WORKSPACE_TOOL_ICONS["run"],
+      renderContent: () => (
         <RunPanel
           ref={runPanelRef}
           workspaceInstanceId={workspaceInstanceId}
@@ -386,8 +370,8 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
     {
       id: "build",
       label: "Build",
-      icon: <Hammer className="h-3.5 w-3.5" />,
-      content: (
+      icon: WORKSPACE_TOOL_ICONS["build"],
+      renderContent: () => (
         <BuildPanel
           workspaceInstanceId={workspaceInstanceId}
           roots={roots}
@@ -404,8 +388,8 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
     {
       id: "tests",
       label: "Tests",
-      icon: <FlaskConical className="h-3.5 w-3.5" />,
-      content: (
+      icon: WORKSPACE_TOOL_ICONS["tests"],
+      renderContent: () => (
         <TestsPanel
           activeFileTitle={activeFileIsJava ? activeFile?.title ?? null : null}
           canDiscover={activeFileIsJava}
@@ -424,9 +408,9 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
     {
       id: "coverage",
       label: "Coverage",
-      icon: <ShieldCheck className="h-3.5 w-3.5" />,
+      icon: WORKSPACE_TOOL_ICONS["coverage"],
       badge: coverage.coverageReport ? `${coverage.coverageReport.totalPercentage}%` : undefined,
-      content: (
+      renderContent: () => (
         <CoveragePanel
           report={coverage.coverageReport}
           coverageEnabled={coverage.coverageOverlayEnabled}
@@ -448,10 +432,10 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
       // same Git manager as the Git tab, scoped to this workspace's repos.
       id: "git",
       label: "Git",
-      icon: <GitBranch className="h-3.5 w-3.5" />,
+      icon: WORKSPACE_TOOL_ICONS["git"],
       // Mounted on first open and kept, so the commit message and
       // selection survive hiding the tool window.
-      content: gitSnapshotOwner.gitRoots.length > 0 && (gitToolWindowMounted || (bottomDockOpen && bottomDockTab === "git")) ? (
+      renderContent: () => gitSnapshotOwner.gitRoots.length > 0 && (gitToolWindowMounted || (bottomDockOpen && bottomDockTab === "git")) ? (
         <div data-testid="code-workspace-git-tool-window" tabIndex={-1} className="relative h-full min-h-0 outline-none">
           <WorkspaceGitManager
             workspaceName={title}
@@ -469,8 +453,8 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
     {
       id: "debug",
       label: "Debug",
-      icon: <Bug className="h-3.5 w-3.5" />,
-      content: (
+      icon: WORKSPACE_TOOL_ICONS["debug"],
+      renderContent: () => (
         <DebugPanel
           debug={debug}
           onStart={activeFileDebuggable ? debugLaunch.startDebugActiveTarget : null}
