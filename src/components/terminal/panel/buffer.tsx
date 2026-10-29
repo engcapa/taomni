@@ -206,7 +206,7 @@ export function captureBufferCommand(term: Terminal): string {
 
 
 // Heuristic: does the terminal currently show an idle shell prompt waiting for
-// input? True only when the cursor line is non-empty AND ends in a common
+// input? The logical prompt must be non-empty AND end in a common
 // prompt terminator with nothing typed after it. This deliberately returns
 // false for a blank screen (shell still starting up — e.g. a slow .bashrc /
 // conda init), a streaming MOTD, or a half-typed command, so callers that need
@@ -219,7 +219,20 @@ export function terminalAtIdlePrompt(term: Terminal): boolean {
   const buffer = term.buffer.active;
   if (buffer.type === "alternate") return false;
 
-  const cursorRow = buffer.baseY + buffer.cursorY;
+  let cursorRow = buffer.baseY + buffer.cursorY;
+  let readlineMargin = false;
+  // Readline explicitly writes CR LF CR after an exactly full prompt. Unlike
+  // autowrap, that empty cursor row has no isWrapped flag. Only consider the
+  // immediately preceding row while readline is active and its final cell is
+  // a printed space, not an unused padded cell. Do not scan old output.
+  if (
+    buffer.cursorX === 0 && cursorRow > 0 && term.modes.bracketedPasteMode
+    && !buffer.getLine(cursorRow)?.translateToString(true).trim()
+    && buffer.getLine(cursorRow - 1)?.getCell(term.cols - 1)?.getChars() === " "
+  ) {
+    cursorRow -= 1;
+    readlineMargin = true;
+  }
   let start = cursorRow;
   while (start > 0 && buffer.getLine(start)?.isWrapped) start -= 1;
 
@@ -228,12 +241,13 @@ export function terminalAtIdlePrompt(term: Terminal): boolean {
     const line = buffer.getLine(row);
     if (!line) continue;
     text +=
-      row === cursorRow
+      row === cursorRow && !readlineMargin
         ? line.translateToString(false).slice(0, buffer.cursorX)
         : line.translateToString(false);
   }
 
   if (text.replace(/\s+$/, "").length === 0) return false; // blank: not ready
+  if (readlineMargin && extractTerminalCommand(text) !== "") return false;
   // Ends in a prompt terminator, optionally followed by a single space.
   return /[$#>%][ \t]{0,4}$/.test(text);
 }

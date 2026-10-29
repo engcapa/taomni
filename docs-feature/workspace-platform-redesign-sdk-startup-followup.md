@@ -4,6 +4,11 @@
 
 ## 本轮恢复记录（持续更新）
 
+- `dba8c361568b3bbf8d148f2733987ac889faa94f` 的 GitHub [40952190607](https://github.com/engcapa/taomni/actions/runs/40952190607) 已结束：**243 passed / 17 failed / 0 skipped**，260次执行与计划逐项一致。browser Linux43/0、Windows43/0、macOS42/1；native Linux42/3、Windows43/0、macOS30/13（通过/失败）。6,390个回执附件逐字节/SHA及source/runner/release身份已核验；Windows原生fixture、工具窗与HOME清理通过。失败包含macOS冷开长帧、061/062响应预算，以及Linux074/075长帧和063输入帧，全部原始证据保留，不合并main或宣称验收。
+- 同source=`dfb2b7445da7c37b112349ce7cdddd688ac3f11dcb264f65bbf3b062e825e07c` 本机最终组合：browser18/18、native专项23/24、native完整适用crash9/9。全部性能断言通过，browser40个观察点2,551帧最大108.2ms，native57个观察点3,738帧最大120ms；三个HOME布局均验证2,938文件/428目录/7层/320宽目录/64嵌套项目及指定八类文件。唯一native失败为010终端prompt已出现但ready超时，保留现场继续定位；这些结果不能抵消托管失败。
+- 冷开React提交采样确认首次status widget host注册和viewport测量会重画整个编辑器；另有空inlay/semantic/breadcrumb更新在外部store提交期间排入无变化的transition。当前将status slot订阅移到工具栏，viewport交给语义请求订阅，并在显示投影排队前去除真正无变化的更新。修前status host回归重画3次、viewport回归多1次、空overlay回归多2次；修后各项通过，inlay保留最新视口刷新、过期结果拒收及卸载取消。完整编辑器及相关消费者9文件299项、TypeScript/Vite/refactor通过。保留即时文件/命令目标、完整高亮及原150/1500ms预算；matching release及新SHA托管结果待完成，诊断注入不构成验收。这是显示投影内部重构，沿用064–079和现有LSP/拆屏保留用例，不新增重复入口用例。
+- 旧源码隔离worktree的 `workspace-prompt-length-diagnosticxx/run-20261030-053845-196522077` 稳定复现010终端ready超时：真实Bash/readline在224字符prompt恰好占满112列的两行后发送CR/LF/CR，光标落在无isWrapped的下一空行。现在仅在bracketed paste开启、空行首及前一行末格确为已打印空格时检查相邻prompt，拒绝旧输出/补齐空格/半条命令/alternate screen。真实xterm重放112/224列回归修前2失败，修后连同CWD安装、预览和命令解析4文件39项通过；原010原生会话/输出/隐藏恢复断言不变，matching release及实际native重验待完成。
+
 - 恢复时当前分支为 `5354899c`，远端分支仍为 `dc33439e`；远端 main 仍为 `569d09327f251e123a2d78881585683f85f5b6c1`。保留当前分支和隔离测试桌面，不操作用户 profile 或读取私密 fixture。
 - 续建 `5354899c` QA release 后，本机 `workspace-resume-native/run-20261029-190044-875887466` 为 **4 passed / 3 failed**：074/075/076/077 通过，065/067/073 冷打开最长帧 189/227/175ms。证明焦点/末行几何/HOME/Run 修正的实际边界，不代表性能通过。
 - 后续采样发现首次文件改变菜单所有权会同步重画整个主窗口；菜单消费者现在自行采样或订阅当前所有权。`TC-WS-078` 保留首次文件 Close 可用、dirty Save 真正生效、关闭最后文件后禁用、切换 Sessions 后贡献释放、重开已保存正文的流程。修前3项 mounted 测试失败，修后菜单/Actions/语言5文件39项通过；078 browser 通过。
