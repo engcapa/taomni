@@ -4,7 +4,7 @@ import { File, Folder } from "./icons";
 import { createGitDirectoryChangeCounts } from "./model/trees";
 import { DEFAULT_EXPLORER_SORT, sortExplorerEntries } from "./explorerPreferences";
 import type { ProjectTreeProps } from "./projectTreeTypes";
-import { projectTreeRows } from "./ProjectTreeRows";
+import { projectTreeRows } from "./projectTreeRendering";
 import { ProjectTreeViewport } from "./ProjectTreeViewport";
 
 /**

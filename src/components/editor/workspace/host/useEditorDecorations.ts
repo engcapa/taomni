@@ -71,6 +71,7 @@ export function useEditorDecorations(context: UseEditorDecorationsContext) {
   const renderedOverlayRef = useRef({ highlights, inlayHints });
   const renderedSemanticTokensRef = useRef(semanticTokens);
   const renderedGitRef = useRef({ changes: gitChanges, blame: gitBlame });
+  const renderedStripeRef = useRef({ diagnostics, gitChanges, usages: highlights });
   const pendingGitUpdateFrameRef = useRef<number | null>(null);
   const renderedDebugRef = useRef({
     breakpoints: debugBreakpoints,
@@ -112,9 +113,14 @@ export function useEditorDecorations(context: UseEditorDecorationsContext) {
   // The stripe is secondary chrome: update it after the frame so document and
   // decoration transactions keep their single synchronous dispatch.
   useEffect(() => {
+    const previous = renderedStripeRef.current;
+    if (sameArrayOrBothEmpty(previous.diagnostics, diagnostics)
+      && sameArrayOrBothEmpty(previous.gitChanges, gitChanges)
+      && sameArrayOrBothEmpty(previous.usages, highlights)) return;
     const frame = window.requestAnimationFrame(() => {
       const view = viewRef.current;
       if (!view || !view.dom.isConnected) return;
+      renderedStripeRef.current = { diagnostics, gitChanges, usages: highlights };
       view.dispatch({
         effects: setErrorStripeSources.of({ diagnostics, gitChanges, usages: highlights }),
       });

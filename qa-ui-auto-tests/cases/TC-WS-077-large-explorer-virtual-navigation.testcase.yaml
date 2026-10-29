@@ -93,6 +93,7 @@ steps:
     expect_truthy: true
     timeout_sec: 5
 - dblclick: '[data-testid="code-workspace-tree-file"][data-path="document-0000.txt"]'
+- wait_for: '[data-testid="workspace-file-editor"] .cm-content:focus'
 - assert_text:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
     contains: Public document 0
@@ -110,7 +111,7 @@ verification:
   requirements:
   - id: R1
     requirement: Virtualization bounds mounted tree rows while preserving the full logical keyboard order, exact opened documents, filtering, view changes
-      and sorting without extra activations.
+      and sorting without extra activations. Opening the selected file transfers focus to its editor after layout without an extra click.
     actions:
     - 3
     - 5
@@ -151,6 +152,7 @@ verification:
     - 39
     - 40
     - 41
+    - 42
     checkpoints:
     - step: 9
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-viewport\"]"}'
@@ -189,12 +191,14 @@ verification:
         >= document.querySelector(\".taomni-explorer-list-columns\").getBoundingClientRect().bottom && document.activeElement.getBoundingClientRect().bottom
         <= document.activeElement.closest(\"[data-view-mode]\").getBoundingClientRect().bottom", "expect_truthy": true, "timeout_sec": 5}}'
     - step: 38
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "Public document 0"}}'
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content:focus"}'
     - step: 39
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree\"] [role=\"treeitem\"]", "min": 5, "max": 100}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "Public document 0"}}'
     - step: 40
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 3}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree\"] [role=\"treeitem\"]", "min": 5, "max": 100}}'
     - step: 41
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 3}}'
+    - step: 42
       expectation: '{"assert_no_runtime_errors": null}'
   native:
   - check: Real packaged WebView scrolling, focus, key input and native document reads.

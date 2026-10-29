@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { selectCodeWorkspaceUi, useCodeWorkspaceStore, type EditorGroupId } from "../../../../stores/codeWorkspaceStore";
 import type { CodeWorkspaceFileRef } from "../../../../types";
 import { fileKey } from "../codeWorkspaceModel";
@@ -19,8 +19,9 @@ export interface UseWorkspaceTreeOpeningContext {
 
 export function useWorkspaceTreeOpening(context: UseWorkspaceTreeOpeningContext) {
   const { treeFocus, workspaceInstanceId, editorCommands, buffers, splitLayoutLeaf, openFile } = context;
+  const pendingFocusFrame = useRef<{ id: number; requestId: number; key: string } | null>(null);
 
-  const tryGrantTreeFocus = useCallback((intent: TreeOpenIntent, canonicalKey: string): boolean => {
+  const grantTreeFocus = useCallback((intent: TreeOpenIntent, canonicalKey: string): boolean => {
     if (treeFocus.pendingTreeOpenIntentRef.current?.requestId !== intent.requestId) {
       return false;
     }
@@ -54,8 +55,28 @@ export function useWorkspaceTreeOpening(context: UseWorkspaceTreeOpeningContext)
     return false;
   }, [workspaceInstanceId]);
 
+  const tryGrantTreeFocus = useCallback((intent: TreeOpenIntent, canonicalKey: string): boolean => {
+    if (treeFocus.pendingTreeOpenIntentRef.current?.requestId !== intent.requestId) return false;
+    const pending = pendingFocusFrame.current;
+    if (pending?.requestId === intent.requestId && pending.key === canonicalKey) return false;
+    if (pending) window.cancelAnimationFrame(pending.id);
+    // Port registration runs with React's mount effects. Let CodeMirror's
+    // already queued measurement run first, instead of forcing layout of an
+    // unfinished editor and its ancestors inside that same interaction task.
+    const id = window.requestAnimationFrame(() => {
+      pendingFocusFrame.current = null;
+      grantTreeFocus(intent, canonicalKey);
+    });
+    pendingFocusFrame.current = { id, requestId: intent.requestId, key: canonicalKey };
+    return false;
+  }, [grantTreeFocus]);
+
   useEffect(() => {
     treeFocus.tryGrantTreeFocusRef.current = tryGrantTreeFocus;
+    return () => {
+      if (pendingFocusFrame.current) window.cancelAnimationFrame(pendingFocusFrame.current.id);
+      pendingFocusFrame.current = null;
+    };
   }, [tryGrantTreeFocus]);
 
   const requestTreeOpen = useCallback(async (

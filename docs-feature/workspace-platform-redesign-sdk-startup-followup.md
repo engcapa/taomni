@@ -1,6 +1,115 @@
 # 工作区文件打开与 SDK 后台初始化
 
-当前状态：文件打开及标签切换卡顿仍未通过验收。最新托管相关集 [40840344631](https://github.com/engcapa/taomni/actions/runs/40840344631)（`9d70ce07`）共64次执行，55 passed / 9 failed、无跳过；适用的完整崩溃组通过。用户授权本机隔离 QA release 性能复现，已捕获真实 HOME 场景的窗口线程同步扫描造成4–6秒长帧。后台扫描修复后仍有冷打开长帧；当前继续减少全局样式重写及目录树渲染。参考 [Home 文件打开分析](../docs-issue/workspace-home-file-open-latency-design.md)，全量与正式四轮性能对照仍待执行。以下保留失败，关联[重构实现报告](./workspace-platform-redesign-implementation-report.md)。
+**2026-10-29 暂停交接：按用户要求整理后本地提交并暂停，不启动新测试或修复。本轮性能及三平台验收尚未通过。** 后续开发先读本节快照，再按待办继续；下方历史记录中“正在”“待执行”等文字均属于当时状态，不能覆盖本节结论。
+
+## 续接入口与提交状态
+
+- 仓库 `/data-raw-ssd/code-src/person/taomni`，分支 `docs/workspace-platform-redesign`。本次交接与未验收修正一并提交，其父提交为已推送的 `dc33439e26b209b9f8f69f2456529ca77aafcf22`；本次只作本地提交，未推送、未触发新 workflow。
+- 锚定目标：现代、简洁、易用；尽量匹配[设计](./workspace-platform-redesign-design.md)和[原型](./workspace-platform-redesign-prototype.html)，保留 main 的能力。当前重点是文件打开/切换的停顿，不能用局部快了替代整体性能验收。
+- 用户提供的[HOME 性能分析](../docs-issue/workspace-home-file-open-latency-design.md)是修复依据；[实现报告](./workspace-platform-redesign-implementation-report.md)含早先 UI、崩溃及正式性能证据。本节更新于两份文档的早期状态之后。
+- 分支曾合入旧 main，并吸收远程 Compact/HOME 目录加载修复；**本轮相关集全绿后仍需重新 fetch/merge 最新 main**。当前本地 `origin/main` 为 `569d09327f251e123a2d78881585683f85f5b6c1`，未据此冒充远程最新。不要在相关集失败时提前执行下一次 main 合并。
+
+## 用户手工测试反馈与验收重点
+
+| 用户实际反馈 | 后续必须验证的结果 |
+| --- | --- |
+| 添加/打开目录后，打开文件会显示 SDK 加载数秒到十几秒，期间阻塞 | 目录先作为普通 file explorer 使用；文件先显示、可输入，SDK/LSP/项目识别异步；无代码需求时不自动探测 |
+| QA release 打开600多行 JSON 约2–3秒且卡住 | 同时验证普通704行公开 JSON 与接近用户负载的长行 JSON，不只测试小文件 |
+| 用户指定 `/home/zhyhang/credentials.json` 帮助复现 | 已只统计196,289 bytes、693行、最长行5,148字符；不读写其正文，不把字段或内容放进 fixture/报告，使用公开合成数据 |
+| 后续手测发现 HTML、text 以及任意类型/大小的文件都有停顿；多个 tab 切换也一样 | 覆盖首次文件、第二个新文件、已打开 tab 来回切换、dirty、Home 返回、重开恢复，不能只测 JSON 或第一次打开 |
+| 使用“最新编译 QA 进制”在 `$HOME` 打开文件和切 tab 仍约5秒，要求达到 VS Code 类编辑器的打开速度 | 这仍是未关闭的用户反馈；不能归咎于用户用了旧进制。自动化的隔离配置与用户实际 QA 配置可能不同，需核对真实路径、目录规模、设置和匹配二进制身份 |
+| 添加 folder 后要默认显示并展开目录树 | 每次成功添加、第二/第三 root、重复选择、取消、跨工作区迟到结果都要回归；被动切模式不强制改变用户侧栏偏好 |
+| HOME/大目录节点曾显示 empty，目录打开拖慢；默认工作区也要完整文件能力 | 保留按可见层级加载、明确 loading/error/retry、普通文件浏览、排序/列表/包平铺及源码 LSP 能力；不要因优化跳过真实目录或缩减功能 |
+
+上述反馈针对多个先后构建。秒级根因已找到并修过，但最新组合源码尚未无注入验收，不能标记用户的5秒问题已解决。当前自动化硬门槛仍为正文/高亮1500ms及完整观察期每帧150ms；同条件相对 main 不退化还要单独验证。目标为即时交互，预算通过不自动等于手测体验验收。
+
+## 当前正在开发的代码与功能保留范围
+
+| 范围 | 已落地或本次提交的内容 | 尚需完成 |
+| --- | --- | --- |
+| 后端线程 | 文件读取与 `workspace_execution_model` 的路径解析、扫描移到 blocking worker；后者曾在窗口线程递归 HOME，导致4–6秒冻结 | 用新 release 检查窗口线程不再同步扫描，保留真实错误/取消/重试 |
+| 项目/SDK/LSP | 按真实源码需求后台发现；普通 txt/html/json/md 不自动递归执行发现；已识别项目的普通文档保留 Run | HOME Git 仍未实现“只沿活动文件祖先找最近仓库”的全部设计；评估后补齐，保留并发上限、真实 Git 状态与手动刷新 |
+| 编辑器 | 常驻 EditorView、按文件缓存 EditorState、快读取合并提交、慢读取恢复、dirty/undo/光标/滚动/折叠隔离 | 继续定位冷挂载渲染/布局；不能通过丢弃历史、关闭高亮或破坏拆屏来提速 |
+| 本次焦点修正 | `hooks/useWorkspaceTreeOpening.ts` 将树打开后的焦点放到编辑器测量帧，重新校验请求/epoch/pane/file/input焦点，去重并取消过期帧；新增8项支持测试 | 无注入 native/browser 真实打开后自动聚焦、直接输入、迟到端口及切换竞态仍待执行 |
+| 本次冷初始化 | 撤回 detached EditorView 构造，恢复真实 parent 初始化；`host/useEditorDecorations.ts` 跳过初始相同 stripe sources 的空更新 | 匹配 release 尚未运行本轮专项，不能声称收益成立 |
+| 外观/样式 | 外观扩展有界缓存，style-mod ESM/CJS 仅在CSS变化时改STYLE；保留全局字体大小/字体/主题、重附加与多pane | 本次组合源码仍需全局外观和多pane回归 |
+| 文件树 | >80逻辑行虚拟化，overscan上下各8行；完整逻辑键盘顺序、Git计数索引、自然排序 | 本次修正 sticky header/真实padding/末行半像素裁切，保留严格077几何断言，需跨WebView确认 |
+| 跨平台模块 | 将 `ProjectTreeRows.tsx` 改为 `projectTreeRendering.tsx`，消除其与 `projectTreeRows.ts` 在大小写不敏感系统中的冲突 | 重新证明Windows/macOS可构建、App可加载；可补通用同stem大小写冲突静态检查，防止再次漏到CI |
+| 用例调整 | 077新增真实打开后的 `.cm-content:focus`；040对原有300ms合并写入增加最多5秒条件轮询，原断言不删 | 下轮相关集加入 `TC-IDE-TREEOPEN-01-project-tree-open-focus-native`，保留键盘直接输入、undo及磁盘SHA |
+
+此前 UI 实现仍需作为最终功能回归范围：全局与session大预览、Sessions无welcome/旧小预览、分区正确路由、广播选择、很多session tab的滚动/过滤、工具栏过滤与收纳、语音项移除、所有视图顶部窗口拖动、系统目录选择器、工作区terminal右键、单一Git按钮、IDE工具区分隔、工作区文件/session恢复、文件树列表/排序/包平铺以及Agents Crew“开发中”按钮。不要把这些已有实现当作本次组合源码已全量验证；按[用例规范](./workspace-platform-redesign-testcases.md)和实现报告追踪，发现缺失则补用例。
+
+## 已采取的性能对比与诊断措施
+
+1. **正式比较使用同机原生 release 四轮交错**：`main-1 → candidate-1 → main-2 → candidate-2`。固定main与candidate的完整SHA、相同WebView/1440×900/DPR/数据集/观察器，保留原始二进制及producer identity，不重写identity、不以重新构建版本替换已验收candidate。
+2. 负载包含24个真实PTY、会话创建/切换/回显、完整2MiB终端输出、3,097文件的目录浏览/冷暖展开/滚动、24×64KiB文件、1MiB编辑器及每轮400正式输入键；核验正文、输出序号/字节/SHA、dirty/save/undo/redo、CPU/PSS与关闭后进程清理。
+3. 比较保存所有样本、p50/p95、每轮分布与慢尾；延迟门槛为原有main p95×1.15加噪声（至少20ms，回显至少30ms，并纳入两次main差异）。资源门槛见 `workspace_perf/analyze.py`，不得临时抬高；输入仍受150ms预算约束。
+4. 历史正式比较 [40703223277](https://github.com/engcapa/taomni/actions/runs/40703223277) 已执行且**失败**，candidate=`f6f8d27681e5dae552b03c6d784a074844ee52ad`、baseline=`a57437927b62d6036a6d473eddccc053a4b4c0e8`。会话切换54→402ms、冷工作区951→1540ms、树滚动46→266ms、24终端空闲CPU 0.331→2.139核等有退化；这批历史结果不代表当前候选，最终必须重新正式比较。
+5. 历史隔离CSS实验确认圆角overflow裁剪造成WebKit高CPU；最终以四角装饰保留9px圆角/边框/阴影，避开整层裁剪破坏viewport弹窗。对照诊断有改善，仍须以新组合源码正式性能验证确认。
+6. 当前本机专项使用独立Xvfb/QA配置。真实输入起点为最早pointerdown/mousedown，不从异步读取完成或dblclick之后起算；保留每帧、正文、高亮、EditorView复用与存储写入耗时，仅记录key/长度、不保存值。
+7. 原生栈/系统调用证明HOME扫描的秒级根因；JSC采样、转发DOM计时分别定位冗余scroll写入、首次focus、重复STYLE、语言/补全重配置和React渲染。干预诊断与无注入标准用例分开；“保留失败继续收样”的脚本末尾主动失败，不拿它通过验收。
+8. 临时size containment、CSSOM插入及detached构造未得到有效整体收益，未保留为性能结论。最近诊断warm切换42–62ms只是定位样本；不是与main匹配的正式比较，也不能抵销冷打开失败或用户仍5秒的反馈。
+
+正式 workflow 为 [qa-workspace-performance.yml](../.github/workflows/qa-workspace-performance.yml)，实现入口在 `.agents/skills/qa-ui-auto/scripts/workspace_perf/`。只在同SHA三平台全量无未接受失败、并合入被固定的main后启动。若workflow尚未出现在默认分支，按现有push入口把同一已验收SHA推到 `qa/workspace-performance/<functional-run-id>`，不能为绕过gate新造一个源码提交。当前gate仅明确白名单三条RDP性能例外；如出现用户允许单列的其他RDP/VNC性能case，先精确扩展例外合同，不能把功能/基础设施失败放入例外。
+
+## 暂停时的真实验证结果
+
+| 输入/证据 | 实际结果与限制 |
+| --- | --- |
+| GitHub `40840344631`，`9d70ce07` | 64次执行：55 passed / 9 failed；全为150ms长帧失败；完整适用崩溃组17次通过。旧源码结果，不能替代本次 |
+| GitHub [40854331480](https://github.com/engcapa/taomni/actions/runs/40854331480)，`dc33439e` | 已结束，workflow failure。计划244次适用执行；实际164次：67 passed / 97 failed、用例无skip，另80次Windows/macOS native因构建失败未执行 |
+| 上述run分组 | Linux browser 34 passed / 7 failed；Linux native 33 passed / 8 failed；Windows与macOS browser各0 passed / 41 failed，均为App初始模块冲突。不能把分片job success当作用例通过 |
+| 上述run失败分类 | Linux browser：040异步存储假设、077末行裁切、064/066/068/070/073长帧；Linux native：077裁切、064/065/066/067/068/073/075长帧（165–203ms）。完整三平台崩溃组未全绿 |
+| 上述run证据核验 | 已下载6份browser及4份Linux native原始receipt；签名、source稳定性、2,418个发布附件的大小/SHA均通过。source=`efcd353a2d596c23c3658dc8e8db1809d7bee915abd17eb9bbc9bb344bf84600`。失败原件保留在 `qa-ui-auto-report/github-40854331480/` |
+| 本机 `workspace-local-cold-init-candidate/run-20261029-175907-811321107` | 同dc33439e matching QA release，7条中1 passed / 6 failed；065/067/073/074/075最长帧229/227/233/197/223ms；076真实Run/PTY通过；077几何失败 |
+| 本次提交支持测试 | `workspace-focus-navigation-unit.log`：7文件33项passed；覆盖本次8项焦点生命周期及真实编辑器/虚拟树/stripe。不是browser/native验收 |
+| 本次编译前端与静态 | TypeScript、Vite QA frontend及 `pnpm check:refactor` 已通过；768 commands/328 facade exports/39 events保持，908模块边界、4,125文件大小检查通过；audit gate通过，4个既有orphan未增加 |
+| 本次077 dry-run | 只证明native语法/verb支持，不含执行receipt，不能算真实用例通过 |
+| 本次匹配QA release | `workspace-deferred-focus-qa-release` 已按暂停要求在Rust编译阶段停止；前端构建及检查通过，新release未构建完成，恢复后需续建。尚未运行本次源码的无注入native性能专项，不要使用上一个构建冒充匹配 |
+
+## 恢复后的待办顺序
+
+1. **确认输入与环境**：检查本次提交、远端同分支是否有新提交、`native_build.py --check`及真实QA身份；恢复本任务独立测试桌面，不能操作用户桌面或生产profile。若远端有新代码，先阅读影响，保留现有修复，避免覆盖他人改动。
+2. **先解决当前性能与功能失败**：批量编译一次matching QA release，在独立本机桌面串行运行065/067/073/074/075/076/077，观察真实HOME与公开fixture。确认本次焦点时序、padding、模块改名修复有效；仍超150ms则用原始帧和采样拆解剩余主线程工作，不能靠反复重跑筛慢样本。补查用户实际配置与自动化隔离配置的差异，继续关闭5秒反馈。
+3. **三平台相关集**：推送完整40位SHA，通过 `gh` 调度 `qa-ui-auto-platforms` 的browser/native/release；复用下方65条ID选集并加入TREEOPEN-01及受影响入口，必须包含完整10 ID `crash-regression`。修失败、提交推送、重跑并监控原始case结果，直到全部适用相关执行通过。不要只看workflow/job颜色。
+4. **合并main并做受影响回归**：相关集全绿后重新fetch远程main、合入当前分支、解决冲突；重跑冲突/新main影响到的用户功能、相关性能及完整崩溃组；不能只验证能编译。
+5. **三平台全量**：当前组合SHA运行scope=all，检查selection、原始receipt、source/runner/case/build身份与汇总；失败修复后循环。`TC-IDE-C6-06`外部clickhousecrud源码缺口按policy和用户确认单列；只允许RDP/VNC server/client性能失败单列，功能失败必须修。
+6. **正式性能及最终手测**：相同已全量验证SHA与刚合入的固定main运行四轮比较，重点复查上述10项历史退化及sessions/terminal/file explorer；比较失败则修复，产品源码变化后重新取得对应功能证据再比较。提供matching QA release供用户重测HOME各类文件、连续tab切换与添加目录；记录平台、profile、数据规模和实际二进制身份，用户反馈未关闭前不要宣称完成。
+
+## 恢复命令与执行约束
+
+- Node22路径 `/data/dev/nodejs.backup-20260707-090544/bin`；pnpm10；`CARGO_BUILD_JOBS=2`，本机测试worker总数≤2、native串行。一般browser/native在GitHub跑；用户后续明确授权本机隔离QA release仅用于workspace性能复现。
+- GitHub用已登录的 `gh`；外网命令加 `HTTP_PROXY/HTTPS_PROXY/ALL_PROXY=http://10.1.0.80:3228`。workflow `head`一定用40位SHA；曾错误传短SHA导致checkout失败，不要重复。
+- 系统工具此前已下载并解包到 `qa-ui-auto-report/_local/qa-tools/usr/bin`，无需sudo；`-lgbm`已可解析，没有待用户执行的apt安装要求。重建环境先检查现有工具，不直接重复apt或下载。
+- QA二进制 `src-tauri/target/qa-ui-auto/release/taomni`，身份文件为邻接的 `taomni.qa-identity.json`；本机配置 `_local/workspace-latency-native.yaml`，驱动4544/4545。自动化只用其独立profile/公开fixture，不触碰生产 `/usr/bin/taomni`、生产配置/密码及用户手测QA profile。用户先前要求的QA存储清理已完成，不自动再次清空。
+- 独立桌面为 `DISPLAY=:190`、1440×900×24。恢复时按owned job状态重启Xvfb及 `dbus-run-session -- metacity --sm-disable --no-composite`；`xdotool`只对该DISPLAY使用。长任务使用 `background_job.py`，不要把进程留在前台工具调用里。
+- 磁盘暂停前约95%、14GiB可用。超过95%只清理本repo可重建临时文件，保留失败报告、唯一原始证据及Cargo增量缓存，不执行cargo clean。
+
+```bash
+# 设置PATH/PYTHONPATH后先检查；返回1表示需构建，不是已编译通过。
+PATH=/data/dev/nodejs.backup-20260707-090544/bin:$PATH \
+  python3 .agents/skills/qa-ui-auto/scripts/native_build.py --check
+
+# 构建须通过background_job启动，CARGO_BUILD_JOBS=2；完成后再串行启动专项。
+python3 .agents/skills/qa-ui-auto/scripts/background_job.py start \
+  --name workspace-resume-qa-release --log qa-ui-auto-report/_local/workspace-resume-qa-release.log \
+  --env PATH=/data/dev/nodejs.backup-20260707-090544/bin:$PATH --env CARGO_BUILD_JOBS=2 \
+  -- python3 .agents/skills/qa-ui-auto/scripts/native_build.py --release
+```
+
+本机下一轮专项参数：`--mode native --config qa-ui-auto-report/_local/workspace-latency-native.yaml --filter TC-WS-065,TC-WS-067,TC-WS-073,TC-WS-074,TC-WS-075,TC-WS-076,TC-WS-077 --workers 1 --keep-runs 0 --require-pass`，通过background job传入 `DISPLAY=:190`、`PYTHONPATH=.agents/skills/qa-ui-auto/scripts` 及工具PATH。使用新的report目录，不覆盖原始失败。
+
+本节 `_local/` 均指 `qa-ui-auto-report/_local/`。托管65条ID及244次计划保存在 `_local/workspace-virtual-hosted-case-ids.txt`、`_local/workspace-virtual-hosted-plan.json`（恢复时重新plan加入TREEOPEN-01）；若临时目录已清理，从40854331480的selection artifact重建。GitHub参数保持 `scope=selected`、三平台、browser/native、`native_release=true`、`browser_workers=2`、`shards=auto`、`publish_issues=false`。全量与四轮性能均不能用该selected计划替代。
+
+关键本机原件：`_local/workspace-profiler-baseline/combined-native-stack-02.txt`及04/06/08为秒级扫描栈；`workspace-cold-init-diagnostic/run-20261029-180422-204114234/`为转发诊断，077中 `diagnostic-focus-geometry.json`有700.5/700px原始几何；`workspace-deferred-focus-hypothesis/run-20261029-181431-841227501/`仅是假设验证。`_local/profile_workspace_*.py`均为ignored临时诊断，不是标准runner或产品依赖。
+
+## 暂停资源
+
+本次提交前已停止本任务 `workspace-deferred-focus-qa-release`（PID843548，Rust编译中断）、`workspace-qa-wm`（PID770027）及 `workspace-qa-xvfb`（PID769813），保留增量产物和所有失败报告。没有停止生产应用或用户手测实例。GitHub 40854331480已自行结束为failure，未派发新运行。
+
+暂停前另核对040/077的全部verification checkpoint与实际步骤索引/期望一致；这是静态一致性检查，不是运行时通过。构建helper按既有策略在编译开始时移除了旧 `taomni.qa-identity.json`，成功后才会重写；暂停时该文件确实不存在。当前没有可据以宣称“性能修复完成”的本次源码native报告。恢复后先续建matching release再运行，不手工补写identity；不要因为旧路径下仍有可执行文件就直接认定已包含本次修正。
+
+以下保留开发历史与原失败，用于追溯，不作为当前已完成清单。
 
 ## 目标与保留行为
 
@@ -549,3 +658,35 @@ Project pane。后续真实按键已触达逻辑末行，但发现本机 WebKit 
 重建相同插件。Project虚拟行同时处理列表固定表头、容器内边距及从pane导航到行的焦点，
 键盘回归改为挂载真实FileTreePane，077增加列表末行焦点及可见范围断言。
 此组合正在重新编译匹配的QA release；其原生性能、077、全局字体主题和完整崩溃回归仍待验收。
+
+## 本机冷初始化与三平台兼容性继续修正
+
+`dc33439e` 对应 QA release source `efcd353a2d596c23c3658dc8e8db1809d7bee915abd17eb9bbc9bb344bf84600`：
+本机隔离桌面标准 run `workspace-local-cold-init-candidate/run-20261029-175907-811321107`
+为 1 passed / 6 failed。065/067/073/074/075 的最大帧分别为229/227/233/197/223ms；
+076 的真实项目 Run/PTY 通过。077 末行已正确选中和聚焦，但 bottom=700.5px、树底界=700px，
+半像素裁切失败不能放宽断言忽略。完整原始报告保留。
+
+诊断 forwarding 和 JSC 采样确认同步焦点仍强制首次布局，耗时约76–90ms。临时诊断
+仅将焦点排到编辑器测量帧，其耗时降至11–15ms，整帧仍超过150ms；该诊断主动标为失败，
+不能代替无注入验收。撤回没有收益的 detached `EditorView` 构造，恢复在真实 parent 内初始化；
+树打开的焦点改由一帧调度拥有，提交时重新检查请求、交互 epoch、活动 pane/file 和输入框焦点，
+取消卸载和被后续请求替代的帧。保留未挂载端口的重试。初始 error stripe 已有正确 sources，
+不再为相同 sources 重复排队一次空更新。
+
+树虚拟滚动的 scroll range、sticky header 和底部留白统一使用真实容器 padding；
+077 保留精确几何断言，并增加打开后真实 `.cm-content:focus` 检查。现有
+`TC-IDE-TREEOPEN-01-project-tree-open-focus-native` 继续保护 Enter 后直接输入、undo、
+原生磁盘 SHA、树刷新与上下文菜单焦点返回，需加入下一轮相关集。
+
+托管 Windows/macOS 在大小写不敏感文件系统中把 `ProjectTreeRows.tsx` 与
+`projectTreeRows.ts` 解析为同名模块；渲染器改名为 `projectTreeRendering.tsx`，
+逻辑模型、接口与持久化契约不变。相关 hook/真实编辑器/虚拟树/stripe 支持测试
+7文件33项通过，其中8项覆盖排队焦点、去重、输入框/交互/file/pane变化、迟到端口、
+请求替代与卸载。匹配新产品源码的 QA release、无注入本机专项和 GitHub 三平台相关集仍待执行。
+
+同 run 的 Linux `TC-WS-040` 已显示正确的新 root，但紧接着同步读取 localStorage
+早于既有300ms元数据合并写入。用例改为最多5秒轮询同一条“恰好一个 root”表达式，
+保留其UI单实例、取消、打开实际正文和目录菜单数量断言；不主动 flush 或改写存储，
+也不改变文件激活的1500/150ms预算。Windows/macOS browser 的初始 App 模块失败，
+原始控制台确认与上述大小写冲突同源，不能把 shard job 的 success 当作 case 通过。
