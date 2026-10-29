@@ -176,7 +176,17 @@ pub(super) async fn actions<R: Runtime>(
         eval_js(&state, script).await?;
         let deadline = Instant::now() + Duration::from_secs(30);
         loop {
-            let task = eval_js(&state, format!("return window[{key}] || null;")).await?;
+            // Consume the completed task in this observation. A separate
+            // cleanup evaluation adds another UI-thread/WebView round trip
+            // after pointer-up, delaying the response under renderer load.
+            let task = eval_js(
+                &state,
+                format!(
+                    "const task = window[{key}] || null; \
+                     if (task?.done) delete window[{key}]; return task;"
+                ),
+            )
+            .await?;
             if task.get("done").and_then(Value::as_bool) == Some(true) {
                 if let Some(message) = task.get("error").and_then(Value::as_str) {
                     return Err(message.to_string());
@@ -190,7 +200,9 @@ pub(super) async fn actions<R: Runtime>(
         }
     }
     .await;
-    let _ = eval_js(&state, format!("delete window[{key}]; return true;")).await;
+    if result.is_err() {
+        let _ = eval_js(&state, format!("delete window[{key}]; return true;")).await;
+    }
     match result {
         Ok(value) => ok(value),
         Err(message) => error(message),

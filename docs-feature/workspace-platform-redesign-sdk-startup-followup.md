@@ -34,10 +34,17 @@
 - 首次paint调度的集成回归发现：延后自动document didOpen会使库源码导航和尚未启动的文档同步产生时序退化，完整测试曾出现渲染循环/OOM。已撤回这项未验收试验及其提取模块，恢复原document open生命周期；当前仅延后自动Run及server能力发现。诊断采样和失败日志保留，临时注入已移除。符号导航支持测试明确等待provider真实宣告符号能力，保留原文件搜索fallback及URI解析断言。完整编辑器组合回归与匹配构建继续进行，不把试验的48项支持测试当作最终实现已通过。
 
 - 保留自动document open生命周期后，完整组合 `workspace-source-paint-retained-03.log` **6文件308项passed**，覆盖真实编辑器、树慢读、命令owner、自动Run/server让出及显式刷新。Java Run测试等待真实可用按钮，默认Java探测mock保留Promise失败合同，不再用undefined制造伪状态覆盖；原终端与cwd断言保留。HOME fixture/树与标签滚动/观察器30项通过，Rust fmt及TypeScript/refactor通过（768 commands、328 facade exports、39 events、910模块、4140文件）。当前source=`2f7adbff962eafef130b83e40f12cde2f05559fd241403a2adfd017d454236e6`，matching QA release正在编译，尚无这批大HOME负载的真实性能通过结论。GitHub workflow计划阶段也执行HOME fixture结构、指定文件类型及owned清理合同。
+- `c6286d22` 的上述 QA release 已构建完成（二进制SHA=`fdf195b5f8d21b953d02f868ef3e8e2c547de1b8bc3339db233bd51ee7ca5a3d`）。本机 `workspace-home-layout-1-browser/run-20261029-225859-931420313` **15 passed / 1 failed**，唯一失败068冷notes最长帧160.3ms；匹配 native `workspace-home-layout-2-native/run-20261029-230932-998884638` **9/9 passed**，含065/067/073–077/079/TREEOPEN-01；`workspace-home-layout-3-native/run-20261029-231216-594701753` 完整适用崩溃组 **9/9 passed**。三个run的134/1056/292个附件已逐字节/SHA和回执身份核验；这些是c628源码的结果，不能替代后续修改。
+- 同提交 GitHub [40895271908](https://github.com/engcapa/taomni/actions/runs/40895271908) 已完成 **241 passed / 16 failed / 0 skipped**：browser Linux43/0、Windows43/0、macOS42/1；native Linux37/7、Windows40/2、macOS36/6（通过/失败）。三平台QA release均构建成功，6,344个回执附件逐字节/SHA及source/runner/profile已核验。Linux native失败为065/066/070/073/074/075/079的152–187ms长帧；macOS native067/068为156/170ms长帧。不能以job成功或HOME个别平台通过标记验收。
+- 其余托管失败已逐项定位：039和native工具窗快捷键的即时断言读到异步portal/rail提交前的状态，失败HTML随后是正确单bar/aria-pressed；现在在原精确断言前有界等待真实目标状态，保留所有pane/草稿/几何/PTY断言及verification映射。Windows/macOS 069原始样本在scrollLeft=0与255/264间振荡，固定翻页越过目标标签另一边；箭头现在先完整显示边缘标签再继续翻页。真实几何回归修前失败，修后与滚动生命周期14项通过。
+- Windows 079的性能与真实Git断言完成后，owned fixture清理遇到Git只读object的WinError5。清理现在仅对owned树内的PermissionError补写权限后重试，其他错误继续失败，不glob/不接触其他HOME路径。5项fixture支持测试通过，真实Windows清理待新runner验证。
+- 冷开CPU profile显示Actions snapshot反复读取native-backed navigator属性；120个action的一批快照修前读取964次。现在一批snapshot/binding index只解析一次platform/locale，下一批仍识别变化，原派发/冲突/显示合同不变。新增回归修前失败；修后快捷键/Actions56项及编辑器/设置消费者281项通过。仍沿用064–079等实际入口验证，支持测试不构成性能结论。
+- macOS 061/062原始trace显示普通文件正文分别在动作开始后1028/1022ms出现，但驱动结果/观察往返使动作总耗时1514/1741ms，原失败保留。QA桥在确认全部input ticks完成的同一次观察中消费任务，取消成功路径的重复cleanup evaluation，错误/超时仍清理并取消迟到ticks；不减少真实输入、不重放动作、不更改1500ms动作及5000ms SDK超时。桥键盘/指针21项通过，matching release与三平台原用例仍待验证。
+- 上述组合本机 browser `workspace-binding-browser/run-20261029-233451-758746202` **16 passed / 0 failed / 0 skipped**，含完整适用崩溃组、C3-01、064/066/068/069/070/073/077/078；142个附件和回执已核验。JSON正文264.7ms/高亮355.3ms、长行JSON261/337.6ms、冷notes正文251.2ms，原160.3ms失败路径本轮117.9ms。随后构建类型检查发现新增支持测试缺少必填category，已补齐且该项回归重跑通过；这是测试类型修正，产品行为不变，但源码身份保守变化，最终仍以新SHA的GitHub结果及匹配native构建为准。
 
-## 续接入口与提交状态
+## 当前分支与历史交接入口
 
-- 仓库 `/data-raw-ssd/code-src/person/taomni`，分支 `docs/workspace-platform-redesign`。本次交接与未验收修正一并提交，其父提交为已推送的 `dc33439e26b209b9f8f69f2456529ca77aafcf22`；本次只作本地提交，未推送、未触发新 workflow。
+- 仓库 `/data-raw-ssd/code-src/person/taomni`，分支 `docs/workspace-platform-redesign`。恢复后已推送至 `c6286d22694bfe4c0618ad0efd2e60fbd48faa93` 并运行上述GitHub相关集；后续修正及验证记录见“本轮恢复记录”。`dc33439e`及以下暂停快照属于历史交接状态，不代表当前分支未推送或已验收。
 - 锚定目标：现代、简洁、易用；尽量匹配[设计](./workspace-platform-redesign-design.md)和[原型](./workspace-platform-redesign-prototype.html)，保留 main 的能力。当前重点是文件打开/切换的停顿，不能用局部快了替代整体性能验收。
 - 用户提供的[HOME 性能分析](../docs-issue/workspace-home-file-open-latency-design.md)是修复依据；[实现报告](./workspace-platform-redesign-implementation-report.md)含早先 UI、崩溃及正式性能证据。本节更新于两份文档的早期状态之后。
 - 分支曾合入旧 main，并吸收远程 Compact/HOME 目录加载修复；**本轮相关集全绿后仍需重新 fetch/merge 最新 main**。当前本地 `origin/main` 为 `569d09327f251e123a2d78881585683f85f5b6c1`，未据此冒充远程最新。不要在相关集失败时提前执行下一次 main 合并。
@@ -104,7 +111,7 @@
 
 1. **确认输入与环境**：检查本次提交、远端同分支是否有新提交、`native_build.py --check`及真实QA身份；恢复本任务独立测试桌面，不能操作用户桌面或生产profile。若远端有新代码，先阅读影响，保留现有修复，避免覆盖他人改动。
 2. **先解决当前性能与功能失败**：批量编译一次matching QA release，在独立本机桌面串行运行065/067/073/074/075/076/077，观察真实HOME与公开fixture。确认本次焦点时序、padding、模块改名修复有效；仍超150ms则用原始帧和采样拆解剩余主线程工作，不能靠反复重跑筛慢样本。补查用户实际配置与自动化隔离配置的差异，继续关闭5秒反馈。
-3. **三平台相关集**：推送完整40位SHA，通过 `gh` 调度 `qa-ui-auto-platforms` 的browser/native/release；复用下方65条ID选集并加入TREEOPEN-01及受影响入口，必须包含完整10 ID `crash-regression`。修失败、提交推送、重跑并监控原始case结果，直到全部适用相关执行通过。不要只看workflow/job颜色。
+3. **三平台相关集**：推送完整40位SHA，通过 `gh` 调度 `qa-ui-auto-platforms` 的browser/native/release；使用下方已扩充的70条ID选集，包含TREEOPEN-01、078/079和完整10 ID `crash-regression`。修失败、提交推送、重跑并监控原始case结果，直到全部适用相关执行通过。不要只看workflow/job颜色。
 4. **合并main并做受影响回归**：相关集全绿后重新fetch远程main、合入当前分支、解决冲突；重跑冲突/新main影响到的用户功能、相关性能及完整崩溃组；不能只验证能编译。
 5. **三平台全量**：当前组合SHA运行scope=all，检查selection、原始receipt、source/runner/case/build身份与汇总；失败修复后循环。`TC-IDE-C6-06`外部clickhousecrud源码缺口按policy和用户确认单列；只允许RDP/VNC server/client性能失败单列，功能失败必须修。
 6. **正式性能及HOME验收**：相同已全量验证SHA与刚合入的固定main运行四轮比较，重点复查上述10项历史退化及sessions/terminal/file explorer；比较失败则修复，产品源码变化后重新取得对应功能证据再比较。记录平台、profile、数据规模和实际二进制身份；按用户补充，GitHub runner真实HOME大型混合fixture的各类文件、连续tab切换与深层路径全部通过，可关闭该HOME性能验收，无需等待用户手工复测。
