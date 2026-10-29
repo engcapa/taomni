@@ -41,6 +41,7 @@ from .steps import REGISTRY as STEP_REGISTRY, StepContext, StepError
 from .deadline import BudgetedPage, Deadline, using_deadline
 from .provenance import input_digest, execution_identity, conditions_identity
 from .browser_evidence import BrowserEvidence, traces_ssh_terminal
+from . import browser_tracing
 
 _browser = None
 _playwright = None
@@ -194,16 +195,13 @@ def _run_browser_case_inner(payload: dict) -> dict:
         browser_evidence = BrowserEvidence(page, captured_console, case_dir,
             trace_terminal=traces_ssh_terminal(case_dict.get("fixtures", [])))
 
-        # Tracing: record everything; only persist on failure.
-        try:
-            browser_ctx.tracing.start(screenshots=True, snapshots=True, sources=False)
-        except Exception:  # noqa: BLE001
-            pass
+        # Record actions/diagnostics; frame probes exclude DOM snapshot overhead.
+        result["browser_trace"] = browser_tracing.start(browser_ctx, case_dict)
 
         ctx = StepContext(
             page=BudgetedPage(page, deadline), case_id=case_dict["id"], case_dir=case_dir,
             cfg=cfg, env=env, dry_run=False,
-            case_state={"runtime_console": captured_console},
+            case_state={"runtime_console": captured_console, "browser_trace": result["browser_trace"]},
         )
 
         try:
@@ -260,15 +258,7 @@ def _run_browser_case_inner(payload: dict) -> dict:
         finally:
             cleanup_started = time.monotonic()
             browser_evidence.close()
-            try:
-                trace_path = case_dir / "trace.zip"
-                browser_ctx.tracing.stop(**({"path": str(trace_path)} if failure is not None else {}))
-                if failure is not None:
-                    failure.setdefault("artifacts", {})["trace"] = str(
-                        trace_path.relative_to(report_root)
-                    )
-            except Exception:  # noqa: BLE001
-                pass
+            browser_tracing.stop(browser_ctx, case_dir, report_root, failure)
             with suppress(Exception):
                 browser_ctx.close()
             result["timings"]["cleanup_sec"] = time.monotonic() - cleanup_started
