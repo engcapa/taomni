@@ -1,7 +1,8 @@
 import { GitBranch, ChevronDown, Plus } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useT } from "../../lib/i18n";
-import { gitProbePath, gitSnapshot } from "../../lib/git";
+import { gitProbePath } from "../../lib/git";
+import { fetchGitSnapshotDeduplicated } from "../../lib/workspaceGitSnapshotRequests";
 import { useAppStore } from "../../stores/appStore";
 import {
   useWorkspacePlatformStore,
@@ -42,7 +43,7 @@ function useWorkspaceGitBar(workspace: PlatformWorkspace | undefined): GitBarSta
           setState({ branch: null, changeCount: 0 });
           return;
         }
-        const snapshot = await gitSnapshot(probe.repoRoot);
+        const snapshot = await fetchGitSnapshotDeduplicated(probe.repoRoot, { forceRefresh: true });
         if (cancelled) return;
         setState({
           branch: snapshot?.currentBranch ?? null,

@@ -1,3 +1,4 @@
+import { findEditorByTitle } from "../../editorReadiness";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { selectCodeWorkspaceUi, useCodeWorkspaceStore } from "../../../../../../stores/codeWorkspaceStore";
@@ -36,15 +37,17 @@ export function registerinteractionEditing5Cases(caseContext: registerinteractio
     });
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main/java/com/acme/App.java");
-    fireEvent.click(screen.getByTestId("code-workspace-run-target"));
+    await findEditorByTitle("app / src/main/java/com/acme/App.java");
+    const runButton = screen.getByTestId("code-workspace-run-target");
+    await waitFor(() => expect(runButton).not.toBeDisabled());
+    fireEvent.click(runButton);
 
     await waitFor(() => expect(caseContext.workspaceTestHarness.workspaceMocks.workspaceJavaRunTarget).toHaveBeenCalledWith(
       "/repo/app",
       "src/main/java/com/acme/App.java",
       undefined,
     ));
-    expect(screen.getByRole("tab", { name: /Terminal/, selected: true })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: /Terminal/, selected: true })).toBeInTheDocument();
     expect(await screen.findByTestId("mock-workspace-terminal")).toHaveAttribute(
       "data-initial-cwd",
       "/repo/app",
@@ -91,7 +94,7 @@ export function registerinteractionEditing5Cases(caseContext: registerinteractio
     });
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-    await screen.findByTitle("app / src/one.ts");
+    await findEditorByTitle("app / src/one.ts");
     await waitFor(() => expect(registrationRef.current).not.toBeNull());
 
     expect(registrationRef.current?.execute("workspace.jumpToBookmarkJ")).toBe(true);
@@ -145,8 +148,8 @@ export function registerinteractionEditing5Cases(caseContext: registerinteractio
     });
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-    await screen.findByTitle("app / src/main.ts");
-    await screen.findByTitle("app / src/util.ts");
+    await findEditorByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/util.ts");
     const { EditorView } = await import("@codemirror/view");
     const panes = screen.getAllByTestId("code-workspace-editor-pane");
     const primaryPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") === "primary");

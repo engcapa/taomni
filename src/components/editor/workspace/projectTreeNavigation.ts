@@ -6,6 +6,14 @@ export interface ProjectTreeNavigationActions {
   onToggleDir: (rootId: string, path: string) => void;
 }
 
+type TreeNavigator = (key: string, actions: ProjectTreeNavigationActions) => boolean;
+const virtualNavigators = new WeakMap<HTMLElement, TreeNavigator>();
+
+export function registerProjectTreeNavigation(tree: HTMLElement, navigate: TreeNavigator): () => void {
+  virtualNavigators.set(tree, navigate);
+  return () => { if (virtualNavigators.get(tree) === navigate) virtualNavigators.delete(tree); };
+}
+
 export function treeRowSelection(row: HTMLElement): TreeSelection | null {
   const { treeKind, rootId, looseId, path = "" } = row.dataset;
   if (treeKind === "root" && rootId) return { kind: "root", rootId };
@@ -18,6 +26,8 @@ export function treeRowSelection(row: HTMLElement): TreeSelection | null {
 /** Navigation selects visible rows; it never invokes a row's activation click. */
 export function navigateProjectTree(tree: HTMLElement, key: string, actions: ProjectTreeNavigationActions): boolean {
   if (!["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft", "Home", "End"].includes(key)) return false;
+  const virtual = virtualNavigators.get(tree);
+  if (virtual) return virtual(key, actions);
   const rows = Array.from(tree.querySelectorAll<HTMLElement>("[role='treeitem'][data-tree-kind]"));
   if (!rows.length) return false;
   const select = (row: HTMLElement | undefined) => {

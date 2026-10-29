@@ -1,5 +1,6 @@
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { flushSync } from "react-dom";
 import type { CodeWorkspaceTabProps } from "../../editor/workspace/controller/model";
 import { WorkspaceCodeEditor } from "../WorkspaceCodeEditor";
 import { useAppStore } from "../../../stores/appStore";
@@ -40,6 +41,17 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("platform editor ownership", () => {
+  it("forwards a new active file during the synchronous tab commit", () => {
+    render(<Harness sharedFiles />);
+    act(() => useWorkspacePlatformStore.getState().openFileInWorkspace(workspaceId, { rootId: root.id, path: "first.txt" }));
+    expect(editor.props!.hostIntegration?.activeFile).toMatchObject({ path: "first.txt" });
+    act(() => {
+      flushSync(() => useWorkspacePlatformStore.getState().openFileInWorkspace(workspaceId, { rootId: root.id, path: "second.txt" }));
+      expect(editor.props!.hostIntegration?.activeFile).toMatchObject({ path: "second.txt" });
+      expect(editor.props!.hostIntegration?.paneFiles).toEqual([{ kind: "root", rootId: root.id, path: "second.txt" }]);
+    });
+  });
+
   it("persists an active-file publication without feeding it back as a new shared-editor definition", () => {
     render(<Harness sharedFiles />);
     act(() => useAppStore.getState().setTabCodeWorkspaceContext(tabId, context({

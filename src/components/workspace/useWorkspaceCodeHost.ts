@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useDeferredValue, useMemo, useRef } from "react";
 import { fileKey } from "../editor/workspace/codeWorkspaceModel";
 import type { WorkspaceFileMenu, WorkspaceHostIntegration, WorkspaceHostSnapshot } from "../editor/workspace/workspaceHostIntegration";
 import { useWorkspaceEditorHostStore } from "../../stores/workspaceEditorHostStore";
@@ -23,6 +23,12 @@ export function useWorkspaceCodeHost(workspace: PlatformWorkspace, visible: bool
   const active = workspaceMode && selectedWorkspace;
   const sidebarExpanded = useAppStore((state) => !state.sidebarCollapsed);
   const leftToolAreaVisible = active && sidebarExpanded && workspace.activeLeftToolWindow !== "sessions";
+  // Navigation can synchronously commit an external store. Defer the retained
+  // workbench's visibility/portal projection, keeping file targets and buffers
+  // current so input can never land in the previous file during a transition.
+  const presentation = useDeferredValue(useMemo(() => ({
+    active, editorVisible: visible, leftToolAreaVisible, leftToolAreaHost,
+  }), [active, visible, leftToolAreaVisible, leftToolAreaHost]));
   const canvasLayout = useWorkspaceUiStore((state) => state.canvasLayouts[workspace.id] ?? "single");
   const latest = useRef({ workspace, visible });
   latest.current = { workspace, visible };
@@ -129,8 +135,8 @@ export function useWorkspaceCodeHost(workspace: PlatformWorkspace, visible: bool
     previousActive.current = key;
     useWorkspacePlatformStore.getState().syncWorkspaceFiles(current.id, entries, reveal);
   }, []);
-  return useMemo(() => enabled ? { active, editorVisible: visible, leftToolAreaVisible, showEditorTabs, navigationItems, files, activeFile, canvasLayout, paneFiles, leftToolAreaHost, recoverDraft, onSnapshot,
+  return useMemo(() => enabled ? { ...presentation, showEditorTabs, navigationItems, files, activeFile, canvasLayout, paneFiles, recoverDraft, onSnapshot,
     onActivateFile, onOpenGitDiff, onFolderOpened, onActivateToolWindow, onLeftToolAreaChange, registerFileMenu } : undefined,
-    [enabled, active, visible, leftToolAreaVisible, showEditorTabs, navigationItems, files, activeFile, canvasLayout, paneFiles, leftToolAreaHost, recoverDraft, onSnapshot,
+    [enabled, presentation, showEditorTabs, navigationItems, files, activeFile, canvasLayout, paneFiles, recoverDraft, onSnapshot,
       onActivateFile, onOpenGitDiff, onFolderOpened, onActivateToolWindow, onLeftToolAreaChange, registerFileMenu]);
 }

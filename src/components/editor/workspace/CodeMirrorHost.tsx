@@ -198,6 +198,7 @@ export const CodeMirrorHost = memo(function CodeMirrorHost({
     resolveGateSequenceRef: editor.resolveGateSequenceRef,
     setResolveGateUi: editor.setResolveGateUi,
     completionControllerRef: editor.completionControllerRef,
+    renderedCompletionPolicyRef: editor.renderedCompletionPolicyRef,
   });
   const buildDebugChrome = useCallback((
     markers: DebugBreakpointMarker[] | undefined,

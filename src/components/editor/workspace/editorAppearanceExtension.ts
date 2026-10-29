@@ -21,6 +21,13 @@ export interface EditorAppearanceExtensionProfile {
   virtualSpace?: EditorVirtualSpacePolicy;
 }
 
+// A theme allocates a global StyleModule. File activation must reuse it rather
+// than append identical rules with a fresh selector on every document switch.
+// Keep only recent settings combinations; panes and cached states own their
+// extensions independently of this small lookup cache.
+const appearanceExtensions = new Map<string, Extension>();
+const MAX_CACHED_APPEARANCES = 16;
+
 const HIGH_CONTRAST_COLORS: CodeThemeVars = codeThemeVariablesFromPalette({
   variant: "dark",
   background: "#000000",
@@ -54,6 +61,20 @@ export function resolveEditorAppearanceColors(
 export function editorAppearanceExtension(
   profile: EditorAppearanceExtensionProfile,
 ): Extension {
+  const virtualSpace = {
+    afterLineEnd: profile.virtualSpace?.afterLineEnd ?? false,
+    atFileBottom: profile.virtualSpace?.atFileBottom ?? false,
+  };
+  const key = JSON.stringify([
+    profile.fontFamily, profile.fontSizePx, profile.lineHeight, profile.ligatures,
+    profile.colorSchemeId, profile.highContrast, virtualSpace.afterLineEnd, virtualSpace.atFileBottom,
+  ]);
+  const cached = appearanceExtensions.get(key);
+  if (cached) {
+    appearanceExtensions.delete(key);
+    appearanceExtensions.set(key, cached);
+    return cached;
+  }
   const colors = resolveEditorAppearanceColors(profile);
   const root: Record<string, string> = {
     fontSize: `${profile.fontSizePx}px`,
@@ -69,7 +90,7 @@ export function editorAppearanceExtension(
     root.backgroundColor = colors["--taomni-code-bg"];
     root.color = colors["--taomni-code-text"];
   }
-  return [
+  const extension: Extension = [
     EditorView.theme({
       "&": root,
       ".cm-scroller": scroller,
@@ -110,9 +131,11 @@ export function editorAppearanceExtension(
         : profile.colorSchemeId,
       "data-editor-ligatures": profile.ligatures ? "true" : "false",
     }),
-    editorVirtualSpacePolicy.of(profile.virtualSpace ?? {
-      afterLineEnd: false,
-      atFileBottom: false,
-    }),
+    editorVirtualSpacePolicy.of(virtualSpace),
   ];
+  appearanceExtensions.set(key, extension);
+  if (appearanceExtensions.size > MAX_CACHED_APPEARANCES) {
+    appearanceExtensions.delete(appearanceExtensions.keys().next().value!);
+  }
+  return extension;
 }

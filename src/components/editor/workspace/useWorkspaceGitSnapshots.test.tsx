@@ -207,6 +207,29 @@ describe("useWorkspaceGitSnapshots", () => {
     expect(gitMocks.gitSnapshot).toHaveBeenCalledTimes(2);
   });
 
+  it("limits background snapshot processes to two and releases a slot after failure", async () => {
+    const replies = new Map<string, { resolve: (value: ReturnType<typeof snapshot>) => void; reject: (error: Error) => void }>();
+    gitMocks.gitSnapshot.mockImplementation((root: string) => new Promise((resolve, reject) => {
+      replies.set(root, { resolve, reject });
+    }));
+    const requests = Array.from({ length: 5 }, (_, index) => fetchGitSnapshotDeduplicated(`/pool-${index}`));
+    const results = Promise.allSettled(requests);
+    expect(gitMocks.gitSnapshot).toHaveBeenCalledTimes(2);
+    expect(fetchGitSnapshotDeduplicated("/pool-4")).toBe(requests[4]);
+    replies.get("/pool-0")!.reject(new Error("public failure"));
+    await requests[0].catch(() => undefined);
+    expect(gitMocks.gitSnapshot).toHaveBeenCalledTimes(3);
+    replies.get("/pool-1")!.resolve(snapshot("one", "one"));
+    await requests[1];
+    expect(gitMocks.gitSnapshot).toHaveBeenCalledTimes(4);
+    replies.get("/pool-2")!.resolve(snapshot("two", "two"));
+    await requests[2];
+    expect(gitMocks.gitSnapshot).toHaveBeenCalledTimes(5);
+    replies.get("/pool-3")!.resolve(snapshot("three", "three"));
+    replies.get("/pool-4")!.resolve(snapshot("four", "four"));
+    expect((await results).map((entry) => entry.status)).toEqual(["rejected", "fulfilled", "fulfilled", "fulfilled", "fulfilled"]);
+  });
+
   it("ED-PERF-002-A3: suppresses a slow hidden result and refreshes on show", async () => {
     let resolveFirst!: (value: ReturnType<typeof snapshot>) => void;
     gitMocks.gitSnapshot

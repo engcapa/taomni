@@ -1,3 +1,4 @@
+import { findEditorByTitle, findEditorPanes } from "../../editorReadiness";
 import { EditorSelection } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -45,7 +46,7 @@ export function registeratomicSaveClipboard3Cases(caseContext: registeratomicSav
     caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFileWithEncoding.mockResolvedValue(caseContext.workspaceTestHarness.file(path, "initial\n"));
 
     const rendered = caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle(`app / ${path}`);
+    await findEditorByTitle(`app / ${path}`);
     const content = rendered.container.querySelector<HTMLElement>(".cm-content");
     expect(content).not.toBeNull();
     fireEvent.keyDown(content!, { key: "d", code: "KeyD", ctrlKey: true });
@@ -105,7 +106,7 @@ export function registeratomicSaveClipboard3Cases(caseContext: registeratomicSav
     });
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
 
     // Verify that the clipboard store was acquired and is active for this workspaceInstanceId
     const store = acquireClipboardStore("instance-clipboard-bb1");
@@ -169,10 +170,10 @@ export function registeratomicSaveClipboard3Cases(caseContext: registeratomicSav
     });
 
     const { unmount } = caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-    await screen.findByTitle("app / src/main.ts");
-    await screen.findByTitle("app / src/util.ts");
+    await findEditorByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/util.ts");
 
-    const panes = screen.getAllByTestId("code-workspace-editor-pane");
+    const panes = await findEditorPanes();
     const primaryPane = panes.find((p) => p.getAttribute("data-editor-group-id") === "primary");
     const secondaryPane = panes.find((p) => p.getAttribute("data-editor-group-id") === "secondary");
     const primaryEditor = primaryPane?.querySelector<HTMLElement>(".cm-editor");
@@ -290,7 +291,7 @@ export function registeratomicSaveClipboard3Cases(caseContext: registeratomicSav
     });
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
 
     const observation = screen.getByTestId("code-workspace-clipboard-observation");
     // Live-region semantics exist before any clipboard operation ran.
@@ -421,7 +422,7 @@ export function registeratomicSaveClipboard3Cases(caseContext: registeratomicSav
     );
     await screen.findAllByTitle("app / src/main.ts");
 
-    const panes = screen.getAllByTestId("code-workspace-editor-pane");
+    const panes = await findEditorPanes();
     const primaryPane = panes.find((p) => p.getAttribute("data-editor-group-id") === "primary");
     const secondaryPane = panes.find((p) => p.getAttribute("data-editor-group-id") === "secondary");
     const primaryEditor = primaryPane?.querySelector<HTMLElement>(".cm-editor");

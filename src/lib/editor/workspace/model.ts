@@ -42,6 +42,9 @@ export interface WorkspaceGitRootCandidate {
   id: string;
   name: string;
   path: string;
+  /** Resolve only the nearest repository containing this workspace-relative file. */
+  activeFilePath?: string;
+  ancestorsOnly?: boolean;
 }
 
 export interface WorkspaceGitRoot {

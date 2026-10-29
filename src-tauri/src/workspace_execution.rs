@@ -427,12 +427,18 @@ struct ModelBuilder {
 }
 
 #[tauri::command]
-pub fn workspace_execution_model(
+pub async fn workspace_execution_model(
     repo_root: String,
     active_file: Option<String>,
     tool_config: Option<WorkspaceToolConfig>,
 ) -> Result<WorkspaceExecutionModel, String> {
-    let root = canonical_root(&repo_root)?;
-    let active = resolve_active(&root, active_file.as_deref());
-    detect_execution_model(&root, active.as_deref(), tool_config.as_ref())
+    // This scan can walk a large workspace and probe installed tools. A sync
+    // Tauri command runs on the window thread and also stalls WebView frames.
+    tauri::async_runtime::spawn_blocking(move || {
+        let root = canonical_root(&repo_root)?;
+        let active = resolve_active(&root, active_file.as_deref());
+        detect_execution_model(&root, active.as_deref(), tool_config.as_ref())
+    })
+    .await
+    .map_err(|error| format!("workspace_execution_model: {error}"))?
 }

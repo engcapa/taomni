@@ -20,6 +20,7 @@ import type { useWorkspaceSemanticFeatures } from "./useWorkspaceSemanticFeature
 import type { useWorkspaceSession } from "./useWorkspaceSession";
 import type { useWorkspaceSurfaceState } from "./useWorkspaceSurfaceState";
 import { useWorkspaceTests } from "./useWorkspaceTests";
+import { relativePathWithinRoot } from "../codeWorkspaceModel";
 
 
 export interface UseWorkspaceExecutionRuntimeContext {
@@ -47,6 +48,7 @@ export function useWorkspaceExecutionRuntime(context: UseWorkspaceExecutionRunti
   const [javaRunBusy, setJavaRunBusy] = useState(false);
   const [projectBuildBusy, setProjectBuildBusy] = useState(false);
   const execution = useExecutionTargets({
+    isEditorReady: session.editorCommands.isActiveEditorReady,
     workspaceInstanceId: session.workspaceInstanceId,
     openFilesRef: session.bufferState.openFilesRef,
     activeKey: session.workspaceUi.activeKey,
@@ -58,6 +60,11 @@ export function useWorkspaceExecutionRuntime(context: UseWorkspaceExecutionRunti
     toolConfig: project.buildTools.toolConfig,
     activeFile: editing.documentLanguage.activeFile,
     roots: project.projectTree.roots,
+    projectDetected: project.projectDescriptorDiscovery.discovery?.descriptors.some((descriptor) => {
+      const file = editing.documentLanguage.activeFile;
+      const path = file && editing.absolutePathForOpenFile(file);
+      return !!path && relativePathWithinRoot(descriptor.root, path) !== null;
+    }),
   });
   const runActions = useWorkspaceRunActions({
     runPanelRef: ports.runPanelRef,

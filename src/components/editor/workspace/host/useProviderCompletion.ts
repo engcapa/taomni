@@ -34,6 +34,7 @@ export interface UseProviderCompletionContext {
   resolveGateSequenceRef: import("react").RefObject<number>;
   setResolveGateUi: import("react").Dispatch<import("react").SetStateAction<{ id: number; label: string; message: string; failed: boolean; retrying: boolean; top: number; left: number; retry: () => Promise<"committed" | "unavailable">; insertWithoutImport: () => boolean; dismiss: () => void; } | null>>;
   completionControllerRef: import("react").RefObject<import("../lspCompletion").LspCompletionController | undefined>;
+  renderedCompletionPolicyRef: ReturnType<typeof import("./useEditorHostRefs").useEditorHostRefs>["renderedCompletionPolicyRef"];
 }
 
 export function useProviderCompletion(hostContext: UseProviderCompletionContext) {
@@ -151,6 +152,12 @@ export function useProviderCompletion(hostContext: UseProviderCompletionContext)
       const autoPopup = policy?.autoPopup ?? true;
       const delayMs = policy?.delayMs ?? 100;
       const maxVisibleItems = policy?.maxVisibleItems ?? 100;
+      // This is the configuration installed with the new document. Publishing
+      // it avoids immediately rebuilding the same plugins after mounting.
+      hostContext.renderedCompletionPolicyRef.current = {
+        autoPopup, delayMs, maxVisibleItems,
+        docDelayMs: policy?.documentation?.delayMs ?? hoverDocumentationDelayMs ?? 75,
+      };
 
       return autocompletion({
         activateOnTyping: autoPopup,

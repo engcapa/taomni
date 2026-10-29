@@ -91,3 +91,44 @@ it("refreshes native menu state directly and releases its subscription on unmoun
   act(() => publish("active", registration));
   expect(buildAppMenuSpec).toHaveBeenCalledTimes(3);
 });
+
+it("refreshes native close state and active command owner without a shell render", () => {
+  vi.mocked(installAppMenu).mockResolvedValue(undefined);
+  vi.mocked(buildAppMenuSpec).mockClear();
+  const platform = useWorkspacePlatformStore.getState();
+  const workspace = platform.createWorkspace({ name: "Files", rootPath: "/public" });
+  const registration: WorkspaceCommandRegistration = {
+    items: [{ id: "workspace.save", title: "Save", category: "File", enabled: true }],
+    snapshot: [], execute: vi.fn(() => true), executeAction: vi.fn(async () => ({ kind: "applied" as const })),
+  };
+  let renders = 0;
+  const { unmount } = renderHook(() => {
+    renders++;
+    useMainMenuBridge({
+      dispatchMenuAction: vi.fn(), nativeMenu: true, activeTabClosable: false,
+      importExport: { hasSessions: false } as UseMainMenuBridgeContext["importExport"],
+      quickConnectVisible: false,
+      getActiveWorkspaceCommands: () => {
+        const current = platform.getWorkspace();
+        return current?.openTabs.find((tab) => tab.id === current.activeTabId)?.kind === "file" ? registration : null;
+      },
+      subscribeWorkspaceCommands: () => () => {},
+      t: ((key: string) => key) as UseMainMenuBridgeContext["t"],
+      setActiveTab: vi.fn(), handleCommand: vi.fn(),
+      workspaceCommandRegistrationsRef: { current: {} },
+    });
+  });
+  expect(buildAppMenuSpec).toHaveBeenLastCalledWith(expect.objectContaining({ activeTabClosable: false, workspaceCommands: [] }));
+  let fileId = "";
+  act(() => { fileId = platform.openFileInWorkspace(workspace.id, { rootId: workspace.rootFolders[0]!.id, path: "notes.txt" }).id; });
+  expect(buildAppMenuSpec).toHaveBeenLastCalledWith(expect.objectContaining({ activeTabClosable: true, workspaceCommands: registration.items }));
+  act(() => { platform.openLocalTerminalInWorkspace(workspace.id); });
+  expect(buildAppMenuSpec).toHaveBeenLastCalledWith(expect.objectContaining({ activeTabClosable: true, workspaceCommands: [] }));
+  act(() => platform.setActiveWorkspaceTab(workspace.id, fileId));
+  expect(buildAppMenuSpec).toHaveBeenLastCalledWith(expect.objectContaining({ workspaceCommands: registration.items }));
+  expect(renders).toBe(1);
+  unmount();
+  const calls = vi.mocked(buildAppMenuSpec).mock.calls.length;
+  act(() => platform.closeWorkspaceTab(workspace.id, fileId));
+  expect(buildAppMenuSpec).toHaveBeenCalledTimes(calls);
+});

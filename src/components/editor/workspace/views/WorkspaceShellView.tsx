@@ -146,11 +146,9 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
       <WorkspaceObservationBoundary
         ref={rootRef}
         bridge={observationBridge}
+        clipboardHandle={clipboard.clipboardHandle}
         data-testid="code-workspace-tab"
         data-layout-revision={tabPolicyOwner.layoutRevision}
-        data-clipboard-revision={clipboard.clipboardSnapshot.revision}
-        data-clipboard-history-revision={clipboard.clipboardSnapshot.historyRevision}
-        data-clipboard-consumer-count={clipboard.clipboardSnapshot.consumerCount}
         data-tab-policy-limit={tabPolicyOwner.tabPolicy.limitPerLeaf}
         data-tab-policy-order={tabPolicyOwner.tabPolicy.order}
         data-tab-policy-receipt-status={tabPolicyOwner.tabPolicyReceipt?.status}

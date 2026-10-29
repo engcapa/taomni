@@ -90,6 +90,10 @@ export function useWorkspaceEditorCommands(dependencies: UseWorkspaceEditorComma
   const activeEditorCommandState = useCallback((): EditorCommandState | null => {
     return activeEditorCommandOwner()?.port.state() ?? null;
   }, [activeEditorCommandOwner]);
+  const isActiveEditorReady = useCallback(() => {
+    const owner = activeEditorCommandOwner();
+    return !!owner && !!openFilesRef.current[owner.fileKey] && !openFilesRef.current[owner.fileKey].loading;
+  }, [activeEditorCommandOwner, openFilesRef]);
   const executeActiveEditorCommand = useCallback((commandId: EditorCommandId, options?: EditorCommandOptions) => {
     return activeEditorCommandOwner()?.port.execute(commandId, options) ?? false;
   }, [activeEditorCommandOwner]);
@@ -165,5 +169,5 @@ export function useWorkspaceEditorCommands(dependencies: UseWorkspaceEditorComma
     const file = openFilesRef.current[ui.activeKey ?? ""] ?? null;
     return { file, position: dependencies.editorSelectionRef.current.end };
   }, [workspaceInstanceId]);
-  return { editorCommandOwnerFor, handleReturnToEditor, resolveEditorTarget, executeActiveEditorCommand, executeEditorCommand, editorCommandStateFor, activeEditorCommandState, editorCommandContextRevision, activeEditorCommandOwner, executeEditorCommandFor, editorCommandSignatureRef, setEditorCommandContextRevision, registerEditorCommandPort };
+  return { editorCommandOwnerFor, handleReturnToEditor, resolveEditorTarget, executeActiveEditorCommand, executeEditorCommand, editorCommandStateFor, activeEditorCommandState, isActiveEditorReady, editorCommandContextRevision, activeEditorCommandOwner, executeEditorCommandFor, editorCommandSignatureRef, setEditorCommandContextRevision, registerEditorCommandPort };
 }

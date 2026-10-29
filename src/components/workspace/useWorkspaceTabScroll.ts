@@ -7,6 +7,7 @@ import { maxScrollLeft, setTabScrollLeft, TAB_SCROLL_EDGE_TOLERANCE, TAB_SCROLL_
 export function useWorkspaceTabScroll(workspaceId: string | undefined, tabs: readonly WorkspaceIsolatedTab[] | undefined, activeTabId: string | null | undefined) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const tabElements = useRef(new Map<string, HTMLDivElement>());
+  const userScrolled = useRef(false);
   const [scrollState, setScrollState] = useState({ overflow: false, atStart: true, atEnd: true });
   const setTabElement = useCallback((id: string, element: HTMLDivElement | null) => {
     if (element) tabElements.current.set(id, element);
@@ -33,7 +34,7 @@ export function useWorkspaceTabScroll(workspaceId: string | undefined, tabs: rea
     const element = scrollRef.current;
     const active = activeTabId ? tabElements.current.get(activeTabId) : null;
     if (!element || element.clientWidth <= 0) return;
-    if (active) {
+    if (active && !userScrolled.current) {
       const viewport = element.getBoundingClientRect();
       const rect = active.getBoundingClientRect();
       const left = rect.left - viewport.left + element.scrollLeft;
@@ -49,16 +50,22 @@ export function useWorkspaceTabScroll(workspaceId: string | undefined, tabs: rea
 
   const scheduleMeasurement = useElementResizeFrame(scrollRef, revealActiveTab);
   useLayoutEffect(() => {
+    userScrolled.current = false;
+  }, [workspaceId, activeTabId]);
+  useLayoutEffect(() => {
     scheduleMeasurement();
   }, [workspaceId, tabs, revealActiveTab, scheduleMeasurement]);
 
   const scrollBy = useCallback((direction: "left" | "right") => {
     const element = scrollRef.current;
     if (!element) return;
+    userScrolled.current = true;
     const delta = Math.max(TAB_SCROLL_STEP_MIN, Math.floor(element.clientWidth * 0.8));
     setTabScrollLeft(element, element.scrollLeft + (direction === "right" ? delta : -delta));
     updateScrollState();
   }, [updateScrollState]);
 
-  return { scrollRef, scrollState, setTabElement, updateScrollState, scrollBy, tabElements };
+  const markUserScroll = useCallback(() => { userScrolled.current = true; }, []);
+
+  return { scrollRef, scrollState, setTabElement, updateScrollState, scrollBy, markUserScroll, tabElements };
 }

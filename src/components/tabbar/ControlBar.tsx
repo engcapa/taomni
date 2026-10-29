@@ -41,6 +41,7 @@ import { PlatformToolbarActions } from "./PlatformToolbarActions";
 import { WorkspaceTabStrip } from "../workspace/WorkspaceTabStrip";
 import { WorkspaceTabsFilter } from "../workspace/WorkspaceTabsFilter";
 import { useAppStore } from "../../stores/appStore";
+import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { useSessionImportExport } from "../menubar/useSessionImportExport";
 import type { AppCommand } from "../menubar/commands";
 import { getAppPlatform } from "../../lib/runtime";
@@ -123,6 +124,10 @@ export function ControlBar({
     // Opening a menu samples current ownership without subscribing the entire
     // window to every editor selection, mount and command-state publication.
     const commands = getWorkspaceCommands ? getWorkspaceCommands()?.items ?? [] : workspaceCommands;
+    const workspace = useWorkspacePlatformStore.getState().getWorkspace();
+    const canCloseActiveTab = useAppStore.getState().activeSideTab === "workspaces"
+      ? !!workspace?.openTabs.find((tab) => tab.id === workspace.activeTabId)?.closable
+      : activeTabClosable;
     const importExportItems: MenuItem[] = [
       {
         label: t("menu.importSessions"),
@@ -155,7 +160,7 @@ export function ControlBar({
       { label: t("menu.newLocalTerminal"), testId: "context-menu-item-new-local-terminal", icon: <TerminalIcon className="w-3 h-3" />, onClick: () => onCommand("new-terminal") },
       { label: t("menu.newRemoteSession"), testId: "context-menu-item-new-remote-session", icon: <Plus className="w-3 h-3" />, onClick: () => onCommand("new-session") },
       { label: t("ribbon.newSftp"), testId: "context-menu-item-new-sftp", icon: <FolderOpen className="w-3 h-3" />, onClick: () => onCommand("new-sftp") },
-      { label: t("menu.closeActiveTab"), testId: "context-menu-item-close-active-tab", icon: <X className="w-3 h-3" />, onClick: () => onCommand("close-active"), disabled: !activeTabClosable },
+      { label: t("menu.closeActiveTab"), testId: "context-menu-item-close-active-tab", icon: <X className="w-3 h-3" />, onClick: () => onCommand("close-active"), disabled: !canCloseActiveTab },
       { label: "", separator: true, onClick: () => {} },
       {
         label: t("menu.sessions"),

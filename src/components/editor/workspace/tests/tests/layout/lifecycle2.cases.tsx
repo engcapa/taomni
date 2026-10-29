@@ -1,3 +1,4 @@
+import { findEditorByTitle, findEditorPanes } from "../../editorReadiness";
 import { EditorSelection } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
@@ -101,9 +102,9 @@ export function registerlayoutLifecycle2Cases(caseContext: registerlayoutLifecyc
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace, {}, { strict: true });
 
-    await screen.findByTitle("app / src/main.ts");
-    await screen.findByTitle("app / src/util.ts");
-    await screen.findByTitle("app / src/other.ts");
+    await findEditorByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/util.ts");
+    await findEditorByTitle("app / src/other.ts");
     await waitFor(() => {
       const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-layout-restore");
       expect(ui.bottomDockOpen).toBe(false);
@@ -156,7 +157,7 @@ end_of_record
     });
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-    await screen.findByTitle("app / src/Program.cs");
+    await findEditorByTitle("app / src/Program.cs");
 
     // Execute workspace.showCoverage command
     expect(registrationRef.current?.items.find((item) => item.id === "workspace.showCoverage")?.enabled).toBe(true);
@@ -187,7 +188,7 @@ end_of_record
     });
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-    await screen.findByTitle("app / src/Program.cs");
+    await findEditorByTitle("app / src/Program.cs");
 
     // Split editor right
     const splitRightBtn = caseContext.workspaceTestHarness.toolbarControl("code-workspace-split-right");
@@ -243,7 +244,7 @@ end_of_record
       caseContext.workspaceTestHarness.lspMocks.lspOpenDocument.mockResolvedValue(caseContext.workspaceTestHarness.documentStatus({ available: true, active: false }));
 
       caseContext.workspaceTestHarness.renderWorkspace(viewWorkspace("instance-improve007-persist"));
-      await screen.findByTitle("app / src/Long.java");
+      await findEditorByTitle("app / src/Long.java");
       const pane = screen.getAllByTestId("code-workspace-editor-pane")[0]!;
       const view = EditorView.findFromDOM(pane.querySelector(".cm-editor")!)!;
       act(() => {
@@ -267,7 +268,7 @@ end_of_record
       caseContext.workspaceTestHarness.lspMocks.lspOpenDocument.mockResolvedValue(caseContext.workspaceTestHarness.documentStatus({ available: true, active: false }));
 
       caseContext.workspaceTestHarness.renderWorkspace(viewWorkspace("instance-improve007-split"));
-      await screen.findByTitle("app / src/Long.java");
+      await findEditorByTitle("app / src/Long.java");
       const firstPane = screen.getAllByTestId("code-workspace-editor-pane")[0]!;
       const firstView = EditorView.findFromDOM(firstPane.querySelector(".cm-editor")!)!;
       act(() => {
@@ -281,7 +282,7 @@ end_of_record
 
       fireEvent.click(caseContext.workspaceTestHarness.toolbarControl("code-workspace-split-right"));
       await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
-      const panes = screen.getAllByTestId("code-workspace-editor-pane");
+      const panes = await findEditorPanes();
       const secondView = EditorView.findFromDOM(panes[1]!.querySelector(".cm-editor")!)!;
       act(() => {
         secondView.dispatch({ selection: EditorSelection.cursor(10) });

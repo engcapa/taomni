@@ -7,7 +7,28 @@ import { CodeMirrorHost } from "./CodeMirrorHost";
 import { renderEditor } from "./tests/codeMirrorHost/harness";
 import { WorkspaceDocumentTransactionOwner } from "./workspaceDocumentTransactionOwner";
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+
+it("keeps a fresh editor at its native origin and restores each retained document's scroll", () => {
+  const scrollTop = vi.spyOn(Element.prototype, "scrollTop", "set");
+  const scrollLeft = vi.spyOn(Element.prototype, "scrollLeft", "set");
+  const rendered = renderEditor("first", vi.fn(), { fileKey: "a", path: "a.txt" });
+  const view = EditorView.findFromDOM(rendered.container.querySelector<HTMLElement>(".cm-editor")!)!;
+  const writesFor = (spy: typeof scrollTop) => spy.mock.contexts.filter((context) => context === view.scrollDOM);
+  // Even writing zero forces WebKit to lay out the freshly inserted editor.
+  expect(writesFor(scrollTop)).toHaveLength(0);
+  expect(writesFor(scrollLeft)).toHaveLength(0);
+  view.scrollDOM.scrollTop = 240;
+  view.scrollDOM.scrollLeft = 32;
+  rendered.rerender(<CodeMirrorHost {...rendered.props} fileKey="b" path="b.txt" doc="second" />);
+  expect(EditorView.findFromDOM(view.dom)).toBe(view);
+  expect(view.scrollDOM.scrollTop).toBe(0);
+  expect(view.scrollDOM.scrollLeft).toBe(0);
+  rendered.rerender(<CodeMirrorHost {...rendered.props} />);
+  expect(view.state.doc.toString()).toBe("first");
+  expect(view.scrollDOM.scrollTop).toBe(240);
+  expect(view.scrollDOM.scrollLeft).toBe(32);
+});
 
 it("keeps the editor DOM, per-file selection, folds and standalone undo across consecutive switches", () => {
   const first = "first line\nfolded line\nlast line";

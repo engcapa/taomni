@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  workspaceListDir,
   workspaceListFilesRecursive,
   workspaceReadFile,
 } from "../lib/editor/workspace";
@@ -51,7 +52,7 @@ function errorMessage(error: unknown): string {
  */
 export function useProjectDescriptorDiscovery(
   workspaceRoot: string,
-  options: { autoRefresh?: boolean } = {},
+  options: { autoRefresh?: boolean; autoScope?: "root" | "recursive" } = {},
 ): ProjectDescriptorDiscoveryState {
   const [status, setStatus] = useState<ProjectDescriptorDiscoveryStatus>("idle");
   const [discovery, setDiscovery] = useState<ProjectDescriptorDiscoveryV1 | null>(null);
@@ -59,7 +60,7 @@ export function useProjectDescriptorDiscovery(
   const requestSequenceRef = useRef(0);
   const generationRef = useRef(0);
 
-  const refresh = useCallback(async () => {
+  const discover = useCallback(async (scope: "root" | "recursive") => {
     const requestSequence = ++requestSequenceRef.current;
     const generation = ++generationRef.current;
     if (!workspaceRoot) {
@@ -73,12 +74,11 @@ export function useProjectDescriptorDiscovery(
     setDiscovery(null);
     setReason(null);
 
-    const fileResult = await workspaceListFilesRecursive(
-      workspaceRoot,
-      "",
-      DISCOVERY_MAX_DEPTH,
-      DISCOVERY_MAX_FILES,
-    );
+    // Browsing an ordinary folder needs only its own build descriptors. Full
+    // discovery remains available when sources or an explicit refresh need it.
+    const fileResult = scope === "root"
+      ? await workspaceListDir(workspaceRoot, "")
+      : await workspaceListFilesRecursive(workspaceRoot, "", DISCOVERY_MAX_DEPTH, DISCOVERY_MAX_FILES);
     if (requestSequence !== requestSequenceRef.current) return;
     if (fileResult.state !== "ready") {
       if (fileResult.state === "cancelled") return;
@@ -126,6 +126,7 @@ export function useProjectDescriptorDiscovery(
     setStatus(nextDiscovery.status);
     setReason(nextDiscovery.diagnostics.join("; ") || null);
   }, [workspaceRoot]);
+  const refresh = useCallback(() => discover("recursive"), [discover]);
 
   useEffect(() => {
     if (!options.autoRefresh || !workspaceRoot) {
@@ -136,11 +137,11 @@ export function useProjectDescriptorDiscovery(
       }
       return;
     }
-    void refresh();
+    void discover(options.autoScope ?? "recursive");
     return () => {
       requestSequenceRef.current += 1;
     };
-  }, [options.autoRefresh, refresh, workspaceRoot]);
+  }, [options.autoRefresh, options.autoScope, discover, workspaceRoot]);
 
   return { status, discovery, reason, refresh };
 }

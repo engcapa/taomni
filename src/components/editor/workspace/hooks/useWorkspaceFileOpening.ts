@@ -76,7 +76,7 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
   >(null);
   const pendingClosedFilesRef = useRef(new Map<string, PendingClosedFile>());
 
-  const openFileInternal = useCallback(
+  const openFile = useCallback(
     createOpenFile({
       flushPendingEditorText: project.buffers.flushPendingEditorText,
       pendingClosedFilesRef,
@@ -96,6 +96,7 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
       looseFilesRef: project.projectTree.looseFilesRef,
       findRoot: project.projectTree.findRoot,
       restoreBookmarksForFileKey: session.preferences.restoreBookmarksForFileKey,
+      onActivateFile: host?.onActivateFile,
     }),
     [
       project.uiActions.activateEditorGroup,
@@ -107,13 +108,9 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
       project.lsp.syncDocument,
       project.uiActions.updateEditorGroup,
       session.workspaceInstanceId,
+      host?.onActivateFile,
     ],
   );
-  const openFile = useCallback<typeof openFileInternal>(async (ref, options) => {
-    const result = await openFileInternal(ref, options);
-    if (result && result.activated !== false && options?.activate !== false && !options?.restoring) host?.onActivateFile(ref);
-    return result;
-  }, [openFileInternal, host?.onActivateFile]);
   const treeOpening = useWorkspaceTreeOpening({
     treeFocus: session.treeFocus,
     workspaceInstanceId: session.workspaceInstanceId,

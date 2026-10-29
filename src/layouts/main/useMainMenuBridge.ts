@@ -49,13 +49,17 @@ export function useMainMenuBridge(context: UseMainMenuBridgeContext) {
   useEffect(() => {
     if (!nativeMenu) return;
     let cancelled = false;
-    let previous: WorkspaceCommandRegistration | null | undefined;
+    let previous: { registration: WorkspaceCommandRegistration | null; closable: boolean } | undefined;
     const refresh = () => {
       const registration = getActiveWorkspaceCommands();
-      if (registration === previous) return;
-      previous = registration;
+      const workspace = useWorkspacePlatformStore.getState().getWorkspace();
+      const closable = useAppStore.getState().activeSideTab === "workspaces"
+        ? !!workspace?.openTabs.find((tab) => tab.id === workspace.activeTabId)?.closable
+        : activeTabClosable;
+      if (registration === previous?.registration && closable === previous.closable) return;
+      previous = { registration, closable };
       const spec = buildAppMenuSpec({
-        activeTabClosable,
+        activeTabClosable: closable,
         hasSessions: importExport.hasSessions,
         quickConnectVisible,
         workspaceCommands: registration?.items ?? [],
@@ -67,9 +71,13 @@ export function useMainMenuBridge(context: UseMainMenuBridgeContext) {
     };
     refresh();
     const unsubscribe = subscribeWorkspaceCommands(refresh);
+    const unsubscribePlatform = useWorkspacePlatformStore.subscribe(refresh);
+    const unsubscribeApp = useAppStore.subscribe(refresh);
     return () => {
       cancelled = true;
       unsubscribe();
+      unsubscribePlatform();
+      unsubscribeApp();
     };
   }, [
     nativeMenu,

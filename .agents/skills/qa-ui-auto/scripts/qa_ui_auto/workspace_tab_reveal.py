@@ -16,6 +16,7 @@ const button = direction ? '[data-testid="workspace-tab-scroll-' + direction + '
 const control = button ? document.querySelector(button) : null;
 const hit = document.elementFromPoint((r.left + r.right) / 2, (r.top + r.bottom) / 2);
 return {active: area.querySelector('[data-active="true"]')?.getAttribute('data-tab-id') ?? null,
+  scrollLeft: area.scrollLeft, scrollWidth: area.scrollWidth, clientWidth: area.clientWidth,
   left: r.left, right: r.right, viewportLeft: left, viewportRight: right,
   visible: r.width > 0 && r.height > 0 && !direction && !!hit && target.contains(hit),
   button: control && !control.disabled ? button : null};
@@ -43,7 +44,7 @@ def reveal(ctx, selector: str) -> list[dict]:
             return samples
         button = position.get("button")
         if not button or index == 20:
-            raise StepError(f"Workspace file tab could not be revealed with its scroll arrows: {position}")
+            raise StepError(f"Workspace file tab could not be revealed with its scroll arrows: {position}; samples={samples}")
         if native:
             ctx.session.click(button)
         else:

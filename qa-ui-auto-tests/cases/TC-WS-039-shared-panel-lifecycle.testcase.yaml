@@ -188,6 +188,7 @@ steps:
 - assert_count:
     selector: '[data-testid="code-workspace-editor-pane"] [data-testid="code-workspace-breadcrumbs"][data-variant="statusbar"]'
     equal: 0
+- wait_for: '[data-testid="code-workspace-breadcrumbs"][data-variant="statusbar"]'
 - assert_count:
     selector: '[data-testid="code-workspace-editor-pane"] [data-testid="code-workspace-breadcrumbs"][data-variant="bar"]'
     equal: 1
@@ -314,24 +315,24 @@ verification:
     - 37
     - 38
     - 42
-    - 98
-    - 100
+    - 99
     - 101
-    - 103
-    - 105
+    - 102
+    - 104
     - 106
-    - 108
+    - 107
     - 109
-    - 111
-    - 113
-    - 117
-    - 119
-    - 122
-    - 124
-    - 127
-    - 130
-    - 134
-    - 136
+    - 110
+    - 112
+    - 114
+    - 118
+    - 120
+    - 123
+    - 125
+    - 128
+    - 131
+    - 135
+    - 137
     checkpoints:
     - step: 10
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
@@ -369,49 +370,49 @@ verification:
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_SHARED_PANEL_DRAFT"}}'
     - step: 51
       expectation: '{"assert_no_runtime_errors": null}'
-    - step: 99
+    - step: 100
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
-    - step: 102
+    - step: 103
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
-    - step: 104
+    - step: 105
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
-    - step: 107
+    - step: 108
       expectation: '{"assert_visible": "[data-testid=\"workspace-bottom-dock\"]"}'
-    - step: 110
+    - step: 111
       expectation: '{"assert_not_visible": "[data-testid=\"workspace-bottom-dock\"]"}'
-    - step: 112
+    - step: 113
       expectation: '{"wait_for": "[data-testid=\"tab-overview\"]"}'
-    - step: 114
-      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"]"}'
     - step: 115
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_SHARED_PANEL_DRAFT"}}'
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"]"}'
     - step: 116
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_SHARED_PANEL_DRAFT"}}'
+    - step: 117
       expectation: '{"assert_no_runtime_errors": null}'
-    - step: 118
+    - step: 119
       expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
-    - step: 120
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
     - step: 121
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 122
       expectation: '{"assert_no_runtime_errors": null}'
-    - step: 123
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 125
+    - step: 124
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 126
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 127
       expectation: '{"assert_no_runtime_errors": null}'
-    - step: 128
-      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
     - step: 129
+      expectation: '{"wait_for": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 130
       expectation: '{"assert_visible": "[data-testid=\"collapsed-sidebar-rail\"]"}'
-    - step: 131
-      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"]"}'
     - step: 132
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"]"}'
     - step: 133
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
+    - step: 134
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_SHARED_PANEL_DRAFT"}}'
-    - step: 135
+    - step: 136
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
-    - step: 137
+    - step: 138
       expectation: '{"assert_no_runtime_errors": null}'
     results:
     - 10
@@ -432,68 +433,68 @@ verification:
     - 47
     - 50
     - 51
-    - 99
-    - 102
-    - 104
-    - 107
-    - 110
-    - 112
-    - 114
+    - 100
+    - 103
+    - 105
+    - 108
+    - 111
+    - 113
     - 115
     - 116
-    - 118
-    - 120
+    - 117
+    - 119
     - 121
-    - 123
-    - 125
+    - 122
+    - 124
     - 126
-    - 128
+    - 127
     - 129
-    - 131
+    - 130
     - 132
     - 133
-    - 135
-    - 137
+    - 134
+    - 136
+    - 138
   - id: R2
     requirement: Home/Sessions mode switches apply navigator geometry before immediate utility-tab activation and closing; native press and release reach
       the same target without added sleeps or click retries.
     actions:
-    - 139
     - 140
-    - 142
-    - 144
-    - 146
-    - 147
-    - 148
-    - 151
-    - 152
-    - 153
-    checkpoints:
-    - step: 141
-      expectation: '{"wait_for": "[data-testid=\"mfa-tab\"]"}'
-    - step: 143
-      expectation: '{"wait_for": "[data-testid=\"mfa-empty\"]"}'
-    - step: 145
-      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
-    - step: 149
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"mfa\"]", "name": "data-active", "equals": "true"}}'
-    - step: 150
-      expectation: '{"assert_visible": "[data-testid=\"mfa-tab\"]"}'
-    - step: 154
-      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"settings\"]", "state": "detached"}}'
-    - step: 155
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"mfa\"]", "name": "data-active", "equals": "true"}}'
-    - step: 156
-      expectation: '{"assert_no_runtime_errors": null}'
-    results:
     - 141
     - 143
     - 145
+    - 147
+    - 148
     - 149
-    - 150
+    - 152
+    - 153
     - 154
+    checkpoints:
+    - step: 142
+      expectation: '{"wait_for": "[data-testid=\"mfa-tab\"]"}'
+    - step: 144
+      expectation: '{"wait_for": "[data-testid=\"mfa-empty\"]"}'
+    - step: 146
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 150
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"mfa\"]", "name": "data-active", "equals": "true"}}'
+    - step: 151
+      expectation: '{"assert_visible": "[data-testid=\"mfa-tab\"]"}'
+    - step: 155
+      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"settings\"]", "state": "detached"}}'
+    - step: 156
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"mfa\"]", "name": "data-active", "equals": "true"}}'
+    - step: 157
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 142
+    - 144
+    - 146
+    - 150
+    - 151
     - 155
     - 156
+    - 157
   - id: R3
     requirement: Three consecutive expanded/collapsed sidebar and nested Documentation/split restoration cycles preserve both editors and the dirty draft
       without any runtime errors; each return from Home/Sessions uses the existing terminal and file tabs.
@@ -553,11 +554,11 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-split\"]"}'
     - step: 90
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 2}}'
-    - step: 93
+    - step: 94
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-right-pane\"]"}'
-    - step: 96
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_SHARED_PANEL_DRAFT"}}'
     - step: 97
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "QA_SHARED_PANEL_DRAFT"}}'
+    - step: 98
       expectation: '{"assert_no_runtime_errors": null}'
     results:
     - 53
@@ -579,9 +580,9 @@ verification:
     - 87
     - 89
     - 90
-    - 93
-    - 96
+    - 94
     - 97
+    - 98
   - id: R4
     requirement: Only the active group portals a statusbar navigation trail. Each inactive split uses one fixed-height local breadcrumb bar before and after
       hidden restoration, so it cannot expand to fill the editor.
@@ -612,7 +613,7 @@ verification:
     - step: 91
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"] [data-testid=\"code-workspace-breadcrumbs\"][data-variant=\"statusbar\"]",
         "equal": 0}}'
-    - step: 92
+    - step: 93
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"] [data-testid=\"code-workspace-breadcrumbs\"][data-variant=\"bar\"]",
         "equal": 1}}'
     results:
@@ -623,7 +624,7 @@ verification:
     - 68
     - 69
     - 91
-    - 92
+    - 93
   - id: R5
     requirement: Documentation and both nested editors retain usable nonzero geometry on initial opening and all three hidden restores with the real panel
       library. Deferred resize delivery must preserve sizing, drafts and error reporting.
@@ -631,7 +632,7 @@ verification:
     - 23
     - 46
     - 69
-    - 92
+    - 93
     checkpoints:
     - step: 25
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"code-workspace-right-pane\"]", "min_width": 100, "min_height": 100}}'
@@ -648,9 +649,9 @@ verification:
     - step: 72
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "min_width": 100, "min_height": 100, "min_count":
         2}}'
-    - step: 94
-      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"code-workspace-right-pane\"]", "min_width": 100, "min_height": 100}}'
     - step: 95
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"code-workspace-right-pane\"]", "min_width": 100, "min_height": 100}}'
+    - step: 96
       expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "min_width": 100, "min_height": 100, "min_count":
         2}}'
     results:
@@ -660,8 +661,8 @@ verification:
     - 49
     - 71
     - 72
-    - 94
     - 95
+    - 96
   native:
   - check: Consecutive hidden-panel lifecycle and resizing in the packaged WebView.
     method: automated

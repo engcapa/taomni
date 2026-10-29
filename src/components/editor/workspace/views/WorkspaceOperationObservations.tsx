@@ -1,3 +1,4 @@
+import { useSyncExternalStore } from "react";
 import { useWorkspaceAnnouncements } from "../hooks/useWorkspaceAnnouncements";
 import { useWorkspaceClipboard } from "../hooks/useWorkspaceClipboard";
 import { useWorkspaceUiActions } from "../hooks/useWorkspaceUiActions";
@@ -12,6 +13,11 @@ export interface WorkspaceOperationObservationsProps {
 
 export function WorkspaceOperationObservations(props: WorkspaceOperationObservationsProps) {
   const { announcements, activeFile, uiActions, clipboard } = props;
+  const clipboardSnapshot = useSyncExternalStore(
+    clipboard.clipboardHandle.subscribe,
+    clipboard.clipboardHandle.getSnapshot,
+    clipboard.clipboardHandle.getSnapshot,
+  );
   return (<><div
     id="code-workspace-save-observation"
     data-testid="code-workspace-save-observation"
@@ -62,9 +68,9 @@ export function WorkspaceOperationObservations(props: WorkspaceOperationObservat
       data-operation={uiActions.latestClipboardObservation?.operation}
       data-outcome={uiActions.latestClipboardObservation?.outcome}
       data-system-effect={uiActions.latestClipboardObservation?.systemEffect}
-      data-permission={uiActions.latestClipboardObservation?.permission ?? clipboard.clipboardSnapshot.permission}
+      data-permission={uiActions.latestClipboardObservation?.permission ?? clipboardSnapshot.permission}
       data-permission-generation={
-        uiActions.latestClipboardObservation?.permissionGeneration ?? clipboard.clipboardSnapshot.permissionGeneration
+        uiActions.latestClipboardObservation?.permissionGeneration ?? clipboardSnapshot.permissionGeneration
       }
       data-base-generation={uiActions.latestClipboardObservation?.baseGeneration ?? undefined}
       data-workspace-fallback={
@@ -76,7 +82,7 @@ export function WorkspaceOperationObservations(props: WorkspaceOperationObservat
       }
       data-payload-length={uiActions.latestClipboardObservation?.payloadLength ?? undefined}
       data-history-exclusion={uiActions.latestClipboardObservation?.historyExclusion}
-      data-payload-revision={uiActions.latestClipboardObservation?.payloadRevision ?? clipboard.clipboardSnapshot.payloadRevision}
+      data-payload-revision={uiActions.latestClipboardObservation?.payloadRevision ?? clipboardSnapshot.payloadRevision}
       data-caret-count={uiActions.latestClipboardObservation?.caretCount ?? undefined}
       data-observed-at={uiActions.latestClipboardObservation?.observedAt ?? undefined}
       className="sr-only"

@@ -1,0 +1,102 @@
+id: TC-WS-076
+title: Ordinary project documents retain automatic Run discovery and native execution
+description: Open plain notes in a recognized dependency-free Node project, run its discovered package script with the toolbar, and verify independent real
+  terminal output and retained editor contents.
+modes:
+- native
+covers:
+- F-WS-2
+- F25.1
+tags:
+- p0
+- workspace-redesign
+- regression
+- execution
+fixtures:
+- reset_db
+- workspace_execution_documents
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-project-document-run
+- observe_language_startup: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree-empty"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.platform_workspace_root}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-root"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="notes.txt"]'
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    equals: Public project notes
+- wait_for:
+    selector: '[data-testid="code-workspace-run-target"]:not(:disabled)'
+    timeout_sec: 30
+- assert_language_startup:
+    commands:
+      workspace_execution_model:
+        min: 1
+        fulfilled: 1
+- click: '[data-testid="code-workspace-run-target"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^QA_EXECUTION_DOCUMENT_OK\s*$
+    timeout_sec: 30
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    equals: Public project notes
+- assert_no_runtime_errors: null
+- screenshot: workspace-project-document-run.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Browsing a known project document keeps automatic execution discovery, a runnable toolbar target, actual process output and the document
+      intact.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 15
+    results:
+    - 12
+    - 13
+    - 14
+    - 16
+    - 17
+    - 18
+    - 19
+    checkpoints:
+    - step: 12
+      expectation: "assert_text_equals:\n  selector: '[data-testid=\"workspace-file-editor\"] .cm-content'\n  equals: Public project notes"
+    - step: 13
+      expectation: "wait_for:\n  selector: '[data-testid=\"code-workspace-run-target\"]:not(:disabled)'\n  timeout_sec: 30"
+    - step: 14
+      expectation: "assert_language_startup:\n  commands:\n    workspace_execution_model:\n      min: 1\n      fulfilled: 1"
+    - step: 16
+      expectation: 'wait_for: ''[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'''
+    - step: 17
+      expectation: "assert_pattern:\n  selector: '[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]'\n  regex: (?m)^QA_EXECUTION_DOCUMENT_OK\\\
+        s*$\n  timeout_sec: 30"
+    - step: 18
+      expectation: "assert_text_equals:\n  selector: '[data-testid=\"workspace-file-editor\"] .cm-content'\n  equals: Public project notes"
+    - step: 19
+      expectation: 'assert_no_runtime_errors: null'
+  native:
+  - check: A real execution model and package script execute from a plain document.
+    method: automated
+    reason: Browser stubs cannot prove native command return shape or actual child-process output.
+  visual:
+  - check: Project notes and Run terminal remain visible.
+    method: manual
+    reason: Screenshot supports the exact content and real process assertions.

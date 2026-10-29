@@ -11,6 +11,7 @@ fn write_temp_entries(dir: &Path) -> Vec<String> {
 
 mod atomic_writes;
 mod encoding_matrix;
+mod git_roots_on_demand;
 mod listing_and_git_roots;
 mod resources;
 mod tasks_and_java;

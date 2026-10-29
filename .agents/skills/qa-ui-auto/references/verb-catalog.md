@@ -17,6 +17,8 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 
 ## Navigation & timing
 
+`reveal_project_tree_row: '[data-testid="code-workspace-tree-dir"][data-path="folder"]'` scrolls the real tree viewport until a lazy row is visible, without selection or activation, and saves raw offsets. File-open probes do the same preparation before the first measured pointer event.
+
 `measure_workspace_file_open: {selector, expected, event: click|dblclick, label, require_highlight?: boolean, require_editor_reuse?: boolean}`
 drives one real browser/WebDriver activation and passively records exact canonical
 document publication, visible syntax highlighting and every animation-frame gap.

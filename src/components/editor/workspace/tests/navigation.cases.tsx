@@ -1,3 +1,4 @@
+import { findEditorByTitle } from "./editorReadiness";
 import { EditorView } from "@codemirror/view";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
@@ -26,7 +27,7 @@ it("leaves navigation-bar keyboard state to the mounted breadcrumb surface", asy
     workspaceTestHarness.workspaceMocks.workspaceReadFile.mockResolvedValue(workspaceTestHarness.file("src/main.ts", "const value = 1;"));
 
     const rendered = workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     const content = rendered.container.querySelector<HTMLElement>(".cm-content");
     expect(content).not.toBeNull();
 
@@ -106,7 +107,7 @@ it("opens call and type hierarchy from capability-gated shortcuts", async () => 
     });
 
     workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
     const editor = screen.getByTestId("code-workspace-editor-pane");
 
@@ -186,7 +187,7 @@ it("opens a JDK / dependency class as a read-only library buffer", async () => {
     ));
 
     const rendered = workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/Main.java");
+    await findEditorByTitle("app / src/Main.java");
     const content = rendered.container.querySelector<HTMLElement>(".cm-content");
     expect(content).not.toBeNull();
 
@@ -197,7 +198,7 @@ it("opens a JDK / dependency class as a read-only library buffer", async () => {
       expect.objectContaining({ rootPath: "/repo/app", filePath: "src/Main.java" }),
       classUri,
     ));
-    const libraryTab = await screen.findByTitle("java.lang · java.base · String.java");
+    const libraryTab = await findEditorByTitle("java.lang · java.base · String.java");
     expect(libraryTab).toBeInTheDocument();
     // Library sources never touch the file system, and never open a server document.
     expect(workspaceTestHarness.workspaceMocks.workspaceReadLooseFile).not.toHaveBeenCalled();
@@ -229,7 +230,7 @@ it("opens a JDK / dependency class as a read-only library buffer", async () => {
       expect.objectContaining({ filePath: "src/Main.java", documentUri: classUri }),
       charSequenceUri,
     ));
-    expect(await screen.findByTitle("java.lang · java.base · CharSequence.java")).toBeInTheDocument();
+    expect(await findEditorByTitle("java.lang · java.base · CharSequence.java")).toBeInTheDocument();
     expect(workspaceTestHarness.workspaceMocks.workspaceReadLooseFile).not.toHaveBeenCalled();
     expect(workspaceTestHarness.workspaceMocks.workspaceWriteLooseFile).not.toHaveBeenCalled();
     expect(workspaceTestHarness.workspaceMocks.workspaceWriteFile).not.toHaveBeenCalled();
@@ -290,7 +291,7 @@ it("offers Download sources on a decompiled class and swaps in attached source",
     });
 
     const rendered = workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/Main.java");
+    await findEditorByTitle("app / src/Main.java");
     fireEvent.keyDown(rendered.container.querySelector<HTMLElement>(".cm-content")!, { key: "b", code: "KeyB", ctrlKey: true });
 
     // Decompiled banner + Download sources button appear for the library buffer.
@@ -364,7 +365,7 @@ it("keeps the Download sources banner when no sources are published", async () =
     });
 
     const rendered = workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/Main.java");
+    await findEditorByTitle("app / src/Main.java");
     fireEvent.keyDown(rendered.container.querySelector<HTMLElement>(".cm-content")!, { key: "b", code: "KeyB", ctrlKey: true });
 
     const downloadBtn = await screen.findByTestId("code-workspace-download-sources");
@@ -390,7 +391,7 @@ it("highlights usages at the caret the editor just reported, before the caret st
       if (next) registrationRef.current = next;
     });
     const rendered = workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-    await screen.findByTitle("app / notes.txt");
+    await findEditorByTitle("app / notes.txt");
     const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
     const view = EditorView.findFromDOM(content)!;
     let executePromise: Promise<unknown> | undefined;
@@ -448,7 +449,7 @@ it("does not restore occurrence highlights when a cleared request returns late",
     });
 
     workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     await waitFor(() => expect(pending.length).toBeGreaterThan(0));
 
     // Keep the first cursor-driven request unresolved while invoking the
@@ -516,7 +517,7 @@ it("waits for a pending Java didChange before go-to-definition requests", async 
     });
 
     workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-    await screen.findByTitle("app / src/Main.java");
+    await findEditorByTitle("app / src/Main.java");
     const fileKey = "root:app:src/Main.java";
     await waitFor(() => expect(
       selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-definition-sync-barrier")
@@ -599,7 +600,7 @@ it("applies the same sync barrier to Quick Definition and reports a retryable fa
     workspaceTestHarness.lspMocks.lspDefinition.mockResolvedValue({ status, locations: [] });
 
     workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/Main.java");
+    await findEditorByTitle("app / src/Main.java");
     const fileKey = "root:app:src/Main.java";
     await waitFor(() => expect(
       selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-quick-definition-sync-barrier")
@@ -669,7 +670,7 @@ it("applies the sync barrier to declaration, type definition, and implementation
     });
 
     workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-    await screen.findByTitle("app / src/Main.java");
+    await findEditorByTitle("app / src/Main.java");
     const fileKey = "root:app:src/Main.java";
     await waitFor(() => expect(
       selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-semantic-navigation-sync-barrier")

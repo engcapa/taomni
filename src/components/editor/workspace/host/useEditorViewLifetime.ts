@@ -539,8 +539,9 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
     const state = cached
       ? reconfigureCachedEditorState(cached.state, initialDocumentText, extensions, compartmentEffects)
       : EditorState.create({ doc: initialDoc, extensions });
-    const view = editor.viewRef.current ?? new EditorView({ state, parent: editor.hostRef.current });
-    if (editor.viewRef.current) view.setState(state);
+    const retainedView = editor.viewRef.current;
+    const view = retainedView ?? new EditorView({ state, parent: editor.hostRef.current });
+    if (retainedView) view.setState(state);
     editorLanguageByView.set(view, liveTemplateLanguageForPath(editor.pathRef.current));
     editor.viewRef.current = view;
     viewState = createEditorViewStateLifecycle({
@@ -602,8 +603,12 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
     // ED-IMPROVE-007: one-shot restore of this leaf/file's own caret,
     // selection, scroll and folds. Applied before any user input and never
     // re-applied on prop changes, so late updates cannot overwrite typing.
-    view.scrollDOM.scrollTop = cached?.scrollTop ?? 0;
-    view.scrollDOM.scrollLeft = cached?.scrollLeft ?? 0;
+    // A new scroller already starts at zero. Writing zero still forces a
+    // synchronous WebKit layout of the newly mounted editor and its parents.
+    if (retainedView || cached) {
+      view.scrollDOM.scrollTop = cached?.scrollTop ?? 0;
+      view.scrollDOM.scrollLeft = cached?.scrollLeft ?? 0;
+    }
     if (cached && (cached.scrollTop > 0 || cached.scrollLeft > 0)) {
       editor.pendingDeferredScrollRef.current = { scrollTop: cached.scrollTop, scrollLeft: cached.scrollLeft };
     }

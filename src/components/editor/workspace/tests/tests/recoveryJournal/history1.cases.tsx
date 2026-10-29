@@ -1,3 +1,4 @@
+import { findEditorByTitle } from "../../editorReadiness";
 import { emit } from "@tauri-apps/api/event";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -123,7 +124,7 @@ export function registerrecoveryJournalHistory1Cases(caseContext: registerrecove
       const { disk, workspace, onCommandsChange } = setupWorkspace("missing-snapshots", "src/c.ts");
       vi.mocked(confirmAppDialog).mockReset().mockResolvedValue(true);
       caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/c.ts");
+      await findEditorByTitle("app / src/c.ts");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
       caseContext.workspaceTestHarness.workspaceMocks.workspaceListDir.mockRejectedValue(new Error("listing unavailable"));
       await act(async () => {
@@ -157,7 +158,7 @@ export function registerrecoveryJournalHistory1Cases(caseContext: registerrecove
         return caseContext.workspaceTestHarness.writeAck(caseContext.workspaceTestHarness.file(path, text, { hash: `hash-${text}` }));
       });
       caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/c.ts");
+      await findEditorByTitle("app / src/c.ts");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
       await applyEditWithPreview(workspace.workspaceInstanceId, {
         documentEdits: ["a", "b", "d"].map((name) => ({
@@ -193,7 +194,7 @@ export function registerrecoveryJournalHistory1Cases(caseContext: registerrecove
       });
 
       caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/c.ts");
+      await findEditorByTitle("app / src/c.ts");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
       await applyEditWithPreview(workspace.workspaceInstanceId, {
@@ -261,7 +262,7 @@ export function registerrecoveryJournalHistory1Cases(caseContext: registerrecove
       });
 
       caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/c.ts");
+      await findEditorByTitle("app / src/c.ts");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
       await act(async () => {
@@ -327,7 +328,7 @@ export function registerrecoveryJournalHistory1Cases(caseContext: registerrecove
       vi.mocked(confirmAppDialog).mockReset().mockResolvedValue(true);
 
       caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/c.ts");
+      await findEditorByTitle("app / src/c.ts");
 
       // RC-02: auto-discover opens the review dialog with restore disabled.
       const review = await screen.findByTestId("refactor-recovery-review");
@@ -343,7 +344,7 @@ export function registerrecoveryJournalHistory1Cases(caseContext: registerrecove
     it("queues editor undo until the cross-file post-state and journal are committed", async () => {
       const { disk, workspace, onCommandsChange } = setupWorkspace("pending-history", "src/a.ts");
       caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/a.ts");
+      await findEditorByTitle("app / src/a.ts");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
       let releasePostRead!: () => void;
       const postRead = new Promise<void>((resolve) => { releasePostRead = resolve; });
@@ -388,7 +389,7 @@ export function registerrecoveryJournalHistory1Cases(caseContext: registerrecove
       vi.mocked(confirmAppDialog).mockReset().mockResolvedValue(true);
 
       caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/c.ts");
+      await findEditorByTitle("app / src/c.ts");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
       await applyEditWithPreview(workspace.workspaceInstanceId, {

@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RefObject } from "react";
 import { useWorkspaceTabScroll } from "../useWorkspaceTabScroll";
@@ -30,8 +30,11 @@ function Strip({ elementRef, overflow, atEnd, setTabElement }: {
 }
 
 function WorkspaceStrip({ activeKey }: { activeKey: string }) {
-  const { scrollRef, scrollState, setTabElement } = useWorkspaceTabScroll("workspace", undefined, activeKey);
-  return <Strip elementRef={scrollRef} {...scrollState} setTabElement={setTabElement} />;
+  const { scrollRef, scrollState, setTabElement, scrollBy } = useWorkspaceTabScroll("workspace", undefined, activeKey);
+  return <>
+    <button onClick={() => scrollBy("right")}>Scroll right</button>
+    <Strip elementRef={scrollRef} {...scrollState} setTabElement={setTabElement} />
+  </>;
 }
 
 function EditorStrip({ activeKey }: { activeKey: string }) {
@@ -96,6 +99,23 @@ afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+it("keeps manual tab scrolling across resize notifications until the active tab changes", () => {
+  const h = resizeHarness();
+  const view = render(<WorkspaceStrip activeKey="a" />);
+  const g = geometry();
+  g.setWidth(300);
+  act(h.flush);
+  fireEvent.click(screen.getByRole("button", { name: "Scroll right" }));
+  expect(g.left).toBe(240);
+  act(() => { h.deliver(); h.flush(); });
+  expect(g.left).toBe(240);
+  fireEvent.click(screen.getByRole("button", { name: "Scroll right" }));
+  expect(g.left).toBe(480);
+  view.rerender(<WorkspaceStrip activeKey="b" />);
+  act(h.flush);
+  expect(g.left).toBe(900);
 });
 
 describe.each([

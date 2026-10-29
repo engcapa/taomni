@@ -91,6 +91,10 @@
           "workspace_slow_lsp",
           "workspace_language_files",
           "workspace_watch",
+          "workspace_large_directory",
+          "workspace_home_documents",
+          "workspace_home_git_documents",
+          "workspace_execution_documents",
           "workspace_slow_sdk",
           "workspace_restore_sessions",
           "java_sample_projects",
@@ -629,6 +633,9 @@
                   "workspace_list_dir",
                   "workspace_compact_chain",
                   "workspace_list_files_recursive",
+                  "workspace_execution_model",
+                  "workspace_detect_git_roots",
+                  "git_snapshot",
                   "lsp_start_workspace_watcher",
                   "lsp_stop_workspace_watcher"
                 ]
@@ -639,6 +646,7 @@
             }
           }
         },
+        "reveal_project_tree_row": {"type": "string", "minLength": 1},
         "measure_workspace_file_open": {
           "type": "object",
           "required": ["selector", "expected", "event", "label"],

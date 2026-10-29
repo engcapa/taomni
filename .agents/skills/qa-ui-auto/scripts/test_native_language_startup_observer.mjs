@@ -56,6 +56,29 @@ test("preserves real native rejection and callback unregister semantics", async 
   assert.equal(JSON.stringify(h.observer().observe()).includes("SECRET"), false);
 });
 
+test("tracks real execution discovery without retaining home paths, configuration or model contents", async () => {
+  for (const rejected of [false, true]) {
+    const h = await installed();
+    const payload = { repoRoot: "/SECRET_HOME", activeFile: "SECRET_FILE", toolConfig: { password: "SECRET" } };
+    const result = { source: "SECRET_NATIVE_MODEL" };
+    const promise = h.target.invoke("workspace_execution_model", payload);
+    const check = rejected ? assert.rejects(promise, (error) => error === result) : promise;
+    const request = h.requests.at(-1);
+    assert.equal(request.args[1].body, payload);
+    assert.equal(h.observer().observe().events[0].command, "workspace_execution_model");
+    assert.equal(h.observer().observe().events[0].status, "pending");
+    await h.complete(request, result, rejected);
+    if (rejected) await check;
+    else assert.equal(await check, result);
+    const state = h.observer().observe();
+    assert.equal(state.valid, true);
+    assert.equal(state.events[0].status, rejected ? "rejected" : "fulfilled");
+    assert.equal(JSON.stringify(state).includes("SECRET"), false);
+    assert.equal(h.callbacks.size, 0);
+    h.observer().restore();
+  }
+});
+
 test("fetch wrapper preserves the original promise and synchronous callback throws", async () => {
   const h = await installed();
   const failure = new Error("SECRET_CALLBACK_FAILURE");

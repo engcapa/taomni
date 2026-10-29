@@ -55,6 +55,46 @@ it("publishes a fast read with ready content before activation and never exposes
   expect(h.context.syncLspDocument).not.toHaveBeenCalled();
 });
 
+it("publishes the containing workspace tab before the first microtask can render the new editor", async () => {
+  fs.workspaceReadFile.mockResolvedValue(diskFile("page.html"));
+  const h = harness();
+  let hostActive: CodeWorkspaceFileRef | null = null;
+  Object.assign(h.context, { onActivateFile: (file: CodeWorkspaceFileRef) => { hostActive = file; } });
+  const rendered: Array<{ editor: string; host: string | null }> = [];
+  const unsubscribe = useCodeWorkspaceStore.subscribe(() => {
+    queueMicrotask(() => {
+      const active = ui().activeKey;
+      if (active) rendered.push({ editor: active, host: hostActive ? fileKey(hostActive) : null });
+    });
+  });
+  await h.open(ref("page.html"));
+  await Promise.resolve();
+  unsubscribe();
+  h.unsubscribe();
+  expect(rendered.length).toBeGreaterThan(0);
+  expect(rendered.every((snapshot) => snapshot.editor === snapshot.host)).toBe(true);
+});
+
+it("does not publish a background, restoring, cancelled or superseded file as the host selection", async () => {
+  const h = harness();
+  const activated = vi.fn();
+  Object.assign(h.context, { onActivateFile: activated });
+  fs.workspaceReadFile.mockResolvedValue(diskFile("background.txt"));
+  await h.open(ref("background.txt"), { activate: false });
+  await h.open(ref("background.txt"), { restoring: true });
+  await h.open(ref("cancelled.txt"), { isCurrent: () => false });
+  expect(activated).not.toHaveBeenCalled();
+  let finish!: (value: ReturnType<typeof diskFile>) => void;
+  fs.workspaceReadFile.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+  const pending = h.open(ref("earlier.txt"));
+  fs.workspaceReadFile.mockResolvedValueOnce(diskFile("latest.txt"));
+  await h.open(ref("latest.txt"));
+  finish(diskFile("earlier.txt"));
+  await pending;
+  h.unsubscribe();
+  expect(activated).toHaveBeenCalledExactlyOnceWith(ref("latest.txt"));
+});
+
 it("shows loading only for a slow read and replaces it with the actual file", async () => {
   let resolve!: (value: ReturnType<typeof diskFile>) => void;
   fs.workspaceReadFile.mockReturnValue(new Promise((reply) => { resolve = reply; }));

@@ -731,6 +731,14 @@ controls:
     selector: '[data-testid="context-menu-item-close-active-tab"]'
     kind: interactive
     optional: true
+  - id: workspace-command-submenu
+    selector: '[data-testid="context-menu-workspace-actions"]'
+    kind: interactive
+    optional: true
+  - id: workspace-command-save
+    selector: '[data-testid="context-menu-workspace-command-workspace.save"]'
+    kind: interactive
+    optional: true
 -->
 
 - 控制栏统一菜单承接原 Ribbon 大图标核心命令分发：Session / SFTP / Settings / Help / Servers / Exit。
@@ -12190,6 +12198,10 @@ TC-WS-070 reproduces the all-types report with a five-line HTML file, 704-line t
 
 TC-WS-072 covers the coalesced workspace metadata writer through immediate browser/native window reload. Two file tabs and a terminal are opened, one file is closed, and the surviving file is activated immediately before reload. The folder, mixed tabs, selected file and final dirty text must restore, while the closed file stays closed. No persistence wait or direct store/storage injection is used.
 
+TC-WS-073 adds browser/native cold-open and repeated-tab measurements in an ordinary directory with 300 public documents and 100 subfolders. TC-WS-074 mounts the actual native home as the only workspace root and opens public HTML/text/JSON in a disposable QA-owned child. Both retain the 150ms frame and 1500ms content budgets, editor identity, exact contents, dirty draft and zero automatic recursive/SDK/LSP discovery assertions. The Home fixture never reads personal document contents or changes existing home files; cleanup removes only its explicitly created directory.
+
+TC-WS-075 keeps the real native execution scan under the same Home responsiveness budgets. TC-WS-076 opens plain notes in a recognized Node project, requires actual automatic execution-model completion and a runnable toolbar target, executes its dependency-free package script, and verifies independent terminal output plus unchanged document contents.
+
 ## 12. Workspace-First 平台重构（v6.1）
 
 > 单行共享主工具栏、左侧主导航条多模式、Workspaces 工作区、左下角 MFA 悬浮窗、Agents / Crew 开发中入口与 Ctrl+K 命令面板。测试用例：`TC-WS-001` ~ `TC-WS-049`。`TC-WS-049` 覆盖 Home、Tools、Sessions、空/多标签 Workspaces 的共享标题栏拖动事件、窄窗口真实命中、双击最大化，以及按钮、标签、弹出输入框和右键的排除；`TC-MAIN-RAIL-03` 验证同一顶部边框及 Home/Tools 标题的真实系统位移。`TC-WS-029/030` 还覆盖工作区标签过多时的左右滚动控制，以及顶部空白区保留原生窗口拖动目标。`TC-WS-044` 在 browser/native 中覆盖从 Home 选择已保存工作区后，树形/详细列表的已展开子目录自动重新加载，保留文档与目录展开状态。`TC-WS-045` 覆盖 Tools / Home 显式进入空编辑器时展示文件区，以及收缩、Project 和 Sessions 工具切换后的恢复。`TC-WS-047` 覆盖普通层级文件树显示依赖/构建目录，避免将父目录误判为 Empty。`TC-WS-018/019` 保留连续快捷键开关回归，`TC-WS-046` 追加 Linux 原生 GTK/fcitx 真实输入及大预览重复打开边界。
@@ -12436,6 +12448,11 @@ files:
 - src/components/editor/workspace/ProjectTreeFlat.tsx
 - src/components/editor/workspace/ProjectTreeEntryDetails.tsx
 - src/components/editor/workspace/ProjectTree.tsx
+- src/components/editor/workspace/projectTreeRendering.tsx
+- src/components/editor/workspace/ProjectTreeEntryRows.tsx
+- src/components/editor/workspace/ProjectTreeViewport.tsx
+- src/components/editor/workspace/projectTreeRows.ts
+- src/components/editor/workspace/projectTreeNavigationModel.ts
 - src/components/editor/workspace/FileTreePane.tsx
 - src/components/editor/workspace/hooks/useWorkspaceHostFiles.ts
 - src/components/editor/workspace/hooks/useWorkspaceHostCanvas.ts
@@ -12445,6 +12462,10 @@ files:
 - src/components/workspace/WorkspaceTabsFilter.tsx
 - src/lib/workspaceTabFilter.ts
 controls:
+- id: code-workspace-tree-viewport
+  selector: '[data-testid="code-workspace-tree-viewport"]'
+  kind: display
+  optional: true
 - id: code-workspace-tree-view-all-files
   selector: '[data-testid="code-workspace-tree-view-all-files"]'
   kind: interactive
@@ -13199,3 +13220,9 @@ controls:
 隐藏编辑器布局恢复：`TC-WS-038`（browser/native），通过用户入口隐藏 Project、切换到终端、从 Home 重载并恢复，保留草稿、活动标签及工具窗口；覆盖零尺寸面板注册顺序导致的崩溃。
 
 共享面板组件升级回归：`TC-WS-039`（browser/native），真实嵌套分栏、Documentation、侧栏拖动、终端隐藏、大预览和重载连续操作后保留草稿与编辑器所有权；与 `TC-WS-038` 一起显式断言未捕获异常、未处理 Promise、React 根错误与崩溃页，防止界面恢复后漏报组件异常。
+
+TC-WS-075 adds native Home source-to-document activation coverage for the real `workspace_execution_model` command. It retains the 150ms frame and 1500ms content/highlight budgets, exact public contents and editor reuse; TC-WS-073/074 also reject automatic execution-model scans for ordinary folders.
+
+TC-WS-077 protects virtual explorer rows in browser/native: bounded DOM rows, Home/End and offscreen ArrowUp selection without activation, actual file opening, search/reset, list view and reverse name sorting. Cold/warm frame budgets remain unchanged in TC-WS-073/074.
+
+TC-WS-078 protects application menu ownership after ordinary-file activation: Close availability before/after the first and last file, a contributed Save with saved-content reopen, and release of the closed editor menu. Browser covers the renderer entry; native menu state and store-subscription cleanup have mounted contracts, with current-source hosted activation performance still gated by TC-WS-064/073.

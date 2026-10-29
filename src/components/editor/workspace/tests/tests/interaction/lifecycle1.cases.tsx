@@ -1,3 +1,4 @@
+import { findEditorByTitle } from "../../editorReadiness";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useCallback, useRef, useState, type ComponentProps } from "react";
 import { expect, it, vi } from "vitest";
@@ -51,7 +52,7 @@ export function registerinteractionLifecycle1Cases(caseContext: registerinteract
     );
     expect(caseContext.workspaceTestHarness.descriptorDiscoveryMock.useProjectDescriptorDiscovery).toHaveBeenCalledWith(
       "/repo/app",
-      { autoRefresh: true },
+      { autoRefresh: true, autoScope: "root" },
     );
 
     fireEvent.click(screen.getByTestId("project-facts-refresh-btn"));
@@ -232,7 +233,7 @@ export function registerinteractionLifecycle1Cases(caseContext: registerinteract
     caseContext.workspaceTestHarness.workspaceMocks.workspaceListDir.mockResolvedValue([caseContext.workspaceTestHarness.entry("example.txt", "example.txt")]);
     caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile.mockResolvedValue(caseContext.workspaceTestHarness.file("example.txt", source));
     const rendered = caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / example.txt");
+    await findEditorByTitle("app / example.txt");
     const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
     const view = EditorView.findFromDOM(content)!;
     act(() => { content.focus(); });

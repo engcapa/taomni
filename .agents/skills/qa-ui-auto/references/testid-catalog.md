@@ -1508,6 +1508,8 @@
 - `[data-testid="context-menu-item-servers"]` — interactive [optional] — F1.9.command-servers
 - `[data-testid="context-menu-item-exit"]` — interactive [optional] — F1.9.command-exit
 - `[data-testid="context-menu-item-close-active-tab"]` — interactive [optional] — F1.9.command-close-active
+- `[data-testid="context-menu-workspace-actions"]` — interactive [optional] — F1.9.workspace-command-submenu
+- `[data-testid="context-menu-workspace-command-workspace.save"]` — interactive [optional] — F1.9.workspace-command-save
 
 ## main/detach (F-Detach-1)
 
@@ -1734,6 +1736,7 @@
 
 ## main/workspace-platform (F-WS-2)
 
+- `[data-testid="code-workspace-tree-viewport"]` — display [optional] — F-WS-2.code-workspace-tree-viewport
 - `[data-testid="code-workspace-tree-view-all-files"]` — interactive — F-WS-2.code-workspace-tree-view-all-files
 - `[data-testid="code-workspace-tree-search"]` — interactive — F-WS-2.code-workspace-tree-search
 - `[data-testid="code-workspace-tree-open-default"]` — interactive — F-WS-2.code-workspace-tree-open-default

@@ -1,5 +1,63 @@
 use super::*;
 
+// A non-project explorer root must not fan out into thousands of repositories.
+// Inspect only a bounded shallow listing; active files use ancestor lookup.
+const NON_PROJECT_ROOT_ENTRY_LIMIT: usize = 256;
+
+pub(super) fn detect_workspace_git_roots(
+    roots: Vec<WorkspaceGitRootCandidate>,
+    home: Option<&Path>,
+) -> Result<Vec<WorkspaceGitRoot>, String> {
+    let home = home.and_then(|path| fs::canonicalize(path).ok());
+    let mut repos = Vec::new();
+    for root in roots {
+        let Ok(path) = fs::canonicalize(&root.path) else {
+            continue;
+        };
+        if !path.is_dir() {
+            continue;
+        }
+        let start = if let Some(active_file_path) = &root.active_file_path {
+            let active = resolve_existing_path(&path, active_file_path)?;
+            if !active.is_file() {
+                continue;
+            }
+            active.parent().unwrap_or(&path).to_path_buf()
+        } else {
+            path.clone()
+        };
+        let mut found = Vec::new();
+        if let Some(repo_root) = find_git_repo_root(&start) {
+            found.push(repo_root);
+        }
+        let wants_nested = !root.ancestors_only && root.active_file_path.is_none();
+        let on_demand = wants_nested
+            && !path.join(".git").exists()
+            && (home.as_ref() == Some(&path)
+                || fs::read_dir(&path)
+                    .map(|entries| {
+                        entries.take(NON_PROJECT_ROOT_ENTRY_LIMIT + 1).count()
+                            > NON_PROJECT_ROOT_ENTRY_LIMIT
+                    })
+                    .unwrap_or(false));
+        if wants_nested && !on_demand {
+            let mut remaining_dirs = GIT_ROOT_SCAN_MAX_DIRS;
+            collect_nested_git_roots(
+                &path,
+                0,
+                GIT_ROOT_SCAN_MAX_DEPTH,
+                &mut remaining_dirs,
+                &mut found,
+            )?;
+        }
+        for repo_root in found {
+            upsert_workspace_git_root(&mut repos, &root, &path, &repo_root);
+        }
+    }
+    repos.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+    Ok(repos)
+}
+
 pub(super) fn find_git_repo_root(path: &Path) -> Option<PathBuf> {
     let mut current = Some(path);
     while let Some(dir) = current {
