@@ -63,6 +63,36 @@ const symbols: LspDocumentSymbol[] = [
 ];
 
 describe("Breadcrumbs", () => {
+  it("uses current navigation and popup actions when the visible trail is unchanged", async () => {
+    const pathSegments = [
+      { label: "repo", path: "", kind: "root" as const },
+      { label: "src", path: "src", kind: "directory" as const },
+    ];
+    const props = { pathSegments, symbols: [], position: { line: 0, character: 0 } };
+    const oldLoad = vi.fn().mockResolvedValue([]);
+    const nextLoad = vi.fn().mockResolvedValue([
+      { label: "current.txt", path: "src/current.txt", kind: "file" },
+    ]);
+    const oldAction = vi.fn();
+    const nextAction = vi.fn();
+    const { rerender } = render(<Breadcrumbs {...props} loadPathChildren={oldLoad} />);
+    rerender(<Breadcrumbs {...props} loadPathChildren={nextLoad}
+      pathActionsForSegment={() => [{ id: "copy", label: "Copy old path", onSelect: oldAction }]} />);
+
+    clickPathSegment("directory", "src");
+    const popup = await screen.findByTestId("code-workspace-breadcrumb-popup");
+    expect(await within(popup).findByRole("option", { name: /current.txt/ })).toBeTruthy();
+    expect(oldLoad).not.toHaveBeenCalled();
+    expect(nextLoad).toHaveBeenCalledOnce();
+
+    rerender(<Breadcrumbs {...props} loadPathChildren={nextLoad}
+      pathActionsForSegment={() => [{ id: "copy", label: "Copy current path", onSelect: nextAction }]} />);
+    fireEvent.click(within(popup).getByText("Copy current path"));
+    expect(nextAction).toHaveBeenCalledOnce();
+    expect(oldAction).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("code-workspace-breadcrumb-popup")).toBeNull();
+  });
+
   it("collapses intermediate path and symbol segments for narrow editor panes", () => {
     const segments = [
       { label: "repo", path: "", kind: "root" as const },

@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { LspDocumentSymbol, LspLocation } from "../../../lib/editor/lsp";
 import type {
   GoToFileItem,
@@ -85,8 +86,12 @@ interface WorkspacePopupsHostProps {
   onOpenLocation: (location: LspLocation) => void;
 }
 
-/** Hosts Code Workspace modal/quick-pick overlays outside the editor pane tree. */
-export function WorkspacePopupsHost({
+/**
+ * Closed popups retain their owner but skip unrelated file/caret publications.
+ * Every open/close transition renders, including effect cleanup and focus return;
+ * reopening receives the latest data and handlers from the workspace.
+ */
+export const WorkspacePopupsHost = memo(function WorkspacePopupsHost({
   searchEverywhereOpen,
   searchEverywhereMode,
   goToFileItems,
@@ -216,4 +221,10 @@ export function WorkspacePopupsHost({
       />
     </>
   );
+}, (previous, next) => popupsClosed(previous) && popupsClosed(next));
+
+function popupsClosed(props: WorkspacePopupsHostProps): boolean {
+  return !props.searchEverywhereOpen && !props.recentFilesOpen
+    && !props.recentLocationsOpen && !props.structureOpen
+    && !props.quickDocOpen && !props.locationPeek;
 }

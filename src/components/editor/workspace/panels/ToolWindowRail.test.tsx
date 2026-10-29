@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { useState } from "react";
 import { BottomDock } from "./BottomDock";
-import { ToolWindowRail } from "./ToolWindowRail";
+import { ToolWindowRail, ToolWindowRailButton } from "./ToolWindowRail";
 
 afterEach(() => {
   cleanup();
@@ -10,6 +10,30 @@ afterEach(() => {
 });
 
 describe("ED-PARITY-010 tool window rail", () => {
+  it("keeps current activation and context-menu handlers when button appearance is unchanged", () => {
+    const oldSelect = vi.fn();
+    const nextSelect = vi.fn();
+    const oldMenu = vi.fn();
+    const nextMenu = vi.fn();
+    const item = { id: "run", label: "Run", icon: null, active: false, onSelect: oldSelect };
+    const { rerender } = render(<ToolWindowRailButton item={item} onContextMenu={oldMenu} />);
+    const next = { ...item, onSelect: nextSelect };
+    rerender(<ToolWindowRailButton item={next} onContextMenu={nextMenu} />);
+    const button = screen.getByRole("button", { name: "Run" });
+    fireEvent.click(button);
+    fireEvent.contextMenu(button);
+    expect(nextSelect).toHaveBeenCalledOnce();
+    expect(oldSelect).not.toHaveBeenCalled();
+    expect(nextMenu).toHaveBeenCalledWith(expect.anything(), next);
+    expect(oldMenu).not.toHaveBeenCalled();
+
+    rerender(<ToolWindowRailButton item={{ ...next, active: true, badge: 4, disabled: true, disabledReason: "Busy" }} />);
+    expect(button).toHaveAttribute("aria-pressed", "true");
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent("4");
+    expect(button).toHaveAttribute("title", "Run — Busy");
+  });
+
   it("renders stripe buttons with pressed state, shortcut titles and disabled reasons", () => {
     const onProject = vi.fn();
     render(

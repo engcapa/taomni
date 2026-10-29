@@ -108,7 +108,7 @@ steps:
     value: ${fixture.platform_workspace_root}
 - assert_visible: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
 - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
-- wait_for: '[data-testid="code-workspace-tab"]'
+- wait_for: '[data-testid="code-workspace-tab"]:visible'
 - click: '[data-testid="nav-mode-home"]'
 - assert_attribute:
     selector: '[data-testid="welcome-recent-workspace-filter"]'
@@ -228,7 +228,7 @@ verification:
     - step: 49
       expectation: '{"assert_visible": "[data-testid=\"welcome-recent-workspace-row\"][data-workspace-path=\"${fixture.platform_workspace_root}\"]"}'
     - step: 51
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]:visible"}'
     - step: 53
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-recent-workspace-filter\"]", "name": "value", "equals": "${fixture.platform_workspace_root}"}}'
     - step: 54

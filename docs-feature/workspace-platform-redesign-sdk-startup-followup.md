@@ -351,3 +351,37 @@ passed（Node 22、最多 2 workers）。`TC-WS-025` 增加隐藏 Home 后保留
 010/024 工具条、弹层、终端移动原生回归与完整 crash-regression；正文、高亮、
 每帧 150ms、1500ms 就绪预算及真实 View 身份不变。本机未运行 browser/native，
 本轮托管结果待收集；最终 main 对比和全量门禁仍未完成。
+
+## 面包屑、关闭弹窗与最近记录的订阅边界
+
+`1d63c01b` 的托管运行
+[40819080806](https://github.com/engcapa/taomni/actions/runs/40819080806)
+browser 实际执行 22 次，17 passed / 5 failed。034 外观、069 连续切换与崩溃
+browser 组通过；064/066/068/070 首次打开仍有 251–291ms 长帧。025 在往返
+默认和自定义工作区后有两个常驻编辑器，其新增步骤选中了隐藏实例；现在只在
+该等待中增加 `:visible`，不改变任何正文、路由、状态保持或错误断言。
+native 结果仍在收集，本轮不能宣称性能验收完成。
+
+新的采样显示，隐藏 Home 的子面板直接订阅整个 App store，可以绕过父组件的
+memo。最近会话同时订阅整个 Session store。新增 mounted 回归在改前捕获了
+一次无关状态发布导致 21 次翻译调用；现在分别选择所需 action 与 session/group
+数据，无关文件/状态更新不再重绘历史面板，分组变化仍正常更新。
+
+面包屑路径/图标提取为 memoized `BreadcrumbTrail`，事件通过现有 latest handler
+机制读取当前回调；弹窗的 actions getter、请求 generation、清理和键盘导航仍由
+原 Breadcrumbs 管理。关闭的导航弹窗保留 owner，但跳过无关正文/光标发布；
+每次打开和关闭都渲染，保证异步取消、当前数据、回调以及焦点返回。工具条按钮
+同样按实际显示字段 memo，点击、双击及右键都使用当前 handler 和 item。
+
+此轮是保持交互的内部渲染优化，沿用真实耗时用例 064–071，不新增同义 YAML；
+回归增加选择 `TC-IDE-NAV-01`、`TC-IDE-PARITY-014-01` 以覆盖面包屑导航、
+Structure/Search Everywhere/Recent Files 的关闭再打开，并保留工具条 010/024、
+Home 025/026、全局外观034和完整 crash-regression。单测新增旧/新回调、弹窗
+焦点、状态订阅与当前按钮数据显示断言；本机只运行单测和静态检查，不运行
+browser/native。持久化、后台发现和大型树的剩余方案仍需按实际证据推进，
+不得用单测或较小文件行数替代最终同条件 native 性能对比。
+
+本机最终组合回归：14 文件 357 tests passed（Node.js 22、最多 2 workers）；
+TypeScript、`pnpm check:refactor`、catalog gate、selected CI plan 全部通过。
+新增用例的改前失败和全部修后日志保存在 `qa-ui-auto-report/_local/`，不作为
+browser/native 的执行证据；新 SHA 的托管运行仍待执行。
