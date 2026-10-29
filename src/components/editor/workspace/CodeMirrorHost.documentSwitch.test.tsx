@@ -96,6 +96,21 @@ it("does not carry a standalone file's undo history or selection into another wo
   expect(undo(view)).toBe(false);
 });
 
+it("updates a cached tab after the global appearance and editing settings change in another file", () => {
+  const appearance = { fontFamily: "monospace", fontSizePx: 14, lineHeight: 1.5, ligatures: false, colorSchemeId: "app", highContrast: false };
+  const rendered = renderEditor("first", vi.fn(), { fileKey: "a", path: "a.txt", appearance });
+  const view = EditorView.findFromDOM(rendered.container.querySelector<HTMLElement>(".cm-editor")!)!;
+  rendered.rerender(<CodeMirrorHost {...rendered.props} fileKey="b" path="b.txt" doc="second" />);
+  const current = { ...appearance, fontSizePx: 18, ligatures: true, highContrast: true };
+  rendered.rerender(<CodeMirrorHost {...rendered.props} fileKey="b" path="b.txt" doc="second" appearance={current} readOnly softWrap />);
+  rendered.rerender(<CodeMirrorHost {...rendered.props} appearance={current} readOnly softWrap />);
+  expect(view.state.doc.toString()).toBe("first");
+  expect(view.state.readOnly).toBe(true);
+  expect(view.contentDOM).toHaveClass("cm-lineWrapping");
+  expect(view.contentDOM).toHaveAttribute("data-editor-ligatures", "true");
+  expect(view.contentDOM).toHaveAttribute("data-editor-color-scheme", "high-contrast");
+});
+
 it("ignores an old semantic selection result after switching files on the same view", async () => {
   let resolve!: (value: null) => void;
   const onExpandSelection = vi.fn(() => new Promise<null>((reply) => { resolve = reply; }));

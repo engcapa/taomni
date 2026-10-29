@@ -312,3 +312,13 @@ LSP 重开继续在后台进行。现有 workspace 测试捕获该竞态后已�
 1500ms 内容及每帧 150ms 门槛均未放宽。保留 `TC-WS-025/026`、064–071，
 增加 split/history、跨 pane clipboard、原生 view-state 恢复及关闭重开既有
 用例，与完整崩溃组共同在 GitHub 执行；托管性能结果尚待新版本验证。
+
+复查补充：CodeMirror 的 root reconfigure 会保留已有 compartment overrides，
+单靠重新传入扩展不能保证缓存文件收到新字体、只读、换行等配置。另一个边界
+是旧只读 filter 会拒绝外部 canonical 正文更新。新增两条单测在修前分别捕获
+tabSize 仍为 4（期望 8）与正文仍为旧磁盘快照；现在同时重配各 compartment，
+并沿用已有 remote transaction 标记同步 canonical 内容。7 条真实 View 回归
+包含在另一文件中修改全局外观后回切；CodeMirror/IME/cache 4 文件 88 tests
+passed。前一提交用 Node.js 22、2 workers 执行的相关 10 文件 375 tests passed。
+`TC-WS-034` 增加先切至普通文本再修改 Settings、回切 README 的字体/主题及
+独立撤销断言，覆盖缓存文件的全局外观同步。

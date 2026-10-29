@@ -1,5 +1,6 @@
 import { EditorState, StateEffect, Transaction, type Extension } from "@codemirror/state";
 import { documentReplacementChange } from "./documentSync";
+import { remoteTransactionAnnotation } from "../workspaceDocumentTransactionOwner";
 
 interface CachedEditorState {
   state: EditorState;
@@ -50,11 +51,16 @@ export class EditorStateCache {
 }
 
 /** Rebind every extension to current props without losing the file's state fields. */
-export function reconfigureCachedEditorState(state: EditorState, text: string, extensions: Extension): EditorState {
+export function reconfigureCachedEditorState(
+  state: EditorState,
+  text: string,
+  extensions: Extension,
+  compartmentEffects: readonly StateEffect<unknown>[] = [],
+): EditorState {
   const change = documentReplacementChange(state.doc.toString(), text);
   return state.update({
     ...(change ? { changes: { from: change.from, to: change.to, insert: change.insert } } : {}),
-    effects: StateEffect.reconfigure.of(extensions),
-    annotations: Transaction.addToHistory.of(false),
+    effects: [StateEffect.reconfigure.of(extensions), ...compartmentEffects],
+    annotations: [Transaction.addToHistory.of(false), remoteTransactionAnnotation.of(true)],
   }).state;
 }

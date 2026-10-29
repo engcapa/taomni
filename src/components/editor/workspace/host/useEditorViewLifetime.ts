@@ -2,7 +2,7 @@ import { acceptCompletion, closeBrackets, closeCompletion, completionStatus, set
 import { history } from "@codemirror/commands";
 import { bracketMatching, foldEffect, foldGutter, indentOnInput, indentUnit } from "@codemirror/language";
 import { search } from "@codemirror/search";
-import { EditorState, Text, Transaction } from "@codemirror/state";
+import { EditorState, Text, Transaction, type Compartment, type Extension, type StateEffect } from "@codemirror/state";
 import type { KeyBinding } from "@codemirror/view";
 import { crosshairCursor, drawSelection, EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, rectangularSelection } from "@codemirror/view";
 import { useEffect, useRef } from "react";
@@ -313,6 +313,13 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
       });
       return true;
     };
+    // Root reconfiguration preserves explicit compartment overrides. Replace
+    // them as well, so a cached tab receives the latest settings and chrome.
+    const compartmentEffects: StateEffect<unknown>[] = [];
+    const configure = (compartment: Compartment, extension: Extension): Extension => {
+      compartmentEffects.push(compartment.reconfigure(extension));
+      return compartment.of(extension);
+    };
     const extensions = [
         lineNumbers(),
         foldGutter(),
@@ -346,7 +353,7 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
         bracketMatching(),
         closeBrackets(),
         indentOnInput(),
-        editor.completionCompartment.current.of(buildAutocompletionExtension()),
+        configure(editor.completionCompartment.current, buildAutocompletionExtension()),
         // IDEA: typing `.` / `:` (or server trigger chars) opens the popup
         // immediately instead of waiting for activateOnTypingDelay.
         EditorView.updateListener.of((update) => {
@@ -420,21 +427,21 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
         occurrenceSessionField,
         // Drop pending LSP snippet tabstop sessions on any unrelated edit.
         lspSnippetSessionInvalidator(),
-        context.codeStyleCompartment.current.of([
+        configure(context.codeStyleCompartment.current, [
           EditorState.tabSize.of(codeStyle?.tabSize ?? 2),
           indentUnit.of(codeStyle?.insertSpaces ? " ".repeat(codeStyle?.indentSize || codeStyle?.tabSize || 2) : "\t"),
         ]),
-        context.languageCompartment.current.of(initialLanguage ?? []),
-        context.diagnosticsCompartment.current.of(createDiagnosticChrome(
+        configure(context.languageCompartment.current, initialLanguage ?? []),
+        configure(context.diagnosticsCompartment.current, createDiagnosticChrome(
           diagnostics,
           (line) => editor.onLightbulbRef.current?.(line),
         )),
-        editor.overlayCompartment.current.of(createLspOverlayChrome(
+        configure(editor.overlayCompartment.current, createLspOverlayChrome(
           initialDoc,
           highlights,
           inlayHints,
         )),
-        editor.semanticTokensCompartment.current.of(createLspSemanticTokenChrome(
+        configure(editor.semanticTokensCompartment.current, createLspSemanticTokenChrome(
           initialDoc,
           semanticTokens,
         )),
@@ -445,36 +452,36 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
           targets: runGutterTargets,
           onClick: (target, anchor) => editor.onRunGutterClickRef.current?.(target, anchor),
         }),
-        editor.gitCompartment.current.of(createGitEditorChrome(
+        configure(editor.gitCompartment.current, createGitEditorChrome(
           gitChanges,
           gitBlame,
           (change) => editor.onGitChangeClickRef.current?.(change),
         )),
-        context.coverageCompartment.current.of(createCoverageEditorChrome(
+        configure(context.coverageCompartment.current, createCoverageEditorChrome(
           fileCoverage ?? null,
           coverageEnabled,
         )),
-        context.debugCompartment.current.of(buildDebugChrome(
+        configure(context.debugCompartment.current, buildDebugChrome(
           debugBreakpoints,
           debugCurrentLine,
           debugInlineValues,
           !!debugEvaluate,
         )),
-        context.signatureCompartment.current.of([]),
-        context.hoverCompartment.current.of(lspHoverExtension(
+        configure(context.signatureCompartment.current, []),
+        configure(context.hoverCompartment.current, lspHoverExtension(
           editor.onHoverRef,
           editor.onPinHoverDocRef,
           context.activeHoverResizeSessionRef,
           showHoverDocumentation,
           hoverDocumentationDelayMs,
         )),
-        context.readOnlyCompartment.current.of(readOnlyExtension(readOnly)),
-        context.wrappingCompartment.current.of(softWrap ? EditorView.lineWrapping : []),
-        context.appearanceCompartment.current.of(
+        configure(context.readOnlyCompartment.current, readOnlyExtension(readOnly)),
+        configure(context.wrappingCompartment.current, softWrap ? EditorView.lineWrapping : []),
+        configure(context.appearanceCompartment.current,
           appearance ? editorAppearanceExtension(appearance) : [],
         ),
         renderedDocDecorationField,
-        context.renderedDocCompartment.current.of(renderedDocDecorationConfig.of({
+        configure(context.renderedDocCompartment.current, renderedDocDecorationConfig.of({
           languageId: renderedDocLanguageId ?? liveTemplateLanguageForPath(editor.pathRef.current),
           enabled: renderedDocEnabled,
           onToggleRaw: () => {
@@ -545,7 +552,7 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
         createDocumentUpdateListener({ applyingExternalDocRef: context.applyingExternalDocRef, lastDocumentTextRef: context.lastDocumentTextRef, transactionOwnerRef: editor.transactionOwnerRef, fileKeyRef: editor.fileKeyRef, viewIdRef: editor.viewIdRef, currentCompositionSessionRef: editor.currentCompositionSessionRef, compositionActiveRef: editor.compositionActiveRef, viewRef: editor.viewRef, rememberLocalDocumentEcho: context.rememberLocalDocumentEcho, onChangeRef: editor.onChangeRef, signatureTriggersRef: editor.signatureTriggersRef, emitParameterTrigger, onParameterInvalidateRef: editor.onParameterInvalidateRef, scheduleSelectionEmit, scheduleViewportEmit, viewportEmitTimerRef: editor.viewportEmitTimerRef, restoringInitialViewStateRef: editor.restoringInitialViewStateRef, userInteractedSinceMountRef: editor.userInteractedSinceMountRef, pendingDeferredScrollRef: editor.pendingDeferredScrollRef, scheduleViewStateEmit }),
       ];
     const state = cached
-      ? reconfigureCachedEditorState(cached.state, initialDocumentText, extensions)
+      ? reconfigureCachedEditorState(cached.state, initialDocumentText, extensions, compartmentEffects)
       : EditorState.create({ doc: initialDoc, extensions });
     const view = editor.viewRef.current ?? new EditorView({ state, parent: editor.hostRef.current });
     if (editor.viewRef.current) view.setState(state);
