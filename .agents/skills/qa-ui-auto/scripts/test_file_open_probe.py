@@ -105,7 +105,10 @@ class FileOpenReviewTests(unittest.TestCase):
         page = Mock()
         page.evaluate.side_effect = [True, observation(), observation()]
         with tempfile.TemporaryDirectory() as folder:
-            run(SimpleNamespace(page=page, case_dir=Path(folder)), {**CONFIG, "event": "click"})
+            trace = {"started": True, "screenshots": False, "snapshots": False, "sources": False}
+            run(SimpleNamespace(page=page, case_dir=Path(folder), case_state={"browser_trace": trace}), {**CONFIG, "event": "click"})
+            report = json.loads((Path(folder) / "file-open-cold-json.json").read_text())
+        self.assertEqual(report["browserTrace"], trace)
         page.locator(CONFIG["selector"]).click.assert_called_once_with()
 
     def test_native_plaintext_does_not_fabricate_highlighting(self):

@@ -62,6 +62,8 @@ def measure(ctx: Any, args: Any) -> str:
     report = {"passed": False, "label": config["label"], "mode": "native" if native else "browser",
               "openBudgetMs": OPEN_BUDGET_MS, "frameBudgetMs": FRAME_BUDGET_MS,
               "requireHighlight": config.get("require_highlight", True)}
+    if not native:
+        report["browserTrace"] = getattr(ctx, "case_state", {}).get("browser_trace")
     installed = False
     state = None
     failed = False
