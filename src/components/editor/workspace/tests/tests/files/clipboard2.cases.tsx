@@ -1,3 +1,4 @@
+import { findEditorByTitle } from "../../editorReadiness";
 import { EditorSelection } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
@@ -77,7 +78,7 @@ export function registerfilesClipboard2Cases(caseContext: registerfilesClipboard
     });
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
     fireEvent.click(await screen.findByRole("button", { name: "Update two files" }));
@@ -126,7 +127,7 @@ export function registerfilesClipboard2Cases(caseContext: registerfilesClipboard
     });
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/app.ts");
+    await findEditorByTitle("app / src/app.ts");
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
     // Trigger Alt+Enter on TypeScript file where LSP has no actions
@@ -164,7 +165,7 @@ export function registerfilesClipboard2Cases(caseContext: registerfilesClipboard
     });
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     await waitFor(() => expect(caseContext.workspaceTestHarness.lspMocks.lspOpenDocument).toHaveBeenCalled());
 
     fireEvent.keyDown(window, { key: "l", ctrlKey: true, altKey: true });
@@ -205,7 +206,7 @@ export function registerfilesClipboard2Cases(caseContext: registerfilesClipboard
     });
 
     const rendered = caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
     const content = rendered.container.querySelector<HTMLElement>(".cm-content");
     const view = EditorView.findFromDOM(content!);
@@ -328,7 +329,7 @@ export function registerfilesClipboard2Cases(caseContext: registerfilesClipboard
     caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile.mockResolvedValue(caseContext.workspaceTestHarness.file("src/main.ts", "export const value = 1;"));
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     fireEvent.keyDown(window, { key: "F4", ctrlKey: true });
 
     await waitFor(() => expect(
@@ -348,7 +349,7 @@ export function registerfilesClipboard2Cases(caseContext: registerfilesClipboard
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
     const notes = (await screen.findAllByTestId("code-workspace-tree-file")).find((row) => row.dataset.path === "notes.txt")!;
     fireEvent.doubleClick(notes);
-    await screen.findByTitle("app / notes.txt");
+    await findEditorByTitle("app / notes.txt");
     const before = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-nav");
     const pane = screen.getByTestId("code-workspace-tree-pane");
     fireEvent.keyDown(pane, { key: "ArrowDown" });
@@ -421,7 +422,7 @@ export function registerfilesClipboard2Cases(caseContext: registerfilesClipboard
       caseContext.workspaceTestHarness.file(path, path === "README.md" ? "# Readme\n" : originalText));
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / README.md");
+    await findEditorByTitle("app / README.md");
 
     const pane = screen.getByTestId("code-workspace-tree-pane");
     const dir = await screen.findByTestId("code-workspace-tree-dir");
@@ -436,7 +437,7 @@ export function registerfilesClipboard2Cases(caseContext: registerfilesClipboard
     fireEvent.keyDown(pane, { key: "Enter" });
 
     // Verify example.txt tab is opened and active
-    await screen.findByTitle("app / src/example.txt");
+    await findEditorByTitle("app / src/example.txt");
     await waitFor(() => {
       const activeElement = document.activeElement;
       expect(activeElement?.classList.contains("cm-content")).toBe(true);

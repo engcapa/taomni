@@ -1,3 +1,4 @@
+import { findEditorByTitle } from "../../editorReadiness";
 import { EditorSelection } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
@@ -74,8 +75,8 @@ export function registerlayoutLifecycle3Cases(caseContext: registerlayoutLifecyc
       window.localStorage.setItem("taomni.codeWorkspace.layout.v2.instance-repair009-switch", JSON.stringify(seedLayout));
 
       caseContext.workspaceTestHarness.renderWorkspace(repairWorkspace("instance-repair009-switch"));
-      await screen.findByTitle("app / src/A.java");
-      await screen.findByTitle("app / src/B.java");
+      await findEditorByTitle("app / src/A.java");
+      await findEditorByTitle("app / src/B.java");
 
       const pane = screen.getAllByTestId("code-workspace-editor-pane")[0]!;
       const viewA = EditorView.findFromDOM(pane.querySelector(".cm-editor")!)!;
@@ -117,7 +118,7 @@ export function registerlayoutLifecycle3Cases(caseContext: registerlayoutLifecyc
       caseContext.workspaceTestHarness.lspMocks.lspOpenDocument.mockResolvedValue(caseContext.workspaceTestHarness.documentStatus({ available: true, active: false }));
 
       const { unmount } = caseContext.workspaceTestHarness.renderWorkspace(repairWorkspace("instance-repair009-unmount"));
-      await screen.findByTitle("app / src/A.java");
+      await findEditorByTitle("app / src/A.java");
       const pane = screen.getAllByTestId("code-workspace-editor-pane")[0]!;
       const view = EditorView.findFromDOM(pane.querySelector(".cm-editor")!)!;
 

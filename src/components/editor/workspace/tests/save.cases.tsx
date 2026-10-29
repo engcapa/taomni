@@ -1,3 +1,4 @@
+import { findEditorByTitle, findEditorPanes } from "./editorReadiness";
 import { EditorSelection } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { emit } from "@tauri-apps/api/event";
@@ -84,7 +85,7 @@ export function registerSaveCases(workspaceTestHarness: registerSaveCasesFixture
     }));
 
     const rendered = workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     const content = rendered.container.querySelector<HTMLElement>(".cm-content");
     expect(content).not.toBeNull();
     const view = EditorView.findFromDOM(content!);
@@ -211,7 +212,7 @@ export function registerSaveCases(workspaceTestHarness: registerSaveCasesFixture
     workspaceTestHarness.lspMocks.lspCodeActions.mockRejectedValue(new Error("provider transport failed"));
 
     const rendered = workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     const content = rendered.container.querySelector<HTMLElement>(".cm-content");
     expect(content).not.toBeNull();
     const view = EditorView.findFromDOM(content!)!;
@@ -323,7 +324,7 @@ export function registerSaveCases(workspaceTestHarness: registerSaveCasesFixture
     );
 
     workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
     // Make the buffer dirty through the existing manual formatting path.
@@ -361,7 +362,7 @@ export function registerSaveCases(workspaceTestHarness: registerSaveCasesFixture
       hash: "watcher-original", encoding: "UTF-8", bom: false,
     }));
     workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     const key = "root:app:src/main.ts";
     const current = () => selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), instance).openFiles[key];
     await waitFor(() => expect(current()?.text).toBe("first\nsecond"));
@@ -396,7 +397,7 @@ export function registerSaveCases(workspaceTestHarness: registerSaveCasesFixture
     workspaceTestHarness.workspaceMocks.workspaceReadFile.mockImplementation(async () => disk);
 
     workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     const key = "root:app:src/main.ts";
     await waitFor(() => expect(
       selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-external-conflict")
@@ -467,7 +468,7 @@ export function registerSaveCases(workspaceTestHarness: registerSaveCasesFixture
     fireEvent.click(workspaceTestHarness.toolbarControl("code-workspace-split-right"));
     await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
 
-    const panes = screen.getAllByTestId("code-workspace-editor-pane");
+    const panes = await findEditorPanes();
     const primaryPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") === "primary")!;
     // A live split generates a fresh leaf id for the new pane (unlike the
     // seeded V1 snapshot's "secondary"), so select it by set difference.
@@ -526,7 +527,7 @@ export function registerSaveCases(workspaceTestHarness: registerSaveCasesFixture
     // Reopen (Ctrl+Shift+T) reads the saved disk bytes: the discarded dirty
     // text is not revived and the read is a fresh decode of the same file.
     fireEvent.keyDown(window, { key: "T", ctrlKey: true, shiftKey: true });
-    const reopened = await screen.findByTitle("app / src/main.ts");
+    const reopened = await findEditorByTitle("app / src/main.ts");
     expect(reopened).toBeInTheDocument();
     await waitFor(() => expect(
       EditorView.findFromDOM(
@@ -553,8 +554,8 @@ export function registerSaveCases(workspaceTestHarness: registerSaveCasesFixture
     ));
 
     const rendered = workspaceTestHarness.renderWorkspace(workspace);
-    const content = await screen.findByTestId("code-workspace-editor").then((editor) => (
-      editor.querySelector<HTMLElement>(".cm-content")
+    const content = await findEditorByTitle("app / src/main.ts").then(() => (
+      screen.getByTestId("code-workspace-editor").querySelector<HTMLElement>(".cm-content")
     ));
     expect(content).not.toBeNull();
     const cmEditor = content?.closest<HTMLElement>(".cm-editor");
@@ -624,7 +625,7 @@ export function registerSaveCases(workspaceTestHarness: registerSaveCasesFixture
     )));
 
     workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.txt");
+    await findEditorByTitle("app / src/main.txt");
     await waitFor(() => expect(useCodeWorkspaceStatusStore.getState().actions?.chooseEncoding)
       .toBeTypeOf("function"));
 
@@ -693,7 +694,7 @@ export function registerSaveCases(workspaceTestHarness: registerSaveCasesFixture
     }));
 
     const rendered = workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.txt");
+    await findEditorByTitle("app / src/main.txt");
     const content = rendered.container.querySelector<HTMLElement>(".cm-content");
     expect(content).not.toBeNull();
     fireEvent.keyDown(content!, { key: "d", code: "KeyD", ctrlKey: true });
@@ -737,7 +738,7 @@ export function registerSaveCases(workspaceTestHarness: registerSaveCasesFixture
     ));
 
     workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/legacy.txt");
+    await findEditorByTitle("app / src/legacy.txt");
     await waitFor(() => expect(useCodeWorkspaceStatusStore.getState().actions?.chooseEncoding)
       .toBeTypeOf("function"));
     act(() => useCodeWorkspaceStatusStore.getState().actions?.chooseEncoding?.());

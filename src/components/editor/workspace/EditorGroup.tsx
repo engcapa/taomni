@@ -10,6 +10,7 @@ import { GitDiffPeek } from "./GitDiffPeek";
 import type { GitLineChange } from "./gitEditorChrome";
 import { rollbackGitLineChange } from "./gitEditorChrome";
 import { EditorGroupTabs } from "./group/EditorGroupTabs";
+import { EditorMountBoundary } from "./group/EditorMountBoundary";
 import { ModeButton } from "./group/ModeButton";
 import { type EditorGroupProps } from "./group/types";
 import { useEditorGroupTabs } from "./group/useEditorGroupTabs";
@@ -465,6 +466,95 @@ export function EditorGroup({
                       onSelectLine={(line) => onRevealTargetLine?.(line + 1)}
                     />
                     <div className="min-w-0 min-h-0 border-r border-[var(--taomni-code-border)]">
+                      <EditorMountBoundary>
+                        <CodeMirrorHost
+                          fileKey={activeFile.key}
+                          retainedFileKeys={openOrder}
+                          viewId={groupId}
+                          initialViewState={initialViewState}
+                          onViewStateChange={onViewStateChange
+                            ? (state) => onViewStateChange(groupId, activeFile.key, state)
+                            : undefined}
+                          transactionOwner={transactionOwner}
+                          onWorkspaceHistoryClaim={onWorkspaceHistoryClaim}
+                          historyReplay={activeFile.historyReplay ?? false}
+                          documentRevision={activeFile.documentRevision ?? documentRevision}
+                          clipboardWorkspaceId={workspaceInstanceId}
+                          onClipboardUnavailable={onClipboardUnavailable}
+                          onClipboardObservation={onClipboardObservation}
+                          workspaceActionHost={workspaceActionHost}
+                          path={activeFile.languagePath}
+                          doc={activeFile.text}
+                          documentReady={!activeFile.loading}
+                          visible={visible}
+                          active={isActiveGroup}
+                          diagnostics={activeDiagnostics}
+                          highlights={activeHighlights}
+                          inlayHints={activeInlayHints}
+                          semanticTokens={activeSemanticTokens}
+                          gitChanges={activeGitChanges}
+                          gitBlame={activeGitBlame}
+                          runGutterTargets={activeRunGutterTargets}
+                          onRunGutterClick={onRunGutterClick}
+                          fileCoverage={activeCoverage}
+                          coverageEnabled={coverageEnabled}
+                          reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
+                          // Library sources (JDK / dependency classes) cannot be written back.
+                          readOnly={readOnly || activeFile.loading || !!activeFile.library}
+                          onChange={(doc, caret, caretOffset) => {
+                            if (previewKey === activeFile.key) onPromotePreview(activeFile.key);
+                            onChangeText(activeFile.key, doc, caret, caretOffset);
+                          }}
+                          onSave={() => onSave(activeFile.key)}
+                          onHover={(position) => onHover(activeFile, position)}
+                          onPinHoverDoc={onPinHoverDoc}
+                          onDefinition={(position) => onDefinition(activeFile, position)}
+                          onReferences={(position) => onReferences(activeFile, position)}
+                          onComplete={(position, trigger, token, invocation) => onComplete(activeFile, position, trigger, token, invocation)}
+                          onCompleteResolve={(raw, token) => onCompleteResolve(activeFile, raw, token)}
+                          getCompletionIdentity={() => onCompletionIdentity(activeFile)}
+                          onCompletionDiagnostic={onCompletionDiagnostic}
+                          onScopeFallback={onScopeFallback}
+                          onParameterTrigger={(event) => onParameterTrigger?.(activeFile, event)}
+                          onParameterInvalidate={onParameterInvalidate}
+                          onParameterEscape={onParameterEscape}
+                          parameterPopup={parameterPopup}
+                          onSelectionChange={onSelectionChange}
+                          onViewportChange={handleViewportChange}
+                          onExpandSelection={(selection) => onExpandSelection(activeFile, selection)}
+                          onLightbulb={onLightbulb}
+                          onGitChangeClick={setGitDiffPeek}
+                          onContextMenu={(request) => onEditorContextMenu(activeFile, { ...request, groupId })}
+                          onCommandPortChange={handleEditorCommandPortChange}
+                          completionTriggers={completionTriggers}
+                          completionController={completionController}
+                          signatureTriggers={signatureTriggers}
+                          softWrap={softWrap}
+                          appearance={appearance}
+                          renderedDocEnabled={renderedDocEnabled}
+                          renderedDocLanguageId={renderedDocLanguageId}
+                          onToggleRenderedDocRaw={onToggleRenderedDocRaw}
+                          columnSelectionMode={columnSelectionMode}
+                          showHoverDocumentation={showHoverDocumentation}
+                          hoverDocumentationDelayMs={hoverDocumentationDelayMs}
+                          parameterInfoRequestNonce={parameterInfoRequestNonce}
+                          parameterInfoShowFullSignatures={parameterInfoShowFullSignatures}
+                          onFoldProvenanceChange={setActiveFoldProvenance}
+                          onGoToLineRequest={onGoToLineRequest}
+                          onCompletionUnavailable={onCompletionUnavailable}
+                          codeStyle={activeCodeStyle}
+                        />
+                      </EditorMountBoundary>
+                    </div>
+                    {renderMarkdownPreview(activeFile, onOpenMarkdownHref)}
+                  </div>
+                ) : (
+                  <div className="h-full min-h-0 relative">
+                    <StickyLinesOverlay
+                      stickyLines={stickyLines}
+                      onSelectLine={(line) => onRevealTargetLine?.(line + 1)}
+                    />
+                    <EditorMountBoundary>
                       <CodeMirrorHost
                         fileKey={activeFile.key}
                         retainedFileKeys={openOrder}
@@ -496,8 +586,17 @@ export function EditorGroup({
                         onRunGutterClick={onRunGutterClick}
                         fileCoverage={activeCoverage}
                         coverageEnabled={coverageEnabled}
+                        debugBreakpoints={activeDebugBreakpoints}
+                        debugCurrentLine={activeDebugCurrentLine}
+                        debugInlineValues={activeDebugInlineValues}
+                        debugStep={debugStep}
+                        debugRunToCursor={debugRunToCursor}
+                        debugStop={debugStop}
+                        debugEvaluate={debugEvaluate}
+                        onToggleBreakpoint={onToggleBreakpoint}
+                        onEditBreakpoint={onEditBreakpoint}
+                        breakpointGutterActions={breakpointGutterActions}
                         reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
-                        // Library sources (JDK / dependency classes) cannot be written back.
                         readOnly={readOnly || activeFile.loading || !!activeFile.library}
                         onChange={(doc, caret, caretOffset) => {
                           if (previewKey === activeFile.key) onPromotePreview(activeFile.key);
@@ -542,101 +641,7 @@ export function EditorGroup({
                         onCompletionUnavailable={onCompletionUnavailable}
                         codeStyle={activeCodeStyle}
                       />
-                    </div>
-                    {renderMarkdownPreview(activeFile, onOpenMarkdownHref)}
-                  </div>
-                ) : (
-                  <div className="h-full min-h-0 relative">
-                    <StickyLinesOverlay
-                      stickyLines={stickyLines}
-                      onSelectLine={(line) => onRevealTargetLine?.(line + 1)}
-                    />
-                    <CodeMirrorHost
-                      fileKey={activeFile.key}
-                      retainedFileKeys={openOrder}
-                      viewId={groupId}
-                      initialViewState={initialViewState}
-                      onViewStateChange={onViewStateChange
-                        ? (state) => onViewStateChange(groupId, activeFile.key, state)
-                        : undefined}
-                      transactionOwner={transactionOwner}
-                      onWorkspaceHistoryClaim={onWorkspaceHistoryClaim}
-                      historyReplay={activeFile.historyReplay ?? false}
-                      documentRevision={activeFile.documentRevision ?? documentRevision}
-                      clipboardWorkspaceId={workspaceInstanceId}
-                      onClipboardUnavailable={onClipboardUnavailable}
-                      onClipboardObservation={onClipboardObservation}
-                      workspaceActionHost={workspaceActionHost}
-                      path={activeFile.languagePath}
-                      doc={activeFile.text}
-                      documentReady={!activeFile.loading}
-                      visible={visible}
-                      active={isActiveGroup}
-                      diagnostics={activeDiagnostics}
-                      highlights={activeHighlights}
-                      inlayHints={activeInlayHints}
-                      semanticTokens={activeSemanticTokens}
-                      gitChanges={activeGitChanges}
-                      gitBlame={activeGitBlame}
-                      runGutterTargets={activeRunGutterTargets}
-                      onRunGutterClick={onRunGutterClick}
-                      fileCoverage={activeCoverage}
-                      coverageEnabled={coverageEnabled}
-                      debugBreakpoints={activeDebugBreakpoints}
-                      debugCurrentLine={activeDebugCurrentLine}
-                      debugInlineValues={activeDebugInlineValues}
-                      debugStep={debugStep}
-                      debugRunToCursor={debugRunToCursor}
-                      debugStop={debugStop}
-                      debugEvaluate={debugEvaluate}
-                      onToggleBreakpoint={onToggleBreakpoint}
-                      onEditBreakpoint={onEditBreakpoint}
-                      breakpointGutterActions={breakpointGutterActions}
-                      reveal={revealTarget?.key === activeFile.key ? revealTarget : null}
-                      readOnly={readOnly || activeFile.loading || !!activeFile.library}
-                      onChange={(doc, caret, caretOffset) => {
-                        if (previewKey === activeFile.key) onPromotePreview(activeFile.key);
-                        onChangeText(activeFile.key, doc, caret, caretOffset);
-                      }}
-                      onSave={() => onSave(activeFile.key)}
-                      onHover={(position) => onHover(activeFile, position)}
-                      onPinHoverDoc={onPinHoverDoc}
-                      onDefinition={(position) => onDefinition(activeFile, position)}
-                      onReferences={(position) => onReferences(activeFile, position)}
-                      onComplete={(position, trigger, token, invocation) => onComplete(activeFile, position, trigger, token, invocation)}
-                      onCompleteResolve={(raw, token) => onCompleteResolve(activeFile, raw, token)}
-                      getCompletionIdentity={() => onCompletionIdentity(activeFile)}
-                      onCompletionDiagnostic={onCompletionDiagnostic}
-                      onScopeFallback={onScopeFallback}
-                      onParameterTrigger={(event) => onParameterTrigger?.(activeFile, event)}
-                      onParameterInvalidate={onParameterInvalidate}
-                      onParameterEscape={onParameterEscape}
-                      parameterPopup={parameterPopup}
-                      onSelectionChange={onSelectionChange}
-                      onViewportChange={handleViewportChange}
-                      onExpandSelection={(selection) => onExpandSelection(activeFile, selection)}
-                      onLightbulb={onLightbulb}
-                      onGitChangeClick={setGitDiffPeek}
-                      onContextMenu={(request) => onEditorContextMenu(activeFile, { ...request, groupId })}
-                      onCommandPortChange={handleEditorCommandPortChange}
-                      completionTriggers={completionTriggers}
-                      completionController={completionController}
-                      signatureTriggers={signatureTriggers}
-                      softWrap={softWrap}
-                      appearance={appearance}
-                      renderedDocEnabled={renderedDocEnabled}
-                      renderedDocLanguageId={renderedDocLanguageId}
-                      onToggleRenderedDocRaw={onToggleRenderedDocRaw}
-                      columnSelectionMode={columnSelectionMode}
-                      showHoverDocumentation={showHoverDocumentation}
-                      hoverDocumentationDelayMs={hoverDocumentationDelayMs}
-                      parameterInfoRequestNonce={parameterInfoRequestNonce}
-                      parameterInfoShowFullSignatures={parameterInfoShowFullSignatures}
-                      onFoldProvenanceChange={setActiveFoldProvenance}
-                      onGoToLineRequest={onGoToLineRequest}
-                      onCompletionUnavailable={onCompletionUnavailable}
-                      codeStyle={activeCodeStyle}
-                    />
+                    </EditorMountBoundary>
                   </div>
                 )}
               </div>

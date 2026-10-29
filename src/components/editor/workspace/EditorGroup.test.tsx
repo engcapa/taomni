@@ -130,19 +130,19 @@ function props(overrides: Partial<ComponentProps<typeof EditorGroup>> = {}): Com
 }
 
 describe("EditorGroup tabs", () => {
-  it("keeps the same editor host mounted when activating another ready file", () => {
+  it("keeps the same editor host mounted when activating another ready file", async () => {
     const a = file("a");
     const b = file("b");
     const initial = props({ activeKey: a.key, activeFile: a });
     const view = render(<EditorGroup {...initial} />);
-    const host = screen.getByTestId("mock-code-mirror");
+    const host = await screen.findByTestId("mock-code-mirror");
     view.rerender(<EditorGroup {...initial} activeKey={b.key} activeFile={b} />);
     expect(screen.getByTestId("mock-code-mirror")).toBe(host);
   });
-  it("retains the editor during a slow read, blocks editing and reveals the ready content", () => {
+  it("retains the editor during a slow read, blocks editing and reveals the ready content", async () => {
     const initial = props();
     const rendered = render(<EditorGroup {...initial} />);
-    const host = screen.getByTestId("mock-code-mirror");
+    const host = await screen.findByTestId("mock-code-mirror");
     const loading = { ...file("slow"), text: "", loading: true };
     rendered.rerender(<EditorGroup {...initial} activeKey={loading.key} activeFile={loading} />);
     expect(screen.getByTestId("mock-code-mirror")).toBe(host);
@@ -393,7 +393,7 @@ describe("EditorGroup tabs", () => {
     expect(scrollLeft).not.toBe((paneLeft + 750) + 150 - 200 + 8);
   });
 
-  it("renders sticky lines overlay when activeSymbols and enclosing scope are present", () => {
+  it("renders sticky lines overlay when activeSymbols and enclosing scope are present", async () => {
     const f = file("StickyDemo");
     f.text = "class App {\n  constructor() {\n    this.init();\n  }\n}";
     const onRevealTargetLine = vi.fn();
@@ -417,16 +417,16 @@ describe("EditorGroup tabs", () => {
     })} />);
 
     // Since mock CodeMirrorHost doesn't fire viewport events by default, we verify the component renders without error
-    expect(screen.getByTestId("mock-code-mirror")).toBeInTheDocument();
+    expect(await screen.findByTestId("mock-code-mirror")).toBeInTheDocument();
   });
 
-  it("passes the per-file Reader Mode configuration to the production editor host", () => {
+  it("passes the per-file Reader Mode configuration to the production editor host", async () => {
     render(<EditorGroup {...props({
       renderedDocEnabled: true,
       renderedDocLanguageId: "typescript",
     })} />);
 
-    expect(screen.getByTestId("mock-code-mirror")).toHaveAttribute("data-rendered-doc-enabled", "true");
+    expect(await screen.findByTestId("mock-code-mirror")).toHaveAttribute("data-rendered-doc-enabled", "true");
     expect(screen.getByTestId("mock-code-mirror")).toHaveAttribute("data-rendered-doc-language", "typescript");
   });
 
@@ -505,7 +505,7 @@ describe("EditorGroup tabs", () => {
     ]);
   });
 
-  it("displays region fold provenance badge in the file status bar when active", () => {
+  it("displays region fold provenance badge in the file status bar when active", async () => {
     const f1 = file("sample");
     render(
       <EditorGroup
@@ -518,7 +518,7 @@ describe("EditorGroup tabs", () => {
     );
 
     expect(screen.queryByTestId("code-workspace-fold-provenance")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("mock-trigger-fold-provenance"));
+    fireEvent.click(await screen.findByTestId("mock-trigger-fold-provenance"));
     const badge = screen.getByTestId("code-workspace-fold-provenance");
     expect(badge).toBeInTheDocument();
     expect(badge).toHaveAttribute("data-provenance", "explicit-comment");

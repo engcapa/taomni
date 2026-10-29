@@ -1,3 +1,4 @@
+import { findEditorByTitle } from "../../editorReadiness";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import mermaid from "mermaid";
 import { expect, it, vi } from "vitest";
@@ -120,7 +121,7 @@ export function registerinteractionNavigation2Cases(caseContext: registerinterac
     }]);
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     await waitFor(() => expect(caseContext.workspaceTestHarness.gitMocks.gitBlobPair).toHaveBeenCalledWith(
       "/repo/app",
       "src/main.ts",
@@ -250,7 +251,7 @@ export function registerinteractionNavigation2Cases(caseContext: registerinterac
     });
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     await waitFor(() => {
       expect(registrationRef.current?.items.find((item) => item.id === "workspace.goToSymbol")?.enabled)
         .toBe(true);
@@ -268,7 +269,7 @@ export function registerinteractionNavigation2Cases(caseContext: registerinterac
       "instance-symbol-resolve",
       "0123456789abcdef0123456789abcdef:0",
     ));
-    expect(await screen.findByTitle("app / src/target.ts")).toBeInTheDocument();
+    expect(await findEditorByTitle("app / src/target.ts")).toBeInTheDocument();
     expect(lifecycle).toEqual(["resolve", "read-target"]);
     expect(selectCodeWorkspaceUi(
       useCodeWorkspaceStore.getState(),
@@ -339,7 +340,7 @@ export function registerinteractionNavigation2Cases(caseContext: registerinterac
     });
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     await waitFor(() => expect(caseContext.workspaceTestHarness.lspMocks.lspDocumentSymbols).toHaveBeenCalled());
     fireEvent.click(caseContext.workspaceTestHarness.toolbarControl("code-workspace-right-pane-toggle"));
 
@@ -380,7 +381,7 @@ export function registerinteractionNavigation2Cases(caseContext: registerinterac
     });
 
     const rendered = caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     await waitFor(() => expect(caseContext.workspaceTestHarness.lspMocks.lspOpenDocument).toHaveBeenCalled());
     const editorContent = rendered.container.querySelector<HTMLElement>(".cm-content");
     expect(editorContent).not.toBeNull();
@@ -435,7 +436,7 @@ export function registerinteractionNavigation2Cases(caseContext: registerinterac
     });
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     await waitFor(() => expect(caseContext.workspaceTestHarness.lspMocks.lspOpenDocument).toHaveBeenCalled());
     fireEvent.keyDown(window, { key: "q", ctrlKey: true });
 

@@ -1,3 +1,4 @@
+import { findEditorByTitle } from "./editorReadiness";
 import { emit } from "@tauri-apps/api/event";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
@@ -227,7 +228,7 @@ export function registerRecoveryJournalCases(workspaceTestHarness: registerWorks
       });
 
       workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/main.ts");
+      await findEditorByTitle("app / src/main.ts");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
       await runRename(registrationRef);
 
@@ -257,7 +258,7 @@ export function registerRecoveryJournalCases(workspaceTestHarness: registerWorks
       });
 
       workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/main.ts");
+      await findEditorByTitle("app / src/main.ts");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
       await runRename(registrationRef);
 
@@ -295,7 +296,7 @@ export function registerRecoveryJournalCases(workspaceTestHarness: registerWorks
       });
 
       workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/reader.ts");
+      await findEditorByTitle("app / src/reader.ts");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
       await runRename(registrationRef);
 
@@ -340,7 +341,7 @@ export function registerRecoveryJournalCases(workspaceTestHarness: registerWorks
       mockTwoFileRename();
 
       workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/reader.ts");
+      await findEditorByTitle("app / src/reader.ts");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
       await runRename(registrationRef);
       await waitFor(() => expect(disk["src/other.ts"]).toBe(POST["src/other.ts"]));
@@ -374,7 +375,7 @@ export function registerRecoveryJournalCases(workspaceTestHarness: registerWorks
       seedPendingJournal();
 
       workspaceTestHarness.renderWorkspace(workspace, {});
-      await screen.findByTitle("app / src/main.ts");
+      await findEditorByTitle("app / src/main.ts");
       // RC-02: auto-discover opens the review dialog (figure A) instead of a
       // global confirm. Restore via the dialog; the second confirm reuses the
       // mocked app dialog (default true).
@@ -412,7 +413,7 @@ export function registerRecoveryJournalCases(workspaceTestHarness: registerWorks
       seedPendingJournal();
 
       workspaceTestHarness.renderWorkspace(workspace, {});
-      await screen.findByTitle("app / src/reader.ts");
+      await findEditorByTitle("app / src/reader.ts");
       await waitFor(() => expect(useAppStore.getState().statusMessage).toContain(
         "already matches its pre-refactor content",
       ));
@@ -428,7 +429,7 @@ export function registerRecoveryJournalCases(workspaceTestHarness: registerWorks
       seedPendingJournal();
 
       workspaceTestHarness.renderWorkspace(workspace, {});
-      await screen.findByTitle("app / src/reader.ts");
+      await findEditorByTitle("app / src/reader.ts");
       // RC-02: conflicted entries render in the review dialog with restore
       // disabled and an explicit keep outlet; nothing is overwritten.
       const review = await screen.findByTestId("refactor-recovery-review");
@@ -497,7 +498,7 @@ export function registerRecoveryJournalCases(workspaceTestHarness: registerWorks
       }).ok).toBe(true);
 
       workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/reader.ts");
+      await findEditorByTitle("app / src/reader.ts");
       // Newest first: the both-missing record reviews first with restore disabled.
       const abandonReview = await screen.findByTestId("refactor-recovery-review");
       expect(abandonReview.textContent).toContain("Gone.java");
@@ -541,7 +542,7 @@ export function registerRecoveryJournalCases(workspaceTestHarness: registerWorks
       );
 
       workspaceTestHarness.renderWorkspace(workspace, {});
-      await screen.findByTitle("app / src/reader.ts");
+      await findEditorByTitle("app / src/reader.ts");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
       // Let every pending microtask/discovery pass settle.
       await act(async () => {

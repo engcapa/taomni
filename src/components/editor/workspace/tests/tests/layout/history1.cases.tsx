@@ -1,3 +1,4 @@
+import { findEditorByTitle, findEditorPanes } from "../../editorReadiness";
 import { EditorSelection } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
@@ -157,11 +158,11 @@ export function registerlayoutHistory1Cases(caseContext: registerlayoutHistory1C
     caseContext.workspaceTestHarness.lspMocks.lspDetectServers.mockResolvedValue([caseContext.workspaceTestHarness.csharpStatus({ available: false, active: false })]);
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     fireEvent.click(caseContext.workspaceTestHarness.toolbarControl("code-workspace-split-right"));
     await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
 
-    const panes = screen.getAllByTestId("code-workspace-editor-pane");
+    const panes = await findEditorPanes();
     const primaryPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") === "primary")!;
     const activeSplitPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") !== "primary")!;
     const primaryView = EditorView.findFromDOM(primaryPane.querySelector<HTMLElement>(".cm-editor")!)!;
@@ -224,7 +225,7 @@ export function registerlayoutHistory1Cases(caseContext: registerlayoutHistory1C
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
     await screen.findAllByTitle("app / src/main.ts");
 
-    const panes = screen.getAllByTestId("code-workspace-editor-pane");
+    const panes = await findEditorPanes();
     const primaryPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") === "primary")!;
     const secondaryPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") === "secondary")!;
     const primaryView = EditorView.findFromDOM(primaryPane.querySelector<HTMLElement>(".cm-editor")!)!;
@@ -282,7 +283,7 @@ export function registerlayoutHistory1Cases(caseContext: registerlayoutHistory1C
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
     const fileKey = "root:app:src/main/example.txt";
-    await screen.findByTitle("app / src/main/example.txt");
+    await findEditorByTitle("app / src/main/example.txt");
     // Plain-text example.txt has no active LSP session, so no open is
     // expected; the didClose assertions below observe zero additional calls.
 
@@ -338,7 +339,7 @@ export function registerlayoutHistory1Cases(caseContext: registerlayoutHistory1C
     fireEvent.contextMenu(tabButton, { clientX: 10, clientY: 10 });
     fireEvent.click(await screen.findByRole("button", { name: "Split Right" }));
     await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
-    const panes = screen.getAllByTestId("code-workspace-editor-pane");
+    const panes = await findEditorPanes();
     const leftPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") === "primary")!;
     const rightPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") !== "primary")!;
     const afterSplitUi = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-parity003");

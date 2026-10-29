@@ -1,3 +1,4 @@
+import { findEditorByTitle } from "../../editorReadiness";
 import { EditorView } from "@codemirror/view";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { expect, it } from "vitest";
@@ -48,7 +49,7 @@ export function registeratomicSaveHistory1Cases(caseContext: registeratomicSaveH
     ));
 
     const rendered = caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle(`app / ${path}`);
+    await findEditorByTitle(`app / ${path}`);
     const content = rendered.container.querySelector<HTMLElement>(".cm-content");
     expect(content).not.toBeNull();
 
@@ -129,7 +130,7 @@ export function registeratomicSaveHistory1Cases(caseContext: registeratomicSaveH
     caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile.mockResolvedValue(caseContext.workspaceTestHarness.file("src/main.ts", "original_v1\n"));
 
     const rendered = caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     const content = rendered.container.querySelector<HTMLElement>(".cm-content");
     expect(content).not.toBeNull();
 
@@ -201,7 +202,7 @@ export function registeratomicSaveHistory1Cases(caseContext: registeratomicSaveH
     caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile.mockResolvedValue(caseContext.workspaceTestHarness.file("src/main.ts", "initial_text\n"));
 
     const rendered = caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     const content = rendered.container.querySelector<HTMLElement>(".cm-content");
     expect(content).not.toBeNull();
 
@@ -304,7 +305,7 @@ export function registeratomicSaveHistory1Cases(caseContext: registeratomicSaveH
     caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile.mockResolvedValue(caseContext.workspaceTestHarness.file("src/main.ts", "initial_text\n"));
 
     const rendered = caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     const content = rendered.container.querySelector<HTMLElement>(".cm-content");
     expect(content).not.toBeNull();
     const view = EditorView.findFromDOM(content!);
@@ -398,7 +399,7 @@ export function registeratomicSaveHistory1Cases(caseContext: registeratomicSaveH
       caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile.mockResolvedValue(caseContext.workspaceTestHarness.file("src/main.ts", "gate_text\n"));
 
       const rendered = caseContext.workspaceTestHarness.renderWorkspace(workspace);
-      await screen.findByTitle("app / src/main.ts");
+      await findEditorByTitle("app / src/main.ts");
       const content = rendered.container.querySelector<HTMLElement>(".cm-content");
       expect(content).not.toBeNull();
       const view = EditorView.findFromDOM(content!);

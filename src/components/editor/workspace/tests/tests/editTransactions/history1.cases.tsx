@@ -1,3 +1,4 @@
+import { findEditorByTitle } from "../../editorReadiness";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { confirmAppDialog } from "../../../../../../lib/appDialogs";
@@ -132,7 +133,7 @@ export function registereditTransactionsHistory1Cases(caseContext: registereditT
       vi.mocked(confirmAppDialog).mockResolvedValue(true);
 
       caseContext.workspaceTestHarness.renderWorkspace(workflowWorkspace("instance-improve002-normal"), { onCommandsChange });
-      await screen.findByTitle("app / src/Service.java");
+      await findEditorByTitle("app / src/Service.java");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
       await runWorkflow(registrationRef, "workspace.rearrangeCode");
@@ -172,7 +173,7 @@ export function registereditTransactionsHistory1Cases(caseContext: registereditT
       });
       try {
         caseContext.workspaceTestHarness.renderWorkspace(workflowWorkspace("instance-improve002-quota"), { onCommandsChange });
-        await screen.findByTitle("app / src/Service.java");
+        await findEditorByTitle("app / src/Service.java");
         await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
         await runWorkflow(registrationRef, "workspace.rearrangeCode");
@@ -229,7 +230,7 @@ export function registereditTransactionsHistory1Cases(caseContext: registereditT
       });
 
       caseContext.workspaceTestHarness.renderWorkspace(workflowWorkspace("instance-improve002-mismatch"), { onCommandsChange });
-      await screen.findByTitle("app / src/Service.java");
+      await findEditorByTitle("app / src/Service.java");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
       await runWorkflow(registrationRef, "workspace.rearrangeCode");
@@ -263,7 +264,7 @@ export function registereditTransactionsHistory1Cases(caseContext: registereditT
       ));
 
       caseContext.workspaceTestHarness.renderWorkspace(workflowWorkspace("instance-main001-buffer-effect"), { onCommandsChange });
-      await screen.findByTitle("app / src/Service.java");
+      await findEditorByTitle("app / src/Service.java");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
       await runWorkflow(registrationRef, "workspace.rearrangeCode");
@@ -308,7 +309,7 @@ export function registereditTransactionsHistory1Cases(caseContext: registereditT
       });
 
       caseContext.workspaceTestHarness.renderWorkspace(workflowWorkspace("instance-improve002-unreadable"), { onCommandsChange });
-      await screen.findByTitle("app / src/Service.java");
+      await findEditorByTitle("app / src/Service.java");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
       await runWorkflow(registrationRef, "workspace.rearrangeCode");
@@ -344,7 +345,7 @@ export function registereditTransactionsHistory1Cases(caseContext: registereditT
       ));
 
       caseContext.workspaceTestHarness.renderWorkspace(workflowWorkspace("instance-improve002-unknown"), { onCommandsChange });
-      await screen.findByTitle("app / src/Service.java");
+      await findEditorByTitle("app / src/Service.java");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
       await runWorkflow(registrationRef, "workspace.rearrangeCode");
@@ -367,7 +368,7 @@ export function registereditTransactionsHistory1Cases(caseContext: registereditT
       vi.mocked(confirmAppDialog).mockResolvedValue(true);
 
       caseContext.workspaceTestHarness.renderWorkspace(workflowWorkspace("instance-improve002-cleanup"), { onCommandsChange });
-      await screen.findByTitle("app / src/Service.java");
+      await findEditorByTitle("app / src/Service.java");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
       await runWorkflow(registrationRef, "workspace.codeCleanup");

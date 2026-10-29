@@ -11,8 +11,8 @@ from qa_ui_auto.steps import StepError
 SELECTOR = '[data-testid="code-workspace-tree-dir"][data-path="public-fixture"]'
 
 
-def position(offset=0, *, found=False, visible=False, virtual=True, height=200, total=1000):
-    return dict(offset=offset, found=found, visible=visible, virtual=virtual, height=height, total=total)
+def position(offset=0, *, found=False, visible=False, virtual=True, height=200, total=1000, loading=False):
+    return dict(offset=offset, found=found, visible=visible, virtual=virtual, height=height, total=total, loading=loading)
 
 
 class ProjectTreeRevealTests(unittest.TestCase):
@@ -52,6 +52,25 @@ class ProjectTreeRevealTests(unittest.TestCase):
         self.pending = [position(found=True, visible=True)]
         run(self.ctx, SELECTOR)
         self.assertEqual(self.actions, [])
+
+    def test_waits_for_real_directory_children_before_scrolling(self):
+        for virtual in [False, True]:
+            with self.subTest(virtual=virtual):
+                self.pending = [position(virtual=virtual, loading=True), position(virtual=virtual, found=True, visible=True)]
+                self.assertEqual(len(reveal(self.ctx, SELECTOR)), 2)
+                self.assertEqual(self.actions, [])
+
+    def test_a_child_still_absent_after_loading_fails(self):
+        self.pending = [position(virtual=False, loading=True), position(virtual=False)]
+        with self.assertRaisesRegex(StepError, "disappeared"):
+            run(self.ctx, SELECTOR)
+
+    def test_loading_has_a_bounded_deadline_and_retains_samples(self):
+        self.pending = [position(loading=True)]
+        with patch("qa_ui_auto.project_tree_reveal.time.monotonic", side_effect=[0, 21]):
+            with self.assertRaisesRegex(StepError, "could not be revealed"):
+                run(self.ctx, SELECTOR)
+        self.assertTrue(list(self.ctx.case_dir.glob("tree-reveal-*.json")))
 
     def test_missing_target_at_scroll_boundary_fails_and_retains_samples(self):
         self.pending = [position(), position(), position(800), position(800)]

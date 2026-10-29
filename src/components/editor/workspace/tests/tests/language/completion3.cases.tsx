@@ -1,3 +1,4 @@
+import { findEditorByTitle } from "../../editorReadiness";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { useAppStore } from "../../../../../../stores/appStore";
@@ -118,7 +119,7 @@ export function registerlanguageCompletion3Cases(caseContext: registerlanguageCo
     });
 
     const rendered = caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     const content = rendered.container.querySelector<HTMLElement>(".cm-content");
     expect(content).not.toBeNull();
     await waitFor(() => expect(registrationRef.current).not.toBeNull());
@@ -225,7 +226,7 @@ export function registerlanguageCompletion3Cases(caseContext: registerlanguageCo
     });
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-    await screen.findByTitle("app / src/Program.cs");
+    await findEditorByTitle("app / src/Program.cs");
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
     await waitFor(() => expect(caseContext.workspaceTestHarness.lspMocks.lspGetDiagnostics).toHaveBeenCalled(), { timeout: 3_000 });
 
@@ -350,7 +351,7 @@ export function registerlanguageCompletion3Cases(caseContext: registerlanguageCo
     });
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-    await screen.findByTitle("app / src/Program.cs");
+    await findEditorByTitle("app / src/Program.cs");
     await waitFor(() => expect(registrationRef.current).not.toBeNull());
     await waitFor(() => expect(registrationRef.current?.items.find(
       (item) => item.id === "workspace.gotoDeclaration",

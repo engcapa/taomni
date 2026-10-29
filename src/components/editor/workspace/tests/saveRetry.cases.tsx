@@ -1,3 +1,4 @@
+import { findEditorByTitle } from "./editorReadiness";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { confirmAppDialog } from "../../../../lib/appDialogs";
@@ -124,7 +125,7 @@ describe("ED-REPAIR-001: workspace edit save failure retry safety (mounted)", ()
       });
 
       workspaceTestHarness.renderWorkspace(repairWorkspace("instance-repair001-retry-success"), { onCommandsChange });
-      await screen.findByTitle("app / src/Service.java");
+      await findEditorByTitle("app / src/Service.java");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
       await runWorkflow(registrationRef, "workspace.rearrangeCode");
@@ -164,7 +165,7 @@ describe("ED-REPAIR-001: workspace edit save failure retry safety (mounted)", ()
       });
 
       workspaceTestHarness.renderWorkspace(repairWorkspace("instance-repair001-retry-cancel"), { onCommandsChange });
-      await screen.findByTitle("app / src/Service.java");
+      await findEditorByTitle("app / src/Service.java");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
       await runWorkflow(registrationRef, "workspace.rearrangeCode");
@@ -226,7 +227,7 @@ describe("ED-REPAIR-001: workspace edit save failure retry safety (mounted)", ()
       });
 
       workspaceTestHarness.renderWorkspace(repairWorkspace("instance-repair001-typing-before-retry"), { onCommandsChange });
-      await screen.findByTitle("app / src/Service.java");
+      await findEditorByTitle("app / src/Service.java");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
       await runWorkflow(registrationRef, "workspace.rearrangeCode");
@@ -259,7 +260,7 @@ describe("ED-REPAIR-001: workspace edit save failure retry safety (mounted)", ()
       });
 
       workspaceTestHarness.renderWorkspace(repairWorkspace("instance-repair001-unknown-effect"), { onCommandsChange });
-      await screen.findByTitle("app / src/Service.java");
+      await findEditorByTitle("app / src/Service.java");
       await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
       await runWorkflow(registrationRef, "workspace.rearrangeCode");

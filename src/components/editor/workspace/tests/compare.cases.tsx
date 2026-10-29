@@ -1,3 +1,4 @@
+import { findEditorByTitle } from "./editorReadiness";
 import { EditorSelection } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
@@ -40,7 +41,7 @@ describe("ED-COMPARE-001 editor compare workflow", () => {
       const { registrationRef, onCommandsChange } = captureCommands();
 
       workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/main.ts");
+      await findEditorByTitle("app / src/main.ts");
       await waitFor(() => expect(registrationRef.current).not.toBeNull());
 
       await act(async () => {
@@ -77,7 +78,7 @@ describe("ED-COMPARE-001 editor compare workflow", () => {
       workspaceTestHarness.localHistoryMocks.historyRead.mockResolvedValue("const value = 0;\n");
 
       workspaceTestHarness.renderWorkspace(workspace);
-      await screen.findByTitle("app / src/main.ts");
+      await findEditorByTitle("app / src/main.ts");
       const tab = document.querySelector<HTMLElement>(
         '[data-editor-tab-key="root:app:src/main.ts"] button[title="app / src/main.ts"]',
       );
@@ -104,7 +105,7 @@ describe("ED-COMPARE-001 editor compare workflow", () => {
       const { registrationRef, onCommandsChange } = captureCommands();
 
       const rendered = workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/main.ts");
+      await findEditorByTitle("app / src/main.ts");
       const content = rendered.container.querySelector<HTMLElement>(".cm-content");
       const view = EditorView.findFromDOM(content!);
       expect(view).not.toBeNull();
@@ -136,7 +137,7 @@ describe("ED-COMPARE-001 editor compare workflow", () => {
       const { registrationRef, onCommandsChange } = captureCommands();
 
       const rendered = workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/main.ts");
+      await findEditorByTitle("app / src/main.ts");
       await waitFor(() => expect(registrationRef.current).not.toBeNull());
       await act(async () => {
         await registrationRef.current!.executeAction("workspace.compareWithClipboard");
@@ -172,7 +173,7 @@ describe("ED-COMPARE-001 editor compare workflow", () => {
       const { registrationRef, onCommandsChange } = captureCommands();
 
       const rendered = workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/main.ts");
+      await findEditorByTitle("app / src/main.ts");
       const content = rendered.container.querySelector<HTMLElement>(".cm-content");
       expect(content).not.toBeNull();
       const view = EditorView.findFromDOM(content!);
@@ -207,7 +208,7 @@ describe("ED-COMPARE-001 editor compare workflow", () => {
       workspaceTestHarness.clipboardMocks.readTextResult.mockResolvedValue({ ok: true, text: "const value = 2;\n" });
       const { registrationRef, onCommandsChange } = captureCommands();
       const rendered = workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/main.ts");
+      await findEditorByTitle("app / src/main.ts");
       await waitFor(() => expect(registrationRef.current).not.toBeNull());
       await act(async () => {
         await registrationRef.current!.executeAction("workspace.compareWithClipboard");
@@ -249,7 +250,7 @@ describe("ED-COMPARE-001 editor compare workflow", () => {
       workspaceTestHarness.clipboardMocks.readTextResult.mockResolvedValue({ ok: true, text: "const value = 2;\n" });
       const { registrationRef, onCommandsChange } = captureCommands();
       workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/main.ts");
+      await findEditorByTitle("app / src/main.ts");
       await waitFor(() => expect(registrationRef.current).not.toBeNull());
       await act(async () => {
         await registrationRef.current!.executeAction("workspace.compareWithClipboard");

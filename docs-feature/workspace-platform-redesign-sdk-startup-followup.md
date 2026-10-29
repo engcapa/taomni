@@ -10,7 +10,15 @@
 - Project 树按显式行输入划分默认 memo 边界，保留真实 callback、Git/dirty、压缩路径、列表元数据及 locale 订阅。语言扩展按固定语法配置缓存，失败可重试；加载安装排在文档首次测量帧并取消过期文件结果。没有关闭高亮或修改150/1500ms预算。
 - 剪贴板消费者注册时，根 hook 的完整快照订阅触发同步全工作区重画；订阅移到属性/状态观察节点，原 lifecycle、权限适配器和桥接观察不变。回归修前 owner 多渲染1次，修后 clipboard/真实编辑器5文件310项和观察边界2文件6项通过。
 - `workspace-clipboard-browser-02/run-20261029-194533-955730838` 仍为 **1 passed / 2 failed**：078通过，064/073最长帧195/170ms。这是当前冷初始化进一步拆解的依据，不能宣称性能完成。
-- 本轮尚需 matching release 专项、指定 GitHub workflow 三平台相关集、合入固定 main 后的全量和正式四轮性能比较。此前暂停快照的65 ID选集仍保留，并加入 TREEOPEN-01、078及受影响剪贴板入口。首次构造分帧仅在隔离工作树实验，未作为已验收产品改动。
+- `a6cf6e1b` 的 matching release 本机 `workspace-render-boundaries-native/run-20261029-200206-284996258` 为 **4 passed / 4 failed**、身份稳定：TREEOPEN-01、073、076、077通过；065/067/074/075仍有188/203/154/193ms长帧。不能把此前某一轮通过拼成组合源码通过。
+- 同 SHA 的 GitHub [40870063931](https://github.com/engcapa/taomni/actions/runs/40870063931) 已修复 catalog gate 并开始三平台相关集。browser 共 **122 passed / 7 failed**、无skip：Linux43通过，Windows41通过/2失败，macOS38通过/5失败；全部失败均为150ms帧预算。native仍待汇总，不能以shard job的success替代case结果。
+- 当前继续试验首次EditorView构造与workspace激活分帧，并只延迟导航可见性/portal投影。文件、活动目标、pane列表仍在同步tab提交中传递；新增同步切换回归保护输入目标。编辑器集成测试改为等待真实正文挂载，保留分屏/undo/剪贴板/保存竞态原断言；10条分屏相关定向回归已通过，完整组合回归及matching release待执行。
+- 当前分支标准 browser `workspace-safe-navigation-browser/run-20261029-202437-113973692` 为 **7 passed / 0 failed / 0 skipped**、身份稳定，93个回执绑定附件摘要已核验：064/066/068/070/073/077/078。全部原始观察点最大帧130.1ms；JSON冷开正文270ms/高亮381.6ms、长行JSON277.5/367ms、Home返回119/110.4ms。只说明本机browser当前产品调度通过，不能替代native或三平台验收。
+- `40870063931` Linux native为 **39 passed / 4 failed**；064/067/075最长帧154/160/160ms，074在异步展开子项期间提前报告行不存在，失败HTML随后已包含该行。`project_tree_reveal`现在仅在真实可见loading状态中有界等待，保留滚动样本、缺失/超时失败与所有预算；工具及file-open合同24通过，需在新runner身份下重验074。
+- `workspace-yield-browser-crash/run-20261029-203545-418445277` 完整适用browser崩溃组 **7/7 passed**；TypeScript、refactor、catalog gate通过。支持性组合测试12文件388通过/1失败，最后一项也是新split正文就绪等待，修后完整CodeWorkspaceTab重跑 **254/254 passed**；matching QA release仍在进行。
+- `40870063931` macOS native已出现069滚动箭头无法露出budget.csv（功能失败）和068的155ms长帧；其余shard及Windows仍待收集。069不能套用性能例外，须检查滚动控件/布局/原始驱动证据后修复。
+- 这属于内部调度优化，沿用064–077、TREEOPEN-01和078的实际用户入口，不新增同义YAML或删除预算。先前隔离工作树的browser通过仅作为假设依据；当前分支无注入验证及GitHub新SHA仍待完成。
+- 本轮尚需 matching release 专项、指定 GitHub workflow 三平台相关集、合入固定 main 后的全量和正式四轮性能比较。此前暂停快照的65 ID选集仍保留，并加入 TREEOPEN-01、078及受影响剪贴板入口。
 
 ## 续接入口与提交状态
 

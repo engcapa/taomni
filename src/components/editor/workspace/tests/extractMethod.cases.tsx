@@ -1,3 +1,4 @@
+import { findEditorByTitle } from "./editorReadiness";
 import { EditorSelection } from "@codemirror/state";
 import { EditorView } from "@codemirror/view";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
@@ -329,7 +330,7 @@ export function registerExtractMethodCases(workspaceTestHarness: registerWorkspa
 
     async function mountExtract(fixture: ExtractFixture) {
       workspaceTestHarness.renderWorkspace(fixture.workspace, { onCommandsChange: fixture.onCommandsChange });
-      await screen.findByTitle(EXTRACT_TITLE);
+      await findEditorByTitle(EXTRACT_TITLE);
       await waitFor(() => expect(
         selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), fixture.workspace.workspaceInstanceId!)
           .lspFiles[EXTRACT_KEY]?.syncedText,

@@ -16,6 +16,7 @@ const viewport=tree.getBoundingClientRect();
 const rect=target?.getBoundingClientRect();
 return {found:!!target,visible:!!rect && rect.width>0 && rect.height>0 && rect.top>=viewport.top && rect.bottom<=viewport.bottom,
   virtual:!!tree.querySelector('[data-testid="code-workspace-tree-viewport"]'),
+  loading:!!tree.querySelector('.animate-spin'),
   offset:tree.scrollTop,height:tree.clientHeight,total:tree.scrollHeight,
   targetTop:rect?.top ?? null,targetBottom:rect?.bottom ?? null,viewportTop:viewport.top,viewportBottom:viewport.bottom};
 """
@@ -47,6 +48,15 @@ def reveal(ctx, selector):
                     or any(type(value.get(key)) not in {int, float} or not math.isfinite(value[key]) or value[key] < 0
                            for key in ["offset", "height", "total"])):
                 raise StepError("Invalid project tree visibility observation")
+            if not value.get("found") and value.get("loading"):
+                samples.append(value)
+                if time.monotonic() >= deadline or value["height"] <= 0:
+                    break
+                # Expanding a real directory loads its children asynchronously.
+                # Keep observing the visible loading state before scrolling or
+                # declaring a child absent; never click or synthesize its rows.
+                time.sleep(.025)
+                continue
             if not value.get("virtual") and not value.get("found"):
                 if samples:
                     raise StepError("Explorer row disappeared while scrolling")

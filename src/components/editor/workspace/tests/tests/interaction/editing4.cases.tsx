@@ -1,3 +1,4 @@
+import { findEditorByTitle } from "../../editorReadiness";
 import { EditorView } from "@codemirror/view";
 import { emit } from "@tauri-apps/api/event";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
@@ -86,7 +87,7 @@ export function registerinteractionEditing4Cases(caseContext: registerinteractio
     }));
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     // The document must be open with the provider before Alt+Enter asks it.
     await waitFor(() => expect(caseContext.workspaceTestHarness.lspMocks.lspOpenDocument).toHaveBeenCalled());
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
@@ -146,7 +147,7 @@ export function registerinteractionEditing4Cases(caseContext: registerinteractio
     });
 
     const rendered = caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
     const content = rendered.container.querySelector<HTMLElement>(".cm-content");
     expect(content).not.toBeNull();
@@ -198,7 +199,7 @@ export function registerinteractionEditing4Cases(caseContext: registerinteractio
     }));
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
     fireEvent.keyDown(window, { key: "l", ctrlKey: true, altKey: true });
@@ -238,7 +239,7 @@ export function registerinteractionEditing4Cases(caseContext: registerinteractio
     caseContext.workspaceTestHarness.lspMocks.lspFormatting.mockRejectedValue(new Error("provider transport failed"));
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
     fireEvent.keyDown(window, { key: "l", ctrlKey: true, altKey: true });
@@ -281,7 +282,7 @@ export function registerinteractionEditing4Cases(caseContext: registerinteractio
     );
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     await waitFor(() => expect(screen.getByTestId("workspace-recovery-dialog")).toBeInTheDocument());
     expect(await screen.findByTestId("workspace-recovery-dialog")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Recover selected" }));
@@ -311,7 +312,7 @@ export function registerinteractionEditing4Cases(caseContext: registerinteractio
       if (next) registrationRef.current = next;
     });
     const rendered = caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-    await screen.findByTitle("app / notes.txt");
+    await findEditorByTitle("app / notes.txt");
     const content = rendered.container.querySelector<HTMLElement>(".cm-content")!;
     act(() => { content.focus(); });
     await act(async () => {
@@ -338,7 +339,7 @@ export function registerinteractionEditing4Cases(caseContext: registerinteractio
     caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile.mockResolvedValue(caseContext.workspaceTestHarness.file("src/main.ts", "one\ntwo"));
 
     const rendered = caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     const content = rendered.container.querySelector<HTMLElement>(".cm-content");
     expect(content).not.toBeNull();
     const fileKey = "root:app:src/main.ts";
