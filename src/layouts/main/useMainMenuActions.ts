@@ -82,7 +82,7 @@ export function useMainMenuActions(context: UseMainMenuActionsContext) {
   // is handled by the shared hook, everything else reuses handleCommand.
   const dispatchMenuAction = useCallback((action: MenuActionId) => {
     if (action.startsWith("workspace-command:")) {
-      layout.activeWorkspaceCommandRegistration?.executeAction(action.slice("workspace-command:".length));
+      layout.getActiveWorkspaceCommands()?.executeAction(action.slice("workspace-command:".length));
       return;
     }
     switch (action) {
@@ -98,14 +98,15 @@ export function useMainMenuActions(context: UseMainMenuActionsContext) {
       default:
         handleCommand(action as AppCommand);
     }
-  }, [layout.activeWorkspaceCommandRegistration, handleCommand, layout.importExport]);
+  }, [layout.getActiveWorkspaceCommands, handleCommand, layout.importExport]);
   useMainMenuBridge({
     dispatchMenuAction,
     nativeMenu: layout.nativeMenu,
     activeTabClosable: layout.activeTabClosable,
     importExport: layout.importExport,
     quickConnectVisible: layout.quickConnectVisible,
-    activeWorkspaceCommandRegistration: layout.activeWorkspaceCommandRegistration,
+    getActiveWorkspaceCommands: layout.getActiveWorkspaceCommands,
+    subscribeWorkspaceCommands: layout.subscribeWorkspaceCommands,
     t: layout.t,
     setActiveTab: layout.setActiveTab,
     workspaceCommandRegistrationsRef: layout.workspaceCommandRegistrationsRef,

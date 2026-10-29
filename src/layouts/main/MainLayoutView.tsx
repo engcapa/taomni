@@ -208,9 +208,8 @@ export function MainLayoutView(props: MainLayoutViewProps) {
             nativeMenu={layout.nativeMenu}
             xServerEnabled={layout.xServerEnabled}
             quickConnectVisible={layout.quickConnectVisible}
-            workspaceCommands={layout.activeWorkspaceCommandRegistration?.items ?? []}
+            getWorkspaceCommands={layout.getActiveWorkspaceCommands}
             onCommand={menuActions.handleCommand}
-            onWorkspaceCommand={(commandId) => layout.activeWorkspaceCommandRegistration?.executeAction(commandId)}
             onToggleSidebar={layout.toggleSidebar}
             onStartLocalTerminal={(localShell) =>
               sessionActions.openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell)
@@ -269,7 +268,6 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                     handleOpenLocalPath={workspaceOpening.handleOpenLocalPath}
                     openLanChatTab={utilityTabs.openLanChatTab}
                     welcomeRecentSessions={layout.welcomeRecentSessions}
-                    recentWorkspaces={layout.recentWorkspaces}
                     welcomeMailSessions={layout.welcomeMailSessions}
                     handleConnectSession={connections.handleConnectSession}
                     handleConnectSessions={connections.handleConnectSessions}

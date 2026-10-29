@@ -21,7 +21,7 @@ import {
   Plus,
   Search,
   X,
-} from "lucide-react";
+} from "./icons";
 import { useContextMenu, type MenuItem } from "../../ContextMenu";
 import { useT } from "../../../lib/i18n";
 import {

@@ -17,7 +17,7 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 
 ## Navigation & timing
 
-`measure_workspace_file_open: {selector, expected, event: click|dblclick, label}`
+`measure_workspace_file_open: {selector, expected, event: click|dblclick, label, require_highlight?: boolean}`
 drives one real browser/WebDriver activation and passively records exact canonical
 document publication, visible syntax highlighting and every animation-frame gap.
 Content and highlighting each retain a 1500ms budget; every frame gap must stay
@@ -26,6 +26,15 @@ dispatches synthetic input, retries activation or discards initial slow frames.
 `file-open-<label>.json` retains all frames and separate driver action time on
 success and failure. Browser proves renderer/VFS behavior; native additionally
 exercises the packaged WebView and real filesystem.
+`require_highlight` defaults to `true`. Plain txt/log/csv cases explicitly set it
+to `false` because those documents have no syntax tokens: exact visible canonical
+content still has the same 1500ms budget, and every frame retains its 150ms limit
+through one second after content appears. Existing JSON assertions remain strict.
+For an outer workspace tab, preparation uses its real left/right scroll arrows
+until the target is fully visible and hit-testable, without changing the active
+document. This happens before the activation observer/CPU sample starts; raw
+preparation geometry is retained separately in `tabPreparation`. The subsequent
+activation is still sent exactly once and all original frame budgets apply.
 
 | Verb | Args | Notes |
 |------|------|-------|

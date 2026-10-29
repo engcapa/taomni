@@ -3,7 +3,6 @@ import { useT } from "../lib/i18n";
 import { openLocalShellAsAdministrator, type LocalDirectoryShortcut, type SessionConfig } from "../lib/ipc";
 import { sftpLocalHome } from "../lib/sftp";
 import { useAppStore } from "../stores/appStore";
-import type { RecentWorkspace } from "../types";
 import { LocalTerminalCard, MailSessionsCard, WslCard } from "./welcome/LaunchCards";
 import { LocalDirectoriesPanel } from "./welcome/LocalDirectoriesPanel";
 import { RecentSessionsPanel } from "./welcome/RecentSessionsPanel";
@@ -18,8 +17,6 @@ import { WelcomeHistoryPanel } from "./welcome/WelcomeHistoryPanel";
 
 const EMPTY_RECENT_SESSIONS: SessionConfig[] = [];
 
-const EMPTY_RECENT_WORKSPACES: RecentWorkspace[] = [];
-
 export function WelcomePanel({
   restore,
   onStartLocalTerminal,
@@ -27,7 +24,7 @@ export function WelcomePanel({
   onOpenLocalPath,
   onOpenLanChat,
   recentSessions = EMPTY_RECENT_SESSIONS,
-  recentWorkspaces = EMPTY_RECENT_WORKSPACES,
+  recentWorkspaces: providedRecentWorkspaces,
   mailSessions = EMPTY_RECENT_SESSIONS,
   onOpenMailSession,
   onOpenRecentSession,
@@ -44,7 +41,8 @@ export function WelcomePanel({
 }: WelcomePanelProps) {
   const [pendingDirectoryIds, setPendingDirectoryIds] = useState<string[]>([]);
   const [historyTab, setHistoryTab] = useState<WelcomeHistoryTab>("sessions");
-  const { setStatusMessage } = useAppStore();
+  const setStatusMessage = useAppStore((state) => state.setStatusMessage);
+  const recentWorkspaces = useAppStore((state) => providedRecentWorkspaces ?? state.recentWorkspaces);
   const t = useT();
   const {
     selectedShell,

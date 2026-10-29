@@ -3,11 +3,12 @@ from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from qa_ui_auto.file_open_probe import review, run, validate
 from qa_ui_auto.steps import StepError
 from qa_ui_auto.fixtures.workspace_language_files import JSON_DOCUMENT
+from qa_ui_auto.fixtures.workspace_json_documents import LONG_JSON_DOCUMENT
 from qa_ui_auto.file_open_profile import capture
 
 
@@ -20,8 +21,25 @@ CONFIG = {"selector": "[data-path='records.json']", "event": "dblclick", "label"
 
 
 class FileOpenReviewTests(unittest.TestCase):
+    def setUp(self):
+        reveal = patch("qa_ui_auto.file_open_probe.reveal_tab", return_value=[])
+        self.reveal = reveal.start()
+        self.addCleanup(reveal.stop)
+
     def test_complete_sample(self):
         review(observation())
+
+    def test_plain_document_requires_exact_content_and_keeps_every_frame_budget(self):
+        plain = {**observation(), "firstHighlightMs": None,
+                 "frames": [{"gapMs": 20, "matches": True, "highlighted": False}]}
+        review(plain, require_highlight=False)
+        with self.assertRaises(StepError):
+            review(plain)
+        for patch in [{"firstContentMs": 1501},
+                      {"frames": [{"gapMs": 151, "matches": True, "highlighted": False}]},
+                      {"frames": [{"gapMs": 20, "matches": False, "highlighted": False}]}]:
+            with self.subTest(patch=patch), self.assertRaises(StepError):
+                review({**plain, **patch}, require_highlight=False)
 
     def test_rejects_missing_or_late_results_and_slow_frames(self):
         for patch in [{"started": None}, {"finished": False}, {"firstContentMs": 1501},
@@ -33,7 +51,9 @@ class FileOpenReviewTests(unittest.TestCase):
 
     def test_validates_args_and_artifact_path(self):
         self.assertEqual(validate(CONFIG), CONFIG)
-        for patch in [{"label": "../other"}, {"event": "input"}, {"expected": ""}, {"selector": None}, {"budget": 9999}]:
+        self.assertFalse(validate({**CONFIG, "require_highlight": False})["require_highlight"])
+        for patch in [{"label": "../other"}, {"event": "input"}, {"expected": ""}, {"selector": None},
+                      {"budget": 9999}, {"require_highlight": 0}, {"require_highlight": "false"}]:
             with self.subTest(patch=patch), self.assertRaises(StepError):
                 validate({**CONFIG, **patch})
 
@@ -43,6 +63,15 @@ class FileOpenReviewTests(unittest.TestCase):
         self.assertEqual(len(data["records"]), 100)
         self.assertEqual(data["records"][-1]["name"], "Public fixture 099")
         self.assertEqual(set(data["records"][0]), {"id", "name", "enabled", "description", "category"})
+
+    def test_long_line_fixture_retains_the_reported_workload_dimensions(self):
+        document = json.loads(LONG_JSON_DOCUMENT)
+        self.assertEqual(len(LONG_JSON_DOCUMENT.splitlines()), 693)
+        self.assertGreaterEqual(len(LONG_JSON_DOCUMENT.encode("utf-8")), 190_000)
+        self.assertLessEqual(len(LONG_JSON_DOCUMENT.encode("utf-8")), 210_000)
+        self.assertGreaterEqual(max(map(len, LONG_JSON_DOCUMENT.splitlines())), 5125)
+        self.assertEqual(len(document["records"]), 40)
+        self.assertTrue(all(record["label"].startswith("Public synthetic") for record in document["records"]))
 
     def test_native_action_and_cleanup_have_no_document_writes(self):
         session = Mock()
@@ -81,8 +110,25 @@ class FileOpenReviewTests(unittest.TestCase):
         page = Mock()
         page.evaluate.side_effect = [True, observation(), observation()]
         with tempfile.TemporaryDirectory() as folder:
-            run(SimpleNamespace(page=page, case_dir=Path(folder)), {**CONFIG, "event": "click"})
+            trace = {"started": True, "screenshots": False, "snapshots": False, "sources": False}
+            run(SimpleNamespace(page=page, case_dir=Path(folder), case_state={"browser_trace": trace}), {**CONFIG, "event": "click"})
+            report = json.loads((Path(folder) / "file-open-cold-json.json").read_text())
+        self.assertEqual(report["browserTrace"], trace)
         page.locator(CONFIG["selector"]).click.assert_called_once_with()
+
+    def test_native_plaintext_does_not_fabricate_highlighting(self):
+        session = Mock()
+        plain = {**observation(), "firstHighlightMs": None,
+                 "frames": [{"gapMs": 20, "matches": True, "highlighted": False}]}
+        session.execute.side_effect = [True, plain, plain]
+        with tempfile.TemporaryDirectory() as folder:
+            run(SimpleNamespace(session=session, case_dir=Path(folder)),
+                {**CONFIG, "expected": "Plain document\n", "require_highlight": False})
+            report = json.loads((Path(folder) / "file-open-cold-json.json").read_text())
+        self.assertTrue(report["passed"])
+        self.assertFalse(report["requireHighlight"])
+        self.assertIsNone(report["observation"]["firstHighlightMs"])
+        session.dblclick.assert_called_once_with(CONFIG["selector"])
 
     def test_cpu_samples_are_retained_after_the_original_action_failure(self):
         page = Mock()

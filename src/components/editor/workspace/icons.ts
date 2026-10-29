@@ -1,0 +1,71 @@
+import { memo } from "react";
+import * as Lucide from "lucide-react";
+
+/**
+ * Buffer and selection changes also render workspace chrome. Reuse unchanged
+ * SVG path trees instead of rebuilding every icon on each publication. Props,
+ * context and forwarded refs retain React's normal update semantics.
+ */
+export const Activity = memo(Lucide.Activity);
+export const AlertTriangle = memo(Lucide.AlertTriangle);
+export const AlignHorizontalJustifyCenter = memo(Lucide.AlignHorizontalJustifyCenter);
+export const ArrowLeft = memo(Lucide.ArrowLeft);
+export const ArrowRight = memo(Lucide.ArrowRight);
+export const BookOpen = memo(Lucide.BookOpen);
+export const Braces = memo(Lucide.Braces);
+export const Bug = memo(Lucide.Bug);
+export const ChevronDown = memo(Lucide.ChevronDown);
+export const ChevronRight = memo(Lucide.ChevronRight);
+export const ChevronUp = memo(Lucide.ChevronUp);
+export const ChevronsDownUp = memo(Lucide.ChevronsDownUp);
+export const ChevronsUpDown = memo(Lucide.ChevronsUpDown);
+export const Columns2 = memo(Lucide.Columns2);
+export const Columns3 = memo(Lucide.Columns3);
+export const Database = memo(Lucide.Database);
+export const Download = memo(Lucide.Download);
+export const Eye = memo(Lucide.Eye);
+export const File = memo(Lucide.File);
+export const FileArchive = memo(Lucide.FileArchive);
+export const FileJson2 = memo(Lucide.FileJson2);
+export const FileSpreadsheet = memo(Lucide.FileSpreadsheet);
+export const FileTerminal = memo(Lucide.FileTerminal);
+export const FileText = memo(Lucide.FileText);
+export const Film = memo(Lucide.Film);
+export const FlaskConical = memo(Lucide.FlaskConical);
+export const Folder = memo(Lucide.Folder);
+export const FolderOpen = memo(Lucide.FolderOpen);
+export const FolderTree = memo(Lucide.FolderTree);
+export const GitBranch = memo(Lucide.GitBranch);
+export const GitCommitHorizontal = memo(Lucide.GitCommitHorizontal);
+export const GitFork = memo(Lucide.GitFork);
+export const Hammer = memo(Lucide.Hammer);
+export const Hash = memo(Lucide.Hash);
+export const Image = memo(Lucide.Image);
+export const Link2 = memo(Lucide.Link2);
+export const ListTodo = memo(Lucide.ListTodo);
+export const ListTree = memo(Lucide.ListTree);
+export const Loader2 = memo(Lucide.Loader2);
+export const LocateFixed = memo(Lucide.LocateFixed);
+export const Maximize2 = memo(Lucide.Maximize2);
+export const Minus = memo(Lucide.Minus);
+export const MoreHorizontal = memo(Lucide.MoreHorizontal);
+export const MoreVertical = memo(Lucide.MoreVertical);
+export const Music2 = memo(Lucide.Music2);
+export const Network = memo(Lucide.Network);
+export const PanelRight = memo(Lucide.PanelRight);
+export const Play = memo(Lucide.Play);
+export const Plus = memo(Lucide.Plus);
+export const RefreshCw = memo(Lucide.RefreshCw);
+export const RotateCcw = memo(Lucide.RotateCcw);
+export const Rows2 = memo(Lucide.Rows2);
+export const Save = memo(Lucide.Save);
+export const Search = memo(Lucide.Search);
+export const Settings = memo(Lucide.Settings);
+export const ShieldCheck = memo(Lucide.ShieldCheck);
+export const SlidersHorizontal = memo(Lucide.SlidersHorizontal);
+export const Square = memo(Lucide.Square);
+export const TerminalSquare = memo(Lucide.TerminalSquare);
+export const WrapText = memo(Lucide.WrapText);
+export const X = memo(Lucide.X);
+export const ZoomIn = memo(Lucide.ZoomIn);
+export const ZoomOut = memo(Lucide.ZoomOut);

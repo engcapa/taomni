@@ -1,4 +1,4 @@
-import { ChevronRight, File, Folder, Hash, MoreHorizontal } from "lucide-react";
+import { ChevronRight, File, Folder, Hash, MoreHorizontal } from "./icons";
 import {
   useCallback,
   useEffect,

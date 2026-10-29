@@ -15,7 +15,8 @@ export interface UseMainMenuBridgeContext {
   activeTabClosable: boolean;
   importExport: import("../../components/menubar/useSessionImportExport").UseSessionImportExport;
   quickConnectVisible: boolean;
-  activeWorkspaceCommandRegistration: WorkspaceCommandRegistration | null;
+  getActiveWorkspaceCommands: () => WorkspaceCommandRegistration | null;
+  subscribeWorkspaceCommands: (listener: () => void) => () => void;
   t: import("../../lib/i18n").TranslateFn;
   setActiveTab: (id: string) => void;
   workspaceCommandRegistrationsRef: import("react").RefObject<Record<string, WorkspaceCommandRegistration>>;
@@ -29,7 +30,8 @@ export function useMainMenuBridge(context: UseMainMenuBridgeContext) {
     activeTabClosable,
     importExport,
     quickConnectVisible,
-    activeWorkspaceCommandRegistration,
+    getActiveWorkspaceCommands,
+    subscribeWorkspaceCommands,
     t,
     setActiveTab,
     workspaceCommandRegistrationsRef,
@@ -47,25 +49,35 @@ export function useMainMenuBridge(context: UseMainMenuBridgeContext) {
   useEffect(() => {
     if (!nativeMenu) return;
     let cancelled = false;
-    const spec = buildAppMenuSpec({
-      activeTabClosable,
-      hasSessions: importExport.hasSessions,
-      quickConnectVisible,
-      workspaceCommands: activeWorkspaceCommandRegistration?.items ?? [],
-      t,
-    });
-    void installAppMenu(spec, (action) => dispatchMenuActionRef.current(action)).catch((err) => {
-      if (!cancelled) console.error("Failed to install application menu", err);
-    });
+    let previous: WorkspaceCommandRegistration | null | undefined;
+    const refresh = () => {
+      const registration = getActiveWorkspaceCommands();
+      if (registration === previous) return;
+      previous = registration;
+      const spec = buildAppMenuSpec({
+        activeTabClosable,
+        hasSessions: importExport.hasSessions,
+        quickConnectVisible,
+        workspaceCommands: registration?.items ?? [],
+        t,
+      });
+      void installAppMenu(spec, (action) => dispatchMenuActionRef.current(action)).catch((err) => {
+        if (!cancelled) console.error("Failed to install application menu", err);
+      });
+    };
+    refresh();
+    const unsubscribe = subscribeWorkspaceCommands(refresh);
     return () => {
       cancelled = true;
+      unsubscribe();
     };
   }, [
     nativeMenu,
     activeTabClosable,
     importExport.hasSessions,
     quickConnectVisible,
-    activeWorkspaceCommandRegistration?.items,
+    getActiveWorkspaceCommands,
+    subscribeWorkspaceCommands,
     t,
   ]);
 

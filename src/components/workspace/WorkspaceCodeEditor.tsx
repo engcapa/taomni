@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import { CodeWorkspaceTab, type CodeWorkspaceGitManagerPayload } from "../editor/CodeWorkspaceTab";
 import type { WorkspaceCommandRegistration } from "../editor/workspace/workspaceCommands";
 import { useAppStore } from "../../stores/appStore";
@@ -18,7 +18,7 @@ export interface WorkspaceCodeEditorProps {
 }
 
 /** Preserve the full editor's publication, recents and command ownership. */
-export function WorkspaceCodeEditor({ workspace, tabId, visible, onCommandsChange, sharedFiles = false }: WorkspaceCodeEditorProps) {
+export const WorkspaceCodeEditor = memo(function WorkspaceCodeEditor({ workspace, tabId, visible, onCommandsChange, sharedFiles = false }: WorkspaceCodeEditorProps) {
   const hostIntegration = useWorkspaceCodeHost(workspace, visible, sharedFiles);
   const context = useAppStore((state) => state.codeWorkspaceByTab[tabId]);
   const syncGitManager = useCallback((payload: CodeWorkspaceGitManagerPayload) => {
@@ -82,4 +82,4 @@ export function WorkspaceCodeEditor({ workspace, tabId, visible, onCommandsChang
     onCommandsChange={onCommandsChange}
     hostIntegration={hostIntegration}
   />;
-}
+});

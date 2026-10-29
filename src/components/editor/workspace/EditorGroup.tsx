@@ -1,5 +1,5 @@
 import { EditorView } from "@codemirror/view";
-import { AlertTriangle, Columns2, Download, Eye, File, Loader2 } from "lucide-react";
+import { AlertTriangle, Columns2, Download, Eye, File, Loader2 } from "./icons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { writeText } from "../../../lib/clipboard";

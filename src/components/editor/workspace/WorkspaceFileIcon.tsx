@@ -1,7 +1,7 @@
 import {
   Braces, Database, File, FileArchive, FileJson2, FileSpreadsheet,
   FileTerminal, FileText, Film, Folder, FolderOpen, Image, Music2,
-} from "lucide-react";
+} from "./icons";
 
 /** Shared by folder, search and loose-file views; no provider is needed. */
 export function WorkspaceFileIcon({ path, folder = false, expanded = false }: {

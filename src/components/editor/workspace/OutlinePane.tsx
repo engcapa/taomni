@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, ListTree, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, ListTree, Search } from "./icons";
 import type { LspDocumentSymbol, LspPosition } from "../../../lib/editor/lsp";
 import { symbolChainAtPosition } from "./Breadcrumbs";
 import { symbolKindBadge } from "./StructurePopup";

@@ -1,6 +1,6 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { Minus, MoreVertical } from "lucide-react";
+import { Minus, MoreVertical } from "../icons";
 import { ContextMenu, type MenuItem } from "../../../ContextMenu";
 import { KeepAliveToolPanel } from "./BottomDock";
 

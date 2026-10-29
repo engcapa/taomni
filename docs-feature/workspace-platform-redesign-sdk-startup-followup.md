@@ -1,6 +1,6 @@
 # 工作区文件打开与 SDK 后台初始化
 
-当前状态：候选 `2ff025f4` 相关集 [40773829621](https://github.com/engcapa/taomni/actions/runs/40773829621) 已完成，123 passed / 2 failed，18/18 执行分片已收齐。三平台 browser 51/51、Linux native 25/25、Windows native 24/24 通过；macOS Java 完整编辑也通过。macOS TypeScript 错误 SDK 场景打开普通文件为 1579.30ms，超出原有 1500ms，另一个正常 SDK 场景在所有交互及其 pending 检查通过后的重复观察越过五秒，仍保留原失败。已独立核验原始回执、汇总和 2044 个发布附件 SHA。正在补只读诊断并重跑，不能称全量或正式性能对照已通过。关联[重构实现报告](./workspace-platform-redesign-implementation-report.md)。
+当前状态：文件打开及标签切换卡顿仍未通过验收。产品 `f0c1ae4e` 的相关集 [40787137504](https://github.com/engcapa/taomni/actions/runs/40787137504) 正在执行；三平台 browser 的 JSON 首帧仍有约 195–207ms 停顿，Linux native 有 206–315ms 慢帧，超过保留的 150ms 预算。相同产品的长行公开夹具基线 [40790432602](https://github.com/engcapa/taomni/actions/runs/40790432602) 已在 browser 捕获 410ms 慢帧。后台文件读取和图标复用不足以证明问题解决，继续分析原始 CPU 与原生帧证据。当前组合源码的全量与正式四轮性能仍待执行。以下记录保留历史失败，关联[重构实现报告](./workspace-platform-redesign-implementation-report.md)。
 
 ## 目标与保留行为
 
@@ -98,3 +98,100 @@ SHA 计算会在调用线程执行。现在由独立 async 适配器交给 block
 调用 executor 与另一读取继续推进、UTF-16/BOM、错误与 worker panic。
 CI 的 root Rust contract 同时执行这组测试。原生三平台与完整崩溃组仍须用包含
 本次产品改动的 QA release 验证；不能据此认定渲染慢帧已解决。
+
+## JSON 冷打开的渲染开销
+
+同一改前源码的 Linux 定向 `40784926015` 为 16 passed / 2 failed，原始回执与
+附件 SHA 已核验。JSON browser 的首帧为 197.8ms，内容首次出现前另有 251.3ms
+慢帧；原生首帧为 191ms。CPU 原样采样显示同步 React 渲染/提交占用约 665.6ms，
+其中 Lucide 的 `createElement` 调用约 114.6ms。采样与帧报告保留，不能将这些
+数值外推为未插桩的生产耗时。
+
+工作区常驻的树、面包屑、工具栏、编辑器和 dock 改用共享的 memo 图标组件：
+buffer/selection 更新时复用 props 未变化的 SVG 子树，图标 props、主题 context
+和 ref 仍按 React 语义更新。这不改变操作、可达性或工具内容挂载生命周期。
+`TC-WS-064/065` 与完整崩溃组继续验证最终组合，正式性能比较仍待执行。
+
+改前 JSON run `40782708587` 已收齐，49 passed / 8 failed，1,180 附件 SHA
+核验一致；七项为真实慢帧，Windows 原生 65 的另一项发生于已完成输入、磁盘
+SHA 和重开末尾文本之后：Mod+End 使首行离开 CodeMirror 虚拟视口，新用例却
+要求首行 DOM 存在。现在只读实际文档首行，仍要求精确 `{`；不改变滚动、输入、
+文件内容、预算或磁盘校验。所有原始失败继续保留。
+
+## 用户文件的大小与长行负载
+
+用户提供本机文件路径后，只读统计得到 196,289 bytes、693 行、最长行 5,148
+字符、字符串最大长度 5,125，内容均为 ASCII。未将原文、字段名或字段值写入
+测试与报告。此前 `TC-WS-064/065` 的公开 JSON 只有 19,362 字符，不能代表这项
+长行负载，原用例继续保留。
+
+新增 `TC-WS-066/067` 使用代码生成的公开数据：693 行、197,472 bytes、最长行
+5,151 字符，40 条记录，字符串最大长度 5,125。66 在 browser/native 中验证冷开、
+标签切回与 Home 恢复的精确内容和语法高亮，1500ms 打开及每帧 150ms 预算不变；
+67 增加原生 32 键输入、完整保存 SHA、关闭重开与首行/末尾内容。普通文件的
+SDK/LSP 自动探测必须保持为零。当前新增用例未完成托管执行，不能充当修复证据。
+
+## 编辑器与目录排序的渲染边界
+
+主布局会随编辑器 context 和命令注册发表刷新。为避免输入相同时重复遍历整个
+编辑器，在平台 canvas、编辑器桥与公共 `CodeWorkspaceTab` 入口使用 React 默认
+`memo` 边界；各组件自身的 store/context 订阅继续交付真实变化，没有自定义
+比较器、延迟内容、改变挂载生命周期或取消资源。Project 树仅在目录条目、平铺
+文件或排序偏好变化时重排，selection、caret、dirty 更新复用已有顺序。
+
+本机对应真实编辑器生命周期、平台文件桥、Git 同步、Project 树及公共编辑器共
+5 文件 / 288 tests passed（最多 2 workers）；TypeScript 与 refactor 合同通过。
+这是待托管测量的产品优化，尚不能据单测声称减少慢帧。保留 `TC-WS-064` 至
+`067` 和完整崩溃组，并将补充普通 txt/log/csv 冷开及连续标签切换的响应回归。
+
+新增 `TC-WS-068/069`：68 从真实树冷开 txt/log/csv/未知扩展名的普通文本；69
+在五个 txt/log/csv/JSON 标签之间连续切换十次，其中包含 193KiB 长行 JSON，
+并保留未保存草稿，最后保存、关闭和重开精确内容。两者均覆盖 browser/native。
+普通文本没有语法 token，显式使用 `require_highlight: false`；仍检查完整可见
+canonical 文档、1500ms 内容预算和从真实操作至内容出现后 1 秒的每帧 150ms
+预算。原 JSON 默认高亮断言完全保留。工具 13 项 Python 和 4 项 JS 合同通过，
+覆盖纯文本未高亮、错误内容、慢帧、超时、清理与原始失败保留；目录 audit gate
+及托管选择计划通过。新用例执行结果仍待 GitHub，不能作为通过证据。
+
+普通文件基线 [40792477689](https://github.com/engcapa/taomni/actions/runs/40792477689)
+已在 browser 复现：30 字符 notes.txt 冷开有 159ms 帧间隔，切至 51 字符
+service.log 有 171ms 帧间隔；不是仅由大 JSON 触发的问题。新用例的原始失败
+保留，native 仍在构建。
+
+另修正主窗口的订阅范围：`useMainLayoutState` 仅订阅实际使用的字段，公共
+session import/export hook 和 Welcome 只订阅其 `setStatusMessage` 方法。
+此前后两者即使只取一个方法也订阅整个 app store，文件 context、诊断或状态
+发表会连带刷新整个窗口。新增真实 MainLayout 回归在改前失败；三处订阅边界
+修正后与既有窗口导航、终端保活、主菜单快捷键及 Home 回归共 80 tests passed。
+context 和状态仍由原 owner 发表，原消费者继续收到更新，广播开关仍触发 shell
+更新；没有调整持久化、快捷键或编辑器挂载生命周期。托管帧验证尚未完成。
+状态条消费者与 session import/export 另有 55 tests passed，TypeScript 和
+`pnpm check:refactor` 通过；本机只执行这些单测和静态检查。
+
+同一公共路径还存在 `useWorkspaceTabs` 对完整平台工作区数组的订阅，尽管
+关联 Git 清理只使用“仍打开的 code 编辑器实例 ID”。现在使用浅比较选择这些
+ID，文件选择、目录和 buffer 信息变化由原消费者交付，编辑器关闭或导入实例
+ID 变化仍立即清理失去 owner 的 Git 标签。新增隔离测试改前由一次 render
+增至四次，改后与两条 Git 清理回归、真实 Git 集成及主布局回归共 67 tests
+passed。本轮 `8d4fc91b` 托管验证仍捕获 browser 慢帧（JSON 152–163ms、普通
+文件/标签 188–228ms）；订阅调整尚不能作为卡顿通过证据。
+
+## 命令发布与最近记录隔离
+
+`5d280fbf` 的 Linux 同工具验证 `40795232441` 已结束：21 passed / 10 failed，
+20 个用例 ID（含完整 10 ID 崩溃组）与 711 个附件 SHA 独立核验一致。browser
+冷开/切换慢帧 160–275ms；native 153–276ms。关闭 DOM 快照后仍有真实同步
+React 耗时，因此不能将卡顿归因于录制或宣称前述优化已通过。
+
+进一步去掉命令注册时的主窗口 React state 更新。实例命令和 shell shortcut
+claims 仍同步写入注册表，快捷键读取原 ref；窗口菜单在打开时读取当前 owner，
+macOS 原生菜单直接订阅注册表，隐藏实例发表不重装当前菜单，卸载释放订阅。
+关闭的 owner 不再执行残留菜单操作。最近工作区记录移到 Home 内部订阅，仍
+保持记录与恢复逻辑，打开文件不再因此刷新所有窗口后代。
+
+两条隔离回归在改前分别捕获命令发布 render 1→2、最近记录主窗口 render 3→4。
+修正后主布局、Home 最近记录、主菜单、快捷键桥、编辑器上下文桥共 6 文件 /
+95 tests passed；TypeScript 与 refactor 合同通过。这是纯更新边界重构，没有新增
+用户流程；保留 `TC-WS-064` 至 `069`、Home 路由 `TC-WS-025/026`、
+`TC-IDE-C4-02-split-and-structured-reopen` 与完整崩溃组作为托管行为门禁。
+新的帧测量及三平台结果尚未收齐，当前仍未验收。

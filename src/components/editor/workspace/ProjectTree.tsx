@@ -10,7 +10,7 @@ import {
   File,
   Folder,
   Loader2,
-} from "lucide-react";
+} from "./icons";
 import type {
   CodeWorkspaceFileRef,
   CodeWorkspaceRootInfo,
@@ -219,15 +219,18 @@ function renderEntries(
  * handlers (useLatestHandlers) the tree only re-renders when its data changes.
  */
 export const ProjectTree = memo(function ProjectTree(inputProps: ProjectTreeProps) {
-  const props = useMemo(() => {
-    const sort = inputProps.sort ?? DEFAULT_EXPLORER_SORT;
-    return { ...inputProps,
+  const sort = inputProps.sort ?? DEFAULT_EXPLORER_SORT;
+  // Selection, caret and dirty-buffer publications do not change directory
+  // order. Keep sorting tied to the actual entries and explorer preferences.
+  const sortedEntries = useMemo(() => {
+    return {
       directories: Object.fromEntries(Object.entries(inputProps.directories).map(([key, value]) =>
         [key, { ...value, entries: sortExplorerEntries(value.entries, sort) }])),
       flatFiles: Object.fromEntries(Object.entries(inputProps.flatFiles).map(([key, value]) =>
         [key, { ...value, entries: sortExplorerEntries(value.entries, sort) }])),
     };
-  }, [inputProps]);
+  }, [inputProps.directories, inputProps.flatFiles, sort]);
+  const props = { ...inputProps, ...sortedEntries };
   const {
     roots,
     looseFiles,
