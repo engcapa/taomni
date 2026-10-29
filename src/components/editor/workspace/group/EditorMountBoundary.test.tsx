@@ -6,13 +6,14 @@ import { EditorMountBoundary } from "./EditorMountBoundary";
 const frames = new Map<number, FrameRequestCallback>();
 let sequence = 0;
 beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
     frames.set(++sequence, callback);
     return sequence;
   });
   vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.delete(id));
 });
-afterEach(() => { cleanup(); frames.clear(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); frames.clear(); vi.unstubAllGlobals(); vi.useRealTimers(); });
 const paint = () => act(() => {
   const callbacks = [...frames.values()];
   frames.clear();
@@ -30,6 +31,10 @@ it("yields initial construction, mounts the current file and retains its editor 
   expect(mount).not.toHaveBeenCalled();
   rerender(<EditorMountBoundary><Editor file="second" /></EditorMountBoundary>);
   paint();
+  expect(mount).not.toHaveBeenCalled();
+  paint();
+  expect(mount).not.toHaveBeenCalled();
+  act(() => vi.advanceTimersByTime(0));
   expect(screen.getByText("second")).toBeVisible();
   expect(screen.queryByText("first")).not.toBeInTheDocument();
   rerender(<EditorMountBoundary><Editor file="third" /></EditorMountBoundary>);
@@ -39,12 +44,14 @@ it("yields initial construction, mounts the current file and retains its editor 
   expect(frames.size).toBe(0);
 });
 
-it("cancels a pending editor when its pane closes before the measurement frame", () => {
+it.each([0, 1, 2])("cancels a pending editor when its pane closes after %i frames", (count) => {
   const renderEditor = vi.fn();
   function Editor() { renderEditor(); return <div>Closed file</div>; }
   const { unmount } = render(<EditorMountBoundary><Editor /></EditorMountBoundary>);
+  for (let index = 0; index < count; index++) paint();
   unmount();
   expect(frames.size).toBe(0);
   paint();
+  act(() => vi.runOnlyPendingTimers());
   expect(renderEditor).not.toHaveBeenCalled();
 });

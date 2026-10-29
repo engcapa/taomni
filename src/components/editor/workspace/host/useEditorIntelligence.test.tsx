@@ -11,13 +11,14 @@ describe("editor language activation", () => {
   const frames = new Map<number, FrameRequestCallback>();
   let sequence = 0;
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
     vi.mocked(languageForPath).mockReset();
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
       frames.set(++sequence, callback); return sequence;
     });
     vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.delete(id));
   });
-  afterEach(() => { cleanup(); frames.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+  afterEach(() => { cleanup(); frames.clear(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
   const renderLanguage = () => {
     let current: Extension = [];
     let languageCompartment: Compartment | undefined;
@@ -38,7 +39,9 @@ describe("editor language activation", () => {
     const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach((callback) => callback(1));
   });
 
-  it("yields language installation until the document's first measurement frame", async () => {
+  const finishPaint = () => { paint(); paint(); act(() => vi.advanceTimersByTime(0)); };
+
+  it("keeps grammar installation out of the document's measurement and paint frames", async () => {
     const language: Extension = [];
     vi.mocked(languageForPath).mockResolvedValue(language);
     const { view } = renderLanguage();
@@ -46,8 +49,12 @@ describe("editor language activation", () => {
     expect(view.dispatch).not.toHaveBeenCalled();
     expect(frames.size).toBe(1);
     paint();
-    expect(view.dispatch).toHaveBeenCalledTimes(1);
+    expect(view.dispatch).not.toHaveBeenCalled();
     paint();
+    expect(view.dispatch).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(0));
+    expect(view.dispatch).toHaveBeenCalledTimes(1);
+    finishPaint();
     expect(view.dispatch).toHaveBeenCalledTimes(1);
   });
 
@@ -58,7 +65,7 @@ describe("editor language activation", () => {
     expect(frames.size).toBe(1);
     rerender({ fileKey: "b", path: "b.txt" });
     await act(async () => {});
-    paint();
+    finishPaint();
     expect(view.dispatch).not.toHaveBeenCalled();
   });
 
@@ -70,7 +77,7 @@ describe("editor language activation", () => {
     await act(async () => { reply([]); });
     expect(frames.size).toBe(1);
     unmount();
-    paint();
+    finishPaint();
     expect(view.dispatch).not.toHaveBeenCalled();
   });
 
@@ -85,7 +92,7 @@ describe("editor language activation", () => {
     setLanguage(new Compartment().of([]));
     rerender({ fileKey: "b", path: "b.ts" });
     await act(async () => {});
-    paint();
+    finishPaint();
     expect(view.dispatch).toHaveBeenCalledTimes(1);
   });
 });

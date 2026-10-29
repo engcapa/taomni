@@ -26,6 +26,7 @@ from native_build import QA_APP_ID, verify_identity
 from native_webdriver_transport import WebDriverError, WebDriverTransport
 from native_console import CONSOLE_HOOK_SCRIPT
 from native_pointer import MOUSE_SOURCE, prepare_pointer_target
+from native_paced_input import type_paced_text
 from native_window_focus import NativeWindowFocus
 
 
@@ -1068,52 +1069,7 @@ class NativeSession(WebDriverTransport):
 
     def type_text(self, text: str) -> str:
         """Type text into the focused element, one paced key pair per char."""
-        if not text:
-            return "typed 0 chars"
-        if platform.system() == "Darwin":
-            # The macOS in-process bridge dispatches a whole /actions
-            # sequence inside one synchronous JS task. MutationObserver
-            # callbacks then coalesce, so per-key latency sampling
-            # (native_editor_performance) sees one batch instead of one
-            # sample per key. One request per char preserves event-loop
-            # turns; tauri-driver platforms keep the single batched request.
-            for ch in text:
-                self.request(
-                    "POST",
-                    self.endpoint("/actions"),
-                    {"actions": [{"type": "key", "id": "keyboard", "actions": [
-                        {"type": "keyDown", "value": ch},
-                        {"type": "keyUp", "value": ch},
-                        {"type": "pause", "duration": 20},
-                    ]}]},
-                )
-            return f"typed {len(text)} chars"
-        seq: list[dict[str, Any]] = []
-        for ch in text:
-            if ch.isupper():
-                shift = self.MODIFIER_MAP["Shift"]
-                seq.append({"type": "keyDown", "value": shift})
-                seq.append({"type": "keyDown", "value": ch})
-                seq.append({"type": "keyUp", "value": ch})
-                seq.append({"type": "keyUp", "value": shift})
-            else:
-                seq.append({"type": "keyDown", "value": ch})
-                seq.append({"type": "keyUp", "value": ch})
-            # Let WebKit deliver the input transaction and CodeMirror finish
-            # its scheduled measure before the next native character arrives.
-            seq.append({"type": "pause", "duration": 20})
-        try:
-            self.request(
-                "POST",
-                self.endpoint("/actions"),
-                {"actions": [{"type": "key", "id": "keyboard", "actions": seq}]},
-            )
-        finally:
-            try:
-                self.request("DELETE", self.endpoint("/actions"))
-            except WebDriverError:
-                pass
-        return f"typed {len(text)} chars"
+        return type_paced_text(self, text)
 
     def wait_absent(self, selector: str, timeout: float = 5.0) -> None:
         deadline = time.time() + timeout
