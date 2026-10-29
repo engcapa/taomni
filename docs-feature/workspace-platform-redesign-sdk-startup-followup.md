@@ -1,6 +1,6 @@
 # 工作区文件打开与 SDK 后台初始化
 
-当前状态：文件打开及标签切换卡顿仍未通过验收。最新托管相关集 [40826483271](https://github.com/engcapa/taomni/actions/runs/40826483271)（`dd477f6c`）共57次执行，50 passed / 7 failed、无跳过；适用的完整崩溃组通过。用户随后授权本机隔离 QA release 性能复现，已捕获真实 HOME 场景的原生窗口线程同步执行 `workspace_execution_model`，造成4–6秒长帧。后台执行与普通文件按需发现修复正在验证，未据单测声称问题解决。参考 [Home 文件打开分析](../docs-issue/workspace-home-file-open-latency-design.md)，全量与正式四轮性能对照仍待执行。以下保留历史失败，关联[重构实现报告](./workspace-platform-redesign-implementation-report.md)。
+当前状态：文件打开及标签切换卡顿仍未通过验收。最新托管相关集 [40840344631](https://github.com/engcapa/taomni/actions/runs/40840344631)（`9d70ce07`）共64次执行，55 passed / 9 failed、无跳过；适用的完整崩溃组通过。用户授权本机隔离 QA release 性能复现，已捕获真实 HOME 场景的窗口线程同步扫描造成4–6秒长帧。后台扫描修复后仍有冷打开长帧；当前继续减少全局样式重写及目录树渲染。参考 [Home 文件打开分析](../docs-issue/workspace-home-file-open-latency-design.md)，全量与正式四轮性能对照仍待执行。以下保留失败，关联[重构实现报告](./workspace-platform-redesign-implementation-report.md)。
 
 ## 目标与保留行为
 
@@ -518,3 +518,34 @@ JSON冷开245ms；最长帧152/197ms仍失败。上述仅用于定位，正式�
 用例及多语言工具配置browser用例，保留功能回归边界。076的fixture、catalog、
 policy、schema和依赖同步登记。正在推进新SHA托管相关集与完整崩溃组；
 冷打开长帧仍在修复中，相关集通过前不合并main。
+
+## 外观样式与大目录渲染（2026-10-29 本机 QA release）
+
+`9d70ce07` 托管64次执行为 browser 25 passed / 5 failed，native 30 passed / 4 failed，原始1473个附件摘要及源码身份已核验。全部9个失败均为150ms帧预算：browser 064/066/068/070/073，native 065/067/073/075。真实 HOME 的074及项目普通文档运行076通过，完整适用崩溃组17次执行通过；这些结果不替代后续组合源码验收。
+
+新增真实 Host 外观生命周期回归：相同设置切换文件、第二编辑器 pane 共享样式，以及移除样式表后重新附加。改前2 failed / 1 passed；外观扩展按所有设置值做有界缓存，style-mod 4.1.3 的 ESM/CJS 路径仅在 CSS 变化时写 textContent，保留顺序、nonce、脱离 DOM 后附加的逻辑。修正后连同文档切换与性能支持测试为21 passed。此处是消除重复样式写入，不能据单测声称性能通过。
+
+同源码的本机标准 runner `workspace-local-appearance-candidate/run-20261029-163903-131038814` 为1 passed / 3 failed：073冷打开374ms、074为267ms、075为273ms长帧；076真实脚本运行通过。连续路径诊断 `workspace-local-appearance-pipeline/run-20261029-164329-996280186` 保留失败继续收样，最后主动使case失败：073切换最大帧95–117ms，074切换79–99ms；首次打开仍有351ms/265ms长帧。观察脚本只转发原调用，不延长或删除预算；这些诊断不能作为整条case通过证据。曾隐藏树的隔离实验没有读到最终文档，探针超时，不能据其数据宣称改善，保留在 `workspace-tree-isolation-diagnostic`。
+
+当前将 Project 树拆为逻辑行及视口渲染，超过80行时只挂载可见行和上下各8行预取；采用已有排序、压缩链、分组、错误与 dirty/Git 标记，未改变文件扫描或文件操作。键盘顺序按全部逻辑行计算，Home/End/上下及父子导航保留。077同时覆盖 browser/native 的跨屏导航不激活、真实文件、搜索/清除、列表及反向排序；073/074/075保留150/1500ms预算。虚拟行由真实滚动揭示，滚动样本另存；读取文件的计时仍从最早 pointerdown/mousedown 开始。目录树、编辑器样式、全局字体主题及完整崩溃组需要本轮匹配release与托管重新验证。
+
+
+目录虚拟化后的标准本机 run `workspace-local-virtual-candidate/run-20261029-171751-679135703`
+为2 passed / 5 failed：073与076通过；065/067/074/075最长帧分别为152/162/151/228ms，
+仍未达到150ms预算。077首先在驱动聚焦不可聚焦的滚动容器时失败，按键入口改为已有可聚焦的
+Project pane。后续真实按键已触达逻辑末行，但发现本机 WebKit 的
+`Intl.Collator` 默认区域为 `en-US-u-va-posix`，即使指定 `sensitivity: "base"`，
+也把大写文件名排到小写前。现在仅移除 POSIX 排序变体，保留自然语言与其他区域设置，
+补充三种区域的混合大小写/数字顺序断言；原077的README/Draft10预期不放宽。
+
+只转发DOM调用的诊断 `workspace-virtual-pipeline/run-20261029-172419-747904347`
+保留全部超预算样本并在最终断言失败。073、074、075的已打开标签切换最大帧为
+42–62ms；首次创建编辑器仍有154–195ms长帧。原生采样及转发栈表明首次focus包含
+58–76ms同步布局。独立CSSOM插入实验没有改善（冷开仍178–234ms），未采用到产品。
+这些是定位数据，不是整条用例通过，也不是正式main/candidate性能结论。
+
+继续减少初始化的重复工作：EditorView在附加到真实host前完成插件、样式和属性构建；
+空语言/签名提示不再重复reconfigure；补全初始配置记录实际安装的策略，避免随后立即再次
+重建相同插件。Project虚拟行同时处理列表固定表头、容器内边距及从pane导航到行的焦点，
+键盘回归改为挂载真实FileTreePane，077增加列表末行焦点及可见范围断言。
+此组合正在重新编译匹配的QA release；其原生性能、077、全局字体主题和完整崩溃回归仍待验收。

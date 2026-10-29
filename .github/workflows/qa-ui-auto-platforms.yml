@@ -152,7 +152,7 @@ jobs:
         run: python -m unittest test_native_pointer test_ci_x11_session test_ci_ssh_features test_runtime_errors test_native_resize_observer test_native_console test_terminal_burst_probe test_ci_windows_ssh_shell test_ci_windows_posix_ssh test_native_drag test_backup_cloud test_backup_journal test_browser_evidence test_keyboard_steps
       - name: Language startup process and observation contracts
         if: inputs.scope != 'selected'
-        run: python -m unittest test_language_startup_observer test_sdk_startup_probe test_workspace_slow_sdk test_sdk_editor_input test_sdk_action_trace test_file_open_probe test_browser_tracing test_workspace_tab_reveal test_native_contenteditable test_rdp_deferred_clipboard
+        run: python -m unittest test_language_startup_observer test_sdk_startup_probe test_workspace_slow_sdk test_sdk_editor_input test_sdk_action_trace test_file_open_probe test_project_tree_reveal test_browser_tracing test_workspace_tab_reveal test_native_contenteditable test_rdp_deferred_clipboard
       - name: Linux package setup contracts
         run: python -m unittest test_ci_linux_setup test_ci_setup_protoc
       - uses: actions/setup-node@v4

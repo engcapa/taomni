@@ -30,6 +30,7 @@ def assert_language(ctx: EditorProbeContext, args: Any) -> str:
 def register(register_verb: Register) -> None:
     from .sdk_startup_probe import run as sdk_startup
     from .file_open_probe import run as file_open
+    from .project_tree_reveal import run as reveal_tree
     # The existing QA-only save-race owner keeps its state and side effects.
     # Registration moves here with no changes to those public verbs or payloads.
     for name, action in {
@@ -42,5 +43,6 @@ def register(register_verb: Register) -> None:
         "assert_language_startup": assert_language,
         "native_sdk_startup_probe": sdk_startup,
         "measure_workspace_file_open": file_open,
+        "reveal_project_tree_row": reveal_tree,
     }.items():
         register_verb(name)(action)

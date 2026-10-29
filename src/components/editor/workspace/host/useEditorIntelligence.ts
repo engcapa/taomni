@@ -47,14 +47,20 @@ export function useEditorIntelligence(context: UseEditorIntelligenceContext) {
     let cancelled = false;
     void languageForPath(path)
       .then((language: Extension | null) => {
-        if (cancelled || !viewRef.current) return;
-        viewRef.current.dispatch({
+        const view = viewRef.current;
+        if (cancelled || !view) return;
+        const current = languageCompartment.current.get(view.state);
+        if (current === language || (!language && Array.isArray(current) && current.length === 0)) return;
+        view.dispatch({
           effects: languageCompartment.current.reconfigure(language ?? []),
         });
       })
       .catch(() => {
-        if (cancelled || !viewRef.current) return;
-        viewRef.current.dispatch({
+        const view = viewRef.current;
+        if (cancelled || !view) return;
+        const current = languageCompartment.current.get(view.state);
+        if (Array.isArray(current) && current.length === 0) return;
+        view.dispatch({
           effects: languageCompartment.current.reconfigure([]),
         });
       });
@@ -102,6 +108,8 @@ export function useEditorIntelligence(context: UseEditorIntelligenceContext) {
     if (!view) return;
     let cancelled = false;
     if (!parameterPopup || parameterPopup.signatures.length === 0) {
+      const current = signatureCompartment.current.get(view.state);
+      if (Array.isArray(current) && current.length === 0) return;
       window.queueMicrotask(() => {
         const current = viewRef.current;
         if (cancelled || !current || current !== view) return;

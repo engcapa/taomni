@@ -9,7 +9,13 @@ export interface ExplorerSort {
 
 export const DEFAULT_EXPLORER_SORT: ExplorerSort = { field: "name", descending: false, foldersFirst: true };
 export const EXPLORER_SORT_KEY = "taomni.codeWorkspace.explorerSort.v1";
-const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+export function createExplorerNameCollator(locale = new Intl.Collator().resolvedOptions().locale): Intl.Collator {
+  // WebKit inherits en-US-u-va-posix on C/UTF-8 Linux desktops. That variant
+  // orders uppercase before lowercase even with sensitivity:"base".
+  const naturalLocale = locale.replace(/-va-posix(?=-|$)/i, "").replace(/-posix(?=-|$)/i, "").replace(/-u$/i, "");
+  return new Intl.Collator(naturalLocale, { numeric: true, sensitivity: "base" });
+}
+const collator = createExplorerNameCollator();
 
 export function readExplorerSort(): ExplorerSort {
   try {

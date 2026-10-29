@@ -92,4 +92,3 @@ export function clearGitSnapshotCache(repoRoot?: string): void {
   }
   gitSnapshotCache.delete(normalizedRepoRoot(repoRoot));
 }
-

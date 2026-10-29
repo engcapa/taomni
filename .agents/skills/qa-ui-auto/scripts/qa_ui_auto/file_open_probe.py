@@ -12,6 +12,7 @@ from .deadline import budget_time as time
 from .steps import StepError
 from .file_open_profile import capture as capture_profile
 from .workspace_tab_reveal import reveal as reveal_tab
+from .project_tree_reveal import reveal as reveal_tree
 
 SCRIPT = Path(__file__).with_suffix(".js").read_text(encoding="utf-8")
 OPEN_BUDGET_MS = 1500
@@ -56,13 +57,14 @@ def run(ctx: Any, args: Any) -> str:
     # Native scrollIntoView may leave the first tab clipped in WebKitGTK. Use
     # real strip arrows before installing the file activation frame observer.
     preparation = reveal_tab(ctx, config["selector"])
+    tree_preparation = reveal_tree(ctx, config["selector"])
     profile = (nullcontext() if hasattr(ctx, "session") else capture_profile(
         ctx.page, ctx.case_dir / ("file-open-" + config["label"] + "-cpu-profile.json")))
     with profile:
-        return measure(ctx, config, preparation=preparation)
+        return measure(ctx, config, preparation=preparation, tree_preparation=tree_preparation)
 
 
-def measure(ctx: Any, args: Any, *, preparation: list[dict] | None = None) -> str:
+def measure(ctx: Any, args: Any, *, preparation: list[dict] | None = None, tree_preparation: list[dict] | None = None) -> str:
     config = validate(args)
     native = hasattr(ctx, "session")
     execute = ctx.session.execute if native else lambda source: ctx.page.evaluate("() => {" + source + "}")
@@ -71,6 +73,7 @@ def measure(ctx: Any, args: Any, *, preparation: list[dict] | None = None) -> st
               "requireHighlight": config.get("require_highlight", True),
               "requireEditorReuse": config.get("require_editor_reuse", False)}
     report["tabPreparation"] = preparation
+    report["treePreparation"] = tree_preparation
     if not native:
         report["browserTrace"] = getattr(ctx, "case_state", {}).get("browser_trace")
     installed = False

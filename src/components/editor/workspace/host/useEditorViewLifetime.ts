@@ -540,7 +540,11 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
       ? reconfigureCachedEditorState(cached.state, initialDocumentText, extensions, compartmentEffects)
       : EditorState.create({ doc: initialDoc, extensions });
     const retainedView = editor.viewRef.current;
-    const view = retainedView ?? new EditorView({ state, parent: editor.hostRef.current });
+    // Construct before attaching: plugins can otherwise force layout while the
+    // editor still lacks its styles/attributes, then invalidate it again.
+    const root = editor.hostRef.current.getRootNode() as Document | ShadowRoot;
+    const view = retainedView ?? new EditorView({ state, root });
+    if (!retainedView) editor.hostRef.current.appendChild(view.dom);
     if (retainedView) view.setState(state);
     editorLanguageByView.set(view, liveTemplateLanguageForPath(editor.pathRef.current));
     editor.viewRef.current = view;

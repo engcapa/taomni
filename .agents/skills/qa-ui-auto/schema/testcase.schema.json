@@ -643,6 +643,7 @@
             }
           }
         },
+        "reveal_project_tree_row": {"type": "string", "minLength": 1},
         "measure_workspace_file_open": {
           "type": "object",
           "required": ["selector", "expected", "event", "label"],

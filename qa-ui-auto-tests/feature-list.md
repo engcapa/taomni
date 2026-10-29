@@ -12440,6 +12440,10 @@ files:
 - src/components/editor/workspace/ProjectTreeFlat.tsx
 - src/components/editor/workspace/ProjectTreeEntryDetails.tsx
 - src/components/editor/workspace/ProjectTree.tsx
+- src/components/editor/workspace/ProjectTreeRows.tsx
+- src/components/editor/workspace/ProjectTreeViewport.tsx
+- src/components/editor/workspace/projectTreeRows.ts
+- src/components/editor/workspace/projectTreeNavigationModel.ts
 - src/components/editor/workspace/FileTreePane.tsx
 - src/components/editor/workspace/hooks/useWorkspaceHostFiles.ts
 - src/components/editor/workspace/hooks/useWorkspaceHostCanvas.ts
@@ -12449,6 +12453,10 @@ files:
 - src/components/workspace/WorkspaceTabsFilter.tsx
 - src/lib/workspaceTabFilter.ts
 controls:
+- id: code-workspace-tree-viewport
+  selector: '[data-testid="code-workspace-tree-viewport"]'
+  kind: display
+  optional: true
 - id: code-workspace-tree-view-all-files
   selector: '[data-testid="code-workspace-tree-view-all-files"]'
   kind: interactive
@@ -13205,3 +13213,5 @@ controls:
 共享面板组件升级回归：`TC-WS-039`（browser/native），真实嵌套分栏、Documentation、侧栏拖动、终端隐藏、大预览和重载连续操作后保留草稿与编辑器所有权；与 `TC-WS-038` 一起显式断言未捕获异常、未处理 Promise、React 根错误与崩溃页，防止界面恢复后漏报组件异常。
 
 TC-WS-075 adds native Home source-to-document activation coverage for the real `workspace_execution_model` command. It retains the 150ms frame and 1500ms content/highlight budgets, exact public contents and editor reuse; TC-WS-073/074 also reject automatic execution-model scans for ordinary folders.
+
+TC-WS-077 protects virtual explorer rows in browser/native: bounded DOM rows, Home/End and offscreen ArrowUp selection without activation, actual file opening, search/reset, list view and reverse name sorting. Cold/warm frame budgets remain unchanged in TC-WS-073/074.

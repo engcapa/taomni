@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { WorkspaceEntry } from "../../../lib/editor/workspace";
-import { DEFAULT_EXPLORER_SORT, EXPLORER_SORT_KEY, explorerPackage, readExplorerSort, sortExplorerEntries, writeExplorerSort } from "./explorerPreferences";
+import { createExplorerNameCollator, DEFAULT_EXPLORER_SORT, EXPLORER_SORT_KEY, explorerPackage, readExplorerSort, sortExplorerEntries, writeExplorerSort } from "./explorerPreferences";
 
 const entry = (name: string, size: number, mtime: number, fileType: WorkspaceEntry["fileType"] = "file"): WorkspaceEntry =>
   ({ name, path: name, size, mtime, fileType, isHidden: false });
@@ -8,6 +8,12 @@ const files = [entry("notes10.txt", 20, 3), entry("Documents", 0, 1, "dir"), ent
 
 describe("file explorer preferences", () => {
   beforeEach(() => localStorage.clear());
+
+  it.each(["en-US-u-va-posix", "en-US", "zh-CN"])("sorts mixed case and numeric names naturally with %s", (locale) => {
+    const names = ["README.md", "Draft10.txt", "document-0299.txt", "Draft2.txt", "document-0000.txt"];
+    expect(names.sort(createExplorerNameCollator(locale).compare))
+      .toEqual(["document-0000.txt", "document-0299.txt", "Draft2.txt", "Draft10.txt", "README.md"]);
+  });
 
   it("naturally sorts names, retains folders first in both directions and never mutates a listing", () => {
     expect(sortExplorerEntries(files, DEFAULT_EXPLORER_SORT).map((file) => file.name))

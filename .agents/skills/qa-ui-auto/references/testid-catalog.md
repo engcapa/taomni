@@ -1734,6 +1734,7 @@
 
 ## main/workspace-platform (F-WS-2)
 
+- `[data-testid="code-workspace-tree-viewport"]` — display [optional] — F-WS-2.code-workspace-tree-viewport
 - `[data-testid="code-workspace-tree-view-all-files"]` — interactive — F-WS-2.code-workspace-tree-view-all-files
 - `[data-testid="code-workspace-tree-search"]` — interactive — F-WS-2.code-workspace-tree-search
 - `[data-testid="code-workspace-tree-open-default"]` — interactive — F-WS-2.code-workspace-tree-open-default
