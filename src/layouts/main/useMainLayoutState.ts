@@ -1,4 +1,5 @@
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
+import { useShallow } from "zustand/react/shallow";
 import { activeWorkspaceRuntimeTabId } from "../../lib/workspaceRuntimeIdentity";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type PanelImperativeHandle } from "react-resizable-panels";
@@ -23,6 +24,7 @@ import { SAVED_PASSWORD_VAULT_REASON_KEY } from "./authentication";
 import { readQuickConnectVisible } from "./sessionPolicy";
 import { type ConnectQueueEntry, type ControlToolExecutor, type PendingAuth } from "./types";
 import { useTerminalProfiles } from "./useTerminalProfiles";
+import { selectMainLayoutAppState } from "./mainLayoutAppState";
 
 
 export interface UseMainLayoutStateContext {
@@ -71,7 +73,7 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
     setTabHasNewOutput,
     removeRecentWorkspace,
     clearRecentWorkspaces,
-  } = useAppStore();
+  } = useAppStore(useShallow(selectMainLayoutAppState));
   const { loadSessions, markConnected, sessions, updateSession, setSelectedSession, setSearchQuery } = useSessionStore();
   const activeTab = tabs.find((t) => t.id === activeTabId);
   const primaryMode = useAppStore((state) => state.activeSideTab);

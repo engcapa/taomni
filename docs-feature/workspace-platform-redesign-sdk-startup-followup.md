@@ -152,3 +152,18 @@ canonical 文档、1500ms 内容预算和从真实操作至内容出现后 1 秒
 预算。原 JSON 默认高亮断言完全保留。工具 13 项 Python 和 4 项 JS 合同通过，
 覆盖纯文本未高亮、错误内容、慢帧、超时、清理与原始失败保留；目录 audit gate
 及托管选择计划通过。新用例执行结果仍待 GitHub，不能作为通过证据。
+
+普通文件基线 [40792477689](https://github.com/engcapa/taomni/actions/runs/40792477689)
+已在 browser 复现：30 字符 notes.txt 冷开有 159ms 帧间隔，切至 51 字符
+service.log 有 171ms 帧间隔；不是仅由大 JSON 触发的问题。新用例的原始失败
+保留，native 仍在构建。
+
+另修正主窗口的订阅范围：`useMainLayoutState` 仅订阅实际使用的字段，公共
+session import/export hook 和 Welcome 只订阅其 `setStatusMessage` 方法。
+此前后两者即使只取一个方法也订阅整个 app store，文件 context、诊断或状态
+发表会连带刷新整个窗口。新增真实 MainLayout 回归在改前失败；三处订阅边界
+修正后与既有窗口导航、终端保活、主菜单快捷键及 Home 回归共 80 tests passed。
+context 和状态仍由原 owner 发表，原消费者继续收到更新，广播开关仍触发 shell
+更新；没有调整持久化、快捷键或编辑器挂载生命周期。托管帧验证尚未完成。
+状态条消费者与 session import/export 另有 55 tests passed，TypeScript 和
+`pnpm check:refactor` 通过；本机只执行这些单测和静态检查。

@@ -45,7 +45,7 @@ export interface UseSessionImportExport {
 
 export function useSessionImportExport(): UseSessionImportExport {
   const { sessions, importSessions } = useSessionStore();
-  const { setStatusMessage } = useAppStore();
+  const setStatusMessage = useAppStore((state) => state.setStatusMessage);
   const [pendingImport, setPendingImport] = useState<{
     result: SessionImportResult;
     source: string;

@@ -44,7 +44,7 @@ export function WelcomePanel({
 }: WelcomePanelProps) {
   const [pendingDirectoryIds, setPendingDirectoryIds] = useState<string[]>([]);
   const [historyTab, setHistoryTab] = useState<WelcomeHistoryTab>("sessions");
-  const { setStatusMessage } = useAppStore();
+  const setStatusMessage = useAppStore((state) => state.setStatusMessage);
   const t = useT();
   const {
     selectedShell,
