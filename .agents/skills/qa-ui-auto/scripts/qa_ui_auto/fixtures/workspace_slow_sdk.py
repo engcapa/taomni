@@ -31,7 +31,18 @@ def build_probe(parent: Path) -> dict:
     executable = binary_dir / ("java" + suffix)
     command = [compiler, "--edition=2024", "-C", "opt-level=1", "-C", "codegen-units=1",
                "-o", str(executable), str(source)]
-    result = subprocess.run(command, capture_output=True, text=True, timeout=60)
+    # Cold Windows linker/antivirus startup can exceed a minute. This bounded
+    # fixture compilation happens before the unchanged five-second SDK probe.
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=180)
+    except subprocess.TimeoutExpired as error:
+        def decoded(value):
+            return value.decode("utf-8", errors="replace") if isinstance(value, bytes) else value or ""
+        (parent / "compile.log").write_text(
+            decoded(error.stdout) + decoded(error.stderr) + "\nFixture compiler exceeded 180 seconds.\n",
+            encoding="utf-8",
+        )
+        raise
     (parent / "compile.log").write_text(result.stdout + result.stderr, encoding="utf-8")
     result.check_returncode()
     shutil.copy2(executable, binary_dir / ("javac" + suffix))

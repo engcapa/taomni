@@ -9,24 +9,7 @@ import socket
 import subprocess
 import time
 
-
-def windows_listeners(ports: tuple[int, ...]) -> list[dict]:
-    """Read the OS TCP table; Windows may silently drop closed-port SYNs."""
-    import json
-    script = (
-        "$ErrorActionPreference = 'Stop'; "
-        f"$ports = @({','.join(str(int(port)) for port in ports)}); "
-        "$listeners = @(Get-NetTCPConnection -State Listen -ErrorAction Stop | "
-        "Where-Object { $_.LocalPort -in $ports } | Select-Object LocalAddress,LocalPort,OwningProcess); "
-        "ConvertTo-Json -InputObject $listeners -Compress"
-    )
-    result = subprocess.run(["powershell", "-NoProfile", "-NonInteractive", "-Command", script],
-                            check=True, capture_output=True, text=True, timeout=10)
-    listeners = json.loads(result.stdout)
-    if not isinstance(listeners, list) or any(not isinstance(row, dict) or row.get("LocalPort") not in ports
-                                             or not isinstance(row.get("OwningProcess"), int) for row in listeners):
-        raise RuntimeError("Windows TCP listener observation is invalid")
-    return listeners
+from native_windows_tcp import windows_listeners
 
 
 def wait_for_driver_ports(host: str, ports: tuple[int, ...], timeout: float = 5) -> dict | None:

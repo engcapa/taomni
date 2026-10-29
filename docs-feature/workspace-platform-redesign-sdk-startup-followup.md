@@ -65,6 +65,11 @@
 - 本机matching release构建687.51秒，binary SHA=`aa0582c18009cec73c71d24a2d539e86d8025c6c717f610c0f7acf68d2c5560c`。`workspace-measured-geometry-native-targeted/run-20261030-033908-030602290` 为 **22 passed / 1 failed / 0 skipped**，身份稳定，1433个附件和回执已核验；所有性能点通过，最大帧97ms，HOME深层JSON正文129ms/高亮208ms/max62ms，HOME源码261/404/91ms。026/042真实OS选择及073全部Page入口通过。022的真实choose/cancel均完成，但选择后立即一次性读取路径失败，随后失败HTML已显示精确目标；产品 `browse()` 在OS关闭后异步提交返回值。现在仅对原精确路径表达式增加最多5秒poll，根数量、选中目录、实际文件、取消及reload断言不变；不影响150/1500ms性能门槛，不重建相同源码binary。完整native崩溃组及022修正后的专项待完成，原失败保留。
 - 同source/runner的完整native崩溃组 `workspace-measured-geometry-native-crash/run-20261030-034555-627009028` **9/9 passed**；随后单独执行修正的022，`workspace-picker-publication-native/run-20261030-034933-052596312` **1/1 passed**，原精确路径、choose/cancel、根目录、读取实际文件及reload全部通过。两个执行均身份稳定、无skip，292/13个附件与回执已核验。只重跑改变的用例且复用相同matching release；原22/1不改写，不能把本机通过外推为GitHub当前SHA通过。
 
+- `b5fcae70` 的 GitHub [40940714805](https://github.com/engcapa/taomni/actions/runs/40940714805) 已结束，原始执行为 **251 passed / 9 failed / 0 skipped**、260次。剩余包括macOS browser 064/073、macOS native 064及Linux HOME深层JSON的150ms长帧，Linux 077旧End滚动重试覆盖新Home请求、024-03终端移动后结果行缺失、macOS061在整组动作结束前SDK已到五秒，以及Windows054端口观察PowerShell超时和062 fixture编译超过60秒。失败原件保留，新源码仍须重新托管验证。
+- 目录树旧请求竞态已有真实挂载的改前失败；滚动测量重试现在随新导航、手动wheel/pointer输入或卸载取消。光标/折叠快照改为直接通知独立布局保存调度器，继续250ms合并、退出立即保存和workspace切换清理；不再为保存通知重画编辑器。菜单列表、Search Everywhere和Keymap消费者共享同一份prepared evaluation，Actions注册/选择变化只发布菜单投影；命令port与派发仍即时，菜单通知继续让出真实paint，卸载取消。改前回归捕获owner额外渲染，修后StrictMode/命令替换/旧evaluation拒绝/只读和选择变化等21项定向支持回归通过。
+- 中间源码 `b31a6734ab467c5948603bb1dd24f206a8ed36bc8ae40b8dfae9e2bb28284cb8` 的本机 `workspace-projection-browser/run-20261030-042129-141641026` **16/16 passed**、无skip、输入稳定，回执及全部附件已核验。完整适用browser崩溃组、064/066/068/069/070/073/077/078均通过，2554个原始观察帧最大105.4ms；后续命令context通知的进一步隔离尚需新组合回归，不将该结果外推为新源码通过。
+- Windows重启检查现直接读取IPv4/IPv6原生IP Helper listener表，保留真实PID、占用等待和观察错误失败，不再启动慢PowerShell/CIM查询。Windows构建job增加原生表及进程清理合同。SDK fixture的独立rustc准备保留有界180秒及超时诊断；产品SDK五秒、动作1500ms和全帧150ms预算均不变。20项工具/真实独立SDK子进程合同通过，实际Windows边界留给新workflow验证。
+
 ## 当前分支与历史交接入口
 
 - 仓库 `/data-raw-ssd/code-src/person/taomni`，分支 `docs/workspace-platform-redesign`。恢复后已推送至 `80f32c3a174d03328b3c9c220e587cbfc10d2c61` 并运行上述GitHub相关集；后续修正及验证记录见“本轮恢复记录”。`dc33439e`及以下暂停快照属于历史交接状态，不代表当前分支未推送或已验收。
