@@ -4,7 +4,6 @@ import { activeWorkspaceRuntimeTabId } from "../../lib/workspaceRuntimeIdentity"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type PanelImperativeHandle } from "react-resizable-panels";
 import { useToolWindowStripeStore } from "../../components/editor/workspace/toolWindowStripeStore";
-import type { WorkspaceCommandRegistration } from "../../components/editor/workspace/workspaceCommands";
 import { type SftpPendingUploadRequest } from "../../components/filebrowser/FileBrowser";
 import { useSessionImportExport } from "../../components/menubar/useSessionImportExport";
 import { useConfirmDialog } from "../../components/sidebar/ConfirmDialog";
@@ -25,6 +24,7 @@ import { readQuickConnectVisible } from "./sessionPolicy";
 import { type ConnectQueueEntry, type ControlToolExecutor, type PendingAuth } from "./types";
 import { useTerminalProfiles } from "./useTerminalProfiles";
 import { selectMainLayoutAppState } from "./mainLayoutAppState";
+import { useWorkspaceCommandRegistry } from "./useWorkspaceCommandRegistry";
 
 
 export interface UseMainLayoutStateContext {
@@ -61,7 +61,6 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
     terminalSplitInputLockedTabIds,
     terminalRuntimeByTab,
     welcomeRecentSessionLimit,
-    recentWorkspaces,
     toggleMultiExec,
     selectAllTerminalTabs,
     clearMultiExecSelection,
@@ -127,30 +126,12 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
   // The active tab's contextual action toolbar (Capture / Detach / Maximize …)
   // portals into this slot, which lives inside the ControlBar.
   const [tabActionSlot, setTabActionSlot] = useState<HTMLDivElement | null>(null);
-  const [workspaceCommandRegistrations, setWorkspaceCommandRegistrations] = useState<Record<string, WorkspaceCommandRegistration>>({});
-  const workspaceCommandRegistrationsRef = useRef<Record<string, WorkspaceCommandRegistration>>({});
-  const handleWorkspaceCommandsChange = useCallback((tabId: string, registration: WorkspaceCommandRegistration | null) => {
-    if (registration) {
-      workspaceCommandRegistrationsRef.current = {
-        ...workspaceCommandRegistrationsRef.current,
-        [tabId]: registration,
-      };
-    } else if (tabId in workspaceCommandRegistrationsRef.current) {
-      const next = { ...workspaceCommandRegistrationsRef.current };
-      delete next[tabId];
-      workspaceCommandRegistrationsRef.current = next;
-    }
-    setWorkspaceCommandRegistrations((current) => {
-      if (registration) return current[tabId] === registration ? current : { ...current, [tabId]: registration };
-      if (!(tabId in current)) return current;
-      const next = { ...current };
-      delete next[tabId];
-      return next;
-    });
-  }, []);
+  const { workspaceCommandRegistrationsRef, handleWorkspaceCommandsChange, subscribeWorkspaceCommands } = useWorkspaceCommandRegistry();
   const platformActiveTabId = useWorkspacePlatformStore((state) => activeWorkspaceRuntimeTabId(state.getWorkspace()));
   const commandTabId = primaryMode === "workspaces" ? platformActiveTabId : primaryMode === "sessions" ? activeTabId : undefined;
-  const activeWorkspaceCommandRegistration = commandTabId ? workspaceCommandRegistrations[commandTabId] ?? null : null;
+  const getActiveWorkspaceCommands = useCallback(() => commandTabId
+    ? workspaceCommandRegistrationsRef.current[commandTabId] ?? null : null,
+  [commandTabId, workspaceCommandRegistrationsRef]);
   // On macOS we render a native global menu bar instead of the in-app app menu.
   // The native menu lives at the top of the screen, matching standard macOS
   // apps; the in-bar menu button is hidden there.
@@ -307,7 +288,8 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
     toggleTerminalSplit,
     toggleMultiExec,
     setShowAbout,
-    activeWorkspaceCommandRegistration,
+    getActiveWorkspaceCommands,
+    subscribeWorkspaceCommands,
     importExport,
     nativeMenu,
     workspaceCommandRegistrationsRef,
@@ -332,7 +314,6 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
     selectAllTerminalTabs,
     clearMultiExecSelection,
     welcomeRecentSessions,
-    recentWorkspaces,
     welcomeMailSessions,
     removeRecentWorkspace,
     clearRecentWorkspaces,

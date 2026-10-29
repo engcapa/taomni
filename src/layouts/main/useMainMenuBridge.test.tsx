@@ -1,10 +1,12 @@
-import { cleanup, fireEvent, renderHook } from "@testing-library/react";
+import { act, cleanup, fireEvent, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useMainMenuBridge, type UseMainMenuBridgeContext } from "./useMainMenuBridge";
 import { useAppStore } from "../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { workspaceEditorRuntimeId } from "../../lib/workspaceRuntimeIdentity";
 import type { WorkspaceCommandRegistration } from "../../components/editor/workspace/workspaceCommands";
+import { buildAppMenuSpec, installAppMenu } from "../../lib/nativeAppMenu";
+import { useWorkspaceCommandRegistry } from "./useWorkspaceCommandRegistry";
 
 vi.mock("../../lib/nativeAppMenu", () => ({ buildAppMenuSpec: vi.fn(), installAppMenu: vi.fn() }));
 
@@ -31,7 +33,8 @@ it("reopens through the shared editor registration for either a file or code tab
   renderHook(() => useMainMenuBridge({
     dispatchMenuAction: vi.fn(), nativeMenu: false, activeTabClosable: true,
     importExport: { hasSessions: false } as UseMainMenuBridgeContext["importExport"],
-    quickConnectVisible: false, activeWorkspaceCommandRegistration: registration,
+    quickConnectVisible: false, getActiveWorkspaceCommands: () => registration,
+    subscribeWorkspaceCommands: () => () => {},
     t: ((key: string) => key) as UseMainMenuBridgeContext["t"],
     setActiveTab: vi.fn(), handleCommand,
     workspaceCommandRegistrationsRef: { current: { [workspaceEditorRuntimeId(workspace)]: registration } },
@@ -49,4 +52,42 @@ it("reopens through the shared editor registration for either a file or code tab
   reopen();
   expect(executeAction).toHaveBeenCalledTimes(2);
   expect(handleCommand).toHaveBeenCalledWith("new-terminal");
+});
+
+it("refreshes native menu state directly and releases its subscription on unmount", () => {
+  vi.mocked(installAppMenu).mockResolvedValue(undefined);
+  vi.mocked(buildAppMenuSpec).mockClear();
+  let renders = 0;
+  const { result, unmount } = renderHook(() => {
+    renders++;
+    const registry = useWorkspaceCommandRegistry();
+    useMainMenuBridge({
+      dispatchMenuAction: vi.fn(), nativeMenu: true, activeTabClosable: true,
+      importExport: { hasSessions: false } as UseMainMenuBridgeContext["importExport"],
+      quickConnectVisible: false,
+      getActiveWorkspaceCommands: () => registry.workspaceCommandRegistrationsRef.current.active ?? null,
+      subscribeWorkspaceCommands: registry.subscribeWorkspaceCommands,
+      t: ((key: string) => key) as UseMainMenuBridgeContext["t"],
+      setActiveTab: vi.fn(), handleCommand: vi.fn(),
+      workspaceCommandRegistrationsRef: registry.workspaceCommandRegistrationsRef,
+    });
+    return registry;
+  });
+  const registration: WorkspaceCommandRegistration = {
+    items: [{ id: "workspace.save", title: "Save", category: "File", enabled: true }],
+    snapshot: [], execute: vi.fn(() => true), executeAction: vi.fn(async () => ({ kind: "applied" })),
+  };
+  expect(buildAppMenuSpec).toHaveBeenCalledTimes(1);
+  act(() => result.current.handleWorkspaceCommandsChange("active", registration));
+  expect(buildAppMenuSpec).toHaveBeenLastCalledWith(expect.objectContaining({ workspaceCommands: registration.items }));
+  expect(buildAppMenuSpec).toHaveBeenCalledTimes(2);
+  act(() => result.current.handleWorkspaceCommandsChange("hidden", registration));
+  expect(buildAppMenuSpec).toHaveBeenCalledTimes(2);
+  act(() => result.current.handleWorkspaceCommandsChange("active", null));
+  expect(buildAppMenuSpec).toHaveBeenLastCalledWith(expect.objectContaining({ workspaceCommands: [] }));
+  expect(renders).toBe(1);
+  const publish = result.current.handleWorkspaceCommandsChange;
+  unmount();
+  act(() => publish("active", registration));
+  expect(buildAppMenuSpec).toHaveBeenCalledTimes(3);
 });

@@ -48,7 +48,7 @@ import { useUpdateStore } from "../../stores/updateStore";
 import { useT } from "../../lib/i18n";
 import type { LocalShellSelection } from "../../types";
 import type { SessionConfig } from "../../lib/ipc";
-import type { WorkspaceCommandMenuItem } from "../editor/workspace/workspaceCommands";
+import type { WorkspaceCommandMenuItem, WorkspaceCommandRegistration } from "../editor/workspace/workspaceCommands";
 import type { ActionResult } from "../editor/workspace/workspaceActionRegistry";
 
 const IS_MAC = getAppPlatform() === "macos";
@@ -64,6 +64,7 @@ interface ControlBarProps {
   xServerEnabled: boolean;
   quickConnectVisible: boolean;
   workspaceCommands?: WorkspaceCommandMenuItem[];
+  getWorkspaceCommands?: () => WorkspaceCommandRegistration | null;
   onCommand: (command: AppCommand) => void;
   onWorkspaceCommand?: (commandId: string) => void | Promise<ActionResult>;
   onToggleSidebar: () => void;
@@ -86,6 +87,7 @@ export function ControlBar({
   xServerEnabled,
   quickConnectVisible,
   workspaceCommands = [],
+  getWorkspaceCommands,
   onCommand,
   onWorkspaceCommand,
   onToggleSidebar,
@@ -118,6 +120,9 @@ export function ControlBar({
   } = useSessionImportExport();
 
   const openMainMenu = (event: React.MouseEvent) => {
+    // Opening a menu samples current ownership without subscribing the entire
+    // window to every editor selection, mount and command-state publication.
+    const commands = getWorkspaceCommands ? getWorkspaceCommands()?.items ?? [] : workspaceCommands;
     const importExportItems: MenuItem[] = [
       {
         label: t("menu.importSessions"),
@@ -187,15 +192,18 @@ export function ControlBar({
           { label: t("menu.sockscap"), testId: "context-menu-item-sockscap", icon: <Shield className="w-3 h-3" />, onClick: () => onCommand("sockscap") },
           { label: t("menu.gitRepository"), testId: "context-menu-item-git-repository", icon: <GitBranch className="w-3 h-3" />, onClick: () => onCommand("git") },
           { label: t("menu.codeWorkspace"), testId: "context-menu-item-code-workspace", icon: <FileText className="w-3 h-3" />, onClick: () => onCommand("code-workspace") },
-          ...(workspaceCommands.length > 0 ? [{
+          ...(commands.length > 0 ? [{
             label: t("menu.codeWorkspaceActions"),
             testId: "context-menu-workspace-actions",
             icon: <Braces className="w-3 h-3" />,
-            children: workspaceCommands.map((command): MenuItem => ({
+            children: commands.map((command): MenuItem => ({
               label: command.keybinding ? `${command.title}  ${command.keybinding}` : command.title,
               testId: `context-menu-workspace-command-${command.id}`,
               disabled: !command.enabled,
-              onClick: () => onWorkspaceCommand?.(command.id),
+              onClick: () => {
+                if (getWorkspaceCommands) void getWorkspaceCommands()?.executeAction(command.id);
+                else void onWorkspaceCommand?.(command.id);
+              },
             })),
             onClick: () => {},
           } satisfies MenuItem] : []),

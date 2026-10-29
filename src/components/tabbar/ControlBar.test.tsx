@@ -4,6 +4,7 @@ import { useAppStore } from "../../stores/appStore";
 import { useTabOverviewStore } from "../../stores/tabOverviewStore";
 import { ControlBar } from "./ControlBar";
 import type { AppCommand } from "../menubar/commands";
+import type { WorkspaceCommandRegistration } from "../editor/workspace/workspaceCommands";
 
 const windowMocks = vi.hoisted(() => ({
   startDragging: vi.fn(async () => undefined),
@@ -72,6 +73,7 @@ function renderControlBar(
     commands?: Parameters<typeof ControlBar>[0]["workspaceCommands"];
     onCommand?: (commandId: string) => void;
     onToggleSidebar?: () => void;
+    getCommands?: () => WorkspaceCommandRegistration | null;
   } = {},
   onDetachActiveTab?: () => void,
 ) {
@@ -82,6 +84,7 @@ function renderControlBar(
       xServerEnabled={false}
       quickConnectVisible={false}
       workspaceCommands={workspace.commands}
+      getWorkspaceCommands={workspace.getCommands}
       onCommand={onCommand}
       onWorkspaceCommand={workspace.onCommand}
       onToggleSidebar={workspace.onToggleSidebar ?? vi.fn()}
@@ -153,6 +156,27 @@ describe("ControlBar settings button", () => {
     expect(useTabOverviewStore.getState().open).toBe(true);
     fireEvent.click(screen.getByTestId("tab-overview-trigger"));
     expect(useTabOverviewStore.getState().open).toBe(false);
+  });
+
+  it("reads the current workspace menu on opening and releases closed command owners", () => {
+    let current: WorkspaceCommandRegistration | null = null;
+    renderControlBar(vi.fn(), { getCommands: () => current });
+    const executeAction = vi.fn(async () => ({ kind: "applied" as const }));
+    current = {
+      items: [{ id: "workspace.save", title: "Save", category: "File", enabled: true }],
+      snapshot: [], execute: vi.fn(() => true), executeAction,
+    };
+    // No parent rerender between registration and opening the menu.
+    fireEvent.click(screen.getByTestId("app-main-menu"));
+    fireEvent.mouseEnter(screen.getByTestId("context-menu-item-tools"));
+    fireEvent.mouseEnter(screen.getByTestId("context-menu-workspace-actions"));
+    const save = screen.getByTestId("context-menu-workspace-command-workspace.save");
+    current = null;
+    fireEvent.click(save);
+    expect(executeAction).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("app-main-menu"));
+    fireEvent.mouseEnter(screen.getByTestId("context-menu-item-tools"));
+    expect(screen.queryByTestId("context-menu-workspace-actions")).not.toBeInTheDocument();
   });
 
   it("preserves dragging and maximize gestures in the tab strip filler", () => {

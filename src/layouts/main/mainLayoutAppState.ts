@@ -29,7 +29,6 @@ const MAIN_LAYOUT_KEYS = [
   "terminalSplitInputLockedTabIds",
   "terminalRuntimeByTab",
   "welcomeRecentSessionLimit",
-  "recentWorkspaces",
   "toggleMultiExec",
   "selectAllTerminalTabs",
   "clearMultiExecSelection",

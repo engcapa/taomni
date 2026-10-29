@@ -100,6 +100,13 @@ describe("MainLayout attached SFTP sidebar", () => {
     expect(useAppStore.getState().codeWorkspaceByTab["performance-editor"]).toEqual(context);
     expect(useAppStore.getState().statusMessage).toBe("Opened notes.txt");
     expect(controlBarMock.props.length).toBe(renders);
+    act(() => useAppStore.getState().upsertRecentWorkspace({
+      id: "performance-workspace", name: "Project", lastOpenedAt: Date.now(), isGitRepo: false,
+      roots: [{ id: "root", name: "Project", path: "/public/project", kind: "folder" }], looseFiles: [],
+      lastActiveFile: { kind: "root", rootId: "root", path: "notes.txt" },
+    }));
+    expect(useAppStore.getState().recentWorkspaces[0]?.lastActiveFile?.path).toBe("notes.txt");
+    expect(controlBarMock.props.length).toBe(renders);
     act(() => useAppStore.getState().toggleMultiExec());
     expect(controlBarMock.props.length).toBeGreaterThan(renders);
     expect(screen.getByTestId("global-session-surface")).toBeVisible();

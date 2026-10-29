@@ -18,7 +18,7 @@ export interface TabContentRouterProps {
   handleOpenLocalPath: (target: string, opts?: { embedFolder?: boolean; title?: string; sessionId?: string; }) => Promise<void>;
   openLanChatTab: () => void;
   welcomeRecentSessions: SessionConfig[];
-  recentWorkspaces: RecentWorkspace[];
+  recentWorkspaces?: RecentWorkspace[];
   welcomeMailSessions: SessionConfig[];
   handleConnectSession: (session: SessionConfig) => void;
   handleConnectSessions: (targets: SessionConfig[]) => void;
