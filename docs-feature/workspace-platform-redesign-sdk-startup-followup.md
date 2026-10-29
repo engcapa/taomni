@@ -1,6 +1,6 @@
 # 工作区文件打开与 SDK 后台初始化
 
-**2026-10-29 已按用户要求恢复开发、测试与验证；性能及三平台验收仍未通过。** 当前进展见下方“本轮恢复记录”；其后的暂停快照及历史结果保留用于追溯，不能视作当前组合源码已验收。
+**2026-10-30 持续开发、测试与验证；性能及三平台验收仍未通过。** 当前进展见下方“本轮恢复记录”；其后的暂停快照及历史结果保留用于追溯，不能视作当前组合源码已验收。
 
 ## 本轮恢复记录（持续更新）
 
@@ -41,10 +41,18 @@
 - 冷开CPU profile显示Actions snapshot反复读取native-backed navigator属性；120个action的一批快照修前读取964次。现在一批snapshot/binding index只解析一次platform/locale，下一批仍识别变化，原派发/冲突/显示合同不变。新增回归修前失败；修后快捷键/Actions56项及编辑器/设置消费者281项通过。仍沿用064–079等实际入口验证，支持测试不构成性能结论。
 - macOS 061/062原始trace显示普通文件正文分别在动作开始后1028/1022ms出现，但驱动结果/观察往返使动作总耗时1514/1741ms，原失败保留。QA桥在确认全部input ticks完成的同一次观察中消费任务，取消成功路径的重复cleanup evaluation，错误/超时仍清理并取消迟到ticks；不减少真实输入、不重放动作、不更改1500ms动作及5000ms SDK超时。桥键盘/指针21项通过，matching release与三平台原用例仍待验证。
 - 上述组合本机 browser `workspace-binding-browser/run-20261029-233451-758746202` **16 passed / 0 failed / 0 skipped**，含完整适用崩溃组、C3-01、064/066/068/069/070/073/077/078；142个附件和回执已核验。JSON正文264.7ms/高亮355.3ms、长行JSON261/337.6ms、冷notes正文251.2ms，原160.3ms失败路径本轮117.9ms。随后构建类型检查发现新增支持测试缺少必填category，已补齐且该项回归重跑通过；这是测试类型修正，产品行为不变，但源码身份保守变化，最终仍以新SHA的GitHub结果及匹配native构建为准。
+- 修正已分为Actions批处理 `735da34e`、标签箭头 `8936c39e` 和验证工具 `80f32c3a174d03328b3c9c220e587cbfc10d2c61` 三个提交并推送。TypeScript、Rust fmt、refactor、catalog、dev contract及257次三平台相关集plan通过；GitHub [40905529591](https://github.com/engcapa/taomni/actions/runs/40905529591) 使用该完整SHA、原70 ID、browser/native/release正在运行，尚无托管通过结论。
+- 同源码 source=`0ee6ecf6da5bef306e4bbd85f444084278641dbb468e63377df491e175e1cc6a` 的本机QA release构建688.92秒，binary SHA=`02bc4c1eb0576315944a15d58b1054448358a791d92c4aa9c127bd3fe4599e49`。`workspace-binding-native-targeted/run-20261029-235820-229533292` **13/13 passed**，含061–063真实SDK、065/067/073–077/079、TREEOPEN及工具窗；`workspace-binding-native-crash/run-20261030-000200-288928528` 完整适用崩溃组 **9/9 passed**，无skip、身份稳定，1179/292个附件逐字节/SHA和回执已核验。JSON冷开正文259ms/高亮366ms/max帧95ms，长行JSON267/367/107ms；HOME深层长行JSON143/215/72ms、源码262/397/96ms、Git普通文档240/630/88ms。三个HOME用例均保留实际2938文件/428目录/7层/64项目/320宽目录统计，指定八类文件全部存在；本机通过不替代GitHub验收。
+
+- 当前 GitHub `40905529591` 三平台 browser **129/129 passed、无skip**（每平台43），564个回执附件逐字节/SHA及source/runner已核验。macOS首个native分片 **11/11 passed**，含067长行JSON、075真实HOME源码；075冷开正文594ms/高亮869ms/max帧143ms，仍使用原1500/150ms预算。Linux/Windows及其余macOS native待收齐，不据局部通过提前合并main或标记验收。
+- `40905529591` 最终为 **251 passed / 6 failed / 0 skipped**，257次实际执行与计划逐项一致；三平台browser各43/43，native Linux39/5、Windows42/0、macOS41/1（通过/失败）。6,360个回执附件逐字节/SHA、source/runner及QA release身份已核验，基础设施错误为空。Windows/macOS标签滚动和Windows owned Git清理通过；剩余Linux064/065/068/073/075为181/174/161/154/201ms长帧，macOS062清空源码动作1980.67ms，仍不验收、不合并main。所有原始失败保留在 `_local/workspace-40905529591/`。
+- 冷开采样显示EditorView构造后的整个workspace状态投影与首次测量/高亮叠加；`startTransition`不能保证先绘制。命令port、路由和实时caret refs仍同步，仅菜单revision、光标/viewport展示更新改为两次rAF后的合并transition，卸载取消全部待处理任务。真实command owner回归修前多渲染一次，修后即时action仍成功且绘制前不重画owner；队列StrictMode/顺序/unmount等及完整编辑器组合 **6文件281项passed**。内部调度沿用064–079/TREEOPEN/078入口与原预算，不新增同义用例。
+- macOS062原始HTTP trace中普通源码打开529.9ms，随后fill的contenteditable观察985.2ms、全选204ms、Backspace666.9ms，最终正文正确清空。当前SDK被动trace增加连续renderer帧心跳以区分真实停帧和桥等待，保留每个间隔及完整动作1500ms判定，不用DOM时间替代；Python/Node工具合同19项通过。上述新产品调度尚需新源码browser、matching QA release及GitHub三平台原相关集验证，旧binary结果不冒充当前通过。
+- 新调度 source=`91855c8132d524e10ebbb21872ffc73eb86e4a8badcc3ddece2a9786f85156d1`、runner=`ab13ec226bdb82042b07c11901967159eb204ea9f9cb4487b74abaf9ba6239a4`：本机 `workspace-after-paint-browser/run-20261030-005536-280194345` **16/16 passed、无skip**，含完整适用browser崩溃组，142个附件及回执身份已核验。全部文件打开观察点最大帧114.2ms；704行JSON正文240.9ms/高亮332.8ms，长行JSON244.2/324.1ms。TypeScript、refactor及dev contract通过；matching release构建和本机native专项/崩溃组继续执行，三平台GitHub新SHA待派发。
 
 ## 当前分支与历史交接入口
 
-- 仓库 `/data-raw-ssd/code-src/person/taomni`，分支 `docs/workspace-platform-redesign`。恢复后已推送至 `c6286d22694bfe4c0618ad0efd2e60fbd48faa93` 并运行上述GitHub相关集；后续修正及验证记录见“本轮恢复记录”。`dc33439e`及以下暂停快照属于历史交接状态，不代表当前分支未推送或已验收。
+- 仓库 `/data-raw-ssd/code-src/person/taomni`，分支 `docs/workspace-platform-redesign`。恢复后已推送至 `80f32c3a174d03328b3c9c220e587cbfc10d2c61` 并运行上述GitHub相关集；后续修正及验证记录见“本轮恢复记录”。`dc33439e`及以下暂停快照属于历史交接状态，不代表当前分支未推送或已验收。
 - 锚定目标：现代、简洁、易用；尽量匹配[设计](./workspace-platform-redesign-design.md)和[原型](./workspace-platform-redesign-prototype.html)，保留 main 的能力。当前重点是文件打开/切换的停顿，不能用局部快了替代整体性能验收。
 - 用户提供的[HOME 性能分析](../docs-issue/workspace-home-file-open-latency-design.md)是修复依据；[实现报告](./workspace-platform-redesign-implementation-report.md)含早先 UI、崩溃及正式性能证据。本节更新于两份文档的早期状态之后。
 - 分支曾合入旧 main，并吸收远程 Compact/HOME 目录加载修复；**本轮相关集全绿后仍需重新 fetch/merge 最新 main**。当前本地 `origin/main` 为 `569d09327f251e123a2d78881585683f85f5b6c1`，未据此冒充远程最新。不要在相关集失败时提前执行下一次 main 合并。
