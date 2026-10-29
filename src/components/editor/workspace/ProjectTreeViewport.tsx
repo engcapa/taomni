@@ -1,10 +1,11 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { Fragment, useCallback, useLayoutEffect, useRef, useState } from "react";
+import { Fragment, useLayoutEffect, useRef, useState } from "react";
 import type { TreeSelection } from "./codeWorkspaceModel";
 import { registerProjectTreeNavigation } from "./projectTreeNavigation";
 import { projectTreeNavigationTarget } from "./projectTreeNavigationModel";
 import { treeSelectionKey, type ProjectTreeRow } from "./projectTreeRows";
 import type { ProjectTreeProps } from "./projectTreeTypes";
+import { useProjectTreeScrollRequest } from "./useProjectTreeScrollRequest";
 
 const VIRTUAL_THRESHOLD = 80;
 
@@ -54,12 +55,7 @@ export function ProjectTreeViewport({ rows, selected, viewMode }: {
   const items = list.getVirtualItems();
   const selectedKey = treeSelectionKey(selected);
   const previousSelection = useRef({ key: null as string | null, virtual: false });
-  const reveal = useCallback((index: number) => {
-    const item = items.find((value) => value.index === index);
-    const offset = list.scrollOffset ?? 0;
-    if (item && item.start >= offset + insets.header && item.end <= offset + (list.scrollRect?.height ?? 0) - insets.bottom) return;
-    list.scrollToIndex(index, { align: "auto" });
-  }, [items, list, insets.header, insets.bottom]);
+  const reveal = useProjectTreeScrollRequest(list, rows, virtual);
 
   useLayoutEffect(() => {
     const element = tree();
