@@ -1,0 +1,95 @@
+id: TC-WS-071
+title: Home-root watching preserves external reload without tree refresh feedback
+description: Mount the real runner home beside an isolated public folder. Create and modify files from the host and require incremental tree updates and clean-buffer reload. Count real forwarding-only native IPC calls to reject full-tree refresh feedback from app state writes. Mutate only the retained report fixture, without touching other home files or any personal profile.
+modes: [native]
+covers: [F-WS-2, F25.1, F25.3, F11.2]
+tags: [p0, workspace-redesign, file-explorer, regression, performance]
+fixtures: [reset_db, workspace_watch, release_build_required]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-home-watch
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree-empty"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.platform_workspace_root}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-root"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="Documents"] [data-testid="code-workspace-tree-dir-arrow"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="Documents/notes.txt"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="Pictures"] [data-testid="code-workspace-tree-dir-arrow"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="Pictures/logo.svg"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.workspace_host_home}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-tree-root"]'
+    equal: 2
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/notes.txt"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: ${fixture.workspace_notes_text}
+- observe_language_startup: null
+- host_write_file:
+    path: ${fixture.platform_workspace_root}/Documents/created-externally.txt
+    text: "Public external creation\n"
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="Documents/created-externally.txt"]'
+- assert_visible: '[data-testid="code-workspace-tree-file"][data-path="Pictures/logo.svg"]'
+- assert_language_startup:
+    commands:
+      workspace_list_dir: {equal: 1}
+      workspace_list_files_recursive: {equal: 0}
+      workspace_compact_chain: {equal: 0}
+    quiet_ms: 1000
+- host_write_file:
+    path: ${fixture.platform_workspace_root}/Documents/notes.txt
+    text: "Public external replacement\n"
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: Public external replacement
+    timeout_sec: 20
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-tab-title
+    equals: notes.txt
+- assert_visible: '[data-testid="code-workspace-tree-file"][data-path="Pictures/logo.svg"]'
+- assert_language_startup:
+    commands:
+      workspace_list_dir: {equal: 2}
+      workspace_list_files_recursive: {equal: 0}
+      workspace_compact_chain: {equal: 0}
+      sdk_get_registry: {equal: 0}
+      sdk_analyze_workspace: {equal: 0}
+      sdk_resolve_workspace: {equal: 0}
+      lsp_detect_servers: {equal: 0}
+      lsp_open_document: {equal: 0}
+    quiet_ms: 1000
+- host_delete_file:
+    path: ${fixture.platform_workspace_root}/Documents/created-externally.txt
+- assert_not_visible: '[data-testid="code-workspace-tree-file"][data-path="Documents/created-externally.txt"]'
+- host_write_file:
+    path: ${fixture.platform_workspace_root}/Documents/created-externally.txt
+    text: "Public external creation\n"
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="Documents/created-externally.txt"]'
+- assert_language_startup:
+    commands:
+      workspace_list_dir: {equal: 4}
+      workspace_list_files_recursive: {equal: 0}
+      workspace_compact_chain: {equal: 0}
+    quiet_ms: 1000
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/created-externally.txt"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: "Public external creation\n"
+- click: '[data-testid="workspace-tab"][data-tab-title="notes.txt"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor"]'
+    contains: "Public external replacement\n"
+- assert_no_runtime_errors: null
+- screenshot: workspace-home-external-refresh.png

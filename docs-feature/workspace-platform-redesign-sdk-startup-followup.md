@@ -251,3 +251,29 @@ dirty/save/undo、split/grid/single、StrictMode、恢复和 pending save，共
 六次切换，增加重复点击当前标签和正文聚焦，共 11 次激活测量。正文、HTML
 高亮、零自动 SDK/LSP、1500ms 内容和每帧 150ms 预算未放宽。当前实现的
 GitHub 性能与完整崩溃回归仍待执行，不能据单测宣称速度达标。
+
+
+## Home 文件监听与增量目录刷新
+
+`7724ce43` 的 Linux 托管运行
+[40805896015](https://github.com/engcapa/taomni/actions/runs/40805896015)
+已结束：38 次执行中 31 passed / 7 failed，无基础设施错误；完整崩溃组通过。
+失败仍是文件打开/激活长帧（154–199ms），不是性能验收通过证据。
+
+参考 `docs-issue/workspace-home-file-open-latency-design.md`，先处理 P0 监听边界：
+OS watcher 注册移入 blocking worker，Home 根只监听直接子项，已展开目录和
+已打开文件补充按需监听。普通项目保留递归语义，显式打开的缓存目录/文件仍
+可操作。应用自身存储路径在进入异步队列前过滤，显式打开一个内部文件不会
+放开其它内部写入。取消 token 和任务身份保护启动/停止重叠时的归属。
+
+外部事件按 200ms 批次刷新已加载的受影响父目录，不 reset 全树；保留其它
+目录的列表与行。平铺索引仅在当前显示/过滤需要时更新，迟到响应不能覆盖
+新一轮列表。Project 树只接收 dirty 提示，正文和加载变化不重建该输入。
+移除初始文档构造中多余的空扩展 EditorState 初始化。
+
+新增 native `TC-WS-071` 将真实 runner Home 与公开的报告目录同时加入，
+用真实 host 新建、修改、删除及重建文件，核验树、buffer 与未受影响目录，
+通过转发观察器断言没有递归扫描或全树重刷。这个用例负责磁盘/监听契约；
+064–070 的真实打开帧预算继续独立保留，完整崩溃组仍是门禁。
+本机不执行 browser/native 用例；执行 focused Vitest、真实 notify Rust 测试、
+工具单测、TypeScript 与 refactor 合同。EditorView 复用及最终性能验收尚未完成。

@@ -267,10 +267,12 @@ fn workspace_watcher_filters_recursive_roots_and_loose_files() {
     let targets = vec![
         WorkspaceWatchTarget {
             recursive: true,
+            direct_children: false,
             filter_path: root.path().to_path_buf(),
         },
         WorkspaceWatchTarget {
             recursive: false,
+            direct_children: false,
             filter_path: loose.clone(),
         },
     ];
@@ -285,6 +287,7 @@ fn workspace_watcher_filters_recursive_roots_and_loose_files() {
     assert!(workspace_watch_target_matches(
         &[WorkspaceWatchTarget {
             recursive: false,
+            direct_children: false,
             filter_path: loose.clone(),
         }],
         &normalized_file_operation_path(&loose)
@@ -292,6 +295,7 @@ fn workspace_watcher_filters_recursive_roots_and_loose_files() {
     assert!(!workspace_watch_target_matches(
         &[WorkspaceWatchTarget {
             recursive: false,
+            direct_children: false,
             filter_path: loose,
         }],
         &normalized_file_operation_path(&sibling)

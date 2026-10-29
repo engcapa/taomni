@@ -67,8 +67,9 @@ export function lspWorkspaceDidChangeWatchedFiles(
 export function lspStartWorkspaceWatcher(
   workspaceId: string,
   roots: string[],
+  directories?: string[],
 ): Promise<void> {
-  return invoke<void>("lsp_start_workspace_watcher", { workspaceId, roots });
+  return invoke<void>("lsp_start_workspace_watcher", { workspaceId, roots, ...(directories ? { directories } : {}) });
 }
 
 export function lspStopWorkspaceWatcher(workspaceId: string): Promise<void> {

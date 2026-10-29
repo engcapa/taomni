@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { lspStartWorkspaceWatcher, lspStopWorkspaceWatcher } from "../../../../lib/editor/lsp";
-import { isTauriRuntime } from "../../../../lib/runtime";
 import type { CodeWorkspaceLooseFileInfo, CodeWorkspaceRootInfo } from "../../../../types";
-import { errorMessage, initialLooseFiles, initialRoots, rootDirKey, writeCodeWorkspaceTreeViewMode, type TreeViewMode } from "../codeWorkspaceModel";
+import { initialLooseFiles, initialRoots, rootDirKey, writeCodeWorkspaceTreeViewMode, type TreeViewMode } from "../codeWorkspaceModel";
 import { TREE_DETAILS_STORAGE_KEY } from "../controller/model";
 import { useWorkspaceTreeData } from "../useWorkspaceTreeData";
 import { useWorkspaceStoreActions } from "./useWorkspaceStoreActions";
 import { readExplorerSort, writeExplorerSort, type ExplorerSort } from "../explorerPreferences";
+import { useWorkspaceFileWatcher } from "./useWorkspaceFileWatcher";
 
 
 export interface UseWorkspaceTreeModelContext {
@@ -59,23 +58,7 @@ export function useWorkspaceTreeModel(context: UseWorkspaceTreeModelContext) {
     rootsRef.current = roots;
   }, [roots]);
 
-  useEffect(() => {
-    if (!isTauriRuntime()) return undefined;
-    const watchPaths = [
-      ...roots.map((root) => root.path),
-      ...looseFiles.map((file) => file.path),
-    ];
-    let disposed = false;
-    void lspStartWorkspaceWatcher(workspaceInstanceId, watchPaths).catch((error) => {
-      if (!disposed) {
-        setStatusMessage(`File watcher unavailable: ${errorMessage(error)}`);
-      }
-    });
-    return () => {
-      disposed = true;
-      void lspStopWorkspaceWatcher(workspaceInstanceId).catch(() => undefined);
-    };
-  }, [looseFiles, roots, setStatusMessage, workspaceInstanceId]);
+  useWorkspaceFileWatcher({ roots, looseFiles, workspaceUi, setStatusMessage, workspaceInstanceId });
 
   useEffect(() => {
     looseFilesRef.current = looseFiles;

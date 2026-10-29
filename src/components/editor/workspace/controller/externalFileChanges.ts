@@ -8,7 +8,7 @@ export interface HandleExternalFileChangeContext {
   semanticIndex: import("../useWorkspaceSemanticIndex").WorkspaceSemanticIndexController;
   openFilesRef: import("react").RefObject<Record<string, import("../editorGroupTypes").OpenFileViewModel>>;
   absolutePathForOpenFile: (file: OpenFileState) => string | null;
-  refreshTree: () => void;
+  refreshTree: (absolutePath: string) => void;
   restoreEchoSuppressorRef: import("react").RefObject<import("../refactorRecoveryController").RestoreEchoSuppressor>;
   setStatusMessage: (message: string) => void;
   enqueueExternalFileConflict: (file: OpenFileState, disk: ExternalDiskSnapshot | null) => void;
@@ -33,7 +33,7 @@ export function createHandleExternalFileChange(controllerContext: HandleExternal
       const absolute = controllerContext.absolutePathForOpenFile(candidate);
       return absolute !== null && fsPathEquals(absolute, normalizedPath);
     });
-    controllerContext.refreshTree();
+    controllerContext.refreshTree(normalizedPath);
     // Restore can remap a renamed file back into the open-file registry before
     // Windows delivers the old delete notification. Consume that owned echo
     // before either the open- or closed-file status path handles it.

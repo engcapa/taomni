@@ -179,6 +179,7 @@ pub async fn lsp_start_workspace_watcher(
     state: State<'_, AppState>,
     workspace_id: String,
     roots: Vec<String>,
+    directories: Option<Vec<String>>,
 ) -> Result<(), String> {
     let workspace_id = workspace_id.trim();
     let workspace_id = if workspace_id.is_empty() {
@@ -186,11 +187,22 @@ pub async fn lsp_start_workspace_watcher(
     } else {
         workspace_id
     };
-    state
-        .workspace
-        .lsp
-        .start_workspace_watcher(workspace_id, roots)
-        .await
+    match directories {
+        Some(directories) => {
+            state
+                .workspace
+                .lsp
+                .start_workspace_watcher_with_directories(workspace_id, roots, directories)
+                .await
+        }
+        None => {
+            state
+                .workspace
+                .lsp
+                .start_workspace_watcher(workspace_id, roots)
+                .await
+        }
+    }
 }
 
 #[tauri::command]

@@ -17,3 +17,4 @@ mod symbols;
 mod watchers_and_capabilities;
 mod workspace_edits;
 mod workspace_watch_lifetime;
+mod workspace_watch_registration;

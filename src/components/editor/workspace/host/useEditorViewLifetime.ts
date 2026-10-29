@@ -2,7 +2,7 @@ import { acceptCompletion, closeBrackets, closeCompletion, completionStatus, set
 import { history } from "@codemirror/commands";
 import { bracketMatching, foldEffect, foldGutter, indentOnInput, indentUnit } from "@codemirror/language";
 import { search } from "@codemirror/search";
-import { EditorState, Transaction } from "@codemirror/state";
+import { EditorState, Text, Transaction } from "@codemirror/state";
 import type { KeyBinding } from "@codemirror/view";
 import { crosshairCursor, drawSelection, EditorView, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, rectangularSelection } from "@codemirror/view";
 import { useEffect } from "react";
@@ -150,7 +150,7 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
       ? owner.acquireView(sharedFileKey, sharedViewId, doc, documentRevision)
       : doc;
     context.lastDocumentTextRef.current = initialDocumentText;
-    const initialDoc = EditorState.create({ doc: initialDocumentText }).doc;
+    const initialDoc = Text.of(initialDocumentText.split("\n"));
     // §8.19.4 resolve gate banner: anchored to the caret at presentation time.
     // The gate request's own closures re-verify identity/doc before acting, so
     // a stale banner is inert — this only decides where it shows.

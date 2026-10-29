@@ -52,7 +52,7 @@ export interface CreateWorkspaceSideContentsContext {
   treeData: ReturnType<typeof useWorkspaceTreeData>;
   expandedRoots: Set<string>;
   expandedDirs: Set<string>;
-  openFiles: Record<string, import("../editorGroupTypes").OpenFileViewModel>;
+  treeOpenFileHints: Record<string, import("../projectTreeTypes").ProjectTreeOpenFileHint>;
   gitDecorations: ReturnType<typeof useWorkspaceGitDecorations>;
   projectTreeHandlers: Pick<Parameters<typeof ProjectTree>[0], "onToggleRoot" | "onToggleDir" | "onSelect" | "onOpenFile" | "onContextMenu">;
   telemetry: ReturnType<typeof useWorkspaceEditorTelemetry>;
@@ -90,7 +90,6 @@ export function createWorkspaceSideContents(context: CreateWorkspaceSideContents
     treeData,
     expandedRoots,
     expandedDirs,
-    openFiles,
     gitDecorations,
     projectTreeHandlers,
     telemetry,
@@ -161,7 +160,7 @@ export function createWorkspaceSideContents(context: CreateWorkspaceSideContents
             expandedDirs={expandedDirs}
             selected={selected}
             activeKey={activeKey}
-            openFiles={openFiles}
+            openFiles={context.treeOpenFileHints}
             gitChangeByRootPath={gitDecorations.gitChangeByRootPath}
             {...projectTreeHandlers}
           />

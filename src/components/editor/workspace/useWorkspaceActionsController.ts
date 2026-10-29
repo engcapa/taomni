@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { startTransition, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   type WorkspaceActionContext,
   type ActionState,
@@ -192,13 +192,14 @@ export function useWorkspaceActionsController({
 
   // Build one immutable snapshot first. Every display projection below is derived
   // from this same prepared context/evaluation set.
+  const displayContext = useDeferredValue(contextData);
   const snapshot = useMemo<ActionSnapshotItem[]>(() => {
     // eslint-disable-next-line @typescript-eslint/no-unused-expressions
     revision;
     activeFocus;
-    contextData;
+    displayContext;
     return host.getSnapshot();
-  }, [host, revision, activeFocus, contextData, getContextData]);
+  }, [host, revision, activeFocus, displayContext, getContextData]);
 
   const menuItems = useMemo<WorkspaceCommandMenuItem[]>(() => snapshot.map((entry) => ({
     id: entry.id,

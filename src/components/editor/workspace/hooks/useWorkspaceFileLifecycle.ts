@@ -24,7 +24,7 @@ export interface UseWorkspaceFileLifecycleContext {
   setExternalFileConflicts: import("react").Dispatch<import("react").SetStateAction<PendingExternalFileConflict[]>>;
   workspaceStyleControllerRef: import("react").RefObject<WorkspaceStyleController>;
   semanticIndex: import("../useWorkspaceSemanticIndex").WorkspaceSemanticIndexController;
-  refreshTree: () => void;
+  refreshTree: (absolutePath: string) => void;
   restoreEchoSuppressorRef: import("react").RefObject<import("../refactorRecoveryController").RestoreEchoSuppressor>;
   setStatusMessage: (message: string) => void;
   setOpenFiles: (updater: Record<string, OpenFileState> | ((prev: Record<string, OpenFileState>) => Record<string, OpenFileState>)) => void;

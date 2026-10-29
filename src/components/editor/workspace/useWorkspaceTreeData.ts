@@ -6,6 +6,7 @@ import {
 } from "../../../lib/editor/workspace";
 import type { CodeWorkspaceRootInfo } from "../../../types";
 import { useExpandedWorkspaceDirectories } from "./hooks/useExpandedWorkspaceDirectories";
+import { useWorkspaceExternalTreeRefresh } from "./hooks/useWorkspaceExternalTreeRefresh";
 import {
   DEFAULT_DIR_STATE,
   DEFAULT_FLAT_FILES_STATE,
@@ -41,6 +42,7 @@ export interface WorkspaceTreeDataController {
   loadFlatFiles: (rootId: string, force?: boolean) => Promise<void>;
   reset: (options?: { retainListings?: boolean }) => void;
   removeRoot: (rootId: string) => void;
+  refreshPath: (absolutePath: string) => void;
 }
 
 /**
@@ -69,7 +71,9 @@ export function useWorkspaceTreeData({
   // replace a newer, populated listing.
   const directoryRequestsRef = useRef<Record<string, number>>({});
   const compactGenerationsRef = useRef<Record<string, number>>({});
+  const compactRequestsRef = useRef<Record<string, symbol>>({});
   const flatGenerationsRef = useRef<Record<string, number>>({});
+  const flatRequestsRef = useRef<Record<string, symbol>>({});
   const activeCompactRequestsRef = useRef(new Set<symbol>());
   const mountedRef = useRef(false);
   const [compactWorkVersion, setCompactWorkVersion] = useState(0);
@@ -106,14 +110,14 @@ export function useWorkspaceTreeData({
     [],
   );
 
-  const loadDir = useCallback(async (rootId: string, path: string) => {
+  const loadDir = useCallback(async (rootId: string, path: string, options?: { background?: boolean }) => {
     const root = findRoot(rootId);
     if (!root) return;
     const generation = generationRef.current;
     const key = rootDirKey(rootId, path);
     const request = (directoryRequestsRef.current[key] ?? 0) + 1;
     directoryRequestsRef.current[key] = request;
-    setDirectories((current) => ({
+    if (!options?.background) setDirectories((current) => ({
       ...current,
       [key]: {
         ...(current[key] ?? DEFAULT_DIR_STATE),
@@ -127,7 +131,7 @@ export function useWorkspaceTreeData({
     const result = await workspaceListDir(root.path, path);
     if (generation !== generationRef.current) return;
     if (directoryRequestsRef.current[key] !== request) return;
-    if (!findRoot(rootId)) return; // root removed / workspace switched mid-flight
+    if (findRoot(rootId)?.path !== root.path) return;
     if (result.state === "ready") {
       setDirectories((current) => ({
         ...current,
@@ -161,6 +165,7 @@ export function useWorkspaceTreeData({
       || activeCompactRequestsRef.current.size >= MAX_COMPACT_REQUESTS) return;
     compactGenerationsRef.current[key] = generation;
     const request = Symbol(key);
+    compactRequestsRef.current[key] = request;
     activeCompactRequestsRef.current.add(request);
     updateCompactChains((current) => ({
       ...current,
@@ -169,7 +174,7 @@ export function useWorkspaceTreeData({
     try {
       const result = await workspaceCompactChain(root.path, path, 16);
       if (!mountedRef.current || generation !== generationRef.current
-        || compactGenerationsRef.current[key] !== generation
+        || compactRequestsRef.current[key] !== request
         || findRoot(rootId)?.path !== root.path) return;
       if (result.state === "ready") {
         const entries = [...result.entries];
@@ -214,6 +219,8 @@ export function useWorkspaceTreeData({
     if (!force && flatGenerationsRef.current[rootId] === generation
       && (cached?.loading || cached?.loaded)) return;
     flatGenerationsRef.current[rootId] = generation;
+    const request = Symbol(rootId);
+    flatRequestsRef.current[rootId] = request;
     setFlatFiles((current) => ({
       ...current,
       [rootId]: {
@@ -229,7 +236,7 @@ export function useWorkspaceTreeData({
       FLAT_VIEW_MAX_FILES,
     );
     if (generation !== generationRef.current) return;
-    if (!findRoot(rootId)) return;
+    if (flatRequestsRef.current[rootId] !== request || findRoot(rootId)?.path !== root.path) return;
     if (result.state === "ready") {
       setFlatFiles((current) => ({
         ...current,
@@ -258,11 +265,36 @@ export function useWorkspaceTreeData({
     onError(message);
   }, [findRoot, onError]);
 
+  const invalidateCompactPaths = useCallback((rootId: string, changedPath: string) => {
+    const prefix = `${rootId}:`;
+    const keys = Object.keys(compactChainsRef.current).filter((key) => {
+      if (!key.startsWith(prefix)) return false;
+      const path = key.slice(prefix.length);
+      return changedPath === path || changedPath.startsWith(`${path}/`);
+    });
+    if (!keys.length) return;
+    for (const key of keys) {
+      delete compactGenerationsRef.current[key];
+      delete compactRequestsRef.current[key];
+    }
+    updateCompactChains((current) => {
+      const next = { ...current };
+      for (const key of keys) delete next[key];
+      return next;
+    });
+  }, [updateCompactChains]);
+  const externalRefresh = useWorkspaceExternalTreeRefresh({
+    roots, directories, treeViewMode, treeFilter, loadDir, loadFlatFiles, invalidateCompactPaths,
+  });
+
   const reset = useCallback((options?: { retainListings?: boolean }) => {
+    externalRefresh.cancel();
     generationRef.current += 1;
     directoryRequestsRef.current = {};
     compactGenerationsRef.current = {};
+    compactRequestsRef.current = {};
     flatGenerationsRef.current = {};
+    flatRequestsRef.current = {};
     flatFilesRef.current = {};
     // A watcher refresh invalidates old requests without unmounting the rows
     // beneath a pending pointer event or the user's keyboard focus. Each new
@@ -275,15 +307,20 @@ export function useWorkspaceTreeData({
     updateCompactChains(retain);
     setFlatFiles(retain);
     setReloadVersion((version) => version + 1);
-  }, [updateCompactChains]);
+  }, [externalRefresh.cancel, updateCompactChains]);
 
   const removeRoot = useCallback((rootId: string) => {
+    delete flatRequestsRef.current[rootId];
+    delete flatGenerationsRef.current[rootId];
     const prefix = `${rootId}:`;
     for (const key of Object.keys(directoryRequestsRef.current)) {
       if (key.startsWith(prefix)) delete directoryRequestsRef.current[key];
     }
     for (const key of Object.keys(compactGenerationsRef.current)) {
       if (key.startsWith(prefix)) delete compactGenerationsRef.current[key];
+    }
+    for (const key of Object.keys(compactRequestsRef.current)) {
+      if (key.startsWith(prefix)) delete compactRequestsRef.current[key];
     }
     setDirectories((current) => Object.fromEntries(
       Object.entries(current).filter(([key]) => !key.startsWith(prefix)),
@@ -350,5 +387,6 @@ export function useWorkspaceTreeData({
     loadFlatFiles,
     reset,
     removeRoot,
+    refreshPath: externalRefresh.refreshPath,
   };
 }
