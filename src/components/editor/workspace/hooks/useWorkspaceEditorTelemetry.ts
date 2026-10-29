@@ -2,6 +2,7 @@ import { startTransition, useCallback, useEffect, useRef, useState } from "react
 import { type LspDocumentHighlight, type LspDocumentSymbol, type LspInlayHint, type LspPosition, type LspRange, type LspSemanticToken } from "../../../../lib/editor/lsp";
 import { type EditorGroupId } from "../../../../stores/codeWorkspaceStore";
 import { type OccurrenceHighlightSession } from "../occurrenceHighlightModel";
+import { useWorkspacePaintQueue } from "./useWorkspacePaintQueue";
 
 
 export interface UseWorkspaceEditorTelemetryContext {
@@ -11,6 +12,7 @@ export interface UseWorkspaceEditorTelemetryContext {
 
 export function useWorkspaceEditorTelemetry(context: UseWorkspaceEditorTelemetryContext) {
   const { activeKey, activeEditorGroupId } = context;
+  const projectAfterPaint = useWorkspacePaintQueue();
   const [activeSelectionStats, setActiveSelectionStats] = useState({ chars: 0, lineBreaks: 0 });
   const [cursorPositions, setCursorPositionsNow] = useState<Record<EditorGroupId, LspPosition>>({
     primary: { line: 0, character: 0 },
@@ -43,15 +45,14 @@ export function useWorkspaceEditorTelemetry(context: UseWorkspaceEditorTelemetry
     primary: [],
     secondary: [],
   });
-  // Caret, viewport and provider results arrive between keystrokes and
-  // re-render the whole workspace shell. Render them as transitions so React
-  // yields to typing (WebKitGTK input stalled behind these renders).
+  // A transition can still render before the editor's first measurement.
+  // Keep live caret refs synchronous, and batch the display state after paint.
   const setCursorPositions = useCallback((update: Parameters<typeof setCursorPositionsNow>[0]) => {
-    startTransition(() => setCursorPositionsNow(update));
-  }, []);
+    projectAfterPaint(() => setCursorPositionsNow(update));
+  }, [projectAfterPaint]);
   const setViewportRanges = useCallback((update: Parameters<typeof setViewportRangesNow>[0]) => {
-    startTransition(() => setViewportRangesNow(update));
-  }, []);
+    projectAfterPaint(() => setViewportRangesNow(update));
+  }, [projectAfterPaint]);
   const setHighlightsByGroup = useCallback((update: Parameters<typeof setHighlightsByGroupNow>[0]) => {
     startTransition(() => setHighlightsByGroupNow(update));
   }, []);

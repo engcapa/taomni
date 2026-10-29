@@ -28,7 +28,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-function renderOwner() {
+function renderOwner(onRender = () => {}) {
   const run = vi.fn();
   const commands: WorkspaceCommand[] = [{
     id: "editor.selectionProbe", title: "Selection", category: "Edit",
@@ -36,6 +36,7 @@ function renderOwner() {
     run,
   }];
   const { result } = renderHook(() => {
+    onRender();
     const editorCommands = useWorkspaceEditorCommands({
       workspaceInstanceId: instanceId,
       pendingTreeOpenIntentRef: { current: null }, tryGrantTreeFocusRef: { current: () => false },
@@ -52,6 +53,46 @@ function renderOwner() {
   });
   return { result, run };
 }
+
+it("keeps the new command owner live while yielding its menu render to the editor paint", async () => {
+  vi.useFakeTimers();
+  const frames = new Map<number, FrameRequestCallback>();
+  let frameId = 0;
+  const request = vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+    frames.set(++frameId, callback);
+    return frameId;
+  });
+  const cancel = vi.spyOn(window, "cancelAnimationFrame").mockImplementation((id) => { frames.delete(id); });
+  const paint = () => act(() => {
+    const callbacks = [...frames.values()];
+    frames.clear();
+    callbacks.forEach((callback) => callback(0));
+  });
+  try {
+    const renders = vi.fn();
+    const { result, run } = renderOwner(renders);
+    renders.mockClear();
+    act(() => {
+      result.current.editorCommands.registerEditorCommandPort("primary", { fileKey: "a", token: {}, port: port(() => state()) });
+      result.current.editorCommands.setEditorCommandContextRevision((revision) => revision + 1);
+      expect(result.current.controller.executeCommand("editor.selectionProbe")).toBe(true);
+    });
+    await act(async () => {});
+    expect(run).toHaveBeenCalledOnce();
+    expect(renders).not.toHaveBeenCalled();
+    paint();
+    expect(renders).not.toHaveBeenCalled();
+    paint();
+    act(() => vi.advanceTimersByTime(0));
+    expect(renders).toHaveBeenCalledOnce();
+    expect(result.current.controller.snapshot[0].state.availability).toBe("available");
+  } finally {
+    cleanup();
+    request.mockRestore();
+    cancel.mockRestore();
+    vi.useRealTimers();
+  }
+});
 
 it("dispatches to a newly registered editor before its menu notification renders", () => {
   const { result, run } = renderOwner();

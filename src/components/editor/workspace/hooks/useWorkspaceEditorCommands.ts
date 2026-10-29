@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { type LspPosition } from "../../../../lib/editor/lsp";
 import { selectCodeWorkspaceUi, useCodeWorkspaceStore, type EditorGroupId } from "../../../../stores/codeWorkspaceStore";
 import {
@@ -13,6 +13,7 @@ import {
 import { type OpenFileState } from "../codeWorkspaceModel";
 import { type TreeOpenIntent } from "../controller/mutationTypes";
 import { type WorkspaceCommandContext } from "../workspaceCommands";
+import { useWorkspacePaintQueue } from "./useWorkspacePaintQueue";
 
 
 export interface UseWorkspaceEditorCommandsContext {
@@ -32,11 +33,12 @@ export function useWorkspaceEditorCommands(dependencies: UseWorkspaceEditorComma
   }>());
 
   const [editorCommandContextRevision, setContextRevision] = useState(0);
+  const projectAfterPaint = useWorkspacePaintQueue();
   // Port ownership changes immediately below. Menu/selection flags are a
   // secondary projection and must not block the first document paint.
   const setEditorCommandContextRevision = useCallback<typeof setContextRevision>((update) => {
-    startTransition(() => setContextRevision(update));
-  }, []);
+    projectAfterPaint(() => setContextRevision(update));
+  }, [projectAfterPaint]);
   /** Selection-derived action-context flags last published (see onSelectionChange). */
   const editorCommandSignatureRef = useRef<string | null>(null);
   const registerEditorCommandPort = useCallback((
