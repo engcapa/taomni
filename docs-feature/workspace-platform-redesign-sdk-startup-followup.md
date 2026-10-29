@@ -221,3 +221,33 @@ split/grid/single、关闭后重开、外部定义和快速 supersede。新增
 HTML 保留高亮、正文精确相等、零自动 SDK/LSP、1500ms 内容和每帧150ms
 断言。064–069、025/026、C4-02 与完整 10 ID 崩溃组继续保留。此处只记录
 实现和单测结果，托管帧验证及原生 release 仍待新一轮执行。
+
+## 激活时的同步持久化与辅助更新
+
+`33313e03` 的 Linux 托管运行
+[40802285035](https://github.com/engcapa/taomni/actions/runs/40802285035)
+已完成并独立核验：25 个适用 ID、38 次执行，28 passed / 10 failed；801 个
+附件 SHA 与 aggregate 一致，无基础设施错误。完整 10 ID 崩溃专项在 browser
+和 native 均通过，但文件激活的性能尚未通过。browser HTML 正文 401.1ms、
+最大帧 241.5ms；native HTML 最大帧 178ms。native 普通文本四种冷开和连续
+十二次标签激活通过，不代表其他文件或用户本机已经达标。保留全部失败证据。
+
+继续去掉公共激活路径中的重复工作：干净文件的加载、关闭和重复 publication
+不重写 dirty 恢复日志；真实编辑、保存、关闭 dirty 文件仍同步更新恢复内容，
+写入失败仍在下次 publication 重试。同一树节点重复 click/double-click、同一
+canvas 重复聚焦不再写 store 或平台持久化。
+
+编辑器 command port 的 owner 注册和命令执行仍即时完成，菜单 projection、
+selection revision 和已捕获 caret/fold/scroll 的持久化通知使用 transition。
+命令 dispatch 从实时 store 和 port 读取上下文，避免辅助 UI 尚未 render 时
+使用旧文件、选区、只读或 composition 标志。布局退出保存仍直接读取原 ref。
+新增改前失败的去重、恢复写入和实时 owner 回归；连同真实 CodeMirror 的
+dirty/save/undo、split/grid/single、StrictMode、恢复和 pending save，共
+8 文件 / 126 tests passed（本机最多 2 workers）。
+
+生命周期测试的命令发布改为按 runtime ID 保存，匹配生产主窗口；此前隐藏
+空 workspace 的晚发布会覆盖测试单个全局变量，现按真实活动 workspace
+选择命令，保留所有实际编辑、撤销与保存断言。`TC-WS-070` 保留三次冷开、
+六次切换，增加重复点击当前标签和正文聚焦，共 11 次激活测量。正文、HTML
+高亮、零自动 SDK/LSP、1500ms 内容和每帧 150ms 预算未放宽。当前实现的
+GitHub 性能与完整崩溃回归仍待执行，不能据单测宣称速度达标。

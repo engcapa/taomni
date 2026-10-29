@@ -8,7 +8,7 @@ import { type QuickDocContent } from "../referenceDocumentation";
 import { type LocationPeekState } from "../LocationPeek";
 import { type SearchEverywhereMode } from "../SearchEverywhere";
 import { type RecentFileEntry } from "../RecentFilesPopup";
-import { type MarkdownViewMode, type OpenFileState, type TreeSelection } from "../codeWorkspaceModel";
+import { fileRefEquals, type MarkdownViewMode, type OpenFileState, type TreeSelection } from "../codeWorkspaceModel";
 import { type WorkspaceSemanticIndexBuildToken } from "../workspaceSemanticIndex";
 
 
@@ -157,6 +157,14 @@ export function useWorkspaceUiActions(context: UseWorkspaceUiActionsContext) {
   }, [patchWorkspaceUi, workspaceInstanceId]);
 
   const setSelected = useCallback((selection: TreeSelection | null) => {
+    const previous = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId).treeSelection;
+    if (previous === selection) return;
+    if (previous && selection && previous.kind === selection.kind) {
+      if (previous.kind === "file" && selection.kind === "file" && fileRefEquals(previous.ref, selection.ref)) return;
+      if (previous.kind === "root" && selection.kind === "root" && previous.rootId === selection.rootId) return;
+      if (previous.kind === "dir" && selection.kind === "dir"
+        && previous.rootId === selection.rootId && previous.path === selection.path) return;
+    }
     patchWorkspaceUi(workspaceInstanceId, { treeSelection: selection });
   }, [patchWorkspaceUi, workspaceInstanceId]);
 

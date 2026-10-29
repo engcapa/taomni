@@ -1,8 +1,9 @@
 id: TC-WS-070
 title: HTML and text documents open and switch responsively across file sizes
-description: Reproduce the reported all-types activation stall with a five-line HTML document, a 704-line plain document and a tiny text file. Cold-open
-  each through the real tree, then activate all three tabs twice. Retain exact canonical content, HTML syntax highlighting, every frame and zero automatic
-  SDK/LSP discovery. Native uses real file reads in the QA release WebView.
+description: Reproduce the reported all-types activation stall with a five-line HTML document, a 704-line plain document and a tiny text file.
+  Cold-open each through the real tree, then activate all three tabs twice. Retain exact canonical content, HTML syntax highlighting, every frame
+  and zero automatic SDK/LSP discovery. Native uses real file reads in the QA release WebView. Clicking the already active tab and focusing its
+  editor must also stay responsive and retain the same content.
 modes:
 - browser
 - native
@@ -139,6 +140,22 @@ steps:
     selector: '[data-testid="workspace-tab"][data-active="true"]'
     name: data-tab-title
     equals: notes.txt
+- measure_workspace_file_open:
+    selector: '[data-testid="workspace-tab"][data-tab-title="notes.txt"]'
+    expected: ${fixture.workspace_notes_text}
+    event: click
+    label: same-active-text-tab
+    require_highlight: false
+- measure_workspace_file_open:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    expected: ${fixture.workspace_notes_text}
+    event: click
+    label: focus-active-text-editor
+    require_highlight: false
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-tab-title
+    equals: notes.txt
 - assert_language_startup:
     commands:
       sdk_get_registry:
@@ -162,10 +179,11 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Reproduce the reported all-types activation stall with a five-line HTML document, a 704-line plain document and a tiny text file. Cold-open
-      each through the real tree, then activate all three tabs twice. Retain exact canonical content, HTML syntax highlighting, every frame and zero automatic
-      SDK/LSP discovery. Native uses real file reads in the QA release WebView. Keep 1500ms exact-content/highlight and 150ms all-frame limits; no retries
-      or synthetic activation.
+    requirement: Reproduce the reported all-types activation stall with a five-line HTML document, a 704-line plain document and a tiny text file.
+      Cold-open each through the real tree, then activate all three tabs twice. Retain exact canonical content, HTML syntax highlighting, every
+      frame and zero automatic SDK/LSP discovery. Native uses real file reads in the QA release WebView. Keep 1500ms exact-content/highlight and
+      150ms all-frame limits; no retries or synthetic activation. Clicking the already active text tab and focusing its editor must preserve content
+      without redundant activation work.
     actions:
     - 4
     - 7
@@ -182,61 +200,81 @@ verification:
     - 25
     - 27
     - 29
+    - 31
+    - 32
     checkpoints:
     - step: 6
-      expectation: "assert_language_startup:\n  commands:\n    sdk_get_registry:\n      equal: 0\n    sdk_analyze_workspace:\n      equal: 0\n    sdk_resolve_workspace:\n\
-        \      equal: 0\n    lsp_detect_servers:\n      equal: 0\n    lsp_discover_java_bundles:\n      equal: 0\n    lsp_open_document:\n      equal: 0\n\
-        \    lsp_document_status:\n      equal: 0\n  quiet_ms: 500"
+      expectation: "assert_language_startup:\n  commands:\n    sdk_get_registry:\n      equal: 0\n    sdk_analyze_workspace:\n      equal: 0\n\
+        \    sdk_resolve_workspace:\n      equal: 0\n    lsp_detect_servers:\n      equal: 0\n    lsp_discover_java_bundles:\n      equal: 0\n\
+        \    lsp_open_document:\n      equal: 0\n    lsp_document_status:\n      equal: 0\n  quiet_ms: 500"
     - step: 13
-      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"code-workspace-tree-file\"][data-path=\"Documents/page.html\"]'\n  expected:\
-        \ ${fixture.workspace_html_text}\n  event: dblclick\n  label: cold-html"
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"code-workspace-tree-file\"][data-path=\"Documents/page.html\"]'\n\
+        \  expected: ${fixture.workspace_html_text}\n  event: dblclick\n  label: cold-html"
     - step: 14
-      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals: page.html"
+      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
+        \ page.html"
     - step: 15
-      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"code-workspace-tree-file\"][data-path=\"Documents/report.txt\"]'\n  expected:\
-        \ ${fixture.workspace_report_text}\n  event: dblclick\n  label: cold-text-704\n  require_highlight: false"
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"code-workspace-tree-file\"][data-path=\"Documents/report.txt\"]'\n\
+        \  expected: ${fixture.workspace_report_text}\n  event: dblclick\n  label: cold-text-704\n  require_highlight: false"
     - step: 16
-      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals: report.txt"
+      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
+        \ report.txt"
     - step: 17
-      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"code-workspace-tree-file\"][data-path=\"Documents/notes.txt\"]'\n  expected:\
-        \ ${fixture.workspace_notes_text}\n  event: dblclick\n  label: cold-text-tiny\n  require_highlight: false"
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"code-workspace-tree-file\"][data-path=\"Documents/notes.txt\"]'\n\
+        \  expected: ${fixture.workspace_notes_text}\n  event: dblclick\n  label: cold-text-tiny\n  require_highlight: false"
     - step: 18
-      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals: notes.txt"
+      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
+        \ notes.txt"
     - step: 19
       expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"page.html\"]'\n  expected: ${fixture.workspace_html_text}\n\
         \  event: click\n  label: return-1-html"
     - step: 20
-      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals: page.html"
+      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
+        \ page.html"
     - step: 21
       expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"report.txt\"]'\n  expected: ${fixture.workspace_report_text}\n\
         \  event: click\n  label: return-1-text-704\n  require_highlight: false"
     - step: 22
-      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals: report.txt"
+      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
+        \ report.txt"
     - step: 23
       expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"notes.txt\"]'\n  expected: ${fixture.workspace_notes_text}\n\
         \  event: click\n  label: return-1-text-tiny\n  require_highlight: false"
     - step: 24
-      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals: notes.txt"
+      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
+        \ notes.txt"
     - step: 25
       expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"page.html\"]'\n  expected: ${fixture.workspace_html_text}\n\
         \  event: click\n  label: return-2-html"
     - step: 26
-      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals: page.html"
+      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
+        \ page.html"
     - step: 27
       expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"report.txt\"]'\n  expected: ${fixture.workspace_report_text}\n\
         \  event: click\n  label: return-2-text-704\n  require_highlight: false"
     - step: 28
-      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals: report.txt"
+      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
+        \ report.txt"
     - step: 29
       expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"notes.txt\"]'\n  expected: ${fixture.workspace_notes_text}\n\
         \  event: click\n  label: return-2-text-tiny\n  require_highlight: false"
     - step: 30
-      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals: notes.txt"
+      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
+        \ notes.txt"
     - step: 31
-      expectation: "assert_language_startup:\n  commands:\n    sdk_get_registry:\n      equal: 0\n    sdk_analyze_workspace:\n      equal: 0\n    sdk_resolve_workspace:\n\
-        \      equal: 0\n    lsp_detect_servers:\n      equal: 0\n    lsp_discover_java_bundles:\n      equal: 0\n    lsp_open_document:\n      equal: 0\n\
-        \    lsp_document_status:\n      equal: 0\n  quiet_ms: 500"
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"workspace-tab\"][data-tab-title=\"notes.txt\"]'\n  expected: ${fixture.workspace_notes_text}\n\
+        \  event: click\n  label: same-active-text-tab\n  require_highlight: false"
     - step: 32
+      expectation: "measure_workspace_file_open:\n  selector: '[data-testid=\"code-workspace-editor\"] .cm-content'\n  expected: ${fixture.workspace_notes_text}\n\
+        \  event: click\n  label: focus-active-text-editor\n  require_highlight: false"
+    - step: 33
+      expectation: "assert_attribute:\n  selector: '[data-testid=\"workspace-tab\"][data-active=\"true\"]'\n  name: data-tab-title\n  equals:\
+        \ notes.txt"
+    - step: 34
+      expectation: "assert_language_startup:\n  commands:\n    sdk_get_registry:\n      equal: 0\n    sdk_analyze_workspace:\n      equal: 0\n\
+        \    sdk_resolve_workspace:\n      equal: 0\n    lsp_detect_servers:\n      equal: 0\n    lsp_discover_java_bundles:\n      equal: 0\n\
+        \    lsp_open_document:\n      equal: 0\n    lsp_document_status:\n      equal: 0\n  quiet_ms: 500"
+    - step: 35
       expectation: 'assert_no_runtime_errors: null'
     results:
     - 6
@@ -260,6 +298,9 @@ verification:
     - 30
     - 31
     - 32
+    - 33
+    - 34
+    - 35
   visual:
   - check: Active documents remain readable.
     method: manual

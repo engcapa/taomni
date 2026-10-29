@@ -7,6 +7,7 @@ import { type ToolWindowRailItem } from "../panels/ToolWindowRail";
 import type { ShellShortcutClaim } from "../shellShortcutRouter";
 import { useLatestHandlers } from "../useLatestHandlers";
 import { useWorkspaceActionsController } from "../useWorkspaceActionsController";
+import { useWorkspaceActionContext } from "./useWorkspaceActionContext";
 import { type WorkspaceCommandContext } from "../workspaceCommands";
 import { useSemanticNavigation } from "./useSemanticNavigation";
 import { useWorkspaceActionPorts } from "./useWorkspaceActionPorts";
@@ -130,40 +131,21 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
     editorPaneRef: surfaceState.editorPaneRef,
   });
 
-  // Stable identity unless the active file actually changes, so the action
-  // snapshot stays fresh on file switch without re-render feedback loops.
-  const actionContextData = useMemo(() => {
-    // Port state is intentionally sampled while constructing the immutable host
-    // snapshot; registration and selection events bump the revision dependency.
-    void session.editorCommands.editorCommandContextRevision;
-    const editorState = session.editorCommands.activeEditorCommandState();
-    return {
-      activeFileKey: session.workspaceUi.activeKey ?? undefined,
-      activeFilePath: editing.documentLanguage.activeFile?.path,
-      editorViewId: editorState ? session.workspaceUi.activeEditorGroupId : undefined,
-      hasActiveFile: !!editorState,
-      hasSelection: editorState?.hasSelection ?? false,
-      readOnly: editorState?.readOnly ?? false,
-      editorComposing: editorState?.composing ?? false,
-      editorCaretCount: editorState?.caretCount ?? 0,
-      editorOccurrenceSessionActive: editorState?.occurrenceSessionActive ?? false,
-      ...(surfaceState.keymapCheatSheetOpen ? { modalOpen: true } : {}),
-    };
-  }, [
-    session.editorCommands.activeEditorCommandState,
-    session.workspaceUi.activeEditorGroupId,
-    editing.documentLanguage.activeFile?.path,
-    session.workspaceUi.activeKey,
-    session.editorCommands.editorCommandContextRevision,
-    surfaceState.keymapCheatSheetOpen,
-  ]);
+  const actionContext = useWorkspaceActionContext({
+    workspaceInstanceId: session.workspaceInstanceId,
+    activeKey: session.workspaceUi.activeKey,
+    activeEditorGroupId: session.workspaceUi.activeEditorGroupId,
+    activeFilePath: editing.documentLanguage.activeFile?.path,
+    modalOpen: surfaceState.keymapCheatSheetOpen,
+    editorCommands: session.editorCommands,
+  });
 
   const actionsController = useWorkspaceActionsController({
     workspaceId: session.workspaceInstanceId,
     commands: commandCatalog.workspaceCommands,
     resolveFocus: commandFocus.commandFocusForTarget,
     getDefaultFocus: () => session.editorCommands.activeEditorCommandOwner() ? "editor" : "workspace",
-    contextData: actionContextData,
+    ...actionContext,
     // §8.16.3 typed-result visibility: surfaced outcomes instead of silent no-ops.
     onCommandExecuted: (commandId, result) => {
       if (!result) return;
