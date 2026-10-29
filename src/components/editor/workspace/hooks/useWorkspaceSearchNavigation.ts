@@ -33,7 +33,7 @@ export interface UseWorkspaceSearchNavigationContext {
   workspaceInstanceId: string;
   storeActions: ReturnType<typeof useWorkspaceStoreActions>;
   librarySources: ReturnType<typeof useWorkspaceLibrarySources>;
-  workspaceUi: import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi;
+  workspaceUi: Omit<import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi, "treeSelection">;
   projectTree: ReturnType<typeof useWorkspaceTreeModel>;
   revealNonceRef: import("react").RefObject<number>;
   setRevealTarget: import("react").Dispatch<import("react").SetStateAction<EditorRevealTarget | null>>;

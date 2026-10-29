@@ -27,7 +27,7 @@ export interface WorkspaceCommandsContext {
   setSurroundWithDialogOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   requestGenerateCandidates: () => Promise<void>;
   closedTabsStack: readonly ClosedTabEntry[];
-  workspaceUi: import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi;
+  workspaceUi: Omit<import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi, "treeSelection">;
   activeEditorGroupId: string;
   setClosedTabsStack: import("react").Dispatch<import("react").SetStateAction<readonly ClosedTabEntry[]>>;
   openFile: (ref: CodeWorkspaceFileRef,options?: { preview?: boolean; groupId?: EditorGroupId; activate?: boolean; restoring?: boolean; isCurrent?: () => boolean; }) => Promise<{ canonicalFileKey: string; groupId: string; error: string|null; }|null>;

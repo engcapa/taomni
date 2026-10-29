@@ -277,7 +277,7 @@ export function useWorkspaceSurfaceComposition(context: UseWorkspaceSurfaceCompo
     toolWindowActions: editorFeatures.toolWindowActions,
     executeWorkspaceCommand: commands.executeWorkspaceCommand,
     fileActions: files.fileActions,
-    selected: session.workspaceUi.treeSelection,
+    workspaceInstanceId: session.workspaceInstanceId,
     activeKey: session.workspaceUi.activeKey,
     get toolWindowOptionsItems() { return toolWindowOptionsItems; },
     treeShowDetails: project.projectTree.treeShowDetails,

@@ -1,6 +1,6 @@
 import type { ToolWindowContent } from "../panels/toolWindowContent";
 import type { CodeWorkspaceLooseFileInfo, CodeWorkspaceRootInfo } from "../../../../types";
-import { FileTreePane } from "../FileTreePane";
+import { WorkspaceProjectTreePane } from "./WorkspaceProjectTreePane";
 import { OutlinePane } from "../OutlinePane";
 import { ProjectTree } from "../ProjectTree";
 import {
@@ -40,7 +40,7 @@ export interface CreateWorkspaceSideContentsContext {
   toolWindowActions: ReturnType<typeof useWorkspaceToolWindows>;
   executeWorkspaceCommand: (commandId: string, context?: WorkspaceCommandContext) => boolean;
   fileActions: ReturnType<typeof useWorkspaceFileActions>;
-  selected: import("../codeWorkspaceModel").TreeSelection | null;
+  workspaceInstanceId: string;
   activeKey: string | null;
   toolWindowOptionsItems: (id: string) => import("../../../ContextMenu").MenuItem[];
   treeShowDetails: boolean;
@@ -81,7 +81,6 @@ export function createWorkspaceSideContents(context: CreateWorkspaceSideContents
     toolWindowActions,
     executeWorkspaceCommand,
     fileActions,
-    selected,
     activeKey,
     treeShowDetails,
     setTreeShowDetails,
@@ -112,59 +111,59 @@ export function createWorkspaceSideContents(context: CreateWorkspaceSideContents
       id: "project",
       label: "Project",
       renderContent: () => (
-        <FileTreePane
-          paneRef={treeFocus.treePaneRef}
-          style={appearance.treePaneStyle}
-          onKeyDown={treeInteractions.handleTreeKeyDown}
-          filter={treeFilter}
-          onFilterChange={uiActions.setTreeFilter}
-          viewMode={treeViewMode}
-          onViewModeChange={setTreeViewMode}
-          fontSize={appearance.treeFontSize}
-          minFontSize={CODE_WORKSPACE_MIN_TREE_FONT_SIZE}
-          maxFontSize={CODE_WORKSPACE_MAX_TREE_FONT_SIZE}
-          defaultFontSize={CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE}
-          onFontSizeChange={appearance.setTreeFontSize}
-          collapsed={!languagePanelOpen}
-          onToggleCollapse={toolWindowActions.toggleProjectTree}
-          onOpenFile={() => executeWorkspaceCommand("workspace.tree.openLooseFile", { focus: "tree" })}
-          onAddFolder={() => executeWorkspaceCommand("workspace.tree.addFolder", { focus: "tree" })}
-          canCreate={!!fileActions.selectedRootDirectory}
-          canMutateSelection={!!selected}
-          onCreateFile={() => executeWorkspaceCommand("workspace.tree.newFile", { focus: "tree" })}
-          onCreateDirectory={() => executeWorkspaceCommand("workspace.tree.newDirectory", { focus: "tree" })}
-          onRename={() => executeWorkspaceCommand("workspace.tree.rename", { focus: "tree" })}
-          onDelete={() => executeWorkspaceCommand("workspace.tree.delete", { focus: "tree" })}
-          onSelectOpenedFile={activeKey ? () => treeInteractions.revealEditorTabInTree(activeKey) : undefined}
-          onExpandAll={treeInteractions.expandAllProjectTree}
-          onCollapseAll={treeInteractions.collapseAllProjectTree}
-          toolWindowOptions={() => context.toolWindowOptionsItems("project")}
-          showDetails={treeShowDetails}
-          onShowDetailsChange={setTreeShowDetails}
-          sort={context.treeSort}
-          onSortChange={context.setTreeSort}
-        >
-          <ProjectTree
-            sort={context.treeSort}
-            onAddFolder={() => executeWorkspaceCommand("workspace.tree.addFolder", { focus: "tree" })}
-            onOpenLooseFile={() => executeWorkspaceCommand("workspace.tree.openLooseFile", { focus: "tree" })}
-            showDetails={treeShowDetails}
-            roots={roots}
-            looseFiles={looseFiles}
-            directories={treeData.directories}
-            compactChains={treeData.compactChains}
-            flatFiles={treeData.flatFiles}
-            treeViewMode={treeViewMode}
-            treeFilter={treeFilter}
-            expandedRoots={expandedRoots}
-            expandedDirs={expandedDirs}
-            selected={selected}
-            activeKey={activeKey}
-            openFiles={context.treeOpenFileHints}
-            gitChangeByRootPath={gitDecorations.gitChangeByRootPath}
-            {...projectTreeHandlers}
-          />
-        </FileTreePane>
+        <WorkspaceProjectTreePane
+          workspaceInstanceId={context.workspaceInstanceId}
+          paneProps={{
+            paneRef: treeFocus.treePaneRef,
+            style: appearance.treePaneStyle,
+            onKeyDown: treeInteractions.handleTreeKeyDown,
+            filter: treeFilter,
+            onFilterChange: uiActions.setTreeFilter,
+            viewMode: treeViewMode,
+            onViewModeChange: setTreeViewMode,
+            fontSize: appearance.treeFontSize,
+            minFontSize: CODE_WORKSPACE_MIN_TREE_FONT_SIZE,
+            maxFontSize: CODE_WORKSPACE_MAX_TREE_FONT_SIZE,
+            defaultFontSize: CODE_WORKSPACE_DEFAULT_TREE_FONT_SIZE,
+            onFontSizeChange: appearance.setTreeFontSize,
+            collapsed: !languagePanelOpen,
+            onToggleCollapse: toolWindowActions.toggleProjectTree,
+            onOpenFile: () => executeWorkspaceCommand("workspace.tree.openLooseFile", { focus: "tree" }),
+            onAddFolder: () => executeWorkspaceCommand("workspace.tree.addFolder", { focus: "tree" }),
+            canCreate: !!fileActions.selectedRootDirectory,
+            onCreateFile: () => executeWorkspaceCommand("workspace.tree.newFile", { focus: "tree" }),
+            onCreateDirectory: () => executeWorkspaceCommand("workspace.tree.newDirectory", { focus: "tree" }),
+            onRename: () => executeWorkspaceCommand("workspace.tree.rename", { focus: "tree" }),
+            onDelete: () => executeWorkspaceCommand("workspace.tree.delete", { focus: "tree" }),
+            onSelectOpenedFile: activeKey ? () => treeInteractions.revealEditorTabInTree(activeKey) : undefined,
+            onExpandAll: treeInteractions.expandAllProjectTree,
+            onCollapseAll: treeInteractions.collapseAllProjectTree,
+            toolWindowOptions: () => context.toolWindowOptionsItems("project"),
+            showDetails: treeShowDetails,
+            onShowDetailsChange: setTreeShowDetails,
+            sort: context.treeSort,
+            onSortChange: context.setTreeSort,
+          }}
+          treeProps={{
+            sort: context.treeSort,
+            onAddFolder: () => executeWorkspaceCommand("workspace.tree.addFolder", { focus: "tree" }),
+            onOpenLooseFile: () => executeWorkspaceCommand("workspace.tree.openLooseFile", { focus: "tree" }),
+            showDetails: treeShowDetails,
+            roots: roots,
+            looseFiles: looseFiles,
+            directories: treeData.directories,
+            compactChains: treeData.compactChains,
+            flatFiles: treeData.flatFiles,
+            treeViewMode: treeViewMode,
+            treeFilter: treeFilter,
+            expandedRoots: expandedRoots,
+            expandedDirs: expandedDirs,
+            activeKey: activeKey,
+            openFiles: context.treeOpenFileHints,
+            gitChangeByRootPath: gitDecorations.gitChangeByRootPath,
+            ...projectTreeHandlers,
+          }}
+        />
       ),
     },
     {

@@ -4,7 +4,7 @@ import { useMountedRef } from "../../../../hooks/useMountedRef";
 import { useT } from "../../../../lib/i18n";
 import { useAppStore } from "../../../../stores/appStore";
 import { useChatStore } from "../../../../stores/chatStore";
-import { selectCodeWorkspaceUi, useCodeWorkspaceStore } from "../../../../stores/codeWorkspaceStore";
+import { useCodeWorkspaceStore } from "../../../../stores/codeWorkspaceStore";
 import { useMainRailHostStore } from "../../../../stores/mainRailHostStore";
 import { useWorkspaceRailStore } from "../../../../stores/workspaceRailStore";
 import { type EditorSelectionRange } from "../CodeMirrorHost";
@@ -22,6 +22,7 @@ import { useWorkspaceReferenceSessions } from "./useWorkspaceReferenceSessions";
 import { useWorkspaceStoreActions } from "./useWorkspaceStoreActions";
 import { useWorkspaceTabPolicy } from "./useWorkspaceTabPolicy";
 import { useWorkspaceTreeFocusState } from "./useWorkspaceTreeFocusState";
+import { createWorkspaceRenderUiSelector, readWorkspaceTreeSelection } from "../workspaceRenderUi";
 
 
 export interface UseWorkspaceSessionContext {
@@ -92,7 +93,9 @@ export function useWorkspaceSession(context: UseWorkspaceSessionContext) {
   // The effect below initializes a missing instance after commit. Keeping the
   // render path read-only avoids notifying external-store subscribers during
   // render when a workspace is mounted for the first time.
-  const workspaceUi = useCodeWorkspaceStore((s) => selectCodeWorkspaceUi(s, workspaceInstanceId));
+  const selectRenderUi = useMemo(() => createWorkspaceRenderUiSelector(workspaceInstanceId), [workspaceInstanceId]);
+  const workspaceUi = useCodeWorkspaceStore(selectRenderUi);
+  const getTreeSelection = useCallback(() => readWorkspaceTreeSelection(workspaceInstanceId), [workspaceInstanceId]);
   const projectPanelRef = useRef<PanelImperativeHandle>(null);
   // Panel `defaultSize` is a mount-time input for react-resizable-panels:
   // re-passing a value that changes while the pointer is down makes the library
@@ -163,6 +166,7 @@ export function useWorkspaceSession(context: UseWorkspaceSessionContext) {
     semanticIndex,
     storeActions,
     workspaceUi,
+    getTreeSelection,
     tabPolicyOwner,
     bufferState,
     clipboard,

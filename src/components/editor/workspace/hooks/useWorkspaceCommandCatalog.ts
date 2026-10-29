@@ -1,3 +1,4 @@
+import { readWorkspaceTreeSelection } from "../workspaceRenderUi";
 import { useMemo } from "react";
 import { type LspPosition } from "../../../../lib/editor/lsp";
 import { useT } from "../../../../lib/i18n";
@@ -61,7 +62,7 @@ export interface UseWorkspaceCommandCatalogContext {
   uiActions: ReturnType<typeof useWorkspaceUiActions>;
   codeGeneration: ReturnType<typeof useCodeGeneration>;
   closedTabsStack: readonly ClosedTabEntry[];
-  workspaceUi: import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi;
+  workspaceUi: Omit<import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi, "treeSelection">;
   setClosedTabsStack: import("react").Dispatch<import("react").SetStateAction<readonly ClosedTabEntry[]>>;
   openFile: (ref: CodeWorkspaceFileRef, options?: { preview?: boolean; groupId?: EditorGroupId; activate?: boolean; restoring?: boolean; isCurrent?: () => boolean; }) => Promise<{ canonicalFileKey: string; groupId: string; error: string | null; } | null>;
   bufferState: ReturnType<typeof useWorkspaceBufferState>;
@@ -379,9 +380,9 @@ export function useWorkspaceCommandCatalog(context: UseWorkspaceCommandCatalogCo
     openLooseFile: fileActions.openLooseFile,
     addRoot: fileActions.addRoot,
     treeContextMenuSessionRef: treeInteractions.treeContextMenuSessionRef,
-    selected: workspaceUi.treeSelection,
+    get selected() { return readWorkspaceTreeSelection(workspaceInstanceId); },
     requestTreeOpen: treeOpening.requestTreeOpen,
-    selectedRootDirectory: fileActions.selectedRootDirectory,
+    get selectedRootDirectory() { return fileActions.getSelectedRootDirectory(); },
     createFile: fileActions.createFile,
     createDir: fileActions.createDir,
     openNewJavaClassDialog: javaCreation.openNewJavaClassDialog,
@@ -417,6 +418,7 @@ export function useWorkspaceCommandCatalog(context: UseWorkspaceCommandCatalogCo
     fileActions.createDir,
     fileActions.createFile,
     fileActions.deleteSelected,
+    fileActions.getSelectedRootDirectory,
     editorCommands.editorCommandStateFor,
     splits.equalizeActiveSplitRatios,
     editorCommands.executeActiveEditorCommand,
@@ -467,8 +469,6 @@ export function useWorkspaceCommandCatalog(context: UseWorkspaceCommandCatalogCo
     saves.saveFile,
     coverage.scanWorkspaceCoverage,
     seSymbolsAvailable,
-    workspaceUi.treeSelection,
-    fileActions.selectedRootDirectory,
     toolWindowRouting.setBottomDockOpen,
     toolWindowRouting.setBottomDockTab,
     languagePreferences.setFormatOnSave,

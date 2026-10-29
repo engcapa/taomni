@@ -9,7 +9,7 @@ import { useWorkspaceFileWatcher } from "./useWorkspaceFileWatcher";
 
 
 export interface UseWorkspaceTreeModelContext {
-  workspaceUi: import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi;
+  workspaceUi: Omit<import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi, "treeSelection">;
   workspace: import("../../../../types").CodeWorkspaceTabInfo;
   setStatusMessage: (message: string) => void;
   workspaceInstanceId: string;

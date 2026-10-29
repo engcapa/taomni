@@ -13,7 +13,7 @@ export interface UseWorkspaceKeyboardContext {
   workspaceInstanceId: string;
   bottomDockOpen: boolean;
   bottomDockTab: BottomDockTabId;
-  workspaceUi: import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi;
+  workspaceUi: Omit<import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi, "treeSelection">;
   openFiles: Record<string, import("../editorGroupTypes").OpenFileViewModel>;
   editorGroups: Record<string, CodeWorkspaceEditorGroupState>;
   setStatusMessage: (message: string) => void;

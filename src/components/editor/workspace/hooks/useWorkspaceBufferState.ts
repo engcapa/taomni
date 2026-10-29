@@ -4,7 +4,7 @@ import { type LibraryBufferInfo, type OpenFileState } from "../codeWorkspaceMode
 
 
 export interface UseWorkspaceBufferStateContext {
-  workspaceUi: import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi;
+  workspaceUi: Omit<import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi, "treeSelection">;
 }
 
 export function useWorkspaceBufferState(context: UseWorkspaceBufferStateContext) {

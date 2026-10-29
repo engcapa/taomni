@@ -331,6 +331,25 @@ describe("ED-TEMPLATE-001: File and Code Templates production flow in CodeWorksp
     return { registrationRef, onCommandsChange };
   };
 
+  it("uses the latest tree directory for Java creation without waiting for an owner render", async () => {
+    const { registrationRef, onCommandsChange } = captureCommands();
+    render(<CodeWorkspaceTab tabId="tab-code" workspace={workspaceInfo} visible onCommandsChange={onCommandsChange} />);
+    await waitFor(() => expect(registrationRef.current).not.toBeNull());
+    const commands = registrationRef.current;
+    await act(async () => {
+      useCodeWorkspaceStore.getState().patchInstance(workspaceInfo.workspaceInstanceId, {
+        treeSelection: { kind: "dir", rootId: "root-1", path: "src/main/java/com/example/current" },
+      });
+      await commands.executeAction("workspace.tree.newJavaClass");
+    });
+    expect(await screen.findByTestId("new-java-class-package")).toHaveTextContent("com.example.current");
+    fireEvent.change(screen.getByTestId("new-java-class-name-input"), { target: { value: "CurrentTarget" } });
+    await act(async () => fireEvent.click(screen.getByTestId("new-java-class-submit")));
+    await waitFor(() => expect(workspaceMocks.workspaceApplyResourceOperation).toHaveBeenCalledWith(
+      workspaceRoot, expect.objectContaining({ kind: "create", path: "src/main/java/com/example/current/CurrentTarget.java" }),
+    ));
+  });
+
   it("opens NewJavaClassDialog via workspace.tree.newJavaClass and creates class in package (ED-TEMPLATE-001-A1)", async () => {
     const { registrationRef, onCommandsChange } = captureCommands();
     render(

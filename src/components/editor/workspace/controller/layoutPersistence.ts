@@ -19,7 +19,7 @@ export interface PersistWorkspaceLayoutNowContext {
   activeEditorGroupId: string;
   expandedRootIds: string[];
   expandedDirKeys: string[];
-  workspaceUi: import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi;
+  workspaceUi: Omit<import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi, "treeSelection">;
   tabPolicyRef: import("react").RefObject<WorkspaceTabPolicyV3>;
   viewStatesRef: import("react").RefObject<WorkspaceViewStates>;
   openFilesRef: import("react").RefObject<Record<string, import("../editorGroupTypes").OpenFileViewModel>>;

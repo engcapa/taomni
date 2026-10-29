@@ -68,7 +68,7 @@ export interface WorkspaceShellViewProps {
   toolWindowActions: ReturnType<typeof useWorkspaceToolWindows>;
   renderToolWindowSideArea: (side: "left" | "right") => import("react").JSX.Element;
   languagePanelOpen: boolean;
-  workspaceUi: import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi;
+  workspaceUi: Omit<import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi, "treeSelection">;
   editorLayout: ReturnType<typeof createWorkspaceLayoutRenderer>;
   renderEditorGroup: ReturnType<typeof createRenderEditorGroup>;
   sideContents: ReturnType<typeof createWorkspaceSideContents>;

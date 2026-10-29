@@ -146,3 +146,59 @@ it("reads selection, read-only and composition changes without waiting for a Rea
   expect(result.current.controller.executeCommand("editor.selectionProbe")).toBe(true);
   expect(run).toHaveBeenCalledWith(expect.objectContaining({ editorCaretCount: 2 }));
 });
+
+it("publishes live tree menus without rendering their owner and releases instance subscriptions", async () => {
+  const renders = vi.fn();
+  const run = vi.fn();
+  const editorListeners = new Set<() => void>();
+  const editorCommands = {
+    activeEditorCommandState: () => null,
+    subscribeEditorCommandContext: (listener: () => void) => {
+      editorListeners.add(listener);
+      return () => { editorListeners.delete(listener); };
+    },
+  };
+  const commands: WorkspaceCommand[] = [{
+    id: "tree.probe", title: "Tree selection", category: "File",
+    when: () => !!useCodeWorkspaceStore.getState().getInstance(instanceId).treeSelection,
+    run: () => { run(useCodeWorkspaceStore.getState().getInstance(instanceId).treeSelection); },
+  }];
+  const { result, unmount } = renderHook(() => {
+    renders();
+    const context = useWorkspaceActionContext({
+      workspaceInstanceId: instanceId, activeKey: "a", activeEditorGroupId: "primary",
+      modalOpen: false, editorCommands,
+    });
+    return useWorkspaceActionsController({ commands, activeFocus: "tree", ...context });
+  });
+  expect(editorListeners.size).toBe(1);
+  expect(result.current.snapshot[0].state.availability).toBe("disabled");
+  const changed = vi.fn();
+  const unsubscribe = result.current.projection.subscribe(changed);
+  renders.mockClear();
+  const selection = { kind: "dir" as const, rootId: "root", path: "current" };
+  await act(async () => {
+    useCodeWorkspaceStore.getState().patchInstance(instanceId, { treeSelection: selection });
+    expect(result.current.snapshot[0].state.availability).toBe("available");
+    expect((await result.current.executeAction("tree.probe")).kind).toBe("applied");
+  });
+  expect(run).toHaveBeenCalledWith(selection);
+  expect(result.current.snapshot[0].state.availability).toBe("available");
+  expect(changed).toHaveBeenCalledOnce();
+  act(() => {
+    useCodeWorkspaceStore.getState().patchInstance("another-instance", { treeSelection: selection });
+    useCodeWorkspaceStore.getState().patchInstance(instanceId, { treeFilter: "unrelated" });
+  });
+  expect(changed).toHaveBeenCalledOnce();
+  act(() => useCodeWorkspaceStore.getState().patchInstance(instanceId, { treeSelection: null }));
+  expect(result.current.executeCommand("tree.probe")).toBe(false);
+  expect(result.current.snapshot[0].state.availability).toBe("disabled");
+  expect(changed).toHaveBeenCalledTimes(2);
+  expect(renders).not.toHaveBeenCalled();
+  unmount();
+  expect(editorListeners.size).toBe(0);
+  changed.mockClear();
+  act(() => useCodeWorkspaceStore.getState().patchInstance(instanceId, { treeSelection: selection }));
+  expect(changed).not.toHaveBeenCalled();
+  unsubscribe();
+});

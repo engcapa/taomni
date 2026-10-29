@@ -36,5 +36,13 @@ export function useWorkspaceActionContext({
   const contextData = useMemo(() => getContextData(), [
     getContextData, activeKey, activeEditorGroupId, activeFilePath,
   ]);
-  return { contextData, getContextData, subscribeContextChanges: subscribeEditorCommandContext };
+  const subscribeContextChanges = useCallback((listener: () => void) => {
+    const unsubscribeEditor = subscribeEditorCommandContext(listener);
+    const unsubscribeTree = useCodeWorkspaceStore.subscribe((state, previous) => {
+      if (selectCodeWorkspaceUi(state, workspaceInstanceId).treeSelection
+        !== selectCodeWorkspaceUi(previous, workspaceInstanceId).treeSelection) listener();
+    });
+    return () => { unsubscribeEditor(); unsubscribeTree(); };
+  }, [subscribeEditorCommandContext, workspaceInstanceId]);
+  return { contextData, getContextData, subscribeContextChanges };
 }

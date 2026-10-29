@@ -37,7 +37,7 @@ export interface ApplyTabPolicyContext {
   splitOrientation: EditorSplitOrientation | null;
   expandedRootIds: string[];
   expandedDirKeys: string[];
-  workspaceUi: import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi;
+  workspaceUi: Omit<import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi, "treeSelection">;
   setStatusMessage: (message: string) => void;
   setTabPolicyReceipt: import("react").Dispatch<import("react").SetStateAction<TabPolicyLifecycleReceiptView | null>>;
 }
