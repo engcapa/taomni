@@ -62,7 +62,12 @@ steps:
 - wait_for: '[data-testid="workspace-tab"][data-active="true"][data-tab-title="records.json"]'
 - dblclick: '[data-testid="code-workspace-tree-file"][data-path="Documents/long-records.json"]'
 - wait_for: '[data-testid="workspace-tab"][data-active="true"][data-tab-title="long-records.json"]'
-- click: '[data-testid="workspace-tab"][data-tab-title="notes.txt"]'
+- measure_workspace_file_open:
+    selector: '[data-testid="workspace-tab"][data-tab-title="notes.txt"]'
+    expected: ${fixture.workspace_notes_text}
+    event: click
+    label: initial-notes-tab
+    require_highlight: false
 - fill:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
     value: Draft retained across ten file tab changes

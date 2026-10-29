@@ -30,6 +30,11 @@ exercises the packaged WebView and real filesystem.
 to `false` because those documents have no syntax tokens: exact visible canonical
 content still has the same 1500ms budget, and every frame retains its 150ms limit
 through one second after content appears. Existing JSON assertions remain strict.
+For an outer workspace tab, preparation uses its real left/right scroll arrows
+until the target is fully visible and hit-testable, without changing the active
+document. This happens before the activation observer/CPU sample starts; raw
+preparation geometry is retained separately in `tabPreparation`. The subsequent
+activation is still sent exactly once and all original frame budgets apply.
 
 | Verb | Args | Notes |
 |------|------|-------|

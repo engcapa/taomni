@@ -8,6 +8,15 @@ text explicitly omits the syntax-token requirement. Native cases retain real
 keyboard input, save/reopen and full disk SHA checks. No SDK/LSP auto-discovery
 is allowed for these ordinary documents.
 
+When the window is narrow, reveal a clipped outer tab using its real left/right
+scroll buttons before starting the activation measurement. Check that scrolling
+keeps the active document and retain preparation geometry separately. The
+original native `scrollIntoView` preparation in run `40793877197` left notes.txt
+clipped behind the scroll-area edge, so no activation occurred. That failure is
+retained; it must not be counted as a passing latency sample. `TC-WS-069` also
+measures this initial notes.txt return before creating the draft, in addition to
+the original ten consecutive switches. No synthetic tab activation is used.
+
 ## Browser recording overhead
 
 The original browser recording enabled Playwright DOM snapshots and screencast

@@ -3,7 +3,7 @@ from pathlib import Path
 import tempfile
 from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from qa_ui_auto.file_open_probe import review, run, validate
 from qa_ui_auto.steps import StepError
@@ -21,6 +21,11 @@ CONFIG = {"selector": "[data-path='records.json']", "event": "dblclick", "label"
 
 
 class FileOpenReviewTests(unittest.TestCase):
+    def setUp(self):
+        reveal = patch("qa_ui_auto.file_open_probe.reveal_tab", return_value=[])
+        self.reveal = reveal.start()
+        self.addCleanup(reveal.stop)
+
     def test_complete_sample(self):
         review(observation())
 

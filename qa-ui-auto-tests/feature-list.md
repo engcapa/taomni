@@ -12180,7 +12180,7 @@ TC-WS-059/060 cover ordinary-document discovery suppression and every explicit f
 
 TC-WS-066/067 retain the same opening, frame, native input and byte-exact save/reopen contracts with public synthetic 693-line / 193KiB JSON and 5KiB strings. This supplements the smaller 19KiB JSON; it never copies or uploads user documents. Hosted evidence is required before claiming the reported long-line freeze is fixed.
 
-TC-WS-068 measures cold tree activation of txt/log/csv and an unclassified text extension with exact canonical contents and all-frame responsiveness. TC-WS-069 makes ten measured activations across five mixed file tabs, retains a dirty draft, saves and reopens it. Plain-text cases explicitly omit syntax-token assertions; JSON retains its existing highlighting requirement. All activations preserve 1500ms content and 150ms frame budgets in browser/native; hosted execution remains pending.
+TC-WS-068 measures cold tree activation of txt/log/csv and an unclassified text extension with exact canonical contents and all-frame responsiveness. TC-WS-069 measures the initial return to notes.txt plus ten activations across five mixed file tabs, retains a dirty draft, saves and reopens it. Clipped tabs are first revealed through real scroll arrows without changing the active document. Plain-text cases explicitly omit syntax-token assertions; JSON retains its existing highlighting requirement. All activations preserve 1500ms content and 150ms frame budgets in browser/native; hosted execution remains pending.
 
 ## 12. Workspace-First 平台重构（v6.1）
 
