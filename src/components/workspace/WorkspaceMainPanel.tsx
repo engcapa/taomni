@@ -1,5 +1,5 @@
 import { Bookmark, Bug, Database, ListTodo, Search, Server, Terminal, TriangleAlert, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { type WorkspaceCodeEditorProps } from "./WorkspaceCodeEditor";
 import { WorkspaceFileSurface } from "./WorkspaceFileSurface";
 import { TerminalPanel } from "../terminal/TerminalPanel";
@@ -41,7 +41,7 @@ const DOCK_ICONS = { terminal: Terminal, problems: TriangleAlert, run: Bug, find
  */
 type CommandProps = Pick<WorkspaceCodeEditorProps, "onCommandsChange"> & { onEditSession?: (sessionId: string) => void };
 
-export function WorkspaceMainPanel({ visible = true, onCommandsChange, onEditSession }: { visible?: boolean } & CommandProps) {
+export const WorkspaceMainPanel = memo(function WorkspaceMainPanel({ visible = true, onCommandsChange, onEditSession }: { visible?: boolean } & CommandProps) {
   const workspaces = useWorkspacePlatformStore((s) => s.workspaces);
   const activeId = useWorkspacePlatformStore((s) => s.activeWorkspaceId);
   return (
@@ -51,14 +51,14 @@ export function WorkspaceMainPanel({ visible = true, onCommandsChange, onEditSes
       ))}
     </div>
   );
-}
+});
 
-function WorkspaceCanvas({ workspaceId, visible, onCommandsChange, onEditSession }: { workspaceId: string; visible: boolean } & CommandProps) {
+const WorkspaceCanvas = memo(function WorkspaceCanvas({ workspaceId, visible, onCommandsChange, onEditSession }: { workspaceId: string; visible: boolean } & CommandProps) {
   const [started, setStarted] = useState(visible);
   useEffect(() => { if (visible) setStarted(true); }, [visible]);
   if (!started && !visible) return null;
   return <WorkspaceCanvasContents workspaceId={workspaceId} visible={visible} onCommandsChange={onCommandsChange} onEditSession={onEditSession} />;
-}
+});
 
 function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange, onEditSession }: { workspaceId: string; visible: boolean } & CommandProps) {
   const t = useT();

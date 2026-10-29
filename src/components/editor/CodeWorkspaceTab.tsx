@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { type CodeWorkspaceTabProps } from "./workspace/controller/model";
 import { useWorkspaceActionPorts } from "./workspace/hooks/useWorkspaceActionPorts";
 import { useWorkspaceCommandRouting } from "./workspace/hooks/useWorkspaceCommandRouting";
@@ -16,11 +17,14 @@ import { WorkspaceShellView } from "./workspace/views/WorkspaceShellView";
 import { WorkspaceHostContext } from "./workspace/workspaceHostIntegration";
 import { useWorkspaceHostFiles } from "./workspace/hooks/useWorkspaceHostFiles";
 
-export function CodeWorkspaceTab(props: CodeWorkspaceTabProps) {
+// Context/command publications also refresh the host chrome. They must not
+// re-render the entire editor when its inputs did not change; the runtime's
+// own store and context subscriptions continue to deliver real updates.
+export const CodeWorkspaceTab = memo(function CodeWorkspaceTab(props: CodeWorkspaceTabProps) {
   return <WorkspaceHostContext.Provider value={props.hostIntegration ?? null}>
     <CodeWorkspaceRuntime {...props} />
   </WorkspaceHostContext.Provider>;
-}
+});
 
 function CodeWorkspaceRuntime({
   tabId,

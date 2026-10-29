@@ -1,6 +1,6 @@
 # 工作区文件打开与 SDK 后台初始化
 
-当前状态：JSON 打开卡顿仍未通过验收。产品 `f0c1ae4e` 的相关集 [40787137504](https://github.com/engcapa/taomni/actions/runs/40787137504) 正在执行；三平台 browser 的 JSON 首帧仍有约 195–207ms 停顿，超过保留的 150ms 预算。后台文件读取和图标复用不足以证明问题解决，继续分析原始 CPU 与原生帧证据。新增与用户文件大小及长行分布相近的公开夹具；不采集或上传真实文件内容。当前组合源码的全量与正式四轮性能仍待执行。以下记录保留历史失败，关联[重构实现报告](./workspace-platform-redesign-implementation-report.md)。
+当前状态：文件打开及标签切换卡顿仍未通过验收。产品 `f0c1ae4e` 的相关集 [40787137504](https://github.com/engcapa/taomni/actions/runs/40787137504) 正在执行；三平台 browser 的 JSON 首帧仍有约 195–207ms 停顿，Linux native 有 206–315ms 慢帧，超过保留的 150ms 预算。相同产品的长行公开夹具基线 [40790432602](https://github.com/engcapa/taomni/actions/runs/40790432602) 已在 browser 捕获 410ms 慢帧。后台文件读取和图标复用不足以证明问题解决，继续分析原始 CPU 与原生帧证据。当前组合源码的全量与正式四轮性能仍待执行。以下记录保留历史失败，关联[重构实现报告](./workspace-platform-redesign-implementation-report.md)。
 
 ## 目标与保留行为
 
@@ -130,3 +130,16 @@ SHA 和重开末尾文本之后：Mod+End 使首行离开 CodeMirror 虚拟视�
 标签切回与 Home 恢复的精确内容和语法高亮，1500ms 打开及每帧 150ms 预算不变；
 67 增加原生 32 键输入、完整保存 SHA、关闭重开与首行/末尾内容。普通文件的
 SDK/LSP 自动探测必须保持为零。当前新增用例未完成托管执行，不能充当修复证据。
+
+## 编辑器与目录排序的渲染边界
+
+主布局会随编辑器 context 和命令注册发表刷新。为避免输入相同时重复遍历整个
+编辑器，在平台 canvas、编辑器桥与公共 `CodeWorkspaceTab` 入口使用 React 默认
+`memo` 边界；各组件自身的 store/context 订阅继续交付真实变化，没有自定义
+比较器、延迟内容、改变挂载生命周期或取消资源。Project 树仅在目录条目、平铺
+文件或排序偏好变化时重排，selection、caret、dirty 更新复用已有顺序。
+
+本机对应真实编辑器生命周期、平台文件桥、Git 同步、Project 树及公共编辑器共
+5 文件 / 288 tests passed（最多 2 workers）；TypeScript 与 refactor 合同通过。
+这是待托管测量的产品优化，尚不能据单测声称减少慢帧。保留 `TC-WS-064` 至
+`067` 和完整崩溃组，并将补充普通 txt/log/csv 冷开及连续标签切换的响应回归。
