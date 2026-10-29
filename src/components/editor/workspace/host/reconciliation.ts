@@ -146,6 +146,7 @@ export function areCodeMirrorHostPropsEqual(prev: CodeMirrorHostProps, next: Cod
   if (prev.transactionOwner !== next.transactionOwner) return false;
   if (prev.documentRevision !== next.documentRevision) return false;
   if (prev.doc !== next.doc) return false;
+  if (prev.documentReady !== next.documentReady) return false;
   if (prev.visible !== next.visible) return false;
   if (prev.active !== next.active) return false;
   if (prev.readOnly !== next.readOnly) return false;

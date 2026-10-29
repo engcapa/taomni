@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { type ClipboardObservationRecord } from "../clipboardObservationContract";
 import { type CompositionSession, type EditorSelectionRange } from "./types";
 import { type CompletionResolveGateRequest } from "../lspCompletion";
+import type { EditorViewStateLifecycle } from "./editorViewStateLifecycle";
 import type { WorkspaceActionHost } from "../workspaceActionHost";
 let nextEditorHostViewId = 0;
 
@@ -207,7 +208,7 @@ export function useEditorHostRefs(context: UseEditorHostRefsContext) {
   const onViewStateChangeRef = useRef(onViewStateChange);
   onViewStateChangeRef.current = onViewStateChange;
   const lastEmittedViewStateRef = useRef<string | null>(null);
-  const viewStateEmitTimerRef = useRef<number | null>(null);
+  const viewStateLifecycleRef = useRef<EditorViewStateLifecycle | null>(null);
   const pendingDeferredScrollRef = useRef<{ scrollTop: number; scrollLeft: number; } | null>(null);
   const userInteractedSinceMountRef = useRef(false);
   const restoringInitialViewStateRef = useRef(false);
@@ -280,5 +281,5 @@ export function useEditorHostRefs(context: UseEditorHostRefsContext) {
   debugEvaluateRef.current = debugEvaluate;
   onContextMenuRef.current = onContextMenu;
   onToggleRenderedDocRawRef.current = onToggleRenderedDocRaw;
-  return { getCompletionIdentityRef, viewRef, pathRef, completionCompartment, onCompleteRef, onCompleteResolveRef, completionTriggersRef, onCompletionDiagnosticRef, onScopeFallbackRef, onCompletionUnavailableRef, presentResolveGateRef, pendingCompletionAcceptanceRef, resolveGateSequenceRef, setResolveGateUi, completionControllerRef, onToggleBreakpointRef, onEditBreakpointRef, breakpointGutterActionsRef, debugStepRef, debugRunToCursorRef, debugStopRef, debugEvaluateRef, signatureTriggersRef, columnSelectionModeRef, parameterInfoShowFullSignaturesRef, onSelectionChangeRef, onFoldProvenanceChangeRef, lastSelectionRef, selectionOriginRef, onViewportChangeRef, hostRef, transactionOwnerRef, fileKeyRef, viewIdRef, selectionEmitTimerRef, viewportEmitTimerRef, onViewStateChangeRef, viewStateEmitTimerRef, lastEmittedViewStateRef, onSaveRef, onParameterTriggerRef, onExpandSelectionRef, pointerClickCountRef, shiftExtendKeyRef, basicCompletionReopenRef, visibleRef, activeRef, onLightbulbRef, overlayCompartment, semanticTokensCompartment, onRunGutterClickRef, gitCompartment, onGitChangeClickRef, onHoverRef, onPinHoverDocRef, onToggleRenderedDocRawRef, onDefinitionRef, onReferencesRef, workspaceActionHostRef, onParameterEscapeRef, onContextMenuRef, currentCompositionSessionRef, compositionActiveRef, onChangeRef, onParameterInvalidateRef, restoringInitialViewStateRef, userInteractedSinceMountRef, pendingDeferredScrollRef, selectionKeyTrackerCleanupRef, initialViewStateRef, compositionEndFinalizeRef, compositionSessionSeqRef, onGoToLineRequestRef, workspaceHistoryClaimRef, onClipboardUnavailableRef, onClipboardObservationRef, renderedCompletionPolicyRef, editorViewId, historyReplayRef, resolveGateUi };
+  return { getCompletionIdentityRef, viewRef, pathRef, completionCompartment, onCompleteRef, onCompleteResolveRef, completionTriggersRef, onCompletionDiagnosticRef, onScopeFallbackRef, onCompletionUnavailableRef, presentResolveGateRef, pendingCompletionAcceptanceRef, resolveGateSequenceRef, setResolveGateUi, completionControllerRef, onToggleBreakpointRef, onEditBreakpointRef, breakpointGutterActionsRef, debugStepRef, debugRunToCursorRef, debugStopRef, debugEvaluateRef, signatureTriggersRef, columnSelectionModeRef, parameterInfoShowFullSignaturesRef, onSelectionChangeRef, onFoldProvenanceChangeRef, lastSelectionRef, selectionOriginRef, onViewportChangeRef, hostRef, transactionOwnerRef, fileKeyRef, viewIdRef, selectionEmitTimerRef, viewportEmitTimerRef, onViewStateChangeRef, viewStateLifecycleRef, lastEmittedViewStateRef, onSaveRef, onParameterTriggerRef, onExpandSelectionRef, pointerClickCountRef, shiftExtendKeyRef, basicCompletionReopenRef, visibleRef, activeRef, onLightbulbRef, overlayCompartment, semanticTokensCompartment, onRunGutterClickRef, gitCompartment, onGitChangeClickRef, onHoverRef, onPinHoverDocRef, onToggleRenderedDocRawRef, onDefinitionRef, onReferencesRef, workspaceActionHostRef, onParameterEscapeRef, onContextMenuRef, currentCompositionSessionRef, compositionActiveRef, onChangeRef, onParameterInvalidateRef, restoringInitialViewStateRef, userInteractedSinceMountRef, pendingDeferredScrollRef, selectionKeyTrackerCleanupRef, initialViewStateRef, compositionEndFinalizeRef, compositionSessionSeqRef, onGoToLineRequestRef, workspaceHistoryClaimRef, onClipboardUnavailableRef, onClipboardObservationRef, renderedCompletionPolicyRef, editorViewId, historyReplayRef, resolveGateUi };
 }

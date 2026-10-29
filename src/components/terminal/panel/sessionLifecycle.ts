@@ -36,7 +36,7 @@ function setupTerminalSession(controllerContext: TerminalSessionLifecycleContext
     unlistenAuthPrompt: null,
     detachImeGuard: null,
     cleanupImePositionLock: null,
-    resizeTimer: undefined,
+    resizeFrame: undefined,
     activityPromptTimer: undefined,
     sshLaunchTimer: undefined,
     sockscapLaunchTimer: undefined,
@@ -226,10 +226,14 @@ function setupTerminalSession(controllerContext: TerminalSessionLifecycleContext
   });
 
   const observer = new ResizeObserver(() => {
-    clearTimeout(lifetime.resizeTimer);
-    lifetime.resizeTimer = setTimeout(() => {
-      controllerContext.fitVisibleTerminal();
-    }, 100);
+    // A moved portal is already interactive. Fit its latest geometry on the
+    // next frame so input does not race a PTY resize a hundred ms later.
+    // Coalesce drag notifications to at most one measurement per frame.
+    if (lifetime.resizeFrame !== undefined) return;
+    lifetime.resizeFrame = requestAnimationFrame(() => {
+      lifetime.resizeFrame = undefined;
+      if (!lifetime.destroyed) controllerContext.fitVisibleTerminal();
+    });
   });
   observer.observe(el);
 
@@ -290,7 +294,7 @@ function setupTerminalSession(controllerContext: TerminalSessionLifecycleContext
     scrollDisposable.dispose();
     renderDisposable.dispose();
     resizeDisposable.dispose();
-    clearTimeout(lifetime.resizeTimer);
+    if (lifetime.resizeFrame !== undefined) cancelAnimationFrame(lifetime.resizeFrame);
     window.clearInterval(automationStateTimer);
     if (lifetime.activityPromptTimer) clearTimeout(lifetime.activityPromptTimer);
     if (lifetime.sshLaunchTimer !== undefined) clearTimeout(lifetime.sshLaunchTimer);

@@ -89,6 +89,8 @@ export interface CodeMirrorHostProps {
   /** Store revision used when the first view creates the canonical document. */
   documentRevision?: number;
   doc: string;
+  /** False while doc is a read placeholder; it cannot restore or persist view state. */
+  documentReady?: boolean;
   visible: boolean;
   /**
    * ED-REPAIR-008: whether this editor instance belongs to the active editor group.
@@ -184,8 +186,8 @@ export interface CodeMirrorHostProps {
   onViewportChange?: (range: LspRange) => void;
   /**
    * ED-IMPROVE-007: one-shot caret/selection/scroll/fold snapshot for this
-   * leaf/file, applied when the view mounts. Later user input is never
-   * overwritten by a late restore because it is only applied here.
+   * leaf/file, applied once its document is ready. Later user input is never
+   * overwritten by a late restore.
    */
   initialViewState?: PersistedEditorViewState | null;
   /** Reports view-state changes for in-memory capture and debounced persistence. */

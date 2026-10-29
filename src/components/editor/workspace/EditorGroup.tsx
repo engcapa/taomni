@@ -483,6 +483,7 @@ export function EditorGroup({
                         workspaceActionHost={workspaceActionHost}
                         path={activeFile.languagePath}
                         doc={activeFile.text}
+                        documentReady={!activeFile.loading}
                         visible={visible}
                         active={isActiveGroup}
                         diagnostics={activeDiagnostics}
@@ -568,6 +569,7 @@ export function EditorGroup({
                       workspaceActionHost={workspaceActionHost}
                       path={activeFile.languagePath}
                       doc={activeFile.text}
+                      documentReady={!activeFile.loading}
                       visible={visible}
                       active={isActiveGroup}
                       diagnostics={activeDiagnostics}

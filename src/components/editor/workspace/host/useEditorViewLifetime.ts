@@ -23,7 +23,7 @@ import { createMountedEditorActions } from "./createMountedEditorActions";
 import { createTemplateKeybindings } from "./createTemplateKeybindings";
 import { cancelActiveHoverResize, foldHoverProvenanceTooltip, lspHoverExtension, lspNavigationExtensions } from "./intelligence";
 import { type EditorSelectionRange } from "./types";
-import { applyPersistedEditorViewState, captureEditorViewState, importFoldPathByView } from "./viewState";
+import { importFoldPathByView } from "./viewState";
 import { importFoldRange } from "../importFold";
 import { liveTemplateLanguageForPath } from "../liveTemplates";
 import { cancelLspSnippetSession, lspSnippetSessionInvalidator, resetBasicCompletionSession, type CompletionResolveGateRequest } from "../lspCompletion";
@@ -45,11 +45,13 @@ import {
 import { treeRevisionField } from "../workspaceSyntaxFacts";
 import { desiredVisualColumnField, virtualOverflowRestoreField, virtualSpaceClickHandler, virtualSpaceOverflowField, virtualSpaceTypingHandler } from "../workspaceVirtualSpace";
 import { useEditorHostRefs } from "./useEditorHostRefs";
+import { createEditorViewStateLifecycle, type EditorViewStateLifecycle } from "./editorViewStateLifecycle";
 import { EditorStateCache, reconfigureCachedEditorState } from "./editorStateCache";
 
 export interface UseEditorViewLifetimeContext {
   editor: ReturnType<typeof useEditorHostRefs>;
   doc: string;
+  documentReady: boolean;
   documentRevision: number;
   lastDocumentTextRef: import("react").RefObject<string>;
   emitSelection: (view: EditorView) => void;
@@ -107,6 +109,7 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
   const {
     editor,
     doc,
+    documentReady,
     documentRevision,
     emitSelection,
     emitViewport,
@@ -241,26 +244,8 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
         if (editor.viewRef.current === view) emitViewport(view);
       }, 125);
     };
-    // ED-IMPROVE-007: capture is cheap and stays in memory; identical
-    // snapshots are dropped so a scroll or caret move does not schedule a
-    // persistence write per event.
-    const scheduleViewStateEmit = (view: EditorView, delay = 150) => {
-      if (!editor.onViewStateChangeRef.current) return;
-      if (editor.viewStateEmitTimerRef.current !== null) {
-        window.clearTimeout(editor.viewStateEmitTimerRef.current);
-      }
-      editor.viewStateEmitTimerRef.current = window.setTimeout(() => {
-        editor.viewStateEmitTimerRef.current = null;
-        if (editor.viewRef.current !== view) return;
-        const handler = editor.onViewStateChangeRef.current;
-        if (!handler) return;
-        const captured = captureEditorViewState(view);
-        const serialized = JSON.stringify(captured);
-        if (serialized === editor.lastEmittedViewStateRef.current) return;
-        editor.lastEmittedViewStateRef.current = serialized;
-        handler(captured);
-      }, delay);
-    };
+    let viewState: EditorViewStateLifecycle | null = null;
+    const scheduleViewStateEmit = (view: EditorView, delay?: number) => viewState?.schedule(view, delay);
     const saveHandler = () => {
       editor.onSaveRef.current();
       return true;
@@ -558,6 +543,13 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
     if (editor.viewRef.current) view.setState(state);
     editorLanguageByView.set(view, liveTemplateLanguageForPath(editor.pathRef.current));
     editor.viewRef.current = view;
+    viewState = createEditorViewStateLifecycle({
+      view, refs: editor, documentReady,
+      initialState: cached ? null : editor.initialViewStateRef.current,
+      callback,
+      onRestored: (restored) => { emitSelection(restored); emitViewport(restored); },
+    });
+    editor.viewStateLifecycleRef.current = viewState;
     // ED-PARITY-011 DEC-011-07: remember whether the latest key in this view
     // was a Shift+navigation extend. Window capture sees it even when the
     // workspace dispatcher consumes the key before CodeMirror.
@@ -615,23 +607,7 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
     if (cached && (cached.scrollTop > 0 || cached.scrollLeft > 0)) {
       editor.pendingDeferredScrollRef.current = { scrollTop: cached.scrollTop, scrollLeft: cached.scrollLeft };
     }
-    const initialViewState = cached ? null : editor.initialViewStateRef.current;
-    if (initialViewState) {
-      editor.restoringInitialViewStateRef.current = true;
-      try {
-        const restoreResult = applyPersistedEditorViewState(view, initialViewState);
-        editor.pendingDeferredScrollRef.current = restoreResult.deferredScroll;
-      } finally {
-        editor.restoringInitialViewStateRef.current = false;
-      }
-      view.requestMeasure();
-    }
-    const cancelDeferredScroll = () => {
-      editor.userInteractedSinceMountRef.current = true;
-      editor.pendingDeferredScrollRef.current = null;
-    };
-    view.scrollDOM?.addEventListener("wheel", cancelDeferredScroll, { passive: true });
-    view.scrollDOM?.addEventListener("pointerdown", cancelDeferredScroll, { passive: true });
+    viewState.restoreWhenReady(documentReady);
     const disposeComposition = createCompositionLifecycle({
       view,
       compositionActiveRef: editor.compositionActiveRef,
@@ -693,25 +669,9 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
       unregisterEditorActions?.();
       clearPendingSelectionEmit();
       clearPendingViewportEmit();
-      if (editor.viewStateEmitTimerRef.current !== null) {
-        window.clearTimeout(editor.viewStateEmitTimerRef.current);
-        editor.viewStateEmitTimerRef.current = null;
-      }
-      // ED-REPAIR-009: Tail capture on unmount / teardown
-      if (editor.viewRef.current === view && callback.callback) {
-        try {
-          const captured = captureEditorViewState(view);
-          const serialized = JSON.stringify(captured);
-          if (serialized !== editor.lastEmittedViewStateRef.current) {
-            editor.lastEmittedViewStateRef.current = serialized;
-            callback.callback(captured);
-          }
-        } catch {
-          // view may be in teardown
-        }
-      }
-      view.scrollDOM?.removeEventListener("wheel", cancelDeferredScroll);
-      view.scrollDOM?.removeEventListener("pointerdown", cancelDeferredScroll);
+      const cacheReadyState = viewState?.canCapture() === true;
+      viewState?.dispose();
+      if (editor.viewStateLifecycleRef.current === viewState) editor.viewStateLifecycleRef.current = null;
       context.requestParameterInfoRef.current = null;
       cancelActiveHoverResize(context.activeHoverResizeSessionRef);
       clipboardContextByView.delete(view);
@@ -731,9 +691,11 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
       editor.basicCompletionReopenRef.current = false;
       editor.selectionKeyTrackerCleanupRef.current?.();
       editor.selectionKeyTrackerCleanupRef.current = null;
-      stateCache.current.save(sharedFileKey, {
-        state: view.state, path: documentPath, scrollTop: view.scrollDOM.scrollTop, scrollLeft: view.scrollDOM.scrollLeft,
-      });
+      if (cacheReadyState) {
+        stateCache.current.save(sharedFileKey, {
+          state: view.state, path: documentPath, scrollTop: view.scrollDOM.scrollTop, scrollLeft: view.scrollDOM.scrollLeft,
+        });
+      }
       if (owner && sharedFileKey) owner.releaseView(sharedFileKey, sharedViewId);
     };
   }, [fileKey, viewId, ownerAtRender, workspaceActionHost, clipboardWorkspaceId]);
