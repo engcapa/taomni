@@ -15,6 +15,7 @@ import { type OpenFileState, CODE_WORKSPACE_MAX_FONT_SIZE, CODE_WORKSPACE_MIN_FO
 import { type CodeWorkspaceGitManagerPayload } from "../controller/model";
 import { useWorkspaceHost } from "../workspaceHostIntegration";
 import { useT } from "../../../../lib/i18n";
+import { useCodeWorkspaceStatusStore } from "../../../../stores/codeWorkspaceStatusStore";
 
 
 export interface WorkspaceToolbarProps {
@@ -24,7 +25,6 @@ export interface WorkspaceToolbarProps {
   dirtyCount: number;
   visible: boolean;
   hasSourceBuffers: boolean;
-  workspaceWidgetHost: HTMLElement | null;
   projectFactsRoot: string;
   projectFacts: { refresh: (customOptions?: Partial<import("../../../../stores/projectFactsStore").FetchProjectFactsOptions>) => Promise<import("../../../../stores/projectFactsStore").WorkspaceProjectFactsEntry>; invalidate: (reason?: string) => void; workspaceRoot: string; generation: number; status: import("../../../../stores/projectFactsStore").ProjectFactsStatus; reason: string | null; fingerprint: string | null; structure: import("../projectStructureModel").ProjectStructureSnapshotV2 | null; provenance: import("../../../../lib/editor/workspaceTooling").MavenToolingProvenance | import("../../../../lib/editor/workspaceTooling").GradleToolingProvenance | null; isStale: boolean; abortController?: AbortController | null; };
   projectDescriptorDiscovery: import("../../../../hooks/useProjectDescriptorDiscovery").ProjectDescriptorDiscoveryState;
@@ -79,7 +79,10 @@ export interface WorkspaceToolbarProps {
 export function WorkspaceToolbar(viewProps: WorkspaceToolbarProps) {
   const host = useWorkspaceHost();
   const t = useT();
-  const { absolutePathForOpenFile, activeCapabilities, activeDebugConfiguration, activeFile, activeFileDebuggable, activeFileRunnable, activeFileSoftWrap, activeGitRoot, activeInlayHintsEnabled, activeLanguageId, activeRunConfiguration, activeRunConfigurations, buildActiveProject, closeSplit, columnSelectionMode, currentEditorFontSize, debugRuntimeAvailable, debugSessionActive, dirtyCount, executeWorkspaceCommand, gitRoots, gitRootsLoading, intelligencePreferences, javaRunBusy, looseFiles, navCan, onOpenGitManager, openTabPolicySettings, projectBuildBusy, projectDescriptorDiscovery, projectFacts, projectFactsRoot, refreshProjectFacts, rightPaneOpen, rightPaneTab, roots, runActiveTarget, setCodeViewFontSize, setStatusMessage, setSyncSplitScroll, setToolbarMoreOpen, splitEditor, splitOrientation, startDebugActiveTarget, stepCodeViewFontSize, syncSplitScroll, title, toggleColumnSelectionMode, toggleInlayHintsForActiveLanguage, toggleInlineBlame, toggleSoftWrap, toolbarMoreOpen, visible, workspaceInstanceId, workspaceWidgetHost } = viewProps;
+  // The status slot appears when the first editor publishes its status. Its
+  // portal target must not redraw the complete editor during that first paint.
+  const workspaceWidgetHost = useCodeWorkspaceStatusStore((state) => state.widgetHost);
+  const { absolutePathForOpenFile, activeCapabilities, activeDebugConfiguration, activeFile, activeFileDebuggable, activeFileRunnable, activeFileSoftWrap, activeGitRoot, activeInlayHintsEnabled, activeLanguageId, activeRunConfiguration, activeRunConfigurations, buildActiveProject, closeSplit, columnSelectionMode, currentEditorFontSize, debugRuntimeAvailable, debugSessionActive, dirtyCount, executeWorkspaceCommand, gitRoots, gitRootsLoading, intelligencePreferences, javaRunBusy, looseFiles, navCan, onOpenGitManager, openTabPolicySettings, projectBuildBusy, projectDescriptorDiscovery, projectFacts, projectFactsRoot, refreshProjectFacts, rightPaneOpen, rightPaneTab, roots, runActiveTarget, setCodeViewFontSize, setStatusMessage, setSyncSplitScroll, setToolbarMoreOpen, splitEditor, splitOrientation, startDebugActiveTarget, stepCodeViewFontSize, syncSplitScroll, title, toggleColumnSelectionMode, toggleInlayHintsForActiveLanguage, toggleInlineBlame, toggleSoftWrap, toolbarMoreOpen, visible, workspaceInstanceId } = viewProps;
  return (<header className={`${host ? "h-8 gap-1 px-2" : "h-10 gap-2 px-3"} shrink-0 flex items-center overflow-x-auto border-b border-[var(--taomni-code-border)] bg-[var(--taomni-code-gutter-bg)]`}>
         {host ? <>
           <span data-testid="workspace-editor-title" className="min-w-0 truncate font-medium" title={activeFile?.path ?? title}>

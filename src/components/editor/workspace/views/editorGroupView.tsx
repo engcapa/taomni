@@ -164,7 +164,7 @@ export interface RenderEditorGroupContext {
   setViewportRanges: (update: Parameters<import("react").Dispatch<import("react").SetStateAction<Record<string, LspRange | null>>>>[0]) => void;
   syncSplitScroll: boolean;
   splitOrientation: EditorSplitOrientation | null;
-  workspaceUi: import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi;
+  workspaceUi: Omit<import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi, "treeSelection">;
   syncScrollOriginGroupIdRef: import("react").RefObject<string | null>;
   getLspSelectionRanges: (file: OpenFileState, selection: EditorSelectionRange) => Promise<LspRange[] | null>;
   openCodeActionsForLine: (line: number) => Promise<void>;

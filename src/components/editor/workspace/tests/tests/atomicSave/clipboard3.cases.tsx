@@ -425,6 +425,13 @@ export function registeratomicSaveClipboard3Cases(caseContext: registeratomicSav
     const panes = await findEditorPanes();
     const primaryPane = panes.find((p) => p.getAttribute("data-editor-group-id") === "primary");
     const secondaryPane = panes.find((p) => p.getAttribute("data-editor-group-id") === "secondary");
+    await waitFor(() => {
+      for (const pane of [primaryPane, secondaryPane]) {
+        const editor = pane?.querySelector<HTMLElement>(".cm-editor");
+        expect(editor).toBeTruthy();
+        expect(EditorView.findFromDOM(editor!)?.state.doc.toString()).toBe("line1: alpha\nline2: beta\nline3: gamma\n");
+      }
+    });
     const primaryEditor = primaryPane?.querySelector<HTMLElement>(".cm-editor");
     const secondaryEditor = secondaryPane?.querySelector<HTMLElement>(".cm-editor");
 

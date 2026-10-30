@@ -3,6 +3,7 @@ title: Home source discovery keeps the desktop responsive and never delays ordin
 description: Exercise real automatic execution-model discovery for a public Python source below Home. Retain every activation frame and verify
   source-to-document switches, exact contents and the existing editor. The shared owned HOME fixture includes at least 2900 mixed files, 400 directories,
   64 nested project manifests, a 320-file directory and seven-level paths; its measured filesystem dimensions are retained in home-fixture-layout.json.
+  Every activation/key frame allows at most 165ms (150ms baseline plus the user-approved 10% tolerance); all raw samples are retained.
 modes:
 - native
 covers:
@@ -79,7 +80,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A real execution-model command is exercised while public source and ordinary documents meet unchanged 150ms frame and 1500ms
+    requirement: A real execution-model command is exercised while public source and ordinary documents meet 165ms frame and 1500ms
       content/highlight budgets. Warm activations reuse the editor and retain exact contents.
     actions:
     - 1

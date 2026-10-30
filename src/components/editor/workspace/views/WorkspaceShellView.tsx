@@ -22,6 +22,7 @@ import { WorkspaceEditingPopups } from "./WorkspaceEditingPopups";
 import { WorkspaceGenerationPopups } from "./WorkspaceGenerationPopups";
 import { WorkspaceNavigationPopups } from "./WorkspaceNavigationPopups";
 import { WorkspaceOperationObservations } from "./WorkspaceOperationObservations";
+import { WorkspaceCommandPublication, type WorkspaceCommandPublicationProps } from "./WorkspaceCommandPublication";
 import { WorkspaceRefactoringPopups } from "./WorkspaceRefactoringPopups";
 import { WorkspaceToolbar } from "./WorkspaceToolbar";
 import { createWorkspaceDockContents } from "./createWorkspaceDockContents";
@@ -33,6 +34,7 @@ import { useEffect, useRef } from "react";
 
 
 export interface WorkspaceShellViewProps {
+  commandPublication: WorkspaceCommandPublicationProps;
   workspaceGenerationPopupsProps: import("react").ComponentProps<typeof WorkspaceGenerationPopups>;
   workspaceDebugPopupsProps: import("react").ComponentProps<typeof WorkspaceDebugPopups>;
   workspaceEditingPopupsProps: import("react").ComponentProps<typeof WorkspaceEditingPopups>;
@@ -66,7 +68,7 @@ export interface WorkspaceShellViewProps {
   toolWindowActions: ReturnType<typeof useWorkspaceToolWindows>;
   renderToolWindowSideArea: (side: "left" | "right") => import("react").JSX.Element;
   languagePanelOpen: boolean;
-  workspaceUi: import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi;
+  workspaceUi: Omit<import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi, "treeSelection">;
   editorLayout: ReturnType<typeof createWorkspaceLayoutRenderer>;
   renderEditorGroup: ReturnType<typeof createRenderEditorGroup>;
   sideContents: ReturnType<typeof createWorkspaceSideContents>;
@@ -143,6 +145,7 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
   } = props;
   return ((
     <WorkspaceClipboardSessionContext.Provider value={clipboard.clipboardHandle}>
+      <WorkspaceCommandPublication {...props.commandPublication} />
       <WorkspaceObservationBoundary
         ref={rootRef}
         bridge={observationBridge}

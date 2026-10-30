@@ -2,6 +2,7 @@ id: TC-WS-065
 title: Ordinary JSON retains responsive real input and byte-exact native saving
 description: Open the same public 704-line JSON through real native file reading, measure 32 paced keys with a 150ms p95 input guardrail, save, close and
   reopen, and independently hash the complete disk bytes. Ordinary JSON must never start automatic SDK/LSP discovery.
+  Every activation/key frame allows at most 165ms (150ms baseline plus the user-approved 10% tolerance); all raw samples are retained.
 modes:
 - native
 covers:

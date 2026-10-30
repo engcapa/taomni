@@ -1,8 +1,9 @@
 id: TC-WS-064
 title: 704-line JSON opens and restores without blocking the workspace
 description: Activate a public 704-line JSON fixture through the real file tree, switch to notes and return, then restore from Home. Require the exact canonical
-  document and visible syntax highlighting within 1500ms, every frame gap at most 150ms through one second after highlighting, and zero automatic SDK/LSP
+  document and visible syntax highlighting within 1500ms, every frame gap at most 165ms through one second after highlighting, and zero automatic SDK/LSP
   requests. Retain every frame and real driver action time; do not inject document contents.
+  Every activation/key frame allows at most 165ms (150ms baseline plus the user-approved 10% tolerance); all raw samples are retained.
 modes:
 - browser
 - native
@@ -114,7 +115,7 @@ verification:
   requirements:
   - id: R1
     requirement: Activate a public 704-line JSON fixture through the real file tree, switch to notes and return, then restore from Home. Require the exact
-      canonical document and visible syntax highlighting within 1500ms, every frame gap at most 150ms through one second after highlighting, and zero automatic
+      canonical document and visible syntax highlighting within 1500ms, every frame gap at most 165ms through one second after highlighting, and zero automatic
       SDK/LSP requests. Retain every frame and real driver action time; do not inject document contents.
     actions:
     - 4

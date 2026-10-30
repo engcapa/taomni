@@ -3,10 +3,20 @@
 `TC-WS-064`–`069` use a capture listener on the real file-tree/tab activation.
 The in-app animation-frame observer checks the exact visible canonical document,
 JSON syntax highlighting where applicable, the 1500ms content/highlight budget,
-and **every** frame gap against 150ms until one second after readiness. Plain
+and **every** frame gap against a 150ms baseline until one second after readiness. Plain
 text explicitly omits the syntax-token requirement. Native cases retain real
 keyboard input, save/reopen and full disk SHA checks. No SDK/LSP auto-discovery
 is allowed for these ordinary documents.
+
+On 2026-10-30 the user authorized up to 10% slowness for long frames. Individual
+activation and held-SDK key frames therefore pass at **at most 165ms**. Reports
+retain the 150ms baseline, 10% tolerance, 165ms limit and every unrounded raw
+sample. Any frame above 165ms still fails, including a late settled frame.
+The 1500ms content/highlight/action deadlines, input p95 guardrails and real
+five-second SDK timeout remain unchanged. Historical runs retain their original
+results; a new run with the revised runner/case identity is required. This
+acceptance change does not establish a product speedup or waive comparison with
+main.
 
 When the window is narrow, reveal a clipped outer tab using its real left/right
 scroll buttons before starting the activation measurement. Check that scrolling

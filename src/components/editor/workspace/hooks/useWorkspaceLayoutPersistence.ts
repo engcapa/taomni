@@ -8,6 +8,8 @@ import type { CodeWorkspaceFileRef,CodeWorkspaceLooseFileInfo,CodeWorkspaceRootI
 import { type LibraryBufferInfo,fileKey,initialFileRef } from "../codeWorkspaceModel";
 import { createRestoreTimingRecorder,executeBoundedAsyncQueue,planWorkspaceRestore } from "../workspaceRestoreModel";
 import { createPersistWorkspaceLayoutNow } from "../controller/layoutPersistence";
+import type { WorkspaceViewStateChanges } from "../workspaceViewStateChanges";
+import { useWorkspaceLayoutSaveScheduler } from "./useWorkspaceLayoutSaveScheduler";
 
 
 export interface UseWorkspaceLayoutPersistenceContext {
@@ -35,14 +37,14 @@ export interface UseWorkspaceLayoutPersistenceContext {
   activeEditorGroupId: string;
   expandedRootIds: string[];
   expandedDirKeys: string[];
-  workspaceUi: import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi;
+  workspaceUi: Omit<import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi, "treeSelection">;
   tabPolicyRef: import("react").RefObject<WorkspaceTabPolicyV3>;
   viewStatesRef: import("react").RefObject<WorkspaceViewStates>;
   openFilesRef: import("react").RefObject<Record<string,import("../editorGroupTypes").OpenFileViewModel>>;
   setStatusMessage: (message: string) => void;
   persistWorkspaceLayoutNowRef: import("react").RefObject<((targetInstanceId?: string) => void)|null>;
   tabPolicyRevision: number;
-  viewStateRevision: number;
+  viewStateChanges: WorkspaceViewStateChanges;
   workspaceInstanceIdRef: import("react").RefObject<string>;
 }
 
@@ -81,7 +83,7 @@ export function useWorkspaceLayoutPersistence(context: UseWorkspaceLayoutPersist
     setStatusMessage,
     persistWorkspaceLayoutNowRef,
     tabPolicyRevision,
-    viewStateRevision,
+    viewStateChanges,
     workspaceInstanceIdRef,
   }=context;
 
@@ -276,12 +278,14 @@ export function useWorkspaceLayoutPersistence(context: UseWorkspaceLayoutPersist
 
   persistWorkspaceLayoutNowRef.current=persistWorkspaceLayoutNow;
 
+  const { schedule: scheduleLayoutSave, cancel: cancelLayoutSave } = useWorkspaceLayoutSaveScheduler(
+    workspaceInstanceId, persistWorkspaceLayoutNowRef, viewStateChanges,
+  );
+
   useEffect(() => {
     if(!workspaceInstanceId) return;
-    const timer=window.setTimeout(() => {
-      persistWorkspaceLayoutNowRef.current?.(workspaceInstanceId);
-    },250);
-    return () => window.clearTimeout(timer);
+    scheduleLayoutSave();
+    return cancelLayoutSave;
   },[
     activeEditorGroupId,
     bottomDockOpen,
@@ -297,7 +301,8 @@ export function useWorkspaceLayoutPersistence(context: UseWorkspaceLayoutPersist
     workspaceUi.layoutTreeV2,
     workspaceUi.shellChromeState,
     tabPolicyRevision,
-    viewStateRevision,
+    scheduleLayoutSave,
+    cancelLayoutSave,
   ]);
 
   // ED-REPAIR-009: Flush layout snapshot on workspace unmount / window close

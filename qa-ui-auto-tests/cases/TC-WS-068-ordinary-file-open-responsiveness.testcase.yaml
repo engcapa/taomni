@@ -1,8 +1,9 @@
 id: TC-WS-068
 title: Ordinary and unclassified text files open with continuously responsive frames
 description: Cold-open txt, log, csv and an unclassified text extension through the real file tree. Each exact visible canonical document must appear within
-  1500ms; every animation-frame gap through one settled second must stay within 150ms. Plain documents do not fabricate syntax highlighting, and no automatic
+  1500ms; every animation-frame gap through one settled second must stay within 165ms (150ms baseline + 10% tolerance). Plain documents do not fabricate syntax highlighting, and no automatic
   SDK/LSP discovery is allowed.
+  Every activation/key frame allows at most 165ms (150ms baseline plus the user-approved 10% tolerance); all raw samples are retained.
 modes:
 - browser
 - native
@@ -109,7 +110,7 @@ verification:
   requirements:
   - id: R1
     requirement: Cold-open txt, log, csv and an unclassified text extension through the real file tree. Each exact visible canonical document must appear
-      within 1500ms; every animation-frame gap through one settled second must stay within 150ms. Plain documents do not fabricate syntax highlighting,
+      within 1500ms; every animation-frame gap through one settled second must stay within 165ms (150ms baseline + 10% tolerance). Plain documents do not fabricate syntax highlighting,
       and no automatic SDK/LSP discovery is allowed.
     actions:
     - 4

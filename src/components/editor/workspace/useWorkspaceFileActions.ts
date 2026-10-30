@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, type Dispatch, type RefObject, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, type Dispatch, type RefObject, type SetStateAction } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { confirmAppDialog, promptAppDialog } from "../../../lib/appDialogs";
 import { writeText } from "../../../lib/clipboard";
@@ -52,6 +52,7 @@ interface UseWorkspaceFileActionsOptions {
   roots: CodeWorkspaceRootInfo[];
   gitRoots: WorkspaceGitRoot[];
   selected: TreeSelection | null;
+  getSelected?: () => TreeSelection | null;
   activeKey: string | null;
   openFiles: Record<string, OpenFileState>;
   directories: Record<string, DirectoryState>;
@@ -85,6 +86,7 @@ interface UseWorkspaceFileActionsOptions {
 
 export interface WorkspaceFileActionsController {
   selectedRootDirectory: RootDirectory | null;
+  getSelectedRootDirectory: () => RootDirectory | null;
   copyTreePath: (rootId: string, path: string, absolute: boolean) => Promise<void>;
   addRoot: () => Promise<void>;
   addLooseFilePath: (path: string) => Promise<void>;
@@ -114,6 +116,7 @@ export function useWorkspaceFileActions({
   roots,
   gitRoots,
   selected,
+  getSelected,
   activeKey,
   openFiles,
   directories,
@@ -272,7 +275,9 @@ export function useWorkspaceFileActions({
     if (!wasExpanded && (!state?.loaded || state.error)) void loadDir(rootId, path);
   }, [directories, expandedDirs, loadDir, setExpandedDirs]);
 
-  const selectedRootDirectory = useMemo<RootDirectory | null>(() => {
+  const readSelection = useCallback(() => getSelected ? getSelected() : selected, [getSelected, selected]);
+  const getSelectedRootDirectory = useCallback((): RootDirectory | null => {
+    const selected = readSelection();
     if (selected?.kind === "dir") return { rootId: selected.rootId, path: selected.path };
     if (selected?.kind === "file" && selected.ref.kind === "root") {
       return { rootId: selected.ref.rootId, path: parentPath(selected.ref.path) };
@@ -284,10 +289,10 @@ export function useWorkspaceFileActions({
       }
     }
     return roots[0] ? { rootId: roots[0].id, path: "" } : null;
-  }, [activeKey, openFiles, roots, selected]);
+  }, [activeKey, openFiles, roots, readSelection]);
 
   const createFile = useCallback(async (target?: RootDirectory) => {
-    const directory = target ?? selectedRootDirectory;
+    const directory = target ?? getSelectedRootDirectory();
     if (!directory) {
       onStatus("Add a folder before creating files");
       return;
@@ -331,12 +336,12 @@ export function useWorkspaceFileActions({
     notifyWorkspaceFileOperationCompleted,
     openFile,
     prepareWorkspaceFileOperation,
-    selectedRootDirectory,
+    getSelectedRootDirectory,
     setSelected,
   ]);
 
   const createDir = useCallback(async (target?: RootDirectory) => {
-    const directory = target ?? selectedRootDirectory;
+    const directory = target ?? getSelectedRootDirectory();
     if (!directory) {
       onStatus("Add a folder before creating directories");
       return;
@@ -378,13 +383,13 @@ export function useWorkspaceFileActions({
     onStatus,
     notifyWorkspaceFileOperationCompleted,
     prepareWorkspaceFileOperation,
-    selectedRootDirectory,
+    getSelectedRootDirectory,
     setExpandedDirs,
     setSelected,
   ]);
 
   const renameSelected = useCallback(async (target?: TreeSelection) => {
-    const selection = target ?? selected;
+    const selection = target ?? readSelection();
     if (!selection) return;
     if (selection.kind === "root") {
       const root = findRoot(selection.rootId);
@@ -474,14 +479,14 @@ export function useWorkspaceFileActions({
     notifyWorkspaceFileOperationCompleted,
     onStatus,
     prepareWorkspaceFileOperation,
-    selected,
+    readSelection,
     setLooseFiles,
     setRoots,
     workspaceId,
   ]);
 
   const deleteSelected = useCallback(async (target?: TreeSelection) => {
-    const selection = target ?? selected;
+    const selection = target ?? readSelection();
     if (!selection) return;
     if (selection.kind === "root") {
       const root = findRoot(selection.rootId);
@@ -592,7 +597,7 @@ export function useWorkspaceFileActions({
     openOrderRef,
     prepareWorkspaceFileOperation,
     removeTreeDataRoot,
-    selected,
+    readSelection,
     setActiveKey,
     setLooseFiles,
     setOpenFiles,
@@ -730,7 +735,8 @@ export function useWorkspaceFileActions({
   }, [findRoot, gitRoots, notifyWorkspacePathGitChanged, onStatus]);
 
   return {
-    selectedRootDirectory,
+    get selectedRootDirectory() { return getSelectedRootDirectory(); },
+    getSelectedRootDirectory,
     copyTreePath,
     addRoot,
     addLooseFilePath,

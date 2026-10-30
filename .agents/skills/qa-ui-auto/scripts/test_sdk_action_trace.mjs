@@ -41,8 +41,8 @@ function harness() {
     window, install, listeners, frames, disconnected: () => disconnected,
     change(value) { text = value; mutation(); },
     click() { listeners.get("dblclick")({ type: "dblclick", target: new Element() }); },
-    frame() {
-      now += 16;
+    frame(gapMs = 16) {
+      now += gapMs;
       const pending = [...frames.values()]; frames.clear();
       for (const callback of pending) callback();
     },
@@ -63,10 +63,21 @@ test("passively records input, next frames and canonical/DOM publication", () =>
   assert.equal(state.documents[0].text, "source");
   assert.equal(state.documents.at(-1).text, "Weekly notes");
   assert.equal(state.pendingInputFrames, 0);
+  assert.equal(state.heartbeatFrames.length, 1);
+  assert.equal(state.heartbeatFrames[0].gapMs, 16);
   assert.equal(h.disconnected(), true);
   assert.equal(h.listeners.size, 0);
   assert.equal(h.frames.size, 0);
   assert.equal(h.window.__QA_SDK_ACTION_TRACE__, undefined);
+});
+
+test("retains a renderer stall between user actions and cancels the continuous observer", () => {
+  const h = harness(); h.install("owner");
+  h.frame(); h.frame(985); h.frame();
+  const state = h.window.__QA_SDK_ACTION_TRACE__.finish();
+  assert.deepEqual(Array.from(state.heartbeatFrames, (frame) => frame.gapMs), [16, 985, 16]);
+  assert.equal(state.inputs.length, 0);
+  assert.equal(h.frames.size, 0);
 });
 
 test("cleanup cancels every pending frame and leaves no listener or observer", () => {

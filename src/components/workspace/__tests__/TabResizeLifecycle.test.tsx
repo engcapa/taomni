@@ -32,6 +32,7 @@ function Strip({ elementRef, overflow, atEnd, setTabElement }: {
 function WorkspaceStrip({ activeKey }: { activeKey: string }) {
   const { scrollRef, scrollState, setTabElement, scrollBy } = useWorkspaceTabScroll("workspace", undefined, activeKey);
   return <>
+    <button onClick={() => scrollBy("left")}>Scroll left</button>
     <button onClick={() => scrollBy("right")}>Scroll right</button>
     <Strip elementRef={scrollRef} {...scrollState} setTabElement={setTabElement} />
   </>;
@@ -116,6 +117,29 @@ it("keeps manual tab scrolling across resize notifications until the active tab 
   view.rerender(<WorkspaceStrip activeKey="b" />);
   act(h.flush);
   expect(g.left).toBe(900);
+});
+
+it("reveals a clipped tab in either direction without jumping past its other edge", () => {
+  const h = resizeHarness();
+  render(<WorkspaceStrip activeKey="a" />);
+  const g = geometry();
+  g.setWidth(319);
+  const strip = screen.getByTestId("strip");
+  vi.mocked(strip.getBoundingClientRect).mockImplementation(() => ({ left: 375.5, right: 694.5 } as DOMRect));
+  const tab = screen.getByTestId("tab-b");
+  vi.mocked(tab.getBoundingClientRect).mockImplementation(() => ({
+    left: 604.4375 - g.left, right: 723.765625 - g.left, width: 119.328125,
+  } as DOMRect));
+  act(h.flush);
+  fireEvent.click(screen.getByRole("button", { name: "Scroll right" }));
+  expect(tab.getBoundingClientRect().left).toBeGreaterThanOrEqual(375.5);
+  expect(tab.getBoundingClientRect().right).toBeLessThanOrEqual(694.5);
+  strip.scrollLeft = 255;
+  fireEvent.click(screen.getByRole("button", { name: "Scroll left" }));
+  expect(tab.getBoundingClientRect().left).toBeGreaterThanOrEqual(375.5);
+  expect(tab.getBoundingClientRect().right).toBeLessThanOrEqual(694.5);
+  act(() => { h.deliver(); h.flush(); });
+  expect(tab.getBoundingClientRect().left).toBeGreaterThanOrEqual(375.5);
 });
 
 describe.each([

@@ -17,7 +17,7 @@ import { useWorkspaceTreeModel } from "./useWorkspaceTreeModel";
 
 
 export interface UseWorkspaceDocumentLanguageContext {
-  workspaceUi: import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi;
+  workspaceUi: Omit<import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi, "treeSelection">;
   lsp: ReturnType<typeof useWorkspaceLspSession>;
   bufferState: ReturnType<typeof useWorkspaceBufferState>;
   intelligence: ReturnType<typeof useWorkspaceIntelligencePreferences>;

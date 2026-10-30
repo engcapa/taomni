@@ -2,6 +2,7 @@
 import shutil
 import tempfile
 import json
+import stat
 from pathlib import Path
 from typing import Any
 
@@ -47,4 +48,12 @@ def teardown(ctx: Any) -> None:
     # Never glob or traverse a personal project/profile during cleanup.
     if root.parent != Path.home().resolve() or not root.name.startswith("taomni-qa-perf-") or root.is_symlink():
         raise RuntimeError("Refusing to clean an unowned home performance fixture")
-    shutil.rmtree(root)
+    def remove_readonly(function, path, error):
+        target = Path(path)
+        if not isinstance(error[1], PermissionError) or target.is_symlink() or not target.resolve().is_relative_to(root.resolve()):
+            raise error[1]
+        # Git objects are read-only on Windows. Retry only within this owned
+        # fixture and let a still-locked file or any unrelated failure surface.
+        target.chmod(stat.S_IMODE(target.stat().st_mode) | stat.S_IWRITE)
+        function(path)
+    shutil.rmtree(root, onerror=remove_readonly)

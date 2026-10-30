@@ -12,7 +12,7 @@ export interface UseWorkspaceSplitsContext {
   splitLayoutLeaf: (instanceId: string,leafId: string,orientation: "horizontal"|"vertical",newFileKey?: string) => void;
   workspaceInstanceId: string;
   closeLayoutLeaf: (instanceId: string,leafId: string) => void;
-  workspaceUi: import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi;
+  workspaceUi: Omit<import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi, "treeSelection">;
   setStoreActiveEditorGroup: (instanceId: string,groupId: EditorGroupId) => void;
   setStatusMessage: (message: string) => void;
   moveLayoutTabStore: (instanceId: string,sourceLeafId: string,targetLeafId: string,fileKey: string) => void;

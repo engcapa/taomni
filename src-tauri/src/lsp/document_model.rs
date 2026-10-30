@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 pub(super) struct WorkspaceWatcherHandle {
+    pub(super) watcher_id: Option<String>,
     pub(super) cancelled: tokio_util::sync::CancellationToken,
     pub(super) task: tokio::task::JoinHandle<()>,
 }

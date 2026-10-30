@@ -5,6 +5,21 @@ import type { WorkspaceCommand } from "./workspaceCommands";
 import type { WorkspaceActionContext } from "./workspaceActionRegistry";
 
 describe("useWorkspaceActionsController", () => {
+  it("publishes newly registered commands without recomposing their editor owner", () => {
+    const renders = vi.fn();
+    const command = (title: string): WorkspaceCommand => ({ id: "workspace.publication", title, category: "Edit", run: vi.fn() });
+    const { result, rerender } = renderHook(({ commands }) => {
+      renders();
+      return useWorkspaceActionsController({ commands });
+    }, { initialProps: { commands: [command("First")] } });
+    expect(result.current.snapshot[0]?.title).toBe("First");
+    expect(renders).toHaveBeenCalledTimes(1);
+    renders.mockClear();
+    rerender({ commands: [command("Replacement")] });
+    expect(result.current.snapshot[0]?.title).toBe("Replacement");
+    expect(renders).toHaveBeenCalledTimes(1);
+  });
+
   it("projects an owner context change once with the current availability", () => {
     const commands: WorkspaceCommand[] = [{
       id: "editor.liveFile", title: "File", category: "Edit",

@@ -6,6 +6,8 @@ import {
   lspDefinition,
   lspDetectServers,
   lspStopWorkspace,
+  lspStartWorkspaceWatcher,
+  lspStopWorkspaceWatcher,
   nextLspRequestSequence,
   type LspDocumentDescriptor,
   type LspLocationsResult,
@@ -30,6 +32,23 @@ describe("workspace provider and explorer lifetime boundary", () => {
     expect(await lspStopWorkspace("workspace", true)).toBe(1);
     expect(coreMocks.invoke).toHaveBeenCalledWith("lsp_stop_workspace", {
       workspaceId: "workspace", preserveFileWatcher: true,
+    });
+  });
+
+  it("passes registration ownership without changing legacy watcher payloads", async () => {
+    await lspStartWorkspaceWatcher("workspace", ["/repo"]);
+    expect(coreMocks.invoke).toHaveBeenLastCalledWith("lsp_start_workspace_watcher", {
+      workspaceId: "workspace", roots: ["/repo"],
+    });
+    await lspStopWorkspaceWatcher("workspace");
+    expect(coreMocks.invoke).toHaveBeenLastCalledWith("lsp_stop_workspace_watcher", { workspaceId: "workspace" });
+    await lspStartWorkspaceWatcher("workspace", ["/repo"], ["/repo/src"], "owner");
+    expect(coreMocks.invoke).toHaveBeenLastCalledWith("lsp_start_workspace_watcher", {
+      workspaceId: "workspace", roots: ["/repo"], directories: ["/repo/src"], watcherId: "owner",
+    });
+    await lspStopWorkspaceWatcher("workspace", "owner");
+    expect(coreMocks.invoke).toHaveBeenLastCalledWith("lsp_stop_workspace_watcher", {
+      workspaceId: "workspace", watcherId: "owner",
     });
   });
 });

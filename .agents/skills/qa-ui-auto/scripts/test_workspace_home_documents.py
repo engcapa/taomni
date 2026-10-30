@@ -3,6 +3,8 @@ from types import SimpleNamespace
 import tempfile
 import unittest
 import json
+import os
+import stat
 from unittest.mock import patch
 
 from qa_ui_auto.fixtures import workspace_home_documents as fixture
@@ -52,6 +54,29 @@ class HomeFixtureOwnershipTests(unittest.TestCase):
         for path in [Path.home(), Path.home() / ".local/share/com.taomni.app.qa", Path("/tmp/taomni-qa-perf-fake")]:
             with self.subTest(path=path), self.assertRaisesRegex(RuntimeError, "unowned"):
                 fixture.teardown(SimpleNamespace(values={"workspace_home_fixture_root": str(path)}))
+
+    def test_cleanup_retries_readonly_git_objects_and_propagates_other_errors(self):
+        with tempfile.TemporaryDirectory() as folder:
+            home = Path(folder)
+            owned = home / "taomni-qa-perf-readonly"
+            owned.mkdir()
+            git_object = owned / "git-object"
+            git_object.write_text("public object")
+            git_object.chmod(stat.S_IREAD)
+            ctx = SimpleNamespace(values={"workspace_home_fixture_root": str(owned)})
+            def remove_readonly(root, **kwargs):
+                handler = kwargs.get("onerror")
+                self.assertIsNotNone(handler)
+                remove = lambda path: self.assertTrue(Path(path).stat().st_mode & stat.S_IWRITE)
+                handler(remove, str(git_object), (PermissionError, PermissionError("readonly"), None))
+                self.assertTrue(git_object.exists())
+                denied = RuntimeError("not a permissions error")
+                with self.assertRaisesRegex(RuntimeError, "not a permissions error"):
+                    handler(os.unlink, str(git_object), (RuntimeError, denied, None))
+            with patch.object(fixture.Path, "home", return_value=home), patch.object(
+                fixture.shutil, "rmtree", side_effect=remove_readonly,
+            ):
+                fixture.teardown(ctx)
 
     def test_browser_cannot_silently_replace_a_real_home_case(self):
         with self.assertRaisesRegex(RuntimeError, "native"):

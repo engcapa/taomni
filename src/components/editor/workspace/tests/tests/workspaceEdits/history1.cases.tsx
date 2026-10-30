@@ -166,6 +166,8 @@ export function registerworkspaceEditsHistory1Cases(caseContext: registerworkspa
     await screen.findByTitle("app / src/main.ts");
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
 
+    await waitFor(() => expect(document.querySelector(".cm-content")?.textContent).toBe("x=1"));
+
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
     await waitFor(() => expect(caseContext.workspaceTestHarness.lspMocks.lspCodeActions).toHaveBeenCalled());
     fireEvent.click(await screen.findByRole("button", { name: "Insert space" }));
@@ -292,6 +294,8 @@ export function registerworkspaceEditsHistory1Cases(caseContext: registerworkspa
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
     await screen.findByTitle("app / src/main.ts");
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
+
+    await waitFor(() => expect(document.querySelector(".cm-content")?.textContent).toBe("x=1"));
 
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
     fireEvent.click(await screen.findByRole("button", { name: "Insert space" }));

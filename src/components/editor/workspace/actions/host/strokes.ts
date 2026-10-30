@@ -82,8 +82,10 @@ export const definitionShortcutCache = new WeakMap<
 >();
 
 /** Parse an action's built-in default keybinding strings into physical strokes. */
-export function parseDefinitionKeybindings(action: WorkspaceActionDefinition): readonly Shortcut[] {
-  const platform = detectKeymapPlatform();
+export function parseDefinitionKeybindings(
+  action: WorkspaceActionDefinition,
+  platform: KeymapPlatform = detectKeymapPlatform(),
+): readonly Shortcut[] {
   const cached = definitionShortcutCache.get(action);
   if (cached && cached.platform === platform) return cached.shortcuts;
   // Command adapters are recreated whenever the workspace re-registers its

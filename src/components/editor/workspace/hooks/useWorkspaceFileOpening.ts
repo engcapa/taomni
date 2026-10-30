@@ -56,7 +56,7 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
       [groupId]: { ...(leaf ?? {}), [fileKey]: state },
     };
     if (session.mountedRef.current) {
-      session.layoutHydration.setViewStateRevision((revision) => revision + 1);
+      session.layoutHydration.viewStateChanges.notify();
     } else {
       persistWorkspaceLayoutNowRef.current?.(session.workspaceInstanceId);
     }
@@ -244,7 +244,7 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
     setStatusMessage: session.setStatusMessage,
     persistWorkspaceLayoutNowRef,
     tabPolicyRevision: session.tabPolicyOwner.tabPolicyRevision,
-    viewStateRevision: session.layoutHydration.viewStateRevision,
+    viewStateChanges: session.layoutHydration.viewStateChanges,
     workspaceInstanceIdRef: project.semanticQueries.workspaceInstanceIdRef,
   });
 
@@ -269,7 +269,8 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
     locationController: project.workspaceLocationControllerRef.current,
     roots: project.projectTree.roots,
     gitRoots: project.gitSnapshotOwner.gitRoots,
-    selected: session.workspaceUi.treeSelection,
+    selected: null,
+    getSelected: session.getTreeSelection,
     activeKey: session.workspaceUi.activeKey,
     openFiles: session.workspaceUi.openFiles,
     directories: project.projectTree.treeData.directories,
@@ -310,7 +311,8 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
     openFile,
     openTerminalAt,
     terminalDockRef: ports.terminalDockRef,
-    selected: session.workspaceUi.treeSelection,
+    selected: null,
+    getSelected: session.getTreeSelection,
     treeOpening,
     editorCommands: session.editorCommands,
     workspaceCommandRunnerRef: ports.workspaceCommandRunnerRef,

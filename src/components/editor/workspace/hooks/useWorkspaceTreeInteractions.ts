@@ -33,6 +33,7 @@ export interface UseWorkspaceTreeInteractionsContext {
   openTerminalAt: (rootId: string, path: string, pathIsFile?: boolean) => void;
   terminalDockRef: import("react").RefObject<TerminalDockHandle | null>;
   selected: TreeSelection | null;
+  getSelected?: () => TreeSelection | null;
   treeOpening: ReturnType<typeof useWorkspaceTreeOpening>;
   editorCommands: ReturnType<typeof useWorkspaceEditorCommands>;
   workspaceCommandRunnerRef: import("react").RefObject<(commandId: string, context?: WorkspaceCommandContext) => boolean>;
@@ -54,6 +55,7 @@ export function useWorkspaceTreeInteractions(context: UseWorkspaceTreeInteractio
     openTerminalAt,
     terminalDockRef,
     selected,
+    getSelected,
     treeOpening,
     editorCommands,
     workspaceCommandRunnerRef,
@@ -265,6 +267,7 @@ export function useWorkspaceTreeInteractions(context: UseWorkspaceTreeInteractio
   }, [openTerminalAt, setStatusMessage]);
 
   const handleTreeKeyDown = useCallback((event: React.KeyboardEvent<HTMLElement>) => {
+    const selection = getSelected ? getSelected() : selected;
     const pane = treeFocus.treePaneRef.current;
     const target = event.target;
     if (!pane || !(target instanceof HTMLElement) || event.nativeEvent.isComposing) return;
@@ -283,10 +286,10 @@ export function useWorkspaceTreeInteractions(context: UseWorkspaceTreeInteractio
     }
     if (key === "Enter") {
       event.preventDefault();
-      if (selected?.kind === "file") {
-        void treeOpening.requestTreeOpen(selected.ref, { split: event.ctrlKey || event.metaKey });
-      } else if (selected?.kind === "root") fileActions.toggleRoot(selected.rootId);
-      else if (selected?.kind === "dir") fileActions.toggleDir(selected.rootId, selected.path);
+      if (selection?.kind === "file") {
+        void treeOpening.requestTreeOpen(selection.ref, { split: event.ctrlKey || event.metaKey });
+      } else if (selection?.kind === "root") fileActions.toggleRoot(selection.rootId);
+      else if (selection?.kind === "dir") fileActions.toggleDir(selection.rootId, selection.path);
       return;
     }
     if ((event.nativeEvent as KeyboardEvent).isComposing) return;
@@ -297,12 +300,12 @@ export function useWorkspaceTreeInteractions(context: UseWorkspaceTreeInteractio
     }
     if (key === "F2") {
       event.preventDefault();
-      workspaceCommandRunnerRef.current("workspace.tree.rename", { focus: "tree", payload: { selection: selected ?? undefined } });
+      workspaceCommandRunnerRef.current("workspace.tree.rename", { focus: "tree", payload: { selection: selection ?? undefined } });
     } else if (key === "Delete") {
       event.preventDefault();
-      workspaceCommandRunnerRef.current("workspace.tree.delete", { focus: "tree", payload: { selection: selected ?? undefined } });
+      workspaceCommandRunnerRef.current("workspace.tree.delete", { focus: "tree", payload: { selection: selection ?? undefined } });
     }
-  }, [editorCommands.handleReturnToEditor, treeOpening.requestTreeOpen, selected, uiActions.setSelected, fileActions.toggleDir, fileActions.toggleRoot]);
+  }, [editorCommands.handleReturnToEditor, treeOpening.requestTreeOpen, getSelected, selected, uiActions.setSelected, fileActions.toggleDir, fileActions.toggleRoot]);
 
   const showTreeContextMenu = useCallback(
     createShowTreeContextMenu({

@@ -22,14 +22,14 @@ steps:
 - vault_first_run: qa-ws-native-explorer
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="code-workspace-tree-empty"]'
-- click: '[data-testid="code-workspace-tree-add-folder"]'
 - native_folder_dialog:
+    trigger: '[data-testid="code-workspace-tree-add-folder"]'
     action: cancel
 - assert_count:
     selector: '[data-testid="code-workspace-tree-root"]'
     equal: 0
-- click: '[data-testid="code-workspace-tree-add-folder"]'
 - native_folder_dialog:
+    trigger: '[data-testid="code-workspace-tree-add-folder"]'
     action: choose
     path: ${fixture.platform_workspace_root}
 - wait_for: '[data-testid="code-workspace-tree-root"]'
@@ -122,81 +122,79 @@ verification:
     actions:
     - 3
     - 5
-    - 6
-    - 8
-    - 9
-    - 11
-    - 12
-    - 14
-    - 18
-    - 21
-    - 22
-    - 24
-    - 25
-    - 28
-    - 31
-    - 34
-    - 37
-    - 38
-    - 44
-    - 47
-    - 48
-    results:
     - 7
-    - 15
+    - 9
+    - 10
+    - 12
     - 16
-    - 17
     - 19
     - 20
-    - 27
-    - 30
+    - 22
+    - 23
+    - 26
+    - 29
+    - 32
     - 35
+    - 36
+    - 42
+    - 45
+    - 46
+    results:
+    - 6
+    - 13
+    - 14
+    - 15
+    - 17
+    - 18
+    - 25
+    - 28
+    - 33
+    - 38
+    - 39
     - 40
     - 41
-    - 42
-    - 43
-    - 46
-    - 50
-    - 51
+    - 44
+    - 48
+    - 49
     checkpoints:
-    - step: 7
+    - step: 6
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree-root\"]", "equal": 0}}'
-    - step: 15
+    - step: 13
       expectation: '{"assert_count": {"selector": "[data-tree-kind][data-path]", "equal": 6}}'
-    - step: 16
+    - step: 14
       expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[0].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[1].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[2].dataset.path].join(''|'')
         === \"Documents|Pictures|src\"", "expect_truthy": true}}'
-    - step: 17
+    - step: 15
       expectation: '{"eval_readonly": {"expression": "[document.querySelectorAll(''[data-tree-kind][data-path]'')[3].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[4].dataset.path,document.querySelectorAll(''[data-tree-kind][data-path]'')[5].dataset.path].join(''|'')
         === \"Draft10.txt|Draft2.txt|README.md\"", "expect_truthy": true}}'
-    - step: 19
+    - step: 17
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-list-name\"]'').getBoundingClientRect().left
         >= document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree\"]'').getBoundingClientRect().left", "expect_truthy":
         true}}'
-    - step: 20
+    - step: 18
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-list-name\"]'').getBoundingClientRect().right
         <= document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree\"]'').getBoundingClientRect().right", "expect_truthy":
         true}}'
-    - step: 27
+    - step: 25
       expectation: '{"assert_file_contains": {"path": "${fixture.platform_workspace_root}/Renamed.txt", "contains": "Tenth."}}'
-    - step: 30
+    - step: 28
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"]", "contains": "Tenth."}}'
-    - step: 35
+    - step: 33
       expectation: '{"assert_file_contains": {"path": "${fixture.platform_workspace_root}/Renamed.txt", "contains": "SAVED"}}'
-    - step: 40
+    - step: 38
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree\"]", "contains": "src/main/java · com.example"}}'
-    - step: 41
+    - step: 39
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree\"]", "contains": "src/main/java · com.example.util"}}'
-    - step: 42
+    - step: 40
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree\"]", "contains": "src/test/java · com.example"}}'
-    - step: 43
+    - step: 41
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-flat-file\"][data-path=\"src/main/java/com/example/util/Helper.java\"]",
         "regex": "^Helper[.]java$"}}'
-    - step: 46
+    - step: 44
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"]", "contains": "package com.example.util;"}}'
-    - step: 50
+    - step: 48
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"]", "contains": "package com.example.util;"}}'
-    - step: 51
+    - step: 49
       expectation: '{"assert_no_runtime_errors": null}'
   visual:
   - check: Review file area, row metadata, selection, toolbar and package layout in the retained screenshot.

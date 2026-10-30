@@ -4,6 +4,7 @@ description: Reproduce the reported all-types activation stall with a five-line 
   Cold-open each through the real tree, then activate all three tabs twice. Retain exact canonical content, HTML syntax highlighting, every frame
   and zero automatic SDK/LSP discovery. Native uses real file reads in the QA release WebView. Clicking the already active tab and focusing its
   editor must also stay responsive and retain the same content.
+  Every activation/key frame allows at most 165ms (150ms baseline plus the user-approved 10% tolerance); all raw samples are retained.
 modes:
 - browser
 - native
@@ -192,7 +193,7 @@ verification:
     requirement: Reproduce the reported all-types activation stall with a five-line HTML document, a 704-line plain document and a tiny text file.
       Cold-open each through the real tree, then activate all three tabs twice. Retain exact canonical content, HTML syntax highlighting, every
       frame and zero automatic SDK/LSP discovery. Native uses real file reads in the QA release WebView. Keep 1500ms exact-content/highlight and
-      150ms all-frame limits; no retries or synthetic activation. Clicking the already active text tab and focusing its editor must preserve content
+      165ms all-frame limits; no retries or synthetic activation. Clicking the already active text tab and focusing its editor must preserve content
       without redundant activation work. After the first open, cold-opening another small file and switching tabs must retain the same actual
       editor without a loading/unmount cycle.
     actions:

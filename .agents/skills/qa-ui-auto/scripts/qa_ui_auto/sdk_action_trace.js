@@ -1,10 +1,19 @@
 (owner) => {
   if (window.__QA_SDK_ACTION_TRACE__) throw new Error("SDK action trace already installed");
-  const state = { installedEpochMs: Date.now(), inputs: [], frames: [], documents: [] };
+  const state = { installedEpochMs: Date.now(), inputs: [], frames: [], documents: [], heartbeatFrames: [] };
   const cleanups = [];
   let pendingFrame = null;
   const inputFrames = new Set();
   let previous = null;
+  let previousFrameMs = performance.now();
+  let heartbeatFrame;
+  function heartbeat() {
+    const nowMs = performance.now();
+    state.heartbeatFrames.push({ epochMs: Date.now(), nowMs, gapMs: nowMs - previousFrameMs });
+    previousFrameMs = nowMs;
+    heartbeatFrame = requestAnimationFrame(heartbeat);
+  }
+  heartbeatFrame = requestAnimationFrame(heartbeat);
   function snapshot() {
     const el = document.querySelector('[data-testid="workspace-file-editor"] .cm-content');
     const view = el?.cmTile?.root?.view;
@@ -48,6 +57,7 @@
   cleanups.push(() => observer.disconnect());
   recordDocument();
   window.__QA_SDK_ACTION_TRACE__ = { owner, finish: () => {
+    cancelAnimationFrame(heartbeatFrame);
     for (const cleanup of cleanups) cleanup();
     if (pendingFrame !== null) cancelAnimationFrame(pendingFrame);
     state.pendingInputFrames = inputFrames.size;

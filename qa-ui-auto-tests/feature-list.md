@@ -9624,6 +9624,10 @@ controls:
     selector: '[data-testid="search-everywhere-shortcut-workspace.format"]'
     kind: display
     optional: true
+  - id: search-everywhere-page-down-shortcut
+    selector: '[data-testid="search-everywhere-shortcut-editor.pageDown"]'
+    kind: display
+    optional: true
   - id: search-everywhere-assign-shortcut-hint
     selector: '[data-testid="search-everywhere-assign-shortcut-hint"]'
     kind: display

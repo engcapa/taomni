@@ -1,6 +1,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { CodeWorkspaceRootInfo } from "../../../types";
+import type { TreeSelection } from "./codeWorkspaceModel";
 import { useWorkspaceFileActions } from "./useWorkspaceFileActions";
 
 const dialogMocks = vi.hoisted(() => ({
@@ -182,6 +183,48 @@ describe("useWorkspaceFileActions", () => {
     expect(workspaceMocks.workspaceCreateFile).not.toHaveBeenCalled();
     expect(lspMocks.lspWorkspaceDidFileOperation).not.toHaveBeenCalled();
     expect(props.onStatus).toHaveBeenCalledWith("server rejected create");
+  });
+
+  it.each(["file", "directory"])("creates a %s in the live selection and retains the dialog target", async (kind) => {
+    let selection: TreeSelection | null = { kind: "dir", rootId: "root-1", path: "old" };
+    const props = options({ getSelected: () => selection });
+    const { result, unmount } = renderHook(() => useWorkspaceFileActions(props));
+    selection = { kind: "dir", rootId: "root-1", path: "current" };
+    dialogMocks.promptAppDialog.mockImplementation(async () => {
+      selection = { kind: "dir", rootId: "root-1", path: "later" };
+      return "created";
+    });
+    workspaceMocks.workspaceCreateFile.mockResolvedValue({ path: "current/created" });
+    workspaceMocks.workspaceCreateDir.mockResolvedValue({ path: "current/created" });
+
+    expect(result.current.selectedRootDirectory).toEqual({ rootId: "root-1", path: "current" });
+    await act(async () => kind === "file" ? result.current.createFile() : result.current.createDir());
+    expect(dialogMocks.promptAppDialog).toHaveBeenCalledWith(expect.objectContaining({ initialValue: "current/" }));
+    const create = kind === "file" ? workspaceMocks.workspaceCreateFile : workspaceMocks.workspaceCreateDir;
+    expect(create).toHaveBeenCalledWith("/repo", "current/created");
+    expect(props.loadDir).toHaveBeenCalledWith("root-1", "current");
+    unmount();
+  });
+
+  it("renames and deletes the live selection while explicit context targets take priority", async () => {
+    let selection: TreeSelection | null = { kind: "dir", rootId: "root-1", path: "old" };
+    const props = options({ getSelected: () => selection });
+    const { result, unmount } = renderHook(() => useWorkspaceFileActions(props));
+    const file = (path: string): TreeSelection => ({ kind: "file", ref: { kind: "root", rootId: "root-1", path } });
+    selection = file("current.txt");
+    dialogMocks.promptAppDialog.mockResolvedValue("renamed.txt");
+    await act(async () => result.current.renameSelected());
+    expect(props.applyResourceOperation).toHaveBeenLastCalledWith(expect.objectContaining({
+      kind: "rename", oldPath: "/repo/current.txt", newPath: "/repo/renamed.txt",
+    }));
+    selection = file("later.txt");
+    await act(async () => result.current.deleteSelected());
+    expect(props.applyResourceOperation).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "delete", path: "/repo/later.txt" }));
+    await act(async () => result.current.renameSelected(file("context.txt")));
+    expect(props.applyResourceOperation).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "rename", oldPath: "/repo/context.txt" }));
+    await act(async () => result.current.deleteSelected(file("context.txt")));
+    expect(props.applyResourceOperation).toHaveBeenLastCalledWith(expect.objectContaining({ kind: "delete", path: "/repo/context.txt" }));
+    unmount();
   });
 
   it("keeps UI state convergence after a didCreateFiles transport failure", async () => {

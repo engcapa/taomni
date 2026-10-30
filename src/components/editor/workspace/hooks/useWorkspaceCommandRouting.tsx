@@ -1,10 +1,11 @@
 import { WORKSPACE_TOOL_ICONS } from "../workspaceToolIcons";
-import { useCallback, useEffect, useLayoutEffect, useMemo } from "react";
-import { useCodeWorkspaceStatusStore } from "../../../../stores/codeWorkspaceStatusStore";
+import { useCallback, useEffect, useMemo } from "react";
 import type { CodeWorkspaceFileRef } from "../../../../types";
 import { isPathContainedInRoot } from "../navigationHistoryModel";
 import { type ToolWindowRailItem } from "../panels/ToolWindowRail";
 import type { ShellShortcutClaim } from "../shellShortcutRouter";
+import type { ActionSnapshotItem } from "../workspaceActionHost";
+import type { WorkspaceCommandPublicationProps } from "../views/WorkspaceCommandPublication";
 import { useLatestHandlers } from "../useLatestHandlers";
 import { useWorkspaceActionsController } from "../useWorkspaceActionsController";
 import { useWorkspaceActionContext } from "./useWorkspaceActionContext";
@@ -181,7 +182,6 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
     rootRef: surfaceState.rootRef,
     visible,
   });
-  const workspaceWidgetHost = useCodeWorkspaceStatusStore((s) => s.widgetHost);
 
   // Stable handler identities let the memoized project tree skip the
   // per-caret-move workspace re-render.
@@ -283,16 +283,12 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
     activeEditorGroupIdRef: surfaceState.activeEditorGroupIdRef,
   });
 
-  const runSearchEverywhereCommand = useCallback((commandId: string) => {
+  const runSearchEverywhereCommand = useCallback((entry: ActionSnapshotItem) => {
     project.uiActions.setSearchEverywhereOpen(false);
     // §8.17.3: run the SAME frozen evaluation the list rendered — a stale or
     // disabled entry must not re-evaluate itself into a fresh context.
-    const entry = actionsController.snapshot.find((item) => item.id === commandId);
-    if (!entry) return;
     void actionsController.host.executePrepared(entry.evaluation);
-  }, [actionsController]);
-
-  const commandRegistration = actionsController.commandRegistration;
+  }, [actionsController.host, project.uiActions.setSearchEverywhereOpen]);
 
   // W0 §8.20.1: while this instance is the active workspace tab and its
   // reopen stack is non-empty, claim Ctrl+Shift+T from the shell router so
@@ -311,24 +307,9 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
       }]
       : []
   ), [visible, surfaceState.closedTabsStack.length, session.workspaceInstanceId]);
-  const commandRegistrationWithClaims = useMemo(
-    () => (
-      shellShortcutClaims.length > 0
-        ? { ...commandRegistration, shellShortcutClaims }
-        : commandRegistration
-    ),
-    [commandRegistration, shellShortcutClaims],
-  );
-
-  useLayoutEffect(() => {
-    if (!onCommandsChange) return;
-    onCommandsChange(tabId, commandRegistrationWithClaims);
-  }, [commandRegistrationWithClaims, onCommandsChange, tabId]);
-
-  useEffect(() => {
-    if (!onCommandsChange) return;
-    return () => onCommandsChange(tabId, null);
-  }, [onCommandsChange, tabId]);
+  const commandPublication: WorkspaceCommandPublicationProps = {
+    tabId, projection: actionsController.projection, shellShortcutClaims, onCommandsChange,
+  };
 
   // Track navigation location on tab activation / file switch (I3)
   useEffect(() => {
@@ -376,6 +357,6 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
     rightToolRailItems,
     keymap,
     runSearchEverywhereCommand,
-    workspaceWidgetHost,
+    commandPublication,
   };
 }

@@ -1,7 +1,8 @@
 id: TC-WS-073
 title: Large ordinary directory opens and switches files without recursive project discovery
-description: Mount a public directory with 300 extra documents and 100 child folders. Measure actual cold and warm activations with the original 150ms frame/1500ms
+description: Mount a public directory with 300 extra documents and 100 child folders. Measure actual cold and warm activations with 165ms frame/1500ms
   content budgets, retain the editor instance and dirty draft, and reject automatic recursive/SDK/LSP work.
+  Every activation/key frame allows at most 165ms (150ms baseline plus the user-approved 10% tolerance); all raw samples are retained.
 modes:
 - browser
 - native
@@ -9,6 +10,7 @@ covers:
 - F-WS-2
 - F25.1
 - F25.3
+- F25.5
 - F11.2
 tags:
 - p0
@@ -106,6 +108,70 @@ steps:
     quiet_ms: 1000
 - assert_no_runtime_errors: null
 - screenshot: workspace-tc-ws-073-file-activation.png
+- click: '[data-testid="workspace-tab"][data-tab-title="records.json"]'
+- click: '[data-testid="workspace-file-editor"] .cm-content'
+- press:
+    key: Mod+Home
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+- eval_readonly:
+    expression: document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main?.head === 0
+    expect_truthy: true
+- press:
+    key: PageDown
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+- eval_readonly:
+    expression: document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main?.head > 0 && document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main.empty
+      === true
+    expect_truthy: true
+- press:
+    key: PageUp
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+- eval_readonly:
+    expression: document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main?.head === 0 && document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main.empty
+      === true
+    expect_truthy: true
+- press:
+    key: Shift+PageDown
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+- eval_readonly:
+    expression: document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main?.anchor === 0 && document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main?.head
+      > 0 && document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main.empty === false
+    expect_truthy: true
+- press:
+    key: Mod+End
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+- press:
+    key: Shift+PageUp
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+- eval_readonly:
+    expression: document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main?.anchor === document.querySelector('.cm-content')?.cmTile?.root?.view?.state.doc.length
+      && document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main?.head < document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main?.anchor
+    expect_truthy: true
+- press:
+    key: Mod+Home
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+- press:
+    key: Mod+Shift+a
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+- wait_for: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+- fill:
+    selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+    value: Page Down
+- wait_for: '[data-testid="search-everywhere-shortcut-editor.pageDown"]'
+- click: '[data-testid="search-everywhere-shortcut-editor.pageDown"]'
+- assert_not_visible: '[data-testid="code-workspace-search-everywhere"]'
+- eval_readonly:
+    expression: document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main?.head > 0 && document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main.empty
+      === true
+    expect_truthy: true
+- assert_disabled: '[data-testid="workspace-editor-save"]'
+- click: '[data-testid="workspace-tab"][data-tab-title="notes.txt"]'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    contains: Public draft retained in the home workspace
+- assert_enabled: '[data-testid="workspace-editor-save"]'
+- assert_no_runtime_errors: null
+- screenshot: workspace-tc-ws-073-page-actions.png
 verification:
   review: reviewed
   requirements:
@@ -160,6 +226,76 @@ verification:
         \    sdk_analyze_workspace:\n      equal: 0\n    sdk_resolve_workspace:\n      equal: 0\n    lsp_detect_servers:\n      equal: 0\n    lsp_open_document:\n\
         \      equal: 0\n    workspace_execution_model:\n      equal: 0\n  quiet_ms: 1000"
     - step: 22
+      expectation: 'assert_no_runtime_errors: null'
+  - id: R2
+    requirement: Page navigation and selection use measured geometry through real keys and the Actions picker; clean JSON and
+      the other dirty draft stay intact.
+    actions:
+    - 24
+    - 25
+    - 26
+    - 28
+    - 30
+    - 32
+    - 34
+    - 35
+    - 37
+    - 38
+    - 40
+    - 42
+    - 46
+    results:
+    - 27
+    - 29
+    - 31
+    - 33
+    - 36
+    - 39
+    - 41
+    - 43
+    - 44
+    - 45
+    - 47
+    - 48
+    - 49
+    checkpoints:
+    - step: 27
+      expectation: "eval_readonly:\n  expression: document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main?.head\
+        \ === 0\n  expect_truthy: true"
+    - step: 29
+      expectation: "eval_readonly:\n  expression: document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main?.head\
+        \ > 0 && document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main.empty\n    === true\n  expect_truthy:\
+        \ true"
+    - step: 31
+      expectation: "eval_readonly:\n  expression: document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main?.head\
+        \ === 0 && document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main.empty\n    === true\n  expect_truthy:\
+        \ true"
+    - step: 33
+      expectation: "eval_readonly:\n  expression: document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main?.anchor\
+        \ === 0 && document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main?.head\n    > 0 && document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main.empty\
+        \ === false\n  expect_truthy: true"
+    - step: 36
+      expectation: "eval_readonly:\n  expression: document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main?.anchor\
+        \ === document.querySelector('.cm-content')?.cmTile?.root?.view?.state.doc.length\n    && document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main?.head\
+        \ < document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main?.anchor\n  expect_truthy: true"
+    - step: 39
+      expectation: 'wait_for: ''[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'''
+    - step: 41
+      expectation: 'wait_for: ''[data-testid="search-everywhere-shortcut-editor.pageDown"]'''
+    - step: 43
+      expectation: 'assert_not_visible: ''[data-testid="code-workspace-search-everywhere"]'''
+    - step: 44
+      expectation: "eval_readonly:\n  expression: document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main?.head\
+        \ > 0 && document.querySelector('.cm-content')?.cmTile?.root?.view?.state.selection.main.empty\n    === true\n  expect_truthy:\
+        \ true"
+    - step: 45
+      expectation: 'assert_disabled: ''[data-testid="workspace-editor-save"]'''
+    - step: 47
+      expectation: "assert_text:\n  selector: '[data-testid=\"workspace-file-editor\"] .cm-content'\n  contains: Public draft\
+        \ retained in the home workspace"
+    - step: 48
+      expectation: 'assert_enabled: ''[data-testid="workspace-editor-save"]'''
+    - step: 49
       expectation: 'assert_no_runtime_errors: null'
   native:
   - check: Real home/disk reads and the packaged WebView frame timings.

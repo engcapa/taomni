@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import signal
 import socket
+import struct
 import subprocess
 import sys
 import tempfile
@@ -37,11 +38,11 @@ class NativePortReleaseTest(unittest.TestCase):
                 wait_for_driver_ports("127.0.0.1", (4444,), timeout=0)
 
     def test_windows_failed_or_invalid_os_observations_cannot_mean_a_free_port(self):
-        with patch("native_process_group.subprocess.run", side_effect=subprocess.CalledProcessError(1, "powershell")):
-            with self.assertRaises(subprocess.CalledProcessError):
+        with patch("native_windows_tcp._read_table", side_effect=PermissionError("TCP table access denied")):
+            with self.assertRaises(PermissionError):
                 windows_listeners((4444,))
-        for value in ['null', '{}', '[{"LocalPort": 1234,"OwningProcess": 10}]', '[{"LocalPort":4444}]']:
-            with self.subTest(value=value), patch("native_process_group.subprocess.run", return_value=subprocess.CompletedProcess([], 0, value, "")):
+        for value in [b"", b"\0", struct.pack("=I", 1)]:
+            with self.subTest(value=value), patch("native_windows_tcp._read_table", return_value=value):
                 with self.assertRaises(RuntimeError):
                     windows_listeners((4444,))
 

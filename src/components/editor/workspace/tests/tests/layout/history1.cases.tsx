@@ -15,6 +15,39 @@ export interface registerlayoutHistory1CasesContext {
 }
 
 export function registerlayoutHistory1Cases(caseContext: registerlayoutHistory1CasesContext) {
+  it("moves status widgets between hosts without rendering the editor owner", async () => {
+    const { useCodeWorkspaceStatusStore } = await import("../../../../../../stores/codeWorkspaceStatusStore");
+    const { projectFactsMock } = await import("../../../../tests/codeWorkspaceTab/harness");
+    const workspace: CodeWorkspaceTabInfo = {
+      repoRoot: "/repo/app", workspaceInstanceId: "status-host-owner", name: "Status host",
+      roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }], looseFiles: [],
+    };
+    const first = document.createElement("div");
+    const second = document.createElement("div");
+    document.body.append(first, second);
+    useCodeWorkspaceStatusStore.getState().setWidgetHost(null);
+    const view = caseContext.workspaceTestHarness.renderWorkspace(workspace);
+    try {
+      await screen.findByTestId("code-workspace-tree");
+      await act(async () => undefined);
+      projectFactsMock.useProjectFacts.mockClear();
+      act(() => useCodeWorkspaceStatusStore.getState().setWidgetHost(first));
+      expect(first.querySelector('[data-testid="code-workspace-sdk-status"]')).not.toBeNull();
+      act(() => useCodeWorkspaceStatusStore.getState().setWidgetHost(second));
+      expect(first.querySelector('[data-testid="code-workspace-sdk-status"]')).toBeNull();
+      expect(second.querySelector('[data-testid="code-workspace-sdk-status"]')).not.toBeNull();
+      act(() => useCodeWorkspaceStatusStore.getState().setWidgetHost(null));
+      expect(second.querySelector('[data-testid="code-workspace-sdk-status"]')).toBeNull();
+      expect(screen.getByTestId("code-workspace-sdk-status")).toBeInTheDocument();
+      expect(projectFactsMock.useProjectFacts).not.toHaveBeenCalled();
+    } finally {
+      view.unmount();
+      useCodeWorkspaceStatusStore.getState().setWidgetHost(null);
+      first.remove();
+      second.remove();
+    }
+  });
+
   it("persists and renders the flat file view with language src groups only", async () => {
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",

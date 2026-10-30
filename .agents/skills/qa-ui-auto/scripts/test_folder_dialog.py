@@ -1,10 +1,11 @@
 import json
 import subprocess
 import unittest
+import threading
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from qa_ui_auto import folder_dialog
 from qa_ui_auto.steps import StepError
@@ -95,6 +96,48 @@ class FolderDialogContracts(unittest.TestCase):
                 folder_dialog.run_folder_dialog(ctx, {"action": "cancel"})
             self.assertEqual(run.call_args.args[0][0], "C:/pwsh/pwsh.exe")
             self.assertEqual(run.call_args.kwargs["env"]["QA_PICKER_ACTION"], "cancel")
+
+    def test_trigger_can_wait_for_the_real_os_dialog_to_close_without_deadlocking_the_driver(self):
+        with TemporaryDirectory() as directory:
+            clicked, operated = threading.Event(), threading.Event()
+            def click(selector):
+                self.assertEqual(selector, "#add-folder")
+                clicked.set()
+                self.assertTrue(operated.wait(2), "driver waited before the OS helper could operate")
+            def operate(ctx, path):
+                self.assertTrue(clicked.wait(2))
+                operated.set()
+                return {"pid": 123, "transport": "actual OS helper"}
+            ctx = SimpleNamespace(case_dir=Path(directory), session=SimpleNamespace(click=click))
+            with patch.object(folder_dialog.platform, "system", return_value="Linux"), patch.object(folder_dialog, "linux_dialog", side_effect=operate):
+                folder_dialog.run_folder_dialog(ctx, {"action": "cancel", "trigger": "#add-folder"})
+            observation = json.loads((ctx.case_dir / "native-folder-dialogs.jsonl").read_text())
+            self.assertTrue(observation["passed"])
+            self.assertEqual(observation["trigger"], "#add-folder")
+            self.assertEqual(observation["pid"], 123)
+
+    def test_trigger_failures_are_not_hidden_by_an_os_helper_result(self):
+        with TemporaryDirectory() as directory:
+            ctx = SimpleNamespace(case_dir=Path(directory), session=SimpleNamespace(click=Mock(side_effect=StepError("click failed"))))
+            with patch.object(folder_dialog.platform, "system", return_value="Linux"), patch.object(folder_dialog, "linux_dialog", return_value={"pid": 123}):
+                with self.assertRaisesRegex(StepError, "click failed"):
+                    folder_dialog.run_folder_dialog(ctx, {"action": "cancel", "trigger": "#add-folder"})
+            self.assertFalse(json.loads((ctx.case_dir / "native-folder-dialogs.jsonl").read_text())["passed"])
+
+    def test_invalid_trigger_is_rejected_before_input(self):
+        ctx = SimpleNamespace(session=SimpleNamespace(click=Mock()))
+        for trigger in ("", None, 12):
+            with self.subTest(trigger=trigger), self.assertRaises(StepError):
+                folder_dialog.selected_path(ctx, {"action": "cancel", "trigger": trigger})
+        ctx.session.click.assert_not_called()
+
+    def test_control_coverage_counts_the_trigger_and_never_the_selected_disk_path(self):
+        from qa_ui_auto.control_coverage import INTERACTIVE_VERBS, _selectors_in_step
+        self.assertIn("native_folder_dialog", INTERACTIVE_VERBS)
+        self.assertEqual(_selectors_in_step("native_folder_dialog", {
+            "action": "choose", "path": "/owned/project", "trigger": "#add-folder",
+        }), ["#add-folder"])
+        self.assertEqual(_selectors_in_step("native_folder_dialog", {"action": "cancel"}), [])
 
 if __name__ == "__main__":
     unittest.main()

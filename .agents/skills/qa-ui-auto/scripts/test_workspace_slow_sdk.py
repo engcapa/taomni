@@ -6,8 +6,22 @@ import subprocess
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 from qa_ui_auto.fixtures.workspace_slow_sdk import build_probe
+
+
+class HeldSdkCompileFailureTest(unittest.TestCase):
+    def test_fixture_compile_timeout_keeps_diagnostics_without_creating_a_usable_sdk(self):
+        with tempfile.TemporaryDirectory() as directory, \
+                patch("qa_ui_auto.fixtures.workspace_slow_sdk.shutil.which", return_value="rustc"), \
+                patch("qa_ui_auto.fixtures.workspace_slow_sdk.subprocess.run",
+                      side_effect=subprocess.TimeoutExpired("rustc", 180, b"compiler output\n", b"linker output\n")):
+            root = Path(directory) / "sdk"
+            with self.assertRaises(subprocess.TimeoutExpired):
+                build_probe(root)
+            self.assertIn("compiler output\nlinker output", (root / "compile.log").read_text())
+            self.assertFalse((root / "events.jsonl").exists())
 
 
 class HeldSdkProbeTest(unittest.TestCase):

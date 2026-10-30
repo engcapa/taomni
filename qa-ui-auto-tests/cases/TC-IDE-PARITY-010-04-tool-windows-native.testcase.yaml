@@ -64,6 +64,9 @@ steps:
     key: Alt+1
     macos_key: Meta+1
     selector: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for:
+    selector: '[data-testid="code-workspace-tool-rail-project"][aria-pressed="true"]'
+    timeout_sec: 5
 - assert_attribute:
     selector: '[data-testid="code-workspace-tool-rail-project"]'
     name: aria-pressed
@@ -75,6 +78,9 @@ steps:
     key: Alt+1
     macos_key: Meta+1
     selector: '[data-testid="code-workspace-tree-pane"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-tool-rail-project"][aria-pressed="false"]'
+    timeout_sec: 5
 - assert_attribute:
     selector: '[data-testid="code-workspace-tool-rail-project"]'
     name: aria-pressed
@@ -83,6 +89,9 @@ steps:
     key: Alt+1
     macos_key: Meta+1
     selector: '[data-testid="code-workspace-editor"] .cm-content'
+- wait_for:
+    selector: '[data-testid="code-workspace-tool-rail-project"][aria-pressed="true"]'
+    timeout_sec: 5
 - assert_attribute:
     selector: '[data-testid="code-workspace-tool-rail-project"]'
     name: aria-pressed
@@ -114,22 +123,22 @@ verification:
     requirement: A2：Alt+1 在打包 WebView 中按 IDEA 语义切换 Project 工具窗：已显示但编辑器有焦点时激活（焦点进项目树），激活时再按隐藏，隐藏后再按打开。
     actions:
     - 20
-    - 23
-    - 25
+    - 24
+    - 27
     checkpoints:
-    - step: 21
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
     - step: 22
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
+    - step: 23
       expectation: "{\"wait_for\": {\"selector\": \"[data-testid=\\\"code-workspace-tree-pane\\\"]:focus-within\", \"timeout_sec\": 5}}"
-    - step: 24
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "false"}}'
     - step: 26
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "false"}}'
+    - step: 29
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-project\"]", "name": "aria-pressed", "equals": "true"}}'
     results:
-    - 21
     - 22
-    - 24
+    - 23
     - 26
+    - 29
   visual:
   - check: 不声明视觉结论。
     method: not-applicable

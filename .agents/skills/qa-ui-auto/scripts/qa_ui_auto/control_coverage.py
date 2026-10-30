@@ -69,6 +69,7 @@ INTERACTIVE_VERBS = {
     "middle_click",
     "click", "dblclick", "right_click", "hover", "drag_to", "drag_path", "native_click",
     "native_pointer_drag", "native_window_drag",
+    "native_folder_dialog",
     "fill", "type", "send_keys", "terminal_input", "press", "blur", "select_option", "upload_file",
     "set_check", "send_text_via_label", "open_session", "click_menu",
     "quick_connect", "auth", "attach_sftp", "set_remote_path",
@@ -173,6 +174,8 @@ def _selectors_in_step(verb: str, args: Any) -> list[str]:
         return out
     if not isinstance(args, dict):
         return out
+    if verb == "native_folder_dialog":
+        return [args["trigger"]] if isinstance(args.get("trigger"), str) else []
     # Rich form: pluck known selector-bearing keys.
     if "selector" in args and isinstance(args["selector"], str):
         # `screenshot: {path: ..., selector: ...}` is OK; selector here means

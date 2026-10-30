@@ -2,6 +2,8 @@ import { compileWhenExpr } from "../conditions";
 import { type ActionResult, type ActionState, type WorkspaceActionContext, type WorkspaceActionDefinition, type WorkspaceFocus } from "../types";
 import { type KeyboardEventLike, type WorkspaceCommand, type WorkspaceCommandMenuItem } from "../../workspaceCommands";
 import { type KeymapSchemeV3, type Shortcut, shortcutIdentity } from "../../workspaceKeymapScheme";
+import { getLocale } from "../../../../../lib/i18n";
+import { detectKeymapPlatform } from "../../workspaceKeymapPlatform";
 import { ActionKeybindings } from "./keybindings";
 import {
   type WorkspaceActionHostOptions,
@@ -550,11 +552,15 @@ export class WorkspaceActionHost {
     customContext?: ActionInvocation | WorkspaceActionContext | unknown,
   ): ActionSnapshotItem[] {
     const context = freezeContext(this.buildContext(customContext));
+    // Resolve host-backed environment getters once for this immutable catalog.
+    // A later snapshot still observes platform overrides and locale changes.
+    const platform = detectKeymapPlatform();
+    const locale = getLocale();
     const items = Array.from(this.registrations.values()).map((action): ActionSnapshotItem => {
       // Snapshot shows the EFFECTIVE bindings (scheme override > defaults)
       // so every surface displays the same truth the dispatcher resolves.
-      const { shortcuts, source } = this.effectiveShortcuts(action.id);
-      const keybindings = this.effectiveKeybindingDisplay(action.id);
+      const { shortcuts, source } = this.keybindings.effectiveShortcuts(action.id, platform);
+      const keybindings = this.keybindings.effectiveKeybindingDisplay(action.id, platform, locale);
       const evaluation = this.prepareWithContext(action.id, context, "snapshot");
       return {
         id: action.id,
@@ -563,7 +569,7 @@ export class WorkspaceActionHost {
         keybinding: keybindings[0],
         keybindings,
         shortcuts,
-        baseShortcuts: this.baseDefinitionShortcuts(action.id),
+        baseShortcuts: this.keybindings.baseDefinitionShortcuts(action.id, platform),
         bindingSource: source,
         keywords: action.keywords,
         state: evaluation.state,

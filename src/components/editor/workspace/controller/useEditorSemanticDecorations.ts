@@ -1,9 +1,10 @@
 import { useEffect } from "react";
-import { lspDocumentHighlights, lspInlayHints, lspSemanticTokens, type LspDocumentDescriptor, type LspDocumentHighlight, type LspInlayHint, type LspSemanticToken, type LspPosition, type LspRange } from "../../../../lib/editor/lsp";
+import { lspDocumentHighlights, lspInlayHints, lspSemanticTokens, type LspDocumentDescriptor, type LspDocumentHighlight, type LspInlayHint, type LspSemanticToken, type LspPosition } from "../../../../lib/editor/lsp";
 import { fallbackWordHighlights } from "../lspIntelligenceChrome";
 import { isOccurrenceSessionValid, type OccurrenceHighlightSession } from "../occurrenceHighlightModel";
 import { type OpenFileState } from "../codeWorkspaceModel";
 import { LSP_HIGHLIGHT_IDLE_DELAY_MS, initialInlayHintRange, LSP_INLAY_HINT_IDLE_DELAY_MS, LSP_SEMANTIC_TOKENS_IDLE_DELAY_MS } from "./model";
+import type { WorkspaceViewportRanges } from "../workspaceViewportRanges";
 
 
 export interface UseEditorSemanticDecorationsContext {
@@ -27,7 +28,7 @@ export interface UseEditorSemanticDecorationsContext {
   setOccurrenceSession: import("react").Dispatch<import("react").SetStateAction<OccurrenceHighlightSession | null>>;
   activeInlayHintsEnabled: boolean;
   setInlayHintsByGroup: (update: Parameters<import("react").Dispatch<import("react").SetStateAction<Record<string, LspInlayHint[]>>>>[0]) => void;
-  viewportRanges: Record<string, LspRange | null>;
+  viewportRanges: WorkspaceViewportRanges;
   setSemanticTokensByGroup: (update: Parameters<import("react").Dispatch<import("react").SetStateAction<Record<string, LspSemanticToken[]>>>>[0]) => void;
 }
 
@@ -61,13 +62,17 @@ export function useEditorSemanticDecorations(context: UseEditorSemanticDecoratio
     // ED-PARITY-022 DEC-022-04: Java usages are semantic; while the provider
     // cannot answer, show none rather than a same-text imitation.
     const semanticOnly = /\.java$/i.test(file.ref.path);
+    const publishHighlights = (highlights: LspDocumentHighlight[]) => {
+      setHighlightsByGroup((current) => (
+        !highlights.length && !(current[groupId] ?? []).length
+          ? current
+          : { ...current, [groupId]: highlights }
+      ));
+    };
     if (!activeCapabilities?.documentHighlight || !descriptor) {
       const timer = window.setTimeout(() => {
         if (!cancelled && canApply()) {
-          setHighlightsByGroup((current) => ({
-            ...current,
-            [groupId]: semanticOnly ? [] : fallbackWordHighlights(file.text, position),
-          }));
+          publishHighlights(semanticOnly ? [] : fallbackWordHighlights(file.text, position));
         }
       }, LSP_HIGHLIGHT_IDLE_DELAY_MS);
       return () => {
@@ -88,14 +93,11 @@ export function useEditorSemanticDecorations(context: UseEditorSemanticDecoratio
         .then((result) => {
           if (cancelled || !canApply() || !isCurrentLspDocumentRequest(file, epoch)) return;
           updateLspStatusForFile(file, result.status);
-          setHighlightsByGroup((current) => ({ ...current, [groupId]: result.highlights }));
+          publishHighlights(result.highlights);
         })
         .catch(() => {
           if (cancelled || !canApply() || !isCurrentLspDocumentRequest(file, epoch)) return;
-          setHighlightsByGroup((current) => ({
-            ...current,
-            [groupId]: semanticOnly ? [] : fallbackWordHighlights(file.text, position),
-          }));
+          publishHighlights(semanticOnly ? [] : fallbackWordHighlights(file.text, position));
         });
     }, LSP_HIGHLIGHT_IDLE_DELAY_MS);
     return () => {
@@ -142,29 +144,39 @@ export function useEditorSemanticDecorations(context: UseEditorSemanticDecoratio
       ));
       return;
     }
-    const range = viewportRanges[groupId] ?? initialInlayHintRange(file.text);
     const descriptor = lspDescriptorForFile(file);
     if (!descriptor) return;
     let cancelled = false;
+    let generation = 0;
+    let timer: number | null = null;
     const epoch = lspDocumentEpochRef.current[file.key] ?? 0;
-    const timer = window.setTimeout(() => {
-      if (!isCurrentLspDocumentRequest(file, epoch)) return;
-      void lspInlayHints(descriptor, range)
-        .then((result) => {
-          if (cancelled || !isCurrentLspDocumentRequest(file, epoch)) return;
-          updateLspStatusForFile(file, result.status);
-          setInlayHintsByGroup((current) => ({ ...current, [groupId]: result.hints }));
-        })
-        .catch(() => {
-          if (cancelled || !isCurrentLspDocumentRequest(file, epoch)) return;
-          setInlayHintsByGroup((current) => (
-            (current[groupId] ?? []).length === 0 ? current : { ...current, [groupId]: [] }
-          ));
-        });
-    }, LSP_INLAY_HINT_IDLE_DELAY_MS);
+    const refresh = () => {
+      const request = ++generation;
+      if (timer !== null) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = null;
+        if (!isCurrentLspDocumentRequest(file, epoch)) return;
+        const range = viewportRanges.getSnapshot()[groupId] ?? initialInlayHintRange(file.text);
+        void lspInlayHints(descriptor, range)
+          .then((result) => {
+            if (cancelled || request !== generation || !isCurrentLspDocumentRequest(file, epoch)) return;
+            updateLspStatusForFile(file, result.status);
+            setInlayHintsByGroup((current) => ({ ...current, [groupId]: result.hints }));
+          })
+          .catch(() => {
+            if (cancelled || request !== generation || !isCurrentLspDocumentRequest(file, epoch)) return;
+            setInlayHintsByGroup((current) => (
+              (current[groupId] ?? []).length === 0 ? current : { ...current, [groupId]: [] }
+            ));
+          });
+      }, LSP_INLAY_HINT_IDLE_DELAY_MS);
+    };
+    const unsubscribe = viewportRanges.subscribe(refresh);
+    refresh();
     return () => {
       cancelled = true;
-      window.clearTimeout(timer);
+      unsubscribe();
+      if (timer !== null) window.clearTimeout(timer);
     };
   }, [
     activeCapabilities?.inlayHint,

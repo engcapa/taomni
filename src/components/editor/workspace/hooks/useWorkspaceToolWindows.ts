@@ -11,7 +11,7 @@ export interface UseWorkspaceToolWindowsContext {
   lastProjectPanelSizeRef: import("react").RefObject<number>;
   toolWindowLayoutRef: import("react").RefObject<import("../useToolWindowLayout").ToolWindowLayoutController>;
   rootRef: import("react").RefObject<HTMLDivElement | null>;
-  workspaceUi: import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi;
+  workspaceUi: Omit<import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi, "treeSelection">;
   bottomDockTab: BottomDockTabId;
   setBottomDockHeightForTool: (instanceId: string, toolId: BottomDockTabId, height: number) => void;
   workspaceInstanceId: string;

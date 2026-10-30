@@ -3,6 +3,7 @@ import { Compartment, type Extension } from "@codemirror/state";
 import { EditorView, showTooltip } from "@codemirror/view";
 import { type WindowResizeSession } from "../windowResizeSession";
 import { languageForPath } from "../../../git/diffLanguage";
+import { scheduleAfterEditorPaint } from "../scheduleAfterEditorPaint";
 import { lspHoverExtension, cancelActiveHoverResize, signatureTooltipDom } from "./intelligence";
 
 
@@ -45,17 +46,17 @@ export function useEditorIntelligence(context: UseEditorIntelligenceContext) {
 
   useEffect(() => {
     let cancelled = false;
-    let frame: number | null = null;
+    let cancelInstallation: (() => void) | null = null;
     const install = (language: Extension | null) => {
       const view = viewRef.current;
       if (cancelled || !view) return;
       const current = languageCompartment.current.get(view.state);
       if (current === language || (!language && Array.isArray(current) && current.length === 0)) return;
       // A resolved import runs in a microtask, alongside the first EditorView
-      // commit. Let the view measure its document before rebuilding language
-      // plugins. Input keeps working and the current document owns the update.
-      frame = window.requestAnimationFrame(() => {
-        frame = null;
+      // commit. Let its measurement and paint finish before rebuilding grammar
+      // plugins; a rAF callback can still precede that frame's layout and paint.
+      cancelInstallation = scheduleAfterEditorPaint(() => {
+        cancelInstallation = null;
         if (cancelled || viewRef.current !== view) return;
         view.dispatch({
           effects: languageCompartment.current.reconfigure(language ?? []),
@@ -65,7 +66,7 @@ export function useEditorIntelligence(context: UseEditorIntelligenceContext) {
     void languageForPath(path).then(install, () => install(null));
     return () => {
       cancelled = true;
-      if (frame !== null) window.cancelAnimationFrame(frame);
+      cancelInstallation?.();
     };
   }, [path, context.fileKey]);
 

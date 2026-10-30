@@ -1,8 +1,9 @@
 id: TC-WS-069
 title: Mixed file tabs switch responsively and preserve an unsaved draft
 description: Open five txt/log/csv/JSON tabs including the public 193KiB long-line document. Edit a plain-text draft, switch through every other tab and
-  back twice, retaining every activation frame with a 150ms gap budget and 1500ms exact-content budget. JSON still requires syntax highlighting. Save, close
+  back twice, retaining every activation frame with a 165ms gap budget and 1500ms exact-content budget. JSON still requires syntax highlighting. Save, close
   and reopen the exact draft and require zero automatic SDK/LSP discovery.
+  Every activation/key frame allows at most 165ms (150ms baseline plus the user-approved 10% tolerance); all raw samples are retained.
 modes:
 - browser
 - native

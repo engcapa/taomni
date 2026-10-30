@@ -24,6 +24,7 @@ export interface UseWorkspaceJavaCreationContext {
 
 export function useWorkspaceJavaCreation(context: UseWorkspaceJavaCreationContext) {
   const { fileActions, setStatusMessage, projectTree, applyLspWorkspaceEdit, uiActions, openFile, gitSnapshotOwner } = context;
+  const { getSelectedRootDirectory } = fileActions;
 
   const [newJavaClassDialogState, setNewJavaClassDialogState] = useState<{
     open: boolean;
@@ -46,7 +47,7 @@ export function useWorkspaceJavaCreation(context: UseWorkspaceJavaCreationContex
   } | null>(null);
 
   const openNewJavaClassDialog = useCallback((target?: { rootId: string; path: string; }) => {
-    const directory = target ?? fileActions.selectedRootDirectory;
+    const directory = target ?? getSelectedRootDirectory();
     if (!directory) {
       setStatusMessage("Add a folder before creating Java classes");
       return;
@@ -81,7 +82,7 @@ export function useWorkspaceJavaCreation(context: UseWorkspaceJavaCreationContex
       projectFactsGeneration: facts.generation,
       projectFactsFingerprint: facts.fingerprint,
     });
-  }, [projectTree.treeData.directories, projectTree.findRoot, fileActions.selectedRootDirectory, setStatusMessage]);
+  }, [projectTree.treeData.directories, projectTree.findRoot, getSelectedRootDirectory, setStatusMessage]);
 
   const createJavaClassFromPlan = useCallback(createCreateJavaClassFromPlan({
     newJavaClassDialogState,

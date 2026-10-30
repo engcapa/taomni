@@ -6,9 +6,11 @@ import os
 import platform
 import shutil
 import subprocess
+from concurrent.futures import Future, ThreadPoolExecutor
+from contextvars import copy_context
 from pathlib import Path
 
-from .deadline import budget_time as time
+from .deadline import budget_time as time, remaining_timeout
 from .native_steps import _verb
 from .steps import StepError
 
@@ -23,8 +25,10 @@ def command(*args: str, check: bool = True) -> str:
 
 
 def selected_path(ctx, args: dict) -> Path | None:
-    if not isinstance(args, dict) or set(args) - {"action", "path"}:
-        raise StepError("native_folder_dialog: expected {action: choose|cancel, path?}")
+    if not isinstance(args, dict) or set(args) - {"action", "path", "trigger"}:
+        raise StepError("native_folder_dialog: expected {action: choose|cancel, path?, trigger?}")
+    if "trigger" in args and (not isinstance(args["trigger"], str) or not args["trigger"].strip()):
+        raise StepError("native_folder_dialog: trigger must be a non-empty selector")
     if args.get("action") == "cancel" and "path" not in args:
         return None
     if args.get("action") != "choose" or not isinstance(args.get("path"), str):
@@ -93,10 +97,11 @@ def linux_dialog(ctx, path: Path | None) -> dict:
     return {"transport": "X11 OS keyboard", "window": window, "pid": pid, "application": str(application)}
 
 
-@_verb("native_folder_dialog")
-def run_folder_dialog(ctx, args) -> str:
+def _operate_folder_dialog(ctx, args, trigger_click: Future | None = None) -> str:
     path = selected_path(ctx, args)
     observation = {"action": args["action"], "path": str(path) if path else None, "platform": platform.system()}
+    if args.get("trigger"):
+        observation["trigger"] = args["trigger"]
     try:
         if platform.system() == "Linux":
             observation.update(linux_dialog(ctx, path))
@@ -104,7 +109,8 @@ def run_folder_dialog(ctx, args) -> str:
             env = os.environ.copy()
             env.update(QA_PICKER_APPLICATION=str(Path(ctx.session.application).resolve()),
                        QA_PICKER_TITLE=TITLE, QA_PICKER_PATH=str(path) if path else "",
-                       QA_PICKER_ACTION=args["action"])
+                       QA_PICKER_ACTION=args["action"],
+                       QA_PICKER_SCREENSHOT=str((ctx.case_dir / "native-folder-dialog.png").resolve()))
             helper = Path(__file__).parent
             if platform.system() == "Windows":
                 # Use the maintained runner runtime to compile and invoke
@@ -115,7 +121,6 @@ def run_folder_dialog(ctx, args) -> str:
                 cmd = [runtime, "-NoProfile", "-NonInteractive", "-File", str(helper / "folder_dialog_windows.ps1")]
             elif platform.system() == "Darwin":
                 cmd = ["osascript", "-l", "JavaScript", str(helper / "folder_dialog_macos.js")]
-                command("screencapture", "-x", str(ctx.case_dir / "native-folder-dialog.png"), check=False)
             else:
                 raise StepError("native_folder_dialog: unsupported OS")
             try:
@@ -130,6 +135,8 @@ def run_folder_dialog(ctx, args) -> str:
             if result.returncode:
                 raise StepError(f"native_folder_dialog: {result.stderr.strip() or result.stdout.strip()}")
             observation.update(json.loads(result.stdout))
+        if trigger_click is not None:
+            trigger_click.result(timeout=remaining_timeout(120))
         observation["passed"] = True
     except Exception as error:
         observation.update(passed=False, error=str(error))
@@ -149,3 +156,16 @@ def run_folder_dialog(ctx, args) -> str:
         with (ctx.case_dir / "native-folder-dialogs.jsonl").open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(observation) + "\n")
     return f"OS directory chooser {args['action']} completed"
+
+
+@_verb("native_folder_dialog")
+def run_folder_dialog(ctx, args) -> str:
+    selected_path(ctx, args)  # Validate owned paths and arguments before input.
+    if not args.get("trigger"):
+        return _operate_folder_dialog(ctx, args)
+    # A modal NSOpenPanel can hold the WebView click response until it closes.
+    # Operate the actual owned OS chooser while that one real click is pending;
+    # join it before returning, and preserve both operations' failures.
+    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="qa-folder-click") as executor:
+        click = executor.submit(copy_context().run, ctx.session.click, args["trigger"])
+        return _operate_folder_dialog(ctx, args, click)

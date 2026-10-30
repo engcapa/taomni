@@ -19,7 +19,27 @@ use tokio_util::sync::CancellationToken;
 
 impl LspManager {
     pub(in crate::lsp) async fn stop_workspace_watcher(&self, workspace_id: &str) {
-        let handle = self.workspace_watchers.lock().await.remove(workspace_id);
+        self.stop_workspace_watcher_owned(workspace_id, None).await;
+    }
+
+    pub(in crate::lsp) async fn stop_workspace_watcher_owned(
+        &self,
+        workspace_id: &str,
+        watcher_id: Option<&str>,
+    ) {
+        let mut watchers = self.workspace_watchers.lock().await;
+        // Effect cleanup and replacement IPC run concurrently. A late stop
+        // owns only its registration, even while the next one initializes.
+        if let Some(watcher_id) = watcher_id {
+            if !watchers
+                .get(workspace_id)
+                .is_some_and(|handle| handle.watcher_id.as_deref() == Some(watcher_id))
+            {
+                return;
+            }
+        }
+        let handle = watchers.remove(workspace_id);
+        drop(watchers);
         let Some(handle) = handle else {
             return;
         };
@@ -41,6 +61,17 @@ impl LspManager {
         workspace_id: &str,
         roots: Vec<String>,
         directories: Vec<String>,
+    ) -> Result<(), String> {
+        self.start_workspace_watcher_owned(workspace_id, roots, directories, None)
+            .await
+    }
+
+    pub(in crate::lsp) async fn start_workspace_watcher_owned(
+        &self,
+        workspace_id: &str,
+        roots: Vec<String>,
+        directories: Vec<String>,
+        watcher_id: Option<String>,
     ) -> Result<(), String> {
         let mut roots = roots
             .into_iter()
@@ -159,7 +190,11 @@ impl LspManager {
         let task_id = task.id();
         watchers.insert(
             workspace_id.clone(),
-            WorkspaceWatcherHandle { cancelled, task },
+            WorkspaceWatcherHandle {
+                watcher_id,
+                cancelled,
+                task,
+            },
         );
         drop(watchers);
         let result = initialized_receiver

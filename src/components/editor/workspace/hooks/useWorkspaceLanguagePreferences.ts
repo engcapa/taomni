@@ -15,7 +15,7 @@ export interface UseWorkspaceLanguagePreferencesContext {
   codeStyle: ReturnType<typeof useWorkspaceCodeStyle>;
   setStatusMessage: (message: string) => void;
   bufferState: ReturnType<typeof useWorkspaceBufferState>;
-  workspaceUi: import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi;
+  workspaceUi: Omit<import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi, "treeSelection">;
   executeAutoImportOnTheFly: (targetFile?: OpenFileState) => Promise<import("../autoImportModel").AutoImportPlanOutcome>;
 }
 

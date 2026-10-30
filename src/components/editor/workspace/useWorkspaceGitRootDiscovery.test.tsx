@@ -82,3 +82,36 @@ it("reports ancestor failures and retries them when the workspace becomes visibl
   await flushFrames();
   expect(result.current.gitRoots).toEqual([repo("project")]);
 });
+
+it("keeps an empty ancestor result from rendering the workspace again", async () => {
+  const renders = vi.fn();
+  const { rerender } = renderHook(({ path }) => {
+    renders();
+    return useWorkspaceGitRootDiscovery({ roots, activeFile: file(path), visible: true, onError: vi.fn() });
+  }, { initialProps: { path: "Documents/a.txt" } });
+  await act(async () => {});
+  renders.mockClear();
+  await flushFrames();
+  expect(mocks.workspaceDetectGitRoots).toHaveBeenCalledTimes(2);
+  expect(renders).not.toHaveBeenCalled();
+  rerender({ path: "Documents/b.json" });
+  renders.mockClear();
+  await flushFrames();
+  expect(mocks.workspaceDetectGitRoots).toHaveBeenCalledTimes(3);
+  expect(renders).not.toHaveBeenCalled();
+});
+
+it("clears a previous repository when the next file has no repository", async () => {
+  const { result, rerender } = renderHook(({ path }) => useWorkspaceGitRootDiscovery({
+    roots, activeFile: file(path), visible: true, onError: vi.fn(),
+  }), { initialProps: { path: "project/a.txt" } });
+  await act(async () => {});
+  mocks.workspaceDetectGitRoots.mockResolvedValueOnce([repo("project")]);
+  await flushFrames();
+  expect(result.current.gitRoots).toEqual([repo("project")]);
+  rerender({ path: "Documents/plain.txt" });
+  expect(result.current.gitRoots).toEqual([]);
+  await flushFrames();
+  rerender({ path: "project/a.txt" });
+  expect(result.current.gitRoots).toEqual([]);
+});

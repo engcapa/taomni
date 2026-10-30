@@ -13,7 +13,7 @@ export interface UseWorkspaceGitDecorationsContext {
   roots: CodeWorkspaceRootInfo[];
   gitRoots: import("../../../../lib/editor/workspace").WorkspaceGitRoot[];
   gitSnapshots: Record<string, import("../codeWorkspaceModel").WorkspaceGitSnapshotState>;
-  workspaceUi: import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi;
+  workspaceUi: Omit<import("../../../../stores/codeWorkspaceStore").CodeWorkspaceInstanceUi, "treeSelection">;
   editorGroups: Record<string, CodeWorkspaceEditorGroupState>;
   openFiles: Record<string, import("../editorGroupTypes").OpenFileViewModel>;
   openFilesRef: import("react").RefObject<Record<string, import("../editorGroupTypes").OpenFileViewModel>>;

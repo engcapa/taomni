@@ -26,6 +26,8 @@ import { useWorkspaceLspClientEvents } from "../useWorkspaceLspClientEvents";
 import { useWorkspaceNavigation } from "../useWorkspaceNavigation";
 import { useWorkspaceSemanticIndex } from "../useWorkspaceSemanticIndex";
 import { useWorkspaceHost } from "../workspaceHostIntegration";
+import { useWorkspaceActionProjection } from "../hooks/useWorkspaceActionProjection";
+import type { ActionSnapshotItem } from "../workspaceActionHost";
 
 
 export interface WorkspaceNavigationPopupsProps {
@@ -39,7 +41,7 @@ export interface WorkspaceNavigationPopupsProps {
   fetchWorkspaceSymbols: (query: string) => Promise<import("../SearchEverywhere").GoToSymbolQueryResult>;
   uiActions: ReturnType<typeof useWorkspaceUiActions>;
   openWorkspaceSymbol: (symbol: GoToSymbolItem, options?: { split: boolean; }) => Promise<void>;
-  runSearchEverywhereCommand: (commandId: string) => void;
+  runSearchEverywhereCommand: (entry: ActionSnapshotItem) => void;
   keymap: ReturnType<typeof useWorkspaceKeymap>;
   toolWindowRouting: ReturnType<typeof useWorkspaceToolWindowRouting>;
   recentFilesOpen: boolean;
@@ -76,12 +78,12 @@ export interface WorkspaceNavigationPopupsProps {
 
 export function WorkspaceNavigationPopups(props: WorkspaceNavigationPopupsProps) {
   const host = useWorkspaceHost();
+  const { snapshot } = useWorkspaceActionProjection(props.actionsController.projection);
   const {
     keyboard,
     searchEverywhereOpen,
     searchEverywhereMode,
     navigation,
-    actionsController,
     seSymbolsAvailable,
     semanticIndex,
     fetchWorkspaceSymbols,
@@ -139,14 +141,17 @@ export function WorkspaceNavigationPopups(props: WorkspaceNavigationPopupsProps)
       goToFileItems={navigation.goToFileItems}
       goToFileLoading={navigation.goToFileLoading}
       goToFileTruncated={navigation.goToFileTruncated}
-      actionSnapshots={actionsController.snapshot.filter((entry) => entry.id !== "workspace.goToFile")}
+      actionSnapshots={snapshot.filter((entry) => entry.id !== "workspace.goToFile")}
       symbolsAvailable={seSymbolsAvailable}
       semanticIndex={semanticIndex.snapshot}
       fetchWorkspaceSymbols={fetchWorkspaceSymbols}
       onCloseSearchEverywhere={() => uiActions.setSearchEverywhereOpen(false)}
       onOpenFileItem={navigation.openGoToFileItem}
       onOpenSymbol={(symbol, options) => void openWorkspaceSymbol(symbol, options)}
-      onRunCommand={runSearchEverywhereCommand}
+      onRunCommand={(commandId) => {
+        const entry = snapshot.find((item) => item.id === commandId);
+        if (entry) runSearchEverywhereCommand(entry);
+      }}
       onAssignShortcut={(commandId) => {
         // ED-PARITY-013 DEC-013-03: Find Action Alt+Enter = Assign Shortcut.
         uiActions.setSearchEverywhereOpen(false);

@@ -27,8 +27,29 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup(); vi.restoreAllMocks();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
   if (originalScrollTo) Object.defineProperty(Element.prototype, "scrollTo", originalScrollTo);
   else Reflect.deleteProperty(Element.prototype, "scrollTo");
+});
+
+it("keeps the latest Home request after an earlier End reveal checks its measurements", () => {
+  vi.useFakeTimers();
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => window.setTimeout(() => callback(performance.now()), 16));
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => window.clearTimeout(id));
+  render(<Harness />);
+  const tree = screen.getByRole("tree");
+  const pane = screen.getByTestId("code-workspace-tree-pane");
+  act(() => pane.focus());
+  fireEvent.keyDown(pane, { key: "End" });
+  expect(screen.getByText("item-499.txt").closest("button")).toHaveFocus();
+  fireEvent.keyDown(pane, { key: "Home" });
+  expect(screen.getByTestId("code-workspace-tree-root")).toHaveFocus();
+  act(() => vi.advanceTimersByTime(400));
+  expect(tree.scrollTop).toBe(0);
+  expect(screen.getByTestId("code-workspace-tree-root")).toHaveFocus();
+  expect(screen.getAllByRole("treeitem").length).toBeLessThan(40);
+  expect(open).not.toHaveBeenCalled();
 });
 
 function Harness({ mode = "tree", filter = "" }: { mode?: ProjectTreeProps["treeViewMode"]; filter?: string }) {

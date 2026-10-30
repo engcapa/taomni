@@ -32,7 +32,14 @@ vi.mock("../../../lib/editor/workspace", async (importOriginal) => ({
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => null) }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => () => {}), emit: vi.fn(async () => {}) }));
 vi.mock("../WorkspaceGitPanel", () => ({ WorkspaceGitPanel: () => null }));
-const runtime = vi.hoisted(() => ({ mounted: vi.fn(), released: vi.fn() }));
+const runtime = vi.hoisted(() => ({ mounted: vi.fn(), released: vi.fn(), composed: vi.fn() }));
+vi.mock("../../editor/workspace/views/WorkspaceShellView", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../editor/workspace/views/WorkspaceShellView")>();
+  return { ...actual, WorkspaceShellView: (props: import("../../editor/workspace/views/WorkspaceShellView").WorkspaceShellViewProps) => {
+    runtime.composed(props.activeKey);
+    return <actual.WorkspaceShellView {...props} />;
+  } };
+});
 vi.mock("../WorkspaceSessionPane", () => ({ WorkspaceSessionPane: ({ tab }: { tab: { id: string } }) => {
   useEffect(() => {
     runtime.mounted(tab.id);
@@ -165,6 +172,39 @@ async function editor() {
   });
   return view! as EditorView;
 }
+
+it("reconciles an outer file selection before recomposing the editor and retains its dirty undo owner", async () => {
+  render(<Panel />);
+  const view = await editor();
+  const platform = useWorkspacePlatformStore.getState();
+  const workspace = platform.getWorkspace()!;
+  const first = workspace.openTabs[0];
+  const root = workspace.rootFolders[0];
+  let second = first;
+  act(() => { second = platform.openFileInWorkspace(workspace.id, { rootId: root.id, path: "second.txt" }); });
+  await waitFor(() => expect(screen.getByTestId("workspace-file-editor")).toHaveAttribute("data-path", "second.txt"));
+  await waitFor(() => expect(view.state.doc.toString()).toBe("const original = 1;\n"));
+  act(() => view.dispatch({ userEvent: "input.type", changes: { from: 0, insert: "dirty " } }));
+  await waitFor(() => expect(screen.getByTestId("workspace-file-editor")).toHaveAttribute("data-dirty", "true"));
+  act(() => platform.setActiveWorkspaceTab(workspace.id, first.id));
+  await waitFor(() => expect(screen.getByTestId("workspace-file-editor")).toHaveAttribute("data-path", "index.ts"));
+  // Drain the existing after-paint metadata publications before observing the
+  // next selection. Neither buffer needs an IPC read or a loading transition.
+  await act(async () => { await new Promise((resolve) => setTimeout(resolve, 200)); });
+  const reads = vi.mocked(readWorkspaceText).mock.calls.length;
+  runtime.composed.mockClear();
+  await act(async () => platform.setActiveWorkspaceTab(workspace.id, second.id));
+  await waitFor(() => expect(screen.getByTestId("workspace-file-editor")).toHaveAttribute("data-path", "second.txt"));
+  const secondKey = `root:${root.id}:second.txt`;
+  expect(runtime.composed).toHaveBeenCalled();
+  expect(runtime.composed.mock.calls.map(([key]) => key)).toEqual(expect.arrayContaining([secondKey]));
+  expect(runtime.composed.mock.calls.every(([key]) => key === secondKey)).toBe(true);
+  expect(await editor()).toBe(view);
+  expect(view.state.doc.toString()).toBe("dirty const original = 1;\n");
+  expect(vi.mocked(readWorkspaceText).mock.calls.length).toBe(reads);
+  await act(async () => { expect((await activeCommands().executeAction("workspace.undo")).kind).toBe("applied"); });
+  await waitFor(() => expect(view.state.doc.toString()).toBe("const original = 1;\n"));
+});
 
 it("loads under StrictMode and retains the same editor, unsaved text and undo across workspace/mode switches", async () => {
   const { rerender } = render(<StrictMode><Panel /></StrictMode>);

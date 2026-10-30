@@ -18,16 +18,22 @@ def fill_contenteditable(session: EditorInputSession, element: str, selector: st
                          text: str, error_type: type[Exception]) -> str:
     # WebKit /value accepts contenteditable without the beforeinput/input
     # transactions CM owns. Use actual keys, retaining the normal input pacing.
-    for _ in range(3):
-        session.request("POST", session.element_path(element, "/click"), {})
-        if session.execute(
+    def focused() -> bool:
+        return session.execute(
             f"const el = document.querySelector({json.dumps(selector)});"
             "return !!el && document.activeElement === el;"
-        ) is True:
-            break
-        time.sleep(.1)
-    else:
-        raise error_type(f"contenteditable did not receive focus: {selector}")
+        ) is True
+
+    # Opening an editor normally focuses it. Retain that owner instead of
+    # adding another pointer action and WebView round trip before real keys.
+    if not focused():
+        for _ in range(3):
+            session.request("POST", session.element_path(element, "/click"), {})
+            if focused():
+                break
+            time.sleep(.1)
+        else:
+            raise error_type(f"contenteditable did not receive focus: {selector}")
     # CodeMirror uses Cmd+A on macOS. Ctrl+A moves to the start of the line,
     # which leaves old text in place instead of replacing the document.
     session.press_combo("Mod+a")

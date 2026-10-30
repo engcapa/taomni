@@ -47,7 +47,8 @@ export function useWorkspaceKeymap(context: UseWorkspaceKeymapContext) {
 
   useEffect(() => {
     actionsController.host.setKeymapScheme(activeKeymapScheme);
-  }, [actionsController.host, activeKeymapScheme]);
+    actionsController.projection.publish();
+  }, [actionsController.host, actionsController.projection, activeKeymapScheme]);
 
   // IDEA's macOS keymap binds Cmd+1..0 to tool windows; the app shell's Cmd+N
   // tab switch yields those strokes while focus is inside this workspace.
