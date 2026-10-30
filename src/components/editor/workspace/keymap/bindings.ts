@@ -203,11 +203,15 @@ export function filterActionOwned(bindings: readonly unknown[]): readonly unknow
  * - Without a host (standalone embedders/tests): the legacy full spread,
  *   marked transitional — every real workspace mount provides a host.
  */
+let hostedPrimitiveKeybindings: readonly unknown[] | undefined;
+
 export function buildEditorPrimitiveKeybindings(hasActionHost: boolean): readonly unknown[] {
   if (!hasActionHost) {
     return LEGACY_UNHOSTED_SPREAD;
   }
-  return [
+  // These bindings contain only static CodeMirror commands. Dynamic actions
+  // still resolve through each editor's host adapter; do not cache that owner.
+  return hostedPrimitiveKeybindings ??= [
     ...RETAINED_ESCAPE_STACK,
     ...closeBracketsKeymap,
     ...filterActionOwned(defaultKeymap),

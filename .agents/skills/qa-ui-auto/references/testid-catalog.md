@@ -277,6 +277,11 @@
 
 ## code-workspace/editor-shell (F25.5)
 
+- `[data-testid="workspace-code-style-dialog"]` — display — F25.5.code-style-dialog
+- `[data-testid="code-style-scheme-row-default"]` — display — F25.5.code-style-default-scheme
+- `[data-testid="code-style-copy"]` — interactive — F25.5.code-style-copy
+- `[data-testid="code-style-field-tabSize"]` — interactive — F25.5.code-style-tab-size
+- `[data-testid="code-style-close"]` — interactive — F25.5.code-style-close
 - `[data-testid="code-workspace-editor-search"]` — display — F25.5.editor-find-panel
 - `[data-testid="code-workspace-editor-search"] input[name="search"]` — interactive — F25.5.editor-find-input
 - `[data-testid="code-workspace-editor-search"] input[name="replace"]` — interactive — F25.5.editor-replace-input

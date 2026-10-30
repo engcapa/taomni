@@ -8435,6 +8435,8 @@ controls:
 
 Compact 目录只预加载可见行，并限制刷新期间的原生并发；`TC-WS-057` 保护 Home 形状目录中的压缩路径浏览、展开恢复与视图切换。
 
+`TC-IDE-C8-08-code-style-dialog-lifecycle-browser` 保护 Code Style 从关闭状态打开、修改方案后重开及继续编辑同一个 dirty buffer 的生命周期。
+
 <!-- feature
 id: F25.5
 status: partial
@@ -8484,10 +8486,26 @@ files:
   - src/components/editor/workspace/LocalHistoryDialog.tsx
   - src/components/editor/workspace/editorCompareModel.ts
   - src/components/editor/workspace/AutoImportSettingsDialog.tsx
+  - src/components/editor/workspace/CodeStyleSettingsDialog.tsx
   - src/components/editor/workspace/AutoImportCandidateDialog.tsx
   - src/components/editor/workspace/FileTemplateSettingsDialog.tsx
   - src/components/editor/workspace/NewJavaClassDialog.tsx
 controls:
+  - id: code-style-dialog
+    selector: '[data-testid="workspace-code-style-dialog"]'
+    kind: display
+  - id: code-style-default-scheme
+    selector: '[data-testid="code-style-scheme-row-default"]'
+    kind: display
+  - id: code-style-copy
+    selector: '[data-testid="code-style-copy"]'
+    kind: interactive
+  - id: code-style-tab-size
+    selector: '[data-testid="code-style-field-tabSize"]'
+    kind: interactive
+  - id: code-style-close
+    selector: '[data-testid="code-style-close"]'
+    kind: interactive
   - id: editor-find-panel
     selector: '[data-testid="code-workspace-editor-search"]'
     kind: display

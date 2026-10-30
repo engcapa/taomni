@@ -61,6 +61,7 @@ export function CodeStyleSettingsDialog({
   const [renaming, setRenaming] = useState(false);
   const [renameDraft, setRenameDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [newExclusionPattern, setNewExclusionPattern] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -99,8 +100,6 @@ export function CodeStyleSettingsDialog({
         entry.id === selected.id ? { ...entry, values } : entry),
     });
   };
-
-  const [newExclusionPattern, setNewExclusionPattern] = useState("");
 
   const updateSaveActions = (patch: Partial<CodeStyleSaveActionsV3>): void => {
     if (isBuiltIn) return;

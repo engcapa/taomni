@@ -4,6 +4,9 @@
 
 ## 本轮恢复记录（持续更新）
 
+- `bc75d8567926520038c66177aa1a45ada4557549` 的 GitHub [41007654861](https://github.com/engcapa/taomni/actions/runs/41007654861) 已收齐并核验273次执行、18份回执及6508个附件：**270 passed / 3 failed / 0 skipped**，与完整75 ID的selection一致，无能力缺口。三平台browser各45/45、Windows native45/45；Linux native45/47，074/075长帧分别165.00000000000364/173ms，保持原始失败；macOS native45/46，TREE-01在分屏容器出现后立即读到1个编辑器。失败捕获随后已有两个实际EditorView和原文件正文，现仅为此用例增加第二pane的内容就绪条件，保留恰好2个编辑器的原断言并补第二pane正文与运行时错误断言，不放宽性能预算。072重载和074树指针功能在三平台均通过，SDK061–063、macOS原生菜单080和完整适用crash组通过。本机matching release native23/25，070/073分别206/171ms失败；标准browser21/22，070为241ms；回执、附件和source/runner/release均已核验，不能称作性能验收通过。
+- 本机070的CPU采样显示关闭的导航/编辑弹层、SDK状态和固定键位构造仍参与同步提交。本轮让关闭的弹层组跳过无关props更新，并只在Search Everywhere或Keymap实际消费动作时订阅projection；打开/关闭仍完整渲染、清理和恢复焦点，重开读取当前owner、文件、动作和handler。SDK状态保留自身请求及语言订阅；固定CodeMirror primitive keymap仅懒构造一次，动态host派发仍逐实例绑定。关闭订阅回归修前3项失败，修后与当前动作、StrictMode、文档焦点、迟到LSP消息、右键菜单、剪贴板和Go To Line等支持组合9文件60项通过；实际性能收益仍待无诊断browser/native与GitHub验证。
+- 上述挂载回归另稳定复现Code Style设置在关闭→打开时因条件返回前后Hooks数量不同而崩溃；真实browser从Actions入口也已改前失败，原件为`workspace-code-style-before-browser/run-20261030-140112-479914794`。现将同一个state hook移到条件返回前，不改方案格式或owner；新增`TC-IDE-C8-08-code-style-dialog-lifecycle-browser`，验证修改方案后重开、dirty正文与继续输入并纳入完整crash组。挂载及真实browser修后通过，后者为`workspace-code-style-after-browser/run-20261030-140435-834341389`，回执及5个附件已核验；三平台仍待完成。
 - `cf1729a9854cdd64f694ee26caa2397230fdf379` 的 GitHub [41002449709](https://github.com/engcapa/taomni/actions/runs/41002449709) 已收齐并核验258次执行及6362个附件：**252 passed / 6 failed / 0 skipped**，与selection一致。Linux/Windows browser均43/43，macOS41/43；Linux native42/44、Windows42/42、macOS41/43。真实SDK061–063三平台及macOS菜单080通过；macOS browser070/073、native070及Linux native075仍有167.7–208ms长帧，Linux074与macOS072另有功能失败，不能按10%帧容差放行。本机标准browser19/19；matching release native22/23，070有191ms长帧；两组回执、source/runner/build身份及全部附件已核验，失败原件保留。本次dispatch漏选022和TREE-01，下一轮补齐完整73 ID并加入011/050，不声称258次等于原完整选集。
 - 072已用真实共享编辑器挂载回归稳定复现：外层tab元数据保存正确，重载中断编辑器关闭effect后旧布局仍含records.json；恢复随后将它重新发布到外层。初次host对账现在通过原关闭/dirty确认/资源清理owner移除旧布局里已被外层关闭的root文件；中断open已提交的placeholder也保留所有权，由新请求清理。未提交tab的取消读取仍可被新请求重新打开，避免误当作用户已关闭文件。保留编辑器新打开文件、loose/library、dirty恢复和split语义。三条区分回归均有修前红、修后绿证据，最终相关17项通过；072增加重载前关闭结果断言，不等待存储timer、不改写store/storage；真实browser/native待新组合验收。
 - CPU采样发现关闭的全局搜索框仍订阅所有workspace并构建索引。现仅打开时挂载索引、查询和焦点/键盘owner，关闭释放，重开读取最新文件/会话。隐藏索引回归改前红、改后绿；保留重新搜索、焦点、Enter和Escape。真实入口沿用011；050只验证工具栏/过滤器，不能当作搜索执行证据。树pointer选择不再对已点击行自动reveal，滚动目标相差不超过既有1px阈值时不触发同步无效scroll；键盘/外部选择仍reveal，测量重试/取消保留。两条改前树回归均红，修后与搜索/树4文件22项通过；074相邻文件误开及性能收益仍待实际验证。
@@ -114,9 +117,10 @@
 | SDK/LSP生命周期 | 已实现；本机及cf1729托管macOS061–063真实SDK场景通过；最终组合三平台保留真实错误、手动刷新、取消/重试、迟到响应及文档队列顺序 |
 | 多root与系统选择器 | 已实现；最终三平台确认第二/第三root、重复选择、取消、跨工作区迟到结果和成功后展开Project |
 | 编辑器与崩溃保留契约 | 先前组合392项支持测试通过；最终同SHA验证dirty/save、undo/redo、恢复、分屏、剪贴板、树焦点、Page导航、隐藏面板及完整适用crash组 |
-| 关闭/重载与树指针竞态 | cf1729托管072与074功能失败；072旧布局恢复已稳定复现并修正，树选择滚动已调整；须以新组合实际验证，不能归为允许的慢帧 |
+| 关闭/重载与树指针竞态 | bc75托管072与074功能断言已在三平台通过；074还有Linux长帧，不能归为功能问题已完全验收；最终组合继续保留 |
+| 设置与分屏就绪 | Code Style打开崩溃已修复且新增区分回归，真实browser修后待完成；TREE-01增加真实第二编辑器就绪及正文断言，最终macOS复验 |
 | macOS应用菜单生命周期 | cf1729托管080已通过真实enabled/checked、保存、关闭、勾选项及reload后About回调；最终组合保留该原生回归 |
-| 当前分支全量回归 | 相关集全绿后，以当前分支同一SHA使用指定workflow的scope=all验证三平台browser/native，核对全部执行及构建身份 |
+| 当前分支全量回归 | 相关集全绿后，以当前分支同一SHA使用指定workflow的scope=all验证三平台browser/native；Linux选择ubuntu-22.04-x11以保留正式比较可复用的原始release，核对全部执行及构建身份 |
 | 外部缺口与证据文档 | clickhousecrud源码未提供的TC-IDE-C6-06按既有约定单列；整理最终同SHA回执、截图、构建身份及遗留项，不计缺口为通过 |
 
 HOME混合fixture与用户要求的本机测试产物清理已完成，不列为剩余开发项。

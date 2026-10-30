@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { memo, useEffect, useId, useState } from "react";
 import { Import, RotateCcw, Save, X } from "lucide-react";
 import {
   DEFAULT_AUTO_IMPORT_SETTINGS,
@@ -15,7 +15,7 @@ export interface AutoImportSettingsDialogProps {
   onClose: () => void;
 }
 
-export function AutoImportSettingsDialog({ open, onClose }: AutoImportSettingsDialogProps) {
+export const AutoImportSettingsDialog = memo(function AutoImportSettingsDialog({ open, onClose }: AutoImportSettingsDialogProps) {
   const [settings, setSettings] = useState<AutoImportSettings>({
     ...DEFAULT_AUTO_IMPORT_SETTINGS,
   });
@@ -219,4 +219,4 @@ export function AutoImportSettingsDialog({ open, onClose }: AutoImportSettingsDi
       </div>
     </div>
   );
-}
+}, (previous, next) => !previous.open && !next.open);
