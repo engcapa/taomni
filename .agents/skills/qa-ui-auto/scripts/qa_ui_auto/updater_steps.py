@@ -7,6 +7,7 @@ from . import updater_fixture
 from .deadline import budget_time as time
 from .native_steps import VERBS
 from .steps import StepError
+from .native_app_menu import native_menu
 
 
 def active(ctx):
@@ -106,6 +107,7 @@ def assert_progress(ctx, args):
 
 VERBS.update({
     "native_about": native_about,
+    "native_menu": native_menu,
     "updater_fixture_mode": fixture_mode,
     "updater_release": release,
     "assert_updater_installed": assert_installed,

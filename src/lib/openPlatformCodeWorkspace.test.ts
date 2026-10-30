@@ -28,6 +28,7 @@ describe("editor entry point ownership", () => {
     expect(workspace.activeTabId).toBe(workspace.openTabs[0].id);
     expect(useAppStore.getState().activeSideTab).toBe("workspaces");
     expect(useAppStore.getState().tabs.map((tab) => tab.id)).toEqual(["shell"]);
+    window.dispatchEvent(new Event("pagehide"));
     useWorkspacePlatformStore.getState().reloadFromStorage();
     expect(useWorkspacePlatformStore.getState().getWorkspace(id)?.codeWorkspace).toMatchObject(project);
   });

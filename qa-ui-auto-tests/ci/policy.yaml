@@ -13,6 +13,7 @@ smoke:
 - TC-WS-055
 - TC-WS-056
 - TC-WS-057
+- TC-IDE-C8-08-code-style-dialog-lifecycle-browser
 unavailable:
   # This read-only regression targets the user's external clickhousecrud
   # checkout, not an in-repository sample. Hosted VMs have neither that source
@@ -22,6 +23,8 @@ unavailable:
     windows/native: External clickhousecrud project (QA_JAVA_PROJECT_ROOT) is not distributed with the repository; run locally with the original project.
     macos/native: External clickhousecrud project (QA_JAVA_PROJECT_ROOT) is not distributed with the repository; run locally with the original project.
 cases:
+- TC-IDE-C8-08-code-style-dialog-lifecycle-browser
+- TC-WS-080
 - TC-WS-079
 - TC-WS-078
 - TC-WS-077
@@ -378,6 +381,7 @@ cases:
 - TC-IDE-C7-05-gradle-tooling-ingestion-native
 - TC-IDE-C7-06-project-facts-failed-refresh-browser
 - TC-IDE-C7-07-consumer-prerequisite-surfaced-browser
+- TC-IDE-C7-08-descriptor-mutations-native
 - TC-IDE-C8-01
 - TC-IDE-C8-02
 - TC-IDE-C8-03-reformat-unavailable-zero-commit-browser
@@ -468,6 +472,7 @@ cases:
 - TC-IDE-PARITY-024-01
 - TC-IDE-PARITY-024-02
 - TC-IDE-PARITY-024-03-tool-window-move-native
+- TC-IDE-PARITY-024-04-terminal-readline-margin-native
 - TC-IDE-PARITY-025-01
 - TC-IDE-PARITY-025-02-debugger-native
 - TC-IDE-PARITY-026-01

@@ -1,3 +1,5 @@
+import { memo } from "react";
+import { createPortal } from "react-dom";
 import { type EditorGroupId } from "../../../../stores/codeWorkspaceStore";
 import type { CodeWorkspaceFileRef, CodeWorkspaceRootInfo } from "../../../../types";
 import { LspMessageRequestDialog } from "../LspMessageRequestDialog";
@@ -76,9 +78,9 @@ export interface WorkspaceNavigationPopupsProps {
   lspClientEvents: ReturnType<typeof useWorkspaceLspClientEvents>;
 }
 
-export function WorkspaceNavigationPopups(props: WorkspaceNavigationPopupsProps) {
+export const WorkspaceNavigationPopups = memo(function WorkspaceNavigationPopups(props: WorkspaceNavigationPopupsProps) {
   const host = useWorkspaceHost();
-  const { snapshot } = useWorkspaceActionProjection(props.actionsController.projection);
+  const snapshot = useWorkspaceActionProjection(props.actionsController.projection, props.searchEverywhereOpen)?.snapshot ?? [];
   const {
     keyboard,
     searchEverywhereOpen,
@@ -262,5 +264,14 @@ export function WorkspaceNavigationPopups(props: WorkspaceNavigationPopupsProps)
       />
     )}
   </>);
+}, (previous, next) => navigationPopupsClosed(previous) && navigationPopupsClosed(next));
+
+function navigationPopupsClosed(props: WorkspaceNavigationPopupsProps): boolean {
+  return !props.keyboard.tabSwitcherOpen && !props.searchEverywhereOpen
+    && !props.recentFilesOpen && !props.uiActions.recentLocationsOpen
+    && !props.structureOpen && !props.quickDocOpen && !props.locationPeek
+    && !props.treeInteractions.treeContextMenu && !props.treeInteractions.editorContextMenu
+    && !(props.visible && props.structuralSearch.dialogOpen)
+    && !props.usages.usagesScopeDialog?.open
+    && !(props.visible && props.lspClientEvents.messageRequest);
 }
-import { createPortal } from "react-dom";

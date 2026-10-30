@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -345,7 +345,7 @@ function KotlinProfileDetails({ profile, t }: { profile: ProjectSdkProfile; t: T
   );
 }
 
-export function WorkspaceSdkStatus({ roots, autoResolve = true }: WorkspaceSdkStatusProps) {
+export const WorkspaceSdkStatus = memo(function WorkspaceSdkStatus({ roots, autoResolve = true }: WorkspaceSdkStatusProps) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const [busyKey, setBusyKey] = useState<string | null>(null);
@@ -598,4 +598,4 @@ export function WorkspaceSdkStatus({ roots, autoResolve = true }: WorkspaceSdkSt
       )}
     </>
   );
-}
+});

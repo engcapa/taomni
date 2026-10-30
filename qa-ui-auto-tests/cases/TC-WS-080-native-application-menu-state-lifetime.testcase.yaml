@@ -1,0 +1,260 @@
+id: TC-WS-080
+title: Native application menu patches flags and preserves action channels through save close and reload
+description: Read actual enabled and checked states through AppKit NSMenu, activate its real action channels, save a public file and reopen its disk contents.
+  State-only updates and structural replacements must keep About, Quick Connect, Save and Close callable. Browser stubs cannot establish this native resource
+  lifetime.
+modes:
+- native
+native_platforms:
+- macOS
+covers:
+- F1.8
+- F-WS-2
+- F25.3
+tags:
+- p0
+- workspace-redesign
+- regression
+fixtures:
+- reset_db
+- workspace_explorer
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-native-menu
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree-empty"]'
+- native_menu:
+    action: close-active
+    enabled: false
+- native_menu:
+    action: toggle-quick-connect
+    enabled: true
+    checked: false
+    activate: true
+- wait_for: '[data-testid="quick-connect"]'
+- native_menu:
+    action: toggle-quick-connect
+    enabled: true
+    checked: true
+- native_about: null
+- wait_for: '[data-testid="about-dialog"]'
+- press: Escape
+- assert_not_visible: '[data-testid="about-dialog"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.platform_workspace_root}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- wait_for: '[data-testid="workspace-file-editor"] .cm-content'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    contains: platform workspace root
+- native_menu:
+    action: workspace-command:workspace.save
+    enabled: false
+- fill:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    value: 'Public native menu save
+
+      '
+- wait_for: '[data-testid="workspace-editor-save"]:not(:disabled)'
+- native_menu:
+    action: workspace-command:workspace.save
+    enabled: true
+    activate: true
+- wait_for: '[data-testid="workspace-editor-save"]:disabled'
+- native_menu:
+    action: workspace-command:workspace.save
+    enabled: false
+- native_menu:
+    action: close-active
+    enabled: true
+    activate: true
+- assert_count:
+    selector: '[data-testid="workspace-tab"]'
+    equal: 0
+- assert_not_visible: '[data-testid="workspace-file-editor"]'
+- native_menu:
+    action: close-active
+    enabled: false
+- native_menu:
+    action: toggle-quick-connect
+    enabled: true
+    checked: true
+    activate: true
+- assert_not_visible: '[data-testid="quick-connect"]'
+- native_menu:
+    action: toggle-quick-connect
+    enabled: true
+    checked: false
+- native_about: null
+- wait_for: '[data-testid="about-dialog"]'
+- press: Escape
+- assert_not_visible: '[data-testid="about-dialog"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    contains: Public native menu save
+- native_menu:
+    action: close-active
+    enabled: true
+- assert_no_runtime_errors: null
+- reload: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-file-editor"] .cm-content'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    contains: Public native menu save
+- native_menu:
+    action: workspace-command:workspace.save
+    enabled: false
+- native_about: null
+- wait_for: '[data-testid="about-dialog"]'
+- press: Escape
+- assert_not_visible: '[data-testid="about-dialog"]'
+- assert_no_runtime_errors: null
+- screenshot: workspace-tc-ws-080-native-menu-lifetime.png
+verification:
+  review: reviewed
+  native:
+  - check: Actual AppKit flags, menu action channels, filesystem save and current-document callback replacement.
+    method: automated
+    reason: The read-only installed specification locates menu indices only. All flags and activations use real NSMenu objects on the AppKit main thread;
+      reopening and reloading confirm the native save and document lifetime.
+  visual:
+  - check: Native menu and dialog readability.
+    method: manual
+    reason: State, callbacks and saved content have executable assertions. The final screenshot records app state; menu typography and OS interaction fidelity
+      still require visual review.
+  requirements:
+  - id: R1
+    requirement: Close starts disabled; Quick Connect toggles with current checkmarks; clean Save is disabled, dirty Save writes via AppKit, closing removes
+      the editor, and reopened and reloaded documents retain saved content and live About callbacks.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 6
+    - 9
+    - 11
+    - 13
+    - 14
+    - 15
+    - 16
+    - 18
+    - 22
+    - 24
+    - 27
+    - 31
+    - 34
+    - 36
+    - 38
+    - 42
+    - 43
+    - 47
+    - 49
+    results:
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 10
+    - 12
+    - 17
+    - 19
+    - 20
+    - 21
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 35
+    - 37
+    - 39
+    - 40
+    - 41
+    - 44
+    - 45
+    - 46
+    - 48
+    - 50
+    - 51
+    checkpoints:
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-empty\"]"}'
+    - step: 5
+      expectation: '{"native_menu": {"action": "close-active", "enabled": false}}'
+    - step: 6
+      expectation: '{"native_menu": {"action": "toggle-quick-connect", "enabled": true, "checked": false, "activate": true}}'
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"quick-connect\"]"}'
+    - step: 8
+      expectation: '{"native_menu": {"action": "toggle-quick-connect", "enabled": true, "checked": true}}'
+    - step: 10
+      expectation: '{"wait_for": "[data-testid=\"about-dialog\"]"}'
+    - step: 12
+      expectation: '{"assert_not_visible": "[data-testid=\"about-dialog\"]"}'
+    - step: 17
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
+    - step: 20
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "platform workspace root"}}'
+    - step: 21
+      expectation: '{"native_menu": {"action": "workspace-command:workspace.save", "enabled": false}}'
+    - step: 23
+      expectation: '{"wait_for": "[data-testid=\"workspace-editor-save\"]:not(:disabled)"}'
+    - step: 24
+      expectation: '{"native_menu": {"action": "workspace-command:workspace.save", "enabled": true, "activate": true}}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"workspace-editor-save\"]:disabled"}'
+    - step: 26
+      expectation: '{"native_menu": {"action": "workspace-command:workspace.save", "enabled": false}}'
+    - step: 27
+      expectation: '{"native_menu": {"action": "close-active", "enabled": true, "activate": true}}'
+    - step: 28
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 0}}'
+    - step: 29
+      expectation: '{"assert_not_visible": "[data-testid=\"workspace-file-editor\"]"}'
+    - step: 30
+      expectation: '{"native_menu": {"action": "close-active", "enabled": false}}'
+    - step: 31
+      expectation: '{"native_menu": {"action": "toggle-quick-connect", "enabled": true, "checked": true, "activate": true}}'
+    - step: 32
+      expectation: '{"assert_not_visible": "[data-testid=\"quick-connect\"]"}'
+    - step: 33
+      expectation: '{"native_menu": {"action": "toggle-quick-connect", "enabled": true, "checked": false}}'
+    - step: 35
+      expectation: '{"wait_for": "[data-testid=\"about-dialog\"]"}'
+    - step: 37
+      expectation: '{"assert_not_visible": "[data-testid=\"about-dialog\"]"}'
+    - step: 39
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "Public native menu save"}}'
+    - step: 40
+      expectation: '{"native_menu": {"action": "close-active", "enabled": true}}'
+    - step: 41
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 44
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
+    - step: 45
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "Public native menu save"}}'
+    - step: 46
+      expectation: '{"native_menu": {"action": "workspace-command:workspace.save", "enabled": false}}'
+    - step: 48
+      expectation: '{"wait_for": "[data-testid=\"about-dialog\"]"}'
+    - step: 50
+      expectation: '{"assert_not_visible": "[data-testid=\"about-dialog\"]"}'
+    - step: 51
+      expectation: '{"assert_no_runtime_errors": null}'

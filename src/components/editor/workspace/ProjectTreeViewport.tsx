@@ -1,4 +1,4 @@
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { measureElement, useVirtualizer } from "@tanstack/react-virtual";
 import { Fragment, useLayoutEffect, useRef, useState } from "react";
 import type { TreeSelection } from "./codeWorkspaceModel";
 import { registerProjectTreeNavigation } from "./projectTreeNavigation";
@@ -21,6 +21,8 @@ export function ProjectTreeViewport({ rows, selected, viewMode }: {
     const host = hostRef.current;
     const element = tree();
     if (!virtual || !host || !element) return;
+    let disposed = false;
+    let frame: number | null = null;
     const header = element.querySelector<HTMLElement>('[data-testid="code-workspace-list-columns"]');
     const measure = () => {
       const margin = host.getBoundingClientRect().top - element.getBoundingClientRect().top + element.scrollTop;
@@ -30,18 +32,42 @@ export function ProjectTreeViewport({ rows, selected, viewMode }: {
       setInsets((previous) => previous.margin === margin && previous.header === height && previous.bottom === bottom
         ? previous : { margin, header: height, bottom });
     };
+    const schedule = () => {
+      if (disposed || frame !== null) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        if (!disposed) measure();
+      });
+    };
     measure();
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
     observer?.observe(element);
     if (header) observer?.observe(header);
-    window.addEventListener("resize", measure);
-    return () => { observer?.disconnect(); window.removeEventListener("resize", measure); };
+    window.addEventListener("resize", schedule);
+    return () => {
+      disposed = true;
+      observer?.disconnect();
+      window.removeEventListener("resize", schedule);
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
   }, [virtual, viewMode]);
   const list = useVirtualizer({
     count: rows.length,
     getScrollElement: tree,
     getItemKey: (index) => rows[index].key,
     estimateSize: () => 28,
+    measureElement: (element, entry, instance) => {
+      // Ref attachment runs inside React's commit while sibling DOM can still
+      // be changing. Reading offsetHeight there repeatedly forces layout.
+      // Keep the cached/estimated size until the observer supplies the actual
+      // border box; variable rows and font changes still update normally.
+      if (entry) return measureElement(element, entry, instance);
+      const index = instance.indexFromElement(element);
+      return instance.measurementsCache[index]?.size ?? instance.options.estimateSize(index);
+    },
+    // Row measurements change the spacer and can adjust ancestor scrolling.
+    // Publish them after ResizeObserver delivery to avoid a WebKit resize loop.
+    useAnimationFrameWithResizeObserver: true,
     overscan: 8,
     scrollMargin: insets.margin,
     scrollPaddingStart: insets.header,
@@ -55,6 +81,7 @@ export function ProjectTreeViewport({ rows, selected, viewMode }: {
   const items = list.getVirtualItems();
   const selectedKey = treeSelectionKey(selected);
   const previousSelection = useRef({ key: null as string | null, virtual: false });
+  const pointerSelection = useRef<string | null>(null);
   const reveal = useProjectTreeScrollRequest(list, rows, virtual);
 
   useLayoutEffect(() => {
@@ -77,8 +104,13 @@ export function ProjectTreeViewport({ rows, selected, viewMode }: {
 
   useLayoutEffect(() => {
     const previous = previousSelection.current;
+    const pointerKey = pointerSelection.current;
+    pointerSelection.current = null;
     previousSelection.current = { key: selectedKey, virtual };
     if (previous.key === selectedKey && previous.virtual === virtual) return;
+    // Pointer input already reached this row. Re-revealing it here can
+    // scroll between the two physical clicks and open its neighbour instead.
+    if (previous.virtual === virtual && pointerKey === selectedKey) return;
     if (!virtual || !selectedKey) return;
     const index = rows.findIndex((row) => treeSelectionKey(row.selection) === selectedKey);
     if (index >= 0) reveal(index);
@@ -100,6 +132,13 @@ export function ProjectTreeViewport({ rows, selected, viewMode }: {
   if (!virtual) return <>{rows.map((row) => <Fragment key={row.key}>{row.render()}</Fragment>)}</>;
   return (
     <div ref={hostRef} data-testid="code-workspace-tree-viewport" data-row-count={rows.length}
+      onClickCapture={(event) => {
+        pointerSelection.current = null;
+        if (event.detail === 0 || !(event.target instanceof Element)) return;
+        const row = event.target.closest<HTMLElement>("[data-virtual-index]");
+        const selectedRow = row ? rows[Number(row.dataset.virtualIndex)] : undefined;
+        if (selectedRow) pointerSelection.current = treeSelectionKey(selectedRow.selection);
+      }}
       style={{ position: "relative", width: "100%", height: Math.max(0, list.getTotalSize() - insets.bottom) }}>
       {items.map((item) => (
         <div key={item.key} data-index={item.index} data-virtual-index={item.index} ref={list.measureElement}

@@ -221,17 +221,25 @@ export function terminalAtIdlePrompt(term: Terminal): boolean {
 
   let cursorRow = buffer.baseY + buffer.cursorY;
   let readlineMargin = false;
-  // Readline explicitly writes CR LF CR after an exactly full prompt. Unlike
-  // autowrap, that empty cursor row has no isWrapped flag. Only consider the
-  // immediately preceding row while readline is active and its final cell is
-  // a printed space, not an unused padded cell. Do not scan old output.
+  // Readline can explicitly move to a non-wrapped row at the right margin,
+  // either after the prompt's final space or immediately before printing it.
+  // Only join the immediately preceding full row while readline is active;
+  // unused padded cells and older output must not establish readiness.
+  const cursorLine = buffer.getLine(cursorRow);
+  let beforeMarginSpace = false;
   if (
-    buffer.cursorX === 0 && cursorRow > 0 && term.modes.bracketedPasteMode
-    && !buffer.getLine(cursorRow)?.translateToString(true).trim()
-    && buffer.getLine(cursorRow - 1)?.getCell(term.cols - 1)?.getChars() === " "
+    buffer.cursorX <= 1 && cursorRow > 0 && term.modes.bracketedPasteMode
+    && !cursorLine?.isWrapped
+    && !cursorLine?.translateToString(true).trim()
   ) {
-    cursorRow -= 1;
-    readlineMargin = true;
+    const marginCell = buffer.getLine(cursorRow - 1)?.getCell(term.cols - 1)?.getChars();
+    const afterMarginSpace = buffer.cursorX === 0 && marginCell === " ";
+    beforeMarginSpace = buffer.cursorX === 1 && cursorLine?.getCell(0)?.getChars() === " "
+      && marginCell !== undefined && /^[$#>%]$/.test(marginCell);
+    if (afterMarginSpace || beforeMarginSpace) {
+      cursorRow -= 1;
+      readlineMargin = true;
+    }
   }
   let start = cursorRow;
   while (start > 0 && buffer.getLine(start)?.isWrapped) start -= 1;
@@ -246,6 +254,7 @@ export function terminalAtIdlePrompt(term: Terminal): boolean {
         : line.translateToString(false);
   }
 
+  if (readlineMargin && beforeMarginSpace) text += " ";
   if (text.replace(/\s+$/, "").length === 0) return false; // blank: not ready
   if (readlineMargin && extractTerminalCommand(text) !== "") return false;
   // Ends in a prompt terminator, optionally followed by a single space.

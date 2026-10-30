@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { type WorkspaceEntry, type WorkspaceFile } from "./model";
+import { notifyWorkspaceFilesChanged } from "./changes";
 
 export function workspaceCreateFile(
   repoRoot: string,
@@ -10,6 +11,9 @@ export function workspaceCreateFile(
     repoRoot,
     path,
     contents,
+  }).then((file) => {
+    notifyWorkspaceFilesChanged(repoRoot, [path]);
+    return file;
   });
 }
 
@@ -25,7 +29,9 @@ export function workspaceDeletePath(
   path: string,
   recursive = false,
 ): Promise<void> {
-  return invoke<void>("workspace_delete_path", { repoRoot, path, recursive });
+  return invoke<void>("workspace_delete_path", { repoRoot, path, recursive }).then(() => {
+    notifyWorkspaceFilesChanged(repoRoot, [path]);
+  });
 }
 
 export function workspaceRenamePath(
@@ -37,6 +43,9 @@ export function workspaceRenamePath(
     repoRoot,
     fromPath,
     toPath,
+  }).then((entry) => {
+    notifyWorkspaceFilesChanged(repoRoot, [fromPath, toPath]);
+    return entry;
   });
 }
 
@@ -74,5 +83,15 @@ export function workspaceApplyResourceOperation(
   return invoke<WorkspaceResourceOperationResult>("workspace_apply_resource_operation", {
     repoRoot,
     operation,
+  }).then((result) => {
+    if (!result.ignored) {
+      if (operation.kind === "rename") {
+        notifyWorkspaceFilesChanged(repoRoot, [operation.fromPath]);
+        notifyWorkspaceFilesChanged(operation.toRepoRoot ?? repoRoot, [operation.toPath]);
+      } else {
+        notifyWorkspaceFilesChanged(repoRoot, [operation.path]);
+      }
+    }
+    return result;
   });
 }

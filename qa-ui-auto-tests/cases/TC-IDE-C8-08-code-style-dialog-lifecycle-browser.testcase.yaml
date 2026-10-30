@@ -1,0 +1,116 @@
+id: TC-IDE-C8-08-code-style-dialog-lifecycle-browser
+title: Code Style settings open, close and reopen without losing the editor
+description: >-
+  Reproduces the closed-to-open Hooks failure with a mounted editor. Open Code
+  Style through Search Everywhere Actions, copy and edit a scheme, close and
+  reopen it, then continue editing the same dirty buffer. These renderer
+  lifecycle assertions use the browser filesystem; native disk and provider
+  behavior is covered by the existing workspace cases.
+covers: [F25.5]
+tags: [code-workspace, editor-settings, crash-regression, p1]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 180
+steps:
+  - open: ${cfg.app.base_url}
+  - wait_for: '[data-testid="welcome-panel"]'
+  - click: '[data-testid="side-tab-tools"]:visible'
+  - click: '[data-testid="sidebar-tool-code-workspace"]'
+  - wait_for: '[data-testid="code-workspace-tab"]'
+  - click: '[data-testid="code-workspace-tree-add-folder"]'
+  - wait_for: '[data-testid="text-input-dialog"]'
+  - click: '[data-testid="text-input-dialog-confirm"]'
+  - wait_for: '[data-testid="code-workspace-tree-file"]'
+  - dblclick: '[data-testid="code-workspace-tree-file"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Mod+End
+  - type: qa-code-style-retained
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+  - fill:
+      selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+      value: Code Style Settings
+  - click: '[data-testid="code-workspace-search-everywhere"] >> text=Code Style Settings'
+  - wait_for: '[data-testid="workspace-code-style-dialog"]'
+  - assert_visible: '[data-testid="code-style-scheme-row-default"]'
+  - click: '[data-testid="code-style-copy"]'
+  - fill:
+      selector: '[data-testid="code-style-field-tabSize"]'
+      value: '2'
+  - click: '[data-testid="code-style-close"]'
+  - wait_for:
+      selector: '[data-testid="workspace-code-style-dialog"]'
+      state: detached
+  - press: Control+Shift+N
+  - wait_for: '[data-testid="code-workspace-search-everywhere"]'
+  - click: '[data-testid="code-workspace-search-everywhere"] >> role=tab[name="Actions"]'
+  - fill:
+      selector: '[data-testid="code-workspace-search-everywhere"] input[aria-label="Search actions"]'
+      value: Code Style Settings
+  - click: '[data-testid="code-workspace-search-everywhere"] >> text=Code Style Settings'
+  - wait_for: '[data-testid="workspace-code-style-dialog"]'
+  - assert_attribute:
+      selector: '[data-testid="code-style-field-tabSize"]'
+      name: value
+      equals: '2'
+  - click: '[data-testid="code-style-close"]'
+  - wait_for:
+      selector: '[data-testid="workspace-code-style-dialog"]'
+      state: detached
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: qa-code-style-retained
+  - click: '[data-testid="code-workspace-editor"] .cm-content'
+  - press: Mod+End
+  - type: '-after-settings'
+  - assert_text:
+      selector: '[data-testid="code-workspace-editor"] .cm-content'
+      contains: qa-code-style-retained-after-settings
+  - assert_no_runtime_errors: null
+  - screenshot: code-style-reopened-editor-retained.png
+verification:
+  review: reviewed
+  requirements:
+    - id: R1
+      requirement: Open Code Style from the real Actions entry while a dirty editor remains mounted.
+      actions: [3, 4, 6, 8, 10, 12, 13, 14, 15, 17, 18, 19]
+      checkpoints:
+        - step: 20
+          expectation: The Code Style dialog is visible without a Hooks exception.
+        - step: 21
+          expectation: The built-in scheme is listed.
+      results: [20, 21]
+    - id: R2
+      requirement: Copy and edit a scheme, then reopen the dialog with the edited value.
+      actions: [22, 23, 24, 26, 28, 29, 30]
+      checkpoints:
+        - step: 25
+          expectation: Closing removes the dialog.
+        - step: 31
+          expectation: Reopening shows the dialog.
+        - step: 32
+          expectation: The copied scheme still has tabSize 2.
+      results: [25, 31, 32]
+    - id: R3
+      requirement: Closing settings preserves the dirty buffer and allows further typing without runtime errors.
+      actions: [33, 36, 37, 38]
+      checkpoints:
+        - step: 34
+          expectation: The reopened dialog closes cleanly.
+        - step: 35
+          expectation: The original marker is still present in the editor.
+        - step: 39
+          expectation: New input appends to that same marker.
+        - step: 40
+          expectation: No runtime errors were observed.
+      results: [34, 35, 39, 40]
+  visual:
+    - check: Dialog visibility, retained scheme value and editor content match the requested lifecycle.
+      method: automated
+      reason: DOM assertions cover these states; this case makes no pixel parity claim.
+  native:
+    - check: React Hooks order and mounted editor retention are renderer behavior.
+      method: not-applicable
+      reason: This case uses the browser fixture; it does not claim native disk, clipboard or provider effects.

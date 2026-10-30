@@ -6,11 +6,16 @@ const native = vi.hoisted(() => ({
   current: null as { items: Resource[] } | null,
   failInstall: false,
   closed: [] as string[],
+  created: 0,
 }));
 
 interface Resource {
   id: string;
   items: Resource[];
+  enabled: boolean;
+  checked: boolean;
+  setEnabled: (value: boolean) => Promise<void>;
+  setChecked: (value: boolean) => Promise<void>;
   close: () => Promise<void>;
   setAsAppMenu: () => Promise<void>;
 }
@@ -18,13 +23,18 @@ interface Resource {
 vi.mock("@tauri-apps/api/menu", () => {
   let sequence = 0;
   const create = async (options: {
-    id?: string; items?: Resource[]; action?: () => void;
+    id?: string; items?: Resource[]; action?: () => void; enabled?: boolean; checked?: boolean;
   }): Promise<Resource> => {
+    native.created++;
     const id = options.id ?? `generated-${++sequence}`;
     if (options.action) native.channels.set(id, options.action);
     return {
       id,
       items: options.items ?? [],
+      enabled: options.enabled ?? true,
+      checked: options.checked ?? false,
+      async setEnabled(this: Resource, value) { this.enabled = value; },
+      async setChecked(this: Resource, value) { this.checked = value; },
       async close() {
         native.closed.push(id);
         native.channels.delete(id);
@@ -96,6 +106,67 @@ describe("native menu action lifetime", () => {
     const pending = installAppMenu(spec, vi.fn());
     expect(appMenuInstallationReady()).toBe(false);
     await pending;
+    expect(appMenuInstallationReady()).toBe(true);
+  });
+
+  it("updates enabled and checked states without replacing live menu resources or action channels", async () => {
+    const oldDispatch = vi.fn();
+    await installAppMenu(spec, oldDispatch);
+    const current = native.current;
+    const created = native.created;
+    native.closed = [];
+    const dispatch = vi.fn();
+    const changed: AppMenuSpec = { submenus: [{ ...spec.submenus[0], items: [
+      { type: "item", id: "about", label: "About Taomni", action: "help", enabled: false },
+      { type: "check", id: "quick", label: "Quick Connect", checked: false, action: "toggle-quick-connect" },
+    ] }] };
+    await installAppMenu(changed, dispatch);
+    expect(native.current).toBe(current);
+    expect(native.created).toBe(created);
+    expect(native.closed).toEqual([]);
+    expect(current!.items[0].items[0].enabled).toBe(false);
+    expect(current!.items[0].items[1].checked).toBe(false);
+    click(1);
+    expect(dispatch).toHaveBeenCalledWith("toggle-quick-connect");
+    expect(oldDispatch).not.toHaveBeenCalled();
+    expect(appMenuInstallationReady()).toBe(true);
+  });
+
+  it("does not create superseded menus while waiting for the installation owner", async () => {
+    await installAppMenu(spec, vi.fn());
+    const created = native.created;
+    const dispatch = vi.fn();
+    await Promise.all([
+      installAppMenu(spec, vi.fn()),
+      installAppMenu(spec, vi.fn()),
+      installAppMenu(spec, dispatch),
+    ]);
+    expect(native.created - created).toBe(4);
+    click(0);
+    expect(dispatch).toHaveBeenCalledWith("help");
+    expect(appMenuInstallationReady()).toBe(true);
+  });
+
+  it("rolls back failed state updates and replaces uncertain resources on retry", async () => {
+    const dispatch = vi.fn();
+    await installAppMenu(spec, dispatch);
+    const previous = native.current!;
+    const [about, quick] = previous.items[0].items;
+    vi.spyOn(quick, "setChecked").mockRejectedValueOnce(new Error("AppKit update failed"));
+    const changed: AppMenuSpec = { submenus: [{ ...spec.submenus[0], items: [
+      { type: "item", id: "about", label: "About Taomni", action: "help", enabled: false },
+      { type: "check", id: "quick", label: "Quick Connect", checked: false, action: "toggle-quick-connect" },
+    ] }] };
+    await expect(installAppMenu(changed, vi.fn())).rejects.toThrow("AppKit update failed");
+    expect(native.current).toBe(previous);
+    expect(about.enabled).toBe(true);
+    expect(quick.checked).toBe(true);
+    expect(appMenuInstallationReady()).toBe(false);
+    click(1);
+    expect(dispatch).toHaveBeenCalledWith("toggle-quick-connect");
+    await installAppMenu(changed, vi.fn());
+    expect(native.current).not.toBe(previous);
+    expect(native.closed).toContain(about.id);
     expect(appMenuInstallationReady()).toBe(true);
   });
 });

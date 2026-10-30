@@ -7,6 +7,7 @@ driver input methods. Only observations use JavaScript.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
 from pathlib import Path
 from typing import Any, Callable
@@ -15,6 +16,7 @@ from .deadline import budget_time as time
 from .language_startup_observer import validate_observation
 from .sdk_editor_input import measure as measure_editor_input
 from .sdk_action_trace import capture as capture_action_trace
+from .workspace_stage_trace import capture as capture_stages
 from .steps import StepError
 
 ACTION_BUDGET_MS = 1500
@@ -91,7 +93,11 @@ def run(ctx: Any, args: Any) -> str:
             raise StepError("SDK child exists but the actual SDK/LSP IPC is no longer pending")
         return {"child": child, "pendingInvocations": pending}
 
-    def until(expression: str, expires: float) -> Any:
+    def until(expression: str, expires: float, *, pending: bool) -> Any:
+        if pending:
+            # Observe both facts in the same renderer turn. A second driver
+            # request can consume the real child's remaining five-second life.
+            expression = "(() => { const result = (" + expression + "); return result ? {result, observation: window.__taomniQaLanguageStartup?.observe() ?? null} : null; })()"
         while time.monotonic() < expires:
             value = read(expression)
             if value:
@@ -108,10 +114,11 @@ def run(ctx: Any, args: Any) -> str:
             invoke()
             record["invokeDurationMs"] = (time.monotonic() - started) * 1000
             record["invokeCompletedEpochMs"] = time.time() * 1000
-            until(expression, started + ACTION_BUDGET_MS / 1000)
+            result = until(expression, started + ACTION_BUDGET_MS / 1000, pending=pending)
             record["resultObservedEpochMs"] = time.time() * 1000
             if pending:
-                record["sdkPending"] = require_pending()
+                state = validate_observation(result.get("observation") if isinstance(result, dict) else None)
+                record["sdkPending"] = require_pending(state)
             record["durationMs"] = (time.monotonic() - started) * 1000
             if record["durationMs"] > ACTION_BUDGET_MS:
                 raise StepError(f"{label} exceeded {ACTION_BUDGET_MS}ms: {record['durationMs']:.1f}ms")
@@ -122,8 +129,22 @@ def run(ctx: Any, args: Any) -> str:
     def content_is(text: str) -> str:
         return f"document.querySelector({json.dumps(editor)})?.textContent === {json.dumps(text)}"
 
+    def release_sdk() -> None:
+        if not gate.exists():
+            gate.write_text("release\n", encoding="utf-8")
+            report["gateReleasedEpochMs"] = time.time() * 1000
+
+    @contextmanager
+    def release_after_actions():
+        try:
+            yield
+        finally:
+            # Diagnostic WebDriver calls can be slow. Release only after all
+            # action/pending assertions, but before collecting trace/IPC data.
+            release_sdk()
+
     try:
-        with capture_action_trace(session, ctx.case_dir):
+        with capture_stages(ctx, "sdk"), capture_action_trace(session, ctx.case_dir), release_after_actions():
             observation()
             # File read/publication must complete without awaiting SDK discovery.
             action("open-source", lambda: session.dblclick(source_row),
@@ -162,16 +183,16 @@ def run(ctx: Any, args: Any) -> str:
         report["passed"] = False
         raise
     finally:
+        # Also covers failure while installing the trace, before the inner
+        # context owns cleanup. No capture may delay terminating our child.
+        release_sdk()
         try:
-            try:
-                report["invokeObservation"] = observation()
-                report["sdkEvents"] = events()
-            except Exception as error:
-                report["captureError"] = str(error)
-                if report["passed"]:
-                    report["passed"] = False
-                    raise
-            finally:
-                (ctx.case_dir / "sdk-startup-responsiveness.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+            report["invokeObservation"] = observation()
+            report["sdkEvents"] = events()
+        except Exception as error:
+            report["captureError"] = str(error)
+            if report["passed"]:
+                report["passed"] = False
+                raise
         finally:
-            gate.write_text("release\n", encoding="utf-8")
+            (ctx.case_dir / "sdk-startup-responsiveness.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

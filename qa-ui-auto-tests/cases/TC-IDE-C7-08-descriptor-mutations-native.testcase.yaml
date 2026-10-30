@@ -1,0 +1,176 @@
+id: TC-IDE-C7-08-descriptor-mutations-native
+title: Project descriptor discovery follows native create save rename and delete
+description: Creates and saves a package descriptor through the production editor, verifies its native bytes, then renames
+  it out of and back into descriptor discovery and deletes it. No manual project refresh or application reload may create
+  the discovery result. Ordinary folders begin idle; browser descriptor and missing-tooling behavior remains covered by C7-03.
+covers:
+- F25.5
+tags:
+- code-workspace
+- ide-c7
+- project-structure
+- regression
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+- platform_workspace_root
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-descriptor-mutations
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id": "qa-descriptors", "name": "descriptor-root", "roots": [{"id": "descriptor-root", "name": "descriptor-root",
+      "path": "${fixture.platform_workspace_root}", "kind": "folder"}], "looseFiles": [], "lastOpenedAt": 1756100000000, "isGitRepo":
+      false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- assert_not_visible: '[data-testid="project-facts-status-badge"]'
+- click: '[data-testid="code-workspace-tree-new"]'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: package.json
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- fill:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    value: '{"name":"qa-descriptor","version":"1.0.0"}
+
+      '
+- press: Control+s
+- assert_text:
+    selector: '[data-testid="project-facts-discovery-status"]'
+    contains: Project Discovered
+    timeout_sec: 20
+- assert_file_sha256:
+    path: ${fixture.platform_workspace_root}/package.json
+    equals: 20b291b40ba4a796a310d8e04a05d26df1ca397e4d4dd84cc2515480d2afb8e4
+- right_click: '[data-testid="code-workspace-tree-file"][data-path="package.json"]'
+- click_menu: Rename...
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: manifest.json
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="manifest.json"]'
+- assert_file_sha256:
+    path: ${fixture.platform_workspace_root}/manifest.json
+    equals: 20b291b40ba4a796a310d8e04a05d26df1ca397e4d4dd84cc2515480d2afb8e4
+- wait_for:
+    selector: '[data-testid="project-facts-discovery-status"]'
+    state: hidden
+- right_click: '[data-testid="code-workspace-tree-file"][data-path="manifest.json"]'
+- click_menu: Rename...
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: package.json
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="package.json"]'
+- assert_file_sha256:
+    path: ${fixture.platform_workspace_root}/package.json
+    equals: 20b291b40ba4a796a310d8e04a05d26df1ca397e4d4dd84cc2515480d2afb8e4
+- wait_for:
+    selector: '[data-testid="project-facts-discovery-status"]'
+    state: visible
+- right_click: '[data-testid="code-workspace-tree-file"][data-path="package.json"]'
+- click_menu: Delete
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="package.json"]'
+    state: detached
+- wait_for:
+    selector: '[data-testid="project-facts-discovery-status"]'
+    state: hidden
+- assert_text:
+    selector: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+    contains: README.md
+- assert_no_runtime_errors: null
+- screenshot: project-descriptor-mutations-native.png
+verification:
+  review: reviewed
+  requirements:
+  - id: descriptor-mutations
+    requirement: Descriptor status follows successful filesystem mutations automatically; saved and renamed native files retain
+      exact bytes and the unrelated README remains.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 10
+    - 11
+    - 13
+    - 14
+    - 16
+    - 17
+    - 20
+    - 21
+    - 23
+    - 24
+    - 28
+    - 29
+    - 31
+    - 32
+    - 36
+    - 37
+    - 39
+    checkpoints:
+    - step: 9
+      expectation: '{"assert_not_visible": "[data-testid=\"project-facts-status-badge\"]"}'
+    - step: 18
+      expectation: '{"assert_text": {"selector": "[data-testid=\"project-facts-discovery-status\"]", "contains": "Project
+        Discovered", "timeout_sec": 20}}'
+    - step: 19
+      expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/package.json", "equals": "20b291b40ba4a796a310d8e04a05d26df1ca397e4d4dd84cc2515480d2afb8e4"}}'
+    - step: 26
+      expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/manifest.json", "equals": "20b291b40ba4a796a310d8e04a05d26df1ca397e4d4dd84cc2515480d2afb8e4"}}'
+    - step: 33
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"package.json\"]"}'
+    - step: 34
+      expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/package.json", "equals": "20b291b40ba4a796a310d8e04a05d26df1ca397e4d4dd84cc2515480d2afb8e4"}}'
+    - step: 35
+      expectation: '{"wait_for": {"selector": "[data-testid=\"project-facts-discovery-status\"]", "state": "visible"}}'
+    - step: 38
+      expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 40
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-file\"][data-path=\"package.json\"]", "state":
+        "detached"}}'
+    - step: 41
+      expectation: '{"wait_for": {"selector": "[data-testid=\"project-facts-discovery-status\"]", "state": "hidden"}}'
+    - step: 42
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]", "contains":
+        "README.md"}}'
+    - step: 43
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 9
+    - 18
+    - 19
+    - 26
+    - 33
+    - 34
+    - 35
+    - 38
+    - 40
+    - 41
+    - 42
+    - 43
+  native:
+  - check: Real workspace_create_file, encoded save and resource rename/delete with independent disk SHA reads.
+    method: automated
+    reason: Browser VFS cannot establish native filesystem notifications or saved bytes.
+  visual:
+  - check: Project discovery and tree state remain readable.
+    method: manual
+    reason: Final screenshot records the actual application state.

@@ -18,6 +18,27 @@ describe.each([{ entry: "CJS", components: panels }, { entry: "ESM", components:
     beforeEach(() => { clock = installPanelResizeHarness(); });
     afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
+    it("retains a closed percentage default before geometry and across hidden restoration", () => {
+      const fixture = mountPanelResizeFixture(false, components, false, true);
+      const docs = fixture.container.querySelector<HTMLElement>('[id="docs"]')!;
+      expect(fixture.docsRef.current!.isCollapsed()).toBe(true);
+      expect(Number.parseFloat(docs.style.flexGrow)).toBe(0);
+      expect(fixture.onResize).not.toHaveBeenCalled();
+      for (const width of [1000, 0, 1200]) {
+        fixture.setWidth(width);
+        fixture.deliver();
+        expect(Number.parseFloat(docs.style.flexGrow)).toBe(0);
+        clock.flushFrame();
+        expect(fixture.docsRef.current!.isCollapsed()).toBe(true);
+        expect(Number.parseFloat(docs.style.flexGrow)).toBe(0);
+      }
+      act(() => fixture.docsRef.current!.expand());
+      expect(fixture.docsRef.current!.isCollapsed()).toBe(false);
+      expect(fixture.docsRef.current!.getSize().inPixels).toBeCloseTo(185, 1);
+      act(() => fixture.docsRef.current!.collapse());
+      expect(Number.parseFloat(docs.style.flexGrow)).toBe(0);
+    });
+
     it("defers hidden-to-visible layout publication and panel callbacks beyond observer delivery", () => {
       const fixture = mountFixture();
       const initial = fixture.groupRef.current!.getLayout();

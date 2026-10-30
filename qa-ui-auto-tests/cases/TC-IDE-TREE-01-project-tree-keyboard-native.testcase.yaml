@@ -166,9 +166,14 @@ steps:
     selector: '[data-testid="code-workspace-tree-file"][data-path="src/main/example.txt"]'
     key: Mod+Enter
 - wait_for: '[data-testid="code-workspace-editor-split"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]:not([data-editor-group-id="primary"]) .cm-content'
 - assert_count:
     selector: '[data-testid="code-workspace-editor-pane"] .cm-content'
     equal: 2
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-pane"]:not([data-editor-group-id="primary"]) .cm-content'
+    contains: The editor buffer should survive tree navigation.
+- assert_no_runtime_errors: null
 - screenshot: 06-retained-split.png
 verification:
   review: reviewed
@@ -296,11 +301,20 @@ verification:
     - step: 71
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-split\"]"}'
     - step: 72
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]:not([data-editor-group-id=\"primary\"]) .cm-content"}'
+    - step: 73
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"] .cm-content", "equal":
         2}}'
+    - step: 74
+      expectation: The second pane contains the original example.txt buffer.
+    - step: 75
+      expectation: No runtime errors were observed while splitting.
     results:
     - 71
     - 72
+    - 73
+    - 74
+    - 75
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

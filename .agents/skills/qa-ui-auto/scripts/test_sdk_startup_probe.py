@@ -6,7 +6,7 @@ import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock
-from contextlib import nullcontext
+from contextlib import contextmanager, nullcontext
 from unittest.mock import patch
 
 from qa_ui_auto.sdk_startup_probe import pending_child, run
@@ -90,23 +90,38 @@ class SdkStartupProbeTest(unittest.TestCase):
             self.assertTrue(gate.exists())
             self.assertFalse(json.loads((root / "sdk-startup-responsiveness.json").read_text())["passed"])
 
-    def test_final_pending_belongs_to_last_completed_action_before_later_capture(self, _trace):
+    def test_final_pending_and_gate_release_precede_later_diagnostic_capture(self, trace):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             events, gate = root / "events.jsonl", root / "release"
             now = time.time() * 1000
             events.write_text("\n".join(json.dumps({"pid": 123, "phase": phase, "epochMs": now})
                                         for phase in ["started", "waiting"]) + "\n")
-            flags = {"notes": False, "pendingObservedAfterNotes": False}
+            flags = {"notes": False, "pendingObservedAfterNotes": False, "atomicResults": 0}
+
+            @contextmanager
+            def capture(*_):
+                yield
+                self.assertEqual(gate.read_text(), "release\n")
+                flags["traceCapturedAfterRelease"] = True
+
+            trace.side_effect = capture
 
             def execute(script):
                 if "__taomniQaLanguageStartup" not in script:
                     return True
+                atomic = "const result = (" in script
+                if atomic:
+                    flags["atomicResults"] += 1
                 completed = flags["pendingObservedAfterNotes"]
+                if completed:
+                    self.assertTrue(gate.exists(), "Final IPC capture must not hold the real SDK child")
                 if flags["notes"]:
+                    self.assertTrue(atomic or gate.exists(), "Observe the UI result and pending IPC in one request")
                     flags["pendingObservedAfterNotes"] = True
-                return {"valid": True, "transport": "browser-invoke", "events": [{
+                state = {"valid": True, "transport": "browser-invoke", "events": [{
                     "command": "sdk_resolve_workspace", "status": "fulfilled" if completed else "pending"}]}
+                return {"result": True, "observation": state} if atomic else state
 
             session = Mock()
             session.execute.side_effect = execute
@@ -116,6 +131,8 @@ class SdkStartupProbeTest(unittest.TestCase):
                 run(ctx, {"events": str(events), "gate": str(gate)})
             report = json.loads((root / "sdk-startup-responsiveness.json").read_text())
         self.assertTrue(report["passed"])
+        self.assertTrue(flags["traceCapturedAfterRelease"])
+        self.assertEqual(flags["atomicResults"], 4)
         self.assertTrue(all(action["passed"] for action in report["actions"]))
         self.assertEqual(report["finalPending"], report["actions"][-1]["sdkPending"])
         self.assertEqual(report["finalPending"]["pendingInvocations"][0]["status"], "pending")

@@ -15,9 +15,11 @@ from qa_ui_auto.testcase import discover
 
 ROOT = Path(__file__).resolve().parents[4]
 EXPECTED = {
+    "TC-IDE-C8-08-code-style-dialog-lifecycle-browser",
     "TC-WS-038", "TC-WS-039", "TC-WS-045", "TC-WS-051", "TC-WS-052",
     "TC-WS-053", "TC-WS-054", "TC-WS-055", "TC-WS-056", "TC-WS-057",
 }
+BROWSER_ONLY = {"TC-WS-055", "TC-IDE-C8-08-code-style-dialog-lifecycle-browser"}
 
 
 class CrashRegressionTests(unittest.TestCase):
@@ -28,7 +30,7 @@ class CrashRegressionTests(unittest.TestCase):
         self.assertTrue(EXPECTED.issubset(policy["smoke"]))
         for case in cases:
             with self.subTest(case=case.id):
-                self.assertIn("browser" if case.id == "TC-WS-055" else "native", case.modes)
+                self.assertIn("browser" if case.id in BROWSER_ONLY else "native", case.modes)
                 self.assertTrue(any("assert_no_runtime_errors" in step for step in case.steps))
                 self.assertIsNone(case.skip)
 
@@ -40,7 +42,7 @@ class CrashRegressionTests(unittest.TestCase):
         self.assertFalse(plan["gaps"])
         self.assertEqual(len(plan["entries"]), 6)
         for entry in plan["entries"]:
-            expected = EXPECTED - ({"TC-WS-055"} if entry["mode"] == "native" else {"TC-WS-051", "TC-WS-054", "TC-WS-056"})
+            expected = EXPECTED - (BROWSER_ONLY if entry["mode"] == "native" else {"TC-WS-051", "TC-WS-054", "TC-WS-056"})
             self.assertEqual(set(entry["selected_ids"]), expected)
             self.assertEqual("release" in entry["capabilities"], entry["mode"] == "native")
 

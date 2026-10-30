@@ -21,6 +21,7 @@ mod actions;
 mod capture;
 
 mod about;
+mod application_menu;
 
 mod server;
 

@@ -294,6 +294,7 @@ steps:
   - set_viewport: {width: 1440, height: 900}
   - click: '[data-testid="code-workspace-toolbar-more"]'
   - click: '[data-testid="code-workspace-split-right"]'
+  - wait_for: '[data-testid="code-workspace-editor"] .cm-content >> nth=1'
   - assert_count: {selector: '[data-testid="code-workspace-editor"] .cm-content', equal: 2}
   - click: '[data-testid="code-workspace-editor"] .cm-content >> nth=0'
   - press: Mod+Home
@@ -453,19 +454,19 @@ verification:
       results: [160, 163]
     - id: ED-PARITY-005-V2-shared-history
       requirement: Two UI views of Main.java show the same atomic acceptance; Undo from the sibling view restores both and removes the import.
-      actions: [166, 176, 179, 182, 183]
+      actions: [166, 177, 180, 183, 184]
       checkpoints:
-        - step: 167
+        - step: 168
           expectation: The split exposes two editor views.
-        - step: 180
-          expectation: Both views show the same single import.
         - step: 181
+          expectation: Both views show the same single import.
+        - step: 182
           expectation: Both views show the accepted snippet text.
-        - step: 184
-          expectation: One Undo in the sibling view restores the prefix in both views.
         - step: 185
+          expectation: One Undo in the sibling view restores the prefix in both views.
+        - step: 186
           expectation: The import is absent from both views after Undo.
-      results: [167, 180, 181, 184, 185]
+      results: [168, 181, 182, 185, 186]
   visual:
     - check: Selected row, documentation, popup anchor, density and clipping against IDEA R1/R2/R6.
       method: manual

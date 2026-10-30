@@ -65,6 +65,14 @@ export function useWorkspaceHostFiles(dependencies: WorkspaceHostFilesDependenci
       if (!isCurrent()) return;
       const current = live.current;
       const wanted = new Set(requested.files.map(fileKey));
+      const initialUi = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), current.session.workspaceInstanceId);
+      // Reload can interrupt an outer-tab close before the editor effect saves
+      // its layout. The host's restored file list owns root tabs; reconcile
+      // stale layout entries through the normal close/recovery owner as well.
+      const previous = previousWanted.current ?? new Set(Object.values(initialUi.editorGroups)
+        .flatMap((group) => group.openOrder)
+        .filter((key) => initialUi.openFiles[key]?.ref.kind === "root"));
+      previousWanted.current = new Set(previous);
       for (const ref of requested.files) {
         if (!isCurrent()) return;
         const key = fileKey(ref);
@@ -73,9 +81,19 @@ export function useWorkspaceHostFiles(dependencies: WorkspaceHostFilesDependenci
         // Selection-only host updates must not reinsert a file closed inside
         // the editor while this reconciliation was queued. Its next snapshot
         // will remove that outer tab. Existing buffers need no redundant open.
-        if (!groupId && previousWanted.current?.has(key)) continue;
+        if (!groupId && previous.has(key)) continue;
+        if (groupId) previousWanted.current.add(key);
         if (!groupId || !ui.openFiles[key] || ui.openFiles[key].loading) {
-          await current.files.openFile(ref, { preview: false, activate: false, restoring: true, groupId, isCurrent });
+          try {
+            await current.files.openFile(ref, { preview: false, activate: false, restoring: true, groupId, isCurrent });
+          } finally {
+            // Retain a committed placeholder even if this request was replaced.
+            // A cancelled read with no tab remains eligible for the next open.
+            const after = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), current.session.workspaceInstanceId);
+            if (Object.values(after.editorGroups).some((group) => group.openOrder.includes(key))) {
+              previousWanted.current?.add(key);
+            }
+          }
         }
         if (!isCurrent()) return;
         const draft = !recovered.current.has(key) ? requested.recoverDraft(ref) : null;
@@ -104,9 +122,9 @@ export function useWorkspaceHostFiles(dependencies: WorkspaceHostFilesDependenci
           }
         }
       }
-      // A new file opened inside the editor is published below, never treated
-      // as an external close. Close only files removed from a previous host list.
-      const removed = [...(previousWanted.current ?? [])].filter((key) => !wanted.has(key));
+      // A new file opened inside the editor is published below. Only restored
+      // or previously host-owned files can become external close requests.
+      const removed = [...previous].filter((key) => !wanted.has(key));
       for (const key of removed) {
         if (!isCurrent()) return;
         const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), current.session.workspaceInstanceId);

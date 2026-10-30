@@ -458,6 +458,21 @@
           }
         },
         "native_about": { "type": "null" },
+        "native_menu": {
+          "type": "object",
+          "oneOf": [{"required": ["path"]}, {"required": ["action"]}],
+          "anyOf": [{"required": ["enabled"]}, {"required": ["checked"]}],
+          "if": {"required": ["activate"], "properties": {"activate": {"const": true}}},
+          "then": {"required": ["enabled"], "properties": {"enabled": {"const": true}}},
+          "properties": {
+            "path": { "type": "array", "minItems": 1, "maxItems": 8, "items": { "type": "integer", "minimum": 0 } },
+            "action": { "type": "string", "minLength": 1 },
+            "enabled": { "type": "boolean" },
+            "checked": { "type": "boolean" },
+            "activate": { "type": "boolean" }
+          },
+          "additionalProperties": false
+        },
         "updater_fixture_mode": { "enum": ["correct", "broken", "slow"] },
         "updater_release": { "enum": [1, 2] },
         "assert_updater_installed": { "enum": ["aarch64", "x86_64"] },

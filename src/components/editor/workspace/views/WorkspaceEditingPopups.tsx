@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { ClipboardHistoryPopup } from "../ClipboardHistoryPopup";
 import { CodeInsightNotice, type CodeInsightNoticeState } from "../CodeInsightNotice";
 import type { GoToLineRequest } from "../CodeMirrorHost";
@@ -43,8 +44,10 @@ export interface WorkspaceEditingPopupsProps {
   activeFile: import("../editorGroupTypes").OpenFileViewModel | null;
 }
 
-export function WorkspaceEditingPopups(props: WorkspaceEditingPopupsProps) {
-  const { snapshot } = useWorkspaceActionProjection(props.actionsController.projection);
+export const WorkspaceEditingPopups = memo(function WorkspaceEditingPopups(props: WorkspaceEditingPopupsProps) {
+  const snapshot = useWorkspaceActionProjection(
+    props.actionsController.projection, props.keymapCheatSheetOpen || props.keymap.keymapSettingsOpen,
+  )?.snapshot ?? [];
   const {
     uiActions,
     editorCommands,
@@ -204,4 +207,12 @@ export function WorkspaceEditingPopups(props: WorkspaceEditingPopupsProps) {
       onClose={() => codeStyle.setCodeStyleSettingsOpen(false)}
     />
   </>);
+}, (previous, next) => editingPopupsClosed(previous) && editingPopupsClosed(next));
+
+function editingPopupsClosed(props: WorkspaceEditingPopupsProps): boolean {
+  return !props.uiActions.clipboardHistoryOpen && !props.uiActions.generateCode.open
+    && !props.uiActions.surroundWithDialogOpen && !props.keymapCheatSheetOpen
+    && !props.codeInsightNotice && !props.goToLineRequest
+    && !props.keymap.keymapMigrationNoticeOpen && !props.keymap.keymapSettingsOpen
+    && !props.codeStyle.codeStyleSettingsOpen;
 }

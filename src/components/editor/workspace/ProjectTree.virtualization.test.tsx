@@ -108,3 +108,141 @@ it("returns from a scrolled viewport to a short filtered result without retainin
   expect(screen.getByText("item-025.txt").closest("button")).toHaveAttribute("aria-selected", "true");
   expect(open).not.toHaveBeenCalled();
 });
+
+function trackResizeObservers() {
+  const observers: Array<{ callback: ResizeObserverCallback; targets: Set<Element> }> = [];
+  vi.stubGlobal("ResizeObserver", class {
+    private record: typeof observers[number];
+    constructor(callback: ResizeObserverCallback) {
+      this.record = { callback, targets: new Set() };
+      observers.push(this.record);
+    }
+    observe(target: Element) { this.record.targets.add(target); }
+    unobserve(target: Element) { this.record.targets.delete(target); }
+    disconnect() { this.record.targets.clear(); }
+  });
+  return observers;
+}
+
+it("publishes observed row sizes after delivery without forcing layout during their commit", () => {
+  vi.useFakeTimers();
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => window.setTimeout(() => callback(performance.now()), 16));
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => window.clearTimeout(id));
+  const observers = trackResizeObservers();
+  const rowHeightReads = vi.fn();
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+    if (this.hasAttribute("data-virtual-index")) rowHeightReads();
+    return this.getAttribute("role") === "tree" ? 240 : 28;
+  });
+  const rendered = render(<Harness />);
+  const viewport = screen.getByTestId("code-workspace-tree-viewport");
+  const first = viewport.querySelector<HTMLElement>('[data-virtual-index="0"]')!;
+  const before = parseFloat(viewport.style.height);
+  expect(rowHeightReads).not.toHaveBeenCalled();
+  const observer = observers.find((candidate) => candidate.targets.has(first))!;
+  expect(observer).toBeDefined();
+  act(() => observer.callback([{
+    target: first,
+    borderBoxSize: [{ blockSize: 42, inlineSize: 320 }],
+  } as unknown as ResizeObserverEntry], {} as ResizeObserver));
+  // Resize delivery must finish before changing the observed tree's scroll
+  // range. WebKit otherwise reports an undelivered ResizeObserver loop.
+  expect(parseFloat(viewport.style.height)).toBe(before);
+  act(() => vi.advanceTimersByTime(16));
+  expect(parseFloat(viewport.style.height)).toBe(before + 14);
+  expect(viewport.querySelector<HTMLElement>('[data-virtual-index="1"]')!.style.transform).toBe("translateY(42px)");
+  expect(rowHeightReads).not.toHaveBeenCalled();
+  act(() => observer.callback([{
+    target: first,
+    borderBoxSize: [{ blockSize: 56, inlineSize: 320 }],
+  } as unknown as ResizeObserverEntry], {} as ResizeObserver));
+  const observerCount = observers.length;
+  rendered.unmount();
+  act(() => vi.advanceTimersByTime(16));
+  expect(parseFloat(viewport.style.height)).toBe(before + 14);
+  expect(observers).toHaveLength(observerCount);
+  expect(rowHeightReads).not.toHaveBeenCalled();
+});
+
+it("coalesces observed viewport insets and cancels their publication on unmount", () => {
+  vi.useFakeTimers();
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => window.setTimeout(() => callback(performance.now()), 16));
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => window.clearTimeout(id));
+  const observers = trackResizeObservers();
+  let padding = 4;
+  const layoutReads = vi.fn();
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    const viewport = this.hasAttribute("data-row-count");
+    if (viewport) layoutReads();
+    return new DOMRect(0, viewport ? padding : 0, 320, 240);
+  });
+  const rendered = render(<Harness mode="list" />);
+  const tree = screen.getByRole("tree");
+  const viewport = screen.getByTestId("code-workspace-tree-viewport");
+  const observer = observers.find((candidate) => candidate.targets.has(tree))!;
+  const before = parseFloat(viewport.style.height);
+  const scroll = vi.spyOn(Element.prototype, "scrollTo");
+  layoutReads.mockClear();
+  padding = 20;
+  tree.style.paddingTop = "20px";
+  act(() => {
+    observer.callback([], {} as ResizeObserver);
+    observer.callback([], {} as ResizeObserver);
+  });
+  expect(parseFloat(viewport.style.height)).toBe(before);
+  expect(layoutReads).not.toHaveBeenCalled();
+  act(() => vi.advanceTimersByTime(16));
+  expect(parseFloat(viewport.style.height)).toBe(before);
+  expect(layoutReads).toHaveBeenCalledTimes(1);
+  // The measured header/padding participates in real reveal geometry, while
+  // the spacer's content height remains independent of its scroll margin.
+  const pane = screen.getByTestId("code-workspace-tree-pane");
+  act(() => pane.focus());
+  fireEvent.keyDown(pane, { key: "End" });
+  expect(scroll).toHaveBeenCalled();
+  expect(screen.getByText("item-499.txt").closest("button")).toHaveFocus();
+  act(() => observer.callback([], {} as ResizeObserver));
+  rendered.unmount();
+  act(() => {
+    observer.callback([], {} as ResizeObserver);
+    vi.advanceTimersByTime(16);
+  });
+  expect(layoutReads).toHaveBeenCalledTimes(1);
+});
+
+it("keeps pointer-selected rows in place between the first click and double-click", () => {
+  vi.useFakeTimers();
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => window.setTimeout(() => callback(performance.now()), 16));
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => window.clearTimeout(id));
+  render(<Harness />);
+  const tree = screen.getByRole("tree");
+  const scroll = vi.spyOn(Element.prototype, "scrollTo");
+  const row = screen.getByText("item-005.txt").closest("button")!;
+  const initialScroll = tree.scrollTop;
+  scroll.mockClear();
+  fireEvent.pointerDown(row);
+  fireEvent.click(row, { detail: 1 });
+  expect(row).toHaveAttribute("aria-selected", "true");
+  act(() => vi.advanceTimersByTime(100));
+  expect(scroll).not.toHaveBeenCalled();
+  expect(tree.scrollTop).toBe(initialScroll);
+  fireEvent.doubleClick(row);
+  expect(open).toHaveBeenCalledWith({ kind: "root", rootId: "root", path: "item-005.txt" }, { preview: false });
+  expect(open).toHaveBeenCalledTimes(1);
+});
+
+it("navigates visible rows without forcing a redundant virtualizer scroll commit", () => {
+  render(<Harness />);
+  const pane = screen.getByTestId("code-workspace-tree-pane");
+  act(() => pane.focus());
+  const scroll = vi.spyOn(Element.prototype, "scrollTo");
+  scroll.mockClear();
+  fireEvent.keyDown(pane, { key: "Home" });
+  expect(screen.getByTestId("code-workspace-tree-root")).toHaveFocus();
+  fireEvent.keyDown(pane, { key: "ArrowDown" });
+  expect(screen.getByText("item-000.txt").closest("button")).toHaveFocus();
+  expect(scroll).not.toHaveBeenCalled();
+  fireEvent.keyDown(pane, { key: "End" });
+  expect(scroll).toHaveBeenCalled();
+  expect(screen.getByText("item-499.txt").closest("button")).toHaveFocus();
+});

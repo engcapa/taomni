@@ -1,0 +1,125 @@
+id: TC-IDE-PARITY-024-04-terminal-readline-margin-native
+title: Readline margin prompts remain ready for real PTY input
+description: In an isolated Linux Bash PTY, use the explicit CR/LF/CR margin newline before the final space after one and two full rows. Readiness must return, typed commands must clear it, and actual independent output must survive moving the same Terminal tool window.
+covers:
+- F25.5
+tags:
+- code-workspace
+- ed-parity-024
+- regression
+- p1
+modes:
+- native
+native_platforms:
+- Linux
+fixtures:
+- reset_db
+- workspace_root
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-readline-margin-password
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-margin","name":"qa-margin","roots":[{"id":"qa-margin","name":"qa-margin","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"qa-margin","path":"notes.txt"},"lastOpenedAt":1756500000000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- wait_for: '[data-testid="code-workspace-editor-pane"]'
+- click: '[data-testid="code-workspace-bottom-tab-terminal"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-terminal-dock"] [data-terminal-ready="true"]'
+    timeout_sec: 30
+- terminal_input:
+    selector: '[data-testid="code-workspace-terminal-dock"] .xterm-helper-textarea'
+    text: "__qa_cols=$(stty size); __qa_cols=${__qa_cols##* }; PS1=\"qa-margin$(printf '%*s' \"$((__qa_cols - 10))\" '')\\$\"$'\\r\\n\\r '; printf '\\nQA_MARGIN_ONE\\n'"
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]'
+    regex: (?m)^QA_MARGIN_ONE\r?$
+- wait_for:
+    selector: '[data-testid="code-workspace-terminal-dock"] [data-terminal-ready="true"]'
+    timeout_sec: 10
+- terminal_input:
+    selector: '[data-testid="code-workspace-terminal-dock"] .xterm-helper-textarea'
+    text: echo QA_MARGIN_TYPED
+    submit: false
+- wait_for:
+    selector: '[data-testid="code-workspace-terminal-dock"] [data-terminal-ready="true"]'
+    state: detached
+    timeout_sec: 10
+- press:
+    selector: '[data-testid="code-workspace-terminal-dock"] .xterm-helper-textarea'
+    key: Enter
+- assert_pattern:
+    selector: '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]'
+    regex: (?m)^QA_MARGIN_TYPED\r?$
+- wait_for: '[data-testid="code-workspace-terminal-dock"] [data-terminal-ready="true"]'
+- right_click: '[data-testid="code-workspace-bottom-tab-terminal"]'
+- click: '[data-testid="code-workspace-tool-rail-menu-move"]'
+- click: '[data-testid="code-workspace-tool-rail-menu-move-right-top"]'
+- wait_for: '[data-testid="code-workspace-right-pane"] [data-testid="code-workspace-terminal-dock"]'
+- terminal_input:
+    selector: '[data-testid="code-workspace-terminal-dock"] .xterm-helper-textarea'
+    text: "__qa_cols=$(stty size); __qa_cols=${__qa_cols##* }; PS1=\"qa-margin$(printf '%*s' \"$((2 * __qa_cols - 10))\" '')\\$\"$'\\r\\n\\r '; printf '\\nQA_MARGIN_TWO\\n'"
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]'
+    regex: (?m)^QA_MARGIN_TWO\r?$
+- wait_for:
+    selector: '[data-testid="code-workspace-terminal-dock"] [data-terminal-ready="true"]'
+    timeout_sec: 10
+- assert_pattern:
+    selector: '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]'
+    regex: (?m)^QA_MARGIN_TYPED\r?$
+- terminal_input:
+    selector: '[data-testid="code-workspace-terminal-dock"] .xterm-helper-textarea'
+    text: echo QA_MARGIN_AFTER_MOVE
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]'
+    regex: (?m)^QA_MARGIN_AFTER_MOVE\r?$
+- wait_for: '[data-testid="code-workspace-terminal-dock"] [data-terminal-ready="true"]'
+- assert_no_runtime_errors: null
+- screenshot: terminal-readline-margin.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: One-row and two-row Bash prompts at the right margin return to ready, pending input clears readiness, and real output survives tool-window movement.
+    actions: [9, 11, 14, 16, 19, 20, 21, 23, 27]
+    results: [12, 13, 15, 17, 18, 22, 24, 25, 26, 28, 29, 30]
+    checkpoints:
+    - step: 12
+      expectation: "assert_pattern:\n  selector: '[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]'\n  regex: (?m)^QA_MARGIN_ONE\\r?$"
+    - step: 13
+      expectation: "wait_for:\n  selector: '[data-testid=\"code-workspace-terminal-dock\"] [data-terminal-ready=\"true\"]'\n  timeout_sec: 10"
+    - step: 15
+      expectation: "wait_for:\n  selector: '[data-testid=\"code-workspace-terminal-dock\"] [data-terminal-ready=\"true\"]'\n  state: detached\n  timeout_sec: 10"
+    - step: 17
+      expectation: "assert_pattern:\n  selector: '[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]'\n  regex: (?m)^QA_MARGIN_TYPED\\r?$"
+    - step: 18
+      expectation: "wait_for: '[data-testid=\"code-workspace-terminal-dock\"] [data-terminal-ready=\"true\"]'"
+    - step: 22
+      expectation: "wait_for: '[data-testid=\"code-workspace-right-pane\"] [data-testid=\"code-workspace-terminal-dock\"]'"
+    - step: 24
+      expectation: "assert_pattern:\n  selector: '[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]'\n  regex: (?m)^QA_MARGIN_TWO\\r?$"
+    - step: 25
+      expectation: "wait_for:\n  selector: '[data-testid=\"code-workspace-terminal-dock\"] [data-terminal-ready=\"true\"]'\n  timeout_sec: 10"
+    - step: 26
+      expectation: "assert_pattern:\n  selector: '[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]'\n  regex: (?m)^QA_MARGIN_TYPED\\r?$"
+    - step: 28
+      expectation: "assert_pattern:\n  selector: '[data-testid=\"code-workspace-terminal-dock\"] [data-testid=\"terminal-pane\"]'\n  regex: (?m)^QA_MARGIN_AFTER_MOVE\\r?$"
+    - step: 29
+      expectation: "wait_for: '[data-testid=\"code-workspace-terminal-dock\"] [data-terminal-ready=\"true\"]'"
+    - step: 30
+      expectation: "assert_no_runtime_errors: null"
+  native:
+  - check: Real Bash/readline output, xterm wrapping and retained PTY ownership.
+    method: automated
+    reason: Browser stubs do not generate Bash's explicit margin newline or execute commands in a real PTY. This Bash-specific regression runs on Linux; 024-03 retains three-platform movement coverage.
+  visual:
+  - check: Terminal and margin prompt remain visible after movement.
+    method: manual
+    reason: Screenshot supplements the ready state and exact independent-output assertions.

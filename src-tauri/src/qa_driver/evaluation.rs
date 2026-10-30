@@ -3,7 +3,7 @@ use super::model::ElementRef;
 use serde_json::Value;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
-use std::time::Duration;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tauri::Runtime;
 use tokio::sync::oneshot;
 
@@ -72,16 +72,22 @@ pub(super) async fn eval_js<R: Runtime>(
     state: &DriverState<R>,
     body: String,
 ) -> Result<Value, String> {
+    let started = Instant::now();
+    let requested_epoch_ms = epoch_ms();
     let script = format!(
         r#"(() => {{
-          try {{
-            {body}
-          }} catch (error) {{
-            return {{ __qaError: String(error), __qaStack: error && error.stack ? error.stack : null }};
-          }}
+          const startedEpochMs = Date.now();
+          const value = (() => {{
+            try {{
+              {body}
+            }} catch (error) {{
+              return {{ __qaError: String(error), __qaStack: error && error.stack ? error.stack : null }};
+            }}
+          }})();
+          return {{ __qaEvaluationTiming: {{ startedEpochMs, finishedEpochMs: Date.now() }}, value }};
         }})()"#
     );
-    let (sender, receiver) = oneshot::channel::<String>();
+    let (sender, receiver) = oneshot::channel::<(String, u128)>();
     let sender = Arc::new(StdMutex::new(Some(sender)));
     let callback_sender = sender.clone();
     state
@@ -89,24 +95,55 @@ pub(super) async fn eval_js<R: Runtime>(
         .eval_with_callback(script, move |result| {
             if let Ok(mut sender) = callback_sender.lock() {
                 if let Some(sender) = sender.take() {
-                    let _ = sender.send(result);
+                    let _ = sender.send((result, epoch_ms()));
                 }
             }
         })
         .map_err(|e| format!("failed to evaluate JavaScript: {e}"))?;
-    let raw = tokio::time::timeout(Duration::from_secs(30), receiver)
+    let (raw, callback_epoch_ms) = tokio::time::timeout(Duration::from_secs(30), receiver)
         .await
         .map_err(|_| "WebView JavaScript evaluation timed out".to_string())?
         .map_err(|_| "WebView JavaScript callback was dropped".to_string())?;
-    if raw.trim().is_empty() {
-        return Ok(Value::Null);
+    let (value, timing) = decode_evaluation(&raw)?;
+    if started.elapsed() >= Duration::from_millis(100) {
+        // Only the opt-in QA bridge calls this evaluator. Do not log scripts,
+        // selectors or results; timestamps distinguish a busy renderer from
+        // main-thread scheduling and delayed WKWebView completion callbacks.
+        eprintln!(
+            "qa-webview-evaluation {}",
+            serde_json::json!({
+                "requestedEpochMs": requested_epoch_ms,
+                "renderer": timing,
+                "callbackEpochMs": callback_epoch_ms,
+                "durationMs": started.elapsed().as_secs_f64() * 1000.0,
+            })
+        );
     }
-    let value: Value = serde_json::from_str(&raw)
-        .map_err(|e| format!("WebView returned invalid JSON {raw:?}: {e}"))?;
     if let Some(message) = value.get("__qaError").and_then(Value::as_str) {
         return Err(format!("JavaScript error: {message}"));
     }
     Ok(value)
+}
+
+fn epoch_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+}
+
+fn decode_evaluation(raw: &str) -> Result<(Value, Value), String> {
+    let mut envelope: Value = serde_json::from_str(raw)
+        .map_err(|e| format!("WebView returned invalid JSON {raw:?}: {e}"))?;
+    let fields = envelope
+        .as_object_mut()
+        .ok_or("WebView evaluation timing envelope is missing")?;
+    let timing = fields
+        .remove("__qaEvaluationTiming")
+        .ok_or("WebView evaluation timing is missing")?;
+    // JSON serialization omits undefined properties. A script with no return
+    // still follows the WebDriver null-result contract.
+    Ok((fields.remove("value").unwrap_or(Value::Null), timing))
 }
 
 /// Locator prelude for a not-yet-registered locator (first match).
@@ -117,4 +154,48 @@ pub(super) fn element_lookup_from_parts(using: &str, selector: &str) -> String {
         "{helper}\nconst el = __qaLookup({using}, {selector});\n",
         helper = lookup_helper()
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_evaluation;
+    use serde_json::{Value, json};
+
+    #[test]
+    fn evaluator_preserves_arbitrary_script_values() {
+        for value in [
+            Value::Null,
+            json!(true),
+            json!(42),
+            json!("text"),
+            json!([1]),
+            json!({"value": 2, "__qaEvaluationTiming": "user value"}),
+        ] {
+            let raw = json!({"__qaEvaluationTiming": {"startedEpochMs": 1, "finishedEpochMs": 2}, "value": value}).to_string();
+            let (decoded, timing) = decode_evaluation(&raw).unwrap();
+            assert_eq!(decoded, value);
+            assert_eq!(timing["finishedEpochMs"], 2);
+        }
+    }
+
+    #[test]
+    fn undefined_scripts_return_null_and_errors_retain_their_message() {
+        assert_eq!(
+            decode_evaluation(r#"{"__qaEvaluationTiming":{}}"#)
+                .unwrap()
+                .0,
+            Value::Null
+        );
+        let raw = json!({"__qaEvaluationTiming": {}, "value": {"__qaError": "original error", "__qaStack": "original stack"}}).to_string();
+        let (value, _) = decode_evaluation(&raw).unwrap();
+        assert_eq!(value["__qaError"], "original error");
+        assert_eq!(value["__qaStack"], "original stack");
+    }
+
+    #[test]
+    fn incomplete_evaluation_is_an_error() {
+        for raw in ["", "null", "{}", "{broken"] {
+            assert!(decode_evaluation(raw).is_err());
+        }
+    }
 }

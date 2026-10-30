@@ -1,22 +1,63 @@
 # 工作区文件打开与 SDK 后台初始化
 
-**2026-10-30 持续开发、测试与验证；性能及三平台验收仍未通过。** 当前进展见下方“本轮恢复记录”；其后的暂停快照及历史结果保留用于追溯，不能视作当前组合源码已验收。
+**2026-10-30 按用户最新要求：性能暂列 TODO，继续非性能修复及三平台功能验收。** 现有性能失败、原始样本和验收门槛保留；暂不继续性能优化与诊断；按用户最新要求取消main对比，不作为待办或验收前置。下方历史结果不能视作当前组合源码已验收。
 
 ## 本轮恢复记录（持续更新）
 
+- **性能 TODO（用户要求暂缓）**：冷文件打开的偶发长帧仍未达标；最近指定workflow [41036792573](https://github.com/engcapa/taomni/actions/runs/41036792573) 的 Linux075为171ms，macOS074为186.99999999999815ms、073为168ms，均超过165ms。恢复此项时继续保留1500ms正文/高亮、165ms全观察期帧限制及既有输入门槛；不做main比较。功能回归可继续推进；含性能case的workflow即使只有性能失败，原始总体结果仍如实记为失败，不改写为全绿。
+- Terminal 非性能修复提交`ad9c797fa86a6bddfce84058034ff6a8aa606c86`已推当前分支，指定workflow全量[41045269719](https://github.com/engcapa/taomni/actions/runs/41045269719)进行中，670 ID、2,217次适用执行；3项clickhousecrud外部源码缺口单列。source=`c51e8e1fbacba403d3cc0a64100aff973f0e062ae219e70b60a3b821132cfd41`，runner保持`0d80f2910f0fcbca68a969eaf75211b808ca0687171597545c8fda18f475d141`。本机118项支持测试通过/1既有编译模式条件skip，TypeScript、QA前端构建、refactor/catalog/dev contract通过；matching release构建成功，binary=`68778be3fcd1b0f235dc81a28832bfb6d9f3e3244db3706db6e37c5777f89042`。真实native024-03/024-04 **2/2通过**，回执与24个附件已核验（`/tmp/taomni-workspace-terminal-margin-native-probe/run-20261030-191500-628028294`）；完整browser crash组 **8/8通过**，回执、输入及附件已核验，完整native crash组 **9/9通过**，回执及292个附件已核验（`/tmp/taomni-workspace-terminal-margin-native-crash/run-20261030-191535-879102167`）。
+- Terminal根因与保留边界：9ea本机024-03的实际PTY及提示符均存在，但Bash在右边界显式CR/LF/CR后打印末空格，光标位于未自动wrap行的col1，原逻辑只识别col0。现仅在readline启用、当前行未自动wrap且为空、前行确实满格时连接末空格，保留未提交命令和普通输出负向条件。真实xterm区分回归修前2失败/16通过；扩大回归暴露的提前单元格读取已改为候选处才读取，原失败日志保留。024-04在真实Linux Bash中显式生成一行/两行边界提示符，检查未提交命令非就绪及工具窗移动后的独立输出；024-03保留三平台原移动断言。
+
+- 动作投影优化提交`9ea8e3a441d267c7df4c30c5335120cb782bcd9b`的指定workflow [41036792573](https://github.com/engcapa/taomni/actions/runs/41036792573) 已完整核验：92 ID、320次执行，**317 passed /3 failed /0 skipped**，selection无缺失或能力缺口；三平台browser各58/58，native Linux49/50、Windows49/49、macOS45/47，三项均为上述性能失败，非性能断言全部通过。source=`bb45513b00032c730f77a694b1eba8029365017d9b86304825373b5fd610f874`，runner=`0d80f2910f0fcbca68a969eaf75211b808ca0687171597545c8fda18f475d141`。本机标准browser36/36，native冷探针068/075为2/2、其余26通过/1失败（024-03）；全部文件/SDK性能断言通过仅代表该本机样本，不能替代GitHub失败。回执、附件及selection均已核验。
+
+- `ef14c47d19c2449a27211bc042111c3e70cc633a` 的指定workflow [41031711276](https://github.com/engcapa/taomni/actions/runs/41031711276) 已完整核验：**318 passed / 2 failed / 0 skipped**；18份回执、9,949个附件及320次selection逐项核验，无缺失或能力缺口。三平台browser各58/58，macOS导航弹层回归通过；native Linux49/50、Windows49/49、macOS46/47。Linux075冷源码175ms、macOS068冷未分类文本180ms均超过165ms，非性能断言全部通过；原件保留，不启动此SHA全量。source=`87327cb8f51d8c74912f4ec2df4b90f9f2af0b88b05f7e780cb33172a5a4d155`、runner保持`0d80f2910f0fcbca68a969eaf75211b808ca0687171597545c8fda18f475d141`。
+- 独立bd39 release诊断复现075冷源码173ms，正文417ms/高亮710ms；首次EditorView构造、React提交及动作快照均有采样，不能归为单一根因。真实挂载区分回归发现命令注册与上下文effect在同一版本重复清空投影、完整求值两次；版本通知现保留匹配的host/generation/context缓存，live选择/只读/composition/树及keymap通知仍强制刷新。修前1失败/1通过，修后连同StrictMode、命令替换、陈旧evaluation拒绝、迟到port、闭合popup和快捷键保留9文件68项通过（`workspace-action-revisions-before.log`、`workspace-action-revisions-after.log`）。这是纯实现优化，继续使用068/075冷开、061–063真实SDK和既有Actions/Keymap入口用例，不增加同义YAML；matching release及新组合测量待完成，尚不宣称提速。
+- `bd39bea344cd5d5c1e43b53797e655bfdad1b3e7` 的指定workflow [41026740704](https://github.com/engcapa/taomni/actions/runs/41026740704) 已完整核验92 ID、320次执行：**319 passed / 1 failed / 0 skipped**；18份回执、9,947个附件及selection逐项核验，无缺失或能力缺口。Linux/Windows browser各58/58，macOS browser57/58；native Linux50/50、Windows49/49、macOS47/47，包含原失败SDK输入、冷源码及HOME074，无RO运行时错误。唯一NAV-01在macOS browser弹层打开后约20ms被延迟光标关闭，不能称相关集通过。source=`ab60f04933cfbd105bf5843ad13107483e5eb9eec603f4f4e04af391b930b14a`、runner=`0d80f2910f0fcbca68a969eaf75211b808ca0687171597545c8fda18f475d141`。
+- NAV-01的原始trace显示文件路径未变，光标4:1的延迟发布却触发无条件关闭。新挂载回归修前1失败/1通过（`workspace-breadcrumb-late-caret-before-02.log`）；现仅在路径或实际符号链变化时关闭并使迟到目录列表失效，同一链内的光标遥测不再取消弹层。修后连同切文件、符号切换、选项执行、Escape焦点恢复和宽度/portal保留5文件24项通过（`workspace-breadcrumb-late-caret-after.log`），TypeScript及refactor检查通过。既有NAV-01保留全部断言并增加运行时错误断言；真实browser NAV-01/02 **2/2通过**，`workspace-breadcrumb-browser/run-20261030-170638-043828831`回执及4个附件已核验，source=`87327cb8f51d8c74912f4ec2df4b90f9f2af0b88b05f7e780cb33172a5a4d155`。GitHub仍待新组合复验。修复先在隔离checkout完成，保持bd39本机原生测量的输入稳定。
+- bd39本机标准browser `workspace-resize-browser/run-20261030-162920-429876136` **36/36通过**，含完整适用crash组及隐藏Documentation实际布局框断言；回执和附件已核验。40个观察点、2,527帧最大135.40000000596046ms。matching release native `workspace-resize-native/run-20261030-165902-682677914` **26 passed / 2 failed / 0 skipped**，067长行JSON166ms、070 HTML/text174ms超预算，原件保留，不从后续通过中删除。binary SHA=`654995b5071361457e33b999f7508aba3623620867dbb39eef3fdc94ba8b58b6`；原生回执和附件已核验。全量仅规划2,216次，clickhousecrud外部缺口仍单列。
+- `bd6e8b2d355e2487ce5467a90d8f54218394c652` 的指定workflow GitHub [41018236925](https://github.com/engcapa/taomni/actions/runs/41018236925) 已结束：91 ID、317次执行，**314 passed / 3 failed / 0 skipped**。18份回执、9,808个附件及selection逐项核验通过，无缺失或能力缺口。Linux/Windows/macOS browser各58/58；Linux native46/49、Windows48/48、macOS46/46。Linux native061第7键177ms、075源码冷开168ms超过165ms；074在末尾捕获`ResizeObserver loop completed with undelivered notifications`，属于必须修复的运行时错误，不能按性能容差接受。source=`40cf06856d2d97f5fc6bbae0e8669f490d420aa203638667993afac64e9ca4c7`、runner=`0d80f2910f0fcbca68a969eaf75211b808ca0687171597545c8fda18f475d141`。原始证据在`qa-ui-auto-report/_local/workspace-41018236925/`，尚未启动全量或正式比较。
+- 相同bd6输入本机标准browser `workspace-generation-browser/run-20261030-150830-042433958` 为 **34 passed / 1 failed / 0 skipped**，38个观察点保留2,414帧，唯一超预算样本为064冷JSON的203.80000001192093ms，正文415.2ms、高亮612.9ms。matching release native `workspace-generation-native/run-20261030-153756-394246698` 为 **25 passed / 1 failed / 0 skipped**，42个观察点保留2,664帧，唯一超165ms为073 HTML冷开190ms，正文/高亮318ms；HOME074、源码075及完整适用crash组通过。两批回执、输入及附件已核验，native共3,073附件；binary SHA=`e3f8b4d32f06675de15d3937937282fa8628f86ced62bef59b355c0b70c9e896`，release构建893.17秒。失败保留，不以分片job颜色替代原始case结果。
+- 针对074运行时错误，文件树viewport inset及虚拟行尺寸观察改为在下一动画帧发布，合并重复通知并在卸载取消；不吞掉ResizeObserver错误。挂载区分回归修前捕获RO delivery内立即改变spacer，修后连同行高、列表padding、End末行聚焦及卸载/迟到通知共9项通过，见`workspace-resize-delivery-lifecycle-02.log`。这是内部测量生命周期修复，保留074/077/TREE-01/TREEOPEN-01/034及完整crash用例验证用户行为，无需新增同义YAML；当前修改尚待matching release和GitHub真实验收。
+- 本轮保留回归另捕获隐藏/零尺寸挂载时，关闭的Documentation面板被分配33.333%宽度；bd6原提交同样复现（`workspace-splitter-bd6-baseline.log`），不是RO修改引入。面板依赖在零尺寸分支丢弃了仍有意义的百分比默认值；现通过已有依赖patch同时修正ESM/CJS，保留`0%`等百分比，像素约束仍等首次真实测量。树/焦点/连续拖动/隐藏恢复9文件47项组合支持测试通过（`workspace-resize-retained-03.log`）；双入口隐藏恢复与展开及Git/Debug/嵌套布局5文件105项保留回归也通过（`workspace-panel-retained.log`）。TypeScript及refactor检查通过，768 commands/328 exports/39 events、918模块边界、4,170文件检查保持。沿用024-01/024-03、工具窗、TC-GIT-DIFF-01及完整crash真实用例；patch是已登记的生成依赖差异，不改公共API或持久化格式，真实browser/native与GitHub仍待验证。
+- bd6 release在独立桌面的JSC/转发布局诊断已执行（`workspace-bd6-jsc-diagnostic-02`）：SDK输入及冷源码的采样均保存，语法安装、编辑器挂载、focus与菜单快照都有主线程工作；本次未复现177/168ms，因此不声称已定位剩余长帧的单一原因。诊断配置绑定`workspace_stage_trace=true`，两条case都以明确diagnostic-only失败结束，不计验收通过；首次未暴露JSC profiler的失败也保留。
+- `71811a4af2d1f4b965850b908607c23e263058ba` 的 GitHub [41013510946](https://github.com/engcapa/taomni/actions/runs/41013510946) 已收齐并核验309次执行、18份回执与9611个附件：**307 passed / 2 failed / 0 skipped**，与88 ID选集逐项一致、无缺失和能力缺口。Linux/Windows browser各56/56，macOS55/56，073 HTML冷开173.0999999998603ms失败；Linux native47/48，075源码冷开170ms失败；Windows47/47、macOS46/46，SDK061–063、真实HOME文档074、TREE-01分屏就绪、macOS菜单080与完整适用crash组均通过。尚未启动全量或正式比较。
+- 相同产品源码的本机标准browser `workspace-popup-browser/run-20261030-141442-623226464` **32/32通过**，40个观察点保留2532帧、最大134.69999998807907ms；matching release native `workspace-popup-native/run-20261030-144318-256119455` **25/26通过**，唯一079 HTML冷开174ms失败。HOME074最大161ms、源码075最大154ms；binary SHA=`2a8ea575c16042b58060455708bb9f9bedf94550ff40a41306efc6c4fec84c5e`。两批回执、附件及输入身份已核验；runner为补崩溃名单前的657e身份，不冒充71811的0d80身份。原始失败不回写或原样筛绿。
+- macOS073的CPU采样仍有约13.6ms关闭的Generation弹层渲染，整体同步React提交与布局/GC叠加。现只在代码生成/模板组前后都关闭时跳过无关props更新；六种打开入口、关闭清理、重开后的当前回调、模板持久化、撤销焦点、迟到导入候选与实时项目事实均保留。新增挂载回归改前1失败/5通过，修后连同既有设置/弹层组合6文件29项通过。此内部memo优化沿用C8-01/02/05/06/07、007-01/03/04、064–079和完整crash入口，不新增同义YAML；实际性能收益待新源码browser/native和GitHub验证。`workspace-source-stage-diagnostic/run-20261030-150044-337500080`为明确失败的转发诊断，不能作为验收通过。
+- `2fb88b24723d654e70478ee4398f68af4af41443` 的 GitHub [41012953201](https://github.com/engcapa/taomni/actions/runs/41012953201) 在计划前的crash-regression契约测试失败，尚未执行UI用例。原因是新增Code Style崩溃用例后，固定崩溃名单和smoke名单未同步；本轮补齐两处，并明确该新增用例的browser范围，保留三平台native原有全部崩溃用例及实际失败门禁。这是测试契约补齐，不改变产品源码、测量脚本或性能阈值；原始失败保留。
+- `bc75d8567926520038c66177aa1a45ada4557549` 的 GitHub [41007654861](https://github.com/engcapa/taomni/actions/runs/41007654861) 已收齐并核验273次执行、18份回执及6508个附件：**270 passed / 3 failed / 0 skipped**，与完整75 ID的selection一致，无能力缺口。三平台browser各45/45、Windows native45/45；Linux native45/47，074/075长帧分别165.00000000000364/173ms，保持原始失败；macOS native45/46，TREE-01在分屏容器出现后立即读到1个编辑器。失败捕获随后已有两个实际EditorView和原文件正文，现仅为此用例增加第二pane的内容就绪条件，保留恰好2个编辑器的原断言并补第二pane正文与运行时错误断言，不放宽性能预算。072重载和074树指针功能在三平台均通过，SDK061–063、macOS原生菜单080和完整适用crash组通过。本机matching release native23/25，070/073分别206/171ms失败；标准browser21/22，070为241ms；回执、附件和source/runner/release均已核验，不能称作性能验收通过。
+- 本机070的CPU采样显示关闭的导航/编辑弹层、SDK状态和固定键位构造仍参与同步提交。本轮让关闭的弹层组跳过无关props更新，并只在Search Everywhere或Keymap实际消费动作时订阅projection；打开/关闭仍完整渲染、清理和恢复焦点，重开读取当前owner、文件、动作和handler。SDK状态保留自身请求及语言订阅；固定CodeMirror primitive keymap仅懒构造一次，动态host派发仍逐实例绑定。关闭订阅回归修前3项失败，修后与当前动作、StrictMode、文档焦点、迟到LSP消息、右键菜单、剪贴板和Go To Line等支持组合9文件60项通过；实际性能收益仍待无诊断browser/native与GitHub验证。
+- 上述挂载回归另稳定复现Code Style设置在关闭→打开时因条件返回前后Hooks数量不同而崩溃；真实browser从Actions入口也已改前失败，原件为`workspace-code-style-before-browser/run-20261030-140112-479914794`。现将同一个state hook移到条件返回前，不改方案格式或owner；新增`TC-IDE-C8-08-code-style-dialog-lifecycle-browser`，验证修改方案后重开、dirty正文与继续输入并纳入完整crash组。挂载及真实browser修后通过，后者为`workspace-code-style-after-browser/run-20261030-140435-834341389`，回执及5个附件已核验；三平台仍待完成。
+- `cf1729a9854cdd64f694ee26caa2397230fdf379` 的 GitHub [41002449709](https://github.com/engcapa/taomni/actions/runs/41002449709) 已收齐并核验258次执行及6362个附件：**252 passed / 6 failed / 0 skipped**，与selection一致。Linux/Windows browser均43/43，macOS41/43；Linux native42/44、Windows42/42、macOS41/43。真实SDK061–063三平台及macOS菜单080通过；macOS browser070/073、native070及Linux native075仍有167.7–208ms长帧，Linux074与macOS072另有功能失败，不能按10%帧容差放行。本机标准browser19/19；matching release native22/23，070有191ms长帧；两组回执、source/runner/build身份及全部附件已核验，失败原件保留。本次dispatch漏选022和TREE-01，下一轮补齐完整73 ID并加入011/050，不声称258次等于原完整选集。
+- 072已用真实共享编辑器挂载回归稳定复现：外层tab元数据保存正确，重载中断编辑器关闭effect后旧布局仍含records.json；恢复随后将它重新发布到外层。初次host对账现在通过原关闭/dirty确认/资源清理owner移除旧布局里已被外层关闭的root文件；中断open已提交的placeholder也保留所有权，由新请求清理。未提交tab的取消读取仍可被新请求重新打开，避免误当作用户已关闭文件。保留编辑器新打开文件、loose/library、dirty恢复和split语义。三条区分回归均有修前红、修后绿证据，最终相关17项通过；072增加重载前关闭结果断言，不等待存储timer、不改写store/storage；真实browser/native待新组合验收。
+- CPU采样发现关闭的全局搜索框仍订阅所有workspace并构建索引。现仅打开时挂载索引、查询和焦点/键盘owner，关闭释放，重开读取最新文件/会话。隐藏索引回归改前红、改后绿；保留重新搜索、焦点、Enter和Escape。真实入口沿用011；050只验证工具栏/过滤器，不能当作搜索执行证据。树pointer选择不再对已点击行自动reveal，滚动目标相差不超过既有1px阈值时不触发同步无效scroll；键盘/外部选择仍reveal，测量重试/取消保留。两条改前树回归均红，修后与搜索/树4文件22项通过；074相邻文件误开及性能收益仍待实际验证。
+- `06298dc33f977c72dae34ce05ed7ea3557c931f1` 的 macOS 诊断 [40997186885](https://github.com/engcapa/taomni/actions/runs/40997186885) 已收齐并核验25次执行：18 passed / 7 failed / 0 skipped，与selection一致；browser9/9、native9/16。065/069/075按诊断规则主动拒绝验收通过；061/062打开源码分别2788.3/4444.8ms、063恢复约1500.1ms、073冷notes帧191.9999999999991ms，原件保留。采样发现macOS主线程反复创建/替换/释放Tauri菜单，但061主线程大部分空闲，073长帧内也没有同量级已捕获DOM调用，不能称菜单已解释全部超时。
+- 本轮针对菜单重复工作：语义相同的可见spec不再安装；完整创建/替换进入同一串行owner，过期排队版本不创建原生资源；enabled/checked变化原位更新，保留Tauri 2.12显式resource和action channel，失败回滚并允许下次publication重试。纯spec类型、builder和有副作用installer分为三个有明确输入/输出的模块，保持原facade API，避免反向依赖。回归24项及QA工具40项通过；新增macOS原生080通过真实NSMenu检查flags、Save写盘、Close、Quick Connect、About和reload后的回调，已注册schema/policy/dependencies。080本机Linux不适用，真实macOS执行和无诊断性能验证仍待GitHub，不据支持测试宣称提速。
+- `a133d636ca41599654fc27de81ff17ba5b2f5ab6` 的 GitHub [40991754886](https://github.com/engcapa/taomni/actions/runs/40991754886) 已核验263次执行：**256 passed / 7 failed / 0 skipped**、与selection完全一致。三平台browser各43/43，Linux native46/46、Windows44/44；macOS37/44，061恢复、062/063打开普通文件动作超时，065/069/073/075长帧174/175/171/189ms；075慢帧发生于打开notes，首个source观察最大102ms。Linux57观察点3,540帧最大157ms，真实SDK三场景均通过；仍不能验收整体性能。macOS桥接记录显示JS执行多为0–1ms，但请求至renderer开始及无JS操作的HTTP返回也有数百毫秒延误，继续诊断，不扣除预算。
+- 同source=`6fd0e5565fde811a95a04920cc15ace5460b01a5b58255dc943c1fef045b1c33`、runner=`9256b1d538f3a9f2e1426fe683e76a700d8ac36d0bd3d6b50c7c386bb3372516` 的本机支持测试392项、Rust桥接3项、refactor、完整前端构建通过；标准browser19/19（40点2,531帧最大146.1ms）、matching release native23/23及完整适用crash组通过。binary SHA=`7c3e02498ce11459951dcd7582d359cbdfb383ff8bf5306dd3246b9ef024f1b1`。新增默认关闭的原生任务/布局转发诊断；配置绑定conditions摘要，诊断用例不能被记为验收通过，后续正常性能运行必须关闭。
+- `37cc6ff364a2f5fcaf3f1d42d18c630f8c9d1a2b` 的 GitHub [40986096085](https://github.com/engcapa/taomni/actions/runs/40986096085) 已结束并核验263次执行：**256 passed / 7 failed / 0 skipped**，与selection完全一致。三平台browser各43/43、Windows native44/44、Linux45/46、macOS38/44。保留Linux075的168ms，以及macOS061动作、068/070/073/079长帧和Maven终端未出现BUILD FAILURE的原始失败；不因后续某分片通过而改写旧报告。
+- 新组合[40987880102](https://github.com/engcapa/taomni/actions/runs/40987880102)已核验263次执行：256 passed / 7 failed / 0 skipped，三平台browser各43/43、Linux native45/46、macOS38/44、Windows44/44。Linux074深层长行JSON为175ms；macOS061/062动作1681.6/1506.5ms，066/070/073/074长帧分别175.9999999999991/197/190/188ms，均未达验收。macOS061正文已在动作约595ms出现，但一次只读execute耗时1309ms且期间渲染heartbeat多数16–20ms；新增QA桥接排队/JS执行/回调时间戳用于分清该边界，原1500ms判定不变。
+- 可选初始化任务各自两帧延后仍会聚集在同一paint前，叠加语法重配和工作区显示投影。新增回归先复现两项在同一轮执行，现共享队列每帧执行一项；不就绪的port不能阻塞其他pane挂载，取消、异常后续任务及卸载清理均保留。定向3文件16项与完整受影响组合12文件392项通过，refactor/边界合同通过；browser/matching native与GitHub验证继续执行；尚不据此宣称加速。内部调度保留064–079、TREEOPEN-01、SDK061–063与完整crash入口及原预算，无新增同义YAML。
+- 按用户2026-10-30的最新要求，继续当前分支非性能开发和验收；三平台全量保留，性能列TODO，取消main比较。
+- 新组合`319dbe0c7d56a827df49f9131c29085ea75868bb`已推送并启动指定workflow [40987880102](https://github.com/engcapa/taomni/actions/runs/40987880102)：72 ID、263次执行、无能力缺口，source=`48b8855756bd159c59bf2cc5fe516dc438a89f5e632e263b17398e2927e67e73`、runner=`9256b1d538f3a9f2e1426fe683e76a700d8ac36d0bd3d6b50c7c386bb3372516`。本机matching QA release已完成（binary SHA=`8c03d0cd940da0ff0128f1a6c35ee190a13d14b8b9d1f9a6c30fdc01a72df7e3`），标准native `workspace-tree-measure-sdk-native/run-20261030-094122-536557264` **23/23 passed、0 skipped**，含完整适用crash9/9及061/062/063真实SDK成功/失败/Java场景。47观察点、3,039帧最大149ms，三个真实HOME布局均确认2,938文件、428目录、7层、320宽目录及64嵌套项目与指定八类文件。回执/附件摘要与source/runner/release均已核验；当前托管结果未收齐，不能用本机通过替代。
+- `37cc6ff364a2f5fcaf3f1d42d18c630f8c9d1a2b` 已推送并启动指定workflow [40986096085](https://github.com/engcapa/taomni/actions/runs/40986096085)，仍为72 ID、263次执行、无能力缺口。source=`48b8855756bd159c59bf2cc5fe516dc438a89f5e632e263b17398e2927e67e73`、runner=`efc8e25422d2cb89fdd046a822b7d69968fcc38d976a4e17280646724505cc34`。本机标准browser最终18/19、完整适用crash7/7通过；066冷开242.70000000298023ms失败保留，当前源码未通过性能验收。后续SDK只读采集合并属于runner新身份，需单独记录，不覆盖此运行。
+- 新的虚拟树修复将React ref提交时逐行同步高度读取改为等待ResizeObserver真实尺寸。回归修前捕获30次同步读取，修后4文件20项通过，并验证42px动态行高、总高度及后续行位置。保留077/TREE-01/TREEOPEN-01及064–079的真实入口，不新增同义YAML或关闭字体/动态行高能力；标准browser、matching release及新SHA托管验证继续执行。
+- 新组合的TypeScript、refactor（768 commands/328 exports/39 events、918模块、4163文件）、catalog gate、SDK工具25项及trace4项通过。标准browser仍在执行，已保留066冷开242.70000000298023ms失败；CPU采样显示首次同步React渲染，存储写入仅0–0.2ms，不能将本机结果称作性能通过。其余完整崩溃组目前全部通过；后续matching release/native及GitHub验证用于判断发布构建边界。
+- macOS062原始时序确认：最后UI结果在SDK启动后4492ms已出现，但独立pending观察又耗时582ms、trace采集64ms，释放gate晚于五秒。仅提前到trace前释放仍不足；现在把UI结果和真实IPC pending放到同一次只读请求中观察，随后验证新鲜子进程heartbeat，再立即释放gate并采集全部诊断。两步合同均先复现旧顺序失败，修后SDK工具25项通过。没有延长SDK超时、降低动作/逐键预算或修改062错误正文断言，原失败保留。
+- GitHub [40980594603](https://github.com/engcapa/taomni/actions/runs/40980594603)（`93332b7a24b5cc82d580b003eda9e3f3788ab9ed`）已收齐并核验263次执行：**257 passed / 6 failed / 0 skipped**、与selection逐项一致；6,459个回执附件逐字节/SHA及source/runner/release身份已核验。三平台browser各43/43，native Linux44/46、Windows44/44、macOS40/44。Windows030真实监听替换/磁盘冲突已通过。剩余Linux074/075为176/261ms，macOS070/074/079为203/200/183.9999999999991ms；macOS062因末尾独立pending观察及trace采集延误gate而显示五秒timeout。全部原始失败保留，当前不验收；source=`2e563f76e79a0ca04c27279221b9a53357e2bcd33e78a0dd39d9c357885550dd`、runner=`34476c3112421afc5b0c2eefb248a2a836298cc68d601d8619e9e02ff5818607`。
+- 同source本机标准browser `workspace-host-watcher-browser-perf/run-20261030-083245-366129456`为7 passed/1 failed：064在第1步goto被另一同URL导航打断、尚未进入性能测量；其余066/068/069/070/073/077/078通过。保留该失败，064单独恢复运行`workspace-host-watcher-browser-startup-recovery/run-20261030-083923-935901340`为1/1通过，冷开正文219.4ms/高亮363.7ms、恢复/重开最大帧109.4ms。两批回执及附件摘要已核验，共40个观察点、2,537帧、最大155.3ms；仅1帧处于150–165ms容差区间，不能称作同条件加速或用本机结果替代GitHub。
 - GitHub [40972368025](https://github.com/engcapa/taomni/actions/runs/40972368025) 已收齐并核验263次执行：**255 passed / 8 failed / 0 skipped**、与selection一致，无缺失。三平台browser各43/43；native Linux44/46、Windows43/44、macOS39/44。七项为性能失败；新增Windows030为真实外部写盘后冲突框未出现，失败页明确显示`File watcher unavailable: workspace watcher initialization cancelled`，不能按性能容差接受。原始回执及全部附件保留。
-- 监听器旧effect的stop与新start异步并发，workspace级stop会取消替代注册。当前在原IPC上增加可选注册ID，cleanup只取消其所属注册；保持旧调用及完整workspace释放语义，并处理卸载后才完成的初始化。前端回归修前3失败、修后相关16项通过，Rust真实监听器/生命周期12项通过，TypeScript、Rust formatting、refactor及catalog gate通过。030保留全部恢复/凭据/磁盘冲突断言，增加目录折叠/展开触发监听器替换，42条原精确checkpoint和新目录checkpoint已核对；dry-run只证明语法。匹配release及三平台真实写盘验证待完成，没有放宽等待或预算。
+- 监听器旧effect的stop与新start异步并发，workspace级stop会取消替代注册。当前在原IPC上增加可选注册ID，cleanup只取消其所属注册；保持旧调用及完整workspace释放语义，并处理卸载后才完成的初始化。前端回归修前3失败、修后相关16项通过，Rust真实监听器/生命周期12项通过，TypeScript、Rust formatting、refactor及catalog gate通过。030保留全部恢复/凭据/磁盘冲突断言，增加目录折叠/展开触发监听器替换，全部精确checkpoint和actions/results映射已核对；dry-run只证明语法。匹配release及三平台真实写盘验证待完成，没有放宽等待或预算。
 - 外层标签请求与工作区展示现在分别订阅：请求桥继续即时协调真实buffer、取消迟到请求、恢复draft和同步canvas；文件列表/活动文件变化不再先用旧buffer重画整个Runtime。真实挂载回归修前在选择已打开文件时捕获旧activeKey额外重画，修后通过，并检查同一EditorView、dirty正文、无重复读取与undo；host/canvas及完整工作区生命周期支持测试23/23通过。保留069/073/075及原拆屏/恢复入口，无新增同义YAML；新的matching release、标准browser/native及GitHub三平台结果待执行。
-- GitHub 40972368025已确认三平台browser各43/43，Linux native44/46；063第7键167ms、075冷源码197ms均超165ms。已收macOS native分片的061动作超1500ms、069/073分别207/200ms也失败；其余native仍在收集。原件保留，本机诊断不替代托管验收，尚不合main。
-- `f8ea6eb6f590320446ddfab91db8c1f0ccd82652` 已推送，并通过指定workflow启动 GitHub [40972368025](https://github.com/engcapa/taomni/actions/runs/40972368025)。本地plan为72 ID、三平台browser/native/release、263次执行、无能力缺口；dev contract通过。source=`eda0484ca14c049eef29d78675e37f331b27edeb1dacaf54f6d2ed30416eafd6`，runner=`34476c3112421afc5b0c2eefb248a2a836298cc68d601d8619e9e02ff5818607`。本机matching QA release已构建完成，耗时716.70秒，binary SHA=`cc6323e2fa103654cec19f349cba79e0269a21f82dcdff83b8b996df62ca7e42`；本机native专项25/25及完整适用native崩溃组9/9均已通过、无skip，输入身份稳定，回执签名及附件摘要已核验。native57个文件观察点3,805帧最大108ms；074/075/079均确认2,938文件、428目录、7层路径、320宽目录及64嵌套项目，指定八类文件齐全。托管原始case结果尚未收齐，不合入main。
+- GitHub 40972368025已确认三平台browser各43/43，Linux native44/46；063第7键167ms、075冷源码197ms均超165ms。已收macOS native分片的061动作超1500ms、069/073分别207/200ms也失败；其余native仍在收集。原件保留，本机诊断不替代托管验收。
+- `f8ea6eb6f590320446ddfab91db8c1f0ccd82652` 已推送，并通过指定workflow启动 GitHub [40972368025](https://github.com/engcapa/taomni/actions/runs/40972368025)。本地plan为72 ID、三平台browser/native/release、263次执行、无能力缺口；dev contract通过。source=`eda0484ca14c049eef29d78675e37f331b27edeb1dacaf54f6d2ed30416eafd6`，runner=`34476c3112421afc5b0c2eefb248a2a836298cc68d601d8619e9e02ff5818607`。本机matching QA release已构建完成，耗时716.70秒，binary SHA=`cc6323e2fa103654cec19f349cba79e0269a21f82dcdff83b8b996df62ca7e42`；本机native专项25/25及完整适用native崩溃组9/9均已通过、无skip，输入身份稳定，回执签名及附件摘要已核验。native57个文件观察点3,805帧最大108ms；074/075/079均确认2,938文件、428目录、7层路径、320宽目录及64嵌套项目，指定八类文件齐全。托管原始case结果尚未收齐。
 - 新口径下的标准browser `workspace-frame-approved-browser/run-20261030-070809-539831857` **19/19 passed / 0 skipped**，含完整适用崩溃组、剪贴板/导航及064/066/068/069/070/073/077/078；输入稳定、回执签名和附件摘要已核验。40个文件观察点共2539帧，最大128.6ms；本轮没有帧进入150–165ms容差区间，不据此宣称同条件加速。TypeScript、refactor、catalog gate及测量工具25项通过；matching release正在构建，native与三平台结果待完成。
 - 用户于2026-10-30补充接受“长帧不超过10%的慢”：当前按单帧150ms基准允许最多10%偏差，即**每一帧≤165ms**验收。报告同时记录150ms基准、10%容差、165ms上限及未取整原始帧；正文/高亮/动作1500ms、输入p95及真实SDK五秒超时不变。旧报告保留原判定，不回写通过；后续须以新runner/case身份执行。本项是用户调整验收口径，不是产品性能提升，不能豁免超过165ms或功能失败。
 - 按用户要求清理本机测试产物：确认无cargo/rustc/该QA binary运行后，仅移除旧`src-tauri/target/qa-ui-auto/debug`，释放19,612,114,944字节；SSD可用由9,848,877,056增至29,460,987,904字节。release二进制SHA在清理前后均为`8618c682cab63c1f72de07960fea721ed1f11b9ebb8c1b9930391aee1e77d12f`；源码、原始失败证据及release缓存保留。记录在`_local/workspace-disk-cleanup-20261030.json`。
 - 树选择隔离后的标准browser `workspace-tree-final-browser/run-20261030-064822-585915889` 为18 passed / 1 failed / 0 skipped；069切回notes首帧153.3ms按当时150ms标准失败，原件保留。CPU采样显示外层tab选择和内部文件激活连续同步提交；存储写入仅0–0.2ms，不能归因于持久化。该报告不因新容差追认通过，matching新输入执行待完成。
-- `27d95ada904ecdd1f046e56f0c7d82d611208e35` 的 GitHub [40961872846](https://github.com/engcapa/taomni/actions/runs/40961872846) 已收齐260次执行：**246 passed / 14 failed / 0 skipped**，与selection逐项一致。browser Linux43/0、Windows43/0、macOS42/1；native Linux44/1、Windows43/0、macOS31/12（通过/失败）。仍未达到验收：macOS冷开/切换最长失败帧157–255ms、061打开源码1786.3ms、062恢复1843.8ms、063最后普通文件动作期间真实SDK已结束；Linux075记录150.0000000000009ms也原样保留为失败，不放宽阈值。原始回执、source/runner/release及附件摘要已核验；不合入main或启动正式性能比较。
+- `27d95ada904ecdd1f046e56f0c7d82d611208e35` 的 GitHub [40961872846](https://github.com/engcapa/taomni/actions/runs/40961872846) 已收齐260次执行：**246 passed / 14 failed / 0 skipped**，与selection逐项一致。browser Linux43/0、Windows43/0、macOS42/1；native Linux44/1、Windows43/0、macOS31/12（通过/失败）。仍未达到验收：macOS冷开/切换最长失败帧157–255ms、061打开源码1786.3ms、062恢复1843.8ms、063最后普通文件动作期间真实SDK已结束；Linux075记录150.0000000000009ms也原样保留为失败，不放宽阈值。原始回执、source/runner/release及附件摘要已核验；尚不启动正式性能比较。
 - 上述已提交source=`c4b338fb08aa79d176372e47e545e326128558ca303f8182f28afb66c52c5ebb` 的本机标准browser18/18、native专项24/24及完整适用native crash9/9均通过。browser40观察点2541帧最大104.9ms，native57观察点3747帧最大123ms；010在此前复现prompt缺陷的同长度报告路径中无注入通过，三个真实HOME布局及指定八类文件全部核验。这些本机结果不替代GitHub剩余失败。
 - 树选择诊断确认仅点击选中就触发整个Runtime约20ms提交，紧接着才是实际文件激活。当前把treeSelection订阅放到独立Project pane，Runtime仅订阅其他UI字段；文件/目录创建、rename/delete、Enter/F2/Delete及命令派发在入口读取当前选择，显式上下文目标优先，已打开对话框固定原目标。菜单投影独立订阅本实例选择并在卸载时清理；Java新建仍从实时选择解析目录。真实mounted回归修前多2次owner渲染，修后树点击/连续方向键不再重画owner；完整CodeWorkspaceTab256项、文件动作15项、菜单5项及Java模板8项通过，TypeScript通过。纯内部订阅重构，沿用现有077/TREEOPEN-01、新增选择TREE-01及C8-07真实文件创建/undo保留场景，无同义YAML新增。匹配新源码的首轮标准browser为18/1（069首帧153.3ms，按当时150ms标准失败）；新容差下的新身份验证继续执行，尚无新源码native/托管性能结论。
-- `dba8c361568b3bbf8d148f2733987ac889faa94f` 的 GitHub [40952190607](https://github.com/engcapa/taomni/actions/runs/40952190607) 已结束：**243 passed / 17 failed / 0 skipped**，260次执行与计划逐项一致。browser Linux43/0、Windows43/0、macOS42/1；native Linux42/3、Windows43/0、macOS30/13（通过/失败）。6,390个回执附件逐字节/SHA及source/runner/release身份已核验；Windows原生fixture、工具窗与HOME清理通过。失败包含macOS冷开长帧、061/062响应预算，以及Linux074/075长帧和063输入帧，全部原始证据保留，不合并main或宣称验收。
+- `dba8c361568b3bbf8d148f2733987ac889faa94f` 的 GitHub [40952190607](https://github.com/engcapa/taomni/actions/runs/40952190607) 已结束：**243 passed / 17 failed / 0 skipped**，260次执行与计划逐项一致。browser Linux43/0、Windows43/0、macOS42/1；native Linux42/3、Windows43/0、macOS30/13（通过/失败）。6,390个回执附件逐字节/SHA及source/runner/release身份已核验；Windows原生fixture、工具窗与HOME清理通过。失败包含macOS冷开长帧、061/062响应预算，以及Linux074/075长帧和063输入帧，全部原始证据保留，尚未验收。
 - 同source=`dfb2b7445da7c37b112349ce7cdddd688ac3f11dcb264f65bbf3b062e825e07c` 本机最终组合：browser18/18、native专项23/24、native完整适用crash9/9。全部性能断言通过，browser40个观察点2,551帧最大108.2ms，native57个观察点3,738帧最大120ms；三个HOME布局均验证2,938文件/428目录/7层/320宽目录/64嵌套项目及指定八类文件。唯一native失败为010终端prompt已出现但ready超时，保留现场继续定位；这些结果不能抵消托管失败。
 - 冷开React提交采样确认首次status widget host注册和viewport测量会重画整个编辑器；另有空inlay/semantic/breadcrumb更新在外部store提交期间排入无变化的transition。当前将status slot订阅移到工具栏，viewport交给语义请求订阅，并在显示投影排队前去除真正无变化的更新。修前status host回归重画3次、viewport回归多1次、空overlay回归多2次；修后各项通过，inlay保留最新视口刷新、过期结果拒收及卸载取消。完整编辑器及相关消费者9文件299项、TypeScript/Vite/refactor通过。保留即时文件/命令目标、完整高亮及原150/1500ms预算；matching release及新SHA托管结果待完成，诊断注入不构成验收。这是显示投影内部重构，沿用064–079和现有LSP/拆屏保留用例，不新增重复入口用例。
 - 旧源码隔离worktree的 `workspace-prompt-length-diagnosticxx/run-20261030-053845-196522077` 稳定复现010终端ready超时：真实Bash/readline在224字符prompt恰好占满112列的两行后发送CR/LF/CR，光标落在无isWrapped的下一空行。现在仅在bracketed paste开启、空行首及前一行末格确为已打印空格时检查相邻prompt，拒绝旧输出/补齐空格/半条命令/alternate screen。真实xterm重放112/224列回归修前2失败，修后连同CWD安装、预览和命令解析4文件39项通过；原010原生会话/输出/隐藏恢复断言不变，matching release及实际native重验待完成。
@@ -35,7 +76,7 @@
 - `workspace-yield-browser-crash/run-20261029-203545-418445277` 完整适用browser崩溃组 **7/7 passed**；TypeScript、refactor、catalog gate通过。支持性组合测试12文件388通过/1失败，最后一项也是新split正文就绪等待，修后完整CodeWorkspaceTab重跑 **254/254 passed**；matching QA release仍在进行。
 - `40870063931` macOS native已出现069滚动箭头无法露出budget.csv（功能失败）和068的155ms长帧；其余shard及Windows仍待收集。069不能套用性能例外，须检查滚动控件/布局/原始驱动证据后修复。
 - 这属于内部调度优化，沿用064–077、TREEOPEN-01和078的实际用户入口，不新增同义YAML或删除预算。先前隔离工作树的browser通过仅作为假设依据；当前分支无注入验证及GitHub新SHA仍待完成。
-- 本轮尚需 matching release 专项、指定 GitHub workflow 三平台相关集、合入固定 main 后的全量和正式四轮性能比较。此前暂停快照的65 ID选集仍保留，并加入 TREEOPEN-01、078及受影响剪贴板入口。
+- 本轮继续matching release功能专项及指定GitHub workflow当前分支三平台全量；性能列TODO，取消四轮main比较。此前暂停快照的65 ID选集仍保留，并加入 TREEOPEN-01、078及受影响剪贴板入口。
 - `4bfccf02` 的 GitHub [40876274070](https://github.com/engcapa/taomni/actions/runs/40876274070) 仍未通过：browser Linux41/2、Windows38/5、macOS37/6；native Linux39/4、Windows39/2、macOS35/6（通过/失败），全部已结束。回执签名、逐附件字节/SHA、源码和QA release身份已核验；job success不能替代case结果。主要剩余项为150ms长帧、慢读取空白编辑器、标签滚动及异步挂载瞬态。
 - 慢读取超过80ms后已发布loading buffer，编辑器port注册曾提前消费树焦点intent；读取回调随后误判过期并丢弃正文，留下永久空白只读编辑器。现在只在读取完成、canonical key确定后授予焦点，读取有效性独立于焦点intent，并保留新请求/卸载失效。真实openFile/store/hook的4项回归修前全失败；修后与焦点、滚动等5文件30项通过。
 - 标签栏箭头手动滚动曾被resize/metadata通知重新拉回活动标签；现在用户滚动保持控制权，活动文件/工作区改变时再自动显示活动标签。真实滚动回归修前失败、修后通过；069原始输入及预算保留，跨平台执行仍待新SHA验证。
@@ -61,12 +102,12 @@
 - 修正已分为Actions批处理 `735da34e`、标签箭头 `8936c39e` 和验证工具 `80f32c3a174d03328b3c9c220e587cbfc10d2c61` 三个提交并推送。TypeScript、Rust fmt、refactor、catalog、dev contract及257次三平台相关集plan通过；GitHub [40905529591](https://github.com/engcapa/taomni/actions/runs/40905529591) 使用该完整SHA、原70 ID、browser/native/release正在运行，尚无托管通过结论。
 - 同源码 source=`0ee6ecf6da5bef306e4bbd85f444084278641dbb468e63377df491e175e1cc6a` 的本机QA release构建688.92秒，binary SHA=`02bc4c1eb0576315944a15d58b1054448358a791d92c4aa9c127bd3fe4599e49`。`workspace-binding-native-targeted/run-20261029-235820-229533292` **13/13 passed**，含061–063真实SDK、065/067/073–077/079、TREEOPEN及工具窗；`workspace-binding-native-crash/run-20261030-000200-288928528` 完整适用崩溃组 **9/9 passed**，无skip、身份稳定，1179/292个附件逐字节/SHA和回执已核验。JSON冷开正文259ms/高亮366ms/max帧95ms，长行JSON267/367/107ms；HOME深层长行JSON143/215/72ms、源码262/397/96ms、Git普通文档240/630/88ms。三个HOME用例均保留实际2938文件/428目录/7层/64项目/320宽目录统计，指定八类文件全部存在；本机通过不替代GitHub验收。
 
-- 当前 GitHub `40905529591` 三平台 browser **129/129 passed、无skip**（每平台43），564个回执附件逐字节/SHA及source/runner已核验。macOS首个native分片 **11/11 passed**，含067长行JSON、075真实HOME源码；075冷开正文594ms/高亮869ms/max帧143ms，仍使用原1500/150ms预算。Linux/Windows及其余macOS native待收齐，不据局部通过提前合并main或标记验收。
-- `40905529591` 最终为 **251 passed / 6 failed / 0 skipped**，257次实际执行与计划逐项一致；三平台browser各43/43，native Linux39/5、Windows42/0、macOS41/1（通过/失败）。6,360个回执附件逐字节/SHA、source/runner及QA release身份已核验，基础设施错误为空。Windows/macOS标签滚动和Windows owned Git清理通过；剩余Linux064/065/068/073/075为181/174/161/154/201ms长帧，macOS062清空源码动作1980.67ms，仍不验收、不合并main。所有原始失败保留在 `_local/workspace-40905529591/`。
+- 当前 GitHub `40905529591` 三平台 browser **129/129 passed、无skip**（每平台43），564个回执附件逐字节/SHA及source/runner已核验。macOS首个native分片 **11/11 passed**，含067长行JSON、075真实HOME源码；075冷开正文594ms/高亮869ms/max帧143ms，仍使用原1500/150ms预算。Linux/Windows及其余macOS native待收齐，不据局部通过标记验收。
+- `40905529591` 最终为 **251 passed / 6 failed / 0 skipped**，257次实际执行与计划逐项一致；三平台browser各43/43，native Linux39/5、Windows42/0、macOS41/1（通过/失败）。6,360个回执附件逐字节/SHA、source/runner及QA release身份已核验，基础设施错误为空。Windows/macOS标签滚动和Windows owned Git清理通过；剩余Linux064/065/068/073/075为181/174/161/154/201ms长帧，macOS062清空源码动作1980.67ms，仍不验收。所有原始失败保留在 `_local/workspace-40905529591/`。
 - 冷开采样显示EditorView构造后的整个workspace状态投影与首次测量/高亮叠加；`startTransition`不能保证先绘制。命令port、路由和实时caret refs仍同步，仅菜单revision、光标/viewport展示更新改为两次rAF后的合并transition，卸载取消全部待处理任务。真实command owner回归修前多渲染一次，修后即时action仍成功且绘制前不重画owner；队列StrictMode/顺序/unmount等及完整编辑器组合 **6文件281项passed**。内部调度沿用064–079/TREEOPEN/078入口与原预算，不新增同义用例。
 - macOS062原始HTTP trace中普通源码打开529.9ms，随后fill的contenteditable观察985.2ms、全选204ms、Backspace666.9ms，最终正文正确清空。当前SDK被动trace增加连续renderer帧心跳以区分真实停帧和桥等待，保留每个间隔及完整动作1500ms判定，不用DOM时间替代；Python/Node工具合同19项通过。上述新产品调度尚需新源码browser、matching QA release及GitHub三平台原相关集验证，旧binary结果不冒充当前通过。
 - 新调度 source=`91855c8132d524e10ebbb21872ffc73eb86e4a8badcc3ddece2a9786f85156d1`、runner=`ab13ec226bdb82042b07c11901967159eb204ea9f9cb4487b74abaf9ba6239a4`：本机 `workspace-after-paint-browser/run-20261030-005536-280194345` **16/16 passed、无skip**，含完整适用browser崩溃组，142个附件及回执身份已核验。全部文件打开观察点最大帧114.2ms；704行JSON正文240.9ms/高亮332.8ms，长行JSON244.2/324.1ms。TypeScript、refactor及dev contract通过；matching release构建和本机native专项/崩溃组继续执行，三平台GitHub新SHA待派发。
-- 上述源码本机 native 专项 **19 passed / 1 failed**，性能断言全部通过，唯一失败为工具窗 terminal ready 超时；完整适用native崩溃组 **9/9 passed**，回执/附件/QA release身份已核验。GitHub [40918244213](https://github.com/engcapa/taomni/actions/runs/40918244213) 最终 **243 passed / 14 failed / 0 skipped**：browser Linux43/0、Windows43/0、macOS41/2；native Linux36/8、Windows42/0、macOS38/4（通过/失败）。6,340个附件逐字节/SHA及全部回执签名、source/runner/release身份已核验。Linux064/066/067/068/070/074/075/079仍有158–228ms长帧；macOS browser070/073及native064超150ms，native061/062/063仍失败。未合并main或标记验收。
+- 上述源码本机 native 专项 **19 passed / 1 failed**，性能断言全部通过，唯一失败为工具窗 terminal ready 超时；完整适用native崩溃组 **9/9 passed**，回执/附件/QA release身份已核验。GitHub [40918244213](https://github.com/engcapa/taomni/actions/runs/40918244213) 最终 **243 passed / 14 failed / 0 skipped**：browser Linux43/0、Windows43/0、macOS41/2；native Linux36/8、Windows42/0、macOS38/4（通过/失败）。6,340个附件逐字节/SHA及全部回执签名、source/runner/release身份已核验。Linux064/066/067/068/070/074/075/079仍有158–228ms长帧；macOS browser070/073及native064超150ms，native061/062/063仍失败。尚未验收。
 - 冷打开诊断约20次React提交，首次EditorView构造、workspace投影、几何测量与语言安装仍会叠加。当前首次挂载与语法安装都使用两轮rAF后独立任务，让前一个阶段有绘制机会；继续复用后续文件的EditorView，保留过期文件/卸载取消和语言失败清空。没有延迟document didOpen、关闭高亮或改变预算。直接回归修前4失败/4通过、修后8/8通过；CodeWorkspaceTab完整 **254/254 passed**。两个code action集成回归在原操作前等待真实正文，保留全部journal/undo断言。内部调度继续沿用064–079/TREEOPEN/078，无同义YAML新增。
 - `workspace-paint-stages-browser/run-20261030-015535-751914446` 的16条全通过，但执行期间支持测试发生修改，`identity_stable=false`，不算当前验收；固定输入后的标准browser、matching release及native专项/完整崩溃组待核验。
 - macOS新被动trace区分出驱动往返开销：063清空总1620ms，renderer最大心跳间隔112ms，其中一次只读执行请求582ms；061普通文件正文在动作开始后912ms出现，但总1512ms并耗尽真实SDK五秒等待。062真实probe在gate释放前超时，因此不能期待fixture非零退出正文。原失败全部保留。客户端仍保留桥同步执行时代的Darwin逐字符HTTP workaround，而当前桥已按每tick duration异步执行；现在将paced输入所有权提取到`native_paced_input.py`，所有平台共用单请求键序列，保留每个keydown/up、Shift、20ms暂停、失败释放与禁止重放。新增工具回归修前Darwin失败、修后Python46项及原桥异步逐键观察/取消2项通过。SDK逐键帧、每八键1500ms、全部字符/总耗时、同一真实pending子进程与5000ms超时合同不变；macOS原用例仍需新runner托管验证。
@@ -78,7 +119,7 @@
 - macOS真实模态NSOpenPanel可能等待关闭后才返回WebView点击。`native_folder_dialog`增加 `trigger`，由一个真实driver点击与已有owned OS操作器同时完成，同步等待两者并保留失败；022/026/030/042合并原点击与OS步骤，所有结果与checkpoint断言保持。已聚焦的contenteditable保留当前焦点后发送真实Mod+A/Backspace或逐键输入；未聚焦仍必须真实点击并验证焦点，不合成或重放输入。新的matching release、本机标准执行与GitHub验证待完成，诊断注入不能用于验收。
 - 本轮支持回归：几何/Git/恢复/高亮与保留能力15文件208项通过；完整CodeWorkspaceTab在StrictMode双编辑器测试等待两个真实正文挂载后 **254/254 passed**，原跨分屏复制/粘贴/undo及lease断言全部保留。Python真实输入、目录选择器和共享消费者 **160/160 passed**。073追加PageUp/PageDown、Shift翻页选择及Actions搜索执行Page Down，并保留干净JSON、另一标签dirty正文和原全部性能观察；控件catalog已同步。四条OS用例把trigger展开后与原步骤逐项相同，五条变更用例的checkpoint与实际步骤完全一致。catalog gate通过（4个既有orphan未增加）；新增022后的71 ID托管selection为260次适用执行，无能力缺口。dry-run只算语法验证，030使用明确的一次性占位密码解析，不连接SSH；030真实SSH/SFTP恢复留给GitHub提供的服务验证。
 - 固定source=`7410c24bd80059537c496a1e9e62b72388afcfe317b1312e0978848761e538ce`、runner=`99a334d358a7aa460d2c69fc83fade61a5e7f6f645300045975077cef49587c6` 的标准本机browser `workspace-measured-geometry-browser-stable/run-20261030-031826-501895098` 为 **16/16 passed**，无skip、身份稳定，回执和附件已核验；2555个文件打开观察帧的最大间隔122.9ms，新Page按键/选择及Actions入口全部通过。此前在catalog修正前主动停止的 `workspace-measured-geometry-browser` 不算当前通过证据，原目录保留。matching release编译中，真实native与托管性能仍待验证。
-- `b5fcae70a71c11c23ecc78c169cbcce15b0dea19` 已推送，TypeScript、QA前端构建及refactor通过（768 commands/328 exports/39 events、912模块、4147文件）；dev contract通过。指定workflow的新运行 [40940714805](https://github.com/engcapa/taomni/actions/runs/40940714805) 已启动，下载的selection确认相同source/runner与260次计划执行，无能力缺口。GitHub API把完整SHA作为workflow `ref` 返回422且没有创建运行；改用已核实指向该SHA的当前分支作为workflow ref，`head`仍为完整40位SHA。当前browser/native结果仍待收集，未合并main。
+- `b5fcae70a71c11c23ecc78c169cbcce15b0dea19` 已推送，TypeScript、QA前端构建及refactor通过（768 commands/328 exports/39 events、912模块、4147文件）；dev contract通过。指定workflow的新运行 [40940714805](https://github.com/engcapa/taomni/actions/runs/40940714805) 已启动，下载的selection确认相同source/runner与260次计划执行，无能力缺口。GitHub API把完整SHA作为workflow `ref` 返回422且没有创建运行；改用已核实指向该SHA的当前分支作为workflow ref，`head`仍为完整40位SHA。当前browser/native结果仍待收集，尚未验收。
 - 本机matching release构建687.51秒，binary SHA=`aa0582c18009cec73c71d24a2d539e86d8025c6c717f610c0f7acf68d2c5560c`。`workspace-measured-geometry-native-targeted/run-20261030-033908-030602290` 为 **22 passed / 1 failed / 0 skipped**，身份稳定，1433个附件和回执已核验；所有性能点通过，最大帧97ms，HOME深层JSON正文129ms/高亮208ms/max62ms，HOME源码261/404/91ms。026/042真实OS选择及073全部Page入口通过。022的真实choose/cancel均完成，但选择后立即一次性读取路径失败，随后失败HTML已显示精确目标；产品 `browse()` 在OS关闭后异步提交返回值。现在仅对原精确路径表达式增加最多5秒poll，根数量、选中目录、实际文件、取消及reload断言不变；不影响150/1500ms性能门槛，不重建相同源码binary。完整native崩溃组及022修正后的专项待完成，原失败保留。
 - 同source/runner的完整native崩溃组 `workspace-measured-geometry-native-crash/run-20261030-034555-627009028` **9/9 passed**；随后单独执行修正的022，`workspace-picker-publication-native/run-20261030-034933-052596312` **1/1 passed**，原精确路径、choose/cancel、根目录、读取实际文件及reload全部通过。两个执行均身份稳定、无skip，292/13个附件与回执已核验。只重跑改变的用例且复用相同matching release；原22/1不改写，不能把本机通过外推为GitHub当前SHA通过。
 
@@ -87,17 +128,46 @@
 - 中间源码 `b31a6734ab467c5948603bb1dd24f206a8ed36bc8ae40b8dfae9e2bb28284cb8` 的本机 `workspace-projection-browser/run-20261030-042129-141641026` **16/16 passed**、无skip、输入稳定，回执及全部附件已核验。完整适用browser崩溃组、064/066/068/069/070/073/077/078均通过，2554个原始观察帧最大105.4ms；后续命令context通知的进一步隔离尚需新组合回归，不将该结果外推为新源码通过。
 - Windows重启检查现直接读取IPv4/IPv6原生IP Helper listener表，保留真实PID、占用等待和观察错误失败，不再启动慢PowerShell/CIM查询。Windows构建job增加原生表及进程清理合同。SDK fixture的独立rustc准备保留有界180秒及超时诊断；产品SDK五秒、动作1500ms和全帧150ms预算均不变。20项工具/真实独立SDK子进程合同通过，实际Windows边界留给新workflow验证。
 
+## 本轮全量发现的功能回归（2026-10-30）
+
+`41045269719` 当前已核验的 browser 分片暴露以下非性能问题，原始失败保留：
+
+- 普通目录按需发现后，UI 新建/保存描述符没有失效通知。现在文件创建、保存、重命名和删除仅在磁盘操作成功后通知发现层；普通文本写入不触发项目扫描，HOME 仍只浅扫，显式刷新仍保留有界递归。新 mounted 回归改前2失败/5通过；修后连同 Windows 路径、隐藏状态和 Git 生命周期14项通过。新增 `TC-IDE-C7-08-descriptor-mutations-native` 独立操作 owned fixture，验证创建/保存/来回重命名/删除、发现状态及真实文件 SHA；尚待执行。
+- C7-06/07、D1-01 与 C2-02 原用例仅打开无 pom 的普通 README，却预期 Maven 工具失败或补全项目降级提示。现在先通过 UI 创建并保存明确 Maven 描述符，再保留全部原失败原因、刷新、scope 和补全提示断言；不恢复普通文件的自动 Maven 扫描。C7-03 改用编辑器 fill 避免 XML 自动补闭合制造错误正文，并在手动刷新前断言自动发现。
+- 多仓库快照更新会取消 Git HEAD effect，原请求完成后因旧 owner 取消而丢失结果，当前 owner 又因 pending Set 而跳过。现以 promise Map 共享进行中的读取，每个 effect 单独控制发布；旧 HEAD、文件切换及卸载的迟到结果仍被拒绝。区分回归改前2失败/1通过，修后3项通过；保留 `TC-IDE-PARITY-022-01` 原 gutter、HEAD/buffer popup、Show Diff、可撤销 Rollback 和 error stripe 断言，以及008-03真实原生Git边界。
+- PARITY-005-02 原本点击分屏后立即计数；失败DOM已存在两个 pane，第二 EditorView尚未就绪。增加第二真实 `.cm-content` 的条件等待，保留双编辑器精确计数、补全内容和跨pane撤销/重做断言。
+
+原生全量还发现 C4-03 的24标签恢复失败。增加第二pane真实正文的条件等待后，本机仍捕获该编辑器出现后被移除：旧版最近工作区首次导入只登记最后活动文件，后台恢复结束后，host把其余23个标签当作外层关闭项处理。现在仅在首次创建平台工作区时，从同一恢复身份的布局导入完整已知root文件列表；后续已存在工作区仍由外层文件列表拥有关闭语义，不会从旧布局复活已关闭标签。前三项区分回归修前全部失败；补查每leaf 24标签时，又复现通用去重helper的全局24条上限，现改为按布局所有leaf去重，保留原有每leaf上限。四项回归及入口、host请求/分屏、恢复队列和完整编辑器生命周期9文件55项通过。C4-03保留两实例精确计数、真实编辑及末标签正文，另在后台恢复后检查24个外层文件标签、两实例仍在及无运行时错误。新组合尚需匹配QA release和原生验证。
+
+031恢复后首次邮件标签在窄strip中被裁切，WebKit滚动后点中了S3；现先用真实标签导航菜单揭示邮件，再保留原直接点击和五种协议surface/顺序/ownership断言，不使用合成激活或点击重试。C7-08与031首轮原生probe还暴露WebDriver不支持的`:has-text`，已分别改用现有`click_menu`和标准XPath；保持全部发现状态、磁盘SHA及协议surface断言。修正后本机Linux release原生2/2通过，15个附件、回执与source/runner/build身份已核验（`/tmp/taomni-workspace-selector-native-02/run-20261030-201042-042205466`）；该证据属于ef57产品源码，首次导入修复组合仍需新原生验证。
+
+当前修复提交 `ef57ad4b2a4c66ce1e0b857bc48ac2f224a68467` 已推到当前分支，指定 workflow 定向运行 [41051642653](https://github.com/engcapa/taomni/actions/runs/41051642653) 正在执行三平台browser/native及完整适用crash组。source=`82a4dc2aa9d0db5f73a1c0363ece2d00be57692f398191a0d2d470977ab8af2b`、runner=`0d80f2910f0fcbca68a969eaf75211b808ca0687171597545c8fda18f475d141`；RDP Rust代码、依赖及构建配置未变，定向运行复用41045269719已通过的原生合同，最终全量恢复全部合同。
+
+ef57本机：14项目标单测、80项保留测试全部通过，QA前端TypeScript/refactor/build、catalog及开发合同通过。真实browser目标7项已全部通过（首轮5通过/2条因新增pom后README selector不唯一失败，精确限定README后2/2通过，原失败保留）；031恢复流程1/1通过；完整crash组8/8通过。报告均在`/tmp/taomni-workspace-facts-git-*`，回执、source/runner身份及全部附件摘要已核验。matching QA release原生probe为1通过/3失败，008-03真实Git通过，C4-03及上述两处selector原失败保留；完整native crash组9/9通过，292个附件及回执已核验。前一SHA结果不能作为新源码验收。
+
+全量macOS updater附件还发现发布范围不一致：回执含真实release bundle与Disposable.app，workflow上传排除了两个分片各31个文件，共62个。旧运行保留原receipt与缺失列表，不称全部附件已验证；现移除主QA artifact的这些排除规则，最终全量必须逐个核验所有receipt文件。独立精简diagnostics仍保留其原范围。此workflow-only修复不改变产品、case或runner身份，也不需要重新编译QA应用。
+
+原全量`41045269719`已收齐25份报告及2,217次执行：**2,192 passed /25 failed /0 skipped**；24次功能失败均属于上述发现/Git/分屏恢复/031问题，另1次Linux075为168ms性能TODO。已核验25,566个实际附件，62个缺失按前段保留，不称旧证据完整。`90fb47c5`的全量[41054942234](https://github.com/engcapa/taomni/actions/runs/41054942234)在Catalog门禁失败，尚无UI执行：031的XPath没有登记到控件alias。现补齐对应alias并重新生成catalog，不降低coverage baseline。该SHA本机browser11/11通过，含完整8项crash组，回执及25个附件已核验；后续每leaf上限修正还需新组合复验。
+
 ## 当前非性能 follow-up
 
-以下按最终组合源码验收；历史通过不能替代新源码证据。40972368025已确认新增Windows原生监听器取消/冲突通知失败，需与性能修复一并关闭。
+以下按最终组合源码验收；历史通过不能替代新源码证据。Windows监听器所有权修复已在40980594603真实原生030通过；最终组合继续保留该回归。
 
 | 事项 | 当前状态与关闭条件 |
 | --- | --- |
-| Windows外部修改冲突通知 | 030真实外部写盘后未弹冲突框；注册所有权修复及前端回归已加入，仍需真实Windows原生验证替换监听、dirty草稿、外部字节保护和保存冲突 |
-| SDK/LSP生命周期 | 已实现；最终三平台确认真实错误、手动刷新、取消/重试、迟到响应隔离、文档队列及didClose/didOpen顺序 |
+| SDK/LSP生命周期 | 已实现；本机及cf1729托管macOS061–063真实SDK场景通过；最终组合三平台保留真实错误、手动刷新、取消/重试、迟到响应及文档队列顺序 |
 | 多root与系统选择器 | 已实现；最终三平台确认第二/第三root、重复选择、取消、跨工作区迟到结果和成功后展开Project |
-| 编辑器与崩溃保留契约 | 当前287项支持测试通过；最终同SHA验证dirty/save、undo/redo、恢复、分屏、剪贴板、树焦点、Page导航、隐藏面板及完整适用crash组 |
-| 最新main与全量集成 | 相关集全绿后再合入最新main，处理冲突及受影响回归，然后使用指定workflow的scope=all验证三平台browser/native |
+| 编辑器与崩溃保留契约 | 先前组合392项支持测试通过；最终同SHA验证dirty/save、undo/redo、恢复、分屏、剪贴板、树焦点、Page导航、隐藏面板及完整适用crash组 |
+| 关闭/重载与树指针竞态 | 历史组合托管072与074功能断言已通过；bd6 Linux074仍有下项运行时错误，最终组合继续保留真实关闭/重载与指针断言 |
+| 文件树ResizeObserver生命周期 | bd6托管Linux native074真实错误已修；下一帧合并及卸载清理回归通过，bd39三平台原生074及ef14已收Linux/macOS通过，最终组合继续保留，不接受过滤错误 |
+| 隐藏工具面板几何 | 零尺寸挂载时关闭Documentation占33.333%宽度已修；树/分隔器47项、双入口及跨消费者105项通过，bd39三平台真实038通过，最终组合保留实际无布局框断言 |
+| 导航弹层与迟到光标遥测 | 同一路径/符号链的延迟光标不再关闭弹层；区分回归修前红、修后24项通过，ef14三平台browser NAV-01/02通过，最终组合继续保留 |
+| 设置与分屏就绪 | Code Style打开崩溃已修复且新增区分回归，当前产品源码真实browser修后通过；TREE-01增加真实第二编辑器就绪及正文断言，最终三平台复验 |
+| macOS应用菜单生命周期 | cf1729托管080已通过真实enabled/checked、保存、关闭、勾选项及reload后About回调；最终组合保留该原生回归 |
+| Terminal右边界readiness | 118项支持测试通过；matching release本机024-03/024-04真实PTY均通过，browser/native完整crash组8/8及9/9通过，GitHub三平台执行中 |
+| 描述符发现与多仓库Git | 已修复成功磁盘操作后的发现失效、并发HEAD结果丢失；本机相关browser及真实native边界通过，最终组合三平台复验原断言 |
+| 旧版工作区首次导入 | 24标签恢复后被host关闭的根因已修，保持每leaf 24标签且全布局去重；新增4项区分回归及55项保留测试通过，原生C4-03和最终托管组合待验证 |
+| 当前分支全量功能回归 | 性能按用户要求另列TODO；以当前分支同一SHA使用指定workflow的scope=all验证三平台browser/native，逐项处理非性能失败；Linux保留默认ubuntu-24.04-xvfb执行桌面与原始ubuntu-22.04 release producer，核对原始producer、全部执行及构建身份 |
 | 外部缺口与证据文档 | clickhousecrud源码未提供的TC-IDE-C6-06按既有约定单列；整理最终同SHA回执、截图、构建身份及遗留项，不计缺口为通过 |
 
 HOME混合fixture与用户要求的本机测试产物清理已完成，不列为剩余开发项。
@@ -107,7 +177,7 @@ HOME混合fixture与用户要求的本机测试产物清理已完成，不列为
 - 仓库 `/data-raw-ssd/code-src/person/taomni`，分支 `docs/workspace-platform-redesign`。恢复后已推送至 `80f32c3a174d03328b3c9c220e587cbfc10d2c61` 并运行上述GitHub相关集；后续修正及验证记录见“本轮恢复记录”。`dc33439e`及以下暂停快照属于历史交接状态，不代表当前分支未推送或已验收。
 - 锚定目标：现代、简洁、易用；尽量匹配[设计](./workspace-platform-redesign-design.md)和[原型](./workspace-platform-redesign-prototype.html)，保留 main 的能力。当前重点是文件打开/切换的停顿，不能用局部快了替代整体性能验收。
 - 用户提供的[HOME 性能分析](../docs-issue/workspace-home-file-open-latency-design.md)是修复依据；[实现报告](./workspace-platform-redesign-implementation-report.md)含早先 UI、崩溃及正式性能证据。本节更新于两份文档的早期状态之后。
-- 分支曾合入旧 main，并吸收远程 Compact/HOME 目录加载修复；**本轮相关集全绿后仍需重新 fetch/merge 最新 main**。当前本地 `origin/main` 为 `569d09327f251e123a2d78881585683f85f5b6c1`，未据此冒充远程最新。不要在相关集失败时提前执行下一次 main 合并。
+- 分支历史已吸收远程 Compact/HOME 目录加载修复。本轮按用户最新要求保留当前分支作为开发与验收对象；不再安排main比较。
 
 ## 用户手工测试反馈与验收重点
 
@@ -121,7 +191,7 @@ HOME混合fixture与用户要求的本机测试产物清理已完成，不列为
 | 添加 folder 后要默认显示并展开目录树 | 每次成功添加、第二/第三 root、重复选择、取消、跨工作区迟到结果都要回归；被动切模式不强制改变用户侧栏偏好 |
 | HOME/大目录节点曾显示 empty，目录打开拖慢；默认工作区也要完整文件能力 | 保留按可见层级加载、明确 loading/error/retry、普通文件浏览、排序/列表/包平铺及源码 LSP 能力；不要因优化跳过真实目录或缩减功能 |
 
-上述反馈针对多个先后构建。秒级根因已找到并修过，但最新组合源码尚未无注入验收，不能标记用户的5秒问题已解决。当前自动化门槛为正文/高亮1500ms及完整观察期每帧≤165ms（150ms基准加用户允许的10%容差）；同条件相对 main 不退化还要单独验证。按用户最新补充，GitHub真实HOME模拟场景通过可作为HOME性能验收，不要求用户手工复测作为前置。
+上述反馈针对多个先后构建。秒级根因已找到并修过，但最新组合源码尚未无注入验收，不能标记用户的5秒问题已解决。当前自动化门槛为正文/高亮1500ms及完整观察期每帧≤165ms（150ms基准加用户允许的10%容差）；按用户最新要求不再安排main比较；性能仅保留既有绝对门槛TODO。按用户最新补充，GitHub真实HOME模拟场景通过可作为HOME性能验收，不要求用户手工复测作为前置。
 
 ## 当前正在开发的代码与功能保留范围
 
@@ -139,18 +209,20 @@ HOME混合fixture与用户要求的本机测试产物清理已完成，不列为
 
 此前 UI 实现仍需作为最终功能回归范围：全局与session大预览、Sessions无welcome/旧小预览、分区正确路由、广播选择、很多session tab的滚动/过滤、工具栏过滤与收纳、语音项移除、所有视图顶部窗口拖动、系统目录选择器、工作区terminal右键、单一Git按钮、IDE工具区分隔、工作区文件/session恢复、文件树列表/排序/包平铺以及Agents Crew“开发中”按钮。不要把这些已有实现当作本次组合源码已全量验证；按[用例规范](./workspace-platform-redesign-testcases.md)和实现报告追踪，发现缺失则补用例。
 
-## 已采取的性能对比与诊断措施
+## 历史性能对比与诊断措施
+
+**以下为历史方法和证据。按用户最新要求不再做main比较，四轮比较、基线校验和复用比较binary不属于当前待办或验收前置。性能优化暂列TODO。**
 
 1. **正式比较使用同机原生 release 四轮交错**：`main-1 → candidate-1 → main-2 → candidate-2`。固定main与candidate的完整SHA、相同WebView/1440×900/DPR/数据集/观察器，保留原始二进制及producer identity，不重写identity、不以重新构建版本替换已验收candidate。
 2. 负载包含24个真实PTY、会话创建/切换/回显、完整2MiB终端输出、3,097文件的目录浏览/冷暖展开/滚动、24×64KiB文件、1MiB编辑器及每轮400正式输入键；核验正文、输出序号/字节/SHA、dirty/save/undo/redo、CPU/PSS与关闭后进程清理。
 3. 比较保存所有样本、p50/p95、每轮分布与慢尾；延迟门槛为原有main p95×1.15加噪声（至少20ms，回显至少30ms，并纳入两次main差异）。资源门槛见 `workspace_perf/analyze.py`，不得临时抬高；输入仍受150ms预算约束。
-4. 历史正式比较 [40703223277](https://github.com/engcapa/taomni/actions/runs/40703223277) 已执行且**失败**，candidate=`f6f8d27681e5dae552b03c6d784a074844ee52ad`、baseline=`a57437927b62d6036a6d473eddccc053a4b4c0e8`。会话切换54→402ms、冷工作区951→1540ms、树滚动46→266ms、24终端空闲CPU 0.331→2.139核等有退化；这批历史结果不代表当前候选，最终必须重新正式比较。
+4. 历史正式比较 [40703223277](https://github.com/engcapa/taomni/actions/runs/40703223277) 已执行且**失败**，candidate=`f6f8d27681e5dae552b03c6d784a074844ee52ad`、baseline=`a57437927b62d6036a6d473eddccc053a4b4c0e8`。会话切换54→402ms、冷工作区951→1540ms、树滚动46→266ms、24终端空闲CPU 0.331→2.139核等有退化；这批历史结果不代表当前候选；按最新要求不再安排main比较。
 5. 历史隔离CSS实验确认圆角overflow裁剪造成WebKit高CPU；最终以四角装饰保留9px圆角/边框/阴影，避开整层裁剪破坏viewport弹窗。对照诊断有改善，仍须以新组合源码正式性能验证确认。
 6. 当前本机专项使用独立Xvfb/QA配置。真实输入起点为最早pointerdown/mousedown，不从异步读取完成或dblclick之后起算；保留每帧、正文、高亮、EditorView复用与存储写入耗时，仅记录key/长度、不保存值。
 7. 原生栈/系统调用证明HOME扫描的秒级根因；JSC采样、转发DOM计时分别定位冗余scroll写入、首次focus、重复STYLE、语言/补全重配置和React渲染。干预诊断与无注入标准用例分开；“保留失败继续收样”的脚本末尾主动失败，不拿它通过验收。
 8. 临时size containment、CSSOM插入及detached构造未得到有效整体收益，未保留为性能结论。最近诊断warm切换42–62ms只是定位样本；不是与main匹配的正式比较，也不能抵销冷打开失败或用户仍5秒的反馈。
 
-正式 workflow 为 [qa-workspace-performance.yml](../.github/workflows/qa-workspace-performance.yml)，实现入口在 `.agents/skills/qa-ui-auto/scripts/workspace_perf/`。只在同SHA三平台全量无未接受失败、并合入被固定的main后启动。若workflow尚未出现在默认分支，按现有push入口把同一已验收SHA推到 `qa/workspace-performance/<functional-run-id>`，不能为绕过gate新造一个源码提交。当前gate仅明确白名单三条RDP性能例外；如出现用户允许单列的其他RDP/VNC性能case，先精确扩展例外合同，不能把功能/基础设施失败放入例外。
+原性能workflow与实现入口保留作历史工具，不再调度；不推送`qa/workspace-performance/*`比较分支，也不把main基线或四轮比较作为当前验收前置。
 
 ## 暂停时的真实验证结果
 
@@ -167,18 +239,16 @@ HOME混合fixture与用户要求的本机测试产物清理已完成，不列为
 | 本次077 dry-run | 只证明native语法/verb支持，不含执行receipt，不能算真实用例通过 |
 | 本次匹配QA release | `workspace-deferred-focus-qa-release` 已按暂停要求在Rust编译阶段停止；前端构建及检查通过，新release未构建完成，恢复后需续建。尚未运行本次源码的无注入native性能专项，不要使用上一个构建冒充匹配 |
 
-## 恢复后的待办顺序
+## 当前待办顺序（按用户最新要求）
 
-1. **确认输入与环境**：检查本次提交、远端同分支是否有新提交、`native_build.py --check`及真实QA身份；恢复本任务独立测试桌面，不能操作用户桌面或生产profile。若远端有新代码，先阅读影响，保留现有修复，避免覆盖他人改动。
-2. **先解决当前性能与功能失败**：批量编译一次matching QA release，在独立本机桌面串行运行065/067/073/074/075/076/077，观察真实HOME与公开fixture。确认本次焦点时序、padding、模块改名修复有效；仍超150ms则用原始帧和采样拆解剩余主线程工作，不能靠反复重跑筛慢样本。补查用户实际配置与自动化隔离配置的差异，继续关闭5秒反馈。
-3. **三平台相关集**：推送完整40位SHA，通过 `gh` 调度 `qa-ui-auto-platforms` 的browser/native/release；使用下方已扩充的70条ID选集，包含TREEOPEN-01、078/079和完整10 ID `crash-regression`。修失败、提交推送、重跑并监控原始case结果，直到全部适用相关执行通过。不要只看workflow/job颜色。
-4. **合并main并做受影响回归**：相关集全绿后重新fetch远程main、合入当前分支、解决冲突；重跑冲突/新main影响到的用户功能、相关性能及完整崩溃组；不能只验证能编译。
-5. **三平台全量**：当前组合SHA运行scope=all，检查selection、原始receipt、source/runner/case/build身份与汇总；失败修复后循环。`TC-IDE-C6-06`外部clickhousecrud源码缺口按policy和用户确认单列；只允许RDP/VNC server/client性能失败单列，功能失败必须修。
-6. **正式性能及HOME验收**：相同已全量验证SHA与刚合入的固定main运行四轮比较，重点复查上述10项历史退化及sessions/terminal/file explorer；比较失败则修复，产品源码变化后重新取得对应功能证据再比较。记录平台、profile、数据规模和实际二进制身份；按用户补充，GitHub runner真实HOME大型混合fixture的各类文件、连续tab切换与深层路径全部通过，可关闭该HOME性能验收，无需等待用户手工复测。
+1. **Terminal非性能修复**：完成右边界readline提示符readiness修复；支持回归118通过、1既有编译模式条件skip，catalog/refactor/dev contract通过。匹配QA release已构建；独立桌面024-03移动与024-04一行/两行显式边界、未提交输入非就绪及真实独立输出2/2通过；browser/native完整crash组8/8及9/9均通过，全部回执及附件已核验。
+2. **三平台全量功能回归**：已将`ad9c797fa86a6bddfce84058034ff6a8aa606c86`推到当前分支，通过指定[qa-ui-auto-platforms.yml](../.github/workflows/qa-ui-auto-platforms.yml)启动[41045269719](https://github.com/engcapa/taomni/actions/runs/41045269719)。scope=all、三平台browser/native、QA release，670 ID、2,217次适用执行；尚在执行，不能算通过。核验selection、原始receipt、source/runner/case/build身份及全部非性能断言，处理实际功能失败。最终新组合保留SDK/LSP、目录选择器、多root、恢复/分屏/剪贴板、导航、隐藏面板、macOS菜单、Git及完整适用crash组。
+3. **明确缺口与证据**：TC-IDE-C6-06的外部clickhousecrud源码缺口在三native平台单列，不计通过。全量证据下载到`/tmp`，由report目录链接，避免再次占满工程挂载点；保留原失败，不以分片job颜色替代case结果。
+4. **性能TODO**：停止继续优化和诊断。现有165ms帧、1500ms正文/高亮/动作、SDK五秒及输入门槛不变；全量内若触发性能失败，原始case/workflow仍如实失败，汇总中单列TODO。GitHub真实HOME混合fixture继续保留。**不做main对比，也不以该对比阻塞其余工作。**
 
 ## 恢复命令与执行约束
 
-- Node22路径 `/data/dev/nodejs.backup-20260707-090544/bin`；pnpm10；`CARGO_BUILD_JOBS=2`，本机测试worker总数≤2、native串行。一般browser/native在GitHub跑；用户后续明确授权本机隔离QA release仅用于workspace性能复现。
+- Node22路径 `/data/dev/nodejs.backup-20260707-090544/bin`；pnpm10；`CARGO_BUILD_JOBS=2`，本机测试worker总数≤2、native串行。最终browser/native在GitHub验证；用户已授权本机Linux隔离browser/native相关验证，当前运行功能和崩溃回归。
 - GitHub用已登录的 `gh`；外网命令加 `HTTP_PROXY/HTTPS_PROXY/ALL_PROXY=http://10.1.0.80:3228`。workflow `head`一定用40位SHA；曾错误传短SHA导致checkout失败，不要重复。
 - 系统工具此前已下载并解包到 `qa-ui-auto-report/_local/qa-tools/usr/bin`，无需sudo；`-lgbm`已可解析，没有待用户执行的apt安装要求。重建环境先检查现有工具，不直接重复apt或下载。
 - QA二进制 `src-tauri/target/qa-ui-auto/release/taomni`，身份文件为邻接的 `taomni.qa-identity.json`；本机配置 `_local/workspace-latency-native.yaml`，驱动4544/4545。自动化只用其独立profile/公开fixture，不触碰生产 `/usr/bin/taomni`、生产配置/密码及用户手测QA profile。用户先前要求的QA存储清理已完成，不自动再次清空。
@@ -199,7 +269,7 @@ python3 .agents/skills/qa-ui-auto/scripts/background_job.py start \
 
 本机下一轮专项参数：`--mode native --config qa-ui-auto-report/_local/workspace-latency-native.yaml --filter TC-WS-065,TC-WS-067,TC-WS-073,TC-WS-074,TC-WS-075,TC-WS-076,TC-WS-077 --workers 1 --keep-runs 0 --require-pass`，通过background job传入 `DISPLAY=:190`、`PYTHONPATH=.agents/skills/qa-ui-auto/scripts` 及工具PATH。使用新的report目录，不覆盖原始失败。
 
-本节 `_local/` 均指 `qa-ui-auto-report/_local/`。历史托管65条ID及244次计划保存在 `_local/workspace-virtual-hosted-case-ids.txt`、`_local/workspace-virtual-hosted-plan.json`；本轮已扩为70 ID，保存在 `_local/workspace-resumed-hosted-case-ids.txt`，含TREEOPEN-01、078、079和受影响剪贴板入口，dispatch前重新plan；若临时目录已清理，从40854331480的selection artifact重建。GitHub参数保持 `scope=selected`、三平台、browser/native、`native_release=true`、`browser_workers=1`、`shards=auto`、`publish_issues=false`。全量与四轮性能均不能用该selected计划替代。
+本节 `_local/` 均指 `qa-ui-auto-report/_local/`。历史托管65条ID及244次计划保存在 `_local/workspace-virtual-hosted-case-ids.txt`、`_local/workspace-virtual-hosted-plan.json`；本轮已扩为70 ID，保存在 `_local/workspace-resumed-hosted-case-ids.txt`，含TREEOPEN-01、078、079和受影响剪贴板入口，dispatch前重新plan；若临时目录已清理，从40854331480的selection artifact重建。GitHub参数保持 `scope=selected`、三平台、browser/native、`native_release=true`、`browser_workers=1`、`shards=auto`、`publish_issues=false`。全量不能用该selected计划替代；main比较已取消，不再调度四轮性能。
 
 关键本机原件：`_local/workspace-profiler-baseline/combined-native-stack-02.txt`及04/06/08为秒级扫描栈；`workspace-cold-init-diagnostic/run-20261029-180422-204114234/`为转发诊断，077中 `diagnostic-focus-geometry.json`有700.5/700px原始几何；`workspace-deferred-focus-hypothesis/run-20261029-181431-841227501/`仅是假设验证。`_local/profile_workspace_*.py`均为ignored临时诊断，不是标准runner或产品依赖。
 
@@ -559,7 +629,7 @@ passed（Node 22、最多 2 workers）。`TC-WS-025` 增加隐藏 Home 后保留
 历史分区再进入 workspace 的实际流程。保留并选择 064–071 性能、034 外观、
 010/024 工具条、弹层、终端移动原生回归与完整 crash-regression；正文、高亮、
 每帧 150ms、1500ms 就绪预算及真实 View 身份不变。本机未运行 browser/native，
-本轮托管结果待收集；最终 main 对比和全量门禁仍未完成。
+当时托管结果尚待收集。按用户最新要求，main对比已取消；当前仅继续本分支全量功能验收，性能列TODO。
 
 ## 面包屑、关闭弹窗与最近记录的订阅边界
 
@@ -726,7 +796,7 @@ JSON冷开245ms；最长帧152/197ms仍失败。上述仅用于定位，正式�
 自动模型成功响应与独立终端输出；同时选取原Maven Run/Build/Tests原生
 用例及多语言工具配置browser用例，保留功能回归边界。076的fixture、catalog、
 policy、schema和依赖同步登记。正在推进新SHA托管相关集与完整崩溃组；
-冷打开长帧仍在修复中，相关集通过前不合并main。
+冷打开长帧仍在修复中，相关集通过后继续当前分支全量验收。
 
 ## 外观样式与大目录渲染（2026-10-29 本机 QA release）
 

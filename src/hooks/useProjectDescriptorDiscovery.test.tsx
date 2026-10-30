@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { WorkspaceEntry, WorkspaceFile, WorkspaceTreeLoadResult } from "../lib/editor/workspace";
 import { workspaceListDir, workspaceListFilesRecursive, workspaceReadFile } from "../lib/editor/workspace";
 import { useProjectDescriptorDiscovery } from "./useProjectDescriptorDiscovery";
+import { notifyWorkspaceFilesChanged } from "../lib/editor/workspace/changes";
 
 vi.mock("../lib/editor/workspace", () => ({
   workspaceListDir: vi.fn(),
@@ -43,12 +44,66 @@ afterEach(() => {
 });
 
 beforeEach(() => {
+  vi.resetAllMocks();
   vi.mocked(workspaceListDir).mockResolvedValue(ready([]));
   listFilesMock.mockResolvedValue(ready([]));
   readFileMock.mockResolvedValue(file("", ""));
 });
 
 describe("useProjectDescriptorDiscovery", () => {
+  it("discovers a newly created descriptor and its saved content without scanning ordinary edits", async () => {
+    const { result, unmount } = renderHook(() => useProjectDescriptorDiscovery("/public", {
+      autoRefresh: true, autoScope: "root",
+    }));
+    await waitFor(() => expect(result.current.status).toBe("unresolved"));
+    act(() => notifyWorkspaceFilesChanged("/public", ["README.txt"]));
+    act(() => notifyWorkspaceFilesChanged("/other", ["pom.xml"]));
+    expect(workspaceListDir).toHaveBeenCalledTimes(1);
+    vi.mocked(workspaceListDir).mockResolvedValue(ready([entry("pom.xml", "pom.xml")]));
+    readFileMock.mockResolvedValue(file("pom.xml", "<project><artifactId>created</artifactId></project>"));
+    act(() => notifyWorkspaceFilesChanged("/public", ["pom.xml"]));
+    await waitFor(() => expect(result.current.discovery?.descriptors[0]?.name).toBe("created"));
+    readFileMock.mockResolvedValue(file("pom.xml", "<project><artifactId>saved</artifactId></project>"));
+    act(() => notifyWorkspaceFilesChanged("/public", ["pom.xml"]));
+    await waitFor(() => expect(result.current.discovery?.descriptors[0]?.name).toBe("saved"));
+    expect(listFilesMock).not.toHaveBeenCalled();
+    unmount();
+    act(() => notifyWorkspaceFilesChanged("/public", ["pom.xml"]));
+    expect(workspaceListDir).toHaveBeenCalledTimes(3);
+  });
+
+  it("invalidates removed descriptor directories and rejects late reads after changing roots", async () => {
+    listFilesMock.mockResolvedValue(ready([entry("pom.xml", "module/pom.xml")]));
+    readFileMock.mockResolvedValue(file("module/pom.xml", "<project><artifactId>nested</artifactId></project>"));
+    const { result, rerender } = renderHook(({ root }) => useProjectDescriptorDiscovery(root, {
+      autoRefresh: true, autoScope: "recursive",
+    }), { initialProps: { root: "/public" } });
+    await waitFor(() => expect(result.current.status).toBe("descriptor-only"));
+    let finish!: (value: WorkspaceTreeLoadResult<WorkspaceEntry>) => void;
+    listFilesMock.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    act(() => notifyWorkspaceFilesChanged("/public", ["module"]));
+    expect(result.current.status).toBe("loading");
+    listFilesMock.mockResolvedValue(ready([]));
+    rerender({ root: "/next" });
+    await waitFor(() => expect(result.current.status).toBe("unresolved"));
+    await act(async () => finish(ready([entry("pom.xml", "module/pom.xml")])));
+    expect(result.current.discovery?.descriptors).toHaveLength(0);
+  });
+
+  it("matches Windows descriptor mutations while hidden workspaces stay idle", async () => {
+    const { result, rerender } = renderHook(({ visible }) => useProjectDescriptorDiscovery("C:\\Public", {
+      autoRefresh: visible, autoScope: "root",
+    }), { initialProps: { visible: false } });
+    act(() => notifyWorkspaceFilesChanged("c:\\public", ["Cargo.toml"]));
+    expect(workspaceListDir).not.toHaveBeenCalled();
+    vi.mocked(workspaceListDir).mockResolvedValue(ready([entry("Cargo.toml", "Cargo.toml")]));
+    readFileMock.mockResolvedValue(file("Cargo.toml", '[package]\nname = "public"\nversion = "1.0.0"'));
+    rerender({ visible: true });
+    await waitFor(() => expect(result.current.status).toBe("descriptor-only"));
+    act(() => notifyWorkspaceFilesChanged("c:\\public", ["Cargo.toml"]));
+    await waitFor(() => expect(workspaceListDir).toHaveBeenCalledTimes(2));
+  });
+
   it("inspects ordinary folder descriptors without a recursive scan and retains full manual refresh", async () => {
     vi.mocked(workspaceListDir).mockResolvedValue(ready([
       entry("package.json", "package.json"), entry("notes.txt", "notes.txt"),

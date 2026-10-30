@@ -2,6 +2,8 @@ import { useAppStore } from "../stores/appStore";
 import { DEFAULT_WORKSPACE_ID, useWorkspacePlatformStore } from "../stores/workspacePlatformStore";
 import { newWorkspaceInstanceId, recentWorkspaceIdFromParts, rootIdForPath, workspacePathName } from "../stores/app/recentWorkspaces";
 import type { CodeWorkspaceTabInfo } from "../types";
+import { fileRefFromFileKey, readWorkspaceLayoutSnapshot } from "../components/editor/workspace/workspaceLayoutPersistence";
+import { workspaceEditorInstanceId } from "./workspaceRuntimeIdentity";
 
 /** All editor entry points belong to Workspaces, including restored Sessions tabs. */
 export function openPlatformCodeWorkspace(info: CodeWorkspaceTabInfo): string {
@@ -30,6 +32,20 @@ export function openPlatformCodeWorkspace(info: CodeWorkspaceTabInfo): string {
         looseFiles,
       },
     });
+    // A legacy recent/Sessions entry has no outer file tabs yet. Register its
+    // saved layout before the host reconciles, or it treats every restored
+    // background/split tab as an external close. Existing platform workspaces
+    // already own their file list, including closes interrupted by a reload.
+    const snapshot = readWorkspaceLayoutSnapshot(workspaceEditorInstanceId(workspace));
+    if (snapshot) {
+      const keys = new Set(Object.values(snapshot.editorGroups).flatMap((group) => group.openOrder));
+      const files = [...keys].flatMap((key) => {
+        const ref = fileRefFromFileKey(key);
+        return ref?.kind === "root" && roots.some((root) => root.id === ref.rootId)
+          ? [{ rootId: ref.rootId, path: ref.path }] : [];
+      });
+      if (files.length) store.syncWorkspaceFiles(workspace.id, files);
+    }
   } else if (hasProject && !workspace.codeWorkspace) {
     const existingFolders = workspace.rootFolders;
     const mappedRoots = roots.map((root) => ({

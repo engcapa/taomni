@@ -26,8 +26,14 @@ interface CommandResult {
  * are opened as isolated workspace instances, never in Sessions mode.
  */
 export function GlobalCommandModal() {
-  const t = useT();
   const open = useWorkspaceUiStore((s) => s.globalSearchOpen);
+  return open ? <OpenGlobalCommandModal /> : null;
+}
+
+// Keep the search index and its data subscriptions with the visible dialog.
+// Opening takes fresh store snapshots; closing releases listeners and focus work.
+function OpenGlobalCommandModal() {
+  const t = useT();
   const close = useWorkspaceUiStore((s) => s.closeGlobalSearch);
   const openSessionPicker = useWorkspaceUiStore((s) => s.openSessionPicker);
   const workspaces = useWorkspacePlatformStore((s) => s.workspaces);
@@ -43,12 +49,9 @@ export function GlobalCommandModal() {
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    if (!open) return;
-    setQuery("");
-    setActiveIndex(0);
     const timer = window.setTimeout(() => inputRef.current?.focus(), 0);
     return () => window.clearTimeout(timer);
-  }, [open]);
+  }, []);
 
   const results = useMemo<CommandResult[]>(() => {
     const list: CommandResult[] = [];
@@ -173,7 +176,6 @@ export function GlobalCommandModal() {
   // Escape must close the palette even when focus left the dialog (e.g. after a
   // native click or a fill that did not refocus the input).
   useEffect(() => {
-    if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       event.preventDefault();
@@ -181,9 +183,7 @@ export function GlobalCommandModal() {
     };
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
-  }, [close, open]);
-
-  if (!open) return null;
+  }, [close]);
 
   const runResult = (result: CommandResult | undefined) => {
     if (!result) return;
