@@ -43,13 +43,13 @@ export function useMainMenuBridge(context: UseMainMenuBridgeContext) {
     dispatchMenuActionRef.current = dispatchMenuAction;
   }, [dispatchMenuAction]);
 
-  // Build + install the macOS global menu. Rebuilt whenever a piece of state
-  // shown in the menu changes (checkmarks, enabled state) — all low-frequency,
-  // so a full rebuild is simpler and cheaper than mutating individual items.
+  // Command publications also carry caret/provider state. Only visible menu
+  // changes reach AppKit; the installer patches flags on existing resources.
   useEffect(() => {
     if (!nativeMenu) return;
     let cancelled = false;
     let previous: { registration: WorkspaceCommandRegistration | null; closable: boolean } | undefined;
+    let previousSpec: string | undefined;
     const refresh = () => {
       const registration = getActiveWorkspaceCommands();
       const workspace = useWorkspacePlatformStore.getState().getWorkspace();
@@ -65,8 +65,19 @@ export function useMainMenuBridge(context: UseMainMenuBridgeContext) {
         workspaceCommands: registration?.items ?? [],
         t,
       });
+      const serialized = JSON.stringify(spec);
+      if (serialized === previousSpec) return;
+      previousSpec = serialized;
       void installAppMenu(spec, (action) => dispatchMenuActionRef.current(action)).catch((err) => {
-        if (!cancelled) console.error("Failed to install application menu", err);
+        if (!cancelled) {
+          // A failed attempt must not suppress the next publication's retry.
+          // An obsolete failure cannot invalidate a newer requested spec.
+          if (previousSpec === serialized) {
+            previous = undefined;
+            previousSpec = undefined;
+          }
+          console.error("Failed to install application menu", err);
+        }
       });
     };
     refresh();

@@ -184,6 +184,7 @@ loopback HTTP to the real updater. Only the disposable report-owned app is repla
 | Verb | Arguments | Behavior |
 |---|---|---|
 | `native_about` | `null` | macOS QA bridge activates the installed AppKit NSMenu About item; requires enabled real menu and runs its native event/frontend callback. Does not synthesize app state or a command. |
+| `native_menu` | `{path: [zero-based indices] \| action: id, enabled?, checked?, activate?}` | macOS QA only. An action id locates its path in the current installed menu specification; the actual flags and activation always use AppKit NSMenu. Saves every native observation. Requires enabled or checked; activation additionally requires enabled=true and an actual enabled leaf. Sends one native activation, with no retry of uncertain delivery. Does not enumerate Tauri resource wrappers or synthesize renderer state. |
 | `updater_fixture_mode` | `broken \| correct \| slow` | Switches the fixture manifest, not application state. `broken` pairs ARM signature with Intel URL; `correct` retains generated per-arch URLs; `slow` holds first/second streams at 20%/60%. |
 | `updater_release` | `1 \| 2` | Releases one held real HTTP download; does not synthesize IPC progress. |
 | `assert_updater_installed` | `aarch64 \| x86_64` | Independently reads installed executable SHA256, `lipo` architecture and Info.plist version against the authentic archive; retains installed-*.json. |

@@ -8,7 +8,10 @@ import type { WorkspaceCommandRegistration } from "../../components/editor/works
 import { buildAppMenuSpec, installAppMenu } from "../../lib/nativeAppMenu";
 import { useWorkspaceCommandRegistry } from "./useWorkspaceCommandRegistry";
 
-vi.mock("../../lib/nativeAppMenu", () => ({ buildAppMenuSpec: vi.fn(), installAppMenu: vi.fn() }));
+vi.mock("../../lib/nativeAppMenu", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../lib/nativeAppMenu")>();
+  return { ...actual, buildAppMenuSpec: vi.fn(actual.buildAppMenuSpec), installAppMenu: vi.fn() };
+});
 
 beforeEach(() => {
   localStorage.clear();
@@ -131,4 +134,62 @@ it("refreshes native close state and active command owner without a shell render
   const calls = vi.mocked(buildAppMenuSpec).mock.calls.length;
   act(() => platform.closeWorkspaceTab(workspace.id, fileId));
   expect(buildAppMenuSpec).toHaveBeenCalledTimes(calls);
+});
+
+it("ignores command publications that do not change any visible native menu state", () => {
+  vi.mocked(installAppMenu).mockResolvedValue(undefined).mockClear();
+  const { result } = renderHook(() => {
+    const registry = useWorkspaceCommandRegistry();
+    useMainMenuBridge({
+      dispatchMenuAction: vi.fn(), nativeMenu: true, activeTabClosable: false,
+      importExport: { hasSessions: false } as UseMainMenuBridgeContext["importExport"],
+      quickConnectVisible: false,
+      getActiveWorkspaceCommands: () => registry.workspaceCommandRegistrationsRef.current.active ?? null,
+      subscribeWorkspaceCommands: registry.subscribeWorkspaceCommands,
+      t: ((key: string) => key) as UseMainMenuBridgeContext["t"],
+      setActiveTab: vi.fn(), handleCommand: vi.fn(),
+      workspaceCommandRegistrationsRef: registry.workspaceCommandRegistrationsRef,
+    });
+    return registry;
+  });
+  const registration: WorkspaceCommandRegistration = {
+    items: [{ id: "workspace.save", title: "Save", category: "File", enabled: true }],
+    snapshot: [], execute: vi.fn(() => true), executeAction: vi.fn(async () => ({ kind: "applied" as const })),
+  };
+  act(() => result.current.handleWorkspaceCommandsChange("active", registration));
+  const installed = vi.mocked(installAppMenu).mock.calls.length;
+  act(() => result.current.handleWorkspaceCommandsChange("active", {
+    ...registration, items: registration.items.map((item) => ({ ...item })),
+  }));
+  expect(installAppMenu).toHaveBeenCalledTimes(installed);
+  act(() => result.current.handleWorkspaceCommandsChange("active", {
+    ...registration, items: registration.items.map((item) => ({ ...item, enabled: false })),
+  }));
+  expect(installAppMenu).toHaveBeenCalledTimes(installed + 1);
+});
+
+it("retries a failed installation on the next publication with the same visible state", async () => {
+  vi.mocked(installAppMenu).mockClear().mockRejectedValueOnce(new Error("AppKit unavailable"))
+    .mockResolvedValue(undefined);
+  const error = vi.spyOn(console, "error").mockImplementation(() => {});
+  let publish = () => {};
+  const context: UseMainMenuBridgeContext = {
+    dispatchMenuAction: vi.fn(), nativeMenu: true, activeTabClosable: false,
+    importExport: { hasSessions: false } as UseMainMenuBridgeContext["importExport"],
+    quickConnectVisible: false, getActiveWorkspaceCommands: () => null,
+    subscribeWorkspaceCommands: (listener) => { publish = listener; return () => {}; },
+    t: ((key: string) => key) as UseMainMenuBridgeContext["t"],
+    setActiveTab: vi.fn(), handleCommand: vi.fn(), workspaceCommandRegistrationsRef: { current: {} },
+  };
+  try {
+    renderHook(() => useMainMenuBridge(context));
+    await act(async () => {});
+    expect(installAppMenu).toHaveBeenCalledTimes(1);
+    act(() => publish());
+    await act(async () => {});
+    expect(installAppMenu).toHaveBeenCalledTimes(2);
+    expect(error).toHaveBeenCalledWith("Failed to install application menu", expect.any(Error));
+  } finally {
+    error.mockRestore();
+  }
 });

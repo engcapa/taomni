@@ -4,7 +4,9 @@
 
 ## 本轮恢复记录（持续更新）
 
-- `a133d636ca41599654fc27de81ff17ba5b2f5ab6` 的 GitHub [40991754886](https://github.com/engcapa/taomni/actions/runs/40991754886) 已核验263次执行：**256 passed / 7 failed / 0 skipped**、与selection完全一致。三平台browser各43/43，Linux native46/46、Windows44/44；macOS37/44，061恢复、062/063打开普通文件动作超时，065/069/073/075长帧174/175/171/189ms。Linux57观察点3,540帧最大157ms，真实SDK三场景均通过；仍不能验收整体性能。macOS桥接记录显示JS执行多为0–1ms，但请求至renderer开始及无JS操作的HTTP返回也有数百毫秒延误，继续诊断，不扣除预算。
+- `06298dc33f977c72dae34ce05ed7ea3557c931f1` 的 macOS 诊断 [40997186885](https://github.com/engcapa/taomni/actions/runs/40997186885) 已收齐并核验25次执行：18 passed / 7 failed / 0 skipped，与selection一致；browser9/9、native9/16。065/069/075按诊断规则主动拒绝验收通过；061/062打开源码分别2788.3/4444.8ms、063恢复约1500.1ms、073冷notes帧191.9999999999991ms，原件保留。采样发现macOS主线程反复创建/替换/释放Tauri菜单，但061主线程大部分空闲，073长帧内也没有同量级已捕获DOM调用，不能称菜单已解释全部超时。
+- 本轮针对菜单重复工作：语义相同的可见spec不再安装；完整创建/替换进入同一串行owner，过期排队版本不创建原生资源；enabled/checked变化原位更新，保留Tauri 2.12显式resource和action channel，失败回滚并允许下次publication重试。纯spec类型、builder和有副作用installer分为三个有明确输入/输出的模块，保持原facade API，避免反向依赖。回归24项及QA工具40项通过；新增macOS原生080通过真实NSMenu检查flags、Save写盘、Close、Quick Connect、About和reload后的回调，已注册schema/policy/dependencies。080本机Linux不适用，真实macOS执行和无诊断性能验证仍待GitHub，不据支持测试宣称提速。
+- `a133d636ca41599654fc27de81ff17ba5b2f5ab6` 的 GitHub [40991754886](https://github.com/engcapa/taomni/actions/runs/40991754886) 已核验263次执行：**256 passed / 7 failed / 0 skipped**、与selection完全一致。三平台browser各43/43，Linux native46/46、Windows44/44；macOS37/44，061恢复、062/063打开普通文件动作超时，065/069/073/075长帧174/175/171/189ms；075慢帧发生于打开notes，首个source观察最大102ms。Linux57观察点3,540帧最大157ms，真实SDK三场景均通过；仍不能验收整体性能。macOS桥接记录显示JS执行多为0–1ms，但请求至renderer开始及无JS操作的HTTP返回也有数百毫秒延误，继续诊断，不扣除预算。
 - 同source=`6fd0e5565fde811a95a04920cc15ace5460b01a5b58255dc943c1fef045b1c33`、runner=`9256b1d538f3a9f2e1426fe683e76a700d8ac36d0bd3d6b50c7c386bb3372516` 的本机支持测试392项、Rust桥接3项、refactor、完整前端构建通过；标准browser19/19（40点2,531帧最大146.1ms）、matching release native23/23及完整适用crash组通过。binary SHA=`7c3e02498ce11459951dcd7582d359cbdfb383ff8bf5306dd3246b9ef024f1b1`。新增默认关闭的原生任务/布局转发诊断；配置绑定conditions摘要，诊断用例不能被记为验收通过，后续正常性能运行必须关闭。
 - `37cc6ff364a2f5fcaf3f1d42d18c630f8c9d1a2b` 的 GitHub [40986096085](https://github.com/engcapa/taomni/actions/runs/40986096085) 已结束并核验263次执行：**256 passed / 7 failed / 0 skipped**，与selection完全一致。三平台browser各43/43、Windows native44/44、Linux45/46、macOS38/44。保留Linux075的168ms，以及macOS061动作、068/070/073/079长帧和Maven终端未出现BUILD FAILURE的原始失败；不因后续某分片通过而改写旧报告。
 - 新组合[40987880102](https://github.com/engcapa/taomni/actions/runs/40987880102)已核验263次执行：256 passed / 7 failed / 0 skipped，三平台browser各43/43、Linux native45/46、macOS38/44、Windows44/44。Linux074深层长行JSON为175ms；macOS061/062动作1681.6/1506.5ms，066/070/073/074长帧分别175.9999999999991/197/190/188ms，均未达验收。macOS061正文已在动作约595ms出现，但一次只读execute耗时1309ms且期间渲染heartbeat多数16–20ms；新增QA桥接排队/JS执行/回调时间戳用于分清该边界，原1500ms判定不变。
@@ -108,7 +110,8 @@
 | --- | --- |
 | SDK/LSP生命周期 | 已实现；本机061–063真实SDK场景通过，托管macOS061/062仍有动作超时；最终三平台保留真实错误、手动刷新、取消/重试、迟到响应及文档队列顺序 |
 | 多root与系统选择器 | 已实现；最终三平台确认第二/第三root、重复选择、取消、跨工作区迟到结果和成功后展开Project |
-| 编辑器与崩溃保留契约 | 当前392项支持测试通过；最终同SHA验证dirty/save、undo/redo、恢复、分屏、剪贴板、树焦点、Page导航、隐藏面板及完整适用crash组 |
+| 编辑器与崩溃保留契约 | 先前组合392项支持测试通过；最终同SHA验证dirty/save、undo/redo、恢复、分屏、剪贴板、树焦点、Page导航、隐藏面板及完整适用crash组 |
+| macOS应用菜单生命周期 | 当前消除重复原生菜单工作；最终080验证真实enabled/checked更新、保存、关闭、勾选项及reload后About回调，不能只用mounted mock证明AppKit行为 |
 | 当前分支全量回归 | 相关集全绿后，以当前分支同一SHA使用指定workflow的scope=all验证三平台browser/native，核对全部执行及构建身份 |
 | 外部缺口与证据文档 | clickhousecrud源码未提供的TC-IDE-C6-06按既有约定单列；整理最终同SHA回执、截图、构建身份及遗留项，不计缺口为通过 |
 
@@ -183,7 +186,7 @@ HOME混合fixture与用户要求的本机测试产物清理已完成，不列为
 
 1. **确认输入与环境**：检查本次提交、远端同分支是否有新提交、`native_build.py --check`及真实QA身份；恢复本任务独立测试桌面，不能操作用户桌面或生产profile。若远端有新代码，先阅读影响，保留现有修复，避免覆盖他人改动。
 2. **先解决当前性能与功能失败**：需要本机复现时批量编译一次matching QA release，在独立桌面串行运行受影响专项，观察真实HOME与公开fixture。按用户最新口径，每帧超过165ms则用原始帧和采样拆解剩余主线程工作；正文/高亮/动作1500ms、SDK五秒及输入p95不变，不能靠反复重跑筛慢样本。补查实际配置与自动化隔离配置的差异，继续关闭5秒反馈。
-3. **三平台相关集**：推送完整40位SHA，通过 `gh` 调度 `qa-ui-auto-platforms` 的browser/native/release；当前72条ID选集包含TREEOPEN-01、078/079和完整10 ID `crash-regression`，以本轮selection记录为准。修失败、提交推送、重跑并监控原始case结果，直到全部适用相关执行通过。不要只看workflow/job颜色。
+3. **三平台相关集**：推送完整40位SHA，通过 `gh` 调度 `qa-ui-auto-platforms` 的browser/native/release，关闭`workspace_stage_trace`；原72条ID选集加macOS原生080，保留TREEOPEN-01、078/079和完整10 ID `crash-regression`，以本轮selection记录为准。修失败、提交推送、重跑并监控原始case结果，直到全部适用相关执行通过。不要只看workflow/job颜色。
 4. **三平台全量**：当前分支同一SHA运行scope=all，检查selection、原始receipt、source/runner/case/build身份与汇总；失败修复后循环。`TC-IDE-C6-06`外部clickhousecrud源码缺口按policy和用户确认单列；只允许RDP/VNC server/client性能失败单列，功能失败必须修。
 5. **正式性能及HOME验收**：相同已全量验证SHA与固定main基线运行四轮比较，重点复查上述10项历史退化及sessions/terminal/file explorer；比较失败则修复，产品源码变化后重新取得对应功能证据再比较。记录平台、profile、数据规模和实际二进制身份；按用户补充，GitHub runner真实HOME大型混合fixture的各类文件、连续tab切换与深层路径全部通过，可关闭该HOME性能验收，无需等待用户手工复测。
 

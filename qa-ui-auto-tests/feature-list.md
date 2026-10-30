@@ -628,6 +628,9 @@ files:
   - src/components/tabbar/ControlBar.tsx
   - src/components/ContextMenu.tsx
   - src/components/AboutDialog.tsx
+  - src/lib/nativeAppMenu.ts
+  - src/lib/nativeAppMenuInstaller.ts
+  - src/lib/nativeAppMenuSpec.ts
 controls:
   - id: about-check-update
     selector: '[data-testid="about-check-update"]'

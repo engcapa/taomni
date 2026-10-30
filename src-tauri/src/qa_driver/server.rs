@@ -91,6 +91,10 @@ pub fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, host: Stri
                 post(native_about::<R>),
             )
             .route(
+                "/session/{session_id}/qa/application-menu",
+                post(super::application_menu::application_menu::<R>),
+            )
+            .route(
                 "/session/{session_id}/window/handles",
                 get(super::windows::handles::<R>),
             )
