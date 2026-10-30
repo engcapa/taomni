@@ -6,11 +6,11 @@ import { BOTTOM_DOCK_MIN_HEIGHT, type BottomDockTab } from "../panels/BottomDock
 import { MoreToolWindowsButton, type ToolWindowRailItem } from "../panels/ToolWindowRail";
 import { ToolWindowPane, ToolWindowSlot, ToolWindowSplitArea } from "../panels/ToolWindowHost";
 import { TOOL_WINDOW_ANCHORS, TOOL_WINDOW_ANCHOR_LABELS, anchorSide, type ToolWindowAnchor } from "../toolWindowLayout";
-import type { WorkspaceHostIntegration } from "../workspaceHostIntegration";
+import type { WorkspaceHostPresentation } from "../workspaceHostIntegration";
 import type { ToolWindowContent } from "../panels/toolWindowContent";
 
 export interface CreateToolWindowChromeContext {
-  host?: WorkspaceHostIntegration | null;
+  host?: WorkspaceHostPresentation | null;
   toolWindowContents: ToolWindowContent[];
   toolWindowLayout: import("../useToolWindowLayout").ToolWindowLayoutController;
   currentBottomDockHeight: number;

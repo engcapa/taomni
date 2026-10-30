@@ -14,27 +14,30 @@ import { useWorkspaceSurfaceComposition } from "./workspace/hooks/useWorkspaceSu
 import { useWorkspaceSurfaceState } from "./workspace/hooks/useWorkspaceSurfaceState";
 import { createWorkspaceShellProps } from "./workspace/views/createWorkspaceShellProps";
 import { WorkspaceShellView } from "./workspace/views/WorkspaceShellView";
-import { WorkspaceHostContext } from "./workspace/workspaceHostIntegration";
-import { useWorkspaceHostFiles } from "./workspace/hooks/useWorkspaceHostFiles";
+import { WorkspaceHostContext, WorkspaceHostRequestContext, useWorkspaceHostPresentation } from "./workspace/workspaceHostIntegration";
+import { WorkspaceHostFilesBridge } from "./workspace/views/WorkspaceHostFilesBridge";
 
 // Context/command publications also refresh the host chrome. They must not
 // re-render the entire editor when its inputs did not change; the runtime's
 // own store and context subscriptions continue to deliver real updates.
 export const CodeWorkspaceTab = memo(function CodeWorkspaceTab(props: CodeWorkspaceTabProps) {
-  return <WorkspaceHostContext.Provider value={props.hostIntegration ?? null}>
-    <CodeWorkspaceRuntime {...props} />
-  </WorkspaceHostContext.Provider>;
+  const { hostIntegration, ...runtime } = props;
+  const presentation = useWorkspaceHostPresentation(hostIntegration);
+  return <WorkspaceHostRequestContext.Provider value={hostIntegration ?? null}>
+    <WorkspaceHostContext.Provider value={presentation}>
+      <CodeWorkspaceRuntime {...runtime} />
+    </WorkspaceHostContext.Provider>
+  </WorkspaceHostRequestContext.Provider>;
 });
 
-function CodeWorkspaceRuntime({
+const CodeWorkspaceRuntime = memo(function CodeWorkspaceRuntime({
   tabId,
   workspace,
   visible = true,
   onOpenGitManager,
   onSyncGitManager,
   onCommandsChange,
-  hostIntegration,
-}: CodeWorkspaceTabProps) {
+}: Omit<CodeWorkspaceTabProps, "hostIntegration">) {
   const session = useWorkspaceSession({
     workspace,
     tabId,
@@ -117,7 +120,6 @@ function CodeWorkspaceRuntime({
     editorFeatures,
     commands,
   });
-  useWorkspaceHostFiles({ host: hostIntegration, session, project, files, editing });
   const executionRuntime = useWorkspaceExecutionRuntime({
     editing,
     session,
@@ -160,7 +162,10 @@ function CodeWorkspaceRuntime({
     visible,
     onOpenGitManager,
   });
-  return <WorkspaceShellView {...shell.shellProps} />;
-}
+  return <>
+    <WorkspaceHostFilesBridge key={session.workspaceInstanceId} session={session} project={project} files={files} editing={editing} />
+    <WorkspaceShellView {...shell.shellProps} />
+  </>;
+});
 
 export { debugCurrentLineForFile,extractContextSnippet,isDeclarationDefinitionEquivalentLanguage,type CodeWorkspaceGitManagerPayload } from "./workspace/controller/model";

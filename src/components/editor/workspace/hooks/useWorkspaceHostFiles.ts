@@ -11,7 +11,7 @@ import { useWorkspaceHostCanvas } from "./useWorkspaceHostCanvas";
 type Session = ReturnType<typeof useWorkspaceSession>;
 type Project = ReturnType<typeof useWorkspaceProjectRuntime>;
 
-interface Dependencies {
+export interface WorkspaceHostFilesDependencies {
   host?: WorkspaceHostIntegration;
   session: Pick<Session, "workspaceInstanceId" | "mountedRef" | "workspaceUi" | "setStatusMessage"> & {
     bufferState: Pick<Session["bufferState"], "openFilesRef" | "lspFilesRef">;
@@ -36,7 +36,7 @@ function publishSnapshot(host: WorkspaceHostIntegration, workspaceInstanceId: st
 }
 
 /** Host requests share the editor's normal buffer, close, recovery and LSP owners. */
-export function useWorkspaceHostFiles(dependencies: Dependencies) {
+export function useWorkspaceHostFiles(dependencies: WorkspaceHostFilesDependencies) {
   const { host, session, project, files } = dependencies;
   const live = useRef(dependencies);
   live.current = dependencies;
