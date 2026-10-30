@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { CodeWorkspaceRootInfo } from "../../../../types";
 import { TextInputDialog } from "../../../sidebar/ConfirmDialog";
 import { AutoImportCandidateDialog } from "../AutoImportCandidateDialog";
@@ -27,7 +28,7 @@ export interface WorkspaceGenerationPopupsProps {
   refactoring: ReturnType<typeof useSymbolRefactoring>;
 }
 
-export function WorkspaceGenerationPopups(props: WorkspaceGenerationPopupsProps) {
+export const WorkspaceGenerationPopups = memo(function WorkspaceGenerationPopups(props: WorkspaceGenerationPopupsProps) {
   const {
     newJavaClassDialogState,
     setNewJavaClassDialogState,
@@ -97,4 +98,14 @@ export function WorkspaceGenerationPopups(props: WorkspaceGenerationPopupsProps)
       </div>
     )}
   </>);
+}, (previous, next) => generationPopupsClosed(previous) && generationPopupsClosed(next));
+
+/** Closed owners stay mounted; every open/close transition still renders. */
+function generationPopupsClosed(props: WorkspaceGenerationPopupsProps): boolean {
+  return props.newJavaClassDialogState === null
+    && !props.fileTemplateSettingsOpen
+    && !props.autoImportSettingsOpen
+    && props.autoImportCandidatePrompt === null
+    && !props.workspaceUndoConfirmOpen
+    && !props.refactoring.extractNamingPrompt;
 }

@@ -4,6 +4,9 @@
 
 ## 本轮恢复记录（持续更新）
 
+- `71811a4af2d1f4b965850b908607c23e263058ba` 的 GitHub [41013510946](https://github.com/engcapa/taomni/actions/runs/41013510946) 已收齐并核验309次执行、18份回执与9611个附件：**307 passed / 2 failed / 0 skipped**，与88 ID选集逐项一致、无缺失和能力缺口。Linux/Windows browser各56/56，macOS55/56，073 HTML冷开173.0999999998603ms失败；Linux native47/48，075源码冷开170ms失败；Windows47/47、macOS46/46，SDK061–063、真实HOME文档074、TREE-01分屏就绪、macOS菜单080与完整适用crash组均通过。尚未启动全量或正式比较。
+- 相同产品源码的本机标准browser `workspace-popup-browser/run-20261030-141442-623226464` **32/32通过**，40个观察点保留2532帧、最大134.69999998807907ms；matching release native `workspace-popup-native/run-20261030-144318-256119455` **25/26通过**，唯一079 HTML冷开174ms失败。HOME074最大161ms、源码075最大154ms；binary SHA=`2a8ea575c16042b58060455708bb9f9bedf94550ff40a41306efc6c4fec84c5e`。两批回执、附件及输入身份已核验；runner为补崩溃名单前的657e身份，不冒充71811的0d80身份。原始失败不回写或原样筛绿。
+- macOS073的CPU采样仍有约13.6ms关闭的Generation弹层渲染，整体同步React提交与布局/GC叠加。现只在代码生成/模板组前后都关闭时跳过无关props更新；六种打开入口、关闭清理、重开后的当前回调、模板持久化、撤销焦点、迟到导入候选与实时项目事实均保留。新增挂载回归改前1失败/5通过，修后连同既有设置/弹层组合6文件29项通过。此内部memo优化沿用C8-01/02/05/06/07、007-01/03/04、064–079和完整crash入口，不新增同义YAML；实际性能收益待新源码browser/native和GitHub验证。`workspace-source-stage-diagnostic/run-20261030-150044-337500080`为明确失败的转发诊断，不能作为验收通过。
 - `2fb88b24723d654e70478ee4398f68af4af41443` 的 GitHub [41012953201](https://github.com/engcapa/taomni/actions/runs/41012953201) 在计划前的crash-regression契约测试失败，尚未执行UI用例。原因是新增Code Style崩溃用例后，固定崩溃名单和smoke名单未同步；本轮补齐两处，并明确该新增用例的browser范围，保留三平台native原有全部崩溃用例及实际失败门禁。这是测试契约补齐，不改变产品源码、测量脚本或性能阈值；原始失败保留。
 - `bc75d8567926520038c66177aa1a45ada4557549` 的 GitHub [41007654861](https://github.com/engcapa/taomni/actions/runs/41007654861) 已收齐并核验273次执行、18份回执及6508个附件：**270 passed / 3 failed / 0 skipped**，与完整75 ID的selection一致，无能力缺口。三平台browser各45/45、Windows native45/45；Linux native45/47，074/075长帧分别165.00000000000364/173ms，保持原始失败；macOS native45/46，TREE-01在分屏容器出现后立即读到1个编辑器。失败捕获随后已有两个实际EditorView和原文件正文，现仅为此用例增加第二pane的内容就绪条件，保留恰好2个编辑器的原断言并补第二pane正文与运行时错误断言，不放宽性能预算。072重载和074树指针功能在三平台均通过，SDK061–063、macOS原生菜单080和完整适用crash组通过。本机matching release native23/25，070/073分别206/171ms失败；标准browser21/22，070为241ms；回执、附件和source/runner/release均已核验，不能称作性能验收通过。
 - 本机070的CPU采样显示关闭的导航/编辑弹层、SDK状态和固定键位构造仍参与同步提交。本轮让关闭的弹层组跳过无关props更新，并只在Search Everywhere或Keymap实际消费动作时订阅projection；打开/关闭仍完整渲染、清理和恢复焦点，重开读取当前owner、文件、动作和handler。SDK状态保留自身请求及语言订阅；固定CodeMirror primitive keymap仅懒构造一次，动态host派发仍逐实例绑定。关闭订阅回归修前3项失败，修后与当前动作、StrictMode、文档焦点、迟到LSP消息、右键菜单、剪贴板和Go To Line等支持组合9文件60项通过；实际性能收益仍待无诊断browser/native与GitHub验证。
@@ -121,7 +124,7 @@
 | 关闭/重载与树指针竞态 | bc75托管072与074功能断言已在三平台通过；074还有Linux长帧，不能归为功能问题已完全验收；最终组合继续保留 |
 | 设置与分屏就绪 | Code Style打开崩溃已修复且新增区分回归，当前产品源码真实browser修后通过；TREE-01增加真实第二编辑器就绪及正文断言，最终三平台复验 |
 | macOS应用菜单生命周期 | cf1729托管080已通过真实enabled/checked、保存、关闭、勾选项及reload后About回调；最终组合保留该原生回归 |
-| 当前分支全量回归 | 相关集全绿后，以当前分支同一SHA使用指定workflow的scope=all验证三平台browser/native；Linux选择ubuntu-22.04-x11以保留正式比较可复用的原始release，核对全部执行及构建身份 |
+| 当前分支全量回归 | 相关集全绿后，以当前分支同一SHA使用指定workflow的scope=all验证三平台browser/native；Linux保留默认ubuntu-24.04-xvfb执行桌面与原始ubuntu-22.04 release producer，正式比较按producer复用构建，核对全部执行及构建身份 |
 | 外部缺口与证据文档 | clickhousecrud源码未提供的TC-IDE-C6-06按既有约定单列；整理最终同SHA回执、截图、构建身份及遗留项，不计缺口为通过 |
 
 HOME混合fixture与用户要求的本机测试产物清理已完成，不列为剩余开发项。
