@@ -4,6 +4,11 @@
 
 ## 本轮恢复记录（持续更新）
 
+- `bd6e8b2d355e2487ce5467a90d8f54218394c652` 的指定workflow GitHub [41018236925](https://github.com/engcapa/taomni/actions/runs/41018236925) 已结束：91 ID、317次执行，**314 passed / 3 failed / 0 skipped**。18份回执、9,808个附件及selection逐项核验通过，无缺失或能力缺口。Linux/Windows/macOS browser各58/58；Linux native46/49、Windows48/48、macOS46/46。Linux native061第7键177ms、075源码冷开168ms超过165ms；074在末尾捕获`ResizeObserver loop completed with undelivered notifications`，属于必须修复的运行时错误，不能按性能容差接受。source=`40cf06856d2d97f5fc6bbae0e8669f490d420aa203638667993afac64e9ca4c7`、runner=`0d80f2910f0fcbca68a969eaf75211b808ca0687171597545c8fda18f475d141`。原始证据在`qa-ui-auto-report/_local/workspace-41018236925/`，尚未启动全量或正式比较。
+- 相同bd6输入本机标准browser `workspace-generation-browser/run-20261030-150830-042433958` 为 **34 passed / 1 failed / 0 skipped**，38个观察点保留2,414帧，唯一超预算样本为064冷JSON的203.80000001192093ms，正文415.2ms、高亮612.9ms。matching release native `workspace-generation-native/run-20261030-153756-394246698` 为 **25 passed / 1 failed / 0 skipped**，42个观察点保留2,664帧，唯一超165ms为073 HTML冷开190ms，正文/高亮318ms；HOME074、源码075及完整适用crash组通过。两批回执、输入及附件已核验，native共3,073附件；binary SHA=`e3f8b4d32f06675de15d3937937282fa8628f86ced62bef59b355c0b70c9e896`，release构建893.17秒。失败保留，不以分片job颜色替代原始case结果。
+- 针对074运行时错误，文件树viewport inset及虚拟行尺寸观察改为在下一动画帧发布，合并重复通知并在卸载取消；不吞掉ResizeObserver错误。挂载区分回归修前捕获RO delivery内立即改变spacer，修后连同行高、列表padding、End末行聚焦及卸载/迟到通知共9项通过，见`workspace-resize-delivery-lifecycle-02.log`。这是内部测量生命周期修复，保留074/077/TREE-01/TREEOPEN-01/034及完整crash用例验证用户行为，无需新增同义YAML；当前修改尚待matching release和GitHub真实验收。
+- 本轮保留回归另捕获隐藏/零尺寸挂载时，关闭的Documentation面板被分配33.333%宽度；bd6原提交同样复现（`workspace-splitter-bd6-baseline.log`），不是RO修改引入。面板依赖在零尺寸分支丢弃了仍有意义的百分比默认值；现通过已有依赖patch同时修正ESM/CJS，保留`0%`等百分比，像素约束仍等首次真实测量。树/焦点/连续拖动/隐藏恢复9文件47项组合支持测试通过（`workspace-resize-retained-03.log`）；双入口隐藏恢复与展开及Git/Debug/嵌套布局5文件105项保留回归也通过（`workspace-panel-retained.log`）。TypeScript及refactor检查通过，768 commands/328 exports/39 events、918模块边界、4,170文件检查保持。沿用024-01/024-03、工具窗、TC-GIT-DIFF-01及完整crash真实用例；patch是已登记的生成依赖差异，不改公共API或持久化格式，真实browser/native与GitHub仍待验证。
+- bd6 release在独立桌面的JSC/转发布局诊断已执行（`workspace-bd6-jsc-diagnostic-02`）：SDK输入及冷源码的采样均保存，语法安装、编辑器挂载、focus与菜单快照都有主线程工作；本次未复现177/168ms，因此不声称已定位剩余长帧的单一原因。诊断配置绑定`workspace_stage_trace=true`，两条case都以明确diagnostic-only失败结束，不计验收通过；首次未暴露JSC profiler的失败也保留。
 - `71811a4af2d1f4b965850b908607c23e263058ba` 的 GitHub [41013510946](https://github.com/engcapa/taomni/actions/runs/41013510946) 已收齐并核验309次执行、18份回执与9611个附件：**307 passed / 2 failed / 0 skipped**，与88 ID选集逐项一致、无缺失和能力缺口。Linux/Windows browser各56/56，macOS55/56，073 HTML冷开173.0999999998603ms失败；Linux native47/48，075源码冷开170ms失败；Windows47/47、macOS46/46，SDK061–063、真实HOME文档074、TREE-01分屏就绪、macOS菜单080与完整适用crash组均通过。尚未启动全量或正式比较。
 - 相同产品源码的本机标准browser `workspace-popup-browser/run-20261030-141442-623226464` **32/32通过**，40个观察点保留2532帧、最大134.69999998807907ms；matching release native `workspace-popup-native/run-20261030-144318-256119455` **25/26通过**，唯一079 HTML冷开174ms失败。HOME074最大161ms、源码075最大154ms；binary SHA=`2a8ea575c16042b58060455708bb9f9bedf94550ff40a41306efc6c4fec84c5e`。两批回执、附件及输入身份已核验；runner为补崩溃名单前的657e身份，不冒充71811的0d80身份。原始失败不回写或原样筛绿。
 - macOS073的CPU采样仍有约13.6ms关闭的Generation弹层渲染，整体同步React提交与布局/GC叠加。现只在代码生成/模板组前后都关闭时跳过无关props更新；六种打开入口、关闭清理、重开后的当前回调、模板持久化、撤销焦点、迟到导入候选与实时项目事实均保留。新增挂载回归改前1失败/5通过，修后连同既有设置/弹层组合6文件29项通过。此内部memo优化沿用C8-01/02/05/06/07、007-01/03/04、064–079和完整crash入口，不新增同义YAML；实际性能收益待新源码browser/native和GitHub验证。`workspace-source-stage-diagnostic/run-20261030-150044-337500080`为明确失败的转发诊断，不能作为验收通过。
@@ -121,7 +126,9 @@
 | SDK/LSP生命周期 | 已实现；本机及cf1729托管macOS061–063真实SDK场景通过；最终组合三平台保留真实错误、手动刷新、取消/重试、迟到响应及文档队列顺序 |
 | 多root与系统选择器 | 已实现；最终三平台确认第二/第三root、重复选择、取消、跨工作区迟到结果和成功后展开Project |
 | 编辑器与崩溃保留契约 | 先前组合392项支持测试通过；最终同SHA验证dirty/save、undo/redo、恢复、分屏、剪贴板、树焦点、Page导航、隐藏面板及完整适用crash组 |
-| 关闭/重载与树指针竞态 | bc75托管072与074功能断言已在三平台通过；074还有Linux长帧，不能归为功能问题已完全验收；最终组合继续保留 |
+| 关闭/重载与树指针竞态 | 历史组合托管072与074功能断言已通过；bd6 Linux074仍有下项运行时错误，最终组合继续保留真实关闭/重载与指针断言 |
+| 文件树ResizeObserver生命周期 | bd6托管Linux native074捕获真实运行时错误；下一帧合并发布及卸载清理已补区分回归，待新组合三平台真实验证，不接受过滤错误 |
+| 隐藏工具面板几何 | 本轮支持回归发现零尺寸挂载时关闭的Documentation占33.333%宽度，bd6基线复现；百分比默认值修复后树/分隔器47项、双入口及跨消费者105项通过，待真实browser/native验证 |
 | 设置与分屏就绪 | Code Style打开崩溃已修复且新增区分回归，当前产品源码真实browser修后通过；TREE-01增加真实第二编辑器就绪及正文断言，最终三平台复验 |
 | macOS应用菜单生命周期 | cf1729托管080已通过真实enabled/checked、保存、关闭、勾选项及reload后About回调；最终组合保留该原生回归 |
 | 当前分支全量回归 | 相关集全绿后，以当前分支同一SHA使用指定workflow的scope=all验证三平台browser/native；Linux保留默认ubuntu-24.04-xvfb执行桌面与原始ubuntu-22.04 release producer，正式比较按producer复用构建，核对全部执行及构建身份 |
@@ -198,8 +205,8 @@ HOME混合fixture与用户要求的本机测试产物清理已完成，不列为
 
 1. **确认输入与环境**：检查本次提交、远端同分支是否有新提交、`native_build.py --check`及真实QA身份；恢复本任务独立测试桌面，不能操作用户桌面或生产profile。若远端有新代码，先阅读影响，保留现有修复，避免覆盖他人改动。
 2. **先解决当前性能与功能失败**：需要本机复现时批量编译一次matching QA release，在独立桌面串行运行受影响专项，观察真实HOME与公开fixture。按用户最新口径，每帧超过165ms则用原始帧和采样拆解剩余主线程工作；正文/高亮/动作1500ms、SDK五秒及输入p95不变，不能靠反复重跑筛慢样本。补查实际配置与自动化隔离配置的差异，继续关闭5秒反馈。
-3. **三平台相关集**：推送完整40位SHA，通过 `gh` 调度 `qa-ui-auto-platforms` 的browser/native/release，关闭`workspace_stage_trace`；原72条ID选集加macOS原生080，保留TREEOPEN-01、078/079和完整10 ID `crash-regression`，以本轮selection记录为准。修失败、提交推送、重跑并监控原始case结果，直到全部适用相关执行通过。不要只看workflow/job颜色。
-4. **三平台全量**：当前分支同一SHA运行scope=all，检查selection、原始receipt、source/runner/case/build身份与汇总；失败修复后循环。`TC-IDE-C6-06`外部clickhousecrud源码缺口按policy和用户确认单列；只允许RDP/VNC server/client性能失败单列，功能失败必须修。
+3. **三平台相关集**：推送完整40位SHA，通过 `gh` 调度 `qa-ui-auto-platforms` 的browser/native/release，关闭`workspace_stage_trace`；本轮91 ID、317次计划执行，保留TREEOPEN-01、078/079、macOS原生080、模板/导入入口和完整11 ID `crash-regression`，以selection记录为准。修失败、提交推送、重跑并监控原始case结果，直到全部适用相关执行通过。不要只看workflow/job颜色。
+4. **三平台全量**：当前分支同一SHA运行scope=all，检查selection、原始receipt、source/runner/case/build身份与汇总；失败修复后循环。当前本机生成的计划为669 ID、2,216次执行，尚未启动，不能算执行证据。`TC-IDE-C6-06`外部clickhousecrud源码缺口按policy和用户确认单列；只允许RDP/VNC server/client性能失败单列，功能失败必须修。
 5. **正式性能及HOME验收**：相同已全量验证SHA与固定main基线运行四轮比较，重点复查上述10项历史退化及sessions/terminal/file explorer；比较失败则修复，产品源码变化后重新取得对应功能证据再比较。记录平台、profile、数据规模和实际二进制身份；按用户补充，GitHub runner真实HOME大型混合fixture的各类文件、连续tab切换与深层路径全部通过，可关闭该HOME性能验收，无需等待用户手工复测。
 
 ## 恢复命令与执行约束

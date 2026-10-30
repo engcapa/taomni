@@ -21,6 +21,8 @@ export function ProjectTreeViewport({ rows, selected, viewMode }: {
     const host = hostRef.current;
     const element = tree();
     if (!virtual || !host || !element) return;
+    let disposed = false;
+    let frame: number | null = null;
     const header = element.querySelector<HTMLElement>('[data-testid="code-workspace-list-columns"]');
     const measure = () => {
       const margin = host.getBoundingClientRect().top - element.getBoundingClientRect().top + element.scrollTop;
@@ -30,12 +32,24 @@ export function ProjectTreeViewport({ rows, selected, viewMode }: {
       setInsets((previous) => previous.margin === margin && previous.header === height && previous.bottom === bottom
         ? previous : { margin, header: height, bottom });
     };
+    const schedule = () => {
+      if (disposed || frame !== null) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        if (!disposed) measure();
+      });
+    };
     measure();
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
     observer?.observe(element);
     if (header) observer?.observe(header);
-    window.addEventListener("resize", measure);
-    return () => { observer?.disconnect(); window.removeEventListener("resize", measure); };
+    window.addEventListener("resize", schedule);
+    return () => {
+      disposed = true;
+      observer?.disconnect();
+      window.removeEventListener("resize", schedule);
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
   }, [virtual, viewMode]);
   const list = useVirtualizer({
     count: rows.length,
@@ -51,6 +65,9 @@ export function ProjectTreeViewport({ rows, selected, viewMode }: {
       const index = instance.indexFromElement(element);
       return instance.measurementsCache[index]?.size ?? instance.options.estimateSize(index);
     },
+    // Row measurements change the spacer and can adjust ancestor scrolling.
+    // Publish them after ResizeObserver delivery to avoid a WebKit resize loop.
+    useAnimationFrameWithResizeObserver: true,
     overscan: 8,
     scrollMargin: insets.margin,
     scrollPaddingStart: insets.header,

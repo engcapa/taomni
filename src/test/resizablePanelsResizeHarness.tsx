@@ -65,7 +65,7 @@ export function installPanelResizeHarness() {
   };
 }
 
-export function mountPanelResizeFixture(nested = false, components = Panels, syncVisibility = false) {
+export function mountPanelResizeFixture(nested = false, components = Panels, syncVisibility = false, percentDefaults = false) {
   const { Group, Panel, Separator } = components;
   const groupRef = createRef<GroupImperativeHandle>();
   const nestedRef = createRef<GroupImperativeHandle>();
@@ -78,9 +78,9 @@ export function mountPanelResizeFixture(nested = false, components = Panels, syn
     if (PanelResizeObserver.delivering) throw new Error("Panel onResize ran during observer delivery");
   });
   const Fixture = ({ open = true }: { open?: boolean }) => <>
-    <Group id="resize-root" groupRef={groupRef} defaultLayout={{ editor: 80, docs: 20 }}
+    <Group id="resize-root" groupRef={groupRef} defaultLayout={percentDefaults ? undefined : { editor: 80, docs: 20 }}
       onLayoutChange={onLayoutChange} onLayoutChanged={onLayoutChanged}>
-      <Panel id="editor" minSize={200} onResize={onResize}>
+      <Panel id="editor" defaultSize={percentDefaults ? "80%" : undefined} minSize={200} onResize={onResize}>
         {nested && <Group id="resize-nested" groupRef={nestedRef}>
           <Panel id="left" minSize={100} onResize={onResize}>left editor</Panel>
           <Separator />
@@ -88,7 +88,7 @@ export function mountPanelResizeFixture(nested = false, components = Panels, syn
         </Group>}
       </Panel>
       <Separator />
-      <Panel id="docs" panelRef={docsRef} defaultSize={235} minSize={185} collapsible
+      <Panel id="docs" panelRef={docsRef} defaultSize={percentDefaults ? "0%" : 235} minSize={185} collapsible
         groupResizeBehavior="preserve-pixel-size" onResize={onResize}>Documentation</Panel>
     </Group>
     {syncVisibility && <PanelVisibility panelRef={docsRef} open={open} />}
