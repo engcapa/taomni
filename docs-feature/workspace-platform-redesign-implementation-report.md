@@ -1,5 +1,8 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
+> 2026-10-31 用例范围更新：用户授权 C6-06 改用公开 Apache Commons Lang 3.17.0。CI 按固定提交/SHA256下载并编译，设置 `QA_JAVA_PROJECT_ROOT`；本地缺路径跳过。以下 clickhousecrud 外部缺口均为历史执行状态，新用例三平台 native 结果待补，不能回写历史为通过。性能仍暂缓，main 比较取消，以 SDK startup follow-up 的当前状态为准。
+
+
 > 当前已合并 main `c793f30b`。文件先显示并可编辑、SDK/LSP 后台初始化、普通文件跳过自动探测及每次成功添加目录展开 Project 的实现已完成，见[SDK 跟进记录](./workspace-platform-redesign-sdk-startup-followup.md)。候选 `3190f31e` 的三平台 browser 相关集 **51/51 passed**，原生阶段发现并正在修正逐字观察往返耗尽 SDK 超时及 macOS QA 桥漏译 Backspace 两项工具问题；保留全部原失败，修正后重跑三平台相关集和完整 10 ID 崩溃专项。RDP 剪贴板功能修复定向 [40767562150](https://github.com/engcapa/taomni/actions/runs/40767562150) 已独立核验 **21/21 passed**。
 
 > 正式四轮性能对照尚未通过，当前组合源码的全量尚待执行。旧全量 [40743957940](https://github.com/engcapa/taomni/actions/runs/40743957940) 的 **645 个适用 ID、2,115 passed / 3 failed、25/25 分片**仍原样保留，20,307 个发布附件 SHA 已独立核验，62 个明确上传排除的大夹具单列。RDP 性能失败按用户授权单列，不计通过；clickhousecrud 外部缺口按用户确认保留。browser/native 只在 GitHub 执行，本机仅单测、静态检查与 QA release 编译。以下历史章节以本节最新状态为准。

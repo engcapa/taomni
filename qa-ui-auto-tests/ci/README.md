@@ -366,12 +366,25 @@ WebView captures; they do not establish full desktop capture or OS permission
 handling. macOS bridge DOM events do not prove system keyboard/IME interaction.
 Unsupported platform/verb combinations appear as gaps in selection/report.
 
-`TC-IDE-C6-06-java-definition-realproject-native` additionally requires the
-user's original external `clickhousecrud` checkout (`QA_JAVA_PROJECT_ROOT`).
-That source is not part of this repository. The hosted plan records an explicit
-gap on each platform and rejects explicitly selecting it; run it locally with
-the original project. The in-repository Maven/Gradle definition cases still run
-on hosted VMs. A generated lookalike cannot establish the external-project claim.
+`TC-IDE-C6-06-java-definition-realproject-native` uses the public
+[Apache Commons Lang](https://github.com/apache/commons-lang) 3.17.0 Maven project.
+Only native entries selecting that case request `java-real-project`: the execution
+process downloads the commit and SHA256 pinned in `toolchains.yaml`, compiles the
+unmodified upstream sources with the prepared Maven/JDK, and exports the absolute
+`QA_JAVA_PROJECT_ROOT` before launching the runner. `java-real-project/project.json`
+records the repository, revision, archive checksum and path; per-case
+`java-project-inputs.json` records the input file hashes. Download, checksum,
+compilation and missing hosted-path errors fail setup; they are not policy gaps.
+The case verifies field, cross-file source and JDK definition navigation, history
+back, runtime errors and unchanged Java/POM bytes on Linux, Windows and macOS.
+
+For local native execution, set `QA_JAVA_PROJECT_ROOT` to an absolute Commons Lang
+3.17.0 checkout (revision `29ccc7665f3bc5d84155a3092ab2209a053324e6`). With no path,
+the fixture reports an explicit skip before resetting app data. A configured bad
+path fails instead of skipping. As with other cases, `--require-pass` rejects a
+skip; omit that flag when an intentional local omission is acceptable. The
+original clickhousecrud checkout is no longer required. Earlier receipts and
+external-project gaps retain their original meaning and are not retroactive passes.
 
 ## Evidence and maintenance
 

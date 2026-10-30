@@ -140,11 +140,8 @@ class SelectionTests(unittest.TestCase):
         # planner's changed-path list with its loop-control boolean. The
         # workflow summary iterates this field after planning.
         self.assertIsInstance(plan['changed_paths'], list)
-        # The user's external project remains unavailable on both desktops.
-        self.assertEqual([(g['case'], g['linux_profile']) for g in plan['gaps']], [
-            ('TC-IDE-C6-06-java-definition-realproject-native', 'ubuntu-24.04-xvfb'),
-            ('TC-IDE-C6-06-java-definition-realproject-native', 'ubuntu-26.04-wayland'),
-            *[(cid, 'ubuntu-26.04-wayland') for cid in sorted(x11_only)]])
+        self.assertEqual([(g['case'], g['linux_profile']) for g in plan['gaps']],
+                         [(cid, 'ubuntu-26.04-wayland') for cid in sorted(x11_only)])
 
     def test_restore_pulls_predecessor_before_it(self):
         cid = 'TC-auto-F-DB-1-query-tab-rename-native-restore'
@@ -176,15 +173,18 @@ class SelectionTests(unittest.TestCase):
             self.assertEqual(entry['selected_ids'], ['TC-151'])
             self.assertIn('vnc', entry['capabilities'])
 
-    def test_external_project_is_reported_as_gap_and_explicit_selection_fails(self):
+    def test_public_java_project_is_selected_and_provisioned_on_every_native_platform(self):
         cid = 'TC-IDE-C6-06-java-definition-realproject-native'
-        plan = make_plan(args(scope='all', modes='native'))
-        gaps = [gap for gap in plan['gaps'] if gap['case'] == cid]
-        self.assertEqual({gap['platform'] for gap in gaps}, {'linux', 'windows', 'macos'})
-        self.assertTrue(all('QA_JAVA_PROJECT_ROOT' in gap['reason'] for gap in gaps))
-        self.assertTrue(all(cid not in entry['selected_ids'] for entry in plan['entries']))
-        with self.assertRaisesRegex(ValueError, 'explicit cases unavailable'):
-            make_plan(args(scope='selected', case_ids=cid, modes='native'))
+        for scope in ('selected', 'all'):
+            plan = make_plan(args(scope=scope, case_ids=cid if scope == 'selected' else '', modes='native'))
+            self.assertFalse(any(gap['case'] == cid for gap in plan['gaps']))
+            entries = [entry for entry in plan['entries'] if cid in entry['selected_ids']]
+            self.assertEqual({entry['platform_key'] for entry in entries}, {'linux', 'windows', 'macos'})
+            for entry in entries:
+                self.assertIn('java', entry['capabilities'])
+                self.assertIn('java-real-project', entry['capabilities'])
+        other = make_plan(args(scope='selected', case_ids='TC-IDE-C6-05-query-definition-reveal-history-native', modes='native'))
+        self.assertTrue(all('java-real-project' not in entry['capabilities'] for entry in other['entries']))
 
     def test_unknown_empty_and_wrong_platform_requests_fail(self):
         for override in ({'scope':'selected'}, {'scope':'selected','case_ids':'TC-NOT-REAL'},

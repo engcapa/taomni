@@ -2,6 +2,8 @@
 
 **2026-10-30：可执行的非性能功能回归及三平台GitHub补验已收尾，性能暂列TODO。** 原始clickhousecrud工程未提供的三项native缺口单列。现有性能失败、原始样本和验收门槛保留；暂不继续性能优化与诊断；按用户最新要求取消main对比，不作为待办或验收前置。当前组合的功能与性能结果分列如下；历史记录不替代当前证据。
 
+**2026-10-31：按用户最新要求调整 C6-06 真实 Java 工程来源。** 不再限定原始 clickhousecrud；GitHub runner 按固定提交与 SHA256 下载公开 Apache Commons Lang 3.17.0，编译后设置 `QA_JAVA_PROJECT_ROOT`，三平台 native 纳入实际选集。本地未指定路径则显式 skip，指定无效路径或 CI 未准备路径则失败。原有三项外部缺口属于历史证据，不改写为通过；新用例本机 Linux native 已通过，GitHub 三平台执行待补。性能仍暂缓，不恢复 main 对比。
+
 ## 当前组合验证（2026-10-30）
 
 产品组合为`2730b58be1a7953b0513c6092bc77649463b6b35`；`f3acc41b8c44ded0d83f6b314a4c5eb1bbf29fac`仅修正两项QA用例与本文档，产品和runner身份保持一致：
@@ -178,9 +180,15 @@ ef57本机：14项目标单测、80项保留测试全部通过，QA前端TypeScr
 
 可执行的非性能开发与验证已收尾。当前产品组合的全量及57/57补验已验证SDK/LSP生命周期、多root与目录选择器、编辑器dirty/save/undo/redo、旧版24标签及分屏恢复、关闭/重载、树指针与ResizeObserver生命周期、隐藏面板几何、导航弹层、macOS应用菜单、Terminal右边界readiness、多仓库Git、标签ownership及描述符完整磁盘操作。两项QA修正版已在三平台browser/native通过；完整适用crash组全部通过。性能失败所在用例未执行的后续步骤仍不算通过。
 
-**非性能仅剩原始clickhousecrud项目验证缺口**：`TC-IDE-C6-06-java-definition-realproject-native`依赖未分发的原始项目；需提供`QA_JAVA_PROJECT_ROOT`对应工程后补Linux/Windows/macOS native。三项均为能力缺口，不计通过或skip，也不以其它项目替代。
+**C6-06 真实公开 Java 工程回归**：`TC-IDE-C6-06-java-definition-realproject-native`现使用 Apache Commons Lang 3.17.0（`29ccc7665f3bc5d84155a3092ab2209a053324e6`），按最新用户授权替换原项目限定。CI 下载、校验、编译并配置路径，覆盖字段/跨文件/JDK 跳转、返回、源码/POM SHA 与运行时错误。本地缺路径可跳过；本机 Linux 新用例已通过，GitHub 三平台新执行结果待补，历史缺口不计为新用例通过。
 
-HOME混合fixture、本机测试产物清理和当前证据归档已完成。性能单列TODO，当前没有其它待开发的非性能产品功能。
+2026-10-31 本机验证：公开归档的 SHA256 核验及 JDK21/Maven 真实编译成功；CI selection 确认 Linux/Windows/macOS native 均选中 C6-06 且包含 `java` / `java-real-project`，无原外部项目 gap。相关 CI 选集、执行及 Maven 契约测试通过，最终夹具6项测试通过，catalog audit与 `pnpm check:refactor` 通过。没有修改产品源码，复用 source 匹配的 QA release（`native_build.py --release --check` 确认 inputs match），无需重编或重跑产品全量 crash 组。
+
+隔离桌面本机 native `/tmp/taomni-public-java-native-report-04/run-20261031-071943-290780928` **1 passed /0 failed /0 skipped**；本地未设置路径 `/tmp/taomni-public-java-local-skip-report/run-20261031-072127-346692852` **0 passed /0 failed /1 skipped**，明确不计为导航通过。source=`69f94bb8e72d51dd286631d2e55868a42ea4655167ad9d5c8194a5c494eb1281`，runner=`95ca5805bb1bcb492837d23cda668b6216ce7cb0910991dddea0a74b3617e3ee`；两份回执及12/6个附件的签名、字节数/SHA与当前身份均已核验，最终截图已检查。正式通过保留字段声明光标、跨文件/JDK正文、四次返回光标、Java/POM哈希及零运行时错误断言。
+
+原始 `native-report-03` 保留1次用例失败：返回后类声明已离开 CodeMirror 虚拟视口，DOM正文断言错误；改为实际来源光标断言后通过。01/02为本机启动PATH误选无jsonschema的Python，未启动用例；其日志保留。Windows/macOS与GitHub新用例尚未执行，不以计划或本机结果代替三平台通过。此次仅更新既有 C6-06 的数据来源和执行支持，没有新产品行为或控件，不新增同义 YAML。
+
+HOME混合fixture、本机测试产物清理和当前证据归档已完成。性能单列TODO，当前没有其它待开发的非性能产品功能；此次仅修改 QA 用例、夹具和 CI 准备，不改产品行为，不需要为此重编产品。
 
 ## 当前分支与历史交接入口
 
@@ -251,7 +259,7 @@ HOME混合fixture、本机测试产物清理和当前证据归档已完成。性
 
 ## 当前待办顺序（按用户最新要求）
 
-1. **外部项目缺口**：原始clickhousecrud工程未提供，C6-06三平台native单列待补，不以其它fixture替代原项目。
+1. **公开项目验证**：C6-06 改为 CI 自动准备固定版本 Commons Lang；不再等待原始 clickhousecrud，三平台 native 新结果待补。本地不设 `QA_JAVA_PROJECT_ROOT` 时跳过。
 2. **性能TODO，暂缓**：Linux075 172ms、macOS074约166ms仍超过165ms。保留1500ms正文/高亮/动作、165ms完整观察期、真实SDK五秒及既有输入门槛；不继续优化或诊断，不调度main比较。
 
 非性能GitHub闭环与证据归档已完成：全量2,220次、25份回执和25,586附件，修正版补验57/57、15份回执和1,043附件，均无缺失。产品/runner指纹相同，只有两份case变化；这些case使用新结果，其余未修改case复用全量证据，旧全量失败不改写。最后的文档归档仅记录证据，不改变产品、case或runner；沿用C4-03、C7-08、PARITY-008-01及完整crash的实际结果，无新增行为需要新用例或重编应用。

@@ -154,6 +154,9 @@ def main():
                 config["app"]["tooling_java_home"] = os.environ["JAVA_HOME"]
                 if "java25" in entry["capabilities"]:
                     config["app"]["tooling_java25_home"] = os.environ["JAVA25_HOME"]
+            if "java-real-project" in entry["capabilities"]:
+                from ci_java_project import prepare as prepare_java_project
+                prepare_java_project(args.report / "java-real-project")
             if entry["mode"] == "native" and platform.system() == "Darwin" and os.environ.get("TAOMNI_QA_MACOS_LLDB") == "1":
                 # Opt-in crash capture is part of the recorded run config.
                 config["app"]["macos_lldb"] = True

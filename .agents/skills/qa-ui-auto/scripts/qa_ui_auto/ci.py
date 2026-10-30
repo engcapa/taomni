@@ -111,6 +111,8 @@ def capabilities(cases, mode: str) -> list[str]:
                 result.add("updater")
             if fixtures & {"jdtls_required", "java25_projects", "java_test_bundle", "java_sample_projects", "sortable_java_fixtures"}:
                 result.add("java")
+            if "java_real_project" in fixtures:
+                result.update({"java", "java-real-project"})
             if "java25_projects" in fixtures:
                 result.add("java25")
             if "java_test_bundle" in fixtures or "debug" in case.tags:

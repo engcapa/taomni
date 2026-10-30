@@ -94,6 +94,7 @@ from . import model_inspector_gateway
 from . import backup_cloud
 from . import credential_store
 from . import path_completion
+from . import java_real_project
 from . import dual_display_required
 from . import rdp_deferred_clipboard
 
@@ -133,6 +134,7 @@ REGISTRY: dict[str, Fixture] = {
     "mysql_required": Fixture("mysql_required", mysql_required.setup),
     "vnc_required": Fixture("vnc_required", vnc_required.setup),
     "ard_required": Fixture("ard_required", ard_required.setup, ard_required.teardown),
+    "java_real_project": Fixture("java_real_project", java_real_project.setup),
     "jdtls_required": Fixture("jdtls_required", jdtls_required.setup),
     "java_test_bundle": Fixture("java_test_bundle", java_test_bundle.setup),
     "linux_x11_required": Fixture("linux_x11_required", linux_x11_required.setup),
