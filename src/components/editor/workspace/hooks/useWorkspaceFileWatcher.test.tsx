@@ -17,7 +17,7 @@ it("watches expanded directories and open files without restarting on text, care
     roots: [{ ...root }], looseFiles: [], workspaceInstanceId: "home-workspace", setStatusMessage: status,
     workspaceUi: { expandedDirKeys: expanded, openFiles: files ? { [file.key]: { ...file, text } } : {} },
   }), { initialProps: { text: "first", expanded: ["home:Documents"], files: true } });
-  expect(ipc.start).toHaveBeenLastCalledWith("home-workspace", [root.path, "/users/qa/Documents/notes.txt"], ["/users/qa/Documents"]);
+  expect(ipc.start).toHaveBeenLastCalledWith("home-workspace", [root.path, "/users/qa/Documents/notes.txt"], ["/users/qa/Documents"], expect.any(String));
   rerender({ text: "edited", expanded: ["home:Documents"], files: true });
   expect(ipc.start).toHaveBeenCalledTimes(1);
   expect(ipc.stop).not.toHaveBeenCalled();
@@ -25,9 +25,42 @@ it("watches expanded directories and open files without restarting on text, care
   expect(ipc.start).toHaveBeenCalledTimes(2);
   expect(ipc.start.mock.lastCall?.[2]).toEqual(["/users/qa/Documents", "/users/qa/Pictures"]);
   rerender({ text: "", expanded: ["home:Pictures"], files: false });
-  expect(ipc.start).toHaveBeenLastCalledWith("home-workspace", [root.path], ["/users/qa/Pictures"]);
+  expect(ipc.start).toHaveBeenLastCalledWith("home-workspace", [root.path], ["/users/qa/Pictures"], expect.any(String));
   unmount();
   expect(ipc.stop).toHaveBeenCalledTimes(3);
+});
+
+it("binds delayed cleanup to the registration it owns after a replacement starts", async () => {
+  const props = { roots: [root], looseFiles: [], workspaceInstanceId: "workspace", setStatusMessage: status };
+  const { rerender, unmount } = renderHook(({ expanded }) => useWorkspaceFileWatcher({
+    ...props, workspaceUi: { openFiles: {}, expandedDirKeys: expanded },
+  }), { initialProps: { expanded: [] as string[] } });
+  const firstOwner = ipc.start.mock.lastCall?.[3];
+  expect(firstOwner).toEqual(expect.any(String));
+  rerender({ expanded: ["home:Documents"] });
+  const currentOwner = ipc.start.mock.lastCall?.[3];
+  expect(currentOwner).toEqual(expect.any(String));
+  expect(currentOwner).not.toBe(firstOwner);
+  expect(ipc.stop).toHaveBeenCalledWith("workspace", firstOwner);
+  await act(async () => {});
+  unmount();
+  expect(ipc.stop).toHaveBeenLastCalledWith("workspace", currentOwner);
+});
+
+it("releases an initialization that completes after unmount using its own identity", async () => {
+  let ready!: () => void;
+  ipc.start.mockImplementationOnce(() => new Promise<void>((resolve) => { ready = resolve; }));
+  const { unmount } = renderHook(() => useWorkspaceFileWatcher({
+    roots: [root], looseFiles: [], workspaceInstanceId: "disposed", setStatusMessage: status,
+    workspaceUi: { openFiles: {}, expandedDirKeys: [] },
+  }));
+  const owner = ipc.start.mock.lastCall?.[3];
+  expect(owner).toEqual(expect.any(String));
+  unmount();
+  ipc.stop.mockClear();
+  await act(async () => ready());
+  expect(ipc.stop).toHaveBeenCalledWith("disposed", owner);
+  expect(status).not.toHaveBeenCalled();
 });
 
 it("surfaces current initialization failures and ignores a disposed registration's late failure", async () => {

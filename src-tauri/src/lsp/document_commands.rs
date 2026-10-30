@@ -180,6 +180,7 @@ pub async fn lsp_start_workspace_watcher(
     workspace_id: String,
     roots: Vec<String>,
     directories: Option<Vec<String>>,
+    watcher_id: Option<String>,
 ) -> Result<(), String> {
     let workspace_id = workspace_id.trim();
     let workspace_id = if workspace_id.is_empty() {
@@ -187,15 +188,27 @@ pub async fn lsp_start_workspace_watcher(
     } else {
         workspace_id
     };
-    match directories {
-        Some(directories) => {
+    match (directories, watcher_id) {
+        (directories, Some(watcher_id)) => {
+            state
+                .workspace
+                .lsp
+                .start_workspace_watcher_owned(
+                    workspace_id,
+                    roots,
+                    directories.unwrap_or_default(),
+                    Some(watcher_id),
+                )
+                .await
+        }
+        (Some(directories), None) => {
             state
                 .workspace
                 .lsp
                 .start_workspace_watcher_with_directories(workspace_id, roots, directories)
                 .await
         }
-        None => {
+        (None, None) => {
             state
                 .workspace
                 .lsp
@@ -209,6 +222,7 @@ pub async fn lsp_start_workspace_watcher(
 pub async fn lsp_stop_workspace_watcher(
     state: State<'_, AppState>,
     workspace_id: String,
+    watcher_id: Option<String>,
 ) -> Result<(), String> {
     let workspace_id = workspace_id.trim();
     if workspace_id.is_empty() {
@@ -217,7 +231,7 @@ pub async fn lsp_stop_workspace_watcher(
     state
         .workspace
         .lsp
-        .stop_workspace_watcher(workspace_id)
+        .stop_workspace_watcher_owned(workspace_id, watcher_id.as_deref())
         .await;
     Ok(())
 }

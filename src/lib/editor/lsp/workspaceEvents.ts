@@ -68,10 +68,13 @@ export function lspStartWorkspaceWatcher(
   workspaceId: string,
   roots: string[],
   directories?: string[],
+  watcherId?: string,
 ): Promise<void> {
-  return invoke<void>("lsp_start_workspace_watcher", { workspaceId, roots, ...(directories ? { directories } : {}) });
+  return invoke<void>("lsp_start_workspace_watcher", {
+    workspaceId, roots, ...(directories ? { directories } : {}), ...(watcherId ? { watcherId } : {}),
+  });
 }
 
-export function lspStopWorkspaceWatcher(workspaceId: string): Promise<void> {
-  return invoke<void>("lsp_stop_workspace_watcher", { workspaceId });
+export function lspStopWorkspaceWatcher(workspaceId: string, watcherId?: string): Promise<void> {
+  return invoke<void>("lsp_stop_workspace_watcher", { workspaceId, ...(watcherId ? { watcherId } : {}) });
 }

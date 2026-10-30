@@ -4,6 +4,11 @@
 
 ## 本轮恢复记录（持续更新）
 
+- GitHub [40972368025](https://github.com/engcapa/taomni/actions/runs/40972368025) 已收齐并核验263次执行：**255 passed / 8 failed / 0 skipped**、与selection一致，无缺失。三平台browser各43/43；native Linux44/46、Windows43/44、macOS39/44。七项为性能失败；新增Windows030为真实外部写盘后冲突框未出现，失败页明确显示`File watcher unavailable: workspace watcher initialization cancelled`，不能按性能容差接受。原始回执及全部附件保留。
+- 监听器旧effect的stop与新start异步并发，workspace级stop会取消替代注册。当前在原IPC上增加可选注册ID，cleanup只取消其所属注册；保持旧调用及完整workspace释放语义，并处理卸载后才完成的初始化。前端回归修前3失败、修后相关16项通过，Rust真实监听器/生命周期12项通过，TypeScript、Rust formatting、refactor及catalog gate通过。030保留全部恢复/凭据/磁盘冲突断言，增加目录折叠/展开触发监听器替换，42条原精确checkpoint和新目录checkpoint已核对；dry-run只证明语法。匹配release及三平台真实写盘验证待完成，没有放宽等待或预算。
+- 外层标签请求与工作区展示现在分别订阅：请求桥继续即时协调真实buffer、取消迟到请求、恢复draft和同步canvas；文件列表/活动文件变化不再先用旧buffer重画整个Runtime。真实挂载回归修前在选择已打开文件时捕获旧activeKey额外重画，修后通过，并检查同一EditorView、dirty正文、无重复读取与undo；host/canvas及完整工作区生命周期支持测试23/23通过。保留069/073/075及原拆屏/恢复入口，无新增同义YAML；新的matching release、标准browser/native及GitHub三平台结果待执行。
+- GitHub 40972368025已确认三平台browser各43/43，Linux native44/46；063第7键167ms、075冷源码197ms均超165ms。已收macOS native分片的061动作超1500ms、069/073分别207/200ms也失败；其余native仍在收集。原件保留，本机诊断不替代托管验收，尚不合main。
+- `f8ea6eb6f590320446ddfab91db8c1f0ccd82652` 已推送，并通过指定workflow启动 GitHub [40972368025](https://github.com/engcapa/taomni/actions/runs/40972368025)。本地plan为72 ID、三平台browser/native/release、263次执行、无能力缺口；dev contract通过。source=`eda0484ca14c049eef29d78675e37f331b27edeb1dacaf54f6d2ed30416eafd6`，runner=`34476c3112421afc5b0c2eefb248a2a836298cc68d601d8619e9e02ff5818607`。本机matching QA release已构建完成，耗时716.70秒，binary SHA=`cc6323e2fa103654cec19f349cba79e0269a21f82dcdff83b8b996df62ca7e42`；本机native专项25/25及完整适用native崩溃组9/9均已通过、无skip，输入身份稳定，回执签名及附件摘要已核验。native57个文件观察点3,805帧最大108ms；074/075/079均确认2,938文件、428目录、7层路径、320宽目录及64嵌套项目，指定八类文件齐全。托管原始case结果尚未收齐，不合入main。
 - 新口径下的标准browser `workspace-frame-approved-browser/run-20261030-070809-539831857` **19/19 passed / 0 skipped**，含完整适用崩溃组、剪贴板/导航及064/066/068/069/070/073/077/078；输入稳定、回执签名和附件摘要已核验。40个文件观察点共2539帧，最大128.6ms；本轮没有帧进入150–165ms容差区间，不据此宣称同条件加速。TypeScript、refactor、catalog gate及测量工具25项通过；matching release正在构建，native与三平台结果待完成。
 - 用户于2026-10-30补充接受“长帧不超过10%的慢”：当前按单帧150ms基准允许最多10%偏差，即**每一帧≤165ms**验收。报告同时记录150ms基准、10%容差、165ms上限及未取整原始帧；正文/高亮/动作1500ms、输入p95及真实SDK五秒超时不变。旧报告保留原判定，不回写通过；后续须以新runner/case身份执行。本项是用户调整验收口径，不是产品性能提升，不能豁免超过165ms或功能失败。
 - 按用户要求清理本机测试产物：确认无cargo/rustc/该QA binary运行后，仅移除旧`src-tauri/target/qa-ui-auto/debug`，释放19,612,114,944字节；SSD可用由9,848,877,056增至29,460,987,904字节。release二进制SHA在清理前后均为`8618c682cab63c1f72de07960fea721ed1f11b9ebb8c1b9930391aee1e77d12f`；源码、原始失败证据及release缓存保留。记录在`_local/workspace-disk-cleanup-20261030.json`。
@@ -81,6 +86,21 @@
 - 目录树旧请求竞态已有真实挂载的改前失败；滚动测量重试现在随新导航、手动wheel/pointer输入或卸载取消。光标/折叠快照改为直接通知独立布局保存调度器，继续250ms合并、退出立即保存和workspace切换清理；不再为保存通知重画编辑器。菜单列表、Search Everywhere和Keymap消费者共享同一份prepared evaluation，Actions注册/选择变化只发布菜单投影；命令port与派发仍即时，菜单通知继续让出真实paint，卸载取消。改前回归捕获owner额外渲染，修后StrictMode/命令替换/旧evaluation拒绝/只读和选择变化等21项定向支持回归通过。
 - 中间源码 `b31a6734ab467c5948603bb1dd24f206a8ed36bc8ae40b8dfae9e2bb28284cb8` 的本机 `workspace-projection-browser/run-20261030-042129-141641026` **16/16 passed**、无skip、输入稳定，回执及全部附件已核验。完整适用browser崩溃组、064/066/068/069/070/073/077/078均通过，2554个原始观察帧最大105.4ms；后续命令context通知的进一步隔离尚需新组合回归，不将该结果外推为新源码通过。
 - Windows重启检查现直接读取IPv4/IPv6原生IP Helper listener表，保留真实PID、占用等待和观察错误失败，不再启动慢PowerShell/CIM查询。Windows构建job增加原生表及进程清理合同。SDK fixture的独立rustc准备保留有界180秒及超时诊断；产品SDK五秒、动作1500ms和全帧150ms预算均不变。20项工具/真实独立SDK子进程合同通过，实际Windows边界留给新workflow验证。
+
+## 当前非性能 follow-up
+
+以下按最终组合源码验收；历史通过不能替代新源码证据。40972368025已确认新增Windows原生监听器取消/冲突通知失败，需与性能修复一并关闭。
+
+| 事项 | 当前状态与关闭条件 |
+| --- | --- |
+| Windows外部修改冲突通知 | 030真实外部写盘后未弹冲突框；注册所有权修复及前端回归已加入，仍需真实Windows原生验证替换监听、dirty草稿、外部字节保护和保存冲突 |
+| SDK/LSP生命周期 | 已实现；最终三平台确认真实错误、手动刷新、取消/重试、迟到响应隔离、文档队列及didClose/didOpen顺序 |
+| 多root与系统选择器 | 已实现；最终三平台确认第二/第三root、重复选择、取消、跨工作区迟到结果和成功后展开Project |
+| 编辑器与崩溃保留契约 | 当前287项支持测试通过；最终同SHA验证dirty/save、undo/redo、恢复、分屏、剪贴板、树焦点、Page导航、隐藏面板及完整适用crash组 |
+| 最新main与全量集成 | 相关集全绿后再合入最新main，处理冲突及受影响回归，然后使用指定workflow的scope=all验证三平台browser/native |
+| 外部缺口与证据文档 | clickhousecrud源码未提供的TC-IDE-C6-06按既有约定单列；整理最终同SHA回执、截图、构建身份及遗留项，不计缺口为通过 |
+
+HOME混合fixture与用户要求的本机测试产物清理已完成，不列为剩余开发项。
 
 ## 当前分支与历史交接入口
 

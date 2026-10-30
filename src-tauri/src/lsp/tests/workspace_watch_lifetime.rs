@@ -108,3 +108,65 @@ async fn provider_restart_preserves_real_file_watcher_until_workspace_disposal()
     assert_eq!(manager.stop_workspace("workspace").await, 0);
     assert!(manager.workspace_watchers.lock().await.is_empty());
 }
+
+#[tokio::test]
+async fn late_cleanup_cannot_cancel_a_replacement_watcher() {
+    let manager = LspManager::new();
+    let root = tempfile::tempdir().unwrap();
+    let roots = vec![root.path().to_string_lossy().into_owned()];
+    manager
+        .start_workspace_watcher_owned("workspace", roots.clone(), vec![], Some("old".into()))
+        .await
+        .unwrap();
+
+    // Poll replacement first so its ownership is published before old cleanup
+    // runs, while its blocking OS registration is still in flight.
+    let replacement = manager.start_workspace_watcher_owned(
+        "workspace",
+        roots,
+        vec![],
+        Some("replacement".into()),
+    );
+    let stale_stop = manager.stop_workspace_watcher_owned("workspace", Some("old"));
+    let (result, ()) = tokio::join!(biased; replacement, stale_stop);
+    result.expect("old cleanup must not cancel replacement initialization");
+    {
+        let watchers = manager.workspace_watchers.lock().await;
+        let current = watchers
+            .get("workspace")
+            .expect("replacement remains owned");
+        assert_eq!(current.watcher_id.as_deref(), Some("replacement"));
+        assert!(!current.cancelled.is_cancelled());
+        assert!(!current.task.is_finished());
+    }
+    manager
+        .stop_workspace_watcher_owned("workspace", Some("replacement"))
+        .await;
+    assert!(manager.workspace_watchers.lock().await.is_empty());
+}
+
+#[tokio::test]
+async fn owned_cleanup_cancels_its_inflight_registration_and_legacy_disposal_still_works() {
+    let manager = LspManager::new();
+    let root = tempfile::tempdir().unwrap();
+    let roots = vec![root.path().to_string_lossy().into_owned()];
+    let start = manager.start_workspace_watcher_owned(
+        "workspace",
+        roots.clone(),
+        vec![],
+        Some("disposed".into()),
+    );
+    let stop = manager.stop_workspace_watcher_owned("workspace", Some("disposed"));
+    let (result, ()) = tokio::join!(biased; start, stop);
+    if let Err(error) = result {
+        assert!(error.contains("cancelled"), "{error}");
+    }
+    assert!(manager.workspace_watchers.lock().await.is_empty());
+
+    manager
+        .start_workspace_watcher_owned("workspace", roots, vec![], Some("mounted".into()))
+        .await
+        .unwrap();
+    manager.stop_workspace_watcher("workspace").await;
+    assert!(manager.workspace_watchers.lock().await.is_empty());
+}

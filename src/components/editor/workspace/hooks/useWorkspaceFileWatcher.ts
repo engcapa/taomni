@@ -40,13 +40,19 @@ export function useWorkspaceFileWatcher({ roots, looseFiles, workspaceUi, worksp
   useEffect(() => {
     if (!isTauriRuntime()) return undefined;
     const paths = JSON.parse(plan) as { roots: string[]; directories: string[] };
+    const watcherId = crypto.randomUUID();
     let disposed = false;
-    void lspStartWorkspaceWatcher(workspaceInstanceId, paths.roots, paths.directories).catch((error) => {
+    const stop = () => lspStopWorkspaceWatcher(workspaceInstanceId, watcherId).catch(() => undefined);
+    void lspStartWorkspaceWatcher(workspaceInstanceId, paths.roots, paths.directories, watcherId).then(() => {
+      // A stop can reach native before its async start has acquired ownership.
+      // Release that late initialization without stopping its replacement.
+      if (disposed) void stop();
+    }).catch((error) => {
       if (!disposed) setStatusMessage(`File watcher unavailable: ${errorMessage(error)}`);
     });
     return () => {
       disposed = true;
-      void lspStopWorkspaceWatcher(workspaceInstanceId).catch(() => undefined);
+      void stop();
     };
   }, [plan, setStatusMessage, workspaceInstanceId]);
 }
