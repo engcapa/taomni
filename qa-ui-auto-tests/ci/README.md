@@ -105,6 +105,13 @@ Hosted runner quotas, setup, artifact transfer and contract compilation still
 bound wall time, even with independent platform pipelines.
 More shards can reduce elapsed time while increasing billed runner minutes.
 
+For workspace startup diagnosis, `workspace_stage_trace=true` records forwarding
+task/layout timings in native file-open and SDK cases. It defaults off, is bound
+to the report's configuration digest, and marks each trace `diagnosticOnly`.
+Original performance failures remain failures; a successful traced probe also
+ends its case with an explicit diagnostic-only failure. Use a run with tracing
+off for performance acceptance.
+
 ### Development case contract
 
 Pull requests that touch product code receive a lightweight **Development case

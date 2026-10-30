@@ -14,6 +14,7 @@ from .file_open_profile import capture as capture_profile
 from .workspace_tab_reveal import reveal as reveal_tab
 from .project_tree_reveal import reveal as reveal_tree
 from .workspace_frame_budget import FRAME_BUDGET_MS, FRAME_LIMIT_MS, FRAME_TOLERANCE_PERCENT
+from .workspace_stage_trace import capture as capture_stages
 
 SCRIPT = Path(__file__).with_suffix(".js").read_text(encoding="utf-8")
 OPEN_BUDGET_MS = 1500
@@ -61,7 +62,7 @@ def run(ctx: Any, args: Any) -> str:
     tree_preparation = reveal_tree(ctx, config["selector"])
     profile = (nullcontext() if hasattr(ctx, "session") else capture_profile(
         ctx.page, ctx.case_dir / ("file-open-" + config["label"] + "-cpu-profile.json")))
-    with profile:
+    with profile, capture_stages(ctx, config["label"]) if hasattr(ctx, "session") else nullcontext():
         return measure(ctx, config, preparation=preparation, tree_preparation=tree_preparation)
 
 

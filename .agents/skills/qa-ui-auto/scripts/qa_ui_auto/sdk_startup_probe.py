@@ -16,6 +16,7 @@ from .deadline import budget_time as time
 from .language_startup_observer import validate_observation
 from .sdk_editor_input import measure as measure_editor_input
 from .sdk_action_trace import capture as capture_action_trace
+from .workspace_stage_trace import capture as capture_stages
 from .steps import StepError
 
 ACTION_BUDGET_MS = 1500
@@ -143,7 +144,7 @@ def run(ctx: Any, args: Any) -> str:
             release_sdk()
 
     try:
-        with capture_action_trace(session, ctx.case_dir), release_after_actions():
+        with capture_stages(ctx, "sdk"), capture_action_trace(session, ctx.case_dir), release_after_actions():
             observation()
             # File read/publication must complete without awaiting SDK discovery.
             action("open-source", lambda: session.dblclick(source_row),

@@ -38,6 +38,10 @@ on:
         description: Use release QA builds for selected native cases (reuse full-run caches)
         type: boolean
         default: false
+      workspace_stage_trace:
+        description: Diagnostic workspace task/layout tracing (exclude from performance acceptance)
+        type: boolean
+        default: false
       run_rdp_unit_contracts:
         description: Run RDP Rust unit contracts (disable only when reusing matching prior unit evidence)
         type: boolean
@@ -66,6 +70,7 @@ on:
       shards: {type: string, default: auto}
       browser_workers: {type: number, default: 2}
       native_release: {type: boolean, default: false}
+      workspace_stage_trace: {type: boolean, default: false}
       run_rdp_unit_contracts: {type: boolean, default: true}
       case_ids: {type: string, default: ''}
       features: {type: string, default: ''}
@@ -266,6 +271,7 @@ jobs:
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
       operation: run
+      workspace_stage_trace: ${{ inputs.workspace_stage_trace || false }}
 
   build-windows:
     needs: plan
@@ -286,6 +292,7 @@ jobs:
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
       operation: run
+      workspace_stage_trace: ${{ inputs.workspace_stage_trace || false }}
 
   build-macos:
     needs: plan
@@ -308,6 +315,7 @@ jobs:
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
       operation: run
+      workspace_stage_trace: ${{ inputs.workspace_stage_trace || false }}
 
   native-contracts:
     needs: plan

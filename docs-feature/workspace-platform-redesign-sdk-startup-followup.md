@@ -4,8 +4,10 @@
 
 ## 本轮恢复记录（持续更新）
 
+- `a133d636ca41599654fc27de81ff17ba5b2f5ab6` 的 GitHub [40991754886](https://github.com/engcapa/taomni/actions/runs/40991754886) 已核验263次执行：**256 passed / 7 failed / 0 skipped**、与selection完全一致。三平台browser各43/43，Linux native46/46、Windows44/44；macOS37/44，061恢复、062/063打开普通文件动作超时，065/069/073/075长帧174/175/171/189ms。Linux57观察点3,540帧最大157ms，真实SDK三场景均通过；仍不能验收整体性能。macOS桥接记录显示JS执行多为0–1ms，但请求至renderer开始及无JS操作的HTTP返回也有数百毫秒延误，继续诊断，不扣除预算。
+- 同source=`6fd0e5565fde811a95a04920cc15ace5460b01a5b58255dc943c1fef045b1c33`、runner=`9256b1d538f3a9f2e1426fe683e76a700d8ac36d0bd3d6b50c7c386bb3372516` 的本机支持测试392项、Rust桥接3项、refactor、完整前端构建通过；标准browser19/19（40点2,531帧最大146.1ms）、matching release native23/23及完整适用crash组通过。binary SHA=`7c3e02498ce11459951dcd7582d359cbdfb383ff8bf5306dd3246b9ef024f1b1`。新增默认关闭的原生任务/布局转发诊断；配置绑定conditions摘要，诊断用例不能被记为验收通过，后续正常性能运行必须关闭。
 - `37cc6ff364a2f5fcaf3f1d42d18c630f8c9d1a2b` 的 GitHub [40986096085](https://github.com/engcapa/taomni/actions/runs/40986096085) 已结束并核验263次执行：**256 passed / 7 failed / 0 skipped**，与selection完全一致。三平台browser各43/43、Windows native44/44、Linux45/46、macOS38/44。保留Linux075的168ms，以及macOS061动作、068/070/073/079长帧和Maven终端未出现BUILD FAILURE的原始失败；不因后续某分片通过而改写旧报告。
-- 新组合[40987880102](https://github.com/engcapa/taomni/actions/runs/40987880102)已核验219次执行：三平台browser各43/43、Linux native45/46、macOS38/44；Windows原生producer/消费者仍待收齐。Linux074深层长行JSON为175ms；macOS061/062动作1681.6/1506.5ms，066/070/073/074长帧分别175.9999999999991/197/190/188ms，均未达验收。macOS061正文已在动作约595ms出现，但一次只读execute耗时1309ms且期间渲染heartbeat多数16–20ms；新增QA桥接排队/JS执行/回调时间戳用于分清该边界，原1500ms判定不变。
+- 新组合[40987880102](https://github.com/engcapa/taomni/actions/runs/40987880102)已核验263次执行：256 passed / 7 failed / 0 skipped，三平台browser各43/43、Linux native45/46、macOS38/44、Windows44/44。Linux074深层长行JSON为175ms；macOS061/062动作1681.6/1506.5ms，066/070/073/074长帧分别175.9999999999991/197/190/188ms，均未达验收。macOS061正文已在动作约595ms出现，但一次只读execute耗时1309ms且期间渲染heartbeat多数16–20ms；新增QA桥接排队/JS执行/回调时间戳用于分清该边界，原1500ms判定不变。
 - 可选初始化任务各自两帧延后仍会聚集在同一paint前，叠加语法重配和工作区显示投影。新增回归先复现两项在同一轮执行，现共享队列每帧执行一项；不就绪的port不能阻塞其他pane挂载，取消、异常后续任务及卸载清理均保留。定向3文件16项与完整受影响组合12文件392项通过，refactor/边界合同通过；browser/matching native与GitHub验证继续执行；尚不据此宣称加速。内部调度保留064–079、TREEOPEN-01、SDK061–063与完整crash入口及原预算，无新增同义YAML。
 - 按用户2026-10-30的要求，本轮继续在当前分支开发和验收；三平台全量及正式性能比较保留，main仅作为固定SHA的比较基线。
 - 新组合`319dbe0c7d56a827df49f9131c29085ea75868bb`已推送并启动指定workflow [40987880102](https://github.com/engcapa/taomni/actions/runs/40987880102)：72 ID、263次执行、无能力缺口，source=`48b8855756bd159c59bf2cc5fe516dc438a89f5e632e263b17398e2927e67e73`、runner=`9256b1d538f3a9f2e1426fe683e76a700d8ac36d0bd3d6b50c7c386bb3372516`。本机matching QA release已完成（binary SHA=`8c03d0cd940da0ff0128f1a6c35ee190a13d14b8b9d1f9a6c30fdc01a72df7e3`），标准native `workspace-tree-measure-sdk-native/run-20261030-094122-536557264` **23/23 passed、0 skipped**，含完整适用crash9/9及061/062/063真实SDK成功/失败/Java场景。47观察点、3,039帧最大149ms，三个真实HOME布局均确认2,938文件、428目录、7层、320宽目录及64嵌套项目与指定八类文件。回执/附件摘要与source/runner/release均已核验；当前托管结果未收齐，不能用本机通过替代。
@@ -106,7 +108,7 @@
 | --- | --- |
 | SDK/LSP生命周期 | 已实现；本机061–063真实SDK场景通过，托管macOS061/062仍有动作超时；最终三平台保留真实错误、手动刷新、取消/重试、迟到响应及文档队列顺序 |
 | 多root与系统选择器 | 已实现；最终三平台确认第二/第三root、重复选择、取消、跨工作区迟到结果和成功后展开Project |
-| 编辑器与崩溃保留契约 | 当前287项支持测试通过；最终同SHA验证dirty/save、undo/redo、恢复、分屏、剪贴板、树焦点、Page导航、隐藏面板及完整适用crash组 |
+| 编辑器与崩溃保留契约 | 当前392项支持测试通过；最终同SHA验证dirty/save、undo/redo、恢复、分屏、剪贴板、树焦点、Page导航、隐藏面板及完整适用crash组 |
 | 当前分支全量回归 | 相关集全绿后，以当前分支同一SHA使用指定workflow的scope=all验证三平台browser/native，核对全部执行及构建身份 |
 | 外部缺口与证据文档 | clickhousecrud源码未提供的TC-IDE-C6-06按既有约定单列；整理最终同SHA回执、截图、构建身份及遗留项，不计缺口为通过 |
 

@@ -141,6 +141,9 @@ def main():
             config = {"app": {"base_url": "http://127.0.0.1:5000", "mode": entry["mode"]},
                       "worker": {"parallel": 1 if serial else entry.get("workers", 2)},
                       "report": {"dir": str(args.report), "keep_runs": 0}}
+            if entry["mode"] == "native" and os.environ.get("QA_WORKSPACE_STAGE_TRACE") == "1":
+                # Bind diagnostic instrumentation to the conditions digest.
+                config["diagnostics"] = {"workspace_stage_trace": True}
             desktop = _prepare_runtime(stack, entry, args.report, config)
             if "java" in entry["capabilities"]:
                 from ci_toolchains import prepare_java

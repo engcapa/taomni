@@ -1192,6 +1192,8 @@ class NativeHarness:
                 encoding="utf-8",
             )
         session = NativeSession(self.driver.url, self.application, self.driver.mark_session_closed)
+        session.owned_app_pid = (self.driver.proc.pid if platform.system() == "Darwin"
+                                 and self.driver.proc and not self.driver.macos_lldb else None)
         from native_application_restart import restart_owned_application
         session.application_restarter = lambda: restart_owned_application(self.driver, session)
         session.deadline = getattr(self, "deadline", None)

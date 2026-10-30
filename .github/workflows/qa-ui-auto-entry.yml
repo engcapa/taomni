@@ -8,6 +8,7 @@ on:
       operation: {type: string, default: run}
       max_parallel: {type: number, default: 8}
       run_rdp_unit_contracts: {type: boolean, default: true}
+      workspace_stage_trace: {type: boolean, default: false}
 permissions:
   contents: read
 env:
@@ -31,6 +32,7 @@ jobs:
     env:
       TAOMNI_QA_RDP_TRACE: ${{ contains(matrix.capabilities, 'xrdp') && '1' || '0' }}
       QA_NATIVE_ARTIFACT: ${{ inputs.operation == 'run' && matrix.mode == 'native' && 'qa-ui-auto-report/native-runtime/runtime.tar.gz' || '' }}
+      QA_WORKSPACE_STAGE_TRACE: ${{ inputs.workspace_stage_trace && '1' || '0' }}
     steps:
       - uses: actions/checkout@v4
         with:
