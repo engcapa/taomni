@@ -70,7 +70,7 @@ steps:
     equals: qa-restore-browser
 - click: '[data-testid="workspace-tabs-filter-trigger"]'
 - wait_for: '[data-testid="workspace-tabs-filter-menu"]'
-- click: '[data-testid="workspace-tabs-filter-row"]:has-text("qa-restore-mail")'
+- click: xpath=//button[@data-testid="workspace-tabs-filter-row"][contains(.,"qa-restore-mail")]
 - wait_for: '[data-testid="workspace-tab"][data-session-id="qa-restore-mail"][data-active="true"]'
 - click: '[data-testid="workspace-tab"][data-session-id="qa-restore-mail"]'
 - wait_for: '[data-testid="workspace-session-pane"][data-kind="mail"]'

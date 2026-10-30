@@ -137,11 +137,13 @@
 - 多仓库快照更新会取消 Git HEAD effect，原请求完成后因旧 owner 取消而丢失结果，当前 owner 又因 pending Set 而跳过。现以 promise Map 共享进行中的读取，每个 effect 单独控制发布；旧 HEAD、文件切换及卸载的迟到结果仍被拒绝。区分回归改前2失败/1通过，修后3项通过；保留 `TC-IDE-PARITY-022-01` 原 gutter、HEAD/buffer popup、Show Diff、可撤销 Rollback 和 error stripe 断言，以及008-03真实原生Git边界。
 - PARITY-005-02 原本点击分屏后立即计数；失败DOM已存在两个 pane，第二 EditorView尚未就绪。增加第二真实 `.cm-content` 的条件等待，保留双编辑器精确计数、补全内容和跨pane撤销/重做断言。
 
-原生全量还发现 C4-03 在24标签恢复的 pane shell 就绪后立即计数，Linux尚无EditorView、macOS失败附件采集时已出现两实例。增加第二pane真实正文的条件等待，保留两实例精确计数、活动文件编辑及末标签正文断言。031恢复后首次邮件标签在窄strip中被裁切，WebKit滚动后点中了S3；现先用真实标签导航菜单揭示邮件，再保留原直接点击和五种协议surface/顺序/ownership断言，不使用合成激活或点击重试。
+原生全量还发现 C4-03 的24标签恢复失败。增加第二pane真实正文的条件等待后，本机仍捕获该编辑器出现后被移除：旧版最近工作区首次导入只登记最后活动文件，后台恢复结束后，host把其余23个标签当作外层关闭项处理。现在仅在首次创建平台工作区时，从同一恢复身份的布局导入完整已知root文件列表；后续已存在工作区仍由外层文件列表拥有关闭语义，不会从旧布局复活已关闭标签。新增3项区分回归修前全部失败，修后连同入口、host请求/分屏、恢复队列和完整编辑器生命周期9文件54项通过。C4-03保留两实例精确计数、真实编辑及末标签正文，另在后台恢复后检查24个外层文件标签、两实例仍在及无运行时错误。匹配新源码的QA release正在构建，尚未据此关闭原生失败。
+
+031恢复后首次邮件标签在窄strip中被裁切，WebKit滚动后点中了S3；现先用真实标签导航菜单揭示邮件，再保留原直接点击和五种协议surface/顺序/ownership断言，不使用合成激活或点击重试。C7-08与031首轮原生probe还暴露WebDriver不支持的`:has-text`，已分别改用现有`click_menu`和标准XPath；保持全部发现状态、磁盘SHA及协议surface断言。修正后本机Linux release原生2/2通过，15个附件、回执与source/runner/build身份已核验（`/tmp/taomni-workspace-selector-native-02/run-20261030-201042-042205466`）；该证据属于ef57产品源码，首次导入修复组合仍需新原生验证。
 
 当前修复提交 `ef57ad4b2a4c66ce1e0b857bc48ac2f224a68467` 已推到当前分支，指定 workflow 定向运行 [41051642653](https://github.com/engcapa/taomni/actions/runs/41051642653) 正在执行三平台browser/native及完整适用crash组。source=`82a4dc2aa9d0db5f73a1c0363ece2d00be57692f398191a0d2d470977ab8af2b`、runner=`0d80f2910f0fcbca68a969eaf75211b808ca0687171597545c8fda18f475d141`；RDP Rust代码、依赖及构建配置未变，定向运行复用41045269719已通过的原生合同，最终全量恢复全部合同。
 
-本机：14项目标单测、80项保留测试全部通过，QA前端TypeScript/refactor/build、catalog及开发合同通过。真实browser目标7项已全部通过（首轮5通过/2条因新增pom后README selector不唯一失败，精确限定README后2/2通过，原失败保留）；031恢复流程1/1通过；完整crash组8/8通过。报告均在`/tmp/taomni-workspace-facts-git-*`，回执、source/runner身份及全部附件摘要已核验。matching QA release原生probe与完整crash组待构建完成后串行执行。前一SHA结果不能作为新源码验收。
+ef57本机：14项目标单测、80项保留测试全部通过，QA前端TypeScript/refactor/build、catalog及开发合同通过。真实browser目标7项已全部通过（首轮5通过/2条因新增pom后README selector不唯一失败，精确限定README后2/2通过，原失败保留）；031恢复流程1/1通过；完整crash组8/8通过。报告均在`/tmp/taomni-workspace-facts-git-*`，回执、source/runner身份及全部附件摘要已核验。matching QA release原生probe为1通过/3失败，008-03真实Git通过，C4-03及上述两处selector原失败保留；完整native crash组9/9通过，292个附件及回执已核验。前一SHA结果不能作为新源码验收。
 
 全量macOS updater附件还发现发布范围不一致：回执含真实release bundle与Disposable.app，workflow上传排除了其中31个文件。旧运行保留原receipt与缺失列表，不称全部附件已验证；现移除主QA artifact的这些排除规则，最终全量必须逐个核验所有receipt文件。独立精简diagnostics仍保留其原范围。此workflow-only修复不改变产品、case或runner身份，也不需要重新编译QA应用。
 
@@ -161,6 +163,8 @@
 | 设置与分屏就绪 | Code Style打开崩溃已修复且新增区分回归，当前产品源码真实browser修后通过；TREE-01增加真实第二编辑器就绪及正文断言，最终三平台复验 |
 | macOS应用菜单生命周期 | cf1729托管080已通过真实enabled/checked、保存、关闭、勾选项及reload后About回调；最终组合保留该原生回归 |
 | Terminal右边界readiness | 118项支持测试通过；matching release本机024-03/024-04真实PTY均通过，browser/native完整crash组8/8及9/9通过，GitHub三平台执行中 |
+| 描述符发现与多仓库Git | 已修复成功磁盘操作后的发现失效、并发HEAD结果丢失；本机相关browser及真实native边界通过，最终组合三平台复验原断言 |
+| 旧版工作区首次导入 | 24标签恢复后被host关闭的根因已修；新增3项区分回归及54项保留测试通过，原生C4-03和最终托管组合待验证 |
 | 当前分支全量功能回归 | 性能按用户要求另列TODO；以当前分支同一SHA使用指定workflow的scope=all验证三平台browser/native，逐项处理非性能失败；Linux保留默认ubuntu-24.04-xvfb执行桌面与原始ubuntu-22.04 release producer，核对原始producer、全部执行及构建身份 |
 | 外部缺口与证据文档 | clickhousecrud源码未提供的TC-IDE-C6-06按既有约定单列；整理最终同SHA回执、截图、构建身份及遗留项，不计缺口为通过 |
 
@@ -623,7 +627,7 @@ passed（Node 22、最多 2 workers）。`TC-WS-025` 增加隐藏 Home 后保留
 历史分区再进入 workspace 的实际流程。保留并选择 064–071 性能、034 外观、
 010/024 工具条、弹层、终端移动原生回归与完整 crash-regression；正文、高亮、
 每帧 150ms、1500ms 就绪预算及真实 View 身份不变。本机未运行 browser/native，
-本轮托管结果待收集；最终 main 对比和全量门禁仍未完成。
+当时托管结果尚待收集。按用户最新要求，main对比已取消；当前仅继续本分支全量功能验收，性能列TODO。
 
 ## 面包屑、关闭弹窗与最近记录的订阅边界
 

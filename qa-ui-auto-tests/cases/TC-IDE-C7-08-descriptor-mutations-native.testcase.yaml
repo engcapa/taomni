@@ -53,7 +53,7 @@ steps:
     path: ${fixture.platform_workspace_root}/package.json
     equals: 20b291b40ba4a796a310d8e04a05d26df1ca397e4d4dd84cc2515480d2afb8e4
 - right_click: '[data-testid="code-workspace-tree-file"][data-path="package.json"]'
-- click: '[data-testid="context-menu"] button:has-text("Rename...")'
+- click_menu: Rename...
 - wait_for: '[data-testid="text-input-dialog"]'
 - fill:
     selector: '[data-testid="text-input-dialog-input"]'
@@ -67,7 +67,7 @@ steps:
     selector: '[data-testid="project-facts-discovery-status"]'
     state: hidden
 - right_click: '[data-testid="code-workspace-tree-file"][data-path="manifest.json"]'
-- click: '[data-testid="context-menu"] button:has-text("Rename...")'
+- click_menu: Rename...
 - wait_for: '[data-testid="text-input-dialog"]'
 - fill:
     selector: '[data-testid="text-input-dialog-input"]'
@@ -81,7 +81,7 @@ steps:
     selector: '[data-testid="project-facts-discovery-status"]'
     state: visible
 - right_click: '[data-testid="code-workspace-tree-file"][data-path="package.json"]'
-- click: '[data-testid="context-menu"] button:has-text("Delete")'
+- click_menu: Delete
 - wait_for: '[data-testid="confirm-dialog"]'
 - click: '[data-testid="confirm-dialog-confirm"]'
 - wait_for:
