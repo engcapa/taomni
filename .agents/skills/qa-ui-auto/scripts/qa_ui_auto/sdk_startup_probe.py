@@ -7,6 +7,7 @@ driver input methods. Only observations use JavaScript.
 """
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
 from pathlib import Path
 from typing import Any, Callable
@@ -122,8 +123,22 @@ def run(ctx: Any, args: Any) -> str:
     def content_is(text: str) -> str:
         return f"document.querySelector({json.dumps(editor)})?.textContent === {json.dumps(text)}"
 
+    def release_sdk() -> None:
+        if not gate.exists():
+            gate.write_text("release\n", encoding="utf-8")
+            report["gateReleasedEpochMs"] = time.time() * 1000
+
+    @contextmanager
+    def release_after_actions():
+        try:
+            yield
+        finally:
+            # Diagnostic WebDriver calls can be slow. Release only after all
+            # action/pending assertions, but before collecting trace/IPC data.
+            release_sdk()
+
     try:
-        with capture_action_trace(session, ctx.case_dir):
+        with capture_action_trace(session, ctx.case_dir), release_after_actions():
             observation()
             # File read/publication must complete without awaiting SDK discovery.
             action("open-source", lambda: session.dblclick(source_row),
@@ -162,16 +177,16 @@ def run(ctx: Any, args: Any) -> str:
         report["passed"] = False
         raise
     finally:
+        # Also covers failure while installing the trace, before the inner
+        # context owns cleanup. No capture may delay terminating our child.
+        release_sdk()
         try:
-            try:
-                report["invokeObservation"] = observation()
-                report["sdkEvents"] = events()
-            except Exception as error:
-                report["captureError"] = str(error)
-                if report["passed"]:
-                    report["passed"] = False
-                    raise
-            finally:
-                (ctx.case_dir / "sdk-startup-responsiveness.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+            report["invokeObservation"] = observation()
+            report["sdkEvents"] = events()
+        except Exception as error:
+            report["captureError"] = str(error)
+            if report["passed"]:
+                report["passed"] = False
+                raise
         finally:
-            gate.write_text("release\n", encoding="utf-8")
+            (ctx.case_dir / "sdk-startup-responsiveness.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")

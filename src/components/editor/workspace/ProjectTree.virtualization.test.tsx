@@ -108,3 +108,36 @@ it("returns from a scrolled viewport to a short filtered result without retainin
   expect(screen.getByText("item-025.txt").closest("button")).toHaveAttribute("aria-selected", "true");
   expect(open).not.toHaveBeenCalled();
 });
+
+it("uses resize observations for new rows without forcing layout during their commit", () => {
+  const observers: Array<{ callback: ResizeObserverCallback; targets: Set<Element> }> = [];
+  vi.stubGlobal("ResizeObserver", class {
+    private record: typeof observers[number];
+    constructor(callback: ResizeObserverCallback) {
+      this.record = { callback, targets: new Set() };
+      observers.push(this.record);
+    }
+    observe(target: Element) { this.record.targets.add(target); }
+    unobserve(target: Element) { this.record.targets.delete(target); }
+    disconnect() { this.record.targets.clear(); }
+  });
+  const rowHeightReads = vi.fn();
+  vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) {
+    if (this.hasAttribute("data-virtual-index")) rowHeightReads();
+    return this.getAttribute("role") === "tree" ? 240 : 28;
+  });
+  render(<Harness />);
+  const viewport = screen.getByTestId("code-workspace-tree-viewport");
+  const first = viewport.querySelector<HTMLElement>('[data-virtual-index="0"]')!;
+  const before = parseFloat(viewport.style.height);
+  expect(rowHeightReads).not.toHaveBeenCalled();
+  const observer = observers.find((candidate) => candidate.targets.has(first))!;
+  expect(observer).toBeDefined();
+  act(() => observer.callback([{
+    target: first,
+    borderBoxSize: [{ blockSize: 42, inlineSize: 320 }],
+  } as unknown as ResizeObserverEntry], {} as ResizeObserver));
+  expect(parseFloat(viewport.style.height)).toBe(before + 14);
+  expect(viewport.querySelector<HTMLElement>('[data-virtual-index="1"]')!.style.transform).toBe("translateY(42px)");
+  expect(rowHeightReads).not.toHaveBeenCalled();
+});

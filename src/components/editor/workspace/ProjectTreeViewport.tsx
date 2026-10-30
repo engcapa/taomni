@@ -1,4 +1,4 @@
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { measureElement, useVirtualizer } from "@tanstack/react-virtual";
 import { Fragment, useLayoutEffect, useRef, useState } from "react";
 import type { TreeSelection } from "./codeWorkspaceModel";
 import { registerProjectTreeNavigation } from "./projectTreeNavigation";
@@ -42,6 +42,15 @@ export function ProjectTreeViewport({ rows, selected, viewMode }: {
     getScrollElement: tree,
     getItemKey: (index) => rows[index].key,
     estimateSize: () => 28,
+    measureElement: (element, entry, instance) => {
+      // Ref attachment runs inside React's commit while sibling DOM can still
+      // be changing. Reading offsetHeight there repeatedly forces layout.
+      // Keep the cached/estimated size until the observer supplies the actual
+      // border box; variable rows and font changes still update normally.
+      if (entry) return measureElement(element, entry, instance);
+      const index = instance.indexFromElement(element);
+      return instance.measurementsCache[index]?.size ?? instance.options.estimateSize(index);
+    },
     overscan: 8,
     scrollMargin: insets.margin,
     scrollPaddingStart: insets.header,
