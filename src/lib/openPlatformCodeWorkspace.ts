@@ -2,7 +2,7 @@ import { useAppStore } from "../stores/appStore";
 import { DEFAULT_WORKSPACE_ID, useWorkspacePlatformStore } from "../stores/workspacePlatformStore";
 import { newWorkspaceInstanceId, recentWorkspaceIdFromParts, rootIdForPath, workspacePathName } from "../stores/app/recentWorkspaces";
 import type { CodeWorkspaceTabInfo } from "../types";
-import { fileRefFromFileKey, readWorkspaceLayoutSnapshot, uniqueOrderedKeys } from "../components/editor/workspace/workspaceLayoutPersistence";
+import { fileRefFromFileKey, readWorkspaceLayoutSnapshot } from "../components/editor/workspace/workspaceLayoutPersistence";
 import { workspaceEditorInstanceId } from "./workspaceRuntimeIdentity";
 
 /** All editor entry points belong to Workspaces, including restored Sessions tabs. */
@@ -38,7 +38,8 @@ export function openPlatformCodeWorkspace(info: CodeWorkspaceTabInfo): string {
     // already own their file list, including closes interrupted by a reload.
     const snapshot = readWorkspaceLayoutSnapshot(workspaceEditorInstanceId(workspace));
     if (snapshot) {
-      const files = uniqueOrderedKeys(snapshot.editorGroups).flatMap((key) => {
+      const keys = new Set(Object.values(snapshot.editorGroups).flatMap((group) => group.openOrder));
+      const files = [...keys].flatMap((key) => {
         const ref = fileRefFromFileKey(key);
         return ref?.kind === "root" && roots.some((root) => root.id === ref.rootId)
           ? [{ rootId: ref.rootId, path: ref.path }] : [];

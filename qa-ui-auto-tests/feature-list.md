@@ -12987,6 +12987,8 @@ controls:
   kind: interactive
 - id: workspace-tabs-filter-row
   selector: '[data-testid="workspace-tabs-filter-row"]'
+  aliases:
+  - 'xpath=//button[@data-testid="workspace-tabs-filter-row"][contains(.,"qa-restore-mail")]'
   kind: interactive
 - id: workspace-tabs-filter-empty
   selector: '[data-testid="workspace-tabs-filter-empty"]'

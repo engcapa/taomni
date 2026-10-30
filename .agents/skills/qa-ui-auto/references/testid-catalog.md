@@ -1891,6 +1891,7 @@
 - `[data-testid="workspace-tabs-filter-search"]` — interactive — F-WS-2.workspace-tabs-filter-search
 - `[data-testid="workspace-tabs-filter-clear"]` — interactive — F-WS-2.workspace-tabs-filter-clear
 - `[data-testid="workspace-tabs-filter-row"]` — interactive — F-WS-2.workspace-tabs-filter-row
+  ↳ `xpath=//button[@data-testid="workspace-tabs-filter-row"][contains(.,"qa-restore-mail")]` — alias
 - `[data-testid="workspace-tabs-filter-empty"]` — display — F-WS-2.workspace-tabs-filter-empty
 - `[data-testid="workspace-tab-filter-chip"]` — interactive — F-WS-2.workspace-tab-filter-chip
 - `[data-testid="workspace-tab-filter-all"]` — interactive — F-WS-2.workspace-tab-filter-all

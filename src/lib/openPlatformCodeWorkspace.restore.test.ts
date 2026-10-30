@@ -60,6 +60,15 @@ describe("legacy editor layout import", () => {
     expect(readWorkspaceLayoutSnapshot(instanceId)?.editorGroups.primary.openOrder).toContain("loose:notes");
   });
 
+  it("preserves the existing 24-tab limit per leaf when both leaves are full", () => {
+    const remaining = Array.from({ length: 24 }, (_, index) => `file${index + 24}.txt`);
+    seedLayout(keys, remaining.map((path) => `root:root-a:${path}`));
+    const id = openPlatformCodeWorkspace(project);
+    const workspace = useWorkspacePlatformStore.getState().getWorkspace(id)!;
+    expect(workspace.openTabs.filter((tab) => tab.kind === "file").map((tab) => tab.filePath))
+      .toEqual([...paths, ...remaining]);
+  });
+
   it("does not resurrect a closed outer tab from a layout left behind by an interrupted save", () => {
     seedLayout();
     const id = openPlatformCodeWorkspace(project);
