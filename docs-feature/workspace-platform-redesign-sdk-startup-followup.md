@@ -4,6 +4,7 @@
 
 ## 本轮恢复记录（持续更新）
 
+- `2fb88b24723d654e70478ee4398f68af4af41443` 的 GitHub [41012953201](https://github.com/engcapa/taomni/actions/runs/41012953201) 在计划前的crash-regression契约测试失败，尚未执行UI用例。原因是新增Code Style崩溃用例后，固定崩溃名单和smoke名单未同步；本轮补齐两处，并明确该新增用例的browser范围，保留三平台native原有全部崩溃用例及实际失败门禁。这是测试契约补齐，不改变产品源码、测量脚本或性能阈值；原始失败保留。
 - `bc75d8567926520038c66177aa1a45ada4557549` 的 GitHub [41007654861](https://github.com/engcapa/taomni/actions/runs/41007654861) 已收齐并核验273次执行、18份回执及6508个附件：**270 passed / 3 failed / 0 skipped**，与完整75 ID的selection一致，无能力缺口。三平台browser各45/45、Windows native45/45；Linux native45/47，074/075长帧分别165.00000000000364/173ms，保持原始失败；macOS native45/46，TREE-01在分屏容器出现后立即读到1个编辑器。失败捕获随后已有两个实际EditorView和原文件正文，现仅为此用例增加第二pane的内容就绪条件，保留恰好2个编辑器的原断言并补第二pane正文与运行时错误断言，不放宽性能预算。072重载和074树指针功能在三平台均通过，SDK061–063、macOS原生菜单080和完整适用crash组通过。本机matching release native23/25，070/073分别206/171ms失败；标准browser21/22，070为241ms；回执、附件和source/runner/release均已核验，不能称作性能验收通过。
 - 本机070的CPU采样显示关闭的导航/编辑弹层、SDK状态和固定键位构造仍参与同步提交。本轮让关闭的弹层组跳过无关props更新，并只在Search Everywhere或Keymap实际消费动作时订阅projection；打开/关闭仍完整渲染、清理和恢复焦点，重开读取当前owner、文件、动作和handler。SDK状态保留自身请求及语言订阅；固定CodeMirror primitive keymap仅懒构造一次，动态host派发仍逐实例绑定。关闭订阅回归修前3项失败，修后与当前动作、StrictMode、文档焦点、迟到LSP消息、右键菜单、剪贴板和Go To Line等支持组合9文件60项通过；实际性能收益仍待无诊断browser/native与GitHub验证。
 - 上述挂载回归另稳定复现Code Style设置在关闭→打开时因条件返回前后Hooks数量不同而崩溃；真实browser从Actions入口也已改前失败，原件为`workspace-code-style-before-browser/run-20261030-140112-479914794`。现将同一个state hook移到条件返回前，不改方案格式或owner；新增`TC-IDE-C8-08-code-style-dialog-lifecycle-browser`，验证修改方案后重开、dirty正文与继续输入并纳入完整crash组。挂载及真实browser修后通过，后者为`workspace-code-style-after-browser/run-20261030-140435-834341389`，回执及5个附件已核验；三平台仍待完成。
@@ -118,7 +119,7 @@
 | 多root与系统选择器 | 已实现；最终三平台确认第二/第三root、重复选择、取消、跨工作区迟到结果和成功后展开Project |
 | 编辑器与崩溃保留契约 | 先前组合392项支持测试通过；最终同SHA验证dirty/save、undo/redo、恢复、分屏、剪贴板、树焦点、Page导航、隐藏面板及完整适用crash组 |
 | 关闭/重载与树指针竞态 | bc75托管072与074功能断言已在三平台通过；074还有Linux长帧，不能归为功能问题已完全验收；最终组合继续保留 |
-| 设置与分屏就绪 | Code Style打开崩溃已修复且新增区分回归，真实browser修后待完成；TREE-01增加真实第二编辑器就绪及正文断言，最终macOS复验 |
+| 设置与分屏就绪 | Code Style打开崩溃已修复且新增区分回归，当前产品源码真实browser修后通过；TREE-01增加真实第二编辑器就绪及正文断言，最终三平台复验 |
 | macOS应用菜单生命周期 | cf1729托管080已通过真实enabled/checked、保存、关闭、勾选项及reload后About回调；最终组合保留该原生回归 |
 | 当前分支全量回归 | 相关集全绿后，以当前分支同一SHA使用指定workflow的scope=all验证三平台browser/native；Linux选择ubuntu-22.04-x11以保留正式比较可复用的原始release，核对全部执行及构建身份 |
 | 外部缺口与证据文档 | clickhousecrud源码未提供的TC-IDE-C6-06按既有约定单列；整理最终同SHA回执、截图、构建身份及遗留项，不计缺口为通过 |
