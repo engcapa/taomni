@@ -108,6 +108,7 @@ steps:
     - shared line
     - edit-kept
 - assert_visible: '[data-editor-tab-key][data-active="true"][data-dirty="true"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-selectionBackground'
 - assert_count:
     selector: '[data-testid="code-workspace-editor"] .cm-selectionBackground'
     min: 1
@@ -177,12 +178,12 @@ verification:
       expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["repo-a WORKTREE", "shared line", "edit-kept"]}}'
     - step: 44
       expectation: '{"assert_visible": "[data-editor-tab-key][data-active=\"true\"][data-dirty=\"true\"]"}'
-    - step: 45
+    - step: 46
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-selectionBackground", "min": 1}}'
     results:
     - 43
     - 44
-    - 45
+    - 46
   visual:
   - check: 截图中标题、n/N 导航、两侧标签/结果树与高亮无截断遮挡；与 IDEA 参照的视觉差异单独记录于 comparison record。
     method: manual
