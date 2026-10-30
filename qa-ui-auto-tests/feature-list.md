@@ -8437,6 +8437,8 @@ Compact 目录只预加载可见行，并限制刷新期间的原生并发；`TC
 
 `TC-IDE-C8-08-code-style-dialog-lifecycle-browser` 保护 Code Style 从关闭状态打开、修改方案后重开及继续编辑同一个 dirty buffer 的生命周期。
 
+`TC-IDE-PARITY-024-04-terminal-readline-margin-native` 在 Linux 真实 Bash PTY 中保护一行及两行右边界提示符的就绪、未提交输入非就绪和工具窗移动后的独立输出；024-03 继续覆盖三平台移动。
+
 <!-- feature
 id: F25.5
 status: partial

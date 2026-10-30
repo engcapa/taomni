@@ -37,14 +37,30 @@ describe("idle terminal prompt", () => {
     },
   );
 
+  it.each([cols + 1, cols * 2 + 1])(
+    "recognizes a %i-cell readline prompt whose final space is printed after an explicit newline",
+    async (length) => {
+      // Native Bash can place the terminator in the final cell, then emit an
+      // explicit newline before the trailing space. The cursor sits at col 1
+      // on a non-wrapped row, although the prompt still spans both rows.
+      const term = await render(`\x1b[?2004h${prompt(length).slice(0, -1)}\r\n\r `);
+      expect(term.buffer.active.cursorX).toBe(1);
+      expect(term.buffer.active.getLine(term.buffer.active.cursorY)?.isWrapped).toBe(false);
+      expect(terminalAtIdlePrompt(term)).toBe(true);
+    },
+  );
+
   it.each([
     ["blank startup", ""],
     ["a short prompt above a new blank row", "\x1b[?2004hqa@host:~$ \r\n"],
     ["a full output row outside readline", `${prompt(cols)}\r\n\r`],
     ["an extra blank output row", `\x1b[?2004h${prompt(cols)}\r\n\r\n`],
     ["a newline after an unfilled row", `\x1b[?2004h${prompt(cols - 1)}\r\n`],
+    ["a space below an unfilled prompt", `\x1b[?2004h${prompt(cols - 1)}\r\n\r `],
+    ["a full output row and space outside readline", `${prompt(cols + 1).slice(0, -1)}\r\n\r `],
     ["a typed command on the next row", `\x1b[?2004h${prompt(cols)}\r\n\recho pending`],
     ["a typed command ending in a prompt character", `\x1b[?2004hqa$ ${"x".repeat(cols - 6)}$ \r\n\r`],
+    ["a typed command ending in a margin prompt character", `\x1b[?2004hqa$ ${"x".repeat(cols - 5)}$\r\n\r `],
     ["the alternate screen", `\x1b[?1049h\x1b[?2004h${prompt(cols)}\r\n\r`],
   ])("does not treat %s as an idle prompt", async (_name, output) => {
     expect(terminalAtIdlePrompt(await render(output))).toBe(false);
