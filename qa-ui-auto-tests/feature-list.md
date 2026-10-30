@@ -8458,6 +8458,9 @@ files:
   - src/components/editor/workspace/WorkspaceTabPolicySettingsDialog.tsx
   - src/components/editor/workspace/Breadcrumbs.tsx
   - src/components/editor/workspace/ProjectFactsStatusBadge.tsx
+  - src/hooks/useProjectDescriptorDiscovery.ts
+  - src/lib/editor/workspace/changes.ts
+  - src/components/editor/workspace/hooks/useWorkspaceGitDecorations.ts
   - src/components/editor/workspace/EditorGroup.tsx
   - src/components/editor/workspace/HighlightingWidget.tsx
   - src/components/editor/workspace/FileTreePane.tsx

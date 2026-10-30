@@ -12,6 +12,9 @@ description: 'Browser gate case (ED-COMP-004 A3). In the stub preview no ready p
 
   by unit tests and the native provider gate.
 
+  Creates and saves a Maven descriptor through the UI before asserting missing project tooling; ordinary folders
+  remain idle.
+
   '
 covers:
 - F25.5
@@ -37,7 +40,27 @@ steps:
 - wait_for: '[data-testid="text-input-dialog"]'
 - click: '[data-testid="text-input-dialog-confirm"]'
 - wait_for: '[data-testid="code-workspace-tree-file"]'
-- dblclick: '[data-testid="code-workspace-tree-file"]'
+- click: '[data-testid="code-workspace-tree-new"]'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: pom.xml
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content'
+- fill:
+    selector: '[data-testid="code-workspace-editor"] .cm-content'
+    value: <project><artifactId>qa-project</artifactId></project>
+- press: Control+s
+- assert_text:
+    selector: '[data-testid="project-facts-discovery-status"]'
+    contains: Maven Discovered
+    timeout_sec: 15
+- assert_text:
+    selector: '[data-testid="project-facts-status-badge"]'
+    contains: Facts Failed
+    timeout_sec: 30
+- dblclick: '[data-testid="code-workspace-tree-file"]:has-text("README.txt")'
 - wait_for: '[data-testid="code-workspace-editor-pane"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Control+Space
@@ -50,6 +73,7 @@ steps:
     contains: using document scope
     timeout_sec: 10
 - screenshot: tc-ide-c2-02-scope-fallback.png
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -61,9 +85,9 @@ verification:
     - 5
     - 7
     - 9
-    - 11
-    - 13
-    - 14
+    - 21
+    - 23
+    - 24
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -75,17 +99,35 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
     - step: 10
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
-    - step: 12
+    - step: 22
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
-    - step: 15
+    - step: 25
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Completion
         project scope unavailable", "timeout_sec": 20}}'
-    - step: 16
+    - step: 26
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "using document
         scope", "timeout_sec": 10}}'
     results:
+    - 25
+    - 26
+  - id: maven-prerequisite
+    requirement: A saved Maven descriptor establishes project scope before the failure or fallback assertion; ordinary
+      README browsing does not trigger tooling.
+    actions:
+    - 11
+    - 12
+    - 14
     - 15
-    - 16
+    - 17
+    - 18
+    checkpoints:
+    - step: 19
+      expectation: Maven discovery is visible and the unavailable build backend stays explicitly failed.
+    - step: 20
+      expectation: Maven discovery is visible and the unavailable build backend stays explicitly failed.
+    results:
+    - 19
+    - 20
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

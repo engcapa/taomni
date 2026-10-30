@@ -4,6 +4,7 @@ import {
   workspaceListFilesRecursive,
   workspaceReadFile,
 } from "../lib/editor/workspace";
+import { subscribeWorkspaceFileChanges, workspaceChangePath } from "../lib/editor/workspace/changes";
 import {
   discoverProjectDescriptors,
   type BuildDescriptorInput,
@@ -17,6 +18,7 @@ const DESCRIPTOR_NAMES = new Set([
   "build.gradle",
   "build.gradle.kts",
 ]);
+const WINDOWS_DESCRIPTOR_NAMES = new Set([...DESCRIPTOR_NAMES].map((name) => name.toLowerCase()));
 const DISCOVERY_MAX_DEPTH = 16;
 const DISCOVERY_MAX_FILES = 2000;
 const DESCRIPTOR_MAX_BYTES = 256 * 1024;
@@ -59,6 +61,7 @@ export function useProjectDescriptorDiscovery(
   const [reason, setReason] = useState<string | null>(null);
   const requestSequenceRef = useRef(0);
   const generationRef = useRef(0);
+  const knownDescriptorsRef = useRef<{ root: string; paths: string[] }>({ root: "", paths: [] });
 
   const discover = useCallback(async (scope: "root" | "recursive") => {
     const requestSequence = ++requestSequenceRef.current;
@@ -122,6 +125,7 @@ export function useProjectDescriptorDiscovery(
       };
     }
 
+    knownDescriptorsRef.current = { root: workspaceRoot, paths: nextDiscovery.descriptors.map((item) => item.path) };
     setDiscovery(nextDiscovery);
     setStatus(nextDiscovery.status);
     setReason(nextDiscovery.diagnostics.join("; ") || null);
@@ -142,6 +146,29 @@ export function useProjectDescriptorDiscovery(
       requestSequenceRef.current += 1;
     };
   }, [options.autoRefresh, options.autoScope, discover, workspaceRoot]);
+
+  useEffect(() => {
+    if (!options.autoRefresh || !workspaceRoot) return;
+    const root = workspaceChangePath(workspaceRoot, "");
+    const boundary = root.endsWith("/") ? root : `${root}/`;
+    const names = /^[a-z]:\//i.test(root) ? WINDOWS_DESCRIPTOR_NAMES : DESCRIPTOR_NAMES;
+    return subscribeWorkspaceFileChanges(({ paths }) => {
+      const relevant = paths.some((path) => {
+        if (path !== root && !path.startsWith(boundary)) return false;
+        const relative = path.slice(boundary.length);
+        // Ordinary writes never restart project discovery. Root-only browsing
+        // stays shallow, including HOME; source/explicit discovery stays bounded.
+        const descriptor = names.has(relative.split("/").at(-1) ?? "")
+          && (options.autoScope !== "root" || !relative.includes("/"));
+        const known = knownDescriptorsRef.current;
+        return descriptor || (known.root === workspaceRoot && known.paths.some((known) => {
+          const knownPath = workspaceChangePath("", known);
+          return knownPath === path || knownPath.startsWith(`${path}/`);
+        }));
+      });
+      if (relevant) void discover(options.autoScope ?? "recursive");
+    });
+  }, [discover, options.autoRefresh, options.autoScope, workspaceRoot]);
 
   return { status, discovery, reason, refresh };
 }

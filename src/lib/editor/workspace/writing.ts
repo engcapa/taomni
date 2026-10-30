@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { type WorkspaceFile } from "./model";
 import { parseWorkspaceWriteError, type WorkspaceWriteAck } from "./writeModel";
+import { notifyWorkspaceFilesChanged } from "./changes";
 
 export async function workspaceWriteFile(
   repoRoot: string,
@@ -9,12 +10,14 @@ export async function workspaceWriteFile(
   expectedHash?: string | null,
 ): Promise<WorkspaceFile> {
   try {
-    return await invoke<WorkspaceFile>("workspace_write_file", {
+    const file = await invoke<WorkspaceFile>("workspace_write_file", {
       repoRoot,
       path,
       contents,
       expectedHash: expectedHash ?? null,
     });
+    notifyWorkspaceFilesChanged(repoRoot, [path]);
+    return file;
   } catch (err) {
     throw parseWorkspaceWriteError(err);
   }
@@ -26,11 +29,13 @@ export async function workspaceWriteLooseFile(
   expectedHash?: string | null,
 ): Promise<WorkspaceFile> {
   try {
-    return await invoke<WorkspaceFile>("workspace_write_loose_file", {
+    const file = await invoke<WorkspaceFile>("workspace_write_loose_file", {
       path,
       contents,
       expectedHash: expectedHash ?? null,
     });
+    notifyWorkspaceFilesChanged("", [path]);
+    return file;
   } catch (err) {
     throw parseWorkspaceWriteError(err);
   }
@@ -46,7 +51,7 @@ export async function workspaceWriteFileEncoded(
   bom = false,
 ): Promise<WorkspaceWriteAck> {
   try {
-    return await invoke<WorkspaceWriteAck>("workspace_write_file_encoded", {
+    const ack = await invoke<WorkspaceWriteAck>("workspace_write_file_encoded", {
       repoRoot,
       path,
       contents,
@@ -54,6 +59,8 @@ export async function workspaceWriteFileEncoded(
       encoding,
       bom,
     });
+    notifyWorkspaceFilesChanged(repoRoot, [path]);
+    return ack;
   } catch (err) {
     throw parseWorkspaceWriteError(err);
   }
@@ -68,13 +75,15 @@ export async function workspaceWriteLooseFileEncoded(
   bom = false,
 ): Promise<WorkspaceWriteAck> {
   try {
-    return await invoke<WorkspaceWriteAck>("workspace_write_loose_file_encoded", {
+    const ack = await invoke<WorkspaceWriteAck>("workspace_write_loose_file_encoded", {
       path,
       contents,
       expectedHash: expectedHash ?? null,
       encoding,
       bom,
     });
+    notifyWorkspaceFilesChanged("", [path]);
+    return ack;
   } catch (err) {
     throw parseWorkspaceWriteError(err);
   }

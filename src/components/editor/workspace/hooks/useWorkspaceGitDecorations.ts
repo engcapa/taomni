@@ -40,7 +40,7 @@ export function useWorkspaceGitDecorations(context: UseWorkspaceGitDecorationsCo
       primary: null,
       secondary: null,
     });
-  const gitHeadRequestsRef = useRef(new Set<string>());
+  const gitHeadRequestsRef = useRef(new Map<string, Promise<string | null>>());
   const gitBlameCacheRef = useRef(new Map<string, GitBlameLine | null>());
 
   const gitChangeByRootPath = useMemo(() => {
@@ -152,28 +152,27 @@ export function useWorkspaceGitDecorations(context: UseWorkspaceGitDecorationsCo
         }));
         continue;
       }
-      if (gitHeadRequestsRef.current.has(target.sourceKey)) continue;
-      gitHeadRequestsRef.current.add(target.sourceKey);
-      void gitBlobPair(target.repoRoot, target.path, "HEAD", "")
-        .then((pair) => {
+      // Effects can be replaced by another repository's snapshot while this
+      // immutable blob is pending. Each current owner subscribes to the same
+      // request; cleanup only cancels that owner's publication.
+      let request = gitHeadRequestsRef.current.get(target.sourceKey);
+      if (!request) {
+        request = gitBlobPair(target.repoRoot, target.path, "HEAD", "")
+          .then((pair) => pair.binary || pair.oversize ? null : pair.oldText ?? "")
+          .catch(() => null)
+          .finally(() => gitHeadRequestsRef.current.delete(target.sourceKey));
+        gitHeadRequestsRef.current.set(target.sourceKey, request);
+      }
+      void request.then((text) => {
           if (cancelled) return;
           setGitHeadTextByFile((current) => ({
             ...current,
             [key]: {
               sourceKey: target.sourceKey,
-              text: pair.binary || pair.oversize ? null : pair.oldText ?? "",
+              text,
             },
           }));
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setGitHeadTextByFile((current) => ({
-              ...current,
-              [key]: { sourceKey: target.sourceKey, text: null },
-            }));
-          }
-        })
-        .finally(() => gitHeadRequestsRef.current.delete(target.sourceKey));
+        });
     }
     return () => { cancelled = true; };
   }, [activeGitFileStateSignature, gitTargetForFile]);

@@ -381,6 +381,7 @@ cases:
 - TC-IDE-C7-05-gradle-tooling-ingestion-native
 - TC-IDE-C7-06-project-facts-failed-refresh-browser
 - TC-IDE-C7-07-consumer-prerequisite-surfaced-browser
+- TC-IDE-C7-08-descriptor-mutations-native
 - TC-IDE-C8-01
 - TC-IDE-C8-02
 - TC-IDE-C8-03-reformat-unavailable-zero-commit-browser
