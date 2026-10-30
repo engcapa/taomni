@@ -92,7 +92,11 @@ def run(ctx: Any, args: Any) -> str:
             raise StepError("SDK child exists but the actual SDK/LSP IPC is no longer pending")
         return {"child": child, "pendingInvocations": pending}
 
-    def until(expression: str, expires: float) -> Any:
+    def until(expression: str, expires: float, *, pending: bool) -> Any:
+        if pending:
+            # Observe both facts in the same renderer turn. A second driver
+            # request can consume the real child's remaining five-second life.
+            expression = "(() => { const result = (" + expression + "); return result ? {result, observation: window.__taomniQaLanguageStartup?.observe() ?? null} : null; })()"
         while time.monotonic() < expires:
             value = read(expression)
             if value:
@@ -109,10 +113,11 @@ def run(ctx: Any, args: Any) -> str:
             invoke()
             record["invokeDurationMs"] = (time.monotonic() - started) * 1000
             record["invokeCompletedEpochMs"] = time.time() * 1000
-            until(expression, started + ACTION_BUDGET_MS / 1000)
+            result = until(expression, started + ACTION_BUDGET_MS / 1000, pending=pending)
             record["resultObservedEpochMs"] = time.time() * 1000
             if pending:
-                record["sdkPending"] = require_pending()
+                state = validate_observation(result.get("observation") if isinstance(result, dict) else None)
+                record["sdkPending"] = require_pending(state)
             record["durationMs"] = (time.monotonic() - started) * 1000
             if record["durationMs"] > ACTION_BUDGET_MS:
                 raise StepError(f"{label} exceeded {ACTION_BUDGET_MS}ms: {record['durationMs']:.1f}ms")

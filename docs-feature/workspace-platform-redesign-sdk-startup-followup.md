@@ -5,10 +5,11 @@
 ## 本轮恢复记录（持续更新）
 
 - 按用户2026-10-30的要求，本轮继续在当前分支开发和验收；三平台全量及正式性能比较保留，main仅作为固定SHA的比较基线。
+- `37cc6ff364a2f5fcaf3f1d42d18c630f8c9d1a2b` 已推送并启动指定workflow [40986096085](https://github.com/engcapa/taomni/actions/runs/40986096085)，仍为72 ID、263次执行、无能力缺口。source=`48b8855756bd159c59bf2cc5fe516dc438a89f5e632e263b17398e2927e67e73`、runner=`efc8e25422d2cb89fdd046a822b7d69968fcc38d976a4e17280646724505cc34`。本机标准browser最终18/19、完整适用crash7/7通过；066冷开242.70000000298023ms失败保留，当前源码未通过性能验收。后续SDK只读采集合并属于runner新身份，需单独记录，不覆盖此运行。
 - 新的虚拟树修复将React ref提交时逐行同步高度读取改为等待ResizeObserver真实尺寸。回归修前捕获30次同步读取，修后4文件20项通过，并验证42px动态行高、总高度及后续行位置。保留077/TREE-01/TREEOPEN-01及064–079的真实入口，不新增同义YAML或关闭字体/动态行高能力；标准browser、matching release及新SHA托管验证继续执行。
 - 新组合的TypeScript、refactor（768 commands/328 exports/39 events、918模块、4163文件）、catalog gate、SDK工具25项及trace4项通过。标准browser仍在执行，已保留066冷开242.70000000298023ms失败；CPU采样显示首次同步React渲染，存储写入仅0–0.2ms，不能将本机结果称作性能通过。其余完整崩溃组目前全部通过；后续matching release/native及GitHub验证用于判断发布构建边界。
-- macOS062的SDK交互、逐键和pending检查全部完成后，末尾trace/IPC采集又耗时646ms，导致原五秒timeout先发生。探针现在在最后真实pending检查后立即释放gate，随后采集全部诊断；新增合同修前失败、修后9项通过。没有延长SDK超时或修改062错误正文断言，原失败保留。
-- GitHub [40980594603](https://github.com/engcapa/taomni/actions/runs/40980594603)（`93332b7a24b5cc82d580b003eda9e3f3788ab9ed`）已收齐并核验263次执行：**257 passed / 6 failed / 0 skipped**、与selection逐项一致；6,459个回执附件逐字节/SHA及source/runner/release身份已核验。三平台browser各43/43，native Linux44/46、Windows44/44、macOS40/44。Windows030真实监听替换/磁盘冲突已通过。剩余Linux074/075为176/261ms，macOS070/074/079为203/200/183.9999999999991ms；macOS062因末尾采集延误gate而显示五秒timeout。全部原始失败保留，当前不验收；source=`2e563f76e79a0ca04c27279221b9a53357e2bcd33e78a0dd39d9c357885550dd`、runner=`34476c3112421afc5b0c2eefb248a2a836298cc68d601d8619e9e02ff5818607`。
+- macOS062原始时序确认：最后UI结果在SDK启动后4492ms已出现，但独立pending观察又耗时582ms、trace采集64ms，释放gate晚于五秒。仅提前到trace前释放仍不足；现在把UI结果和真实IPC pending放到同一次只读请求中观察，随后验证新鲜子进程heartbeat，再立即释放gate并采集全部诊断。两步合同均先复现旧顺序失败，修后SDK工具25项通过。没有延长SDK超时、降低动作/逐键预算或修改062错误正文断言，原失败保留。
+- GitHub [40980594603](https://github.com/engcapa/taomni/actions/runs/40980594603)（`93332b7a24b5cc82d580b003eda9e3f3788ab9ed`）已收齐并核验263次执行：**257 passed / 6 failed / 0 skipped**、与selection逐项一致；6,459个回执附件逐字节/SHA及source/runner/release身份已核验。三平台browser各43/43，native Linux44/46、Windows44/44、macOS40/44。Windows030真实监听替换/磁盘冲突已通过。剩余Linux074/075为176/261ms，macOS070/074/079为203/200/183.9999999999991ms；macOS062因末尾独立pending观察及trace采集延误gate而显示五秒timeout。全部原始失败保留，当前不验收；source=`2e563f76e79a0ca04c27279221b9a53357e2bcd33e78a0dd39d9c357885550dd`、runner=`34476c3112421afc5b0c2eefb248a2a836298cc68d601d8619e9e02ff5818607`。
 - 同source本机标准browser `workspace-host-watcher-browser-perf/run-20261030-083245-366129456`为7 passed/1 failed：064在第1步goto被另一同URL导航打断、尚未进入性能测量；其余066/068/069/070/073/077/078通过。保留该失败，064单独恢复运行`workspace-host-watcher-browser-startup-recovery/run-20261030-083923-935901340`为1/1通过，冷开正文219.4ms/高亮363.7ms、恢复/重开最大帧109.4ms。两批回执及附件摘要已核验，共40个观察点、2,537帧、最大155.3ms；仅1帧处于150–165ms容差区间，不能称作同条件加速或用本机结果替代GitHub。
 - GitHub [40972368025](https://github.com/engcapa/taomni/actions/runs/40972368025) 已收齐并核验263次执行：**255 passed / 8 failed / 0 skipped**、与selection一致，无缺失。三平台browser各43/43；native Linux44/46、Windows43/44、macOS39/44。七项为性能失败；新增Windows030为真实外部写盘后冲突框未出现，失败页明确显示`File watcher unavailable: workspace watcher initialization cancelled`，不能按性能容差接受。原始回执及全部附件保留。
 - 监听器旧effect的stop与新start异步并发，workspace级stop会取消替代注册。当前在原IPC上增加可选注册ID，cleanup只取消其所属注册；保持旧调用及完整workspace释放语义，并处理卸载后才完成的初始化。前端回归修前3失败、修后相关16项通过，Rust真实监听器/生命周期12项通过，TypeScript、Rust formatting、refactor及catalog gate通过。030保留全部恢复/凭据/磁盘冲突断言，增加目录折叠/展开触发监听器替换，全部精确checkpoint和actions/results映射已核对；dry-run只证明语法。匹配release及三平台真实写盘验证待完成，没有放宽等待或预算。
@@ -100,7 +101,7 @@
 | 事项 | 当前状态与关闭条件 |
 | --- | --- |
 | Windows外部修改冲突通知 | 40980594603真实Windows原生030通过，监听器所有权缺陷已关闭；最终组合保留替换监听、dirty草稿、外部字节保护和保存冲突回归 |
-| SDK/LSP生命周期 | 已实现；macOS062发现交互结束后的诊断采集拖过真实五秒超时，已修正释放顺序，待原生重验；最终三平台保留真实错误、手动刷新、取消/重试、迟到响应及文档队列顺序 |
+| SDK/LSP生命周期 | 已实现；macOS062末尾独立pending读取及trace采集拖过五秒，已合并UI/pending只读观察并提前释放，待原生重验；最终三平台保留真实错误、手动刷新、取消/重试、迟到响应及文档队列顺序 |
 | 多root与系统选择器 | 已实现；最终三平台确认第二/第三root、重复选择、取消、跨工作区迟到结果和成功后展开Project |
 | 编辑器与崩溃保留契约 | 当前287项支持测试通过；最终同SHA验证dirty/save、undo/redo、恢复、分屏、剪贴板、树焦点、Page导航、隐藏面板及完整适用crash组 |
 | 当前分支全量回归 | 相关集全绿后，以当前分支同一SHA使用指定workflow的scope=all验证三平台browser/native，核对全部执行及构建身份 |
