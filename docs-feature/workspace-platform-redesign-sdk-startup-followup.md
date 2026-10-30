@@ -137,7 +137,13 @@
 - 多仓库快照更新会取消 Git HEAD effect，原请求完成后因旧 owner 取消而丢失结果，当前 owner 又因 pending Set 而跳过。现以 promise Map 共享进行中的读取，每个 effect 单独控制发布；旧 HEAD、文件切换及卸载的迟到结果仍被拒绝。区分回归改前2失败/1通过，修后3项通过；保留 `TC-IDE-PARITY-022-01` 原 gutter、HEAD/buffer popup、Show Diff、可撤销 Rollback 和 error stripe 断言，以及008-03真实原生Git边界。
 - PARITY-005-02 原本点击分屏后立即计数；失败DOM已存在两个 pane，第二 EditorView尚未就绪。增加第二真实 `.cm-content` 的条件等待，保留双编辑器精确计数、补全内容和跨pane撤销/重做断言。
 
-这些修复的当前组合仍需本机 matching QA release 和指定 workflow 的三平台证据；前一SHA结果不能作为新源码验收。
+原生全量还发现 C4-03 在24标签恢复的 pane shell 就绪后立即计数，Linux尚无EditorView、macOS失败附件采集时已出现两实例。增加第二pane真实正文的条件等待，保留两实例精确计数、活动文件编辑及末标签正文断言。031恢复后首次邮件标签在窄strip中被裁切，WebKit滚动后点中了S3；现先用真实标签导航菜单揭示邮件，再保留原直接点击和五种协议surface/顺序/ownership断言，不使用合成激活或点击重试。
+
+当前修复提交 `ef57ad4b2a4c66ce1e0b857bc48ac2f224a68467` 已推到当前分支，指定 workflow 定向运行 [41051642653](https://github.com/engcapa/taomni/actions/runs/41051642653) 正在执行三平台browser/native及完整适用crash组。source=`82a4dc2aa9d0db5f73a1c0363ece2d00be57692f398191a0d2d470977ab8af2b`、runner=`0d80f2910f0fcbca68a969eaf75211b808ca0687171597545c8fda18f475d141`；RDP Rust代码、依赖及构建配置未变，定向运行复用41045269719已通过的原生合同，最终全量恢复全部合同。
+
+本机：14项目标单测、80项保留测试全部通过，QA前端TypeScript/refactor/build、catalog及开发合同通过。真实browser目标7项已全部通过（首轮5通过/2条因新增pom后README selector不唯一失败，精确限定README后2/2通过，原失败保留）；031恢复流程1/1通过；完整crash组8/8通过。报告均在`/tmp/taomni-workspace-facts-git-*`，回执、source/runner身份及全部附件摘要已核验。matching QA release原生probe与完整crash组待构建完成后串行执行。前一SHA结果不能作为新源码验收。
+
+全量macOS updater附件还发现发布范围不一致：回执含真实release bundle与Disposable.app，workflow上传排除了其中31个文件。旧运行保留原receipt与缺失列表，不称全部附件已验证；现移除主QA artifact的这些排除规则，最终全量必须逐个核验所有receipt文件。独立精简diagnostics仍保留其原范围。此workflow-only修复不改变产品、case或runner身份，也不需要重新编译QA应用。
 
 ## 当前非性能 follow-up
 
