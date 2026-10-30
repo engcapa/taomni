@@ -71,15 +71,16 @@ export function Breadcrumbs({
     }
   }, [activeNavigationBar, visibleItems.length]);
 
-  // Close popup when the active trail changes (file switch / cursor jump).
+  // Close when the path or active symbol trail changes. Delayed caret telemetry
+  // within the same trail must not dismiss a newly opened navigation popup.
   useEffect(() => {
-    // Invalidate an in-flight directory listing whenever the active trail or
-    // caret changes, so a late response cannot reopen an obsolete popup.
+    // Invalidate an in-flight listing so a late response cannot reopen an
+    // obsolete popup after navigating to another file or symbol.
     loadGenerationRef.current += 1;
     setPopup(null);
     setQuery("");
     setSelectedIndex(0);
-  }, [pathSegments, position.line, position.character]);
+  }, [pathSegments, symbolChain]);
 
   const closePopup = useCallback((restoreFocus = false) => {
     loadGenerationRef.current += 1;
