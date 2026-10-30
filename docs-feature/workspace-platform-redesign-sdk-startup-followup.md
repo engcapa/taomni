@@ -4,6 +4,9 @@
 
 ## 本轮恢复记录（持续更新）
 
+- `cf1729a9854cdd64f694ee26caa2397230fdf379` 的 GitHub [41002449709](https://github.com/engcapa/taomni/actions/runs/41002449709) 已收齐并核验258次执行及6362个附件：**252 passed / 6 failed / 0 skipped**，与selection一致。Linux/Windows browser均43/43，macOS41/43；Linux native42/44、Windows42/42、macOS41/43。真实SDK061–063三平台及macOS菜单080通过；macOS browser070/073、native070及Linux native075仍有167.7–208ms长帧，Linux074与macOS072另有功能失败，不能按10%帧容差放行。本机标准browser19/19；matching release native22/23，070有191ms长帧；两组回执、source/runner/build身份及全部附件已核验，失败原件保留。本次dispatch漏选022和TREE-01，下一轮补齐完整73 ID并加入011/050，不声称258次等于原完整选集。
+- 072已用真实共享编辑器挂载回归稳定复现：外层tab元数据保存正确，重载中断编辑器关闭effect后旧布局仍含records.json；恢复随后将它重新发布到外层。初次host对账现在通过原关闭/dirty确认/资源清理owner移除旧布局里已被外层关闭的root文件；中断open已提交的placeholder也保留所有权，由新请求清理。未提交tab的取消读取仍可被新请求重新打开，避免误当作用户已关闭文件。保留编辑器新打开文件、loose/library、dirty恢复和split语义。三条区分回归均有修前红、修后绿证据，最终相关17项通过；072增加重载前关闭结果断言，不等待存储timer、不改写store/storage；真实browser/native待新组合验收。
+- CPU采样发现关闭的全局搜索框仍订阅所有workspace并构建索引。现仅打开时挂载索引、查询和焦点/键盘owner，关闭释放，重开读取最新文件/会话。隐藏索引回归改前红、改后绿；保留重新搜索、焦点、Enter和Escape。真实入口沿用011；050只验证工具栏/过滤器，不能当作搜索执行证据。树pointer选择不再对已点击行自动reveal，滚动目标相差不超过既有1px阈值时不触发同步无效scroll；键盘/外部选择仍reveal，测量重试/取消保留。两条改前树回归均红，修后与搜索/树4文件22项通过；074相邻文件误开及性能收益仍待实际验证。
 - `06298dc33f977c72dae34ce05ed7ea3557c931f1` 的 macOS 诊断 [40997186885](https://github.com/engcapa/taomni/actions/runs/40997186885) 已收齐并核验25次执行：18 passed / 7 failed / 0 skipped，与selection一致；browser9/9、native9/16。065/069/075按诊断规则主动拒绝验收通过；061/062打开源码分别2788.3/4444.8ms、063恢复约1500.1ms、073冷notes帧191.9999999999991ms，原件保留。采样发现macOS主线程反复创建/替换/释放Tauri菜单，但061主线程大部分空闲，073长帧内也没有同量级已捕获DOM调用，不能称菜单已解释全部超时。
 - 本轮针对菜单重复工作：语义相同的可见spec不再安装；完整创建/替换进入同一串行owner，过期排队版本不创建原生资源；enabled/checked变化原位更新，保留Tauri 2.12显式resource和action channel，失败回滚并允许下次publication重试。纯spec类型、builder和有副作用installer分为三个有明确输入/输出的模块，保持原facade API，避免反向依赖。回归24项及QA工具40项通过；新增macOS原生080通过真实NSMenu检查flags、Save写盘、Close、Quick Connect、About和reload后的回调，已注册schema/policy/dependencies。080本机Linux不适用，真实macOS执行和无诊断性能验证仍待GitHub，不据支持测试宣称提速。
 - `a133d636ca41599654fc27de81ff17ba5b2f5ab6` 的 GitHub [40991754886](https://github.com/engcapa/taomni/actions/runs/40991754886) 已核验263次执行：**256 passed / 7 failed / 0 skipped**、与selection完全一致。三平台browser各43/43，Linux native46/46、Windows44/44；macOS37/44，061恢复、062/063打开普通文件动作超时，065/069/073/075长帧174/175/171/189ms；075慢帧发生于打开notes，首个source观察最大102ms。Linux57观察点3,540帧最大157ms，真实SDK三场景均通过；仍不能验收整体性能。macOS桥接记录显示JS执行多为0–1ms，但请求至renderer开始及无JS操作的HTTP返回也有数百毫秒延误，继续诊断，不扣除预算。
@@ -108,10 +111,11 @@
 
 | 事项 | 当前状态与关闭条件 |
 | --- | --- |
-| SDK/LSP生命周期 | 已实现；本机061–063真实SDK场景通过，托管macOS061/062仍有动作超时；最终三平台保留真实错误、手动刷新、取消/重试、迟到响应及文档队列顺序 |
+| SDK/LSP生命周期 | 已实现；本机及cf1729托管macOS061–063真实SDK场景通过；最终组合三平台保留真实错误、手动刷新、取消/重试、迟到响应及文档队列顺序 |
 | 多root与系统选择器 | 已实现；最终三平台确认第二/第三root、重复选择、取消、跨工作区迟到结果和成功后展开Project |
 | 编辑器与崩溃保留契约 | 先前组合392项支持测试通过；最终同SHA验证dirty/save、undo/redo、恢复、分屏、剪贴板、树焦点、Page导航、隐藏面板及完整适用crash组 |
-| macOS应用菜单生命周期 | 当前消除重复原生菜单工作；最终080验证真实enabled/checked更新、保存、关闭、勾选项及reload后About回调，不能只用mounted mock证明AppKit行为 |
+| 关闭/重载与树指针竞态 | cf1729托管072与074功能失败；072旧布局恢复已稳定复现并修正，树选择滚动已调整；须以新组合实际验证，不能归为允许的慢帧 |
+| macOS应用菜单生命周期 | cf1729托管080已通过真实enabled/checked、保存、关闭、勾选项及reload后About回调；最终组合保留该原生回归 |
 | 当前分支全量回归 | 相关集全绿后，以当前分支同一SHA使用指定workflow的scope=all验证三平台browser/native，核对全部执行及构建身份 |
 | 外部缺口与证据文档 | clickhousecrud源码未提供的TC-IDE-C6-06按既有约定单列；整理最终同SHA回执、截图、构建身份及遗留项，不计缺口为通过 |
 

@@ -29,7 +29,10 @@ export function useProjectTreeScrollRequest(
       if (request.current !== current || latestRows.current[index]?.key !== key) return;
       const offset = list.getOffsetForIndex(index, align);
       if (!offset) return;
-      list.scrollToOffset(offset[0]);
+      // A no-op scroll still synchronously notifies the virtualizer and can
+      // flush React from this layout effect. Keep measurement retries, but
+      // scroll only when the target actually needs to move.
+      if (Math.abs(offset[0] - (list.scrollOffset ?? 0)) > 1) list.scrollToOffset(offset[0]);
       current.frame = requestAnimationFrame(() => {
         current.frame = null;
         if (request.current !== current || latestRows.current[index]?.key !== key) return;

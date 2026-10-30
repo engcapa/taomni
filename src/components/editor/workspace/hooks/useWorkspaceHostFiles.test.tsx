@@ -95,4 +95,62 @@ describe("workspace host request ownership", () => {
     expect(first.onSnapshot).not.toHaveBeenCalled();
     expect(latest.onSnapshot).toHaveBeenLastCalledWith({ files: Object.values(ui().openFiles), activeFile: refs[0] });
   });
+
+  it("closes a root tab committed by an interrupted request without closing a later editor open", async () => {
+    const store = useCodeWorkspaceStore.getState();
+    store.updateEditorGroup(instanceId, "primary", (group) => ({ ...group, openOrder: [keys[0]] }));
+    const first = { ...host(), files: [refs[0]] };
+    const ports = dependencies(first);
+    const close = vi.mocked(ports.editing.fileLifecycle.closeFile).mockImplementation(async (key) => {
+      store.closeLayoutTabInLeaf(instanceId, "primary", key);
+    });
+    let finish = () => {};
+    const open = vi.mocked(ports.files.openFile).mockImplementationOnce(async () => {
+      store.updateEditorGroup(instanceId, "primary", (group) => ({ ...group, openOrder: keys }));
+      await new Promise<void>((resolve) => { finish = resolve; });
+      return null;
+    });
+    const { rerender } = renderHook(({ request }) => useWorkspaceHostFiles({ ...ports, host: request }), { initialProps: { request: first } });
+    await act(async () => undefined);
+    rerender({ request: host(1) });
+    await act(async () => undefined);
+    expect(open).toHaveBeenCalledTimes(1);
+    const latest = { ...host(), files: [refs[0]] };
+    rerender({ request: latest });
+    await act(async () => finish());
+    expect(close).toHaveBeenCalledWith(keys[1], "primary");
+    expect(ui().editorGroups.primary.openOrder).toEqual([keys[0]]);
+    expect(latest.onSnapshot).toHaveBeenLastCalledWith({ files: [ui().openFiles[keys[0]]], activeFile: refs[0] });
+    // A subsequent file opened by the editor is published to the host, rather
+    // than mistaken for a stale restore or an external close.
+    store.updateEditorGroup(instanceId, "primary", (group) => ({ ...group, openOrder: keys }));
+    rerender({ request: { ...latest } });
+    await act(async () => undefined);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(latest.onSnapshot).toHaveBeenLastCalledWith({ files: Object.values(ui().openFiles), activeFile: refs[0] });
+  });
+
+  it("retries an interrupted read with no committed tab when the newer request still wants it", async () => {
+    const store = useCodeWorkspaceStore.getState();
+    store.updateEditorGroup(instanceId, "primary", (group) => ({ ...group, openOrder: [keys[0]] }));
+    const first = { ...host(), files: [refs[0]] };
+    const ports = dependencies(first);
+    let finish = () => {};
+    const open = vi.mocked(ports.files.openFile)
+      .mockImplementationOnce(() => new Promise((resolve) => { finish = () => resolve(null); }))
+      .mockImplementationOnce(async () => {
+        store.updateEditorGroup(instanceId, "primary", (group) => ({ ...group, openOrder: keys }));
+        return { canonicalFileKey: keys[1], groupId: "primary", error: null };
+      });
+    const { rerender } = renderHook(({ request }) => useWorkspaceHostFiles({ ...ports, host: request }), { initialProps: { request: first } });
+    await act(async () => undefined);
+    rerender({ request: host(1) });
+    await act(async () => undefined);
+    const latest = host(0);
+    rerender({ request: latest });
+    await act(async () => finish());
+    expect(open).toHaveBeenCalledTimes(2);
+    expect(ui().editorGroups.primary.openOrder).toEqual(keys);
+    expect(latest.onSnapshot).toHaveBeenLastCalledWith({ files: Object.values(ui().openFiles), activeFile: refs[0] });
+  });
 });

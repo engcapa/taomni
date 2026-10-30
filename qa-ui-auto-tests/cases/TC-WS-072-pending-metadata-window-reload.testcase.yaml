@@ -35,6 +35,9 @@ steps:
 - wait_for: '[data-testid="workspace-tab"][data-tab-kind="terminal"]'
 - click: '[data-testid="workspace-tab"][data-tab-title="records.json"] [data-testid="workspace-tab-close"]'
 - assert_no_runtime_errors: null
+- assert_count:
+    selector: '[data-testid="workspace-tab"][data-tab-title="records.json"]'
+    equal: 0
 - click: '[data-testid="workspace-tab"][data-tab-title="notes.txt"]'
 - reload_window: null
 - click: '[data-testid="nav-mode-workspaces"]'
@@ -68,30 +71,32 @@ verification:
   requirements:
   - id: R1
     requirement: Immediate document reload preserves workspace folders, surviving mixed tabs, closed-file removal, active selection and dirty recovery without an explicit persistence wait.
-    actions: [3, 5, 6, 7, 8, 10, 11, 13, 14, 16, 18, 19, 21, 23, 24, 25]
-    results: [15, 22, 26, 27, 28, 29, 30, 31, 32, 33, 34]
+    actions: [3, 5, 6, 7, 8, 10, 11, 13, 14, 16, 18, 19, 21, 24, 25, 26]
+    results: [15, 22, 23, 27, 28, 29, 30, 31, 32, 33, 34, 35]
     checkpoints:
     - step: 15
       expectation: The editor marks the unsaved text dirty before switching away.
     - step: 22
       expectation: No runtime errors occur before reload.
-    - step: 26
-      expectation: The restored editor is present and still marks the recovered text dirty.
+    - step: 23
+      expectation: The closed records.json tab is absent before immediate reload, without waiting for metadata persistence.
     - step: 27
-      expectation: The restored active tab is notes.txt.
+      expectation: The restored editor is present and still marks the recovered text dirty.
     - step: 28
-      expectation: Exactly one file tab survives.
+      expectation: The restored active tab is notes.txt.
     - step: 29
-      expectation: The local terminal tab is restored.
+      expectation: Exactly one file tab survives.
     - step: 30
-      expectation: The closed records.json tab stays closed.
+      expectation: The local terminal tab is restored.
     - step: 31
-      expectation: The original folder is restored.
+      expectation: The closed records.json tab stays closed.
     - step: 32
-      expectation: The final unsaved input survives reload.
+      expectation: The original folder is restored.
     - step: 33
-      expectation: The original document contents also survive.
+      expectation: The final unsaved input survives reload.
     - step: 34
+      expectation: The original document contents also survive.
+    - step: 35
       expectation: No uncaught renderer errors or crash fallback.
   visual:
   - check: Restored workspace is readable.

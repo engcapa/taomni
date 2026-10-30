@@ -142,6 +142,37 @@ it("preserves the selected file when a cold workspace also restores a terminal b
   expect(platform.getWorkspace()!.openTabs.map((tab) => tab.id)).toEqual([terminal.id, file.id]);
 });
 
+it("keeps an outer file closed when reload interrupts its editor reconciliation", async () => {
+  const first = render(<Panel />);
+  const view = await editor();
+  act(() => view.dispatch({ userEvent: "input.type", changes: { from: 0, insert: "// immediate reload draft\n" } }));
+  await waitFor(() => expect(screen.getByTestId("workspace-file-editor")).toHaveAttribute("data-dirty", "true"));
+  const platform = useWorkspacePlatformStore.getState();
+  const workspace = platform.getWorkspace()!;
+  const original = workspace.openTabs[0];
+  let second = original;
+  act(() => { second = platform.openFileInWorkspace(workspace.id, { rootId: workspace.rootFolders[0].id, path: "records.json" }); });
+  await waitFor(() => expect(screen.getByTestId("workspace-file-editor")).toHaveAttribute("data-path", "records.json"));
+  act(() => platform.openLocalTerminalInWorkspace(workspace.id));
+  act(() => {
+    platform.closeWorkspaceTab(workspace.id, second.id);
+    platform.setActiveWorkspaceTab(workspace.id, original.id);
+    // A document teardown cannot wait for the host effect or provider cleanup.
+    window.dispatchEvent(new Event("beforeunload"));
+    first.unmount();
+  });
+  useCodeWorkspaceStore.setState({ byInstanceId: {} });
+  platform.reloadFromStorage();
+  useWorkspaceEditorStore.setState({ documents: readWorkspaceDocumentRecovery(), activeTabId: null });
+  expect(platform.getWorkspace()!.openTabs.filter((tab) => tab.kind === "file").map((tab) => tab.id)).toEqual([original.id]);
+  render(<Panel />);
+  expect((await editor()).state.doc.toString()).toContain("// immediate reload draft");
+  await waitFor(() => expect(screen.getByTestId("workspace-file-editor")).toHaveAttribute("data-path", "index.ts"));
+  expect(platform.getWorkspace()!.openTabs.filter((tab) => tab.kind === "file").map((tab) => tab.id)).toEqual([original.id]);
+  expect(document.querySelector('[data-testid="workspace-tab"][data-tab-title="records.json"]')).toBeNull();
+  expect(platform.getWorkspace()!.openTabs.filter((tab) => tab.kind === "terminal")).toHaveLength(1);
+});
+
 it("keeps a recovered draft readable when its file cannot be reopened and prevents unsafe saving", async () => {
   const first = render(<Panel />);
   const view = await editor();

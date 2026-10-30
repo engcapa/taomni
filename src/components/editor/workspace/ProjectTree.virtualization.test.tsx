@@ -141,3 +141,40 @@ it("uses resize observations for new rows without forcing layout during their co
   expect(viewport.querySelector<HTMLElement>('[data-virtual-index="1"]')!.style.transform).toBe("translateY(42px)");
   expect(rowHeightReads).not.toHaveBeenCalled();
 });
+
+it("keeps pointer-selected rows in place between the first click and double-click", () => {
+  vi.useFakeTimers();
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => window.setTimeout(() => callback(performance.now()), 16));
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => window.clearTimeout(id));
+  render(<Harness />);
+  const tree = screen.getByRole("tree");
+  const scroll = vi.spyOn(Element.prototype, "scrollTo");
+  const row = screen.getByText("item-005.txt").closest("button")!;
+  const initialScroll = tree.scrollTop;
+  scroll.mockClear();
+  fireEvent.pointerDown(row);
+  fireEvent.click(row, { detail: 1 });
+  expect(row).toHaveAttribute("aria-selected", "true");
+  act(() => vi.advanceTimersByTime(100));
+  expect(scroll).not.toHaveBeenCalled();
+  expect(tree.scrollTop).toBe(initialScroll);
+  fireEvent.doubleClick(row);
+  expect(open).toHaveBeenCalledWith({ kind: "root", rootId: "root", path: "item-005.txt" }, { preview: false });
+  expect(open).toHaveBeenCalledTimes(1);
+});
+
+it("navigates visible rows without forcing a redundant virtualizer scroll commit", () => {
+  render(<Harness />);
+  const pane = screen.getByTestId("code-workspace-tree-pane");
+  act(() => pane.focus());
+  const scroll = vi.spyOn(Element.prototype, "scrollTo");
+  scroll.mockClear();
+  fireEvent.keyDown(pane, { key: "Home" });
+  expect(screen.getByTestId("code-workspace-tree-root")).toHaveFocus();
+  fireEvent.keyDown(pane, { key: "ArrowDown" });
+  expect(screen.getByText("item-000.txt").closest("button")).toHaveFocus();
+  expect(scroll).not.toHaveBeenCalled();
+  fireEvent.keyDown(pane, { key: "End" });
+  expect(scroll).toHaveBeenCalled();
+  expect(screen.getByText("item-499.txt").closest("button")).toHaveFocus();
+});

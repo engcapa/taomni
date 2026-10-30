@@ -64,6 +64,7 @@ export function ProjectTreeViewport({ rows, selected, viewMode }: {
   const items = list.getVirtualItems();
   const selectedKey = treeSelectionKey(selected);
   const previousSelection = useRef({ key: null as string | null, virtual: false });
+  const pointerSelection = useRef<string | null>(null);
   const reveal = useProjectTreeScrollRequest(list, rows, virtual);
 
   useLayoutEffect(() => {
@@ -86,8 +87,13 @@ export function ProjectTreeViewport({ rows, selected, viewMode }: {
 
   useLayoutEffect(() => {
     const previous = previousSelection.current;
+    const pointerKey = pointerSelection.current;
+    pointerSelection.current = null;
     previousSelection.current = { key: selectedKey, virtual };
     if (previous.key === selectedKey && previous.virtual === virtual) return;
+    // Pointer input already reached this row. Re-revealing it here can
+    // scroll between the two physical clicks and open its neighbour instead.
+    if (previous.virtual === virtual && pointerKey === selectedKey) return;
     if (!virtual || !selectedKey) return;
     const index = rows.findIndex((row) => treeSelectionKey(row.selection) === selectedKey);
     if (index >= 0) reveal(index);
@@ -109,6 +115,13 @@ export function ProjectTreeViewport({ rows, selected, viewMode }: {
   if (!virtual) return <>{rows.map((row) => <Fragment key={row.key}>{row.render()}</Fragment>)}</>;
   return (
     <div ref={hostRef} data-testid="code-workspace-tree-viewport" data-row-count={rows.length}
+      onClickCapture={(event) => {
+        pointerSelection.current = null;
+        if (event.detail === 0 || !(event.target instanceof Element)) return;
+        const row = event.target.closest<HTMLElement>("[data-virtual-index]");
+        const selectedRow = row ? rows[Number(row.dataset.virtualIndex)] : undefined;
+        if (selectedRow) pointerSelection.current = treeSelectionKey(selectedRow.selection);
+      }}
       style={{ position: "relative", width: "100%", height: Math.max(0, list.getTotalSize() - insets.bottom) }}>
       {items.map((item) => (
         <div key={item.key} data-index={item.index} data-virtual-index={item.index} ref={list.measureElement}
