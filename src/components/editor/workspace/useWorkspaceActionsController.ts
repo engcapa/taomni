@@ -197,10 +197,10 @@ export function useWorkspaceActionsController({
   useEffect(() => {
     if (host.isDisposed()) return;
     const unregister = host.registerCommands(commands);
-    projection.publish();
+    projection.notify();
     return unregister;
   }, [host, commands, projection]);
-  useEffect(() => projection.publish(), [projection, contextKey]);
+  useEffect(() => projection.notify(), [projection, contextKey]);
   useEffect(() => subscribeContextChanges?.(projection.publish), [projection, subscribeContextChanges]);
 
   return {

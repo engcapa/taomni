@@ -10,6 +10,9 @@ export interface WorkspaceActionProjectionSnapshot {
 export interface WorkspaceActionProjection {
   getSnapshot: () => WorkspaceActionProjectionSnapshot;
   subscribe: (listener: () => void) => () => void;
+  /** Notify versioned owner/command changes without discarding a matching evaluation. */
+  notify: () => void;
+  /** Live editor/tree/keymap inputs may change without a new owner context key. */
   publish: () => void;
 }
 
@@ -24,6 +27,9 @@ export function createWorkspaceActionProjection(
     host: WorkspaceActionHost; generation: number; contextKey: object;
     value: WorkspaceActionProjectionSnapshot;
   } | null = null;
+  const notify = () => {
+    for (const listener of listeners) listener();
+  };
   return {
     getSnapshot: () => {
       const { host, contextKey } = input();
@@ -44,9 +50,10 @@ export function createWorkspaceActionProjection(
       listeners.add(listener);
       return () => { listeners.delete(listener); };
     },
+    notify,
     publish: () => {
       cached = null;
-      for (const listener of listeners) listener();
+      notify();
     },
   };
 }
