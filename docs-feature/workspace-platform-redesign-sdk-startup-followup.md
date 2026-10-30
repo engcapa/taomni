@@ -1,12 +1,35 @@
 # 工作区文件打开与 SDK 后台初始化
 
-**2026-10-30 按用户最新要求：性能暂列 TODO，继续非性能修复及三平台功能验收。** 现有性能失败、原始样本和验收门槛保留；暂不继续性能优化与诊断；按用户最新要求取消main对比，不作为待办或验收前置。下方历史结果不能视作当前组合源码已验收。
+**2026-10-30：可执行的非性能功能回归及三平台GitHub补验已收尾，性能暂列TODO。** 原始clickhousecrud工程未提供的三项native缺口单列。现有性能失败、原始样本和验收门槛保留；暂不继续性能优化与诊断；按用户最新要求取消main对比，不作为待办或验收前置。当前组合的功能与性能结果分列如下；历史记录不替代当前证据。
 
-## 本轮恢复记录（持续更新）
+## 当前组合验证（2026-10-30）
 
-- 当前最终组合提交`2730b58be1a7953b0513c6092bc77649463b6b35`已推送，指定workflow全量[41060730487](https://github.com/engcapa/taomni/actions/runs/41060730487)执行中：671 ID、2,220次适用执行、25个执行分片；3项clickhousecrud外部源码缺口单列。source=`69f94bb8e72d51dd286631d2e55868a42ea4655167ad9d5c8194a5c494eb1281`，runner=`0d80f2910f0fcbca68a969eaf75211b808ca0687171597545c8fda18f475d141`。计划门禁、工具合同、原生合同及三平台QA release构建均通过；尚未收齐全量结果，不能称组合验收通过。本机9文件55项支持测试、refactor/catalog/dev contract通过；匹配QA release构建成功，browser相关及完整crash共11/11、原生恢复/分屏/磁盘操作/标签恢复专项5/5、完整native crash9/9通过，25/69/292个附件及回执均已核验。报告分别在`/tmp/taomni-workspace-legacy-browser-03/`、`/tmp/taomni-workspace-legacy-native-03-probe/`、`/tmp/taomni-workspace-legacy-native-03-crash/`。原生控制脚本首次误用了两个缩写ID，选集检查失败且未启动UI；修为完整ID后执行上述五项，保留原失败日志。
-- 全量已核验2,155次执行，剩macOS native一个分片。两项非性能失败均需补验证：PARITY-008-01返回编辑器后立即计数选区，失败捕获DOM已有原选区，现先等待选区实际绘制再保留原计数、dirty正文和Git零写入断言；C7-08的`click_menu`返回DOM节点，macOS QA桥接器无法序列化该值，现使用已登记的Rename/Delete testid走标准WebDriver点击，保留真实保存/重命名/删除及全部SHA断言。本机修正后browser/native各1/1通过，8/12个附件及回执已核验；产品与runner身份不变，复用匹配release及已通过的保留场景，不为case修正重编应用。指定workflow将定向复验这两项及三平台完整适用crash组；原全量的Linux075 172ms和macOS074约166ms另列性能TODO，保留原始失败。
-- **性能 TODO（用户要求暂缓）**：冷文件打开的偶发长帧仍未达标；最近指定workflow [41036792573](https://github.com/engcapa/taomni/actions/runs/41036792573) 的 Linux075为171ms，macOS074为186.99999999999815ms、073为168ms，均超过165ms。恢复此项时继续保留1500ms正文/高亮、165ms全观察期帧限制及既有输入门槛；不做main比较。功能回归可继续推进；含性能case的workflow即使只有性能失败，原始总体结果仍如实记为失败，不改写为全绿。
+产品组合为`2730b58be1a7953b0513c6092bc77649463b6b35`；`f3acc41b8c44ded0d83f6b314a4c5eb1bbf29fac`仅修正两项QA用例与本文档，产品和runner身份保持一致：
+
+- source：`69f94bb8e72d51dd286631d2e55868a42ea4655167ad9d5c8194a5c494eb1281`
+- runner：`0d80f2910f0fcbca68a969eaf75211b808ca0687171597545c8fda18f475d141`
+
+指定[qa-ui-auto-platforms.yml](../.github/workflows/qa-ui-auto-platforms.yml)全量[41060730487](https://github.com/engcapa/taomni/actions/runs/41060730487)已完成：671 ID、25份执行报告、**2,216 passed /4 failed /0 skipped**；2,220次执行与selection逐项相符。25份回执和25,586个附件已逐字节/SHA核验，无附件缺失；计划门禁、工具合同、原生合同及三平台QA release构建均通过，CI汇总及独立复核均无基础设施错误。原始workflow结果为失败，不能改写为全绿。
+
+| 平台 | browser（通过/总数） | native（通过/总数） | 原始失败 |
+| --- | --- | --- | --- |
+| Linux | 457/457 | 300/301，含独立双屏执行 | 075长帧172ms，性能TODO |
+| Windows | 457/457 | 281/281 | 无 |
+| macOS | 454/455 | 267/269 | browser 008-01、native C7-08用例问题；074长帧约166ms，性能TODO |
+
+两个用例问题已在`f3acc41b`修正，原始失败保留。008-01返回编辑器后立即计数选区，失败捕获DOM随后已有原选区；现等待选区实际绘制，再保留原计数、dirty正文和Git零写入断言。C7-08的`click_menu`返回DOM节点，macOS QA桥接器无法序列化该值；现使用已登记的Rename/Delete testid走标准WebDriver点击，保留真实保存、两次重命名、删除及全部磁盘SHA断言。修正后本机browser/native各1/1通过，8/12个附件及回执已核验。指定workflow定向[41071967519](https://github.com/engcapa/taomni/actions/runs/41071967519)已完成13 ID、**57 passed /0 failed /0 skipped**：三平台browser各9/9、native各10/10，包含这两项及完整适用crash组。15份回执及1,043个附件全部核验，无缺失；selection的57次执行逐项相符，无能力缺口，CI汇总及独立aggregate复核均通过。已检查macOS原生删除后README保留的最终截图，以及browser返回后的dirty正文和原选区截图。该轮沿用全量已通过的Rust原生合同，Rust代码、依赖、工具链和release配置未变。
+
+本机当前source的9文件55项支持测试、refactor/catalog/dev contract通过；匹配QA release构建成功。browser相关及完整crash共11/11、原生恢复/分屏/磁盘操作/标签恢复专项5/5、完整native crash9/9通过，25/69/292个附件及回执均已核验。报告分别在`/tmp/taomni-workspace-legacy-browser-03/`、`/tmp/taomni-workspace-legacy-native-03-probe/`、`/tmp/taomni-workspace-legacy-native-03-crash/`。原生控制脚本首次误用了两个缩写ID，选集检查失败且未启动UI；修为完整ID后完成上述五项，原日志保留。两项QA修正未改变产品及runner，复用匹配release和其它已通过场景，不为case修正重编本机应用。
+
+三平台真实HOME fixture均核验为2,938文件、428目录、最深7层，含320个平铺文档、64个项目，`log/txt/md/json/java/ts/py/sh`八类文件齐全。Linux/Windows 074整条通过；macOS 074仍按性能TODO保留失败，不把失败后的未执行步骤计为通过。Linux原始producer日志确认Ubuntu22.04.5，执行报告确认Ubuntu24.04/X11/Openbox，双屏执行按selection独立核验；原始QA构建身份保持，未在消费分片重新编译或补写identity。
+
+两轮功能证据按相同source/runner及实际case指纹衔接，各自保留原始producer身份。Windows补验与全量使用同一二进制；Linux补验重新构建，记录的构建输入相同、二进制哈希不同；macOS补验的构建环境为15.8.2/Node22.23.4，全量为15.7.9/Node22.23.2，二进制分别记录。性能TODO继续引用原始全量样本，功能补验不产生性能通过结论。
+
+证据在`qa-ui-auto-report/_local/workspace-41060730487/`与`workspace-41071967519/`，均链接到`/tmp/taomni-workspace-hosted-<run>/`。每组保留原始报告、selection、receipt、`verified-evidence.json`及`selection-execution-check.json`；两轮均用维护中的CI aggregate独立核验构建、分片、桌面及run身份，结果为`local-aggregate-check.json`。大附件遇到网络EOF后使用本机临时分块续传工具，核验ZIP及所有回执文件，不改runner或原始报告。工程盘保持约24GB可用，新大产物均在`/tmp`。
+
+## 历史恢复记录（后续结论以当前组合验证为准）
+
+- **性能 TODO（用户要求暂缓）**：冷文件打开的偶发长帧仍未达标；此前指定workflow [41036792573](https://github.com/engcapa/taomni/actions/runs/41036792573) 的 Linux075为171ms，macOS074为186.99999999999815ms、073为168ms，均超过165ms。恢复此项时继续保留1500ms正文/高亮、165ms全观察期帧限制及既有输入门槛；不做main比较。功能回归可继续推进；含性能case的workflow即使只有性能失败，原始总体结果仍如实记为失败，不改写为全绿。
 - Terminal 非性能修复提交`ad9c797fa86a6bddfce84058034ff6a8aa606c86`已推当前分支，指定workflow全量[41045269719](https://github.com/engcapa/taomni/actions/runs/41045269719)进行中，670 ID、2,217次适用执行；3项clickhousecrud外部源码缺口单列。source=`c51e8e1fbacba403d3cc0a64100aff973f0e062ae219e70b60a3b821132cfd41`，runner保持`0d80f2910f0fcbca68a969eaf75211b808ca0687171597545c8fda18f475d141`。本机118项支持测试通过/1既有编译模式条件skip，TypeScript、QA前端构建、refactor/catalog/dev contract通过；matching release构建成功，binary=`68778be3fcd1b0f235dc81a28832bfb6d9f3e3244db3706db6e37c5777f89042`。真实native024-03/024-04 **2/2通过**，回执与24个附件已核验（`/tmp/taomni-workspace-terminal-margin-native-probe/run-20261030-191500-628028294`）；完整browser crash组 **8/8通过**，回执、输入及附件已核验，完整native crash组 **9/9通过**，回执及292个附件已核验（`/tmp/taomni-workspace-terminal-margin-native-crash/run-20261030-191535-879102167`）。
 - Terminal根因与保留边界：9ea本机024-03的实际PTY及提示符均存在，但Bash在右边界显式CR/LF/CR后打印末空格，光标位于未自动wrap行的col1，原逻辑只识别col0。现仅在readline启用、当前行未自动wrap且为空、前行确实满格时连接末空格，保留未提交命令和普通输出负向条件。真实xterm区分回归修前2失败/16通过；扩大回归暴露的提前单元格读取已改为候选处才读取，原失败日志保留。024-04在真实Linux Bash中显式生成一行/两行边界提示符，检查未提交命令非就绪及工具窗移动后的独立输出；024-03保留三平台原移动断言。
 
@@ -134,45 +157,30 @@
 
 `41045269719` 当前已核验的 browser 分片暴露以下非性能问题，原始失败保留：
 
-- 普通目录按需发现后，UI 新建/保存描述符没有失效通知。现在文件创建、保存、重命名和删除仅在磁盘操作成功后通知发现层；普通文本写入不触发项目扫描，HOME 仍只浅扫，显式刷新仍保留有界递归。新 mounted 回归改前2失败/5通过；修后连同 Windows 路径、隐藏状态和 Git 生命周期14项通过。新增 `TC-IDE-C7-08-descriptor-mutations-native` 独立操作 owned fixture，验证创建/保存/来回重命名/删除、发现状态及真实文件 SHA；尚待执行。
+- 普通目录按需发现后，UI 新建/保存描述符没有失效通知。现在文件创建、保存、重命名和删除仅在磁盘操作成功后通知发现层；普通文本写入不触发项目扫描，HOME 仍只浅扫，显式刷新仍保留有界递归。新 mounted 回归改前2失败/5通过；修后连同 Windows 路径、隐藏状态和 Git 生命周期14项通过。新增 `TC-IDE-C7-08-descriptor-mutations-native` 独立操作 owned fixture，验证创建/保存/来回重命名/删除、发现状态及真实文件SHA；修正版已在本机及GitHub三平台原生通过。
 - C7-06/07、D1-01 与 C2-02 原用例仅打开无 pom 的普通 README，却预期 Maven 工具失败或补全项目降级提示。现在先通过 UI 创建并保存明确 Maven 描述符，再保留全部原失败原因、刷新、scope 和补全提示断言；不恢复普通文件的自动 Maven 扫描。C7-03 改用编辑器 fill 避免 XML 自动补闭合制造错误正文，并在手动刷新前断言自动发现。
 - 多仓库快照更新会取消 Git HEAD effect，原请求完成后因旧 owner 取消而丢失结果，当前 owner 又因 pending Set 而跳过。现以 promise Map 共享进行中的读取，每个 effect 单独控制发布；旧 HEAD、文件切换及卸载的迟到结果仍被拒绝。区分回归改前2失败/1通过，修后3项通过；保留 `TC-IDE-PARITY-022-01` 原 gutter、HEAD/buffer popup、Show Diff、可撤销 Rollback 和 error stripe 断言，以及008-03真实原生Git边界。
 - PARITY-005-02 原本点击分屏后立即计数；失败DOM已存在两个 pane，第二 EditorView尚未就绪。增加第二真实 `.cm-content` 的条件等待，保留双编辑器精确计数、补全内容和跨pane撤销/重做断言。
 
-原生全量还发现 C4-03 的24标签恢复失败。增加第二pane真实正文的条件等待后，本机仍捕获该编辑器出现后被移除：旧版最近工作区首次导入只登记最后活动文件，后台恢复结束后，host把其余23个标签当作外层关闭项处理。现在仅在首次创建平台工作区时，从同一恢复身份的布局导入完整已知root文件列表；后续已存在工作区仍由外层文件列表拥有关闭语义，不会从旧布局复活已关闭标签。前三项区分回归修前全部失败；补查每leaf 24标签时，又复现通用去重helper的全局24条上限，现改为按布局所有leaf去重，保留原有每leaf上限。四项回归及入口、host请求/分屏、恢复队列和完整编辑器生命周期9文件55项通过。C4-03保留两实例精确计数、真实编辑及末标签正文，另在后台恢复后检查24个外层文件标签、两实例仍在及无运行时错误。新组合尚需匹配QA release和原生验证。
+原生全量还发现 C4-03 的24标签恢复失败。增加第二pane真实正文的条件等待后，本机仍捕获该编辑器出现后被移除：旧版最近工作区首次导入只登记最后活动文件，后台恢复结束后，host把其余23个标签当作外层关闭项处理。现在仅在首次创建平台工作区时，从同一恢复身份的布局导入完整已知root文件列表；后续已存在工作区仍由外层文件列表拥有关闭语义，不会从旧布局复活已关闭标签。前三项区分回归修前全部失败；补查每leaf 24标签时，又复现通用去重helper的全局24条上限，现改为按布局所有leaf去重，保留原有每leaf上限。四项回归及入口、host请求/分屏、恢复队列和完整编辑器生命周期9文件55项通过。C4-03保留两实例精确计数、真实编辑及末标签正文，另在后台恢复后检查24个外层文件标签、两实例仍在及无运行时错误。当前组合已完成匹配QA release、本机恢复专项及三平台全量C4-03验证，均通过；详见当前组合验证。
 
-031恢复后首次邮件标签在窄strip中被裁切，WebKit滚动后点中了S3；现先用真实标签导航菜单揭示邮件，再保留原直接点击和五种协议surface/顺序/ownership断言，不使用合成激活或点击重试。C7-08与031首轮原生probe还暴露WebDriver不支持的`:has-text`，已分别改用现有`click_menu`和标准XPath；保持全部发现状态、磁盘SHA及协议surface断言。修正后本机Linux release原生2/2通过，15个附件、回执与source/runner/build身份已核验（`/tmp/taomni-workspace-selector-native-02/run-20261030-201042-042205466`）；该证据属于ef57产品源码，首次导入修复组合仍需新原生验证。
+031恢复后首次邮件标签在窄strip中被裁切，WebKit滚动后点中了S3；现先用真实标签导航菜单揭示邮件，再保留原直接点击和五种协议surface/顺序/ownership断言，不使用合成激活或点击重试。C7-08与031首轮原生probe还暴露WebDriver不支持的`:has-text`，已分别改用现有`click_menu`和标准XPath；保持全部发现状态、磁盘SHA及协议surface断言。修正后本机Linux release原生2/2通过，15个附件、回执与source/runner/build身份已核验（`/tmp/taomni-workspace-selector-native-02/run-20261030-201042-042205466`）；该证据属于ef57历史产品源码；首次导入修复组合及进一步的macOS选择器补验见当前组合验证。
 
-当前修复提交 `ef57ad4b2a4c66ce1e0b857bc48ac2f224a68467` 已推到当前分支，指定 workflow 定向运行 [41051642653](https://github.com/engcapa/taomni/actions/runs/41051642653) 正在执行三平台browser/native及完整适用crash组。source=`82a4dc2aa9d0db5f73a1c0363ece2d00be57692f398191a0d2d470977ab8af2b`、runner=`0d80f2910f0fcbca68a969eaf75211b808ca0687171597545c8fda18f475d141`；RDP Rust代码、依赖及构建配置未变，定向运行复用41045269719已通过的原生合同，最终全量恢复全部合同。
+中间修复提交 `ef57ad4b2a4c66ce1e0b857bc48ac2f224a68467` 的指定workflow定向运行 [41051642653](https://github.com/engcapa/taomni/actions/runs/41051642653) 已完成：104次执行，95 passed /9 failed /0 skipped。9次失败为三平台C4恢复及C7-08/031旧选择器问题；15份回执与1,348个附件全部核验，无缺失，原始失败保留。source=`82a4dc2aa9d0db5f73a1c0363ece2d00be57692f398191a0d2d470977ab8af2b`、runner=`0d80f2910f0fcbca68a969eaf75211b808ca0687171597545c8fda18f475d141`；RDP Rust代码、依赖及构建配置未变，定向运行复用41045269719已通过的原生合同，最终全量恢复全部合同。
 
 ef57本机：14项目标单测、80项保留测试全部通过，QA前端TypeScript/refactor/build、catalog及开发合同通过。真实browser目标7项已全部通过（首轮5通过/2条因新增pom后README selector不唯一失败，精确限定README后2/2通过，原失败保留）；031恢复流程1/1通过；完整crash组8/8通过。报告均在`/tmp/taomni-workspace-facts-git-*`，回执、source/runner身份及全部附件摘要已核验。matching QA release原生probe为1通过/3失败，008-03真实Git通过，C4-03及上述两处selector原失败保留；完整native crash组9/9通过，292个附件及回执已核验。前一SHA结果不能作为新源码验收。
 
-全量macOS updater附件还发现发布范围不一致：回执含真实release bundle与Disposable.app，workflow上传排除了两个分片各31个文件，共62个。旧运行保留原receipt与缺失列表，不称全部附件已验证；现移除主QA artifact的这些排除规则，最终全量必须逐个核验所有receipt文件。独立精简diagnostics仍保留其原范围。此workflow-only修复不改变产品、case或runner身份，也不需要重新编译QA应用。
+全量macOS updater附件还发现发布范围不一致：回执含真实release bundle与Disposable.app，workflow上传排除了两个分片各31个文件，共62个。旧运行保留原receipt与缺失列表，不称全部附件已验证；现移除主QA artifact的这些排除规则，当前全量25,586个回执附件已全部核验，无此缺口。独立精简diagnostics仍保留其原范围。此workflow-only修复不改变产品、case或runner身份，也不需要重新编译QA应用。
 
-原全量`41045269719`已收齐25份报告及2,217次执行：**2,192 passed /25 failed /0 skipped**；24次功能失败均属于上述发现/Git/分屏恢复/031问题，另1次Linux075为168ms性能TODO。已核验25,566个实际附件，62个缺失按前段保留，不称旧证据完整。`90fb47c5`的全量[41054942234](https://github.com/engcapa/taomni/actions/runs/41054942234)在Catalog门禁失败，尚无UI执行：031的XPath没有登记到控件alias。现补齐对应alias并重新生成catalog，不降低coverage baseline。该SHA本机browser11/11通过，含完整8项crash组，回执及25个附件已核验；后续每leaf上限修正还需新组合复验。
+原全量`41045269719`已收齐25份报告及2,217次执行：**2,192 passed /25 failed /0 skipped**；24次功能失败均属于上述发现/Git/分屏恢复/031问题，另1次Linux075为168ms性能TODO。已核验25,566个实际附件，62个缺失按前段保留，不称旧证据完整。`90fb47c5`的全量[41054942234](https://github.com/engcapa/taomni/actions/runs/41054942234)在Catalog门禁失败，尚无UI执行：031的XPath没有登记到控件alias。现补齐对应alias并重新生成catalog，不降低coverage baseline。该SHA本机browser11/11通过，含完整8项crash组，回执及25个附件已核验；每leaf上限修正已在当前组合55项支持测试与三平台原生C4-03通过。
 
 ## 当前非性能 follow-up
 
-以下按最终组合源码验收；历史通过不能替代新源码证据。Windows监听器所有权修复已在40980594603真实原生030通过；最终组合继续保留该回归。
+可执行的非性能开发与验证已收尾。当前产品组合的全量及57/57补验已验证SDK/LSP生命周期、多root与目录选择器、编辑器dirty/save/undo/redo、旧版24标签及分屏恢复、关闭/重载、树指针与ResizeObserver生命周期、隐藏面板几何、导航弹层、macOS应用菜单、Terminal右边界readiness、多仓库Git、标签ownership及描述符完整磁盘操作。两项QA修正版已在三平台browser/native通过；完整适用crash组全部通过。性能失败所在用例未执行的后续步骤仍不算通过。
 
-| 事项 | 当前状态与关闭条件 |
-| --- | --- |
-| SDK/LSP生命周期 | 已实现；本机及cf1729托管macOS061–063真实SDK场景通过；最终组合三平台保留真实错误、手动刷新、取消/重试、迟到响应及文档队列顺序 |
-| 多root与系统选择器 | 已实现；最终三平台确认第二/第三root、重复选择、取消、跨工作区迟到结果和成功后展开Project |
-| 编辑器与崩溃保留契约 | 先前组合392项支持测试通过；最终同SHA验证dirty/save、undo/redo、恢复、分屏、剪贴板、树焦点、Page导航、隐藏面板及完整适用crash组 |
-| 关闭/重载与树指针竞态 | 历史组合托管072与074功能断言已通过；bd6 Linux074仍有下项运行时错误，最终组合继续保留真实关闭/重载与指针断言 |
-| 文件树ResizeObserver生命周期 | bd6托管Linux native074真实错误已修；下一帧合并及卸载清理回归通过，bd39三平台原生074及ef14已收Linux/macOS通过，最终组合继续保留，不接受过滤错误 |
-| 隐藏工具面板几何 | 零尺寸挂载时关闭Documentation占33.333%宽度已修；树/分隔器47项、双入口及跨消费者105项通过，bd39三平台真实038通过，最终组合保留实际无布局框断言 |
-| 导航弹层与迟到光标遥测 | 同一路径/符号链的延迟光标不再关闭弹层；区分回归修前红、修后24项通过，ef14三平台browser NAV-01/02通过，最终组合继续保留 |
-| 设置与分屏就绪 | Code Style打开崩溃已修复且新增区分回归，当前产品源码真实browser修后通过；TREE-01增加真实第二编辑器就绪及正文断言，最终三平台复验 |
-| macOS应用菜单生命周期 | cf1729托管080已通过真实enabled/checked、保存、关闭、勾选项及reload后About回调；最终组合保留该原生回归 |
-| Terminal右边界readiness | 118项支持测试通过；matching release本机024-03/024-04真实PTY均通过，browser/native完整crash组8/8及9/9通过，GitHub三平台执行中 |
-| 描述符发现与多仓库Git | 已修复成功磁盘操作后的发现失效、并发HEAD结果丢失；本机相关browser及真实native边界通过，最终组合三平台复验原断言 |
-| 旧版工作区首次导入 | 24标签恢复后被host关闭的根因已修，保持每leaf 24标签且全布局去重；新增4项区分回归及55项保留测试通过，原生C4-03和最终托管组合待验证 |
-| 当前分支全量功能回归 | 性能按用户要求另列TODO；以当前分支同一SHA使用指定workflow的scope=all验证三平台browser/native，逐项处理非性能失败；Linux保留默认ubuntu-24.04-xvfb执行桌面与原始ubuntu-22.04 release producer，核对原始producer、全部执行及构建身份 |
-| 外部缺口与证据文档 | clickhousecrud源码未提供的TC-IDE-C6-06按既有约定单列；整理最终同SHA回执、截图、构建身份及遗留项，不计缺口为通过 |
+**非性能仅剩原始clickhousecrud项目验证缺口**：`TC-IDE-C6-06-java-definition-realproject-native`依赖未分发的原始项目；需提供`QA_JAVA_PROJECT_ROOT`对应工程后补Linux/Windows/macOS native。三项均为能力缺口，不计通过或skip，也不以其它项目替代。
 
-HOME混合fixture与用户要求的本机测试产物清理已完成，不列为剩余开发项。
+HOME混合fixture、本机测试产物清理和当前证据归档已完成。性能单列TODO，当前没有其它待开发的非性能产品功能。
 
 ## 当前分支与历史交接入口
 
@@ -243,10 +251,10 @@ HOME混合fixture与用户要求的本机测试产物清理已完成，不列为
 
 ## 当前待办顺序（按用户最新要求）
 
-1. **Terminal非性能修复**：完成右边界readline提示符readiness修复；支持回归118通过、1既有编译模式条件skip，catalog/refactor/dev contract通过。匹配QA release已构建；独立桌面024-03移动与024-04一行/两行显式边界、未提交输入非就绪及真实独立输出2/2通过；browser/native完整crash组8/8及9/9均通过，全部回执及附件已核验。
-2. **三平台全量功能回归**：已将`ad9c797fa86a6bddfce84058034ff6a8aa606c86`推到当前分支，通过指定[qa-ui-auto-platforms.yml](../.github/workflows/qa-ui-auto-platforms.yml)启动[41045269719](https://github.com/engcapa/taomni/actions/runs/41045269719)。scope=all、三平台browser/native、QA release，670 ID、2,217次适用执行；尚在执行，不能算通过。核验selection、原始receipt、source/runner/case/build身份及全部非性能断言，处理实际功能失败。最终新组合保留SDK/LSP、目录选择器、多root、恢复/分屏/剪贴板、导航、隐藏面板、macOS菜单、Git及完整适用crash组。
-3. **明确缺口与证据**：TC-IDE-C6-06的外部clickhousecrud源码缺口在三native平台单列，不计通过。全量证据下载到`/tmp`，由report目录链接，避免再次占满工程挂载点；保留原失败，不以分片job颜色替代case结果。
-4. **性能TODO**：停止继续优化和诊断。现有165ms帧、1500ms正文/高亮/动作、SDK五秒及输入门槛不变；全量内若触发性能失败，原始case/workflow仍如实失败，汇总中单列TODO。GitHub真实HOME混合fixture继续保留。**不做main对比，也不以该对比阻塞其余工作。**
+1. **外部项目缺口**：原始clickhousecrud工程未提供，C6-06三平台native单列待补，不以其它fixture替代原项目。
+2. **性能TODO，暂缓**：Linux075 172ms、macOS074约166ms仍超过165ms。保留1500ms正文/高亮/动作、165ms完整观察期、真实SDK五秒及既有输入门槛；不继续优化或诊断，不调度main比较。
+
+非性能GitHub闭环与证据归档已完成：全量2,220次、25份回执和25,586附件，修正版补验57/57、15份回执和1,043附件，均无缺失。产品/runner指纹相同，只有两份case变化；这些case使用新结果，其余未修改case复用全量证据，旧全量失败不改写。最后的文档归档仅记录证据，不改变产品、case或runner；沿用C4-03、C7-08、PARITY-008-01及完整crash的实际结果，无新增行为需要新用例或重编应用。
 
 ## 恢复命令与执行约束
 
