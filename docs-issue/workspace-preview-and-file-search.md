@@ -68,4 +68,57 @@
 1. Linux TC-WS-081：纯 Preview 查找通过，Split 步骤 36 失败。焦点记录证明按键来自预览，截图却显示源码 Find。CodeMirror 异步挂载可能晚于预览聚焦，后注册的同 owner Find 覆盖预览动作。补充稳定失败的 hook 回归；Action 层增加默认 0 的注册优先级，聚焦预览使用 1，失焦／卸载移除后恢复源码动作。既有同优先级的后注册覆盖、owner 隔离与自定义快捷键保持原契约。
 2. macOS TC-WS-037：拷贝成功后双击目标却打开 README。新增搜索状态行放在结果之前，文件 watcher 刷新结束移除提示，恰好在指针定位后把目标上移一行。原始 screenshot／focus events 保留在 `/tmp/taomni-search-hosted-native-before/`。加载／错误／截断提示移到已发布结果末尾，避免异步状态变化移动点击目标。补充先失败的结果顺序与 DOM 身份／打开行为回归，保留 TC-WS-037 的真实磁盘复制和保存断言。
 
-跟进快速回归：8 个测试文件、77 项通过；`pnpm check:refactor` 与 `audit --gate` 通过。TC-WS-081 增加 Split 的实际高亮截图，断言未放宽。使用最终源码重建 QA release，并重跑本地 HOME、完整 crash／目标用例与三平台验证；最终结果待补充。
+跟进快速回归：8 个测试文件、77 项通过；`pnpm check:refactor` 与 `audit --gate` 通过。TC-WS-081 增加 Split 的实际高亮截图，断言未放宽。使用最终源码重建 QA release，并重跑本地 HOME、完整 crash／目标用例与三平台验证，结果见下文。
+
+
+## 最终源码验收
+
+产品提交：`a1cc9c9f`、`efc3eea7`。最终源码 SHA256：`f9920d8ae7d0e07222c37b71a7a5475d6bac71ed0204558057404ea54fcbc22a`，runner SHA256：`d3db1f7a56a3afd6841941e680ce8a499da1f673e166d5e55ccb278afb7990de`。
+
+- QA release 构建：通过，包含 TypeScript、生产前端、refactor 契约／边界／行数检查；日志 `/tmp/taomni-preview-tree-final-build.log`。应用 ID 为 `com.taomni.app.qa`。
+- 快速回归：8 个文件 77 项通过；Workspace 挂载回归 2 项通过（按用例名筛选，其余 259 项未选择）。开发用例契约与静态 QA audit 通过。
+- 最终 browser：`/tmp/taomni-preview-tree-browser-final/run-20261031-172622-636525530`，12/12、零失败／跳过，包含完整 8 项 crash 回归；TC-WS-082 内容可用 189ms，最大帧 87.5ms。
+- 最终 native：`/tmp/taomni-preview-tree-native-final/run-20261031-173307-038807728`，12/12、零失败／跳过，包含完整 9 项 crash 回归；TC-WS-082 内容可用 249ms，最大帧 118ms。
+- 最终 HOME native：`/tmp/taomni-preview-tree-home-final/run-20261031-173240-651027619`，1/1；确认根目录 `.bashrc` 与 `.config` 可发现、快捷键无 New Session 冲突。仅访问元数据，未打开或修改个人文件。
+- 上述本地报告 identity_stable=true，native 构建与源码指纹一致；检查原始 runner receipt 签名与所列 artifact 字节数／SHA256，均通过。最终串行验证链 `/tmp/taomni-preview-tree-final-validation.log` 退出 0。
+
+[最终 GitHub 三平台 run 41188334492](https://github.com/engcapa/taomni/actions/runs/41188334492) 测试 `efc3eea7`。选择清单无 gaps／unreviewed，72/72 次 UI 执行通过、零失败／跳过，包含完整 browser／native crash-regression 集合。工作流 conclusion=success；[原始 CI 汇总](workspace-preview-and-file-search-evidence/github-ci-summary.json) 的 passed=true、report_ok=true，failures／infrastructure_errors 均为空。已校验全部 15 份托管执行报告的 runner receipt 签名与所有登记 artifact 的字节数／SHA256；identity_stable=true、源码一致，同一平台的四个原生分片使用相同 binary hash。
+
+| 平台 | Browser | Native |
+| --- | --- | --- |
+| Linux / WebKitGTK | 12/12 | 12/12 |
+| Windows / WebView2 | 12/12 | 12/12 |
+| macOS / WKWebView | 12/12 | 12/12 |
+
+原生列为真实 Tauri IPC 与对应平台 WebView；browser 列均为 Chromium。Linux 使用托管 Xvfb；macOS 使用隔离 QA WKWebView bridge，不能据此声称物理键盘、系统 IME 或权限弹窗已测。工作流按选择跳过的工具／开发契约 job 不计作 UI 用例通过；UI 验收要求零失败／跳过。
+
+### 最终输入响应数据
+
+保留原有空查询／IPC／结果打开／帧预算，不因失败或测量波动调整阈值。最终独立批次在编译与 E2E 结束后执行，5 轮、45 字符、20ms 驱动字符间隔：keydown→下一帧 p50 23.5ms、p95 56.1ms、最大 97.7ms；连续帧 p95 16.8ms、最大 100ms。原有 150ms 探针阈值通过，目标文档 5/5 找到，空查询递归索引调用每轮均为 0。相对较早独立基线 p95 增加 18.9ms，不能只引用早期较快的候选数据。
+
+已启动的交错补测也保留原始结果：同一 Chromium 148 / Linux 主机，前后各两轮预热不参与统计，然后按 AB／BA 交错五轮，每版 45 字符；baseline 为 `abf342f6`，candidate 为 `efc3eea7`。
+
+| 指标（ms） | 修改前 | 最终候选 |
+| --- | --- | --- |
+| keydown→下一帧 p50 | 25.5 | 29.6 |
+| keydown→下一帧 p95 | 44.1 | 84.9 |
+| keydown→下一帧最大值 | 109.9 | 95.3 |
+| 连续帧 p95 | 16.8 | 16.8 |
+| 连续帧最大间隔 | 99.9 | 83.4 |
+| 目标文档发现次数 | 0/5 | 5/5 |
+| 空查询递归索引调用 | 0 | 0 |
+
+交错数据的尾延迟仍有差异，因此这里只确认绝对响应预算、空查询工作量与懒加载契约通过，不声称严格零退化或速度提升。按本次验收约定，十几毫秒级差异暂不追加优化；不再为小样本波动重复跑到更快结果。主机运行中的其他个人应用未停止。测试后已关闭专用基线 Vite，保留用户原有服务。
+
+原始数据：[早期独立基线](workspace-preview-and-file-search-evidence/search-performance-before.json)、[最终独立候选](workspace-preview-and-file-search-evidence/search-performance-final-isolated.json)、[完整交错数据（含预热）](workspace-preview-and-file-search-evidence/search-performance-interleaved.json)。以上为 Chromium 渲染器诊断，不冒充原生 OS→屏幕延迟；native release 的结果打开与帧预算由 TC-WS-082 另行覆盖。
+
+### 可直接查看的截图
+
+截图使用可丢弃 fixture，不包含真实 HOME 内容。完整过程、故障截图与原始 receipt 保留在对应 GitHub artifacts；仓库保留以下关键图：
+
+| 行为 | 修改前 | 修改后（最终 GitHub Linux native） |
+| --- | --- | --- |
+| Markdown Ctrl+F | [没有查找栏](workspace-preview-and-file-search-evidence/markdown-find-before.png) | [查找与高亮](workspace-preview-and-file-search-evidence/markdown-preview-found.png)，[Split 预览查找](workspace-preview-and-file-search-evidence/markdown-split-preview-found.png) |
+| 目录／普通文件搜索 | [只返回目录中的文件](workspace-preview-and-file-search-evidence/tree-folder-search-before.png) | [返回目录、空目录和文档并打开正确内容](workspace-preview-and-file-search-evidence/file-and-folder-search-beyond-index.png) |
+
+此记录与截图的后续提交仅补充已执行证据，不改变运行行为；没有新增可执行用例。保留验收用例为 TC-WS-081／082／037 与完整 crash-regression 集合。
