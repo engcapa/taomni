@@ -194,7 +194,7 @@ impl MobileRuntime {
             let _ = running.task.await;
         }
         self.broker.disable();
-        if let Ok(auth) = self.auth.lock() {
+        if let Ok(mut auth) = self.auth.lock() {
             let _ = auth.flush();
         }
     }

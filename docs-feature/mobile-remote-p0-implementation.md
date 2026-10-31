@@ -48,14 +48,14 @@ pnpm build:mobile                # 生成内嵌 PWA，主 build 会自动执行
 | 设计项 | 具体证据 | 当前结果 |
 | --- | --- | --- |
 | V-01 / V-06 | Rust `mobile::auth`、真实 HTTP/WS security/CORS/revoke/listener 测试 | 本机通过 |
-| V-02 | Rust 真实 provider follow-up/cancel/turn_in_progress、确认点绑定/重复作答；native 保存会话投影 | Rust 本机通过；native 待 GitHub |
+| V-02 | Rust 真实 provider follow-up/cancel/turn_in_progress、确认点绑定/重复作答；native 保存会话投影 | Rust Rust 本机通过；native 待 GitHub |
 | V-03 | Rust 双设备真实 PTY、只读拒绝/尺寸钳制/桌面抢回/续接；回放 UTF-8/CR/截断 | 本机通过；桌面原生入口待 GitHub |
 | V-04 | TC-MOBILE-001：390×844、配对、双 Origin endpoint、终端/Agent 输入分离、只读文件/diff、移除与重载；renderer fixture 显式不算 native 证据 | 本机通过 |
 | V-04 / V-05 | TC-MOBILE-003：真实 headless listener 内嵌 PWA 配对、WS、390×844、离线外壳；TC-MOBILE-002：真实桌面 settings→PTY→吊销 | 待 GitHub |
 | V-07 | Rust 真实 Git worktree/staged/deleted diff、大文件/二进制/越界、无终端文件事件；settings Vitest 21 tests | 本机通过 |
-| V-07 / crash | 完整 crash-regression browser/native；matching QA release | 执行中，最终提交补记 run 链接与 selected 结果 |
+| V-07 / crash | 完整 crash-regression browser/native；matching QA release | 本机稳定源码 browser 9/9（含全部 8 项 crash）通过；native 执行中，最终提交补记 GitHub 结果 |
 
-本机 Node 22.23.4、pnpm 10；Rust 1.98。完整 `pnpm build`（含 check:refactor、Mobile Web 和桌面构建）已通过；Rust `cargo check --lib` 已通过。后续源码变更均重跑受影响检查。
+本机 Node 22.23.4、pnpm 10；Rust 1.98。完整 `pnpm build`（含 check:refactor、Mobile Web 和桌面构建）已通过；Rust `cargo check --lib` 已通过。后续源码变更均重跑受影响检查。最新移动 Rust 集合为 12 项通过，QA 审计无覆盖倒退，CI 规划与 provenance/crash 选择工具契约 28 项通过。
 
 未验证：Android/iOS 真手机、PWA 真实安装、相机扫码权限、真实公网 HTTPS→私网 PNA、用户实际隧道/反向代理、Windows/macOS 实例运行及真实 SSH 网络。本轮使用本机手机尺寸模拟与 GitHub Linux 原生服务测试，不称为多端真机通过。headless CC/Codex/ACP 和桌面副作用工具明确不支持，非隐藏失败或占位按钮。
 

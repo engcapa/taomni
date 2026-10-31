@@ -80,6 +80,12 @@ impl Auth {
             .map_err(|_| "Cannot publish device store")?;
         Ok(())
     }
+    fn synchronize_revocation(&mut self) {
+        if self.path.as_ref().is_some_and(|p| !p.is_file()) {
+            self.devices.clear();
+            self.tickets.clear();
+        }
+    }
     pub fn pairing_code(&mut self) -> String {
         let code = Uuid::new_v4().simple().to_string(); // 122 random bits, 5 minutes
         self.code = Some((hash(&code), Instant::now() + Duration::from_secs(300)));
@@ -92,6 +98,7 @@ impl Auth {
         origin: Option<String>,
         source: &str,
     ) -> Result<serde_json::Value, String> {
+        self.synchronize_revocation();
         let now = Instant::now();
         self.failures.retain(|_, (until, _)| *until > now);
         // Also bound arbitrary source identities; the listener never trusts X-Forwarded-For.
@@ -163,6 +170,7 @@ impl Auth {
             && self.devices.iter().any(|d| d.device_id == id)
     }
     pub fn revoke(&mut self, id: &str) -> Result<(), String> {
+        self.synchronize_revocation();
         let previous = self.devices.clone();
         self.devices.retain(|d| d.device_id != id);
         if let Err(e) = self.save() {
@@ -190,7 +198,8 @@ impl Auth {
         (until > Instant::now() && expected_origin.as_deref() == origin && self.exists(&device))
             .then_some(device)
     }
-    pub fn flush(&self) -> Result<(), String> {
+    pub fn flush(&mut self) -> Result<(), String> {
+        self.synchronize_revocation();
         self.save()
     }
 }
@@ -256,6 +265,8 @@ mod tests {
         b.load(path.clone()).unwrap();
         assert!(b.authenticate(token).is_some());
         std::fs::remove_file(&path).unwrap();
+        // Shutdown must never resurrect a deleted device store.
+        b.flush().unwrap();
         b.load(path).unwrap();
         assert!(b.authenticate(token).is_none());
     }

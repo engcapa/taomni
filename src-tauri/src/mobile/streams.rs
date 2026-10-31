@@ -126,7 +126,8 @@ async fn run(
             }
             _ = heartbeat.tick() => {
                 if last_in.elapsed() > Duration::from_secs(90) { break; }
-                if last_out.elapsed() >= Duration::from_secs(30) {
+                // A busy output-only viewer still needs an opportunity to ACK.
+                if last_out.elapsed() >= Duration::from_secs(30) || last_in.elapsed() >= Duration::from_secs(30) {
                     if send(&mut socket, json!({"type":"heartbeat"})).await.is_err() { break; }
                     last_out = Instant::now();
                 }

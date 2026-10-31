@@ -31,6 +31,9 @@ impl From<&str> for ApiError {
 }
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
+        if matches!(self.0.as_str(), "unauthorized" | "origin_denied") {
+            log::warn!("Mobile request rejected: {}", self.0);
+        }
         let status = match self.0.as_str() {
             "unauthorized" => StatusCode::UNAUTHORIZED,
             "origin_denied" | "path_denied" | "not_holder" => StatusCode::FORBIDDEN,
