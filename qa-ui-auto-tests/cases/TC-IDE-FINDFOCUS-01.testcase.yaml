@@ -1,6 +1,8 @@
 id: TC-IDE-FINDFOCUS-01
 title: Focused F0 Find navigation, recovery, Replace and split remount
-description: ED-FINDFOCUS-001 / V-FF-03 self-check. Exact UTF-8/LF F0 is created through UI in isolated browser VFS. True focus before chords; automatic first match, Enter/Shift+Enter, Esc selection, repeat, invalid/zero recovery, retained Replace/undo and split. Does not prove native disk, IME or provider. Second F0 tree is [54,58), corrected against original bytes.
+description: ED-FINDFOCUS-001 / V-FF-03 self-check. Exact UTF-8/LF F0 is created through UI in isolated browser VFS. True focus before chords; automatic
+  first match, Enter/Shift+Enter, Esc selection, repeat, invalid/zero recovery, retained Replace/undo and split. Does not prove native disk, IME or provider.
+  Second F0 tree is [54,58), corrected against original bytes. Await the restored CodeMirror content after undo before counting its three unchanged lines.
 covers:
 - F25.1
 - F25.5
@@ -390,6 +392,7 @@ steps:
 - assert_count:
     selector: '[data-testid="code-workspace-editor-pane"]'
     equal: 1
+- wait_for: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
 - assert_count:
     selector: '[data-testid="code-workspace-editor"] .cm-content .cm-line'
     equal: 3
@@ -602,7 +605,8 @@ verification:
     - step: 107
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content"}'
     - step: 111
-      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelector(''.cm-workspace-search-input'')", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelector(''.cm-workspace-search-input'')", "expect_truthy":
+        true}}'
     - step: 113
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status", "contains": "1 / 2"}}'
     - step: 114
@@ -610,13 +614,16 @@ verification:
     - step: 116
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status", "contains": "2 / 2"}}'
     - step: 117
-      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelector(''.cm-workspace-search-input'')", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelector(''.cm-workspace-search-input'')", "expect_truthy":
+        true}}'
     - step: 118
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equal": 3}}'
     - step: 119
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)", "regex": "^Project\\ tree\\ example$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)", "regex": "^Project\\ tree\\
+        example$"}}'
     - step: 120
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)", "regex": "^The\\ editor\\ buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)", "regex": "^The\\ editor\\
+        buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
     - step: 121
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(3)", "regex": "^$"}}'
     - step: 123
@@ -630,13 +637,16 @@ verification:
     - step: 129
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equal": 3}}'
     - step: 130
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)", "regex": "^Project\\ tree\\ example$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)", "regex": "^Project\\ tree\\
+        example$"}}'
     - step: 131
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)", "regex": "^The\\ editor\\ buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)", "regex": "^The\\ editor\\
+        buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
     - step: 132
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(3)", "regex": "^$"}}'
     - step: 136
-      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelector(''.cm-workspace-search-input'')", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelector(''.cm-workspace-search-input'')", "expect_truthy":
+        true}}'
     - step: 138
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status", "contains": "1 / 2"}}'
     - step: 139
@@ -644,13 +654,16 @@ verification:
     - step: 141
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status", "contains": "2 / 2"}}'
     - step: 142
-      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelector(''.cm-workspace-search-input'')", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelector(''.cm-workspace-search-input'')", "expect_truthy":
+        true}}'
     - step: 143
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equal": 3}}'
     - step: 144
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)", "regex": "^Project\\ tree\\ example$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)", "regex": "^Project\\ tree\\
+        example$"}}'
     - step: 145
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)", "regex": "^The\\ editor\\ buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)", "regex": "^The\\ editor\\
+        buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
     - step: 146
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(3)", "regex": "^$"}}'
     - step: 148
@@ -664,9 +677,11 @@ verification:
     - step: 154
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equal": 3}}'
     - step: 155
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)", "regex": "^Project\\ tree\\ example$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)", "regex": "^Project\\ tree\\
+        example$"}}'
     - step: 156
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)", "regex": "^The\\ editor\\ buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)", "regex": "^The\\ editor\\
+        buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
     - step: 157
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(3)", "regex": "^$"}}'
     - step: 160
@@ -684,9 +699,11 @@ verification:
     - step: 184
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equal": 3}}'
     - step: 185
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)", "regex": "^Project\\ tree\\ example$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)", "regex": "^Project\\ tree\\
+        example$"}}'
     - step: 186
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)", "regex": "^The\\ editor\\ buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)", "regex": "^The\\ editor\\
+        buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
     - step: 187
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(3)", "regex": "^$"}}'
     - step: 189
@@ -703,20 +720,22 @@ verification:
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-search\"] .cm-workspace-search-status", "contains": "2 / 2"}}'
     - step: 205
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "equal": 1}}'
-    - step: 206
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equal": 3}}'
     - step: 207
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)", "regex": "^Project\\ tree\\ example$"}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line", "equal": 3}}'
     - step: 208
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)", "regex": "^The\\ editor\\ buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(1)", "regex": "^Project\\ tree\\
+        example$"}}'
     - step: 209
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(2)", "regex": "^The\\ editor\\
+        buffer\\ should\\ survive\\ tree\\ navigation\\.$"}}'
+    - step: 210
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line:nth-child(3)", "regex": "^$"}}'
     results:
     - 205
-    - 206
     - 207
     - 208
     - 209
+    - 210
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual
