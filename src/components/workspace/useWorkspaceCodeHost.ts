@@ -1,3 +1,4 @@
+import { workspaceFileTabId, workspaceFileTabRef } from "../../lib/workspaceFileTarget";
 import { useCallback, useDeferredValue, useMemo, useRef } from "react";
 import { fileKey } from "../editor/workspace/codeWorkspaceModel";
 import type { WorkspaceFileMenu, WorkspaceHostIntegration, WorkspaceHostSnapshot } from "../editor/workspace/workspaceHostIntegration";
@@ -32,19 +33,17 @@ export function useWorkspaceCodeHost(workspace: PlatformWorkspace, visible: bool
   const canvasLayout = useWorkspaceUiStore((state) => state.canvasLayouts[workspace.id] ?? "single");
   const latest = useRef({ workspace, visible });
   latest.current = { workspace, visible };
-  const files = useMemo<CodeWorkspaceFileRef[]>(() => workspace.openTabs
-    .filter((tab) => tab.kind === "file" && !!tab.rootFolderId && !!tab.filePath)
-    .map((tab) => ({ kind: "root", rootId: tab.rootFolderId!, path: tab.filePath! })), [workspace.openTabs]);
+  const files = useMemo(() => workspace.openTabs.flatMap((tab) => {
+    const ref = workspaceFileTabRef(tab);
+    return ref ? [ref] : [];
+  }), [workspace.openTabs]);
   const activeTab = workspace.openTabs.find((tab) => tab.id === workspace.activeTabId);
-  const activeFile = useMemo<CodeWorkspaceFileRef | null>(() => activeTab?.kind === "file" && activeTab.rootFolderId && activeTab.filePath
-    ? { kind: "root", rootId: activeTab.rootFolderId, path: activeTab.filePath } : null,
-  [activeTab?.kind, activeTab?.rootFolderId, activeTab?.filePath]);
+  const activeFile = useMemo(() => workspaceFileTabRef(activeTab), [activeTab]);
   const showEditorTabs = workspace.openTabs.some((tab) => tab.kind === "code");
   const paneFiles = useMemo<CodeWorkspaceFileRef[]>(() => {
     const ordered = activeTab ? [activeTab, ...workspace.openTabs.filter((tab) => tab.id !== activeTab.id)] : workspace.openTabs;
     return ordered.slice(0, canvasLayout === "single" ? 1 : canvasLayout === "split" ? 2 : 4)
-      .filter((tab) => tab.kind === "file" && tab.rootFolderId && tab.filePath)
-      .map((tab) => ({ kind: "root", rootId: tab.rootFolderId!, path: tab.filePath! }));
+      .flatMap((tab) => { const ref = workspaceFileTabRef(tab); return ref ? [ref] : []; });
   }, [activeTab, workspace.openTabs, canvasLayout]);
   const previousActive = useRef(activeFile ? fileKey(activeFile) : null);
   const registerFileMenu = useCallback((groupId: string, menu: WorkspaceFileMenu | null) => {
@@ -56,7 +55,10 @@ export function useWorkspaceCodeHost(workspace: PlatformWorkspace, visible: bool
     if (ref.kind === "root") {
       useWorkspacePlatformStore.getState().openFileInWorkspace(current.id, { rootId: ref.rootId, path: ref.path });
     } else {
-      useWorkspacePlatformStore.getState().openCodeWorkspaceTab(current.id);
+      // New loose/provider buffers are published with their title in the next
+      // snapshot. Reusing a live outer tab needs no generic CODE-tab fallback.
+      const id = workspaceFileTabId(current.id, ref);
+      useWorkspacePlatformStore.getState().setActiveWorkspaceTab(current.id, id);
     }
   }, []);
   const onOpenGitDiff = useCallback((path: string) => {
@@ -103,35 +105,32 @@ export function useWorkspaceCodeHost(workspace: PlatformWorkspace, visible: bool
     onSelect: () => { useWorkspacePlatformStore.getState().openGitTab(workspace.id); },
   }], [t, sidebarExpanded, workspace.id, workspace.activeLeftToolWindow, activeTab?.kind]);
   const recoverDraft = useCallback((ref: CodeWorkspaceFileRef) => {
-    if (ref.kind !== "root") return null;
-    const id = `ws:${latest.current.workspace.id}:file:${ref.rootId}:${ref.path}`;
+    const id = workspaceFileTabId(latest.current.workspace.id, ref);
     const draft = useWorkspaceEditorStore.getState().documents[id];
     return draft?.dirty ? { text: draft.text, savedText: draft.savedText, hash: draft.savedHash } : null;
   }, []);
   const onSnapshot = useCallback(({ files: buffers, activeFile: active }: WorkspaceHostSnapshot) => {
     const { workspace: current, visible: currentVisible } = latest.current;
-    const rootFiles = buffers.filter((buffer) => buffer.ref.kind === "root");
     const nextMirrored = new Set<string>();
-    const entries = rootFiles.map((buffer) => {
-      const ref = buffer.ref as Extract<CodeWorkspaceFileRef, { kind: "root" }>;
-      const tabId = `ws:${current.id}:file:${ref.rootId}:${ref.path}`;
-      nextMirrored.add(tabId);
+    const entries = buffers.map((buffer) => {
+      const ref = buffer.ref;
+      const tabId = workspaceFileTabId(current.id, ref);
+      if (!buffer.library) nextMirrored.add(tabId);
       const state = useWorkspaceEditorStore.getState();
       const patch = { path: ref.path, language: languageFromPath(buffer.languagePath), text: buffer.text,
         savedText: buffer.savedText, savedHash: buffer.hash, dirty: buffer.dirty, loading: buffer.loading, error: buffer.error };
       const previous = state.documents[tabId];
-      if (!previous || Object.entries(patch).some(([key, value]) => previous[key as keyof typeof patch] !== value)) {
+      if (!buffer.library && (!previous || Object.entries(patch).some(([key, value]) => previous[key as keyof typeof patch] !== value))) {
         state.setDocument(tabId, patch);
       }
-      return { rootId: ref.rootId, path: ref.path };
+      return { ref, title: buffer.title, transient: !!buffer.library };
     });
     for (const id of mirrored.current) {
       if (!nextMirrored.has(id)) useWorkspaceEditorStore.getState().removeDocument(id);
     }
     mirrored.current = nextMirrored;
     const key = active ? fileKey(active) : null;
-    const reveal = currentVisible && active?.kind === "root" && key !== previousActive.current
-      ? { rootId: active.rootId, path: active.path } : null;
+    const reveal = currentVisible && active && key !== previousActive.current ? active : null;
     previousActive.current = key;
     useWorkspacePlatformStore.getState().syncWorkspaceFiles(current.id, entries, reveal);
   }, []);

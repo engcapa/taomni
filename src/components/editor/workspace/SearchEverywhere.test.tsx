@@ -221,9 +221,9 @@ describe("SearchEverywhere", () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
-  it("reports the index size and truncation", () => {
+  it("reports the index size and partial search results", () => {
     renderPopup({ truncated: true });
-    expect(screen.getByText(/file index truncated · 3 files/)).toBeInTheDocument();
+    expect(screen.getByText(/Partial results; narrow your search · 3 files/)).toBeInTheDocument();
   });
 
   it("shows an indexing hint while loading with no results", () => {

@@ -167,6 +167,8 @@ export interface EditorActionBridgeViewRegistration {
 export interface WorkspaceActionRegistrationOptions {
   /** Restrict these dynamic action handlers to one mounted editor view. */
   ownerViewId?: string;
+  /** Focused surface overrides must survive later asynchronous editor mounts. */
+  priority?: number;
 }
 
 export interface ActionKeybindingHostPort {

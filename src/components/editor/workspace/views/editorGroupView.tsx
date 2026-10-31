@@ -633,8 +633,8 @@ export function createRenderEditorGroup(controllerContext: RenderEditorGroupCont
         formatBytes={formatBytes}
         formatMtime={formatMtime}
         isMarkdownPath={isMarkdownPath}
-        renderMarkdownPreview={(file, onOpenHref) => (
-          <MarkdownPreview file={file} onOpenHref={onOpenHref} />
+        renderMarkdownPreview={(file, onOpenHref, searchOwner) => (
+          <MarkdownPreview file={file} onOpenHref={onOpenHref} searchOwner={searchOwner} />
         )}
       />
     );

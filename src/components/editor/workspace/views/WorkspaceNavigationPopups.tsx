@@ -143,6 +143,8 @@ export const WorkspaceNavigationPopups = memo(function WorkspaceNavigationPopups
       goToFileItems={navigation.goToFileItems}
       goToFileLoading={navigation.goToFileLoading}
       goToFileTruncated={navigation.goToFileTruncated}
+      goToFileError={navigation.goToFileError}
+      onFileQueryChange={navigation.setFileSearchQuery}
       actionSnapshots={snapshot.filter((entry) => entry.id !== "workspace.goToFile")}
       symbolsAvailable={seSymbolsAvailable}
       semanticIndex={semanticIndex.snapshot}

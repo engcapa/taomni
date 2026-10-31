@@ -153,7 +153,7 @@ export function createWorkspaceSideContents(context: CreateWorkspaceSideContents
             looseFiles: looseFiles,
             directories: treeData.directories,
             compactChains: treeData.compactChains,
-            flatFiles: treeData.flatFiles,
+            flatFiles: treeFilter.trim() ? treeData.searchFiles : treeData.flatFiles,
             treeViewMode: treeViewMode,
             treeFilter: treeFilter,
             expandedRoots: expandedRoots,

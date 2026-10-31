@@ -83,4 +83,19 @@ describe("Project tree row updates", () => {
       expect(row("src")).toHaveTextContent("zh-CN:1");
     } finally { act(() => setLocale(original)); }
   });
+
+  it("keeps published flat results ahead of changing search status rows", () => {
+    const props = fixture();
+    const entries = props.directories[rootDirKey("root", "")].entries.filter((entry) => entry.fileType === "file");
+    const state = { entries, loaded: true, loading: true, error: null, truncated: false };
+    const { rerender } = render(<ProjectTree {...props} treeViewMode="files" flatFiles={{ root: state }} />);
+    const file = row("a.txt");
+    expect(screen.getByRole("status")).toHaveTextContent("Searching workspace");
+    expect(file.compareDocumentPosition(screen.getByRole("status")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    rerender(<ProjectTree {...props} treeViewMode="files" flatFiles={{ root: { ...state, loading: false } }} />);
+    expect(row("a.txt")).toBe(file);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    fireEvent.doubleClick(file);
+    expect(props.onOpenFile).toHaveBeenCalledWith(ref("a.txt"), { preview: false });
+  });
 });

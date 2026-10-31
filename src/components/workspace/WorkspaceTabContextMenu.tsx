@@ -1,3 +1,4 @@
+import { workspaceFileTabRef } from "../../lib/workspaceFileTarget";
 import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, ClipboardCopy, Copy, Pencil, Trash2, X } from "lucide-react";
 import { ContextMenu, type MenuItem } from "../ContextMenu";
 import { promptAppDialog } from "../../lib/appDialogs";
@@ -21,8 +22,9 @@ export function WorkspaceTabContextMenu({ workspace, tab, x, y, onClose }: Props
   const index = workspace.openTabs.findIndex((item) => item.id === tab.id);
   const store = useWorkspacePlatformStore.getState();
   const fileMenus = useWorkspaceEditorHostStore((state) => state.fileMenus[workspace.id]);
-  const fileItems = tab.kind === "file" && tab.rootFolderId && tab.filePath
-    ? Object.values(fileMenus ?? {}).map((menu) => menu({ kind: "root", rootId: tab.rootFolderId!, path: tab.filePath! })).find(Boolean)
+  const fileRef = workspaceFileTabRef(tab);
+  const fileItems = fileRef
+    ? Object.values(fileMenus ?? {}).map((menu) => menu(fileRef)).find(Boolean)
     : null;
   const closeTabs = (others: boolean) => {
     for (const item of workspace.openTabs) {

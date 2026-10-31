@@ -13,3 +13,10 @@ java-test:
   version: 0.43.1
   url: https://open-vsx.org/api/vscjava/vscode-java-test/0.43.1/file/vscjava.vscode-java-test-0.43.1.vsix
   sha256: 16f091b1683cd07845671727b4b1332092660887f08b6af5c76225bfdc071f07
+
+java-real-project:
+  version: 3.17.0
+  repository: https://github.com/apache/commons-lang
+  revision: 29ccc7665f3bc5d84155a3092ab2209a053324e6
+  url: https://codeload.github.com/apache/commons-lang/tar.gz/29ccc7665f3bc5d84155a3092ab2209a053324e6
+  sha256: 6cf65d8a31af5025115e5690a3e980baf256ff3bfe0e4d0abf746360acf388f0

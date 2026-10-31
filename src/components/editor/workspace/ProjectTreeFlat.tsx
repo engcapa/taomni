@@ -7,6 +7,7 @@ import { DEFAULT_FLAT_FILES_STATE, FLAT_VIEW_MAX_FILES, fileKey, flatSourceGroup
 import type { ProjectTreeProps } from "./projectTreeTypes";
 import { GitStatusBadge, ProjectTreeEntryDetails } from "./ProjectTreeEntryDetails";
 import { WorkspaceFileIcon } from "./WorkspaceFileIcon";
+import { ProjectTreeDirectoryRow } from "./ProjectTreeEntryRows";
 import { explorerPackage } from "./explorerPreferences";
 
 /** Retained renderer for embedders; the workspace viewport uses lazy rows. */
@@ -39,7 +40,7 @@ export function matchingFlatFileRows(
       </div>
     ) }];
   }
-  if (state.error) {
+  if (state.error && !state.entries.length) {
     return [{ key: `${root.id}:flat-message`, render: () => (
       <div className="m-2 rounded border border-red-500/30 bg-red-500/10 p-2 text-[12px] text-red-500">
         {state.error}
@@ -47,13 +48,13 @@ export function matchingFlatFileRows(
     ) }];
   }
   const entries = state.entries.filter((entry) => {
-    if (shouldHideEntry(entry)) return false;
+    if (shouldHideEntry(entry) && !(treeFilter.trim() && entry.fileType === "dir")) return false;
     // Flat view only lists language sources under recognized src/lib/app roots.
     // Filter search keeps the broader recursive index so nested names still match.
     if (options.groupBySource && !isFlatViewSourceFile(entry.path)) return false;
     return matchesTreeFilter(entry.name, entry.path, treeFilter);
   });
-  if (entries.length === 0) {
+  if (entries.length === 0 && !state.loading && !state.truncated) {
     return [{ key: `${root.id}:flat-message`, render: () => (
       <div className="px-3 py-2 text-[var(--taomni-code-muted)]">
         {state.loaded ? (options.groupBySource ? "No language source files" : "No files") : "Not loaded"}
@@ -73,9 +74,6 @@ export function matchingFlatFileRows(
     groups.set("__matches__", entries);
   }
   const rows: ProjectTreeRow[] = [];
-  if (state.truncated) rows.push({ key: `${root.id}:truncated`, render: () => (
-    <div className="px-3 py-1 text-[11px] text-[var(--taomni-code-muted)]">Showing first {FLAT_VIEW_MAX_FILES} files</div>
-  ) });
   for (const [group, groupEntries] of [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     if (options.groupBySource) rows.push({ key: `${root.id}:group:${group}`, render: () => (
             <div
@@ -89,13 +87,23 @@ export function matchingFlatFileRows(
             </div>
     ) });
     for (const entry of groupEntries) {
+      if (entry.fileType === "dir") {
+        const selection = { kind: "dir" as const, rootId: root.id, path: entry.path };
+        rows.push({ key: `${root.id}:search-dir:${entry.path}`, selection, level: 2, expanded: false, render: () => (
+          <ProjectTreeDirectoryRow entry={entry} rootId={root.id} rootName={root.name} depth={1} list={false}
+            selected={selected?.kind === "dir" && selected.rootId === root.id && selected.path === entry.path}
+            displayPath={entry.path} displayName={entry.path} expanded={false} changeCount={0} loading={false}
+            onSelect={onSelect} onToggleDir={props.onToggleDir} onContextMenu={onContextMenu} />
+        ) });
+        continue;
+      }
       const ref: CodeWorkspaceFileRef = { kind: "root", rootId: root.id, path: entry.path };
       const key = fileKey(ref);
       const active = activeKey === key;
       const isSelected = selected?.kind === "file" && isRootRef(selected.ref, root.id, entry.path);
       const open = openFiles[key];
       const change = gitChangeForPath(gitChangeByRootPath, root.id, entry.path);
-      const label = props.treeViewMode === "packages" ? explorerPackage(entry.path).file : options.groupBySource ? flatSourceRelativePath(entry.path) : entry.path;
+      const label = treeFilter.trim() ? entry.path : props.treeViewMode === "packages" ? explorerPackage(entry.path).file : options.groupBySource ? flatSourceRelativePath(entry.path) : entry.path;
       rows.push({ key: `${root.id}:flat:${entry.path}`, selection: { kind: "file", ref }, level: 2, render: () => (
               <button
                 key={`${root.id}:flat:${entry.path}`}
@@ -133,5 +141,17 @@ export function matchingFlatFileRows(
       ) });
     }
   }
+  // Async status changes must not move already published, clickable results.
+  if (state.loading) rows.push({ key: `${root.id}:searching`, render: () => (
+    <div className="flex items-center gap-2 px-3 py-1 text-[11px] text-[var(--taomni-code-muted)]" role="status">
+      <Loader2 className="w-3.5 h-3.5 animate-spin" />Searching workspace…
+    </div>
+  ) });
+  if (state.error) rows.push({ key: `${root.id}:search-error`, render: () => (
+    <div className="px-3 py-1 text-[11px] text-red-500" role="status">Some folders could not be searched: {state.error}</div>
+  ) });
+  if (state.truncated) rows.push({ key: `${root.id}:truncated`, render: () => (
+    <div className="px-3 py-1 text-[11px] text-[var(--taomni-code-muted)]">{treeFilter.trim() ? "Partial results; narrow your search" : `Showing first ${FLAT_VIEW_MAX_FILES} files`}</div>
+  ) });
   return rows;
 }

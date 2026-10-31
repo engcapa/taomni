@@ -30,7 +30,7 @@ function publishSnapshot(host: WorkspaceHostIntegration, workspaceInstanceId: st
   const ui = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
   const keys = [...new Set(Object.values(ui.editorGroups).flatMap((group) => group.openOrder))];
   const files = keys.map((key) => ui.openFiles[key])
-    .filter((file): file is OpenFileState => !!file && !file.library && file.ref.kind === "root");
+    .filter((file): file is OpenFileState => !!file);
   if (files.some((file) => file.loading)) return;
   host.onSnapshot({ files, activeFile: ui.openFiles[ui.activeKey ?? ""]?.ref ?? null });
 }
@@ -71,7 +71,7 @@ export function useWorkspaceHostFiles(dependencies: WorkspaceHostFilesDependenci
       // stale layout entries through the normal close/recovery owner as well.
       const previous = previousWanted.current ?? new Set(Object.values(initialUi.editorGroups)
         .flatMap((group) => group.openOrder)
-        .filter((key) => initialUi.openFiles[key]?.ref.kind === "root"));
+        .filter((key) => !!initialUi.openFiles[key]));
       previousWanted.current = new Set(previous);
       for (const ref of requested.files) {
         if (!isCurrent()) return;

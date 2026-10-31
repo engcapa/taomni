@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import DOMPurify from "dompurify";
 import { renderFormatted } from "../../../lib/chat/renderFormatted";
+import { useMarkdownPreviewSearch, type MarkdownPreviewSearchOwner } from "./useMarkdownPreviewSearch";
 import {
   ensureMermaidReady,
   errorMessage,
@@ -14,12 +15,16 @@ import {
 export function MarkdownPreview({
   file,
   onOpenHref,
+  searchOwner,
 }: {
   file: OpenFileState;
   onOpenHref: (href: string) => boolean;
+  searchOwner?: MarkdownPreviewSearchOwner;
 }) {
   const html = useMemo(() => renderFormatted(file.text, "md") ?? "", [file.text]);
   const rootRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const search = useMarkdownPreviewSearch(rootRef, contentRef, html, searchOwner);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -101,11 +106,13 @@ export function MarkdownPreview({
     return () => {
       cancelled = true;
     };
-  });
+  }, [file.key, file.title, html]);
 
   return (
     <div
       ref={rootRef}
+      onFocusCapture={search.onFocusCapture}
+      onBlurCapture={search.onBlurCapture}
       tabIndex={-1}
       data-testid="code-workspace-markdown-preview"
       className="taomni-chat-md h-full min-h-0 overflow-auto bg-[var(--taomni-code-bg)] px-5 py-4 text-[length:var(--taomni-code-font-size)] leading-6 text-[var(--taomni-code-text)] outline-none"
@@ -120,7 +127,8 @@ export function MarkdownPreview({
         }
       }}
     >
-      <div dangerouslySetInnerHTML={{ __html: html }} />
+      {search.toolbar}
+      <div ref={contentRef} dangerouslySetInnerHTML={{ __html: html }} />
     </div>
   );
 }

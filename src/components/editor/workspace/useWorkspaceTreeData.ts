@@ -5,6 +5,7 @@ import {
   workspaceListFilesRecursive,
 } from "../../../lib/editor/workspace";
 import type { CodeWorkspaceRootInfo } from "../../../types";
+import { useWorkspaceTreeSearch } from "./useWorkspaceTreeSearch";
 import { useExpandedWorkspaceDirectories } from "./hooks/useExpandedWorkspaceDirectories";
 import { useWorkspaceExternalTreeRefresh } from "./hooks/useWorkspaceExternalTreeRefresh";
 import {
@@ -26,7 +27,7 @@ interface UseWorkspaceTreeDataOptions {
   expandedRootIds: ReadonlySet<string>;
   expandedDirKeys?: ReadonlySet<string>;
   treeViewMode: TreeViewMode;
-  /** When non-empty, recursive file indexes load so tree filter can match nested files. */
+  /** Non-empty queries search metadata without changing expansion or the flat index. */
   treeFilter?: string;
   onError: (message: string) => void;
 }
@@ -38,6 +39,7 @@ export interface WorkspaceTreeDataController {
   directories: Record<string, DirectoryState>;
   compactChains: Record<string, CompactChainState>;
   flatFiles: Record<string, FlatFilesState>;
+  searchFiles: Record<string, FlatFilesState>;
   loadDir: (rootId: string, path: string) => Promise<void>;
   loadFlatFiles: (rootId: string, force?: boolean) => Promise<void>;
   reset: (options?: { retainListings?: boolean }) => void;
@@ -78,6 +80,8 @@ export function useWorkspaceTreeData({
   const mountedRef = useRef(false);
   const [compactWorkVersion, setCompactWorkVersion] = useState(0);
   const [reloadVersion, setReloadVersion] = useState(0);
+  const [searchVersion, setSearchVersion] = useState(0);
+  const refreshSearch = useCallback(() => setSearchVersion((version) => version + 1), []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -284,7 +288,7 @@ export function useWorkspaceTreeData({
     });
   }, [updateCompactChains]);
   const externalRefresh = useWorkspaceExternalTreeRefresh({
-    roots, directories, treeViewMode, treeFilter, loadDir, loadFlatFiles, invalidateCompactPaths,
+    roots, directories, treeViewMode, treeFilter, loadDir, loadFlatFiles, invalidateCompactPaths, refreshSearch,
   });
 
   const reset = useCallback((options?: { retainListings?: boolean }) => {
@@ -371,10 +375,12 @@ export function useWorkspaceTreeData({
     }
   }, [roots, expandedRootIds, expandedDirKeys, directories, compactChains, compactWorkVersion, loadCompactChain, treeViewMode, treeFilter]);
 
+  const searchFiles = useWorkspaceTreeSearch(roots, directories, flatFiles, treeFilter, reloadVersion + searchVersion);
+
   useEffect(() => {
-    // Flat view always indexes; tree/compact only index when the filter needs
-    // nested matches (substring search cannot walk unloaded directories).
-    const needsFlatIndex = treeViewMode === "flat" || treeViewMode === "files" || treeViewMode === "packages" || treeFilter.trim().length > 0;
+    // Flat views retain their existing capped cache; tree search owns a
+    // separate query-dependent walk and must not start a second recursive scan.
+    const needsFlatIndex = treeViewMode === "flat" || treeViewMode === "files" || treeViewMode === "packages";
     if (!needsFlatIndex) return;
     roots.forEach((root) => void loadFlatFiles(root.id));
   }, [loadFlatFiles, reloadVersion, roots, treeFilter, treeViewMode]);
@@ -383,6 +389,7 @@ export function useWorkspaceTreeData({
     directories,
     compactChains,
     flatFiles,
+    searchFiles,
     loadDir,
     loadFlatFiles,
     reset,

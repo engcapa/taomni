@@ -197,7 +197,7 @@ export function projectTreeRows(props: ProjectTreeRenderProps): ProjectTreeRow[]
       ),
     });
     if (expanded) rows.push(...(
-      treeViewMode === "flat" || treeViewMode === "packages"
+      !treeFilter.trim() && (treeViewMode === "flat" || treeViewMode === "packages")
         ? matchingFlatFileRows(root, props, { groupBySource: true })
         : treeViewMode === "files" || treeFilter.trim()
           ? matchingFlatFileRows(root, props, { groupBySource: false })

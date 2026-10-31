@@ -1,0 +1,454 @@
+{
+  "head": "efc3eea773b10ce109b3b5daf1c753d10f51eb04",
+  "run_id": "41188334492",
+  "attempt": "1",
+  "entries": [
+    {
+      "id": "linux-browser",
+      "group_id": "linux-browser",
+      "selected": 12,
+      "linux_profile": "",
+      "desktop": {},
+      "counts": {
+        "passed": 12
+      },
+      "errors": []
+    },
+    {
+      "id": "linux-native-shard-1",
+      "group_id": "linux-native",
+      "selected": 3,
+      "linux_profile": "ubuntu-24.04-xvfb",
+      "desktop": {
+        "profile": "ubuntu-24.04-xvfb",
+        "os_id": "ubuntu",
+        "version_id": "24.04",
+        "session_type": "x11",
+        "desktop": "Openbox",
+        "display_server": "Xvfb",
+        "compositor": "xcompmgr"
+      },
+      "counts": {
+        "passed": 3
+      },
+      "errors": []
+    },
+    {
+      "id": "linux-native-shard-2",
+      "group_id": "linux-native",
+      "selected": 3,
+      "linux_profile": "ubuntu-24.04-xvfb",
+      "desktop": {
+        "profile": "ubuntu-24.04-xvfb",
+        "os_id": "ubuntu",
+        "version_id": "24.04",
+        "session_type": "x11",
+        "desktop": "Openbox",
+        "display_server": "Xvfb",
+        "compositor": "xcompmgr"
+      },
+      "counts": {
+        "passed": 3
+      },
+      "errors": []
+    },
+    {
+      "id": "linux-native-shard-3",
+      "group_id": "linux-native",
+      "selected": 3,
+      "linux_profile": "ubuntu-24.04-xvfb",
+      "desktop": {
+        "profile": "ubuntu-24.04-xvfb",
+        "os_id": "ubuntu",
+        "version_id": "24.04",
+        "session_type": "x11",
+        "desktop": "Openbox",
+        "display_server": "Xvfb",
+        "compositor": "xcompmgr"
+      },
+      "counts": {
+        "passed": 3
+      },
+      "errors": []
+    },
+    {
+      "id": "linux-native-shard-4",
+      "group_id": "linux-native",
+      "selected": 3,
+      "linux_profile": "ubuntu-24.04-xvfb",
+      "desktop": {
+        "profile": "ubuntu-24.04-xvfb",
+        "os_id": "ubuntu",
+        "version_id": "24.04",
+        "session_type": "x11",
+        "desktop": "Openbox",
+        "display_server": "Xvfb",
+        "compositor": "xcompmgr"
+      },
+      "counts": {
+        "passed": 3
+      },
+      "errors": []
+    },
+    {
+      "id": "windows-browser",
+      "group_id": "windows-browser",
+      "selected": 12,
+      "linux_profile": "",
+      "desktop": {},
+      "counts": {
+        "passed": 12
+      },
+      "errors": []
+    },
+    {
+      "id": "windows-native-shard-1",
+      "group_id": "windows-native",
+      "selected": 3,
+      "linux_profile": "",
+      "desktop": {},
+      "counts": {
+        "passed": 3
+      },
+      "errors": []
+    },
+    {
+      "id": "windows-native-shard-2",
+      "group_id": "windows-native",
+      "selected": 3,
+      "linux_profile": "",
+      "desktop": {},
+      "counts": {
+        "passed": 3
+      },
+      "errors": []
+    },
+    {
+      "id": "windows-native-shard-3",
+      "group_id": "windows-native",
+      "selected": 3,
+      "linux_profile": "",
+      "desktop": {},
+      "counts": {
+        "passed": 3
+      },
+      "errors": []
+    },
+    {
+      "id": "windows-native-shard-4",
+      "group_id": "windows-native",
+      "selected": 3,
+      "linux_profile": "",
+      "desktop": {},
+      "counts": {
+        "passed": 3
+      },
+      "errors": []
+    },
+    {
+      "id": "macos-browser",
+      "group_id": "macos-browser",
+      "selected": 12,
+      "linux_profile": "",
+      "desktop": {},
+      "counts": {
+        "passed": 12
+      },
+      "errors": []
+    },
+    {
+      "id": "macos-native-shard-1",
+      "group_id": "macos-native",
+      "selected": 3,
+      "linux_profile": "",
+      "desktop": {},
+      "counts": {
+        "passed": 3
+      },
+      "errors": []
+    },
+    {
+      "id": "macos-native-shard-2",
+      "group_id": "macos-native",
+      "selected": 3,
+      "linux_profile": "",
+      "desktop": {},
+      "counts": {
+        "passed": 3
+      },
+      "errors": []
+    },
+    {
+      "id": "macos-native-shard-3",
+      "group_id": "macos-native",
+      "selected": 3,
+      "linux_profile": "",
+      "desktop": {},
+      "counts": {
+        "passed": 3
+      },
+      "errors": []
+    },
+    {
+      "id": "macos-native-shard-4",
+      "group_id": "macos-native",
+      "selected": 3,
+      "linux_profile": "",
+      "desktop": {},
+      "counts": {
+        "passed": 3
+      },
+      "errors": []
+    }
+  ],
+  "groups": [
+    {
+      "id": "linux-browser",
+      "selected": 12,
+      "counts": {
+        "passed": 12
+      },
+      "errors": [],
+      "shards": [
+        "linux-browser"
+      ]
+    },
+    {
+      "id": "linux-native",
+      "selected": 12,
+      "counts": {
+        "passed": 12
+      },
+      "errors": [],
+      "shards": [
+        "linux-native-shard-1",
+        "linux-native-shard-2",
+        "linux-native-shard-3",
+        "linux-native-shard-4"
+      ]
+    },
+    {
+      "id": "windows-browser",
+      "selected": 12,
+      "counts": {
+        "passed": 12
+      },
+      "errors": [],
+      "shards": [
+        "windows-browser"
+      ]
+    },
+    {
+      "id": "windows-native",
+      "selected": 12,
+      "counts": {
+        "passed": 12
+      },
+      "errors": [],
+      "shards": [
+        "windows-native-shard-1",
+        "windows-native-shard-2",
+        "windows-native-shard-3",
+        "windows-native-shard-4"
+      ]
+    },
+    {
+      "id": "macos-browser",
+      "selected": 12,
+      "counts": {
+        "passed": 12
+      },
+      "errors": [],
+      "shards": [
+        "macos-browser"
+      ]
+    },
+    {
+      "id": "macos-native",
+      "selected": 12,
+      "counts": {
+        "passed": 12
+      },
+      "errors": [],
+      "shards": [
+        "macos-native-shard-1",
+        "macos-native-shard-2",
+        "macos-native-shard-3",
+        "macos-native-shard-4"
+      ]
+    }
+  ],
+  "build_hashes": {
+    "native-build-linux-x64-release": "392f336a865e5ac8a3111ead61f95bebaa904bc0afdfac44cadc6cb1dac4a38e",
+    "native-build-windows-x64-release": "236cea3f0698d91a7f878a5e58b03e179b3ced477bf47c322c24a78896d930c8",
+    "native-build-macos-arm64-release": "28c8732f67baf62d3d354e50670a5696420e1bf9bc1f2926d308054064fb3d44"
+  },
+  "failures": [],
+  "gaps": [],
+  "not_applicable": [
+    {
+      "case": "TC-WS-037",
+      "platform": "linux",
+      "mode": "browser",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-051",
+      "platform": "linux",
+      "mode": "browser",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-054",
+      "platform": "linux",
+      "mode": "browser",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-056",
+      "platform": "linux",
+      "mode": "browser",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-IDE-C8-08-code-style-dialog-lifecycle-browser",
+      "platform": "linux",
+      "mode": "native",
+      "linux_profile": "ubuntu-24.04-xvfb",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-036",
+      "platform": "linux",
+      "mode": "native",
+      "linux_profile": "ubuntu-24.04-xvfb",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-041",
+      "platform": "linux",
+      "mode": "native",
+      "linux_profile": "ubuntu-24.04-xvfb",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-055",
+      "platform": "linux",
+      "mode": "native",
+      "linux_profile": "ubuntu-24.04-xvfb",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-037",
+      "platform": "windows",
+      "mode": "browser",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-051",
+      "platform": "windows",
+      "mode": "browser",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-054",
+      "platform": "windows",
+      "mode": "browser",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-056",
+      "platform": "windows",
+      "mode": "browser",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-IDE-C8-08-code-style-dialog-lifecycle-browser",
+      "platform": "windows",
+      "mode": "native",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-036",
+      "platform": "windows",
+      "mode": "native",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-041",
+      "platform": "windows",
+      "mode": "native",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-055",
+      "platform": "windows",
+      "mode": "native",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-037",
+      "platform": "macos",
+      "mode": "browser",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-051",
+      "platform": "macos",
+      "mode": "browser",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-054",
+      "platform": "macos",
+      "mode": "browser",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-056",
+      "platform": "macos",
+      "mode": "browser",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-IDE-C8-08-code-style-dialog-lifecycle-browser",
+      "platform": "macos",
+      "mode": "native",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-036",
+      "platform": "macos",
+      "mode": "native",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-041",
+      "platform": "macos",
+      "mode": "native",
+      "reason": "case does not declare this mode"
+    },
+    {
+      "case": "TC-WS-055",
+      "platform": "macos",
+      "mode": "native",
+      "reason": "case does not declare this mode"
+    }
+  ],
+  "unreviewed": [],
+  "passed": true,
+  "report_ok": true,
+  "infrastructure_errors": [],
+  "job_results": {
+    "plan": "success",
+    "tool-contracts": "skipped",
+    "execute-browser": "success",
+    "build-linux": "success",
+    "build-windows": "success",
+    "build-macos": "success",
+    "execute-linux-native": "success",
+    "execute-windows-native": "success",
+    "execute-macos-native": "success",
+    "native-contracts": "skipped"
+  }
+}

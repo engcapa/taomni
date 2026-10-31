@@ -1,3 +1,4 @@
+import { workspaceFileTabRef } from "./workspaceFileTarget";
 import { useAppStore } from "../stores/appStore";
 import { DEFAULT_WORKSPACE_ID, useWorkspacePlatformStore } from "../stores/workspacePlatformStore";
 import { newWorkspaceInstanceId, recentWorkspaceIdFromParts, rootIdForPath, workspacePathName } from "../stores/app/recentWorkspaces";
@@ -40,9 +41,9 @@ export function openPlatformCodeWorkspace(info: CodeWorkspaceTabInfo): string {
     if (snapshot) {
       const keys = new Set(Object.values(snapshot.editorGroups).flatMap((group) => group.openOrder));
       const files = [...keys].flatMap((key) => {
-        const ref = fileRefFromFileKey(key);
-        return ref?.kind === "root" && roots.some((root) => root.id === ref.rootId)
-          ? [{ rootId: ref.rootId, path: ref.path }] : [];
+        const ref = fileRefFromFileKey(key, looseFiles);
+        return ref && (ref.kind === "loose" || roots.some((root) => root.id === ref.rootId))
+          ? [{ ref }] : [];
       });
       if (files.length) store.syncWorkspaceFiles(workspace.id, files);
     }
@@ -75,6 +76,15 @@ export function openPlatformCodeWorkspace(info: CodeWorkspaceTabInfo): string {
   const initialFile = info.initialFile && store.getWorkspace(workspace.id)?.codeWorkspace?.initialFile;
   if (initialFile?.kind === "root") {
     store.openFileInWorkspace(workspace.id, { rootId: initialFile.rootId, path: initialFile.path });
+  } else if (initialFile?.kind === "loose") {
+    const files = store.getWorkspace(workspace.id)!.openTabs.flatMap((tab) => {
+      const ref = workspaceFileTabRef(tab);
+      return ref ? [{ ref, title: tab.title, transient: tab.transient }] : [];
+    });
+    if (!files.some((file) => file.ref.kind === "loose" && file.ref.id === initialFile.id)) {
+      files.push({ ref: initialFile, title: workspacePathName(initialFile.path), transient: false });
+    }
+    store.syncWorkspaceFiles(workspace.id, files, initialFile);
   }
   const app = useAppStore.getState();
   app.setActiveSideTab("workspaces");

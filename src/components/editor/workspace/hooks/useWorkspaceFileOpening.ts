@@ -312,6 +312,10 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
     openTerminalAt,
     terminalDockRef: ports.terminalDockRef,
     selected: null,
+    treeFilter: session.workspaceUi.treeFilter,
+    showDirectoryTree: () => {
+      if (["flat", "files", "packages"].includes(session.workspaceUi.treeViewMode)) project.projectTree.setTreeViewMode("tree");
+    },
     getSelected: session.getTreeSelection,
     treeOpening,
     editorCommands: session.editorCommands,

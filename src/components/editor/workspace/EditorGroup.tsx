@@ -458,7 +458,7 @@ export function EditorGroup({
                   </div>
                 )}
                 {isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "preview" ? (
-                  renderMarkdownPreview(activeFile, onOpenMarkdownHref)
+                  renderMarkdownPreview(activeFile, onOpenMarkdownHref, { actionHost: workspaceActionHost, groupId, standalone: true })
                 ) : isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "split" ? (
                   <div className="h-full min-h-0 grid grid-cols-2 relative">
                     <StickyLinesOverlay
@@ -546,7 +546,7 @@ export function EditorGroup({
                         />
                       </EditorMountBoundary>
                     </div>
-                    {renderMarkdownPreview(activeFile, onOpenMarkdownHref)}
+                    {renderMarkdownPreview(activeFile, onOpenMarkdownHref, { actionHost: workspaceActionHost, groupId, standalone: false })}
                   </div>
                 ) : (
                   <div className="h-full min-h-0 relative">

@@ -49,6 +49,36 @@ describe("workspace metadata persistence outside file activation", () => {
     expect(store.getWorkspace(workspace.id)).toEqual(expected);
   });
 
+  it("does not restore a provider URI when reload interrupts its close publication", () => {
+    const store = useWorkspacePlatformStore.getState();
+    const ref = { kind: "loose" as const, id: "jdk-string", path: "jdt://contents/String.class?=java.base" };
+    const workspace = store.createWorkspace({ name: "provider-close", codeWorkspace: {
+      repoRoot: "/project", roots: [], looseFiles: [], initialFile: ref,
+    } });
+    store.syncWorkspaceFiles(workspace.id, [{ ref, title: "String.java", transient: true }], ref);
+    const tabId = store.getWorkspace(workspace.id)!.activeTabId;
+    store.closeWorkspaceTab(workspace.id, tabId);
+    // The editor's deferred context still names the closed library at teardown.
+    window.dispatchEvent(new Event("pagehide"));
+    store.reloadFromStorage();
+    expect(store.getWorkspace(workspace.id)?.openTabs).toEqual([]);
+    expect(store.getWorkspace(workspace.id)?.codeWorkspace?.initialFile).toBeNull();
+    expect(JSON.stringify(read())).not.toContain(ref.path);
+  });
+
+  it("ignores a legacy persisted library initial target without reading it as a disk file", () => {
+    const store = useWorkspacePlatformStore.getState();
+    const workspace = store.createWorkspace({ name: "legacy-library", codeWorkspace: {
+      repoRoot: "/project", roots: [], looseFiles: [],
+      initialFile: { kind: "loose", id: "old-library", path: "jdt://contents/Map.class?=java.base" },
+    } });
+    localStorage.setItem(PLATFORM_WORKSPACES_STORAGE_KEY, JSON.stringify({
+      version: 1, workspaces: [workspace], activeWorkspaceId: workspace.id, createdNodes: [],
+    }));
+    store.reloadFromStorage();
+    expect(store.getWorkspace(workspace.id)?.codeWorkspace?.initialFile).toBeNull();
+  });
+
   it("discards pending writes when explicitly reloading newer external state", () => {
     const store = useWorkspacePlatformStore.getState();
     store.createWorkspace({ name: "old-local-state" });

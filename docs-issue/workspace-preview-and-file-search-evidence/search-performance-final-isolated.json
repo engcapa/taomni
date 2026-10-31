@@ -1,0 +1,1671 @@
+{
+  "url": "http://localhost:5000",
+  "samples": [
+    {
+      "keys": [
+        {
+          "key": "D",
+          "ms": 85.30000001192093,
+          "expected": "D",
+          "actual": "D",
+          "correct": true
+        },
+        {
+          "key": "o",
+          "ms": 21,
+          "expected": "Do",
+          "actual": "Do",
+          "correct": true
+        },
+        {
+          "key": "c",
+          "ms": 23.200000017881393,
+          "expected": "Doc",
+          "actual": "Doc",
+          "correct": true
+        },
+        {
+          "key": "u",
+          "ms": 19.30000001192093,
+          "expected": "Docu",
+          "actual": "Docu",
+          "correct": true
+        },
+        {
+          "key": "m",
+          "ms": 18.30000001192093,
+          "expected": "Docum",
+          "actual": "Docum",
+          "correct": true
+        },
+        {
+          "key": "e",
+          "ms": 23.400000005960464,
+          "expected": "Docume",
+          "actual": "Docume",
+          "correct": true
+        },
+        {
+          "key": "n",
+          "ms": 24.5,
+          "expected": "Documen",
+          "actual": "Documen",
+          "correct": true
+        },
+        {
+          "key": "t",
+          "ms": 24.400000005960464,
+          "expected": "Document",
+          "actual": "Document",
+          "correct": true
+        },
+        {
+          "key": "s",
+          "ms": 24.19999998807907,
+          "expected": "Documents",
+          "actual": "Documents",
+          "correct": true
+        }
+      ],
+      "frames": [
+        -7.000000011920747,
+        83.30000000000018,
+        16.699999999999818,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.599999999999454,
+        16.800000000000182,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.800000000000182,
+        16.600000000000364,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.599999999999454,
+        16.699999999999818,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454
+      ],
+      "stopped": true,
+      "value": "Documents",
+      "found": true,
+      "observation": {
+        "valid": true,
+        "transport": "browser-invoke",
+        "events": [
+          {
+            "index": 0,
+            "command": "workspace_list_dir",
+            "startedMs": 4565.800000011921,
+            "status": "fulfilled",
+            "finishedMs": 4692.4000000059605
+          },
+          {
+            "index": 1,
+            "command": "workspace_list_dir",
+            "startedMs": 4567.4000000059605,
+            "status": "fulfilled",
+            "finishedMs": 4695
+          },
+          {
+            "index": 2,
+            "command": "workspace_detect_git_roots",
+            "startedMs": 4567.600000023842,
+            "status": "fulfilled",
+            "finishedMs": 4634.600000023842
+          },
+          {
+            "index": 3,
+            "command": "workspace_list_dir",
+            "startedMs": 4598.200000017881,
+            "status": "fulfilled",
+            "finishedMs": 4695.5
+          },
+          {
+            "index": 4,
+            "command": "workspace_list_dir",
+            "startedMs": 5975.200000017881,
+            "status": "fulfilled",
+            "finishedMs": 5976.100000023842
+          },
+          {
+            "index": 5,
+            "command": "workspace_list_dir",
+            "startedMs": 5976.700000017881,
+            "status": "fulfilled",
+            "finishedMs": 6032.100000023842
+          },
+          {
+            "index": 6,
+            "command": "workspace_list_dir",
+            "startedMs": 5976.9000000059605,
+            "status": "fulfilled",
+            "finishedMs": 6033.800000011921
+          },
+          {
+            "index": 7,
+            "command": "workspace_list_dir",
+            "startedMs": 6050.700000017881,
+            "status": "fulfilled",
+            "finishedMs": 6051.300000011921
+          },
+          {
+            "index": 8,
+            "command": "workspace_list_dir",
+            "startedMs": 6050.700000017881,
+            "status": "fulfilled",
+            "finishedMs": 6051.5
+          },
+          {
+            "index": 9,
+            "command": "workspace_list_dir",
+            "startedMs": 6051.600000023842,
+            "status": "fulfilled",
+            "finishedMs": 6052
+          },
+          {
+            "index": 10,
+            "command": "workspace_list_dir",
+            "startedMs": 6052,
+            "status": "fulfilled",
+            "finishedMs": 6052.300000011921
+          },
+          {
+            "index": 11,
+            "command": "workspace_list_dir",
+            "startedMs": 6052.100000023842,
+            "status": "fulfilled",
+            "finishedMs": 6052.5
+          },
+          {
+            "index": 12,
+            "command": "workspace_list_dir",
+            "startedMs": 6052.5,
+            "status": "fulfilled",
+            "finishedMs": 6052.9000000059605
+          },
+          {
+            "index": 13,
+            "command": "workspace_list_dir",
+            "startedMs": 6052.600000023842,
+            "status": "fulfilled",
+            "finishedMs": 6052.9000000059605
+          },
+          {
+            "index": 14,
+            "command": "workspace_list_dir",
+            "startedMs": 6053,
+            "status": "fulfilled",
+            "finishedMs": 6053.300000011921
+          },
+          {
+            "index": 15,
+            "command": "workspace_list_dir",
+            "startedMs": 6053.100000023842,
+            "status": "fulfilled",
+            "finishedMs": 6053.4000000059605
+          },
+          {
+            "index": 16,
+            "command": "workspace_list_dir",
+            "startedMs": 6053.4000000059605,
+            "status": "fulfilled",
+            "finishedMs": 6053.800000011921
+          },
+          {
+            "index": 17,
+            "command": "workspace_list_dir",
+            "startedMs": 6053.4000000059605,
+            "status": "fulfilled",
+            "finishedMs": 6053.9000000059605
+          },
+          {
+            "index": 18,
+            "command": "workspace_list_dir",
+            "startedMs": 6053.9000000059605,
+            "status": "fulfilled",
+            "finishedMs": 6054.100000023842
+          }
+        ],
+        "nowMs": 6881.700000017881
+      },
+      "idleObservation": {
+        "valid": true,
+        "transport": "browser-invoke",
+        "events": [
+          {
+            "index": 0,
+            "command": "workspace_list_dir",
+            "startedMs": 4565.800000011921,
+            "status": "fulfilled",
+            "finishedMs": 4692.4000000059605
+          },
+          {
+            "index": 1,
+            "command": "workspace_list_dir",
+            "startedMs": 4567.4000000059605,
+            "status": "fulfilled",
+            "finishedMs": 4695
+          },
+          {
+            "index": 2,
+            "command": "workspace_detect_git_roots",
+            "startedMs": 4567.600000023842,
+            "status": "fulfilled",
+            "finishedMs": 4634.600000023842
+          },
+          {
+            "index": 3,
+            "command": "workspace_list_dir",
+            "startedMs": 4598.200000017881,
+            "status": "fulfilled",
+            "finishedMs": 4695.5
+          }
+        ],
+        "nowMs": 5230.4000000059605
+      }
+    },
+    {
+      "keys": [
+        {
+          "key": "D",
+          "ms": 56.099999994039536,
+          "expected": "D",
+          "actual": "D",
+          "correct": true
+        },
+        {
+          "key": "o",
+          "ms": 37.900000005960464,
+          "expected": "Do",
+          "actual": "Do",
+          "correct": true
+        },
+        {
+          "key": "c",
+          "ms": 33.400000005960464,
+          "expected": "Doc",
+          "actual": "Doc",
+          "correct": true
+        },
+        {
+          "key": "u",
+          "ms": 38.20000001788139,
+          "expected": "Docu",
+          "actual": "Docu",
+          "correct": true
+        },
+        {
+          "key": "m",
+          "ms": 37.20000001788139,
+          "expected": "Docum",
+          "actual": "Docum",
+          "correct": true
+        },
+        {
+          "key": "e",
+          "ms": 35.30000001192093,
+          "expected": "Docume",
+          "actual": "Docume",
+          "correct": true
+        },
+        {
+          "key": "n",
+          "ms": 20.400000005960464,
+          "expected": "Documen",
+          "actual": "Documen",
+          "correct": true
+        },
+        {
+          "key": "t",
+          "ms": 23.5,
+          "expected": "Document",
+          "actual": "Document",
+          "correct": true
+        },
+        {
+          "key": "s",
+          "ms": 19,
+          "expected": "Documents",
+          "actual": "Documents",
+          "correct": true
+        }
+      ],
+      "frames": [
+        -3.899999999999636,
+        50,
+        16.599999999999454,
+        16.699999999999818,
+        33.30000000000018,
+        16.699999999999818,
+        16.600000000000364,
+        16.800000000000182,
+        16.599999999999454,
+        16.600000000000364,
+        33.399999999999636,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.800000000000182,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.599999999999454,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.700000000000728,
+        16.599999999999454,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.700000000000728,
+        16.599999999999454,
+        16.600000000000364,
+        16.800000000000182,
+        16.599999999999454,
+        16.699999999999818,
+        16.700000000000728,
+        16.599999999999454,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.600000000000364,
+        16.800000000000182,
+        16.599999999999454,
+        16.699999999999818,
+        16.600000000000364,
+        16.600000000000364,
+        16.799999999999272,
+        16.700000000000728,
+        16.599999999999454,
+        16.699999999999818,
+        16.700000000000728,
+        16.599999999999454,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.700000000000728,
+        16.5,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.600000000000364,
+        16.799999999999272,
+        16.600000000000364,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818
+      ],
+      "stopped": true,
+      "value": "Documents",
+      "found": true,
+      "observation": {
+        "valid": true,
+        "transport": "browser-invoke",
+        "events": [
+          {
+            "index": 0,
+            "command": "workspace_list_dir",
+            "startedMs": 4030.4000000059605,
+            "status": "fulfilled",
+            "finishedMs": 4176.5999999940395
+          },
+          {
+            "index": 1,
+            "command": "workspace_list_dir",
+            "startedMs": 4033,
+            "status": "fulfilled",
+            "finishedMs": 4184
+          },
+          {
+            "index": 2,
+            "command": "workspace_detect_git_roots",
+            "startedMs": 4033.7000000178814,
+            "status": "fulfilled",
+            "finishedMs": 4112.800000011921
+          },
+          {
+            "index": 3,
+            "command": "workspace_list_dir",
+            "startedMs": 4074.2000000178814,
+            "status": "fulfilled",
+            "finishedMs": 4184.9000000059605
+          },
+          {
+            "index": 4,
+            "command": "workspace_list_dir",
+            "startedMs": 5448.9000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5449.9000000059605
+          },
+          {
+            "index": 5,
+            "command": "workspace_list_dir",
+            "startedMs": 5450.0999999940395,
+            "status": "fulfilled",
+            "finishedMs": 5511.0999999940395
+          },
+          {
+            "index": 6,
+            "command": "workspace_list_dir",
+            "startedMs": 5450.200000017881,
+            "status": "fulfilled",
+            "finishedMs": 5512.200000017881
+          },
+          {
+            "index": 7,
+            "command": "workspace_list_dir",
+            "startedMs": 5528.9000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5529.5
+          },
+          {
+            "index": 8,
+            "command": "workspace_list_dir",
+            "startedMs": 5528.9000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5529.700000017881
+          },
+          {
+            "index": 9,
+            "command": "workspace_list_dir",
+            "startedMs": 5529.700000017881,
+            "status": "fulfilled",
+            "finishedMs": 5530.200000017881
+          },
+          {
+            "index": 10,
+            "command": "workspace_list_dir",
+            "startedMs": 5530.200000017881,
+            "status": "fulfilled",
+            "finishedMs": 5555.700000017881
+          },
+          {
+            "index": 11,
+            "command": "workspace_list_dir",
+            "startedMs": 5530.200000017881,
+            "status": "fulfilled",
+            "finishedMs": 5555.800000011921
+          },
+          {
+            "index": 12,
+            "command": "workspace_list_dir",
+            "startedMs": 5555.800000011921,
+            "status": "fulfilled",
+            "finishedMs": 5556.5999999940395
+          },
+          {
+            "index": 13,
+            "command": "workspace_list_dir",
+            "startedMs": 5555.9000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5557
+          },
+          {
+            "index": 14,
+            "command": "workspace_list_dir",
+            "startedMs": 5557.200000017881,
+            "status": "fulfilled",
+            "finishedMs": 5558.4000000059605
+          },
+          {
+            "index": 15,
+            "command": "workspace_list_dir",
+            "startedMs": 5557.300000011921,
+            "status": "fulfilled",
+            "finishedMs": 5558.5
+          },
+          {
+            "index": 16,
+            "command": "workspace_list_dir",
+            "startedMs": 5558.700000017881,
+            "status": "fulfilled",
+            "finishedMs": 5560.4000000059605
+          },
+          {
+            "index": 17,
+            "command": "workspace_list_dir",
+            "startedMs": 5558.700000017881,
+            "status": "fulfilled",
+            "finishedMs": 5560.5
+          },
+          {
+            "index": 18,
+            "command": "workspace_list_dir",
+            "startedMs": 5560.700000017881,
+            "status": "fulfilled",
+            "finishedMs": 5561.5
+          }
+        ],
+        "nowMs": 6354.300000011921
+      },
+      "idleObservation": {
+        "valid": true,
+        "transport": "browser-invoke",
+        "events": [
+          {
+            "index": 0,
+            "command": "workspace_list_dir",
+            "startedMs": 4030.4000000059605,
+            "status": "fulfilled",
+            "finishedMs": 4176.5999999940395
+          },
+          {
+            "index": 1,
+            "command": "workspace_list_dir",
+            "startedMs": 4033,
+            "status": "fulfilled",
+            "finishedMs": 4184
+          },
+          {
+            "index": 2,
+            "command": "workspace_detect_git_roots",
+            "startedMs": 4033.7000000178814,
+            "status": "fulfilled",
+            "finishedMs": 4112.800000011921
+          },
+          {
+            "index": 3,
+            "command": "workspace_list_dir",
+            "startedMs": 4074.2000000178814,
+            "status": "fulfilled",
+            "finishedMs": 4184.9000000059605
+          }
+        ],
+        "nowMs": 4734.4000000059605
+      }
+    },
+    {
+      "keys": [
+        {
+          "key": "D",
+          "ms": 97.69999998807907,
+          "expected": "D",
+          "actual": "D",
+          "correct": true
+        },
+        {
+          "key": "o",
+          "ms": 35,
+          "expected": "Do",
+          "actual": "Do",
+          "correct": true
+        },
+        {
+          "key": "c",
+          "ms": 27.799999982118607,
+          "expected": "Doc",
+          "actual": "Doc",
+          "correct": true
+        },
+        {
+          "key": "u",
+          "ms": 30,
+          "expected": "Docu",
+          "actual": "Docu",
+          "correct": true
+        },
+        {
+          "key": "m",
+          "ms": 28.900000005960464,
+          "expected": "Docum",
+          "actual": "Docum",
+          "correct": true
+        },
+        {
+          "key": "e",
+          "ms": 22.30000001192093,
+          "expected": "Docume",
+          "actual": "Docume",
+          "correct": true
+        },
+        {
+          "key": "n",
+          "ms": 30,
+          "expected": "Documen",
+          "actual": "Documen",
+          "correct": true
+        },
+        {
+          "key": "t",
+          "ms": 22.700000017881393,
+          "expected": "Document",
+          "actual": "Document",
+          "correct": true
+        },
+        {
+          "key": "s",
+          "ms": 20.099999994039536,
+          "expected": "Documents",
+          "actual": "Documents",
+          "correct": true
+        }
+      ],
+      "frames": [
+        -0.09999999403953552,
+        100,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.799999999999272,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.5,
+        16.700000000000728,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.799999999999272,
+        16.600000000000364,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.599999999999454,
+        16.699999999999818,
+        16.700000000000728
+      ],
+      "stopped": true,
+      "value": "Documents",
+      "found": true,
+      "observation": {
+        "valid": true,
+        "transport": "browser-invoke",
+        "events": [
+          {
+            "index": 0,
+            "command": "workspace_list_dir",
+            "startedMs": 4340.799999982119,
+            "status": "fulfilled",
+            "finishedMs": 4474.899999976158
+          },
+          {
+            "index": 1,
+            "command": "workspace_list_dir",
+            "startedMs": 4342.5999999940395,
+            "status": "fulfilled",
+            "finishedMs": 4480.299999982119
+          },
+          {
+            "index": 2,
+            "command": "workspace_detect_git_roots",
+            "startedMs": 4342.799999982119,
+            "status": "fulfilled",
+            "finishedMs": 4420.5
+          },
+          {
+            "index": 3,
+            "command": "workspace_list_dir",
+            "startedMs": 4378,
+            "status": "fulfilled",
+            "finishedMs": 4481.199999988079
+          },
+          {
+            "index": 4,
+            "command": "workspace_list_dir",
+            "startedMs": 5798.699999988079,
+            "status": "fulfilled",
+            "finishedMs": 5799.799999982119
+          },
+          {
+            "index": 5,
+            "command": "workspace_list_dir",
+            "startedMs": 5800.0999999940395,
+            "status": "fulfilled",
+            "finishedMs": 5862.699999988079
+          },
+          {
+            "index": 6,
+            "command": "workspace_list_dir",
+            "startedMs": 5800.199999988079,
+            "status": "fulfilled",
+            "finishedMs": 5866
+          },
+          {
+            "index": 7,
+            "command": "workspace_list_dir",
+            "startedMs": 5883.0999999940395,
+            "status": "fulfilled",
+            "finishedMs": 5883.799999982119
+          },
+          {
+            "index": 8,
+            "command": "workspace_list_dir",
+            "startedMs": 5883.199999988079,
+            "status": "fulfilled",
+            "finishedMs": 5883.899999976158
+          },
+          {
+            "index": 9,
+            "command": "workspace_list_dir",
+            "startedMs": 5884,
+            "status": "fulfilled",
+            "finishedMs": 5903
+          },
+          {
+            "index": 10,
+            "command": "workspace_list_dir",
+            "startedMs": 5903.0999999940395,
+            "status": "fulfilled",
+            "finishedMs": 5903.5
+          },
+          {
+            "index": 11,
+            "command": "workspace_list_dir",
+            "startedMs": 5903.0999999940395,
+            "status": "fulfilled",
+            "finishedMs": 5903.5
+          },
+          {
+            "index": 12,
+            "command": "workspace_list_dir",
+            "startedMs": 5903.5,
+            "status": "fulfilled",
+            "finishedMs": 5903.799999982119
+          },
+          {
+            "index": 13,
+            "command": "workspace_list_dir",
+            "startedMs": 5903.5,
+            "status": "fulfilled",
+            "finishedMs": 5903.899999976158
+          },
+          {
+            "index": 14,
+            "command": "workspace_list_dir",
+            "startedMs": 5903.899999976158,
+            "status": "fulfilled",
+            "finishedMs": 5904.199999988079
+          },
+          {
+            "index": 15,
+            "command": "workspace_list_dir",
+            "startedMs": 5904,
+            "status": "fulfilled",
+            "finishedMs": 5904.399999976158
+          },
+          {
+            "index": 16,
+            "command": "workspace_list_dir",
+            "startedMs": 5904.399999976158,
+            "status": "fulfilled",
+            "finishedMs": 5904.699999988079
+          },
+          {
+            "index": 17,
+            "command": "workspace_list_dir",
+            "startedMs": 5904.399999976158,
+            "status": "fulfilled",
+            "finishedMs": 5904.799999982119
+          },
+          {
+            "index": 18,
+            "command": "workspace_list_dir",
+            "startedMs": 5904.799999982119,
+            "status": "fulfilled",
+            "finishedMs": 5905.399999976158
+          }
+        ],
+        "nowMs": 6708.5
+      },
+      "idleObservation": {
+        "valid": true,
+        "transport": "browser-invoke",
+        "events": [
+          {
+            "index": 0,
+            "command": "workspace_list_dir",
+            "startedMs": 4340.799999982119,
+            "status": "fulfilled",
+            "finishedMs": 4474.899999976158
+          },
+          {
+            "index": 1,
+            "command": "workspace_list_dir",
+            "startedMs": 4342.5999999940395,
+            "status": "fulfilled",
+            "finishedMs": 4480.299999982119
+          },
+          {
+            "index": 2,
+            "command": "workspace_detect_git_roots",
+            "startedMs": 4342.799999982119,
+            "status": "fulfilled",
+            "finishedMs": 4420.5
+          },
+          {
+            "index": 3,
+            "command": "workspace_list_dir",
+            "startedMs": 4378,
+            "status": "fulfilled",
+            "finishedMs": 4481.199999988079
+          }
+        ],
+        "nowMs": 5009.799999982119
+      }
+    },
+    {
+      "keys": [
+        {
+          "key": "D",
+          "ms": 53.900000005960464,
+          "expected": "D",
+          "actual": "D",
+          "correct": true
+        },
+        {
+          "key": "o",
+          "ms": 25.69999998807907,
+          "expected": "Do",
+          "actual": "Do",
+          "correct": true
+        },
+        {
+          "key": "c",
+          "ms": 24.80000001192093,
+          "expected": "Doc",
+          "actual": "Doc",
+          "correct": true
+        },
+        {
+          "key": "u",
+          "ms": 22.69999998807907,
+          "expected": "Docu",
+          "actual": "Docu",
+          "correct": true
+        },
+        {
+          "key": "m",
+          "ms": 21.5,
+          "expected": "Docum",
+          "actual": "Docum",
+          "correct": true
+        },
+        {
+          "key": "e",
+          "ms": 21.099999994039536,
+          "expected": "Docume",
+          "actual": "Docume",
+          "correct": true
+        },
+        {
+          "key": "n",
+          "ms": 18.900000005960464,
+          "expected": "Documen",
+          "actual": "Documen",
+          "correct": true
+        },
+        {
+          "key": "t",
+          "ms": 18.400000005960464,
+          "expected": "Document",
+          "actual": "Document",
+          "correct": true
+        },
+        {
+          "key": "s",
+          "ms": 17.69999998807907,
+          "expected": "Documents",
+          "actual": "Documents",
+          "correct": true
+        }
+      ],
+      "frames": [
+        6.700000005960646,
+        33.399999999999636,
+        16.600000000000364,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.599999999999454,
+        16.800000000000182,
+        16.5,
+        16.800000000000182,
+        16.600000000000364,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.599999999999454,
+        16.800000000000182,
+        16.600000000000364,
+        16.599999999999454,
+        16.800000000000182,
+        16.600000000000364,
+        16.599999999999454,
+        16.800000000000182,
+        16.600000000000364,
+        16.599999999999454,
+        16.800000000000182,
+        16.600000000000364,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.599999999999454,
+        16.699999999999818,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.599999999999454,
+        16.800000000000182,
+        16.600000000000364,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.699999999999818,
+        16.5,
+        16.800000000000182,
+        16.599999999999454,
+        16.700000000000728,
+        16.599999999999454,
+        16.699999999999818
+      ],
+      "stopped": true,
+      "value": "Documents",
+      "found": true,
+      "observation": {
+        "valid": true,
+        "transport": "browser-invoke",
+        "events": [
+          {
+            "index": 0,
+            "command": "workspace_list_dir",
+            "startedMs": 4272.5,
+            "status": "fulfilled",
+            "finishedMs": 4405.5999999940395
+          },
+          {
+            "index": 1,
+            "command": "workspace_list_dir",
+            "startedMs": 4274.0999999940395,
+            "status": "fulfilled",
+            "finishedMs": 4411.199999988079
+          },
+          {
+            "index": 2,
+            "command": "workspace_detect_git_roots",
+            "startedMs": 4274.299999982119,
+            "status": "fulfilled",
+            "finishedMs": 4337.299999982119
+          },
+          {
+            "index": 3,
+            "command": "workspace_list_dir",
+            "startedMs": 4304.0999999940395,
+            "status": "fulfilled",
+            "finishedMs": 4411.5
+          },
+          {
+            "index": 4,
+            "command": "workspace_list_dir",
+            "startedMs": 5668.699999988079,
+            "status": "fulfilled",
+            "finishedMs": 5669.9000000059605
+          },
+          {
+            "index": 5,
+            "command": "workspace_list_dir",
+            "startedMs": 5670.299999982119,
+            "status": "fulfilled",
+            "finishedMs": 5724.4000000059605
+          },
+          {
+            "index": 6,
+            "command": "workspace_list_dir",
+            "startedMs": 5670.4000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5725.299999982119
+          },
+          {
+            "index": 7,
+            "command": "workspace_list_dir",
+            "startedMs": 5742.0999999940395,
+            "status": "fulfilled",
+            "finishedMs": 5742.699999988079
+          },
+          {
+            "index": 8,
+            "command": "workspace_list_dir",
+            "startedMs": 5742.199999988079,
+            "status": "fulfilled",
+            "finishedMs": 5742.799999982119
+          },
+          {
+            "index": 9,
+            "command": "workspace_list_dir",
+            "startedMs": 5742.9000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5743.299999982119
+          },
+          {
+            "index": 10,
+            "command": "workspace_list_dir",
+            "startedMs": 5743.299999982119,
+            "status": "fulfilled",
+            "finishedMs": 5743.799999982119
+          },
+          {
+            "index": 11,
+            "command": "workspace_list_dir",
+            "startedMs": 5743.4000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5743.799999982119
+          },
+          {
+            "index": 12,
+            "command": "workspace_list_dir",
+            "startedMs": 5743.9000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5744.199999988079
+          },
+          {
+            "index": 13,
+            "command": "workspace_list_dir",
+            "startedMs": 5743.9000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5744.299999982119
+          },
+          {
+            "index": 14,
+            "command": "workspace_list_dir",
+            "startedMs": 5744.299999982119,
+            "status": "fulfilled",
+            "finishedMs": 5744.5999999940395
+          },
+          {
+            "index": 15,
+            "command": "workspace_list_dir",
+            "startedMs": 5744.299999982119,
+            "status": "fulfilled",
+            "finishedMs": 5744.699999988079
+          },
+          {
+            "index": 16,
+            "command": "workspace_list_dir",
+            "startedMs": 5744.799999982119,
+            "status": "fulfilled",
+            "finishedMs": 5745
+          },
+          {
+            "index": 17,
+            "command": "workspace_list_dir",
+            "startedMs": 5744.799999982119,
+            "status": "fulfilled",
+            "finishedMs": 5745.199999988079
+          },
+          {
+            "index": 18,
+            "command": "workspace_list_dir",
+            "startedMs": 5745.199999988079,
+            "status": "fulfilled",
+            "finishedMs": 5745.4000000059605
+          }
+        ],
+        "nowMs": 6577.799999982119
+      },
+      "idleObservation": {
+        "valid": true,
+        "transport": "browser-invoke",
+        "events": [
+          {
+            "index": 0,
+            "command": "workspace_list_dir",
+            "startedMs": 4272.5,
+            "status": "fulfilled",
+            "finishedMs": 4405.5999999940395
+          },
+          {
+            "index": 1,
+            "command": "workspace_list_dir",
+            "startedMs": 4274.0999999940395,
+            "status": "fulfilled",
+            "finishedMs": 4411.199999988079
+          },
+          {
+            "index": 2,
+            "command": "workspace_detect_git_roots",
+            "startedMs": 4274.299999982119,
+            "status": "fulfilled",
+            "finishedMs": 4337.299999982119
+          },
+          {
+            "index": 3,
+            "command": "workspace_list_dir",
+            "startedMs": 4304.0999999940395,
+            "status": "fulfilled",
+            "finishedMs": 4411.5
+          }
+        ],
+        "nowMs": 4958.5999999940395
+      }
+    },
+    {
+      "keys": [
+        {
+          "key": "D",
+          "ms": 31.80000001192093,
+          "expected": "D",
+          "actual": "D",
+          "correct": true
+        },
+        {
+          "key": "o",
+          "ms": 24.099999994039536,
+          "expected": "Do",
+          "actual": "Do",
+          "correct": true
+        },
+        {
+          "key": "c",
+          "ms": 17.599999994039536,
+          "expected": "Doc",
+          "actual": "Doc",
+          "correct": true
+        },
+        {
+          "key": "u",
+          "ms": 39,
+          "expected": "Docu",
+          "actual": "Docu",
+          "correct": true
+        },
+        {
+          "key": "m",
+          "ms": 23.5,
+          "expected": "Docum",
+          "actual": "Docum",
+          "correct": true
+        },
+        {
+          "key": "e",
+          "ms": 21.299999982118607,
+          "expected": "Docume",
+          "actual": "Docume",
+          "correct": true
+        },
+        {
+          "key": "n",
+          "ms": 15.300000011920929,
+          "expected": "Documen",
+          "actual": "Documen",
+          "correct": true
+        },
+        {
+          "key": "t",
+          "ms": 23.400000005960464,
+          "expected": "Document",
+          "actual": "Document",
+          "correct": true
+        },
+        {
+          "key": "s",
+          "ms": 17.099999994039536,
+          "expected": "Documents",
+          "actual": "Documents",
+          "correct": true
+        }
+      ],
+      "frames": [
+        8.1999999940399,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.599999999999454,
+        33.400000000000546,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.800000000000182,
+        16.600000000000364,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.800000000000182,
+        16.600000000000364,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.699999999999818,
+        16.600000000000364,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.599999999999454,
+        16.699999999999818,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.600000000000364,
+        16.800000000000182,
+        16.599999999999454,
+        16.600000000000364,
+        16.699999999999818,
+        16.699999999999818,
+        16.700000000000728,
+        16.599999999999454,
+        16.699999999999818,
+        16.700000000000728,
+        16.699999999999818,
+        16.599999999999454,
+        16.700000000000728,
+        16.599999999999454,
+        16.699999999999818,
+        16.700000000000728
+      ],
+      "stopped": true,
+      "value": "Documents",
+      "found": true,
+      "observation": {
+        "valid": true,
+        "transport": "browser-invoke",
+        "events": [
+          {
+            "index": 0,
+            "command": "workspace_list_dir",
+            "startedMs": 4360.800000011921,
+            "status": "fulfilled",
+            "finishedMs": 4480.800000011921
+          },
+          {
+            "index": 1,
+            "command": "workspace_list_dir",
+            "startedMs": 4362.300000011921,
+            "status": "fulfilled",
+            "finishedMs": 4482.9000000059605
+          },
+          {
+            "index": 2,
+            "command": "workspace_detect_git_roots",
+            "startedMs": 4362.5,
+            "status": "fulfilled",
+            "finishedMs": 4428.200000017881
+          },
+          {
+            "index": 3,
+            "command": "workspace_list_dir",
+            "startedMs": 4390.9000000059605,
+            "status": "fulfilled",
+            "finishedMs": 4483.5
+          },
+          {
+            "index": 4,
+            "command": "workspace_list_dir",
+            "startedMs": 5623.5,
+            "status": "fulfilled",
+            "finishedMs": 5624.4000000059605
+          },
+          {
+            "index": 5,
+            "command": "workspace_list_dir",
+            "startedMs": 5624.700000017881,
+            "status": "fulfilled",
+            "finishedMs": 5683.200000017881
+          },
+          {
+            "index": 6,
+            "command": "workspace_list_dir",
+            "startedMs": 5624.800000011921,
+            "status": "fulfilled",
+            "finishedMs": 5684.700000017881
+          },
+          {
+            "index": 7,
+            "command": "workspace_list_dir",
+            "startedMs": 5702.300000011921,
+            "status": "fulfilled",
+            "finishedMs": 5702.800000011921
+          },
+          {
+            "index": 8,
+            "command": "workspace_list_dir",
+            "startedMs": 5702.4000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5702.9000000059605
+          },
+          {
+            "index": 9,
+            "command": "workspace_list_dir",
+            "startedMs": 5702.9000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5703.4000000059605
+          },
+          {
+            "index": 10,
+            "command": "workspace_list_dir",
+            "startedMs": 5703.4000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5703.800000011921
+          },
+          {
+            "index": 11,
+            "command": "workspace_list_dir",
+            "startedMs": 5703.4000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5703.800000011921
+          },
+          {
+            "index": 12,
+            "command": "workspace_list_dir",
+            "startedMs": 5703.9000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5704.200000017881
+          },
+          {
+            "index": 13,
+            "command": "workspace_list_dir",
+            "startedMs": 5703.9000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5704.300000011921
+          },
+          {
+            "index": 14,
+            "command": "workspace_list_dir",
+            "startedMs": 5704.4000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5704.700000017881
+          },
+          {
+            "index": 15,
+            "command": "workspace_list_dir",
+            "startedMs": 5704.4000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5704.800000011921
+          },
+          {
+            "index": 16,
+            "command": "workspace_list_dir",
+            "startedMs": 5704.9000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5727.5
+          },
+          {
+            "index": 17,
+            "command": "workspace_list_dir",
+            "startedMs": 5704.9000000059605,
+            "status": "fulfilled",
+            "finishedMs": 5727.5
+          },
+          {
+            "index": 18,
+            "command": "workspace_list_dir",
+            "startedMs": 5727.600000023842,
+            "status": "fulfilled",
+            "finishedMs": 5728.200000017881
+          }
+        ],
+        "nowMs": 6531.100000023842
+      },
+      "idleObservation": {
+        "valid": true,
+        "transport": "browser-invoke",
+        "events": [
+          {
+            "index": 0,
+            "command": "workspace_list_dir",
+            "startedMs": 4360.800000011921,
+            "status": "fulfilled",
+            "finishedMs": 4480.800000011921
+          },
+          {
+            "index": 1,
+            "command": "workspace_list_dir",
+            "startedMs": 4362.300000011921,
+            "status": "fulfilled",
+            "finishedMs": 4482.9000000059605
+          },
+          {
+            "index": 2,
+            "command": "workspace_detect_git_roots",
+            "startedMs": 4362.5,
+            "status": "fulfilled",
+            "finishedMs": 4428.200000017881
+          },
+          {
+            "index": 3,
+            "command": "workspace_list_dir",
+            "startedMs": 4390.9000000059605,
+            "status": "fulfilled",
+            "finishedMs": 4483.5
+          }
+        ],
+        "nowMs": 5012.5
+      }
+    }
+  ],
+  "budgetMs": 150,
+  "measurement": "Browser keydown to next animation frame and continuous frame gaps; all samples retained, same 2100-file fixture, 20ms driver pacing.",
+  "passed": true
+}
