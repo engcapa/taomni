@@ -1,3 +1,4 @@
+import { registerHostNavigationCases } from "../../workspace/tests/hostNavigation.cases";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import mermaid from "mermaid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -332,6 +333,8 @@ export function registerCodeWorkspaceTabBehavior2Cases() {
       clearGitSnapshotCache();
       clearGitSnapshotInFlight();
     });
+
+    registerHostNavigationCases({ workspaceMocks, file, lspMocks, documentStatus, defaultCapabilities });
 
     registerInteractionCases({
       get projectFactsMock() { return projectFactsMock; },

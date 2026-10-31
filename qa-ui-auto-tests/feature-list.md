@@ -8449,6 +8449,9 @@ files:
   - src/components/editor/workspace/liveTemplates.ts
   - src/components/editor/workspace/editorSearchPanel.ts
   - src/components/editor/workspace/lspHyperlink.ts
+  - src/components/editor/workspace/hooks/useWorkspaceHostFiles.ts
+  - src/components/workspace/useWorkspaceCodeHost.ts
+  - src/lib/workspaceFileTarget.ts
   - src/components/editor/CodeWorkspaceTab.tsx
   - src/components/editor/workspace/UndoWorkspaceEditConfirmDialog.tsx
   - src/components/editor/workspace/RefactorRecoveryReviewDialog.tsx

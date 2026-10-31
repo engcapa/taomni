@@ -23,9 +23,10 @@ describe("editor entry point ownership", () => {
     const workspace = useWorkspacePlatformStore.getState().getWorkspace(id)!;
     expect(workspace.codeWorkspace).toMatchObject(project);
     expect(workspace.rootFolders[0]).toMatchObject(project.roots![0]);
-    expect(workspace.openTabs).toHaveLength(1);
+    expect(workspace.openTabs).toHaveLength(2);
     expect(workspace.openTabs[0].kind).toBe("code");
-    expect(workspace.activeTabId).toBe(workspace.openTabs[0].id);
+    expect(workspace.openTabs[1]).toMatchObject({ kind: "file", title: "notes.txt", editorFile: project.initialFile });
+    expect(workspace.activeTabId).toBe(workspace.openTabs[1].id);
     expect(useAppStore.getState().activeSideTab).toBe("workspaces");
     expect(useAppStore.getState().tabs.map((tab) => tab.id)).toEqual(["shell"]);
     window.dispatchEvent(new Event("pagehide"));

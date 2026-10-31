@@ -1,3 +1,4 @@
+import { findEditorByTitle } from "../../editorReadiness";
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import * as workspaceSearchModule from "../../../../../../lib/editor/workspaceSearch";
@@ -63,7 +64,7 @@ export function registereditTransactionsLifecycle3Cases(caseContext: registeredi
       vi.spyOn(workspaceSearchModule, "workspaceSearchStart").mockResolvedValue("search-repair-002");
 
       caseContext.workspaceTestHarness.renderWorkspace(workspace, { onCommandsChange });
-      await screen.findByTitle("app / src/c.ts");
+      await findEditorByTitle("app / src/c.ts");
 
       // Open find in files panel
       await act(async () => {
@@ -168,6 +169,9 @@ export function registereditTransactionsLifecycle3Cases(caseContext: registeredi
         // ED-AUDIT-008: editor focus reserves the journal action for shared
         // document undo. Use the workspace shortcut, as the retained history
         // cases do, to verify the selected replacement remains one transaction.
+        const row = (await screen.findAllByTestId("code-workspace-find-match-row"))[0];
+        row.focus();
+        expect(document.activeElement).toBe(row);
         await act(async () => { fireEvent.keyDown(window, { key: "z", ctrlKey: true }); });
         fireEvent.click(await screen.findByTestId("code-workspace-undo-confirm-ok"));
         await waitFor(() => expect(disk["src/a.ts"]).toBe("hello needle"));

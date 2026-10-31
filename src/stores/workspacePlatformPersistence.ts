@@ -1,3 +1,4 @@
+import { workspaceDurableCodeDefinition } from "../lib/workspaceFileTarget";
 import type { WorkspacePlatformState } from "./workspacePlatformStore";
 
 export const PLATFORM_WORKSPACES_STORAGE_KEY = "taomni.platformWorkspaces.v1";
@@ -31,7 +32,13 @@ function flushWorkspacePlatformPersistence(): void {
     if (window.localStorage.getItem(PLATFORM_WORKSPACES_STORAGE_KEY) !== observedStorage) return;
     const serialized = JSON.stringify({
       version: 1,
-      workspaces: snapshot.workspaces,
+      workspaces: snapshot.workspaces.map((workspace) => {
+        const openTabs = workspace.openTabs.filter((tab) => !tab.transient);
+        // A close may remove the transient tab before context catches up.
+        const codeWorkspace = workspaceDurableCodeDefinition(workspace.codeWorkspace);
+        return { ...workspace, codeWorkspace, openTabs, activeTabId: openTabs.some((tab) => tab.id === workspace.activeTabId)
+          ? workspace.activeTabId : openTabs[0]?.id ?? "" };
+      }),
       activeWorkspaceId: snapshot.activeWorkspaceId,
       createdNodes: snapshot.createdNodes,
     });

@@ -12,7 +12,8 @@ import { create } from "zustand";
 import type { SessionConfig } from "../lib/ipc/session";
 import { createWorkspaceTabActions } from "./workspacePlatformTabActions";
 import { createWorkspaceCodeActions } from "./workspacePlatformCodeActions";
-import type { CodeWorkspaceTabInfo } from "../types";
+import { workspaceDurableCodeDefinition, type WorkspaceFileTarget } from "../lib/workspaceFileTarget";
+import type { CodeWorkspaceFileRef, CodeWorkspaceTabInfo } from "../types";
 import { cancelWorkspacePlatformPersistence, observeWorkspacePlatformStorage, persistWorkspacePlatformMetadata as persist, PLATFORM_WORKSPACES_STORAGE_KEY } from "./workspacePlatformPersistence";
 
 export { PLATFORM_WORKSPACES_STORAGE_KEY };
@@ -47,6 +48,9 @@ export interface WorkspaceIsolatedTab {
   /** `kind === "file"` payload. */
   filePath?: string;
   rootFolderId?: string;
+  editorFile?: CodeWorkspaceFileRef;
+  /** Runtime-only library source owned by the editor/provider. */
+  transient?: boolean;
   /** Source `SessionConfig` id for session kinds (any global session). */
   sessionId?: string;
   protocol?: string;
@@ -158,7 +162,7 @@ export interface WorkspacePlatformState {
   moveWorkspaceTab: (workspaceId: string, tabId: string, index: number) => void;
   duplicateWorkspaceTab: (workspaceId: string, tabId: string, cwd?: string) => WorkspaceIsolatedTab | null;
   setActiveWorkspaceTab: (workspaceId: string, tabId: string) => void;
-  syncWorkspaceFiles: (workspaceId: string, files: Array<{ rootId: string; path: string }>, active?: { rootId: string; path: string } | null) => void;
+  syncWorkspaceFiles: (workspaceId: string, files: WorkspaceFileTarget[], active?: CodeWorkspaceFileRef | null) => void;
   setActiveLeftToolWindow: (workspaceId: string, toolWindow: WorkspaceToolWindow) => void;
   setBottomDockOpen: (workspaceId: string, open: boolean) => void;
   setBottomDockTool: (workspaceId: string, tool: WorkspaceBottomTool) => void;
@@ -234,10 +238,11 @@ function isPlatformWorkspace(value: unknown): value is PlatformWorkspace {
 }
 
 function normalizeWorkspace(workspace: PlatformWorkspace): PlatformWorkspace {
-  const openTabs = (workspace.openTabs ?? []).filter((tab) => tab && typeof tab.id === "string")
+  const openTabs = (workspace.openTabs ?? []).filter((tab) => tab && typeof tab.id === "string" && !tab.transient)
     .map((tab) => tab.sessionId && tab.protocol ? { ...tab, kind: sessionTabKind(tab.protocol) } : tab);
   return {
     ...workspace,
+    codeWorkspace: workspaceDurableCodeDefinition(workspace.codeWorkspace),
     isDefault: workspace.id === DEFAULT_WORKSPACE_ID || workspace.isDefault === true,
     description: workspace.description ?? "",
     pinnedSessionIds: Array.isArray(workspace.pinnedSessionIds) ? workspace.pinnedSessionIds : [],

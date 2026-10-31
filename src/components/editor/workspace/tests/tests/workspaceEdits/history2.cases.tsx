@@ -1,3 +1,4 @@
+import { findEditorByTitle } from "../../editorReadiness";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 import { confirmAppDialog } from "../../../../../../lib/appDialogs";
@@ -83,7 +84,7 @@ export function registerworkspaceEditsHistory2Cases(caseContext: registerworkspa
     }));
 
     const rendered = caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    await screen.findByTitle("app / src/main.ts");
+    await findEditorByTitle("app / src/main.ts");
     await waitFor(() => expect(screen.queryByText("LSP idle")).not.toBeInTheDocument());
     fireEvent.keyDown(window, { key: "Enter", altKey: true });
     fireEvent.click(await screen.findByRole("button", { name: "Extract generated helper" }));

@@ -1,3 +1,4 @@
+import { workspaceFileTabId } from "../lib/workspaceFileTarget";
 import type { StoreApi } from "zustand";
 import type { WorkspacePlatformState, WorkspaceIsolatedTab } from "./workspacePlatformStore";
 import { computeDuplicateTitle } from "./app/tabTitles";
@@ -19,16 +20,17 @@ export function createWorkspaceTabActions(
   syncWorkspaceFiles: (workspaceId, files, active) => {
     set((state) => {
       const workspaces = updateWorkspace(state.workspaces, workspaceId, (workspace) => {
-        const idFor = (file: { rootId: string; path: string }) => `ws:${workspaceId}:file:${file.rootId}:${file.path}`;
+        const idFor = (file: typeof files[number]) => workspaceFileTabId(workspaceId, file.ref);
         const wanted = new Set(files.map(idFor));
         const openTabs = workspace.openTabs.filter((tab) => tab.kind !== "file" || wanted.has(tab.id));
         for (const file of files) {
           const id = idFor(file);
           if (openTabs.some((tab) => tab.id === id)) continue;
-          openTabs.push({ id, workspaceId, kind: "file", rootFolderId: file.rootId, filePath: file.path,
-            title: file.path.split("/").pop() || file.path, closable: true, createdAt: Date.now() });
+          openTabs.push({ id, workspaceId, kind: "file", rootFolderId: file.ref.kind === "root" ? file.ref.rootId : undefined, filePath: file.ref.path,
+            editorFile: file.ref, transient: file.transient,
+            title: file.title || file.ref.path.split(/[\\/]/).pop() || file.ref.path, closable: true, createdAt: Date.now() });
         }
-        const activeTabId = active ? idFor(active) : openTabs.some((tab) => tab.id === workspace.activeTabId)
+        const activeTabId = active ? workspaceFileTabId(workspaceId, active) : openTabs.some((tab) => tab.id === workspace.activeTabId)
           ? workspace.activeTabId : openTabs[0]?.id ?? "";
         if (activeTabId === workspace.activeTabId && openTabs.length === workspace.openTabs.length
           && openTabs.every((tab, index) => tab === workspace.openTabs[index])) return workspace;
