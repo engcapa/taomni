@@ -10,7 +10,7 @@ from typing import Sequence
 
 _TRANSFER = re.compile(r"could not transfer (?:artifact|metadata)", re.IGNORECASE)
 _TRANSIENT = re.compile(
-    r"status code:\s*(?:408|429|5\d\d)\b|(?:read|connect(?:ion)?) timed out|"
+    r"(?:status code:|HTTP Status:)\s*(?:408|429|5\d\d)\b|(?:read|connect(?:ion)?) timed out|"
     r"connection reset|temporary failure in name resolution",
     re.IGNORECASE,
 )

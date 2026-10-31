@@ -1,6 +1,8 @@
 id: TC-WS-017
 title: Workspace/mode switches retain unsaved text, undo/redo and saved files
-description: Workspace/mode switches retain unsaved text, undo/redo and saved files. Native verifies packaged WebView and real workspace file IO where declared.
+description: 'Workspace/mode switches retain unsaved text, undo/redo and saved files. Native verifies packaged WebView and real workspace file IO where
+  declared. Collapse Select All to its start before inserting one X: this gives one insertion transaction on every browser, rather than assuming replacement
+  deletion and typing share one undo entry. Undo must restore the exact original text.'
 modes:
 - browser
 - native
@@ -22,10 +24,10 @@ steps:
 - seed_storage:
     key: taomni.platformWorkspaces.v1
     value: '{"version": 1, "activeWorkspaceId": "default-workspace", "createdNodes": [], "workspaces": [{"id": "default-workspace", "name": "Default Workspace",
-      "description": "", "isDefault": true, "rootFolders": [{"id": "root-1", "name": "qa-root", "path": "${fixture.platform_workspace_root}", "addedAt": 1}],
-      "pinnedSessionIds": [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId":
-      ""}, {"id": "second-workspace", "name": "Second Workspace", "description": "", "isDefault": false, "rootFolders": [], "pinnedSessionIds": [], "activeLeftToolWindow":
-      "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId": ""}]}'
+      "description": "", "isDefault": true, "rootFolders": [{"id": "root-1", "name": "qa-root", "path": "${fixture.platform_workspace_root}", "addedAt":
+      1}], "pinnedSessionIds": [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs":
+      [], "activeTabId": ""}, {"id": "second-workspace", "name": "Second Workspace", "description": "", "isDefault": false, "rootFolders": [], "pinnedSessionIds":
+      [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId": ""}]}'
 - reload_window: null
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
@@ -41,6 +43,9 @@ steps:
 - press:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
     key: Mod+a
+- press:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    key: ArrowLeft
 - type:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
     text: X
@@ -68,9 +73,13 @@ steps:
 - press:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
     key: Mod+z
-- assert_text:
-    selector: '[data-testid="workspace-file-editor"] .cm-content'
-    contains: platform workspace root
+- assert_items:
+    selector: '[data-testid="workspace-file-editor"] .cm-content .cm-line'
+    equals:
+    - '# platform workspace root'
+    - ''
+    - Seeded by the qa-ui-auto platform_workspace_root fixture.
+    - ''
 - press:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
     key: Mod+Shift+z
@@ -130,10 +139,11 @@ verification:
     - 12
     - 15
     - 16
-    - 19
+    - 17
     - 20
-    - 22
+    - 21
     - 23
+    - 24
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -147,11 +157,11 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
     - step: 14
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "platform workspace root"}}'
-    - step: 18
+    - step: 19
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"]", "name": "data-dirty", "equals": "true"}}'
-    - step: 21
+    - step: 22
       expectation: '{"assert_not_visible": "[data-testid=\"workspace-file-editor\"]"}'
-    - step: 24
+    - step: 25
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "X"}}'
     results:
     - 3
@@ -160,76 +170,77 @@ verification:
     - 11
     - 13
     - 14
-    - 18
-    - 21
-    - 24
+    - 19
+    - 22
+    - 25
   - id: R2
     requirement: Home、Sessions 再返回工作区保留未保存内容与撤销重做历史。
     actions:
-    - 25
-    - 27
-    - 29
-    - 31
-    - 33
-    checkpoints:
-    - step: 26
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 28
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 30
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "X"}}'
-    - step: 32
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "platform workspace root"}}'
-    - step: 34
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "X"}}'
-    results:
     - 26
     - 28
     - 30
     - 32
     - 34
+    checkpoints:
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 31
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "X"}}'
+    - step: 33
+      expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content .cm-line", "equals": ["# platform workspace root",
+        "", "Seeded by the qa-ui-auto platform_workspace_root fixture.", ""]}}'
+    - step: 35
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "X"}}'
+    results:
+    - 27
+    - 29
+    - 31
+    - 33
+    - 35
   - id: R3
     requirement: 保存完成后重载仍可读取编辑后的文件；native 经过真实磁盘 IPC。
     actions:
-    - 35
-    - 38
-    - 41
+    - 36
+    - 39
+    - 42
     checkpoints:
-    - step: 37
+    - step: 38
       expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"][data-dirty]", "equal": 0}}'
-    - step: 40
+    - step: 41
       expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 42
-      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
     - step: 43
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
+    - step: 44
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "X"}}'
     results:
-    - 37
-    - 40
-    - 42
+    - 38
+    - 41
     - 43
+    - 44
   - id: R4
     requirement: 文件过滤只展示匹配的已加载文件，清空后恢复文件树。
     actions:
-    - 45
-    - 47
-    - 48
-    - 50
-    - 52
-    checkpoints:
-    - step: 46
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
-    - step: 49
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-flat-file\"]", "equal": 0}}'
-    - step: 51
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-flat-file\"]", "equal": 1}}'
-    - step: 53
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-file\"]"}'
-    results:
     - 46
+    - 48
     - 49
     - 51
     - 53
+    checkpoints:
+    - step: 47
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+    - step: 50
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-flat-file\"]", "equal": 0}}'
+    - step: 52
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-flat-file\"]", "equal": 1}}'
+    - step: 54
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-file\"]"}'
+    results:
+    - 47
+    - 50
+    - 52
+    - 54
   visual:
   - check: 与 HTML 原型比较圆角框架、紧凑尺寸、无溢出和可用操作入口。
     method: manual

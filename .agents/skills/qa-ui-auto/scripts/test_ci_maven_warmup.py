@@ -69,6 +69,7 @@ class MavenWarmupTests(unittest.TestCase):
     @patch.object(warmup.subprocess, "run")
     def test_transfer_statuses_and_connection_failure(self, run, sleep):
         for suffix in ["status code: 408", "status code: 429", "status code: 503",
+                       "HTTP Status: 429", "HTTP Status: 503",
                        "Read timed out", "Connection reset", "Temporary failure in name resolution"]:
             with self.subTest(suffix=suffix):
                 run.reset_mock()

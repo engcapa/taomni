@@ -49,9 +49,18 @@ class FolderDialogContracts(unittest.TestCase):
                 folder_dialog.command("xdotool", "search")
 
     def test_unsupported_desktop_fails_before_os_input(self):
-        with patch.dict(folder_dialog.os.environ, {"DISPLAY": "", "GDK_BACKEND": "wayland"}), patch.object(folder_dialog, "command") as command:
+        with patch.dict(folder_dialog.os.environ, {"DISPLAY": "", "GDK_BACKEND": "x11"}), patch.object(folder_dialog, "command") as command:
             with self.assertRaisesRegex(StepError, "requires X11"):
                 folder_dialog.linux_dialog(SimpleNamespace(), None)
+            command.assert_not_called()
+
+    def test_wayland_uses_the_owned_compositor_without_x11_input(self):
+        with patch.dict(folder_dialog.os.environ, {"DISPLAY": "", "GDK_BACKEND": "wayland"}), \
+                patch("qa_ui_auto.folder_dialog_wayland.operate", return_value={"pid": 123}) as operate, \
+                patch.object(folder_dialog, "command") as command:
+            ctx = SimpleNamespace()
+            self.assertEqual(folder_dialog.linux_dialog(ctx, None), {"pid": 123})
+            operate.assert_called_once_with(ctx, None, folder_dialog.TITLE)
             command.assert_not_called()
 
     def test_failed_owned_dialog_operation_is_retained_in_evidence(self):

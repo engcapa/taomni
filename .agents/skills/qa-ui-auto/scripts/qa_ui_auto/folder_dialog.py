@@ -40,6 +40,10 @@ def selected_path(ctx, args: dict) -> Path | None:
 
 
 def linux_dialog(ctx, path: Path | None) -> dict:
+    from . import wayland
+    if wayland.active():
+        from .folder_dialog_wayland import operate
+        return operate(ctx, path, TITLE)
     if not os.environ.get("DISPLAY") or os.environ.get("GDK_BACKEND") == "wayland":
         raise StepError("native_folder_dialog: Linux OS chooser automation requires X11")
     application = Path(ctx.session.application).resolve()
