@@ -48,16 +48,37 @@ pnpm build:mobile                # 生成内嵌 PWA，主 build 会自动执行
 | 设计项 | 具体证据 | 当前结果 |
 | --- | --- | --- |
 | V-01 / V-06 | Rust `mobile::auth`、真实 HTTP/WS security/CORS/revoke/listener 测试 | 本机通过 |
-| V-02 | Rust 真实 provider follow-up/cancel/turn_in_progress、确认点绑定/重复作答；native 保存会话投影 | Rust Rust 本机通过；native 待 GitHub |
-| V-03 | Rust 双设备真实 PTY、只读拒绝/尺寸钳制/桌面抢回/续接；回放 UTF-8/CR/截断 | 本机通过；桌面原生入口待 GitHub |
+| V-02 | Rust 真实 provider follow-up/cancel/turn_in_progress、确认点绑定/重复作答；native 保存会话投影 | Rust 本机通过；TC-MOBILE-002 GitHub Linux 通过 |
+| V-03 | Rust 双设备真实 PTY、只读拒绝/尺寸钳制/桌面抢回/续接；回放 UTF-8/CR/截断 | 本机通过；TC-MOBILE-002 GitHub Linux 桌面原生入口通过 |
 | V-04 | TC-MOBILE-001：390×844、配对、双 Origin endpoint、终端/Agent 输入分离、只读文件/diff、移除与重载；renderer fixture 显式不算 native 证据 | 本机通过 |
-| V-04 / V-05 | TC-MOBILE-003：真实 headless listener 内嵌 PWA 配对、WS、390×844、离线外壳；TC-MOBILE-002：真实桌面 settings→PTY→吊销 | 待 GitHub |
+| V-04 / V-05 | TC-MOBILE-003：真实 headless listener 内嵌 PWA 配对、WS、390×844、离线外壳；TC-MOBILE-002：真实桌面 settings→PTY→吊销 | GitHub Linux 通过；本机额外复用源码匹配的 release 二进制通过 headless/PWA 探针 |
 | V-07 | Rust 真实 Git worktree/staged/deleted diff、大文件/二进制/越界、无终端文件事件；settings Vitest 21 tests | 本机通过 |
-| V-07 / crash | 完整 crash-regression browser/native；matching QA release | 本机稳定源码 browser 9/9（含全部 8 项 crash）通过；native 执行中，最终提交补记 GitHub 结果 |
+| V-07 / crash | 完整 crash-regression browser/native；matching QA release | 本机稳定源码 browser 9/9（含全部 8 项 crash）通过；GitHub 三平台 browser/native selected 共 56/56 通过，见下表 |
 
 本机 Node 22.23.4、pnpm 10；Rust 1.98。完整 `pnpm build`（含 check:refactor、Mobile Web 和桌面构建）已通过；Rust `cargo check --lib` 已通过。后续源码变更均重跑受影响检查。最新移动 Rust 集合为 12 项通过，QA 审计无覆盖倒退，CI 规划与 provenance/crash 选择工具契约 28 项通过。
 
-未验证：Android/iOS 真手机、PWA 真实安装、相机扫码权限、真实公网 HTTPS→私网 PNA、用户实际隧道/反向代理、Windows/macOS 实例运行及真实 SSH 网络。本轮使用本机手机尺寸模拟与 GitHub Linux 原生服务测试，不称为多端真机通过。headless CC/Codex/ACP 和桌面副作用工具明确不支持，非隐藏失败或占位按钮。
+### GitHub selected 执行
+
+最新验证：[qa-ui-auto-platforms / 41228578529](https://github.com/engcapa/taomni/actions/runs/41228578529)，代码与用例提交 `abfa5e182be180c435e4bb4a8458d15cd425f3b4`。显式选择 `TC-MOBILE-001,TC-MOBILE-002,TC-MOBILE-003`，workflow 合并完整 `crash-regression` 集合，使用匹配源码的独立 QA release。
+
+| 平台 | browser | native |
+| --- | --- | --- |
+| Linux | 9/9 通过 | 11/11 通过，含 TC-MOBILE-002/003 |
+| Windows | 9/9 通过 | 9/9 通过 |
+| macOS | 9/9 通过 | 9/9 通过 |
+
+已下载并核对最终 `ci-summary.json`、逐例报告和原始 receipt：共 **56/56 通过、0 failed、0 skipped**；`passed=true`、`report_ok=true`，无 infrastructure errors、未审用例或分组错误。执行期间源码稳定，三平台源码与 runner 指纹一致。分片 job 绿色本身不代表用例通过。原生 Rust 契约 35 项通过（含 12 项 mobile）；Windows capture helper 契约 26 项通过。
+
+报告保存在本机 `qa-ui-auto-report/github/41228578529/`，GitHub Actions artifacts 同步保留 selection、原始报告、截图、receipt 与汇总。产品源码指纹为 `b437d4048073b51e8fb3534f9a55affcdc748305abac75602b1c1c2f3ca1dae1`；本记录与截图的后续提交不修改被测产品、runner 或用例。
+
+前轮失败与修复均保留在 Actions 中：TC-MOBILE-002 在设备吊销尚处于 busy 时点击服务关闭，已改用真实 WebDriver 点击并等待可操作状态；TC-MOBILE-003 的 Chromium 二进制查找受隔离 `XDG_CACHE_HOME` 影响，已固定安装位置并继承 `PLAYWRIGHT_BROWSERS_PATH`；TC-MOBILE-001 在重开实例后早于异步列表加载统计数量，已等待实际会话条目再保留原有精确数量断言。未跳过失败用例或降低断言。
+
+### 手机尺寸截图
+
+- [终端只读与接管界面](mobile-remote-p0/terminal-phone.png)、[Agent 文件与 diff](mobile-remote-p0/agent-files-phone.png)：production Mobile Web + renderer fixture，390×844。
+- [真实 headless 服务页面](mobile-remote-p0/headless-phone.png)：源码匹配的 Linux QA release 内嵌页面，390×844；未创建终端的空列表符合 P0 能力边界。
+
+未验证：Android/iOS 真手机、PWA 真实安装、相机扫码权限、真实公网 HTTPS→私网 PNA、用户实际隧道/反向代理、Windows/macOS 移动服务专用场景及真实 SSH 网络。三平台构建与桌面 crash 用例不代表移动服务在三平台均完成专项验收。本轮使用本机手机尺寸模拟与 GitHub Linux 原生服务测试，不称为多端真机通过。headless CC/Codex/ACP 和桌面副作用工具明确不支持，非隐藏失败或占位按钮。
 
 ## 回退
 
