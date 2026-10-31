@@ -4,7 +4,7 @@ modes:
 - browser
 - native
 description: Ctrl+F searches the rendered Markdown without switching modes; closing and reopening restores focus. Native checks the packaged WebView shortcut
-  path.
+  path, including a Split preview focused before the asynchronous source editor finishes mounting.
 covers:
 - F25.1
 fixtures:
@@ -76,6 +76,7 @@ steps:
 - assert_count:
     selector: '[data-testid="markdown-search-match"]'
     equal: 1
+- screenshot: markdown-split-preview-found.png
 - press: Escape
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Mod+f
@@ -114,9 +115,9 @@ verification:
     - 34
     - 35
     - 37
-    - 39
     - 40
     - 41
+    - 42
     results:
     - 15
     - 16
@@ -125,8 +126,8 @@ verification:
     - 24
     - 32
     - 38
-    - 43
     - 44
+    - 45
     checkpoints:
     - step: 15
       expectation: '{"assert_count": {"selector": "[data-testid=\"markdown-search-match\"]", "equal": 1}}'
@@ -142,12 +143,12 @@ verification:
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "# platform workspace root"}}'
     - step: 38
       expectation: '{"assert_count": {"selector": "[data-testid=\"markdown-search-match\"]", "equal": 1}}'
-    - step: 43
-      expectation: '{"assert_count": {"selector": "[data-testid=\"markdown-preview-search\"]", "equal": 0}}'
     - step: 44
+      expectation: '{"assert_count": {"selector": "[data-testid=\"markdown-preview-search\"]", "equal": 0}}'
+    - step: 45
       expectation: '{"assert_no_runtime_errors": null}'
   visual:
-  - check: Review retained search screenshot for actual result rows and unobstructed controls.
+  - check: Review markdown-preview-found.png and markdown-split-preview-found.png for actual highlighted text and unobstructed controls.
     method: manual
     reason: Screenshot review supplements exact functional assertions.
   native:

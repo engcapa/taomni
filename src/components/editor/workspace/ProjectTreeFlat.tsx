@@ -74,17 +74,6 @@ export function matchingFlatFileRows(
     groups.set("__matches__", entries);
   }
   const rows: ProjectTreeRow[] = [];
-  if (state.loading) rows.push({ key: `${root.id}:searching`, render: () => (
-    <div className="flex items-center gap-2 px-3 py-1 text-[11px] text-[var(--taomni-code-muted)]" role="status">
-      <Loader2 className="w-3.5 h-3.5 animate-spin" />Searching workspace…
-    </div>
-  ) });
-  if (state.error) rows.push({ key: `${root.id}:search-error`, render: () => (
-    <div className="px-3 py-1 text-[11px] text-red-500" role="status">Some folders could not be searched: {state.error}</div>
-  ) });
-  if (state.truncated) rows.push({ key: `${root.id}:truncated`, render: () => (
-    <div className="px-3 py-1 text-[11px] text-[var(--taomni-code-muted)]">{treeFilter.trim() ? "Partial results; narrow your search" : `Showing first ${FLAT_VIEW_MAX_FILES} files`}</div>
-  ) });
   for (const [group, groupEntries] of [...groups.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     if (options.groupBySource) rows.push({ key: `${root.id}:group:${group}`, render: () => (
             <div
@@ -152,5 +141,17 @@ export function matchingFlatFileRows(
       ) });
     }
   }
+  // Async status changes must not move already published, clickable results.
+  if (state.loading) rows.push({ key: `${root.id}:searching`, render: () => (
+    <div className="flex items-center gap-2 px-3 py-1 text-[11px] text-[var(--taomni-code-muted)]" role="status">
+      <Loader2 className="w-3.5 h-3.5 animate-spin" />Searching workspace…
+    </div>
+  ) });
+  if (state.error) rows.push({ key: `${root.id}:search-error`, render: () => (
+    <div className="px-3 py-1 text-[11px] text-red-500" role="status">Some folders could not be searched: {state.error}</div>
+  ) });
+  if (state.truncated) rows.push({ key: `${root.id}:truncated`, render: () => (
+    <div className="px-3 py-1 text-[11px] text-[var(--taomni-code-muted)]">{treeFilter.trim() ? "Partial results; narrow your search" : `Showing first ${FLAT_VIEW_MAX_FILES} files`}</div>
+  ) });
   return rows;
 }

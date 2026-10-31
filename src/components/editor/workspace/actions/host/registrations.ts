@@ -25,6 +25,7 @@ export class ActionRegistrations {
     token: symbol;
     action: WorkspaceActionDefinition;
     ownerViewId: string | null;
+    priority: number;
   }>>();
 
   private actionLayerBases = new Map<string, WorkspaceActionDefinition | undefined>();
@@ -46,7 +47,7 @@ export class ActionRegistrations {
     if (this.host.isDisposed()) return () => { };
     const token = Symbol("actions");
     const ownerViewId = options.ownerViewId ?? null;
-    for (const action of actions) this.pushActionLayer(action, token, ownerViewId);
+    for (const action of actions) this.pushActionLayer(action, token, ownerViewId, options.priority ?? 0);
     this.host.bumpGeneration();
     return () => {
       let changed = false;
@@ -61,6 +62,7 @@ export class ActionRegistrations {
     action: WorkspaceActionDefinition,
     token: symbol,
     ownerViewId: string | null,
+    priority = 0,
   ): void {
     let layers = this.actionLayers.get(action.id);
     if (!layers) {
@@ -68,8 +70,10 @@ export class ActionRegistrations {
       this.actionLayers.set(action.id, layers);
       this.actionLayerBases.set(action.id, this.actions.get(action.id));
     }
-    layers.push({ token, action, ownerViewId });
-    this.actions.set(action.id, action);
+    layers.push({ token, action, ownerViewId, priority });
+    // Stable sorting retains last-registration wins for equal priorities.
+    layers.sort((left, right) => left.priority - right.priority);
+    this.actions.set(action.id, layers[layers.length - 1]!.action);
   }
 
   actionForContext(

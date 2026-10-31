@@ -44,7 +44,7 @@ export function useMarkdownPreviewSearch(
         secondary: ["Ctrl+l"], requiresEditor: true, run: async () => { move(1); return { kind: "applied" }; } }),
       editorAction({ id: "editor.findPrevious", title: "Find Previous Match", category: "Edit", defaultKeybinding: "Shift+F3",
         secondary: ["Ctrl+Shift+l"], requiresEditor: true, run: async () => { move(-1); return { kind: "applied" }; } }),
-    ], { ownerViewId: owner.groupId });
+    ], { ownerViewId: owner.groupId, priority: 1 });
   }, [owner?.actionHost, owner?.groupId, owner?.standalone, focused, openSearch, move]);
 
   useLayoutEffect(() => {

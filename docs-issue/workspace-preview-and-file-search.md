@@ -50,12 +50,22 @@
 - `pnpm build`：通过（包含 `pnpm check:refactor`）。
 - 搜索、导航、shell 快捷键、树缓存／外部刷新／虚拟行：6 个文件，50 项通过。
 - CodeWorkspaceTab 完整集首轮 260 项通过，新增预览焦点断言需等待下一帧；修正测试等待后新增 2 项通过。首轮暴露的查询测试 teardown 返回 mock、旧树搜索索引假设均已修正，并由上述 50 项验证通过。
-- Browser 目标／保留行为：`/tmp/taomni-search-browser5/run-20261031-162347-482885441`，TC-WS-036／041／081／082 四项通过。之后为 TC-WS-082 增补性能／IPC 断言，需补跑该用例。
+- 首个完整候选（`a1cc9c9f`）本地最终 browser：`/tmp/taomni-search-browser-stable/run-20261031-164422-807763953`，11/11，通过完整 8 项 crash 回归与 TC-WS-036／041／081；独立 TC-WS-082 `/tmp/taomni-search-browser-final-isolated/run-20261031-165227-989101415`，1/1，通过性能／IPC 断言，内容可用 200.8ms，最大帧 85.3ms。两批 identity_stable 均为 true。
 - 输入响应基线：`/tmp/taomni-search-performance-before.json`，相同 2100 文件 fixture、5 轮、20ms 字符间隔，所有字符与连续帧保留。45 次按键最大 keydown→frame 97.4ms，最大帧间隔 100ms；5 轮均未找到索引之外的目标文件。该记录只用于输入与帧响应比较，不将自动化总耗时当作产品延迟。
 - 独立输入响应复测（原生编译／其他自动化停止后）：`/tmp/taomni-search-performance-before-isolated.json` 与 `after-isolated.json`。前后各 5 轮共 45 个字符；keydown→frame p50 为 18.8／15.9ms，p95 为 37.2／42.0ms，最大 42.7／47.9ms；连续帧 p95 均为 16.8ms、最大均为 33.4ms。空查询递归索引调用均为 0，目标文档从 0/5 变为 5/5。没有观察到明显响应退化，保留全部样本，不将该小样本结论外推到任意目录规模。
 - 初轮并行编译／回归期间，候选输入最大 118ms、结果打开出现 170ms 帧，超过既有 165ms 上限。失败原件保留在 `/tmp/taomni-search-performance-after.json`、`/tmp/taomni-search-final-browser/`；编译结束单独复测 TC-WS-082 通过，报告 `/tmp/taomni-search-final-browser2/`，阈值未改。
 - Shell／SearchEverywhere 最终回归：2 个文件，29 项通过（包含 partial results 新文案断言）。
 - `audit --gate`：通过，`/tmp/taomni-search-audit2.log`。新增用例、policy、依赖与控件目录已同步。
-- 首轮完整 crash browser 8 项均通过，但期间修改了 QA fixture，导致 runner 身份稳定检查失败；不作为最终验收，最终批次会重跑。
+- 首轮完整 crash browser 8 项均通过，但期间修改了 QA fixture，导致 runner 身份稳定检查失败；不作为验收。上述最终稳定 browser 批次已重跑覆盖。
 - 最终审查将 shell 修复收敛为：检测活动工作区注册后让出 Ctrl+Shift+N，由工作区 keymap 自行执行，保留自定义键位和弹层焦点保护。此前直接 executeAction 的实现不作为最终版本。
-- 最终 native QA release／真实 HOME、完整 crash 回归及 GitHub 三平台：执行中，完成后补充实际结果。
+- 首个完整候选本地 native QA release：`/tmp/taomni-search-native-final/run-20261031-165320-318196940`，12/12，包括完整 9 项 native crash 回归和 TC-WS-037／081／082；identity_stable=true，内容可用 229ms、最大帧 115ms。
+- 真实 HOME native：`/tmp/taomni-search-home-final/run-20261031-165259-387615279`，1/1、identity_stable=true。Ctrl+Shift+N 找到根目录 `.bashrc`，目录筛选找到 `.bashrc` 与 `.config`，没有 New Session 弹窗；只读取元数据，不打开或修改个人文件。
+
+### GitHub 首轮暴露的异步回归
+
+[首轮三平台 run 41185946040](https://github.com/engcapa/taomni/actions/runs/41185946040) 使用 `a1cc9c9f`，三平台 browser 各 12/12、零失败／跳过，原始报告与源码指纹一致。原始 native 报告暴露以下问题，因此该轮不能算三平台验收通过：
+
+1. Linux TC-WS-081：纯 Preview 查找通过，Split 步骤 36 失败。焦点记录证明按键来自预览，截图却显示源码 Find。CodeMirror 异步挂载可能晚于预览聚焦，后注册的同 owner Find 覆盖预览动作。补充稳定失败的 hook 回归；Action 层增加默认 0 的注册优先级，聚焦预览使用 1，失焦／卸载移除后恢复源码动作。既有同优先级的后注册覆盖、owner 隔离与自定义快捷键保持原契约。
+2. macOS TC-WS-037：拷贝成功后双击目标却打开 README。新增搜索状态行放在结果之前，文件 watcher 刷新结束移除提示，恰好在指针定位后把目标上移一行。原始 screenshot／focus events 保留在 `/tmp/taomni-search-hosted-native-before/`。加载／错误／截断提示移到已发布结果末尾，避免异步状态变化移动点击目标。补充先失败的结果顺序与 DOM 身份／打开行为回归，保留 TC-WS-037 的真实磁盘复制和保存断言。
+
+跟进快速回归：8 个测试文件、77 项通过；`pnpm check:refactor` 与 `audit --gate` 通过。TC-WS-081 增加 Split 的实际高亮截图，断言未放宽。使用最终源码重建 QA release，并重跑本地 HOME、完整 crash／目标用例与三平台验证；最终结果待补充。
