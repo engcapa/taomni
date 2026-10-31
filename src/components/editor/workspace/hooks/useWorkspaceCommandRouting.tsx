@@ -187,7 +187,7 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
   // per-caret-move workspace re-render.
   const projectTreeHandlers = useLatestHandlers({
     onToggleRoot: files.fileActions.toggleRoot,
-    onToggleDir: files.fileActions.toggleDir,
+    onToggleDir: files.treeInteractions.toggleTreeDirectory,
     onSelect: project.uiActions.setSelected,
     onOpenFile: (ref: CodeWorkspaceFileRef, options?: { preview?: boolean; }) => { void files.treeOpening.requestTreeOpen(ref, options); },
     onContextMenu: files.treeInteractions.showTreeContextMenu,

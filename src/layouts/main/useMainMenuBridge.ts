@@ -165,6 +165,14 @@ export function useMainMenuBridge(context: UseMainMenuBridgeContext) {
       const state = useAppStore.getState();
       const platform = useWorkspacePlatformStore.getState();
       const workspace = platform.getWorkspace();
+      // The workspace has a live file navigator even before its first file
+      // opens. A shell New Session must not share that Ctrl+Shift+N stroke.
+      if (state.activeSideTab === "workspaces" && workspace) {
+        const registration = workspaceCommandRegistrationsRef.current[workspaceEditorRuntimeId(workspace)];
+        // Yield to the workspace keymap, including its custom bindings and
+        // modal/focus guards. The shell must not dispatch the action twice.
+        if (registration) return;
+      }
       const codeTab = workspace?.openTabs.find((tab) => tab.kind === "code");
       const editorTab = workspace?.openTabs.find((tab) => tab.id === workspace.activeTabId && (tab.kind === "file" || tab.kind === "code"));
       if (state.activeSideTab === "workspaces" && editorTab) return;

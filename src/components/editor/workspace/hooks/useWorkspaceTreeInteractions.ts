@@ -33,6 +33,8 @@ export interface UseWorkspaceTreeInteractionsContext {
   openTerminalAt: (rootId: string, path: string, pathIsFile?: boolean) => void;
   terminalDockRef: import("react").RefObject<TerminalDockHandle | null>;
   selected: TreeSelection | null;
+  treeFilter: string;
+  showDirectoryTree: () => void;
   getSelected?: () => TreeSelection | null;
   treeOpening: ReturnType<typeof useWorkspaceTreeOpening>;
   editorCommands: ReturnType<typeof useWorkspaceEditorCommands>;
@@ -266,6 +268,25 @@ export function useWorkspaceTreeInteractions(context: UseWorkspaceTreeInteractio
     terminalDockRef.current?.openAt(cwd, basename(cwd));
   }, [openTerminalAt, setStatusMessage]);
 
+  const toggleTreeDirectory = useCallback((rootId: string, path: string) => {
+    if (!context.treeFilter.trim()) { fileActions.toggleDir(rootId, path); return; }
+    // Activating a folder match reveals its real hierarchy. Do not turn a
+    // folder result into a file tab or leave expansion hidden by the query.
+    uiActions.setTreeFilter("");
+    context.showDirectoryTree();
+    uiActions.setExpandedRoots((current) => new Set(current).add(rootId));
+    const ancestors: string[] = [];
+    let prefix = "";
+    for (const part of path.split("/").filter(Boolean)) {
+      prefix = prefix ? `${prefix}/${part}` : part;
+      ancestors.push(prefix);
+    }
+    uiActions.setExpandedDirs((current) => new Set([...current, ...ancestors.map((item) => rootDirKey(rootId, item))]));
+    uiActions.setSelected({ kind: "dir", rootId, path });
+    for (const directory of ["", ...ancestors]) void treeData.loadDir(rootId, directory);
+    treeFocus.treePaneRef.current?.focus();
+  }, [context.treeFilter, context.showDirectoryTree, fileActions.toggleDir, treeData.loadDir, uiActions, treeFocus]);
+
   const handleTreeKeyDown = useCallback((event: React.KeyboardEvent<HTMLElement>) => {
     const selection = getSelected ? getSelected() : selected;
     const pane = treeFocus.treePaneRef.current;
@@ -278,7 +299,7 @@ export function useWorkspaceTreeInteractions(context: UseWorkspaceTreeInteractio
     if (!tree || (target !== pane && !tree.contains(target))) return;
     if (target.closest("input, textarea, select, [contenteditable='true']")) return;
     if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey &&
-      navigateProjectTree(tree, key, { onSelect: uiActions.setSelected, onToggleRoot: fileActions.toggleRoot, onToggleDir: fileActions.toggleDir })) {
+      navigateProjectTree(tree, key, { onSelect: uiActions.setSelected, onToggleRoot: fileActions.toggleRoot, onToggleDir: toggleTreeDirectory })) {
       event.preventDefault();
       treeFocus.treeInteractionEpochRef.current += 1;
       treeFocus.pendingTreeOpenIntentRef.current = null;
@@ -289,7 +310,7 @@ export function useWorkspaceTreeInteractions(context: UseWorkspaceTreeInteractio
       if (selection?.kind === "file") {
         void treeOpening.requestTreeOpen(selection.ref, { split: event.ctrlKey || event.metaKey });
       } else if (selection?.kind === "root") fileActions.toggleRoot(selection.rootId);
-      else if (selection?.kind === "dir") fileActions.toggleDir(selection.rootId, selection.path);
+      else if (selection?.kind === "dir") toggleTreeDirectory(selection.rootId, selection.path);
       return;
     }
     if ((event.nativeEvent as KeyboardEvent).isComposing) return;
@@ -305,7 +326,7 @@ export function useWorkspaceTreeInteractions(context: UseWorkspaceTreeInteractio
       event.preventDefault();
       workspaceCommandRunnerRef.current("workspace.tree.delete", { focus: "tree", payload: { selection: selection ?? undefined } });
     }
-  }, [editorCommands.handleReturnToEditor, treeOpening.requestTreeOpen, getSelected, selected, uiActions.setSelected, fileActions.toggleDir, fileActions.toggleRoot]);
+  }, [editorCommands.handleReturnToEditor, treeOpening.requestTreeOpen, getSelected, selected, uiActions.setSelected, toggleTreeDirectory, fileActions.toggleRoot]);
 
   const showTreeContextMenu = useCallback(
     createShowTreeContextMenu({
@@ -344,6 +365,7 @@ export function useWorkspaceTreeInteractions(context: UseWorkspaceTreeInteractio
     revealEditorTabInExplorer,
     openEditorTabInTerminal,
     handleTreeKeyDown,
+    toggleTreeDirectory,
     expandAllProjectTree,
     collapseAllProjectTree,
     treeContextMenu,

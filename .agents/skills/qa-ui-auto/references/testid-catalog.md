@@ -675,6 +675,18 @@
 
 ## code-workspace/execution (F25.1)
 
+- `[data-testid="code-workspace-markdown-preview"]` — interactive — F25.1.markdown-preview-surface
+- `button[title="Edit"]` — interactive — F25.1.markdown-preview-mode-edit
+- `button[title="Preview"]` — interactive — F25.1.markdown-preview-mode-preview
+- `button[title="Split"]` — interactive — F25.1.markdown-preview-mode-split
+- `[data-testid="markdown-preview-search"]` — display — F25.1.markdown-preview-search
+- `[data-testid="markdown-search-match"]` — display — F25.1.markdown-preview-search-match
+- `[aria-label="Go to file"]` — interactive — F25.1.go-to-file-query
+- `[aria-label="Find in preview"]` — interactive — F25.1.markdown-preview-find-input
+- `[aria-label="Next match"]` — interactive — F25.1.markdown-preview-find-next
+- `[aria-label="Previous match"]` — interactive — F25.1.markdown-preview-find-previous
+- `[aria-label="Close preview search"]` — interactive — F25.1.markdown-preview-find-close
+- `[data-testid="markdown-search-count"]` — display — F25.1.markdown-preview-find-count
 - `[data-testid="sidebar-tool-code-workspace"]` — interactive — F25.1.sidebar-entry
 - `[data-testid="code-workspace-tab"]` — display — F25.1.workspace
 - `[data-testid="code-workspace-git-panel-toggle"]` — interactive [optional] — F25.1.git-panel-toggle

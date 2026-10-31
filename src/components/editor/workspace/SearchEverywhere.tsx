@@ -50,6 +50,8 @@ interface SearchEverywhereProps {
   items: GoToFileItem[];
   loading: boolean;
   truncated?: boolean;
+  fileSearchError?: string | null;
+  onFileQueryChange?: (query: string) => void;
   /**
    * Instance-scoped host snapshot (§8.17.3): the ONLY actions input. The
    * legacy WorkspaceCommand[] migration adapter is gone; execution goes
@@ -143,6 +145,8 @@ export function SearchEverywhere({
   items,
   loading,
   truncated = false,
+  fileSearchError,
+  onFileQueryChange,
   actionSnapshots,
   symbolsAvailable = false,
   semanticIndex,
@@ -171,6 +175,10 @@ export function SearchEverywhere({
     diagnostics: [],
   });
   const [symbolsLoading, setSymbolsLoading] = useState(false);
+  useEffect(() => {
+    onFileQueryChange?.(open && (mode === "files" || mode === "all") ? query : "");
+    return () => onFileQueryChange?.("");
+  }, [open, mode, query, onFileQueryChange]);
 
   useEffect(() => {
     if (!open) return;
@@ -422,8 +430,14 @@ export function SearchEverywhere({
             {(mode === "all" || mode === "files" || mode === "classes" || mode === "symbols") && (
               <span className="shrink-0">Open In Right Split Ctrl+Enter</span>
             )}
+            {(mode === "files" || mode === "all") && fileSearchError && (
+              <span role="status" className="truncate text-amber-600" title={fileSearchError}>Some folders could not be searched: {fileSearchError}</span>
+            )}
+            {(mode === "files" || mode === "all") && loading && (
+              <span role="status" className="shrink-0">Searching workspace…</span>
+            )}
             {mode === "files" && (
-              <span className="shrink-0">{truncated ? "file index truncated · " : ""}{items.length} file{items.length === 1 ? "" : "s"}</span>
+              <span className="shrink-0">{truncated ? "Partial results; narrow your search · " : ""}{items.length} file{items.length === 1 ? "" : "s"}</span>
             )}
             {mode === "actions" && <span className="shrink-0">{actionCommands.length} action{actionCommands.length === 1 ? "" : "s"}</span>}
             {(mode === "all" || mode === "classes" || mode === "symbols") && (

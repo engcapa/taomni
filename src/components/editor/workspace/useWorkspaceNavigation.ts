@@ -4,6 +4,7 @@ import { selectCodeWorkspaceUi, useCodeWorkspaceStore, type EditorGroupId } from
 import type { GoToFileItem, SearchEverywhereMode } from "./SearchEverywhere";
 import type { RecentFileEntry } from "./RecentFilesPopup";
 import { createDoubleShiftDetector } from "./doubleShift";
+import { useWorkspaceFileSearch } from "./useWorkspaceFileSearch";
 import {
   fileKey,
   fileMeta,
@@ -53,6 +54,8 @@ export interface WorkspaceNavigationController {
   goToFileItems: GoToFileItem[];
   goToFileLoading: boolean;
   goToFileTruncated: boolean;
+  goToFileError: string | null;
+  setFileSearchQuery: (query: string) => void;
   openSearchEverywhere: (mode?: SearchEverywhereMode) => void;
   openGoToFileItem: (item: GoToFileItem, options?: { split: boolean }) => void;
   navigateHistory: (delta: -1 | 1) => void;
@@ -139,6 +142,8 @@ export function useWorkspaceNavigation({
   const changedFileKeysRef = useRef<Set<string>>(new Set());
   const caretByKeyRef = useRef<Record<string, WorkspaceNavPosition>>({});
   const previousActiveKeyRef = useRef<string | null>(null);
+  const [fileSearchQuery, setFileSearchQuery] = useState("");
+  const fileSearch = useWorkspaceFileSearch(roots, flatFiles, fileSearchQuery);
 
   const openSearchEverywhere = useCallback((mode: SearchEverywhereMode = "files") => {
     rootsRef.current?.forEach((root) => void loadFlatFiles(root.id));
@@ -156,8 +161,11 @@ export function useWorkspaceNavigation({
         items.push({ rootId: root.id, rootName: root.name, path: entry.path });
       }
     }
+    for (const item of fileSearch?.items ?? []) {
+      if (!items.some((known) => known.rootId === item.rootId && known.path === item.path)) items.push(item);
+    }
     return items;
-  }, [flatFiles, roots]);
+  }, [flatFiles, roots, fileSearch?.items]);
 
   const goToFileLoading = useMemo(
     () => roots.some((root) => flatFiles[root.id]?.loading ?? false),
@@ -459,8 +467,10 @@ export function useWorkspaceNavigation({
   return {
     navCan,
     goToFileItems,
-    goToFileLoading,
-    goToFileTruncated,
+    goToFileLoading: goToFileLoading || !!fileSearch?.loading,
+    goToFileTruncated: fileSearch ? fileSearch.truncated : goToFileTruncated,
+    goToFileError: fileSearch?.error ?? null,
+    setFileSearchQuery,
     openSearchEverywhere,
     openGoToFileItem,
     navigateHistory,

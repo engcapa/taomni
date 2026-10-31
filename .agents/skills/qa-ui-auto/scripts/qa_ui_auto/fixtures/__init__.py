@@ -66,6 +66,7 @@ from . import ssh_posix_required
 from . import session_config
 from . import x11_session_required
 from . import project_tree
+from . import workspace_search_large
 from . import workspace_explorer, workspace_hidden_entries, workspace_slow_lsp
 from . import workspace_language_files, workspace_slow_sdk
 from . import workspace_watch
@@ -140,6 +141,7 @@ REGISTRY: dict[str, Fixture] = {
     "linux_x11_required": Fixture("linux_x11_required", linux_x11_required.setup),
     "linux_desktop_required": Fixture("linux_desktop_required", linux_desktop_required.setup),
     "workspace_root": Fixture("workspace_root", workspace_root.setup, workspace_root.teardown),
+    "workspace_search_large": Fixture("workspace_search_large", workspace_search_large.setup),
     "workspace_explorer": Fixture("workspace_explorer", workspace_explorer.setup),
     "workspace_compact_tree": Fixture("workspace_compact_tree", workspace_compact_tree.setup),
     "workspace_hidden_entries": Fixture("workspace_hidden_entries", workspace_hidden_entries.setup),

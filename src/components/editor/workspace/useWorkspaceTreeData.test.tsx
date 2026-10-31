@@ -62,11 +62,16 @@ describe("useWorkspaceTreeData", () => {
     expect(workspaceMocks.workspaceListFilesRecursive).not.toHaveBeenCalled();
 
     rerender({ mode: "tree", filter: "http" });
+    await waitFor(() => expect(result.current.searchFiles[root.id]?.loading).toBe(false));
+    // Searching has its own cancellable metadata walk; it does not warm or
+    // enlarge the shared flat index just to display filtered tree results.
+    expect(workspaceMocks.workspaceListFilesRecursive).not.toHaveBeenCalled();
+
+    rerender({ mode: "flat", filter: "" });
     await waitFor(() => expect(result.current.flatFiles[root.id]?.loaded).toBe(true));
     expect(workspaceMocks.workspaceListFilesRecursive).toHaveBeenCalledWith("/repo", "", 25, 2_000);
-
-    // Flat mode reuses the already-warmed index (no second recursive scan).
     workspaceMocks.workspaceListFilesRecursive.mockClear();
+    rerender({ mode: "tree", filter: "" });
     rerender({ mode: "flat", filter: "" });
     expect(result.current.flatFiles[root.id]?.loaded).toBe(true);
     expect(workspaceMocks.workspaceListFilesRecursive).not.toHaveBeenCalled();
@@ -230,11 +235,11 @@ describe("useWorkspaceTreeData", () => {
     expect(result.current.compactChains["root-1:src"]).toMatchObject({ path: "src/changed", loading: false });
   });
 
-  it.each(["flat", "files", "tree", "packages"] as const)("refreshes a retained recursive index in %s view", async (mode) => {
+  it.each(["flat", "files", "packages"] as const)("refreshes a retained recursive index in %s view", async (mode) => {
     const onError = vi.fn();
     workspaceMocks.workspaceListFilesRecursive.mockResolvedValue(ready([ENTRY]));
     const { result } = renderHook(() => useWorkspaceTreeData({
-      roots, expandedRootIds: noExpandedRoots, treeViewMode: mode, treeFilter: mode === "tree" ? "a" : "", onError,
+      roots, expandedRootIds: noExpandedRoots, treeViewMode: mode, treeFilter: "", onError,
     }));
     await waitFor(() => expect(result.current.flatFiles[root.id]?.loaded).toBe(true));
     let resolveIndex!: (value: WorkspaceTreeLoadResult<unknown>) => void;
@@ -244,6 +249,20 @@ describe("useWorkspaceTreeData", () => {
     expect(result.current.flatFiles[root.id]).toMatchObject({ loaded: true, loading: true, entries: [ENTRY] });
     await act(async () => resolveIndex(ready([])));
     expect(result.current.flatFiles[root.id]).toMatchObject({ loading: false, entries: [] });
+  });
+
+  it("refreshes filtered tree results after reset without warming the flat index", async () => {
+    workspaceMocks.workspaceListDir.mockResolvedValue(ready([ENTRY]));
+    const { result } = renderHook(() => useWorkspaceTreeData({
+      roots, expandedRootIds: noExpandedRoots, treeViewMode: "tree", treeFilter: "a", onError: vi.fn(),
+    }));
+    await waitFor(() => expect(result.current.searchFiles[root.id]?.loading).toBe(false));
+    expect(result.current.searchFiles[root.id].entries).toEqual([ENTRY]);
+    workspaceMocks.workspaceListDir.mockResolvedValue(ready([]));
+    act(() => result.current.reset({ retainListings: true }));
+    await waitFor(() => expect(result.current.searchFiles[root.id]?.loading).toBe(false));
+    expect(result.current.searchFiles[root.id].entries).toEqual([]);
+    expect(workspaceMocks.workspaceListFilesRecursive).not.toHaveBeenCalled();
   });
 
   // ── W0 §8.20.1 boundary: non-ready unions keep cache + error, never crash ──

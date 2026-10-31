@@ -87,6 +87,7 @@
           "platform_workspace_root",
           "workspace_ignored_ancestor_root",
           "workspace_explorer",
+          "workspace_search_large",
           "workspace_compact_tree",
           "workspace_hidden_entries",
           "workspace_slow_lsp",

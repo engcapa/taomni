@@ -9,6 +9,7 @@ interface Dependencies {
   treeFilter: string;
   loadDir: (rootId: string, path: string, options?: { background?: boolean }) => Promise<void>;
   loadFlatFiles: (rootId: string, force?: boolean) => Promise<void>;
+  refreshSearch?: () => void;
   invalidateCompactPaths: (rootId: string, path: string) => void;
 }
 
@@ -34,13 +35,15 @@ export function useWorkspaceExternalTreeRefresh(dependencies: Dependencies) {
       const paths = [...pending.current];
       pending.current.clear();
       const state = latest.current;
-      const flat = ["flat", "files", "packages"].includes(state.treeViewMode) || !!state.treeFilter.trim();
+      const flat = ["flat", "files", "packages"].includes(state.treeViewMode);
+      let searchChanged = false;
       for (const root of state.roots) {
         const changed = paths.flatMap((path) => {
           const relative = relativePathWithinRoot(root.path, path);
           return relative === null ? [] : [relative];
         });
         if (!changed.length) continue;
+        searchChanged = true;
         const parents = new Set(changed.map(parentPath));
         for (const path of parents) {
           // A change below an unopened branch cannot change any displayed row.
@@ -51,6 +54,7 @@ export function useWorkspaceExternalTreeRefresh(dependencies: Dependencies) {
         for (const path of changed) state.invalidateCompactPaths(root.id, path);
         if (flat) void state.loadFlatFiles(root.id, true);
       }
+      if (searchChanged && state.treeFilter.trim()) state.refreshSearch?.();
     }, 200);
   }, []);
   return { refreshPath, cancel };

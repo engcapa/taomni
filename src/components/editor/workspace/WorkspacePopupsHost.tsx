@@ -31,6 +31,8 @@ interface WorkspacePopupsHostProps {
   goToFileItems: GoToFileItem[];
   goToFileLoading: boolean;
   goToFileTruncated: boolean;
+  goToFileError?: string | null;
+  onFileQueryChange?: (query: string) => void;
   actionSnapshots: ActionSnapshotItem[];
   symbolsAvailable: boolean;
   semanticIndex: WorkspaceSemanticIndexSnapshot;
@@ -97,6 +99,8 @@ export const WorkspacePopupsHost = memo(function WorkspacePopupsHost({
   goToFileItems,
   goToFileLoading,
   goToFileTruncated,
+  goToFileError,
+  onFileQueryChange,
   actionSnapshots,
   symbolsAvailable,
   semanticIndex,
@@ -158,6 +162,8 @@ export const WorkspacePopupsHost = memo(function WorkspacePopupsHost({
         items={goToFileItems}
         loading={goToFileLoading}
         truncated={goToFileTruncated}
+        fileSearchError={goToFileError}
+        onFileQueryChange={onFileQueryChange}
         actionSnapshots={actionSnapshots}
         symbolsAvailable={symbolsAvailable}
         semanticIndex={semanticIndex}

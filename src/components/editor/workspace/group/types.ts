@@ -252,5 +252,5 @@ export interface EditorGroupProps {
   formatBytes: (size: number) => string;
   formatMtime: (mtime: number) => string;
   isMarkdownPath: (path: string) => boolean;
-  renderMarkdownPreview: (file: OpenFileViewModel, onOpenHref: (href: string) => boolean) => ReactNode;
+  renderMarkdownPreview: (file: OpenFileViewModel, onOpenHref: (href: string) => boolean, searchOwner: import("../useMarkdownPreviewSearch").MarkdownPreviewSearchOwner) => ReactNode;
 }

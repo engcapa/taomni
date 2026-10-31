@@ -20,6 +20,25 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
+it("yields file search from an empty workspace to its keymap without creating a session", () => {
+  const platform = useWorkspacePlatformStore.getState();
+  const workspace = platform.createWorkspace({ name: "HOME", rootPath: "/home/test" });
+  const executeAction = vi.fn(async () => ({ kind: "applied" as const }));
+  const registration = { items: [], snapshot: [], execute: vi.fn(), executeAction } satisfies WorkspaceCommandRegistration;
+  const handleCommand = vi.fn();
+  renderHook(() => useMainMenuBridge({
+    dispatchMenuAction: vi.fn(), nativeMenu: false, activeTabClosable: false,
+    importExport: { hasSessions: false } as UseMainMenuBridgeContext["importExport"],
+    quickConnectVisible: false, getActiveWorkspaceCommands: () => registration,
+    subscribeWorkspaceCommands: () => () => {}, t: ((key: string) => key) as UseMainMenuBridgeContext["t"],
+    setActiveTab: vi.fn(), handleCommand,
+    workspaceCommandRegistrationsRef: { current: { [workspaceEditorRuntimeId(workspace)]: registration } },
+  }));
+  fireEvent.keyDown(window, { key: "N", ctrlKey: true, shiftKey: true });
+  expect(executeAction).not.toHaveBeenCalled();
+  expect(handleCommand).not.toHaveBeenCalled();
+});
+
 it("reopens through the shared editor registration for either a file or code tab", () => {
   const platform = useWorkspacePlatformStore.getState();
   const workspace = platform.createWorkspace({ name: "Project", rootPath: "/project" });

@@ -7601,6 +7601,42 @@ files:
   - src-tauri/src/test_results.rs
   - src-tauri/src/dap.rs
 controls:
+  - id: markdown-preview-surface
+    selector: '[data-testid="code-workspace-markdown-preview"]'
+    kind: interactive
+  - id: markdown-preview-mode-edit
+    selector: 'button[title="Edit"]'
+    kind: interactive
+  - id: markdown-preview-mode-preview
+    selector: 'button[title="Preview"]'
+    kind: interactive
+  - id: markdown-preview-mode-split
+    selector: 'button[title="Split"]'
+    kind: interactive
+  - id: markdown-preview-search
+    selector: '[data-testid="markdown-preview-search"]'
+    kind: display
+  - id: markdown-preview-search-match
+    selector: '[data-testid="markdown-search-match"]'
+    kind: display
+  - id: go-to-file-query
+    selector: '[aria-label="Go to file"]'
+    kind: interactive
+  - id: markdown-preview-find-input
+    selector: '[aria-label="Find in preview"]'
+    kind: interactive
+  - id: markdown-preview-find-next
+    selector: '[aria-label="Next match"]'
+    kind: interactive
+  - id: markdown-preview-find-previous
+    selector: '[aria-label="Previous match"]'
+    kind: interactive
+  - id: markdown-preview-find-close
+    selector: '[aria-label="Close preview search"]'
+    kind: interactive
+  - id: markdown-preview-find-count
+    selector: '[data-testid="markdown-search-count"]'
+    kind: display
   - id: sidebar-entry
     selector: '[data-testid="sidebar-tool-code-workspace"]'
     kind: interactive
