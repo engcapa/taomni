@@ -11,7 +11,11 @@ import threading
 import time
 from .mobile_wire import http, Ws
 from .steps import StepError
-from .terminal_burst_probe import click, until, PANE
+from .terminal_burst_probe import until, PANE
+
+
+def click(session, selector):
+    session.click(selector)
 
 ORIGIN = 'https://mobile.qa.invalid'
 
@@ -118,6 +122,7 @@ def desktop(ctx, terminal_input):
         else:
             raise AssertionError('Revoked device WebSocket remained open')
         click(ctx.session, '[data-testid="mobile-settings-revoke"]')
+        until(ctx.session, 'document.querySelectorAll(\'[data-testid="mobile-settings-revoke"]\').length === 0 && !document.querySelector(\'[data-testid="mobile-settings-toggle"]\')?.disabled')
         checks.append('settings-revocation-closes-existing-websocket')
         click(ctx.session, '[data-testid="mobile-settings-toggle"]')
         until(ctx.session, 'document.querySelector(\'[data-testid="mobile-settings-status"]\')?.textContent.includes("已关闭")')

@@ -48,7 +48,11 @@ jobs:
       - name: Chromium for mobile against the real native service
         if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'mobile')
         shell: bash
-        run: python -m playwright install --with-deps chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/qa-mobile-browsers
+        run: |
+          python -m playwright install --with-deps chromium
+          echo "PLAYWRIGHT_BROWSERS_PATH=$PLAYWRIGHT_BROWSERS_PATH" >> "$GITHUB_ENV"
 
       - name: Shared VNC fixture ownership contracts
         if: matrix.mode == 'browser' && contains(matrix.capabilities, 'vnc') && inputs.operation == 'run'
