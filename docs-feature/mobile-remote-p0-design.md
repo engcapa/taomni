@@ -5,44 +5,15 @@
 ## 1. 设计摘要与范围
 
 - 类型：新功能。内容包括新增移动控制面，以及实例端移动服务。
-- 文档位置：`docs-feature/mobile-remote-p0-design.md`。本文已随 PR #743 合入 main，当前基线为 main `4ac65c816`。后续一切修订仍走“分支 + PR”：main 受 ruleset 保护，bypass 名单为空，管理员也不能直推。
+- 文档位置：`docs-feature/mobile-remote-p0-design.md`。后续一切修订仍走“分支 + PR”：main 受 ruleset 保护，bypass 名单为空，管理员也不能直推。
 - 设计状态：部分可实施。
   - DEC-01～DEC-12 均已定或可由 agent 自决，P0 核心任务可以开始。
   - 剩余待决不阻塞 P0 核心，包括：IM 的微信落地方式、diff 数据源、任务文件根来源、headless 下的终端来源。见 §10。
-  - 原有 DEC/AC/TASK/V 编号全部保留，未新增，未重编号。
-- 来源：用户需求，2026-10-25 讨论。
+  - DEC/AC/TASK/V 编号全程稳定。
+- 需求背景：
   - 移动端主要用于连接远程 PC 上运行的 taomni 实例，并管理多个远程实例；也要能连部署在云上的 taomni。
   - 重点是远程执行情况的便捷交互：正在执行的终端如何回显到手机并同步操作，但不要重到屏幕共享的程度。
   - 远程环境一般没有公网 IP。用户提出可考虑借助飞书、微信，并参考 ZCode（https://github.com/zai-org/ZCode.git）。
-  - 同日用户点选“按这条路线写一份 P0 移动端设计文档”，即接受 §4 的推荐路线。随后又给出 5 条决策，见修订记录。
-- 修订记录（2026-10-25，用户 5 条决策）：
-  1. 手机主场景是输入命令、发提示词、看结果、做审批。一般不改代码，但要能看文件、看 diff，交互要方便、实时。
-  2. 中继与外网访问由用户自行解决，设计不考虑、不选型。
-  3. 飞书/微信定位为通知与审批入口，可直接发命令，可非实时地看部分结果与文件。
-  4. 现阶段不考虑上架 App，只做 Mobile Web。
-  5. PC 端或云上实例可以开着桌面，也可以 headless 运行。
-  - 修订影响：P0 新增只读文件查看与 diff 查看；IM 升级为第二客户端面（P1）；headless 改为与桌面模式同契约的双运行模式；原生壳与上架改为暂不考虑。
-  - 同日用户确认分期：IM 放 P1，headless 证明放 P0。
-- Review 修订记录（用户 5 点 Review 意见）：
-  1. 修复 CORS 悖论：多实例切换本质是跨域，`/api/v1/*` 按 §4.4 两级 CORS 策略放行。
-  2. `task_status`、`file_changed` 从终端 WS 迁到实例级事件流 `WS /api/v1/events`。
-  3. 补充 Linux headless 无 GUI 约束。
-  4. 收紧 PTY resize 与 ring buffer 边界。
-  5. 飞书接入优先用官方 WebSocket 长连接，入站 webhook 仅作 fallback。
-- 新基线修订记录（2026-10-28）：按 PR #748 的 workspace-first 平台壳 v6.1 重钉锚点。
-  - 引入三类身份区分。
-  - 平台工作区状态只在桌面前端 localStorage，后端读不到。
-  - 配对入口挂在主导航条 Settings 的实例级全局入口下。
-  - 当时该版本推送到 PR #743。
-- 新基线修订记录（2026-10-31）：按 PR #749–#759 的工作区壳层后续工作重钉锚点，Rust 终端/会话/Agent 结论不变。当时只改了本地文档；此后本文随 PR #743 合入 main。
-- 评审修订记录（本次，基线 main `4ac65c816`）：按后附锚点文件原文逐项复核 §2，并修订以下几类问题。
-  - **身份规则**：终端注册表键为前端传入的不透明字符串；后端运行终端不携带已保存会话 id 或工作区 id。
-  - **复用方式**：终端写、改尺寸、发信号的逻辑写在 `#[tauri::command]` 函数体内，参数是 `State<'_, AppState>`，须抽出内部函数后才能复用。
-  - **CORS**：`Access-Control-Allow-Credentials` 改为不发送；`/health` 纳入预检回显；补同源放行规则。
-  - **安全上下文**：Mobile Web 的 PWA、扫码、剪贴板依赖安全上下文（HTTPS）。
-  - **headless 范围收窄**：headless 下无桌面、P0 又不新建终端，故终端列表可能为空；依赖桌面前端执行的 Agent 工具在 headless 下无法完成。
-  - **文件根**：改为以后端已记录的 Agent 线程工作目录为准。
-  - 编号全部保留。
 - 平台与运行方式：
   - 实例端（server）在 Windows、macOS、Linux 三端可运行，server 代码必须兼容三端构建与运行。
   - 实例端有两种运行模式（DEC-06）：桌面模式随 Tauri 桌面进程运行；headless 模式不建窗口，只跑核心 + 移动服务。两者对外是同一 v1 契约。
@@ -99,7 +70,7 @@
 
 ## 2. 当前实现与功能缺口
 
-依据列中，“源码实查”指本次已对照基线 main `4ac65c816` 的锚点原文核对；“待核实”指输入包中没有原文，结论来自旧版文档或间接线索，须由实施者在动手前核对。
+依据列中，“源码实查”指结论有锚点原文为据；“待核实”指无原文佐证，结论来自间接线索，须由实施者在动手前核对。
 
 | 位置与符号 | 当前行为 / 契约 | 本次影响 | 依据与确定性 |
 |---|---|---|---|
@@ -123,7 +94,7 @@
 | workspace-first 平台壳：`src/components/sidebar/PrimaryNavigationRail.tsx`、`src/layouts/main/MainLayoutView.tsx`、`src/components/workspace/WorkspaceMainPanel.tsx`、`src/stores/workspacePlatformStore.ts`（`PlatformWorkspace`、`WorkspaceIsolatedTab`）、`workspacePlatformPersistence.ts`、`workspacePlatformTabActions.ts`、`workspacePlatformCodeActions.ts`、`src/stores/app/layoutSlice.ts` | 主导航条的模式按钮为 home/workspaces/sessions/tools，`MainLayoutView` 另有 `activeSideTab === "agents"` 分支。工作区有多根目录（`rootFolders`）、“★ 常用”已保存会话 id（`pinnedSessionIds`，仅快捷方式）、隔离 tab 列表，不触碰 `appStore.tabs`。工作区 tab id 均以 `ws:<workspaceId>:` 开头，形态多样：`…:local:<随机>`、`…:sess:<SessionConfig.id>:<随机>`、`…:file:<rootId>:<path>`、`…:git`、`…:code`、`…:duplicate:<uuid>`。底部 dock 终端的 tabId 为 `<workspaceId>:dock-terminal`，不带 `ws:` 前缀。状态只持久化在桌面 localStorage `taomni.platformWorkspaces.v1`，后端没有对应表 | 移动设计区分三类身份（硬约束，见 §4.3）：① **后端运行终端键**：`terminals` 注册表键，不透明，是 PTY attach 的唯一目标；② **已保存会话 id**：`SessionConfig.id`，只读展示；③ **桌面展示 tab id**：`appStore` Tab 或 `WorkspaceIsolatedTab`，移动服务不解析、不构造、不用它推导任何东西。同一已保存会话在两种模式下是两个独立运行实例，在后端表现为两个注册表键，移动列表按键分开展示，不按已保存会话合并 | 源码实查；`PrimaryNavMode` 类型定义、`WorkspaceSwitcher` 等其余壳层组件待核实 |
 | 桌面设置入口：`PrimaryNavigationRail` 底部 Settings 按钮 → `onOpenSettings` → `MainLayoutView` 中的 `menuActions.handleCommand("settings")`（`useMainMenuActions` 经 `createHandleCommand` 打开设置 tab） | 设置入口由主导航条触发，不属于某个工作区，也不在 Sessions/Workspaces 模式间各有一份 | 配对码生成与已配对设备列表挂在该实例级设置入口下。`src/components/settings/` 的目录结构不在输入包内，待核实 | 接线源码实查；设置目录待核实 |
 | `vite.config.ts`、`package.json`（`pnpm dev` 浏览器预览） | 旧版文档记载浏览器预览使用 Tauri stubs | stubs 不能证明手机能连上真实实例。P0 联调必须连真实移动服务（V-04） | 待核实 |
-| ZCode、OpenCode Mobile 官方文档（外部事实，2026-10-25 查阅） | ZCode 的手机是桌面遥控器，不能新建连接；OpenCode 定位为“实例跑活，Mobile 只是控制面”，通过 endpoint 档案切换实例 | 本设计采用控制面模型（DEC-01），协议与鉴权按 taomni 现状重写 | 本次未复核，沿用旧记录 |
+| ZCode、OpenCode Mobile 官方文档（外部事实） | ZCode 的手机是桌面遥控器，不能新建连接；OpenCode 定位为“实例跑活，Mobile 只是控制面”，通过 endpoint 档案切换实例 | 本设计采用控制面模型（DEC-01），协议与鉴权按 taomni 现状重写 | 本次未复核 |
 
 短板归纳：
 
@@ -942,7 +913,7 @@ AC-17 属于 P1，不计入 P0 交付条件。
 
 - **基线与位置**
   - 仓库：engcapa/taomni。
-  - 本文已随 PR #743 合入 main，当前基线为 main `4ac65c816`，文档位于 `docs-feature/mobile-remote-p0-design.md`。
+  - 文档位于 `docs-feature/mobile-remote-p0-design.md`。
   - 后续对本文的修订须新开分支 + PR。
   - 实施前先核对 main 是否已前进：若已前进，须在新基线上重新核对 §2 锚点。锚点变化以新基线为准，不得按旧行号硬套。
   - workspace-first 壳层的桌面组件与状态，不得当作移动服务的后端数据源。
