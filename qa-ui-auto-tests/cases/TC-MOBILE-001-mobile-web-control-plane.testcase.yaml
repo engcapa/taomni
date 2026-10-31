@@ -30,7 +30,7 @@ steps:
     selector: '[data-testid="mobile-pair-code"]'
     value: qa-mobile-code
 - click: '[data-testid="mobile-pair-submit"]'
-- wait_for: '[data-testid="mobile-sessions"]'
+- wait_for: '[data-testid="mobile-session"][data-session-kind="agent"]'
 - assert_count:
     selector: '[data-testid="mobile-session"]'
     equal: 2
@@ -102,7 +102,7 @@ steps:
     selector: '[data-testid="mobile-pair-code"]'
     value: qa-mobile-code
 - click: '[data-testid="mobile-pair-submit"]'
-- wait_for: '[data-testid="mobile-sessions"]'
+- wait_for: '[data-testid="mobile-session"][data-session-kind="agent"]'
 - click: '[data-testid="mobile-instances-back"]'
 - assert_count:
     selector: '[data-testid="mobile-instance-open"]'
@@ -112,6 +112,7 @@ steps:
     selector: '[data-testid="mobile-instance-open"]'
     equal: 2
 - click: article:has(h3:text-is("Cloud")) [data-testid="mobile-instance-open"]
+- wait_for: '[data-testid="mobile-session"][data-session-kind="agent"]'
 - assert_count:
     selector: '[data-testid="mobile-session"]'
     equal: 2
@@ -157,8 +158,8 @@ verification:
     - 48
     - 50
     - 52
-    - 54
     - 55
+    - 56
     checkpoints:
     - step: 10
       expectation: '[data-testid="mobile-session"] has 2 entries.'
@@ -194,11 +195,11 @@ verification:
       expectation: '[data-testid="mobile-instance-open"] has 2 entries.'
     - step: 51
       expectation: '[data-testid="mobile-instance-open"] has 2 entries.'
-    - step: 53
+    - step: 54
       expectation: '[data-testid="mobile-session"] has 2 entries.'
-    - step: 56
-      expectation: '[data-testid="mobile-instance-open"] has 1 entries.'
     - step: 57
+      expectation: '[data-testid="mobile-instance-open"] has 1 entries.'
+    - step: 58
       expectation: No runtime errors occurred.
     results:
     - 10
@@ -218,9 +219,9 @@ verification:
     - 39
     - 49
     - 51
-    - 53
-    - 56
+    - 54
     - 57
+    - 58
   visual:
   - check: Phone viewport has no horizontal page overflow.
     method: automated
