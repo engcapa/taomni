@@ -25,4 +25,4 @@
 
 回归测试同时收紧两项既有前置条件：provider preview 必须等真实 editor pane 挂载；Replace in Files 的工作区撤销明确将焦点放在结果行，防止迟到的编辑器挂载抢占 Ctrl+Z。这保留了编辑器输入导致请求过期、跨文件撤销和排除文件不写入的全部原断言，不通过增加超时或放宽结果来回避失败。补强后的五项组合（Java/C#/TypeScript 标签 + preview stale + excluded replace undo）通过。
 
-`pnpm check:refactor` 已通过（768 commands、328 facade exports、39 literal events；919 implementation modules；4178 files）。`qa_ui_auto audit --gate` 和三平台 selected plan 通过。完整 mounted 集及匹配最终源码的 GitHub browser/native 结果待本轮验证后补录；先前本地浏览器 crash 8/8 通过，只作为测试前置条件补强前的辅助证据。
+`pnpm check:refactor` 已通过（768 commands、328 facade exports、39 literal events；919 implementation modules；4178 files）。`qa_ui_auto audit --gate` 和三平台 selected plan 通过。完整 mounted 集已通过：19 files / 378 passed / 0 failed（`/tmp/taomni-navigation-final-378.log`）。分屏就绪 helper 增加最少已挂载编辑器数量，survivor-history 场景明确等待两个 CodeMirror，保留 dirty cancel、history、LSP 释放和保存字节断言。匹配最终源码的 GitHub browser/native 结果待本轮验证后补录；先前本地浏览器 crash 8/8 通过，只作为测试前置条件补强前的辅助证据。

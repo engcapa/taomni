@@ -468,7 +468,7 @@ export function registerSaveCases(workspaceTestHarness: registerSaveCasesFixture
     fireEvent.click(workspaceTestHarness.toolbarControl("code-workspace-split-right"));
     await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
 
-    const panes = await findEditorPanes();
+    const panes = await findEditorPanes(2);
     const primaryPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") === "primary")!;
     // A live split generates a fresh leaf id for the new pane (unlike the
     // seeded V1 snapshot's "secondary"), so select it by set difference.

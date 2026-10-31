@@ -8,11 +8,11 @@ export async function findEditorByTitle(title: Parameters<typeof screen.findByTi
   return tab;
 }
 
-export async function findEditorPanes() {
+export async function findEditorPanes(minimumEditors = 1) {
   return waitFor(() => {
     const panes = screen.getAllByTestId("code-workspace-editor-pane");
     expect(screen.queryAllByRole("status", { name: "Loading editor" })).toHaveLength(0);
-    expect(panes.some((pane) => pane.querySelector(".cm-content"))).toBe(true);
+    expect(panes.filter((pane) => pane.querySelector(".cm-content")).length).toBeGreaterThanOrEqual(minimumEditors);
     return panes;
   });
 }
