@@ -2,7 +2,27 @@
 
 **2026-10-30：可执行的非性能功能回归及三平台GitHub补验已收尾，性能暂列TODO。** 原始clickhousecrud工程未提供的三项native缺口单列。现有性能失败、原始样本和验收门槛保留；暂不继续性能优化与诊断；按用户最新要求取消main对比，不作为待办或验收前置。当前组合的功能与性能结果分列如下；历史记录不替代当前证据。
 
-**2026-10-31：按用户最新要求调整 C6-06 真实 Java 工程来源。** 不再限定原始 clickhousecrud；GitHub runner 按固定提交与 SHA256 下载公开 Apache Commons Lang 3.17.0，编译后设置 `QA_JAVA_PROJECT_ROOT`，三平台 native 纳入实际选集。本地未指定路径则显式 skip，指定无效路径或 CI 未准备路径则失败。原有三项外部缺口属于历史证据，不改写为通过；新用例本机 Linux native 已通过，GitHub 三平台执行待补。性能仍暂缓，不恢复 main 对比。
+**2026-10-31：按用户最新要求调整 C6-06 真实 Java 工程来源。** 不再限定原始 clickhousecrud；GitHub runner 按固定提交与 SHA256 下载公开 Apache Commons Lang 3.17.0，编译后设置 `QA_JAVA_PROJECT_ROOT`，三平台 native 纳入实际选集。本地未指定路径则显式 skip，指定无效路径或 CI 未准备路径则失败。原有三项外部缺口属于历史证据，不改写为通过；新用例本机 Linux native 及 GitHub 三平台均已通过，见下节。性能仍暂缓，不恢复 main 对比。
+
+## C6-06 三平台公开项目验收（2026-10-31）
+
+实现提交 [`592bb79111ddeb2293177c454ae4aba6cf9a0e0a`](https://github.com/engcapa/taomni/commit/592bb79111ddeb2293177c454ae4aba6cf9a0e0a) 已推送至当前分支。指定 workflow [41147517507](https://github.com/engcapa/taomni/actions/runs/41147517507) **success**，13 个 ID、6 份执行报告、**57 passed /0 failed /0 skipped**：C6-05/C6-06 在三平台的6次原生执行全部通过，完整适用 crash-regression 共51次通过。精确 selection 与57次执行逐项一致，能力缺口为零。
+
+| 平台 | browser 崩溃组 | native（Java 两项及崩溃组） |
+| --- | --- | --- |
+| Linux / Ubuntu 24.04 Xvfb | 8/8 | 11/11 |
+| Windows 2025 / WebView2 | 8/8 | 11/11 |
+| macOS 15 ARM64 / WKWebView | 8/8 | 11/11 |
+
+产品 source 仍为 `69f94bb8e72d51dd286631d2e55868a42ea4655167ad9d5c8194a5c494eb1281`；新 runner 为 `95ca5805bb1bcb492837d23cda668b6216ce7cb0910991dddea0a74b3617e3ee`，C6-06 case 指纹为 `3c182363f2891635753c0c84062acc8b877ea9a6600e19946444d79270a202fe`。三平台均使用 source 匹配的 QA release，原始 producer/build identity 保留。每个平台都实际下载同一固定提交的 Commons Lang 源码、校验归档 SHA256 并编译成功；`project.json`、归档及 Maven 日志已保留。用例均通过字段/跨文件/JDK 定义、四次历史返回光标、Java/POM 完整字节哈希和零运行时错误检查；三平台最终截图已检查。本地缺路径的预期 skip 仍单独记录，不混入 hosted 通过数。
+
+6 份回执及 **1,088 个附件**的签名、字节数和 SHA256 已核验，无附件缺失；Windows 回执中的路径分隔符只在本地定位附件时转换，未改写原始回执。CI 汇总与维护中的 aggregate 本地独立复核均为 passed/report_ok，基础设施错误为零。证据在 `qa-ui-auto-report/_local/workspace-41147517507/`，链接到 `/tmp/taomni-public-java-hosted/`；包含原始 artifacts、GitHub run 状态、selection、`reports/local-aggregate-check.json` 与 `reports/verified-evidence.json`。
+
+参数为 `scope=selected`、`modes=browser,native`、三平台、`native_release=true`、`shards=1`、`browser_workers=1`、`publish_issues=false`。本轮复用 [41060730487](https://github.com/engcapa/taomni/actions/runs/41060730487) 已通过的 Rust 原生合同：产品/Rust 代码、依赖、工具链及 release 配置未改动，因此 `run_rdp_unit_contracts=false`；selected 工作流按既有策略不重跑全工具合同，相关选集/执行/Maven及新夹具合同已有本机通过证据。三平台 release 构建及 Windows capture helper 合同本轮通过。
+
+首轮 [41147059619](https://github.com/engcapa/taomni/actions/runs/41147059619) 保留为 **failure**：操作者仅指定 native，但 workflow 自动并入两项 browser-only crash 用例，选集检查拒绝执行，未启动 UI。改为 browser/native 后以相同提交重派成功，没有修改产品、用例或断言。失败日志保存在证据目录 `first-dispatch-failure.log`。
+
+原始 clickhousecrud 的三项缺口保留历史事实；按用户授权变更后的公开项目验证已闭环，不再等待该原始工程，也不将新结果回写为旧项目通过。性能仍列 TODO，原始全量的性能失败及165ms/1500ms门槛保持，不安排 main 对比。此次结果归档只更新文档，不改变产品、case或runner，不需要再次重编或重跑。
 
 ## 当前组合验证（2026-10-30）
 
@@ -180,13 +200,13 @@ ef57本机：14项目标单测、80项保留测试全部通过，QA前端TypeScr
 
 可执行的非性能开发与验证已收尾。当前产品组合的全量及57/57补验已验证SDK/LSP生命周期、多root与目录选择器、编辑器dirty/save/undo/redo、旧版24标签及分屏恢复、关闭/重载、树指针与ResizeObserver生命周期、隐藏面板几何、导航弹层、macOS应用菜单、Terminal右边界readiness、多仓库Git、标签ownership及描述符完整磁盘操作。两项QA修正版已在三平台browser/native通过；完整适用crash组全部通过。性能失败所在用例未执行的后续步骤仍不算通过。
 
-**C6-06 真实公开 Java 工程回归**：`TC-IDE-C6-06-java-definition-realproject-native`现使用 Apache Commons Lang 3.17.0（`29ccc7665f3bc5d84155a3092ab2209a053324e6`），按最新用户授权替换原项目限定。CI 下载、校验、编译并配置路径，覆盖字段/跨文件/JDK 跳转、返回、源码/POM SHA 与运行时错误。本地缺路径可跳过；本机 Linux 新用例已通过，GitHub 三平台新执行结果待补，历史缺口不计为新用例通过。
+**C6-06 真实公开 Java 工程回归**：`TC-IDE-C6-06-java-definition-realproject-native`现使用 Apache Commons Lang 3.17.0（`29ccc7665f3bc5d84155a3092ab2209a053324e6`），按最新用户授权替换原项目限定。CI 下载、校验、编译并配置路径，覆盖字段/跨文件/JDK 跳转、返回、源码/POM SHA 与运行时错误。本地缺路径可跳过；本机 Linux 及 GitHub 三平台新用例已通过（57/57 相关集），历史缺口不回写为旧项目通过。
 
 2026-10-31 本机验证：公开归档的 SHA256 核验及 JDK21/Maven 真实编译成功；CI selection 确认 Linux/Windows/macOS native 均选中 C6-06 且包含 `java` / `java-real-project`，无原外部项目 gap。相关 CI 选集、执行及 Maven 契约测试通过，最终夹具6项测试通过，catalog audit与 `pnpm check:refactor` 通过。没有修改产品源码，复用 source 匹配的 QA release（`native_build.py --release --check` 确认 inputs match），无需重编或重跑产品全量 crash 组。
 
 隔离桌面本机 native `/tmp/taomni-public-java-native-report-04/run-20261031-071943-290780928` **1 passed /0 failed /0 skipped**；本地未设置路径 `/tmp/taomni-public-java-local-skip-report/run-20261031-072127-346692852` **0 passed /0 failed /1 skipped**，明确不计为导航通过。source=`69f94bb8e72d51dd286631d2e55868a42ea4655167ad9d5c8194a5c494eb1281`，runner=`95ca5805bb1bcb492837d23cda668b6216ce7cb0910991dddea0a74b3617e3ee`；两份回执及12/6个附件的签名、字节数/SHA与当前身份均已核验，最终截图已检查。正式通过保留字段声明光标、跨文件/JDK正文、四次返回光标、Java/POM哈希及零运行时错误断言。
 
-原始 `native-report-03` 保留1次用例失败：返回后类声明已离开 CodeMirror 虚拟视口，DOM正文断言错误；改为实际来源光标断言后通过。01/02为本机启动PATH误选无jsonschema的Python，未启动用例；其日志保留。Windows/macOS与GitHub新用例尚未执行，不以计划或本机结果代替三平台通过。此次仅更新既有 C6-06 的数据来源和执行支持，没有新产品行为或控件，不新增同义 YAML。
+原始 `native-report-03` 保留1次用例失败：返回后类声明已离开 CodeMirror 虚拟视口，DOM正文断言错误；改为实际来源光标断言后通过。01/02为本机启动PATH误选无jsonschema的Python，未启动用例；其日志保留。上述为本机阶段记录；后续 GitHub 三平台新用例及完整适用 crash 组已通过，见文首验收记录。此次仅更新既有 C6-06 的数据来源和执行支持，没有新产品行为或控件，不新增同义 YAML。
 
 HOME混合fixture、本机测试产物清理和当前证据归档已完成。性能单列TODO，当前没有其它待开发的非性能产品功能；此次仅修改 QA 用例、夹具和 CI 准备，不改产品行为，不需要为此重编产品。
 
@@ -259,10 +279,11 @@ HOME混合fixture、本机测试产物清理和当前证据归档已完成。性
 
 ## 当前待办顺序（按用户最新要求）
 
-1. **公开项目验证**：C6-06 改为 CI 自动准备固定版本 Commons Lang；不再等待原始 clickhousecrud，三平台 native 新结果待补。本地不设 `QA_JAVA_PROJECT_ROOT` 时跳过。
-2. **性能TODO，暂缓**：Linux075 172ms、macOS074约166ms仍超过165ms。保留1500ms正文/高亮/动作、165ms完整观察期、真实SDK五秒及既有输入门槛；不继续优化或诊断，不调度main比较。
+C6-06 公开项目验证已完成：三平台 native 均通过，相关集57/57，原工程不再是待办。本地不设 `QA_JAVA_PROJECT_ROOT` 时仍按预期跳过。
 
-非性能GitHub闭环与证据归档已完成：全量2,220次、25份回执和25,586附件，修正版补验57/57、15份回执和1,043附件，均无缺失。产品/runner指纹相同，只有两份case变化；这些case使用新结果，其余未修改case复用全量证据，旧全量失败不改写。最后的文档归档仅记录证据，不改变产品、case或runner；沿用C4-03、C7-08、PARITY-008-01及完整crash的实际结果，无新增行为需要新用例或重编应用。
+1. **性能TODO，暂缓**：Linux075 172ms、macOS074约166ms仍超过165ms。保留1500ms正文/高亮/动作、165ms完整观察期、真实SDK五秒及既有输入门槛；不继续优化或诊断，不调度main比较。
+
+2026-10-30 两轮非性能GitHub闭环与证据归档已完成：全量2,220次、25份回执和25,586附件，修正版补验57/57、15份回执和1,043附件，均无缺失。产品/runner指纹相同，只有两份case变化；这些case使用新结果，其余未修改case复用全量证据，旧全量失败不改写。最后的文档归档仅记录证据，不改变产品、case或runner；沿用C4-03、C7-08、PARITY-008-01及完整crash的实际结果，无新增行为需要新用例或重编应用。
 
 ## 恢复命令与执行约束
 

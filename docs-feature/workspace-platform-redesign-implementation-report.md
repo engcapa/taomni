@@ -1,6 +1,6 @@
 # Workspace-First & One-System 平台重构 · 实现与验证报告
 
-> 2026-10-31 用例范围更新：用户授权 C6-06 改用公开 Apache Commons Lang 3.17.0。CI 按固定提交/SHA256下载并编译，设置 `QA_JAVA_PROJECT_ROOT`；本地缺路径跳过。以下 clickhousecrud 外部缺口均为历史执行状态，新用例三平台 native 结果待补，不能回写历史为通过。性能仍暂缓，main 比较取消，以 SDK startup follow-up 的当前状态为准。
+> 2026-10-31 用例范围更新：用户授权 C6-06 改用公开 Apache Commons Lang 3.17.0。CI 按固定提交/SHA256下载并编译，设置 `QA_JAVA_PROJECT_ROOT`；本地缺路径跳过。以下 clickhousecrud 外部缺口均为历史执行状态，实现提交 `592bb791` 的 [GitHub 41147517507](https://github.com/engcapa/taomni/actions/runs/41147517507) 已完成三平台 browser 各8/8、native各11/11，共 **57 passed /0 failed /0 skipped**；包括 C6-05/C6-06 与完整适用 crash 组。6份回执和1,088附件已逐字节/SHA核验，CI及本地独立 aggregate 均通过。新结果不回写为旧项目通过。性能仍暂缓，main 比较取消，以 SDK startup follow-up 的当前状态为准。
 
 
 > 当前已合并 main `c793f30b`。文件先显示并可编辑、SDK/LSP 后台初始化、普通文件跳过自动探测及每次成功添加目录展开 Project 的实现已完成，见[SDK 跟进记录](./workspace-platform-redesign-sdk-startup-followup.md)。候选 `3190f31e` 的三平台 browser 相关集 **51/51 passed**，原生阶段发现并正在修正逐字观察往返耗尽 SDK 超时及 macOS QA 桥漏译 Backspace 两项工具问题；保留全部原失败，修正后重跑三平台相关集和完整 10 ID 崩溃专项。RDP 剪贴板功能修复定向 [40767562150](https://github.com/engcapa/taomni/actions/runs/40767562150) 已独立核验 **21/21 passed**。
