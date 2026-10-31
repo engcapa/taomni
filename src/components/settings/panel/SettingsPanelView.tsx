@@ -21,6 +21,7 @@ import { ClaudeCodePanel } from "../ClaudeCodePanel";
 import { CodeViewAppearanceSettings } from "../CodeViewAppearanceSettings";
 import { CodexCodePanel } from "../CodexCodePanel";
 import { EditorAiLanguagePanel } from "../EditorAiLanguagePanel";
+import { MobileServiceSettings } from "../MobileServiceSettings";
 import { LanChatSettings } from "../LanChatSettings";
 import { LanguageSection } from "../LanguageSection";
 import { LanguageServersSettings } from "../LanguageServersSettings";
@@ -501,6 +502,8 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
                 <AppProxyPanel />
               </section>
             </SettingsAnchor>
+
+            <SettingsAnchor id="mobile-service"><MobileServiceSettings /></SettingsAnchor>
 
             <SettingsAnchor id="lanchat">
               <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">

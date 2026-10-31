@@ -390,3 +390,18 @@ Native only (Linux/Windows/macOS): `{folder?: INBOX, size_delta?: 0, empty_newes
 
 - `mail_server_sparse_sync: {configure_only: true}` disables CONDSTORE before connecting; `mail_server_sparse_sync: null` (native-only, Linux/Windows/macOS): deliver 1,100 sparse ten-digit INBOX UIDs and disconnect the next synchronization FLAGS FETCH; fake IMAP enforces a 4 KiB command limit.
 - `mail_server_assert_sync_transport: null` (native-only): require exactly one injected FLAGS disconnect, a large explicit UID flag batch and zero rejected oversized commands, independently of UI counts.
+
+### `mobile_service_probe` (native, Linux)
+
+Arguments: `desktop` or `headless`. `desktop` requires a real local PTY and the
+mobile listener/pairing code opened through Settings. It uses two external
+HTTP/WS devices, operates settings revoke controls, verifies real PTY output
+and desktop input reclamation, then stops the listener. `headless` launches the
+matching QA executable with DISPLAY/WAYLAND_DISPLAY removed in a disposable
+profile, verifies health/pair/events/profile exclusion and clean shutdown.
+Receipts contain assertions and no pairing secrets. See TC-MOBILE-002/003.
+
+The `mobile_web` browser fixture serves the production mobile bundle with a
+deterministic HTTP/WS peer; it does not establish Rust/native service behavior.
+The `mobile_service` fixture seeds only isolated saved-session rows for native
+projection checks and assigns receipt paths.

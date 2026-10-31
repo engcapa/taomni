@@ -13297,3 +13297,143 @@ TC-WS-075 adds native Home source-to-document activation coverage for the real `
 TC-WS-077 protects virtual explorer rows in browser/native: bounded DOM rows, Home/End and offscreen ArrowUp selection without activation, actual file opening, search/reset, list view and reverse name sorting. Cold/warm frame budgets remain unchanged in TC-WS-073/074.
 
 TC-WS-078 protects application menu ownership after ordinary-file activation: Close availability before/after the first and last file, a contributed Save with saved-content reopen, and release of the closed editor menu. Browser covers the renderer entry; native menu state and store-subscription cleanup have mounted contracts, with current-source hosted activation performance still gated by TC-WS-064/073.
+
+## 移动端远程控制面
+
+### P0 独立 Mobile Web 与实例移动服务 🟡
+
+<!-- feature
+id: F-MOBILE-1
+status: partial
+area: mobile/control-plane
+components: [MobileServiceSettings, MobileWeb, MobileRuntime]
+files:
+  - src/components/settings/MobileServiceSettings.tsx
+  - src-tauri/src/mobile/mod.rs
+  - src-tauri/src/mobile/server.rs
+  - src-tauri/src/mobile/streams.rs
+  - src-tauri/src/mobile/pty_broker.rs
+  - src-tauri/src/mobile/agent_view.rs
+  - src-tauri/src/mobile/file_view.rs
+  - mobile-web/src/App.tsx
+  - mobile-web/src/TerminalView.tsx
+  - mobile-web/src/TaskView.tsx
+  - mobile-web/src/PairForm.tsx
+controls:
+  - id: mobile-add-instance
+    selector: '[data-testid="mobile-add-instance"]'
+    kind: interactive
+  - id: mobile-empty-instances
+    selector: '[data-testid="mobile-empty-instances"]'
+    kind: display
+  - id: mobile-endpoint
+    selector: '[data-testid="mobile-endpoint"]'
+    kind: interactive
+  - id: mobile-label
+    selector: '[data-testid="mobile-label"]'
+    kind: interactive
+  - id: mobile-pair-code
+    selector: '[data-testid="mobile-pair-code"]'
+    kind: interactive
+  - id: mobile-pair-submit
+    selector: '[data-testid="mobile-pair-submit"]'
+    kind: interactive
+  - id: mobile-sessions
+    selector: '[data-testid="mobile-sessions"]'
+    kind: display
+  - id: mobile-session
+    selector: '[data-testid="mobile-session"]'
+    kind: interactive
+  - id: mobile-saved-session
+    selector: '[data-testid="mobile-saved-session"]'
+    kind: display
+  - id: mobile-terminal-status
+    selector: '[data-testid="mobile-terminal-status"]'
+    kind: display
+  - id: mobile-take-control
+    selector: '[data-testid="mobile-take-control"]'
+    kind: interactive
+  - id: mobile-resize
+    selector: '[data-testid="mobile-resize"]'
+    kind: interactive
+  - id: mobile-paste
+    selector: '[data-testid="mobile-paste"]'
+    kind: interactive
+  - id: mobile-terminal-input
+    selector: '[data-testid="mobile-terminal-input"]'
+    kind: interactive
+  - id: mobile-terminal-send
+    selector: '[data-testid="mobile-terminal-send"]'
+    kind: interactive
+  - id: mobile-sessions-back
+    selector: '[data-testid="mobile-sessions-back"]'
+    kind: interactive
+  - id: mobile-agent-input
+    selector: '[data-testid="mobile-agent-input"]'
+    kind: interactive
+  - id: mobile-agent-send
+    selector: '[data-testid="mobile-agent-send"]'
+    kind: interactive
+  - id: mobile-task-status
+    selector: '[data-testid="mobile-task-status"]'
+    kind: display
+  - id: mobile-task-stop
+    selector: '[data-testid="mobile-task-stop"]'
+    kind: interactive
+  - id: mobile-file-open
+    selector: '[data-testid="mobile-file-open"]'
+    kind: interactive
+  - id: mobile-diff-open
+    selector: '[data-testid="mobile-diff-open"]'
+    kind: interactive
+  - id: mobile-file-content
+    selector: '[data-testid="mobile-file-content"]'
+    kind: display
+  - id: mobile-file-view
+    selector: '[data-testid="mobile-file-view"]'
+    kind: display
+  - id: mobile-instances-back
+    selector: '[data-testid="mobile-instances-back"]'
+    kind: interactive
+  - id: mobile-cloud-open
+    selector: 'article:has(h3:text-is("Cloud")) [data-testid="mobile-instance-open"]'
+    kind: interactive
+  - id: mobile-cloud-remove
+    selector: 'article:has(h3:text-is("Cloud")) [data-testid="mobile-instance-remove"]'
+    kind: interactive
+  - id: mobile-instance-open
+    selector: '[data-testid="mobile-instance-open"]'
+    kind: interactive
+  - id: mobile-instance-remove
+    selector: '[data-testid="mobile-instance-remove"]'
+    kind: interactive
+  - id: mobile-settings
+    selector: '[data-testid="mobile-settings"]'
+    kind: display
+  - id: mobile-settings-status
+    selector: '[data-testid="mobile-settings-status"]'
+    kind: display
+  - id: mobile-settings-port
+    selector: '[data-testid="mobile-settings-port"]'
+    kind: interactive
+  - id: mobile-settings-toggle
+    selector: '[data-testid="mobile-settings-toggle"]'
+    kind: interactive
+  - id: mobile-settings-pair
+    selector: '[data-testid="mobile-settings-pair"]'
+    kind: interactive
+  - id: mobile-settings-code
+    selector: '[data-testid="mobile-settings-code"]'
+    kind: display
+  - id: mobile-settings-refresh
+    selector: '[data-testid="mobile-settings-refresh"]'
+    kind: interactive
+  - id: mobile-settings-revoke
+    selector: '[data-testid="mobile-settings-revoke"]'
+    kind: interactive
+-->
+
+- 默认不监听；全局设置开启回环/局域网移动服务，生成一次性码、查看与吊销设备。
+- 独立 PWA 支持多个 endpoint、终端共享与单写权、Agent 后续指令及只读文件/diff。
+- Linux headless 不创建 Tauri/GTK 窗口；桌面工具运行时不可用的路径显式报错。
+- 当前执行证据与限制见 `docs-feature/mobile-remote-p0-implementation.md`，未验证的平台与真手机能力不作完成声明。

@@ -56,6 +56,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Protocol
 
+from . import mobile_web, mobile_service
 from . import ard_required, editor_typing_fixtures, file_move_recovery_fixtures, git_diff_repo, java25_projects, java_rename_deleted_fixtures, java_sample_projects, java_test_bundle, jdtls_required, linux_desktop_required, linux_x11_required, mysql_required, reset_db, restore_24tab_fixtures, sftp_required, sortable_java_fixtures, ssh_required, view_state_fixtures, vnc_required, welcome_recents, workspace_root
 from . import platform_workspace_root
 from . import workspace_restore_sessions
@@ -115,6 +116,8 @@ class Fixture:
 
 
 REGISTRY: dict[str, Fixture] = {
+    "mobile_web": Fixture("mobile_web", mobile_web.setup, mobile_web.teardown),
+    "mobile_service": Fixture("mobile_service", mobile_service.setup),
     "bookmark_assets": Fixture("bookmark_assets", bookmark_assets.setup),
     "mail_stress": Fixture("mail_stress", mail_stress.setup),
     "model_inspector_gateway": Fixture("model_inspector_gateway", model_inspector_gateway.setup, model_inspector_gateway.teardown),

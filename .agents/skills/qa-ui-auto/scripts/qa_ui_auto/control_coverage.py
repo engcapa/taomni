@@ -66,6 +66,7 @@ from qa_ui_auto.testcase import discover, step_verb_and_args  # noqa: E402
 
 
 INTERACTIVE_VERBS = {
+    "mobile_service_probe",
     "middle_click",
     "click", "dblclick", "right_click", "hover", "drag_to", "drag_path", "native_click",
     "native_pointer_drag", "native_window_drag",
@@ -161,6 +162,10 @@ def _selectors_in_step(verb: str, args: Any) -> list[str]:
     `screenshot` only touches a selector when given the `selector:` key in
     rich form; the path key is a filename and must NOT be reported.
     """
+    # The specialized native oracle operates these real settings controls;
+    # it never invokes their IPC handlers directly (mobile_native.desktop).
+    if verb == "mobile_service_probe" and args == "desktop":
+        return ['[data-testid="mobile-settings-refresh"]', '[data-testid="mobile-settings-revoke"]']
     out: list[str] = []
     # Short form: `click: '[data-testid="x"]'` → args is a string.
     if isinstance(args, str):

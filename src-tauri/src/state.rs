@@ -102,6 +102,7 @@ pub struct AppState {
     pub remote_desktop: RemoteDesktopRuntime,
     pub database: DatabaseRuntime,
     pub agent: AgentRuntime,
+    pub mobile: Arc<crate::mobile::MobileRuntime>,
 }
 
 impl AppState {
@@ -119,7 +120,9 @@ impl AppState {
         // debug adapter (D2), which drives jdtls via this handle.
         let lsp = Arc::new(LspManager::with_sdk(sdk.clone()));
         let dap = Arc::new(crate::dap::DapManager::with_lsp(lsp.clone()));
+        let mobile = Arc::new(crate::mobile::MobileRuntime::default());
         Self {
+            mobile: mobile.clone(),
             tunnels: Arc::new(TunnelRegistry::new()),
             sockscap: Arc::new(SocksCapRuntime::new()),
             servers: Arc::new(ServerRegistry::new()),
@@ -140,7 +143,9 @@ impl AppState {
             },
             terminal: TerminalRuntime {
                 terminals: Arc::new(RwLock::new(HashMap::new())),
-                terminal_outputs: Arc::new(Mutex::new(HashMap::new())),
+                terminal_outputs: Arc::new(crate::terminal::TerminalOutputHub::new(
+                    mobile.broker.clone(),
+                )),
                 ssh_auth_responders: Arc::new(Mutex::new(HashMap::new())),
                 local_directory_runtime: Arc::new(Mutex::new(HashMap::new())),
             },

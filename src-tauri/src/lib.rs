@@ -37,6 +37,7 @@ mod rdp;
 mod screenshot;
 #[cfg(windows)]
 pub use screenshot::scroll_input::run_helper as run_screenshot_scroll_input;
+pub mod mobile;
 mod sdk;
 mod serial;
 mod servers;
@@ -187,6 +188,7 @@ pub fn run() {
             // Runs before the app-data dir is created so the directory rename
             // targets a non-existent destination on every platform.
             migrate::run(&app_data);
+            app.manage(mobile::headless::ModeLease::acquire(&app_data, false).map_err(std::io::Error::other)?);
             app.manage(backup::coordination::ProfileLease::prepare(&app_data)
                 .map_err(std::io::Error::other)?);
 

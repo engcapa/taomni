@@ -1,5 +1,8 @@
 # taomni 移动端 P0：远程实例控制面 详细设计
 
+> 实施分支 `feat/mobile-remote-p0` 的盘点、参数、证据与未验证边界见 [实施记录](mobile-remote-p0-implementation.md)。下文保留原 DEC/AC/TASK/V 编号和设计验收口径；完成状态以实施记录中的真实执行证据为准。
+
+
 > 本文档按仓库 `.agents/skills/feature-design` 的模板与工作流编制：决策 `DEC-*`、验收 `AC-*`、任务 `TASK-*`、验证 `V-*` 全程串联。设计状态不代表已经实现或验证。所有验证条目在设计阶段均为待执行。凡结论依赖 TASK-03/TASK-04 的盘点结果或 TASK-01 的 headless 证明，正文一律标“待盘点后确认”或“待证明后确认”，不作为既定事实。
 
 ## 1. 设计摘要与范围

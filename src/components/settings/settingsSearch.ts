@@ -159,6 +159,11 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     terms: ["proxy", "socks", "socks5", "http proxy", "network", "vpn", "outbound", "代理", "网络", "出站"],
   },
   {
+    id: "mobile-service",
+    titleKeys: [],
+    terms: ["mobile", "remote", "pairing", "headless", "移动服务", "手机", "配对", "远程控制"],
+  },
+  {
     id: "lanchat",
     titleKeys: ["settings.lanChatSection"],
     terms: ["lanchat", "lan", "messenger", "chat", "broadcast", "局域网", "内网", "通讯", "聊天", "广播", "消息"],
@@ -279,7 +284,7 @@ export const SETTINGS_GROUPS: SettingsGroupDef[] = [
   {
     id: "network",
     titleKey: "settings.groupNetwork",
-    entryIds: ["app-proxy", "lanchat"],
+    entryIds: ["app-proxy", "mobile-service", "lanchat"],
   },
   {
     id: "ai",

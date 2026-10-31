@@ -20,7 +20,7 @@ def is_check(step: dict) -> bool:
         return True
     if verb == "native_menu":
         return "enabled" in args or "checked" in args
-    if verb.startswith("assert_") or verb in {"wait_for", "native_editor_performance", "native_save_reader_lock", "native_terminal_burst", "parity005_wait_pending"}:
+    if verb.startswith("assert_") or verb in {"wait_for", "native_editor_performance", "native_save_reader_lock", "native_terminal_burst", "mobile_service_probe", "parity005_wait_pending"}:
         return True
     if verb == "eval_readonly":
         return args.get("expect_truthy", True) or "contains" in args

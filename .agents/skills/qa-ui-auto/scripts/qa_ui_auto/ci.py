@@ -85,6 +85,8 @@ def capabilities(cases, mode: str) -> list[str]:
     result = set()
     for case in cases:
         fixtures = set(case.fixtures)
+        if mode == "native" and "mobile_service" in fixtures:
+            result.add("mobile")
         if fixtures & {"ssh_required", "sftp_required"}:
             result.add("ssh")
         if "ssh_posix_required" in fixtures:
@@ -499,7 +501,7 @@ def main(argv=None):
                 github_output(f'has_{platform_key}_native', str(bool(native)).lower())
             contracts = [{k: v for k, v in b.items() if k not in {'selected_ids', 'case_digests'}}
                          for b in result['builds'] if b['platform_key'] == 'linux'
-                         and (b['rdp_unit_contracts'] or 'dual-display' in b['capabilities'])]
+                         and (b['rdp_unit_contracts'] or 'dual-display' in b['capabilities'] or 'mobile' in b['capabilities'])]
             github_output('contracts_matrix', json.dumps({'include': contracts}, separators=(',', ':')))
             github_output('has_contracts', str(bool(contracts)).lower())
             github_output("has_cases", str(bool(result["entries"])).lower())

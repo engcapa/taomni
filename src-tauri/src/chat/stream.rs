@@ -26,6 +26,7 @@ pub(super) use shutdown::stop_thread_runtime;
 
 pub(crate) use shutdown::{__cmd__chat_stop_stream, __tauri_command_name_chat_stop_stream};
 
-pub use preparation::chat_stream;
+pub use preparation::{chat_stream, chat_stream_inner};
+pub(crate) use shutdown::stop_thread_runtime_inner;
 
 pub(crate) use preparation::{__cmd__chat_stream, __tauri_command_name_chat_stream};

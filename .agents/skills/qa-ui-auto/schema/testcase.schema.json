@@ -61,6 +61,8 @@
       "items": {
         "enum": [
           "reset_db",
+          "mobile_web",
+          "mobile_service",
           "unreachable_app_proxy",
           "backup_policy",
           "backup_cloud",
@@ -562,6 +564,7 @@
         "terminal_input": {
           "$ref": "#/$defs/terminal_input_arg"
         },
+        "mobile_service_probe": { "enum": ["desktop", "headless"] },
         "native_terminal_burst": {
           "$ref": "#/$defs/native_terminal_burst_arg"
         },

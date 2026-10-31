@@ -1,3 +1,4 @@
+import { mobileStub } from "./mobileStub";
 import { voiceStub } from "./voiceStub";
 import { installStubMailQaControl } from "./mailServerStub";
 import { stubMfaInvoke } from "./mfaStub";
@@ -28,6 +29,7 @@ const stubCommandRegistry = new CommandRegistry();
 if (typeof window !== "undefined") installStubMailQaControl(mailStubSeed);
 
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
+  if (cmd.startsWith("mobile_")) return await mobileStub(cmd, args) as T;
   if (cmd === "backup_get_policy") {
     return JSON.parse(localStorage.getItem("taomni.backup.policy") || JSON.stringify({
       autoBackupEnabled: false, frequency: "weekly", maxRetainedCopies: 7,

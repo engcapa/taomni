@@ -45,8 +45,9 @@ pub(super) async fn stream_provider(turn: StreamTurn<'_>) -> Result<(), String> 
         user_msg,
         agent_ctx,
     } = turn;
+    let event_thread_id = req.thread_id.clone();
     let emit = |evt: &StreamEventOut| {
-        let _ = app.emit(&event_name, evt.clone());
+        crate::chat::emit_stream_event(app.as_ref(), state, &event_thread_id, &event_name, evt);
     };
     let ai_config = AiConfig::load(&default_ai_config_path());
     let output_format = resolve_output_format(&thread, &ai_config);
@@ -147,7 +148,7 @@ pub(super) async fn stream_provider(turn: StreamTurn<'_>) -> Result<(), String> 
     };
 
     // Create a provider-agnostic cancellation handle for this in-flight turn.
-    let cancel_token = tokio_util::sync::CancellationToken::new();
+    let cancel_token = state.mobile.turn_cancel(&req.thread_id);
     state.agent.chat_runs.lock().await.insert(
         req.thread_id.clone(),
         run::ChatRunHandle::direct_llm(cancel_token.clone()),
@@ -157,8 +158,8 @@ pub(super) async fn stream_provider(turn: StreamTurn<'_>) -> Result<(), String> 
     let mut is_cancelled = false;
 
     let mut ran_with_tools = false;
-    if provider.supports_tools_for(&llm_req) {
-        agent_ctx.refresh_runtime_bindings(state.inner()).await;
+    if provider.supports_tools_for(&llm_req) && app.is_some() {
+        agent_ctx.refresh_runtime_bindings(state).await;
 
         let runtime_result = tokio::select! {
             _ = cancel_token.cancelled() => {
@@ -166,7 +167,7 @@ pub(super) async fn stream_provider(turn: StreamTurn<'_>) -> Result<(), String> 
                 None
             }
             result = crate::agent::tool_runtime::AgentToolRuntime::provision(
-                &app,
+                app.as_ref().ok_or("desktop_required")?,
                 &agent_ctx,
                 ai_config.cc_bridge.confirm_readonly,
             ) => Some(result),

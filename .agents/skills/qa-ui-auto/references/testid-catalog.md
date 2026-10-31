@@ -1960,6 +1960,46 @@
 - `[data-testid="menu-export-sessions"]` — display — F-WS-6.menu-export-sessions
 - `[data-testid="open-tabs-filter"]` — interactive — F-WS-6.open-tabs-filter
 
+## mobile/control-plane (F-MOBILE-1)
+
+- `[data-testid="mobile-add-instance"]` — interactive — F-MOBILE-1.mobile-add-instance
+- `[data-testid="mobile-empty-instances"]` — display — F-MOBILE-1.mobile-empty-instances
+- `[data-testid="mobile-endpoint"]` — interactive — F-MOBILE-1.mobile-endpoint
+- `[data-testid="mobile-label"]` — interactive — F-MOBILE-1.mobile-label
+- `[data-testid="mobile-pair-code"]` — interactive — F-MOBILE-1.mobile-pair-code
+- `[data-testid="mobile-pair-submit"]` — interactive — F-MOBILE-1.mobile-pair-submit
+- `[data-testid="mobile-sessions"]` — display — F-MOBILE-1.mobile-sessions
+- `[data-testid="mobile-session"]` — interactive — F-MOBILE-1.mobile-session
+- `[data-testid="mobile-saved-session"]` — display — F-MOBILE-1.mobile-saved-session
+- `[data-testid="mobile-terminal-status"]` — display — F-MOBILE-1.mobile-terminal-status
+- `[data-testid="mobile-take-control"]` — interactive — F-MOBILE-1.mobile-take-control
+- `[data-testid="mobile-resize"]` — interactive — F-MOBILE-1.mobile-resize
+- `[data-testid="mobile-paste"]` — interactive — F-MOBILE-1.mobile-paste
+- `[data-testid="mobile-terminal-input"]` — interactive — F-MOBILE-1.mobile-terminal-input
+- `[data-testid="mobile-terminal-send"]` — interactive — F-MOBILE-1.mobile-terminal-send
+- `[data-testid="mobile-sessions-back"]` — interactive — F-MOBILE-1.mobile-sessions-back
+- `[data-testid="mobile-agent-input"]` — interactive — F-MOBILE-1.mobile-agent-input
+- `[data-testid="mobile-agent-send"]` — interactive — F-MOBILE-1.mobile-agent-send
+- `[data-testid="mobile-task-status"]` — display — F-MOBILE-1.mobile-task-status
+- `[data-testid="mobile-task-stop"]` — interactive — F-MOBILE-1.mobile-task-stop
+- `[data-testid="mobile-file-open"]` — interactive — F-MOBILE-1.mobile-file-open
+- `[data-testid="mobile-diff-open"]` — interactive — F-MOBILE-1.mobile-diff-open
+- `[data-testid="mobile-file-content"]` — display — F-MOBILE-1.mobile-file-content
+- `[data-testid="mobile-file-view"]` — display — F-MOBILE-1.mobile-file-view
+- `[data-testid="mobile-instances-back"]` — interactive — F-MOBILE-1.mobile-instances-back
+- `article:has(h3:text-is("Cloud")) [data-testid="mobile-instance-open"]` — interactive — F-MOBILE-1.mobile-cloud-open
+- `article:has(h3:text-is("Cloud")) [data-testid="mobile-instance-remove"]` — interactive — F-MOBILE-1.mobile-cloud-remove
+- `[data-testid="mobile-instance-open"]` — interactive — F-MOBILE-1.mobile-instance-open
+- `[data-testid="mobile-instance-remove"]` — interactive — F-MOBILE-1.mobile-instance-remove
+- `[data-testid="mobile-settings"]` — display — F-MOBILE-1.mobile-settings
+- `[data-testid="mobile-settings-status"]` — display — F-MOBILE-1.mobile-settings-status
+- `[data-testid="mobile-settings-port"]` — interactive — F-MOBILE-1.mobile-settings-port
+- `[data-testid="mobile-settings-toggle"]` — interactive — F-MOBILE-1.mobile-settings-toggle
+- `[data-testid="mobile-settings-pair"]` — interactive — F-MOBILE-1.mobile-settings-pair
+- `[data-testid="mobile-settings-code"]` — display — F-MOBILE-1.mobile-settings-code
+- `[data-testid="mobile-settings-refresh"]` — interactive — F-MOBILE-1.mobile-settings-refresh
+- `[data-testid="mobile-settings-revoke"]` — interactive — F-MOBILE-1.mobile-settings-revoke
+
 ## network/sockscap (F-Sockscap-1)
 
 - `[data-testid="side-tab-tools"]` — interactive — F-Sockscap-1.tools-side-tab

@@ -34,7 +34,12 @@ pub(super) fn read_loop_local(
     if let Ok(mut outputs) = outputs.lock() {
         outputs.remove(&session_id);
     }
-    let _ = app.emit(&format!("terminal-exit-{}", session_id), "closed");
+    outputs.broker.exit(&session_id);
+    crate::mobile::events::EventSink::emit(
+        &crate::mobile::events::DesktopSink(app),
+        &format!("terminal-exit-{}", session_id),
+        serde_json::json!("closed"),
+    );
 }
 
 pub(super) fn validate_session_id(session_id: &str) -> Result<(), String> {
@@ -50,13 +55,29 @@ pub async fn write_terminal(
     data: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    let gate = state.mobile.broker.gate(&session_id).ok();
+    let _guard = match gate.as_ref() {
+        Some(g) => Some(g.lock().await),
+        None => None,
+    };
+    if let Some((cols, rows)) = state.mobile.broker.desktop(&session_id, None) {
+        let _ = resize_terminal_inner(&state, &session_id, cols, rows).await;
+    }
+    write_terminal_inner(&state, &session_id, &data).await
+}
+
+pub(crate) async fn write_terminal_inner(
+    state: &AppState,
+    session_id: &str,
+    data: &str,
+) -> Result<(), String> {
     let bytes = B64
         .decode(&data)
         .map_err(|e| format!("Invalid base64: {}", e))?;
 
     let terminals = state.terminal.terminals.read().await;
     let terminal = terminals
-        .get(&session_id)
+        .get(session_id)
         .ok_or_else(|| format!("Terminal {} not found", session_id))?;
 
     match terminal {
@@ -86,9 +107,24 @@ pub async fn resize_terminal(
     rows: u16,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    let gate = state.mobile.broker.gate(&session_id).ok();
+    let _guard = match gate.as_ref() {
+        Some(g) => Some(g.lock().await),
+        None => None,
+    };
+    state.mobile.broker.desktop(&session_id, Some((cols, rows)));
+    resize_terminal_inner(&state, &session_id, cols, rows).await
+}
+
+pub(crate) async fn resize_terminal_inner(
+    state: &AppState,
+    session_id: &str,
+    cols: u16,
+    rows: u16,
+) -> Result<(), String> {
     let terminals = state.terminal.terminals.read().await;
     let terminal = terminals
-        .get(&session_id)
+        .get(session_id)
         .ok_or_else(|| format!("Terminal {} not found", session_id))?;
 
     match terminal {
@@ -114,15 +150,23 @@ pub async fn send_terminal_signal(
     signal: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    send_terminal_signal_inner(&state, &session_id, &signal).await
+}
+
+pub(crate) async fn send_terminal_signal_inner(
+    state: &AppState,
+    session_id: &str,
+    signal: &str,
+) -> Result<(), String> {
     let terminals = state.terminal.terminals.read().await;
     let terminal = terminals
-        .get(&session_id)
+        .get(session_id)
         .ok_or_else(|| format!("Terminal {} not found", session_id))?;
 
     match terminal {
-        ActiveTerminal::Local { child, .. } => send_local_signal(child, &signal),
+        ActiveTerminal::Local { child, .. } => send_local_signal(child, signal),
         ActiveTerminal::Ssh { channel, .. } => {
-            let sig = ssh_signal_from_name(&signal)?;
+            let sig = ssh_signal_from_name(signal)?;
             let channel = Arc::clone(channel);
             drop(terminals);
             let ch = channel.lock().await;
@@ -135,6 +179,7 @@ pub async fn send_terminal_signal(
 
 #[tauri::command]
 pub async fn close_terminal(session_id: String, state: State<'_, AppState>) -> Result<(), String> {
+    state.mobile.broker.remove(&session_id);
     let removed = {
         let mut terminals = state.terminal.terminals.write().await;
         terminals.remove(&session_id)

@@ -79,6 +79,8 @@ on:
   pull_request:
     paths:
       - 'src/**'
+      - 'mobile-web/**'
+      - 'src-tauri/build.rs'
       - 'src-tauri/src/**'
       - 'package.json'
       - 'pnpm-lock.yaml'

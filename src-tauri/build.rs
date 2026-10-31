@@ -2,6 +2,7 @@ use std::fs;
 use std::path::Path;
 
 fn main() {
+    embed_mobile_assets();
     enforce_asr_llm_isolation();
     compile_hbase_protos();
     compile_linux_sockscap_launcher();
@@ -216,4 +217,43 @@ fn scan_for_forbidden(dir: &Path, needles: &[&str], dir_label: &str) {
             }
         }
     }
+}
+
+/// Embed the independent PWA so both desktop and window-free entrypoints can
+/// serve it without resolving resources through AppHandle.
+fn embed_mobile_assets() {
+    fn collect(root: &Path, dir: &Path, entries: &mut Vec<String>) {
+        if let Ok(items) = fs::read_dir(dir) {
+            for item in items.flatten() {
+                let path = item.path();
+                if path.is_dir() {
+                    collect(root, &path, entries);
+                } else if path.is_file() {
+                    let name = path
+                        .strip_prefix(root)
+                        .unwrap()
+                        .to_string_lossy()
+                        .replace('\\', "/");
+                    let absolute = fs::canonicalize(&path).unwrap();
+                    entries.push(format!(
+                        "({:?}, include_bytes!({:?}) as &[u8]),",
+                        name, absolute
+                    ));
+                }
+            }
+        }
+    }
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/mobile-web");
+    println!("cargo:rerun-if-changed={}", root.display());
+    let mut entries = Vec::new();
+    collect(&root, &root, &mut entries);
+    let source = format!(
+        "static ASSETS: &[(&str, &[u8])] = &[{}];",
+        entries.join("\n")
+    );
+    fs::write(
+        Path::new(&std::env::var("OUT_DIR").unwrap()).join("mobile_assets.rs"),
+        source,
+    )
+    .unwrap();
 }

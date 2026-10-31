@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # These tests do not need a desktop and must not delay publishing the app.
-if [[ "${QA_RDP_CONTRACTS:-false}" != true && "${QA_DUAL_CONTRACTS:-false}" != true ]]; then
+if [[ "${QA_RDP_CONTRACTS:-false}" != true && "${QA_DUAL_CONTRACTS:-false}" != true && "${QA_MOBILE_CONTRACTS:-false}" != true ]]; then
   echo 'No native Rust contracts selected.'
   exit 0
 fi
@@ -23,6 +23,9 @@ if [[ "${QA_RDP_CONTRACTS:-false}" == true ]]; then
 fi
 if [[ "${QA_DUAL_CONTRACTS:-false}" == true ]]; then
   filters+=(capture:: screenshot::surfaces:: screenshot::qa::save_dialog_observation::)
+fi
+if [[ "${QA_MOBILE_CONTRACTS:-false}" == true ]]; then
+  filters+=(mobile::)
 fi
 # libtest accepts multiple OR filters. Compile/link the root test binary once.
 cargo test --locked "${profile[@]}" --lib -- "${filters[@]}"

@@ -346,6 +346,8 @@ pub async fn create_ssh_terminal(
         if terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} already exists", session_id));
         }
+        state.mobile.broker.register(&session_id);
+        state.mobile.broker.desktop(&session_id, Some((cols, rows)));
         terminals.insert(session_id.clone(), terminal);
     }
 
@@ -391,7 +393,12 @@ pub async fn create_ssh_terminal(
         if let Ok(mut outputs) = outputs.lock() {
             outputs.remove(&sid);
         }
-        let _ = app.emit(&format!("terminal-exit-{}", sid), "closed");
+        outputs.broker.exit(&sid);
+        crate::mobile::events::EventSink::emit(
+            &crate::mobile::events::DesktopSink(app),
+            &format!("terminal-exit-{}", sid),
+            serde_json::json!("closed"),
+        );
     });
 
     Ok(session_id)

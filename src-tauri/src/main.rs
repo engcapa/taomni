@@ -2,6 +2,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
+    if std::env::args().nth(1).as_deref() == Some("--headless") {
+        std::process::exit(taomni_lib::mobile::headless::run());
+    }
     if std::env::args().nth(1).as_deref() == Some("--ssh-stdio-forward") {
         std::process::exit(taomni_lib::terminal::openssh::stdio_forward());
     }

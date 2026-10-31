@@ -45,6 +45,11 @@ jobs:
       - uses: ./.github/actions/qa-runtime
         with:
           mode: ${{ matrix.mode }}
+      - name: Chromium for mobile against the real native service
+        if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'mobile')
+        shell: bash
+        run: python -m playwright install --with-deps chromium
+
       - name: Shared VNC fixture ownership contracts
         if: matrix.mode == 'browser' && contains(matrix.capabilities, 'vnc') && inputs.operation == 'run'
         run: python -m unittest -v test_browser_case
@@ -318,6 +323,7 @@ jobs:
           QA_RELEASE: ${{ matrix.profile == 'release' }}
           QA_RDP_CONTRACTS: ${{ matrix.rdp_unit_contracts && inputs.run_rdp_unit_contracts }}
           QA_DUAL_CONTRACTS: ${{ contains(matrix.capabilities, 'dual-display') }}
+          QA_MOBILE_CONTRACTS: ${{ contains(matrix.capabilities, 'mobile') }}
         run: |
           mkdir -p qa-contract-output
           bash .agents/skills/qa-ui-auto/scripts/ci_rust_contracts.sh 2>&1 | tee qa-contract-output/contracts.log

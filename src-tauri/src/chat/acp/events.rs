@@ -9,7 +9,7 @@ use futures::StreamExt;
 use serde_json::json;
 use std::collections::HashMap;
 use tauri::AppHandle;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 
 #[derive(Default)]
 pub(super) struct AcpEventAccumulator {
@@ -27,6 +27,14 @@ pub(super) fn emit_acp_permission(
     source_label: &str,
     permission: AcpPermissionPrompt,
 ) {
+    let state = app.state::<crate::state::AppState>();
+    let key = format!("acp:{permission_owner_id}:{}", permission.call_id);
+    state.mobile.confirmations.lock().unwrap().insert(key.clone(), json!({"id":key,"thread_id":thread_id,"tool":"ACP permission","supported":false,"owner":permission_owner_id,"call":permission.call_id}));
+    state.mobile.task_status(
+        thread_id,
+        "awaiting_confirmation",
+        "desktop_confirmation_required",
+    );
     let options = permission
         .options
         .into_iter()
@@ -57,6 +65,15 @@ pub(super) fn dismiss_acp_permission(
     permission_owner_id: Option<&str>,
     call_id: Option<&str>,
 ) {
+    let state = app.state::<crate::state::AppState>();
+    state.mobile.confirmations.lock().unwrap().retain(|_, v| {
+        !(v["thread_id"] == thread_id
+            && permission_owner_id.is_none_or(|owner| v["owner"] == owner)
+            && call_id.is_none_or(|call| v["call"] == call))
+    });
+    state
+        .mobile
+        .task_status(thread_id, "running", "confirmation_resolved");
     let _ = app.emit(
         "agent-acp-permission-dismissed",
         json!({
@@ -169,7 +186,12 @@ impl AcpEventAccumulator {
 }
 
 pub(super) fn emit(app: &AppHandle, event_name: &str, event: StreamEventOut) {
-    let _ = app.emit(event_name, event);
+    let state = app.state::<crate::state::AppState>();
+    if let Some(thread) = event_name.strip_prefix("chat-stream:") {
+        crate::chat::emit_stream_event(Some(app), &state, thread, event_name, &event);
+    } else {
+        let _ = app.emit(event_name, event);
+    }
 }
 
 pub(super) fn emit_error(app: &AppHandle, event_name: &str, assistant_id: &str, message: String) {

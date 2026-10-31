@@ -28,6 +28,57 @@ pub async fn chat_stream(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    chat_stream_inner(req, Some(app), state.inner(), false).await
+}
+
+pub async fn chat_stream_inner(
+    req: ChatSendRequest,
+    app: Option<AppHandle>,
+    state: &AppState,
+    reserved: bool,
+) -> Result<(), String> {
+    let tid = req.thread_id.clone();
+    if !reserved {
+        let mut pending = state.mobile.pending_turns.lock().unwrap();
+        if pending.contains_key(&tid) {
+            return Err("turn_in_progress".into());
+        }
+        pending.insert(tid.clone(), tokio_util::sync::CancellationToken::new());
+    }
+    let cancel = state.mobile.turn_cancel(&tid);
+    state.mobile.task_status(&tid, "running", "turn_starting");
+    let result = stream_inner(req, app, state).await;
+    if cancel.is_cancelled() {
+        crate::chat::stop_thread_runtime_inner(&tid, None, state).await;
+    }
+    state.agent.chat_runs.lock().await.remove(&tid);
+    let failed = state
+        .mobile
+        .task_summaries
+        .lock()
+        .unwrap()
+        .get(&tid)
+        .is_some_and(|v| v["summary"] == "turn_failed");
+    state.mobile.task_status(
+        &tid,
+        "idle",
+        if cancel.is_cancelled() {
+            "stopped"
+        } else if result.is_ok() && !failed {
+            "turn_finished"
+        } else {
+            "turn_failed"
+        },
+    );
+    state.mobile.pending_turns.lock().unwrap().remove(&tid);
+    result
+}
+
+async fn stream_inner(
+    req: ChatSendRequest,
+    app: Option<AppHandle>,
+    state: &AppState,
+) -> Result<(), String> {
     {
         let ai_ctx = state.ai_ctx.read().await;
         if ai_ctx.config.fully_disabled {
@@ -36,8 +87,9 @@ pub async fn chat_stream(
     }
 
     let event_name = format!("chat-stream:{}", req.thread_id);
+    let event_thread_id = req.thread_id.clone();
     let emit = |evt: &StreamEventOut| {
-        let _ = app.emit(&event_name, evt.clone());
+        crate::chat::emit_stream_event(app.as_ref(), state, &event_thread_id, &event_name, evt);
     };
     let attachments = validate_chat_attachments(&req.attachments)?;
 
@@ -79,7 +131,7 @@ pub async fn chat_stream(
     });
 
     let agent_ctx = crate::agent::context::build_agent_thread_context(
-        state.inner(),
+        state,
         crate::agent::context::AgentThreadContextInput {
             thread_id: req.thread_id.clone(),
             linked_session_id: thread.linked_session_id.clone(),
@@ -93,11 +145,15 @@ pub async fn chat_stream(
         },
     )?;
 
+    if app.is_some() {
+        crate::mobile::file_view::remember_root(state, &agent_ctx);
+    }
+
     if crate::agent::acp_bridge::profile_id_from_provider_id(&thread.provider_id).is_some() {
         return acp::stream(
             &req,
-            &app,
-            state.inner(),
+            app.as_ref().ok_or("desktop_required")?,
+            state,
             &event_name,
             &thread,
             &history,

@@ -3382,3 +3382,6 @@ def _do_mail_server_assert_sync_transport(ctx: NativeStepContext, args: Any) -> 
         if not any(len(batch) > 200 for batch in batches):
             raise StepError("sync transport: no large explicit UID flag batch was exercised")
     return "one injected FLAGS disconnect recovered; large UID flag batches exercised; no oversized commands"
+
+from .mobile_native import register as register_mobile
+register_mobile(_verb, VERBS["terminal_input"])

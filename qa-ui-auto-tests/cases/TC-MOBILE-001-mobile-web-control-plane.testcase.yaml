@@ -1,0 +1,231 @@
+id: TC-MOBILE-001
+title: Mobile Web pairs switches instances and separates terminal and Agent input
+covers:
+- F-MOBILE-1
+tags:
+- p0
+- mobile
+- control-plane
+modes:
+- browser
+fixtures:
+- mobile_web
+timeout_sec: 180
+description: Production mobile bundle at phone dimensions with a deterministic HTTP/WS peer. Rust service security and real PTY effects
+  are covered separately by TC-MOBILE-002 and native mobile contracts.
+steps:
+- set_viewport:
+    width: 390
+    height: 844
+- open: ${fixture.mobile_endpoint}
+- wait_for: '[data-testid="mobile-empty-instances"]'
+- click: '[data-testid="mobile-add-instance"]'
+- fill:
+    selector: '[data-testid="mobile-endpoint"]'
+    value: ${fixture.mobile_endpoint}
+- fill:
+    selector: '[data-testid="mobile-label"]'
+    value: Home PC
+- fill:
+    selector: '[data-testid="mobile-pair-code"]'
+    value: qa-mobile-code
+- click: '[data-testid="mobile-pair-submit"]'
+- wait_for: '[data-testid="mobile-sessions"]'
+- assert_count:
+    selector: '[data-testid="mobile-session"]'
+    equal: 2
+- assert_text:
+    selector: '[data-testid="mobile-saved-session"]'
+    contains: Build host
+- click: '[data-testid="mobile-session"][data-session-kind="terminal"]'
+- assert_text:
+    selector: '[data-testid="mobile-terminal-status"]'
+    contains: 只读
+- assert_disabled: '[data-testid="mobile-resize"]'
+- click: '[data-testid="mobile-take-control"]'
+- assert_text:
+    selector: '[data-testid="mobile-terminal-status"]'
+    contains: 控制中
+- click: '[data-testid="mobile-resize"]'
+- click: '[data-testid="mobile-paste"]'
+- fill:
+    selector: '[data-testid="mobile-terminal-input"]'
+    value: QA_MOBILE_WEBSOCKET_INPUT
+- click: '[data-testid="mobile-terminal-send"]'
+- assert_file_contains:
+    path: ${fixture.mobile_receipt}
+    contains: PTY QA_MOBILE_WEBSOCKET_INPUT
+- click: '[data-testid="mobile-take-control"]'
+- assert_text:
+    selector: '[data-testid="mobile-terminal-status"]'
+    contains: 只读
+- assert_disabled: '[data-testid="mobile-resize"]'
+- screenshot: mobile-terminal-readonly.png
+- click: '[data-testid="mobile-sessions-back"]'
+- click: '[data-testid="mobile-session"][data-session-kind="agent"]'
+- fill:
+    selector: '[data-testid="mobile-agent-input"]'
+    value: QA_AGENT_PROMPT_CHANNEL
+- click: '[data-testid="mobile-agent-send"]'
+- assert_text:
+    selector: '[data-testid="mobile-task-status"]'
+    contains: 运行中
+- assert_file_contains:
+    path: ${fixture.mobile_receipt}
+    contains: AGENT QA_AGENT_PROMPT_CHANNEL
+- assert_disabled: '[data-testid="mobile-agent-send"]'
+- click: '[data-testid="mobile-task-stop"]'
+- assert_text:
+    selector: '[data-testid="mobile-task-status"]'
+    contains: 空闲
+- click: '[data-testid="mobile-file-open"]'
+- assert_text:
+    selector: '[data-testid="mobile-file-content"]'
+    contains: QA_MOBILE_CHANGED
+- click: '[data-testid="mobile-diff-open"]'
+- assert_text:
+    selector: '[data-testid="mobile-file-view"]'
+    contains: '@@ -1 +1 @@'
+- eval_readonly:
+    expression: document.documentElement.scrollWidth <= window.innerWidth
+    expect_truthy: true
+- screenshot: mobile-agent-files.png
+- click: '[data-testid="mobile-instances-back"]'
+- click: '[data-testid="mobile-add-instance"]'
+- fill:
+    selector: '[data-testid="mobile-endpoint"]'
+    value: ${fixture.mobile_endpoint2}
+- fill:
+    selector: '[data-testid="mobile-label"]'
+    value: Cloud
+- fill:
+    selector: '[data-testid="mobile-pair-code"]'
+    value: qa-mobile-code
+- click: '[data-testid="mobile-pair-submit"]'
+- wait_for: '[data-testid="mobile-sessions"]'
+- click: '[data-testid="mobile-instances-back"]'
+- assert_count:
+    selector: '[data-testid="mobile-instance-open"]'
+    equal: 2
+- reload_window: null
+- assert_count:
+    selector: '[data-testid="mobile-instance-open"]'
+    equal: 2
+- click: article:has(h3:text-is("Cloud")) [data-testid="mobile-instance-open"]
+- assert_count:
+    selector: '[data-testid="mobile-session"]'
+    equal: 2
+- click: '[data-testid="mobile-instances-back"]'
+- click: article:has(h3:text-is("Cloud")) [data-testid="mobile-instance-remove"]
+- assert_count:
+    selector: '[data-testid="mobile-instance-open"]'
+    equal: 1
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Phone layout pairs and persists two endpoints, controls a WS terminal and routes Agent prompts separately; file and
+      diff remain read-only.
+    actions:
+    - 2
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 12
+    - 15
+    - 17
+    - 18
+    - 19
+    - 20
+    - 22
+    - 26
+    - 27
+    - 28
+    - 29
+    - 33
+    - 35
+    - 37
+    - 41
+    - 42
+    - 43
+    - 44
+    - 45
+    - 46
+    - 48
+    - 50
+    - 52
+    - 54
+    - 55
+    checkpoints:
+    - step: 10
+      expectation: '[data-testid="mobile-session"] has 2 entries.'
+    - step: 11
+      expectation: '[data-testid="mobile-saved-session"] shows Build host.'
+    - step: 13
+      expectation: '[data-testid="mobile-terminal-status"] shows 只读.'
+    - step: 14
+      expectation: '[data-testid="mobile-resize"] is disabled.'
+    - step: 16
+      expectation: '[data-testid="mobile-terminal-status"] shows 控制中.'
+    - step: 21
+      expectation: Independent receipt contains PTY QA_MOBILE_WEBSOCKET_INPUT.
+    - step: 23
+      expectation: '[data-testid="mobile-terminal-status"] shows 只读.'
+    - step: 24
+      expectation: '[data-testid="mobile-resize"] is disabled.'
+    - step: 30
+      expectation: '[data-testid="mobile-task-status"] shows 运行中.'
+    - step: 31
+      expectation: Independent receipt contains AGENT QA_AGENT_PROMPT_CHANNEL.
+    - step: 32
+      expectation: '[data-testid="mobile-agent-send"] is disabled.'
+    - step: 34
+      expectation: '[data-testid="mobile-task-status"] shows 空闲.'
+    - step: 36
+      expectation: '[data-testid="mobile-file-content"] shows QA_MOBILE_CHANGED.'
+    - step: 38
+      expectation: '[data-testid="mobile-file-view"] shows @@ -1 +1 @@.'
+    - step: 39
+      expectation: Phone document does not overflow horizontally.
+    - step: 49
+      expectation: '[data-testid="mobile-instance-open"] has 2 entries.'
+    - step: 51
+      expectation: '[data-testid="mobile-instance-open"] has 2 entries.'
+    - step: 53
+      expectation: '[data-testid="mobile-session"] has 2 entries.'
+    - step: 56
+      expectation: '[data-testid="mobile-instance-open"] has 1 entries.'
+    - step: 57
+      expectation: No runtime errors occurred.
+    results:
+    - 10
+    - 11
+    - 13
+    - 14
+    - 16
+    - 21
+    - 23
+    - 24
+    - 30
+    - 31
+    - 32
+    - 34
+    - 36
+    - 38
+    - 39
+    - 49
+    - 51
+    - 53
+    - 56
+    - 57
+  visual:
+  - check: Phone viewport has no horizontal page overflow.
+    method: automated
+    reason: DOM geometry assertion plus diagnostic screenshots.
+  native:
+  - check: Native networking is outside this renderer case.
+    method: not-applicable
+    reason: TC-MOBILE-002/003 and Rust mobile contracts own the native boundary.

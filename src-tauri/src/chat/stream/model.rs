@@ -7,8 +7,8 @@ use tauri::State;
 
 pub(super) struct StreamTurn<'a> {
     pub(super) req: ChatSendRequest,
-    pub(super) app: AppHandle,
-    pub(super) state: State<'a, AppState>,
+    pub(super) app: Option<AppHandle>,
+    pub(super) state: &'a AppState,
     pub(super) event_name: String,
     pub(super) thread: store::ChatThread,
     pub(super) history: Vec<store::ChatMessage>,

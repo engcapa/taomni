@@ -71,6 +71,7 @@ pub use output::{
 
 pub(crate) use output::revoke_window_outputs;
 
+pub use output::TerminalOutputHub;
 use output::{TerminalOutputSubscribers, add_terminal_output_channel, send_terminal_output};
 
 pub(crate) use output::{
@@ -142,4 +143,8 @@ pub use connection_probe::{test_proxy_connection, test_ssh_connection};
 pub(crate) use connection_probe::{
     __cmd__test_proxy_connection, __cmd__test_ssh_connection,
     __tauri_command_name_test_proxy_connection, __tauri_command_name_test_ssh_connection,
+};
+
+pub(crate) use io_commands::{
+    resize_terminal_inner, send_terminal_signal_inner, write_terminal_inner,
 };
