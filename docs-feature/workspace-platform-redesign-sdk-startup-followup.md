@@ -4,7 +4,19 @@
 
 **2026-10-31：按用户最新要求调整 C6-06 真实 Java 工程来源。** 不再限定原始 clickhousecrud；GitHub runner 按固定提交与 SHA256 下载公开 Apache Commons Lang 3.17.0，编译后设置 `QA_JAVA_PROJECT_ROOT`，三平台 native 纳入实际选集。本地未指定路径则显式 skip，指定无效路径或 CI 未准备路径则失败。原有三项外部缺口属于历史证据，不改写为通过；新用例本机 Linux native 及 GitHub 三平台均已通过，见下节。性能仍暂缓，不恢复 main 对比。
 
-## C6-06 三平台公开项目验收（2026-10-31）
+## 定义跳转外层标签修复（2026-10-31）
+
+用户在 Linux Java 源文件点击引用类时，目标内容已切换但外层标签没有同步，或标签名称包含 URI 查询串。共享宿主只发布 root 文件，遗漏 library/loose 文档，且丢失编辑器可读标题；修复 `98187117` 统一保留完整文件引用和标题。根目录外普通文件保持可恢复、可编辑，provider 源码只读且不持久化 URI。详细复现、边界与证据见 [定义跳转标签修复记录](../docs-issue/workspace-definition-navigation-tabs.md)。
+
+旧 C6-06 主要断言内容与历史，保留通用 CODE 标签时不能发现此问题。增强后的用例关闭通用标签，实际 Mod+click，并验证源/Pair.java/Map.java 标签、选中状态、重复跳转去重及关闭重开，保留原有历史光标和文件字节哈希检查。Java/C# 虚拟源码和 TypeScript 根目录外文件的 mounted 回归覆盖共享同步逻辑；本机完整受影响组合 **19 files /378 passed /0 failed**。Linux 匹配 QA release 的真实 Java C6-06 已通过，98 步及 12 个附件核验完成。
+
+最终测试就绪提交为 `64fc13951ee380ab7a809c8ad196085b72e3ab6e`，精确 head 的三平台 workflow [41171099386](https://github.com/engcapa/taomni/actions/runs/41171099386) 已 **success**。13 个 ID、6 份报告共 **57 passed /0 failed /0 skipped**；Linux、Windows、macOS 均 browser **8/8**、native **11/11**，包含两项 Java 定义用例及完整适用 crash-regression。三平台实际下载、校验并编译固定 Commons Lang 工程；增强后的 C6-06 各 98 步通过，三平台最终标签截图已逐一检查。
+
+本轮 source 为 `219ae61571a8b54b0f5d8c16fea3e04af3c123194961a72b7071c99f07d5fbf6`，runner 为 `95ca5805bb1bcb492837d23cda668b6216ce7cb0910991dddea0a74b3617e3ee`，C6-06 为 `089999b3df493d7cf883e85c72c9468fedd6552977a200ba834c554ea830c011`。6 份回执及 **1,087 个附件**的签名、字节数、SHA256 全部核验；selection 与 57 次执行逐项一致，缺口为零，CI 汇总及维护中的 aggregate 独立复核均为 passed/report_ok。三平台匹配 QA release 构建及 Windows capture helper 合同通过；Rust 合同沿用未变更部分的全量记录，selected 策略跳过的 job 不计为本轮执行通过。
+
+证据在 `qa-ui-auto-report/_local/workspace-41171099386/`，链接至 `/tmp/taomni-definition-tabs-hosted/`；精确构建身份、原始报告、附件及复核结果见修复记录。`pnpm check:refactor`、catalog/dev contract 通过。此次归档只改文档，不改变产品/case/runner 指纹。下节旧公开项目结果保留为历史，不替代修复后的本轮证据。性能继续 TODO，不恢复 main 对比。
+
+## C6-06 三平台公开项目验收历史（2026-10-31）
 
 实现提交 [`592bb79111ddeb2293177c454ae4aba6cf9a0e0a`](https://github.com/engcapa/taomni/commit/592bb79111ddeb2293177c454ae4aba6cf9a0e0a) 已推送至当前分支。指定 workflow [41147517507](https://github.com/engcapa/taomni/actions/runs/41147517507) **success**，13 个 ID、6 份执行报告、**57 passed /0 failed /0 skipped**：C6-05/C6-06 在三平台的6次原生执行全部通过，完整适用 crash-regression 共51次通过。精确 selection 与57次执行逐项一致，能力缺口为零。
 
