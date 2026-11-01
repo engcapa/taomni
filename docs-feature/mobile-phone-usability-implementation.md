@@ -69,7 +69,7 @@
 
 ## 当前验证记录
 
-下列是本轮实际结果，旧运行不冒充本轮证据；本地 Linux 验证完成，GitHub 结果待补。产品提交 `341a4885`，飞书增量提交 `50b94ae5`；远程 main 已于 `de186f95` 合并（包含 `6ddd5beb`），冲突处保留了双方 QA case 注册。
+下列是本轮实际结果，旧运行不冒充本轮证据；本地 Linux 与 GitHub 三平台所选用例均已验证完成。产品提交 `341a4885`，飞书增量提交 `50b94ae5`；远程 main 已于 `de186f95` 合并（包含 `6ddd5beb`），冲突处保留了双方 QA case 注册。
 
 | 层 | 命令 / 用例 | 当前结果 |
 | --- | --- | --- |
@@ -87,6 +87,24 @@
 | QA release build | `native_build.py --release` | 最终构建通过，独立 ID `com.taomni.app.qa` / release，源码 SHA `cd8f8cbf93c690959dadbbc247a1e5f422199e7c2f3a1efc7ff338c28b82597e`，binary SHA `2b27a241ec57233338788530a5e036be9a425359a53b3e66d26f7f923dbc98ed`；日志 `qa-ui-auto-report/mobile-final/mobile-native-build.log` |
 | native mobile | TC-MOBILE-002/003/004/005 | 4 passed，0 failed/skipped，source stable=true，54.1s；`qa-ui-auto-report/mobile-final/native-mobile/run-20261101-225134-727421420`；实际 PTY、吊销/headless、默认关闭→开关启用→local/saved 创建、跨设备 poll 拒绝、可读标题和独立磁盘 marker 通过 |
 | native crash | 完整 crash-regression 9 例 | 9 passed，0 failed/skipped，source stable=true，298.84s；`qa-ui-auto-report/mobile-final/native-crash/run-20261101-225252-957141462`；038/039/045/051/052/053/054/056/057 全通过，含真实 pane/dirty/PT​Y/save/hash/cold-restart 断言 |
-| GitHub | `qa-ui-auto-platforms` selected mobile + crash | 未执行，按要求先完成本地验证 |
+| GitHub | `qa-ui-auto-platforms` selected mobile + crash | [41318993783](https://github.com/engcapa/taomni/actions/runs/41318993783) / attempt 1 / `c98a9edfedefc7eee8f441a7f1419310eca8b47b`：**63/63 passed，0 failed/skipped，0 infrastructure errors**；三平台 QA release 与完整 crash-regression，已下载原始报告并独立汇总核验 |
+
+### GitHub 最终证据（2026-11-02 核对）
+
+| 平台 | browser | native |
+| --- | --- | --- |
+| Linux | 10/10 | 13/13 |
+| Windows | 10/10 | 10/10 |
+| macOS | 10/10 | 10/10 |
+
+下载全部 15 份原始执行报告、selection、build identity、Rust/Vitest 日志后，通过 `ci_collect.py` + `qa_ui_auto.ci report` 独立汇总：`passed=true`、`report_ok=true`，failures/gaps/unreviewed/infrastructure_errors 全为空，与 hosted 汇总逐组合一致。所有报告 `dry_run=false`、`identity_stable=true`、exit 0，15 份原始 runner receipt 齐全；源码及 runner 指纹与本地通过版本一致，各平台四个 native shard 共用各自同一 QA release 二进制 SHA。workflow 的辅助 tool-contracts/development-case-contract/publish-issues job 按条件未选择，不是用例跳过。
+
+原始 artifact 保存在 `qa-ui-auto-report/mobile-final/github-41318993783-artifacts/`，无重写收集在 `github-41318993783-collected/`，独立日志在 `github-41318993783-independent-report.log`。hosted 原生契约 **83 passed**（包含 mobile **60**），Vitest **81 passed**；原始 `contracts.log` 在 artifacts 的 `contracts-native-build-linux-x64-release-*` 目录。TC-MOBILE-005 hosted 独立 receipt 再次确认 local/saved 请求 pending→opened、其他设备 404、两个独立 PTY marker 与各自 nonce 精确相同，WS 与 desktop 独立输出行均存在。
+
+Linux 的 native 多出 TC-MOBILE-002/003/005 专项：服务/headless 与手机委托创建只在 Linux 实际专项验证；Windows/macOS native 的 10 项是飞书设置及完整 crash-regression，不能据此声称这三个移动服务专项也在 Windows/macOS 执行。
+
+本地 `qa_ui_auto status --gate` 对 mobile + 全部 crash 的精确 16 个不同 case / Linux 视图返回 `ok=true`、`gaps=[]`（browser/native 合计 23 次实际执行），报告 `qa-ui-auto-report/mobile-final/current-linux-completion.json`。
+
+保留的非通过记录：首个 cold native build 编译完成但源码期间变化被 identity 拒绝，不用于验收；触摸/最新/隐藏 textarea 缺陷的失败 browser 原件保留；GitHub `41318886667` 因 dispatch `head` 传短 SHA 在 checkout 前失败，未执行用例，已用完整 SHA 重发，不算成功或跳过测试。
 
 未验证：真 iOS/Android 软键盘、IME/触摸硬件，真实飞书客户端卡片渲染和回调投递，公网 HTTPS/私网权限、真实 SSH 认证交互。Chromium 手机视口及标准 Touch DOM oracle 不等于这些真机能力已验收。
