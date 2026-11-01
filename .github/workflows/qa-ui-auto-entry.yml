@@ -47,10 +47,16 @@ jobs:
           mode: ${{ matrix.mode }}
       - name: Chromium for mobile against the real native service
         if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'mobile')
+        timeout-minutes: 15
         shell: bash
         env:
+          QA_LINUX_PROFILE: ${{ matrix.linux_profile }}
           PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/qa-mobile-browsers
         run: |
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            source .agents/skills/qa-ui-auto/scripts/ci_linux_apt.sh
+            prepare_apt_mirrors "${QA_LINUX_PROFILE:-ubuntu-24.04-xvfb}"
+          fi
           python -m playwright install --with-deps chromium
           echo "PLAYWRIGHT_BROWSERS_PATH=$PLAYWRIGHT_BROWSERS_PATH" >> "$GITHUB_ENV"
 

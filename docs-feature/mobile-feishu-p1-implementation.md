@@ -77,7 +77,8 @@ Headless 可加 `--feishu`；从当前数据目录读取同一配置。可通过
 - `mobile::im_adapter` Rust fixture：真实 loopback HTTP 与 protobuf WebSocket，token/消息、心跳、断线重连、重复事件、越权、确认卡片映射到真实 oneshot、发送重试 UUID、真实 Agent 后续轮次及停止、不允许 PTY、文件快照/截断/链接、配置与持久去重。
 - GitHub 首轮 `41258283715`：触发参数误用了短 SHA，checkout 失败，未执行用例；改为完整 SHA。
 - GitHub `41258424343`：初轮 browser 三平台各 10/10，Linux Rust 契约 41/41；Linux native TC-MOBILE-004 保存凭据返回 `VAULT_LOCKED`。原来的 `vault_first_run` 在主界面可见时直接返回，不能证明按需凭据库已经初始化；浏览器 stub 又缺少此状态检查。已复用现有 vault gate，新增解锁续存/取消保留回归，YAML 改为实际初始化弹窗，stub 同样拒绝锁定状态。本轮不能计为通过（即使个别 shard job 为绿色）。
-- 修复后的三平台 browser/native 与完整 `crash-regression` 正待重新执行；最终记录核对 selection、raw summary、receipt 和 aggregate。
+- 凭据库修复 `10e73c6d` 的三平台 browser/native 与完整 `crash-regression` 在 `41260611701` 执行中；最终记录核对 selection、raw summary、receipt 和 aggregate。
+- 旧轮次 Linux Chromium 安装在 `apt-get update` 的 Azure HTTP 镜像索引停留超过 20 分钟。`ci_linux_setup.sh` 原有 HTTPS 镜像准备发生在 Chromium 步骤之后；已让 Chromium 安装先调用同一 `prepare_apt_mirrors`，并加 15 分钟步骤上限。镜像 helper 的 5 项 shell 行为测试通过，YAML 解析和 refactor 检查通过。未修改用例断言或减少选择范围。
 - V-08 真实飞书账号、应用发布、实际通知与卡片到达、只允许出站的网络环境：未验证。开发期间未向真实飞书发送消息，也未搜索/使用个人凭据。AC-17 当前为部分实现，不能标记全部验收完成。
 - P0 真机、相机/PWA 安装、公共 TLS/PNA 的既有验证缺口不因本次测试自动补齐。
 
