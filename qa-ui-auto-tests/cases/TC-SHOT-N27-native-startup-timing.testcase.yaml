@@ -1,0 +1,26 @@
+id: TC-SHOT-N27
+title: Native screenshot overlay startup timing is measured in backend segments and to the select phase
+description: "P0-0 measurement case for the screenshot startup delay. The overlay is opened three times through the production entry (first cold, then two warm opens) and the scenario reports the P0-0 backend segments (permission, display, hide, capture, save_png, window_built, cover, show, focus) plus the time to the overlay window, to the base image element and to the select phase for each run. This case is measurement, not an absolute budget gate, so it fails only when a run never reaches select or when the backend segment snapshot is incomplete. It runs on Linux, Windows and macOS; on Linux it runs on Xvfb, X11 and Wayland profiles so the platform segments are comparable."
+covers: [F27.1]
+tags: [screenshot, native, timing, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario: {scenario: startup-timing}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: startup-timing
+    requirement: Three overlay opens each reach the select phase, and each run reports a complete P0-0 backend segment list in order together with window, base-image and select times, so the startup delay can be attributed to permission, display lookup, hiding, capture, PNG encoding, window creation, cover, show or focus instead of guessed from a single total.
+    actions: [1, 2]
+    checkpoints:
+    - {step: 3, expectation: "Evidence contains three runs (run 0 cold, runs 1-2 warm), each with selectMs, windowMs, imageMs, backendComplete true and backendStages exactly start, permission, display, hide, capture, save_png, window_built, cover, show, focus, plus per-stage deltas; medianSelectMs is present. No absolute millisecond threshold is asserted."}
+    results: [3]
+  visual:
+  - {check: Overlay timing evidence, method: automated, reason: "The claimed evidence is numeric timing from the backend snapshot and DOM phase polling, not pixel comparison; the overlay reaching select phase is the visual readiness signal."}
+  native:
+  - {check: Production overlay open through the QA scenario, method: automated, reason: "The scenario calls the production open_overlay entry (not a stub capture) in the isolated debug QA app, reads the real WebviewWindow and overlay DOM, and reports the backend timing snapshot recorded inside open_overlay_inner."}

@@ -10,6 +10,8 @@ use super::runtime::SESSION_GENERATION;
 use super::runtime::STARTING_RECORDING;
 use super::runtime::blocking;
 use super::runtime::internal_error;
+use super::runtime::startup_timing_mark;
+use super::runtime::startup_timing_reset;
 use super::runtime::tool_state;
 use super::session;
 use super::surfaces;
@@ -113,10 +115,14 @@ pub(super) async fn open_overlay_inner(
         // as a crop of the first output (or rejected only on another output).
         return Err("Wayland does not expose the current window's screen coordinates. Use Screen region and select the window on the desired display.".into());
     }
+    // P0-0 startup timing: reset first, then mark each stage. Marks are
+    // recording only and never change the capture/hide/window behaviour.
+    startup_timing_reset();
     let generation = SESSION_GENERATION.load(Ordering::SeqCst);
     capture::request_capture_permission(app)
         .await
         .map_err(internal_error)?;
+    startup_timing_mark("permission");
     if SESSION_GENERATION.load(Ordering::SeqCst) != generation {
         return Err("screenshot opening was cancelled".into());
     }
@@ -128,6 +134,7 @@ pub(super) async fn open_overlay_inner(
         })
         .await?
     };
+    startup_timing_mark("display");
     let window_region = if let Some(window) = &current_window {
         let pos = window.outer_position().map_err(|e| e.to_string())?;
         let size = window.outer_size().map_err(|e| e.to_string())?;
@@ -156,15 +163,18 @@ pub(super) async fn open_overlay_inner(
         // Let the invoking options menu disappear before freezing the window.
         tokio::time::sleep(HIDE_SETTLE).await;
     }
-    let (path, width, height) = {
+    startup_timing_mark("hide");
+    // Capture and PNG encoding are split into two blocking steps so the
+    // timing snapshot can separate them; the order and thread are unchanged.
+    let image = {
         let app = app.clone();
         let display = display.clone();
-        blocking("capture", move || {
-            let image = capture::capture_display(&app, &display)?;
-            capture::save_png(&image, "shot")
-        })
-        .await?
+        blocking("capture", move || capture::capture_display(&app, &display)).await?
     };
+    startup_timing_mark("capture");
+    let (path, width, height) =
+        { blocking("save_png", move || capture::save_png(&image, "shot")).await? };
+    startup_timing_mark("save_png");
     if SESSION_GENERATION.load(Ordering::SeqCst) != generation {
         std::fs::remove_file(path).ok();
         return Err("screenshot opening was cancelled".into());
@@ -191,12 +201,16 @@ pub(super) async fn open_overlay_inner(
         .skip_taskbar(true)
         .build()
         .map_err(|e| format!("open overlay window: {e}"))?;
+    startup_timing_mark("window_built");
     watch_session_window(&window);
     cover_display(&window, &display).await?;
+    startup_timing_mark("cover");
     window
         .show()
         .map_err(|e| format!("show overlay window: {e}"))?;
+    startup_timing_mark("show");
     focus_capture_window(&window).await;
+    startup_timing_mark("focus");
     Ok(())
 }
 

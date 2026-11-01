@@ -26,6 +26,8 @@ mod input_scenarios;
 pub use input_scenarios::*;
 mod platform_evidence;
 pub use platform_evidence::*;
+mod startup_timing;
+pub use startup_timing::*;
 #[cfg(test)]
 mod tests;
 
