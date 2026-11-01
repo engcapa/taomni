@@ -57,11 +57,7 @@ mod wsl;
 
 pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
     match invoke.message.command() {
-        "mobile_status"
-        | "mobile_start"
-        | "mobile_stop"
-        | "mobile_pairing_code"
-        | "mobile_revoke" => mobile::handle(invoke),
+        command if mobile::handles(command) => mobile::handle(invoke),
         "recovery_get" | "recovery_update" | "recovery_ready" => webview_recovery::handle(invoke),
         "detach_terminal_output"
         | "list_local_shells"

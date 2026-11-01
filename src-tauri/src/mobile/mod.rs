@@ -1,5 +1,7 @@
 //! Opt-in, instance-owned mobile control plane. No listener exists by default.
 mod agent_view;
+pub mod im_adapter;
+pub use im_adapter::*;
 pub mod auth;
 pub mod events;
 pub(crate) mod file_view;
@@ -60,6 +62,7 @@ impl Core {
 }
 
 pub struct MobileRuntime {
+    pub im: Arc<im_adapter::Runtime>,
     pub auth: Mutex<auth::Auth>,
     pub events: Arc<events::Events>,
     pub broker: Arc<pty_broker::Broker>,
@@ -82,6 +85,7 @@ impl Default for MobileRuntime {
     fn default() -> Self {
         let events = Arc::new(events::Events::default());
         Self {
+            im: Arc::new(im_adapter::Runtime::default()),
             auth: Mutex::new(auth::Auth::default()),
             broker: Arc::new(pty_broker::Broker::new(events.clone())),
             events,
@@ -189,7 +193,9 @@ impl MobileRuntime {
         Ok(address)
     }
     pub async fn stop(&self) {
-        if let Some(running) = self.lifecycle.lock().await.take() {
+        let mut lifecycle = self.lifecycle.lock().await;
+        self.im.stop().await;
+        if let Some(running) = lifecycle.take() {
             running.cancel.cancel();
             let _ = running.task.await;
         }

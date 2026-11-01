@@ -105,7 +105,7 @@ async fn serve() -> Result<(), String> {
     let state = Arc::new(initialize(&data)?);
     let address = state
         .mobile
-        .start(Core::Headless(state.clone()), data, lan, port)
+        .start(Core::Headless(state.clone()), data.clone(), lan, port)
         .await?;
     // Explicit operator-facing stdout, never tracing/log files. Codes rotate on
     // expiry and can be requested with SIGHUP on Unix without restarting work.
@@ -114,6 +114,21 @@ async fn serve() -> Result<(), String> {
         "Pairing code (5 minutes): {}",
         state.mobile.auth.lock().unwrap().pairing_code()
     );
+    if std::env::args().any(|a| a == "--feishu") {
+        let config = super::im_adapter::Config::load(&data)?;
+        let secret = match std::env::var("TAOMNI_FEISHU_APP_SECRET") {
+            Ok(value) if !value.is_empty() => zeroize::Zeroizing::new(value),
+            _ => state
+                .vault
+                .resolve(&config.secret_ref)?
+                .ok_or("Configure Feishu credentials or TAOMNI_FEISHU_APP_SECRET")?,
+        };
+        state
+            .mobile
+            .im
+            .start(Core::Headless(state.clone()), config, secret)
+            .await?;
+    }
     #[cfg(unix)]
     {
         let mut term = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())

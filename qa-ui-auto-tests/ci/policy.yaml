@@ -19,6 +19,7 @@ cases:
 - TC-MOBILE-001
 - TC-MOBILE-002
 - TC-MOBILE-003
+- TC-MOBILE-004
 - TC-WS-081
 - TC-WS-082
 - TC-IDE-C8-08-code-style-dialog-lifecycle-browser

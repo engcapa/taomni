@@ -1,0 +1,114 @@
+id: TC-MOBILE-004
+title: Feishu adapter persists credentials identity bindings and isolated proxy without connecting
+covers:
+- F-MOBILE-2
+tags:
+- p1
+- mobile
+- feishu
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 120
+description: Settings entry and persistence workflow. Native verifies real vault/config IPC; browser uses a renderer stub. No real Feishu connection or message is made. Native Rust loopback fixtures own long-connection transport and Agent effects.
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-feishu-settings-password
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: feishu
+- wait_for: '[data-testid="feishu-settings"]'
+- assert_disabled: '[data-testid="feishu-toggle"]'
+- fill:
+    selector: '[data-testid="feishu-app-id"]'
+    value: cli_qa_settings
+- fill:
+    selector: '[data-testid="feishu-app-secret"]'
+    value: qa-disposable-not-real-secret
+- fill:
+    selector: '[data-testid="feishu-bindings"]'
+    value: invalid_identity
+- click: '[data-testid="feishu-save"]'
+- assert_text:
+    selector: '[data-testid="feishu-error"]'
+    contains: invalid_identity_binding
+- fill:
+    selector: '[data-testid="feishu-bindings"]'
+    value: ou_qa_user oc_qa_chat
+- fill:
+    selector: '[data-testid="feishu-mobile-endpoint"]'
+    value: https://mobile.example.invalid
+- select_option:
+    selector: '[data-testid="feishu-proxy-mode"]'
+    value: custom
+- wait_for: '[data-testid="feishu-custom-proxy"]'
+- select_option:
+    selector: '[data-testid="feishu-proxy-mode"]'
+    value: none
+- click: '[data-testid="feishu-save"]'
+- wait_for: '[data-testid="feishu-saved"]'
+- assert_items:
+    selector: '[data-testid="feishu-app-secret"]'
+    attribute: value
+    equals: ['']
+- assert_disabled: '[data-testid="feishu-toggle"]'
+- click: '[data-testid="tab-item"][data-tab-type="settings"] [data-testid="tab-close"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: feishu
+- assert_items:
+    selector: '[data-testid="feishu-app-id"]'
+    attribute: value
+    equals: [cli_qa_settings]
+- assert_text_equals:
+    selector: '[data-testid="feishu-bindings"]'
+    equals: ou_qa_user oc_qa_chat
+- assert_items:
+    selector: '[data-testid="feishu-proxy-mode"] option:checked'
+    attribute: value
+    equals: [none]
+- assert_text:
+    selector: '[data-testid="feishu-status"]'
+    contains: 已停止
+- assert_no_runtime_errors: null
+- screenshot: feishu-settings-saved-without-connection.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Global settings finds Feishu; invalid bindings fail; saved app identity/proxy survive reopening while the secret stays hidden and outbound connection remains disabled with mobile off.
+    actions: [3, 4, 7, 8, 9, 10, 12, 13, 14, 16, 17, 21, 22, 23]
+    checkpoints:
+    - step: 6
+      expectation: Adapter cannot start before the mobile service.
+    - step: 11
+      expectation: Malformed identity is rejected before persistence.
+    - step: 15
+      expectation: Feature uses shared Settings proxy configuration controls.
+    - step: 19
+      expectation: App Secret field is empty after saving.
+    - step: 20
+      expectation: No outbound connection starts from saving credentials.
+    - step: 24
+      expectation: App ID persists across reopening Settings.
+    - step: 25
+      expectation: Bound user and chat persist across reopening Settings.
+    - step: 26
+      expectation: No-proxy selection persists independently.
+    - step: 27
+      expectation: Adapter remains stopped.
+    - step: 28
+      expectation: No runtime errors.
+    results: [6, 11, 15, 19, 20, 24, 25, 26, 27, 28]
+  visual:
+  - check: Settings screenshot is diagnostic.
+    method: not-applicable
+    reason: Field and state assertions own acceptance.
+  native:
+  - check: Actual credential/config persistence requires native IPC.
+    method: automated
+    reason: Native mode writes the isolated QA vault and app-data config; the protocol fixture separately checks actual HTTP/WS behavior.

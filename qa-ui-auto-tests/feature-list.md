@@ -13437,3 +13437,65 @@ controls:
 - 独立 PWA 支持多个 endpoint、终端共享与单写权、Agent 后续指令及只读文件/diff。
 - Linux headless 不创建 Tauri/GTK 窗口；桌面工具运行时不可用的路径显式报错。
 - 当前执行证据与限制见 `docs-feature/mobile-remote-p0-implementation.md`，未验证的平台与真手机能力不作完成声明。
+
+### P1 飞书 Agent 适配器 🟡
+
+<!-- feature
+id: F-MOBILE-2
+status: partial
+area: mobile/feishu
+components: [FeishuAdapterSettings, FeishuAdapterRuntime]
+files:
+  - src/components/settings/FeishuAdapterSettings.tsx
+  - src-tauri/src/mobile/im_adapter/mod.rs
+  - src-tauri/src/mobile/im_adapter/actions.rs
+  - src-tauri/src/mobile/im_adapter/config.rs
+  - src-tauri/src/mobile/im_adapter/network.rs
+  - src-tauri/src/mobile/im_adapter/protocol.rs
+  - src-tauri/src/mobile/im_adapter/settings.rs
+  - src-tauri/src/mobile/im_adapter/worker.rs
+controls:
+  - id: feishu-settings
+    selector: '[data-testid="feishu-settings"]'
+    kind: display
+  - id: feishu-loading
+    selector: '[data-testid="feishu-loading"]'
+    kind: display
+  - id: feishu-app-id
+    selector: '[data-testid="feishu-app-id"]'
+    kind: interactive
+  - id: feishu-app-secret
+    selector: '[data-testid="feishu-app-secret"]'
+    kind: interactive
+  - id: feishu-mobile-endpoint
+    selector: '[data-testid="feishu-mobile-endpoint"]'
+    kind: interactive
+  - id: feishu-bindings
+    selector: '[data-testid="feishu-bindings"]'
+    kind: interactive
+  - id: feishu-proxy-mode
+    selector: '[data-testid="feishu-proxy-mode"]'
+    kind: interactive
+  - id: feishu-custom-proxy
+    selector: '[data-testid="feishu-custom-proxy"]'
+    kind: display
+  - id: feishu-save
+    selector: '[data-testid="feishu-save"]'
+    kind: interactive
+  - id: feishu-toggle
+    selector: '[data-testid="feishu-toggle"]'
+    kind: interactive
+  - id: feishu-saved
+    selector: '[data-testid="feishu-saved"]'
+    kind: display
+  - id: feishu-status
+    selector: '[data-testid="feishu-status"]'
+    kind: display
+  - id: feishu-error
+    selector: '[data-testid="feishu-error"]'
+    kind: display
+-->
+
+企业自建应用出站长连接、白名单、通知、确认卡片与 Agent 指令/文件快照。
+TC-MOBILE-004 覆盖设置与真实 native 配置 IPC；Rust loopback fixture 覆盖 HTTP/WS 与 Agent 副作用。
+真实飞书应用端到端仍待配置后验证，详见 `docs-feature/mobile-feishu-p1-implementation.md`。

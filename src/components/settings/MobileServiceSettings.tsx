@@ -1,3 +1,4 @@
+import { FeishuAdapterSettings } from "./FeishuAdapterSettings";
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { qrSvgModel, type QrSvgModel } from "../../lib/mfa/qrSvg";
@@ -66,6 +67,7 @@ export function MobileServiceSettings() {
       })}>吊销设备</button></div>)}
       {!status.devices.length && <p className="text-[var(--taomni-text-muted)] mt-2">暂无已配对设备</p>}
     </div>
+    <FeishuAdapterSettings mobileEnabled={status.enabled} />
     {error && <p role="alert" data-testid="mobile-settings-error" className="mt-2 text-red-400">{error}</p>}
   </section>;
 }

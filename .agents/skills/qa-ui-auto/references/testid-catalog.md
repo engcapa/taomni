@@ -2000,6 +2000,22 @@
 - `[data-testid="mobile-settings-refresh"]` — interactive — F-MOBILE-1.mobile-settings-refresh
 - `[data-testid="mobile-settings-revoke"]` — interactive — F-MOBILE-1.mobile-settings-revoke
 
+## mobile/feishu (F-MOBILE-2)
+
+- `[data-testid="feishu-settings"]` — display — F-MOBILE-2.feishu-settings
+- `[data-testid="feishu-loading"]` — display — F-MOBILE-2.feishu-loading
+- `[data-testid="feishu-app-id"]` — interactive — F-MOBILE-2.feishu-app-id
+- `[data-testid="feishu-app-secret"]` — interactive — F-MOBILE-2.feishu-app-secret
+- `[data-testid="feishu-mobile-endpoint"]` — interactive — F-MOBILE-2.feishu-mobile-endpoint
+- `[data-testid="feishu-bindings"]` — interactive — F-MOBILE-2.feishu-bindings
+- `[data-testid="feishu-proxy-mode"]` — interactive — F-MOBILE-2.feishu-proxy-mode
+- `[data-testid="feishu-custom-proxy"]` — display — F-MOBILE-2.feishu-custom-proxy
+- `[data-testid="feishu-save"]` — interactive — F-MOBILE-2.feishu-save
+- `[data-testid="feishu-toggle"]` — interactive — F-MOBILE-2.feishu-toggle
+- `[data-testid="feishu-saved"]` — display — F-MOBILE-2.feishu-saved
+- `[data-testid="feishu-status"]` — display — F-MOBILE-2.feishu-status
+- `[data-testid="feishu-error"]` — display — F-MOBILE-2.feishu-error
+
 ## network/sockscap (F-Sockscap-1)
 
 - `[data-testid="side-tab-tools"]` — interactive — F-Sockscap-1.tools-side-tab
