@@ -399,6 +399,7 @@ area: main/welcome
 components: [WelcomePanel]
 files:
   - src/components/WelcomePanel.tsx
+  - src/components/welcome/LaunchCards.tsx
 controls:
   - id: panel-root
     selector: '[data-testid="welcome-panel"]'

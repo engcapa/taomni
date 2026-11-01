@@ -23,6 +23,12 @@ html[data-app-theme="dark"] .taomni-main-window {
 .taomni-platform-workbench {
   padding: 4px 6px 4px 0;
 }
+/* macOS overlay controls occupy the window's top 28px. Keeping this outside
+   the workbench prevents overlap and sidebar-dependent toolbar insets. */
+.taomni-native-titlebar {
+  height: 28px;
+  flex-shrink: 0;
+}
 .taomni-navigator-frame,
 .taomni-main-canvas-frame,
 .taomni-right-context-frame {

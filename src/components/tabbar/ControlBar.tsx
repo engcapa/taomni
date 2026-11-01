@@ -53,10 +53,6 @@ import type { WorkspaceCommandMenuItem, WorkspaceCommandRegistration } from "../
 import type { ActionResult } from "../editor/workspace/workspaceActionRegistry";
 
 const IS_MAC = getAppPlatform() === "macos";
-// Width reserved on the left for the native macOS traffic-light controls when
-// the overlay title bar is active. Windows/Linux render their own controls on
-// the right instead, so no inset is needed there.
-const MAC_TRAFFIC_LIGHT_INSET = 76;
 
 interface ControlBarProps {
   activeTabClosable: boolean;
@@ -236,9 +232,6 @@ export function ControlBar({
     >
       {ctx.render}
       {previewNode}
-      {IS_MAC && (
-        <div className="shrink-0 self-stretch" style={{ width: MAC_TRAFFIC_LIGHT_INSET }} data-window-drag />
-      )}
       <div className="flex items-center gap-1 px-1.5 shrink-0">
         {activeSideTab !== "home" && <BarButton
           testId="toggle-left-sidebar"

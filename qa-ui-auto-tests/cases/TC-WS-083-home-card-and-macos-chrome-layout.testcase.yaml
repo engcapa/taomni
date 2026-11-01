@@ -1,0 +1,178 @@
+id: TC-WS-083
+title: Home cards stay above history and macOS window controls reserve shell space
+description: Regression for 0.5.4 macOS overlay overlap, duplicate toolbar inset and WKWebView percentage-height cards. Native validates the actual
+  packaged WKWebView; other platforms retain the same toolbar and Home actions.
+modes:
+- browser
+- native
+covers:
+- F1.6
+- F-WS-1
+fixtures:
+- reset_db
+tags:
+- regression
+- workspace-redesign
+- home-layout
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-home-layout
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- eval_readonly:
+    expression: Math.max(document.querySelector('.taomni-home-launch-card').getBoundingClientRect().bottom, document.querySelector('.taomni-home-launch-card:last-child').getBoundingClientRect().bottom)
+      <= document.querySelector('.taomni-home-launch-grid').getBoundingClientRect().bottom + 1
+    expect_truthy: true
+- eval_readonly:
+    expression: Math.max(document.querySelector('.taomni-home-shell-buttons > button:last-child').getBoundingClientRect().bottom, document.querySelector('.taomni-home-launch-card:last-child
+      .taomni-home-card-footer').getBoundingClientRect().bottom) <= document.querySelector('.taomni-home-launch-grid').getBoundingClientRect().bottom
+      + 1
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('.taomni-home-launch-grid').getBoundingClientRect().bottom < document.querySelector('[data-testid' + String.fromCharCode(61)
+      + '"welcome-history-panel"]').getBoundingClientRect().top
+    expect_truthy: true
+- eval_readonly:
+    expression: typeof window.__TAURI_INTERNALS__ === 'undefined' || !/Mac/.test(navigator.platform) || document.querySelector('[data-testid'
+      + String.fromCharCode(61) + '"nav-mode-home"]').getBoundingClientRect().top >= 32
+    expect_truthy: true
+- screenshot: home-collapsed-cards.png
+- hover: '[data-testid="welcome-version-footer"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"welcome-history-panel"]').nextElementSibling.tagName === 'DETAILS'
+      && document.querySelector('[data-testid' + String.fromCharCode(61) + '"welcome-version-footer"]').previousElementSibling.tagName === 'DETAILS'
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('.taomni-home-launch-grid').getBoundingClientRect().bottom <= document.querySelector('.taomni-home-content
+      > details').getBoundingClientRect().top
+    expect_truthy: true
+- assert_visible: '[data-testid="welcome-version-footer"]'
+- screenshot: home-tips-and-version.png
+- press: Mod+b
+- wait_for: '[data-testid="home-sidebar-panel"]'
+- hover: '[data-testid="welcome-new-session"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"platform-mode-title"]').getBoundingClientRect().left - document.querySelector('[data-testid'
+      + String.fromCharCode(61) + '"control-bar"]').getBoundingClientRect().left < 40
+    expect_truthy: true
+- eval_readonly:
+    expression: Math.max(document.querySelector('.taomni-home-launch-card').getBoundingClientRect().bottom, document.querySelector('.taomni-home-launch-card:last-child').getBoundingClientRect().bottom)
+      <= document.querySelector('.taomni-home-launch-grid').getBoundingClientRect().bottom + 1
+    expect_truthy: true
+- click: '[data-testid="welcome-new-session"]'
+- wait_for: '[data-testid="session-cancel"]'
+- click: '[data-testid="session-cancel"]'
+- assert_not_visible: '[data-testid="session-cancel"]'
+- screenshot: home-expanded-cards.png
+- press: Mod+b
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"platform-mode-title"]').getBoundingClientRect().left - document.querySelector('[data-testid'
+      + String.fromCharCode(61) + '"control-bar"]').getBoundingClientRect().left < 40
+    expect_truthy: true
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="toggle-left-sidebar"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"toggle-left-sidebar"]').getBoundingClientRect().left - document.querySelector('[data-testid'
+      + String.fromCharCode(61) + '"control-bar"]').getBoundingClientRect().left < 16
+    expect_truthy: true
+- click: '[data-testid="toggle-left-sidebar"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"toggle-left-sidebar"]').getBoundingClientRect().left - document.querySelector('[data-testid'
+      + String.fromCharCode(61) + '"control-bar"]').getBoundingClientRect().left < 16
+    expect_truthy: true
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Cards and their actions stay inside the launch grid above history, tips and version; expanded/collapsed sidebars retain clickable
+      session actions and no extra toolbar inset. Native macOS rail starts below the overlay controls.
+    actions:
+    - 4
+    - 11
+    - 16
+    - 18
+    - 21
+    - 23
+    - 26
+    - 29
+    - 32
+    - 35
+    results:
+    - 6
+    - 7
+    - 8
+    - 9
+    - 12
+    - 13
+    - 14
+    - 19
+    - 20
+    - 24
+    - 28
+    - 31
+    - 34
+    - 37
+    checkpoints:
+    - step: 6
+      expectation: '{"eval_readonly": {"expression": "Math.max(document.querySelector(''.taomni-home-launch-card'').getBoundingClientRect().bottom,
+        document.querySelector(''.taomni-home-launch-card:last-child'').getBoundingClientRect().bottom) <= document.querySelector(''.taomni-home-launch-grid'').getBoundingClientRect().bottom
+        + 1", "expect_truthy": true}}'
+    - step: 7
+      expectation: '{"eval_readonly": {"expression": "Math.max(document.querySelector(''.taomni-home-shell-buttons > button:last-child'').getBoundingClientRect().bottom,
+        document.querySelector(''.taomni-home-launch-card:last-child .taomni-home-card-footer'').getBoundingClientRect().bottom) <= document.querySelector(''.taomni-home-launch-grid'').getBoundingClientRect().bottom
+        + 1", "expect_truthy": true}}'
+    - step: 8
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.taomni-home-launch-grid'').getBoundingClientRect().bottom < document.querySelector(''[data-testid''
+        + String.fromCharCode(61) + ''\"welcome-history-panel\"]'').getBoundingClientRect().top", "expect_truthy": true}}'
+    - step: 9
+      expectation: '{"eval_readonly": {"expression": "typeof window.__TAURI_INTERNALS__ === ''undefined'' || !/Mac/.test(navigator.platform) ||
+        document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"nav-mode-home\"]'').getBoundingClientRect().top >= 32", "expect_truthy":
+        true}}'
+    - step: 12
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"welcome-history-panel\"]'').nextElementSibling.tagName
+        === ''DETAILS'' && document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"welcome-version-footer\"]'').previousElementSibling.tagName
+        === ''DETAILS''", "expect_truthy": true}}'
+    - step: 13
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''.taomni-home-launch-grid'').getBoundingClientRect().bottom <= document.querySelector(''.taomni-home-content
+        > details'').getBoundingClientRect().top", "expect_truthy": true}}'
+    - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"welcome-version-footer\"]"}'
+    - step: 19
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"platform-mode-title\"]'').getBoundingClientRect().left
+        - document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"control-bar\"]'').getBoundingClientRect().left < 40", "expect_truthy":
+        true}}'
+    - step: 20
+      expectation: '{"eval_readonly": {"expression": "Math.max(document.querySelector(''.taomni-home-launch-card'').getBoundingClientRect().bottom,
+        document.querySelector(''.taomni-home-launch-card:last-child'').getBoundingClientRect().bottom) <= document.querySelector(''.taomni-home-launch-grid'').getBoundingClientRect().bottom
+        + 1", "expect_truthy": true}}'
+    - step: 24
+      expectation: '{"assert_not_visible": "[data-testid=\"session-cancel\"]"}'
+    - step: 28
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"platform-mode-title\"]'').getBoundingClientRect().left
+        - document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"control-bar\"]'').getBoundingClientRect().left < 40", "expect_truthy":
+        true}}'
+    - step: 31
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"toggle-left-sidebar\"]'').getBoundingClientRect().left
+        - document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"control-bar\"]'').getBoundingClientRect().left < 16", "expect_truthy":
+        true}}'
+    - step: 34
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"toggle-left-sidebar\"]'').getBoundingClientRect().left
+        - document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"control-bar\"]'').getBoundingClientRect().left < 16", "expect_truthy":
+        true}}'
+    - step: 37
+      expectation: '{"assert_no_runtime_errors": null}'
+  visual:
+  - check: Card/action boundaries, footer order and toolbar leading space in both sidebar states.
+    method: automated
+    reason: DOM geometry, session-dialog interaction and screenshots are retained.
+  native:
+  - check: Real WKWebView card sizing and native overlay control clearance.
+    method: automated
+    reason: Same geometry assertions execute in the isolated packaged QA app; browser cannot establish WKWebView layout.

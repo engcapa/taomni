@@ -7,6 +7,7 @@
 }
 .taomni-home-launch-grid {
   display: grid;
+  flex-shrink: 0;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 225px), 1fr));
   gap: 11px;
   align-items: stretch;
@@ -17,6 +18,9 @@
   justify-content: space-between;
   min-width: 0;
   min-height: 158px;
+  /* Stretch to the grid row, never resolve 100% against the Home viewport.
+     WebKit otherwise extends cards and their actions over the history/footer. */
+  height: auto;
   gap: 8px;
   padding: 11px 13px;
   border: 1px solid var(--taomni-card-border);
