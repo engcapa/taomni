@@ -96,6 +96,7 @@ export function registerVncPanelLayout3Cases() {
 
       it("pastes an external Linux clipboard when WebKit reports an empty value", async () => {
         const platform = vi.spyOn(navigator, "platform", "get").mockReturnValue("Linux");
+        const userAgent = vi.spyOn(navigator, "userAgent", "get").mockReturnValue("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/605.1.15");
         vi.stubGlobal("__TAURI_INTERNALS__", {});
         const defaultInvoke = mocks.invoke.getMockImplementation();
         mocks.invoke.mockImplementation((command: string, args?: unknown) => {
@@ -113,6 +114,7 @@ export function registerVncPanelLayout3Cases() {
           expect(clipboardTexts(socket)).toEqual(["copied externally"]);
           expect(mocks.invoke).toHaveBeenCalledWith("clipboard_read_text");
         } finally {
+          userAgent.mockRestore();
           platform.mockRestore();
         }
       });

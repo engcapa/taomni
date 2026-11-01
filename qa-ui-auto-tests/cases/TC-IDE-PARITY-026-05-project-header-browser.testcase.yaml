@@ -1,13 +1,14 @@
 id: TC-IDE-PARITY-026-05
 title: Project tool window header, New menu, views, Appearance and speed search match IDEA
-description: "ED-PARITY-026 A3 browser case. The Project tool window uses IDEA's single title row — \"Project ▾\" view selector, then New (+), Select Opened\
-  \ File, Expand All, Collapse All, Options (⋮) and Hide (−) — instead of the two Taomni toolbar rows. New (+) creates files; the selector switches Project\
-  \ / Project Files; Options › Appearance toggles Details (time, size), Compact Directories and the tree zoom; typing in the tree opens IDEA speed search,\
-  \ Esc clears it; Hide collapses the tool window and Alt+1 restores it.\n\n  Mode: browser.\n Header actions may publish after the editor shell; allow\
-  \ 1.5s for their exact order to settle."
+description: "ED-PARITY-026 A3 browser case. The Project tool window uses IDEA's single title row — \"Project ▾\" view selector, then New (+),\
+  \ Select Opened File, Expand All, Collapse All, Options (⋮) and Hide (−) — instead of the two Taomni toolbar rows. New (+) creates files; the\
+  \ selector switches Project / Project Files; Options › Appearance toggles Details (time, size), Compact Directories and the tree zoom; typing\
+  \ in the tree opens IDEA speed search, Esc clears it; Hide collapses the tool window and Alt+1 restores it.\n\n  Mode: browser.\n Header actions\
+  \ may publish after the editor shell; allow 1.5s for their exact order to settle."
 covers:
 - F25.5
 tags:
+- splitter-regression
 - code-workspace
 - project-tree
 - ed-parity-026
@@ -175,6 +176,11 @@ steps:
 - wait_for:
     selector: '[data-testid="code-workspace-tree-pane"]'
     timeout_sec: 5
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"code-workspace-editor-pane"]').getBoundingClientRect().width
+      > 100
+    expect_truthy: true
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -189,25 +195,31 @@ verification:
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tree-view-selector\"]", "contains": "Project"}}'
     - step: 14
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"]
-        > button:nth-of-type(1)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-view-selector''", "expect_truthy": true, "timeout_sec": 1.5}}'
+        > button:nth-of-type(1)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-view-selector''", "expect_truthy": true, "timeout_sec":
+        1.5}}'
     - step: 15
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"]
         > button:nth-of-type(3)'')?.getAttribute(''title'') === ''New…''", "expect_truthy": true, "timeout_sec": 1.5}}'
     - step: 16
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"]
-        > button:nth-of-type(4)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-select-opened''", "expect_truthy": true, "timeout_sec": 1.5}}'
+        > button:nth-of-type(4)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-select-opened''", "expect_truthy": true, "timeout_sec":
+        1.5}}'
     - step: 17
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"]
-        > button:nth-of-type(5)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-expand-all''", "expect_truthy": true, "timeout_sec": 1.5}}'
+        > button:nth-of-type(5)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-expand-all''", "expect_truthy": true, "timeout_sec":
+        1.5}}'
     - step: 18
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"]
-        > button:nth-of-type(6)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-collapse-all''", "expect_truthy": true, "timeout_sec": 1.5}}'
+        > button:nth-of-type(6)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-collapse-all''", "expect_truthy": true, "timeout_sec":
+        1.5}}'
     - step: 19
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"]
-        > button:nth-of-type(7)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-toolbar-more''", "expect_truthy": true, "timeout_sec": 1.5}}'
+        > button:nth-of-type(7)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-toolbar-more''", "expect_truthy": true, "timeout_sec":
+        1.5}}'
     - step: 20
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-tree-toolbar-actions\"]
-        > button:nth-of-type(8)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-collapse''", "expect_truthy": true, "timeout_sec": 1.5}}'
+        > button:nth-of-type(8)'')?.getAttribute(''data-testid'') === ''code-workspace-tree-collapse''", "expect_truthy": true, "timeout_sec":
+        1.5}}'
     - step: 21
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tree-filter\"]"}'
     - step: 22
@@ -300,8 +312,8 @@ verification:
     - step: 49
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file-details\"]"}'
     - step: 50
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-tree-file-details\"]", "regex": "20\\d\\d.*\\d{1,2}:\\d{2}, \\d+(\\.\\d)?
-        (B|KB|MB)"}}'
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-tree-file-details\"]", "regex": "20\\d\\d.*\\d{1,2}:\\d{2},
+        \\d+(\\.\\d)? (B|KB|MB)"}}'
     - step: 51
       expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.tree.details", "equals": "true"}}'
     - step: 55
@@ -363,6 +375,21 @@ verification:
     results:
     - 80
     - 83
+  - id: R-SIZE
+    requirement: Restoring Project leaves both the tree and editor usable with nonzero editor width; retain the real panel-library pixel-width
+      and continuous-drag regression in CodeWorkspaceSplitter.integration.test.tsx.
+    actions:
+    - 81
+    - 82
+    results:
+    - 84
+    - 85
+    checkpoints:
+    - step: 84
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-editor-pane\"]'').getBoundingClientRect().width
+        > 100", "expect_truthy": true}}'
+    - step: 85
+      expectation: '{"assert_no_runtime_errors": null}'
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

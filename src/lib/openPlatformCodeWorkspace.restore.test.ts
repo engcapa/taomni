@@ -51,13 +51,14 @@ describe("legacy editor layout import", () => {
     expect(readWorkspaceLayoutSnapshot(instanceId)).toEqual(before);
   });
 
-  it("keeps loose and library tabs in the editor while importing only known roots once", () => {
+  it("imports known root and loose tabs once while retaining library tabs in the editor layout", () => {
     seedLayout([keys[0], "loose:notes", "library:java:List", "root:removed:gone.txt"], [keys[0], keys[12]]);
     const id = openPlatformCodeWorkspace(project);
     const workspace = useWorkspacePlatformStore.getState().getWorkspace(id)!;
     expect(workspace.openTabs.filter((tab) => tab.kind === "file").map((tab) => [tab.rootFolderId, tab.filePath]))
-      .toEqual([["root-a", paths[0]], ["root-a", paths[12]]]);
+      .toEqual([["root-a", paths[0]], [undefined, "/notes.txt"], ["root-a", paths[12]]]);
     expect(readWorkspaceLayoutSnapshot(instanceId)?.editorGroups.primary.openOrder).toContain("loose:notes");
+    expect(readWorkspaceLayoutSnapshot(instanceId)?.editorGroups.primary.openOrder).toContain("library:java:List");
   });
 
   it("preserves the existing 24-tab limit per leaf when both leaves are full", () => {
