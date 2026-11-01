@@ -14,6 +14,7 @@ mod listener_policy;
 pub mod pty_broker;
 mod replay;
 mod server;
+pub mod session_open;
 mod session_view;
 mod settings;
 mod streams;
@@ -83,6 +84,7 @@ pub struct MobileRuntime {
     pub roots_changed: tokio::sync::Notify,
     pub desktop_available: std::sync::atomic::AtomicBool,
     pub devices_changed: tokio::sync::Notify,
+    pub open_requests: session_open::OpenRequests,
 }
 pub struct Running {
     pub address: String,
@@ -108,6 +110,7 @@ impl Default for MobileRuntime {
             profile_data: Mutex::new(None),
             roots_changed: tokio::sync::Notify::new(),
             desktop_available: std::sync::atomic::AtomicBool::new(false),
+            open_requests: session_open::OpenRequests::default(),
         }
     }
 }
@@ -176,6 +179,7 @@ impl MobileRuntime {
         }
         *self.profile_data.lock().unwrap_or_else(|e| e.into_inner()) =
             Some(data.canonicalize().unwrap_or_else(|_| data.clone()));
+        self.open_requests.ensure_loaded(&data);
         self.auth
             .lock()
             .map_err(|_| "auth_unavailable")?

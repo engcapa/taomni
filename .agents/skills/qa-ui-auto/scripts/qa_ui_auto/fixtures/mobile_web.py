@@ -29,7 +29,7 @@ def setup(ctx):
     receipt.write_text('', encoding='utf-8')
     clients = []
     lock = threading.RLock()
-    state = {'paired': False, 'connection_id': 'fixture-connection', 'holder': 'none', 'seq': 0, 'event_seq': 0, 'task': 'idle'}
+    state = {'paired': False, 'connection_id': 'fixture-connection', 'holder': 'none', 'seq': 0, 'event_seq': 0, 'task': 'idle', 'open': 0}
 
     def record(text):
         with lock, receipt.open('a', encoding='utf-8') as f:
@@ -76,6 +76,10 @@ def setup(ctx):
                 return self.reply(401, {'error': 'unauthorized'})
             if path == '/api/v1/ws-ticket':
                 return self.reply(200, {'ticket': 'qa-single-use-fixture-ticket'})
+            if path == '/api/v1/open-requests':
+                record('OPEN ' + body.get('kind', '') + ' ' + str(body.get('saved_session_id') or ''))
+                state['open'] += 1
+                return self.reply(200, {'request_id': f"qa-open-{state['open']}", 'status': 'pending'})
             if path.endswith('/message'):
                 record('AGENT ' + body.get('text', ''))
                 state['task'] = 'running'
@@ -97,7 +101,11 @@ def setup(ctx):
             terminal = {'id': 'term:qa-runtime', 'kind': 'terminal', 'title': 'Local shell', 'status': 'running', 'summary': 'QA terminal'}
             task = {'id': 'thread:qa-task', 'kind': 'agent', 'title': 'Review task', 'status': state['task'], 'summary': 'QA agent'}
             if path == '/api/v1/sessions':
-                return self.reply(200, {'sessions': [terminal, task], 'saved_sessions': [{'id': 'saved', 'name': 'Build host', 'session_type': 'SSH', 'group_path': 'QA'}]})
+                return self.reply(200, {'sessions': [terminal, task], 'saved_sessions': [{'id': 'saved', 'name': 'Build host', 'session_type': 'SSH', 'group_path': 'QA'}],
+                                        'capabilities': {'open_sessions': True}})
+            if path.startswith('/api/v1/open-requests/'):
+                # The desktop answers on the first poll in this peer.
+                return self.reply(200, {'request_id': path.rsplit('/', 1)[1], 'status': 'opened', 'session_id': 'term:qa-opened'})
             if path.startswith('/api/v1/sessions/'):
                 return self.reply(200, {**task, 'confirmations': []})
             if path.endswith('/changes'):
@@ -123,7 +131,8 @@ def setup(ctx):
             try:
                 send({'type': 'hello', 'connection_id': 'fixture-connection', 'instance_id': 'qa', 'run_mode': 'desktop', 'event_seq': state['event_seq']})
                 if is_term:
-                    send({'type': 'replay', 'lines': ['QA_MOBILE_REPLAY', '$ '], 'last_seq': state['seq']})
+                    lines = [f'QA_MOBILE_LOG_{i:03d}' for i in range(120)] + ['QA_MOBILE_REPLAY', '$ ']
+                    send({'type': 'replay', 'lines': lines, 'last_seq': state['seq']})
                     send({'type': 'control', 'connection_id': 'fixture-connection', 'holder': state['holder']})
                 while True:
                     opcode, payload = read_frame(self.rfile)
@@ -141,7 +150,8 @@ def setup(ctx):
                         send({'type': 'control', 'connection_id': 'fixture-connection', 'holder': 'none'})
                     elif kind == 'input':
                         text = base64.b64decode(value['data_b64']).decode()
-                        record('PTY ' + text)
+                        # Escaped so control keys stay readable and line-safe in the receipt.
+                        record('PTY ' + text.encode('unicode_escape').decode('ascii'))
                         state['seq'] += 1
                         send({'type': 'output', 'seq': state['seq'], 'data_b64': base64.b64encode(('\r\n' + text).encode()).decode()})
                     elif kind == 'resize':

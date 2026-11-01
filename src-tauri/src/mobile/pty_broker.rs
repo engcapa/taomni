@@ -12,6 +12,8 @@ use tokio::sync::{Mutex as AsyncMutex, broadcast};
 
 pub struct Terminal {
     pub running: bool,
+    /// Display name reported by the desktop tab; the key itself is opaque.
+    pub title: Option<String>,
     pub exit_code: Option<u32>,
     pub desktop_last_activity_at: Option<i64>,
     exited_at: Option<std::time::Instant>,
@@ -29,6 +31,7 @@ impl Default for Terminal {
     fn default() -> Self {
         Self {
             running: true,
+            title: None,
             exit_code: None,
             desktop_last_activity_at: None,
             exited_at: None,
@@ -63,6 +66,27 @@ impl Broker {
             .unwrap_or_else(|e| e.into_inner())
             .insert(id.to_owned(), Terminal::default());
         self.changed(id, "opened");
+    }
+    /// Records the desktop tab title for an already registered terminal. Returns
+    /// whether it changed; unknown keys are ignored (the tab may be closing).
+    pub fn set_title(&self, id: &str, title: &str) -> bool {
+        let title: String = title.trim().chars().take(120).collect();
+        let changed = {
+            let mut ts = self.terminals.lock().unwrap_or_else(|e| e.into_inner());
+            let Some(t) = ts.get_mut(id) else {
+                return false;
+            };
+            let next = (!title.is_empty()).then_some(title);
+            if t.title == next {
+                return false;
+            }
+            t.title = next;
+            true
+        };
+        if changed {
+            self.changed(id, "renamed");
+        }
+        changed
     }
     fn changed(&self, id: &str, kind: &str) {
         if self.enabled.load(Ordering::Relaxed) {

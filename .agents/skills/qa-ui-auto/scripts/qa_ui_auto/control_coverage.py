@@ -66,7 +66,7 @@ from qa_ui_auto.testcase import discover, step_verb_and_args  # noqa: E402
 
 
 INTERACTIVE_VERBS = {
-    "mobile_service_probe",
+    "mobile_service_probe", "mobile_browser_probe",
     "middle_click",
     "click", "dblclick", "right_click", "hover", "drag_to", "drag_path", "native_click",
     "native_pointer_drag", "native_window_drag",
@@ -166,6 +166,10 @@ def _selectors_in_step(verb: str, args: Any) -> list[str]:
     # it never invokes their IPC handlers directly (mobile_native.desktop).
     if verb == "mobile_service_probe" and args == "desktop":
         return ['[data-testid="mobile-settings-refresh"]', '[data-testid="mobile-settings-revoke"]']
+    if verb == "mobile_service_probe" and args == "open-session":
+        return ['[data-testid="mobile-settings-open-sessions"]']
+    if verb == "mobile_browser_probe" and args == "touch-scroll":
+        return ['[data-testid="mobile-terminal-screen"]', '[data-testid="mobile-terminal-latest"]']
     out: list[str] = []
     # Short form: `click: '[data-testid="x"]'` → args is a string.
     if isinstance(args, str):

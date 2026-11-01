@@ -8,12 +8,20 @@ async fn status(runtime: &MobileRuntime) -> Result<Value, String> {
     let auth = runtime.auth.lock().map_err(|_| "auth_unavailable")?;
     Ok(
         json!({"enabled":running.as_ref().is_some_and(|r| !r.task.is_finished()),
+        "allow_open_sessions":runtime.open_requests.allowed(),
         "address":running.as_ref().map(|r| &r.address), "failed_attempts":auth.failed_attempts,
         "devices":auth.devices.iter().map(|d| json!({"device_id":d.device_id,"label":d.label,"origin":d.origin,"created_at":d.created_at,"last_used_at":d.last_used_at})).collect::<Vec<_>>() }),
     )
 }
 #[tauri::command]
-pub async fn mobile_status(state: State<'_, AppState>) -> Result<Value, String> {
+pub async fn mobile_status(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<Value, String> {
+    // Settings shows the open-sessions opt-in before the service ever starts.
+    if let Ok(data) = crate::resolved_app_data_dir(&app) {
+        state.mobile.open_requests.ensure_loaded(&data);
+    }
     status(&state.mobile).await
 }
 #[tauri::command]

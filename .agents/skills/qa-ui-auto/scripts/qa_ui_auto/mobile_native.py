@@ -214,4 +214,10 @@ def register(verb, terminal_input):
             return desktop(ctx, terminal_input)
         if args == 'headless':
             return headless(ctx)
-        raise StepError('mobile_service_probe requires desktop or headless')
+        if args == 'open-session':
+            from .mobile_open_session import run as open_session
+            endpoint = address(ctx)
+            owner = pair(endpoint, text(ctx, '[data-testid="mobile-settings-code"]'))
+            other = pair(endpoint, code(ctx))
+            return open_session(ctx, endpoint, owner, other)
+        raise StepError('mobile_service_probe requires desktop, headless or open-session')

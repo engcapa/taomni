@@ -1,4 +1,4 @@
-use super::{Core, MobileRuntime, agent_view, file_view, session_view, streams};
+use super::{Core, MobileRuntime, agent_view, file_view, session_open, session_view, streams};
 use axum::{
     Json, Router,
     extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State},
@@ -37,10 +37,17 @@ impl IntoResponse for ApiError {
         }
         let status = match self.0.as_str() {
             "unauthorized" => StatusCode::UNAUTHORIZED,
-            "host_denied" | "origin_denied" | "path_denied" | "not_holder" => StatusCode::FORBIDDEN,
-            "rate_limited" => StatusCode::TOO_MANY_REQUESTS,
+            "host_denied"
+            | "origin_denied"
+            | "path_denied"
+            | "not_holder"
+            | "open_sessions_disabled" => StatusCode::FORBIDDEN,
+            "rate_limited" | "too_many_open_requests" => StatusCode::TOO_MANY_REQUESTS,
             "turn_in_progress" | "already_resolved" | "control_busy" => StatusCode::CONFLICT,
-            "session_not_found" | "terminal_not_found" => StatusCode::NOT_FOUND,
+            "session_not_found"
+            | "terminal_not_found"
+            | "saved_session_not_found"
+            | "open_request_not_found" => StatusCode::NOT_FOUND,
             _ => StatusCode::BAD_REQUEST,
         };
         (status, Json(json!({"error":self.0}))).into_response()
@@ -144,6 +151,8 @@ pub fn router(s: Service) -> Router {
         .route("/api/v1/tasks/{id}/changes", get(changes))
         .route("/api/v1/tasks/{id}/files", get(file))
         .route("/api/v1/tasks/{id}/changes/{*path}", get(diff))
+        .route("/api/v1/open-requests", post(open_session))
+        .route("/api/v1/open-requests/{id}", get(open_status))
         .route("/api/v1/events", get(streams::events))
         .route("/api/v1/terminals/{id}/stream", get(streams::terminal))
         .fallback(get(static_file))
@@ -193,6 +202,24 @@ async fn ticket(State(s): State<Service>, headers: HeaderMap) -> ApiResult {
 async fn sessions(State(s): State<Service>, headers: HeaderMap) -> ApiResult {
     authenticated(&s, &headers)?;
     Ok(Json(session_view::list(&s.core.state()).await?))
+}
+async fn open_session(
+    State(s): State<Service>,
+    headers: HeaderMap,
+    Json(body): Json<Value>,
+) -> ApiResult {
+    let device = authenticated(&s, &headers)?;
+    Ok(Json(session_open::start(
+        &s.core, &s.runtime, &device, &body,
+    )?))
+}
+async fn open_status(
+    State(s): State<Service>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> ApiResult {
+    let device = authenticated(&s, &headers)?;
+    Ok(Json(s.runtime.open_requests.poll(&device, &id)?))
 }
 async fn detail(State(s): State<Service>, headers: HeaderMap, Path(id): Path<String>) -> ApiResult {
     authenticated(&s, &headers)?;

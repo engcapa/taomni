@@ -2,6 +2,19 @@ use crate::session::models::SessionType;
 use crate::state::AppState;
 use serde_json::{Value, json};
 
+/// Saved session types that open as a terminal tab (what the phone can attach to).
+pub fn is_terminal_type(kind: &SessionType) -> bool {
+    matches!(
+        kind,
+        SessionType::SSH
+            | SessionType::Telnet
+            | SessionType::Rlogin
+            | SessionType::Mosh
+            | SessionType::Serial
+            | SessionType::LocalShell
+            | SessionType::FTP
+    )
+}
 pub async fn list(state: &AppState) -> Result<Value, String> {
     let mut sessions = vec![];
     {
@@ -12,7 +25,7 @@ pub async fn list(state: &AppState) -> Result<Value, String> {
             .lock()
             .map_err(|_| "broker_unavailable")?;
         for (id, terminal) in terminals.iter() {
-            sessions.push(json!({"id":format!("term:{id}"),"kind":"terminal", "title":id,
+            sessions.push(json!({"id":format!("term:{id}"),"kind":"terminal", "title":terminal.title.as_deref().unwrap_or(id),
                 "status":if terminal.running {"running"} else {"exited"},"last_activity_at":null,"summary":"", "workspace_context":null}));
         }
     }
@@ -42,11 +55,11 @@ pub async fn list(state: &AppState) -> Result<Value, String> {
             "last_activity_at":summaries.get(&thread.id).map(|v| &v["last_activity_at"]).cloned().unwrap_or(json!(thread.updated_at)),"summary":summaries.get(&thread.id).map(|v| &v["summary"]).cloned().unwrap_or(json!("")), "workspace_context":null}));
     }
     sessions.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
-    let saved: Vec<_> = saved.into_iter().filter(|s| matches!(s.session_type,
-        SessionType::SSH | SessionType::Telnet | SessionType::Rlogin | SessionType::Mosh |
-        SessionType::Serial | SessionType::LocalShell | SessionType::FTP))
+    let saved: Vec<_> = saved.into_iter().filter(|s| is_terminal_type(&s.session_type))
         .map(|s| json!({"id":s.id,"name":s.name,"session_type":s.session_type,"group_path":s.group_path})).collect();
-    Ok(json!({"sessions":sessions,"saved_sessions":saved}))
+    Ok(
+        json!({"sessions":sessions,"saved_sessions":saved,"capabilities":{"open_sessions":super::session_open::available(state)}}),
+    )
 }
 pub async fn detail(state: &AppState, id: &str) -> Result<Value, String> {
     if let Some(id) = id.strip_prefix("term:") {
@@ -58,7 +71,7 @@ pub async fn detail(state: &AppState, id: &str) -> Result<Value, String> {
             .map_err(|_| "broker_unavailable")?;
         let t = ts.get(id).ok_or("session_not_found")?;
         return Ok(
-            json!({"id":format!("term:{id}"), "kind":"terminal", "title":id,
+            json!({"id":format!("term:{id}"), "kind":"terminal", "title":t.title.as_deref().unwrap_or(id),
             "status":if t.running {"running"} else {"exited"},"holder":super::pty_broker::Broker::holder(t)}),
         );
     }

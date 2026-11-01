@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { encoded, errorText, request, statusText, type Changes, type Detail, type FileContent, type Instance, type Session } from "./api";
 
 export function TaskView({ instance, session, revision }: { instance: Instance; session: Session; revision: number }) {
@@ -12,6 +12,7 @@ export function TaskView({ instance, session, revision }: { instance: Instance; 
   const [content, setContent] = useState<FileContent | null>(null);
   const [updated, setUpdated] = useState("");
   const [fileChoice, setFileChoice] = useState<{ path: string; diff: boolean } | null>(null);
+  const form = useRef<HTMLFormElement>(null);
   const path = `/sessions/${encoded(session.id)}`;
   const load = useCallback(async (signal?: AbortSignal) => {
     const value = await request<Detail>(instance, path, undefined, signal);
@@ -47,11 +48,11 @@ export function TaskView({ instance, session, revision }: { instance: Instance; 
     {detail?.tools?.map(tool => <p key={tool.id}>{tool.name} · {tool.status === "running" ? "执行中" : "已结束"}</p>)}
     <button data-testid="mobile-task-stop" disabled={busy || !running} onClick={() => void action(`${path}/stop`, {})}>停止当前轮次</button>
     {detail?.confirmations?.map(c => <div className="confirmation" key={c.id}><p>待确认：{c.tool}</p>{c.supported ? <div className="actions"><button disabled={busy} onClick={() => void action(`/tasks/${encoded(session.id)}/confirmations/${encoded(c.id)}`, { decision: "approve" })}>同意</button><button disabled={busy} onClick={() => void action(`/tasks/${encoded(session.id)}/confirmations/${encoded(c.id)}`, { decision: "reject" })}>拒绝</button></div> : <p>需在桌面确认</p>}</div>)}
-    <form onSubmit={e => { e.preventDefault(); if (messageBytes > 32768) return; const message = text; void action(`${path}/message`, { text: message }, () => { setText(""); setHistory(h => [message, ...h.filter(v => v !== message)].slice(0,10)); }); }}>
-      <label>给 Agent 的后续指令<textarea data-testid="mobile-agent-input" value={text} onChange={e => setText(e.target.value)} placeholder="下一步需要做什么？" maxLength={32768} disabled={busy} /></label>
+    <form ref={form} onSubmit={e => { e.preventDefault(); if (busy || running || !text.trim() || messageBytes > 32768) return; const message = text; void action(`${path}/message`, { text: message }, () => { setText(""); setHistory(h => [message, ...h.filter(v => v !== message)].slice(0,10)); }); }}>
+      <label>给 Agent 的后续指令<textarea data-testid="mobile-agent-input" value={text} onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); form.current?.requestSubmit(); } }} placeholder="下一步需要做什么？（外接键盘 Ctrl/⌘+Enter 发送）" maxLength={32768} disabled={busy} /></label>
       <p className="note" role={messageBytes > 32768 ? "alert" : undefined}>{messageBytes} / 32768 UTF-8 字节</p>
       <p className="note">由手机发起，未带桌面上下文。此输入不会发送到 PTY。headless 下桌面工具不可用。</p>
-      <div className="actions"><button className="primary" data-testid="mobile-agent-send" disabled={busy || !!running || !text.trim() || messageBytes > 32768}>发送指令</button><button type="button" onClick={() => setText("请汇报当前进展、阻塞点和下一步。")}>汇报进展</button></div>
+      <div className="actions"><button className="primary" data-testid="mobile-agent-send" disabled={busy || !!running || !text.trim() || messageBytes > 32768}>发送指令</button><button type="button" data-testid="mobile-agent-continue" onClick={() => setText("继续")}>继续</button><button type="button" onClick={() => setText("请汇报当前进展、阻塞点和下一步。")}>汇报进展</button></div>
       {history.map((value, i) => <button type="button" className="history" key={i} onClick={() => setText(value)}>{value.slice(0,80)}</button>)}
     </form>
     {error && <p role="alert" data-testid="mobile-task-error">{error}</p>}

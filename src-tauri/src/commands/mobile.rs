@@ -6,6 +6,10 @@ pub(super) fn handles(command: &str) -> bool {
             | "mobile_stop"
             | "mobile_pairing_code"
             | "mobile_revoke"
+            | "mobile_open_session_result"
+            | "mobile_claim_open_session"
+            | "mobile_set_open_sessions"
+            | "mobile_terminal_title"
             | "mobile_feishu_get"
             | "mobile_feishu_save"
             | "mobile_feishu_start"
@@ -23,6 +27,10 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::mobile::mobile_stop,
         crate::mobile::mobile_pairing_code,
         crate::mobile::mobile_revoke,
+        crate::mobile::session_open::mobile_open_session_result,
+        crate::mobile::session_open::mobile_claim_open_session,
+        crate::mobile::session_open::mobile_set_open_sessions,
+        crate::mobile::session_open::mobile_terminal_title,
     ];
     handler(invoke)
 }

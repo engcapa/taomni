@@ -59,7 +59,7 @@ export function useLive(instance: Instance, path: string, onFrame: (frame: Frame
           if (typeof frame.last_seq === "number") sequence = frame.last_seq;
           callback.current(frame);
         };
-        socket.onclose = event => { if (channel.current === socket) channel.current = null; if (disposed || ended) return; if (ended || event.code === 4004) { status.current("终端已退出或关闭"); return; } if (event.code === 4001) { status.current("已被实例吊销，请重新配对"); return; } retry(); };
+        socket.onclose = event => { if (channel.current === socket) channel.current = null; if (disposed) return; if (ended || event.code === 4004) { status.current("终端已退出或关闭"); return; } if (event.code === 4001) { status.current("已被实例吊销，请重新配对"); return; } retry(); };
         socket.onerror = () => socket?.close();
       } catch (error) {
         if (error instanceof ApiError && ["unauthorized", "origin_denied"].includes(error.code)) { status.current("配对已失效，请重新配对"); return; }
@@ -77,6 +77,7 @@ export function useLive(instance: Instance, path: string, onFrame: (frame: Frame
   }, [instance.id, instance.token, instance.endpoint, path]);
   return (frame: Frame) => {
     if (channel.current?.readyState !== WebSocket.OPEN) return false;
-    channel.current.send(JSON.stringify(frame)); return true;
+    try { channel.current.send(JSON.stringify(frame)); return true; }
+    catch { channel.current.close(); return false; }
   };
 }

@@ -401,6 +401,25 @@ matching QA executable with DISPLAY/WAYLAND_DISPLAY removed in a disposable
 profile, verifies health/pair/events/profile exclusion and clean shutdown.
 Receipts contain assertions and no pairing secrets. See TC-MOBILE-002/003.
 
+The additive `open-session` argument (TC-MOBILE-005) requires Settings with a
+running listener, an unused pairing code, the open-sessions checkbox off, and
+no terminal tabs. With the `mobile_service` fixture it pairs two external devices,
+proves disabled local/saved requests return `open_sessions_disabled`, then clicks
+the real checkbox. Local and saved LocalShell requests must return pending then
+opened with different `term:` ids; another device cannot poll them. It correlates
+each id with one new local desktop tab, a readable mirrored session-list title,
+and WS take-control/input, asserting a separate stdout line and exact independent
+host marker bytes. The saved request also verifies its distinct shell arguments.
+It never invokes app IPC/registry writers and leaves both tabs and the listener
+running for YAML assertions/cleanup. Failures retain the phase and network/desktop
+observations in `mobile-open-session-receipt.json`, without tokens or pairing codes.
+
+`mobile_browser_probe: touch-scroll` (browser only) dispatches standard Touch DOM
+input to the rendered xterm screen, observes its accessible first-row position
+move backwards without moving the page, then clicks “最新” and verifies the
+original latest-output position is restored. It writes `mobile-touch-scroll.json`.
+This proves browser event integration, not physical iOS/Android touch hardware.
+
 The `mobile_web` browser fixture serves the production mobile bundle with a
 deterministic HTTP/WS peer; it does not establish Rust/native service behavior.
 The `mobile_service` fixture seeds only isolated saved-session rows for native

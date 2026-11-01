@@ -7,6 +7,7 @@ import { createContinueConnectQueue, createOpenAfterJumpPassword, createOpenQueu
 import { useMainLayoutState } from "./useMainLayoutState";
 import { useMainSessionActions } from "./useMainSessionActions";
 import { useSessionResume } from "./useSessionResume";
+import { useMobileBridge } from "./useMobileBridge";
 import { useShellSessionTabs } from "./useShellSessionTabs";
 import { useWorkspaceTabs } from "./useWorkspaceTabs";
 
@@ -192,6 +193,11 @@ export function useMainWorkspaceOpening(context: UseMainWorkspaceOpeningContext)
     terminalCwds: layout.terminalCwds,
     activeTabId: layout.activeTabId,
     setStatusMessage: layout.setStatusMessage,
+  });
+  useMobileBridge({
+    openQueuedSession,
+    openLocalTab: sessionActions.openLocalTab,
+    authenticationBusy: () => layout.awaitingManualAuthRef.current || layout.awaitingVaultUnlockRef.current,
   });
   return {
     continueConnectQueue,

@@ -13317,10 +13317,16 @@ files:
   - src-tauri/src/mobile/pty_broker.rs
   - src-tauri/src/mobile/agent_view.rs
   - src-tauri/src/mobile/file_view.rs
+  - src-tauri/src/mobile/session_open.rs
+  - src/layouts/main/useMobileBridge.ts
   - mobile-web/src/App.tsx
   - mobile-web/src/TerminalView.tsx
   - mobile-web/src/TaskView.tsx
   - mobile-web/src/PairForm.tsx
+  - mobile-web/src/InstanceView.tsx
+  - mobile-web/src/TerminalComposer.tsx
+  - mobile-web/src/TerminalKeybar.tsx
+  - mobile-web/src/terminalKeys.ts
 controls:
   - id: mobile-add-instance
     selector: '[data-testid="mobile-add-instance"]'
@@ -13421,6 +13427,9 @@ controls:
   - id: mobile-settings-toggle
     selector: '[data-testid="mobile-settings-toggle"]'
     kind: interactive
+  - id: mobile-settings-open-sessions
+    selector: '[data-testid="mobile-settings-open-sessions"]'
+    kind: interactive
   - id: mobile-settings-pair
     selector: '[data-testid="mobile-settings-pair"]'
     kind: interactive
@@ -13433,11 +13442,225 @@ controls:
   - id: mobile-settings-revoke
     selector: '[data-testid="mobile-settings-revoke"]'
     kind: interactive
+  - id: mobile-app
+    selector: '[data-testid="mobile-app"]'
+    kind: display
+  - id: mobile-insecure-note
+    selector: '[data-testid="mobile-insecure-note"]'
+    kind: display
+  - id: mobile-link-pending
+    selector: '[data-testid="mobile-link-pending"]'
+    kind: display
+  - id: mobile-instance-missing
+    selector: '[data-testid="mobile-instance-missing"]'
+    kind: display
+  - id: mobile-first-instance
+    selector: '[data-testid="mobile-first-instance"]'
+    kind: interactive
+  - id: mobile-connection
+    selector: '[data-testid="mobile-connection"]'
+    kind: display
+  - id: mobile-instance-error
+    selector: '[data-testid="mobile-instance-error"]'
+    kind: display
+  - id: mobile-retry
+    selector: '[data-testid="mobile-retry"]'
+    kind: interactive
+  - id: mobile-open-status
+    selector: '[data-testid="mobile-open-status"]'
+    kind: display
+  - id: mobile-open-local
+    selector: '[data-testid="mobile-open-local"]'
+    kind: interactive
+  - id: mobile-refresh
+    selector: '[data-testid="mobile-refresh"]'
+    kind: interactive
+  - id: mobile-empty-sessions
+    selector: '[data-testid="mobile-empty-sessions"]'
+    kind: display
+  - id: mobile-saved-open
+    selector: '[data-testid="mobile-saved-open"]'
+    kind: interactive
+  - id: mobile-pair-form
+    selector: '[data-testid="mobile-pair-form"]'
+    kind: display
+  - id: mobile-pair-error
+    selector: '[data-testid="mobile-pair-error"]'
+    kind: display
+  - id: mobile-task
+    selector: '[data-testid="mobile-task"]'
+    kind: display
+  - id: mobile-agent-continue
+    selector: '[data-testid="mobile-agent-continue"]'
+    kind: interactive
+  - id: mobile-task-error
+    selector: '[data-testid="mobile-task-error"]'
+    kind: display
+  - id: mobile-changes-error
+    selector: '[data-testid="mobile-changes-error"]'
+    kind: display
+  - id: mobile-terminal-command
+    selector: '[data-testid="mobile-terminal-command"]'
+    kind: interactive
+  - id: mobile-terminal-command-send
+    selector: '[data-testid="mobile-terminal-command-send"]'
+    kind: interactive
+  - id: mobile-terminal-send-enter
+    selector: '[data-testid="mobile-terminal-send-enter"]'
+    kind: interactive
+  - id: mobile-terminal-history
+    selector: '[data-testid="mobile-terminal-history"]'
+    kind: interactive
+  - id: mobile-keybar
+    selector: '[data-testid="mobile-keybar"]'
+    kind: display
+  - id: mobile-keystrip
+    selector: '[data-testid="mobile-keystrip"]'
+    kind: display
+  - id: mobile-terminal
+    selector: '[data-testid="mobile-terminal"]'
+    kind: display
+  - id: mobile-terminal-back
+    selector: '[data-testid="mobile-terminal-back"]'
+    kind: interactive
+  - id: mobile-terminal-font-down
+    selector: '[data-testid="mobile-terminal-font-down"]'
+    kind: interactive
+  - id: mobile-terminal-font-up
+    selector: '[data-testid="mobile-terminal-font-up"]'
+    kind: interactive
+  - id: mobile-terminal-keys
+    selector: '[data-testid="mobile-terminal-keys"]'
+    kind: interactive
+  - id: mobile-terminal-fullscreen
+    selector: '[data-testid="mobile-terminal-fullscreen"]'
+    kind: interactive
+  - id: mobile-terminal-screen
+    selector: '[data-testid="mobile-terminal-screen"]'
+    kind: display
+  - id: mobile-terminal-latest
+    selector: '[data-testid="mobile-terminal-latest"]'
+    kind: interactive
+  - id: mobile-terminal-notice
+    selector: '[data-testid="mobile-terminal-notice"]'
+    kind: display
+  - id: mobile-terminal-keyboard
+    selector: '[data-testid="mobile-terminal-keyboard"]'
+    kind: interactive
+  - id: mobile-key-esc
+    selector: '[data-testid="mobile-key-esc"]'
+    kind: interactive
+  - id: mobile-key-ctrl-c
+    selector: '[data-testid="mobile-key-ctrl-c"]'
+    kind: interactive
+  - id: mobile-key-ctrl-l
+    selector: '[data-testid="mobile-key-ctrl-l"]'
+    kind: interactive
+  - id: mobile-key-tab
+    selector: '[data-testid="mobile-key-tab"]'
+    kind: interactive
+  - id: mobile-key-home
+    selector: '[data-testid="mobile-key-home"]'
+    kind: interactive
+  - id: mobile-key-up
+    selector: '[data-testid="mobile-key-up"]'
+    kind: interactive
+  - id: mobile-key-end
+    selector: '[data-testid="mobile-key-end"]'
+    kind: interactive
+  - id: mobile-key-pgup
+    selector: '[data-testid="mobile-key-pgup"]'
+    kind: interactive
+  - id: mobile-key-ctrl
+    selector: '[data-testid="mobile-key-ctrl"]'
+    kind: interactive
+  - id: mobile-key-alt
+    selector: '[data-testid="mobile-key-alt"]'
+    kind: interactive
+  - id: mobile-key-shift-tab
+    selector: '[data-testid="mobile-key-shift-tab"]'
+    kind: interactive
+  - id: mobile-key-pipe
+    selector: '[data-testid="mobile-key-pipe"]'
+    kind: interactive
+  - id: mobile-key-left
+    selector: '[data-testid="mobile-key-left"]'
+    kind: interactive
+  - id: mobile-key-down
+    selector: '[data-testid="mobile-key-down"]'
+    kind: interactive
+  - id: mobile-key-right
+    selector: '[data-testid="mobile-key-right"]'
+    kind: interactive
+  - id: mobile-key-pgdn
+    selector: '[data-testid="mobile-key-pgdn"]'
+    kind: interactive
+  - id: mobile-key-backspace
+    selector: '[data-testid="mobile-key-backspace"]'
+    kind: interactive
+  - id: mobile-key-ctrl-r
+    selector: '[data-testid="mobile-key-ctrl-r"]'
+    kind: interactive
+  - id: mobile-key-ctrl-a
+    selector: '[data-testid="mobile-key-ctrl-a"]'
+    kind: interactive
+  - id: mobile-key-ctrl-e
+    selector: '[data-testid="mobile-key-ctrl-e"]'
+    kind: interactive
+  - id: mobile-key-ctrl-w
+    selector: '[data-testid="mobile-key-ctrl-w"]'
+    kind: interactive
+  - id: mobile-key-ctrl-u
+    selector: '[data-testid="mobile-key-ctrl-u"]'
+    kind: interactive
+  - id: mobile-key-ctrl-k
+    selector: '[data-testid="mobile-key-ctrl-k"]'
+    kind: interactive
+  - id: mobile-key-ctrl-z
+    selector: '[data-testid="mobile-key-ctrl-z"]'
+    kind: interactive
+  - id: mobile-key-ctrl-d
+    selector: '[data-testid="mobile-key-ctrl-d"]'
+    kind: interactive
+  - id: mobile-key-tilde
+    selector: '[data-testid="mobile-key-tilde"]'
+    kind: interactive
+  - id: mobile-key-dash
+    selector: '[data-testid="mobile-key-dash"]'
+    kind: interactive
+  - id: mobile-key-slash
+    selector: '[data-testid="mobile-key-slash"]'
+    kind: interactive
+  - id: mobile-key-star
+    selector: '[data-testid="mobile-key-star"]'
+    kind: interactive
+  - id: mobile-key-gt
+    selector: '[data-testid="mobile-key-gt"]'
+    kind: interactive
+  - id: mobile-key-amp
+    selector: '[data-testid="mobile-key-amp"]'
+    kind: interactive
+  - id: mobile-key-dollar
+    selector: '[data-testid="mobile-key-dollar"]'
+    kind: interactive
+  - id: mobile-key-backslash
+    selector: '[data-testid="mobile-key-backslash"]'
+    kind: interactive
+  - id: mobile-key-backtick
+    selector: '[data-testid="mobile-key-backtick"]'
+    kind: interactive
+  - id: mobile-key-dquote
+    selector: '[data-testid="mobile-key-dquote"]'
+    kind: interactive
+  - id: mobile-key-squote
+    selector: '[data-testid="mobile-key-squote"]'
+    kind: interactive
 -->
 
 - 默认不监听；全局设置开启回环/局域网移动服务，生成一次性码、查看与吊销设备。
 - 独立 PWA 支持多个 endpoint、终端共享与单写权、Agent 后续指令及只读文件/diff。
 - Linux headless 不创建 Tauri/GTK 窗口；桌面工具运行时不可用的路径显式报错。
+- 桌面设置显式允许后，已配对手机可请求新建本地终端或打开已保存会话；TC-MOBILE-005 定义真实 HTTP/WS → 桌面 tab → PTY → 独立磁盘 marker 的 Linux 验证，并保护默认拒绝、跨设备请求隔离和可读标题（运行结果以报告为准）。
 - 当前执行证据与限制见 `docs-feature/mobile-remote-p0-implementation.md`，未验证的平台与真手机能力不作完成声明。
 
 ### P1 飞书 Agent 适配器 🟡

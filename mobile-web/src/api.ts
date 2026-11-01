@@ -15,7 +15,7 @@ export interface Session {
   last_activity_at?: number;
 }
 export interface SavedSession { id: string; name: string; session_type: string; group_path: string | null }
-export interface SessionList { sessions: Session[]; saved_sessions: SavedSession[] }
+export interface SessionList { sessions: Session[]; saved_sessions: SavedSession[]; capabilities?: { open_sessions?: boolean } }
 export interface Confirmation { id: string; tool: string; supported: boolean }
 export interface Detail extends Session { holder?: string; confirmations?: Confirmation[]; context_notice?: string; tools?: { id: string; name: string; status: string }[] }
 export interface Changes { changes: { path: string; change_kind: string; diff_available: boolean }[]; truncated?: boolean }
@@ -73,6 +73,18 @@ export function errorText(error: unknown): string {
     not_holder: "当前为只读，需先接管输入。",
     control_busy: "另一台设备正在控制该终端。",
     terminal_exited: "终端已退出。",
+    terminal_not_found: "终端已关闭或不存在。",
+    open_sessions_disabled: "实例未允许手机打开会话：请在桌面 设置 → 移动服务 中开启“允许已配对手机打开已保存会话和新建本地终端”。",
+    desktop_unavailable: "实例的桌面窗口当前不可用，无法打开会话。",
+    saved_session_not_found: "已保存会话不存在或已被删除，请刷新。",
+    saved_session_not_terminal: "该会话类型不是终端，不能在手机上打开。",
+    too_many_open_requests: "已有多个会话正在打开，请等待完成后再试。",
+    open_timeout: "桌面未在 3 分钟内完成打开（可能在等待桌面上解锁 vault 或 SSH 认证）。稍后可在会话列表中查看。",
+    open_cancelled: "桌面已取消打开。",
+    open_failed: "桌面打开会话失败，请在桌面查看原因。",
+    open_request_not_found: "打开请求已过期，请重试。",
+    invalid_open_request: "打开请求无效。",
+    desktop_size_unavailable: "已释放输入；桌面未记录终端尺寸，未能恢复桌面尺寸。",
   } as Record<string, string>)[code] || `操作失败（${code}），请重试。`;
 }
 const STORAGE = "taomni.mobile.instances.v1";
