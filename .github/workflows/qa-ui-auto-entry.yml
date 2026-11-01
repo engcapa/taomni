@@ -359,6 +359,9 @@ jobs:
         env:
           QA_RELEASE: ${{ contains(matrix.capabilities, 'release') }}
         run: |
+          # A verified cached app skips its frontend build. Cargo still runs
+          # the package build script when compiling the helper's test target.
+          pnpm build:mobile
           python - <<'PYTHON' 2>&1 | tee qa-build-output/capture-contracts.log
           import os, subprocess
           from native_build import ROOT, configured_environment

@@ -70,9 +70,23 @@ M1 的历史证据需更正：GitHub API 已确认 [41262327253](https://github.
 - 旧代码隔离探针：在临时目录恢复初始 `live.ts/api.ts`，新增测试复现 3 项失败（重启事件丢失、已移除终端重连、413 误报网络错误）；修复后对应测试通过。日志：`qa-ui-auto-report/mobile-review/baseline-frontend.log`。
 - Rust 真实网络/磁盘/PTY：`cargo test --manifest-path src-tauri/Cargo.toml --lib mobile::`，首轮 34/34 通过（0 failed/ignored），日志 `qa-ui-auto-report/mobile-review/rust-complete.log`。补充绑定线程回填场景后，修复前探针以 diff_unavailable 失败（`bound-root-before.log`）；修复后完整 mobile 集合再次 34/34 通过（`bound-root-after.log`），`pnpm check:refactor` 和 rustfmt 也再次通过。
 - 前端：`pnpm exec vitest run mobile-web/src src/components/settings/FeishuAdapterSettings.test.tsx src/stores/chatStore.test.ts`，最终 5 文件 50/50 通过，包括桌面 turn_in_progress 无回退/无多余消息回归（chatStore 39 项）。日志 `qa-ui-auto-report/mobile-review/frontend-complete.log`；移动设置的真实入口由 TC-MOBILE-002 覆盖。
-- QA audit --gate 通过，678 个用例无 schema 错误、catalog 一致、覆盖无倒退；CI selection 规划通过。`pnpm build`（含 TypeScript、check:refactor、Mobile Web、桌面 bundle）及 `cargo fmt --check` 均通过。构建日志 `qa-ui-auto-report/mobile-review/build-complete.log`；边界/文件大小检查无例外新增。测试断言类型导入导致的前次构建失败已修正并完整重跑。
+- QA audit --gate 通过，678 个用例无 schema 错误、catalog 一致、覆盖无倒退；CI selection 规划通过。`pnpm build`（含 TypeScript、check:refactor、Mobile Web、桌面 bundle）及 `cargo fmt --check` 均通过。构建日志 `qa-ui-auto-report/mobile-review/build-complete.log`；边界/文件大小检查无例外新增。测试断言类型导入导致的前次构建失败已修正并完整重跑。补充按仓库要求使用 Node 22.18.0 / pnpm 10.30.0，相关 Vitest 50/50 再次通过；此前本地与 workflow 使用 Node 24.18.0，未把它写成 Node 22 证据。
 - 自动化选择：TC-MOBILE-001～004，加完整 crash-regression；Linux/Windows/macOS，browser/native，`native_release=true`。001 是手机尺寸 fixture UI，002 是真实桌面 HTTP/WS/PTY（Linux），003 是无 Display headless+真实内嵌外壳（Linux），004 是三平台设置与真实 native vault/配置持久化。其余 native 平台运行设置和完整 crash 集合，不假称已运行 Linux 专属用例。
-- GitHub 首次运行 [41269081051](https://github.com/engcapa/taomni/actions/runs/41269081051) 测试 `766debc2`，规划通过；复核发现绑定线程的 F-08 边界遗漏后主动取消，不计通过。后续新提交保持同样 62 项选择重跑；最终原始报告核验待回填，绿色 job 不代替 passed/report_ok 与 receipt/source/build 一致性。
+- GitHub 首次运行 [41269081051](https://github.com/engcapa/taomni/actions/runs/41269081051) 测试 `766debc2`，规划通过；复核发现绑定线程的 F-08 边界遗漏后主动取消，不计通过。后续提交 `8fa4843a7a54f62e885e04a434929fc1911b109a` 在 [41269713293](https://github.com/engcapa/taomni/actions/runs/41269713293) 保持同样 62 项选择重跑；最终原始报告核验待回填，绿色 job 不代替 passed/report_ok 与 receipt/source/build 一致性。
+
+### GitHub 当前修复提交验证
+
+运行：[41269713293](https://github.com/engcapa/taomni/actions/runs/41269713293)，提交 `8fa4843a7a54f62e885e04a434929fc1911b109a`。已下载 selection，确认 native_release、无 capability gaps/未审用例；产品源码指纹 `2c69fe852338ddef1ce47c4d9c18cc8fe007d22dc95aa2714a65c0c896dc7b08`，runner 指纹 `516f2fb7d9dd7cade32bb8d803c608790869f019b704b8acb0eae765ed5809f6`。
+
+| 平台 | browser | native |
+| --- | --- | --- |
+| Linux | 10/10，0 failed/skipped | 9/9 已执行通过；另外 3 项因依赖安装未启动，待重试 |
+| Windows | 10/10，0 failed/skipped | 10/10，0 failed/skipped |
+| macOS | 10/10，0 failed/skipped | 10/10，0 failed/skipped |
+
+browser 原始报告确认实际执行、identity_stable=true。Linux 原生 Rust 契约 **57/57**（含 mobile 34 项），同 job 的 Vitest **50/50**；日志已下载到 `qa-ui-auto-report/mobile-review/github-rust-contracts.log`。
+
+初次执行的 Linux native shard-4 在安装 Ubuntu 依赖时遇到镜像同步错误（索引实际 1707632 字节、预期 1707592，apt 退出 100），未启动 TC-WS-038/052/057。失败日志保存在 `qa-ui-auto-report/mobile-review/linux-shard4.log`，不能计为通过；其余 Linux native 9 项与 macOS native 10 项原始报告均通过、identity_stable=true。Windows native 10/10 也已通过（identity_stable=true），capture helper 26/26、原子替换 4/4 通过。首轮实际执行 59/59，通过报告没有失败或跳过；缺失的 3 项未计通过。已保存 attempt-1 失败汇总，GitHub 接受只重试 shard-4 并重新汇总，保持原提交、完整选择与原 QA release；shard-4 重试 3/3 通过；独立 ci report 计数达到 62/62，但因重试 attempt 与原 selection 的身份不一致而拒绝合并（execution selection/run identity differs），最终汇总失败，不能作为完整通过证据。原始证据未改写。后续完整运行 [41273645448](https://github.com/engcapa/taomni/actions/runs/41273645448) 复用了匹配构建，但暴露 Windows cached-app 路径跳过前端构建后，helper Cargo 测试缺少 Mobile Web 资源，触发 F-30 的 release 资源缺失检查。已停止该轮，并在 Windows helper 契约步骤显式生成 Mobile Web；保留 release 缺资源失败检查。构建/原生产物/Linux setup 工具契约 14/14 与 workflow YAML 解析通过；后续完整运行待核验。
 
 ### 尚不能由本轮自动化证明的验收
 
