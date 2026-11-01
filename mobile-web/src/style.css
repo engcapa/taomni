@@ -64,7 +64,9 @@ textarea { min-height: 110px; resize: vertical; }
 .badge { display: inline-block; font-size: 10px; white-space: nowrap; color: #b6c8de; background: #22334b; padding: 5px 7px; border-radius: 6px; }
 .saved-session { display: flex; justify-content: space-between; padding: 16px 0; border-bottom: 1px solid #25354c; gap: 12px; font-size: 13px; }
 .saved-session span { color: #91a3bd; font-size: 11px; }
-.terminal { height: 48dvh; min-height: 230px; padding: 10px; background: #09121f; border-radius: 8px; overflow: hidden; }
+/* vh is the fallback for engines that drop dvh: a container left content-sized
+   makes xterm's fit addon grow it one row per observation (seen on a phone). */
+.terminal { height: 48vh; height: 48dvh; min-height: 230px; background: #09121f; border-radius: 8px; overflow: hidden; }
 .keybar { display: flex; gap: 7px; overflow-x: auto; padding: 8px 0; }
 .keybar button { flex-shrink: 0; font-size: 12px; padding: 9px 12px; }
 .history { display: block; width: 100%; text-align: left; margin: 6px 0; overflow-wrap: anywhere; }

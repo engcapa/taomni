@@ -35,22 +35,58 @@ export function TerminalView({ instance, session }: { instance: Instance; sessio
   }, value => { setStatus(value); if (value !== "已连接") setHolder("none"); });
   const sendRef = useRef(send); sendRef.current = send;
   useEffect(() => {
-    if (!host.current) return;
+    const element = host.current;
+    if (!element) return;
     const term = new Terminal({ fontSize: 13, cursorBlink: false, scrollback: 1000, screenReaderMode: true, theme: { background: "#09121f", foreground: "#dce8f5" } });
-    const fitter = new FitAddon(); term.loadAddon(fitter); term.open(host.current);
+    const fitter = new FitAddon(); term.loadAddon(fitter); term.open(element);
     terminal.current = term; fit.current = fitter;
+    // An engine that drops the css height leaves the box content-sized, and the
+    // fit addon then feeds its own result back: every observation is one row
+    // taller than the container, so the screen grows without bound and pushes
+    // the controls off the page. Pin the box in pixels from the live viewport so
+    // its size never depends on unit support or on the terminal's own content.
+    const sizeToViewport = () => {
+      const height = `${Math.round(Math.max(230, window.innerHeight * 0.48))}px`;
+      if (element.style.height !== height) element.style.height = height;
+    };
+    const relayout = () => { sizeToViewport(); fitter.fit(); };
+    sizeToViewport();
     fitter.fit();
     const input = term.onData(data => { if (controlRef.current) sendRef.current({ type: "input", data_b64: encode(data) }); });
-    const observer = new ResizeObserver(() => fitter.fit()); observer.observe(host.current);
-    return () => { observer.disconnect(); input.dispose(); term.dispose(); terminal.current = null; fit.current = null; };
+    const observer = new ResizeObserver(() => fitter.fit()); observer.observe(element);
+    window.addEventListener("resize", relayout);
+    window.addEventListener("orientationchange", relayout);
+    window.visualViewport?.addEventListener("resize", relayout);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", relayout);
+      window.removeEventListener("orientationchange", relayout);
+      window.visualViewport?.removeEventListener("resize", relayout);
+      input.dispose(); term.dispose(); terminal.current = null; fit.current = null;
+    };
   }, []);
   const input = (text: string) => {
     if (!controlling) return;
     if (!send({ type: "input", data_b64: encode(text) })) setNotice("连接已断开，输入未发送。");
   };
+  // Full-screen TUIs (Codex, Claude Code) paint at the PTY geometry, so a read-only
+  // phone view of a desktop-sized session re-wraps every absolute position. The PTY
+  // only accepts a size from the write holder, so adopt the phone width as soon as
+  // control is taken: the app gets SIGWINCH and redraws for this screen.
+  const adopted = useRef(false);
+  useEffect(() => {
+    if (!controlling) { adopted.current = false; return; }
+    if (adopted.current) return;
+    adopted.current = true;
+    const timer = setTimeout(() => {
+      fit.current?.fit();
+      if (terminal.current) sendRef.current({ type: "resize", cols: terminal.current.cols, rows: terminal.current.rows });
+    }, 60);
+    return () => clearTimeout(timer);
+  }, [controlling]);
   return <section className="card terminal-card" data-testid="mobile-terminal">
     <div className="section-heading"><div><p className="eyebrow">LIVE TERMINAL</p><h2>终端输出</h2></div><span className="badge" data-testid="mobile-terminal-status">{exited ? "已退出" : controlling ? "控制中" : "只读"} · {status}</span></div>
-    <p className="note">回放最近 1000 行。接管后输入会直接发往远程终端，可能打断正在执行的命令。</p>
+    <p className="note">回放最近 1000 行。只读视图沿用桌面终端尺寸，Codex、Claude Code 这类全屏程序在窄屏会被折行；接管输入后自动按手机宽度重排，桌面一旦输入即恢复。</p>
     <div ref={host} className="terminal" data-testid="mobile-terminal-screen" />
     <div className="actions"><button className="primary" data-testid="mobile-take-control" disabled={exited || status !== "已连接"} onClick={() => { setNotice(""); send({ type: controlling ? "release-control" : "take-control" }); }}>{controlling ? "释放输入" : "接管输入"}</button>
       <button data-testid="mobile-resize" disabled={!controlling} onClick={() => { fit.current?.fit(); if (terminal.current) send({ type: "resize", cols: terminal.current.cols, rows: terminal.current.rows }); }}>适配尺寸</button>

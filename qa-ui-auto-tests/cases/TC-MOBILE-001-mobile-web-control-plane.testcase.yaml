@@ -46,6 +46,9 @@ steps:
 - assert_text:
     selector: '[data-testid="mobile-terminal-status"]'
     contains: 控制中
+- assert_file_contains:
+    path: ${fixture.mobile_receipt}
+    contains: RESIZE
 - click: '[data-testid="mobile-resize"]'
 - click: '[data-testid="mobile-paste"]'
 - fill:
@@ -121,13 +124,24 @@ steps:
 - assert_count:
     selector: '[data-testid="mobile-instance-open"]'
     equal: 1
+- click: '[data-testid="mobile-instance-open"]'
+- click: '[data-testid="mobile-session"][data-session-kind="terminal"]'
+- wait_for: '[data-testid="mobile-terminal-screen"]'
+- eval_readonly:
+    expression: document.querySelector('.terminal').getBoundingClientRect().height <= window.innerHeight * 0.55 && document.querySelector('.terminal').getBoundingClientRect().height >= 200 && document.querySelector('.terminal').scrollHeight <= document.querySelector('.terminal').clientHeight + 1
+    expect_truthy: true
+- wait: 1.5
+- eval_readonly:
+    expression: document.querySelector('.terminal').getBoundingClientRect().height <= window.innerHeight * 0.55 && document.querySelector('.terminal').scrollHeight <= document.querySelector('.terminal').clientHeight + 1 && document.querySelector('.keybar').getBoundingClientRect().top <= document.documentElement.scrollHeight
+    expect_truthy: true
+- screenshot: mobile-terminal-layout.png
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
   - id: R1
     requirement: Phone layout pairs and persists two endpoints, controls a WS terminal and routes Agent prompts separately; file and
-      diff remain read-only.
+      diff remain read-only. The terminal box stays bounded to part of the phone viewport and does not grow from its own fit result.
     actions:
     - 2
     - 4
@@ -141,25 +155,33 @@ verification:
     - 18
     - 19
     - 20
-    - 22
-    - 26
+    - 21
+    - 23
     - 27
     - 28
     - 29
-    - 33
-    - 35
-    - 37
-    - 41
+    - 30
+    - 34
+    - 36
+    - 38
     - 42
     - 43
     - 44
     - 45
     - 46
-    - 48
-    - 50
-    - 52
-    - 55
+    - 47
+    - 49
+    - 51
+    - 53
     - 56
+    - 57
+    - 59
+    - 60
+    - 61
+    - 62
+    - 63
+    - 64
+    - 65
     checkpoints:
     - step: 10
       expectation: '[data-testid="mobile-session"] has 2 entries.'
@@ -171,35 +193,41 @@ verification:
       expectation: '[data-testid="mobile-resize"] is disabled.'
     - step: 16
       expectation: '[data-testid="mobile-terminal-status"] shows 控制中.'
-    - step: 21
+    - step: 17
+      expectation: Taking control adopts the phone geometry automatically (RESIZE receipt before the manual fit click).
+    - step: 22
       expectation: Independent receipt contains PTY QA_MOBILE_WEBSOCKET_INPUT.
-    - step: 23
-      expectation: '[data-testid="mobile-terminal-status"] shows 只读.'
     - step: 24
+      expectation: '[data-testid="mobile-terminal-status"] shows 只读.'
+    - step: 25
       expectation: '[data-testid="mobile-resize"] is disabled.'
-    - step: 30
-      expectation: '[data-testid="mobile-task-status"] shows 运行中.'
     - step: 31
-      expectation: Independent receipt contains AGENT QA_AGENT_PROMPT_CHANNEL.
+      expectation: '[data-testid="mobile-task-status"] shows 运行中.'
     - step: 32
+      expectation: Independent receipt contains AGENT QA_AGENT_PROMPT_CHANNEL.
+    - step: 33
       expectation: '[data-testid="mobile-agent-send"] is disabled.'
-    - step: 34
+    - step: 35
       expectation: '[data-testid="mobile-task-status"] shows 空闲.'
-    - step: 36
+    - step: 37
       expectation: '[data-testid="mobile-file-content"] shows QA_MOBILE_CHANGED.'
-    - step: 38
-      expectation: '[data-testid="mobile-file-view"] shows @@ -1 +1 @@.'
     - step: 39
+      expectation: '[data-testid="mobile-file-view"] shows @@ -1 +1 @@.'
+    - step: 40
       expectation: Phone document does not overflow horizontally.
-    - step: 49
+    - step: 50
       expectation: '[data-testid="mobile-instance-open"] has 2 entries.'
-    - step: 51
+    - step: 52
       expectation: '[data-testid="mobile-instance-open"] has 2 entries.'
-    - step: 54
+    - step: 55
       expectation: '[data-testid="mobile-session"] has 2 entries.'
-    - step: 57
-      expectation: '[data-testid="mobile-instance-open"] has 1 entries.'
     - step: 58
+      expectation: '[data-testid="mobile-instance-open"] has 1 entries.'
+    - step: 62
+      expectation: Terminal box is 200px..55% of the phone viewport and has no internal overflow.
+    - step: 64
+      expectation: Terminal box stays bounded and the key bar remains inside the document after 1.5s (no fit feedback growth).
+    - step: 66
       expectation: No runtime errors occurred.
     results:
     - 10
@@ -207,21 +235,24 @@ verification:
     - 13
     - 14
     - 16
-    - 21
-    - 23
+    - 17
+    - 22
     - 24
-    - 30
+    - 25
     - 31
     - 32
-    - 34
-    - 36
-    - 38
+    - 33
+    - 35
+    - 37
     - 39
-    - 49
-    - 51
-    - 54
-    - 57
+    - 40
+    - 50
+    - 52
+    - 55
     - 58
+    - 62
+    - 64
+    - 66
   visual:
   - check: Phone viewport has no horizontal page overflow.
     method: automated
