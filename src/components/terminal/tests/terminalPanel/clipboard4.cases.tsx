@@ -35,6 +35,9 @@ export function registerTerminalPanelClipboard4Cases() {
   });
 
   it("installs SSH cwd reporting when a delayed startup later reaches an idle prompt", async () => {
+    // This contract exercises desktop SSH integration. Browser Windows uses
+    // a deliberately shorter probe instead of installing the shell hook.
+    vi.stubGlobal("__TAURI_INTERNALS__", {});
     let onOutput: ((data: Uint8Array) => void) | undefined;
     ipcMocks.createSshTerminal.mockImplementation(async (...args: unknown[]) => {
       onOutput = args[9] as (data: Uint8Array) => void;
@@ -95,6 +98,7 @@ export function registerTerminalPanelClipboard4Cases() {
   });
 
   it("holds keystrokes while a hidden SSH setup line is still being installed", async () => {
+    vi.stubGlobal("__TAURI_INTERNALS__", {});
     let onOutput: ((data: Uint8Array) => void) | undefined;
     ipcMocks.createSshTerminal.mockImplementation(async (...args: unknown[]) => {
       onOutput = args[9] as (data: Uint8Array) => void;

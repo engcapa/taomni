@@ -86,7 +86,8 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
   // when a terminal hides this group, every panel has zero geometry and the
   // library can put the re-registered editor after Documentation. Its separator
   // then targets a nonexistent panel. Live tool visibility uses panel refs.
-  const initialEditorPanelSize = useRef(props.languagePanelOpen ? "56%" : "80%").current;
+  // The editor consumes the remaining space after the tool panels' sizes.
+  // A separate percentage default normalizes their persisted pixel widths.
   // A group mounted behind a terminal first measures zero. The library
   // reapplies these defaults when it becomes measurable, so an already closed
   // side must also start collapsed rather than claim hidden editor space.
@@ -274,7 +275,6 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
                 />}
                 <Panel
                   id="editor"
-                  defaultSize={initialEditorPanelSize}
                   minSize="37px"
                   className="min-w-0"
                 >

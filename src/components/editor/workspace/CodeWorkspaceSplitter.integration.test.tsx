@@ -425,7 +425,7 @@ describe("CodeWorkspace project splitter integration (real react-resizable-panel
       applyGeometry(container, 452);
     });
     await waitFor(() => {
-      expect(styleFlexGrow(project)).toBeGreaterThan(0);
+      expect(Math.abs((1197 * styleFlexGrow(project)) / 100 - 452)).toBeLessThanOrEqual(1);
     });
     const initialFlexGrow = styleFlexGrow(project);
 
@@ -509,7 +509,7 @@ describe("CodeWorkspace project splitter integration (real react-resizable-panel
       applyGeometry(container, 452);
     });
     await waitFor(() => {
-      expect(styleFlexGrow(project)).toBeGreaterThan(0);
+      expect(Math.abs((1197 * styleFlexGrow(project)) / 100 - 452)).toBeLessThanOrEqual(1);
     });
 
     fireEvent.click(screen.getByTestId("code-workspace-tree-collapse"));
