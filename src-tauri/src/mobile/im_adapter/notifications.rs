@@ -1,6 +1,6 @@
 //! Stable per-turn notification identities also deduplicate snapshot reconciliation.
 use super::{
-    Runtime, actions,
+    Runtime, actions, cards,
     config::Config,
     worker::{Outbound, enqueue},
 };
@@ -79,7 +79,7 @@ impl Notifications {
                         format!(
                             "{}{}",
                             actions::bounded(&format!("Taomni {task} · {status}\n{summary}")),
-                            actions::link(config)
+                            cards::link_line(config, task)
                         ),
                         &id,
                     ),

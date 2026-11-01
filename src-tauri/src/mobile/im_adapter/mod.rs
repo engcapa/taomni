@@ -1,5 +1,7 @@
 //! Opt-in Feishu adapter; long connection only, no public webhook ingress.
 mod actions;
+mod cards;
+mod commands;
 mod config;
 mod network;
 mod notifications;
@@ -146,3 +148,9 @@ mod tests;
 
 #[cfg(test)]
 mod network_tests;
+
+#[cfg(test)]
+mod commands_tests;
+
+#[cfg(test)]
+mod cards_tests;

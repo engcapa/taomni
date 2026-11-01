@@ -1,6 +1,7 @@
 use super::{
     Runtime,
-    actions::{self, Request},
+    actions::{self, Reply, Request},
+    cards::MESSAGE_CHARS,
     config::Config,
     network::{self, Network},
     protocol::Fragments,
@@ -25,8 +26,20 @@ impl Outbound {
         Self {
             chat,
             kind: "text",
-            content: json!({"text":text.chars().take(2000).collect::<String>()}),
+            content: json!({"text":text.chars().take(MESSAGE_CHARS).collect::<String>()}),
             uuid: actions::key(key)[..32].into(),
+        }
+    }
+    /// Cards are built within `cards::CARD_BYTES` by their builders.
+    pub fn reply(chat: String, reply: Reply, key: &str) -> Self {
+        match reply {
+            Reply::Text(text) => Self::text(chat, text, key),
+            Reply::Card(card) => Self {
+                chat,
+                kind: "interactive",
+                content: card,
+                uuid: actions::key(key)[..32].into(),
+            },
         }
     }
 }
@@ -165,8 +178,8 @@ async fn business(
                 let core = core.clone();
                 let config = config.clone();
                 commands.spawn(async move {
-                    let text = actions::execute_request(&core, &config, &request).await;
-                    Outbound::text(request.chat, text, &request.key)
+                    let reply = actions::execute_request(&core, &config, &request).await;
+                    Outbound::reply(request.chat, reply, &request.key)
                 });
             }
             Some(result) = commands.join_next(), if !commands.is_empty() => match result {

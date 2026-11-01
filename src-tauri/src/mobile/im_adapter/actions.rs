@@ -1,22 +1,34 @@
-use super::config::Config;
+use super::{cards, commands, config::Config};
 use crate::mobile::{Core, agent_view, file_view, session_view};
 use rusqlite::OptionalExtension;
-use serde_json::{Value, json};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
+
+pub use cards::{bounded, confirmation_card};
 
 pub struct Request {
     pub key: String,
     pub chat: String,
     pub command: String,
     pub private_chat: bool,
+    /// Card buttons already carry a full id; never retarget a stale button
+    /// through prefix resolution after its original session disappears.
+    exact_session: bool,
 }
-pub fn bounded(text: &str) -> String {
-    let mut chars = text.chars();
-    let value: String = chars.by_ref().take(1200).collect();
-    if chars.next().is_some() {
-        format!("{value}\n[已截断]")
-    } else {
-        value
+/// Command reply: plain text (help, errors, acknowledgements) or an
+/// interactive card (list/show).
+pub enum Reply {
+    Text(String),
+    Card(Value),
+}
+#[cfg(test)]
+impl Reply {
+    /// Text as sent, or the serialized card JSON.
+    pub fn text(&self) -> String {
+        match self {
+            Self::Text(text) => text.clone(),
+            Self::Card(card) => card.to_string(),
+        }
     }
 }
 pub fn key(value: &str) -> String {
@@ -43,7 +55,7 @@ pub fn authorize(config: &Config, value: &Value) -> Result<Option<Request>, Stri
         return Err("feishu_stale_event".into());
     }
     let event = &value["event"];
-    let (open, chat, id, command) = match header["event_type"].as_str() {
+    let (open, chat, id, command, private_chat) = match header["event_type"].as_str() {
         Some("im.message.receive_v1") => {
             if event["sender"]["sender_type"] != "user"
                 || event["message"]["message_type"] != "text"
@@ -53,15 +65,28 @@ pub fn authorize(config: &Config, value: &Value) -> Result<Option<Request>, Stri
             let content: Value =
                 serde_json::from_str(event["message"]["content"].as_str().unwrap_or(""))
                     .map_err(|_| "feishu_invalid_text")?;
-            let text = content["text"].as_str().unwrap_or("").trim();
-            let Some(command) = text.strip_prefix("/taomni ") else {
+            let private_chat = event["message"]["chat_type"] == "p2p";
+            let text = content["text"].as_str().unwrap_or("");
+            let Some(command) = commands::normalize(text, private_chat) else {
                 return Ok(None);
             };
             (
                 event["sender"]["sender_id"]["open_id"].as_str(),
                 event["message"]["chat_id"].as_str(),
                 event["message"]["message_id"].as_str(),
-                command.to_owned(),
+                command,
+                private_chat,
+            )
+        }
+        Some("card.action.trigger") if event["action"]["value"].get("action").is_some() => {
+            let chat = event["context"]["open_chat_id"].as_str();
+            let (command, private_chat) = cards::callback_command(&event["action"]["value"], chat)?;
+            (
+                event["operator"]["open_id"].as_str(),
+                chat,
+                header["event_id"].as_str(),
+                command,
+                private_chat,
             )
         }
         Some("card.action.trigger") => {
@@ -84,6 +109,7 @@ pub fn authorize(config: &Config, value: &Value) -> Result<Option<Request>, Stri
                 event["context"]["open_chat_id"].as_str(),
                 header["event_id"].as_str(),
                 format!("{decision} {thread} {confirmation}"),
+                false,
             )
         }
         _ => return Ok(None),
@@ -102,8 +128,9 @@ pub fn authorize(config: &Config, value: &Value) -> Result<Option<Request>, Stri
     Ok(Some(Request {
         key: key(&format!("{}:{id}", config.app_id)),
         chat: chat.into(),
-        private_chat: event["message"]["chat_type"] == "p2p",
+        private_chat,
         command,
+        exact_session: header["event_type"] == "card.action.trigger",
     }))
 }
 pub fn prepare(core: &Core) -> Result<(), String> {
@@ -145,72 +172,154 @@ pub fn link(config: &Config) -> String {
         format!("\nMobile Web：{}", config.mobile_endpoint)
     }
 }
-pub async fn execute_request(core: &Core, config: &Config, request: &Request) -> String {
+pub async fn execute_request(core: &Core, config: &Config, request: &Request) -> Reply {
     if request.command.len() > 8192 {
-        return "操作失败：指令不能超过 8192 UTF-8 字节。".into();
+        return Reply::Text("操作失败：指令不能超过 8192 UTF-8 字节。".into());
     }
     let action = request.command.split_whitespace().next().unwrap_or("");
     if matches!(action, "show" | "file") && !request.private_chat {
-        return "操作失败：内容查询仅允许已绑定的私聊。".into();
+        return Reply::Text("操作失败：内容查询仅允许已绑定的私聊。".into());
     }
-    execute(core, config, &request.command).await
+    let p2p_chat = request.private_chat.then_some(request.chat.as_str());
+    run(
+        core,
+        config,
+        &request.command,
+        p2p_chat,
+        request.exact_session,
+    )
+    .await
 }
-pub async fn execute(core: &Core, config: &Config, command: &str) -> String {
+/// Executes a canonical command outside any chat, so cards carry no
+/// private-chat buttons.
+#[cfg(test)]
+pub async fn execute(core: &Core, config: &Config, command: &str) -> Reply {
+    run(core, config, command, None, false).await
+}
+async fn run(
+    core: &Core,
+    config: &Config,
+    command: &str,
+    p2p_chat: Option<&str>,
+    exact_session: bool,
+) -> Reply {
     let result = if command.starts_with("file ") && !config.allow_file_content {
         Err("file_content_disabled".into())
     } else {
-        dispatch(core, command).await
+        dispatch(core, config, command, p2p_chat, exact_session).await
     };
     let text = match result {
-        Ok(text) => text,
+        Ok(Reply::Text(text)) => text,
+        Ok(card) => return card,
         Err(code) => format!("操作失败：{code}"),
     };
-    format!("{}{}", bounded(&text), link(config))
+    Reply::Text(format!("{}{}", bounded(&text), link(config)))
 }
-async fn dispatch(core: &Core, command: &str) -> Result<String, String> {
+async fn dispatch(
+    core: &Core,
+    config: &Config,
+    command: &str,
+    p2p_chat: Option<&str>,
+    exact_session: bool,
+) -> Result<Reply, String> {
     let mut parts = command.splitn(3, ' ');
     let action = parts.next().unwrap_or("");
-    let task = parts.next().unwrap_or("");
+    let target = parts.next().unwrap_or("");
     let rest = parts.next().unwrap_or("").trim();
     match action {
-        "help" => Ok("/taomni list\n/taomni show thread:<id>\n/taomni file thread:<id> <相对路径>\n/taomni send thread:<id> 指令\n/taomni stop thread:<id>\n/taomni approve thread:<id> <确认id>\n/taomni reject thread:<id> <确认id>\n不支持 PTY 输入。".into()),
-        "list" => {
-            let value = session_view::list(&core.state()).await?;
-            Ok(value["sessions"].as_array().unwrap().iter().take(20).map(|v| format!("{} · {} · {}",v["id"].as_str().unwrap_or(""),v["title"].as_str().unwrap_or(""),v["status"].as_str().unwrap_or(""))).collect::<Vec<_>>().join("\n"))
-        }
+        "help" => return Ok(Reply::Text(commands::HELP.into())),
+        "list" | "show" | "file" | "send" | "stop" | "approve" | "reject" => {}
+        _ => return Ok(Reply::Text(commands::UNKNOWN.into())),
+    }
+    let listed = session_view::list(&core.state()).await?;
+    let sessions = listed["sessions"]
+        .as_array()
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    if action == "list" {
+        return Ok(Reply::Card(cards::list(config, sessions, p2p_chat)));
+    }
+    if target.is_empty() {
+        return Err(commands::usage(action));
+    }
+    if exact_session && !sessions.iter().any(|session| session["id"] == target) {
+        return Err("未找到该会话；卡片可能已过期，请发送“列表”刷新。".into());
+    }
+    let task = commands::resolve(sessions, target)?;
+    let task = task.as_str();
+    match action {
         "show" => {
-            let value = session_view::detail(&core.state(), task).await?;
-            let result = if let Some(tid) = task.strip_prefix("thread:") {
-                core.state().db.lock().map_err(|_| "database_unavailable")?.query_row(
-                    "SELECT CASE WHEN redacted = 0 THEN substr(content,1,1201) ELSE '[内容已隐藏]' END FROM ai_chat_messages WHERE thread_id = ?1 AND role = 'assistant' ORDER BY created_at DESC,rowid DESC LIMIT 1",
-                    [tid], |r| r.get::<_,String>(0)).optional().map_err(|_| "database_unavailable")?.unwrap_or_default()
-            } else { String::new() };
-            Ok(format!("{} · {}\n{}\n{}\n最近结果：\n{}", value["title"].as_str().unwrap_or(""),value["status"].as_str().unwrap_or(""),
-                value["summary"].as_str().unwrap_or(""),value["confirmations"].as_array().map(|a| a.iter().map(|c| format!("确认 {}：{}（{}）",c["id"].as_str().unwrap_or(""),c["tool"].as_str().unwrap_or(""),if c["supported"] == true {"可批准/拒绝"} else {"需在桌面确认"})).collect::<Vec<_>>().join("\n")).unwrap_or_default(), result))
+            let detail = session_view::detail(&core.state(), task).await?;
+            let body = show_text(core, &detail)?;
+            let short = commands::short_id(task);
+            Ok(Reply::Card(cards::show(
+                config, &detail, &short, &body, p2p_chat,
+            )))
         }
         "file" => {
             let value = file_view::file(&core.state(), task, rest).await?;
-            Ok(format!("{}\n{}{}", rest, value["content"].as_str().unwrap_or(""),
-                if value["truncated"] == true { "\n[文件已截断]" } else { "" }))
+            Ok(Reply::Text(format!(
+                "{}\n{}{}",
+                rest,
+                value["content"].as_str().unwrap_or(""),
+                if value["truncated"] == true {
+                    "\n[文件已截断]"
+                } else {
+                    ""
+                }
+            )))
         }
-        "send" | "stop" | "approve" | "reject" if !task.starts_with("thread:") => Err("agent_only_no_pty_input".into()),
-        "send" => { agent_view::message(core.clone(), task, rest).await?; Ok("已提交 Agent 后续指令；未带桌面上下文。".into()) }
-        "stop" => { agent_view::stop(core, task).await?; Ok("已请求停止当前轮次。".into()) }
-        "approve" | "reject" => { agent_view::confirm(&core.state(), task, rest, action)?; Ok("确认已处理。".into()) }
-        _ => Err("unknown_command_use_taomni_help".into()),
+        // Applied after resolution: a short id may name a terminal.
+        _ if !task.starts_with("thread:") => Err("agent_only_no_pty_input".into()),
+        "send" => {
+            agent_view::message(core.clone(), task, rest).await?;
+            Ok(Reply::Text(
+                "已提交 Agent 后续指令；未带桌面上下文。".into(),
+            ))
+        }
+        "stop" => {
+            agent_view::stop(core, task).await?;
+            Ok(Reply::Text("已请求停止当前轮次。".into()))
+        }
+        _ => {
+            agent_view::confirm(&core.state(), task, rest, action)?;
+            Ok(Reply::Text("确认已处理。".into()))
+        }
     }
 }
-pub fn confirmation_card(config: &Config, task: &str, confirmation: &Value) -> Value {
-    let mut elements = vec![
-        json!({"tag":"div","text":{"tag":"plain_text","content":bounded(&format!("{}\n{}",task,confirmation["tool"].as_str().unwrap_or("确认")))}}),
-    ];
-    if confirmation["supported"] == true {
-        elements.push(json!({"tag":"action","actions":([("同意","approve"),("拒绝","reject")].iter().map(|(label,decision)| json!({"tag":"button","text":{"tag":"plain_text","content":label},"type":"default","value":{"task_id":task,"confirmation_id":confirmation["id"],"decision":decision}})).collect::<Vec<_>>()) }));
-    } else {
-        elements.push(json!({"tag":"div","text":{"tag":"plain_text","content":"需在桌面确认"}}));
+fn show_text(core: &Core, detail: &Value) -> Result<String, String> {
+    let status = detail["status"].as_str().unwrap_or("");
+    let mut text = format!(
+        "{} · {}",
+        detail["title"].as_str().unwrap_or(""),
+        cards::status_text(status)
+    );
+    let summary = detail["summary"].as_str().unwrap_or("");
+    if !summary.is_empty() {
+        text.push('\n');
+        text.push_str(summary);
     }
-    if !config.mobile_endpoint.is_empty() {
-        elements.push(json!({"tag":"div","text":{"tag":"plain_text","content":link(config)}}));
+    for c in detail["confirmations"].as_array().into_iter().flatten() {
+        text.push_str(&format!(
+            "\n确认 {}：{}（{}）",
+            c["id"].as_str().unwrap_or(""),
+            c["tool"].as_str().unwrap_or(""),
+            if c["supported"] == true {
+                "可批准/拒绝"
+            } else {
+                "需在桌面确认"
+            }
+        ));
     }
-    json!({"config":{"wide_screen_mode":true},"header":{"title":{"tag":"plain_text","content":"Taomni 等待确认"}},"elements":elements})
+    if let Some(tid) = detail["id"]
+        .as_str()
+        .and_then(|id| id.strip_prefix("thread:"))
+    {
+        let result = core.state().db.lock().map_err(|_| "database_unavailable")?.query_row(
+            "SELECT CASE WHEN redacted = 0 THEN substr(content,1,1201) ELSE '[内容已隐藏]' END FROM ai_chat_messages WHERE thread_id = ?1 AND role = 'assistant' ORDER BY created_at DESC,rowid DESC LIMIT 1",
+            [tid], |r| r.get::<_, String>(0)).optional().map_err(|_| "database_unavailable")?.unwrap_or_default();
+        text.push_str("\n最近结果：\n");
+        text.push_str(&result);
+    }
+    Ok(text)
 }

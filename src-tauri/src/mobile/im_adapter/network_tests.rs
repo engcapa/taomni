@@ -167,7 +167,7 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
     let runtime = &f.state.mobile.im;
     runtime.start_network(core.clone(), net).await.unwrap();
     wait(|| p.pings.load(Ordering::SeqCst) > 0).await;
-    p.events.send(event("om_list", "/taomni list")).unwrap();
+    p.events.send(event("om_list", "列表")).unwrap();
     wait(|| {
         p.sent.lock().unwrap().iter().any(|m| {
             m["content"]
@@ -177,11 +177,35 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
         })
     })
     .await;
+    let list_card: Value = {
+        let sent = p.sent.lock().unwrap();
+        let message = sent
+            .iter()
+            .find(|m| m["msg_type"] == "interactive")
+            .unwrap();
+        serde_json::from_str(message["content"].as_str().unwrap()).unwrap()
+    };
+    assert!(list_card.to_string().contains("1. feishu-t · Feishu QA"));
+    // Click the value actually emitted by the list card over real protobuf WS.
+    let show = json!({"header":{"app_id":"cli_qa","event_type":"card.action.trigger","event_id":"show-card",
+        "create_time":chrono::Utc::now().timestamp_millis().to_string()},"event":{
+        "operator":{"open_id":"ou_allowed"},"context":{"open_chat_id":"oc_allowed"},
+        "action":{"value":list_card["elements"][1]["actions"][0]["value"]}}});
+    p.events.send(show.clone()).unwrap();
+    wait(|| {
+        p.sent.lock().unwrap().iter().any(|m| {
+            m["msg_type"] == "interactive"
+                && m["content"].as_str().unwrap_or("").contains("最近结果")
+        })
+    })
+    .await;
+    p.events.send(show).unwrap();
+    wait(|| runtime.snapshot().duplicates == 1).await;
     // A duplicate platform event ID is not sufficient: message_id is canonical.
     let mut duplicate = event("om_list", "/taomni list");
     duplicate["header"]["event_id"] = json!("another-event");
     p.events.send(duplicate).unwrap();
-    wait(|| runtime.snapshot().duplicates == 1).await;
+    wait(|| runtime.snapshot().duplicates == 2).await;
     p.events.send(json!({"invalid_json":true})).unwrap();
     wait(|| p.bad_acks.load(Ordering::SeqCst) == 1).await;
     assert_eq!(
@@ -193,6 +217,7 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
     denied["event"]["sender"]["sender_id"]["open_id"] = json!("ou_stranger");
     p.events.send(denied).unwrap();
     wait(|| runtime.snapshot().rejected == 2).await;
+    f.state.mobile.broker.register("blocked");
     p.events
         .send(event("om_pty", "/taomni send term:blocked text"))
         .unwrap();
@@ -208,7 +233,7 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
     p.events
         .send(event(
             "om_send1",
-            "/taomni send thread:feishu-task First Feishu turn",
+            "继续\u{3000}feis\u{3000}First Feishu turn",
         ))
         .unwrap();
     wait(|| requests.load(Ordering::SeqCst) == 1).await;
@@ -227,9 +252,11 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
         })
     })
     .await;
-    p.events
-        .send(event("om_stop", "/taomni stop thread:feishu-task"))
-        .unwrap();
+    let stop = json!({"header":{"app_id":"cli_qa","event_type":"card.action.trigger","event_id":"stop-card",
+        "create_time":chrono::Utc::now().timestamp_millis().to_string()},"event":{
+        "operator":{"open_id":"ou_allowed"},"context":{"open_chat_id":"oc_allowed"},
+        "action":{"value":{"action":"stop","task_id":"thread:feishu-task"}}}});
+    p.events.send(stop).unwrap();
     wait(|| {
         !f.state
             .mobile
@@ -267,6 +294,7 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
     assert!(
         actions::execute(&core, &config(), "show thread:feishu-task")
             .await
+            .text()
             .contains("FEISHU_REAL_TURN")
     );
     let (tx, rx) = tokio::sync::oneshot::channel();
@@ -282,11 +310,13 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
     );
     f.state.mobile.events.publish(json!({"type":"task_status","task_id":"thread:feishu-task","status":"awaiting_confirmation","summary":"write_file"}));
     wait(|| {
-        p.sent
-            .lock()
-            .unwrap()
-            .iter()
-            .any(|m| m["msg_type"] == "interactive")
+        p.sent.lock().unwrap().iter().any(|m| {
+            m["msg_type"] == "interactive"
+                && m["content"]
+                    .as_str()
+                    .unwrap_or("")
+                    .contains("Taomni 等待确认")
+        })
     })
     .await;
     let card = json!({"header":{"app_id":"cli_qa","event_type":"card.action.trigger","event_id":"card-id","create_time":chrono::Utc::now().timestamp_micros().to_string()},
@@ -303,7 +333,7 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
     p.events.send(json!({"close":true})).unwrap();
     wait(|| p.connections.load(Ordering::SeqCst) >= 2 && p.pings.load(Ordering::SeqCst) >= 2).await;
     p.events.send(event("om_list", "/taomni list")).unwrap();
-    wait(|| runtime.snapshot().duplicates == 2).await;
+    wait(|| runtime.snapshot().duplicates == 3).await;
     f.state.mobile.events.publish(json!({"type":"task_status","task_id":"thread:feishu-task","status":"idle","summary":"turn_finished"}));
     wait(|| {
         p.sent.lock().unwrap().iter().any(|m| {
@@ -341,7 +371,7 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
             .query_row("SELECT count(*) FROM mobile_feishu_events", [], |r| r
                 .get::<_, i64>(0))
             .unwrap(),
-        7
+        8
     );
     provider_task.abort();
     server.abort();

@@ -44,11 +44,18 @@ fn identity_application_freshness_and_message_id_dedup_keys() {
     replay = message;
     replay["header"]["create_time"] = json!("1");
     assert!(actions::authorize(&cfg, &replay).is_err());
-    assert!(
+    // Private chats now answer unrecognized text with a help pointer; group
+    // text without the prefix stays ignored.
+    assert_eq!(
         actions::authorize(&cfg, &event("ignore", "hello"))
             .unwrap()
-            .is_none()
+            .unwrap()
+            .command,
+        "hello"
     );
+    let mut group = event("ignore", "hello");
+    group["event"]["message"]["chat_type"] = json!("group");
+    assert!(actions::authorize(&cfg, &group).unwrap().is_none());
 }
 #[test]
 fn fragments_roundtrip_out_of_order_duplicate_and_bounds() {
@@ -105,20 +112,24 @@ async fn real_confirmation_scoping_durable_admission_and_no_pty_commands() {
     assert!(!actions::claim(&core, "first").unwrap());
     actions::prepare(&core).unwrap();
     assert!(!actions::claim(&core, "first").unwrap());
+    f.state.mobile.broker.register("terminal");
     assert!(
         actions::execute(&core, &cfg, "send term:terminal bad")
             .await
+            .text()
             .contains("agent_only_no_pty_input")
     );
     assert!(
         actions::execute(&core, &cfg, "stop term:terminal")
             .await
+            .text()
             .contains("agent_only_no_pty_input")
     );
     assert!(
         actions::execute(&core, &cfg, "list")
             .await
-            .contains("thread:feishu-task")
+            .text()
+            .contains("2. feishu-t · Feishu QA")
     );
     let (tx, rx) = tokio::sync::oneshot::channel();
     f.state
@@ -131,14 +142,18 @@ async fn real_confirmation_scoping_durable_admission_and_no_pty_commands() {
         "cid".into(),
         json!({"id":"cid","thread_id":"feishu-task","tool":"write_file","supported":true}),
     );
+    let wrong = serde_json::from_value(json!({"id":"wrong","title":"Other task","provider_id":"local","created_at":1,"updated_at":1,"source":"drawer","mode":"chat","linked_session_id":null})).unwrap();
+    crate::chat::store::create_thread(&f.state.db.lock().unwrap(), &wrong).unwrap();
     assert!(
         actions::execute(&core, &cfg, "approve thread:wrong cid")
             .await
+            .text()
             .contains("not_supported")
     );
     assert!(
         actions::execute(&core, &cfg, "approve thread:feishu-task cid")
             .await
+            .text()
             .contains("确认已处理")
     );
     assert!(matches!(
@@ -148,6 +163,7 @@ async fn real_confirmation_scoping_durable_admission_and_no_pty_commands() {
     assert!(
         actions::execute(&core, &cfg, "approve thread:feishu-task cid")
             .await
+            .text()
             .contains("already_resolved")
     );
     let card = json!({"header":{"app_id":"cli_qa","event_type":"card.action.trigger","event_id":"card-event","create_time":chrono::Utc::now().timestamp_micros().to_string()},
@@ -188,12 +204,14 @@ async fn real_confirmation_scoping_durable_admission_and_no_pty_commands() {
     assert!(
         actions::execute_request(&core, &cfg, &private)
             .await
+            .text()
             .contains("file_content_disabled")
     );
     private.private_chat = false;
     assert!(
         actions::execute_request(&core, &cfg, &private)
             .await
+            .text()
             .contains("仅允许已绑定的私聊")
     );
     let long = actions::authorize(
@@ -208,17 +226,21 @@ async fn real_confirmation_scoping_durable_admission_and_no_pty_commands() {
     assert!(
         actions::execute_request(&core, &cfg, &long)
             .await
+            .text()
             .contains("8192 UTF-8")
     );
     let mut linked = cfg.clone();
     linked.allow_file_content = true;
     linked.mobile_endpoint = "https://mobile.example.invalid".into();
-    let snapshot = actions::execute(&core, &linked, "file thread:feishu-task notes.txt").await;
+    let snapshot = actions::execute(&core, &linked, "file thread:feishu-task notes.txt")
+        .await
+        .text();
     assert!(snapshot.contains("[已截断]"));
     assert!(snapshot.ends_with(&linked.mobile_endpoint));
     assert!(
         actions::execute(&core, &cfg, "file thread:feishu-task ../secret")
             .await
+            .text()
             .contains("操作失败")
     );
     let text = actions::bounded(&"中".repeat(2000));
