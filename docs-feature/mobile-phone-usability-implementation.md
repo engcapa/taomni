@@ -69,7 +69,7 @@
 
 ## 当前验证记录
 
-下列是本轮实际结果，旧运行不冒充本轮证据；最终 native/GitHub 结果待补。
+下列是本轮实际结果，旧运行不冒充本轮证据；本地 Linux 验证完成，GitHub 结果待补。产品提交 `341a4885`，飞书增量提交 `50b94ae5`；远程 main 已于 `de186f95` 合并（包含 `6ddd5beb`），冲突处保留了双方 QA case 注册。
 
 | 层 | 命令 / 用例 | 当前结果 |
 | --- | --- | --- |
@@ -77,13 +77,16 @@
 | Rust unit/loopback | `cargo test --lib mobile::` | 60 passed，0 failed/ignored；合并飞书卡片/短命令与新 session registry/claim 边界 |
 | TypeScript | `pnpm exec tsc -b --pretty false`、mobile-web tsconfig | 通过（Node 22.23.4） |
 | 边界 | `pnpm check:refactor`、`git diff --check` | 通过；781 native commands / 328 facade exports / 39 literal events；新模块大小合规 |
-| Rust 格式 | 受影响模块 `rustfmt --edition 2024 --check --config skip_children=true ...` | 通过。完整 `cargo fmt --all -- --check` 被既存 `src-tauri/vendor/ironrdp-*` 格式差异阻塞，本轮不改 vendor |
+| Rust 格式 | `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` 与受影响模块 rustfmt | 仓库规定命令通过。额外 `--all` 检查被既存 `src-tauri/vendor/ironrdp-*` 格式差异阻塞，本轮不改 vendor |
 | QA 静态 | `qa_ui_auto.audit --gate`、catalog `--check`、三平台 selected plan | 通过；无 catalog/覆盖退化，不以此代替实际运行 |
 | QA harness unit | `python -m unittest qa_ui_auto.test_mobile_open_session -v` | 9 passed；只证明 oracle 自身，不是 native 接受证据 |
+| 保留消费者 unit | `FeishuAdapterSettings.test.tsx`、`chatStore.test.ts` | 44 passed；QA observation/development-contract Python 另外 10 项通过 |
 | browser | TC-MOBILE-001 扩展 129 步 | passed，0 failed/skipped，source stable=true；`qa-ui-auto-report/mobile-final/browser/run-20261101-224015-133505601`，含 touch/最新、草稿/修饰键、短视口和深链配对 |
-| browser | TC-MOBILE-004 飞书设置 | 初轮 passed；最终稳定源码再执行，旧记录不作为新 source 证据 |
-| browser crash | 完整 crash-regression 初轮 | 8 passed，0 failed/skipped，但该轮 source stable=false；保留原报告且不作为最终有效证据，稳定源码后重跑 |
-| native | TC-MOBILE-002/003/004/005 + 完整 crash-regression | 隔离 QA release 正在构建；不以 dry-run/旧二进制声明通过 |
+| browser | TC-MOBILE-004 飞书设置 | 最终稳定源码 1 passed，0 failed/skipped；`qa-ui-auto-report/mobile-final/browser-settings/run-20261101-224823-825353599` |
+| browser crash | 完整 crash-regression | 最终 8 passed，0 failed/skipped，source stable=true；`qa-ui-auto-report/mobile-final/browser-crash/run-20261101-224225-528666688`。初轮 source stable=false 不作为证据 |
+| QA release build | `native_build.py --release` | 最终构建通过，独立 ID `com.taomni.app.qa` / release，源码 SHA `cd8f8cbf93c690959dadbbc247a1e5f422199e7c2f3a1efc7ff338c28b82597e`，binary SHA `2b27a241ec57233338788530a5e036be9a425359a53b3e66d26f7f923dbc98ed`；日志 `qa-ui-auto-report/mobile-final/mobile-native-build.log` |
+| native mobile | TC-MOBILE-002/003/004/005 | 4 passed，0 failed/skipped，source stable=true，54.1s；`qa-ui-auto-report/mobile-final/native-mobile/run-20261101-225134-727421420`；实际 PTY、吊销/headless、默认关闭→开关启用→local/saved 创建、跨设备 poll 拒绝、可读标题和独立磁盘 marker 通过 |
+| native crash | 完整 crash-regression 9 例 | 9 passed，0 failed/skipped，source stable=true，298.84s；`qa-ui-auto-report/mobile-final/native-crash/run-20261101-225252-957141462`；038/039/045/051/052/053/054/056/057 全通过，含真实 pane/dirty/PT​Y/save/hash/cold-restart 断言 |
 | GitHub | `qa-ui-auto-platforms` selected mobile + crash | 未执行，按要求先完成本地验证 |
 
 未验证：真 iOS/Android 软键盘、IME/触摸硬件，真实飞书客户端卡片渲染和回调投递，公网 HTTPS/私网权限、真实 SSH 认证交互。Chromium 手机视口及标准 Touch DOM oracle 不等于这些真机能力已验收。
