@@ -307,9 +307,12 @@ jobs:
         shell: pwsh
         env:
           TAOMNI_REQUIRE_NSIS_TESTS: '1'
+          TAOMNI_SHERPA_NATIVE_TEST: '1'
         run: |
           $ErrorActionPreference = "Stop"
           $PSNativeCommandUseErrorActionPreference = $true
+          $env:TAOMNI_SHERPA_TEST_ARCHIVE_DIR = (Resolve-Path src-tauri/target/sherpa-onnx-prebuilt).Path
+          node --test scripts/sherpa-onnx-cache.test.mjs
           node --test scripts/windows-runtime-bundle.test.mjs
           pwsh -File scripts/verify-windows-release-bundle.ps1
 
@@ -376,7 +379,7 @@ jobs:
           cache-on-failure: true
 
       - name: Refresh sherpa-onnx native cache
-        run: node scripts/refresh-sherpa-onnx-cache.mjs
+        run: node scripts/refresh-sherpa-onnx-cache.mjs src-tauri/Cargo.toml aarch64-apple-darwin x86_64-apple-darwin
 
       # -----------------------------------------------------------------------
       # Install MIT Kerberos for both architectures.

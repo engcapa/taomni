@@ -5,6 +5,9 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const manifest = resolve(process.argv[2] ?? join(root, "src-tauri/Cargo.toml"));
+// Optional cross-compilation triples follow the manifest path. Cargo clean
+// otherwise only selects the host target, even when other targets are cached.
+const targets = process.argv.slice(3);
 
 function cargo(args) {
   const result = spawnSync("cargo", [...args, "--manifest-path", manifest], {
@@ -29,6 +32,12 @@ if (dirname(prebuilt) !== target) throw new Error(`Invalid sherpa cache path: ${
 // Invalidate the build script AND remove the empty lib/ directories: upstream
 // treats an existing lib/ as a complete download. Rebuilding also restores DLLs
 // beside the profile's executables, which rust-cache removes separately.
-cargo(["clean", "--package", "sherpa-onnx-sys"]);
+// Package-scoped clean defaults to the dev profile. Release must be selected
+// explicitly or its cached build script will skip copying the runtime DLLs.
+for (const profile of ["dev", "release"]) {
+  const args = ["clean", "--package", "sherpa-onnx-sys", "--profile", profile];
+  cargo(args);
+  if (targets.length) cargo([...args, ...targets.flatMap((target) => ["--target", target])]);
+}
 rmSync(prebuilt, { recursive: true, force: true });
 console.log(`Refreshed sherpa-onnx build state and native cache: ${prebuilt}`);
