@@ -5980,6 +5980,7 @@ area: mail/compose
 components: [MailClientTab, RichMailEditor, RecipientField]
 files:
   - src/components/mail/MailClientTab.tsx
+  - src/components/mail/client/MailComposer.tsx
   - src/components/mail/RichMailEditor.tsx
   - src/components/mail/RecipientField.tsx
   - src/lib/mailHtml.ts

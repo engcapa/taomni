@@ -88,13 +88,15 @@ export function MailComposer(viewProps: MailComposerProps) {
             if (files.length > 0) void handleDropComposeFiles(files);
           }}
         >
+          {/* This overlay belongs to the mail pane, whose available height is
+              smaller than the window after titlebar and toolbar layout. */}
           <MailDraggableDialog
             title={draft.id ? "Edit draft" : draft.replyContext?.kind ? "Reply" : "New message"}
             icon={<MailIcon className="w-4 h-4 text-[var(--taomni-text-muted)]" />}
             ariaLabel="New message"
             minWidth={520}
             minHeight={360}
-            className="w-[min(920px,calc(100vw-48px))] h-[min(760px,calc(100vh-72px))] max-w-[calc(100vw-48px)] max-h-[calc(100vh-72px)]"
+            className="w-[min(920px,calc(100vw-48px))] h-[min(760px,calc(100vh-72px))] min-h-0 max-w-full max-h-full"
             onClose={() => {
               setComposeOpen(false);
               setComposePrompt(null);
