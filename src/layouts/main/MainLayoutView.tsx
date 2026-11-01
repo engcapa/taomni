@@ -114,6 +114,16 @@ export function MainLayoutView(props: MainLayoutViewProps) {
           className="fixed inset-x-[14px] top-[2px] h-[4px] z-[9999] cursor-grab active:cursor-grabbing"
           onMouseDown={startWindowDrag}
         />
+        {/* Overlay traffic lights belong to the window, outside both the rail
+            and the resizable navigator/canvas. Reserve their height once. */}
+        {layout.nativeMenu && (
+          <div
+            data-window-drag
+            aria-hidden="true"
+            className="taomni-native-titlebar"
+            onMouseDown={startWindowDrag}
+          />
+        )}
         {chrome.chatDrawerTopPinned && <ChatDrawer />}
 
         <div data-testid="platform-workbench" className="taomni-platform-workbench flex-1 flex min-h-0">
