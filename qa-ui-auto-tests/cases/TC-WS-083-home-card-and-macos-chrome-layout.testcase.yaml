@@ -35,8 +35,8 @@ steps:
       + '"welcome-history-panel"]').getBoundingClientRect().top
     expect_truthy: true
 - eval_readonly:
-    expression: '!document.querySelector(''.taomni-native-titlebar'') || document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''"nav-mode-home"]'').getBoundingClientRect().top
-      >= 32'
+    expression: typeof window.__TAURI_INTERNALS__ === 'undefined' || !/Mac/.test(navigator.platform) || document.querySelector('[data-testid'
+      + String.fromCharCode(61) + '"nav-mode-home"]').getBoundingClientRect().top >= 32
     expect_truthy: true
 - screenshot: home-collapsed-cards.png
 - hover: '[data-testid="welcome-version-footer"]'
@@ -132,8 +132,9 @@ verification:
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''.taomni-home-launch-grid'').getBoundingClientRect().bottom < document.querySelector(''[data-testid''
         + String.fromCharCode(61) + ''\"welcome-history-panel\"]'').getBoundingClientRect().top", "expect_truthy": true}}'
     - step: 9
-      expectation: '{"eval_readonly": {"expression": "!document.querySelector(''.taomni-native-titlebar'') || document.querySelector(''[data-testid''
-        + String.fromCharCode(61) + ''\"nav-mode-home\"]'').getBoundingClientRect().top >= 32", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "typeof window.__TAURI_INTERNALS__ === ''undefined'' || !/Mac/.test(navigator.platform) ||
+        document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"nav-mode-home\"]'').getBoundingClientRect().top >= 32", "expect_truthy":
+        true}}'
     - step: 12
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"welcome-history-panel\"]'').nextElementSibling.tagName
         === ''DETAILS'' && document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"welcome-version-footer\"]'').previousElementSibling.tagName
