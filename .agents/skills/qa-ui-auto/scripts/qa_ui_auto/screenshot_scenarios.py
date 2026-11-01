@@ -35,6 +35,7 @@ SCENARIOS = {
     "scroll-permission-error": "screenshot_qa_scroll_permission_error",
     "capture-permission-error": "screenshot_qa_capture_permission_error",
     "escape-entry": "screenshot_qa_escape_entry",
+    "startup-timing": "screenshot_qa_startup_timing",
     "x11-compositor-bypass": "screenshot_qa_x11_compositor_bypass",
 }
 
