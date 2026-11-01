@@ -77,14 +77,30 @@ Headless 可加 `--feishu`；从当前数据目录读取同一配置。可通过
 - `mobile::im_adapter` Rust fixture：真实 loopback HTTP 与 protobuf WebSocket，token/消息、心跳、断线重连、重复事件、越权、确认卡片映射到真实 oneshot、发送重试 UUID、真实 Agent 后续轮次及停止、不允许 PTY、文件快照/截断/链接、配置与持久去重。
 - GitHub 首轮 `41258283715`：触发参数误用了短 SHA，checkout 失败，未执行用例；改为完整 SHA。
 - GitHub `41258424343`：初轮 browser 三平台各 10/10，Linux Rust 契约 41/41；Linux native TC-MOBILE-004 保存凭据返回 `VAULT_LOCKED`。原来的 `vault_first_run` 在主界面可见时直接返回，不能证明按需凭据库已经初始化；浏览器 stub 又缺少此状态检查。已复用现有 vault gate，新增解锁续存/取消保留回归，YAML 改为实际初始化弹窗，stub 同样拒绝锁定状态。本轮不能计为通过（即使个别 shard job 为绿色）。
-- 凭据库修复 `10e73c6d` 的三平台 browser/native 与完整 `crash-regression` 在 `41260611701` 执行中；最终记录核对 selection、raw summary、receipt 和 aggregate。
+- 凭据库修复 `10e73c6d` 的三平台 browser/native 与完整 `crash-regression` 在 [41260611701](https://github.com/engcapa/taomni/actions/runs/41260611701) 最终通过；selection、raw summary、receipt 和 aggregate 核对结果见下表。
 - 旧轮次 Linux Chromium 安装在 `apt-get update` 的 Azure HTTP 镜像索引停留超过 20 分钟。`ci_linux_setup.sh` 原有 HTTPS 镜像准备发生在 Chromium 步骤之后；已让 Chromium 安装先调用同一 `prepare_apt_mirrors`，并加 15 分钟步骤上限。镜像 helper 的 5 项 shell 行为测试通过，YAML 解析和 refactor 检查通过。未修改用例断言或减少选择范围。
+- Linux 追加轮次 `41261967252` 仅选 native，规划被完整 crash-regression 中仅支持 browser 的用例拒绝，未执行用例；保留此失败，不算通过证据。改为 browser/native 后，[41262327253](https://github.com/engcapa/taomni/actions/runs/41262327253) 在提交 `d813defe2641d910d4cc1e01f09831c6830f3bac` 成功：browser 10/10、native 12/12，0 failed、0 skipped；Rust 契约 41/41。已下载原始 artifacts 并用 `qa_ui_auto.ci report` 独立复核 selection、receipt、源码/用例/runner/QA binary 身份与汇总，`passed=true`、`report_ok=true`，无基础设施错误或缺失用例。报告位于 `qa-ui-auto-report/github/41262327253/`。
+- 补充本机 browser 审阅截图：使用全新隔离浏览器上下文，经首次凭据库设置、保存、关闭并重开 Settings，再截图完整飞书配置区；确认 App ID 保留、密钥框为空，运行时错误为 0。此截图不替代 native 或真实飞书消息证据。
 - V-08 真实飞书账号、应用发布、实际通知与卡片到达、只允许出站的网络环境：未验证。开发期间未向真实飞书发送消息，也未搜索/使用个人凭据。AC-17 当前为部分实现，不能标记全部验收完成。
 - P0 真机、相机/PWA 安装、公共 TLS/PNA 的既有验证缺口不因本次测试自动补齐。
 
+### 三平台最终自动化证据
+
+运行 `41260611701`，被测提交 `10e73c6de41cf036fdc6918dca1fd13e7d8df771`。显式选择 `TC-MOBILE-001,TC-MOBILE-002,TC-MOBILE-003,TC-MOBILE-004`，workflow 合并完整 `crash-regression`，native 使用匹配源码的隔离 QA release。
+
+| 平台 | browser | native |
+| --- | --- | --- |
+| Linux | 10/10 通过 | 12/12 通过，含 TC-MOBILE-002/003/004 |
+| Windows | 10/10 通过 | 10/10 通过，含 TC-MOBILE-004 |
+| macOS | 10/10 通过 | 10/10 通过，含 TC-MOBILE-004 |
+
+共 **62/62 通过、0 failed、0 skipped**。Linux Rust 契约 41/41（含 mobile 18 项），Windows capture helper 契约 26/26。已下载 selection、逐例报告、截图、原始 receipt、QA build identity 和 hosted `ci-summary.json`；在本机用 `ci_collect.py` 与 `qa_ui_auto.ci report` 重新汇总，分组计数和三平台 binary hash 与 hosted 汇总完全一致。`passed=true`、`report_ok=true`，无基础设施错误、缺失用例或未审用例。
+
+报告位于 `qa-ui-auto-report/github/41260611701/`，GitHub Actions artifacts 同步保留。产品源码指纹 `647acb54ac86ea5a5e73f77646b224d4aec6823e135bda8533f04c10570a1bae`，runner 指纹 `9af9d8af84dd9fcef6837d1dcd6c12e5a0a18d98094eaa8b4aff8b06498acfa0`。镜像修复后追加运行 `41262327253` 的产品/runner 指纹与本轮一致，Linux 22/22 再次通过；本次证据与截图收尾不修改产品、用例或 runner。
+
 ## P1 之后的建议任务
 
-以下为 2026-11-01 用户要求整理的候选工作顺序，不表示原设计已经定义 P2，也不在本轮自动启动这些产品变更。P1 自身须先取得当前 CI 通过证据，并单独完成真实飞书 V-08。
+以下为 2026-11-01 用户要求整理的候选工作顺序，不表示原设计已经定义 P2，也不在本轮自动启动这些产品变更。P1 已取得上述 CI 通过证据；真实飞书 V-08 仍须单独完成，独立离线告警也尚未实现。
 
 | 顺序 | 后续工作 | 具体交付与验收边界 |
 | --- | --- | --- |
