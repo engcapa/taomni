@@ -53,7 +53,7 @@ jobs:
         with:
           node-version: '22'
       - name: Build selection contracts
-        run: node --test scripts/resolve-release-build.test.mjs scripts/release-workflow.test.mjs
+        run: node --test scripts/resolve-release-build.test.mjs scripts/release-workflow.test.mjs scripts/sherpa-onnx-cache.test.mjs
       - name: Resolve build selection and version
         id: plan
         env:
@@ -118,6 +118,9 @@ jobs:
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
+
+      - name: Refresh sherpa-onnx native cache
+        run: node scripts/refresh-sherpa-onnx-cache.mjs
 
       - name: Install Linux bundle dependencies
         if: matrix.platform == 'ubuntu-22.04'
@@ -371,6 +374,9 @@ jobs:
         with:
           workspaces: src-tauri -> target
           cache-on-failure: true
+
+      - name: Refresh sherpa-onnx native cache
+        run: node scripts/refresh-sherpa-onnx-cache.mjs
 
       # -----------------------------------------------------------------------
       # Install MIT Kerberos for both architectures.
