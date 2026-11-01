@@ -34,7 +34,7 @@ export function LocalTerminalCard({
 
   return (
     <div
-      className="taomni-home-launch-card text-left h-full border taomni-card-hover flex flex-col"
+      className="taomni-home-launch-card text-left border taomni-card-hover flex flex-col"
       style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
     >
       <div className="flex items-center gap-2 mb-1">
@@ -140,7 +140,7 @@ export function WslCard({
   return (
     <div
       data-testid="welcome-wsl-card"
-      className="taomni-home-launch-card text-left h-full border taomni-card-hover flex flex-col"
+      className="taomni-home-launch-card text-left border taomni-card-hover flex flex-col"
       style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
     >
       <div className="flex items-center gap-2 mb-1">
@@ -193,7 +193,7 @@ export function MailSessionsCard({
   return (
     <div
       data-testid="welcome-mail-card"
-      className="taomni-home-launch-card text-left h-full border taomni-card-hover flex flex-col"
+      className="taomni-home-launch-card text-left border taomni-card-hover flex flex-col"
       style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
     >
       <div className="flex items-center gap-2 mb-1">
@@ -251,7 +251,7 @@ export function ActionCard({
   return (
     <button
       data-testid={testId}
-      className="taomni-home-launch-card text-left h-full border taomni-card-hover flex flex-col"
+      className="taomni-home-launch-card text-left border taomni-card-hover flex flex-col"
       style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
       onClick={onClick}
       type="button"
