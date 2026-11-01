@@ -2,6 +2,7 @@ id: TC-MOBILE-004
 title: Feishu adapter persists credentials identity bindings and isolated proxy without connecting
 covers:
 - F-MOBILE-2
+- F12.1
 tags:
 - p1
 - mobile
@@ -12,10 +13,12 @@ modes:
 fixtures:
 - reset_db
 timeout_sec: 120
-description: Settings entry and persistence workflow. Native verifies real vault/config IPC; browser uses a renderer stub. No real Feishu connection or message is made. Native Rust loopback fixtures own long-connection transport and Agent effects.
+description: Settings entry and persistence workflow. Native verifies real vault/config IPC; browser uses a renderer
+  stub. No real Feishu connection or message is made. Native Rust loopback fixtures own long-connection transport
+  and Agent effects. A fresh on-demand vault is initialized through the actual setup dialog after saving, not inferred
+  from a visible welcome panel.
 steps:
 - open: ${cfg.app.base_url}
-- vault_first_run: qa-feishu-settings-password
 - click: '[data-testid="ribbon-settings"]'
 - fill:
     selector: '[data-testid="settings-search-input"]'
@@ -49,11 +52,20 @@ steps:
     selector: '[data-testid="feishu-proxy-mode"]'
     value: none
 - click: '[data-testid="feishu-save"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-feishu-settings-password
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-feishu-settings-password
+- click: '[data-testid="vault-setup-confirm"]'
 - wait_for: '[data-testid="feishu-saved"]'
 - assert_items:
     selector: '[data-testid="feishu-app-secret"]'
     attribute: value
-    equals: ['']
+    equals:
+    - ''
 - assert_disabled: '[data-testid="feishu-toggle"]'
 - click: '[data-testid="tab-item"][data-tab-type="settings"] [data-testid="tab-close"]'
 - click: '[data-testid="ribbon-settings"]'
@@ -63,14 +75,16 @@ steps:
 - assert_items:
     selector: '[data-testid="feishu-app-id"]'
     attribute: value
-    equals: [cli_qa_settings]
+    equals:
+    - cli_qa_settings
 - assert_text_equals:
     selector: '[data-testid="feishu-bindings"]'
     equals: ou_qa_user oc_qa_chat
 - assert_items:
     selector: '[data-testid="feishu-proxy-mode"] option:checked'
     attribute: value
-    equals: [none]
+    equals:
+    - none
 - assert_text:
     selector: '[data-testid="feishu-status"]'
     contains: 已停止
@@ -80,30 +94,65 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Global settings finds Feishu; invalid bindings fail; saved app identity/proxy survive reopening while the secret stays hidden and outbound connection remains disabled with mobile off.
-    actions: [3, 4, 7, 8, 9, 10, 12, 13, 14, 16, 17, 21, 22, 23]
+    requirement: Global settings finds Feishu; invalid bindings fail; saved app identity/proxy survive reopening
+      while the secret stays hidden and outbound connection remains disabled with mobile off. First use initializes
+      the vault inline and resumes the pending save.
+    actions:
+    - 2
+    - 3
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 13
+    - 15
+    - 16
+    - 18
+    - 19
+    - 20
+    - 24
+    - 25
+    - 26
     checkpoints:
-    - step: 6
+    - step: 5
       expectation: Adapter cannot start before the mobile service.
-    - step: 11
+    - step: 10
       expectation: Malformed identity is rejected before persistence.
-    - step: 15
+    - step: 14
       expectation: Feature uses shared Settings proxy configuration controls.
-    - step: 19
+    - step: 22
       expectation: App Secret field is empty after saving.
-    - step: 20
+    - step: 23
       expectation: No outbound connection starts from saving credentials.
-    - step: 24
-      expectation: App ID persists across reopening Settings.
-    - step: 25
-      expectation: Bound user and chat persist across reopening Settings.
-    - step: 26
-      expectation: No-proxy selection persists independently.
     - step: 27
-      expectation: Adapter remains stopped.
+      expectation: App ID persists across reopening Settings.
     - step: 28
+      expectation: Bound user and chat persist across reopening Settings.
+    - step: 29
+      expectation: No-proxy selection persists independently.
+    - step: 30
+      expectation: Adapter remains stopped.
+    - step: 31
       expectation: No runtime errors.
-    results: [6, 11, 15, 19, 20, 24, 25, 26, 27, 28]
+    - step: 17
+      expectation: Saving the first secret opens the existing on-demand vault setup dialog.
+    - step: 21
+      expectation: Setting the master password resumes the save, without another click or credential re-entry.
+    results:
+    - 5
+    - 10
+    - 14
+    - 17
+    - 21
+    - 22
+    - 23
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
   visual:
   - check: Settings screenshot is diagnostic.
     method: not-applicable
@@ -111,4 +160,5 @@ verification:
   native:
   - check: Actual credential/config persistence requires native IPC.
     method: automated
-    reason: Native mode writes the isolated QA vault and app-data config; the protocol fixture separately checks actual HTTP/WS behavior.
+    reason: Native mode writes the isolated QA vault and app-data config; the protocol fixture separately checks
+      actual HTTP/WS behavior.

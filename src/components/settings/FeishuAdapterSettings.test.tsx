@@ -2,9 +2,11 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { FeishuAdapterSettings } from "./FeishuAdapterSettings";
 const ipc = vi.hoisted(() => vi.fn());
+const gate = vi.hoisted(() => vi.fn());
+vi.mock("../../lib/vaultGate", () => ({ ensureVaultReady: gate }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: ipc }));
 const initial = () => ({ config: { app_id: "", secret_ref: "", bindings: [], mobile_endpoint: "", proxy_mode: "app", custom_proxy: { enabled: true, mode: "manual", kind: "http", host: "", port: 3128, session_id: "", username: "", password_ref: "" } }, secret_configured: false, status: { state: "stopped", error: null, delivered: 0, failed_deliveries: 0, rejected: 0, duplicates: 0, reconnects: 0 } });
-beforeEach(() => { ipc.mockImplementation(async command => command === "list_sessions" ? [] : initial()); });
+beforeEach(() => { gate.mockResolvedValue(true); ipc.mockImplementation(async command => command === "list_sessions" ? [] : initial()); });
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 it("saves only to feature settings, clears the supplied secret and keeps start disabled while mobile is off", async () => {
   const view = initial();
@@ -41,4 +43,31 @@ it("shows actionable native failures and blocks configuration edits while connec
   ipc.mockRejectedValueOnce("feishu_network_failed_check_proxy");
   fireEvent.click(screen.getByTestId("feishu-toggle"));
   expect(await screen.findByTestId("feishu-error")).toHaveTextContent("check_proxy");
+});
+
+it.each([true, false])("handles an on-demand locked vault, ready=%s, retaining unsaved inputs on cancellation", async ready => {
+  gate.mockResolvedValueOnce(ready);
+  const view = initial();
+  let saves = 0;
+  ipc.mockImplementation(async (command, args) => {
+    if (command === "vault_status") return { state: "locked", entry_count: 0 };
+    if (command === "mobile_feishu_save") {
+      if (++saves === 1) throw "VAULT_LOCKED";
+      return { ...view, config: { ...args.config, secret_ref: "vault:stored" }, secret_configured: true };
+    }
+    return view;
+  });
+  render(<FeishuAdapterSettings mobileEnabled={false} />);
+  fireEvent.change(await screen.findByTestId("feishu-app-secret"), { target: { value: "retained-secret" } });
+  fireEvent.click(screen.getByTestId("feishu-save"));
+  if (ready) {
+    await screen.findByTestId("feishu-saved");
+    expect(saves).toBe(2);
+    expect(screen.getByTestId("feishu-app-secret")).toHaveValue("");
+  } else {
+    expect(await screen.findByTestId("feishu-error")).toHaveTextContent("输入已保留");
+    expect(saves).toBe(1);
+    expect(screen.getByTestId("feishu-app-secret")).toHaveValue("retained-secret");
+  }
+  expect(gate).toHaveBeenCalledWith(expect.stringContaining("飞书凭据"));
 });

@@ -17,7 +17,7 @@
 4. 设置 App ID、App Secret 和 `open_id chat_id` 白名单，每行一组；最多 32 组。身份必须与会话同时匹配。通知发往这些会话，群成员即使无操作权限也可见通知。
 5. 填可从手机访问的 Mobile Web 地址（可选），选择应用代理 / 独立代理 / 不使用代理，保存后启动连接。
 
-App Secret 保存在已解锁的加密 vault，`mobile-feishu.json` 仅保存引用。密钥不回传前端，不进入 Mobile Web。配置修改必须先停止适配器。独立代理重用 Settings 代理编辑器与后端严格解析，不修改应用代理；不使用代理显式绕过环境/系统代理，配置代理失败不自动直连。
+App Secret 保存在加密 vault；首次使用或锁定时通过现有按需弹窗初始化/解锁，完成后自动继续保存，取消保留输入。`mobile-feishu.json` 仅保存密钥引用。密钥不回传前端，不进入 Mobile Web。配置修改必须先停止适配器。独立代理重用 Settings 代理编辑器与后端严格解析，不修改应用代理；不使用代理显式绕过环境/系统代理，配置代理失败不自动直连。
 
 Headless 可加 `--feishu`；从当前数据目录读取同一配置。可通过进程环境 `TAOMNI_FEISHU_APP_SECRET` 临时提供密钥，或使用已解锁 vault 中的引用；不通过命令行参数传递明文密钥。未提供可用凭据时显式报错，不擅自解锁 vault。
 
@@ -69,12 +69,28 @@ Headless 可加 `--feishu`；从当前数据目录读取同一配置。可通过
 
 ## 验证记录
 
-本机 Linux：`pnpm build` 通过（含 `check:refactor`）；相关 Settings Vitest 10/10 通过；`cargo test --lib mobile::` 18/18 通过（含最近结果查询复测）。静态 `audit --gate` 与 native dry-run 通过；dry-run 不算 native 执行证据。
+本机 Linux：`pnpm build` 通过（含 `check:refactor`）；初轮相关 Settings Vitest 10/10 通过；凭据库修复后含 vault gate 的相关测试 16/16 通过；`cargo test --lib mobile::` 18/18 通过（含最近结果查询复测）。静态 `audit --gate` 与 native dry-run 通过；dry-run 不算 native 执行证据。
 
-实际 browser：`qa-ui-auto-report/feishu-p1-browser/run-20261101-084505-771164808`，TC-MOBILE-001、TC-MOBILE-004 共 2/2 通过，0 失败、0 跳过；004 确实关闭并重新创建 Settings 标签，非重复激活原标签。截图：[保存后重开](mobile-feishu-p1/settings.png)。
+初轮实际 browser：`qa-ui-auto-report/feishu-p1-browser/run-20261101-084505-771164808`，TC-MOBILE-001、TC-MOBILE-004 共 2/2 通过，0 失败、0 跳过；004 确实关闭并重新创建 Settings 标签，非重复激活原标签。截图：[保存后重开](mobile-feishu-p1/settings.png)。修复按需解锁后，TC-MOBILE-004 在 `run-20261101-091406-971275306` 再次通过，实际完成首次凭据库弹窗和自动续存。
 
 - `TC-MOBILE-004`：全局设置入口、非法身份拒绝、独立代理编辑、密钥保存后清空、关闭/重新打开 Settings 后配置恢复，移动服务未开启时不能启动。browser 为 renderer stub；native 使用隔离 QA vault 和真实 IPC/磁盘配置。
 - `mobile::im_adapter` Rust fixture：真实 loopback HTTP 与 protobuf WebSocket，token/消息、心跳、断线重连、重复事件、越权、确认卡片映射到真实 oneshot、发送重试 UUID、真实 Agent 后续轮次及停止、不允许 PTY、文件快照/截断/链接、配置与持久去重。
-- GitHub 三平台 browser/native：待执行；包括受影响移动用例与完整 `crash-regression` 集合。最终记录必须核对 selection、raw summary、receipt 和 aggregate，不能仅看绿色 job。
+- GitHub 首轮 `41258283715`：触发参数误用了短 SHA，checkout 失败，未执行用例；改为完整 SHA。
+- GitHub `41258424343`：初轮 browser 三平台各 10/10，Linux Rust 契约 41/41；Linux native TC-MOBILE-004 保存凭据返回 `VAULT_LOCKED`。原来的 `vault_first_run` 在主界面可见时直接返回，不能证明按需凭据库已经初始化；浏览器 stub 又缺少此状态检查。已复用现有 vault gate，新增解锁续存/取消保留回归，YAML 改为实际初始化弹窗，stub 同样拒绝锁定状态。本轮不能计为通过（即使个别 shard job 为绿色）。
+- 修复后的三平台 browser/native 与完整 `crash-regression` 正待重新执行；最终记录核对 selection、raw summary、receipt 和 aggregate。
 - V-08 真实飞书账号、应用发布、实际通知与卡片到达、只允许出站的网络环境：未验证。开发期间未向真实飞书发送消息，也未搜索/使用个人凭据。AC-17 当前为部分实现，不能标记全部验收完成。
 - P0 真机、相机/PWA 安装、公共 TLS/PNA 的既有验证缺口不因本次测试自动补齐。
+
+## P1 之后的建议任务
+
+以下为 2026-11-01 用户要求整理的候选工作顺序，不表示原设计已经定义 P2，也不在本轮自动启动这些产品变更。P1 自身须先取得当前 CI 通过证据，并单独完成真实飞书 V-08。
+
+| 顺序 | 后续工作 | 具体交付与验收边界 |
+| --- | --- | --- |
+| 1 | 移动端专项验收补齐 | Android/iOS 真机 PWA、相机扫码、剪贴板、后台恢复；公共 TLS/PNA；Windows/macOS 移动服务的配对、吊销、PTY 单写权和尺寸复原。保留平台实测证据，浏览器 stub 不代替 native/真机。 |
+| 2 | IM 可靠送达 | 持久化待发送通知、应用重启恢复、可追踪的失败重试。模拟断网/限流/崩溃，明确受理与执行状态；不得把现有至多一次登记宣称为保证执行。 |
+| 3 | 飞书交互与绑定引导 | 群聊 @ 指令、获取/确认身份绑定的本机引导、实例标识。默认拒绝未授权身份；若允许单应用多实例，须先设计明确路由，不能依赖官方随机集群分发。 |
+| 4 | 独立离线告警 | 另行设计独立监测端，覆盖断网、进程崩溃与主机关机。验收告警延迟和恢复通知；本实例主动停止通知不能替代独立离线检测。 |
+| 5 | 微信官方渠道决策 | 比较企业微信与服务号的接收事件方式、审批回调、权限、部署与成本；确定一个明确方案后再开发，不实施个人微信自动化。 |
+
+headless 新建终端、原生壳/应用商店、内置中继不自动纳入这些任务。原设计对前者要求另行决策，后两者当前不在范围内。

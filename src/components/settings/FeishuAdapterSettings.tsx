@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import type { AppProxyConfig } from "../../lib/ipc";
+import { isVaultLockedError, type AppProxyConfig } from "../../lib/ipc";
+import { ensureVaultReady } from "../../lib/vaultGate";
+import { useVaultStore } from "../../stores/vaultStore";
 import { AppProxyPanel } from "./AppProxyPanel";
 
 interface Config {
@@ -52,13 +54,22 @@ export function FeishuAdapterSettings({ mobileEnabled }: { mobileEnabled: boolea
   const dirty = !!secret || JSON.stringify(config) !== JSON.stringify(view.config);
   const act = async (run: () => Promise<void>) => {
     setBusy(true); setError(""); setSaved(false);
-    try { await run(); } catch (e) { setError(String(e)); } finally { setBusy(false); }
+    try {
+      try { await run(); } catch (e) {
+        if (!isVaultLockedError(e)) throw e;
+        await useVaultStore.getState().refresh();
+        if (!(await ensureVaultReady("保存或使用飞书凭据需要解锁凭据库"))) {
+          throw new Error("未解锁凭据库，操作未完成；输入已保留。");
+        }
+        await run();
+      }
+    } catch (e) { setError(String(e)); } finally { setBusy(false); }
   };
   const patch = (value: Partial<Config>) => { setDraft({ ...draft, ...value }); setSaved(false); };
   return <section data-testid="feishu-settings" className="mt-5 border-t pt-4 space-y-3">
     <h4 className="font-semibold">飞书 / Feishu Agent 适配器（P1）</h4>
     <p>使用企业自建应用的长连接，无需公网入站地址。先开启移动服务；关闭本页继续运行，关闭移动服务会停止适配器。</p>
-    <p className="text-[var(--taomni-text-muted)]">每个 Taomni 实例使用独立应用。需开启机器人能力、订阅 im.message.receive_v1 和 card.action.trigger，并授予 im:message:send_as_bot 与im:message.p2p_msg:readonly（私聊接收）权限。</p>
+    <p className="text-[var(--taomni-text-muted)]">每个 Taomni 实例使用独立应用。需开启机器人能力、订阅 im.message.receive_v1 和 card.action.trigger，并授予 im:message:send_as_bot 与 im:message.p2p_msg:readonly（私聊接收）权限。</p>
     <fieldset disabled={busy || running} className="space-y-3">
       <label className="block">App ID<input data-testid="feishu-app-id" className="taomni-input w-full" value={draft.app_id} onChange={e => patch({ app_id: e.target.value.trim() })} placeholder="cli_…" autoComplete="off" /></label>
       <label className="block">App Secret（{view.secret_configured ? "已保存；留空保留" : "保存到已解锁的凭据库"}）<input data-testid="feishu-app-secret" className="taomni-input w-full" type="password" value={secret} onChange={e => { setSecret(e.target.value); setSaved(false); }} autoComplete="new-password" /></label>
