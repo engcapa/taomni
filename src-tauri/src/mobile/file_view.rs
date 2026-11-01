@@ -31,12 +31,14 @@ pub fn remember_root(state: &AppState, context: &crate::agent::context::AgentThr
         .unwrap_or_else(|e| e.into_inner());
     if let Some(root) = root {
         roots.insert(context.thread_id.clone(), root);
-    } else if local.is_some()
+    } else if context.cwd.is_some()
+        || context.code_workspace.is_some()
+        || context.local_terminal_env.is_some()
         || context.bound_session_id.is_some()
-        || context.linked_session_id.is_some()
     {
         // An explicit invalid/remote binding revokes access; context-free mobile
-        // follow-ups retain the last desktop-granted local root.
+        // follow-ups retain the last desktop-granted local root. The thread's
+        // persisted linked_session_id alone is not a new context grant/revoke.
         roots.remove(&context.thread_id);
     }
     state.mobile.roots_changed.notify_one();

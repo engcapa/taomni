@@ -21,7 +21,7 @@ M1 的历史证据需更正：GitHub API 已确认 [41262327253](https://github.
 | F-05 | 修复：缺失终端升级后发送 error + 4004；exit/4004 停止重连 | `streams.rs`、`live.test.tsx`；真实 WS 回归 |
 | F-06 | 修复：单帧分片/编码/JSON 错误回失败 ACK 并计数，保持连接 | `im_adapter/worker.rs`、`network_tests.rs` 的坏 JSON ACK 与后续正常事件 |
 | F-07 | 修复：采用建议中的粗粒度失效事件，每任务 500ms 合并，忽略高频生成目录；飞书独立订阅 task_status | `file_watch.rs`、`events.rs`、`worker.rs`；文件与独立订阅回归 |
-| F-08 | 确认删除路径存在；修复：无新本地根时保留既有根，移动后续请求不清除目录授权 | `file_view::remember_root`；真实上下文重建后文件仍可读 |
+| F-08 | 确认删除路径存在；修复：无新本地根时保留既有根，移动后续请求不清除目录授权 | `file_view::remember_root`；真实上下文重建（含数据库回填 linked_session_id）后文件仍可读；显式远程 cwd 仍撤销权限 |
 | F-09 | 修复：拒绝家目录/文件系统根/profile/配置目录及常见凭据路径 | `file_policy.rs`、`review_tests.rs` 的 .env 与路径边界断言 |
 | F-10 | 修复：headless stderr logger、周期失败计数与飞书状态 | `headless_ops.rs`、`headless.rs`；真实部署日志抽检仍另列 |
 | F-11 | 修复：Windows headless AttachConsole/AllocConsole；跨平台每五分钟轮码，Ctrl-C 正常退出 | `headless_ops.rs`、`headless.rs`；Windows 实际操作者控制台交互未实测 |
@@ -68,11 +68,11 @@ M1 的历史证据需更正：GitHub API 已确认 [41262327253](https://github.
 ## 验证与证据
 
 - 旧代码隔离探针：在临时目录恢复初始 `live.ts/api.ts`，新增测试复现 3 项失败（重启事件丢失、已移除终端重连、413 误报网络错误）；修复后对应测试通过。日志：`qa-ui-auto-report/mobile-review/baseline-frontend.log`。
-- Rust 真实网络/磁盘/PTY：`cargo test --manifest-path src-tauri/Cargo.toml --lib mobile::`，34/34 通过（0 failed/ignored），日志 `qa-ui-auto-report/mobile-review/rust-complete.log`。
+- Rust 真实网络/磁盘/PTY：`cargo test --manifest-path src-tauri/Cargo.toml --lib mobile::`，首轮 34/34 通过（0 failed/ignored），日志 `qa-ui-auto-report/mobile-review/rust-complete.log`。补充绑定线程回填场景后，修复前探针以 diff_unavailable 失败（`bound-root-before.log`）；修复后完整 mobile 集合再次 34/34 通过（`bound-root-after.log`），`pnpm check:refactor` 和 rustfmt 也再次通过。
 - 前端：`pnpm exec vitest run mobile-web/src src/components/settings/FeishuAdapterSettings.test.tsx src/stores/chatStore.test.ts`，最终 5 文件 50/50 通过，包括桌面 turn_in_progress 无回退/无多余消息回归（chatStore 39 项）。日志 `qa-ui-auto-report/mobile-review/frontend-complete.log`；移动设置的真实入口由 TC-MOBILE-002 覆盖。
 - QA audit --gate 通过，678 个用例无 schema 错误、catalog 一致、覆盖无倒退；CI selection 规划通过。`pnpm build`（含 TypeScript、check:refactor、Mobile Web、桌面 bundle）及 `cargo fmt --check` 均通过。构建日志 `qa-ui-auto-report/mobile-review/build-complete.log`；边界/文件大小检查无例外新增。测试断言类型导入导致的前次构建失败已修正并完整重跑。
 - 自动化选择：TC-MOBILE-001～004，加完整 crash-regression；Linux/Windows/macOS，browser/native，`native_release=true`。001 是手机尺寸 fixture UI，002 是真实桌面 HTTP/WS/PTY（Linux），003 是无 Display headless+真实内嵌外壳（Linux），004 是三平台设置与真实 native vault/配置持久化。其余 native 平台运行设置和完整 crash 集合，不假称已运行 Linux 专属用例。
-- GitHub 新运行及原始报告核验：待执行/回填，绿色 job 不代替 passed/report_ok 与 receipt/source/build 一致性。
+- GitHub 首次运行 [41269081051](https://github.com/engcapa/taomni/actions/runs/41269081051) 测试 `766debc2`，规划通过；复核发现绑定线程的 F-08 边界遗漏后主动取消，不计通过。后续新提交保持同样 62 项选择重跑；最终原始报告核验待回填，绿色 job 不代替 passed/report_ok 与 receipt/source/build 一致性。
 
 ### 尚不能由本轮自动化证明的验收
 

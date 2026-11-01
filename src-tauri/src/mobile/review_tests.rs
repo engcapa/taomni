@@ -52,6 +52,7 @@ async fn subdirectory_root_paths_stay_local_and_diff_is_literal() {
         &f.state,
         crate::agent::context::AgentThreadContextInput {
             thread_id: "task".into(),
+            linked_session_id: Some("desktop-tab-restored-from-thread".into()),
             ..Default::default()
         },
     )
@@ -86,6 +87,22 @@ async fn subdirectory_root_paths_stay_local_and_diff_is_literal() {
             "file_unavailable"
         );
     }
+    let remote = crate::agent::context::build_agent_thread_context(
+        &f.state,
+        crate::agent::context::AgentThreadContextInput {
+            thread_id: "task".into(),
+            linked_session_id: Some("remote-tab".into()),
+            cwd: Some(root.to_string_lossy().into_owned()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    file_view::remember_root(&f.state, &remote);
+    assert!(
+        file_view::file(&f.state, "thread:task", "inside.txt")
+            .await
+            .is_err()
+    );
     f.finish().await;
 }
 
