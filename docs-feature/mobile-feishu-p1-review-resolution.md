@@ -76,17 +76,37 @@ M1 的历史证据需更正：GitHub API 已确认 [41262327253](https://github.
 
 ### GitHub 当前修复提交验证
 
-运行：[41269713293](https://github.com/engcapa/taomni/actions/runs/41269713293)，提交 `8fa4843a7a54f62e885e04a434929fc1911b109a`。已下载 selection，确认 native_release、无 capability gaps/未审用例；产品源码指纹 `2c69fe852338ddef1ce47c4d9c18cc8fe007d22dc95aa2714a65c0c896dc7b08`，runner 指纹 `516f2fb7d9dd7cade32bb8d803c608790869f019b704b8acb0eae765ed5809f6`。
+运行：[41275734638](https://github.com/engcapa/taomni/actions/runs/41275734638)，测试提交 `c1e74ae94c86e8b106d121e3e738b578a7704bb6`，run attempt 为 1。selection 的 `native_release=true`，无 capability gaps/未审用例；产品源码指纹 `2c69fe852338ddef1ce47c4d9c18cc8fe007d22dc95aa2714a65c0c896dc7b08`，runner 指纹 `bd305ff90a9721a887eb1cf7930c2471b0ac296c895281a18fd85d5efec6f5e4`。
 
 | 平台 | browser | native |
 | --- | --- | --- |
-| Linux | 10/10，0 failed/skipped | 9/9 已执行通过；另外 3 项因依赖安装未启动，待重试 |
+| Linux | 10/10，0 failed/skipped | 12/12，0 failed/skipped |
 | Windows | 10/10，0 failed/skipped | 10/10，0 failed/skipped |
 | macOS | 10/10，0 failed/skipped | 10/10，0 failed/skipped |
 
-browser 原始报告确认实际执行、identity_stable=true。Linux 原生 Rust 契约 **57/57**（含 mobile 34 项），同 job 的 Vitest **50/50**；日志已下载到 `qa-ui-auto-report/mobile-review/github-rust-contracts.log`。
+GitHub workflow 最终 **success**；下载全部 15 份原始执行报告后，独立 `ci_collect.py` + `qa_ui_auto.ci report` 确认 **62/62，0 failed/skipped**，`passed=true`、`report_ok=true`，failures/gaps/unreviewed/infrastructure_errors 均为空。原始报告均实际执行、`identity_stable=true`，selection/receipt/source/runner/case/QA build 身份匹配，全部为同一 run attempt 1。hosted summary 与独立执行汇总一致；hosted 额外的 job_results 也均为 success 或按工作流规则 skipped（不是用例跳过）。TC-MOBILE-002 独立 receipt 确认鉴权/CORS、双设备真实 PTY 与写权、桌面输入抢回、吊销关闭连接和停止监听通过。Linux 原生 Rust 契约 **57/57**（含 mobile 34 项），同 job 的 Vitest **50/50**；日志在 `qa-ui-auto-report/github/41275734638/native-contracts.log`。Windows capture helper **26/26**、原子替换 **4/4** 通过；日志 `qa-ui-auto-report/github/41275734638/windows-build.log`。
 
-初次执行的 Linux native shard-4 在安装 Ubuntu 依赖时遇到镜像同步错误（索引实际 1707632 字节、预期 1707592，apt 退出 100），未启动 TC-WS-038/052/057。失败日志保存在 `qa-ui-auto-report/mobile-review/linux-shard4.log`，不能计为通过；其余 Linux native 9 项与 macOS native 10 项原始报告均通过、identity_stable=true。Windows native 10/10 也已通过（identity_stable=true），capture helper 26/26、原子替换 4/4 通过。首轮实际执行 59/59，通过报告没有失败或跳过；缺失的 3 项未计通过。已保存 attempt-1 失败汇总，GitHub 接受只重试 shard-4 并重新汇总，保持原提交、完整选择与原 QA release；shard-4 重试 3/3 通过；独立 ci report 计数达到 62/62，但因重试 attempt 与原 selection 的身份不一致而拒绝合并（execution selection/run identity differs），最终汇总失败，不能作为完整通过证据。原始证据未改写。后续完整运行 [41273645448](https://github.com/engcapa/taomni/actions/runs/41273645448) 复用了匹配构建，但暴露 Windows cached-app 路径跳过前端构建后，helper Cargo 测试缺少 Mobile Web 资源，触发 F-30 的 release 资源缺失检查。已停止该轮，并在 Windows helper 契约步骤显式生成 Mobile Web；保留 release 缺资源失败检查。构建/原生产物/Linux setup 工具契约 14/14 与 workflow YAML 解析通过；后续运行 [41274514157](https://github.com/engcapa/taomni/actions/runs/41274514157) 的原始报告发现 TC-MOBILE-002 点击落在上方设置区块，服务未启动（当时 Linux native 为 11/12）。设置搜索平滑滚动时，原生点击器两次位置相同不足以证明画面稳定；已改为持续 300ms 稳定且命中测试通过，点击前滚动使用 instant。新增短暂滚动停顿回归，修复前确实返回旧位置而失败，修复后点击/拖拽契约 96/96 通过；`pnpm check:refactor` 通过。属于测试驱动器修复，保留 TC-MOBILE-002 的真实 UI 开启、HTTP/WS/PTY 与吊销断言，不新增产品用例或改变产品源码。后续完整运行结果另行核验。
+最终证据目录：`qa-ui-auto-report/github/41275734638/`（`downloads/` 原始报告/receipts、`hosted/` GitHub 汇总、`verified/ci-summary.json` 独立汇总、`verification.txt` 对照结果）。三个 native release 的二进制 SHA-256 经汇总/receipt 校验一致：
+
+| QA release | SHA-256 |
+| --- | --- |
+| Linux x64 | `be12e604ebf7df091bbe1298035d2e17320c2693db8491a68298266a715fc255` |
+| Windows x64 | `0c87945d01a2123044ea5cd4ce1253822ccc81e0439019ca5b0ce867d4e2d373` |
+| macOS arm64 | `c25158703f4f45c93feaed460e0efa51a9a8d9db163529c6ed6a5f3d34bc125f` |
+
+本次证据回填仅改 Markdown；产品、runner、用例内容身份不变，测试对象仍明确为上述 `c1e74ae9…`。
+
+### 失败记录与修正
+
+保留以下原始失败，不将历史成功、重试计数或绿色 job 当作当前完整通过：
+
+- [41269081051](https://github.com/engcapa/taomni/actions/runs/41269081051)：发现 F-08 数据库回填 linked_session_id 边界后取消，补回归并修复为 `8fa4843a`。
+- [41269713293](https://github.com/engcapa/taomni/actions/runs/41269713293)：首轮 Linux shard-4 安装依赖时遇 Ubuntu 镜像同步错误，apt 退出 100，3 项未执行。单独重试 3/3 通过后计数达到 62/62，但 attempt-2 执行与 attempt-1 selection 不一致，独立 ci report 正确拒绝（execution selection/run identity differs）；该轮不计完整通过。
+- [41273645448](https://github.com/engcapa/taomni/actions/runs/41273645448)：缓存 app 路径跳过前端构建后，Windows helper Cargo 测试触发 F-30 release 资源缺失检查。取消后在 helper 步骤先生成 Mobile Web（`5067c2b6`），保留缺资源失败检查。构建/原生产物/Linux setup 契约 14/14、workflow YAML 解析通过；下一轮实际验证 capture helper 26/26、原子替换 4/4 通过。
+- [41274514157](https://github.com/engcapa/taomni/actions/runs/41274514157)：原始报告为 TC-MOBILE-002 失败，最终 `passed=false, report_ok=true`。点击事件落在上方设置区块，未触发服务开启；绿色分片 job 不代表用例通过。设置搜索平滑滚动时，两次位置相同不足以证明画面稳定；点击器改为持续 300ms 稳定并通过命中测试，准备滚动使用 instant（`c1e74ae9`）。新增短暂滚动停顿回归，修复前返回旧位置失败，修复后点击/拖拽契约 96/96 与 check:refactor 通过（`pointer-before.log`、`pointer-after.log`）。属于驱动器修复，保留 TC-MOBILE-002 的真实 UI 开启和 HTTP/WS/PTY/吊销断言，产品源码不变，无需新增产品用例。
+- [41275602933](https://github.com/engcapa/taomni/actions/runs/41275602933)：dispatch 的短 SHA 被 checkout 当作分支名，规划阶段退出，未执行用例；改用完整 SHA 发起当前运行。
+
+失败日志、截图和各轮原始报告均保留在 `qa-ui-auto-report/github/<run-id>/`；没有改写 receipt 或混合不同 attempt 的证据。
 
 ### 尚不能由本轮自动化证明的验收
 
