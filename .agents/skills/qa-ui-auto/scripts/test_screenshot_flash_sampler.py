@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, patch
 
-from screenshot_flash_sampler import GRID, capture_source, grid, run, summarize
+from screenshot_flash_sampler import GRID, capture_source, grid, run, summarize, wall_clock_ns
 
 
 class FlashSamplerTests(unittest.TestCase):
@@ -36,6 +36,31 @@ class FlashSamplerTests(unittest.TestCase):
             self.assertLessEqual(events[0]["captureEndedMonoMs"], events[1]["captureStartedMonoMs"])
             self.assertNotIn("points", events[0])
 
+    def test_windows_capture_brackets_use_precise_utc_and_qpc_not_quantized_ticks(self):
+        with TemporaryDirectory() as directory:
+            stop = Path(directory) / "stop"
+            def capture():
+                stop.write_text("stop")
+                return {"points": [[1, 2, 3]] * (48 * 27), "width": 100,
+                        "height": 100, "transport": "test"}
+            output = io.StringIO()
+            with patch("screenshot_flash_sampler.wall_clock_ns", return_value=Mock(side_effect=[
+                    1_700_000_000_000_000_000, 1_700_000_000_031_200_000])), \
+                 patch("screenshot_flash_sampler.time.perf_counter_ns", side_effect=[1_000_000_000, 1_031_200_000]), \
+                 patch("screenshot_flash_sampler.time.monotonic_ns", side_effect=AssertionError("quantized tick clock")), \
+                 patch("screenshot_flash_sampler.time.time_ns", side_effect=AssertionError("coarse UTC clock")), \
+                 patch("screenshot_flash_sampler.time.sleep"):
+                run(capture, output, stop)
+            first = json.loads(output.getvalue().splitlines()[0])
+            self.assertAlmostEqual(first["captureEndedMonoMs"] - first["captureStartedMonoMs"], 31.2)
+            self.assertAlmostEqual(first["captureEndedMs"] - first["captureStartedMs"], 31.2, places=3)
+
+    @unittest.skipUnless(__import__("sys").platform == "win32", "Windows precise UTC API")
+    def test_windows_precise_wall_clock_preserves_real_utc_epoch(self):
+        import time
+        precise = wall_clock_ns()
+        self.assertLess(abs(precise() - time.time_ns()), 100_000_000)
+
     def test_shell_capture_timestamp_is_not_replaced_by_delivery_time(self):
         with TemporaryDirectory() as directory:
             stop = Path(directory) / "stop"
@@ -55,7 +80,7 @@ class FlashSamplerTests(unittest.TestCase):
     def test_hard_lifetime_is_a_failure_not_a_green_stop(self):
         with TemporaryDirectory() as directory:
             output, capture = io.StringIO(), Mock()
-            with patch("screenshot_flash_sampler.time.monotonic", side_effect=[0, 46]):
+            with patch("screenshot_flash_sampler.time.perf_counter", side_effect=[0, 46]):
                 with self.assertRaisesRegex(RuntimeError, "finite lifetime"):
                     run(capture, output, Path(directory) / "stop")
             self.assertEqual(output.getvalue(), "")

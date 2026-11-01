@@ -44,7 +44,9 @@ pub(super) fn marker_pixels(image: &RgbaImage) -> usize {
     for y in 0..h {
         for x in 0..w {
             let [r, g, b, _] = image.get_pixel(x, y).0;
-            if r > 180 && b > 180 && g < 90 && r - g > 120 && b - g > 120 {
+            // #ff00ff with a small tolerance, not arbitrary desktop purple
+            // (the hosted Windows Firefox icon contains purple pixels).
+            if r >= 240 && b >= 240 && g <= 15 {
                 count += 1;
             }
         }

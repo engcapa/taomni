@@ -169,7 +169,17 @@
 2026-11-01 本机 Windows 11（Node 22.22.2 / pnpm 10.30.1）：
 
 - 前端全套：662 文件通过，6180 测试通过，1 原有跳过（`qa-ui-auto-report/tmp/screenshot-unit-full-node22.log`）。后续修改原生与 QA 工具，不把旧证据冒充最终所有源码证据。
-- 截图 browser 首轮 39/41；026/027 因 ready IPC 新顺序失败，保留原参数检查后两项复跑通过；最终全组复跑中。新增 040 加载/重开通过；StrictMode 重放预取重复读回先红后绿；共享 WebView guards 4 项通过。
+- 截图 browser 首轮 39/41；026/027 因 ready IPC 新顺序失败，保留原参数检查后两项复跑通过；随后完整截图 browser 41/41 通过（`run-20261101-222152-935490800`）。新增 040 加载/重开通过；StrictMode 重放预取重复读回先红后绿；共享 WebView guards 4 项通过。
 - 原生 debug QA 候选构建成功（含完整 `pnpm build --mode qa` 与 refactor 检查）。N27/N28 已实际运行，WGC 读取显示器被本机执行环境拒绝：`You do not have permission to capture the given monitor. (0x80070005)`；两个 native case **失败，不计通过**，保留 run `run-20261101-221939-942182400`。
 - Python 新 sampler/broker 11 项与 scenario runner 8 项通过；Windows 不支持无权限 symlink 的既有工具单测不计通过；Linux-only 代码必须由 runner 编译/原生检查。
-- GitHub 仍需：三平台 browser/native、Linux 全部 `ubuntu-24.04-xvfb,ubuntu-22.04-x11,ubuntu-22.04-vnc,ubuntu-26.04-wayland`，先全部截图 + crash，再全量。无关截图的性能失败仅单独列明，不能改原始 receipt 为通过。尚无 runner 通过证据，任务未完成。
+- GitHub 第一轮：[`41315939146`](https://github.com/engcapa/taomni/actions/runs/41315939146)，候选 `40469cb5`，三平台 browser/native + Linux 全四 profile + 自动追加 crash；browser 三端各 49/49 通过，N27 六组 native 各 40 次通过、ready 全部早于 show、0 超时。整体失败（7 项）：Linux 三个 X11 profile 的 N28 采到黑帧且间隔超标，Wayland N28 间隔超标、N16 Manual→Auto 未产生新帧；Windows N28 品红检测误计桌面图标；macOS N28 单次独立 CoreGraphics 读取耗时约 554ms。原始失败与 receipt 保留，不能因 job 成功就当 case 通过。全量尚未执行，任务未完成。
+
+2026-11-02 本机 Windows 11 后续：
+
+- WGC 自动化拒绝的根因已通过进程 TokenIntegrityLevel 对照确认：位于 Low 完整性报告树的 EdgeDriver 及其 QA 子进程为 Low（4096），普通启动与用户应用为 Medium（8192）。相同已验证驱动字节复制到正常工具目录后，driver/QA 都为 Medium，N10 原生逐像素误差为 0。未通过调整隐私策略解决。后续按用户明确要求，仅报告目录补当前用户访问权并改为可继承 Medium；项目父目录未改。runner 新增只读完整性守卫，禁止再把该条件误报为隐私权限问题。
+- 修复后 `run-20261102-064551-401425600`：N10、N27 通过，N28 隔离通过但采样失败，N29 初版通过但 2ms 耗时不能证明实际占用。没有把这些证据写成全通过。
+- 独立采样器改为 numpy 分析、20ms 目标间隔，numpy 在开始采样前加载；Windows Python 3.12 的 15.6ms `monotonic_ns` 与粗粒度 UTC 改用 QPC `perf_counter_ns` 和 `GetSystemTimePreciseAsFileTime`，保留真实读取区间和原 100ms/10ms 阈值。N28 `run-20261102-065848-786432700` 通过：66 帧、show 后 34 帧、无均匀帧，最大保守间隔 74.80ms，clockStable true。不外推其它 OS。
+- N29 加入真实 message-only window 持有者、占用对照读及生产 typed busy retry 计数，修复 NULL 持有者无法证明竞争的问题。`run-20261102-073733-500825200` 通过：occupiedControl true、同一请求 busyRetries 3、257ms、decoded RGBA 全相等。用户原始首次 Done 弹窗文字未保存，只证明此竞争回归，不宣称精确复现原始错误。
+- 为避免创建第二个 `<img>` 重新进入未绘制状态，view 复用已经 decode 的 Image 节点；identity、resize、StrictMode 卸载测试通过。Linux 黑帧修复仍需新的 native runner 像素证据。
+- Rust 聚焦 122/122 通过；runner/采样相关 Python 55/55 通过；refactor contracts / boundaries / size 与 QA audit gate 通过。完整 frontend 最新 662 文件通过、1 文件失败（6181 测试通过、1 失败、1 原有跳过）：无关编辑器 `editorPerformance.test.tsx` reconfigure 次数 2≠1；单文件 10/10 复跑通过。原完整失败保留，不计成完整全绿。
+- 下一轮仍需：截图 + crash 六组 native / 三端 browser 全绿后，再 scope=all；Wayland N16 与 macOS 采样超时未关闭。P1-1 常驻复用需在已取得的隐藏执行握手证据基础上继续实现/验收；P1-4 门槛未满足，650ms 不缩短。

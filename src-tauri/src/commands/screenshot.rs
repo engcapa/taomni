@@ -76,6 +76,7 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::screenshot::qa::screenshot_qa_hotkey,
         crate::screenshot::qa::screenshot_qa_escape_entry,
         crate::screenshot::qa::screenshot_qa_startup_timing,
+        crate::screenshot::qa::screenshot_qa_clipboard_retry,
         crate::screenshot::qa::screenshot_qa_startup_isolation,
         crate::screenshot::qa::screenshot_qa_startup_flash,
         crate::screenshot::qa::screenshot_qa_x11_compositor_bypass,

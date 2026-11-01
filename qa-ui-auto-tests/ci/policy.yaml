@@ -647,6 +647,7 @@ cases:
 - TC-SHOT-N25
 - TC-SHOT-N27
 - TC-SHOT-N28
+- TC-SHOT-N29
 - TC-SHOT-040
 - TC-RDPS-NAT-01-start-connect-display
 - TC-RDPS-NAT-02-clipboard-rich

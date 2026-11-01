@@ -28,8 +28,12 @@ mod platform_evidence;
 pub use platform_evidence::*;
 mod startup_timing;
 pub use startup_timing::*;
+mod clipboard_retry;
+pub use clipboard_retry::*;
 mod startup_isolation;
 pub use startup_isolation::*;
+#[cfg(test)]
+mod startup_isolation_tests;
 mod startup_flash;
 pub use startup_flash::*;
 #[cfg(test)]

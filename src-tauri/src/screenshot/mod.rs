@@ -188,6 +188,8 @@ mod scroll_commands;
 
 mod output_commands;
 
+mod clipboard_copy;
+
 mod overlay_commands;
 
 mod pin_commands;

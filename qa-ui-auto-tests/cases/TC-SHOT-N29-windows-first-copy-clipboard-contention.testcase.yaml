@@ -1,0 +1,27 @@
+id: TC-SHOT-N29
+title: One screenshot copy request survives transient Windows clipboard contention
+description: "Regression for the user report that the first Done fails to open the clipboard and a second click is required. A real thread owns an invisible message-only window and holds OpenClipboard without clearing contents. A control read must return typed ClipboardOccupied before the holder is allowed to start its 200ms release timer. A single production screenshot_copy_image command must report at least one typed busy retry, publish a known PNG and return exact decoded clipboard pixels. Persistent failures remain actionable; renderer failure retention is covered by ScreenshotOverlay unit regression."
+covers: [F27.1]
+tags: [screenshot, native, regression, p1]
+modes: [native]
+native_platforms: [Windows]
+fixtures: [reset_db]
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario: {scenario: clipboard-retry}
+- assert_visible: '[data-testid="system-screenshot"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: first-copy-contention
+    requirement: The initial copy request retries only temporary clipboard occupation, succeeds after the real competing owner releases it and publishes unchanged pixels without a second user click.
+    actions: [1, 2]
+    checkpoints:
+    - {step: 3, expectation: "held, occupiedControl and singleRequest are true, busyRetries is at least 1, elapsedMs is at least 200, copyError is null and pixelsMatch is true; the fixture uses a real message-only window and OpenClipboard, an occupied control read and one production screenshot_copy_image."}
+    - {step: 4, expectation: The main renderer remains usable after the clipboard operation.}
+    results: [3, 4]
+  visual:
+  - {check: Clipboard image fidelity, method: automated, reason: Every decoded RGBA pixel must match the known copied PNG; no screenshot capture API is stubbed.}
+  native:
+  - {check: Windows clipboard contention and real publication, method: automated, reason: The fixture holds the native lock and the production command writes the real OS clipboard in the isolated QA process.}

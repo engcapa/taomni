@@ -38,6 +38,7 @@ SCENARIOS = {
     "startup-timing": "screenshot_qa_startup_timing",
     "startup-isolation": "screenshot_qa_startup_isolation",
     "startup-flash": "screenshot_qa_startup_flash",
+    "clipboard-retry": "screenshot_qa_clipboard_retry",
     "x11-compositor-bypass": "screenshot_qa_x11_compositor_bypass",
 }
 

@@ -753,6 +753,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "screenshot_qa_hotkey"
         | "screenshot_qa_escape_entry"
         | "screenshot_qa_startup_timing"
+        | "screenshot_qa_clipboard_retry"
         | "screenshot_qa_startup_isolation"
         | "screenshot_qa_startup_flash"
         | "screenshot_qa_x11_compositor_bypass" => screenshot::handle(invoke),

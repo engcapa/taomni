@@ -51,6 +51,24 @@ function drag(id: string, from: [number, number], to: [number, number]) {
 const shapes = () => screen.getByTestId("screenshot-annotation-canvas").getAttribute("data-shapes");
 
 describe("ScreenshotOverlay", () => {
+  it("retains the crop and annotations after a clipboard failure and allows a successful retry", async () => {
+    api.copyImageToClipboard.mockRejectedValueOnce(new Error("clipboard occupied")).mockResolvedValueOnce(undefined);
+    await open();
+    drag("screenshot-select-layer", [100, 100], [500, 400]);
+    fireEvent.click(screen.getByTestId("screenshot-tool-rect"));
+    drag("screenshot-annotation-layer", [150, 150], [250, 250]);
+    expect(shapes()).toBe("1");
+    fireEvent.click(screen.getByTestId("screenshot-copy"));
+    await waitFor(() => expect(api.copyImageToClipboard).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.getByTestId("screenshot-copy")).not.toBeDisabled());
+    expect(api.closeScreenshotOverlay).not.toHaveBeenCalled();
+    expect(shapes()).toBe("1");
+    expect(screen.getByTestId("screenshot-selection")).toBeVisible();
+    fireEvent.click(screen.getByTestId("screenshot-copy"));
+    await waitFor(() => expect(api.closeScreenshotOverlay).toHaveBeenCalledOnce());
+    expect(api.copyImageToClipboard).toHaveBeenCalledTimes(2);
+  });
+
   it.each(["replace", "new", "copy"])("Done in a pin editor copies and performs the chosen %s action", async (action) => {
     api.fetchOverlayInit.mockResolvedValueOnce({ path: "pin.png", displayId: "0,0", width: 2048, height: 1152, scaleFactor: 1, document: true, sourcePin: "screenshot-pin-1" });
     render(<ScreenshotOverlay />);

@@ -5,6 +5,7 @@ import { ImageEditPanel } from "../ImageEditPanel";
 import { ScrollCaptureResult } from "../ScrollCaptureResult";
 import { HANDLE, HANDLE_CURSORS } from "./geometry";
 import { Magnifier } from "./Magnifier";
+import { ScreenshotBaseImage } from "./ScreenshotBaseImage";
 import { ToolButton } from "./ToolButton";
 import { type Handle } from "./types";
 import { useScreenshotActions } from "./useScreenshotActions";
@@ -41,14 +42,7 @@ export function ScreenshotOverlayView(props: ScreenshotOverlayViewProps) {
       style={{ background: state.img ? "#000000" : "transparent" }}
     >
       {!state.scrollResult && state.img && state.imgUrl && (
-        <img
-          data-testid="screenshot-base-image"
-          src={state.imgUrl}
-          alt=""
-          draggable={false}
-          className="fixed inset-0 z-0"
-          style={{ width: state.imageSize.w, height: state.imageSize.h }}
-        />
+        <ScreenshotBaseImage image={state.img} width={state.imageSize.w} height={state.imageSize.h} />
       )}
 
       {/* Dim layer: full dim while selecting, selection-hole dim once selected. */}

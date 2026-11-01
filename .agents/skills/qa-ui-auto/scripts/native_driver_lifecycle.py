@@ -44,6 +44,9 @@ def ensure_owned_driver_running(
         driver._restart_required = False
 
     if driver.proc is not None and driver.proc.poll() is None and tcp_probe(driver.host, driver.port):
+        if system == "Windows":
+            from native_windows_integrity import ensure_medium_driver_tree
+            ensure_medium_driver_tree(driver.proc.pid)
         return
     if driver.proc is not None and driver.proc.poll() is None:
         driver.stop()
@@ -54,3 +57,8 @@ def ensure_owned_driver_running(
     if tcp_probe(driver.host, driver.port):
         raise WebDriverError(f"native driver port {driver.port} did not become available")
     driver.start()
+    if system == "Windows":
+        if driver.proc is None:
+            raise WebDriverError("Owned Windows native driver did not start")
+        from native_windows_integrity import ensure_medium_driver_tree
+        ensure_medium_driver_tree(driver.proc.pid)

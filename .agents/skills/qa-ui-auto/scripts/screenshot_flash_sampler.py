@@ -14,8 +14,10 @@ from pathlib import Path
 import platform
 import time
 
+import numpy as np
+
 GRID = (48, 27)
-STEP_SEC = 0.05
+STEP_SEC = 0.02
 MAX_LIFETIME_SEC = 45
 UNIFORM_SHARE = 0.97
 
@@ -23,9 +25,13 @@ UNIFORM_SHARE = 0.97
 def summarize(points):
     if len(points) != GRID[0] * GRID[1]:
         raise ValueError("missing independent pixel grid")
-    count, color = max((sum(all(abs(a - b) <= 12 for a, b in zip(pixel, candidate))
-                            for pixel in points), candidate)
-                       for candidate in points[::37])
+    # Keep pixel analysis off the sampling budget: the scalar Python loop
+    # previously spent tens of milliseconds after every native readback.
+    pixels = np.asarray(points, dtype=np.int16)
+    candidates = pixels[::37]
+    counts = np.all(np.abs(pixels[:, None, :] - candidates[None, :, :]) <= 12, axis=2).sum(axis=0)
+    # Preserve the scalar oracle's lexicographic tie-break for equal counts.
+    count, color = max((int(count), tuple(int(c) for c in color)) for count, color in zip(counts, candidates))
     return count / len(points), list(color)
 
 
@@ -119,22 +125,45 @@ def capture_source(rectangle, scale):
             rectangle["y"] + rectangle["height"])
 
     def capture():
-        options = {"all_screens": True} if system == "Windows" else {"xdisplay": os.environ["DISPLAY"]}
-        image = ImageGrab.grab(bbox=bbox, **options)
+        image = (ImageGrab.grab(bbox=bbox, all_screens=True) if system == "Windows"
+                 else ImageGrab.grab(bbox=bbox, xdisplay=os.environ["DISPLAY"]))
         return {"width": image.width, "height": image.height, "points": grid(image),
                 "transport": "independent fresh GDI ImageGrab" if system == "Windows"
                 else "independent fresh X11 ImageGrab"}
     return capture
 
 
+def wall_clock_ns():
+    if platform.system() != "Windows":
+        return time.time_ns
+    # Python <=3.12 uses GetSystemTimeAsFileTime (15.6ms resolution).
+    # Do not compare that quantized clock to a 10ms drift allowance or infer
+    # precise show boundaries from it. Keep real UTC, not a synthetic offset.
+    from ctypes.wintypes import FILETIME
+    precise = ctypes.WinDLL("kernel32", use_last_error=True).GetSystemTimePreciseAsFileTime
+    precise.argtypes = [ctypes.POINTER(FILETIME)]
+    precise.restype = None
+
+    def read():
+        value = FILETIME()
+        precise(ctypes.byref(value))
+        ticks = (value.dwHighDateTime << 32) | value.dwLowDateTime
+        return (ticks - 116444736000000000) * 100
+    return read
+
+
 def run(capture, stream, stop, *, lifetime=MAX_LIFETIME_SEC):
-    expires = time.monotonic() + lifetime
+    wall = wall_clock_ns()
+    # On Windows Python <=3.12, monotonic_ns is GetTickCount64 (15.6ms).
+    # perf_counter_ns is monotonic QPC; the capture bracket must retain its
+    # actual high-resolution duration rather than quantized tick differences.
+    expires = time.perf_counter() + lifetime
     index = 0
-    while not stop.exists() and time.monotonic() < expires:
-        scheduled = time.monotonic()
-        started_wall, started_mono = time.time_ns() / 1e6, time.monotonic_ns() / 1e6
+    while not stop.exists() and time.perf_counter() < expires:
+        scheduled = time.perf_counter()
+        started_wall, started_mono = wall() / 1e6, time.perf_counter_ns() / 1e6
         frame = capture()
-        ended_mono, ended_wall = time.monotonic_ns() / 1e6, time.time_ns() / 1e6
+        ended_mono, ended_wall = time.perf_counter_ns() / 1e6, wall() / 1e6
         # The broker brackets its synchronous stage readback; an external
         # snapshot is conservatively bracketed by its full native invocation.
         sample = {"captureStartedMs": started_wall, "captureEndedMs": ended_wall,
@@ -145,7 +174,7 @@ def run(capture, stream, stop, *, lifetime=MAX_LIFETIME_SEC):
         stream.write(json.dumps(sample) + "\n")
         stream.flush()
         index += 1
-        time.sleep(max(0, STEP_SEC - (time.monotonic() - scheduled)))
+        time.sleep(max(0, STEP_SEC - (time.perf_counter() - scheduled)))
     if not stop.exists():
         raise RuntimeError("independent sampler reached its finite lifetime")
     stream.write(json.dumps({"kind": "stopped", "samples": index}) + "\n")

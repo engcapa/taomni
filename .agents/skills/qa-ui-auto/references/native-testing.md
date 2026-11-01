@@ -11,6 +11,12 @@ Before setup, inspect the selected config's `app.native_binary` and driver path:
 an explicit legacy config overrides the harness's isolated QA default. Use the
 verified QA binary and a WebView-compatible driver in a task config; do not rebuild
 because a config points at the wrong executable. Check ports before launch.
+On Windows, keep verified driver executables in a normal tools directory, not a
+Low-integrity report/browser-download tree. The harness checks the owned driver
+tree's token integrity before launching the QA app; a Low adapter can make WGC
+return `0x80070005` even when desktop screen-capture permission is enabled.
+Inspect that evidence before attributing the failure to privacy policy. The
+harness never changes ACLs, tokens or privacy settings to make a test pass.
 
 Desktop launch may show a window. Global OS input/IME tests also share the user's
 keyboard, pointer and focus: when the user is active on that desktop, agree a
