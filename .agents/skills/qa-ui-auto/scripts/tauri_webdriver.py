@@ -547,7 +547,7 @@ class NativeSession(WebDriverTransport):
             # Scroll only; dispatch the actual context click through W3C input.
             try:
                 self.request("POST", self.endpoint("/execute/sync"), {
-                    "script": "arguments[0].scrollIntoView({block:'nearest', inline:'nearest'});",
+                    "script": "arguments[0].scrollIntoView({block:'nearest', inline:'nearest', behavior:'instant'});",
                     "args": [origin],
                 })
                 point = prepare_pointer_target(self, origin, allow_alternate=button == 2)

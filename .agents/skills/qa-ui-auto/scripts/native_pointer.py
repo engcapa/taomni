@@ -80,7 +80,7 @@ return original;
 
 def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
                            *, allow_alternate: bool = False) -> dict:
-    """Wait for two matching points; never activate a target or replay input.
+    """Wait for a stable viewport interval; never activate or replay input.
 
     Element-origin actions leave geometry resolution to the driver. Resolve
     against the current viewport explicitly so a row changing after a save
@@ -89,6 +89,7 @@ def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
     """
     end = time.monotonic() + timeout
     previous = None
+    stable_since = None
     last = None
     centered = False
     while True:
@@ -102,8 +103,15 @@ def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
                        or not math.isfinite(last[k]) for k in ("x", "y", "width", "height"))):
             raise WebDriverError("invalid native pointer target geometry")
         current = tuple(last[k] for k in ("x", "y", "width", "height")) if last["ready"] else None
+        now = time.monotonic()
         if current is not None and current == previous:
-            return {"x": int(last["x"]), "y": int(last["y"])}
+            # WebKit search scrolling can pause for more than one sample
+            # before the next layout/compositor update. A sustained interval
+            # prevents sending trusted input to an earlier viewport position.
+            if stable_since is not None and now - stable_since >= 0.3:
+                return {"x": int(last["x"]), "y": int(last["y"])}
+        else:
+            stable_since = now if current is not None else None
         previous = current
         if not last["ready"] and (last.get("outside") is True or not centered):
             # Nearest alignment can leave a control behind a sticky header or
@@ -112,7 +120,7 @@ def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
             # move it outside again; no input has been sent at this stage.
             centered = True
             session.request("POST", session.endpoint("/execute/sync"), {
-                "script": "arguments[0].scrollIntoView({block:'center', inline:'center'});",
+                "script": "arguments[0].scrollIntoView({block:'center', inline:'center', behavior:'instant'});",
                 "args": [origin],
             })
         remaining = end - time.monotonic()

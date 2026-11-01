@@ -1,5 +1,6 @@
 import json
 import subprocess
+from itertools import chain, repeat
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
@@ -99,30 +100,42 @@ class NativePointerReadinessTest(TestCase):
     def geometry(self, x=270, y=217, ready=True):
         return dict(x=x, y=y, width=420, height=24, ready=ready)
 
+    def respond(self, values):
+        self.session.request.side_effect = chain(values, repeat(values[-1]))
+
+    def test_short_scroll_pause_does_not_activate_the_old_viewport_point(self):
+        # Search can briefly pause its smooth scroll before another layout
+        # frame reaches WebKit's compositor. Two equal samples are insufficient.
+        self.session.request.side_effect = lambda *args: self.geometry(
+            y=217 if self.now < 0.12 else 405)
+        self.assertEqual(prepare_pointer_target(self.session, self.origin),
+                         {'x': 270, 'y': 405})
+        self.assertGreaterEqual(self.now, 0.4)
+
     def test_moving_row_must_settle_before_a_point_can_be_used(self):
-        self.session.request.side_effect = [self.geometry(y=190), self.geometry(y=204),
-                                            self.geometry(), self.geometry()]
+        self.respond([self.geometry(y=190), self.geometry(y=204),
+                      self.geometry(), self.geometry()])
         self.assertEqual(prepare_pointer_target(self.session, self.origin), {'x': 270, 'y': 217})
-        self.assertEqual(self.session.request.call_count, 4)
-        self.assertGreaterEqual(self.now, 0.15)
+        self.assertGreaterEqual(self.session.request.call_count, 4)
+        self.assertGreaterEqual(self.now, 0.4)
         self.assertTrue(all(c.args[1].endswith('/execute/sync') for c in self.session.request.call_args_list))
 
     def test_covered_point_cannot_satisfy_stability_until_uncovered(self):
-        self.session.request.side_effect = [self.geometry(ready=False), None, self.geometry(ready=False),
-                                            self.geometry(), self.geometry()]
+        self.respond([self.geometry(ready=False), None, self.geometry(ready=False),
+                      self.geometry(), self.geometry()])
         self.assertEqual(prepare_pointer_target(self.session, self.origin), {'x': 270, 'y': 217})
-        self.assertEqual(self.session.request.call_count, 5)
+        self.assertGreaterEqual(self.session.request.call_count, 5)
 
     def test_coverage_resets_an_earlier_stable_candidate(self):
-        self.session.request.side_effect = [self.geometry(), self.geometry(ready=False), None,
-                                            self.geometry(), self.geometry()]
+        self.respond([self.geometry(), self.geometry(ready=False), None,
+                      self.geometry(), self.geometry()])
         prepare_pointer_target(self.session, self.origin)
-        self.assertEqual(self.session.request.call_count, 5)
+        self.assertGreaterEqual(self.session.request.call_count, 5)
 
     def test_layout_growth_scrolls_the_same_target_back_into_view_before_input(self):
         outside = {**self.geometry(ready=False), "outside": True}
-        self.session.request.side_effect = [self.geometry(y=190), outside, None,
-                                            self.geometry(), self.geometry()]
+        self.respond([self.geometry(y=190), outside, None,
+                      self.geometry(), self.geometry()])
         self.assertEqual(prepare_pointer_target(self.session, self.origin), {'x': 270, 'y': 217})
         scroll = self.session.request.call_args_list[2]
         self.assertIn('scrollIntoView', scroll.args[2]['script'])
@@ -131,7 +144,7 @@ class NativePointerReadinessTest(TestCase):
 
     def test_covered_target_can_scroll_clear_of_a_sticky_header_before_input(self):
         covered = {**self.geometry(y=59, ready=False), "outside": False}
-        self.session.request.side_effect = [covered, None, self.geometry(), self.geometry()]
+        self.respond([covered, None, self.geometry(), self.geometry()])
         self.assertEqual(prepare_pointer_target(self.session, self.origin), {'x': 270, 'y': 217})
         scroll = self.session.request.call_args_list[1]
         self.assertIn("block:'center'", scroll.args[2]['script'])
