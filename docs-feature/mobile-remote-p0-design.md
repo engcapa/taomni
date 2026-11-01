@@ -114,7 +114,7 @@ P0 正面解决以上问题，不顺带重构桌面终端、聊天或 SSH。
 | ID | 场景与前置条件 | 用户动作或触发 | 必须观察到的结果 | 适用平台 / 边界 |
 |---|---|---|---|---|
 | AC-01 | 桌面已开启移动服务，手机未配对 | 桌面显示配对码/二维码；手机扫码或手动输入 endpoint + 配对码 | 一次性码单次有效、5 分钟过期，过期或复用均失败。成功后手机拿到 per-instance token，桌面已配对设备列表出现该设备。token 不出现在 URL 中。扫码依赖安全上下文（HTTPS 或 localhost），非安全上下文只能手动输入 | 三端实例 + Android/iOS 浏览器 |
-| AC-02 | 手机已配对两个实例（一台 PC、一台云主机 endpoint）；PWA 外壳由实例 A 托管 | 在实例列表切换到实例 B；在某个实例的桌面吊销该设备 | 切换后会话列表、任务状态立即属于新实例，旧实例 WS 断开。被吊销后该实例全部业务 API 返回鉴权失败，手机显示“已被实例吊销”，不自动用旧 token 重试。从 A 的 Origin 向 B 发请求时，B 按 §4.4 两级 CORS 策略处理：`/health`、`/pair` 回显 Origin；已配对 Origin 的业务预检通过，带 Authorization 头的响应可读；未配对 Origin 的业务预检不通过，浏览器不发出业务请求。吊销设备时，其 Origin 同步从 B 的放行清单删除。会话列表以带种类前缀的后端运行键为标识，同一已保存会话的两个独立运行实例显示为两条 | 三端实例 + 手机浏览器；PC 与云实例同一协议；混合内容（HTTPS 外壳调 HTTP 实例）会被浏览器拦截，见 §4.5 |
+| AC-02 | 手机已配对两个实例（一台 PC、一台云主机 endpoint）；PWA 外壳由实例 A 托管 | 在实例列表切换到实例 B；在某个实例的桌面吊销该设备 | 切换后会话列表、任务状态立即属于新实例，旧实例 WS 断开。被吊销后该实例全部业务 API 返回鉴权失败，手机显示“已被实例吊销”，不自动用旧 token 重试。从 A 的 Origin 向 B 发请求时，B 按 §4.4 两级 CORS 策略处理：`/health`、`/pair` 回显 Origin；已配对 Origin 的业务预检通过，带 Authorization 头的响应可读；预检允许传输，未配对 Origin 的业务请求在 handler 前返回带 CORS 头的固定 origin_denied 错误，不返回业务数据。吊销设备时，其 Origin 同步从 B 的放行清单删除。会话列表以带种类前缀的后端运行键为标识，同一已保存会话的两个独立运行实例显示为两条 | 三端实例 + 手机浏览器；PC 与云实例同一协议；混合内容（HTTPS 外壳调 HTTP 实例）会被浏览器拦截，见 §4.5 |
 | AC-03 | PC 上某终端正在输出 | 手机打开该终端 attach 视图 | 先看到最近输出的尾部（§4.3 的行尾回放），随后实时输出与桌面同一 PTY 一致，不另开新 shell。退出视图再进入，仍是同一会话 | 本地终端（含 OpenSSH 包装的 SSH）与 russh SSH 终端均适用 |
 | AC-04 | 桌面与手机同时看同一终端 | 手机默认只读；只读态下尝试改尺寸；手机点“接管输入”并改尺寸；之后桌面敲键盘或改尺寸 | 只读时，手机输入与 resize 均被服务端拒绝（回 `not_holder`，不转发给 PTY）。接管后，手机输入到达 PTY；resize 仅在持有写权时生效，并钳制在列 20～300、行 10～100。桌面一经 `write_terminal` 写入或经 `resize_terminal` 改尺寸，即抢回写权：手机收到提示并回到只读，PTY 尺寸恢复为 broker 记录的桌面最后尺寸（无记录时不恢复并记日志），不长期挤窄桌面终端。接管前有“输入可能打断正在执行的命令”的提示；能否识别“Agent 正在使用该终端”待 TASK-02/03 盘点后确认，无法识别时对所有终端统一提示 | 三端实例 + 手机浏览器 |
 | AC-05 | 某 Agent 线程正在跑一轮 | 手机打开任务卡片，点“停止”；再发一条后续指令 | 停止映射到 `ChatRunRegistry` 的取消或进程停止，任务状态变为已停止。后续指令作为新一轮发出，不篡改已停止轮次的历史；线程有在途轮次时拒绝并返回 `turn_in_progress`。手机发起的轮次缺少桌面每轮注入的上下文（cwd、绑定会话等），差异范围待 TASK-03 盘点后确认并在卡片上提示 | 三端实例；停止与后续指令语义以 TASK-03 盘点为准 |
@@ -122,14 +122,14 @@ P0 正面解决以上问题，不顺带重构桌面终端、聊天或 SSH。
 | AC-07 | 实例可通过用户自备的两种 endpoint 到达（如局域网地址与用户自建隧道/组网域名） | 手机分别用两个 endpoint URL 配对同一实例 | 两次都只需填 endpoint URL + 配对码，客户端代码无厂商分支。设计不提供、不选型、不配置中继与外网访问 | 三端实例；只验收“给定可达 endpoint 时能通” |
 | AC-08 | 手机断网后恢复，或 WS 断开后重连 | 重连同一终端 attach 视图；重连实例级事件流 | 终端流按 `after_seq` 续接，不重复输出已收到的数据；`after_seq` 已超出 ring buffer 时，服务端重发 `replay` 并标 `gap: true`。事件流按事件序列号续接；超出最近 200 条事件缓冲时，服务端回 `resync`，手机改用 REST 重拉会话、任务、改动列表。重连期间显示“重连中”，不清空已收输出 | 手机浏览器；弱网为必测场景 |
 | AC-09 | 移动服务关闭或实例下线；实例以桌面模式或 headless 模式运行 | 手机打开实例/会话；同一实例先后以两种模式提供服务（两种模式不同时运行于同一 app-data） | 移动服务关闭时实例端不监听新连接。手机显示实例离线与上次在线时间，不自动删除注册信息。重新开启后，token 未吊销即可重连。两种模式下 v1 契约一致；`/health` 与事件流 `hello` 返回 `run_mode` 仅作展示，不作客户端分支 | 三端实例；两种模式分开验证 |
-| AC-10 | 安全基线：未配对请求、过期 token、跨实例 token、未配对 Origin | 直接调 API；复用另一实例的 token；暴力猜配对码；从未配对 Origin 发跨域请求 | ① 除 `/health`、`/pair` 与静态外壳外，全部 API（含 WS 升级）先鉴权后执行业务。② 配对接口限流，并记录失败（只记来源与计数，不记尝试的码）。③ token 在实例端只以哈希存储；手机端存于浏览器存储，这是已知短板，须在 UI 与文档中明示，不承诺 Keychain/Keystore。④ CORS 按 §4.4 两级策略：响应头不出现 `*`，**不发送** `Access-Control-Allow-Credentials`（token 只走 Authorization 头，不用 Cookie）；业务端点只回显同源或已配对 Origin；WS 握手同样校验 Origin。不得复用 `servers/http.rs` 的 `*` 做法。⑤ 日志不含 token、配对码、WS 票据、Authorization 头、终端输入输出字节、文件内容、已保存会话的连接字段 | 三端实例；安全回归见 V-06 |
+| AC-10 | 安全基线：未配对请求、过期 token、跨实例 token、未配对 Origin | 直接调 API；复用另一实例的 token；暴力猜配对码；从未配对 Origin 发跨域请求 | ① 除 `/health`、`/pair` 与静态外壳外，全部 API（含 WS 升级）先鉴权后执行业务。② 配对接口限流，并记录失败（只记来源与计数，不记尝试的码）。③ token 在实例端只以哈希存储；手机端存于浏览器存储，这是已知短板，须在 UI 与文档中明示，不承诺 Keychain/Keystore。④ CORS 按 §4.4 两级策略：响应头不出现 `*`，**不发送** `Access-Control-Allow-Credentials`（token 只走 Authorization 头，不用 Cookie）；业务数据只放行同源或已配对 Origin；预检与固定拒绝响应可回显 Origin；WS 握手同样校验 Origin。不得复用 `servers/http.rs` 的 `*` 做法。⑤ 日志不含 token、配对码、WS 票据、Authorization 头、终端输入输出字节、文件内容、已保存会话的连接字段 | 三端实例；安全回归见 V-06 |
 | AC-11 | 手机消费慢、网络抖动 | 终端高速输出时手机从后台切回前台 | 服务端单连接出队有界；慢消费者被断开，可按序列号重连恢复。服务端内存不出现无界增长。心跳超时按 §4.4 处理 | 三端实例 |
 | AC-12 | 桌面回归：移动服务关、开两种状态 | 正常使用桌面终端、聊天、会话切换、SSH 终端 | 两种状态下桌面行为与改前一致。移动服务开启不新增桌面弹窗、不改变现有会话列表顺序。桌面输入始终可抢回写权（AC-04）。为复用而抽出内部函数后，现有 `#[tauri::command]` 签名与行为不变 | 三端桌面 |
 | AC-13 | PWA 安装与离线外壳；endpoint 为 HTTPS（或 localhost） | 手机浏览器“添加到主屏幕”，断网后打开 | 已缓存的外壳可以打开，显示实例列表与“离线”提示。实时数据缺失时不把过期数据当作最新，每块数据标注上次更新时间。HTTP 局域网 endpoint 不是安全上下文，Service Worker 不可用，该 endpoint 下本条不适用，UI 须明示 | Android Chrome / iOS Safari；离线仅指外壳，不承诺离线操作 |
 | AC-14 | P0 边界（反向验收） | 在手机上寻找文件编辑、保存、冲突解决、SFTP、数据库、RDP/VNC、新建终端、新建 SSH 连接入口 | 均不存在，也不以占位按钮出现。已保存会话只作只读信息展示，不出现连接动作，不展示非终端类型。文件查看与 diff 查看是只读的（见 AC-15） | 手机浏览器 |
 | AC-15 | 任务改了文件，手机正在看该任务；手机只看任务卡片或改动页，未打开任何终端 | 打开任务的“改动”页；任务又改了一个文件；点开一个文件 | 改动列表经实例级事件流 `WS /api/v1/events` 推送 `file_changed` 后刷新，不靠手动刷新，不依赖终端 WS。不开终端时 `task_status` 与改动推送仍能到达。点文件看到只读全文（行号；大文件截断并提示）；点 diff 看到该文件的统一 diff（分 hunk 折叠；超长截断）。文件 API 只接受“任务 id + 相对路径”，只允许后端已知的该任务工作目录根内的路径：先净化，再规范化（解析符号链接），再逐段校验在根内；越界或符号链接逃逸一律拒绝 | 三端实例；diff 数据源、`file_changed` 的事件来源、任务工作目录根的来源均待 TASK-04 盘点后确认（git diff 优先，工具改动摘要为 fallback），盘点前不承诺 |
 | AC-16 | 同一实例以 headless 模式运行（无窗口）；Linux 云主机无 Display | 手机配对、看会话、看终端、停任务、看文件/diff；在无 Display 环境下启动 `--headless` | ① v1 契约与桌面模式一致；对 headless 下实际存在的终端与任务，行为一致。② headless 进程退出即实例离线，手机不自动改 endpoint。③ 配对码由命令行/日志输出，确切方式由 TASK-01 定。④ Linux 无 Display 下 `--headless` 不初始化 GTK/WebView/窗口，移动服务正常响应；该用例须在真正无 Display 的环境验证。⑤ 已知限制：P0 不新建终端，headless 又无桌面创建终端，因此终端列表可能为空，此时终端 attach 记为“不适用”而非“通过”；依赖桌面前端执行的 Agent 副作用工具在 headless 下须显式失败，不得挂起。能力范围待 TASK-01 证明后确认 | 三端实例；headless 为 P0 运行模式，证明失败时 headless 部分回流 |
-| AC-17 | P1：飞书/微信 IM 已绑定实例；实例在无公网 IP / VPN 组网环境（无入站端口） | 任务完成、等待审批、实例掉线时 IM 收到消息；用户在 IM 里发“批准”“发一条后续指令”“看当前任务摘要/某文件” | IM 收到的是状态通知与审批入口卡片，不是实时终端流。批准/拒绝只回传到 TASK-03 确认可透传的点。后续指令作为新一轮发出。要结果或文件时，返回截断摘要 + 跳回 Mobile Web 的链接。IM 身份须绑定到白名单用户，未绑定身份的指令一律拒绝。无入站端口时，飞书适配器优先用官方 WebSocket 长连接（实例主动出站）；入站 webhook 仅为实例已有公网 endpoint 时的 fallback | P1；飞书先行，微信落地方式待决（§10）；IM 不替代 Mobile Web 的实时查看 |
+| AC-17 | P1：飞书/微信 IM 已绑定实例；实例在无公网 IP / VPN 组网环境（无入站端口） | 任务完成、等待审批、实例掉线时 IM 收到消息；用户在 IM 里发“批准”“发一条后续指令”“看当前任务摘要/某文件” | IM 收到的是状态通知与审批入口卡片，不是实时终端流。批准/拒绝只回传到 TASK-03 确认可透传的点。后续指令作为新一轮发出。要结果或文件时，返回截断摘要 + 跳回 Mobile Web 的链接。IM 身份须绑定到白名单用户，未绑定身份的指令一律拒绝。无入站端口时，飞书适配器优先用官方 WebSocket 长连接（实例主动出站）；本期不提供入站 webhook，长连接覆盖事件与卡片回调 | P1；飞书先行，微信落地方式待决（§10）；IM 不替代 Mobile Web 的实时查看 |
 
 ## 4. 方案与关键决策
 
@@ -342,11 +342,11 @@ PWA 外壳由哪个实例托管，只决定它首次加载的 Origin。切到另
 
 - **同源判断**：请求 Origin 与该请求的 Host 一致即视为同源，直接放行，不依赖清单（实例经多个 endpoint 打开自身外壳时均成立）。
   - 经用户自备反向代理到达时，Host 可能被改写，此时同源判断是否成立待 TASK-01 实测。
-  - 无 Origin 头的非浏览器请求（如 P1 IM 适配器的进程内调用）不受 CORS 约束，但仍须鉴权。
+  - 无 Origin 头的非浏览器请求不受 CORS 约束，但仍须 Bearer 鉴权。P1 IM 进程内动作使用独立的 TLS + app_id/open_id/chat_id 白名单鉴权；Web 设备吊销不影响 IM，设置可一键停止全部 IM 动作，停止后编辑绑定再重启可撤销指定主体。
 - **第一级（`/health` 与 `/pair`）**：预检与实际响应都回显请求 Origin，并带 `Vary: Origin`。
   - 配对前服务端不知道该 Origin 是否可信，但这两个端点不暴露业务数据：`/health` 只返回服务元信息；配对仍须一次性码 + 限流。
   - 恶意站点通过预检也拿不到 token。
-- **第二级（其他业务端点，含 WS 票据签发）**：仅当 Origin 同源，或在该实例的“已配对 Origin 清单”中时才回显，否则不回显 CORS 头。
+- **第二级（其他业务端点，含 WS 票据签发）**：仅当 Origin 同源，或在该实例的“已配对 Origin 清单”中时才允许进入业务 handler。预检允许 Authorization 传输；拒绝的实际响应仅返回 origin_denied 并回显 Origin，使吊销后的浏览器可读错误并停止旧 token 重试。
   - 清单在配对成功时记录（配对请求的 Origin 与 device_id 对应），随设备清单一并持久化，设备吊销时同步删除该设备的全部 Origin。
   - 已配对设备从一个新的跨域 Origin 访问时，须用新配对码重新配对。重新配对会生成新的设备记录，旧记录保留到用户吊销为止。
 - **响应头固定集**：
@@ -374,7 +374,7 @@ PWA 外壳由哪个实例托管，只决定它首次加载的 Origin。切到另
 | `GET /api/v1/tasks/{id}/changes/{path}/diff` | 手机 → 移动服务 | Bearer token；`{path}` URL 编码 | 统一 diff，分 hunk，超长截断 | 数据源待 TASK-04 盘点；无 diff 时返回 `diff_unavailable`，不返回空 diff |
 | `WS /api/v1/terminals/{id}/stream` | 手机 ↔ 移动服务 | 票据 + Origin 校验；`{id}` 为 `term:` 标识 | 见下方“终端流”；错误 `{ type: "error", code }` 后关闭 | 序列号单调递增，断线可续接；只承载 PTY 相关消息 |
 | `WS /api/v1/events` | 手机 ↔ 移动服务 | 票据 + Origin 校验 | 见下方“事件流”；错误 `{ type: "error", code }` 后关闭 | 每个实例一条连接；事件序列号单调递增；超出缓冲时回 `resync` |
-| `POST /api/v1/im/webhook`（P1，fallback） | 飞书/微信平台 → IM 适配器 | 平台签名 + 白名单身份 | 适配器内部调用同一 v1 API；回复为截断摘要 + Mobile Web 链接 | 仅当实例已有公网 endpoint 时可用；未绑定身份或签名失败一律拒绝；不提供实时终端流 |
+| IM 出站长连接（P1，无 HTTP 路由） | 飞书平台 ↔ IM 适配器 | TLS + app_id/open_id/chat_id 白名单 + 时效校验 | 进程内调用共享 view；回复为截断摘要 + Mobile Web 链接 | 独立于手机 Bearer；设置可一键停用，修改绑定后重启可吊销主体；本期无 webhook |
 
 WS 消息格式：JSON；输出数据用 base64，避免控制字符破坏帧解析。
 
@@ -530,7 +530,7 @@ EventSink 解耦：
 | `src-tauri/src/mobile/session_view.rs`（拟新增） | 会话列表与详情的派生视图，按 §4.3 身份规则：`term:` / `thread:` 前缀；已保存会话只读、只含终端类类型、只暴露非连接字段。不新开会话 DB 表 | AC-02/AC-05/AC-14 | TASK-02 |
 | `src-tauri/src/mobile/agent_view.rs`（拟新增） | 任务状态、停止映射（`ChatRunRegistry`）、后续指令入口（`turn_in_progress`）、确认点透传（以 TASK-03 盘点为准，`already_resolved`） | AC-05/AC-06 | TASK-03 |
 | `src-tauri/src/mobile/file_view.rs`（拟新增） | 只读文件/diff 视图：任务工作目录根校验（净化 + 规范化 + 逐段比较，不暴露 loose 读取）、改动列表、文件截断、diff 分 hunk。数据源以 TASK-04 盘点为准 | AC-15 | TASK-04 |
-| `src-tauri/src/mobile/im_adapter.rs`（拟新增，P1） | 飞书/微信 IM 适配器：飞书优先 WebSocket 长连接（含重连退避与事件去重），入站 webhook 作 fallback；签名校验、白名单绑定、通知、审批、发命令、快照查询。内部调用同一 v1 API | AC-17 | TASK-07 |
+| `src-tauri/src/mobile/im_adapter.rs`（拟新增，P1） | 飞书/微信 IM 适配器：飞书优先 WebSocket 长连接（含重连退避与事件去重），本期无入站 webhook；独立白名单鉴权、通知、审批、发命令、快照查询。内部调用共享 view | AC-17 | TASK-07 |
 | `src-tauri/src/terminal/io_commands.rs`、`terminal/output.rs`（修改） | 把 write / resize / signal 的命令体抽成以 `&AppState` 为参数的内部函数，命令保留为薄包装，签名与行为不变。在 `send_terminal_output` 处增加移动分支；桌面 `write_terminal` / `resize_terminal` 调用通知 broker（用于抢回与尺寸记录）。读循环中的 `terminal-exit-*` 发送改走 EventSink | AC-03/AC-04/AC-12 | TASK-02 |
 | `src-tauri/src/chat/`、`src-tauri/src/agent/` 相关处（修改，范围以 TASK-03 盘点为准） | 停止、发消息、权限回传等逻辑若写在命令函数体内，同样抽出内部函数，命令行为不变。流式事件发送改走 EventSink | AC-05/AC-06/AC-12 | TASK-03 |
 | `src-tauri/src/lib.rs`、`src-tauri/src/state.rs`（含 `state/domains`）、`src-tauri/src/main.rs`（修改） | 仅在移动服务开启时把注册表句柄交给 mobile 模块。不改现有命令签名与桌面事件名。headless 启动路径：在 `main.rs` 进入 `run()` 前拦截 `--headless`，绕过 `tauri::Builder`。`setup()` 初始化项与退出清理项逐项分流。EventSink 桌面适配器。`main.rs` 与 `state/domains` 原文待核实 | AC-12/AC-16 | TASK-01 |
@@ -956,3 +956,17 @@ AC-17 属于 P1，不计入 P0 交付条件。
   - 以 §7 的 V 项与 §8 的真机步骤为依据。
   - stubs、mock WS、合成 fixture 不能替代真实服务证据。
   - 实施完成前，不得把设计状态说成“已实现”或“已验证”。
+
+## 2026-11-01 独立评审后的契约回填
+
+本轮授权来源为当前分支独立评审完善请求，逐项证据见 [评审处置记录](mobile-feishu-p1-review-resolution.md)。
+
+- DEC-07：长连接同时承载消息和卡片；本期不提供 webhook。IM 白名单是独立可停用主体，不使用手机 token；群聊不开放 show/file 内容查询，file 还须设置显式开启。
+- DEC-08 / TASK-01：token 90 天绝对有效期、30 天闲置有效期；成功配对不计失败；来源表有界淘汰；共享回环代理桶仅限制无效码，不阻断正确的 122 位一次性码。
+- DEC-09 / AC-02、AC-10、V-06：区分 CORS 传输与业务授权。预检与固定拒绝响应可读；业务仍须同源/配对 Origin 和 Bearer，WS 仍校验 Origin + 单次票据。Host 仅允许监听地址或 profile 配置的 allowed_hosts。
+- DEC-10：holder 保持 mobile/none，control 帧补充 desktop_last_activity_at；手机接管时可见桌面最近活动。REST 终端 stop 只能由持有设备执行，统一发送 PTY Ctrl-C；已退出时幂等。
+- AC-12：同线程轮次排他也约束桌面，并在移动服务关闭时生效。拒绝发生于落库前；桌面不得回退 chat_send，须给出可理解提示。TurnGuard 覆盖预留的完整生命周期。
+- AC-16：headless 直连 provider 为明确标注的文本能力；CC/Codex/ACP 返回 desktop_required。自定义 data-dir 将 AI/应用代理配置也隔离在该目录；headless 的飞书密钥仅通过环境提供，不宣称可自行解锁 vault。
+- DEC-11：仅开放安全的任务项目根；文件变化按任务/500ms 合并为粗粒度失效，已退出 PTY 保留尾部且最多 64 条；完整参数不投影到工具摘要。
+
+以上回填不代表 V-05 的用户 endpoint、Android/iOS 真机安装/扫码或 V-08 真实飞书已经通过；这些必须分别保留真实证据。

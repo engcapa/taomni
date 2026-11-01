@@ -19,6 +19,12 @@ pub struct Device {
     pub token_hash: String,
 }
 
+const TOKEN_LIFETIME: i64 = 90 * 86400;
+const TOKEN_IDLE: i64 = 30 * 86400;
+fn valid(device: &Device, now: i64) -> bool {
+    now < device.created_at.saturating_add(TOKEN_LIFETIME)
+        && now < device.last_used_at.saturating_add(TOKEN_IDLE)
+}
 pub struct Auth {
     path: Option<PathBuf>,
     pub devices: Vec<Device>,
@@ -52,7 +58,12 @@ impl Default for Auth {
     }
 }
 impl Auth {
+    pub fn clear_ephemeral(&mut self) {
+        self.code = None;
+        self.tickets.clear();
+    }
     pub fn load(&mut self, path: PathBuf) -> Result<(), String> {
+        self.clear_ephemeral();
         self.devices = match std::fs::read(&path) {
             Ok(bytes) => {
                 serde_json::from_slice(&bytes).map_err(|_| "Invalid mobile device store")?
@@ -101,23 +112,33 @@ impl Auth {
         self.synchronize_revocation();
         let now = Instant::now();
         self.failures.retain(|_, (until, _)| *until > now);
-        // Also bound arbitrary source identities; the listener never trusts X-Forwarded-For.
-        if self.failures.len() >= 1024 {
-            return Err("rate_limited".into());
-        }
-        let attempt = self
-            .failures
-            .entry(source.to_owned())
-            .or_insert((now + Duration::from_secs(300), 0));
-        if attempt.1 >= 5 {
-            return Err("rate_limited".into());
-        }
-        attempt.1 += 1;
-        if !self
+        let correct = self
             .code
             .as_ref()
-            .is_some_and(|(expected, until)| *until > now && equal(expected, &hash(code)))
-        {
+            .is_some_and(|(expected, until)| *until > now && equal(expected, &hash(code)));
+        // A reverse proxy is an untrusted shared source. Still throttle invalid
+        // attempts, but never let that shared bucket deny a valid 122-bit code.
+        let shared = source
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback());
+        if self.failures.get(source).is_some_and(|(_, n)| *n >= 5) && !(shared && correct) {
+            return Err("rate_limited".into());
+        }
+        if !correct {
+            if !self.failures.contains_key(source) && self.failures.len() >= 1024 {
+                let oldest = self
+                    .failures
+                    .iter()
+                    .min_by_key(|(_, (until, _))| *until)
+                    .map(|(key, _)| key.clone());
+                if let Some(key) = oldest {
+                    self.failures.remove(&key);
+                }
+            }
+            self.failures
+                .entry(source.to_owned())
+                .or_insert((now + Duration::from_secs(300), 0))
+                .1 += 1;
             self.failed_attempts += 1;
             log::warn!(
                 "Mobile pairing rejected: source={source}, failures={}",
@@ -125,6 +146,8 @@ impl Auth {
             );
             return Err("invalid_or_expired_code".into());
         }
+        self.devices
+            .retain(|device| valid(device, chrono::Utc::now().timestamp()));
         if self.devices.len() >= 256 {
             return Err("device_limit".into());
         }
@@ -152,22 +175,31 @@ impl Auth {
             self.tickets.clear();
             return None;
         }
+        let now = chrono::Utc::now().timestamp();
         let digest = hash(token);
         let device = self
             .devices
             .iter_mut()
-            .find(|d| equal(&d.token_hash, &digest))?;
-        device.last_used_at = chrono::Utc::now().timestamp();
-        Some(device.device_id.clone())
+            .find(|d| valid(d, now) && equal(&d.token_hash, &digest))?;
+        let checkpoint = now - device.last_used_at >= 300;
+        device.last_used_at = now;
+        let id = device.device_id.clone();
+        if checkpoint && self.save().is_err() {
+            return None;
+        }
+        Some(id)
     }
     pub fn paired_origin(&self, origin: &str) -> bool {
-        self.devices
-            .iter()
-            .any(|d| d.origin.as_deref() == Some(origin))
+        self.devices.iter().any(|d| {
+            valid(d, chrono::Utc::now().timestamp()) && d.origin.as_deref() == Some(origin)
+        })
     }
     pub fn exists(&self, id: &str) -> bool {
         !self.path.as_ref().is_some_and(|p| !p.is_file())
-            && self.devices.iter().any(|d| d.device_id == id)
+            && self
+                .devices
+                .iter()
+                .any(|d| d.device_id == id && valid(d, chrono::Utc::now().timestamp()))
     }
     pub fn revoke(&mut self, id: &str) -> Result<(), String> {
         self.synchronize_revocation();
@@ -205,69 +237,5 @@ impl Auth {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn single_use_expiry_revocation_and_origin_bound_tickets() {
-        let mut auth = Auth::default();
-        let code = auth.pairing_code();
-        let pair = auth
-            .pair("phone", &code, Some("https://phone.example".into()), "ip")
-            .unwrap();
-        assert!(auth.pair("again", &code, None, "ip").is_err());
-        let token = pair["token"].as_str().unwrap();
-        let id = auth.authenticate(token).unwrap();
-        assert!(auth.authenticate("wrong").is_none());
-        assert!(
-            !serde_json::to_string(&auth.devices)
-                .unwrap()
-                .contains(token)
-        );
-        let ticket = auth
-            .ticket(id.clone(), Some("https://phone.example".into()))
-            .unwrap();
-        assert!(
-            auth.consume_ticket(&ticket, Some("https://evil.example"))
-                .is_none()
-        );
-        assert!(
-            auth.consume_ticket(&ticket, Some("https://phone.example"))
-                .is_none()
-        );
-        let ticket = auth.ticket(id.clone(), None).unwrap();
-        assert_eq!(auth.consume_ticket(&ticket, None), Some(id.clone()));
-        assert!(auth.consume_ticket(&ticket, None).is_none());
-        auth.revoke(&id).unwrap();
-        assert!(auth.authenticate(token).is_none());
-        assert!(!auth.paired_origin("https://phone.example"));
-        let code = auth.pairing_code();
-        auth.code.as_mut().unwrap().1 = Instant::now() - Duration::from_secs(1);
-        assert!(auth.pair("expired", &code, None, "ip2").is_err());
-        for _ in 0..5 {
-            let _ = auth.pair("bad", "bad", None, "bad-ip");
-        }
-        assert_eq!(
-            auth.pair("bad", "bad", None, "bad-ip").unwrap_err(),
-            "rate_limited"
-        );
-    }
-    #[test]
-    fn persistence_contains_only_hashes_and_deletion_revokes() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("mobile-devices.json");
-        let mut a = Auth::default();
-        a.load(path.clone()).unwrap();
-        let code = a.pairing_code();
-        let pair = a.pair("phone", &code, None, "ip").unwrap();
-        let token = pair["token"].as_str().unwrap();
-        assert!(!std::fs::read_to_string(&path).unwrap().contains(token));
-        let mut b = Auth::default();
-        b.load(path.clone()).unwrap();
-        assert!(b.authenticate(token).is_some());
-        std::fs::remove_file(&path).unwrap();
-        // Shutdown must never resurrect a deleted device store.
-        b.flush().unwrap();
-        b.load(path).unwrap();
-        assert!(b.authenticate(token).is_none());
-    }
-}
+#[path = "auth_tests.rs"]
+mod tests;

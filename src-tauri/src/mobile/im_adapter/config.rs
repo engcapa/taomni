@@ -16,6 +16,7 @@ pub struct Binding {
 pub struct Config {
     pub app_id: String,
     pub secret_ref: String,
+    pub allow_file_content: bool,
     pub mobile_endpoint: String,
     pub bindings: Vec<Binding>,
     pub proxy_mode: String,
@@ -26,6 +27,7 @@ impl Default for Config {
         Self {
             app_id: String::new(),
             secret_ref: String::new(),
+            allow_file_content: false,
             mobile_endpoint: String::new(),
             bindings: vec![],
             proxy_mode: "app".into(),

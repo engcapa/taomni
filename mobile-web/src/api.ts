@@ -17,7 +17,7 @@ export interface Session {
 export interface SavedSession { id: string; name: string; session_type: string; group_path: string | null }
 export interface SessionList { sessions: Session[]; saved_sessions: SavedSession[] }
 export interface Confirmation { id: string; tool: string; supported: boolean }
-export interface Detail extends Session { holder?: string; confirmations?: Confirmation[]; context_notice?: string }
+export interface Detail extends Session { holder?: string; confirmations?: Confirmation[]; context_notice?: string; tools?: { id: string; name: string; status: string }[] }
 export interface Changes { changes: { path: string; change_kind: string; diff_available: boolean }[]; truncated?: boolean }
 export interface FileContent { path: string; content?: string; hunks?: string[]; truncated: boolean }
 export class ApiError extends Error {
@@ -42,7 +42,8 @@ export async function request<T>(instance: Pick<Instance, "endpoint" | "token">,
       headers: { ...(instance.token ? { Authorization: `Bearer ${instance.token}` } : {}), ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
       body: body === undefined ? undefined : JSON.stringify(body), signal: abort.signal,
     });
-    const value = await response.json();
+    const value = await response.json().catch(() => ({})) as { error?: string };
+    if (response.status === 413) throw new ApiError("message_too_large");
     if (!response.ok) throw new ApiError(value.error || "request_failed");
     return value as T;
   } catch (error) {
@@ -64,6 +65,7 @@ export function errorText(error: unknown): string {
     diff_unavailable: "无可读的本地任务目录或 Git diff。请在桌面建立任务上下文。",
     path_denied: "该路径超出任务目录，访问已拒绝。",
     binary_file: "二进制文件无法以文本显示。",
+    message_too_large: "指令不能超过 32768 UTF-8 字节，请缩短后重试。",
     turn_in_progress: "当前轮次仍在运行，请先停止或等待完成。",
     already_resolved: "该确认已在其他设备作答。",
     desktop_required: "此任务依赖桌面运行时，请在桌面继续。",

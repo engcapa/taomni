@@ -276,6 +276,9 @@ export function createChatSendingActions(set: StoreApi<ChatStore>["setState"], g
           },
         });
       } catch (e) {
+        if (String(e).includes("turn_in_progress")) {
+          throw new Error("当前任务正在执行，请先停止或等待当前轮次完成。");
+        }
         if (isVaultLockedError(e)) {
           // Surface the unlock dialog, then bail out — the user re-presses Send
           // after unlocking. Don't fall back to chat_send since that would hit

@@ -28,7 +28,7 @@ fn authorize(s: &Service, headers: &HeaderMap, ticket: &str) -> Result<String, A
     s.runtime
         .auth
         .lock()
-        .unwrap()
+        .unwrap_or_else(|e| e.into_inner())
         .consume_ticket(ticket, origin(headers))
         .ok_or_else(|| "unauthorized".into())
 }
@@ -40,14 +40,14 @@ pub async fn events(
 ) -> Result<Response, ApiError> {
     let device = authorize(&s, &headers, &q.ticket)?;
     // Subscribe before hello/sequence snapshot: no event can fall in the gap.
-    let rx = s.runtime.events.tx.subscribe();
+    let (event_seq, rx) = s.runtime.events.subscribe();
     let frames = q
         .after_seq
         .map(|after| s.runtime.events.resume(after))
         .unwrap_or_default();
     Ok(ws
         .max_message_size(64 * 1024)
-        .on_upgrade(move |socket| run(socket, s, device, None, rx, frames)))
+        .on_upgrade(move |socket| run(socket, s, device, None, rx, frames, event_seq)))
 }
 pub async fn terminal(
     State(s): State<Service>,
@@ -61,7 +61,24 @@ pub async fn terminal(
         .strip_prefix("term:")
         .ok_or("terminal_not_found")?
         .to_owned();
-    let (rx, mut frames) = s.runtime.broker.subscribe(&id)?;
+    let (rx, mut frames) = match s.runtime.broker.subscribe(&id) {
+        Ok(value) => value,
+        Err(_) => {
+            return Ok(ws.on_upgrade(|mut socket| async move {
+                let _ = send(
+                    &mut socket,
+                    json!({"type":"error","code":"terminal_not_found"}),
+                )
+                .await;
+                let _ = socket
+                    .send(Message::Close(Some(axum::extract::ws::CloseFrame {
+                        code: 4004,
+                        reason: "terminal_not_found".into(),
+                    })))
+                    .await;
+            }));
+        }
+    };
     if let Some(after) = q.after_seq {
         let state: Vec<_> = frames
             .iter()
@@ -73,7 +90,7 @@ pub async fn terminal(
     }
     Ok(ws
         .max_message_size(64 * 1024)
-        .on_upgrade(move |socket| run(socket, s, device, Some(id), rx, frames)))
+        .on_upgrade(move |socket| run(socket, s, device, Some(id), rx, frames, 0)))
 }
 async fn send(socket: &mut WebSocket, event: Value) -> Result<(), ()> {
     tokio::time::timeout(
@@ -91,9 +108,10 @@ async fn run(
     terminal: Option<String>,
     mut rx: broadcast::Receiver<Value>,
     frames: Vec<Value>,
+    event_seq: u64,
 ) {
     let connection = uuid::Uuid::new_v4().to_string();
-    let hello = json!({"type":"hello", "instance_id":s.runtime.instance_id,"run_mode":s.core.mode(),"event_seq":s.runtime.events.seq(), "device_id":device,"connection_id":connection});
+    let hello = json!({"type":"hello", "instance_id":s.runtime.instance_id,"run_mode":s.core.mode(),"event_seq":event_seq, "device_id":device,"connection_id":connection});
     if send(&mut socket, hello).await.is_err() {
         return;
     }
@@ -107,7 +125,13 @@ async fn run(
     let mut last_in = Instant::now();
     let mut last_out = Instant::now();
     loop {
-        if !s.runtime.auth.lock().unwrap().exists(&device) {
+        if !s
+            .runtime
+            .auth
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .exists(&device)
+        {
             let _ = socket
                 .send(Message::Close(Some(axum::extract::ws::CloseFrame {
                     code: 4001,
@@ -119,7 +143,7 @@ async fn run(
         tokio::select! {
             _ = s.cancel.cancelled() => break,
             _ = s.runtime.devices_changed.notified() => {
-                if !s.runtime.auth.lock().unwrap().exists(&device) {
+                if !s.runtime.auth.lock().unwrap_or_else(|e| e.into_inner()).exists(&device) {
                     let _ = socket.send(Message::Close(Some(axum::extract::ws::CloseFrame { code:4001, reason:"device_revoked".into() }))).await;
                     break;
                 }
@@ -186,7 +210,13 @@ async fn terminal_command(
     let gate = broker.gate(id)?;
     let _guard = gate.lock().await;
     // Recheck after taking the operation gate: revoke cannot authorize queued input.
-    if !s.runtime.auth.lock().unwrap().exists(device) {
+    if !s
+        .runtime
+        .auth
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .exists(device)
+    {
         return Err("unauthorized".into());
     }
     let state = s.core.state();

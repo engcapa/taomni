@@ -13473,6 +13473,9 @@ controls:
   - id: feishu-bindings
     selector: '[data-testid="feishu-bindings"]'
     kind: interactive
+  - id: feishu-allow-files
+    selector: '[data-testid="feishu-allow-files"]'
+    kind: interactive
   - id: feishu-proxy-mode
     selector: '[data-testid="feishu-proxy-mode"]'
     kind: interactive

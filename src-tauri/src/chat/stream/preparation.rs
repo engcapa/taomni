@@ -28,37 +28,39 @@ pub async fn chat_stream(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    chat_stream_inner(req, Some(app), state.inner(), false).await
+    chat_stream_inner(req, Some(app), state.inner(), None).await
 }
 
 pub async fn chat_stream_inner(
     req: ChatSendRequest,
     app: Option<AppHandle>,
     state: &AppState,
-    reserved: bool,
+    reserved: Option<crate::mobile::turn::TurnGuard>,
 ) -> Result<(), String> {
     let tid = req.thread_id.clone();
-    if !reserved {
-        let mut pending = state.mobile.pending_turns.lock().unwrap();
-        if pending.contains_key(&tid) {
-            return Err("turn_in_progress".into());
-        }
-        pending.insert(tid.clone(), tokio_util::sync::CancellationToken::new());
-    }
-    let cancel = state.mobile.turn_cancel(&tid);
+    let mut guard = match reserved {
+        Some(guard) => guard,
+        None => crate::mobile::turn::TurnGuard::reserve(&state.mobile, &tid)?,
+    };
+    guard.bind_runs(state.agent.chat_runs.clone());
+    let cancel = guard.turn.cancel.clone();
     state.mobile.task_status(&tid, "running", "turn_starting");
-    let result = stream_inner(req, app, state).await;
+    use futures::FutureExt;
+    let result = match std::panic::AssertUnwindSafe(stream_inner(req, app, state))
+        .catch_unwind()
+        .await
+    {
+        Ok(result) => result,
+        Err(_) => {
+            cancel.cancel();
+            Err("turn_failed".into())
+        }
+    };
     if cancel.is_cancelled() {
         crate::chat::stop_thread_runtime_inner(&tid, None, state).await;
     }
     state.agent.chat_runs.lock().await.remove(&tid);
-    let failed = state
-        .mobile
-        .task_summaries
-        .lock()
-        .unwrap()
-        .get(&tid)
-        .is_some_and(|v| v["summary"] == "turn_failed");
+    let failed = guard.failed();
     state.mobile.task_status(
         &tid,
         "idle",
@@ -70,7 +72,8 @@ pub async fn chat_stream_inner(
             "turn_failed"
         },
     );
-    state.mobile.pending_turns.lock().unwrap().remove(&tid);
+    guard.finish();
+    drop(guard);
     result
 }
 

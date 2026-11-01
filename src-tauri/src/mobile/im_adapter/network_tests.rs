@@ -36,6 +36,7 @@ struct Platform {
     pings: Arc<AtomicUsize>,
     tokens: Arc<AtomicUsize>,
     acks: Arc<AtomicUsize>,
+    bad_acks: Arc<AtomicUsize>,
     attempts: Arc<Mutex<Vec<Value>>>,
 }
 async fn endpoint(State(p): State<Platform>, Json(body): Json<Value>) -> Json<Value> {
@@ -82,7 +83,8 @@ async fn stream(mut socket: WebSocket, p: Platform, mut events: broadcast::Recei
             result=events.recv()=> {
                 let Ok(value)=result else { break; };
                 if value["close"]==true { let _=socket.close().await;break; }
-                let frame=Frame {service:7,method:1,headers:vec![protocol::Header {key:"type".into(),value:"event".into()}],payload:Some(value.to_string().into_bytes()),..Default::default()};
+                let payload = if value["invalid_json"] == true { b"not JSON".to_vec() } else { value.to_string().into_bytes() };
+                let frame=Frame {service:7,method:1,headers:vec![protocol::Header {key:"type".into(),value:"event".into()}],payload:Some(payload),..Default::default()};
                 if socket.send(AxumMessage::Binary(frame.encode_to_vec().into())).await.is_err() {break;}
             }
             result=socket.next()=> {
@@ -93,8 +95,9 @@ async fn stream(mut socket: WebSocket, p: Platform, mut events: broadcast::Recei
                     let mut pong=frame;pong.headers[0].value="pong".into();pong.payload=Some(json!({"PingInterval":1}).to_string().into_bytes());
                     if socket.send(AxumMessage::Binary(pong.encode_to_vec().into())).await.is_err() {break;}
                 } else {
-                    assert_eq!(serde_json::from_slice::<Value>(frame.payload.as_ref().unwrap()).unwrap()["code"],200);
-                    p.acks.fetch_add(1,Ordering::SeqCst);
+                    let code = serde_json::from_slice::<Value>(frame.payload.as_ref().unwrap()).unwrap()["code"].as_u64().unwrap();
+                    if code == 500 { p.bad_acks.fetch_add(1, Ordering::SeqCst); }
+                    else { assert_eq!(code, 200); p.acks.fetch_add(1, Ordering::SeqCst); }
                 }
             }
         }
@@ -143,6 +146,7 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
         pings: Arc::default(),
         tokens: Arc::default(),
         acks: Arc::default(),
+        bad_acks: Arc::default(),
         attempts: Arc::default(),
     };
     let router = Router::new()
@@ -178,10 +182,17 @@ async fn real_long_connection_routes_once_notifies_confirms_and_reconnects() {
     duplicate["header"]["event_id"] = json!("another-event");
     p.events.send(duplicate).unwrap();
     wait(|| runtime.snapshot().duplicates == 1).await;
+    p.events.send(json!({"invalid_json":true})).unwrap();
+    wait(|| p.bad_acks.load(Ordering::SeqCst) == 1).await;
+    assert_eq!(
+        p.connections.load(Ordering::SeqCst),
+        1,
+        "poison messages must not reconnect the socket"
+    );
     let mut denied = event("om_bad", "/taomni stop thread:feishu-task");
     denied["event"]["sender"]["sender_id"]["open_id"] = json!("ou_stranger");
     p.events.send(denied).unwrap();
-    wait(|| runtime.snapshot().rejected == 1).await;
+    wait(|| runtime.snapshot().rejected == 2).await;
     p.events
         .send(event("om_pty", "/taomni send term:blocked text"))
         .unwrap();

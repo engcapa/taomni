@@ -1,4 +1,5 @@
 id: TC-MOBILE-002
+# Review regressions: read-only REST stop is forbidden; last-Origin revocation returns a CORS-readable error.
 title: Desktop mobile settings authenticate devices share real PTY and revoke access
 covers:
 - F-MOBILE-1

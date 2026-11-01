@@ -16,8 +16,10 @@ export function MobileServiceSettings() {
   const [error, setError] = useState("");
   useEffect(() => {
     let disposed = false;
-    void invoke<Status>("mobile_status").then(value => { if (!disposed) setStatus(value); }).catch(e => { if (!disposed) setError(String(e)); });
-    return () => { disposed = true; };
+    const refresh = () => { void invoke<Status>("mobile_status").then(value => { if (!disposed) setStatus(value); }).catch(e => { if (!disposed) setError(String(e)); }); };
+    refresh();
+    const timer = setInterval(refresh, 3000);
+    return () => { disposed = true; clearInterval(timer); };
   }, []);
   useEffect(() => {
     let disposed = false;
@@ -49,7 +51,7 @@ export function MobileServiceSettings() {
     </div>
     <p className="mt-3" data-testid="mobile-settings-status">{status.enabled ? `运行中 · ${status.address}` : "已关闭 · 无监听端口"}</p>
     {status.enabled && <div className="mt-3 space-y-3">
-      <p className="text-[var(--taomni-text-muted)]">手机请使用可到达的局域网地址或自备 HTTPS endpoint；0.0.0.0 与 127.0.0.1 不能作为远程手机地址。</p>
+      <p className="text-[var(--taomni-text-muted)]">局域网 HTTP 为明文连接，会传输凭据和内容；互联网请配置 HTTPS。手机请使用可到达的局域网地址或自备 HTTPS endpoint；0.0.0.0 与 127.0.0.1 不能作为远程手机地址。</p>
       <label className="block">配对二维码中的实例地址<input data-testid="mobile-settings-endpoint" className="mt-1 block w-full border rounded px-2 py-1" value={endpoint} onChange={e => setEndpoint(e.target.value)} placeholder="https://pc.example.com" /></label>
       <button data-testid="mobile-settings-pair" className="border rounded px-3 py-1.5" disabled={busy} onClick={() => void act(async () => {
         setCode(await invoke<string>("mobile_pairing_code")); setExpires(Date.now() + 300000);

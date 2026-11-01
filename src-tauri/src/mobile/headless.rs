@@ -3,8 +3,13 @@ use super::Core;
 use crate::state::AppState;
 use std::{
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
+
+static CONFIG_ROOT: OnceLock<PathBuf> = OnceLock::new();
+pub(crate) fn config_root() -> Option<PathBuf> {
+    CONFIG_ROOT.get().cloned()
+}
 
 /// Desktop instances share this lock; a headless process owns it exclusively.
 /// ProfileLease independently protects backup/restore operations.
@@ -71,6 +76,7 @@ fn argument(name: &str) -> Option<String> {
     args.windows(2).find(|w| w[0] == name).map(|w| w[1].clone())
 }
 pub fn run() -> i32 {
+    super::headless_ops::initialize();
     match tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
@@ -89,7 +95,8 @@ pub fn run() -> i32 {
     }
 }
 async fn serve() -> Result<(), String> {
-    let data = match argument("--data-dir") {
+    let custom_data = argument("--data-dir");
+    let data = match custom_data.as_ref() {
         Some(p) => PathBuf::from(p),
         None => dirs::data_dir()
             .ok_or("No application data directory")?
@@ -100,6 +107,12 @@ async fn serve() -> Result<(), String> {
         .parse::<u16>()
         .map_err(|_| "Invalid port")?;
     let lan = std::env::args().any(|a| a == "--mobile-lan");
+    if custom_data.is_some() {
+        let _ = CONFIG_ROOT.set(data.join("config"));
+        crate::migrate::run_profile(&data);
+    } else {
+        crate::migrate::run(&data);
+    }
     let _mode = ModeLease::acquire(&data, true)?;
     let _profile = crate::backup::coordination::ProfileLease::prepare(&data)?;
     let state = Arc::new(initialize(&data)?);
@@ -112,23 +125,37 @@ async fn serve() -> Result<(), String> {
     println!("Mobile endpoint: {address}");
     println!(
         "Pairing code (5 minutes): {}",
-        state.mobile.auth.lock().unwrap().pairing_code()
+        state
+            .mobile
+            .auth
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .pairing_code()
     );
     if std::env::args().any(|a| a == "--feishu") {
         let config = super::im_adapter::Config::load(&data)?;
-        let secret = match std::env::var("TAOMNI_FEISHU_APP_SECRET") {
-            Ok(value) if !value.is_empty() => zeroize::Zeroizing::new(value),
-            _ => state
-                .vault
-                .resolve(&config.secret_ref)?
-                .ok_or("Configure Feishu credentials or TAOMNI_FEISHU_APP_SECRET")?,
-        };
+        let secret = super::headless_ops::secret(std::env::var("TAOMNI_FEISHU_APP_SECRET").ok())?;
         state
             .mobile
             .im
             .start(Core::Headless(state.clone()), config, secret)
             .await?;
     }
+    let observer = super::headless_ops::observe(state.mobile.clone());
+    let runtime = state.mobile.clone();
+    let rotate = tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_secs(300)).await;
+            println!(
+                "Pairing code (5 minutes): {}",
+                runtime
+                    .auth
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .pairing_code()
+            );
+        }
+    });
     #[cfg(unix)]
     {
         let mut term = tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
@@ -139,12 +166,14 @@ async fn serve() -> Result<(), String> {
             tokio::select! {
                 _ = tokio::signal::ctrl_c() => break,
                 _ = term.recv() => break,
-                _ = hup.recv() => println!("Pairing code (5 minutes): {}", state.mobile.auth.lock().unwrap().pairing_code()),
+                _ = hup.recv() => println!("Pairing code (5 minutes): {}", state.mobile.auth.lock().unwrap_or_else(|e| e.into_inner()).pairing_code()),
             }
         }
     }
     #[cfg(not(unix))]
     tokio::signal::ctrl_c().await.map_err(|e| e.to_string())?;
+    observer.abort();
+    rotate.abort();
     state.mobile.stop().await;
     let runs = std::mem::take(&mut *state.agent.chat_runs.lock().await);
     for (_, run) in runs {

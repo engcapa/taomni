@@ -25,8 +25,16 @@ pub async fn list(state: &AppState) -> Result<Value, String> {
         (threads, saved)
     };
     let runs = state.agent.chat_runs.lock().await;
-    let pending = state.mobile.pending_turns.lock().unwrap();
-    let summaries = state.mobile.task_summaries.lock().unwrap();
+    let pending = state
+        .mobile
+        .pending_turns
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let summaries = state
+        .mobile
+        .task_summaries
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     for thread in threads {
         let confirmations = super::agent_view::confirmations(state, &thread.id);
         sessions.push(json!({"id":format!("thread:{}",thread.id), "kind":"agent", "title":thread.title,
@@ -62,20 +70,25 @@ pub async fn detail(state: &AppState, id: &str) -> Result<Value, String> {
             .ok_or("session_not_found")?
     };
     let running = state.agent.chat_runs.lock().await.contains_key(tid)
-        || state.mobile.pending_turns.lock().unwrap().contains_key(tid);
+        || state
+            .mobile
+            .pending_turns
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains_key(tid);
     let summary = state
         .mobile
         .task_summaries
         .lock()
-        .unwrap()
+        .unwrap_or_else(|e| e.into_inner())
         .get(tid)
         .map(|v| v["summary"].clone())
         .unwrap_or(json!(""));
     let confirmations = super::agent_view::confirmations(state, tid);
     Ok(json!({"id":id,"kind":"agent","title":thread.title,
         "status":if !confirmations.is_empty() {"awaiting_confirmation"} else if running {"running"} else {"idle"},
-        "summary":summary, "tools":[], "confirmations":confirmations,
-        "capabilities":{"message":state.mobile.desktop_available.load(std::sync::atomic::Ordering::Relaxed) || (!matches!(thread.provider_id.as_str(),"claude-code" | "codex") && !thread.provider_id.starts_with("acp:")),
+        "summary":summary, "tools":state.mobile.tools.lock().unwrap_or_else(|e| e.into_inner()).get(tid).cloned().unwrap_or_default(), "confirmations":confirmations,
+        "capabilities":{"message":state.mobile.desktop_available.load(std::sync::atomic::Ordering::Relaxed) || (!matches!(thread.provider_id.as_str(),"claude-code" | "codex") && crate::agent::acp_bridge::profile_id_from_provider_id(&thread.provider_id).is_none()),
             "desktop_tools":state.mobile.desktop_available.load(std::sync::atomic::Ordering::Relaxed)},
-        "context_notice":"由手机发起，未带桌面上下文"}))
+        "context_notice":if state.mobile.desktop_available.load(std::sync::atomic::Ordering::Relaxed) { "由手机发起，未带桌面上下文；消息中的 ActionCard / WebSearch 确认请在桌面处理" } else { "Headless：本轮仅提供文本回复，未提供桌面工具；依赖桌面的 provider 返回 desktop_required" }}))
 }

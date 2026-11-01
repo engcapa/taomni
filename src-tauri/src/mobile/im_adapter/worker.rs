@@ -8,7 +8,6 @@ use super::{
 use crate::mobile::Core;
 use serde_json::{Value, json};
 use std::{
-    collections::HashSet,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -64,7 +63,11 @@ async fn socket_loop(
         if started.elapsed() >= Duration::from_secs(60) {
             attempts = 0;
         }
-        runtime.status.lock().unwrap().reconnects += 1;
+        runtime
+            .status
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .reconnects += 1;
         tokio::time::sleep(Duration::from_secs([1, 2, 5, 10, 30][attempts.min(4)])).await;
         attempts = (attempts + 1).min(4);
     }
@@ -99,8 +102,25 @@ async fn connection(
                     continue;
                 }
                 if frame.method != 1 { continue; }
-                let Some(bytes) = fragments.accept(&frame)? else { continue; };
-                let value: Value = serde_json::from_slice(&bytes).map_err(|_| "feishu_invalid_event")?;
+                let bytes = match fragments.accept(&frame) {
+                    Ok(Some(bytes)) => bytes,
+                    Ok(None) => continue,
+                    Err(code) => {
+                        runtime.error(&code);
+                        runtime.status.lock().unwrap_or_else(|e| e.into_inner()).rejected += 1;
+                        network::write(&mut socket, frame.response(false, None)).await?;
+                        continue;
+                    }
+                };
+                let value: Value = match serde_json::from_slice(&bytes) {
+                    Ok(value) => value,
+                    Err(_) => {
+                        runtime.error("feishu_invalid_event");
+                        runtime.status.lock().unwrap_or_else(|e| e.into_inner()).rejected += 1;
+                        network::write(&mut socket, frame.response(false, None)).await?;
+                        continue;
+                    }
+                };
                 let card = value["header"]["event_type"] == "card.action.trigger";
                 let mut toast = "已受理，请查看机器人回复";
                 let accepted = match actions::authorize(&network.config, &value) {
@@ -108,7 +128,7 @@ async fn connection(
                         match input.try_reserve() {
                             Ok(permit) => match actions::claim(core, &request.key) {
                                 Ok(true) => { permit.send(request); true },
-                                Ok(false) => { runtime.status.lock().unwrap().duplicates += 1; true },
+                                Ok(false) => { runtime.status.lock().unwrap_or_else(|e| e.into_inner()).duplicates += 1; true },
                                 Err(error) => { runtime.error(&error); false },
                             },
                             Err(_) => { runtime.error("feishu_inbound_queue_full"); false },
@@ -116,7 +136,7 @@ async fn connection(
                     }
                     Ok(None) => true,
                     Err(_) => {
-                        runtime.status.lock().unwrap().rejected += 1;
+                        runtime.status.lock().unwrap_or_else(|e| e.into_inner()).rejected += 1;
                         log::warn!("Feishu event rejected: application, identity, format or freshness check failed");
                         toast = "无权限或回调已过期";
                         true
@@ -137,47 +157,45 @@ async fn business(
     output: mpsc::Sender<Outbound>,
     mut events: broadcast::Receiver<Value>,
 ) {
+    let mut commands = tokio::task::JoinSet::new();
+    let mut notifications = super::notifications::Notifications::default();
     loop {
         tokio::select! {
-            Some(request) = input.recv() => {
-                let text = actions::execute(&core, &config, &request.command).await;
-                enqueue(&runtime, &output, Outbound::text(request.chat, text, &request.key));
+            Some(request) = input.recv(), if commands.len() < 4 => {
+                let core = core.clone();
+                let config = config.clone();
+                commands.spawn(async move {
+                    let text = actions::execute_request(&core, &config, &request).await;
+                    Outbound::text(request.chat, text, &request.key)
+                });
             }
+            Some(result) = commands.join_next(), if !commands.is_empty() => match result {
+                Ok(value) => enqueue(&runtime, &output, value),
+                Err(_) => runtime.error("feishu_command_failed"),
+            },
             result = events.recv() => {
                 match result {
-                    Ok(event) => {
-                        if event["type"] != "task_status" { continue; }
-                        let status = event["status"].as_str().unwrap_or("");
-                        if status != "awaiting_confirmation" && status != "idle" { continue; }
-                        let task = event["task_id"].as_str().unwrap_or("");
-                        let summary = event["summary"].as_str().unwrap_or("");
-                        if status == "idle" && !matches!(summary,"turn_finished"|"turn_failed"|"stopped") { continue; }
-                        let confirmations = if status == "awaiting_confirmation" {
-                            task.strip_prefix("thread:").map(|tid| crate::mobile::agent_view::confirmations(&core.state(),tid)).unwrap_or_default()
-                        } else { vec![] };
-                        let chats: HashSet<_> = config.bindings.iter().map(|b| b.chat_id.clone()).collect();
-                        for chat in chats {
-                            let id = format!("{}:{}:{}",runtime.instance,event["seq"],chat);
-                            if confirmations.is_empty() {
-                                enqueue(&runtime, &output, Outbound::text(chat,format!("{}{}",actions::bounded(&format!("Taomni {task} · {status}\n{summary}")),actions::link(&config)),&id));
-                            } else {
-                                for confirmation in &confirmations {
-                                    enqueue(&runtime,&output,Outbound { chat:chat.clone(),kind:"interactive",content:actions::confirmation_card(&config,task,confirmation),
-                                        uuid:actions::key(&format!("{id}:{}",confirmation["id"]))[..32].into() });
-                                }
-                            }
-                        }
+                    Ok(event) => notifications.deliver(&runtime, &core, &config, &output, &event),
+                    Err(broadcast::error::RecvError::Lagged(_)) => {
+                        runtime.error("feishu_event_gap_reconciled");
+                        let snapshots: Vec<_> = core.state().mobile.task_summaries.lock()
+                            .unwrap_or_else(|e| e.into_inner()).values().cloned().collect();
+                        for event in snapshots { notifications.deliver(&runtime, &core, &config, &output, &event); }
                     }
-                    Err(broadcast::error::RecvError::Lagged(_)) => runtime.error("feishu_event_gap_query_list"),
                     Err(broadcast::error::RecvError::Closed) => return,
                 }
             }
         }
     }
 }
-fn enqueue(runtime: &Runtime, output: &mpsc::Sender<Outbound>, value: Outbound) {
+
+pub(super) fn enqueue(runtime: &Runtime, output: &mpsc::Sender<Outbound>, value: Outbound) {
     if output.try_send(value).is_err() {
-        runtime.status.lock().unwrap().failed_deliveries += 1;
+        runtime
+            .status
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .failed_deliveries += 1;
         runtime.error("feishu_outbound_queue_full_query_snapshot");
     }
 }
@@ -189,13 +207,21 @@ async fn delivery(runtime: Arc<Runtime>, network: Network, mut output: mpsc::Rec
                 .await
             {
                 Ok(()) => {
-                    runtime.status.lock().unwrap().delivered += 1;
+                    runtime
+                        .status
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .delivered += 1;
                     break;
                 }
                 Err(error) => {
                     runtime.error(&error);
                     if attempt == 4 {
-                        runtime.status.lock().unwrap().failed_deliveries += 1;
+                        runtime
+                            .status
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .failed_deliveries += 1;
                     } else {
                         tokio::time::sleep(Duration::from_secs([1, 2, 5, 10][attempt])).await;
                     }

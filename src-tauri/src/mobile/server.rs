@@ -15,6 +15,7 @@ use tokio_util::sync::CancellationToken;
 #[derive(Clone)]
 pub struct Service {
     pub core: Core,
+    pub hosts: Arc<std::collections::HashSet<String>>,
     pub runtime: Arc<MobileRuntime>,
     pub cancel: CancellationToken,
 }
@@ -36,7 +37,7 @@ impl IntoResponse for ApiError {
         }
         let status = match self.0.as_str() {
             "unauthorized" => StatusCode::UNAUTHORIZED,
-            "origin_denied" | "path_denied" | "not_holder" => StatusCode::FORBIDDEN,
+            "host_denied" | "origin_denied" | "path_denied" | "not_holder" => StatusCode::FORBIDDEN,
             "rate_limited" => StatusCode::TOO_MANY_REQUESTS,
             "turn_in_progress" | "already_resolved" | "control_busy" => StatusCode::CONFLICT,
             "session_not_found" | "terminal_not_found" => StatusCode::NOT_FOUND,
@@ -64,7 +65,11 @@ pub fn origin_allowed(s: &Service, headers: &HeaderMap) -> bool {
     // Forwarded headers are untrusted. A rewriting proxy must pair its shell
     // origin explicitly; we never trust a client-supplied X-Forwarded-Host.
     ((url.scheme() == "http" || url.scheme() == "https") && authority.eq_ignore_ascii_case(host))
-        || s.runtime.auth.lock().unwrap().paired_origin(origin)
+        || s.runtime
+            .auth
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .paired_origin(origin)
 }
 pub fn authenticated(s: &Service, headers: &HeaderMap) -> Result<String, ApiError> {
     let token = headers
@@ -80,20 +85,29 @@ pub fn authenticated(s: &Service, headers: &HeaderMap) -> Result<String, ApiErro
         .ok_or_else(|| "unauthorized".into())
 }
 async fn cors(State(s): State<Service>, request: axum::extract::Request, next: Next) -> Response {
+    let host = request
+        .headers()
+        .get(header::HOST)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if !s.hosts.contains(&host) {
+        return ApiError("host_denied".into()).into_response();
+    }
     let path = request.uri().path();
     let api = path.starts_with("/api/v1/");
     let public = path == "/api/v1/health" || path == "/api/v1/pair";
     let allowed = !api || public || origin_allowed(&s, request.headers());
     let origin = origin(request.headers()).map(str::to_owned);
     let preflight = request.method() == axum::http::Method::OPTIONS;
-    let mut response = if !allowed {
-        ApiError("origin_denied".into()).into_response()
-    } else if preflight && api {
+    let mut response = if preflight && api {
         StatusCode::NO_CONTENT.into_response()
+    } else if !allowed {
+        ApiError("origin_denied".into()).into_response()
     } else {
         next.run(request).await
     };
-    if api && allowed {
+    if api {
         let h = response.headers_mut();
         if let Some(origin) = origin.and_then(|o| o.parse().ok()) {
             h.insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, origin);
@@ -139,7 +153,7 @@ pub fn router(s: Service) -> Router {
 }
 async fn health(State(s): State<Service>) -> Json<Value> {
     Json(
-        json!({"service":"taomni-mobile","version":"1","pairing_required":true,"run_mode":s.core.mode()}),
+        json!({"service":"taomni-mobile","version":"1","pairing_required":true,"run_mode":s.core.mode(),"shell_available":!ASSETS.is_empty()}),
     )
 }
 #[derive(Deserialize)]
@@ -172,7 +186,7 @@ async fn ticket(State(s): State<Service>, headers: HeaderMap) -> ApiResult {
         .runtime
         .auth
         .lock()
-        .unwrap()
+        .unwrap_or_else(|e| e.into_inner())
         .ticket(id, origin(&headers).map(str::to_owned))?;
     Ok(Json(json!({"ticket":ticket})))
 }
@@ -185,8 +199,8 @@ async fn detail(State(s): State<Service>, headers: HeaderMap, Path(id): Path<Str
     Ok(Json(session_view::detail(&s.core.state(), &id).await?))
 }
 async fn stop(State(s): State<Service>, headers: HeaderMap, Path(id): Path<String>) -> ApiResult {
-    authenticated(&s, &headers)?;
-    agent_view::stop(&s.core, &id).await?;
+    let device = authenticated(&s, &headers)?;
+    agent_view::stop_as(&s.core, &id, Some(&device)).await?;
     Ok(Json(json!({"status":"stopped"})))
 }
 #[derive(Deserialize)]
@@ -266,6 +280,8 @@ async fn static_file(uri: axum::http::Uri) -> Response {
                 "text/css"
             } else if path.ends_with(".webmanifest") {
                 "application/manifest+json"
+            } else if path.ends_with(".png") {
+                "image/png"
             } else if path.ends_with(".svg") {
                 "image/svg+xml"
             } else {

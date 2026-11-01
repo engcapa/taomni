@@ -1,4 +1,3 @@
-use super::server::Service;
 use crate::state::AppState;
 use serde_json::{Value, json};
 use std::{
@@ -24,11 +23,20 @@ pub fn remember_root(state: &AppState, context: &crate::agent::context::AgentThr
         });
     let root = local
         .and_then(|p| std::fs::canonicalize(p).ok())
-        .filter(|p| p.is_dir());
-    let mut roots = state.mobile.file_roots.lock().unwrap();
+        .filter(|p| p.is_dir() && super::file_policy::allowed_root(p));
+    let mut roots = state
+        .mobile
+        .file_roots
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     if let Some(root) = root {
         roots.insert(context.thread_id.clone(), root);
-    } else {
+    } else if local.is_some()
+        || context.bound_session_id.is_some()
+        || context.linked_session_id.is_some()
+    {
+        // An explicit invalid/remote binding revokes access; context-free mobile
+        // follow-ups retain the last desktop-granted local root.
         roots.remove(&context.thread_id);
     }
     state.mobile.roots_changed.notify_one();
@@ -37,20 +45,33 @@ fn task(id: &str) -> Result<&str, String> {
     id.strip_prefix("thread:").ok_or("diff_unavailable".into())
 }
 fn root(state: &AppState, id: &str) -> Result<PathBuf, String> {
-    state
+    let root = state
         .mobile
         .file_roots
         .lock()
-        .unwrap()
+        .unwrap_or_else(|e| e.into_inner())
         .get(task(id)?)
         .cloned()
-        .ok_or("diff_unavailable".into())
+        .ok_or("diff_unavailable")?;
+    if !super::file_policy::allowed_root(&root)
+        || state
+            .mobile
+            .profile_data
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .as_ref()
+            .is_some_and(|data| root.starts_with(data))
+    {
+        return Err("path_denied".into());
+    }
+    Ok(root)
 }
 fn relative(path: &str) -> Result<&Path, String> {
     let p = Path::new(path);
     if path.is_empty()
         || path.contains(['\\', ':', '\0'])
         || p.is_absolute()
+        || !super::file_policy::allowed_path(p)
         || p.components().any(|c| !matches!(c, Component::Normal(_)))
     {
         return Err("path_denied".into());
@@ -64,14 +85,28 @@ pub fn resolve(root: &Path, path: &str) -> Result<PathBuf, String> {
         .join(path)
         .canonicalize()
         .map_err(|_| "file_unavailable")?;
-    if !target.starts_with(&root) {
+    if !super::file_policy::allowed_root(&root)
+        || !target.starts_with(&root)
+        || !super::file_policy::allowed_path(target.strip_prefix(&root).map_err(|_| "path_denied")?)
+    {
         return Err("path_denied".into());
     }
     Ok(target)
 }
 async fn git(root: &Path, args: &[&str]) -> Result<(Vec<u8>, bool), String> {
-    let mut child = tokio::process::Command::new("git")
-        .args(["--no-pager", "-c", "core.quotepath=false", "-C"])
+    let mut command = tokio::process::Command::new("git");
+    #[cfg(windows)]
+    command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    let mut child = command
+        .args([
+            "--no-pager",
+            "--literal-pathspecs",
+            "-c",
+            "core.quotepath=false",
+            "-c",
+            "core.fsmonitor=false",
+            "-C",
+        ])
         .arg(root)
         .args(args)
         .stdin(Stdio::null())
@@ -115,13 +150,22 @@ pub async fn changes(state: &AppState, id: &str) -> Result<Value, String> {
             "--porcelain=v1",
             "-z",
             "--no-renames",
-            "--untracked-files=normal",
+            "--untracked-files=all",
+            "--",
+            ".",
         ],
     )
     .await?;
+    let (prefix, _) = git(&root, &["rev-parse", "--show-prefix"]).await?;
+    let prefix = std::str::from_utf8(&prefix)
+        .map_err(|_| "diff_unavailable")?
+        .trim_end_matches('\n');
     let mut changes = vec![];
     for row in bytes.split(|b| *b == 0).filter(|r| r.len() >= 4) {
         let Ok(path) = std::str::from_utf8(&row[3..]) else {
+            continue;
+        };
+        let Some(path) = path.strip_prefix(prefix) else {
             continue;
         };
         if relative(path).is_err() {
@@ -133,9 +177,18 @@ pub async fn changes(state: &AppState, id: &str) -> Result<Value, String> {
 }
 pub async fn file(state: &AppState, id: &str, path: &str) -> Result<Value, String> {
     let target = resolve(&root(state, id)?, path)?;
-    let file = tokio::fs::File::open(target)
+    if !tokio::fs::metadata(&target)
         .await
-        .map_err(|_| "file_unavailable")?;
+        .map_err(|_| "file_unavailable")?
+        .is_file()
+    {
+        return Err("file_unavailable".into());
+    }
+    let mut options = tokio::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    options.custom_flags(libc::O_NONBLOCK | libc::O_NOFOLLOW);
+    let file = options.open(target).await.map_err(|_| "file_unavailable")?;
     if !file
         .metadata()
         .await
@@ -210,53 +263,6 @@ pub async fn diff(state: &AppState, id: &str, path: &str) -> Result<Value, Strin
     Ok(json!({"path":path,"hunks":hunks,"truncated":truncated}))
 }
 
-/// Native filesystem notifications, independent of PTY and mobile page lifetime.
-pub fn watch(service: Service) -> tokio::task::JoinHandle<()> {
-    tokio::spawn(async move {
-        use notify::{RecursiveMode, Watcher};
-        let mut watches = std::collections::HashMap::new();
-        loop {
-            let roots = service.runtime.file_roots.lock().unwrap().clone();
-            watches.retain(|id, (root, _)| roots.get(id) == Some(root));
-            for (id, root) in roots {
-                if watches.contains_key(&id) {
-                    continue;
-                }
-                let events = service.runtime.events.clone();
-                let task = format!("thread:{id}");
-                let base = root.clone();
-                let watcher = notify::recommended_watcher(
-                    move |result: notify::Result<notify::Event>| match result {
-                        Ok(event)
-                            if event.kind.is_modify()
-                                || event.kind.is_create()
-                                || event.kind.is_remove() =>
-                        {
-                            for path in event.paths {
-                                if let Ok(relative) = path.strip_prefix(&base) {
-                                    if relative.components().any(|c| c.as_os_str() == ".git") {
-                                        continue;
-                                    }
-                                    events.publish(json!({"type":"file_changed", "task_id":task,"path":relative.to_string_lossy(),"change_kind":"changed"}));
-                                }
-                            }
-                        }
-                        Err(_) => events.publish(json!({"type":"resync"})),
-                        _ => {}
-                    },
-                );
-                if let Ok(mut watcher) = watcher {
-                    if watcher.watch(&root, RecursiveMode::Recursive).is_ok() {
-                        watches.insert(id, (root, watcher));
-                    } else {
-                        service.runtime.events.publish(json!({"type":"resync"}));
-                    }
-                }
-            }
-            tokio::select! { _ = service.cancel.cancelled() => break, _ = service.runtime.roots_changed.notified() => {} }
-        }
-    })
-}
 #[cfg(test)]
 mod tests {
     use super::*;

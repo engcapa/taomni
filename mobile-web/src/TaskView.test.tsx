@@ -1,0 +1,20 @@
+import "@testing-library/jest-dom/vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { expect, it, vi } from "vitest";
+import { TaskView } from "./TaskView";
+import { request, type Instance } from "./api";
+vi.mock("./api", async importOriginal => ({ ...await importOriginal<typeof import("./api")>(), request: vi.fn() }));
+it("counts UTF-8 bytes and keeps oversized Chinese instructions from being submitted", async () => {
+  vi.mocked(request).mockImplementation(async (_instance, path) => path.endsWith("/changes") ? { changes: [] } : { id:"thread:t", status:"idle", tools:[], confirmations:[] });
+  const instance: Instance = { id:"phone", endpoint:"https://pc.example", token:"t", deviceId:"d", label:"PC" };
+  render(<TaskView instance={instance} session={{ id:"thread:t", title:"Task", kind:"agent", status:"idle", summary:"" }} revision={0} />);
+  await waitFor(() => expect(request).toHaveBeenCalledTimes(2));
+  const input = screen.getByTestId("mobile-agent-input");
+  fireEvent.change(input, { target: { value:"中".repeat(11000) } });
+  expect(screen.getByRole("alert")).toHaveTextContent("33000 / 32768 UTF-8 字节");
+  expect(screen.getByTestId("mobile-agent-send")).toBeDisabled();
+  fireEvent.submit(input.closest("form")!);
+  expect(request).toHaveBeenCalledTimes(2);
+  fireEvent.change(input, { target: { value:"继续" } });
+  expect(screen.getByTestId("mobile-agent-send")).toBeEnabled();
+});

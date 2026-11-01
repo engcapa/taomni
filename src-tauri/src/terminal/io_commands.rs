@@ -34,7 +34,20 @@ pub(super) fn read_loop_local(
     if let Ok(mut outputs) = outputs.lock() {
         outputs.remove(&session_id);
     }
-    outputs.broker.exit(&session_id);
+    use tauri::Manager;
+    let code = {
+        let state = app.state::<AppState>();
+        let terminals = state.terminal.terminals.blocking_read();
+        match terminals.get(&session_id) {
+            Some(ActiveTerminal::Local { child, .. }) => child
+                .lock()
+                .ok()
+                .and_then(|mut child| child.try_wait().ok().flatten())
+                .map(|status| status.exit_code()),
+            _ => None,
+        }
+    };
+    outputs.broker.exit_with_code(&session_id, code);
     crate::mobile::events::EventSink::emit(
         &crate::mobile::events::DesktopSink(app),
         &format!("terminal-exit-{}", session_id),

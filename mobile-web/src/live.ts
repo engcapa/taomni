@@ -14,12 +14,14 @@ export function useLive(instance: Instance, path: string, onFrame: (frame: Frame
     let lastFrame = Date.now();
     let sequence = 0;
     let connected = false;
+    let instanceId: string | undefined;
+    let ended = false;
     const abort = new AbortController();
     const connect = async () => {
       status.current(connected ? "重连中" : "连接中");
       try {
         const { ticket } = await request<{ ticket: string }>(instance, "/ws-ticket", {}, abort.signal);
-        if (disposed) return;
+        if (disposed || ended) return;
         const url = new URL(`${instance.endpoint}/api/v1${path}`);
         url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
         if (connected) url.searchParams.set("after_seq", String(sequence));
@@ -37,9 +39,17 @@ export function useLive(instance: Instance, path: string, onFrame: (frame: Frame
           try { frame = JSON.parse(event.data); } catch { socket?.close(); return; }
           if (frame.type === "heartbeat") { socket?.send(JSON.stringify({ type: "heartbeat-ack" })); return; }
           if (frame.type === "hello") {
-            if (path === "/events" && !reconnect && typeof frame.event_seq === "number") sequence = frame.event_seq;
+            const changed = instanceId !== undefined && frame.instance_id !== instanceId;
+            instanceId = typeof frame.instance_id === "string" ? frame.instance_id : undefined;
+            if (changed) sequence = 0;
+            if (path === "/events" && (!reconnect || changed) && typeof frame.event_seq === "number") sequence = frame.event_seq;
             callback.current(frame); return;
           }
+          if (frame.type === "resync") {
+            if (typeof frame.last_seq === "number") sequence = frame.last_seq;
+            callback.current(frame); return;
+          }
+          if (frame.type === "exit" || (frame.type === "error" && frame.code === "terminal_not_found")) ended = true;
           // Reconnected terminals resume the retained client buffer. The
           // automatic initial replay belongs to new viewers only.
           if (typeof frame.seq === "number") {
@@ -49,7 +59,7 @@ export function useLive(instance: Instance, path: string, onFrame: (frame: Frame
           if (typeof frame.last_seq === "number") sequence = frame.last_seq;
           callback.current(frame);
         };
-        socket.onclose = event => { if (channel.current === socket) channel.current = null; if (disposed) return; if (event.code === 4001) { status.current("已被实例吊销，请重新配对"); return; } retry(); };
+        socket.onclose = event => { if (channel.current === socket) channel.current = null; if (disposed || ended) return; if (ended || event.code === 4004) { status.current("终端已退出或关闭"); return; } if (event.code === 4001) { status.current("已被实例吊销，请重新配对"); return; } retry(); };
         socket.onerror = () => socket?.close();
       } catch (error) {
         if (error instanceof ApiError && ["unauthorized", "origin_denied"].includes(error.code)) { status.current("配对已失效，请重新配对"); return; }
@@ -57,7 +67,7 @@ export function useLive(instance: Instance, path: string, onFrame: (frame: Frame
       }
     };
     const retry = () => {
-      if (disposed) return;
+      if (disposed || ended) return;
       status.current("离线 · 重连中");
       timer = setTimeout(connect, [1000, 2000, 5000, 10000, 30000][Math.min(attempts++, 4)]);
     };

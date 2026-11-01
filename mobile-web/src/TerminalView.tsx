@@ -11,6 +11,7 @@ export function TerminalView({ instance, session }: { instance: Instance; sessio
   const fit = useRef<FitAddon | null>(null);
   const [connection, setConnection] = useState("");
   const [ownerConnection, setOwnerConnection] = useState("");
+  const [desktopActivity, setDesktopActivity] = useState<number | null>(null);
   const [holder, setHolder] = useState("none");
   const [status, setStatus] = useState("连接中");
   const [notice, setNotice] = useState("");
@@ -27,7 +28,7 @@ export function TerminalView({ instance, session }: { instance: Instance; sessio
     } else if (frame.type === "replay" && Array.isArray(frame.lines)) {
       terminal.current?.reset(); terminal.current?.write(frame.lines.join("\r\n"));
       if (frame.gap) setNotice("部分输出已超出回放范围，已显示最近输出。");
-    } else if (frame.type === "control" && typeof frame.holder === "string") { setHolder(frame.holder); setOwnerConnection(String(frame.connection_id || "")); }
+    } else if (frame.type === "control" && typeof frame.holder === "string") { setHolder(frame.holder); setDesktopActivity(typeof frame.desktop_last_activity_at === "number" ? frame.desktop_last_activity_at : null); setOwnerConnection(String(frame.connection_id || "")); }
     else if (frame.type === "control-lost") { setHolder("none"); setNotice("桌面已抢回输入控制，当前为只读。"); }
     else if (frame.type === "exit") { setExited(true); setHolder("none"); }
     else if (frame.type === "error") setNotice(errorText(new ApiError(String(frame.code))));
@@ -54,6 +55,7 @@ export function TerminalView({ instance, session }: { instance: Instance; sessio
     <div className="actions"><button className="primary" data-testid="mobile-take-control" disabled={exited || status !== "已连接"} onClick={() => { setNotice(""); send({ type: controlling ? "release-control" : "take-control" }); }}>{controlling ? "释放输入" : "接管输入"}</button>
       <button data-testid="mobile-resize" disabled={!controlling} onClick={() => { fit.current?.fit(); if (terminal.current) send({ type: "resize", cols: terminal.current.cols, rows: terminal.current.rows }); }}>适配尺寸</button>
     </div>
+    {desktopActivity && <p className="note">桌面最近活动：{new Date(desktopActivity * 1000).toLocaleTimeString()}；接管后桌面随时可抢回。</p>}
     <div className="keybar" aria-label="终端常用键">
       {[["Tab", "\t"], ["Esc", "\x1b"], ["Ctrl-C", "\x03"], ["Ctrl-L", "\x0c"], ["↑", "\x1b[A"], ["↓", "\x1b[B"]].map(([label, key]) => <button key={label} disabled={!controlling} onClick={() => input(key)}>{label}</button>)}
       <button data-testid="mobile-paste" disabled={!controlling} onClick={() => setPasteOpen(v => !v)}>粘贴 / 历史</button>

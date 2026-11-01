@@ -2,6 +2,7 @@
 mod actions;
 mod config;
 mod network;
+mod notifications;
 mod protocol;
 mod settings;
 mod worker;
@@ -47,15 +48,18 @@ impl Default for Runtime {
 }
 impl Runtime {
     pub fn snapshot(&self) -> Status {
-        self.status.lock().unwrap().clone()
+        self.status
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
     fn state(&self, state: &str, error: Option<String>) {
-        let mut value = self.status.lock().unwrap();
+        let mut value = self.status.lock().unwrap_or_else(|e| e.into_inner());
         value.state = state.into();
         value.error = error;
     }
     fn error(&self, error: &str) {
-        self.status.lock().unwrap().error = Some(error.into());
+        self.status.lock().unwrap_or_else(|e| e.into_inner()).error = Some(error.into());
     }
     pub async fn start(
         self: &Arc<Self>,
@@ -81,7 +85,7 @@ impl Runtime {
             return Err("feishu_already_running_stop_before_reconfiguring".into());
         }
         actions::prepare(&core)?;
-        let events = core.state().mobile.events.tx.subscribe();
+        let events = core.state().mobile.events.tasks.subscribe();
         let cancel = CancellationToken::new();
         let runtime = self.clone();
         let task_core = core.clone();

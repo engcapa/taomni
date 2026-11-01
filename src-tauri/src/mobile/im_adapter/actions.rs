@@ -8,6 +8,7 @@ pub struct Request {
     pub key: String,
     pub chat: String,
     pub command: String,
+    pub private_chat: bool,
 }
 pub fn bounded(text: &str) -> String {
     let mut chars = text.chars();
@@ -32,7 +33,7 @@ pub fn authorize(config: &Config, value: &Value) -> Result<Option<Request>, Stri
         .as_str()
         .and_then(|s| s.parse::<i64>().ok())
         .ok_or("feishu_event_time_missing")?;
-    let timestamp = if header["event_type"] == "card.action.trigger" {
+    let timestamp = if timestamp > 100_000_000_000_000 {
         timestamp / 1000
     } else {
         timestamp
@@ -95,12 +96,13 @@ pub fn authorize(config: &Config, value: &Value) -> Result<Option<Request>, Stri
     if !config.allows(open, chat) {
         return Err("feishu_identity_denied".into());
     }
-    if command.len() > 8192 || id.is_empty() || id.len() > 256 {
+    if id.is_empty() || id.len() > 256 {
         return Err("feishu_command_too_large".into());
     }
     Ok(Some(Request {
         key: key(&format!("{}:{id}", config.app_id)),
         chat: chat.into(),
+        private_chat: event["message"]["chat_type"] == "p2p",
         command,
     }))
 }
@@ -143,8 +145,22 @@ pub fn link(config: &Config) -> String {
         format!("\nMobile Web：{}", config.mobile_endpoint)
     }
 }
+pub async fn execute_request(core: &Core, config: &Config, request: &Request) -> String {
+    if request.command.len() > 8192 {
+        return "操作失败：指令不能超过 8192 UTF-8 字节。".into();
+    }
+    let action = request.command.split_whitespace().next().unwrap_or("");
+    if matches!(action, "show" | "file") && !request.private_chat {
+        return "操作失败：内容查询仅允许已绑定的私聊。".into();
+    }
+    execute(core, config, &request.command).await
+}
 pub async fn execute(core: &Core, config: &Config, command: &str) -> String {
-    let result = dispatch(core, command).await;
+    let result = if command.starts_with("file ") && !config.allow_file_content {
+        Err("file_content_disabled".into())
+    } else {
+        dispatch(core, command).await
+    };
     let text = match result {
         Ok(text) => text,
         Err(code) => format!("操作失败：{code}"),

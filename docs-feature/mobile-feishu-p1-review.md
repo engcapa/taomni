@@ -1,3 +1,5 @@
+> 后续核对与处置：[mobile-feishu-p1-review-resolution.md](mobile-feishu-p1-review-resolution.md)。本报告保留原始评审结论，后续修复和 CI 结果以处置记录为准。
+
 # taomni 移动端 P0 + P1（分支 feat/mobile-feishu-p1）独立评审报告
 
 评审对象：分支 `feat/mobile-feishu-p1`，头 `d813defe2`（完整 `d813defe2641d910d4cc1e01f09831c6830f3bac`），合并基底 `e72fc0d6f`，评审日期 2026-11-01。

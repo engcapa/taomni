@@ -3,12 +3,16 @@ use crate::state::{AppState, CcPermissionDecision};
 use serde_json::{Value, json};
 
 pub fn confirmations(state: &AppState, thread: &str) -> Vec<Value> {
-    let pending = state.agent.cc_pending_permissions.lock().unwrap();
+    let pending = state
+        .agent
+        .cc_pending_permissions
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     state
         .mobile
         .confirmations
         .lock()
-        .unwrap()
+        .unwrap_or_else(|e| e.into_inner())
         .values()
         .filter(|v| {
             v["thread_id"] == thread
@@ -25,7 +29,13 @@ pub fn confirm(state: &AppState, id: &str, cid: &str, decision: &str) -> Result<
         "reject" => CcPermissionDecision::Deny,
         _ => return Err("invalid_decision".into()),
     };
-    let known = state.mobile.confirmations.lock().unwrap().get(cid).cloned();
+    let known = state
+        .mobile
+        .confirmations
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .get(cid)
+        .cloned();
     let Some(known) = known.filter(|v| v["thread_id"] == tid) else {
         return Err("not_supported_on_mobile".into());
     };
@@ -36,7 +46,7 @@ pub fn confirm(state: &AppState, id: &str, cid: &str, decision: &str) -> Result<
         .agent
         .cc_pending_permissions
         .lock()
-        .unwrap()
+        .unwrap_or_else(|e| e.into_inner())
         .remove(cid)
         .ok_or("already_resolved")?;
     sender.send(value).map_err(|_| "already_resolved")?;
@@ -44,12 +54,12 @@ pub fn confirm(state: &AppState, id: &str, cid: &str, decision: &str) -> Result<
     Ok(())
 }
 pub async fn stop(core: &Core, id: &str) -> Result<(), String> {
+    stop_as(core, id, None).await
+}
+pub async fn stop_as(core: &Core, id: &str, device: Option<&str>) -> Result<(), String> {
     let state = core.state();
     if let Some(tid) = id.strip_prefix("thread:") {
         crate::chat::stop_thread_runtime_inner(tid, core.app().as_ref(), &state).await;
-        state.mobile.events.publish(
-            json!({"type":"task_status","task_id":id,"status":"idle","summary":"stopped"}),
-        );
     } else if let Some(tid) = id.strip_prefix("term:") {
         let gate = state.mobile.broker.gate(tid)?;
         let _guard = gate.lock().await;
@@ -58,16 +68,17 @@ pub async fn stop(core: &Core, id: &str) -> Result<(), String> {
             .broker
             .terminals
             .lock()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .get(tid)
             .is_some_and(|t| t.running);
         if !running {
             return Ok(());
         }
-        #[cfg(unix)]
-        crate::terminal::send_terminal_signal_inner(&state, tid, "SIGINT").await?;
-        #[cfg(not(unix))]
-        crate::terminal::write_terminal_inner(&state, tid, "Aw==").await?; // ConPTY Ctrl-C, never kill
+        state
+            .mobile
+            .broker
+            .ensure_device_holder(tid, device.ok_or("not_holder")?)?;
+        crate::terminal::write_terminal_inner(&state, tid, "Aw==").await?; // PTY Ctrl-C to the foreground group
     } else {
         return Err("session_not_found".into());
     }
@@ -75,15 +86,17 @@ pub async fn stop(core: &Core, id: &str) -> Result<(), String> {
 }
 pub async fn message(core: Core, id: &str, text: &str) -> Result<(), String> {
     let tid = id.strip_prefix("thread:").ok_or("agent_only")?.to_owned();
-    if text.trim().is_empty() || text.len() > 32768 {
+    if text.len() > 32768 {
+        return Err("message_too_large".into());
+    }
+    if text.trim().is_empty() {
         return Err("invalid_message".into());
     }
     let state = core.state();
     // Shared with desktop preparation: reserve before spawn, including the
     // pre-provider phase where ChatRunRegistry otherwise has no entry yet.
     let running = state.agent.chat_runs.lock().await.contains_key(&tid);
-    let mut pending = state.mobile.pending_turns.lock().unwrap();
-    if pending.contains_key(&tid) || running {
+    if running {
         return Err("turn_in_progress".into());
     }
     let thread = {
@@ -98,15 +111,14 @@ pub async fn message(core: Core, id: &str, text: &str) -> Result<(), String> {
     {
         return Err("desktop_required".into());
     }
-    pending.insert(tid.clone(), tokio_util::sync::CancellationToken::new());
-    drop(pending);
     let req: crate::chat::ChatSendRequest =
         serde_json::from_value(json!({"thread_id":tid,"content":text,"terminal_context":null}))
             .map_err(|_| "invalid_message")?;
+    let guard = super::turn::TurnGuard::reserve(&state.mobile, &tid)?;
     drop(state);
     tokio::spawn(async move {
         let state = core.state();
-        let _result = crate::chat::chat_stream_inner(req, core.app(), &state, true).await;
+        let _result = crate::chat::chat_stream_inner(req, core.app(), &state, Some(guard)).await;
     });
     Ok(())
 }

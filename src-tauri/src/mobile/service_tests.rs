@@ -12,8 +12,8 @@ const ORIGIN: &str = "https://mobile.example";
 pub(super) struct Fixture {
     _dir: tempfile::TempDir,
     pub(super) state: Arc<AppState>,
-    endpoint: String,
-    client: reqwest::Client,
+    pub(super) endpoint: String,
+    pub(super) client: reqwest::Client,
 }
 impl Fixture {
     pub(super) async fn new() -> Self {
@@ -39,7 +39,7 @@ impl Fixture {
             client: reqwest::Client::builder().no_proxy().build().unwrap(),
         }
     }
-    async fn pair(&self) -> (String, String) {
+    pub(super) async fn pair(&self) -> (String, String) {
         let code = self.state.mobile.auth.lock().unwrap().pairing_code();
         let value: Value = self
             .client
@@ -72,7 +72,7 @@ impl Fixture {
             .unwrap();
         value["ticket"].as_str().unwrap().into()
     }
-    async fn ws(&self, token: &str, path: &str) -> Ws {
+    pub(super) async fn ws(&self, token: &str, path: &str) -> Ws {
         let ticket = self.ticket(token).await;
         let mut request = format!(
             "{}/api/v1{path}?ticket={ticket}",
@@ -85,7 +85,7 @@ impl Fixture {
             .insert("Origin", ORIGIN.parse().unwrap());
         tokio_tungstenite::connect_async(request).await.unwrap().0
     }
-    async fn get(&self, token: &str, path: &str) -> Value {
+    pub(super) async fn get(&self, token: &str, path: &str) -> Value {
         self.client
             .get(format!("{}/api/v1{path}", self.endpoint))
             .header("Origin", ORIGIN)
@@ -176,11 +176,13 @@ async fn http_security_cors_revocation_and_listener_shutdown() {
         .await
         .unwrap();
     assert_eq!(response.status(), 403);
-    assert!(
-        response
-            .headers()
-            .get("access-control-allow-origin")
-            .is_none()
+    assert_eq!(
+        response.headers()["access-control-allow-origin"],
+        "https://evil.example"
+    );
+    assert_eq!(
+        response.json::<Value>().await.unwrap(),
+        json!({"error":"origin_denied"})
     );
     let mut ws = f.ws(&token, "/events").await;
     assert_eq!(frame(&mut ws, "hello").await["run_mode"], "headless");
@@ -296,6 +298,50 @@ async fn two_viewers_share_real_pty_with_readonly_resize_control_and_replay() {
             if all.contains("QA_MOBILE_REAL_PTY") {
                 break;
             }
+        }
+    }
+    #[cfg(unix)]
+    {
+        send(&mut a, json!({"type":"input", "data_b64":B64.encode(b"printf '\\nQA_SLEEP_STARTED\\n'; sleep 100\r")})).await;
+        let mut output = String::new();
+        while !output.contains("\r\nQA_SLEEP_STARTED\r\n") {
+            let value = frame(&mut a, "output").await;
+            output.push_str(&String::from_utf8_lossy(
+                &B64.decode(value["data_b64"].as_str().unwrap()).unwrap(),
+            ));
+        }
+        let route = format!("{}/api/v1/sessions/term%3A{id}/stop", f.endpoint);
+        let denied = f
+            .client
+            .post(&route)
+            .bearer_auth(&t2)
+            .json(&json!({}))
+            .send()
+            .await
+            .unwrap();
+        assert_eq!(denied.status(), 403);
+        assert_eq!(denied.json::<Value>().await.unwrap()["error"], "not_holder");
+        assert_eq!(
+            f.client
+                .post(route)
+                .bearer_auth(&t1)
+                .json(&json!({}))
+                .send()
+                .await
+                .unwrap()
+                .status(),
+            200
+        );
+        send(
+            &mut a,
+            json!({"type":"input", "data_b64":B64.encode(b"printf '\\nQA_STOP_RECOVERED\\n'\r")}),
+        )
+        .await;
+        while !output.contains("\r\nQA_STOP_RECOVERED\r\n") {
+            let value = frame(&mut a, "output").await;
+            output.push_str(&String::from_utf8_lossy(
+                &B64.decode(value["data_b64"].as_str().unwrap()).unwrap(),
+            ));
         }
     }
     send(&mut a, json!({"type":"resize","cols":999,"rows":999})).await;

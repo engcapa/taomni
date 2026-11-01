@@ -90,6 +90,25 @@ steps:
     contains: 已停止
 - assert_no_runtime_errors: null
 - screenshot: feishu-settings-saved-without-connection.png
+- eval_readonly:
+    expression: "!document.getElementById('feishu-allow-files').checked"
+    expect_truthy: true
+- assert_text:
+    selector: '[data-testid="feishu-settings"]'
+    contains: 内容默认不发送
+- click: '[data-testid="feishu-allow-files"]'
+- click: '[data-testid="feishu-save"]'
+- wait_for: '[data-testid="feishu-saved"]'
+- click: '[data-testid="tab-item"][data-tab-type="settings"] [data-testid="tab-close"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: feishu
+- wait_for: '[data-testid="feishu-settings"]'
+- eval_readonly:
+    expression: document.getElementById('feishu-allow-files').checked
+    expect_truthy: true
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -153,6 +172,19 @@ verification:
     - 29
     - 30
     - 31
+  - id: R2
+    requirement: File content export defaults off, explicitly warns of sending content to Feishu, and an opt-in survives closing and reopening Settings.
+    actions: [35, 36, 38, 39, 40]
+    checkpoints:
+    - step: 33
+      expectation: Private-chat file content export defaults off.
+    - step: 34
+      expectation: The data export warning is visible.
+    - step: 42
+      expectation: Explicit opt-in persists after Settings is recreated.
+    - step: 43
+      expectation: No runtime errors after changing the export setting.
+    results: [33, 34, 42, 43]
   visual:
   - check: Settings screenshot is diagnostic.
     method: not-applicable

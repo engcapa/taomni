@@ -111,6 +111,9 @@ pub fn resolved_app_data_dir<R: tauri::Runtime>(
 /// directory on macOS.  `dirs` does not honor XDG variables there, so native
 /// QA supplies explicit debug-only overrides instead of changing HOME.
 pub fn resolved_config_dir() -> Option<std::path::PathBuf> {
+    if let Some(root) = mobile::headless::config_root() {
+        return Some(root);
+    }
     if cfg!(debug_assertions) {
         if let Ok(raw) = std::env::var("NEWMOB_CONFIG_DIR") {
             if let Some(path) = qa_override_path(&raw) {
@@ -528,6 +531,9 @@ pub fn run() {
             if let tauri::RunEvent::Exit = event {
                 screenshot::shutdown();
                 let state = app_handle.state::<AppState>();
+                tauri::async_runtime::block_on(async {
+                    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), state.mobile.stop()).await;
+                });
                 sockscap::shutdown_on_exit(app_handle, &state);
             }
         });

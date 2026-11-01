@@ -1,6 +1,6 @@
 // Renderer preview only. No Feishu connection or message is made here.
 import { loadStubVault } from "./commands/vault";
-let config = { app_id: "", secret_ref: "", mobile_endpoint: "", bindings: [] as { open_id: string; chat_id: string }[], proxy_mode: "app", custom_proxy: { enabled: true, mode: "manual", session_id: "", kind: "http", host: "", port: 3128, username: "", password_ref: "" } };
+let config = { allow_file_content: false, app_id: "", secret_ref: "", mobile_endpoint: "", bindings: [] as { open_id: string; chat_id: string }[], proxy_mode: "app", custom_proxy: { enabled: true, mode: "manual", session_id: "", kind: "http", host: "", port: 3128, username: "", password_ref: "" } };
 let status = { state: "stopped", error: null as string | null, reconnects: 0, delivered: 0, failed_deliveries: 0, rejected: 0, duplicates: 0 };
 export function feishuStub(command: string, args?: Record<string, unknown>) {
   if (command === "mobile_feishu_save") {

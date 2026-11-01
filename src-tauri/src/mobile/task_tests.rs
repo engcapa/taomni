@@ -40,6 +40,7 @@ async fn headless_followup_is_a_real_turn_cancellable_and_never_overlaps() {
     let f = Fixture::with_config(config).await;
     thread(&f.state, "task", "local");
     let core = Core::Headless(f.state.clone());
+    let mut notifications = f.state.mobile.events.tasks.subscribe();
     agent_view::message(core.clone(), "thread:task", "First turn")
         .await
         .unwrap();
@@ -102,6 +103,23 @@ async fn headless_followup_is_a_real_turn_cancellable_and_never_overlaps() {
         messages
             .iter()
             .any(|m| m.content.contains("QA_REAL_FOLLOWUP"))
+    );
+    let mut counts = std::collections::HashMap::new();
+    while let Ok(event) = notifications.try_recv() {
+        if event["status"] == "idle" {
+            *counts
+                .entry(event["summary"].as_str().unwrap().to_owned())
+                .or_insert(0) += 1;
+        }
+    }
+    assert_eq!(counts.get("stopped"), Some(&1));
+    assert_eq!(counts.get("turn_finished"), Some(&1));
+    let before = f.state.mobile.events.seq();
+    agent_view::stop(&core, "thread:task").await.unwrap();
+    assert_eq!(
+        f.state.mobile.events.seq(),
+        before,
+        "idle stops must not send notifications"
     );
     thread(&f.state, "cc", "claude-code");
     assert_eq!(
@@ -183,7 +201,7 @@ async fn real_git_file_diff_bounds_and_notifications_without_a_terminal() {
             if let Ok(Ok(event)) =
                 tokio::time::timeout(std::time::Duration::from_millis(50), events.recv()).await
             {
-                if event["type"] == "file_changed" && event["path"] == "test.txt" {
+                if event["type"] == "file_changed" && event["task_id"] == "thread:task" {
                     break;
                 }
             }

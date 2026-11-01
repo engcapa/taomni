@@ -27,9 +27,12 @@ const NEW_DB_NAME: &str = "taomni.db";
 
 /// Run all migrations. Call once at startup, before the app-data dir is
 /// created or the database is opened.
-pub fn run(new_app_data: &Path) {
+pub fn run_profile(new_app_data: &Path) {
     migrate_app_data_dir(new_app_data);
     migrate_db_file(new_app_data);
+}
+pub fn run(new_app_data: &Path) {
+    run_profile(new_app_data);
     if std::env::var_os("NEWMOB_DATA_DIR").is_some() {
         return;
     }

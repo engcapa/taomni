@@ -84,7 +84,7 @@ pub(crate) async fn stop_thread_runtime_inner(
             .unwrap()
             .remove(&id);
     }
-    state.mobile.task_status(thread_id, "idle", "stopped");
+    // The owning turn publishes its terminal state after cancellation has unwound.
     // Clear a visible native-tool gate immediately even when its subprocess
     // has just been stopped and cannot deliver its own runtime event.
     if let Some(app) = app {

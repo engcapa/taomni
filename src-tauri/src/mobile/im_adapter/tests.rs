@@ -15,7 +15,7 @@ pub(super) fn config() -> Config {
 }
 pub(super) fn event(id: &str, text: &str) -> Value {
     json!({"schema":"2.0","header":{"app_id":"cli_qa","event_type":"im.message.receive_v1","event_id":format!("event-{id}"),"create_time":chrono::Utc::now().timestamp_millis().to_string()},
-        "event":{"sender":{"sender_type":"user","sender_id":{"open_id":"ou_allowed"}},"message":{"message_id":id,"chat_id":"oc_allowed","message_type":"text","content":json!({"text":text}).to_string()}}})
+        "event":{"sender":{"sender_type":"user","sender_id":{"open_id":"ou_allowed"}},"message":{"message_id":id,"chat_id":"oc_allowed","message_type":"text","chat_type":"p2p","content":json!({"text":text}).to_string()}}})
 }
 pub(super) fn thread(state: &crate::state::AppState) {
     let value=serde_json::from_value(json!({"id":"feishu-task","title":"Feishu QA","provider_id":"local","created_at":1,"updated_at":1,"source":"drawer","mode":"chat","linked_session_id":null})).unwrap();
@@ -156,6 +156,12 @@ async fn real_confirmation_scoping_durable_admission_and_no_pty_commands() {
         actions::authorize(&cfg, &card).unwrap().unwrap().command,
         "reject thread:feishu-task cid"
     );
+    let mut millis = card.clone();
+    millis["header"]["create_time"] = json!(chrono::Utc::now().timestamp_millis().to_string());
+    assert_eq!(
+        actions::authorize(&cfg, &millis).unwrap().unwrap().command,
+        "reject thread:feishu-task cid"
+    );
     let mut stranger = card.clone();
     stranger["event"]["operator"]["open_id"] = json!("ou_stranger");
     assert!(actions::authorize(&cfg, &stranger).is_err());
@@ -173,7 +179,39 @@ async fn real_confirmation_scoping_durable_admission_and_no_pty_commands() {
         .lock()
         .unwrap()
         .insert("feishu-task".into(), root.path().into());
+    let mut private = actions::authorize(
+        &cfg,
+        &event("file-private", "/taomni file thread:feishu-task notes.txt"),
+    )
+    .unwrap()
+    .unwrap();
+    assert!(
+        actions::execute_request(&core, &cfg, &private)
+            .await
+            .contains("file_content_disabled")
+    );
+    private.private_chat = false;
+    assert!(
+        actions::execute_request(&core, &cfg, &private)
+            .await
+            .contains("仅允许已绑定的私聊")
+    );
+    let long = actions::authorize(
+        &cfg,
+        &event(
+            "too-long",
+            &format!("/taomni send thread:feishu-task {}", "中".repeat(3000)),
+        ),
+    )
+    .unwrap()
+    .unwrap();
+    assert!(
+        actions::execute_request(&core, &cfg, &long)
+            .await
+            .contains("8192 UTF-8")
+    );
     let mut linked = cfg.clone();
+    linked.allow_file_content = true;
     linked.mobile_endpoint = "https://mobile.example.invalid".into();
     let snapshot = actions::execute(&core, &linked, "file thread:feishu-task notes.txt").await;
     assert!(snapshot.contains("[已截断]"));

@@ -6,6 +6,9 @@ if [[ "${QA_RDP_CONTRACTS:-false}" != true && "${QA_DUAL_CONTRACTS:-false}" != t
   echo 'No native Rust contracts selected.'
   exit 0
 fi
+if [[ "${QA_MOBILE_CONTRACTS:-false}" == true ]]; then
+  pnpm exec vitest run mobile-web/src src/components/settings/FeishuAdapterSettings.test.tsx src/stores/chatStore.test.ts
+fi
 pnpm build --mode qa
 cd src-tauri
 profile=()

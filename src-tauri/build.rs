@@ -245,6 +245,12 @@ fn embed_mobile_assets() {
     }
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("resources/mobile-web");
     println!("cargo:rerun-if-changed={}", root.display());
+    if !root.join("index.html").is_file() {
+        if std::env::var("PROFILE").as_deref() == Ok("release") {
+            panic!("Mobile Web assets missing; run pnpm build:mobile before a release build");
+        }
+        println!("cargo:warning=Mobile Web assets missing; run pnpm build:mobile");
+    }
     let mut entries = Vec::new();
     collect(&root, &root, &mut entries);
     let source = format!(

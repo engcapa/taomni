@@ -90,6 +90,8 @@ def desktop(ctx, terminal_input):
             output = ''
             while marker not in output:
                 output += base64.b64decode(ws.receive('output')['data_b64']).decode(errors='replace')
+        status, _, error = http(endpoint, '/sessions/' + quote(terminal_id, safe='') + '/stop', token2, body={}, origin=ORIGIN)
+        assert status == 403 and error['error'] == 'not_holder'
         checks.append('two-devices-real-pty-output-and-write-lock')
         # Activate the actual terminal tab, then use the existing native input
         # verb. Neither the IPC command nor terminal registry handlers are called.
@@ -123,7 +125,10 @@ def desktop(ctx, terminal_input):
             raise AssertionError('Revoked device WebSocket remained open')
         click(ctx.session, '[data-testid="mobile-settings-revoke"]')
         until(ctx.session, 'document.querySelectorAll(\'[data-testid="mobile-settings-revoke"]\').length === 0 && !document.querySelector(\'[data-testid="mobile-settings-toggle"]\')?.disabled')
-        checks.append('settings-revocation-closes-existing-websocket')
+        status, headers, value = http(endpoint, '/sessions', token, origin=ORIGIN)
+        assert status == 403 and value['error'] == 'origin_denied'
+        assert headers.get('access-control-allow-origin', headers.get('Access-Control-Allow-Origin')) == ORIGIN
+        checks.append('settings-revocation-closes-existing-websocket-and-returns-readable-origin-error')
         click(ctx.session, '[data-testid="mobile-settings-toggle"]')
         until(ctx.session, 'document.querySelector(\'[data-testid="mobile-settings-status"]\')?.textContent.includes("已关闭")')
         try:

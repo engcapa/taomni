@@ -12,6 +12,9 @@ use tokio::sync::{Mutex as AsyncMutex, broadcast};
 
 pub struct Terminal {
     pub running: bool,
+    pub exit_code: Option<u32>,
+    pub desktop_last_activity_at: Option<i64>,
+    exited_at: Option<std::time::Instant>,
     pub holder: Option<(String, String)>, // device + connection, not just device
     pub desktop_size: Option<(u16, u16)>,
     pub size: Option<(u16, u16)>,
@@ -26,6 +29,9 @@ impl Default for Terminal {
     fn default() -> Self {
         Self {
             running: true,
+            exit_code: None,
+            desktop_last_activity_at: None,
+            exited_at: None,
             holder: None,
             desktop_size: None,
             size: None,
@@ -54,7 +60,7 @@ impl Broker {
     pub fn register(&self, id: &str) {
         self.terminals
             .lock()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .insert(id.to_owned(), Terminal::default());
         self.changed(id, "opened");
     }
@@ -67,7 +73,7 @@ impl Broker {
         if !self.enabled.load(Ordering::Relaxed) {
             return;
         }
-        let mut terms = self.terminals.lock().unwrap();
+        let mut terms = self.terminals.lock().unwrap_or_else(|e| e.into_inner());
         let Some(t) = terms.get_mut(id).filter(|t| t.running) else {
             return;
         };
@@ -83,25 +89,43 @@ impl Broker {
         let _ =
             t.tx.send(json!({"type":"output", "seq":t.seq, "data_b64":B64.encode(bytes)}));
     }
+    /// Retain exited tails until explicit close, bounded to the latest 64.
     pub fn exit(&self, id: &str) {
-        if let Some(t) = self.terminals.lock().unwrap().get_mut(id) {
-            t.running = false;
-            t.holder = None;
-            t.replay = Replay::default();
-            t.chunks.clear();
-            t.bytes = 0;
-            let _ = t.tx.send(json!({"type":"exit", "code":null}));
+        self.exit_with_code(id, None);
+    }
+    pub fn exit_with_code(&self, id: &str, code: Option<u32>) {
+        let mut terms = self.terminals.lock().unwrap_or_else(|e| e.into_inner());
+        let Some(t) = terms.get_mut(id).filter(|t| t.running) else {
+            return;
+        };
+        t.running = false;
+        t.exit_code = code;
+        t.holder = None;
+        t.exited_at = Some(std::time::Instant::now());
+        let _ = t.tx.send(json!({"type":"exit", "code":t.exit_code}));
+        let mut exited: Vec<_> = terms
+            .iter()
+            .filter_map(|(id, t)| t.exited_at.map(|time| (time, id.clone())))
+            .collect();
+        exited.sort_by_key(|(time, _)| *time);
+        let excess = exited.len().saturating_sub(64);
+        for (_, id) in exited.into_iter().take(excess) {
+            terms.remove(&id);
         }
+        drop(terms);
         self.changed(id, "exited");
     }
     pub fn remove(&self, id: &str) {
         self.exit(id);
-        self.terminals.lock().unwrap().remove(id);
+        self.terminals
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(id);
     }
     pub fn gate(&self, id: &str) -> Result<Arc<AsyncMutex<()>>, String> {
         self.terminals
             .lock()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .get(id)
             .map(|t| t.gate.clone())
             .ok_or("terminal_not_found".into())
@@ -113,8 +137,12 @@ impl Broker {
             .unwrap_or_else(|| "none".into())
     }
     pub fn desktop(&self, id: &str, size: Option<(u16, u16)>) -> Option<(u16, u16)> {
-        let mut ts = self.terminals.lock().unwrap();
+        let mut ts = self.terminals.lock().unwrap_or_else(|e| e.into_inner());
         let t = ts.get_mut(id)?;
+        // Initial size registration is not user activity.
+        if size.is_none() || t.desktop_size.is_some() {
+            t.desktop_last_activity_at = Some(chrono::Utc::now().timestamp());
+        }
         let held = t.holder.take().is_some();
         let restore = if held { t.desktop_size } else { None };
         if held {
@@ -129,7 +157,7 @@ impl Broker {
         }
         if held {
             let _ = t.tx.send(json!({"type":"control-lost", "reason":if size.is_some() {"desktop_resize"} else {"desktop_input"}}));
-            let _ = t.tx.send(json!({"type":"control","holder":"none"}));
+            let _ = t.tx.send(json!({"type":"control","holder":"none", "desktop_last_activity_at":t.desktop_last_activity_at}));
         }
         restore
     }
@@ -140,7 +168,7 @@ impl Broker {
         connection: &str,
         take: bool,
     ) -> Result<Option<(u16, u16)>, String> {
-        let mut ts = self.terminals.lock().unwrap();
+        let mut ts = self.terminals.lock().unwrap_or_else(|e| e.into_inner());
         let t = ts
             .get_mut(id)
             .filter(|t| t.running)
@@ -154,13 +182,27 @@ impl Broker {
             t.holder = None;
             let _ = t.tx.send(json!({"type":"control", "holder":"none"}));
             t.size = t.desktop_size;
+            if t.desktop_size.is_none() {
+                log::warn!("Mobile control released without a recorded desktop size");
+                let _ =
+                    t.tx.send(json!({"type":"error","code":"desktop_size_unavailable"}));
+            }
             return Ok(t.desktop_size);
         }
-        let _ = t.tx.send(json!({"type":"control", "holder":Self::holder(t), "connection_id":t.holder.as_ref().map(|(_, c)| c)}));
+        let _ = t.tx.send(json!({"type":"control", "holder":Self::holder(t), "desktop_last_activity_at":t.desktop_last_activity_at, "connection_id":t.holder.as_ref().map(|(_, c)| c)}));
         Ok(None)
     }
+    pub fn ensure_device_holder(&self, id: &str, device: &str) -> Result<(), String> {
+        let ts = self.terminals.lock().unwrap_or_else(|e| e.into_inner());
+        let t = ts.get(id).ok_or("terminal_not_found")?;
+        if t.holder.as_ref().is_some_and(|(d, _)| d == device) {
+            Ok(())
+        } else {
+            Err("not_holder".into())
+        }
+    }
     pub fn ensure_holder(&self, id: &str, connection: &str) -> Result<(), String> {
-        let ts = self.terminals.lock().unwrap();
+        let ts = self.terminals.lock().unwrap_or_else(|e| e.into_inner());
         let t = ts.get(id).filter(|t| t.running).ok_or("terminal_exited")?;
         if t.holder.as_ref().is_some_and(|(_, c)| c == connection) {
             Ok(())
@@ -176,7 +218,7 @@ impl Broker {
         rows: u16,
     ) -> Result<Option<(u16, u16)>, String> {
         self.ensure_holder(id, connection)?;
-        let mut ts = self.terminals.lock().unwrap();
+        let mut ts = self.terminals.lock().unwrap_or_else(|e| e.into_inner());
         let t = ts.get_mut(id).ok_or("terminal_not_found")?;
         let size = (cols.clamp(20, 300), rows.clamp(10, 100));
         if t.size == Some(size) {
@@ -186,20 +228,20 @@ impl Broker {
         Ok(Some(size))
     }
     pub fn subscribe(&self, id: &str) -> Result<(broadcast::Receiver<Value>, Vec<Value>), String> {
-        let ts = self.terminals.lock().unwrap();
+        let ts = self.terminals.lock().unwrap_or_else(|e| e.into_inner());
         let t = ts.get(id).ok_or("terminal_not_found")?;
         let rx = t.tx.subscribe();
         let mut frames = vec![
             json!({"type":"replay", "lines":t.replay.lines(), "last_seq":t.seq}),
-            json!({"type":"control", "holder":Self::holder(t), "connection_id":t.holder.as_ref().map(|(_, c)| c)}),
+            json!({"type":"control", "holder":Self::holder(t), "desktop_last_activity_at":t.desktop_last_activity_at, "connection_id":t.holder.as_ref().map(|(_, c)| c)}),
         ];
         if !t.running {
-            frames.push(json!({"type":"exit", "code":null}));
+            frames.push(json!({"type":"exit", "code":t.exit_code}));
         }
         Ok((rx, frames))
     }
     pub fn resume(&self, id: &str, after: u64) -> Vec<Value> {
-        let ts = self.terminals.lock().unwrap();
+        let ts = self.terminals.lock().unwrap_or_else(|e| e.into_inner());
         let Some(t) = ts.get(id) else {
             return vec![];
         };
@@ -221,7 +263,12 @@ impl Broker {
     }
     pub fn disable(&self) {
         self.enabled.store(false, Ordering::Relaxed);
-        for t in self.terminals.lock().unwrap().values_mut() {
+        for t in self
+            .terminals
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .values_mut()
+        {
             t.replay = Replay::default();
             t.chunks.clear();
             t.bytes = 0;

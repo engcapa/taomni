@@ -67,6 +67,6 @@ export function PairForm({ onPair, onCancel }: { onPair: (value: Instance) => vo
         {window.isSecureContext && <button type="button" onClick={() => setScanner(true)}>扫描二维码</button>}</div>
     </form>
     {scanner && <Scanner onRead={read} onClose={() => setScanner(false)} />}
-    <p className="note">配对凭据保存在当前浏览器中，安全性低于系统钥匙串。请仅在自己的设备上配对。</p>
+    <p className="note">iOS 或不支持扫码的浏览器请复制并手动输入配对码。配对凭据保存在当前浏览器中，安全性低于系统钥匙串。请仅在自己的设备上配对。</p>
   </section>;
 }

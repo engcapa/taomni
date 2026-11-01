@@ -3,15 +3,21 @@ mod agent_view;
 pub mod im_adapter;
 pub use im_adapter::*;
 pub mod auth;
+pub mod confirmation;
 pub mod events;
+mod file_policy;
 pub(crate) mod file_view;
+mod file_watch;
 pub mod headless;
+mod headless_ops;
+mod listener_policy;
 pub mod pty_broker;
 mod replay;
 mod server;
 mod session_view;
 mod settings;
 mod streams;
+pub mod turn;
 pub use settings::*;
 
 use crate::state::AppState;
@@ -69,8 +75,10 @@ pub struct MobileRuntime {
     pub lifecycle: tokio::sync::Mutex<Option<Running>>,
     pub instance_id: String,
     pub confirmations: Mutex<std::collections::HashMap<String, serde_json::Value>>,
-    pub pending_turns: Mutex<std::collections::HashMap<String, CancellationToken>>,
+    pub pending_turns: Mutex<std::collections::HashMap<String, turn::Turn>>,
+    pub tools: Mutex<std::collections::HashMap<String, Vec<serde_json::Value>>>,
     pub task_summaries: Mutex<std::collections::HashMap<String, serde_json::Value>>,
+    pub profile_data: Mutex<Option<PathBuf>>,
     pub file_roots: Mutex<std::collections::HashMap<String, PathBuf>>,
     pub roots_changed: tokio::sync::Notify,
     pub desktop_available: std::sync::atomic::AtomicBool,
@@ -95,7 +103,9 @@ impl Default for MobileRuntime {
             confirmations: Mutex::new(Default::default()),
             pending_turns: Mutex::new(Default::default()),
             task_summaries: Mutex::new(Default::default()),
+            tools: Mutex::new(Default::default()),
             file_roots: Mutex::new(Default::default()),
+            profile_data: Mutex::new(None),
             roots_changed: tokio::sync::Notify::new(),
             desktop_available: std::sync::atomic::AtomicBool::new(false),
         }
@@ -105,15 +115,33 @@ impl MobileRuntime {
     pub fn turn_cancel(&self, thread: &str) -> CancellationToken {
         self.pending_turns
             .lock()
-            .unwrap()
+            .unwrap_or_else(|e| e.into_inner())
             .get(thread)
-            .cloned()
+            .map(|turn| turn.cancel.clone())
             .unwrap_or_default()
     }
     pub fn task_status(&self, thread: &str, status: &str, summary: &str) {
         let value = serde_json::json!({"type":"task_status","task_id":format!("thread:{thread}"),
             "status":status,"summary":summary.chars().take(160).collect::<String>(),"last_activity_at":chrono::Utc::now().timestamp()});
-        let mut summaries = self.task_summaries.lock().unwrap();
+        let round = self
+            .pending_turns
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(thread)
+            .map(|t| t.id.clone());
+        let mut value = value;
+        value["turn_id"] = serde_json::json!(round);
+        let mut summaries = self
+            .task_summaries
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        if summaries.get(thread).is_some_and(|old| {
+            old["turn_id"] == value["turn_id"]
+                && old["status"] == value["status"]
+                && old["summary"] == value["summary"]
+        }) {
+            return;
+        }
         if !summaries.contains_key(thread) && summaries.len() >= 200 {
             let oldest = summaries
                 .iter()
@@ -146,6 +174,8 @@ impl MobileRuntime {
         if let Some(r) = running.as_ref().filter(|r| !r.task.is_finished()) {
             return Ok(r.address.clone());
         }
+        *self.profile_data.lock().unwrap_or_else(|e| e.into_inner()) =
+            Some(data.canonicalize().unwrap_or_else(|_| data.clone()));
         self.auth
             .lock()
             .map_err(|_| "auth_unavailable")?
@@ -161,7 +191,16 @@ impl MobileRuntime {
         let cancel = CancellationToken::new();
         let task_cancel = cancel.clone();
         let runtime = self.clone();
+        let hosts = Arc::new(listener_policy::hosts(
+            &data,
+            listener
+                .local_addr()
+                .map_err(|_| "mobile_address_unavailable")?
+                .port(),
+            lan,
+        )?);
         let service = server::Service {
+            hosts,
             core,
             runtime: self.clone(),
             cancel: cancel.clone(),
@@ -170,7 +209,7 @@ impl MobileRuntime {
             .enabled
             .store(true, std::sync::atomic::Ordering::Relaxed);
         let task = tokio::spawn(async move {
-            let watch = file_view::watch(service.clone());
+            let watch = file_watch::watch(service.clone());
             let result = axum::serve(
                 listener,
                 server::router(service)
@@ -201,6 +240,7 @@ impl MobileRuntime {
         }
         self.broker.disable();
         if let Ok(mut auth) = self.auth.lock() {
+            auth.clear_ephemeral();
             let _ = auth.flush();
         }
     }
@@ -211,3 +251,6 @@ mod service_tests;
 
 #[cfg(test)]
 mod task_tests;
+
+#[cfg(test)]
+mod review_tests;

@@ -10,7 +10,7 @@ export default defineConfig({
     name: "mobile-offline-shell",
     closeBundle() {
       const output = fileURLToPath(new URL("../src-tauri/resources/mobile-web", import.meta.url));
-      const files = ["index.html", "manifest.webmanifest", "icon.svg", ...readdirSync(join(output, "assets")).map(name => `assets/${name}`)];
+      const files = ["index.html", "manifest.webmanifest", "icon.svg", "icon-180.png", "icon-192.png", "icon-512.png", "icon-maskable.png", ...readdirSync(join(output, "assets")).map(name => `assets/${name}`)];
       const revision = createHash("sha256");
       for (const name of files) revision.update(name).update(readFileSync(join(output, name)));
       const worker = readFileSync(join(output, "sw.js"), "utf8")

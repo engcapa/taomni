@@ -74,6 +74,13 @@ impl ControlHandler {
         args: Value,
     ) -> Result<CallToolResult, ErrorData> {
         let call_id = Uuid::new_v4().to_string();
+        let mobile = self.app_state().mobile.clone();
+        let _mobile_gate = crate::mobile::confirmation::DesktopConfirmation::new(
+            &mobile,
+            &call_id,
+            &scope.thread_id,
+            tool,
+        );
         let (tx, rx) = tokio::sync::oneshot::channel::<CcToolOutcome>();
         {
             let state = self.app_state();

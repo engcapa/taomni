@@ -6,7 +6,7 @@ import { useVaultStore } from "../../stores/vaultStore";
 import { AppProxyPanel } from "./AppProxyPanel";
 
 interface Config {
-  app_id: string; secret_ref: string; mobile_endpoint: string;
+  app_id: string; secret_ref: string; mobile_endpoint: string; allow_file_content?: boolean;
   bindings: { open_id: string; chat_id: string }[];
   proxy_mode: "app" | "custom" | "none"; custom_proxy: AppProxyConfig;
 }
@@ -76,6 +76,8 @@ export function FeishuAdapterSettings({ mobileEnabled }: { mobileEnabled: boolea
       <label className="block">通知中的 Mobile Web 地址（可选）<input data-testid="feishu-mobile-endpoint" className="taomni-input w-full" value={draft.mobile_endpoint} onChange={e => patch({ mobile_endpoint: e.target.value })} placeholder="https://pc.example.com" /></label>
       <label className="block">授权身份绑定（每行：用户 open_id 会话 chat_id）<textarea data-testid="feishu-bindings" className="taomni-input w-full" rows={3} value={bindings} onChange={e => { setBindings(e.target.value); setSaved(false); }} placeholder="ou_… oc_…" /></label>
       <p>只接受已绑定用户在指定会话中的命令或卡片操作。通知发送到这些会话；群内其他成员也能看到通知，请按需要授权。</p>
+      <p>命令回复、任务摘要和确认工具名会发送到飞书服务器；群聊成员可见通知。最近助手结果仅私聊可查询，文件内容默认不发送。</p>
+      <label className="block"><input id="feishu-allow-files" data-testid="feishu-allow-files" type="checkbox" checked={draft.allow_file_content ?? false} onChange={e => patch({ allow_file_content: e.target.checked })} />允许私聊查询任务目录内的文件内容（发送到飞书服务器）</label>
       <label className="block">网络代理<select data-testid="feishu-proxy-mode" className="taomni-input w-full" value={draft.proxy_mode} onChange={e => patch({ proxy_mode: e.target.value as Config["proxy_mode"] })}>
         <option value="app">使用应用代理（默认）</option><option value="custom">独立代理</option><option value="none">不使用代理</option>
       </select></label>

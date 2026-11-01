@@ -2008,6 +2008,7 @@
 - `[data-testid="feishu-app-secret"]` — interactive — F-MOBILE-2.feishu-app-secret
 - `[data-testid="feishu-mobile-endpoint"]` — interactive — F-MOBILE-2.feishu-mobile-endpoint
 - `[data-testid="feishu-bindings"]` — interactive — F-MOBILE-2.feishu-bindings
+- `[data-testid="feishu-allow-files"]` — interactive — F-MOBILE-2.feishu-allow-files
 - `[data-testid="feishu-proxy-mode"]` — interactive — F-MOBILE-2.feishu-proxy-mode
 - `[data-testid="feishu-custom-proxy"]` — display — F-MOBILE-2.feishu-custom-proxy
 - `[data-testid="feishu-save"]` — interactive — F-MOBILE-2.feishu-save
