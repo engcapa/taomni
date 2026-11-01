@@ -15,7 +15,6 @@ use std::sync::OnceLock;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
-use std::time::Instant;
 use tauri::{AppHandle, Manager};
 #[derive(Default)]
 pub(super) struct ToolState {
@@ -32,12 +31,6 @@ pub(super) struct ToolState {
     pub(super) scroll: Option<Arc<scroll::ScrollControl>>,
     pub(super) pins: HashMap<String, PinInit>,
     pub(super) pin_tools: HashMap<String, serde_json::Value>,
-    /// P0-0 startup timing: start of the latest `open_overlay_inner` run and
-    /// the cumulative elapsed milliseconds of each stage in that run.
-    /// Recording only; it never changes capture, hiding or window behaviour,
-    /// and it is read back only by the QA startup-timing scenario.
-    pub(super) startup_started: Option<Instant>,
-    pub(super) startup_stages: Vec<(String, u64)>,
 }
 
 pub(super) static STATE: OnceLock<Mutex<ToolState>> = OnceLock::new();
@@ -77,31 +70,6 @@ pub(super) fn capture_lease() -> Result<Arc<session::SessionLease>, String> {
 
 pub(super) fn internal_error(e: anyhow::Error) -> String {
     format!("{e:#}")
-}
-
-/// P0-0 startup timing: reset the snapshot at the start of an overlay open.
-/// Called from `open_overlay_inner` only; the snapshot survives the open so
-/// the QA scenario can read it after the overlay reaches the select phase.
-pub(super) fn startup_timing_reset() {
-    let mut state = tool_state();
-    state.startup_started = Some(Instant::now());
-    state.startup_stages = vec![("start".to_string(), 0)];
-}
-
-/// Record one stage of the current overlay open. A no-op if no open is in
-/// progress, so callers never need to branch on timing state.
-pub(super) fn startup_timing_mark(stage: &str) {
-    let mut state = tool_state();
-    if let Some(started) = state.startup_started {
-        let elapsed = started.elapsed().as_millis() as u64;
-        state.startup_stages.push((stage.to_string(), elapsed));
-        log::info!("[screenshot-startup-timing] stage={stage} elapsed_ms={elapsed}");
-    }
-}
-
-/// Snapshot of the latest overlay-open stages, in record order.
-pub(super) fn startup_timing_snapshot() -> Vec<(String, u64)> {
-    tool_state().startup_stages.clone()
 }
 
 /// App exit: stop recordings and delete temp files.

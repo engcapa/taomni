@@ -113,11 +113,14 @@ pub async fn screenshot_edit_pin(app: AppHandle, window: WebviewWindow) -> Resul
             window_region: None,
             document: true,
             source_pin: Some(window.label().to_string()),
+            generation: super::SESSION_GENERATION.load(std::sync::atomic::Ordering::SeqCst),
         });
         let editor = super::window_builder(
             &app,
             super::OVERLAY_LABEL,
-            WebviewUrl::App("index.html#screenshot-overlay".into()),
+            // A decorated document window: keep the opaque theme background
+            // (`#screenshot-overlay` alone selects the transparent surface).
+            WebviewUrl::App("index.html#screenshot-overlay-document".into()),
         )
         .title("Screenshot editor")
         .inner_size(1000.0, 760.0)

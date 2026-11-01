@@ -1,6 +1,7 @@
 use super::startup::MonitorTarget;
 use super::startup::monitor_stream_index;
 use crate::servers::rdp::capture::PortalInput;
+use crate::servers::rdp::capture::stage_trace;
 use anyhow::Context as _;
 use anyhow::bail;
 use ashpd::desktop::PersistMode;
@@ -43,72 +44,91 @@ impl PortalContext {
             input_enabled,
             pipewire_fd,
         ) = runtime.block_on(async move {
-            let remote_desktop = RemoteDesktop::new().await?;
-            let screencast = Screencast::new().await?;
+            let remote_desktop =
+                stage_trace::cancellable(async { Ok(RemoteDesktop::new().await?) }).await?;
+            let screencast =
+                stage_trace::cancellable(async { Ok(Screencast::new().await?) }).await?;
+            stage_trace::check_cancelled()?;
+            // Acquire the session before entering the cancellable consent work:
+            // every interrupted request then has an explicit session to close.
             let session = remote_desktop.create_session().await?;
+            stage_trace::mark("portal_create_session");
 
-            if request_input {
-                remote_desktop
-                    .select_devices(
+            let selected = stage_trace::cancellable(async {
+                if request_input {
+                    remote_desktop
+                        .select_devices(
+                            &session,
+                            DeviceType::Keyboard | DeviceType::Pointer,
+                            None,
+                            PersistMode::DoNot,
+                        )
+                        .await?
+                        .response()?;
+                    stage_trace::mark("portal_select_devices");
+                }
+                screencast
+                    .select_sources(
                         &session,
-                        DeviceType::Keyboard | DeviceType::Pointer,
+                        CursorMode::Embedded,
+                        SourceType::Monitor.into(),
+                        target.is_some(),
                         None,
                         PersistMode::DoNot,
                     )
                     .await?
                     .response()?;
-            }
-            screencast
-                .select_sources(
-                    &session,
-                    CursorMode::Embedded,
-                    SourceType::Monitor.into(),
-                    target.is_some(),
-                    None,
-                    PersistMode::DoNot,
-                )
-                .await?
-                .response()?;
+                stage_trace::mark("portal_select_sources");
 
-            let response = remote_desktop.start(&session, None).await?.response()?;
-            let streams = response
-                .streams()
-                .filter(|streams| !streams.is_empty())
-                .ok_or_else(|| anyhow::anyhow!("portal did not return a monitor stream"))?;
-            let index = match target {
-                Some(target) => match monitor_stream_index(
-                    &streams
-                        .iter()
-                        .map(|s| (s.position(), s.size()))
-                        .collect::<Vec<_>>(),
-                    target,
-                ) {
-                    Ok(index) => index,
-                    Err(error) => {
-                        let _ = session.close().await;
-                        return Err(error);
-                    }
-                },
-                None => 0,
-            };
-            let stream = &streams[index];
-            let logical_size = stream.size().and_then(|(width, height)| {
-                u32::try_from(width).ok().zip(u32::try_from(height).ok())
-            });
-            let input_enabled = request_input
-                && response.devices().contains(DeviceType::Keyboard)
-                && response.devices().contains(DeviceType::Pointer);
-            let stream_node = stream.pipe_wire_node_id();
-            let pipewire_fd = screencast.open_pipe_wire_remote(&session).await?;
-            Ok::<_, anyhow::Error>((
-                remote_desktop,
-                screencast,
-                session,
-                stream_node,
-                logical_size,
-                input_enabled,
-                pipewire_fd,
-            ))
+                let response = remote_desktop.start(&session, None).await?.response()?;
+                stage_trace::mark("portal_start");
+                let streams = response
+                    .streams()
+                    .filter(|streams| !streams.is_empty())
+                    .ok_or_else(|| anyhow::anyhow!("portal did not return a monitor stream"))?;
+                let index = match target {
+                    Some(target) => match monitor_stream_index(
+                        &streams
+                            .iter()
+                            .map(|s| (s.position(), s.size()))
+                            .collect::<Vec<_>>(),
+                        target,
+                    ) {
+                        Ok(index) => index,
+                        Err(error) => return Err(error),
+                    },
+                    None => 0,
+                };
+                let stream = &streams[index];
+                let logical_size = stream.size().and_then(|(width, height)| {
+                    u32::try_from(width).ok().zip(u32::try_from(height).ok())
+                });
+                let input_enabled = request_input
+                    && response.devices().contains(DeviceType::Keyboard)
+                    && response.devices().contains(DeviceType::Pointer);
+                let stream_node = stream.pipe_wire_node_id();
+                let pipewire_fd = screencast.open_pipe_wire_remote(&session).await?;
+                stage_trace::mark("portal_pipewire_remote");
+                Ok::<_, anyhow::Error>((stream_node, logical_size, input_enabled, pipewire_fd))
+            })
+            .await;
+            match selected {
+                Ok((stream_node, logical_size, input_enabled, pipewire_fd)) => Ok((
+                    remote_desktop,
+                    screencast,
+                    session,
+                    stream_node,
+                    logical_size,
+                    input_enabled,
+                    pipewire_fd,
+                )),
+                Err(error) => {
+                    // Close before releasing the constructor's worker/lease,
+                    // including cancellation while a chooser is still open.
+                    let _ = session.close().await;
+                    Err(error)
+                }
+            }
         })?;
 
         Ok((

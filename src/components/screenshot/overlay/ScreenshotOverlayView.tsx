@@ -35,7 +35,10 @@ export function ScreenshotOverlayView(props: ScreenshotOverlayViewProps) {
       data-phase={state.phase}
       data-selection-mode={state.selectionMode}
       className="fixed inset-0 overflow-hidden select-none outline-none"
-      style={{ background: "#000000" }}
+      // P0-1b: transparent until the base image exists, so an early frame of
+      // the (transparent) overlay window shows the dimmed real desktop, not
+      // a solid black or theme-coloured screen.
+      style={{ background: state.img ? "#000000" : "transparent" }}
     >
       {!state.scrollResult && state.img && state.imgUrl && (
         <img

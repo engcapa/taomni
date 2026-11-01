@@ -89,6 +89,9 @@ export async function invokeScreenshot<T>(cmd: string, args?: any): Promise<T> {
     }
 
     case "screenshot_overlay_init": {
+      // Browser-only fixture for observing the real renderer's loading state.
+      const delay = Number(new URLSearchParams(location.search).get("qaScreenshotInitDelayMs") ?? 0);
+      if (Number.isFinite(delay) && delay > 0) await new Promise((resolve) => setTimeout(resolve, Math.min(delay, 3000)));
       if (stubScreenshotDocument && stubScreenshotActivePin) return { ...stubScreenshotActivePin, displayId: "0,0", scaleFactor: 1, document: true, sourcePin: stubActivePinLabel } as T;
       return ({
         windowRegion: stubScreenshotIncludeWindow ? { x: 40, y: 30, width: 320, height: 240 } : null,
@@ -97,7 +100,13 @@ export async function invokeScreenshot<T>(cmd: string, args?: any): Promise<T> {
         width: 400,
         height: 300,
         scaleFactor: 1,
+        generation: 1,
       } as unknown) as T;
+    }
+
+    case "screenshot_overlay_ready": {
+      stubScreenshotCall(cmd, args);
+      return (true as unknown) as T;
     }
 
     case "screenshot_open_overlay": {

@@ -1,7 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("../../lib/ipc", () => ({ listSystemFonts: async () => ["Arial", "Noto Sans"] }));
+vi.mock("../../lib/ipc/application", () => ({ listSystemFonts: async () => ["Arial", "Noto Sans"] }));
 import { ScreenshotOverlay } from "./ScreenshotOverlay";
+import { installOverlayCanvasStub, installOverlayImageStub } from "./overlayTestHarness";
 
 const api = vi.hoisted(() => ({
   updateSourcePin: vi.fn(), listDisplays: vi.fn(), switchScreenshotDisplay: vi.fn(), fetchOverlayInit: vi.fn(), captureFull: vi.fn(), loadScreenshotUrl: vi.fn(), revokeScreenshotUrl: vi.fn(),
@@ -32,32 +33,8 @@ beforeEach(() => {
   api.openImageEditor.mockResolvedValue("working-copy.png");
   api.ocrImage.mockResolvedValue({ text: "user@example.com" });
   api.autoRedact.mockResolvedValue({ count: 2, boxes: [{ x: 10, y: 20, w: 40, h: 20 }, { x: 80, y: 20, w: 40, h: 20 }] });
-  vi.stubGlobal("Image", function () {
-    const image = document.createElement("img");
-    image.decode = vi.fn().mockResolvedValue(undefined);
-    let width = 2048, height = 1152;
-    Object.defineProperties(image, {
-      naturalWidth: { get: () => width }, naturalHeight: { get: () => height },
-      src: { set: (url: string) => {
-        const size = /base64,(\d+)x(\d+)$/.exec(url);
-        if (size) { width = Number(size[1]); height = Number(size[2]); }
-        queueMicrotask(() => image.onload?.(new Event("load")));
-      } },
-    });
-    return image;
-  });
-  const context = new Proxy({} as CanvasRenderingContext2D, {
-    get: (target, name) => {
-      if (name === "getTransform") return () => ({ a: 1 });
-      if (name === "getImageData") return () => ({ data: new Uint8ClampedArray(4), width: 1, height: 1 });
-      if (!Reflect.has(target, name)) Reflect.set(target, name, vi.fn());
-      return Reflect.get(target, name);
-    },
-  });
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context);
-  vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockImplementation(function (this: HTMLCanvasElement) {
-    return `data:image/png;base64,${this.width}x${this.height}`;
-  });
+  installOverlayImageStub();
+  installOverlayCanvasStub();
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -466,10 +443,12 @@ describe("ScreenshotOverlay", () => {
   });
 
   it("renders load errors with a usable cancel action", async () => {
-    api.fetchOverlayInit.mockRejectedValueOnce(new Error("no pending capture"));
+    api.fetchOverlayInit.mockRejectedValueOnce(new Error("no pending screenshot overlay"));
     api.captureFull.mockRejectedValueOnce(new Error("screen permission denied"));
     render(<ScreenshotOverlay />);
     await screen.findByTestId("screenshot-overlay-error");
+    // No backend session (dev/QA direct open): the overlay captured live.
+    expect(api.captureFull).toHaveBeenCalledOnce();
     expect(screen.queryByTestId("screenshot-base-image")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("screenshot-cancel"));
     await waitFor(() => expect(api.closeScreenshotOverlay).toHaveBeenCalledOnce());

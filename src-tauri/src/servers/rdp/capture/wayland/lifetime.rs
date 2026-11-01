@@ -11,6 +11,7 @@ use crate::servers::engine::LogEmitter;
 use crate::servers::rdp::capture::Capturer;
 use crate::servers::rdp::capture::Frame;
 use crate::servers::rdp::capture::PortalInput;
+use crate::servers::rdp::capture::stage_trace;
 use anyhow::bail;
 use pipewire::channel;
 use std::sync::Arc;
@@ -43,9 +44,32 @@ impl WaylandCapturer {
             mailbox.clone(),
             log.clone(),
         )?;
-        let initial = mailbox
-            .take_timeout(INITIAL_FRAME_TIMEOUT)?
-            .ok_or_else(|| anyhow::anyhow!("PipeWire produced no frame within 10 seconds"))?;
+        // Even a failed first-frame wait must stop the PipeWire worker before
+        // returning its portal/session ownership to the caller.
+        struct StopOnFailure(Option<channel::Sender<()>>);
+        impl Drop for StopOnFailure {
+            fn drop(&mut self) {
+                if let Some(stop) = &self.0 {
+                    let _ = stop.send(());
+                }
+            }
+        }
+        let mut stop = StopOnFailure(Some(stop));
+        let deadline = std::time::Instant::now() + INITIAL_FRAME_TIMEOUT;
+        let initial = loop {
+            stage_trace::check_cancelled()?;
+            if let Some(frame) = mailbox.take_timeout(FRAME_WAIT)? {
+                break frame;
+            }
+            if mailbox.is_closed() {
+                bail!("Wayland PipeWire capture stream closed");
+            }
+            if std::time::Instant::now() >= deadline {
+                bail!("PipeWire produced no frame within 10 seconds");
+            }
+        };
+        stage_trace::check_cancelled()?;
+        stage_trace::mark("pipewire_first_frame");
         let frame = raw_to_frame(initial)?;
         let width = frame.width;
         let height = frame.height;
@@ -66,7 +90,7 @@ impl WaylandCapturer {
         Ok(Self {
             portal,
             mailbox,
-            stop,
+            stop: stop.0.take().expect("PipeWire stop owner"),
             width,
             height,
             retained: Some(frame),
@@ -86,10 +110,12 @@ impl Capturer for WaylandCapturer {
     }
 
     fn capture(&mut self) -> anyhow::Result<Frame> {
+        stage_trace::check_cancelled()?;
         if let Some(frame) = self.retained.take() {
             return Ok(frame);
         }
         loop {
+            stage_trace::check_cancelled()?;
             if let Some(raw) = self.mailbox.take_timeout(FRAME_WAIT)? {
                 let frame = raw_to_frame(raw)?;
                 self.width = frame.width;
@@ -103,6 +129,7 @@ impl Capturer for WaylandCapturer {
     }
 
     fn poll_frame(&mut self) -> anyhow::Result<Option<Frame>> {
+        stage_trace::check_cancelled()?;
         if let Some(frame) = self.retained.take() {
             return Ok(Some(frame));
         }

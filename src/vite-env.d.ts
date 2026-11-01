@@ -13,3 +13,5 @@ declare const __TAOMNI_TERMINAL_TEXT_MIRROR__: boolean;
 declare const __TAOMNI_QA_SAVE_GATE__: boolean;
 declare const __TAOMNI_QA_COMPLETION_OBSERVATION__: boolean;
 declare const __TAOMNI_QA_UPDATER__: boolean;
+/** Screenshot overlay startup marks (`window.__TAOMNI_OVERLAY_TIMING__`): QA bundle only. */
+declare const __TAOMNI_QA_OVERLAY_TIMING__: boolean;

@@ -36,8 +36,16 @@ SCENARIOS = {
     "capture-permission-error": "screenshot_qa_capture_permission_error",
     "escape-entry": "screenshot_qa_escape_entry",
     "startup-timing": "screenshot_qa_startup_timing",
+    "startup-isolation": "screenshot_qa_startup_isolation",
+    "startup-flash": "screenshot_qa_startup_flash",
     "x11-compositor-bypass": "screenshot_qa_x11_compositor_bypass",
 }
+
+# Seconds the runner waits for one scenario result. Startup measurement opens
+# the overlay in two groups of 20 real captures. The case's own deadline
+# remains authoritative through budget_time; this cap must not undercut it.
+DEFAULT_DEADLINE = 90
+DEADLINES = {"startup-timing": 600, "startup-isolation": 150}
 
 
 def run_scenario(ctx, args):
@@ -76,7 +84,7 @@ def run_scenario(ctx, args):
         )
         if started is not True:
             raise StepError("native_screenshot_scenario: could not start isolated QA command")
-        deadline = time.monotonic() + 90
+        deadline = time.monotonic() + DEADLINES.get(scenario, DEFAULT_DEADLINE)
         while time.monotonic() < deadline:
             state = ctx.session.execute(f"return window[{key}] || null;")
             if isinstance(state, dict) and state.get("done"):

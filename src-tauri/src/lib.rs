@@ -33,6 +33,7 @@ mod objectstorage;
 pub mod perf;
 mod proxy;
 mod qa_driver;
+mod qa_logging;
 mod rdp;
 mod screenshot;
 #[cfg(windows)]
@@ -384,6 +385,16 @@ pub fn run() {
 
             if cfg!(debug_assertions) {
                 let mut logger = tauri_plugin_log::Builder::default().level(log::LevelFilter::Info);
+                let qa_data = std::env::var_os("NEWMOB_DATA_DIR").map(std::path::PathBuf::from);
+                if let Some(path) = qa_logging::directory(&app.config().identifier, qa_data.as_deref()) {
+                    logger = logger.targets([
+                        tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+                        tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Folder {
+                            path,
+                            file_name: None,
+                        }),
+                    ]);
+                }
                 if app.config().identifier == "com.taomni.app.qa"
                     && std::env::var("TAOMNI_QA_RDP_TRACE").as_deref() == Ok("1")
                 {

@@ -3,7 +3,9 @@ use crate::screenshot::capture::DisplayInfo;
 use crate::screenshot::capture::ScreenshotFile;
 use crate::screenshot::model::ScreenshotProbe;
 use crate::screenshot::ocr;
+use crate::screenshot::overlay_handoff;
 use crate::screenshot::runtime::blocking;
+use crate::screenshot::startup_timing;
 use std::path::PathBuf;
 use tauri::AppHandle;
 
@@ -13,9 +15,19 @@ use tauri::AppHandle;
 /// on every WebView engine.
 #[tauri::command]
 pub async fn screenshot_read_file(path: String) -> Result<tauri::ipc::Response, String> {
+    // B10 of the startup timing: only the overlay's base image read-back.
+    let base_image = overlay_handoff::is_base_image(&path);
     blocking("read", move || {
         let path = capture::ensure_artifact_path(&path)?;
-        Ok(tauri::ipc::Response::new(std::fs::read(path)?))
+        if base_image {
+            startup_timing::mark("read_file_start");
+        }
+        let bytes = std::fs::read(path)?;
+        if base_image {
+            startup_timing::mark("read_file_end");
+            startup_timing::note("readBytes", serde_json::json!(bytes.len()));
+        }
+        Ok(tauri::ipc::Response::new(bytes))
     })
     .await
 }
@@ -42,6 +54,12 @@ pub async fn screenshot_capture_full(
     app: AppHandle,
     display_id: Option<String>,
 ) -> Result<ScreenshotFile, String> {
+    // The overlay's live-capture fallback is for dev/QA direct opens only.
+    // During a backend open the app windows may still be visible, so a
+    // capture now could contain them.
+    if overlay_handoff::open_pending() {
+        return Err("a screenshot is opening; its capture is not ready yet".into());
+    }
     blocking("capture", move || {
         let display = capture::resolve_display(&app, display_id.as_deref())?;
         let image = capture::capture_display(&app, &display)?;

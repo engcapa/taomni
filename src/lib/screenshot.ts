@@ -61,6 +61,8 @@ export interface OverlayInit {
   windowRegion?: PhysicalRect | null;
   document?: boolean;
   sourcePin?: string | null;
+  /** Capture session generation; echoed by `signalOverlayReady`. */
+  generation?: number;
 }
 
 export interface RecordingStarted {
@@ -199,6 +201,11 @@ export async function openScreenshotOverlay(displayId?: string, includeCurrentWi
 /** The pending overlay payload (call on mount). */
 export async function fetchOverlayInit(): Promise<OverlayInit> {
   return invoke<OverlayInit>("screenshot_overlay_init");
+}
+
+/** The overlay committed its base image (or error view): the backend may show it. */
+export async function signalOverlayReady(generation: number): Promise<boolean> {
+  return invoke<boolean>("screenshot_overlay_ready", { generation });
 }
 
 /** Tell the backend the overlay now shows another background image. */

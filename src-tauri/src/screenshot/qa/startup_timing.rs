@@ -1,29 +1,32 @@
 use super::*;
+use crate::screenshot::startup_timing;
 
 // ---------------------------------------------------------------------------
-// Screenshot startup timing (P0-0 measurement, TC-SHOT-N27)
+// Screenshot startup timing (P0-0 / P0-0b measurement, TC-SHOT-N27)
 // ---------------------------------------------------------------------------
 //
-// This scenario measures, it does not gate on an absolute millisecond
-// budget: CI runners and the user's slow machines have no common budget yet,
-// and the point of P0-0 is to collect the segmented numbers first. The case
-// fails only when a run never reaches the select phase or when the backend
-// timing snapshot is incomplete, because either means the measurement itself
-// (or the overlay open) is broken, not merely slow.
+// Measurement, not an absolute millisecond budget: CI runners and the
+// user's slow machines have no common budget. The case fails only when a run
+// never reaches the select phase, when a required backend stage is missing,
+// or when the QA build's renderer marks are missing, because each of those
+// means the open (or the measurement) is broken rather than slow.
 //
-// Each run opens the overlay through the production entry, records:
-//   - window_ms: the overlay WebviewWindow exists in the app (creation, not
-//     mapped/first-frame)
-//   - image_ms: the base image element is in the overlay DOM
-//   - select_ms: the overlay reports phase "select" (ready for interaction)
-//   - backend stages: the P0-0 snapshot from `open_overlay_inner`, with
-//     per-stage deltas computed from its cumulative elapsed values
-// Run 0 is the cold open after a closed session; runs 1-2 are warm opens.
-// The scenario does not sample desktop pixels, so it cannot by itself
-// quantify the camera-flash frames; that stays a native-driver observation
-// in the case file until a pixel sampler exists.
+// Each run opens the overlay through the production command entry and
+// records, relative to the backend start of that open:
+//   - backend stages (cumulative and per-stage deltas, record order); the
+//     order is not asserted because the window build and the capture overlap
+//   - renderer marks from the QA build (`window.__TAOMNI_OVERLAY_TIMING__`),
+//     converted from wall-clock epoch milliseconds
+//   - window/image/select times polled from outside, comparable with the
+//     P0-0 baseline, and firstMs = max(show, renderer commit): the overlay
+//     is visible with its base image and ready for selection
+//   - whether the ready handshake beat its timeout (item 6)
+// Run 0 follows a closed session (same-process first open, not a process
+// cold start); later runs are warm opens.
 
-const EXPECTED_STAGES: &[&str] = &[
+const RUNS: usize = 40;
+/// Stages every open records, in any order.
+const REQUIRED_STAGES: &[&str] = &[
     "start",
     "permission",
     "display",
@@ -31,10 +34,13 @@ const EXPECTED_STAGES: &[&str] = &[
     "capture",
     "save_png",
     "window_built",
+    "window_joined",
     "cover",
     "show",
     "focus",
 ];
+/// Renderer marks of the QA build, in their natural order.
+const RENDERER_MARKS: &[&str] = &["entry", "app", "mount", "init", "read", "decode", "commit"];
 
 fn stage_deltas(stages: &[(String, u64)]) -> Vec<Value> {
     let mut previous = 0u64;
@@ -48,9 +54,54 @@ fn stage_deltas(stages: &[(String, u64)]) -> Vec<Value> {
         .collect()
 }
 
+fn percentile(values: &mut [u64], p: f64) -> Option<u64> {
+    if values.is_empty() {
+        return None;
+    }
+    values.sort_unstable();
+    let rank = ((values.len() as f64 - 1.0) * p).round() as usize;
+    values.get(rank).copied()
+}
+
+fn stage_ms(stages: &[(String, u64)], name: &str) -> Option<u64> {
+    stages
+        .iter()
+        .find(|(stage, _)| stage == name)
+        .map(|(_, ms)| *ms)
+}
+
+async fn renderer_marks(
+    overlay: &WebviewWindow,
+    start_wall_ms: u64,
+) -> serde_json::Map<String, Value> {
+    let raw = eval_raw(
+        overlay,
+        "(window.__TAOMNI_OVERLAY_TIMING__ || {marks:{}})".to_string(),
+        Duration::from_millis(800),
+    )
+    .await
+    .unwrap_or(Value::Null);
+    let mut marks = serde_json::Map::new();
+    if let Some(object) = raw.get("marks").and_then(Value::as_object) {
+        for (name, value) in object {
+            if let Some(wall) = value.as_f64() {
+                // Relative to the backend start; negative = before the open.
+                marks.insert(
+                    name.clone(),
+                    json!((wall - start_wall_ms as f64).round() as i64),
+                );
+            }
+        }
+    }
+    marks
+}
+
 async fn run_once(app: &AppHandle, run: usize) -> anyhow::Result<Value> {
     let started = Instant::now();
-    super::super::open_overlay(app, None)
+    let main = app
+        .get_webview_window("main")
+        .context("main window missing")?;
+    super::super::screenshot_open_overlay(app.clone(), main, None, None)
         .await
         .map_err(|e| anyhow::anyhow!("open_overlay failed on run {run}: {e}"))?;
     let overlay = wait_window(app, super::super::OVERLAY_LABEL, Duration::from_secs(15))
@@ -69,16 +120,12 @@ async fn run_once(app: &AppHandle, run: usize) -> anyhow::Result<Value> {
             Duration::from_millis(500),
         )
         .await;
-        if let Some(state) = state {
-            if state.get("qaEvalError").is_none() {
-                if image_ms.is_none() && state.get("hasImage") == Some(&Value::Bool(true)) {
-                    image_ms = Some(started.elapsed().as_millis() as u64);
-                }
-                if select_ms.is_none()
-                    && state.get("phase") == Some(&Value::String("select".into()))
-                {
-                    select_ms = Some(started.elapsed().as_millis() as u64);
-                }
+        if let Some(state) = state.filter(|state| state.get("qaEvalError").is_none()) {
+            if image_ms.is_none() && state.get("hasImage") == Some(&Value::Bool(true)) {
+                image_ms = Some(started.elapsed().as_millis() as u64);
+            }
+            if select_ms.is_none() && state.get("phase") == Some(&Value::String("select".into())) {
+                select_ms = Some(started.elapsed().as_millis() as u64);
             }
         }
         if image_ms.is_none() || select_ms.is_none() {
@@ -86,69 +133,218 @@ async fn run_once(app: &AppHandle, run: usize) -> anyhow::Result<Value> {
         }
     }
 
-    let backend = super::super::runtime::startup_timing_snapshot();
-    let backend_names: Vec<String> = backend.iter().map(|(name, _)| name.clone()).collect();
-    let backend_complete =
-        backend_names.iter().map(String::as_str).collect::<Vec<_>>() == EXPECTED_STAGES;
-    let deltas = stage_deltas(&backend);
-    let total_ms = select_ms.unwrap_or_else(|| started.elapsed().as_millis() as u64);
+    let backend = startup_timing::snapshot();
+    let names: Vec<&str> = backend
+        .stages
+        .iter()
+        .map(|(name, _)| name.as_str())
+        .collect();
+    let missing: Vec<&str> = REQUIRED_STAGES
+        .iter()
+        .copied()
+        .filter(|stage| !names.contains(stage))
+        .collect();
+    let handshake = backend
+        .notes
+        .get("profile")
+        .and_then(|p| p["readyHandshake"].as_bool())
+        == Some(true);
+    let ready_recorded = names.contains(&"ready") || names.contains(&"ready_timeout");
+    let mut required_capture = vec![
+        "capture_open_start",
+        "capture_open_end",
+        "capture_grab",
+        "capture_drain_end",
+        "capture_drop_start",
+        "capture_drop_end",
+    ];
+    #[cfg(target_os = "linux")]
+    if wayland::active() {
+        required_capture.extend([
+            "portal_create_session",
+            "portal_select_sources",
+            "portal_start",
+            "portal_pipewire_remote",
+            "pipewire_first_frame",
+        ]);
+    }
+    let missing_capture: Vec<_> = required_capture
+        .into_iter()
+        .filter(|stage| !names.contains(stage))
+        .collect();
+    let marks = renderer_marks(&overlay, backend.start_wall_ms).await;
+    let missing_marks: Vec<&str> = RENDERER_MARKS
+        .iter()
+        .copied()
+        .filter(|mark| !marks.contains_key(*mark))
+        .collect();
+    let show = stage_ms(&backend.stages, "show");
+    let commit = marks
+        .get("commit")
+        .and_then(Value::as_i64)
+        .map(|v| v.max(0) as u64);
+    let first_ms = show.zip(commit).map(|(show, commit)| show.max(commit));
     Ok(json!({
         "run": run,
+        "group": if run < RUNS / 2 { "handshake-probe" } else { "optimized" },
         "cold": run == 0,
         "windowMs": window_ms,
         "overlayVisible": visible,
         "imageMs": image_ms,
         "selectMs": select_ms,
-        "totalMs": total_ms,
-        "backendComplete": backend_complete,
-        "backendStages": backend_names,
-        "backendDeltas": deltas,
+        "firstMs": first_ms,
+        "backendComplete": missing.is_empty() && missing_capture.is_empty() && (!handshake || ready_recorded),
+        "missingStages": missing,
+        "missingCaptureStages": missing_capture,
+        "backendStages": names,
+        "backendDeltas": stage_deltas(&backend.stages),
+        "notes": backend.notes,
+        "entryOrigin": backend.entry_origin,
+        "entryLeadMs": backend.entry_lead_ms,
+        "renderer": marks,
+        "rendererComplete": missing_marks.is_empty(),
+        "missingRendererMarks": missing_marks,
+        "readyBeforeShow": backend.notes.get("readyBeforeShow"),
     }))
 }
 
-/// Open the overlay three times and report segmented startup timing.
+fn summarize(runs: &[Value]) -> Value {
+    let mut stages: std::collections::BTreeMap<String, Vec<u64>> = Default::default();
+    for run in runs {
+        for delta in run["backendDeltas"].as_array().into_iter().flatten() {
+            if let (Some(name), Some(ms)) = (delta["stage"].as_str(), delta["elapsedMs"].as_u64()) {
+                stages.entry(name.to_string()).or_default().push(ms);
+            }
+        }
+    }
+    let stages: serde_json::Map<String, Value> = stages
+        .into_iter()
+        .map(|(name, mut values)| {
+            let p50 = percentile(&mut values, 0.5);
+            let p95 = percentile(&mut values, 0.95);
+            (name, json!({"p50": p50, "p95": p95, "n": values.len()}))
+        })
+        .collect();
+    let column = |key: &str| -> Value {
+        let mut values: Vec<u64> = runs.iter().filter_map(|run| run[key].as_u64()).collect();
+        let p50 = percentile(&mut values, 0.5);
+        let p95 = percentile(&mut values, 0.95);
+        json!({"p50": p50, "p95": p95, "n": values.len()})
+    };
+    let renderer = |mark: &str| -> Value {
+        let mut values: Vec<u64> = runs
+            .iter()
+            .filter_map(|run| run["renderer"][mark].as_i64())
+            .map(|v| v.max(0) as u64)
+            .collect();
+        let p50 = percentile(&mut values, 0.5);
+        let p95 = percentile(&mut values, 0.95);
+        json!({"p50": p50, "p95": p95, "n": values.len()})
+    };
+    let handshakes: Vec<bool> = runs
+        .iter()
+        .filter_map(|run| run["readyBeforeShow"].as_bool())
+        .collect();
+    let ready = handshakes.iter().filter(|ready| **ready).count();
+    json!({
+        "elapsedByStage": stages,
+        "selectMs": column("selectMs"),
+        "firstMs": column("firstMs"),
+        "renderer": RENDERER_MARKS.iter().map(|mark| (mark.to_string(), renderer(mark))).collect::<serde_json::Map<_, _>>(),
+        "readyHandshake": {
+            "runs": handshakes.len(),
+            "readyBeforeShow": ready,
+            "timeouts": handshakes.len() - ready,
+            "ratio": (!handshakes.is_empty()).then(|| ready as f64 / handshakes.len() as f64),
+        },
+    })
+}
+
+/// Open the overlay `RUNS` times and report segmented startup timing.
 /// QA-only: `ensure_qa` refuses to run outside the isolated debug QA app.
 #[tauri::command]
 pub async fn screenshot_qa_startup_timing(app: AppHandle) -> Result<String, String> {
     ensure_qa(&app)?;
+    let _profile = crate::screenshot::startup_profile::QaProfile::install(
+        crate::screenshot::startup_profile::StartupProfile::OPTIMIZED,
+    );
     let _cleanup = ScenarioCleanup(app.clone());
     super::super::close_session(&app);
+    wait_closed(&app, super::super::OVERLAY_LABEL, Duration::from_secs(5)).await;
     let mut runs = Vec::new();
     let mut errors: Vec<String> = Vec::new();
-    for run in 0..3 {
+    for run in 0..RUNS {
+        let profile = if run < RUNS / 2 {
+            // First measure the hidden-renderer handshake without early build
+            // or exclusion. Later samples exercise the dependent P1 candidate.
+            crate::screenshot::startup_profile::StartupProfile {
+                early_window: false,
+                capture_exclusion: false,
+                ..crate::screenshot::startup_profile::StartupProfile::OPTIMIZED
+            }
+        } else {
+            crate::screenshot::startup_profile::StartupProfile::OPTIMIZED
+        };
+        let _run_profile = crate::screenshot::startup_profile::QaProfile::install(profile);
         match run_once(&app, run).await {
             Ok(value) => runs.push(value),
             Err(error) => {
-                errors.push(error.to_string());
+                errors.push(format!("{error:#}"));
                 break;
             }
         }
         super::super::close_session(&app);
+        let closed = wait_closed(&app, super::super::OVERLAY_LABEL, Duration::from_secs(5)).await;
         tokio::time::sleep(Duration::from_millis(300)).await;
+        let restored = main_visible(&app);
+        if let Some(value) = runs.last_mut() {
+            value["closed"] = json!(closed);
+            value["mainRestored"] = json!(restored);
+        }
+        let _ = keep_json(
+            &json!({"runs": runs, "errors": errors}),
+            "startup-timing-incremental.json",
+        );
+        if !closed || !restored {
+            errors.push(format!("session did not close/restore on run {run}"));
+            break;
+        }
     }
-    let reached_select = runs.iter().all(|run| run["selectMs"].is_number());
-    let backend_complete = runs
+    let reached_select = runs.iter().all(|run| {
+        run["selectMs"].is_number()
+            && run["imageMs"].is_number()
+            && run["firstMs"].is_number()
+            && run["overlayVisible"] == true
+            && run["closed"] == true
+            && run["mainRestored"] == true
+    });
+    let backend_complete = runs.iter().all(|run| run["backendComplete"] == json!(true));
+    let renderer_complete = runs
         .iter()
-        .all(|run| run["backendComplete"] == Value::Bool(true));
-    let mut select_times: Vec<u64> = runs
-        .iter()
-        .filter_map(|run| run["selectMs"].as_u64())
-        .collect();
-    select_times.sort_unstable();
-    let median_select_ms = select_times.get(select_times.len() / 2).copied();
-    let ok = runs.len() == 3 && errors.is_empty() && reached_select && backend_complete;
-    Ok(report(
-        ok,
-        json!({
-            "scenario": "startup-timing",
-            "platform": platform(),
-            "appPid": std::process::id(),
-            "displays": super::platform_evidence::display_facts(&app),
-            "runs": runs,
-            "medianSelectMs": median_select_ms,
-            "coldSelectMs": runs.first().and_then(|run| run["selectMs"].as_u64()),
-            "errors": errors,
-            "note": "Measurement only: no absolute millisecond budget is asserted. windowMs is window creation, not first frame; flash frames are not pixel-sampled by this scenario.",
-        }),
-    ))
+        .all(|run| run["rendererComplete"] == json!(true));
+    let summary = summarize(&runs);
+    let ok = runs.len() == RUNS
+        && errors.is_empty()
+        && reached_select
+        && backend_complete
+        && renderer_complete
+        && main_visible(&app);
+    let details = json!({
+        "scenario": "startup-timing",
+        "platform": platform(),
+        "appPid": std::process::id(),
+        "displays": super::platform_evidence::display_facts(&app),
+        "summary": summary,
+        "groups": {
+            "handshakeProbe": summarize(&runs.iter().filter(|run| run["group"] == "handshake-probe").cloned().collect::<Vec<_>>()),
+            "optimized": summarize(&runs.iter().filter(|run| run["group"] == "optimized").cloned().collect::<Vec<_>>()),
+        },
+        "medianSelectMs": summary["selectMs"]["p50"],
+        "coldSelectMs": runs.first().and_then(|run| run["selectMs"].as_u64()),
+        "runs": runs,
+        "errors": errors,
+        "note": "Measurement only: no absolute millisecond budget is asserted. Run 0 is the same-process first open, not a process cold start. CI runners are not slow machines.",
+    });
+    let _ = keep_json(&details, "startup-timing.json");
+    Ok(report(ok, details))
 }

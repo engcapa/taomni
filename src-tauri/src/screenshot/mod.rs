@@ -49,6 +49,16 @@ mod scroll_controls;
 
 mod overlay_session;
 
+mod overlay_open;
+
+mod overlay_handoff;
+
+mod capture_exclusion;
+
+mod startup_profile;
+
+mod startup_timing;
+
 mod pin_window;
 
 mod recording_controls;
@@ -228,6 +238,12 @@ pub(crate) use output_commands::{
     __cmd__screenshot_copy_image, __cmd__screenshot_save_data_url, __cmd__screenshot_save_image,
     __tauri_command_name_screenshot_copy_image, __tauri_command_name_screenshot_save_data_url,
     __tauri_command_name_screenshot_save_image,
+};
+
+pub use overlay_handoff::screenshot_overlay_ready;
+
+pub(crate) use overlay_handoff::{
+    __cmd__screenshot_overlay_ready, __tauri_command_name_screenshot_overlay_ready,
 };
 
 pub use overlay_commands::{

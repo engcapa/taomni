@@ -129,3 +129,47 @@
 ### 5.6 不做项
 
 不改滚动截图、录屏、OCR、贴图、标注画布的逻辑与语义；不在没有原生像素验证的情况下缩短 650 ms、250 ms 排空与 HIDE_SETTLE；不在截图之前显示 overlay 或任何 taomni 窗口（P0-1b 的透明 show 仍发生在截图之后）；不绕过、不缓存、不常驻 Wayland portal 授权与会话；不改变 pin 窗口不被隐藏的现有行为；不改 OPENING、SessionLease、STARTING_RECORDING 以及滚动、录屏守卫的判定代码；不改快捷键注册机制与默认组合键；不放宽 `ensure_artifact_path` 的路径校验，不改用 asset 协议 URL，保留同源 blob；不优化 `focus_capture_window` 的重试次数与间隔；不在 X11 上单独缩短 250 ms 排空；不把 CI 数据写成慢机结论，不把同进程首开写成进程冷启动，不把 1080p/768p 的 save_png 结论外推到 4K。
+
+## 6. 实施状态（分支 `feat/screenshot-startup-optimization`）
+
+本节记录代码现状；验证结果以 GitHub `qa-ui-auto-platforms` 的 run 为准，见 6.4。
+
+### 6.1 已实现
+
+| 项 | 实现位置 | 说明 |
+|---|---|---|
+| P0-0 / P0-0b 打点 | `screenshot/startup_timing.rs`（独立 mutex，可在 capture 线程打点）；`servers/rdp/capture/stage_trace.rs`（线程内观察者，portal 与 PipeWire 子段）；前端 `overlay/startupTiming.ts`（仅 `--mode qa` 构建写 `window.__TAOMNI_OVERLAY_TIMING__`） | 后端：entry（命令/快捷键，`entryLeadMs`）、permission、display、hide、capture_open_start/end、capture_hidden_signal、capture_grab、capture_drain_end、capture_drop_start/end、portal_create_session/select_devices/select_sources/start/pipewire_remote、pipewire_first_frame、capture、save_png、window_built、window_joined、cover、ready/ready_timeout、show（含 `showWallMs`）、hide_after_show、focus、read_file_start/end（含字节数）。前端：nav、fcp、entry、app、mount、init、read、decode、commit、paint。release 只记录与写日志，不读回 |
+| P0-1b 透明首帧 | `index.html`（label 为 `screenshot-overlay` 且 hash 恰为 `#screenshot-overlay` 时不写主题底色并加 `screenshot-overlay-surface`）；`styles/base.css`；`overlay_open.rs` builder `.transparent(true)`；`ScreenshotOverlayView` 根背景在无底图时透明 | 贴图编辑器改用 `#screenshot-overlay-document`，透明关闭时用 `#screenshot-overlay-opaque`，两者保持主题底色。macOS 依赖已开启的 `macOSPrivateApi` |
+| P0-3 拆包 | `main.tsx` 首个应用模块 `screenshotOverlayBoot.ts`；`screenshotOverlayRoot.tsx`；`lib/webviewGuards.ts`（右键菜单、刷新键、文件拖入导航三项守卫从 App 抽出，主窗口与 overlay 共用） | 原生 overlay 窗口跳过恢复握手（overlay 从不注册 renderer recovery）与 `App`。overlay 静态依赖除主入口共享部分外约 0.5 MB（主要是 i18n 词典），App 约 6.8 MB；`screenshotOverlayRoot.test.ts` 断言不静态到达 App、layouts、filebrowser、notes、servers、terminal、editor、appStore。`sweepExpiredHandoffs` 属于 SFTP 凭据交接，overlay 不需要 |
+| P0-5 预取并行 | `overlay/prefetch.ts`、`overlay/images.ts` | boot 模块在 React 与 overlay UI 求值前发起 init、读回与解码；`loadImage` 直接 `await image.decode()`；shortcut status 刷新推迟到底图提交后 |
+| P0-1 ready 握手 | `overlay_handoff.rs`（`screenshot_overlay_ready`，按 SESSION_GENERATION 匹配）；`OverlayInit.generation`；前端 layout effect | 实验关闭默认；N27/N28 用 scoped QA profile 显式开启，超时 1500 ms 为首轮探针值，不是最终默认承诺。loadError 分支也发 ready（payload 已知时）。N27 两组各 20 次分别观察原串行建窗握手和 P1 候选，第 6 项未取得 native 比例前不启用生产默认 |
+| P1-2 建窗并行 | `overlay_open.rs` | 权限通过后立即在 blocking 线程 build 隐藏窗口，与 hide/截图并行；`screenshot_overlay_init` 在有进行中的 open 时等待 payload；后端 open 进行中 `screenshot_capture_full` 拒绝执行；原生 overlay 窗口内不再回退 `captureFull()`，仅浏览器/dev 直开保留 |
+| P1-3 Linux 重叠 | `capture/overlap.rs` | 同一 blocking 线程：open（portal 会话 + PipeWire，或 X11 capturer）→ 等带时间戳的隐藏完成信号 → 排空至少 250 ms，拒绝信号前或缺失时间戳的帧。无新帧则先完整 Drop 原 source，再串行新建安全重试；取消传到 portal consent 和首帧等待，worker 清理结束后才释放租约。会话不留存不复用，`PersistMode::DoNot` 不变。PipeWire captured_at 现为 callback 接收时间，非 producer PTS，此限制需 native 标记像素验收 |
+| P1-6 排除自身窗口 | `capture_exclusion.rs` | 仅显式实验候选：Windows API 在 build ≥ 19041 可用，macOS 主版本 15 是待测候选，不代表已像素验证。默认关闭，N28 先读回校验、真实对照图像验证与撤销验证，通过后才建立具体 OS 白名单。顺序：排除 → 截图 → show overlay → 隐藏应用窗口 → 撤销排除；任何错误路径及 UI 回调超时后的 send 失败均由 `Drop` 撤销 |
+| 回退开关 | `startup_profile.rs` | `TAOMNI_SCREENSHOT_STARTUP=legacy` 恢复串行路径；`-early-window`、`-handshake`、`-transparent`、`-overlap`、`-exclusion`、`ready-timeout=<ms>` 单项控制 |
+
+### 6.2 未做与原因
+
+- P1-1 预热复用 overlay：依赖第 6 项（隐藏窗口是否执行 JS 与解码）。P1-2 已让渲染进程在隐藏期间加载，N27 的 `readyBeforeShow` 比例就是第 6 项的观测数据；比例与慢机数据出来前不做常驻窗口。
+- P1-4 X11 条件化 hide：第 13 项未关闭，650 ms 不变。
+- P1-7 枚举去重：低优先级，未做。
+- 650 ms、250 ms 排空、HIDE_SETTLE、`focus_capture_window` 重试均未改。
+
+### 6.3 用例
+
+| 用例 | 变化 | 覆盖 |
+|---|---|---|
+| TC-SHOT-N27 | 修改：两组各 20 次打开（串行建窗握手探针／优化候选），后端子段 + 渲染进程标记 + 每组 P50/P95 + 握手比例，逐次关闭和恢复断言及增量证据，`timeout_sec: 600` | P0-0b、P0-3/P0-5 定量、第 6 项 |
+| TC-SHOT-N28 | 新增：`startup-isolation`（主窗口品红标记；对照截图必须含标记；排除 API 生效与撤销；5 次生产打开底图标记像素为 0、会话中主窗口隐藏、关闭后恢复）+ `startup-flash`（独立 OS 像素采样进程，Wayland 用 job-owned GNOME Shell Screenshot stage grid，不建第二个 portal；保存真实采样时间区间、最大间隔 ≤100ms，show 后不得出现整屏均匀帧，缺失/超时必须失败而非绿色跳过） | I1、I6、P1-2、P1-3、P1-6、P0-1b、P0-1 |
+| TC-SHOT-040 | 新增 browser 延迟 init：透明 loading、不提前选择、decode/ready 后选择、Cancel 与重开清空选区；026/027 保留旧参数断言并加入 ready IPC 顺序 | P0-1b、ready、重开生命周期 |
+| 单元测试 | `ScreenshotOverlayStartup.test.tsx`、`screenshotOverlayRoot.test.ts`、`screenshotOverlayBoot.test.ts`、`images.test.ts`、Rust `startup_timing`/`startup_profile`/`overlay_handoff`/`stage_trace` | 透明根背景、ready 一次且带 generation、预取消费、失败会话不截屏、入口不含主应用、decode 直连 |
+
+### 6.4 验证记录
+
+2026-11-01 本机 Windows 11（Node 22.22.2 / pnpm 10.30.1）：
+
+- 前端全套：662 文件通过，6180 测试通过，1 原有跳过（`qa-ui-auto-report/tmp/screenshot-unit-full-node22.log`）。后续修改原生与 QA 工具，不把旧证据冒充最终所有源码证据。
+- 截图 browser 首轮 39/41；026/027 因 ready IPC 新顺序失败，保留原参数检查后两项复跑通过；最终全组复跑中。新增 040 加载/重开通过；StrictMode 重放预取重复读回先红后绿；共享 WebView guards 4 项通过。
+- 原生 debug QA 候选构建成功（含完整 `pnpm build --mode qa` 与 refactor 检查）。N27/N28 已实际运行，WGC 读取显示器被本机执行环境拒绝：`You do not have permission to capture the given monitor. (0x80070005)`；两个 native case **失败，不计通过**，保留 run `run-20261101-221939-942182400`。
+- Python 新 sampler/broker 11 项与 scenario runner 8 项通过；Windows 不支持无权限 symlink 的既有工具单测不计通过；Linux-only 代码必须由 runner 编译/原生检查。
+- GitHub 仍需：三平台 browser/native、Linux 全部 `ubuntu-24.04-xvfb,ubuntu-22.04-x11,ubuntu-22.04-vnc,ubuntu-26.04-wayland`，先全部截图 + crash，再全量。无关截图的性能失败仅单独列明，不能改原始 receipt 为通过。尚无 runner 通过证据，任务未完成。

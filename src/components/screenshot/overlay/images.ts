@@ -1,20 +1,21 @@
 import { loadScreenshotUrl, revokeScreenshotUrl } from "../../../lib/screenshot";
 import { paintWatermark, type WatermarkSettings } from "../../../lib/screenshotImage";
 
-export function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    // WebKit can fire load before the bitmap is ready for drawImage. Publish
-    // only decoded pixels so an immediate export cannot become transparent.
-    image.onload = () => { image.decode().then(() => resolve(image), reject); };
-    image.onerror = () => reject(new Error("failed to load screenshot image"));
-    image.src = src;
-  });
+export async function loadImage(src: string): Promise<HTMLImageElement> {
+  const image = new Image();
+  image.src = src;
+  // decode() settles once the bitmap is loaded and decoded, without waiting
+  // for a load event first. WebKit can fire load before the bitmap is ready
+  // for drawImage, so publish only decoded pixels: an immediate export can
+  // never become transparent. A broken or missing image rejects here too.
+  await image.decode();
+  return image;
 }
 
 /** Load a backend artifact into an image backed by a same-origin URL. */
-export async function loadArtifact(path: string): Promise<{ img: HTMLImageElement; url: string; }> {
+export async function loadArtifact(path: string, onRead?: () => void): Promise<{ img: HTMLImageElement; url: string; }> {
   const url = await loadScreenshotUrl(path);
+  onRead?.();
   try {
     return { img: await loadImage(url), url };
   } catch (e) {

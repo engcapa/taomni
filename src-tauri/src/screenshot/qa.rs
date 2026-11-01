@@ -28,6 +28,10 @@ mod platform_evidence;
 pub use platform_evidence::*;
 mod startup_timing;
 pub use startup_timing::*;
+mod startup_isolation;
+pub use startup_isolation::*;
+mod startup_flash;
+pub use startup_flash::*;
 #[cfg(test)]
 mod tests;
 

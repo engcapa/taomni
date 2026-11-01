@@ -174,7 +174,7 @@ jobs:
         run: node --test .agents/skills/qa-ui-auto/scripts/test_language_startup_observer.mjs .agents/skills/qa-ui-auto/scripts/test_native_language_startup_observer.mjs .agents/skills/qa-ui-auto/scripts/test_sdk_action_trace.mjs .agents/skills/qa-ui-auto/scripts/test_file_open_probe.mjs .agents/skills/qa-ui-auto/scripts/test_native_paced_input.mjs
       - name: Wayland automation contracts
         if: inputs.scope != 'selected'
-        run: python -m unittest test_wayland_tools test_multi_display test_ci_wayland_startup
+        run: python -m unittest test_wayland_tools test_multi_display test_ci_wayland_startup test_ci_wayland_capture test_screenshot_flash_sampler
 
   plan:
     runs-on: ubuntu-24.04

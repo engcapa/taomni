@@ -693,6 +693,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "screenshot_probe"
         | "screenshot_open_overlay"
         | "screenshot_overlay_init"
+        | "screenshot_overlay_ready"
         | "screenshot_overlay_update"
         | "screenshot_close_overlay"
         | "screenshot_pin_to_screen"
@@ -752,6 +753,8 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "screenshot_qa_hotkey"
         | "screenshot_qa_escape_entry"
         | "screenshot_qa_startup_timing"
+        | "screenshot_qa_startup_isolation"
+        | "screenshot_qa_startup_flash"
         | "screenshot_qa_x11_compositor_bypass" => screenshot::handle(invoke),
         "notes_list"
         | "notes_get"
