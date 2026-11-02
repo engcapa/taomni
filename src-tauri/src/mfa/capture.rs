@@ -148,7 +148,10 @@ fn capture_all_monitors() -> Result<Vec<LumaFrame>, String> {
 /// Retain the actual decoder input only in the isolated hosted QA app.
 /// The normal app never writes screen scans. This is evidence, not a second
 /// capture or a replacement result; all errors remain those of the real scan.
-pub(super) fn retain_hosted_qa_scan<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>, bytes: &[u8]) {
+pub(super) fn retain_hosted_qa_scan<R: tauri::Runtime>(
+    window: &tauri::WebviewWindow<R>,
+    bytes: &[u8],
+) {
     use tauri::Manager;
     if !cfg!(debug_assertions)
         || window.app_handle().config().identifier != crate::QA_APP_ID

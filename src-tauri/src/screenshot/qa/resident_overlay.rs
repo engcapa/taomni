@@ -155,7 +155,11 @@ pub async fn screenshot_qa_resident_overlay(app: AppHandle) -> Result<String, St
                 anyhow::ensure!(init.generation > previous, "session generation did not advance");
             }
             previous_generation = Some(init.generation);
-            let notes = super::super::startup_timing::snapshot().notes;
+            let timing = super::super::startup_timing::snapshot();
+            trace.mark("startup-evidence", json!({"index":index, "stages":timing.stages,
+                "notes":timing.notes, "renderer":eval_raw(&window,
+                    "window.__TAOMNI_OVERLAY_TIMING__ ?? null".into(), Duration::from_secs(1)).await}));
+            let notes = timing.notes;
             anyhow::ensure!(notes.get("windowReused") == Some(&json!(true)), "prewarmed/resident native window was rebuilt");
             anyhow::ensure!(notes.get("readyBeforeShow") == Some(&json!(true)), "resident frame was shown before readiness");
             let path = init.path.clone();
