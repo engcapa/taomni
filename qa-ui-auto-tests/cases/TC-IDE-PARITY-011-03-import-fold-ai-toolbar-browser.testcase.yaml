@@ -1,6 +1,7 @@
 id: TC-IDE-PARITY-011-03
 title: Default import folding and user-selection-only AI toolbar
-description: 'ED-PARITY-011 A4 browser case: a reopened Java file shows its import block folded (IDEA default), a Find match selection does not raise the AI selection toolbar, and a Shift+Arrow extend does.
+description: 'ED-PARITY-011 A4 browser case: a reopened Java file shows its import block folded (IDEA default), a Find match selection does not raise the AI selection
+  toolbar, and a Shift+Arrow extend does.
 
 
   Mode: browser.
@@ -58,6 +59,10 @@ steps:
     selector: '[data-testid="code-workspace-editor-tab-strip"] [data-active="true"]:not([data-dirty])'
     timeout_sec: 10
 - press: Control+F4
+- wait_for:
+    selector: '[data-testid="code-workspace-editor-tab-strip"] [data-editor-tab-key$="Demo011.java"]'
+    state: hidden
+    timeout_sec: 10
 - click: '[data-testid="code-workspace-tab"]'
 - press: Control+Shift+N
 - wait_for:
@@ -107,27 +112,27 @@ verification:
     requirement: A4/DEC-011-06：含两条 import 的 Java 文件重新打开后 import 块默认折叠为一行。
     actions:
     - 20
-    - 30
+    - 31
     checkpoints:
-    - step: 32
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-foldPlaceholder", "timeout_sec": 10}}'
     - step: 33
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-foldPlaceholder", "timeout_sec": 10}}'
+    - step: 34
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line:has-text(\"import\")", "equal": 1}}'
     results:
-    - 32
     - 33
+    - 34
   - id: R2
     requirement: A4/DEC-011-07：Find 选中匹配后 Esc 不出现 AI 工具条；Shift+方向键扩选出现。
     actions:
-    - 38
+    - 39
     checkpoints:
-    - step: 41
+    - step: 42
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-ai-selection-toolbar\"]", "equal": 0}}'
-    - step: 47
+    - step: 48
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-ai-selection-toolbar\"]"}'
     results:
-    - 41
-    - 47
+    - 42
+    - 48
   visual:
   - check: 检查 widget 与 tab 胶囊/图标需对照 IDEA idea-03/idea-29。
     method: manual
