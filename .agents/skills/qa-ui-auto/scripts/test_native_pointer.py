@@ -107,6 +107,13 @@ class NativePointerReadinessTest(TestCase):
         self.assertGreaterEqual(self.now, 0.15)
         self.assertTrue(all(c.args[1].endswith('/execute/sync') for c in self.session.request.call_args_list))
 
+    def test_subpixel_webkit_dimension_jitter_keeps_the_same_physical_target(self):
+        first = {**self.geometry(), "width": 738.0000000000001}
+        second = {**self.geometry(), "width": 738.0}
+        self.session.request.side_effect = [first, second]
+        self.assertEqual(prepare_pointer_target(self.session, self.origin), {'x': 270, 'y': 217})
+        self.assertEqual(self.session.request.call_count, 2)
+
     def test_covered_point_cannot_satisfy_stability_until_uncovered(self):
         self.session.request.side_effect = [self.geometry(ready=False), None, self.geometry(ready=False),
                                             self.geometry(), self.geometry()]

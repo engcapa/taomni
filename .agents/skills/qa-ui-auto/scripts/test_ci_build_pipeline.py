@@ -21,6 +21,8 @@ class BuildPipelineTests(unittest.TestCase):
         self.assertEqual(step['if'], "runner.os == 'Linux' && inputs.operation == 'build'")
         self.assertIn('pnpm check:refactor', step['run'])
         for path in ('src/components/mail/MailClientTab.test.tsx',
+                     'src/components/mail/MailHtmlReader.lifecycle.test.tsx',
+                     'src/components/editor/workspace/CodeMirrorHost.loadingViewState.test.tsx',
                      'src/components/screenshot/overlay/prefetch.test.ts',
                      'src/components/editor/workspace/useMarkdownPreviewSearch.test.tsx'):
             self.assertIn(path, step['run'])

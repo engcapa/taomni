@@ -90,6 +90,7 @@ def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
     end = time.monotonic() + timeout
     previous = None
     last = None
+    samples = []
     centered = False
     while True:
         if session.deadline:
@@ -101,7 +102,12 @@ def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
                 or any(isinstance(last.get(k), bool) or not isinstance(last.get(k), (int, float))
                        or not math.isfinite(last[k]) for k in ("x", "y", "width", "height"))):
             raise WebDriverError("invalid native pointer target geometry")
-        current = tuple(last[k] for k in ("x", "y", "width", "height")) if last["ready"] else None
+        # WebKit can alternate fractional layout dimensions while the physical
+        # pointer point stays unchanged. Compare dimensions at pixel precision;
+        # movement, coverage and meaningful resizing must still settle.
+        current = tuple(round(last[k]) for k in ("x", "y", "width", "height")) if last["ready"] else None
+        samples.append(last)
+        samples = samples[-6:]
         if current is not None and current == previous:
             return {"x": int(last["x"]), "y": int(last["y"])}
         previous = current
@@ -117,7 +123,7 @@ def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
             })
         remaining = end - time.monotonic()
         if remaining <= 0:
-            raise WebDriverError(f"native pointer target did not become stable and hit-testable: {last}")
+            raise WebDriverError(f"native pointer target did not become stable and hit-testable: {last}; recent geometry: {samples}")
         if session.deadline:
             remaining = min(remaining, session.deadline.remaining())
         time.sleep(min(0.05, remaining))

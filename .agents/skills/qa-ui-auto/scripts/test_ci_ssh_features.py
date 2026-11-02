@@ -1,12 +1,54 @@
 """Authenticated Cygwin installation, owned SSH homes and SCP receipt paths."""
 import os
 from pathlib import Path, PureWindowsPath
+import hashlib
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
 import ci_ssh_features
 from ci_ssh_features import prepare_cygwin_home, transfer_paths
+
+
+class CygwinInstallerTest(unittest.TestCase):
+    def test_versioned_installer_is_verified_before_execution_and_publication(self):
+        from ci_ssh_features import CYGWIN_SETUP_URL, install
+
+        payload = b"verified test installer"
+        with tempfile.TemporaryDirectory() as directory:
+            env_file = Path(directory) / "github-env"
+            with patch.dict(os.environ, {"RUNNER_TEMP": directory, "GITHUB_ENV": str(env_file)}), \
+                    patch("ci_ssh_features.platform.system", return_value="Windows"), \
+                    patch("ci_ssh_features.CYGWIN_SETUP_SHA256", hashlib.sha256(payload).hexdigest()), \
+                    patch("ci_ssh_features.urllib.request.urlretrieve",
+                          side_effect=lambda url, path: path.write_bytes(payload)) as download, \
+                    patch("ci_ssh_features.subprocess.run") as execute:
+                execute.return_value.returncode = 0
+                install()
+                self.assertRegex(CYGWIN_SETUP_URL, r"/setup/setup-\d+\.\d+\.x86_64\.exe$")
+                download.assert_called_once()
+                url, destination = download.call_args.args
+                self.assertEqual(url, CYGWIN_SETUP_URL)
+                self.assertEqual(destination.name, "setup.exe")
+                self.assertEqual(destination.parent.parent, Path(directory))
+                self.assertFalse(destination.parent.exists())
+                self.assertEqual(execute.call_count, 1)
+                self.assertIn("QA_CYGWIN_ROOT=", env_file.read_text())
+
+    def test_checksum_mismatch_cannot_execute_or_publish_the_installation(self):
+        from ci_ssh_features import install
+
+        with tempfile.TemporaryDirectory() as directory:
+            env_file = Path(directory) / "github-env"
+            with patch.dict(os.environ, {"RUNNER_TEMP": directory, "GITHUB_ENV": str(env_file)}), \
+                    patch("ci_ssh_features.platform.system", return_value="Windows"), \
+                    patch("ci_ssh_features.urllib.request.urlretrieve",
+                          side_effect=lambda url, path: path.write_bytes(b"unexpected installer")), \
+                    patch("ci_ssh_features.subprocess.run") as execute:
+                with self.assertRaisesRegex(RuntimeError, "checksum"):
+                    install()
+                execute.assert_not_called()
+                self.assertFalse(env_file.exists())
 
 
 class TransferPathsTest(unittest.TestCase):
@@ -44,9 +86,9 @@ class CygwinInstallTest(unittest.TestCase):
 
     def test_official_versioned_archive_keeps_the_authenticated_pin(self):
         self.assertEqual(ci_ssh_features.CYGWIN_SETUP_URL,
-                         "https://cygwin.com/setup/setup-2.937.x86_64.exe")
+                         "https://cygwin.com/setup/setup-2.941.x86_64.exe")
         self.assertEqual(ci_ssh_features.CYGWIN_SETUP_SHA256,
-                         "2c9f2fb56e1fb687b5d9680afa8f8b06e6214f0e483096af0eae1946431226c5")
+                         "9d31ffc08b14eaaf5ddf15799a934f6bc1be3d87ed986736cb1980c508ed9502")
 
     def test_only_verified_installer_runs_in_a_fresh_directory_per_attempt(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -55,7 +97,7 @@ class CygwinInstallTest(unittest.TestCase):
             downloads = []
 
             def download(url, destination):
-                self.assertEqual(url, "https://cygwin.com/setup/setup-2.937.x86_64.exe")
+                self.assertEqual(url, "https://cygwin.com/setup/setup-2.941.x86_64.exe")
                 path = Path(destination)
                 self.assertEqual(path.parent.parent, root)
                 self.assertEqual(list(path.parent.iterdir()), [])

@@ -23,13 +23,11 @@ import time
 import urllib.request
 import shutil
 
-
-# Keep the versioned archive paired with its pin: setup-x86_64.exe is rolling.
-# Verified 2026-11-02 with the archive's .sig and https://cygwin.com/key/pubring.asc;
-# signer 56405CF6FCC81574682A5D561A698DE9E2E56300 matches
-# https://cygwin.com/install.html#verify-sig. Re-verify before updating either.
-CYGWIN_SETUP_URL = "https://cygwin.com/setup/setup-2.937.x86_64.exe"
-CYGWIN_SETUP_SHA256 = "2c9f2fb56e1fb687b5d9680afa8f8b06e6214f0e483096af0eae1946431226c5"
+# Keep main's versioned archive paired with its authenticated pin:
+# setup-x86_64.exe is rolling. Archive digest verification is recorded in
+# docs-issue/ci-run-41359273298.md. Re-verify before updating either value.
+CYGWIN_SETUP_URL = "https://cygwin.com/setup/setup-2.941.x86_64.exe"
+CYGWIN_SETUP_SHA256 = "9d31ffc08b14eaaf5ddf15799a934f6bc1be3d87ed986736cb1980c508ed9502"
 
 
 def transfer_paths(remote_dir: PurePath, remote_posix: str, local_dir: PurePath) -> dict[str, str]:

@@ -1,7 +1,9 @@
 import type { EditorView } from "@codemirror/view";
 import type { RefObject } from "react";
+import { foldEffect } from "@codemirror/language";
+import { importFoldRange } from "../importFold";
 import type { PersistedEditorViewState } from "../workspaceLayoutPersistence";
-import { applyPersistedEditorViewState, captureEditorViewState } from "./viewState";
+import { applyPersistedEditorViewState, captureEditorViewState, importFoldPathByView } from "./viewState";
 
 interface ViewStateRefs {
   viewRef: RefObject<EditorView | null>;
@@ -15,6 +17,8 @@ interface ViewStateLifecycleContext {
   view: EditorView;
   refs: ViewStateRefs;
   documentReady: boolean;
+  path: string;
+  cached: boolean;
   initialState: PersistedEditorViewState | null;
   callback: { callback: ((state: PersistedEditorViewState) => void) | undefined };
   onRestored: (view: EditorView) => void;
@@ -74,6 +78,17 @@ export function createEditorViewStateLifecycle(context: ViewStateLifecycleContex
       initialized = true;
       // A loading placeholder must never consume a persisted snapshot. The
       // caller invokes this again after the real document is reconciled.
+      const importFold = importFoldRange(context.path, view.state.doc.toString());
+      if (importFold) {
+        importFoldPathByView.set(view, context.path);
+        // Defaults belong to the first real document, not its empty read
+        // placeholder. Cached folds and a user's expansion remain authoritative.
+        if (!context.cached && !interacted && context.initialState?.importsExpanded !== true) {
+          view.dispatch({ effects: foldEffect.of(importFold) });
+        }
+      } else {
+        importFoldPathByView.delete(view);
+      }
       if (context.initialState && !interacted) {
         refs.userInteractedSinceMountRef.current = false;
         refs.restoringInitialViewStateRef.current = true;

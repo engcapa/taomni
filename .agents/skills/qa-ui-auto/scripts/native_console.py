@@ -4,6 +4,7 @@ Installed idempotently after navigation; the document owns listeners and release
 them on reload. Keep diagnostics independent from product code and UI state.
 """
 
+from native_frame_errors import FRAME_RUNTIME_ERROR_HOOK_SCRIPT
 from native_resize_observer import RESIZE_OBSERVER_HOOK_SCRIPT
 from native_editor_selection import EDITOR_SELECTION_HOOK_SCRIPT
 
@@ -178,5 +179,4 @@ if (!window.__QA_UI_AUTO_CONSOLE__) {
     });
   });
 }
-return true;
-"""
+""" + FRAME_RUNTIME_ERROR_HOOK_SCRIPT + "\nreturn true;\n"
