@@ -134,7 +134,7 @@ jobs:
         with:
           mode: contracts
       - name: QA case and control catalog
-        run: python -m unittest test_control_coverage_window && python -m qa_ui_auto.audit --gate
+        run: python -m unittest test_control_coverage_window test_window_context && python -m qa_ui_auto.audit --gate
       - name: TypeScript and source boundaries
         run: pnpm exec tsc -b && pnpm check:refactor
       - name: SFTP lifecycle, navigation and floating controls
