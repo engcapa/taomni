@@ -81,10 +81,12 @@ export function registerMainLayoutLifecycle2Cases() {
     expect(windowOpenSpy).toHaveBeenCalledTimes(1);
     expect(screen.queryByTestId("sftp-sidebar")).not.toBeInTheDocument();
 
-    // Click SFTP button now that it's detached (should call window.open again, NOT open sidebar)
+    // The same entry restores the side panel even when the popup was blocked.
     fireEvent.click(screen.getByRole("button", { name: /sftp/i }));
-    expect(windowOpenSpy).toHaveBeenCalledTimes(2);
-    expect(screen.queryByTestId("sftp-sidebar")).not.toBeInTheDocument();
+    expect(windowOpenSpy).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("sftp-sidebar")).toBeInTheDocument();
+    expect(terminalLifecycle.mounted).toHaveBeenCalledTimes(1);
+    expect(terminalLifecycle.unmounted).not.toHaveBeenCalled();
 
     windowOpenSpy.mockRestore();
   });
