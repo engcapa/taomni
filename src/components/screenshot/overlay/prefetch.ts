@@ -3,7 +3,7 @@
 // and the overlay UI. The init effect consumes the result; without a
 // prefetch it loads the same payload itself.
 
-import { captureFull, fetchOverlayInit, isScreenshotOverlayWindow, type OverlayInit } from "../../../lib/screenshot";
+import { captureFull, fetchOverlayInit, isScreenshotOverlayWindow, revokeScreenshotUrl, type OverlayInit } from "../../../lib/screenshot";
 import { loadArtifact } from "./images";
 import { markOverlayStartup } from "./startupTiming";
 
@@ -53,6 +53,12 @@ export function takeOverlayPrefetch(): Promise<OverlayPayload> | null {
   return prefetched;
 }
 
+/** An idle host can outlive an early load whose child never mounted. */
+export function discardOverlayPrefetch(): void {
+  const prefetched = takeOverlayPrefetch();
+  if (prefetched) void prefetched.then(({ url }) => revokeScreenshotUrl(url), () => undefined);
+}
+
 /**
  * The overlay payload: the prefetched one, or a fresh load. Only a missing
  * backend session in a dev/browser direct open falls back to a live capture.
@@ -60,13 +66,17 @@ export function takeOverlayPrefetch(): Promise<OverlayPayload> | null {
  * session failed or was cancelled it must not capture while the app windows
  * may be visible again.
  */
-export async function resolveOverlayPayload(): Promise<OverlayPayload> {
+export async function resolveOverlayPayload(generation?: number): Promise<OverlayPayload> {
   const prefetched = takeOverlayPrefetch();
   if (prefetched) {
     try {
-      return await prefetched;
+      const payload = await prefetched;
+      if (generation === undefined || payload.init.generation === generation) return payload;
+      revokeScreenshotUrl(payload.url);
     } catch (error) {
-      if (!isNoPendingOverlay(error)) throw error;
+      const failedGeneration = failedOverlayGeneration(error);
+      if (!isNoPendingOverlay(error)
+        && (generation === undefined || failedGeneration === generation)) throw error;
     }
   }
   let init: OverlayInit;
@@ -77,5 +87,6 @@ export async function resolveOverlayPayload(): Promise<OverlayPayload> {
     const file = await captureFull();
     init = { path: file.path, displayId: "", width: file.width, height: file.height, scaleFactor: 1 };
   }
+  if (generation !== undefined && init.generation !== generation) throw new Error("screenshot session changed while loading");
   return loadPayload(init);
 }

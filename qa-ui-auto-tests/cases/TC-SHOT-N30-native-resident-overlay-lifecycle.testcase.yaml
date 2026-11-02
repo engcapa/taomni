@@ -1,6 +1,6 @@
 id: TC-SHOT-N30
 title: Resident native screenshot WebView remounts each generation and releases all session ownership
-description: "P1-1 production default and guarded native ownership scenario. Before any capture, prewarm must produce an invisible empty renderer with no payload/lease/hidden ledger; the first and next two opens must reuse it. Three opens retain the same native WebView identity while remounting complete screenshot state by generation. Each starts in select with a new decoded image and no prior crop or annotation, then creates both. IPC close and a native CloseRequested retire to an invisible empty renderer, purge the previous artifact, restore main, and release the cross-process lease. The third open must not be destroyed by a stale close/reset. This is not process-cold or unmeasured speedup evidence. Original control, recorder, scroll, focus, pin and mixed-DPI cases remain required in the complete screenshot suite."
+description: "P1-1 production default and guarded native ownership scenario. Before any capture, prewarm must produce an invisible empty renderer with no payload/lease/hidden ledger; the first and next two opens must reuse it. Three opens retain the same native WebView identity while remounting complete screenshot state by generation. Each starts in select with a new decoded image and no prior crop or annotation, then creates both. IPC close and a native CloseRequested retire to an invisible empty renderer, purge the previous artifact, restore main, and release the cross-process lease. The third open must not be destroyed by a stale close/reset; both a retired IPC close and the generation-qualified deferred native cleanup are invoked against the current session and must be ignored. This is not process-cold or unmeasured speedup evidence. Original control, recorder, scroll, focus, pin and mixed-DPI cases remain required in the complete screenshot suite."
 covers: [F27.1]
 tags: [screenshot, native, p1]
 modes: [native]
@@ -20,7 +20,7 @@ verification:
     requirement: Reuse only the hidden window, not capture or editable state; each generation must load a fresh decoded image and signal readiness before show.
     actions: [1, 2]
     checkpoints:
-    - {step: 3, expectation: "Three rounds have identical WebView identity, strictly increasing generations, no prior crop/annotations at each start, natural image dimensions, readyBeforeShow true and windowReused true on all rounds including the first prewarmed entry. Each round can create a crop and annotation."}
+    - {step: 3, expectation: "Three rounds have identical WebView identity, strictly increasing generations, no prior crop/annotations at each start, natural image dimensions, readyBeforeShow true and windowReused true on all rounds including the first prewarmed entry. Each round can create a crop and annotation, staleNativeCloseIgnored is true, and the current payload remains owned after stale IPC and deferred-native closes."}
     results: [3]
   - id: resident-cleanup
     requirement: Closing by IPC or native close must restore the main window and release images, artifacts and the cross-process lease without accidentally ending the next session.

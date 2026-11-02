@@ -181,21 +181,22 @@ pub(super) fn retire(window: &WebviewWindow) -> Result<bool, String> {
 /// Only an active screenshot CloseRequested is intercepted. A recording has
 /// already transferred ToolState.overlay to None; its close must still destroy
 /// this surface rather than restore windows or reopen an idle overlay.
-pub(super) fn intercept_close() -> Option<bool> {
-    if tool_state().overlay.is_none() {
-        return None;
-    }
+pub(super) fn intercept_close() -> Option<(u64, bool)> {
+    let generation = tool_state().overlay.as_ref()?.generation;
     let mut owner = RESIDENT.lock().unwrap_or_else(|p| p.into_inner());
-    if let Some(slot) = owner.as_mut().filter(|slot| slot.phase == Phase::Active) {
+    if let Some(slot) = owner
+        .as_mut()
+        .filter(|slot| slot.generation == generation && slot.phase == Phase::Active)
+    {
         slot.phase = Phase::Closing;
-        Some(true)
+        Some((generation, true))
     } else {
         // A second close event must not destroy the surface or enqueue cleanup
         // that could later retire an unrelated next session.
         owner
             .as_ref()
-            .filter(|slot| slot.phase == Phase::Closing)
-            .map(|_| false)
+            .filter(|slot| slot.generation == generation && slot.phase == Phase::Closing)
+            .map(|_| (generation, false))
     }
 }
 

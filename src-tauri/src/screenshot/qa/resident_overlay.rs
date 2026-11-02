@@ -113,6 +113,8 @@ pub async fn screenshot_qa_resident_overlay(app: AppHandle) -> Result<String, St
             let window = wait_window(&app, super::super::OVERLAY_LABEL, Duration::from_secs(10)).await?;
             let init = super::super::screenshot_overlay_init().await.map_err(anyhow::Error::msg)?;
             if let Some(stale) = init.generation.checked_sub(1) {
+                anyhow::ensure!(!super::super::overlay_session::close_session_if_current(&app, stale),
+                    "deferred native close claimed a newer session");
                 super::super::screenshot_close_overlay(app.clone(), Some(stale))
                     .await.map_err(anyhow::Error::msg)?;
                 anyhow::ensure!(super::super::tool_state().overlay.as_ref()
@@ -170,7 +172,7 @@ pub async fn screenshot_qa_resident_overlay(app: AppHandle) -> Result<String, St
             anyhow::ensure!(!std::path::Path::new(&path).exists(), "retired screenshot artifact was not purged");
             rounds.push(json!({"index":index, "view":view, "idle":idle,
                 "windowReused":notes.get("windowReused").cloned().unwrap_or(json!(false)), "readyBeforeShow":notes.get("readyBeforeShow"),
-                "artifactPurged":true}));
+                "artifactPurged":true, "staleNativeCloseIgnored":true}));
         }
         // Keep original controls/scroll/recorder and mixed-DPI acceptance in
         // their existing cases; this scenario proves the resident owner itself.

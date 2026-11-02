@@ -4,8 +4,8 @@ use crate::screenshot::capture;
 use crate::screenshot::edit;
 use crate::screenshot::model::OverlayInit;
 use crate::screenshot::overlay_handoff;
-use crate::screenshot::overlay_session::close_session;
 use crate::screenshot::overlay_session::open_overlay_with_window;
+use crate::screenshot::overlay_session::{close_session, close_session_if_current};
 use crate::screenshot::pins;
 use crate::screenshot::runtime::SESSION_GENERATION;
 use crate::screenshot::runtime::blocking;
@@ -153,10 +153,10 @@ pub async fn screenshot_close_overlay(
 ) -> Result<(), String> {
     // A resident WebView can finish a copy/dialog from a retired generation.
     // Legacy callers omit this field; current renderers echo their payload.
-    if generation.is_some_and(|generation| generation != SESSION_GENERATION.load(Ordering::SeqCst))
-    {
-        return Ok(());
+    if let Some(generation) = generation {
+        close_session_if_current(&app, generation);
+    } else {
+        close_session(&app);
     }
-    close_session(&app);
     Ok(())
 }

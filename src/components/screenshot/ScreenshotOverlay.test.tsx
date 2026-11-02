@@ -10,6 +10,8 @@ const api = vi.hoisted(() => ({
   saveImageToFile: vi.fn(), pinToScreen: vi.fn(), ocrImage: vi.fn(), autoRedact: vi.fn(),
   scrollCapture: vi.fn(), scrollPlan: vi.fn(), openImageEditor: vi.fn(), updateOverlayImage: vi.fn(), startRecording: vi.fn(),
 }));
+const dialogs = vi.hoisted(() => ({ save: vi.fn(), open: vi.fn() }));
+vi.mock("@tauri-apps/plugin-dialog", () => dialogs);
 vi.mock("../../lib/screenshot", async (original) => ({
   ...await original<typeof import("../../lib/screenshot")>(), ...api,
 }));
@@ -51,6 +53,24 @@ function drag(id: string, from: [number, number], to: [number, number]) {
 const shapes = () => screen.getByTestId("screenshot-annotation-canvas").getAttribute("data-shapes");
 
 describe("ScreenshotOverlay", () => {
+  it("a retired export cannot open a Save dialog over the next resident generation", async () => {
+    let finishExport!: (file: { path: string; width: number; height: number }) => void;
+    api.saveDataUrl.mockReturnValueOnce(new Promise((resolve) => { finishExport = resolve; }));
+    const first = render(<ScreenshotOverlay />);
+    await screen.findByTestId("screenshot-hint");
+    drag("screenshot-select-layer", [100, 100], [500, 400]);
+    fireEvent.click(screen.getByTestId("screenshot-save"));
+    await waitFor(() => expect(api.saveDataUrl).toHaveBeenCalledOnce());
+    first.unmount();
+    render(<ScreenshotOverlay />);
+    await screen.findByTestId("screenshot-hint");
+    await act(async () => finishExport({ path: "retired-export.png", width: 400, height: 300 }));
+    expect(dialogs.save).not.toHaveBeenCalled();
+    expect(api.saveImageToFile).not.toHaveBeenCalled();
+    expect(api.closeScreenshotOverlay).not.toHaveBeenCalled();
+    expect(screen.getByTestId("screenshot-overlay")).toHaveAttribute("data-phase", "select");
+  });
+
   it("a retired copy cannot close the next resident generation", async () => {
     let finishCopy!: () => void;
     api.copyImageToClipboard.mockReturnValueOnce(new Promise<void>((resolve) => { finishCopy = resolve; }));

@@ -118,8 +118,9 @@ export function useScreenshotActions(context: UseScreenshotActionsContext) {
       let editor: string | undefined;
       if (choose) {
         const { open } = await import("@tauri-apps/plugin-dialog");
+        if (!state.isCurrent()) return;
         const selected = await open({ title: state.t("screenshot.chooseEditor"), multiple: false, directory: false });
-        if (typeof selected !== "string") return;
+        if (!state.isCurrent() || typeof selected !== "string") return;
         editor = selected;
       }
       const file = await saveDataUrl(await exportCropped());
@@ -176,7 +177,9 @@ export function useScreenshotActions(context: UseScreenshotActionsContext) {
     runBusy(async () => {
       try {
         const file = await saveDataUrl(await exportCropped());
+        if (!state.isCurrent()) return;
         const { save } = await import("@tauri-apps/plugin-dialog");
+        if (!state.isCurrent()) return;
         const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
         const dest = await save({
           title: state.t("screenshot.save"),

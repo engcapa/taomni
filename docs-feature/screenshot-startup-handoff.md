@@ -210,4 +210,11 @@
 | Ubuntu 22.04 VNC | 1193/1204 | 986/993 | 981/985 | 1140/1149 |
 | Ubuntu 26.04 Wayland | 1285/1308 | 1285/1297 | 1262/1286 | 1419/1444 |
 
-`firstMs=max(show, renderer commit)` 不是独立原生第一像素测量，`selectMs` 是后端 focus 完成后才读取的可选区轮询。三组均包含新的前端入口，不能称为原始 main 与最终版本的严格匹配对照；也不是慢机、进程冷启动或 4K 数据。Windows/macOS 收益明显，Linux 仍受未改的 650ms 隐藏、250ms 排空及每次 Wayland 新授权／首帧约束，不宣称全平台“瞬时”。P1-4 门槛未满足，650ms 不缩短。最终格式与工具修正后正在本机匹配 release 批量复验，随后 `scope=all` 三端与四 Linux profile 全量验收；全量结果未收齐前任务不标完成。
+`firstMs=max(show, renderer commit)` 不是独立原生第一像素测量，`selectMs` 是后端 focus 完成后才读取的可选区轮询。三组均包含新的前端入口，不能称为原始 main 与最终版本的严格匹配对照；也不是慢机、进程冷启动或 4K 数据。Windows/macOS 收益明显，Linux 仍受未改的 650ms 隐藏、250ms 排空及每次 Wayland 新授权／首帧约束，不宣称全平台“瞬时”。P1-4 门槛未满足，650ms 不缩短。最终格式与工具修正后本机 `run-20261102-102243-508566600` release 截图＋crash 34/34、browser `run-20261102-102919-110636400` 49/49 通过，均 identity_stable true、receipt 完整；全量结果未满足约定范围前任务不标完成。
+
+### 6.5 全量与所有权收尾（2026-11-02）
+
+- 首次 `scope=all` [`41377822416`](https://github.com/engcapa/taomni/actions/runs/41377822416)，`295b27b8`，三端／Linux 四 profile，计划 3175 次、40 entries：实际 2797 通过、22 失败，Windows 一组 browser 和四组 native 在 Cygwin 准备阶段未执行，不能写成全量通过。多数失败是无关编辑器响应预算；用户再次明确其它功能性能类失败可先忽略，原始 summary／receipt 和严格失败不变。非性能失败（MFA 无二维码反馈、Java 默认 import 折叠、mail 对话框点击）单独复核，未用该豁免掩盖。终端 burst 的失败段原始 IPC 流完整、无缺索引，2MiB SHA-256 与期望完全一致，但 UI done marker 观察超时，不能称为渲染完整性通过。
+- 基础设施：Cygwin 原 hash 对应官方 2.937，但 rolling `setup-x86_64.exe` 已换版；改为官方版本化 URL，保留原 SHA-256。通过 detached signature 与官方 GPG 指纹 `56405CF6FCC81574682A5D561A698DE9E2E56300` 独立验签；每次在全新空目录下载，校验失败仍拒绝执行。Linux tool-contract 中模拟 Windows 重启的 test double 需创建新的 owned `driver.proc` 并断言新 PID 的只读完整性检查；生产隔离守卫与原 taskkill 树断言不变。
+- 复用审查补充：未消费的冷首次 prefetch 必须按 host generation 校验，旧 decoded URL／迟到读取在 idle 后释放，旧失败不能污染下一代；host 透传 typed generation，payload owner 每挂载绑定它。退役 Save／选择外部编辑器在发出 native dialog 前检查存活性。原生 CloseRequested 异步清理与 IPC close 用同一 generation 原子 claim，只有胜者执行原恢复／清理顺序；迟到 native cleanup 不得关闭新代，不修改 OPENING、SessionLease 或录屏／滚动守卫。
+- 新增 before-fix 回归实际失败（旧 prefetch 返回 generation 7 而非 8、旧 Save 打开 dialog），修复后 frontend 聚焦 48/48；Rust 聚焦 125/125（含两个并发 close claim 回归）通过，N30 补真实 native stale-cleanup 断言。`pnpm check:refactor`／Rust fmt／strict TypeScript 通过。完整前端 `screenshot-generation-units.log`：665 文件、6194 测试通过，1 原有 skip；匹配 release、最终截图＋crash 和全量重跑仍需收齐，不以旧源码通过替代。

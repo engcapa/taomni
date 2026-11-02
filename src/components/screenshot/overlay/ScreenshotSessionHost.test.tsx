@@ -2,8 +2,10 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { StrictMode, useEffect, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextScreenshotSession, ScreenshotSessionHost } from "./ScreenshotSessionHost";
+import { useScreenshotSessionGeneration } from "./sessionGeneration";
 
-const api = vi.hoisted(() => ({ listen: vi.fn(), begin: vi.fn(), invoke: vi.fn() }));
+const api = vi.hoisted(() => ({ listen: vi.fn(), begin: vi.fn(), invoke: vi.fn(), discard: vi.fn() }));
+vi.mock("./prefetch", () => ({ discardOverlayPrefetch: api.discard }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: api.invoke }));
 beforeEach(() => api.invoke.mockResolvedValue({ generation: 7, active: true }));
 vi.mock("@tauri-apps/api/window", () => ({ getCurrentWindow: () => ({ listen: api.listen }) }));
@@ -17,6 +19,21 @@ function Child({ release }: { release: () => void }) {
 }
 
 describe("native screenshot resident session owner", () => {
+  it("disposes an unconsumed cold prefetch on idle and supplies the next child's generation", async () => {
+    let handler!: (event: { payload: { generation: number; active: boolean } }) => void;
+    api.invoke.mockResolvedValueOnce(null);
+    api.listen.mockImplementation((_event, callback) => { handler = callback; return Promise.resolve(vi.fn()); });
+    function Generation() { return <span>generation {useScreenshotSessionGeneration()}</span>; }
+    render(<ScreenshotSessionHost><Generation /></ScreenshotSessionHost>);
+    await waitFor(() => expect(api.discard).toHaveBeenCalledOnce());
+    expect(screen.queryByText(/generation/)).not.toBeInTheDocument();
+    act(() => handler({ payload: { generation: 8, active: true } }));
+    expect(screen.getByText("generation 8")).toBeVisible();
+    act(() => handler({ payload: { generation: 8, active: false } }));
+    expect(api.discard).toHaveBeenCalledTimes(2);
+    act(() => handler({ payload: { generation: 9, active: true } }));
+    expect(screen.getByText("generation 9")).toBeVisible();
+  });
   it("registers the session listener before initial mount, unmounts on idle, then starts with fresh state", async () => {
     let handler!: (event: { payload: { generation: number; active: boolean } }) => void;
     let installed!: (stop: () => void) => void;

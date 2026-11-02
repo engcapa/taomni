@@ -4,6 +4,7 @@ import { StrictMode } from "react";
 vi.mock("../../lib/ipc/application", () => ({ listSystemFonts: async () => [] }));
 import { ScreenshotOverlay } from "./ScreenshotOverlay";
 import { startOverlayPrefetch, takeOverlayPrefetch } from "./overlay/prefetch";
+import { ScreenshotSessionGeneration } from "./overlay/sessionGeneration";
 import { installOverlayCanvasStub, installOverlayImageStub } from "./overlayTestHarness";
 
 const api = vi.hoisted(() => ({
@@ -55,6 +56,19 @@ describe("ScreenshotOverlay startup", () => {
     expect(screen.getByTestId("screenshot-overlay").style.background).not.toBe("transparent");
     expect(api.signalOverlayReady).toHaveBeenCalledExactlyOnceWith(7);
     await waitFor(() => expect(api.shortcutStatus).toHaveBeenCalled());
+    expect(api.captureFull).not.toHaveBeenCalled();
+  });
+
+  it("uses the host generation instead of an unconsumed first-open screenshot", async () => {
+    api.fetchOverlayInit.mockResolvedValueOnce(INIT).mockResolvedValueOnce({ ...INIT, path: "new-capture.png", generation: 8 });
+    api.loadScreenshotUrl.mockResolvedValueOnce("blob:old-prefetch").mockResolvedValueOnce("blob:current-session");
+    startOverlayPrefetch();
+    await waitFor(() => expect(api.loadScreenshotUrl).toHaveBeenCalledOnce());
+    render(<ScreenshotSessionGeneration.Provider value={8}><ScreenshotOverlay /></ScreenshotSessionGeneration.Provider>);
+    await screen.findByTestId("screenshot-base-image");
+    await waitFor(() => expect(api.signalOverlayReady).toHaveBeenCalledExactlyOnceWith(8));
+    expect(api.loadScreenshotUrl).toHaveBeenNthCalledWith(2, "new-capture.png");
+    expect(api.revokeScreenshotUrl).toHaveBeenCalledExactlyOnceWith("blob:old-prefetch");
     expect(api.captureFull).not.toHaveBeenCalled();
   });
 

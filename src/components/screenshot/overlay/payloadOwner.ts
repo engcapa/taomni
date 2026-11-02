@@ -7,7 +7,7 @@ import { resolveOverlayPayload, type OverlayPayload } from "./prefetch";
  * replay reacquires the same load, but an actual unmount releases even a late
  * IPC/decode result. Only this owner revokes the initial URL.
  */
-export function createOverlayPayloadOwner() {
+export function createOverlayPayloadOwner(generation?: number) {
   let promise: Promise<OverlayPayload> | null = null;
   let consumers = 0;
   let revision = 0;
@@ -18,7 +18,7 @@ export function createOverlayPayloadOwner() {
       if (disposed) throw new Error("screenshot image owner already disposed");
       consumers += 1;
       revision += 1;
-      const loading = promise ??= resolveOverlayPayload();
+      const loading = promise ??= resolveOverlayPayload(generation);
       let released = false;
       return {
         promise: loading,

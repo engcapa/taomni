@@ -14,7 +14,7 @@ use super::session;
 use super::surfaces;
 use super::window_lifecycle::restore_app_windows;
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::AppHandle;
 use tauri::Manager;
 use tauri::WebviewWindow;
@@ -105,6 +105,7 @@ pub(super) fn watch_session_window(window: &WebviewWindow) {
         ) {
             return;
         }
+        let generation = SESSION_GENERATION.load(Ordering::SeqCst);
         let active = {
             let state = tool_state();
             if label == OVERLAY_LABEL {
@@ -115,11 +116,13 @@ pub(super) fn watch_session_window(window: &WebviewWindow) {
         };
         if label == OVERLAY_LABEL {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                if let Some(cleanup) = super::overlay_resident::intercept_close() {
+                if let Some((generation, cleanup)) = super::overlay_resident::intercept_close() {
                     api.prevent_close();
                     if cleanup {
                         let app = app.clone();
-                        tauri::async_runtime::spawn_blocking(move || close_session(&app));
+                        tauri::async_runtime::spawn_blocking(move || {
+                            close_session_if_current(&app, generation);
+                        });
                     }
                     return;
                 }
@@ -144,14 +147,41 @@ pub(super) fn watch_session_window(window: &WebviewWindow) {
             if active {
                 let app = app.clone();
                 // Joining recorder threads must not block the event loop.
-                tauri::async_runtime::spawn_blocking(move || close_session(&app));
+                tauri::async_runtime::spawn_blocking(move || {
+                    close_session_if_current(&app, generation);
+                });
             }
         }
     });
 }
 
+/// A deferred native event and IPC close compete for the same generation.
+/// Claim it atomically before any window, artifact or lease side effects.
+fn claim_close_generation(current: &AtomicU64, generation: u64) -> bool {
+    current
+        .compare_exchange(
+            generation,
+            generation.wrapping_add(1),
+            Ordering::SeqCst,
+            Ordering::SeqCst,
+        )
+        .is_ok()
+}
+
+pub(super) fn close_session_if_current(app: &AppHandle, generation: u64) -> bool {
+    if !claim_close_generation(&SESSION_GENERATION, generation) {
+        return false;
+    }
+    finish_close_session(app);
+    true
+}
+
 pub(crate) fn close_session(app: &AppHandle) {
     SESSION_GENERATION.fetch_add(1, Ordering::SeqCst);
+    finish_close_session(app);
+}
+
+fn finish_close_session(app: &AppHandle) {
     let recording = {
         let mut state = tool_state();
         state.overlay = None;
@@ -192,4 +222,43 @@ pub(crate) fn close_session(app: &AppHandle) {
     restore_app_windows(app);
     capture::purge_tracked();
     tool_state().session_lease = None;
+}
+
+#[cfg(test)]
+mod close_generation_tests {
+    use super::*;
+    use std::sync::Barrier;
+
+    #[test]
+    fn deferred_close_cannot_claim_the_next_open_after_ipc_retired_its_owner() {
+        let current = AtomicU64::new(7);
+        assert!(claim_close_generation(&current, 7));
+        // The next open retains generation 8 until its own close.
+        assert!(!claim_close_generation(&current, 7));
+        assert_eq!(current.load(Ordering::SeqCst), 8);
+        assert!(claim_close_generation(&current, 8));
+    }
+
+    #[test]
+    fn simultaneous_native_and_ipc_close_claim_exactly_once() {
+        let current = Arc::new(AtomicU64::new(9));
+        let barrier = Arc::new(Barrier::new(3));
+        let handles: Vec<_> = (0..2)
+            .map(|_| {
+                let current = current.clone();
+                let barrier = barrier.clone();
+                std::thread::spawn(move || {
+                    barrier.wait();
+                    claim_close_generation(&current, 9)
+                })
+            })
+            .collect();
+        barrier.wait();
+        let claims = handles
+            .into_iter()
+            .map(|handle| usize::from(handle.join().unwrap()))
+            .sum::<usize>();
+        assert_eq!(claims, 1);
+        assert_eq!(current.load(Ordering::SeqCst), 10);
+    }
 }

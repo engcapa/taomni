@@ -18,6 +18,7 @@ import { type WatermarkSettings } from "../../../lib/screenshotImage";
 import { screenshotShortcutLabel, useScreenshotShortcutStore } from "../../../lib/screenshotShortcut";
 import { FILLABLE_TOOLS, FONT_STACK, type AnnotationCanvasHandle, type AnnotationTool, type CssRect, type EraserMode, type Shape } from "../AnnotationCanvas";
 import { failedOverlayGeneration } from "./prefetch";
+import { useScreenshotSessionGeneration } from "./sessionGeneration";
 import { createOverlayPayloadOwner } from "./payloadOwner";
 import { markOverlayStartup } from "./startupTiming";
 import { COLORS } from "./tools";
@@ -25,6 +26,7 @@ import { type Handle, type ImageSnapshot, type Phase } from "./types";
 
 
 export function useScreenshotOverlayState() {
+  const sessionGeneration = useScreenshotSessionGeneration();
   const t = useT();
   const stopShortcut = screenshotShortcutLabel(useScreenshotShortcutStore((s) => s.status));
   const [init, setInit] = useState<OverlayInit | null>(null);
@@ -184,11 +186,11 @@ export function useScreenshotOverlayState() {
   // Init: the payload of the backend session (possibly prefetched while the
   // UI modules loaded); only a dev/QA direct open falls back to a live
   // fullscreen capture so the overlay never renders blank.
-  const generationRef = useRef<number | null>(null);
+  const generationRef = useRef<number | null>(sessionGeneration ?? null);
   const payloadOwner = useRef<ReturnType<typeof createOverlayPayloadOwner> | null>(null);
   useEffect(() => {
     let cancelled = false;
-    payloadOwner.current ??= createOverlayPayloadOwner();
+    payloadOwner.current ??= createOverlayPayloadOwner(sessionGeneration);
     const lease = payloadOwner.current.acquire();
     (async () => {
       const { init: data, ...loaded } = await lease.promise;
@@ -205,7 +207,7 @@ export function useScreenshotOverlayState() {
       } else setPhase("select");
     })().catch((e: unknown) => {
       if (cancelled) return;
-      generationRef.current = failedOverlayGeneration(e);
+      generationRef.current = failedOverlayGeneration(e) ?? sessionGeneration ?? null;
       setLoadError(formatUnknownError(e));
     });
     return () => {
