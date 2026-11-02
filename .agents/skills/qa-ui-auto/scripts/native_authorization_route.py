@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import re
 import shlex
 import shutil
 import subprocess
@@ -12,6 +13,11 @@ import sys
 def desktop_argument(value: str) -> str:
     if any(character in value for character in "\r\n"):
         raise ValueError("Desktop launcher path contains a newline")
+    # xdg-utils 1.1.3 treats the first Exec token literally (including quotes)
+    # when finding the executable. Keep simple paths unquoted so both its
+    # association query and generic URL opener can actually invoke our handler.
+    if re.fullmatch(r"[A-Za-z0-9_./-]+", value):
+        return value
     escaped = value.replace("\\", "\\\\\\\\").replace('"', '\\\\"')
     for character in ("`", "$"):
         escaped = escaped.replace(character, "\\\\" + character)

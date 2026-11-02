@@ -1,9 +1,12 @@
 """Owned browser routing preserves real URL opening without leaking profiles."""
 from pathlib import Path
 import os
+import shlex
+import shutil
 import subprocess
+import sys
 import tempfile
-from unittest import TestCase, main
+from unittest import TestCase, main, skipUnless
 from unittest.mock import patch
 
 from native_authorization_browser import command, main as launch_browser
@@ -86,6 +89,49 @@ class AuthorizationBrowserRouteTest(TestCase):
                 self.assertFalse(route.handler.exists())
                 self.assertFalse((Path(expected["XDG_CONFIG_HOME"]) / "mimeapps.list").exists())
 
+    @skipUnless(sys.platform == "linux" and shutil.which("xdg-mime") and shutil.which("xdg-open"),
+                "requires the real Linux system URL association tools")
+    def test_real_xdg_tools_resolve_and_open_the_owned_handler(self):
+        import json
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            case = root / "case"
+            case.mkdir()
+            expected = self.expected(root)
+            arguments = root / "browser-arguments.txt"
+            browser = root / "firefox"
+            browser.write_text("#!/bin/sh\nprintf '%s\\n' \"$@\" > " + shlex.quote(str(arguments)) + "\n")
+            browser.chmod(0o700)
+            # Exercise generic xdg-utils even on a GNOME runner, without
+            # accessing the user's desktop, DBus, browser or associations.
+            environment = {**expected, "GITHUB_ACTIONS": "true", "DE": "generic",
+                           "XDG_CURRENT_DESKTOP": "X-Generic", "DISPLAY": ":fixture-only",
+                           "DBUS_SESSION_BUS_ADDRESS": "unix:path=" + str(root / "no-bus"),
+                           "BROWSER": "/bin/false"}
+            with patch.dict(os.environ, environment), \
+                    patch("native_authorization_route.shutil.which", return_value=str(browser)):
+                route = AuthorizationBrowserRoute(case, expected)
+                try:
+                    route.install()  # Must not mock xdg-mime's executable lookup.
+                    desktop = route.handler.read_text()
+                    launcher = str(route.root / "open-browser.sh")
+                    self.assertIn("Exec=" + launcher + " %u\n", desktop)
+                    url = "https://accounts.feishu.cn/oauth/v1/device/verify?flow_id=synthetic"
+                    subprocess.run(["xdg-open", url], capture_output=True, text=True,
+                                   check=True, timeout=5)
+                    self.assertEqual(arguments.read_text().splitlines(),
+                                     ["--no-remote", "--profile", str(route.profile), url])
+                    evidence = json.loads(route.record.read_text())
+                    self.assertTrue(evidence["launched"])
+                    self.assertEqual(evidence["profile"], str(route.profile))
+                    self.assertNotIn("synthetic", route.record.read_text())
+                finally:
+                    route.restore()
+                self.assertFalse(route.handler.exists())
+                for folder in (Path(expected["XDG_CONFIG_HOME"]),
+                               Path(expected["XDG_DATA_HOME"]) / "applications"):
+                    self.assertFalse((folder / "mimeapps.list").exists())
+
     def test_route_refuses_non_hosted_environment_and_external_xdg_paths(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -131,6 +177,8 @@ class AuthorizationBrowserRouteTest(TestCase):
                 execute.assert_not_called()
 
     def test_desktop_exec_quote_keeps_paths_one_argument_and_url_unquoted(self):
+        self.assertEqual(desktop_argument("/tmp/qa-run_123/open-browser.sh"),
+                         "/tmp/qa-run_123/open-browser.sh")
         self.assertEqual(desktop_argument("/tmp/qa folder/open.sh"), '"/tmp/qa folder/open.sh"')
         self.assertEqual(desktop_argument('/tmp/a"b'), '"/tmp/a\\\\"b"')
         self.assertEqual(desktop_argument("/tmp/$x`y%z"), '"/tmp/\\\\$x\\\\`y%%z"')
