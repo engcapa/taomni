@@ -68,7 +68,8 @@ def setup(ctx: Any) -> None:
         try:
             route.install()
             ctx._backup_browser = ExternalBrowserOwner(
-                Path(ctx.report_root), Path(ctx.case_dir), expected, profile=route.profile)
+                Path(ctx.report_root), Path(ctx.case_dir), expected,
+                profile=route.profile, launch_record=route.record)
         except BaseException:
             route.restore()
             raise

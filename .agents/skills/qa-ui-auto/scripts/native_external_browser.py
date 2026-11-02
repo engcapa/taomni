@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import re
 import signal
 import time
 
@@ -52,7 +53,8 @@ def inherits_isolation(pid: int, expected: dict[str, str], proc_root: Path) -> b
     return values == expected
 
 
-def owns_profile(pid: int, profile: Path | None, proc_root: Path) -> bool:
+def owns_profile(pid: int, profile: Path | None, proc_root: Path,
+                 launch_record: Path | None = None) -> bool:
     if profile is None:
         return False
     try:
@@ -60,14 +62,35 @@ def owns_profile(pid: int, profile: Path | None, proc_root: Path) -> bool:
     except OSError:
         return False
     target = str(profile).encode()
-    return (b"--user-data-dir=" + target in args
+    if (b"--user-data-dir=" + target in args
             or any(arg in (b"--profile", b"-profile") and index + 1 < len(args)
-                   and args[index + 1] == target for index, arg in enumerate(args)))
+                   and args[index + 1] == target for index, arg in enumerate(args))):
+        return True
+    # Chromium replaces argv with one unquoted, space-joined process title.
+    # Such a title loses argument boundaries: do not trust a profile-looking
+    # substring alone. Require this launcher's exact PID + kernel birth AND
+    # a whitespace-delimited exact profile flag in the observed title.
+    if (launch_record is None or len([arg for arg in args if arg]) != 1
+            or any(character.isspace() for character in str(profile))):
+        return False
+    try:
+        launch = json.loads(launch_record.read_text())
+        current = identity(pid, proc_root)
+    except (OSError, ValueError):
+        return False
+    if (not isinstance(launch, dict) or not current or Path(current["executable"]).name not in BROWSERS
+            or launch.get("launched") is not True or launch.get("pid") != pid
+            or launch.get("started") != current["started"]
+            or launch.get("profile") != str(profile)):
+        return False
+    flag = rb"(?:^|[ \t])--user-data-dir=" + re.escape(target) + rb"(?=[ \t]|$)"
+    return re.search(flag, args[0]) is not None
 
 
 class ExternalBrowserOwner:
     def __init__(self, report_root: Path, case_dir: Path, expected: dict[str, str],
-                 proc_root: Path = Path("/proc"), profile: Path | None = None):
+                 proc_root: Path = Path("/proc"), profile: Path | None = None,
+                 launch_record: Path | None = None):
         root = report_root.resolve()
         if set(expected) != {"XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME"}:
             raise RuntimeError("External browser cleanup requires all three native XDG roots")
@@ -79,6 +102,12 @@ class ExternalBrowserOwner:
                 not profile.resolve().is_relative_to(Path(expected["XDG_CACHE_HOME"]).resolve())
                 or not (profile / ".taomni-qa-browser").is_file()):
             raise RuntimeError("External browser profile must be inside the run-owned cache")
+        if launch_record is not None and (
+                profile is None or launch_record != case_dir / "authorization-browser" / "launch.json"
+                or launch_record.resolve() != launch_record
+                or not launch_record.resolve().is_relative_to(root)):
+            raise RuntimeError("External browser launch record must be inside the owned case")
+        self.launch_record = launch_record
         self.expected = expected
         self.profile = profile.resolve() if profile is not None else None
         self.proc_root = proc_root
@@ -93,7 +122,7 @@ class ExternalBrowserOwner:
         self.path.write_text(json.dumps(self.record, indent=2) + "\n", encoding="utf-8")
 
     def proves_ownership(self, pid: int) -> bool:
-        return (owns_profile(pid, self.profile, self.proc_root) if self.profile is not None
+        return (owns_profile(pid, self.profile, self.proc_root, self.launch_record) if self.profile is not None
                 else inherits_isolation(pid, self.expected, self.proc_root))
 
     def current_owned(self) -> list[dict]:

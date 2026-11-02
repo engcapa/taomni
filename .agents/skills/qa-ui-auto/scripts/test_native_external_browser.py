@@ -1,5 +1,6 @@
 """Authorization browser ownership must never reach pre-existing/foreign processes."""
 from pathlib import Path
+import json
 import os
 import signal
 import tempfile
@@ -148,6 +149,51 @@ class ExternalBrowserOwnerTest(TestCase):
             with patch.dict(os.environ, expected):
                 with self.assertRaisesRegex(RuntimeError, "run-owned cache"):
                     ExternalBrowserOwner(root, root, expected, proc, profile=root / "unowned")
+
+    def test_chromium_flattened_title_requires_the_launchers_exact_kernel_identity(self):
+        from native_external_browser import owns_profile
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proc, expected = self.layout(root)
+            profile = Path(expected["XDG_CACHE_HOME"]) / "auth"
+            profile.mkdir(parents=True)
+            (profile / ".taomni-qa-browser").write_text("fixture")
+            record = root / "authorization-browser" / "launch.json"
+            record.parent.mkdir()
+            with patch.dict(os.environ, expected):
+                owner = ExternalBrowserOwner(root, root, expected, proc, profile=profile,
+                                             launch_record=record)
+            owned = self.process(proc, 41, {}, executable="chrome", started="201")
+            title = str(root / "chrome") + " --no-first-run --user-data-dir=" + str(profile)
+            (owned / "cmdline").write_bytes(title.encode() + b"\0")
+            launch = {"launched": True, "pid": 41, "started": "201", "profile": str(profile)}
+            # A real profile-looking title is still ambiguous without the
+            # launcher's non-reusable PID/birth claim. Never use substring proof.
+            self.assertFalse(owns_profile(41, profile, proc))
+            self.assertFalse(owns_profile(41, profile, proc, record))
+            for altered in ({**launch, "pid": 42}, {**launch, "started": "200"},
+                            {**launch, "profile": str(profile) + "-other"},
+                            {**launch, "launched": False}):
+                record.write_text(json.dumps(altered))
+                self.assertFalse(owns_profile(41, profile, proc, record))
+            for invalid_record in ("{broken", "null", "[]"):
+                record.write_text(invalid_record)
+                self.assertFalse(owns_profile(41, profile, proc, record))
+            record.write_text(json.dumps(launch))
+            self.assertTrue(owns_profile(41, profile, proc, record))
+            for invalid in (title + "-other", "chrome https://example.org/?arg=--user-data-dir=" + str(profile),
+                            "chrome --other=--user-data-dir=" + str(profile)):
+                (owned / "cmdline").write_bytes(invalid.encode() + b"\0")
+                self.assertFalse(owns_profile(41, profile, proc, record))
+            (owned / "cmdline").write_bytes(title.encode() + b" --new-window\0")
+            other = self.process(proc, 42, {}, executable="chrome", started="202")
+            (other / "cmdline").write_bytes(title.encode() + b"\0")
+            with patch("native_external_browser.os.kill",
+                       side_effect=lambda pid, sig: (proc / str(pid) / "stat").unlink()) as kill:
+                owner.stop()
+            kill.assert_called_once_with(41, signal.SIGTERM)
+            self.assertEqual(owner.record["status"], "closed")
+            self.assertEqual([item["pid"] for item in owner.record["excluded"]], [42])
 
     def test_no_owned_browser_is_not_a_cleanup_success(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -4,8 +4,9 @@ description: 'Issue #714 regression. Native uses production polling and locks ag
   renderer model. Cancellation never deletes cloud applications or backup files.
   Hosted Linux uses an xdg-utils-compatible run-local system URL association and
   real browser with a private profile under the excluded QA cache. Cleanup verifies that exact profile,
-  executable and PID birth identity, preserving pre-existing/foreign processes
-  and preventing an authorization QR from contaminating the following MFA scan.'
+  executable and PID birth identity, including Chromium process-title rewrites
+  bound to the original launcher PID/birth record, preserving pre-existing/foreign
+  processes and preventing an authorization QR from contaminating the following MFA scan.'
 covers:
 - F-BACKUP-1
 - F-BACKUP-2

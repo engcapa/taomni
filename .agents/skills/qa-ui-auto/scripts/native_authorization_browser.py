@@ -25,6 +25,10 @@ def command(browser: Path, profile: Path, url: str) -> list[str]:
     raise ValueError("Unsupported real authorization browser")
 
 
+def kernel_birth() -> str:
+    return Path("/proc/self/stat").read_text().rsplit(")", 1)[1].split()[19]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--browser", type=Path, required=True)
@@ -45,9 +49,13 @@ def main():
             or record.name != "launch.json"):
         raise RuntimeError("Authorization browser profile is not fixture-owned")
     argv = command(args.browser, profile, args.url)
-    # Never retain authorization URLs, codes, cookies or browser environment.
+    started = kernel_birth()
+    # exec preserves kernel birth identity even when Chromium later rewrites
+    # /proc/cmdline into one space-joined process title. Never retain URLs,
+    # codes, cookies or browser environment.
     args.record.write_text(json.dumps({"browser": str(args.browser), "profile": str(profile),
-                                       "pid": os.getpid(), "launched": True}) + "\n", encoding="utf-8")
+                                       "pid": os.getpid(), "started": started,
+                                       "launched": True}) + "\n", encoding="utf-8")
     os.execv(str(args.browser), argv)
 
 

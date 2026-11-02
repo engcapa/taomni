@@ -62,7 +62,8 @@ class BackupCloudFixtureTest(TestCase):
             try:
                 route.assert_called_once_with(root, expected)
                 route.return_value.install.assert_called_once()
-                owner.assert_called_once_with(root, root, expected, profile=route.return_value.profile)
+                owner.assert_called_once_with(root, root, expected, profile=route.return_value.profile,
+                                              launch_record=route.return_value.record)
                 events = []
                 owner.return_value.stop.side_effect = lambda: events.append("browser-stop")
                 with patch.object(ctx._backup_server, "shutdown", side_effect=lambda: events.append("server-stop")), \

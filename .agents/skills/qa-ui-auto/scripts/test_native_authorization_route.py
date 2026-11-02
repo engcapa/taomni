@@ -159,7 +159,8 @@ class AuthorizationBrowserRouteTest(TestCase):
             argv = ["launcher", "--browser", "/usr/bin/google-chrome", "--profile", str(profile),
                     "--record", str(record), "--cache-root", str(cache), url]
             with patch.dict(os.environ, {"GITHUB_ACTIONS": "true", "XDG_CACHE_HOME": "sanitized"}), \
-                    patch("sys.argv", argv), patch("native_authorization_browser.os.execv") as execute:
+                    patch("sys.argv", argv), patch("native_authorization_browser.kernel_birth", return_value="123"), \
+                    patch("native_authorization_browser.os.execv") as execute:
                 launch_browser()
             execute.assert_called_once()
             self.assertEqual(execute.call_args.args[0], "/usr/bin/google-chrome")
@@ -168,6 +169,7 @@ class AuthorizationBrowserRouteTest(TestCase):
             evidence = json.loads(record.read_text())
             self.assertTrue(evidence["launched"])
             self.assertEqual(evidence["profile"], str(profile.resolve()))
+            self.assertEqual(evidence["started"], "123")
             self.assertNotIn("not-recorded", record.read_text())
             (profile / ".taomni-qa-browser").unlink()
             with patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}), \
