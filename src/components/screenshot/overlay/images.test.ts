@@ -41,6 +41,16 @@ describe("screenshot image decoding", () => {
     expect(await loading).toBe(image);
   });
 
+  it("decodes as soon as the source is set, without waiting for a load event", async () => {
+    const loading = loadImage("capture.png");
+    const { image, decoded } = pendingImages[0];
+    // decode() was requested immediately; no onload handler is involved.
+    expect(image.decode).toHaveBeenCalledOnce();
+    expect(image.getAttribute("src")).toBe("capture.png");
+    decoded();
+    expect(await loading).toBe(image);
+  });
+
   it("waits for the intermediate PNG to decode before drawing the physical crop", async () => {
     const drawImage = vi.fn();
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({ drawImage } as unknown as CanvasRenderingContext2D);

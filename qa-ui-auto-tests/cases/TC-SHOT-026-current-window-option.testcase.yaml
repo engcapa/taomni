@@ -28,7 +28,7 @@ steps:
 - assert_not_visible: '[data-testid="screenshot-selection"]'
 - assert_not_visible: '[data-testid="screenshot-toolbar"]'
 - eval_readonly:
-    expression: window.__taomniStubScreenshotCalls.at(-1).args.includeCurrentWindow === true
+    expression: window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_open_overlay" && window.__taomniStubScreenshotCalls.at(-2).args.includeCurrentWindow === true && window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_overlay_ready"
 - drag_to:
     from: '[data-testid="screenshot-select-layer"]'
     to: '[data-testid="screenshot-select-layer"]'
@@ -58,7 +58,7 @@ steps:
 - assert_not_visible: '[data-testid="screenshot-selection"]'
 - assert_not_visible: '[data-testid="screenshot-toolbar"]'
 - eval_readonly:
-    expression: window.__taomniStubScreenshotCalls.at(-1).args.includeCurrentWindow === true
+    expression: window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_open_overlay" && window.__taomniStubScreenshotCalls.at(-2).args.includeCurrentWindow === true && window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_overlay_ready"
 - drag_to:
     from: '[data-testid="screenshot-select-layer"]'
     to: '[data-testid="screenshot-select-layer"]'
@@ -79,7 +79,7 @@ steps:
 - wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
 - assert_not_visible: '[data-testid="screenshot-selection"]'
 - eval_readonly:
-    expression: window.__taomniStubScreenshotCalls.at(-1).args.includeCurrentWindow === false
+    expression: window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_open_overlay" && window.__taomniStubScreenshotCalls.at(-2).args.includeCurrentWindow === false && window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_overlay_ready"
 - press: Escape
 - wait_for: '[data-testid="system-screenshot"]'
 verification:
@@ -115,7 +115,7 @@ verification:
     - step: 10
       expectation: '{"assert_not_visible": "[data-testid=\"screenshot-toolbar\"]"}'
     - step: 11
-      expectation: '{"eval_readonly": {"expression": "window.__taomniStubScreenshotCalls.at(-1).args.includeCurrentWindow === true"}}'
+      expectation: The open request includes the current window, followed by the overlay ready signal.
     - step: 13
       expectation: '{"wait_for": "[data-testid=\"screenshot-toolbar\"]"}'
     - step: 14
@@ -133,7 +133,7 @@ verification:
     - step: 26
       expectation: '{"assert_not_visible": "[data-testid=\"screenshot-toolbar\"]"}'
     - step: 27
-      expectation: '{"eval_readonly": {"expression": "window.__taomniStubScreenshotCalls.at(-1).args.includeCurrentWindow === true"}}'
+      expectation: The open request includes the current window, followed by the overlay ready signal.
     - step: 29
       expectation: '{"wait_for": "[data-testid=\"screenshot-toolbar\"]"}'
     - step: 30
@@ -145,7 +145,7 @@ verification:
     - step: 36
       expectation: '{"assert_not_visible": "[data-testid=\"screenshot-selection\"]"}'
     - step: 37
-      expectation: '{"eval_readonly": {"expression": "window.__taomniStubScreenshotCalls.at(-1).args.includeCurrentWindow === false"}}'
+      expectation: The ordinary open request excludes the current window, followed by the overlay ready signal.
     - step: 39
       expectation: '{"wait_for": "[data-testid=\"system-screenshot\"]"}'
     results:

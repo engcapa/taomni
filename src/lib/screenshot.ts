@@ -61,6 +61,8 @@ export interface OverlayInit {
   windowRegion?: PhysicalRect | null;
   document?: boolean;
   sourcePin?: string | null;
+  /** Capture session generation; echoed by `signalOverlayReady`. */
+  generation?: number;
 }
 
 export interface RecordingStarted {
@@ -201,6 +203,11 @@ export async function fetchOverlayInit(): Promise<OverlayInit> {
   return invoke<OverlayInit>("screenshot_overlay_init");
 }
 
+/** The overlay committed its base image (or error view): the backend may show it. */
+export async function signalOverlayReady(generation: number): Promise<boolean> {
+  return invoke<boolean>("screenshot_overlay_ready", { generation });
+}
+
 /** Tell the backend the overlay now shows another background image. */
 export async function updateOverlayImage(file: ScreenshotFile): Promise<void> {
   return invoke<void>("screenshot_overlay_update", {
@@ -224,8 +231,10 @@ export const openPinTools = (view: PinView) => invoke<string>("screenshot_open_p
 export const closePinTools = () => invoke<void>("screenshot_close_pin_tools");
 
 /** End the capture session: close tool windows, reshow app windows. */
-export async function closeScreenshotOverlay(): Promise<void> {
-  return invoke<void>("screenshot_close_overlay");
+export async function closeScreenshotOverlay(generation?: number): Promise<void> {
+  return generation === undefined
+    ? invoke<void>("screenshot_close_overlay")
+    : invoke<void>("screenshot_close_overlay", { generation });
 }
 
 export async function pinToScreen(path: string): Promise<string> {

@@ -17,16 +17,16 @@ steps:
     selector: '[data-testid="screenshot-scroll-progress"]'
     equals: "Scroll capture \xB7 3 frames"
 - click: '[data-testid="screenshot-scroll-stop"]'
-- wait_for: '[data-testid="screenshot-overlay"]'
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
 - eval_readonly:
-    expression: window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_stop_scroll_capture" && window.__taomniStubScreenshotCalls.at(-1).args.cancel
+    expression: window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_stop_scroll_capture" && window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_overlay_ready" && window.__taomniStubScreenshotCalls.at(-2).args.cancel
       === false
 - open: ${cfg.app.base_url}#screenshot-scroll
 - wait_for: '[data-testid="screenshot-scroll-controller"]'
 - click: '[data-testid="screenshot-scroll-cancel"]'
-- wait_for: '[data-testid="screenshot-overlay"]'
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
 - eval_readonly:
-    expression: window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_stop_scroll_capture" && window.__taomniStubScreenshotCalls.at(-1).args.cancel
+    expression: window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_stop_scroll_capture" && window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_overlay_ready" && window.__taomniStubScreenshotCalls.at(-2).args.cancel
       === true
 - press: Escape
 - wait_for: '[data-testid="system-screenshot"]'
@@ -49,16 +49,16 @@ steps:
 - eval_readonly:
     expression: window.__taomniStubScreenshotCalls.at(-1).args.mode === "manual"
 - click: '[data-testid="screenshot-scroll-cancel"]'
-- wait_for: '[data-testid="screenshot-overlay"]'
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
 - press: Escape
 - wait_for: '[data-testid="system-screenshot"]'
 - assert_visible: '[data-testid="system-screenshot"]'
 - open: ${cfg.app.base_url}#screenshot-scroll
 - wait_for: '[data-testid="screenshot-scroll-controller"]'
 - press: Escape
-- wait_for: '[data-testid="screenshot-overlay"]'
+- wait_for: '[data-testid="screenshot-overlay"][data-phase="select"]'
 - eval_readonly:
-    expression: window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_stop_scroll_capture" && window.__taomniStubScreenshotCalls.at(-1).args.cancel === false
+    expression: window.__taomniStubScreenshotCalls.at(-2).cmd === "screenshot_stop_scroll_capture" && window.__taomniStubScreenshotCalls.at(-1).cmd === "screenshot_overlay_ready" && window.__taomniStubScreenshotCalls.at(-2).args.cancel === false
 verification:
   review: reviewed
   requirements:

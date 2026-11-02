@@ -14,6 +14,19 @@ ROOT = Path(__file__).resolve().parents[4]
 
 
 class BuildPipelineTests(unittest.TestCase):
+    def test_frontend_regressions_run_once_on_linux_producer_and_keep_original_log(self):
+        workflow = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
+        steps = workflow['jobs']['entry']['steps']
+        step = next(s for s in steps if s.get('name') == 'Frontend behavior unit regressions')
+        self.assertEqual(step['if'], "runner.os == 'Linux' && inputs.operation == 'build'")
+        self.assertIn('pnpm check:refactor', step['run'])
+        self.assertIn('pnpm exec vitest run 2>&1 | tee qa-build-output/frontend-unit-contracts.log', step['run'])
+        # No path filters: the final candidate must retain the complete frontend
+        # unit suite, including the newly merged mail/editor lifecycle tests.
+        self.assertEqual(step['run'].count('pnpm exec vitest run'), 1)
+        upload = next(s for s in steps if s.get('name') == 'Retain native build diagnostics')
+        self.assertIn('qa-build-output/frontend-unit-contracts.log', upload['with']['path'])
+
     def test_failed_contracts_cannot_leave_a_passing_aggregate(self):
         jobs = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())['jobs']
         step = next(s for s in jobs['summarize']['steps'] if s.get('name') == 'Include supporting job results')
@@ -70,8 +83,7 @@ class BuildPipelineTests(unittest.TestCase):
                 root_tests = [c for c in commands if '--lib' in c and '-p' not in c]
                 self.assertEqual(len(root_tests), 1)
                 expected = ['lsp::tests::workspace_watch_lifetime', 'commands::workspace_reads::tests',
-                    'workspace::tests::text_and_encoding', 'workspace::tests::encoding_matrix'] + (['rdp::'] if rdp else []) + (['capture::', 'screenshot::surfaces::',
-                    'screenshot::qa::save_dialog_observation::'] if dual else [])
+                    'workspace::tests::text_and_encoding', 'workspace::tests::encoding_matrix'] + (['rdp::'] if rdp else []) + (['capture::', 'screenshot::', 'mfa::'] if dual else [])
                 self.assertEqual(root_tests[0], ['test', '--locked', '--release', '--lib', '--', *expected])
                 self.assertEqual(any('rdp-probe' in c for c in commands), rdp)
                 self.assertEqual(any('profile_photo_encoder_costs' in c for c in commands), rdp)

@@ -22,10 +22,13 @@ async fn geometry(window: &WebviewWindow) -> anyhow::Result<Value> {
     }
     // GTK can cache transient 0,0 coordinates around unmap/remap. Observe
     // the X server independently, as we do with Mutter on Wayland.
-    let title = window.title()?;
+    // The display picker briefly unmaps this resident surface. A title lookup
+    // can miss an unmapped window or resolve a different same-titled surface;
+    // use its actual GDK XID, then still require the exact remapped geometry.
+    let xid = x11_window_id(window).context("X11 surface identity unavailable")?;
     let output = tokio::task::spawn_blocking(move || {
         std::process::Command::new("xwininfo")
-            .args(["-name", &title])
+            .args(["-id", &format!("0x{xid:x}")])
             .output()
     })
     .await??;

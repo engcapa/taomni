@@ -26,6 +26,18 @@ mod input_scenarios;
 pub use input_scenarios::*;
 mod platform_evidence;
 pub use platform_evidence::*;
+mod startup_timing;
+pub use startup_timing::*;
+mod clipboard_retry;
+pub use clipboard_retry::*;
+mod resident_overlay;
+pub use resident_overlay::*;
+mod startup_isolation;
+pub use startup_isolation::*;
+mod startup_flash;
+#[cfg(test)]
+mod startup_isolation_tests;
+pub use startup_flash::*;
 #[cfg(test)]
 mod tests;
 

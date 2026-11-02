@@ -4,6 +4,10 @@
 > 行号为约数（±3 行），函数名是首要锚点，动手前在工作树复核。
 > 术语：T_first = overlay 可见、底图已上屏、`phase === "select"`；S_front = selectMs − show 累计时（show 之后到 select 的前端段）；windowMs 数值上等于含 focus 的后端链路结束，不是单纯建窗时刻；N27 的 run0 只是“同进程首开”，不是进程冷启动。
 
+## 当前验收优先级（用户 2026-11-02 明确调整）
+
+目标是按钮或快捷键触发后尽快看到底图并开始选区，避免显著延迟；**不要求完全消除短暂闪烁**。不为零闪帧添加固定等待，不把原生采样工具自身的 100ms 覆盖门槛当作产品性能完成前提。旧严格闪帧场景与原始失败证据保留作诊断，不能追改为通过。N28 保留窗口隔离、像素与恢复的强制验收；性能以 N27 的触发到可选区、分段 P50/P95 及 P1-1 原生复用结果为准。I1–I7、安全隐藏/排空与 Wayland 授权语义不变；三端、Linux 四 profile、截图＋crash 后全量验证的范围不变。
+
 ## 1. 问题描述
 
 用户在 taomni 里点击截图按钮或按截图快捷键后，开始截图前有两个症状：
@@ -129,3 +133,108 @@
 ### 5.6 不做项
 
 不改滚动截图、录屏、OCR、贴图、标注画布的逻辑与语义；不在没有原生像素验证的情况下缩短 650 ms、250 ms 排空与 HIDE_SETTLE；不在截图之前显示 overlay 或任何 taomni 窗口（P0-1b 的透明 show 仍发生在截图之后）；不绕过、不缓存、不常驻 Wayland portal 授权与会话；不改变 pin 窗口不被隐藏的现有行为；不改 OPENING、SessionLease、STARTING_RECORDING 以及滚动、录屏守卫的判定代码；不改快捷键注册机制与默认组合键；不放宽 `ensure_artifact_path` 的路径校验，不改用 asset 协议 URL，保留同源 blob；不优化 `focus_capture_window` 的重试次数与间隔；不在 X11 上单独缩短 250 ms 排空；不把 CI 数据写成慢机结论，不把同进程首开写成进程冷启动，不把 1080p/768p 的 save_png 结论外推到 4K。
+
+## 6. 实施状态（分支 `feat/screenshot-startup-optimization`）
+
+本节记录代码现状；验证结果以 GitHub `qa-ui-auto-platforms` 的 run 为准，见 6.4。
+
+### 6.1 已实现
+
+| 项 | 实现位置 | 说明 |
+|---|---|---|
+| P0-0 / P0-0b 打点 | `screenshot/startup_timing.rs`（独立 mutex，可在 capture 线程打点）；`servers/rdp/capture/stage_trace.rs`（线程内观察者，portal 与 PipeWire 子段）；前端 `overlay/startupTiming.ts`（仅 `--mode qa` 构建写 `window.__TAOMNI_OVERLAY_TIMING__`） | 后端：entry（命令/快捷键，`entryLeadMs`）、permission、display、hide、capture_open_start/end、capture_hidden_signal、capture_grab、capture_drain_end、capture_drop_start/end、portal_create_session/select_devices/select_sources/start/pipewire_remote、pipewire_first_frame、capture、save_png、window_built、window_joined、cover、ready/ready_timeout、show（含 `showWallMs`）、hide_after_show、focus、read_file_start/end（含字节数）。前端：nav、fcp、entry、app、mount、init、read、decode、commit、paint。release 只记录与写日志，不读回 |
+| P0-1b 透明首帧 | `index.html`（label 为 `screenshot-overlay` 且 hash 恰为 `#screenshot-overlay` 时不写主题底色并加 `screenshot-overlay-surface`）；`styles/base.css`；`overlay_open.rs` builder `.transparent(true)`；`ScreenshotOverlayView` 根背景在无底图时透明 | 贴图编辑器改用 `#screenshot-overlay-document`，透明关闭时用 `#screenshot-overlay-opaque`，两者保持主题底色。macOS 依赖已开启的 `macOSPrivateApi` |
+| P0-3 拆包 | `main.tsx` 首个应用模块 `screenshotOverlayBoot.ts`；`screenshotOverlayRoot.tsx`；`lib/webviewGuards.ts`（右键菜单、刷新键、文件拖入导航三项守卫从 App 抽出，主窗口与 overlay 共用） | 原生 overlay 窗口跳过恢复握手（overlay 从不注册 renderer recovery）与 `App`。overlay 静态依赖除主入口共享部分外约 0.5 MB（主要是 i18n 词典），App 约 6.8 MB；`screenshotOverlayRoot.test.ts` 断言不静态到达 App、layouts、filebrowser、notes、servers、terminal、editor、appStore。`sweepExpiredHandoffs` 属于 SFTP 凭据交接，overlay 不需要 |
+| P0-5 预取并行 | `overlay/prefetch.ts`、`overlay/images.ts` | boot 模块在 React 与 overlay UI 求值前发起 init、读回与解码；`loadImage` 直接 `await image.decode()`；shortcut status 刷新推迟到底图提交后 |
+| P0-1 ready 握手 | `overlay_handoff.rs`（`screenshot_overlay_ready`，按 SESSION_GENERATION 匹配）；`OverlayInit.generation`；前端 layout effect | 六组 hosted 原生各 40/40 ready 早于 show、0 超时，候选改为默认启用；仍带 1500ms 失败兜底，不添加固定等帧。loadError 也发 ready（payload 已知时）。这是提交/解码证据，不声称隐藏 WebView 已在屏幕绘制 |
+| P1-2 建窗并行 | `overlay_open.rs` | 权限通过后立即在 blocking 线程 build 隐藏窗口，与 hide/截图并行；`screenshot_overlay_init` 在有进行中的 open 时等待 payload；后端 open 进行中 `screenshot_capture_full` 拒绝执行；原生 overlay 窗口内不再回退 `captureFull()`，仅浏览器/dev 直开保留 |
+| P1-3 Linux 重叠 | `capture/overlap.rs` | 同一 blocking 线程：open（portal 会话 + PipeWire，或 X11 capturer）→ 等带时间戳的隐藏完成信号 → 排空至少 250 ms，拒绝信号前或缺失时间戳的帧。无新帧则先完整 Drop 原 source，再串行新建安全重试；取消传到 portal consent 和首帧等待，worker 清理结束后才释放租约。会话不留存不复用，`PersistMode::DoNot` 不变。PipeWire captured_at 现为 callback 接收时间，非 producer PTS，此限制需 native 标记像素验收 |
+| P1-1 预热复用 | `overlay_resident.rs`、`ScreenshotSessionHost.tsx`、启动后 `prewarm` | 主窗口建立后预热隐藏空 WebView，不申请截图权限、不打开 portal、不占租约；每 generation 完整 remount/unmount，事件订阅后快照消除首次触发竞态。关闭时保持原恢复顺序，仅窗口步骤替换成 hide + renderer reset；录屏移交、贴图文档保留销毁逻辑。N30 原生证明 identity、清空、文件清理、原生 CloseRequested 和租约释放 |
+| P1-6 排除自身窗口 | `capture_exclusion.rs` | Windows 已验证 build 26100 / 26300 白名单，未验证版本走隐藏；macOS 15 新 run 的首张生产图含整个 marker，尽管 direct control 通过，因此禁用 macOS 排除并回退原 hide，不加等待掩盖失败。顺序与所有 RAII 恢复保留 |
+| 回退开关 | `startup_profile.rs` | `TAOMNI_SCREENSHOT_STARTUP=legacy` 恢复串行路径；`-early-window`、`-handshake`、`-transparent`、`-overlap`、`-exclusion`、`ready-timeout=<ms>` 单项控制 |
+
+### 6.2 未做与原因
+
+- P1-1 已实现，`75d226e5` 的 hosted 第四轮已通过六组 native N30、全部截图／crash、四组 Linux 双屏（Wayland 含混合 DPI）、滚动与录屏回归。后续测试工具修正与格式收尾仍以最终 `scope=all` 结果确认，不把编译或 mounted 测试等同于 native 验收。
+- P1-4 X11 条件化 hide：第 13 项未关闭，650 ms 不变。
+- P1-7 枚举去重：低优先级，未做。
+- 650 ms、250 ms 排空、HIDE_SETTLE、`focus_capture_window` 重试均未改。
+
+### 6.3 用例
+
+| 用例 | 变化 | 覆盖 |
+|---|---|---|
+| TC-SHOT-N27 | 修改：三组各 20 次打开（串行建窗握手／并行候选／常驻复用），后端子段 + 渲染标记 + 分组 P50/P95 + 握手比例；复用保持原 navigation/entry epochs，不能伪造第二次导航；关闭需确认隐藏、空 renderer、无 payload/lease/hidden ledger、主窗口恢复，`timeout_sec: 600` | P0-0b、P0-3/P0-5 定量、第 6 项 |
+| TC-SHOT-N28 | 强制 `startup-isolation`：主窗口 marker 对照、排除生效与撤销（仅支持白名单）、5 次生产打开 0 marker 像素、会话隐藏及关闭恢复。用户 2026-11-02 明确性能优先后，严格 `startup-flash` 从阻塞验收移为保留的诊断，函数及旧失败原件不变，不冒充通过 | I1、I6、P1-2、P1-3、P1-6、P0-1b、P0-1 |
+| TC-SHOT-N30 | 原生复用三代同一 WebView、递增 generation、清空旧选择/标注、每代新图、IPC/原生关闭、真实文件清理与租约释放，主窗口恢复；迟到复制不能关闭新 generation 的 mounted 回归 | P1-1、I2/I3/I6 |
+| TC-SHOT-040 | 新增 browser 延迟 init：透明 loading、不提前选择、decode/ready 后选择、Cancel 与重开清空选区；026/027 保留旧参数断言并加入 ready IPC 顺序 | P0-1b、ready、重开生命周期 |
+| 单元测试 | `ScreenshotOverlayStartup.test.tsx`、`screenshotOverlayRoot.test.ts`、`screenshotOverlayBoot.test.ts`、`images.test.ts`、Rust `startup_timing`/`startup_profile`/`overlay_handoff`/`stage_trace` | 透明根背景、ready 一次且带 generation、预取消费、失败会话不截屏、入口不含主应用、decode 直连 |
+
+### 6.4 验证记录
+
+2026-11-01 本机 Windows 11（Node 22.22.2 / pnpm 10.30.1）：
+
+- 前端全套：662 文件通过，6180 测试通过，1 原有跳过（`qa-ui-auto-report/tmp/screenshot-unit-full-node22.log`）。后续修改原生与 QA 工具，不把旧证据冒充最终所有源码证据。
+- 截图 browser 首轮 39/41；026/027 因 ready IPC 新顺序失败，保留原参数检查后两项复跑通过；随后完整截图 browser 41/41 通过（`run-20261101-222152-935490800`）。新增 040 加载/重开通过；StrictMode 重放预取重复读回先红后绿；共享 WebView guards 4 项通过。
+- 原生 debug QA 候选构建成功（含完整 `pnpm build --mode qa` 与 refactor 检查）。N27/N28 已实际运行，WGC 读取显示器被本机执行环境拒绝：`You do not have permission to capture the given monitor. (0x80070005)`；两个 native case **失败，不计通过**，保留 run `run-20261101-221939-942182400`。
+- Python 新 sampler/broker 11 项与 scenario runner 8 项通过；Windows 不支持无权限 symlink 的既有工具单测不计通过；Linux-only 代码必须由 runner 编译/原生检查。
+- GitHub 第一轮：[`41315939146`](https://github.com/engcapa/taomni/actions/runs/41315939146)，候选 `40469cb5`，三平台 browser/native + Linux 全四 profile + 自动追加 crash；browser 三端各 49/49 通过，N27 六组 native 各 40 次通过、ready 全部早于 show、0 超时。整体失败（7 项）：Linux 三个 X11 profile 的 N28 采到黑帧且间隔超标，Wayland N28 间隔超标、N16 Manual→Auto 未产生新帧；Windows N28 品红检测误计桌面图标；macOS N28 单次独立 CoreGraphics 读取耗时约 554ms。原始失败与 receipt 保留，不能因 job 成功就当 case 通过。全量尚未执行，任务未完成。
+
+2026-11-02 本机 Windows 11 后续：
+
+- WGC 自动化拒绝的根因已通过进程 TokenIntegrityLevel 对照确认：位于 Low 完整性报告树的 EdgeDriver 及其 QA 子进程为 Low（4096），普通启动与用户应用为 Medium（8192）。相同已验证驱动字节复制到正常工具目录后，driver/QA 都为 Medium，N10 原生逐像素误差为 0。未通过调整隐私策略解决。后续按用户明确要求，仅报告目录补当前用户访问权并改为可继承 Medium；项目父目录未改。runner 新增只读完整性守卫，禁止再把该条件误报为隐私权限问题。
+- 修复后 `run-20261102-064551-401425600`：N10、N27 通过，N28 隔离通过但采样失败，N29 初版通过但 2ms 耗时不能证明实际占用。没有把这些证据写成全通过。
+- 独立采样器改为 numpy 分析、20ms 目标间隔，numpy 在开始采样前加载；Windows Python 3.12 的 15.6ms `monotonic_ns` 与粗粒度 UTC 改用 QPC `perf_counter_ns` 和 `GetSystemTimePreciseAsFileTime`，保留真实读取区间和原 100ms/10ms 阈值。N28 `run-20261102-065848-786432700` 通过：66 帧、show 后 34 帧、无均匀帧，最大保守间隔 74.80ms，clockStable true。不外推其它 OS。
+- N29 加入真实 message-only window 持有者、占用对照读及生产 typed busy retry 计数，修复 NULL 持有者无法证明竞争的问题。`run-20261102-073733-500825200` 通过：occupiedControl true、同一请求 busyRetries 3、257ms、decoded RGBA 全相等。用户原始首次 Done 弹窗文字未保存，只证明此竞争回归，不宣称精确复现原始错误。
+- 为避免创建第二个 `<img>` 重新进入未绘制状态，view 复用已经 decode 的 Image 节点；identity、resize、StrictMode 卸载测试通过。Linux 黑帧修复仍需新的 native runner 像素证据。
+- Rust 聚焦 122/122 通过；runner/采样相关 Python 55/55 通过；refactor contracts / boundaries / size 与 QA audit gate 通过。完整 frontend 最新 662 文件通过、1 文件失败（6181 测试通过、1 失败、1 原有跳过）：无关编辑器 `editorPerformance.test.tsx` reconfigure 次数 2≠1；单文件 10/10 复跑通过。原完整失败保留，不计成完整全绿。
+- 第二轮 [`41363657648`](https://github.com/engcapa/taomni/actions/runs/41363657648)，`ad358be9`：334/340 通过、6 项 N28 失败；无基础设施错误、原始 receipt 完整。Wayland N16 及其它功能通过。五端 N28 为严格闪帧/采样门槛失败；macOS N28 为第一个生产 open 含整个品红 marker（direct exclusion 对照通过不能代表生产正确），故 macOS 排除路径禁用回退 hide。严格闪帧门槛随后按用户明示移出阻塞验收，旧 run 仍为失败，不重标。
+- 本机 N30 `run-20261102-084806-096469900`通过三代同 WebView/租约/关闭清理；全组 Windows debug 后续 25 项中 22 通过，N12 `defaultHidesWindows` 读取竞态、N17 系统剪贴板被覆盖、N4 原始默认 chord 被已安装用户应用占用恢复失败，原件 `run-20261102-084905-454774400` 保留。N12 改为有界观察原生隐藏；不改变用户应用/全局默认快捷键，不将 N17/N4 硬写通过。
+- 本机 debug 三组各 20 次 `run-20261102-083215-548672500`：firstMs P50/P95 为串行握手 1255/1322ms、并行 899/950ms、复用 821/910ms；focus 后轮询 selectMs P50 为 1443/1093/1026ms，不能把 focus 后轮询时刻等同纯渲染或真实第一像素。这台 debug 的 PNG 编码约 650–800ms，是剩余大头；不据此改编码或外推 release/4K。
+- 完整前端曾 6184 通过、2 失败、1 原有 skip（664 文件）。两个编辑器失败证实为测试与 deferred mount/grammar 两帧加载竞态，分别等待真实 Java language compartment 与两个 EditorView 挂载，不删内容、undo 或次数断言；修复后完整 `screenshot-resident-units-stable.log`：664 文件、6187 测试全部通过，1 原有 skip。截图聚焦 56 项与类型检查通过。
+- 本机 browser 截图／crash 在仍改动的 Vite HMR 期间重跑失败（032/033/036 与 workspace 导航等），不标通过；一轮 QA build 检测到编译中 inputs 改变而拒绝身份记录，保留 exit 2。随后冻结源码批次再构建/运行，不伪造 source stable。
+- 冻结候选 `1a5be417`：本机 screenshot browser `run-20261102-090908-152209500` 41/41，crash browser `run-20261102-091052-706960600` 8/8，均 identity_stable true、有匹配 receipt。原生 `run-20261102-091146-524231000` N30 证明首次触发也复用预热空窗口、三代一致 identity、陈旧 generation close 不影响新会话、所有租约/文件清理通过；N12/N17 仍失败，N4 恢复正确 prior registered=false 状态后通过。
+- N12 进一步定位为公开菜单调用尚处 focus 完成前就被 QA 关闭/重开，后者由未改的 OPENING guard 正确忽略。QA 等待 OPENING 释放后，`run-20261102-092535-808500700` N12/N17 2/2 通过，随后 `run-20261102-092752-615715900` N12/N17/N30/N4 4/4 通过、identity_stable true。N17 添加失败时 clipboard sequence/owner PID/format 只读记录；后续未复现，不能宣称定位了覆盖方。
+- Hosted 第三轮 [`41370911143`](https://github.com/engcapa/taomni/actions/runs/41370911143) 对应 `1a5be417`，338/346 通过、8 失败，无基础设施错误。三项 N12 是公开入口完成前重开竞态，五项 N28 是 RAII `eval` 把函数体的顶层 `return true` 当脚本执行，WebKit 报 `SyntaxError: Return statements are only valid inside functions.`；分别由 `44cac55b`、`75d226e5` 修正。六组 native N30 与 Linux 四组双屏通过。原失败报告／receipt 保留，不重标。
+- 本机最终 debug 截图 `run-20261102-094540-834368200`：25/25 通过，0 失败／跳过，identity_stable true、receipt 完整。随后匹配 release 的 crash `run-20261102-095510-433910300`：8/9 通过，WS-054 在 native 冷重启时被 runner 的 TCP 表检查中断；原失败保留。真实受控 IPv4/IPv6 socket 证明本机 `GetExtendedTcpTable(TCP_TABLE_OWNER_PID_LISTENER)` 会给可接受连接的监听端点返回非 LISTEN state，不能据此抛错。runner 保留所有返回的目标端点为占用，仍须实际端点消失才能重启，不修改应用逻辑、不终止无关进程；新增真实监听／关闭与异常 state 占用契约。相关 Python 36 项通过、1 Linux-only 跳过；Rust fmt 与 refactor 检查通过。
+- Hosted 第四轮 [`41373708966`](https://github.com/engcapa/taomni/actions/runs/41373708966) 对应 `75d226e5`：**346/346 通过，0 失败／跳过**，workflow success、report_ok true；三端 browser 各 49/49，Windows／macOS native 各 34/34，Linux xvfb／X11／VNC 各 32/32、Wayland 31/31，四组 Linux 双屏各 1/1。31/31 执行 entry 收齐；独立复核 receipt 签名、所有绑定文件哈希、source／runner／case／selection、QA ID、同 producer 二进制哈希、release 与 desktop profile 均匹配。N25 是 X11-only，Wayland 不适用不是跳过。N27 六组各 60 次 ready 早于 show、0 超时；N28 所有生产图 0 marker 像素并恢复；N30 六组预热空窗、三代复用／清理／租约与陈旧关闭隔离通过。
+
+第四轮 N27 release（每列每组 20 次；单位 ms，P50/P95）：
+
+| 组合 | 串行握手 firstMs | 并行 firstMs | 常驻复用 firstMs | 常驻复用 selectMs |
+|---|---|---|---|---|
+| Windows 2025 | 636/672 | 337/357 | 125/142 | 331/348 |
+| macOS 15 ARM64 | 475/537 | 331/348 | 297/322 | 466/496 |
+| Ubuntu 24.04 xvfb | 1219/1234 | 986/990 | 972/978 | 1131/1141 |
+| Ubuntu 22.04 X11 | 1180/1203 | 985/999 | 983/988 | 1141/1150 |
+| Ubuntu 22.04 VNC | 1193/1204 | 986/993 | 981/985 | 1140/1149 |
+| Ubuntu 26.04 Wayland | 1285/1308 | 1285/1297 | 1262/1286 | 1419/1444 |
+
+`firstMs=max(show, renderer commit)` 不是独立原生第一像素测量，`selectMs` 是后端 focus 完成后才读取的可选区轮询。三组均包含新的前端入口，不能称为原始 main 与最终版本的严格匹配对照；也不是慢机、进程冷启动或 4K 数据。Windows/macOS 收益明显，Linux 仍受未改的 650ms 隐藏、250ms 排空及每次 Wayland 新授权／首帧约束，不宣称全平台“瞬时”。P1-4 门槛未满足，650ms 不缩短。最终格式与工具修正后本机 `run-20261102-102243-508566600` release 截图＋crash 34/34、browser `run-20261102-102919-110636400` 49/49 通过，均 identity_stable true、receipt 完整；全量结果未满足约定范围前任务不标完成。
+
+### 6.5 全量与所有权收尾（2026-11-02）
+
+- 首次 `scope=all` [`41377822416`](https://github.com/engcapa/taomni/actions/runs/41377822416)，`295b27b8`，三端／Linux 四 profile，计划 3175 次、40 entries：实际 2797 通过、22 失败，Windows 一组 browser 和四组 native 在 Cygwin 准备阶段未执行，不能写成全量通过。多数失败是无关编辑器响应预算；用户再次明确其它功能性能类失败可先忽略，原始 summary／receipt 和严格失败不变。非性能失败（MFA 无二维码反馈、Java 默认 import 折叠、mail 对话框点击）单独复核，未用该豁免掩盖。终端 burst 的失败段原始 IPC 流完整、无缺索引，2MiB SHA-256 与期望完全一致，但 UI done marker 观察超时，不能称为渲染完整性通过。
+- 基础设施：Cygwin 原 hash 对应官方 2.937，但 rolling `setup-x86_64.exe` 已换版；改为官方版本化 URL，保留原 SHA-256。通过 detached signature 与官方 GPG 指纹 `56405CF6FCC81574682A5D561A698DE9E2E56300` 独立验签；每次在全新空目录下载，校验失败仍拒绝执行。Linux tool-contract 中模拟 Windows 重启的 test double 需创建新的 owned `driver.proc` 并断言新 PID 的只读完整性检查；生产隔离守卫与原 taskkill 树断言不变。
+- 复用审查补充：未消费的冷首次 prefetch 必须按 host generation 校验，旧 decoded URL／迟到读取在 idle 后释放，旧失败不能污染下一代；host 透传 typed generation，payload owner 每挂载绑定它。退役 Save／选择外部编辑器在发出 native dialog 前检查存活性。原生 CloseRequested 异步清理与 IPC close 用同一 generation 原子 claim，只有胜者执行原恢复／清理顺序；迟到 native cleanup 不得关闭新代，不修改 OPENING、SessionLease 或录屏／滚动守卫。
+- 新增 before-fix 回归实际失败（旧 prefetch 返回 generation 7 而非 8、旧 Save 打开 dialog），修复后 frontend 聚焦 48/48；Rust 聚焦 125/125（含两个并发 close claim 回归）通过，N30 补真实 native stale-cleanup 断言。`pnpm check:refactor`／Rust fmt／strict TypeScript 通过。完整前端 `screenshot-generation-units.log`：665 文件、6194 测试通过，1 原有 skip；匹配 release、最终截图＋crash 和全量重跑仍需收齐，不以旧源码通过替代。
+- 用户随后明确当前通过远程桌面连接，所有后续测试只在 GitHub runner 执行；本机自建 Vite 服务已停止，用户安装的 Taomni／远程桌面设置未改。此前 release `run-20261102-152005-341276300` 30/34、复核 `run-20261102-153133-047167200` 1/4，失败保留：系统剪贴板只读序列证实生产复制后位图已出现，约 190ms 后 `rdpclip.exe` 接管并清空，未杀该进程或修改远程桌面策略；N29 real contention 3 次 typed retry、253ms、RGBA 相等，N30 三代 staleNativeCloseIgnored true。WS-054 单次冷恢复面板计数失败后原断言复跑通过，不能将首轮覆盖成通过。
+- 未改候选功能复核 [`41404757126`](https://github.com/engcapa/taomni/actions/runs/41404757126)：40/41、report_ok true、无基础设施错误。MFA N106、Java 默认 import 折叠、Linux 联系人补全与完整 crash 均通过；唯一重复失败为 macOS native mail Close dialog 被裁切，仍为功能阻塞。限定修正 composer max-height/width 为所属内容区 100%，保留原 native close/reopen/contact 断言并补 viewport geometry，禁止用强制点击穿透。
+- 第二轮全量 [`41405599909`](https://github.com/engcapa/taomni/actions/runs/41405599909)，`db3eb049`：Windows browser 461/461，Linux browser 460/461（1 项无关帧预算），macOS browser 453/459（5 项无关帧预算，1 项 Markdown Split preview Find）。工具／原生 contracts 已通过，native 仍收集中，不能把已完成 shard 当完整通过。Markdown 故障图为 preview 已可见但 No active editor；预览 Find 不应依赖尚未注册的 deferred source command port。保持统一 keymap/dispatcher，仅由已挂载且实际聚焦的预览补足 readiness，并以 runner 单元／原 native case 验证。未改源码复核 run `41410499910` 中 browser 原失败再次复现；native WS-081 通过，但 WS-054 titlebar hit-test 失败，原件均保留。
+- 最新 affected runner `41411423338`：Linux producer 的新预览 readiness 回归本身通过，但第二个原用例被第一例留下的 DOM 污染（multiple preview）；显式 afterEach(cleanup) 修正，未删原断言。Windows 全量另发现 `ci_x11_session` 还引用已删除的共享 setup 路径；SSH/X11 统一调用每次独立下载、校验、执行、清理的 owner。完整性守卫误纳入系统 sandbox 进程，改为实际 native driver 角色且创建时间不早于真实父进程，防 parent PID 回收；Low adapter 与无法读取仍失败。三项均添加 runner contracts，未在用户远程桌面执行本机测试。
+- 第二轮全量最终：2961 通过、141 失败、0 跳过，73 项 Windows shard-4 因 X11 setup 路径缺失未执行，report_ok false；141 中 123 为 Windows driver 身份误判、11 为无关帧预算，另有 7 个功能失败：WS-030 native restart HTTP500、MFA106 no-QR、VNC N23 按标题找 unmapped X11 overlay、WS-054 冷恢复布局、WS-071 目录调用数、WS-081 preview Find、macOS mail close。原件与 strict workflow failure 保留，不改成绩。
+- `223417f0` affected run `41412967370` 的 Linux producer 前端 127/127、refactor 通过，Linux/macOS browser 各 51/51；已完成 Linux native shard 和 macOS native mail／preview／截图均通过，Windows 尚待收齐。冷恢复布局另证实 layout-only 请求可在磁盘恢复 pending 时被旧 captured host 覆盖，完成/失败收尾改读 live host，新增受控 pending regression；WS-054 原四面板/内容/hash 不删。N23 X11 geometry 改实际 GDK XID，不按窗口标题查询 unmap 期间的表面；尺寸/像素/DPR 断言不变。MFA 仅 isolated hosted QA 留存实际送入 decoder 的 TQF luma 与长度/协议分类日志，不记录 decoded secret，不改生产扫描／权限／反馈语义，用于定位全量才出现的非 OTP 结果。
+- `41412967370` 收齐后为 379/381，report_ok true、无基础设施错误；Windows native 39/39，三端 browser 各51/51。剩余 xvfb N23 标题 lookup 已改 XID；macOS N30 首次 fs read 从357到1881ms（1524ms），导致1500ms握手兜底，ready在show后72ms到达。保留该截图性能失败，不加固定等待、不放宽timeout/ready断言，N30追加原始stage/renderer证据便于复核。
+- 用户 2026-11-02 明确继续处理截图及已经出现的邮件、Markdown、工作区、MFA问题，范围锁定，不继续纳入新功能；全部测试仅runner。`7d66cb5b` 全量run `41418266772` 的Linux producer被新增Rust fmt检查挡住（MFA取证函数签名换行），采用runner精确diff修正；未把缺失Linux执行写成通过。
+- 按用户要求获取并合并远程 `main`（`a58434059d3f0d6e6d44b492e12ea72a5a6e4dbf`）。邮件 composer 完整采用上游 `min-h-0 max-w-full max-h-full` 及面板内边界／两次实际关闭／阅读内容／运行时回归，不保留重复的 viewport-only 用例变体；同时引入上游 iframe 自有 ResizeObserver 生命周期与真实文档到达后的默认 import 折叠修复。Cygwin 使用上游 2.941 URL/hash，保留本分支 SSH/X11 每次独立临时目录下载与校验 owner，并同步合并后的契约测试。上游这批提交未更改 Markdown preview Find、冷恢复 layout 请求或 MFA 扫屏，故不据此宣称这些问题已解决。截图路径和 I1–I7 相关文件合并中无上游改动，原本分支安全约束保留。合并源码须重新运行 runner 上的 fmt/refactor、相关单元、全部截图＋crash 及全量矩阵；旧 SHA 的通过不当作合并后证据。本机未运行测试。
+- 合并后 runner `41423300212` 的 Linux／Windows browser 各52/52，原 receipt、绑定文件 hash、source/case identity 已分别核验。现有 native contracts 为134通过、6原有ignore；日志证实筛选只含 capture/surfaces，漏掉新增 startup/handoff/generation/clipboard 单元，因此将同一 Rust root binary 的筛选补为完整 `screenshot::` 及已在范围内的 `mfa::`，不以旧 contract job 绿代替未执行的回归。下一候选 Linux producer 改跑完整 frontend Vitest，保留原日志和 fail-fast 结果；本机不执行任何测试。
+- 合并矩阵 `41423300212` 已核验31/31 entries、383/384通过、无缺失；三端browser各52、Windows native39、macOS native38、Linux xvfb37/VNC37/Wayland36及四双屏各1均通过。唯一失败为X11 WS-054冷重启close-window的空消息HTTP500，复现此前WS-030同一阶段问题；未放宽原case／冷恢复／hash断言。验证补充 `ddc34908` run `41426229378` 完整frontend666文件、6202通过/1原有skip，Rust251通过/6原有ignore（含startup/handoff/generation/clipboard），Linux20/20、receipt全核验。
+- X11重启工具调整为核对本次launcher group内真实exe/PID/kernel birth后，向唯一managed XID发正常WM close（非kill/destroy），独立观察该XID消失，再保留原app/WebKit storage退出屏障。HTTP500不视为成功、不重发关闭、不绕过确认、不重置profile；原失败消息与请求阶段先于cleanup记录。Windows/macOS/Wayland原关闭路径不变，新增fail-closed工具单元与WS-030/054原生验收待runner验证。
+- `ce79af0e` 全范围矩阵 `41439022324` 384/384、31/31 entries、截图265/265、完整crash78/78，原receipt/绑定文件/源码/runner/case/同源release build及desktop均核验通过；X11 WS054仍记录HTTP500，但精确XID消失、app/storage退出、新会话、原面板/保存hash/冷恢复均通过。随后同SHA全量 `41443016369` 3175执行/40entries继续运行。
+- 全量VNC MFA106再次失败，保留的真实TQF输入及用户提供图像共同证明：备份AUTH715测试打开的Firefox飞书登录QR遗留在桌面。第一次decoder日志为113字节OTP＋60字节非OTP，关闭MFA QR后仍有60字节非OTP；产品“不是MFA QR”反馈正确，无QR测试前提被污染。只调整hosted Linux授权fixture清理：基线排除既有PID、要求继承三个run-owned XDG根、每次信号前核对真实exe/kernel birth；只SIGTERM且等待退出，无法证明归属/退出就失败，不kill-by-name、不隐藏任意窗口、不改MFA过滤或反馈。将AUTH715→MFA106注册为同native shard前置链，新增归属/foreign/PID复用/清理失败/规划contract；本机不执行测试，待runner复验，不把旧全量失败覆盖成通过。
+- 全量 `41443016369` 完整3175执行、40/40 entries：3168通过/7失败，report_ok true、无缺失/infra；截图265/265、crash78/78全过。6项其它功能纯性能失败按用户授权暂不阻塞，唯一功能问题为上面的MFA环境污染。`e75279db` 聚焦复核中VNC/X11/Wayland的真实Firefox清理＋MFA空扫描均通过，Xvfb的Chrome未保留XDG环境所以清理器正确fail closed；macOS shard2因hosted ARM容量未获runner而取消（无执行）。下一修正仅为授权fixture设置run-local URL association，经真实system opener启动带case-private profile的浏览器，并用profile+kernel birth证明所有权，profile留在排除上传的native-appcache。仍不按名称清理，不改MFA产品／断言／代理，待runner复验。
+- `7b6b7175` 聚焦矩阵 [`41460743834`](https://github.com/engcapa/taomni/actions/runs/41460743834)：31/31 entries、390 执行中 386 通过／4 失败，report_ok true、无缺失／infra。四项均为 Linux AUTH715：X11／VNC／Wayland fixture setup 的系统 URL 关联未选中，xvfb 流程断言通过但清理没有可归属浏览器，真实 launcher 的 `launch.json` 未产生。源码证实 `.desktop` 无条件引用可执行路径，而 xdg-utils 1.1.3 的 `first_word` 不解析引号，导致 executable lookup／generic opener 失败；xvfb fallback 关联查询不证明实际启动。修正仅对安全路径去掉多余 Exec 引号，保留特殊字符转义、真实系统 opener／浏览器、private profile 与 PID birth 清理守卫；补真实 xdg-mime／xdg-open 工具回归（只替换浏览器子进程，不 mock 系统解析）。截图／MFA／邮件产品语义及原用例断言不改；本机仅执行提交必需的 refactor 静态检查，不运行测试或应用。随后需 runner 单元与全量矩阵验证，不将该失败 run 重标通过。用户再次明确 backup／MFA／email 功能失败均需处理，仅非截图的纯性能失败可暂不阻塞。
+- `0b588fd6` Linux 聚焦 [`41470957223`](https://github.com/engcapa/taomni/actions/runs/41470957223)：129 个工具单元中 128 通过／1 Windows-only 原有 skip，新增真实 XDG 系统解析／启动 contract 通过，refactor／fmt 通过。完整 frontend 665 文件通过／1 文件失败（6201 通过／1 失败／1 原有 skip）；Git `WorkspaceGitManager.parity008` 在 repo-B 元数据已提交但异步 language 尚未挂载编辑器时立即断言正文。只将原正文断言改为等待实际挂载，并在释放旧 repo-A 结果后再次断言 B 正文仍在，保留原 stale-result／EOL／repository/title 断言，不改产品或预算。producer 因该失败未进入原生执行，不将未运行的 backup／MFA／mail／crash 写成通过；原日志保留，后续候选 runner 重验。
+- `30687b8d` 聚焦 [`41473961334`](https://github.com/engcapa/taomni/actions/runs/41473961334)：完整 frontend 666 文件／6202 通过、1 原有 skip，Linux release producer 成功；57 执行中 49 通过／8 失败，report_ok true、无缺失／infra。四 profile 的 AUTH715 清理及随后 MFA106 no-QR 失败，mail／其余 crash 全过。各组 `launch.json` 现已真实产生，PID 与被排除的 Chrome 主进程一致；上一修正已经打通真实 opener，剩余为 Chromium `SetProcessTitleFromCommandLine` 将 argv 重写为空格连接单串，NUL token-only matcher 无法证明 profile。追加 launcher exec 前的 kernel birth 记录；仅在 exact PID/birth/profile 匹配并有完整分隔的 profile flag 时接受单串 title，不以子串或名称授权，仍按真实 executable/birth 在每次 SIGTERM 前复核。新增缺记录／错误PID或birth／错误profile／路径前缀／URL伪匹配／损坏记录／foreign Chrome 不可终止的 contract。产品 MFA 筛选、授权与原 case 断言不改；本机不运行测试，待 runner 真实 Chrome 退出及 MFA 空扫描复验。
+- `2bd28e7a` 聚焦 [`41483385734`](https://github.com/engcapa/taomni/actions/runs/41483385734)：57 执行中 53 通过／4 AUTH715 setup 失败，report_ok true；完整 frontend 666 文件／6202 通过、1 原有 skip。真实 runner 的 `ctx.case_dir` 为相对路径，route 保存的 launch record 是绝对路径，新增路径守卫未经规范化即比较而错误拒绝。将 case 目录 resolve 后再比较精确 record 路径，继续拒绝外部／symlink；补真实相对 case 路径和拒绝分支 contract。MFA 本轮通过不能代表联合验收，因为 AUTH715 未运行；继续 runner 重验，不将原失败覆盖成通过。
+- `69a69388` 聚焦 [`41489269943`](https://github.com/engcapa/taomni/actions/runs/41489269943) 已收齐：**57/57 通过、0 失败／跳过，17/17 entries、report_ok true、workflow success**。Linux browser 9/9，xvfb／X11／VNC／Wayland native 各12/12；backup→MFA 四组8项、邮件5项及 Linux完整crash44项全过。四组 launch record 的 PID／kernel birth／profile 与 cleanup closed Chrome 主进程完全匹配（7805/14063、8294/75549、7836/27244、11370/26709），后续原 no-QR／恢复断言通过。19 个 qa artifact ZIP 的 GitHub SHA-256／大小匹配；17 份原 receipt、1510 个绑定文件（46,042,702 bytes）及源码／runner／case／selection、同 producer QA release／desktop identity 全核验，aggregate 重算一致。核验结果 `/tmp/taomni-41489269943-check.RsMMBh/verification-result.json`，原报告 `/tmp/taomni-41489269943-reports.1kjDY4`；下载 EOF／502 重试保留在下载日志，不重写用例结果。runner 工具单元130通过／1 Windows-only原有skip，完整前端666文件／6202通过／1原有skip，fmt/refactor通过。本轮没有选择 TC-SHOT，不冒充最终三端截图或全量证据；后续 `scope=all` 三端／四Linux profile 派发被当前会话权限拦截，尚未启动，需用户批准／执行，不绕过权限、任务不标全量完成。

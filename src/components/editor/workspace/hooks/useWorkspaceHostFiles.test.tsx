@@ -5,6 +5,7 @@ import type { CodeWorkspaceFileRef } from "../../../../types";
 import { fileKey, makeLoadingFile } from "../codeWorkspaceModel";
 import type { WorkspaceHostIntegration } from "../workspaceHostIntegration";
 import { useWorkspaceHostFiles } from "./useWorkspaceHostFiles";
+import { getAllLeafNodes } from "../recursiveLayoutTree";
 
 const instanceId = "host-reconciliation";
 const root = { id: "root", path: "/project", name: "project", kind: "folder" as const };
@@ -61,6 +62,29 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("workspace host request ownership", () => {
+  it("applies a layout-only request made while cold-restored files are still opening", async () => {
+    const store = useCodeWorkspaceStore.getState();
+    store.updateEditorGroup(instanceId, "primary", (group) => ({ ...group, openOrder: [keys[0]] }));
+    const first = host();
+    const ports = dependencies(first);
+    let finish!: () => void;
+    vi.mocked(ports.files.openFile).mockImplementationOnce(async () => {
+      await new Promise<void>((resolve) => { finish = resolve; });
+      store.updateEditorGroup(instanceId, "primary", (group) => ({ ...group, openOrder: keys }));
+      return { canonicalFileKey: keys[1], groupId: "primary", error: null };
+    });
+    const { rerender } = renderHook(({ request }) => useWorkspaceHostFiles({ ...ports, host: request }), { initialProps: { request: first } });
+    await act(async () => undefined);
+    const latest = { ...host(), canvasLayout: "split" as const, paneFiles: refs };
+    rerender({ request: latest });
+    await act(async () => finish());
+    const leaves = getAllLeafNodes(ui().layoutTreeV2);
+    expect(leaves).toHaveLength(2);
+    expect(leaves.map((leaf) => ui().editorGroups[leaf.id].activeKey)).toEqual(keys);
+    expect(first.onSnapshot).not.toHaveBeenCalled();
+    expect(latest.onSnapshot).toHaveBeenLastCalledWith({ files: Object.values(ui().openFiles), activeFile: refs[0] });
+  });
+
   it("publishes an already reconciled file list without another editor render or open", async () => {
     const request = host();
     const ports = dependencies(request);

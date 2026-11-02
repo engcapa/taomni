@@ -8,6 +8,29 @@ from tauri_webdriver import TauriDriverProcess
 
 
 class NativeDriverLifecycleTest(unittest.TestCase):
+    def test_windows_reused_driver_checks_adapter_integrity_before_app_launch(self):
+        with TemporaryDirectory() as directory:
+            driver = TauriDriverProcess({}, Path(directory))
+            driver.proc = Mock(pid=17)
+            driver.proc.poll.return_value = None
+            with patch("tauri_webdriver.platform.system", return_value="Windows"), \
+                 patch("tauri_webdriver._tcp_ok", return_value=True), \
+                 patch("native_windows_integrity.ensure_medium_driver_tree") as inspect:
+                driver.ensure_running()
+            inspect.assert_called_once_with(17)
+
+    def test_windows_restarted_driver_checks_new_owned_tree(self):
+        with TemporaryDirectory() as directory:
+            driver = TauriDriverProcess({}, Path(directory))
+            def start():
+                driver.proc = Mock(pid=18)
+            with patch("tauri_webdriver.platform.system", return_value="Windows"), \
+                 patch("tauri_webdriver._tcp_ok", return_value=False), \
+                 patch.object(driver, "start", side_effect=start), \
+                 patch("native_windows_integrity.ensure_medium_driver_tree") as inspect:
+                driver.ensure_running()
+            inspect.assert_called_once_with(18)
+
     def test_linux_reuses_its_running_owned_driver(self):
         with TemporaryDirectory() as directory:
             driver = TauriDriverProcess({}, Path(directory))

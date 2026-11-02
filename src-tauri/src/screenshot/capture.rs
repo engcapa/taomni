@@ -53,6 +53,12 @@ mod source;
 
 mod frames;
 
+#[cfg(target_os = "linux")]
+mod overlap;
+
+#[cfg(target_os = "linux")]
+pub(super) use overlap::capture_after_hidden;
+
 #[cfg(test)]
 mod tests;
 

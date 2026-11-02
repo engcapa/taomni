@@ -9,6 +9,8 @@ import email.parser
 import email.policy
 import hashlib
 import json
+import os
+import platform
 import threading
 import time
 import uuid
@@ -56,6 +58,22 @@ def setup(ctx: Any) -> None:
         return
     root = isolated_data_root(ctx) / "backup-control"
     setup_credential_store(ctx)
+    if (ctx.case_id == "TC-BACKUP-AUTH-715" and platform.system() == "Linux"
+            and os.environ.get("GITHUB_ACTIONS") == "true"):
+        from native_external_browser import ExternalBrowserOwner
+        from native_authorization_route import AuthorizationBrowserRoute
+        from tauri_webdriver import native_isolation_env
+        expected = native_isolation_env(Path(ctx.report_root))
+        route = AuthorizationBrowserRoute(Path(ctx.case_dir), expected)
+        try:
+            route.install()
+            ctx._backup_browser = ExternalBrowserOwner(
+                Path(ctx.report_root), Path(ctx.case_dir), expected,
+                profile=route.profile, launch_record=route.record)
+        except BaseException:
+            route.restore()
+            raise
+        ctx._backup_browser_route = route
     root.mkdir(parents=True, exist_ok=True)
     ctx.values.update(backup_policy_path=str(root.parent / "backup_policy.json"), backup_control_path=str(root / "config.json"))
     if ctx.case_id == "TC-BACKUP-COMPAT-001":
@@ -202,7 +220,17 @@ def setup(ctx: Any) -> None:
 def teardown(ctx: Any) -> None:
     from . import backup_snapshot
     backup_snapshot.teardown(ctx)
-    server = getattr(ctx, "_backup_server", None)
-    if server:
-        server.shutdown()
-        server.server_close()
+    try:
+        browser = getattr(ctx, "_backup_browser", None)
+        if browser is not None:
+            browser.stop()
+    finally:
+        try:
+            route = getattr(ctx, "_backup_browser_route", None)
+            if route is not None:
+                route.restore()
+        finally:
+            server = getattr(ctx, "_backup_server", None)
+            if server:
+                server.shutdown()
+                server.server_close()

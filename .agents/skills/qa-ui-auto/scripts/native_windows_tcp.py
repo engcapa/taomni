@@ -8,7 +8,6 @@ import struct
 _DWORD = ctypes.c_uint32
 _INSUFFICIENT_BUFFER = 122
 _LISTENER_TABLE = 3  # TCP_TABLE_OWNER_PID_LISTENER
-_LISTEN = 2
 _IPV4_ROW = struct.Struct("=IIIIII")
 _IPV6_ROW = struct.Struct("=16sII16sIIII")
 
@@ -45,13 +44,15 @@ def _decode_table(data: bytes, family: int, ports: tuple[int, ...]) -> list[dict
     for index in range(count):
         fields = row.unpack_from(data, 4 + index * row.size)
         if family == socket.AF_INET:
-            state, address, port, _, _, pid = fields
+            _, address, port, _, _, pid = fields
             address = struct.pack("=I", address)
             scope = 0
         else:
-            address, scope, port, _, _, _, state, pid = fields
-        if state != _LISTEN:
-            raise RuntimeError("Windows listener table contains a non-listening row")
+            address, scope, port, _, _, _, _, pid = fields
+        # GetExtendedTcpTable already filters TCP_TABLE_OWNER_PID_LISTENER.
+        # The local host returned non-LISTEN state values even for a socket
+        # which accepted a connection. Keep every returned matching endpoint
+        # as occupied: never let an unexpected state prove a port is free.
         port = socket.ntohs(port & 0xffff)
         if port not in ports:
             continue

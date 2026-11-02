@@ -1,10 +1,10 @@
 id: TC-WS-054
 title: 'Crash regression: release WebView multi-file layouts, cold restart and exact disk save'
 description: Runs toolbar layouts through production controls and real editor/store owners in the matching QA release WebView. Verifies four real files,
-  exact saved bytes, a process cold restart with the initially empty vault, and layouts after restoration. No layout or resizable-panel mocks. Repeats four
+  exact saved bytes, a process cold restart with the initially empty vault, and layouts after restoration, including layout requests while cold-restored disk reads are still finishing. No layout or resizable-panel mocks. Repeats four
   consecutive narrow/wide editor geometry cycles with Documentation and sidebar resizing, then saves long and short content before cold restart. Also checks
   undo/redo, dirty state and unchanged disk bytes after the first wide save; preserves the LSP-decoration selection regression without retrying or replaying
-  input.
+  input. On X11, cold restart uses the verified QA owner's normal window-manager close request, requires its exact native surface to disappear and app/storage processes to exit, and does not treat an empty WebDriver HTTP 500 as proof of closure.
 modes:
 - native
 covers:

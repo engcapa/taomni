@@ -245,12 +245,15 @@ describe("WorkspaceGitManager ED-PARITY-008 repository context", () => {
     fireEvent.click(rowFor("repo-b"));
     await waitFor(() => expect(screen.getByTestId("git-diff-viewer")).toHaveAttribute("data-repo-root", "/fx/repo-b"));
 
-    expect(screen.getByTestId("git-diff-viewer")).toHaveTextContent("repo-b WORKTREE");
+    // Repository metadata commits before the async language load mounts the
+    // editor. Observe the actual B content before releasing A's stale result.
+    await waitFor(() => expect(screen.getByTestId("git-diff-viewer")).toHaveTextContent("repo-b WORKTREE"));
     // A stale repo-a reload is EOL-only; applying it would re-show the banner under repo-b.
     await act(async () => { lateReload.resolve(pair("same.txt", "late-a\n", "late-a\r\n")); });
     expect(screen.getByTestId("git-diff-viewer")).toHaveAttribute("data-repo-root", "/fx/repo-b");
     expect(screen.getByTestId("workspace-diff-title")).toHaveTextContent("repo-b / same.txt");
     expect(screen.queryByTestId("git-diff-eol-only-banner")).toBeNull();
+    expect(screen.getByTestId("git-diff-viewer")).toHaveTextContent("repo-b WORKTREE");
     expect(screen.getByTestId("git-diff-viewer")).not.toHaveTextContent("late-a");
   });
 });

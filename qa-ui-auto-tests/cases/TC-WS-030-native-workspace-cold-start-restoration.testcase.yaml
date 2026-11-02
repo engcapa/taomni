@@ -3,7 +3,7 @@ title: Native cold start restores workspace files and reconnects independent SSH
 description: Uses an actual OS chooser and UI-created workspace tabs. Saves SSH/SFTP credentials in vault, restarts the owned QA process twice without profile reset,
   verifies real SSH command output, SFTP marker, local PTY, unsaved draft, active tab and disk conflict protection. Expanded source directory entries must survive
   both cold starts without re-expanding the tree. The selected root is explicitly below a .cache ancestor on every OS; ordinary descendants must still emit real file-change/conflict
-  events after collapsing and expanding a restored directory replaces the watcher.
+  events after collapsing and expanding a restored directory replaces the watcher. X11 cold restart observes the exact owned native window and app/storage shutdown independently of WebDriver; transport errors alone never count as a successful close.
 modes:
 - native
 covers:

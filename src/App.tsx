@@ -31,7 +31,8 @@ import { useAppTheme } from "./lib/appTheme";
 import { applyCodeViewProfile, loadCodeViewProfile } from "./lib/codeViewProfile";
 import { attachSftpSync } from "./lib/sftpSync";
 import { sweepExpiredHandoffs } from "./components/filebrowser/SftpDetachedWindow";
-import { dispatchNativeFileDrop, isOsFileDrag } from "./lib/osFileDrop";
+import { dispatchNativeFileDrop } from "./lib/osFileDrop";
+import { useWebviewGuards } from "./lib/webviewGuards";
 import { isTauriRuntime, getAppPlatform } from "./lib/runtime";
 import { subscribeUiAppearanceStorage, useAppStore } from "./stores/appStore";
 import { AppDialogProvider } from "./lib/appDialogs";
@@ -79,66 +80,12 @@ function App() {
     });
   }, [resolvedTheme]);
 
-  // In production builds (the shipped binary, not `pnpm dev` / `tauri dev`),
-  // suppress the WebView's native right-click menu. On WebView2/WKWebView that
-  // menu exposes "Reload", which reloads the whole webview and tears down every
-  // live terminal / SFTP / AI session — there is no real navigation in this SPA,
-  // so a reload is always destructive. Editable fields keep their native
-  // Cut/Copy/Paste menu (which never contains Reload), and the app's own custom
-  // context menus call preventDefault themselves, so capture-phase here leaves
-  // them intact (preventDefault does not stop propagation to React handlers).
-  useEffect(() => {
-    if (!import.meta.env.PROD) return;
-    const suppressNativeMenu = (event: MouseEvent) => {
-      const target = event.target as HTMLElement | null;
-      if (target?.closest('input, textarea, [contenteditable]:not([contenteditable="false"])')) {
-        return;
-      }
-      event.preventDefault();
-    };
-    window.addEventListener("contextmenu", suppressNativeMenu, { capture: true });
-    return () => window.removeEventListener("contextmenu", suppressNativeMenu, { capture: true });
-  }, []);
-
-  // Production builds: also block the WebView's reload shortcuts (F5 and
-  // Ctrl/Cmd+R, including their Shift hard-reload variants). Like the native
-  // Reload menu item, these reload the whole webview and tear down every live
-  // session. We only preventDefault (never stopPropagation), so components that
-  // legitimately use these keys still receive them: F5 still runs a query in
-  // the SQL editor, Ctrl+R still reaches the terminal (bash reverse-search) and
-  // RDP/VNC viewers forward the keys to the remote.
-  useEffect(() => {
-    if (!import.meta.env.PROD) return;
-    const blockReloadKeys = (event: KeyboardEvent) => {
-      const isReload =
-        event.key === "F5" ||
-        ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "r");
-      if (isReload) event.preventDefault();
-    };
-    window.addEventListener("keydown", blockReloadKeys, { capture: true });
-    return () => window.removeEventListener("keydown", blockReloadKeys, { capture: true });
-  }, []);
+  useWebviewGuards();
 
   // Mirror the transfer queue across same-origin windows so a user can see
   // the same uploads/downloads from both the main app and a detached SFTP
   // window. The cleanup tears the channel down on hot-reload too.
   useEffect(() => attachSftpSync(), []);
-  useEffect(() => {
-    const preventFileNavigation = (event: DragEvent) => {
-      if (!isOsFileDrag(event.dataTransfer)) return;
-      event.preventDefault();
-      if (event.type === "dragover" && event.dataTransfer) {
-        event.dataTransfer.dropEffect = "copy";
-      }
-    };
-
-    window.addEventListener("dragover", preventFileNavigation, { capture: true });
-    window.addEventListener("drop", preventFileNavigation, { capture: true });
-    return () => {
-      window.removeEventListener("dragover", preventFileNavigation, { capture: true });
-      window.removeEventListener("drop", preventFileNavigation, { capture: true });
-    };
-  }, []);
   useEffect(() => {
     if (!isTauriRuntime()) return;
 

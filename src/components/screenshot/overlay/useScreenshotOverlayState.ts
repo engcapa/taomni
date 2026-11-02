@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { formatUnknownError } from "../../../lib/appDialogs";
 import { useT } from "../../../lib/i18n";
-import { listSystemFonts } from "../../../lib/ipc";
+import { listSystemFonts } from "../../../lib/ipc/application";
 import {
-  captureFull,
   closeScreenshotOverlay,
-  fetchOverlayInit,
   listDisplays,
   revokeScreenshotUrl,
+  signalOverlayReady,
   toPhysicalRect,
   type OverlayInit,
   type PhysicalRect,
@@ -18,12 +17,16 @@ import {
 import { type WatermarkSettings } from "../../../lib/screenshotImage";
 import { screenshotShortcutLabel, useScreenshotShortcutStore } from "../../../lib/screenshotShortcut";
 import { FILLABLE_TOOLS, FONT_STACK, type AnnotationCanvasHandle, type AnnotationTool, type CssRect, type EraserMode, type Shape } from "../AnnotationCanvas";
-import { loadArtifact } from "./images";
+import { failedOverlayGeneration } from "./prefetch";
+import { useScreenshotSessionGeneration } from "./sessionGeneration";
+import { createOverlayPayloadOwner } from "./payloadOwner";
+import { markOverlayStartup } from "./startupTiming";
 import { COLORS } from "./tools";
 import { type Handle, type ImageSnapshot, type Phase } from "./types";
 
 
 export function useScreenshotOverlayState() {
+  const sessionGeneration = useScreenshotSessionGeneration();
   const t = useT();
   const stopShortcut = screenshotShortcutLabel(useScreenshotShortcutStore((s) => s.status));
   const [init, setInit] = useState<OverlayInit | null>(null);
@@ -99,11 +102,16 @@ export function useScreenshotOverlayState() {
   const pendingShapes = useRef<Shape[] | null>(null);
   // The backend focuses the native window once it is mapped; give the document
   // focus too, so key handlers run even when the window is focused without a
-  // focused element (otherwise the first click has to do it).
+  // focused element (otherwise the first click has to do it). The renderer
+  // can load while its window is still hidden, so wait for the base image:
+  // it exists only after the desktop was captured.
+  const hasImage = !!img;
   useEffect(() => {
+    if (!hasImage) return;
     window.focus();
     rootRef.current?.focus({ preventScroll: true });
-  }, []);
+  }, [hasImage]);
+  useEffect(() => { markOverlayStartup("mount"); }, []);
   useLayoutEffect(() => {
     if (pendingShapes.current && canvasRef.current) {
       canvasRef.current.restore(pendingShapes.current);
@@ -127,6 +135,12 @@ export function useScreenshotOverlayState() {
   } | null>(null);
   const toastTimer = useRef<number | null>(null);
   const busyRef = useRef(false);
+  const sessionAlive = useRef(true);
+  useLayoutEffect(() => {
+    sessionAlive.current = true;
+    return () => { sessionAlive.current = false; };
+  }, []);
+  const isCurrent = useCallback(() => sessionAlive.current, []);
 
   useEffect(() => {
     if (tool !== "text" && !textSelected) return;
@@ -144,6 +158,7 @@ export function useScreenshotOverlayState() {
   const toPhysical = (r: CssRect) => toPhysicalRect(r, sx, sy, bounds);
 
   const showToast = useCallback((msg: string) => {
+    if (!sessionAlive.current) return;
     setToast(msg);
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(null), 2500);
@@ -158,31 +173,30 @@ export function useScreenshotOverlayState() {
   // Image undo keeps previous backgrounds alive. Revoke all owned URLs only
   // on unmount, not when selecting the next edit snapshot.
   const ownedUrls = useRef(new Set<string>());
-  useEffect(() => { if (imgUrl) ownedUrls.current.add(imgUrl); }, [imgUrl]);
+  const initialUrl = useRef<string | null>(null);
+  useEffect(() => {
+    if (imgUrl && imgUrl !== initialUrl.current) ownedUrls.current.add(imgUrl);
+  }, [imgUrl]);
   useEffect(() => () => { ownedUrls.current.forEach(revokeScreenshotUrl); }, []);
 
   const close = useCallback(() => {
-    void closeScreenshotOverlay().catch(() => undefined);
+    if (sessionAlive.current) void closeScreenshotOverlay(generationRef.current ?? undefined).catch(() => undefined);
   }, []);
 
-  // Init: prefer the pending overlay payload; fall back to a live fullscreen
-  // capture so the overlay never renders blank (dev/QA direct open).
+  // Init: the payload of the backend session (possibly prefetched while the
+  // UI modules loaded); only a dev/QA direct open falls back to a live
+  // fullscreen capture so the overlay never renders blank.
+  const generationRef = useRef<number | null>(sessionGeneration ?? null);
+  const payloadOwner = useRef<ReturnType<typeof createOverlayPayloadOwner> | null>(null);
   useEffect(() => {
     let cancelled = false;
+    payloadOwner.current ??= createOverlayPayloadOwner(sessionGeneration);
+    const lease = payloadOwner.current.acquire();
     (async () => {
-      let data: OverlayInit;
-      try {
-        data = await fetchOverlayInit();
-      } catch {
-        const file = await captureFull();
-        data = { path: file.path, displayId: "", width: file.width, height: file.height, scaleFactor: 1 };
-      }
+      const { init: data, ...loaded } = await lease.promise;
       if (cancelled) return;
-      const loaded = await loadArtifact(data.path);
-      if (cancelled) {
-        revokeScreenshotUrl(loaded.url);
-        return;
-      }
+      initialUrl.current = loaded.url;
+      generationRef.current = data.generation ?? null;
       setInit(data);
       if (!data.document) void listDisplays().then((items) => { if (!cancelled) setDisplays(items); }).catch(() => undefined);
       setImg(loaded.img);
@@ -192,12 +206,34 @@ export function useScreenshotOverlayState() {
         setScrollResult({ frames: 0, ...size }); setSel({ x: 0, y: 0, ...size }); setTool("move"); setPhase("preview");
       } else setPhase("select");
     })().catch((e: unknown) => {
-      if (!cancelled) setLoadError(formatUnknownError(e));
+      if (cancelled) return;
+      generationRef.current = failedOverlayGeneration(e) ?? sessionGeneration ?? null;
+      setLoadError(formatUnknownError(e));
     });
     return () => {
       cancelled = true;
+      lease.release();
     };
   }, []);
+
+  // P0-1: the base image (or the error view) is committed. Tell the backend
+  // so it shows the window now instead of an unpainted surface. A layout
+  // effect runs before the next paint without depending on rAF, which a
+  // hidden window may never schedule.
+  const readyFor = useRef<number | null>(null);
+  const committed = !!loadError || (!!img && phase !== "loading");
+  useLayoutEffect(() => {
+    if (!committed) return;
+    markOverlayStartup("commit");
+    const generation = generationRef.current ?? init?.generation;
+    if (generation === undefined || generation === null || readyFor.current === generation) return;
+    readyFor.current = generation;
+    void signalOverlayReady(generation).catch(() => undefined);
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(() => markOverlayStartup("paint"));
+    // Deferred until the base image is up: the stop-shortcut label is not
+    // needed for the first frame.
+    void useScreenshotShortcutStore.getState().refresh();
+  }, [committed, init]);
 
   useEffect(() => {
     const onResize = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
@@ -205,6 +241,7 @@ export function useScreenshotOverlayState() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
   return {
+    isCurrent,
     img,
     pickerCacheRef,
     setPickerInfo,
