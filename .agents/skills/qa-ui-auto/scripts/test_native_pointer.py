@@ -1,6 +1,6 @@
 import json
 import subprocess
-from itertools import chain, repeat
+from itertools import chain, cycle, repeat
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
@@ -119,6 +119,13 @@ class NativePointerReadinessTest(TestCase):
         self.assertGreaterEqual(self.session.request.call_count, 4)
         self.assertGreaterEqual(self.now, 0.4)
         self.assertTrue(all(c.args[1].endswith('/execute/sync') for c in self.session.request.call_args_list))
+
+    def test_subpixel_webkit_dimension_jitter_keeps_the_same_physical_target(self):
+        first = {**self.geometry(), "width": 738.0000000000001}
+        second = {**self.geometry(), "width": 738.0}
+        self.session.request.side_effect = cycle([first, second])
+        self.assertEqual(prepare_pointer_target(self.session, self.origin), {'x': 270, 'y': 217})
+        self.assertGreaterEqual(self.now, 0.3)
 
     def test_covered_point_cannot_satisfy_stability_until_uncovered(self):
         self.respond([self.geometry(ready=False), None, self.geometry(ready=False),

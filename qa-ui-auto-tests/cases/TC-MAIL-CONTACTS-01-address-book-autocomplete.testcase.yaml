@@ -21,9 +21,11 @@ description: 'TASK-19 (docs-feature/mail-thunderbird-parity-design.md AC-61, DEC
   '
 covers:
 - F-MAIL-21
+- F-MAIL-2
 tags:
 - mail
 - p2
+- composer-layout
 modes:
 - browser
 - native
@@ -36,6 +38,9 @@ steps:
 - seed_storage:
     key: taomni.quickConnectVisible
     value: 'true'
+- seed_storage:
+    key: taomni.qa.resizeTrace.v1
+    value: '1'
 - reload_window: null
 - wait_for: '[data-testid="qc-input"]'
 - fill:
@@ -69,6 +74,11 @@ steps:
     selector: '[data-testid="mail-recipient-suggestions"]'
     contains: Zed Contact
 - screenshot: mail-contacts-01-autocomplete.png
+- &id001
+  eval_readonly:
+    expression: document.querySelector('[role][aria-modal]').getBoundingClientRect().top >= document.querySelector('[role][aria-modal]').parentElement.getBoundingClientRect().top
+      && document.querySelector('[role][aria-modal]').getBoundingClientRect().bottom <= document.querySelector('[role][aria-modal]').parentElement.getBoundingClientRect().bottom
+    expect_truthy: true
 - click: '[role="dialog"][aria-label="New message"] button[aria-label="Close dialog"]'
 - assert_not_visible: '[role="dialog"][aria-label="New message"]'
 - click: '[data-testid="mail-compose-open"]'
@@ -82,6 +92,16 @@ steps:
     selector: '[data-testid="mail-recipient-suggestions"]'
     contains: Zed Contact
 - screenshot: mail-contacts-01-reopened.png
+- *id001
+- click: '[role="dialog"][aria-label="New message"] button[aria-label="Close dialog"]'
+- assert_not_visible: '[role="dialog"][aria-label="New message"]'
+- eval_readonly:
+    expression: >-
+      !!(document.querySelector('.taomni-mail-reader-frame')?.contentDocument?.body?.textContent?.trim()
+      || document.querySelector('.taomni-mail-reader-text')?.textContent?.trim())
+      && document.querySelector('.taomni-mail-reader-paper').getBoundingClientRect().height >= 120
+    expect_truthy: true
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -90,56 +110,97 @@ verification:
     actions:
     - 1
     - 2
-    - 3
-    - 5
+    - 4
     - 6
-    - 9
+    - 7
     - 10
     - 11
     - 12
     - 13
+    - 14
     checkpoints:
-    - step: 8
+    - step: 9
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
-    - step: 14
+    - step: 15
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-contact-row\"][data-contact-name=\"Zed Contact\"]", "timeout_sec": 20}}'
     results:
-    - 14
+    - 15
   - id: R2
     requirement: 写信时在收件人中输入地址片段，自动补全列出地址簿中的该联系人及其姓名（AC-61）。
     actions:
-    - 15
     - 16
     - 17
+    - 18
     checkpoints:
-    - step: 18
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-recipient-suggestion\"]", "timeout_sec": 20}}'
     - step: 19
+      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-recipient-suggestion\"]", "timeout_sec": 20}}'
+    - step: 20
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-recipient-suggestions\"]", "contains": "Zed Contact"}}'
     results:
-    - 18
     - 19
+    - 20
   - id: R3
     requirement: 关闭写信窗口后重新打开，重新输入联系人片段仍能得到当前查询的建议；关闭期间的迟到查询不得恢复旧建议（该竞态另由 owner 单测控制响应顺序验证）。
     actions:
-    - 21
     - 23
-    - 24
-    checkpoints:
-    - step: 22
-      expectation: 写信窗口关闭。
-    - step: 25
-      expectation: 重新打开后出现当前查询的联系人建议。
-    - step: 26
-      expectation: 建议中仍包含 Zed Contact。
-    results:
-    - 22
     - 25
     - 26
+    checkpoints:
+    - step: 24
+      expectation: 写信窗口关闭。
+    - step: 27
+      expectation: 重新打开后出现当前查询的联系人建议。
+    - step: 28
+      expectation: 建议中仍包含 Zed Contact。
+    results:
+    - 24
+    - 27
+    - 28
+  - id: R4
+    requirement: 写信窗口及再次打开的窗口均限制在邮件面板内；macOS 标题区、工具栏与小窗口不得裁切关闭按钮，真实点击关闭且无运行时异常。
+    actions:
+    - 17
+    - 25
+    - 31
+    results:
+    - 22
+    - 30
+    - 32
+    - 34
+    checkpoints:
+    - step: 22
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[role][aria-modal]'').getBoundingClientRect().top >= document.querySelector(''[role][aria-modal]'').parentElement.getBoundingClientRect().top
+        && document.querySelector(''[role][aria-modal]'').getBoundingClientRect().bottom <= document.querySelector(''[role][aria-modal]'').parentElement.getBoundingClientRect().bottom",
+        "expect_truthy": true}}'
+    - step: 30
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[role][aria-modal]'').getBoundingClientRect().top >= document.querySelector(''[role][aria-modal]'').parentElement.getBoundingClientRect().top
+        && document.querySelector(''[role][aria-modal]'').getBoundingClientRect().bottom <= document.querySelector(''[role][aria-modal]'').parentElement.getBoundingClientRect().bottom",
+        "expect_truthy": true}}'
+    - step: 32
+      expectation: '{"assert_not_visible": "[role=\"dialog\"][aria-label=\"New message\"]"}'
+    - step: 34
+      expectation: '{"assert_no_runtime_errors": null}'
+  - id: R5
+    requirement: The selected message retains nonempty readable content and a visible reader after composer reopen/close. Native fixtures use the HTML iframe; browser stubs use plain text. Neither path may produce a runtime loop.
+    actions:
+    - 17
+    - 25
+    - 31
+    results:
+    - 33
+    - 34
+    checkpoints:
+    - step: 33
+      expectation: The selected message has nonempty body content (iframe for native HTML or text for browser stub) and a visible reader at least 120 pixels high.
+    - step: 34
+      expectation: No uncaught runtime error, including ResizeObserver delivery errors.
   visual:
   - check: 截图中收件人下拉列出 “Zed Contact <zed.contact@example.org>”。
     method: manual
     reason: 像素与布局需人工评审。
+  - check: 写信窗口位于邮件面板内部，标题和关闭按钮不被工具栏裁切。
+    method: automated
+    reason: 上下边界断言及两次真实关闭操作覆盖初次打开和重开。
   native:
   - check: native 模式验证联系人写入账户数据库并由后端补全查询返回；browser 仅验证渲染层；平台结果分别记录。
     method: automated

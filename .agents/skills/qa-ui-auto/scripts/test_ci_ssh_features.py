@@ -1,10 +1,48 @@
 """Owned Cygwin home preparation and native SCP receipt paths."""
 from pathlib import Path, PureWindowsPath
+import hashlib
+import os
 import tempfile
 import unittest
 from unittest.mock import patch
 
 from ci_ssh_features import prepare_cygwin_home, transfer_paths
+
+
+class CygwinInstallerTest(unittest.TestCase):
+    def test_versioned_installer_is_verified_before_execution_and_publication(self):
+        from ci_ssh_features import CYGWIN_SETUP_URL, install
+
+        payload = b"verified test installer"
+        with tempfile.TemporaryDirectory() as directory:
+            env_file = Path(directory) / "github-env"
+            with patch.dict(os.environ, {"RUNNER_TEMP": directory, "GITHUB_ENV": str(env_file)}), \
+                    patch("ci_ssh_features.platform.system", return_value="Windows"), \
+                    patch("ci_ssh_features.CYGWIN_SETUP_SHA256", hashlib.sha256(payload).hexdigest()), \
+                    patch("ci_ssh_features.urllib.request.urlretrieve",
+                          side_effect=lambda url, path: path.write_bytes(payload)) as download, \
+                    patch("ci_ssh_features.subprocess.run") as execute:
+                execute.return_value.returncode = 0
+                install()
+                self.assertRegex(CYGWIN_SETUP_URL, r"/setup/setup-\d+\.\d+\.x86_64\.exe$")
+                download.assert_called_once_with(CYGWIN_SETUP_URL, Path(directory) / "qa-cygwin-setup.exe")
+                self.assertEqual(execute.call_count, 1)
+                self.assertIn("QA_CYGWIN_ROOT=", env_file.read_text())
+
+    def test_checksum_mismatch_cannot_execute_or_publish_the_installation(self):
+        from ci_ssh_features import install
+
+        with tempfile.TemporaryDirectory() as directory:
+            env_file = Path(directory) / "github-env"
+            with patch.dict(os.environ, {"RUNNER_TEMP": directory, "GITHUB_ENV": str(env_file)}), \
+                    patch("ci_ssh_features.platform.system", return_value="Windows"), \
+                    patch("ci_ssh_features.urllib.request.urlretrieve",
+                          side_effect=lambda url, path: path.write_bytes(b"unexpected installer")), \
+                    patch("ci_ssh_features.subprocess.run") as execute:
+                with self.assertRaisesRegex(RuntimeError, "checksum"):
+                    install()
+                execute.assert_not_called()
+                self.assertFalse(env_file.exists())
 
 
 class TransferPathsTest(unittest.TestCase):
