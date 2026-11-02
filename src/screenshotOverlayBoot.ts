@@ -26,9 +26,12 @@ export function isNativeScreenshotOverlay(): boolean {
 }
 
 export const SCREENSHOT_OVERLAY_BOOT = isNativeScreenshotOverlay();
+export const SCREENSHOT_IDLE_BOOT = !!(window as Window & {
+  __TAOMNI_SCREENSHOT_IDLE__?: boolean;
+}).__TAOMNI_SCREENSHOT_IDLE__;
 
 if (SCREENSHOT_OVERLAY_BOOT) {
   markOverlayStartup("entry");
   observeOverlayPaint();
-  startOverlayPrefetch();
+  if (!SCREENSHOT_IDLE_BOOT) startOverlayPrefetch();
 }

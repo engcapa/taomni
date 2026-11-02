@@ -151,7 +151,7 @@ async fn production_open(
 pub async fn screenshot_qa_startup_isolation(app: AppHandle) -> Result<String, String> {
     ensure_qa(&app)?;
     let _profile = crate::screenshot::startup_profile::QaProfile::install(
-        crate::screenshot::startup_profile::StartupProfile::OPTIMIZED,
+        crate::screenshot::startup_profile::StartupProfile::DEFAULT,
     );
     let _cleanup = ScenarioCleanup(app.clone());
     super::super::close_session(&app);

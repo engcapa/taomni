@@ -27,6 +27,12 @@ pub(crate) use overlay_session::close_session;
 
 pub use overlay_session::open_overlay;
 
+pub(crate) use overlay_open::prewarm;
+pub use overlay_resident::screenshot_overlay_session;
+pub(crate) use overlay_resident::{
+    __cmd__screenshot_overlay_session, __tauri_command_name_screenshot_overlay_session,
+};
+
 pub(crate) use recording_controls::recording_ended;
 
 pub use runtime::shutdown;
@@ -52,6 +58,8 @@ mod overlay_session;
 mod overlay_open;
 
 mod overlay_handoff;
+
+mod overlay_resident;
 
 mod capture_exclusion;
 

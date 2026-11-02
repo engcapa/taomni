@@ -231,8 +231,10 @@ export const openPinTools = (view: PinView) => invoke<string>("screenshot_open_p
 export const closePinTools = () => invoke<void>("screenshot_close_pin_tools");
 
 /** End the capture session: close tool windows, reshow app windows. */
-export async function closeScreenshotOverlay(): Promise<void> {
-  return invoke<void>("screenshot_close_overlay");
+export async function closeScreenshotOverlay(generation?: number): Promise<void> {
+  return generation === undefined
+    ? invoke<void>("screenshot_close_overlay")
+    : invoke<void>("screenshot_close_overlay", { generation });
 }
 
 export async function pinToScreen(path: string): Promise<string> {

@@ -84,6 +84,7 @@ pub(super) async fn open_overlay_with_window(
     if result.is_err() {
         // Never leave the user with no visible window.
         tool_state().overlay = None;
+        super::overlay_resident::forget();
         if let Some(window) = app.get_webview_window(OVERLAY_LABEL) {
             let _ = window.close();
         }
@@ -112,6 +113,21 @@ pub(super) fn watch_session_window(window: &WebviewWindow) {
                 state.recorder_open
             }
         };
+        if label == OVERLAY_LABEL {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if let Some(cleanup) = super::overlay_resident::intercept_close() {
+                    api.prevent_close();
+                    if cleanup {
+                        let app = app.clone();
+                        tauri::async_runtime::spawn_blocking(move || close_session(&app));
+                    }
+                    return;
+                }
+            }
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                super::overlay_resident::forget();
+            }
+        }
         #[cfg(target_os = "linux")]
         if matches!(event, tauri::WindowEvent::CloseRequested { .. }) && pins::native_wayland() {
             let ends_session = label != OVERLAY_LABEL || active;
@@ -162,6 +178,14 @@ pub(crate) fn close_session(app: &AppHandle) {
     surfaces::close_borders(app);
     for label in [OVERLAY_LABEL, RECORDER_LABEL, surfaces::SCROLL_LABEL] {
         if let Some(window) = app.get_webview_window(label) {
+            if label == OVERLAY_LABEL {
+                match super::overlay_resident::retire(&window) {
+                    Ok(true) => continue,
+                    Ok(false) => {}
+                    Err(error) => log::warn!("resident screenshot reset failed; closing: {error}"),
+                }
+                super::overlay_resident::forget();
+            }
             let _ = window.close();
         }
     }

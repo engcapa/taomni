@@ -1,0 +1,36 @@
+id: TC-SHOT-N30
+title: Resident native screenshot WebView remounts each generation and releases all session ownership
+description: "P1-1 production default and guarded native ownership scenario. Before any capture, prewarm must produce an invisible empty renderer with no payload/lease/hidden ledger; the first and next two opens must reuse it. Three opens retain the same native WebView identity while remounting complete screenshot state by generation. Each starts in select with a new decoded image and no prior crop or annotation, then creates both. IPC close and a native CloseRequested retire to an invisible empty renderer, purge the previous artifact, restore main, and release the cross-process lease. The third open must not be destroyed by a stale close/reset. This is not process-cold or unmeasured speedup evidence. Original control, recorder, scroll, focus, pin and mixed-DPI cases remain required in the complete screenshot suite."
+covers: [F27.1]
+tags: [screenshot, native, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario: {scenario: resident-overlay}
+- assert_visible: '[data-testid="system-screenshot"]'
+- assert_no_runtime_errors:
+verification:
+  review: reviewed
+  requirements:
+  - id: resident-generation-ownership
+    requirement: Reuse only the hidden window, not capture or editable state; each generation must load a fresh decoded image and signal readiness before show.
+    actions: [1, 2]
+    checkpoints:
+    - {step: 3, expectation: "Three rounds have identical WebView identity, strictly increasing generations, no prior crop/annotations at each start, natural image dimensions, readyBeforeShow true and windowReused true on all rounds including the first prewarmed entry. Each round can create a crop and annotation."}
+    results: [3]
+  - id: resident-cleanup
+    requirement: Closing by IPC or native close must restore the main window and release images, artifacts and the cross-process lease without accidentally ending the next session.
+    actions: [1, 2]
+    checkpoints:
+    - {step: 3, expectation: "Every idle renderer is empty and hidden, mainRestored and leaseAvailable true, payloadRetained/leaseRetained/hiddenRetained/scrollActive/recordingActive false, artifactPurged true. The next round remains usable after both IPC close and native CloseRequested."}
+    - {step: 4, expectation: Main UI remains visible and usable after scenario cleanup.}
+    - {step: 5, expectation: No runtime errors were emitted.}
+    results: [3, 4, 5]
+  visual:
+  - {check: First frame and mixed-DPI pixels, method: external, reason: "This lifecycle check retains native dimensions and readiness but does not substitute for N28 native isolation pixels or N23 dual-display fidelity. Brief flicker is permitted by the user's performance-first acceptance."}
+  native:
+  - {check: Real resident WebView lifecycle and session lease, method: automated, reason: "Uses production capture/open/close plus native window state, real artifact cleanup and real SessionLease reacquisition. DOM-only remounts cannot establish native reuse or lease release."}

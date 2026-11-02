@@ -5,6 +5,7 @@
 
 import { useEffect } from "react";
 import { ScreenshotOverlay } from "./components/screenshot/ScreenshotOverlay";
+import { ScreenshotSessionHost } from "./components/screenshot/overlay/ScreenshotSessionHost";
 import { AppDialogProvider } from "./lib/appDialogs";
 import { useAppTheme } from "./lib/appTheme";
 import { getAppPlatform } from "./lib/runtime";
@@ -31,7 +32,7 @@ export function ScreenshotOverlayRoot() {
 
   return (
     <AppDialogProvider>
-      <ScreenshotOverlay />
+      <ScreenshotSessionHost><ScreenshotOverlay /></ScreenshotSessionHost>
     </AppDialogProvider>
   );
 }

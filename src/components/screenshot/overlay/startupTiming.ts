@@ -22,6 +22,21 @@ export function markOverlayStartup(name: string, at?: number): void {
   marks[name] ??= at ?? performance.timeOrigin + performance.now();
 }
 
+/** New resident session; preserve renderer startup provenance separately. */
+export function beginOverlaySession(): void {
+  if (!__TAOMNI_QA_OVERLAY_TIMING__) return;
+  const target = slot();
+  const previous = target.marks;
+  target.marks = {};
+  // The WebView did not navigate/re-evaluate entry or app. Keep those original
+  // epochs (negative relative to a later backend open), never invent a second
+  // navigation or call a warm generation a process cold start.
+  for (const name of ["nav", "entry", "app", "fcp"]) {
+    if (previous[name] !== undefined) target.marks[name] = previous[name];
+  }
+  target.marks.session = performance.timeOrigin + performance.now();
+}
+
 /** Navigation start and first contentful paint of this renderer. */
 export function observeOverlayPaint(): void {
   if (!__TAOMNI_QA_OVERLAY_TIMING__) return;

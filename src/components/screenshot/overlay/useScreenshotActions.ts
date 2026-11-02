@@ -10,6 +10,7 @@ import {
   saveImageToFile,
   scrollCapture,
   scrollPlan,
+  revokeScreenshotUrl,
   startRecording,
   switchScreenshotDisplay,
   updateOverlayImage,
@@ -61,14 +62,14 @@ export function useScreenshotActions(context: UseScreenshotActionsContext) {
 
   /** Run an output action once (buttons + shortcuts can race). */
   const runBusy = async (action: () => Promise<void>) => {
-    if (state.busyRef.current) return;
+    if (state.busyRef.current || !state.isCurrent()) return;
     state.busyRef.current = true;
     state.setBusy(true);
     try {
       await action();
     } finally {
       state.busyRef.current = false;
-      state.setBusy(false);
+      if (state.isCurrent()) state.setBusy(false);
     }
   };
 
@@ -122,25 +123,30 @@ export function useScreenshotActions(context: UseScreenshotActionsContext) {
         editor = selected;
       }
       const file = await saveDataUrl(await exportCropped());
+      if (!state.isCurrent()) return;
       await openImageEditor(file.path, editor);
-      await closeScreenshotOverlay();
+      if (state.isCurrent()) await closeScreenshotOverlay(state.init?.generation);
     } catch (e) { state.showToast(formatUnknownError(e)); }
   });
 
   const finishPinEdit = (action: "replace" | "new" | "copy") => runBusy(async () => {
     try {
       const file = await saveDataUrl(await exportCropped());
+      if (!state.isCurrent()) return;
       await copyImageToClipboard(file.path);
+      if (!state.isCurrent()) return;
       if (action === "replace") await updateSourcePin(file.path);
       if (action === "new") await pinToScreen(file.path);
-      await closeScreenshotOverlay();
+      if (state.isCurrent()) await closeScreenshotOverlay(state.init?.generation);
     } catch (e) { state.showToast(formatUnknownError(e)); }
   });
 
   const changeDisplay = (displayId: string) => runBusy(async () => {
     try {
       const data = await switchScreenshotDisplay(displayId);
+      if (!state.isCurrent()) return;
       const loaded = await loadArtifact(data.path);
+      if (!state.isCurrent()) { revokeScreenshotUrl(loaded.url); return; }
       state.canvasRef.current?.clear();
       state.setInit(data); state.setImg(loaded.img); state.setImgUrl(loaded.url);
       state.setSel(null); state.setContour(null); state.setPhase("select"); state.setTool("select");
@@ -156,9 +162,11 @@ export function useScreenshotActions(context: UseScreenshotActionsContext) {
     runBusy(async () => {
       try {
         const file = await saveDataUrl(await exportCropped());
+        if (!state.isCurrent()) return;
         await copyImageToClipboard(file.path);
+        if (!state.isCurrent()) return;
         state.showToast(state.t("screenshot.copied"));
-        await closeScreenshotOverlay();
+        if (state.isCurrent()) await closeScreenshotOverlay(state.init?.generation);
       } catch (e) {
         state.showToast(state.t("screenshot.copyFailed", { error: formatUnknownError(e) }));
       }
@@ -175,10 +183,10 @@ export function useScreenshotActions(context: UseScreenshotActionsContext) {
           defaultPath: `Taomni-${stamp}.png`,
           filters: [{ name: "PNG", extensions: ["png"] }],
         });
-        if (typeof dest !== "string" || !dest.trim()) return;
+        if (!state.isCurrent() || typeof dest !== "string" || !dest.trim()) return;
         await saveImageToFile(file.path, dest);
         state.showToast(state.t("screenshot.saved"));
-        await closeScreenshotOverlay();
+        if (state.isCurrent()) await closeScreenshotOverlay(state.init?.generation);
       } catch (e) {
         state.showToast(state.t("screenshot.saveFailed", { error: formatUnknownError(e) }));
       }
@@ -188,8 +196,9 @@ export function useScreenshotActions(context: UseScreenshotActionsContext) {
     runBusy(async () => {
       try {
         const file = await saveDataUrl(await exportCropped());
+        if (!state.isCurrent()) return;
         await pinToScreen(file.path);
-        await closeScreenshotOverlay();
+        if (state.isCurrent()) await closeScreenshotOverlay(state.init?.generation);
       } catch (e) {
         state.showToast(state.t("screenshot.pinFailed", { error: formatUnknownError(e) }));
       }
@@ -203,6 +212,7 @@ export function useScreenshotActions(context: UseScreenshotActionsContext) {
       try {
         const file = await saveDataUrl(await exportCropped());
         const res = await ocrImage(file.path);
+        if (!state.isCurrent()) return;
         state.setOcrText(res.text || state.t("screenshot.ocrEmpty"));
       } catch (e) {
         state.setOcrText(state.t("screenshot.ocrFailed", { error: formatUnknownError(e) }));
@@ -217,6 +227,7 @@ export function useScreenshotActions(context: UseScreenshotActionsContext) {
       try {
         const file = await saveDataUrl(await exportCropped());
         const res = await autoRedact(file.path);
+        if (!state.isCurrent()) return;
         if (res.count === 0) {
           state.showToast(state.t("screenshot.redactNone"));
           return;
@@ -259,8 +270,11 @@ export function useScreenshotActions(context: UseScreenshotActionsContext) {
       try {
         // The backend hides this window while it scrolls, then shows it.
         const res = await scrollCapture(state.init.displayId || undefined, state.plannedRegion, state.scrollMode);
+        if (!state.isCurrent()) return;
         const loaded = await loadArtifact(res.path);
+        if (!state.isCurrent()) { revokeScreenshotUrl(loaded.url); return; }
         await updateOverlayImage(res).catch(() => undefined);
+        if (!state.isCurrent()) { revokeScreenshotUrl(loaded.url); return; }
         state.canvasRef.current?.clear();
         state.setInit({ ...state.init, path: res.path, width: res.width, height: res.height });
         state.setImg(loaded.img);

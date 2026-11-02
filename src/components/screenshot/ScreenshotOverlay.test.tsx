@@ -51,6 +51,22 @@ function drag(id: string, from: [number, number], to: [number, number]) {
 const shapes = () => screen.getByTestId("screenshot-annotation-canvas").getAttribute("data-shapes");
 
 describe("ScreenshotOverlay", () => {
+  it("a retired copy cannot close the next resident generation", async () => {
+    let finishCopy!: () => void;
+    api.copyImageToClipboard.mockReturnValueOnce(new Promise<void>((resolve) => { finishCopy = resolve; }));
+    const first = render(<ScreenshotOverlay />);
+    await screen.findByTestId("screenshot-hint");
+    drag("screenshot-select-layer", [100, 100], [500, 400]);
+    fireEvent.click(screen.getByTestId("screenshot-copy"));
+    await waitFor(() => expect(api.copyImageToClipboard).toHaveBeenCalledOnce());
+    first.unmount();
+    render(<ScreenshotOverlay />);
+    await screen.findByTestId("screenshot-hint");
+    await act(async () => finishCopy());
+    expect(api.closeScreenshotOverlay).not.toHaveBeenCalled();
+    expect(screen.getByTestId("screenshot-overlay")).toHaveAttribute("data-phase", "select");
+  });
+
   it("retains the crop and annotations after a clipboard failure and allows a successful retry", async () => {
     api.copyImageToClipboard.mockRejectedValueOnce(new Error("clipboard occupied")).mockResolvedValueOnce(undefined);
     await open();

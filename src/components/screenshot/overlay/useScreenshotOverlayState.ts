@@ -133,6 +133,12 @@ export function useScreenshotOverlayState() {
   } | null>(null);
   const toastTimer = useRef<number | null>(null);
   const busyRef = useRef(false);
+  const sessionAlive = useRef(true);
+  useLayoutEffect(() => {
+    sessionAlive.current = true;
+    return () => { sessionAlive.current = false; };
+  }, []);
+  const isCurrent = useCallback(() => sessionAlive.current, []);
 
   useEffect(() => {
     if (tool !== "text" && !textSelected) return;
@@ -150,6 +156,7 @@ export function useScreenshotOverlayState() {
   const toPhysical = (r: CssRect) => toPhysicalRect(r, sx, sy, bounds);
 
   const showToast = useCallback((msg: string) => {
+    if (!sessionAlive.current) return;
     setToast(msg);
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(null), 2500);
@@ -171,7 +178,7 @@ export function useScreenshotOverlayState() {
   useEffect(() => () => { ownedUrls.current.forEach(revokeScreenshotUrl); }, []);
 
   const close = useCallback(() => {
-    void closeScreenshotOverlay().catch(() => undefined);
+    if (sessionAlive.current) void closeScreenshotOverlay(generationRef.current ?? undefined).catch(() => undefined);
   }, []);
 
   // Init: the payload of the backend session (possibly prefetched while the
@@ -232,6 +239,7 @@ export function useScreenshotOverlayState() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
   return {
+    isCurrent,
     img,
     pickerCacheRef,
     setPickerInfo,

@@ -102,6 +102,16 @@ pub async fn screenshot_edit_pin(app: AppHandle, window: WebviewWindow) -> Resul
             .ok_or("another screenshot session is active")?;
         owns_session = true;
         super::tool_state().session_lease = Some(std::sync::Arc::new(lease));
+        super::overlay_resident::discard_idle(&app)?;
+        // Native destruction is queued. Do not build a document with the same
+        // label until an idle selection surface has actually gone away.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        while app.get_webview_window(super::OVERLAY_LABEL).is_some() {
+            if std::time::Instant::now() >= deadline {
+                return Err("previous screenshot surface did not close".into());
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(15)).await;
+        }
         let path = capture::temp_artifact_path("edit-pin", "png").map_err(super::internal_error)?;
         std::fs::copy(&pin.path, &path).map_err(|e| e.to_string())?;
         super::tool_state().overlay = Some(super::OverlayInit {

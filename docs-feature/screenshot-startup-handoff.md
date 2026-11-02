@@ -4,6 +4,10 @@
 > 行号为约数（±3 行），函数名是首要锚点，动手前在工作树复核。
 > 术语：T_first = overlay 可见、底图已上屏、`phase === "select"`；S_front = selectMs − show 累计时（show 之后到 select 的前端段）；windowMs 数值上等于含 focus 的后端链路结束，不是单纯建窗时刻；N27 的 run0 只是“同进程首开”，不是进程冷启动。
 
+## 当前验收优先级（用户 2026-11-02 明确调整）
+
+目标是按钮或快捷键触发后尽快看到底图并开始选区，避免显著延迟；**不要求完全消除短暂闪烁**。不为零闪帧添加固定等待，不把原生采样工具自身的 100ms 覆盖门槛当作产品性能完成前提。旧严格闪帧场景与原始失败证据保留作诊断，不能追改为通过。N28 保留窗口隔离、像素与恢复的强制验收；性能以 N27 的触发到可选区、分段 P50/P95 及 P1-1 原生复用结果为准。I1–I7、安全隐藏/排空与 Wayland 授权语义不变；三端、Linux 四 profile、截图＋crash 后全量验证的范围不变。
+
 ## 1. 问题描述
 
 用户在 taomni 里点击截图按钮或按截图快捷键后，开始截图前有两个症状：
@@ -142,15 +146,16 @@
 | P0-1b 透明首帧 | `index.html`（label 为 `screenshot-overlay` 且 hash 恰为 `#screenshot-overlay` 时不写主题底色并加 `screenshot-overlay-surface`）；`styles/base.css`；`overlay_open.rs` builder `.transparent(true)`；`ScreenshotOverlayView` 根背景在无底图时透明 | 贴图编辑器改用 `#screenshot-overlay-document`，透明关闭时用 `#screenshot-overlay-opaque`，两者保持主题底色。macOS 依赖已开启的 `macOSPrivateApi` |
 | P0-3 拆包 | `main.tsx` 首个应用模块 `screenshotOverlayBoot.ts`；`screenshotOverlayRoot.tsx`；`lib/webviewGuards.ts`（右键菜单、刷新键、文件拖入导航三项守卫从 App 抽出，主窗口与 overlay 共用） | 原生 overlay 窗口跳过恢复握手（overlay 从不注册 renderer recovery）与 `App`。overlay 静态依赖除主入口共享部分外约 0.5 MB（主要是 i18n 词典），App 约 6.8 MB；`screenshotOverlayRoot.test.ts` 断言不静态到达 App、layouts、filebrowser、notes、servers、terminal、editor、appStore。`sweepExpiredHandoffs` 属于 SFTP 凭据交接，overlay 不需要 |
 | P0-5 预取并行 | `overlay/prefetch.ts`、`overlay/images.ts` | boot 模块在 React 与 overlay UI 求值前发起 init、读回与解码；`loadImage` 直接 `await image.decode()`；shortcut status 刷新推迟到底图提交后 |
-| P0-1 ready 握手 | `overlay_handoff.rs`（`screenshot_overlay_ready`，按 SESSION_GENERATION 匹配）；`OverlayInit.generation`；前端 layout effect | 实验关闭默认；N27/N28 用 scoped QA profile 显式开启，超时 1500 ms 为首轮探针值，不是最终默认承诺。loadError 分支也发 ready（payload 已知时）。N27 两组各 20 次分别观察原串行建窗握手和 P1 候选，第 6 项未取得 native 比例前不启用生产默认 |
+| P0-1 ready 握手 | `overlay_handoff.rs`（`screenshot_overlay_ready`，按 SESSION_GENERATION 匹配）；`OverlayInit.generation`；前端 layout effect | 六组 hosted 原生各 40/40 ready 早于 show、0 超时，候选改为默认启用；仍带 1500ms 失败兜底，不添加固定等帧。loadError 也发 ready（payload 已知时）。这是提交/解码证据，不声称隐藏 WebView 已在屏幕绘制 |
 | P1-2 建窗并行 | `overlay_open.rs` | 权限通过后立即在 blocking 线程 build 隐藏窗口，与 hide/截图并行；`screenshot_overlay_init` 在有进行中的 open 时等待 payload；后端 open 进行中 `screenshot_capture_full` 拒绝执行；原生 overlay 窗口内不再回退 `captureFull()`，仅浏览器/dev 直开保留 |
 | P1-3 Linux 重叠 | `capture/overlap.rs` | 同一 blocking 线程：open（portal 会话 + PipeWire，或 X11 capturer）→ 等带时间戳的隐藏完成信号 → 排空至少 250 ms，拒绝信号前或缺失时间戳的帧。无新帧则先完整 Drop 原 source，再串行新建安全重试；取消传到 portal consent 和首帧等待，worker 清理结束后才释放租约。会话不留存不复用，`PersistMode::DoNot` 不变。PipeWire captured_at 现为 callback 接收时间，非 producer PTS，此限制需 native 标记像素验收 |
-| P1-6 排除自身窗口 | `capture_exclusion.rs` | 仅显式实验候选：Windows API 在 build ≥ 19041 可用，macOS 主版本 15 是待测候选，不代表已像素验证。默认关闭，N28 先读回校验、真实对照图像验证与撤销验证，通过后才建立具体 OS 白名单。顺序：排除 → 截图 → show overlay → 隐藏应用窗口 → 撤销排除；任何错误路径及 UI 回调超时后的 send 失败均由 `Drop` 撤销 |
+| P1-1 预热复用 | `overlay_resident.rs`、`ScreenshotSessionHost.tsx`、启动后 `prewarm` | 主窗口建立后预热隐藏空 WebView，不申请截图权限、不打开 portal、不占租约；每 generation 完整 remount/unmount，事件订阅后快照消除首次触发竞态。关闭时保持原恢复顺序，仅窗口步骤替换成 hide + renderer reset；录屏移交、贴图文档保留销毁逻辑。N30 原生证明 identity、清空、文件清理、原生 CloseRequested 和租约释放 |
+| P1-6 排除自身窗口 | `capture_exclusion.rs` | Windows 已验证 build 26100 / 26300 白名单，未验证版本走隐藏；macOS 15 新 run 的首张生产图含整个 marker，尽管 direct control 通过，因此禁用 macOS 排除并回退原 hide，不加等待掩盖失败。顺序与所有 RAII 恢复保留 |
 | 回退开关 | `startup_profile.rs` | `TAOMNI_SCREENSHOT_STARTUP=legacy` 恢复串行路径；`-early-window`、`-handshake`、`-transparent`、`-overlap`、`-exclusion`、`ready-timeout=<ms>` 单项控制 |
 
 ### 6.2 未做与原因
 
-- P1-1 预热复用 overlay：依赖第 6 项（隐藏窗口是否执行 JS 与解码）。P1-2 已让渲染进程在隐藏期间加载，N27 的 `readyBeforeShow` 比例就是第 6 项的观测数据；比例与慢机数据出来前不做常驻窗口。
+- P1-1 已实现并在本机通过 N30；跨平台、混合 DPI、滚动与录屏全套回归仍需最终源码 run，不把编译或 mounted 测试等同于 native 验收。
 - P1-4 X11 条件化 hide：第 13 项未关闭，650 ms 不变。
 - P1-7 枚举去重：低优先级，未做。
 - 650 ms、250 ms 排空、HIDE_SETTLE、`focus_capture_window` 重试均未改。
@@ -159,8 +164,9 @@
 
 | 用例 | 变化 | 覆盖 |
 |---|---|---|
-| TC-SHOT-N27 | 修改：两组各 20 次打开（串行建窗握手探针／优化候选），后端子段 + 渲染进程标记 + 每组 P50/P95 + 握手比例，逐次关闭和恢复断言及增量证据，`timeout_sec: 600` | P0-0b、P0-3/P0-5 定量、第 6 项 |
-| TC-SHOT-N28 | 新增：`startup-isolation`（主窗口品红标记；对照截图必须含标记；排除 API 生效与撤销；5 次生产打开底图标记像素为 0、会话中主窗口隐藏、关闭后恢复）+ `startup-flash`（独立 OS 像素采样进程，Wayland 用 job-owned GNOME Shell Screenshot stage grid，不建第二个 portal；保存真实采样时间区间、最大间隔 ≤100ms，show 后不得出现整屏均匀帧，缺失/超时必须失败而非绿色跳过） | I1、I6、P1-2、P1-3、P1-6、P0-1b、P0-1 |
+| TC-SHOT-N27 | 修改：三组各 20 次打开（串行建窗握手／并行候选／常驻复用），后端子段 + 渲染标记 + 分组 P50/P95 + 握手比例；复用保持原 navigation/entry epochs，不能伪造第二次导航；关闭需确认隐藏、空 renderer、无 payload/lease/hidden ledger、主窗口恢复，`timeout_sec: 600` | P0-0b、P0-3/P0-5 定量、第 6 项 |
+| TC-SHOT-N28 | 强制 `startup-isolation`：主窗口 marker 对照、排除生效与撤销（仅支持白名单）、5 次生产打开 0 marker 像素、会话隐藏及关闭恢复。用户 2026-11-02 明确性能优先后，严格 `startup-flash` 从阻塞验收移为保留的诊断，函数及旧失败原件不变，不冒充通过 | I1、I6、P1-2、P1-3、P1-6、P0-1b、P0-1 |
+| TC-SHOT-N30 | 原生复用三代同一 WebView、递增 generation、清空旧选择/标注、每代新图、IPC/原生关闭、真实文件清理与租约释放，主窗口恢复；迟到复制不能关闭新 generation 的 mounted 回归 | P1-1、I2/I3/I6 |
 | TC-SHOT-040 | 新增 browser 延迟 init：透明 loading、不提前选择、decode/ready 后选择、Cancel 与重开清空选区；026/027 保留旧参数断言并加入 ready IPC 顺序 | P0-1b、ready、重开生命周期 |
 | 单元测试 | `ScreenshotOverlayStartup.test.tsx`、`screenshotOverlayRoot.test.ts`、`screenshotOverlayBoot.test.ts`、`images.test.ts`、Rust `startup_timing`/`startup_profile`/`overlay_handoff`/`stage_trace` | 透明根背景、ready 一次且带 generation、预取消费、失败会话不截屏、入口不含主应用、decode 直连 |
 
@@ -182,4 +188,9 @@
 - N29 加入真实 message-only window 持有者、占用对照读及生产 typed busy retry 计数，修复 NULL 持有者无法证明竞争的问题。`run-20261102-073733-500825200` 通过：occupiedControl true、同一请求 busyRetries 3、257ms、decoded RGBA 全相等。用户原始首次 Done 弹窗文字未保存，只证明此竞争回归，不宣称精确复现原始错误。
 - 为避免创建第二个 `<img>` 重新进入未绘制状态，view 复用已经 decode 的 Image 节点；identity、resize、StrictMode 卸载测试通过。Linux 黑帧修复仍需新的 native runner 像素证据。
 - Rust 聚焦 122/122 通过；runner/采样相关 Python 55/55 通过；refactor contracts / boundaries / size 与 QA audit gate 通过。完整 frontend 最新 662 文件通过、1 文件失败（6181 测试通过、1 失败、1 原有跳过）：无关编辑器 `editorPerformance.test.tsx` reconfigure 次数 2≠1；单文件 10/10 复跑通过。原完整失败保留，不计成完整全绿。
-- 下一轮仍需：截图 + crash 六组 native / 三端 browser 全绿后，再 scope=all；Wayland N16 与 macOS 采样超时未关闭。P1-1 常驻复用需在已取得的隐藏执行握手证据基础上继续实现/验收；P1-4 门槛未满足，650ms 不缩短。
+- 第二轮 [`41363657648`](https://github.com/engcapa/taomni/actions/runs/41363657648)，`ad358be9`：334/340 通过、6 项 N28 失败；无基础设施错误、原始 receipt 完整。Wayland N16 及其它功能通过。五端 N28 为严格闪帧/采样门槛失败；macOS N28 为第一个生产 open 含整个品红 marker（direct exclusion 对照通过不能代表生产正确），故 macOS 排除路径禁用回退 hide。严格闪帧门槛随后按用户明示移出阻塞验收，旧 run 仍为失败，不重标。
+- 本机 N30 `run-20261102-084806-096469900`通过三代同 WebView/租约/关闭清理；全组 Windows debug 后续 25 项中 22 通过，N12 `defaultHidesWindows` 读取竞态、N17 系统剪贴板被覆盖、N4 原始默认 chord 被已安装用户应用占用恢复失败，原件 `run-20261102-084905-454774400` 保留。N12 改为有界观察原生隐藏；不改变用户应用/全局默认快捷键，不将 N17/N4 硬写通过。
+- 本机 debug 三组各 20 次 `run-20261102-083215-548672500`：firstMs P50/P95 为串行握手 1255/1322ms、并行 899/950ms、复用 821/910ms；focus 后轮询 selectMs P50 为 1443/1093/1026ms，不能把 focus 后轮询时刻等同纯渲染或真实第一像素。这台 debug 的 PNG 编码约 650–800ms，是剩余大头；不据此改编码或外推 release/4K。
+- 完整前端曾 6184 通过、2 失败、1 原有 skip（664 文件）。两个编辑器失败证实为测试与 deferred mount/grammar 两帧加载竞态，分别等待真实 Java language compartment 与两个 EditorView 挂载，不删内容、undo 或次数断言；修复后完整 `screenshot-resident-units-stable.log`：664 文件、6187 测试全部通过，1 原有 skip。截图聚焦 56 项与类型检查通过。
+- 本机 browser 截图／crash 在仍改动的 Vite HMR 期间重跑失败（032/033/036 与 workspace 导航等），不标通过；一轮 QA build 检测到编译中 inputs 改变而拒绝身份记录，保留 exit 2。随后冻结源码批次再构建/运行，不伪造 source stable。
+- 下一轮仍需最终源码截图＋crash 六组 native / 三端 browser 全绿，再 scope=all；P1-4 门槛未满足，650ms 不缩短。

@@ -130,7 +130,10 @@ mod imp {
                 .and_then(|value| value.trim().parse().ok())
         });
         build
-            .is_some_and(|build| build >= FIRST_BUILD)
+            // Exact build families with native marker evidence: this Windows
+            // 11 host and the Windows Server 2025 hosted runner. Do not infer
+            // pixel correctness for every API-capable Windows version.
+            .is_some_and(|build| build >= FIRST_BUILD && matches!(build, 26100 | 26300))
             .then_some("WDA_EXCLUDEFROMCAPTURE")
     }
 
@@ -185,20 +188,12 @@ mod imp {
 
     /// `NSWindowSharingNone`.
     const SHARING_NONE: usize = 0;
-    /// Candidate version for the explicit exclusion experiment. API readback
-    /// alone is not pixel evidence; DEFAULT keeps exclusion off until N28.
-    const CANDIDATE_MAJOR: std::ops::RangeInclusive<isize> = 15..=15;
-
     pub(super) fn supported() -> Option<&'static str> {
-        static MAJOR: std::sync::OnceLock<isize> = std::sync::OnceLock::new();
-        let major = *MAJOR.get_or_init(|| {
-            objc2_foundation::NSProcessInfo::processInfo()
-                .operatingSystemVersion()
-                .majorVersion
-        });
-        CANDIDATE_MAJOR
-            .contains(&major)
-            .then_some("NSWindowSharingNone")
+        // Hosted macOS 15 run 41363657648: API readback and a direct
+        // control passed, yet the first production open retained the whole
+        // marker. This path is not reliable; use ordinary hide, not an extra
+        // compositing delay or an unverified speedup.
+        None
     }
 
     fn ns_window(app: &AppHandle, label: &str) -> Result<*mut AnyObject, String> {

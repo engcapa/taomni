@@ -1,34 +1,30 @@
 id: TC-SHOT-N28
-title: Native screenshot startup isolates the main-window marker and has no sampled flash with gaps bounded to 100ms
-description: "Pixel evidence for the optimized startup pipeline (I1 with P1-2 early window, P1-3 overlapped Linux capture and P1-6 capture exclusion, plus P0-1b/P0-1 first frame). Step 3 paints a full-window magenta marker into the main window. A direct capture with the window visible must contain at least 400 marker pixels; the near-exact #ff00ff marker is counted at every pixel, not in detached or unmarked Taomni windows. Where capture exclusion is supported, it must remove this marker from a direct capture and release must bring it back. Five production opens must store base images with zero marker pixels and restore the main window on close. Step 4 uses a separately owned, finite-lifetime sampler process over the non-uniform QA fixture (intentionally exempt from hiding). Fresh snapshots use independent GDI on Windows, X11 on all three X11 Linux profiles, CoreGraphics on macOS and the owned Mutter broker's GNOME Shell.Screenshot stage pixels on Wayland, without another portal session, chooser or flash. It targets 20ms intervals and requires the measured conservative maximum capture gap, including show/end boundaries and capture-time uncertainty, to be at most 100ms. No sampled post-show frame may be uniform. Missing pixels, capture errors, clock jumps, slow sampling or helper shutdown failure fail the case; no platform gets a green skip. Flashes shorter than the measured sampling resolution are not ruled out."
+title: Native screenshot startup isolates the main-window marker and restores the application
+description: "Mandatory correctness evidence for the low-latency startup pipeline (I1/I6 with P1-2 early window, P1-3 overlapped Linux capture and verified P1-6 capture exclusion). Paint the main window #ff00ff. A direct visible control must contain at least 400 near-exact marker pixels, counted at every pixel. Where exclusion is enabled it must remove this marker and release must bring it back. Five production opens must store base images with zero marker pixels, hide main during selection and restore it on close. On 2026-11-02 the user explicitly prioritized entering selection promptly and accepted brief flicker; this case therefore no longer gates zero-flash or the independent sampler's 100ms resolution. The strict startup-flash diagnostic and its historical failures remain unchanged and do not become passes. No delay is added to hide a flash. Timing and resident ownership are independently covered by N27/N30."
 covers: [F27.1]
 tags: [screenshot, native, p1]
 modes: [native]
 native_platforms: [Linux, Windows, macOS]
 fixtures: [reset_db]
-timeout_sec: 240
+timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="system-screenshot"]'
 - native_screenshot_scenario: {scenario: startup-isolation}
-- native_screenshot_scenario: {scenario: startup-flash}
 - assert_visible: '[data-testid="system-screenshot"]'
+- assert_no_runtime_errors:
 verification:
   review: reviewed
   requirements:
   - id: startup-isolation
-    requirement: The near-exact main-window marker is absent from every pixel of the captured base image on the platform's chosen startup path; exclusion is verified and released where supported, and every session restores the main window. This check does not establish absence of unmarked detached windows.
+    requirement: The near-exact main-window marker is absent from every pixel of the captured base image on the platform's production startup path; exclusion is verified and released where enabled, and every session restores the main window. This check does not establish absence of unmarked detached windows.
     actions: [1, 2]
     checkpoints:
-    - {step: 3, expectation: "controlMarkerPixels is at least 400 sampled pixels; exclusion is unsupported or passed (main excluded, 0 marker pixels while excluded, at least 400 after release); all five opens record markerPixels 0, the isolation path, mainHiddenDuringSession true, closed true and mainRestored true."}
-    results: [3]
-  - id: startup-first-frame
-    requirement: From show through the observation end, independent fresh display pixels contain no sampled uniform flash, with no conservative capture gap above 100ms. This bound is evidence resolution, not a claim that sub-100ms flashes cannot occur.
-    actions: [1, 2]
-    checkpoints:
-    - {step: 4, expectation: "On Windows, macOS and each Linux profile (ubuntu-24.04-xvfb, ubuntu-22.04-x11, ubuntu-22.04-vnc, ubuntu-26.04-wayland): evidence.sampled true, desktopVaried true before open, at least 5 samplesAfterShow, flashFrames empty, samplingCoverage true, monotonic true, clockStable true and maxGapMs at most 100. Trace retains actual capture-time brackets, native capture durations, conservative inter-capture gaps and first/last boundary gaps. Wayland transport is owned GNOME Shell stage capture without a portal. Helper logs and incremental samples survive failure, and the owned sampler exits or is killed/reaped on every error; capture or shutdown failures fail rather than skip."}
-    results: [4]
+    - {step: 3, expectation: "controlMarkerPixels at least 400; exclusion unsupported/disabled or passed (main excluded, 0 marker pixels while excluded, at least 400 after release); all five opens have markerPixels 0, mainHiddenDuringSession true, closed true and mainRestored true."}
+    - {step: 4, expectation: Main renderer is restored and usable.}
+    - {step: 5, expectation: No runtime errors were emitted.}
+    results: [3, 4, 5]
   visual:
-  - {check: Base image and sampled frames, method: automated, reason: "Near-exact #ff00ff main-window marker pixels are counted in the complete real base image and direct control captures; arbitrary purple desktop icon pixels are not this marker. Flash detection uses 48x27 actual display pixel grids with capture brackets and a measured gap bound, not DOM readiness or cached frames. The control capture, first base image, raw sampling JSONL and helper log are retained; shorter flashes and unmarked windows remain outside this proof."}
+  - {check: Base image isolation, method: automated, reason: "Near-exact #ff00ff pixels are counted across the complete real image; arbitrary purple icons are not the marker. The control, excluded image and first base image are retained. Brief flicker is accepted by the updated user goal; historical flash evidence remains diagnostic."}
   native:
-  - {check: Real capture APIs and window isolation, method: automated, reason: "The isolated QA app calls the real production exclusion/open commands. A separate killable process independently reads fresh OS snapshots, using owned GNOME Shell stage capture rather than competing product PipeWire/portal sessions on Wayland. Browser stubs, WebView screenshots and handshake timestamps cannot establish this pixel evidence."}
+  - {check: Real capture APIs and window isolation, method: automated, reason: "The QA app calls real production exclusion/open commands and verifies actual image pixels, native visibility, close and restoration. Browser stubs or handshake timestamps cannot establish this evidence."}

@@ -38,6 +38,9 @@ const DEFAULT_READY_TIMEOUT: Duration = Duration::from_millis(1500);
 pub(super) struct StartupProfile {
     /// P1-2: build the hidden overlay window while hiding and capturing.
     pub(super) early_window: bool,
+    /// P1-1: retain a successfully opened selection surface between sessions.
+    /// Idle windows own no capture, lease, image URL or editable session state.
+    pub(super) reuse_window: bool,
     /// P0-1: show the overlay only after its base image is committed.
     pub(super) ready_handshake: bool,
     pub(super) ready_timeout: Duration,
@@ -51,20 +54,22 @@ pub(super) struct StartupProfile {
 }
 
 impl StartupProfile {
-    /// Until native gates are closed, hidden execution and exclusion remain
-    /// explicit experiments. P0 frontend work and conservative Linux overlap
-    /// do not depend on those gates.
+    /// Hidden execution/decoding: six hosted combinations, 40/40 ready before
+    /// show each. Reuse now has an explicit lifecycle owner and native checks;
+    /// exclusion is independently restricted to verified OS builds.
     pub(super) const DEFAULT: Self = Self {
-        early_window: false,
-        ready_handshake: false,
+        early_window: true,
+        reuse_window: true,
+        ready_handshake: true,
         ready_timeout: DEFAULT_READY_TIMEOUT,
         transparent: true,
         capture_overlap: true,
-        capture_exclusion: false,
+        capture_exclusion: true,
     };
 
     pub(super) const OPTIMIZED: Self = Self {
         early_window: true,
+        reuse_window: false,
         ready_handshake: true,
         ready_timeout: DEFAULT_READY_TIMEOUT,
         transparent: true,
@@ -74,6 +79,7 @@ impl StartupProfile {
 
     pub(super) const LEGACY: Self = Self {
         early_window: false,
+        reuse_window: false,
         ready_handshake: false,
         ready_timeout: DEFAULT_READY_TIMEOUT,
         transparent: false,
@@ -102,6 +108,7 @@ impl StartupProfile {
             };
             match name {
                 "early-window" => self.early_window = enabled,
+                "reuse" => self.reuse_window = enabled,
                 "handshake" => self.ready_handshake = enabled,
                 "transparent" => self.transparent = enabled,
                 "overlap" => self.capture_overlap = enabled,
@@ -117,6 +124,11 @@ impl StartupProfile {
                     }
                 }
             }
+        }
+        // Reuse must never expose the previous bitmap: it is valid only with
+        // an early hidden remount and the generation-matched ready barrier.
+        if self.reuse_window && !(self.early_window && self.ready_handshake) {
+            self.reuse_window = false;
         }
         self
     }
@@ -136,6 +148,30 @@ pub(super) fn current() -> StartupProfile {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn resident_reuse_requires_hidden_early_mount_and_ready_barrier() {
+        assert!(
+            StartupProfile::DEFAULT
+                .with_overrides("+reuse")
+                .reuse_window
+        );
+        assert!(
+            StartupProfile::OPTIMIZED
+                .with_overrides("+reuse")
+                .reuse_window
+        );
+        assert!(
+            !StartupProfile::OPTIMIZED
+                .with_overrides("+reuse,-handshake")
+                .reuse_window
+        );
+        assert!(
+            !StartupProfile::OPTIMIZED
+                .with_overrides("+reuse,-early-window")
+                .reuse_window
+        );
+    }
 
     #[test]
     fn overrides_toggle_single_items_and_legacy_restores_serial_pipeline() {

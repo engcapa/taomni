@@ -21,10 +21,12 @@ use crate::screenshot::startup_timing;
 //     P0-0 baseline, and firstMs = max(show, renderer commit): the overlay
 //     is visible with its base image and ready for selection
 //   - whether the ready handshake beat its timeout (item 6)
+// Three matched groups: serial hidden-handshake, early parallel, resident.
 // Run 0 follows a closed session (same-process first open, not a process
-// cold start); later runs are warm opens.
+// cold start); later runs are warm opens. A resident renderer keeps original
+// navigation/entry epochs; its remount/decode/commit marks belong to this open.
 
-const RUNS: usize = 40;
+const RUNS: usize = 60;
 /// Stages every open records, in any order.
 const REQUIRED_STAGES: &[&str] = &[
     "start",
@@ -33,7 +35,6 @@ const REQUIRED_STAGES: &[&str] = &[
     "hide",
     "capture",
     "save_png",
-    "window_built",
     "window_joined",
     "cover",
     "show",
@@ -186,14 +187,15 @@ async fn run_once(app: &AppHandle, run: usize) -> anyhow::Result<Value> {
     let first_ms = show.zip(commit).map(|(show, commit)| show.max(commit));
     Ok(json!({
         "run": run,
-        "group": if run < RUNS / 2 { "handshake-probe" } else { "optimized" },
+        "group": if run < 20 { "handshake-probe" } else if run < 40 { "optimized" } else { "resident" },
         "cold": run == 0,
         "windowMs": window_ms,
         "overlayVisible": visible,
         "imageMs": image_ms,
         "selectMs": select_ms,
         "firstMs": first_ms,
-        "backendComplete": missing.is_empty() && missing_capture.is_empty() && (!handshake || ready_recorded),
+        "backendComplete": missing.is_empty() && missing_capture.is_empty() && (!handshake || ready_recorded)
+            && (names.contains(&"window_built") || names.contains(&"window_reused")),
         "missingStages": missing,
         "missingCaptureStages": missing_capture,
         "backendStages": names,
@@ -274,7 +276,7 @@ pub async fn screenshot_qa_startup_timing(app: AppHandle) -> Result<String, Stri
     let mut runs = Vec::new();
     let mut errors: Vec<String> = Vec::new();
     for run in 0..RUNS {
-        let profile = if run < RUNS / 2 {
+        let profile = if run < 20 {
             // First measure the hidden-renderer handshake without early build
             // or exclusion. Later samples exercise the dependent P1 candidate.
             crate::screenshot::startup_profile::StartupProfile {
@@ -282,8 +284,13 @@ pub async fn screenshot_qa_startup_timing(app: AppHandle) -> Result<String, Stri
                 capture_exclusion: false,
                 ..crate::screenshot::startup_profile::StartupProfile::OPTIMIZED
             }
-        } else {
+        } else if run < 40 {
             crate::screenshot::startup_profile::StartupProfile::OPTIMIZED
+        } else {
+            crate::screenshot::startup_profile::StartupProfile {
+                reuse_window: true,
+                ..crate::screenshot::startup_profile::StartupProfile::OPTIMIZED
+            }
         };
         let _run_profile = crate::screenshot::startup_profile::QaProfile::install(profile);
         match run_once(&app, run).await {
@@ -338,6 +345,7 @@ pub async fn screenshot_qa_startup_timing(app: AppHandle) -> Result<String, Stri
         "groups": {
             "handshakeProbe": summarize(&runs.iter().filter(|run| run["group"] == "handshake-probe").cloned().collect::<Vec<_>>()),
             "optimized": summarize(&runs.iter().filter(|run| run["group"] == "optimized").cloned().collect::<Vec<_>>()),
+            "resident": summarize(&runs.iter().filter(|run| run["group"] == "resident").cloned().collect::<Vec<_>>()),
         },
         "medianSelectMs": summary["selectMs"]["p50"],
         "coldSelectMs": runs.first().and_then(|run| run["selectMs"].as_u64()),

@@ -54,6 +54,9 @@ pub async fn screenshot_start_recording(
     let capture_lease = capture_lease()?;
     let generation = SESSION_GENERATION.load(Ordering::SeqCst);
     let had_overlay = tool_state().overlay.is_some();
+    // Idle P1-1 WebViews own no selection and must never become an error or
+    // recorder preview surface. Retire only that unused native shell here.
+    super::overlay_resident::discard_idle(&app)?;
     let display = capture::resolve_display(&app, display_id.as_deref()).map_err(internal_error)?;
     let bounded = capture::clamp_region(
         display.width,

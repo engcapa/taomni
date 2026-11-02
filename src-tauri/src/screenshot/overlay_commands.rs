@@ -147,7 +147,16 @@ pub async fn screenshot_overlay_update(
 /// End the capture session: close the overlay and recorder bar, reshow the
 /// hidden app windows and delete the session's temp files.
 #[tauri::command]
-pub async fn screenshot_close_overlay(app: AppHandle) -> Result<(), String> {
+pub async fn screenshot_close_overlay(
+    app: AppHandle,
+    generation: Option<u64>,
+) -> Result<(), String> {
+    // A resident WebView can finish a copy/dialog from a retired generation.
+    // Legacy callers omit this field; current renderers echo their payload.
+    if generation.is_some_and(|generation| generation != SESSION_GENERATION.load(Ordering::SeqCst))
+    {
+        return Ok(());
+    }
     close_session(&app);
     Ok(())
 }

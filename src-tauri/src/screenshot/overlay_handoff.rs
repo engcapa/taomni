@@ -65,6 +65,16 @@ pub(super) fn end_pending(generation: u64) {
     channel().send_modify(|state| state.finish(generation));
 }
 
+pub(super) fn current_generation() -> Option<u64> {
+    let generation = SESSION_GENERATION.load(Ordering::SeqCst);
+    let pending = channel().borrow();
+    if pending.opening && pending.generation == Some(generation) {
+        return Some(generation);
+    }
+    drop(pending);
+    tool_state().overlay.as_ref().map(|init| init.generation)
+}
+
 pub(super) fn open_pending() -> bool {
     let state = channel().borrow();
     state.opening && state.generation == Some(SESSION_GENERATION.load(Ordering::SeqCst))

@@ -458,6 +458,7 @@ pub fn run() {
                 }
                 let main_window = builder.build()?;
                 webview_recovery::install(&main_window);
+                screenshot::prewarm(app.handle());
 
                 // The macOS QA runner cannot use tauri-driver (there is no
                 // Tauri WebDriver adapter for WKWebView).  An opt-in bridge

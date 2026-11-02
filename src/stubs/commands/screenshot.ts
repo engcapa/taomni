@@ -104,6 +104,10 @@ export async function invokeScreenshot<T>(cmd: string, args?: any): Promise<T> {
       } as unknown) as T;
     }
 
+    case "screenshot_overlay_session": {
+      return { generation: 1, active: location.hash.startsWith("#screenshot-overlay") } as T;
+    }
+
     case "screenshot_overlay_ready": {
       stubScreenshotCall(cmd, args);
       return (true as unknown) as T;

@@ -16,6 +16,7 @@ use super::capture_exclusion;
 use super::model::OverlayInit;
 use super::model::PhysicalRegion;
 use super::overlay_handoff;
+use super::overlay_resident;
 use super::overlay_session::watch_session_window;
 #[cfg(target_os = "linux")]
 use super::pins;
@@ -94,7 +95,7 @@ async fn run(
     // Start building only once capture is permitted: a denied permission
     // must not create (and then tear down) any overlay surface.
     if profile.early_window {
-        *window_task = Some(spawn_overlay_window(app, profile.transparent));
+        *window_task = Some(spawn_overlay_window(app, profile, generation));
     }
     let display = {
         let app = app.clone();
@@ -149,13 +150,21 @@ async fn run(
             .map_err(|e| format!("open overlay window: {e}"))??,
         None => {
             let app = app.clone();
-            let transparent = profile.transparent;
-            tauri::async_runtime::spawn_blocking(move || open_window(&app, transparent))
+            tauri::async_runtime::spawn_blocking(move || open_window(&app, profile, generation))
                 .await
                 .map_err(|e| format!("open overlay window: {e}"))??
         }
     };
     startup_timing::mark("window_joined");
+    if profile.reuse_window {
+        // Scroll preview can turn this surface into a document. Reset only
+        // when beginning a new selection session, not during scroll/record.
+        super::edit::reset_hidden_surface(&window).await?;
+        window.set_decorations(false).map_err(|e| e.to_string())?;
+        window.set_resizable(false).map_err(|e| e.to_string())?;
+        window.set_always_on_top(true).map_err(|e| e.to_string())?;
+        window.set_skip_taskbar(true).map_err(|e| e.to_string())?;
+    }
     cover_display(&window, &display).await?;
     startup_timing::mark("cover");
     if profile.ready_handshake {
@@ -168,6 +177,7 @@ async fn run(
         .show()
         .map_err(|e| format!("show overlay window: {e}"))?;
     tool_state().overlay = Some(init);
+    overlay_resident::presented(generation);
     startup_timing::note("showWallMs", json!(startup_timing::wall_clock_ms()));
     startup_timing::mark("show");
     if let Some(exclusion) = exclusion {
@@ -315,14 +325,31 @@ async fn capture_while_hiding(app: &AppHandle, display: &DisplayInfo) -> Result<
 }
 
 /// P1-2: build the hidden overlay window concurrently with the capture.
-fn spawn_overlay_window(app: &AppHandle, transparent: bool) -> WindowTask {
+fn spawn_overlay_window(app: &AppHandle, profile: StartupProfile, generation: u64) -> WindowTask {
     let app = app.clone();
-    tauri::async_runtime::spawn_blocking(move || open_window(&app, transparent))
+    tauri::async_runtime::spawn_blocking(move || open_window(&app, profile, generation))
 }
 
 /// Build the hidden overlay surface and attach the session close handling.
-fn open_window(app: &AppHandle, transparent: bool) -> Result<WebviewWindow, String> {
+fn open_window(
+    app: &AppHandle,
+    profile: StartupProfile,
+    generation: u64,
+) -> Result<WebviewWindow, String> {
+    let _build = overlay_resident::WINDOW_BUILD
+        .lock()
+        .unwrap_or_else(|p| p.into_inner());
+    ensure_current(generation)?;
+    if profile.reuse_window {
+        if let Some(window) = overlay_resident::take_idle(app, generation, profile.transparent)? {
+            return Ok(window);
+        }
+    } else {
+        overlay_resident::discard_idle(app)?;
+    }
     wait_for_closed_overlay(app);
+    ensure_current(generation)?;
+    let transparent = profile.transparent;
     // Only the exact `#screenshot-overlay` route makes the page transparent
     // (index.html); an opaque window keeps the theme background.
     let route = if transparent {
@@ -330,8 +357,23 @@ fn open_window(app: &AppHandle, transparent: bool) -> Result<WebviewWindow, Stri
     } else {
         "index.html#screenshot-overlay-opaque"
     };
+    let window = build_window(app, transparent, route, false)?;
+    startup_timing::mark("window_built");
+    if profile.reuse_window {
+        overlay_resident::remember(generation, transparent);
+    }
+    watch_session_window(&window);
+    Ok(window)
+}
+
+fn build_window(
+    app: &AppHandle,
+    transparent: bool,
+    route: &str,
+    idle: bool,
+) -> Result<WebviewWindow, String> {
     let url = WebviewUrl::App(route.into());
-    let window = window_builder(app, OVERLAY_LABEL, url)
+    window_builder(app, OVERLAY_LABEL, url)
         .title("Screenshot")
         .visible(false)
         .decorations(false)
@@ -340,11 +382,48 @@ fn open_window(app: &AppHandle, transparent: bool) -> Result<WebviewWindow, Stri
         .always_on_top(true)
         .skip_taskbar(true)
         .transparent(transparent)
+        .initialization_script(if idle {
+            "window.__TAOMNI_SCREENSHOT_IDLE__ = true;"
+        } else {
+            ""
+        })
         .build()
-        .map_err(|e| format!("open overlay window: {e}"))?;
-    startup_timing::mark("window_built");
-    watch_session_window(&window);
-    Ok(window)
+        .map_err(|e| format!("open overlay window: {e}"))
+}
+
+/// Startup warmup creates only a hidden, empty renderer. No capture permission,
+/// portal, app hide, image or SessionLease is acquired before a user trigger.
+pub(crate) fn prewarm(app: &AppHandle) {
+    let profile = startup_profile::current();
+    if !profile.reuse_window {
+        return;
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _build = overlay_resident::WINDOW_BUILD
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        if app.get_webview_window(OVERLAY_LABEL).is_some()
+            || super::runtime::OPENING.load(Ordering::SeqCst)
+        {
+            return;
+        }
+        let generation = SESSION_GENERATION.load(Ordering::SeqCst);
+        let route = if profile.transparent {
+            "index.html#screenshot-overlay"
+        } else {
+            "index.html#screenshot-overlay-opaque"
+        };
+        match build_window(&app, profile.transparent, route, true) {
+            Ok(window) => {
+                overlay_resident::remember_idle(generation, profile.transparent);
+                watch_session_window(&window);
+            }
+            Err(error) => {
+                log::warn!("screenshot prewarm failed; on-demand build will retry: {error}")
+            }
+        }
+    });
 }
 
 /// A previous overlay can still be closing when the next open starts early.
@@ -358,6 +437,7 @@ fn wait_for_closed_overlay(app: &AppHandle) {
 fn profile_facts(profile: &StartupProfile) -> serde_json::Value {
     json!({
         "earlyWindow": profile.early_window,
+        "reuseWindow": profile.reuse_window,
         "readyHandshake": profile.ready_handshake,
         "readyTimeoutMs": profile.ready_timeout.as_millis() as u64,
         "transparent": profile.transparent,

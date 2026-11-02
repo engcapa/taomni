@@ -27,7 +27,10 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
             rejected == true
                 && app
                     .get_webview_window(super::super::OVERLAY_LABEL)
-                    .is_none(),
+                    .is_none_or(|window| {
+                        super::super::overlay_resident::is_idle()
+                            && window.is_visible().ok() == Some(false)
+                    }),
             None,
             None,
         )
@@ -47,6 +50,12 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
     super::super::close_session(&app);
     wait_closed(&app, super::super::OVERLAY_LABEL, Duration::from_secs(5)).await;
     super::super::open_overlay(&app, None).await?;
+    // On the exclusion path, hide is queued after showing the captured
+    // overlay. Observe the actual native state rather than racing that queue.
+    let hidden_deadline = Instant::now() + Duration::from_secs(3);
+    while main_visible(&app) && Instant::now() < hidden_deadline {
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
     let default_hidden = !main_visible(&app)
         && super::super::screenshot_overlay_init()
             .await?

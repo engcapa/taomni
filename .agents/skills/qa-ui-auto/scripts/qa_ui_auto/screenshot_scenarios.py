@@ -39,11 +39,12 @@ SCENARIOS = {
     "startup-isolation": "screenshot_qa_startup_isolation",
     "startup-flash": "screenshot_qa_startup_flash",
     "clipboard-retry": "screenshot_qa_clipboard_retry",
+    "resident-overlay": "screenshot_qa_resident_overlay",
     "x11-compositor-bypass": "screenshot_qa_x11_compositor_bypass",
 }
 
 # Seconds the runner waits for one scenario result. Startup measurement opens
-# the overlay in two groups of 20 real captures. The case's own deadline
+# the overlay in three groups of 20 real captures. The case's own deadline
 # remains authoritative through budget_time; this cap must not undercut it.
 DEFAULT_DEADLINE = 90
 DEADLINES = {"startup-timing": 600, "startup-isolation": 150}

@@ -632,7 +632,10 @@ pub async fn screenshot_qa_capture_permission_error(app: AppHandle) -> Result<St
             "#, Duration::from_secs(10)).await.map_err(|e| e.to_string())?;
             let no_overlay = app
                 .get_webview_window(super::super::OVERLAY_LABEL)
-                .is_none()
+                .is_none_or(|window| {
+                    super::super::overlay_resident::is_idle()
+                        && window.is_visible().ok() == Some(false)
+                })
                 && super::super::tool_state().overlay.is_none();
             let hide_calls =
                 super::super::QA_WINDOW_HIDE_CALLS.load(Ordering::SeqCst) - hide_calls_before;
