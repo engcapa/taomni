@@ -2818,6 +2818,7 @@
 
 - `[data-testid="sftp-floating-button"]` — interactive [optional] — F7.4.floating-entry
 - `[data-testid="sftp-reattach"]` — interactive [optional] — F7.4.restore-sidebar
+- `[data-testid="sftp-detached-window"]` — display [optional] — F7.4.detached-window
 - `[data-testid="sftp-detach"]` — interactive [optional] — F7.4.detach
 - `[data-testid="sftp-close"]` — interactive [optional] — F7.4.close
 - `[data-testid="sftp-orientation-toggle"]` — interactive — F7.4.orientation-toggle

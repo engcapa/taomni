@@ -2463,6 +2463,10 @@ controls:
     selector: '[data-testid="sftp-reattach"]'
     kind: interactive
     optional: true       # detached SFTP window
+  - id: detached-window
+    selector: '[data-testid="sftp-detached-window"]'
+    kind: display
+    optional: true
   - id: detach
     selector: '[data-testid="sftp-detach"]'
     kind: interactive
