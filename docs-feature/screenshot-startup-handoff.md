@@ -193,4 +193,6 @@
 - 本机 debug 三组各 20 次 `run-20261102-083215-548672500`：firstMs P50/P95 为串行握手 1255/1322ms、并行 899/950ms、复用 821/910ms；focus 后轮询 selectMs P50 为 1443/1093/1026ms，不能把 focus 后轮询时刻等同纯渲染或真实第一像素。这台 debug 的 PNG 编码约 650–800ms，是剩余大头；不据此改编码或外推 release/4K。
 - 完整前端曾 6184 通过、2 失败、1 原有 skip（664 文件）。两个编辑器失败证实为测试与 deferred mount/grammar 两帧加载竞态，分别等待真实 Java language compartment 与两个 EditorView 挂载，不删内容、undo 或次数断言；修复后完整 `screenshot-resident-units-stable.log`：664 文件、6187 测试全部通过，1 原有 skip。截图聚焦 56 项与类型检查通过。
 - 本机 browser 截图／crash 在仍改动的 Vite HMR 期间重跑失败（032/033/036 与 workspace 导航等），不标通过；一轮 QA build 检测到编译中 inputs 改变而拒绝身份记录，保留 exit 2。随后冻结源码批次再构建/运行，不伪造 source stable。
-- 下一轮仍需最终源码截图＋crash 六组 native / 三端 browser 全绿，再 scope=all；P1-4 门槛未满足，650ms 不缩短。
+- 冻结候选 `1a5be417`：本机 screenshot browser `run-20261102-090908-152209500` 41/41，crash browser `run-20261102-091052-706960600` 8/8，均 identity_stable true、有匹配 receipt。原生 `run-20261102-091146-524231000` N30 证明首次触发也复用预热空窗口、三代一致 identity、陈旧 generation close 不影响新会话、所有租约/文件清理通过；N12/N17 仍失败，N4 恢复正确 prior registered=false 状态后通过。
+- N12 进一步定位为公开菜单调用尚处 focus 完成前就被 QA 关闭/重开，后者由未改的 OPENING guard 正确忽略。QA 等待 OPENING 释放后，`run-20261102-092535-808500700` N12/N17 2/2 通过，随后 `run-20261102-092752-615715900` N12/N17/N30/N4 4/4 通过、identity_stable true。N17 添加失败时 clipboard sequence/owner PID/format 只读记录；后续未复现，不能宣称定位了覆盖方。
+- Hosted 第三轮 [`41370911143`](https://github.com/engcapa/taomni/actions/runs/41370911143) 对应 `1a5be417`，三端 browser 已各 49/49，native release / contracts 待收齐；本轮不含后续 N12 QA 等待修正。下一轮仍需最终源码截图＋crash 六组 native / 三端 browser 全绿，再 scope=all；P1-4 门槛未满足，650ms 不缩短。
