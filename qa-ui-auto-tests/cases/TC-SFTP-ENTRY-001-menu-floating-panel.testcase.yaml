@@ -1,0 +1,354 @@
+id: TC-SFTP-ENTRY-001
+title: SSH SFTP menu stays available with either Sessions width and the movable entry follows panel visibility
+covers:
+- F1.2
+- F3.1
+- F7.4
+tags:
+- ssh
+- sftp
+- sidebar
+- floating
+- lifecycle
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- ssh_posix_required
+timeout_sec: 210
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.mergeToolWindowRail
+    value: 'true'
+- seed_storage:
+    key: taomni.sidebarCollapsedByGroup.v1
+    value: '{"terminal": false, "code-workspace": true}'
+- reload_window: null
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="sidebar"]'
+- assert_visible: '[data-testid="session-new"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.ssh_posix.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.ssh_posix.port}
+- set_check:
+    selector: '[data-testid="session-specify-username"]'
+    checked: true
+- fill:
+    selector: '[data-testid="session-user"]'
+    value: ${cfg.ssh_posix.user}
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-sftp-entry
+- click: '[data-testid="session-save"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-sftp-entry"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-sftp-entry"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_POSIX_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- wait_for: '[data-testid="sftp-floating-button"]'
+- assert_visible: '[data-testid="expanded-sidebar-panel"]'
+- assert_count:
+    selector: '[data-testid="sidebar-rail"] [data-testid="attached-sftp-toggle"]'
+    equal: 0
+- assert_element_geometry:
+    selector: '[data-testid="sftp-floating-button"]'
+    min_width: 38
+    min_height: 32
+    viewport_margin: 4
+- eval_readonly:
+    expression: document.querySelector('[data-testid="sftp-floating-button"]').getBoundingClientRect().width <= 40 && document.querySelector('[data-testid="sftp-floating-button"]').getBoundingClientRect().height
+      <= 34
+    expect_truthy: true
+- drag_to:
+    from: '[data-testid="sftp-floating-button"]'
+    by:
+      dx: -120
+      dy: -60
+      steps: 12
+- assert_not_visible: '[data-testid="sftp-browser"]'
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem('taomni.sftp.floatingPosition')).x < 1
+    expect_truthy: true
+- screenshot: sftp-entry-dragged.png
+- click: '[data-testid="titlebar-actions-more"]'
+- assert_visible: '[data-testid="attached-sftp-toggle"]'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-browser"]'
+- assert_not_visible: '[data-testid="sftp-floating-button"]'
+- assert_visible: '[data-testid="sftp-close"] svg.lucide-panel-right-close'
+- click: '[data-testid="sftp-close"]'
+- wait_for: '[data-testid="sftp-floating-button"]'
+- assert_not_visible: '[data-testid="sftp-browser"]'
+- eval_readonly:
+    expression: JSON.parse(localStorage.getItem('taomni.sftp.floatingPosition')).x < 1
+    expect_truthy: true
+- click: '[data-testid="sftp-floating-button"]'
+- wait_for: '[data-testid="sftp-browser"]'
+- assert_not_visible: '[data-testid="sftp-floating-button"]'
+- click: '[data-testid="titlebar-actions-more"]'
+- assert_attribute:
+    selector: '[data-testid="attached-sftp-toggle"]'
+    name: aria-pressed
+    equals: 'true'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-floating-button"]'
+- assert_not_visible: '[data-testid="sftp-browser"]'
+- click: '[data-testid="toggle-left-sidebar"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- assert_count:
+    selector: '[data-testid="sidebar-rail"] [data-testid="attached-sftp-toggle"]'
+    equal: 0
+- click: '[data-testid="titlebar-actions-more"]'
+- assert_visible: '[data-testid="attached-sftp-toggle"]'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-browser"]'
+- assert_not_visible: '[data-testid="sftp-floating-button"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 30
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo QA_SFTP_COLLAPSED_LIVE
+    submit: true
+    verify:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+      regex: (?m)^QA_SFTP_COLLAPSED_LIVE\r?$
+      timeout_sec: 30
+      attempts: 1
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^QA_SFTP_COLLAPSED_LIVE\r?$
+    timeout_sec: 30
+- click: '[data-testid="sftp-close"]'
+- wait_for: '[data-testid="sftp-floating-button"]'
+- click: '[data-testid="toggle-left-sidebar"]'
+- wait_for: '[data-testid="expanded-sidebar-panel"]'
+- press:
+    selector: '[data-testid="sftp-floating-button"]'
+    key: Enter
+- wait_for: '[data-testid="sftp-browser"]'
+- assert_not_visible: '[data-testid="sftp-floating-button"]'
+- click: '[data-testid="sftp-close"]'
+- wait_for: '[data-testid="sftp-floating-button"]'
+- assert_element_geometry:
+    selector: '[data-testid="sftp-floating-button"]'
+    min_width: 38
+    min_height: 32
+    viewport_margin: 4
+- screenshot: sftp-entry-expanded.png
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 30
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo QA_SFTP_HIDDEN_LIVE
+    submit: true
+    verify:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+      regex: (?m)^QA_SFTP_HIDDEN_LIVE\r?$
+      timeout_sec: 30
+      attempts: 1
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^QA_SFTP_HIDDEN_LIVE\r?$
+    timeout_sec: 30
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The compact floating entry can be dragged without opening SFTP, retains its position across hiding/reopening, supports keyboard activation
+      and disappears while the panel is visible. The hide icon restores the entry. Both expanded and collapsed Sessions retain SFTP in the actions
+      menu and have no rail SFTP button. The real SSH terminal executes distinct commands after both transitions.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 8
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 16
+    - 17
+    - 19
+    - 21
+    - 22
+    - 29
+    - 33
+    - 35
+    - 39
+    - 43
+    - 46
+    - 48
+    - 51
+    - 54
+    - 56
+    - 60
+    - 62
+    - 64
+    - 66
+    - 69
+    - 74
+    checkpoints:
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-sftp-entry\"]"}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 23
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        60}}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 25
+      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 26
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail\"] [data-testid=\"attached-sftp-toggle\"]", "equal": 0}}'
+    - step: 27
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"sftp-floating-button\"]", "min_width": 38, "min_height": 32, "viewport_margin":
+        4}}'
+    - step: 28
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid=\"sftp-floating-button\"]'').getBoundingClientRect().width
+        <= 40 && document.querySelector(''[data-testid=\"sftp-floating-button\"]'').getBoundingClientRect().height <= 34", "expect_truthy": true}}'
+    - step: 30
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-browser\"]"}'
+    - step: 31
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(''taomni.sftp.floatingPosition'')).x < 1", "expect_truthy": true}}'
+    - step: 34
+      expectation: '{"assert_visible": "[data-testid=\"attached-sftp-toggle\"]"}'
+    - step: 36
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 37
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 38
+      expectation: '{"assert_visible": "[data-testid=\"sftp-close\"] svg.lucide-panel-right-close"}'
+    - step: 40
+      expectation: '{"wait_for": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 41
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-browser\"]"}'
+    - step: 42
+      expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(''taomni.sftp.floatingPosition'')).x < 1", "expect_truthy": true}}'
+    - step: 44
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 45
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 47
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"attached-sftp-toggle\"]", "name": "aria-pressed", "equals": "true"}}'
+    - step: 49
+      expectation: '{"wait_for": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 50
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-browser\"]"}'
+    - step: 52
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 53
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail\"] [data-testid=\"attached-sftp-toggle\"]", "equal": 0}}'
+    - step: 55
+      expectation: '{"assert_visible": "[data-testid=\"attached-sftp-toggle\"]"}'
+    - step: 57
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 58
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 59
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        30}}'
+    - step: 61
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_SFTP_COLLAPSED_LIVE\\r?$",
+        "timeout_sec": 30}}'
+    - step: 63
+      expectation: '{"wait_for": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 65
+      expectation: '{"wait_for": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 67
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 68
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 70
+      expectation: '{"wait_for": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 71
+      expectation: '{"assert_element_geometry": {"selector": "[data-testid=\"sftp-floating-button\"]", "min_width": 38, "min_height": 32, "viewport_margin":
+        4}}'
+    - step: 73
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        30}}'
+    - step: 75
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_SFTP_HIDDEN_LIVE\\r?$",
+        "timeout_sec": 30}}'
+    - step: 76
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 6
+    - 7
+    - 9
+    - 15
+    - 18
+    - 20
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 28
+    - 30
+    - 31
+    - 34
+    - 36
+    - 37
+    - 38
+    - 40
+    - 41
+    - 42
+    - 44
+    - 45
+    - 47
+    - 49
+    - 50
+    - 52
+    - 53
+    - 55
+    - 57
+    - 58
+    - 59
+    - 61
+    - 63
+    - 65
+    - 67
+    - 68
+    - 70
+    - 71
+    - 73
+    - 75
+    - 76
+  visual:
+  - check: Inspect the retained screenshots for readable terminal content, compact SFTP controls and usable side-panel sizing.
+    method: manual
+    reason: Geometry and DOM assertions support, but do not replace, visual review.
+  native:
+  - check: Run the same controls, pointer drag and Enter activation in packaged WebViews; verify the original SSH PTY still executes commands.
+    method: automated
+    reason: Browser stubs cannot establish native WebView/window, SSH PTY or SFTP channel ownership.

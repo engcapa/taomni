@@ -1,4 +1,4 @@
-import { Link2, Map, Maximize2, X } from "lucide-react";
+import { Link2, Map, Maximize2, PanelRightClose } from "lucide-react";
 import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "react-resizable-panels";
 import { useT } from "../../../lib/i18n";
 import { submitSshAuthResponse } from "../../../lib/ipc";
@@ -153,9 +153,10 @@ export function FileBrowserView(inputs: FileBrowserViewProps) {
               type="button"
               className="px-1 hover:bg-[var(--taomni-hover)] rounded"
               title={t("fileBrowser.hideSftpPanel")}
+              aria-label={t("fileBrowser.hideSftpPanel")}
               onClick={props.onClose}
             >
-              <X className="w-3 h-3" />
+              <PanelRightClose className="w-3 h-3" />
             </button>
           )}
         </div>

@@ -117,7 +117,6 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
   const [pendingAuth, setPendingAuth] = useState<PendingAuth | null>(null);
   const [showAbout, setShowAbout] = useState(false);
   const [attachedSidebars, setAttachedSidebars] = useState<Record<string, boolean>>({});
-  const [sftpDetachedTabs, setSftpDetachedTabs] = useState<Record<string, boolean>>({});
   const [pendingSftpUploadRequests, setPendingSftpUploadRequests] = useState<Record<string, SftpPendingUploadRequest>>({});
   const [quickConnectVisible, setQuickConnectVisible] = useState(readQuickConnectVisible);
   // The active tab's contextual action toolbar (Capture / Detach / Maximize …)
@@ -220,7 +219,6 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
   return {
     setAttachedSidebars,
     tabs,
-    setSftpDetachedTabs,
     setPendingSftpUploadRequests,
     terminalCwdsRef,
     setTerminalCwds,
@@ -295,7 +293,6 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
     terminalSplitActive,
     mergeToolWindowRail,
     mainRailHost,
-    sftpDetachedTabs,
     attachedSidebars,
     aiFullyDisabled,
     chatDrawerOpen,

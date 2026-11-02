@@ -6,6 +6,8 @@ import { deserializeVncViewerOptions } from "../../lib/vncOptions";
 import type { Tab } from "../../types";
 import { useLanChatStore } from "../../stores/lanChatStore";
 import { t as tr } from "../../lib/i18n";
+import { reattachSftp } from "./reattachSftp";
+import type { DetachedSftpParams } from "../../lib/sftpWindowState";
 
 
 export interface UseDetachedWindowEventsContext {
@@ -13,10 +15,11 @@ export interface UseDetachedWindowEventsContext {
   setActiveTab: (id: string) => void;
   addTab: (tab: Tab) => void;
   setStatusMessage: (message: string) => void;
+  showAttachedSftp: (tabId: string) => void;
 }
 
 export function useDetachedWindowEvents(context: UseDetachedWindowEventsContext) {
-  const { tabsRef, setActiveTab, addTab, setStatusMessage } = context;
+  const { tabsRef, setActiveTab, addTab, setStatusMessage, showAttachedSftp } = context;
 
   /**
    * Subscribe to reattach messages broadcast by detached windows. Each
@@ -43,6 +46,17 @@ export function useDetachedWindowEvents(context: UseDetachedWindowEventsContext)
         return;
       }
       recentReattach.set(burstKey, now);
+      if (msg.kind === "sftp") {
+        try {
+          if (await reattachSftp(msg.payload as DetachedSftpParams, { tabsRef, setActiveTab, addTab, showAttachedSftp })) {
+            setStatusMessage(tr("status.reattached"));
+          }
+        } catch (error) {
+          setStatusMessage(tr("fileBrowser.statusSftpConnectFailed", { error: String(error) }));
+        }
+        clearReattachHandoff(msg.kind, msg.id);
+        return;
+      }
       if (msg.kind === "lan-chat") {
         const p = msg.payload as { activeConvId?: string; title?: string } | undefined;
         const convId = p?.activeConvId || msg.id;
@@ -189,7 +203,6 @@ export function useDetachedWindowEvents(context: UseDetachedWindowEventsContext)
           break;
         }
         default:
-          /* SFTP reattach not wired — SFTP detach is co-existing, not exclusive. */
           break;
       }
       clearReattachHandoff(msg.kind, msg.id);
@@ -199,6 +212,6 @@ export function useDetachedWindowEvents(context: UseDetachedWindowEventsContext)
     // before we subscribed.
     drainPendingReattach().forEach((msg) => { void handle(msg); });
     return unsub;
-  }, [addTab, setActiveTab, setStatusMessage]);
+  }, [addTab, setActiveTab, setStatusMessage, showAttachedSftp]);
   return {  };
 }

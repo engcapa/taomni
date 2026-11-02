@@ -333,7 +333,6 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                     requestTerminalCwd={terminals.requestTerminalCwd}
                     pendingSftpUploadRequests={layout.pendingSftpUploadRequests}
                     setPendingSftpUploadRequests={layout.setPendingSftpUploadRequests}
-                    setSftpDetachedTabs={layout.setSftpDetachedTabs}
                     setAttachedSidebars={layout.setAttachedSidebars}
                     openDetachedSftp={windowLifecycle.openDetachedSftp}
                     splitGridColumns={chrome.splitGridColumns}

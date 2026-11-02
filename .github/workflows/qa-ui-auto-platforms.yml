@@ -118,6 +118,36 @@ defaults:
     shell: bash
 
 jobs:
+  sftp-contracts:
+    name: SFTP navigation and window contracts
+    if: >-
+      inputs.scope == 'all' || contains(inputs.case_ids, 'TC-SFTP-') ||
+      contains(inputs.case_ids, 'TC-043') || contains(inputs.case_ids, 'TC-145') ||
+      contains(inputs.case_ids, 'TC-IDE-PARITY-027-02')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/qa-runtime
+        with:
+          mode: contracts
+      - name: QA case and control catalog
+        run: python -m qa_ui_auto.audit --gate
+      - name: TypeScript and source boundaries
+        run: pnpm exec tsc -b && pnpm check:refactor
+      - name: SFTP lifecycle, navigation and floating controls
+        run: >-
+          pnpm exec vitest run --maxWorkers=2
+          src/components/filebrowser/SftpFloatingButton.test.tsx
+          src/components/filebrowser/SftpDetachedWindow.test.tsx
+          src/components/filebrowser/browser/useFileBrowserConnection.test.tsx
+          src/layouts/main/reattachSftp.test.ts
+          src/layouts/MainLayout.test.tsx
+          src/stores/sftpStore.test.ts
+          src/lib/detachedSession.test.ts
+
   development-case-contract:
     name: Development case contract
     if: github.event_name == 'pull_request' && inputs.scope == ''
@@ -331,7 +361,7 @@ jobs:
   summarize:
     name: qa-ui-auto-platforms-result
     if: always() && needs.plan.result != 'skipped'
-    needs: [plan, tool-contracts, execute-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
+    needs: [plan, tool-contracts, sftp-contracts, execute-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
