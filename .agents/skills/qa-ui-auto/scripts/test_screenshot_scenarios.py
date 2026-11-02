@@ -55,6 +55,18 @@ class ScreenshotScenariosTest(TestCase):
                 files = list(self.ctx.case_dir.glob("screenshot-capture-png-*.json"))
                 self.assertTrue(any(json.loads(path.read_text())["transportError"] == str(error) for path in files))
 
+    def test_marker_raii_cleanup_is_a_script_not_an_async_function_body(self):
+        import subprocess
+        import re
+        root = Path(__file__).resolve().parents[4]
+        source = (root / "src-tauri/src/screenshot/qa/startup_isolation.rs").read_text(encoding="utf-8")
+        script = re.search(r'self\.0\.eval\("([^"\n]+)"\)', source)
+        if script is None:
+            self.fail("native marker cleanup eval script not found")
+        expression = script.group(1)
+        subprocess.run(["node", "-e", "const vm=require('node:vm');new vm.Script(process.argv[1]);", expression],
+                       check=True, capture_output=True, text=True, timeout=10)
+
     def test_new_scenarios_only_invoke_their_fixed_commands(self):
         for scenario, command in (("current-window", "screenshot_qa_current_window"), ("pin-tools", "screenshot_qa_pin_tools"), ("pin-arrangement", "screenshot_qa_pin_arrangement"), ("scroll-manual", "screenshot_qa_scroll_manual"), ("colors", "screenshot_qa_colors"), ("capture-fidelity", "screenshot_qa_capture_fidelity"), ("ocr-redact", "screenshot_qa_ocr_redact"), ("freehand", "screenshot_qa_freehand"), ("controls", "screenshot_qa_controls"), ("full-recorder", "screenshot_qa_full_recorder"), ("scroll-permission-error", "screenshot_qa_scroll_permission_error"), ("capture-permission-error", "screenshot_qa_capture_permission_error"), ("escape-entry", "screenshot_qa_escape_entry"), ("startup-timing", "screenshot_qa_startup_timing"), ("startup-isolation", "screenshot_qa_startup_isolation"), ("startup-flash", "screenshot_qa_startup_flash"), ("clipboard-retry", "screenshot_qa_clipboard_retry"), ("resident-overlay", "screenshot_qa_resident_overlay"), ("x11-compositor-bypass", "screenshot_qa_x11_compositor_bypass")):
             self.ctx.session.execute.side_effect = [True, {"done": True, "value": 'OK {"pixels":100}'}, True]
