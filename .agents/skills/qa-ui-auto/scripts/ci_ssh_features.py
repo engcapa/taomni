@@ -22,6 +22,9 @@ import time
 import urllib.request
 import shutil
 
+CYGWIN_SETUP_URL = "https://cygwin.com/setup/setup-2.941.x86_64.exe"
+CYGWIN_SETUP_SHA256 = "9d31ffc08b14eaaf5ddf15799a934f6bc1be3d87ed986736cb1980c508ed9502"
+
 
 def transfer_paths(remote_dir: PurePath, remote_posix: str, local_dir: PurePath) -> dict[str, str]:
     """Keep SSH paths separate from native paths used to verify actual bytes."""
@@ -67,8 +70,10 @@ def install():
         setup = root.parent / "qa-cygwin-setup.exe"
         # The official installer verifies the signed repository metadata and
         # each package checksum. Use HTTPS and keep its setup logs as evidence.
-        urllib.request.urlretrieve("https://cygwin.com/setup-x86_64.exe", setup)
-        if hashlib.sha256(setup.read_bytes()).hexdigest() != "2c9f2fb56e1fb687b5d9680afa8f8b06e6214f0e483096af0eae1946431226c5":
+        # Pin the URL as well as the hash: the unversioned installer changes
+        # whenever upstream releases setup, even if our fixture is unchanged.
+        urllib.request.urlretrieve(CYGWIN_SETUP_URL, setup)
+        if hashlib.sha256(setup.read_bytes()).hexdigest() != CYGWIN_SETUP_SHA256:
             raise RuntimeError("Cygwin installer checksum differs from pinned version")
         result = subprocess.run([str(setup), "--quiet-mode", "--no-shortcuts", "--no-startmenu", "--no-desktop",
             "--root", str(root), "--local-package-dir", str(root.parent / "qa-cygwin-packages"),

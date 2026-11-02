@@ -1,6 +1,6 @@
 import { acceptCompletion, closeBrackets, closeCompletion, completionStatus, setSelectedCompletion, startCompletion } from "@codemirror/autocomplete";
 import { history } from "@codemirror/commands";
-import { bracketMatching, foldEffect, foldGutter, indentOnInput, indentUnit } from "@codemirror/language";
+import { bracketMatching, foldGutter, indentOnInput, indentUnit } from "@codemirror/language";
 import { search } from "@codemirror/search";
 import { EditorState, Text, Transaction, type Compartment, type Extension, type StateEffect } from "@codemirror/state";
 import type { KeyBinding } from "@codemirror/view";
@@ -23,8 +23,6 @@ import { createMountedEditorActions } from "./createMountedEditorActions";
 import { createTemplateKeybindings } from "./createTemplateKeybindings";
 import { cancelActiveHoverResize, foldHoverProvenanceTooltip, lspHoverExtension, lspNavigationExtensions } from "./intelligence";
 import { type EditorSelectionRange } from "./types";
-import { importFoldPathByView } from "./viewState";
-import { importFoldRange } from "../importFold";
 import { liveTemplateLanguageForPath } from "../liveTemplates";
 import { cancelLspSnippetSession, lspSnippetSessionInvalidator, resetBasicCompletionSession, type CompletionResolveGateRequest } from "../lspCompletion";
 import { createDiagnosticChrome } from "../lspDiagnosticChrome";
@@ -548,6 +546,7 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
     editor.viewRef.current = view;
     viewState = createEditorViewStateLifecycle({
       view, refs: editor, documentReady,
+      path: documentPath, cached: cached !== undefined,
       initialState: cached ? null : editor.initialViewStateRef.current,
       callback,
       onRestored: (restored) => { emitSelection(restored); emitViewport(restored); },
@@ -564,17 +563,6 @@ export function useEditorViewLifetime(context: UseEditorViewLifetimeContext) {
     };
     window.addEventListener("keydown", trackSelectionKey, true);
     editor.selectionKeyTrackerCleanupRef.current = () => window.removeEventListener("keydown", trackSelectionKey, true);
-    // ED-PARITY-011 DEC-011-06: IDEA folds the import block by default.
-    // Imports the user expanded in this leaf stay expanded when it remounts.
-    const importFold = importFoldRange(editor.pathRef.current, view.state.doc.toString());
-    if (importFold && importFold.to <= view.state.doc.length) {
-      importFoldPathByView.set(view, editor.pathRef.current);
-      if (!cached && editor.initialViewStateRef.current?.importsExpanded !== true) {
-        view.dispatch({ effects: foldEffect.of(importFold) });
-      }
-    } else {
-      importFoldPathByView.delete(view);
-    }
     const providerRowForEvent = (event: MouseEvent): { row: HTMLLIElement; index: number; } | null => {
       if (!editor.pathRef.current.toLowerCase().endsWith(".java") || editor.viewRef.current !== view) return null;
       const row = (event.target as HTMLElement).closest<HTMLLIElement>(

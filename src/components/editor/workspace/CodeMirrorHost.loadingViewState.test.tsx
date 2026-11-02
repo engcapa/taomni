@@ -11,6 +11,31 @@ import { WorkspaceDocumentTransactionOwner } from "./workspaceDocumentTransactio
 
 afterEach(cleanup);
 
+it("folds imports once the loading document arrives without replacing its editor", () => {
+  const doc = "package demo;\nimport a.B;\nimport c.D;\nclass Demo {}\n";
+  const rendered = renderEditor("", vi.fn(), {
+    fileKey: "imports", path: "Demo.java", documentReady: false, readOnly: true,
+  });
+  const view = viewIn(rendered.container);
+  rendered.rerender(<CodeMirrorHost {...rendered.props} doc={doc} documentReady readOnly={false} />);
+  expect(viewIn(rendered.container)).toBe(view);
+  expect(foldedRanges(view.state).size).toBe(1);
+  expect(rendered.onChange).not.toHaveBeenCalled();
+});
+
+it("keeps explicitly expanded imports expanded after a delayed read", () => {
+  const doc = "import a.B;\nimport c.D;\nclass Demo {}\n";
+  const rendered = renderEditor("", vi.fn(), {
+    fileKey: "imports", path: "Demo.java", documentReady: false, readOnly: true,
+    initialViewState: {
+      mainSelection: { anchor: 0, head: 0 }, selections: [], scrollTop: 0,
+      folds: [], importsExpanded: true,
+    },
+  });
+  rendered.rerender(<CodeMirrorHost {...rendered.props} doc={doc} documentReady readOnly={false} />);
+  expect(foldedRanges(viewIn(rendered.container).state).size).toBe(0);
+});
+
 const text = Text.of(Array.from({ length: 60 }, (_, index) => `line ${index + 1} contents`));
 
 function snapshot(line: number): PersistedEditorViewState {

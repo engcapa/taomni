@@ -98,89 +98,75 @@ export const MailHtmlReader = forwardRef<MailHtmlReaderHandle, MailHtmlReaderPro
     const iframe = iframeRef.current;
     if (!iframe) return;
 
-    let ro: ResizeObserver | null = null;
-    let mo: MutationObserver | null = null;
-    let cancelled = false;
-
-    const measure = () => {
-      if (cancelled) return;
-      const doc = iframe.contentDocument;
-      if (!doc) return;
-      const body = doc.body;
-      const root = doc.documentElement;
-      if (!body || !root) return;
-      const height = Math.ceil(
-        Math.max(
-          body.scrollHeight,
-          body.offsetHeight,
-          root.scrollHeight,
-          root.offsetHeight,
-          120,
-        ),
-      );
-      setFrameHeight((prev) => (Math.abs(prev - height) > 1 ? height : prev));
-    };
-
-    let t1: number | undefined;
-    let t2: number | undefined;
-
-    const onFrameClick = (event: MouseEvent) => {
-      const anchor = (event.target as Element | null)?.closest?.("a[href]");
-      const href = anchor?.getAttribute("href") ?? "";
-      if (!/^mailto:/i.test(href) || !onMailtoRef.current) return;
-      event.preventDefault();
-      onMailtoRef.current(href);
-    };
-    let clickDoc: Document | null = null;
+    let releaseDocument: (() => void) | undefined;
 
     const attachObservers = () => {
+      releaseDocument?.();
+      releaseDocument = undefined;
       const doc = iframe.contentDocument;
-      if (!doc?.body) return;
-      if (clickDoc !== doc) {
-        clickDoc?.removeEventListener("click", onFrameClick);
-        doc.addEventListener("click", onFrameClick);
-        clickDoc = doc;
-      }
-      measure();
-      if (typeof ResizeObserver !== "undefined") {
-        ro = new ResizeObserver(() => measure());
-        ro.observe(doc.body);
-        if (doc.documentElement) ro.observe(doc.documentElement);
-      }
-      if (typeof MutationObserver !== "undefined") {
-        mo = new MutationObserver(() => measure());
-        mo.observe(doc.body, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-          characterData: true,
-        });
-      }
-      doc.querySelectorAll("img").forEach((img) => {
-        if (img.complete) return;
-        img.addEventListener("load", measure, { once: true });
-        img.addEventListener("error", measure, { once: true });
+      const view = doc?.defaultView;
+      if (!doc?.body || !view) return;
+      let disposed = false;
+      let frame: number | undefined;
+      const measure = () => {
+        frame = undefined;
+        if (disposed) return;
+        const body = doc.body;
+        const root = doc.documentElement;
+        if (!body || !root) return;
+        const height = Math.ceil(Math.max(
+          body.scrollHeight, body.offsetHeight,
+          root.scrollHeight, root.offsetHeight, 120,
+        ));
+        setFrameHeight((prev) => (Math.abs(prev - height) > 1 ? height : prev));
+      };
+      const schedule = () => {
+        if (!disposed && frame === undefined) frame = view.requestAnimationFrame(measure);
+      };
+      const onFrameClick = (event: MouseEvent) => {
+        const anchor = (event.target as Element | null)?.closest?.("a[href]");
+        const href = anchor?.getAttribute("href") ?? "";
+        if (!/^mailto:/i.test(href) || !onMailtoRef.current) return;
+        event.preventDefault();
+        onMailtoRef.current(href);
+      };
+      doc.addEventListener("click", onFrameClick);
+      // RO belongs to the observed document. A parent-window observer targeting
+      // iframe roots can hit WebView2's cross-document delivery depth checks even
+      // without a DOM write. Publish height outside delivery as well.
+      const ro = typeof view.ResizeObserver === "undefined" ? null : new view.ResizeObserver(schedule);
+      ro?.observe(doc.body);
+      ro?.observe(doc.documentElement);
+      const mo = typeof view.MutationObserver === "undefined" ? null : new view.MutationObserver(schedule);
+      mo?.observe(doc.body, {
+        childList: true, subtree: true, attributes: true, characterData: true,
       });
-      if (typeof window !== "undefined") {
-        t1 = window.setTimeout(measure, 50);
-        t2 = window.setTimeout(measure, 250);
+      const images = [...doc.querySelectorAll("img")].filter((img) => !img.complete);
+      for (const img of images) {
+        img.addEventListener("load", schedule, { once: true });
+        img.addEventListener("error", schedule, { once: true });
       }
+      const timers = [view.setTimeout(schedule, 50), view.setTimeout(schedule, 250)];
+      schedule();
+      releaseDocument = () => {
+        disposed = true;
+        if (frame !== undefined) view.cancelAnimationFrame(frame);
+        for (const timer of timers) view.clearTimeout(timer);
+        ro?.disconnect();
+        mo?.disconnect();
+        doc.removeEventListener("click", onFrameClick);
+        for (const img of images) {
+          img.removeEventListener("load", schedule);
+          img.removeEventListener("error", schedule);
+        }
+      };
     };
 
-    const onLoad = () => attachObservers();
-    iframe.addEventListener("load", onLoad);
-    if (iframe.contentDocument?.readyState === "complete") {
-      attachObservers();
-    }
-
+    iframe.addEventListener("load", attachObservers);
+    if (iframe.contentDocument?.readyState === "complete") attachObservers();
     return () => {
-      cancelled = true;
-      if (t1 !== undefined) clearTimeout(t1);
-      if (t2 !== undefined) clearTimeout(t2);
-      iframe.removeEventListener("load", onLoad);
-      clickDoc?.removeEventListener("click", onFrameClick);
-      ro?.disconnect();
-      mo?.disconnect();
+      iframe.removeEventListener("load", attachObservers);
+      releaseDocument?.();
     };
   }, [srcDoc]);
 
