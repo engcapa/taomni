@@ -103,7 +103,9 @@ steps:
 - click: '[data-testid="sftp-detach"]'
 - switch_window:
     selector: '[data-testid="sftp-detached-window"]'
-    timeout_sec: 30
+    # Allow a read-only DOM probe to recover after WKWebView's first-navigation
+    # evaluation callback times out (30s); window/listing assertions still apply.
+    timeout_sec: 60
 - wait_for: '[data-testid="sftp-remote-path-segments"] button[data-path="/tmp/qa-sftp-window/before"]'
 - assert_text:
     selector: '[data-testid="sftp-remote-list"]'
@@ -181,7 +183,7 @@ steps:
 - click: '[data-testid="sftp-detach"]'
 - switch_window:
     selector: '[data-testid="sftp-detached-window"]'
-    timeout_sec: 30
+    timeout_sec: 60
 - wait_for: '[data-testid="sftp-remote-path-segments"] button[data-path="/tmp/qa-sftp-window/popup"]'
 - assert_text:
     selector: '[data-testid="sftp-remote-list"]'

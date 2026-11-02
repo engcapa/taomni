@@ -69,6 +69,8 @@ def native_switch(ctx, args):
                     return f"selected real WebView window {handle} with {selector}"
             except Exception as exc:
                 error = str(exc)
+                _record_native_context(ctx, "probe_error", handle=handle,
+                                       selector=selector, error=error)
         time.sleep(.1)
     raise StepError(f"No real window matches {selector}: {error}")
 
