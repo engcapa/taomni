@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useCallback, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { editorAction } from "./keymap/actions";
 import type { WorkspaceActionHost } from "./workspaceActionHost";
 
@@ -34,7 +34,7 @@ export function useMarkdownPreviewSearch(
     setIndex((current) => matches.current.length ? (current + delta + matches.current.length) % matches.current.length : 0);
   }, []);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const host = owner?.actionHost;
     if (!host || (!owner.standalone && !focused)) return;
     return host.registerActions([
@@ -44,8 +44,15 @@ export function useMarkdownPreviewSearch(
         secondary: ["Ctrl+l"], requiresEditor: true, run: async () => { move(1); return { kind: "applied" }; } }),
       editorAction({ id: "editor.findPrevious", title: "Find Previous Match", category: "Edit", defaultKeybinding: "Shift+F3",
         secondary: ["Ctrl+Shift+l"], requiresEditor: true, run: async () => { move(-1); return { kind: "applied" }; } }),
-    ], { ownerViewId: owner.groupId, priority: 1 });
-  }, [owner?.actionHost, owner?.groupId, owner?.standalone, focused, openSearch, move]);
+    ].map((action) => ({
+      ...action,
+      // Split's preview is usable before the deferred CodeMirror port exists.
+      // Keep the shared keymap/dispatcher, but let this mounted, focused
+      // surface establish its own readiness instead of requiring that port.
+      when: (context: import("./workspaceActionRegistry").WorkspaceActionContext) => context.focus === "editor"
+        && (!!context.hasActiveFile || rootRef.current?.contains(document.activeElement) === true),
+    })), { ownerViewId: owner.groupId, priority: 1 });
+  }, [owner?.actionHost, owner?.groupId, owner?.standalone, focused, openSearch, move, rootRef]);
 
   useLayoutEffect(() => {
     const content = contentRef.current;

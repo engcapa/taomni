@@ -94,7 +94,7 @@ export function MailComposer(viewProps: MailComposerProps) {
             ariaLabel="New message"
             minWidth={520}
             minHeight={360}
-            className="w-[min(920px,calc(100vw-48px))] h-[min(760px,calc(100vh-72px))] max-w-[calc(100vw-48px)] max-h-[calc(100vh-72px)]"
+            className="w-[min(920px,calc(100vw-48px))] h-[min(760px,calc(100vh-72px))] max-w-full max-h-full"
             onClose={() => {
               setComposeOpen(false);
               setComposePrompt(null);

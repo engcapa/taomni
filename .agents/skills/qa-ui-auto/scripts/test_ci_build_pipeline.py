@@ -14,6 +14,21 @@ ROOT = Path(__file__).resolve().parents[4]
 
 
 class BuildPipelineTests(unittest.TestCase):
+    def test_frontend_regressions_run_once_on_linux_producer_and_keep_original_log(self):
+        workflow = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
+        steps = workflow['jobs']['entry']['steps']
+        step = next(s for s in steps if s.get('name') == 'Frontend behavior unit regressions')
+        self.assertEqual(step['if'], "runner.os == 'Linux' && inputs.operation == 'build'")
+        self.assertIn('pnpm check:refactor', step['run'])
+        for path in ('src/components/mail/MailClientTab.test.tsx',
+                     'src/components/screenshot/overlay/prefetch.test.ts',
+                     'src/components/editor/workspace/useMarkdownPreviewSearch.test.tsx'):
+            self.assertIn(path, step['run'])
+            self.assertTrue((ROOT / path).is_file())
+        self.assertIn('| tee qa-build-output/frontend-unit-contracts.log', step['run'])
+        upload = next(s for s in steps if s.get('name') == 'Retain native build diagnostics')
+        self.assertIn('qa-build-output/frontend-unit-contracts.log', upload['with']['path'])
+
     def test_failed_contracts_cannot_leave_a_passing_aggregate(self):
         jobs = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())['jobs']
         step = next(s for s in jobs['summarize']['steps'] if s.get('name') == 'Include supporting job results')

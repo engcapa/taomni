@@ -51,6 +51,12 @@ jobs:
       - name: Updater unit contracts
         if: (contains(matrix.capabilities, 'updater')) && inputs.operation == 'run'
         run: pnpm test src/lib/updateService.test.ts src/stores/updateStore.test.ts src/components/UpdateDialog.test.tsx
+      - name: Frontend behavior unit regressions
+        if: runner.os == 'Linux' && inputs.operation == 'build'
+        run: |
+          mkdir -p qa-build-output
+          pnpm check:refactor
+          pnpm exec vitest run src/components/mail/MailClientTab.test.tsx src/components/screenshot/ScreenshotOverlay.test.tsx src/components/screenshot/ScreenshotOverlayStartup.test.tsx src/components/screenshot/overlay/prefetch.test.ts src/components/screenshot/overlay/ScreenshotSessionHost.test.tsx src/components/editor/workspace/useMarkdownPreviewSearch.test.tsx 2>&1 | tee qa-build-output/frontend-unit-contracts.log
       - name: Ubuntu 22.04 PipeWire build cache
         if: runner.os == 'Linux' && matrix.mode == 'native' && startsWith(matrix.linux_profile, 'ubuntu-22.04')
         uses: actions/cache@v4
@@ -370,6 +376,7 @@ jobs:
           name: build-log-${{ matrix.id }}-${{ inputs.artifact_key }}
           path: |
             qa-build-output/build.log
+            qa-build-output/frontend-unit-contracts.log
             qa-build-output/capture-contracts.log
             qa-build-output/session-cleanup-contracts.log
             qa-build-output/backup-atomic-contracts.log

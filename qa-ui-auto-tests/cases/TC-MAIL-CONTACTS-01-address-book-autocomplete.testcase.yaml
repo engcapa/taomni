@@ -16,7 +16,9 @@ description: 'TASK-19 (docs-feature/mail-thunderbird-parity-design.md AC-61, DEC
 
   native mode stores the contact in the account database and searches it
 
-  through the real backend.
+  through the real backend. The composer remains bounded by its mail pane in
+  short packaged WebViews so the original close button remains hit-testable;
+  the same contact suggestion must survive closing and reopening.
 
   '
 covers:
@@ -82,6 +84,11 @@ steps:
     selector: '[data-testid="mail-recipient-suggestions"]'
     contains: Zed Contact
 - screenshot: mail-contacts-01-reopened.png
+- assert_element_geometry:
+    selector: '[role="dialog"][aria-label="New message"]'
+    min_width: 320
+    min_height: 300
+    viewport_margin: 0
 verification:
   review: reviewed
   requirements:
@@ -132,10 +139,13 @@ verification:
       expectation: 重新打开后出现当前查询的联系人建议。
     - step: 26
       expectation: 建议中仍包含 Zed Contact。
+    - step: 28
+      expectation: Reopened composer is wholly inside the viewport; its native close button was hit-testable during the first close.
     results:
     - 22
     - 25
     - 26
+    - 28
   visual:
   - check: 截图中收件人下拉列出 “Zed Contact <zed.contact@example.org>”。
     method: manual
