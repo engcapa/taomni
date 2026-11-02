@@ -195,6 +195,31 @@ class ExternalBrowserOwnerTest(TestCase):
             self.assertEqual(owner.record["status"], "closed")
             self.assertEqual([item["pid"] for item in owner.record["excluded"]], [42])
 
+    def test_absolute_launch_record_accepts_runner_relative_case_but_rejects_foreign_or_symlink(self):
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
+            root = Path(directory).resolve()
+            case = root.relative_to(Path.cwd()) / "case"
+            case.mkdir()
+            proc, expected = self.layout(root)
+            profile = Path(expected["XDG_CACHE_HOME"]) / "auth"
+            profile.mkdir(parents=True)
+            (profile / ".taomni-qa-browser").write_text("fixture")
+            record = case.resolve() / "authorization-browser" / "launch.json"
+            record.parent.mkdir()
+            with patch.dict(os.environ, expected):
+                owner = ExternalBrowserOwner(root, case, expected, proc, profile=profile,
+                                             launch_record=record)
+                self.assertEqual(owner.launch_record, record)
+                with self.assertRaisesRegex(RuntimeError, "owned case"):
+                    ExternalBrowserOwner(root, case, expected, proc, profile=profile,
+                                         launch_record=root / "foreign" / "launch.json")
+                target = root / "foreign.json"
+                target.write_text("{}")
+                record.symlink_to(target)
+                with self.assertRaisesRegex(RuntimeError, "owned case"):
+                    ExternalBrowserOwner(root, case, expected, proc, profile=profile,
+                                         launch_record=record)
+
     def test_no_owned_browser_is_not_a_cleanup_success(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

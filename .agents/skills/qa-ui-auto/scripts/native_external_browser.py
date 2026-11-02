@@ -103,7 +103,7 @@ class ExternalBrowserOwner:
                 or not (profile / ".taomni-qa-browser").is_file()):
             raise RuntimeError("External browser profile must be inside the run-owned cache")
         if launch_record is not None and (
-                profile is None or launch_record != case_dir / "authorization-browser" / "launch.json"
+                profile is None or launch_record != case_dir.resolve() / "authorization-browser" / "launch.json"
                 or launch_record.resolve() != launch_record
                 or not launch_record.resolve().is_relative_to(root)):
             raise RuntimeError("External browser launch record must be inside the owned case")
