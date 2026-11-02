@@ -92,7 +92,13 @@ The harness redirects Linux XDG data/config/cache and the app's debug-only
 macOS; `dirs` resolves Windows Known Folders and ignores `APPDATA`, so the
 explicit override is the only effective redirection there), then restores its
 environment on exit. `reset_db` only clears QA application state inside verified
-run roots. Native runs are sequential. The driver must be started by this run to
+run roots. Native runs are sequential. X11 cold-restart cases request normal WM closure
+of the unique managed window whose PID/executable/kernel birth identity belongs
+to this launcher's process group. They independently require the exact XID to
+disappear and the original app/storage processes to exit before releasing the
+driver. An empty WebDriver HTTP 500 alone is never close evidence; no close input
+is replayed, confirmation is not bypassed, and profiles are not reseeded.
+The driver must be started by this run to
 inherit isolation; an existing listener is rejected. Configure free WebDriver and
 native-driver ports for independent jobs.
 
