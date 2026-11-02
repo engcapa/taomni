@@ -60,7 +60,7 @@ jobs:
           mkdir -p qa-build-output
           python -m unittest test_ci_ssh_features test_ci_x11_session test_ci_build_pipeline test_native_windows_integrity test_native_frame_errors test_native_pointer
           pnpm check:refactor
-          pnpm exec vitest run src/components/mail/MailClientTab.test.tsx src/components/mail/MailHtmlReader.lifecycle.test.tsx src/components/screenshot/ScreenshotOverlay.test.tsx src/components/screenshot/ScreenshotOverlayStartup.test.tsx src/components/screenshot/overlay/prefetch.test.ts src/components/screenshot/overlay/ScreenshotSessionHost.test.tsx src/components/editor/workspace/CodeMirrorHost.loadingViewState.test.tsx src/components/editor/workspace/useMarkdownPreviewSearch.test.tsx src/components/editor/workspace/hooks/useWorkspaceHostFiles.test.tsx src/components/editor/workspace/hooks/useWorkspaceHostCanvas.test.tsx src/components/mfa/MfaAddDialog.test.tsx src/lib/mfa/fixtures.test.ts 2>&1 | tee qa-build-output/frontend-unit-contracts.log
+          pnpm exec vitest run 2>&1 | tee qa-build-output/frontend-unit-contracts.log
       - name: Ubuntu 22.04 PipeWire build cache
         if: runner.os == 'Linux' && matrix.mode == 'native' && startsWith(matrix.linux_profile, 'ubuntu-22.04')
         uses: actions/cache@v4
