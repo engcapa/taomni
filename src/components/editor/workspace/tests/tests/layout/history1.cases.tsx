@@ -380,6 +380,12 @@ export function registerlayoutHistory1Cases(caseContext: registerlayoutHistory1C
     expect(afterSplitUi.editorGroups.primary.openOrder).toContain(fileKey);
     const rightGroupId = rightPane.getAttribute("data-editor-group-id")!;
     expect(afterSplitUi.editorGroups[rightGroupId]?.openOrder).toContain(fileKey);
+    // The pane shell precedes its deferred editor mount. Wait for both real
+    // EditorViews, not just two shells, before asserting retained buffers.
+    await waitFor(() => {
+      expect(leftPane.querySelector(".cm-editor")).not.toBeNull();
+      expect(rightPane.querySelector(".cm-editor")).not.toBeNull();
+    });
     const leftView = EditorView.findFromDOM(leftPane.querySelector<HTMLElement>(".cm-editor")!)!;
     const rightView = EditorView.findFromDOM(rightPane.querySelector<HTMLElement>(".cm-editor")!)!;
     expect(leftView.state.doc.toString()).toBe(afterTypingText);
