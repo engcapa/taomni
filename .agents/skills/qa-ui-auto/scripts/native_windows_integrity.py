@@ -52,6 +52,50 @@ def process_integrity(pid: int) -> int:
         kernel.CloseHandle(process)
 
 
+def process_created_at(pid: int) -> int:
+    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel.OpenProcess.restype = wintypes.HANDLE
+    kernel.GetProcessTimes.argtypes = [wintypes.HANDLE, *([ctypes.POINTER(wintypes.FILETIME)] * 4)]
+    kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+    process = kernel.OpenProcess(0x1000, False, pid)
+    if not process:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        created, exited, kernel_time, user_time = (wintypes.FILETIME() for _ in range(4))
+        if not kernel.GetProcessTimes(process, ctypes.byref(created), ctypes.byref(exited),
+                                      ctypes.byref(kernel_time), ctypes.byref(user_time)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        return (created.dwHighDateTime << 32) | created.dwLowDateTime
+    finally:
+        kernel.CloseHandle(process)
+
+
+def select_driver_processes(rows: list[tuple[int, int, str]], root_pid: int,
+                            created_at=process_created_at) -> list[tuple[int, str]]:
+    """Only the launcher/native adapter carry the QA app's inherited token.
+
+    Toolhelp parent PIDs can refer to an older, exited process with a recycled
+    PID. Browser renderers and unrelated OS sandbox processes are not adapters.
+    Require both a driver role and a creation time after the actual parent.
+    """
+    if not any(pid == root_pid for pid, _, _ in rows):
+        return []
+    born = {root_pid: created_at(root_pid)}
+    while True:
+        added = False
+        for pid, parent, name in rows:
+            if pid in born or parent not in born or name.casefold() not in {"tauri-driver.exe", "msedgedriver.exe"}:
+                continue
+            created = created_at(pid)
+            if created >= born[parent]:
+                born[pid] = created
+                added = True
+        if not added:
+            break
+    return [(pid, name) for pid, _, name in rows if pid in born]
+
+
 def owned_driver_processes(root_pid: int) -> list[tuple[int, str]]:
     class Entry(ctypes.Structure):
         _fields_ = [("size", wintypes.DWORD), ("usage", wintypes.DWORD),
@@ -78,13 +122,7 @@ def owned_driver_processes(root_pid: int) -> list[tuple[int, str]]:
             present = kernel.Process32NextW(snapshot, ctypes.byref(entry))
     finally:
         kernel.CloseHandle(snapshot)
-    owned = {root_pid}
-    while True:
-        expanded = owned | {pid for pid, parent, _ in rows if parent in owned}
-        if expanded == owned:
-            break
-        owned = expanded
-    return [(pid, name) for pid, _, name in rows if pid in owned]
+    return select_driver_processes(rows, root_pid)
 
 
 def ensure_medium_driver_tree(root_pid: int) -> list[dict]:

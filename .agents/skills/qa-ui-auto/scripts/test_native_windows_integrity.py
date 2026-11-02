@@ -2,13 +2,36 @@
 import os
 import sys
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from native_webdriver_transport import WebDriverError
-from native_windows_integrity import ensure_medium_driver_tree, owned_driver_processes, process_integrity
+from native_windows_integrity import ensure_medium_driver_tree, owned_driver_processes, process_integrity, select_driver_processes
 
 
 class WindowsIntegrityTest(unittest.TestCase):
+    def test_recycled_parent_pids_and_browser_sandboxes_are_not_native_adapters(self):
+        rows = [(17, 1, "tauri-driver.exe"), (18, 17, "msedgedriver.exe"),
+                (19, 18, "taomni.exe"), (20, 19, "msedgewebview2.exe"),
+                (21, 17, "fontdrvhost.exe"), (22, 21, "SearchHost.exe"),
+                (23, 17, "msedgedriver.exe")]
+        births = Mock(side_effect={17: 100, 18: 110, 23: 10}.__getitem__)
+        self.assertEqual(select_driver_processes(rows, 17, births),
+                         [(17, "tauri-driver.exe"), (18, "msedgedriver.exe")])
+        self.assertTrue(all(call.args[0] in {17, 18, 23} for call in births.call_args_list))
+
+    def test_an_absent_root_cannot_adopt_children_of_a_recycled_pid(self):
+        births = Mock()
+        self.assertEqual(select_driver_processes([(18, 17, "msedgedriver.exe")], 17, births), [])
+        births.assert_not_called()
+
+    def test_live_nested_adapter_with_low_token_still_fails_closed(self):
+        rows = [(17, 1, "tauri-driver.exe"), (18, 17, "tauri-driver.exe"), (19, 18, "msedgedriver.exe")]
+        selected = select_driver_processes(rows, 17, {17: 100, 18: 101, 19: 102}.__getitem__)
+        with patch("native_windows_integrity.owned_driver_processes", return_value=selected), \
+             patch("native_windows_integrity.process_integrity", side_effect=[8192, 8192, 4096]):
+            with self.assertRaisesRegex(WebDriverError, "below Medium Integrity.*msedgedriver.exe"):
+                ensure_medium_driver_tree(17)
+
     def test_medium_driver_tree_preserves_process_evidence(self):
         with patch("native_windows_integrity.owned_driver_processes", return_value=[
                 (17, "tauri-driver.exe"), (18, "msedgedriver.exe")]), \

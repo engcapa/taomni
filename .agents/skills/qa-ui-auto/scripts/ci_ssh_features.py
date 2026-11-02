@@ -62,6 +62,20 @@ def prepare_cygwin_home(root: Path, user: str) -> Path:
     return home
 
 
+def install_cygwin_packages(root: Path, packages: str, *, timeout: int = 900) -> None:
+    """Each package consumer verifies a fresh copy; no stale shared setup path."""
+    with tempfile.TemporaryDirectory(prefix="qa-cygwin-setup-", dir=root.parent) as directory:
+        setup = Path(directory) / "setup.exe"
+        urllib.request.urlretrieve(CYGWIN_SETUP_URL, setup)
+        if hashlib.sha256(setup.read_bytes()).hexdigest() != CYGWIN_SETUP_SHA256:
+            raise RuntimeError("Cygwin installer checksum differs from pinned version")
+        result = subprocess.run([str(setup), "--quiet-mode", "--no-shortcuts", "--no-startmenu", "--no-desktop",
+            "--root", str(root), "--local-package-dir", str(root.parent / "qa-cygwin-packages"),
+            "--site", "https://mirrors.kernel.org/sourceware/cygwin/", "--packages", packages], timeout=timeout)
+    if result.returncode:
+        raise RuntimeError("Cygwin SSH/Kerberos package installation failed")
+
+
 def install():
     from ci_services import command
     system = platform.system()
@@ -75,16 +89,7 @@ def install():
         root = Path(os.environ["RUNNER_TEMP"]) / "qa-cygwin"
         # The official installer verifies the signed repository metadata and
         # each package checksum. Use HTTPS and keep its setup logs as evidence.
-        with tempfile.TemporaryDirectory(prefix="qa-cygwin-setup-", dir=root.parent) as directory:
-            setup = Path(directory) / "setup.exe"
-            urllib.request.urlretrieve(CYGWIN_SETUP_URL, setup)
-            if hashlib.sha256(setup.read_bytes()).hexdigest() != CYGWIN_SETUP_SHA256:
-                raise RuntimeError("Cygwin installer checksum differs from pinned version")
-            result = subprocess.run([str(setup), "--quiet-mode", "--no-shortcuts", "--no-startmenu", "--no-desktop",
-                "--root", str(root), "--local-package-dir", str(root.parent / "qa-cygwin-packages"),
-                "--site", "https://mirrors.kernel.org/sourceware/cygwin/", "--packages",
-                "openssh,krb5-server,krb5-workstation,python3,coreutils"], timeout=900)
-        if result.returncode: raise RuntimeError("Cygwin SSH/Kerberos package installation failed")
+        install_cygwin_packages(root, "openssh,krb5-server,krb5-workstation,python3,coreutils")
         os.environ["QA_CYGWIN_ROOT"] = root.as_posix()
         with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8", newline="\n") as stream:
             stream.write(f"QA_CYGWIN_ROOT={root.as_posix()}\n")

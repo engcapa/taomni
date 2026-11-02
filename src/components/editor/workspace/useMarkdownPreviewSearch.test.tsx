@@ -1,9 +1,11 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useRef } from "react";
-import { expect, it, vi } from "vitest";
+import { afterEach, expect, it, vi } from "vitest";
 import { WorkspaceActionHost } from "./workspaceActionHost";
 import { useMarkdownPreviewSearch } from "./useMarkdownPreviewSearch";
 import { createKeymapScheme, setActionBindings } from "./workspaceKeymapScheme";
+
+afterEach(cleanup);
 
 function Preview({ host }: { host: WorkspaceActionHost }) {
   const root = useRef<HTMLDivElement>(null);

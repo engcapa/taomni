@@ -55,6 +55,7 @@ jobs:
         if: runner.os == 'Linux' && inputs.operation == 'build'
         run: |
           mkdir -p qa-build-output
+          python -m unittest test_ci_ssh_features test_ci_x11_session test_ci_build_pipeline test_native_windows_integrity
           pnpm check:refactor
           pnpm exec vitest run src/components/mail/MailClientTab.test.tsx src/components/screenshot/ScreenshotOverlay.test.tsx src/components/screenshot/ScreenshotOverlayStartup.test.tsx src/components/screenshot/overlay/prefetch.test.ts src/components/screenshot/overlay/ScreenshotSessionHost.test.tsx src/components/editor/workspace/useMarkdownPreviewSearch.test.tsx 2>&1 | tee qa-build-output/frontend-unit-contracts.log
       - name: Ubuntu 22.04 PipeWire build cache
