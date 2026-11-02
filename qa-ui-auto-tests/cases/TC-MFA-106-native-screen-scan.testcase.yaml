@@ -11,7 +11,9 @@ description: >-
   on screen and the dialog stays usable. macOS needs Screen Recording
   permission and is covered manually (V-26). Isolated hosted QA retains the exact
   luma input for distinguishing desktop interference from decoder results; the
-  no-QR and restored-dialog assertions remain unchanged.
+  no-QR and restored-dialog assertions remain unchanged. Its hosted dependency runs
+  TC-BACKUP-AUTH-715 first in the same native process sequence to prove that the
+  real external authorization browser is cleaned up before the no-QR capture.
 covers: [F-MFA-2]
 tags: [mfa, screen-capture, native-boundary, p1]
 modes: [native]

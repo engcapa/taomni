@@ -143,6 +143,17 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual([(g['case'], g['linux_profile']) for g in plan['gaps']],
                          [(cid, 'ubuntu-26.04-wayland') for cid in sorted(x11_only)])
 
+    def test_mfa_scan_retains_authorization_browser_cleanup_predecessor_in_same_shard(self):
+        plan = make_plan(args(scope='selected', platforms='linux,windows', modes='native',
+                              case_ids='TC-MFA-106', shards='auto',
+                              linux_profiles=','.join(LINUX_PROFILES)))
+        for entry in plan['entries']:
+            if 'TC-MFA-106' in entry['selected_ids']:
+                self.assertIn('TC-BACKUP-AUTH-715', entry['selected_ids'])
+                self.assertLess(entry['selected_ids'].index('TC-BACKUP-AUTH-715'),
+                                entry['selected_ids'].index('TC-MFA-106'))
+        self.assertEqual(sum('TC-MFA-106' in e['selected_ids'] for e in plan['entries']), 5)
+
     def test_restore_pulls_predecessor_before_it(self):
         cid = 'TC-auto-F-DB-1-query-tab-rename-native-restore'
         plan = make_plan(args(scope='selected', case_ids=cid, modes='native'))

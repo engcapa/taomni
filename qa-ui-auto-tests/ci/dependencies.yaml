@@ -108,6 +108,9 @@ TC-BACKUP-SETTINGS-001: []
 TC-BACKUP-SETTINGS-002: []
 TC-BACKUP-AUTH-714: []
 TC-BACKUP-AUTH-715: []
+# Keep real browser authorization and the following no-QR native scan together.
+TC-MFA-106:
+- TC-BACKUP-AUTH-715
 TC-BACKUP-COMPAT-001: []
 TC-BACKUP-SETTINGS-003: []
 TC-BACKUP-SETTINGS-004: []

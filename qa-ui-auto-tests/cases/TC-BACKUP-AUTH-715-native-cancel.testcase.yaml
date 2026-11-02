@@ -1,7 +1,10 @@
 id: TC-BACKUP-AUTH-715
 title: Cancel authorization A after adding B; cleanup and dismissal survive reopening
 description: 'Issue #714 regression. Native uses production polling and locks against loopback; browser is an explicit
-  renderer model. Cancellation never deletes cloud applications or backup files.'
+  renderer model. Cancellation never deletes cloud applications or backup files.
+  Hosted Linux fixture cleanup records and closes only newly started browsers that
+  inherit all three run-owned XDG roots, preserving pre-existing/foreign processes
+  and preventing an authorization QR from contaminating the following MFA scan.'
 covers:
 - F-BACKUP-1
 - F-BACKUP-2

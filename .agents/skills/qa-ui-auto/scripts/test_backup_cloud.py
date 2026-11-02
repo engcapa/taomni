@@ -21,7 +21,8 @@ class BackupCloudFixtureTest(TestCase):
         ctx = SimpleNamespace(cfg={"app": {"mode": "native"}}, case_id=case,
                               case_dir=root, values={})
         with patch.object(backup_cloud, "isolated_data_root", return_value=root), \
-                patch.object(backup_cloud, "setup_credential_store"):
+                patch.object(backup_cloud, "setup_credential_store"), \
+                patch.dict(backup_cloud.os.environ, {"GITHUB_ACTIONS": "false"}):
             backup_cloud.setup(ctx)
         self.addCleanup(backup_cloud.teardown, ctx)
         return ctx
@@ -43,6 +44,40 @@ class BackupCloudFixtureTest(TestCase):
             self.assertIn("authorization_pending", events)
             self.assertNotIn("refresh_ok", events)
             backup_cloud.teardown(ctx)
+
+    def test_hosted_linux_authorization_fixture_owns_its_browser_until_teardown(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ctx = SimpleNamespace(cfg={"app": {"mode": "native"}}, case_id="TC-BACKUP-AUTH-715",
+                                  case_dir=root, report_root=root, values={})
+            expected = {f"XDG_{name}_HOME": str(root / name.lower()) for name in ("DATA", "CONFIG", "CACHE")}
+            with patch.object(backup_cloud, "isolated_data_root", return_value=root), \
+                    patch.object(backup_cloud, "setup_credential_store"), \
+                    patch.object(backup_cloud.platform, "system", return_value="Linux"), \
+                    patch.dict(backup_cloud.os.environ, {"GITHUB_ACTIONS": "true", **expected}), \
+                    patch("tauri_webdriver.native_isolation_env", return_value=expected), \
+                    patch("native_external_browser.ExternalBrowserOwner") as owner:
+                backup_cloud.setup(ctx)
+            try:
+                owner.assert_called_once_with(root, root, expected)
+                events = []
+                owner.return_value.stop.side_effect = lambda: events.append("browser-stop")
+                with patch.object(ctx._backup_server, "shutdown", side_effect=lambda: events.append("server-stop")), \
+                        patch.object(ctx._backup_server, "server_close"):
+                    backup_cloud.teardown(ctx)
+                self.assertEqual(events, ["browser-stop", "server-stop"])
+            finally:
+                ctx._backup_server.shutdown()
+                ctx._backup_server.server_close()
+
+    def test_browser_cleanup_failure_is_reported_but_loopback_server_still_closes(self):
+        ctx = SimpleNamespace(_backup_browser=Mock(), _backup_server=Mock())
+        ctx._backup_browser.stop.side_effect = RuntimeError("owned browser did not exit")
+        with patch("qa_ui_auto.fixtures.backup_snapshot.teardown"):
+            with self.assertRaisesRegex(RuntimeError, "owned browser"):
+                backup_cloud.teardown(ctx)
+        ctx._backup_server.shutdown.assert_called_once()
+        ctx._backup_server.server_close.assert_called_once()
 
     def test_native_compat_history_contains_all_fixed_envelopes(self):
         with tempfile.TemporaryDirectory() as directory:
