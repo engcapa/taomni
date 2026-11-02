@@ -16,6 +16,7 @@ modes:
 fixtures:
 - reset_db
 - ssh_posix_required
+- path_completion
 timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
@@ -92,11 +93,13 @@ steps:
 - click: '[data-testid="sftp-local-path-edit"]'
 - fill:
     selector: input[data-testid="sftp-local-path"]
-    value: /
+    value: ${fixture.path_completion_root}/project-beta
 - press:
     selector: input[data-testid="sftp-local-path"]
     key: Enter
-- wait_for: '[data-testid="sftp-local-path-segments"] button[data-path="/"]'
+- assert_text:
+    selector: '[data-testid="sftp-local-list"]'
+    contains: beta-marker.txt
 - click: '[data-testid="sftp-detach"]'
 - switch_window:
     selector: '[data-testid="sftp-detached-window"]'
@@ -105,7 +108,9 @@ steps:
 - assert_text:
     selector: '[data-testid="sftp-remote-list"]'
     contains: QA_SFTP_BEFORE.txt
-- wait_for: '[data-testid="sftp-local-path-segments"] button[data-path="/"]'
+- assert_text:
+    selector: '[data-testid="sftp-local-list"]'
+    contains: beta-marker.txt
 - assert_visible: '[data-testid="sftp-reattach"]'
 - click: '[data-testid="sftp-remote-path-edit"]'
 - fill:
@@ -118,6 +123,16 @@ steps:
 - assert_text:
     selector: '[data-testid="sftp-remote-list"]'
     contains: QA_SFTP_POPUP.txt
+- click: '[data-testid="sftp-local-path-edit"]'
+- fill:
+    selector: input[data-testid="sftp-local-path"]
+    value: ${fixture.path_completion_root}/only space/child
+- press:
+    selector: input[data-testid="sftp-local-path"]
+    key: Enter
+- assert_text:
+    selector: '[data-testid="sftp-local-list"]'
+    contains: child-marker.txt
 - assert_no_runtime_errors: null
 - screenshot: sftp-window-restore-action.png
 - switch_window:
@@ -127,9 +142,11 @@ steps:
 - wait_for: '[data-testid="sftp-browser"]'
 - wait_for: '[data-testid="sftp-remote-path-segments"] button[data-path="/tmp/qa-sftp-window/popup"]'
 - assert_text:
+    selector: '[data-testid="sftp-local-list"]'
+    contains: child-marker.txt
+- assert_text:
     selector: '[data-testid="sftp-remote-list"]'
     contains: QA_SFTP_POPUP.txt
-- wait_for: '[data-testid="sftp-local-path-segments"] button[data-path="/"]'
 - assert_count:
     selector: '[data-testid="terminal-pane"]'
     equal: 1
@@ -156,6 +173,9 @@ steps:
 - wait_for: '[data-testid="sftp-browser"]'
 - wait_for: '[data-testid="sftp-remote-path-segments"] button[data-path="/tmp/qa-sftp-window/popup"]'
 - assert_text:
+    selector: '[data-testid="sftp-local-list"]'
+    contains: child-marker.txt
+- assert_text:
     selector: '[data-testid="sftp-remote-list"]'
     contains: QA_SFTP_POPUP.txt
 - click: '[data-testid="sftp-detach"]'
@@ -176,6 +196,9 @@ steps:
 - assert_count:
     selector: '[data-testid="terminal-pane"]'
     equal: 1
+- assert_text:
+    selector: '[data-testid="sftp-local-list"]'
+    contains: child-marker.txt
 - screenshot: sftp-window-restored-sidebar.png
 - click: '[data-testid="sftp-close"]'
 - wait_for: '[data-testid="sftp-floating-button"]'
@@ -200,9 +223,9 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Detach uses the sidebar's selected remote and local folders. The real child window exposes Restore, returns to the same terminal's
-      side panel with the popup's latest folder, and closes. Hiding and reopening retain the directory. A second detach/restore round trip succeeds
-      without duplicating or disconnecting the terminal.
+    requirement: Detach uses the sidebar's selected remote and local fixture directories. The real child window exposes Restore and changes both directories.
+      Restore returns their distinct marker listings to the same terminal's side panel and closes the child. Hiding and reopening retain both directories.
+      A second detach/restore succeeds without duplicating or disconnecting the terminal.
     actions:
     - 1
     - 2
@@ -233,15 +256,18 @@ verification:
     - 44
     - 45
     - 46
+    - 49
+    - 50
     - 51
-    - 59
-    - 61
+    - 55
     - 63
+    - 65
     - 67
-    - 68
     - 72
+    - 73
     - 77
-    - 80
+    - 83
+    - 86
     checkpoints:
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
@@ -271,68 +297,74 @@ verification:
     - step: 33
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "QA_SFTP_BEFORE.txt"}}'
     - step: 37
-      expectation: '{"wait_for": "[data-testid=\"sftp-local-path-segments\"] button[data-path=\"/\"]"}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "beta-marker.txt"}}'
     - step: 40
       expectation: '{"wait_for": "[data-testid=\"sftp-remote-path-segments\"] button[data-path=\"/tmp/qa-sftp-window/before\"]"}'
     - step: 41
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "QA_SFTP_BEFORE.txt"}}'
     - step: 42
-      expectation: '{"wait_for": "[data-testid=\"sftp-local-path-segments\"] button[data-path=\"/\"]"}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "beta-marker.txt"}}'
     - step: 43
       expectation: '{"assert_visible": "[data-testid=\"sftp-reattach\"]"}'
     - step: 47
       expectation: '{"wait_for": "[data-testid=\"sftp-remote-path-segments\"] button[data-path=\"/tmp/qa-sftp-window/popup\"]"}'
     - step: 48
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "QA_SFTP_POPUP.txt"}}'
-    - step: 49
-      expectation: '{"assert_no_runtime_errors": null}'
     - step: 52
-      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "child-marker.txt"}}'
     - step: 53
-      expectation: '{"wait_for": "[data-testid=\"sftp-remote-path-segments\"] button[data-path=\"/tmp/qa-sftp-window/popup\"]"}'
-    - step: 54
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "QA_SFTP_POPUP.txt"}}'
-    - step: 55
-      expectation: '{"wait_for": "[data-testid=\"sftp-local-path-segments\"] button[data-path=\"/\"]"}'
+      expectation: '{"assert_no_runtime_errors": null}'
     - step: 56
-      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"]", "equal": 1}}'
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
     - step: 57
-      expectation: '{"assert_not_visible": "[data-testid=\"sftp-floating-button\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"sftp-remote-path-segments\"] button[data-path=\"/tmp/qa-sftp-window/popup\"]"}'
     - step: 58
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "child-marker.txt"}}'
+    - step: 59
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "QA_SFTP_POPUP.txt"}}'
+    - step: 60
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"]", "equal": 1}}'
+    - step: 61
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 62
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
         30}}'
-    - step: 60
+    - step: 64
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_SFTP_RESTORED_LIVE\\r?$",
         "timeout_sec": 30}}'
-    - step: 62
-      expectation: '{"wait_for": "[data-testid=\"sftp-floating-button\"]"}'
-    - step: 64
-      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
-    - step: 65
-      expectation: '{"wait_for": "[data-testid=\"sftp-remote-path-segments\"] button[data-path=\"/tmp/qa-sftp-window/popup\"]"}'
     - step: 66
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "QA_SFTP_POPUP.txt"}}'
+      expectation: '{"wait_for": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 68
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
     - step: 69
       expectation: '{"wait_for": "[data-testid=\"sftp-remote-path-segments\"] button[data-path=\"/tmp/qa-sftp-window/popup\"]"}'
     - step: 70
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "QA_SFTP_POPUP.txt"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "child-marker.txt"}}'
     - step: 71
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 73
-      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "QA_SFTP_POPUP.txt"}}'
     - step: 74
-      expectation: '{"assert_not_visible": "[data-testid=\"sftp-floating-button\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"sftp-remote-path-segments\"] button[data-path=\"/tmp/qa-sftp-window/popup\"]"}'
     - step: 75
-      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"]", "equal": 1}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "QA_SFTP_POPUP.txt"}}'
+    - step: 76
+      expectation: '{"assert_no_runtime_errors": null}'
     - step: 78
-      expectation: '{"wait_for": "[data-testid=\"sftp-floating-button\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
     - step: 79
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 80
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"]", "equal": 1}}'
+    - step: 81
+      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "child-marker.txt"}}'
+    - step: 84
+      expectation: '{"wait_for": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 85
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
         30}}'
-    - step: 81
+    - step: 87
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_SFTP_SECOND_RESTORE_LIVE\\r?$",
         "timeout_sec": 30}}'
-    - step: 82
+    - step: 88
       expectation: '{"assert_no_runtime_errors": null}'
     results:
     - 6
@@ -354,29 +386,32 @@ verification:
     - 43
     - 47
     - 48
-    - 49
     - 52
     - 53
-    - 54
-    - 55
     - 56
     - 57
     - 58
+    - 59
     - 60
+    - 61
     - 62
     - 64
-    - 65
     - 66
+    - 68
     - 69
     - 70
     - 71
-    - 73
     - 74
     - 75
+    - 76
     - 78
     - 79
+    - 80
     - 81
-    - 82
+    - 84
+    - 85
+    - 87
+    - 88
   visual:
   - check: Inspect the retained screenshots for readable terminal content, compact SFTP controls and usable side-panel sizing.
     method: manual
@@ -386,3 +421,5 @@ verification:
       PTY after each restore.
     method: automated
     reason: Browser stubs cannot establish native WebView/window, SSH PTY or SFTP channel ownership.
+description: Use isolated local fixture directories on every OS, including Windows drive paths. Verify distinct local and remote marker listings before
+  detach, in the popup, and after each restore; the popup changes both selected directories.
