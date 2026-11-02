@@ -56,26 +56,31 @@ class BackupCloudFixtureTest(TestCase):
                     patch.object(backup_cloud.platform, "system", return_value="Linux"), \
                     patch.dict(backup_cloud.os.environ, {"GITHUB_ACTIONS": "true", **expected}), \
                     patch("tauri_webdriver.native_isolation_env", return_value=expected), \
-                    patch("native_external_browser.ExternalBrowserOwner") as owner:
+                    patch("native_external_browser.ExternalBrowserOwner") as owner, \
+                    patch("native_authorization_route.AuthorizationBrowserRoute") as route:
                 backup_cloud.setup(ctx)
             try:
-                owner.assert_called_once_with(root, root, expected)
+                route.assert_called_once_with(root, expected)
+                route.return_value.install.assert_called_once()
+                owner.assert_called_once_with(root, root, expected, profile=route.return_value.profile)
                 events = []
                 owner.return_value.stop.side_effect = lambda: events.append("browser-stop")
                 with patch.object(ctx._backup_server, "shutdown", side_effect=lambda: events.append("server-stop")), \
                         patch.object(ctx._backup_server, "server_close"):
                     backup_cloud.teardown(ctx)
                 self.assertEqual(events, ["browser-stop", "server-stop"])
+                route.return_value.restore.assert_called_once()
             finally:
                 ctx._backup_server.shutdown()
                 ctx._backup_server.server_close()
 
     def test_browser_cleanup_failure_is_reported_but_loopback_server_still_closes(self):
-        ctx = SimpleNamespace(_backup_browser=Mock(), _backup_server=Mock())
+        ctx = SimpleNamespace(_backup_browser=Mock(), _backup_browser_route=Mock(), _backup_server=Mock())
         ctx._backup_browser.stop.side_effect = RuntimeError("owned browser did not exit")
         with patch("qa_ui_auto.fixtures.backup_snapshot.teardown"):
             with self.assertRaisesRegex(RuntimeError, "owned browser"):
                 backup_cloud.teardown(ctx)
+        ctx._backup_browser_route.restore.assert_called_once()
         ctx._backup_server.shutdown.assert_called_once()
         ctx._backup_server.server_close.assert_called_once()
 

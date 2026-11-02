@@ -110,6 +110,45 @@ class ExternalBrowserOwnerTest(TestCase):
                 kill.assert_called_once_with(11, signal.SIGTERM)
             self.assertEqual(owner.record["status"], "failed")
 
+    def test_private_profile_proves_chrome_ownership_even_when_xdg_is_not_retained(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proc, expected = self.layout(root)
+            profile = Path(expected["XDG_CACHE_HOME"]) / "auth-private"
+            profile.mkdir(parents=True)
+            (profile / ".taomni-qa-browser").write_text("fixture")
+            with patch.dict(os.environ, expected):
+                owner = ExternalBrowserOwner(root, root, expected, proc, profile=profile)
+            owned = self.process(proc, 30, {}, executable="chrome")
+            (owned / "cmdline").write_bytes(b"chrome\0--user-data-dir=" + str(profile).encode() + b"\0")
+            other = self.process(proc, 31, expected, executable="chrome")
+            (other / "cmdline").write_bytes(b"chrome\0--user-data-dir=/foreign\0")
+            with patch("native_external_browser.os.kill", side_effect=lambda pid, sig: (proc / str(pid) / "stat").unlink()) as kill:
+                owner.stop()
+                kill.assert_called_once_with(30, signal.SIGTERM)
+            self.assertEqual(owner.record["status"], "closed")
+            self.assertEqual([item["pid"] for item in owner.record["excluded"]], [31])
+
+    def test_private_profile_does_not_match_a_url_or_prefix_and_must_be_run_owned(self):
+        from native_external_browser import owns_profile
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proc, expected = self.layout(root)
+            profile = Path(expected["XDG_CACHE_HOME"]) / "auth"
+            for args, owned in ((["firefox", "--profile", str(profile)], True),
+                                (["chrome", "--user-data-dir=" + str(profile)], True),
+                                (["chrome", "--user-data-dir=" + str(profile) + "-other"], False),
+                                (["firefox", "https://example.org/" + str(profile)], False)):
+                process = self.process(proc, 40, expected)
+                (process / "cmdline").write_bytes(b"\0".join(arg.encode() for arg in args))
+                self.assertEqual(owns_profile(40, profile, proc), owned)
+                for path in process.iterdir():
+                    path.unlink()
+                process.rmdir()
+            with patch.dict(os.environ, expected):
+                with self.assertRaisesRegex(RuntimeError, "run-owned cache"):
+                    ExternalBrowserOwner(root, root, expected, proc, profile=root / "unowned")
+
     def test_no_owned_browser_is_not_a_cleanup_success(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
