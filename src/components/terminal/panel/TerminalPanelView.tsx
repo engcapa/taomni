@@ -16,6 +16,7 @@ import { useTerminalHighlights } from "./useTerminalHighlights";
 import { useTerminalInteraction } from "./useTerminalInteraction";
 import { useTerminalLifecycle } from "./useTerminalLifecycle";
 import { useTerminalPanelState } from "./useTerminalPanelState";
+import { SftpFloatingButton } from "../../filebrowser/SftpFloatingButton";
 
 
 export interface TerminalPanelViewProps {
@@ -86,12 +87,16 @@ export function TerminalPanelView(props: TerminalPanelViewProps) {
         alt="" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ opacity: panel.background.opacity }} />}
       {panel.background.error && <span role="status" className="absolute top-1 right-2 z-10 text-xs">{panel.background.error}</span>}
       <div ref={panel.containerRef} className="terminal-host relative w-full h-full overflow-hidden" />
+      {sftpToggle && !sftpToggle.open && activeForShortcuts && (
+        <SftpFloatingButton onOpen={sftpToggle.onToggle} />
+      )}
 
       <TabActions active={activeForShortcuts}>
         {sftpToggle && (
           <button
             type="button"
             data-testid="attached-sftp-toggle"
+            aria-pressed={sftpToggle.open}
             onClick={sftpToggle.onToggle}
             title={sftpToggle.open ? panel.t("terminal.sftpFloatingClose") : panel.t("terminal.sftpFloatingOpen")}
             style={{

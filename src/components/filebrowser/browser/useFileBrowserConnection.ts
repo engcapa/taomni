@@ -60,12 +60,23 @@ export function useFileBrowserConnection(context: UseFileBrowserConnectionContex
 
   useEffect(() => {
     let cancelled = false;
+    let stopLocalNavigationWatch = () => {};
     ensureSession(props.sessionId);
     void (async () => {
       await authPromptReadyRef.current.catch(() => undefined);
       if (cancelled) return;
       const current = useSftpStore.getState().sessions[props.sessionId];
       if (current?.attached || current?.attaching) return;
+      let localNavigated = Boolean(current?.local.path);
+      if (props.initialLocalPath) {
+        stopLocalNavigationWatch = useSftpStore.subscribe((state, previous) => {
+          const session = state.sessions[props.sessionId];
+          if (session && !session.attached && session.local.path
+            && session.local.path !== previous.sessions[props.sessionId]?.local.path) {
+            localNavigated = true;
+          }
+        });
+      }
       attach({
         sessionId: props.sessionId,
         host: props.host,
@@ -86,15 +97,22 @@ export function useFileBrowserConnection(context: UseFileBrowserConnectionContex
           if (!cancelled && props.initialPath && untouched) {
             void navigate(props.sessionId, "remote", props.initialPath);
           }
+          const local = session?.local;
+          const localUntouched = local && !local.loading && !localNavigated;
+          if (!cancelled && props.initialLocalPath && localUntouched) {
+            void navigate(props.sessionId, "local", props.initialLocalPath);
+          }
         })
         .catch((err) => {
           if (!cancelled) {
             setStatus(t("fileBrowser.statusSftpConnectFailed", { error: String(err) }));
           }
-        });
+        })
+        .finally(() => stopLocalNavigationWatch());
     })();
     return () => {
       cancelled = true;
+      stopLocalNavigationWatch();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.sessionId]);

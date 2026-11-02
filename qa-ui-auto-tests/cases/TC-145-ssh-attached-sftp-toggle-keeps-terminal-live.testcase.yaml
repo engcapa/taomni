@@ -1,10 +1,8 @@
 id: TC-145
 title: SSH attached SFTP toggles closed and reopened without losing the live terminal
-description: >-
-  Verify the portable attached-SFTP lifecycle against a real POSIX SSH PTY.
-  Hosted Windows uses a separate Cygwin OpenSSH service: direct protocol probes
-  reproduce first-byte loss in Win32 OpenSSH/Git Bash without Taomni.
-  TC-010 and TC-012 retain the Win32 permissions and path conversion contracts.
+description: 'Verify the portable attached-SFTP lifecycle against a real POSIX SSH PTY. Hosted Windows uses a separate Cygwin OpenSSH service: direct
+  protocol probes reproduce first-byte loss in Win32 OpenSSH/Git Bash without Taomni. TC-010 and TC-012 retain the Win32 permissions and path conversion
+  contracts.'
 covers:
 - F3.1
 - F7.1
@@ -63,6 +61,7 @@ steps:
 - click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-browser"]'
+- assert_not_visible: '[data-testid="sftp-floating-button"]'
 - wait_for:
     selector: '[data-testid="sftp-remote-list"] tbody tr'
     timeout_sec: 30
@@ -90,6 +89,7 @@ steps:
 - wait_for:
     selector: '[data-testid="sftp-browser"]'
     state: detached
+- wait_for: '[data-testid="sftp-floating-button"]'
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
     timeout_sec: 30
@@ -110,6 +110,7 @@ steps:
 - click: '[data-testid="titlebar-actions-more"]'
 - click: '[data-testid="attached-sftp-toggle"]'
 - wait_for: '[data-testid="sftp-browser"]'
+- assert_not_visible: '[data-testid="sftp-floating-button"]'
 - wait_for:
     selector: '[data-testid="sftp-remote-list"] tbody tr'
     timeout_sec: 30
@@ -134,6 +135,7 @@ steps:
 - wait_for:
     selector: '[data-testid="sftp-browser"]'
     state: detached
+- wait_for: '[data-testid="sftp-floating-button"]'
 - assert_not_visible: '[data-testid="sftp-browser"]'
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
@@ -152,14 +154,15 @@ steps:
     regex: (?m)^qa-ssh-after-reopened-sftp-close\r?$
     timeout_sec: 10
 - screenshot: 145-ssh-attached-sftp-toggle.png
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: An authenticated SSH terminal opens its attached SFTP browser, exposes both panes and the transfer queue, accepts a command while the browser
-      is open, closes the browser without disconnecting, accepts a command while closed, and reopens and closes the browser again with the terminal still
-      ready. Each of the two open and two close transitions must execute a distinct command once with its exact standalone output; a lost write is never
-      replayed.
+    requirement: An authenticated SSH terminal opens its attached SFTP browser, exposes both panes and the transfer queue, accepts a command while
+      the browser is open, closes the browser without disconnecting, accepts a command while closed, and reopens and closes the browser again with
+      the terminal still ready. Each of the two open and two close transitions must execute a distinct command once with its exact standalone output;
+      a lost write is never replayed. The floating entry is hidden with the panel open and visible after each hide.
     actions:
     - 1
     - 2
@@ -176,17 +179,16 @@ verification:
     - 19
     - 21
     - 22
-    - 29
-    - 31
+    - 30
     - 32
-    - 35
-    - 36
-    - 38
-    - 39
-    - 43
-    - 45
+    - 33
+    - 37
+    - 40
+    - 41
     - 46
-    - 50
+    - 48
+    - 49
+    - 54
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
@@ -206,44 +208,56 @@ verification:
     - step: 23
       expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
     - step: 24
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"] tbody tr", "timeout_sec": 30}}'
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-floating-button\"]"}'
     - step: 25
-      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"]"}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"] tbody tr", "timeout_sec": 30}}'
     - step: 26
-      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"sftp-remote-pane\"]"}'
     - step: 27
-      expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"sftp-local-pane\"]"}'
     - step: 28
+      expectation: '{"assert_visible": "[data-testid=\"sftp-transfer-queue\"]"}'
+    - step: 29
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
         10}}'
-    - step: 30
+    - step: 31
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-with\\-sftp\\-open\\r?$", "timeout_sec":
         10}}'
-    - step: 33
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached"}}'
     - step: 34
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached"}}'
+    - step: 35
+      expectation: '{"wait_for": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 36
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
         30}}'
-    - step: 37
+    - step: 39
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa\\-ssh\\-after\\-sftp\\-close\\r?$", "timeout_sec":
         60}}'
-    - step: 40
-      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
-    - step: 41
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"] tbody tr", "timeout_sec": 30}}'
     - step: 42
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 43
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 44
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-remote-list\"] tbody tr", "timeout_sec": 30}}'
+    - step: 45
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
         30}}'
-    - step: 44
-      expectation: The exact new command output is present after this SFTP transition; an echo or previous output cannot satisfy it.
     - step: 47
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa-ssh-reopened-sftp\\r?$", "timeout_sec": 10}}'
+    - step: 50
       expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached"}}'
-    - step: 48
-      expectation: '{"assert_not_visible": "[data-testid=\"sftp-browser\"]"}'
-    - step: 49
-      expectation: The SSH terminal is ready after the second SFTP close.
     - step: 51
-      expectation: The exact new command output is present after this SFTP transition; an echo or previous output cannot satisfy it.
+      expectation: '{"wait_for": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 52
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-browser\"]"}'
+    - step: 53
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        30}}'
+    - step: 55
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"]", "regex": "(?m)^qa-ssh-after-reopened-sftp-close\\r?$", "timeout_sec":
+        10}}'
+    - step: 57
+      expectation: '{"assert_no_runtime_errors": null}'
     results:
     - 3
     - 4
@@ -258,23 +272,28 @@ verification:
     - 26
     - 27
     - 28
-    - 30
-    - 33
+    - 29
+    - 31
     - 34
-    - 37
-    - 40
-    - 41
+    - 35
+    - 36
+    - 39
     - 42
+    - 43
     - 44
+    - 45
     - 47
-    - 48
-    - 49
+    - 50
     - 51
+    - 52
+    - 53
+    - 55
+    - 57
   visual:
-  - check: Attached SFTP panes, transfer queue, and terminal remain readable across open/close transitions.
+  - check: Inspect the retained screenshots for readable terminal content, compact SFTP controls and usable side-panel sizing.
     method: manual
-    reason: DOM assertions do not establish split-pane sizing or visual continuity.
+    reason: Geometry and DOM assertions support, but do not replace, visual review.
   native:
-  - check: Native runs verify the packaged SSH terminal remains connected while the attached SFTP panel is mounted and unmounted.
+  - check: The original real SSH terminal remains ready and executes each distinct command after two open and two hide transitions.
     method: automated
-    reason: Browser VFS behavior cannot prove native SSH/SFTP lifecycle wiring.
+    reason: Browser stubs cannot establish native WebView/window, SSH PTY or SFTP channel ownership.

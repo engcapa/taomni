@@ -22,11 +22,30 @@ it("opens the detached initial directory when no user navigation has happened", 
   vi.mocked(sftpAttach).mockResolvedValueOnce({ homeDir: "/home/qa" });
   const sid = "detached-connection-initial";
   const { unmount } = renderHook(() => useFileBrowserConnection({
-    props: { sessionId: sid, host: "localhost", port: 22, username: "qa", authMethod: "gssapi", authData: null, initialPath: "/initial" },
+    props: { sessionId: sid, host: "localhost", port: 22, username: "qa", authMethod: "gssapi", authData: null, initialPath: "/initial", initialLocalPath: "/local/current" },
     navigate: useSftpStore.getState().navigate, setStatus: vi.fn(), t: (key: string) => key,
   }));
   await waitFor(() => expect(useSftpStore.getState().sessions[sid]?.remote.path).toBe("/initial"));
   expect(vi.mocked(sftpListRemote).mock.calls.map((call) => call[1])).toEqual(["/home/qa", "/initial"]);
+  await waitFor(() => expect(useSftpStore.getState().sessions[sid]?.local.path).toBe("/local/current"));
+  unmount();
+});
+
+it("keeps a local folder entered while the detached connection is pending", async () => {
+  let connected!: (value: { homeDir: string }) => void;
+  vi.mocked(sftpAttach).mockImplementationOnce(() => new Promise((resolve) => { connected = resolve; }));
+  const sid = "detached-connection-local-navigation";
+  const { unmount } = renderHook(() => useFileBrowserConnection({
+    props: { sessionId: sid, host: "localhost", port: 22, username: "qa", authMethod: "gssapi", authData: null, initialLocalPath: "/old-local" },
+    navigate: useSftpStore.getState().navigate, setStatus: vi.fn(), t: (key: string) => key,
+  }));
+  await waitFor(() => expect(sftpAttach).toHaveBeenCalledOnce());
+  await act(async () => {
+    await useSftpStore.getState().navigate(sid, "local", "/user-chosen");
+    connected({ homeDir: "/home/qa" });
+  });
+  await waitFor(() => expect(useSftpStore.getState().sessions[sid]?.attached).toBe(true));
+  expect(useSftpStore.getState().sessions[sid].local.path).toBe("/user-chosen");
   unmount();
 });
 

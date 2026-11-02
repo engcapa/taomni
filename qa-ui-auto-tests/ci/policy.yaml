@@ -16,6 +16,7 @@ smoke:
 - TC-IDE-C8-08-code-style-dialog-lifecycle-browser
 unavailable: {}
 cases:
+- TC-SFTP-ENTRY-001
 - TC-WS-083
 - TC-WS-081
 - TC-WS-082

@@ -121,17 +121,21 @@ export function registerMainLayoutLayout1Cases() {
       expect(useAppStore.getState().sidebarCollapsedByGroup["code-workspace"]).toBe(true);
     });
 
-    it("moves SFTP into the collapsed rail and leaves Chat to the shared bottom button", async () => {
+    it("keeps SFTP in terminal actions when Sessions collapses and leaves Chat to the shared bottom button", async () => {
       render(<MainLayout />);
       act(() => useAppStore.getState().setActiveTab("ssh-tab"));
-      await waitFor(() => expect(host.querySelector('[data-testid="attached-sftp-toggle"]')).not.toBeNull());
+      await waitFor(() => expect(useAppStore.getState().sidebarCollapsed).toBe(true));
+      expect(host.querySelector('[data-testid="attached-sftp-toggle"]')).toBeNull();
       expect(host.querySelector('[data-testid="tab-chat-toggle"]')).toBeNull();
       const active = terminalPanelMock.props.filter((props) => props.tabId === "ssh-tab").at(-1);
-      expect(active?.sftpToggle).toBeUndefined();
+      expect(active?.sftpToggle).toBeDefined();
       expect(active?.chatToggle).toBeUndefined();
-      fireEvent.click(host.querySelector('[data-testid="attached-sftp-toggle"]')!);
+      fireEvent.click(screen.getByTestId("attached-sftp-toggle"));
       expect(screen.getByTestId("sftp-sidebar")).toBeInTheDocument();
-      expect(host.querySelector('[data-testid="attached-sftp-toggle"]')).toHaveAttribute("aria-pressed", "true");
+      act(() => useAppStore.getState().toggleSidebar());
+      expect(host.querySelector('[data-testid="attached-sftp-toggle"]')).toBeNull();
+      fireEvent.click(screen.getByTestId("attached-sftp-toggle"));
+      expect(screen.queryByTestId("sftp-sidebar")).not.toBeInTheDocument();
     });
 
     it("keeps the floating toggles when the bar merge is turned off", async () => {

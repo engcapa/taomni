@@ -13,6 +13,7 @@ import { useAppStore } from "../../stores/appStore";
 import { type TerminalProfile } from "../../lib/terminalProfile";
 import { getTerminal, markTerminalDetachPending, clearTerminalDetachPending } from "../../lib/terminal/terminalRegistry";
 import { t as tr } from "../../lib/i18n";
+import { sftpWindowPaths } from "../../lib/sftpWindowState";
 
 
 export interface OpenDetachedSftpContext {
@@ -31,6 +32,7 @@ export function createOpenDetachedSftp(controllerContext: OpenDetachedSftpContex
     const detachedSessionId = `${params.sessionId}__detached`;
     writeDetachedHandoff({
       ...params,
+      ...sftpWindowPaths(params.sessionId),
       sessionId: detachedSessionId,
       parentSessionId: params.sessionId,
       title,

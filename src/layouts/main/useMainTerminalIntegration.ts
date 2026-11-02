@@ -37,13 +37,6 @@ export function useMainTerminalIntegration(context: UseMainTerminalIntegrationCo
         void store.detach(sftpSessionId);
         void store.detach(detachedSessionId);
       }
-      layout.setSftpDetachedTabs((prev) => {
-        const next = { ...prev };
-        for (const closedId of closedIds) {
-          delete next[closedId];
-        }
-        return next;
-      });
       layout.setPendingSftpUploadRequests((prev) => {
         const next = { ...prev };
         for (const closedId of closedIds) {
@@ -170,7 +163,6 @@ export function useMainTerminalIntegration(context: UseMainTerminalIntegrationCo
       const sftpSessionId = `attached-${tabId}`;
       const id = ++layout.sftpUploadRequestSeqRef.current;
       layout.setTerminalSplitActive(false);
-      layout.setSftpDetachedTabs((prev) => ({ ...prev, [tabId]: false }));
       layout.setAttachedSidebars((prev) => ({ ...prev, [tabId]: true }));
       layout.setPendingSftpUploadRequests((prev) => ({
         ...prev,

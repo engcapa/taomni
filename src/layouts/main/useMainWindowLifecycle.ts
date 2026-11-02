@@ -86,11 +86,15 @@ export function useMainWindowLifecycle(context: UseMainWindowLifecycleContext) {
     openDetachedDatabase,
     openDetachedSftp,
   }), [openDetachedDatabase, openDetachedRdp, openDetachedSftp, openDetachedTerminal, openDetachedVnc]);
+  const showAttachedSftp = useCallback((tabId: string) => {
+    layout.setAttachedSidebars((prev) => ({ ...prev, [tabId]: true }));
+  }, [layout.setAttachedSidebars]);
   useDetachedWindowEvents({
     tabsRef: layout.tabsRef,
     setActiveTab: layout.setActiveTab,
     addTab: layout.addTab,
     setStatusMessage: layout.setStatusMessage,
+    showAttachedSftp,
   });
 
   useEffect(() => {

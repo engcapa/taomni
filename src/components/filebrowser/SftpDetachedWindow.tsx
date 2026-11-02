@@ -1,8 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { PanelRightOpen } from "lucide-react";
 import { FileBrowser } from "./FileBrowser";
 import { useAppTheme } from "../../lib/appTheme";
 import { subscribeCwdHint, getLatestCwdHint } from "../../lib/sftpSync";
-import { getAppPlatform } from "../../lib/runtime";
+import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
+import { closeCurrentDetachedWindow } from "../../lib/detachWindowing";
+import { sftpWindowPaths, type DetachedSftpParams } from "../../lib/sftpWindowState";
+import { useSftpStore } from "../../stores/sftpStore";
 import { useT } from "../../lib/i18n";
 import {
   consumeDetachedHandoff as consumeGenericHandoff,
@@ -11,33 +15,8 @@ import {
   detachedWindowUrl as detachedGenericUrl,
   detectDetachedRoute,
   sweepExpiredHandoffs as sweepGenericHandoffs,
+  broadcastReattach,
 } from "../../lib/detachedSession";
-
-interface DetachedSftpParams {
-  /**
-   * Session id used by the detached window for its OWN SFTP attach. We
-   * deliberately make this distinct from the parent window's session id
-   * (see `parentSessionId`) so the backend opens a fresh SFTP channel and
-   * the popup never contends with the sidebar / standalone tab for the
-   * same `Mutex<SftpSession>` lock.
-   */
-  sessionId: string;
-  /**
-   * Original session id in the parent window. Used only so the detached
-   * window can subscribe to the same OSC 7 cwd-hint broadcasts that the
-   * main window publishes for the source tab. The detached window does
-   * NOT attach SFTP under this id.
-   */
-  parentSessionId?: string;
-  host: string;
-  port: number;
-  username: string;
-  authMethod: string;
-  authData: string | null;
-  networkSettingsJson?: string | null;
-  initialPath?: string;
-  title?: string;
-}
 
 // Re-export TTL so callers expecting the previous symbol still work.
 export { HANDOFF_TTL_MS } from "../../lib/detachedSession";
@@ -103,6 +82,8 @@ export function detectDetachedSftpRoute(): string | null {
 
 export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
   const t = useT();
+  const reattachingRef = useRef(false);
+  const [reattachError, setReattachError] = useState<string | null>(null);
   const { mode, resolvedTheme } = useAppTheme();
   const [uiFontFamily, setUiFontFamily] = useState(() => {
     try {
@@ -127,6 +108,21 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
   const [params, setParams] = useState<DetachedSftpParams | null>(() =>
     consumeDetachedHandoff(sessionId),
   );
+  const reattach = async () => {
+    if (!params || reattachingRef.current) return;
+    reattachingRef.current = true;
+    setReattachError(null);
+    broadcastReattach("sftp", sessionId, { ...params, ...sftpWindowPaths(sessionId) });
+    clearDetachedHandoff(sessionId);
+    try {
+      await useSftpStore.getState().detach(sessionId);
+      if (isTauriRuntime()) await closeCurrentDetachedWindow();
+      else window.close();
+    } catch (error) {
+      reattachingRef.current = false;
+      setReattachError(String(error));
+    }
+  };
   // Flip to true after a grace period if no handoff has arrived. Lets us
   // replace the indefinite "waiting…" spinner with an actionable error so
   // the popup never *looks* blank to the user.
@@ -287,8 +283,20 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
         className="h-6 px-2 flex items-center text-[11px] font-semibold border-b shrink-0"
         style={{ borderColor: "var(--taomni-divider)", background: "var(--taomni-quick-bg)" }}
       >
-        <span className="truncate">{title}</span>
+        <span className="truncate flex-1">{title}</span>
+        <button
+          type="button"
+          data-testid="sftp-reattach"
+          className="inline-flex items-center gap-1 rounded px-1.5 hover:bg-[var(--taomni-hover)]"
+          title={t(params.attachedToTerminal ? "fileBrowser.restoreSftpPanel" : "rdp.reattach")}
+          aria-label={t(params.attachedToTerminal ? "fileBrowser.restoreSftpPanel" : "rdp.reattach")}
+          onClick={() => void reattach()}
+        >
+          <PanelRightOpen size={13} />
+          {t(params.attachedToTerminal ? "fileBrowser.restoreSftpPanel" : "rdp.reattach")}
+        </button>
       </div>
+      {reattachError && <div role="alert" className="px-2 text-xs">{reattachError}</div>}
       <div className="flex-1 min-h-0">
         <FileBrowser
           sessionId={params.sessionId}
@@ -299,6 +307,7 @@ export function SftpDetachedWindow({ sessionId }: { sessionId: string }) {
           authData={params.authData}
           networkSettingsJson={params.networkSettingsJson ?? null}
           initialPath={params.initialPath}
+          initialLocalPath={params.initialLocalPath}
           cwdHint={cwdHint}
           detachable={false}
         />

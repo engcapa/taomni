@@ -90,7 +90,6 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
     setActiveTab,
     setAttachedSidebars,
     setPendingSftpUploadRequests,
-    setSftpDetachedTabs,
     setStatusMessage,
     setTerminalSplitLayout,
     settingsTabs,
@@ -225,7 +224,6 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
       requestTerminalCwd={requestTerminalCwd}
       pendingSftpUploadRequests={pendingSftpUploadRequests}
       setPendingSftpUploadRequests={setPendingSftpUploadRequests}
-      setSftpDetachedTabs={setSftpDetachedTabs}
       setAttachedSidebars={setAttachedSidebars}
       openDetachedSftp={openDetachedSftp}
       splitGridColumns={splitGridColumns}
@@ -258,6 +256,7 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
             authData={tab.sftp.authData}
             networkSettingsJson={tab.sftp.networkSettingsJson ?? null}
             initialPath={tab.sftp.initialPath}
+            initialLocalPath={tab.sftp.initialLocalPath}
             pathMappings={tab.sftp.pathMappings}
             detachable
             onDetach={() => openDetachedSftp(tab.sftp!, tab.title)}

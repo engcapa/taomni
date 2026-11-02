@@ -60,7 +60,6 @@ export interface TerminalTabContentsProps {
   requestTerminalCwd: (tabId: string) => boolean;
   pendingSftpUploadRequests: Record<string, import("../../../components/filebrowser/FileBrowser").SftpPendingUploadRequest>;
   setPendingSftpUploadRequests: import("react").Dispatch<import("react").SetStateAction<Record<string, import("../../../components/filebrowser/FileBrowser").SftpPendingUploadRequest>>>;
-  setSftpDetachedTabs: import("react").Dispatch<import("react").SetStateAction<Record<string, boolean>>>;
   setAttachedSidebars: import("react").Dispatch<import("react").SetStateAction<Record<string, boolean>>>;
   openDetachedSftp: (params: import("../../../types").SftpTabInfo, title: string) => void;
   splitGridColumns: number;
@@ -120,7 +119,6 @@ export function TerminalTabContents(inputs: TerminalTabContentsProps) {
     requestTerminalCwd,
     pendingSftpUploadRequests,
     setPendingSftpUploadRequests,
-    setSftpDetachedTabs,
     setAttachedSidebars,
     openDetachedSftp,
     splitGridColumns,
@@ -228,7 +226,7 @@ export function TerminalTabContents(inputs: TerminalTabContentsProps) {
                 open: chatDrawerOpen && activeTabId === tab.id,
                 onToggle: () => void toggleTabChat(chatBindingIdForTab(tab) ?? tab.id),
               } : undefined}
-              sftpToggle={!terminalSplitVisible && tab.ssh && sshBrowserMode(parseSessionOptions(tab.ssh.optionsJson).sshBrowser) !== "disabled" && !(terminalRailMerged && isActive) ? {
+              sftpToggle={!terminalSplitVisible && tab.ssh && sshBrowserMode(parseSessionOptions(tab.ssh.optionsJson).sshBrowser) !== "disabled" ? {
                 open: sidebarOpen,
                 onToggle: () => toggleTerminalSftp(tab),
               } : undefined}
@@ -287,7 +285,6 @@ export function TerminalTabContents(inputs: TerminalTabContentsProps) {
               void writeTerminal(sid, encodeBase64(` cd '${escaped}'\r`));
             }}
             onDetach={() => {
-              setSftpDetachedTabs((prev) => ({ ...prev, [tab.id]: true }));
               setAttachedSidebars((prev) => ({ ...prev, [tab.id]: false }));
               openDetachedSftp(
                 {
