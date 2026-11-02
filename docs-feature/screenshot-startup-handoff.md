@@ -155,7 +155,7 @@
 
 ### 6.2 未做与原因
 
-- P1-1 已实现并在本机通过 N30；跨平台、混合 DPI、滚动与录屏全套回归仍需最终源码 run，不把编译或 mounted 测试等同于 native 验收。
+- P1-1 已实现，`75d226e5` 的 hosted 第四轮已通过六组 native N30、全部截图／crash、四组 Linux 双屏（Wayland 含混合 DPI）、滚动与录屏回归。后续测试工具修正与格式收尾仍以最终 `scope=all` 结果确认，不把编译或 mounted 测试等同于 native 验收。
 - P1-4 X11 条件化 hide：第 13 项未关闭，650 ms 不变。
 - P1-7 枚举去重：低优先级，未做。
 - 650 ms、250 ms 排空、HIDE_SETTLE、`focus_capture_window` 重试均未改。
@@ -195,4 +195,19 @@
 - 本机 browser 截图／crash 在仍改动的 Vite HMR 期间重跑失败（032/033/036 与 workspace 导航等），不标通过；一轮 QA build 检测到编译中 inputs 改变而拒绝身份记录，保留 exit 2。随后冻结源码批次再构建/运行，不伪造 source stable。
 - 冻结候选 `1a5be417`：本机 screenshot browser `run-20261102-090908-152209500` 41/41，crash browser `run-20261102-091052-706960600` 8/8，均 identity_stable true、有匹配 receipt。原生 `run-20261102-091146-524231000` N30 证明首次触发也复用预热空窗口、三代一致 identity、陈旧 generation close 不影响新会话、所有租约/文件清理通过；N12/N17 仍失败，N4 恢复正确 prior registered=false 状态后通过。
 - N12 进一步定位为公开菜单调用尚处 focus 完成前就被 QA 关闭/重开，后者由未改的 OPENING guard 正确忽略。QA 等待 OPENING 释放后，`run-20261102-092535-808500700` N12/N17 2/2 通过，随后 `run-20261102-092752-615715900` N12/N17/N30/N4 4/4 通过、identity_stable true。N17 添加失败时 clipboard sequence/owner PID/format 只读记录；后续未复现，不能宣称定位了覆盖方。
-- Hosted 第三轮 [`41370911143`](https://github.com/engcapa/taomni/actions/runs/41370911143) 对应 `1a5be417`，三端 browser 已各 49/49，native release / contracts 待收齐；本轮不含后续 N12 QA 等待修正。下一轮仍需最终源码截图＋crash 六组 native / 三端 browser 全绿，再 scope=all；P1-4 门槛未满足，650ms 不缩短。
+- Hosted 第三轮 [`41370911143`](https://github.com/engcapa/taomni/actions/runs/41370911143) 对应 `1a5be417`，338/346 通过、8 失败，无基础设施错误。三项 N12 是公开入口完成前重开竞态，五项 N28 是 RAII `eval` 把函数体的顶层 `return true` 当脚本执行，WebKit 报 `SyntaxError: Return statements are only valid inside functions.`；分别由 `44cac55b`、`75d226e5` 修正。六组 native N30 与 Linux 四组双屏通过。原失败报告／receipt 保留，不重标。
+- 本机最终 debug 截图 `run-20261102-094540-834368200`：25/25 通过，0 失败／跳过，identity_stable true、receipt 完整。随后匹配 release 的 crash `run-20261102-095510-433910300`：8/9 通过，WS-054 在 native 冷重启时被 runner 的 TCP 表检查中断；原失败保留。真实受控 IPv4/IPv6 socket 证明本机 `GetExtendedTcpTable(TCP_TABLE_OWNER_PID_LISTENER)` 会给可接受连接的监听端点返回非 LISTEN state，不能据此抛错。runner 保留所有返回的目标端点为占用，仍须实际端点消失才能重启，不修改应用逻辑、不终止无关进程；新增真实监听／关闭与异常 state 占用契约。相关 Python 36 项通过、1 Linux-only 跳过；Rust fmt 与 refactor 检查通过。
+- Hosted 第四轮 [`41373708966`](https://github.com/engcapa/taomni/actions/runs/41373708966) 对应 `75d226e5`：**346/346 通过，0 失败／跳过**，workflow success、report_ok true；三端 browser 各 49/49，Windows／macOS native 各 34/34，Linux xvfb／X11／VNC 各 32/32、Wayland 31/31，四组 Linux 双屏各 1/1。31/31 执行 entry 收齐；独立复核 receipt 签名、所有绑定文件哈希、source／runner／case／selection、QA ID、同 producer 二进制哈希、release 与 desktop profile 均匹配。N25 是 X11-only，Wayland 不适用不是跳过。N27 六组各 60 次 ready 早于 show、0 超时；N28 所有生产图 0 marker 像素并恢复；N30 六组预热空窗、三代复用／清理／租约与陈旧关闭隔离通过。
+
+第四轮 N27 release（每列每组 20 次；单位 ms，P50/P95）：
+
+| 组合 | 串行握手 firstMs | 并行 firstMs | 常驻复用 firstMs | 常驻复用 selectMs |
+|---|---|---|---|---|
+| Windows 2025 | 636/672 | 337/357 | 125/142 | 331/348 |
+| macOS 15 ARM64 | 475/537 | 331/348 | 297/322 | 466/496 |
+| Ubuntu 24.04 xvfb | 1219/1234 | 986/990 | 972/978 | 1131/1141 |
+| Ubuntu 22.04 X11 | 1180/1203 | 985/999 | 983/988 | 1141/1150 |
+| Ubuntu 22.04 VNC | 1193/1204 | 986/993 | 981/985 | 1140/1149 |
+| Ubuntu 26.04 Wayland | 1285/1308 | 1285/1297 | 1262/1286 | 1419/1444 |
+
+`firstMs=max(show, renderer commit)` 不是独立原生第一像素测量，`selectMs` 是后端 focus 完成后才读取的可选区轮询。三组均包含新的前端入口，不能称为原始 main 与最终版本的严格匹配对照；也不是慢机、进程冷启动或 4K 数据。Windows/macOS 收益明显，Linux 仍受未改的 650ms 隐藏、250ms 排空及每次 Wayland 新授权／首帧约束，不宣称全平台“瞬时”。P1-4 门槛未满足，650ms 不缩短。最终格式与工具修正后正在本机匹配 release 批量复验，随后 `scope=all` 三端与四 Linux profile 全量验收；全量结果未收齐前任务不标完成。

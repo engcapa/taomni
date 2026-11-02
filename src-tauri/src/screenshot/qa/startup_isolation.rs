@@ -35,7 +35,9 @@ impl Drop for MarkerOwner {
     fn drop(&mut self) {
         // eval executes a script, not run_js's async function body. A
         // top-level `return true` is a WebKit SyntaxError on RAII cleanup.
-        let _ = self.0.eval("document.getElementById('qa-isolation-marker')?.remove();");
+        let _ = self
+            .0
+            .eval("document.getElementById('qa-isolation-marker')?.remove();");
     }
 }
 

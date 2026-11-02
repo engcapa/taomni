@@ -34,9 +34,9 @@ mod resident_overlay;
 pub use resident_overlay::*;
 mod startup_isolation;
 pub use startup_isolation::*;
+mod startup_flash;
 #[cfg(test)]
 mod startup_isolation_tests;
-mod startup_flash;
 pub use startup_flash::*;
 #[cfg(test)]
 mod tests;

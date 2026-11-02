@@ -1,7 +1,9 @@
 """Contract for the OS listener observation used by Windows application restart."""
 import ctypes
+import os
 import socket
 import struct
+import sys
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -33,16 +35,46 @@ class WindowsTcpTableTest(unittest.TestCase):
         with patch.object(tcp, "_read_table", return_value=struct.pack("=I", 0)):
             self.assertEqual(tcp.windows_listeners((4444,)), [])
 
-    def test_invalid_listener_state_or_truncated_rows_cannot_establish_free_ports(self):
-        invalid = struct.pack("=IIIIIII", 1, 5, 0, 0, 0, 0, 42)
-        for data in [b"", b"\0", struct.pack("=I", 1), invalid]:
+    def test_truncated_rows_cannot_establish_free_ports(self):
+        for data in [b"", b"\0", struct.pack("=I", 1)]:
             with self.subTest(data=data), self.assertRaises(RuntimeError):
                 tcp._decode_table(data, socket.AF_INET, (4444,))
+
+    def test_unexpected_states_in_filtered_tables_still_keep_requested_ports_occupied(self):
+        for state in (0, 1, 5, 6, 12):
+            ipv4 = struct.pack("=I", 1) + struct.pack(
+                "=I4sIIII", state, socket.inet_pton(socket.AF_INET, "127.0.0.1"),
+                socket.htons(4444), 0, 0, 42,
+            )
+            ipv6 = struct.pack("=I", 1) + struct.pack(
+                "=16sII16sIIII", socket.inet_pton(socket.AF_INET6, "::1"), 0,
+                socket.htons(4445), bytes(16), 0, 0, state, 43,
+            )
+            with self.subTest(state=state), patch.object(tcp, "_read_table", side_effect=[ipv4, ipv6]):
+                self.assertEqual(tcp.windows_listeners((4444, 4445)), [
+                    {"LocalAddress": "127.0.0.1", "LocalPort": 4444, "OwningProcess": 42},
+                    {"LocalAddress": "::1", "LocalPort": 4445, "OwningProcess": 43},
+                ])
+
+    @unittest.skipUnless(sys.platform == "win32", "live Windows IP Helper listener table")
+    def test_real_owned_listeners_are_present_until_their_sockets_close(self):
+        for family, address in ((socket.AF_INET, "127.0.0.1"), (socket.AF_INET6, "::1")):
+            with self.subTest(family=family):
+                with socket.socket(family) as listener:
+                    listener.bind((address, 0))
+                    listener.listen()
+                    port = listener.getsockname()[1]
+                    self.assertIn({"LocalAddress": address, "LocalPort": port, "OwningProcess": os.getpid()},
+                                  tcp.windows_listeners((port,)))
+                    with socket.create_connection((address, port), timeout=2), listener.accept()[0]:
+                        self.assertTrue(tcp.windows_listeners((port,)))
+                self.assertEqual(tcp.windows_listeners((port,)), [])
 
     def test_reallocates_if_the_os_table_grows_between_observations(self):
         data = struct.pack("=IIIIIII", 1, 2, 0, socket.htons(4444), 0, 0, 42)
         def query(buffer, size_pointer, ordered, family, table_class, reserved):
             size = ctypes.cast(size_pointer, ctypes.POINTER(tcp._DWORD))
+            self.assertFalse(ordered)
             self.assertEqual((family, table_class, reserved), (socket.AF_INET, 3, 0))
             if buffer is None:
                 size.contents.value = 4

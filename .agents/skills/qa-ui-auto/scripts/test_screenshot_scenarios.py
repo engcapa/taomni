@@ -60,7 +60,7 @@ class ScreenshotScenariosTest(TestCase):
         import re
         root = Path(__file__).resolve().parents[4]
         source = (root / "src-tauri/src/screenshot/qa/startup_isolation.rs").read_text(encoding="utf-8")
-        script = re.search(r'self\.0\.eval\("([^"\n]+)"\)', source)
+        script = re.search(r'self\s*\.\s*0\s*\.\s*eval\(\s*"([^"\n]+)"\s*\)', source)
         if script is None:
             self.fail("native marker cleanup eval script not found")
         expression = script.group(1)
