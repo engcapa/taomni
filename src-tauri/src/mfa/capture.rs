@@ -145,6 +145,27 @@ fn capture_all_monitors() -> Result<Vec<LumaFrame>, String> {
     Ok(frames)
 }
 
+/// Retain the actual decoder input only in the isolated hosted QA app.
+/// The normal app never writes screen scans. This is evidence, not a second
+/// capture or a replacement result; all errors remain those of the real scan.
+pub(super) fn retain_hosted_qa_scan<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>, bytes: &[u8]) {
+    use tauri::Manager;
+    if !cfg!(debug_assertions)
+        || window.app_handle().config().identifier != crate::QA_APP_ID
+        || std::env::var("GITHUB_ACTIONS").as_deref() != Ok("true")
+    {
+        return;
+    }
+    let Some(root) = std::env::var_os("RUNNER_TEMP") else {
+        return;
+    };
+    let root = std::path::PathBuf::from(root).join("taomni-qa-artifacts");
+    let path = root.join(format!("mfa-scan-{}.tqf", uuid::Uuid::new_v4()));
+    if let Err(error) = std::fs::create_dir_all(&root).and_then(|_| std::fs::write(path, bytes)) {
+        log::warn!("retain hosted MFA scan evidence: {error}");
+    }
+}
+
 /// Hide `window`, capture every display, then always restore and refocus it.
 pub fn capture_screens_hiding<R: tauri::Runtime>(
     window: &tauri::WebviewWindow<R>,

@@ -149,16 +149,21 @@ export function useWorkspaceHostFiles(dependencies: WorkspaceHostFilesDependenci
         current.project.buffers.flushPendingEditorText();
         applying.current = false;
         settledRequest.current = request;
-        reconcileCanvas(requested);
-        publishSnapshot(requested, current.session.workspaceInstanceId);
+        // Layout can change while the same file request awaits disk restore.
+        // Reconcile the latest host, not the captured pre-restore layout: refs
+        // do not trigger a render when applying/settledRequest change below.
+        const latest = live.current.host ?? requested;
+        reconcileCanvas(latest);
+        publishSnapshot(latest, current.session.workspaceInstanceId);
       }
     }).catch((error) => {
       if (isCurrent()) {
         applying.current = false;
         live.current.session.setStatusMessage(String(error));
         settledRequest.current = request;
-        reconcileCanvas(requested);
-        publishSnapshot(requested, live.current.session.workspaceInstanceId);
+        const latest = live.current.host ?? requested;
+        reconcileCanvas(latest);
+        publishSnapshot(latest, live.current.session.workspaceInstanceId);
       }
     });
     return () => { cancelled = true; };

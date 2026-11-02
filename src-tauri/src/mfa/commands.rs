@@ -269,8 +269,12 @@ pub async fn mfa_read_clipboard_image(state: State<'_, AppState>) -> Result<Resp
 /// Hide the calling window, capture every display and return luma frames.
 #[tauri::command]
 pub async fn mfa_capture_screens(window: tauri::WebviewWindow) -> Result<Response, String> {
-    tauri::async_runtime::spawn_blocking(move || capture::capture_screens_hiding(&window))
-        .await
-        .map_err(|e| format!("screen capture task: {e}"))?
-        .map(Response::new)
+    tauri::async_runtime::spawn_blocking(move || {
+        let bytes = capture::capture_screens_hiding(&window)?;
+        capture::retain_hosted_qa_scan(&window, &bytes);
+        Ok::<_, String>(bytes)
+    })
+    .await
+    .map_err(|e| format!("screen capture task: {e}"))?
+    .map(Response::new)
 }

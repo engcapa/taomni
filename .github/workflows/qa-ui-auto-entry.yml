@@ -51,13 +51,16 @@ jobs:
       - name: Updater unit contracts
         if: (contains(matrix.capabilities, 'updater')) && inputs.operation == 'run'
         run: pnpm test src/lib/updateService.test.ts src/stores/updateStore.test.ts src/components/UpdateDialog.test.tsx
+      - name: Rust source formatting contract
+        if: runner.os == 'Linux' && inputs.operation == 'build'
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
       - name: Frontend behavior unit regressions
         if: runner.os == 'Linux' && inputs.operation == 'build'
         run: |
           mkdir -p qa-build-output
           python -m unittest test_ci_ssh_features test_ci_x11_session test_ci_build_pipeline test_native_windows_integrity
           pnpm check:refactor
-          pnpm exec vitest run src/components/mail/MailClientTab.test.tsx src/components/screenshot/ScreenshotOverlay.test.tsx src/components/screenshot/ScreenshotOverlayStartup.test.tsx src/components/screenshot/overlay/prefetch.test.ts src/components/screenshot/overlay/ScreenshotSessionHost.test.tsx src/components/editor/workspace/useMarkdownPreviewSearch.test.tsx 2>&1 | tee qa-build-output/frontend-unit-contracts.log
+          pnpm exec vitest run src/components/mail/MailClientTab.test.tsx src/components/screenshot/ScreenshotOverlay.test.tsx src/components/screenshot/ScreenshotOverlayStartup.test.tsx src/components/screenshot/overlay/prefetch.test.ts src/components/screenshot/overlay/ScreenshotSessionHost.test.tsx src/components/editor/workspace/useMarkdownPreviewSearch.test.tsx src/components/editor/workspace/hooks/useWorkspaceHostFiles.test.tsx src/components/editor/workspace/hooks/useWorkspaceHostCanvas.test.tsx src/components/mfa/MfaAddDialog.test.tsx src/lib/mfa/fixtures.test.ts 2>&1 | tee qa-build-output/frontend-unit-contracts.log
       - name: Ubuntu 22.04 PipeWire build cache
         if: runner.os == 'Linux' && matrix.mode == 'native' && startsWith(matrix.linux_profile, 'ubuntu-22.04')
         uses: actions/cache@v4
