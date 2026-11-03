@@ -13703,6 +13703,27 @@ controls:
   - id: mobile-type-enter
     selector: '[data-testid="mobile-type-enter"]'
     kind: interactive
+  - id: mobile-type-shift
+    selector: '.compact-keyboard button[aria-label="Shift"]'
+    kind: interactive
+  - id: mobile-type-symbols
+    selector: '.compact-keyboard button[aria-label="切换数字符号"]'
+    kind: interactive
+  - id: mobile-type-uppercase
+    selector: '[data-testid="mobile-type-A"]'
+    kind: interactive
+  - id: mobile-type-number
+    selector: '[data-testid="mobile-type-1"]'
+    kind: interactive
+  - id: mobile-type-punctuation
+    selector: '[data-testid="mobile-type-!"]'
+    kind: interactive
+  - id: mobile-type-space
+    selector: '[data-testid="mobile-type-space"]'
+    kind: interactive
+  - id: mobile-type-backspace
+    selector: '[data-testid="mobile-type-backspace"]'
+    kind: interactive
 -->
 
 - 默认不监听；全局设置开启回环/局域网移动服务，生成一次性码、查看与吊销设备。
