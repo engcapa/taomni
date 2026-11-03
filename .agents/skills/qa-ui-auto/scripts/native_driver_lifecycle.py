@@ -1,6 +1,7 @@
 """Restore an owned native driver before creating the next isolated session."""
 from __future__ import annotations
 
+import os
 import subprocess
 import time
 from typing import Callable, Protocol
@@ -21,9 +22,21 @@ class DriverOwner(Protocol):
     def stop(self) -> None: ...
 
 
+def driver_start_environment(driver: DriverOwner) -> dict[str, str]:
+    """Remember executable lookup inherited by the app's driver parent."""
+    environment = dict(os.environ)
+    driver._inherited_path = environment.get("PATH")
+    return environment
+
+
 def ensure_owned_driver_running(
     driver: DriverOwner, *, system: str, tcp_probe: Callable[[str, int], bool],
 ) -> None:
+    # Fixtures may temporarily prepend a disposable executable. A reused
+    # tauri-driver otherwise keeps its old PATH when spawning the next app.
+    if (hasattr(driver, "_inherited_path")
+            and driver._inherited_path != os.environ.get("PATH")):
+        driver.stop()
     if system == "Linux":
         # Linux normally reuses tauri-driver across cases. An explicit app
         # restart releases it too; a failed restart must not strand later

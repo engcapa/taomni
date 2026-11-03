@@ -139,8 +139,17 @@ def run(ctx, endpoint, pairing_code):
                 # until the phone supplies one-shot credentials for this attempt.
                 ctx.session.click('[data-testid="ribbon-settings"]')
                 ctx.session.fill('[data-testid="settings-search-input"]', 'vault')
+                until(ctx.session, '!!document.querySelector(\'[data-testid="vault-init-button"], [data-testid="vault-lock-button"]\')')
+                if ctx.session.count('[data-testid="vault-init-button"]'):
+                    ctx.session.click('[data-testid="vault-init-button"]')
+                    ctx.session.find('[data-testid="vault-setup-dialog"]')
+                    ctx.session.fill('[data-testid="vault-setup-pw1"]', 'qa-mobile-auth-master')
+                    ctx.session.fill('[data-testid="vault-setup-pw2"]', 'qa-mobile-auth-master')
+                    ctx.session.click('[data-testid="vault-setup-confirm"]')
+                    ctx.session.wait_absent('[data-testid="vault-setup-dialog"]')
+                until(ctx.session, 'document.querySelector(\'[data-testid="vault-state-badge"]\')?.textContent === "unlocked"')
                 ctx.session.click('[data-testid="vault-lock-button"]')
-                until(ctx.session, '!document.querySelector(\'[data-testid="vault-lock-button"]\')')
+                until(ctx.session, 'document.querySelector(\'[data-testid="vault-state-badge"]\')?.textContent === "locked"')
                 for name in ['HTTP proxy', 'SOCKS proxy', 'app proxy', 'custom proxy']:
                     record = open_saved('QA phone ' + name)
                     form(record)

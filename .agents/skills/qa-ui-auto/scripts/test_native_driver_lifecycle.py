@@ -4,10 +4,31 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, patch
 
+from native_driver_lifecycle import driver_start_environment
 from tauri_webdriver import TauriDriverProcess
 
 
 class NativeDriverLifecycleTest(unittest.TestCase):
+    def test_fixture_path_and_restoration_restart_the_driver_parent(self):
+        with TemporaryDirectory() as directory:
+            driver = TauriDriverProcess({}, Path(directory))
+            for original, updated in [("/system", "/fixture:/system"), ("/fixture:/system", "/system")]:
+                driver.proc = Mock()
+                driver.proc.poll.return_value = None
+                with patch.dict("os.environ", {"PATH": original}):
+                    self.assertEqual(driver_start_environment(driver)["PATH"], original)
+                def stopped():
+                    driver.proc = None
+                with patch.dict("os.environ", {"PATH": updated}), \
+                        patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                        patch.object(driver, "stop", side_effect=stopped) as stop, \
+                        patch("native_driver_lifecycle.wait_for_driver_ports") as ports, \
+                        patch.object(driver, "start") as start:
+                    driver.ensure_running()
+                stop.assert_called_once()
+                ports.assert_called_once()
+                start.assert_called_once()
+
     def test_linux_reuses_its_running_owned_driver(self):
         with TemporaryDirectory() as directory:
             driver = TauriDriverProcess({}, Path(directory))

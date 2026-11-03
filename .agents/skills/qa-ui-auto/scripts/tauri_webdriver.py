@@ -28,6 +28,7 @@ from native_console import CONSOLE_HOOK_SCRIPT
 from native_pointer import MOUSE_SOURCE, prepare_click_target
 from native_paced_input import type_paced_text
 from native_window_focus import NativeWindowFocus
+from native_driver_lifecycle import driver_start_environment
 
 
 ROOT = Path.cwd()
@@ -290,7 +291,7 @@ class TauriDriverProcess:
             # same W3C subset over this run-owned loopback port.
             if not self.application.is_file():
                 raise WebDriverError(f"macOS QA application not found: {self.application}")
-            env = dict(os.environ)
+            env = driver_start_environment(self)
             env["TAOMNI_QA_WEBDRIVER_HOST"] = self.host
             env["TAOMNI_QA_WEBDRIVER_PORT"] = str(self.port)
             command = [str(self.application.resolve())]
@@ -312,7 +313,7 @@ class TauriDriverProcess:
             cmd = [self.command, "--port", str(self.port), "--native-port", str(self.native_port)]
             if self.native_driver:
                 cmd += ["--native-driver", str(self.native_driver)]
-            env = dict(os.environ)
+            env = driver_start_environment(self)
             if platform.system() == "Linux" and env.get("GDK_BACKEND") == "wayland":
                 # The app's floating capture windows use a separate XWayland
                 # connection. Keep the parent/DBus activation environment at
