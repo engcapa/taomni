@@ -3,6 +3,7 @@
 
 pub mod anthropic;
 pub mod gpu_detect;
+pub mod invocation;
 pub mod llama_server;
 pub mod model_catalog;
 pub mod openai_compat;
