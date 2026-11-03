@@ -14,6 +14,7 @@ smoke:
 - TC-WS-056
 - TC-WS-057
 - TC-IDE-C8-08-code-style-dialog-lifecycle-browser
+- TC-ORCH-PARTIAL-002
 unavailable: {}
 cases:
 - TC-ORCH-001

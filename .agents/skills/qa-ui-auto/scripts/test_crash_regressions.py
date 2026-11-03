@@ -18,6 +18,7 @@ EXPECTED = {
     "TC-IDE-C8-08-code-style-dialog-lifecycle-browser",
     "TC-WS-038", "TC-WS-039", "TC-WS-045", "TC-WS-051", "TC-WS-052",
     "TC-WS-053", "TC-WS-054", "TC-WS-055", "TC-WS-056", "TC-WS-057",
+    "TC-ORCH-PARTIAL-002",
 }
 BROWSER_ONLY = {"TC-WS-055", "TC-IDE-C8-08-code-style-dialog-lifecycle-browser"}
 
