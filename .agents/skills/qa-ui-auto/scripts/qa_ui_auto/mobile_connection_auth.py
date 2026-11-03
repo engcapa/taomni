@@ -7,6 +7,7 @@ an external SSH host or physical phone/IME validation.
 import json
 from pathlib import Path
 import sqlite3
+import time
 from contextlib import closing, suppress
 from types import SimpleNamespace
 from playwright.sync_api import sync_playwright, expect
@@ -18,7 +19,7 @@ from .terminal_burst_probe import until
 
 
 def run(ctx, endpoint, pairing_code):
-    receipt = {'passed': False, 'checks': [], 'requests': [], 'phase': 'pair'}
+    receipt = {'passed': False, 'checks': [], 'requests': [], 'control_events': [], 'phase': 'pair'}
     errors = []
     root = Path(ctx.case_dir)
     try:
@@ -28,6 +29,13 @@ def run(ctx, endpoint, pairing_code):
                 context = browser.new_context(viewport={'width': 390, 'height': 844})
                 page = context.new_page()
                 page.on('pageerror', lambda error: errors.append(str(error)))
+                def observe_socket(socket):
+                    def received(payload):
+                        frame = json.loads(payload)
+                        if frame.get('type') in ('control', 'control-lost'):
+                            receipt['control_events'].append({'phase': receipt['phase'], **frame})
+                    socket.on('framereceived', received)
+                page.on('websocket', observe_socket)
                 page.goto(endpoint, wait_until='networkidle')
                 page.get_by_test_id('mobile-first-instance').click()
                 page.get_by_test_id('mobile-endpoint').fill(endpoint)
@@ -70,6 +78,24 @@ def run(ctx, endpoint, pairing_code):
                     until(ctx.session, '!document.querySelector(\'[data-testid="mfa-prompt"]\')', timeout=10)
                     until(ctx.session, '[...(window.__taomni_terminal_registry__?.entries?.values() || [])].some(e => e.sessionId === '
                           + json.dumps(result['session_id'][5:]) + ' && e.isReady?.())', timeout=15)
+                    # Connection readiness precedes forced desktop fits at 80
+                    # and 300 ms. Those legitimately reclaim phone control.
+                    # Wait for the desktop layout/readiness to settle before
+                    # taking control once; never retry the takeover action.
+                    deadline, stable_since, previous = time.monotonic() + 15, None, None
+                    while time.monotonic() < deadline:
+                        state = ctx.session.execute('return { ready: [...(window.__taomni_terminal_registry__?.entries?.values() || [])].some(e => e.sessionId === '
+                            + json.dumps(result['session_id'][5:]) + ' && e.isReady?.()), layout: [...document.querySelectorAll(\'[data-testid="terminal-pane"]\')].map(e => { const r=e.getBoundingClientRect(); return [r.x,r.y,r.width,r.height]; }) };')
+                        now = time.monotonic()
+                        if state.get('ready') and state == previous:
+                            if stable_since is not None and now - stable_since >= 0.6:
+                                break
+                        else:
+                            stable_since = now if state.get('ready') else None
+                        previous = state
+                        time.sleep(0.05)
+                    else:
+                        raise AssertionError('desktop terminal layout/readiness did not settle before phone takeover')
                     page.get_by_test_id('mobile-take-control').click()
                     expect(page.get_by_test_id('mobile-terminal-status')).to_contain_text('控制中')
                     if not page.get_by_test_id('mobile-compact-keyboard').is_visible():
