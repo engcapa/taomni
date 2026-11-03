@@ -135,3 +135,34 @@ def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
         if session.deadline:
             remaining = min(remaining, session.deadline.remaining())
         time.sleep(min(0.05, remaining))
+
+
+def prepare_click_target(session, origin: dict, timeout: float = 5.0,
+                         *, allow_alternate: bool = False) -> dict:
+    """Check geometry again after the driver has moved the physical pointer.
+
+    WebKit's compositor can advance a pending search scroll during W3C input,
+    even after DOM geometry appeared stable. Hover is safe to repeat; button
+    input is never sent until that round trip still points at the same target.
+    """
+    end = time.monotonic() + timeout
+    while True:
+        remaining = end - time.monotonic()
+        if session.deadline:
+            remaining = min(remaining, session.deadline.remaining())
+        if remaining <= 0:
+            raise WebDriverError("native click target moved during pointer preparation")
+        point = prepare_pointer_target(session, origin, remaining,
+                                       allow_alternate=allow_alternate)
+        session.request("POST", session.endpoint("/actions"), {"actions": [{
+            "type": "pointer", "id": MOUSE_SOURCE,
+            "parameters": {"pointerType": "mouse"}, "actions": [{
+                "type": "pointerMove", "duration": 0, "origin": "viewport", **point,
+            }],
+        }]})
+        current = session.request("POST", session.endpoint("/execute/sync"), {
+            "script": TARGET_GEOMETRY, "args": [origin, allow_alternate],
+        })
+        if (isinstance(current, dict) and current.get("ready") is True
+                and current.get("x") == point["x"] and current.get("y") == point["y"]):
+            return point

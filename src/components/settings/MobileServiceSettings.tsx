@@ -52,7 +52,7 @@ export function MobileServiceSettings() {
     <label className="mt-3 block"><input data-testid="mobile-settings-open-sessions" type="checkbox" checked={!!status.allow_open_sessions} disabled={busy} onChange={e => { const enabled = e.target.checked; void act(async () => {
       await invoke("mobile_set_open_sessions", { enabled }); setStatus(await invoke<Status>("mobile_status"));
     }); }} /> 允许已配对手机打开已保存会话和新建本地终端</label>
-    <p className="mt-1 text-[var(--taomni-text-muted)]">在本机桌面窗口中打开，复用已保存的凭据、代理和跳板机；需要解锁 vault 或 SSH 认证时在本机完成。仅在桌面运行时可用，headless 不支持。关闭此开关阻止尚未受理的请求；桌面已受理的连接继续运行。</p>
+    <p className="mt-1 text-[var(--taomni-text-muted)]">在本机桌面窗口中打开，复用已保存的凭据、代理和跳板机；缺少的连接凭据可在手机填写，仅用于本次连接，不修改已保存的会话。保险库主密码仅在本机输入。仅在桌面运行时可用，headless 不支持。关闭此开关阻止尚未受理的请求；桌面已受理的连接继续运行。</p>
     <p className="mt-3" data-testid="mobile-settings-status">{status.enabled ? `运行中 · ${status.address}` : "已关闭 · 无监听端口"}</p>
     {status.enabled && <div className="mt-3 space-y-3">
       <p className="text-[var(--taomni-text-muted)]">局域网 HTTP 为明文连接，会传输凭据和内容；互联网请配置 HTTPS。手机请使用可到达的局域网地址或自备 HTTPS endpoint；0.0.0.0 与 127.0.0.1 不能作为远程手机地址。</p>

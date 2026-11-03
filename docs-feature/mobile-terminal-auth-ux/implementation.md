@@ -35,3 +35,7 @@ TC-MOBILE-007 使用临时 loopback ssh2 服务、实际 SSH 加密和认证，�
 GitHub 选择完整移动用例 001–007、SSH 回归 122/139/143/150，并自动合并全部 crash-regression，合计 90 次执行：三平台各 15 次 browser，Linux 17 次 native，Windows/macOS 各 14 次 native。平台不适用的用例由原有声明决定，不计为通过。运行 41564971986 的三平台 browser 45 次全部通过；最终提交、运行链接和原生结果在最终验证后追加。静态审核与 dry-run 不计为实际验收证据。
 
 物理 Android/iOS 的软键盘、中文输入法和触摸手感未由桌面浏览器自动化验证。GitHub 原生覆盖 Windows WebView2、Linux WebKitGTK 与 macOS WKWebView；手机页面运行于 Playwright Chromium。
+
+## 托管测试故障调查
+
+运行 41564971986 的 Linux TC-MOBILE-002 保留了真实 pointer/focus 证据：滚动期间点击坐标落在 feishu-app-id 的 label，而不是 mobile-settings-toggle，服务未收到启动操作。原生输入器现在先移动同一个 W3C 鼠标，再复核目标位置与命中；仅重新准备悬停，绝不重放按钮输入。98 项 pointer/driver 合约通过，原设置/网络断言保持不变。设置页说明同步为手机可填写一次性连接凭据，保险库主密码仍只在本机输入。

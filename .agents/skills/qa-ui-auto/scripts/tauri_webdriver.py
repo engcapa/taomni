@@ -25,7 +25,7 @@ from typing import Any
 from native_build import QA_APP_ID, verify_identity
 from native_webdriver_transport import WebDriverError, WebDriverTransport
 from native_console import CONSOLE_HOOK_SCRIPT
-from native_pointer import MOUSE_SOURCE, prepare_pointer_target
+from native_pointer import MOUSE_SOURCE, prepare_click_target
 from native_paced_input import type_paced_text
 from native_window_focus import NativeWindowFocus
 
@@ -550,7 +550,7 @@ class NativeSession(WebDriverTransport):
                     "script": "arguments[0].scrollIntoView({block:'nearest', inline:'nearest', behavior:'instant'});",
                     "args": [origin],
                 })
-                point = prepare_pointer_target(self, origin, allow_alternate=button == 2)
+                point = prepare_click_target(self, origin, allow_alternate=button == 2)
             except WebDriverError as exc:
                 if _is_stale_element_error(exc) and attempt < 2:
                     last_stale = exc

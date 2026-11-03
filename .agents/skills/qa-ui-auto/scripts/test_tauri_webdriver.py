@@ -19,7 +19,7 @@ from tauri_webdriver import NativeHarness, NativeSession, TauriDriverProcess, We
 class NativeSessionTransportTest(TestCase):
     def setUp(self):
         # Geometry polling has separate readiness/real-WebView contracts.
-        target = patch('tauri_webdriver.prepare_pointer_target', return_value={'x': 270, 'y': 217})
+        target = patch('tauri_webdriver.prepare_click_target', return_value={'x': 270, 'y': 217})
         self.prepare_pointer_target = target.start()
         self.addCleanup(target.stop)
 
