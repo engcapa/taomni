@@ -153,6 +153,8 @@ pub fn router(s: Service) -> Router {
         .route("/api/v1/tasks/{id}/changes/{*path}", get(diff))
         .route("/api/v1/open-requests", post(open_session))
         .route("/api/v1/open-requests/{id}", get(open_status))
+        .route("/api/v1/open-requests/{id}/auth", post(open_auth))
+        .route("/api/v1/open-requests/{id}/cancel", post(cancel_open))
         .route("/api/v1/events", get(streams::events))
         .route("/api/v1/terminals/{id}/stream", get(streams::terminal))
         .fallback(get(static_file))
@@ -220,6 +222,32 @@ async fn open_status(
 ) -> ApiResult {
     let device = authenticated(&s, &headers)?;
     Ok(Json(s.runtime.open_requests.poll(&device, &id)?))
+}
+#[derive(Deserialize)]
+struct AuthAnswer {
+    challenge_id: String,
+    responses: Option<Vec<String>>,
+}
+async fn open_auth(
+    State(s): State<Service>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(answer): Json<AuthAnswer>,
+) -> ApiResult {
+    let device = authenticated(&s, &headers)?;
+    s.runtime
+        .open_requests
+        .answer(&device, &id, &answer.challenge_id, answer.responses)?;
+    Ok(Json(json!({"status":"accepted"})))
+}
+async fn cancel_open(
+    State(s): State<Service>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+) -> ApiResult {
+    let device = authenticated(&s, &headers)?;
+    s.runtime.open_requests.cancel(&device, &id)?;
+    Ok(Json(json!({"status":"cancelled"})))
 }
 async fn detail(State(s): State<Service>, headers: HeaderMap, Path(id): Path<String>) -> ApiResult {
     authenticated(&s, &headers)?;

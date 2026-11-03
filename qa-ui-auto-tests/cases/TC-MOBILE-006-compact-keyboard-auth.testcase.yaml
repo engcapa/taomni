@@ -1,0 +1,280 @@
+id: TC-MOBILE-006
+title: Compact phone keyboard and transient multi-round connection authentication
+covers:
+- F-MOBILE-1
+tags:
+- mobile
+- terminal
+- authentication
+modes:
+- browser
+fixtures:
+- mobile_web
+timeout_sec: 150
+description: Production mobile bundle with deterministic HTTP/WS peer. Native SSH/password/private-key/OTP ownership is verified by TC-MOBILE-007
+  and Rust service tests.
+steps:
+- set_viewport:
+    width: 390
+    height: 844
+- open: ${fixture.mobile_endpoint}
+- wait_for: '[data-testid="mobile-add-instance"]'
+- click: '[data-testid="mobile-add-instance"]'
+- fill:
+    selector: '[data-testid="mobile-pair-code"]'
+    value: qa-mobile-code
+- click: '[data-testid="mobile-pair-submit"]'
+- wait_for: '[data-testid="mobile-saved-open"]'
+- click: '[data-testid="mobile-saved-open"]'
+- wait_for: '[data-testid="mobile-connection-auth"]'
+- eval_readonly:
+    expression: document.querySelector('.connection-auth input').value === 'developer' && document.querySelector('.connection-auth label:last-of-type
+      input').type === 'password' && !document.querySelector('.connection-auth label:last-of-type input').value
+    expect_truthy: true
+    timeout_sec: 5
+- fill:
+    selector: '[data-testid="mobile-auth-answer-0"]'
+    value: phone-user
+- fill:
+    selector: '[data-testid="mobile-auth-answer-1"]'
+    value: qa-temp-secret
+- click: '[data-testid="mobile-auth-submit"]'
+- assert_text:
+    selector: '[data-testid="mobile-connection-auth"]'
+    contains: SSH 验证码
+- fill:
+    selector: '[data-testid="mobile-auth-answer-0"]'
+    value: '123456'
+- click: '[data-testid="mobile-auth-submit"]'
+- wait_for: '[data-testid="mobile-terminal-screen"]'
+- assert_file_contains:
+    path: ${fixture.mobile_receipt}
+    contains: AUTH login
+- assert_file_contains:
+    path: ${fixture.mobile_receipt}
+    contains: AUTH otp
+- eval_readonly:
+    expression: '!JSON.stringify(localStorage).includes(''qa-temp-secret'') && !JSON.stringify(localStorage).includes(''123456'')'
+    expect_truthy: true
+    timeout_sec: 5
+- click: '[data-testid="mobile-take-control"]'
+- wait_for: '[data-testid="mobile-compact-keyboard"]'
+- eval_readonly:
+    expression: document.documentElement.classList.contains('terminal-fullscreen') && document.querySelector('.terminal').offsetHeight >= 450
+      && !document.querySelector('.command-bar').offsetHeight && document.activeElement?.tagName !== 'TEXTAREA'
+    expect_truthy: true
+    timeout_sec: 5
+- click: '[data-testid="mobile-type-q"]'
+- click: '[data-testid="mobile-key-ctrl"]'
+- click: '[data-testid="mobile-type-c"]'
+- click: '[data-testid="mobile-type-enter"]'
+- assert_file_contains:
+    path: ${fixture.mobile_receipt}
+    contains: PTY q
+- assert_file_contains:
+    path: ${fixture.mobile_receipt}
+    contains: PTY \x03
+- assert_file_contains:
+    path: ${fixture.mobile_receipt}
+    contains: PTY \r
+- click: .compact-keyboard button[aria-label="Shift"]
+- click: '[data-testid="mobile-type-A"]'
+- click: .compact-keyboard button[aria-label="切换数字符号"]
+- click: '[data-testid="mobile-type-1"]'
+- click: .compact-keyboard button[aria-label="Shift"]
+- click: '[data-testid="mobile-type-!"]'
+- click: '[data-testid="mobile-type-space"]'
+- click: '[data-testid="mobile-type-backspace"]'
+- assert_file_contains:
+    path: ${fixture.mobile_receipt}
+    contains: PTY A
+- assert_file_contains:
+    path: ${fixture.mobile_receipt}
+    contains: PTY 1
+- assert_file_contains:
+    path: ${fixture.mobile_receipt}
+    contains: PTY !
+- assert_file_contains:
+    path: ${fixture.mobile_receipt}
+    contains: PTY \x7f
+- click: '[data-testid="mobile-input-hide"]'
+- assert_count:
+    selector: '[data-testid="mobile-compact-keyboard"]'
+    equal: 0
+- click: '[data-testid="mobile-input-compact"]'
+- wait_for: '[data-testid="mobile-compact-keyboard"]'
+- click: '[data-testid="mobile-terminal-keyboard"]'
+- fill:
+    selector: '[data-testid="mobile-terminal-command"]'
+    value: echo 中文草稿
+- click: '[data-testid="mobile-input-compact"]'
+- click: '[data-testid="mobile-terminal-keyboard"]'
+- eval_readonly:
+    expression: document.querySelector('.command-bar input').value === 'echo 中文草稿'
+    expect_truthy: true
+    timeout_sec: 5
+- click: '[data-testid="mobile-input-compact"]'
+- set_viewport:
+    width: 390
+    height: 400
+- eval_readonly:
+    expression: document.querySelector('.terminal').offsetHeight >= 100 && document.querySelector('.input-modes').getBoundingClientRect().bottom
+      <= innerHeight+1 && document.documentElement.scrollWidth <= innerWidth
+    expect_truthy: true
+    timeout_sec: 5
+- set_viewport:
+    width: 844
+    height: 390
+- eval_readonly:
+    expression: document.querySelector('.terminal').offsetHeight >= 100 && document.querySelector('.input-modes').getBoundingClientRect().bottom
+      <= innerHeight+1 && document.documentElement.scrollWidth <= innerWidth
+    expect_truthy: true
+    timeout_sec: 5
+- set_viewport:
+    width: 390
+    height: 844
+- screenshot: mobile-compact-keyboard.png
+- click: '[data-testid="mobile-terminal-back"]'
+- click: '[data-testid="mobile-saved-open"]'
+- wait_for: '[data-testid="mobile-connection-auth"]'
+- click: '[data-testid="mobile-auth-cancel"]'
+- eval_readonly:
+    expression: '!document.querySelector(''.connection-auth'') && !document.querySelector(''.open-status'')'
+    expect_truthy: true
+    timeout_sec: 5
+- assert_file_contains:
+    path: ${fixture.mobile_receipt}
+    contains: CANCEL qa-open-2
+- click: '[data-testid="mobile-open-local"]'
+- wait_for: '[data-testid="mobile-terminal-screen"]'
+- assert_file_contains:
+    path: ${fixture.mobile_receipt}
+    contains: OPEN local
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Compact keyboard sends real terminal frames without editable focus; system drafts survive mode switches. Login and OTP use separate
+      masked transient rounds, cancellation waits for the server and a subsequent local open succeeds.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 13
+    - 15
+    - 16
+    - 17
+    - 21
+    - 22
+    - 24
+    - 25
+    - 26
+    - 27
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 37
+    - 38
+    - 43
+    - 45
+    - 46
+    - 47
+    - 48
+    - 49
+    - 50
+    - 52
+    - 53
+    - 55
+    - 57
+    - 58
+    - 59
+    - 60
+    - 61
+    - 62
+    - 65
+    - 66
+    checkpoints:
+    - step: 10
+      expectation: A fresh login round prefills the account and masks an empty password.
+    - step: 14
+      expectation: Next SSH authentication round replaces the login form.
+    - step: 18
+      expectation: Independent peer receipt contains AUTH login.
+    - step: 19
+      expectation: Independent peer receipt contains AUTH otp.
+    - step: 20
+      expectation: Neither password nor OTP is persisted in phone storage.
+    - step: 23
+      expectation: Default full viewport has at least 450px of output and compact keys without a system input field taking focus.
+    - step: 28
+      expectation: Independent peer receipt contains PTY q.
+    - step: 29
+      expectation: Independent peer receipt contains PTY \x03.
+    - step: 30
+      expectation: Independent peer receipt contains PTY \r.
+    - step: 39
+      expectation: Shift/symbol/space/backspace input reaches the peer, and hiding the input area restores output space.
+    - step: 40
+      expectation: Shift/symbol/space/backspace input reaches the peer, and hiding the input area restores output space.
+    - step: 41
+      expectation: Shift/symbol/space/backspace input reaches the peer, and hiding the input area restores output space.
+    - step: 42
+      expectation: Shift/symbol/space/backspace input reaches the peer, and hiding the input area restores output space.
+    - step: 44
+      expectation: Shift/symbol/space/backspace input reaches the peer, and hiding the input area restores output space.
+    - step: 51
+      expectation: Switching input modes preserves the unsent native IME draft.
+    - step: 54
+      expectation: Short portrait keeps terminal output and input mode controls inside the viewport.
+    - step: 56
+      expectation: Landscape keeps terminal and compact keyboard usable without overflow.
+    - step: 63
+      expectation: Server-acknowledged cancellation removes this round and the opening state.
+    - step: 64
+      expectation: Independent peer receipt contains CANCEL qa-open-2.
+    - step: 67
+      expectation: Independent peer receipt contains OPEN local.
+    - step: 68
+      expectation: No runtime errors throughout authentication, mode changes, cancellation and local opening.
+    results:
+    - 10
+    - 14
+    - 18
+    - 19
+    - 20
+    - 23
+    - 28
+    - 29
+    - 30
+    - 39
+    - 40
+    - 41
+    - 42
+    - 44
+    - 51
+    - 54
+    - 56
+    - 63
+    - 64
+    - 67
+    - 68
+  visual:
+  - check: Phone controls and output remain readable without horizontal overflow.
+    method: automated
+    reason: Geometry assertions and diagnostic phone screenshots; physical devices remain unverified.
+  native:
+  - check: Native networking is outside the deterministic renderer peer.
+    method: not-applicable
+    reason: TC-MOBILE-007 uses actual Tauri IPC, russh, a loopback SSH peer and native platform shell.

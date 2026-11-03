@@ -33,11 +33,20 @@ function saveFlag(key: string, value: boolean) {
   try { localStorage.setItem(key, value ? "1" : "0"); } catch { /* keep the in-memory choice */ }
 }
 
-export const loadFullscreen = () => loadFlag(FULLSCREEN_KEY, false);
+export const loadFullscreen = () => loadFlag(FULLSCREEN_KEY, true);
 export const saveFullscreen = (value: boolean) => saveFlag(FULLSCREEN_KEY, value);
 /** Whether the on-screen key rows are shown; hiding them gives the output more rows. */
 export const loadKeysOpen = () => loadFlag(KEYS_KEY, true);
 export const saveKeysOpen = (value: boolean) => saveFlag(KEYS_KEY, value);
+
+export type InputMode = "compact" | "system" | "hidden";
+const INPUT_MODE_KEY = "taomni.mobile.terminalInputMode.v1";
+export function loadInputMode(): InputMode {
+  try { const value = localStorage.getItem(INPUT_MODE_KEY); return value === "system" || value === "hidden" ? value : "compact"; } catch { return "compact"; }
+}
+export function saveInputMode(mode: InputMode) {
+  try { localStorage.setItem(INPUT_MODE_KEY, mode); } catch { /* keep in memory */ }
+}
 
 function setStyle(element: HTMLElement, property: string, value: string) {
   if (element.style.getPropertyValue(property) !== value) element.style.setProperty(property, value);

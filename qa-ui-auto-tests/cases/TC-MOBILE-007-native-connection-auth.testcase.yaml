@@ -1,0 +1,92 @@
+id: TC-MOBILE-007
+title: Phone credentials unlock real native SSH password OTP and encrypted key with local PTY recovery
+covers:
+- F-MOBILE-1
+- F2.1
+tags:
+- mobile
+- native-boundary
+- authentication
+modes:
+- native
+fixtures:
+- reset_db
+- mobile_service
+timeout_sec: 240
+description: 'All three OSes: isolated QA desktop starts a real listener. Public phone UI pairs and opens saved loopback SSH accounts.
+  Native russh authenticates one-shot username/password, OTP and an encrypted private key; each input reaches an independent SSH peer
+  receipt and native terminal output. Cancellation rejects late replies; wrong credentials surface failure; a new local platform PTY
+  still emits stdout. The SSH peer uses a deterministic shell channel, not an external shell. Physical mobile IME remains outside this
+  case.'
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-mobile-auth-master
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: mobile
+- wait_for: '[data-testid="mobile-settings"]'
+- fill:
+    selector: '[data-testid="mobile-settings-port"]'
+    value: '0'
+- click: '[data-testid="mobile-settings-toggle"]'
+- assert_text:
+    selector: '[data-testid="mobile-settings-status"]'
+    contains: 运行中
+- click: '[data-testid="mobile-settings-open-sessions"]'
+- click: '[data-testid="mobile-settings-pair"]'
+- wait_for: '[data-testid="mobile-settings-code"]'
+- mobile_service_probe: connection-auth
+- assert_file_contains:
+    path: ${fixture.mobile_auth_receipt}
+    contains: '"passed": true'
+- assert_file_contains:
+    path: ${fixture.mobile_ssh_marker}
+    contains: QA_NATIVE_SSH_PING
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Native phone-to-desktop connection authentication is private, ephemeral, cancellable and recoverable, and the existing
+      local-open path creates a working platform shell.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 9
+    - 10
+    - 11
+    - 12
+    checkpoints:
+    - step: 8
+      expectation: The real native mobile listener is running.
+    - step: 12
+      expectation: Phone UI completes password, distinct OTP and encrypted-key rounds; each of three native SSH streams reaches the
+        independent peer exactly once. Another paired device is denied. Cancelled preflight creates no tab and refuses late answers; cancellation during native OTP also settles both views.
+        Wrong credentials fail and local platform PTY output remains usable. Neither phone storage nor saved session rows retain the
+        typed secrets.
+    - step: 13
+      expectation: Original probe receipt is passed with all native connection checks.
+    - step: 14
+      expectation: Independent loopback SSH server recorded decrypted terminal input.
+    - step: 15
+      expectation: No runtime errors occurred in the native desktop.
+    results:
+    - 8
+    - 12
+    - 13
+    - 14
+    - 15
+  visual:
+  - check: Phone controls and output remain readable without horizontal overflow.
+    method: automated
+    reason: Geometry assertions and diagnostic phone screenshots; physical devices remain unverified.
+  native:
+  - check: Native listener, SSH and local PTY side effects.
+    method: automated
+    reason: TC-MOBILE-007 uses actual Tauri IPC, russh, a loopback SSH peer and native platform shell.

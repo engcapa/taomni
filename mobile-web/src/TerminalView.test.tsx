@@ -68,6 +68,7 @@ it("applies sticky Ctrl to the next system-keyboard character and resets on lost
 it("edits focused command drafts with symbol/arrow keys and brackets paste exactly once", () => {
   render(<TerminalView instance={instance} session={session} />);
   connect();
+  fireEvent.click(screen.getByTestId("mobile-terminal-keyboard"));
   const command = screen.getByTestId("mobile-terminal-command") as HTMLInputElement;
   fireEvent.change(command, { target: { value: "ab" } });
   command.focus(); command.setSelectionRange(1, 1);
@@ -78,4 +79,44 @@ it("edits focused command drafts with symbol/arrow keys and brackets paste exact
   fireEvent.submit(command.closest("form")!);
   expect(inputs()).toEqual(["\x1b[200~a|b\x1b[201~\r"]);
   expect(command).toHaveValue("");
+});
+
+it("defaults to a compact keyboard, preserves a system draft across switches and stops typing when control is lost", () => {
+  render(<TerminalView instance={instance} session={session} />);
+  expect(screen.getByTestId("mobile-terminal-command")).not.toBeVisible();
+  expect(screen.queryByTestId("mobile-terminal-menu")).toBeNull();
+  connect();
+  fireEvent.click(screen.getByTestId("mobile-type-a"));
+  fireEvent.click(screen.getByTestId("mobile-key-ctrl"));
+  fireEvent.click(screen.getByTestId("mobile-type-c"));
+  fireEvent.click(screen.getByTestId("mobile-type-enter"));
+  expect(inputs()).toEqual(["a", "\x03", "\r"]);
+  expect(mock.term.textarea.inputMode).toBe("none");
+  fireEvent.click(screen.getByTestId("mobile-terminal-keyboard"));
+  const command = screen.getByTestId("mobile-terminal-command");
+  expect(command).toHaveFocus();
+  fireEvent.change(command, { target: { value: "echo 中文" } });
+  fireEvent.click(screen.getByTestId("mobile-input-compact"));
+  expect(command).not.toHaveFocus();
+  expect(command).not.toBeVisible();
+  fireEvent.click(screen.getByTestId("mobile-terminal-keyboard"));
+  expect(command).toHaveValue("echo 中文");
+  act(() => mock.frame({ type: "control-lost" }));
+  expect(command).toBeDisabled();
+  expect(screen.queryByTestId("mobile-compact-keyboard")).toBeNull();
+});
+
+it("keeps font, resize, fullscreen and history available through more and dismisses it with Escape", () => {
+  render(<TerminalView instance={instance} session={session} />);
+  connect();
+  fireEvent.click(screen.getByTestId("mobile-terminal-more"));
+  fireEvent.click(screen.getByTestId("mobile-terminal-font-up"));
+  expect(mock.term.options.fontSize).toBe(14);
+  fireEvent.click(screen.getByTestId("mobile-resize"));
+  expect(mock.send).toHaveBeenCalledWith({ type: "resize", cols: 40, rows: 20 });
+  expect(screen.queryByTestId("mobile-terminal-menu")).toBeNull();
+  fireEvent.click(screen.getByTestId("mobile-terminal-more"));
+  fireEvent.keyDown(document, { key: "Escape" });
+  expect(screen.queryByTestId("mobile-terminal-menu")).toBeNull();
+  expect(screen.getByTestId("mobile-terminal-more")).toHaveFocus();
 });

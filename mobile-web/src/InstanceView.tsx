@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, errorText, loadInstances, request, saveInstances, statusText, type Instance, type Session, type SessionList } from "./api";
 import { useLive } from "./live";
-import { openSession, type OpenTarget } from "./openSession";
+import { openSession, type OpenTarget, type OpenStatus } from "./openSession";
+import { ConnectionAuthForm } from "./ConnectionAuthForm";
 import { TaskView } from "./TaskView";
 import { TerminalView } from "./TerminalView";
 
@@ -24,6 +25,7 @@ export function InstanceView({ instance, sessionId, onSelect, onCloseSession, on
   const [revision, setRevision] = useState(0);
   const [opening, setOpening] = useState<string | null>(null);
   const [openError, setOpenError] = useState("");
+  const [openProgress, setOpenProgress] = useState<OpenStatus | null>(null);
   const generation = useRef(0);
   const abort = useRef<AbortController | null>(null);
   const openAbort = useRef<AbortController | null>(null);
@@ -55,8 +57,8 @@ export function InstanceView({ instance, sessionId, onSelect, onCloseSession, on
     openAbort.current?.abort();
     const controller = new AbortController();
     openAbort.current = controller;
-    setOpening(label); setOpenError("");
-    openSession(instance, target, controller.signal).then(id => {
+    setOpening(label); setOpenError(""); setOpenProgress(null);
+    openSession(instance, target, controller.signal, progress => { if (!controller.signal.aborted) setOpenProgress(progress); }).then(id => {
       if (controller.signal.aborted) return;
       known.current = placeholder(id, label);
       refresh();
@@ -64,9 +66,17 @@ export function InstanceView({ instance, sessionId, onSelect, onCloseSession, on
     }).catch(error => {
       if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) return;
       setOpenError(errorText(error instanceof ApiError ? error : new ApiError("open_failed")));
-    }).finally(() => { if (openAbort.current === controller) { openAbort.current = null; setOpening(null); } });
+    }).finally(() => { if (openAbort.current === controller) { openAbort.current = null; setOpening(null); setOpenProgress(null); } });
   };
-  const cancelOpen = () => { openAbort.current?.abort(); openAbort.current = null; setOpening(null); };
+  const cancelOpen = () => {
+    const id = openProgress?.request_id;
+    if (!id) return;
+    // Await the server's cancellation before dropping our polling owner. A
+    // failed cancellation remains actionable instead of claiming it stopped.
+    void request(instance, `/open-requests/${encodeURIComponent(id)}/cancel`, {}).then(() => {
+      openAbort.current?.abort(); openAbort.current = null; setOpening(null); setOpenProgress(null);
+    }).catch(error => setOpenError(errorText(error)));
+  };
 
   const listed = sessionId ? data.sessions.find(v => v.id === sessionId) : undefined;
   if (listed) known.current = listed;
@@ -82,8 +92,10 @@ export function InstanceView({ instance, sessionId, onSelect, onCloseSession, on
       <div className="page-title"><p className="eyebrow">INSTANCE OVERVIEW</p><h1>远程执行，一目了然。</h1><p className="muted">终端与 Agent 留在实例端持续运行。</p></div>
       <div className="stats"><div><strong>{data.sessions.filter(s => s.status === "running").length}</strong><span>正在运行</span></div><div><strong>{data.sessions.filter(s => s.status === "awaiting_confirmation").length}</strong><span>等待确认</span></div><div><strong>{data.sessions.length}</strong><span>全部会话</span></div></div>
       {(opening || openError) && <div className="card open-status" role="status" data-testid="mobile-open-status">
-        {opening ? <><p>正在桌面打开“{opening}”…需要解锁 vault 或 SSH 认证时，请在桌面完成。</p><button onClick={cancelOpen}>不再等待</button></> : <p className="error">{openError}</p>}
+        {opening ? <><p>正在连接“{opening}”…{openProgress?.auth ? "请填写下方认证信息。" : "如需认证，将在此处提示。"}</p><button disabled={!openProgress?.request_id} onClick={cancelOpen}>取消连接</button></> : <p className="error">{openError}</p>}
+        {opening && openError && <p className="error" role="alert">{openError}</p>}
       </div>}
+      {opening && openProgress?.auth && <ConnectionAuthForm key={openProgress.auth.id} instance={instance} requestId={openProgress.request_id} challenge={openProgress.auth} onCancel={cancelOpen} />}
       <div className="section-heading"><h2>终端与任务</h2><div className="heading-actions">
         {canOpen && <button className="primary" data-testid="mobile-open-local" disabled={!!opening} onClick={() => open({ kind: "local" }, "本地终端")}>＋ 本地终端</button>}
         <button data-testid="mobile-refresh" onClick={refresh}>刷新</button>

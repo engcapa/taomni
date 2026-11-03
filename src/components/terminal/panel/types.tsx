@@ -13,6 +13,8 @@ export interface SshConnectInfo {
   authMethod: string;
   authData: string | null;
   optionsJson?: string;
+  /** Transient owner for initial mobile-initiated connection authentication. */
+  mobileOpenRequestId?: string;
 }
 
 

@@ -10,7 +10,7 @@ const HISTORY_LIMIT = 20;
  * The multi-line panel keeps paste explicit (it never reads the clipboard on
  * its own) and recent lines can be reused from the history.
  */
-export function TerminalComposer({ disabled, panelOpen, onSend, onNotice, keyHandler }: {
+export function TerminalComposer({ disabled, panelOpen, onSend, onNotice, keyHandler, systemKeyboard = true }: {
   disabled: boolean;
   panelOpen: boolean;
   /** Sends text as a paste (newlines → Enter, bracketed when enabled); returns false when nothing was sent. */
@@ -18,6 +18,7 @@ export function TerminalComposer({ disabled, panelOpen, onSend, onNotice, keyHan
   onNotice: (text: string) => void;
   /** Lets the key bar edit a focused native draft instead of the remote shell. */
   keyHandler?: RefObject<((key: string) => boolean) | null>;
+  systemKeyboard?: boolean;
 }) {
   const [line, setLine] = useState("");
   const [paste, setPaste] = useState("");
@@ -26,6 +27,11 @@ export function TerminalComposer({ disabled, panelOpen, onSend, onNotice, keyHan
   const lineInput = useRef<HTMLInputElement>(null);
   const pasteInput = useRef<HTMLTextAreaElement>(null);
   const selection = useRef<{ field: HTMLInputElement | HTMLTextAreaElement; start: number; end: number } | null>(null);
+  useLayoutEffect(() => {
+    if (systemKeyboard && !disabled) lineInput.current?.focus();
+    else { lineInput.current?.blur(); pasteInput.current?.blur(); }
+  }, [systemKeyboard]);
+  useLayoutEffect(() => { if (disabled) { lineInput.current?.blur(); pasteInput.current?.blur(); } }, [disabled]);
   useLayoutEffect(() => {
     if (!keyHandler) return;
     keyHandler.current = key => {
@@ -63,7 +69,7 @@ export function TerminalComposer({ disabled, panelOpen, onSend, onNotice, keyHan
   };
   const reuse = (value: string) => { if (/[\r\n]/.test(value)) setPaste(value); else setLine(value); };
   return <>
-    <form className="command-bar" onSubmit={event => { event.preventDefault(); submitLine(); }}>
+    <form className="command-bar" hidden={!systemKeyboard} onSubmit={event => { event.preventDefault(); submitLine(); }}>
       <input
         ref={lineInput}
         data-testid="mobile-terminal-command"
@@ -78,7 +84,7 @@ export function TerminalComposer({ disabled, panelOpen, onSend, onNotice, keyHan
           // unfinished command. keyCode 229 covers Safari's composition edge.
           if (event.key === "Enter" && (composing.current || event.nativeEvent.isComposing || event.keyCode === 229)) event.preventDefault();
         }}
-        placeholder={disabled ? "接管输入后可在此输入命令" : "输入命令，回车发送；空行即回车"}
+        placeholder={disabled ? "先接管输入" : "输入命令…"}
         enterKeyHint="send"
         autoCapitalize="none"
         autoCorrect="off"
@@ -88,7 +94,7 @@ export function TerminalComposer({ disabled, panelOpen, onSend, onNotice, keyHan
       />
       <button className="primary" data-testid="mobile-terminal-command-send" disabled={disabled} onMouseDown={event => event.preventDefault()}>发送</button>
     </form>
-    {panelOpen && <div className="paste-panel">
+    {panelOpen && <div className="paste-panel" role="region" aria-label="多行输入与历史">
       <label>多行内容<textarea ref={pasteInput} data-testid="mobile-terminal-input" disabled={disabled} value={paste} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onChange={event => setPaste(event.target.value)} maxLength={8192} autoCapitalize="none" autoCorrect="off" spellCheck={false} /></label>
       <div className="actions">
         <button disabled={disabled || !paste} data-testid="mobile-terminal-send" onClick={() => submitPaste(false)}>发送到终端</button>

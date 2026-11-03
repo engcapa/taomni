@@ -38,10 +38,14 @@ steps:
     selector: '[data-testid="mobile-saved-session"]'
     contains: Build host
 - click: '[data-testid="mobile-session"][data-session-kind="terminal"]'
+- click: '[data-testid="mobile-terminal-more"]'
+- click: '[data-testid="mobile-terminal-fullscreen"]'
 - assert_text:
     selector: '[data-testid="mobile-terminal-status"]'
     contains: 只读
+- click: '[data-testid="mobile-terminal-more"]'
 - assert_disabled: '[data-testid="mobile-resize"]'
+- click: '[data-testid="mobile-terminal-more"]'
 - click: '[data-testid="mobile-take-control"]'
 - assert_text:
     selector: '[data-testid="mobile-terminal-status"]'
@@ -49,7 +53,9 @@ steps:
 - assert_file_contains:
     path: ${fixture.mobile_receipt}
     contains: RESIZE
+- click: '[data-testid="mobile-terminal-more"]'
 - click: '[data-testid="mobile-resize"]'
+- click: '[data-testid="mobile-terminal-more"]'
 - click: '[data-testid="mobile-paste"]'
 - fill:
     selector: '[data-testid="mobile-terminal-input"]'
@@ -62,7 +68,9 @@ steps:
 - assert_text:
     selector: '[data-testid="mobile-terminal-status"]'
     contains: 只读
+- click: '[data-testid="mobile-terminal-more"]'
 - assert_disabled: '[data-testid="mobile-resize"]'
+- click: '[data-testid="mobile-terminal-more"]'
 - screenshot: mobile-terminal-readonly.png
 - click: '[data-testid="mobile-sessions-back"]'
 - click: '[data-testid="mobile-session"][data-session-kind="agent"]'
@@ -128,11 +136,13 @@ steps:
 - click: '[data-testid="mobile-session"][data-session-kind="terminal"]'
 - wait_for: '[data-testid="mobile-terminal-screen"]'
 - eval_readonly:
-    expression: document.querySelector('.terminal').getBoundingClientRect().height <= window.innerHeight * 0.55 && document.querySelector('.terminal').getBoundingClientRect().height >= 200 && document.querySelector('.terminal').scrollHeight <= document.querySelector('.terminal').clientHeight + 1
+    expression: document.querySelector('.terminal').getBoundingClientRect().height <= window.innerHeight * 0.55 && document.querySelector('.terminal').getBoundingClientRect().height
+      >= 200 && document.querySelector('.terminal').scrollHeight <= document.querySelector('.terminal').clientHeight + 1
     expect_truthy: true
 - wait: 1.5
 - eval_readonly:
-    expression: document.querySelector('.terminal').getBoundingClientRect().height <= window.innerHeight * 0.55 && document.querySelector('.terminal').scrollHeight <= document.querySelector('.terminal').clientHeight + 1 && document.querySelector('.keybar').getBoundingClientRect().top <= document.documentElement.scrollHeight
+    expression: document.querySelector('.terminal').getBoundingClientRect().height <= window.innerHeight * 0.55 && document.querySelector('.terminal').scrollHeight
+      <= document.querySelector('.terminal').clientHeight + 1 && document.querySelector('.keybar').getBoundingClientRect().top <= document.documentElement.scrollHeight
     expect_truthy: true
 - screenshot: mobile-terminal-layout.png
 - click: '[data-testid="mobile-take-control"]'
@@ -145,34 +155,39 @@ steps:
 - click: '[data-testid="mobile-key-right"]'
 - assert_file_contains:
     path: ${fixture.mobile_receipt}
-    contains: 'PTY \x1b[D'
+    contains: PTY \x1b[D
 - assert_file_contains:
     path: ${fixture.mobile_receipt}
-    contains: 'PTY \x1b[C'
+    contains: PTY \x1b[C
 - assert_file_contains:
     path: ${fixture.mobile_receipt}
-    contains: 'PTY \x1b[1;5C'
+    contains: PTY \x1b[1;5C
 - click: '[data-testid="mobile-key-ctrl-r"]'
 - assert_file_contains:
     path: ${fixture.mobile_receipt}
-    contains: 'PTY \x12'
+    contains: PTY \x12
 - fill:
     selector: '[data-testid="mobile-terminal-command"]'
     value: echo QA_COMMAND_BAR
 - click: '[data-testid="mobile-terminal-command-send"]'
 - assert_file_contains:
     path: ${fixture.mobile_receipt}
-    contains: 'PTY echo QA_COMMAND_BAR\r'
+    contains: PTY echo QA_COMMAND_BAR\r
+- click: '[data-testid="mobile-terminal-more"]'
 - click: '[data-testid="mobile-terminal-fullscreen"]'
 - eval_readonly:
-    expression: document.documentElement.classList.contains('terminal-fullscreen') && document.querySelector('.terminal-card').getBoundingClientRect().bottom <= innerHeight + 1 && document.querySelector('.terminal').offsetHeight >= 120 && document.querySelector('.keybar').getBoundingClientRect().bottom <= innerHeight + 1
+    expression: document.documentElement.classList.contains('terminal-fullscreen') && document.querySelector('.terminal-card').getBoundingClientRect().bottom
+      <= innerHeight + 1 && document.querySelector('.terminal').offsetHeight >= 120 && document.querySelector('.keys').getBoundingClientRect().bottom
+      <= innerHeight + 1
     expect_truthy: true
     timeout_sec: 3
+- click: '[data-testid="mobile-terminal-more"]'
 - click: '[data-testid="mobile-terminal-font-up"]'
 - eval_readonly:
     expression: document.querySelector('.terminal-card small').textContent.includes('字号 14')
     expect_truthy: true
     timeout_sec: 3
+- click: '[data-testid="mobile-terminal-more"]'
 - screenshot: mobile-terminal-fullscreen.png
 - click: '[data-testid="mobile-terminal-back"]'
 - wait_for: '[data-testid="mobile-saved-open"]'
@@ -187,6 +202,7 @@ steps:
 - assert_file_contains:
     path: ${fixture.mobile_receipt}
     contains: OPEN local
+- click: '[data-testid="mobile-terminal-more"]'
 - click: '[data-testid="mobile-terminal-fullscreen"]'
 - eval_readonly:
     expression: '!document.documentElement.classList.contains(''terminal-fullscreen'') && document.documentElement.scrollWidth <= window.innerWidth'
@@ -211,27 +227,30 @@ steps:
 - click: '[data-testid="mobile-terminal-command-send"]'
 - assert_file_contains:
     path: ${fixture.mobile_receipt}
-    contains: 'PTY |b\r'
+    contains: PTY |b\r
+- click: '[data-testid="mobile-terminal-more"]'
 - click: '[data-testid="mobile-terminal-fullscreen"]'
 - set_viewport:
     width: 844
     height: 390
 - eval_readonly:
-    expression: document.querySelector('.terminal-actions').getBoundingClientRect().bottom <= innerHeight + 1 && document.querySelector('.terminal').offsetHeight >= 100 && document.documentElement.scrollWidth <= innerWidth
+    expression: document.querySelector('.input-modes').getBoundingClientRect().bottom <= innerHeight + 1 && document.querySelector('.terminal').offsetHeight
+      >= 100 && document.documentElement.scrollWidth <= innerWidth
     expect_truthy: true
     timeout_sec: 3
 - set_viewport:
     width: 390
     height: 400
 - eval_readonly:
-    expression: document.querySelector('.terminal-actions').getBoundingClientRect().bottom <= innerHeight + 1 && document.querySelector('.terminal').offsetHeight >= 100 && document.documentElement.scrollWidth <= innerWidth
+    expression: document.querySelector('.input-modes').getBoundingClientRect().bottom <= innerHeight + 1 && document.querySelector('.terminal').offsetHeight
+      >= 100 && document.documentElement.scrollWidth <= innerWidth
     expect_truthy: true
     timeout_sec: 3
 - set_viewport:
     width: 390
     height: 844
 - click: '[data-testid="mobile-terminal-back"]'
-- open: '${fixture.mobile_endpoint}/#/session/thread%3Aqa-task'
+- open: ${fixture.mobile_endpoint}/#/session/thread%3Aqa-task
 - wait_for: '[data-testid="mobile-agent-input"]'
 - click: '[data-testid="mobile-agent-continue"]'
 - press:
@@ -245,7 +264,7 @@ steps:
 - wait_for: '[data-testid="mobile-sessions"]'
 - click: '[data-testid="mobile-instances-back"]'
 - wait_for: '[data-testid="mobile-instance-open"]'
-- open: '${fixture.mobile_endpoint2}/#/session/thread%3Aqa-task'
+- open: ${fixture.mobile_endpoint2}/#/session/thread%3Aqa-task
 - wait_for: '[data-testid="mobile-empty-instances"]'
 - click: '[data-testid="mobile-add-instance"]'
 - fill:
@@ -268,200 +287,232 @@ verification:
     - 7
     - 8
     - 12
-    - 15
-    - 17
-    - 18
     - 19
-    - 20
     - 21
     - 23
+    - 25
+    - 26
     - 27
-    - 28
     - 29
-    - 30
-    - 34
+    - 35
     - 36
+    - 37
     - 38
     - 42
-    - 43
     - 44
-    - 45
     - 46
-    - 47
-    - 49
+    - 50
     - 51
+    - 52
     - 53
-    - 56
+    - 54
+    - 55
     - 57
     - 59
-    - 60
     - 61
-    - 62
-    - 63
     - 64
     - 65
+    - 67
+    - 68
+    - 69
+    - 70
+    - 71
+    - 72
+    - 73
     checkpoints:
     - step: 10
       expectation: '[data-testid="mobile-session"] has 2 entries.'
     - step: 11
       expectation: '[data-testid="mobile-saved-session"] shows Build host.'
-    - step: 13
+    - step: 15
       expectation: '[data-testid="mobile-terminal-status"] shows 只读.'
-    - step: 14
-      expectation: '[data-testid="mobile-resize"] is disabled.'
-    - step: 16
-      expectation: '[data-testid="mobile-terminal-status"] shows 控制中.'
     - step: 17
-      expectation: Taking control adopts the phone geometry automatically (RESIZE receipt before the manual fit click).
-    - step: 22
-      expectation: Independent receipt contains PTY QA_MOBILE_WEBSOCKET_INPUT.
-    - step: 24
-      expectation: '[data-testid="mobile-terminal-status"] shows 只读.'
-    - step: 25
       expectation: '[data-testid="mobile-resize"] is disabled.'
-    - step: 31
-      expectation: '[data-testid="mobile-task-status"] shows 运行中.'
+    - step: 20
+      expectation: '[data-testid="mobile-terminal-status"] shows 控制中.'
+    - step: 21
+      expectation: Taking control adopts the phone geometry automatically (RESIZE receipt before the manual fit click).
+    - step: 28
+      expectation: Independent receipt contains PTY QA_MOBILE_WEBSOCKET_INPUT.
+    - step: 30
+      expectation: '[data-testid="mobile-terminal-status"] shows 只读.'
     - step: 32
-      expectation: Independent receipt contains AGENT QA_AGENT_PROMPT_CHANNEL.
-    - step: 33
-      expectation: '[data-testid="mobile-agent-send"] is disabled.'
-    - step: 35
-      expectation: '[data-testid="mobile-task-status"] shows 空闲.'
-    - step: 37
-      expectation: '[data-testid="mobile-file-content"] shows QA_MOBILE_CHANGED.'
+      expectation: '[data-testid="mobile-resize"] is disabled.'
     - step: 39
-      expectation: '[data-testid="mobile-file-view"] shows @@ -1 +1 @@.'
+      expectation: '[data-testid="mobile-task-status"] shows 运行中.'
     - step: 40
+      expectation: Independent receipt contains AGENT QA_AGENT_PROMPT_CHANNEL.
+    - step: 41
+      expectation: '[data-testid="mobile-agent-send"] is disabled.'
+    - step: 43
+      expectation: '[data-testid="mobile-task-status"] shows 空闲.'
+    - step: 45
+      expectation: '[data-testid="mobile-file-content"] shows QA_MOBILE_CHANGED.'
+    - step: 47
+      expectation: '[data-testid="mobile-file-view"] shows @@ -1 +1 @@.'
+    - step: 48
       expectation: Phone document does not overflow horizontally.
-    - step: 50
-      expectation: '[data-testid="mobile-instance-open"] has 2 entries.'
-    - step: 52
-      expectation: '[data-testid="mobile-instance-open"] has 2 entries.'
-    - step: 55
-      expectation: '[data-testid="mobile-session"] has 2 entries.'
     - step: 58
+      expectation: '[data-testid="mobile-instance-open"] has 2 entries.'
+    - step: 60
+      expectation: '[data-testid="mobile-instance-open"] has 2 entries.'
+    - step: 63
+      expectation: '[data-testid="mobile-session"] has 2 entries.'
+    - step: 66
       expectation: '[data-testid="mobile-instance-open"] has 1 entries.'
-    - step: 62
+    - step: 70
       expectation: Terminal box is 200px..55% of the phone viewport and has no internal overflow.
-    - step: 64
+    - step: 72
       expectation: Terminal box stays bounded and the key bar remains inside the document after 1.5s (no fit feedback growth).
-    - step: 129
+    - step: 142
       expectation: No runtime errors occurred.
     results:
     - 10
     - 11
-    - 13
-    - 14
-    - 16
+    - 15
     - 17
-    - 22
-    - 24
-    - 25
-    - 31
+    - 20
+    - 21
+    - 28
+    - 30
     - 32
-    - 33
-    - 35
-    - 37
     - 39
     - 40
-    - 50
-    - 52
-    - 55
+    - 41
+    - 43
+    - 45
+    - 47
+    - 48
     - 58
-    - 62
-    - 64
-    - 129
-  - id: R2
-    requirement: The phone terminal sends left/right arrows, a sticky Ctrl modifier and strip combos as PTY input, sends a typed
-      command line with Enter from a native field, fills the visual viewport in full screen with the key bar inside it, steps
-      the font size, and opens a saved session and a new local terminal through the instance before attaching to them.
-    actions:
+    - 60
+    - 63
     - 66
-    - 68
-    - 69
     - 70
-    - 71
-    - 75
-    - 77
-    - 78
-    - 80
-    - 82
-    - 85
-    - 87
-    - 90
-    - 91
-    - 94
-    checkpoints:
-    - step: 67
-      expectation: Taking control again shows 控制中.
-    - step: 72
-      expectation: Receipt contains the left arrow sequence ESC [ D.
-    - step: 73
-      expectation: Receipt contains the right arrow sequence ESC [ C.
-    - step: 74
-      expectation: Ctrl armed on the key bar turns the next right arrow into ESC [ 1 ; 5 C.
-    - step: 76
-      expectation: The ^R strip key sends 0x12.
-    - step: 79
-      expectation: The command bar sends the typed line followed by CR.
-    - step: 81
-      expectation: Full screen keeps the card and key bar inside the viewport and the terminal at least 120px tall.
-    - step: 83
-      expectation: A+ raises the terminal font size to 14.
-    - step: 89
-      expectation: Opening a saved session posts an open request for that saved session id.
-    - step: 93
-      expectation: The new local terminal button posts a local open request.
-    - step: 95
-      expectation: Leaving full screen restores page layout without horizontal overflow.
-    results:
-    - 67
     - 72
-    - 73
+    - 142
+  - id: R2
+    requirement: The phone terminal sends left/right arrows, a sticky Ctrl modifier and strip combos as PTY input, sends a typed command
+      line with Enter from a native field, fills the visual viewport in full screen with the key bar inside it, steps the font size,
+      and opens a saved session and a new local terminal through the instance before attaching to them.
+    actions:
     - 74
     - 76
+    - 77
+    - 78
     - 79
-    - 81
     - 83
+    - 85
+    - 86
     - 89
+    - 92
+    - 96
+    - 98
+    - 101
+    - 102
+    - 106
+    checkpoints:
+    - step: 75
+      expectation: Taking control again shows 控制中.
+    - step: 80
+      expectation: Receipt contains the left arrow sequence ESC [ D.
+    - step: 81
+      expectation: Receipt contains the right arrow sequence ESC [ C.
+    - step: 82
+      expectation: Ctrl armed on the key bar turns the next right arrow into ESC [ 1 ; 5 C.
+    - step: 84
+      expectation: The ^R strip key sends 0x12.
+    - step: 87
+      expectation: The command bar sends the typed line followed by CR.
+    - step: 90
+      expectation: Full screen keeps the card and key bar inside the viewport and the terminal at least 120px tall.
+    - step: 93
+      expectation: A+ raises the terminal font size to 14.
+    - step: 100
+      expectation: Opening a saved session posts an open request for that saved session id.
+    - step: 104
+      expectation: The new local terminal button posts a local open request.
+    - step: 107
+      expectation: Leaving full screen restores page layout without horizontal overflow.
+    results:
+    - 75
+    - 80
+    - 81
+    - 82
+    - 84
+    - 87
+    - 90
     - 93
-    - 95
+    - 100
+    - 104
+    - 107
   - id: R3
     requirement: Phone drags scroll terminal history without moving the page and latest restores its position; native command drafts
       accept symbol, caret and backspace keys locally before explicit send. Compact portrait and landscape keep actions above the bottom.
-    actions: [97, 98, 99, 101, 102, 104, 106, 107, 109]
+    actions:
+    - 109
+    - 110
+    - 111
+    - 113
+    - 114
+    - 116
+    - 119
+    - 120
+    - 122
     checkpoints:
-    - step: 96
-      expectation: Standard Touch DOM events move rendered xterm history backwards without moving window.scrollY; latest restores the original row.
-    - step: 100
-      expectation: Tapping pipe inserts it at the focused command draft caret rather than sending it to the PTY.
-    - step: 103
-      expectation: On-screen left and backspace edit the draft to |b without losing focus.
-    - step: 105
-      expectation: Only the explicitly sent edited draft reaches the fixture PTY followed by CR.
     - step: 108
-      expectation: At 844x390 landscape the terminal stays at least 100px tall and all action controls fit without horizontal overflow.
-    - step: 110
-      expectation: At a short 390x400 portrait viewport the terminal and actions remain usable with no horizontal overflow.
-    results: [96, 100, 103, 105, 108, 110]
-  - id: R4
-    requirement: Feishu-style deep links open the requested task, quick continue plus Ctrl+Enter sends only to the Agent channel,
-      parent navigation remains usable on a direct link, and first-time pairing preserves the requested task.
-    actions: [113, 115, 116, 118, 119, 121, 123, 125, 126, 127]
-    checkpoints:
-    - step: 114
-      expectation: The session deep link immediately opens the Agent composer using the paired instance.
+      expectation: Standard Touch DOM events move rendered xterm history backwards without moving window.scrollY; latest restores the
+        original row.
+    - step: 112
+      expectation: Tapping pipe inserts it at the focused command draft caret rather than sending it to the PTY.
+    - step: 115
+      expectation: On-screen left and backspace edit the draft to |b without losing focus.
     - step: 117
+      expectation: Only the explicitly sent edited draft reaches the fixture PTY followed by CR.
+    - step: 121
+      expectation: At 844x390 landscape the terminal stays at least 100px tall and all action controls fit without horizontal overflow.
+    - step: 123
+      expectation: At a short 390x400 portrait viewport the terminal and actions remain usable with no horizontal overflow.
+    results:
+    - 108
+    - 112
+    - 115
+    - 117
+    - 121
+    - 123
+  - id: R4
+    requirement: Feishu-style deep links open the requested task, quick continue plus Ctrl+Enter sends only to the Agent channel, parent
+      navigation remains usable on a direct link, and first-time pairing preserves the requested task.
+    actions:
+    - 126
+    - 128
+    - 129
+    - 131
+    - 132
+    - 134
+    - 136
+    - 138
+    - 139
+    - 140
+    checkpoints:
+    - step: 127
+      expectation: The session deep link immediately opens the Agent composer using the paired instance.
+    - step: 130
       expectation: The quick continue prompt sent with Ctrl+Enter appears in the independent Agent receipt.
-    - step: 120
+    - step: 133
       expectation: Returning from a directly loaded task reaches the session list, not the root or a different instance.
-    - step: 122
+    - step: 135
       expectation: The next parent navigation reaches the instance list.
-    - step: 124
+    - step: 137
       expectation: The separate localhost origin has no credentials yet and asks for pairing.
-    - step: 128
+    - step: 141
       expectation: Pairing from a deep link resumes directly into that Agent task instead of losing its id.
-    results: [114, 117, 120, 122, 124, 128]
+    results:
+    - 127
+    - 130
+    - 133
+    - 135
+    - 137
+    - 141
   visual:
   - check: Phone viewport has no horizontal page overflow.
     method: automated

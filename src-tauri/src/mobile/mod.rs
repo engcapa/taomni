@@ -236,6 +236,7 @@ impl MobileRuntime {
         Ok(address)
     }
     pub async fn stop(&self) {
+        self.open_requests.cancel_pending(None);
         let mut lifecycle = self.lifecycle.lock().await;
         self.im.stop().await;
         if let Some(running) = lifecycle.take() {

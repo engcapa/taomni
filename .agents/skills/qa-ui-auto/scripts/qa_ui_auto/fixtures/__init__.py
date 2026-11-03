@@ -117,7 +117,7 @@ class Fixture:
 
 REGISTRY: dict[str, Fixture] = {
     "mobile_web": Fixture("mobile_web", mobile_web.setup, mobile_web.teardown),
-    "mobile_service": Fixture("mobile_service", mobile_service.setup),
+    "mobile_service": Fixture("mobile_service", mobile_service.setup, mobile_service.teardown),
     "bookmark_assets": Fixture("bookmark_assets", bookmark_assets.setup),
     "mail_stress": Fixture("mail_stress", mail_stress.setup),
     "model_inspector_gateway": Fixture("model_inspector_gateway", model_inspector_gateway.setup, model_inspector_gateway.teardown),

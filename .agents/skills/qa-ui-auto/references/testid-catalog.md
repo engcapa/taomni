@@ -2071,6 +2071,20 @@
 - `[data-testid="mobile-key-backtick"]` — interactive — F-MOBILE-1.mobile-key-backtick
 - `[data-testid="mobile-key-dquote"]` — interactive — F-MOBILE-1.mobile-key-dquote
 - `[data-testid="mobile-key-squote"]` — interactive — F-MOBILE-1.mobile-key-squote
+- `[data-testid="mobile-terminal-more"]` — interactive — F-MOBILE-1.mobile-terminal-more
+- `[data-testid="mobile-terminal-menu"]` — display — F-MOBILE-1.mobile-terminal-menu
+- `[data-testid="mobile-compact-keyboard"]` — display — F-MOBILE-1.mobile-compact-keyboard
+- `[data-testid="mobile-input-modes"]` — display — F-MOBILE-1.mobile-input-modes
+- `[data-testid="mobile-input-compact"]` — interactive — F-MOBILE-1.mobile-input-compact
+- `[data-testid="mobile-input-hide"]` — interactive — F-MOBILE-1.mobile-input-hide
+- `[data-testid="mobile-connection-auth"]` — display — F-MOBILE-1.mobile-connection-auth
+- `[data-testid="mobile-auth-submit"]` — interactive — F-MOBILE-1.mobile-auth-submit
+- `[data-testid="mobile-auth-cancel"]` — interactive — F-MOBILE-1.mobile-auth-cancel
+- `[data-testid="mobile-auth-answer-0"]` — interactive — F-MOBILE-1.mobile-auth-answer-0
+- `[data-testid="mobile-auth-answer-1"]` — interactive — F-MOBILE-1.mobile-auth-answer-1
+- `[data-testid="mobile-type-q"]` — interactive — F-MOBILE-1.mobile-type-q
+- `[data-testid="mobile-type-c"]` — interactive — F-MOBILE-1.mobile-type-c
+- `[data-testid="mobile-type-enter"]` — interactive — F-MOBILE-1.mobile-type-enter
 
 ## mobile/feishu (F-MOBILE-2)
 

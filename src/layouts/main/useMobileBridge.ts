@@ -7,6 +7,7 @@ import { useAppStore } from "../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import type { LocalLaunchOutcome } from "../../types";
 import type { ConnectQueueOutcome } from "./types";
+import { prepareMobileSsh } from "./mobileConnectionAuth";
 
 /** Backend event `mobile-open-session` (src-tauri/src/mobile/session_open.rs). */
 interface MobileOpenRequest {
@@ -23,6 +24,7 @@ export interface MobileBridgeContext {
   openLocalTab: () => Promise<LocalLaunchOutcome>;
   /** Do not replace an authentication dialog belonging to a desktop operation. */
   authenticationBusy?: () => boolean;
+  openMobileSsh?: (session: SessionConfig, method: string, credential: string | null, requestId: string) => string;
 }
 
 /** Waits for store state, with a bounded lifetime even if the main shell unmounts. */
@@ -98,6 +100,10 @@ export function useMobileBridge(context: MobileBridgeContext) {
         const outcome = await within(contextRef.current.openLocalTab(), abort.signal);
         if (outcome.status !== "started" || !outcome.tabId) throw new Error(outcome.status === "cancelled" ? "open_cancelled" : "open_failed");
         tabId = outcome.tabId;
+      } else if (session.session_type === "SSH" && contextRef.current.openMobileSsh) {
+        const prepared = await within(prepareMobileSsh(session, request.request_id, abort.signal), abort.signal);
+        if (disposed || abort.signal.aborted) return;
+        tabId = contextRef.current.openMobileSsh(prepared.session, prepared.method, prepared.credential, request.request_id);
       } else {
         const savedId = session.id;
         const before = new Set(useAppStore.getState().tabs.map(tab => tab.id));
@@ -114,6 +120,7 @@ export function useMobileBridge(context: MobileBridgeContext) {
       const request = event.payload;
       if (disposed || !request?.request_id || !["local", "saved"].includes(request.kind)) return;
       const abort = new AbortController();
+      abort.signal.addEventListener("abort", () => { void invoke("mobile_cancel_open_session", { requestId: request.request_id }).catch(() => {}); }, { once: true });
       const deadline = Date.now() + OPEN_TIMEOUT_MS;
       const timer = window.setTimeout(() => abort.abort(), OPEN_TIMEOUT_MS);
       pending.add(abort);

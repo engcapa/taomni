@@ -1,5 +1,5 @@
 use super::active::ActiveTerminal;
-use super::authentication::build_kbd_prompter;
+use super::authentication::build_mobile_kbd_prompter;
 use super::authentication::clear_session_auth_responders;
 use super::io_commands::validate_session_id;
 use super::output::TerminalOutputChannel;
@@ -152,6 +152,7 @@ pub async fn create_ssh_terminal(
     x11_trusted: Option<bool>,
     startup_command: Option<String>,
     keep_open_after_startup_command: Option<bool>,
+    mobile_open_request_id: Option<String>,
     on_output: TerminalOutputChannel,
     state: State<'_, AppState>,
     app_handle: AppHandle,
@@ -159,6 +160,12 @@ pub async fn create_ssh_terminal(
 ) -> Result<String, String> {
     let output_generation = crate::webview_recovery::output_generation(&app_handle, window.label());
     validate_session_id(&session_id)?;
+    let mobile = crate::mobile::session_open::connection_auth::context(
+        &app_handle,
+        &window,
+        mobile_open_request_id,
+        &session_id,
+    )?;
     {
         let terminals = state.terminal.terminals.read().await;
         if terminals.contains_key(&session_id) {
@@ -258,10 +265,11 @@ pub async fn create_ssh_terminal(
     // Keyboard-interactive (MFA/OTP) prompter: bridges the SSH auth loop to
     // the frontend so a second factor can be entered mid-connect. Cleaned up
     // below once connect resolves (success or error).
-    let prompter = build_kbd_prompter(
+    let prompter = build_mobile_kbd_prompter(
         app_handle.clone(),
         state.terminal.ssh_auth_responders.clone(),
         session_id.clone(),
+        mobile.clone(),
     );
 
     // X11 forwarding: resolve the local X server + cookie if the session has
@@ -297,7 +305,7 @@ pub async fn create_ssh_terminal(
             keep_open: keep_open_after_startup_command.unwrap_or(false),
         });
 
-    let connect_result = ssh::connect_ssh(
+    let connect = ssh::connect_ssh(
         &host,
         port,
         &username,
@@ -308,8 +316,20 @@ pub async fn create_ssh_terminal(
         Some(&prompter),
         x11_forward,
         startup_command.as_ref(),
-    )
-    .await;
+    );
+    let connect_result = if let Some(mobile) = &mobile {
+        let (cancel, remaining) = mobile
+            .runtime
+            .open_requests
+            .cancellation(&mobile.request_id)?;
+        tokio::select! {
+            result = connect => result,
+            _ = cancel.cancelled() => Err("open_cancelled".into()),
+            _ = tokio::time::sleep(remaining) => Err("open_timeout".into()),
+        }
+    } else {
+        connect.await
+    };
     // Drop any responder left dangling for this session (e.g. auth failed
     // while a prompt round was still registered) so the map doesn't leak.
     clear_session_auth_responders(&state.terminal.ssh_auth_responders, &session_id);

@@ -74,6 +74,7 @@ pub fn mobile_revoke(device_id: String, state: State<'_, AppState>) -> Result<()
         .lock()
         .map_err(|_| "auth_unavailable")?
         .revoke(&device_id)?;
+    state.mobile.open_requests.cancel_pending(Some(&device_id));
     state.mobile.devices_changed.notify_waiters();
     Ok(())
 }

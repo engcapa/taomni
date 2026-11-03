@@ -78,8 +78,11 @@ export function TerminalKeybar({ disabled, modifiers, onModifiers, onSend, appCu
       onClick={() => click(def)}
     >{def.label}</button>;
   };
+  const all = KEY_ROWS.flat();
+  const primary = ["esc", "tab", "ctrl", "alt", "left", "up", "down", "right"];
+  const ordered = [...primary.map(id => all.find(def => def.id === id)!), ...all.filter(def => !primary.includes(def.id))];
   return <div className="keys" onContextMenu={e => e.preventDefault()}>
-    <div className="keybar" role="group" aria-label="终端常用键" data-testid="mobile-keybar">{KEY_ROWS.flat().map(button)}</div>
+    <div className="keybar" role="group" aria-label="终端常用键" data-testid="mobile-keybar">{ordered.map(button)}</div>
     <div className="keystrip" role="group" aria-label="组合键与符号" data-testid="mobile-keystrip">{KEY_STRIP.map(button)}</div>
   </div>;
 }

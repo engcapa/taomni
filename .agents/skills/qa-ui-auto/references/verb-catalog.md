@@ -391,7 +391,7 @@ Native only (Linux/Windows/macOS): `{folder?: INBOX, size_delta?: 0, empty_newes
 - `mail_server_sparse_sync: {configure_only: true}` disables CONDSTORE before connecting; `mail_server_sparse_sync: null` (native-only, Linux/Windows/macOS): deliver 1,100 sparse ten-digit INBOX UIDs and disconnect the next synchronization FLAGS FETCH; fake IMAP enforces a 4 KiB command limit.
 - `mail_server_assert_sync_transport: null` (native-only): require exactly one injected FLAGS disconnect, a large explicit UID flag batch and zero rejected oversized commands, independently of UI counts.
 
-### `mobile_service_probe` (native, Linux)
+### `mobile_service_probe` (native)
 
 Arguments: `desktop` or `headless`. `desktop` requires a real local PTY and the
 mobile listener/pairing code opened through Settings. It uses two external
@@ -413,6 +413,16 @@ host marker bytes. The saved request also verifies its distinct shell arguments.
 It never invokes app IPC/registry writers and leaves both tabs and the listener
 running for YAML assertions/cleanup. Failures retain the phase and network/desktop
 observations in `mobile-open-session-receipt.json`, without tokens or pairing codes.
+
+`connection-auth` (TC-MOBILE-007, Linux/Windows/macOS) uses the production phone
+bundle against the actual desktop listener and disposable loopback SSH peer.
+Enable the open-sessions checkbox and generate a pairing code first. The probe
+uses public phone controls for one-shot account/password, SSH OTP, encrypted-key
+passphrase, cancellation, failure recovery and new local PTY stdout. It checks
+another device cannot answer and compares the saved row plus independent SSH
+input/output receipts. Credentials remain disposable and are omitted from reports.
+The deterministic SSH peer is not an external shell; physical phone IME is unverified.
+The older `desktop`, `headless` and `open-session` probes remain Linux-only.
 
 `mobile_browser_probe: touch-scroll` (browser only) dispatches standard Touch DOM
 input to the rendered xterm screen, observes its accessible first-row position

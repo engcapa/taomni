@@ -13328,6 +13328,11 @@ files:
   - mobile-web/src/TerminalComposer.tsx
   - mobile-web/src/TerminalKeybar.tsx
   - mobile-web/src/terminalKeys.ts
+  - src-tauri/src/mobile/connection_auth.rs
+  - src/layouts/main/mobileConnectionAuth.ts
+  - mobile-web/src/CompactKeyboard.tsx
+  - mobile-web/src/TerminalControls.tsx
+  - mobile-web/src/ConnectionAuthForm.tsx
 controls:
   - id: mobile-add-instance
     selector: '[data-testid="mobile-add-instance"]'
@@ -13655,6 +13660,48 @@ controls:
     kind: interactive
   - id: mobile-key-squote
     selector: '[data-testid="mobile-key-squote"]'
+    kind: interactive
+  - id: mobile-terminal-more
+    selector: '[data-testid="mobile-terminal-more"]'
+    kind: interactive
+  - id: mobile-terminal-menu
+    selector: '[data-testid="mobile-terminal-menu"]'
+    kind: display
+  - id: mobile-compact-keyboard
+    selector: '[data-testid="mobile-compact-keyboard"]'
+    kind: display
+  - id: mobile-input-modes
+    selector: '[data-testid="mobile-input-modes"]'
+    kind: display
+  - id: mobile-input-compact
+    selector: '[data-testid="mobile-input-compact"]'
+    kind: interactive
+  - id: mobile-input-hide
+    selector: '[data-testid="mobile-input-hide"]'
+    kind: interactive
+  - id: mobile-connection-auth
+    selector: '[data-testid="mobile-connection-auth"]'
+    kind: display
+  - id: mobile-auth-submit
+    selector: '[data-testid="mobile-auth-submit"]'
+    kind: interactive
+  - id: mobile-auth-cancel
+    selector: '[data-testid="mobile-auth-cancel"]'
+    kind: interactive
+  - id: mobile-auth-answer-0
+    selector: '[data-testid="mobile-auth-answer-0"]'
+    kind: interactive
+  - id: mobile-auth-answer-1
+    selector: '[data-testid="mobile-auth-answer-1"]'
+    kind: interactive
+  - id: mobile-type-q
+    selector: '[data-testid="mobile-type-q"]'
+    kind: interactive
+  - id: mobile-type-c
+    selector: '[data-testid="mobile-type-c"]'
+    kind: interactive
+  - id: mobile-type-enter
+    selector: '[data-testid="mobile-type-enter"]'
     kind: interactive
 -->
 

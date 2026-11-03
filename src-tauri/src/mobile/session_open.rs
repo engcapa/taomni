@@ -21,6 +21,9 @@ use std::{
 };
 use tauri::{Emitter, Manager, State};
 
+#[path = "connection_auth.rs"]
+pub mod connection_auth;
+
 /// Event the desktop main window handles (see `useMobileBridge.ts`).
 pub const OPEN_EVENT: &str = "mobile-open-session";
 const SETTINGS_FILE: &str = "mobile-open-sessions.json";
@@ -44,6 +47,9 @@ struct Request {
     /// Once the desktop claims the request, the normal desktop connection flow
     /// owns it. Disabling future opens does not tear down an accepted connection.
     claimed: bool,
+    terminal: Option<String>,
+    auth: Option<connection_auth::PendingChallenge>,
+    cancel: tokio_util::sync::CancellationToken,
 }
 
 #[derive(Default)]
@@ -103,6 +109,8 @@ impl OpenRequests {
                 && now.duration_since(request.created) >= PENDING_TIMEOUT
             {
                 request.outcome = Outcome::Failed("open_timeout".into());
+                request.auth = None;
+                request.cancel.cancel();
             }
         }
     }
@@ -127,6 +135,9 @@ impl OpenRequests {
                 created: Instant::now(),
                 outcome: Outcome::Pending,
                 claimed: false,
+                terminal: None,
+                auth: None,
+                cancel: Default::default(),
             },
         );
         Ok(id)
@@ -146,7 +157,9 @@ impl OpenRequests {
             .filter(|r| r.device == device)
             .ok_or("open_request_not_found")?;
         Ok(match &request.outcome {
-            Outcome::Pending => json!({"request_id":id, "status":"pending"}),
+            Outcome::Pending => {
+                json!({"request_id":id, "status":"pending", "auth":request.auth.as_ref().map(|a| &a.challenge)})
+            }
             Outcome::Opened(key) => {
                 json!({"request_id":id, "status":"opened", "session_id":format!("term:{key}")})
             }
@@ -186,6 +199,10 @@ impl OpenRequests {
             Ok(key) => Outcome::Opened(key),
             Err(code) => Outcome::Failed(error_code(&code)),
         };
+        request.auth = None;
+        if matches!(request.outcome, Outcome::Failed(_)) {
+            request.cancel.cancel();
+        }
         true
     }
 }

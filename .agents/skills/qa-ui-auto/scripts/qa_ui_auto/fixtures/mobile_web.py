@@ -29,7 +29,8 @@ def setup(ctx):
     receipt.write_text('', encoding='utf-8')
     clients = []
     lock = threading.RLock()
-    state = {'paired': False, 'connection_id': 'fixture-connection', 'holder': 'none', 'seq': 0, 'event_seq': 0, 'task': 'idle', 'open': 0}
+    state = {'paired': False, 'connection_id': 'fixture-connection', 'holder': 'none', 'seq': 0, 'event_seq': 0, 'task': 'idle', 'open': 0, 'opens': {}}
+    auth_case = ctx.case_id == 'TC-MOBILE-006'
 
     def record(text):
         with lock, receipt.open('a', encoding='utf-8') as f:
@@ -79,7 +80,26 @@ def setup(ctx):
             if path == '/api/v1/open-requests':
                 record('OPEN ' + body.get('kind', '') + ' ' + str(body.get('saved_session_id') or ''))
                 state['open'] += 1
-                return self.reply(200, {'request_id': f"qa-open-{state['open']}", 'status': 'pending'})
+                request_id = f"qa-open-{state['open']}"
+                state['opens'][request_id] = {'round': 0 if auth_case and body.get('kind') == 'saved' else 2, 'cancelled': False}
+                return self.reply(200, {'request_id': request_id, 'status': 'pending'})
+            if path.startswith('/api/v1/open-requests/') and path.endswith('/auth'):
+                request_id = path.split('/')[-2]
+                opened = state['opens'][request_id]
+                round_id = opened['round']
+                if opened['cancelled'] or body.get('challenge_id') != f'{request_id}-{round_id}':
+                    return self.reply(409, {'error': 'already_resolved'})
+                expected = ['phone-user', 'qa-temp-secret'] if round_id == 0 else ['123456']
+                if body.get('responses') != expected:
+                    return self.reply(400, {'error': 'invalid_auth_response'})
+                opened['round'] += 1
+                record('AUTH ' + ('login' if round_id == 0 else 'otp'))
+                return self.reply(200, {'status': 'accepted'})
+            if path.startswith('/api/v1/open-requests/') and path.endswith('/cancel'):
+                request_id = path.split('/')[-2]
+                state['opens'][request_id]['cancelled'] = True
+                record('CANCEL ' + request_id)
+                return self.reply(200, {'status': 'cancelled'})
             if path.endswith('/message'):
                 record('AGENT ' + body.get('text', ''))
                 state['task'] = 'running'
@@ -104,8 +124,15 @@ def setup(ctx):
                 return self.reply(200, {'sessions': [terminal, task], 'saved_sessions': [{'id': 'saved', 'name': 'Build host', 'session_type': 'SSH', 'group_path': 'QA'}],
                                         'capabilities': {'open_sessions': True}})
             if path.startswith('/api/v1/open-requests/'):
-                # The desktop answers on the first poll in this peer.
-                return self.reply(200, {'request_id': path.rsplit('/', 1)[1], 'status': 'opened', 'session_id': 'term:qa-opened'})
+                request_id = path.rsplit('/', 1)[1]
+                opened = state['opens'][request_id]
+                if opened['cancelled']:
+                    return self.reply(200, {'request_id': request_id, 'status': 'failed', 'error': 'open_cancelled'})
+                if opened['round'] < 2:
+                    round_id = opened['round']
+                    prompts = [{'prompt': '用户名', 'echo': True, 'initial': 'developer'}, {'prompt': '密码', 'echo': False}] if round_id == 0 else [{'prompt': '一次性验证码', 'echo': False}]
+                    return self.reply(200, {'request_id': request_id, 'status': 'pending', 'auth': {'id': f'{request_id}-{round_id}', 'name': '登录账户' if round_id == 0 else 'SSH 验证码', 'instructions': '仅本次连接使用', 'prompts': prompts}})
+                return self.reply(200, {'request_id': request_id, 'status': 'opened', 'session_id': 'term:qa-opened'})
             if path.startswith('/api/v1/sessions/'):
                 return self.reply(200, {**task, 'confirmations': []})
             if path.endswith('/changes'):

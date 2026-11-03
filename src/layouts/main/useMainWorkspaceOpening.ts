@@ -198,6 +198,7 @@ export function useMainWorkspaceOpening(context: UseMainWorkspaceOpeningContext)
     openQueuedSession,
     openLocalTab: sessionActions.openLocalTab,
     authenticationBusy: () => layout.awaitingManualAuthRef.current || layout.awaitingVaultUnlockRef.current,
+    openMobileSsh: openSshTab,
   });
   return {
     continueConnectQueue,

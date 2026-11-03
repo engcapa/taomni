@@ -6,7 +6,9 @@ import { ApiError, encoded, errorText, type Instance, type Session } from "./api
 import { useLive, type Frame } from "./live";
 import { TerminalComposer } from "./TerminalComposer";
 import { TerminalKeybar } from "./TerminalKeybar";
-import { FONT_MAX, FONT_MIN, MONO_FONT, clampFontSize, loadFontSize, loadFullscreen, loadKeysOpen, pinTerminal, saveFontSize, saveFullscreen, saveKeysOpen } from "./terminalDisplay";
+import { CompactKeyboard } from "./CompactKeyboard";
+import { TerminalInputMode, TerminalMore } from "./TerminalControls";
+import { FONT_MAX, FONT_MIN, MONO_FONT, clampFontSize, loadFontSize, loadFullscreen, loadInputMode, loadKeysOpen, pinTerminal, saveFontSize, saveFullscreen, saveInputMode, saveKeysOpen, type InputMode } from "./terminalDisplay";
 import { NO_MODIFIERS, applyTypedModifiers, encodeBase64, pastePayload, type Modifiers } from "./terminalKeys";
 import { attachTouchGestures } from "./terminalTouch";
 
@@ -33,6 +35,7 @@ export function TerminalView({ instance, session, onBack }: { instance: Instance
   const [fullscreen, setFullscreen] = useState(loadFullscreen);
   const [scrolledUp, setScrolledUp] = useState(false);
   const [keysOpen, setKeysOpen] = useState(loadKeysOpen);
+  const [inputMode, setInputMode] = useState(loadInputMode);
   const controlling = holder === `mobile:${instance.deviceId}` && ownerConnection === connection && status === "已连接" && !exited;
   const controlRef = useRef(false); controlRef.current = controlling;
   const modifiersRef = useRef(modifiers); modifiersRef.current = modifiers;
@@ -60,6 +63,9 @@ export function TerminalView({ instance, session, onBack }: { instance: Instance
     const term = new Terminal({ fontSize, fontFamily: MONO_FONT, cursorBlink: false, scrollback: 1000, screenReaderMode: true, theme: { background: "#09121f", foreground: "#dce8f5" } });
     const fitter = new FitAddon(); term.loadAddon(fitter); term.open(element);
     terminal.current = term; fit.current = fitter;
+    // Tapping output must never summon the large system keyboard. The explicit
+    // system-input action focuses a real IME field instead.
+    if (term.textarea) term.textarea.inputMode = "none";
     const layout = () => { pinTerminal(box, element, fullscreenRef.current); fitter.fit(); };
     relayout.current = layout;
     layout();
@@ -127,6 +133,7 @@ export function TerminalView({ instance, session, onBack }: { instance: Instance
     relayout.current();
   }, [fontSize]);
   useEffect(() => saveKeysOpen(keysOpen), [keysOpen]);
+  useEffect(() => saveInputMode(inputMode), [inputMode]);
   useLayoutEffect(() => {
     saveFullscreen(fullscreen);
     document.documentElement.classList.toggle("terminal-fullscreen", fullscreen);
@@ -147,10 +154,11 @@ export function TerminalView({ instance, session, onBack }: { instance: Instance
     if (ok) terminal.current?.scrollToBottom();
     return ok;
   };
-  const toggleKeyboard = () => {
-    const term = terminal.current;
-    if (!term) return;
-    if (term.textarea && document.activeElement === term.textarea) term.blur(); else term.focus();
+  const changeInputMode = (mode: InputMode) => {
+    terminal.current?.blur();
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    setPanelOpen(false);
+    setInputMode(mode);
   };
   const command = (frame: Frame) => { if (!send(frame)) setNotice("连接已断开，操作未发送。"); };
   // Full-screen TUIs (Codex, Claude Code) paint at the PTY geometry, so a read-only
@@ -170,32 +178,35 @@ export function TerminalView({ instance, session, onBack }: { instance: Instance
   }, [controlling]);
   const badge = exited ? "已退出" : controlling ? "控制中" : holder !== "none" ? "只读 · 他处已接管" : "只读";
   return <section ref={card} className={`card terminal-card${fullscreen ? " fullscreen" : ""}`} data-testid="mobile-terminal">
-    <div className="section-heading">
-      {fullscreen && onBack && <button className="terminal-back" data-testid="mobile-terminal-back" aria-label="返回会话列表" onClick={onBack}>‹</button>}
-      <div className="terminal-title"><p className="eyebrow">LIVE TERMINAL</p><h2>{session.title || "终端输出"}</h2></div>
+    <div className="section-heading terminal-heading">
+      {onBack && <button className="terminal-back" data-testid="mobile-terminal-back" aria-label="返回会话列表" onClick={onBack}>‹</button>}
+      <h2 className="terminal-title" title={session.title}>{session.title || "终端输出"}</h2>
       <div className="terminal-tools">
-        <span className="badge" data-testid="mobile-terminal-status">{badge} · {status}</span>
-        <button data-testid="mobile-terminal-font-down" aria-label="缩小字号" title="缩小字号" disabled={fontSize <= FONT_MIN} onMouseDown={keepFocus} onClick={() => setFontSize(v => clampFontSize(v - 1))}>A−</button>
-        <button data-testid="mobile-terminal-font-up" aria-label="放大字号" title="放大字号" disabled={fontSize >= FONT_MAX} onMouseDown={keepFocus} onClick={() => setFontSize(v => clampFontSize(v + 1))}>A+</button>
-        <button data-testid="mobile-terminal-keys" aria-pressed={keysOpen} aria-label={keysOpen ? "收起按键" : "显示按键"} onMouseDown={keepFocus} onClick={() => setKeysOpen(v => !v)}>按键</button>
-        <button data-testid="mobile-terminal-fullscreen" aria-pressed={fullscreen} aria-label={fullscreen ? "退出全屏" : "全屏"} onMouseDown={keepFocus} onClick={() => setFullscreen(v => !v)}>{fullscreen ? "退出" : "全屏"}</button>
+        <span className="badge" data-testid="mobile-terminal-status" title={status}>{badge}{status !== "已连接" && ` · ${status}`}</span>
+        <button className={controlling ? undefined : "primary"} data-testid="mobile-take-control" disabled={exited || status !== "已连接"} onMouseDown={keepFocus} onClick={() => { setNotice(""); command({ type: controlling ? "release-control" : "take-control" }); }}>{controlling ? "释放" : "接管输入"}</button>
+        <TerminalMore>
+          <div className="actions">
+            <button data-testid="mobile-terminal-font-down" aria-label="缩小字号" disabled={fontSize <= FONT_MIN} onMouseDown={keepFocus} onClick={() => setFontSize(v => clampFontSize(v - 1))}>A−</button>
+            <small>字号 {fontSize}</small>
+            <button data-testid="mobile-terminal-font-up" aria-label="放大字号" disabled={fontSize >= FONT_MAX} onMouseDown={keepFocus} onClick={() => setFontSize(v => clampFontSize(v + 1))}>A+</button>
+          </div>
+          <button data-testid="mobile-terminal-keys" aria-pressed={keysOpen} onMouseDown={keepFocus} onClick={() => setKeysOpen(v => !v)}>{keysOpen ? "收起快捷键" : "显示快捷键"}</button>
+          <button data-testid="mobile-terminal-fullscreen" aria-pressed={fullscreen} onMouseDown={keepFocus} onClick={() => setFullscreen(v => !v)}>{fullscreen ? "退出全屏" : "全屏"}</button>
+          <button data-testid="mobile-paste" aria-pressed={panelOpen} disabled={!controlling} onClick={() => { setInputMode("system"); setPanelOpen(v => !v); }}>多行 / 历史</button>
+          <button data-testid="mobile-resize" disabled={!controlling} onClick={() => { fit.current?.fit(); if (terminal.current) command({ type: "resize", cols: terminal.current.cols, rows: terminal.current.rows }); }}>适配尺寸</button>
+          <p className="note">拖动输出查看历史，双指缩放调整字号。接管后按手机尺寸重排，桌面输入可随时抢回。</p>
+          {desktopActivity && <p className="note">桌面最近活动：{new Date(desktopActivity * 1000).toLocaleTimeString()}</p>}
+        </TerminalMore>
       </div>
     </div>
-    <p className="note terminal-intro">在终端上下拖动可滚动历史，双指缩放调整字号。只读视图沿用桌面终端尺寸，全屏程序在窄屏会被折行；接管输入后自动按手机宽度重排，桌面一旦输入即恢复。</p>
     <div className="terminal-frame">
       <div ref={host} className="terminal" data-testid="mobile-terminal-screen" />
       {scrolledUp && <button className="scroll-latest" data-testid="mobile-terminal-latest" onMouseDown={keepFocus} onClick={() => terminal.current?.scrollToBottom()}>↓ 最新</button>}
     </div>
     {notice && <p role="status" className="terminal-notice" data-testid="mobile-terminal-notice">{notice}</p>}
-    <TerminalComposer disabled={!controlling} panelOpen={panelOpen} onSend={sendText} onNotice={setNotice} keyHandler={draftKeyHandler} />
+    <TerminalComposer disabled={!controlling} systemKeyboard={inputMode === "system"} panelOpen={panelOpen} onSend={sendText} onNotice={setNotice} keyHandler={draftKeyHandler} />
     {keysOpen && <TerminalKeybar disabled={!controlling} modifiers={modifiers} onModifiers={setModifiers} onSend={data => { if (!draftKeyHandler.current?.(data)) input(data); }} appCursor={() => terminal.current?.modes.applicationCursorKeysMode ?? false} />}
-    <div className="actions terminal-actions">
-      <button className="primary" data-testid="mobile-take-control" disabled={exited || status !== "已连接"} onClick={() => { setNotice(""); command({ type: controlling ? "release-control" : "take-control" }); }}>{controlling ? "释放输入" : "接管输入"}</button>
-      <button data-testid="mobile-terminal-keyboard" disabled={!controlling} onMouseDown={keepFocus} onClick={toggleKeyboard}>键盘</button>
-      <button data-testid="mobile-paste" aria-pressed={panelOpen} disabled={!controlling} onClick={() => setPanelOpen(v => !v)}>多行 / 历史</button>
-      <button data-testid="mobile-resize" disabled={!controlling} onClick={() => { fit.current?.fit(); if (terminal.current) command({ type: "resize", cols: terminal.current.cols, rows: terminal.current.rows }); }}>适配尺寸</button>
-    </div>
-    {desktopActivity && <p className="note terminal-meta">桌面最近活动：{new Date(desktopActivity * 1000).toLocaleTimeString()}；接管后桌面随时可抢回。</p>}
-    <small className="muted terminal-meta">输入通道：PTY · 字号 {fontSize}</small>
+    {inputMode === "compact" && controlling && <CompactKeyboard disabled={!controlling} modifiers={modifiers} onSend={data => { if (input(data)) setModifiers(NO_MODIFIERS); }} />}
+    <TerminalInputMode mode={inputMode} disabled={!controlling} onChange={changeInputMode} />
   </section>;
 }

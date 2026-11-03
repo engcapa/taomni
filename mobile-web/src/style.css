@@ -72,72 +72,57 @@ textarea { min-height: 110px; resize: vertical; }
 .heading-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .open-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; font-size: 13px; }
 .open-status p { margin: 0; }
-/* vh is the fallback for engines that drop dvh: a container left content-sized
-   makes xterm's fit addon grow it one row per observation (seen on a phone). */
-.terminal-frame > .terminal { height: 48vh; height: 48dvh; min-height: 230px; background: #09121f; border-radius: 8px; overflow: hidden; }
-/* Two fixed rows of eight so ↑ sits above ↓ (inverted-T arrows). */
-.keybar { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 5px; padding: 8px 0; }
-.keybar button { min-width: 0; min-height: 40px; padding: 6px 2px; font-size: 12px; white-space: nowrap; overflow: hidden; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-.keybar button[aria-pressed="true"] { color: #082b28; background: #65e2c8; border-color: #65e2c8; font-weight: 650; }
-/* Row of shell combos and hard-to-reach symbols; swipes sideways. */
-.keystrip { display: flex; gap: 5px; overflow-x: auto; padding: 0 0 8px; scrollbar-width: none; overscroll-behavior-x: contain; }
-.keystrip::-webkit-scrollbar { display: none; }
-.keystrip button { flex: 0 0 auto; min-width: 42px; min-height: 38px; padding: 6px 9px; font-size: 13px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-/* Drags on the terminal scroll its history (terminalTouch.ts), not the page. */
+/* Every input mode keeps a bounded output box; fullscreen follows visualViewport. */
+[hidden] { display: none !important; }
+.terminal-card { position: relative; }
+.terminal-card .terminal-heading { margin: 0 0 6px; flex-wrap: nowrap; gap: 6px; }
+.terminal-heading .terminal-title { display: block; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.terminal-tools { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.terminal-tools button, .terminal-back { min-height: 36px; padding: 6px 9px; font-size: 12px; }
 .terminal-frame { position: relative; }
-.terminal-frame .terminal { touch-action: none; }
-.scroll-latest { position: absolute; right: 10px; bottom: 10px; z-index: 5; min-height: 34px; padding: 5px 12px; font-size: 12px; border-radius: 17px; color: #082b28; background: #65e2c8e6; border-color: #65e2c8; box-shadow: 0 4px 14px #0008; }
-.command-bar { display: flex; gap: 8px; margin: 10px 0 0; }
-/* 16px or more: iOS Safari zooms the page when a smaller field takes focus. */
-.command-bar input { margin: 0; flex: 1; min-width: 0; padding: 10px 12px; font: 16px/1.3 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
-/* Global form min-height must never enlarge xterm's invisible IME textarea. */
+.terminal-frame > .terminal { height: 48vh; height: 48dvh; min-height: 200px; background: #09121f; border-radius: 6px; overflow: hidden; touch-action: none; }
 .terminal .xterm-helper-textarea { font-size: 16px !important; min-height: 0; }
 .terminal .xterm-accessibility { overflow: hidden; }
-.command-bar button { flex-shrink: 0; }
-.paste-panel label { margin-top: 10px; }
-.terminal-back { min-height: 34px; padding: 5px 10px; font-size: 12px; }
-.terminal-tools { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-.terminal-tools button { min-height: 34px; padding: 5px 10px; font-size: 12px; }
-.terminal-tools button[aria-pressed="true"] { border-color: #65e2c8; color: #65e2c8; }
-.terminal-actions { margin: 12px 0 4px; gap: 8px; }
-.terminal-notice { margin: 8px 0 0; font-size: 13px; color: #e3c981; }
-/* Full screen: the card covers the visual viewport (top/max-height are set from
-   visualViewport in terminalDisplay.ts) so the key bar stays above the soft keyboard. */
+.scroll-latest { position: absolute; right: 10px; bottom: 10px; z-index: 5; min-height: 34px; padding: 5px 12px; font-size: 12px; border-radius: 17px; color: #082b28; background: #65e2c8e6; border-color: #65e2c8; }
+/* One horizontally scrollable row preserves every existing terminal key. */
+.keys { display: flex; gap: 4px; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; padding: 5px 0 0; flex-shrink: 0; }
+.keybar, .keystrip { display: flex; gap: 4px; }
+.keys::-webkit-scrollbar { display: none; }
+.keys button { min-width: 38px; min-height: 36px; padding: 5px 7px; font-size: 12px; white-space: nowrap; flex-shrink: 0; }
+.keys button, .compact-keyboard button { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+button[aria-pressed="true"] { border-color: #65e2c8; color: #65e2c8; }
+.keys button[aria-pressed="true"] { background: #65e2c8; color: #082b28; }
+.compact-keyboard { display: grid; gap: 4px; padding-top: 5px; }
+.typing-row { display: flex; justify-content: center; gap: 4px; }
+.typing-row button { flex: 1 1 0; min-width: 0; min-height: 34px; padding: 5px 0; font: 14px ui-monospace, monospace; border-radius: 5px; }
+.typing-row:nth-child(2) { padding: 0 12px; }
+.typing-row .space-key { flex-grow: 4; }
+.input-modes { display: flex; gap: 5px; padding-top: 5px; }
+.input-modes button { min-height: 34px; padding: 5px 9px; font-size: 12px; }
+.input-modes button:last-child { margin-left: auto; }
+.command-bar { display: flex; gap: 6px; margin: 5px 0 0; }
+.command-bar input { margin: 0; flex: 1; min-width: 0; padding: 8px 10px; font: 16px/1.3 ui-monospace, monospace; }
+.command-bar button { flex-shrink: 0; min-height: 36px; padding: 6px 10px; }
+.terminal-notice { margin: 5px 0 0; font-size: 12px; color: #e3c981; max-height: 3.5em; overflow-y: auto; }
+.terminal-more { position: relative; }
+.terminal-menu { position: absolute; top: calc(100% + 6px); right: 0; width: min(280px, 85vw); max-height: 65vh; max-height: 65dvh; overflow-y: auto; z-index: 40; padding: 10px; border: 1px solid #405470; border-radius: 10px; background: #152238; box-shadow: 0 8px 30px #0008; }
+.terminal-menu > button { display: block; width: 100%; margin-bottom: 6px; text-align: left; }
+.terminal-menu .actions { align-items: center; margin: 0 0 8px; }
+.terminal-menu .note { white-space: normal; margin: 8px 0; }
+.paste-panel { overflow-y: auto; max-height: 35vh; max-height: 35dvh; }
+.paste-panel label { margin-top: 6px; }
+.paste-panel textarea { min-height: 70px; }
+.paste-panel .actions { margin: 6px 0; gap: 5px; }
+.paste-panel button { min-height: 34px; padding: 5px 8px; font-size: 12px; }
 html.terminal-fullscreen, html.terminal-fullscreen body { overflow: hidden; overscroll-behavior: none; }
-.terminal-card.fullscreen { position: fixed; top: 0; left: 0; right: 0; z-index: 30; display: flex; flex-direction: column; margin: 0; border: 0; border-radius: 0; overflow-y: auto; overscroll-behavior: contain; padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
+.terminal-card.fullscreen { position: fixed; top: 0; left: 0; right: 0; z-index: 30; display: flex; flex-direction: column; margin: 0; border: 0; border-radius: 0; overflow-y: auto; overscroll-behavior: contain; padding: max(5px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right)) max(5px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left)); }
 .terminal-card.fullscreen > * { flex-shrink: 0; }
 .terminal-card.fullscreen .terminal-frame { flex: 1 1 0; min-height: 100px; }
-.terminal-card.fullscreen .paste-panel { flex-shrink: 1; min-height: 0; max-height: 35%; overflow-y: auto; }
-.terminal-card.fullscreen[data-compact="true"] .keystrip { display: none; }
-/* Soft keyboard / short landscape viewport: a single scrollable row leaves
-   room for output. Navigation and modifiers are the first visible targets. */
-.terminal-card.fullscreen[data-compact="true"] .keybar { display: flex; overflow-x: auto; }
-.terminal-card.fullscreen[data-compact="true"] .keybar button { flex: 0 0 42px; }
-.terminal-card.fullscreen[data-compact="true"] [data-testid="mobile-key-left"],
-.terminal-card.fullscreen[data-compact="true"] [data-testid="mobile-key-up"],
-.terminal-card.fullscreen[data-compact="true"] [data-testid="mobile-key-down"],
-.terminal-card.fullscreen[data-compact="true"] [data-testid="mobile-key-right"] { order: -3; }
-.terminal-card.fullscreen[data-compact="true"] .modifier { order: -2; }
-.terminal-card.fullscreen .terminal-title, .terminal-card.fullscreen .terminal-intro, .terminal-card.fullscreen .terminal-meta { display: none; }
-.terminal-card.fullscreen .section-heading { margin: 0 0 6px; flex-wrap: nowrap; }
-.terminal-card.fullscreen .terminal-tools { margin-left: auto; min-width: 0; }
-.terminal-card.fullscreen .terminal-back { flex-shrink: 0; }
-/* The inline min-height would push the key bar off a landscape screen. */
 .terminal-card.fullscreen .terminal-frame > .terminal { min-height: 0; }
-.terminal-card.fullscreen .command-bar { margin-top: 6px; }
-.terminal-card.fullscreen .command-bar input { padding: 8px 10px; }
-.terminal-card.fullscreen .terminal-actions { margin: 6px 0 0; }
-.terminal-card.fullscreen .terminal-actions button { min-height: 36px; padding: 6px 10px; font-size: 12px; }
-.terminal-card.fullscreen .keybar { padding: 6px 0 0; }
-/* Landscape / tablet full screen: one row of 16 saves a row of height; the
-   arrows stay together as ← ↑ ↓ → at the end of the row. */
-@media (min-width: 640px) {
-  .terminal-card.fullscreen .keybar { grid-template-columns: repeat(16, minmax(0, 1fr)); }
-  .terminal-card.fullscreen [data-testid="mobile-key-left"] { order: 1; }
-  .terminal-card.fullscreen [data-testid="mobile-key-up"] { order: 2; }
-  .terminal-card.fullscreen [data-testid="mobile-key-down"] { order: 3; }
-  .terminal-card.fullscreen [data-testid="mobile-key-right"] { order: 4; }
-  .terminal-card.fullscreen [data-testid="mobile-key-pgdn"] { order: 5; }
+.terminal-card.fullscreen .paste-panel { flex-shrink: 1; min-height: 0; }
+@media (max-height: 480px) and (min-width: 640px) {
+  .compact-keyboard { grid-template-columns: 1fr 1fr; }
+  .typing-row:nth-child(2) { padding: 0; }
 }
 .history { display: block; width: 100%; text-align: left; margin: 6px 0; overflow-wrap: anywhere; }
 .back { margin-top: 20px; }
