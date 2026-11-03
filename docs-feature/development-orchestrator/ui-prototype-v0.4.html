@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Taomni 开发编排 · v0.4 交互线框</title>
+<style>
+:root{font-family:Inter,"Noto Sans CJK SC","Microsoft YaHei",sans-serif;color:#253247;background:#edf0f4;font-size:14px;line-height:1.5;--muted:#657184;--line:#d9dfe8;--accent:#21665e;--soft:#edf6f3;--warn:#85552d}
+*{box-sizing:border-box}body{margin:0}button,input,select,textarea{font:inherit}button{cursor:pointer;border:1px solid var(--line);border-radius:6px;background:white;color:inherit;padding:7px 12px}button:hover:not(:disabled){background:#f1f4f7}button:disabled{opacity:.48;cursor:not-allowed}button.primary{background:var(--accent);color:white;border-color:var(--accent)}button.primary:hover{background:#174e48}button.danger{color:#943c3c}button.small{padding:4px 9px;font-size:12px}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #729cba;outline-offset:2px}input[type=text],select,textarea{border:1px solid #c8d1dc;border-radius:5px;padding:8px 10px;background:white;color:inherit;max-width:100%}textarea{width:100%;resize:vertical;min-height:78px}input[type=checkbox]{accent-color:var(--accent)}[hidden]{display:none!important}.muted{color:var(--muted)}.tiny{font-size:12px}.mono{font-family:"SFMono-Regular",Consolas,monospace;font-size:12px}.tag{display:inline-block;border:1px solid #d4ddd9;color:#31594f;background:var(--soft);padding:2px 7px;border-radius:4px;font-size:11px}.warn-tag{color:var(--warn);background:#fff4e7;border-color:#ead7bf}.draft{color:#58657b;background:#f3f5f8;border-color:#d6dde6}h1,h2,h3,p{margin:0}h1{font-size:21px;letter-spacing:-.3px}h2{font-size:15px}h3{font-size:13px}.window{max-width:1480px;margin:18px auto;border:1px solid #cbd3df;border-radius:10px;overflow:hidden;background:white;box-shadow:0 10px 36px #28364b0d}.titlebar{display:flex;align-items:center;gap:13px;background:#f8f9fb;border-bottom:1px solid var(--line);height:41px;padding:0 16px}.dots{display:flex;gap:5px}.dots i{width:9px;height:9px;border:1px solid #b9c3d0;border-radius:50%;display:block}.titlebar strong{font-size:12px}.spacer{flex:1}.review-banner{padding:9px 18px;background:#f4f6f9;border-bottom:1px solid var(--line);font-size:12px;color:#4e5d73;display:flex;gap:16px;align-items:center}.shell{display:flex;min-height:827px}.rail{width:52px;border-right:1px solid var(--line);background:#f9fafb;display:flex;align-items:center;flex-direction:column;gap:14px;padding:19px 0}.rail span{display:grid;place-items:center;width:31px;height:31px;border:1px solid #d9dfe7;border-radius:7px;color:#718096;font-size:11px}.rail span.active{background:#eaf2ef;border-color:#97b7ad;color:#24584d}.sidebar{width:211px;padding:20px 13px;border-right:1px solid var(--line);background:#fcfcfd}.sidebar .brand{font-size:14px;font-weight:650;margin:0 7px 19px}.nav{width:100%;display:flex;align-items:center;text-align:left;gap:9px;border:0;margin:5px 0;padding:9px 10px;background:none;color:#526075}.nav.active{background:#eaf1ef;color:#255e53}.nav span{margin-left:auto;font-size:11px}.side-label{font-size:11px;color:#748194;letter-spacing:.8px;margin:27px 9px 8px}.project{margin:6px 8px;font-size:12px}.project b{display:block;font-weight:500}.sidebar .note{border:1px solid var(--line);border-radius:6px;padding:10px;margin:29px 5px 0;font-size:11px;color:#68758a}.main{flex:1;min-width:0;padding:25px 27px 20px}.heading{display:flex;align-items:start;gap:14px;margin-bottom:21px}.heading p{margin-top:4px;font-size:12px;color:var(--muted)}.actions{display:flex;gap:8px}.steps{display:flex;gap:20px;font-size:12px;color:#758196;margin:0 0 19px}.steps .current{color:var(--accent);font-weight:600}.columns{display:grid;grid-template-columns:minmax(0,1fr) 292px;gap:19px}.panel{border:1px solid var(--line);border-radius:7px;margin-bottom:15px;overflow:hidden}.panel-head{padding:12px 15px;border-bottom:1px solid #e4e8ee;display:flex;align-items:center;gap:9px;background:#fdfefe}.panel-body{padding:14px 15px}.field{margin-bottom:13px}.field label{display:block;font-size:12px;font-weight:600;margin-bottom:5px}.inline{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.field select{width:100%}.task-row{display:flex;gap:9px;padding:9px 0;border-bottom:1px solid #edf0f4;align-items:start}.task-row:last-child{border-bottom:0}.task-row .tag{margin-left:auto;white-space:nowrap}.task-row label{font-size:12px}.source-row{display:flex;gap:8px;align-items:center;font-size:12px;margin-bottom:9px}.source-row b{font-weight:500}.source-row button{margin-left:auto}.kv{display:flex;gap:12px;justify-content:space-between;margin:9px 0;font-size:12px}.kv strong{font-weight:600;text-align:right}.callbox{padding:12px;border:1px solid #cbded7;background:#f5faf8;border-radius:6px;margin-bottom:12px}.callbox strong{display:block;font-size:14px;color:#24594e}.callbox p{font-size:11px;color:#59746b;margin-top:5px}.notice{font-size:12px;padding:10px 12px;border-left:3px solid #c29865;background:#fcf7f0;color:#775535;margin:12px 0}.foot{border-top:1px solid var(--line);margin-top:19px;padding-top:14px;display:flex;gap:12px;align-items:center;font-size:11px;color:var(--muted)}.tabs{display:flex;gap:18px;border-bottom:1px solid var(--line);margin-bottom:14px;font-size:12px}.tabs span{padding:0 0 9px;color:#718096}.tabs .active{color:var(--accent);border-bottom:2px solid var(--accent)}.run-columns{display:grid;grid-template-columns:276px minmax(0,1fr);gap:18px}.run-card{padding:13px;margin-bottom:10px;border:1px solid var(--line);border-radius:6px;font-size:12px;background:#fff}.run-card.selected{border-color:#81aa9c;background:#f4f9f7}.run-card h3{margin-bottom:7px}.run-card p{font-size:11px;color:var(--muted);margin:5px 0}.run-card .tag{margin-top:3px}.table{width:100%;border-collapse:collapse;font-size:12px}.table th,.table td{text-align:left;padding:10px 11px;border-bottom:1px solid #e7ebf0;vertical-align:top}.table th{font-size:11px;color:#68758a;font-weight:500;background:#f8f9fb}.table tr:last-child td{border-bottom:0}.table td small{display:block;font-size:11px;color:var(--muted);margin-top:2px}.log{font-size:11px;line-height:1.9;color:#58677c}.log b{font-weight:500;color:#2d465d}.artifact{background:#f9fafb;border:1px solid #e0e5ec;padding:12px;border-radius:5px;font-size:12px}.artifact pre{white-space:pre-wrap;margin:9px 0 0;font:11px/1.7 Consolas,monospace;color:#617089}.statusline{font-size:11px;color:var(--muted);padding:7px 16px;border-top:1px solid var(--line);background:#fbfcfd}.toast{position:fixed;bottom:22px;right:25px;max-width:450px;padding:12px 17px;border:1px solid #aac0b7;border-radius:7px;background:#f4faf7;box-shadow:0 6px 25px #24344720;z-index:5;font-size:13px}dialog{border:1px solid #c9d2df;border-radius:9px;padding:23px;max-width:600px;width:calc(100% - 32px);color:inherit;box-shadow:0 22px 90px #182a3c30}dialog::backdrop{background:#24304455}dialog h2{font-size:18px;margin-bottom:10px}dialog p{font-size:13px;color:#617087;margin-bottom:12px}dialog .actions{justify-content:flex-end;margin-top:20px}dialog pre{max-height:320px;overflow:auto;white-space:pre-wrap;font-size:12px;background:#f5f7fa;padding:13px;border-radius:5px}.checkline{font-size:12px;margin-top:13px;display:flex;gap:7px}.draft-footer{max-width:1480px;margin:12px auto 24px;color:#657184;font-size:12px;padding:0 8px}.source-check{width:14px;height:14px}a{color:#27665c}
+@media(max-width:1100px){.sidebar{width:176px}.main{padding:20px 18px}.columns{grid-template-columns:minmax(0,1fr) 250px}.run-columns{grid-template-columns:220px minmax(0,1fr)}}@media(max-width:850px){.window{margin:0;border-radius:0}.sidebar{display:none}.columns,.run-columns{grid-template-columns:1fr}.main{padding:18px 13px}.rail{width:42px}.heading{flex-wrap:wrap}.review-banner{flex-wrap:wrap;gap:3px}.foot{flex-wrap:wrap}.table{font-size:11px}.draft-footer{padding:0 13px}}
+</style>
+</head>
+<body>
+<div class="window">
+  <header class="titlebar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><strong>Taomni / Workspaces / Agents · Crew</strong><span class="spacer"></span><span class="tiny muted">设计原型 · 不连接服务</span><button id="exit" class="small">退出应用场景</button></header>
+  <div class="review-banner"><strong>v0.4 低保真交互稿 · 待评审</strong><span>所有资料、用量与结果均为固定演示；不调用模型、不读写仓库、不保存凭据。</span></div>
+  <div class="shell">
+    <aside class="rail" aria-label="现有导航示意"><span>⌂</span><span>WS</span><span>SSH</span><span class="active">AI</span><span>⋯</span></aside>
+    <aside class="sidebar">
+      <div class="brand">开发编排</div>
+      <button class="nav active" id="nav-create">＋ 新建 API / 合包</button>
+      <button class="nav" id="nav-runs">▤ 运行与计划 <span>2</span></button>
+      <button class="nav" id="nav-profile">⚙ 执行配置 <span>示意</span></button>
+      <div class="side-label">当前项目</div><div class="project"><b>taomni</b><span class="mono muted">main @ 3fb5b06d9</span></div>
+      <div class="side-label">后续阶段</div><button class="nav" disabled>跨 agent 交接 <span>P1B</span></button><button class="nav" disabled>记忆 / 语义决策 <span>P2</span></button>
+      <div class="note">离开视图不停止任务。<br>退出宿主需先确认停止。<br>不包含驻留 daemon。</div>
+    </aside>
+    <main class="main">
+      <section id="create-view" aria-label="API合包创建">
+        <div class="heading"><div><h1>一次准备，分项交付</h1><p>选择已批准任务和背景，先预览，再确认一次请求。</p></div><span class="spacer"></span><span class="tag draft">用户显式合包 · 无自动扩项</span></div>
+        <div class="steps"><span>① 任务与执行配置</span><span class="current">② 上下文与预算预览</span><span>③ 确认后执行</span></div>
+        <div class="columns">
+          <div>
+            <div class="panel"><div class="panel-head"><h2>任务包</h2><span class="spacer"></span><select id="pack-kind" aria-label="任务包类型"><option>联合设计包</option><option>静态审阅包</option><option>≤3 文件 patch 包（演示）</option></select></div><div class="panel-body">
+              <div class="field"><label for="goal">目标</label><textarea id="goal">为项目设置增加新选项：统一字段、IPC、错误语义与测试计划。不修改代码，不改变已批准验收。</textarea></div>
+              <div class="task-row"><input type="checkbox" checked disabled aria-label="任务A已选择"><label>A · 架构与状态边界<br><span class="muted tiny">输入：现状实现、适用规范</span></label><span class="tag draft">候选设计</span></div>
+              <div class="task-row"><input type="checkbox" checked disabled aria-label="任务B已选择"><label>B · IPC 与兼容契约<br><span class="muted tiny">输出需引用 A 的共享决策</span></label><span class="tag draft">同一发布组</span></div>
+              <div class="task-row"><input type="checkbox" checked disabled aria-label="任务C已选择"><label>C · 验收与测试计划<br><span class="muted tiny">生成计划，不代表实际测试通过</span></label><span class="tag draft">不可伪造 PASS</span></div>
+            </div></div>
+            <div class="panel"><div class="panel-head"><h2>上下文清单</h2><span class="tag draft">固定快照 · 演示</span><span class="spacer"></span><button id="preview" class="small">查看实际发送正文</button></div><div class="panel-body">
+              <div class="source-row"><input class="source-check" type="checkbox" checked disabled aria-label="AGENTS必需"><b>AGENTS.md</b><span class="muted">适用规范 · 必需</span><span class="spacer"></span><span class="mono muted">src-01</span></div>
+              <div class="source-row"><input class="source-check" type="checkbox" checked disabled aria-label="设计任务必需"><b>design / task / AC</b><span class="muted">目标与边界 · 必需</span><span class="spacer"></span><span class="mono muted">src-02</span></div>
+              <div class="source-row"><input class="source-check" type="checkbox" checked disabled aria-label="代码背景必需"><b>相关实现、调用方与测试</b><span class="spacer"></span><span class="mono muted">src-03…08</span></div>
+              <div class="source-row"><input id="optional" class="source-check" type="checkbox" checked><label for="optional">附加：已批准历史设计片段</label><span class="spacer"></span><span class="mono muted">src-09</span></div>
+              <div class="inline tiny muted"><span>包含 9 份资料</span><span>·</span><span>规范 / 正文已展开</span><span>·</span><span>项目记忆：仅选定批准来源</span></div>
+              <div id="source-note" class="notice">排除：个人目录、凭据、无关日志。没有隐式调用摘要、Jev 或 embedding。</div>
+            </div></div>
+          </div>
+          <aside>
+            <div class="panel"><div class="panel-head"><h2>执行预览</h2></div><div class="panel-body">
+              <div class="field"><label for="protocol">协议 / 用户配置</label><select id="protocol"><option>Anthropic Messages · long-api</option><option>OpenAI Responses · long-api</option><option>OpenAI Chat · long-api</option></select></div>
+              <div class="kv"><span class="muted">模型</span><strong>用户固定 model-id</strong></div><div class="kv"><span class="muted">代理</span><strong>使用应用代理</strong></div><div class="kv"><span class="muted">输入估算</span><strong id="input-size">约 148K tokens</strong></div><div class="kv"><span class="muted">用户声明窗口</span><strong>1M · 未实测</strong></div><div class="kv"><span class="muted">预留生成上限</span><strong>32K · 含推理余量</strong></div><div class="kv"><span class="muted">输出方式</span><strong>NDJSON 分帧</strong></div>
+              <div class="callbox"><strong>主生成 1 · 辅助 0 · 补救 0</strong><p>截断不自动续写。完整项先保存候选；补救须额外确认。</p></div>
+              <div class="kv"><span class="muted">费用规则</span><strong>8 points / 生成</strong></div><div class="kv"><span class="muted">手工系数</span><strong>1.0</strong></div><div class="kv"><span class="muted">语义决策</span><strong>旁路 Jev</strong></div>
+              <p class="tiny muted">数值仅作布局演示，不是实际 token 统计或报价。模型能力不足时必须阻塞。</p>
+            </div></div>
+            <div class="notice">候选设计不等于通过验收。此包不授权改代码、安装依赖、提交或合并。</div>
+            <button id="submit" class="primary" style="width:100%">确认执行范围与一次调用…</button>
+          </aside>
+        </div>
+        <div class="foot"><span>计划 revision 1 · 上下文 bundle 1 · 发布组 g1</span><span class="spacer"></span><span>视图关闭不会撤销已提交运行</span></div>
+      </section>
+      <section id="run-view" hidden aria-label="运行与计划">
+        <div class="heading"><div><h1>运行与计划</h1><p>执行事实、已保存候选、验证和接受分别展示。</p></div><span class="spacer"></span><div class="actions"><button id="pause">停止新派发</button><button id="cancel" class="danger">停止当前执行…</button></div></div>
+        <div class="run-columns">
+          <aside>
+            <div class="run-card selected"><h3>项目设置 · 联合设计包</h3><p class="mono">run-001 · main@3fb5b06d9</p><span id="run-badge" class="tag warn-tag">部分结果 · 等待处理</span><p>3 个成员，已保存 2 个候选<br>主生成 1 / 辅助 0 / 补救 0</p></div>
+            <div class="run-card"><h3>限定文件修改 · CC</h3><p class="mono">run-002 · 独立 worktree</p><span class="tag draft">waiting_build_pool</span><p>依赖已准备；构建池被占用。<br>尚未启动第二个 cargo。</p></div>
+            <div class="panel"><div class="panel-body"><h3>退出与恢复边界</h3><p class="tiny muted" style="margin-top:8px">面板切换 / renderer 刷新不取消。退出宿主需要停止并保存；失联进程先对账，不自动重发。</p></div></div>
+          </aside>
+          <div>
+            <div class="tabs"><span class="active">计划与产物</span><span>上下文</span><span>执行记录</span><span>权限与费用</span></div>
+            <div id="partial-notice" class="notice"><strong>输出达到上限，第 C 项未完整结束。</strong><br>A / B 已独立落盘为 candidate；共享组 g1 未完成，未应用、未验收。没有自动补救请求。</div>
+            <div class="panel"><table class="table"><thead><tr><th>成员 / 依赖</th><th>实际结果</th><th>可执行操作</th></tr></thead><tbody>
+              <tr><td><b>A · 架构与状态边界</b><small>来源 src-01…08</small></td><td><span class="tag">candidate_saved</span><small>已持久化 · 等待共享组完整</small></td><td><button class="small artifact-open">查看候选</button></td></tr>
+              <tr><td><b>B · IPC 与兼容契约</b><small>引用 A / 共享决策</small></td><td><span class="tag">candidate_saved</span><small>已持久化 · 非 PASS</small></td><td><button class="small artifact-open">查看候选</button></td></tr>
+              <tr><td><b>C · 验收与测试计划</b><small>与 A / B 同组 g1</small></td><td><span id="c-status" class="tag warn-tag">incomplete</span><small id="c-description">半项保留诊断，不补造结束帧</small></td><td><button id="recovery" class="small">申请一次补救…</button></td></tr>
+            </tbody></table></div>
+            <div class="panel"><div class="panel-head"><h2>候选与发布门</h2><span class="spacer"></span><span class="tag draft">无自动合并</span></div><div class="panel-body">
+              <div class="artifact"><b>A · 候选设计 / artifact-a1</b><span class="mono muted" style="display:block">输入版本一致 · 内容 hash 由 host 计算</span><pre>来源：AGENTS / 现状实现 / 接口契约
+结论：状态 owner 保留在 Rust，UI 仅投影。
+未决：完整包恢复后再核对跨项约束。
+验证：尚未执行产品测试；当前不是通过证据。</pre></div>
+              <div class="inline" style="margin-top:12px"><button id="accept" disabled>接受候选（组未完整）</button><button disabled>应用到目标分支（未授权）</button><span class="tiny muted">门不满足时不能点击绕过</span></div>
+            </div></div>
+            <div class="panel"><div class="panel-head"><h2>执行记录</h2><span class="spacer"></span><span class="tiny muted">脱敏 · 示例</span></div><div class="panel-body log" id="log"><div>09:41:02　<b>请求已发送</b> · request-01，主生成预留 1</div><div>09:41:19　<b>item A 已保存</b> · artifact-a1 + 事件事务完成</div><div>09:41:27　<b>item B 已保存</b> · artifact-b1 + 事件事务完成</div><div>09:41:35　<b>max_output / C 不完整</b> · 保留前缀候选，禁止自动发布</div></div></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+  <footer class="statusline">UI 原型 v0.4 · 设计状态不代表已实现　|　P1A：API 三协议 + 一个 CC bridge　|　P1B：Codex / 交接　|　P2：Jev / 记忆 / 外部执行器</footer>
+</div>
+<div class="draft-footer">评审重点：是否接受“创建时左侧资料 / 右侧执行预览，运行时左侧列表 / 右侧计划与候选”的信息结构？本稿不是主导航改版，不包含图编辑器或费用报表。</div>
+<dialog id="source-dialog"><h2>实际发送上下文 · 演示</h2><p>正式实现应提供完整正文 / hash / omission，不能仅展示文件路径。这里是固定示例，不读取你的文件。</p><pre>[受信执行边界]
+只生成设计；不改代码、不安装、不提交。
+
+[source src-01 | AGENTS.md | hash: host-computed]
+保留原有契约；原生副作用必须真实验证。
+
+[source src-03 | 当前实现 | snapshot: fixed]
+目标模块、调用方和测试的实际正文在此展开。
+
+[任务 A / B / C]
+输出架构、IPC 和测试计划，保留来源 / 未决项。
+
+[输出契约]
+逐项 NDJSON：item_header → chunks → item_end。
+组完整且协议成功后才可进入接受。
+
+[omission]
+排除个人历史、密钥、无关目录。必需资料缺失则阻塞。</pre><div class="actions"><button data-close>返回上下文清单</button></div></dialog>
+<dialog id="confirm-dialog"><h2>确认这一次执行</h2><p>演示模式不会真的发送请求。正式产品需在这里确认冻结的计划 / 上下文版本、出站资料、权限和调用预算。</p><div class="callbox"><strong>主生成 1 · 辅助 0 · 补救 0</strong><p>合包 A / B / C，同一发布组。只生成候选设计，不授权写入或合并。</p></div><label class="checkline"><input id="confirm-check" type="checkbox">我已核对资料范围、费用单位和本次输出目标</label><div class="actions"><button data-close>返回修改</button><button id="confirm-run" class="primary" disabled>演示执行 → 查看截断场景</button></div></dialog>
+<dialog id="recovery-dialog"><h2>允许一次补救调用？</h2><p>已保存的 A / B 不丢失。补救范围为 C ＋必要共享约束，引用原输入和候选 hash；不是免费续写，也不会重做全部已完成项。</p><div class="kv"><span>新增请求</span><strong>最多 1 次</strong></div><div class="kv"><span>演示估算</span><strong>额外 8 points · 用户系数 1.0</strong></div><div class="notice">共享约束缺失时范围可能需要扩大；正式产品必须先预览。用户拒绝或关闭时，不发新请求。</div><div class="actions"><button data-close>暂不补救，保留候选</button><button id="confirm-recovery" class="primary">演示授权一次补救</button></div></dialog>
+<dialog id="exit-dialog"><h2>仍有任务现场需要处理</h2><p>有 1 个等待处理的设计包、1 个等待构建池的 CLI 任务。退出宿主后不继续执行；当前候选保留，未确认停止的进程重启后先对账。</p><div class="notice">关闭此对话框 / 留在应用不取消任务。“停止并保存”需等真实停止结果，不能立即伪报退出完成。</div><div class="actions"><button data-close>留在应用</button><button id="confirm-exit" class="danger">演示停止并保存</button></div></dialog>
+<div id="toast" class="toast" hidden role="status" aria-live="polite"></div>
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+function showView(name) {
+  $('create-view').hidden = name !== 'create'; $('run-view').hidden = name !== 'runs';
+  $('nav-create').classList.toggle('active', name === 'create'); $('nav-runs').classList.toggle('active', name === 'runs');
+}
+let toastTimer;
+function notify(text) { $('toast').textContent = text; $('toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { $('toast').hidden = true; }, 5500); }
+$('nav-create').onclick = () => showView('create'); $('nav-runs').onclick = () => showView('runs');
+$('nav-profile').onclick = () => notify('原型不编辑真实配置。产品将复用 Settings，显示协议、能力、费用单位和系数。');
+$('preview').onclick = () => $('source-dialog').showModal();
+$('submit').onclick = () => { $('confirm-check').checked = false; $('confirm-run').disabled = true; $('confirm-dialog').showModal(); };
+$('confirm-check').onchange = () => { $('confirm-run').disabled = !$('confirm-check').checked; };
+$('confirm-run').onclick = () => { $('confirm-dialog').close(); showView('runs'); notify('演示：已进入预设截断场景。没有发送模型请求。'); };
+$('optional').onchange = () => { $('input-size').textContent = $('optional').checked ? '约 148K tokens' : '约 132K tokens'; $('source-note').textContent = $('optional').checked ? '排除：个人目录、凭据、无关日志。没有隐式调用摘要、Jev 或 embedding。' : '可选历史片段已排除。必需规范与任务仍保留；数字为固定演示，不是实际统计。'; };
+$('pack-kind').onchange = () => notify($('pack-kind').selectedIndex === 2 ? 'patch 演示边界：总计 ≤3 文本文件且另过输出预算；不含依赖 / lockfile 变更。' : '任务类型选择只演示，不自动更换模型、资料或授权。');
+for (const button of document.querySelectorAll('[data-close]')) button.onclick = () => button.closest('dialog').close();
+for (const button of document.querySelectorAll('.artifact-open')) button.onclick = () => { $('source-dialog').showModal(); notify('此原型以同一只读对话框展示来源 / 候选结构，不打开真实文件。'); };
+$('recovery').onclick = () => $('recovery-dialog').showModal();
+$('confirm-recovery').onclick = () => {
+  $('recovery-dialog').close(); $('c-status').textContent = 'candidate_saved'; $('c-status').className = 'tag';
+  $('c-description').textContent = '补救演示完成；仍未验收 / 应用'; $('run-badge').textContent = '候选完整 · 待接受'; $('run-badge').className = 'tag';
+  $('partial-notice').textContent = '演示：新增一次补救后，C 与共享组已完整。原 A / B 候选未覆盖。设计候选仍需人工接受；没有真实模型调用或测试通过。';
+  $('log').append(Object.assign(document.createElement('div'), {textContent: '09:44:10　用户授权补救演示 · 新 request-02 / recovery=1 · C candidate 保存'}));
+  $('recovery').disabled = true; $('recovery').textContent = '已用补救演示'; $('accept').disabled = false; $('accept').textContent = '审阅并接受设计候选';
+  notify('演示补救结束；未调用模型、未修改文件、未自动应用。');
+};
+$('accept').onclick = () => notify('原型不执行实际接受。产品需展示精确候选 / 发布组、验证条件和人工确认，不连带授权合并。');
+$('pause').onclick = () => notify('演示：停止新派发，当前现场保留。不是取消已运行任务。');
+$('cancel').onclick = () => notify('演示：应进入 stopping，并在确认真实进程 / 请求停止后释放资源；本页无真实任务。');
+$('exit').onclick = () => $('exit-dialog').showModal();
+$('confirm-exit').onclick = () => { $('exit-dialog').close(); notify('演示停止并保存。原型仍留在页面，未退出产品或终止真实进程。'); };
+const initialView = new URLSearchParams(location.search).get('view');
+showView(initialView === 'runs' ? 'runs' : 'create');
+if (initialView === 'recovery') { showView('runs'); $('recovery-dialog').showModal(); }
+if (initialView === 'exit') { showView('runs'); $('exit-dialog').showModal(); }
+</script>
+</body>
+</html>
