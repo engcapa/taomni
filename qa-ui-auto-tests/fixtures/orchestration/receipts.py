@@ -4,6 +4,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import socket
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -12,9 +14,15 @@ MARKER_NAME = "taomni-worker-marker.txt"
 
 def assert_isolated_network(interfaces: set[str] | None = None) -> None:
     if interfaces is None:
-        if not Path("/sys/class/net").is_dir():
+        if sys.platform != "linux":
             raise RuntimeError("real workers require a Linux loopback-only network namespace")
-        interfaces = {path.name for path in Path("/sys/class/net").iterdir()}
+        try:
+            # Kernel enumeration follows this process's current network
+            # namespace. A preexisting sysfs mount can still show the parent's
+            # interfaces after unshare --net; never use it as network evidence.
+            interfaces = {name for _, name in socket.if_nameindex()}
+        except OSError:
+            raise RuntimeError("cannot verify current network namespace interfaces") from None
     if interfaces != {"lo"}:
         raise RuntimeError("real workers require a loopback-only network namespace; external networking is forbidden")
 

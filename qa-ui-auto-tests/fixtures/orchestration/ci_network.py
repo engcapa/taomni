@@ -14,6 +14,10 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from receipts import assert_isolated_network
+
 
 def display_environment(source: dict[str, str]) -> dict[str, str]:
     allowed = {}
@@ -59,8 +63,10 @@ def main() -> None:
         display_flag = ["--allow-display"] if args.allow_display else []
         os.execv(unshare, [unshare, "--net", "--", sys.executable, "-I", str(Path(__file__).resolve()),
                           "--inside", "--uid", str(args.uid), "--gid", str(args.gid), *display_flag, "--", *command])
-    if {path.name for path in Path("/sys/class/net").iterdir()} != {"lo"}:
-        parser.error("unexpected network interface in isolated namespace")
+    try:
+        assert_isolated_network()
+    except RuntimeError as exc:
+        parser.error(str(exc))
     ip = shutil.which("ip")
     if not ip:
         parser.error("required iproute2 ip is not installed")
