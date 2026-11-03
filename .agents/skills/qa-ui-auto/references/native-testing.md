@@ -11,6 +11,12 @@ Before setup, inspect the selected config's `app.native_binary` and driver path:
 an explicit legacy config overrides the harness's isolated QA default. Use the
 verified QA binary and a WebView-compatible driver in a task config; do not rebuild
 because a config points at the wrong executable. Check ports before launch.
+On Windows, keep verified driver executables in a normal tools directory, not a
+Low-integrity report/browser-download tree. The harness checks the owned driver
+tree's token integrity before launching the QA app; a Low adapter can make WGC
+return `0x80070005` even when desktop screen-capture permission is enabled.
+Inspect that evidence before attributing the failure to privacy policy. The
+harness never changes ACLs, tokens or privacy settings to make a test pass.
 
 Desktop launch may show a window. Global OS input/IME tests also share the user's
 keyboard, pointer and focus: when the user is active on that desktop, agree a
@@ -86,7 +92,13 @@ The harness redirects Linux XDG data/config/cache and the app's debug-only
 macOS; `dirs` resolves Windows Known Folders and ignores `APPDATA`, so the
 explicit override is the only effective redirection there), then restores its
 environment on exit. `reset_db` only clears QA application state inside verified
-run roots. Native runs are sequential. The driver must be started by this run to
+run roots. Native runs are sequential. X11 cold-restart cases request normal WM closure
+of the unique managed window whose PID/executable/kernel birth identity belongs
+to this launcher's process group. They independently require the exact XID to
+disappear and the original app/storage processes to exit before releasing the
+driver. An empty WebDriver HTTP 500 alone is never close evidence; no close input
+is replayed, confirmation is not bypassed, and profiles are not reseeded.
+The driver must be started by this run to
 inherit isolation; an existing listener is rejected. Configure free WebDriver and
 native-driver ports for independent jobs.
 

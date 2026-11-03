@@ -363,7 +363,14 @@ pub async fn screenshot_qa_escape_entry(app: AppHandle) -> Result<String, String
     let leftover: Vec<String> = app
         .webview_windows()
         .keys()
-        .filter(|label| capture_window_label(label))
+        .filter(|label| {
+            capture_window_label(label)
+                && !(label.as_str() == super::super::OVERLAY_LABEL
+                    && super::super::overlay_resident::is_idle()
+                    && app
+                        .get_webview_window(label)
+                        .is_some_and(|window| window.is_visible().ok() == Some(false)))
+        })
         .cloned()
         .collect();
     let main_after = json!({
@@ -529,7 +536,14 @@ pub async fn screenshot_qa_x11_compositor_bypass(app: AppHandle) -> Result<Strin
         let leftover: Vec<String> = app
             .webview_windows()
             .keys()
-            .filter(|label| capture_window_label(label))
+            .filter(|label| {
+                capture_window_label(label)
+                    && !(label.as_str() == super::super::OVERLAY_LABEL
+                        && super::super::overlay_resident::is_idle()
+                        && app
+                            .get_webview_window(label)
+                            .is_some_and(|window| window.is_visible().ok() == Some(false)))
+            })
             .cloned()
             .collect();
         let main_after = json!({

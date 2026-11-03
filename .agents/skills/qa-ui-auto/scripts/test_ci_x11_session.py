@@ -1,11 +1,33 @@
 from pathlib import Path
+import os
 import subprocess
 import tempfile
 import threading
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
-from ci_x11_session import observe_window_tree, publish_window_tree
+from ci_x11_session import install, observe_window_tree, publish_window_tree
+
+
+class X11PackageInstallTest(TestCase):
+    def test_windows_installs_through_the_shared_verified_setup_owner(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.dict(os.environ, {"QA_CYGWIN_ROOT": str(Path(directory) / "cygwin")}), \
+             patch("ci_x11_session.platform.system", return_value="Windows"), \
+             patch("ci_ssh_features.install_cygwin_packages") as packages, \
+             patch("ci_services.command") as command:
+            install()
+            packages.assert_called_once_with(Path(directory) / "cygwin",
+                "xorg-server-extra,xauth,xclock,xwininfo,xdpyinfo,font-misc-misc", timeout=600)
+            command.assert_not_called()
+
+    def test_windows_cannot_continue_after_shared_setup_verification_fails(self):
+        with tempfile.TemporaryDirectory() as directory, \
+             patch.dict(os.environ, {"QA_CYGWIN_ROOT": directory}), \
+             patch("ci_x11_session.platform.system", return_value="Windows"), \
+             patch("ci_ssh_features.install_cygwin_packages", side_effect=RuntimeError("checksum differs")):
+            with self.assertRaisesRegex(RuntimeError, "checksum differs"):
+                install()
 
 
 class X11WindowObserverTest(TestCase):

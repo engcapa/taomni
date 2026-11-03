@@ -1,13 +1,11 @@
 id: TC-IDE-PARITY-027-02
-title: SSH terminal tool windows (SFTP, Chat) live in the collapsed sidebar rail like Code Workspace
-description: 'ED-PARITY-027 browser + native case. Activating an SSH terminal collapses the main sidebar to its rail and moves the terminal''s tool windows (attached SFTP,
-  Chat) from the control bar''s tab actions into that rail while actions such as Detach stay in the control bar; the rail SFTP button opens and closes the attached browser
-  without losing the terminal. Expanding the sidebar returns the toggles to the terminal and is remembered for terminal tabs only.
-
-  '
+title: SSH SFTP stays in the actions menu across Sessions collapse while terminal sidebar preferences remain isolated
+description: SFTP consistently uses the actions menu and compact floating entry. Retain merged-rail collapse/expand preferences and Home return behavior
+  without adding SFTP to the left rail.
 covers:
 - F1.2
 - F7.1
+- F7.4
 tags:
 - terminal
 - sftp
@@ -19,8 +17,7 @@ modes:
 - native
 fixtures:
 - reset_db
-- ssh_required
-- sftp_required
+- ssh_posix_required
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
@@ -28,12 +25,9 @@ steps:
     key: taomni.mergeToolWindowRail
     value: 'true'
 - seed_storage:
-    key: taomni.sidebarCollapsed
-    value: 'false'
-- seed_storage:
     key: taomni.sidebarCollapsedByGroup.v1
-    value: '{"code-workspace":true,"terminal":true}'
-- reload_window:
+    value: '{"terminal": true, "code-workspace": true}'
+- reload_window: null
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sidebar"]'
 - assert_visible: '[data-testid="session-new"]'
@@ -41,16 +35,16 @@ steps:
 - wait_for: '[data-testid="session-editor"]'
 - fill:
     selector: '[data-testid="session-host"]'
-    value: ${cfg.ssh.host}
+    value: ${cfg.ssh_posix.host}
 - fill:
     selector: '[data-testid="session-port"]'
-    value: ${cfg.ssh.port}
+    value: ${cfg.ssh_posix.port}
 - set_check:
     selector: '[data-testid="session-specify-username"]'
     checked: true
 - fill:
     selector: '[data-testid="session-user"]'
-    value: ${cfg.ssh.user}
+    value: ${cfg.ssh_posix.user}
 - click: '[data-testid="session-section-bookmark"]'
 - wait_for: '[data-testid="bookmark-settings"]'
 - fill:
@@ -62,55 +56,60 @@ steps:
 - wait_for: '[data-testid="auth-prompt"]'
 - fill:
     selector: '[data-testid="auth-password"]'
-    value: ${env.QA_SSH_PASSWORD}
+    value: ${env.QA_POSIX_SSH_PASSWORD}
 - click: '[data-testid="auth-submit"]'
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
     timeout_sec: 60
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 30
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-    text: printf '\nQA_ED027_READY\n'
+    text: echo QA_ED027_READY
     submit: true
+    verify:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+      regex: (?m)^QA_ED027_READY\r?$
+      timeout_sec: 30
+      attempts: 1
 - assert_pattern:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
     regex: (?m)^QA_ED027_READY\r?$
     timeout_sec: 30
-- wait_for:
-    selector: '[data-testid="collapsed-sidebar-rail"]'
-    timeout_sec: 10
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- wait_for: '[data-testid="sftp-floating-button"]'
+- assert_count:
+    selector: '[data-testid="sidebar-rail"] [data-testid="attached-sftp-toggle"]'
+    equal: 0
 - click: '[data-testid="titlebar-actions-more"]'
-- wait_for: '[data-testid="collapsed-sidebar-rail"] [data-testid="attached-sftp-toggle"]'
-- wait_for:
-    selector: '[data-testid="tab-action-slot"] [data-testid="attached-sftp-toggle"]'
-    state: detached
-    timeout_sec: 5
-- assert_visible: '[data-testid="tab-action-slot"] [data-testid="terminal-detach"]'
-- screenshot: tc-ide-parity-027-02-terminal-rail.png
-- click: '[data-testid="collapsed-sidebar-rail"] [data-testid="attached-sftp-toggle"]'
-- wait_for:
-    selector: '[data-testid="sftp-browser"]'
-    timeout_sec: 30
+- assert_visible: '[data-testid="tab-action-slot"] [data-testid="attached-sftp-toggle"]'
+- assert_visible: '[data-testid="terminal-detach"]'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-browser"]'
+- assert_not_visible: '[data-testid="sftp-floating-button"]'
 - click: '[data-testid="titlebar-actions-more"]'
 - assert_attribute:
-    selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="attached-sftp-toggle"]'
+    selector: '[data-testid="attached-sftp-toggle"]'
     name: aria-pressed
     equals: 'true'
-- click: '[data-testid="collapsed-sidebar-rail"] [data-testid="attached-sftp-toggle"]'
+- click: '[data-testid="attached-sftp-toggle"]'
 - wait_for:
     selector: '[data-testid="sftp-browser"]'
     state: detached
-    timeout_sec: 10
+- wait_for: '[data-testid="sftp-floating-button"]'
 - assert_visible: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
-- click: '[data-testid="collapsed-sidebar-rail"] [data-testid="side-tab-sessions"]'
+- click: '[data-testid="toggle-left-sidebar"]'
 - wait_for: '[data-testid="session-tree"]'
 - wait_for:
     selector: '[data-testid="collapsed-sidebar-rail"]'
     state: detached
-    timeout_sec: 5
 - click: '[data-testid="titlebar-actions-more"]'
-- wait_for:
-    selector: '[data-testid="tab-action-slot"] [data-testid="attached-sftp-toggle"]'
-    timeout_sec: 5
+- assert_visible: '[data-testid="attached-sftp-toggle"]'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-browser"]'
+- click: '[data-testid="sftp-close"]'
+- wait_for: '[data-testid="sftp-floating-button"]'
 - click: '[data-testid="nav-mode-home"]'
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="side-tab-sessions"]'
@@ -123,326 +122,147 @@ steps:
 - assert_localstorage:
     key: taomni.sidebarCollapsedByGroup.v1
     contains: '"code-workspace":true'
+- screenshot: tc-ide-parity-027-02-consistent-sftp.png
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: A+B：SSH 终端就绪后主侧栏折叠为工具条，终端的 SFTP 开关出现在工具条里，控制栏的标签操作区不再重复显示（Detach 等操作仍在控制栏）。
+    requirement: Collapsed and expanded Sessions keep the same SFTP actions menu and never expose a rail SFTP button; opening and hiding preserve the
+      ready terminal. Expanding Sessions is remembered for terminal tabs, and returning from Home retains that preference without changing Code Workspace's
+      preference.
     actions:
     - 1
     - 2
     - 3
     - 4
     - 5
-    - 6
-    - 9
+    - 8
+    - 10
     - 11
     - 12
     - 13
     - 14
-    - 15
-    - 17
-    - 18
-    - 20
-    - 22
-    - 23
-    - 25
-    - 28
-    - 33
-    - 35
-    - 37
-    - 40
-    - 43
-    - 45
-    - 47
-    - 48
-    checkpoints:
-    - step: 7
-      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
-    - step: 8
-      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
-    - step: 10
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 16
-      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 19
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ed027-rail\"]"}'
-    - step: 21
-      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
-    - step: 24
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
-    - step: 26
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_ED027_READY\\r?$", "timeout_sec": 30}}'
-    - step: 27
-      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "timeout_sec": 10}}'
-    - step: 29
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"attached-sftp-toggle\"]"}'
-    - step: 30
-      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]", "state": "detached", "timeout_sec": 5}}'
-    - step: 31
-      expectation: '{"assert_visible": "[data-testid=\"tab-action-slot\"] [data-testid=\"terminal-detach\"]"}'
-    - step: 34
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "timeout_sec": 30}}'
-    - step: 36
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"attached-sftp-toggle\"]", "name": "aria-pressed", "equals": "true"}}'
-    - step: 38
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached", "timeout_sec": 10}}'
-    - step: 39
-      expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]"}'
-    - step: 41
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 42
-      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "state": "detached", "timeout_sec": 5}}'
-    - step: 44
-      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]", "timeout_sec": 5}}'
-    - step: 46
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 49
-      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
-    - step: 50
-      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
-    - step: 51
-      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"terminal\":false"}}'
-    - step: 52
-      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"code-workspace\":true"}}'
-    results:
-    - 7
-    - 8
-    - 10
     - 16
+    - 17
     - 19
     - 21
-    - 24
-    - 26
-    - 27
-    - 29
+    - 22
+    - 25
     - 30
-    - 31
-    - 34
+    - 33
     - 36
     - 38
-    - 39
-    - 41
     - 42
-    - 44
-    - 46
+    - 45
+    - 47
     - 49
-    - 50
     - 51
-    - 52
-  - id: R2
-    requirement: B：工具条里的 SFTP 按钮打开附加 SFTP 浏览器（按钮呈按下态），再次点击关闭，终端保持就绪。
-    actions:
-    - 1
-    - 2
-    - 3
-    - 4
-    - 5
+    - 53
+    - 54
+    checkpoints:
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ed027-rail\"]"}'
+    - step: 20
+      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
+    - step: 23
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        60}}'
+    - step: 24
+      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec":
+        30}}'
+    - step: 26
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_ED027_READY\\r?$",
+        "timeout_sec": 30}}'
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"]"}'
+    - step: 28
+      expectation: '{"wait_for": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 29
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail\"] [data-testid=\"attached-sftp-toggle\"]", "equal": 0}}'
+    - step: 31
+      expectation: '{"assert_visible": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]"}'
+    - step: 32
+      expectation: '{"assert_visible": "[data-testid=\"terminal-detach\"]"}'
+    - step: 34
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 35
+      expectation: '{"assert_not_visible": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 37
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"attached-sftp-toggle\"]", "name": "aria-pressed", "equals": "true"}}'
+    - step: 39
+      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached"}}'
+    - step: 40
+      expectation: '{"wait_for": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 41
+      expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]"}'
+    - step: 43
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 44
+      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "state": "detached"}}'
+    - step: 46
+      expectation: '{"assert_visible": "[data-testid=\"attached-sftp-toggle\"]"}'
+    - step: 48
+      expectation: '{"wait_for": "[data-testid=\"sftp-browser\"]"}'
+    - step: 50
+      expectation: '{"wait_for": "[data-testid=\"sftp-floating-button\"]"}'
+    - step: 52
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 55
+      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
+    - step: 56
+      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
+    - step: 57
+      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"terminal\":false"}}'
+    - step: 58
+      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"code-workspace\":true"}}'
+    - step: 60
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
     - 6
+    - 7
     - 9
-    - 11
-    - 12
-    - 13
-    - 14
     - 15
-    - 17
     - 18
     - 20
-    - 22
     - 23
-    - 25
-    - 28
-    - 33
-    - 35
-    - 37
-    - 40
-    - 43
-    - 45
-    - 47
-    - 48
-    checkpoints:
-    - step: 7
-      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
-    - step: 8
-      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
-    - step: 10
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 16
-      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 19
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ed027-rail\"]"}'
-    - step: 21
-      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
-    - step: 24
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
-    - step: 26
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_ED027_READY\\r?$", "timeout_sec": 30}}'
-    - step: 27
-      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "timeout_sec": 10}}'
-    - step: 29
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"attached-sftp-toggle\"]"}'
-    - step: 30
-      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]", "state": "detached", "timeout_sec": 5}}'
-    - step: 31
-      expectation: '{"assert_visible": "[data-testid=\"tab-action-slot\"] [data-testid=\"terminal-detach\"]"}'
-    - step: 34
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "timeout_sec": 30}}'
-    - step: 36
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"attached-sftp-toggle\"]", "name": "aria-pressed", "equals": "true"}}'
-    - step: 38
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached", "timeout_sec": 10}}'
-    - step: 39
-      expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]"}'
-    - step: 41
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 42
-      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "state": "detached", "timeout_sec": 5}}'
-    - step: 44
-      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]", "timeout_sec": 5}}'
-    - step: 46
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 49
-      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
-    - step: 50
-      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
-    - step: 51
-      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"terminal\":false"}}'
-    - step: 52
-      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"code-workspace\":true"}}'
-    results:
-    - 7
-    - 8
-    - 10
-    - 16
-    - 19
-    - 21
     - 24
     - 26
     - 27
-    - 29
-    - 30
-    - 31
-    - 34
-    - 36
-    - 38
-    - 39
-    - 41
-    - 42
-    - 44
-    - 46
-    - 49
-    - 50
-    - 51
-    - 52
-  - id: R3
-    requirement: A：展开主侧栏后开关回到控制栏的标签操作区；切到 Welcome 再回到终端仍保持展开，只记住终端组（Code Workspace 组仍为折叠）。
-    actions:
-    - 1
-    - 2
-    - 3
-    - 4
-    - 5
-    - 6
-    - 9
-    - 11
-    - 12
-    - 13
-    - 14
-    - 15
-    - 17
-    - 18
-    - 20
-    - 22
-    - 23
-    - 25
     - 28
-    - 33
+    - 29
+    - 31
+    - 32
+    - 34
     - 35
     - 37
-    - 40
-    - 43
-    - 45
-    - 47
-    - 48
-    checkpoints:
-    - step: 7
-      expectation: '{"wait_for": "[data-testid=\"sidebar\"]"}'
-    - step: 8
-      expectation: '{"assert_visible": "[data-testid=\"session-new\"]"}'
-    - step: 10
-      expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
-    - step: 16
-      expectation: '{"wait_for": "[data-testid=\"bookmark-settings\"]"}'
-    - step: 19
-      expectation: '{"wait_for": "[data-testid=\"session-tree-item\"][data-session-name=\"qa-ui-auto-ed027-rail\"]"}'
-    - step: 21
-      expectation: '{"wait_for": "[data-testid=\"auth-prompt\"]"}'
-    - step: 24
-      expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]", "timeout_sec": 60}}'
-    - step: 26
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_ED027_READY\\r?$", "timeout_sec": 30}}'
-    - step: 27
-      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "timeout_sec": 10}}'
-    - step: 29
-      expectation: '{"wait_for": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"attached-sftp-toggle\"]"}'
-    - step: 30
-      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]", "state": "detached", "timeout_sec": 5}}'
-    - step: 31
-      expectation: '{"assert_visible": "[data-testid=\"tab-action-slot\"] [data-testid=\"terminal-detach\"]"}'
-    - step: 34
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "timeout_sec": 30}}'
-    - step: 36
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"collapsed-sidebar-rail\"] [data-testid=\"attached-sftp-toggle\"]", "name": "aria-pressed", "equals": "true"}}'
-    - step: 38
-      expectation: '{"wait_for": {"selector": "[data-testid=\"sftp-browser\"]", "state": "detached", "timeout_sec": 10}}'
-    - step: 39
-      expectation: '{"assert_visible": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"][data-terminal-ready=\"true\"]"}'
-    - step: 41
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 42
-      expectation: '{"wait_for": {"selector": "[data-testid=\"collapsed-sidebar-rail\"]", "state": "detached", "timeout_sec": 5}}'
-    - step: 44
-      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-action-slot\"] [data-testid=\"attached-sftp-toggle\"]", "timeout_sec": 5}}'
-    - step: 46
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 49
-      expectation: '{"wait_for": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]"}'
-    - step: 50
-      expectation: '{"assert_visible": "[data-testid=\"session-tree\"]"}'
-    - step: 51
-      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"terminal\":false"}}'
-    - step: 52
-      expectation: '{"assert_localstorage": {"key": "taomni.sidebarCollapsedByGroup.v1", "contains": "\"code-workspace\":true"}}'
-    results:
-    - 7
-    - 8
-    - 10
-    - 16
-    - 19
-    - 21
-    - 24
-    - 26
-    - 27
-    - 29
-    - 30
-    - 31
-    - 34
-    - 36
-    - 38
     - 39
+    - 40
     - 41
-    - 42
+    - 43
     - 44
     - 46
-    - 49
+    - 48
     - 50
-    - 51
     - 52
+    - 55
+    - 56
+    - 57
+    - 58
+    - 60
   visual:
-  - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
+  - check: Inspect the retained screenshots for readable terminal content, compact SFTP controls and usable side-panel sizing.
     method: manual
-    reason: 像素与原生窗口边界不能由 DOM 断言代替。
+    reason: Geometry and DOM assertions support, but do not replace, visual review.
   native:
-  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+  - check: Exercise actual packaged layout and SSH/SFTP channel ownership; browser results do not establish native PTY continuity.
     method: automated
-    reason: 明确记录执行边界和未验证平台。
+    reason: Browser stubs cannot establish native WebView/window, SSH PTY or SFTP channel ownership.

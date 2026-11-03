@@ -9,6 +9,7 @@ export interface FileBrowserProps {
   authData: string | null;
   networkSettingsJson?: string | null;
   initialPath?: string;
+  initialLocalPath?: string;
   onDetach?: () => void;
   onClose?: () => void;
   onTerminalSync?: (cwd: string) => void;

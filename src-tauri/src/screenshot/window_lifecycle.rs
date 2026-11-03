@@ -102,28 +102,41 @@ pub(crate) fn window_builder<'a>(
 // Overlay window
 // ---------------------------------------------------------------------------
 
+/// Windows owned by the capture tool (and the QA fixture) are never hidden
+/// or excluded from a capture: pins stay part of the captured desktop.
+pub(super) fn is_tool_window(label: &str) -> bool {
+    label == OVERLAY_LABEL
+        || label == RECORDER_LABEL
+        || label == surfaces::SCROLL_LABEL
+        || label.starts_with(surfaces::BORDER_PREFIX)
+        || label.starts_with(PIN_LABEL_PREFIX)
+        || label == qa::QA_WINDOW_LABEL
+}
+
+/// Visible app windows that a capture must not contain.
+pub(super) fn capturable_app_windows(app: &AppHandle) -> Vec<(String, WebviewWindow)> {
+    app.webview_windows()
+        .into_iter()
+        .filter(|(label, window)| {
+            if is_tool_window(label) || !window.is_visible().unwrap_or(false) {
+                return false;
+            }
+            #[cfg(target_os = "linux")]
+            if window.is_minimized().unwrap_or(false) {
+                return false;
+            }
+            true
+        })
+        .collect()
+}
+
 /// Hide every visible app window except the screenshot tool's own and remember
 /// them (merged with windows already hidden for this session).
 pub(super) fn hide_app_windows(app: &AppHandle) -> bool {
     let mut hid_any = false;
+    let windows = capturable_app_windows(app);
     let mut state = tool_state();
-    for (label, window) in app.webview_windows() {
-        if label == OVERLAY_LABEL
-            || label == RECORDER_LABEL
-            || label == surfaces::SCROLL_LABEL
-            || label.starts_with(surfaces::BORDER_PREFIX)
-            || label.starts_with(PIN_LABEL_PREFIX)
-            || label == qa::QA_WINDOW_LABEL
-        {
-            continue;
-        }
-        if !window.is_visible().unwrap_or(false) {
-            continue;
-        }
-        #[cfg(target_os = "linux")]
-        if window.is_minimized().unwrap_or(false) {
-            continue;
-        }
+    for (label, window) in windows {
         #[cfg(all(debug_assertions, target_os = "macos"))]
         QA_WINDOW_HIDE_CALLS.fetch_add(1, Ordering::SeqCst);
         // GTK hide/show unmaps the toplevel: X11 resets its position and

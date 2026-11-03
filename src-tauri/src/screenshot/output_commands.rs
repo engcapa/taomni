@@ -2,7 +2,6 @@ use crate::screenshot::capture;
 use crate::screenshot::capture::ScreenshotFile;
 use crate::screenshot::runtime::blocking;
 use crate::state::AppState;
-use std::borrow::Cow;
 use std::path::PathBuf;
 use tauri::AppHandle;
 use tauri::Manager;
@@ -15,26 +14,8 @@ pub async fn screenshot_copy_image(app: AppHandle, path: String) -> Result<(), S
     blocking("clipboard", move || {
         let path = capture::ensure_artifact_path(&path)?;
         let image = clipboard_image(&path)?;
-        let (width, height) = (image.width() as usize, image.height() as usize);
         let state = app.state::<AppState>();
-        let mut guard = state
-            .clipboard
-            .lock()
-            .map_err(|_| anyhow::anyhow!("clipboard lock poisoned"))?;
-        if guard.is_none() {
-            *guard = Some(
-                arboard::Clipboard::new().map_err(|e| anyhow::anyhow!("open clipboard: {e}"))?,
-            );
-        }
-        guard
-            .as_mut()
-            .expect("clipboard initialised")
-            .set_image(arboard::ImageData {
-                width,
-                height,
-                bytes: Cow::Owned(image.into_raw()),
-            })
-            .map_err(|e| anyhow::anyhow!("write image to clipboard: {e}"))
+        super::clipboard_copy::publish(&state.clipboard, &image)
     })
     .await
 }

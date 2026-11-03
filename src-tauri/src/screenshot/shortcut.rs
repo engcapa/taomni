@@ -123,6 +123,7 @@ fn register(app: &AppHandle, shortcut: Shortcut) -> Result<(), String> {
 /// Route a global-shortcut failure back to a visible app window so permission
 /// instructions remain usable even when the shortcut was pressed in another app.
 pub(super) async fn open_from_shortcut(app: &AppHandle) -> Result<(), String> {
+    super::startup_timing::begin_entry("shortcut");
     let result = super::open_overlay(app, None).await;
     if let Err(error) = &result {
         let window = app.get_webview_window("main").or_else(|| {

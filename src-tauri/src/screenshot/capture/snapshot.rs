@@ -7,6 +7,7 @@ use super::pixels::crop;
 use super::pixels::frame_to_rgba;
 use super::source::FrameSource;
 use crate::servers::rdp::capture::Capturer;
+use crate::servers::rdp::capture::stage_trace;
 use anyhow::Context;
 use image::RgbaImage;
 use std::time::Duration;
@@ -14,29 +15,95 @@ use std::time::Instant;
 use tauri::AppHandle;
 
 /// Capture a whole display (physical pixels), without prompting from workers.
+/// Marks/cancellation have an effect only inside a caller's stage-trace scope.
 pub fn capture_display(app: &AppHandle, display: &DisplayInfo) -> anyhow::Result<RgbaImage> {
     ensure_capture_permission()?;
+    stage_trace::check_cancelled()?;
     #[cfg(not(target_os = "linux"))]
     {
         let _ = app;
+        stage_trace::mark("capture_open_start");
         let monitor = xcap_monitor_for(display)?;
-        monitor.capture_image().context("capture display")
+        stage_trace::mark("capture_open_end");
+        let result = monitor.capture_image().context("capture display");
+        stage_trace::mark("capture_grab");
+        stage_trace::mark("capture_drain_end");
+        stage_trace::mark("capture_drop_start");
+        drop(monitor);
+        stage_trace::mark("capture_drop_end");
+        stage_trace::check_cancelled()?;
+        result
     }
     #[cfg(target_os = "linux")]
     {
-        let mut source = FrameSource::open(app, display.clone());
-        let mut latest = source.grab()?;
-        // Portal startup retains its first frame. Drain the stream through a
-        // short settling interval so that frame cannot freeze a closing
-        // chooser or the tail of the application's compositor animation.
-        let until = Instant::now() + Duration::from_millis(250);
-        while Instant::now() < until {
-            if let Some(image) = source.poll()? {
-                latest = image.clone();
+        // This source is constructed after the hide barrier, including when
+        // overlap falls back after retiring its pre-barrier stream.
+        let opened_after = Instant::now();
+        let mut observed = ObservedSource::open(app, display)?;
+        let result = (|| {
+            let source = observed.source();
+            let mut latest = None;
+            let mut first = true;
+            let until = Instant::now() + Duration::from_millis(250);
+            loop {
+                stage_trace::check_cancelled()?;
+                if let Some(image) = source.poll()?.cloned() {
+                    if first {
+                        stage_trace::mark("capture_grab");
+                        first = false;
+                    }
+                    if source.captured_at().is_some_and(|at| at >= opened_after) {
+                        latest = Some(image);
+                    }
+                }
+                if Instant::now() >= until {
+                    break;
+                }
+                std::thread::sleep(Duration::from_millis(20));
             }
-            std::thread::sleep(Duration::from_millis(20));
-        }
-        Ok(latest)
+            stage_trace::check_cancelled()?;
+            latest
+                .context("capture produced no timestamped frame after hiding; retry the screenshot")
+        })();
+        stage_trace::mark("capture_drain_end");
+        drop(observed);
+        result
+    }
+}
+
+/// Explicit retirement keeps the final Drop marks inside the observer/token
+/// scope, including cancellation and failed polls. A reopen cannot overlap it.
+#[cfg(target_os = "linux")]
+pub(super) struct ObservedSource {
+    source: Option<FrameSource>,
+}
+
+#[cfg(target_os = "linux")]
+impl ObservedSource {
+    pub(super) fn open(app: &AppHandle, display: &DisplayInfo) -> anyhow::Result<Self> {
+        stage_trace::check_cancelled()?;
+        stage_trace::mark("capture_open_start");
+        let source = Self {
+            source: Some(FrameSource::open(app, display.clone())),
+        };
+        stage_trace::mark("capture_open_end");
+        stage_trace::check_cancelled()?;
+        Ok(source)
+    }
+
+    pub(super) fn source(&mut self) -> &mut FrameSource {
+        self.source
+            .as_mut()
+            .expect("capture source already retired")
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl Drop for ObservedSource {
+    fn drop(&mut self) {
+        stage_trace::mark("capture_drop_start");
+        drop(self.source.take());
+        stage_trace::mark("capture_drop_end");
     }
 }
 

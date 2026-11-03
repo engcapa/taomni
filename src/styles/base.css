@@ -12,6 +12,13 @@ body.notes-detached-document,
   background: transparent !important;
 }
 
+/* Native screenshot overlay: transparent until the captured desktop is drawn. */
+html.screenshot-overlay-surface,
+html.screenshot-overlay-surface body,
+html.screenshot-overlay-surface #root {
+  background: transparent !important;
+}
+
 #root {
   width: 100vw;
   height: 100vh;

@@ -17,11 +17,15 @@ import shlex
 import socket
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 import urllib.request
 import shutil
 
+# Keep main's versioned archive paired with its authenticated pin:
+# setup-x86_64.exe is rolling. Archive digest verification is recorded in
+# docs-issue/ci-run-41359273298.md. Re-verify before updating either value.
 CYGWIN_SETUP_URL = "https://cygwin.com/setup/setup-2.941.x86_64.exe"
 CYGWIN_SETUP_SHA256 = "9d31ffc08b14eaaf5ddf15799a934f6bc1be3d87ed986736cb1980c508ed9502"
 
@@ -56,6 +60,20 @@ def prepare_cygwin_home(root: Path, user: str) -> Path:
     return home
 
 
+def install_cygwin_packages(root: Path, packages: str, *, timeout: int = 900) -> None:
+    """Each package consumer verifies a fresh copy; no stale shared setup path."""
+    with tempfile.TemporaryDirectory(prefix="qa-cygwin-setup-", dir=root.parent) as directory:
+        setup = Path(directory) / "setup.exe"
+        urllib.request.urlretrieve(CYGWIN_SETUP_URL, setup)
+        if hashlib.sha256(setup.read_bytes()).hexdigest() != CYGWIN_SETUP_SHA256:
+            raise RuntimeError("Cygwin installer checksum differs from pinned version")
+        result = subprocess.run([str(setup), "--quiet-mode", "--no-shortcuts", "--no-startmenu", "--no-desktop",
+            "--root", str(root), "--local-package-dir", str(root.parent / "qa-cygwin-packages"),
+            "--site", "https://mirrors.kernel.org/sourceware/cygwin/", "--packages", packages], timeout=timeout)
+    if result.returncode:
+        raise RuntimeError("Cygwin SSH/Kerberos package installation failed")
+
+
 def install():
     from ci_services import command
     system = platform.system()
@@ -67,19 +85,9 @@ def install():
         command(["brew", "install", "krb5"])
     else:
         root = Path(os.environ["RUNNER_TEMP"]) / "qa-cygwin"
-        setup = root.parent / "qa-cygwin-setup.exe"
         # The official installer verifies the signed repository metadata and
         # each package checksum. Use HTTPS and keep its setup logs as evidence.
-        # Pin the URL as well as the hash: the unversioned installer changes
-        # whenever upstream releases setup, even if our fixture is unchanged.
-        urllib.request.urlretrieve(CYGWIN_SETUP_URL, setup)
-        if hashlib.sha256(setup.read_bytes()).hexdigest() != CYGWIN_SETUP_SHA256:
-            raise RuntimeError("Cygwin installer checksum differs from pinned version")
-        result = subprocess.run([str(setup), "--quiet-mode", "--no-shortcuts", "--no-startmenu", "--no-desktop",
-            "--root", str(root), "--local-package-dir", str(root.parent / "qa-cygwin-packages"),
-            "--site", "https://mirrors.kernel.org/sourceware/cygwin/", "--packages",
-            "openssh,krb5-server,krb5-workstation,python3,coreutils"], timeout=900)
-        if result.returncode: raise RuntimeError("Cygwin SSH/Kerberos package installation failed")
+        install_cygwin_packages(root, "openssh,krb5-server,krb5-workstation,python3,coreutils")
         os.environ["QA_CYGWIN_ROOT"] = root.as_posix()
         with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8", newline="\n") as stream:
             stream.write(f"QA_CYGWIN_ROOT={root.as_posix()}\n")

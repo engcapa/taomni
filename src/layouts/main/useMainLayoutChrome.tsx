@@ -1,11 +1,9 @@
 import { sshBrowserMode } from "../../lib/sshSessionOptions";
 import { parseSessionOptions } from "../../lib/terminalProfile";
-import { FolderOpen } from "lucide-react";
 import { useEffect, useState } from "react";
 import { type ToolWindowRailItem } from "../../components/editor/workspace/panels/ToolWindowRail";
 import { useViewportSize } from "../../hooks/useViewportSize";
 import { resolveChatDock } from "../../lib/chat/chatDock";
-import { getSessionNetworkSettings, toNetworkSettingsPayload } from "../../lib/networkSettings";
 import { getAppPlatform } from "../../lib/runtime";
 import type { Tab } from "../../types";
 import { useMainLayoutState } from "./useMainLayoutState";
@@ -21,7 +19,7 @@ export interface UseMainLayoutChromeContext {
 }
 
 export function useMainLayoutChrome(context: UseMainLayoutChromeContext) {
-  const { layout, windowLifecycle, terminals } = context;
+  const { layout, terminals } = context;
 
   const terminalTabs = layout.tabs.filter((t) => t.type === "terminal");
   const sftpTabs = layout.tabs.filter((t) => t.type === "sftp" && t.sftp);
@@ -38,47 +36,14 @@ export function useMainLayoutChrome(context: UseMainLayoutChromeContext) {
   const mailTabs = layout.tabs.filter((t) => t.type === "mail" && t.mail);
   const terminalSplitVisible =
     layout.terminalSplitActive && terminalTabs.length > 0 && layout.activeTab?.type === "terminal";
-  // ED-PARITY-027 B: a terminal's tool windows (attached SFTP, Chat) move from
-  // its floating actions into the collapsed sidebar rail.
+  // Chat follows the merged rail; SFTP always stays in the terminal actions.
   const terminalRailMerged = layout.mergeToolWindowRail && layout.sidebarCollapsed && !!layout.mainRailHost
     && layout.activeTab?.type === "terminal" && !terminalSplitVisible;
   const toggleTerminalSftp = (tab: Tab) => {
     if (sshBrowserMode(parseSessionOptions(tab.ssh?.optionsJson).sshBrowser) === "disabled") return;
-    if (layout.sftpDetachedTabs[tab.id] && tab.ssh) {
-      windowLifecycle.openDetachedSftp(
-        {
-          sessionId: `attached-${tab.id}`,
-          host: tab.ssh.host,
-          port: tab.ssh.port,
-          username: tab.ssh.username,
-          authMethod: tab.ssh.authMethod,
-          authData: tab.ssh.authData,
-          networkSettingsJson: JSON.stringify(
-            toNetworkSettingsPayload(getSessionNetworkSettings(tab.ssh.optionsJson)),
-          ),
-          initialPath: layout.terminalCwds[tab.id],
-          attachedToTerminal: true,
-        },
-        `${tab.title} — SFTP`,
-      );
-    } else {
-      terminals.toggleAttachedSidebar(tab.id);
-    }
+    terminals.toggleAttachedSidebar(tab.id);
   };
   const terminalRailItems: ToolWindowRailItem[] = [];
-  if (terminalRailMerged && layout.activeTab) {
-    const railTab = layout.activeTab;
-    if (railTab.ssh && sshBrowserMode(parseSessionOptions(railTab.ssh.optionsJson).sshBrowser) !== "disabled") {
-      terminalRailItems.push({
-        id: "sftp",
-        label: layout.t("terminal.sftpFloatingButtonLabel"),
-        icon: <FolderOpen />,
-        active: !!layout.attachedSidebars[railTab.id],
-        testId: "attached-sftp-toggle",
-        onSelect: () => toggleTerminalSftp(railTab),
-      });
-    }
-  }
   const effectiveMultiExecSelectedCount = layout.terminalSplitActive
     ? [...layout.multiExecSelectedTabIds].filter((id) => !layout.terminalSplitInputLockedTabIds.has(id)).length
     : layout.multiExecSelectedTabIds.size;

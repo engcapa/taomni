@@ -289,6 +289,9 @@ def main() -> None:
                         value = evaluate("imports.gi.GLib.getenv('XAUTHORITY')")
                     elif name in {"geometry", "place"}:
                         value = window_command(request, diagnostics)
+                    elif name == "capture_grid":
+                        from ci_wayland_capture import capture_grid
+                        value = capture_grid(evaluate, request.get("rect"))
                     elif name == "pointer":
                         value = pointer(request["x"], request["y"])
                     elif name == "pointer_position":

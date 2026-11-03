@@ -45,7 +45,20 @@
           root.dataset.appTheme = resolved;
           root.dataset.appThemeMode = mode;
           root.style.colorScheme = resolved;
-          root.style.background = resolved === "dark" ? "#15171c" : "#ffffff";
+          // The native screenshot overlay window is transparent until its
+          // captured desktop is drawn: never paint a theme-coloured frame
+          // there (the pin document editor uses #screenshot-overlay-document
+          // and keeps the opaque theme background).
+          var internals = window.__TAURI_INTERNALS__;
+          var label = internals && internals.metadata && internals.metadata.currentWindow
+            ? internals.metadata.currentWindow.label
+            : "";
+          if (label === "screenshot-overlay" && location.hash === "#screenshot-overlay") {
+            root.classList.add("screenshot-overlay-surface");
+            root.style.background = "transparent";
+          } else {
+            root.style.background = resolved === "dark" ? "#15171c" : "#ffffff";
+          }
         } catch (_) {
           /* noop */
         }

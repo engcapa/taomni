@@ -1,7 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-vi.mock("../../lib/ipc", () => ({ listSystemFonts: async () => ["Arial", "Noto Sans"] }));
+vi.mock("../../lib/ipc/application", () => ({ listSystemFonts: async () => ["Arial", "Noto Sans"] }));
 import { ScreenshotOverlay } from "./ScreenshotOverlay";
+import { installOverlayCanvasStub, installOverlayImageStub } from "./overlayTestHarness";
 
 const api = vi.hoisted(() => ({
   updateSourcePin: vi.fn(), listDisplays: vi.fn(), switchScreenshotDisplay: vi.fn(), fetchOverlayInit: vi.fn(), captureFull: vi.fn(), loadScreenshotUrl: vi.fn(), revokeScreenshotUrl: vi.fn(),
@@ -9,6 +10,8 @@ const api = vi.hoisted(() => ({
   saveImageToFile: vi.fn(), pinToScreen: vi.fn(), ocrImage: vi.fn(), autoRedact: vi.fn(),
   scrollCapture: vi.fn(), scrollPlan: vi.fn(), openImageEditor: vi.fn(), updateOverlayImage: vi.fn(), startRecording: vi.fn(),
 }));
+const dialogs = vi.hoisted(() => ({ save: vi.fn(), open: vi.fn() }));
+vi.mock("@tauri-apps/plugin-dialog", () => dialogs);
 vi.mock("../../lib/screenshot", async (original) => ({
   ...await original<typeof import("../../lib/screenshot")>(), ...api,
 }));
@@ -32,32 +35,8 @@ beforeEach(() => {
   api.openImageEditor.mockResolvedValue("working-copy.png");
   api.ocrImage.mockResolvedValue({ text: "user@example.com" });
   api.autoRedact.mockResolvedValue({ count: 2, boxes: [{ x: 10, y: 20, w: 40, h: 20 }, { x: 80, y: 20, w: 40, h: 20 }] });
-  vi.stubGlobal("Image", function () {
-    const image = document.createElement("img");
-    image.decode = vi.fn().mockResolvedValue(undefined);
-    let width = 2048, height = 1152;
-    Object.defineProperties(image, {
-      naturalWidth: { get: () => width }, naturalHeight: { get: () => height },
-      src: { set: (url: string) => {
-        const size = /base64,(\d+)x(\d+)$/.exec(url);
-        if (size) { width = Number(size[1]); height = Number(size[2]); }
-        queueMicrotask(() => image.onload?.(new Event("load")));
-      } },
-    });
-    return image;
-  });
-  const context = new Proxy({} as CanvasRenderingContext2D, {
-    get: (target, name) => {
-      if (name === "getTransform") return () => ({ a: 1 });
-      if (name === "getImageData") return () => ({ data: new Uint8ClampedArray(4), width: 1, height: 1 });
-      if (!Reflect.has(target, name)) Reflect.set(target, name, vi.fn());
-      return Reflect.get(target, name);
-    },
-  });
-  vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(context);
-  vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockImplementation(function (this: HTMLCanvasElement) {
-    return `data:image/png;base64,${this.width}x${this.height}`;
-  });
+  installOverlayImageStub();
+  installOverlayCanvasStub();
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
@@ -74,6 +53,58 @@ function drag(id: string, from: [number, number], to: [number, number]) {
 const shapes = () => screen.getByTestId("screenshot-annotation-canvas").getAttribute("data-shapes");
 
 describe("ScreenshotOverlay", () => {
+  it("a retired export cannot open a Save dialog over the next resident generation", async () => {
+    let finishExport!: (file: { path: string; width: number; height: number }) => void;
+    api.saveDataUrl.mockReturnValueOnce(new Promise((resolve) => { finishExport = resolve; }));
+    const first = render(<ScreenshotOverlay />);
+    await screen.findByTestId("screenshot-hint");
+    drag("screenshot-select-layer", [100, 100], [500, 400]);
+    fireEvent.click(screen.getByTestId("screenshot-save"));
+    await waitFor(() => expect(api.saveDataUrl).toHaveBeenCalledOnce());
+    first.unmount();
+    render(<ScreenshotOverlay />);
+    await screen.findByTestId("screenshot-hint");
+    await act(async () => finishExport({ path: "retired-export.png", width: 400, height: 300 }));
+    expect(dialogs.save).not.toHaveBeenCalled();
+    expect(api.saveImageToFile).not.toHaveBeenCalled();
+    expect(api.closeScreenshotOverlay).not.toHaveBeenCalled();
+    expect(screen.getByTestId("screenshot-overlay")).toHaveAttribute("data-phase", "select");
+  });
+
+  it("a retired copy cannot close the next resident generation", async () => {
+    let finishCopy!: () => void;
+    api.copyImageToClipboard.mockReturnValueOnce(new Promise<void>((resolve) => { finishCopy = resolve; }));
+    const first = render(<ScreenshotOverlay />);
+    await screen.findByTestId("screenshot-hint");
+    drag("screenshot-select-layer", [100, 100], [500, 400]);
+    fireEvent.click(screen.getByTestId("screenshot-copy"));
+    await waitFor(() => expect(api.copyImageToClipboard).toHaveBeenCalledOnce());
+    first.unmount();
+    render(<ScreenshotOverlay />);
+    await screen.findByTestId("screenshot-hint");
+    await act(async () => finishCopy());
+    expect(api.closeScreenshotOverlay).not.toHaveBeenCalled();
+    expect(screen.getByTestId("screenshot-overlay")).toHaveAttribute("data-phase", "select");
+  });
+
+  it("retains the crop and annotations after a clipboard failure and allows a successful retry", async () => {
+    api.copyImageToClipboard.mockRejectedValueOnce(new Error("clipboard occupied")).mockResolvedValueOnce(undefined);
+    await open();
+    drag("screenshot-select-layer", [100, 100], [500, 400]);
+    fireEvent.click(screen.getByTestId("screenshot-tool-rect"));
+    drag("screenshot-annotation-layer", [150, 150], [250, 250]);
+    expect(shapes()).toBe("1");
+    fireEvent.click(screen.getByTestId("screenshot-copy"));
+    await waitFor(() => expect(api.copyImageToClipboard).toHaveBeenCalledOnce());
+    await waitFor(() => expect(screen.getByTestId("screenshot-copy")).not.toBeDisabled());
+    expect(api.closeScreenshotOverlay).not.toHaveBeenCalled();
+    expect(shapes()).toBe("1");
+    expect(screen.getByTestId("screenshot-selection")).toBeVisible();
+    fireEvent.click(screen.getByTestId("screenshot-copy"));
+    await waitFor(() => expect(api.closeScreenshotOverlay).toHaveBeenCalledOnce());
+    expect(api.copyImageToClipboard).toHaveBeenCalledTimes(2);
+  });
+
   it.each(["replace", "new", "copy"])("Done in a pin editor copies and performs the chosen %s action", async (action) => {
     api.fetchOverlayInit.mockResolvedValueOnce({ path: "pin.png", displayId: "0,0", width: 2048, height: 1152, scaleFactor: 1, document: true, sourcePin: "screenshot-pin-1" });
     render(<ScreenshotOverlay />);
@@ -466,10 +497,12 @@ describe("ScreenshotOverlay", () => {
   });
 
   it("renders load errors with a usable cancel action", async () => {
-    api.fetchOverlayInit.mockRejectedValueOnce(new Error("no pending capture"));
+    api.fetchOverlayInit.mockRejectedValueOnce(new Error("no pending screenshot overlay"));
     api.captureFull.mockRejectedValueOnce(new Error("screen permission denied"));
     render(<ScreenshotOverlay />);
     await screen.findByTestId("screenshot-overlay-error");
+    // No backend session (dev/QA direct open): the overlay captured live.
+    expect(api.captureFull).toHaveBeenCalledOnce();
     expect(screen.queryByTestId("screenshot-base-image")).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId("screenshot-cancel"));
     await waitFor(() => expect(api.closeScreenshotOverlay).toHaveBeenCalledOnce());

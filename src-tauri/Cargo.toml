@@ -321,6 +321,8 @@ windows = { version = "0.62", features = [
   "Win32_System_WinRT_Graphics_Capture",
   "Win32_Foundation",
   "Win32_Graphics_Gdi",
+  # Screenshot startup: DwmFlush after excluding app windows from capture.
+  "Win32_Graphics_Dwm",
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_WindowsAndMessaging",
   # RDP server: built-in Remote Desktop detection (TermService state and
@@ -357,7 +359,7 @@ xcap = "0.9.6"
 objc2 = "0.6.4"
 block2 = "0.6.2"
 dispatch2 = "0.3.1"
-objc2-foundation = { version = "0.3.2", features = ["NSArray", "NSError", "NSData", "NSDictionary", "NSString"] }
+objc2-foundation = { version = "0.3.2", features = ["NSArray", "NSError", "NSData", "NSDictionary", "NSProcessInfo", "NSString"] }
 objc2-app-kit = { version = "0.3.2", default-features = false, features = ["NSPasteboard"] }
 objc2-core-media = { version = "0.3.2", features = ["CMSampleBuffer", "objc2-core-video"] }
 # AudioBufferList/ASBD for the RDPSND ScreenCaptureKit system-audio loopback.

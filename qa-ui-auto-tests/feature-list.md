@@ -2452,7 +2452,21 @@ files:
   - src/components/filebrowser/FileBrowser.tsx
   - src/components/filebrowser/FileToolbar.tsx
   - src/components/filebrowser/SftpDetachedWindow.tsx
+  - src/components/filebrowser/SftpFloatingButton.tsx
+  - src/layouts/main/reattachSftp.ts
 controls:
+  - id: floating-entry
+    selector: '[data-testid="sftp-floating-button"]'
+    kind: interactive
+    optional: true       # SSH attached panel is hidden
+  - id: restore-sidebar
+    selector: '[data-testid="sftp-reattach"]'
+    kind: interactive
+    optional: true       # detached SFTP window
+  - id: detached-window
+    selector: '[data-testid="sftp-detached-window"]'
+    kind: display
+    optional: true
   - id: detach
     selector: '[data-testid="sftp-detach"]'
     kind: interactive
@@ -2474,9 +2488,9 @@ controls:
     optional: true
 -->
 
-- **附加侧边栏**：每个 SSH 终端右上角 `attached-sftp-toggle`，与终端共用凭证；远程面板首次跟随 OSC 7 跳转一次，工具条 Sync 按钮可手动重跳
+- **附加侧边栏**：SSH 终端的 `…` 菜单始终保留 `attached-sftp-toggle`，Sessions 树展开或收缩均不迁移到左栏。面板隐藏时显示小型可拖动的 `sftp-floating-button`，打开后悬浮入口消失；面板右上角的隐藏图标恢复悬浮入口及其位置。目录仅由显式导航和 Sync 按钮更新。
 - **独立标签页**：从会话编辑器选择 `SessionType::SFTP` → 全标签 `FileBrowser`，未激活时仍挂载以保持传输
-- **分离窗口**：附加 / 独立两种均提供 Detach 入口
+- **分离窗口**：附加 / 独立两种均提供 Detach 入口；窗口顶部 `sftp-reattach` 将当前远端、本地目录还原到原侧边面板或原 SFTP 标签，保留 SSH 终端。源标签已关闭时恢复为独立 SFTP 标签。
   - Tauri：通过 `open_sftp_window` 打开真实 OS WebviewWindow
   - 浏览器：`window.open` 兜底
   - 使用独立 sessionId（`__detached`）避免与父窗口共享 SFTP channel

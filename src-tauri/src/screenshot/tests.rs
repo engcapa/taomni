@@ -59,6 +59,7 @@ fn close_session_state_resets_overlay_and_recording() {
             window_region: None,
             document: false,
             source_pin: None,
+            generation: 0,
         });
         state.hidden = vec!["main".into()];
     }

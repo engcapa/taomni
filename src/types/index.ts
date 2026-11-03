@@ -567,6 +567,7 @@ export interface SftpTabInfo {
   authData: string | null;
   networkSettingsJson?: string | null;
   initialPath?: string;
+  initialLocalPath?: string;
   attachedToTerminal?: boolean;
   /** Deployment path mappings: local ↔ remote directory pairs. */
   pathMappings?: SftpPathMapping[];

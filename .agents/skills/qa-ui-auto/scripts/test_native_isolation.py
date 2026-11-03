@@ -473,6 +473,8 @@ class NativeIsolationTest(unittest.TestCase):
             driver = native.TauriDriverProcess({}, Path(directory))
             process = Mock(pid=31415)
             process.poll.return_value = None
+            replacement = Mock(pid=27182)
+            replacement.poll.return_value = None
             driver.proc = process
             session = native.NativeSession(driver.url, driver.application, driver.mark_session_closed)
             session.session_id = "lost-session"
@@ -480,7 +482,8 @@ class NativeIsolationTest(unittest.TestCase):
             with patch.object(native.platform, "system", return_value="Windows"), \
                  patch.object(native.subprocess, "run", return_value=Mock(returncode=0)) as kill, \
                  patch.object(native, "_tcp_ok", return_value=False), \
-                 patch.object(driver, "start") as start:
+                 patch.object(driver, "start", side_effect=lambda: setattr(driver, "proc", replacement)) as start, \
+                 patch("native_windows_integrity.ensure_medium_driver_tree") as integrity:
                 with self.assertRaisesRegex(native.WebDriverError, "no such session"):
                     session.close()
                 kill.assert_called_once_with(
@@ -489,8 +492,12 @@ class NativeIsolationTest(unittest.TestCase):
                 )
                 process.wait.assert_called_once_with(timeout=5)
                 self.assertIsNone(driver.proc)
+                integrity.assert_not_called()
                 driver.ensure_running()
                 start.assert_called_once_with()
+                self.assertIs(driver.proc, replacement)
+                integrity.assert_called_once_with(replacement.pid)
+                kill.assert_called_once()
 
     def test_windows_tree_cleanup_failure_is_observable_and_retriable(self):
         with TemporaryDirectory() as directory:

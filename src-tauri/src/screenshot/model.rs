@@ -11,6 +11,9 @@ pub struct OverlayInit {
     pub window_region: Option<PhysicalRegion>,
     pub document: bool,
     pub source_pin: Option<String>,
+    /// `SESSION_GENERATION` of the session that owns this payload; the
+    /// renderer echoes it in `screenshot_overlay_ready`.
+    pub generation: u64,
 }
 
 #[derive(Clone, Debug, Serialize)]

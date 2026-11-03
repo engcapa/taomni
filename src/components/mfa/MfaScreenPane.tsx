@@ -16,7 +16,12 @@ export function MfaScreenPane({ onTexts }: { onTexts: (texts: string[]) => MfaTe
   const scan = async () => {
     setState({ kind: "busy" });
     try {
-      const texts = await decodeLumaFrames(await mfaCaptureScreens());
+      const frames = await mfaCaptureScreens();
+      const texts = await decodeLumaFrames(frames);
+      if (import.meta.env.MODE === "qa") console.info("[qa MFA scan]", {
+        frames: frames.map(({ width, height }) => ({ width, height })),
+        decoded: texts.map((text) => ({ length: text.length, otp: text.startsWith("otpauth") })),
+      });
       if (texts.length === 0) {
         setState({ kind: "error", message: t("mfa.screenNoQr") });
         return;

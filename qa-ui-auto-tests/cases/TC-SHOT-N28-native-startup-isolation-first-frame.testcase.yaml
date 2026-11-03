@@ -1,0 +1,30 @@
+id: TC-SHOT-N28
+title: Native screenshot startup isolates the main-window marker and restores the application
+description: "Mandatory correctness evidence for the low-latency startup pipeline (I1/I6 with P1-2 early window, P1-3 overlapped Linux capture and verified P1-6 capture exclusion). Paint the main window #ff00ff. A direct visible control must contain at least 400 near-exact marker pixels, counted at every pixel. Where exclusion is enabled it must remove this marker and release must bring it back. Five production opens must store base images with zero marker pixels, hide main during selection and restore it on close. On 2026-11-02 the user explicitly prioritized entering selection promptly and accepted brief flicker; this case therefore no longer gates zero-flash or the independent sampler's 100ms resolution. The strict startup-flash diagnostic and its historical failures remain unchanged and do not become passes. No delay is added to hide a flash. Timing and resident ownership are independently covered by N27/N30."
+covers: [F27.1]
+tags: [screenshot, native, p1]
+modes: [native]
+native_platforms: [Linux, Windows, macOS]
+fixtures: [reset_db]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario: {scenario: startup-isolation}
+- assert_visible: '[data-testid="system-screenshot"]'
+- assert_no_runtime_errors:
+verification:
+  review: reviewed
+  requirements:
+  - id: startup-isolation
+    requirement: The near-exact main-window marker is absent from every pixel of the captured base image on the platform's production startup path; exclusion is verified and released where enabled, and every session restores the main window. This check does not establish absence of unmarked detached windows.
+    actions: [1, 2]
+    checkpoints:
+    - {step: 3, expectation: "controlMarkerPixels at least 400; exclusion unsupported/disabled or passed (main excluded, 0 marker pixels while excluded, at least 400 after release); all five opens have markerPixels 0, mainHiddenDuringSession true, closed true and mainRestored true."}
+    - {step: 4, expectation: Main renderer is restored and usable.}
+    - {step: 5, expectation: No runtime errors were emitted.}
+    results: [3, 4, 5]
+  visual:
+  - {check: Base image isolation, method: automated, reason: "Near-exact #ff00ff pixels are counted across the complete real image; arbitrary purple icons are not the marker. The control, excluded image and first base image are retained. Brief flicker is accepted by the updated user goal; historical flash evidence remains diagnostic."}
+  native:
+  - {check: Real capture APIs and window isolation, method: automated, reason: "The QA app calls real production exclusion/open commands and verifies actual image pixels, native visibility, close and restoration. Browser stubs or handshake timestamps cannot establish this evidence."}

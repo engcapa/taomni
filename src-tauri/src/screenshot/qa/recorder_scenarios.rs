@@ -27,7 +27,10 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
             rejected == true
                 && app
                     .get_webview_window(super::super::OVERLAY_LABEL)
-                    .is_none(),
+                    .is_none_or(|window| {
+                        super::super::overlay_resident::is_idle()
+                            && window.is_visible().ok() == Some(false)
+                    }),
             None,
             None,
         )
@@ -44,9 +47,23 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
         (selected == true, current_region, window_artifact)
     };
     let current_visible = main_visible(&app);
+    // Public menu trigger is intentionally fire-and-forget. A committed
+    // selection can precede the original open's focus completion; do not
+    // immediately close/retrigger while its unchanged OPENING guard is held.
+    let opening_deadline = Instant::now() + Duration::from_secs(3);
+    while super::super::OPENING.load(Ordering::SeqCst) && Instant::now() < opening_deadline {
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    let entry_finished = !super::super::OPENING.load(Ordering::SeqCst);
     super::super::close_session(&app);
     wait_closed(&app, super::super::OVERLAY_LABEL, Duration::from_secs(5)).await;
     super::super::open_overlay(&app, None).await?;
+    // On the exclusion path, hide is queued after showing the captured
+    // overlay. Observe the actual native state rather than racing that queue.
+    let hidden_deadline = Instant::now() + Duration::from_secs(3);
+    while main_visible(&app) && Instant::now() < hidden_deadline {
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
     let default_hidden = !main_visible(&app)
         && super::super::screenshot_overlay_init()
             .await?
@@ -298,6 +315,7 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
     });
     Ok(report(
         current_visible
+            && entry_finished
             && selected
             && (current_window_unsupported || current_region.is_some())
             && default_hidden
@@ -311,7 +329,7 @@ pub async fn screenshot_qa_controls(app: AppHandle) -> Result<String, String> {
             && cancelled == json!(true)
             && cleanup
             && artifact.is_some(),
-        json!({"currentWindowVisible":current_visible,"currentWindowReadyToSelect":selected,"currentWindowUnsupported":current_window_unsupported,"currentRegion":current_region,
+        json!({"currentWindowVisible":current_visible,"currentEntryFinished":entry_finished,"currentWindowReadyToSelect":selected,"currentWindowUnsupported":current_window_unsupported,"currentRegion":current_region,
             "defaultHidesWindows":default_hidden,"requestedRegion":requested_region,"selectedRegion":region,"scrollCompleted":completed,"scrollProgress":progress,"geometry":geometry,"comparison":comparison,
             "markedClipboard":marked_clipboard,"redLinePixels":red,"greenLinePixels":green,"annotatedArtifact":annotated_artifact,
             "scrollCancelledPreservesAnnotations":cancelled,"controlsCleaned":cleanup,"artifact":artifact,

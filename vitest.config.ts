@@ -17,6 +17,7 @@ export default defineConfig(({ mode }) => ({
     __TAOMNI_QA_SAVE_GATE__: JSON.stringify(false),
     __TAOMNI_QA_COMPLETION_OBSERVATION__: JSON.stringify(false),
     __TAOMNI_QA_UPDATER__: JSON.stringify(false),
+    __TAOMNI_QA_OVERLAY_TIMING__: JSON.stringify(true),
   },
   test: {
     environment: "jsdom",

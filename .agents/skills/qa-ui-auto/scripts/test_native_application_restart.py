@@ -10,6 +10,7 @@ from native_webdriver_transport import WebDriverError
 class NativeApplicationRestartTest(unittest.TestCase):
     def setUp(self):
         self.shutdown = patch("native_application_restart.wait_for_application_shutdown", return_value={"process_ids": []}).start()
+        self.x11 = patch("native_application_restart.uses_x11_window_close", return_value=False).start()
         self.addCleanup(patch.stopall)
 
     def scenario(self):
@@ -179,6 +180,68 @@ class NativeApplicationRestartTest(unittest.TestCase):
             restart_owned_application(driver, session)
         self.assertEqual(session.application_restart_observation["cleanup_errors"], ["cleanup connection refused"])
         driver.stop.assert_called_once()
+        driver.start.assert_not_called()
+
+    def test_x11_close_requires_native_surface_disappearance_and_storage_exit(self):
+        session, driver, events = self.scenario()
+        self.x11.return_value = True
+        observed = {"transport": "X11 window-manager close", "pid": 123,
+                    "window_id": "0x123", "window_closed": False}
+        session.execute.side_effect = WebDriverError('HTTP 500: {"value":{"error":"unknown error","message":""}}')
+        with patch("native_application_restart.close_x11_application_window", return_value=observed) as close, \
+                patch("native_application_restart.x11_window_closed", side_effect=[False, True]) as closed, \
+                patch("native_application_restart.time.sleep"):
+            result = restart_owned_application(driver, session)
+        close.assert_called_once_with(session.application, {})
+        session.click.assert_not_called()
+        self.assertEqual(closed.call_count, 2)
+        self.shutdown.assert_called_once_with(driver, session, {})
+        self.assertIn("HTTP 500", observed["webdriver_close_error"])
+        self.assertEqual(result["native_close"], observed)
+        self.assertEqual(events, ["close", "stop-owner", "start-owner", "start-session"])
+
+    def test_x11_unknown_error_with_existing_native_window_stays_failed(self):
+        session, driver, _ = self.scenario()
+        self.x11.return_value = True
+        session.execute.side_effect = WebDriverError("HTTP 500: unknown error")
+        observed = {"transport": "X11 window-manager close", "window_id": "0x123"}
+        with patch("native_application_restart.close_x11_application_window", return_value=observed), \
+                patch("native_application_restart.x11_window_closed", return_value=False), \
+                patch("native_application_restart.time.monotonic", side_effect=[0, 0, 16]), \
+                patch("native_application_restart.time.sleep"):
+            with self.assertRaisesRegex(RuntimeError, "did not close"):
+                restart_owned_application(driver, session)
+        self.shutdown.assert_not_called()
+        driver.start.assert_not_called()
+        self.assertIn("HTTP 500", session.application_restart_observation["native_close"]["webdriver_close_error"])
+
+    def test_x11_confirmation_is_not_bypassed_and_uncertain_storage_is_not_killed_for_pass(self):
+        for dialog in (True, False):
+            with self.subTest(dialog=dialog):
+                session, driver, _ = self.scenario()
+                self.x11.return_value = True
+                session.execute.side_effect = None
+                session.execute.return_value = "Exit confirmation" if dialog else None
+                self.shutdown.reset_mock()
+                self.shutdown.side_effect = RuntimeError("storage processes did not exit normally")
+                observed = {"transport": "X11 window-manager close", "window_id": "0x123"}
+                with patch("native_application_restart.close_x11_application_window", return_value=observed), \
+                        patch("native_application_restart.x11_window_closed", return_value=not dialog):
+                    with self.assertRaisesRegex(RuntimeError, "confirmation" if dialog else "storage processes"):
+                        restart_owned_application(driver, session)
+                driver.start.assert_not_called()
+                session.click.assert_not_called()
+
+    def test_x11_close_identity_failure_never_dispatches_a_fallback_click(self):
+        session, driver, _ = self.scenario()
+        self.x11.return_value = True
+        with patch("native_application_restart.close_x11_application_window",
+                   side_effect=WebDriverError("No unique managed X11 window")):
+            with self.assertRaisesRegex(WebDriverError, "No unique"):
+                restart_owned_application(driver, session)
+        session.click.assert_not_called()
+        session.execute.assert_not_called()
+        self.shutdown.assert_not_called()
         driver.start.assert_not_called()
 
     def test_reused_session_cannot_claim_a_cold_start(self):

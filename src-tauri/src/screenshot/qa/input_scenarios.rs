@@ -497,7 +497,10 @@ pub async fn screenshot_qa_hotkey(app: AppHandle) -> Result<String, String> {
         let disabled = super::super::shortcut::screenshot_shortcut_set(app.clone(), Some(String::new())).await?;
         press_hotkey().await?;
         tokio::time::sleep(Duration::from_millis(800)).await;
-        let did_not_open = app.get_webview_window(super::super::OVERLAY_LABEL).is_none();
+        let did_not_open = super::super::tool_state().overlay.is_none()
+            && app.get_webview_window(super::super::OVERLAY_LABEL)
+                .is_none_or(|window| super::super::overlay_resident::is_idle()
+                    && window.is_visible().ok() == Some(false));
         Ok::<_,String>((status.registered, ready == json!(true), closed, restored, !disabled.enabled && did_not_open))
     }.await;
     super::super::close_session(&app);
@@ -511,9 +514,16 @@ pub async fn screenshot_qa_hotkey(app: AppHandle) -> Result<String, String> {
         None => std::fs::remove_file(&settings_path).is_ok(),
     };
     let (registered, opened, closed, restored, disabled) = result?;
-    let same_shortcut = restored_status
-        .as_ref()
-        .is_ok_and(|s| s.accelerator == previous.accelerator);
+    // A separately installed app may already own the initial default chord.
+    // Restore the exact prior config AND registration state without stealing
+    // that chord or pretending an unavailable registration was successful.
+    if restored_status.is_err() && !previous.registered && settings_restored {
+        super::super::shortcut::init(&app);
+    }
+    let actual_status = super::super::shortcut::screenshot_shortcut_status().await?;
+    let same_shortcut = actual_status.accelerator == previous.accelerator
+        && actual_status.enabled == previous.enabled
+        && actual_status.registered == previous.registered;
     Ok(report(
         registered
             && opened
@@ -523,6 +533,7 @@ pub async fn screenshot_qa_hotkey(app: AppHandle) -> Result<String, String> {
             && same_shortcut
             && settings_restored,
         json!({"registered":registered,"overlayLoaded":opened,"nativeCloseRestoredMain":closed && restored,
-            "disabledDoesNotTrigger":disabled,"originalShortcutRestored":same_shortcut,"originalSettingsRestored":settings_restored}),
+            "disabledDoesNotTrigger":disabled,"originalShortcutRestored":same_shortcut,"originalSettingsRestored":settings_restored,
+            "previousStatus":previous,"restoredStatus":actual_status,"restoreError":restored_status.err()}),
     ))
 }

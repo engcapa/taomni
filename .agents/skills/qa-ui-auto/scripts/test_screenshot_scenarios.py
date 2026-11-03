@@ -55,11 +55,28 @@ class ScreenshotScenariosTest(TestCase):
                 files = list(self.ctx.case_dir.glob("screenshot-capture-png-*.json"))
                 self.assertTrue(any(json.loads(path.read_text())["transportError"] == str(error) for path in files))
 
+    def test_marker_raii_cleanup_is_a_script_not_an_async_function_body(self):
+        import subprocess
+        import re
+        root = Path(__file__).resolve().parents[4]
+        source = (root / "src-tauri/src/screenshot/qa/startup_isolation.rs").read_text(encoding="utf-8")
+        script = re.search(r'self\s*\.\s*0\s*\.\s*eval\(\s*"([^"\n]+)"\s*\)', source)
+        if script is None:
+            self.fail("native marker cleanup eval script not found")
+        expression = script.group(1)
+        subprocess.run(["node", "-e", "const vm=require('node:vm');new vm.Script(process.argv[1]);", expression],
+                       check=True, capture_output=True, text=True, timeout=10)
+
     def test_new_scenarios_only_invoke_their_fixed_commands(self):
-        for scenario, command in (("current-window", "screenshot_qa_current_window"), ("pin-tools", "screenshot_qa_pin_tools"), ("pin-arrangement", "screenshot_qa_pin_arrangement"), ("scroll-manual", "screenshot_qa_scroll_manual"), ("colors", "screenshot_qa_colors"), ("capture-fidelity", "screenshot_qa_capture_fidelity"), ("ocr-redact", "screenshot_qa_ocr_redact"), ("freehand", "screenshot_qa_freehand"), ("controls", "screenshot_qa_controls"), ("full-recorder", "screenshot_qa_full_recorder"), ("scroll-permission-error", "screenshot_qa_scroll_permission_error"), ("capture-permission-error", "screenshot_qa_capture_permission_error"), ("escape-entry", "screenshot_qa_escape_entry"), ("x11-compositor-bypass", "screenshot_qa_x11_compositor_bypass")):
+        for scenario, command in (("current-window", "screenshot_qa_current_window"), ("pin-tools", "screenshot_qa_pin_tools"), ("pin-arrangement", "screenshot_qa_pin_arrangement"), ("scroll-manual", "screenshot_qa_scroll_manual"), ("colors", "screenshot_qa_colors"), ("capture-fidelity", "screenshot_qa_capture_fidelity"), ("ocr-redact", "screenshot_qa_ocr_redact"), ("freehand", "screenshot_qa_freehand"), ("controls", "screenshot_qa_controls"), ("full-recorder", "screenshot_qa_full_recorder"), ("scroll-permission-error", "screenshot_qa_scroll_permission_error"), ("capture-permission-error", "screenshot_qa_capture_permission_error"), ("escape-entry", "screenshot_qa_escape_entry"), ("startup-timing", "screenshot_qa_startup_timing"), ("startup-isolation", "screenshot_qa_startup_isolation"), ("startup-flash", "screenshot_qa_startup_flash"), ("clipboard-retry", "screenshot_qa_clipboard_retry"), ("resident-overlay", "screenshot_qa_resident_overlay"), ("x11-compositor-bypass", "screenshot_qa_x11_compositor_bypass")):
             self.ctx.session.execute.side_effect = [True, {"done": True, "value": 'OK {"pixels":100}'}, True]
             run_scenario(self.ctx, {"scenario": scenario})
             self.assertIn(command, self.ctx.session.execute.call_args_list[-3].args[0])
+
+    def test_startup_measurement_waits_longer_than_the_default_scenario(self):
+        from qa_ui_auto import screenshot_scenarios
+        self.assertGreater(screenshot_scenarios.DEADLINES["startup-timing"], screenshot_scenarios.DEFAULT_DEADLINE)
+        self.assertTrue(set(screenshot_scenarios.DEADLINES) <= set(SCENARIOS))
 
     def test_macos_source_passes_only_the_format_to_fixed_command(self):
         self.ctx.session.execute.side_effect = [True, {"done": True, "value": 'OK {"streamOpens":0,"snapshotReads":20}'}, True]

@@ -68,7 +68,9 @@ pub async fn screenshot_scroll_capture(
         }
     };
     let generation = SESSION_GENERATION.load(Ordering::SeqCst);
-    let overlay = app.get_webview_window(OVERLAY_LABEL);
+    let overlay = app
+        .get_webview_window(OVERLAY_LABEL)
+        .filter(|_| tool_state().overlay.is_some());
     if let Some(window) = &overlay {
         let _ = window.hide();
     }

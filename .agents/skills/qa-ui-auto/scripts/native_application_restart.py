@@ -11,6 +11,7 @@ import time
 from native_process_group import wait_for_driver_ports
 from native_application_shutdown import linux_storage_processes, wait_for_application_shutdown
 from native_webdriver_transport import WebDriverError
+from native_window_close_x11 import close_x11_application_window, x11_window_closed
 
 
 def close_macos_application_window(application: Path) -> dict:
@@ -27,7 +28,13 @@ def close_macos_application_window(application: Path) -> dict:
     return observation
 
 
-def close_application_window(session, timeout: float = 15) -> dict | None:
+def uses_x11_window_close() -> bool:
+    return (platform.system() == "Linux" and not os.environ.get("WAYLAND_DISPLAY")
+            and os.environ.get("XDG_SESSION_TYPE", "").lower() != "wayland")
+
+
+def close_application_window(session, timeout: float = 15,
+                             processes: dict[int, str] | None = None) -> dict | None:
     """Use the production close path before releasing the owned driver tree.
 
     DELETE-session/kill is teardown, not a normal application close. In
@@ -47,6 +54,11 @@ def close_application_window(session, timeout: float = 15) -> dict | None:
     try:
         if session.transport == "macOS WKWebView bridge":
             observation = close_macos_application_window(session.application)
+        elif processes is not None and uses_x11_window_close():
+            observation = close_x11_application_window(session.application, processes)
+            # Preserve independent native evidence even if WebDriver loses its
+            # reply while the normal close handler destroys the WebView.
+            session.application_restart_observation["native_close"] = observation
         else:
             session.click('[data-testid="window-close"]')
     except (WebDriverError, OSError) as error:
@@ -73,15 +85,24 @@ def close_application_window(session, timeout: float = 15) -> dict | None:
             return observation
         else:
             raise
+    native_x11 = observation is not None and observation.get("transport") == "X11 window-manager close"
     end = time.monotonic() + timeout
     while time.monotonic() < end:
         if session.deadline:
             session.deadline.remaining()
+        if native_x11 and observation is not None and x11_window_closed(observation):
+            return observation
         try:
             dialog = session.execute(
                 'return document.querySelector("[data-testid=confirm-dialog]")?.textContent ?? null;'
             )
         except (WebDriverError, OSError) as error:
+            if native_x11 and observation is not None:
+                # No transport error proves closure. Observe this exact XID
+                # independently, without replaying input or killing its owner.
+                observation["webdriver_close_error"] = str(error)
+                time.sleep(0.05)
+                continue
             if closed(error):
                 return observation
             raise
@@ -103,7 +124,7 @@ def restart_owned_application(driver, session) -> dict:
     processes = linux_storage_processes(driver, session.application) if platform.system() == "Linux" else {}
     primary_error = None
     try:
-        close_observation = close_application_window(session)
+        close_observation = close_application_window(session, processes=processes)
         observation["native_close"] = close_observation
         # The WebView has closed normally. Release transport/ownership without
         # sending DELETE to an already closed browsing context.
@@ -114,6 +135,7 @@ def restart_owned_application(driver, session) -> dict:
         primary_error = error
         observation["error_stage"] = observation["stage"]
         observation["close_error"] = str(error)
+        observation["close_request"] = dict(getattr(session, "last_request", {}))
         raise
     finally:
         observation["stage"] = "release-owner"

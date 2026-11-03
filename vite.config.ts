@@ -34,6 +34,8 @@ export default defineConfig(({ command, mode, isPreview }) => ({
     __TAOMNI_QA_SAVE_GATE__: JSON.stringify(mode === "qa"),
     __TAOMNI_QA_COMPLETION_OBSERVATION__: JSON.stringify(mode === "qa"),
     __TAOMNI_QA_UPDATER__: JSON.stringify(mode === "qa"),
+    // Screenshot overlay startup marks (P0-0b): read by native QA only.
+    __TAOMNI_QA_OVERLAY_TIMING__: JSON.stringify(mode === "qa"),
   },
   optimizeDeps: {
     // Keep qa-ui-auto startup from crawling the entire dependency graph in

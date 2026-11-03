@@ -23,6 +23,30 @@ class WindowContextTests(unittest.TestCase):
         for value in [None, {}, {'selector': ''}, {'selector': '#main', 'close_with': ''}]:
             with self.assertRaises(RuntimeError): arguments(value)
 
+    def test_first_navigation_probe_timeout_retries_observation_within_case_budget(self):
+        import json
+        session = Mock()
+        session.endpoint.side_effect = lambda path: '/session/owned' + path
+        handles = ['main', 'detached']
+        session.request.side_effect = [handles, None, None, handles, None, None]
+        session.execute.side_effect = [False, WebDriverError(
+            'WebView JavaScript evaluation timed out'), False, True]
+        with tempfile.TemporaryDirectory() as directory, \
+                patch('qa_ui_auto.window_context.time.monotonic', side_effect=[0, 0, 31]), \
+                patch('qa_ui_auto.window_context.time.sleep'):
+            ctx = SimpleNamespace(session=session, case_dir=Path(directory))
+            result = native_switch(ctx, {'selector': '#popup', 'timeout_sec': 60})
+            entries = [json.loads(line) for line in
+                       (ctx.case_dir / 'native-window-context.jsonl').read_text().splitlines()]
+        self.assertIn('detached', result)
+        self.assertEqual([entry['phase'] for entry in entries],
+                         ['windows', 'probe_error', 'selected'])
+        self.assertEqual(entries[1]['handle'], 'detached')
+        self.assertIn('evaluation timed out', entries[1]['error'])
+        self.assertEqual(entries[2]['handle'], 'detached')
+        session.click.assert_not_called()
+        session.install_console_hook.assert_called_once()
+
     def test_reattach_click_may_close_its_source_before_webdriver_acknowledges(self):
         session = Mock()
         session.endpoint.side_effect = lambda path: '/session/owned' + path

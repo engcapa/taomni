@@ -47,11 +47,9 @@ def install():
         command(["brew", "install", "--cask", "xquartz"], timeout=600)
     else:
         root = Path(os.environ["QA_CYGWIN_ROOT"])
-        command([root.parent / "qa-cygwin-setup.exe", "--quiet-mode", "--no-shortcuts",
-                 "--no-startmenu", "--no-desktop", "--root", root,
-                 "--local-package-dir", root.parent / "qa-cygwin-packages",
-                 "--site", "https://mirrors.kernel.org/sourceware/cygwin/", "--packages",
-                 "xorg-server-extra,xauth,xclock,xwininfo,xdpyinfo,font-misc-misc"], timeout=600)
+        from ci_ssh_features import install_cygwin_packages
+        install_cygwin_packages(root,
+            "xorg-server-extra,xauth,xclock,xwininfo,xdpyinfo,font-misc-misc", timeout=600)
 
 
 def start(services):

@@ -9,6 +9,20 @@ import { contactMocks, filterMocks, folder, getMessageRow, info, mailMocks, mess
 
 export function registerMailClientTabEditing1Cases() {
 
+  it("bounds the composer to its mail pane and retains the close/reopen workflow", async () => {
+    renderMailbox();
+    await screen.findByText(/Second line stays visible/);
+    fireEvent.click(screen.getByTestId("mail-compose-open"));
+    const composer = await screen.findByRole("dialog", { name: "New message" });
+    // A viewport-sized child can exceed the mail pane below the toolbar.
+    // Flex centering would then clip its titlebar in a short native WebView.
+    expect(composer).toHaveClass("max-h-full", "max-w-full");
+    fireEvent.click(within(composer).getByRole("button", { name: "Close dialog" }));
+    expect(screen.queryByRole("dialog", { name: "New message" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("mail-compose-open"));
+    expect(await screen.findByRole("dialog", { name: "New message" })).toHaveClass("max-h-full");
+  });
+
   it("keeps the loaded body when double-click opens the message in a tab", async () => {
     renderMailbox();
 

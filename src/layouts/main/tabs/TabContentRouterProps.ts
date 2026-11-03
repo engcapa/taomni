@@ -74,7 +74,6 @@ export interface TabContentRouterProps {
   requestTerminalCwd: (tabId: string) => boolean;
   pendingSftpUploadRequests: Record<string, SftpPendingUploadRequest>;
   setPendingSftpUploadRequests: import("react").Dispatch<import("react").SetStateAction<Record<string, SftpPendingUploadRequest>>>;
-  setSftpDetachedTabs: import("react").Dispatch<import("react").SetStateAction<Record<string, boolean>>>;
   setAttachedSidebars: import("react").Dispatch<import("react").SetStateAction<Record<string, boolean>>>;
   openDetachedSftp: (params: import("../../../types").SftpTabInfo, title: string) => void;
   splitGridColumns: number;

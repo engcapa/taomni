@@ -32,6 +32,8 @@ use objc2_core_video::{
 #[cfg(target_os = "macos")]
 pub(crate) mod xcap_backend;
 
+pub(crate) mod stage_trace;
+
 #[cfg(target_os = "linux")]
 pub(crate) mod wayland;
 #[cfg(target_os = "linux")]

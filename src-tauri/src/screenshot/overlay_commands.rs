@@ -3,14 +3,16 @@ use super::labels::OVERLAY_LABEL;
 use crate::screenshot::capture;
 use crate::screenshot::edit;
 use crate::screenshot::model::OverlayInit;
-use crate::screenshot::overlay_session::close_session;
+use crate::screenshot::overlay_handoff;
 use crate::screenshot::overlay_session::open_overlay_with_window;
+use crate::screenshot::overlay_session::{close_session, close_session_if_current};
 use crate::screenshot::pins;
 use crate::screenshot::runtime::SESSION_GENERATION;
 use crate::screenshot::runtime::blocking;
 use crate::screenshot::runtime::capture_lease;
 use crate::screenshot::runtime::internal_error;
 use crate::screenshot::runtime::tool_state;
+use crate::screenshot::startup_timing;
 use crate::screenshot::window_lifecycle::HIDE_SETTLE;
 use crate::screenshot::window_lifecycle::cover_display;
 use crate::screenshot::window_lifecycle::focus_capture_window;
@@ -27,6 +29,11 @@ pub async fn screenshot_open_overlay(
     display_id: Option<String>,
     include_current_window: Option<bool>,
 ) -> Result<(), String> {
+    startup_timing::begin_entry(if include_current_window.unwrap_or(false) {
+        "command-current-window"
+    } else {
+        "command"
+    });
     #[cfg(target_os = "linux")]
     let display_id =
         if display_id.as_ref().is_none_or(|id| id.trim().is_empty()) && pins::native_wayland() {
@@ -50,13 +57,12 @@ pub async fn screenshot_open_overlay(
     .await
 }
 
-/// The pending overlay payload, set by [`open_overlay`].
+/// The pending overlay payload, set by [`open_overlay`]. The overlay window
+/// can load before the desktop is captured; it then waits for the payload of
+/// the open in progress. Without one it fails at once (dev/QA direct open).
 #[tauri::command]
 pub async fn screenshot_overlay_init() -> Result<OverlayInit, String> {
-    tool_state()
-        .overlay
-        .clone()
-        .ok_or_else(|| "no pending screenshot overlay".to_string())
+    overlay_handoff::wait_for_init().await
 }
 
 /// Switch the selection surface to another physical display without ending
@@ -106,6 +112,7 @@ pub async fn screenshot_switch_display(
         window_region: None,
         document: false,
         source_pin: None,
+        generation,
     });
     if let Ok(init) = &result {
         edit::reset_hidden_surface(&window).await?;
@@ -140,7 +147,16 @@ pub async fn screenshot_overlay_update(
 /// End the capture session: close the overlay and recorder bar, reshow the
 /// hidden app windows and delete the session's temp files.
 #[tauri::command]
-pub async fn screenshot_close_overlay(app: AppHandle) -> Result<(), String> {
-    close_session(&app);
+pub async fn screenshot_close_overlay(
+    app: AppHandle,
+    generation: Option<u64>,
+) -> Result<(), String> {
+    // A resident WebView can finish a copy/dialog from a retired generation.
+    // Legacy callers omit this field; current renderers echo their payload.
+    if let Some(generation) = generation {
+        close_session_if_current(&app, generation);
+    } else {
+        close_session(&app);
+    }
     Ok(())
 }

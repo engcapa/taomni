@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { act, render, waitFor } from "@testing-library/react";
 import { Compartment, EditorState } from "@codemirror/state";
 import { CompletionContext } from "@codemirror/autocomplete";
+import { LanguageSupport } from "@codemirror/language";
 import { EditorView } from "@codemirror/view";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createFixtureCompletionSource, MAX_COMPLETION_OPTIONS } from "./lspCompletion";
@@ -265,8 +266,17 @@ describe("Editor typing and completion performance verification", () => {
 
     const rendered = render(<CodeMirrorHost {...props} />);
     await waitFor(() => expect(reconfigure.mock.calls.length).toBeGreaterThan(0));
-    await act(async () => {
-      await new Promise((resolve) => window.setTimeout(resolve, 0));
+    // Grammar installation is intentionally deferred until after two paints.
+    // Observe its compartment, not an arbitrary zero-delay timer: otherwise
+    // its valid reconfigure can land inside the diagnostics-only count below.
+    await waitFor(() => {
+      expect(reconfigure.mock.contexts.some((compartment) => {
+        const root = rendered.container.querySelector<HTMLElement>(".cm-editor");
+        const view = root ? EditorView.findFromDOM(root) : null;
+        if (!view || !(compartment instanceof Compartment)) return false;
+        const extension = compartment.get(view.state);
+        return extension instanceof LanguageSupport && extension.language.name === "java";
+      })).toBe(true);
     });
     reconfigure.mockClear();
 

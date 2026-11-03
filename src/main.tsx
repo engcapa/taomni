@@ -1,4 +1,7 @@
 import "./lib/webviewCompat";
+// Must stay the first app module: the overlay starts loading its base image
+// before React and the UI modules below are evaluated.
+import { SCREENSHOT_OVERLAY_BOOT, markOverlayStartup } from "./screenshotOverlayBoot";
 import React from "react";
 import ReactDOM from "react-dom/client";
 import "./index.css";
@@ -95,7 +98,23 @@ function renderStartupCrash(error: unknown): void {
   ReactDOM.createRoot(document.getElementById("root")!).render(<AppCrash error={error} phase="startup" />);
 }
 
+async function bootstrapScreenshotOverlay(): Promise<void> {
+  // The overlay is never installed into renderer recovery (capture surfaces
+  // only stop their session) and owns no recoverable tabs, so it skips the
+  // recovery handshake and the main app modules entirely.
+  const { ScreenshotOverlayRoot } = await import("./screenshotOverlayRoot");
+  markOverlayStartup("app");
+  ReactDOM.createRoot(document.getElementById("root")!).render(
+    <React.StrictMode>
+      <RootErrorBoundary>
+        <ScreenshotOverlayRoot />
+      </RootErrorBoundary>
+    </React.StrictMode>,
+  );
+}
+
 async function bootstrap(): Promise<void> {
+  if (SCREENSHOT_OVERLAY_BOOT) return bootstrapScreenshotOverlay();
   const { getRecoveryBootstrap, markRecoveryStartup, trackRecoveryDescription } = await import("./lib/runtimeRecovery");
   const recovery = await getRecoveryBootstrap();
   markRecoveryStartup(recovery.recovering);

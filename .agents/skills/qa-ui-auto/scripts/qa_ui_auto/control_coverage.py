@@ -209,6 +209,16 @@ def _touches_for_case(case) -> list[Touch]:  # case: TestCase
         if not isinstance(step, dict) or len(step) != 1:
             continue
         verb, args = step_verb_and_args(step)
+        if verb == "switch_window" and isinstance(args, dict):
+            # close_with performs one real click in the source window; the
+            # target selector only observes the destination after closure.
+            close_control = args.get("close_with")
+            if isinstance(close_control, str):
+                out.append(Touch(case_id=case.id, selector=close_control, kind="interactive"))
+            target = args.get("selector")
+            if isinstance(target, str):
+                out.append(Touch(case_id=case.id, selector=target, kind="display"))
+            continue
         if verb in INTERACTIVE_VERBS:
             kind = "interactive"
         elif verb in DISPLAY_VERBS:

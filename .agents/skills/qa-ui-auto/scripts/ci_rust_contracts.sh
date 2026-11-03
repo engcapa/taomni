@@ -25,7 +25,9 @@ if [[ "${QA_RDP_CONTRACTS:-false}" == true ]]; then
   filters+=(rdp::)
 fi
 if [[ "${QA_DUAL_CONTRACTS:-false}" == true ]]; then
-  filters+=(capture:: screenshot::surfaces:: screenshot::qa::save_dialog_observation::)
+  # Keep startup handoff/generation, clipboard and resident safety units in the
+  # same root binary as geometry. Narrow surface filters miss these regressions.
+  filters+=(capture:: screenshot:: mfa::)
 fi
 if [[ "${QA_MOBILE_CONTRACTS:-false}" == true ]]; then
   filters+=(mobile::)

@@ -27,6 +27,12 @@ pub(crate) use overlay_session::close_session;
 
 pub use overlay_session::open_overlay;
 
+pub(crate) use overlay_open::prewarm;
+pub use overlay_resident::screenshot_overlay_session;
+pub(crate) use overlay_resident::{
+    __cmd__screenshot_overlay_session, __tauri_command_name_screenshot_overlay_session,
+};
+
 pub(crate) use recording_controls::recording_ended;
 
 pub use runtime::shutdown;
@@ -48,6 +54,18 @@ mod runtime;
 mod scroll_controls;
 
 mod overlay_session;
+
+mod overlay_open;
+
+mod overlay_handoff;
+
+mod overlay_resident;
+
+mod capture_exclusion;
+
+mod startup_profile;
+
+mod startup_timing;
 
 mod pin_window;
 
@@ -178,6 +196,8 @@ mod scroll_commands;
 
 mod output_commands;
 
+mod clipboard_copy;
+
 mod overlay_commands;
 
 mod pin_commands;
@@ -228,6 +248,12 @@ pub(crate) use output_commands::{
     __cmd__screenshot_copy_image, __cmd__screenshot_save_data_url, __cmd__screenshot_save_image,
     __tauri_command_name_screenshot_copy_image, __tauri_command_name_screenshot_save_data_url,
     __tauri_command_name_screenshot_save_image,
+};
+
+pub use overlay_handoff::screenshot_overlay_ready;
+
+pub(crate) use overlay_handoff::{
+    __cmd__screenshot_overlay_ready, __tauri_command_name_screenshot_overlay_ready,
 };
 
 pub use overlay_commands::{

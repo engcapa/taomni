@@ -122,7 +122,9 @@ pub(super) async fn wait_window(
     let deadline = Instant::now() + timeout;
     loop {
         if let Some(window) = app.get_webview_window(label) {
-            return Ok(window);
+            if label != super::super::OVERLAY_LABEL || !super::super::overlay_resident::is_idle() {
+                return Ok(window);
+            }
         }
         if Instant::now() >= deadline {
             anyhow::bail!("window '{label}' did not open");
@@ -133,7 +135,19 @@ pub(super) async fn wait_window(
 
 pub(super) async fn wait_closed(app: &AppHandle, label: &str, timeout: Duration) -> bool {
     let deadline = Instant::now() + timeout;
-    while app.get_webview_window(label).is_some() {
+    while let Some(window) = app.get_webview_window(label) {
+        if label == super::super::OVERLAY_LABEL && super::super::overlay_resident::is_idle() {
+            let released = {
+                let state = super::super::tool_state();
+                state.overlay.is_none() && state.session_lease.is_none() && state.hidden.is_empty()
+            };
+            if released && window.is_visible().ok() == Some(false)
+                && eval_raw(&window,
+                    "document.readyState === 'complete' && !document.querySelector('[data-testid=\"screenshot-overlay\"]')".into(),
+                    Duration::from_millis(300)).await == Some(json!(true)) {
+                return true;
+            }
+        }
         if Instant::now() >= deadline {
             return false;
         }
