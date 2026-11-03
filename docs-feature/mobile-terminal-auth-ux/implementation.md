@@ -6,7 +6,7 @@
 
 - 终端默认占满视口，保留旧的显式全屏偏好。顶栏只保留返回、标题、连接/控制状态、接管/释放、更多。
 - 常用终端键横向单行；紧凑四行键盘直接发送 PTY 输入，支持 Shift、符号、空格、退格、回车及一次性 Ctrl/Alt。点击输出不主动打开系统键盘。
-- 系统输入模式支持中文草稿；切换紧凑/系统/收起保留未发送草稿。字体、尺寸、历史、多行粘贴等操作保留在更多菜单。
+- “命令草稿”支持中文编辑，切换模式保留未发送内容；“直接输入”显式聚焦 xterm，支持逐字符/IME 输入并与 Tab 等终端键保持同一输入流。字体、尺寸、历史、多行粘贴等操作保留在更多菜单。
 - 手机打开 SSH 时可以填写本次用户名/密码，随后接收原生 SSH 的 OTP 或加密私钥口令。保险库锁定时允许填写本次密码，不向手机索取保险库主密码。
 - 每轮认证只属于发起的已配对设备和打开请求；桌面与手机共享同一个 SSH 一次性响应器。先完成者生效，迟到、重复、跨设备答案被拒绝。
 - 手机答案不写会话配置或 localStorage；请求失败、超时、取消、撤销设备或停止服务释放等待者。已成功打开的终端不随请求清理而关闭。
@@ -60,4 +60,31 @@ GitHub 选择完整移动用例 001–007、SSH 回归 122/139/143/150，并自�
 - OpenSSH 取消：probe 和 route 准备受同一个取消令牌/截止时间约束；在 terminal registry 写锁取得后，使用请求锁原子检查有效性并执行 PTY 创建/注册。探测子进程由 kill-on-drop 释放，发布前错误显式杀死 PTY；russh 注册前也重新检查，端口转发仅在成功注册路径启动。TC-MOBILE-008 观察真实阻塞 probe PID，覆盖取消、撤销和停止服务后无晚到 PTY/注册；Rust 测试另覆盖截止时间与丢弃准备任务。
 - 迟到取消：成功、失败、进度与完成回调都检查原 controller 的归属。TC-MOBILE-009 让服务器直到 B 开始轮询才返回 A 的取消响应，验证 B 继续逐轮认证；InstanceView 单元测试同时覆盖迟到失败。
 
-新增模块均保持单一职责；保留 IPC 名称、保存格式和旧 transport 调用入口。最终本轮执行结果在验证结束后追加，前次 90/90 不视为新增场景的验收。
+新增模块均保持单一职责；保留 IPC 名称、保存格式和旧 transport 调用入口。本轮最终执行结果见下文，前次 90/90 不视为新增场景的验收。
+
+本轮前端相关测试 17 文件 / 63 项、Rust mobile 68 项、QA session-opening 工具 9 项及驱动生命周期等合约 109 项通过。类型检查、QA release 构建（包含手机前端构建）、静态 audit --gate 与 pnpm check:refactor 通过。Linux 原生新增认证/取消用例 2/2 通过（native-review-2），完整原生 crash-regression 9/9 通过（native-crash）；布局稳定后只接管一次的认证用例又在 native-review-3 通过。上述运行源码身份稳定，使用 com.taomni.app.qa release。
+
+首轮实际执行暴露了测试前提问题，失败证据保留在 `qa-ui-auto-report/mobile-review/`：欢迎页已出现时 vault_first_run 可以不初始化保险库，认证用例现通过公开设置页初始化后再锁定，并断言 locked 状态；复用的 Linux 驱动不会自动继承 fixture 的 PATH，驱动生命周期模块现记录启动 PATH，在改变及恢复时重建驱动父进程。另一次接管失败对应连接后的 80/300ms 强制桌面尺寸同步，用例现等待桌面布局和终端就绪状态持续稳定后再执行单次接管，保留控制权 WebSocket 收据、输入和独立端点输出断言，不重试接管操作。
+
+托管 macOS 扩展认证又识别出测试端应用代理路径错误：显式 QA 配置根在 Windows/macOS 会由 resolved_config_dir 追加 com.taomni.app.qa，fixture 之前漏掉这一层，导致应用代理实际禁用而直连目标。fixture 已按三个系统的真实解析规则修正；新增路径/隔离合约两项，与 session-opening 合约合计 11 项通过。HTTP、SOCKS、应用及独立代理仍分别要求真实代理端认证收据，不把直连计为通过。
+
+文件边界例外：既有超限的 tauri_webdriver.py 本轮仅净增一行导入；环境快照状态及 PATH 改变后的重启行为全部放在 native_driver_lifecycle.py，未增加适配器内联职责。该适配器同时承载三平台启动、macOS 调试与 WebDriver session 公共入口，本轮保留这些调用契约；后续按 TauriDriverProcess（启动/进程所有权）与 NativeSession（协议/操作）边界拆出模块，保留 facade，并以已有驱动生命周期、重启、进程组和传输合约及三平台 native 场景验证迁移。本次 109 项相关合约与新环境切换回归保护此接入边界。
+
+OpenSSH 用例以真实阻塞子进程验证取消所有权，不代表真实 Kerberos ticket 互通；实体 Android/iOS 的软键盘、中文输入法与触摸体验仍未验证。
+
+## Review 修正后的最终验收
+
+产品修复提交为 `741ff560835aebed16ba6281722a1a2ec084738d`，测试修正后的最终验收提交为 `b7d5265c3f27e56c51e5a9ee4a4e36d6a0a61b8e`。[GitHub 运行 41598182747](https://github.com/engcapa/taomni/actions/runs/41598182747) 已成功结束；全部 selected 用例连同自动合并的完整 crash-regression 为 **94/94 通过，0 失败、0 跳过**。
+
+| 平台 | Browser | Native QA release |
+| --- | --- | --- |
+| Linux | 16/16 | 18/18 |
+| Windows | 16/16 | 14/14 |
+| macOS | 16/16 | 14/14 |
+| 合计 | 48/48 | 46/46 |
+
+三平台 TC-MOBILE-007 的独立 SSH 收据均确认九条输入流、两个跳板通道和四次真实代理认证（HTTP、SOCKS5、应用 HTTP、独立 SOCKS5）；手机存储与保存会话无一次性秘密。TC-MOBILE-008 验证 Linux 的实际 probe 进程取消/撤销/停止及无迟到 PTY；TC-MOBILE-009 在三平台 browser 验证迟到取消响应期间后续请求仍完成认证。全部 crash-regression 的 browser/native 场景按各自平台声明完成。
+
+GitHub strict 汇总通过；下载原始报告后独立重新聚合也通过，94 项精确匹配，无缺失、重复、覆盖缺口或未审核项。原始 receipt、源码/case/runner 指纹以及三平台 `com.taomni.app.qa` release 二进制身份一致。源码指纹为 `819ac215eaadecc9269ccfe125335f627659da6e4100aef7cea2f18b241e89fe`。本轮托管合约另确认前端 16 文件 / 89 项、Rust 91 项通过，三平台构建及 Windows 捕获辅助程序合约成功。
+
+原始证据位于 `qa-ui-auto-report/mobile-review/github-final-4/`，独立核验结果为 `local-verified-ci-summary.json`；合约日志位于相邻的 `github-final-4-contracts/`。前几轮失败/被修正取代的运行仍保留，不计为本轮通过证据。本节后的提交只更新验收文档，产品、用例和 runner 内容均与上述验收提交相同。
