@@ -2076,6 +2076,8 @@
 - `[data-testid="mobile-compact-keyboard"]` — display — F-MOBILE-1.mobile-compact-keyboard
 - `[data-testid="mobile-input-modes"]` — display — F-MOBILE-1.mobile-input-modes
 - `[data-testid="mobile-input-compact"]` — interactive — F-MOBILE-1.mobile-input-compact
+- `[data-testid="mobile-input-direct"]` — interactive — F-MOBILE-1.mobile-input-direct
+- `[data-testid="mobile-terminal-screen"] .xterm-helper-textarea` — interactive — F-MOBILE-1.mobile-terminal-direct-input
 - `[data-testid="mobile-input-hide"]` — interactive — F-MOBILE-1.mobile-input-hide
 - `[data-testid="mobile-connection-auth"]` — display — F-MOBILE-1.mobile-connection-auth
 - `[data-testid="mobile-auth-submit"]` — interactive — F-MOBILE-1.mobile-auth-submit

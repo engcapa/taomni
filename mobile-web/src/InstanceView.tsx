@@ -58,24 +58,26 @@ export function InstanceView({ instance, sessionId, onSelect, onCloseSession, on
     const controller = new AbortController();
     openAbort.current = controller;
     setOpening(label); setOpenError(""); setOpenProgress(null);
-    openSession(instance, target, controller.signal, progress => { if (!controller.signal.aborted) setOpenProgress(progress); }).then(id => {
-      if (controller.signal.aborted) return;
+    openSession(instance, target, controller.signal, progress => { if (openAbort.current === controller && !controller.signal.aborted) setOpenProgress(progress); }).then(id => {
+      if (openAbort.current !== controller || controller.signal.aborted) return;
       known.current = placeholder(id, label);
       refresh();
       onSelect(id);
     }).catch(error => {
-      if (controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) return;
+      if (openAbort.current !== controller || controller.signal.aborted || (error instanceof DOMException && error.name === "AbortError")) return;
       setOpenError(errorText(error instanceof ApiError ? error : new ApiError("open_failed")));
     }).finally(() => { if (openAbort.current === controller) { openAbort.current = null; setOpening(null); setOpenProgress(null); } });
   };
   const cancelOpen = () => {
     const id = openProgress?.request_id;
-    if (!id) return;
+    const controller = openAbort.current;
+    if (!id || !controller) return;
     // Await the server's cancellation before dropping our polling owner. A
     // failed cancellation remains actionable instead of claiming it stopped.
     void request(instance, `/open-requests/${encodeURIComponent(id)}/cancel`, {}).then(() => {
-      openAbort.current?.abort(); openAbort.current = null; setOpening(null); setOpenProgress(null);
-    }).catch(error => setOpenError(errorText(error)));
+      if (openAbort.current !== controller) return;
+      controller.abort(); openAbort.current = null; setOpening(null); setOpenProgress(null);
+    }).catch(error => { if (openAbort.current === controller) setOpenError(errorText(error)); });
   };
 
   const listed = sessionId ? data.sessions.find(v => v.id === sessionId) : undefined;

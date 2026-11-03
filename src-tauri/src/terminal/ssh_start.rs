@@ -11,8 +11,6 @@ use crate::terminal::network;
 use crate::terminal::ssh;
 use crate::terminal::x11;
 use crate::terminal::x11_forward;
-use std::io::Read;
-use std::io::Write;
 use std::sync::Arc;
 use tauri::AppHandle;
 use tauri::Emitter;
@@ -203,63 +201,26 @@ pub async fn create_ssh_terminal(
     };
 
     if matches!(auth, ssh::SshAuth::Gssapi) {
-        super::openssh::probe(&host, port, &username, network.as_ref()).await?;
-        let mut launch = super::openssh::launch(&host, port, &username, network.as_ref()).await?;
-        launch.args.insert(0, "-tt".into());
-        if x11.unwrap_or(false) {
-            launch.args.insert(
-                0,
-                if x11_trusted.unwrap_or(true) {
-                    "-Y"
-                } else {
-                    "-X"
-                }
-                .into(),
-            );
-        }
-        if let Some(net) = &network {
-            for forward in &net.local_forwards {
-                launch
-                    .args
-                    .insert(0, format!("-L{}:{}", forward.local, forward.remote));
-            }
-            if !net.local_forwards.is_empty() {
-                launch.args.insert(0, "-oExitOnForwardFailure=yes".into());
-            }
-        }
-        let keep_open = keep_open_after_startup_command.unwrap_or(false);
-        let command = startup_command
-            .as_deref()
-            .map(str::trim)
-            .filter(|s| !s.is_empty());
-        if !keep_open {
-            if let Some(command) = command {
-                launch.args.push(command.into());
-            }
-        }
-        let (mut handle, reader) =
-            super::pty::create_command_pty(cols, rows, &launch.program, &launch.args)?;
-        if keep_open {
-            if let Some(command) = command {
-                handle
-                    .writer
-                    .write_all(format!("{command}\r").as_bytes())
-                    .map_err(|e| e.to_string())?;
-            }
-        }
-        super::local_start::register_routed_terminal(
-            session_id.clone(),
-            handle,
-            reader,
+        return super::ssh_start_openssh::start(
+            session_id,
+            &host,
+            port,
+            &username,
+            cols,
+            rows,
+            network.as_ref(),
+            x11.unwrap_or(false),
+            x11_trusted.unwrap_or(true),
+            startup_command.as_deref(),
+            keep_open_after_startup_command.unwrap_or(false),
             on_output,
             state.inner(),
             app_handle,
             window.label(),
             output_generation,
-            launch.route,
+            mobile.as_ref(),
         )
-        .await?;
-        return Ok(session_id);
+        .await;
     }
 
     // Keyboard-interactive (MFA/OTP) prompter: bridges the SSH auth loop to
@@ -317,19 +278,9 @@ pub async fn create_ssh_terminal(
         x11_forward,
         startup_command.as_ref(),
     );
-    let connect_result = if let Some(mobile) = &mobile {
-        let (cancel, remaining) = mobile
-            .runtime
-            .open_requests
-            .cancellation(&mobile.request_id)?;
-        tokio::select! {
-            result = connect => result,
-            _ = cancel.cancelled() => Err("open_cancelled".into()),
-            _ = tokio::time::sleep(remaining) => Err("open_timeout".into()),
-        }
-    } else {
-        connect.await
-    };
+    let connect_result =
+        crate::mobile::session_open::connection_auth::during_connection(mobile.as_ref(), connect)
+            .await;
     // Drop any responder left dangling for this session (e.g. auth failed
     // while a prompt round was still registered) so the map doesn't leak.
     clear_session_auth_responders(&state.terminal.ssh_auth_responders, &session_id);
@@ -337,38 +288,49 @@ pub async fn create_ssh_terminal(
 
     let handle_arc = Arc::new(handle);
 
-    // Start any session-attached local port forwards. We capture the join
-    // handles so `close_terminal` can abort them and release the bound
-    // TCP listening ports.
-    let forward_handles = if let Some(n) = &network {
-        if !n.local_forwards.is_empty() {
-            forwards::spawn_local_forwards(
-                handle_arc.clone(),
-                &n.local_forwards,
-                app_handle.clone(),
-                session_id.clone(),
-            )
-        } else {
-            Vec::new()
-        }
-    } else {
-        Vec::new()
-    };
-
-    let terminal = ActiveTerminal::Ssh {
-        channel: Arc::new(AsyncMutex::new(channel)),
-        handle: handle_arc,
-        forwards: AsyncMutex::new(forward_handles),
-    };
-
     {
         let mut terminals = state.terminal.terminals.write().await;
         if terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} already exists", session_id));
         }
-        state.mobile.broker.register(&session_id);
-        state.mobile.broker.desktop(&session_id, Some((cols, rows)));
-        terminals.insert(session_id.clone(), terminal);
+        let register = || {
+            // Start any session-attached local port forwards. We capture the join
+            // handles so `close_terminal` can abort them and release the bound
+            // TCP listening ports.
+            let forward_handles = if let Some(n) = &network {
+                if !n.local_forwards.is_empty() {
+                    forwards::spawn_local_forwards(
+                        handle_arc.clone(),
+                        &n.local_forwards,
+                        app_handle.clone(),
+                        session_id.clone(),
+                    )
+                } else {
+                    Vec::new()
+                }
+            } else {
+                Vec::new()
+            };
+
+            let terminal = ActiveTerminal::Ssh {
+                channel: Arc::new(AsyncMutex::new(channel)),
+                handle: handle_arc,
+                forwards: AsyncMutex::new(forward_handles),
+            };
+
+            state.mobile.broker.register(&session_id);
+            state.mobile.broker.desktop(&session_id, Some((cols, rows)));
+            terminals.insert(session_id.clone(), terminal);
+            Ok(())
+        };
+        if let Some(mobile) = &mobile {
+            mobile
+                .runtime
+                .open_requests
+                .while_pending(&mobile.request_id, register)?;
+        } else {
+            register()?;
+        }
     }
 
     crate::webview_recovery::register_output(

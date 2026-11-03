@@ -3,6 +3,8 @@
 const { Server, utils } = require("ssh2");
 const fs = require("node:fs");
 const path = require("node:path");
+const net = require("node:net");
+let proxies;
 const root = process.argv[2];
 const receipt = path.join(root, "mobile-ssh-peer.jsonl");
 const record = value => fs.appendFileSync(receipt, JSON.stringify(value) + "\n");
@@ -31,6 +33,16 @@ const server = new Server({ hostKeys: [host.private] }, client => {
   });
   client.on("ready", () => {
     record({ event: "authenticated" });
+    client.on("tcpip", (accept, reject, info) => {
+      if (info.destIP !== "127.0.0.1" || info.destPort !== server.address().port) return reject();
+      const target = net.connect(info.destPort, info.destIP, () => {
+        record({ event: "jump-channel" });
+        const stream = accept(); stream.pipe(target); target.pipe(stream);
+        stream.on("close", () => target.destroy());
+        target.on("close", () => stream.destroy());
+      });
+      target.on("error", () => { target.destroy(); reject(); });
+    });
     client.on("session", accept => {
       const session = accept();
       // russh uses want_reply=false; ssh2 omits the acknowledgement callback.
@@ -64,6 +76,9 @@ const server = new Server({ hostKeys: [host.private] }, client => {
     });
   });
 });
-server.listen(0, "127.0.0.1", () => process.stdout.write(JSON.stringify({ port: server.address().port, keyPath }) + "\n"));
-const close = () => { for (const client of clients) client.end(); server.close(() => process.exit(0)); };
+server.listen(0, "127.0.0.1", async () => {
+  proxies = await require("./mobile_proxy_peer.cjs").start(server.address().port, record);
+  process.stdout.write(JSON.stringify({ port: server.address().port, keyPath, httpPort: proxies.httpPort, socksPort: proxies.socksPort }) + "\n");
+});
+const close = () => { proxies?.close(); for (const client of clients) client.end(); server.close(() => process.exit(0)); };
 process.on("SIGTERM", close); process.on("SIGINT", close);

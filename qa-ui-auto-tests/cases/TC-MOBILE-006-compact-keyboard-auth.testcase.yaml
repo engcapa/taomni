@@ -11,8 +11,8 @@ modes:
 fixtures:
 - mobile_web
 timeout_sec: 150
-description: Production mobile bundle with deterministic HTTP/WS peer. Native SSH/password/private-key/OTP ownership is verified by TC-MOBILE-007
-  and Rust service tests.
+description: Production mobile bundle with deterministic HTTP/WS peer. Native SSH/password/private-key/OTP ownership is verified by TC-MOBILE-007 and Rust
+  service tests.
 steps:
 - set_viewport:
     width: 390
@@ -28,8 +28,8 @@ steps:
 - click: '[data-testid="mobile-saved-open"]'
 - wait_for: '[data-testid="mobile-connection-auth"]'
 - eval_readonly:
-    expression: document.querySelector('.connection-auth input').value === 'developer' && document.querySelector('.connection-auth label:last-of-type
-      input').type === 'password' && !document.querySelector('.connection-auth label:last-of-type input').value
+    expression: document.querySelector('.connection-auth input').value === 'developer' && document.querySelector('.connection-auth label:last-of-type input').type
+      === 'password' && !document.querySelector('.connection-auth label:last-of-type input').value
     expect_truthy: true
     timeout_sec: 5
 - fill:
@@ -60,8 +60,8 @@ steps:
 - click: '[data-testid="mobile-take-control"]'
 - wait_for: '[data-testid="mobile-compact-keyboard"]'
 - eval_readonly:
-    expression: document.documentElement.classList.contains('terminal-fullscreen') && document.querySelector('.terminal').offsetHeight >= 450
-      && !document.querySelector('.command-bar').offsetHeight && document.activeElement?.tagName !== 'TEXTAREA'
+    expression: document.documentElement.classList.contains('terminal-fullscreen') && document.querySelector('.terminal').offsetHeight >= 450 && !document.querySelector('.command-bar').offsetHeight
+      && document.activeElement?.tagName !== 'TEXTAREA'
     expect_truthy: true
     timeout_sec: 5
 - click: '[data-testid="mobile-type-q"]'
@@ -118,16 +118,16 @@ steps:
     width: 390
     height: 400
 - eval_readonly:
-    expression: document.querySelector('.terminal').offsetHeight >= 100 && document.querySelector('.input-modes').getBoundingClientRect().bottom
-      <= innerHeight+1 && document.documentElement.scrollWidth <= innerWidth
+    expression: document.querySelector('.terminal').offsetHeight >= 100 && document.querySelector('.input-modes').getBoundingClientRect().bottom <= innerHeight+1
+      && document.documentElement.scrollWidth <= innerWidth
     expect_truthy: true
     timeout_sec: 5
 - set_viewport:
     width: 844
     height: 390
 - eval_readonly:
-    expression: document.querySelector('.terminal').offsetHeight >= 100 && document.querySelector('.input-modes').getBoundingClientRect().bottom
-      <= innerHeight+1 && document.documentElement.scrollWidth <= innerWidth
+    expression: document.querySelector('.terminal').offsetHeight >= 100 && document.querySelector('.input-modes').getBoundingClientRect().bottom <= innerHeight+1
+      && document.documentElement.scrollWidth <= innerWidth
     expect_truthy: true
     timeout_sec: 5
 - set_viewport:
@@ -151,12 +151,36 @@ steps:
     path: ${fixture.mobile_receipt}
     contains: OPEN local
 - assert_no_runtime_errors: null
+- assert_text:
+    selector: '[data-testid="mobile-terminal-status"]'
+    contains: 控制中
+- assert_text:
+    selector: '[data-testid="mobile-terminal-status"]'
+    contains: 控制中
+- click: '[data-testid="mobile-input-direct"]'
+- type:
+    selector: '[data-testid="mobile-terminal-screen"] .xterm-helper-textarea'
+    text: git che
+- click: '[data-testid="mobile-key-tab"]'
+- assert_file_contains:
+    path: ${fixture.mobile_receipt}
+    contains: DIRECT git che\t
+- eval_readonly:
+    expression: document.querySelector(".xterm-helper-textarea").inputMode === "text" && document.activeElement === document.querySelector(".xterm-helper-textarea")
+    expect_truthy: true
+    timeout_sec: 5
+- click: '[data-testid="mobile-input-compact"]'
+- eval_readonly:
+    expression: document.querySelector(".xterm-helper-textarea").inputMode === "none"
+    expect_truthy: true
+    timeout_sec: 5
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Compact keyboard sends real terminal frames without editable focus; system drafts survive mode switches. Login and OTP use separate
-      masked transient rounds, cancellation waits for the server and a subsequent local open succeeds.
+    requirement: Compact keyboard sends real terminal frames without editable focus; system drafts survive mode switches. Login and OTP use separate masked
+      transient rounds, cancellation waits for the server and a subsequent local open succeeds.
     actions:
     - 1
     - 2
@@ -205,6 +229,11 @@ verification:
     - 62
     - 65
     - 66
+    - 69
+    - 71
+    - 72
+    - 73
+    - 76
     checkpoints:
     - step: 10
       expectation: A fresh login round prefills the account and masks an empty password.
@@ -248,6 +277,14 @@ verification:
       expectation: Independent peer receipt contains OPEN local.
     - step: 68
       expectation: No runtime errors throughout authentication, mode changes, cancellation and local opening.
+    - step: 74
+      expectation: Direct system typing reaches PTY before Tab, without implicit Enter.
+    - step: 75
+      expectation: Direct input focuses xterm for immediate keyboard and IME input.
+    - step: 77
+      expectation: Compact mode disables system keyboard on output taps.
+    - step: 78
+      expectation: No runtime errors after direct typing.
     results:
     - 10
     - 14
@@ -270,6 +307,10 @@ verification:
     - 64
     - 67
     - 68
+    - 74
+    - 75
+    - 77
+    - 78
   visual:
   - check: Phone controls and output remain readable without horizontal overflow.
     method: automated

@@ -12,7 +12,7 @@ modes:
 fixtures:
 - reset_db
 - mobile_service
-timeout_sec: 240
+timeout_sec: 420
 description: 'All three OSes: isolated QA desktop starts a real listener. Public phone UI pairs and opens saved loopback SSH accounts.
   Native russh authenticates one-shot username/password, OTP and an encrypted private key; each input reaches an independent SSH peer
   receipt and native terminal output. Cancellation rejects late replies; wrong credentials surface failure; a new local platform PTY
@@ -66,7 +66,7 @@ verification:
     - step: 8
       expectation: The real native mobile listener is running.
     - step: 12
-      expectation: Phone UI completes password, distinct OTP and encrypted-key rounds; each of three native SSH streams reaches the
+      expectation: Phone UI completes password, distinct OTP and encrypted-key rounds, jump-host OTP/encrypted-key rounds, and locked-vault HTTP/SOCKS5/app/custom proxy credentials; each of nine native SSH streams reaches the
         independent peer exactly once. Another paired device is denied. Cancelled preflight creates no tab and refuses late answers; cancellation during native OTP also settles both views.
         Wrong credentials fail and local platform PTY output remains usable. Neither phone storage nor saved session rows retain the
         typed secrets.

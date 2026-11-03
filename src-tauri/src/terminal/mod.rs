@@ -60,6 +60,7 @@ mod authentication;
 mod tests;
 
 mod ssh_start;
+mod ssh_start_openssh;
 
 mod io_commands;
 

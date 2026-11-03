@@ -119,6 +119,42 @@ def run(ctx, endpoint, pairing_code):
                 connected(record)
                 receipt['checks'].append('native-encrypted-private-key-phone-passphrase')
 
+                # Jump authentication must share this request's phone responder,
+                # then authenticate the target over a real direct-tcpip channel.
+                for name, title, answer in [('jump OTP', 'SSH OTP', '123456'), ('jump private key', 'Unlock SSH private key', 'qa-key-passphrase')]:
+                    record = open_saved('QA phone ' + name)
+                    form(record)
+                    page.get_by_test_id('mobile-auth-answer-0').fill('qa-phone-user')
+                    page.get_by_test_id('mobile-auth-answer-1').fill('qa-temp-secret')
+                    page.get_by_test_id('mobile-auth-submit').click()
+                    expect(page.get_by_test_id('mobile-connection-auth')).to_contain_text('Jump host', timeout=30000)
+                    expect(page.get_by_test_id('mobile-connection-auth')).to_contain_text(title)
+                    form(record)
+                    page.get_by_test_id('mobile-auth-answer-0').fill(answer)
+                    page.get_by_test_id('mobile-auth-submit').click()
+                    connected(record)
+                    receipt['checks'].append('native-' + name.replace(' ', '-') + '-then-target-ssh')
+
+                # Lock through the public desktop UI. Proxy refs are unresolved
+                # until the phone supplies one-shot credentials for this attempt.
+                ctx.session.click('[data-testid="ribbon-settings"]')
+                ctx.session.fill('[data-testid="settings-search-input"]', 'vault')
+                ctx.session.click('[data-testid="vault-lock-button"]')
+                until(ctx.session, '!document.querySelector(\'[data-testid="vault-lock-button"]\')')
+                for name in ['HTTP proxy', 'SOCKS proxy', 'app proxy', 'custom proxy']:
+                    record = open_saved('QA phone ' + name)
+                    form(record)
+                    page.get_by_test_id('mobile-auth-answer-0').fill('qa-phone-user')
+                    page.get_by_test_id('mobile-auth-answer-1').fill('qa-temp-secret')
+                    page.get_by_test_id('mobile-auth-submit').click()
+                    expect(page.get_by_test_id('mobile-connection-auth')).to_contain_text('代理', timeout=30000)
+                    form(record)
+                    page.get_by_test_id('mobile-auth-answer-0').fill('qa-proxy-user')
+                    page.get_by_test_id('mobile-auth-answer-1').fill('qa-proxy-secret')
+                    page.get_by_test_id('mobile-auth-submit').click()
+                    connected(record)
+                    receipt['checks'].append('locked-vault-one-shot-' + name.replace(' ', '-'))
+
                 # Cancel before a tab is created; late replies cannot create one.
                 before = ctx.session.execute(DESKTOP)
                 record = open_saved('QA phone password')
@@ -172,7 +208,7 @@ def run(ctx, endpoint, pairing_code):
                 receipt['checks'].append('new-local-terminal-real-platform-pty-stdout-after-auth-failure')
                 page.screenshot(path=str(root / 'mobile-native-local.png'), full_page=True)
                 storage = page.evaluate('JSON.stringify(localStorage)')
-                require(all(secret not in storage for secret in ('qa-temp-secret', '123456', 'qa-key-passphrase')), 'phone persisted credentials')
+                require(all(secret not in storage for secret in ('qa-temp-secret', '123456', 'qa-key-passphrase', 'qa-proxy-secret')), 'phone persisted credentials')
                 require(not errors, 'phone runtime errors: ' + repr(errors))
                 context.close()
             finally:
@@ -181,8 +217,12 @@ def run(ctx, endpoint, pairing_code):
         with closing(sqlite3.connect((profile / 'taomni.db').as_uri() + '?mode=ro', uri=True)) as db:
             original = db.execute('SELECT username, options_json FROM sessions WHERE id=?', ('QA phone password',)).fetchone()
             require(original[0] == 'old-user' and 'qa-temp-secret' not in original[1], 'phone auth changed persisted account credentials')
+            persisted = str(db.execute('SELECT username, options_json FROM sessions').fetchall())
+            require(all(secret not in persisted for secret in ('qa-temp-secret', 'qa-proxy-secret', 'qa-key-passphrase', '123456')), 'phone authentication persisted a secret in a saved session')
         peer = [json.loads(line) for line in (root / 'mobile-ssh-peer.jsonl').read_text(encoding='utf-8').splitlines()]
-        require(sum(event['event'] == 'shell-input' for event in peer) == 3, 'independent SSH peer did not receive each of the three native input streams exactly once')
+        require(sum(event['event'] == 'shell-input' for event in peer) == 9, 'independent SSH peer did not receive each of the nine native input streams exactly once')
+        require(sum(event['event'] == 'jump-channel' for event in peer) == 2, 'jump authentication did not open both real channels')
+        require(sum(event['event'] == 'proxy-authenticated' for event in peer) == 4, 'proxy credentials did not authenticate all four real routes')
         receipt.update(passed=True, phase='completed', peer_events=peer, phone_errors=errors)
         return ', '.join(receipt['checks'])
     except BaseException as error:

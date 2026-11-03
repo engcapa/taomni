@@ -39,10 +39,10 @@ export const saveFullscreen = (value: boolean) => saveFlag(FULLSCREEN_KEY, value
 export const loadKeysOpen = () => loadFlag(KEYS_KEY, true);
 export const saveKeysOpen = (value: boolean) => saveFlag(KEYS_KEY, value);
 
-export type InputMode = "compact" | "system" | "hidden";
+export type InputMode = "compact" | "system" | "direct" | "hidden";
 const INPUT_MODE_KEY = "taomni.mobile.terminalInputMode.v1";
 export function loadInputMode(): InputMode {
-  try { const value = localStorage.getItem(INPUT_MODE_KEY); return value === "system" || value === "hidden" ? value : "compact"; } catch { return "compact"; }
+  try { const value = localStorage.getItem(INPUT_MODE_KEY); return value === "system" || value === "direct" || value === "hidden" ? value : "compact"; } catch { return "compact"; }
 }
 export function saveInputMode(mode: InputMode) {
   try { localStorage.setItem(INPUT_MODE_KEY, mode); } catch { /* keep in memory */ }

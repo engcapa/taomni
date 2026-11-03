@@ -161,6 +161,21 @@ impl OpenRequests {
             PENDING_TIMEOUT.saturating_sub(Instant::now().duration_since(request.created)),
         ))
     }
+    /// Linearize the final synchronous launch/registration with cancellation.
+    /// No terminal side effects may start after the request has ended.
+    pub fn while_pending<T>(
+        &self,
+        id: &str,
+        action: impl FnOnce() -> Result<T, String>,
+    ) -> Result<T, String> {
+        let mut requests = self.requests.lock().unwrap_or_else(|e| e.into_inner());
+        Self::prune(&mut requests);
+        requests
+            .get(id)
+            .filter(|r| r.claimed && r.outcome == Outcome::Pending)
+            .ok_or("open_cancelled")?;
+        action()
+    }
     pub fn bind_terminal(&self, id: &str, terminal: &str) -> Result<(), String> {
         self.cancellation(id)?;
         let mut requests = self.requests.lock().unwrap_or_else(|e| e.into_inner());
@@ -240,6 +255,28 @@ impl OpenRequests {
 pub struct MobileAuthContext {
     pub runtime: Arc<MobileRuntime>,
     pub request_id: String,
+}
+
+/// Cancellation owns the whole asynchronous preparation, including OpenSSH
+/// probes/routes. Dropping the operation also drops kill-on-drop processes.
+pub async fn during_connection<T>(
+    mobile: Option<&MobileAuthContext>,
+    operation: impl std::future::Future<Output = Result<T, String>>,
+) -> Result<T, String> {
+    if let Some(mobile) = mobile {
+        let (cancel, remaining) = mobile
+            .runtime
+            .open_requests
+            .cancellation(&mobile.request_id)?;
+        tokio::select! {
+            biased;
+            _ = cancel.cancelled() => Err("open_cancelled".into()),
+            _ = tokio::time::sleep(remaining) => Err("open_timeout".into()),
+            result = operation => result,
+        }
+    } else {
+        operation.await
+    }
 }
 
 #[tauri::command]

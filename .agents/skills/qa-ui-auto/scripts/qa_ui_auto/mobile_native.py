@@ -220,7 +220,10 @@ def register(verb, terminal_input):
             owner = pair(endpoint, text(ctx, '[data-testid="mobile-settings-code"]'))
             other = pair(endpoint, code(ctx))
             return open_session(ctx, endpoint, owner, other)
+        if args == 'openssh-cancel':
+            from .mobile_openssh import run
+            return run(ctx, address(ctx))
         if args == 'connection-auth':
             from .mobile_connection_auth import run as connection_auth
             return connection_auth(ctx, address(ctx), text(ctx, '[data-testid="mobile-settings-code"]'))
-        raise StepError('mobile_service_probe requires desktop, headless, open-session or connection-auth')
+        raise StepError('mobile_service_probe requires desktop, headless, open-session connection-auth or openssh-cancel')

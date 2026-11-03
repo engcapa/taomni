@@ -27,7 +27,8 @@ export function TerminalMore({ children }: { children: ReactNode }) {
 export function TerminalInputMode({ mode, disabled, onChange }: { mode: InputMode; disabled: boolean; onChange: (mode: InputMode) => void }) {
   return <div className="input-modes" data-testid="mobile-input-modes" role="group" aria-label="终端输入方式">
     <button data-testid="mobile-input-compact" aria-pressed={mode === "compact"} onMouseDown={keepFocus} onClick={() => onChange(mode === "compact" ? "hidden" : "compact")}>紧凑键盘</button>
-    <button data-testid="mobile-terminal-keyboard" disabled={disabled} aria-pressed={mode === "system"} onMouseDown={keepFocus} onClick={() => onChange(mode === "system" ? "hidden" : "system")}>中文 / 系统键盘</button>
+    <button data-testid="mobile-input-direct" disabled={disabled} aria-pressed={mode === "direct"} onMouseDown={keepFocus} onClick={() => onChange("direct")}>直接输入</button>
+    <button data-testid="mobile-terminal-keyboard" disabled={disabled} aria-pressed={mode === "system"} onMouseDown={keepFocus} onClick={() => onChange(mode === "system" ? "hidden" : "system")}>命令草稿</button>
     <button data-testid="mobile-input-hide" aria-label="收起输入区" disabled={mode === "hidden"} onMouseDown={keepFocus} onClick={() => onChange("hidden")}>⌄</button>
   </div>;
 }

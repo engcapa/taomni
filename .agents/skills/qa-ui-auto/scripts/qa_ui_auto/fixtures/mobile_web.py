@@ -29,8 +29,9 @@ def setup(ctx):
     receipt.write_text('', encoding='utf-8')
     clients = []
     lock = threading.RLock()
-    state = {'paired': False, 'connection_id': 'fixture-connection', 'holder': 'none', 'seq': 0, 'event_seq': 0, 'task': 'idle', 'open': 0, 'opens': {}}
-    auth_case = ctx.case_id == 'TC-MOBILE-006'
+    state = {'paired': False, 'connection_id': 'fixture-connection', 'holder': 'none', 'seq': 0, 'event_seq': 0, 'task': 'idle', 'open': 0, 'opens': {}, 'direct': ''}
+    auth_case = ctx.case_id in ('TC-MOBILE-006', 'TC-MOBILE-009')
+    cancel_race = threading.Event()
 
     def record(text):
         with lock, receipt.open('a', encoding='utf-8') as f:
@@ -99,6 +100,10 @@ def setup(ctx):
                 request_id = path.split('/')[-2]
                 state['opens'][request_id]['cancelled'] = True
                 record('CANCEL ' + request_id)
+                if ctx.case_id == 'TC-MOBILE-009' and request_id == 'qa-open-1':
+                    if not cancel_race.wait(10):
+                        return self.reply(500, {'error': 'next_request_not_observed'})
+                    record('CANCEL_RESPONSE ' + request_id)
                 return self.reply(200, {'status': 'cancelled'})
             if path.endswith('/message'):
                 record('AGENT ' + body.get('text', ''))
@@ -128,6 +133,8 @@ def setup(ctx):
                 opened = state['opens'][request_id]
                 if opened['cancelled']:
                     return self.reply(200, {'request_id': request_id, 'status': 'failed', 'error': 'open_cancelled'})
+                if ctx.case_id == 'TC-MOBILE-009' and request_id == 'qa-open-2':
+                    cancel_race.set()
                 if opened['round'] < 2:
                     round_id = opened['round']
                     prompts = [{'prompt': '用户名', 'echo': True, 'initial': 'developer'}, {'prompt': '密码', 'echo': False}] if round_id == 0 else [{'prompt': '一次性验证码', 'echo': False}]
@@ -179,6 +186,9 @@ def setup(ctx):
                         text = base64.b64decode(value['data_b64']).decode()
                         # Escaped so control keys stay readable and line-safe in the receipt.
                         record('PTY ' + text.encode('unicode_escape').decode('ascii'))
+                        state['direct'] = (state['direct'] + text)[-32:]
+                        if state['direct'].endswith('git che\t'):
+                            record('DIRECT git che\\t')
                         state['seq'] += 1
                         send({'type': 'output', 'seq': state['seq'], 'data_b64': base64.b64encode(('\r\n' + text).encode()).decode()})
                     elif kind == 'resize':

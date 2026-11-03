@@ -264,3 +264,72 @@ async fn real_http_challenges_require_authentication_and_the_requesting_device()
     );
     fixture.finish().await;
 }
+
+#[test]
+fn final_launch_guard_never_runs_after_cancel_revoke_stop_or_expiry() {
+    for reason in ["cancel", "revoke", "stop", "timeout"] {
+        let requests = OpenRequests::default();
+        let id = pending(&requests);
+        match reason {
+            "cancel" => requests.cancel("phone-a", &id).unwrap(),
+            "revoke" => requests.cancel_pending(Some("phone-a")),
+            "stop" => requests.cancel_pending(None),
+            _ => {
+                requests
+                    .requests
+                    .lock()
+                    .unwrap()
+                    .get_mut(&id)
+                    .unwrap()
+                    .created = Instant::now() - PENDING_TIMEOUT
+            }
+        }
+        let mut launched = false;
+        assert!(
+            requests
+                .while_pending(&id, || {
+                    launched = true;
+                    Ok(())
+                })
+                .is_err(),
+            "{reason}"
+        );
+        assert!(!launched, "{reason}");
+    }
+}
+
+#[tokio::test]
+async fn whole_connection_preparation_is_dropped_on_mobile_cancellation() {
+    let fixture = crate::mobile::service_tests::Fixture::new().await;
+    let id = pending(&fixture.state.mobile.open_requests);
+    let context = MobileAuthContext {
+        runtime: fixture.state.mobile.clone(),
+        request_id: id.clone(),
+    };
+    let dropped = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    struct Owner(Arc<std::sync::atomic::AtomicBool>);
+    impl Drop for Owner {
+        fn drop(&mut self) {
+            self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+    let owner = Owner(dropped.clone());
+    let operation = during_connection(Some(&context), async move {
+        let _owner = owner;
+        std::future::pending::<()>().await;
+        Ok(())
+    });
+    let cancel = async {
+        tokio::task::yield_now().await;
+        fixture
+            .state
+            .mobile
+            .open_requests
+            .cancel("phone-a", &id)
+            .unwrap();
+    };
+    let (result, _) = tokio::join!(operation, cancel);
+    assert_eq!(result.unwrap_err(), "open_cancelled");
+    assert!(dropped.load(std::sync::atomic::Ordering::SeqCst));
+    fixture.finish().await;
+}

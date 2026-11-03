@@ -1,5 +1,6 @@
 """Ephemeral loopback SSH peer and previous-version session rows; all OSes."""
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -23,11 +24,25 @@ def start(ctx):
         ctx.values['mobile_auth_receipt'] = str((Path(ctx.case_dir) / 'mobile-connection-auth-receipt.json').resolve())
         ctx.values['mobile_ssh_marker'] = str((Path(ctx.case_dir) / 'mobile-ssh-input-marker.txt').resolve())
         options = {'networkSettings': {'proxyKind': 'none'}, 'x11': False}
-        return [
+        sessions = [
             ssh_session('QA phone password', options, host='127.0.0.1', port=config['port'], user='old-user', auth='Password'),
             ssh_session('QA phone OTP', options, host='127.0.0.1', port=config['port'], user='qa-otp-user', auth='Password'),
             ssh_session('QA phone private key', options, host='127.0.0.1', port=config['port'], user='qa-key-user', auth={'PrivateKey': {'key_path': config['keyPath']}}),
         ]
+        for name, auth, user in [('jump OTP', 'Password', 'qa-otp-user'), ('jump private key', 'PrivateKey', 'qa-key-user')]:
+            network = {'proxyKind': 'ssh-tunnel', 'jumpHost': '127.0.0.1', 'jumpPort': str(config['port']), 'jumpUser': user,
+                       'jumpAuthKind': auth, 'jumpPassword': 'unused-factor', 'jumpKeyPath': config['keyPath']}
+            sessions.append(ssh_session('QA phone ' + name, {'networkSettings': network}, host='127.0.0.1', port=config['port'], user='old-user', auth='Password'))
+        for name, kind, port in [('HTTP proxy', 'http', config['httpPort']), ('SOCKS proxy', 'socks5', config['socksPort']), ('app proxy', 'app', config['httpPort']), ('custom proxy', 'custom', config['socksPort'])]:
+            custom = {'enabled': True, 'mode': 'manual', 'kind': 'socks5', 'host': '127.0.0.1', 'port': port, 'username': 'saved-proxy-user', 'password_ref': 'vault:qa-proxy-locked', 'session_id': ''}
+            network = {'proxyKind': kind, 'proxyHost': '127.0.0.1', 'proxyPort': str(port), 'proxyUser': 'saved-proxy-user', 'proxyPass': 'vault:qa-proxy-locked', 'customProxy': custom}
+            sessions.append(ssh_session('QA phone ' + name, {'networkSettings': network}, host='127.0.0.1', port=config['port'], user='old-user', auth='Password'))
+        from .backup_policy import isolated_data_root
+        isolated_data_root(ctx)  # validates every isolation path before fixture writes
+        config_root = Path(os.environ.get('NEWMOB_CONFIG_DIR') or os.environ['XDG_CONFIG_HOME']) / 'taomni'
+        config_root.mkdir(parents=True, exist_ok=True)
+        (config_root / 'proxy.json').write_text(json.dumps({'enabled': True, 'mode': 'manual', 'kind': 'http', 'host': '127.0.0.1', 'port': config['httpPort'], 'username': 'saved-proxy-user', 'password_ref': 'vault:qa-proxy-locked', 'session_id': ''}), encoding='utf-8')
+        return sessions
     except BaseException:
         stop(ctx)
         raise

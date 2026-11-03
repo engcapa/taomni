@@ -1,6 +1,6 @@
-use super::authentication::SshAuth;
+use super::authentication::{KbdInteractivePrompter, SshAuth};
 use super::connection::SshHandler;
-use super::connection::connect_ssh_authenticated_with;
+use super::connection::connect_ssh_authenticated_with_prompter;
 use crate::terminal::network::NetworkSettings;
 use crate::terminal::network::establish_transport;
 use russh::ChannelStream;
@@ -97,6 +97,15 @@ pub(crate) async fn build_ssh_transport(
     port: u16,
     network: Option<&NetworkSettings>,
 ) -> Result<SshTransport, String> {
+    build_ssh_transport_with_prompter(host, port, network, None).await
+}
+
+pub(crate) async fn build_ssh_transport_with_prompter(
+    host: &str,
+    port: u16,
+    network: Option<&NetworkSettings>,
+    prompter: Option<&KbdInteractivePrompter>,
+) -> Result<SshTransport, String> {
     match network {
         Some(n) if n.uses_jump_host() => {
             if n.jump_host.trim().is_empty() {
@@ -130,12 +139,23 @@ pub(crate) async fn build_ssh_transport(
             // break the async-recursion cycle the compiler sees (this fn ->
             // connect_ssh_authenticated_with -> ... -> this fn); the runtime
             // path never actually recurses because `network` is `None` here.
-            let jump = Box::pin(connect_ssh_authenticated_with(
+            let jump_prompter: Option<KbdInteractivePrompter> = prompter.map(|prompt| {
+                let prompt = prompt.clone();
+                let label = format!("Jump host {}:{}", n.jump_host, n.jump_port);
+                Arc::new(
+                    move |mut request: super::authentication::KbdInteractiveRequest| {
+                        request.name = format!("{} · {}", label, request.name);
+                        prompt(request)
+                    },
+                ) as KbdInteractivePrompter
+            });
+            let jump = Box::pin(connect_ssh_authenticated_with_prompter(
                 &n.jump_host,
                 n.jump_port,
                 &n.jump_user,
                 jump_auth,
                 None,
+                jump_prompter.as_ref(),
             ))
             .await
             .map_err(|e| format!("jump host {}:{}: {}", n.jump_host, n.jump_port, e))?;

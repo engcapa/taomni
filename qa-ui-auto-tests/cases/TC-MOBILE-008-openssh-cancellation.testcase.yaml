@@ -1,0 +1,63 @@
+id: TC-MOBILE-008
+title: Mobile cancellation revocation and service stop kill OpenSSH probe before PTY registration
+covers:
+- F-MOBILE-1
+- F2.1
+tags:
+- mobile
+- native-boundary
+- authentication
+modes:
+- native
+native_platforms:
+- Linux
+fixtures:
+- reset_db
+- mobile_openssh
+timeout_sec: 180
+description: A fixture-owned ssh executable on isolated PATH starts a real blocked subprocess. Cancel, revoke and stop must kill it and prevent a late PTY or broker terminal. This proves process ownership, not Kerberos ticket interoperability. Expiry and final registration ownership also have Rust regressions.
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-mobile-openssh-master
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: mobile
+- wait_for: '[data-testid="mobile-settings"]'
+- fill:
+    selector: '[data-testid="mobile-settings-port"]'
+    value: '0'
+- click: '[data-testid="mobile-settings-toggle"]'
+- assert_text:
+    selector: '[data-testid="mobile-settings-status"]'
+    contains: 运行中
+- click: '[data-testid="mobile-settings-open-sessions"]'
+- mobile_service_probe: openssh-cancel
+- assert_file_contains:
+    path: ${fixture.mobile_openssh_receipt}
+    contains: '"passed": true'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Cancel, revoke and stop during an actual OpenSSH probe terminate its child and prevent late terminal launch or registration.
+    actions: [1, 2, 3, 4, 5, 6, 7, 9, 10]
+    checkpoints:
+    - step: 8
+      expectation: Native mobile listener is running.
+    - step: 10
+      expectation: All three cancellation paths kill the real probe and preserve broker terminal counts after release of a late successful probe.
+    - step: 11
+      expectation: Original process receipt passed, with no PTY launch events.
+    - step: 12
+      expectation: No native runtime errors.
+    results: [8, 10, 11, 12]
+  visual:
+  - check: No visual comparison is required.
+    method: not-applicable
+    reason: Process and terminal lifecycle assertions own acceptance.
+  native:
+  - check: Real native subprocess cancellation and broker registration.
+    method: automated
+    reason: Probe process liveness and native HTTP terminal results are observed independently.

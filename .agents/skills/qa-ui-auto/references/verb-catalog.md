@@ -434,3 +434,13 @@ The `mobile_web` browser fixture serves the production mobile bundle with a
 deterministic HTTP/WS peer; it does not establish Rust/native service behavior.
 The `mobile_service` fixture seeds only isolated saved-session rows for native
 projection checks and assigns receipt paths.
+
+`mobile_service_probe: openssh-cancel` (TC-MOBILE-008, Linux native) uses the
+`mobile_openssh` fixture to place a deterministic blocking ssh executable on the
+isolated QA app's PATH. It observes real child PIDs, cancels/revokes/stops through
+HTTP or desktop Settings, then releases late probe success and asserts no PTY
+launch or broker registration. This tests process ownership, not Kerberos ticket
+interoperability. The fixture restores PATH and never alters a user executable.
+TC-MOBILE-007 also authenticates through real SSH direct-tcpip jump channels (OTP
+and encrypted key), and HTTP/SOCKS5/application/independent proxies after locking
+the vault through desktop Settings; the peer independently records routing.

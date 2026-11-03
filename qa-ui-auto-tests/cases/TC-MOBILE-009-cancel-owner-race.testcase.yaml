@@ -1,0 +1,101 @@
+id: TC-MOBILE-009
+title: A delayed cancel response never aborts the next phone connection
+covers:
+- F-MOBILE-1
+tags:
+- mobile
+- authentication
+modes:
+- browser
+fixtures:
+- mobile_web
+timeout_sec: 90
+description: The HTTP peer holds A cancellation until B polling begins, after A polling has reported failure. B must retain its challenge and complete authentication.
+  Unit tests also cover a late cancellation failure.
+steps:
+- open: ${fixture.mobile_endpoint}
+- click: '[data-testid="mobile-add-instance"]'
+- fill:
+    selector: '[data-testid="mobile-pair-code"]'
+    value: qa-mobile-code
+- click: '[data-testid="mobile-pair-submit"]'
+- click: '[data-testid="mobile-saved-open"]'
+- wait_for: '[data-testid="mobile-connection-auth"]'
+- click: '[data-testid="mobile-auth-cancel"]'
+- eval_readonly:
+    expression: '!document.querySelector(".connection-auth")'
+    expect_truthy: true
+    timeout_sec: 5
+- click: '[data-testid="mobile-saved-open"]'
+- wait_for: '[data-testid="mobile-connection-auth"]'
+- assert_file_contains:
+    path: ${fixture.mobile_receipt}
+    contains: CANCEL_RESPONSE qa-open-1
+- assert_text:
+    selector: '[data-testid="mobile-connection-auth"]'
+    contains: 登录账户
+- fill:
+    selector: '[data-testid="mobile-auth-answer-0"]'
+    value: phone-user
+- fill:
+    selector: '[data-testid="mobile-auth-answer-1"]'
+    value: qa-temp-secret
+- click: '[data-testid="mobile-auth-submit"]'
+- assert_text:
+    selector: '[data-testid="mobile-connection-auth"]'
+    contains: SSH 验证码
+- fill:
+    selector: '[data-testid="mobile-auth-answer-0"]'
+    value: '123456'
+- click: '[data-testid="mobile-auth-submit"]'
+- wait_for: '[data-testid="mobile-terminal-screen"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A late cancellation response is ignored after ownership transfers to B; B retains progress and completes authentication.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 7
+    - 9
+    - 13
+    - 14
+    - 15
+    - 17
+    - 18
+    checkpoints:
+    - step: 6
+      expectation: A has a live authentication challenge.
+    - step: 8
+      expectation: A polling observes failure before the cancel response returns.
+    - step: 11
+      expectation: Peer has released the delayed A cancellation after B started polling.
+    - step: 12
+      expectation: B still owns its login challenge.
+    - step: 16
+      expectation: B continues to its next authentication round.
+    - step: 19
+      expectation: B opens its terminal despite the late A response.
+    - step: 20
+      expectation: No runtime errors.
+    results:
+    - 6
+    - 8
+    - 11
+    - 12
+    - 16
+    - 19
+    - 20
+  visual:
+  - check: No visual comparison is required.
+    method: not-applicable
+    reason: Request and authentication ownership are asserted directly.
+  native:
+  - check: HTTP response interleaving is a browser boundary.
+    method: not-applicable
+    reason: Rust cancellation and native connection ownership are covered by TC-MOBILE-007/008.

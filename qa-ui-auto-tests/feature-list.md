@@ -13676,6 +13676,12 @@ controls:
   - id: mobile-input-compact
     selector: '[data-testid="mobile-input-compact"]'
     kind: interactive
+  - id: mobile-input-direct
+    selector: '[data-testid="mobile-input-direct"]'
+    kind: interactive
+  - id: mobile-terminal-direct-input
+    selector: '[data-testid="mobile-terminal-screen"] .xterm-helper-textarea'
+    kind: interactive
   - id: mobile-input-hide
     selector: '[data-testid="mobile-input-hide"]'
     kind: interactive

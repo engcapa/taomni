@@ -33,7 +33,7 @@ afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 function connect() {
   act(() => { mock.status("已连接"); mock.frame({ type: "hello", connection_id: "c" }); mock.frame({ type: "control", holder: "mobile:phone", connection_id: "c" }); });
 }
-const inputs = () => mock.send.mock.calls.map((call: unknown[]) => call[0] as Frame).filter(frame => frame.type === "input").map(frame => atob(String(frame.data_b64)));
+const inputs = () => mock.send.mock.calls.map((call: unknown[]) => call[0] as Frame).filter(frame => frame.type === "input").map(frame => new TextDecoder().decode(Uint8Array.from(atob(String(frame.data_b64)), c => c.charCodeAt(0))));
 
 it("keeps read-only input out of the wire, then adopts and follows phone geometry only while holder", () => {
   vi.useFakeTimers();
@@ -119,4 +119,22 @@ it("keeps font, resize, fullscreen and history available through more and dismis
   fireEvent.keyDown(document, { key: "Escape" });
   expect(screen.queryByTestId("mobile-terminal-menu")).toBeNull();
   expect(screen.getByTestId("mobile-terminal-more")).toHaveFocus();
+});
+
+it("direct system input sends incrementally before Tab and never adds an implicit Enter", () => {
+  render(<TerminalView instance={instance} session={session} />);
+  connect();
+  fireEvent.click(screen.getByTestId("mobile-input-direct"));
+  expect(mock.term.textarea).toHaveFocus();
+  expect(mock.term.textarea.inputMode).toBe("text");
+  act(() => mock.input("git che"));
+  fireEvent.click(screen.getByTestId("mobile-key-tab"));
+  act(() => mock.input("中文"));
+  expect(inputs()).toEqual(["git che", "\t", "中文"]);
+  fireEvent.click(screen.getByTestId("mobile-input-compact"));
+  expect(mock.term.textarea.inputMode).toBe("none");
+  expect(mock.term.textarea).not.toHaveFocus();
+  act(() => mock.frame({ type: "control-lost" }));
+  act(() => mock.input("late"));
+  expect(inputs()).toEqual(["git che", "\t", "中文"]);
 });

@@ -5,12 +5,11 @@ import { parseSessionOptions } from "../../lib/terminalProfile";
 import { useVaultStore } from "../../stores/vaultStore";
 import { passwordRefFromOptions, resolveSessionAuth } from "./authentication";
 
-interface Prompt { prompt: string; echo: boolean; initial: string }
-type Ask = (name: string, instructions: string, prompts: Prompt[]) => Promise<string[]>;
+import { prepareMobileProxy, type MobileAsk, type MobileAuthPrompt } from "./mobileProxyAuth";
 
 /** One connection's credentials; never updates a saved session or the vault. */
 export async function prepareMobileSsh(session: SessionConfig, requestId: string, signal: AbortSignal) {
-  const ask: Ask = async (name, instructions, prompts) => {
+  const ask: MobileAsk = async (name, instructions, prompts) => {
     const answer = await invoke<string[]>("mobile_connection_auth", { requestId, name, instructions, prompts });
     if (signal.aborted) throw new Error("open_cancelled");
     if (!Array.isArray(answer) || answer.length !== prompts.length) throw new Error("invalid_auth_response");
@@ -22,7 +21,7 @@ export async function prepareMobileSsh(session: SessionConfig, requestId: string
   let credential = method === "Password" ? passwordRefFromOptions(session) : data;
   const needsPassword = method === "Password" && (!credential || vaultLocked());
   if (needsPassword || !session.username?.trim()) {
-    const prompts: Prompt[] = [{ prompt: "用户名", echo: true, initial: session.username || "root" }];
+    const prompts: MobileAuthPrompt[] = [{ prompt: "用户名", echo: true, initial: session.username || "root" }];
     if (needsPassword) prompts.push({ prompt: "密码", echo: false, initial: "" });
     const values = await ask(`连接 ${session.host}:${session.port}`, "仅用于本次连接，不修改已保存账户。保险库锁定时可直接输入本次密码，无需向手机提供保险库主密码。", prompts);
     if (!values[0].trim()) throw new Error("invalid_auth_response");
@@ -33,7 +32,8 @@ export async function prepareMobileSsh(session: SessionConfig, requestId: string
   // Materialize the same saved/manual jump settings for this attempt only.
   // Clearing the saved jump id prevents its vault ref overwriting a one-shot
   // phone answer in the backend's normal jump credential resolver.
-  const network = getSessionNetworkSettings(effective.options_json);
+  const network = await prepareMobileProxy(getSessionNetworkSettings(effective.options_json), vaultLocked(), ask);
+  effective = { ...effective, options_json: JSON.stringify({ ...parseSessionOptions(effective.options_json), networkSettings: network }) };
   if (network.proxyKind === "ssh-tunnel") {
     let jump = { ...network };
     if (network.jumpSessionId) {

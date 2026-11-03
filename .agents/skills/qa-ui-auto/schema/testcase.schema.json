@@ -63,6 +63,7 @@
           "reset_db",
           "mobile_web",
           "mobile_service",
+          "mobile_openssh",
           "unreachable_app_proxy",
           "backup_policy",
           "backup_cloud",
@@ -564,7 +565,7 @@
         "terminal_input": {
           "$ref": "#/$defs/terminal_input_arg"
         },
-        "mobile_service_probe": { "enum": ["desktop", "headless", "open-session", "connection-auth"] },
+        "mobile_service_probe": { "enum": ["desktop", "headless", "open-session", "connection-auth", "openssh-cancel"] },
         "mobile_browser_probe": { "enum": ["touch-scroll"] },
         "native_terminal_burst": {
           "$ref": "#/$defs/native_terminal_burst_arg"

@@ -63,8 +63,8 @@ export function TerminalView({ instance, session, onBack }: { instance: Instance
     const term = new Terminal({ fontSize, fontFamily: MONO_FONT, cursorBlink: false, scrollback: 1000, screenReaderMode: true, theme: { background: "#09121f", foreground: "#dce8f5" } });
     const fitter = new FitAddon(); term.loadAddon(fitter); term.open(element);
     terminal.current = term; fit.current = fitter;
-    // Tapping output must never summon the large system keyboard. The explicit
-    // system-input action focuses a real IME field instead.
+    // Compact/draft modes keep output taps from summoning the system keyboard.
+    // Direct input explicitly opts into xterm's incremental keyboard/IME path.
     if (term.textarea) term.textarea.inputMode = "none";
     const layout = () => { pinTerminal(box, element, fullscreenRef.current); fitter.fit(); };
     relayout.current = layout;
@@ -135,6 +135,11 @@ export function TerminalView({ instance, session, onBack }: { instance: Instance
   useEffect(() => saveKeysOpen(keysOpen), [keysOpen]);
   useEffect(() => saveInputMode(inputMode), [inputMode]);
   useLayoutEffect(() => {
+    const term = terminal.current;
+    if (term?.textarea) term.textarea.inputMode = inputMode === "direct" && controlling ? "text" : "none";
+    if (inputMode !== "direct" || !controlling) term?.blur();
+  }, [inputMode, controlling]);
+  useLayoutEffect(() => {
     saveFullscreen(fullscreen);
     document.documentElement.classList.toggle("terminal-fullscreen", fullscreen);
     return () => document.documentElement.classList.remove("terminal-fullscreen");
@@ -159,6 +164,12 @@ export function TerminalView({ instance, session, onBack }: { instance: Instance
     if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
     setPanelOpen(false);
     setInputMode(mode);
+    // Focus in this user gesture so iOS can open its keyboard. onData sends
+    // each committed character without adding Enter or paste wrappers.
+    if (mode === "direct" && controlling && terminal.current?.textarea) {
+      terminal.current.textarea.inputMode = "text";
+      terminal.current.focus();
+    }
   };
   const command = (frame: Frame) => { if (!send(frame)) setNotice("连接已断开，操作未发送。"); };
   // Full-screen TUIs (Codex, Claude Code) paint at the PTY geometry, so a read-only
