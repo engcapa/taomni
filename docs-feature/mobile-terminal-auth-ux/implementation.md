@@ -32,10 +32,22 @@ TC-MOBILE-007 使用临时 loopback ssh2 服务、实际 SSH 加密和认证，�
 
 开发前相关终端输入测试 20 项通过。开发后相关前端测试 21 文件/94 项通过；Rust mobile 66 项通过。浏览器 TC-MOBILE-001 与扩展后的 TC-MOBILE-006 实际执行通过。Linux QA release 下 TC-MOBILE-007 完整通过（native-auth-11/run-20261103-102755-548194255，身份稳定，1 passed / 0 failed / 0 skipped）。独立 SSH 测试端同时实现真实桌面的 shell 初始化完成协议，避免把初始化阶段隐藏的输出误判为认证失败。静态 audit --gate、类型检查、cargo check 与重构边界检查已通过。
 
-GitHub 选择完整移动用例 001–007、SSH 回归 122/139/143/150，并自动合并全部 crash-regression，合计 90 次执行：三平台各 15 次 browser，Linux 17 次 native，Windows/macOS 各 14 次 native。平台不适用的用例由原有声明决定，不计为通过。运行 41564971986 的三平台 browser 45 次全部通过；最终提交、运行链接和原生结果在最终验证后追加。静态审核与 dry-run 不计为实际验收证据。
+GitHub 选择完整移动用例 001–007、SSH 回归 122/139/143/150，并自动合并全部 crash-regression，合计 90 次执行：三平台各 15 次 browser，Linux 17 次 native，Windows/macOS 各 14 次 native。平台不适用的用例由原有声明决定，不计为通过。修复 SSH 测试端后，[运行 41567717905](https://github.com/engcapa/taomni/actions/runs/41567717905)（8dc7e0b60e537d19c6d90f4f61e61549a3774f6c）90/90 全部通过，GitHub 汇总成功。独立重新聚合原始报告后，确认选中 ID、receipt、源码/runner/case 身份及三平台 QA release 二进制一致，0 失败、0 跳过、无缺失或重复。静态审核与 dry-run 不计为实际验收证据。
 
 物理 Android/iOS 的软键盘、中文输入法和触摸手感未由桌面浏览器自动化验证。GitHub 原生覆盖 Windows WebView2、Linux WebKitGTK 与 macOS WKWebView；手机页面运行于 Playwright Chromium。
 
 ## 托管测试故障调查
 
 运行 41564971986 的 Linux TC-MOBILE-002 保留了真实 pointer/focus 证据：滚动期间点击坐标落在 feishu-app-id 的 label，而不是 mobile-settings-toggle，服务未收到启动操作。原生输入器现在先移动同一个 W3C 鼠标，再复核目标位置与命中；仅重新准备悬停，绝不重放按钮输入。98 项 pointer/driver 合约通过，原设置/网络断言保持不变。设置页说明同步为手机可填写一次性连接凭据，保险库主密码仍只在本机输入。
+
+点击加固与设置说明修正后，本地最终 QA release 的 TC-MOBILE-002/007 为 2/2 通过；完整原生 crash-regression 为 9/9 通过（native-final-crash/run-20261103-110915-975227120，身份稳定）。源码指纹 4facfc162f532783893d6874fb1498d519368c944f11243daf9e623f506b518e。最新全量[运行 41569156140](https://github.com/engcapa/taomni/actions/runs/41569156140)已成功结束，验证提交 dcfca476e8aea5db9879fc827219e69f99394527。GitHub 汇总与本地独立重新聚合均为 90/90 通过，0 失败、0 跳过；选中项无缺失、无重复，源码、runner、case、原始 receipt 与 QA release 二进制身份全部匹配。
+
+
+| 平台 | Browser | Native QA release |
+| --- | --- | --- |
+| Linux | 15/15 | 17/17 |
+| Windows | 15/15 | 14/14 |
+| macOS | 15/15 | 14/14 |
+| 合计 | 45/45 | 45/45 |
+
+三平台构建、原生 Rust 合约和最终汇总均成功。下载的原始证据位于 `qa-ui-auto-report/mobile-terminal-auth/github-final/`；独立核验结果为 `local-verified-ci-summary.json`。此处验收记录为文档更新，执行证据绑定上述产品提交及内容指纹。
