@@ -12,6 +12,7 @@ import json
 import os
 import sqlite3
 import subprocess
+from contextlib import closing
 from pathlib import Path
 from typing import Any
 
@@ -122,6 +123,19 @@ def _physical_child(root: Path, child: Path) -> Path:
     return child
 
 
+def _verify_project_identity(actual: str, expected: str) -> None:
+    # Rust canonicalization may return Windows extended drive/UNC paths. Compare
+    # filesystem identities, not spelling or a stripped prefix; different/missing
+    # directories must fail even when their names look equivalent.
+    if not Path(actual).samefile(expected):
+        raise AssertionError("native task was created against another project's source root")
+
+
+def _query_rows(db: sqlite3.Connection, query: str, parameters: tuple = ()) -> list[tuple]:
+    with closing(db.execute(query, parameters)) as cursor:
+        return cursor.fetchall()
+
+
 def _verify_native(ctx: Any, events: list[dict]) -> dict:
     expectation = API_CASES[str(ctx.case_id)]
     root = Path(ctx.values["orchestration_data_root"])
@@ -141,8 +155,8 @@ def _verify_native(ctx: Any, events: list[dict]) -> dict:
         raise AssertionError("partial/recovery fixture sequence is incorrect")
     if len({event["request_id"] for event in events}) != len(events):
         raise AssertionError("duplicate native generation request identity")
-    with sqlite3.connect(database.as_uri() + "?mode=ro", uri=True) as db:
-        runs = [json.loads(row[0]) for row in db.execute("SELECT data FROM runs ORDER BY created_at, rowid")]
+    with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as db:
+        runs = [json.loads(row[0]) for row in _query_rows(db, "SELECT data FROM runs ORDER BY created_at, rowid")]
         if [run["intent"] for run in runs] != expectation["intents"]:
             raise AssertionError("native durable runs do not match the submitted tasks")
         receipts = []
@@ -151,17 +165,16 @@ def _verify_native(ctx: Any, events: list[dict]) -> dict:
             total_requests += run["requestCount"]
             if run["worktreePath"] is not None:
                 raise AssertionError("direct API task unexpectedly created a coding worktree")
-            if Path(run["projectPath"]).resolve() != Path(ctx.values["orchestration_project"]).resolve():
-                raise AssertionError("native task was created against another project's source root")
-            requests = list(db.execute("SELECT kind,state FROM request_ledger WHERE run_id=? ORDER BY rowid", (run["id"],)))
-            attempts = list(db.execute("SELECT state FROM attempts WHERE run_id=? ORDER BY rowid", (run["id"],)))
+            _verify_project_identity(run["projectPath"], ctx.values["orchestration_project"])
+            requests = _query_rows(db, "SELECT kind,state FROM request_ledger WHERE run_id=? ORDER BY rowid", (run["id"],))
+            attempts = _query_rows(db, "SELECT state FROM attempts WHERE run_id=? ORDER BY rowid", (run["id"],))
             if len(requests) != run["requestCount"] or len(attempts) != len(requests):
                 raise AssertionError("native run, request ledger and attempt counts disagree")
             for source in run["sources"]:
                 if hashlib.sha256(source["content"].encode()).hexdigest() != source["hash"]:
                     raise AssertionError("native context snapshot hash mismatch")
-            artifact_rows = {row[0]: (row[1], json.loads(row[2])) for row in db.execute(
-                "SELECT id,hash,data FROM artifacts WHERE run_id=?", (run["id"],))}
+            artifact_rows = {row[0]: (row[1], json.loads(row[2])) for row in _query_rows(
+                db, "SELECT id,hash,data FROM artifacts WHERE run_id=?", (run["id"],))}
             artifacts = []
             for artifact in run["artifacts"]:
                 file = _physical_child(root, root / "artifacts" / artifact["id"])
@@ -193,8 +206,8 @@ def _verify_native(ctx: Any, events: list[dict]) -> dict:
                 resource = next((item for item in snapshot["resources"] if item["id"] == resource_id), None)
                 if not resource or resource["kind"] != "api" or resource["protocol"] != events[0]["route"]:
                     raise AssertionError("native HTTP protocol differs from the task's frozen API resource")
-                stored_events = [json.loads(row[0]) for row in db.execute(
-                    "SELECT data FROM events WHERE run_id=? ORDER BY sequence", (run["id"],))]
+                stored_events = [json.loads(row[0]) for row in _query_rows(
+                    db, "SELECT data FROM events WHERE run_id=? ORDER BY sequence", (run["id"],))]
                 if stored_events != run["events"]:
                     raise AssertionError("native event rows differ from the run snapshot")
                 kinds = [event["kind"] for event in run["events"]]

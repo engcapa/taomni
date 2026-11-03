@@ -9,7 +9,7 @@ import json
 import sqlite3
 import tempfile
 import unittest
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -31,6 +31,7 @@ class OrchestrationAdapterTests(unittest.TestCase):
         self.root.mkdir(parents=True)
         self.fixture = self.case / "orchestration-fixture"
         self.fixture.mkdir()
+        (self.report / "project").mkdir()
         self.ctx = SimpleNamespace(
             case_id="TC-ORCH-005", case_dir=self.case, report_root=self.report,
             cfg={"app": {"mode": "native"}},
@@ -141,6 +142,104 @@ class OrchestrationAdapterTests(unittest.TestCase):
         self.assertIsNone(self.ctx.orchestration_fixture)
         evidence = json.loads((self.fixture / "evidence.json").read_text())
         self.assertEqual(evidence["status"], "failed")
+
+    def test_windows_extended_drive_and_unc_project_spellings_use_samefile_identity(self):
+        pairs = (
+            (r"\\?\D:\qa\source\project", r"D:\qa\source\project"),
+            (r"\\?\UNC\fixture-host\share\project", r"\\fixture-host\share\project"),
+        )
+        for actual, expected in pairs:
+            with self.subTest(actual=actual):
+                self.assertNotEqual(PureWindowsPath(actual), PureWindowsPath(expected))
+                actual_path = Mock()
+                actual_path.samefile.return_value = True
+                with patch.object(orchestration, "Path", return_value=actual_path) as path:
+                    orchestration._verify_project_identity(actual, expected)
+                path.assert_called_once_with(actual)
+                actual_path.samefile.assert_called_once_with(expected)
+                actual_path.resolve.assert_not_called()
+
+    def test_different_or_missing_windows_project_identity_is_rejected(self):
+        pairs = (
+            (r"\\?\D:\qa\wrong-project", r"D:\qa\source\project"),
+            (r"\\?\UNC\fixture-host\other\project", r"\\fixture-host\share\project"),
+        )
+        for actual, expected in pairs:
+            with self.subTest(actual=actual):
+                actual_path = Mock()
+                actual_path.samefile.return_value = False
+                with patch.object(orchestration, "Path", return_value=actual_path), \
+                        self.assertRaisesRegex(AssertionError, "another project's source root"):
+                    orchestration._verify_project_identity(actual, expected)
+                actual_path.samefile.assert_called_once_with(expected)
+        actual_path = Mock()
+        actual_path.samefile.side_effect = FileNotFoundError("missing project")
+        with patch.object(orchestration, "Path", return_value=actual_path), self.assertRaises(FileNotFoundError):
+            orchestration._verify_project_identity(*pairs[0])
+
+    def test_real_different_project_identity_still_fails_native_evidence(self):
+        self.seed()
+        other = self.report / "other-project"
+        other.mkdir()
+        self.ctx.values["orchestration_project"] = str(other)
+        with self.assertRaisesRegex(AssertionError, "another project's source root"):
+            orchestration._verify_native(self.ctx, self.events)
+
+    def test_readonly_connection_closes_after_success_and_all_cursors_are_closed(self):
+        self.seed()
+        opened, cursors = [], []
+        class RecordingConnection(sqlite3.Connection):
+            def execute(connection, *args, **kwargs):
+                cursor = super().execute(*args, **kwargs)
+                cursors.append(cursor)
+                return cursor
+        connect = sqlite3.connect
+        def record_connect(*args, **kwargs):
+            connection = connect(*args, factory=RecordingConnection, **kwargs)
+            opened.append(connection)
+            return connection
+        with patch.object(orchestration.sqlite3, "connect", side_effect=record_connect) as mocked:
+            self.assertEqual(orchestration._verify_native(self.ctx, self.events)["status"], "passed")
+        mocked.assert_called_once_with((self.root / "state.sqlite3").as_uri() + "?mode=ro", uri=True)
+        self.assertTrue(cursors)
+        for connection in opened:
+            with self.assertRaises(sqlite3.ProgrammingError):
+                connection.execute("SELECT 1")
+        for cursor in cursors:
+            with self.assertRaises(sqlite3.ProgrammingError):
+                cursor.fetchone()
+
+    def test_readonly_connection_closes_on_validation_and_query_exceptions(self):
+        self.seed()
+        connect = sqlite3.connect
+        for cause in (AssertionError("different source"), OSError("identity unavailable")):
+            with self.subTest(cause=type(cause).__name__):
+                connection = connect((self.root / "state.sqlite3").as_uri() + "?mode=ro", uri=True)
+                with patch.object(orchestration.sqlite3, "connect", return_value=connection), \
+                        patch.object(orchestration, "_verify_project_identity", side_effect=cause), \
+                        self.assertRaises(type(cause)):
+                    orchestration._verify_native(self.ctx, self.events)
+                with self.assertRaises(sqlite3.ProgrammingError):
+                    connection.execute("SELECT 1")
+        class BrokenQueryConnection(sqlite3.Connection):
+            def execute(connection, *args, **kwargs):
+                raise sqlite3.OperationalError("unreadable evidence query")
+        broken = connect((self.root / "state.sqlite3").as_uri() + "?mode=ro", uri=True,
+                         factory=BrokenQueryConnection)
+        with patch.object(orchestration.sqlite3, "connect", return_value=broken), \
+                self.assertRaises(sqlite3.OperationalError):
+            orchestration._verify_native(self.ctx, self.events)
+        with self.assertRaises(sqlite3.ProgrammingError):
+            sqlite3.Connection.execute(broken, "SELECT 1")
+
+    def test_query_cursor_closes_even_if_fetching_rows_fails(self):
+        cursor = Mock()
+        cursor.fetchall.side_effect = sqlite3.OperationalError("fetch failed")
+        connection = Mock()
+        connection.execute.return_value = cursor
+        with self.assertRaises(sqlite3.OperationalError):
+            orchestration._query_rows(connection, "SELECT data FROM runs", ())
+        cursor.close.assert_called_once()
 
     def test_browser_setup_does_not_start_a_real_server_and_uses_case_parent_boundary(self):
         case = self.report / "browser-case"
