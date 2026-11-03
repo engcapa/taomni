@@ -7,6 +7,17 @@ import subprocess
 from .session_config import ssh_session
 
 
+def app_proxy_fixture_path(ctx):
+    from native_build import QA_APP_ID
+    from .backup_policy import isolated_data_root
+    isolated_data_root(ctx)  # validates all native isolation roots before writes
+    override = os.environ.get('NEWMOB_CONFIG_DIR')
+    # resolved_config_dir uses qa_override_path on Windows/macOS, appending
+    # the QA application ID. Linux's XDG config root is used directly.
+    config_root = Path(override) / QA_APP_ID if override else Path(os.environ['XDG_CONFIG_HOME'])
+    return config_root / 'taomni' / 'proxy.json'
+
+
 def start(ctx):
     root = Path(__file__).resolve().parents[6]
     script = Path(__file__).with_name('mobile_ssh_peer.cjs')
@@ -37,11 +48,9 @@ def start(ctx):
             custom = {'enabled': True, 'mode': 'manual', 'kind': 'socks5', 'host': '127.0.0.1', 'port': port, 'username': 'saved-proxy-user', 'password_ref': 'vault:qa-proxy-locked', 'session_id': ''}
             network = {'proxyKind': kind, 'proxyHost': '127.0.0.1', 'proxyPort': str(port), 'proxyUser': 'saved-proxy-user', 'proxyPass': 'vault:qa-proxy-locked', 'customProxy': custom}
             sessions.append(ssh_session('QA phone ' + name, {'networkSettings': network}, host='127.0.0.1', port=config['port'], user='old-user', auth='Password'))
-        from .backup_policy import isolated_data_root
-        isolated_data_root(ctx)  # validates every isolation path before fixture writes
-        config_root = Path(os.environ.get('NEWMOB_CONFIG_DIR') or os.environ['XDG_CONFIG_HOME']) / 'taomni'
-        config_root.mkdir(parents=True, exist_ok=True)
-        (config_root / 'proxy.json').write_text(json.dumps({'enabled': True, 'mode': 'manual', 'kind': 'http', 'host': '127.0.0.1', 'port': config['httpPort'], 'username': 'saved-proxy-user', 'password_ref': 'vault:qa-proxy-locked', 'session_id': ''}), encoding='utf-8')
+        proxy_path = app_proxy_fixture_path(ctx)
+        proxy_path.parent.mkdir(parents=True, exist_ok=True)
+        proxy_path.write_text(json.dumps({'enabled': True, 'mode': 'manual', 'kind': 'http', 'host': '127.0.0.1', 'port': config['httpPort'], 'username': 'saved-proxy-user', 'password_ref': 'vault:qa-proxy-locked', 'session_id': ''}), encoding='utf-8')
         return sessions
     except BaseException:
         stop(ctx)
