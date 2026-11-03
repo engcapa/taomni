@@ -8,12 +8,13 @@ import json
 from pathlib import Path
 import sqlite3
 from contextlib import closing, suppress
+from types import SimpleNamespace
 from playwright.sync_api import sync_playwright, expect
 from .mobile_wire import http
 from .mobile_native import code, pair, ORIGIN
 from .mobile_open_session import DESKTOP, require
 from .fixtures.backup_policy import isolated_data_root
-from .terminal_burst_probe import until, TRACE_INSTALL, TRACE_COLLECT
+from .terminal_burst_probe import until
 
 
 def run(ctx, endpoint, pairing_code):
@@ -67,10 +68,12 @@ def run(ctx, endpoint, pairing_code):
                     require(result['status'] == 'opened' and result['session_id'].startswith('term:'), 'native SSH did not resolve to a broker terminal')
                     record['result'] = result
                     until(ctx.session, '!document.querySelector(\'[data-testid="mfa-prompt"]\')', timeout=10)
-                    # Observe native readiness after its existing shell setup;
-                    # output during the private CWD probe is intentionally blanked.
-                    ctx.session.execute(TRACE_INSTALL)
+                    until(ctx.session, '[...(window.__taomni_terminal_registry__?.entries?.values() || [])].some(e => e.sessionId === '
+                          + json.dumps(result['session_id'][5:]) + ' && e.isReady?.())', timeout=15)
                     page.get_by_test_id('mobile-take-control').click()
+                    expect(page.get_by_test_id('mobile-terminal-status')).to_contain_text('控制中')
+                    if not page.get_by_test_id('mobile-compact-keyboard').is_visible():
+                        page.get_by_test_id('mobile-input-compact').click()
                     expect(page.get_by_test_id('mobile-compact-keyboard')).to_be_visible()
                     page.get_by_test_id('mobile-terminal-keyboard').click()
                     page.get_by_test_id('mobile-terminal-command').fill('echo QA_NATIVE_SSH_PING')
@@ -78,7 +81,6 @@ def run(ctx, endpoint, pairing_code):
                     until(ctx.session, '[...(window.__taomni_terminal_registry__?.entries?.values() || [])].some(e => e.sessionId === '
                           + json.dumps(result['session_id'][5:]) + ' && e.getBufferText().includes("QA_NATIVE_SSH_PONG"))', timeout=15)
                     record['native_ssh_output'] = True
-                    record['native_output_trace'] = ctx.session.execute(TRACE_COLLECT)
                     page.get_by_test_id('mobile-terminal-back').click()
 
                 # Account can be changed on the phone, without updating the saved row.
@@ -175,7 +177,8 @@ def run(ctx, endpoint, pairing_code):
                 context.close()
             finally:
                 browser.close()
-        with closing(sqlite3.connect(isolated_data_root(ctx) / 'taomni.db')) as db:
+        profile = isolated_data_root(SimpleNamespace(cfg=ctx.cfg, report_root=root.parent))
+        with closing(sqlite3.connect((profile / 'taomni.db').as_uri() + '?mode=ro', uri=True)) as db:
             original = db.execute('SELECT username, options_json FROM sessions WHERE id=?', ('QA phone password',)).fetchone()
             require(original[0] == 'old-user' and 'qa-temp-secret' not in original[1], 'phone auth changed persisted account credentials')
         peer = [json.loads(line) for line in (root / 'mobile-ssh-peer.jsonl').read_text(encoding='utf-8').splitlines()]
@@ -186,8 +189,6 @@ def run(ctx, endpoint, pairing_code):
         receipt['failure'] = {'type': type(error).__name__, 'message': str(error)}
         with suppress(Exception):
             receipt['desktop_at_failure'] = ctx.session.execute(DESKTOP)
-        with suppress(Exception):
-            receipt['native_output_trace'] = ctx.session.execute(TRACE_COLLECT)
         raise
     finally:
         (root / 'mobile-connection-auth-receipt.json').write_text(json.dumps(receipt, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')

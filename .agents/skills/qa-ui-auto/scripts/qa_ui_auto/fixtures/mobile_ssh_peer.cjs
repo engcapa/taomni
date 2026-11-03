@@ -43,6 +43,15 @@ const server = new Server({ hostKeys: [host.private] }, client => {
         stream.on("data", data => {
           pending += data.toString("utf8");
           stream.write(data);
+          // Implement the shell setup completion used by the real renderer.
+          // Echoing its source alone leaves subsequent output inside the
+          // renderer's private setup filter; a real shell executes this printf.
+          if (pending.includes("TaomniCwdIntegrationDone") && /[\r\n]/.test(pending)) {
+            record({ event: "shell-setup" });
+            stream.write("\r\n\x1b]7;file://qa.invalid/qa\x1b\\\x1b]633;TaomniCwdIntegrationDone\x07$ ");
+            pending = "";
+            return;
+          }
           if (pending.includes("QA_NATIVE_SSH_PING") && /[\r\n]/.test(pending.slice(pending.indexOf("QA_NATIVE_SSH_PING")))) {
             record({ event: "shell-input", marker: "QA_NATIVE_SSH_PING" });
             fs.writeFileSync(path.join(root, "mobile-ssh-input-marker.txt"), "QA_NATIVE_SSH_PING\n");

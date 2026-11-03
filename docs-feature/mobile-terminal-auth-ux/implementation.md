@@ -23,15 +23,15 @@
 | 用户名密码、逐轮 OTP、掩码、不持久化、取消后本地打开 | TC-MOBILE-006 HTTP/WS 独立测试端 | TC-MOBILE-007 实际 Tauri 服务、russh、加密私钥及原生 PTY |
 | 隔离、迟到答案、取消原生 OTP、错误密码恢复 | 表单与草稿单元测试 | TC-MOBILE-007；66 项 mobile Rust 测试 |
 | 原有无显示器服务、配对安全、保存会话/本地入口 | TC-MOBILE-001 | TC-MOBILE-003、005 |
-| 设置与认证相关旧流程 | TC-MOBILE-004、122、139、143、150 | 同用例的原生模式 |
+| 设置与认证相关旧流程 | TC-MOBILE-004、122、139、143、150 | TC-MOBILE-004、139、143、150 的原生模式（122 的 open_session 仅浏览器支持） |
 | 崩溃回归 | 工作流自动加入全部 crash-regression | 同标签全部原生用例及匹配 QA release |
 
 TC-MOBILE-007 使用临时 loopback ssh2 服务、实际 SSH 加密和认证，独立记录输入并回传确定性的 shell 输出；本地终端则执行实际平台 shell。测试不依赖外部 SSH 账号，不代表真实远程 shell 环境的完整兼容性验证。
 
 ## 验证记录
 
-开发前相关终端输入测试 20 项通过。开发后相关前端测试 21 文件/94 项通过；Rust mobile 66 项通过。浏览器 TC-MOBILE-001 与 TC-MOBILE-006 首轮实际执行通过；扩展键盘断言后继续验证。静态 audit --gate、类型检查、cargo check 与重构边界检查已通过。
+开发前相关终端输入测试 20 项通过。开发后相关前端测试 21 文件/94 项通过；Rust mobile 66 项通过。浏览器 TC-MOBILE-001 与扩展后的 TC-MOBILE-006 实际执行通过。Linux QA release 下 TC-MOBILE-007 完整通过（native-auth-11/run-20261103-102755-548194255，身份稳定，1 passed / 0 failed / 0 skipped）。独立 SSH 测试端同时实现真实桌面的 shell 初始化完成协议，避免把初始化阶段隐藏的输出误判为认证失败。静态 audit --gate、类型检查、cargo check 与重构边界检查已通过。
 
-GitHub 最终提交、完整 selected 清单、运行链接和实际通过/失败/跳过数量在最终验证后追加。静态审核与 dry-run 不计为实际验收证据。
+GitHub 选择完整移动用例 001–007、SSH 回归 122/139/143/150，并自动合并全部 crash-regression，合计 90 次执行：三平台各 15 次 browser，Linux 17 次 native，Windows/macOS 各 14 次 native。平台不适用的用例由原有声明决定，不计为通过。运行 41564971986 的三平台 browser 45 次全部通过；最终提交、运行链接和原生结果在最终验证后追加。静态审核与 dry-run 不计为实际验收证据。
 
 物理 Android/iOS 的软键盘、中文输入法和触摸手感未由桌面浏览器自动化验证。GitHub 原生覆盖 Windows WebView2、Linux WebKitGTK 与 macOS WKWebView；手机页面运行于 Playwright Chromium。
