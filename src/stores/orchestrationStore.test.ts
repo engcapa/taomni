@@ -87,6 +87,16 @@ describe("orchestration projection and command ownership", () => {
     expect(ipc.startAgentRun).not.toHaveBeenCalled();
   });
 
+  it("selects and restores canonical Windows tasks from display-path projects", async () => {
+    useOrchestrationStore.setState({ runs: [runFixture({ projectPath: "\\\\?\\C:\\Users\\QA\\project" })] });
+    state().setProject("C:/Users/QA/project");
+    state().selectRun("run-1");
+    expect(state().selectedRunId).toBe("run-1");
+    state().setProject("D:/other");
+    state().setProject("c:/users/qa/project/");
+    expect(state().selectedRunId).toBe("run-1");
+  });
+
   it("rejects stale snapshots arriving after an action, deduplicating snapshot reads", async () => {
     useOrchestrationStore.setState({ runs: [runFixture()] });
     const response = deferred<ipc.AgentRun>();

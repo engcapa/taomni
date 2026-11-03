@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { agentProjectKey, sameAgentProject } from "../lib/orchestrationProject";
 import {
   cancelAgentRun, createAgentRun, getAgentRun, getAgentSettings, listAgentRuns,
   recoverAgentRun, saveAgentSettings, startAgentRun,
@@ -18,7 +19,8 @@ function savedSelection(projectPath: string): string | null {
   try {
     const value: unknown = JSON.parse(localStorage.getItem(SELECTION_KEY) ?? "{}");
     if (!value || typeof value !== "object") return null;
-    const id = (value as Record<string, unknown>)[projectPath];
+    const saved = value as Record<string, unknown>;
+    const id = saved[agentProjectKey(projectPath)] ?? Object.entries(saved).find(([path]) => sameAgentProject(path, projectPath))?.[1];
     return typeof id === "string" ? id : null;
   } catch { return null; }
 }
@@ -28,7 +30,7 @@ function persistSelection(projectPath: string, runId: string | null) {
   try {
     const previous: unknown = JSON.parse(localStorage.getItem(SELECTION_KEY) ?? "{}");
     const selections = previous && typeof previous === "object" ? previous : {};
-    localStorage.setItem(SELECTION_KEY, JSON.stringify({ ...selections, [projectPath]: runId }));
+    localStorage.setItem(SELECTION_KEY, JSON.stringify({ ...selections, [agentProjectKey(projectPath)]: runId }));
   } catch { /* Runtime state remains usable when storage is unavailable. */ }
 }
 
@@ -117,7 +119,7 @@ export const useOrchestrationStore = create<OrchestrationState>((set, get) => {
     },
     selectRun: (selectedRunId) => {
       const { projectPath, runs } = get();
-      if (selectedRunId && !runs.some((run) => run.id === selectedRunId && run.projectPath === projectPath)) return;
+      if (selectedRunId && !runs.some((run) => run.id === selectedRunId && sameAgentProject(run.projectPath, projectPath))) return;
       selectionGeneration += 1;
       persistSelection(projectPath, selectedRunId);
       set({ selectedRunId, error: null });

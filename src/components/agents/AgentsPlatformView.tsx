@@ -1,6 +1,7 @@
 import { FileText, Menu, PanelRight, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { AgentIntent } from "../../lib/ipc/orchestration";
+import { sameAgentProject } from "../../lib/orchestrationProject";
 import { useOrchestrationStore } from "../../stores/orchestrationStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { WorkspaceFsModals } from "../workspace/WorkspaceFsModals";
@@ -42,10 +43,10 @@ export function AgentsPlatformView() {
   const projectName = roots.find((root) => root.path === projectPath)?.name ?? "";
   // Gate the old selection during the render before the project-sync effect.
   const run = state.projectPath === projectPath
-    ? state.runs.find((entry) => entry.id === state.selectedRunId && entry.projectPath === projectPath) ?? null
+    ? state.runs.find((entry) => entry.id === state.selectedRunId && sameAgentProject(entry.projectPath, projectPath)) ?? null
     : null;
   const recoveryRun = state.runs.find((entry) =>
-    entry.id === recoveryId && entry.projectPath === projectPath && entry.status === "partial",
+    entry.id === recoveryId && sameAgentProject(entry.projectPath, projectPath) && entry.status === "partial",
   );
 
   useEffect(() => {

@@ -117,6 +117,18 @@ describe("approved development Agent workspace", () => {
     expect(ipc.cancelAgentRun).not.toHaveBeenCalled();
   });
 
+  it("shows and selects a Windows canonical backend task under its display-path project", async () => {
+    const workspace = useWorkspacePlatformStore.getState().getWorkspace()!;
+    useWorkspacePlatformStore.getState().removeRootFolder(DEFAULT_WORKSPACE_ID, workspace.rootFolders[0].id);
+    useWorkspacePlatformStore.getState().addRootFolder(DEFAULT_WORKSPACE_ID, { path: "C:/Users/QA/project" });
+    vi.mocked(ipc.listAgentRuns).mockResolvedValue([runFixture({ projectPath: "\\\\?\\C:\\Users\\QA\\project" })]);
+    render(<AgentsPlatformView />); await ready();
+    fireEvent.click(await screen.findByTestId("orch-run-run-1"));
+    expect(screen.getByTestId("orch-conversation")).toHaveAttribute("data-run-id", "run-1");
+    expect(screen.getByTestId("orch-run-status")).toHaveAttribute("data-status", "planned");
+    expect(ipc.createAgentRun).not.toHaveBeenCalled();
+  });
+
   it("reconnects on focus without sending or starting another task", async () => {
     render(<AgentsPlatformView />); await ready();
     vi.mocked(ipc.listAgentRuns).mockResolvedValue([runFixture({ status: "partial" })]);

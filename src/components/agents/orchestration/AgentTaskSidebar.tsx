@@ -1,5 +1,6 @@
 import { Folder, Plus, Search, Settings } from "lucide-react";
 import { useState } from "react";
+import { sameAgentProject } from "../../../lib/orchestrationProject";
 import type { AgentRun, AgentSettings } from "../../../lib/ipc/orchestration";
 import type { PlatformWorkspace } from "../../../stores/workspacePlatformStore";
 import { useOrchT } from "./locales";
@@ -22,7 +23,7 @@ export function AgentTaskSidebar({
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const visible = runs.filter((run) =>
-    run.projectPath === projectPath && run.title.toLocaleLowerCase().includes(search.toLocaleLowerCase()),
+    sameAgentProject(run.projectPath, projectPath) && run.title.toLocaleLowerCase().includes(search.toLocaleLowerCase()),
   );
 
   return (

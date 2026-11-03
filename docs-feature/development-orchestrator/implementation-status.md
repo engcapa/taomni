@@ -106,9 +106,23 @@ No local product browser/native case, live fixture endpoint or real worker was r
 
 ### Hosted evidence
 
-Pending first pushed implementation SHA and workflow dispatch. All three platform
-browser/native release runs, required crash evidence and real-six-harness receipts
-remain **unrun** at this checkpoint. No hosted pass is claimed.
+- Pushed phases: `620e04a0b` (protocol extraction/invocation), `888218a04`
+  (candidate runtime/UI/hosted wiring), `a54d479be` (mandatory crash-set registration).
+- [Run 41674669109](https://github.com/engcapa/taomni/actions/runs/41674669109)
+  failed checkout because the dispatch used a short SHA; no test ran. Corrected
+  subsequent dispatches use the full immutable SHA.
+- [Run 41675128700](https://github.com/engcapa/taomni/actions/runs/41675128700)
+  failed mandatory crash-set unit assertions because the new tagged recovery case
+  was not yet registered in the exact expected/smoke sets. Fixed in `a54d479be`;
+  all four crash-planning unit tests then passed. Preserve existing crash cases.
+- [Run 41675950537](https://github.com/engcapa/taomni/actions/runs/41675950537),
+  pinned to `a54d479be718be3b7198df80fb9a103db4cb267a`, passed planning and
+  started the three-platform browser/native release pipeline. The supporting real
+  harness installer failed before worker execution; a follow-up adds safe
+  harness/stage diagnostics rather than exposing private logs or treating skips
+  as success. Browser/native results and complete crash evidence remain pending.
+
+No hosted product or six-harness acceptance pass is claimed at this checkpoint.
 
 ## Remaining work — not waived by phase 1
 
