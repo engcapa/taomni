@@ -1538,6 +1538,58 @@
 - `[data-testid="detached-reattach"]` — interactive [optional] — F-Detach-1.detached-reattach
 - `[data-testid="detached-os-fullscreen"]` — interactive [optional] — F-Detach-1.detached-os-fullscreen
 
+## main/development-agent (F-ORCH-1)
+
+- `[data-testid="orch-prompt"]` — interactive — F-ORCH-1.orch-prompt
+- `[data-testid="orch-send"]` — interactive — F-ORCH-1.orch-send
+- `[data-testid="orch-intent"]` — interactive — F-ORCH-1.orch-intent
+- `[data-testid="orch-project-add"]` — interactive — F-ORCH-1.orch-project-add
+- `[data-testid="orch-settings-open"]` — interactive — F-ORCH-1.orch-settings-open
+- `[data-testid="orch-settings-save"]` — interactive — F-ORCH-1.orch-settings-save
+- `[data-testid="orch-settings-cancel"]` — interactive — F-ORCH-1.orch-settings-cancel
+- `[data-testid="orch-plan-name"]` — interactive — F-ORCH-1.orch-plan-name
+- `[data-testid="orch-project-select"]` — interactive — F-ORCH-1.orch-project-select
+- `[data-testid="orch-planning-resource"]` — interactive — F-ORCH-1.orch-planning-resource
+- `[data-testid="orch-review-resource"]` — interactive — F-ORCH-1.orch-review-resource
+- `[data-testid="orch-settings-resources"]` — interactive — F-ORCH-1.orch-settings-resources
+- `[data-testid="orch-resource-editor"]` — display — F-ORCH-1.orch-resource-editor
+- `[data-testid="orch-resource-openai_chat"]` — interactive — F-ORCH-1.orch-resource-chat
+- `[data-testid="orch-resource-provider"]` — interactive — F-ORCH-1.orch-resource-provider
+- `[data-testid="orch-resource-protocol"]` — interactive — F-ORCH-1.orch-resource-protocol
+- `[data-testid="orch-resource-address"]` — interactive — F-ORCH-1.orch-resource-address
+- `[data-testid="orch-resource-model"]` — interactive — F-ORCH-1.orch-resource-model
+- `[data-testid="orch-concurrency"]` — interactive — F-ORCH-1.orch-concurrency
+- `[data-testid="orch-attach"]` — interactive — F-ORCH-1.orch-attach
+- `[data-testid="orch-source-paths"]` — interactive — F-ORCH-1.orch-source-paths
+- `[data-testid^="orch-worker-"]` — interactive — F-ORCH-1.orch-worker-resource
+  ↳ `[data-testid="orch-worker-resource-claude-code"]` — alias
+  ↳ `[data-testid="orch-worker-resource-codex"]` — alias
+  ↳ `[data-testid="orch-worker-resource-pi"]` — alias
+  ↳ `[data-testid="orch-worker-resource-opencode"]` — alias
+  ↳ `[data-testid="orch-worker-resource-deepseek-harness"]` — alias
+  ↳ `[data-testid="orch-worker-resource-zcode"]` — alias
+- `[data-testid^="orch-artifact-"]:not([data-testid="orch-artifact-content"])` — interactive — F-ORCH-1.orch-artifact-entry
+- `[data-testid^="orch-partial-artifact-"]` — interactive — F-ORCH-1.orch-partial-artifact
+- `[data-testid="orch-new-task"]` — interactive — F-ORCH-1.orch-new-task
+- `[data-testid="orch-approve-plan"]` — interactive — F-ORCH-1.orch-approve-plan
+- `[data-testid="orch-recovery-open"]` — interactive — F-ORCH-1.orch-recovery-open
+- `[data-testid="orch-recovery-confirm"]` — interactive — F-ORCH-1.orch-recovery-confirm
+- `[data-testid="orch-recovery-dismiss"]` — interactive — F-ORCH-1.orch-recovery-dismiss
+- `[data-testid="orch-show-sources"]` — interactive — F-ORCH-1.orch-show-sources
+- `[data-testid="orch-show-changes"]` — interactive — F-ORCH-1.orch-show-changes
+- `[data-testid="orch-workspace"]` — display — F-ORCH-1.orch-workspace
+- `[data-testid="orch-empty-state"]` — display — F-ORCH-1.orch-empty-state
+- `[data-testid="orch-plan"]` — display — F-ORCH-1.orch-plan
+- `[data-testid="orch-settings-dialog"]` — display — F-ORCH-1.orch-settings-dialog
+- `[data-testid="orch-recovery-dialog"]` — display — F-ORCH-1.orch-recovery-dialog
+- `[data-testid="orch-artifacts-panel"]` — display — F-ORCH-1.orch-artifacts-panel
+- `[data-testid="orch-sources-panel"]` — display — F-ORCH-1.orch-sources-panel
+- `[data-testid="orch-source-src-1"]` — display — F-ORCH-1.orch-source-first
+- `[data-run-id][data-testid^="orch-run-"]` — interactive — F-ORCH-1.orch-run-entry
+- `[data-testid="orch-run-status"]` — display — F-ORCH-1.orch-run-status
+- `[data-testid="orch-run-snapshot"]` — display — F-ORCH-1.orch-run-snapshot
+- `[data-testid="orch-artifact-content"]` — display — F-ORCH-1.orch-artifact-content
+
 ## main/menubar (F1.8)
 
 - `[data-testid="about-check-update"]` — interactive — F1.8.about-check-update

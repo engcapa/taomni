@@ -1,0 +1,167 @@
+id: TC-ORCH-001
+title: Developer agent uses shared defaults across tasks without rewriting old snapshots
+description: Verify the approved v0.6 conversation-first surface, real native shared-settings persistence, explicit project and unchanged historical execution configuration. Browser mode exercises deterministic preview only.
+modes: [browser, native]
+covers: [F-WS-6, F-ORCH-1]
+tags: [p0, orchestration, shared-settings]
+fixtures: [reset_db, orchestration_llm]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-orch-001
+- click: '[data-testid="home-open-agents"]'
+- wait_for: '[data-testid="orch-workspace"]'
+- assert_not_visible: '[data-testid="orch-settings-dialog"]'
+- click: '[data-testid="orch-project-add"]'
+- wait_for: '[data-testid="workspace-fs-modal-input"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.orchestration_project}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- select_option:
+    selector: '[data-testid="orch-intent"]'
+    value: plan
+- fill:
+    selector: '[data-testid="orch-prompt"]'
+    value: Design a compatible project settings option with an IPC contract and test plan.
+- click: '[data-testid="orch-send"]'
+- wait_for: '[data-testid="orch-plan"]'
+- assert_text:
+    selector: '[data-testid="orch-run-snapshot"]'
+    contains: Shared QA plan
+- click: '[data-testid="orch-settings-open"]'
+- wait_for: '[data-testid="orch-plan-name"]'
+- fill:
+    selector: '[data-testid="orch-plan-name"]'
+    value: Updated shared defaults
+- click: '[data-testid="orch-settings-save"]'
+- wait_for:
+    selector: '[data-testid="orch-settings-dialog"]'
+    state: hidden
+- assert_text:
+    selector: '[data-testid="orch-run-snapshot"]'
+    contains: Shared QA plan
+- click: '[data-testid="orch-new-task"]'
+- assert_not_visible: '[data-testid="orch-plan"]'
+- fill:
+    selector: '[data-testid="orch-prompt"]'
+    value: Review the settings contract and identify compatibility risks without changing files.
+- select_option:
+    selector: '[data-testid="orch-intent"]'
+    value: review
+- click: '[data-testid="orch-send"]'
+- wait_for: '[data-testid="orch-plan"]'
+- assert_text:
+    selector: '[data-testid="orch-run-snapshot"]'
+    contains: Updated shared defaults
+- assert_count:
+    selector: '[data-run-id][data-testid^="orch-run-"]'
+    equal: 2
+- click: '[data-testid="orch-settings-open"]'
+- fill:
+    selector: '[data-testid="orch-plan-name"]'
+    value: Unsaved edit must not apply
+- press: Escape
+- assert_not_visible: '[data-testid="orch-settings-dialog"]'
+- click: '[data-testid="orch-settings-open"]'
+- eval_readonly:
+    expression: document.getElementById('orch-plan-name').value
+    contains: Updated shared defaults
+- click: '[data-testid="orch-settings-cancel"]'
+- reload_window: null
+- wait_for: '[data-testid="orch-run-snapshot"]'
+- assert_text:
+    selector: '[data-testid="orch-run-snapshot"]'
+    contains: Updated shared defaults
+- assert_attribute:
+    selector: '[data-testid="orch-run-status"]'
+    name: data-status
+    equals: planned
+- click: '[data-run-id][data-testid^="orch-run-"]:last-of-type'
+- assert_text:
+    selector: '[data-testid="orch-run-snapshot"]'
+    contains: Shared QA plan
+- assert_attribute:
+    selector: '[data-testid="orch-run-status"]'
+    name: data-status
+    equals: planned
+- assert_no_runtime_errors: null
+- screenshot: orchestration-shared-defaults.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Two tasks inherit shared defaults at creation; saving affects the second task but never rewrites the
+      first snapshot.
+    actions:
+    - 6
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 15
+    - 17
+    - 18
+    - 21
+    - 23
+    - 24
+    - 25
+    checkpoints:
+    - step: 14
+      expectation: First task pins Shared QA plan.
+    - step: 20
+      expectation: Saving new defaults preserves the first task snapshot.
+    - step: 27
+      expectation: Second task pins Updated shared defaults.
+    - step: 28
+      expectation: Exactly two submitted tasks exist.
+    results:
+    - 14
+    - 20
+    - 27
+    - 28
+  - id: R2
+    requirement: Escape discards unsaved settings and renderer reload restores the selected planned run without sending
+      a generation request.
+    actions:
+    - 29
+    - 30
+    - 31
+    - 33
+    - 35
+    - 36
+    - 40
+    checkpoints:
+    - step: 32
+      expectation: Escape closes the settings draft.
+    - step: 34
+      expectation: Reopening retains saved defaults, not unsaved edit.
+    - step: 38
+      expectation: Selected run snapshot survives renderer reload.
+    - step: 39
+      expectation: No approval occurred; restored task remains planned.
+    - step: 43
+      expectation: No runtime errors occurred.
+    - step: 41
+      expectation: Selecting the original historical task after reload restores its original shared-plan snapshot.
+    - step: 42
+      expectation: Original task is still planned; no generation was silently started.
+    results:
+    - 32
+    - 34
+    - 38
+    - 39
+    - 43
+    - 41
+    - 42
+  visual:
+  - check: Approved v0.6 conversation-first layout and terminal-state screenshot
+    method: manual
+    reason: The authored screenshot is retained for review; selectors and static checks alone do not prove visual fidelity
+      and no screenshot is claimed reviewed or executed.
+  native:
+  - check: Named native boundary and independent evidence
+    method: automated
+    reason: Native fixture teardown independently asserts zero HTTP generations, empty request/attempt ledgers, two planned
+      run snapshots and saved profiles.json revision/name. Browser only checks deterministic localStorage/stub state.

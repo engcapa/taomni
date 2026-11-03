@@ -45,6 +45,18 @@ export function frontendEvents() {
   }
   return [...names].sort();
 }
+export function nativeRoutes(sources, errors = []) {
+  const routes = new Map();
+  for (const source of sources) {
+    for (const match of source.matchAll(/((?:"\w+"\s*\|?\s*)+)\s*=>\s*\{?\s*(?:super::)?(\w+)::handle\(invoke\)/g)) {
+      for (const name of match[1].matchAll(/"(\w+)"/g)) {
+        if (routes.has(name[1])) errors.push(`Duplicate native route: ${name[1]}`);
+        routes.set(name[1], match[2]);
+      }
+    }
+  }
+  return routes;
+}
 export function currentContracts() {
   return {
     schema: 1,
@@ -67,13 +79,9 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     if (new Set(names).size !== names.length) errors.push("Duplicate native command names");
     const dispatcher = "src-tauri/src/commands/mod.rs";
     if (fs.existsSync(path.join(root, dispatcher))) {
-      const routes = new Map();
-      for (const match of read(dispatcher).matchAll(/((?:"\w+"\s*\|?\s*)+)\s*=>\s*\{?\s*(\w+)::handle\(invoke\)/g)) {
-        for (const name of match[1].matchAll(/"(\w+)"/g)) {
-          if (routes.has(name[1])) errors.push(`Duplicate native route: ${name[1]}`);
-          routes.set(name[1], match[2]);
-        }
-      }
+      const delegated = [...read(dispatcher).matchAll(/if (\w+)::owns\(invoke\.message\.command\(\)\)\s*\{\s*return \1::handle\(invoke\);/g)].map((match) => `src-tauri/src/commands/${match[1]}.rs`);
+      const routingSources = [dispatcher, ...delegated];
+      const routes = nativeRoutes(routingSources.map(read), errors);
       for (const command of actual.commands) {
         const domain = routes.get(command.name);
         if (!domain || !read(`src-tauri/src/commands/${domain}.rs`).includes(`crate::${command.handler},`)) {

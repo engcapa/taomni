@@ -148,6 +148,81 @@ jobs:
           src/stores/sftpStore.test.ts
           src/lib/detachedSession.test.ts
 
+  orchestration-contracts:
+    name: Orchestration contracts and standalone real harness canary
+    if: >-
+      inputs.scope == 'all' || contains(inputs.case_ids, 'TC-ORCH-') ||
+      contains(inputs.tags, 'orchestration') || github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: ./.github/actions/qa-runtime
+        with:
+          mode: contracts
+      - name: Offline orchestration fixture contracts
+        run: >-
+          python -I -m unittest discover
+          -s "$GITHUB_WORKSPACE/qa-ui-auto-tests/fixtures/orchestration"
+          -p 'test_*.py' -v
+      - name: Product UI, projection and source contracts (Node 22)
+        run: |
+          pnpm exec vitest run --maxWorkers=2 src/stores/orchestrationStore.test.ts src/components/agents
+          pnpm exec tsc -b
+          pnpm check:refactor
+      # Keep the harness runtime separate from the application's Node 22/pnpm 10.
+      # The installer verifies exact versions/integrities from harness_catalog.json.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.0'
+      - name: Require Linux namespace tooling
+        run: |
+          command -v unshare
+          command -v ip
+          command -v git
+          /usr/bin/python3 --version
+      - name: Install all six pinned real harnesses in disposable paths
+        run: >-
+          python -I "$GITHUB_WORKSPACE/qa-ui-auto-tests/fixtures/orchestration/install_harnesses.py"
+          --root "$RUNNER_TEMP/orchestration-harnesses"
+      # No secrets are provided. Network isolation is enforced before executing
+      # any harness; ci_network drops privileges and strips inherited environment.
+      - name: Validate all real workers against loopback-only fixtures
+        run: |
+          sudo env GITHUB_ACTIONS=true /usr/bin/python3 -I \
+            "$GITHUB_WORKSPACE/qa-ui-auto-tests/fixtures/orchestration/ci_network.py" \
+            --uid "$(id -u)" --gid "$(id -g)" -- \
+            /usr/bin/python3 -I \
+            "$GITHUB_WORKSPACE/qa-ui-auto-tests/fixtures/orchestration/validate_workers.py" \
+            --installation "$RUNNER_TEMP/orchestration-harnesses/installation.json" \
+            --output "$RUNNER_TEMP/orchestration-evidence" --timeout 120
+      - name: Record evidence scope
+        if: always()
+        run: |
+          printf '%s\n' \
+            '## Orchestration real harness canary' \
+            'Scope: standalone installed harness processes, loopback fixture protocols, real Git worktrees, tool results and marker artifacts.' \
+            'Not proof of native Taomni scheduling, product adapters, UI dispatch, cancellation or the browser/native crash-regression suite.' \
+            'Any missing harness, install failure, isolation failure or receipt mismatch fails this required supporting job.' \
+            >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: qa-orchestration-contracts-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            qa-ui-auto-tests/fixtures/orchestration/harness_catalog.json
+            ${{ runner.temp }}/orchestration-harnesses/installation.json
+            ${{ runner.temp }}/orchestration-evidence/validation.json
+            ${{ runner.temp }}/orchestration-evidence/*.receipt.json
+            ${{ runner.temp }}/orchestration-evidence/requests.ndjson
+          if-no-files-found: warn
+          retention-days: 14
+
   development-case-contract:
     name: Development case contract
     if: github.event_name == 'pull_request' && inputs.scope == ''
@@ -263,6 +338,8 @@ jobs:
           QA_FEATURES: ${{ inputs.features }}
           # New feature PRs always run the packaged crash suite. Focused manual
           # selections also retain it, even when their feature selectors differ.
+          # The planner keeps real orchestration workers in a separate native
+          # namespace entry while reusing the same verified release build.
           QA_TAGS: ${{ inputs.scope == '' && github.event_name == 'pull_request' && 'crash-regression' || (inputs.scope == 'selected' || inputs.scope == 'impacted') && format('{0},crash-regression', inputs.tags) || inputs.tags }}
         run: python -m qa_ui_auto.ci plan
       - uses: actions/upload-artifact@v4
@@ -361,7 +438,7 @@ jobs:
   summarize:
     name: qa-ui-auto-platforms-result
     if: always() && needs.plan.result != 'skipped'
-    needs: [plan, tool-contracts, sftp-contracts, execute-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
+    needs: [plan, tool-contracts, sftp-contracts, orchestration-contracts, execute-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

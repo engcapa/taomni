@@ -65,6 +65,7 @@
           "backup_policy",
           "backup_cloud",
           "model_inspector_gateway",
+          "orchestration_llm",
           "credential_store",
           "path_completion",
           "ssh_required",

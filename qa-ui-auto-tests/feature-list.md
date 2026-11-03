@@ -13248,7 +13248,7 @@ controls:
 
 工作区可通过 + 菜单、Ctrl/Cmd+Alt+O 选择器与左栏 Sessions 工具窗口打开任意全局会话，运行实例与 Sessions 模式完全隔离。
 
-### 12.6 Agents / Crew 开发中入口与全局 Ctrl+K 命令面板
+### 12.6 开发 Agent 入口与全局 Ctrl+K 命令面板
 
 <!-- feature
 id: F-WS-6
@@ -13298,7 +13298,7 @@ controls:
   kind: interactive
 -->
 
-按当前产品范围，Agents / Crew 各入口显示“开发中”提示并保留当前画布；任务编排暂缓。全局 Ctrl/Cmd+K 命令面板仍可检索工作区、会话与工具动作并执行跳转。
+Agents各入口现在打开v0.6会话式开发界面，替代旧“开发中”提示；TC-WS-011保留Home / 命令面板实际导航和全局搜索回归。独立API、共享配置与候选由F-ORCH-1及专用用例保护；旧模拟agentsStore不是运行真相。
 
 
 工作区普通目录复用完整编辑器、LSP 与全局外观设置：`TC-WS-034`（browser），`TC-WS-035`（native、真实 Java LSP 与磁盘）。
@@ -13314,3 +13314,163 @@ TC-WS-075 adds native Home source-to-document activation coverage for the real `
 TC-WS-077 protects virtual explorer rows in browser/native: bounded DOM rows, Home/End and offscreen ArrowUp selection without activation, actual file opening, search/reset, list view and reverse name sorting. Cold/warm frame budgets remain unchanged in TC-WS-073/074.
 
 TC-WS-078 protects application menu ownership after ordinary-file activation: Close availability before/after the first and last file, a contributed Save with saved-content reopen, and release of the closed editor menu. Browser covers the renderer entry; native menu state and store-subscription cleanup have mounted contracts, with current-source hosted activation performance still gated by TC-WS-064/073.
+
+
+### 12.7 会话式开发 Agent、共享设置与独立 LLM 调用
+
+<!-- feature
+id: F-ORCH-1
+status: in-progress
+area: main/development-agent
+components: [AgentsPlatformView, AgentComposer, AgentConversation, SharedAgentSettings, TaskInspector]
+files:
+- src/components/agents/AgentsPlatformView.tsx
+- src/components/agents/orchestration/AgentComposer.tsx
+- src/components/agents/orchestration/AgentConversation.tsx
+- src/components/agents/orchestration/SharedAgentSettings.tsx
+- src/components/agents/orchestration/TaskInspector.tsx
+- src/stores/orchestrationStore.ts
+- src/lib/ipc/orchestration.ts
+- src-tauri/src/orchestration/commands.rs
+- src-tauri/src/orchestration/core/service.rs
+- src-tauri/src/llm/invocation/mod.rs
+controls:
+- id: orch-prompt
+  selector: '[data-testid="orch-prompt"]'
+  kind: interactive
+- id: orch-send
+  selector: '[data-testid="orch-send"]'
+  kind: interactive
+- id: orch-intent
+  selector: '[data-testid="orch-intent"]'
+  kind: interactive
+- id: orch-project-add
+  selector: '[data-testid="orch-project-add"]'
+  kind: interactive
+- id: orch-settings-open
+  selector: '[data-testid="orch-settings-open"]'
+  kind: interactive
+- id: orch-settings-save
+  selector: '[data-testid="orch-settings-save"]'
+  kind: interactive
+- id: orch-settings-cancel
+  selector: '[data-testid="orch-settings-cancel"]'
+  kind: interactive
+- id: orch-plan-name
+  selector: '[data-testid="orch-plan-name"]'
+  kind: interactive
+- id: orch-project-select
+  selector: '[data-testid="orch-project-select"]'
+  kind: interactive
+- id: orch-planning-resource
+  selector: '[data-testid="orch-planning-resource"]'
+  kind: interactive
+- id: orch-review-resource
+  selector: '[data-testid="orch-review-resource"]'
+  kind: interactive
+- id: orch-settings-resources
+  selector: '[data-testid="orch-settings-resources"]'
+  kind: interactive
+- id: orch-resource-editor
+  selector: '[data-testid="orch-resource-editor"]'
+  kind: display
+- id: orch-resource-chat
+  selector: '[data-testid="orch-resource-openai_chat"]'
+  kind: interactive
+- id: orch-resource-provider
+  selector: '[data-testid="orch-resource-provider"]'
+  kind: interactive
+- id: orch-resource-protocol
+  selector: '[data-testid="orch-resource-protocol"]'
+  kind: interactive
+- id: orch-resource-address
+  selector: '[data-testid="orch-resource-address"]'
+  kind: interactive
+- id: orch-resource-model
+  selector: '[data-testid="orch-resource-model"]'
+  kind: interactive
+- id: orch-concurrency
+  selector: '[data-testid="orch-concurrency"]'
+  kind: interactive
+- id: orch-attach
+  selector: '[data-testid="orch-attach"]'
+  kind: interactive
+- id: orch-source-paths
+  selector: '[data-testid="orch-source-paths"]'
+  kind: interactive
+- id: orch-worker-resource
+  selector: '[data-testid^="orch-worker-"]'
+  kind: interactive
+  aliases:
+  - '[data-testid="orch-worker-resource-claude-code"]'
+  - '[data-testid="orch-worker-resource-codex"]'
+  - '[data-testid="orch-worker-resource-pi"]'
+  - '[data-testid="orch-worker-resource-opencode"]'
+  - '[data-testid="orch-worker-resource-deepseek-harness"]'
+  - '[data-testid="orch-worker-resource-zcode"]'
+- id: orch-artifact-entry
+  selector: '[data-testid^="orch-artifact-"]:not([data-testid="orch-artifact-content"])'
+  kind: interactive
+- id: orch-partial-artifact
+  selector: '[data-testid^="orch-partial-artifact-"]'
+  kind: interactive
+- id: orch-new-task
+  selector: '[data-testid="orch-new-task"]'
+  kind: interactive
+- id: orch-approve-plan
+  selector: '[data-testid="orch-approve-plan"]'
+  kind: interactive
+- id: orch-recovery-open
+  selector: '[data-testid="orch-recovery-open"]'
+  kind: interactive
+- id: orch-recovery-confirm
+  selector: '[data-testid="orch-recovery-confirm"]'
+  kind: interactive
+- id: orch-recovery-dismiss
+  selector: '[data-testid="orch-recovery-dismiss"]'
+  kind: interactive
+- id: orch-show-sources
+  selector: '[data-testid="orch-show-sources"]'
+  kind: interactive
+- id: orch-show-changes
+  selector: '[data-testid="orch-show-changes"]'
+  kind: interactive
+- id: orch-workspace
+  selector: '[data-testid="orch-workspace"]'
+  kind: display
+- id: orch-empty-state
+  selector: '[data-testid="orch-empty-state"]'
+  kind: display
+- id: orch-plan
+  selector: '[data-testid="orch-plan"]'
+  kind: display
+- id: orch-settings-dialog
+  selector: '[data-testid="orch-settings-dialog"]'
+  kind: display
+- id: orch-recovery-dialog
+  selector: '[data-testid="orch-recovery-dialog"]'
+  kind: display
+- id: orch-artifacts-panel
+  selector: '[data-testid="orch-artifacts-panel"]'
+  kind: display
+- id: orch-sources-panel
+  selector: '[data-testid="orch-sources-panel"]'
+  kind: display
+- id: orch-source-first
+  selector: '[data-testid="orch-source-src-1"]'
+  kind: display
+- id: orch-run-entry
+  selector: '[data-run-id][data-testid^="orch-run-"]'
+  kind: interactive
+- id: orch-run-status
+  selector: '[data-testid="orch-run-status"]'
+  kind: display
+- id: orch-run-snapshot
+  selector: '[data-testid="orch-run-snapshot"]'
+  kind: display
+- id: orch-artifact-content
+  selector: '[data-testid="orch-artifact-content"]'
+  kind: display
+-->
+
+TC-ORCH-001验证统一配置供多个任务复用、历史快照不追改、取消草稿与选择恢复，原生断言零生成调用；TC-ORCH-PARTIAL-002验证Anthropic截断保留两份candidate、刷新后仍不自动重试及一次显式恢复；TC-ORCH-003验证上下文正文与一次Responses审阅；TC-ORCH-005验证一次Chat Completions规划及三份持久候选。Native teardown独立核对真实HTTP协议/次数、SQLite request/attempt ledger、上下文哈希及候选磁盘字节SHA-256与run/row一致；Browser明确为VFS/确定性stub，不证明原生网络/磁盘/进程。TC-ORCH-WORKER-004由独立Linux release-native路径启动六个真实harness，经产品审批/调度、独立worktree和fixture核对进程/工具/产物；其专用helper与API用例证据隔离。以上均为已编写待GitHub执行的用例，静态audit/schema/planner或fixture单测不能记作native通过，截图也仍待视觉审阅。

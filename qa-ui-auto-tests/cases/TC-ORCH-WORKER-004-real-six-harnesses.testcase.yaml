@@ -1,0 +1,288 @@
+id: TC-ORCH-WORKER-004
+title: Native Taomni schedules all six installed coding harnesses against the isolated fixture LLM
+description: Real UI submissions freeze and approve one worker at a time. Native teardown independently verifies six durable candidate tasks, owned Git worktrees, harmless marker diffs, real tool-result protocol requests and pinned installed process receipts. No browser stub or standalone canary substitutes for this evidence.
+modes: [native]
+native_platforms: [Linux]
+covers: [F-ORCH-1]
+tags: [p0, orchestration, real-worker, release-native]
+fixtures: [reset_db, orchestration_llm, release_build_required]
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-orch-worker-004
+- click: '[data-testid="home-open-agents"]'
+- wait_for: '[data-testid="orch-workspace"]'
+- click: '[data-testid="orch-project-add"]'
+- wait_for: '[data-testid="workspace-fs-modal-input"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.orchestration_project}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- select_option:
+    selector: '[data-testid="orch-intent"]'
+    value: develop
+- fill:
+    selector: '[data-testid="orch-prompt"]'
+    value: ${fixture.orchestration_worker_prompt_1}
+- click: '[data-testid="orch-send"]'
+- wait_for: '[data-testid="orch-approve-plan"]'
+- click: '[data-testid="orch-approve-plan"]'
+- wait_for:
+    selector: '[data-testid="orch-run-status"][data-status="candidate"]'
+    timeout_sec: 75
+- click: '[data-testid="orch-show-changes"]'
+- wait_for: '[data-testid="orch-artifact-content"]'
+- assert_text:
+    selector: '[data-testid="orch-artifact-content"]'
+    contains: claude-code
+- click: '[data-testid="orch-new-task"]'
+- click: '[data-testid="orch-settings-open"]'
+- click: '[data-testid="orch-worker-resource-claude-code"]'
+- click: '[data-testid="orch-worker-resource-codex"]'
+- click: '[data-testid="orch-settings-save"]'
+- wait_for:
+    selector: '[data-testid="orch-settings-dialog"]'
+    state: hidden
+- fill:
+    selector: '[data-testid="orch-prompt"]'
+    value: ${fixture.orchestration_worker_prompt_2}
+- click: '[data-testid="orch-send"]'
+- wait_for: '[data-testid="orch-approve-plan"]'
+- click: '[data-testid="orch-approve-plan"]'
+- wait_for:
+    selector: '[data-testid="orch-run-status"][data-status="candidate"]'
+    timeout_sec: 75
+- click: '[data-testid="orch-show-changes"]'
+- wait_for: '[data-testid="orch-artifact-content"]'
+- assert_text:
+    selector: '[data-testid="orch-artifact-content"]'
+    contains: codex
+- click: '[data-testid="orch-new-task"]'
+- click: '[data-testid="orch-settings-open"]'
+- click: '[data-testid="orch-worker-resource-codex"]'
+- click: '[data-testid="orch-worker-resource-pi"]'
+- click: '[data-testid="orch-settings-save"]'
+- wait_for:
+    selector: '[data-testid="orch-settings-dialog"]'
+    state: hidden
+- fill:
+    selector: '[data-testid="orch-prompt"]'
+    value: ${fixture.orchestration_worker_prompt_3}
+- click: '[data-testid="orch-send"]'
+- wait_for: '[data-testid="orch-approve-plan"]'
+- click: '[data-testid="orch-approve-plan"]'
+- wait_for:
+    selector: '[data-testid="orch-run-status"][data-status="candidate"]'
+    timeout_sec: 75
+- click: '[data-testid="orch-show-changes"]'
+- wait_for: '[data-testid="orch-artifact-content"]'
+- assert_text:
+    selector: '[data-testid="orch-artifact-content"]'
+    contains: '"worker_id": "pi"'
+- click: '[data-testid="orch-new-task"]'
+- click: '[data-testid="orch-settings-open"]'
+- click: '[data-testid="orch-worker-resource-pi"]'
+- click: '[data-testid="orch-worker-resource-opencode"]'
+- click: '[data-testid="orch-settings-save"]'
+- wait_for:
+    selector: '[data-testid="orch-settings-dialog"]'
+    state: hidden
+- fill:
+    selector: '[data-testid="orch-prompt"]'
+    value: ${fixture.orchestration_worker_prompt_4}
+- click: '[data-testid="orch-send"]'
+- wait_for: '[data-testid="orch-approve-plan"]'
+- click: '[data-testid="orch-approve-plan"]'
+- wait_for:
+    selector: '[data-testid="orch-run-status"][data-status="candidate"]'
+    timeout_sec: 75
+- click: '[data-testid="orch-show-changes"]'
+- wait_for: '[data-testid="orch-artifact-content"]'
+- assert_text:
+    selector: '[data-testid="orch-artifact-content"]'
+    contains: opencode
+- click: '[data-testid="orch-new-task"]'
+- click: '[data-testid="orch-settings-open"]'
+- click: '[data-testid="orch-worker-resource-opencode"]'
+- click: '[data-testid="orch-worker-resource-deepseek-harness"]'
+- click: '[data-testid="orch-settings-save"]'
+- wait_for:
+    selector: '[data-testid="orch-settings-dialog"]'
+    state: hidden
+- fill:
+    selector: '[data-testid="orch-prompt"]'
+    value: ${fixture.orchestration_worker_prompt_5}
+- click: '[data-testid="orch-send"]'
+- wait_for: '[data-testid="orch-approve-plan"]'
+- click: '[data-testid="orch-approve-plan"]'
+- wait_for:
+    selector: '[data-testid="orch-run-status"][data-status="candidate"]'
+    timeout_sec: 75
+- click: '[data-testid="orch-show-changes"]'
+- wait_for: '[data-testid="orch-artifact-content"]'
+- assert_text:
+    selector: '[data-testid="orch-artifact-content"]'
+    contains: deepseek-harness
+- click: '[data-testid="orch-new-task"]'
+- click: '[data-testid="orch-settings-open"]'
+- click: '[data-testid="orch-worker-resource-deepseek-harness"]'
+- click: '[data-testid="orch-worker-resource-zcode"]'
+- click: '[data-testid="orch-settings-save"]'
+- wait_for:
+    selector: '[data-testid="orch-settings-dialog"]'
+    state: hidden
+- fill:
+    selector: '[data-testid="orch-prompt"]'
+    value: ${fixture.orchestration_worker_prompt_6}
+- click: '[data-testid="orch-send"]'
+- wait_for: '[data-testid="orch-approve-plan"]'
+- click: '[data-testid="orch-approve-plan"]'
+- wait_for:
+    selector: '[data-testid="orch-run-status"][data-status="candidate"]'
+    timeout_sec: 75
+- click: '[data-testid="orch-show-changes"]'
+- wait_for: '[data-testid="orch-artifact-content"]'
+- assert_text:
+    selector: '[data-testid="orch-artifact-content"]'
+    contains: zcode
+- assert_count:
+    selector: '[data-run-id][data-testid^="orch-run-"][data-status="candidate"]'
+    equal: 6
+- reload_window: null
+- wait_for:
+    selector: '[data-testid="orch-run-status"][data-status="candidate"]'
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-run-id][data-testid^="orch-run-"][data-status="candidate"]'
+    equal: 6
+- assert_no_runtime_errors: null
+- screenshot: orchestration-native-six-real-workers.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Each of six pinned real coding harnesses is selected explicitly in shared settings, submitted and approved
+      through the product UI, and returns an unaccepted candidate from its own worktree. No fake worker or browser stub
+      substitutes.
+    actions:
+    - 3
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 13
+    - 15
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 24
+    - 25
+    - 27
+    - 29
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 38
+    - 39
+    - 41
+    - 43
+    - 46
+    - 47
+    - 48
+    - 49
+    - 50
+    - 52
+    - 53
+    - 55
+    - 57
+    - 60
+    - 61
+    - 62
+    - 63
+    - 64
+    - 66
+    - 67
+    - 69
+    - 71
+    - 74
+    - 75
+    - 76
+    - 77
+    - 78
+    - 80
+    - 81
+    - 83
+    - 85
+    checkpoints:
+    - step: 14
+      expectation: Approved Claude Code task reaches candidate.
+    - step: 17
+      expectation: Claude Code candidate body identifies its real worker.
+    - step: 28
+      expectation: Approved Codex task reaches candidate.
+    - step: 31
+      expectation: Codex candidate identifies its real worker.
+    - step: 42
+      expectation: Approved Pi task reaches candidate.
+    - step: 45
+      expectation: Pi candidate identifies its real worker.
+    - step: 56
+      expectation: Approved OpenCode task reaches candidate.
+    - step: 59
+      expectation: OpenCode candidate identifies its real worker.
+    - step: 70
+      expectation: Approved DeepSeek Harness task reaches candidate.
+    - step: 73
+      expectation: DeepSeek candidate identifies its real worker.
+    - step: 84
+      expectation: Approved ZCode task reaches candidate.
+    - step: 87
+      expectation: ZCode candidate identifies its real worker.
+    - step: 88
+      expectation: All six distinct UI-submitted tasks are candidate.
+    results:
+    - 14
+    - 17
+    - 28
+    - 31
+    - 42
+    - 45
+    - 56
+    - 59
+    - 70
+    - 73
+    - 84
+    - 87
+    - 88
+  - id: R2
+    requirement: Renderer reload restores six terminal candidates without restarting a worker or losing ownership evidence.
+    actions:
+    - 89
+    checkpoints:
+    - step: 90
+      expectation: Selected candidate task restores.
+    - step: 91
+      expectation: All six saved candidates remain.
+    - step: 92
+      expectation: No runtime errors occurred.
+    results:
+    - 90
+    - 91
+    - 92
+  visual:
+  - check: Six-worker terminal-state screenshot
+    method: manual
+    reason: Screenshot is authored for later visual review, not claimed executed or reviewed from static checks.
+  native:
+  - check: Native scheduler, installed harness, HTTP tools, worktree and durable artifacts
+    method: automated
+    reason: Dedicated orchestration_workers teardown verifies six SQLite tasks, one completed host request ledger per
+      task, immutable sourceRevision, twelve actual wire tool/final requests, owned marker diffs, candidate DB/disk hashes
+      and pinned installed bridge process identities. GitHub-only Linux matching release execution is required; pure
+      fixture tests and standalone canaries are not this proof.

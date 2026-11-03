@@ -103,6 +103,10 @@ def capabilities(cases, mode: str) -> list[str]:
             result.add("ard")
         if mode == "native":
             result.add("display")
+            if "orchestration_llm" in fixtures:
+                result.add("orchestration-contracts")
+                if "real-worker" in case.tags:
+                    result.update({"orchestration-workers", "release"})
             if fixtures & {"backup_cloud", "credential_store"}:
                 result.add("secret-service")
             if "dual_display_required" in fixtures:
@@ -262,7 +266,19 @@ def make_plan(args) -> dict:
                     if dual_ids and dual_ids != {c.id for c in eligible}:
                         variants = [("", [c for c in eligible if c.id not in dual_ids]),
                                     ("dual-display", [c for c in eligible if c.id in dual_ids])]
+                # Real harness tasks require a loopback-only namespace. Keep
+                # their entry separate from crash/API/service cases even when
+                # --shards=1; all entries still reuse the same release runtime.
+                isolated_variants = []
                 for variant, variant_cases in variants:
+                    worker_cases = [case for case in variant_cases if "real-worker" in case.tags
+                                    and "orchestration_llm" in case.fixtures]
+                    ordinary_cases = [case for case in variant_cases if case not in worker_cases]
+                    if ordinary_cases:
+                        isolated_variants.append((variant, ordinary_cases))
+                    if worker_cases:
+                        isolated_variants.append(((variant + "-" if variant else "") + "orchestration-workers", worker_cases))
+                for variant, variant_cases in isolated_variants:
                     ids = [c.id for c in variant_cases]
                     for cid in ids:
                         if set(dependencies.get(cid, [])) - set(ids):
@@ -499,7 +515,8 @@ def main(argv=None):
                 github_output(f'has_{platform_key}_native', str(bool(native)).lower())
             contracts = [{k: v for k, v in b.items() if k not in {'selected_ids', 'case_digests'}}
                          for b in result['builds'] if b['platform_key'] == 'linux'
-                         and (b['rdp_unit_contracts'] or 'dual-display' in b['capabilities'])]
+                         and (b['rdp_unit_contracts'] or 'dual-display' in b['capabilities']
+                              or 'orchestration-contracts' in b['capabilities'])]
             github_output('contracts_matrix', json.dumps({'include': contracts}, separators=(',', ':')))
             github_output('has_contracts', str(bool(contracts)).lower())
             github_output("has_cases", str(bool(result["entries"])).lower())

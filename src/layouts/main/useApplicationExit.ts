@@ -5,6 +5,7 @@ import { exitApp } from "../../lib/ipc";
 import { listQueryTabs } from "../../lib/queryRegistry";
 import { t as tr } from "../../lib/i18n";
 import { saveBackupSettingsBeforeExit } from "../../stores/backupSettingsStore";
+import { agentActiveRuns } from "../../lib/ipc/orchestration";
 
 
 export interface UseApplicationExitContext {
@@ -46,6 +47,28 @@ export function useApplicationExit(context: UseApplicationExitContext) {
     void (async () => {
       try {
         if (!(await confirmExitWithOpenTabs())) return;
+        let unfinished: number;
+        for (;;) {
+          try {
+            unfinished = await agentActiveRuns();
+            break;
+          } catch (error) {
+            if (!await confirmAppExit({
+              title: tr("exit.cleanupFailedTitle"),
+              message: tr("exit.cleanupFailedMessage", { error: String(error) }),
+              confirmLabel: tr("exit.retryCleanup"),
+              cancelLabel: tr("exit.cancelExit"),
+              danger: true,
+            })) return;
+          }
+        }
+        if (unfinished > 0 && !await confirmAppExit({
+          title: tr("ribbon.exit"),
+          message: tr("exit.agentTasks", { count: unfinished }),
+          confirmLabel: tr("ribbon.exit"),
+          cancelLabel: tr("exit.cancelExit"),
+          danger: true,
+        })) return;
         if (!await saveBackupSettingsBeforeExit(() => confirmAppExit({
           title: tr("backupUnified.unsavedTitle"),
           message: tr("backupUnified.unsavedExit"),

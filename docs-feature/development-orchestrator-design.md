@@ -1,8 +1,8 @@
 # Taomni 开发任务编排与调度设计
 
-- 状态：**v0.6重建原型已由用户确认；本轮同步设计、提交并push，随后等待指令。产品开发 / CI执行仍暂停。**
-- 日期：2026-11-03。
-- 当前分支 `feat/development-orchestrator`，HEAD `0c350c0db`；首轮静态代码基线为`3fb5b06d9`，旧证据不冒充当前运行验证。
+- 状态：**v0.6原型已确认；用户已重新授权分阶段产品开发、详细英文提交与GitHub browser/native验证。当前实施与证据见[实施进度](development-orchestrator/implementation-status.md)，尚未完成全部P1A验收。**
+- 更新日期：2026-11-04。
+- 当前分支 `feat/development-orchestrator`；已推送的设计基线为`a13e34dc7`，首轮静态代码基线为`3fb5b06d9`。旧证据不冒充当前运行验证。
 - 目标平台：Windows、macOS、Linux。
 - 用户已明确：**成本规则由用户定义，不调查全部市场价格；可手工设置计费 / 系数 / 任务适配，显式启用成本感知选择，但不允许系统擅自换未授权模型。**
 - 核心契约：[调度](development-orchestrator/scheduler-contract.md)、[上下文 / 会话 / 记忆](development-orchestrator/context-session-memory.md)、[决策路由](development-orchestrator/decision-and-routing.md)。

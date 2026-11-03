@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # These tests do not need a desktop and must not delay publishing the app.
-if [[ "${QA_RDP_CONTRACTS:-false}" != true && "${QA_DUAL_CONTRACTS:-false}" != true ]]; then
+if [[ "${QA_RDP_CONTRACTS:-false}" != true && "${QA_DUAL_CONTRACTS:-false}" != true && "${QA_ORCH_CONTRACTS:-false}" != true ]]; then
   echo 'No native Rust contracts selected.'
   exit 0
 fi
@@ -25,6 +25,9 @@ if [[ "${QA_DUAL_CONTRACTS:-false}" == true ]]; then
   # Keep startup handoff/generation, clipboard and resident safety units in the
   # same root binary as geometry. Narrow surface filters miss these regressions.
   filters+=(capture:: screenshot:: mfa::)
+fi
+if [[ "${QA_ORCH_CONTRACTS:-false}" == true ]]; then
+  filters+=(orchestration:: llm::invocation go_compatibility_tests)
 fi
 # libtest accepts multiple OR filters. Compile/link the root test binary once.
 cargo test --locked "${profile[@]}" --lib -- "${filters[@]}"

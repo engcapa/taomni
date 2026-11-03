@@ -30,6 +30,7 @@ mod module_lock;
 mod nettools;
 mod notes;
 mod objectstorage;
+pub mod orchestration;
 pub mod perf;
 mod proxy;
 mod qa_driver;
@@ -146,8 +147,17 @@ async fn exit_app(app_handle: AppHandle, state: State<'_, AppState>) -> Result<(
         .state::<app_exit::ExitGate>()
         .run(
             async {
-                sockscap::prepare_for_exit(&app_handle, state).await?;
-                screenshot::wait_for_recovery_recording().await
+                let runtime = app_handle.state::<orchestration::OrchestrationRuntime>();
+                let result = async {
+                    runtime.prepare_for_exit(&app_handle).await?;
+                    sockscap::prepare_for_exit(&app_handle, state).await?;
+                    screenshot::wait_for_recovery_recording().await
+                }
+                .await;
+                if result.is_err() {
+                    runtime.resume_after_failed_exit();
+                }
+                result
             },
             || {
                 webview_recovery::closing_all(&app_handle);
@@ -230,6 +240,7 @@ pub fn run() {
             // Decentralized LAN messenger state (separate lanchat.sqlite).
             let lanchat_state = Arc::new(lanchat::LanChatState::new(&app_data));
 
+            app.manage(orchestration::OrchestrationRuntime::default());
             app.manage(AppState::new(
                 conn,
                 notes_conn,

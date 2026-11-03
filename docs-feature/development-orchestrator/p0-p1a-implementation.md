@@ -1,7 +1,7 @@
 # 开发编排：P0 / P1A 纵向切片实施交接
 
-- 状态：v0.6 UI已确认、实施计划同步稿。本轮仅文档 / 原型commit与push，之后等指令，暂停产品开发 / CI运行。
-- 当前HEAD `0c350c0db`，初始静态基线`3fb5b06d9`；AGENTS.md三端 / 800行 / crash-regression继续有效。
+- 状态：v0.6 UI已确认，用户已重新授权按阶段实施与详细英文提交。已落地范围、未完成能力和执行证据统一记录在[implementation-status.md](implementation-status.md)，不得把第一阶段基础切片称为完整P1A。
+- 已推送设计基线`a13e34dc7`，初始静态基线`3fb5b06d9`；AGENTS.md三端 / 800行 / crash-regression继续有效。
 - 设计来源：[主设计](../development-orchestrator-design.md)、[review工程修正](review-resolution-v0.4.md)。
 - 当前UI基准：[v0.6交互原型](ui-prototype-v0.6.html)、[UX / 配置继承](developer-agent-ux-v0.6.md)，**用户已查看并确认**。v0.4仍保留历史，不作为TASK-OR09实施基准。
 
@@ -57,7 +57,7 @@ P1B 接 **Codex**、portable handoff、审批 / gate 查询投影；P2 才接外
 
 配置一次、多任务复用：Settings持有共享resources + default_plan，复用已有provider / model / Vault / proxy，不为每task复制endpoint / 密钥。`orchestration/profiles.json`保存版本化共享配置，安全原子写、CAS且无秘密明文；TaskSubmission仅项目、目标、意图、资料和继承plan引用，发送时冻结effective revision。保存影响未来任务，旧任务不热换；取消设置不保存。schema细节见[v0.6 UX §5](developer-agent-ux-v0.6.md)，无需第9张表。
 
-## 4. TASK 工作包（全部待实施）
+## 4. TASK 工作包（计划与验收边界；逐项状态见implementation-status.md）
 
 ### TASK-OR01 旧行为保护 + Codec 先行拆分
 
@@ -132,7 +132,7 @@ P1B 接 **Codex**、portable handoff、审批 / gate 查询投影；P2 才接外
 
 - 新增：`src/components/agents/orchestration/{AgentTaskSidebar,AgentConversation,AgentComposer,PlanMessage,TaskInspector,RecoveryPrompt}.tsx`、`SharedAgentSettings.tsx`与同位行为测试、typed `model.ts`。按职责200–500行，不造单一超大UI controller。
 - 修改：`AgentsPlatformView.tsx`只组合；入口 / locale沿现有Taomni，设置复用已有provider / Vault / proxy UI；`useApplicationExit.ts`与OR03协调。不恢复旧agentsStore模拟执行。
-- 依赖：OR08、OR04共享配置与OR06产物合同；DEC-OR11/13/14已由用户确认，UI不再等待重复方向审批，实施本身仍等下一指令。
+- 依赖：OR08、OR04共享配置与OR06产物合同；DEC-OR11/13/14已由用户确认，UI不再等待重复方向审批，实施已由后续用户指令授权。
 - 行为：左项目任务、中会话和输入、右按需diff / context；计划 / worker展开在消息中。默认方案跨任务沿用，输入仅目标 / 意图 / 文件；设置保存 / 取消与旧任务快照、部分候选 / 显式恢复都有真实状态。
 - AC：AC-UX01～07、AC-O07/O11/O15/O16；V-OR09。
 - 完成：高度对齐v0.6主布局与状态；unit证明多个任务共用配置、改设置不追改旧任务、Esc不保存、无逐任务必填参数；GitHub browser/native证明真实交互，不以原型demo当完成。
@@ -172,7 +172,7 @@ Windows：WebView2、Job Object、junction / ACL、命令argv / 路径；macOS�
 
 ## 7. 交接状态与发布门
 
-- 全部 TASK 当前 pending / 未领取，AC/V均待实施 / 待执行。
-- 用户曾要求开始开发，后明确暂停为“先重做原型 / 设计”；当前原型已确认，但最新动作仅详细英文提交 / push后等待。**不能用此前开发请求跳过当前暂停。**
+- 用户已在设计提交之后明确要求重新开始开发、按阶段提交，且仅本地unit、GitHub browser/native；最新授权取代此前“提交后等待”的暂停。
+- TASK-OR01/02/04/05/06/08/09已有第一阶段基础实现和局部unit证据，OR03/07/10仍有重要执行、Bootstrap、验证与验收缺口。精确状态见[implementation-status.md](implementation-status.md)。
 - DEC-OR11/13/14图稿 / 统一配置方向已确认，无需重复审批。真实CC与其他harness能力仍须OR07 / 后续合同证明，不足blocked，不静默替换或用mockworker冒充。
 - 若P1A纵向闭环没跑通，暂停memory / Jev / trigger / 外部executor工作，不以先铺基础设施替代交付。

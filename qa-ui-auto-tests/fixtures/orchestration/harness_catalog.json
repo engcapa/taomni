@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "researched_at": "2026-11-03",
+  "validation_status": "source_verified_not_live_validated",
+  "runtime": {"node": "24.14.0", "python": ">=3.11", "platform": "linux"},
+  "harnesses": {
+    "claude-code": {
+      "package": "@anthropic-ai/claude-code",
+      "version": "2.1.72",
+      "integrity": "sha512-GhoUURM5xUPL+DSn0jMPXDEkWvocl5lqCs/wnyYDUliY0fBlXm7LxWnjLCBPZ0LoeUnr2e6MFRBxyUFrgrRp0A==",
+      "bin": "claude",
+      "entrypoint": "cli.js",
+      "protocol": "anthropic_messages",
+      "stdout": "stream-json; result.subtype=success and !result.is_error",
+      "endpoint_configuration": "ANTHROPIC_BASE_URL=<fixture origin>; ANTHROPIC_API_KEY=dummy",
+      "source": "https://github.com/anthropics/claude-code",
+      "docs": ["https://code.claude.com/docs/en/headless", "https://code.claude.com/docs/en/cli-reference"],
+      "notes": "Official npm distribution remains available but npm installation is deprecated. Pin deliberately retains the script entrypoint; never infer current package bin path. Docs HTTP 403 through research proxy; existing Taomni bridge confirms stream-json flags. Exact optional isolation flags require CI installed-version check."
+    },
+    "codex": {
+      "package": "@openai/codex",
+      "version": "0.166.0",
+      "integrity": "sha512-2Szlp1l1cz5TX1ccpX4Zok3DZrot9xeZe0km+6/1v8JmqxADwyJxKBJah4dBymkwtS25j/u6dipJusTOI97Z8Q==",
+      "bin": "codex",
+      "entrypoint": "bin/codex.js",
+      "protocol": "openai_responses",
+      "stdout": "exec --json NDJSON; turn.completed and matching agent message",
+      "endpoint_configuration": "CODEX_HOME/config.toml model_provider=fixture, model_providers.fixture.base_url, wire_api=responses, requires_openai_auth=false",
+      "source": "https://github.com/openai/codex/tree/rust-v0.166.0",
+      "docs": ["https://raw.githubusercontent.com/openai/codex/rust-v0.166.0/codex-rs/core/config.schema.json"],
+      "notes": "Codex custom provider speaks Responses, not legacy chat. Websockets, code mode, remote model discovery and SDK retries are disabled; CLI feature drift fails validation rather than fabricating compatibility."
+    },
+    "pi": {
+      "package": "@earendil-works/pi-coding-agent",
+      "version": "1.5.0",
+      "integrity": "sha512-xNDZ5kqowO6Z03FS2gwAkPEGk1ssxVcYKQ6qZId84mFEvwACvvyc2l0vAMOS+c5zvxLRMLBE9r4y44IGYkMJaQ==",
+      "bin": "pi",
+      "entrypoint": "dist/bundle/cli.js",
+      "protocol": "openai_chat",
+      "stdout": "--print --mode json NDJSON; agent_end",
+      "endpoint_configuration": "isolated HOME/.pi/agent/models.json providers.fixture {baseUrl,api:openai-completions,apiKey,models}",
+      "source": "https://github.com/badlogic/pi-mono/tree/a57438e918350a2387d7518e46c74f367cc7feaf",
+      "docs": ["packages/coding-agent/docs/models.md", "packages/coding-agent/src/cli/args.ts"],
+      "notes": "Verified official current package name is @earendil-works/pi-coding-agent, not an assumed older scope. --offline and all extension/context auto-discovery disable flags are source verified."
+    },
+    "opencode": {
+      "package": "opencode-ai",
+      "version": "1.2.27",
+      "integrity": "sha512-icCLoC52HgM89Mv+sXVtxpWmR7vXW1AjjE99koZTXG6C4/iGlTsKlxG9y9oFrGkadvpoW1qTF/Qp0xrjPOEfvg==",
+      "bin": "opencode",
+      "entrypoint": "bin/opencode",
+      "protocol": "openai_chat",
+      "stdout": "run --format json NDJSON; step_finish",
+      "endpoint_configuration": "OPENCODE_CONFIG provider.fixture {npm:@ai-sdk/openai-compatible,options:{baseURL,apiKey},models}; enabled_providers:[fixture]",
+      "source": "https://github.com/anomalyco/opencode/tree/v1.2.27",
+      "docs": ["packages/opencode/src/cli/cmd/run.ts", "packages/opencode/src/provider/provider.ts", "packages/opencode/src/flag/flag.ts"],
+      "notes": "Pins a source-verified 1.x release rather than confusing reorganized current source with the npm binary. Default plugins/model fetch/update/LSP download/project config are disabled. Auxiliary title requests are disabled in config and any extra generation request fails receipt validation."
+    },
+    "deepseek-harness": {
+      "package": "@deepseek-ai/dsh",
+      "version": "0.2.2-alpha.3",
+      "integrity": "sha512-ffV06fOgiOeIJOmA3EgPj+U6azJrsLACiscLj9t+AfM7p9p14bMzErWRhgeC8nizBTyQ2ckxkPQtj4Pqon8mGw==",
+      "bin": "dsh",
+      "entrypoint": "lib/bin.js",
+      "protocol": "anthropic_messages",
+      "stdout": "--profile headless --json NDJSON; final.reason.kind=completed",
+      "endpoint_configuration": "DSH_HOME plus --patch YAML llm-deepseek {baseURL,models,thinking:disabled}; agent-default-model {provider:deepseek-official,model:fixture-worker}",
+      "source": "https://github.com/deepseek-ai/deepseek-harness/tree/8bd073392eef6f54e921a093b95076248eb08cbb",
+      "docs": ["apps/cli/README.md", "apps/cli/reference/README.md", "packages/bundle/headless/README.md", "packages/llm/llm-deepseek/src/adapter.ts", "packages/shell/tool-bash/src/index.ts"],
+      "notes": "Cordis plugin harness, not DeepSeek model branding. Native API is Anthropic Messages. Published npm alpha matches pinned source version; no invented dsh exec command. Node>=24.9.0. Telemetry explicitly disabled and network namespace prevents unconfigured endpoints."
+    },
+    "zcode": {
+      "source_repository": "https://github.com/zai-org/ZCode.git",
+      "commit": "a9fe401eede6e6e5e01be9048679c206fe6f02d9",
+      "workspace_package": "@zcode/cli",
+      "entrypoint": "apps/zcode-cli/packages/cli/dist/zcode.cjs",
+      "protocol": "openai_chat",
+      "stdout": "--prompt <text> --output-format stream-json; terminal type=result",
+      "endpoint_configuration": "ZCODE_PERSONAL_PROVIDER_CONFIG_FILE schemaVersion=1 config.providerConfigRules.providerRules[].config.api {type:openai-chat-completions,baseUrl}",
+      "source": "https://github.com/zai-org/ZCode/tree/a9fe401eede6e6e5e01be9048679c206fe6f02d9",
+      "docs": ["apps/zcode-cli/docs/usage/01-quickstart.md", "apps/zcode-cli/docs/usage/02-cli-reference.md", "apps/zcode-cli/docs/usage/03-config.md", "apps/zcode-cli/docs/usage/04-tools.md"],
+      "build_commands": ["pnpm@10.33.2 install --frozen-lockfile", "pnpm@10.33.2 --filter @zcode/cli... build"],
+      "notes": "No public npm CLI package assumed. Build full official source workspace; retain adjacent runtime resources. Runtime reads explicit personal provider file, not obsolete ZCODE_MODEL/API_KEY overrides. Source usage requires Node24.14.0. --model/--print/--settings/--allowed-tools are explicitly unsupported."
+    }
+  }
+}

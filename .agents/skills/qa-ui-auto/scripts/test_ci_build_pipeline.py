@@ -14,6 +14,24 @@ ROOT = Path(__file__).resolve().parents[4]
 
 
 class BuildPipelineTests(unittest.TestCase):
+    def test_real_workers_use_pinned_install_and_native_namespace_without_changing_normal_lanes(self):
+        workflow = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
+        steps = workflow['jobs']['entry']['steps']
+        install = next(s for s in steps if s.get('name') == 'Install all six pinned real orchestration harnesses before network isolation')
+        native = next(s for s in steps if s.get('name') == 'Native Taomni six-worker scheduling in loopback-only namespace')
+        self.assertLess(steps.index(install), steps.index(native))
+        self.assertIn("contains(matrix.capabilities, 'orchestration-workers')", install['if'])
+        self.assertIn('install_harnesses.py', install['run'])
+        self.assertNotIn('--harness', install['run'])
+        for contract in ('ci_network.py', 'ci_native.py', '--uid', '--gid', '--native-artifact', '--installation', '--adapter-bin', '--adapter-sha256', '--run-id', '--attempt'):
+            self.assertIn(contract, native['run'])
+        self.assertNotIn('validate_workers.py', native['run'])
+        for name in ('Run selected cases (Linux Xvfb desktop)', 'Run selected cases (Linux VNC or GNOME Wayland desktop)'):
+            normal = next(s for s in steps if s.get('name') == name)
+            self.assertIn("!contains(matrix.capabilities, 'orchestration-workers')", normal['if'])
+        runtime = next(s for s in steps if s.get('name') == "Download this invocation's verified native runtime")
+        self.assertLess(steps.index(runtime), steps.index(native))
+
     def test_frontend_regressions_run_once_on_linux_producer_and_keep_original_log(self):
         workflow = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
         steps = workflow['jobs']['entry']['steps']
@@ -62,8 +80,9 @@ class BuildPipelineTests(unittest.TestCase):
     @unittest.skipUnless(os.name == 'posix' and shutil.which('bash'), 'POSIX shell contract')
     def test_rust_contracts_use_one_root_binary_with_all_selected_filters(self):
         script = ROOT / '.agents/skills/qa-ui-auto/scripts/ci_rust_contracts.sh'
-        for rdp, dual in [(True, True), (True, False), (False, True), (False, False)]:
-            with self.subTest(rdp=rdp, dual=dual), tempfile.TemporaryDirectory() as tmp:
+        combinations = [(rdp, dual, orch) for rdp in (False, True) for dual in (False, True) for orch in (False, True)]
+        for rdp, dual, orch in combinations:
+            with self.subTest(rdp=rdp, dual=dual, orch=orch), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp); (root / 'src-tauri').mkdir()
                 log = root / 'commands.jsonl'
                 for name in ('cargo', 'pnpm'):
@@ -74,16 +93,16 @@ class BuildPipelineTests(unittest.TestCase):
                     tool.chmod(0o755)
                 env = dict(os.environ, PATH=str(root) + os.pathsep + os.environ['PATH'],
                            COMMAND_LOG=str(log), QA_RDP_CONTRACTS=str(rdp).lower(),
-                           QA_DUAL_CONTRACTS=str(dual).lower(), QA_RELEASE='true')
+                           QA_DUAL_CONTRACTS=str(dual).lower(), QA_ORCH_CONTRACTS=str(orch).lower(), QA_RELEASE='true')
                 subprocess.run(['bash', str(script)], cwd=root, env=env, check=True, capture_output=True)
                 commands = [json.loads(line)[1:] for line in log.read_text().splitlines()] if log.exists() else []
-                if not rdp and not dual:
+                if not rdp and not dual and not orch:
                     self.assertFalse(commands)
                     continue
                 root_tests = [c for c in commands if '--lib' in c and '-p' not in c]
                 self.assertEqual(len(root_tests), 1)
                 expected = ['lsp::tests::workspace_watch_lifetime', 'commands::workspace_reads::tests',
-                    'workspace::tests::text_and_encoding', 'workspace::tests::encoding_matrix'] + (['rdp::'] if rdp else []) + (['capture::', 'screenshot::', 'mfa::'] if dual else [])
+                    'workspace::tests::text_and_encoding', 'workspace::tests::encoding_matrix'] + (['rdp::'] if rdp else []) + (['capture::', 'screenshot::', 'mfa::'] if dual else []) + (['orchestration::', 'llm::invocation', 'go_compatibility_tests'] if orch else [])
                 self.assertEqual(root_tests[0], ['test', '--locked', '--release', '--lib', '--', *expected])
                 self.assertEqual(any('rdp-probe' in c for c in commands), rdp)
                 self.assertEqual(any('profile_photo_encoder_costs' in c for c in commands), rdp)

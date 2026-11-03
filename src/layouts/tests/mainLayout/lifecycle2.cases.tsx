@@ -256,9 +256,9 @@ export function registerMainLayoutLifecycle2Cases() {
     fireEvent.click(screen.getByTestId("window-close"));
     fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
 
-    expect(await screen.findByText("SocksCap cleanup failed")).toBeInTheDocument();
+    expect(await screen.findByText("Safe exit could not complete")).toBeInTheDocument();
     expect(screen.getByTestId("confirm-dialog-message")).toHaveTextContent(
-      "Taomni stayed open because SocksCap could not safely restore the network",
+      "Taomni stayed open because required task or network cleanup could not complete safely",
     );
     expect(exitApp).toHaveBeenCalledTimes(1);
 

@@ -22,6 +22,7 @@ import { invokeDatabase } from "./commands/database";
 import { invokeLanchat } from "./commands/lanchat";
 import { invokeNotes } from "./commands/notes";
 import { invokeScreenshot } from "./commands/screenshot";
+import { invokeOrchestration } from "./commands/orchestration";
 
 const stubCommandRegistry = new CommandRegistry();
 
@@ -103,6 +104,10 @@ for (const command of ["sockscap_capabilities","sockscap_redirector_install_stat
 
 for (const command of ["list_tunnels","upsert_tunnel","delete_tunnel","start_tunnel","stop_tunnel","start_all_tunnels","stop_all_tunnels","get_tunnel_status","list_tunnel_statuses","test_tunnel","reorder_tunnels"]) {
   stubCommandRegistry.register({ domain: "tunnel", command, handler: (args) => invokeTunnel(command, args) });
+}
+
+for (const command of ["orchestration_get_settings", "orchestration_save_settings", "orchestration_list_runs", "orchestration_get_run", "orchestration_create_run", "orchestration_preview_context", "orchestration_start_run", "orchestration_cancel_run", "orchestration_recover_run", "orchestration_active_count"]) {
+  stubCommandRegistry.register({ domain: "orchestration", command, handler: (args) => invokeOrchestration(command, args) });
 }
 
 for (const command of ["chat_list_threads","chat_new_thread","chat_list_messages","chat_set_thread_provider","chat_set_thread_llm_model","chat_set_thread_cc_model","chat_set_thread_output_format","chat_delete_thread","chat_purge_old","chat_stop_stream","acp_probe_profile","chat_stat_attachment_paths","chat_read_clipboard_image_attachment","chat_send","chat_generate_media"]) {

@@ -330,6 +330,7 @@ windows = { version = "0.62", features = [
   "Win32_Security",
   "Win32_Security_Cryptography",
   "Win32_System_Threading",
+  "Win32_System_JobObjects",
   "Win32_UI_Shell",
   "Win32_System_DataExchange",
   # Screenshot OCR: the built-in Windows.Media.Ocr engine (no install).

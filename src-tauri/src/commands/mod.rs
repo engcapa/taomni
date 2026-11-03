@@ -3,6 +3,7 @@
 
 mod agent;
 mod ai;
+mod ai_routes;
 mod appearance;
 mod application;
 mod asr;
@@ -27,6 +28,7 @@ mod mfa;
 mod models;
 mod notes;
 mod objectstorage;
+mod orchestration;
 mod perf;
 mod proxy;
 mod rdp;
@@ -55,6 +57,9 @@ mod workspace_writes;
 mod wsl;
 
 pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
+    if ai_routes::owns(invoke.message.command()) {
+        return ai_routes::handle(invoke);
+    }
     match invoke.message.command() {
         "recovery_get" | "recovery_update" | "recovery_ready" => webview_recovery::handle(invoke),
         "detach_terminal_output"
@@ -539,68 +544,6 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "vault_update"
         | "vault_delete"
         | "vault_list" => vault::handle(invoke),
-        "get_ai_config"
-        | "get_opencode_go_catalog"
-        | "get_provider_models"
-        | "test_llm_model"
-        | "save_ai_config"
-        | "save_ai_api_key"
-        | "test_llm_connection"
-        | "generate_shell_command"
-        | "update_shell_audit_outcome"
-        | "is_session_ai_write_disabled" => ai::handle(invoke),
-        "tab_suggest_path" | "tab_suggest_fim" | "tab_rewrite_command" => tab::handle(invoke),
-        "agent_explain_error"
-        | "agent_plan_tool"
-        | "agent_execute_tool"
-        | "agent_run"
-        | "web_search_execute"
-        | "deep_search_execute"
-        | "searxng_availability"
-        | "web_fetch_execute"
-        | "probe_searxng_instances"
-        | "provider_caps"
-        | "keyring_put"
-        | "keyring_get"
-        | "keyring_delete"
-        | "acp_probe_profile"
-        | "acp_resolve_permission"
-        | "acp_cancel_permission"
-        | "cc_detect"
-        | "cc_get_custom_settings"
-        | "cc_get_profile_settings"
-        | "cc_send_message"
-        | "cc_stream_message"
-        | "cc_stop_session"
-        | "cc_test_settings"
-        | "cc_resolve_tool_call"
-        | "cc_resolve_permission"
-        | "cc_cancel_capture"
-        | "cc_track_terminal"
-        | "cc_untrack_terminal"
-        | "codex_detect"
-        | "codex_get_custom_config"
-        | "codex_get_profile_config"
-        | "codex_stop_session"
-        | "codex_test_config"
-        | "codex_validate_config" => agent::handle(invoke),
-        "chat_new_thread"
-        | "chat_list_threads"
-        | "chat_list_messages"
-        | "chat_delete_thread"
-        | "chat_set_thread_provider"
-        | "chat_set_thread_cc_model"
-        | "chat_set_thread_llm_model"
-        | "chat_set_thread_output_format"
-        | "chat_purge_old"
-        | "chat_export_archive"
-        | "chat_stat_attachment_paths"
-        | "chat_read_clipboard_image_attachment"
-        | "chat_send"
-        | "chat_generate_media"
-        | "chat_stream"
-        | "chat_stop_stream"
-        | "inline_qq_stream" => chat::handle(invoke),
         "models_list"
         | "models_download"
         | "models_delete"

@@ -1,6 +1,6 @@
-import { alertAppDialog } from "../../lib/appDialogs";
-import { t } from "../../lib/i18n";
+import { useAppStore } from "../../stores/appStore";
 
+/** Retain the established entry import while opening the real agent surface. */
 export function showAgentsComingSoon() {
-  void alertAppDialog({ title: "Agents / Crew", message: t("platform.agentsComingSoon") });
+  useAppStore.getState().setActiveSideTab("agents");
 }

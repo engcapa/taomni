@@ -18,6 +18,22 @@ def args(**overrides):
 
 
 class SelectionTests(unittest.TestCase):
+    def test_six_workers_use_dedicated_namespace_entry_and_share_verified_release_build(self):
+        plan = make_plan(args(scope='selected', platforms='linux,windows,macos', modes='native',
+                              case_ids='TC-ORCH-WORKER-004,TC-ORCH-003', shards='1'))
+        isolated = [entry for entry in plan['entries'] if 'orchestration-workers' in entry['capabilities']]
+        self.assertEqual(len(isolated), 1)
+        self.assertEqual(isolated[0]['platform_key'], 'linux')
+        self.assertEqual(isolated[0]['selected_ids'], ['TC-ORCH-WORKER-004'])
+        self.assertIn('release', isolated[0]['capabilities'])
+        self.assertIn('orchestration-contracts', isolated[0]['capabilities'])
+        normal = [entry for entry in plan['entries'] if entry is not isolated[0]]
+        self.assertTrue(all(entry['selected_ids'] == ['TC-ORCH-003'] for entry in normal))
+        self.assertTrue(all('orchestration-contracts' in entry['capabilities'] for entry in normal))
+        linux = next(entry for entry in normal if entry['platform_key'] == 'linux')
+        self.assertEqual(linux['build_id'], isolated[0]['build_id'])
+        self.assertEqual(len([build for build in plan['builds'] if build['platform_key'] == 'linux']), 1)
+
     def test_portable_sftp_lifecycle_uses_posix_without_changing_win32_path_cases(self):
         plan = make_plan(args(scope="selected", case_ids="TC-145"))
         self.assertEqual(len(plan["entries"]), 6)
@@ -133,8 +149,12 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual({cid for entry in x11 for cid in entry['selected_ids']} - x11_only, {
             cid for entry in wayland for cid in entry['selected_ids']
         })
-        self.assertEqual(len(x11), 2)
-        self.assertEqual(len(wayland), 2)
+        self.assertEqual(len(x11), 3)
+        self.assertEqual(len(wayland), 3)
+        for entries in (x11, wayland):
+            isolated = [entry for entry in entries if 'orchestration-workers' in entry['capabilities']]
+            self.assertEqual(len(isolated), 1)
+            self.assertEqual(isolated[0]['selected_ids'], ['TC-ORCH-WORKER-004'])
         self.assertEqual(sum('dual-display' in e['capabilities'] for e in wayland), 1)
         # The dual-display dependency walk must not overwrite the impacted
         # planner's changed-path list with its loop-control boolean. The

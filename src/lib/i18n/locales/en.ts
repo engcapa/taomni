@@ -498,9 +498,10 @@ const dict = {
     promptOneTerminal: "There is {count} open tab, including {terminals} terminal session. Exit Taomni and close them?",
     promptMany: "There are {count} open tabs. Exit Taomni and close them?",
     promptManyTerminals: "There are {count} open tabs, including {terminals} terminal sessions. Exit Taomni and close them?",
-    cleanupFailedTitle: "SocksCap cleanup failed",
+    agentTasks: "There are {count} unfinished agent executions. Exit and stop the executions owned by this application? Candidates and worktrees will be retained; interrupted executions will not restart automatically.",
+    cleanupFailedTitle: "Safe exit could not complete",
     cleanupFailedMessage:
-      "Taomni stayed open because SocksCap could not safely restore the network. Retry cleanup, or cancel exit and use Recover network.\n\n{error}",
+      "Taomni stayed open because required task or network cleanup could not complete safely. Retry cleanup, or cancel exit and inspect the affected task or use Recover network.\n\n{error}",
     retryCleanup: "Retry cleanup",
     cancelExit: "Cancel exit",
   },

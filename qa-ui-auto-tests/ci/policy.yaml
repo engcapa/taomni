@@ -16,6 +16,11 @@ smoke:
 - TC-IDE-C8-08-code-style-dialog-lifecycle-browser
 unavailable: {}
 cases:
+- TC-ORCH-001
+- TC-ORCH-PARTIAL-002
+- TC-ORCH-003
+- TC-ORCH-005
+- TC-ORCH-WORKER-004
 - TC-SFTP-ENTRY-001
 - TC-WS-083
 - TC-WS-081

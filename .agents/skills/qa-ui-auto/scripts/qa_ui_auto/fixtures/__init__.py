@@ -98,6 +98,7 @@ from . import path_completion
 from . import java_real_project
 from . import dual_display_required
 from . import rdp_deferred_clipboard
+from . import orchestration
 
 
 class FixtureContext(Protocol):
@@ -115,6 +116,7 @@ class Fixture:
 
 
 REGISTRY: dict[str, Fixture] = {
+    "orchestration_llm": Fixture("orchestration_llm", orchestration.setup, orchestration.teardown),
     "bookmark_assets": Fixture("bookmark_assets", bookmark_assets.setup),
     "mail_stress": Fixture("mail_stress", mail_stress.setup),
     "model_inspector_gateway": Fixture("model_inspector_gateway", model_inspector_gateway.setup, model_inspector_gateway.teardown),

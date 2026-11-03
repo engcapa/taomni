@@ -1,0 +1,125 @@
+id: TC-ORCH-003
+title: Direct task invocation uses OpenAI Responses and actual context without spawning a coding CLI
+description: Native evidence verifies a loopback Responses request through the production Rust invocation path; browser evidence covers the source inspector and candidate renderer only.
+modes: [browser, native]
+covers: [F-ORCH-1]
+tags: [p0, orchestration, llm-protocol]
+fixtures: [reset_db, orchestration_llm]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-orch-003
+- click: '[data-testid="home-open-agents"]'
+- wait_for: '[data-testid="orch-workspace"]'
+- click: '[data-testid="orch-project-add"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.orchestration_project}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- select_option:
+    selector: '[data-testid="orch-intent"]'
+    value: review
+- click: '[data-testid="orch-attach"]'
+- fill:
+    selector: '[data-testid="orch-source-paths"]'
+    value: spec.md
+- fill:
+    selector: '[data-testid="orch-prompt"]'
+    value: Review the settings requirement and repository rules. Report evidence and unverified risks.
+- click: '[data-testid="orch-send"]'
+- wait_for: '[data-testid="orch-run-snapshot"]'
+- click: '[data-testid="orch-show-sources"]'
+- wait_for: '[data-testid="orch-source-src-1"]'
+- assert_text:
+    selector: '[data-testid="orch-sources-panel"]'
+    contains: AGENTS.md
+- assert_text:
+    selector: '[data-testid="orch-sources-panel"]'
+    contains: spec.md
+- click: '[data-testid="orch-approve-plan"]'
+- wait_for:
+    selector: '[data-testid="orch-run-status"][data-status="candidate"]'
+    timeout_sec: 90
+- click: '[data-testid="orch-show-changes"]'
+- wait_for: '[data-testid="orch-artifact-content"]'
+- assert_text:
+    selector: '[data-testid="orch-artifact-content"]'
+    contains: candidate
+- assert_count:
+    selector: '[data-testid^="orch-artifact-"]:not([data-testid="orch-artifact-content"])'
+    equal: 1
+- assert_not_visible: '[data-testid="orch-approve-plan"]'
+- reload_window: null
+- wait_for:
+    selector: '[data-testid="orch-run-status"][data-status="candidate"]'
+    timeout_sec: 30
+- click: '[data-testid="orch-show-changes"]'
+- assert_count:
+    selector: '[data-testid^="orch-artifact-"]:not([data-testid="orch-artifact-content"])'
+    equal: 1
+- assert_no_runtime_errors: null
+- screenshot: orchestration-responses-context.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Review includes real selected context and produces exactly one unaccepted candidate after explicit approval.
+    actions:
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 14
+    - 18
+    - 20
+    checkpoints:
+    - step: 16
+      expectation: Rules source is present.
+    - step: 17
+      expectation: Explicit spec.md source is present.
+    - step: 19
+      expectation: Approved review finishes candidate, not applied.
+    - step: 22
+      expectation: Artifact displays candidate text.
+    - step: 23
+      expectation: Exactly one review artifact is available.
+    - step: 24
+      expectation: Plan cannot be started a second time.
+    results:
+    - 16
+    - 17
+    - 19
+    - 22
+    - 23
+    - 24
+  - id: R2
+    requirement: Reload restores the same terminal candidate without a second generation.
+    actions:
+    - 25
+    - 27
+    checkpoints:
+    - step: 26
+      expectation: Durable run is still candidate after reload.
+    - step: 28
+      expectation: One retained review artifact is restored.
+    - step: 29
+      expectation: No runtime errors occurred.
+    results:
+    - 26
+    - 28
+    - 29
+  visual:
+  - check: Approved v0.6 conversation-first layout and terminal-state screenshot
+    method: manual
+    reason: The authored screenshot is retained for review; selectors and static checks alone do not prove visual fidelity
+      and no screenshot is claimed reviewed or executed.
+  native:
+  - check: Named native boundary and independent evidence
+    method: automated
+    reason: Native teardown verifies exactly one openai_responses HTTP SSE request, one completed main ledger/attempt,
+      candidate file SHA-256 matching SQLite/run snapshot, source hashes and no coding worktree. Browser is renderer-only
+      stub evidence.

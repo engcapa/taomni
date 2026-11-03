@@ -93,7 +93,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
   // Home opens as the wide launch surface from the prototype. The toolbar
   // toggles can still reveal either companion panel on demand.
   useEffect(() => {
-    if (activeSideTab !== "home") return;
+    if (activeSideTab !== "home" && activeSideTab !== "agents") return;
     useAppStore.getState().setSidebarCollapsed(true);
     useAppStore.getState().setRightSidebarCollapsed(true);
   }, [activeSideTab]);
@@ -167,7 +167,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
               // The panel's default scroll container can pan the fixed rail when
               // a focused/selected session is scrolled into view. Its children
               // own their scrolling; this frame must keep the rail in place.
-              style={{ overflow: "clip" }}
+              style={{ overflow: "clip", ...(activeSideTab === "agents" ? { display: "none" } : {}) }}
               onResize={(size: PanelSize, _id, prevSize?: PanelSize) => {
                 const percentage = size.asPercentage;
                 if (percentage > 2) {
@@ -205,7 +205,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
               className="taomni-platform-resizer"
               // Keep the separator in layout so the panel library retains its
               // adjacent-panel mapping when Home collapses the navigator.
-              style={layout.sidebarCollapsed ? { width: 0, visibility: "hidden", pointerEvents: "none" } : undefined}
+              style={layout.sidebarCollapsed || activeSideTab === "agents" ? { width: 0, visibility: "hidden", pointerEvents: "none" } : undefined}
             />
 
             <Panel id="content">

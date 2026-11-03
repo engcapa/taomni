@@ -12,6 +12,9 @@ import {
 } from "../../../stores/workspacePlatformStore";
 import { useWorkspaceUiStore } from "../../../stores/workspaceUiStore";
 import type { SessionConfig } from "../../../lib/ipc";
+import { resetOrchestrationHarness } from "../orchestration/__tests__/harness";
+
+vi.mock("../../../lib/ipc/orchestration");
 
 const session: SessionConfig = {
   id: "sess-ssh",
@@ -30,6 +33,7 @@ const session: SessionConfig = {
 };
 
 beforeEach(() => {
+  resetOrchestrationHarness();
   window.localStorage.clear();
   useAgentsStore.setState({ tasks: [], selectedTaskId: null });
   useWorkspacePlatformStore.getState().reloadFromStorage();
@@ -45,19 +49,22 @@ afterEach(() => {
 });
 
 describe("Agents platform mode (TASK-09)", () => {
-  it("keeps only the bottom chat entry in the primary rail", () => {
+  it("preserves the existing chat entry without starting simulated legacy tasks", () => {
     useAppStore.setState({ activeSideTab: "sessions" });
     render(<PrimaryNavigationRail />);
-    expect(screen.queryByTestId("nav-mode-agents")).not.toBeInTheDocument();
     expect(screen.getByTestId("rail-chat-button")).toBeInTheDocument();
     expect(useAgentsStore.getState().tasks).toHaveLength(0);
   });
 
-  it("shows only the placeholder when a legacy Agents mode is restored", () => {
+  it("renders the real development workspace instead of legacy simulated task UI", async () => {
     render(<AgentsPlatformView />);
-    expect(screen.getByTestId("agents-coming-soon")).toHaveTextContent("under development");
+    await waitFor(() => expect(screen.getByTestId("orch-composer-settings")).toHaveTextContent("Daily development"));
+    expect(screen.queryByTestId("agents-coming-soon")).not.toBeInTheDocument();
+    expect(screen.getByTestId("orch-sidebar")).toBeInTheDocument();
+    expect(screen.getByTestId("orch-composer")).toBeInTheDocument();
     expect(screen.queryByTestId("agents-dispatch-modal")).not.toBeInTheDocument();
     expect(screen.queryByTestId("agents-task-detail")).not.toBeInTheDocument();
+    expect(useAgentsStore.getState().tasks).toHaveLength(0);
   });
 
   it("UT-WS-09-04 filters workspaces, sessions and actions in the Ctrl+K palette", async () => {

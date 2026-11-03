@@ -1,0 +1,187 @@
+id: TC-ORCH-005
+title: Direct planning uses Chat Completions with one approved generation and durable candidate documents
+description: Native teardown verifies an actual production OpenAI Chat Completions SSE request, SQLite request ledger and SHA-256 of all three candidate files. Browser mode validates deterministic renderer stubs only, not HTTP, disk, workers or passing tests.
+modes: [browser, native]
+covers: [F-ORCH-1]
+tags: [p0, orchestration, llm-protocol, chat-completions]
+fixtures: [reset_db, orchestration_llm]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-orch-005
+- click: '[data-testid="home-open-agents"]'
+- wait_for: '[data-testid="orch-workspace"]'
+- click: '[data-testid="orch-project-add"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.orchestration_project}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- select_option:
+    selector: '[data-testid="orch-project-select"]'
+    value: ${fixture.orchestration_project}
+- click: '[data-testid="orch-settings-open"]'
+- select_option:
+    selector: '[data-testid="orch-planning-resource"]'
+    value: openai_chat
+- select_option:
+    selector: '[data-testid="orch-review-resource"]'
+    value: openai_responses
+- click: '[data-testid="orch-settings-dialog"] details summary'
+- fill:
+    selector: '[data-testid="orch-concurrency"]'
+    value: '4'
+- click: '[data-testid="orch-settings-resources"]'
+- click: '[data-testid="orch-resource-openai_chat"]'
+- select_option:
+    selector: '[data-testid="orch-resource-provider"]'
+    value: ''
+- fill:
+    selector: '[data-testid="orch-resource-address"]'
+    value: ${fixture.orchestration_base_url}
+- fill:
+    selector: '[data-testid="orch-resource-model"]'
+    value: fixture-complete
+- click: '[data-testid="orch-resource-editor"] details summary'
+- select_option:
+    selector: '[data-testid="orch-resource-protocol"]'
+    value: openai_chat
+- click: '[data-testid="orch-settings-save"]'
+- wait_for:
+    selector: '[data-testid="orch-settings-dialog"]'
+    state: hidden
+- select_option:
+    selector: '[data-testid="orch-intent"]'
+    value: plan
+- click: '[data-testid="orch-attach"]'
+- fill:
+    selector: '[data-testid="orch-source-paths"]'
+    value: spec.md
+- fill:
+    selector: '[data-testid="orch-prompt"]'
+    value: Plan the settings option with a compatible interface and evidence-backed test plan. Do not change project files.
+- click: '[data-testid="orch-send"]'
+- wait_for: '[data-testid="orch-approve-plan"]'
+- assert_attribute:
+    selector: '[data-testid="orch-run-status"]'
+    name: data-status
+    equals: planned
+- click: '[data-testid="orch-show-sources"]'
+- assert_text:
+    selector: '[data-testid="orch-sources-panel"]'
+    contains: AGENTS.md
+- assert_text:
+    selector: '[data-testid="orch-sources-panel"]'
+    contains: spec.md
+- click: '[data-testid="orch-approve-plan"]'
+- wait_for:
+    selector: '[data-testid="orch-run-status"][data-status="candidate"]'
+    timeout_sec: 90
+- click: '[data-testid="orch-show-changes"]'
+- wait_for: '[data-testid="orch-artifact-content"]'
+- assert_count:
+    selector: '[data-testid^="orch-artifact-"]:not([data-testid="orch-artifact-content"])'
+    equal: 3
+- click: '[data-testid^="orch-artifact-"]:not([data-testid="orch-artifact-content"]):nth-of-type(2)'
+- assert_text:
+    selector: '[data-testid="orch-artifact-content"]'
+    contains: candidate
+- assert_not_visible: '[data-testid="orch-recovery-open"]'
+- assert_not_visible: '[data-testid="orch-approve-plan"]'
+- reload_window: null
+- wait_for:
+    selector: '[data-testid="orch-run-status"][data-status="candidate"]'
+    timeout_sec: 30
+- click: '[data-testid="orch-show-changes"]'
+- assert_count:
+    selector: '[data-testid^="orch-artifact-"]:not([data-testid="orch-artifact-content"])'
+    equal: 3
+- assert_no_runtime_errors: null
+- screenshot: orchestration-chat-completions-candidates.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The explicitly selected Chat Completions planning resource requires approval and emits three unaccepted
+      document candidates.
+    actions:
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 23
+    - 24
+    - 25
+    - 26
+    - 27
+    - 30
+    - 33
+    - 35
+    - 38
+    checkpoints:
+    - step: 22
+      expectation: Shared endpoint/model/protocol and concurrency=4 save successfully before the task is created.
+    - step: 29
+      expectation: Submitted task is planned before approval.
+    - step: 31
+      expectation: Repository rules are present.
+    - step: 32
+      expectation: Selected spec.md is present.
+    - step: 34
+      expectation: Approved planning finishes candidate.
+    - step: 37
+      expectation: Exactly three candidate documents exist.
+    - step: 39
+      expectation: Artifact body is candidate data.
+    - step: 40
+      expectation: No recovery is offered for a complete pack.
+    - step: 41
+      expectation: No second plan-start action remains.
+    results:
+    - 22
+    - 29
+    - 31
+    - 32
+    - 34
+    - 37
+    - 39
+    - 40
+    - 41
+  - id: R2
+    requirement: Candidate task and documents survive renderer reload without extra Chat generation.
+    actions:
+    - 42
+    - 44
+    checkpoints:
+    - step: 43
+      expectation: Candidate status restores after reload.
+    - step: 45
+      expectation: All three candidates restore.
+    - step: 46
+      expectation: No runtime errors occurred.
+    results:
+    - 43
+    - 45
+    - 46
+  visual:
+  - check: Approved v0.6 conversation-first layout and terminal-state screenshot
+    method: manual
+    reason: The authored screenshot is retained for review; selectors and static checks alone do not prove visual fidelity
+      and no screenshot is claimed reviewed or executed.
+  native:
+  - check: Named native boundary and independent evidence
+    method: automated
+    reason: Native teardown requires exactly one openai_chat SSE POST with one completed main ledger/attempt, three disk
+      candidate hashes matching SQLite/run snapshots and no worker worktree. Browser is deterministic stub-only evidence.

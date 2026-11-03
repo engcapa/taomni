@@ -328,6 +328,7 @@ jobs:
           QA_RELEASE: ${{ matrix.profile == 'release' }}
           QA_RDP_CONTRACTS: ${{ matrix.rdp_unit_contracts && inputs.run_rdp_unit_contracts }}
           QA_DUAL_CONTRACTS: ${{ contains(matrix.capabilities, 'dual-display') }}
+          QA_ORCH_CONTRACTS: ${{ contains(matrix.capabilities, 'orchestration-contracts') }}
         run: |
           mkdir -p qa-contract-output
           bash .agents/skills/qa-ui-auto/scripts/ci_rust_contracts.sh 2>&1 | tee qa-contract-output/contracts.log
@@ -394,8 +395,56 @@ jobs:
         with:
           name: runtime-${{ matrix.build_id }}-${{ inputs.artifact_key }}
           path: qa-ui-auto-report/native-runtime
+      - name: Pinned Node runtime for real orchestration workers
+        if: runner.os == 'Linux' && inputs.operation == 'run' && contains(matrix.capabilities, 'orchestration-workers')
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.14.0'
+      - name: Require native orchestration namespace dependencies
+        if: runner.os == 'Linux' && inputs.operation == 'run' && contains(matrix.capabilities, 'orchestration-workers')
+        run: |
+          command -v unshare
+          command -v ip
+          command -v git
+          command -v dbus-run-session
+          command -v python
+      - name: Install all six pinned real orchestration harnesses before network isolation
+        if: runner.os == 'Linux' && inputs.operation == 'run' && contains(matrix.capabilities, 'orchestration-workers')
+        timeout-minutes: 45
+        run: >-
+          python -I "$GITHUB_WORKSPACE/qa-ui-auto-tests/fixtures/orchestration/install_harnesses.py"
+          --root "$RUNNER_TEMP/orchestration-native-harnesses"
+      - name: Native Taomni six-worker scheduling in loopback-only namespace
+        if: runner.os == 'Linux' && inputs.operation == 'run' && contains(matrix.capabilities, 'orchestration-workers')
+        timeout-minutes: 25
+        env:
+          QA_ENTRY: ${{ matrix.id }}
+        run: |
+          adapter_bin="$(dirname "$(realpath "$(command -v tauri-driver)")")"
+          adapter_sha256="$(sha256sum "$adapter_bin/tauri-driver" | cut -d ' ' -f 1)"
+          sudo env GITHUB_ACTIONS=true "$(command -v python)" -I \
+            "$GITHUB_WORKSPACE/qa-ui-auto-tests/fixtures/orchestration/ci_network.py" \
+            --uid "$(id -u)" --gid "$(id -g)" -- \
+            "$(command -v python)" -I \
+            "$GITHUB_WORKSPACE/qa-ui-auto-tests/fixtures/orchestration/ci_native.py" \
+            --selection "$GITHUB_WORKSPACE/qa-ui-auto-report/selection.json" --entry "$QA_ENTRY" \
+            --report "$GITHUB_WORKSPACE/qa-ui-auto-report/$QA_ENTRY" \
+            --installation "$RUNNER_TEMP/orchestration-native-harnesses/installation.json" \
+            --native-artifact "$GITHUB_WORKSPACE/qa-ui-auto-report/native-runtime/runtime.tar.gz" \
+            --adapter-bin "$adapter_bin" --adapter-sha256 "$adapter_sha256" \
+            --run-id "$GITHUB_RUN_ID" --attempt "$GITHUB_RUN_ATTEMPT"
+      - name: Retain pinned native worker installation identity
+        if: always() && runner.os == 'Linux' && inputs.operation == 'run' && contains(matrix.capabilities, 'orchestration-workers')
+        uses: actions/upload-artifact@v4
+        with:
+          name: orchestration-install-${{ matrix.id }}-${{ inputs.artifact_key }}
+          path: |
+            qa-ui-auto-tests/fixtures/orchestration/harness_catalog.json
+            ${{ runner.temp }}/orchestration-native-harnesses/installation.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Run selected cases (Linux Xvfb desktop)
-        if: (runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_wrapper == 'xvfb') && inputs.operation == 'run'
+        if: (runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_wrapper == 'xvfb') && inputs.operation == 'run' && !contains(matrix.capabilities, 'orchestration-workers')
         env:
           QA_ENTRY: ${{ matrix.id }}
           QA_DUAL_DISPLAY: ${{ contains(matrix.capabilities, 'dual-display') }}
@@ -409,7 +458,7 @@ jobs:
             --selection qa-ui-auto-report/selection.json --entry "$QA_ENTRY" \
             --report "qa-ui-auto-report/$QA_ENTRY"
       - name: Run selected cases (Linux VNC or GNOME Wayland desktop)
-        if: (runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_wrapper == 'dbus') && inputs.operation == 'run'
+        if: (runner.os == 'Linux' && matrix.mode == 'native' && matrix.linux_wrapper == 'dbus') && inputs.operation == 'run' && !contains(matrix.capabilities, 'orchestration-workers')
         env:
           QA_ENTRY: ${{ matrix.id }}
         run: >-
@@ -449,6 +498,7 @@ jobs:
             !qa-ui-auto-report/${{ matrix.id }}/**/native-appconfig/**
             !qa-ui-auto-report/${{ matrix.id }}/**/native-appcache/**
             !qa-ui-auto-report/${{ matrix.id }}/**/_workdirs/**
+            !qa-ui-auto-report/${{ matrix.id }}/_launcher-home/**
           if-no-files-found: warn
           retention-days: 14
       - name: Retain compact native diagnostics
@@ -468,6 +518,7 @@ jobs:
             !qa-ui-auto-report/${{ matrix.id }}/**/native-appconfig/**
             !qa-ui-auto-report/${{ matrix.id }}/**/native-appcache/**
             !qa-ui-auto-report/${{ matrix.id }}/**/_workdirs/**
+            !qa-ui-auto-report/${{ matrix.id }}/_launcher-home/**
             !qa-ui-auto-report/${{ matrix.id }}/**/_updater-assets/**
             !qa-ui-auto-report/${{ matrix.id }}/**/TC-UPDATE-MACOS-*/artifacts/**
             !qa-ui-auto-report/${{ matrix.id }}/**/TC-UPDATE-MACOS-*/staged/*.app.tar.gz

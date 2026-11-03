@@ -497,9 +497,10 @@ export const zhCN: DeepPartial<typeof en> = {
     promptOneTerminal: "当前有 {count} 个打开的标签页，其中包含 {terminals} 个终端会话。确认退出 Taomni 并关闭它们？",
     promptMany: "当前有 {count} 个打开的标签页。确认退出 Taomni 并关闭它们？",
     promptManyTerminals: "当前有 {count} 个打开的标签页，其中包含 {terminals} 个终端会话。确认退出 Taomni 并关闭它们？",
-    cleanupFailedTitle: "SocksCap 清理失败",
+    agentTasks: "当前有 {count} 个尚未结束的 Agent 执行。确认退出并停止本应用持有的执行？候选产物和工作树将保留，中断执行不会自动重启。",
+    cleanupFailedTitle: "安全退出未完成",
     cleanupFailedMessage:
-      "为避免遗留网络状态，Taomni 已取消退出。请重试清理，或取消退出后使用“恢复网络”。\n\n{error}",
+      "任务或网络状态尚未安全清理，Taomni 已取消退出。请重试清理，或取消退出后检查相关任务、使用“恢复网络”。\n\n{error}",
     retryCleanup: "重试清理",
     cancelExit: "取消退出",
   },
