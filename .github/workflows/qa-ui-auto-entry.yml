@@ -441,6 +441,7 @@ jobs:
           path: |
             qa-ui-auto-tests/fixtures/orchestration/harness_catalog.json
             ${{ runner.temp }}/orchestration-native-harnesses/installation.json
+            ${{ runner.temp }}/orchestration-native-harnesses/install-failure.json
           if-no-files-found: error
           retention-days: 14
       - name: Run selected cases (Linux Xvfb desktop)

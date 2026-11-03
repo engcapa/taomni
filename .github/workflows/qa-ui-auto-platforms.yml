@@ -217,6 +217,7 @@ jobs:
           path: |
             qa-ui-auto-tests/fixtures/orchestration/harness_catalog.json
             ${{ runner.temp }}/orchestration-harnesses/installation.json
+            ${{ runner.temp }}/orchestration-harnesses/install-failure.json
             ${{ runner.temp }}/orchestration-evidence/validation.json
             ${{ runner.temp }}/orchestration-evidence/*.receipt.json
             ${{ runner.temp }}/orchestration-evidence/requests.ndjson
