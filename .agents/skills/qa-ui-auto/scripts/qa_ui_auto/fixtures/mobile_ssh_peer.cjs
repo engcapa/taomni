@@ -33,7 +33,8 @@ const server = new Server({ hostKeys: [host.private] }, client => {
     record({ event: "authenticated" });
     client.on("session", accept => {
       const session = accept();
-      session.on("pty", accept => accept());
+      // russh uses want_reply=false; ssh2 omits the acknowledgement callback.
+      session.on("pty", accept => accept?.());
       session.on("window-change", accept => accept?.());
       session.on("shell", accept => {
         const stream = accept();

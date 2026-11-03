@@ -2085,6 +2085,13 @@
 - `[data-testid="mobile-type-q"]` — interactive — F-MOBILE-1.mobile-type-q
 - `[data-testid="mobile-type-c"]` — interactive — F-MOBILE-1.mobile-type-c
 - `[data-testid="mobile-type-enter"]` — interactive — F-MOBILE-1.mobile-type-enter
+- `.compact-keyboard button[aria-label="Shift"]` — interactive — F-MOBILE-1.mobile-type-shift
+- `.compact-keyboard button[aria-label="切换数字符号"]` — interactive — F-MOBILE-1.mobile-type-symbols
+- `[data-testid="mobile-type-A"]` — interactive — F-MOBILE-1.mobile-type-uppercase
+- `[data-testid="mobile-type-1"]` — interactive — F-MOBILE-1.mobile-type-number
+- `[data-testid="mobile-type-!"]` — interactive — F-MOBILE-1.mobile-type-punctuation
+- `[data-testid="mobile-type-space"]` — interactive — F-MOBILE-1.mobile-type-space
+- `[data-testid="mobile-type-backspace"]` — interactive — F-MOBILE-1.mobile-type-backspace
 
 ## mobile/feishu (F-MOBILE-2)
 
