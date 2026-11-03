@@ -44,6 +44,8 @@ steps:
     name: data-status
     equals: partial
 - reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="home-open-agents"]'
 - wait_for:
     selector: '[data-testid="orch-run-status"][data-status="partial"]'
     timeout_sec: 30
@@ -69,7 +71,7 @@ verification:
   requirements:
   - id: R1
     requirement: A truncated Anthropic planning response preserves two complete candidates; dismissing recovery and reloading
-      does not retry.
+      does not retry. Reload returns to Home; explicitly reopen Agent before checking the retained task.
     actions:
     - 5
     - 6
@@ -82,6 +84,7 @@ verification:
     - 18
     - 20
     - 22
+    - 24
     checkpoints:
     - step: 13
       expectation: Initial request ends partial.
@@ -92,10 +95,13 @@ verification:
     - step: 21
       expectation: Dismissing consent leaves task partial.
     - step: 23
-      expectation: Reload restores partial terminal state.
-    - step: 24
-      expectation: The same two candidates remain.
+      expectation: Renderer reload opens the intended Home surface before the user reopens Agent; global navigation persistence
+        is not required.
     - step: 25
+      expectation: Reload restores partial terminal state.
+    - step: 26
+      expectation: The same two candidates remain.
+    - step: 27
       expectation: Recovery consent was not silently restored or accepted.
     results:
     - 13
@@ -103,28 +109,29 @@ verification:
     - 17
     - 21
     - 23
-    - 24
     - 25
+    - 26
+    - 27
   - id: R2
     requirement: One explicit recovery adds only missing output and retains earlier candidate identities and hashes.
     actions:
-    - 26
-    - 27
-    - 30
-    checkpoints:
-    - step: 28
-      expectation: Authorized recovery yields an unaccepted candidate group.
-    - step: 29
-      expectation: No second recovery is offered.
-    - step: 32
-      expectation: Exactly design, contract and tests candidates exist.
-    - step: 33
-      expectation: No runtime errors occurred.
-    results:
     - 28
     - 29
     - 32
-    - 33
+    checkpoints:
+    - step: 30
+      expectation: Authorized recovery yields an unaccepted candidate group.
+    - step: 31
+      expectation: No second recovery is offered.
+    - step: 34
+      expectation: Exactly design, contract and tests candidates exist.
+    - step: 35
+      expectation: No runtime errors occurred.
+    results:
+    - 30
+    - 31
+    - 34
+    - 35
   visual:
   - check: Approved v0.6 conversation-first layout and terminal-state screenshot
     method: manual

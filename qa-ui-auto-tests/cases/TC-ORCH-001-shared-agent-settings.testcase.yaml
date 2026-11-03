@@ -69,6 +69,8 @@ steps:
     contains: Updated shared defaults
 - click: '[data-testid="orch-settings-cancel"]'
 - reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="home-open-agents"]'
 - wait_for: '[data-testid="orch-run-snapshot"]'
 - assert_text:
     selector: '[data-testid="orch-run-snapshot"]'
@@ -123,7 +125,7 @@ verification:
     - 28
   - id: R2
     requirement: Escape discards unsaved settings and renderer reload restores the selected planned run without sending
-      a generation request.
+      a generation request. Reload returns to Home; explicitly reopen Agent before checking the retained task.
     actions:
     - 29
     - 30
@@ -131,30 +133,35 @@ verification:
     - 33
     - 35
     - 36
-    - 40
+    - 38
+    - 42
     checkpoints:
     - step: 32
       expectation: Escape closes the settings draft.
     - step: 34
       expectation: Reopening retains saved defaults, not unsaved edit.
-    - step: 38
+    - step: 37
+      expectation: Renderer reload opens the intended Home surface before the user reopens Agent; global navigation persistence
+        is not required.
+    - step: 40
       expectation: Selected run snapshot survives renderer reload.
-    - step: 39
+    - step: 41
       expectation: No approval occurred; restored task remains planned.
     - step: 43
-      expectation: No runtime errors occurred.
-    - step: 41
       expectation: Selecting the original historical task after reload restores its original shared-plan snapshot.
-    - step: 42
+    - step: 44
       expectation: Original task is still planned; no generation was silently started.
+    - step: 45
+      expectation: No runtime errors occurred.
     results:
     - 32
     - 34
-    - 38
-    - 39
-    - 43
+    - 37
+    - 40
     - 41
-    - 42
+    - 43
+    - 44
+    - 45
   visual:
   - check: Approved v0.6 conversation-first layout and terminal-state screenshot
     method: manual

@@ -122,6 +122,19 @@ No local product browser/native case, live fixture endpoint or real worker was r
   harness/stage diagnostics rather than exposing private logs or treating skips
   as success. Browser/native results and complete crash evidence remain pending.
 
+- Do not interpret green individual browser jobs as case acceptance. The raw Linux
+  receipt from run `41675950537` contains **9 passed / 4 failed / 0 skipped**:
+  ORCH-001/003/005/PARTIAL-002 each failed after reload because application-wide
+  navigation deliberately restarts at Home. The correction preserves reload and
+  all result assertions, explicitly reopens Agent from Home, then verifies restored
+  tasks/candidates. Final aggregation, not the job exit, remains authoritative.
+- In [run 41678202559](https://github.com/engcapa/taomni/actions/runs/41678202559)
+  (`ce2b252a465d64a28c6c70682875185554a70959`), all **six pinned harness
+  installations completed**, including the ZCode source build. Actual worker
+  execution was blocked by an isolation verifier reading the host sysfs network
+  mount after `unshare --net`; the correction must query current kernel network
+  interfaces and still require exactly loopback. No direct/networked fallback.
+
 No hosted product or six-harness acceptance pass is claimed at this checkpoint.
 
 ## Remaining work — not waived by phase 1

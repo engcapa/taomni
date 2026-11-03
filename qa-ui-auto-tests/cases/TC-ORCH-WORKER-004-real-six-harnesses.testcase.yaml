@@ -149,6 +149,8 @@ steps:
     selector: '[data-run-id][data-testid^="orch-run-"][data-status="candidate"]'
     equal: 6
 - reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="home-open-agents"]'
 - wait_for:
     selector: '[data-testid="orch-run-status"][data-status="candidate"]'
     timeout_sec: 30
@@ -262,19 +264,25 @@ verification:
     - 88
   - id: R2
     requirement: Renderer reload restores six terminal candidates without restarting a worker or losing ownership evidence.
+      Reload returns to Home; explicitly reopen Agent before checking the retained task.
     actions:
     - 89
+    - 91
     checkpoints:
     - step: 90
-      expectation: Selected candidate task restores.
-    - step: 91
-      expectation: All six saved candidates remain.
+      expectation: Renderer reload opens the intended Home surface before the user reopens Agent; global navigation persistence
+        is not required.
     - step: 92
+      expectation: Selected candidate task restores.
+    - step: 93
+      expectation: All six saved candidates remain.
+    - step: 94
       expectation: No runtime errors occurred.
     results:
     - 90
-    - 91
     - 92
+    - 93
+    - 94
   visual:
   - check: Six-worker terminal-state screenshot
     method: manual

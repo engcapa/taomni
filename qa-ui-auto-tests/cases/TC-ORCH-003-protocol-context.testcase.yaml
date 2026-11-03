@@ -49,7 +49,10 @@ steps:
     selector: '[data-testid^="orch-artifact-"]:not([data-testid="orch-artifact-content"])'
     equal: 1
 - assert_not_visible: '[data-testid="orch-approve-plan"]'
+- screenshot: orchestration-responses-before-reload.png
 - reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="home-open-agents"]'
 - wait_for:
     selector: '[data-testid="orch-run-status"][data-status="candidate"]'
     timeout_sec: 30
@@ -97,26 +100,34 @@ verification:
     - 23
     - 24
   - id: R2
-    requirement: Reload restores the same terminal candidate without a second generation.
+    requirement: Reload restores the same terminal candidate without a second generation. Reload returns to Home; explicitly
+      reopen Agent before checking the retained task.
     actions:
-    - 25
-    - 27
-    checkpoints:
-    - step: 26
-      expectation: Durable run is still candidate after reload.
-    - step: 28
-      expectation: One retained review artifact is restored.
-    - step: 29
-      expectation: No runtime errors occurred.
-    results:
     - 26
     - 28
+    - 30
+    checkpoints:
+    - step: 27
+      expectation: Renderer reload opens the intended Home surface before the user reopens Agent; global navigation persistence
+        is not required.
+    - step: 29
+      expectation: Durable run is still candidate after reload.
+    - step: 31
+      expectation: One retained review artifact is restored.
+    - step: 32
+      expectation: No runtime errors occurred.
+    results:
+    - 27
     - 29
+    - 31
+    - 32
   visual:
   - check: Approved v0.6 conversation-first layout and terminal-state screenshot
     method: manual
     reason: The authored screenshot is retained for review; selectors and static checks alone do not prove visual fidelity
-      and no screenshot is claimed reviewed or executed.
+      and no screenshot is claimed reviewed or executed. Capture orchestration-responses-before-reload.png before reload
+      while the conversation and candidate inspector are visible; retain the final screenshot after explicit Home-to-Agent
+      reopening. Both still require visual review.
   native:
   - check: Named native boundary and independent evidence
     method: automated

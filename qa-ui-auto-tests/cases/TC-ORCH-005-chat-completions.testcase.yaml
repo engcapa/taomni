@@ -87,7 +87,10 @@ steps:
     contains: candidate
 - assert_not_visible: '[data-testid="orch-recovery-open"]'
 - assert_not_visible: '[data-testid="orch-approve-plan"]'
+- screenshot: orchestration-chat-before-reload.png
 - reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="home-open-agents"]'
 - wait_for:
     selector: '[data-testid="orch-run-status"][data-status="candidate"]'
     timeout_sec: 30
@@ -160,26 +163,34 @@ verification:
     - 40
     - 41
   - id: R2
-    requirement: Candidate task and documents survive renderer reload without extra Chat generation.
+    requirement: Candidate task and documents survive renderer reload without extra Chat generation. Reload returns to
+      Home; explicitly reopen Agent before checking the retained task.
     actions:
-    - 42
-    - 44
-    checkpoints:
-    - step: 43
-      expectation: Candidate status restores after reload.
-    - step: 45
-      expectation: All three candidates restore.
-    - step: 46
-      expectation: No runtime errors occurred.
-    results:
     - 43
     - 45
+    - 47
+    checkpoints:
+    - step: 44
+      expectation: Renderer reload opens the intended Home surface before the user reopens Agent; global navigation persistence
+        is not required.
+    - step: 46
+      expectation: Candidate status restores after reload.
+    - step: 48
+      expectation: All three candidates restore.
+    - step: 49
+      expectation: No runtime errors occurred.
+    results:
+    - 44
     - 46
+    - 48
+    - 49
   visual:
   - check: Approved v0.6 conversation-first layout and terminal-state screenshot
     method: manual
     reason: The authored screenshot is retained for review; selectors and static checks alone do not prove visual fidelity
-      and no screenshot is claimed reviewed or executed.
+      and no screenshot is claimed reviewed or executed. Capture orchestration-chat-before-reload.png before reload while
+      the conversation and candidate inspector are visible; retain the final screenshot after explicit Home-to-Agent
+      reopening. Both still require visual review.
   native:
   - check: Named native boundary and independent evidence
     method: automated
