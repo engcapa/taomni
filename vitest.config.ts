@@ -37,6 +37,9 @@ export default defineConfig(({ mode }) => ({
       "**/qa-ui-auto-report/**",
       // These contracts use node:test and run with `pnpm test:tools`.
       "scripts/*.test.mjs",
+      // The approved prototype uses Node's vm/node:test, not the product DOM.
+      // qa-ui-auto-entry runs it explicitly with node --test before Vitest.
+      "docs-feature/development-orchestrator/ui-prototype-v0.6-model.test.mjs",
     ],
   },
 }));

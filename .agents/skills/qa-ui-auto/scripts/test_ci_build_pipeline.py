@@ -44,6 +44,12 @@ class BuildPipelineTests(unittest.TestCase):
         self.assertEqual(step['run'].count('pnpm exec vitest run'), 1)
         upload = next(s for s in steps if s.get('name') == 'Retain native build diagnostics')
         self.assertIn('qa-build-output/frontend-unit-contracts.log', upload['with']['path'])
+        prototype = 'docs-feature/development-orchestrator/ui-prototype-v0.6-model.test.mjs'
+        self.assertIn(f'node --test {prototype}', step['run'])
+        self.assertIn('qa-build-output/orchestration-prototype-unit-contracts.log', upload['with']['path'])
+        config = (ROOT / 'vitest.config.ts').read_text()
+        self.assertIn(f'"{prototype}"', config)
+        self.assertIn('"scripts/*.test.mjs"', config)
 
     def test_failed_contracts_cannot_leave_a_passing_aggregate(self):
         jobs = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())['jobs']
