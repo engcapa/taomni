@@ -61,9 +61,9 @@ class LaunchContractTests(unittest.TestCase):
                         self.assertNotIn("api.openai.com", path.read_text())
                         self.assertNotIn("api.anthropic.com", path.read_text())
                 if name in {"codex", "deepseek-harness"}:
-                    self.assertEqual(launch.stdin, b"unit prompt")
+                    self.assertEqual(launch.stdin, b"unit prompt\n")
                 else:
-                    self.assertIn("unit prompt", launch.command)
+                    self.assertIn("unit prompt\n", launch.command)
                 if name == "deepseek-harness":
                     self.assertIn("--profile", launch.command)
                     self.assertIn("headless", launch.command)
@@ -75,6 +75,27 @@ class LaunchContractTests(unittest.TestCase):
                 if name == "zcode":
                     self.assertNotIn("--model", launch.command)
                     self.assertIn("--prompt", launch.command)
+
+    def test_opencode_prompt_metadata_is_newline_terminated_before_harness_suffix(self):
+        marker = {"run_id": "run", "worker_id": "opencode"}
+        prompt = "Task\n" + WORKER_MARKER + json.dumps(marker)
+        launch = prepare_launch(self.installation, "opencode", "http://127.0.0.1:123/v1", self.tree,
+                                self.root / "state-newline", prompt)
+        rendered = launch.command[-1]
+        self.assertTrue(rendered.endswith("\n"))
+        from behavior import metadata
+        self.assertEqual(metadata({"message": rendered + "</harness-context>"}, WORKER_MARKER), marker)
+        with self.assertRaises(ValueError):
+            metadata({"message": prompt + "</harness-context>"}, WORKER_MARKER)
+
+    def test_codex_fixture_keeps_filesystem_sandbox_and_never_enables_legacy_bypass(self):
+        prepare_launch(self.installation, "codex", "http://127.0.0.1:123/v1", self.tree,
+                       self.root / "state-sandbox", "Task")
+        config = (self.root / "state-sandbox" / "home" / ".codex" / "config.toml").read_text()
+        self.assertIn('sandbox_mode = "workspace-write"', config)
+        self.assertIn('approval_policy = "never"', config)
+        self.assertNotIn("danger-full-access", config)
+        self.assertNotIn("use_legacy_landlock", config)
 
     def test_missing_drifted_identity_and_external_endpoint_fail_closed(self):
         for url in ("https://api.example.test/v1", "http://localhost:123/v1", "http://127.0.0.1:123/",

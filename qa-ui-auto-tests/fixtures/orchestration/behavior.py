@@ -57,6 +57,15 @@ def tool_failure_categories(value: Any) -> list[str]:
     text = "\n".join(strings(value))[:1024 * 1024]
     patterns = {
         "sandbox_denied": r"(?:sandbox.*(?:denied|failed|not permitted)|bwrap:|Operation not permitted|unshare.*failed)",
+        "sandbox_backend_bwrap": r"(?:\bbwrap\b|\bbubblewrap\b)",
+        "sandbox_backend_landlock": r"\blandlock\b",
+        "sandbox_backend_seccomp": r"\bseccomp\b",
+        "sandbox_user_namespace_denied": r"(?:user namespace.*(?:not permitted|denied|disabled)|unprivileged.*user.*namespace|bwrap:.*(?:No permissions|creating new namespace.*failed)|clone.*EPERM)",
+        "sandbox_mount_denied": r"(?:mount.*(?:Operation not permitted|Permission denied)|Failed to mount|mount.*proc.*failed)",
+        "sandbox_apparmor_denied": r"(?:AppArmor.*(?:denied|restrict|block)|apparmor_restrict_unprivileged_userns)",
+        "sandbox_seccomp_failed": r"(?:seccomp.*(?:failed|denied|not permitted)|Failed to install.*seccomp)",
+        "sandbox_landlock_failed": r"(?:LandlockRestrict|landlock.*(?:failed|not supported|denied))",
+        "sandbox_legacy_incompatible": r"filesystem-restricted execution requires bubblewrap to isolate app-server sockets",
         "tool_process_start_failed": r"(?:CreateProcess|Failed to spawn|failed to create.*process|exec_command failed)",
         "working_directory_missing": r"(?:chdir|working directory|workdir|cwd).*(?:No such file|not found|does not exist)",
         "permission_denied": r"(?:Permission denied|EACCES|EPERM)(?![A-Z_])",
@@ -207,7 +216,8 @@ def worker_decision(body: dict, protocol: str, worker: dict, roots: dict[str, Pa
                            "anthropic_messages": "tool_use_id"}[protocol]
     matching = [result for result in results if result.get(expected_result_key) == call_id]
     if matching:
-        failed = tool_failure_categories(matching)
+        failed = set(tool_failure_categories(matching)) - {
+            "sandbox_backend_bwrap", "sandbox_backend_landlock", "sandbox_backend_seccomp"}
         if any(result.get("is_error") for result in matching) or failed:
             raise FixtureError("worker returned an error tool result")
         return Decision(text=json.dumps({"type": "worker_result", "status": "completed",

@@ -54,6 +54,32 @@ def value_shape(value: Any) -> str:
     return "other"
 
 
+def marker_json_diagnostic(text: list[str]) -> dict:
+    """Structural JSON error flags only; never expose suffix/prompt contents."""
+    result = {"worker_metadata_json_errors": [], "worker_metadata_terminal_newline": False}
+    for value in text:
+        for line in value.splitlines(keepends=True):
+            if not line.startswith(WORKER_MARKER):
+                continue
+            raw = line[len(WORKER_MARKER):].rstrip("\r\n")
+            result["worker_metadata_terminal_newline"] |= line.endswith(("\n", "\r"))
+            try:
+                json.loads(raw)
+            except json.JSONDecodeError as exc:
+                kinds = {"Extra data": "trailing_data", "Unterminated string starting at": "unterminated_string",
+                         "Expecting value": "expected_value", "Expecting ',' delimiter": "expected_delimiter",
+                         "Expecting property name enclosed in double quotes": "expected_property"}
+                category = kinds.get(exc.msg, "invalid_json")
+                if category not in result["worker_metadata_json_errors"]:
+                    result["worker_metadata_json_errors"].append(category)
+                if category == "trailing_data":
+                    suffix = raw[exc.pos:].lstrip()
+                    result["worker_metadata_trailing_kind"] = (
+                        "xml_tag" if suffix.startswith("<") else "bracket" if suffix.startswith("[")
+                        else "object" if suffix.startswith("{") else "other")
+    return result
+
+
 def request_diagnostic(body: dict) -> dict:
     text = list(strings(body))
     result = {"request_keys": sorted(set(body) & REQUEST_KEYS),
@@ -62,7 +88,8 @@ def request_diagnostic(body: dict) -> dict:
               "worker_marker_line": any(line.startswith(WORKER_MARKER) for value in text for line in value.splitlines()),
               "worker_marker_embedded": any(WORKER_MARKER in value for value in text),
               "pack_marker_line": any(line.startswith(PACK_MARKER) for value in text for line in value.splitlines()),
-              "categories": failure_categories(body), "shell_tools": [], "other_tool_count": 0}
+              "categories": failure_categories(body), "shell_tools": [], "other_tool_count": 0,
+              **marker_json_diagnostic(text)}
     try:
         worker = metadata(body, WORKER_MARKER)
         worker_id = worker.get("worker_id") if worker else None

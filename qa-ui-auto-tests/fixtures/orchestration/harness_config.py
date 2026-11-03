@@ -64,6 +64,11 @@ def verify_installation(installation: dict, harness: str) -> dict:
 
 def prepare_launch(installation: dict, harness: str, base_url: str, worktree: Path,
                    state_root: Path, prompt: str) -> Launch:
+    # Harnesses may append context suffixes to the last text part. End the
+    # host declaration with a physical newline before giving them the prompt;
+    # the strict start-of-line JSON parser must never accept trailing wrappers.
+    if not prompt.endswith("\n"):
+        prompt += "\n"
     origin = fixture_url(base_url)
     item = verify_installation(installation, harness)
     if not is_linked_worktree(worktree):

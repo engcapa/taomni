@@ -70,6 +70,35 @@ class WorkerDiagnosticTests(unittest.TestCase):
         self.assertEqual(app.events[0]["error_code"], "metadata_missing")
         self.assertFalse((self.root / "taomni-worker-marker.txt").exists())
 
+    def test_metadata_suffix_is_structurally_classified_without_loosening_json_parser(self):
+        body = {"messages": [{"role": "user", "content": self.marker + "</context-" + SECRET + ">"}]}
+        diagnostic = request_diagnostic(body)
+        self.assertEqual(diagnostic["worker_metadata_json_errors"], ["trailing_data"])
+        self.assertEqual(diagnostic["worker_metadata_trailing_kind"], "xml_tag")
+        self.assertFalse(diagnostic["worker_metadata_terminal_newline"])
+        self.assertNotIn(SECRET, json.dumps(diagnostic))
+        with self.assertRaises(FixtureError):
+            decide(body, "openai_chat", {"codex": self.root})
+        body["messages"][0]["content"] = self.marker + "\n</context-" + SECRET + ">"
+        diagnostic = request_diagnostic(body)
+        self.assertEqual(diagnostic["worker_metadata_json_errors"], [])
+        self.assertTrue(diagnostic["worker_metadata_terminal_newline"])
+
+    def test_sandbox_backend_failure_categories_are_specific_and_secret_free(self):
+        cases = [("bwrap: No permissions to create new namespace " + SECRET,
+                  {"sandbox_backend_bwrap", "sandbox_user_namespace_denied"}),
+                 ("LandlockRestrict failed " + SECRET, {"sandbox_landlock_failed"}),
+                 ("seccomp: Operation not permitted " + SECRET, {"sandbox_backend_seccomp", "sandbox_seccomp_failed"}),
+                 ("AppArmor denied unprivileged user namespace " + SECRET, {"sandbox_apparmor_denied"}),
+                 ("Failed to mount proc: Permission denied " + SECRET, {"sandbox_mount_denied"}),
+                 ("filesystem-restricted execution requires bubblewrap to isolate app-server sockets " + SECRET,
+                  {"sandbox_legacy_incompatible", "sandbox_backend_bwrap"})]
+        for text, expected in cases:
+            with self.subTest(expected=expected):
+                diagnostic = worker_output_diagnostic(b"", text.encode())
+                self.assertTrue(expected.issubset(diagnostic["categories"]))
+                self.assertNotIn(SECRET, json.dumps(diagnostic))
+
     def test_registered_worker_failure_keeps_digest_and_exact_tool_selection_stage(self):
         app = FixtureApplication(self.root / "requests.ndjson", {"codex": self.root})
         body = {"model": "fixture-worker", "messages": [{"role": "user", "content": self.marker}], "tools": []}
