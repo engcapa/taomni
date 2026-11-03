@@ -135,7 +135,45 @@ No local product browser/native case, live fixture endpoint or real worker was r
   mount after `unshare --net`; the correction must query current kernel network
   interfaces and still require exactly loopback. No direct/networked fallback.
 
-No hosted product or six-harness acceptance pass is claimed at this checkpoint.
+- Corrected [run 41679954935](https://github.com/engcapa/taomni/actions/runs/41679954935)
+  (`66659b0523d26293441c4bbe01c737940d47038d`) has downloaded raw browser
+  summaries confirming **Linux 13/13, macOS 13/13 and Windows 13/13**, with no
+  failures/skips, after the explicit Home-to-Agent reopen. This includes the ORCH
+  API UI cases, retained entry/global-search case and all applicable browser crash
+  regressions. The raw final aggregate also verifies **macOS native 14/14** using
+  matching release WebView identity. Downloaded native partial/recovery evidence
+  independently confirms two Anthropic generations, main-failed/recovery-completed
+  ledgers, one recovery authorization and the three candidate files' SHA-256 hashes.
+  **Windows native failed 14/14**: initial ORCH cases failed the fixture's project
+  path identity check; subsequent cases hit a retained SQLite read connection
+  during reset. Linux native did not run because the Linux build's frontend unit
+  stage incorrectly collected the Node-only prototype test with Vitest. No native
+  missing or failed result is counted as a pass.
+- The same run's isolated standalone canary actually executed real harnesses:
+  **Claude Code / Pi / ZCode passed**, each with two protocol generations,
+  matching real tool result, pinned process identity and an owned marker artifact.
+  **Codex failed** because no owned marker was produced despite final stdout;
+  **OpenCode failed** its initial fixture request/final-result validation;
+  **DeepSeek Harness failed** due to an extra failed fixture request. No failed
+  worker is treated as passed, and none of these standalone outcomes establishes
+  native Taomni scheduling. All six remain required.
+
+Follow-up repairs after that failed run preserve all checks:
+
+- `844424e6c` gives the seven Node-only prototype tests their own required hosted
+  `node --test` command/log; Vitest discovery retains all 676 product test files.
+- `5176f8a7f` compares native fixture project directories with filesystem identity
+  and deterministically closes read-only SQLite connections/cursors. Eighteen
+  adapter/reset boundary units passed; Windows execution must be rerun.
+- The fixture follow-up supplies Codex's explicit tool workdir/non-login setting,
+  suppresses source-verified auxiliary title generation in OpenCode/DeepSeek, and
+  adds bounded closed-set failure diagnostics. Previous masked 422 responses do
+  not establish their exact cause; only a new actual hosted run can validate the
+  configuration. Pins, marker ownership, successful tool results and the two-call
+  requirement remain strict.
+
+Full hosted product acceptance, native crash evidence and six-harness scheduling
+are not complete at this checkpoint.
 
 ## Remaining work — not waived by phase 1
 

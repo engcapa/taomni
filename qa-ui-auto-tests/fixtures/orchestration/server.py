@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from behavior import FixtureError, MODEL_IDS, WORKER_MARKER, decide, metadata, safe_id
 from protocols import compact, json_response, stream_response
+from diagnostics import request_diagnostic
 from receipts import is_linked_worktree
 
 PATH_PROTOCOL = {"/v1/messages": "anthropic_messages", "/v1/chat/completions": "openai_chat",
@@ -119,9 +120,13 @@ class FixtureApplication:
         request_id = "req_fixture_" + uuid.uuid4().hex
         try:
             decision = decide(body, protocol, self.register_request_worker(body))
-        except FixtureError:
-            self.record(method=method, route=protocol, status=422, error="unsupported_fixture_request")
-            return Reply(422, {"error": {"type": "invalid_request_error",
+        except FixtureError as exc:
+            diagnostic = request_diagnostic(body)
+            self.record(method=method, route=protocol, status=422, error="unsupported_fixture_request",
+                        request_id=request_id, streaming=body.get("stream") is True,
+                        request_sha256=hashlib.sha256(compact(body).encode()).hexdigest(),
+                        worker_digest=diagnostic.get("worker_digest"), diagnostic=diagnostic, **exc.diagnostic)
+            return Reply(422, {"error": {"type": "invalid_request_error", "code": exc.diagnostic["error_code"],
                                          "message": "unsupported fixture request; inspect manifest/tool configuration"}})
         model = body.get("model", "fixture-complete")
         # Approved tool names are a closed set; worker identity is logged as a
@@ -131,7 +136,8 @@ class FixtureApplication:
                        request_sha256=hashlib.sha256(compact(body).encode()).hexdigest(),
                        worker_digest=hashlib.sha256(decision.worker_id.encode()).hexdigest() if decision.worker_id else None,
                        tool_name=decision.tool_name, tool_call_id=decision.call_id,
-                       tool_result_seen=decision.tool_result_seen)
+                       tool_result_seen=decision.tool_result_seen,
+                       diagnostic=request_diagnostic(body) if decision.worker_id else None)
         status = 503 if decision.scenario == "http-error" else 200
         self.record(status=status, **receipt)
         if status == 503:

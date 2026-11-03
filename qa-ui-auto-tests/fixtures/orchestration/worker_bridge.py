@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from behavior import WORKER_MARKER, FixtureError, metadata, safe_id
 from harness_config import CATALOG_PATH, prepare_launch
 from receipts import assert_isolated_network, validate_artifact, validate_stdout
+from diagnostics import bounded_file, worker_output_diagnostic
 
 MAX_OUTPUT_BYTES = 16 * 1024 * 1024
 
@@ -91,6 +92,7 @@ def run_worker(installation: dict, harness: str, base_url: str, worktree: Path,
             kill_group(process)
         raise InterruptedError(f"supervisor signal {signum}")
 
+    stage = "process_start"
     previous = {}
     for sig in (signal.SIGTERM, signal.SIGINT):
         previous[sig] = signal.signal(sig, stop)
@@ -101,15 +103,20 @@ def run_worker(installation: dict, harness: str, base_url: str, worktree: Path,
             process = subprocess.Popen(launch.command, cwd=worktree, env=launch.env,
                                        stdin=subprocess.PIPE, stdout=stdout, stderr=stderr, start_new_session=True)
             try:
+                stage = "process_run"
                 process.communicate(input=launch.stdin, timeout=timeout)
             finally:
                 kill_group(process)
+        stage = "process_exit"
         if interrupted or process.returncode != 0:
             raise RuntimeError("real harness exited unsuccessfully; inspect private harness logs")
+        stage = "output_limit"
         if output_path.stat().st_size > MAX_OUTPUT_BYTES or error_path.stat().st_size > MAX_OUTPUT_BYTES:
             raise RuntimeError("real harness exceeded the bounded receipt output size")
         output = output_path.read_bytes()
+        stage = "stdout_terminal"
         evidence = validate_stdout(harness, output, worker["run_id"], worker["worker_id"])
+        stage = "artifact_ownership"
         artifact = validate_artifact(worktree, f"taomni:{worker['run_id']}:{worker['worker_id']}\n", [])
         final = {"type": "worker_result", "status": "completed", "run_id": worker["run_id"],
                  "worker_id": worker["worker_id"], "artifact": "taomni-worker-marker.txt"}
@@ -123,6 +130,21 @@ def run_worker(installation: dict, harness: str, base_url: str, worktree: Path,
             receipt.chmod(0o600)
             output.write(json.dumps(result, indent=2) + "\n")
         return result
+    except (ValueError, RuntimeError, AssertionError, OSError, subprocess.TimeoutExpired) as exc:
+        failure = {"schema_version": 1, "status": "failed", "harness": harness, "stage": stage,
+                   "exit_code": process.returncode if process is not None else None,
+                   "protocol": launch.expected_protocol,
+                   "timeout": isinstance(exc, subprocess.TimeoutExpired), "interrupted": interrupted}
+        try:
+            stdout = bounded_file(output_path, MAX_OUTPUT_BYTES)
+            stderr = bounded_file(error_path, MAX_OUTPUT_BYTES)
+            failure["output"] = worker_output_diagnostic(stdout, stderr)
+            with (state_root / "worker-failure.json").open("x", encoding="utf-8") as output:
+                (state_root / "worker-failure.json").chmod(0o600)
+                output.write(json.dumps(failure, indent=2) + "\n")
+        except OSError:
+            pass  # Never mask the original hard failure with a diagnostic error.
+        raise
     finally:
         for sig, handler in previous.items():
             signal.signal(sig, handler)

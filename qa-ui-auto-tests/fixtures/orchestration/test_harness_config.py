@@ -67,6 +67,11 @@ class LaunchContractTests(unittest.TestCase):
                 if name == "deepseek-harness":
                     self.assertIn("--profile", launch.command)
                     self.assertIn("headless", launch.command)
+                    patch = (self.root / ("state-" + name) / "fixture.cordis.yml").read_text()
+                    self.assertIn("- id: session-title-llm\n  disabled: true", patch)
+                if name == "opencode":
+                    title = launch.command.index("--title")
+                    self.assertEqual(launch.command[title + 1], "Taomni isolated worker")
                 if name == "zcode":
                     self.assertNotIn("--model", launch.command)
                     self.assertIn("--prompt", launch.command)

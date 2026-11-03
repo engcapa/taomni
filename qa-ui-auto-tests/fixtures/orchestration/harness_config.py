@@ -150,7 +150,8 @@ stream_idle_timeout_ms = 30000
                    OPENCODE_DISABLE_MODELS_FETCH="1", OPENCODE_DISABLE_LSP_DOWNLOAD="1",
                    OPENCODE_DISABLE_AUTOCOMPACT="1", OPENCODE_DISABLE_PROJECT_CONFIG="1",
                    OPENCODE_DISABLE_CLAUDE_CODE="1", OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER="1")
-        command += ["run", "--format", "json", "--model", "fixture/fixture-worker", prompt]
+        command += ["run", "--format", "json", "--title", "Taomni isolated worker",
+                    "--model", "fixture/fixture-worker", prompt]
     elif harness == "deepseek-harness":
         env.update(DSH_HOME=str(home / ".dsh"), DEEPSEEK_API_KEY=DUMMY_KEY, DSH_TELEMETRY_DISABLED="1")
         patch = state_root / "fixture.cordis.yml"
@@ -171,6 +172,8 @@ stream_idle_timeout_ms = 30000
     model: fixture-worker
     reasoningEffort: off
 - id: agent-instructions
+  disabled: true
+- id: session-title-llm
   disabled: true
 - id: session-telemetry-otel
   disabled: true

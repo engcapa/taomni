@@ -13,6 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from behavior import WORKER_MARKER
+from diagnostics import failure_context
 from harness_config import CATALOG_PATH, verify_installation
 from receipts import (assert_isolated_network, clean_environment, validate_artifact,
                       validate_worker_events)
@@ -84,7 +85,9 @@ def validate(installation: dict, output: Path, harnesses: list[str], timeout: in
             except (ValueError, RuntimeError, AssertionError, OSError, subprocess.TimeoutExpired) as exc:
                 # Exceptions from our own validators carry no upstream text;
                 # raw provider/harness diagnostics remain private under state.
-                failures.append({"harness": harness, "status": "failed", "reason": str(exc)})
+                failures.append({"harness": harness, "status": "failed", "reason": str(exc),
+                                 "diagnostic": failure_context(output / ("state-" + harness),
+                                                               fixture.application.events[start:])})
     finally:
         fixture.close()
     report = {"schema_version": 1, "scope": "standalone_real_harness_canary_not_ui_or_scheduler_evidence",

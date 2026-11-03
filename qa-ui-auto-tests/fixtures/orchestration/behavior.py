@@ -14,10 +14,32 @@ WORKER_MARKER = "TAOMNI_ORCHESTRATION_FIXTURE="
 SAFE_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,160}$")
 MODEL_IDS = ("fixture-complete", "fixture-partial", "fixture-truncated", "fixture-error",
              "fixture-http-error", "fixture-worker")
+SHELL_NAMES = ("Bash", "bash", "exec_command", "shell_command", "shell")
+ERROR_REASONS = {
+    "invalid fixture metadata JSON": ("metadata_json_invalid", "metadata"),
+    "fixture metadata must be an object": ("metadata_shape_invalid", "metadata"),
+    "generation requires TAOMNI_PACK_MANIFEST or registered worker metadata": ("metadata_missing", "metadata"),
+    "worker is not registered with this fixture server": ("worker_unregistered", "registration"),
+    "worker identity cannot be reassigned to another worktree": ("worker_reassigned", "registration"),
+    "worker worktree is outside the trusted QA owner root": ("worktree_outside_owner", "registration"),
+    "worker worktree is already assigned to another owner": ("worktree_owner_duplicate", "registration"),
+    "worker marker must use the fixed worktree-relative filename": ("marker_path_invalid", "ownership"),
+    "worker marker text does not match ownership metadata": ("marker_owner_invalid", "ownership"),
+    "worker returned an error tool result": ("tool_result_error", "tool_result"),
+    "no supported real shell tool advertised by harness": ("shell_tool_missing", "tool_selection"),
+    "tool definition requires a string name": ("tool_definition_invalid", "tool_schema"),
+    "shell tool schema must be an object": ("shell_schema_invalid", "tool_schema"),
+    "model must be a string": ("model_shape_invalid", "request_shape"),
+}
 
 
 class FixtureError(ValueError):
-    """A malformed or unsupported request, never silently converted to success."""
+    """Own error code/category, never publish raw exception text."""
+
+    @property
+    def diagnostic(self) -> dict:
+        code, stage = ERROR_REASONS.get(str(self), ("fixture_request_invalid", "validation"))
+        return {"error_code": code, "error_stage": stage}
 
 
 def strings(value: Any) -> Iterable[str]:
@@ -29,6 +51,21 @@ def strings(value: Any) -> Iterable[str]:
     elif isinstance(value, list):
         for child in value:
             yield from strings(child)
+
+
+def tool_failure_categories(value: Any) -> list[str]:
+    text = "\n".join(strings(value))[:1024 * 1024]
+    patterns = {
+        "sandbox_denied": r"(?:sandbox.*(?:denied|failed|not permitted)|bwrap:|Operation not permitted|unshare.*failed)",
+        "tool_process_start_failed": r"(?:CreateProcess|Failed to spawn|failed to create.*process|exec_command failed)",
+        "working_directory_missing": r"(?:chdir|working directory|workdir|cwd).*(?:No such file|not found|does not exist)",
+        "permission_denied": r"(?:Permission denied|EACCES|EPERM)(?![A-Z_])",
+        "invalid_tool_arguments": r"(?:invalid.*(?:tool|arguments|input)|missing.*required|validation error)",
+    }
+    categories = [name for name, pattern in patterns.items() if re.search(pattern, text, re.I)]
+    if any(int(code) != 0 for code in re.findall(r"(?:exit(?:ed with)?(?: code)?|exit_code)[\s:=]+(-?[0-9]{1,6})", text, re.I)):
+        categories.append("tool_exit_nonzero")
+    return categories
 
 
 def metadata(body: dict, marker: str) -> dict | None:
@@ -170,21 +207,24 @@ def worker_decision(body: dict, protocol: str, worker: dict, roots: dict[str, Pa
                            "anthropic_messages": "tool_use_id"}[protocol]
     matching = [result for result in results if result.get(expected_result_key) == call_id]
     if matching:
-        if any(result.get("is_error") for result in matching):
+        failed = tool_failure_categories(matching)
+        if any(result.get("is_error") for result in matching) or failed:
             raise FixtureError("worker returned an error tool result")
         return Decision(text=json.dumps({"type": "worker_result", "status": "completed",
                                          "run_id": run_id, "worker_id": worker_id,
                                          "artifact": marker_path}), worker_id=worker_id,
                         call_id=call_id, scenario="worker-final", tool_result_seen=True)
     names = {tool.get("name"): tool for tool in offered_tools(body)}
-    name = next((name for name in ("Bash", "bash", "exec_command", "shell_command", "shell")
+    name = next((name for name in SHELL_NAMES
                  if name in names), None)
     if name is None:
         raise FixtureError("no supported real shell tool advertised by harness")
     if name == "shell":
         args = {"command": ["/bin/sh", "-c", command], "workdir": str(root)}
     elif name == "exec_command":
-        args = {"cmd": command, "max_output_tokens": 256}
+        # Pinned Codex resolves cwd from workdir independently of its process
+        # cwd, and otherwise permits login-shell startup to change directory.
+        args = {"cmd": command, "workdir": str(root), "login": False, "max_output_tokens": 256}
     else:
         args = {"command": command}
         if name == "Bash":
