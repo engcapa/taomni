@@ -11,14 +11,19 @@ from typing import Any
 from behavior import PACK_MARKER, WORKER_MARKER, SHELL_NAMES, FixtureError, metadata, strings, tool_failure_categories
 
 SANDBOX_ERRORS = {
-    "bwrap_create_namespace_failed": r"(?:bwrap|bubblewrap)[^\n]*(?:creating new namespace|create (?:a )?new namespace)[^\n]*(?:failed|not permitted|denied)",
+    "bwrap_create_namespace_failed": r"(?:bwrap|bubblewrap)[^\n]*(?:creating (?:a )?new namespace|create (?:a )?new namespace)[^\n]*(?:failed|not permitted|denied)",
+    "bwrap_loopback_address_failed": r"(?:bwrap|bubblewrap)[^\n]*(?:loopback[^\n]*failed[^\n]*RTM_NEWADDR|RTM_NEWADDR[^\n]*(?:failed|not permitted|denied))",
+    "bwrap_loopback_link_failed": r"(?:bwrap|bubblewrap)[^\n]*(?:loopback[^\n]*failed[^\n]*RTM_NEWLINK|RTM_NEWLINK[^\n]*(?:failed|not permitted|denied))",
+    "bwrap_netlink_failed": r"(?:bwrap|bubblewrap)[^\n]*(?:netlink[^\n]*(?:failed|not permitted|denied)|failed[^\n]*netlink)",
+    "bwrap_uid_map_setup_failed": r"(?:bwrap|bubblewrap)[^\n]*(?:setting up|create|setup)[^\n]*uid map[^\n]*(?:failed|not permitted|denied)",
+    "bwrap_gid_map_setup_failed": r"(?:bwrap|bubblewrap)[^\n]*(?:setting up|create|setup)[^\n]*gid map[^\n]*(?:failed|not permitted|denied)",
     "bwrap_unshare_user_namespace": r"(?:bwrap|bubblewrap)[^\n]*(?:unshare|create)[^\n]*user namespace",
     "bwrap_uid_map_failed": r"(?:setting|writing|write|set)[^\n]*(?:uid_map|uid map|uidmap)[^\n]*(?:failed|denied|not permitted)",
     "bwrap_gid_map_failed": r"(?:setting|writing|write|set)[^\n]*(?:gid_map|gid map|gidmap)[^\n]*(?:failed|denied|not permitted)",
     "bwrap_setgroups_failed": r"setgroups[^\n]*(?:failed|denied|not permitted)",
     "bwrap_mount_proc_failed": r"(?:mount|mounting)[^\n]*(?:/proc|proc filesystem)[^\n]*(?:failed|denied|not permitted)",
     "bwrap_mount_failed": r"(?:bwrap|bubblewrap)[^\n]*(?:mount|bind)[^\n]*(?:failed|denied|not permitted)",
-    "bwrap_userns_unavailable": r"(?:bwrap|bubblewrap)[^\n]*(?:No permissions to create new namespace|unprivileged user namespaces.*disabled)",
+    "bwrap_userns_unavailable": r"(?:bwrap|bubblewrap)[^\n]*(?:No permissions to create (?:a )?new namespace|unprivileged user namespaces.*disabled)",
     "bwrap_setuid_failed": r"(?:bwrap|bubblewrap)[^\n]*(?:setuid|setgid|setresuid|setresgid)[^\n]*(?:failed|denied|not permitted)",
     "seccomp_install_failed": r"(?:seccomp[^\n]*(?:failed|denied|not permitted)|failed to (?:install|apply)[^\n]*seccomp)",
     "sandbox_restrictions_failed": r"error applying (?:legacy )?Linux sandbox restrictions",
@@ -32,6 +37,12 @@ ERRNO_PHRASES = {"EPERM": r"(?:\bEPERM\b|Operation not permitted|os error 1(?:[^
                  "ENOSYS": r"(?:\bENOSYS\b|Function not implemented|os error 38(?:[^0-9]|$))",
                  "ENOENT": r"(?:\bENOENT\b|No such file or directory|os error 2(?:[^0-9]|$))",
                  "EROFS": r"(?:\bEROFS\b|Read-only file system|os error 30(?:[^0-9]|$))"}
+
+SANDBOX_TOKENS = frozenset({"bwrap", "bubblewrap", "loopback", "RTM_NEWADDR", "RTM_NEWLINK", "netlink",
+                            "namespace", "userns", "netns", "uid_map", "gid_map", "uidmap", "gidmap",
+                            "setgroups", "setuid", "setgid", "setresuid", "setresgid", "clone", "clone3",
+                            "unshare", "mount", "bind", "pivot_root", "proc", "seccomp", "landlock",
+                            "capset", "capabilities", "prctl", "newuidmap", "newgidmap", "denied", "failed"})
 
 REQUEST_KEYS = frozenset({"messages", "input", "instructions", "system", "tools", "tool_choice", "stream",
                          "model", "max_tokens", "max_output_tokens", "temperature", "previous_response_id"})
@@ -71,11 +82,55 @@ def sandbox_tool_diagnostic(body: dict) -> dict:
     results = [item for item in walk_objects(body) if item.get("type") in {"tool_result", "function_call_output"}
                or item.get("role") == "tool"]
     text = "\n".join(strings(results))[:1024 * 1024]
+    tokens = re.findall(r"[A-Za-z_][A-Za-z0-9_]*", text)
     return {"tool_result_count": len(results),
+            "sandbox_tokens": sorted({approved for approved in SANDBOX_TOKENS
+                                      if any(token.lower() == approved.lower() for token in tokens)}),
             "sandbox_error_codes": [name for name, pattern in SANDBOX_ERRORS.items() if re.search(pattern, text, re.I)],
             "sandbox_errno": [name for name, pattern in ERRNO_PHRASES.items() if re.search(pattern, text, re.I)],
             "sandbox_backends": [name for name in ("bwrap", "bubblewrap", "seccomp", "landlock")
                                  if re.search(r"\b" + name + r"\b", text, re.I)]}
+
+
+def sandbox_host_facts() -> dict:
+    """Read fixed local kernel controls only; no subprocess, probes or egress."""
+    facts = {}
+    numeric = {
+        "unprivileged_userns_clone": "/proc/sys/kernel/unprivileged_userns_clone",
+        "apparmor_restrict_unprivileged_userns": "/proc/sys/kernel/apparmor_restrict_unprivileged_userns",
+        "max_user_namespaces": "/proc/sys/user/max_user_namespaces",
+        "max_net_namespaces": "/proc/sys/user/max_net_namespaces",
+    }
+    for name, filename in numeric.items():
+        try:
+            value = Path(filename).read_text().strip()
+            facts[name] = int(value) if value.isascii() and value.isdigit() and len(value) <= 12 else "unavailable"
+        except OSError:
+            facts[name] = "unavailable"
+    try:
+        value = Path("/sys/module/apparmor/parameters/enabled").read_text().strip().lower()
+        facts["apparmor_enabled"] = value in {"y", "yes", "1"} if value in {"y", "yes", "1", "n", "no", "0"} else "unavailable"
+    except OSError:
+        facts["apparmor_enabled"] = "unavailable"
+    try:
+        value = Path("/proc/self/attr/current").read_text().strip()
+        facts["apparmor_process_mode"] = ("unconfined" if value == "unconfined" else "enforce"
+            if value.endswith("(enforce)") else "complain" if value.endswith("(complain)") else "unknown")
+    except OSError:
+        facts["apparmor_process_mode"] = "unavailable"
+    try:
+        status = Path("/proc/self/status").read_text()
+        for key in ("NoNewPrivs", "Seccomp", "Seccomp_filters"):
+            match = re.search(r"^" + key + r":\s*([0-9]{1,6})\s*$", status, re.M)
+            facts[key.lower()] = int(match[1]) if match else "unavailable"
+        match = re.search(r"^CapEff:\s*([0-9a-fA-F]{1,16})\s*$", status, re.M)
+        if match:
+            capabilities = int(match[1], 16)
+            facts["effective_cap_net_admin"] = bool(capabilities & (1 << 12))
+            facts["effective_cap_sys_admin"] = bool(capabilities & (1 << 21))
+    except OSError:
+        pass
+    return facts
 
 
 def value_shape(value: Any) -> str:

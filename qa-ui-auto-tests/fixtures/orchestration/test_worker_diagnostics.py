@@ -6,11 +6,12 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from behavior import WORKER_MARKER, FixtureError, decide
-from diagnostics import request_diagnostic, worker_output_diagnostic, failure_context
+from diagnostics import request_diagnostic, worker_output_diagnostic, failure_context, sandbox_host_facts
 from server import FixtureApplication
 
 SECRET = "unpublished-token-abcdef"
@@ -98,6 +99,45 @@ class WorkerDiagnosticTests(unittest.TestCase):
                 diagnostic = worker_output_diagnostic(b"", text.encode())
                 self.assertTrue(expected.issubset(diagnostic["categories"]))
                 self.assertNotIn(SECRET, json.dumps(diagnostic))
+
+    def test_bwrap_loopback_rtm_failure_preserves_only_fixed_tokens_operation_and_errno(self):
+        body = {"system": "uid_map seccomp AppArmor denied " + SECRET, "input": [{"type": "function_call_output",
+            "call_id": "call-owned", "output": "bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted " + SECRET}]}
+        diagnostic = request_diagnostic(body)
+        self.assertEqual(diagnostic["sandbox_error_codes"], ["bwrap_loopback_address_failed"])
+        self.assertEqual(diagnostic["sandbox_errno"], ["EPERM"])
+        self.assertEqual(diagnostic["sandbox_tokens"], ["RTM_NEWADDR", "bwrap", "failed", "loopback"])
+        self.assertNotIn(SECRET, json.dumps(diagnostic))
+        self.assertNotIn("uid_map", diagnostic["sandbox_tokens"])
+        variants = [("bwrap: No permissions to create a new namespace: Operation not permitted", "bwrap_userns_unavailable"),
+                    ("bwrap: loopback: Failed RTM_NEWLINK: Operation not permitted", "bwrap_loopback_link_failed"),
+                    ("bwrap: creating a new namespace failed: Operation not permitted", "bwrap_create_namespace_failed")]
+        for message, code in variants:
+            result = request_diagnostic({"messages": [{"role": "tool", "content": message}]})
+            self.assertIn(code, result["sandbox_error_codes"])
+
+    def test_sandbox_host_facts_read_fixed_safe_controls_and_never_publish_profile_identity(self):
+        files = {"/proc/sys/kernel/unprivileged_userns_clone": "1\n",
+                 "/proc/sys/kernel/apparmor_restrict_unprivileged_userns": "1\n",
+                 "/proc/sys/user/max_user_namespaces": "6191547\n", "/proc/sys/user/max_net_namespaces": "6191547\n",
+                 "/sys/module/apparmor/parameters/enabled": "Y\n",
+                 "/proc/self/attr/current": SECRET + " (enforce)\n",
+                 "/proc/self/status": "Name:\t" + SECRET + "\nNoNewPrivs:\t0\nSeccomp:\t2\nSeccomp_filters:\t1\nCapEff:\t0000000000201000\n"}
+        with patch.object(Path, "read_text", autospec=True, side_effect=lambda path: files[str(path)]) as read:
+            facts = sandbox_host_facts()
+        self.assertEqual(read.call_count, 7)
+        self.assertEqual(facts["apparmor_process_mode"], "enforce")
+        self.assertTrue(facts["apparmor_enabled"])
+        self.assertEqual(facts["seccomp"], 2)
+        self.assertTrue(facts["effective_cap_net_admin"])
+        self.assertTrue(facts["effective_cap_sys_admin"])
+        self.assertNotIn(SECRET, json.dumps(facts))
+        self.assertNotIn("CapEff", json.dumps(facts))
+        self.assertNotIn("00201000", json.dumps(facts))
+        with patch.object(Path, "read_text", side_effect=OSError("private file " + SECRET)):
+            unavailable = sandbox_host_facts()
+        self.assertEqual(unavailable["apparmor_process_mode"], "unavailable")
+        self.assertNotIn(SECRET, json.dumps(unavailable))
 
     def test_registered_worker_failure_keeps_digest_and_exact_tool_selection_stage(self):
         app = FixtureApplication(self.root / "requests.ndjson", {"codex": self.root})

@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from behavior import WORKER_MARKER
-from diagnostics import failure_context
+from diagnostics import failure_context, sandbox_host_facts
 from harness_config import CATALOG_PATH, verify_installation
 from receipts import (assert_isolated_network, clean_environment, validate_artifact,
                       validate_worker_events)
@@ -31,6 +31,7 @@ def git(command: list[str], cwd: Path, env: dict) -> bytes:
 
 def validate(installation: dict, output: Path, harnesses: list[str], timeout: int) -> dict:
     assert_isolated_network()
+    host_facts = sandbox_host_facts()
     # Inventory failures are captured, not a successful skipped matrix entry.
     failures, available = [], []
     for harness in harnesses:
@@ -91,7 +92,7 @@ def validate(installation: dict, output: Path, harnesses: list[str], timeout: in
     finally:
         fixture.close()
     report = {"schema_version": 1, "scope": "standalone_real_harness_canary_not_ui_or_scheduler_evidence",
-              "network": "loopback_only_linux_namespace", "run_id": run_id,
+              "network": "loopback_only_linux_namespace", "run_id": run_id, "sandbox_host": host_facts,
               "installation_catalog_sha256": installation.get("catalog_sha256"),
               "required_harnesses": harnesses, "passed": passed, "failures": failures,
               "status": "passed" if not failures and len(passed) == len(harnesses) else "failed"}
