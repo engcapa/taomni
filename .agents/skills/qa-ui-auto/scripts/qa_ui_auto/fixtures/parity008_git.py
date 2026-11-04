@@ -111,6 +111,7 @@ def setup(ctx: Any) -> None:
               }
               for (const [name, text] of Object.entries(files)) await vfs.vfsWriteText(root + '/' + name, text);
               localStorage.setItem('taomni.qa.parity008.enabled', 'true');
+              localStorage.removeItem('taomni.qa.parity008.changeTypes');
               localStorage.removeItem('taomni.qa.parity008.holdPairRepo');
               localStorage.setItem('taomni.git.workspace.changes.tree', 'flat');
               localStorage.setItem('taomni.recentWorkspaces.v1', JSON.stringify([{

@@ -572,7 +572,7 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
       title: "Local Terminal",
       closable: true,
       protocol: "Local",
-      terminalInitialCwd: initialCwd,
+      ...(initialCwd ? { terminalInitialCwd: initialCwd } : {}),
       createdAt: Date.now(),
     };
     set((state) => {

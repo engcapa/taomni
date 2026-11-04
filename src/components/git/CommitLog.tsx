@@ -15,6 +15,7 @@ import { DiffViewer } from "./DiffViewer";
 import { BranchFilterSelect, type BranchFilterOption } from "./shared/BranchFilterSelect";
 import { CommitMessageHover } from "./shared/CommitMessageHover";
 import { useGitFileContextMenu } from "./shared/useGitFileContextMenu";
+import { gitChangeStatusColor } from "./shared/changeStatus";
 
 const ROW_H = 88;
 const LANE_W = 14;
@@ -329,7 +330,11 @@ export function CommitLog({ repoRoot, headOid, branches = [], busy, onContextMen
                       openFileMenu(file.path, event);
                     }}
                   >
-                    <span className={`shrink-0 w-[58px] text-center rounded px-1 py-0.5 text-[10px] uppercase ${statusColor(file.status)}`}>
+                    <span
+                      data-testid="git-log-file-status"
+                      data-change-status={file.status}
+                      className={`shrink-0 w-[58px] text-center rounded px-1 py-0.5 text-[10px] uppercase ${gitChangeStatusColor(file.status)}`}
+                    >
                       {file.status}
                     </span>
                     <span className="truncate text-[12px]">{file.path}</span>
@@ -353,20 +358,6 @@ export function CommitLog({ repoRoot, headOid, branches = [], busy, onContextMen
       {fileMenu}
     </div>
   );
-}
-
-function statusColor(status: string): string {
-  switch (status) {
-    case "added":
-      return "bg-emerald-500/15 text-emerald-500";
-    case "deleted":
-      return "bg-red-500/15 text-red-500";
-    case "renamed":
-    case "copied":
-      return "bg-purple-500/15 text-purple-500";
-    default:
-      return "bg-blue-500/15 text-blue-500";
-  }
 }
 
 function commitBodyPreview(entry: GitLogEntry): string {

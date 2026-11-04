@@ -148,7 +148,7 @@ export function ChangesView({
           amend={{ checked: amendChecked,onChange: setAmendChecked }}
         />
       </Panel>
-      <PanelResizeHandle className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] cursor-col-resize" />
+      <PanelResizeHandle id="git-changes-list-resize-handle" className="w-[3px] bg-[var(--taomni-divider)] hover:bg-[var(--taomni-accent)] cursor-col-resize" />
       <Panel id="changes-diff" defaultSize="64%" minSize="35%" className="min-w-0 min-h-0 flex flex-col">
         <ChangesDiffPane
           title={active?.path??t("git.workspaceChanges.diffTitle")}

@@ -114,6 +114,7 @@
           "parity005_completion",
           "parity006_replace",
           "parity008_git",
+          "git_change_types",
           "parity009_ssr",
           "parity007_extract",
           "mail_server",

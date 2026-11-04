@@ -10491,11 +10491,29 @@ files:
   - src/components/git/CompareView.tsx
   - src/components/git/shared/DiffPane.tsx
   - src/components/git/shared/fileActions.ts
+  - src/components/git/shared/changeStatus.ts
+  - src/components/git/shared/ChangesListToolbar.tsx
+  - src/components/git/ChangesTree.tsx
+  - src/components/git/changes/presentation.ts
+  - src/components/git/changes/flat.tsx
+  - src/components/git/panel/ChangesView.tsx
   - src/components/git/shared/useGitFileContextMenu.tsx
   - src/components/git/panel/menus.tsx
   - src/components/git/workspace/changeMenu.ts
   - src/components/git/DiffViewer.tsx
 controls:
+  - id: git-change-status
+    selector: '[data-testid="git-change-status"]'
+    kind: display
+  - id: git-log-file-status
+    selector: '[data-testid="git-log-file-status"]'
+    kind: display
+  - id: git-changes-list-resize-handle
+    selector: '[data-testid="git-changes-list-resize-handle"]'
+    kind: interactive
+  - id: git-changes-more-actions
+    selector: 'button[aria-label="More change actions"]'
+    kind: interactive
   - id: git-file-copy-path
     selector: '[data-testid="git-file-copy-path"]'
     kind: interactive
@@ -10576,6 +10594,7 @@ controls:
     aliases: ['.git-log-view [data-testid="git-log-files-resize-handle"]']
 -->
 
+- Changes 工具栏在宽窄布局均只保留一个 Tree/Flat 切换入口。Changes 树形/平铺列表与 Log 共用按变更类型配色：Modified 蓝色、Added 绿色、Deleted/冲突红色、Renamed/Copied 紫色、Untracked 琥珀色；暂存状态不改变类型颜色。
 - Git Log、聚合 Workspace Git Log 和 Compare 复用 `DiffViewer` 展示文本差异；Split 模式支持拖动/键盘调整左右正文宽度，并在新视图与差异导航时从行首开始显示。
 - 横向滚动由两侧 CodeMirror 编辑器独立保留，纵向同步继续按已有开关工作；非文本和大文件保护分支不创建可操作分割控件。
 
@@ -13207,6 +13226,7 @@ controls:
   - id: git-changes-tree-toggle
     selector: '[data-testid="git-changes-tree-toggle"]'
     kind: interactive
+    aliases: ['button[aria-label="Switch to flat list"]', 'button[aria-label="Switch to directory tree"]']
   - id: git-commit-amend
     selector: '[data-testid="git-commit-amend"]'
     kind: interactive

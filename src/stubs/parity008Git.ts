@@ -63,6 +63,14 @@ function enabled(): boolean {
   try { return localStorage.getItem(enabledKey) === "true"; } catch { return false; }
 }
 
+function changeTypes(repoRoot: string): GitChange[] | null {
+  if (repoRoot !== `${parity008Root}/repo-b` || localStorage.getItem("taomni.qa.parity008.changeTypes") !== "true") return null;
+  return [
+    { path: "same.txt", oldPath: null, status: "modified", staged: true, unstaged: false, conflict: false },
+    { path: "new.txt", oldPath: null, status: "added", staged: true, unstaged: false, conflict: false },
+  ];
+}
+
 function holdRepo(): string | null {
   try { return localStorage.getItem(holdKey); } catch { return null; }
 }
@@ -98,7 +106,7 @@ function snapshot(repoRoot: string): GitSnapshot {
     upstream: null,
     ahead: 0,
     behind: 0,
-    changes: repo.changes.map((change) => ({ ...change })),
+    changes: (changeTypes(repoRoot) ?? repo.changes).map((change) => ({ ...change })),
     remotes: [],
     branches: [{
       name: "main", fullName: "main", current: true, remote: false, upstream: null,
@@ -175,6 +183,9 @@ export async function parity008Invoke(cmd: string, args: Record<string, unknown>
         subject: "fixture baseline", body: "", refs: ["HEAD -> main"] }];
     }
     case "git_commit_files":
+      if (changeTypes(repoRoot)) return changeTypes(repoRoot)!.map((change) => ({
+        ...change, path: change.path === "new.txt" ? "added.txt" : change.path, staged: false,
+      }));
       return ["same.txt", "stable.txt"].map((filePath) => ({ path: filePath, oldPath: null,
         status: "added", staged: false, unstaged: false, conflict: false }));
     default:

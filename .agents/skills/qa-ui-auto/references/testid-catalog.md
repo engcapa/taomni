@@ -1120,6 +1120,10 @@
 
 ## git/diff (F26.1)
 
+- `[data-testid="git-change-status"]` — display — F26.1.git-change-status
+- `[data-testid="git-log-file-status"]` — display — F26.1.git-log-file-status
+- `[data-testid="git-changes-list-resize-handle"]` — interactive — F26.1.git-changes-list-resize-handle
+- `button[aria-label="More change actions"]` — interactive — F26.1.git-changes-more-actions
 - `[data-testid="git-file-copy-path"]` — interactive — F26.1.git-file-copy-path
 - `[data-testid="git-file-copy-relative-path"]` — interactive — F26.1.git-file-copy-relative-path
 - `[data-testid="git-file-reveal"]` — interactive — F26.1.git-file-reveal
@@ -1943,6 +1947,8 @@
 - `[data-testid="git-branches-tab"]` — interactive — F-WS-4.git-branches-tab
 - `[data-testid="git-changes-tab"]` — interactive — F-WS-4.git-changes-tab
 - `[data-testid="git-changes-tree-toggle"]` — interactive — F-WS-4.git-changes-tree-toggle
+  ↳ `button[aria-label="Switch to flat list"]` — alias
+  ↳ `button[aria-label="Switch to directory tree"]` — alias
 - `[data-testid="git-commit-amend"]` — interactive — F-WS-4.git-commit-amend
 - `[data-testid="git-commit-and-push"]` — interactive — F-WS-4.git-commit-and-push
 - `[data-testid="git-commit-button"]` — interactive — F-WS-4.git-commit-button
