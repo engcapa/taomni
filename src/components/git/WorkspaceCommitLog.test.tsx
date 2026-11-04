@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GitBlobPair, GitChange, GitLogEntry } from "../../lib/git";
 import { WorkspaceCommitLog } from "./WorkspaceCommitLog";
+import * as clipboard from "../../lib/clipboard";
 
 const gitMocks = vi.hoisted(() => ({
   gitBlobPair: vi.fn(),
@@ -78,6 +79,25 @@ describe("WorkspaceCommitLog", () => {
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("copies the historical file from its commit repository and closes stale menus", async () => {
+    const writeText = vi.spyOn(clipboard, "writeText").mockResolvedValue();
+    render(<WorkspaceCommitLog busy={false} roots={[
+      { id: "app", name: "app", path: "/repo", repoRoot: "/repo/app", rootIds: ["root"] },
+      { id: "service", name: "service", path: "/repo", repoRoot: "/repo/service", rootIds: ["root"] },
+    ]} snapshots={{}} />);
+    fireEvent.contextMenu(await screen.findByText("src/service.ts"));
+    fireEvent.click(screen.getByTestId("git-file-copy-path"));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("/repo/service/src/service.ts"));
+    fireEvent.contextMenu(screen.getByText("src/service.ts"));
+    fireEvent.click(screen.getByText("App commit"));
+    await screen.findByText("src/App.tsx");
+    expect(screen.queryByTestId("git-file-copy-path")).not.toBeInTheDocument();
+    fireEvent.contextMenu(screen.getByText("src/App.tsx"));
+    fireEvent.click(screen.getByTestId("git-file-copy-relative-path"));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("src/App.tsx"));
   });
 
   it("aggregates commits across repositories and loads details from the selected commit repo", async () => {

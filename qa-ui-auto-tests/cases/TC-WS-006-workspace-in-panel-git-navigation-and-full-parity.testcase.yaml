@@ -1,8 +1,9 @@
 id: TC-WS-006
 title: In-workspace Git panel reachable from four entries with the full main parity surface
-description: 'v6.1 AC-06 / DEC-04. The removed [Files | Git] row (marker 1) and the removed top-right Git button (marker 3) stay absent. The built-in Git panel
-  opens from the workspace status bar, the primary rail Git button, the workspace tab strip and the editor''s compare-in-Git action, and keeps every main Git
-  capability: repository selector, six views (Changes/Log/Branches/Tags/Stash/Settings), tree/flat switch, amend and commit, and side-by-side/unified diffs.'
+description: 'v6.1 AC-06 / DEC-04. The removed [Files | Git] row (marker 1) and the removed top-right Git button (marker 3) stay absent. The built-in Git
+  panel opens from the workspace status bar, the primary rail Git button, the workspace tab strip and the editor''s compare-in-Git action, and keeps every
+  main Git capability: repository selector, six views (Changes/Log/Branches/Tags/Stash/Settings), tree/flat switch, amend and commit, and side-by-side/unified
+  diffs.'
 modes:
 - browser
 - native
@@ -103,6 +104,12 @@ steps:
 - assert_count:
     selector: '[data-testid="code-workspace-git-panel-toggle"]'
     equal: 0
+- assert_count:
+    selector: '[data-testid="code-workspace-bottom-tab-git"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="code-workspace-bottom-tab-overflow-git"]'
+    equal: 0
 - screenshot: ws-006-in-workspace-git-panel.png
 verification:
   review: reviewed
@@ -179,7 +186,7 @@ verification:
     - 51
     - 59
   - id: R4
-    requirement: 'Each toolbar has one Git entry: the merged rail and editor compare action stay available, while the duplicate legacy editor Git button stays absent.'
+    requirement: The workspace rail has one Git entry and the editor compare action; the duplicate legacy Git dock and toolbar buttons stay absent.
     actions:
     - 44
     checkpoints:
@@ -189,10 +196,16 @@ verification:
       expectation: '{''assert_count'': {''selector'': ''[data-testid="editor-open-git-diff"]'', ''equal'': 1}}'
     - step: 62
       expectation: '{''assert_count'': {''selector'': ''[data-testid="code-workspace-git-panel-toggle"]'', ''equal'': 0}}'
+    - step: 63
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="code-workspace-bottom-tab-git"]'', ''equal'': 0}}'
+    - step: 64
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="code-workspace-bottom-tab-overflow-git"]'', ''equal'': 0}}'
     results:
     - 60
     - 61
     - 62
+    - 63
+    - 64
   visual:
   - check: Git 面板保留 main 的视觉与信息密度，移除的冗余入口确不存在。
     method: manual

@@ -57,6 +57,13 @@ Cover changed behavior and regressions; Vitest has no configured numeric coverag
 
 Every new feature, UI refactor and component upgrade must also run the complete `crash-regression` tagged browser/native suite before review, using a matching QA release binary for native. Run affected feature cases in addition to this suite. Keep a regression for every user-reported crash, reproduce it before the fix where possible, and assert actual pane/content/lifecycle results as well as `assert_no_runtime_errors`. See `qa-ui-auto-tests/ci/crash-regressions.md`. The platforms workflow automatically includes this suite on product PRs and focused hosted runs; failed or missing crash evidence blocks completion.
 
+## macOS UI and Shortcut Compatibility
+
+- Design and test macOS desktop UI against its AppKit application menu, native traffic-light controls and overlay title bar. Browser preview has a renderer menu and different chrome; do not require Windows/Linux custom controls on macOS or infer native compatibility from browser screenshots.
+- Follow macOS shortcut conventions for standard actions: Command for application/editing commands, `Cmd+,` for Settings, `Cmd+Q` for Quit, `Cmd+W` for closing the current document/tab (or window when appropriate), and `Cmd+Shift+Z` for Redo. Preserve system Hide/Minimize/fullscreen shortcuts. Keep Control-based terminal signals and intentional editor/keymap bindings distinct; do not mechanically replace every Ctrl with Cmd. Display macOS modifier names/symbols consistently with the actual binding.
+- For changed shortcuts, specify the action, exact platform chord, focus/context, menu accelerator and visible result. Check native-menu/frontend duplicate dispatch, conflicting system shortcuts, editable-field ownership, IME composition, disabled contexts and focus restoration. Use `Mod` only for an intentional Cmd/Ctrl equivalent; use explicit `Meta`, `Control` and `Alt`/Option or `macos_key` for platform-specific behavior.
+- Use `.agents/skills/qa-ui-auto/references/macos-ui-compatibility.md` and its linked native runbook for case design. WKWebView bridge `press` and AppKit menu activation do not establish OS key delivery, actual menu-bar clicking or native window control behavior. Keep those checks and untested macOS versions/architectures explicit; record existing deviations as gaps rather than changing expectations to match them.
+
 ## Commit & Pull Request Guidelines
 
 Follow the history's Conventional Commit pattern: `fix(screenshot): repair capture controls`, `feat(filebrowser): add folder suggestions`, or `test(rdp): verify viewport`. Keep commits focused.

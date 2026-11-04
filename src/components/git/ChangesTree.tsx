@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, type MouseEvent } from "react";
 import { ChevronDown, ChevronRight, Folder } from "lucide-react";
 import { gitChangeLabel, type GitChange } from "../../lib/git";
+import { gitChangeStatusColor } from "./shared/changeStatus";
 import {
   buildPathTree,
   collectFilePaths,
@@ -58,15 +59,13 @@ function TriCheckbox({
 }
 
 function StatusPill({ change }: { change: GitChange }) {
-  const color = change.conflict
-    ? "bg-red-500/15 text-red-500"
-    : change.status === "untracked"
-      ? "bg-amber-500/15 text-amber-500"
-      : change.staged
-        ? "bg-emerald-500/15 text-emerald-500"
-        : "bg-blue-500/15 text-blue-500";
+  const color = gitChangeStatusColor(change.status, change.conflict);
   return (
-    <span className={`shrink-0 w-[68px] text-center rounded px-1 py-0.5 text-[10px] uppercase ${color}`}>
+    <span
+      data-testid="git-change-status"
+      data-change-status={change.conflict ? "conflict" : change.status}
+      className={`shrink-0 w-[68px] text-center rounded px-1 py-0.5 text-[10px] uppercase ${color}`}
+    >
       {gitChangeLabel(change)}
     </span>
   );

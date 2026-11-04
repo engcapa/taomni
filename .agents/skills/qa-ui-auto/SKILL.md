@@ -22,6 +22,7 @@ skill; `qa-ui-auto` remains the canonical installed name and CLI.
 | Design test cases for an implementation handoff | [authoring.md](references/authoring.md#design-to-implementation-handoff) for locations, case detail and planning/implementation responsibilities |
 | Author YAML or controls | [authoring.md](references/authoring.md) and relevant [verb-catalog.md](references/verb-catalog.md) entries |
 | Launch native QA | [native-testing.md](references/native-testing.md) |
+| Author/verify macOS UI, menus, shortcuts or window chrome | [macos-ui-compatibility.md](references/macos-ui-compatibility.md), including its linked OS checks |
 | Claim current coverage, combine reports or release | [verification.md](references/verification.md) |
 | Compare IDEA UI/interaction | Also [idea-visual-interaction.md](references/idea-visual-interaction.md) |
 | Substantial skill/runner refactor or requested skill E2E | [skill-e2e-evaluation.md](references/skill-e2e-evaluation.md) |
@@ -59,6 +60,13 @@ or skill/tool verification stays within that scope and records packaged-WebView
 behavior as unverified; it does not inherit an app build requirement.
 IPC, disk, processes, dialogs,
 clipboard, IME, shortcuts and windows need native evidence at affected boundaries.
+For macOS, select menu/window assertions by both OS and runtime: the desktop
+uses AppKit menus and overlay traffic lights, while browser preview retains
+the renderer menu. Follow the [macOS coverage matrix](references/macos-ui-compatibility.md)
+before reusing Windows/Linux chrome cases or treating WKWebView actions as OS input.
+Use macOS Command conventions for standard application/editing actions, preserve
+terminal Control signals, and verify focus/IME ownership and duplicate dispatch
+between menu accelerators and WebView listeners.
 Real browser service bridges do not become native evidence. UI and interaction
 can be redesigned; test the new target while preserving retained capabilities.
 
@@ -245,7 +253,7 @@ relay, encodings, OS input or the system clipboard.
 ## GitHub Hosted Execution
 
 For manual/nightly/reusable three-platform browser/native jobs, use the independent
-[CI runbook](../../../../qa-ui-auto-tests/ci/README.md). The workflow plans exact
+[CI runbook](../../../qa-ui-auto-tests/ci/README.md). The workflow plans exact
 case IDs and dependencies before provisioning runner-local services. Inspect its
 selection manifest, raw receipts and aggregate summary; hosted capability gaps
 are not passes. The original E2E/native/release workflows remain separate.

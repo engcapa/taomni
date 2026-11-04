@@ -111,6 +111,7 @@ def setup(ctx: Any) -> None:
               }
               for (const [name, text] of Object.entries(files)) await vfs.vfsWriteText(root + '/' + name, text);
               localStorage.setItem('taomni.qa.parity008.enabled', 'true');
+              localStorage.removeItem('taomni.qa.parity008.changeTypes');
               localStorage.removeItem('taomni.qa.parity008.holdPairRepo');
               localStorage.setItem('taomni.git.workspace.changes.tree', 'flat');
               localStorage.setItem('taomni.recentWorkspaces.v1', JSON.stringify([{
@@ -126,6 +127,7 @@ def setup(ctx: Any) -> None:
     elif mode == "native":
         workspace, manifest = create_native_fixture(Path(tempfile.gettempdir()) / "taomni-qa-parity008")
         values["parity008_root"] = workspace.as_posix()
+        values["parity008_repo_b_file_native"] = str(workspace / "repo-b" / "same.txt")
         for name in ("repo-a", "repo-b"):
             key = name.replace("-", "_")
             repo = manifest["repos"][name]

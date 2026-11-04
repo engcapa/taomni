@@ -138,6 +138,14 @@ unverified with the remaining action. Optional `native_platforms: [Linux, Window
 restricts a case; it does not prove either platform was tested. Known Linux-only
 verbs are rejected before native launch on unsupported targets.
 
+For macOS system menus and window styling, read
+[macos-ui-compatibility.md](macos-ui-compatibility.md). It maps existing/new YAML
+cases to the AppKit and WKWebView boundaries and links reproducible OS checks
+for menu tracking, native Edit actions, traffic lights, resize and fullscreen.
+`native_menu` observes/activates the installed NSMenu through AppKit; it does
+not click the global menu bar or deliver a hardware shortcut. WebView screenshots
+also omit the system menu bar and native window frame.
+
 ## Performance Must Not Regress
 
 Choose metrics for the changed behavior: startup/readiness, input response,

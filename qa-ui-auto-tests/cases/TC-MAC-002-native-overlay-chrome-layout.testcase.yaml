@@ -1,0 +1,218 @@
+id: TC-MAC-002
+title: macOS WKWebView reserves native title-bar space through modes sidebars and themes
+description: >-
+  Verify a single native title-bar strip, absent custom window buttons and
+  application-menu entry, usable toolbar/navigation geometry and a bounded
+  About dialog. Repeat clearance through Home, Sessions, collapsed/expanded
+  sidebar and Workspaces, with light/dark/system theme transitions. Native
+  traffic-light rectangles, resizing and fullscreen require the linked OS checks.
+covers:
+- F1.2
+- F1.3
+- F1.6
+- F1.8
+- F6.2
+- F-WS-1
+tags:
+- p1
+- macos
+- window
+- regression
+modes:
+- native
+native_platforms:
+- macOS
+fixtures:
+- reset_db
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-mac-chrome
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_attribute:
+    selector: html
+    name: data-app-platform
+    equals: macos
+- assert_count:
+    selector: .taomni-native-titlebar
+    equal: 1
+- assert_element_geometry:
+    selector: .taomni-native-titlebar
+    min_width: 100
+    min_height: 28
+    viewport_margin: 0
+- eval_readonly:
+    expression: Math.abs(document.querySelector('.taomni-native-titlebar').getBoundingClientRect().height - 28) <= 1 && Math.abs(document.querySelector('.taomni-platform-workbench').getBoundingClientRect().top - 28) <= 1
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="window-controls"], [data-testid="window-min"], [data-testid="window-max"], [data-testid="window-close"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="app-main-menu"]'
+    equal: 0
+- assert_element_geometry:
+    selector: '[data-testid="control-bar"]'
+    min_width: 100
+    min_height: 28
+    viewport_margin: 0
+- assert_element_geometry:
+    selector: '[data-testid="nav-mode-home"]'
+    min_width: 24
+    min_height: 24
+    viewport_margin: 0
+- screenshot: macos-chrome-home-system.png
+- click: '[data-testid="theme-cycle"]'
+- assert_localstorage:
+    key: taomni.appTheme.v1
+    equals: light
+- assert_attribute:
+    selector: html
+    name: data-app-theme
+    equals: light
+- screenshot: macos-chrome-home-light.png
+- click: '[data-testid="theme-cycle"]'
+- assert_localstorage:
+    key: taomni.appTheme.v1
+    equals: dark
+- assert_attribute:
+    selector: html
+    name: data-app-theme
+    equals: dark
+- screenshot: macos-chrome-home-dark.png
+- click: '[data-testid="theme-cycle"]'
+- assert_localstorage:
+    key: taomni.appTheme.v1
+    equals: system
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- assert_element_geometry:
+    selector: '[data-testid="control-bar"]'
+    min_width: 100
+    min_height: 28
+    viewport_margin: 0
+- eval_readonly:
+    expression: document.querySelector('.taomni-control-bar').getBoundingClientRect().top >= document.querySelector('.taomni-native-titlebar').getBoundingClientRect().bottom
+    expect_truthy: true
+- click: '[data-testid="toggle-left-sidebar"]'
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- eval_readonly:
+    expression: document.querySelector('.taomni-control-bar').getBoundingClientRect().top >= document.querySelector('.taomni-native-titlebar').getBoundingClientRect().bottom
+    expect_truthy: true
+- click: '[data-testid="toggle-left-sidebar"]'
+- wait_for: '[data-testid="session-tree"]'
+- native_about: null
+- wait_for: '[data-testid="about-dialog"]'
+- assert_element_geometry:
+    selector: '[data-testid="about-dialog"]'
+    min_width: 240
+    min_height: 100
+    viewport_margin: 12
+- screenshot: macos-chrome-about.png
+- press: Escape
+- assert_not_visible: '[data-testid="about-dialog"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree-empty"]'
+- eval_readonly:
+    expression: document.querySelector('.taomni-control-bar').getBoundingClientRect().top >= document.querySelector('.taomni-native-titlebar').getBoundingClientRect().bottom
+    expect_truthy: true
+- assert_element_geometry:
+    selector: '[data-testid="control-bar"]'
+    min_width: 100
+    min_height: 28
+    viewport_margin: 0
+- assert_element_geometry:
+    selector: '[data-testid="nav-mode-workspaces"]'
+    min_width: 24
+    min_height: 24
+    viewport_margin: 0
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- eval_readonly:
+    expression: Math.abs(document.querySelector('.taomni-native-titlebar').getBoundingClientRect().height - 28) <= 1 && Math.abs(document.querySelector('.taomni-platform-workbench').getBoundingClientRect().top - 28) <= 1
+    expect_truthy: true
+- assert_count:
+    selector: .taomni-native-titlebar
+    equal: 1
+- assert_count:
+    selector: '[data-testid="window-controls"]'
+    equal: 0
+- assert_no_runtime_errors: null
+- screenshot: macos-chrome-restored-home.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Native Mac reserves one 28 CSS px title-bar strip above the workbench, omits custom controls and preserves usable geometry through modes and panels.
+    actions: [1, 2, 3, 24, 28, 31, 33, 37, 39, 44]
+    checkpoints:
+    - step: 5
+      expectation: This is the production macOS renderer branch.
+    - step: 6
+      expectation: Exactly one native title-bar strip exists.
+    - step: 7
+      expectation: The strip reserves at least 28 CSS px inside the viewport.
+    - step: 8
+      expectation: The strip height and workbench top are 28 CSS px within 1px, rejecting a doubled inset or overlap.
+    - step: 9
+      expectation: No duplicate renderer min/max/close controls exist.
+    - step: 10
+      expectation: The native app has no renderer application-menu button.
+    - step: 11
+      expectation: Home's toolbar is within the WebView bounds.
+    - step: 12
+      expectation: Home navigation has a visible usable box.
+    - step: 27
+      expectation: Sessions toolbar clears the native title-bar strip.
+    - step: 30
+      expectation: Collapsing the sidebar retains top clearance.
+    - step: 32
+      expectation: Expanding restores the actual Sessions tree.
+    - step: 35
+      expectation: About fits within a 12 CSS px viewport margin.
+    - step: 38
+      expectation: Escape dismisses the bounded dialog.
+    - step: 41
+      expectation: Workspaces toolbar clears the same strip.
+    - step: 42
+      expectation: Workspaces toolbar remains within the viewport.
+    - step: 43
+      expectation: Workspaces navigation remains reachable.
+    - step: 46
+      expectation: Returning Home retains the single 28 CSS px inset without overlap or added space.
+    - step: 47
+      expectation: Mode and sidebar transitions never duplicate the strip.
+    - step: 48
+      expectation: Returning Home does not introduce custom window buttons.
+    - step: 49
+      expectation: The transitions introduce no uncaught runtime errors.
+    results: [6, 7, 8, 9, 10, 11, 12, 27, 30, 32, 35, 38, 41, 42, 43, 46, 47, 48, 49]
+  - id: R2
+    requirement: Theme cycling reaches light, dark and system while keeping native Mac chrome available.
+    actions: [14, 18, 22]
+    checkpoints:
+    - step: 15
+      expectation: Light is persisted after the initial system mode.
+    - step: 16
+      expectation: The document applies the light palette.
+    - step: 19
+      expectation: Dark is persisted on the next click.
+    - step: 20
+      expectation: The document applies the dark palette.
+    - step: 23
+      expectation: The next click restores following the system.
+    results: [15, 16, 19, 20, 23]
+  visual:
+  - check: Workbench/toolbar/navigation/dialog geometry in the packaged WKWebView.
+    method: automated
+    reason: Geometry and clearance assertions execute in the real WebView; PNGs retain each theme and the modal state.
+  - check: Real frame/traffic-light overlap, Retina scaling and system-theme live changes.
+    method: manual
+    reason: MAC-OS-04/05/06 in native/runbooks/macos-ui-compatibility.md require OS captures and actual resize/fullscreen/display operations.
+  native:
+  - check: Actual macOS packaged layout and AppKit-opened dialog.
+    method: automated
+    reason: Native-only macOS case; browser preview has no native title-bar strip and cannot establish this WKWebView layout.
+  - check: Window controls, drag, minimize/restore, Zoom, fullscreen and close lifecycle.
+    method: manual
+    reason: DOM geometry and native_about do not operate the window manager; use MAC-OS-04/05 separately.

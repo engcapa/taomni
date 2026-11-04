@@ -1,0 +1,16 @@
+# Focused system-menu/chrome checks; use --mode native on a Mac.
+# The harness selects the isolated QA debug binary and its identity record.
+# For an existing QA release build, set app.native_binary in a local copy.
+app:
+  base_url: http://tauri.localhost
+  mode: native
+worker:
+  parallel: 1
+webdriver:
+  host: 127.0.0.1
+  port: 4444
+  startup_timeout: 30
+  isolate_app_data: true
+report:
+  dir: qa-ui-auto-report/macos
+  keep_runs: 5

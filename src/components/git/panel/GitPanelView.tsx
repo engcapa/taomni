@@ -592,6 +592,7 @@ export function GitPanelView(inputs: GitPanelViewProps) {
           items={changeMenuItems({
             repoRoot,
             opPaths,
+            contextPath: menu.path,
             conflicted: changesList.some((c) => opPaths.includes(c.path) && c.conflict),
             onStage: stageSelected,
             onUnstage: unstageSelected,

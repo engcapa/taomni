@@ -1,0 +1,263 @@
+id: TC-WS-084
+title: Workspace Git rail and Changes/Log file actions (browser)
+description: Use two repositories with the same filename to detect wrong-repository dispatch. Browser checks renderer clipboard/paste and the explicit unsupported
+  OS-shell error. Native checks the independent OS clipboard, real file-manager IPC, and the PTY working directory. No app-menu or OS keyboard-delivery
+  claim.
+modes:
+- browser
+covers:
+- F-WS-4
+- F26.1
+tags:
+- p1
+- workspace
+- git
+- file-actions
+fixtures:
+- reset_db
+- parity008_git
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-workspace-git-actions-TC-WS-084
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"parity008","path":"${fixture.parity008_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
+- reload_window: null
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-sidebar-panel"]'
+- assert_count:
+    selector: '[data-testid="sidebar-rail"] [data-testid="code-workspace-tool-rail-git"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="code-workspace-bottom-tab-git"]'
+    equal: 0
+- click: '[data-testid="code-workspace-tool-rail-git"]'
+- wait_for: '[data-testid="workspace-git-manager"]'
+- wait_for: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+- fill:
+    selector: '[data-testid="git-commit-message"]'
+    value: ''
+- right_click: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+- assert_menu_items:
+  - Stage
+  - Unstage
+  - Copy Path
+  - Copy Relative Path
+  - Reveal in Explorer
+  - Open in Terminal
+- click: '[data-testid="git-file-copy-path"]'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Copied path
+- press:
+    selector: '[data-testid="git-commit-message"]'
+    key: Mod+V
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"git-commit-message"]').value.split(String.fromCharCode(92)).join('/')
+      === "${fixture.parity008_root}/repo-b/same.txt"
+    expect_truthy: true
+- fill:
+    selector: '[data-testid="git-commit-message"]'
+    value: ''
+- fill:
+    selector: '[data-testid="git-commit-message"]'
+    value: ''
+- right_click: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+- click: '[data-testid="git-file-copy-relative-path"]'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Copied relative path
+- press:
+    selector: '[data-testid="git-commit-message"]'
+    key: Mod+V
+- eval_readonly:
+    expression: document.querySelector('[data-testid' + String.fromCharCode(61) + '"git-commit-message"]').value === "same.txt"
+    expect_truthy: true
+- fill:
+    selector: '[data-testid="git-commit-message"]'
+    value: ''
+- right_click: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+- click: '[data-testid="git-file-reveal"]'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Opening files with the OS shell is not available in browser preview.
+- right_click: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+- click: '[data-testid="git-file-open-terminal"]'
+- wait_for: '[data-testid="workspace-tab"][data-tab-kind="terminal"][data-active="true"]'
+- eval_readonly:
+    expression: localStorage.getItem('taomni.platformWorkspaces.v1').includes('"terminalInitialCwd":"${fixture.parity008_root}/repo-b"')
+    expect_truthy: true
+    timeout_sec: 5
+- click: '[data-testid="workspace-tab"][data-tab-kind="terminal"] [data-testid="workspace-tab-close"]'
+- wait_for: '[data-testid="workspace-git-panel"]'
+- click: '[data-testid="git-log-tab"]'
+- wait_for: '[data-testid="git-log-commit"][data-repo-root$="repo-b"]'
+- click: '[data-testid="git-log-commit"][data-repo-root$="repo-b"]'
+- wait_for: '[data-testid="git-log-file"][data-path="same.txt"]'
+- fill:
+    selector: input[aria-label="Filter messages"]
+    value: ''
+- click: '[data-testid="git-log-commit"][data-repo-root$="repo-b"]'
+- wait_for: '[data-testid="git-log-file"][data-path="same.txt"]'
+- right_click: '[data-testid="git-log-file"][data-path="same.txt"]'
+- assert_menu_items:
+  - Copy Path
+  - Copy Relative Path
+  - Reveal in Explorer
+  - Open in Terminal
+- click: '[data-testid="git-file-copy-path"]'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Copied path
+- press:
+    selector: input[aria-label="Filter messages"]
+    key: Mod+V
+- eval_readonly:
+    expression: document.querySelector('input[aria-label' + String.fromCharCode(61) + '"Filter messages"]').value.split(String.fromCharCode(92)).join('/')
+      === "${fixture.parity008_root}/repo-b/same.txt"
+    expect_truthy: true
+- fill:
+    selector: input[aria-label="Filter messages"]
+    value: ''
+- fill:
+    selector: input[aria-label="Filter messages"]
+    value: ''
+- click: '[data-testid="git-log-commit"][data-repo-root$="repo-b"]'
+- wait_for: '[data-testid="git-log-file"][data-path="same.txt"]'
+- right_click: '[data-testid="git-log-file"][data-path="same.txt"]'
+- click: '[data-testid="git-file-copy-relative-path"]'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Copied relative path
+- press:
+    selector: input[aria-label="Filter messages"]
+    key: Mod+V
+- eval_readonly:
+    expression: document.querySelector('input[aria-label' + String.fromCharCode(61) + '"Filter messages"]').value === "same.txt"
+    expect_truthy: true
+- fill:
+    selector: input[aria-label="Filter messages"]
+    value: ''
+- wait_for: '[data-testid="git-log-commit"][data-repo-root$="repo-b"]'
+- click: '[data-testid="git-log-commit"][data-repo-root$="repo-b"]'
+- wait_for: '[data-testid="git-log-file"][data-path="same.txt"]'
+- right_click: '[data-testid="git-log-file"][data-path="same.txt"]'
+- click: '[data-testid="git-file-reveal"]'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Opening files with the OS shell is not available in browser preview.
+- right_click: '[data-testid="git-log-file"][data-path="same.txt"]'
+- screenshot: tc-ws-084-git-log-file-menu.png
+- click: '[data-testid="git-file-open-terminal"]'
+- wait_for: '[data-testid="workspace-tab"][data-tab-kind="terminal"][data-active="true"]'
+- click: '[data-testid="workspace-tab"][data-tab-kind="terminal"] [data-testid="workspace-tab-close"]'
+- wait_for: '[data-testid="workspace-git-panel"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Workspace has one Git rail entry; it still opens the full multi-repository Git panel.
+    actions:
+    - 8
+    - 12
+    checkpoints:
+    - step: 10
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-git\"]", "equal": 1}}'
+    - step: 11
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bottom-tab-git\"]", "equal": 0}}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"workspace-change-row\"][data-repo-root$=\"repo-b\"][data-path=\"same.txt\"]"}'
+    results:
+    - 10
+    - 11
+    - 14
+  - id: R2
+    requirement: Changes copies the clicked repo-b file absolute and repository-relative paths, preserving Git actions.
+    actions:
+    - 16
+    - 18
+    - 24
+    - 25
+    checkpoints:
+    - step: 17
+      expectation: '{"assert_menu_items": ["Stage", "Unstage", "Copy Path", "Copy Relative Path", "Reveal in Explorer", "Open in Terminal"]}'
+    - step: 21
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"git-commit-message\"]'').value.split(String.fromCharCode(92)).join(''/'')
+        === \"${fixture.parity008_root}/repo-b/same.txt\"", "expect_truthy": true}}'
+    - step: 28
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"git-commit-message\"]'').value
+        === \"same.txt\"", "expect_truthy": true}}'
+    results:
+    - 17
+    - 21
+    - 28
+  - id: R3
+    requirement: Changes opens the containing directory (or reports the explicit browser limitation) and a terminal at repo-b, then returns to Git.
+    actions:
+    - 30
+    - 31
+    - 33
+    - 34
+    checkpoints:
+    - step: 32
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Opening files with the OS shell is not available in
+        browser preview."}}'
+    - step: 35
+      expectation: '{"wait_for": "[data-testid=\"workspace-tab\"][data-tab-kind=\"terminal\"][data-active=\"true\"]"}'
+    - step: 36
+      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''taomni.platformWorkspaces.v1'').includes(''\"terminalInitialCwd\":\"${fixture.parity008_root}/repo-b\"'')",
+        "expect_truthy": true, "timeout_sec": 5}}'
+    results:
+    - 32
+    - 35
+    - 36
+  - id: R4
+    requirement: Git Log file actions resolve the selected commit repository and expose all four operations, including a real local PTY in native mode.
+    actions:
+    - 39
+    - 46
+    - 48
+    - 56
+    - 57
+    - 65
+    - 66
+    - 70
+    checkpoints:
+    - step: 47
+      expectation: '{"assert_menu_items": ["Copy Path", "Copy Relative Path", "Reveal in Explorer", "Open in Terminal"]}'
+    - step: 51
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''input[aria-label'' + String.fromCharCode(61) + ''\"Filter messages\"]'').value.split(String.fromCharCode(92)).join(''/'')
+        === \"${fixture.parity008_root}/repo-b/same.txt\"", "expect_truthy": true}}'
+    - step: 60
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''input[aria-label'' + String.fromCharCode(61) + ''\"Filter messages\"]'').value
+        === \"same.txt\"", "expect_truthy": true}}'
+    - step: 67
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Opening files with the OS shell is not available in
+        browser preview."}}'
+    - step: 71
+      expectation: '{"wait_for": "[data-testid=\"workspace-tab\"][data-tab-kind=\"terminal\"][data-active=\"true\"]"}'
+    - step: 73
+      expectation: '{"wait_for": "[data-testid=\"workspace-git-panel\"]"}'
+    - step: 74
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 47
+    - 51
+    - 60
+    - 67
+    - 71
+    - 73
+    - 74
+  visual:
+  - check: Context-menu layout and one Git rail entry
+    method: manual
+    reason: Review the retained screenshot; DOM counts establish removal but not pixel appearance.
+  native:
+  - check: OS clipboard, containing-directory open, and terminal cwd
+    method: not-applicable
+    reason: Browser uses controlled Git/VFS and cannot launch the OS shell; TC-WS-085 owns native boundaries.

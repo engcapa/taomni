@@ -156,16 +156,20 @@ controls:
 id: F1.3
 status: done
 area: main/window
-components: [AppTitleBar, WindowControls, WindowResizeHandles, TitleBarTrayControls]
+components: [MainLayoutView, WindowControls, WindowResizeHandles, TitleBarTrayControls]
 files:
+  - src/layouts/main/MainLayoutView.tsx
+  - src/styles/platform.css
   - src/components/tabbar/ControlBar.tsx
   - src/components/window/WindowDragHandle.tsx
   - src/components/window/WindowResizeHandles.tsx
   - src/lib/windowDrag.ts
-  - src/components/window/AppTitleBar.tsx
   - src/components/window/WindowControls.tsx
   - src/components/window/TitleBarTrayControls.tsx
 controls:
+  - id: native-titlebar
+    selector: '.taomni-native-titlebar'
+    kind: display    # macOS desktop overlay clearance; TC-MAC-002 reaches this runtime
   - id: titlebar
     selector: '[data-testid="app-titlebar"]'
     kind: display
@@ -217,11 +221,13 @@ controls:
     kind: display    # clicking would close the window and abort the test
 -->
 
-- 取消原生 decorations，前端自绘 `AppTitleBar` + `WindowControls`（最小化 / 最大化 / 关闭）
-- 标题栏左侧固定 `WindowDragHandle`（48px）作为可识别的窗口移动锚点；Tab 数量不会挤掉该区域
+- Windows/Linux 使用无 decorations 的窗口与前端 `WindowControls`（最小化 / 最大化 / 关闭）；macOS 桌面启用原生 decorations、Overlay 标题栏和三色窗口按钮，隐藏前端窗口按钮与缩放边缘。macOS 浏览器预览同样不显示这些前端窗口按钮。
+- macOS 桌面在 workbench 外单独预留 28 CSS px 顶部区域，避免原生按钮与导航条/工具栏重叠；浏览器预览没有该区域。`TC-MAC-002` 验证实际 WKWebView 中的预留、模式/侧栏切换和主题；`TC-WS-083` 保留 Home 卡片/工具栏回归。
+- 标题栏内固定 `WindowDragHandle` 作为窗口移动锚点；当前主窗口样式宽 14px，Tab 数量不会挤掉该区域。
 - 标题栏操作区 `PlatformToolbarActions` 按 Home / Sessions / Workspaces / Tools 排列导航、布局、搜索、大预览和更多操作；语音 (PTT) 保留在 `More window actions`，主题与语言入口移至主导航条。
-- `WindowResizeHandles` 在无 decorations 模式下提供 8 向窗口缩放（North/South/East/West/四个角）
+- `WindowResizeHandles` 在 Windows/Linux 无 decorations 模式下提供 8 向窗口缩放（North/South/East/West/四个角）；macOS 通过系统窗口边缘操作。
 - 主菜单 / Sessions / View / Tunneling / Settings / Help / Exit 入口接入
+- `TC-100` 保留 Windows/Linux 标题栏检查。macOS 的三色按钮、真实拖动、缩放/全屏与显示比例兼容性见 [原生检查步骤](native/runbooks/macos-ui-compatibility.md) 的 MAC-OS-04/05/06；DOM 通过不代表窗口管理器行为已验证。
 
 ### 1.4 紧凑 UI 模式（Compact mode）❌ 已移除
 
@@ -688,7 +694,8 @@ controls:
     optional: true
 -->
 
-- 原 per-menu `MenuBar`（menu-bar/menu-terminal/menu-view…）已从产品移除；统一入口是标题栏的 `app-main-menu` 按钮，经共享 ContextMenu 渲染一级/二级菜单。
+- 原 per-menu `MenuBar`（menu-bar/menu-terminal/menu-view…）已从产品移除。Windows/Linux 与浏览器预览通过 `app-main-menu` 按钮和共享 ContextMenu 展开菜单；macOS 桌面隐藏该按钮，使用 AppKit 系统菜单，复用系统 Edit/Services/Hide/Window 能力。
+- `TC-MAC-001` 验证真实 AppKit 全局命令、取消/重开、Settings 单标签复用和关闭；`TC-WS-080` 保留 enabled/checked、保存与重载后的回调生命周期。`TC-MAC-003` 验证 Mac 浏览器菜单、Command/Control 区别、输入框所有权及 Cmd+A/Z/Shift+Z。实际系统菜单点击、加速键、剪贴板、IME 和窗口行为按 [macOS 原生检查步骤](native/runbooks/macos-ui-compatibility.md) 单独记录结果。
 - 菜单项 testid 两种来源：显式 `testId`（如 context-menu-item-new-local-terminal）或按 label 生成的 slug（`context-menu-item-<slug>`）。用例对无显式 testid 的条目使用 `[data-testid="context-menu"] >> text="…"` 派生选择器。
 
 - 顶级菜单：Terminal / Sessions / View / X server / Tools / Settings / Macros / Help
@@ -7726,6 +7733,7 @@ controls:
     kind: interactive
   - id: bottom-tab-git               # ED-PARITY-018 Git tool window tab
     selector: '[data-testid="code-workspace-bottom-tab-git"]'
+    aliases: ['[data-testid="code-workspace-bottom-tab-overflow-git"]']
     kind: interactive
     optional: true
   - id: bottom-tab-overflow
@@ -10469,7 +10477,7 @@ controls:
 - 搜索优先使用所有已加载 Java 编辑器的快照，包含非活动 dirty 缓冲，按所选范围过滤且不保存磁盘。无法读取、非 UTF-8、超过 2 MiB 或 parser 未完成时显示带路径的类型化错误，不能当作空结果；TC-IDE-PARITY-009-05/06 覆盖缓冲/范围/错误恢复与 native 零写入。
 - 原生后端为 tree-sitter-java AST 匹配（节点类型 + 叶子 token），排除注释、字符串与相似调用；无 regex 回退，不可用/无效模板/不支持的修饰符均为类型化状态。结果进入底部 “Structural Search” 工具窗：文件 → 类 → 方法 → 位置树，预览/打开并选中匹配范围；Esc/Cancel 取消并释放请求。Replace、Type/Reference/Script 修饰符与其他语言尚未实现。
 
-## 26. Git Diff Viewport
+## 26. Git file actions and Diff Viewport
 
 <!-- feature
 id: F26.1
@@ -10482,8 +10490,42 @@ files:
   - src/components/git/WorkspaceCommitLog.tsx
   - src/components/git/CompareView.tsx
   - src/components/git/shared/DiffPane.tsx
+  - src/components/git/shared/fileActions.ts
+  - src/components/git/shared/changeStatus.ts
+  - src/components/git/shared/ChangesListToolbar.tsx
+  - src/components/git/ChangesTree.tsx
+  - src/components/git/changes/presentation.ts
+  - src/components/git/changes/flat.tsx
+  - src/components/git/panel/ChangesView.tsx
+  - src/components/git/shared/useGitFileContextMenu.tsx
+  - src/components/git/panel/menus.tsx
+  - src/components/git/workspace/changeMenu.ts
   - src/components/git/DiffViewer.tsx
 controls:
+  - id: git-change-status
+    selector: '[data-testid="git-change-status"]'
+    kind: display
+  - id: git-log-file-status
+    selector: '[data-testid="git-log-file-status"]'
+    kind: display
+  - id: git-changes-list-resize-handle
+    selector: '[data-testid="git-changes-list-resize-handle"]'
+    kind: interactive
+  - id: git-changes-more-actions
+    selector: 'button[aria-label="More change actions"]'
+    kind: interactive
+  - id: git-file-copy-path
+    selector: '[data-testid="git-file-copy-path"]'
+    kind: interactive
+  - id: git-file-copy-relative-path
+    selector: '[data-testid="git-file-copy-relative-path"]'
+    kind: interactive
+  - id: git-file-reveal
+    selector: '[data-testid="git-file-reveal"]'
+    kind: interactive
+  - id: git-file-open-terminal
+    selector: '[data-testid="git-file-open-terminal"]'
+    kind: interactive
   - id: git-panel
     selector: '[data-testid="git-panel"]'
     kind: display
@@ -10492,6 +10534,9 @@ controls:
     kind: interactive
   - id: git-log-commit
     selector: '[data-testid="git-log-commit"]'
+    kind: interactive
+  - id: git-log-message-filter
+    selector: 'input[aria-label="Filter messages"]'
     kind: interactive
   - id: git-log-file
     selector: '[data-testid="git-log-file"]'
@@ -10549,6 +10594,7 @@ controls:
     aliases: ['.git-log-view [data-testid="git-log-files-resize-handle"]']
 -->
 
+- Changes 工具栏在宽窄布局均只保留一个 Tree/Flat 切换入口。Changes 树形/平铺列表与 Log 共用按变更类型配色：Modified 蓝色、Added 绿色、Deleted/冲突红色、Renamed/Copied 紫色、Untracked 琥珀色；暂存状态不改变类型颜色。
 - Git Log、聚合 Workspace Git Log 和 Compare 复用 `DiffViewer` 展示文本差异；Split 模式支持拖动/键盘调整左右正文宽度，并在新视图与差异导航时从行首开始显示。
 - 横向滚动由两侧 CodeMirror 编辑器独立保留，纵向同步继续按已有开关工作；非文本和大文件保护分支不创建可操作分割控件。
 
@@ -13180,6 +13226,7 @@ controls:
   - id: git-changes-tree-toggle
     selector: '[data-testid="git-changes-tree-toggle"]'
     kind: interactive
+    aliases: ['button[aria-label="Switch to flat list"]', 'button[aria-label="Switch to directory tree"]']
   - id: git-commit-amend
     selector: '[data-testid="git-commit-amend"]'
     kind: interactive
@@ -13210,6 +13257,8 @@ controls:
 -->
 
 工作区内置专用 Git 面板可通过主左栏 Git 按钮、左栏 Git 状态条、编辑器“在 Git 面板对比”与工作区 GIT 标签进入，保留 main 的 6 大子面板、Tree/Flat、Amend 与并排/统一 Diff。
+
+工作区左侧工具条只保留主 Git 入口，移除编辑器提供的下方重复 Git 按钮及其 overflow 项。Changes 文件列表与 Log 的提交变更文件列表均支持 Copy Path、Copy Relative Path、Reveal in Explorer 和 Open in Terminal；路径按文件所属仓库计算，终端在文件所在目录启动并保留 Git 标签。浏览器对打开系统文件管理器显示明确限制；原生模式调用现有系统打开接口。
 
 ### 12.5 工作区打开全局任意会话与会话选择器
 

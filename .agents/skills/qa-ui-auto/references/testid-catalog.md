@@ -708,6 +708,7 @@
 - `[data-testid="code-workspace-bottom-tab-tests"]` — interactive — F25.1.tests-tab
 - `[data-testid="code-workspace-bottom-tab-debug"]` — interactive — F25.1.debug-tab
 - `[data-testid="code-workspace-bottom-tab-git"]` — interactive [optional] — F25.1.bottom-tab-git
+  ↳ `[data-testid="code-workspace-bottom-tab-overflow-git"]` — alias
 - `[data-testid="code-workspace-bottom-tab-overflow"]` — interactive [optional] — F25.1.bottom-tab-overflow
 - `[data-testid="code-workspace-bottom-tab-overflow-menu"]` — display [optional] — F25.1.bottom-tab-overflow-menu
 - `[data-testid="code-workspace-bottom-tab-overflow-build"]` — interactive [optional] — F25.1.bottom-tab-overflow-build
@@ -1119,9 +1120,18 @@
 
 ## git/diff (F26.1)
 
+- `[data-testid="git-change-status"]` — display — F26.1.git-change-status
+- `[data-testid="git-log-file-status"]` — display — F26.1.git-log-file-status
+- `[data-testid="git-changes-list-resize-handle"]` — interactive — F26.1.git-changes-list-resize-handle
+- `button[aria-label="More change actions"]` — interactive — F26.1.git-changes-more-actions
+- `[data-testid="git-file-copy-path"]` — interactive — F26.1.git-file-copy-path
+- `[data-testid="git-file-copy-relative-path"]` — interactive — F26.1.git-file-copy-relative-path
+- `[data-testid="git-file-reveal"]` — interactive — F26.1.git-file-reveal
+- `[data-testid="git-file-open-terminal"]` — interactive — F26.1.git-file-open-terminal
 - `[data-testid="git-panel"]` — display — F26.1.git-panel
 - `[data-testid="git-log-tab"]` — interactive — F26.1.git-log-tab
 - `[data-testid="git-log-commit"]` — interactive — F26.1.git-log-commit
+- `input[aria-label="Filter messages"]` — interactive — F26.1.git-log-message-filter
 - `[data-testid="git-log-file"]` — interactive — F26.1.git-log-file
 - `[data-testid="git-diff-viewer"]` — display — F26.1.diff-viewer
   ↳ `.git-log-view [data-testid="git-diff-viewer"]` — alias
@@ -1684,6 +1694,7 @@
 
 ## main/window (F1.3)
 
+- `.taomni-native-titlebar` — display — F1.3.native-titlebar
 - `[data-testid="app-titlebar"]` — display — F1.3.titlebar
 - `[data-testid="control-bar"] [data-testid="platform-toolbar-actions"]` — display — F1.3.tray
 - `[data-testid="control-bar"]` — display — F1.3.control-bar
@@ -1936,6 +1947,8 @@
 - `[data-testid="git-branches-tab"]` — interactive — F-WS-4.git-branches-tab
 - `[data-testid="git-changes-tab"]` — interactive — F-WS-4.git-changes-tab
 - `[data-testid="git-changes-tree-toggle"]` — interactive — F-WS-4.git-changes-tree-toggle
+  ↳ `button[aria-label="Switch to flat list"]` — alias
+  ↳ `button[aria-label="Switch to directory tree"]` — alias
 - `[data-testid="git-commit-amend"]` — interactive — F-WS-4.git-commit-amend
 - `[data-testid="git-commit-and-push"]` — interactive — F-WS-4.git-commit-and-push
 - `[data-testid="git-commit-button"]` — interactive — F-WS-4.git-commit-button

@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GitBlobPair, GitChange, GitLogEntry } from "../../lib/git";
 import { CommitLog } from "./CommitLog";
+import * as clipboard from "../../lib/clipboard";
 
 const gitMocks = vi.hoisted(() => ({
   gitBlobPair: vi.fn(),
@@ -77,6 +78,20 @@ describe("CommitLog", () => {
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("opens file actions for the context-clicked historical file", async () => {
+    gitMocks.gitLog.mockResolvedValue([commit("commit-1")]);
+    const writeText = vi.spyOn(clipboard, "writeText").mockResolvedValue();
+    render(<CommitLog repoRoot={"C:\\repo\\"} headOid="head-1" busy={false} onContextMenu={vi.fn()} />);
+    const file = await screen.findByText("long-lines.txt");
+    fireEvent.contextMenu(file);
+    expect(screen.getByTestId("git-file-reveal")).toBeInTheDocument();
+    expect(screen.getByTestId("git-file-open-terminal")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("git-file-copy-path"));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("C:\\repo\\long-lines.txt"));
+    expect(file.closest("button")).toHaveAttribute("aria-pressed", "true");
   });
 
   it("keeps the selected file when a log refresh returns the same commit", async () => {
