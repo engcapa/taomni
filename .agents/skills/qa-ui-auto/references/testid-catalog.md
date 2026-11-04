@@ -1684,6 +1684,7 @@
 
 ## main/window (F1.3)
 
+- `.taomni-native-titlebar` — display — F1.3.native-titlebar
 - `[data-testid="app-titlebar"]` — display — F1.3.titlebar
 - `[data-testid="control-bar"] [data-testid="platform-toolbar-actions"]` — display — F1.3.tray
 - `[data-testid="control-bar"]` — display — F1.3.control-bar

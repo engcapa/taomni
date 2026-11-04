@@ -94,6 +94,16 @@ Trigger the skill in Claude Code by asking naturally: "run smoke tests", "what f
 See `.agents/skills/qa-ui-auto/references/authoring.md` and `verb-catalog.md`.
 The Python step library lives at `.agents/skills/qa-ui-auto/scripts/qa_ui_auto/steps/`.
 
+For macOS, follow the [UI/shortcut case contract](../.agents/skills/qa-ui-auto/references/macos-ui-compatibility.md)
+and [native OS procedures](native/runbooks/macos-ui-compatibility.md). Declare
+runtime/platform scope explicitly: desktop uses AppKit menus and native traffic
+lights; Mac browser preview retains the renderer menu. Record exact Command,
+Control and Option chords, focus/IME context, menu accelerator and observable
+result; preserve standard macOS editing/Settings/Close/Quit semantics. A renderer
+key event or AppKit action alone cannot certify physical shortcut delivery or
+window-manager behavior. `TC-MAC-001/002/003` cover the respective native menu,
+WKWebView chrome and browser/shortcut branches; retain separate OS evidence.
+
 ## Coverage status
 
 Use `python -m qa_ui_auto status` for written, reviewed and observed execution

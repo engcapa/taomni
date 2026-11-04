@@ -93,6 +93,16 @@ Browser and focused native checks may jointly satisfy the matrix without repeati
 the entire browser suite in native. Never replace a required native effect with
 a stubbed pass, or claim native fidelity from browser results.
 
+For macOS menu/chrome changes, use the runtime split and case matrix in
+[macos-ui-compatibility.md](macos-ui-compatibility.md). Keep AppKit command/state,
+WKWebView layout and OS pointer/shortcut/window checks separately traceable;
+the desktop's absent `app-main-menu` and custom min/max/close controls are
+expected behavior. Browser preview still has its renderer menu.
+For each changed shortcut, specify the exact chord, focus/IME context, menu
+accelerator, target and decisive result using that reference's shortcut contract.
+Preserve macOS Command-based standard actions and Control-based terminal signals;
+verify single dispatch and both positive and relevant negative contexts.
+
 ## Cases
 
 - One unique ID per `cases/<id>-<slug>.testcase.yaml`; drafts may use `cases/auto/`.

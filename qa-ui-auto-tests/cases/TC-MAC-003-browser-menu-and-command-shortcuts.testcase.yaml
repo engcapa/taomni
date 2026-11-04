@@ -1,0 +1,221 @@
+id: TC-MAC-003
+title: Mac browser preview keeps its menu and distinguishes Command shortcuts from Control
+description: >-
+  Exercise the real Mac renderer branch: renderer menu remains available without
+  a native title-bar strip or custom window buttons. Explicit Command+B toggles
+  the sidebar outside text fields, Control+B/K do not invoke shell commands,
+  Command+A/Z/Shift+Z edit the focused input, and Command+K opens a usable single
+  command palette. Browser evidence does not certify AppKit accelerators or IME.
+covers:
+- F1.2
+- F1.3
+- F1.6
+- F1.8
+- F6.2
+- F6.3
+- F-WS-1
+- F-WS-6
+tags:
+- p1
+- macos
+- shortcuts
+- regression
+modes:
+- browser
+browser_platforms:
+- macOS
+fixtures:
+- reset_db
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-mac-browser
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_attribute:
+    selector: html
+    name: data-app-platform
+    equals: macos
+- assert_count:
+    selector: .taomni-native-titlebar
+    equal: 0
+- assert_count:
+    selector: '[data-testid="window-controls"], [data-testid="window-min"], [data-testid="window-max"], [data-testid="window-close"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="app-main-menu"]'
+    equal: 1
+- click: '[data-testid="app-main-menu"]'
+- click: '[data-testid="context-menu-item-help"]'
+- wait_for: '[data-testid="about-dialog"]'
+- press: Escape
+- assert_not_visible: '[data-testid="about-dialog"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- assert_attribute:
+    selector: '[data-testid="toggle-left-sidebar"]'
+    name: aria-pressed
+    equals: 'true'
+- press:
+    selector: '[data-testid="control-bar"]'
+    key: Meta+b
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- assert_attribute:
+    selector: '[data-testid="toggle-left-sidebar"]'
+    name: aria-pressed
+    equals: 'false'
+- press:
+    selector: '[data-testid="control-bar"]'
+    key: Control+b
+- assert_attribute:
+    selector: '[data-testid="toggle-left-sidebar"]'
+    name: aria-pressed
+    equals: 'false'
+- assert_visible: '[data-testid="collapsed-sidebar-rail"]'
+- press:
+    selector: '[data-testid="control-bar"]'
+    key: Meta+b
+- wait_for: '[data-testid="session-tree"]'
+- assert_attribute:
+    selector: '[data-testid="toggle-left-sidebar"]'
+    name: aria-pressed
+    equals: 'true'
+- click: '[data-testid="app-main-menu"]'
+- click: '[data-testid="context-menu-item-new-remote-session"]'
+- wait_for: '[data-testid="session-name"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-mac-input-owner
+- press:
+    selector: '[data-testid="session-name"]'
+    key: Meta+b
+- assert_attribute:
+    selector: '[data-testid="toggle-left-sidebar"]'
+    name: aria-pressed
+    equals: 'true'
+- eval_readonly:
+    expression: document.activeElement.getAttribute('data-testid') === 'session-name' && document.activeElement.value === 'qa-mac-input-owner'
+    expect_truthy: true
+- press:
+    selector: '[data-testid="session-name"]'
+    key: Meta+a
+- press: Backspace
+- eval_readonly:
+    expression: document.activeElement.value === ''
+    expect_truthy: true
+- press: Meta+z
+- eval_readonly:
+    expression: document.activeElement.value === 'qa-mac-input-owner'
+    expect_truthy: true
+- press: Meta+Shift+z
+- eval_readonly:
+    expression: document.activeElement.value === ''
+    expect_truthy: true
+- press: Meta+z
+- eval_readonly:
+    expression: document.activeElement.value === 'qa-mac-input-owner'
+    expect_truthy: true
+- press: Escape
+- assert_not_visible: '[data-testid="session-editor"]'
+- press:
+    selector: '[data-testid="control-bar"]'
+    key: Control+k
+- assert_not_visible: '[data-testid="global-search-modal"]'
+- press:
+    selector: '[data-testid="control-bar"]'
+    key: Meta+k
+- wait_for: '[data-testid="global-search-input"]'
+- assert_count:
+    selector: '[data-testid="global-search-modal"]'
+    equal: 1
+- fill:
+    selector: '[data-testid="global-search-input"]'
+    value: qa-mac-search
+- press: Escape
+- assert_not_visible: '[data-testid="global-search-modal"]'
+- press:
+    selector: '[data-testid="control-bar"]'
+    key: Meta+k
+- wait_for: '[data-testid="global-search-input"]'
+- assert_count:
+    selector: '[data-testid="global-search-modal"]'
+    equal: 1
+- press: Escape
+- assert_not_visible: '[data-testid="global-search-modal"]'
+- assert_no_runtime_errors: null
+- assert_visible: '[data-testid="toggle-left-sidebar"][title$="(Cmd+B)"]'
+- screenshot: macos-browser-command-routing.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Mac browser preview has a usable renderer menu with no native strip or Windows/Linux window buttons.
+    actions: [1, 2, 3, 9, 10, 12]
+    checkpoints:
+    - step: 5
+      expectation: The production renderer selected the macOS branch.
+    - step: 6
+      expectation: Browser preview does not reserve the native-only title-bar strip.
+    - step: 7
+      expectation: Custom window buttons are absent on Mac.
+    - step: 8
+      expectation: Exactly one renderer menu entry remains available.
+    - step: 11
+      expectation: Help opens About through the renderer menu.
+    - step: 13
+      expectation: Escape dismisses About.
+    results: [5, 6, 7, 8, 11, 13]
+  - id: R2
+    requirement: Command+B toggles the sidebar once outside text fields and is labeled Cmd+B; Control+B does not toggle, and the focused input owns editing and Command-based undo/redo.
+    actions: [14, 17, 20, 23, 26, 27, 29, 30, 33, 34, 36, 38, 40, 42]
+    checkpoints:
+    - step: 16
+      expectation: Sessions begins with an expanded sidebar.
+    - step: 19
+      expectation: One Command+B collapses it.
+    - step: 21
+      expectation: Control+B leaves it collapsed.
+    - step: 25
+      expectation: A second Command+B expands it.
+    - step: 31
+      expectation: Command+B from a text input does not toggle the shell sidebar.
+    - step: 32
+      expectation: The same input retains focus and exact text.
+    - step: 35
+      expectation: Command+A and Backspace clear only the focused input.
+    - step: 37
+      expectation: Command+Z restores its exact previous contents.
+    - step: 39
+      expectation: Command+Shift+Z redoes that single deletion.
+    - step: 41
+      expectation: Another undo restores exact text again.
+    - step: 43
+      expectation: Escape cancels the session editor.
+    - step: 58
+      expectation: The actual sidebar tooltip labels its shortcut Cmd+B on Mac.
+    results: [19, 21, 25, 31, 32, 35, 37, 39, 41, 43, 58]
+  - id: R3
+    requirement: Command+K opens the app palette, Control+K does not, and dismiss/reopen retains one usable palette without runtime errors.
+    actions: [44, 46, 49, 50, 52, 55]
+    checkpoints:
+    - step: 45
+      expectation: Control+K does not open the app palette.
+    - step: 48
+      expectation: Command+K opens one palette.
+    - step: 51
+      expectation: Escape dismisses it after entering a query.
+    - step: 54
+      expectation: Command+K can reopen one palette.
+    - step: 56
+      expectation: Escape dismisses the reopened palette.
+    - step: 57
+      expectation: No uncaught runtime errors occurred.
+    results: [45, 48, 51, 54, 56, 57]
+  visual:
+  - check: Mac preview controls and overlays remain readable.
+    method: manual
+    reason: The PNG is browser evidence; inspect it without treating it as an OS frame or traffic-light capture.
+  native:
+  - check: Physical shortcuts, AppKit accelerators, OS clipboard and native editing/IME.
+    method: manual
+    reason: Browser key input proves renderer routing only. MAC-OS-02/03/07 in native/runbooks/macos-ui-compatibility.md specify the separate native checks.
