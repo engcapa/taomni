@@ -168,6 +168,15 @@ export async function parity008Invoke(cmd: string, args: Record<string, unknown>
     }
     case "git_operation_state":
       return { kind: "none", conflictedPaths: [] };
+    case "git_log": {
+      const repo = REPOS[repoRoot]!;
+      return [{ oid: repo.headOid, shortOid: repo.headOid.slice(0, 7), parents: [],
+        authorName: "Parity Fixture", authorEmail: "fixture@example.invalid", date: "2026-02-02T10:00:00Z",
+        subject: "fixture baseline", body: "", refs: ["HEAD -> main"] }];
+    }
+    case "git_commit_files":
+      return ["same.txt", "stable.txt"].map((filePath) => ({ path: filePath, oldPath: null,
+        status: "added", staged: false, unstaged: false, conflict: false }));
     default:
       return [];
   }

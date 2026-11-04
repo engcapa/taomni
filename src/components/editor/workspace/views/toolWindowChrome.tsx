@@ -162,7 +162,10 @@ export function createToolWindowChrome(context: CreateToolWindowChromeContext) {
     stripeMeta.set(item.id, { label: item.id === "documentation" ? "Documentation" : item.label, icon: item.icon, shortcut: item.shortcut });
   }
   for (const tab of bottomDockTabs) stripeMeta.set(tab.id, { label: tab.label, icon: tab.icon, badge: tab.badge });
-  const stripeToolIds = ["project", "structure", "documentation", ...bottomDockTabs.map((tab) => tab.id)];
+  // The platform host supplies the workspace Git tab entry above the editor
+  // tools. Its legacy dock entry would add a second Git button (and overflow item).
+  const stripeToolIds = ["project", "structure", "documentation", ...bottomDockTabs.map((tab) => tab.id)]
+    .filter((id) => !context.host || id !== "git");
   const toggleToolWindowFromStripe = (id: string) => {
     const side = anchorSide(toolWindowLayout.anchorOf(id));
     if (context.host && (side === "left" ? !context.host.leftToolAreaVisible : !context.host.editorVisible)) {

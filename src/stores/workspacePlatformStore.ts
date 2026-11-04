@@ -148,7 +148,7 @@ export interface WorkspacePlatformState {
   openGitTab: (workspaceId: string, focusPath?: string) => WorkspaceIsolatedTab;
   openCodeWorkspaceTab: (workspaceId: string) => WorkspaceIsolatedTab;
   updateCodeWorkspace: (workspaceId: string, info: CodeWorkspaceTabInfo) => void;
-  openLocalTerminalInWorkspace: (workspaceId: string) => WorkspaceIsolatedTab;
+  openLocalTerminalInWorkspace: (workspaceId: string, initialCwd?: string) => WorkspaceIsolatedTab;
   openSessionInWorkspace: (
     workspaceId: string,
     session: SessionConfig,
@@ -564,7 +564,7 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
 
   ...createWorkspaceCodeActions(set, persist),
 
-  openLocalTerminalInWorkspace: (workspaceId) => {
+  openLocalTerminalInWorkspace: (workspaceId, initialCwd) => {
     const tab: WorkspaceIsolatedTab = {
       id: newRuntimeId(`ws:${workspaceId}:local`),
       workspaceId,
@@ -572,6 +572,7 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
       title: "Local Terminal",
       closable: true,
       protocol: "Local",
+      terminalInitialCwd: initialCwd,
       createdAt: Date.now(),
     };
     set((state) => {

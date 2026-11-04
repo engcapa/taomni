@@ -16,6 +16,7 @@ import type { GitWorkspaceRootInfo } from "../../types";
 import { DiffViewer } from "./DiffViewer";
 import { BranchFilterSelect, type BranchFilterOption } from "./shared/BranchFilterSelect";
 import { CommitMessageHover } from "./shared/CommitMessageHover";
+import { useGitFileContextMenu } from "./shared/useGitFileContextMenu";
 
 const ROW_H = 88;
 const LANE_W = 14;
@@ -146,6 +147,7 @@ export function WorkspaceCommitLog({ roots, snapshots, busy }: WorkspaceCommitLo
   );
   const selectedRepoRoot = selected?.repoRoot ?? null;
   const selectedCommitOid = selected?.oid ?? null;
+  const { openFileMenu, fileMenu } = useGitFileContextMenu(selectedRepoRoot, selectedCommitOid);
   const graphRows = useMemo(() => workspaceGraphRows(entries, roots), [entries, roots]);
   const maxGraphWidth = useMemo(
     () => [...graphRows.values()].reduce((max, row) => Math.max(max, row.width), 1),
@@ -263,6 +265,7 @@ export function WorkspaceCommitLog({ roots, snapshots, busy }: WorkspaceCommitLo
                   tabIndex={0}
                   data-testid="git-log-commit"
                   data-oid={entry.oid}
+                  data-repo-root={entry.repoRoot}
                   style={{ height: ROW_H }}
                   className="w-full flex items-start gap-2 overflow-hidden"
                   onClick={() => setSelectedKey(entryKey(entry))}
@@ -348,6 +351,10 @@ export function WorkspaceCommitLog({ roots, snapshots, busy }: WorkspaceCommitLo
                       filePath === file.path ? "bg-[var(--taomni-hover)]" : ""
                     }`}
                     onClick={() => setFilePath(file.path)}
+                    onContextMenu={(event) => {
+                      setFilePath(file.path);
+                      openFileMenu(file.path, event);
+                    }}
                   >
                     <span className={`shrink-0 w-[58px] text-center rounded px-1 py-0.5 text-[10px] uppercase ${statusColor(file.status)}`}>
                       {file.status}
@@ -368,6 +375,7 @@ export function WorkspaceCommitLog({ roots, snapshots, busy }: WorkspaceCommitLo
           </PanelGroup>
         </Panel>
       </PanelGroup>
+      {fileMenu}
     </div>
   );
 }

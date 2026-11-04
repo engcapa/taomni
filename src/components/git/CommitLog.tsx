@@ -14,6 +14,7 @@ import { buildGraph, graphColor, type GraphRow } from "../../lib/gitGraph";
 import { DiffViewer } from "./DiffViewer";
 import { BranchFilterSelect, type BranchFilterOption } from "./shared/BranchFilterSelect";
 import { CommitMessageHover } from "./shared/CommitMessageHover";
+import { useGitFileContextMenu } from "./shared/useGitFileContextMenu";
 
 const ROW_H = 88;
 const LANE_W = 14;
@@ -112,6 +113,7 @@ export function CommitLog({ repoRoot, headOid, branches = [], busy, onContextMen
     [entries, selectedOid],
   );
   const selectedCommitOid = selected?.oid ?? null;
+  const { openFileMenu, fileMenu } = useGitFileContextMenu(repoRoot, selectedCommitOid);
 
   // Load the changed-files list for the selected commit.
   useEffect(() => {
@@ -322,6 +324,10 @@ export function CommitLog({ repoRoot, headOid, branches = [], busy, onContextMen
                       filePath === file.path ? "bg-[var(--taomni-hover)]" : ""
                     }`}
                     onClick={() => setFilePath(file.path)}
+                    onContextMenu={(event) => {
+                      setFilePath(file.path);
+                      openFileMenu(file.path, event);
+                    }}
                   >
                     <span className={`shrink-0 w-[58px] text-center rounded px-1 py-0.5 text-[10px] uppercase ${statusColor(file.status)}`}>
                       {file.status}
@@ -344,6 +350,7 @@ export function CommitLog({ repoRoot, headOid, branches = [], busy, onContextMen
       </Panel>
     </PanelGroup>
       </div>
+      {fileMenu}
     </div>
   );
 }

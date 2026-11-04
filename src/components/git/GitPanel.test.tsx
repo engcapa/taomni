@@ -4,6 +4,7 @@ import { useAppStore } from "../../stores/appStore";
 import { GitPanel } from "./GitPanel";
 import type { GitLogEntry, GitOperationState, GitSnapshot } from "../../lib/git";
 import { notifyGitRepoChanged, subscribeGitRepoRefresh } from "../../lib/gitRefresh";
+import * as clipboard from "../../lib/clipboard";
 
 const gitMocks = vi.hoisted(() => {
   const settings = {
@@ -112,6 +113,22 @@ describe("GitPanel", () => {
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it("provides file actions in single-repository Changes", async () => {
+    const initial = await gitMocks.gitSnapshot();
+    gitMocks.gitSnapshot.mockResolvedValueOnce({ ...initial, changes: [{
+      path: "src/renamed.ts", oldPath: "src/old.ts", status: "renamed",
+      staged: false, unstaged: true, conflict: false,
+    }] });
+    const writeText = vi.spyOn(clipboard, "writeText").mockResolvedValue();
+    render(<GitPanel repoRoot="/repo" />);
+    fireEvent.contextMenu(await screen.findByText("renamed.ts"));
+    expect(screen.getByTestId("git-file-reveal")).toBeInTheDocument();
+    expect(screen.getByTestId("git-file-open-terminal")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("git-file-copy-path"));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith("/repo/src/renamed.ts"));
   });
 
   it("delivers repo refresh events to subscribers", () => {

@@ -7733,6 +7733,7 @@ controls:
     kind: interactive
   - id: bottom-tab-git               # ED-PARITY-018 Git tool window tab
     selector: '[data-testid="code-workspace-bottom-tab-git"]'
+    aliases: ['[data-testid="code-workspace-bottom-tab-overflow-git"]']
     kind: interactive
     optional: true
   - id: bottom-tab-overflow
@@ -10476,7 +10477,7 @@ controls:
 - 搜索优先使用所有已加载 Java 编辑器的快照，包含非活动 dirty 缓冲，按所选范围过滤且不保存磁盘。无法读取、非 UTF-8、超过 2 MiB 或 parser 未完成时显示带路径的类型化错误，不能当作空结果；TC-IDE-PARITY-009-05/06 覆盖缓冲/范围/错误恢复与 native 零写入。
 - 原生后端为 tree-sitter-java AST 匹配（节点类型 + 叶子 token），排除注释、字符串与相似调用；无 regex 回退，不可用/无效模板/不支持的修饰符均为类型化状态。结果进入底部 “Structural Search” 工具窗：文件 → 类 → 方法 → 位置树，预览/打开并选中匹配范围；Esc/Cancel 取消并释放请求。Replace、Type/Reference/Script 修饰符与其他语言尚未实现。
 
-## 26. Git Diff Viewport
+## 26. Git file actions and Diff Viewport
 
 <!-- feature
 id: F26.1
@@ -10489,8 +10490,24 @@ files:
   - src/components/git/WorkspaceCommitLog.tsx
   - src/components/git/CompareView.tsx
   - src/components/git/shared/DiffPane.tsx
+  - src/components/git/shared/fileActions.ts
+  - src/components/git/shared/useGitFileContextMenu.tsx
+  - src/components/git/panel/menus.tsx
+  - src/components/git/workspace/changeMenu.ts
   - src/components/git/DiffViewer.tsx
 controls:
+  - id: git-file-copy-path
+    selector: '[data-testid="git-file-copy-path"]'
+    kind: interactive
+  - id: git-file-copy-relative-path
+    selector: '[data-testid="git-file-copy-relative-path"]'
+    kind: interactive
+  - id: git-file-reveal
+    selector: '[data-testid="git-file-reveal"]'
+    kind: interactive
+  - id: git-file-open-terminal
+    selector: '[data-testid="git-file-open-terminal"]'
+    kind: interactive
   - id: git-panel
     selector: '[data-testid="git-panel"]'
     kind: display
@@ -10499,6 +10516,9 @@ controls:
     kind: interactive
   - id: git-log-commit
     selector: '[data-testid="git-log-commit"]'
+    kind: interactive
+  - id: git-log-message-filter
+    selector: 'input[aria-label="Filter messages"]'
     kind: interactive
   - id: git-log-file
     selector: '[data-testid="git-log-file"]'
@@ -13217,6 +13237,8 @@ controls:
 -->
 
 工作区内置专用 Git 面板可通过主左栏 Git 按钮、左栏 Git 状态条、编辑器“在 Git 面板对比”与工作区 GIT 标签进入，保留 main 的 6 大子面板、Tree/Flat、Amend 与并排/统一 Diff。
+
+工作区左侧工具条只保留主 Git 入口，移除编辑器提供的下方重复 Git 按钮及其 overflow 项。Changes 文件列表与 Log 的提交变更文件列表均支持 Copy Path、Copy Relative Path、Reveal in Explorer 和 Open in Terminal；路径按文件所属仓库计算，终端在文件所在目录启动并保留 Git 标签。浏览器对打开系统文件管理器显示明确限制；原生模式调用现有系统打开接口。
 
 ### 12.5 工作区打开全局任意会话与会话选择器
 
