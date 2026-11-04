@@ -287,6 +287,26 @@ This is an evidence repair, **not a claimed fix** for the unclassified Windows
 startup failure. Hosted revalidation remains required and no implicit action
 retry, longer readiness timeout, weakened assertion or progress UI is introduced.
 
+Diagnostic rerun checkpoints (preserved, not accepted as native evidence):
+
+- [Run 41759389902](https://github.com/engcapa/taomni/actions/runs/41759389902)
+  used `native` only. The mandatory `crash-regression` selector includes two
+  browser-only cases, so the planner rejected the incomplete mode set before
+  product execution. The standalone six-worker job passed; no Windows case ran.
+- [Run 41760139052](https://github.com/engcapa/taomni/actions/runs/41760139052)
+  used `browser,native` at the same `8e2b775a1` head. Raw aggregation confirms
+  **Windows browser 13/13 passed** and no capability gaps/unreviewed cases.
+  Windows native **did not execute**: the required producer unit tests caught
+  a new test comparing a short temporary path (`RUNNER~1`) with the wrapper's
+  correctly resolved canonical path (`runneradmin`). The follow-up canonicalizes
+  the expected log path and adds a host-independent resolved-directory regression;
+  log append/content assertions, startup timeout and native case selection remain
+  unchanged. All six standalone workers passed again. Missing native results still
+  fail the aggregate and do not supersede the original startup failure.
+- Local offline startup/log/build/crash-selection units passed **26/26** after
+  the canonical-path expectation repair; the prior additional QA transport,
+  reset, planner and aggregate run passed **75/75**. No local product UI ran.
+
 Full hosted acceptance of the current candidate is still blocked by that Windows
 startup failure; the later planned product responsibilities below remain open.
 

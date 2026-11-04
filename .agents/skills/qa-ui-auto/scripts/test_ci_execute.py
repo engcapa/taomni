@@ -4,7 +4,7 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from ci_execute import _classify_runner_result, _prepare_runtime, _windows_driver_wrapper
 
@@ -18,8 +18,21 @@ class ExecuteRuntimeTests(unittest.TestCase):
             wrapper = _windows_driver_wrapper("C:/Edge Driver/msedgedriver.exe", root)
             script = wrapper.read_text(encoding="utf-8")
             self.assertIn('"C:/Edge Driver/msedgedriver.exe" --verbose --append-log ', script)
-            self.assertIn(f'"--log-path={previous}" %*', script)
+            self.assertIn(f'"--log-path={previous.resolve()}" %*', script)
             self.assertEqual(previous.read_text(encoding="utf-8"), "first failed session\n")
+
+    def test_windows_driver_uses_resolved_directory_not_temporary_short_spelling(self):
+        # Windows TemporaryDirectory may use RUNNER~1 while Path.resolve()
+        # expands it to runneradmin. Test the same canonical output contract
+        # on every host, without assuming those display strings are equal.
+        with tempfile.TemporaryDirectory(prefix="canonical driver report ") as directory:
+            canonical = Path(directory)
+            short_report = Mock()
+            short_report.resolve.return_value = canonical
+            wrapper = _windows_driver_wrapper("C:/Edge Driver/msedgedriver.exe", short_report)
+            self.assertEqual(wrapper, canonical / "webview-driver.cmd")
+            self.assertIn(f'"--log-path={canonical / "webview-driver.log"}" %*',
+                          wrapper.read_text(encoding="utf-8"))
 
     def test_display_services_use_the_started_desktop_until_their_cleanup_finishes(self):
         for profile in ("ubuntu-22.04-vnc", "ubuntu-26.04-wayland"):
