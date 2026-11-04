@@ -2,7 +2,8 @@ id: TC-WS-086
 title: Changes has one Tree/Flat action and status colors match Log
 description: Single and multi-repository tree/flat layouts, wide and compact toolbars. Staged Modified and Added files must have distinct colors and match
   Log foreground/background colors. Browser uses a controlled provider; native validates real Git status/commit data and packaged WebView styles as explicitly
-  requested. No OS shortcut-delivery claim.
+  requested. No OS shortcut-delivery claim. Collapse the Project sidebar through its resize handle to reach the wide toolbar in a 1024px native window;
+  no browser viewport or macOS window-chrome assumptions.
 modes:
 - browser
 - native
@@ -34,6 +35,9 @@ steps:
 - wait_for: '[data-testid="git-panel"]'
 - wait_for: '[data-testid="git-change-status"][data-change-status="added"]'
 - wait_for: '[data-testid="git-change-status"][data-change-status="modified"]'
+- press:
+    selector: '[data-testid="main-sidebar-resize-handle"]'
+    key: Home
 - press:
     selector: '[data-testid="git-changes-list-resize-handle"]'
     key: End
@@ -149,6 +153,9 @@ steps:
     expect_truthy: true
     timeout_sec: 5
 - press:
+    selector: '[data-testid="main-sidebar-resize-handle"]'
+    key: Home
+- press:
     selector: '[data-testid="git-changes-list-resize-handle"]'
     key: End
 - eval_readonly:
@@ -193,141 +200,143 @@ verification:
     requirement: Exactly one Tree/Flat action in wide/compact single and multi-repository Changes; switching preserves functional view state.
     actions:
     - 13
-    - 18
-    - 23
-    - 25
-    - 27
-    - 28
-    - 53
-    - 56
-    results:
     - 14
-    - 15
-    - 16
     - 19
-    - 21
     - 24
     - 26
+    - 28
     - 29
-    - 49
-    - 51
     - 54
     - 57
     - 58
+    results:
+    - 15
+    - 16
+    - 17
+    - 20
+    - 22
+    - 25
+    - 27
+    - 30
+    - 50
+    - 52
+    - 55
+    - 59
+    - 60
     checkpoints:
-    - step: 14
+    - step: 15
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-tree-mode]'').parentElement.clientWidth > 576", "expect_truthy": true,
         "timeout_sec": 5}}'
-    - step: 15
-      expectation: '{"assert_count": {"selector": "button[aria-label=\"Switch to flat list\"], button[aria-label=\"Switch to directory tree\"]", "equal":
-        1}}'
     - step: 16
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"git-changes-tree-toggle\"]", "name": "data-tree-mode", "equals": "tree"}}'
-    - step: 19
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"git-changes-tree-toggle\"]", "name": "data-tree-mode", "equals": "flat"}}'
-    - step: 21
       expectation: '{"assert_count": {"selector": "button[aria-label=\"Switch to flat list\"], button[aria-label=\"Switch to directory tree\"]", "equal":
         1}}'
-    - step: 24
+    - step: 17
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"git-changes-tree-toggle\"]", "name": "data-tree-mode", "equals": "tree"}}'
+    - step: 20
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"git-changes-tree-toggle\"]", "name": "data-tree-mode", "equals": "flat"}}'
+    - step: 22
+      expectation: '{"assert_count": {"selector": "button[aria-label=\"Switch to flat list\"], button[aria-label=\"Switch to directory tree\"]", "equal":
+        1}}'
+    - step: 25
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-tree-mode]'').parentElement.clientWidth < 560", "expect_truthy": true,
         "timeout_sec": 5}}'
-    - step: 26
+    - step: 27
       expectation: '{"assert_count": {"selector": "button[aria-label=\"Switch to flat list\"], button[aria-label=\"Switch to directory tree\"]", "equal":
         1}}'
-    - step: 29
+    - step: 30
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"git-changes-tree-toggle\"]", "name": "data-tree-mode", "equals": "tree"}}'
-    - step: 49
+    - step: 50
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"git-changes-tree-toggle\"]", "name": "data-tree-mode", "equals": "flat"}}'
-    - step: 51
+    - step: 52
       expectation: '{"assert_count": {"selector": "button[aria-label=\"Switch to flat list\"], button[aria-label=\"Switch to directory tree\"]", "equal":
         1}}'
-    - step: 54
+    - step: 55
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"git-changes-tree-toggle\"]", "name": "data-tree-mode", "equals": "tree"}}'
-    - step: 57
+    - step: 59
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-tree-mode]'').parentElement.clientWidth > 576", "expect_truthy": true,
         "timeout_sec": 5}}'
-    - step: 58
+    - step: 60
       expectation: '{"assert_count": {"selector": "button[aria-label=\"Switch to flat list\"], button[aria-label=\"Switch to directory tree\"]", "equal":
         1}}'
   - id: R2
     requirement: Staged Added and Modified use distinct type colors in both layouts; foreground and background match the same types in both Log implementations.
     actions:
-    - 18
-    - 28
-    - 31
-    - 33
-    - 53
-    - 60
+    - 19
+    - 29
+    - 32
+    - 34
+    - 54
     - 62
+    - 64
     results:
-    - 17
-    - 20
-    - 30
-    - 36
+    - 18
+    - 21
+    - 31
     - 37
     - 38
     - 39
-    - 50
-    - 55
-    - 65
-    - 66
+    - 40
+    - 51
+    - 56
     - 67
     - 68
     - 69
+    - 70
+    - 71
     checkpoints:
-    - step: 17
+    - step: 18
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"modified\"]'')).color
         !== getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"added\"]'')).color", "expect_truthy": true,
         "timeout_sec": 5}}'
-    - step: 20
+    - step: 21
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"modified\"]'')).color
         !== getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"added\"]'')).color", "expect_truthy": true,
         "timeout_sec": 5}}'
-    - step: 30
+    - step: 31
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"modified\"]'')).color
         !== getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"added\"]'')).color", "expect_truthy": true,
         "timeout_sec": 5}}'
-    - step: 36
+    - step: 37
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"modified\"]'')).color
         === getComputedStyle(document.querySelector(''.git-log-view [data-change-status'' + String.fromCharCode(61) + ''\"modified\"]'')).color", "expect_truthy":
         true, "timeout_sec": 5}}'
-    - step: 37
+    - step: 38
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"modified\"]'')).backgroundColor
         === getComputedStyle(document.querySelector(''.git-log-view [data-change-status'' + String.fromCharCode(61) + ''\"modified\"]'')).backgroundColor",
         "expect_truthy": true, "timeout_sec": 5}}'
-    - step: 38
+    - step: 39
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"added\"]'')).color
         === getComputedStyle(document.querySelector(''.git-log-view [data-change-status'' + String.fromCharCode(61) + ''\"added\"]'')).color", "expect_truthy":
         true, "timeout_sec": 5}}'
-    - step: 39
+    - step: 40
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"added\"]'')).backgroundColor
         === getComputedStyle(document.querySelector(''.git-log-view [data-change-status'' + String.fromCharCode(61) + ''\"added\"]'')).backgroundColor",
         "expect_truthy": true, "timeout_sec": 5}}'
-    - step: 50
+    - step: 51
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"modified\"]'')).color
         !== getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"added\"]'')).color", "expect_truthy": true,
         "timeout_sec": 5}}'
-    - step: 55
+    - step: 56
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"modified\"]'')).color
         !== getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"added\"]'')).color", "expect_truthy": true,
         "timeout_sec": 5}}'
-    - step: 65
+    - step: 67
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"modified\"]'')).color
         === getComputedStyle(document.querySelector(''.git-log-view [data-change-status'' + String.fromCharCode(61) + ''\"modified\"]'')).color", "expect_truthy":
-        true, "timeout_sec": 5}}'
-    - step: 66
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"modified\"]'')).backgroundColor
-        === getComputedStyle(document.querySelector(''.git-log-view [data-change-status'' + String.fromCharCode(61) + ''\"modified\"]'')).backgroundColor",
-        "expect_truthy": true, "timeout_sec": 5}}'
-    - step: 67
-      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"added\"]'')).color
-        === getComputedStyle(document.querySelector(''.git-log-view [data-change-status'' + String.fromCharCode(61) + ''\"added\"]'')).color", "expect_truthy":
         true, "timeout_sec": 5}}'
     - step: 68
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"modified\"]'')).backgroundColor
+        === getComputedStyle(document.querySelector(''.git-log-view [data-change-status'' + String.fromCharCode(61) + ''\"modified\"]'')).backgroundColor",
+        "expect_truthy": true, "timeout_sec": 5}}'
+    - step: 69
+      expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"added\"]'')).color
+        === getComputedStyle(document.querySelector(''.git-log-view [data-change-status'' + String.fromCharCode(61) + ''\"added\"]'')).color", "expect_truthy":
+        true, "timeout_sec": 5}}'
+    - step: 70
       expectation: '{"eval_readonly": {"expression": "getComputedStyle(document.querySelector(''[data-change-status'' + String.fromCharCode(61) + ''\"added\"]'')).backgroundColor
         === getComputedStyle(document.querySelector(''.git-log-view [data-change-status'' + String.fromCharCode(61) + ''\"added\"]'')).backgroundColor",
         "expect_truthy": true, "timeout_sec": 5}}'
-    - step: 69
+    - step: 71
       expectation: '{"assert_no_runtime_errors": null}'
   visual:
   - check: Type colors and a single toggle across tree/flat/wide/compact layouts
