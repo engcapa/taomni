@@ -148,7 +148,7 @@ verification:
   native:
   - check: Production stream collector and independent prefix/final file evidence
     method: automated
-    reason: 'Native-only real API requests use fixture-tail-partial: complete contract item_end without trailing LF followed
+    reason: 'Native-only real API requests use fixture-tail-partial: complete second non-tests item_end without trailing LF followed
       by max_tokens/message_stop, no group_end/pack_end. A read-only request-arrival oracle synchronously records two
       original candidate IDs, SQLite/run/disk hashes and main-failed/recovery-sent ledger before responding. Teardown
       requires missing-tests-only recovery, unchanged prefix IDs/hashes, three final files, exactly two Messages requests
