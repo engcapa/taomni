@@ -222,8 +222,22 @@ Additional verified receipts and reliability repairs:
   access or proof of Codex's independent network-deny mode. Real execution is
   pending run `41746495508`.
 
-Full hosted acceptance of the latest candidate, new tail/process lifecycle evidence
-and all-six native scheduling are not complete at this checkpoint.
+- In [run 41745445797](https://github.com/engcapa/taomni/actions/runs/41745445797)
+  (`35580796337fe21c7da498d72fa18782b33b6c4c`), required Linux native Rust
+  contracts passed **131 unit/contract tests**, then explicitly executed and passed
+  **both real process-lifecycle tests**. Actual stdio-closed descendants stopped
+  after leader exit and explicit cancellation; the production group verifier was
+  exercised, not a mocked child status. This does not prove group escape containment
+  or replace the app-level six-worker and UI cancellation scenarios.
+- `f21c2e206` removed the redundant nested loopback setup failure but exposed
+  Codex bwrap `uid_map` EACCES on the Ubuntu 24 restricted-userns host. The next
+  supporting canary uses the supported Ubuntu **22.04** baseline and native run
+  `41747699420` explicitly requests **ubuntu-22.04-x11**. No global AppArmor/sysctl
+  policy is changed and no filesystem sandbox is disabled. Evidence remains tied
+  to its actual runner/profile, not relabeled as Ubuntu 24 compatibility.
+
+Full hosted acceptance of the latest candidate, new tail UI evidence and all-six
+native scheduling are not complete at this checkpoint.
 
 ## Remaining work — not waived by phase 1
 
