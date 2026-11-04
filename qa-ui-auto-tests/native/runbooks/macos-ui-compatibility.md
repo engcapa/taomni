@@ -28,6 +28,21 @@ observations. Capture the entire OS window/menu bar when testing chrome; a
 WebDriver screenshot contains only the WebView. Review the pixels for clipping,
 readability and actual traffic-light overlap; retaining a PNG alone is no verdict.
 
+## Known Baseline Gaps
+
+- `close-active` in `src/lib/nativeAppMenu.ts` declares no Cmd+W accelerator.
+  MAC-OS-02 must check physical delivery independently; a passing menu action
+  does not resolve this gap.
+- Home's local-terminal and New Session cards hardcode `Ctrl+Shift+T` and
+  `Ctrl+Shift+N` in `WelcomePanel.tsx` and `welcome/PlatformLaunchCards.tsx`.
+  The shell handler in `useMainMenuBridge.ts` accepts either Control or Command.
+  The incorrect Mac labels are visible in `TC-MAC-002/macos-chrome-home-dark.png`
+  from [the macOS native run](https://github.com/engcapa/taomni/actions/runs/41779377402/artifacts/13299063626).
+  Require labels to name the intended macOS chord and match its actual owner;
+  preserve the workspace Reopen/Go to File routing when correcting them.
+  The current automated cases do not assert these Home badges or physical
+  delivery, so their passing results do not close this compatibility gap.
+
 ## MAC-OS-01 — System Menu Tracking And Ownership
 
 1. From Home, click the real macOS menu bar. Check the application menu,
@@ -72,7 +87,10 @@ menu chord and use the same chord from the applicable focused surface.
 4. Cmd+F opens Find in the focused editor/terminal, not another pane. Escape
    dismisses it and returns typing to that same surface. Exercise the affected
    app-specific Cmd shortcut once and across key repeat/up; a toggle must not
-   dispatch through both AppKit and a WebView listener.
+   dispatch through both AppKit and a WebView listener. Compare Home's local
+   terminal/New Session badges, menu entries and actual delivered chords too;
+   require Command labels for their intended Mac bindings and keep workspace
+   Reopen/Go to File ownership intact.
 5. Cmd+H hides only the QA app, Cmd+Option+H hides others only on the dedicated
    desktop, and Cmd+M minimizes the intended window. Restore through Dock/Window
    menu. Existing content, focus and menu actions remain usable.

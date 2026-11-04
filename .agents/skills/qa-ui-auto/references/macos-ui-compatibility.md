@@ -117,6 +117,12 @@ the concrete source/runtime gap and remaining action. Do not mark it N/A,
 silently substitute a different chord or broaden this testing task into product
 changes. For example, `close-active` currently has no accelerator in
 `nativeAppMenu.ts`; the existing menu case does not establish Cmd+W support.
+Home also hardcodes `Ctrl+Shift+T/N` badges in `WelcomePanel.tsx` and
+`welcome/PlatformLaunchCards.tsx`. Its shell handler accepts Control or Command,
+so the displayed Mac chord needs its own check; sidebar Cmd+B coverage does not
+establish Home label consistency. Keep these
+[baseline gaps](../../../../qa-ui-auto-tests/native/runbooks/macos-ui-compatibility.md#known-baseline-gaps)
+separate from passing menu-routing and geometry assertions.
 
 ## Selection And Evidence
 
