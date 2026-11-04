@@ -91,7 +91,7 @@ activation is still sent exactly once and all original frame budgets apply.
 | `native_ime_keys` | `{selector, expected_engine, keys}` | Native Linux/X11 only. Injects physical XTest keys through the named configured fcitx5 engine and records an observation artifact; testcase assertions must verify the committed result. |
 | `native_editor_performance` | `{selector, keys, max_p95_ms, capture_text?, label?}` | Native packaged app only. Injects at least five ASCII keys through W3C WebDriver actions and records keydown-to-CodeMirror-DOM-mutation latency. `keys` accepts a single-char array or a plain string typed character-by-character. `capture_text` (default true) also records per-key rendered text; set it false for multi-megabyte documents so the O(N) textContent probe does not inflate the measured latency. `label` names the per-invocation artifact `native-editor-performance-<label>.json` so repeated measurement groups accumulate instead of overwriting. The artifact also records the next animation frame as a diagnostic, but does not gate on it because a frame requested from CodeMirror's mutation observer is one frame later than the paint containing that mutation. Fails when p95 exceeds the supplied guardrail. |
 | `blur` | selector | Removes focus from a control by calling `HTMLElement.blur()`, dispatching the real blur/focusout events. Use it to commit a blur-committed field (clamped number inputs, rename/name fields) because a synthesized Tab does not move focus on the macOS in-process bridge (and WebKit keeps focus when a non-focusable preview is clicked). Assert the committed value afterwards. |
-| `press` | key string **or** `{key, selector?}` | E.g. `Enter`, `Control+Shift+F`. `Mod+X` maps to `Meta+X` on macOS (where CodeMirror maps Mod to Cmd) and `Control+X` elsewhere, so one chord drives the platform-native editing primitive on all three OSes. Keep exact `Control+…` for bindings the product matches literally (e.g. `Control+Shift+N`). A selector focuses without clicking/activating in either mode. Native uses DOM focus then W3C key actions, not physical OS focus evidence. For activation, add a separate `click`. |
+| `press` | key string **or** `{key, macos_key?, selector?}` | E.g. `Enter`, `Control+Shift+F`. `Mod+X` maps to `Meta+X` on macOS and `Control+X` elsewhere for intentional Cmd/Ctrl equivalents. `macos_key` overrides `key` on the Mac host; explicit `Meta` is Command, `Alt` is Option, and `Control` remains Control (including terminal signals). Match current platform keymaps and macOS conventions; see [shortcut contract](macos-ui-compatibility.md#shortcut-test-contract). A selector sets DOM focus without clicking/activating. Native uses WebView key actions (macOS: synthetic events), not physical OS shortcut evidence. Use a separate action and postcondition for menu accelerators, OS Edit and focus traversal. |
 | `select_option` | `{selector, label?, value?}` | At least one of label/value. |
 | `upload_file` | `{selector, path}` | Hooks into a file input. |
 
@@ -175,6 +175,17 @@ real JDT LS, Rust IPC or disk effects.
 | `parity005_release` | `fetch \| resolve` | Releases held responses; fails if none is pending. |
 | `parity005_trace` | `{fetch?, resolve?, pending?}` | Asserts exact request counts and saves the read-only event trace in the case report. |
 
+## macOS application menus
+
+Native macOS QA bridge only; no updater fixture is required. These verbs operate
+installed AppKit objects; actual menu-bar tracking, physical shortcuts and native
+Edit/window actions need the [macOS OS checks](macos-ui-compatibility.md).
+
+| Verb | Arguments | Behavior |
+|---|---|---|
+| `native_about` | `null` | macOS QA bridge activates the installed AppKit NSMenu About item; requires enabled real menu and runs its native event/frontend callback. Does not synthesize app state or a command. |
+| `native_menu` | `{path: [zero-based indices] \| action: id, enabled?, checked?, activate?}` | macOS QA only. An action id locates its path in the current installed menu specification; the actual flags and activation always use AppKit NSMenu. Saves every native observation. Requires enabled or checked; activation additionally requires enabled=true and an actual enabled leaf. Sends one native activation, with no retry of uncertain delivery. Does not enumerate Tauri resource wrappers or synthesize renderer state. |
+
 ## macOS updater release regression
 
 Native macOS only, with `macos_updater`. Downloads SHA256-pinned, authentically signed
@@ -183,8 +194,6 @@ loopback HTTP to the real updater. Only the disposable report-owned app is repla
 
 | Verb | Arguments | Behavior |
 |---|---|---|
-| `native_about` | `null` | macOS QA bridge activates the installed AppKit NSMenu About item; requires enabled real menu and runs its native event/frontend callback. Does not synthesize app state or a command. |
-| `native_menu` | `{path: [zero-based indices] \| action: id, enabled?, checked?, activate?}` | macOS QA only. An action id locates its path in the current installed menu specification; the actual flags and activation always use AppKit NSMenu. Saves every native observation. Requires enabled or checked; activation additionally requires enabled=true and an actual enabled leaf. Sends one native activation, with no retry of uncertain delivery. Does not enumerate Tauri resource wrappers or synthesize renderer state. |
 | `updater_fixture_mode` | `broken \| correct \| slow` | Switches the fixture manifest, not application state. `broken` pairs ARM signature with Intel URL; `correct` retains generated per-arch URLs; `slow` holds first/second streams at 20%/60%. |
 | `updater_release` | `1 \| 2` | Releases one held real HTTP download; does not synthesize IPC progress. |
 | `assert_updater_installed` | `aarch64 \| x86_64` | Independently reads installed executable SHA256, `lipo` architecture and Info.plist version against the authentic archive; retains installed-*.json. |

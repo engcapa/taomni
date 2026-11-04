@@ -156,16 +156,20 @@ controls:
 id: F1.3
 status: done
 area: main/window
-components: [AppTitleBar, WindowControls, WindowResizeHandles, TitleBarTrayControls]
+components: [MainLayoutView, WindowControls, WindowResizeHandles, TitleBarTrayControls]
 files:
+  - src/layouts/main/MainLayoutView.tsx
+  - src/styles/platform.css
   - src/components/tabbar/ControlBar.tsx
   - src/components/window/WindowDragHandle.tsx
   - src/components/window/WindowResizeHandles.tsx
   - src/lib/windowDrag.ts
-  - src/components/window/AppTitleBar.tsx
   - src/components/window/WindowControls.tsx
   - src/components/window/TitleBarTrayControls.tsx
 controls:
+  - id: native-titlebar
+    selector: '.taomni-native-titlebar'
+    kind: display    # macOS desktop overlay clearance; TC-MAC-002 reaches this runtime
   - id: titlebar
     selector: '[data-testid="app-titlebar"]'
     kind: display
@@ -217,11 +221,13 @@ controls:
     kind: display    # clicking would close the window and abort the test
 -->
 
-- 取消原生 decorations，前端自绘 `AppTitleBar` + `WindowControls`（最小化 / 最大化 / 关闭）
-- 标题栏左侧固定 `WindowDragHandle`（48px）作为可识别的窗口移动锚点；Tab 数量不会挤掉该区域
+- Windows/Linux 使用无 decorations 的窗口与前端 `WindowControls`（最小化 / 最大化 / 关闭）；macOS 桌面启用原生 decorations、Overlay 标题栏和三色窗口按钮，隐藏前端窗口按钮与缩放边缘。macOS 浏览器预览同样不显示这些前端窗口按钮。
+- macOS 桌面在 workbench 外单独预留 28 CSS px 顶部区域，避免原生按钮与导航条/工具栏重叠；浏览器预览没有该区域。`TC-MAC-002` 验证实际 WKWebView 中的预留、模式/侧栏切换和主题；`TC-WS-083` 保留 Home 卡片/工具栏回归。
+- 标题栏内固定 `WindowDragHandle` 作为窗口移动锚点；当前主窗口样式宽 14px，Tab 数量不会挤掉该区域。
 - 标题栏操作区 `PlatformToolbarActions` 按 Home / Sessions / Workspaces / Tools 排列导航、布局、搜索、大预览和更多操作；语音 (PTT) 保留在 `More window actions`，主题与语言入口移至主导航条。
-- `WindowResizeHandles` 在无 decorations 模式下提供 8 向窗口缩放（North/South/East/West/四个角）
+- `WindowResizeHandles` 在 Windows/Linux 无 decorations 模式下提供 8 向窗口缩放（North/South/East/West/四个角）；macOS 通过系统窗口边缘操作。
 - 主菜单 / Sessions / View / Tunneling / Settings / Help / Exit 入口接入
+- `TC-100` 保留 Windows/Linux 标题栏检查。macOS 的三色按钮、真实拖动、缩放/全屏与显示比例兼容性见 [原生检查步骤](native/runbooks/macos-ui-compatibility.md) 的 MAC-OS-04/05/06；DOM 通过不代表窗口管理器行为已验证。
 
 ### 1.4 紧凑 UI 模式（Compact mode）❌ 已移除
 
@@ -688,7 +694,8 @@ controls:
     optional: true
 -->
 
-- 原 per-menu `MenuBar`（menu-bar/menu-terminal/menu-view…）已从产品移除；统一入口是标题栏的 `app-main-menu` 按钮，经共享 ContextMenu 渲染一级/二级菜单。
+- 原 per-menu `MenuBar`（menu-bar/menu-terminal/menu-view…）已从产品移除。Windows/Linux 与浏览器预览通过 `app-main-menu` 按钮和共享 ContextMenu 展开菜单；macOS 桌面隐藏该按钮，使用 AppKit 系统菜单，复用系统 Edit/Services/Hide/Window 能力。
+- `TC-MAC-001` 验证真实 AppKit 全局命令、取消/重开、Settings 单标签复用和关闭；`TC-WS-080` 保留 enabled/checked、保存与重载后的回调生命周期。`TC-MAC-003` 验证 Mac 浏览器菜单、Command/Control 区别、输入框所有权及 Cmd+A/Z/Shift+Z。实际系统菜单点击、加速键、剪贴板、IME 和窗口行为按 [macOS 原生检查步骤](native/runbooks/macos-ui-compatibility.md) 单独记录结果。
 - 菜单项 testid 两种来源：显式 `testId`（如 context-menu-item-new-local-terminal）或按 label 生成的 slug（`context-menu-item-<slug>`）。用例对无显式 testid 的条目使用 `[data-testid="context-menu"] >> text="…"` 派生选择器。
 
 - 顶级菜单：Terminal / Sessions / View / X server / Tools / Settings / Macros / Help

@@ -1,0 +1,171 @@
+id: TC-MAC-001
+title: macOS AppKit menu opens global commands and keeps their current owners
+description: >-
+  Exercise installed AppKit actions from Home and Sessions, cancel and reopen
+  New Session, toggle the sidebar, reuse Settings and close its current tab.
+  Complements TC-WS-080 state/save lifetime coverage. Requires real NSMenu;
+  global menu-bar clicking and physical accelerators remain separate OS checks.
+covers:
+- F1.2
+- F1.5
+- F1.6
+- F1.8
+- F6.2
+- F6.3
+- F11.1
+- F-WS-1
+tags:
+- p1
+- macos
+- native-menu
+- regression
+modes:
+- native
+native_platforms:
+- macOS
+fixtures:
+- reset_db
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-mac-menu
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_count:
+    selector: '[data-testid="app-main-menu"]'
+    equal: 0
+- native_menu:
+    action: help
+    enabled: true
+    activate: true
+- wait_for: '[data-testid="about-dialog"]'
+- assert_count:
+    selector: '[data-testid="about-dialog"]'
+    equal: 1
+- press: Escape
+- assert_not_visible: '[data-testid="about-dialog"]'
+- native_menu:
+    action: new-session
+    enabled: true
+    activate: true
+- wait_for: '[data-testid="session-editor"]'
+- assert_count:
+    selector: '[data-testid="session-editor"]'
+    equal: 1
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-mac-menu-cancel
+- click: '[data-testid="session-cancel"]'
+- assert_not_visible: '[data-testid="session-editor"]'
+- native_menu:
+    action: new-session
+    enabled: true
+    activate: true
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-cancel"]'
+- assert_not_visible: '[data-testid="session-editor"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- native_menu:
+    action: view
+    enabled: true
+    activate: true
+- wait_for: '[data-testid="collapsed-sidebar-rail"]'
+- native_menu:
+    action: view
+    enabled: true
+    activate: true
+- wait_for: '[data-testid="session-tree"]'
+- native_menu:
+    action: settings
+    enabled: true
+    activate: true
+- wait_for: '[data-testid="settings-panel"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="settings"]'
+    equal: 1
+- native_menu:
+    action: settings
+    enabled: true
+    activate: true
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="settings"]'
+    equal: 1
+- native_menu:
+    action: close-active
+    enabled: true
+    activate: true
+- assert_not_visible: '[data-testid="settings-panel"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="settings"]'
+    equal: 0
+- native_menu:
+    action: close-active
+    enabled: false
+- native_about: null
+- wait_for: '[data-testid="about-dialog"]'
+- press: Escape
+- assert_not_visible: '[data-testid="about-dialog"]'
+- assert_no_runtime_errors: null
+- screenshot: macos-native-menu-routing.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Native Home has no renderer application menu; AppKit About and New Session open usable dialogs that cancel and reopen.
+    actions: [1, 2, 3, 6, 9, 11, 14, 15, 16, 18, 20]
+    checkpoints:
+    - step: 5
+      expectation: Renderer application-menu count is zero in the native Mac runtime.
+    - step: 8
+      expectation: The real AppKit Help command opens one About dialog.
+    - step: 10
+      expectation: Escape dismisses About.
+    - step: 13
+      expectation: The native New Session action opens one editor.
+    - step: 17
+      expectation: Cancel removes the edited session dialog.
+    - step: 19
+      expectation: New Session remains callable after cancellation.
+    - step: 21
+      expectation: The reopened dialog also cancels cleanly.
+    results: [5, 8, 10, 13, 17, 19, 21]
+  - id: R2
+    requirement: AppKit View toggles once per activation; Settings reuses one tab and closing it releases the current menu owner without breaking About.
+    actions: [22, 24, 26, 28, 31, 33, 37, 39]
+    checkpoints:
+    - step: 23
+      expectation: Sessions starts with its real tree visible.
+    - step: 25
+      expectation: One View action collapses the sidebar.
+    - step: 27
+      expectation: A second View action restores the Sessions tree.
+    - step: 30
+      expectation: Settings creates one Settings tab.
+    - step: 32
+      expectation: Invoking Settings again reuses that tab.
+    - step: 34
+      expectation: Close removes Settings content.
+    - step: 35
+      expectation: The Settings tab is removed from the strip too.
+    - step: 36
+      expectation: Close becomes disabled with no closable active tab.
+    - step: 38
+      expectation: About still opens through AppKit after menu ownership changes.
+    - step: 40
+      expectation: About remains dismissible.
+    - step: 41
+      expectation: No uncaught runtime or React-root errors occurred.
+    results: [25, 27, 30, 32, 34, 35, 36, 38, 40, 41]
+  visual:
+  - check: System menu tracking, typography and native frame.
+    method: manual
+    reason: MAC-OS-01/06 in native/runbooks/macos-ui-compatibility.md require OS captures; the WebView PNG omits system menus and traffic lights.
+  native:
+  - check: Installed AppKit menu flags and action callbacks.
+    method: automated
+    reason: native_menu/native_about use actual NSMenu, with visible dialog, sidebar and tab postconditions; no store dispatch substitutes for the action.
+  - check: Actual menu-bar clicking, physical shortcuts and native Edit responders.
+    method: manual
+    reason: MAC-OS-01/02/03 require real OS input. AppKit programmatic activation does not prove menu tracking or accelerator delivery.
