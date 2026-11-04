@@ -192,6 +192,14 @@ Ubuntu 24.04, and Windows/macOS are unaffected.
 | `ubuntu-22.04-vnc` | Ubuntu 22.04 / X11 Xtigervnc | LXQt + Openbox + xcompmgr | The app runs inside a real VNC-served desktop with transparent-window compositing |
 | `ubuntu-26.04-wayland` | Ubuntu 26.04 LTS / native Wayland | Ubuntu GNOME Shell/Mutter, virtual 1920×1080 monitor, software rendering | Current LTS Wayland startup, WebKitGTK and app workflows |
 
+The minimal Ubuntu 24.04 Openbox desktop also starts a real, job-owned PCManFM-Qt
+file-manager daemon and verifies its D-Bus process owner before running cases.
+A private `inode/directory` association survives each app's isolated XDG config;
+HTTP(S) associations and personal settings are unchanged. This lets Git/SFTP
+“open containing folder” actions reach a real file-manager window instead of
+waiting indefinitely for a cold GUI process. The desktop owns daemon cleanup
+and restores its XDG fallback. LXQt/GNOME retain their existing file managers.
+
 Versioned runner labels fix the Ubuntu release family, not an immutable image:
 GitHub updates runner images and apt packages. Reports retain `VERSION_ID`,
 `PRETTY_NAME`, runner image version and desktop readiness. Upgrading the latest

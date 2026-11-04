@@ -97,4 +97,11 @@ GitHub strict 汇总通过；下载原始报告后独立重新聚合也通过，
 
 本地复现后确认终端 mounted harness 未 mock 新增的 `ssh-auth-resolved-*` Tauri 订阅；补齐后还暴露出三处旧调用断言未包含新增的可选 mobile request 参数。修正仅涉及测试：补充事件 mock、精确参数断言，并验证订阅顺序、失败传播、清理、匹配请求才关闭 MFA，以及首次连接传入 mobile request 而重连不复用。终端测试为 92 通过 / 1 原有条件跳过，类型与重构检查通过。产品行为、YAML 用例与 runner 均未修改，因此不新增 UI case；保留 TC-MOBILE-007 与 TC-139/143/150 保护实际认证和重连边界，并要求同组 116 次 hosted browser/native 全部重跑。
 
-首轮失败日志、本地复现与后续证据保留在 `qa-ui-auto-report/main-merge-20261104/`。后续 hosted 结果未确认前，本节不宣称 main 同步后的完整验收通过。
+首轮失败日志、本地复现与后续证据保留在 `qa-ui-auto-report/main-merge-20261104/`。修复提交 `3251e7c6c4d0a5618ad73eecbd21690def62902e` 后，本地完整前端为 688 文件 / 6298 通过 / 1 原有条件跳过。
+
+[第二轮 41817765658](https://github.com/engcapa/taomni/actions/runs/41817765658) 的构建、Rust 合约、receipt 与源码身份检查全部通过，实际 114/116 通过、0 跳过；Linux native 的 TC-WS-085 和 TC-MOBILE-008 失败，不能计为完整验收。其余五组及完整 crash-regression 均通过，原报告保留。
+
+- TC-WS-085 在第 25 步 Reveal in Explorer 阻塞。main 的既有成功证据使用含文件管理器服务的 Ubuntu 22.04 LXQt，默认 24.04 只有 Openbox。独立 Xvfb/D-Bus 探针复现冷启动文件管理器使 xdg-open 等待；启动真实 PCManFM-Qt daemon 并配置目录关联后，xdg-open 返回且观察到实际目录窗口。CI 现为默认 Openbox 预置真实服务、核验 D-Bus PID 与隔离应用的 inode/directory 关联，只改任务自有配置并恢复环境，不替换产品 IPC 或把失败当成功。
+- TC-MOBILE-008 的 revoke 场景已交付设备删除点击，随后清理循环查询可撤销设备数时 WebKit 返回 stale node handle；最终 DOM 已无设备，stop 场景尚未执行。原生元素计数现提取为只读查询模块，最多三次重新查询明确 stale 的响应，受用例 deadline 约束；其他错误仍失败，不重放点击、HTTP 请求或整段场景。
+
+工具修复包含 107 项桌面/查询/输入/传输合约及实际文件管理器探针；保持 YAML 与产品行为不变，继续用同组 116 次三平台 browser/native 和 QA release 验收。后续 hosted 结果未确认前，本节不宣称 main 同步后的完整验收通过。

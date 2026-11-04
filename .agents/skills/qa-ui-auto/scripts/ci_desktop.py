@@ -389,6 +389,9 @@ EndSection
                                             "XDG_CURRENT_DESKTOP": "LXQt"})
         else:
             self.start(["openbox", "--sm-disable"])
+            from ci_file_manager import prepare_file_manager
+            facts["file_manager"] = prepare_file_manager(
+                self.root / "file-manager", self.start, self._wait)
         for _ in range(40):
             wm = subprocess.check_output(["xprop", "-root", "_NET_SUPPORTING_WM_CHECK"], text=True)
             if "window id" in wm:
@@ -603,7 +606,7 @@ EndSection
             for key in ("DISPLAY", "WAYLAND_DISPLAY", "XAUTHORITY", "XDG_RUNTIME_DIR", "PULSE_SERVER", "XDG_SESSION_TYPE",
                         "XDG_CURRENT_DESKTOP", "GDK_BACKEND", "LIBGL_ALWAYS_SOFTWARE",
                         "WEBKIT_DISABLE_DMABUF_RENDERER", "GTK_IM_MODULE", "QT_IM_MODULE", "XMODIFIERS",
-                        "QA_MULTI_DISPLAY_FIXTURE"):
+                        "QA_MULTI_DISPLAY_FIXTURE", "XDG_CONFIG_DIRS"):
                 if key in self.environment_before:
                     os.environ[key] = self.environment_before[key]
                 else:

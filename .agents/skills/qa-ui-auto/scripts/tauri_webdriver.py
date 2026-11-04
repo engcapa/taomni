@@ -25,6 +25,7 @@ from typing import Any
 from native_build import QA_APP_ID, verify_identity
 from native_webdriver_transport import WebDriverError, WebDriverTransport
 from native_console import CONSOLE_HOOK_SCRIPT
+from native_element_query import count_elements
 from native_pointer import MOUSE_SOURCE, prepare_click_target
 from native_paced_input import type_paced_text
 from native_window_focus import NativeWindowFocus
@@ -523,12 +524,7 @@ class NativeSession(WebDriverTransport):
         return f"clicked {selector}"
 
     def count(self, selector: str) -> int:
-        using, value = selector_strategy(selector)
-        elements = self.request("POST", self.endpoint("/elements"),
-                                {"using": using, "value": value})
-        if not isinstance(elements, list):
-            raise WebDriverError(f"invalid element list for {selector}: {elements!r}")
-        return len(elements)
+        return count_elements(self, selector, selector_strategy(selector))
 
     def right_click(self, selector: str) -> str:
         return self.pointer_button_click(selector, 2)
