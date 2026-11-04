@@ -104,4 +104,19 @@ GitHub strict 汇总通过；下载原始报告后独立重新聚合也通过，
 - TC-WS-085 在第 25 步 Reveal in Explorer 阻塞。main 的既有成功证据使用含文件管理器服务的 Ubuntu 22.04 LXQt，默认 24.04 只有 Openbox。独立 Xvfb/D-Bus 探针复现冷启动文件管理器使 xdg-open 等待；启动真实 PCManFM-Qt daemon 并配置目录关联后，xdg-open 返回且观察到实际目录窗口。CI 现为默认 Openbox 预置真实服务、核验 D-Bus PID 与隔离应用的 inode/directory 关联，只改任务自有配置并恢复环境，不替换产品 IPC 或把失败当成功。
 - TC-MOBILE-008 的 revoke 场景已交付设备删除点击，随后清理循环查询可撤销设备数时 WebKit 返回 stale node handle；最终 DOM 已无设备，stop 场景尚未执行。原生元素计数现提取为只读查询模块，最多三次重新查询明确 stale 的响应，受用例 deadline 约束；其他错误仍失败，不重放点击、HTTP 请求或整段场景。
 
-工具修复包含 107 项桌面/查询/输入/传输合约及实际文件管理器探针；保持 YAML 与产品行为不变，继续用同组 116 次三平台 browser/native 和 QA release 验收。后续 hosted 结果未确认前，本节不宣称 main 同步后的完整验收通过。
+工具修复包含 107 项桌面/查询/输入/传输合约及实际文件管理器探针；与 Linux producer 相同的本地契约集合为 148 通过 / 1 既有平台条件跳过，静态 audit 与重构边界检查通过。保持 YAML 与产品行为不变，使用同组 116 次三平台 browser/native 和 QA release 验收。
+
+### main 同步后的最终验收
+
+最终测试提交为 `d26a48de1bcc124efbae31bbdb1f747bcdf2e01a`。[GitHub 运行 41829423732](https://github.com/engcapa/taomni/actions/runs/41829423732) 与下载原始报告后的独立重新聚合均成功：**116/116 通过，0 失败、0 跳过**。精确选例、分片、原始 receipt、源码/case/runner 及三个平台 QA release 二进制身份一致，无缺失、重复、能力缺口或未审核用例。
+
+| 平台 | Browser | Native QA release |
+| --- | --- | --- |
+| Linux | 19/19 | 21/21 |
+| Windows | 19/19 | 17/17 |
+| macOS | 20/20 | 20/20 |
+| 合计 | 58/58 | 58/58 |
+
+全部 crash-regression 的适用 browser/native 执行通过；三平台构建、托管完整前端单元测试、原生 Rust 合约及 strict 汇总成功。Linux TC-WS-085 的全部 69 步通过，Reveal in Explorer 的点击 1.11 秒返回，桌面保留真实文件管理器 PID/就绪证据。TC-MOBILE-008 全部 12 步通过，三个实际 probe 的 cancel/revoke/stop 均验证进程终止、无迟到 PTY 或 broker 注册，receipt 完整且 passed=true。
+
+源码身份为 `4f742d38224898e15a6add094894939e773e82cbb4cd9dc8fbf07c012e6be6f6`，runner 身份为 `f9c35f2ad75ec20aeb6b08a7b299971431459cf0a8a4704a67016e0fd6868551`。最终原始报告保留在 `qa-ui-auto-report/main-merge-20261104/hosted-evidence-sya14re0/`，独立结果为该目录的 `local-verified-ci-summary.json` 和 `verification-result.json`。前两轮原始失败仍保留，不改写、不计为通过；本节验收记录提交仅更新文档，不改变被测产品、用例或 runner 身份。实体 Android/iOS 输入法、触摸及 OS-global 菜单/快捷键等原有未验证边界不因本次合并测试而扩大覆盖声明。
