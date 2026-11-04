@@ -1,10 +1,12 @@
 import { type GitLogEntry,type GitResetMode } from "../../../lib/git";
 import { type MenuItem } from "../../ContextMenu";
+import { gitFileMenuItems } from "../shared/fileActions";
 
 
 export function changeMenuItems(opts: {
   repoRoot: string;
   opPaths: string[];
+  contextPath: string;
   conflicted: boolean;
   onStage: () => void;
   onUnstage: () => void;
@@ -16,10 +18,6 @@ export function changeMenuItems(opts: {
   onMarkResolved: () => void;
 }): MenuItem[] {
   const { repoRoot,opPaths,conflicted,onStage,onUnstage,onDiscard,onShowDiff }=opts;
-  const sep=repoRoot.includes("\\")? "\\":"/";
-  const copy=(text: string) => {
-    void navigator.clipboard?.writeText(text).catch(() => { });
-  };
   const disabled=opPaths.length===0;
   const items: MenuItem[]=[
     { label: "Show diff",disabled,onClick: onShowDiff },
@@ -39,12 +37,7 @@ export function changeMenuItems(opts: {
     { label: "Unstage",disabled,onClick: onUnstage },
     { label: "Discard…",disabled,danger: true,onClick: onDiscard },
     { label: "",separator: true },
-    {
-      label: opPaths.length>1? `Copy paths (${opPaths.length})`:"Copy path",
-      disabled,
-      onClick: () => copy(opPaths.map((p) => `${repoRoot}${sep}${p.split("/").join(sep)}`).join("\n")),
-    },
-    { label: "Copy relative path",disabled,onClick: () => copy(opPaths.join("\n")) },
+    ...gitFileMenuItems(opPaths.map((path) => ({ repoRoot, path })), { repoRoot, path: opts.contextPath }),
   );
   return items;
 }

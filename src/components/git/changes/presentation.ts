@@ -1,6 +1,7 @@
 import { type GitChange } from "../../../lib/git";
 import { type TranslateFn } from "../../../lib/i18n";
 import type { GitWorkspaceRootInfo } from "../../../types";
+import { gitChangeStatusColor } from "../shared/changeStatus";
 
 export function repoAbbr(name: string): string {
   const words = name
@@ -21,27 +22,27 @@ export function workspaceStatusMeta(change: GitChange, t: TranslateFn): {
   if (change.conflict) {
     return {
       kindLabel: "!",
-      kindClass: "bg-red-500/15 text-red-500",
+      kindClass: gitChangeStatusColor(change.status, true),
       statusLabel: t("git.workspaceChanges.statusConflict"),
     };
   }
   if (change.staged) {
     return {
       kindLabel: shortChangeKind(change),
-      kindClass: "bg-emerald-500/15 text-emerald-600",
+      kindClass: gitChangeStatusColor(change.status),
       statusLabel: t("git.workspaceChanges.statusStaged"),
     };
   }
   if (change.status === "untracked") {
     return {
       kindLabel: "?",
-      kindClass: "bg-amber-500/15 text-amber-600",
+      kindClass: gitChangeStatusColor(change.status),
       statusLabel: t("git.workspaceChanges.statusUntracked"),
     };
   }
   return {
     kindLabel: shortChangeKind(change),
-    kindClass: "bg-blue-500/15 text-blue-500",
+    kindClass: gitChangeStatusColor(change.status),
     statusLabel: statusLabelForChange(change, t),
   };
 }

@@ -185,8 +185,10 @@ describe("Workspace Git integration (TASK-06)", () => {
     for (const id of ["project", "sessions", "git"]) {
       expect(screen.getAllByTestId(`code-workspace-tool-rail-${id}`)).toHaveLength(1);
     }
+    expect(screen.queryByTestId("code-workspace-bottom-tab-git")).not.toBeInTheDocument();
     fireEvent.click(within(rail).getByTestId("code-workspace-bottom-tab-overflow"));
     const menu = await screen.findByTestId("code-workspace-bottom-tab-overflow-menu");
+    expect(within(menu).queryByTestId("code-workspace-bottom-tab-overflow-git")).not.toBeInTheDocument();
     for (const id of ["terminal", "problems", "run", "search", "todos", "build", "tests", "coverage", "debug", "structure"]) {
       expect(within(menu).getByTestId(`code-workspace-bottom-tab-overflow-${id}`)).toBeVisible();
     }

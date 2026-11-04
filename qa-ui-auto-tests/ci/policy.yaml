@@ -16,6 +16,9 @@ smoke:
 - TC-IDE-C8-08-code-style-dialog-lifecycle-browser
 unavailable: {}
 cases:
+- TC-WS-086
+- TC-WS-084
+- TC-WS-085
 - TC-MAC-001
 - TC-MAC-002
 - TC-MAC-003

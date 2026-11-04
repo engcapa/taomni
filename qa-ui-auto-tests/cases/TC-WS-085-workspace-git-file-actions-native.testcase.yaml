@@ -1,0 +1,243 @@
+id: TC-WS-085
+title: Workspace Git rail and Changes/Log file actions (native)
+description: Two repositories with the same filename detect wrong-repository dispatch. Independent OS clipboard checks require exact absolute and relative
+  paths. Real file-manager IPC and PTY cwd verify native effects. Browser TC-WS-084 verifies renderer copy/paste; this case makes no AppKit paste or OS
+  keyboard-delivery claim.
+modes:
+- native
+covers:
+- F-WS-4
+- F26.1
+tags:
+- p1
+- workspace
+- git
+- file-actions
+fixtures:
+- reset_db
+- parity008_git
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-workspace-git-actions-TC-WS-085
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"parity008","path":"${fixture.parity008_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
+- reload_window: null
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-sidebar-panel"]'
+- assert_count:
+    selector: '[data-testid="sidebar-rail"] [data-testid="code-workspace-tool-rail-git"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="code-workspace-bottom-tab-git"]'
+    equal: 0
+- click: '[data-testid="code-workspace-tool-rail-git"]'
+- wait_for: '[data-testid="workspace-git-manager"]'
+- wait_for: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+- right_click: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+- assert_menu_items:
+  - Stage
+  - Unstage
+  - Copy Path
+  - Copy Relative Path
+  - Reveal in Explorer
+  - Open in Terminal
+- click: '[data-testid="git-file-copy-path"]'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Copied path
+- host_clipboard:
+    action: assert
+    kind: text
+    equals: ${fixture.parity008_repo_b_file_native}
+- right_click: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+- click: '[data-testid="git-file-copy-relative-path"]'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Copied relative path
+- host_clipboard:
+    action: assert
+    kind: text
+    equals: same.txt
+- right_click: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+- click: '[data-testid="git-file-reveal"]'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: 'Opened '
+- right_click: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+- click: '[data-testid="git-file-open-terminal"]'
+- wait_for: '[data-testid="workspace-tab"][data-tab-kind="terminal"][data-active="true"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: git rev-parse --show-toplevel
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^[^\r\n]*[/\\]repo-b\s*$
+    timeout_sec: 20
+- click: '[data-testid="workspace-tab"][data-tab-kind="terminal"] [data-testid="workspace-tab-close"]'
+- wait_for: '[data-testid="workspace-git-panel"]'
+- click: '[data-testid="git-log-tab"]'
+- wait_for: '[data-testid="git-log-commit"][data-repo-root$="repo-b"]'
+- click: '[data-testid="git-log-commit"][data-repo-root$="repo-b"]'
+- wait_for: '[data-testid="git-log-file"][data-path="same.txt"]'
+- wait_for: '[data-testid="git-log-commit"][data-repo-root$="repo-b"]'
+- click: '[data-testid="git-log-commit"][data-repo-root$="repo-b"]'
+- wait_for: '[data-testid="git-log-file"][data-path="same.txt"]'
+- right_click: '[data-testid="git-log-file"][data-path="same.txt"]'
+- assert_menu_items:
+  - Copy Path
+  - Copy Relative Path
+  - Reveal in Explorer
+  - Open in Terminal
+- click: '[data-testid="git-file-copy-path"]'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Copied path
+- host_clipboard:
+    action: assert
+    kind: text
+    equals: ${fixture.parity008_repo_b_file_native}
+- wait_for: '[data-testid="git-log-commit"][data-repo-root$="repo-b"]'
+- click: '[data-testid="git-log-commit"][data-repo-root$="repo-b"]'
+- wait_for: '[data-testid="git-log-file"][data-path="same.txt"]'
+- right_click: '[data-testid="git-log-file"][data-path="same.txt"]'
+- click: '[data-testid="git-file-copy-relative-path"]'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Copied relative path
+- host_clipboard:
+    action: assert
+    kind: text
+    equals: same.txt
+- wait_for: '[data-testid="git-log-commit"][data-repo-root$="repo-b"]'
+- click: '[data-testid="git-log-commit"][data-repo-root$="repo-b"]'
+- wait_for: '[data-testid="git-log-file"][data-path="same.txt"]'
+- right_click: '[data-testid="git-log-file"][data-path="same.txt"]'
+- click: '[data-testid="git-file-reveal"]'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: 'Opened '
+- right_click: '[data-testid="git-log-file"][data-path="same.txt"]'
+- screenshot: tc-ws-085-git-log-file-menu.png
+- click: '[data-testid="git-file-open-terminal"]'
+- wait_for: '[data-testid="workspace-tab"][data-tab-kind="terminal"][data-active="true"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: git rev-parse --show-toplevel
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^[^\r\n]*[/\\]repo-b\s*$
+    timeout_sec: 20
+- click: '[data-testid="workspace-tab"][data-tab-kind="terminal"] [data-testid="workspace-tab-close"]'
+- wait_for: '[data-testid="workspace-git-panel"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Workspace has one Git rail entry; it still opens the full multi-repository Git panel.
+    actions:
+    - 8
+    - 12
+    checkpoints:
+    - step: 10
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-git\"]", "equal": 1}}'
+    - step: 11
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bottom-tab-git\"]", "equal": 0}}'
+    - step: 14
+      expectation: '{"wait_for": "[data-testid=\"workspace-change-row\"][data-repo-root$=\"repo-b\"][data-path=\"same.txt\"]"}'
+    results:
+    - 10
+    - 11
+    - 14
+  - id: R2
+    requirement: Changes copies the clicked repo-b file absolute and repository-relative paths, preserving Git actions.
+    actions:
+    - 15
+    - 17
+    - 20
+    - 21
+    checkpoints:
+    - step: 16
+      expectation: '{"assert_menu_items": ["Stage", "Unstage", "Copy Path", "Copy Relative Path", "Reveal in Explorer", "Open in Terminal"]}'
+    - step: 19
+      expectation: '{"host_clipboard": {"action": "assert", "kind": "text", "equals": "${fixture.parity008_repo_b_file_native}"}}'
+    - step: 23
+      expectation: '{"host_clipboard": {"action": "assert", "kind": "text", "equals": "same.txt"}}'
+    results:
+    - 16
+    - 19
+    - 23
+  - id: R3
+    requirement: Changes opens the containing directory (or reports the explicit browser limitation) and a terminal at repo-b, then returns to Git.
+    actions:
+    - 24
+    - 25
+    - 27
+    - 28
+    checkpoints:
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Opened "}}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"workspace-tab\"][data-tab-kind=\"terminal\"][data-active=\"true\"]"}'
+    - step: 32
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^[^\\r\\n]*[/\\\\]repo-b\\s*$",
+        "timeout_sec": 20}}'
+    results:
+    - 26
+    - 29
+    - 32
+  - id: R4
+    requirement: Git Log file actions resolve the selected commit repository and expose all four operations, including a real local PTY in native mode.
+    actions:
+    - 35
+    - 42
+    - 44
+    - 50
+    - 51
+    - 57
+    - 58
+    - 62
+    checkpoints:
+    - step: 43
+      expectation: '{"assert_menu_items": ["Copy Path", "Copy Relative Path", "Reveal in Explorer", "Open in Terminal"]}'
+    - step: 46
+      expectation: '{"host_clipboard": {"action": "assert", "kind": "text", "equals": "${fixture.parity008_repo_b_file_native}"}}'
+    - step: 53
+      expectation: '{"host_clipboard": {"action": "assert", "kind": "text", "equals": "same.txt"}}'
+    - step: 59
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Opened "}}'
+    - step: 63
+      expectation: '{"wait_for": "[data-testid=\"workspace-tab\"][data-tab-kind=\"terminal\"][data-active=\"true\"]"}'
+    - step: 66
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^[^\\r\\n]*[/\\\\]repo-b\\s*$",
+        "timeout_sec": 20}}'
+    - step: 68
+      expectation: '{"wait_for": "[data-testid=\"workspace-git-panel\"]"}'
+    - step: 69
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 43
+    - 46
+    - 53
+    - 59
+    - 63
+    - 66
+    - 68
+    - 69
+  visual:
+  - check: Context-menu layout and one Git rail entry
+    method: manual
+    reason: Review the retained screenshot; DOM counts establish removal but not pixel appearance.
+  native:
+  - check: OS clipboard, containing-directory open, and terminal cwd
+    method: automated
+    reason: Host clipboard oracle and git output from the real PTY; file-manager IPC must succeed. OS window appearance remains a manual boundary.

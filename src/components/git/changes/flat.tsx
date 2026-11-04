@@ -191,6 +191,8 @@ export function WorkspaceFlatChangeRow({
         onChange={(event) => onToggleChecked(event.target.checked)}
       />
       <span
+        data-testid="git-change-status"
+        data-change-status={change.conflict ? "conflict" : change.status}
         className={`shrink-0 w-5 rounded px-0.5 py-0 text-center text-[10px] font-semibold ${status.kindClass}`}
         title={status.statusLabel}
         aria-label={status.statusLabel}

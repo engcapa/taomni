@@ -304,20 +304,6 @@ export function ChangesListToolbar({
                 setMoreOpen(false);
               }}
             />
-            {compact ? (
-              <>
-                <MenuDivider />
-                <MenuSectionLabel>{t("git.workspaceChanges.viewActions")}</MenuSectionLabel>
-                <MenuActionItem
-                  label={viewLabel}
-                  icon={treeMode ? <List className="w-3.5 h-3.5" /> : <ListTree className="w-3.5 h-3.5" />}
-                  onClick={() => {
-                    onToggleTreeMode();
-                    setMoreOpen(false);
-                  }}
-                />
-              </>
-            ) : null}
           </div>
         ) : null}
       </div>
@@ -325,14 +311,6 @@ export function ChangesListToolbar({
       <span className="shrink-0 min-w-10 text-center text-[11px] text-[var(--taomni-text-muted)]">
         {checkedCount}/{totalCount}
       </span>
-
-      {!compact ? (
-        <ToolbarIconButton
-          label={viewLabel}
-          icon={treeMode ? <List className="w-3.5 h-3.5" /> : <ListTree className="w-3.5 h-3.5" />}
-          onClick={onToggleTreeMode}
-        />
-      ) : null}
     </div>
   );
 }
