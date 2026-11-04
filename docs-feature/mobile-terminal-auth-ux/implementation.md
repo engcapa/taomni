@@ -87,4 +87,14 @@ OpenSSH 用例以真实阻塞子进程验证取消所有权，不代表真实 Ke
 
 GitHub strict 汇总通过；下载原始报告后独立重新聚合也通过，94 项精确匹配，无缺失、重复、覆盖缺口或未审核项。原始 receipt、源码/case/runner 指纹以及三平台 `com.taomni.app.qa` release 二进制身份一致。源码指纹为 `819ac215eaadecc9269ccfe125335f627659da6e4100aef7cea2f18b241e89fe`。本轮托管合约另确认前端 16 文件 / 89 项、Rust 91 项通过，三平台构建及 Windows 捕获辅助程序合约成功。
 
-原始证据位于 `qa-ui-auto-report/mobile-review/github-final-4/`，独立核验结果为 `local-verified-ci-summary.json`；合约日志位于相邻的 `github-final-4-contracts/`。前几轮失败/被修正取代的运行仍保留，不计为本轮通过证据。本节后的提交只更新验收文档，产品、用例和 runner 内容均与上述验收提交相同。
+原始证据位于 `qa-ui-auto-report/mobile-review/github-final-4/`，独立核验结果为 `local-verified-ci-summary.json`；合约日志位于相邻的 `github-final-4-contracts/`。前几轮失败/被修正取代的运行仍保留，不计为本轮通过证据。本节后的验收文档提交未改变上述产品、用例和 runner 内容；后续 main 同步另行记录如下。
+
+## 2026-11-04 同步 main
+
+合并 `origin/main` 的 `604894bea24c626d924b7c7015b2a5b6f92af68f`，合并提交 `4eda132b565af7f1edb056a530ea555ae3bd83dd`。仅 `ci/policy.yaml` 冲突，按双方注册项并集解决，保留移动端 001–009 及新 Git/macOS 用例。Node 22 / pnpm 10 下相关前端 23 文件 / 117 项、QA 选择及崩溃回归契约 29 项、类型与重构检查、静态 audit 全部通过。
+
+[首次托管运行 41815112750](https://github.com/engcapa/taomni/actions/runs/41815112750) 选择三平台 browser/native 共 116 次，包含移动端、SSH、Git/macOS 与完整 crash-regression。六个 browser 分片成功；Linux producer 的全量前端测试为 26 失败 / 6269 通过 / 1 跳过，原生执行因此缺失，不能视为验收通过。
+
+本地复现后确认终端 mounted harness 未 mock 新增的 `ssh-auth-resolved-*` Tauri 订阅；补齐后还暴露出三处旧调用断言未包含新增的可选 mobile request 参数。修正仅涉及测试：补充事件 mock、精确参数断言，并验证订阅顺序、失败传播、清理、匹配请求才关闭 MFA，以及首次连接传入 mobile request 而重连不复用。终端测试为 92 通过 / 1 原有条件跳过，类型与重构检查通过。产品行为、YAML 用例与 runner 均未修改，因此不新增 UI case；保留 TC-MOBILE-007 与 TC-139/143/150 保护实际认证和重连边界，并要求同组 116 次 hosted browser/native 全部重跑。
+
+首轮失败日志、本地复现与后续证据保留在 `qa-ui-auto-report/main-merge-20261104/`。后续 hosted 结果未确认前，本节不宣称 main 同步后的完整验收通过。
