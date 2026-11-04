@@ -52,6 +52,7 @@ steps:
 - assert_count:
     selector: '[data-testid="session-editor"]'
     equal: 1
+- click: '[data-testid="session-section-bookmark"]'
 - fill:
     selector: '[data-testid="session-name"]'
     value: qa-mac-menu-cancel
@@ -113,7 +114,7 @@ verification:
   requirements:
   - id: R1
     requirement: Native Home has no renderer application menu; AppKit About and New Session open usable dialogs that cancel and reopen.
-    actions: [1, 2, 3, 6, 9, 11, 14, 15, 17, 19]
+    actions: [1, 2, 3, 6, 9, 11, 14, 15, 16, 18, 20]
     checkpoints:
     - step: 5
       expectation: Renderer application-menu count is zero in the native Mac runtime.
@@ -123,40 +124,40 @@ verification:
       expectation: Escape dismisses About.
     - step: 13
       expectation: The native New Session action opens one editor.
-    - step: 16
+    - step: 17
       expectation: Cancel removes the edited session dialog.
-    - step: 18
+    - step: 19
       expectation: New Session remains callable after cancellation.
-    - step: 20
+    - step: 21
       expectation: The reopened dialog also cancels cleanly.
-    results: [5, 8, 10, 13, 16, 18, 20]
+    results: [5, 8, 10, 13, 17, 19, 21]
   - id: R2
     requirement: AppKit View toggles once per activation; Settings reuses one tab and closing it releases the current menu owner without breaking About.
-    actions: [21, 23, 25, 27, 30, 32, 36, 38]
+    actions: [22, 24, 26, 28, 31, 33, 37, 39]
     checkpoints:
-    - step: 22
+    - step: 23
       expectation: Sessions starts with its real tree visible.
-    - step: 24
+    - step: 25
       expectation: One View action collapses the sidebar.
-    - step: 26
+    - step: 27
       expectation: A second View action restores the Sessions tree.
-    - step: 29
+    - step: 30
       expectation: Settings creates one Settings tab.
-    - step: 31
+    - step: 32
       expectation: Invoking Settings again reuses that tab.
-    - step: 33
-      expectation: Close removes Settings content.
     - step: 34
-      expectation: The Settings tab is removed from the strip too.
+      expectation: Close removes Settings content.
     - step: 35
+      expectation: The Settings tab is removed from the strip too.
+    - step: 36
       expectation: Close becomes disabled with no closable active tab.
-    - step: 37
+    - step: 38
       expectation: About still opens through AppKit after menu ownership changes.
-    - step: 39
-      expectation: About remains dismissible.
     - step: 40
+      expectation: About remains dismissible.
+    - step: 41
       expectation: No uncaught runtime or React-root errors occurred.
-    results: [24, 26, 29, 31, 33, 34, 35, 37, 39, 40]
+    results: [25, 27, 30, 32, 34, 35, 36, 38, 40, 41]
   visual:
   - check: System menu tracking, typography and native frame.
     method: manual

@@ -82,6 +82,7 @@ steps:
     equals: 'true'
 - click: '[data-testid="app-main-menu"]'
 - click: '[data-testid="context-menu-item-new-remote-session"]'
+- click: '[data-testid="session-section-bookmark"]'
 - wait_for: '[data-testid="session-name"]'
 - fill:
     selector: '[data-testid="session-name"]'
@@ -167,7 +168,7 @@ verification:
     results: [5, 6, 7, 8, 11, 13]
   - id: R2
     requirement: Command+B toggles the sidebar once outside text fields and is labeled Cmd+B; Control+B does not toggle, and the focused input owns editing and Command-based undo/redo.
-    actions: [14, 17, 20, 23, 26, 27, 29, 30, 33, 34, 36, 38, 40, 42]
+    actions: [14, 17, 20, 23, 26, 27, 28, 30, 31, 34, 35, 37, 39, 41, 43]
     checkpoints:
     - step: 16
       expectation: Sessions begins with an expanded sidebar.
@@ -177,40 +178,40 @@ verification:
       expectation: Control+B leaves it collapsed.
     - step: 25
       expectation: A second Command+B expands it.
-    - step: 31
-      expectation: Command+B from a text input does not toggle the shell sidebar.
     - step: 32
+      expectation: Command+B from a text input does not toggle the shell sidebar.
+    - step: 33
       expectation: The same input retains focus and exact text.
-    - step: 35
+    - step: 36
       expectation: Command+A and Backspace clear only the focused input.
-    - step: 37
+    - step: 38
       expectation: Command+Z restores its exact previous contents.
-    - step: 39
+    - step: 40
       expectation: Command+Shift+Z redoes that single deletion.
-    - step: 41
+    - step: 42
       expectation: Another undo restores exact text again.
-    - step: 43
+    - step: 44
       expectation: Escape cancels the session editor.
-    - step: 58
+    - step: 59
       expectation: The actual sidebar tooltip labels its shortcut Cmd+B on Mac.
-    results: [19, 21, 25, 31, 32, 35, 37, 39, 41, 43, 58]
+    results: [19, 21, 25, 32, 33, 36, 38, 40, 42, 44, 59]
   - id: R3
     requirement: Command+K opens the app palette, Control+K does not, and dismiss/reopen retains one usable palette without runtime errors.
-    actions: [44, 46, 49, 50, 52, 55]
+    actions: [45, 47, 50, 51, 53, 56]
     checkpoints:
-    - step: 45
+    - step: 46
       expectation: Control+K does not open the app palette.
-    - step: 48
+    - step: 49
       expectation: Command+K opens one palette.
-    - step: 51
+    - step: 52
       expectation: Escape dismisses it after entering a query.
-    - step: 54
+    - step: 55
       expectation: Command+K can reopen one palette.
-    - step: 56
-      expectation: Escape dismisses the reopened palette.
     - step: 57
+      expectation: Escape dismisses the reopened palette.
+    - step: 58
       expectation: No uncaught runtime errors occurred.
-    results: [45, 48, 51, 54, 56, 57]
+    results: [46, 49, 52, 55, 57, 58]
   visual:
   - check: Mac preview controls and overlays remain readable.
     method: manual
