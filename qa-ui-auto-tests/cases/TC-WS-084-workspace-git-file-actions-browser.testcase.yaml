@@ -52,7 +52,7 @@ steps:
 - click: '[data-testid="git-file-copy-path"]'
 - assert_text:
     selector: '[data-testid="status-bar-message"]'
-    contains: Copied
+    contains: Copied path
 - press:
     selector: '[data-testid="git-commit-message"]'
     key: Mod+V
@@ -70,7 +70,7 @@ steps:
 - click: '[data-testid="git-file-copy-relative-path"]'
 - assert_text:
     selector: '[data-testid="status-bar-message"]'
-    contains: Copied
+    contains: Copied relative path
 - press:
     selector: '[data-testid="git-commit-message"]'
     key: Mod+V
@@ -88,9 +88,10 @@ steps:
 - right_click: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
 - click: '[data-testid="git-file-open-terminal"]'
 - wait_for: '[data-testid="workspace-tab"][data-tab-kind="terminal"][data-active="true"]'
-- assert_localstorage:
-    key: taomni.platformWorkspaces.v1
-    contains: '"terminalInitialCwd":"${fixture.parity008_root}/repo-b"'
+- eval_readonly:
+    expression: localStorage.getItem('taomni.platformWorkspaces.v1').includes('"terminalInitialCwd":"${fixture.parity008_root}/repo-b"')
+    expect_truthy: true
+    timeout_sec: 5
 - click: '[data-testid="workspace-tab"][data-tab-kind="terminal"] [data-testid="workspace-tab-close"]'
 - wait_for: '[data-testid="workspace-git-panel"]'
 - click: '[data-testid="git-log-tab"]'
@@ -111,7 +112,7 @@ steps:
 - click: '[data-testid="git-file-copy-path"]'
 - assert_text:
     selector: '[data-testid="status-bar-message"]'
-    contains: Copied
+    contains: Copied path
 - press:
     selector: input[aria-label="Filter messages"]
     key: Mod+V
@@ -131,7 +132,7 @@ steps:
 - click: '[data-testid="git-file-copy-relative-path"]'
 - assert_text:
     selector: '[data-testid="status-bar-message"]'
-    contains: Copied
+    contains: Copied relative path
 - press:
     selector: input[aria-label="Filter messages"]
     key: Mod+V
@@ -170,7 +171,7 @@ verification:
     - step: 11
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bottom-tab-git\"]", "equal": 0}}'
     - step: 14
-      expectation: '{"wait_for": "[data-testid=\"workspace-change-row\"][data-repo-root$=\"/repo-b\"][data-path=\"same.txt\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"workspace-change-row\"][data-repo-root$=\"repo-b\"][data-path=\"same.txt\"]"}'
     results:
     - 10
     - 11
@@ -209,7 +210,8 @@ verification:
     - step: 35
       expectation: '{"wait_for": "[data-testid=\"workspace-tab\"][data-tab-kind=\"terminal\"][data-active=\"true\"]"}'
     - step: 36
-      expectation: '{"assert_localstorage": {"key": "taomni.platformWorkspaces.v1", "contains": "\"terminalInitialCwd\":\"${fixture.parity008_root}/repo-b\""}}'
+      expectation: '{"eval_readonly": {"expression": "localStorage.getItem(''taomni.platformWorkspaces.v1'').includes(''\"terminalInitialCwd\":\"${fixture.parity008_root}/repo-b\"'')",
+        "expect_truthy": true, "timeout_sec": 5}}'
     results:
     - 32
     - 35
