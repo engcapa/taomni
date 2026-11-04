@@ -1,0 +1,156 @@
+id: TC-ORCH-PARTIAL-006
+title: Truncated Messages output preserves a complete no-newline candidate tail before one explicit recovery
+description: Native regression for a syntactically complete second item_end without LF followed by max_tokens and message_stop, but no group/pack terminal. Before the collector fix the second candidate is lost. The recovery-request oracle independently captures two existing artifact IDs and disk/SQLite hashes before emitting missing tests, then final teardown proves both remain unchanged and exactly two HTTP requests occurred.
+modes: [native]
+covers: [F-ORCH-1]
+tags: [p0, orchestration, partial-recovery, regression]
+fixtures: [reset_db, orchestration_llm]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-orch-tail-006
+- click: '[data-testid="home-open-agents"]'
+- wait_for: '[data-testid="orch-workspace"]'
+- click: '[data-testid="orch-project-add"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.orchestration_project}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- select_option:
+    selector: '[data-testid="orch-intent"]'
+    value: plan
+- fill:
+    selector: '[data-testid="orch-prompt"]'
+    value: Plan a compatible settings field, interface contract and tests. Preserve complete documents even if output ends before the full pack.
+- click: '[data-testid="orch-send"]'
+- wait_for: '[data-testid="orch-approve-plan"]'
+- click: '[data-testid="orch-approve-plan"]'
+- wait_for:
+    selector: '[data-testid="orch-run-status"][data-status="partial"]'
+    timeout_sec: 90
+- assert_count:
+    selector: '[data-testid^="orch-partial-artifact-"]'
+    equal: 2
+- click: '[data-testid^="orch-partial-artifact-"]:nth-of-type(2)'
+- wait_for: '[data-testid="orch-artifact-content"]'
+- assert_text:
+    selector: '[data-testid="orch-artifact-content"]'
+    contains: candidate
+- screenshot: orchestration-complete-no-lf-tail-before-reload.png
+- click: '[data-testid="orch-recovery-open"]'
+- wait_for: '[data-testid="orch-recovery-dialog"]'
+- click: '[data-testid="orch-recovery-dismiss"]'
+- assert_attribute:
+    selector: '[data-testid="orch-run-status"]'
+    name: data-status
+    equals: partial
+- reload_window: null
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="home-open-agents"]'
+- wait_for:
+    selector: '[data-testid="orch-run-status"][data-status="partial"]'
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid^="orch-partial-artifact-"]'
+    equal: 2
+- assert_not_visible: '[data-testid="orch-recovery-dialog"]'
+- click: '[data-testid="orch-recovery-open"]'
+- click: '[data-testid="orch-recovery-confirm"]'
+- wait_for:
+    selector: '[data-testid="orch-run-status"][data-status="candidate"]'
+    timeout_sec: 90
+- assert_not_visible: '[data-testid="orch-recovery-open"]'
+- click: '[data-testid="orch-show-changes"]'
+- wait_for: '[data-testid="orch-artifacts-panel"]'
+- assert_count:
+    selector: '[data-testid^="orch-artifact-"]:not([data-testid="orch-artifact-content"])'
+    equal: 3
+- assert_no_runtime_errors: null
+- screenshot: orchestration-complete-no-lf-tail-recovered.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A native Anthropic max_tokens receipt whose second complete item_end lacks LF preserves both design
+      and contract as partial candidates, without treating the incomplete pack as success.
+    actions:
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 15
+    - 19
+    - 21
+    checkpoints:
+    - step: 13
+      expectation: The first approved generation is partial, not candidate success.
+    - step: 14
+      expectation: Exactly two complete prefix candidates are visible; before the collector tail fix this would be one.
+    - step: 17
+      expectation: The retained second candidate body is readable.
+    - step: 22
+      expectation: Dismissing recovery sends nothing and leaves the run partial.
+    results:
+    - 13
+    - 14
+    - 17
+    - 22
+  - id: R2
+    requirement: Reload returns Home, then explicit Agent reopening restores two prefix candidates without automatic
+      recovery.
+    actions:
+    - 23
+    - 25
+    checkpoints:
+    - step: 24
+      expectation: The application intentionally opens Home after renderer reload.
+    - step: 26
+      expectation: The original partial run restores after reopening Agent.
+    - step: 27
+      expectation: Both complete prefix candidates remain saved.
+    - step: 28
+      expectation: No recovery consent is accepted or reopened automatically.
+    results:
+    - 24
+    - 26
+    - 27
+    - 28
+  - id: R3
+    requirement: Exactly one explicit recovery requests only tests; before its response the native oracle captures the
+      two original candidate IDs/hash/bytes, and final evidence proves unchanged prefix identities with three final candidates
+      and main-failed/recovery-completed ledgers.
+    actions:
+    - 29
+    - 30
+    - 33
+    checkpoints:
+    - step: 31
+      expectation: The single authorized recovery ends candidate.
+    - step: 32
+      expectation: No additional recovery action remains.
+    - step: 35
+      expectation: Exactly design, contract and tests candidates are present.
+    - step: 36
+      expectation: No runtime errors occurred.
+    results:
+    - 31
+    - 32
+    - 35
+    - 36
+  visual:
+  - check: No-newline partial prefix before reload and final recovered candidates
+    method: manual
+    reason: Two screenshot steps retain the real rendered states for later hosted visual review. Authoring, pure unit
+      and static validation do not count as executed screenshots.
+  native:
+  - check: Production stream collector and independent prefix/final file evidence
+    method: automated
+    reason: 'Native-only real API requests use fixture-tail-partial: complete contract item_end without trailing LF followed
+      by max_tokens/message_stop, no group_end/pack_end. A read-only request-arrival oracle synchronously records two
+      original candidate IDs, SQLite/run/disk hashes and main-failed/recovery-sent ledger before responding. Teardown
+      requires missing-tests-only recovery, unchanged prefix IDs/hashes, three final files, exactly two Messages requests
+      and main-failed/recovery-completed attempts. No browser stub establishes this boundary; matching release native
+      execution remains unrun until hosted evidence exists.'

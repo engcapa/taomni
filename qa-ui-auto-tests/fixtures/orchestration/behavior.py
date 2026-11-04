@@ -12,7 +12,7 @@ from typing import Any, Iterable
 PACK_MARKER = "TAOMNI_PACK_MANIFEST="
 WORKER_MARKER = "TAOMNI_ORCHESTRATION_FIXTURE="
 SAFE_ID = re.compile(r"^[A-Za-z0-9_.:-]{1,160}$")
-MODEL_IDS = ("fixture-complete", "fixture-partial", "fixture-truncated", "fixture-error",
+MODEL_IDS = ("fixture-complete", "fixture-partial", "fixture-tail-partial", "fixture-truncated", "fixture-error",
              "fixture-http-error", "fixture-worker")
 SHELL_NAMES = ("Bash", "bash", "exec_command", "shell_command", "shell")
 ERROR_REASONS = {
@@ -190,6 +190,21 @@ def decide(body: dict, protocol: str, worker_roots: dict[str, Path] | None = Non
     if manifest is None:
         raise FixtureError("generation requires TAOMNI_PACK_MANIFEST or registered worker metadata")
     recovery = any(line == "TAOMNI_RECOVERY=true" for text in strings(body) for line in text.splitlines())
+    if scenario == "tail-partial":
+        if recovery:
+            if manifest.get("expected_ids") != ["tests"]:
+                raise FixtureError("tail recovery must request only the missing tests item")
+            return Decision(text=pack_text(manifest), scenario="complete")
+        if manifest.get("expected_ids") != ["design", "contract", "tests"]:
+            raise FixtureError("tail partial requires the three-item planning manifest")
+        # Complete two items, but end the second item_end JSON without LF. The
+        # enclosing pack is still incomplete and the wire stop is max_tokens.
+        frames = [json.loads(line) for line in pack_text(manifest).splitlines()]
+        tail = next(index for index, frame in enumerate(frames)
+                    if frame.get("type") == "item_end" and frame.get("item_id") == "contract")
+        text = "\n".join(json.dumps(frame, ensure_ascii=False, separators=(",", ":"))
+                         for frame in frames[:tail + 1])
+        return Decision(text=text, scenario="partial")
     if recovery and scenario == "partial":
         scenario = "complete"
     return Decision(text=pack_text(manifest, partial=scenario == "partial"), scenario=scenario)

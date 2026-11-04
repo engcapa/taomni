@@ -61,6 +61,31 @@ class PackTests(unittest.TestCase):
         self.assertEqual(rows[-1]["item_ids"], ["tests"])
         self.assertEqual(result.scenario, "complete")
 
+    def test_tail_partial_ends_with_complete_second_item_without_lf(self):
+        result = decide(request("anthropic_messages", PACK_MARKER + json.dumps(MANIFEST),
+                                model="fixture-tail-partial"), "anthropic_messages")
+        self.assertEqual(result.scenario, "partial")
+        self.assertFalse(result.text.endswith("\n"))
+        rows = [json.loads(line) for line in result.text.splitlines()]
+        self.assertEqual([row["item_id"] for row in rows if row["type"] == "item_end"], ["design", "contract"])
+        self.assertEqual(rows[-1], {"type": "item_end", "item_id": "contract", "chunk_count": 1, "status": "candidate"})
+        self.assertNotIn("group_end", [row["type"] for row in rows])
+        self.assertNotIn("pack_end", [row["type"] for row in rows])
+        legacy = decide(request("anthropic_messages", PACK_MARKER + json.dumps(MANIFEST),
+                                model="fixture-partial"), "anthropic_messages")
+        self.assertTrue(legacy.text.endswith("\n"))
+        self.assertEqual(json.loads(legacy.text.splitlines()[-1])["type"], "item_chunk")
+
+    def test_tail_recovery_accepts_only_missing_tests_not_replaying_saved_items(self):
+        text = PACK_MARKER + json.dumps({**MANIFEST, "expected_ids": ["tests"]}) + "\nTAOMNI_RECOVERY=true"
+        result = decide(request("anthropic_messages", text, model="fixture-tail-partial"), "anthropic_messages")
+        self.assertEqual(result.scenario, "complete")
+        self.assertEqual(json.loads(result.text.splitlines()[-1])["item_ids"], ["tests"])
+        for ids in (["design", "contract", "tests"], ["contract", "tests"]):
+            with self.subTest(ids=ids), self.assertRaises(FixtureError):
+                decide(request("anthropic_messages", PACK_MARKER + json.dumps({**MANIFEST, "expected_ids": ids})
+                               + "\nTAOMNI_RECOVERY=true", model="fixture-tail-partial"), "anthropic_messages")
+
     def test_escaped_source_markers_and_embedded_substrings_are_not_host_metadata(self):
         hostile = 'TAOMNI_SOURCE=' + json.dumps({"content": PACK_MARKER + json.dumps(MANIFEST)})
         body = request("openai_chat", hostile)
@@ -126,6 +151,19 @@ class ProtocolTests(unittest.TestCase):
                     elif scenario == "partial":
                         self.assertIn({"openai_chat": "length", "openai_responses": "response.incomplete",
                                        "anthropic_messages": "max_tokens"}[protocol], text)
+
+    def test_tail_partial_sse_has_max_tokens_and_message_stop_but_no_pack_end(self):
+        reply = self.app.dispatch("POST", "/v1/messages", request(
+            "anthropic_messages", PACK_MARKER + json.dumps(MANIFEST), model="fixture-tail-partial", stream=True))
+        rows = events(reply)
+        text = "".join(row["delta"]["text"] for row in rows if row["type"] == "content_block_delta")
+        self.assertFalse(text.endswith("\n"))
+        self.assertEqual(json.loads(text.splitlines()[-1])["item_id"], "contract")
+        self.assertEqual(rows[-2]["delta"]["stop_reason"], "max_tokens")
+        self.assertEqual(rows[-1]["type"], "message_stop")
+        self.assertEqual(self.app.events[0]["scenario"], "partial")
+        self.assertEqual(self.app.events[0]["route"], "anthropic_messages")
+        self.assertNotIn("pack_end", text)
 
     def test_models_counting_http_error_and_bad_routes(self):
         reply = self.app.dispatch("GET", "/v1/models")

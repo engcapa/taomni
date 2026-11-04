@@ -67,6 +67,7 @@ execution/isolation contracts.
 | TC-ORCH-003 | Responses request with actual source contents and native candidate publication |
 | TC-ORCH-005 | Chat Completions request and shared-resource controls |
 | TC-ORCH-WORKER-004 | Linux native UI dispatch through Taomni to all six installed real harnesses; real worktrees, tool results, request ledger, marker/diff, pinned process and artifact hashes |
+| TC-ORCH-PARTIAL-006 | Native no-newline complete item tail survives truncation; synchronous read-only recovery-arrival proof binds the two prefix candidate IDs/hashes before adding only missing tests |
 
 Native API fixtures exercise real IPC/network/disk boundaries; browser versions
 exercise the production renderer against explicit stubs. The standalone six-worker
@@ -80,7 +81,10 @@ complete mandatory `crash-regression` suite remain in their ordinary lanes.
 No local product browser/native case, live fixture endpoint or real worker was run.
 
 - Node **22.23.4**, pnpm **10.33.0**: 111 focused Vitest tests passed across nine
-  UI/store/navigation/safe-exit files; `tsc -b` passed.
+  UI/store/navigation/safe-exit files; `tsc -b` passed. After repairing the test
+  runner boundary, the complete local frontend unit suite passed **676 files /
+  6258 tests**, with **one existing skipped test**. Prototype Node tests (7) and
+  IPC route-checker tests (3) passed separately; no application was launched.
 - `cargo test --lib orchestration:: --no-default-features --features voice-capture
   -j 2`: **30 passed**, none failed/ignored. Includes context/manifest/framing,
   store/settings, capacity, cancel-before-spawn, unknown ownership and atomic finish.
@@ -88,7 +92,10 @@ No local product browser/native case, live fixture endpoint or real worker was r
   `go_compatibility_tests` **22 passed**. A final combined root-unit run of
   `llm::invocation llm::openai_compat llm::anthropic orchestration::` passed
   **88 tests**, none failed/ignored. After the final safe-exit integration change,
-  the combined `orchestration:: app_exit::` run passed **33 tests**.
+  the combined `orchestration:: app_exit::` run passed **33 tests**. The later
+  dispatch/tail/Unix-cleanup repair passed **53 unit tests**, with **two hosted-only
+  real-process tests ignored locally**. Those ignored tests are explicitly run
+  in the hosted native contract job and are not claimed as local passes.
 - An additional focused stub/safe-exit run passed **7 tests** (including the four
   safe-exit tests already in the 111-test run); three new browser-stub tests cover
   immutable defaults, explicit recovery and resource revocation.
@@ -172,8 +179,33 @@ Follow-up repairs after that failed run preserve all checks:
   configuration. Pins, marker ownership, successful tool results and the two-call
   requirement remain strict.
 
-Full hosted product acceptance, native crash evidence and six-harness scheduling
-are not complete at this checkpoint.
+Additional verified receipts and reliability repairs:
+
+- In [run 41740668667](https://github.com/engcapa/taomni/actions/runs/41740668667)
+  (`27af621e0b8350095d2159047f2e29bfc3e82ce0`), downloaded Windows native
+  summaries now confirm **14/14 passed, zero failed/skipped**, after physical path
+  identity and deterministic read-connection cleanup. The Responses fixture
+  independently records one real generation, a completed main request, no recovery
+  and a matching candidate-file hash. Other Windows cases reset successfully.
+- [Run 41743820673](https://github.com/engcapa/taomni/actions/runs/41743820673)
+  (`025a007f527f22cf35ce7d37e2924c960572c211`) confirms **five standalone real
+  harnesses passed**: Claude Code, Pi, OpenCode, DeepSeek Harness and ZCode.
+  OpenCode's pinned CLI quote-escapes positional prompt text; using its verbatim
+  stdin path resolves the demonstrated fixture metadata failure without loosening
+  parsing. **Codex remains failed** with a genuine bwrap tool result reporting
+  EPERM; workspace-write and network namespace protection remain enabled.
+- `71c4faec8` repairs three independently reviewed reliability defects: resource
+  revocation/cancellation is rechecked with short spawn under the owner lock;
+  complete no-newline candidate tails survive provider truncation while the pack
+  stays failed/partial; Unix process groups require checked bounded termination
+  evidence independent of a cached leader exit. Pure units passed; two hosted-only
+  same-group descendant scenarios are wired into required native contracts.
+- On 2026-11-04 the user explicitly asked to keep process/progress presentation
+  unchanged. No new per-tool timeline, token display or progress UI is introduced
+  by these reliability and validation repairs.
+
+Full hosted product acceptance, Linux native crash evidence and six-harness
+scheduling are not complete at this checkpoint.
 
 ## Remaining work — not waived by phase 1
 

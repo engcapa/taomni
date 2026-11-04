@@ -105,6 +105,20 @@ class OrchestrationAdapterTests(unittest.TestCase):
                 self.seed(case_id)
                 self.assertEqual(orchestration._verify_native(self.ctx, self.events)["status"], "passed")
 
+    def test_tail_case_requires_pre_recovery_prefix_and_exact_preserved_identity(self):
+        runs = self.seed("TC-ORCH-PARTIAL-006")
+        with self.assertRaisesRegex(AssertionError, "prefix proof"):
+            orchestration._verify_native(self.ctx, self.events)
+        artifacts = [{"id": item["id"], "item_id": item["itemId"], "hash": item["hash"],
+                      "path": str(self.root / "artifacts" / item["id"]), "bytes": len(item["content"].encode())}
+                     for item in runs[0]["artifacts"] if item["itemId"] != "tests"]
+        self.ctx.orchestration_tail_prefix = {"run_id": "run-0", "requested_ids": ["tests"], "artifacts": artifacts}
+        evidence = orchestration._verify_native(self.ctx, self.events)
+        self.assertEqual(len(evidence["pre_recovery_prefix"]["artifacts"]), 2)
+        artifacts[0]["id"] = "unexpected-replacement"
+        with self.assertRaisesRegex(AssertionError, "identity/hash"):
+            orchestration._verify_native(self.ctx, self.events)
+
     def test_wrong_protocol_and_extra_request_are_not_native_passes(self):
         self.seed()
         for events in ([{**self.events[0], "route": "openai_responses"}], self.events * 2,

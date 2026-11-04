@@ -53,6 +53,9 @@ def setup(ctx: Any) -> None:
                       orchestration_complete_model="fixture-complete",
                       orchestration_partial_model="fixture-partial")
     _seed_isolated_configuration(ctx, fixture_root, ctx.values["orchestration_base_url"])
+    if str(ctx.case_id) == "TC-ORCH-PARTIAL-006" and running is not None:
+        from .orchestration_tail import install_recovery_probe
+        install_recovery_probe(ctx, running.application)
     if str(ctx.case_id) == "TC-ORCH-WORKER-004":
         from . import orchestration_workers
         orchestration_workers.setup(ctx)
@@ -67,7 +70,8 @@ def _seed_isolated_configuration(ctx: Any, fixture_root: Path, base_url: str) ->
     subprocess.run(["git", "init", "--quiet", str(project)], check=True)
     subprocess.run(["git", "-C", str(project), "-c", "user.name=QA Fixture", "-c", "user.email=qa@example.invalid", "add", "."], check=True)
     subprocess.run(["git", "-C", str(project), "-c", "user.name=QA Fixture", "-c", "user.email=qa@example.invalid", "-c", "commit.gpgsign=false", "commit", "--quiet", "-m", "fixture baseline"], check=True)
-    model = "fixture-partial" if "PARTIAL" in str(ctx.case_id).upper() else "fixture-complete"
+    model = "fixture-tail-partial" if str(ctx.case_id) == "TC-ORCH-PARTIAL-006" else (
+        "fixture-partial" if "PARTIAL" in str(ctx.case_id).upper() else "fixture-complete")
     resources = []
     for protocol in ("openai_chat", "openai_responses", "anthropic_messages"):
         resources.append(dict(id=protocol, name=protocol, kind="api", protocol=protocol,
@@ -114,6 +118,8 @@ API_CASES = {
                             "intents": ["plan"], "items": ["design", "contract", "tests"]},
     "TC-ORCH-003": {"requests": ["openai_responses"], "intents": ["review"], "items": ["review"]},
     "TC-ORCH-005": {"requests": ["openai_chat"], "intents": ["plan"], "items": ["design", "contract", "tests"]},
+    "TC-ORCH-PARTIAL-006": {"requests": ["anthropic_messages", "anthropic_messages"],
+                             "intents": ["plan"], "items": ["design", "contract", "tests"]},
 }
 
 
@@ -150,7 +156,7 @@ def _verify_native(ctx: Any, events: list[dict]) -> dict:
            or event.get("streaming") is not True or not event.get("request_sha256")
            or event.get("tool_name") is not None or event.get("worker_digest") is not None for event in events):
         raise AssertionError("native API receipt is not an independent successful streaming generation")
-    scenarios = ["partial", "complete"] if str(ctx.case_id) == "TC-ORCH-PARTIAL-002" else ["complete"] * len(events)
+    scenarios = ["partial", "complete"] if len(expectation["requests"]) == 2 else ["complete"] * len(events)
     if [event.get("scenario") for event in events] != scenarios:
         raise AssertionError("partial/recovery fixture sequence is incorrect")
     if len({event["request_id"] for event in events}) != len(events):
@@ -225,8 +231,13 @@ def _verify_native(ctx: Any, events: list[dict]) -> dict:
                     or profiles["name"] != "Updated shared defaults"
                     or runs[0]["settingsSnapshot"]["revision"] >= runs[1]["settingsSnapshot"]["revision"]):
                 raise AssertionError("shared settings save/cancel rewrote a historical snapshot")
+    if str(ctx.case_id) == "TC-ORCH-PARTIAL-006":
+        from .orchestration_tail import verify_recovery_probe
+        prefix = verify_recovery_probe(ctx, receipts)
+    else:
+        prefix = None
     return {"scope": "native_product_api_http_sqlite_candidate_files", "case_id": str(ctx.case_id),
-            "status": "passed", "requests": events, "runs": receipts}
+            "status": "passed", "requests": events, "runs": receipts, "pre_recovery_prefix": prefix}
 
 
 def teardown(ctx: Any) -> None:
